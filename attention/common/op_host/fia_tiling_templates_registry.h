@@ -35,9 +35,9 @@ using FiaTilingClassCase = std::unique_ptr<FiaTilingBase> (*)(gert::TilingContex
 
 class FiaTilingCases {
 public:
-    explicit FiaTilingCases(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit FiaTilingCases(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
     template <typename T>
     void AddTiling(int32_t priority)
@@ -146,16 +146,16 @@ private:
 
 class FiaRegister {
 public:
-    explicit FiaRegister(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit FiaRegister(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
     template <typename T>
     FiaRegister &tiling(int32_t priority, int32_t soc_version)
     {
         auto tilingCases = FiaTilingRegistry::GetInstance().RegisterOp(op_type_, soc_version);
         OP_CHECK_IF(tilingCases == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please the op name."),
+                    OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please check the op name."),
                     return *this);
         tilingCases->AddTiling<T>(priority);
         return *this;
@@ -167,7 +167,7 @@ public:
         for (int32_t soc_version : soc_versions) {
             auto tilingCases = FiaTilingRegistry::GetInstance().RegisterOp(op_type_, soc_version);
             OP_CHECK_IF(tilingCases == nullptr,
-                        OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please the op name."),
+                        OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please check the op name."),
                         return *this);
             tilingCases->AddTiling<T>(priority);
         }
@@ -180,8 +180,8 @@ private:
 
 // op_type: 算子名称， class_name: 注册的 tiling 类, soc_version：芯片版本号
 // priority: tiling 类的优先级, 越小表示优先级越高, 即会优先选择这个tiling类
-#define REGISTER_TILING_TEMPLATE_FIA(op_type, class_name, soc_versions, priority)                                      \
-    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority;                            \
-    static FiaRegister VAR_UNUSED##op_type##class_name##priority_register =                                            \
+#define REGISTER_TILING_TEMPLATE_FIA(op_type, class_name, soc_versions, priority) \
+    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority; \
+    static FiaRegister VAR_UNUSED##op_type##class_name##priority_register = \
         FiaRegister(#op_type).tiling<class_name>(priority, soc_versions)
 } // namespace optiling

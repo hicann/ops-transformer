@@ -25,7 +25,7 @@
 
 namespace optiling {
 
-template <typename T> 
+template <typename T>
 std::unique_ptr<FiaTilingBase> TILING_CLASS(gert::TilingContext *context)
 {
     return std::unique_ptr<T>(new (std::nothrow) T(context));
@@ -35,15 +35,15 @@ using FiaTilingClassCase = std::unique_ptr<FiaTilingBase> (*)(gert::TilingContex
 
 class FiaTilingCases {
 public:
-    explicit FiaTilingCases(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit FiaTilingCases(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
-    template <typename T> 
+    template <typename T>
     void AddTiling(int32_t priority)
     {
         OP_CHECK_IF(cases_.find(priority) != cases_.end(),
-                   OPS_REPORT_VECTOR_INNER_ERR(op_type_, "There are duplicate registrations."), return);
+                    OPS_REPORT_VECTOR_INNER_ERR(op_type_, "There are duplicate registrations."), return);
         cases_[priority] = TILING_CLASS<T>;
         OP_CHECK_IF(
             cases_[priority] == nullptr,
@@ -72,8 +72,7 @@ public:
         return registry_impl_;
     }
 
-    std::shared_ptr<FiaTilingCases> RegisterOp(const std::string &op_type,
-                                            int32_t soc_version)
+    std::shared_ptr<FiaTilingCases> RegisterOp(const std::string &op_type, int32_t soc_version)
     {
         auto soc_iter = registry_map_.find(soc_version);
         if (soc_iter == registry_map_.end()) {
@@ -82,8 +81,7 @@ public:
             registry_map_[soc_version] = op_type_map;
         } else {
             if (soc_iter->second.find(op_type) == soc_iter->second.end()) {
-                soc_iter->second[op_type] =
-                    std::shared_ptr<FiaTilingCases>(new (std::nothrow) FiaTilingCases(op_type));
+                soc_iter->second[op_type] = std::shared_ptr<FiaTilingCases>(new (std::nothrow) FiaTilingCases(op_type));
             }
         }
 
@@ -127,8 +125,7 @@ public:
         return ge::GRAPH_FAILED;
     }
 
-    const std::map<int32_t, FiaTilingClassCase> &GetTilingTemplates(const std::string &op_type,
-                                                                    int32_t soc_version)
+    const std::map<int32_t, FiaTilingClassCase> &GetTilingTemplates(const std::string &op_type, int32_t soc_version)
     {
         auto soc_iter = registry_map_.find(soc_version);
         OP_CHECK_IF(soc_iter == registry_map_.end(),
@@ -149,29 +146,29 @@ private:
 
 class FiaRegister {
 public:
-    explicit FiaRegister(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit FiaRegister(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
-    template <typename T> 
+    template <typename T>
     FiaRegister &tiling(int32_t priority, int32_t soc_version)
     {
         auto tilingCases = FiaTilingRegistry::GetInstance().RegisterOp(op_type_, soc_version);
         OP_CHECK_IF(tilingCases == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please the op name."),
+                    OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please check the op name."),
                     return *this);
         tilingCases->AddTiling<T>(priority);
         return *this;
     }
 
-    template <typename T> 
-    FiaRegister &tiling(int32_t priority, const std::vector<int32_t>& soc_versions)
+    template <typename T>
+    FiaRegister &tiling(int32_t priority, const std::vector<int32_t> &soc_versions)
     {
         for (int32_t soc_version : soc_versions) {
             auto tilingCases = FiaTilingRegistry::GetInstance().RegisterOp(op_type_, soc_version);
             OP_CHECK_IF(tilingCases == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please the op name."),
-                    return *this);
+                        OPS_REPORT_VECTOR_INNER_ERR(op_type_, "Register op tiling failed, please check the op name."),
+                        return *this);
             tilingCases->AddTiling<T>(priority);
         }
         return *this;
@@ -184,7 +181,7 @@ private:
 // op_type: 算子名称， class_name: 注册的 tiling 类, soc_version：芯片版本号
 // priority: tiling 类的优先级, 越小表示优先级越高, 即会优先选择这个tiling类
 #define REGISTER_TILING_TEMPLATE_FIA(op_type, class_name, soc_versions, priority) \
-        [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority;          \
-        static FiaRegister VAR_UNUSED##op_type##class_name##priority_register = \
-                FiaRegister(#op_type).tiling<class_name>(priority, soc_versions)
+    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority; \
+    static FiaRegister VAR_UNUSED##op_type##class_name##priority_register = \
+        FiaRegister(#op_type).tiling<class_name>(priority, soc_versions)
 } // namespace optiling

@@ -754,7 +754,7 @@ bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum &s
             preTokens = s1Size;
             nextTokens = s2Size - s1Size;
             OP_LOGD(context_,
-                    "Unequal s, sparseType rightDownCasual reset to band, and reset preTokens[%ld] "
+                    "Unequal s, sparseType rightDownCausal reset to band, and reset preTokens[%ld] "
                     "and nextTokens[%ld].",
                     preTokens, nextTokens);
             sparseType = SparseEnum::BAND;
@@ -928,7 +928,7 @@ bool FlashAttentionScoreTilingBase::SetPseAlibiParams()
         auto pseS2Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 1);
         if (pseS1Size == PSE_ALIBI_S_SIZE && s1Size > PSE_ALIBI_S_SIZE && pseS2Size == s2Size) {
             if (s1Size != s2Size) {
-                OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 lager than 1024");
+                OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 larger than 1024");
                 return false;
             }
         }
@@ -1340,13 +1340,12 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
             bSize = actualSeqQLen;
             accumS1 = std::accumulate(actualSeqLenData.begin(), actualSeqLenData.end(), 0LL);
             accumS2 = std::accumulate(actualSeqLenKvData.begin(), actualSeqLenKvData.end(), 0LL);
-            OP_CHECK_IF(
-                (t1Size < accumS1 || t2Size < accumS2) && (!isMaxWorkspace),
-                OP_LOGE(
-                    opName,
-                    "Query T(%ld) and key T(%ld) need larger than respectively sum of seqLen(%ld) and sekvLen(%ld).",
-                    t1Size, t2Size, accumS1, accumS2),
-                return false);
+            OP_CHECK_IF((t1Size < accumS1 || t2Size < accumS2) && (!isMaxWorkspace),
+                        OP_LOGE(opName,
+                                "Query T(%ld) and key T(%ld) need to be larger than the sum of seqLen(%ld) and "
+                                "seqlenKv(%ld) respectively.",
+                                t1Size, t2Size, accumS1, accumS2),
+                        return false);
             // 校验EOD场景尾部是否补0
             if (t1Size > accumS1 && t2Size > accumS2) {
                 if ((endQLen != 0 || endKvLen != 0) && (!isMaxWorkspace)) {
@@ -3637,7 +3636,7 @@ protected:
                                 OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
                     pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 } else {
-                    OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 lager than 1024");
+                    OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 larger than 1024");
                     return false;
                 }
             }
@@ -3927,7 +3926,7 @@ protected:
                                 OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
                     pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 } else {
-                    OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 lager than 1024");
+                    OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 larger than 1024");
                     return false;
                 }
             }
@@ -4310,7 +4309,7 @@ protected:
             int64_t lastS2 = actualSeqLenKvData[bandIndex];
             if (preTokens < lastS2 || nextTokens > 0) {
                 OP_LOGE(context_,
-                        "RightDownCausal_Band mode: pre_tokens[%ld] is smaller than last valid s2[%ld]"
+                        "RightDownCausal_Band mode: pre_tokens[%ld] is smaller than last valid s2[%ld] "
                         "or next_tokens[%ld] is larger than 0, wrong config.",
                         preTokens, lastS2, nextTokens);
                 return false;

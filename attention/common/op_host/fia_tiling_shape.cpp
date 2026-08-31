@@ -110,12 +110,12 @@ const std::map<FiaCompareType, CompareFunc<int64_t>> FiaTilingShapeCompare::comp
 std::string LayoutToSerialString(FiaLayout layout)
 {
     const std::map<FiaLayout, std::string> layout2Str = {
-        {FiaLayout::BSH, "BSH"},       {FiaLayout::BSND, "BSND"},     {FiaLayout::BNSD, "BNSD"},
-        {FiaLayout::NZ, "NZ"},         {FiaLayout::TND, "TND"},       {FiaLayout::NBSD, "NBSD"},
-        {FiaLayout::NTD, "NTD"},       {FiaLayout::S1S2, "S1S2"},     {FiaLayout::BS2, "BS2"},
-        {FiaLayout::BnBsH, "BnBsH"},   {FiaLayout::BnNBsD, "BnNBsD"}, {FiaLayout::BNS1S2, "BNS1S2"},
-        {FiaLayout::INS1S2, "1NS1S2"}, {FiaLayout::BNS11, "BNS11"},   {FiaLayout::TN1, "TN1"},
-        {FiaLayout::BS1S2, "BS1S2"},   {FiaLayout::B1S1S2, "B1S1S2"}, {FiaLayout::IS1S2, "1S1S2"},
+        {FiaLayout::BSH, "BSH"},       {FiaLayout::BSND, "BSND"},       {FiaLayout::BNSD, "BNSD"},
+        {FiaLayout::NZ, "NZ"},         {FiaLayout::TND, "TND"},         {FiaLayout::NBSD, "NBSD"},
+        {FiaLayout::NTD, "NTD"},       {FiaLayout::S1S2, "S1S2"},       {FiaLayout::BS2, "BS2"},
+        {FiaLayout::BnBsH, "BnBsH"},   {FiaLayout::BnNBsD, "BnNBsD"},   {FiaLayout::BNS1S2, "BNS1S2"},
+        {FiaLayout::INS1S2, "1NS1S2"}, {FiaLayout::BNS11, "BNS11"},     {FiaLayout::TN1, "TN1"},
+        {FiaLayout::BS1S2, "BS1S2"},   {FiaLayout::B1S1S2, "B1S1S2"},   {FiaLayout::IS1S2, "1S1S2"},
         {FiaLayout::I1S1S2, "11S1S2"}, {FiaLayout::PA_BBND, "PA_BBND"}, {FiaLayout::PA_BNBD, "PA_BNBD"},
         {FiaLayout::PA_NZ, "PA_NZ"},   {FiaLayout::LSE_BNS, "LSE_BNS"}, {FiaLayout::LSE_NT, "LSE_NT"}};
 
@@ -125,7 +125,7 @@ std::string LayoutToSerialString(FiaLayout layout)
     return "UNKNOWN";
 }
 
-static const std::string AXIS_SERIAL_STRINGS[] = {"B", "S", "N", "D", "H", "T", "D1",
+static const std::string AXIS_SERIAL_STRINGS[] = {"B",  "S",  "N",  "D",  "H",  "T",    "D1",
                                                   "D0", "S1", "S2", "Bn", "Bs", "CONST"};
 
 std::string AxisToSerialString(FiaAxis axis)
@@ -194,7 +194,7 @@ ge::graphStatus FiaTilingShape::CheckHasAxis(const FiaAxis &axis, const std::str
                     LayoutToSerialString(layout_).c_str());
             return ge::GRAPH_FAILED;
         } else if (!hasSetN_) {
-            OP_LOGE(opName_, "[%s] %s's N is not specified, cannot caculate D by H.", funcName.c_str(), name_.c_str());
+            OP_LOGE(opName_, "[%s] %s's N is not specified, cannot calculate D by H.", funcName.c_str(), name_.c_str());
             return ge::GRAPH_FAILED;
         } else if (N_ == 0) {
             OP_LOGE(opName_, "[%s] %s's N is 0.", funcName.c_str(), name_.c_str());
@@ -208,7 +208,7 @@ ge::graphStatus FiaTilingShape::CheckHasAxis(const FiaAxis &axis, const std::str
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_LOGE(opName_, "[%s] %s's layout is %s, %s is not exists.", funcName.c_str(), name_.c_str(),
+    OP_LOGE(opName_, "[%s] %s's layout is %s, %s does not exist.", funcName.c_str(), name_.c_str(),
             LayoutToSerialString(layout_).c_str(), AxisToSerialString(axis).c_str());
     return ge::GRAPH_FAILED;
 }

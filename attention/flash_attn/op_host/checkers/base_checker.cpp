@@ -34,14 +34,15 @@ ge::graphStatus FABaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDe
         const auto &it = DTYPE_SUPPORT_MAP.find(name);
         OP_CHECK_IF(
             it == DTYPE_SUPPORT_MAP.end(),
-            OP_LOGE("FlashAttn", "%s datatype support list should be specify in DTYPE_SUPPORT_MAP", name.c_str()),
+            OP_LOGE("FlashAttn", "%s datatype support list should be specified in DTYPE_SUPPORT_MAP", name.c_str()),
             return ge::GRAPH_FAILED);
         auto &expectDtypeList = it->second;
         if (std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end()) {
             std::string dtypeStr = DataTypeToSerialString(desc->GetDataType());
             std::string expectedDtypes;
             for (size_t i = 0; i < expectDtypeList.size(); i++) {
-                if (i > 0) expectedDtypes += ", ";
+                if (i > 0)
+                    expectedDtypes += ", ";
                 expectedDtypes += DataTypeToSerialString(expectDtypeList[i]);
             }
             OP_LOGE_FOR_INVALID_DTYPE("FlashAttn", name.c_str(), dtypeStr.c_str(), expectedDtypes.c_str());
@@ -57,8 +58,8 @@ ge::graphStatus FABaseChecker::CheckFormatSupport(const gert::CompileTimeTensorD
     if (desc != nullptr) {
         auto format = desc->GetOriginFormat();
         OP_CHECK_IF((FORMAT_SUPPORT_SET.find(format) == FORMAT_SUPPORT_SET.end()),
-            OP_LOGE_FOR_INVALID_FORMAT("FlashAttn", name.c_str(), Ops::Base::ToString(format).c_str(), "ND"),
-                return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_FORMAT("FlashAttn", name.c_str(), Ops::Base::ToString(format).c_str(), "ND"),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -69,7 +70,7 @@ std::string FABaseChecker::DataTypeToSerialString(ge::DataType type) const
     if (it != DATATYPE_TO_STRING_MAP.end()) {
         return it->second;
     } else {
-        OP_LOGE("FlashAttn", "datatype %d not support", type);
+        OP_LOGE("FlashAttn", "datatype %d is not supported", type);
         return "UNDEFINED";
     }
 }

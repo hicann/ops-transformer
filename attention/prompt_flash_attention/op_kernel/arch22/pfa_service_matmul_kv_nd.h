@@ -31,35 +31,40 @@
 template <typename INPUT_T, typename T, bool pageAttention = false>
 class PfaMatmulKvNd {
 public:
-    __aicore__ inline PfaMatmulKvNd() {};
-    __aicore__ inline void InitParams(uint32_t dSize, uint32_t valueDSize, uint32_t ropeDSize, uint32_t valueNSize, int64_t mm1Ka, int64_t mm1Kb, int64_t mm1RopeKa, int64_t mm1RopeKb, int64_t mm2Kb);
+    __aicore__ inline PfaMatmulKvNd(){};
+    __aicore__ inline void InitParams(uint32_t dSize, uint32_t valueDSize, uint32_t ropeDSize, uint32_t valueNSize,
+                                      int64_t mm1Ka, int64_t mm1Kb, int64_t mm1RopeKa, int64_t mm1RopeKb,
+                                      int64_t mm2Kb);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<INPUT_T> queryGm, GlobalTensor<INPUT_T> keyGm,
                                                GlobalTensor<INPUT_T> qRopeGm, GlobalTensor<INPUT_T> kRopeGm,
                                                GlobalTensor<T> mm1ResGm[2]);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<INPUT_T> vec1ResGm[2], GlobalTensor<INPUT_T> valueGm,
                                                GlobalTensor<T> mm2ResGm[2], GlobalTensor<INPUT_T> attentionOutGm);
-    __aicore__ inline void InitPageAttentionInfo(GlobalTensor<int32_t> blockTableGm, uint32_t blockSize, uint32_t maxBlockNumPerBatch);
+    __aicore__ inline void InitPageAttentionInfo(GlobalTensor<int32_t> blockTableGm, uint32_t blockSize,
+                                                 uint32_t maxBlockNumPerBatch);
     __aicore__ inline void InitBuffers(TPipe *pipe);
     __aicore__ inline void UpdateKey(GlobalTensor<INPUT_T> keyGm);
     __aicore__ inline void UpdateValue(GlobalTensor<INPUT_T> valueGm);
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    template <CubeFormat OutFormat=CubeFormat::NZ>
+    template <CubeFormat OutFormat = CubeFormat::NZ>
     __aicore__ inline void ComputeMm1(const SplitSameABExtraInfo &info);
-    template <CubeFormat AFormat, CubeFormat OutFormat=CubeFormat::NZ>
+    template <CubeFormat AFormat, CubeFormat OutFormat = CubeFormat::NZ>
     __aicore__ inline void ComputeMm2(const SplitSameABExtraInfo &info);
 
     template <uint32_t M_L1_SIZE>
     __aicore__ inline void ResetLoad3DConfig();
 
 protected:
-    template <typename T1> static __aicore__ inline T1 Align(T1 num, T1 rnd)
+    template <typename T1>
+    static __aicore__ inline T1 Align(T1 num, T1 rnd)
     {
-        return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+        return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
     }
 
-    template <typename T1> static __aicore__ inline size_t BlockAlign(size_t s)
+    template <typename T1>
+    static __aicore__ inline size_t BlockAlign(size_t s)
     {
         if constexpr (IsSameType<T1, int4b_t>::value) {
             return (s + 63) / 64 * 64;
@@ -68,64 +73,69 @@ protected:
         return (s + n - 1) / n * n;
     }
 
-    __aicore__ inline void CopyNDGmToL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor, 
+    __aicore__ inline void CopyNDGmToL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor,
                                         uint32_t srcN, uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyNDGmToZZL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor, 
-                                        uint32_t srcN, uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyNZGmToL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor, 
+    __aicore__ inline void CopyNDGmToZZL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor,
+                                          uint32_t srcN, uint32_t srcD, uint32_t srcDstride);
+    __aicore__ inline void CopyNZGmToL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor,
                                         uint32_t srcN, uint32_t srcD, uint32_t srcNstride);
-    __aicore__ inline void LoadDataAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                        uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize,
-                                        uint32_t subKStart, uint32_t subKSize);
-    __aicore__ inline void LoadDataZZAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                        uint32_t kL1Size, uint32_t subMStart, uint32_t subMSize,
-                                        uint32_t subKStart, uint32_t subKSize);
-    __aicore__ inline void Load3DDataAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                        uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize,
-                                        uint32_t subKStart, uint32_t subKSize);
-    __aicore__ inline void Load3DDataAToL0NonFMatrix(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                        uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize,
-                                        uint32_t subKStart, uint32_t subKSize);
-    __aicore__ inline void LoadDataBTransposeToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor, 
-                                        uint32_t nL1Size, uint32_t subNStart, uint32_t subNSize,
-                                        uint32_t subKStart, uint32_t subKSize);
-    __aicore__ inline void LoadDataBToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor, 
-                                        uint32_t kL1Size, uint32_t subKStart, uint32_t subKSize,
-                                        uint32_t subNStart, uint32_t subNSize);
-    __aicore__ inline void LoadDataZZBToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor, 
-                                        uint32_t kL1Size, uint32_t subKStart, uint32_t subKSize,
-                                        uint32_t subNStart, uint32_t subNSize);
+    __aicore__ inline void LoadDataAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor,
+                                         uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+                                         uint32_t subKSize);
+    __aicore__ inline void LoadDataZZAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor,
+                                           uint32_t kL1Size, uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+                                           uint32_t subKSize);
+    __aicore__ inline void Load3DDataAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor,
+                                           uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+                                           uint32_t subKSize);
+    __aicore__ inline void Load3DDataAToL0NonFMatrix(LocalTensor<INPUT_T> &aL0Tensor,
+                                                     const LocalTensor<INPUT_T> &aL1Tensor, uint32_t mL1Size,
+                                                     uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+                                                     uint32_t subKSize);
+    __aicore__ inline void LoadDataBTransposeToL0(LocalTensor<INPUT_T> &bL0Tensor,
+                                                  const LocalTensor<INPUT_T> &bL1Tensor, uint32_t nL1Size,
+                                                  uint32_t subNStart, uint32_t subNSize, uint32_t subKStart,
+                                                  uint32_t subKSize);
+    __aicore__ inline void LoadDataBToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor,
+                                         uint32_t kL1Size, uint32_t subKStart, uint32_t subKSize, uint32_t subNStart,
+                                         uint32_t subNSize);
+    __aicore__ inline void LoadDataZZBToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor,
+                                           uint32_t kL1Size, uint32_t subKStart, uint32_t subKSize, uint32_t subNStart,
+                                           uint32_t subNSize);
     template <CubeFormat GMFormat>
-    __aicore__ inline void FixpipeL0CToGM(GlobalTensor<T> &cGmTensor, const LocalTensor<T> &cL0Tensor, 
-                                        uint32_t dstStride, uint32_t subMStart, uint32_t subMSize,
-                                        uint32_t subNStart, uint32_t subNSize);
+    __aicore__ inline void FixpipeL0CToGM(GlobalTensor<T> &cGmTensor, const LocalTensor<T> &cL0Tensor,
+                                          uint32_t dstStride, uint32_t subMStart, uint32_t subMSize, uint32_t subNStart,
+                                          uint32_t subNSize);
     __aicore__ inline void CopyInMm1AToL1(LocalTensor<INPUT_T> &aL1Tensor, const SplitSameABExtraInfo &info);
     __aicore__ inline void CopyInMm1RopeAToL1(LocalTensor<INPUT_T> &aRopeL1Tensor, const SplitSameABExtraInfo &info);
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &info, 
-                                        uint32_t subNStart, uint32_t subNSize);
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &info,
+                                          uint32_t subNStart, uint32_t subNSize);
     __aicore__ inline void CopyInMm1BToL1ForPA(LocalTensor<INPUT_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
-                                            uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
-                                            uint32_t nActCopyRowCount, PaCacheLayoutType paCacheLayoutType);
-    __aicore__ inline void CopyInMm1RopeBToL1(LocalTensor<INPUT_T> &bRopeL1Tensor, const SplitSameABExtraInfo &info, 
-                                        uint32_t subNStart, uint32_t subNSize);
-    __aicore__ inline void CopyInMm1RopeBToL1ForPA(LocalTensor<INPUT_T> &bRopeL1Tensor, const uint64_t kRopeGmBaseOffset,
-                                            uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
-                                            uint32_t nActCopyRowCount, PaCacheLayoutType paCacheLayoutType);
+                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
+                                               uint32_t nActCopyRowCount, PaCacheLayoutType paCacheLayoutType);
+    __aicore__ inline void CopyInMm1RopeBToL1(LocalTensor<INPUT_T> &bRopeL1Tensor, const SplitSameABExtraInfo &info,
+                                              uint32_t subNStart, uint32_t subNSize);
+    __aicore__ inline void CopyInMm1RopeBToL1ForPA(LocalTensor<INPUT_T> &bRopeL1Tensor,
+                                                   const uint64_t kRopeGmBaseOffset, uint32_t copyTotalRowCntAlign,
+                                                   uint32_t copyStartRowCnt, uint32_t nActCopyRowCount,
+                                                   PaCacheLayoutType paCacheLayoutType);
     template <CubeFormat AFormat>
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &aL1Tensor, const SplitSameABExtraInfo &info, 
-                                        uint32_t gmStride, uint32_t subMStart, uint32_t subMSize,
-                                        uint32_t subKStart, uint32_t subKSize);
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &aL1Tensor, const SplitSameABExtraInfo &info,
+                                          uint32_t gmStride, uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+                                          uint32_t subKSize);
     template <uint32_t KL0_SPLITE_SIZE>
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &info, 
-                                        uint32_t subKStart, uint32_t subKSize);
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &info,
+                                          uint32_t subKStart, uint32_t subKSize);
     template <uint32_t KL0_SPLITE_SIZE>
     __aicore__ inline void CopyInMm2BToL1ForPA(LocalTensor<INPUT_T> &bL1Tensor, const uint64_t valueGmBaseOffset,
-                                            uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt, uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
-                                            uint32_t copyColumnCount, PaCacheLayoutType paCacheLayoutType);
-    
+                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
+                                               uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
+                                               uint32_t copyColumnCount, PaCacheLayoutType paCacheLayoutType);
+
     __aicore__ inline LocalTensor<INPUT_T> CopyQToL1(const SplitSameABExtraInfo &info, uint32_t mL1Size);
     template <uint32_t KL0_SPLITE_SIZE>
-    __aicore__ inline LocalTensor<INPUT_T> CopyVToL1(const SplitSameABExtraInfo &info, uint32_t subKStart, uint32_t subKSize);
+    __aicore__ inline LocalTensor<INPUT_T> CopyVToL1(const SplitSameABExtraInfo &info, uint32_t subKStart,
+                                                     uint32_t subKSize);
 
 protected:
     // mm1
@@ -159,8 +169,8 @@ protected:
 
 private:
     // L1
-    static constexpr uint32_t L1_1_SIZE = 192 * 1024; // 192KB
-    static constexpr uint32_t L1_2_SIZE = 64 * 1024; // 64KB
+    static constexpr uint32_t L1_1_SIZE = 192 * 1024;          // 192KB
+    static constexpr uint32_t L1_2_SIZE = 64 * 1024;           // 64KB
     static constexpr uint32_t L1_1_SIZE_WOKSPLIT = 128 * 1024; // D等长=128，不切K轴场景
     static constexpr uint32_t L1_2_SIZE_WOKSPLIT = 128 * 1024; // D等长=128，不切K轴场景
 
@@ -190,12 +200,12 @@ private:
     TBuf<TPosition::A1> L1_1;
     TBuf<TPosition::A1> L1_2;
 
-    LocalTensor<INPUT_T> qL1Tensor[2];   // q和v复用L1_1
-    LocalTensor<INPUT_T> kvL1Tensor[2];   // k和p复用L1_2
+    LocalTensor<INPUT_T> qL1Tensor[2];  // q和v复用L1_1
+    LocalTensor<INPUT_T> kvL1Tensor[2]; // k和p复用L1_2
 
     TBuf<TPosition::A2> tmpBufL0A;
     LocalTensor<INPUT_T> aL0TensorPingPong[2];
-    
+
     // L0_B
     TBuf<TPosition::B2> tmpBufL0B;
     LocalTensor<INPUT_T> bL0TensorPingPong[2];
@@ -219,8 +229,11 @@ private:
 };
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitParams(uint32_t dSize, uint32_t valueDSize, uint32_t ropeDSize, uint32_t valueNSize,
-                                        int64_t mm1Ka, int64_t mm1Kb, int64_t mm1RopeKa, int64_t mm1RopeKb, int64_t mm2Kb)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitParams(uint32_t dSize, uint32_t valueDSize,
+                                                                            uint32_t ropeDSize, uint32_t valueNSize,
+                                                                            int64_t mm1Ka, int64_t mm1Kb,
+                                                                            int64_t mm1RopeKa, int64_t mm1RopeKb,
+                                                                            int64_t mm2Kb)
 {
     this->dSize = dSize;
     this->valueDSize = valueDSize;
@@ -285,9 +298,11 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitParams(uint
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitMm1GlobalTensor(GlobalTensor<INPUT_T> queryGm, GlobalTensor<INPUT_T> keyGm,
-                                                                      GlobalTensor<INPUT_T> qRopeGm, GlobalTensor<INPUT_T> kRopeGm,
-                                                                      GlobalTensor<T> mm1ResGm[2])
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitMm1GlobalTensor(GlobalTensor<INPUT_T> queryGm,
+                                                                                     GlobalTensor<INPUT_T> keyGm,
+                                                                                     GlobalTensor<INPUT_T> qRopeGm,
+                                                                                     GlobalTensor<INPUT_T> kRopeGm,
+                                                                                     GlobalTensor<T> mm1ResGm[2])
 {
     // mm1
     this->queryGm = queryGm;
@@ -299,8 +314,9 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitMm1GlobalTe
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitMm2GlobalTensor(GlobalTensor<INPUT_T> vec1ResGm[2], GlobalTensor<INPUT_T> valueGm,
-                                            GlobalTensor<T> mm2ResGm[2], GlobalTensor<INPUT_T> attentionOutGm)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitMm2GlobalTensor(
+    GlobalTensor<INPUT_T> vec1ResGm[2], GlobalTensor<INPUT_T> valueGm, GlobalTensor<T> mm2ResGm[2],
+    GlobalTensor<INPUT_T> attentionOutGm)
 {
     // mm2
     this->vec1ResGm[0] = vec1ResGm[0];
@@ -312,7 +328,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitMm2GlobalTe
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitPageAttentionInfo(GlobalTensor<int32_t> blockTableGm, uint32_t blockSize, uint32_t maxBlockNumPerBatch)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::InitPageAttentionInfo(
+    GlobalTensor<int32_t> blockTableGm, uint32_t blockSize, uint32_t maxBlockNumPerBatch)
 {
     this->blockTableGm = blockTableGm;
     this->kvCacheBlockSize = blockSize;
@@ -384,8 +401,10 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::FreeEventID()
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNDGmToL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor, 
-                                    uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNDGmToL1(LocalTensor<INPUT_T> &l1Tensor,
+                                                                              const GlobalTensor<INPUT_T> &gmSrcTensor,
+                                                                              uint32_t srcN, uint32_t srcD,
+                                                                              uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -400,10 +419,13 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNDGmToL1(Lo
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNDGmToZZL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor, 
-                                                                 uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNDGmToZZL1(
+    LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN, uint32_t srcD,
+    uint32_t srcDstride)
 {
-    ASCENDC_ASSERT(srcDstride < 65536, { KERNEL_LOG(KERNEL_ERROR, "srcDstride must less than 65536, current value is %u", srcDstride); });
+    ASCENDC_ASSERT(srcDstride < 65536, {
+        KERNEL_LOG(KERNEL_ERROR, "srcDstride must be less than 65536, current value is %u", srcDstride);
+    });
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = CeilDiv(srcN, BLOCK_CUBE);
     nd2nzPara.nValue = BLOCK_CUBE; // 行数
@@ -417,8 +439,10 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNDGmToZZL1(
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNZGmToL1(LocalTensor<INPUT_T> &l1Tensor, const GlobalTensor<INPUT_T> &gmSrcTensor, 
-                                                               uint32_t srcN, uint32_t srcD, uint32_t srcNstride)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNZGmToL1(LocalTensor<INPUT_T> &l1Tensor,
+                                                                              const GlobalTensor<INPUT_T> &gmSrcTensor,
+                                                                              uint32_t srcN, uint32_t srcD,
+                                                                              uint32_t srcNstride)
 {
     DataCopyParams param;
     param.blockCount = CeilDiv(srcD, GetC0Num<INPUT_T>());
@@ -429,9 +453,11 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyNZGmToL1(Lo
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                                                uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize,
-                                                                uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataAToL0(LocalTensor<INPUT_T> &aL0Tensor,
+                                                                               const LocalTensor<INPUT_T> &aL1Tensor,
+                                                                               uint32_t mL1Size, uint32_t subMStart,
+                                                                               uint32_t subMSize, uint32_t subKStart,
+                                                                               uint32_t subKSize)
 {
     constexpr uint32_t ROWS_PER_FRAC = BLOCK_CUBE;
     LoadData2DParams loadData2DParams;
@@ -445,14 +471,17 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataAToL0(L
 
     uint32_t mLoops = subMSize / ROWS_PER_FRAC;
     for (uint32_t i = 0; i < mLoops; i++) {
-        LoadData(aL0Tensor[i * ROWS_PER_FRAC * subKSize], srcTensor[i * ROWS_PER_FRAC * GetC0Num<INPUT_T>()], loadData2DParams);
+        LoadData(aL0Tensor[i * ROWS_PER_FRAC * subKSize], srcTensor[i * ROWS_PER_FRAC * GetC0Num<INPUT_T>()],
+                 loadData2DParams);
     }
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataZZAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                                                  uint32_t kL1Size, uint32_t subMStart, uint32_t subMSize,
-                                                                  uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataZZAToL0(LocalTensor<INPUT_T> &aL0Tensor,
+                                                                                 const LocalTensor<INPUT_T> &aL1Tensor,
+                                                                                 uint32_t kL1Size, uint32_t subMStart,
+                                                                                 uint32_t subMSize, uint32_t subKStart,
+                                                                                 uint32_t subKSize)
 {
     LoadData2DParams loadData2DParams;
     loadData2DParams.startIndex = 0;
@@ -466,9 +495,11 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataZZAToL0
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::Load3DDataAToL0(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                                                  uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize,
-                                                                  uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::Load3DDataAToL0(LocalTensor<INPUT_T> &aL0Tensor,
+                                                                                 const LocalTensor<INPUT_T> &aL1Tensor,
+                                                                                 uint32_t mL1Size, uint32_t subMStart,
+                                                                                 uint32_t subMSize, uint32_t subKStart,
+                                                                                 uint32_t subKSize)
 {
     loadData3DParams.l1H = mL1Size / BLOCK_CUBE;
     loadData3DParams.mExtension = subMSize;
@@ -480,9 +511,9 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::Load3DDataAToL0
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::Load3DDataAToL0NonFMatrix(LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, 
-                                                                            uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize,
-                                                                            uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::Load3DDataAToL0NonFMatrix(
+    LocalTensor<INPUT_T> &aL0Tensor, const LocalTensor<INPUT_T> &aL1Tensor, uint32_t mL1Size, uint32_t subMStart,
+    uint32_t subMSize, uint32_t subKStart, uint32_t subKSize)
 {
     loadData3DParams.mExtension = subMSize;
     loadData3DParams.kExtension = subKSize;
@@ -493,27 +524,31 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::Load3DDataAToL0
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataBTransposeToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor, 
-                                                                         uint32_t nL1Size, uint32_t subNStart, uint32_t subNSize,
-                                                                         uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataBTransposeToL0(
+    LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor, uint32_t nL1Size, uint32_t subNStart,
+    uint32_t subNSize, uint32_t subKStart, uint32_t subKSize)
 {
     LocalTensor<INPUT_T> srcTensor = bL1Tensor[nL1Size * subKStart][GetC0Num<INPUT_T>() * subNStart];
     if (nL1Size == subNSize) {
-        mm1LoadDataBTransposeToL0Params.repeatTimes = CeilDiv(subKSize, (uint32_t)BLOCK_CUBE) * CeilDiv(subNSize, GetC0Num<INPUT_T>());
+        mm1LoadDataBTransposeToL0Params.repeatTimes =
+            CeilDiv(subKSize, (uint32_t)BLOCK_CUBE) * CeilDiv(subNSize, GetC0Num<INPUT_T>());
         LoadData(bL0Tensor, srcTensor, mm1LoadDataBTransposeToL0Params);
     } else {
         mm1LoadDataBTransposeToL0Params.repeatTimes = CeilDiv(subNSize, (uint32_t)BLOCK_CUBE);
         uint32_t kLoops = subKSize / GetC0Num<INPUT_T>();
         for (uint32_t i = 0; i < kLoops; i++) {
-            LoadData(bL0Tensor[subNSize * i * BLOCK_CUBE], srcTensor[nL1Size * i * GetC0Num<INPUT_T>()], mm1LoadDataBTransposeToL0Params);
+            LoadData(bL0Tensor[subNSize * i * BLOCK_CUBE], srcTensor[nL1Size * i * GetC0Num<INPUT_T>()],
+                     mm1LoadDataBTransposeToL0Params);
         }
     }
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataBToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor, 
-                                                                uint32_t kL1Size, uint32_t subKStart, uint32_t subKSize,
-                                                                uint32_t subNStart, uint32_t subNSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataBToL0(LocalTensor<INPUT_T> &bL0Tensor,
+                                                                               const LocalTensor<INPUT_T> &bL1Tensor,
+                                                                               uint32_t kL1Size, uint32_t subKStart,
+                                                                               uint32_t subKSize, uint32_t subNStart,
+                                                                               uint32_t subNSize)
 {
     constexpr uint32_t ROWS_PER_FRAC = BLOCK_CUBE;
     mm2LoadDataBToL0Params.srcStride = kL1Size / ROWS_PER_FRAC;
@@ -522,14 +557,17 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataBToL0(L
 
     uint32_t kLoops = subKSize / ROWS_PER_FRAC;
     for (uint32_t i = 0; i < kLoops; i++) {
-        LoadData(bL0Tensor[i * ROWS_PER_FRAC * subNSize], srcTensor[i * ROWS_PER_FRAC * GetC0Num<INPUT_T>()], mm2LoadDataBToL0Params);
+        LoadData(bL0Tensor[i * ROWS_PER_FRAC * subNSize], srcTensor[i * ROWS_PER_FRAC * GetC0Num<INPUT_T>()],
+                 mm2LoadDataBToL0Params);
     }
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataZZBToL0(LocalTensor<INPUT_T> &bL0Tensor, const LocalTensor<INPUT_T> &bL1Tensor, 
-                                    uint32_t nL1Size, uint32_t subKStart, uint32_t subKSize,
-                                    uint32_t subNStart, uint32_t subNSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataZZBToL0(LocalTensor<INPUT_T> &bL0Tensor,
+                                                                                 const LocalTensor<INPUT_T> &bL1Tensor,
+                                                                                 uint32_t nL1Size, uint32_t subKStart,
+                                                                                 uint32_t subKSize, uint32_t subNStart,
+                                                                                 uint32_t subNSize)
 {
     LoadData2DParams loadData2DParams;
     loadData2DParams.startIndex = 0;
@@ -544,9 +582,11 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::LoadDataZZBToL0
 
 template <typename INPUT_T, typename T, bool pageAttention>
 template <CubeFormat GMFormat>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::FixpipeL0CToGM(GlobalTensor<T> &cGmTensor, const LocalTensor<T> &cL0Tensor, 
-                                    uint32_t dstStride, uint32_t subMStart, uint32_t subMSize,
-                                    uint32_t subNStart, uint32_t subNSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::FixpipeL0CToGM(GlobalTensor<T> &cGmTensor,
+                                                                                const LocalTensor<T> &cL0Tensor,
+                                                                                uint32_t dstStride, uint32_t subMStart,
+                                                                                uint32_t subMSize, uint32_t subNStart,
+                                                                                uint32_t subNSize)
 {
     FixpipeParamsV220 fixParams;
     fixParams.nSize = subNSize;
@@ -555,7 +595,9 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::FixpipeL0CToGM(
     fixParams.ndNum = 1;
 
     if constexpr (GMFormat == CubeFormat::NZ) {
-        ASCENDC_ASSERT(subNSize % BLOCK_CUBE == 0, { KERNEL_LOG(KERNEL_ERROR, "subNSize must be divisible by 16, current value is %u", subNSize); });
+        ASCENDC_ASSERT(subNSize % BLOCK_CUBE == 0, {
+            KERNEL_LOG(KERNEL_ERROR, "subNSize must be divisible by 16, current value is %u", subNSize);
+        });
         fixParams.dstStride = dstStride * BLOCK_CUBE * sizeof(T) / ONE_BLK_SIZE;
         GlobalTensor<T> dstTensor = cGmTensor[dstStride * subNStart][BLOCK_CUBE * subMStart];
         Fixpipe<T, T, CFG_NZ>(dstTensor, cL0Tensor, fixParams);
@@ -567,7 +609,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::FixpipeL0CToGM(
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1AToL1(LocalTensor<INPUT_T> &aL1Tensor, const SplitSameABExtraInfo &info)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1AToL1(LocalTensor<INPUT_T> &aL1Tensor,
+                                                                                const SplitSameABExtraInfo &info)
 {
     auto srcGm = queryGm[info.qCoreOffset];
 
@@ -576,7 +619,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1AToL1(
         copyInMm1AToL1Params.ndNum = info.gBaseSize;
         copyInMm1AToL1Params.dValue = copyInMm1AToL1Params.dValue;
         copyInMm1AToL1Params.srcNdMatrixStride = copyInMm1AToL1Params.dValue;
-        copyInMm1AToL1Params.dstNzC0Stride = Align<uint32_t>(info.cubeS1RealSize * info.gBaseSize, (uint32_t)BLOCK_CUBE);
+        copyInMm1AToL1Params.dstNzC0Stride =
+            Align<uint32_t>(info.cubeS1RealSize * info.gBaseSize, (uint32_t)BLOCK_CUBE);
         copyInMm1AToL1Params.dstNzMatrixStride = info.cubeS1RealSize * 32 / sizeof(INPUT_T);
         DataCopy(aL1Tensor, srcGm, copyInMm1AToL1Params);
         return;
@@ -586,15 +630,17 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1AToL1(
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1RopeAToL1(LocalTensor<INPUT_T> &aRopeL1Tensor, const SplitSameABExtraInfo &info)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1RopeAToL1(LocalTensor<INPUT_T> &aRopeL1Tensor,
+                                                                                    const SplitSameABExtraInfo &info)
 {
     auto srcGm = qRopeGm[info.qRopeOffset];
     CopyNDGmToL1(aRopeL1Tensor, srcGm, info.cubeS1RealSize, ropeDSize, this->mm1RopeKa);
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &info, 
-                                                                 uint32_t subNStart, uint32_t subNSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor,
+                                                                                const SplitSameABExtraInfo &info,
+                                                                                uint32_t subNStart, uint32_t subNSize)
 {
     auto srcGm = keyGm[info.kCoreOffset + subNStart * this->mm1Kb];
     copyInMm1BToL1Params.nValue = subNSize;
@@ -603,17 +649,19 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1BToL1(
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1RopeBToL1(LocalTensor<INPUT_T> &bRopeL1Tensor, const SplitSameABExtraInfo &info, 
-                                                                     uint32_t subNStart, uint32_t subNSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1RopeBToL1(LocalTensor<INPUT_T> &bRopeL1Tensor,
+                                                                                    const SplitSameABExtraInfo &info,
+                                                                                    uint32_t subNStart,
+                                                                                    uint32_t subNSize)
 {
     auto srcGm = kRopeGm[info.kRopeOffset + subNStart * this->mm1RopeKb];
     CopyNDGmToL1(bRopeL1Tensor, srcGm, subNSize, ropeDSize, this->mm1RopeKb);
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1BToL1ForPA(LocalTensor<INPUT_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
-                                            uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
-                                            uint32_t nActCopyRowCount, PaCacheLayoutType paCacheLayoutType)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1BToL1ForPA(
+    LocalTensor<INPUT_T> &bL1Tensor, const uint64_t keyGmBaseOffset, uint32_t copyTotalRowCntAlign,
+    uint32_t copyStartRowCnt, uint32_t nActCopyRowCount, PaCacheLayoutType paCacheLayoutType)
 {
     uint32_t blockElementCnt = 32 / sizeof(INPUT_T); // CUBE basic block size is 32
     if (IsSameType<INPUT_T, int4b_t>::value) {
@@ -652,9 +700,9 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1BToL1F
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1RopeBToL1ForPA(LocalTensor<INPUT_T> &bRopeL1Tensor, const uint64_t kRopeGmBaseOffset,
-                                            uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
-                                            uint32_t nActCopyRowCount, PaCacheLayoutType paCacheLayoutType)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1RopeBToL1ForPA(
+    LocalTensor<INPUT_T> &bRopeL1Tensor, const uint64_t kRopeGmBaseOffset, uint32_t copyTotalRowCntAlign,
+    uint32_t copyStartRowCnt, uint32_t nActCopyRowCount, PaCacheLayoutType paCacheLayoutType)
 {
     uint32_t blockElementCnt = 32 / sizeof(INPUT_T); // CUBE basic block size is 32
     if (IsSameType<INPUT_T, int4b_t>::value) {
@@ -694,9 +742,11 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm1RopeBT
 
 template <typename INPUT_T, typename T, bool pageAttention>
 template <CubeFormat AFormat>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2AToL1(LocalTensor<INPUT_T> &aL1Tensor, const SplitSameABExtraInfo &info, 
-                                    uint32_t gmStride, uint32_t subMStart, uint32_t subMSize,
-                                    uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2AToL1(LocalTensor<INPUT_T> &aL1Tensor,
+                                                                                const SplitSameABExtraInfo &info,
+                                                                                uint32_t gmStride, uint32_t subMStart,
+                                                                                uint32_t subMSize, uint32_t subKStart,
+                                                                                uint32_t subKSize)
 {
     if constexpr (AFormat == CubeFormat::NZ) {
         auto srcGm = vec1ResGm[info.taskIdMod2][gmStride * subKStart + GetC0Num<INPUT_T>() * subMStart];
@@ -709,8 +759,9 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2AToL1(
 
 template <typename INPUT_T, typename T, bool pageAttention>
 template <uint32_t KL0_SPLITE_SIZE>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &info, 
-                                                                 uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor,
+                                                                                const SplitSameABExtraInfo &info,
+                                                                                uint32_t subKStart, uint32_t subKSize)
 {
     auto srcGm = valueGm[info.vCoreOffset + subKStart * this->mm2Kb];
     copyInMm2BToL1Params.nValue = subKSize;
@@ -720,9 +771,10 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2BToL1(
 
 template <typename INPUT_T, typename T, bool pageAttention>
 template <uint32_t KL0_SPLITE_SIZE>
-__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2BToL1ForPA(LocalTensor<INPUT_T> &bL1Tensor, const uint64_t valueGmBaseOffset,
-                                            uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt, uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
-                                            uint32_t copyColumnCount, PaCacheLayoutType paCacheLayoutType)
+__aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2BToL1ForPA(
+    LocalTensor<INPUT_T> &bL1Tensor, const uint64_t valueGmBaseOffset, uint32_t copyTotalRowCntAlign,
+    uint32_t copyStartRowCnt, uint32_t nActCopyRowCount, uint32_t copyStartColumnCount, uint32_t copyColumnCount,
+    PaCacheLayoutType paCacheLayoutType)
 {
     uint32_t blockElementCnt = 32 / sizeof(INPUT_T); // CUBE basic block size is 32
     if (IsSameType<INPUT_T, int4b_t>::value) {
@@ -735,7 +787,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2BToL1F
         intriParams.blockCount = copyColumnCount / blockElementCnt;
         intriParams.dstStride = copyTotalRowCntAlign - nActCopyRowCount;
         intriParams.srcStride = kvCacheBlockSize - nActCopyRowCount;
-        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt], valueGm[valueGmBaseOffset + copyStartColumnCount * kvCacheBlockSize], intriParams);
+        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt],
+                 valueGm[valueGmBaseOffset + copyStartColumnCount * kvCacheBlockSize], intriParams);
     } else {
         uint64_t step = this->valueDSize;
         if (paCacheLayoutType == PaCacheLayoutType::PA_BBH) {
@@ -756,7 +809,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyInMm2BToL1F
         mm2Nd2NzParamsForB.dstNzNStride = 1;
         mm2Nd2NzParamsForB.srcNdMatrixStride = 0;
         mm2Nd2NzParamsForB.dstNzMatrixStride = 0;
-        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt], valueGm[valueGmBaseOffset + copyStartColumnCount], mm2Nd2NzParamsForB);
+        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt], valueGm[valueGmBaseOffset + copyStartColumnCount],
+                 mm2Nd2NzParamsForB);
     }
 }
 
@@ -770,7 +824,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ResetLoad3DConf
 }
 
 template <typename INPUT_T, typename T, bool pageAttention>
-__aicore__ inline LocalTensor<INPUT_T> PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyQToL1(const SplitSameABExtraInfo &info, uint32_t mL1Size)
+__aicore__ inline LocalTensor<INPUT_T> PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyQToL1(
+    const SplitSameABExtraInfo &info, uint32_t mL1Size)
 {
     uint32_t pingpong = this->qL1BufIter % 2;
     if (qL1BufAddr[0] == info.qCoreOffset) {
@@ -799,7 +854,8 @@ __aicore__ inline LocalTensor<INPUT_T> PfaMatmulKvNd<INPUT_T, T, pageAttention>:
 
 template <typename INPUT_T, typename T, bool pageAttention>
 template <uint32_t KL0_SPLITE_SIZE>
-__aicore__ inline LocalTensor<INPUT_T> PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyVToL1(const SplitSameABExtraInfo &info, uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline LocalTensor<INPUT_T> PfaMatmulKvNd<INPUT_T, T, pageAttention>::CopyVToL1(
+    const SplitSameABExtraInfo &info, uint32_t subKStart, uint32_t subKSize)
 {
     uint32_t pingpong = this->qL1BufIter % 2;
     WaitFlag<HardEvent::MTE1_MTE2>(Q_EVENT0 + pingpong);
@@ -814,8 +870,9 @@ template <typename INPUT_T, typename T, bool pageAttention>
 template <CubeFormat OutFormat>
 __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(const SplitSameABExtraInfo &info)
 {
-    ASCENDC_ASSERT((!info.withRope) || (dSize == BlockAlign<INPUT_T>(dSize)), 
-        { KERNEL_LOG(KERNEL_ERROR, "dSize must block aligned if with seprate rope, current value is %u", dSize); });
+    ASCENDC_ASSERT((!info.withRope) || (dSize == BlockAlign<INPUT_T>(dSize)), {
+        KERNEL_LOG(KERNEL_ERROR, "dSize must block aligned if with separate rope, current value is %u", dSize);
+    });
     constexpr uint32_t mSplitSize = 512;
     constexpr uint32_t nSplitSize = 128;
     constexpr uint32_t mL0SplitSize = 128;
@@ -839,7 +896,9 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
     uint32_t kL0Tail = kSize - (kL0Loops - 1) * kL0SplitSize;
     ResetLoad3DConfig<mSplitSize>();
 
-    DEF_LAMBDA_WITHTHIS(CopyKToL1)(const SplitSameABExtraInfo &info, uint32_t subNStart, uint32_t subNSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(CopyKToL1)
+    (const SplitSameABExtraInfo &info, uint32_t subNStart, uint32_t subNSize)->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->kvL1BufIter % 2;
         WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + pingpong);
         self_->CopyInMm1BToL1(self_->kvL1Tensor[pingpong], info, subNStart, subNSize);
@@ -849,9 +908,12 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
         }
         SetFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + pingpong);
         return self_->kvL1Tensor[pingpong];
-    } DEF_LAMBDA_END(CopyKToL1);
+    }
+    DEF_LAMBDA_END(CopyKToL1);
 
-    DEF_LAMBDA_WITHTHIS(CopyKToL1ForPA)(const SplitSameABExtraInfo &info, uint32_t subNStart, uint32_t subNSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(CopyKToL1ForPA)
+    (const SplitSameABExtraInfo &info, uint32_t subNStart, uint32_t subNSize)->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->kvL1BufIter % 2;
         WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + pingpong);
         auto kTensor = self_->kvL1Tensor[pingpong];
@@ -877,23 +939,31 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
                 if (IsSameType<INPUT_T, int4b_t>::value) {
                     blockElementCnt = 64; // Block element count is 64
                 }
-                keyOffset += (uint64_t)(info.n2oIdx * self_->dSize * self_->kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
-                kRopeOffset += (uint64_t)(info.n2oIdx * self_->ropeDSize * self_->kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
+                keyOffset +=
+                    (uint64_t)(info.n2oIdx * self_->dSize * self_->kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
+                kRopeOffset += (uint64_t)(info.n2oIdx * self_->ropeDSize * self_->kvCacheBlockSize) +
+                               reaminRowCnt * blockElementCnt;
             } else {
                 if (info.paCacheLayoutType == PaCacheLayoutType::PA_BBH) {
                     // BBH
-                    keyOffset += (uint64_t)(info.n2oIdx * self_->dSize) + reaminRowCnt * self_->valueNSize * self_->dSize;
-                    kRopeOffset += (uint64_t)(info.n2oIdx * self_->ropeDSize) + reaminRowCnt * self_->valueNSize * self_->ropeDSize;
+                    keyOffset +=
+                        (uint64_t)(info.n2oIdx * self_->dSize) + reaminRowCnt * self_->valueNSize * self_->dSize;
+                    kRopeOffset += (uint64_t)(info.n2oIdx * self_->ropeDSize) +
+                                   reaminRowCnt * self_->valueNSize * self_->ropeDSize;
                 } else {
                     // BNBD
-                    keyOffset += (uint64_t)(info.n2oIdx * self_->dSize * self_->kvCacheBlockSize) + reaminRowCnt * self_->dSize;
-                    kRopeOffset += (uint64_t)(info.n2oIdx * self_->ropeDSize * self_->kvCacheBlockSize) + reaminRowCnt * self_->ropeDSize;
+                    keyOffset +=
+                        (uint64_t)(info.n2oIdx * self_->dSize * self_->kvCacheBlockSize) + reaminRowCnt * self_->dSize;
+                    kRopeOffset += (uint64_t)(info.n2oIdx * self_->ropeDSize * self_->kvCacheBlockSize) +
+                                   reaminRowCnt * self_->ropeDSize;
                 }
             }
 
-            self_->CopyInMm1BToL1ForPA(kTensor, keyOffset, Align(subNSize, (uint32_t)BLOCK_CUBE), copyFinishRowCnt, copyRowCnt, info.paCacheLayoutType);
+            self_->CopyInMm1BToL1ForPA(kTensor, keyOffset, Align(subNSize, (uint32_t)BLOCK_CUBE), copyFinishRowCnt,
+                                       copyRowCnt, info.paCacheLayoutType);
             if (info.withRope) {
-                self_->CopyInMm1RopeBToL1ForPA(kRopeTensor, kRopeOffset, Align(subNSize, (uint32_t)BLOCK_CUBE), copyFinishRowCnt, copyRowCnt, info.paCacheLayoutType);
+                self_->CopyInMm1RopeBToL1ForPA(kRopeTensor, kRopeOffset, Align(subNSize, (uint32_t)BLOCK_CUBE),
+                                               copyFinishRowCnt, copyRowCnt, info.paCacheLayoutType);
             }
 
             // 更新循环变量
@@ -902,36 +972,51 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
         }
         SetFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + pingpong);
         return self_->kvL1Tensor[pingpong];
-    } DEF_LAMBDA_END(CopyKToL1ForPA);
+    }
+    DEF_LAMBDA_END(CopyKToL1ForPA);
 
-    DEF_LAMBDA_WITHTHIS(LoadAToL0)(const LocalTensor<INPUT_T> &qL1Tensor, uint32_t mL1Size,
-                                   uint32_t subMStart, uint32_t subMSize, uint32_t subKStart, uint32_t subKSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(LoadAToL0)
+    (const LocalTensor<INPUT_T> &qL1Tensor, uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+     uint32_t subKSize)
+        ->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->abL0BufIter % 2;
         if (likely(mL1Size == mSplitSize)) {
-            self_->Load3DDataAToL0NonFMatrix(self_->aL0TensorPingPong[pingpong], qL1Tensor, mL1Size, subMStart, subMSize, subKStart, subKSize);
+            self_->Load3DDataAToL0NonFMatrix(self_->aL0TensorPingPong[pingpong], qL1Tensor, mL1Size, subMStart,
+                                             subMSize, subKStart, subKSize);
         } else {
-            self_->Load3DDataAToL0(self_->aL0TensorPingPong[pingpong], qL1Tensor, mL1Size, subMStart, subMSize, subKStart, subKSize);
+            self_->Load3DDataAToL0(self_->aL0TensorPingPong[pingpong], qL1Tensor, mL1Size, subMStart, subMSize,
+                                   subKStart, subKSize);
             self_->template ResetLoad3DConfig<mSplitSize>();
         }
         return self_->aL0TensorPingPong[pingpong];
-    } DEF_LAMBDA_END(LoadAToL0);
+    }
+    DEF_LAMBDA_END(LoadAToL0);
 
-    DEF_LAMBDA_WITHTHIS(LoadBToL0)(const LocalTensor<INPUT_T> &kL1Tensor, uint32_t nL1Size,
-                                   uint32_t subNStart, uint32_t subNSize, uint32_t subKStart, uint32_t subKSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(LoadBToL0)
+    (const LocalTensor<INPUT_T> &kL1Tensor, uint32_t nL1Size, uint32_t subNStart, uint32_t subNSize, uint32_t subKStart,
+     uint32_t subKSize)
+        ->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->abL0BufIter % 2;
-        self_->LoadDataBTransposeToL0(self_->bL0TensorPingPong[pingpong], kL1Tensor, nL1Size, subNStart, subNSize, subKStart, subKSize);
+        self_->LoadDataBTransposeToL0(self_->bL0TensorPingPong[pingpong], kL1Tensor, nL1Size, subNStart, subNSize,
+                                      subKStart, subKSize);
         return self_->bL0TensorPingPong[pingpong];
-    } DEF_LAMBDA_END(LoadBToL0);
+    }
+    DEF_LAMBDA_END(LoadBToL0);
 
-    DEF_LAMBDA_WITHTHIS(FixpipeCToGM)(const SplitSameABExtraInfo &info, const LocalTensor<T> &cL0Tensor,
-                                      uint32_t dstStride, uint32_t subMStart, uint32_t subMSize,
-                                      uint32_t subNStart, uint32_t subNSize) {
+    DEF_LAMBDA_WITHTHIS(FixpipeCToGM)
+    (const SplitSameABExtraInfo &info, const LocalTensor<T> &cL0Tensor, uint32_t dstStride, uint32_t subMStart,
+     uint32_t subMSize, uint32_t subNStart, uint32_t subNSize)
+    {
         uint32_t pingpong = self_->cL0BufIter % 2;
         SetFlag<HardEvent::M_FIX>(L0C_EVENT0 + pingpong);
         WaitFlag<HardEvent::M_FIX>(L0C_EVENT0 + pingpong);
-        self_->template FixpipeL0CToGM<OutFormat>(self_->mm1ResGm[info.taskIdMod2], cL0Tensor, dstStride, subMStart, subMSize, subNStart, subNSize);
+        self_->template FixpipeL0CToGM<OutFormat>(self_->mm1ResGm[info.taskIdMod2], cL0Tensor, dstStride, subMStart,
+                                                  subMSize, subNStart, subNSize);
         SetFlag<HardEvent::FIX_M>(L0C_EVENT0 + pingpong);
-    } DEF_LAMBDA_END(FixpipeCToGM);
+    }
+    DEF_LAMBDA_END(FixpipeCToGM);
 
     auto qTensor = CopyQToL1(info, mL1Size);
     bool l1BufLoaded[2] = {false, false};
@@ -943,7 +1028,7 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
             subNSize = Align(nTail, (uint32_t)BLOCK_CUBE);
         }
 
-        if (! l1BufLoaded[kvL1BufIter % 2]) {
+        if (!l1BufLoaded[kvL1BufIter % 2]) {
             if constexpr (pageAttention) {
                 CopyKToL1ForPA(info, n * nSplitSize, subNSizeAct);
             } else {
@@ -965,7 +1050,7 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
 
             if ((info.qkvDSameFlag == false) && (mL0 == 2)) {
                 ++kvL1BufIter;
-                if (! l1BufLoaded[kvL1BufIter % 2]) {
+                if (!l1BufLoaded[kvL1BufIter % 2]) {
                     auto nextN = n + 1;
                     uint32_t nextSubNSizeAct = nSplitSize;
                     if (nextN < nloops) {
@@ -997,7 +1082,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
 
                 WaitFlag<HardEvent::M_MTE1>(L0AB_EVENT0 + abL0BufIter % 2);
                 auto bL0Tensor = LoadBToL0(kTensor, subNSize, 0, subNSize, kL0 * kL0SplitSize, subKL0Size);
-                auto aL0Tensor = LoadAToL0(qTensor, mL1Size, mL0 * mL0SplitSize, subML0Size, kL0 * kL0SplitSize, subKL0Size);
+                auto aL0Tensor =
+                    LoadAToL0(qTensor, mL1Size, mL0 * mL0SplitSize, subML0Size, kL0 * kL0SplitSize, subKL0Size);
                 SetFlag<HardEvent::MTE1_M>(L0AB_EVENT0 + abL0BufIter % 2);
                 WaitFlag<HardEvent::MTE1_M>(L0AB_EVENT0 + abL0BufIter % 2);
 
@@ -1009,15 +1095,15 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm1(cons
                 mmadParams.cmatrixSource = false;
 
                 Mmad(cL0Tensor, aL0Tensor, bL0Tensor, mmadParams);
-                if (likely(! isLastKL0)) {
+                if (likely(!isLastKL0)) {
                     PipeBarrier<PIPE_M>();
                 }
                 SetFlag<HardEvent::M_MTE1>(L0AB_EVENT0 + abL0BufIter % 2);
                 abL0BufIter++;
             }
 
-            FixpipeCToGM(info, cL0Tensor, (OutFormat == CubeFormat::NZ) ? mSizeAct : nSizeAct, 
-                         mL0 * mL0SplitSize, subML0SizeAct, n * nSplitSize, (OutFormat == CubeFormat::NZ) ? subNSize : subNSizeAct);
+            FixpipeCToGM(info, cL0Tensor, (OutFormat == CubeFormat::NZ) ? mSizeAct : nSizeAct, mL0 * mL0SplitSize,
+                         subML0SizeAct, n * nSplitSize, (OutFormat == CubeFormat::NZ) ? subNSize : subNSizeAct);
             cL0BufIter++;
         }
 
@@ -1051,17 +1137,24 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
 
     ResetLoad3DConfig<mSplitSize>();
 
-    DEF_LAMBDA_WITHTHIS(CopyPToL1)(const SplitSameABExtraInfo &info, uint32_t gmStride, 
-                                   uint32_t subMStart, uint32_t subMSize, uint32_t subKStart, uint32_t subKSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(CopyPToL1)
+    (const SplitSameABExtraInfo &info, uint32_t gmStride, uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+     uint32_t subKSize)
+        ->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->kvL1BufIter % 2;
         WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + pingpong);
-        self_->template CopyInMm2AToL1<AFormat>(self_->kvL1Tensor[pingpong], info, gmStride, subMStart, subMSize, subKStart, subKSize);
+        self_->template CopyInMm2AToL1<AFormat>(self_->kvL1Tensor[pingpong], info, gmStride, subMStart, subMSize,
+                                                subKStart, subKSize);
         SetFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + pingpong);
         WaitFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + pingpong);
         return self_->kvL1Tensor[pingpong];
-    } DEF_LAMBDA_END(CopyPToL1);
+    }
+    DEF_LAMBDA_END(CopyPToL1);
 
-    DEF_LAMBDA_WITHTHIS(CopyVToL1ForPA)(const SplitSameABExtraInfo &info, uint32_t subKStart, uint32_t subKSize, uint32_t subDSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(CopyVToL1ForPA)
+    (const SplitSameABExtraInfo &info, uint32_t subKStart, uint32_t subKSize, uint32_t subDSize)->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->qL1BufIter % 2;
         WaitFlag<HardEvent::MTE1_MTE2>(Q_EVENT0 + pingpong);
         auto valueTensor = self_->qL1Tensor[pingpong];
@@ -1085,18 +1178,23 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
                 if (IsSameType<INPUT_T, int4b_t>::value) {
                     blockElementCnt = 64; // Block element count is 64
                 }
-                valueOffset += (uint64_t)(info.n2oIdx * self_->valueDSize * self_->kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
+                valueOffset += (uint64_t)(info.n2oIdx * self_->valueDSize * self_->kvCacheBlockSize) +
+                               reaminRowCnt * blockElementCnt;
             } else {
                 if (info.paCacheLayoutType == PaCacheLayoutType::PA_BBH) {
                     // BBH
-                    valueOffset += (uint64_t)(info.n2oIdx * self_->valueDSize) + reaminRowCnt * self_->valueNSize * self_->valueDSize;
+                    valueOffset += (uint64_t)(info.n2oIdx * self_->valueDSize) +
+                                   reaminRowCnt * self_->valueNSize * self_->valueDSize;
                 } else {
                     // BNBD
-                    valueOffset += (uint64_t)(info.n2oIdx * self_->valueDSize * self_->kvCacheBlockSize) + reaminRowCnt * self_->valueDSize;
+                    valueOffset += (uint64_t)(info.n2oIdx * self_->valueDSize * self_->kvCacheBlockSize) +
+                                   reaminRowCnt * self_->valueDSize;
                 }
             }
 
-            self_->template CopyInMm2BToL1ForPA<kL0SplitSize>(valueTensor, valueOffset, Align(subKSize, (uint32_t)BLOCK_CUBE), copyFinishRowCnt, copyRowCnt, 0, subDSize, info.paCacheLayoutType);
+            self_->template CopyInMm2BToL1ForPA<kL0SplitSize>(valueTensor, valueOffset,
+                                                              Align(subKSize, (uint32_t)BLOCK_CUBE), copyFinishRowCnt,
+                                                              copyRowCnt, 0, subDSize, info.paCacheLayoutType);
 
             // 更新循环变量
             copyFinishRowCnt += copyRowCnt;
@@ -1106,36 +1204,51 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
         WaitFlag<HardEvent::MTE2_MTE1>(Q_EVENT0 + pingpong);
         self_->qL1BufAddr[pingpong] = (uint64_t)-1;
         return self_->qL1Tensor[pingpong];
-    } DEF_LAMBDA_END(CopyVToL1ForPA);
+    }
+    DEF_LAMBDA_END(CopyVToL1ForPA);
 
-    DEF_LAMBDA_WITHTHIS(LoadAToL0)(const LocalTensor<INPUT_T> &pL1Tensor, uint32_t mL1Size,
-                                   uint32_t subMStart, uint32_t subMSize, uint32_t subKStart, uint32_t subKSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(LoadAToL0)
+    (const LocalTensor<INPUT_T> &pL1Tensor, uint32_t mL1Size, uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
+     uint32_t subKSize)
+        ->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->abL0BufIter % 2;
         if (likely(mL1Size == mSplitSize)) {
-            self_->Load3DDataAToL0NonFMatrix(self_->aL0TensorPingPong[pingpong], pL1Tensor, mL1Size, subMStart, subMSize, subKStart, subKSize);
+            self_->Load3DDataAToL0NonFMatrix(self_->aL0TensorPingPong[pingpong], pL1Tensor, mL1Size, subMStart,
+                                             subMSize, subKStart, subKSize);
         } else {
-            self_->Load3DDataAToL0(self_->aL0TensorPingPong[pingpong], pL1Tensor, mL1Size, subMStart, subMSize, subKStart, subKSize);
+            self_->Load3DDataAToL0(self_->aL0TensorPingPong[pingpong], pL1Tensor, mL1Size, subMStart, subMSize,
+                                   subKStart, subKSize);
             self_->template ResetLoad3DConfig<mSplitSize>();
         }
         return self_->aL0TensorPingPong[pingpong];
-    } DEF_LAMBDA_END(LoadAToL0);
+    }
+    DEF_LAMBDA_END(LoadAToL0);
 
-    DEF_LAMBDA_WITHTHIS(LoadBToL0)(uint32_t nSize, const LocalTensor<INPUT_T> &vL1Tensor, uint32_t kL1Size,
-                                   uint32_t subKStart, uint32_t subKSize, uint32_t subNStart, uint32_t subNSize) -> LocalTensor<INPUT_T> {
+    DEF_LAMBDA_WITHTHIS(LoadBToL0)
+    (uint32_t nSize, const LocalTensor<INPUT_T> &vL1Tensor, uint32_t kL1Size, uint32_t subKStart, uint32_t subKSize,
+     uint32_t subNStart, uint32_t subNSize)
+        ->LocalTensor<INPUT_T>
+    {
         uint32_t pingpong = self_->abL0BufIter % 2;
-        self_->LoadDataBToL0(self_->bL0TensorPingPong[pingpong], vL1Tensor, kL1Size, subKStart, subKSize, subNStart, subNSize);
+        self_->LoadDataBToL0(self_->bL0TensorPingPong[pingpong], vL1Tensor, kL1Size, subKStart, subKSize, subNStart,
+                             subNSize);
         return self_->bL0TensorPingPong[pingpong];
-    } DEF_LAMBDA_END(LoadBToL0);
+    }
+    DEF_LAMBDA_END(LoadBToL0);
 
-    DEF_LAMBDA_WITHTHIS(FixpipeCToGM)(const SplitSameABExtraInfo &info, const LocalTensor<T> &cL0Tensor,
-                                      uint32_t dstStride, uint32_t subMStart, uint32_t subMSize,
-                                      uint32_t subNStart, uint32_t subNSize) {
+    DEF_LAMBDA_WITHTHIS(FixpipeCToGM)
+    (const SplitSameABExtraInfo &info, const LocalTensor<T> &cL0Tensor, uint32_t dstStride, uint32_t subMStart,
+     uint32_t subMSize, uint32_t subNStart, uint32_t subNSize)
+    {
         uint32_t pingpong = self_->cL0BufIter % 2;
         SetFlag<HardEvent::M_FIX>(L0C_EVENT0 + pingpong);
         WaitFlag<HardEvent::M_FIX>(L0C_EVENT0 + pingpong);
-        self_->template FixpipeL0CToGM<OutFormat>(self_->mm2ResGm[info.taskIdMod2], cL0Tensor, dstStride, subMStart, subMSize, subNStart, subNSize);
+        self_->template FixpipeL0CToGM<OutFormat>(self_->mm2ResGm[info.taskIdMod2], cL0Tensor, dstStride, subMStart,
+                                                  subMSize, subNStart, subNSize);
         SetFlag<HardEvent::FIX_M>(L0C_EVENT0 + pingpong);
-    } DEF_LAMBDA_END(FixpipeCToGM);
+    }
+    DEF_LAMBDA_END(FixpipeCToGM);
 
     LocalTensor<INPUT_T> vTensor;
     if constexpr (pageAttention) {
@@ -1163,7 +1276,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
                 subKSize = Align(kTail, (uint32_t)BLOCK_CUBE);
             }
 
-            auto pTensor = CopyPToL1(info, (AFormat == CubeFormat::NZ) ? mInputSize : kSize, m * mSplitSize, subMSize, k * kSplitSize, subKSize);
+            auto pTensor = CopyPToL1(info, (AFormat == CubeFormat::NZ) ? mInputSize : kSize, m * mSplitSize, subMSize,
+                                     k * kSplitSize, subKSize);
 
             uint32_t kL0Loops = CeilDiv(subKSizeAct, kL0SplitSize);
             uint32_t kL0Tail = subKSizeAct - (kL0Loops - 1) * kL0SplitSize;
@@ -1178,7 +1292,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
 
                 WaitFlag<HardEvent::M_MTE1>(L0AB_EVENT0 + abL0BufIter % 2);
                 auto aL0Tensor = LoadAToL0(pTensor, subMSize, 0, subMSize, kL0 * kL0SplitSize, subKL0Size);
-                auto bL0Tensor = LoadBToL0(nSize, vTensor, kSize, (k * kSplitSize) + (kL0 * kL0SplitSize), subKL0Size, 0, nSize);
+                auto bL0Tensor =
+                    LoadBToL0(nSize, vTensor, kSize, (k * kSplitSize) + (kL0 * kL0SplitSize), subKL0Size, 0, nSize);
                 SetFlag<HardEvent::MTE1_M>(L0AB_EVENT0 + abL0BufIter % 2);
                 WaitFlag<HardEvent::MTE1_M>(L0AB_EVENT0 + abL0BufIter % 2);
 
@@ -1190,7 +1305,7 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
                 mmadParams.cmatrixSource = false;
 
                 Mmad(cL0Tensor, aL0Tensor, bL0Tensor, mmadParams);
-                if (likely(! (isLastKL1 && isLastKL0))) {
+                if (likely(!(isLastKL1 && isLastKL0))) {
                     PipeBarrier<PIPE_M>();
                 }
                 SetFlag<HardEvent::M_MTE1>(L0AB_EVENT0 + abL0BufIter % 2);
@@ -1201,8 +1316,8 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
             kvL1BufIter++;
         }
 
-        FixpipeCToGM(info, cL0Tensor, (OutFormat == CubeFormat::NZ) ? mSizeAct : nSizeAct, 
-                         m * mSplitSize, subMSizeAct, 0, (OutFormat == CubeFormat::NZ) ? nSize : nSizeAct);
+        FixpipeCToGM(info, cL0Tensor, (OutFormat == CubeFormat::NZ) ? mSizeAct : nSizeAct, m * mSplitSize, subMSizeAct,
+                     0, (OutFormat == CubeFormat::NZ) ? nSize : nSizeAct);
         cL0BufIter++;
     }
 
@@ -1210,4 +1325,4 @@ __aicore__ inline void PfaMatmulKvNd<INPUT_T, T, pageAttention>::ComputeMm2(cons
     qL1BufIter++;
 }
 
-#endif //PFA_SERVICE_MATMUL_KV_ND_H
+#endif // PFA_SERVICE_MATMUL_KV_ND_H
