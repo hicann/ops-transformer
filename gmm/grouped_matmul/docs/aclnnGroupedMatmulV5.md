@@ -50,6 +50,7 @@ abbr {
 | T-T | 左矩阵pertensor，右矩阵pertensor |
 | K-C | 左矩阵pertoken，右矩阵perchannel |
 | K-T | 左矩阵pertoken，右矩阵pertensor |
+| K-G | 左矩阵pertoken，右矩阵pergroup |
 | G-B | 左矩阵pergroup，右矩阵perblock |
 | MX | pergroup-pergroup（G-G）量化模式，量化参数类型为FLOAT8_E8M0，group size为32的特例 |
 | ND | 常规连续排布 |
@@ -349,10 +350,10 @@ aclnnGroupedMatmulV5默认确定性实现。
 | 静态量化 | INT8 | INT8 | BFLOAT16/FLOAT16/INT32/INT8 | [静态量化场景约束](#ascend950-静态量化场景约束) |
 | 静态量化 | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN | BFLOAT16/FLOAT16/FLOAT32 | [静态量化场景约束](#ascend950-静态量化场景约束) |
 | 动态量化（<abbr title="左矩阵pertensor，右矩阵pertensor">T-T</abbr>/T-C/<abbr title="左矩阵pertoken，右矩阵pertensor">K-T</abbr>/K-C） | INT8 | INT8 | BFLOAT16/FLOAT16 | [动态量化（T-T/T-C/K-T/K-C）场景约束](#ascend950-动态量化-ttck) |
-| 动态量化（T-T/T-C/K-T/K-C） | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN | BFLOAT16/FLOAT16/FLOAT32 | [动态量化（T-T/T-C/K-T/K-C）场景约束](#ascend950-动态量化-ttck) |
+| 动态量化（T-T/T-C/K-T/K-C） | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN / INT4 | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN / INT4 | BFLOAT16/FLOAT16/FLOAT32 | [动态量化（T-T/T-C/K-T/K-C）场景约束](#ascend950-动态量化-ttck) |
 | 动态量化（<abbr title="pergroup-pergroup（G-G）量化模式，量化参数类型为FLOAT8_E8M0，group size为32的特例">MX</abbr>） | FLOAT8_E5M2/FLOAT8_E4M3FN / FLOAT4_E2M1 | FLOAT8_E5M2/FLOAT8_E4M3FN / FLOAT4_E2M1 | BFLOAT16/FLOAT16/FLOAT32 | [动态量化（MX）场景约束](#ascend950-动态量化-mx) |
 | 动态量化（<abbr title="左矩阵pergroup，右矩阵perblock">G-B</abbr>） | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN | HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN | BFLOAT16/FLOAT16/FLOAT32 | [动态量化（G-B）场景约束](#ascend950-动态量化-gb) |
-| 全量化-S4S4 | INT4 | INT4 | BFLOAT16/FLOAT16 | [S4S4场景约束](#ascend950-s4s4场景约束) |
+| K-G量化 | INT4 | INT4 | BFLOAT16/FLOAT16 | [K-G场景约束](#ascend950-K-G量化约束) |
 | 伪量化-S8S4 | INT8 | INT4 | BFLOAT16/FLOAT16 | [伪量化场景约束](#ascend950-伪量化场景约束) |
 | <abbr title="对右矩阵权重进行量化的模式，包括perchannel量化模式">伪量化</abbr> | FLOAT16 / BFLOAT16 | INT8/INT4 | FLOAT16 / BFLOAT16 | [伪量化场景约束](#ascend950-伪量化场景约束) |
 | <abbr title="对右矩阵权重进行量化的模式，包括perchannel量化模式">伪量化</abbr> | FLOAT16 / BFLOAT16 | FLOAT8_E5M2/FLOAT8_E4M3FN/HIFLOAT8 | FLOAT16 / BFLOAT16 | [伪量化场景约束](#ascend950-伪量化场景约束) |
@@ -413,6 +414,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 |:---:|:---:|:---:|:---|:---|:---|:---|
 | 0 | INT8 | INT8 | INT32/BFLOAT16/FLOAT32/null | BFLOAT16/FLOAT32 | FLOAT32 | BFLOAT16 |
 | 0 | INT8 | INT8 | INT32/FLOAT16/FLOAT32/null | FLOAT32 | FLOAT32 | FLOAT16 |
+| 0 | INT4 | INT4 | null | UINT64 | FLOAT32 | BFLOAT16/FLOAT16 |
 | 0/2 | HIFLOAT8 | HIFLOAT8 | null | FLOAT32 | FLOAT32 | BFLOAT16/FLOAT16/FLOAT32 |
 | 0/2 | FLOAT8_E5M2/FLOAT8_E4M3FN | FLOAT8_E5M2/FLOAT8_E4M3FN | null | FLOAT32 | FLOAT32 | BFLOAT16/FLOAT16/FLOAT32 |
 
@@ -420,7 +422,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 
   | groupType | 子场景 | shape |
   |:---:|:---|:---|
-  | 0/2 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel</abbr> | `(g, N)` |
+  | 0/2 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel，输入为INT4时，groupType仅支持0</abbr> | `(g, N)` |
   | 0/2 | <abbr title="简称T量化，每个Tensor共用一个相同的量化参数">pertensor</abbr> | `(g, 1)` 或 `(g,)` |
 
 - **perTokenScaleOptional shape**：
@@ -428,8 +430,8 @@ aclnnGroupedMatmulV5默认确定性实现。
 | groupType | 子场景 | shape |
 |:---:|:---|:---|
 | 0 | <abbr title="简称K量化，量化对象是左矩阵，每个token分别使用独立的量化参数">pertoken</abbr> | `(M,)` |
-| 0 | pertensor | `(g, 1)` 或 `(g,)`，输入为 INT8 时不支持pertensor场景 |
-| 2 | pertoken | `(g, M)` |
+| 0 | pertensor | `(g, 1)` 或 `(g,)`，输入为 INT4、INT8 时不支持pertensor场景 |
+| 2 | pertoken | `(g, M)` ，输入为INT4时不支持groupType 2|
 | 2 | pertensor | `(g, 1)` 或 `(g,)` |
 
 </details>
@@ -504,10 +506,10 @@ aclnnGroupedMatmulV5默认确定性实现。
 
 </details>
 
-<a id="ascend950-s4s4场景约束"></a>
+<a id="ascend950-K-G量化约束"></a>
 
 <details>
-<summary>S4S4 场景约束</summary>
+<summary>K-G 场景约束</summary>
 
 - weight仅支持非转置的ND格式，并且N 须为 8 的整数倍
 - 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional
@@ -521,8 +523,13 @@ aclnnGroupedMatmulV5默认确定性实现。
 
 | groupType | 子场景 | shape | 约束 |
 |:---:|:---|:---|:---|
-| 0 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel</abbr> | `[E, N]` | |
 | 0 | <abbr title="简称G量化，在reduce轴上对数据分组，每组使用独立的量化参数">pergroup</abbr> | `[E, G, N]` | $G$须能整除$K$，且$K/G$需为偶数 |
+
+- **perTokenScaleOptional shape**（$g$=分组数）：
+
+| groupType | 子场景 | shape |
+|:---:|:---|:---|
+| 0 | <abbr title="简称K量化，量化对象是左矩阵，每个token分别使用独立的量化参数">pertoken</abbr> | `(M,)` |
 
 </details>
 
