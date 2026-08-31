@@ -20,6 +20,8 @@
 #include "mc2_log.h"
 #include "graph/utils/type_utils.h"
 #include "mc2_tiling_utils.h"
+#include "moe_ep_window_layout.h"
+#include "../../../common/utils/moe_ep_exception_dump.h"
 #include "register/op_def_registry.h"
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
@@ -54,12 +56,9 @@ constexpr int64_t MIN_EP_WORLD_SIZE = 2;
 constexpr int64_t MAX_NUM_EXPERTS = 2048;
 constexpr int64_t MIN_NUM_EXPERTS = 2;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024U * 1024U;
-constexpr uint64_t MB_SIZE = 1024UL * 1024UL;
 constexpr uint64_t UB_ALIGN = 32UL;
 constexpr uint64_t COMM_ALIGN = 512UL;
-constexpr uint64_t NOTIFY_CNT_ALIGN = 15000UL;
 constexpr uint64_t MAX_OUT_DTYPE_SIZE = 2UL;
-constexpr uint64_t METADATA_DTYPE_SIZE = 4UL;
 constexpr int64_t H_MIN = 1;
 constexpr int64_t H_MAX = 8192;
 constexpr int64_t K_MAX = 32;
@@ -236,7 +235,7 @@ static ge::graphStatus CheckInputDataType(const gert::TilingContext *context, co
 }
 
 static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const char *nodeName, MoeEpCombineInfo &info,
-                                       uint32_t &networkMode, uint32_t &serverNum)
+                                       uint32_t &networkMode, uint32_t &serverNum, uint32_t &rankNumPerServerOut)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE(nodeName, "attrs is nullptr."), return ge::GRAPH_FAILED);
@@ -283,90 +282,54 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const
     OP_TILING_CHECK(*cclBufferSizePtr <= 0,
                     OP_LOGE(nodeName, "ccl_buffer_size must be positive, but got %ld.", *cclBufferSizePtr),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((requestedNetworkMode != NETWORK_DIRECT) && (requestedNetworkMode != NETWORK_HYBRID),
-                    OP_LOGE(nodeName, "topo_type is invalid, expected %u or %u, got %ld.", NETWORK_DIRECT,
-                            NETWORK_HYBRID, requestedNetworkMode),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(rankNumPerServer <= 0,
-                    OP_LOGE(nodeName, "rank_num_per_server must be positive, got %ld.", rankNumPerServer),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(epWorldSize % rankNumPerServer != 0,
+    MoeEpTopology topology{};
+    OP_TILING_CHECK(ResolveMoeEpTopology(static_cast<uint32_t>(epWorldSize), requestedNetworkMode, rankNumPerServer,
+                                         topology) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName,
-                            "epWorldSize must be divisible by rank_num_per_server, got epWorldSize=%ld, "
-                            "rank_num_per_server=%ld.",
-                            epWorldSize, rankNumPerServer),
+                            "Invalid Moe EP topology: epWorldSize=%ld, topoType=%ld, "
+                            "rankNumPerServer=%ld.",
+                            epWorldSize, requestedNetworkMode, rankNumPerServer),
                     return ge::GRAPH_FAILED);
-
     info.cfg.epWorldSize = static_cast<uint32_t>(epWorldSize);
     info.cfg.epRankId = static_cast<uint32_t>(*epRankIdPtr);
     info.cfg.numExperts = static_cast<uint32_t>(*numExpertsPtr);
     info.cfg.numLocalExperts = static_cast<uint32_t>(*numExpertsPtr / epWorldSize);
     info.cfg.numMaxTokensPerRank = static_cast<uint32_t>(*nmtPtr);
-    serverNum = static_cast<uint32_t>(epWorldSize / rankNumPerServer);
-    networkMode = (requestedNetworkMode == NETWORK_HYBRID && serverNum > 1U) ? NETWORK_HYBRID : NETWORK_DIRECT;
+    serverNum = topology.serverNum;
+    networkMode = topology.networkMode;
+    rankNumPerServerOut = topology.rankNumPerServer;
 
     return ge::GRAPH_SUCCESS;
 }
 
-static uint64_t AlignUpWin(const uint64_t data)
-{
-    return (data + COMM_ALIGN - 1) / COMM_ALIGN * COMM_ALIGN;
-}
-
 static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *context, MoeEpCombineInfo &info,
-                                                 uint32_t networkMode, uint32_t serverNum, const char *nodeName)
+                                                 uint32_t networkMode, uint32_t serverNum, uint32_t rankNumPerServer,
+                                                 const char *nodeName)
 {
     auto attrs = context->GetAttrs();
     auto cclBufferSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_CCL_BUFFER_SIZE_INDEX);
     auto nmtPtr = attrs->GetAttrPointer<int64_t>(ATTR_NUM_MAX_TPR_INDEX);
 
-    uint64_t maxWindowSize = static_cast<uint64_t>(*cclBufferSizePtr);
-    uint64_t epWorldSize = static_cast<uint64_t>(info.cfg.epWorldSize);
-    uint64_t nmt = static_cast<uint64_t>(*nmtPtr);
-    uint64_t topK = static_cast<uint64_t>(info.cfg.topK);
-    uint64_t moeExpertNumPerRank = static_cast<uint64_t>(info.cfg.numLocalExperts);
-    uint64_t combineDataSizePerRank = nmt * topK * static_cast<uint64_t>(info.cfg.perSlotBytes);
+    const uint64_t maxWindowSize = static_cast<uint64_t>(*cclBufferSizePtr);
+    const MoeEpWindowLayoutParams params = {info.cfg.epWorldSize,
+                                            info.cfg.numLocalExperts,
+                                            static_cast<uint32_t>(*nmtPtr),
+                                            info.cfg.topK,
+                                            info.cfg.hidden,
+                                            networkMode,
+                                            rankNumPerServer,
+                                            serverNum};
+    MoeEpWindowLayout layout{};
+    OP_TILING_CHECK(CalcMoeEpWindowLayout(params, layout) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "Calculate Moe EP window layout failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckMoeEpWindowCapacity(layout.requiredBytes, maxWindowSize, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "Check Moe EP window capacity failed."), return ge::GRAPH_FAILED);
 
-    uint64_t dispatchNotifySize = (nmt + NOTIFY_CNT_ALIGN - 1) / NOTIFY_CNT_ALIGN * epWorldSize * COMM_ALIGN;
-    uint64_t dispatchWinStateSize =
-        epWorldSize * AlignUpWin(moeExpertNumPerRank * sizeof(int32_t)) + epWorldSize * COMM_ALIGN + dispatchNotifySize;
-    uint64_t combineWinStateSize = nmt * topK * COMM_ALIGN + epWorldSize * COMM_ALIGN;
-    uint64_t hiddenAlign = (info.cfg.hidden * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
-    uint64_t topKAlign = (topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
-    uint64_t dispatchReservedPerSlotBytes = AlignUpWin(hiddenAlign + topKAlign * 2 + UB_ALIGN);
-    uint64_t superNodeCount = static_cast<uint64_t>(serverNum);
-    uint64_t scaleoutSlotRawBytes = dispatchReservedPerSlotBytes + topK * sizeof(int32_t);
-    uint64_t scaleoutReservedPerSlotBytes = AlignUpWin(scaleoutSlotRawBytes);
-
-    uint64_t combineDataWinOffset;
-    uint64_t winNeedTotal;
-    if (networkMode == NETWORK_HYBRID) {
-        uint64_t scaleoutRecvDataSize = superNodeCount * nmt * scaleoutReservedPerSlotBytes;
-        uint64_t scaleupFinalRecvDataSize = epWorldSize * nmt * dispatchReservedPerSlotBytes;
-        uint64_t scaleoutRecvStatusSize = AlignUpWin(superNodeCount * nmt * COMM_ALIGN);
-        uint64_t scaleoutRecvDataOffset = dispatchWinStateSize + combineWinStateSize;
-        uint64_t scaleupFinalRecvDataOffset = scaleoutRecvDataOffset + scaleoutRecvDataSize;
-        uint64_t scaleoutRecvStatusOffset = scaleupFinalRecvDataOffset + scaleupFinalRecvDataSize;
-        combineDataWinOffset = scaleoutRecvStatusOffset + scaleoutRecvStatusSize;
-        uint64_t payloadStashWinOffset = combineDataWinOffset + combineDataSizePerRank;
-        uint64_t payloadStashWinSize = nmt * scaleoutReservedPerSlotBytes;
-        winNeedTotal = payloadStashWinOffset + payloadStashWinSize;
-    } else {
-        uint64_t dispatchRecvWinDataReservedSize = epWorldSize * nmt * dispatchReservedPerSlotBytes;
-        uint64_t stateAndRecvDataWinSize =
-            dispatchWinStateSize + combineWinStateSize + dispatchRecvWinDataReservedSize + combineDataSizePerRank;
-        uint64_t dispatchSendWinDataReservedSize = dispatchRecvWinDataReservedSize;
-        combineDataWinOffset = dispatchWinStateSize + combineWinStateSize + dispatchRecvWinDataReservedSize;
-        winNeedTotal = stateAndRecvDataWinSize + dispatchSendWinDataReservedSize;
-    }
-    OP_TILING_CHECK(winNeedTotal > maxWindowSize,
-                    OP_LOGE(nodeName, "HCCL_BUFFSIZE too small, need %luMB, available %luMB.",
-                            (winNeedTotal / MB_SIZE) + 1UL, maxWindowSize / MB_SIZE),
-                    return ge::GRAPH_FAILED);
+    info.dumpMetadata = BuildMoeEpDumpMetadata(params, layout, info.aivNum);
     info.totalWinSizeEp = maxWindowSize;
-    info.combineStateWinOffset = dispatchWinStateSize;
-    info.combineDataWinOffset = combineDataWinOffset;
-    info.sendDataWorkspaceSizePerRank = combineDataSizePerRank;
+    info.combineStateWinOffset = layout.combineStateWinOffset;
+    info.combineDataWinOffset = layout.combineDataWinOffset;
+    info.sendDataWorkspaceSizePerRank = layout.combineDataSize;
 
     return ge::GRAPH_SUCCESS;
 }
@@ -384,9 +347,11 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
     MoeEpCombineInfo &info = tilingData->moeEpCombineInfo;
     uint32_t networkMode = NETWORK_DIRECT;
     uint32_t serverNum = 1U;
+    uint32_t rankNumPerServer = 1U;
 
-    OP_TILING_CHECK(CheckAttrParams(context, nodeName, info, networkMode, serverNum) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check attr params failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckAttrParams(context, nodeName, info, networkMode, serverNum, rankNumPerServer) != ge::GRAPH_SUCCESS,
+        OP_LOGE(nodeName, "Check attr params failed."), return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckInputTensorShape(context, nodeName, info) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Check input tensor shape failed."), return ge::GRAPH_FAILED);
@@ -397,13 +362,6 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
     uint32_t hAlign32 = ((info.cfg.hidden * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
     info.cfg.perSlotBytes = static_cast<uint32_t>(((hAlign32 + UB_ALIGN + COMM_ALIGN - 1UL) / COMM_ALIGN) * COMM_ALIGN);
 
-    OP_TILING_CHECK(BuildAndCheckWindowLayout(context, info, networkMode, serverNum, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check window size failed."), return ge::GRAPH_FAILED);
-
-    uint32_t tplHasTopkWeights = info.hasTopkWeights ? 1 : 0;
-    uint64_t tilingKey = GET_TPL_TILING_KEY(tplHasTopkWeights, TILINGKEY_TPL_A5);
-    context->SetTilingKey(tilingKey);
-
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint64_t ubSize = 0UL;
@@ -412,6 +370,10 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
     context->SetBlockDim(blockDim);
     info.aivNum = aivNum;
     info.totalUbSize = ubSize;
+
+    OP_TILING_CHECK(BuildAndCheckWindowLayout(context, info, networkMode, serverNum, rankNumPerServer, nodeName) !=
+                        ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "Check window size failed."), return ge::GRAPH_FAILED);
 
     size_t *workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
@@ -422,6 +384,10 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
         SYSTEM_NEED_WORKSPACE + static_cast<uint64_t>(info.cfg.epWorldSize) * info.sendDataWorkspaceSizePerRank +
         static_cast<uint64_t>(aivNum) * COMM_ALIGN + static_cast<uint64_t>(info.cfg.epWorldSize) * COMM_ALIGN +
         static_cast<uint64_t>(aivNum) * perCoreRankCountStride;
+
+    uint32_t tplHasTopkWeights = info.hasTopkWeights ? 1 : 0;
+    uint64_t tilingKey = GET_TPL_TILING_KEY(tplHasTopkWeights, TILINGKEY_TPL_A5);
+    context->SetTilingKey(tilingKey);
 
     OP_LOGD(nodeName, "tilingKey=%lu, blockDim=%u, aivNum=%u", tilingKey, blockDim, aivNum);
     PrintTilingDataInfo(nodeName, info);
@@ -438,4 +404,24 @@ ge::graphStatus TilingParseForMoeEpCombine(gert::TilingParseContext *context)
 IMPL_OP_OPTILING(MoeEpCombine)
     .Tiling(MoeEpCombineTilingFunc)
     .TilingParse<MoeEpCombineCompileInfo>(TilingParseForMoeEpCombine);
+
+#if RUNTIME_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION && METADEF_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION
+inline void MoeEpCombineExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+{
+    Mc2Exception::MoeEpExceptionImpl(args, userdata, "MoeEpCombine");
+}
+
+__attribute__((constructor)) void RegisterMoeEpCombineExceptionFunc()
+{
+    int32_t runtimeVersionNum = 0;
+    int32_t metadefVersionNum = 0;
+    if (aclsysGetVersionNum("runtime", &runtimeVersionNum) != ACL_SUCCESS ||
+        aclsysGetVersionNum("metadef", &metadefVersionNum) != ACL_SUCCESS ||
+        runtimeVersionNum < EXCEPTION_DUMP_SUPPORT_VERSION || metadefVersionNum < EXCEPTION_DUMP_SUPPORT_VERSION) {
+        OP_LOGW("MoeEpCombine", "Runtime or metadef does not support exception dump registration.");
+        return;
+    }
+    IMPL_OP(MoeEpCombine).ExceptionDumpParseFunc(MoeEpCombineExceptionImplWrapper);
+}
+#endif
 } // namespace

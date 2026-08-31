@@ -37,14 +37,17 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "adv_api/reduce/reduce.h"
 #include "adv_api/reduce/sum.h"
+#include <cstddef>
 #if __has_include("../common/moe_distribute_base.h")
 #include "../common/moe_distribute_base.h"
 #include "../common/mc2_kernel_utils.h"
 #include "../common/mc2_moe_context.h"
+#include "../common/moe_ep_exception_dump_writer.h"
 #else
 #include "../../common/op_kernel/moe_distribute_base.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../common/op_kernel/mc2_moe_context.h"
+#include "../../common/op_kernel/moe_ep_exception_dump_writer.h"
 #endif
 
 #include "moe_ep_combine_epilogue_tiling_key.h"
@@ -96,6 +99,7 @@ private:
     TPipe *tpipe_{nullptr};
     const MoeEpCombineEpilogueInfo *tilingData_{nullptr};
     __gm__ Mc2Aclnn::MoeCommContext *mc2Context_{nullptr};
+    MoeEpExceptionDump::MoeEpCoreDiagWriter diagWriter_;
 
     uint32_t rankId_{0};
     uint32_t epWorldSize_{0};
@@ -161,6 +165,12 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     if constexpr (HasTopkWeight == 1) {
         combinedTopkWeightsGm_.SetGlobalBuffer((__gm__ float *)combinedTopkWeights);
     }
+
+    constexpr size_t metadataOffset = offsetof(MoeEpCombineEpilogueTilingData, moeEpCombineEpilogueInfo) +
+                                      offsetof(MoeEpCombineEpilogueInfo, dumpMetadata);
+    MoeEpExceptionDump::WriteMetadata(context, tilingGM + metadataOffset);
+    diagWriter_.Init(context, MOE_EP_CORE_DIAG_COMBINE_EPILOGUE, tpipe_);
+    diagWriter_.RunPosRecord(MOE_EP_COMBINE_EPILOGUE_RUN_POS_INIT_DONE);
 }
 
 template <TemplateMoeEpCombineEpilogueTypeClass>
@@ -292,6 +302,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
         SyncFunc<AscendC::HardEvent::MTE3_S>();
     }
     SyncAll<true>();
+    diagWriter_.RunPosRecord(MOE_EP_COMBINE_EPILOGUE_RUN_POS_WAIT_DONE);
 
     if (tPerCore_ == 0) {
         return;
@@ -305,6 +316,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
         DataCopyPad(combinedXGm_[tokenIdx * axisH_], ubResult, xCopyParams);
         xOutQue_.FreeTensor(ubResult);
     }
+    diagWriter_.RunPosRecord(MOE_EP_COMBINE_EPILOGUE_RUN_POS_OUTPUT_DONE);
 }
 
 template <TemplateMoeEpCombineEpilogueTypeClass>
