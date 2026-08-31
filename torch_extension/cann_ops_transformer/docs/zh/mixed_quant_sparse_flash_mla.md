@@ -490,7 +490,6 @@ metadata校验
             </td>
             <td>
                 <ul>
-                     <li>只有ori_kv稀疏场景下，cmp_mask_mode为0和ori_mask_mode必须为0</li>
                      <li>SWA场景下，ori_mask_mode为0、3、4</li>
                  </ul>
              </td>
@@ -513,10 +512,7 @@ metadata校验
              </td>
              <td>
                    <ul>
-                               <li>当ori_kv/cmp_kv/cmp_sparse_indices/ori_sparse_indices传入时，cmp_mask_mode为0和ori_mask_mode必须为0</li>
-                              <li>当cmp_kv不传时，ori_mask_mode为3、4</li>
-                              <li>当ori_mask_mode为3时，cmp_mask_mode必须为3</li>
-                              <li>当ori_mask_mode为4时，cmp_mask_mode必须为3</li>
+                              <li>cmpKvOptional未传入时，cmpMaskMode必须为0 </li>
                      </ul>
             </td>
         </tr>

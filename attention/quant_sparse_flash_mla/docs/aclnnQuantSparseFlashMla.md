@@ -979,7 +979,6 @@ metadataOptional校验
             </td>
             <td>
                 <ul>
-                     <li>oriKvOptional稀疏场景下，cmpMaskMode为0和oriMaskMode必须为0</li>
                      <li>oriMaskMode支持0、3、4</li>
                  </ul>
              </td>
@@ -1000,7 +999,6 @@ metadataOptional校验
              </td>
              <td>
                 <ul>
-                    <li>当oriKvOptional/cmpKvOptional/cmpSparseIndicesOptional/oriSparseIndicesOptional传入时，cmpMaskMode为0和oriMaskMode必须为0</li>
                     <li>cmpKv未传入时，cmpMaskMode必须为0 </li>
                 </ul>
             </td>

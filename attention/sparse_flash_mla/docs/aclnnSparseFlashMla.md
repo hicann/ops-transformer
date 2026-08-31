@@ -412,7 +412,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>cmpMaskMode（int64_t）</td>
       <td>输入</td>
       <td>q和cmpKv计算的mask模式。</td>
-      <td>0: No Mask。<br/>3: RightDownCausal模式。cmpKv未传入时该参数取默认值1。</td>
+      <td>0: No Mask。<br/>3: RightDownCausal模式。cmpKv未传入时该参数取默认值0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -689,7 +689,7 @@ aclnnStatus aclnnSparseFlashMla(
 
 - 使用约束
 
-  - SWA稀疏ori_kv场景仅支持SWA模板，仅传入`oriKvOptional`，同时传入`oriSparseIndicesOptional`和`oriTopkLengthOptional`；配套Metadata接口的`oriTopk`为oriSparseIndicesOptional最后一维K，`oriMaskMode`必须为0，`oriWinLeft`和`oriWinRight`为非负数，且`cmpKvOptional`不传入。
+  - SWA稀疏ori_kv场景仅支持SWA模板，仅传入`oriKvOptional`，同时传入`oriSparseIndicesOptional`和`oriTopkLengthOptional`；配套Metadata接口的`oriTopk`为oriSparseIndicesOptional最后一维K，`oriMaskMode`为0/3/4，`oriWinLeft`和`oriWinRight`仅在`oriMaskMode`为4时取非负数，且`cmpKvOptional`不传入。
   - SWA稀疏ori_kv场景下，`oriTopkLengthOptional`的元素表示实际有效索引条目数，取值应在[0, K]范围内。对每个q token和KV head，`oriSparseIndicesOptional`的[0, oriTopkLengthOptional)区间为左对齐的有效索引条目，[oriTopkLengthOptional, K)区间为无效或填充条目，建议填-1；其他场景`oriTopkLengthOptional`传入nullptr或空Tensor。
   - 除`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
   - `metadataOptional`参数必须传入，由`aclnnSparseFlashMlaMetadata`算子生成，shape固定为(1024,)。
