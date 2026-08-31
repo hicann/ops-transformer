@@ -13,7 +13,7 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "aclnn_kernels/common/op_error_check.h"
-#include "aclnnInner_moe_token_permute_grad.h"  // 该文件为自动生成，在build/autogen/inner路径下
+#include "aclnnInner_moe_token_permute_grad.h" // 该文件为自动生成，在build/autogen/inner路径下
 #include "external/aclnn_kernels/aclnn_platform.h"
 #include "aclnn_kernels/contiguous.h"
 #include "opdev/tensor_view_utils.h"
@@ -67,21 +67,23 @@ static aclnnStatus CheckParams(const aclTensor *permutedOutputGrad, const aclTen
 extern "C" {
 #endif
 
-aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(
-    const aclTensor* permutedOutputGrad, const aclTensor* sortedIndices, int64_t numTopk, bool paddedMode,
-    aclTensor* out, uint64_t* workspaceSize, aclOpExecutor** executor)
+aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(const aclTensor *permutedOutputGrad,
+                                                     const aclTensor *sortedIndices, int64_t numTopk, bool paddedMode,
+                                                     aclTensor *out, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
-    L2_DFX_PHASE_1(aclnnMoeTokenPermuteGrad,
-        DFX_IN(permutedOutputGrad, sortedIndices, numTopk, paddedMode),
+    L2_DFX_PHASE_1(aclnnMoeTokenPermuteGrad, DFX_IN(permutedOutputGrad, sortedIndices, numTopk, paddedMode),
                    DFX_OUT(out));
 
     bool useMoeInitRoutingV2Grad = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeInitRoutingV2Grad) {
-        return aclnnInnerMoeTokenPermuteGradGetWorkspaceSize(
-            permutedOutputGrad, sortedIndices, numTopk, paddedMode, out, workspaceSize, executor);
+        return aclnnInnerMoeTokenPermuteGradGetWorkspaceSize(permutedOutputGrad, sortedIndices, numTopk, paddedMode,
+                                                             out, workspaceSize, executor);
     }
-    CHECK_RET(paddedMode == false, ACLNN_ERR_PARAM_INVALID);
+    if (paddedMode) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "paddedMode only supports false currently, but got true.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
 
     aclnnStatus ret = MoeTokenPermuteGradCheck::CheckParams(permutedOutputGrad, sortedIndices, out);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -102,8 +104,7 @@ aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(
     int64_t activeNum = permutedOutputGradShape.GetDim(0);
 
     // 调用l0接口进行计算
-    auto out_ = l0op::MoeInitRoutingV2Grad(permutedOutputGradContiguous, sortedIndicesContiguous,
-        numTopk, 0, activeNum,
+    auto out_ = l0op::MoeInitRoutingV2Grad(permutedOutputGradContiguous, sortedIndicesContiguous, numTopk, 0, activeNum,
                                            out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
@@ -117,8 +118,8 @@ aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenPermuteGrad(
-    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
+aclnnStatus aclnnMoeTokenPermuteGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                     aclrtStream stream)
 {
     static bool useMoeInitRoutingV2Grad = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeInitRoutingV2Grad) {

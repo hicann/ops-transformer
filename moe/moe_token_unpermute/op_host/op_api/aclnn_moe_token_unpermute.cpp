@@ -17,7 +17,7 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "aclnn_kernels/common/op_error_check.h"
-#include "aclnnInner_moe_token_unpermute.h"  // 该文件为自动生成，在build/autogen/inner路径下
+#include "aclnnInner_moe_token_unpermute.h" // 该文件为自动生成，在build/autogen/inner路径下
 #include "external/aclnn_kernels/aclnn_platform.h"
 #include "aclnn_kernels/contiguous.h"
 #include "opdev/tensor_view_utils.h"
@@ -75,9 +75,10 @@ extern "C" {
 
 constexpr int64_t READ_INDEX_BY_ROW = 2;
 
-aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(
-    const aclTensor* permutedTokens, const aclTensor* sortedIndices, const aclTensor* probsOptional, bool paddedMode,
-    const aclIntArray* restoreShapeOptional, aclTensor* out, uint64_t* workspaceSize, aclOpExecutor** executor)
+aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(const aclTensor *permutedTokens, const aclTensor *sortedIndices,
+                                                   const aclTensor *probsOptional, bool paddedMode,
+                                                   const aclIntArray *restoreShapeOptional, aclTensor *out,
+                                                   uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeTokenUnpermute,
@@ -86,11 +87,13 @@ aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(
 
     bool useMoeFinalizeRoutingV2 = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeFinalizeRoutingV2) {
-        return aclnnInnerMoeTokenUnpermuteGetWorkspaceSize(
-            permutedTokens, sortedIndices, probsOptional, paddedMode, restoreShapeOptional, out, workspaceSize,
-            executor);
+        return aclnnInnerMoeTokenUnpermuteGetWorkspaceSize(permutedTokens, sortedIndices, probsOptional, paddedMode,
+                                                           restoreShapeOptional, out, workspaceSize, executor);
     }
-    CHECK_RET(paddedMode == false, ACLNN_ERR_PARAM_INVALID);
+    if (paddedMode) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "paddedMode only supports false currently, but got true.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
 
     aclnnStatus ret = MoeTokenUnpermuteCheck::CheckParams(permutedTokens, sortedIndices, probsOptional, out);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -104,14 +107,14 @@ aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(
     CHECK_RET(permutedTokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     auto sortedIndicesContiguous = l0op::Contiguous(sortedIndices, uniqueExecutor.get());
     CHECK_RET(sortedIndicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor* probsContiguous = nullptr;
+    const aclTensor *probsContiguous = nullptr;
     if (probsOptional != nullptr) {
         probsContiguous = l0op::Contiguous(probsOptional, uniqueExecutor.get());
         CHECK_RET(probsContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    auto out_ = l0op::MoeFinalizeRoutingV2(
-        permutedTokensContiguous, sortedIndicesContiguous, nullptr, nullptr, nullptr, probsContiguous, nullptr, nullptr,
-        nullptr, nullptr, nullptr, READ_INDEX_BY_ROW, nullptr, nullptr, nullptr, 1, out, uniqueExecutor.get());
+    auto out_ = l0op::MoeFinalizeRoutingV2(permutedTokensContiguous, sortedIndicesContiguous, nullptr, nullptr, nullptr,
+                                           probsContiguous, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                           READ_INDEX_BY_ROW, nullptr, nullptr, nullptr, 1, out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
     // copyout结果，如果出参out是非连续Tensor，需要把计算完的连续Tensor转非连续
     auto viewCopyOutResult = l0op::ViewCopy(out_, out, uniqueExecutor.get());
@@ -122,7 +125,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnMoeTokenUnpermute(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
+aclnnStatus aclnnMoeTokenUnpermute(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
 {
     static bool useMoeFinalizeRoutingV2 = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeFinalizeRoutingV2) {
