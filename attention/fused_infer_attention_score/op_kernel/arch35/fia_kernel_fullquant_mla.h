@@ -164,8 +164,8 @@ public:
 
     __aicore__ inline void InitMMResBuf(__gm__ uint8_t *&workspace)
     {
-        uint32_t mm1OutDtype = sizeof(T);
-        uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * mm1OutDtype;
+        constexpr uint32_t mm1OutDtype = sizeof(T);
+        constexpr uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * mm1OutDtype;
         constexpr uint32_t mm2ResultSize = mBaseSize / CV_RATIO * dVBaseSize * sizeof(T);
         constexpr uint32_t mm2LeftSize = mBaseSize * s2BaseSize * sizeof(INPUT_T);
         l1BufferManager.Init(pipe, 524288); // 512 * 1024
@@ -220,8 +220,6 @@ public:
             constInfo.dSizeRope = fiaBaseParams.dSizeRope;
             constInfo.kRopeStrides.bnStride = fiaBaseParams.kRopeStrides.bnStride;
             constInfo.kRopeStrides.n2Stride = fiaBaseParams.kRopeStrides.n2Stride;
-        } else {
-            constInfo.dSizeRope = 0;
         }
         constInfo.actualSeqLenSize = fiaBaseParams.actualSeqLengthsQSize;
         constInfo.actualSeqLenKVSize = fiaBaseParams.actualSeqLengthsKVSize;

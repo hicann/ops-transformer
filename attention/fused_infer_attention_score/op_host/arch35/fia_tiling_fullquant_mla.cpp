@@ -31,7 +31,6 @@ using namespace AscendC;
 namespace optiling {
 using namespace arch35FIA;
 constexpr uint64_t PRE_LOAD_NUM_MLA_ARCH35 = 3;
-constexpr uint32_t MLA_GSIZE_THRESHOLD = 32;
 
 void FiaTilingFullQuantMlaArch35::InitTilingInfo(TilingInfo *tilingInfo)
 {
@@ -198,9 +197,6 @@ void FiaTilingFullQuantMlaArch35::InitImplParam()
 
     if (!fiaInfo_->sysPrefixFlag) {
         actualSharedPrefixLenFlag_ = false;
-    } else {
-        actualSharedPrefixLenFlag_ = !((actSharedPrefixLenDims == 0) || (actSharedPrefixLen == nullptr) ||
-                                       (actSharedPrefixLen->GetData<int64_t>() == nullptr));
     }
 
     for (uint32_t bIdx = 0; bIdx < fiaInfo_->bSize; bIdx++) {
@@ -209,15 +205,10 @@ void FiaTilingFullQuantMlaArch35::InitImplParam()
             if (actSeqLenQDims == 1) {
                 actSeqLenQData = actSeqLenQ->GetData<int64_t>()[0];
             } else {
-                if (fiaInfo_->qLayout != FiaLayout::TND && fiaInfo_->qLayout != FiaLayout::NTD) {
+                if (bIdx == 0) {
                     actSeqLenQData = actSeqLenQ->GetData<int64_t>()[bIdx];
                 } else {
-                    if (bIdx == 0) {
-                        actSeqLenQData = actSeqLenQ->GetData<int64_t>()[bIdx];
-                    } else {
-                        actSeqLenQData =
-                            actSeqLenQ->GetData<int64_t>()[bIdx] - actSeqLenQ->GetData<int64_t>()[bIdx - 1];
-                    }
+                    actSeqLenQData = actSeqLenQ->GetData<int64_t>()[bIdx] - actSeqLenQ->GetData<int64_t>()[bIdx - 1];
                 }
             }
             actualSeqLengthsQ_.push_back(actSeqLenQData);
@@ -229,19 +220,13 @@ void FiaTilingFullQuantMlaArch35::InitImplParam()
             if (actSeqLenKVDims == 1) {
                 actualSeqLengthsKV_.push_back(actSeqLenKV->GetData<int64_t>()[0]);
             } else {
-                if (fiaInfo_->kvLayout != FiaLayout::TND && fiaInfo_->kvLayout != FiaLayout::NTD) {
+                if (bIdx == 0) {
                     actualSeqLengthsKV_.push_back(actSeqLenKV->GetData<int64_t>()[bIdx]);
                 } else {
-                    if (bIdx == 0) {
-                        actualSeqLengthsKV_.push_back(actSeqLenKV->GetData<int64_t>()[bIdx]);
-                    } else {
-                        actualSeqLengthsKV_.push_back(actSeqLenKV->GetData<int64_t>()[bIdx] -
-                                                      actSeqLenKV->GetData<int64_t>()[bIdx - 1]);
-                    }
+                    actualSeqLengthsKV_.push_back(actSeqLenKV->GetData<int64_t>()[bIdx] -
+                                                  actSeqLenKV->GetData<int64_t>()[bIdx - 1]);
                 }
             }
-        } else if (fiaInfo_->kvStorageMode == KvStorageMode::TENSOR_LIST) {
-            actualSeqLengthsKV_.push_back(fiaInfo_->kvListSeqLens[bIdx]);
         } else {
             actualSeqLengthsKV_.push_back(fiaInfo_->s2Size);
         }
@@ -254,99 +239,6 @@ void FiaTilingFullQuantMlaArch35::AdjustSinnerAndSouter()
     sOuterFactor_ = SOUTER_32;
     sInnerFactor_ = SINNER_128;
     OP_LOGI(fiaInfo_->opName, "MLA Souter:%u SInner:%u", sOuterFactor_, sInnerFactor_);
-}
-
-void FiaTilingFullQuantMlaArch35::GetPreNextTokensLeftUp(int64_t actualSeqLength, int64_t actualSeqLengthKV,
-                                                         int64_t &preTokensLeftUp, int64_t &nextTokensLeftUp)
-{
-    bool isRopeSplit512 = (fiaInfo_->ropeMode == RopeMode::ROPE_SPLIT && fiaInfo_->vHeadDim == DSIZE_512);
-    if (fiaInfo_->sparseMode == SPARSE_MODE_RIGHT_DOWN) {
-        preTokensLeftUp = SPARSE_MODE_INT_MAX_MLA;
-        if (isRopeSplit512) {
-            nextTokensLeftUp = actualSeqLengthKV * fiaInfo_->gSize - actualSeqLength;
-        } else {
-            nextTokensLeftUp = actualSeqLengthKV - actualSeqLength;
-        }
-    } else if (fiaInfo_->sparseMode == SPARSE_MODE_BAND) {
-        if (isRopeSplit512) {
-            preTokensLeftUp =
-                fiaInfo_->preToken * fiaInfo_->gSize - actualSeqLengthKV * fiaInfo_->gSize + actualSeqLength;
-            nextTokensLeftUp =
-                fiaInfo_->nextToken * fiaInfo_->gSize + actualSeqLengthKV * fiaInfo_->gSize - actualSeqLength;
-        } else {
-            preTokensLeftUp = fiaInfo_->preToken - actualSeqLengthKV + actualSeqLength;
-            nextTokensLeftUp = fiaInfo_->nextToken + actualSeqLengthKV - actualSeqLength;
-        }
-    } else {
-        if (isRopeSplit512) {
-            preTokensLeftUp = fiaInfo_->preToken * fiaInfo_->gSize;
-            nextTokensLeftUp = fiaInfo_->nextToken * fiaInfo_->gSize;
-        } else {
-            preTokensLeftUp = fiaInfo_->preToken;
-            nextTokensLeftUp = fiaInfo_->nextToken;
-        }
-    }
-}
-
-void FiaTilingFullQuantMlaArch35::FixParamWithRowInvalid(int64_t &actualSeqLength, int64_t actualSeqLengthKV,
-                                                         int64_t &preTokensLeftUp, int64_t &nextTokensLeftUp)
-{
-    // 若出现行无效，需要重新计算nexttokens，pretokens，actualseqlen，以便正确计算分核核数
-    int64_t nextTokensError = (nextTokensLeftUp < 0) ? -nextTokensLeftUp : 0;
-    nextTokensError = nextTokensError > actualSeqLength ? actualSeqLength : nextTokensError;
-    int64_t preTokensError = 0;
-    if (fiaInfo_->mlaMode == MlaMode::ROPE_SPLIT_D512) {
-        preTokensError = (actualSeqLength > actualSeqLengthKV * fiaInfo_->gSize + preTokensLeftUp) ?
-                             (actualSeqLength - actualSeqLengthKV * fiaInfo_->gSize - preTokensLeftUp) :
-                             0;
-    } else {
-        preTokensError = (actualSeqLength > actualSeqLengthKV + preTokensLeftUp) ?
-                             (actualSeqLength - actualSeqLengthKV - preTokensLeftUp) :
-                             0;
-    }
-    preTokensError = preTokensError > actualSeqLength ? actualSeqLength : preTokensError;
-
-    // 若出现上方行无效，需要重新计算nexttokens，pretokens，actualseqlen
-    nextTokensLeftUp += nextTokensError;
-    preTokensLeftUp -= nextTokensError;
-    actualSeqLength -= nextTokensError;
-
-    // 若出现下方行无效，需要重新计算actualseqlen
-    actualSeqLength -= preTokensError;
-}
-
-bool FiaTilingFullQuantMlaArch35::CheckS1OutSplit()
-{
-    // MLA 全量化不支持 S1 外切分核
-    return false;
-}
-
-void FiaTilingFullQuantMlaArch35::SplitOutSeq()
-{
-    uint32_t curCoreNum = platformInfo_.aicNum;
-    uint32_t sOuterSize = sOuterFactor_ * CV_RATIO;
-    int64_t totalSize = 0;
-    for (uint32_t bIdx = 0; bIdx < fiaInfo_->bSize; bIdx++) {
-        int64_t actualSeqLengthsTmp = actualSeqLengthsQ_[bIdx];
-        int64_t preTokensLeftUp = 0;
-        int64_t nextTokensLeftUp = 0;
-        GetPreNextTokensLeftUp(actualSeqLengthsQ_[bIdx], actualSeqLengthsKV_[bIdx] + fiaInfo_->systemPrefixLen,
-                               preTokensLeftUp, nextTokensLeftUp);
-        FixParamWithRowInvalid(actualSeqLengthsTmp, actualSeqLengthsKV_[bIdx] + fiaInfo_->systemPrefixLen,
-                               preTokensLeftUp, nextTokensLeftUp);
-
-        int64_t outerBlockNums = (actualSeqLengthsTmp * fiaInfo_->gSize + static_cast<int64_t>(sOuterSize) - 1) /
-                                 static_cast<int64_t>(sOuterSize) * fiaInfo_->n2Size;
-        if (actualSeqLengthsTmp == 0 || actualSeqLengthsKV_[bIdx] == 0) {
-            outerBlockNums = fiaInfo_->n2Size;
-        }
-        totalSize += outerBlockNums;
-    }
-
-    int64_t actualUsedCoreNum = std::min(totalSize, static_cast<int64_t>(curCoreNum));
-    CalcNumBlocks(actualUsedCoreNum);
-    tilingData_.baseTiling.fiaS1OuterSplitCoreParams.totalSize = totalSize;
-    tilingData_.baseTiling.fiaS1OuterSplitCoreParams.enableS1OutSplit = true;
 }
 
 bool FiaTilingFullQuantMlaArch35::CheckQKVActualSeqLengthsRight()
@@ -371,8 +263,7 @@ void FiaTilingFullQuantMlaArch35::CreateSplitInput(split_core_v2::BaseInfo &base
     baseInfo.actualLenKvDims = fiaInfo_->actualLenKvDims;
     baseInfo.preToken = fiaInfo_->preToken;
     baseInfo.nextToken = fiaInfo_->nextToken;
-    baseInfo.isS1G = (fiaInfo_->qLayout == FiaLayout::BSH) || (fiaInfo_->qLayout == FiaLayout::BSND) ||
-                     (fiaInfo_->qLayout == FiaLayout::TND);
+    baseInfo.isS1G = true; // qlayout=TND
     baseInfo.sparseMode = fiaInfo_->sparseMode;
     baseInfo.attenMaskFlag = fiaInfo_->attenMaskFlag;
 
@@ -399,16 +290,12 @@ void FiaTilingFullQuantMlaArch35::CreateSplitInput(split_core_v2::BaseInfo &base
             baseInfo.actualSeqS2Size.emplace_back(s2Ptr[i]);
         }
     }
-    if (fiaInfo_->sysPrefixFlag) {
-        baseInfo.actualSeqPrefixSize = fiaInfo_->systemPrefixLen;
-    }
+
     // MLA 全量化基本块: mBaseSize = sOuter * CV_RATIO = 64, s2BaseSize = 128
     splitParam.mBaseSize = sOuterFactor_ * CV_RATIO;
     splitParam.s2BaseSize = sInnerFactor_;
     splitParam.gS1BaseSizeOfFd = 8;
     splitParam.streamK = true;
-    // splitParam.fdTolerance = 10;
-    // splitParam.fdLeastBlock = 2;
 }
 
 void FiaTilingFullQuantMlaArch35::SetSplitOutput(const split_core_v2::FAMetaData &splitRes)
@@ -459,16 +346,12 @@ void FiaTilingFullQuantMlaArch35::SplitPolicy()
     split_core_v2::SplitParam splitParam{};
     CreateSplitInput(baseInfo, splitParam);
 
-    enableS1OutSplit = CheckS1OutSplit();
-    if (enableS1OutSplit) {
-        SplitOutSeq();
-    } else {
-        split_core_v2::FAMetaData result{platformInfo_.aicNum, platformInfo_.cvRatio};
-        split_core_v2::SplitCore(platformInfo_.aicNum, baseInfo, splitParam, result);
-        SetSplitOutput(result);
-        CalcNumBlocks(result.usedCoreNum);
-        flashDecodeFlag_ = (result.fdRes.fdNum > 0);
-    }
+    split_core_v2::FAMetaData result{platformInfo_.aicNum, platformInfo_.cvRatio};
+    split_core_v2::SplitCore(platformInfo_.aicNum, baseInfo, splitParam, result);
+    SetSplitOutput(result);
+    CalcNumBlocks(result.usedCoreNum);
+    flashDecodeFlag_ = (result.fdRes.fdNum > 0);
+
     fiaInfo_->isExistRowInvalid =
         (fiaInfo_->needInit || IsExistRowInvalid(baseInfo) || IsActualSeqLengthsKVHasZero(baseInfo));
 }
@@ -578,11 +461,7 @@ void FiaTilingFullQuantMlaArch35::UpdateTilingKeyConfig()
     }
 
     // MLA 全量化固定 config: S1Aligned64_S2Aligned128_DAligned576_DVAligned512
-    if (sOuter == SOUTER_64 && sInner == SINNER_128 && dSize == DSIZE_576 && dVsize == DSIZE_512) {
-        tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned128_DAligned576_DVAligned512;
-    } else {
-        tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned128_DAligned576_DVAligned512;
-    }
+    tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned128_DAligned576_DVAligned512;
 }
 
 void FiaTilingFullQuantMlaArch35::UpdateTilingKeyLayout()
@@ -598,27 +477,10 @@ void FiaTilingFullQuantMlaArch35::UpdateTilingKeyLayout()
     }
 }
 
-void FiaTilingFullQuantMlaArch35::UpdateTilingKeyPseMode()
-{
-    if (!fiaInfo_->pseShiftFlag && !fiaInfo_->enableAlibiPse) {
-        tilingKeyInfo_.pseMode = PSE_MODE_PSE_NONE_TYPE;
-    } else {
-        tilingKeyInfo_.pseMode = *(fiaInfo_->opParamInfo.pseType);
-    }
-}
-
 void FiaTilingFullQuantMlaArch35::UpdateTilingKeyQuantMode()
 {
     // MLA 全量化 quantMode
     tilingKeyInfo_.quantMode = FULLQUANT_MODE_Q_PER_TOKEN_HEAD_KV_PER_TENSOR;
-}
-
-void FiaTilingFullQuantMlaArch35::UpdateTilingKeyHasRope()
-{
-    tilingKeyInfo_.hasRope = false;
-    if (fiaInfo_->ropeMode == RopeMode::ROPE_SPLIT) {
-        tilingKeyInfo_.hasRope = true;
-    }
 }
 
 void FiaTilingFullQuantMlaArch35::UpdateTilingKeyInfo()
@@ -628,14 +490,11 @@ void FiaTilingFullQuantMlaArch35::UpdateTilingKeyInfo()
     } else {
         UpdateTilingKeyLayout();
         UpdateTilingKeyConfig();
-        UpdateTilingKeyPseMode();
         UpdateTilingKeyQuantMode();
         tilingKeyInfo_.isFd = flashDecodeFlag_;
-        if (fiaInfo_->sysPrefixFlag) {
-            tilingKeyInfo_.isFd = false;
-        }
         tilingKeyInfo_.hasAttenMask = fiaInfo_->attenMaskFlag;
-        UpdateTilingKeyHasRope();
+        tilingKeyInfo_.hasRope = true;
+        tilingKeyInfo_.pseMode = PSE_MODE_PSE_NONE_TYPE;
 
         tilingKeyInfo_.kvLayoutType = tilingData_.baseTiling.fiaPageAttentionParams.paLayoutType;
 
@@ -648,7 +507,7 @@ void FiaTilingFullQuantMlaArch35::UpdateTilingKeyInfo()
                 tilingKeyInfo_.kvLayoutType = 3;
             }
         } else {
-            tilingKeyInfo_.kvLayoutType = 0;
+            tilingKeyInfo_.kvLayoutType = 0; // TND
         }
 
         tilingKeyInfo_.emptyTensor = fiaInfo_->emptyTensorFlag;

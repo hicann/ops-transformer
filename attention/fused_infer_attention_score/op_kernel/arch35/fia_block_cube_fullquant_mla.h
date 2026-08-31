@@ -14,13 +14,23 @@
  */
 #ifndef FIA_BLOCK_CUBE_FULLQUANT_MLA_H_
 #define FIA_BLOCK_CUBE_FULLQUANT_MLA_H_
+#if __has_include("../../../common/op_kernel/offset_calculator.h")
 #include "../../../common/op_kernel/offset_calculator.h"
 #include "../../../common/op_kernel/matmul.h"
 #include "../../../common/op_kernel/FixpipeOut.h"
+#else
+#include "../../common/offset_calculator.h"
+#include "../../common/matmul.h"
+#include "../../common/FixpipeOut.h"
+#endif
 #include "memory_copy_arch35_fused_infer.h"
-
+#if __has_include("../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h")
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
+#else
+#include "../../common/arch35/infer_flash_attention_comm_arch35.h"
+#include "../../common/arch35/flash_attention_score_common_regbase_arch35.h"
+#endif
 #include "kernel_operator_list_tensor_intf.h"
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;
@@ -87,7 +97,6 @@ public:
     static constexpr uint32_t s2BaseSize = (uint32_t)s2TemplateType;
     static constexpr uint32_t dBaseSize = (uint32_t)dTemplateType;
     static constexpr uint32_t dVBaseSize = (uint32_t)dVTemplateType;
-    static constexpr uint32_t s2SplitSize = 256U;
     static constexpr LayOutTypeEnum LAYOUT = layout;
     static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0);
     static constexpr bool HAS_ROPE = hasRope;
@@ -98,22 +107,21 @@ public:
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
     static constexpr bool isInt8 = IsSameType<INPUT_T, int8_t>::value;
-    static constexpr bool isMlaFullQuant = (isFp8 || isInt8) && hasRope;
     static constexpr TPosition bmm2OutPos =
         GetC2Position(dVTemplateType,
                       UbOutCondition<INPUT_T>(IsSameType<INPUT_T, float>::value, PseTypeEnum::PSE_NONE_TYPE, false,
                                               false, hasRope, mBaseSize == 64),
-                      (s2BaseSize == 256 && mBaseSize == 64), isMlaFullQuant);
+                      (s2BaseSize == 256 && mBaseSize == 64), true);
     static constexpr FixpipeConfig BMM2_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, BMM2_TOUB};
 
     static constexpr GmFormat Q_FORMAT = GetQueryGmFormat<layout>();
     static constexpr GmFormat KV_FORMAT = GetKVGmFormat<layout, KvLayoutType, PAGE_ATTENTION>();
 
-    using ROPE_T = std::conditional_t<isMlaFullQuant, bfloat16_t, INPUT_T>;
+    using ROPE_T = bfloat16_t;
     using Q_T = INPUT_T;
     using KV_T = INPUT_T;
     using MM_T = T;
-    using MLA_FULLQUANT_MM2_T = std::conditional_t<isMlaFullQuant && isInt8, int32_t, T>;
+    using MLA_FULLQUANT_MM2_T = std::conditional_t<isInt8, int32_t, T>;
     using mm2ResPos = typename std::conditional<BMM2_TOUB, Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>,
                                                 Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_FORWARD>>::type;
 
@@ -184,27 +192,25 @@ public:
 
     __aicore__ inline void InitBuffers()
     {
-        if constexpr (isMlaFullQuant) {
-            constexpr uint32_t dRopeBaseSize = dBaseSize - dVBaseSize;
-            constexpr uint32_t mm1QSize = mBaseSize * dVBaseSize * sizeof(INPUT_T);
-            constexpr uint32_t mm1QRopeSize = mBaseSize * dRopeBaseSize * sizeof(bfloat16_t);
-            constexpr uint32_t mm1KSize = dVBaseSize * s2BaseSize * sizeof(INPUT_T);
-            constexpr uint32_t mm1KRopeSize = dRopeBaseSize * s2BaseSize * sizeof(bfloat16_t);
+        constexpr uint32_t dRopeBaseSize = dBaseSize - dVBaseSize;
+        constexpr uint32_t mm1QSize = mBaseSize * dVBaseSize * sizeof(INPUT_T);
+        constexpr uint32_t mm1QRopeSize = mBaseSize * dRopeBaseSize * sizeof(bfloat16_t);
+        constexpr uint32_t mm1KSize = dVBaseSize * s2BaseSize * sizeof(INPUT_T);
+        constexpr uint32_t mm1KRopeSize = dRopeBaseSize * s2BaseSize * sizeof(bfloat16_t);
 
-            l1QBuffers.Init((*l1BufferManagerPtr), mm1QSize + mm1QRopeSize);
-            l1KBuffers.Init((*l1BufferManagerPtr), mm1KSize + mm1KRopeSize);
+        l1QBuffers.Init((*l1BufferManagerPtr), mm1QSize + mm1QRopeSize);
+        l1KBuffers.Init((*l1BufferManagerPtr), mm1KSize + mm1KRopeSize);
 
-            l0aBufferManager.Init(tPipe, 65536);  // 64 * 1024
-            l0bBufferManager.Init(tPipe, 65536);  // 64 * 1024
-            l0cBufferManager.Init(tPipe, 262144); // 256 * 1024
-            mmL0ABuffers.Init(l0aBufferManager, 32 * 1024);
-            mmL0BBuffers.Init(l0bBufferManager, 32 * 1024);
-            if constexpr (mBaseSize * s2BaseSize * FLOAT_BYTES <= (L0C_SIZE * KB_TO_BYTES) / NUM_4 &&
-                          mBaseSize * dVBaseSize * FLOAT_BYTES <= (L0C_SIZE * KB_TO_BYTES) / NUM_4) {
-                mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / NUM_4) * KB_TO_BYTES);
-            } else {
-                mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / NUM_2) * KB_TO_BYTES);
-            }
+        l0aBufferManager.Init(tPipe, 65536);  // 64 * 1024
+        l0bBufferManager.Init(tPipe, 65536);  // 64 * 1024
+        l0cBufferManager.Init(tPipe, 262144); // 256 * 1024
+        mmL0ABuffers.Init(l0aBufferManager, 32 * 1024);
+        mmL0BBuffers.Init(l0bBufferManager, 32 * 1024);
+        if constexpr (mBaseSize * s2BaseSize * FLOAT_BYTES <= (L0C_SIZE * KB_TO_BYTES) / NUM_4 &&
+                      mBaseSize * dVBaseSize * FLOAT_BYTES <= (L0C_SIZE * KB_TO_BYTES) / NUM_4) {
+            mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / NUM_4) * KB_TO_BYTES);
+        } else {
+            mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / NUM_2) * KB_TO_BYTES);
         }
     }
 
@@ -300,7 +306,7 @@ public:
             kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm,
                                              constInfo.maxBlockNumPerBatch, bnStrides, n2Strides);
         } else if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_NZ) {
-            uint32_t d0 = 32 / sizeof(KV_T);
+            constexpr uint32_t d0 = 32 / sizeof(KV_T);
             uint32_t d1 = headDim / d0;
             kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, d1, d0, blockTableGm,
                                              constInfo.maxBlockNumPerBatch, bnStrides, n2Strides);
@@ -323,7 +329,7 @@ public:
             kRopeGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm,
                                                 constInfo.maxBlockNumPerBatch, bnStrides, n2Strides);
         } else if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_NZ) {
-            uint32_t d0 = 32 / sizeof(ROPE_T);
+            constexpr uint32_t d0 = 32 / sizeof(ROPE_T);
             uint32_t d1 = headDim / d0;
             kRopeGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, d1, d0, blockTableGm,
                                                 constInfo.maxBlockNumPerBatch, bnStrides, n2Strides);
@@ -426,9 +432,9 @@ public:
         // MLA 全量化 bmm1: Q_nope @ K_nope^T + Q_rope @ K_rope^T
         // Q (含 rope) 首次全载 L1，后续 s2 循环复用
         Buffer<BufferType::L1> mm1A;
-        uint32_t dTypeRATIO = sizeof(bfloat16_t) / sizeof(INPUT_T);
+        uint32_t dTypeRatio = sizeof(bfloat16_t) / sizeof(INPUT_T);
         uint32_t dstNzC0StrideQNope = (runInfo.actMSize + 31) >> 5 << 5;
-        uint32_t offsetQRopeByElement = dstNzC0StrideQNope * constInfo.dSizeV / dTypeRATIO;
+        uint32_t offsetQRopeByElement = dstNzC0StrideQNope * constInfo.dSizeV / dTypeRatio;
 
         if (unlikely(runInfo.isFirstS2Loop)) {
             mm1A = l1QBuffers.Get();
@@ -447,7 +453,7 @@ public:
         LocalTensor<KV_T> mm1BTensor = mm1B.GetTensor<KV_T>();
         uint32_t s2CurSize = runInfo.actSingleLoopS2Size;
         uint32_t dstNzC0StrideKNope = (s2CurSize + 31) >> 5 << 5;
-        uint32_t offsetKRopeByElement = dstNzC0StrideKNope * constInfo.dSizeV / dTypeRATIO;
+        uint32_t offsetKRopeByElement = dstNzC0StrideKNope * constInfo.dSizeV / dTypeRatio;
         CopyKeyTile(mm1BTensor, runInfo, s2CurSize);
         mm1B.Set<HardEvent::MTE2_MTE1>();
 
@@ -583,9 +589,6 @@ public:
     static constexpr bool isInt8 =
         FAFullQuantMlaBlockCube<INPUT_T, T, layout, s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
                                 hasRope, KvLayoutType, enableKVPrefix, useDn, bmm2Write2Ub, splitD>::isInt8;
-    static constexpr bool isMlaFullQuant =
-        FAFullQuantMlaBlockCube<INPUT_T, T, layout, s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
-                                hasRope, KvLayoutType, enableKVPrefix, useDn, bmm2Write2Ub, splitD>::isMlaFullQuant;
     static constexpr bool useDnDummy = false;
     static constexpr bool useNz = false;
     static constexpr TPosition bmm2OutPos =
@@ -593,7 +596,7 @@ public:
                                 hasRope, KvLayoutType, enableKVPrefix, useDn, bmm2Write2Ub, splitD>::bmm2OutPos;
     static constexpr bool bmm2Write2UbDummy = bmm2Write2Ub;
     static constexpr bool splitDDummy = splitD;
-    using ROPE_T = std::conditional_t<isMlaFullQuant, bfloat16_t, INPUT_T>;
+    using ROPE_T = bfloat16_t;
     using Q_T = INPUT_T;
     using KV_T = INPUT_T;
     using MM_T = T;

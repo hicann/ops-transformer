@@ -16,15 +16,26 @@
 #define FIA_BLOCK_VEC_FULLQUANT_MLA_H_
 
 #include "kernel_operator.h"
-
-#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "adv_api/activation/softmax.h"
+#if __has_include("../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h")
+#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
+#else
+#include "../../common/arch35/flash_attention_score_common_regbase_arch35.h"
+#include "../../common/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
+#include "../../common/arch35/vf/vf_flashupdate_new.h"
+#include "../../common/arch35/vf/vf_div_cast_arch35.h"
+#include "../../common/arch35/vf/vf_flash_decode_arch35.h"
+#endif
 #include "fia_public_define_arch35.h"
+#if __has_include("../../../common/op_kernel/vector_common.h")
 #include "../../../common/op_kernel/vector_common.h"
+#else
+#include "../../common/vector_common.h"
+#endif
 #include "memory_copy_arch35_fused_infer.h"
 
 using namespace AscendC;
@@ -52,10 +63,8 @@ public:
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
     static constexpr bool isInt8 = IsSameType<INPUT_T, int8_t>::value;
-    static constexpr bool isMlaFullQuant = (isFp8 || isInt8) && hasRope;
     static constexpr uint32_t DB = 2;
     static constexpr uint32_t PRELOAD_N = 2;
-    static constexpr uint32_t s2SplitSize = 128U;
 
     static constexpr uint32_t initOutputEventId = 0U;
 
@@ -70,8 +79,7 @@ public:
     static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;
     static constexpr bool IS_PER_TOKEN_HEAD = true;
-    static constexpr GmFormat Q_SCALE_FORMAT =
-        GetQueryScaleGmFormat<layout, USE_DN, IS_PER_TOKEN_HEAD, isMlaFullQuant>();
+    static constexpr GmFormat Q_SCALE_FORMAT = GetQueryScaleGmFormat<layout, USE_DN, IS_PER_TOKEN_HEAD, true>();
 
     static constexpr bool POST_QUANT = !IsSameType<OUTPUT_T, half>::value && !IsSameType<OUTPUT_T, bfloat16_t>::value &&
                                        !IsSameType<OUTPUT_T, float>::value;
@@ -216,16 +224,6 @@ public:
             .colCount = dRealSize,
         };
 
-        // uint32_t gS1Idx = runInfo.gS1Idx + runInfo.vecMbaseIdx;
-        // uint32_t gS1DealSize = runInfo.actVecMSize;
-        // uint64_t gS1Size = runInfo.actS1Size * constInfo.realGSize;
-        // if (likely(isPreload)) {
-        //     gS1Idx = runInfo.gS1Idx + mBaseSize;
-        //     if (gS1Idx + mBaseSize > gS1Size) {
-        //         gS1DealSize = gS1Size - gS1Idx;
-        //     }
-        // }
-
         GmCoord gmCoord{
             .bIdx = runInfo.bIdx,
             .n2Idx = runInfo.realN2Idx,
@@ -351,7 +349,6 @@ public:
 
         // MLA 全量化: queryAntiqScaleInputQue (per-token Q scale) 和 pScaleBuf
         constexpr uint32_t softmaxRowmaxBufSize = 256; // s1 baseSize * 4b(fp32)
-        // tPipe->InitBuffer(queryAntiqScaleInputQue, (mBaseSize >> 1U) * sizeof(float));
         tPipe->InitBuffer(queryAntiqScaleInputQue[0], (mBaseSize / CV_RATIO) * sizeof(float));
         tPipe->InitBuffer(queryAntiqScaleInputQue[1], (mBaseSize / CV_RATIO) * sizeof(float));
         tPipe->InitBuffer(pScaleBuf[0], softmaxRowmaxBufSize);
@@ -391,7 +388,6 @@ public:
         mte2ToVId[1] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
         vToMte2Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
         vToMte2Id[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
-        // SetFlag<HardEvent::MTE2_V>(mte2ToVId);
         SetFlag<HardEvent::V_MTE2>(vToMte2Id[0]);
         SetFlag<HardEvent::V_MTE2>(vToMte2Id[1]);
         SetFlag<HardEvent::MTE3_V>(mte3ToVId[0]);
@@ -402,7 +398,6 @@ public:
     {
         WaitFlag<AscendC::HardEvent::MTE3_V>(mte3ToVId[0]);
         WaitFlag<AscendC::HardEvent::MTE3_V>(mte3ToVId[1]);
-        // WaitFlag<AscendC::HardEvent::MTE2_V>(mte2ToVId);
         WaitFlag<AscendC::HardEvent::V_MTE2>(vToMte2Id[0]);
         WaitFlag<AscendC::HardEvent::V_MTE2>(vToMte2Id[1]);
         GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId[0]);
@@ -420,9 +415,6 @@ public:
     {
         uint32_t s2RealSize = runInfo.actSingleLoopS2Size;
         constexpr uint32_t s2BaseSizeCur = s2BaseSize;
-        if (runInfo.actSingleLoopS2Size > s2SplitSize) {
-            s2RealSize = s2SplitSize;
-        }
 
         MaskInfo maskInfo;
         maskInfo.gs1StartIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx + vecMIdx;
@@ -483,18 +475,14 @@ public:
         LocalTensor<float> queryScaleUb;
         LocalTensor<T> pScaleUb;
         // MLA 全量化: 首个 S2 loop 加载 per-token Q scale, 取 pScale buffer
-        if constexpr (isMlaFullQuant) {
-            if (unlikely(runInfo.isFirstS2Loop)) {
-                queryScaleUb = queryAntiqScaleInputQue[runInfo.mloop % DB].template Get<float>();
-                // AscendC::PipeBarrier<PIPE_ALL>();
-                WaitFlag<HardEvent::V_MTE2>(vToMte2Id[runInfo.mloop % DB]);
-                CopyQueryScaleTile(queryScaleUb, runInfo, false);
-                // event_t mte2VEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
-                SetFlag<HardEvent::MTE2_V>(mte2ToVId[runInfo.mloop % DB]);
-                WaitFlag<HardEvent::MTE2_V>(mte2ToVId[runInfo.mloop % DB]);
-            }
-            pScaleUb = pScaleBuf[runInfo.loop % 3].template Get<T>();
+        if (unlikely(runInfo.isFirstS2Loop)) {
+            queryScaleUb = queryAntiqScaleInputQue[runInfo.mloop % DB].template Get<float>();
+            WaitFlag<HardEvent::V_MTE2>(vToMte2Id[runInfo.mloop % DB]);
+            CopyQueryScaleTile(queryScaleUb, runInfo, false);
+            SetFlag<HardEvent::MTE2_V>(mte2ToVId[runInfo.mloop % DB]);
+            WaitFlag<HardEvent::MTE2_V>(mte2ToVId[runInfo.mloop % DB]);
         }
+        pScaleUb = pScaleBuf[runInfo.loop % 3].template Get<T>();
 
         LocalTensor<T> mmRes = bmm1ResBuf.template GetTensor<T>();
         auto stage1CastTensor = this->stage1OutQue[stage1Offset].template AllocTensor<INPUT_T>();
@@ -533,8 +521,7 @@ public:
             }
         } else {
             // 非首 loop: isUpdate=true
-            bool isMlaSgdRuntime =
-                (layout != LayOutTypeEnum::LAYOUT_BNSD) && (constInfo.gSize >= 32) && (constInfo.gSize % 32 == 0);
+            bool isMlaSgdRuntime = (constInfo.gSize >= 32) && (constInfo.gSize % 32 == 0);
             if (likely(s2CalcSize == s2BaseSize)) {
                 if (isMlaSgdRuntime) {
                     FaVectorApi::ProcessVec1Vf<T, INPUT_T, pseShiftType, true, mBaseSize, s2BaseSize, EQ_128, HAS_MASK,
@@ -710,8 +697,6 @@ public:
         bmm2ResBuf.WaitCrossCore();
         if constexpr (bmm2Write2Ub) {
             ProcessVec2OnUb(bmm2ResBuf, runInfo);
-        } else {
-            ProcessVec2OnGm(bmm2ResBuf, runInfo);
         }
     }
 
@@ -771,13 +756,6 @@ public:
             CopyOutAttentionOut(runInfo, vec2ResUb, 0, vecMSize);
         }
         SetFlag<HardEvent::MTE3_V>(mte3ToVId[0]);
-    }
-
-    __aicore__ inline void ProcessVec2OnGm(Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_FORWARD> &bmm2ResBuf,
-                                           RunInfoX runInfo)
-    {
-        // MLA 默认 bmm2Write2Ub=true，此路径暂不实现
-        bmm2ResBuf.SetCrossCore();
     }
 
     __aicore__ inline void CopyOutAttentionOut(RunInfoX runInfo, LocalTensor<T> &vec2ResUb, uint32_t mStartVec,

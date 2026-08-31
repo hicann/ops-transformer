@@ -20,8 +20,13 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
+#if __has_include("../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h")
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
+#else
+#include "../../common/arch35/infer_flash_attention_comm_arch35.h"
+#include "../../common/arch35/vf/vf_flash_decode_arch35.h"
+#endif
 #include "fia_public_define_arch35.h"
 #include "memory_copy_arch35_fused_infer.h"
 
@@ -131,7 +136,8 @@ private:
     TBuf<> fdLseUbBuf;
 
 public:
-    __aicore__ inline FiaBlockVecFlashDecodeFullQuant(ConstInfoX &constInfo) : constInfo(constInfo){};
+    __aicore__ inline FiaBlockVecFlashDecodeFullQuant(ConstInfoX &constInfo)
+        : constInfo(constInfo){};
 
     __aicore__ inline void InitGlobalTensor(GlobalTensor<float> lseMaxFdGm, GlobalTensor<float> lseSumFdGm,
                                             GlobalTensor<float> accumOutGm, GlobalTensor<OUTPUT_T> attentionOutGm,
@@ -332,8 +338,7 @@ protected:
         uint32_t shapeArray[] = {dealRowCount, (uint32_t)constInfo.dSizeV};
         tmpBmm2ResCastTensor.SetShapeInfo(ShapeInfo(2, shapeArray, DataFormat::ND));
         if constexpr (IsSameType<OUTPUT_T, bfloat16_t>::value) { // bf16 采取四舍六入五成双模式
-            Cast(tmpBmm2ResCastTensor, accumOutLocal, AscendC::RoundMode::CAST_RINT,
-                 dealRowCount * this->dSizeV_Align);
+            Cast(tmpBmm2ResCastTensor, accumOutLocal, AscendC::RoundMode::CAST_RINT, dealRowCount * this->dSizeV_Align);
         } else {
             Cast(tmpBmm2ResCastTensor, accumOutLocal, AscendC::RoundMode::CAST_ROUND,
                  dealRowCount * this->dSizeV_Align);
@@ -439,15 +444,15 @@ public:
             uint32_t mOffset = taskInfo.gS1Idx + startRow;
             if constexpr (layout == LayOutTypeEnum::LAYOUT_TND) {
                 uint32_t prefixBS1 = qActSeqLensParser.GetTBase(taskInfo.bIdx);
-                uint64_t bN2Offset = prefixBS1 * constInfo.realGSize * constInfo.realN2Size +
-                    taskInfo.n2Idx * constInfo.realGSize;
+                uint64_t bN2Offset =
+                    prefixBS1 * constInfo.realGSize * constInfo.realN2Size + taskInfo.n2Idx * constInfo.realGSize;
                 DataCopySoftmaxLseTNDArch35<T, ConstInfoX>(softmaxLseGm, maxLseUb, bN2Offset, mOffset, actualGSplitSize,
                                                            constInfo);
             } else if constexpr (layout == LayOutTypeEnum::LAYOUT_NTD) {
                 uint32_t prefixBS1 = qActSeqLensParser.GetTBase(taskInfo.bIdx);
                 uint32_t s1Size = qActSeqLensParser.GetActualSeqLength(taskInfo.bIdx);
-                uint64_t bN2Offset = prefixBS1 * constInfo.realGSize * constInfo.realN2Size +
-                    taskInfo.n2Idx * constInfo.realGSize;
+                uint64_t bN2Offset =
+                    prefixBS1 * constInfo.realGSize * constInfo.realN2Size + taskInfo.n2Idx * constInfo.realGSize;
                 DataCopySoftmaxLseNTDArch35<T, ConstInfoX>(softmaxLseGm, maxLseUb, bN2Offset, mOffset, actualGSplitSize,
                                                            constInfo, s1Size);
             } else if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH) {

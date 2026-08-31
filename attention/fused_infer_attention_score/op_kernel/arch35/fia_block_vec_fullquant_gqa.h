@@ -16,16 +16,28 @@
 #define FIA_BLOCK_VEC_FULLQUANT_GQA_H_
 
 #include "kernel_operator.h"
-
-#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "adv_api/activation/softmax.h"
+#if __has_include("../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h")
+#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
+#else
+#include "../../common/arch35/flash_attention_score_common_regbase_arch35.h"
+#include "../../common/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
+#include "../../common/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
+#include "../../common/arch35/vf/vf_flashupdate_new.h"
+#include "../../common/arch35/vf/vf_div_cast_arch35.h"
+#include "../../common/arch35/vf/vf_flash_decode_arch35.h"
+#endif
 #include "fia_public_define_arch35.h"
+#if __has_include("../../../common/op_kernel/vector_common.h")
 #include "../../../common/op_kernel/vector_common.h"
+#else
+#include "../../common/vector_common.h"
+#endif
 #include "memory_copy_arch35_fused_infer.h"
 
 using namespace AscendC;
@@ -623,14 +635,12 @@ public:
                 }
             } else {
                 if (unlikely(runInfo.s2Idx == s2BaseSize)) { // s2方向第二轮循环更新第一轮循环的deScaleV
-                    LocalTensor<float> sumUb =
-                        this->softmaxSumBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
+                    LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
                     FlashUpdateLastNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, true, false>(
                         vec2ResUb, mmRes, vec2ResUb, expUb, pScaleUb, sumUb, runInfo.actVecMSize, dTemplateAlign64,
                         deScaleVValue, deScaleVValue);
                 } else {
-                    LocalTensor<float> sumUb =
-                        this->softmaxSumBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
+                    LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
                     FlashUpdateLastNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
                         vec2ResUb, mmRes, vec2ResUb, expUb, pScaleUb, sumUb, runInfo.actVecMSize, dTemplateAlign64,
                         deScaleVValue, deScaleVValue);
