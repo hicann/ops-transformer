@@ -1950,6 +1950,8 @@ aclnnStatus aclnnFlashAttentionScoreGradGetWorkspaceSize(
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(executor != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "executor"),
              return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     // 空Tensor处理
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
@@ -2008,6 +2010,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
                           attentionInOptional, prefixOptional, actualSeqQLenOptional, actualSeqKvLenOptional,
                           scaleValue, keepProb, preTokens, nextTokens, headNum, inputLayout, innerPrecise, sparseMode),
                    DFX_OUT(dqOut, dkOut, dvOut, dpseOut));
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     // layout检查
     if (strcmp(inputLayout, "TND") != 0) {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
@@ -2201,6 +2205,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(executor != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "executor"),
              return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
             OP_LOGD("All out tensor is empty");
@@ -2261,6 +2267,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
                actualSeqQLenOptional, actualSeqKvLenOptional, qStartIdxOptional, kvStartIdxOptional, scaleValue,
                keepProb, preTokens, nextTokens, headNum, inputLayout, innerPrecise, sparseMode, pseType),
         DFX_OUT(dqOut, dkOut, dvOut, dpseOut));
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     // layout检查
     if (strcmp(inputLayout, "TND") != 0) {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
@@ -2449,6 +2457,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3GetWorkspaceSize(
                scaleValue, keepProb, preTokens, nextTokens, headNum, inputLayout, innerPrecise, sparseMode, pseType),
         DFX_OUT(dqOut, dqRopeOut, dkOut, dkRopeOut, dvOut, dpseOut));
 
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     // layout检查
     if (strcmp(inputLayout, "TND") != 0) {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
@@ -2541,6 +2551,11 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4GetWorkspaceSize(
                inputLayout, innerPrecise, sparseMode, softmaxInLayout),
         DFX_OUT(dqOut, dkOut, dvOut, dpseOut));
     // layout检查
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(softmaxInLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
+    // layout检查
     if (strcmp(inputLayout, "TND") != 0) {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
@@ -2557,9 +2572,9 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4GetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     // 空Tensor处理
-    CHECK_RET(query != nullptr || keyIn != nullptr || value != nullptr || dy != nullptr ||
-                  attentionInOptional != nullptr || dqOut != nullptr || dkOut != nullptr || dvOut != nullptr ||
-                  workspaceSize != nullptr || executor != nullptr,
+    CHECK_RET(query != nullptr && keyIn != nullptr && value != nullptr && dy != nullptr &&
+                  attentionInOptional != nullptr && dqOut != nullptr && dkOut != nullptr && dvOut != nullptr &&
+                  workspaceSize != nullptr && executor != nullptr,
               ACLNN_ERR_PARAM_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
@@ -2753,6 +2768,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV3GetWorkspaceSize(
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(executor != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "executor"),
              return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
             OP_LOGD("All out tensor is empty");
@@ -2817,6 +2834,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetWorkspaceSize(
                sparseMode, pseType, softmaxInLayout),
         DFX_OUT(dqOut, dqRopeOut, dkOut, dkRopeOut, dvOut, dpseOut, dsinkOut));
 
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     if (strcmp(inputLayout, "TND") != 0) {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
@@ -2912,6 +2931,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetMaxWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     }
 
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     if (strcmp(inputLayout, "TND") != 0) {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
@@ -3228,6 +3249,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV4GetWorkspaceSize(
     OP_CHECK(dkOut != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "dkOut"),
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(dvOut != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "dvOut"),
+             return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
              return ACLNN_ERR_PARAM_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
