@@ -50,11 +50,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnFusedInferAttentionScore
     int64_t valueAntiquantMode, int64_t queryQuantMode, int64_t pseType, const aclTensor *attentionOut,
     const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor);
 
-__attribute__((visibility("default"))) aclnnStatus CheckTensorContiguous(const aclTensorList *key,
-                                                                         const aclTensorList *value,
-                                                                         const aclTensor *keyAntiquantScaleOptional,
-                                                                         const aclTensor *valueAntiquantScaleOptional,
-                                                                         const aclTensor *keyRopeOptional);
+__attribute__((visibility("default"))) aclnnStatus
+CheckTensorContiguous(const aclTensorList *key, const aclTensorList *value, const aclTensor *keyAntiquantScaleOptional,
+                      const aclTensor *valueAntiquantScaleOptional, const aclTensor *keyAntiquantOffsetOptional,
+                      const aclTensor *valueAntiquantOffsetOptional, const aclTensor *keyRopeOptional);
 
 aclnnStatus aclnnFusedInferAttentionScoreV5GetMaxWorkspaceSize(
     const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShiftOptional,
@@ -164,7 +163,9 @@ aclnnStatus aclnnFusedInferAttentionScoreV5GetMaxWorkspaceSize(
 
 aclnnStatus CheckTensorContiguous(const aclTensorList *key, const aclTensorList *value,
                                   const aclTensor *keyAntiquantScaleOptional,
-                                  const aclTensor *valueAntiquantScaleOptional, const aclTensor *keyRopeOptional)
+                                  const aclTensor *valueAntiquantScaleOptional,
+                                  const aclTensor *keyAntiquantOffsetOptional,
+                                  const aclTensor *valueAntiquantOffsetOptional, const aclTensor *keyRopeOptional)
 {
     if ((key != nullptr && !IsContiguous((*key)[0])) || (value != nullptr && !IsContiguous((*value)[0]))) {
         return ACLNN_ERR_INNER_TILING_ERROR;
@@ -173,7 +174,9 @@ aclnnStatus CheckTensorContiguous(const aclTensorList *key, const aclTensorList 
         return ACLNN_ERR_INNER_TILING_ERROR;
     }
     if ((keyAntiquantScaleOptional != nullptr && !IsContiguous(keyAntiquantScaleOptional)) ||
-        (valueAntiquantScaleOptional != nullptr && !IsContiguous(valueAntiquantScaleOptional))) {
+        (valueAntiquantScaleOptional != nullptr && !IsContiguous(valueAntiquantScaleOptional)) ||
+        (keyAntiquantOffsetOptional != nullptr && !IsContiguous(keyAntiquantOffsetOptional)) ||
+        (valueAntiquantOffsetOptional != nullptr && !IsContiguous(valueAntiquantOffsetOptional))) {
         return ACLNN_ERR_INNER_TILING_ERROR;
     }
     return ACLNN_SUCCESS;
@@ -207,8 +210,8 @@ aclnnStatus aclnnFusedInferAttentionScoreV5GetWorkspaceSize(
     const aclTensor *tensorValueSharedPrefixOptional = valueSharedPrefixOptional;
     PrefixTensorPreProcess(tensorKeySharedPrefixOptional, tensorValueSharedPrefixOptional);
 
-    aclnnStatus ret =
-        CheckTensorContiguous(key, value, keyAntiquantScaleOptional, valueAntiquantScaleOptional, keyRopeOptional);
+    aclnnStatus ret = CheckTensorContiguous(key, value, keyAntiquantScaleOptional, valueAntiquantScaleOptional,
+                                            keyAntiquantOffsetOptional, valueAntiquantOffsetOptional, keyRopeOptional);
     if (ret != ACLNN_SUCCESS && NnopbaseSupportTensorV2 == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_TILING_ERROR, "When tensor is not contiguous, opbase package version check failed");
         return ret;

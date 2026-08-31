@@ -123,7 +123,7 @@ public:
                                         RunParamStr<isInfer> &runParam, Buffer<BufferType::L1> &outBufAntiKey,
                                         GlobalTensor<KV_T> &tempKeyGm, ConstInfo<isInfer, hasRope> &constInfo);
     __aicore__ inline void SetAntiqParamCommon(const RunInfo<isInfer> &runInfo, int64_t kvOffset,
-                                               ConstInfo<isInfer, hasRope> &constInfo);
+                                               ConstInfo<isInfer, hasRope> &constInfo, bool isKey);
     __aicore__ inline void AntiquantValue(const RunInfo<isInfer> &runInfo, int64_t &subTaskId, bool &first,
                                           RunParamStr<isInfer> &runParam, Buffer<BufferType::L1> &outBufAntiValue,
                                           ConstInfo<isInfer, hasRope> &constInfo);
@@ -592,7 +592,8 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::AntiquantKe
     const RunInfo<isInfer> &runInfo, int64_t &subTaskId, bool &first, RunParamStr<isInfer> &runParam,
     Buffer<BufferType::L1> &outBufAntiKey, GlobalTensor<KV_T> &tempKeyGm, ConstInfo<isInfer, hasRope> &constInfo)
 {
-    SetAntiqParamCommon(runInfo, runInfo.keyOffset, constInfo);
+    const bool isKey = true; // key 侧 stride (区别于 value 侧)
+    SetAntiqParamCommon(runInfo, runInfo.keyOffset, constInfo, isKey);
     if constexpr (KVFP4) {
         taskParam.isLoadAntiqParam = true;
         taskParam.isFreeAntiqParam = false;
@@ -615,7 +616,7 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::AntiquantKe
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::SetAntiqParamCommon(
-    const RunInfo<isInfer> &runInfo, int64_t kvOffset, ConstInfo<isInfer, hasRope> &constInfo)
+    const RunInfo<isInfer> &runInfo, int64_t kvOffset, ConstInfo<isInfer, hasRope> &constInfo, bool isKey)
 {
     if (isBeforeHalf) {
         taskParam.copyTotalS = GetRealDealSize(runInfo.s2RealSize); // 2 is Vec num
@@ -634,10 +635,25 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::SetAntiqPar
     taskParam.kvGmOffset = kvOffset + constInfo.subBlockIdx * GetRealDealSize(runInfo.s2RealSize) * taskParam.kvStep;
     taskParam.s2BatchOffset = curSequence;
     taskParam.kvPaddingBeginOffset = runInfo.kvLeftPaddingSize;
-    taskParam.antiqParamOffset = runInfo.n2oIdx * taskParam.headDim;
     taskParam.bIdx = runInfo.boIdx;
     taskParam.n2Idx = runInfo.n2oIdx;
     taskParam.s2Idx = runInfo.s2LoopCount;
+    if (isKey) {
+        taskParam.kvBnStride = constInfo.keyBnStride;
+        taskParam.kvN2Stride = constInfo.keyN2Stride;
+        taskParam.scaleBnStride = constInfo.kScaleBnStride;
+        taskParam.scaleN2Stride = constInfo.kScaleN2Stride;
+        taskParam.offsetBnStride = constInfo.kOffsetBnStride;
+        taskParam.offsetN2Stride = constInfo.kOffsetN2Stride;
+    } else {
+        taskParam.kvBnStride = constInfo.valueBnStride;
+        taskParam.kvN2Stride = constInfo.valueN2Stride;
+        taskParam.scaleBnStride = constInfo.vScaleBnStride;
+        taskParam.scaleN2Stride = constInfo.vScaleN2Stride;
+        taskParam.offsetBnStride = constInfo.vOffsetBnStride;
+        taskParam.offsetN2Stride = constInfo.vOffsetN2Stride;
+    }
+    taskParam.antiqParamOffset = runInfo.n2oIdx * taskParam.headDim;
     if constexpr (isInfer) {
         taskParam.s2Idx += runInfo.s2StartIdx / constInfo.s2BaseSize;
         if constexpr (enableKVPrefix) {
@@ -939,7 +955,8 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::AntiquantVa
         tempValueGm = this->valueGm;
         GetKvByTensorList(runInfo, this->valueGm, tempValueGm, constInfo);
     }
-    SetAntiqParamCommon(runInfo, runInfo.valueOffset, constInfo);
+    const bool isKey = false; // value 侧 stride (区别于 key 侧)
+    SetAntiqParamCommon(runInfo, runInfo.valueOffset, constInfo, isKey);
     if constexpr (VALUE_ANTIQUANT_PER_TOKEN || ANTIQUANT_PER_GROUP) {
         taskParam.isFreeAntiqParam = true;
         taskParam.isLoadAntiqParam = true;

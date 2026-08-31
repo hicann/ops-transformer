@@ -1731,7 +1731,7 @@ public:
                  ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,
                  ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
         aicore_config_95.Input("value_antiquant_scale")
             .ParamType(OPTIONAL)
             .DataType(
@@ -1899,7 +1899,7 @@ public:
                  ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,
                  ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
         aicore_config_95.Input("key_shared_prefix")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16,       ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_INT8,

@@ -319,6 +319,11 @@ ge::graphStatus FiaInfoParser::GetStrides()
     const bool keyScaleIsView = hasSingleKvTensor && hasKeyScale && context_->InputIsView(KEY_ANTIQUANT_SCALE_INDEX);
     const bool valueScaleIsView =
         hasSingleKvTensor && hasValueScale && context_->InputIsView(VALUE_ANTIQUANT_SCALE_INDEX);
+    const bool hasKeyOffset = opParamInfo_.keyAntiquantOffset.tensor != nullptr;
+    const bool hasValueOffset = opParamInfo_.valueAntiquantOffset.tensor != nullptr;
+    const bool keyOffsetIsView = hasSingleKvTensor && hasKeyOffset && context_->InputIsView(KEY_ANTIQUANT_OFFSET_INDEX);
+    const bool valueOffsetIsView =
+        hasSingleKvTensor && hasValueOffset && context_->InputIsView(VALUE_ANTIQUANT_OFFSET_INDEX);
 
     if (hasKeyRope) {
         kRopeStrides_ = context_->GetOptionalInputStride(KEY_ROPE_INDEX);
@@ -352,6 +357,18 @@ ge::graphStatus FiaInfoParser::GetStrides()
     if (!HasUsableStride(vScaleStrides_)) {
         vScaleStrides_ = nullptr;
     }
+    if (hasKeyOffset) {
+        kOffsetStrides_ = context_->GetOptionalInputStride(KEY_ANTIQUANT_OFFSET_INDEX);
+    }
+    if (hasValueOffset) {
+        vOffsetStrides_ = context_->GetOptionalInputStride(VALUE_ANTIQUANT_OFFSET_INDEX);
+    }
+    if (!HasUsableStride(kOffsetStrides_)) {
+        kOffsetStrides_ = nullptr;
+    }
+    if (!HasUsableStride(vOffsetStrides_)) {
+        vOffsetStrides_ = nullptr;
+    }
 
     OP_CHECK_IF(keyIsView && !HasStrideMetadata(kStrideCache_),
                 OP_LOGE(opName_, "Failed to get stride metadata for view input key."), return ge::GRAPH_FAILED);
@@ -364,6 +381,12 @@ ge::graphStatus FiaInfoParser::GetStrides()
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(valueScaleIsView && vScaleStrides_ == nullptr,
                 OP_LOGE(opName_, "Failed to get stride metadata for view input valueAntiquantScale."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyOffsetIsView && kOffsetStrides_ == nullptr,
+                OP_LOGE(opName_, "Failed to get stride metadata for view input keyAntiquantOffset."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(valueOffsetIsView && vOffsetStrides_ == nullptr,
+                OP_LOGE(opName_, "Failed to get stride metadata for view input valueAntiquantOffset."),
                 return ge::GRAPH_FAILED);
 
     if (HasUsableStride(kStrideCache_[0])) {
@@ -417,6 +440,30 @@ ge::graphStatus FiaInfoParser::GetStrides()
         if (ValidateStrideLocal(opName_, "valueAntiquantScale",
                                 opParamInfo_.valueAntiquantScale.tensor->GetStorageShape(),
                                 vScaleStrides_) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    if (hasKeyOffset) {
+        if (kOffsetStrides_ == nullptr) {
+            BuildContiguousStride(opParamInfo_.keyAntiquantOffset.tensor->GetStorageShape(),
+                                  keyOffsetContiguousStrides_);
+            kOffsetStrides_ = &keyOffsetContiguousStrides_;
+        }
+        if (ValidateStrideLocal(opName_, "keyAntiquantOffset",
+                                opParamInfo_.keyAntiquantOffset.tensor->GetStorageShape(),
+                                kOffsetStrides_) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    if (hasValueOffset) {
+        if (vOffsetStrides_ == nullptr) {
+            BuildContiguousStride(opParamInfo_.valueAntiquantOffset.tensor->GetStorageShape(),
+                                  valueOffsetContiguousStrides_);
+            vOffsetStrides_ = &valueOffsetContiguousStrides_;
+        }
+        if (ValidateStrideLocal(opName_, "valueAntiquantOffset",
+                                opParamInfo_.valueAntiquantOffset.tensor->GetStorageShape(),
+                                vOffsetStrides_) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
     }
@@ -496,6 +543,42 @@ ge::graphStatus FiaInfoParser::GetKvStrideValues()
         if (kRopeStrides_ != nullptr) {
             kRopeBnStride_ = kRopeStrides_->GetStride(0);
             kRopeN2Stride_ = kRopeStrides_->GetStride(1);
+        }
+    }
+    // 仅 mode4/mode5 scale 及 offset 支持非连续 stride 传入:
+    // mode4 shape [blockNum, bs], mode5 shape [blockNum, N2, bs]
+    if (opParamInfo_.keyAntiquantMode != nullptr) {
+        const auto mode = *opParamInfo_.keyAntiquantMode;
+        if (mode == optiling::arch35FIA::PER_TOKEN_PA_MODE) {
+            if (kScaleStrides_ != nullptr) {
+                kScaleBnStride_ = kScaleStrides_->GetStride(0);
+            }
+            if (vScaleStrides_ != nullptr) {
+                vScaleBnStride_ = vScaleStrides_->GetStride(0);
+            }
+            if (kOffsetStrides_ != nullptr) {
+                kOffsetBnStride_ = kOffsetStrides_->GetStride(0);
+            }
+            if (vOffsetStrides_ != nullptr) {
+                vOffsetBnStride_ = vOffsetStrides_->GetStride(0);
+            }
+        } else if (mode == optiling::arch35FIA::PER_TOKEN_HEAD_PA_MODE) {
+            if (kScaleStrides_ != nullptr) {
+                kScaleBnStride_ = kScaleStrides_->GetStride(0);
+                kScaleN2Stride_ = kScaleStrides_->GetStride(1);
+            }
+            if (vScaleStrides_ != nullptr) {
+                vScaleBnStride_ = vScaleStrides_->GetStride(0);
+                vScaleN2Stride_ = vScaleStrides_->GetStride(1);
+            }
+            if (kOffsetStrides_ != nullptr) {
+                kOffsetBnStride_ = kOffsetStrides_->GetStride(0);
+                kOffsetN2Stride_ = kOffsetStrides_->GetStride(1);
+            }
+            if (vOffsetStrides_ != nullptr) {
+                vOffsetBnStride_ = vOffsetStrides_->GetStride(0);
+                vOffsetN2Stride_ = vOffsetStrides_->GetStride(1);
+            }
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -1781,6 +1864,8 @@ void FiaInfoParser::GenerateInfo(FiaTilingInfo &fiaInfo)
     fiaInfo.kRopeStrides = kRopeStrides_;
     fiaInfo.kScaleStrides = kScaleStrides_;
     fiaInfo.vScaleStrides = vScaleStrides_;
+    fiaInfo.kOffsetStrides = kOffsetStrides_;
+    fiaInfo.vOffsetStrides = vOffsetStrides_;
     fiaInfo.hasViewStride = hasViewStride_;
     fiaInfo.keyBnStride = keyBnStride_;
     fiaInfo.keyN2Stride = keyN2Stride_;
@@ -1788,6 +1873,14 @@ void FiaInfoParser::GenerateInfo(FiaTilingInfo &fiaInfo)
     fiaInfo.valueN2Stride = valueN2Stride_;
     fiaInfo.kRopeBnStride = kRopeBnStride_;
     fiaInfo.kRopeN2Stride = kRopeN2Stride_;
+    fiaInfo.kScaleBnStride = kScaleBnStride_;
+    fiaInfo.kScaleN2Stride = kScaleN2Stride_;
+    fiaInfo.vScaleBnStride = vScaleBnStride_;
+    fiaInfo.vScaleN2Stride = vScaleN2Stride_;
+    fiaInfo.kOffsetBnStride = kOffsetBnStride_;
+    fiaInfo.kOffsetN2Stride = kOffsetN2Stride_;
+    fiaInfo.vOffsetBnStride = vOffsetBnStride_;
+    fiaInfo.vOffsetN2Stride = vOffsetN2Stride_;
 
     fiaInfo.totalOutputSize = opParamInfo_.attenOut.shape->GetStorageShape().GetShapeSize();
 

@@ -48,15 +48,30 @@ void TensorPreProcess(const aclTensorList *&tensorListKey, const aclTensorList *
         return;
     }
     auto tempKey = const_cast<aclTensorList *>(tensorListKey);
+    // 仅 INT4 输入场景（DT_INT32 打包存储）：将 viewShape/StorageShape/viewStrides 换算到 int4 口径（末维 ×8）
+    // SetViewShape 会把 viewStrides 重算成连续值，需用保存的原始 stride 换算后覆盖以保留非连续信息
     for (uint64_t i = 0; i < tempKey->Size(); i++) {
         if ((*tempKey)[i] != nullptr) {
             op::Shape viewShape = (*tempKey)[i]->GetViewShape();
             auto viewShapeDim = viewShape.GetDimNum();
+            auto origStrides = (*tempKey)[i]->GetViewStrides();
             if (viewShapeDim >= 1) {
                 viewShape[viewShapeDim - 1] = viewShape[viewShapeDim - 1] * INT4_NUMS_IN_INT32;
             }
             (*tempKey)[i]->SetViewShape(viewShape);
             (*tempKey)[i]->SetDataType(DataType::DT_INT4);
+            auto storageShape = (*tempKey)[i]->GetStorageShape();
+            if (storageShape.GetDimNum() >= 1) {
+                storageShape[storageShape.GetDimNum() - 1] =
+                    storageShape[storageShape.GetDimNum() - 1] * INT4_NUMS_IN_INT32;
+                (*tempKey)[i]->SetStorageShape(storageShape);
+            }
+            if (origStrides.size() > 0 && viewShapeDim >= 1) {
+                for (uint64_t d = 0; d < origStrides.size() - 1; ++d) {
+                    origStrides[d] = origStrides[d] * static_cast<int64_t>(INT4_NUMS_IN_INT32);
+                }
+                (*tempKey)[i]->SetViewStrides(origStrides);
+            }
         }
     }
 
@@ -65,11 +80,24 @@ void TensorPreProcess(const aclTensorList *&tensorListKey, const aclTensorList *
         if ((*tempValue)[i] != nullptr) {
             op::Shape viewShape = (*tempValue)[i]->GetViewShape();
             auto viewShapeDim = viewShape.GetDimNum();
+            auto origStrides = (*tempValue)[i]->GetViewStrides();
             if (viewShapeDim >= 1) {
                 viewShape[viewShapeDim - 1] = viewShape[viewShapeDim - 1] * INT4_NUMS_IN_INT32;
             }
             (*tempValue)[i]->SetViewShape(viewShape);
             (*tempValue)[i]->SetDataType(DataType::DT_INT4);
+            auto storageShapeV = (*tempValue)[i]->GetStorageShape();
+            if (storageShapeV.GetDimNum() >= 1) {
+                storageShapeV[storageShapeV.GetDimNum() - 1] =
+                    storageShapeV[storageShapeV.GetDimNum() - 1] * INT4_NUMS_IN_INT32;
+                (*tempValue)[i]->SetStorageShape(storageShapeV);
+            }
+            if (origStrides.size() > 0 && viewShapeDim >= 1) {
+                for (uint64_t d = 0; d < origStrides.size() - 1; ++d) {
+                    origStrides[d] = origStrides[d] * static_cast<int64_t>(INT4_NUMS_IN_INT32);
+                }
+                (*tempValue)[i]->SetViewStrides(origStrides);
+            }
         }
     }
 
@@ -97,16 +125,42 @@ void PrefixTensorPreProcess(const aclTensor *&tensorKey, const aclTensor *&tenso
     auto tempKey = const_cast<aclTensor *>(tensorKey);
     op::Shape viewKeyShape = tempKey->GetViewShape();
     auto viewKeyShapeDim = viewKeyShape.GetDimNum();
+    auto keyOrigStrides = tempKey->GetViewStrides();
     viewKeyShape[viewKeyShapeDim - 1] = viewKeyShape[viewKeyShapeDim - 1] * INT4_NUMS_IN_INT32;
     tempKey->SetViewShape(viewKeyShape);
     tempKey->SetDataType(DataType::DT_INT4);
+    auto keyStorageShape = tempKey->GetStorageShape();
+    if (keyStorageShape.GetDimNum() >= 1) {
+        keyStorageShape[keyStorageShape.GetDimNum() - 1] =
+            keyStorageShape[keyStorageShape.GetDimNum() - 1] * INT4_NUMS_IN_INT32;
+        tempKey->SetStorageShape(keyStorageShape);
+    }
+    if (keyOrigStrides.size() > 0 && viewKeyShapeDim >= 1) {
+        for (uint64_t d = 0; d < keyOrigStrides.size() - 1; ++d) {
+            keyOrigStrides[d] = keyOrigStrides[d] * static_cast<int64_t>(INT4_NUMS_IN_INT32);
+        }
+        tempKey->SetViewStrides(keyOrigStrides);
+    }
 
     auto tempValue = const_cast<aclTensor *>(tensorValue);
     op::Shape viewValueShape = tempValue->GetViewShape();
     auto viewValueShapeDim = viewValueShape.GetDimNum();
+    auto valueOrigStrides = tempValue->GetViewStrides();
     viewValueShape[viewValueShapeDim - 1] = viewValueShape[viewValueShapeDim - 1] * INT4_NUMS_IN_INT32;
     tempValue->SetViewShape(viewValueShape);
     tempValue->SetDataType(DataType::DT_INT4);
+    auto valueStorageShape = tempValue->GetStorageShape();
+    if (valueStorageShape.GetDimNum() >= 1) {
+        valueStorageShape[valueStorageShape.GetDimNum() - 1] =
+            valueStorageShape[valueStorageShape.GetDimNum() - 1] * INT4_NUMS_IN_INT32;
+        tempValue->SetStorageShape(valueStorageShape);
+    }
+    if (valueOrigStrides.size() > 0 && viewValueShapeDim >= 1) {
+        for (uint64_t d = 0; d < valueOrigStrides.size() - 1; ++d) {
+            valueOrigStrides[d] = valueOrigStrides[d] * static_cast<int64_t>(INT4_NUMS_IN_INT32);
+        }
+        tempValue->SetViewStrides(valueOrigStrides);
+    }
 
     OP_LOGD("The conversion of kvPrefix from int32 to int4 is completed.");
 }

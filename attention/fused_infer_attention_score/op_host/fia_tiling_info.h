@@ -237,6 +237,8 @@ public:
     const gert::Stride *kRopeStrides = nullptr;
     const gert::Stride *kScaleStrides = nullptr;
     const gert::Stride *vScaleStrides = nullptr;
+    const gert::Stride *kOffsetStrides = nullptr;
+    const gert::Stride *vOffsetStrides = nullptr;
     bool hasViewStride = true;
     uint64_t keyBnStride = 0;
     uint64_t keyN2Stride = 0;
@@ -244,6 +246,14 @@ public:
     uint64_t valueN2Stride = 0;
     uint64_t kRopeBnStride = 0;
     uint64_t kRopeN2Stride = 0;
+    uint64_t kScaleBnStride = 0;
+    uint64_t kScaleN2Stride = 0;
+    uint64_t vScaleBnStride = 0;
+    uint64_t vScaleN2Stride = 0;
+    uint64_t kOffsetBnStride = 0;
+    uint64_t kOffsetN2Stride = 0;
+    uint64_t vOffsetBnStride = 0;
+    uint64_t vOffsetN2Stride = 0;
     // empty Tensor
     bool emptyTensorFlag = false;
     uint64_t totalOutputSize = 0;
@@ -347,7 +357,7 @@ public:
     FiaLayout outLayout = FiaLayout::BSND;
     FiaLayout kvLayout = FiaLayout::BSND;
 
-    // NZ layout D0 from KV shape last dim (16 for fp16/bf16/fp8, 32 for int8)
+    // NZ layout D0 from KV shape last dim
     uint32_t kvCacheNzD0 = 0;
 };
 } // namespace optiling
