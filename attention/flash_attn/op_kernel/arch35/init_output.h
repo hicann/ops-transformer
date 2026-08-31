@@ -30,10 +30,13 @@ template <typename T, uint32_t SYNC_ID, uint32_t POP_BUF_START_ADDR, uint32_t PO
 __aicore__ inline void InitOutput(GlobalTensor<T> outGm, uint64_t totalElementNum, uint32_t vecCoreNum, T initValue)
 {
     if ASCEND_IS_AIV {
-        uint64_t singleCoreElementNum = (totalElementNum + vecCoreNum - 1U) / vecCoreNum;
+        uint64_t singleCoreMaxElementNum = (totalElementNum + vecCoreNum - 1U) / vecCoreNum;
         uint32_t tmpBlockIdx = AscendC::GetBlockIdx();
-        uint64_t gmOffset = tmpBlockIdx * singleCoreElementNum;
+        uint64_t gmOffset = tmpBlockIdx * singleCoreMaxElementNum;
         if (gmOffset < totalElementNum) {
+            uint64_t singleCoreActualElementNum = (gmOffset + singleCoreMaxElementNum > totalElementNum) ?
+                                                      (totalElementNum - gmOffset) :
+                                                      singleCoreMaxElementNum;
             LocalTensor<T> popBuffer =
                 AscendC::LocalTensor<uint8_t>(TPosition::VECIN, POP_BUF_START_ADDR, POP_BUF_ELE_SIZE * sizeof(T))
                     .template ReinterpretCast<T>();
@@ -57,8 +60,8 @@ __aicore__ inline void InitOutput(GlobalTensor<T> outGm, uint64_t totalElementNu
             } else {
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_ID);
             }
-            uint64_t loopCnt = singleCoreElementNum / POP_BUF_ELE_SIZE;
-            uint64_t tailSize = singleCoreElementNum - loopCnt * POP_BUF_ELE_SIZE;
+            uint64_t loopCnt = singleCoreActualElementNum / POP_BUF_ELE_SIZE;
+            uint64_t tailSize = singleCoreActualElementNum - loopCnt * POP_BUF_ELE_SIZE;
             for (uint64_t loop = 0; loop < loopCnt; loop++) {
                 AscendC::DataCopy(outGm[gmOffset], popBuffer, POP_BUF_ELE_SIZE);
                 gmOffset += POP_BUF_ELE_SIZE;
@@ -70,20 +73,6 @@ __aicore__ inline void InitOutput(GlobalTensor<T> outGm, uint64_t totalElementNu
                 dataCopyParams.srcStride = 0;
                 dataCopyParams.dstStride = 0;
                 AscendC::DataCopyPad(outGm[gmOffset], popBuffer, dataCopyParams);
-
-                // static constexpr uint32_t BLOCK_ELEMENT_NUM = 32U / sizeof(T);
-                // uint32_t blockCnt = tailSize / BLOCK_ELEMENT_NUM;
-                // uint32_t tailBlockSize = tailSize % BLOCK_ELEMENT_NUM;
-                // AscendC::DataCopy(outGm[gmOffset], popBuffer, blockCnt * BLOCK_ELEMENT_NUM);
-                // gmOffset += blockCnt * BLOCK_ELEMENT_NUM;
-                // if (tailBlockSize > 0) {
-                //     DataCopyExtParams dataCopyParams;
-                //     dataCopyParams.blockCount = 1;
-                //     dataCopyParams.blockLen = tailBlockSize * sizeof(T);
-                //     dataCopyParams.srcStride = 0;
-                //     dataCopyParams.dstStride = 0;
-                //     AscendC::DataCopyPad(outGm[gmOffset], popBuffer, dataCopyParams);
-                // }
             }
             if constexpr (ENABLE_LOCK) {
                 Mutex::Unlock<PIPE_MTE3>(SYNC_ID);

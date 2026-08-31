@@ -121,8 +121,7 @@ void FlashAttnTilingImpl::SplitPolicy()
         winLeft = MASK_MODE_INT_MAX;
         winRight = MASK_MODE_INT_MAX;
     }
-    fa_tiling_util::AdjustSinnerAndSouter(static_cast<uint32_t>(faInfo_->vHeadDim),
-                                          faInfo_->maxSeqQ, faInfo_->maxSeqKv,
+    fa_tiling_util::AdjustSinnerAndSouter(static_cast<uint32_t>(faInfo_->vHeadDim), faInfo_->maxSeqQ, faInfo_->maxSeqKv,
                                           static_cast<int32_t>(faInfo_->maskMode), winLeft, winRight,
                                           static_cast<uint32_t>(faInfo_->qLayout), sOuterFactor_, sInnerFactor_);
     CalcNumBlocks(platformInfo_.aicNum);
@@ -304,11 +303,12 @@ void FlashAttnTilingImpl::SetFATilingData()
     tilingData_.baseTiling.flashAttnBaseParams.dSize = faInfo_->qkHeadDim;
     tilingData_.baseTiling.flashAttnBaseParams.dSizeV = faInfo_->vHeadDim;
     tilingData_.baseTiling.flashAttnBaseParams.scaleValue = faInfo_->softmaxScale;
-    tilingData_.baseTiling.flashAttnBaseParams.cuSeqLensQSize = faInfo_->qLayout == FaLayout::TND ? (faInfo_->bSize + 1) : 0;
-    tilingData_.baseTiling.flashAttnBaseParams.cuSeqLensKVSize = faInfo_->kvLayout == FaLayout::TND ? (faInfo_->bSize + 1) : 0;
+    tilingData_.baseTiling.flashAttnBaseParams.cuSeqLensQSize =
+        faInfo_->qLayout == FaLayout::TND ? (faInfo_->bSize + 1) : 0;
+    tilingData_.baseTiling.flashAttnBaseParams.cuSeqLensKVSize =
+        faInfo_->kvLayout == FaLayout::TND ? (faInfo_->bSize + 1) : 0;
     tilingData_.baseTiling.flashAttnBaseParams.seqUsedQSize = seqUsedQFlag_ ? faInfo_->bSize : 0;
     tilingData_.baseTiling.flashAttnBaseParams.seqUsedKvSize = seqUsedKvFlag_ ? faInfo_->bSize : 0;
-    tilingData_.baseTiling.flashAttnBaseParams.isKvContinuous = true;
     tilingData_.baseTiling.flashAttnBaseParams.isSoftMaxLseEnable = faInfo_->softmaxLseFlag;
     tilingData_.baseTiling.flashAttnBaseParams.iscuSeqLengthsNull = !cuSeqLenQFlag_;
     tilingData_.baseTiling.flashAttnBaseParams.iscuSeqLengthsKVNull = !cuSeqLenKVFlag_;
@@ -403,7 +403,6 @@ void FlashAttnTilingImpl::PrintAllTilingData()
     OP_LOGD(faInfo_->opName, "scaleValue:%f", flashAttnBaseParams.scaleValue);
     OP_LOGD(faInfo_->opName, "iscuSeqLengthsNull:%d", flashAttnBaseParams.iscuSeqLengthsNull);
     OP_LOGD(faInfo_->opName, "iscuSeqLengthsKVNull:%d", flashAttnBaseParams.iscuSeqLengthsKVNull);
-    OP_LOGD(faInfo_->opName, "isKvContinuous:%d", flashAttnBaseParams.isKvContinuous);
     OP_LOGD(faInfo_->opName, "isSoftMaxLseEnable:%d", flashAttnBaseParams.isSoftMaxLseEnable);
     OP_LOGD(faInfo_->opName, "coreNum:%d", flashAttnBaseParams.coreNum);
 

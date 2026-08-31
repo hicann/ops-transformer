@@ -180,7 +180,6 @@ public:
         constInfo.seqUsedQSize = tilingData->flashAttnBaseParams.seqUsedQSize;
         constInfo.seqUsedKvSize = tilingData->flashAttnBaseParams.seqUsedKvSize;
         constInfo.scaleValue = static_cast<float>(tilingData->flashAttnBaseParams.scaleValue);
-        constInfo.isKvContinuous = tilingData->flashAttnBaseParams.isKvContinuous != 0;
         constInfo.coreNum = tilingData->flashAttnBaseParams.coreNum;
         constInfo.outputLayout = static_cast<FA_LAYOUT>(tilingData->flashAttnBaseParams.outputLayout);
         constInfo.needInitOutput = tilingData->flashAttnBaseParams.needInitOutput;
@@ -513,16 +512,6 @@ public:
         }
         info.actSingleLoopS2SizeAlign =
             AttentionCommon::Align((uint32_t)info.actSingleLoopS2Size, (uint32_t)(FA_BYTE_BLOCK / sizeof(INPUT_T)));
-        if (constInfo.isKvContinuous) {
-            info.isChangeBatch = false;
-        } else {
-            // for tensor-list
-            if (loop == 0) { // 第一个有效任务才需要重置KV的tensor
-                info.isChangeBatch = true;
-            } else {
-                info.isChangeBatch = (info.n2Idx == 0 && s2Cur == curS2Start);
-            }
-        }
 
         GetPreNextTokenLeftUp(actSeqLensQ, actSeqLensKv, info.preTokensLeftUp, info.nextTokensLeftUp);
 
