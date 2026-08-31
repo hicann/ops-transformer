@@ -55,7 +55,10 @@ class MinimaxSparseAttentionSplitKvOpBuilder(OpBuilder):
             softmax_lse_flag=False,
             input_layout="TND",
         ):
-            attention_out = torch.empty(query.shape, dtype=query.dtype, device="meta")
+            out_dtype = (
+                torch.bfloat16 if query.dtype == torch.float8_e4m3fn else query.dtype
+            )
+            attention_out = torch.empty(query.shape, dtype=out_dtype, device="meta")
             if softmax_lse_flag:
                 if input_layout == "TND":
                     lse_shape = (query.size(0), query.size(1), 1)

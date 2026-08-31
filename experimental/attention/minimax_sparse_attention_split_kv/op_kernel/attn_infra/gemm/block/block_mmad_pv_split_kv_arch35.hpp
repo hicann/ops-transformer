@@ -1,5 +1,5 @@
-/*
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -38,9 +38,8 @@ struct BlockMmadPVSplitKvArch35 {
     using LayoutTagV = layout::RowMajor;
     using LayoutTagO = layout::RowMajor;
 
-    using TileCopy = Gemm::Tile::PackedTileCopyTla<
-        ArchTag, ElementP, LayoutTagP, ElementV, LayoutTagV,
-        ElementO, LayoutTagO, void>;
+    using TileCopy =
+        Gemm::Tile::PackedTileCopyTla<ArchTag, ElementP, LayoutTagP, ElementV, LayoutTagV, ElementO, LayoutTagO, void>;
 
     using CopyL1ToL0A = typename TileCopy::CopyL1ToL0A;
     using CopyL1ToL0B = typename TileCopy::CopyL1ToL0B;
@@ -62,6 +61,7 @@ struct BlockMmadPVSplitKvArch35 {
     static constexpr uint32_t V0_V1_FLAG_ID_OFFSET = 16;
     static constexpr uint32_t COPY_GRANULARITY = 2;
     static constexpr uint32_t C0_SIZE = 16;
+    static constexpr uint32_t ELE_NUM_PER_C0 = BYTE_PER_C0 / sizeof(ElementP);
 
     AscendC::LocalTensor<ElementV> l1VTensor_;
     AscendC::LocalTensor<ElementP> l1PTensor_;
@@ -86,13 +86,15 @@ struct BlockMmadPVSplitKvArch35 {
     // equals the gemm K, so QK never hit this.
     uint32_t residentValidSize_ = 0;
 
-    __aicore__ inline
-    BlockMmadPVSplitKvArch35()
-        : resourcePtr_(nullptr), l1BaseAddr_(0), vBufBytes_(0), l1PStageBytes_(0) {}
+    __aicore__ inline BlockMmadPVSplitKvArch35()
+        : resourcePtr_(nullptr),
+          l1BaseAddr_(0),
+          vBufBytes_(0),
+          l1PStageBytes_(0)
+    {}
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline
-    void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
     {
         if constexpr (MODE == 4U) {
             uint16_t flagIdV0 = crossCoreFlag.id;
@@ -104,8 +106,7 @@ struct BlockMmadPVSplitKvArch35 {
     }
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline
-    void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
     {
         if constexpr (MODE == 4U) {
             uint16_t flagIdV0 = crossCoreFlag.id;
@@ -116,13 +117,12 @@ struct BlockMmadPVSplitKvArch35 {
         }
     }
 
-    __aicore__ inline
-    void Init(Arch::Resource<ArchTag> &resource, uint32_t l1StartAddr,
-              uint32_t blockSize, uint32_t D, uint32_t groupSize)
+    __aicore__ inline void Init(Arch::Resource<ArchTag> &resource, uint32_t l1StartAddr, uint32_t blockSize, uint32_t D,
+                                uint32_t groupSize)
     {
         vBufBytes_ = blockSize * D * sizeof(ElementV);
         l1BaseAddr_ = l1StartAddr;
-        l1PStageBytes_ = RoundUp(groupSize, 16U) * RoundUp(blockSize, 16U) * sizeof(ElementP);
+        l1PStageBytes_ = RoundUp(groupSize, 16U) * RoundUp(blockSize, ELE_NUM_PER_C0) * sizeof(ElementP);
         resourcePtr_ = &resource;
         l1VTensor_ = resource.l1Buf.template GetBufferByByte<ElementV>(l1StartAddr);
         l1PTensor_ = resource.l1Buf.template GetBufferByByte<ElementP>(l1StartAddr + vBufBytes_);
@@ -130,21 +130,19 @@ struct BlockMmadPVSplitKvArch35 {
         for (uint32_t i = 0; i < L0_STAGES; i++) {
             l0ATensor_[i] = resource.l0ABuf.template GetBufferByByte<ElementP>(L0A_BUF_SIZE * i);
             l0BTensor_[i] = resource.l0BBuf.template GetBufferByByte<ElementV>(L0B_BUF_SIZE * i);
-            l0CTensor_[i] = resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(
-                L0C_HALF_SIZE + L0C_BUF_SIZE * i);
+            l0CTensor_[i] =
+                resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(L0C_HALF_SIZE + L0C_BUF_SIZE * i);
         }
     }
 
-    __aicore__ inline
-    void SetL1PBuf(uint32_t l1PBufId)
+    __aicore__ inline void SetL1PBuf(uint32_t l1PBufId)
     {
-        l1PTensor_ = resourcePtr_->l1Buf.template GetBufferByByte<ElementP>(
-            l1BaseAddr_ + vBufBytes_ + l1PStageBytes_ * l1PBufId);
+        l1PTensor_ = resourcePtr_->l1Buf.template GetBufferByByte<ElementP>(l1BaseAddr_ + vBufBytes_ +
+                                                                            l1PStageBytes_ * l1PBufId);
     }
 
     template <class TensorV>
-    __aicore__ inline
-    void LoadVResident(TensorV &gmVTensor, uint32_t validSize, uint32_t D)
+    __aicore__ inline void LoadVResident(TensorV &gmVTensor, uint32_t validSize, uint32_t D)
     {
         residentValidSize_ = validSize;
         using CopyGmToL1V = typename TileCopy::template CopyGmToL1B<TensorV>;
@@ -152,10 +150,8 @@ struct BlockMmadPVSplitKvArch35 {
 
         auto l1VLayout = tla::MakeLayout<ElementV, LayoutTagL1B>(validSize, D);
         auto l1VTensorTla = tla::MakeTensor(l1VTensor_, l1VLayout, Arch::PositionL1{});
-        auto l1VTile = GetTile(l1VTensorTla,
-            tla::MakeCoord(0, 0), tla::MakeShape(validSize, D));
-        auto gmVTile = GetTile(gmVTensor,
-            tla::MakeCoord(0, 0), tla::MakeShape(validSize, D));
+        auto l1VTile = GetTile(l1VTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(validSize, D));
+        auto gmVTile = GetTile(gmVTensor, tla::MakeCoord(0, 0), tla::MakeShape(validSize, D));
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID2);
         copyGmToL1V(l1VTile, gmVTile);
@@ -188,13 +184,10 @@ struct BlockMmadPVSplitKvArch35 {
     // constant within a kvHead, so no wsOOff array is marshalled. M is derived from
     // groupCount*groupRows (groupRows runtime constant), matching BlockMmadQK.
     template <class TensorO>
-    __aicore__ inline
-    void operator()(TensorO &gAccumOut, const uint32_t *qTokens, const uint32_t *slotKs,
-                    uint32_t groupCount, uint32_t groupRows,
-                    uint32_t D,
-                    uint64_t perQTokenStride, uint64_t kvHeadBase, uint64_t slotOElems,
-                    uint32_t numBatches, uint32_t bDe,
-                    Arch::CrossCoreFlag &smToMm2Flag)
+    __aicore__ inline void operator()(TensorO &gAccumOut, const uint32_t *qTokens, const uint32_t *slotKs,
+                                      uint32_t groupCount, uint32_t groupRows, uint32_t D, uint64_t perQTokenStride,
+                                      uint64_t kvHeadBase, uint64_t slotOElems, uint32_t numBatches, uint32_t bDe,
+                                      Arch::CrossCoreFlag &smToMm2Flag)
     {
         uint32_t M = groupCount * groupRows;
         uint32_t N = D;
@@ -236,8 +229,7 @@ struct BlockMmadPVSplitKvArch35 {
             auto l0CTensorTla = tla::MakeTensor(l0CTensor_[l0CBufId], l0CLayout, Arch::PositionL0C{});
             for (uint32_t mL0Itr = 0; mL0Itr < mL0Num; mL0Itr++) {
                 uint32_t mAct = (mL0Itr == mL0Num - 1) ? (M - mL0Itr * L0_TILE_M) : L0_TILE_M;
-                auto l0CTile = GetTile(l0CTensorTla,
-                    tla::MakeCoord(mL0Itr * L0_TILE_M, 0), tla::MakeShape(mAct, nAct));
+                auto l0CTile = GetTile(l0CTensorTla, tla::MakeCoord(mL0Itr * L0_TILE_M, 0), tla::MakeShape(mAct, nAct));
                 for (uint32_t kL0Itr = 0; kL0Itr < kL0Num; kL0Itr++) {
                     uint32_t kAct = (kL0Itr == kL0Num - 1) ? (K - kL0Itr * L0_TILE_K) : L0_TILE_K;
                     uint32_t l0ABufId = kL0Itr % L0_STAGES;
@@ -248,8 +240,7 @@ struct BlockMmadPVSplitKvArch35 {
                     uint32_t l0BEventId = l0BBufId + 2;
 
                     auto l0BLayout = tla::MakeLayout<ElementV, LayoutTagL0B>(kAct, nAct);
-                    auto l0BTensorTla = tla::MakeTensor(
-                        l0BTensor_[l0BBufId], l0BLayout, Arch::PositionL0B{});
+                    auto l0BTensorTla = tla::MakeTensor(l0BTensor_[l0BBufId], l0BLayout, Arch::PositionL0B{});
                     // V resident in L0B[1] (stage 1, flag 3): the L1->L0B copy lives in
                     // LoadVResident (once per task, co-located with GM->L1). De-aliased from QK's
                     // K (L0B[0], flag 2). Only the MMA-side gate + drain remain here:
@@ -259,18 +250,15 @@ struct BlockMmadPVSplitKvArch35 {
                     bool firstPVBatch = (bDe == 0U);
                     bool lastPVBatch = (bDe + 1U >= numBatches);
 
-                    auto l1PSubTile = GetTile(l1PTensorTla,
-                        tla::MakeCoord(mL0Itr * L0_TILE_M, kL0Itr * L0_TILE_K),
-                        tla::MakeShape(mAct, kAct));
+                    auto l1PSubTile = GetTile(l1PTensorTla, tla::MakeCoord(mL0Itr * L0_TILE_M, kL0Itr * L0_TILE_K),
+                                              tla::MakeShape(mAct, kAct));
                     auto l0ALayout = tla::MakeLayout<ElementP, LayoutTagL0A>(mAct, kAct);
-                    auto l0ATensorTla = tla::MakeTensor(
-                        l0ATensor_[l0ABufId], l0ALayout, Arch::PositionL0A{});
+                    auto l0ATensorTla = tla::MakeTensor(l0ATensor_[l0ABufId], l0ALayout, Arch::PositionL0A{});
                     AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0AEventId);
                     copyL1ToL0A(l0ATensorTla, l1PSubTile);
                     AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(l0AEventId);
 
-                    if ((mL0Itr == mL0Num - 1U) && (nL0Itr == nL0Num - 1U) &&
-                        (kL0Itr == kL0Num - 1U)) {
+                    if ((mL0Itr == mL0Num - 1U) && (nL0Itr == nL0Num - 1U) && (kL0Itr == kL0Num - 1U)) {
                         SetCrossCoreSync<4, PIPE_MTE1>(smToMm2Flag);
                     }
 
@@ -283,8 +271,7 @@ struct BlockMmadPVSplitKvArch35 {
                     if (mL0Itr == 0 && kL0Itr == 0) {
                         AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CEventId);
                     }
-                    tileMmad(l0CTile, l0ATensorTla, l0BTensorTla,
-                             mAligned, nAct, kAct, initMmad);
+                    tileMmad(l0CTile, l0ATensorTla, l0BTensorTla, mAligned, nAct, kAct, initMmad);
                     AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0AEventId);
                     if (lastPVBatch) {
                         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0BEventId);
@@ -300,8 +287,8 @@ struct BlockMmadPVSplitKvArch35 {
             // GM O_partial layout per slot is [groupRows, D]; only the valid groupRows rows are
             // written (not mFixPAligned8Grp) to avoid fixpipe overflow into the next slot.
             for (uint32_t g = 0; g < groupCount; g += COPY_GRANULARITY) {
-                uint64_t wsOOff = static_cast<uint64_t>(qTokens[g]) * perQTokenStride + kvHeadBase
-                                + static_cast<uint64_t>(slotKs[g]) * slotOElems;
+                uint64_t wsOOff = static_cast<uint64_t>(qTokens[g]) * perQTokenStride + kvHeadBase +
+                                  static_cast<uint64_t>(slotKs[g]) * slotOElems;
                 uint16_t ndNum = 1;
                 uint16_t srcNdStride = 1;
                 uint32_t dstNdStride = 1;
@@ -309,26 +296,22 @@ struct BlockMmadPVSplitKvArch35 {
                     uint32_t nextQ = qTokens[g + 1];
                     uint32_t nextSlot = slotKs[g + 1];
                     if (nextQ > qTokens[g]) {
-                        dstNdStride =
-                            static_cast<int32_t>(nextQ - qTokens[g]) * perQTokenStride +
-                            static_cast<int32_t>(nextSlot - slotKs[g]) *
-                                static_cast<int32_t>(slotOElems);
+                        dstNdStride = static_cast<int32_t>(nextQ - qTokens[g]) * perQTokenStride +
+                                      static_cast<int32_t>(nextSlot - slotKs[g]) * static_cast<int32_t>(slotOElems);
                     } else {
-                        dstNdStride =
-                            static_cast<int32_t>(qTokens[g] - nextQ) * perQTokenStride +
-                            static_cast<int32_t>(slotKs[g] - nextSlot) *
-                                static_cast<int32_t>(slotOElems);
-                        wsOOff = static_cast<uint64_t>(nextQ) * perQTokenStride + kvHeadBase
-                                + static_cast<uint64_t>(nextSlot) * slotOElems;
+                        dstNdStride = static_cast<int32_t>(qTokens[g] - nextQ) * perQTokenStride +
+                                      static_cast<int32_t>(slotKs[g] - nextSlot) * static_cast<int32_t>(slotOElems);
+                        wsOOff = static_cast<uint64_t>(nextQ) * perQTokenStride + kvHeadBase +
+                                 static_cast<uint64_t>(nextSlot) * slotOElems;
                     }
                     srcNdStride = groupRows;
                     ndNum = COPY_GRANULARITY;
                 }
                 auto gmOSlot = tla::MakeTensor(gAccumOut[wsOOff], gmOLayout, Arch::PositionGM{});
-                auto oTile = GetTile(gmOSlot,
-                    tla::MakeCoord(0, nL0Itr * L0_TILE_N), tla::MakeShape(groupRows, nFixPAligned8));
-                auto l0CTile = GetTile(l0CTensorTla,
-                    tla::MakeCoord(g * groupRows, 0), tla::MakeShape(mFixPAligned8Grp, nAct));
+                auto oTile =
+                    GetTile(gmOSlot, tla::MakeCoord(0, nL0Itr * L0_TILE_N), tla::MakeShape(groupRows, nFixPAligned8));
+                auto l0CTile =
+                    GetTile(l0CTensorTla, tla::MakeCoord(g * groupRows, 0), tla::MakeShape(mFixPAligned8Grp, nAct));
                 copyL0CToGm(oTile, l0CTile, ndNum, srcNdStride, dstNdStride);
             }
             AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CEventId);
@@ -336,6 +319,6 @@ struct BlockMmadPVSplitKvArch35 {
     }
 };
 
-}  // namespace NpuArch::Gemm::Block
+} // namespace NpuArch::Gemm::Block
 
-#endif  // GEMM_BLOCK_MMAD_PV_SPLIT_KV_ARCH35_HPP
+#endif // GEMM_BLOCK_MMAD_PV_SPLIT_KV_ARCH35_HPP

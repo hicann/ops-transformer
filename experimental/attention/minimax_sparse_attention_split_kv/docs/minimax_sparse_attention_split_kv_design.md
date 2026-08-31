@@ -109,7 +109,7 @@ Rank 必须匹配：TND ↔ 3 维，BNSD/BSND ↔ 4 维。Paged KV（`block_tabl
 | `lseStatSize` | workspace 中 softmaxMax 或 softmaxSum 各自 float 元素总数，`totalQTokens * kvHeads * topK * groupSize`。 |
 | `workSpaceSize` | `libapiWorkspaceSize + userWorkspace` 字节数。 |
 | `innerPrecise` | 内部计算精度。`0`：fp32 softmax + fp32 `O_partial`；`1`：bf16 softmax + bf16 `O_partial`；`4`（默认）：bf16 softmax + fp32 `O_partial`。其它值 tiling / aclnn 均拒绝。 |
-| `tilingKey` | `20001`（`innerPrecise=4`）、`20002`（`=1`）、`20003`（`=0`）。 |
+| `tilingKey` | `20001`（BF16 `innerPrecise=4`）、`20002`（`=1`）、`20003`（`=0`）、`20004`（FP8 E4M3FN Q/K/V + BF16 out）。 |
 
 ### 3.1.1 innerPrecise 与 tilingKey
 
@@ -117,7 +117,7 @@ Rank 必须匹配：TND ↔ 3 维，BNSD/BSND ↔ 4 维。Paged KV（`block_tabl
 | --- | --- | --- | --- |
 | **0** ALL_HIGH | fp32（NoQuant） | fp32 | `20003` `INNER_HIGH` |
 | **1** ALL_LOW | bf16 | bf16 | `20002` `INNER_LOW` |
-| **4** MIXED（默认） | bf16 | fp32 | `20001` |
+| **4** MIXED（默认） | bf16 | fp32 | `20001`（BF16 QKV） / `20004`（FP8 QKV，attentionOut 仍为 BF16） |
 
 `innerPrecise=0` 走独立 fp32 softmax epilogue（`block_epilogue_online_softmax_arch35_reg_high_prec.hpp`）：按行 `scale → causal -inf mask → max → exp(S-max) → sum`，P cast 为 bf16 后再 ND→zN 写入 L1，供 PV 使用。跨 block 的 rescale 仍在 Phase2，与 `=4` 相同（fp32 `O_partial`）。
 

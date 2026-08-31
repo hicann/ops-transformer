@@ -385,6 +385,20 @@ ge::graphStatus MinimaxSparseAttentionSplitKvTiling::ParseInputTensors(gert::Til
         return ge::GRAPH_FAILED;
     }
     dataType_ = qTensor->GetDataType();
+    auto kTensor = GetIrRequiredDesc(context, KEY_INDEX);
+    auto vTensor = GetIrRequiredDesc(context, VALUE_INDEX);
+    if (kTensor == nullptr || vTensor == nullptr) {
+        OP_LOGE(context->GetNodeName(), "key/value desc is null.");
+        return ge::GRAPH_FAILED;
+    }
+    if (kTensor->GetDataType() != dataType_ || vTensor->GetDataType() != dataType_) {
+        OP_LOGE(context->GetNodeName(), "MinimaxSparseAttentionSplitKv Q/K/V dtype must be consistent.");
+        return ge::GRAPH_FAILED;
+    }
+    if (dataType_ != ge::DT_BF16 && dataType_ != ge::DT_FLOAT8_E4M3FN) {
+        OP_LOGE(context->GetNodeName(), "MinimaxSparseAttentionSplitKv Q/K/V only support BF16 or FLOAT8_E4M3FN.");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -406,6 +420,20 @@ ge::graphStatus MinimaxSparseAttentionSplitKvTiling::CheckTilingConstraints(gert
     if (groupSize_ == 0U || groupSize_ > KERNEL_L0_TILE_M) {
         OP_LOGE(context->GetNodeName(), "groupSize must be in (0, %u], got %u.", KERNEL_L0_TILE_M, groupSize_);
         return ge::GRAPH_FAILED;
+    }
+    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+        if (blockSize_ != KERNEL_HEAD_SIZE) {
+            OP_LOGE(context->GetNodeName(), "MinimaxSparseAttentionSplitKv fp8 path requires blockSize=%u (got %u).",
+                    KERNEL_HEAD_SIZE, blockSize_);
+            return ge::GRAPH_FAILED;
+        }
+        if (innerPrecise_ != INNER_PRECISE_MIXED) {
+            OP_LOGE(context->GetNodeName(),
+                    "MinimaxSparseAttentionSplitKv fp8 path uses FP32 O_partial only "
+                    "(innerPrecise=4); got %u. innerPrecise=0/1 are not implemented.",
+                    innerPrecise_);
+            return ge::GRAPH_FAILED;
+        }
     }
 
     uint32_t batchGroupsMax = KERNEL_L0_TILE_M / groupSize_;
@@ -557,8 +585,9 @@ ge::graphStatus MinimaxSparseAttentionSplitKvTiling::CalculateWorkSpace(gert::Ti
     accumOutSize_ = taskSlots * slotOElems;
     lseStatSize_ = taskSlots * slotStatElems;
     // innerPrecise==1 halves the O_partial buffer (bf16=2B vs fp32=4B); 0 and 4 keep fp32.
-    // lse stats stay fp32 for all modes.
-    uint64_t accumOutBytes = accumOutSize_ * (innerPrecise_ == 1U ? sizeof(uint16_t) : sizeof(float));
+    // FP8 only implements the FP32 O_partial template, so workspace stays fp32.
+    uint64_t accumOutBytes =
+        accumOutSize_ * ((dataType_ != ge::DT_FLOAT8_E4M3FN && innerPrecise_ == 1U) ? sizeof(uint16_t) : sizeof(float));
     uint64_t userWorkspaceSize = accumOutBytes + (lseStatSize_ * 2U) * sizeof(float);
     workSpaceSize_ = libapiSize_ + userWorkspaceSize;
 
@@ -586,7 +615,9 @@ ge::graphStatus MinimaxSparseAttentionSplitKvTiling::FillTilingData(gert::Tiling
     tilingData_->set_lseStatSize(lseStatSize_);
     tilingData_->set_workSpaceSize(workSpaceSize_);
     uint64_t tilingKeyVal = MINIMAX_SA_SPLIT_KV_BF16_D128_TILING;
-    if (innerPrecise_ == INNER_PRECISE_ALL_LOW) {
+    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+        tilingKeyVal = MINIMAX_SA_SPLIT_KV_FP8_D128_BF16_TILING;
+    } else if (innerPrecise_ == INNER_PRECISE_ALL_LOW) {
         tilingKeyVal = MINIMAX_SA_SPLIT_KV_BF16_D128_INNER_LOW_TILING;
     } else if (innerPrecise_ == INNER_PRECISE_ALL_HIGH) {
         tilingKeyVal = MINIMAX_SA_SPLIT_KV_BF16_D128_INNER_HIGH_TILING;

@@ -24,4 +24,9 @@
 // innerPrecise==0: fp32 softmax S (QK NoQuant) + fp32 O_partial.
 #define MINIMAX_SA_SPLIT_KV_BF16_D128_INNER_HIGH_TILING 20003
 
+// FP8 Q/K/V (and quantized P); PV accum / O_partial FP32; attentionOut BF16.
+// Softmax is the same BF16 online template as 20001; innerPrecise must be 4
+// (FP32 O_partial). innerPrecise=0/1 are not implemented for FP8.
+#define MINIMAX_SA_SPLIT_KV_FP8_D128_BF16_TILING 20004
+
 #endif // MINIMAX_SPARSE_ATTENTION_SPLIT_KV_TILINGKEY_H

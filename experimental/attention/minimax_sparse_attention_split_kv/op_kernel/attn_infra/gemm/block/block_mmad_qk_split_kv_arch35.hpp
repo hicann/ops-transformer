@@ -1,5 +1,5 @@
-/*
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ struct BlockMmadQKSplitKvArch35 {
     static constexpr uint32_t L1_Q_STAGES = 1;
     static constexpr uint32_t V0_V1_FLAG_ID_OFFSET = 16;
     static constexpr uint32_t COPY_GRANULARITY = 2;
-    static constexpr uint32_t C0_SIZE = 16;
+    static constexpr uint32_t C0_SIZE = BYTE_PER_C0 / sizeof(ElementQ);
 
     AscendC::LocalTensor<ElementK> l1KTensor_;
     AscendC::LocalTensor<ElementQ> l1QTensor_[L1_Q_STAGES];

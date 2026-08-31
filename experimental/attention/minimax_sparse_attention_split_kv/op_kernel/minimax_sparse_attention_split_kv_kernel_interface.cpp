@@ -33,7 +33,7 @@ __global__ __aicore__ void MinimaxSaSplitKvInferIntf(GM_ADDR q, GM_ADDR k, GM_AD
     using KernelEpilogueSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
     using KernelBlockMmadPV = Gemm::Block::BlockMmadPVSplitKvArch35<InDtype, InDtype, REDtype>;
     using DispatchPolicyRescaleO = Epilogue::EpilogueRescaleOSplitKvArch35;
-    using KernelEpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, InDtype, REDtype>;
+    using KernelEpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, bfloat16_t, REDtype, InDtype>;
 
     using MinimaxSaSplitKvKernel = MinimaxSparseAttentionSplitKvKernelArch35<KernelBlockMmadQK, KernelEpilogueSoftmax,
                                                                              KernelBlockMmadPV, KernelEpilogueRescaleO>;

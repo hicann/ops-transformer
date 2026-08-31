@@ -96,6 +96,29 @@ __attribute__((visibility("default"))) aclnnStatus aclnnMinimaxSparseAttentionSp
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "innerPrecise must be 0, 1 or 4, got %ld.", innerPrecise);
         return ACLNN_ERR_PARAM_INVALID;
     }
+    DataType qDtype = query->GetDataType();
+    DataType kDtype = key->GetDataType();
+    DataType vDtype = value->GetDataType();
+    auto isQkvOk = [](DataType d) { return d == DataType::DT_BF16 || d == DataType::DT_FLOAT8_E4M3FN; };
+    if (!isQkvOk(qDtype) || !isQkvOk(kDtype) || !isQkvOk(vDtype)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv Q/K/V only support BF16 or FLOAT8_E4M3FN.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (qDtype != kDtype || qDtype != vDtype) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv Q/K/V dtype must be consistent.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (attentionOut->GetDataType() != DataType::DT_BF16) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv attentionOut must be BF16.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (qDtype == DataType::DT_FLOAT8_E4M3FN && innerPrecise != 4) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "MinimaxSparseAttentionSplitKv fp8 path uses FP32 O_partial only "
+                "(innerPrecise=4); got %ld. innerPrecise=0/1 are not implemented.",
+                innerPrecise);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     const char *layout = (inputLayout == nullptr || inputLayout[0] == '\0') ? "TND" : inputLayout;
     if (strcmp(layout, "TND") != 0 && strcmp(layout, "BNSD") != 0 && strcmp(layout, "BSND") != 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "inputLayout must be TND, BNSD or BSND, got %s.", layout);
