@@ -1,194 +1,124 @@
 # Pre-commit 配置指导书
 
-## 概述
+## 一、概述
 
-pre-commit是一个Git Hooks框架，用于在`git commit`时自动运行代码检查和格式化工具。本项目已配置以下检查：
+pre-commit 是一个 Git Hooks 框架，在 `git commit` 时自动运行代码检查和格式化，提前拦截规范问题，避免远程 CI 门禁失败。
 
-| Hook | 功能 | 说明 |
-|------|------|------|
-| **pre-commit-hooks** | 基础规范检查 | 行尾空格、文件末尾换行、YAML/JSON 合法性、大文件、合并冲突标记、私钥检测 |
-| **clang-format** | C/C++ 代码格式化 | 自动格式化 C/C++/asc 代码，遵循 `.clang-format`（不限列宽，不自动拆行） |
-| **ruff-check / ruff-format** | Python 检查与格式化 | ruff 静态检查（自动修复）+ 代码格式化 |
-| **codespell** | 拼写检查 | 检测常见拼写错误（CANN/ascend 等术语已加入白名单） |
-| **OAT Check** | 开源合规检查 | 检测许可证头、禁止二进制/归档文件提交（基于 oat-py，Python 实现） |
+| Hook | 功能 |
+|------|------|
+| **pre-commit-hooks** | 行尾空格、文件末尾换行、YAML/JSON 合法性、大文件、合并冲突标记、私钥检测 |
+| **clang-format** | C/C++/asc 代码格式化，遵循 `.clang-format` |
+| **ruff-check / ruff-format** | Python 静态检查（自动修复）+ 格式化 |
+| **codespell** | 拼写检查（CANN/ascend 等术语已加白名单） |
+| **OAT Check** | 开源合规检查（许可证头、二进制/归档文件拦截） |
 
-## 环境要求
+## 二、环境要求
 
-- **Git**: 2.0+
-- **Python**: 3.9+ (pre-commit 4.0+ 依赖；OAT 检查需 3.7+，已被 3.9+ 覆盖)
-- **pre-commit**: 4.0+ (本项目 `minimum_pre_commit_version` 要求)
+- **Git**: 2.0+，**Python**: 3.9+，**pre-commit**: 4.0+
 
-> **工具获取方式说明**：本项目的检查工具分两类，获取方式不同：
-> - **pre-commit 自动拉取**（clang-format / ruff / codespell）：首次运行 `pre-commit run` 时，pre-commit 按 `.pre-commit-config.yaml` 中 `rev` 锁定的版本（clang-format v18.1.8、ruff v0.14.14、codespell v2.4.1）自动下载到隔离环境，与系统装的工具互不影响。无需手动安装。
-> - **脚本自动安装**（OAT / oat-py）：OAT 为 local hook，首次运行 `scripts/oat_check.sh` 时自动通过 `pip install oat-py>=1.0.1` 安装（带文件锁防并发冲突）。需系统有 Python 3.7+。
->
-> 唯一需要手动安装的是 **clang-format**，仅当本地手动运行 `scripts/format_cpp.sh` 时用到（建议装 18.x 以与 pre-commit 拉取的 v18.1.8 保持一致）。
+> clang-format / ruff / codespell 由 pre-commit 首次运行时自动下载（版本见 `.pre-commit-config.yaml`）；OAT 首次运行时自动 `pip install oat-py`。均无需手动安装。
 
-## 安装步骤
-
-注：若需要使用pre-commit提供的代码检查功能，需要按照如下步骤进行安装配置；若无需pre-commit提供的代码检查功能，可不安装。
-
-### 1. 安装pre-commit
+## 三、安装配置
 
 ```bash
-# 方式一: 使用pip
+# 1. 安装 pre-commit
 pip3 install pre-commit
 
-# 方式二: 使用系统包管理器(Ubuntu/Debian)
-sudo apt install pre-commit
-```
-
-### 2. （可选）安装本地 clang-format
-
-仅当需要脱离 pre-commit 手动批量格式化（`bash scripts/format_cpp.sh`）时安装。日常 `git commit` 触发的 pre-commit 不依赖此工具。
-
-```bash
-# Ubuntu/Debian
-sudo apt install clang-format
-
-# macOS
-brew install clang-format
-```
-
-### 3. 项目路径下安装Git Hooks
-
-```bash
+# 2. 安装 Git Hooks
 cd /path/to/ops-transformer
-pre-commit install
+pre-commit install        # 取消：pre-commit uninstall
+
+# 3. 配置 git pc 别名（对指定范围提交运行检查，每个环境执行一次）
+git config --global alias.pc '!f() { pre-commit run --files $(git diff --name-only "$@"); }; f'
+git pc HEAD~x        # 检查最近x笔提交
 ```
 
-安装成功后会显示：
+## 四、日常使用
 
 ```bash
-pre-commit installed at .git/hooks/pre-commit
-```
+# 提交时自动检查
+git add . && git commit -m "msg"
 
-## 使用方法
+# 手动运行
+pre-commit run                        # 暂存区
+pre-commit run --all-files            # 所有文件
+pre-commit run clang-format           # 单个hook
 
-### 自动检查（推荐）
-
-每次执行`git commit`时，pre-commit会自动运行检查：
-
-```bash
-git add .
-git commit -m "your commit message"
-```
-
-输出示例：
-
-```text
-trim trailing whitespace.................................................Passed
-fix end of files.........................................................Passed
-check yaml.................................................................Passed
-check for added large files..............................................Passed
-check for merge conflicts................................................Passed
-detect private key.......................................................Passed
-check json................................................................Passed
-clang-format.............................................................Passed
-ruff-check...............................................................Passed
-ruff-format..............................................................Passed
-codespell.................................................................Passed
-OAT Compliance Check.....................................................Passed
-```
-
-### 手动运行检查
-
-```bash
-# 运行所有检查
-pre-commit run
-
-# 运行特定类型检查
-pre-commit run clang-format
-pre-commit run oat-check
-
-# 检查所有文件（不限于暂存区）
-pre-commit run --all-files
+# 检查指定文件
+pre-commit run --files src/foo.py src/bar.cpp
 
 # 检查指定目录（pre-commit 不支持目录参数，需用 find 展开成文件列表）
-# 以 examples 目录为例：
 find examples -type f | xargs pre-commit run --files
+
+# 跳过（紧急情况）
+git commit --no-verify -m "msg"
 ```
 
-### 跳过检查（紧急情况）
+## 五、失败排查
+
+搜索输出中的 `Failed` 定位失败项，查看该 hook 下方输出处理，或粘贴给 AI 获取修复建议。
+
+| 报错                  | 原因               | 处理方式                                          |
+|-----------------------|--------------------|---------------------------------------------------|
+| clang-format Failed   | 代码存在规范问题 | rebase 最新代码后再做 pre-commit；重新 `git add` 后再次 commit |
+| OAT Compliance Failed | 缺版权声明等       | 搜索 `OAT Scan Result Summary` 定位文件；版权声明无法自动订正，需参照仓内文件头手动补齐 |
+
+## 六、补查历史提交（--no-verify 跳过后）
+
+对指定范围的提交变更文件补跑检查，等价于 CI `codecheck_precommit` 门禁：
 
 ```bash
-git commit --no-verify -m "emergency fix"
+git pc HEAD~x        # 最近x笔提交
+git pc <commit>^     # 某一笔提交
 ```
 
-> **注意**: 仅在紧急情况下使用，正常开发流程应保证检查通过。
+> 部分钩子会自动修复文件，修复后需重新 `git add` 并追加提交。
 
-## 检查项说明
+## 七、检查项说明
 
-### 1. pre-commit-hooks 基础规范
+1. **pre-commit-hooks** (v4.6.0)：trailing-whitespace、end-of-file-fixer、check-yaml/json、check-added-large-files、check-merge-conflict、detect-private-key
+2. **clang-format** (v18.1.8)：遵循项目 `.clang-format`（Google 风格，4 空格缩进，不限列宽不自动拆行，枚举逐行，构造函数初始化列表逐行换行，函数定义大括号换行，指针右对齐 `int *ptr`）
+3. **ruff** (v0.14.14)：ruff-check（`--fix` 自动修复）+ ruff-format
+4. **codespell** (v2.4.1)：拼写检查，CANN、ascend、EnQue 等术语已加白名单
+5. **OAT**：基于 oat-py，检查许可证头（YAML/CSV 已豁免）、禁止二进制和归档文件
 
-由 `pre-commit/pre-commit-hooks` (v4.6.0) 提供，包含：
+## 八、常见问题
 
-- `trailing-whitespace`：清理行尾空格
-- `end-of-file-fixer`：确保文件末尾有换行
-- `check-yaml` / `check-json`：校验配置文件语法
-- `check-added-large-files`：阻止大文件提交
-- `check-merge-conflict`：检测遗留的合并冲突标记
-- `detect-private-key`：检测私钥误提交
+**Q1: 首次提交 OAT 检查很慢？**
 
-### 2. clang-format
+首次运行需 `pip install oat-py`，属正常现象，后续很快。
 
-自动格式化 C/C++/asc 代码，遵循项目 `.clang-format` 配置（基于 Google 风格）：
-
-- **缩进**: 4 空格
-- **列宽**: 不限制（`ColumnLimit: 0`，既不自动拆行也不合并已有换行，换行由开发者自行控制）
-- **枚举**: 短枚举不合并成单行（`AllowShortEnumsOnASingleLine: false`），保持逐行
-- **构造函数初始化列表**: 逐行换行（`PackConstructorInitializers: Never`），防止不限宽时合并成单行巨码
-- **大括号**: 函数定义换行，控制语句同行
-- **指针对齐**: 右对齐(`int *ptr`)
-- **续行符**: `DontAlign`（`\` 紧贴每行内容，不右对齐，与宏行长度解耦）
-
-### 3. ruff (ruff-check / ruff-format)
-
-由 `ruff-pre-commit` (v0.14.14) 提供，针对 Python 代码：
-
-- `ruff-check`：静态检查并自动修复（`--fix`）
-- `ruff-format`：代码格式化
-
-### 4. codespell
-
-由 `codespell` (v2.4.1) 提供，检测常见拼写错误。CANN、ascend、EnQue 等项目术语已加入白名单。
-
-### 5. OAT Compliance Check
-
-OAT (Open Source Audit Tool) 检查开源合规性，基于 Python 版 `oat-py` 实现（无需 Java/Maven）：
-
-| 检查项 | 说明 |
-|--------|------|
-| 许可证头检查 | 确保源文件包含CANN License头（YAML 配置文件和 CSV 测试用例文件已豁免，见 OAT.xml `defaultPolicyFilter`） |
-| 二进制文件检查 | 禁止提交二进制文件 |
-| 归档文件检查 | 禁止提交zip/tar等归档文件 |
-
-OAT检查脚本首次运行时会自动：
-
-1. 检测 Python 3.7+ 环境
-2. 通过 `pip install oat-py>=1.0.1` 安装 OAT 工具（带文件锁，防止并发 pip 冲突）
-
-## 常见问题
-
-### Q1: 首次提交时OAT检查很慢
-
-**原因**: 首次运行需要通过 `pip install oat-py>=1.0.1` 安装 OAT 工具。
-
-**解决**: 这是正常现象，后续提交会使用已安装的 oat-py，速度会很快。
-
-### 手动全量格式化 C/C++ 代码
-
-仓库提供 `scripts/format_cpp.sh`，可脱离 pre-commit 对任意目录全量格式化，常用于批量整理历史代码或本地预览格式化效果：
+**Q2: 手动全量格式化 C/C++？**
 
 ```bash
-# 格式化整个仓库
-bash scripts/format_cpp.sh
-
-# 格式化指定目录
-bash scripts/format_cpp.sh examples
+bash scripts/format_cpp.sh            # 整个仓库
+bash scripts/format_cpp.sh examples   # 指定目录
 ```
 
-脚本会自动排除 `build/`、`build_out/`、`third_party/`、`.git/` 目录，按仓库根目录的 `.clang-format` 配置格式化 `.c/.h/.cpp/.hpp/.cc/.hh/.cxx/.hxx` 文件。
+自动排除 `build/`、`build_out/`、`third_party/`、`.git/`。
+
+**Q3: 如何全局生效，让新 clone 的仓库自动继承？**
+
+```bash
+mkdir -p ~/.git-templates
+pre-commit init-templatedir ~/.git-templates
+git config --global init.templatedir ~/.git-templates
+
+# 已有仓库需重新拷贝模板
+cd /path/to/ops-transformer && git init
+```
+
+> hook 只是启动器，实际检查仍读取当前仓库的 `.pre-commit-config.yaml`；未配置该文件的仓库会自动跳过，互不影响。
+
+取消：`git config --global --unset init.templatedir && rm -rf ~/.git-templates`
+
+**Q4: 何时需要安装本地 clang-format？**
+
+仅手动批量格式化（`bash scripts/format_cpp.sh`）时需要，建议 18.x；日常 `git commit` 触发的 pre-commit 不依赖此工具。
+
+```bash
+sudo apt install clang-format
+```
 
 ## 相关文档
 
