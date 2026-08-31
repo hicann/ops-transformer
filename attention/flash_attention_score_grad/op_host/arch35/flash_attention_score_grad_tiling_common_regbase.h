@@ -461,6 +461,7 @@ struct FuzzyBaseInfoParamsRegbase { // 频繁使用的基础参数
     uint8_t sparseType;
     bool isS1S2Same = false;
     bool coreDivide = false;
+    uint8_t tndLineDeter = 0;
     int64_t deterMaxRound = 0;
     // 每个 batch 的前缀面积总和 prefix,
     // 小于128b传完整的前缀和，大于128b的，按步长传部分前缀和，在kernel内组装完整的前缀和

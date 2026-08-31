@@ -2338,6 +2338,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
     }
     if (IsNewDeter(fBaseParams) && deterParam != nullptr) {
         deterParam->set_coreDivide(fBaseParams.coreDivide);
+        deterParam->set_tndLineDeter(fBaseParams.tndLineDeter);
         deterParam->set_deterPrefixStep(fBaseParams.deterPrefixStep);
         deterParam->set_deterPrefix(fBaseParams.deterPrefix);
         deterParam->set_deterPrefixAlign(fBaseParams.deterPrefixAlign);
