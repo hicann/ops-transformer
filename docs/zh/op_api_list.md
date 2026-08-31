@@ -65,7 +65,7 @@
 |[aclnnCompressorGrad](../../attention/compressor_grad/docs/aclnnCompressorGrad.md)|Compressor的反向算子，用于计算输入X、权重W^KV/W^Gate与位置编码Ape的梯度，前向在gradEnabled为true时导出softmax_score与kv中间结果作为本算子输入。|- | 默认确定性实现 |
 |[aclnnFFNToAttention](../../mc2/ffn_to_attention/docs/aclnnFFNToAttention.md)|将FFN节点上的token数据发往Attention节点。|默认确定性实现| - |
 |[aclnnFfnWorkerBatching](../../ffn/ffn_worker_batching/docs/aclnnFfnWorkerBatching.md)|Attention和FFN分离场景下，FFN侧数据扫描及token重排。|默认确定性实现| - |
-|[aclnnDequantRopeQuantKvcache](../../posembedding/dequant_rope_quant_kvcache/docs/aclnnDequantRopeQuantKvcache.md)|对输入张量进行dequant后，对尾轴进行切分，划分为q、k、vOut，对q、k进行旋转位置编码，并进行量化。|默认确定性实现| - |
+|[aclnnDequantRopeQuantKvcache](../../posembedding/dequant_rope_quant_kvcache/docs/aclnnDequantRopeQuantKvcache.md)|对输入张量进行dequant后，对尾轴进行切分，划分为q、k、vOut，对q、k进行旋转位置编码，并进行量化。|默认确定性实现| 默认确定性实现 |
 |[aclnnDistributeBarrier](../../mc2/distribute_barrier/docs/aclnnDistributeBarrier.md)|完成通信域内的全卡同步，xRef仅用于构建Tensor依赖，接口内不对xRef做任何操作。|默认确定性实现| 默认确定性实现 |
 |[aclnnDistributeBarrierV2](../../mc2/distribute_barrier/docs/aclnnDistributeBarrierV2.md)|完成通信域内的全卡同步，xRef仅用于构建Tensor依赖，接口内不对xRef做任何操作。|默认确定性实现| 默认确定性实现 |
 |[aclnnDenseLightningIndexerGradKLLoss](../../attention/dense_lightning_indexer_grad_kl_loss/docs/aclnnDenseLightningIndexerGradKLLoss.md)|dense场景LightningIndexer的反向算子，再额外融合了Loss计算功能。|默认非确定性实现，支持配置开启| 默认非确定性实现，支持配置开启 |

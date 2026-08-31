@@ -1541,7 +1541,7 @@
     <td><a href="../../posembedding/dequant_rope_quant_kvcache/README.md">dequant_rope_quant_kvcache</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
     <td>对输入张量（x）进行dequant（可选）后，按`sizeSplits`（为切分的长度）对尾轴进行切分，划分为q、k、vOut，对q、k进行旋转位置编码，生成qOut和kOut，之后对kOut和vOut进行量化并按照`indices`更新到kCacheRef和vCacheRef上。</td>
