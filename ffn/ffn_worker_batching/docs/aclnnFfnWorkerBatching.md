@@ -35,7 +35,7 @@
 
     3. 多核并行按gather索引从`token_data`中提取token的hidden states和dynamic scale，同时查表得到对应的session_id、micro_batch_id、token_id。
 
-    4. 单核扫描排序后的专家ID序列，查找跳变点，生成`group_list`（每个专家处理的token起止偏移）。
+    4. 单核扫描排序后的专家ID序列，查找跳变点，生成`groupList`（每个专家处理的token起止偏移）。
 
     其中 $Y = A \times BS \times (K+1)$，$A$ 为Attention worker数量，$BS$ 为micro batch size，$K+1$ 为topK加共享专家数。
 
@@ -50,11 +50,11 @@
   $$
 
   $$
-  \text{group\_list}[e] = [\text{expert\_id}_e, \text{expert\_token\_num}_e]
+  \text{groupList}[e] = [\text{expert\_id}_e, \text{expert\_token\_num}_e]
   $$
 
   $$
-  \text{actual\_token\_num} = \sum_{e} \text{expert\_token\_num}_e
+  \text{actualTokenNum} = \sum_{e} \text{expert\_token\_num}_e
   $$
 
 ## 函数原型
@@ -118,7 +118,7 @@ aclnnStatus aclnnFfnWorkerBatching(
     <tr>
       <td>scheduleContext</td>
       <td>输入</td>
-      <td>FFN侧接收的调度上下文，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从FfnArea中读取token_info_buf和token_data_buf获取待重排的token数据与描述信息。详细结构参见调用示例。</td>
+      <td>FFN侧接收的调度上下文，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从FfnArea中读取token_info_buf和token_data_buf获取待重排的token数据与描述信息。</td>
       <td>不支持空tensor。</td>
       <td>INT8</td>
       <td>ND</td>
@@ -128,7 +128,7 @@ aclnnStatus aclnnFfnWorkerBatching(
     <tr>
       <td>expertNum</td>
       <td>输入</td>
-      <td>本卡专家总数，等于每层本卡专家数 × layer_num。用于推导group_list输出大小。</td>
+      <td>本卡专家总数，等于每层本卡专家数 × layerNum。用于推导groupList输出大小。</td>
       <td>取值范围为(0, 8192]。</td>
       <td>INT64</td>
       <td>-</td>
@@ -355,10 +355,9 @@ aclnnStatus aclnnFfnWorkerBatching(
 
 - 参数A（Attention worker数量）支持 ≤ 1024。
 - 参数M（micro batch数量）支持 ≤ 64。
-- 参数K（topK数）支持 ≤ 64。
+- 参数K+1（topK加共享专家数）支持 ≤ 64。
 - 参数BS（micro batch size）和Y支持泛化，无硬上限（受内存限制）。
 - 参数H（hidden size）支持泛化。
-- tokenDtype为2时，输入int8数据与fp32 scale连续排布。
 - 确定性计算：
   - aclnnFfnWorkerBatching默认确定性实现。
 
