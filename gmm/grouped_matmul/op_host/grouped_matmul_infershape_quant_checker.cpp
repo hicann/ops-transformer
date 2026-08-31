@@ -19,9 +19,8 @@ namespace ops {
 
 static const std::unordered_set<ge::DataType> X_TYPE_SUPPORT_SET = {
     ge::DT_INT8, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2, ge::DT_HIFLOAT8, ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E1M2};
-static const std::unordered_set<ge::DataType> WEIGHT_TYPE_SUPPORT_SET = {ge::DT_INT8, ge::DT_FLOAT8_E4M3FN,
-                                                                         ge::DT_FLOAT8_E5M2, ge::DT_HIFLOAT8,
-                                                                         ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E1M2};
+static const std::unordered_set<ge::DataType> WEIGHT_TYPE_SUPPORT_SET = {
+    ge::DT_INT8, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2, ge::DT_HIFLOAT8, ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E1M2};
 static const std::unordered_set<ge::DataType> BIAS_TYPE_SUPPORT_SET = {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT,
                                                                        ge::DT_INT32};
 static const std::unordered_set<ge::DataType> SCALE_TYPE_SUPPORT_SET = {ge::DT_UINT64, ge::DT_INT64, ge::DT_FLOAT,
@@ -111,19 +110,21 @@ x is %s, weight is %s.",
     OP_CHECK_IF(
         LogicXOR((xDtype == ge::DataType::DT_FLOAT8_E4M3FN || xDtype == ge::DataType::DT_FLOAT8_E5M2),
                  (weightDtype == ge::DataType::DT_FLOAT8_E4M3FN || weightDtype == ge::DataType::DT_FLOAT8_E5M2)),
-        OP_LOGE(
-            context->GetNodeName(),
-            "When x input dtype is FLOAT8, then the weight input dtype must be FLOAT8, vice versa, actual x is %s, \
-weight is %s.", ge::TypeUtils::DataTypeToAscendString(xDtype).GetString(),
-                ge::TypeUtils::DataTypeToAscendString(weightDtype).GetString()), 
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(LogicXOR((xDtype == ge::DataType::DT_FLOAT4_E2M1 || xDtype == ge::DataType::DT_FLOAT4_E1M2),
-        (weightDtype == ge::DataType::DT_FLOAT4_E2M1 || weightDtype == ge::DataType::DT_FLOAT4_E1M2)),
         OP_LOGE(context->GetNodeName(),
-            "When x input dtype is FLOAT4, then the weight input dtype must be FLOAT4, vice versa, actual x is %s, \
-weight is %s.", ge::TypeUtils::DataTypeToAscendString(xDtype).GetString(),
-                ge::TypeUtils::DataTypeToAscendString(weightDtype).GetString()), 
-                return ge::GRAPH_FAILED);
+                "When x input dtype is FLOAT8, then the weight input dtype must be FLOAT8, vice versa, actual x is %s, \
+weight is %s.",
+                ge::TypeUtils::DataTypeToAscendString(xDtype).GetString(),
+                ge::TypeUtils::DataTypeToAscendString(weightDtype).GetString()),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        LogicXOR((xDtype == ge::DataType::DT_FLOAT4_E2M1 || xDtype == ge::DataType::DT_FLOAT4_E1M2),
+                 (weightDtype == ge::DataType::DT_FLOAT4_E2M1 || weightDtype == ge::DataType::DT_FLOAT4_E1M2)),
+        OP_LOGE(context->GetNodeName(),
+                "When x input dtype is FLOAT4, then the weight input dtype must be FLOAT4, vice versa, actual x is %s, \
+weight is %s.",
+                ge::TypeUtils::DataTypeToAscendString(xDtype).GetString(),
+                ge::TypeUtils::DataTypeToAscendString(weightDtype).GetString()),
+        return ge::GRAPH_FAILED);
     auto ScaleDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_SCALE, 0);
     OP_CHECK_IF(SCALE_TYPE_SUPPORT_SET.find(ScaleDtype) == SCALE_TYPE_SUPPORT_SET.end(),
                 OP_LOGE(context->GetNodeName(),
@@ -210,8 +211,8 @@ ge::graphStatus GroupedMatmulQuantChecker::CheckFormatValid(const gert::InferSha
     const auto weightDesc = context->GetDynamicInputDesc(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightDesc);
     const auto weightFormat = weightDesc->GetOriginFormat();
-    OP_CHECK_IF(weightFormat != ge::FORMAT_ND && weightFormat != ge::FORMAT_NCL &&
-                    weightFormat != ge::FORMAT_NCHW && weightFormat != ge::FORMAT_FRACTAL_NZ,
+    OP_CHECK_IF(weightFormat != ge::FORMAT_ND && weightFormat != ge::FORMAT_NCL && weightFormat != ge::FORMAT_NCHW &&
+                    weightFormat != ge::FORMAT_FRACTAL_NZ,
                 OP_LOGE(context->GetNodeName(),
                         "Format of weight only supports ND, NCL, FORMAT_FRACTAL_NZ or NCHW for now, but it is [%s].",
                         ge::TypeUtils::FormatToAscendString(weightFormat).GetString()),
@@ -308,30 +309,30 @@ ge::graphStatus GroupedMatmulQuantChecker::CheckGroupedMatmulPerGroupDim(const g
                 OP_LOGE(context->GetNodeName(), "The dim num of x should be 2, but actual dim num is %zu.", xdimNum_),
                 return ge::GRAPH_FAILED);
     if (gmmAttrs.groupType == GMM_SPLIT_M) {
-        OP_CHECK_IF(weightdimNum_ != GMM_SPLIT_M_SINGLE_WEIGHT_DIM,
-                    OP_LOGE(context->GetNodeName(),
-                            "The dim num of weight should be 3 when groupType is 0 (split M), but \
+        OP_CHECK_IF(
+            weightdimNum_ != GMM_SPLIT_M_SINGLE_WEIGHT_DIM,
+            OP_LOGE(context->GetNodeName(), "The dim num of weight should be 3 when groupType is 0 (split M), but \
 actual dim num is %zu.",
-                            weightdimNum_),
-                    return ge::GRAPH_FAILED);
+                    weightdimNum_),
+            return ge::GRAPH_FAILED);
     } else if (gmmAttrs.groupType == GMM_SPLIT_K) {
-        OP_CHECK_IF(weightdimNum_ != GMM_SPLIT_K_SINGLE_WEIGHT_DIM,
-                    OP_LOGE(context->GetNodeName(),
-                            "The dim num of weight should be 2 when groupType is 2 (split K), but \
+        OP_CHECK_IF(
+            weightdimNum_ != GMM_SPLIT_K_SINGLE_WEIGHT_DIM,
+            OP_LOGE(context->GetNodeName(), "The dim num of weight should be 2 when groupType is 2 (split K), but \
 actual dim num is %zu.",
-                            weightdimNum_),
-                    return ge::GRAPH_FAILED);
+                    weightdimNum_),
+            return ge::GRAPH_FAILED);
     }
     OP_CHECK_IF(scaleDimNum != weightdimNum_,
                 OP_LOGE(context->GetNodeName(), "The dim num of scale[%zu] should be equal to that of weight[%zu] when \
 groupType is %ld.",
                         scaleDimNum, weightdimNum_, gmmAttrs.groupType),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(perTokenDimNum != xdimNum_,
-                OP_LOGE(context->GetNodeName(),
-                        "The dim num of per_token_scale[%zu] should be equal to that of x[%zu].", perTokenDimNum,
-                        xdimNum_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        perTokenDimNum != xdimNum_,
+        OP_LOGE(context->GetNodeName(), "The dim num of per_token_scale[%zu] should be equal to that of x[%zu].",
+                perTokenDimNum, xdimNum_),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -348,36 +349,36 @@ ge::graphStatus GroupedMatmulQuantChecker::CheckGroupedMatmulPerTileShape(const 
                                                 scaleShape->GetDim(weightdimNum_ - PENULTIMATE_DIM);
     auto scaleNDim = gmmAttrs.transposeWeight ? scaleShape->GetDim(weightdimNum_ - PENULTIMATE_DIM) :
                                                 scaleShape->GetDim(weightdimNum_ - 1);
-    OP_CHECK_IF(perTokenMDim != xMDim_,
-                OP_LOGE(context->GetNodeName(),
-                        "When quantification mode is G-B quantification, the M value in x[%ld] and \
+    OP_CHECK_IF(
+        perTokenMDim != xMDim_,
+        OP_LOGE(context->GetNodeName(), "When quantification mode is G-B quantification, the M value in x[%ld] and \
 per_token_scale[%ld] should be consistent.",
-                        xMDim_, perTokenMDim),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(scaleNDim != (weightNDim_ + PERTILE_GROUP_SIZE - 1) / PERTILE_GROUP_SIZE,
-                OP_LOGE(context->GetNodeName(),
-                        "When quantification mode is G-B quantification, the N value in scale [%ld] \
+                xMDim_, perTokenMDim),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        scaleNDim != (weightNDim_ + PERTILE_GROUP_SIZE - 1) / PERTILE_GROUP_SIZE,
+        OP_LOGE(context->GetNodeName(), "When quantification mode is G-B quantification, the N value in scale [%ld] \
 must be equal to the N value in weight [%ld] divided by 128.",
-                        scaleNDim, weightNDim_),
-                return ge::GRAPH_FAILED);
+                scaleNDim, weightNDim_),
+        return ge::GRAPH_FAILED);
     if (gmmAttrs.groupType == GMM_SPLIT_M) {
         int64_t expectScaleKValue = (weightKDim_ + PERTILE_GROUP_SIZE - 1) / PERTILE_GROUP_SIZE;
-        OP_CHECK_IF(perTokenKDim != scaleKDim || scaleKDim != expectScaleKValue,
-                    OP_LOGE(context->GetNodeName(),
-                            "When quantification mode is G-B quantification, and groupType is 0 (split \
-M), the K dim of per_token_scale [%ld] should equal the K dim of scalel [%ld], and its value should be equal to the K \
+        OP_CHECK_IF(
+            perTokenKDim != scaleKDim || scaleKDim != expectScaleKValue,
+            OP_LOGE(context->GetNodeName(), "When quantification mode is G-B quantification, and groupType is 0 (split \
+M), the K dim of per_token_scale [%ld] should equal the K dim of scale [%ld], and its value should be equal to the K \
 dim of weight [%ld] divided by 128, rounded up to the next integer.",
-                            perTokenKDim, scaleNDim, weightNDim_),
-                    return ge::GRAPH_FAILED);
+                    perTokenKDim, scaleNDim, weightNDim_),
+            return ge::GRAPH_FAILED);
     } else {
         int64_t expectScaleKValue = (weightKDim_ / PERTILE_GROUP_SIZE) + groupNum_;
-        OP_CHECK_IF(perTokenKDim != scaleKDim || scaleKDim != expectScaleKValue,
-                    OP_LOGE(context->GetNodeName(),
-                            "When quantification mode is G-B quantification, and groupType is 2 (split \
+        OP_CHECK_IF(
+            perTokenKDim != scaleKDim || scaleKDim != expectScaleKValue,
+            OP_LOGE(context->GetNodeName(), "When quantification mode is G-B quantification, and groupType is 2 (split \
 K), the K dim of per_token_scale [%ld] should equal the K dim of scale [%ld], its value must be equal to the K dim of \
 weight [%ld] divided by 128, plus the groupSize [%ld].",
-                            perTokenKDim, scaleKDim, weightKDim_, groupNum_),
-                    return ge::GRAPH_FAILED);
+                    perTokenKDim, scaleKDim, weightKDim_, groupNum_),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -396,12 +397,12 @@ ge::graphStatus GroupedMatmulQuantChecker::CheckShapeForPerGroupQuantParam(const
 ge::graphStatus GroupedMatmulQuantChecker::CheckPertokenShapeInNormalQuantMode(
     const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs, const gert::Shape *perTokenScaleShape) const
 {
-    OP_CHECK_IF(perTokenScaleShape->GetDimNum() != 1 && perTokenScaleShape->GetDimNum() != 2,
-                OP_LOGE(context->GetNodeName(),
-                        "In T-C or K-C quant mode, the dim num of perTokenScale should be 1 or 2, \
+    OP_CHECK_IF(
+        perTokenScaleShape->GetDimNum() != 1 && perTokenScaleShape->GetDimNum() != 2,
+        OP_LOGE(context->GetNodeName(), "In T-C or K-C quant mode, the dim num of perTokenScale should be 1 or 2, \
 but the actual is [%zu].",
-                        perTokenScaleShape->GetDimNum()),
-                return ge::GRAPH_FAILED);
+                perTokenScaleShape->GetDimNum()),
+        return ge::GRAPH_FAILED);
     if (gmmAttrs.groupType == GMM_SPLIT_M) {
         if (perTokenScaleShape->GetDimNum() == 1) {
             OP_CHECK_IF(perTokenScaleShape->GetDim(0) != xMDim_ && perTokenScaleShape->GetDim(0) != groupNum_,
@@ -621,8 +622,8 @@ ge::graphStatus GroupedMatmulQuantChecker::CheckShape(const gert::InferShapeCont
                 OP_LOGE(context->GetNodeName(), "CheckScenarioValidForShape failed."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckShapeValid(context, commonUtil.attrsInfo) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context->GetNodeName(), "CheckShapeValid failed."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckFormatValid(context) != ge::GRAPH_SUCCESS, OP_LOGE(context->GetNodeName(), "CheckFormatValid failed."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckFormatValid(context) != ge::GRAPH_SUCCESS,
+                OP_LOGE(context->GetNodeName(), "CheckFormatValid failed."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -659,25 +660,27 @@ ge::graphStatus GroupedMatmulQuantChecker::CheckScenarioValidForDtype(const gert
     if (gmmAttrs.groupType == GMM_SPLIT_K) {
         OP_CHECK_IF(xDtype == ge::DT_INT8 || scaleDtype == ge::DT_INT64 || scaleDtype == ge::DT_UINT64,
                     OP_LOGE(context->GetNodeName(), "When split k, x with int8 dtype or scale with int64/uint64 dtype \
-is not supported, but the acutal x dtype is [%s] and actual scale dtype is [%s].",
+is not supported, but the actual x dtype is [%s] and actual scale dtype is [%s].",
                             ge::TypeUtils::DataTypeToAscendString(xDtype).GetString(),
                             ge::TypeUtils::DataTypeToAscendString(scaleDtype).GetString()),
                     return ge::GRAPH_FAILED);
     }
-    if ((xDtype == ge::DT_HIFLOAT8 || xDtype == ge::DT_FLOAT8_E5M2 ||
-         xDtype == ge::DT_FLOAT8_E4M3FN) && perTokenScaleDtype != ge::DT_UNDEFINED) {
+    if ((xDtype == ge::DT_HIFLOAT8 || xDtype == ge::DT_FLOAT8_E5M2 || xDtype == ge::DT_FLOAT8_E4M3FN) &&
+        perTokenScaleDtype != ge::DT_UNDEFINED) {
         OP_CHECK_IF(
-            scaleDtype != perTokenScaleDtype || (scaleDtype != ge::DataType::DT_FLOAT && scaleDtype != ge::DataType::DT_FLOAT8_E8M0),
+            scaleDtype != perTokenScaleDtype ||
+                (scaleDtype != ge::DataType::DT_FLOAT && scaleDtype != ge::DataType::DT_FLOAT8_E8M0),
             OP_LOGE(context->GetNodeName(), "When data type of x is float8/hifloat8, data type of scale [%s] should be \
 equal to per_token_scale's dtype [%s], and be float32/float8_e8m0.",
                     ge::TypeUtils::DataTypeToAscendString(scaleDtype).GetString(),
-                    ge::TypeUtils::DataTypeToAscendString(perTokenScaleDtype).GetString()), return ge::GRAPH_FAILED);
+                    ge::TypeUtils::DataTypeToAscendString(perTokenScaleDtype).GetString()),
+            return ge::GRAPH_FAILED);
     } else if (xDtype == ge::DT_FLOAT4_E2M1 || xDtype == ge::DT_FLOAT4_E1M2) {
-        OP_CHECK_IF(
-            scaleDtype != ge::DataType::DT_FLOAT8_E8M0,
-            OP_LOGE(context->GetNodeName(), "When data type of x is float4, data type of scale [%s] should be \
+        OP_CHECK_IF(scaleDtype != ge::DataType::DT_FLOAT8_E8M0,
+                    OP_LOGE(context->GetNodeName(), "When data type of x is float4, data type of scale [%s] should be \
 equal to float8_e8m0.",
-                    ge::TypeUtils::DataTypeToAscendString(scaleDtype).GetString()), return ge::GRAPH_FAILED);
+                            ge::TypeUtils::DataTypeToAscendString(scaleDtype).GetString()),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -685,8 +688,8 @@ equal to float8_e8m0.",
 ge::graphStatus GroupedMatmulQuantChecker::CheckDtype(const gert::InferDataTypeContext *context,
                                                       const GroupedMatmulCommonUtil &commonUtil) const
 {
-    OP_CHECK_IF(CheckDtypeValid(context) != ge::GRAPH_SUCCESS, OP_LOGE(context->GetNodeName(), "CheckDtypeValid failed."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtypeValid(context) != ge::GRAPH_SUCCESS,
+                OP_LOGE(context->GetNodeName(), "CheckDtypeValid failed."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckScenarioValidForDtype(context, commonUtil.attrsInfo) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context->GetNodeName(), "CheckScenarioValidForDtype failed."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;

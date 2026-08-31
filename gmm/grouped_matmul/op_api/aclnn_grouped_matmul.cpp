@@ -316,7 +316,7 @@ static aclnnStatus CheckShapeSameLengthTensorList(const aclTensorList *tensorLis
             if (tensorType[2] == "true" && innerAxisDimId > -1) {
                 int64_t innerAxisValue = (*tensorList1)[i]->GetViewShape().GetDim(innerAxisDimId);
                 CHECK_COND(innerAxisValue <= MAX_INNER_AXIS, ACLNN_ERR_PARAM_INVALID,
-                           "Dim %lu value of %s[%lu] should less or equal to 65535, but now is %ld.", dimIds[0],
+                           "Dim %lu value of %s[%lu] should be less than or equal to 65535, but now is %ld.", dimIds[0],
                            tensorType[0].c_str(), i, innerAxisValue);
             }
         }
@@ -344,7 +344,7 @@ static aclnnStatus CheckShapeDiffLengthTensorList(const aclTensorList *longTenso
         if (tensorType[2] == "true" && innerAxisdimId > -1) {
             int64_t dimValue = (*singleTensorList)[0]->GetViewShape().GetDim(innerAxisdimId);
             CHECK_COND(dimValue <= MAX_INNER_AXIS, ACLNN_ERR_PARAM_INVALID,
-                       "Dim %ld value of %s[0] should less or equal to 65535, but now is %ld.", innerAxisdimId,
+                       "Dim %ld value of %s[0] should be less than or equal to 65535, but now is %ld.", innerAxisdimId,
                        tensorType[1].c_str(), dimValue);
         }
     }
@@ -573,7 +573,7 @@ static aclnnStatus CheckGroupListCommonTensor(const gmm::GroupedMatmulParams &gm
                        gmmParams.groupTensorOptional->GetViewShape().GetDim(1));
         }
         CHECK_COND(groupListSize <= MAX_GROUP_LIST_SIZE_TENSOR, ACLNN_ERR_PARAM_INVALID,
-                   "When groupList type is tenosr, size of groupList %ld should be less than or equal to %ld.",
+                   "When groupList type is tensor, size of groupList %ld should be less than or equal to %ld.",
                    groupListSize, MAX_GROUP_LIST_SIZE_TENSOR);
         CHECK_COND(
             (groupListSize == static_cast<int64_t>(groupNum) && groupNum > 1) || groupNum == 1, ACLNN_ERR_PARAM_INVALID,
@@ -629,7 +629,7 @@ static aclnnStatus CheckGroupListSplitK(const gmm::GroupedMatmulParams &gmmParam
             }
         } else {
             CHECK_COND((*gmmParams.x)[0]->GetViewShape().GetDim(1) == groupListLastValue, ACLNN_ERR_PARAM_INVALID,
-                       "When splited axis is K, the last value of group list(%ld) must equal with x shape[1] (%ld).",
+                       "When the split axis is K, the last value of group list(%ld) must be equal to x shape[1] (%ld).",
                        groupListLastValue, (*gmmParams.x)[0]->GetViewShape().GetDim(1));
         }
     }
@@ -679,7 +679,7 @@ static aclnnStatus CheckGroupListSplitM(const gmm::GroupedMatmulParams &gmmParam
             }
         } else {
             CHECK_COND((*gmmParams.x)[0]->GetViewShape().GetDim(0) == groupListLastValue, ACLNN_ERR_PARAM_INVALID,
-                       "When splited axis is M, the last value of group list(%ld) must equal with x shape[0] (%ld).",
+                       "When the split axis is M, the last value of group list(%ld) must be equal to x shape[0] (%ld).",
                        groupListLastValue, (*gmmParams.x)[0]->GetViewShape().GetDim(0));
         }
     }
@@ -775,8 +775,8 @@ static aclnnStatus CheckOptionalTensorList(const gmm::GroupedMatmulParams &gmmPa
         // Check the first dimension, batch size must match the group size.
         uint64_t batchSize = tensor0Shape.GetDim(0);
         CHECK_COND(batchSize == numTotal, ACLNN_ERR_PARAM_INVALID,
-                   "%s batch size[%lu] should be euqal "
-                   "with groupList length[%lu].",
+                   "%s batch size[%lu] should be equal to "
+                   "groupList length[%lu].",
                    tensorType.c_str(), batchSize, numTotal);
         // Check tensor’s Ndim must match weight’s Ndim.
         int64_t weightNDimValue = w0Shape.GetDim(weightNDimIdx);
@@ -1270,8 +1270,8 @@ static aclnnStatus CheckA8W4SymmQuantParamsRelationship(const gmm::GroupedMatmul
                 scaleShape.GetDim(scaleDim - 1), n);
     }
     if (!(wK == xK)) {
-        OP_LOGW("GMM A8W4 Symmetric Quant: dim 1 of x shape must be equal with dim 1 of weight shape"
-                "the x shape is (%ld, %ld) and weight shape is (%ld, %ld, %ld)",
+        OP_LOGW("GMM A8W4 Symmetric Quant: dim 1 of x shape must be equal to dim 1 of weight shape. "
+                "The x shape is (%ld, %ld) and weight shape is (%ld, %ld, %ld)",
                 xShape.GetDim(0), xShape.GetDim(1), e, wK, n);
     }
     if (hasBias) {
@@ -3165,7 +3165,7 @@ aclnnStatus CheckCommonParam(const aclTensorList *x, const aclTensorList *weight
     }
     if (groupListType == gmm::GROUP_LIST_SPARSE_M) {
         CHECK_COND(npuArch == NpuArch::DAV_2201 || npuArch == NpuArch::DAV_3510, ACLNN_ERR_PARAM_INVALID,
-                   "This platform not support groupListType is 2.");
+                   "This platform does not support groupListType 2.");
         CHECK_COND(groupType == gmm::SPLIT_M, ACLNN_ERR_PARAM_INVALID,
                    "In op [%s], when groupType == %s, [%s] is not supported. Constraint:[sparse groupListType requires "
                    "groupType == 0(split-M)].",
@@ -3452,7 +3452,7 @@ aclnnStatus aclnnGroupedMatmul(void *workspace, uint64_t workspaceSize, aclOpExe
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmul", "aclnnGroupedMatmulV5");
     L2_DFX_PHASE_2(aclnnGroupedMatmul);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in GMM launch aicore");
+               "An error occurred when GMM launched on aicore.");
     return ACLNN_SUCCESS;
 }
 
@@ -3461,7 +3461,7 @@ aclnnStatus aclnnGroupedMatmulV2(void *workspace, uint64_t workspaceSize, aclOpE
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmulV2", "aclnnGroupedMatmulV5");
     L2_DFX_PHASE_2(aclnnGroupedMatmulV2);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in GMM launch aicore");
+               "An error occurred when GMM launched on aicore.");
     return ACLNN_SUCCESS;
 }
 
@@ -3470,7 +3470,7 @@ aclnnStatus aclnnGroupedMatmulV3(void *workspace, uint64_t workspaceSize, aclOpE
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmulV3", "aclnnGroupedMatmulV5");
     L2_DFX_PHASE_2(aclnnGroupedMatmulV3);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in GMM launch aicore");
+               "An error occurred when GMM launched on aicore.");
     return ACLNN_SUCCESS;
 }
 
@@ -3479,7 +3479,7 @@ aclnnStatus aclnnGroupedMatmulV4(void *workspace, uint64_t workspaceSize, aclOpE
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmulV4", "aclnnGroupedMatmulV5");
     L2_DFX_PHASE_2(aclnnGroupedMatmulV4);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in GMM launch aicore");
+               "An error occurred when GMM launched on aicore.");
     return ACLNN_SUCCESS;
 }
 
@@ -3487,7 +3487,7 @@ aclnnStatus aclnnGroupedMatmulV5(void *workspace, uint64_t workspaceSize, aclOpE
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulV5);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in GMM launch aicore");
+               "An error occurred when GMM launched on aicore.");
     return ACLNN_SUCCESS;
 }
 
@@ -3496,7 +3496,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(void *workspace, uint64_t workspaceSize, 
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulWeightNz);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in GMM launch aicore");
+               "An error occurred when GMM launched on aicore.");
     return ACLNN_SUCCESS;
 }
 

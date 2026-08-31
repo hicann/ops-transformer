@@ -44,7 +44,6 @@ auto CeilDiv(T1 a, T2 b) -> T1
     return (a + b - 1) / b;
 }
 
-
 static inline uint32_t SixteenAlign(uint32_t a, bool up = false)
 {
     if (up) {
@@ -67,8 +66,8 @@ int64_t GroupedMatmulSwigluQuantV2BaseTiling::CalMaxRowInUbA8W4(const uint64_t u
 
     // 忽略对齐项的初始估计
     if (n == 0 || ubSize <= CONSTANT_TERM + LINEAR_TERM_FACTOR * n) {
-        OP_LOGE(context_->GetNodeName(), "GMM_SWIGLU_QUANT TILING: invalid n or ubSize, n = %lu, ubSize = %lu\n",
-                n, ubSize);
+        OP_LOGE(context_->GetNodeName(), "GMM_SWIGLU_QUANT TILING: invalid n or ubSize, n = %lu, ubSize = %lu\n", n,
+                ubSize);
         return 0;
     }
 
@@ -137,10 +136,8 @@ bool GroupedMatmulSwigluQuantV2BaseTiling::IsCapable()
     auto wShape = context_->GetDynamicInputShape(WEIGHT_INDEX, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context_, wShape);
     auto wSShape = wShape->GetStorageShape();
-    if (!(wSShape.GetDimNum() == ND_WEIGHT_DIM_LIMIT ||
-          wSShape.GetDimNum() == ND_WEIGHT_MULTI_TENSOR_DIM ||
-          wSShape.GetDimNum() == NZ_WEIGHT_DIM_LIMIT ||
-          wSShape.GetDimNum() == NZ_WEIGHT_MULTI_TENSOR_DIM)) {
+    if (!(wSShape.GetDimNum() == ND_WEIGHT_DIM_LIMIT || wSShape.GetDimNum() == ND_WEIGHT_MULTI_TENSOR_DIM ||
+          wSShape.GetDimNum() == NZ_WEIGHT_DIM_LIMIT || wSShape.GetDimNum() == NZ_WEIGHT_MULTI_TENSOR_DIM)) {
         return false;
     }
 
@@ -210,8 +207,9 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::ParseInputAndAttr()
         isNz_ = true;
     }
     const auto tuningConfigPtr = attr->GetAttrPointer<gert::ContinuousVector>(ATTR_INDEX_TUNING_CONFIG);
-    tuningConfig_ = tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > 1? 
-                    (reinterpret_cast<const int64_t*>(tuningConfigPtr->GetData()))[0] : 0;
+    tuningConfig_ = tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > 1 ?
+                        (reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData()))[0] :
+                        0;
 
     if (isA4W4_) {
         n_ = wScaleShape->GetStorageShape().GetDim(wScaleDimNum - DIM_1);
@@ -249,7 +247,8 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::ParseInputAndAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-int32_t GroupedMatmulSwigluQuantV2BaseTiling::FindBestSingleN(const uint32_t &aicNum, int64_t baseM, int64_t baseN) const
+int32_t GroupedMatmulSwigluQuantV2BaseTiling::FindBestSingleN(const uint32_t &aicNum, int64_t baseM,
+                                                              int64_t baseN) const
 {
     uint64_t quantGroupNum = quantGroupNum_;
     if (n_ < baseN || tuningConfig_ <= 0 || !(quantGroupNum == 1)) {
@@ -303,18 +302,18 @@ bool GroupedMatmulSwigluQuantV2BaseTiling::TryFullLoadA(int32_t baseM, int64_t b
     return false;
 }
 
-
-ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::DynamicTilingSingleN(gert::TilingContext *context, const uint32_t &aicNum,
-                                                int64_t baseM, int64_t baseN, int64_t baseK)
+ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::DynamicTilingSingleN(gert::TilingContext *context,
+                                                                           const uint32_t &aicNum, int64_t baseM,
+                                                                           int64_t baseN, int64_t baseK)
 {
-    //get info
+    // get info
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     uint64_t l1Size = 0;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, l1Size);
     tilingData_.gmmSwigluQuantV2BaseParams.set_singleN(0);
-  
+
     if (n_ < baseN || tuningConfig_ <= 0 || !isA4W4_) {
         return ge::GRAPH_SUCCESS;
     }
@@ -385,9 +384,10 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::DoOpTiling()
         mLimit_ = ((usrWorkspaceLimit_ / DOUBLE_WORKSPACE_SPLIT) / INT32_DTYPE_SIZE) / n_;
     }
 
-    OP_CHECK_IF(mLimit_ <= 0,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "mLimit_ is %ld must over then 0.", mLimit_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        mLimit_ <= 0,
+        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "mLimit_ is %ld, must be greater than 0.", mLimit_),
+        return ge::GRAPH_FAILED);
     tilingData_.gmmSwigluQuantV2BaseParams.set_mLimit(mLimit_);
 
     DynamicTilingSingleN(context_, blockDim_, A8W4_BASEM, A8W4_BASEN, A8W4_BASEK);

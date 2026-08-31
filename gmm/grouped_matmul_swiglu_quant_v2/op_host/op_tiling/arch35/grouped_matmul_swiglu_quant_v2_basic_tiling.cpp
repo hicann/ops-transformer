@@ -609,7 +609,7 @@ bool GroupedMatmulSwigluQuantV2Tiling950::AnalyzeInputs()
                         return false);
         } else {
             OP_CHECK_IF(!CheckQuantParamsForMXTypeM(xScaleShape, wScaleShape),
-                        OP_LOGE(inputParams_.opName, "CheckShapeForMxQuant failed."), return false);
+                        OP_LOGE(inputParams_.opName, "CheckQuantParamsForMXTypeM failed."), return false);
         }
     }
     return true;

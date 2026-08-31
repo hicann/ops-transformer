@@ -211,7 +211,7 @@ ASCENDC_EXTERN_C graphStatus TilingGMMSwigluQuant(gert::TilingContext *context)
         mLimit = ((usrWorkspaceLimit / DOUBLE_WORKSPACE_SPLIT) / INT32_DTYPE_SIZE) / n;
     }
     OP_CHECK_IF(mLimit <= 0,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "mLimit is %ld must over then 0.", mLimit),
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "mLimit is %ld, must be greater than 0.", mLimit),
                 return GRAPH_FAILED);
     tilingData.gmmSwigluBaseParams.set_mLimit(mLimit);
     if (isA8W4MSD) {
@@ -246,7 +246,8 @@ ASCENDC_EXTERN_C graphStatus TilingGMMSwigluQuant(gert::TilingContext *context)
     OP_LOGD(context->GetNodeName(), "USER_WORKSPACE_LIMIT:              %ld", usrWorkspaceLimit);
     OP_LOGD(context->GetNodeName(), "workspaceSizes:                    %lu", workspaceSizes[0]);
     OP_LOGD(context->GetNodeName(), "isSplitWorkSpace:                  %s", isSplitWorkSpace ? "true" : "false");
-    OP_LOGD(context->GetNodeName(), "GMMSWIGLUQUANT_TILING: baseM is %u, baseK is %u, baseN is %u.", A8W4_BASEM, A8W4_BASEK, A8W4_BASEN);
+    OP_LOGD(context->GetNodeName(), "GMMSWIGLUQUANT_TILING: baseM is %u, baseK is %u, baseN is %u.", A8W4_BASEM,
+            A8W4_BASEK, A8W4_BASEN);
     SetTilingKey(context, isSplitWorkSpace, isA8W4MSD);
     tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->SetBlockDim(compileInfoPtr->aicNum_); // block dim is the number of aicube

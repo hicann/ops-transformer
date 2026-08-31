@@ -440,8 +440,10 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckCaseMultiScenario(const ge
             OP_CHECK_NULL_WITH_CONTEXT(context, wShape_i);
             int64_t kSize = wShape_i->GetDim(wKDimIdx);
             int64_t groupNum = antiquantScaleShape->GetDim(0);
-            OP_CHECK_IF(groupNum <= 0, OP_LOGE(context->GetNodeName(), "GroupNum must be greater than 0."),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                groupNum <= 0,
+                OP_LOGE(context->GetNodeName(), "GroupNum must be greater than 0, but current value is %ld.", groupNum),
+                return ge::GRAPH_FAILED);
             OP_CHECK_IF(kSize % groupNum != 0,
                         OP_LOGE(context->GetNodeName(), "GroupNum must be multiple of the k axis of weight."),
                         return ge::GRAPH_FAILED);
@@ -710,7 +712,7 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForWeightQuantParam(c
     }
     if (IsS8S4NZ(xDtype_, weightDtype_)) {
         OP_CHECK_IF(CheckShapeForTensorList(context, GMM_INDEX_IN_SCALE, "scale", gmmAttrs) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context->GetNodeName(), "CheckShapeForscale failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(context->GetNodeName(), "CheckShapeForScale failed."), return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -741,7 +743,8 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckGroupSize(const gert::Infe
         groupNum = gmmAttrs.transposeWeight ? antiquantScaleShape->GetDim(antiquantScaleDimNum - LAST_DIM) :
                                               antiquantScaleShape->GetDim(antiquantScaleDimNum - PENULTIMATE_DIM);
     }
-    OP_CHECK_IF(groupNum <= 0, OP_LOGE(context->GetNodeName(), "GroupNum must be greater than 0."),
+    OP_CHECK_IF(groupNum <= 0,
+                OP_LOGE(context->GetNodeName(), "GroupNum must be greater than 0, but current value is %ld.", groupNum),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(weightKDim_ % groupNum != 0,
                 OP_LOGE(context->GetNodeName(), "GroupNum must be multiple of the k axis of weight."),

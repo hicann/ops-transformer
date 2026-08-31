@@ -275,8 +275,10 @@ static inline bool CheckDimRange(const GroupedMatmulParams &params)
     return true;
 }
 
-static inline std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t>
-GetX1X2DimValue(const aclTensor *x1, const aclTensor *x2, bool transposeX1, bool transposeX2)
+static inline std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t> GetX1X2DimValue(const aclTensor *x1,
+                                                                                      const aclTensor *x2,
+                                                                                      bool transposeX1,
+                                                                                      bool transposeX2)
 {
     auto x1DimNum = x1->GetViewShape().GetDimNum();
     auto x2DimNum = x2->GetViewShape().GetDimNum();
@@ -398,7 +400,7 @@ static inline bool CheckDimValue(GroupedMatmulParams &params, int64_t x2EDim, in
     OP_CHECK((shareInputOffset + shareInputDim) <= outputBS,
              OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                      "shareInputOffset add shareInputDim should be less than or equal to outputBS, but "
-                     "shareInputOffset is %lld, weight is %lld.",
+                     "shareInputOffset is %lld, outputBS is %lld.",
                      shareInputOffset + shareInputDim, outputBS),
              return false);
 
@@ -1063,13 +1065,14 @@ static inline aclnnStatus CheckSupportScene(const CheckSupportSceneParams &param
     }
 
     if (params.dtype != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s dtype must be 0, but is %lld.", opName, params.dtype);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s dtype must be 0 (FLOAT32), but is %lld.", opName, params.dtype);
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     int64_t viewDimNum = params.w->GetViewShape().GetDimNum();
     if (viewDimNum < MIN_DIM_NUM_ND) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s w's view dimNum should greater than 1, but is %lld.", opName, viewDimNum);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s w's view dimNum should be greater than 1, but is %lld.", opName,
+                viewDimNum);
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -1098,7 +1101,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzGetWorkspaceSize(
                           sharedInputWeight, sharedInputOffset, transposeX1, transposeX2, groupListType),
                    DFX_OUT(out));
 
-    CheckSupportSceneParams supportSceneParams{x1, x2, scale, pertokenScaleOptional, groupList, sharedInput,
+    CheckSupportSceneParams supportSceneParams{x1,    x2,       scale, pertokenScaleOptional, groupList, sharedInput,
                                                logit, rowIndex, dtype};
     auto ret0 = CheckSupportScene(supportSceneParams, transposeX1, transposeX2, "GroupedMatmulFinalizeRoutingWeightNz");
     CHECK_RET(ret0 == ACLNN_SUCCESS, ret0);
@@ -1172,8 +1175,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
                    DFX_IN(x1, x2, scale, bias, pertokenScaleOptional, groupList, sharedInput, logit, rowIndex, dtype,
                           sharedInputWeight, sharedInputOffset, transposeX1, transposeX2, groupListType),
                    DFX_OUT(out));
-    auto checkInputRet =
-        CheckInputParamsForWeightNzV2(x1, x2, antiquantScaleOptional, antiquantOffsetOptional);
+    auto checkInputRet = CheckInputParamsForWeightNzV2(x1, x2, antiquantScaleOptional, antiquantOffsetOptional);
     CHECK_RET(checkInputRet == ACLNN_SUCCESS, checkInputRet);
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && dtype != 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -1234,8 +1236,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
             return ACLNN_ERR_PARAM_NULLPTR;
         }
 
-        CheckSupportSceneParams sceneParams{x1, tmpWeight, scale, pertokenScaleOptional, groupList, sharedInput,
-                                            logit, rowIndex, dtype};
+        CheckSupportSceneParams sceneParams{x1,    tmpWeight, scale, pertokenScaleOptional, groupList, sharedInput,
+                                            logit, rowIndex,  dtype};
         auto ret0 = CheckSupportScene(sceneParams, transposeX1, transposeX2, "GroupedMatmulFinalizeRoutingWeightNzV2");
         CHECK_RET(ret0 == ACLNN_SUCCESS, ret0);
         finalWeight = tmpWeight;
@@ -1299,11 +1301,12 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize(
 
     int64_t viewDimNum = x2->GetViewShape().GetDimNum();
     if (dtype != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "GroupedMatmulFinalizeRouting weightNd dtype must be 0, but is %lld.", dtype);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "GroupedMatmulFinalizeRouting weightNd dtype must be 0 (FLOAT32), but is %lld.", dtype);
         return ACLNN_ERR_PARAM_INVALID;
     } else if (viewDimNum < MIN_DIM_NUM_ND) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "GroupedMatmulFinalizeRouting weightNd x2's view dimNum should greater than 1, but is %lld.",
+                "GroupedMatmulFinalizeRouting weightNd x2's view dimNum should be greater than 1, but is %lld.",
                 viewDimNum);
         return ACLNN_ERR_PARAM_INVALID;
     } else if (!(transposeX1 == false && transposeX2 == false)) {
@@ -1383,12 +1386,12 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2GetWorkspaceSize(
 
     int64_t viewDimNum = x2->GetViewShape().GetDimNum();
     if (dtype != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "GroupedMatmulFinalizeRoutingV2 weightNd dtype must be 0, but is %lld.",
-                dtype);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "GroupedMatmulFinalizeRoutingV2 weightNd dtype must be 0 (FLOAT32), but is %lld.", dtype);
         return ACLNN_ERR_PARAM_INVALID;
     } else if (viewDimNum < MIN_DIM_NUM_ND) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "GroupedMatmulFinalizeRoutingV2 weightNd x2's view dimNum should greater than 1, but is %lld.",
+                "GroupedMatmulFinalizeRoutingV2 weightNd x2's view dimNum should be greater than 1, but is %lld.",
                 viewDimNum);
         return ACLNN_ERR_PARAM_INVALID;
     } else if (!(transposeX1 == false && transposeX2 == false)) {
@@ -1523,7 +1526,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     } else if (viewDimNum < MIN_DIM_NUM_ND) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "aclnnGroupedMatmulFinalizeRoutingV3 weightNd x2's view dimNum should greater than 1, but is %lld.",
+                "aclnnGroupedMatmulFinalizeRoutingV3 weightNd x2's view dimNum should be greater than 1, but is %lld.",
                 viewDimNum);
         return ACLNN_ERR_PARAM_INVALID;
     } else if (!((transposeX1 == false && transposeX2 == false) ||

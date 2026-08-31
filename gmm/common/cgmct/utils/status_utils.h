@@ -41,23 +41,23 @@ constexpr const char *GetStatusString(Status status)
         case Status::success:
             return "Success.\n";
         case Status::batchErrorExcceedsLimit:
-            return "[ERROR] batch cannot greater than int32 max val 2147483647.\n";
+            return "[ERROR] batch cannot be greater than int32 max val 2147483647.\n";
         case Status::mnkErrorExceedsLimit:
-            return "[ERROR] mnk cannot greater than int32 max val 2147483647.\n";
+            return "[ERROR] mnk cannot be greater than int32 max val 2147483647.\n";
         case Status::mkErrorMatrixExceedsLimit:
-            return "[ERROR] mk matrix k cannot greater than 65535.\n";
+            return "[ERROR] mk matrix k cannot be greater than 65535.\n";
         case Status::kmErrorMatrixExceedsLimit:
-            return "[ERROR] km matrix m cannot greater than 65535.\n";
+            return "[ERROR] km matrix m cannot be greater than 65535.\n";
         case Status::knErrorMatrixExceedsLimit:
-            return "[ERROR] kn matrix n cannot greater than 65535.\n";
+            return "[ERROR] kn matrix n cannot be greater than 65535.\n";
         case Status::nkErrorMatrixExceedsLimit:
-            return "[ERROR] nk matrix k cannot greater than 65535.\n";
+            return "[ERROR] nk matrix k cannot be greater than 65535.\n";
         case Status::bf16BiasErrorInvalidDataType:
             return "[ERROR] bfloat16_t type is not supported for bias.\n";
         case Status::tileShapeErrorExceedsLimit:
             return "[ERROR] L1 or L0 tile shape error, mnk config exceed limit.\n";
         case Status::l1L0ErrorExceedsLimit:
-            return "[ERROR] L1/L0 tile shape m can't greater than 128 and n can't grater than 256.\n";
+            return "[ERROR] L1/L0 tile shape m can't be greater than 128 and n can't be greater than 256.\n";
         case Status::l1L0ErrorNotAlign:
             return "[ERROR] L1/L0 tile shape m/n/k should be an integral multiple of 16.\n";
         case Status::l1MnL0MnErrorNotSame:
@@ -73,21 +73,21 @@ constexpr const char *GetStatusString(Status status)
     }
 }
 
-#define CHECK_AND_RETURN(status)                                                                                       \
-    do {                                                                                                               \
-        Status ret = status;                                                                                           \
-        if (ret != Status::success) {                                                                                  \
-            return ret;                                                                                                \
-        }                                                                                                              \
+#define CHECK_AND_RETURN(status) \
+    do { \
+        Status ret = status; \
+        if (ret != Status::success) { \
+            return ret; \
+        } \
     } while (0)
 
-#define ACT_CHECK(status)                                                                                              \
-    do {                                                                                                               \
-        Status ret = status;                                                                                           \
-        if (ret != Status::success) {                                                                                  \
-            std::cerr << "Got Cgmct error: " << GetStatusString(ret) << std::endl;                                     \
-            return;                                                                                                    \
-        }                                                                                                              \
+#define ACT_CHECK(status) \
+    do { \
+        Status ret = status; \
+        if (ret != Status::success) { \
+            std::cerr << "Got Cgmct error: " << GetStatusString(ret) << std::endl; \
+            return; \
+        } \
     } while (0)
 
 } // namespace Gemm

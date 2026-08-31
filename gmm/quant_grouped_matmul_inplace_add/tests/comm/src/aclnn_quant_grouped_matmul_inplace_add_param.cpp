@@ -28,7 +28,7 @@ using ops::adv::tests::utils::AclnnTensor;
 using namespace ops::adv::tests::quant_grouped_matmul_inplace_add;
 
 AclnnQGMMInplaceAddParam::AclnnQGMMInplaceAddParam(std::vector<Tensor> inputs, std::vector<int64_t> groupListData,
-                            int32_t groupListType, int32_t groupSize)
+                                                   int32_t groupListType, int32_t groupSize)
     : Param({}, Tensor(), Tensor(), std::move(groupListData), groupListType, groupSize)
 {
     for (auto &tensor : inputs) {
@@ -46,21 +46,23 @@ AclnnQGMMInplaceAddParam::~AclnnQGMMInplaceAddParam()
     }
 }
 
-bool AclnnQGMMInplaceAddParam::CreateX1AclTensor() {
+bool AclnnQGMMInplaceAddParam::CreateX1AclTensor()
+{
     auto shape = aclnnX1.ShapeView();
     std::vector<int64_t> viewShape = {shape[1], shape[0]};
     std::vector<int64_t> stride = {1, shape[1]};
     x1 = aclCreateTensor(viewShape.data(), viewShape.size(), aclnnX1.GetAclDataType(), stride.data(), 0,
-                        aclFormat::ACL_FORMAT_ND, shape.data(), shape.size(), aclnnX1.GetDevData());
+                         aclFormat::ACL_FORMAT_ND, shape.data(), shape.size(), aclnnX1.GetDevData());
     return x1 != nullptr;
 }
 
-bool AclnnQGMMInplaceAddParam::CreateScale1AclTensor() {
+bool AclnnQGMMInplaceAddParam::CreateScale1AclTensor()
+{
     auto shape = aclnnScale1.ShapeView();
     std::vector<int64_t> viewShape = {shape[1], shape[0], shape[2]};
-    std::vector<int64_t> stride = {shape[2], shape[1]*shape[2], 1};
+    std::vector<int64_t> stride = {shape[2], shape[1] * shape[2], 1};
     scale1 = aclCreateTensor(viewShape.data(), viewShape.size(), aclnnScale1.GetAclDataType(), stride.data(), 0,
-                        aclFormat::ACL_FORMAT_ND, shape.data(), shape.size(), aclnnScale1.GetDevData());
+                             aclFormat::ACL_FORMAT_ND, shape.data(), shape.size(), aclnnScale1.GetDevData());
     return scale1 != nullptr;
 }
 
@@ -73,19 +75,22 @@ bool AclnnQGMMInplaceAddParam::Init()
     aclnnScale2 = ops::adv::tests::utils::AclnnTensor(mTensors["scale2"]);
     aclnnScale1 = ops::adv::tests::utils::AclnnTensor(mTensors["scale1"]);
     auto ret = InitGroupList();
-    LOG_IF_EXPR(ret == false, LOG_ERR("InitGroupList faild"), return false);
+    LOG_IF_EXPR(ret == false, LOG_ERR("InitGroupList failed"), return false);
     auto *cs = static_cast<ops::adv::tests::utils::Case *>(ops::adv::tests::utils::Case::GetCurrentCase());
     LOG_IF_EXPR(cs == nullptr, LOG_ERR("Can't get current case"), return false);
     for (auto *t :
-        std::vector<TensorIntf *>{&aclnnX1, &aclnnX2, &aclnnScale2, &aclnnGroupList, &aclnnY, &aclnnScale1}) {
+         std::vector<TensorIntf *>{&aclnnX1, &aclnnX2, &aclnnScale2, &aclnnGroupList, &aclnnY, &aclnnScale1}) {
         t->FreeDevData();
         auto tFormat = t->GetFormat();
         if (t->GetExpDataSize() <= 0) {
             continue;
         }
         uint8_t *devData = nullptr;
-        if (tFormat == ge::Format::FORMAT_FRACTAL_NZ) { devData = t->AllocDevDataNz(0, 0); }
-        else { devData = t->AllocDevData(0, 0); }
+        if (tFormat == ge::Format::FORMAT_FRACTAL_NZ) {
+            devData = t->AllocDevDataNz(0, 0);
+        } else {
+            devData = t->AllocDevData(0, 0);
+        }
         if (devData == nullptr) {
             return false;
         }

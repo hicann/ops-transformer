@@ -44,7 +44,6 @@ constexpr size_t TYPEM_SCALE_K_DIM_INDEX = 1;
 constexpr size_t TYPEM_SCALE_N_DIM_INDEX = 2;
 constexpr size_t DIM_TWO = 2;
 
-
 static bool SetShapeAndStrideForMXFPTypeMForGMMFinalizeRouting(std::vector<int64_t> &viewShape,
                                                                std::vector<int64_t> &strides)
 {
@@ -96,11 +95,11 @@ static bool IsFP8OrFP4BitsDataTypeForGMMFinalizeRouting(ge::DataType dataType)
            dataType == ge::DataType::DT_FLOAT8_E8M0 || dataType == ge::DataType::DT_FLOAT4_E2M1;
 }
 
-
 static inline aclDataType ToAclDataTypeForGMMFinalizeRouting(ge::DataType dtype)
 {
     static const std::vector<DataType> GMMWsiglu_CONVERT_TO_ACL_DataType_LIST = {
-        ge::DataType::DT_FLOAT8_E4M3FN, ge::DataType::DT_FLOAT8_E5M2, ge::DataType::DT_FLOAT8_E8M0, ge::DataType::DT_FLOAT4_E2M1};
+        ge::DataType::DT_FLOAT8_E4M3FN, ge::DataType::DT_FLOAT8_E5M2, ge::DataType::DT_FLOAT8_E8M0,
+        ge::DataType::DT_FLOAT4_E2M1};
     auto iter =
         std::find(GMMWsiglu_CONVERT_TO_ACL_DataType_LIST.begin(), GMMWsiglu_CONVERT_TO_ACL_DataType_LIST.end(), dtype);
     if (iter == GMMWsiglu_CONVERT_TO_ACL_DataType_LIST.end()) {
@@ -146,12 +145,14 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
             if (index == INDEX_INPUT_WEIGHT_SCALE) {
                 OP_CHECK_IF(!SetShapeAndStrideForMXFPTypeMForGMMFinalizeRouting(viewShape, strides),
                             OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback",
-                                    "SetShapeAndStrideForMXFPTypeMForGMMFinalizeRouting failed"), return nullptr);
+                                    "SetShapeAndStrideForMXFPTypeMForGMMFinalizeRouting failed"),
+                            return nullptr);
             }
         } else {
             OP_CHECK_IF(!SetShapeAndStrideForLastTwoDimForGMMFinalizeRouting(viewShape, strides),
                         OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback",
-                                "SetShapeAndStrideForLastTwoDimForGMMFinalizeRouting failed"), return nullptr);
+                                "SetShapeAndStrideForLastTwoDimForGMMFinalizeRouting failed"),
+                        return nullptr);
         }
     }
     auto aclFormat = aclFormat::ACL_FORMAT_ND;
@@ -160,13 +161,14 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     }
     aclTensor *out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
                                      storageShapeVec.data(), storageShapeVec.size(), deviceAddr);
-    OP_CHECK_IF(out == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback",
-                "The GeTensor2AclTensor out nullptr"), return nullptr);
+    OP_CHECK_IF(out == nullptr,
+                OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The GeTensor2AclTensor out nullptr"),
+                return nullptr);
     return out;
 }
 
 static void PrepareAclTensor(const OpExecuteContext *host_api_ctx, const aclTensor *&tensor, size_t index,
-                                    bool enableTranspose, bool enableNZ)
+                             bool enableTranspose, bool enableNZ)
 {
     if (index == INDEX_INPUT_X || index == INDEX_INPUT_WEIGHT) {
         tensor = GeTensor2AclTensor(host_api_ctx->GetInputTensor(index), enableTranspose, index, enableNZ);
@@ -190,21 +192,30 @@ static void PrepareOutputTensor(const OpExecuteContext *host_api_ctx, const gert
 
 static graphStatus GroupedMatmulFinalizeRoutingExecuteFunc(OpExecuteContext *host_api_ctx)
 {
-    OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The host_api_ctx is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(host_api_ctx == nullptr,
+                OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The host_api_ctx is null"), return GRAPH_FAILED);
     auto attrs = host_api_ctx->GetAttrs();
-    OP_CHECK_IF(attrs == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The attrs is null"), return GRAPH_FAILED);
-    const int64_t* dtypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DTYPE);
-    OP_CHECK_IF(dtypeGe == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The dtypeGe is null"), return GRAPH_FAILED);
-    const float* sharedInputWeightGe = attrs->GetAttrPointer<float>(INDEX_ATTR_SHAREDINPUT_WEIGHT);
-    OP_CHECK_IF(sharedInputWeightGe == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The sharedInputWeightGe is null"), return GRAPH_FAILED);
-    const int64_t* sharedInputOffsetGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_SHAREDINPUT_OFFSET);
-    OP_CHECK_IF(sharedInputOffsetGe == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The sharedInputOffsetGe is null"), return GRAPH_FAILED);
-    const bool*  transXGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_X);
+    OP_CHECK_IF(attrs == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The attrs is null"),
+                return GRAPH_FAILED);
+    const int64_t *dtypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_DTYPE);
+    OP_CHECK_IF(dtypeGe == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The dtypeGe is null"),
+                return GRAPH_FAILED);
+    const float *sharedInputWeightGe = attrs->GetAttrPointer<float>(INDEX_ATTR_SHAREDINPUT_WEIGHT);
+    OP_CHECK_IF(sharedInputWeightGe == nullptr,
+                OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The sharedInputWeightGe is null"),
+                return GRAPH_FAILED);
+    const int64_t *sharedInputOffsetGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_SHAREDINPUT_OFFSET);
+    OP_CHECK_IF(sharedInputOffsetGe == nullptr,
+                OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The sharedInputOffsetGe is null"),
+                return GRAPH_FAILED);
+    const bool *transXGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_X);
     OP_CHECK_IF(transXGe == nullptr, OP_LOGE("aclnnfallback", "transXGe is null"), return GRAPH_FAILED);
-    const bool*  transWeightGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_WEIGHT);
+    const bool *transWeightGe = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_WEIGHT);
     OP_CHECK_IF(transWeightGe == nullptr, OP_LOGE("aclnnfallback", "transWeightGe is null"), return GRAPH_FAILED);
-    const int64_t* groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
-    OP_CHECK_IF(groupListTypeGe == nullptr, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The groupListTypeGe is null"), return GRAPH_FAILED);
+    const int64_t *groupListTypeGe = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_GROUP_LIST_TYPE);
+    OP_CHECK_IF(groupListTypeGe == nullptr,
+                OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The groupListTypeGe is null"),
+                return GRAPH_FAILED);
 
     const aclTensor *aclTensorX = nullptr;
     PrepareAclTensor(host_api_ctx, aclTensorX, INDEX_INPUT_X, false, false);
@@ -249,8 +260,9 @@ static graphStatus GroupedMatmulFinalizeRoutingExecuteFunc(OpExecuteContext *hos
         aclTensorOffset, aclTensorAntiQuantScaleOptional, aclTensorAntiQunatOffsetOptional, aclTensorXScale,
         aclTensorGroupList, aclTensorSharedInput, aclTensorLogit, aclTensorRowIndex, *dtypeGe, *sharedInputWeightGe,
         *sharedInputOffsetGe, *transXGe, *transWeightGe, *groupListTypeGe, tuningConfig, geTensorY);
-    OP_CHECK_IF(apiRet != GRAPH_SUCCESS, OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback",
-                "The apiRet failed:%u", apiRet), return GRAPH_FAILED);
+    OP_CHECK_IF(apiRet != GRAPH_SUCCESS,
+                OP_LOGE("GroupedMatmulFinalizeRouting aclnnfallback", "The api call failed, ret = %u.", apiRet),
+                return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
 

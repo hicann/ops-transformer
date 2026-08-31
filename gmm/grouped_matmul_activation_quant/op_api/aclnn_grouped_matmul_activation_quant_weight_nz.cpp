@@ -783,7 +783,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(void *workspace, uint64_t 
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulActivationQuantWeightNz);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in aclnnGroupedMatmulActivationQuantWeightNz launch aicore.");
+               "An error occurred when aclnnGroupedMatmulActivationQuantWeightNz launched on aicore.");
     return ACLNN_SUCCESS;
 }
 

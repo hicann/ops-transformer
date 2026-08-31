@@ -1307,7 +1307,7 @@ protected:
             return false;
         }
         if (!CheckPertokenShape()) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when %s, CheckPerTokenShape failed.", opName_.c_str(),
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when %s, CheckPertokenShape failed.", opName_.c_str(),
                     GetGroupedMatmulSwigluQuantV2ScenarioName(gmmDsqParams_));
             return false;
         }

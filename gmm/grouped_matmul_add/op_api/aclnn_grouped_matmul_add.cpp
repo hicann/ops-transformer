@@ -67,8 +67,8 @@ static aclnnStatus CheckFormat(gmm_add_advanced::GroupedMatmulAddParams params, 
                op::ToString(params.groupList->GetStorageFormat()).GetString());
     CHECK_COND(
         params.yRef->GetStorageFormat() == Format::FORMAT_ND || params.yRef->GetStorageFormat() == Format::FORMAT_NCL,
-        ACLNN_ERR_PARAM_INVALID, "In op [%s], when non-quant, the format of [%s] is not supported, got [%s].",
-        opName, "yRef", op::ToString(params.yRef->GetStorageFormat()).GetString());
+        ACLNN_ERR_PARAM_INVALID, "In op [%s], when non-quant, the format of [%s] is not supported, got [%s].", opName,
+        "yRef", op::ToString(params.yRef->GetStorageFormat()).GetString());
     return ACLNN_SUCCESS;
 }
 
@@ -183,12 +183,10 @@ static aclnnStatus CheckDtype(gmm_add_advanced::GroupedMatmulAddParams params, c
     auto xDtype = params.x->GetDataType();
     auto weightDtype = params.weight->GetDataType();
     CHECK_COND(params.yRef->GetDataType() == DataType::DT_FLOAT, ACLNN_ERR_PARAM_INVALID,
-               "In op [%s], when non-quant, the data type of [%s] is not supported, got [%s].", opName,
-               "yRef",
+               "In op [%s], when non-quant, the data type of [%s] is not supported, got [%s].", opName, "yRef",
                op::ToString(params.yRef->GetDataType()).GetString());
     CHECK_COND(params.groupList->GetDataType() == DataType::DT_INT64, ACLNN_ERR_PARAM_INVALID,
-               "In op [%s], when non-quant, the data type of [%s] is not supported, got [%s].", opName,
-               "groupList",
+               "In op [%s], when non-quant, the data type of [%s] is not supported, got [%s].", opName, "groupList",
                op::ToString(params.groupList->GetDataType()).GetString());
     if ((xDtype != DataType::DT_FLOAT16 && xDtype != DataType::DT_BF16) || (xDtype != weightDtype)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -280,7 +278,7 @@ aclnnStatus aclnnGroupedMatmulAddV2GetWorkspaceSize(const aclTensor *x, const ac
                                                     uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     const char *opName = "grouped_matmul_add";
-    gmm_add_advanced::GroupedMatmulAddParams params{x, weight, groupList, yRef,
+    gmm_add_advanced::GroupedMatmulAddParams params{x,          weight,          groupList, yRef,
                                                     transposeX, transposeWeight, groupType, groupListType};
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(aclnnGroupedMatmulAddV2,
@@ -293,7 +291,7 @@ aclnnStatus aclnnGroupedMatmulAdd(void *workspace, uint64_t workspaceSize, aclOp
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulAdd);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in QuantGMMInplaceAdd launch aicore.");
+               "An error occurred when QuantGMMInplaceAdd launched on aicore.");
     return ACLNN_SUCCESS;
 }
 
@@ -302,7 +300,7 @@ aclnnStatus aclnnGroupedMatmulAddV2(void *workspace, uint64_t workspaceSize, acl
 {
     L2_DFX_PHASE_2(aclnnGroupedMatmulAddV2);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in QuantGMMInplaceAdd launch aicore.");
+               "An error occurred when QuantGMMInplaceAdd launched on aicore.");
     return ACLNN_SUCCESS;
 }
 

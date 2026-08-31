@@ -73,15 +73,17 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     }
 
     if (index == INDEX_INPUT_SCALE1 && dataType_ge == ge::DataType::DT_FLOAT8_E8M0 && enableTranspose) {
-        OP_CHECK_IF(viewShape.size() < 3, OP_LOGE("aclnnfallback", "Mx tpyek wrong pertokenscale size"),
-                  return nullptr);
+        OP_CHECK_IF(viewShape.size() < 3,
+                    OP_LOGE("aclnnfallback",
+                            "Mx type: wrong perTokenScale size, dim num should be greater than or equal to 3."),
+                    return nullptr);
         auto swap = viewShape[0];
         viewShape[0] = viewShape[1];
         viewShape[1] = swap;
-        strides[0] = 2;                 // 2 in shape(k//64 + g, M, 2)
-        strides[1] = viewShape[0] * 2;  // since last dim is contiguous 2
-        strides[2] = 1;                 // last axis of stride with index 2 has velue 1
-    } else if (enableTranspose) {       // when tensor is transposed, last two dims in strides and viewShape should swap
+        strides[0] = 2;                // 2 in shape(k//64 + g, M, 2)
+        strides[1] = viewShape[0] * 2; // since last dim is contiguous 2
+        strides[2] = 1;                // last axis of stride with index 2 has velue 1
+    } else if (enableTranspose) {      // when tensor is transposed, last two dims in strides and viewShape should swap
         // dimM the second-to-last dim， dimN the last dim
         auto dimM = viewShape.size() - 2;
         auto dimN = viewShape.size() - 1;
@@ -161,13 +163,13 @@ static graphStatus QuantGroupedMatmulInplaceAddExecuteFunc(OpExecuteContext *hos
     auto api_ret_gmm = EXEC_OPAPI_CMD(aclnnQuantGroupedMatmulInplaceAdd, aclTensorX1, aclTensorX2, aclTensorScale1,
                                       aclTensorScale2, groupListTensor, inputYTensor, *groupListTypeGe, groupsize);
     OP_CHECK_IF(api_ret_gmm != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "api_ret failed:%u", api_ret_gmm),
-              return GRAPH_FAILED);
+                return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
 
 IMPL_OP(QuantGroupedMatmulInplaceAdd).OpExecuteFunc(QuantGroupedMatmulInplaceAddExecuteFunc);
 
-}  // namespace fallback
+} // namespace fallback
 
 #ifdef __cplusplus
 }

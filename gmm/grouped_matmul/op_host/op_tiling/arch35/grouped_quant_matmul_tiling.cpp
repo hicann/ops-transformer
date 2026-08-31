@@ -669,7 +669,7 @@ bool GroupedQmmTiling::CheckQuantParams(const gert::StorageShape *xScaleStorageS
     // mx量化校验
     if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE) {
         OP_CHECK_IF(!CheckQuantParamsForMxQuantMode(xScaleStorageShape, wScaleStorageShape, expectedNSize),
-                    OP_LOGE(inputParams_.opName, "CheckParamsForMxQuantMode failed."), return false);
+                    OP_LOGE(inputParams_.opName, "CheckQuantParamsForMxQuantMode failed."), return false);
     }
 
     return true;

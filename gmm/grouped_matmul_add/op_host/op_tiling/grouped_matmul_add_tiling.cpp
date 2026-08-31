@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /*!
  * \file grouped_matmul_add_tiling.cpp
  * \brief
@@ -94,9 +93,8 @@ static ge::graphStatus CalTCubeTiling(const gert::TilingContext *context, Groupe
     uint64_t productMK = static_cast<uint64_t>(baseM) * static_cast<uint64_t>(baseK);
     uint64_t productNK = static_cast<uint64_t>(baseN) * static_cast<uint64_t>(baseK);
     if (productMK > UINT32_MAX || productNK > UINT32_MAX) {
-        OP_LOGE(
-            nodeName, "productMK or productNK > uint32_t max value, productMK:%lu, productNK:%lu", productNK,
-            productMK);
+        OP_LOGE(nodeName, "productMK or productNK > uint32_t max value, productMK:%lu, productNK:%lu", productMK,
+                productNK);
         return ge::GRAPH_FAILED;
     }
     uint32_t mmStepKa =
@@ -122,8 +120,8 @@ static ge::graphStatus CalTCubeTiling(const gert::TilingContext *context, Groupe
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CalMmTiling(
-    gert::TilingContext* context, GroupedMatmulAddTilingData& tiling, int32_t m, int32_t k, int32_t n)
+static ge::graphStatus CalMmTiling(gert::TilingContext *context, GroupedMatmulAddTilingData &tiling, int32_t m,
+                                   int32_t k, int32_t n)
 {
     int32_t baseN = BEST_BASEN;
     int32_t baseK = 0;
@@ -136,8 +134,8 @@ static ge::graphStatus CalMmTiling(
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     // 先根据 baseN 和 L0_B的大小确定baseK
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, l0_B_size);
-    baseK = static_cast<int32_t>(
-        (l0_B_size / DOUBLE_BUFFER_L0A_L0B) / static_cast<uint64_t>(baseN * static_cast<int32_t>(DATATYPE_SIZE)));
+    baseK = static_cast<int32_t>((l0_B_size / DOUBLE_BUFFER_L0A_L0B) /
+                                 static_cast<uint64_t>(baseN * static_cast<int32_t>(DATATYPE_SIZE)));
     baseK = static_cast<int32_t>(SixteenAlign(static_cast<uint32_t>(baseK)));
     // L0_C大小会限制 BaseM
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0_C_size);
@@ -168,8 +166,8 @@ static ge::graphStatus CalMmTiling(
         OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd GetTiling error : type not support");
     }
     auto ret = CalTCubeTiling(context, tiling, m, k, n, baseM, baseN, baseK);
-    OP_CHECK_IF(ge::GRAPH_SUCCESS != ret,
-        OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd CalTCubeTiling error"), return ret);
+    OP_CHECK_IF(ge::GRAPH_SUCCESS != ret, OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd CalTCubeTiling error"),
+                return ret);
     tiling.mmTilingData.set_shareMode(0);
     tiling.mmTilingData.set_baseM(baseM); // set precomputed baseM
     tiling.mmTilingData.set_baseN(baseN); // set precomputed baseN
@@ -178,7 +176,7 @@ static ge::graphStatus CalMmTiling(
     return ge::GRAPH_SUCCESS;
 }
 
-static void PrintInfo(const gert::TilingContext* context, GroupedMatmulAddTilingData& tiling)
+static void PrintInfo(const gert::TilingContext *context, GroupedMatmulAddTilingData &tiling)
 {
     auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Start to print GroupedMatmulAdd tiling data <<<<<<<<<<<<<<<<");
@@ -214,7 +212,7 @@ static void PrintInfo(const gert::TilingContext* context, GroupedMatmulAddTiling
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Print GroupedMatmulAdd tiling data end <<<<<<<<<<<<<<<<");
 }
 
-static ge::graphStatus TilingCheck4GroupedMatmulAdd(const gert::TilingContext* context)
+static ge::graphStatus TilingCheck4GroupedMatmulAdd(const gert::TilingContext *context)
 {
     auto xShape = context->GetInputShape(INDEX_IN_X);
     auto wShape = context->GetInputShape(INDEX_IN_W);
@@ -234,18 +232,13 @@ static ge::graphStatus TilingCheck4GroupedMatmulAdd(const gert::TilingContext* c
     size_t groupListDimNum = groupListShape->GetOriginShape().GetDimNum();
     size_t yRefDimNum = yRefShape->GetOriginShape().GetDimNum();
     // 检查输入dim是否符合预期
-    OP_CHECK_IF(
-        DIMNUM_2D != xDimNum,
-        OP_LOGE(context->GetNodeName(), "xShape error xShape.GetDimNum():%lu", xDimNum),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        DIMNUM_2D != wDimNum,
-        OP_LOGE(context->GetNodeName(), "wShape error wShape.GetDimNum():%lu", wDimNum),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        DIMNUM_1D != groupListDimNum,
-        OP_LOGE(context->GetNodeName(), "groupListShape error groupListShape.GetDimNum():%lu", groupListDimNum),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(DIMNUM_2D != xDimNum, OP_LOGE(context->GetNodeName(), "xShape error xShape.GetDimNum():%lu", xDimNum),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(DIMNUM_2D != wDimNum, OP_LOGE(context->GetNodeName(), "wShape error wShape.GetDimNum():%lu", wDimNum),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(DIMNUM_1D != groupListDimNum,
+                OP_LOGE(context->GetNodeName(), "groupListShape error groupListShape.GetDimNum():%lu", groupListDimNum),
+                return ge::GRAPH_FAILED);
     if (DIMNUM_3D != yRefDimNum) {
         OP_LOGW(context->GetNodeName(), "yRefShape error yRefShape.GetDimNum():%lu", yRefDimNum);
     }
@@ -253,13 +246,13 @@ static ge::graphStatus TilingCheck4GroupedMatmulAdd(const gert::TilingContext* c
     // 检查shape是否可以对应
     auto xk = xOrgShape.GetDim(DIM0);
     auto wk = wOrgShape.GetDim(DIM0);
-    OP_CHECK_IF(
-        xk != wk, OP_LOGE(context->GetNodeName(), "shape Error xk:%ld wk:%ld", xk, wk), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(xk != wk, OP_LOGE(context->GetNodeName(), "shape Error xk:%ld wk:%ld", xk, wk),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
+static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext *context)
 {
     if (IsAdvancedNpuArch(context)) {
         GroupedMatmulAddNoQuantTiling gmmAddTiling;
@@ -269,10 +262,9 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
     }
     GroupedMatmulAddTilingData tiling;
 
-    OP_CHECK_IF(
-        ge::GRAPH_SUCCESS != TilingCheck4GroupedMatmulAdd(context),
-        OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd TilingCheck4GroupedMatmulAdd error"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ge::GRAPH_SUCCESS != TilingCheck4GroupedMatmulAdd(context),
+                OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd TilingCheck4GroupedMatmulAdd error"),
+                return ge::GRAPH_FAILED);
 
     // input shapes was checked in TilingCheck4GroupedMatmulAdd. Fix: refactering to avoid repeated cal.
     auto xShape = context->GetInputShape(INDEX_IN_X)->GetOriginShape();
@@ -292,7 +284,7 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
     tiling.gmmBaseParams.set_coreNum(aicNum * AIC_AIV_RATION);
     tiling.gmmBaseParams.set_groupType(INDEX_GROUP_LIST);
     // set groupListType attr.
-    auto attrs =  context->GetAttrs();
+    auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_GROUP_LIST_TYPE_INDEX_3);
     int64_t groupListType = groupListTypePtr != nullptr ? *groupListTypePtr : GROUP_LIST_TYPE_CUMSUM_0;
@@ -300,8 +292,8 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
 
     // 设置其余
     auto ret = CalMmTiling(context, tiling, m, k, n);
-    OP_CHECK_IF(
-        ge::GRAPH_SUCCESS != ret, OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd CalMmTiling error"), return ret);
+    OP_CHECK_IF(ge::GRAPH_SUCCESS != ret, OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd CalMmTiling error"),
+                return ret);
     context->SetBlockDim(aicNum);
 
     tiling.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
@@ -311,7 +303,7 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
     auto baseM = tiling.mmTilingData.get_baseM();
     auto baseN = tiling.mmTilingData.get_baseN();
     uint32_t userWorkspaceSize = baseM * baseN * FP32_DATATYPE_SIZE * aicNum * DOUBLE_BUFFER_L0A_L0B;
-    size_t* workspaces = context->GetWorkspaceSizes(1);
+    size_t *workspaces = context->GetWorkspaceSizes(1);
     workspaces[0] = static_cast<size_t>(sysWorkspaceSize + userWorkspaceSize);
 
     PrintInfo(context, tiling);
@@ -319,7 +311,7 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepare4GroupedMatmulAdd(gert::TilingParseContext* context)
+static ge::graphStatus TilingPrepare4GroupedMatmulAdd(gert::TilingParseContext *context)
 {
     if (IsAdvancedNpuArch(context)) {
         return gmm_add_advanced::InitCompileInfo(context);
@@ -327,7 +319,6 @@ static ge::graphStatus TilingPrepare4GroupedMatmulAdd(gert::TilingParseContext* 
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
-
 
 IMPL_OP_OPTILING(GroupedMatmulAdd)
     .Tiling(Tiling4GroupedMatmulAdd)

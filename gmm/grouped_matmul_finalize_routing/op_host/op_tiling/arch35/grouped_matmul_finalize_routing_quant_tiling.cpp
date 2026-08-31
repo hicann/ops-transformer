@@ -208,11 +208,11 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckOptional(uint32_t index, cons
         return true;
     }
     auto realDtype = optionalDesc->GetDataType();
-    OP_CHECK_IF(realDtype != targetDtype,
-                OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opType, paramName,
-                                          ge::TypeUtils::DataTypeToSerialString(realDtype),
-                                          ge::TypeUtils::DataTypeToSerialString(targetDtype)),
-                return false);
+    OP_CHECK_IF(
+        realDtype != targetDtype,
+        OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opType, paramName, ge::TypeUtils::DataTypeToSerialString(realDtype),
+                                  ge::TypeUtils::DataTypeToSerialString(targetDtype)),
+        return false);
     return true;
 }
 
@@ -225,7 +225,6 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::IsFp8Dtype(ge::DataType dtype) con
 {
     return (dtype == ge::DT_FLOAT8_E4M3FN || dtype == ge::DT_FLOAT8_E5M2);
 }
-
 
 bool GroupedMatmulFinalizeRoutingQuantTiling::CheckDtype() const
 {
@@ -315,11 +314,11 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
                     return false);
         const gert::Shape &pertokenScaleShape = pertokenScaleStorageShape->GetOriginShape();
         auto pertokenScaleDimNum = pertokenScaleShape.GetDimNum();
-        OP_CHECK_IF(pertokenScaleDimNum != DIM_NUM_MX_PERTOKENSCALE,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "perTokenScale",
-                                                 std::to_string(pertokenScaleDimNum),
-                                                 std::to_string(DIM_NUM_MX_PERTOKENSCALE)),
-                    return false);
+        OP_CHECK_IF(
+            pertokenScaleDimNum != DIM_NUM_MX_PERTOKENSCALE,
+            OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "perTokenScale", std::to_string(pertokenScaleDimNum),
+                                         std::to_string(DIM_NUM_MX_PERTOKENSCALE)),
+            return false);
     } else {
         OP_CHECK_IF(scaleDimNum != DIM_NUM_SCALE,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "scale", std::to_string(scaleDimNum),
@@ -328,11 +327,11 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
         if (pertokenScaleStorageShape != nullptr) {
             const gert::Shape &pertokenScaleShape = pertokenScaleStorageShape->GetOriginShape();
             auto pertokenScaleDimNum = pertokenScaleShape.GetDimNum();
-            OP_CHECK_IF(pertokenScaleDimNum != DIM_NUM_PERTOKENSCALE,
-                        OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "perTokenScale",
-                                                     std::to_string(pertokenScaleDimNum),
-                                                     std::to_string(DIM_NUM_PERTOKENSCALE)),
-                        return false);
+            OP_CHECK_IF(
+                pertokenScaleDimNum != DIM_NUM_PERTOKENSCALE,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "perTokenScale", std::to_string(pertokenScaleDimNum),
+                                             std::to_string(DIM_NUM_PERTOKENSCALE)),
+                return false);
         }
     }
     return true;
@@ -484,17 +483,15 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckCoreNum() const
 {
     auto compileInfo = context_->GetCompileInfo<GroupedMatmulFinalizeRoutingCompileInfo>();
     OP_CHECK_IF(compileInfo == nullptr,
-                OP_LOGE(inputParams_.opName, "GroupedMatmulFinalizeRouting compileInfo is nullptr."),
-                return false);
+                OP_LOGE(inputParams_.opName, "GroupedMatmulFinalizeRouting compileInfo is nullptr."), return false);
     auto aicNum = compileInfo->aicNum;
     auto aivNum = compileInfo->aivNum;
-    OP_CHECK_IF(aicNum == 0,
-               OP_LOGE(inputParams_.opName, "aicNum should be positive integer, actual is %u.", aicNum),
-               return false);
-    OP_CHECK_IF(aivNum != GmmConstant::CORE_RATIO * aicNum,
-                OP_LOGE(inputParams_.opName,
-                        "aicNum:aivNum should be 1:2, actual aicNum: %u, aivNum: %u.", aicNum, aivNum),
+    OP_CHECK_IF(aicNum == 0, OP_LOGE(inputParams_.opName, "aicNum should be positive integer, actual is %u.", aicNum),
                 return false);
+    OP_CHECK_IF(
+        aivNum != GmmConstant::CORE_RATIO * aicNum,
+        OP_LOGE(inputParams_.opName, "aicNum:aivNum should be 1:2, actual aicNum: %u, aivNum: %u.", aicNum, aivNum),
+        return false);
     return true;
 }
 
@@ -678,8 +675,8 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::GetWorkspaceSize()
         size_t *workspaces = context_->GetWorkspaceSizes(1);
         OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
         workspaces[0] = SYS_WORKSPACE_SIZE + deterWorkspaceSize_;
-        OP_LOGD(context_->GetNodeName(), "GetWorkspaceSize: deterministic workspace %u, total=%zu", deterWorkspaceSize_,
-                workspaces[0]);
+        OP_LOGD(context_->GetNodeName(), "GetWorkspaceSize: deterministic workspace %u bytes, total=%zu bytes",
+                deterWorkspaceSize_, workspaces[0]);
     }
     return ge::GRAPH_SUCCESS;
 }

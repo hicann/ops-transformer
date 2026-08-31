@@ -30,25 +30,24 @@ static const size_t MAX_LEN_SIMPLIFIED_KEY = 256;
 static const int32_t INPUT0_INDEX = 0;
 static const int32_t INPUT1_INDEX = 1;
 static const int32_t BIAS_INDEX = 2;
-}
+} // namespace
 
 namespace optiling {
 
 REGISTER_OPS_TILING_TEMPLATE(GroupedMatmulFinalizeRouting, GroupedMatmulFinalizeRoutingBaseTiling, 0);
 
-static ge::graphStatus GroupedMatmulFinalizeRoutingTilingFunc(gert::TilingContext* context)
+static ge::graphStatus GroupedMatmulFinalizeRoutingTilingFunc(gert::TilingContext *context)
 {
-    OP_CHECK_IF(context == nullptr,
-            OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
-            return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
+                return ge::GRAPH_FAILED);
     auto compileInfoPtr = context->GetCompileInfo<GroupedMatmulFinalizeRoutingCompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr,
-            OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "CompileInfo is null"),
-            return ge::GRAPH_FAILED);
-    if (compileInfoPtr->npuArch== NpuArch::DAV_3510) {
+                OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "CompileInfo is null"),
+                return ge::GRAPH_FAILED);
+    if (compileInfoPtr->npuArch == NpuArch::DAV_3510) {
         OP_CHECK_NULL_WITH_CONTEXT(context, context);
         auto xDesc = context->GetDynamicInputDesc(X_INDEX, 0);
-        OP_CHECK_NULL_WITH_CONTEXT(context, xDesc);  // check xDesc is not null
+        OP_CHECK_NULL_WITH_CONTEXT(context, xDesc); // check xDesc is not null
         ge::DataType xDType = xDesc->GetDataType();
         auto w0Desc = context->GetDynamicInputDesc(W_INDEX, 0);
         OP_CHECK_NULL_WITH_CONTEXT(context, w0Desc);
@@ -69,18 +68,16 @@ static ge::graphStatus GroupedMatmulFinalizeRoutingTilingFunc(gert::TilingContex
     }
 }
 
-static ge::graphStatus TilingPrepareForGroupedMatmulFinalizeRouting(gert::TilingParseContext *context) {
-    OP_CHECK_IF(context == nullptr,
-                OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
+static ge::graphStatus TilingPrepareForGroupedMatmulFinalizeRouting(gert::TilingParseContext *context)
+{
+    OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
                 return ge::GRAPH_FAILED);
-    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr,
-                OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
+    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
 
     auto compileInfoPtr = context->GetCompiledInfo<GroupedMatmulFinalizeRoutingCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-                OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null"),
+    OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     std::string val;
@@ -93,7 +90,7 @@ static ge::graphStatus TilingPrepareForGroupedMatmulFinalizeRouting(gert::Tiling
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
     compileInfoPtr->socVersion = ascendcPlatform.GetSocVersion();
     compileInfoPtr->npuArch = ascendcPlatform.GetCurNpuArch();
-    compileInfoPtr->btSize = compileInfoPtr->supportL0c2out ? 1024UL : 0UL; // 1024 is btSize
+    compileInfoPtr->btSize = compileInfoPtr->supportL0c2out ? 1024UL : 0UL;                      // 1024 is btSize
     compileInfoPtr->btSize = compileInfoPtr->supportL12BtBf16 ? 4096UL : compileInfoPtr->btSize; // 4096 is btSize
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, compileInfoPtr->l1Size);
@@ -103,17 +100,14 @@ static ge::graphStatus TilingPrepareForGroupedMatmulFinalizeRouting(gert::Tiling
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2Size);
 
     OP_LOGI(context->GetNodeName(),
-            "parse compile info success soc:%d, l1Size:%lu, l2Size:%lu, coreNum:%lu, supportL0c2out:%d, supportL12BtBf16:%d",
-            static_cast<int>(compileInfoPtr->socVersion),
-            compileInfoPtr->l1Size,
-            compileInfoPtr->l2Size,
-            compileInfoPtr->aicNum,
-            compileInfoPtr->supportL0c2out,
-            compileInfoPtr->supportL12BtBf16);
+            "parse compile info success soc:%d, l1Size(bytes):%lu, l2Size(bytes):%lu, coreNum:%lu, supportL0c2out:%d, "
+            "supportL12BtBf16:%d",
+            static_cast<int>(compileInfoPtr->socVersion), compileInfoPtr->l1Size, compileInfoPtr->l2Size,
+            compileInfoPtr->aicNum, compileInfoPtr->supportL0c2out, compileInfoPtr->supportL12BtBf16);
     return ge::GRAPH_SUCCESS;
 }
 
 IMPL_OP_OPTILING(GroupedMatmulFinalizeRouting)
     .Tiling(GroupedMatmulFinalizeRoutingTilingFunc)
     .TilingParse<GroupedMatmulFinalizeRoutingCompileInfo>(TilingPrepareForGroupedMatmulFinalizeRouting);
-}
+} // namespace optiling
