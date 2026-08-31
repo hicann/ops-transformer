@@ -373,13 +373,16 @@ bash dump_analysis.sh \
 
 ```bash
 # 单卡
-python3 dump_analysis_moe_ep.py <dump_data_path> <file_num> <is_multi>
+python3 dump_analysis_moe_ep.py <dump_data_path> <file_num> <is_multi> [card_names]
 
 # 示例: 单卡
 python3 dump_analysis_moe_ep.py /path/to/dump 1 0
 
-# 示例: 多卡 (2 张卡)
+# 示例: 多卡 (2 张卡, 卡名为 0,1)
 python3 dump_analysis_moe_ep.py /path/to/dump 2 1
+
+# 示例: 多卡 (卡名非连续, 如 3,4,5,6)
+python3 dump_analysis_moe_ep.py /path/to/dump 4 1 3,4,5,6
 ```
 
 | 参数 | 说明 |
@@ -387,12 +390,22 @@ python3 dump_analysis_moe_ep.py /path/to/dump 2 1
 | `dump_data_path` | dump 数据目录, 单卡为 exception_info 所在目录, 多卡为包含 0/ 1/ 子目录的父目录 |
 | `file_num` | 总卡数 |
 | `is_multi` | 0: 单卡, 1: 多卡 |
+| `card_names` | 选填, 多卡时传入实际卡目录名列表(逗号分隔), 不传则按 0~file_num-1 生成 |
 
 ### dump 文件说明
 
 - `exception_info.*` — CANN 框架 dump, 经 CANN 解析脚本解析后生成 `input.0*bin`(context)、`input.2*bin`(topk_idx) 等输入输出文件
 - `*.metadata.bin` — Metadata 区, 包含 `MoeEpDumpMetadata` 结构体(10 个 uint32 字段 + 7 个 Region 的 offset/size, offset/size 为 uint64)
-- `*.per_core_diag.bin` — Per-core 诊断区, 100 个核 x 512B, 每核前两个 uint32 为 op_count 和 run_pos
+- `*.per_core_diag.bin` — Per-core 诊断区, 100 个核 x 512B, 每核 512B slot 内含 4 个 MoeEpCoreDiagRecord(各 64B), 按 byte offset 固定映射:
+
+  | byte offset | op_index | 算子 |
+  |-------------|----------|------|
+  | 0           | 0        | dispatch |
+  | 64          | 1        | dispatch_epilogue |
+  | 128         | 2        | combine |
+  | 192         | 3        | combine_epilogue |
+
+  record 布局: uint64 opCnt + uint32 runPosition + uint32 epRankId + uint32 aivId
 - `*.count_notify.bin` — Count Notify 区, epWorldSize 个 512B 块, 每块第一个 uint32
 - `*.expert_count.bin` — Expert Count 区, epWorldSize 个 512B 块, 每块取 localExpertNum 个 uint32
 - `*.combine_token_state.bin` — Combine Token State 区, nmt*topK 个 512B 块, 每块第一个 uint32
@@ -445,7 +458,7 @@ struct MoeEpDumpMetadata {
    - 打印该卡 Metadata (含开始/结束提示)
    - 解析 context (MoeCommContext 结构体): epRankId, rankSizePerServer, Win区地址, Handle地址, channelsPerRank
    - 解析 topk_idx (input.2): 按 Metadata 的 topK reshape 为 (bs, k), 校验值范围 0 <= val < 全局专家数, 打印全部数据
-   - 分析 Per-core 诊断区: 核数判断(op_count 和 run_pos 全为 0 时停止), 逐核打印
+   - 分析 Per-core 诊断区: 读取 4 个 op record(dispatch/dispatch_epilogue/combine/combine_epilogue), 核数判断(4 个 record 全为 0 时停止), 逐核逐 op 打印 opCnt/runPosition/epRankId/aivId
    - 分析 Count Notify / Expert Count / Combine Token State: 各 Region 数据解析, 打印时附带 shape 说明
 4. **写入 Excel** — 输出 `moe_ep_dump_analysis_result.xlsx`, 共 7 个 sheet
 
@@ -456,7 +469,7 @@ struct MoeEpDumpMetadata {
 | `metadata` | card_num + 10 字段 + 14 Region 列(offset/size 拆分) + bs + core_count | 每卡一行 |
 | `context` | card_num, epRankId, rankSizePerServer, Win区地址_0~N, Handle地址_0~N, channelsPerRank | 按 MoeCommContext 结构体平铺, 每卡一行, N 取各卡最大 rankSizePerServer |
 | `topk_idx` | card_num, token_id, topk_id, expert_id | 每(token, topk)一行 |
-| `per_card_per_core` | card_num, core_count, core_id, op_count, run_pos | 每核一行 |
+| `per_card_per_core` | card_num, core_count, core_id, op_index, op_name, op_count, run_pos, ep_rank_id, aiv_id | 每核每 op 一行 |
 | `count_notify` | card_num, epWorldSize, rank_id, count | 每卡每 rank 一行 |
 | `expert_count` | card_num, localExpertNum, rank_id, expert_id, count | 每卡每 rank 每 expert 一行 |
 | `combine_token_state` | card_num, idx, token_state | 每卡每(token,topk)一行 |

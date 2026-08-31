@@ -64,6 +64,12 @@ REGION_FILE_SUFFIX = {
     "COMBINE_STATE_TAIL": "combine_state_tail.bin",
     "HYBRID_SCALEOUT_STATUS": "hybrid_scaleout_status.bin",
 }
+# Per-core 诊断区: 每个 512B slot 包含 4 个 MoeEpCoreDiagRecord, 每个 record 64B
+# MoeEpCoreDiagRecord 布局: uint64 opCnt(8B) + uint32 runPosition(4B) + uint32 epRankId(4B) + uint32 aivId(4B) + 保留(44B)
+PER_CORE_SLOT_SIZE = 512
+PER_CORE_RECORD_SIZE = 64
+PER_CORE_RECORDS_PER_SLOT = 4
+PER_CORE_OP_NAMES = ["dispatch", "dispatch_epilogue", "combine", "combine_epilogue"]
 
 
 # 单卡分析结果, 封装 analyze_single_card 的返回值
@@ -239,37 +245,55 @@ def check_topk_idx(topk_idx_reshape, global_expert_num: int):
 
 
 # 分析 Per-core 诊断区: 从 .per_core_diag.bin 读取
-# 布局: 100 个核 × 512B/核, 每核前两个 uint32 为 op_count(执行次数) 和 run_pos(执行位置)
-# 核数判断: 当某核的 op_count 和 run_pos 全为 0 时, 认为该核未使用, 之前的核数即使用核数
+# 布局: 100 个核 × 512B/核, 每核 512B slot 内含 4 个 MoeEpCoreDiagRecord(各 64B), 分别对应 4 个算子
+# MoeEpCoreDiagRecord: uint64 opCnt + uint32 runPosition + uint32 epRankId + uint32 aivId
+# 核数判断: 当某核 4 个 record 的 opCnt 和 runPosition 全为 0 时, 认为该核未使用
 def analyze_per_core(target_path: str):
     raw_data = read_region_file(target_path, REGION_FILE_SUFFIX["PER_CORE_DIAG"])
     if raw_data.shape[0] == 0:
         logging.warning("Per-core 诊断区大小为0")
         return 0, []
-    max_cores = raw_data.shape[0] // 512
-    op_counts = []
-    run_poses = []
+    max_cores = raw_data.shape[0] // PER_CORE_SLOT_SIZE
+    per_core_data = []
     core_count = max_cores
     for i in range(max_cores):
-        start = i * 512
-        end = (i + 1) * 512
-        block = raw_data[start:end].view(np.uint32)
-        op_count = int(block[0])
-        run_pos = int(block[1])
-        if op_count == 0 and run_pos == 0:
+        slot_start = i * PER_CORE_SLOT_SIZE
+        slot_end = slot_start + PER_CORE_SLOT_SIZE
+        slot = raw_data[slot_start:slot_end]
+        core_records = []
+        all_zero = True
+        for op_idx in range(PER_CORE_RECORDS_PER_SLOT):
+            rec_start = op_idx * PER_CORE_RECORD_SIZE
+            rec_end = rec_start + PER_CORE_RECORD_SIZE
+            record = slot[rec_start:rec_end].view(np.uint32)
+            op_count = int(record[0]) | (int(record[1]) << 32)
+            run_pos = int(record[2])
+            ep_rank_id = int(record[3])
+            aiv_id = int(record[4])
+            if op_count != 0 or run_pos != 0:
+                all_zero = False
+            core_records.append((op_count, run_pos, ep_rank_id, aiv_id))
+        if all_zero:
             core_count = i
             break
-        op_counts.append(op_count)
-        run_poses.append(run_pos)
-    return core_count, list(zip(op_counts, run_poses))
+        per_core_data.append(core_records)
+    return core_count, per_core_data
 
 
-# 打印 Per-core 分析结果
+# 打印 Per-core 分析结果: 按 op 分组, 每个 op 输出各核的 op_count/run_pos/epRankId/aivId 数组
 def print_per_core(core_count: int, per_core_data: list):
     logging.info("使用核数: %d", core_count)
-    for i in range(core_count):
-        op_count, run_pos = per_core_data[i]
-        logging.info("核%d: op_count=%d, 执行位置=%d", i, op_count, run_pos)
+    for op_idx in range(PER_CORE_RECORDS_PER_SLOT):
+        op_counts = [per_core_data[i][op_idx][0] for i in range(core_count)]
+        run_poses = [per_core_data[i][op_idx][1] for i in range(core_count)]
+        ep_rank_ids = [per_core_data[i][op_idx][2] for i in range(core_count)]
+        aiv_ids = [per_core_data[i][op_idx][3] for i in range(core_count)]
+        if all(c == 0 and r == 0 for c, r in zip(op_counts, run_poses)):
+            continue
+        logging.info("%s op_count: %s", PER_CORE_OP_NAMES[op_idx], op_counts)
+        logging.info("%s run_pos: %s", PER_CORE_OP_NAMES[op_idx], run_poses)
+        logging.info("%s epRankId: %s", PER_CORE_OP_NAMES[op_idx], ep_rank_ids)
+        logging.info("%s aivId: %s", PER_CORE_OP_NAMES[op_idx], aiv_ids)
 
 
 # 分析 Count Notify 区: 从 .count_notify.bin 读取
@@ -498,14 +522,42 @@ def write_topk_idx_sheet(wb, all_topk_idx: list):
                 ws.append([card_num, token_id, topk_id, expert_id])
 
 
-# 写 per_card_per_core sheet: 每核一行, 包含 card_num, core_count, core_id, op_count, run_pos
+# 写 per_card_per_core sheet: 每核每 op 一行
+# 列: card_num, core_count, core_id, op_index, op_name, op_count, run_pos, ep_rank_id, aiv_id
 def write_per_core_sheet(wb, all_per_core: list):
     ws = wb.create_sheet("per_card_per_core")
-    ws.append(["card_num", "core_count", "core_id", "op_count", "run_pos"])
+    ws.append(
+        [
+            "card_num",
+            "core_count",
+            "core_id",
+            "op_index",
+            "op_name",
+            "op_count",
+            "run_pos",
+            "ep_rank_id",
+            "aiv_id",
+        ]
+    )
     for card_num, per_core_data in enumerate(all_per_core):
         core_count = len(per_core_data)
-        for core_id, (op_count, run_pos) in enumerate(per_core_data):
-            ws.append([card_num, core_count, core_id, op_count, run_pos])
+        for core_id, core_records in enumerate(per_core_data):
+            for op_idx, (op_count, run_pos, ep_rank_id, aiv_id) in enumerate(
+                core_records
+            ):
+                ws.append(
+                    [
+                        card_num,
+                        core_count,
+                        core_id,
+                        op_idx,
+                        PER_CORE_OP_NAMES[op_idx],
+                        op_count,
+                        run_pos,
+                        ep_rank_id,
+                        aiv_id,
+                    ]
+                )
 
 
 # 写 count_notify sheet: 每卡每 rank 一行, 含 epWorldSize 便于核对行数
@@ -565,13 +617,19 @@ if __name__ == "__main__":
     # 1. 解析参数, 构建 card_dirs 列表
     if len(sys.argv) < 4:
         logging.error(
-            "用法: python %s <dump_data_path> <file_num> <is_multi>", sys.argv[0]
+            "用法: python %s <dump_data_path> <file_num> <is_multi> [card_names]",
+            sys.argv[0],
         )
         sys.exit(1)
 
     target_dir = os.path.realpath(sys.argv[1])
     file_num = int(sys.argv[2])
     is_multi = int(sys.argv[3])
+    card_names = (
+        [os.path.basename(name) for name in sys.argv[4].split(",")]
+        if len(sys.argv) > 4
+        else []
+    )
     if not os.path.isdir(target_dir):
         logging.error("路径不存在: %s", target_dir)
         sys.exit(1)
@@ -584,7 +642,10 @@ if __name__ == "__main__":
     )
 
     if is_multi == 1:
-        card_dirs = [os.path.join(target_dir, str(i)) for i in range(file_num)]
+        if card_names:
+            card_dirs = [os.path.join(target_dir, name) for name in card_names]
+        else:
+            card_dirs = [os.path.join(target_dir, str(i)) for i in range(file_num)]
     else:
         card_dirs = [target_dir]
 

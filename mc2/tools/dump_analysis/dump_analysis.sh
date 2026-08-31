@@ -204,9 +204,24 @@ echo "-----------------------------"
 echo "-----------------------------"
 
 #开始解析
-file_num=$(ls $TARGET_DIR | wc -l)
+# 检测单卡/多卡: 多卡时 TARGET_DIR 下有数字命名的子目录且包含 exception_info 文件
+is_multi_card=0
+card_dirs_list=()
+if find "$TARGET_DIR" -maxdepth 2 -name "exception_info*" -path "*/[0-9]*/*" | grep -q . 2>/dev/null; then
+    is_multi_card=1
+    while IFS= read -r d; do
+        card_dirs_list+=("$d")
+    done < <(find "$TARGET_DIR" -maxdepth 1 -type d -name "[0-9]*" | sort -V)
+    file_num=${#card_dirs_list[@]}
+    if [ $file_num -eq 0 ]; then
+        echo "error:未找到数字命名的卡目录"
+        exit 1
+    fi
+else
+    file_num=1
+fi
 #判断输入的共享专家卡数是否超出dump数据对应的卡数
-if ls "$TARGET_DIR/1/exception_info."* >/dev/null 2>&1; then
+if [ "$is_multi_card" -eq 1 ]; then
     if [ $SHARE_EXPERT_CARD_COUNT -gt $file_num ]; then
         echo "error:SHARE_EXPERT_CARD_COUNT($SHARE_EXPERT_CARD_COUNT) should <= all_care_num($file_num)"
         exit 1
@@ -240,29 +255,31 @@ if [ "$SOC_VERSION" = "$SOC_VERSION_910_93" ]; then
                 fi
             done
         fi
-    elif ls "$TARGET_DIR/1/exception_info."* >/dev/null 2>&1; then
+    elif [ "$is_multi_card" -eq 1 ]; then
         echo "开始解析多卡dump数据"
-        for ((i = 0; i < file_num; i++))
-        do
-            if ls "$TARGET_DIR$i/exception_info."*.workspace.* >/dev/null 2>&1; then
-                echo "开始解析 $i 卡数据"
-                python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
-                echo "$i 卡数据解析完成"
+        for card_dir in "${card_dirs_list[@]}"; do
+            card_num=$(basename "$card_dir")
+            if ls "$card_dir/exception_info."*.workspace.* >/dev/null 2>&1; then
+                echo "开始解析 $card_num 卡数据"
+                python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $card_num "$card_dir/" $SOC_VERSION
+                echo "$card_num 卡数据解析完成"
                 echo "--------------------------------------------"
             else
-                for file_dump in $TARGET_DIR$i/exception_info.*;
-                do
+                found_dump=0
+                for file_dump in "$card_dir"/exception_info.*; do
                     if [[ -f "$file_dump" ]]; then
-                        echo "开始解析 $i 卡数据"
+                        found_dump=1
+                        echo "开始解析 $card_num 卡数据"
                         python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
-                        python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
-                        echo "$i 卡数据解析完成"
-                        echo "--------------------------------------------"
-                    else
-                        echo "error:路径 $TARGET_DIR$i/ 下没有dump数据"
+                        python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $card_num "$card_dir/" $SOC_VERSION
+                        echo "$card_num 卡数据解析完成"
                         echo "--------------------------------------------"
                     fi
                 done
+                if [[ $found_dump -eq 0 ]]; then
+                    echo "error:路径 $card_dir 下没有dump数据"
+                    echo "--------------------------------------------"
+                fi
             fi
         done
     elif ls "$TARGET_DIR/0/exception_info."* >/dev/null 2>&1; then
@@ -301,19 +318,21 @@ elif [ "$SOC_VERSION" = "$SOC_VERSION_950" ]; then
                 done
             fi
             python3 $SCRIPT_DIR/dump_analysis_moe_ep.py $TARGET_DIR 1 0
-        elif ls "$TARGET_DIR/1/exception_info"* >/dev/null 2>&1; then
+        elif [ "$is_multi_card" -eq 1 ]; then
             echo "开始解析多卡dump数据"
-            for ((i = 0; i < file_num; i++)); do
-                if ! ls "$TARGET_DIR$i/exception_info."*.workspace.* >/dev/null 2>&1; then
-                    for file_dump in $TARGET_DIR$i/exception_info.*; do
+            for card_dir in "${card_dirs_list[@]}"; do
+                card_num=$(basename "$card_dir")
+                if ! ls "$card_dir/exception_info."*.workspace.* >/dev/null 2>&1; then
+                    for file_dump in "$card_dir"/exception_info.*; do
                         if [[ -f "$file_dump" ]]; then
-                            echo "开始预处理 $i 卡数据"
+                            echo "开始预处理 $card_num 卡数据"
                             python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
                         fi
                     done
                 fi
             done
-            python3 $SCRIPT_DIR/dump_analysis_moe_ep.py $TARGET_DIR $file_num 1
+            card_names_str=$(for d in "${card_dirs_list[@]}"; do basename "$d"; done | paste -sd, -)
+            python3 $SCRIPT_DIR/dump_analysis_moe_ep.py $TARGET_DIR $file_num 1 "$card_names_str"
         elif ls "$TARGET_DIR/0/exception_info"* >/dev/null 2>&1; then
             echo "开始解析:单卡dump数据"
             if ! ls "$TARGET_DIR/0/exception_info."*.workspace.* >/dev/null 2>&1; then
@@ -348,29 +367,31 @@ elif [ "$SOC_VERSION" = "$SOC_VERSION_950" ]; then
                     fi
                 done
             fi
-        elif ls "$TARGET_DIR/1/exception_info"* >/dev/null 2>&1; then
+        elif [ "$is_multi_card" -eq 1 ]; then
             echo "开始解析多卡dump数据"
-            for ((i = 0; i < file_num; i++))
-            do
-                if ls "$TARGET_DIR$i/exception_info."*.workspace.* >/dev/null 2>&1; then
-                    echo "开始解析 $i 卡数据"
-                    python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
-                    echo "$i 卡数据解析完成"
+            for card_dir in "${card_dirs_list[@]}"; do
+                card_num=$(basename "$card_dir")
+                if ls "$card_dir/exception_info."*.workspace.* >/dev/null 2>&1; then
+                    echo "开始解析 $card_num 卡数据"
+                    python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $card_num "$card_dir/" $SOC_VERSION
+                    echo "$card_num 卡数据解析完成"
                     echo "--------------------------------------------"
                 else
-                    for file_dump in $TARGET_DIR$i/exception_info.*;
-                    do
+                    found_dump=0
+                    for file_dump in "$card_dir"/exception_info.*; do
                         if [[ -f "$file_dump" ]]; then
-                            echo "开始解析 $i 卡数据"
+                            found_dump=1
+                            echo "开始解析 $card_num 卡数据"
                             python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
-                            python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
-                            echo "$i 卡数据解析完成"
-                            echo "--------------------------------------------"
-                        else
-                            echo "error:路径 $TARGET_DIR$i/ 下没有dump数据"
+                            python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $card_num "$card_dir/" $SOC_VERSION
+                            echo "$card_num 卡数据解析完成"
                             echo "--------------------------------------------"
                         fi
                     done
+                    if [[ $found_dump -eq 0 ]]; then
+                        echo "error:路径 $card_dir 下没有dump数据"
+                        echo "--------------------------------------------"
+                    fi
                 fi
             done
         elif ls "$TARGET_DIR/0/exception_info"* >/dev/null 2>&1; then
