@@ -118,8 +118,8 @@ aclnnStatus FakeArray(const aclIntArray *inArray, aclTensor *&outTensor)
         OP_LOGD("input array is not nullptr");
         int64_t size = static_cast<int64_t>(inArray->Size());
         std::vector<int64_t> shape = {size};
-        outTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_INT64, nullptr,
-                                    0, ACL_FORMAT_ND, shape.data(), shape.size(), nullptr);
+        outTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_INT64, nullptr, 0, ACL_FORMAT_ND,
+                                    shape.data(), shape.size(), nullptr);
         if (outTensor == nullptr) {
             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Try alloc tensor failed");
             return ACLNN_ERR_INNER_NULLPTR;
@@ -200,17 +200,16 @@ int64_t GetPageAttentionCacheHeadDim(const aclTensor *tensor, int64_t numKeyValu
     return -1;
 }
 
-bool IsArch22MlaD512RoutingCandidate(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
-    const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    const char *inputLayout, int64_t numHeads, int64_t numKeyValueHeads,
-    int64_t sparseMode, int64_t blockSize, bool hasUnsupportedFeature)
+bool IsArch22MlaD512RoutingCandidate(const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
+                                     const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
+                                     const char *inputLayout, int64_t numHeads, int64_t numKeyValueHeads,
+                                     int64_t sparseMode, int64_t blockSize, bool hasUnsupportedFeature)
 {
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2201 || hasUnsupportedFeature ||
         query == nullptr || queryRopeOptional == nullptr || keyRopeOptional == nullptr || inputLayout == nullptr ||
-        key == nullptr || value == nullptr || key->Size() != 1 || value->Size() != 1 ||
-        (*key)[0] == nullptr || (*value)[0] == nullptr || numHeads <= 0 || numKeyValueHeads != 1 ||
-        numHeads % numKeyValueHeads != 0 || blockSize <= 0) {
+        key == nullptr || value == nullptr || key->Size() != 1 || value->Size() != 1 || (*key)[0] == nullptr ||
+        (*value)[0] == nullptr || numHeads <= 0 || numKeyValueHeads != 1 || numHeads % numKeyValueHeads != 0 ||
+        blockSize <= 0) {
         return false;
     }
 
@@ -222,29 +221,26 @@ bool IsArch22MlaD512RoutingCandidate(
     const bool hiddenLayout = inputLayoutStr == "BSH" || inputLayoutStr == "BSH_NBSD";
 
     const auto dtype = query->GetDataType();
-    if ((dtype != DataType::DT_FLOAT16 && dtype != DataType::DT_BF16) ||
-        queryRopeOptional->GetDataType() != dtype || (*key)[0]->GetDataType() != dtype ||
-        (*value)[0]->GetDataType() != dtype || keyRopeOptional->GetDataType() != dtype) {
+    if ((dtype != DataType::DT_FLOAT16 && dtype != DataType::DT_BF16) || queryRopeOptional->GetDataType() != dtype ||
+        (*key)[0]->GetDataType() != dtype || (*value)[0]->GetDataType() != dtype ||
+        keyRopeOptional->GetDataType() != dtype) {
         return false;
     }
 
     return query->GetViewShape().GetShapeSize() > 0 && (*key)[0]->GetViewShape().GetShapeSize() > 0 &&
            (*value)[0]->GetViewShape().GetShapeSize() > 0 && queryRopeOptional->GetViewShape().GetShapeSize() > 0 &&
-           keyRopeOptional->GetViewShape().GetShapeSize() > 0 &&
-           HasQueryHeadDim(query, numHeads, 512, hiddenLayout) &&
+           keyRopeOptional->GetViewShape().GetShapeSize() > 0 && HasQueryHeadDim(query, numHeads, 512, hiddenLayout) &&
            HasQueryHeadDim(queryRopeOptional, numHeads, 64, hiddenLayout) &&
            GetPageAttentionCacheHeadDim((*key)[0], numKeyValueHeads) == 512 &&
            GetPageAttentionCacheHeadDim((*value)[0], numKeyValueHeads) == 512 &&
            GetPageAttentionCacheHeadDim(keyRopeOptional, numKeyValueHeads) == 64;
 }
 
-bool IsFAIRoutingCandidate(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
-    const aclTensor *attenMaskOptional, const aclTensor *blockTableOptional,
-    const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    const aclTensor *learnableSinkOptional,
-    const char *inputLayout, int64_t numHeads, int64_t numKeyValueHeads,
-    int64_t sparseMode, int64_t innerPrecise)
+bool IsFAIRoutingCandidate(const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
+                           const aclTensor *attenMaskOptional, const aclTensor *blockTableOptional,
+                           const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
+                           const aclTensor *learnableSinkOptional, const char *inputLayout, int64_t numHeads,
+                           int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise)
 {
     if (query == nullptr || key == nullptr || value == nullptr || key->Size() == 0 || value->Size() == 0 ||
         (*key)[0] == nullptr || (*value)[0] == nullptr || inputLayout == nullptr) {
@@ -268,8 +264,7 @@ bool IsFAIRoutingCandidate(
     const int64_t queryHeadDim = queryShape.GetDim(2);
 
     bool learnableSinkSupported = true;
-    if (learnableSinkOptional != nullptr && inputLayoutStr == "TND" &&
-        queryHeadDim == UNSUPPORTED_SINK_HEAD_DIM &&
+    if (learnableSinkOptional != nullptr && inputLayoutStr == "TND" && queryHeadDim == UNSUPPORTED_SINK_HEAD_DIM &&
         learnableSinkOptional->GetDataType() == DataType::DT_BF16) {
         learnableSinkSupported = false;
     }
@@ -301,8 +296,8 @@ bool IsFAIRoutingCandidate(
         const int64_t keyHeadDim = keyShape.GetDim(2) / numKeyValueHeads;
         const int64_t valueHeadDim = valueShape.GetDim(2) / numKeyValueHeads;
         return queryHeadDim <= MAX_HEAD_DIM && keyHeadDim <= MAX_HEAD_DIM && valueHeadDim <= MAX_HEAD_DIM &&
-               queryHeadDim == keyHeadDim && queryHeadDim == valueHeadDim &&
-               blockSize % BLOCK_SIZE_ALIGNMENT == 0 && blockSize <= MAX_BLOCK_SIZE;
+               queryHeadDim == keyHeadDim && queryHeadDim == valueHeadDim && blockSize % BLOCK_SIZE_ALIGNMENT == 0 &&
+               blockSize <= MAX_BLOCK_SIZE;
     }
     if (keyShape.GetDimNum() == 5) {
         if (valueShape.GetDimNum() <= 3) {
@@ -312,8 +307,8 @@ bool IsFAIRoutingCandidate(
         const int64_t keyHeadDim = keyShape.GetDim(2) * NZ_INNER_BLOCK;
         const int64_t valueHeadDim = valueShape.GetDim(2) * NZ_INNER_BLOCK;
         const bool headDimSupported = queryHeadDim <= MAX_HEAD_DIM && keyHeadDim <= MAX_HEAD_DIM &&
-                                      valueHeadDim <= MAX_HEAD_DIM && queryHeadDim == keyHeadDim && queryHeadDim == valueHeadDim &&
-                                      queryHeadDim != 64 && queryHeadDim != 128;
+                                      valueHeadDim <= MAX_HEAD_DIM && queryHeadDim == keyHeadDim &&
+                                      queryHeadDim == valueHeadDim && queryHeadDim != 64 && queryHeadDim != 128;
         return headDimSupported && blockSize % BLOCK_SIZE_ALIGNMENT == 0 && blockSize <= MAX_BLOCK_SIZE;
     }
     return false;
@@ -363,8 +358,8 @@ bool IsFirstAxisOnlyNonContiguous(const aclTensor *tensor, const char *name)
         return false;
     }
     if (viewShape.GetDim(0) > 1 && viewStrides[0] <= 0) {
-        OP_LOGW("%s has invalid dim0 stride[%ld] for dim0 size[%ld], it will be forced to be contiguous.",
-                name, viewStrides[0], viewShape.GetDim(0));
+        OP_LOGW("%s has invalid dim0 stride[%ld] for dim0 size[%ld], it will be forced to be contiguous.", name,
+                viewStrides[0], viewShape.GetDim(0));
         delete[] viewStrides;
         return false;
     }
@@ -554,8 +549,8 @@ aclnnStatus NormalizeDim0CacheTensor(const aclTensor *&tensor, const char *name,
     return ACLNN_SUCCESS;
 }
 
-CacheStridePolicy DecideCacheStridePolicy(bool supportTensorV2, bool isCacheScene,
-                                          bool isFAIRoutingCandidate, bool isArch22MlaRoutingCandidate)
+CacheStridePolicy DecideCacheStridePolicy(bool supportTensorV2, bool isCacheScene, bool isFAIRoutingCandidate,
+                                          bool isArch22MlaRoutingCandidate)
 {
     if (!supportTensorV2 || !isCacheScene) {
         return CacheStridePolicy::MAKE_CONTIGUOUS;
@@ -569,9 +564,8 @@ CacheStridePolicy DecideCacheStridePolicy(bool supportTensorV2, bool isCacheScen
     return CacheStridePolicy::MAKE_CONTIGUOUS;
 }
 
-aclnnStatus ProcessCacheForL0Input(const aclTensorList *&key, const aclTensorList *&value,
-                                   const aclTensor *&keyRope, CacheStridePolicy policy,
-                                   aclOpExecutor *executor)
+aclnnStatus ProcessCacheForL0Input(const aclTensorList *&key, const aclTensorList *&value, const aclTensor *&keyRope,
+                                   CacheStridePolicy policy, aclOpExecutor *executor)
 {
     if (executor == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "executor is nullptr.");
@@ -587,19 +581,16 @@ aclnnStatus ProcessCacheForL0Input(const aclTensorList *&key, const aclTensorLis
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    if (policy == CacheStridePolicy::KEEP_FAI_KV_DIM0 ||
-        policy == CacheStridePolicy::KEEP_ARCH22_MLA_KV_ROPE_DIM0) {
+    if (policy == CacheStridePolicy::KEEP_FAI_KV_DIM0 || policy == CacheStridePolicy::KEEP_ARCH22_MLA_KV_ROPE_DIM0) {
         const bool completeStrideMetadata = policy == CacheStridePolicy::KEEP_ARCH22_MLA_KV_ROPE_DIM0;
         CHECK_RET(NormalizeDim0CacheTensorList(key, "key", completeStrideMetadata, executor) == ACLNN_SUCCESS,
                   ACLNN_ERR_INNER_NULLPTR);
         CHECK_RET(NormalizeDim0CacheTensorList(value, "value", completeStrideMetadata, executor) == ACLNN_SUCCESS,
                   ACLNN_ERR_INNER_NULLPTR);
         if (policy == CacheStridePolicy::KEEP_ARCH22_MLA_KV_ROPE_DIM0) {
-            CHECK_RET(NormalizeDim0CacheTensor(keyRope, "keyRope", executor) == ACLNN_SUCCESS,
-                      ACLNN_ERR_INNER_NULLPTR);
+            CHECK_RET(NormalizeDim0CacheTensor(keyRope, "keyRope", executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
         } else {
-            CHECK_RET(MakeTensorContiguous(keyRope, "keyRope", executor) == ACLNN_SUCCESS,
-                      ACLNN_ERR_INNER_NULLPTR);
+            CHECK_RET(MakeTensorContiguous(keyRope, "keyRope", executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
         }
         return ACLNN_SUCCESS;
     }
@@ -617,11 +608,10 @@ extern "C" {
 #endif
 
 static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
-    const aclTensor *pseShiftOptional, const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *deqScale1Optional, const aclTensor *quantScale1Optional,
-    const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
+    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShiftOptional,
+    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
+    const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *deqScale1Optional,
+    const aclTensor *quantScale1Optional, const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
     const aclTensor *quantOffset2Optional, const aclTensor *antiquantScaleOptional,
     const aclTensor *antiquantOffsetOptional, const aclTensor *blockTableOptional,
     const aclTensor *queryPaddingSizeOptional, const aclTensor *kvPaddingSizeOptional,
@@ -631,13 +621,12 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
     const aclIntArray *actualSharedPrefixLenOptional, const aclTensor *queryRopeOptional,
     const aclTensor *keyRopeOptional, const aclTensor *keyRopeAntiquantScaleOptional,
     const aclTensor *dequantScaleQueryOptional, const aclTensor *learnableSinkOptional,
-    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional,
-    int64_t numHeads, double scaleValue, int64_t preTokens, int64_t nextTokens,
-    char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode,
+    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional, int64_t numHeads, double scaleValue,
+    int64_t preTokens, int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode,
+    int64_t innerPrecise, int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode,
     int64_t valueAntiquantMode, int64_t queryQuantMode, int64_t pseType, int64_t outDtype,
-    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize,
-    aclOpExecutor **executor, bool enableArch22MlaDim0Stride)
+    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor,
+    bool enableArch22MlaDim0Stride)
 {
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -668,23 +657,21 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
     const bool hasUnsupportedMlaFeature =
         pseShiftOptional != nullptr || queryPaddingSizeOptional != nullptr || kvPaddingSizeOptional != nullptr ||
         keySharedPrefixOptional != nullptr || valueSharedPrefixOptional != nullptr ||
-        learnableSinkOptional != nullptr ||
-        deqScale1Optional != nullptr || quantScale1Optional != nullptr || deqScale2Optional != nullptr ||
-        quantScale2Optional != nullptr || quantOffset2Optional != nullptr || antiquantScaleOptional != nullptr ||
-        antiquantOffsetOptional != nullptr || keyAntiquantScaleOptional != nullptr ||
-        keyAntiquantOffsetOptional != nullptr ||
+        learnableSinkOptional != nullptr || deqScale1Optional != nullptr || quantScale1Optional != nullptr ||
+        deqScale2Optional != nullptr || quantScale2Optional != nullptr || quantOffset2Optional != nullptr ||
+        antiquantScaleOptional != nullptr || antiquantOffsetOptional != nullptr ||
+        keyAntiquantScaleOptional != nullptr || keyAntiquantOffsetOptional != nullptr ||
         valueAntiquantScaleOptional != nullptr || valueAntiquantOffsetOptional != nullptr ||
         keyRopeAntiquantScaleOptional != nullptr || dequantScaleQueryOptional != nullptr ||
-        qStartIdxOptional != nullptr ||
-        kvStartIdxOptional != nullptr || antiquantMode != 0 || keyAntiquantMode != 0 || valueAntiquantMode != 0 ||
-        queryQuantMode != 0;
+        qStartIdxOptional != nullptr || kvStartIdxOptional != nullptr || antiquantMode != 0 || keyAntiquantMode != 0 ||
+        valueAntiquantMode != 0 || queryQuantMode != 0;
     const bool isArch22MlaRoutingCandidate =
         enableArch22MlaDim0Stride &&
         IsArch22MlaD512RoutingCandidate(query, key, value, queryRopeOptional, keyRopeOptional, inputLayout, numHeads,
                                         numKeyValueHeads, sparseMode, blockSize, hasUnsupportedMlaFeature);
     const bool supportTensorV2 = NnopbaseSupportTensorV2 != nullptr;
-    const auto cacheStridePolicy = DecideCacheStridePolicy(
-        supportTensorV2, IsCacheScene(blockTableOptional), isFAIRoutingCandidate, isArch22MlaRoutingCandidate);
+    const auto cacheStridePolicy = DecideCacheStridePolicy(supportTensorV2, IsCacheScene(blockTableOptional),
+                                                           isFAIRoutingCandidate, isArch22MlaRoutingCandidate);
     if (!supportTensorV2) {
         OP_LOGW("Current opbase does not support TensorV2, make key, value and keyRope contiguous.");
     }
@@ -723,8 +710,7 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
     const aclTensor *processedLearnableSink = learnableSinkOptional;
 
     aclOpExecutor *l0Executor = uniqueExecutor.get();
-    CHECK_RET(MakeTensorContiguous(processedQuery, "query", l0Executor) == ACLNN_SUCCESS,
-              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(MakeTensorContiguous(processedQuery, "query", l0Executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(MakeTensorContiguous(processedPseShift, "pseShift", l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(MakeTensorContiguous(processedAttenMask, "attenMask", l0Executor) == ACLNN_SUCCESS,
@@ -759,21 +745,19 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
               ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(MakeTensorContiguous(processedKeyAntiquantOffset, "keyAntiquantOffset", l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(MakeTensorContiguous(processedValueAntiquantScale, "valueAntiquantScale", l0Executor) ==
-                  ACLNN_SUCCESS,
+    CHECK_RET(MakeTensorContiguous(processedValueAntiquantScale, "valueAntiquantScale", l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(MakeTensorContiguous(processedValueAntiquantOffset, "valueAntiquantOffset", l0Executor) ==
-                  ACLNN_SUCCESS,
+    CHECK_RET(MakeTensorContiguous(processedValueAntiquantOffset, "valueAntiquantOffset", l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(MakeTensorContiguous(processedKeyRopeAntiquantScale, "keyRopeAntiquantScale", l0Executor) ==
-                  ACLNN_SUCCESS,
-              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(
+        MakeTensorContiguous(processedKeyRopeAntiquantScale, "keyRopeAntiquantScale", l0Executor) == ACLNN_SUCCESS,
+        ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(MakeTensorContiguous(processedDequantScaleQuery, "dequantScaleQuery", l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(MakeTensorContiguous(processedLearnableSink, "learnableSink", l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
-    auto cacheProcessRet = ProcessCacheForL0Input(
-        processedKey, processedValue, processedKeyRope, cacheStridePolicy, l0Executor);
+    auto cacheProcessRet =
+        ProcessCacheForL0Input(processedKey, processedValue, processedKeyRope, cacheStridePolicy, l0Executor);
     CHECK_RET(cacheProcessRet == ACLNN_SUCCESS, cacheProcessRet);
 
     auto l0Out = l0op::FusedInferAttentionScore(
@@ -784,9 +768,9 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
         processedValueAntiquantScale, processedValueAntiquantOffset, processedKeySharedPrefix,
         processedValueSharedPrefix, actualSharedPrefixLenOptional, processedQueryRope, processedKeyRope,
         processedKeyRopeAntiquantScale, processedDequantScaleQuery, processedLearnableSink, qStartIdxOptional,
-        kvStartIdxOptional, numHeads, scaleValue, preTokens, nextTokens, inputLayout, numKeyValueHeads,
-        sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode, valueAntiquantMode,
-        queryQuantMode, pseType, outDtype, attentionOut, softmaxLse, l0Executor);
+        kvStartIdxOptional, numHeads, scaleValue, preTokens, nextTokens, inputLayout, numKeyValueHeads, sparseMode,
+        innerPrecise, blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, queryQuantMode,
+        pseType, outDtype, attentionOut, softmaxLse, l0Executor);
 
     auto l0AttentionOut = std::get<0>(l0Out);
     auto l0SoftmaxLse = std::get<1>(l0Out);
@@ -809,11 +793,10 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
 }
 
 aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSize(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
-    const aclTensor *pseShiftOptional, const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *deqScale1Optional, const aclTensor *quantScale1Optional,
-    const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
+    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShiftOptional,
+    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
+    const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *deqScale1Optional,
+    const aclTensor *quantScale1Optional, const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
     const aclTensor *quantOffset2Optional, const aclTensor *antiquantScaleOptional,
     const aclTensor *antiquantOffsetOptional, const aclTensor *blockTableOptional,
     const aclTensor *queryPaddingSizeOptional, const aclTensor *kvPaddingSizeOptional,
@@ -823,34 +806,31 @@ aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSize(
     const aclIntArray *actualSharedPrefixLenOptional, const aclTensor *queryRopeOptional,
     const aclTensor *keyRopeOptional, const aclTensor *keyRopeAntiquantScaleOptional,
     const aclTensor *dequantScaleQueryOptional, const aclTensor *learnableSinkOptional,
-    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional,
-    int64_t numHeads, double scaleValue, int64_t preTokens, int64_t nextTokens,
-    char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode,
+    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional, int64_t numHeads, double scaleValue,
+    int64_t preTokens, int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode,
+    int64_t innerPrecise, int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode,
     int64_t valueAntiquantMode, int64_t queryQuantMode, int64_t pseType, int64_t outDtype,
-    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     // V1-V3 retain the shared Inner behavior without the V4-only arch22 MLA stride extension.
     return InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
-        query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
-        actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional,
-        quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional,
-        queryPaddingSizeOptional, kvPaddingSizeOptional, keyAntiquantScaleOptional, keyAntiquantOffsetOptional,
-        valueAntiquantScaleOptional, valueAntiquantOffsetOptional, keySharedPrefixOptional, valueSharedPrefixOptional,
-        actualSharedPrefixLenOptional, queryRopeOptional, keyRopeOptional, keyRopeAntiquantScaleOptional,
-        dequantScaleQueryOptional, learnableSinkOptional, qStartIdxOptional, kvStartIdxOptional, numHeads, scaleValue,
-        preTokens, nextTokens, inputLayout, numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode,
-        softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, queryQuantMode, pseType, outDtype, attentionOut,
-        softmaxLse, workspaceSize, executor, false);
+        query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional, actualSeqLengthsKvOptional,
+        deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional, quantOffset2Optional,
+        antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional, queryPaddingSizeOptional,
+        kvPaddingSizeOptional, keyAntiquantScaleOptional, keyAntiquantOffsetOptional, valueAntiquantScaleOptional,
+        valueAntiquantOffsetOptional, keySharedPrefixOptional, valueSharedPrefixOptional, actualSharedPrefixLenOptional,
+        queryRopeOptional, keyRopeOptional, keyRopeAntiquantScaleOptional, dequantScaleQueryOptional,
+        learnableSinkOptional, qStartIdxOptional, kvStartIdxOptional, numHeads, scaleValue, preTokens, nextTokens,
+        inputLayout, numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag,
+        keyAntiquantMode, valueAntiquantMode, queryQuantMode, pseType, outDtype, attentionOut, softmaxLse,
+        workspaceSize, executor, false);
 }
 
 aclnnStatus InnerFusedInferAttentionScoreV4GetWorkspaceSize(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
-    const aclTensor *pseShiftOptional, const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *deqScale1Optional, const aclTensor *quantScale1Optional,
-    const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
+    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShiftOptional,
+    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
+    const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *deqScale1Optional,
+    const aclTensor *quantScale1Optional, const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
     const aclTensor *quantOffset2Optional, const aclTensor *antiquantScaleOptional,
     const aclTensor *antiquantOffsetOptional, const aclTensor *blockTableOptional,
     const aclTensor *queryPaddingSizeOptional, const aclTensor *kvPaddingSizeOptional,
@@ -860,30 +840,28 @@ aclnnStatus InnerFusedInferAttentionScoreV4GetWorkspaceSize(
     const aclIntArray *actualSharedPrefixLenOptional, const aclTensor *queryRopeOptional,
     const aclTensor *keyRopeOptional, const aclTensor *keyRopeAntiquantScaleOptional,
     const aclTensor *dequantScaleQueryOptional, const aclTensor *learnableSinkOptional,
-    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional,
-    int64_t numHeads, double scaleValue, int64_t preTokens, int64_t nextTokens,
-    char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode,
+    const aclIntArray *qStartIdxOptional, const aclIntArray *kvStartIdxOptional, int64_t numHeads, double scaleValue,
+    int64_t preTokens, int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode,
+    int64_t innerPrecise, int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode,
     int64_t valueAntiquantMode, int64_t queryQuantMode, int64_t pseType, int64_t outDtype,
-    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     // Only V4 opts in to preserving arch22 MLA D512 K/V/KeyRope dim0 strides.
     return InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
-        query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
-        actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional,
-        quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional,
-        queryPaddingSizeOptional, kvPaddingSizeOptional, keyAntiquantScaleOptional, keyAntiquantOffsetOptional,
-        valueAntiquantScaleOptional, valueAntiquantOffsetOptional, keySharedPrefixOptional, valueSharedPrefixOptional,
-        actualSharedPrefixLenOptional, queryRopeOptional, keyRopeOptional, keyRopeAntiquantScaleOptional,
-        dequantScaleQueryOptional, learnableSinkOptional, qStartIdxOptional, kvStartIdxOptional, numHeads, scaleValue,
-        preTokens, nextTokens, inputLayout, numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode,
-        softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, queryQuantMode, pseType, outDtype, attentionOut,
-        softmaxLse, workspaceSize, executor, true);
+        query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional, actualSeqLengthsKvOptional,
+        deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional, quantOffset2Optional,
+        antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional, queryPaddingSizeOptional,
+        kvPaddingSizeOptional, keyAntiquantScaleOptional, keyAntiquantOffsetOptional, valueAntiquantScaleOptional,
+        valueAntiquantOffsetOptional, keySharedPrefixOptional, valueSharedPrefixOptional, actualSharedPrefixLenOptional,
+        queryRopeOptional, keyRopeOptional, keyRopeAntiquantScaleOptional, dequantScaleQueryOptional,
+        learnableSinkOptional, qStartIdxOptional, kvStartIdxOptional, numHeads, scaleValue, preTokens, nextTokens,
+        inputLayout, numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag,
+        keyAntiquantMode, valueAntiquantMode, queryQuantMode, pseType, outDtype, attentionOut, softmaxLse,
+        workspaceSize, executor, true);
 }
 
-aclnnStatus InnerFusedInferAttentionScore(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, const aclrtStream stream)
+aclnnStatus InnerFusedInferAttentionScore(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                          const aclrtStream stream)
 {
     L2_DFX_PHASE_2(InnerFusedInferAttentionScore);
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

@@ -30,8 +30,7 @@ class FiaInfoParser {
 public:
     explicit FiaInfoParser(const gert::TilingContext *context)
         : context_(context)
-    {
-    }
+    {}
     ~FiaInfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;
@@ -57,8 +56,7 @@ public:
     ge::graphStatus GetAttrParaInfo();
     ge::graphStatus GetKvCache();
     ge::graphStatus GetTensorListCache(uint32_t index, const std::string &name,
-                                       std::vector<gert::StorageShape *> &cache,
-                                       std::vector<gert::Stride *> &strides);
+                                       std::vector<gert::StorageShape *> &cache, std::vector<gert::Stride *> &strides);
     ge::graphStatus GetOpParaInfo();
 
     ge::graphStatus GetEmptyTensorFlag();
