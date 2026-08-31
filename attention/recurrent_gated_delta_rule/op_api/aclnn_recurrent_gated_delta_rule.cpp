@@ -180,7 +180,13 @@ aclnnStatus aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(const aclTensor *query,
     }
 
     // stateRef非连续，使用CreateView将设置gert::TensorV2的stride信息
+    op::Shape stateStorageShape;
+    op::Strides stateViewStrides;
+    bool stateNonContiguous = false;
     if (!IsContiguous(stateRef)) {
+        stateStorageShape = stateRef->GetStorageShape();
+        stateViewStrides = stateRef->GetViewStrides();
+        stateNonContiguous = true;
         stateRef = uniqueExecutor.get()->CreateView(stateRef, stateRef->GetViewShape(), stateRef->GetStorageShape(),
                                                     stateRef->GetViewStrides(), stateRef->GetViewOffset());
     }
@@ -191,6 +197,18 @@ aclnnStatus aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(const aclTensor *query,
                                       numAcceptedTokens, scaleValue, uniqueExecutor.get());
     if (outRet == nullptr) {
         return ACLNN_ERR_INNER_NULLPTR;
+    }
+
+    // l0层InferShape/Launcher链路会按连续布局重置输出tensor的stride与storageShape，对于stateRef这类既作输入又作输出的
+    // 非连续tensor，launch阶段按重置后的描述符上报内存长度(退化为numel*size)，而kernel按真实stride写出，
+    // 会导致mssanitizer等按描述符校验内存边界的工具误报越界。此处恢复原始stride与storageShape，保持描述符与真实存储一致。
+    if (stateNonContiguous) {
+        if (stateRef->GetViewStrides() != stateViewStrides) {
+            stateRef->SetViewStrides(stateViewStrides);
+        }
+        if (stateRef->GetStorageShape() != stateStorageShape) {
+            stateRef->SetStorageShape(stateStorageShape);
+        }
     }
 
     auto ViewCopyResult = l0op::ViewCopy(outRet, out, uniqueExecutor.get());
