@@ -47,6 +47,7 @@ operator_group_4:
   - moe_init_routing_v3
   - moe_token_permute_with_routing_map_grad
   - moe_token_unpermute_with_routing_map
+  - moe_token_unpermute_with_ep
   - rope_with_sin_cos_cache
   - moe_re_routing
   - moe_compute_expert_tokens

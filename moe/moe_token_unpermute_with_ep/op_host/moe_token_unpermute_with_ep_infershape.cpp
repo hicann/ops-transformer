@@ -25,21 +25,28 @@ static constexpr int64_t UNPERMUTE_WITH_EP_OUTPUT_TOKENS = 0;
 static constexpr int64_t UNPERMUTE_WITH_EP_ARRT_TOPK = 0;
 static constexpr int64_t UNPERMUTE_WITH_EP_ARRT_RANGE = 1;
 
-static ge::graphStatus InferShapeForMoeTokenUnpermuteWithEp(gert::InferShapeContext* context)
+static ge::graphStatus InferShapeForMoeTokenUnpermuteWithEp(gert::InferShapeContext *context)
 {
-    const gert::Shape* permuted_inputs_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_TOKENS);
-    const gert::Shape* probs_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_PROBS);
-    const int64_t* topk = context->GetAttrs()->GetAttrPointer<int64_t>(UNPERMUTE_WITH_EP_ARRT_TOPK);
+    const gert::Shape *permuted_inputs_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_TOKENS);
+    if (permuted_inputs_shape->GetDimNum() != 2) {
+        return GRAPH_FAILED;
+    }
+    if (permuted_inputs_shape->GetDim(0) == 0 || permuted_inputs_shape->GetDim(1) == 0) {
+        return GRAPH_FAILED;
+    }
+    const gert::Shape *probs_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_PROBS);
+    const int64_t *topk = context->GetAttrs()->GetAttrPointer<int64_t>(UNPERMUTE_WITH_EP_ARRT_TOPK);
     int64_t inputTopK = *topk;
     int64_t tokens_num;
     if (probs_shape == nullptr) {
-        const gert::Shape* indices_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_IDX);
-        tokens_num = indices_shape->GetDim(0) / inputTopK;
+        const gert::Shape *indices_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_IDX);
+        int64_t indicesDim0 = indices_shape->GetDim(0);
+        tokens_num = (indicesDim0 == -1) ? -1 : indicesDim0 / inputTopK;
     } else {
         tokens_num = probs_shape->GetDim(0);
     }
 
-    gert::Shape* out_shape = context->GetOutputShape(UNPERMUTE_WITH_EP_OUTPUT_TOKENS);
+    gert::Shape *out_shape = context->GetOutputShape(UNPERMUTE_WITH_EP_OUTPUT_TOKENS);
     const int8_t out_dim_num = 2;
     out_shape->SetDimNum(out_dim_num);
     out_shape->SetDim(0, tokens_num);
@@ -48,7 +55,7 @@ static ge::graphStatus InferShapeForMoeTokenUnpermuteWithEp(gert::InferShapeCont
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeForMoeTokenUnpermuteWithEp(gert::InferDataTypeContext* context)
+static ge::graphStatus InferDataTypeForMoeTokenUnpermuteWithEp(gert::InferDataTypeContext *context)
 {
     context->SetOutputDataType(0, context->GetInputDataType(UNPERMUTE_WITH_EP_INPUT_TOKENS));
     return GRAPH_SUCCESS;
