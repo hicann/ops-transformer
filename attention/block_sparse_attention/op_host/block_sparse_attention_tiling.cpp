@@ -120,7 +120,10 @@ enum QuantMode : int64_t {
 };
 
 // 判断是否为 mxfp4 量化(OCP 或 CX)
-static bool IsMxfp4Quant(int64_t qm) { return qm == MXFP4_OCP_QUANT || qm == MXFP4_CX_QUANT; }
+static bool IsMxfp4Quant(int64_t qm)
+{
+    return qm == MXFP4_OCP_QUANT || qm == MXFP4_CX_QUANT;
+}
 
 static std::string DataTypeToString(ge::DataType dataType)
 {
@@ -987,18 +990,26 @@ ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext *bsaContext)
     if (attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX) != nullptr) {
         innerPrecise_ = *attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX);
     }
+    auto qInputDesc = bsaContext->GetInputDesc(QUERY_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(bsaContext, qInputDesc);
+    auto dtypeQ = qInputDesc->GetDataType();
     if (socVer_ == SOC_VER_950_CODE) {
-        if (innerPrecise_ != BsaInnerCalcPrec::LOW_HIGH_MIXED) {
+        const bool isFp16OrBf16 = dtypeQ == ge::DT_FLOAT16 || dtypeQ == ge::DT_BF16;
+        if (isFp16OrBf16 && innerPrecise_ != BsaInnerCalcPrec::LOW_HIGH_MIXED &&
+            innerPrecise_ != BsaInnerCalcPrec::ALL_HIGH) {
             OP_LOGE(bsaContext->GetNodeName(),
-                    "On chip 950, only innerPrec = 4 is supported, "
-                    "but got %u.",
+                    "On chip 950, when query dtype is float16 or bfloat16, only "
+                    "innerPrec = 0 or 4 is supported, but got %u.",
                     innerPrecise_);
+            return ge::GRAPH_FAILED;
+        } else if (!isFp16OrBf16 && innerPrecise_ != BsaInnerCalcPrec::LOW_HIGH_MIXED) {
+            OP_LOGE(bsaContext->GetNodeName(),
+                    "On chip 950, when query dtype is %s, only innerPrec = 4 is "
+                    "supported, but got %u.",
+                    DataTypeToString(dtypeQ).c_str(), innerPrecise_);
             return ge::GRAPH_FAILED;
         }
     } else {
-        auto qInputDesc = bsaContext->GetInputDesc(QUERY_INDEX);
-        OP_CHECK_NULL_WITH_CONTEXT(bsaContext, qInputDesc);
-        auto dtypeQ = qInputDesc->GetDataType();
         if (innerPrecise_ != BsaInnerCalcPrec::ALL_HIGH && innerPrecise_ != BsaInnerCalcPrec::ALL_LOW) {
             OP_LOGE(bsaContext->GetNodeName(),
                     "On chip 910 & 910_93, only innerPrec = 0 or 1 is supported, "
@@ -1142,6 +1153,16 @@ void BSATiling::CalcBaseTileTilingParams950()
     } else {
         kvBaseTile_ = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
     }
+}
+
+void BSATiling::TransposedMatmulConfig950()
+{
+    if (innerPrecise_ == BsaInnerCalcPrec::ALL_HIGH && maskType_ == 0) {
+        transposedMm1_ = true;
+    } else {
+        transposedMm1_ = false;
+    }
+    transposedMm2_ = false;
 }
 
 void BSATiling::CalcSplitCoreTilingParams950()
@@ -1456,6 +1477,11 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext *bsaContext)
         tilingKey += 100000000ULL; // 1 for lse out
     }
 
+    // matmul是否转置
+    if (transposedMm1_) {
+        tilingKey += 1000000000ULL;
+    }
+
     return tilingKey;
 }
 
@@ -1490,6 +1516,7 @@ ge::graphStatus BSATiling::GetBsaTiling(gert::TilingContext *bsaContext, BlockSp
     if (socVer_ == SOC_VER_950_CODE) {
         CalcSplitCoreTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
+        TransposedMatmulConfig950();
         CalcWorkspaceTilingParams950(bsaContext);
     } else {
         ret = CalculateTaskSplit(bsaContext);

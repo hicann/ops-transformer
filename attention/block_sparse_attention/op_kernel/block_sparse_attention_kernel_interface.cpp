@@ -1,12 +1,12 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file block_sparse_attention_interface.cpp
@@ -106,7 +106,7 @@ __global__ __aicore__ void BlockSparseAttentionInfer(GM_ADDR q, GM_ADDR k, GM_AD
 using namespace BsaKernelArch35;
 
 template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, Epilogue::LseMode lseMode,
-          Epilogue::LseFormat lseFormat>
+          Epilogue::LseFormat lseFormat, Gemm::Tile::CopyL0CToUBMode mm1L0C2UBMode, bool transposedMm1>
 __global__ __aicore__ void BsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR mask, GM_ADDR blockTables,
                                                GM_ADDR o, GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen,
                                                GM_ADDR blockSparseMask, GM_ADDR workspace, GM_ADDR lse, GM_ADDR tiling)
@@ -128,7 +128,7 @@ __global__ __aicore__ void BsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v, 
     // S is rowMajor on UB(dst)
     using LayoutS = layout::RowMajor;
     // P is actually zN on UB(src), since there is no nd2nz in MTE1
-    using LayoutPDummy = layout::zN;
+    using LayoutPDummy = std::conditional_t<transposedMm1, layout::nZ, layout::zN>;
     using LayoutV = layout::RowMajor;
     using LayoutO = layout::RowMajor;
     // OTmp is rowMajor on UB(dst)
@@ -142,33 +142,34 @@ __global__ __aicore__ void BsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v, 
     // 处理单个tile内Q和K的matmul
     using L1TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
     using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
-    using DispatchPolicyQK = Gemm::MmadAtlasA5BsaQK;
-    using TileCopyQK = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, LayoutQ, ElementK, LayoutK, ElementS,
-                                                         LayoutS, void, Gemm::Tile::CopyL0CToUBMode::NO_SPLIT>;
+    using DispatchPolicyQK = Gemm::MmadAtlasA5BsaQK<transposedMm1>;
+    using TileCopyQK = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, layout::RowMajor, ElementK,
+                                                         layout::ColumnMajor, ElementS, LayoutS, void, mm1L0C2UBMode>;
     using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
                                                   ElementS, void, TileCopyQK>;
     // online softmax
-    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxBsa;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxBsa<transposedMm1>;
     using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
     using SType = Gemm::GemmType<ElementS, LayoutS>;
     using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
     // 处理单个tile内P和Value的matmul
     using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
     using L0TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
-    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV;
+    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV<transposedMm1>;
     using TileCopyPV =
         Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
                                           void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M>;
     using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
                                                   ElementOTmp, void, TileCopyPV>;
     // rescale O
-    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5BsaRescaleO<lseMode, lseFormat>;
+    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5BsaRescaleO<lseMode, lseFormat, transposedMm1>;
     using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
     using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementS,
                                                             ElementK, TileCopyRescaleO, Arch::PositionL0C>;
 
-    using BsaRegularKernelArch35 = BsaRegularKernelArch35<EpilogueMask2Idx, BlockMmadQK, EpilogueOnlineSoftmax,
-                                                          BlockMmadPV, EpilogueRescaleO, qFormat, kvFormat>;
+    using BsaRegularKernelArch35 =
+        BsaRegularKernelArch35<EpilogueMask2Idx, BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
+                               qFormat, kvFormat, transposedMm1>;
     BsaKernelParamsArch35 params{q, k,         v,   mask,  blockTables, actualQseqlen, actualKvseqlen, blockSparseMask,
                                  o, workspace, lse, tiling};
     BsaRegularKernelArch35 bsaRegularKernelArch35;
@@ -216,14 +217,14 @@ __global__ __aicore__ void BsaInferInterfaceFullQuant(GM_ADDR query, GM_ADDR key
     using L1TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
     using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
     // mmad qk
-    using DispatchPolicyQK = Gemm::MmadAtlasA5BsaQK;
+    using DispatchPolicyQK = Gemm::MmadAtlasA5BsaQK<false>;
     using TileCopyQK = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, LayoutQ, ElementK, LayoutK, ElementS,
                                                          LayoutS, void, Gemm::Tile::CopyL0CToUBMode::NO_SPLIT, false,
                                                          Gemm::Tile::ScaleGranularity::PER_TENSOR>;
     using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
                                                   ElementS, void, TileCopyQK>;
     // online softmax
-    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxBsa;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxBsa<false>;
     using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
     using SType = Gemm::GemmType<ElementS, LayoutS>;
     using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
@@ -231,7 +232,7 @@ __global__ __aicore__ void BsaInferInterfaceFullQuant(GM_ADDR query, GM_ADDR key
     using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
     using L0TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
     // mmad pv
-    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV;
+    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV<false>;
     using TileCopyPV =
         Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
                                           void, Gemm::Tile::CopyL0CToUBMode::NO_SPLIT, false,
@@ -239,7 +240,7 @@ __global__ __aicore__ void BsaInferInterfaceFullQuant(GM_ADDR query, GM_ADDR key
     using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
                                                   ElementOTmp, void, TileCopyPV>;
     // rescale o
-    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5BsaRescaleO<lseMode, lseFormat>;
+    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5BsaRescaleO<lseMode, lseFormat, false>;
     using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
     using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementS,
                                                             ElementK, TileCopyRescaleO, Arch::PositionL0C>;

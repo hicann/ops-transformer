@@ -199,6 +199,7 @@ private:
     void CalcSplitCoreTilingParams950();
     void CalcWorkspaceTilingParams950(gert::TilingContext *bsaContext);
     void CalcMatmulPhaseL1TileInfo950();
+    void TransposedMatmulConfig950();
     // 910 exclusive
     ge::graphStatus CalculateTaskSplit(gert::TilingContext *bsaContext);
     ge::graphStatus CalculateWorkSpace(gert::TilingContext *bsaContext);
@@ -289,6 +290,9 @@ private:
     uint32_t kL1BufNum_;
     uint32_t vL1BufNum_;
     uint32_t pL1BufNum_;
+
+    bool transposedMm1_ = false;
+    bool transposedMm2_ = false;
 
     ge::DataType dataType_ = ge::DT_FLOAT16;
     ge::DataType attentionOutDataType_ = ge::DT_FLOAT16;
