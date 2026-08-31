@@ -51,6 +51,12 @@ constexpr int64_t MERGE_LIST_IDX_THREE = 3;
 constexpr int64_t GATHER = 0;
 constexpr int64_t SCATTER = 1;
 
+// 量化模式（与 host quantMode 对齐）：-1 非量化 / 0 静态 / 1 动态(int8)
+constexpr int64_t CS_QUANT_MODE_UNQUANT = -1LL;
+constexpr int64_t CS_QUANT_MODE_STATIC = 0LL;
+constexpr int64_t CS_QUANT_MODE_DYNAMIC = 1LL;
+constexpr float CS_DYNAMIC_QUANT_INT8_SCALE = 127.0f;
+
 // INT4对称量化scale分母，使用2^(n-1)-1=7而非8；
 // 对称量化范围[-7,7]保证每对正负值有对称编码，-8(1000)编码不会被使用。
 constexpr float DYNAMIC_QUANT_INT4_SYM_SCALE = 7.0f;
@@ -99,6 +105,15 @@ constexpr uint16_t BF16_EXP_INVSUB = 0x7f00;
 constexpr uint16_t NEW_MANTISSA = 0x0008;
 constexpr int64_t EXERPT_TOKENS_COUNT = 1;
 constexpr int64_t EXERPT_TOKENS_KEY_VALUE = 2;
+constexpr int64_t EXERPT_TOKENS_NONE = 0;
+
+// CountingSort 性能模板相关常量
+constexpr int64_t COUNTING_SORT_MIN_N = 256LL;
+constexpr int64_t COUNTING_SORT_MAX_N = 1024LL * 1024LL;
+constexpr int64_t COUNTING_SORT_FILTER_CHUNK_SIZE = 4096LL;
+constexpr int64_t COUNTING_SORT_MAX_PER_LOOP_COLS_BYTES = 64LL * 1024LL;
+constexpr int64_t COUNTING_SORT_MAX_ACTUAL_EXPERT_NUM = 256LL;
+constexpr int64_t COUNTING_SORT_ONE_BLOCK_ELEMENT = 8LL;
 
 __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 {
@@ -131,6 +146,15 @@ __aicore__ inline int64_t Align(int64_t elementNum, int64_t bytes)
 __aicore__ inline int64_t AlignBytes(int64_t elementNum, int64_t bytes)
 {
     return (elementNum * bytes + BLOCK_BYTES - 1) / BLOCK_BYTES * BLOCK_BYTES;
+}
+
+// 元素级对齐（例如将 actualExpertNum 对齐到 8）：返回对齐后的元素数
+__aicore__ inline int64_t AlignElem(int64_t elementNum, int64_t elementAlign)
+{
+    if (elementAlign <= 0) {
+        return elementNum;
+    }
+    return (elementNum + elementAlign - 1) / elementAlign * elementAlign;
 }
 
 template <HardEvent event>

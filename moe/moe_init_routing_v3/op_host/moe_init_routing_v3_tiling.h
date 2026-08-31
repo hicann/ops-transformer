@@ -142,9 +142,9 @@ TILING_DATA_FIELD_DEF_STRUCT(MoeV3SrcToDstComputeTilingData, srcToDstComputePara
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(MoeInitRoutingV3, MoeInitRoutingV3TilingData)
 struct MoeInitRoutingV3CompileInfo {
-        int32_t aivNum = 0;
-        uint64_t ubSize = 0;
-        platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
-  };
-}  // namespace optiling
+    int32_t aivNum = 0;
+    uint64_t ubSize = 0;
+    platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
+};
+} // namespace optiling
 #endif

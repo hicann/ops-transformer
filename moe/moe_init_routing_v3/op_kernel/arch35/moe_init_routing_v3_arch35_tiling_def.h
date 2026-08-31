@@ -88,6 +88,26 @@ struct MoeV3Arch35SrcToDstCapacityComputeTilingData {
     int64_t colLoops{0};
 };
 
+// CountingSort性能模板TilingData
+// countingSortMode: 0=未启用, 1=FullLoad(核内全载), 2=CutOrigin(核内4096 chunk切T)
+struct MoeV3Arch35CountingSortTilingData {
+    int64_t countingSortMode{0};
+    int64_t filterNeedCoreNum{0};   // 过滤阶段使用的核数
+    int64_t filterPerCoreTokens{0}; // 每核处理的 token 数（按 n 维切）
+    int64_t lastCoreTokens{0};      // 尾核 token 数
+    int64_t coreEntries{0};         // 每核 flat entries = filterPerCoreTokens * k（上限）
+    int64_t expertCountStride{0};   // align8(actualExpertNum)，专家计数 stride
+    int64_t filterChunkSize{0};     // CutOrigin chunk 大小（4096），FullLoad 不用
+    int64_t csPerLoopCols{0};       // Phase C gather 每轮列数
+    int64_t csColsLoops{0};         // Phase C gather 列方向循环数
+    int64_t csLastLoopCols{0};      // Phase C gather 尾轮列数
+    int64_t maxPerLoopEntries{0};   // CutOrigin 单 chunk 处理上限
+    int64_t pairsWsOffset{0}; // CutOrigin 拆分：pairs/expertCount 区在 workspace 中的起始偏移（int32 元素）
+    int64_t csAggrEnable{0};      // 聚合搬出开关：0=逐行(现状), 1=按专家k行切批
+    int64_t csAggrOutRows{0};     // 搬出聚合 UB 容纳行数 k
+    int64_t csAggrOutBufBytes{0}; // 搬出聚合区字节数 = k * colsAligned * sizeof(T)
+};
+
 // Arch35用的TilingData
 struct MoeInitRoutingV3Arch35TilingData {
     int64_t coreNum{0};
@@ -109,9 +129,9 @@ struct MoeInitRoutingV3Arch35TilingData {
     int64_t epFullload{0}; // 未使用
     int64_t activeNum{0};
     int64_t dropPadMode{0};
-    int64_t smoothType{0};     // 未使用
-    int64_t expertCapacity{0}; // 新增：DropPad模式下的expert capacity
-    int64_t isInputTopkWeight{0}; // 新增：topk_weight输入是否提供
+    int64_t smoothType{0};                          // 未使用
+    int64_t expertCapacity{0};                      // 新增：DropPad模式下的expert capacity
+    int64_t isInputTopkWeight{0};                   // 新增：topk_weight输入是否提供
     int64_t topkWeightOutPerCorePerLoopElements{0}; // 新增：TopkWeightOut每轮处理的索引元素数
     MoeV3Arch35VBSComputeTilingData vbsComputeParamsOp;
     MoeV3Arch35VMSMiddleComputeTilingData vmsMiddleComputeParamsOp;
@@ -119,6 +139,7 @@ struct MoeInitRoutingV3Arch35TilingData {
     MoeV3Arch35ExpertTokensCountTilingData expertTokensCountTilingDataOp;
     MoeV3Arch35GatherOutComputeTilingData gatherOutComputeParamsOp;
     MoeV3Arch35SrcToDstCapacityComputeTilingData srcToDstDropPadParamsOp; // 新增：DropPad SrcToDst TilingData
+    MoeV3Arch35CountingSortTilingData countingSortParamsOp;               // 新增：CountingSort 性能模板
 };
 
 #endif // __MOE_INIT_ROUTING_V3_ARCH35_TILING_DEF_H__
