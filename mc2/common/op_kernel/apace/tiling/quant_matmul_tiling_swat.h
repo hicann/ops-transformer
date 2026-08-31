@@ -22,12 +22,19 @@
 template <mm::DataType aDataType, mm::DataType bDataType>
 class QuantMatmulTilingSwat : public QuantMatmulTilingBase<aDataType, bDataType> {
 public:
-    QuantMatmulTilingSwat() = default;
+    QuantMatmulTilingSwat()
+        : maxBaseM_(BASIC_BLOCK_SIZE_256)
+    {}
     ~QuantMatmulTilingSwat() override = default;
 
     void EnableBaseMHalving(bool enable)
     {
         enableBaseMHalving_ = enable;
+    }
+
+    void SetMaxBaseM(uint64_t v)
+    {
+        maxBaseM_ = v;
     }
 
 protected:
@@ -61,6 +68,7 @@ private:
     using Base::enableAdjustBasicBlock_;
 
     bool enableBaseMHalving_{false};
+    uint64_t maxBaseM_{0};
 
 private:
     uint32_t CalcScaleKL1() const
@@ -272,6 +280,9 @@ private:
         // Start from a 256-sized candidate tile, then refine it and capture
         // the tail statistics used by later scheduling decisions.
         runInfo_.baseM = std::min(args_.m, BASIC_BLOCK_SIZE_256);
+        if (runInfo_.baseM > maxBaseM_) {
+            runInfo_.baseM = maxBaseM_;
+        }
         runInfo_.baseM = !args_.transA ? Align(runInfo_.baseM, CUBE_BLOCK) :
                                          Align(runInfo_.baseM, GetShapeWithDataType<aDataType>(L1_ALIGN_SIZE));
         runInfo_.baseN = std::min(args_.n, BASIC_BLOCK_SIZE_256);
