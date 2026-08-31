@@ -372,7 +372,7 @@ aclnnStatus aclnnMoeGatingTopK(
       x和biasOptional的shape不匹配。<br />
       k的大小不在1到x_shape[-1] / groupCount * kGroup之间。<br />
       kGroup的大小不在1到groupCount之间。<br />
-      每个group的专家数按32对齐之后<br />
+      每个group的专家数按32对齐之后的总数超过2048。<br />
       计算输入参数的值不满足要求。<br />
       </td>
     </tr>

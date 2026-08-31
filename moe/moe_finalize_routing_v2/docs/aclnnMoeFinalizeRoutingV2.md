@@ -450,7 +450,7 @@ int main() {
   // 创建bias aclTensor
   ret = CreateAclTensor(biasHostData, biasShape, &biasAddr, aclDataType::ACL_FLOAT, &bias);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  // 创建totalWeightOut aclTensor
+  // 创建scales aclTensor
   ret = CreateAclTensor(scalesHostData, scalesShape, &scalesDeviceAddr, aclDataType::ACL_FLOAT, &scales);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 

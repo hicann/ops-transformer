@@ -610,8 +610,8 @@ int main()
     std::vector<int16_t> qOutHostData(48 * 2048, 0);
     std::vector<int16_t> kCacheHostData(16 * 4 * 128 * 32, 0);
     std::vector<int16_t> vCacheHostData(16 * 4 * 128 * 32, 0);
-    std::vector<int16_t> kScaleHostData(1 * 128, 0);
-    std::vector<int16_t> vScaleHostData(1 * 128, 0);
+    std::vector<float> kScaleHostData(1 * 128, 0.0f);
+    std::vector<float> vScaleHostData(1 * 128, 0.0f);
 
     void* qkvDeviceAddr = nullptr;
     void* qGammaDeviceAddr = nullptr;
@@ -642,7 +642,6 @@ int main()
 
     double epsilon = 1e-6;
     char* cacheMode = "PA_NZ";
-    bool isOutputQkv = false;
 
     ret = CreateAclTensor(qkvHostData, qkvShape, &qkvDeviceAddr, aclDataType::ACL_FLOAT16, &qkv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -696,7 +695,7 @@ int main()
     PrintOutResult(kCacheShape, &kCacheDeviceAddr);
     PrintOutResult(vCacheShape, &vCacheDeviceAddr);
 
-    // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
+    // 6. 释放aclTensor，需要根据具体API的接口定义修改
     aclDestroyTensor(qkv);
     aclDestroyTensor(qGamma);
     aclDestroyTensor(kGamma);
