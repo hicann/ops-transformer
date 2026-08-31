@@ -130,13 +130,6 @@
           <td>ND</td>
       </tr>
       <tr>
-          <td>sinks</td>
-          <td>输入</td>
-          <td>表示attention结构中的可学习的sinks信息。不支持非连续，shape为[Q_N,]。</td>
-          <td>FLOAT</td>
-          <td>ND</td>
-      </tr>
-      <tr>
           <td>sparse_block_size</td>
           <td>属性</td>
           <td>代表sparse阶段的block大小。sparse_block_size为1时，为Token-wise稀疏化场景；sparse_block_size大于1且小于等于128时，为Block-wise稀疏化场景，块内token共享相同的稀疏化决策。</td>
@@ -224,10 +217,8 @@
   - 参数key、value数据类型仅支持float8_e4m3、int8、hifloat8数据类型。
   - 参数sparse\_block\_size仅支持1。
   - 仅在layout_key为PA_BSND时，key支持0轴非连续。
-  - 支持可选入参sinks。
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - query Q_N不支持48。
   - 参数key、value数据类型仅支持int8数据类型。
   - 参数sparse\_block\_size支持[1,16]，且要求是2的幂次方，在PageAttention场景下要求sparse\_block\_size整除block\_size。
   - key不支持非连续。
-  - 不支持sinks。

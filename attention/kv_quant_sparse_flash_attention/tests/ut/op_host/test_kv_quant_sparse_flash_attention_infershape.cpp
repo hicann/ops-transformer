@@ -18,9 +18,15 @@
 
 class KvQuantSparseFlashAttentionProto : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "KvQuantSparseFlashAttentionProto SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "KvQuantSparseFlashAttentionProto SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "KvQuantSparseFlashAttentionProto TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "KvQuantSparseFlashAttentionProto TearDown" << std::endl;
+    }
 };
 
 TEST_F(KvQuantSparseFlashAttentionProto, KvQuantSparseFlashAttention_infershape_0)

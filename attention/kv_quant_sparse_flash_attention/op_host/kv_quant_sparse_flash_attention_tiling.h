@@ -29,12 +29,11 @@ constexpr uint32_t QUERY_INPUT_INDEX = 0;
 constexpr uint32_t KEY_INPUT_INDEX = 1;
 constexpr uint32_t VALUE_INPUT_INDEX = 2;
 constexpr uint32_t SPARSE_INDICES_INPUT_INDEX = 3;
-constexpr uint32_t KEY_DEQUANT_SCALE_INPUT_INDEX = 3;
-constexpr uint32_t VALUE_DEQUANT_SCALE_INPUT_INDEX = 3;
+constexpr uint32_t KEY_DEQUANT_SCALE_INPUT_INDEX = 4;
+constexpr uint32_t VALUE_DEQUANT_SCALE_INPUT_INDEX = 5;
 constexpr uint32_t BLOCK_TABLE_INPUT_INDEX = 6;
 constexpr uint32_t ACT_SEQ_LEN_Q_INPUT_INDEX = 7;
 constexpr uint32_t ACT_SEQ_LEN_KV_INPUT_INDEX = 8;
-constexpr uint32_t SINKS_INPUT_INDEX = 9;
 // Outputs Index
 constexpr uint32_t OUTPUT_INDEX = 0;
 // Attributes Index
@@ -52,7 +51,6 @@ constexpr uint32_t QUANT_SCALE_REPO_MODE_ATTR_INDEX = 10;
 constexpr uint32_t TILE_SIZE_ATTR_INDEX = 11;
 constexpr uint32_t ROPE_HEAD_DIM_ATTR_INDEX = 12;
 // Dim Num
-constexpr size_t DIM_NUM_ONE = 1;
 constexpr size_t DIM_NUM_TWO = 2;
 constexpr size_t DIM_NUM_THREE = 3;
 constexpr size_t DIM_NUM_FOUR = 4;
@@ -127,7 +125,6 @@ struct QSFAParaInfo {
     QSFAOptionalParaInfo keyRope = {nullptr, nullptr};
     QSFAOptionalParaInfo keyDequantScale = {nullptr, nullptr};
     QSFAOptionalParaInfo valueDequantScale = {nullptr, nullptr};
-    QSFAOptionalParaInfo sinks = {nullptr, nullptr};
     QSFARequiredParaInfo attenOut = {nullptr, nullptr};
 
     const char *layoutQuery = nullptr;
@@ -418,10 +415,9 @@ private:
     ge::graphStatus CheckSingleParaSparseMode() const;
     ge::graphStatus CheckSingleParaSparseBlockSize() const;
     ge::graphStatus CheckSingleParaSparseIndices() const;
-    ge::graphStatus CheckSingleParaSinks() const;
+    ge::graphStatus CheckSingleParaDequantScale() const;
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus CheckMultiParaConsistency() const;
-    ge::graphStatus CheckDequantScaleNotExistence();
     template <typename T>
     ge::graphStatus CheckAttrValueByMap(std::map<std::string, std::pair<const T *, T>> &attrMap) const;
     ge::graphStatus CheckParaExistenceMlaAntiquant() const;

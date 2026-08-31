@@ -15,11 +15,11 @@
 
 #include "register/op_def_registry.h"
 
-constexpr uint32_t KV_QUANT_SPARSE_FLASH_ATTENTION_VERSION_TWO = 2;
 namespace ops {
 class KvQuantSparseFlashAttention : public OpDef {
 public:
-    explicit KvQuantSparseFlashAttention(const char *name) : OpDef(name)
+    explicit KvQuantSparseFlashAttention(const char *name)
+        : OpDef(name)
     {
         this->Input("query")
             .ParamType(REQUIRED)
@@ -31,10 +31,7 @@ public:
             .DataType({ge::DT_INT8, ge::DT_INT8})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .AutoContiguous();
-        this->Input("value")
-            .ParamType(REQUIRED)
-            .Follow("key")
-            .AutoContiguous();
+        this->Input("value").ParamType(REQUIRED).Follow("key").AutoContiguous();
         this->Input("sparse_indices")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT32, ge::DT_INT32})
@@ -63,12 +60,6 @@ public:
         this->Input("actual_seq_lengths_kv")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("sinks")
-            .ParamType(OPTIONAL)
-            .Version(KV_QUANT_SPARSE_FLASH_ATTENTION_VERSION_TWO)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .AutoContiguous();
         this->Output("attention_out")
@@ -106,12 +97,14 @@ public:
             .AutoContiguous();
         aicore_config_95.Input("key")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_INT8, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_INT8})
+            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_INT8, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,
+                       ge::DT_INT8})
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         aicore_config_95.Input("value")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_INT8, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_INT8})
+            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_INT8, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,
+                       ge::DT_INT8})
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         aicore_config_95.Input("sparse_indices")
@@ -142,12 +135,6 @@ public:
         aicore_config_95.Input("actual_seq_lengths_kv")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_INT32})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        aicore_config_95.Input("sinks")
-            .ParamType(OPTIONAL)
-            .Version(KV_QUANT_SPARSE_FLASH_ATTENTION_VERSION_TWO)
-            .DataTypeList({ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         aicore_config_95.Output("attention_out")

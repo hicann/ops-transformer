@@ -164,7 +164,6 @@ TEST_PARAMS = {
                 3072,
             ]
         ],
-        "enable_sinks": [False],
     },
     "TND_TND": {
         "Testcase_Prefix": ["runpy_style"],
@@ -243,7 +242,6 @@ TEST_PARAMS = {
                 128,
             ]
         ],
-        "enable_sinks": [True],
     },
 }
 

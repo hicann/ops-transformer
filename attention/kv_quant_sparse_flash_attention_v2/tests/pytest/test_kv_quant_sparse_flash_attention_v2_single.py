@@ -1,0 +1,87 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
+
+import os
+from pathlib import Path
+import concurrent.futures
+import pytest
+import utils
+import kv_quant_sparse_flash_attention_v2_golden
+
+PT_SAVE_PATH = "./pt_files/"
+DEVICE_ID = 0
+RUN_NPU = True
+SAVE_PT = False
+RESULT_PATH = Path("result.xlsx")
+
+PARAMSET_FILE = os.environ.get(
+    "PARAMSET_FILE", "kv_quant_sparse_flash_attention_v2_paramset"
+)
+ENABLED_PARAMS = utils.load_paramset(PARAMSET_FILE)
+PARAM_COMBINATION_SET = utils.combin_params(ENABLED_PARAMS)
+case_id = 0
+
+
+def execute_qsfa_v2(param_combination):
+    global case_id
+    params = utils.convert_param_combination_to_cs_format(param_combination)
+    input_dict = kv_quant_sparse_flash_attention_v2_golden.generate_input_tensors(
+        params
+    )
+    cpu_result, _, _ = kv_quant_sparse_flash_attention_v2_golden.compute_cpu(
+        input_dict, params
+    )
+    test_data = {
+        "Testcase_Name": params["case_name"],
+        "params": params,
+        "input": input_dict,
+        "cpu_output": cpu_result,
+    }
+    if SAVE_PT:
+        kv_quant_sparse_flash_attention_v2_golden._save_test_case(
+            test_data, PT_SAVE_PATH
+        )
+    overall_result, compare_results = utils.qsfa_v2_run_npu(
+        test_data, testcase_name=None, device_id=DEVICE_ID, result_path=RESULT_PATH
+    )
+    attn_info = compare_results.get("attn_out", {})
+    fulfill_percent = attn_info.get("fulfill_percent", 0.0)
+    case_id += 1
+    return overall_result, fulfill_percent, test_data
+
+
+@pytest.mark.ci
+@pytest.mark.parametrize("param_combination", PARAM_COMBINATION_SET)
+def test_kv_quant_sparse_flash_attention_v2(param_combination):
+    test_data = None
+    fulfill_percent = 0.0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        futures = executor.submit(execute_qsfa_v2, param_combination)
+        for future in concurrent.futures.as_completed([futures]):
+            try:
+                result, fulfill_percent, test_data = future.result()
+                if result == "Failed":
+                    case_name = test_data.get("Testcase_Name", "unknown")
+                    pytest.fail(
+                        f"用例名: {case_name}, 精度: {fulfill_percent:.4f}%",
+                        pytrace=False,
+                    )
+            except Exception as e:
+                params = test_data.get("params") if test_data else None
+                case_name = (
+                    test_data.get("Testcase_Name", "unknown")
+                    if test_data
+                    else "unknown"
+                )
+                if params:
+                    utils.save_result(params, "Failed", "", RESULT_PATH)
+                pytest.fail(f"用例名: {case_name}, 当前用例线程执行失败")

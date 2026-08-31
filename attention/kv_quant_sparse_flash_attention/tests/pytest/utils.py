@@ -260,7 +260,6 @@ def combin_params(enabled_params, pytest_paramset=True):
         "block_num",
         "actual_seq_q",
         "actual_seq_kv",
-        "enable_sinks",
     ]
     range_param_names = [
         "range_query",
@@ -268,7 +267,6 @@ def combin_params(enabled_params, pytest_paramset=True):
         "range_query_rope",
         "range_key_rope",
         "range_dequant_scale",
-        "range_sinks",
     ]
 
     for params in enabled_params:
@@ -313,8 +311,7 @@ def convert_param_combination_to_cs_format(param_combination):
     quant_scale_repo_mode = param_combination["quant_scale_repo_mode"]
     block_size = param_combination.get("block_size") or 256
     block_num = param_combination.get("block_num")
-    enable_sinks = param_combination.get("enable_sinks", False)
-    
+
     # 参数校验：TND layout 下 T 不能超过 B*S
     if layout_query == "TND" and T1 is not None:
         if T1 > B * S1:
@@ -467,10 +464,6 @@ def convert_param_combination_to_cs_format(param_combination):
         "v_dequant_scale": "fp32",
     }
 
-    if enable_sinks == True:
-        shape_input["sinks"] = [N1]
-        dtype_input["sinks"] = "fp32"
-    
     default_range_input = {
         "query": [2, 10],
         "key": [-100, 100.0],
@@ -480,10 +473,9 @@ def convert_param_combination_to_cs_format(param_combination):
         "key_rope": [-10.0, -2],
         "dequant_scale": [0, 1],
         "v_dequant_scale": [0, 1],
-        "sinks": [-0.2, 0.2],
     }
     range_input = {}
-    for key in ["query", "key", "query_rope", "key_rope", "dequant_scale", "sinks"]:
+    for key in ["query", "key", "query_rope", "key_rope", "dequant_scale"]:
         range_key = f"range_{key}"
         if range_key in param_combination and param_combination[range_key] is not None:
             range_input[key] = param_combination[range_key]
@@ -534,14 +526,12 @@ def convert_param_combination_to_cs_format(param_combination):
         "block_num": block_num,
         "actual_seq_q": actual_seq_q,
         "actual_seq_kv": actual_seq_kv,
-        "enable_sinks": enable_sinks,
         # range 参数，保存实际使用的值
         "range_query": range_input["query"],
         "range_key": range_input["key"],
         "range_query_rope": range_input["query_rope"],
         "range_key_rope": range_input["key_rope"],
         "range_dequant_scale": range_input["dequant_scale"],
-        "range_sinks": range_input["sinks"],
     }
 
     return params

@@ -123,6 +123,7 @@ _legacy_map = {
     "inplace_partial_rotary_mul": "posembedding.inplace_partial_rotary_mul",
     "inplace_partial_rotary_mul_backward": "posembedding.inplace_partial_rotary_mul_grad",
     "kv_compress_epilog": "attention.kv_compress_epilog",
+    "kv_quant_sparse_flash_attention": "attention.kv_quant_sparse_flash_attention_v2",
     "lightning_indexer": "attention.lightning_indexer_v2",
     "lightning_indexer_kl_loss": "attention.lightning_indexer_kl_loss",
     "mega_moe": "mc2.mega_moe",

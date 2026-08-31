@@ -176,7 +176,7 @@ class KvQuantSparseFlashAttentionPytestAdapter:
             name: copy.deepcopy(attributes.get(f"pytest_{name}"))
             for name in cls.REQUIRED_PARAM_NAMES
         }
-        for name in ("T1", "T2", "block_size", "block_num", "enable_sinks"):
+        for name in ("T1", "T2", "block_size", "block_num"):
             key = f"pytest_{name}"
             if key in attributes:
                 pytest_params[name] = copy.deepcopy(attributes[key])
@@ -187,7 +187,6 @@ class KvQuantSparseFlashAttentionPytestAdapter:
             "range_key_rope",
             "range_dequant_scale",
             "Testcase_Number",
-            "range_sinks",
         ):
             key = f"pytest_{name}"
             if key in attributes:
