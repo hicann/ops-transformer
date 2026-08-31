@@ -15,8 +15,7 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 class MhcPostFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, h_res, h_out, h_post):
-        op_module = mhc_post_op_builder.load()
-        out = op_module.mhc_post(x, h_res, h_out, h_post)
+        out = torch.ops.cann_ops_transformer.mhc_post(x, h_res, h_out, h_post)
         ctx.save_for_backward(x, h_res, h_out, h_post)
         return out
 
@@ -25,9 +24,14 @@ class MhcPostFunction(torch.autograd.Function):
         x, h_res, h_out, h_post = ctx.saved_tensors
         from ..mhc_post_backward import mhc_post_backward
 
+        # 0-stride expanded grad_output (e.g. from sum().backward()) breaks
+        # aclnnMhcPostBackward when h_res is None; materialize it first.
+        grad_output = grad_output.contiguous()
         grad_x, grad_h_res, grad_h_out, grad_h_post = mhc_post_backward(
             grad_output, x, h_res, h_out, h_post
         )
+        if h_res is None:
+            grad_h_res = None
         return grad_x, grad_h_res, grad_h_out, grad_h_post
 
 
@@ -39,7 +43,7 @@ class MhcPostOpBuilder(OpBuilder):
         return ["csrc/mhc/mhc_post.cpp"]
 
     def schema(self) -> str:
-        return "mhc_post(Tensor x, Tensor hRes, Tensor hOut, Tensor hPost) -> Tensor"
+        return "mhc_post(Tensor x, Tensor? hRes, Tensor hOut, Tensor hPost) -> Tensor"
 
     def register_meta(self):
         @impl(get_as_library(), self.name, "Meta")
@@ -60,7 +64,7 @@ def _mhc_post_dispatch(x, h_res, h_out, h_post):
 def mhc_post(x, h_res, h_out, h_post):
     needs_grad = (
         x.requires_grad
-        or h_res.requires_grad
+        or (h_res is not None and h_res.requires_grad)
         or h_out.requires_grad
         or h_post.requires_grad
     )
@@ -68,5 +72,4 @@ def mhc_post(x, h_res, h_out, h_post):
     if needs_grad:
         return MhcPostFunction.apply(x, h_res, h_out, h_post)
     else:
-        op_module = mhc_post_op_builder.load()
-        return op_module.mhc_post(x, h_res, h_out, h_post)
+        return torch.ops.cann_ops_transformer.mhc_post(x, h_res, h_out, h_post)
