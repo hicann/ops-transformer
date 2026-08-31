@@ -240,6 +240,21 @@ attention:
     options:
       - stem_oam_prep_paged_kv
 
+  generic_block_sparse_attention:
+    module: True
+    src:
+      - attention/generic_block_sparse_attention
+    exclude:
+      - attention/generic_block_sparse_attention/docs
+      - attention/generic_block_sparse_attention/README.md
+    ut_cov_exclude:
+      - attention/generic_block_sparse_attention/op_kernel
+    test:
+      examples: False
+      ut: True
+    options:
+      - generic_block_sparse_attention
+
   flash_attention_score:
     module: True
     src:

@@ -96,6 +96,7 @@
 |[aclnnFusedInferAttentionScoreV4](../../attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV4.md)|适配Decode & Prefill场景的FlashAttention算子。|默认确定性实现| - |
 |[aclnnFusedInferAttentionScoreV5](../../attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV5.md)|适配增量&全量推理场景的FlashAttention算子。|默认确定性实现| 默认确定性实现 |
 |[aclnnGatherPaKvCache](../../attention/gather_pa_kv_cache/docs/aclnnGatherPaKvCache.md)|根据blockTables中的blockId值、seqLens中key/value的seqLen从keyCache/valueCache中将内存不连续的token搬运、拼接成连续的key/value序列。|默认确定性实现| 默认确定性实现 |
+|[aclnnGenericBlockSparseAttention](../../attention/generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md)|GenericBlockSparseAttention通过sparseBlockIdx指定每个Q块选择的KV块，sparseBlockCount指定每个Q块保留的KV块数量，实现高效的稀疏注意力计算。|默认确定性实现|默认确定性实现|
 |[aclnnGroupedMatmulV5](../../gmm/grouped_matmul/docs/aclnnGroupedMatmulV5.md)|实现分组矩阵乘计算，每组矩阵乘的维度大小可以不同。|默认确定性实现| 默认确定性实现 |
 |[aclnnGroupedMatmulAdd](../../gmm/grouped_matmul_add/docs/aclnnGroupedMatmulAdd.md)|实现分组矩阵乘计算，每组矩阵乘的维度大小可以不同。|默认确定性实现| 默认确定性实现 |
 |[aclnnGroupedMatmulAddV2](../../gmm/grouped_matmul_add/docs/aclnnGroupedMatmulAddV2.md)|实现分组矩阵乘计算后原地累加，每组矩阵乘的维度大小可以不同。|默认确定性实现|-|

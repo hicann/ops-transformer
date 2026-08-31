@@ -336,6 +336,7 @@ aclnn_gelu_quant.h
 aclnn_gelu_v2.h
 aclnn_gemma_rms_norm.h
 aclnn_gemm.h
+aclnn_generic_block_sparse_attention.h
 aclnn_ger.h
 aclnn_ge_scalar.h
 aclnn_ge_tensor.h

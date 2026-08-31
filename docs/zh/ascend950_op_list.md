@@ -108,6 +108,16 @@ Ascend 950支持的算子分类和算子列表如下：
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/generic_block_sparse_attention/README.md">generic_block_sparse_attention</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>通过sparseBlockIdx/sparseBlockCount指定稀疏块模式的注意力正向计算。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/inplace_fused_causal_conv1d/README.md">inplace_fused_causal_conv1d</a></td>
     <td>✓</td>
     <td>✓</td>
