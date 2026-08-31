@@ -42,7 +42,6 @@ template <uint8_t QuantMode, typename ExpandXType>
 __aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType> &outLocal, LocalTensor<ExpandXType> &inLocal,
                                   LocalTensor<float> &floatTemp, int32_t processLen)
 {
-    PipeBarrier<PIPE_V>();
     uint32_t mxScaleNum = Ops::Base::CeilAlign(
         Ops::Base::CeilDiv(static_cast<uint32_t>(processLen), static_cast<uint32_t>(ALIGN_32)), 2U);
     using Fp8Type = typename std::conditional<QuantMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;

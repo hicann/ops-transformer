@@ -180,8 +180,8 @@ struct MegaMoeTilingData {
 
     // Dispatch 的分核不改变 UB 布局，所有 AIV core 共用一套配置；对应 kernel DispatchBuffInit。
     MegaMoeDispatchBufferConfig dispatchBufferConfig;
-    // SendMask 按 expertId = aivCoreId + n * blockAivNum 分核，前 remainder 个 core 会多处理一个 expert；
-    // 对应 kernel SendAndQuantBuffInit 的选择条件和 SendMaskCal 的 expert 循环。
+    // SendMask 将全局 expertId 连续均分，前 remainder 个 core 会多处理一个 expert；
+    // 对应 kernel SendAndQuantBuffInit 的选择条件和 SendMaskCal 的连续 expert 区间。
     MegaMoeSendMaskBufferConfig sendMaskConfigForCoreWithExtraExpert;
     MegaMoeSendMaskBufferConfig sendMaskConfigForCoreWithoutExtraExpert;
     uint32_t sendMaskCoreCountWithExtraExpert;
