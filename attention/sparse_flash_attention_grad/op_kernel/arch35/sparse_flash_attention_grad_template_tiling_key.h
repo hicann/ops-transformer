@@ -57,7 +57,11 @@ ASCENDC_TPL_ARGS_DECL(SparseFlashAttentionGrad, // 算子唯一标识，可以op
                       // bit: 35 KvMerge
                       //      0: DISABLE
                       //      1: ENABLE
-                      ASCENDC_TPL_BOOL_DECL(KvMerge, 0, 1));
+                      ASCENDC_TPL_BOOL_DECL(KvMerge, 0, 1),
+                      // bit: 36 HasSinks
+                      //      0: DISABLE
+                      //      1: ENABLE
+                      ASCENDC_TPL_BOOL_DECL(HasSinks, 0, 1));
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InputDType, ASCENDC_TPL_UI_LIST, 0, 1),
                                      ASCENDC_TPL_BOOL_SEL(IsTnd, 0, 1),
@@ -65,6 +69,6 @@ ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InputDType, ASCENDC_TP
                                      ASCENDC_TPL_UINT_SEL(S2TemplateNum, ASCENDC_TPL_UI_LIST, 128),
                                      ASCENDC_TPL_UINT_SEL(DTemplateNum, ASCENDC_TPL_UI_LIST, 512, 576),
                                      ASCENDC_TPL_BOOL_SEL(IsRope, 0, 1), ASCENDC_TPL_BOOL_SEL(Deterministic, 0, 1),
-                                     ASCENDC_TPL_BOOL_SEL(KvMerge, 0, 1),
+                                     ASCENDC_TPL_BOOL_SEL(KvMerge, 0, 1), ASCENDC_TPL_BOOL_SEL(HasSinks, 0, 1),
                                      ASCENDC_TPL_TILING_STRUCT_SEL(sfagTilingWithTemplate)));
 #endif

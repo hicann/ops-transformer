@@ -18,11 +18,12 @@
 
 using namespace AscendC;
 
-template <typename T1, typename T2, const uint32_t IS_TND = 0, const bool KV_MERGE = false>
+template <typename T1, typename T2, const uint32_t IS_TND = 0, bool IS_SINKS = false, bool IS_DETER = false,
+          bool KV_MERGE = false>
 class FlashAttentionGradPreRegbase {
 public:
     __aicore__ inline FlashAttentionGradPreRegbase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
+    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dSinks,
                                 __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *workspace,
                                 const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *ordTilingData,
                                 TPipe *pipe_in);
@@ -37,6 +38,7 @@ public:
 
     GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm;
     GlobalTensor<T1> dqGm, dkGm, dvGm;
+    GlobalTensor<float> dSinksGm, dSinkWorkSpaceGm;
 
     const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *TilingData;
     constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
@@ -81,18 +83,17 @@ public:
     half padValue{1.0};
 };
 
-template <typename T1, typename T2, const uint32_t IS_TND, const bool KV_MERGE>
-__aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, KV_MERGE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *actual_seq_kvlen,
-    __gm__ uint8_t *workspace, const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *orgTilingData,
-    TPipe *pipe_in)
+template <typename T1, typename T2, const uint32_t IS_TND, bool IS_SINKS, bool IS_DETER, bool KV_MERGE>
+__aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS_DETER, KV_MERGE>::Init(
+    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dSinks,
+    __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *workspace,
+    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *orgTilingData, TPipe *pipe_in)
 {
     cBlockIdx = GetBlockIdx();
 
     TilingData = orgTilingData;
     pipe = pipe_in;
 
-    // tiling_data
     qPreBlockFactor = TilingData->preTilingData.qPreBlockFactor;
     qPreBlockTotal = TilingData->preTilingData.qPreBlockTotal;
     qPreBlockTail = TilingData->preTilingData.qPreBlockTail;
@@ -119,6 +120,12 @@ __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, KV_MERGE>::I
     dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
                                   TilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
 
+    if constexpr (IS_SINKS) {
+        dSinksGm.SetGlobalBuffer((__gm__ float *)dSinks);
+        dSinkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                         TilingData->postTilingData.dSinkWorkSpaceOffset / sizeof(T2));
+    }
+
     initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
     dqOffset = ((uint64_t)cBlockIdx) * qPreBlockFactor;
     initdkSize = cBlockIdx == kPreBlockTotal - 1 ? kPreBlockTail : kPreBlockFactor;
@@ -127,8 +134,8 @@ __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, KV_MERGE>::I
     dvOffset = ((uint64_t)cBlockIdx) * vPreBlockFactor;
 }
 
-template <typename T1, typename T2, const uint32_t IS_TND, const bool KV_MERGE>
-__aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, KV_MERGE>::Process()
+template <typename T1, typename T2, const uint32_t IS_TND, bool IS_SINKS, bool IS_DETER, bool KV_MERGE>
+__aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS_DETER, KV_MERGE>::Process()
 {
     // process
     if (g_coreType == AIV) {
@@ -138,11 +145,22 @@ __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, KV_MERGE>::P
         if constexpr (!KV_MERGE) {
             InitOutput<float>(dvWorkSpaceGm[dvOffset], initdvSize, 0);
         }
+        // 单核清零，避免冗余；dSinksGm 0 初值为非 deter AtomicAdd 必需
+        if constexpr (IS_SINKS) {
+            if (GetBlockIdx() == 0) {
+                InitOutput<float>(dSinksGm[0], TilingData->baseParams.g, 0);
+                // dSinkWorkSpace: reduce 需初值 0；非 deter 不分配(len=0)，不清零避免越界
+                if constexpr (IS_DETER) {
+                    int64_t dSinkWsLen = TilingData->baseParams.usedCoreNum * optiling::sfag::MAX_N1;
+                    InitOutput<float>(dSinkWorkSpaceGm[0], dSinkWsLen, 0);
+                }
+            }
+        }
     }
 }
 
-template <typename T1, typename T2, const uint32_t IS_TND, const bool KV_MERGE>
-__aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, KV_MERGE>::SyncALLCores()
+template <typename T1, typename T2, const uint32_t IS_TND, bool IS_SINKS, bool IS_DETER, bool KV_MERGE>
+__aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS_DETER, KV_MERGE>::SyncALLCores()
 {
     SyncAll<false>();
 }

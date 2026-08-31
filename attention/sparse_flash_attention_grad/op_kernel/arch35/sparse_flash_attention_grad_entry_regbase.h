@@ -27,10 +27,10 @@
 #include "sparse_flash_attention_grad_kernel.h"
 
 #define INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL(INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_DROP, IS_TND, IS_ROPE, \
-                                                      IS_DETER, KV_MERGE, s2TemplateType, dTemplateType) \
+                                                      IS_DETER, KV_MERGE, IS_SINKS, s2TemplateType, dTemplateType) \
     do { \
-        FlashAttentionGradPreRegbase<INPUT_TYPE, float, IS_TND, KV_MERGE> opPre; \
-        opPre.Init(dq, dk, dv, actual_seq_kvlen, user, tilingData, &pipeIn); \
+        FlashAttentionGradPreRegbase<INPUT_TYPE, float, IS_TND, IS_SINKS, IS_DETER, KV_MERGE> opPre; \
+        opPre.Init(dq, dk, dv, d_sinks, actual_seq_kvlen, user, tilingData, &pipeIn); \
         opPre.Process(); \
         opPre.SyncALLCores(); \
         pipeIn.Destroy(); \
@@ -38,20 +38,21 @@
         using CubeBlockType = typename std::conditional< \
             g_coreType == AscendC::AIC, \
             SfagBaseApi::FAGBlockCube<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_DROP, IS_TND, IS_ROPE, IS_DETER, KV_MERGE, \
-                                      s2TemplateType, dTemplateType>, \
+                                      IS_SINKS, s2TemplateType, dTemplateType>, \
             SfagBaseApi::FAGBlockCubeDummy<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_DROP, IS_TND, IS_ROPE, IS_DETER, \
-                                           KV_MERGE, s2TemplateType, dTemplateType>>::type; \
+                                           KV_MERGE, IS_SINKS, s2TemplateType, dTemplateType>>::type; \
         using VecBlockType = typename std::conditional< \
             g_coreType == AscendC::AIC, \
             SfagBaseApi::FAGBlockVecDummy<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_DROP, IS_TND, IS_ROPE, IS_DETER, \
-                                          KV_MERGE, s2TemplateType, dTemplateType>, \
+                                          KV_MERGE, IS_SINKS, s2TemplateType, dTemplateType>, \
             SfagBaseApi::FAGBlockVec<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_DROP, IS_TND, IS_ROPE, IS_DETER, KV_MERGE, \
-                                     s2TemplateType, dTemplateType>>::type; \
+                                     IS_SINKS, s2TemplateType, dTemplateType>>::type; \
 \
         SfagBaseApi::FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType> op; \
         __gm__ uint8_t *valueIn = KV_MERGE ? key : value; \
         op.Init(query, key, valueIn, sparse_indices, d_out, out, softmax_max, softmax_sum, actual_seq_qlen, \
-                actual_seq_kvlen, query_rope, key_rope, dq, dk, dv, dq_rope, dk_rope, user, tilingData, &pipeBase); \
+                actual_seq_kvlen, query_rope, key_rope, dq, dk, dv, dq_rope, dk_rope, user, tilingData, &pipeBase, \
+                sinks, d_sinks); \
         op.Process(); \
         if (ORIG_DTYPE_QUERY != DT_FLOAT) { \
             op.SyncALLCores(); \
@@ -75,14 +76,15 @@
 
 // implementation of kernel function
 template <uint8_t inputDType, bool isTnd, uint16_t gTemplateType, uint16_t s2TemplateType, uint16_t dTemplateType,
-          bool isRope, bool deterministic, bool kvMerge>
+          bool isRope, bool deterministic, bool kvMerge, bool isSinks>
 inline __aicore__ void RegbaseSFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                    __gm__ uint8_t *sparse_indices, __gm__ uint8_t *d_out, __gm__ uint8_t *out,
                                    __gm__ uint8_t *softmax_max, __gm__ uint8_t *softmax_sum,
                                    __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *actual_seq_kvlen,
                                    __gm__ uint8_t *query_rope, __gm__ uint8_t *key_rope, __gm__ uint8_t *dq,
                                    __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dq_rope,
-                                   __gm__ uint8_t *dk_rope, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling_data)
+                                   __gm__ uint8_t *dk_rope, __gm__ uint8_t *sinks, __gm__ uint8_t *d_sinks,
+                                   __gm__ uint8_t *workspace, __gm__ uint8_t *tiling_data)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipeIn;
@@ -94,13 +96,14 @@ inline __aicore__ void RegbaseSFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, _
     const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *__restrict tilingData = &tiling_data_in;
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
     INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_FP16(half, float, half, false, isTnd, isRope, deterministic, kvMerge,
-                                                       S2TemplateType(s2TemplateType), DTemplateType(dTemplateType));
+                                                       isSinks, S2TemplateType(s2TemplateType),
+                                                       DTemplateType(dTemplateType));
     return;
 #endif
 
 #if (ORIG_DTYPE_QUERY == DT_BF16)
     INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_BF16(bfloat16_t, float, bfloat16_t, false, isTnd, isRope,
-                                                       deterministic, kvMerge, S2TemplateType(s2TemplateType),
+                                                       deterministic, kvMerge, isSinks, S2TemplateType(s2TemplateType),
                                                        DTemplateType(dTemplateType));
     return;
 #endif

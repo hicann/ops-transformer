@@ -1,4 +1,4 @@
-# aclnnSparseFlashAttentionGrad
+# aclnnSparseFlashAttentionGradV2
 
 ## 产品支持情况
 
@@ -24,6 +24,8 @@
 ## 功能说明
 
 - **接口功能**：根据topkIndices对key和value选取大小为selectedBlockSize的数据重排，接着进行训练场景下计算注意力的反向输出。
+- **与 V1 接口的关系**：V2 在 V1（aclnnSparseFlashAttentionGrad，商发兼容、5 输出）基础上，仅新增可选的可学习 OSS Sink 输入 `sinksOptional` 与对应梯度输出 `dSinksOptional`（6 输出），其余参数与 V1 完全一致。V1/V2 共用同一 OpDef 与 inner 实现。
+- **OSS Sink（可选）**：V2 支持可学习 OSS Sink 输入（`sinksOptional`）与对应梯度输出（`dSinksOptional`），传入 `sinksOptional` 时必须同时提供 `dSinksOptional` 输出。`sinksOptional` 仅支持 <term>Ascend 950PR/Ascend 950DT</term>。
 
 - **计算公式**：根据传入的topkIndice对keyIn和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
 
@@ -79,12 +81,60 @@
    dK \left[ u \left] \mathop{{}}\nolimits_{{:t,:}}=dS\mathop{{}}\nolimits_{{t,:t}}\mathop{{}}\nolimits^{{T}}\text{@}Q/\sqrt{{d\mathop{{}}\nolimits_{{t,:}}}}\right. \right.
   $$
 
+<div style="padding-left:40px;">
+
+  阶段4：计算$dSink$（仅当提供 sinksOptional 输入时）：
+
+</div>
+
+  Sink在前向中扮演一个"虚拟key"角色，其对应的"虚拟value"为0，不直接贡献输出O，但通过softmax归一化因子$\ell$间接影响所有注意力权重$P_j$。因此Sink参与前向softmax的max与sum的计算：
+
+  $$
+   m \mathop{{}}=\mathop{{}}\nolimits max \left( max \mathop{{}}\nolimits_{{j}} \left( S \mathop{{}}\nolimits_{{t,j}} \right) ,\mathop{{}}\nolimits sink \right)
+  $$
+
+  $$
+   e \mathop{{}}\nolimits_{{sink}} = exp \left( sink - m \right)
+  $$
+
+  $$
+   \ell = e \mathop{{}}\nolimits_{{sink}} + \sum \mathop{{}}\nolimits_{{j}} exp \left( S \mathop{{}}\nolimits_{{t,j}} - m \right)
+  $$
+
+  $$
+   P \mathop{{}}\nolimits_{{sink}} = e \mathop{{}}\nolimits_{{sink}} / \ell
+  $$
+
+  引入Sink后，softmax反向的公共项$D_{i}$不变：$D_{i} = \sum \mathop{{}}\nolimits_{{j}} P \mathop{{}}\nolimits_{{t,j}} \cdot dP \mathop{{}}\nolimits_{{t,j}}$（其中$dP \mathop{{}}\nolimits_{{sink}} = dO \text{@} V^{T} = 0$，Sink不直接贡献输出，因此不产生dP）。Sink的梯度如下：
+
+  $$
+   dSink \left[ h \right] = P \mathop{{}}\nolimits_{{sink}} \odot \left( dP \mathop{{}}\nolimits_{{sink}} - D_{i} \right) = \sum \mathop{{}}\nolimits_{{b,i}} P \mathop{{}}\nolimits_{{sink}} \left[ b,i,h \right] \cdot \left( - D_{i} \left[ b,i,h \right] \right)
+  $$
+
+  > 说明：Sink的score梯度遵循softmax反向的"挤压效应"——Sink概率增大时，会挤压其他token的概率，因此$dSink$与所有token的平均收益$D_{i}$相关，最终对所有Batch和Query位置求和得到维度为$[N1]$的$dSink$。
+
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnSparseFlashAttentionGradGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnSparseFlashAttentionGrad”接口执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnSparseFlashAttentionGradV2GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnSparseFlashAttentionGradV2”接口执行计算。
+
+> [!NOTE]
+> V2 为新增接口，与 V1 共用同一 OpDef（SparseFlashAttentionGrad）与同一 inner aclnn 实现。需要商发兼容签名（5 输出、无 sinks/dSinks）时请使用 [aclnnSparseFlashAttentionGrad](aclnnSparseFlashAttentionGrad.md)。
+
+**与 V1 接口（aclnnSparseFlashAttentionGrad）的对比**
+
+| 对比项 | V1：aclnnSparseFlashAttentionGrad | V2：aclnnSparseFlashAttentionGradV2 |
+| :--- | :--- | :--- |
+| 接口定位 | 商发兼容接口，位置参数与商发 `npu_sparse_flash_attention_grad` 严格对齐 | 新增接口，支持 OSS Sink |
+| 输出个数 | 5（dQuery、dKey、dValue、dQueryRope、dKeyRope） | 6（在 V1 基础上新增 dSinks） |
+| sinksOptional 输入 | 无 | 新增（可选，仅 <term>Ascend 950PR/Ascend 950DT</term> 支持） |
+| dSinksOptional 输出 | 无 | 新增（可选，与 sinksOptional 成对出现） |
+| 其余参数 | - | 与 V1 完全一致（参数顺序、类型、含义均不变） |
+| OpDef | SparseFlashAttentionGrad | 与 V1 共用同一 OpDef 与 inner aclnn |
+
+> 综上，V2 相比 V1 仅新增了可选的 sinksOptional 输入与对应的 dSinksOptional 输出，其余参数与 V1 完全一致。不提供 sinksOptional/dSinksOptional 时，V2 的输入输出与 V1 行为保持一致。
 
 ```c++
-aclnnStatus aclnnSparseFlashAttentionGradGetWorkspaceSize(
+aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
     const aclTensor     *query,
     const aclTensor     *key,
     const aclTensor     *value,
@@ -93,6 +143,7 @@ aclnnStatus aclnnSparseFlashAttentionGradGetWorkspaceSize(
     const aclTensor     *out,
     const aclTensor     *softmaxMax,
     const aclTensor     *softmaxSum,
+    const aclTensor     *sinksOptional,            // OSS Sink 输入 [N1]，OPTIONAL，与 dSinksOptional 成对出现
     const aclTensor     *actualSeqLengthsQueryOptional,
     const aclTensor     *actualSeqLengthsKvOptional,
     const aclTensor     *queryRopeOptional,
@@ -109,19 +160,20 @@ aclnnStatus aclnnSparseFlashAttentionGradGetWorkspaceSize(
     const aclTensor     *dValueOut,
     const aclTensor     *dQueryRopeOutOptional,
     const aclTensor     *dKeyRopeOutOptional,
+    const aclTensor     *dSinksOptional,           // Sink 梯度 [N1]，OPTIONAL，与 sinksOptional 成对出现
     uint64_t            *workspaceSize,
     aclOpExecutor      **executor)
 ```
 
 ```c++
-aclnnStatus aclnnSparseFlashAttentionGrad(
+aclnnStatus aclnnSparseFlashAttentionGradV2(
     void             *workspace,
     uint64_t          workspaceSize,
     aclOpExecutor    *executor,
-    aclrtStream stream)
+    aclrtStream       stream)
 ```
 
-## aclnnSparseFlashAttentionGradGetWorkspaceSize
+## aclnnSparseFlashAttentionGradV2GetWorkspaceSize
 
 - **参数说明**
 
@@ -252,6 +304,24 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>√</td>
         </tr>
         <tr>
+            <td>sinksOptional</td>
+            <td>输入</td>
+            <td>可学习 OSS Sink 输入。</td>
+            <td>
+            <ul>
+                <li>可选项，默认值为空指针，未提供时不参与计算；仅 <term>Ascend 950PR/Ascend 950DT</term> 支持。</li>
+                <li>传入 sinksOptional 时必须同时提供 dSinksOptional 输出。</li>
+                <li>Sink 参与前向 softmax 的 max/sum 计算，具体公式请参见<a href="#功能说明">功能说明</a>阶段4。</li>
+            </ul>
+            </td>
+            <td>FLOAT32</td>
+            <td>ND</td>
+            <td>(N1,)<br>
+            N1：与 query 的 N1 保持一致
+            </td>
+            <td>√</td>
+        </tr>
+        <tr>
             <td>actualSeqLengthsQueryOptional</td>
             <td>输入</td>
             <td>每个Batch中，Query的有效token数。</td>
@@ -337,7 +407,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
             <td>layout</td>
             <td>输入</td>
-            <td>layout格式。</td>
+            <td>输入数据的 layout 格式。</td>
             <td>
             支持BSND、TND。
             </td>
@@ -434,7 +504,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>输出</td>
             <td>表示value的梯度。</td>
             <td>
-            可选项。普通场景下与输入value的Shape维度保持一致；KV merge场景下需传入空指针，dValue不单独输出，其梯度合入dKey。
+            可选项。普通场景下与输入value的Shape维度保持一致；KV merge场景下需传入空指针，dValue不单独输出，其梯度合入dKey（Ascend 950PR/Ascend 950DT 与 Atlas A2训练/推理系列产品支持，950上 dValueOut 需传空指针）。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -468,6 +538,21 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>ND</td>
             <td>(B,S2,N2,Dr)、(T2,N2,Dr)
             </td>
+            <td>x</td>
+        </tr>
+        <tr>
+            <td>dSinksOptional</td>
+            <td>输出</td>
+            <td>表示 sinksOptional 的梯度。</td>
+            <td>
+            <ul>
+                <li>当输入 sinksOptional 存在，此变量才会输出。</li>
+                <li>shape 与 sinksOptional 保持一致。</li>
+            </ul>
+            </td>
+            <td>FLOAT32</td>
+            <td>ND</td>
+            <td>(N1,)</td>
             <td>x</td>
         </tr>
         </tbody>
@@ -513,7 +598,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         </tbody>
     </table>
 
-## aclnnSparseFlashAttentionGrad
+## aclnnSparseFlashAttentionGradV2
 
 - **参数说明**
 
@@ -537,7 +622,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
         <td>workspaceSize</td>
         <td>输入</td>
-        <td>在Device侧申请的workspace大小，由第一段接口aclnnSparseFlashAttentionGradGetWorkspaceSize获取。</td>
+        <td>在Device侧申请的workspace大小，由第一段接口aclnnSparseFlashAttentionGradV2GetWorkspaceSize获取。</td>
         </tr>
         <tr>
         <td>executor</td>
@@ -559,12 +644,14 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnSparseFlashAttentionGrad默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+  - aclnnSparseFlashAttentionGradV2默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
 - 公共约束
     - 入参为空的场景处理：
         - query为空Tensor：直接返回。
     - 当前只支持value和key完全一致的场景。
-    - KV merge场景下，value和dValueOut需传入空指针，dKeyOut返回dK+dV，不再单独返回dValue。
+    - KV merge场景下（Ascend 950PR/Ascend 950DT 与 Atlas A2训练/推理系列产品支持），value和dValueOut需传入空指针，dKeyOut返回dK+dV，不再单独返回dValue。
+    - OSS Sink：传入 sinksOptional 时未提供 dSinksOptional 会返回 ACLNN_ERR_PARAM_INVALID。
+    - OSS Sink：sinksOptional 仅支持 <term>Ascend 950PR/Ascend 950DT</term>，其它平台传入 sinksOptional 返回 ACLNN_ERR_RUNTIME_ERROR。
 
 - Mask
     <table style="undefined;table-layout: fixed; width: 942px"><colgroup>
@@ -656,7 +743,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         </tr>
         <tr>
             <td>S1、S2</td>
-            <td>S1支持1~128K，S2支持1~1M</td>
+            <td>1~128K</td>
             <td>S1、S2支持不等长</td>
         </tr>
         <tr>
@@ -689,7 +776,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
             <td>layout</td>
             <td>BSND/TND</td>
-            <td>-</td>
+            <td>query 与 key/value 共用同一 layout</td>
         </tr>
         </tbody>
     </table>
@@ -703,7 +790,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
 #include <vector>
 #include <numeric>
 #include "acl/acl.h"
-#include "aclnnop/aclnn_sparse_flash_attention_grad.h"
+#include "aclnnop/aclnn_sparse_flash_attention_grad_v2.h"
 
 #define CHECK_RET(cond, return_expr) \
   do {                               \
@@ -727,12 +814,12 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
 
 void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
   auto size = GetShapeSize(shape);
-  std::vector<aclFloat16> resultData(size, 0);
+  std::vector<short> resultData(size, 0);
   auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]),
                          *deviceAddr, size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
   for (int64_t i = 0; i < size; i++) {
-    LOG_PRINT("mean result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+    LOG_PRINT("mean result[%ld] is: %e\n", i, resultData[i]);
   }
 }
 
@@ -796,6 +883,7 @@ int main() {
   std::vector<int64_t> actSeqKvLenshape = {1};              // B
   std::vector<int64_t> qRopeShape = {1, 16, 64};            // T1, N1, Drope
   std::vector<int64_t> kRopeShape = {2048, 1, 64};          // T2, N2, Drope
+  std::vector<int64_t> sinksShape = {16};                   // N1
 
   void* qDeviceAddr = nullptr;
   void* kDeviceAddr = nullptr;
@@ -814,6 +902,8 @@ int main() {
   void* dvDeviceAddr = nullptr;
   void* dqRopeDeviceAddr = nullptr;
   void* dkRopeDeviceAddr = nullptr;
+  void* sinksDeviceAddr = nullptr;
+  void* dSinksDeviceAddr = nullptr;
 
   aclTensor* q = nullptr;
   aclTensor* k = nullptr;
@@ -832,6 +922,8 @@ int main() {
   aclTensor* dv = nullptr;
   aclTensor* dqRope = nullptr;
   aclTensor* dkRope = nullptr;
+  aclTensor* sinks = nullptr;
+  aclTensor* dSinks = nullptr;
 
   std::vector<short> qHostData(1 * 16 * 512, 1.0);
   std::vector<short> kHostData(2048 * 1 * 512, 1.0);
@@ -851,6 +943,8 @@ int main() {
   std::vector<short> dvHostData(2048 * 1 * 512, 0);
   std::vector<short> dqRopeHostData(1 * 16 * 64, 0);
   std::vector<short> dkRopeHostData(2048 * 1 * 64, 0);
+  std::vector<float> sinksHostData(16, 0.0);
+  std::vector<float> dSinksHostData(16, 0.0);
 
   ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -886,6 +980,10 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(dkRopeHostData, kRopeShape, &dkRopeDeviceAddr, aclDataType::ACL_FLOAT16, &dkRope);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = CreateAclTensor(sinksHostData, sinksShape, &sinksDeviceAddr, aclDataType::ACL_FLOAT, &sinks);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = CreateAclTensor(dSinksHostData, sinksShape, &dSinksDeviceAddr, aclDataType::ACL_FLOAT, &dSinks);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
 
   double scaleValue = 0.044194;
   int64_t sparseBlockSize = 1;
@@ -899,11 +997,11 @@ int main() {
   uint64_t workspaceSize = 0;
   aclOpExecutor* executor;
 
-  // 调用aclnnSparseFlashAttentionGrad第一段接口
-  ret = aclnnSparseFlashAttentionGradGetWorkspaceSize(q, k, v, sparseIndices, dOut, out, softmaxMax, softmaxSum,
-            actSeqQLen, actSeqKvLen, qRope, kRope, scaleValue, sparseBlockSize, layout, sparseMode, preTokens, nextTokens,
-            deterministic, dq, dk, dv, dqRope, dkRope, &workspaceSize, &executor);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseFlashAttentionGradGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  // 调用aclnnSparseFlashAttentionGradV2第一段接口
+  ret = aclnnSparseFlashAttentionGradV2GetWorkspaceSize(q, k, v, sparseIndices, dOut, out, softmaxMax, softmaxSum, sinks,
+            actSeqQLen, actSeqKvLen, qRope, kRope, scaleValue, sparseBlockSize, layout, sparseMode,
+            preTokens, nextTokens, deterministic, dq, dk, dv, dqRope, dkRope, dSinks, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseFlashAttentionGradV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
   // 根据第一段接口计算出的workspaceSize申请device内存
   void* workspaceAddr = nullptr;
@@ -912,9 +1010,9 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
   }
 
-  // 调用aclnnSparseFlashAttentionGrad第二段接口
-  ret = aclnnSparseFlashAttentionGrad(workspaceAddr, workspaceSize, executor, stream);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseFlashAttentionGrad failed. ERROR: %d\n", ret); return ret);
+  // 调用aclnnSparseFlashAttentionGradV2第二段接口
+  ret = aclnnSparseFlashAttentionGradV2(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseFlashAttentionGradV2 failed. ERROR: %d\n", ret); return ret);
 
   // 4.（固定写法）同步等待任务执行结束
   ret = aclrtSynchronizeStream(stream);
@@ -926,6 +1024,7 @@ int main() {
   PrintOutResult(vShape, &dvDeviceAddr);
   PrintOutResult(qRopeShape, &dqRopeDeviceAddr);
   PrintOutResult(kRopeShape, &dkRopeDeviceAddr);
+  PrintOutResult(sinksShape, &dSinksDeviceAddr);
 
   // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
   aclDestroyTensor(q);
@@ -945,6 +1044,8 @@ int main() {
   aclDestroyTensor(dv);
   aclDestroyTensor(dqRope);
   aclDestroyTensor(dkRope);
+  aclDestroyTensor(sinks);
+  aclDestroyTensor(dSinks);
 
   // 7. 释放device资源
   aclrtFree(qDeviceAddr);
@@ -962,6 +1063,8 @@ int main() {
   aclrtFree(dvDeviceAddr);
   aclrtFree(dqRopeDeviceAddr);
   aclrtFree(dkRopeDeviceAddr);
+  aclrtFree(sinksDeviceAddr);
+  aclrtFree(dSinksDeviceAddr);
   aclrtFree(actSeqQLenDeviceAddr);
   aclrtFree(actSeqKvLenDeviceAddr);
   if (workspaceSize > 0) {

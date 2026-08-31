@@ -8,7 +8,10 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "aclnn_sparse_flash_attention_grad.h"
+#include "aclnn_sparse_flash_attention_grad_v2.h"
+
+#include "opdev/platform.h"
+#include "opdev/op_log.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,27 +32,45 @@ extern aclnnStatus aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
 extern aclnnStatus aclnnInnerSparseFlashAttentionGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                                       aclrtStream stream);
 
-// V1 接口：无 sinks/dSinks（5 输出），位置参数与商发 npu_sparse_flash_attention_grad 严格对齐。
-// 转发 inner 时 sinks/dSinks 传 nullptr。
-aclnnStatus aclnnSparseFlashAttentionGradGetWorkspaceSize(
+// V2 接口：sinks 传了则必须给 dSinks 输出（传了 sinks 却无 dSinks 会拒绝）；
+// 不传 sinks（无 sink 路径）时 dSinks 可为 nullptr 或空占位 tensor。
+// 位置参数顺序与 V1 签名完全一致，仅在 softmaxSum 后插 sinks、dKeyRopeOutOptional 后插
+// dSinksOptional，复用同一 OpDef 与同一 inner aclnn。
+aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
     const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparseIndices,
     const aclTensor *dOut, const aclTensor *out, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
+    const aclTensor *sinks, // oss-sink 输入 [N1] FP32，OPTIONAL；传了则必须给 dSinks
     const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKvOptional,
     const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional, double scaleValue, int64_t sparseBlockSize,
     char *layoutOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool deterministic,
     const aclTensor *dQueryOut, const aclTensor *dKeyOut, const aclTensor *dValueOut,
-    const aclTensor *dQueryRopeOutOptional, const aclTensor *dKeyRopeOutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor *dQueryRopeOutOptional, const aclTensor *dKeyRopeOutOptional,
+    const aclTensor *dSinksOptional, // sink 梯度 [N1] FP32，OPTIONAL；sinks 为空时可空占位
+    uint64_t *workspaceSize, aclOpExecutor **executor)
 {
+    // 不强制 sinks/dSinks 严格成对：host tiling 已把 nullptr/空 shape 的 sinks
+    // 统一识别为 hasSinks=false（sparse_flash_attention_grad_tiling_bs1_regbase.cpp），此时内核
+    // 走无 sink 路径、不写 dSinks，故 dSinks 允许为 nullptr 或空占位 tensor（shape {0}，PTA 无
+    // sink 时返回的占位输出）。仅保留危险方向校验：传了 sinks 却没给 dSinks 输出 buffer。
+    if (sinks != nullptr && dSinksOptional == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "The sinks input of aclnnSparseFlashAttentionGradV2 requires a corresponding dSinks output.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (sinks != nullptr && op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "The sinks input of aclnnSparseFlashAttentionGradV2 is only supported on Ascend950.");
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
     return aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
-        query, key, sparseIndices, dOut, out, softmaxMax, softmaxSum, nullptr /*sinks*/, value,
-        actualSeqLengthsQueryOptional, actualSeqLengthsKvOptional, queryRopeOptional, keyRopeOptional, scaleValue,
-        sparseBlockSize, layoutOptional, sparseMode, preTokens, nextTokens, deterministic, dQueryOut, dKeyOut,
-        dValueOut, dQueryRopeOutOptional, dKeyRopeOutOptional, nullptr /*dSinks*/, workspaceSize, executor);
+        query, key, sparseIndices, dOut, out, softmaxMax, softmaxSum, sinks, value, actualSeqLengthsQueryOptional,
+        actualSeqLengthsKvOptional, queryRopeOptional, keyRopeOptional, scaleValue, sparseBlockSize, layoutOptional,
+        sparseMode, preTokens, nextTokens, deterministic, dQueryOut, dKeyOut, dValueOut, dQueryRopeOutOptional,
+        dKeyRopeOutOptional, dSinksOptional, workspaceSize, executor);
 }
 
-aclnnStatus aclnnSparseFlashAttentionGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                          aclrtStream stream)
+aclnnStatus aclnnSparseFlashAttentionGradV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                            aclrtStream stream)
 {
     return aclnnInnerSparseFlashAttentionGrad(workspace, workspaceSize, executor, stream);
 }

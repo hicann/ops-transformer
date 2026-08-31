@@ -240,6 +240,7 @@
 - [aclnnSparseFlashAttention](../../attention/sparse_flash_attention/docs/aclnnSparseFlashAttention.md)
 - [aclnnSparseFlashAttentionV2](../../attention/sparse_flash_attention/docs/aclnnSparseFlashAttentionV2.md)
 - [aclnnSparseFlashAttentionGrad](../../attention/sparse_flash_attention_grad/docs/aclnnSparseFlashAttentionGrad.md)
+- [aclnnSparseFlashAttentionGradV2](../../attention/sparse_flash_attention_grad/docs/aclnnSparseFlashAttentionGradV2.md)
 - [aclnnSparseFlashMla](../../attention/sparse_flash_mla/docs/aclnnSparseFlashMla.md)
 - [aclnnSparseFlashMlaGrad](../../attention/sparse_flash_mla_grad/docs/aclnnSparseFlashMlaGrad.md)
 - [aclnnSparseFlashMlaGradMetadata](../../attention/sparse_flash_mla_grad_metadata/docs/aclnnSparseFlashMlaGradMetadata.md)

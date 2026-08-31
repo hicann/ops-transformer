@@ -25,6 +25,7 @@ namespace SfagBaseApi {
 constexpr uint32_t NUM_TWO = 2;
 constexpr uint32_t SYNC_V0_V1_DS_A_MAX_DONE_FLAG = 10;
 constexpr uint32_t BIT_MASK_NUM = 8;
+constexpr int64_t MAX_N1 = optiling::sfag::MAX_N1;
 
 TEMPLATES_DEF
 class FAGBlockVec {
@@ -45,7 +46,7 @@ public:
     __aicore__ inline void InitGlobalBuffer(GM_ADDR key, GM_ADDR dy, GM_ADDR y, GM_ADDR sparseIndices,
                                             GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR keyRope, GM_ADDR dq,
                                             GM_ADDR dk, GM_ADDR dv, GM_ADDR actualSeqQlen, GM_ADDR actualSeqKvlen,
-                                            GM_ADDR workspace);
+                                            GM_ADDR workspace, GM_ADDR sinks, GM_ADDR dSinks);
     __aicore__ inline void InitUbBuffer();
     __aicore__ inline void InitCubeVecSharedParams(FagCVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx,
                                                    float qScaleDs);
@@ -76,6 +77,9 @@ public:
                                            const GlobalTensor<CALC_TYPE> &dvWorkSpaceGm, FagConstInfo &constInfo,
                                            FagRunInfo &runInfo);
     __aicore__ inline void CopyMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo, int64_t taskId);
+    __aicore__ inline void FinalizeDSinkAcc(FagConstInfo &constInfo);
+    __aicore__ inline void ReduceDSink(LocalTensor<CALC_TYPE> &scratchTensor, LocalTensor<CALC_TYPE> &reduceOutTensor,
+                                       FagConstInfo &constInfo);
     template <const bool IS_DQ = false>
     __aicore__ inline void CopyUB2L1(FagConstInfo &constInfo, FagRunInfo &runInfo, LocalTensor<INPUT_TYPE> &dstTensor,
                                      LocalTensor<INPUT_TYPE> &srcTensor);
@@ -115,6 +119,7 @@ public:
     GlobalTensor<OUTDTYPE> dqGm, dkGm, dvGm;
     GlobalTensor<int32_t> actualSeqLengthsQueryGm;
     GlobalTensor<int32_t> actualSeqLengthsKeyGm;
+    GlobalTensor<float> sinksGm, dSinksGm, dSinkWorkSpaceGm;
 
     // ub buffer
     TQue<QuePosition::VECIN, 1> attenMaskOrYInQue;
@@ -130,6 +135,12 @@ public:
     TBuf<> deterOffsetBuf;
     TBuf<> vselrIndexesBuf;
     TQue<QuePosition::VECOUT, 1> dsAmaxOutQue;
+    TQue<QuePosition::VECIN, 1> sinksInQue;
+    TQue<QuePosition::VECIN, 1> maxForSinkQue;
+    TQue<QuePosition::VECIN, 1> sumForSinkQue;
+    TBuf<> sinkTensor;
+    TBuf<> dSinkAcc;
+    TBuf<> sinkRowSumBuf;
 
     TPipe *pipe;
     SFagTilingType tilingData;
@@ -187,7 +198,8 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR key,
                                                                     GM_ADDR sparseIndices, GM_ADDR softmaxMax,
                                                                     GM_ADDR softmaxSum, GM_ADDR keyRope, GM_ADDR dq,
                                                                     GM_ADDR dk, GM_ADDR dv, GM_ADDR actualSeqQlen,
-                                                                    GM_ADDR actualSeqKvlen, GM_ADDR workspace)
+                                                                    GM_ADDR actualSeqKvlen, GM_ADDR workspace,
+                                                                    GM_ADDR sinks, GM_ADDR dSinks)
 {
     keyGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)key);
     keyRopeGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)keyRope);
@@ -205,6 +217,13 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR key,
     topkIndicesGm.SetGlobalBuffer((__gm__ int32_t *)sparseIndices);
     actualSeqLengthsQueryGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqQlen);
     actualSeqLengthsKeyGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqKvlen);
+
+    if constexpr (IS_SINKS) {
+        sinksGm.SetGlobalBuffer((__gm__ float *)sinks);
+        dSinksGm.SetGlobalBuffer((__gm__ float *)dSinks);
+        dSinkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                         tilingData->postTilingData.dSinkWorkSpaceOffset / sizeof(float));
+    }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -229,6 +248,18 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::InitUbBuffer()
     pipe->InitBuffer(dSOutQue, 1, VECTOR_BASEM * VREG_SIZE + VREG_SIZE + DETER_EXCEED_USE_SIZE);
     pipe->InitBuffer(pOutQue, 1, VECTOR_BASEM * VREG_SIZE + VREG_SIZE);
     pipe->InitBuffer(topkUbBuf, TOPK_UB_SIZE);
+
+    // dSinkAcc 跨 S1 循环累加，需清零
+    if constexpr (IS_SINKS) {
+        pipe->InitBuffer(sinksInQue, 1, VECTOR_BASEM * sizeof(CALC_TYPE));
+        pipe->InitBuffer(maxForSinkQue, 1, VECTOR_BASEM * sizeof(CALC_TYPE));
+        pipe->InitBuffer(sumForSinkQue, 1, VECTOR_BASEM * sizeof(CALC_TYPE));
+        pipe->InitBuffer(sinkTensor, VECTOR_BASEM * sizeof(CALC_TYPE));
+        pipe->InitBuffer(dSinkAcc, VECTOR_BASEM * sizeof(CALC_TYPE));
+        pipe->InitBuffer(sinkRowSumBuf, VECTOR_BASEM * sizeof(CALC_TYPE));
+        LocalTensor<CALC_TYPE> dSinkAccTensor = dSinkAcc.Get<CALC_TYPE>();
+        Duplicate(dSinkAccTensor, 0.0f, VECTOR_BASEM);
+    }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -432,6 +463,96 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::CopyMaxSum(FagConstInfo &cons
 }
 
 TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::FinalizeDSinkAcc(FagConstInfo &constInfo)
+{
+    if constexpr (IS_SINKS) {
+        // dSinkAcc 由 V3 的 Mul/Sub 写入，UB→GM 的 DataCopy 走 MTE3，须等 V 完成
+        event_t vToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
+        SetFlag<HardEvent::V_MTE3>(vToMte3);
+        WaitFlag<HardEvent::V_MTE3>(vToMte3);
+
+        LocalTensor<CALC_TYPE> dSinkAccTensor = dSinkAcc.Get<CALC_TYPE>();
+        int64_t gSize = constInfo.commonConstInfo.gSize;
+        int64_t firstHalfG = (gSize + 1) >> 1;
+        int64_t halfGRealSize = (vSubBlockIdx == 0) ? firstHalfG : (gSize - firstHalfG);
+        int64_t halfGOffset = firstHalfG * vSubBlockIdx;
+        if (halfGRealSize <= 0) {
+            return; // gSize=1 时 sub1 halfG=0，无数据可写
+        }
+
+        if constexpr (IS_DETER) {
+            // 写本核 slot，由循环外 ReduceDSink 单 writer 跨核归约
+            int64_t slotOffset = cBlockIdx * MAX_N1 + halfGOffset;
+            DataCopyExtParams dSinkCopyParams;
+            dSinkCopyParams.blockCount = 1;
+            dSinkCopyParams.blockLen = static_cast<uint16_t>(halfGRealSize * sizeof(CALC_TYPE));
+            dSinkCopyParams.srcStride = 0;
+            dSinkCopyParams.dstStride = 0;
+            DataCopyPad(dSinkWorkSpaceGm[slotOffset], dSinkAccTensor, dSinkCopyParams);
+        } else {
+            // 用 DataCopyPad（字节级 blockLen）而非 DataCopy——halfGOffset/halfGRealSize 在小 N1 下
+            // 非 32B 对齐，DataCopy 是对齐搬运接口语义未定义；DataCopyPad 专为非对齐设计，稳妥。
+            // V→MTE3 同步已在函数头完成（guard V3 写入的 dSinkAcc），此处无需重复
+            DataCopyExtParams dSinkCopyParams;
+            dSinkCopyParams.blockCount = 1;
+            dSinkCopyParams.blockLen = static_cast<uint16_t>(halfGRealSize * sizeof(CALC_TYPE));
+            dSinkCopyParams.srcStride = 0;
+            dSinkCopyParams.dstStride = 0;
+            SetAtomicAdd<CALC_TYPE>();
+            DataCopyPad(dSinksGm[halfGOffset], dSinkAccTensor, dSinkCopyParams);
+            SetAtomicNone();
+        }
+    }
+}
+
+// scratch/reduceOut 复用 mm1ResBuf[0]/[1]（循环后空闲，TBuf 无 Position 约束，手动管同步）
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ReduceDSink(LocalTensor<CALC_TYPE> &scratchTensor,
+                                                               LocalTensor<CALC_TYPE> &reduceOutTensor,
+                                                               FagConstInfo &constInfo)
+{
+    if constexpr (IS_SINKS && IS_DETER) {
+        // 跨核 slot 可见性由 ProcessDeter 中 ReduceDSink 调用前的 SyncALLCores()（SyncAll<false> 硬 barrier）保证。
+        // 本处不再设置 CrossCore flag：David 上 flag 11-14 非可靠全核 barrier，单 writer 会读到未写完的 slot。
+        int64_t usedCoreNum = tilingData->baseParams.usedCoreNum;
+        if (cBlockIdx == usedCoreNum - 1 && vSubBlockIdx == 0) {
+            int64_t gSize = constInfo.commonConstInfo.gSize;
+            // MTE2 搬 usedCoreNum 个 slot（每核独占 MAX_N1 槽位，各写各段不相交）→ scratch 对应段
+            DataCopyPadExtParams<CALC_TYPE> copyPadParams; // 默认 isPad=false：等长搬运，不补位
+            for (int64_t i = 0; i < usedCoreNum; i++) {
+                DataCopyExtParams copyIn;
+                copyIn.blockCount = 1;
+                copyIn.blockLen = static_cast<uint16_t>(gSize * sizeof(CALC_TYPE));
+                copyIn.srcStride = 0;
+                copyIn.dstStride = 0;
+                DataCopyPad(scratchTensor[i * MAX_N1], dSinkWorkSpaceGm[i * MAX_N1], copyIn, copyPadParams);
+            }
+            // MTE2→V 显式同步：regbase 无自动同步，等所有 slot 搬入完成
+            event_t mte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
+            SetFlag<HardEvent::MTE2_V>(mte2ToV);
+            WaitFlag<HardEvent::MTE2_V>(mte2ToV);
+            // reduceOut = Σ_i scratch[i*MAX_N1]
+            Duplicate(reduceOutTensor, 0.0f, gSize);
+            AscendC::PipeBarrier<PIPE_V>();
+            for (int64_t i = 0; i < usedCoreNum; i++) {
+                Add(reduceOutTensor, reduceOutTensor, scratchTensor[i * MAX_N1], gSize);
+                AscendC::PipeBarrier<PIPE_V>();
+            }
+            // V→MTE3 显式同步：regbase 无自动同步，等归约完成
+            event_t vToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
+            SetFlag<HardEvent::V_MTE3>(vToMte3);
+            WaitFlag<HardEvent::V_MTE3>(vToMte3);
+            DataCopyExtParams outParams;
+            outParams.blockCount = 1;
+            outParams.blockLen = static_cast<uint16_t>(gSize * sizeof(CALC_TYPE));
+            outParams.srcStride = 0;
+            outParams.dstStride = 0;
+            DataCopyPad(dSinksGm[0], reduceOutTensor, outParams);
+        }
+    }
+}
+
+TEMPLATES_DEF_NO_DEFAULT
 template <const bool IS_DQ>
 __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::CopyUB2L1(FagConstInfo &constInfo, FagRunInfo &runInfo,
                                                              LocalTensor<INPUT_TYPE> &dstTensor,
@@ -463,9 +584,30 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec2(LocalTensor<CALC_
     ///////////////////////////////////////////////////////////////
     // VF2: pse + attenMask + muls + simpleSoftmax copyIn+calculate
     ///////////////////////////////////////////////////////////////
-    CalculatePseMulsSelSimpleSoftMax<OUTDTYPE, CALC_TYPE, false, false, false, VECTOR_BASEM, VECTOR_BASEN>(
-        constInfo, runInfo, *pseInfoPtr, *attenMaskInfoPtr, maxSumQue[runInfo.commonRunInfo.taskIdMod2],
-        attenMaskOrYInQue, pseOrDyInQue, mm2ResTensor, mm2ResTensor, pseSlope);
+    if constexpr (IS_SINKS) {
+        if (runInfo.halfGRealSize == 0) {
+            return;
+        }
+        LocalTensor<CALC_TYPE> maxSumTensor = maxSumQue[runInfo.commonRunInfo.taskIdMod2].DeQue<CALC_TYPE>();
+        CopyInSinksAndMaxSum<CALC_TYPE, VECTOR_BASEM>(constInfo, runInfo, sinksGm, softmaxMaxGm, softmaxSumGm,
+                                                      sinksInQue, maxForSinkQue, sumForSinkQue);
+        // maxSumTensor 由 Reuse 重载持有，下方统一 Free
+        CalculatePseMulsSelSimpleSoftMaxReuse<OUTDTYPE, CALC_TYPE, false, false, false, VECTOR_BASEM, VECTOR_BASEN>(
+            constInfo, runInfo, *pseInfoPtr, *attenMaskInfoPtr, maxSumTensor, attenMaskOrYInQue, pseOrDyInQue,
+            mm2ResTensor, mm2ResTensor, pseSlope);
+        LocalTensor<CALC_TYPE> sinkPkTensor = sinkTensor.Get<CALC_TYPE>();
+        // TQue DeQue 自动 MTE2→V 同步，无需额外 PipeBarrier
+        CalculateSinkSimpleSoftMax<CALC_TYPE, VECTOR_BASEM>(constInfo, runInfo, sinksInQue, maxForSinkQue,
+                                                            sumForSinkQue, sinkPkTensor);
+        // SinkSoftMaxVF 是 __simd_vf__ 微指令，StoreAlign(P_sink→sinkTensor) 的写依赖编译器自动 PIPE_V
+        // 同步无法感知；det 调度下 V3 标准 Mul 会读到上一 task 的旧 P_sink，强制 V2 写入先于 V3 读取
+        AscendC::PipeBarrier<PIPE_V>();
+        maxSumQue[runInfo.commonRunInfo.taskIdMod2].FreeTensor(maxSumTensor);
+    } else {
+        CalculatePseMulsSelSimpleSoftMax<OUTDTYPE, CALC_TYPE, false, false, false, VECTOR_BASEM, VECTOR_BASEN>(
+            constInfo, runInfo, *pseInfoPtr, *attenMaskInfoPtr, maxSumQue[runInfo.commonRunInfo.taskIdMod2],
+            attenMaskOrYInQue, pseOrDyInQue, mm2ResTensor, mm2ResTensor, pseSlope);
+    }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -481,6 +623,22 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec3(Buffer<BufferType
 
     LocalTensor<CALC_TYPE> softmaxGradResTensor = softmaxGradResBuf.Get<CALC_TYPE>();
     LocalTensor<INPUT_TYPE> vecOutBuffer = dSOutQue.AllocTensor<INPUT_TYPE>();
+    // rowSumNeg[h] = -Σ_j P[h,j]·dp[h,j]（P∈mm2、dp∈mm1，fp32），须在 BroadcastSubMul 覆盖 mm1(dp) 前计算
+    // 比复用 Di=rowsum(out_bf16·dy) 更精确（golden 已同步为 -(p*dp).sum(-1)）
+    // dSinkAcc 用 Add 跨 key-block task 累加（每个 task 的 Σ_j 是部分和）
+    if constexpr (IS_SINKS) {
+        LocalTensor<CALC_TYPE> sinkRowSumTensor = sinkRowSumBuf.Get<CALC_TYPE>();
+        LocalTensor<CALC_TYPE> sinkPkTensor = sinkTensor.Get<CALC_TYPE>();
+        LocalTensor<CALC_TYPE> dSinkAccTensor = dSinkAcc.Get<CALC_TYPE>();
+        if (runInfo.halfGRealSize > 0 && runInfo.commonRunInfo.s2RealSize > 0) {
+            CalculateSinkNegRowSum<CALC_TYPE, VECTOR_BASEN>(sinkRowSumTensor, mm2ResTensor, mm1ResTensor,
+                                                            static_cast<uint16_t>(runInfo.halfGRealSize),
+                                                            static_cast<uint16_t>(runInfo.commonRunInfo.s2RealSize));
+            // dSinkAcc += P_sink·rowSumNeg；P_sink 就绪由 ProcessVec2 的 PIPE_V barrier 保证
+            Mul(sinkPkTensor, sinkPkTensor, sinkRowSumTensor, runInfo.halfGRealSize);
+            Add(dSinkAccTensor, dSinkAccTensor, sinkPkTensor, runInfo.halfGRealSize);
+        }
+    }
     if (runInfo.commonRunInfo.s2RealSize > static_cast<uint32_t>(S2TemplateType::Aligned64)) {
         BroadcastSubMul<CALC_TYPE, static_cast<uint32_t>(S2TemplateType::Aligned128), 0>(
             mm1ResTensor, mm1ResTensor, softmaxGradResTensor, mm2ResTensor, runInfo.halfGRealSize,
@@ -1042,7 +1200,7 @@ public:
     __aicore__ inline void InitGlobalBuffer(GM_ADDR key, GM_ADDR dy, GM_ADDR y, GM_ADDR sparseIndices,
                                             GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR keyRope, GM_ADDR dq,
                                             GM_ADDR dk, GM_ADDR dv, GM_ADDR actualSeqQlen, GM_ADDR actualSeqKvlen,
-                                            GM_ADDR workspace) {};
+                                            GM_ADDR workspace, GM_ADDR sinks, GM_ADDR dSinks) {};
     __aicore__ inline void SetVecBlockParams(TPipe *pipe, SFagTilingType tilingData, uint32_t vBlockIdx,
                                              uint32_t cBlockIdx, uint32_t vSubBlockIdx, FagConstInfo &constInfo,
                                              AttenMaskInfo &attenMaskInfo, PseInfo &pseInfo) {};
@@ -1074,6 +1232,9 @@ public:
                                            const GlobalTensor<CALC_TYPE> &dvWorkSpaceGm, FagConstInfo &constInfo,
                                            FagRunInfo &runInfo) {};
     __aicore__ inline void CopyMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo, int64_t taskId) {};
+    __aicore__ inline void FinalizeDSinkAcc(FagConstInfo &constInfo) {};
+    __aicore__ inline void ReduceDSink(LocalTensor<CALC_TYPE> &scratchTensor, LocalTensor<CALC_TYPE> &reduceOutTensor,
+                                       FagConstInfo &constInfo) {};
     __aicore__ inline void InitCubeVecSharedParams(FagCVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx,
                                                    float qScaleDs) {};
 };

@@ -40,6 +40,8 @@ struct TempParams {
     int64_t dqWorkspaceLen;
     int64_t dkWorkspaceLen;
     int64_t dvWorkspaceLen;
+    int64_t dSinkWorkSpaceLen; // dSink 跨核 reduce 中间 workspace 长度（host 侧，不入 TilingData；仅
+                               // deter+HAS_SINKS 非零）
     uint32_t layout;
     uint32_t selected_block_count;
     uint32_t selected_block_size = 1;
@@ -50,6 +52,7 @@ struct TempParams {
     bool ropeEnable = false;
     bool deterministic = false;
     bool kvMerge = false;
+    bool hasSinks = false; // sinks 输入是否存在（编入 tiling key bit35 HasSinks）
 };
 
 struct AiCoreParams {

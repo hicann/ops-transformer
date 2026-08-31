@@ -46,7 +46,10 @@ const std::string kAscend950SocInfo = "{\n"
                                       "  }\n"
                                       "}";
 
-constexpr uint64_t kKeyBsndBf16KvMerge = 17717266433UL;
+// G/S2/D 模板按 ASCENDC_TPL_UINT_DECL 合法值列表的 index 编码（CANN FastEncodeTilingKeyDirect 行为）：
+// 模板 128/128/512 在声明 [128]/[128]/[512,576] 中均位于 index 0 → G/S2/D 编码 0。
+// kvMerge=true 置 bit34，BF16 置 bit0。最终 key = (1 << 34) + 1 = 17179869185。
+constexpr uint64_t kKeyBsndBf16KvMerge = 17179869185UL;
 } // namespace
 
 class SparseFlashAttentionGradArch35Tiling : public testing::Test {};
