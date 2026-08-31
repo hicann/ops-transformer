@@ -48,38 +48,40 @@ REG_OP(MaskedSoftmaxWithRelPosBias)
     .ATTR(inner_precision_mode, Int, 0)
     .OP_END_FACTORY_REG(MaskedSoftmaxWithRelPosBias)
 
-    /**
-    * @brief AttentionScore's forward calculation.
+/**
+* @brief AttentionScore's forward calculation.
 
-    * @par Inputs:
-    * six inputs, including:
-    * @li query: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
-    * @li key: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
-    * @li value: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
-    * @li padding_mask: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
-    * @li scale: A scalar. The type only support float16. Enter a 4D Tensor.
-    * @li drop_mask: A matrix Tensor. An optional input parameter. The type only support uint8. Enter a 4D Tensor.
+* @par Inputs:
+* six inputs, including:
+* @li query: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
+* @li key: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
+* @li value: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
+* @li padding_mask: A matrix Tensor. The type only support float16. Enter a 4D Tensor.
+* @li scale: A scalar. The type only support float16. Enter a 4D Tensor.
+* @li drop_mask: A matrix Tensor. An optional input parameter. The type only support uint8. Enter a 4D Tensor.
 
-    * @par Attributes:
-    * @li keep_prob: A float. The keep probability of dropout. Default: 1.0.
-    * @li query_transpose: A bool. If True, changes the shape of "query" from [B, N, S, D] to [B, N, D, S].
-    * Default: false.
-    * @li key_transpose: A bool. If True, changes the shape of "key" from [B, N, S, D] to [B, N, D, S].
-    * Default: false.
-    * @li bmm_score_transpose_a: A bool. If True, changes the shape of "mid_data" from [B, N, S, D] to [B, N, D, S].
-    * Default: false.
-    * @li bmm_score_transpose_b: A bool. If True, changes the shape of "value" from [B, N, S, D] to [B, N, D, S].
-    * Default: false.
-    * @li softmax_axes: A list of int. The dimension softmax would be performed on. Defaults to "[-1]".
+* @par Attributes:
+* @li keep_prob: A float. The keep probability of dropout. Default: 1.0.
+* @li query_transpose: A bool. If True, changes the shape of "query" from [B, N, S, D] to [B, N, D, S].
+* Default: false.
+* @li key_transpose: A bool. If True, changes the shape of "key" from [B, N, S, D] to [B, N, D, S].
+* Default: false.
+* @li bmm_score_transpose_a: A bool. If True, changes the shape of "mid_data" from [B, N, S, D] to [B, N, D, S].
+* Default: false.
+* @li bmm_score_transpose_b: A bool. If True, changes the shape of "value" from [B, N, S, D] to [B, N, D, S].
+* Default: false.
+* @li softmax_axes: A list of int. The dimension softmax would be performed on. Defaults to "[-1]".
 
-    * @par Outputs:
-    * attention_score: The result matrix Tensor. The type only support float16. The output shape is the same as query.
-    * softmax_output: The result matrix Tensor. The type only support float16. The output shape is the same as query.
+* @par Outputs:
+* attention_score: The result matrix Tensor. The type only support float16. The output shape is the same as query.
+* softmax_output: The result matrix Tensor. The type only support float16. The output shape is the same as query.
 
-    * @par Restrictions:
-    * Warning: THIS FUNCTION IS EXPERIMENTAL. Please do not use.
-    */
-    REG_OP(AttentionScore)
+* @par Restrictions:
+* Warning: THIS FUNCTION IS EXPERIMENTAL. Please do not use.
+*/
+#ifndef OPS_PROTO_DEF_ATTENTIONSCORE
+#define OPS_PROTO_DEF_ATTENTIONSCORE
+        REG_OP(AttentionScore)
     .INPUT(query, TensorType({DT_FLOAT16}))
     .INPUT(key, TensorType({DT_FLOAT16}))
     .INPUT(value, TensorType({DT_FLOAT16}))
@@ -95,6 +97,7 @@ REG_OP(MaskedSoftmaxWithRelPosBias)
     .ATTR(bmm_score_transpose_b, Bool, false)
     .ATTR(softmax_axes, ListInt, {-1})
     .OP_END_FACTORY_REG(AttentionScore)
+#endif
 
     /**
      * @brief Tutel dispatch function in moe.
