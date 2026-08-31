@@ -102,19 +102,19 @@ enum ImplMode : uint8_t {
 
 enum PseType : uint8_t {
     PSE_OUTER_MUL_ADD_TYPE = 0, // v2 default
-    PSE_OUTER_ADD_MUL_TYPE, // v1 current usage
+    PSE_OUTER_ADD_MUL_TYPE,     // v1 current usage
     PSE_INNER_MUL_ADD_TYPE,
     PSE_INNER_MUL_ADD_SQRT_TYPE,
     PSE_INVALID_TYPE
 };
-
 
 enum PseEncodeType : uint8_t {
     PES_ENCODE_NONE = 0,
     PSE_ENCODE_ALIBI_S2_FULL = 0x11, // shape: (1024, S2)
 };
 
-template <typename T> static T AlignUp(T num1, T num2)
+template <typename T>
+static T AlignUp(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -125,7 +125,8 @@ template <typename T> static T AlignUp(T num1, T num2)
     return (num1 + num2 - 1) / num2 * num2;
 }
 
-template <typename T> static T AlignDown(T num1, T num2)
+template <typename T>
+static T AlignDown(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -133,7 +134,8 @@ template <typename T> static T AlignDown(T num1, T num2)
     return num1 / num2 * num2;
 }
 
-template <typename T> static T CeilDivision(T num1, T num2)
+template <typename T>
+static T CeilDivision(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -141,7 +143,8 @@ template <typename T> static T CeilDivision(T num1, T num2)
     return (num1 + num2 - 1) / num2;
 }
 
-template <typename T> static T CeilDiv(const T n1, const T n2)
+template <typename T>
+static T CeilDiv(const T n1, const T n2)
 {
     if (n1 == 0) {
         return 0;
@@ -149,7 +152,8 @@ template <typename T> static T CeilDiv(const T n1, const T n2)
     return (n2 != 0) ? (((n1 - 1) / n2) + 1) : n1;
 }
 
-template <typename T> static T CalcTailSize(T num1, T num2)
+template <typename T>
+static T CalcTailSize(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -160,9 +164,15 @@ template <typename T> static T CalcTailSize(T num1, T num2)
 
 class TilingKey {
 public:
-    TilingKey() : splitS1(0), splitS2(0), splitD(0), dtype(0), layoutType(0), sparseType(0), reserved(0)
-    {
-    }
+    TilingKey()
+        : splitS1(0),
+          splitS2(0),
+          splitD(0),
+          dtype(0),
+          layoutType(0),
+          sparseType(0),
+          reserved(0)
+    {}
 
     void Reset()
     {
@@ -187,13 +197,13 @@ public:
         return ss.str();
     }
 
-    uint32_t splitS1    : 1;
-    uint32_t splitS2    : 1;
-    uint32_t splitD     : 1;
-    uint32_t dtype      : 2;
+    uint32_t splitS1 : 1;
+    uint32_t splitS2 : 1;
+    uint32_t splitD : 1;
+    uint32_t dtype : 2;
     uint32_t layoutType : 2;
     uint32_t sparseType : 2;
-    uint32_t reserved   : 23; // to fullfil 32 bit, if add new template bit then decrease this number
+    uint32_t reserved : 23; // to fullfil 32 bit, if add new template bit then decrease this number
 };
 
 inline bool operator==(const TilingKey &left, const TilingKey &right)
@@ -213,7 +223,8 @@ public:
 
 class FusedFloydAttentionTilingBase : public TilingBaseClass {
 public:
-    explicit FusedFloydAttentionTilingBase(gert::TilingContext *context) : TilingBaseClass(context)
+    explicit FusedFloydAttentionTilingBase(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {
         Reset();
     }
@@ -281,17 +292,17 @@ protected:
     bool IsBasicBlockInSoftMax(const ge::Shape &shape) const;
     virtual bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                                     matmul_tiling::MatmulApiTiling &bmm1);
-    virtual bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, 
-                            matmul_tiling::MatmulApiTiling &bmm1) = 0;
+    virtual bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
+                                      matmul_tiling::MatmulApiTiling &bmm1) = 0;
     virtual bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                                     matmul_tiling::MatmulApiTiling &bmm2) = 0;
 
     virtual bool SetBmm2v2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                    matmul_tiling::MatmulApiTiling &bmm2v2) = 0;
+                                      matmul_tiling::MatmulApiTiling &bmm2v2) = 0;
 
-    bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                         matmul_tiling::MatmulApiTiling &bmm1, matmul_tiling::MatmulApiTiling &bmm1k1,
-                         matmul_tiling::MatmulApiTiling &bmm2, matmul_tiling::MatmulApiTiling &bmm2v2);
+    bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, matmul_tiling::MatmulApiTiling &bmm1,
+                         matmul_tiling::MatmulApiTiling &bmm1k1, matmul_tiling::MatmulApiTiling &bmm2,
+                         matmul_tiling::MatmulApiTiling &bmm2v2);
     bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock);
     bool CaclBmmBatch(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock);
     virtual void SetCoreParams();
@@ -400,7 +411,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::GetPlatformInfo()
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compileInfoPtr is null."),
-                   return ge::GRAPH_FAILED);
+                    return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
         aicNum = compileInfoPtr->aicNum;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
@@ -415,7 +426,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, aicoreParams_.l0cSize);
     }
     OP_LOGI(context_, "get platform from compileInfo. aivNum(%u) aicNum(%u) ubSize(%lu) l1Size(%lu) l0cSize(%lu).",
-              aivNum, aicNum, aicoreParams_.ubSize, aicoreParams_.l1Size, aicoreParams_.l0cSize);
+            aivNum, aicNum, aicoreParams_.ubSize, aicoreParams_.l1Size, aicoreParams_.l0cSize);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -451,27 +462,26 @@ void FusedFloydAttentionTilingBase::SetSparseTilingInfo(SparseEnum &sparseType)
     inputParams.set_sparseType(static_cast<uint8_t>(sparseType));
 }
 
-
 ge::graphStatus FusedFloydAttentionTilingBase::GetShapeAttrsInfo()
 {
     opName = context_->GetNodeName();
     OP_LOGD(opName, "TilingContext: %s.", GetTilingContextDebugStr().c_str());
     OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OPS_REPORT_VECTOR_INNER_ERR(opName, "invalid context."),
-               return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(!AnalyzeAttrs() || !AnalyzeDtype() || !AnalyzeLayout() || !AnalyzeOptionalInput(),
-               OPS_REPORT_VECTOR_INNER_ERR(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
 
     alignedS1 = AlignUp(s1Size, FRACTAL_NUM);
     alignedS2 = AlignUp(s2Size, FRACTAL_NUM);
     alignedD = AlignUp(dSize, FRACTAL_NUM);
 
     OP_CHECK_IF(alignedS1 <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "invalid alignedS1 %ld.", alignedS1),
-        return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(alignedS2 <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "invalid alignedS2 %ld.", alignedS2),
-        return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(alignedD <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "invalid alignedD %ld.", alignedD),
-        return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
 
     auto &inputParams = tilingData.inputParams;
     inputParams.set_bSize(bSize);
@@ -485,8 +495,10 @@ ge::graphStatus FusedFloydAttentionTilingBase::GetShapeAttrsInfo()
     inputParams.set_scaleValue(scaleValue);
     inputParams.set_alignedS2(alignedS2);
     inputParams.set_pseType(static_cast<uint32_t>(pseType));
-    OP_LOGD(context_, "input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], keepProb[%f], scaleValue[%f],"
-              "pseType:%ld.", bSize, n2Size, gSize, s1Size, s2Size, dSize, keepProb, scaleValue, pseType);
+    OP_LOGD(context_,
+            "input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], keepProb[%f], scaleValue[%f],"
+            "pseType:%ld.",
+            bSize, n2Size, gSize, s1Size, s2Size, dSize, keepProb, scaleValue, pseType);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -628,12 +640,12 @@ bool FusedFloydAttentionTilingBase::AnalyzeLayout()
     auto &attenShape = context_->GetInputShape(ATTENTION_MASK_INPUT_INDEX)->GetStorageShape();
 
     OP_CHECK_IF(!Analyze4DimLayout(queryShape, keyShape, attenShape),
-               OPS_REPORT_VECTOR_INNER_ERR(opName, "Get unsupported layout: %s", inputLayout), return false);
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "Get unsupported layout: %s", inputLayout), return false);
     return true;
 }
 
-
-bool FusedFloydAttentionTilingBase::Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &attenShape)
+bool FusedFloydAttentionTilingBase::Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
+                                                      const gert::Shape &attenShape)
 {
     // Q:   B H N M D
     // key: B H N K D
@@ -641,8 +653,8 @@ bool FusedFloydAttentionTilingBase::Analyze4DimLayout(const gert::Shape &querySh
     n2Size = keyShape.GetDim(2); // 2:N
     gSize = 1;
     s1Size = queryShape.GetDim(3); // 3:M
-    s2Size = keyShape.GetDim(3); // 3:M
-    dSize = queryShape.GetDim(4); // 4:D
+    s2Size = keyShape.GetDim(3);   // 3:M
+    dSize = queryShape.GetDim(4);  // 4:D
     atten_bSize = attenShape.GetDim(0) * attenShape.GetDim(1);
     s1StrideSize = dSize;
     s2StrideSize = dSize;
@@ -651,7 +663,6 @@ bool FusedFloydAttentionTilingBase::Analyze4DimLayout(const gert::Shape &querySh
 
     return true;
 }
-
 
 bool FusedFloydAttentionTilingBase::AnalyzeOptionalInput()
 {
@@ -688,11 +699,11 @@ ge::graphStatus FusedFloydAttentionTilingBase::DoOpTiling()
     OP_LOGD(context_, "[%s]try template[%s]", templateName, expectTemplate.ToString().c_str());
     if (!MatchTemplate()) {
         OP_LOGI(context_,
-                  "[%s]not match template[%s], input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], "
-                  "keepProb[%f]",
-                  templateName, expectTemplate.ToString().c_str(), inputParams.get_bSize(), inputParams.get_n2Size(),
-                  inputParams.get_gSize(), inputParams.get_s1Size(), inputParams.get_s2Size(), inputParams.get_dSize(),
-                  inputParams.get_keepProb());
+                "[%s]not match template[%s], input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], "
+                "keepProb[%f]",
+                templateName, expectTemplate.ToString().c_str(), inputParams.get_bSize(), inputParams.get_n2Size(),
+                inputParams.get_gSize(), inputParams.get_s1Size(), inputParams.get_s2Size(), inputParams.get_dSize(),
+                inputParams.get_keepProb());
         return ge::GRAPH_PARAM_INVALID;
     }
 
@@ -723,10 +734,10 @@ bool FusedFloydAttentionTilingBase::MatchTemplate()
 
     if (s2BasicBlock == std::numeric_limits<int64_t>::max()) {
         OP_LOGD(context_,
-                  "[%s]can't find proper S1S2 basic block for shape: S1[%ld] S2[%ld], D[%ld], minS1BasicBlock[%ld], "
-                  "dtype[%s], high precision[%d]",
-                  templateName, s1Size, s2Size, dSize, GetMinS1BasicBlock(),
-                  ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str(), isHighPercision);
+                "[%s]can't find proper S1S2 basic block for shape: S1[%ld] S2[%ld], D[%ld], minS1BasicBlock[%ld], "
+                "dtype[%s], high precision[%d]",
+                templateName, s1Size, s2Size, dSize, GetMinS1BasicBlock(),
+                ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str(), isHighPercision);
         return false;
     }
 
@@ -738,7 +749,7 @@ bool FusedFloydAttentionTilingBase::MatchTemplate()
     if (IsTemplateMatched()) {
         (void)CalcUBSize(s1BasicBlock, s2BasicBlock);
         OP_LOGD(context_, "[%s]final basic block: [%ld, %ld, %ld], match template[%s].", templateName, s1BasicBlock,
-                  s2BasicBlock, dBasicBlock, actualTemplate.ToString().c_str());
+                s2BasicBlock, dBasicBlock, actualTemplate.ToString().c_str());
         return true;
     }
 
@@ -886,13 +897,12 @@ ge::graphStatus FusedFloydAttentionTilingBase::PostTiling()
     context_->SetBlockDim(blockDim);
     size_t *workspaces = context_->GetWorkspaceSizes(1);
 
-    OP_LOGD(context_, "[%s] final workspace size:%zu, pseAlibiBaseS1:%ld, pseAlibiBaseS2:%ld.",
-              templateName, workspaces[0], pseAlibiBaseS1, pseAlibiBaseS2);
+    OP_LOGD(context_, "[%s] final workspace size:%zu, pseAlibiBaseS1:%ld, pseAlibiBaseS2:%ld.", templateName,
+            workspaces[0], pseAlibiBaseS1, pseAlibiBaseS2);
     OP_LOGD(opName, "[%s] tiling data:%s", templateName, GetTilingDataDebugStr().c_str());
 
     return ge::GRAPH_SUCCESS;
 }
-
 
 bool FusedFloydAttentionTilingBase::SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                                                        matmul_tiling::MatmulApiTiling &bmm1)
@@ -928,8 +938,7 @@ bool FusedFloydAttentionTilingBase::CaclBmmBatch(int64_t tmpS1BasicBlock, int64_
 
     int64_t bmmv2Num = aicoreParams_.l1Size / 2 / s2Size / (dSize + n2BasicBlock);
     bmmv2Num = std::min(bmmv2Num, static_cast<int64_t>(4));
-    if (bmmv2Num == 3)
-    {
+    if (bmmv2Num == 3) {
         bmmv2Num = 2;
     }
     tilingData.coreParams.set_bmmv2Num(bmmv2Num);
@@ -937,15 +946,13 @@ bool FusedFloydAttentionTilingBase::CaclBmmBatch(int64_t tmpS1BasicBlock, int64_
     return true;
 }
 
-
 bool FusedFloydAttentionTilingBase::SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                                                     matmul_tiling::MatmulApiTiling &bmm1,
                                                     matmul_tiling::MatmulApiTiling &bmm1k1,
                                                     matmul_tiling::MatmulApiTiling &bmm2,
                                                     matmul_tiling::MatmulApiTiling &bmm2v2)
 {
-    if (!CaclBmmBatch(tmpS1BasicBlock, tmpS2BasicBlock))
-    {
+    if (!CaclBmmBatch(tmpS1BasicBlock, tmpS2BasicBlock)) {
         return false;
     }
 
@@ -953,8 +960,8 @@ bool FusedFloydAttentionTilingBase::SetMatMulTiling(int64_t tmpS1BasicBlock, int
         !SetBmm2TilingInput(tmpS1BasicBlock, tmpS2BasicBlock, bmm2)) {
         return false;
     }
-    
-    if (!SetBmm1k1TilingInput(tmpS1BasicBlock, tmpS2BasicBlock, bmm1k1) || 
+
+    if (!SetBmm1k1TilingInput(tmpS1BasicBlock, tmpS2BasicBlock, bmm1k1) ||
         !SetBmm2v2TilingInput(tmpS1BasicBlock, tmpS2BasicBlock, bmm2v2)) {
         return false;
     }
@@ -1064,7 +1071,6 @@ void FusedFloydAttentionTilingBase::SetTensorSizeParams()
     tensorSizeParams.set_bmm2ResUbSize(batchInnerSize * s1BasicBlock * dBasicBlock);
 }
 
-
 ge::graphStatus FusedFloydAttentionTilingBase::GetWorkspaceSize()
 {
     auto &tensorSizeParams = tilingData.tensorSizeParams;
@@ -1077,10 +1083,10 @@ ge::graphStatus FusedFloydAttentionTilingBase::GetWorkspaceSize()
     return ge::GRAPH_SUCCESS;
 }
 
-
 class FusedFloydAttentionTilingS1s2Bn2gs1 : public FusedFloydAttentionTilingBase {
 public:
-    explicit FusedFloydAttentionTilingS1s2Bn2gs1(gert::TilingContext *context) : FusedFloydAttentionTilingBase(context)
+    explicit FusedFloydAttentionTilingS1s2Bn2gs1(gert::TilingContext *context)
+        : FusedFloydAttentionTilingBase(context)
     {
         expectTemplate.splitS1 = 1;
         expectTemplate.splitS2 = 1;
@@ -1140,7 +1146,7 @@ protected:
         }
         if (dSize > L1REUSE_D_Limit) {
             OP_LOGD(context_, "Current condition [dSize(%ld) > L1REUSE_D_Limit(%ld)] does not enable L1Reuse", dSize,
-                      L1REUSE_D_Limit);
+                    L1REUSE_D_Limit);
             return;
         }
         if (dSize == D_SPECIFIC_SIZE && tilingData.inputParams.get_layoutType() == LAYOUT_BNSD &&
@@ -1153,16 +1159,14 @@ protected:
             return;
         }
 
-        if ((tilingData.inputParams.get_layoutType() == LAYOUT_BSND || tilingData.inputParams.get_layoutType() ==
-            LAYOUT_BSH) && s2Size <= L1REUSE_S2_Limit_2048 && dSize <= D_SPECIFIC_SIZE &&
-            bSize * n1Size <= L1REUSE_BNG_Limit) {
+        if ((tilingData.inputParams.get_layoutType() == LAYOUT_BSND ||
+             tilingData.inputParams.get_layoutType() == LAYOUT_BSH) &&
+            s2Size <= L1REUSE_S2_Limit_2048 && dSize <= D_SPECIFIC_SIZE && bSize * n1Size <= L1REUSE_BNG_Limit) {
             OP_LOGD(context_, "Current condition [dSize(%ld) && layout(BSH/BSND) && BN(%ld)] does not enable L1Reuse",
-                      dSize, bSize * n1Size);
+                    dSize, bSize * n1Size);
             return;
         }
-
     }
-
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                             matmul_tiling::MatmulApiTiling &bmm1) override
@@ -1172,8 +1176,8 @@ protected:
         bmm1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm1OutDtype);
         int64_t s2BaseSize = tmpS2BasicBlock * tilingData.coreParams.get_nRatio();
         int32_t batchNum = tilingData.coreParams.get_bmm1Num();
-        
-        bmm1.SetShape(tmpS1BasicBlock, s2BaseSize, dSize); 
+
+        bmm1.SetShape(tmpS1BasicBlock, s2BaseSize, dSize);
         bmm1.SetOrgShape(tmpS1BasicBlock, s2BaseSize, dSize);
         bmm1.SetBias(false);
         bmm1.SetBufferSpace(-1, -1, -1);
@@ -1183,37 +1187,36 @@ protected:
         return true;
     }
 
-
-    bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, 
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+    bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
+                              matmul_tiling::MatmulApiTiling &bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
         bmm1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm1OutDtype);
         int64_t s2BaseSize = tmpS2BasicBlock * tilingData.coreParams.get_nRatio();
 
-        bmm1.SetShape(n2BasicBlock, s2BaseSize, dSize); 
+        bmm1.SetShape(n2BasicBlock, s2BaseSize, dSize);
         bmm1.SetOrgShape(n2BasicBlock, s2BaseSize, dSize);
         bmm1.SetBias(false);
         bmm1.SetBufferSpace(-1, -1, -1);
-        bmm1.SetALayout(1, n2BasicBlock, 1, s1Size, dSize); 
-        bmm1.SetBLayout(1, s2BaseSize, 1, s1Size, dSize); 
-        bmm1.SetCLayout(1, n2BasicBlock, 1, tmpS1BasicBlock, s2BaseSize); 
+        bmm1.SetALayout(1, n2BasicBlock, 1, s1Size, dSize);
+        bmm1.SetBLayout(1, s2BaseSize, 1, s1Size, dSize);
+        bmm1.SetCLayout(1, n2BasicBlock, 1, tmpS1BasicBlock, s2BaseSize);
         int32_t batchNum = tilingData.coreParams.get_bmmv2Num();
         bmm1.SetBatchNum(batchNum);
 
         return true;
     }
 
-    bool SetBmm2v2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, 
-                            matmul_tiling::MatmulApiTiling &bmm2v2) override
+    bool SetBmm2v2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
+                              matmul_tiling::MatmulApiTiling &bmm2v2) override
     {
         bmm2v2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm1OutDtype);
         int64_t s2BaseSize = tmpS2BasicBlock * tilingData.coreParams.get_nRatio();
 
-        bmm2v2.SetShape(n2BasicBlock, dSize, s2BaseSize); 
+        bmm2v2.SetShape(n2BasicBlock, dSize, s2BaseSize);
         bmm2v2.SetOrgShape(n2BasicBlock, dSize, s2BaseSize);
         bmm2v2.SetBias(false);
         bmm2v2.SetBufferSpace(-1, -1, -1);
@@ -1226,7 +1229,6 @@ protected:
 
         return true;
     }
-
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                             matmul_tiling::MatmulApiTiling &bmm2v2) override
@@ -1246,13 +1248,12 @@ protected:
         return true;
     }
 
-
     uint64_t GetTilingKey() const override
     {
         // not care about layout in tiling key, pass BSND(enum value is 0)
-        return GET_TILINGKEY(AxisEnum::S1, AxisEnum::S2, AxisEnum::NONE, implMode, tilingKeyLayout,
-                             tilingKeyBmm1Format, SparseEnum::ANY, PerformanceOrientedEnum::BIG_DOUBLE_BUFFER,
-                             false, hasAttenMask, false, false);
+        return GET_TILINGKEY(AxisEnum::S1, AxisEnum::S2, AxisEnum::NONE, implMode, tilingKeyLayout, tilingKeyBmm1Format,
+                             SparseEnum::ANY, PerformanceOrientedEnum::BIG_DOUBLE_BUFFER, false, hasAttenMask, false,
+                             false);
     }
 
     bool IsCapable() override
@@ -1299,43 +1300,49 @@ protected:
         // dSize小于64的场景，无需切D， workspace占用较小
         if (dSize <= D_SPECIFIC_SIZE) {
             // stage1占用2倍的空间，stage2占用2倍空间
-            workspaces[0] = static_cast<size_t>((
-                                bmm1Bytes * SPACE_NUM_2 + SPACE_NUM_2 * coreParams.get_n2BaseSize() *
-                                coreParams.get_s1BaseSize() * alignedD * calcTypeSize
-                            ) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+            workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 + SPACE_NUM_2 * coreParams.get_n2BaseSize() *
+                                                                               coreParams.get_s1BaseSize() * alignedD *
+                                                                               calcTypeSize) *
+                                                aivNum) +
+                            WORK_SPACE_RESERVE_SIZE;
             // NZND场景，stage1占用3倍的空间，stage2占用2倍空间
             if (s2Size % S2_NZTOND_SIZE_64 != 0) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_3 + SPACE_NUM_2 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize
-                                ) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
+                                                     SPACE_NUM_2 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
             // FP32场景，stage1占用4倍的空间，stage2占用2倍空间
             if (inputDtypeBytes == DATA_TYPE_FP32) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_4 + SPACE_NUM_2 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize
-                                ) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
+                                                     SPACE_NUM_2 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
         } else {
             // 切D场景，stage1占用2倍的空间，stage2占用4倍空间
-            workspaces[0] = static_cast<size_t>((
-                                bmm1Bytes * SPACE_NUM_2 + SPACE_NUM_4 * coreParams.get_n2BaseSize() *
-                                coreParams.get_s1BaseSize() * alignedD * calcTypeSize
-                            ) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+            workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 + SPACE_NUM_4 * coreParams.get_n2BaseSize() *
+                                                                               coreParams.get_s1BaseSize() * alignedD *
+                                                                               calcTypeSize) *
+                                                aivNum) +
+                            WORK_SPACE_RESERVE_SIZE;
             // NZND场景，stage1占用3倍的空间，stage2占用4倍空间
             if (s2Size % S2_NZTOND_SIZE_64 != 0) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_3 + SPACE_NUM_4 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize
-                                ) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
+                                                     SPACE_NUM_4 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
             // FP32场景，stage1占用4倍的空间，stage2占用4倍空间
             if (inputDtypeBytes == DATA_TYPE_FP32) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_4 + SPACE_NUM_4 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize
-                                ) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
+                                                     SPACE_NUM_4 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
         }
 
@@ -1351,10 +1358,10 @@ protected:
     }
 };
 
-
 class FusedFloydAttentionTilingS1s2Bn2gs1Special : public FusedFloydAttentionTilingBase {
 public:
-    explicit FusedFloydAttentionTilingS1s2Bn2gs1Special(gert::TilingContext *context) : FusedFloydAttentionTilingBase(context)
+    explicit FusedFloydAttentionTilingS1s2Bn2gs1Special(gert::TilingContext *context)
+        : FusedFloydAttentionTilingBase(context)
     {
         expectTemplate.splitS1 = 1;
         expectTemplate.splitS2 = 1;
@@ -1422,7 +1429,7 @@ protected:
         }
         if (dSize > L1REUSE_D_Limit) {
             OP_LOGD(context_, "Current condition [dSize(%ld) > L1REUSE_D_Limit(%ld)] does not enable L1Reuse", dSize,
-                      L1REUSE_D_Limit);
+                    L1REUSE_D_Limit);
             return;
         }
         if (dSize == D_SPECIFIC_SIZE && tilingData.inputParams.get_layoutType() == LAYOUT_BNSD &&
@@ -1435,16 +1442,14 @@ protected:
             return;
         }
 
-        if ((tilingData.inputParams.get_layoutType() == LAYOUT_BSND || tilingData.inputParams.get_layoutType() ==
-            LAYOUT_BSH) && s2Size <= L1REUSE_S2_Limit_2048 && dSize <= D_SPECIFIC_SIZE &&
-            bSize * n1Size <= L1REUSE_BNG_Limit) {
+        if ((tilingData.inputParams.get_layoutType() == LAYOUT_BSND ||
+             tilingData.inputParams.get_layoutType() == LAYOUT_BSH) &&
+            s2Size <= L1REUSE_S2_Limit_2048 && dSize <= D_SPECIFIC_SIZE && bSize * n1Size <= L1REUSE_BNG_Limit) {
             OP_LOGD(context_, "Current condition [dSize(%ld) && layout(BSH/BSND) && BN(%ld)] does not enable L1Reuse",
-                      dSize, bSize * n1Size);
+                    dSize, bSize * n1Size);
             return;
         }
-
     }
-
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                             matmul_tiling::MatmulApiTiling &bmm1) override
@@ -1454,8 +1459,8 @@ protected:
         bmm1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm1OutDtype);
         int64_t s2BaseSize = tmpS2BasicBlock * tilingData.coreParams.get_nRatio();
         int32_t batchNum = tilingData.coreParams.get_bmm1Num();
-        
-        bmm1.SetShape(tmpS1BasicBlock, s2BaseSize, dSize); 
+
+        bmm1.SetShape(tmpS1BasicBlock, s2BaseSize, dSize);
         bmm1.SetOrgShape(tmpS1BasicBlock, s2BaseSize, dSize);
         bmm1.SetBias(false);
         bmm1.SetBufferSpace(-1, -1, -1);
@@ -1465,38 +1470,36 @@ protected:
         return true;
     }
 
-
-    bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, 
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+    bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
+                              matmul_tiling::MatmulApiTiling &bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
         bmm1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm1OutDtype);
         int64_t s2BaseSize = tmpS2BasicBlock * tilingData.coreParams.get_nRatio();
 
-        bmm1.SetShape(n2BasicBlock, s2BaseSize, dSize); 
+        bmm1.SetShape(n2BasicBlock, s2BaseSize, dSize);
         bmm1.SetOrgShape(n2BasicBlock, s2BaseSize, dSize);
         bmm1.SetBias(false);
         bmm1.SetBufferSpace(-1, -1, -1);
-        bmm1.SetALayout(1, n2BasicBlock, 1, s1Size, dSize); 
-        bmm1.SetBLayout(1, s2BaseSize, 1, s1Size, dSize); 
-        bmm1.SetCLayout(1, n2BasicBlock, 1, tmpS1BasicBlock, s2BaseSize); 
+        bmm1.SetALayout(1, n2BasicBlock, 1, s1Size, dSize);
+        bmm1.SetBLayout(1, s2BaseSize, 1, s1Size, dSize);
+        bmm1.SetCLayout(1, n2BasicBlock, 1, tmpS1BasicBlock, s2BaseSize);
         int32_t batch = tilingData.coreParams.get_bmmv2Num();
         bmm1.SetBatchNum(batch);
 
         return true;
     }
 
-
     bool SetBmm2v2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                            matmul_tiling::MatmulApiTiling &bmm2v2) override
+                              matmul_tiling::MatmulApiTiling &bmm2v2) override
     {
         bmm2v2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm1OutDtype);
         int64_t s2BaseSize = tmpS2BasicBlock * tilingData.coreParams.get_nRatio();
 
-        bmm2v2.SetShape(n2BasicBlock, dSize, s2BaseSize); 
+        bmm2v2.SetShape(n2BasicBlock, dSize, s2BaseSize);
         bmm2v2.SetOrgShape(n2BasicBlock, dSize, s2BaseSize);
         bmm2v2.SetBias(false);
         bmm2v2.SetBufferSpace(-1, -1, -1);
@@ -1510,8 +1513,7 @@ protected:
         return true;
     }
 
-
-    bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, 
+    bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                             matmul_tiling::MatmulApiTiling &bmm2v2) override
     {
         bmm2v2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -1529,18 +1531,17 @@ protected:
         return true;
     }
 
-
     uint64_t GetTilingKey() const override
     {
         // not care about layout in tiling key, pass BSND(enum value is 0)
         return GET_TILINGKEY(AxisEnum::S1, SparseMode::PREFIX, AxisEnum::NONE, implMode, tilingKeyLayout,
-                             tilingKeyBmm1Format, SparseEnum::ANY, PerformanceOrientedEnum::BIG_DOUBLE_BUFFER,
-                             false, hasAttenMask, false, false);
+                             tilingKeyBmm1Format, SparseEnum::ANY, PerformanceOrientedEnum::BIG_DOUBLE_BUFFER, false,
+                             hasAttenMask, false, false);
     }
 
     bool IsCapable() override
     {
-        if (s2Size > s2sizeSpecial) {
+        if (s2Size >= s2sizeSpecial) {
             return true;
         }
         return false;
@@ -1584,43 +1585,49 @@ protected:
         // dSize小于64的场景，无需切D， workspace占用较小
         if (dSize <= D_SPECIFIC_SIZE) {
             // stage1占用2倍的空间，stage2占用2倍空间
-            workspaces[0] = static_cast<size_t>((
-                                bmm1Bytes * SPACE_NUM_2 + softmaxExpBytes + bmm2stage2BufBytes + 
-                                SPACE_NUM_2 * coreParams.get_n2BaseSize() * coreParams.get_s1BaseSize() * 
-                                alignedD * calcTypeSize) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+            workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 + softmaxExpBytes + bmm2stage2BufBytes +
+                                                 SPACE_NUM_2 * coreParams.get_n2BaseSize() *
+                                                     coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                aivNum) +
+                            WORK_SPACE_RESERVE_SIZE;
             // NZND场景，stage1占用3倍的空间，stage2占用2倍空间
             if (s2Size % S2_NZTOND_SIZE_64 != 0) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_3 + SPACE_NUM_2 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) + 
-                                    WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
+                                                     SPACE_NUM_2 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
             // FP32场景，stage1占用4倍的空间，stage2占用2倍空间
             if (inputDtypeBytes == DATA_TYPE_FP32) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_4 + SPACE_NUM_2 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
-                                    WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
+                                                     SPACE_NUM_2 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
         } else {
             // 切D场景，stage1占用2倍的空间，stage2占用4倍空间
-            workspaces[0] = static_cast<size_t>((
-                                bmm1Bytes * SPACE_NUM_2 + softmaxExpBytes + bmm2stage2BufBytes +
-                                SPACE_NUM_4 * coreParams.get_n2BaseSize() * coreParams.get_s1BaseSize() * 
-                                alignedD * calcTypeSize) * aivNum) + WORK_SPACE_RESERVE_SIZE;
+            workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 + softmaxExpBytes + bmm2stage2BufBytes +
+                                                 SPACE_NUM_4 * coreParams.get_n2BaseSize() *
+                                                     coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                aivNum) +
+                            WORK_SPACE_RESERVE_SIZE;
             // NZND场景，stage1占用3倍的空间，stage2占用4倍空间
             if (s2Size % S2_NZTOND_SIZE_64 != 0) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_3 + SPACE_NUM_4 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
-                                    WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
+                                                     SPACE_NUM_4 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
             // FP32场景，stage1占用4倍的空间，stage2占用4倍空间
             if (inputDtypeBytes == DATA_TYPE_FP32) {
-                workspaces[0] = static_cast<size_t>((
-                                    bmm1Bytes * SPACE_NUM_4 + SPACE_NUM_4 * coreParams.get_n2BaseSize() *
-                                    coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
-                                    WORK_SPACE_RESERVE_SIZE;
+                workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
+                                                     SPACE_NUM_4 * coreParams.get_n2BaseSize() *
+                                                         coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                    aivNum) +
+                                WORK_SPACE_RESERVE_SIZE;
             }
         }
 
@@ -1635,7 +1642,6 @@ protected:
                                           tilingData.softmaxFlashTilingData, true, IsBasicBlockInSoftMax(softmaxShape));
     }
 };
-
 
 // NOTE manually initialize tiling data in hostapi scenario in highest priority template
 REGISTER_OPS_TILING_TEMPLATE(FusedFloydAttention, FusedFloydAttentionTilingS1s2Bn2gs1Special, 95);
