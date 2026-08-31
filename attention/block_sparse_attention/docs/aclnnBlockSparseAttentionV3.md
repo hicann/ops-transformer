@@ -23,7 +23,7 @@
 
 - **接口功能**：BlockSparseAttentionV3稀疏注意力计算，支持灵活的块级稀疏模式，通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算。
 
-  相比于BlockSparseAttentionV3,本接口新增pQuantScaleOptional、quantMode、dstTypeMax参数。
+  相比于BlockSparseAttentionV2,本接口新增pQuantScaleOptional、quantMode、dstTypeMax参数。
 - **计算公式**：稀疏块大小：$blockShapeX \times blockShapeY$，selectIdx指定稀疏模式
 
   $$
@@ -662,7 +662,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - 当前query、key、value的InputLayout必须保持一致。
 - 输入query、key、value的数据类型必须一致，支持FLOAT16和BFLOAT16。
 - query、key、value的D轴当前仅支持配置为64或128
-- blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
+- blockShapeOptional如果传入，则必须包含两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
   <!-- npu="950" id7 -->
   - 在<term>Ascend 950PR/Ascend 950DT</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）时，blockShapeX和blockShapeY均只支持64的倍数。
   <!-- end id7 -->
@@ -714,7 +714,6 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - **quantMode=2/3 (MXFP4量化模式)相关约束（新增）**
 
   - 仅Ascend 950PR/Ascend 950DT支持
-  - blockShapeX 仅支持64的倍数；
   - D仅支持64/128;
   - attentionOut数据类型仅支持FLOAT16或BFLOAT16；
   - 暂不支持attenMaskOptional、PagedAttention、softmaxLse等高阶特性。
