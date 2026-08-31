@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file test_aclnn_sparse_lightning_indexer_grad_kl_loss.cpp
+ * \file test_aclnn_sparse_lightning_indexer_grad_kl_loss_v2.cpp
  * \brief
  */
 
@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <cmath>
 #include "acl/acl.h"
-#include "aclnnop/aclnn_sparse_lightning_indexer_grad_kl_loss.h"
+#include "aclnnop/aclnn_sparse_lightning_indexer_grad_kl_loss_v2.h"
 
 #define CHECK_RET(cond, return_expr) \
     do { \
@@ -132,6 +132,7 @@ int main()
     std::vector<int64_t> dKIndexShape = {t2, n2, dQueryIndex};
     std::vector<int64_t> dWeightShape = {t1, nQueryIndex};
     std::vector<int64_t> lossShape = {1};
+    std::vector<int64_t> sinksShape = {G};
 
     void *qDeviceAddr = nullptr;
     void *kDeviceAddr = nullptr;
@@ -143,6 +144,7 @@ int main()
     void *sparseIndicesDeviceAddr = nullptr;
     void *softmaxMaxDeviceAddr = nullptr;
     void *softmaxSumDeviceAddr = nullptr;
+    void *sinksDeviceAddr = nullptr;
 
     void *dQIndexDeviceAddr = nullptr;
     void *dKIndexDeviceAddr = nullptr;
@@ -159,6 +161,7 @@ int main()
     aclTensor *sparseIndices = nullptr;
     aclTensor *softmaxMax = nullptr;
     aclTensor *softmaxSum = nullptr;
+    aclTensor *sinks = nullptr;
 
     aclTensor *dQIndex = nullptr;
     aclTensor *dKIndex = nullptr;
@@ -180,6 +183,7 @@ int main()
 
     std::vector<float> softmaxMaxHostData(t1 * n1, 25.4483f);
     std::vector<float> softmaxSumHostData(t1 * n1, 1.0f);
+    std::vector<float> sinksHostData(G, 0.0f);
 
     std::vector<aclFloat16> dQIndexHostData(t1 * nQueryIndex * dQueryIndex);
     std::vector<aclFloat16> dKIndexHostData(t2 * dQueryIndex);
@@ -209,6 +213,8 @@ int main()
     ret = CreateAclTensor(softmaxSumHostData, softmaxSumShape, &softmaxSumDeviceAddr, aclDataType::ACL_FLOAT,
                           &softmaxSum);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = CreateAclTensor(sinksHostData, sinksShape, &sinksDeviceAddr, aclDataType::ACL_FLOAT, &sinks);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(dQIndexHostData, dQIndexShape, &dQIndexDeviceAddr, aclDataType::ACL_FLOAT16, &dQIndex);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(dKIndexHostData, dKIndexShape, &dKIndexDeviceAddr, aclDataType::ACL_FLOAT16, &dKIndex);
@@ -232,15 +238,15 @@ int main()
 
     // 3. 调用CANN算子库API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor *executor = nullptr;
 
-    // 调用aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize第一段接口
-    ret = aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize(
-        q, k, qIndex, kIndex, weight, sparseIndices, softmaxMax, softmaxSum, qRope, kRope, acSeqQLen, acSeqKvLen,
+    // 调用aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize第一段接口
+    ret = aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize(
+        q, k, qIndex, kIndex, weight, sparseIndices, softmaxMax, softmaxSum, qRope, kRope, acSeqQLen, acSeqKvLen, sinks,
         scaleValue, layOut, sparseMode, preTokens, nextTokens, deterministic, dQIndex, dKIndex, dWeight, loss,
         &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS,
-              LOG_PRINT("aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize failed. ERROR: %d\n", ret);
+              LOG_PRINT("aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
@@ -250,9 +256,9 @@ int main()
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
 
-    // 调用aclnnSparseLightningIndexerGradKLLoss第二段接口
-    ret = aclnnSparseLightningIndexerGradKLLoss(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseLightningIndexerGradKLLoss failed. ERROR: %d\n", ret);
+    // 调用aclnnSparseLightningIndexerGradKLLossV2第二段接口
+    ret = aclnnSparseLightningIndexerGradKLLossV2(workspaceAddr, workspaceSize, executor, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseLightningIndexerGradKLLossV2 failed. ERROR: %d\n", ret);
               return ret);
 
     // 4. （固定写法）同步等待任务执行结束
@@ -276,6 +282,7 @@ int main()
     aclDestroyTensor(sparseIndices);
     aclDestroyTensor(softmaxMax);
     aclDestroyTensor(softmaxSum);
+    aclDestroyTensor(sinks);
 
     aclDestroyTensor(dQIndex);
     aclDestroyTensor(dKIndex);
@@ -293,6 +300,7 @@ int main()
     aclrtFree(sparseIndicesDeviceAddr);
     aclrtFree(softmaxMaxDeviceAddr);
     aclrtFree(softmaxSumDeviceAddr);
+    aclrtFree(sinksDeviceAddr);
 
     aclrtFree(dQIndexDeviceAddr);
     aclrtFree(dKIndexDeviceAddr);

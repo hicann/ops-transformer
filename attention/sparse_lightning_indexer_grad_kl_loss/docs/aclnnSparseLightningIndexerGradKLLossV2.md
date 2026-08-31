@@ -1,4 +1,4 @@
-# aclnnSparseLightningIndexerGradKLLoss
+# aclnnSparseLightningIndexerGradKLLossV2
 
 ## 产品支持情况
 
@@ -6,10 +6,10 @@
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
@@ -24,6 +24,8 @@
 ## 功能说明
 
 - 接口功能：SparselightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列的网络的推理和训练的性能。
+
+- aclnnSparseLightningIndexerGradKLLossV2在aclnnSparseLightningIndexerGradKLLoss的基础上新增了sinks参数，sinks用于修正target distribution（p）归一化因子，仅Ascend 950PR/Ascend 950DT支持。
 
 - 计算公式：
    用于取Top-k的value的计算公式可以表示为：
@@ -74,10 +76,10 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize”接口获取入参并根据计算流程计算所需workspace大小，再调用“aclnnSparseLightningIndexerGradKLLoss”接口执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize”接口获取入参并根据计算流程计算所需workspace大小，再调用“aclnnSparseLightningIndexerGradKLLossV2”接口执行计算。
 
 ```c++
-aclnnStatus aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize(
+aclnnStatus aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize(
     const aclTensor     *query,
     const aclTensor     *key,
     const aclTensor     *queryIndex,
@@ -90,6 +92,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize(
     const aclTensor     *keyRope,
     const aclIntArray   *actualSeqLengthsQuery,
     const aclIntArray   *actualSeqLengthsKey,
+    const aclTensor     *sinks,
     double               scaleValue,
     char                *layout,
     int64_t              sparseMode,
@@ -112,7 +115,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
     aclrtStream       stream)
 ```
 
-## aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize
+## aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize
 
 - **参数说明:**
 
@@ -367,6 +370,22 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
             <td>-</td>
         </tr>
         <tr>
+        <td>sinks</td>
+        <td>输入</td>
+        <td>用于修正target distribution（p）归一化因子的附加softmax项。</td>
+        <td>
+              <ul>
+                <li>需为1维且长度等于query的N维度。</li>
+                <li>该参数可选，不传入时与aclnnSparseLightningIndexerGradKLLoss接口行为一致。</li>
+                <li>仅Ascend 950PR/Ascend 950DT支持。</li>
+              </ul>
+        </td>
+        <td>FLOAT32</td>
+        <td>ND</td>
+        <td>(N1,)</td>
+        <td>√</td>
+        </tr>
+        <tr>
         <td>deterministic</td>
             <td>输入</td>
             <td>确定性计算。</td>
@@ -441,11 +460,6 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         </tbody>
     </table>
 
-<!-- npu="A3,910b" id7 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
-  - T1支持大于等于actualSeqLengthsQuery的累加和，T2支持大于等于actualSeqLengthsKey的累加和。
-
-<!-- end id7 -->
 - **返回值：**
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
@@ -481,7 +495,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         </tbody>
     </table>
 
-## aclnnSparseLightningIndexerGradKLLoss
+## aclnnSparseLightningIndexerGradKLLossV2
 
 - **参数说明：**
 
@@ -505,7 +519,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         <tr>
         <td>workspaceSize</td>
         <td>输入</td>
-        <td>在Device侧申请的workspace大小，由第一段接口aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize获取。</td>
+        <td>在Device侧申请的workspace大小，由第一段接口aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize获取。</td>
         </tr>
         <tr>
         <td>executor</td>
@@ -527,7 +541,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnSparseLightningIndexerGradKLLoss默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+  - aclnnSparseLightningIndexerGradKLLossV2默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
 - 公共约束
     - 参数query、key、queryIndex、keyIndex的数据类型应保持一致。
     - 参数weights不为float32时，参数query、key、queryIndex、keyIndex、weights的数据类型应保持一致。
@@ -666,10 +680,9 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         </tr>
         </tbody>
     </table>
-    <!-- npu="950" id8 -->
+<!-- npu="950" id8 -->
     <term>Ascend 950PR/Ascend 950DT</term>：N1额外支持48，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对; B、S1、S2均支持泛化。
-    <!-- end id8 -->
-
+<!-- end id8 -->
 ## 调用示例
 
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
@@ -678,7 +691,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"
-#include "aclnnop/aclnn_sparse_lightning_indexer_grad_kl_loss.h"
+#include "aclnnop/aclnn_sparse_lightning_indexer_grad_kl_loss_v2.h"
 
 #define CHECK_RET(cond, return_expr) \
   do {                               \
@@ -786,6 +799,9 @@ int main() {
   std::vector<int64_t> dWeightShape = {1,32};
   std::vector<int64_t> lossShape = {1};
 
+  // sinks为1维float张量，长度与query的N维度保持一致，仅Ascend 950PR/Ascend 950DT支持
+  std::vector<int64_t> sinksShape = {64};
+
   void* qDeviceAddr = nullptr;
   void* kDeviceAddr = nullptr;
   void* qRopeDeviceAddr = nullptr;
@@ -796,6 +812,7 @@ int main() {
   void* sparseIndicesDeviceAddr = nullptr;
   void* softmaxMaxDeviceAddr = nullptr;
   void* softmaxSumDeviceAddr = nullptr;
+  void* sinksDeviceAddr = nullptr;
 
   void* dQIndexDeviceAddr = nullptr;
   void* dKIndexDeviceAddr = nullptr;
@@ -812,6 +829,7 @@ int main() {
   aclTensor* sparseIndices = nullptr;
   aclTensor* softmaxMax = nullptr;
   aclTensor* softmaxSum = nullptr;
+  aclTensor* sinks = nullptr;
 
   aclTensor* dQIndex = nullptr;
   aclTensor* dKIndex = nullptr;
@@ -828,6 +846,7 @@ int main() {
   std::vector<int32_t> sparseIndicesHostData(2048, 1);
   std::vector<float> softmaxMaxHostData(1*64, 1);
   std::vector<float> softmaxSumHostData(1*64, 1);
+  std::vector<float> sinksHostData(64, 1);
 
   std::vector<float> dQIndexHostData(1*32*128, 1);
   std::vector<float> dKIndexHostData(1*1*128, 1);
@@ -853,6 +872,8 @@ int main() {
   ret = CreateAclTensor(softmaxMaxHostData, softmaxMaxShape, &softmaxMaxDeviceAddr, aclDataType::ACL_FLOAT, &softmaxMax);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(softmaxSumHostData, softmaxSumShape, &softmaxSumDeviceAddr, aclDataType::ACL_FLOAT, &softmaxSum);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = CreateAclTensor(sinksHostData, sinksShape, &sinksDeviceAddr, aclDataType::ACL_FLOAT, &sinks);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 
   ret = CreateAclTensor(dQIndexHostData, dQIndexShape, &dQIndexDeviceAddr, aclDataType::ACL_FLOAT16, &dQIndex);
@@ -880,12 +901,12 @@ int main() {
   uint64_t workspaceSize = 0;
   aclOpExecutor* executor;
 
-  // 调用aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize第一段接口
-  ret = aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize(
+  // 调用aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize第一段接口
+  ret = aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize(
             q, k, qIndex, kIndex, weight, sparseIndices, softmaxMax, softmaxSum, qRope, kRope, acSeqQLen, acSeqKvLen,
-            scaleValue, layOut, sparseMode, preTokens, nextTokens, deterministic, dQIndex, dKIndex, dWeight, loss,
+            sinks, scaleValue, layOut, sparseMode, preTokens, nextTokens, deterministic, dQIndex, dKIndex, dWeight, loss,
             &workspaceSize, &executor);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize failed. ERROR: %d\n", ret);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize failed. ERROR: %d\n", ret);
             return ret);
 
   // 根据第一段接口计算出的workspaceSize申请device内存
@@ -895,9 +916,9 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
   }
 
-  // 调用aclnnSparseLightningIndexerGradKLLoss第二段接口
-  ret = aclnnSparseLightningIndexerGradKLLoss(workspaceAddr, workspaceSize, executor, stream);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseLightningIndexerGradKLLoss failed. ERROR: %d\n", ret); return ret);
+  // 调用aclnnSparseLightningIndexerGradKLLossV2第二段接口
+  ret = aclnnSparseLightningIndexerGradKLLossV2(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSparseLightningIndexerGradKLLossV2 failed. ERROR: %d\n", ret); return ret);
 
   // 4.（固定写法）同步等待任务执行结束
   ret = aclrtSynchronizeStream(stream);
@@ -920,6 +941,7 @@ int main() {
   aclDestroyTensor(sparseIndices);
   aclDestroyTensor(softmaxMax);
   aclDestroyTensor(softmaxSum);
+  aclDestroyTensor(sinks);
 
   aclDestroyTensor(dQIndex);
   aclDestroyTensor(dKIndex);
@@ -937,6 +959,7 @@ int main() {
   aclrtFree(sparseIndicesDeviceAddr);
   aclrtFree(softmaxMaxDeviceAddr);
   aclrtFree(softmaxSumDeviceAddr);
+  aclrtFree(sinksDeviceAddr);
 
   aclrtFree(dQIndexDeviceAddr);
   aclrtFree(dKIndexDeviceAddr);
