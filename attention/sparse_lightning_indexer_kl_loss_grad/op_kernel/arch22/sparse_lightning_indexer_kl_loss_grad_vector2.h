@@ -43,6 +43,7 @@ public:
     static constexpr SLILayout LAYOUT_T = SLIT::inputQLayout;
     static constexpr SLILayout KV_LAYOUT_T = SLIT::inputKLayout;
     static constexpr bool deterministic = SLIT::deterministic;
+    static constexpr bool privateScatter = SLIT::privateScatter;
 
     using scatterAddGmType = typename std::conditional<deterministic, GlobalTensor<MM3_OUT_T>, int8_t>::type;
 
@@ -189,7 +190,36 @@ __aicore__ inline void SLIKLLossVector2Service<SLIT>::ProcessVector2()
 
         WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
         copyInUb = mm3ResUb[pingPongIdx * (UB_ROW_SIZE * constInfo.dSizeQueryIndex)];
-        if constexpr (deterministic) {
+        if constexpr (privateScatter) {
+            int32_t scatterBankNum = static_cast<int32_t>(GetBlockNum());
+            if (scatterBankNum <= 0) {
+                scatterBankNum = 1;
+            }
+            int64_t bankElems = totalCost * constInfo.dSizeQueryIndex;
+            __gm__ MM3_OUT_T *basePtr = (__gm__ MM3_OUT_T *)bmm3ResGm.GetPhyAddr();
+            GlobalTensor<MM3_OUT_T> bank0Gm;
+            bank0Gm.SetGlobalBuffer(basePtr);
+            DataCopy(copyInUb, bank0Gm[t2Idx * constInfo.dSizeQueryIndex], t2ProcessSize * constInfo.dSizeQueryIndex);
+            copyInPongUb = scatterAddPongUb[pingPongIdx * (UB_ROW_SIZE * constInfo.dSizeQueryIndex)];
+            for (int32_t bank = 1; bank < scatterBankNum; ++bank) {
+                if (bank > 1) {
+                    SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                    WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                }
+                GlobalTensor<MM3_OUT_T> bankGm;
+                bankGm.SetGlobalBuffer(basePtr + static_cast<uint64_t>(bank) * bankElems);
+                DataCopy(copyInPongUb, bankGm[t2Idx * constInfo.dSizeQueryIndex],
+                         t2ProcessSize * constInfo.dSizeQueryIndex);
+                SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                Add(copyInUb, copyInUb, copyInPongUb, t2ProcessSize * constInfo.dSizeQueryIndex);
+                PipeBarrier<PIPE_V>();
+            }
+            if (scatterBankNum <= 1) {
+                SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+            }
+        } else if constexpr (deterministic) {
             DataCopy(copyInUb, scatterAddResGmBanks[0][t2Idx * constInfo.dSizeQueryIndex],
                      t2ProcessSize * constInfo.dSizeQueryIndex);
             copyInPongUb = scatterAddPongUb[pingPongIdx * (UB_ROW_SIZE * constInfo.dSizeQueryIndex)];

@@ -84,7 +84,7 @@ template <typename InputQT, typename InputKT, typename OutT, SLITopKRange TopKRa
           SLILayout LayoutQT = SLILayout::TND, SLILayout LayoutKT = SLILayout::TND,
           SLISparseMode SparseMode = SLISparseMode::RightDown, const bool HasRope = false,
           const bool HasSequsedQ = false, const bool HasSequsedK = false, const bool Deterministic = false,
-          typename... Args>
+          const bool PrivateScatter = false, typename... Args>
 struct SLIType {
     using inputQT = InputQT;
     using inputKT = InputKT;
@@ -97,6 +97,7 @@ struct SLIType {
     static constexpr bool hasSequsedQ = HasSequsedQ;
     static constexpr bool hasSequsedK = HasSequsedK;
     static constexpr bool deterministic = Deterministic;
+    static constexpr bool privateScatter = PrivateScatter;
 };
 /// @}
 

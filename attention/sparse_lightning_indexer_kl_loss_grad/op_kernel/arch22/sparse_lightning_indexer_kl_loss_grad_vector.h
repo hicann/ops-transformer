@@ -53,6 +53,7 @@ public:
     static constexpr bool hasSequsedK = SLIT::hasSequsedK;
     static constexpr UBAllocPolicy<isTopkLess2k> ubAllocPolicy;
     static constexpr bool deterministic = SLIT::deterministic;
+    static constexpr bool privateScatter = SLIT::privateScatter;
 
     using scatterAddGmType = typename std::conditional<deterministic, GlobalTensor<T>, int8_t>::type;
 
@@ -90,6 +91,7 @@ public:
                                          GlobalTensor<T> &scatterAddRes,
                                          scatterAddGmType scatterAddBanks[SLI_DETER_SCATTER_BANK_NUM]);
     __aicore__ inline void ProcessDeterVector2(SLIKLLossGradRunInfo &runInfo);
+    __aicore__ inline void ProcessPrivateScatterVector2(SLIKLLossGradRunInfo &runInfo);
     __aicore__ inline void SetCachedValidTotalSize(int64_t validTotalSize);
 
 private:
@@ -1337,6 +1339,36 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector2(SLIKLLossGra
         scatterAddPingpong = 1 - scatterAddPingpong;
     }
     SetAtomicNone();
+}
+
+template <typename SLIT>
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessPrivateScatterVector2(SLIKLLossGradRunInfo &runInfo)
+{
+    CrossCoreWaitFlag<2, PIPE_MTE2>(SYNC_C2_TO_V2_SA_FLAG[runInfo.taskIdMod2]);
+    if (!runInfo.isValid) {
+        return;
+    }
+
+    int32_t v0RealKSize = CeilDiv(runInfo.kRealSize, 2);
+    v0RealKSize = Min(SLIGAlign(v0RealKSize, 2), runInfo.kRealSize);
+    int32_t v1RealKSize = runInfo.kRealSize - v0RealKSize;
+    int32_t vRealKSize = 0;
+    int64_t coreKOffset = 0;
+    if (constInfo.subBlockIdx == 0) {
+        vRealKSize = v0RealKSize;
+        coreKOffset = 0;
+    } else {
+        vRealKSize = v1RealKSize;
+        coreKOffset = v0RealKSize;
+    }
+    if (vRealKSize <= 0) {
+        return;
+    }
+
+    int srcOffset = constInfo.aicIdx * topKSize * constInfo.dSizeQueryIndex * 2;
+    GlobalTensor<MM5_OUT_T> srcGm =
+        bmm5ResGm[srcOffset + (runInfo.taskIdMod2 * topKSize + coreKOffset) * constInfo.dSizeQueryIndex];
+    Vector2ScatterAdd(vRealKSize, srcGm, coreKOffset, runInfo, scatterAddResGm);
 }
 
 #if 0

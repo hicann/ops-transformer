@@ -53,7 +53,7 @@ using namespace Slig;
 
 #if __CCE_AICORE__ != 310
 template <bool HasRope, int TopKRange, int LayoutT_QT, int LayoutT_KT, int SparseMode, bool HasSequsedQ,
-          bool HasSequsedK, bool Deterministic>
+          bool HasSequsedK, bool Deterministic, bool PrivateScatter>
 __global__ __aicore__ void sparse_lightning_indexer_kl_loss_grad(
     __gm__ uint8_t *q, __gm__ uint8_t *k, __gm__ uint8_t *w, __gm__ uint8_t *sparseIndices,
     __gm__ uint8_t *attnSoftmaxL1Norm, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensK, __gm__ uint8_t *sequsedQ,
@@ -70,13 +70,14 @@ __global__ __aicore__ void sparse_lightning_indexer_kl_loss_grad(
         SLI_OP_IMPL(SparseLightningIndexerKLLossGradBase, optiling::SparseLightningIndexerKLLossGradTilingData, half,
                     half, half, static_cast<SLITopKRange>(TopKRange), static_cast<SLILayout>(LayoutT_QT),
                     static_cast<SLILayout>(LayoutT_KT), static_cast<SLISparseMode>(SparseMode), HasRope, HasSequsedQ,
-                    HasSequsedK, Deterministic);
+                    HasSequsedK, Deterministic, PrivateScatter);
     }
     if constexpr (ORIG_DTYPE_Q == DT_BF16 && ORIG_DTYPE_K == DT_BF16) {
         SLI_OP_IMPL(SparseLightningIndexerKLLossGradBase, optiling::SparseLightningIndexerKLLossGradTilingData,
                     bfloat16_t, bfloat16_t, bfloat16_t, static_cast<SLITopKRange>(TopKRange),
                     static_cast<SLILayout>(LayoutT_QT), static_cast<SLILayout>(LayoutT_KT),
-                    static_cast<SLISparseMode>(SparseMode), HasRope, HasSequsedQ, HasSequsedK, Deterministic);
+                    static_cast<SLISparseMode>(SparseMode), HasRope, HasSequsedQ, HasSequsedK, Deterministic,
+                    PrivateScatter);
     }
 }
 
