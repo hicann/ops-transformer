@@ -279,7 +279,6 @@ stages:
             identifier: process_checkout
             uses: checkout
             with:
-              token: ${{secrets.GIT_TOKEN}}
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
           -
             name: download
@@ -331,7 +330,6 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
-              token: ${{secrets.GIT_TOKEN}}
           - name: 执行 Kirin PreSmoke_harmony-infer-chs-transformer 测试
             run: bash .gitcode/scripts/kirin_smoke_chs.sh
       PreSmoke_harmony-infer-cpro-transformer:
@@ -344,7 +342,6 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
-              token: ${{secrets.GIT_TOKEN}}
           - name: 执行 Kirin PreSmoke_harmony-infer-cpro-transformer 测试
             run: bash .gitcode/scripts/kirin_smoke_cpro.sh
     pre:
@@ -362,7 +359,6 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
-              token: ${{ secrets.GIT_TOKEN }}
           -
             name: download
             uses: obs-download
@@ -385,7 +381,6 @@ stages:
               source_branch: ${{ env.SOURCE_BRANCH }}
               target_branch: ${{ env.TARGET_BRANCH }}
               obs_path: ${{ env.obs_path }}
-              git_token: ${{ secrets.GIT_TOKEN }}
           -
             name: upload
             uses: obs-upload
