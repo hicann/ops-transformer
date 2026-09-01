@@ -42,87 +42,53 @@
 
 ## 功能说明
 
-- 接口功能：Attention Residuals 的历史残差注意力两段式计算的阶段二：将 `delta` 原地累加到
-  `partialBlockRef`，计算更新后残差的 RMSNorm score；随后与阶段一 `block_attn_res_prepare` 返回的
-  softmax 统计量 `numerator`、`logitMax`、`expSum`（分别对应 O、M、L）计算得到输出 `h`，
-  同时将更新后的残差原地写回 `partialBlockRef`。
+- **接口功能**：
 
-### 计算公式
+  Attention Residuals的历史残差注意力两段式计算的阶段二：将`delta`原地累加到`partialBlockRef`，计算更新后残差的RMSNorm score；随后与阶段一`block_attn_res_prepare`返回的softmax统计量`numerator`、`logitMax`、`expSum`（分别对应O、M、L）计算得到输出`h`，同时将更新后的残差原地写回`partialBlockRef`。
+- **计算公式**：
 
-设 `T` 表示 token 数，`D` 表示 hidden size，计算流程如下。
+  设`T`表示token数，`D`表示hidden size。主要计算过程如下：
 
-#### 1. 累加当前增量
+  1. 更新当前`partialBlockRef`：
 
-将 BFLOAT16 类型的 `delta` 转换为 FP32，并逐元素累加到 FP32 类型的 `partialBlockRef`：
+     $$
+     p[t,d] = partialBlockRef[t,d] + \operatorname{FP32}(delta[t,d])
+     $$
+  2. 计算RMSNorm分母和当前score：
 
-$$
-p[t,d] = partialBlockRef[t,d] + \operatorname{FP32}(delta[t,d])
-$$
+     $$
+     r[t] = \sqrt{\frac{1}{D}\sum_{d=0}^{D-1}p[t,d]^2 + eps}
+     $$
 
-`p` 表示包含本次 `delta` 后的最新累计结果。该步骤使用 FP32 计算，最后将 `p` 原地写回
-`partialBlockRef`。
+     $$
+     score[t] = \frac{\sum_{d=0}^{D-1}p[t,d] \times pseudoQuery[d]}{r[t]}
+     $$
+  3. 将当前score与历史online softmax状态合并：
 
-#### 2. 计算 RMSNorm 分母
+     $$
+     m[t] = \max(logitMax[t], score[t])
+     $$
 
-对每个 token 沿 hidden 维进行 FP32 平方和归约，并计算 RMSNorm 分母：
+     $$
+     alpha[t] = \exp(logitMax[t] - m[t]), \qquad beta[t] = \exp(score[t] - m[t])
+     $$
 
-$$
-r[t] = \sqrt{\frac{1}{D}\sum_{d=0}^{D-1}p[t,d]^2 + eps}
-$$
+     $$
+     ell[t] = expSum[t] \times alpha[t] + beta[t]
+     $$
 
-后续计算只使用每个 token 对应的标量 `r[t]`，不需要生成完整的 RMSNorm 输出 Tensor。
+     $$
+     updatedNumerator[t,d] = numerator[t,d] \times alpha[t] + p[t,d] \times beta[t]
+     $$
+  4. 生成输出：
 
-#### 3. 计算当前累计结果的 score
+     $$
+     partialBlockRef[t,d] \leftarrow p[t,d]
+     $$
 
-`pseudoQuery` 是用于计算当前 partial block logit 的 FP32 向量。对每个 token，将 `p` 与 `pseudoQuery` 做 FP32
-点乘归约，再除以 RMSNorm 分母，得到当前累计结果的 `score`：
-
-$$
-score[t] = \frac{\sum_{d=0}^{D-1}p[t,d] \times pseudoQuery[d]}{r[t]}
-$$
-
-#### 4. 合并 online softmax 历史状态
-
-`logitMax`、`expSum` 和 `numerator` 分别表示 `block_attn_res_prepare` 输出的历史最大值、历史
-softmax 分母累积值和历史加权和。首先计算合并后的最大值：
-
-$$
-m[t] = \max(logitMax[t], score[t])
-$$
-
-以新的最大值 `m[t]` 为基准，分别计算历史项和当前项的缩放因子，避免指数计算发生数值溢出：
-
-$$
-alpha[t] = \exp(logitMax[t] - m[t]), \qquad beta[t] = \exp(score[t] - m[t])
-$$
-
-使用 `alpha` 和 `beta` 更新 softmax 分母：
-
-$$
-ell[t] = expSum[t] \times alpha[t] + beta[t]
-$$
-
-同时更新 online softmax 加权和：
-
-$$
-updatedNumerator[t,d] = numerator[t,d] \times alpha[t] + p[t,d] \times beta[t]
-$$
-
-上述 online softmax 合并过程均使用 FP32 计算。
-
-#### 5. 写回累计结果并生成输出
-
-将最新累计结果 `p` 原地写回 `partialBlockRef`：
-
-$$
-partialBlockRef[t,d] = p[t,d]
-$$
-
-将更新后的加权和除以更新后的 softmax 分母，再转换为 BFLOAT16，得到当前层结果 `h`：
-
-$$
-h[t,d] = \operatorname{BF16}\left(\frac{updatedNumerator[t,d]}{ell[t]}\right)
-$$
+     $$
+     h[t,d] = \operatorname{BF16}\left(\frac{updatedNumerator[t,d]}{ell[t]}\right)
+     $$
 
 ## 函数原型
 
@@ -156,18 +122,206 @@ aclnnStatus aclnnBlockAttnResUpdate(
 
 - **参数说明**
 
-  | 参数名                                   | 输入/输出 | 描述                                                          | 数据类型 | 数据格式 | 维度(shape) | 非连续的Tensor |
-  | ---------------------------------------- | --------- | ------------------------------------------------------------- | -------- | -------- | ----------- | -------------- |
-  | `partialBlockRef`（`aclTensor *`）   | 输入/输出 | 当前已累计的`partialBlockRef`。                             | FLOAT    | ND       | `[T, D]`  | ×             |
-  | `delta`（`const aclTensor *`）       | 输入      | 本次需要累加的`delta`。                                     | BFLOAT16 | ND       | `[T, D]`  | ×             |
-  | `pseudoQuery`（`const aclTensor *`） | 输入      | 用于计算当前 partial block logit 的`pseudoQuery`。          | FLOAT    | ND       | `[D]`     | ×             |
-  | `numerator`（`const aclTensor *`）   | 输入      | `block_attn_res_prepare` 输出的历史 online softmax 加权和。 | FLOAT    | ND       | `[T, D]`  | ×             |
-  | `logitMax`（`const aclTensor *`）    | 输入      | `block_attn_res_prepare` 输出的历史最大 logit。             | FLOAT    | ND       | `[T]`     | ×             |
-  | `expSum`（`const aclTensor *`）      | 输入      | `block_attn_res_prepare` 输出的历史 softmax 分母累积值。    | FLOAT    | ND       | `[T]`     | ×             |
-  | `eps`（`float`）                     | 输入      | RMSNorm 数值稳定项。                                          | -        | -        | -           | -              |
-  | `h`（`aclTensor *`）                 | 输出      | 当前层结果。                                                  | BFLOAT16 | ND       | `[T, D]`  | ×             |
-  | `workspaceSize`（`uint64_t *`）      | 输出      | 返回 Device 侧需要申请的 workspace 大小。                     | -        | -        | -           | -              |
-  | `executor`（`aclOpExecutor **`）     | 输出      | 返回包含算子计算流程的执行器。                                | -        | -        | -           | -              |
+  <table style="table-layout: fixed; width: 1554px"><colgroup>
+  <col style="width: 248px">
+  <col style="width: 121px">
+  <col style="width: 210px">
+  <col style="width: 327px">
+  <col style="width: 160px">
+  <col style="width: 115px">
+  <col style="width: 138px">
+  <col style="width: 145px">
+  </colgroup>
+    <thead>
+      <tr>
+        <th>参数名</th>
+        <th>输入/输出</th>
+        <th>描述</th>
+        <th>使用说明</th>
+        <th>数据类型</th>
+        <th>数据格式</th>
+        <th>维度(shape)</th>
+        <th>非连续Tensor</th>
+      </tr></thead>
+    <tbody>
+      <tr>
+        <td>partialBlockRef(aclTensor*)</td>
+        <td>输入/输出</td>
+        <td>当前已累计的partialBlockRef。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>数据类型支持FLOAT。</li>
+            <li>原始格式和存储格式均仅支持ND。</li>
+            <li>必须为连续Tensor。</li>
+            <li><code>T >= 0</code>，<code>0 <= D <= 8192</code>。</li>
+            <li>支持空Tensor。</li>
+          </ul>
+        </td>
+        <td>FLOAT</td>
+        <td>ND</td>
+        <td>[T, D]</td>
+        <td>×</td>
+      </tr>
+      <tr>
+        <td>delta(const aclTensor*)</td>
+        <td>输入</td>
+        <td>本次需要累加的delta。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>数据类型支持BFLOAT16。</li>
+            <li>原始格式和存储格式均仅支持ND。</li>
+            <li>必须为连续Tensor。</li>
+            <li>shape必须与partialBlockRef相同。</li>
+            <li>支持空Tensor。</li>
+          </ul>
+        </td>
+        <td>BFLOAT16</td>
+        <td>ND</td>
+        <td>[T, D]</td>
+        <td>×</td>
+      </tr>
+      <tr>
+        <td>pseudoQuery(const aclTensor*)</td>
+        <td>输入</td>
+        <td>用于计算当前partial block logit的pseudoQuery。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>数据类型支持FLOAT。</li>
+            <li>原始格式和存储格式均仅支持ND。</li>
+            <li>必须为连续Tensor。</li>
+            <li>长度必须等于partialBlockRef的D。</li>
+            <li>支持空Tensor。</li>
+          </ul>
+        </td>
+        <td>FLOAT</td>
+        <td>ND</td>
+        <td>[D]</td>
+        <td>×</td>
+      </tr>
+      <tr>
+        <td>numerator(const aclTensor*)</td>
+        <td>输入</td>
+        <td>block_attn_res_prepare输出的历史online softmax加权和。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>数据类型支持FLOAT。</li>
+            <li>原始格式和存储格式均仅支持ND。</li>
+            <li>必须为连续Tensor。</li>
+            <li>shape必须与partialBlockRef相同。</li>
+            <li>支持空Tensor。</li>
+          </ul>
+        </td>
+        <td>FLOAT</td>
+        <td>ND</td>
+        <td>[T, D]</td>
+        <td>×</td>
+      </tr>
+      <tr>
+        <td>logitMax(const aclTensor*)</td>
+        <td>输入</td>
+        <td>block_attn_res_prepare输出的历史最大logit。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>数据类型支持FLOAT。</li>
+            <li>原始格式和存储格式均仅支持ND。</li>
+            <li>必须为连续Tensor。</li>
+            <li>长度必须等于partialBlockRef的T。</li>
+            <li>支持空Tensor。</li>
+          </ul>
+        </td>
+        <td>FLOAT</td>
+        <td>ND</td>
+        <td>[T]</td>
+        <td>×</td>
+      </tr>
+      <tr>
+        <td>expSum(const aclTensor*)</td>
+        <td>输入</td>
+        <td>block_attn_res_prepare输出的历史softmax分母累积值。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>数据类型支持FLOAT。</li>
+            <li>原始格式和存储格式均仅支持ND。</li>
+            <li>必须为连续Tensor。</li>
+            <li>长度必须等于partialBlockRef的T。</li>
+            <li>支持空Tensor。</li>
+          </ul>
+        </td>
+        <td>FLOAT</td>
+        <td>ND</td>
+        <td>[T]</td>
+        <td>×</td>
+      </tr>
+      <tr>
+        <td>eps(float)</td>
+        <td>输入</td>
+        <td>RMSNorm数值稳定项。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>必须为有限正数。</li>
+          </ul>
+        </td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>h(aclTensor*)</td>
+        <td>输出</td>
+        <td>当前层结果。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+            <li>数据类型支持BFLOAT16。</li>
+            <li>原始格式和存储格式均仅支持ND。</li>
+            <li>必须为连续Tensor。</li>
+            <li>shape必须与partialBlockRef相同。</li>
+            <li>空Tensor场景下返回空Tensor。</li>
+          </ul>
+        </td>
+        <td>BFLOAT16</td>
+        <td>ND</td>
+        <td>[T, D]</td>
+        <td>×</td>
+      </tr>
+      <tr>
+        <td>workspaceSize(uint64_t*)</td>
+        <td>输出</td>
+        <td>返回Device侧需要申请的workspace大小。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+          </ul>
+        </td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>executor(aclOpExecutor**)</td>
+        <td>输出</td>
+        <td>返回包含算子计算流程的执行器。</td>
+        <td>
+          <ul>
+            <li>必选。</li>
+          </ul>
+        </td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+  </tbody></table>
+
 - **返回值**
 
   `aclnnStatus`：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
@@ -183,7 +337,7 @@ aclnnStatus aclnnBlockAttnResUpdate(
     </colgroup>
     <thead>
       <tr>
-        <th>返回码</th>
+        <th>返回值</th>
         <th>错误码</th>
         <th>描述</th>
       </tr>
@@ -214,7 +368,7 @@ aclnnStatus aclnnBlockAttnResUpdate(
       <tr>
         <td>ACLNN_ERR_RUNTIME_ERROR</td>
         <td>361001</td>
-        <td>当前平台不是 Ascend 950PR/Ascend 950DT。</td>
+        <td>产品型号不在支持的范围内。</td>
       </tr>
     </tbody>
   </table>
@@ -224,32 +378,50 @@ aclnnStatus aclnnBlockAttnResUpdate(
 
 - **参数说明**
 
-  | 参数名            | 输入/输出 | 描述                                         |
-  | ----------------- | --------- | -------------------------------------------- |
-  | `workspace`     | 输入      | Device 侧 workspace 地址。                   |
-  | `workspaceSize` | 输入      | Device 侧 workspace 大小，由第一段接口获取。 |
-  | `executor`      | 输入      | 包含算子计算流程的执行器。                   |
-  | `stream`        | 输入      | ACL stream。                                 |
+  <table style="table-layout: fixed; width: 1150px"><colgroup>
+  <col style="width: 168px">
+  <col style="width: 128px">
+  <col style="width: 854px">
+  </colgroup>
+  <thead>
+    <tr>
+    <th>参数名</th>
+    <th>输入/输出</th>
+    <th>描述</th>
+    </tr></thead>
+  <tbody>
+  <tr>
+    <td>workspace</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace内存地址。</td>
+  </tr>
+  <tr>
+    <td>workspaceSize</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace大小，由第一段接口aclnnBlockAttnResUpdateGetWorkspaceSize获取。</td>
+  </tr>
+  <tr>
+    <td>executor</td>
+    <td>输入</td>
+    <td>op执行器，包含了算子计算流程。</td>
+  </tr>
+  <tr>
+    <td>stream</td>
+    <td>输入</td>
+    <td>指定执行任务的Stream。</td>
+  </tr>
+  </tbody></table>
+
 - **返回值**
 
   `aclnnStatus`：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
-- `partialBlockRef`、`delta`、`pseudoQuery`、`numerator`、`logitMax`、`expSum`、`h`、`workspaceSize` 和
-  `executor` 均不能为空。
-- 所有 Tensor 输入和输出的原始格式及存储格式均仅支持 ND。
-- 所有 Tensor 输入和输出必须连续。
-- `partialBlockRef`、`delta`、`numerator` 和 `h` 的 shape 必须均为 `[T, D]`。
-- `logitMax` 和 `expSum` 的 shape 必须为 `[T]`；`pseudoQuery` 的 shape 必须为 `[D]`。
-- `T >= 0`、`0 <= D <= 8192`；当 `T == 0 || D == 0` 时支持空 Tensor 返回。
-- 非空场景下，`T * D` 不能超出 `int64_t` 可表示范围。
-- `partialBlockRef`、`pseudoQuery`、`numerator`、`logitMax`、`expSum` 为 FLOAT；`delta` 和 `h` 为 BFLOAT16。
-- `eps` 为必选属性，ACLNN C 接口要求调用方显式传入，且必须为有限正数。
-
-<!-- npu="950" id7 -->
-
-<!-- end id7 -->
+- 确定性计算：
+  - aclnnBlockAttnResUpdate默认确定性实现。
+- 所有 Tensor 输入都支持空 Tensor，但必须继续满足彼此的 shape 关系，不能单独任意置空。
+- 非空场景下，`T * D` 不能超出`int64_t`可表示范围。
 
 ## 调用示例
 
@@ -367,9 +539,11 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 
 int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
 {
+    // 1. 初始化Device和Stream。
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
+    // 2. 构造输入和输出数据。
     constexpr int64_t tokenNum = 2;
     constexpr int64_t hiddenSize = 64;
     const std::vector<int64_t> matrixShape = {tokenNum, hiddenSize};
@@ -400,6 +574,7 @@ int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
     aclTensor *expSum = nullptr;
     aclTensor *h = nullptr;
 
+    // 3. 创建输入和输出aclTensor。
     ret = CreateAclTensor<float>(partialBlockRefHostData, matrixShape, &partialBlockRefDeviceAddr,
                                  aclDataType::ACL_FLOAT, aclFormat::ACL_FORMAT_ND, &partialBlockRef);
     std::unique_ptr<void, aclError (*)(void *)> partialBlockRefDeviceAddrPtr(partialBlockRefDeviceAddr, aclrtFree);
@@ -448,6 +623,7 @@ int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
     aclOpExecutor *executor = nullptr;
     void *workspaceAddr = nullptr;
 
+    // 4. 调用第一段接口获取workspace大小和执行器。
     ret = aclnnBlockAttnResUpdateGetWorkspaceSize(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum,
                                                    eps, h, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS,
@@ -455,17 +631,21 @@ int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
 
     std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
     if (workspaceSize > 0) {
+        // 根据第一段接口返回的大小申请Device侧workspace。
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
         workspaceAddrPtr.reset(workspaceAddr);
     }
 
+    // 5. 调用第二段接口执行算子。
     ret = aclnnBlockAttnResUpdate(workspaceAddr, workspaceSize, executor, stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockAttnResUpdate failed. ERROR: %d\n", ret); return ret);
 
+    // 6. 同步等待任务执行完成。
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
+    // 7. 将原地更新结果和输出结果拷贝回Host侧。
     const size_t partialBlockRefSize = partialBlockRefHostData.size() * sizeof(float);
     ret = aclrtMemcpy(partialBlockRefHostData.data(), partialBlockRefSize, partialBlockRefDeviceAddr,
                       partialBlockRefSize,
@@ -489,6 +669,7 @@ int main()
     auto ret = RunBlockAttnResUpdate(deviceId, stream);
     CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("RunBlockAttnResUpdate failed. ERROR: %d\n", ret); return ret);
 
+    // 8. 释放Device和Stream资源。
     Finalize(deviceId, stream);
     return ACL_SUCCESS;
 }

@@ -113,7 +113,7 @@ cann_ops_transformer.block_attn_res_update(
 | `numerator`     | Tensor    | 必选      | `block_attn_res_prepare`输出的历史online softmax加权和。    | `torch.float32`    | `(T, D)`    |
 | `logit_max`     | Tensor    | 必选      | `block_attn_res_prepare`输出的历史最大logit。               | `torch.float32`    | `(T,)`      |
 | `exp_sum`       | Tensor    | 必选      | `block_attn_res_prepare`输出的历史softmax分母累积值。       | `torch.float32`    | `(T,)`      |
-| `eps`           | `float64` | 可选      | RMSNorm计算中的数值稳定项，默认值为`1e-6`。                 | `float64`          | -           |
+| `eps`           | `float`   | 可选      | RMSNorm计算中的数值稳定项，默认值为`1e-6`。                 | `float64`          | -           |
 
 ## 返回值说明
 
@@ -123,6 +123,8 @@ cann_ops_transformer.block_attn_res_update(
 
 ## 约束说明
 
+- 该接口支持推理场景下使用。
+- 该接口支持单算子模式和aclgraph模式调用。
 - 所有 Tensor 输入和输出必须连续。
 - `T`满足`T >= 0`，`D`满足`0 <= D <= 8192`。
 - 当`T == 0`或`D == 0`时支持空Tensor返回。
@@ -137,9 +139,9 @@ cann_ops_transformer.block_attn_res_update(
 
 ## 确定性计算
 
-当前接口不提供单独的确定性开关，确定性能力继承底层`aclnnBlockAttnResUpdate`实现。
+默认支持确定性计算。
 
-## 调用说明
+## 调用示例
 
 - 单算子模式调用：
 
@@ -148,29 +150,18 @@ cann_ops_transformer.block_attn_res_update(
   import torch_npu
   import cann_ops_transformer
 
-  T = 8
-  D = 4096
+  T = 32
+  D = 7168
 
-  partial_block = torch.randn(
-      (T, D), dtype=torch.float32, device="npu:0"
-  )
-  partial_block_ptr = partial_block.data_ptr()
-  delta = torch.randn(
-      (T, D), dtype=torch.bfloat16, device="npu:0"
-  )
-  expected_partial_block = partial_block + delta.float()
-  pseudo_query = torch.randn(
-      (D,), dtype=torch.float32, device="npu:0"
-  )
-  numerator = torch.randn(
-      (T, D), dtype=torch.float32, device="npu:0"
-  )
-  logit_max = torch.randn(
-      (T,), dtype=torch.float32, device="npu:0"
-  )
-  exp_sum = torch.rand(
-      (T,), dtype=torch.float32, device="npu:0"
-  )
+  # 创建输入
+  partial_block = torch.rand((T, D), dtype=torch.float32).npu()
+  delta = torch.rand((T, D), dtype=torch.bfloat16).npu()
+  pseudo_query = torch.rand((D,), dtype=torch.float32).npu()
+  numerator = torch.rand((T, D), dtype=torch.float32).npu()
+  logit_max = torch.rand((T,), dtype=torch.float32).npu()
+  exp_sum = torch.rand((T,), dtype=torch.float32).npu()
+
+  # 调用单算子接口
   h = cann_ops_transformer.block_attn_res_update(
       partial_block,
       delta,
@@ -179,16 +170,67 @@ cann_ops_transformer.block_attn_res_update(
       logit_max,
       exp_sum,
   )
+  ```
 
-  assert h.is_contiguous()
-  assert partial_block.is_contiguous()
-  assert partial_block.data_ptr() == partial_block_ptr
-  torch.testing.assert_close(partial_block, expected_partial_block)
+- aclgraph模式调用：
 
-  print("h shape:", tuple(h.shape))
-  print("h dtype:", h.dtype)
-  print("h[:2, :8]:", h[:2, :8].cpu())
-  print("updated partial_block shape:", tuple(partial_block.shape))
-  print("updated partial_block dtype:", partial_block.dtype)
-  print("updated partial_block[:2, :8]:", partial_block[:2, :8].cpu())
+  ```python
+  import torch
+  import torch_npu
+  import cann_ops_transformer
+
+
+  # 定义待编译的网络
+  class OneOp(torch.nn.Module):
+      def forward(
+          self,
+          partial_block,
+          delta,
+          pseudo_query,
+          numerator,
+          logit_max,
+          exp_sum,
+      ):
+          return cann_ops_transformer.block_attn_res_update(
+              partial_block,
+              delta,
+              pseudo_query,
+              numerator,
+              logit_max,
+              exp_sum,
+              eps=1e-6,
+          )
+
+
+  # 使用npugraph_ex后端编译网络
+  compiled_op = torch.compile(
+      OneOp(),
+      backend="npugraph_ex",
+      fullgraph=True,
+      dynamic=False,
+      options={
+          "static_kernel_compile": True,
+      },
+  )
+
+  T = 8
+  D = 7168
+
+  # 创建输入
+  partial_block = torch.rand((T, D), dtype=torch.float32).npu()
+  delta = torch.rand((T, D), dtype=torch.bfloat16).npu()
+  pseudo_query = torch.rand((D,), dtype=torch.float32).npu()
+  numerator = torch.rand((T, D), dtype=torch.float32).npu()
+  logit_max = torch.rand((T,), dtype=torch.float32).npu()
+  exp_sum = torch.rand((T,), dtype=torch.float32).npu()
+
+  # 执行编译后的网络
+  h = compiled_op(
+      partial_block,
+      delta,
+      pseudo_query,
+      numerator,
+      logit_max,
+      exp_sum,
+  )
   ```

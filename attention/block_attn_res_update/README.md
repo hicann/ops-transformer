@@ -190,6 +190,11 @@ $$
     <td><a href="examples/arch35/test_aclnn_block_attn_res_update.cpp">test_aclnn_block_attn_res_update.cpp</a></td>
     <td>通过aclnnBlockAttnResUpdate接口调用，详细说明参见<a href="docs/aclnnBlockAttnResUpdate.md">接口文档</a>。</td>
   </tr>
+  <tr>
+    <td>PyTorch API</td>
+    <td>-</td>
+    <td>通过<a href="../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_update.md">cann_ops_transformer.block_attn_res_update</a>接口调用。</td>
+  </tr>
 </tbody>
 </table>
 
