@@ -32,13 +32,27 @@
 #ifndef QKV_K_SCALE_K_QUANT_MODE_INT8
 #define QKV_K_SCALE_K_QUANT_MODE_INT8 1
 #endif
+#ifndef QKV_K_SCALE_CACHE_DTYPE_FP8_E4M3FN
+#define QKV_K_SCALE_CACHE_DTYPE_FP8_E4M3FN QKV_K_SCALE_K_QUANT_MODE_FP8
+#endif
+#ifndef QKV_K_SCALE_CACHE_DTYPE_INT8
+#define QKV_K_SCALE_CACHE_DTYPE_INT8 QKV_K_SCALE_K_QUANT_MODE_INT8
+#endif
 #ifndef QKV_K_SCALE_Q_QUANT_MODE_PER_TOKEN_PER_HEAD
 #define QKV_K_SCALE_Q_QUANT_MODE_PER_TOKEN_PER_HEAD 0
 #endif
 #ifndef QKV_K_SCALE_Q_QUANT_MODE_NO_QUANT
 #define QKV_K_SCALE_Q_QUANT_MODE_NO_QUANT 1
 #endif
-
+#ifndef QKV_K_SCALE_Q_QUANT_MODE_MX
+#define QKV_K_SCALE_Q_QUANT_MODE_MX 2
+#endif
+#ifndef QKV_K_SCALE_K_QUANT_MODE_PER_TOKEN_PER_HEAD
+#define QKV_K_SCALE_K_QUANT_MODE_PER_TOKEN_PER_HEAD 0
+#endif
+#ifndef QKV_K_SCALE_K_QUANT_MODE_MX
+#define QKV_K_SCALE_K_QUANT_MODE_MX 1
+#endif
 namespace QkvRmsNormRopeCacheWithKScale {
 using AscendC::CO2Layout;
 using AscendC::DataCopy;
@@ -244,8 +258,7 @@ constexpr uint32_t QKV_K_SCALE_MROPE_POSITION_WINDOW_TOKEN_CAPACITY = 1024U;
 constexpr uint32_t QKV_K_SCALE_MROPE_POSITION_CACHE_BYTES =
     QKV_K_SCALE_MROPE_POSITION_WINDOW_TOKEN_CAPACITY * 3U * sizeof(int32_t);
 constexpr uint32_t QKV_K_SCALE_MROPE_POSITION_CACHE_OFFSET = QKV_K_SCALE_MROPE_COMPACT_BASE_UB_BYTES;
-constexpr uint32_t QKV_K_SCALE_MROPE_POSITION_CACHE_ELEMENTS =
-    QKV_K_SCALE_MROPE_POSITION_CACHE_BYTES / sizeof(int32_t);
+constexpr uint32_t QKV_K_SCALE_MROPE_POSITION_CACHE_ELEMENTS = QKV_K_SCALE_MROPE_POSITION_CACHE_BYTES / sizeof(int32_t);
 constexpr uint32_t QKV_K_SCALE_MROPE_COMPACT_TOTAL_UB_BYTES =
     QKV_K_SCALE_MROPE_POSITION_CACHE_OFFSET + QKV_K_SCALE_MROPE_POSITION_CACHE_BYTES;
 
@@ -343,9 +356,15 @@ __aicore__ inline uint64_t AlignUp(uint64_t value, uint64_t align)
     return ((value + align - 1U) / align) * align;
 }
 
-__aicore__ inline uint64_t MinU64(uint64_t lhs, uint64_t rhs) { return lhs < rhs ? lhs : rhs; }
+__aicore__ inline uint64_t MinU64(uint64_t lhs, uint64_t rhs)
+{
+    return lhs < rhs ? lhs : rhs;
+}
 
-__aicore__ inline uint64_t MaxU64(uint64_t lhs, uint64_t rhs) { return lhs > rhs ? lhs : rhs; }
+__aicore__ inline uint64_t MaxU64(uint64_t lhs, uint64_t rhs)
+{
+    return lhs > rhs ? lhs : rhs;
+}
 
 __aicore__ inline uint64_t NzMatrixElements(uint64_t rowCount)
 {

@@ -18,13 +18,16 @@ public:
     explicit QkvRmsNormRopeCacheWithKScale(const char *name)
         : OpDef(name)
     {
-        const std::vector<ge::DataType> bf16Types = {ge::DT_BF16, ge::DT_BF16};
-        const std::vector<ge::DataType> fp32Types = {ge::DT_FLOAT, ge::DT_FLOAT};
-        const std::vector<ge::DataType> int32Types = {ge::DT_INT32, ge::DT_INT32};
-        const std::vector<ge::DataType> fp8Types = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN};
-        const std::vector<ge::DataType> kCacheTypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_INT8};
-        const std::vector<ge::DataType> qOutTypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_BF16};
-        const std::vector<ge::Format> ndFormats = {ge::FORMAT_ND, ge::FORMAT_ND};
+        // Type groups: RoPE, M-RoPE, M-RoPE MX.
+        const std::vector<ge::DataType> bf16Types = {ge::DT_BF16, ge::DT_BF16, ge::DT_BF16};
+        const std::vector<ge::DataType> fp32Types = {ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT};
+        const std::vector<ge::DataType> int32Types = {ge::DT_INT32, ge::DT_INT32, ge::DT_INT32};
+        const std::vector<ge::DataType> fp8Types = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN};
+        const std::vector<ge::DataType> kCacheTypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_INT8, ge::DT_FLOAT8_E4M3FN};
+        const std::vector<ge::DataType> kScaleTypes = {ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0};
+        const std::vector<ge::DataType> qOutTypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN};
+        const std::vector<ge::DataType> qScaleTypes = {ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0};
+        const std::vector<ge::Format> ndFormats = {ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND};
 
         this->Input("qkv").ParamType(REQUIRED).DataType(bf16Types).Format(ndFormats).UnknownShapeFormat(ndFormats);
         this->Input("q_gamma").ParamType(REQUIRED).DataType(fp32Types).Format(ndFormats).UnknownShapeFormat(ndFormats);
@@ -43,7 +46,7 @@ public:
         this->Input("v_cache").ParamType(REQUIRED).DataType(fp8Types).Format(ndFormats).UnknownShapeFormat(ndFormats);
         this->Input("k_scale_cache")
             .ParamType(REQUIRED)
-            .DataType(fp32Types)
+            .DataType(kScaleTypes)
             .Format(ndFormats)
             .UnknownShapeFormat(ndFormats);
         this->Input("query_start_loc")
@@ -65,7 +68,11 @@ public:
             .UnknownShapeFormat(ndFormats);
 
         this->Output("q_out").ParamType(REQUIRED).DataType(qOutTypes).Format(ndFormats).UnknownShapeFormat(ndFormats);
-        this->Output("q_scale").ParamType(REQUIRED).DataType(fp32Types).Format(ndFormats).UnknownShapeFormat(ndFormats);
+        this->Output("q_scale")
+            .ParamType(OPTIONAL)
+            .DataType(qScaleTypes)
+            .Format(ndFormats)
+            .UnknownShapeFormat(ndFormats);
         this->Output("k_cache")
             .ParamType(REQUIRED)
             .DataType(kCacheTypes)
@@ -74,7 +81,7 @@ public:
         this->Output("v_cache").ParamType(REQUIRED).DataType(fp8Types).Format(ndFormats).UnknownShapeFormat(ndFormats);
         this->Output("k_scale_cache")
             .ParamType(REQUIRED)
-            .DataType(fp32Types)
+            .DataType(kScaleTypes)
             .Format(ndFormats)
             .UnknownShapeFormat(ndFormats);
 
@@ -85,6 +92,7 @@ public:
         this->Attr("mrope_section").AttrType(OPTIONAL).ListInt();
         this->Attr("q_quant_mode").AttrType(OPTIONAL).String("PerTokenPerHead");
         this->Attr("q_out_dtype").AttrType(OPTIONAL).Int(static_cast<int64_t>(ge::DT_FLOAT8_E4M3FN));
+        this->Attr("k_quant_mode").AttrType(OPTIONAL).String("PerTokenPerHead");
 
         OpAICoreConfig config950;
         config950.DynamicCompileStaticFlag(true)

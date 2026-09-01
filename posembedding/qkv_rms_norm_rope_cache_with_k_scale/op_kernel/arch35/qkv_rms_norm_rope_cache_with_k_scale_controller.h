@@ -15,9 +15,13 @@
 
 namespace QkvRmsNormRopeCacheWithKScale {
 
-template <uint32_t QKV_LAYOUT, uint32_t Q_OUT_LAYOUT, uint32_t ROPE_MODE, uint32_t K_QUANT_MODE, uint32_t Q_QUANT_MODE>
+template <uint32_t HEAD_DIM, uint32_t QKV_LAYOUT, uint32_t Q_OUT_LAYOUT, uint32_t ROPE_MODE, uint32_t K_CACHE_DTYPE,
+          uint32_t Q_QUANT_MODE, uint32_t K_QUANT_MODE>
 class QkvRmsNormRopeCacheWithKScaleController {
     static constexpr uint32_t TILE_PARAM_BUFFER_NUM = 2U;
+    static_assert(HEAD_DIM == QKV_K_SCALE_HEAD_DIM_D128, "RoPE/M-RoPE Controller only supports D=128");
+    static_assert(K_QUANT_MODE == QKV_K_SCALE_K_QUANT_MODE_PER_TOKEN_PER_HEAD,
+                  "RoPE/M-RoPE Controller only supports PerTokenPerHead K quantization");
 
 public:
     __aicore__ inline void Process(const GlobalTensors &tensors,
@@ -40,7 +44,7 @@ public:
 
 private:
     using BasicBlock =
-        QkvRmsNormRopeCacheWithKScaleBasicBlock<QKV_LAYOUT, Q_OUT_LAYOUT, ROPE_MODE, K_QUANT_MODE, Q_QUANT_MODE>;
+        QkvRmsNormRopeCacheWithKScaleBasicBlock<QKV_LAYOUT, Q_OUT_LAYOUT, ROPE_MODE, K_CACHE_DTYPE, Q_QUANT_MODE>;
 
     struct TokenRange {
         uint64_t begin;
@@ -114,8 +118,8 @@ private:
             const uint32_t currentBufferId = GetCurrentTileParamBufferId(tileCount);
             const uint32_t previousBufferId = GetPreviousTileParamBufferId(tileCount);
             FillTileParam(tileParam[currentBufferId], tilingData, tokenOffset, tokenSize);
-            basicBlock_.ComputeTile(tileParam[currentBufferId], tileParam[previousBufferId],
-                                    tileCount, tokenOffset + tokenSize >= range.end);
+            basicBlock_.ComputeTile(tileParam[currentBufferId], tileParam[previousBufferId], tileCount,
+                                    tokenOffset + tokenSize >= range.end);
             tokenOffset += tokenSize;
             ++tileCount;
         }
@@ -141,6 +145,18 @@ private:
 
     BasicBlock basicBlock_;
 };
+
+} // namespace QkvRmsNormRopeCacheWithKScale
+
+#include "qkv_rms_norm_rope_cache_with_k_scale_mrope_mx_controller.h"
+
+namespace QkvRmsNormRopeCacheWithKScale {
+
+template <>
+class QkvRmsNormRopeCacheWithKScaleController<QKV_K_SCALE_HEAD_DIM_D128, QKV_K_SCALE_LAYOUT_TND, QKV_K_SCALE_LAYOUT_TND,
+                                              QKV_K_SCALE_ROPE_MODE_MROPE, QKV_K_SCALE_CACHE_DTYPE_FP8_E4M3FN,
+                                              QKV_K_SCALE_Q_QUANT_MODE_MX, QKV_K_SCALE_K_QUANT_MODE_MX>
+    : public QkvRmsNormRopeCacheWithKScaleMropeMxController {};
 
 } // namespace QkvRmsNormRopeCacheWithKScale
 

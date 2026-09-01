@@ -14,7 +14,7 @@
  */
 
 #include <fstream>
-#include <map>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -48,17 +48,6 @@ aclDataType ParseDtype(const string &dtype)
     return ops::ut::ParseAclDtype(dtype);
 }
 
-aclnnStatus ParseStatus(const string &status)
-{
-    static const map<string, aclnnStatus> statusMap = {
-        {"SUCCESS", ACLNN_SUCCESS},
-        {"ERR_PARAM_INVALID", ACLNN_ERR_PARAM_INVALID},
-        {"ERR_PARAM_NULLPTR", ACLNN_ERR_PARAM_NULLPTR},
-    };
-    const auto it = statusMap.find(Trim(status));
-    return it == statusMap.end() ? ACLNN_SUCCESS : it->second;
-}
-
 bool IsNullArg(const string &value)
 {
     const string trimmed = Trim(value);
@@ -80,6 +69,17 @@ aclTensor *BuildTensor(const string &shape, const string &dtype, bool useRange =
         return nullptr;
     }
     return MakeTensorDesc(ParseDims(shape), ParseDtype(dtype), useRange).ToAclTypeRawPtr();
+}
+
+aclTensor *BuildTensor(const string &shape, const string &dtype, const vector<int64_t> &stride,
+                       const vector<int64_t> &storageShape)
+{
+    if (stride.empty()) {
+        return BuildTensor(shape, dtype);
+    }
+    return TensorDesc(ParseDims(shape), ParseDtype(dtype), ACL_FORMAT_ND, stride, 0, storageShape)
+        .ValueRange(-1, 1)
+        .ToAclTypeRawPtr();
 }
 
 aclIntArray *BuildIntArray(const string &value)
@@ -114,10 +114,16 @@ struct QkvRmsNormRopeCacheWithKScaleCase {
     string slotMappingDtype;
     string kCacheShape;
     string kCacheDtype;
+    vector<int64_t> kCacheStride;
+    vector<int64_t> kCacheStorageShape;
     string vCacheShape;
     string vCacheDtype;
+    vector<int64_t> vCacheStride;
+    vector<int64_t> vCacheStorageShape;
     string kScaleCacheShape;
     string kScaleCacheDtype;
+    vector<int64_t> kScaleCacheStride;
+    vector<int64_t> kScaleCacheStorageShape;
     string queryStartLocShape;
     string queryStartLocDtype;
     string seqLensShape;
@@ -138,7 +144,10 @@ struct QkvRmsNormRopeCacheWithKScaleCase {
     string mropePositionDtype;
     string mropeSectionValue;
     string qQuantMode;
-    string expectRet;
+    string kQuantMode = "PerTokenPerHead";
+    // Operator-level semantic expectation. ACLNN boundary expectations are
+    // derived separately so these cases also prove semantic checks are forwarded.
+    string operatorExpectRet;
 };
 
 struct QkvRmsNormRopeCacheWithKScaleAclArgs {
@@ -160,6 +169,7 @@ struct QkvRmsNormRopeCacheWithKScaleAclArgs {
     const char *layoutQOut = nullptr;
     aclIntArray *mropeSection = nullptr;
     const char *qQuantMode = nullptr;
+    const char *kQuantMode = nullptr;
     aclTensor *qOut = nullptr;
     aclTensor *qScale = nullptr;
 };
@@ -172,9 +182,12 @@ QkvRmsNormRopeCacheWithKScaleAclArgs BuildAclArgs(const QkvRmsNormRopeCacheWithK
     args.kGamma = BuildTensor(testCase.kGammaShape, testCase.kGammaDtype);
     args.cosSin = BuildTensor(testCase.cosSinShape, testCase.cosSinDtype);
     args.slotMapping = BuildTensor(testCase.slotMappingShape, testCase.slotMappingDtype);
-    args.kCache = BuildTensor(testCase.kCacheShape, testCase.kCacheDtype);
-    args.vCache = BuildTensor(testCase.vCacheShape, testCase.vCacheDtype);
-    args.kScaleCache = BuildTensor(testCase.kScaleCacheShape, testCase.kScaleCacheDtype);
+    args.kCache =
+        BuildTensor(testCase.kCacheShape, testCase.kCacheDtype, testCase.kCacheStride, testCase.kCacheStorageShape);
+    args.vCache =
+        BuildTensor(testCase.vCacheShape, testCase.vCacheDtype, testCase.vCacheStride, testCase.vCacheStorageShape);
+    args.kScaleCache = BuildTensor(testCase.kScaleCacheShape, testCase.kScaleCacheDtype, testCase.kScaleCacheStride,
+                                   testCase.kScaleCacheStorageShape);
     args.queryStartLoc = BuildTensor(testCase.queryStartLocShape, testCase.queryStartLocDtype);
     args.seqLens = BuildTensor(testCase.seqLensShape, testCase.seqLensDtype);
     args.rotationOptional = BuildTensor(testCase.rotationOptionalShape, testCase.rotationOptionalDtype);
@@ -185,6 +198,7 @@ QkvRmsNormRopeCacheWithKScaleAclArgs BuildAclArgs(const QkvRmsNormRopeCacheWithK
     args.layoutQOut = BuildStringArg(testCase.layoutQOut);
     args.mropeSection = BuildIntArray(testCase.mropeSectionValue);
     args.qQuantMode = BuildStringArg(testCase.qQuantMode);
+    args.kQuantMode = BuildStringArg(testCase.kQuantMode);
     args.qOut = BuildTensor(testCase.qOutShape, testCase.qOutDtype, false);
     args.qScale = BuildTensor(testCase.qScaleShape, testCase.qScaleDtype, false);
     return args;
@@ -194,15 +208,35 @@ void RunCase(const QkvRmsNormRopeCacheWithKScaleCase &testCase)
 {
     const auto args = BuildAclArgs(testCase);
     uint64_t workspaceSize = 0;
-    auto ut = OP_API_UT(
-        aclnnQkvRmsNormRopeCacheWithKScale,
-        INPUT(args.qkv, args.qGamma, args.kGamma, args.cosSin, args.slotMapping, args.kCache, args.vCache,
-              args.kScaleCache, args.queryStartLoc, args.seqLens, args.rotationOptional, args.vScaleOptional,
-              args.mropePosition, args.headNums, args.layoutQkv, args.layoutQOut, testCase.epsilon, args.mropeSection,
-              args.qQuantMode),
-        OUTPUT(args.qOut, args.qScale));
+    auto ut = OP_API_UT(aclnnQkvRmsNormRopeCacheWithKScale,
+                        INPUT(args.qkv, args.qGamma, args.kGamma, args.cosSin, args.slotMapping, args.kCache,
+                              args.vCache, args.kScaleCache, args.queryStartLoc, args.seqLens, args.rotationOptional,
+                              args.vScaleOptional, args.mropePosition, args.headNums, args.layoutQkv, args.layoutQOut,
+                              testCase.epsilon, args.mropeSection, args.qQuantMode, args.kQuantMode),
+                        OUTPUT(args.qOut, args.qScale));
     const aclnnStatus ret = ut.TestGetWorkspaceSize(&workspaceSize);
-    EXPECT_EQ(ret, ParseStatus(testCase.expectRet)) << "caseName=" << testCase.caseName;
+    const string qQuantMode = Trim(testCase.qQuantMode);
+    const string kQuantMode = Trim(testCase.kQuantMode);
+    const bool qPerTokenPerHead = IsNullArg(qQuantMode) || qQuantMode == "<empty>" || qQuantMode == "PerTokenPerHead";
+    const bool kPerTokenPerHead = IsNullArg(kQuantMode) || kQuantMode == "<empty>" || kQuantMode == "PerTokenPerHead";
+    const bool isRopeScene = qPerTokenPerHead && kPerTokenPerHead && IsNullArg(testCase.mropePositionShape);
+    const bool requiredPointerMissing =
+        IsNullArg(testCase.qkvShape) || IsNullArg(testCase.qGammaShape) || IsNullArg(testCase.kGammaShape) ||
+        IsNullArg(testCase.cosSinShape) || IsNullArg(testCase.slotMappingShape) || IsNullArg(testCase.kCacheShape) ||
+        IsNullArg(testCase.vCacheShape) || IsNullArg(testCase.kScaleCacheShape) ||
+        IsNullArg(testCase.vScaleOptionalShape) || IsNullArg(testCase.headNumsValue) || IsNullArg(testCase.qOutShape) ||
+        (isRopeScene && (IsNullArg(testCase.queryStartLocShape) || IsNullArg(testCase.seqLensShape))) ||
+        ((isRopeScene || qQuantMode == "NoQuant") && IsNullArg(testCase.rotationOptionalShape));
+    aclnnStatus expectedRet = requiredPointerMissing ? ACLNN_ERR_PARAM_NULLPTR : ACLNN_SUCCESS;
+    const bool qOutputQuantized =
+        IsNullArg(qQuantMode) || qQuantMode == "<empty>" || qQuantMode == "PerTokenPerHead" || qQuantMode == "Mx";
+    if (expectedRet == ACLNN_SUCCESS && qQuantMode == "NoQuant" && !IsNullArg(testCase.qScaleShape)) {
+        expectedRet = ACLNN_ERR_PARAM_INVALID;
+    } else if (expectedRet == ACLNN_SUCCESS && qOutputQuantized && IsNullArg(testCase.qScaleShape)) {
+        expectedRet = ACLNN_ERR_PARAM_NULLPTR;
+    }
+    EXPECT_EQ(ret, expectedRet) << "caseName=" << testCase.caseName
+                                << ", operatorExpectRet=" << testCase.operatorExpectRet;
 }
 
 vector<QkvRmsNormRopeCacheWithKScaleCase> LoadCases(const string &csvFilePath)
@@ -271,7 +305,7 @@ vector<QkvRmsNormRopeCacheWithKScaleCase> LoadCases(const string &csvFilePath)
             c.mropePositionDtype = Trim(cols[i++]);
             c.mropeSectionValue = Trim(cols[i++]);
             c.qQuantMode = Trim(cols[i++]);
-            c.expectRet = Trim(cols[i++]);
+            c.operatorExpectRet = Trim(cols[i++]);
             cases.emplace_back(c);
         } catch (const std::exception &error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
@@ -300,6 +334,224 @@ class qkv_rms_norm_rope_cache_with_k_scale_csv_test : public testing::TestWithPa
 TEST_P(qkv_rms_norm_rope_cache_with_k_scale_csv_test, csvDrivenCase)
 {
     RunCase(GetParam());
+}
+
+QkvRmsNormRopeCacheWithKScaleCase MakeMropeMxCase()
+{
+    const auto &cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto &testCase) {
+        return testCase.caseName == "mrope_position_token_major_valid";
+    });
+    EXPECT_NE(it, cases.end());
+    if (it == cases.end()) {
+        return {};
+    }
+    auto testCase = *it;
+    testCase.caseName = "mrope_mx_valid";
+    testCase.kCacheDtype = "FLOAT8_E4M3FN";
+    testCase.kScaleCacheShape = "1:1:8:4";
+    testCase.kScaleCacheDtype = "FLOAT8_E8M0";
+    testCase.rotationOptionalShape = "<null>";
+    testCase.qOutDtype = "FLOAT8_E4M3FN";
+    testCase.qScaleShape = "5:8:4";
+    testCase.qScaleDtype = "FLOAT8_E8M0";
+    testCase.qQuantMode = "Mx";
+    testCase.kQuantMode = "Mx";
+    testCase.operatorExpectRet = "SUCCESS";
+    return testCase;
+}
+
+QkvRmsNormRopeCacheWithKScaleCase MakeMropeMxTwoKvHeadsCase()
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.qkvShape = "5:20:128";
+    testCase.kCacheShape = "1:2:8:128";
+    testCase.vCacheShape = "1:2:8:128";
+    testCase.kScaleCacheShape = "1:2:8:4";
+    testCase.vScaleOptionalShape = "2:128";
+    testCase.headNumsValue = "16|2|2";
+    testCase.qOutShape = "5:16:128";
+    testCase.qScaleShape = "5:16:4";
+    return testCase;
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsMropeMxFiveOutputContract)
+{
+    RunCase(MakeMropeMxCase());
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsModifiedV1PerTokenPerHeadContract)
+{
+    const auto &cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(),
+                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+    ASSERT_NE(it, cases.end());
+    RunCase(*it);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsCrossedMropeMxModesToGraphValidation)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.kQuantMode = "PerTokenPerHead";
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsUnsupportedMropeQModeToGraphValidation)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.qQuantMode = "Unsupported";
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsUnsupportedMropeKModeToGraphValidation)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.kQuantMode = "Unsupported";
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsRopeTokenCountAboveLimitToGraphValidation)
+{
+    const auto &cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(),
+                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+    ASSERT_NE(it, cases.end());
+    auto testCase = *it;
+    testCase.qkvShape = "10:262145:128";
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeTokenCountAboveLimitToGraphValidation)
+{
+    const auto &cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto &testCase) {
+        return testCase.caseName == "mrope_position_token_major_valid";
+    });
+    ASSERT_NE(it, cases.end());
+    auto testCase = *it;
+    testCase.qkvShape = "262145:10:128";
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeMxTokenCountAboveLimitToGraphValidation)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.qkvShape = "262145:10:128";
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeMxOverlappingKScaleTokenViewToGraphValidation)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.kScaleCacheStride = {32, 32, 2, 1};
+    testCase.kScaleCacheStorageShape = {1, 1, 8, 4};
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeMxOverlappingKvBlockViewToGraphValidation)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.kCacheShape = "2:1:8:128";
+    testCase.vCacheShape = "2:1:8:128";
+    testCase.kScaleCacheShape = "2:1:8:4";
+    testCase.kCacheStride = {128, 1024, 128, 1};
+    testCase.vCacheStride = testCase.kCacheStride;
+    testCase.kCacheStorageShape = {2, 1, 8, 128};
+    testCase.vCacheStorageShape = testCase.kCacheStorageShape;
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeMxOverlappingKvHeadViewToGraphValidation)
+{
+    auto testCase = MakeMropeMxTwoKvHeadsCase();
+    testCase.kCacheStride = {2048, 128, 128, 1};
+    testCase.vCacheStride = testCase.kCacheStride;
+    testCase.kCacheStorageShape = {1, 2, 8, 128};
+    testCase.vCacheStorageShape = testCase.kCacheStorageShape;
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeMxOverlappingKScaleBlockViewToGraphValidation)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.kCacheShape = "2:1:8:128";
+    testCase.vCacheShape = "2:1:8:128";
+    testCase.kScaleCacheShape = "2:1:8:4";
+    testCase.kScaleCacheStride = {4, 32, 4, 1};
+    testCase.kScaleCacheStorageShape = {2, 1, 8, 4};
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeMxOverlappingKScaleHeadViewToGraphValidation)
+{
+    auto testCase = MakeMropeMxTwoKvHeadsCase();
+    testCase.kScaleCacheStride = {64, 4, 4, 1};
+    testCase.kScaleCacheStorageShape = {1, 2, 8, 4};
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsMropeMxPaddedNonOverlappingViews)
+{
+    auto testCase = MakeMropeMxCase();
+    testCase.kCacheShape = "2:1:8:128";
+    testCase.vCacheShape = "2:1:8:128";
+    testCase.kScaleCacheShape = "2:1:8:4";
+    testCase.kCacheStride = {2048, 2048, 128, 1};
+    testCase.vCacheStride = testCase.kCacheStride;
+    testCase.kCacheStorageShape = {2, 1, 16, 128};
+    testCase.vCacheStorageShape = testCase.kCacheStorageShape;
+    testCase.kScaleCacheStride = {64, 64, 4, 1};
+    testCase.kScaleCacheStorageShape = {2, 1, 16, 4};
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsRopeOverlappingKvBlockViewToGraphValidation)
+{
+    const auto &cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(),
+                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+    ASSERT_NE(it, cases.end());
+    auto testCase = *it;
+    testCase.kCacheShape = "2:2:16:128";
+    testCase.vCacheShape = testCase.kCacheShape;
+    testCase.kScaleCacheShape = "2:2:16:1";
+    testCase.kCacheStride = {128, 2048, 128, 1};
+    testCase.vCacheStride = testCase.kCacheStride;
+    testCase.kCacheStorageShape = {2, 2, 16, 128};
+    testCase.vCacheStorageShape = testCase.kCacheStorageShape;
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, ForwardsMropeOverlappingKScaleBlockViewToGraphValidation)
+{
+    const auto &cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(), [](const auto &testCase) {
+        return testCase.caseName == "mrope_position_token_major_valid";
+    });
+    ASSERT_NE(it, cases.end());
+    auto testCase = *it;
+    testCase.kCacheShape = "2:1:8:128";
+    testCase.vCacheShape = testCase.kCacheShape;
+    testCase.kScaleCacheShape = "2:1:8:1";
+    testCase.kScaleCacheStride = {1, 8, 1, 1};
+    testCase.kScaleCacheStorageShape = {2, 1, 8, 1};
+    RunCase(testCase);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleAclnn, AcceptsRopePaddedNonOverlappingViews)
+{
+    const auto &cases = GetCases();
+    const auto it = std::find_if(cases.begin(), cases.end(),
+                                 [](const auto &testCase) { return testCase.caseName == "normal_decode_t128"; });
+    ASSERT_NE(it, cases.end());
+    auto testCase = *it;
+    testCase.kCacheStride = {6144, 3072, 160, 1};
+    testCase.vCacheStride = testCase.kCacheStride;
+    testCase.kCacheStorageShape = {32, 2, 24, 128};
+    testCase.vCacheStorageShape = testCase.kCacheStorageShape;
+    testCase.kScaleCacheStride = {128, 64, 2, 1};
+    testCase.kScaleCacheStorageShape = {64, 2, 32, 1};
+    RunCase(testCase);
 }
 
 INSTANTIATE_TEST_SUITE_P(QKV_RMS_NORM_ROPE_CACHE_WITH_K_SCALE_CSV, qkv_rms_norm_rope_cache_with_k_scale_csv_test,

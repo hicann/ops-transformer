@@ -29,9 +29,10 @@ import numpy as np
 
 try:
     import ml_dtypes
+    from en_dtypes import float8_e8m0
 except ImportError as exc:  # pragma: no cover - environment error is explicit
     raise ImportError(
-        "QkvRmsNormRopeCacheWithKScale golden requires ml_dtypes"
+        "QkvRmsNormRopeCacheWithKScale golden requires ml_dtypes and en_dtypes"
     ) from exc
 
 
@@ -39,6 +40,7 @@ FP8_MAX = np.float32(448.0)
 INT8_MAX = np.float32(127.0)
 BF16_DTYPE = np.dtype(ml_dtypes.bfloat16)
 FP8_DTYPE = np.dtype(ml_dtypes.float8_e4m3fn)
+E8M0_DTYPE = np.dtype(float8_e8m0)
 
 # CANN/GE DataType enum values from graph/c_types.h.  q_out_dtype uses these
 # integer attributes: 27 = ge::DT_BF16; 36 = ge::DT_FLOAT8_E4M3FN.
@@ -71,6 +73,15 @@ def to_numpy(value):
             .view(torch.uint8)
             .numpy()
             .view(FP8_DTYPE)
+            .reshape(tensor.shape)
+        )
+    if "float8_e8m0" in dtype_name:
+        torch = __import__("torch")
+        return (
+            tensor.view(-1)
+            .view(torch.uint8)
+            .numpy()
+            .view(E8M0_DTYPE)
             .reshape(tensor.shape)
         )
     return tensor.numpy()
@@ -124,10 +135,52 @@ def _dynamic_quant(value: np.ndarray, target: str):
         normalized = value / scale[..., None]
     if target == "fp8":
         quantized = saturating_fp8_cast(normalized)
+        # DAV_3510 F32->E4M3FN with SatMode::SAT and CTRL[50]=0 writes raw
+        # zero for NaN.  This includes explicit NaN/Inf inputs and the NaN
+        # produced by an all-zero row's 0/0 normalization.
+        raw = quantized.view(np.uint8)
+        raw[~np.isfinite(normalized)] = np.uint8(0)
     else:
         rounded = np.rint(normalized.astype(np.float16).astype(np.float32))
         quantized = np.clip(rounded, -INT8_MAX, INT8_MAX).astype(np.int8)
     return quantized, scale
+
+
+def _mx_quant_cublas(value: np.ndarray):
+    """Quantize D32 blocks to E4M3FN with cuBLAS-compatible E8M0 scales."""
+
+    shape = value.shape
+    blocks = np.asarray(value, dtype=np.float32).reshape(
+        *shape[:-1], shape[-1] // 32, 32
+    )
+    amax = np.max(np.abs(blocks), axis=-1)
+    nonfinite_amax = ~np.isfinite(amax)
+    scaled_amax = (amax / FP8_MAX).astype(np.float32)
+    bits = scaled_amax.view(np.uint32)
+    biased = ((bits & np.uint32(0x7F800000)) >> np.uint32(23)).astype(np.int16)
+    mantissa = bits & np.uint32(0x007FFFFF)
+    round_up = ((biased > 0) & (biased < 254) & (mantissa > 0)) | (
+        (biased == 0) & (mantissa > (1 << 22))
+    )
+    exponent = biased + round_up.astype(np.int16) - 127
+    exponent = np.where(amax == 0, -127, exponent)
+    exponent = np.maximum(exponent, -127)
+    exponent = np.where(exponent > 127, 128, exponent).astype(np.int16)
+
+    scale = np.exp2(np.minimum(exponent, 127).astype(np.float32))[..., None]
+    scale = np.where(nonfinite_amax[..., None], np.float32(np.nan), scale)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        quantized = saturating_fp8_cast(blocks / scale)
+    quantized_raw = np.where(
+        nonfinite_amax[..., None], np.uint8(0), quantized.view(np.uint8)
+    )
+    quantized = quantized_raw.reshape(shape).view(FP8_DTYPE)
+
+    scale_raw = np.where(nonfinite_amax | (exponent > 127), 255, exponent + 127).astype(
+        np.uint8
+    )
+    scales = scale_raw.view(E8M0_DTYPE).reshape(*shape[:-1], shape[-1] // 32)
+    return quantized, scales
 
 
 def _normal_rope_positions(token_num: int, query_start_loc, seq_lens):
@@ -273,6 +326,7 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
     epsilon=1e-6,
     mrope_section=None,
     q_quant_mode="PerTokenPerHead",
+    k_quant_mode="PerTokenPerHead",
     q_out_dtype=None,
 ) -> GoldenResult:
     """Compute all logical outputs without modifying the input caches."""
@@ -282,6 +336,7 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
         "head_nums must contain [Nq,Nk,Nv]",
     )
     q_heads, k_heads, v_heads = (int(item) for item in head_nums)
+    is_mx = str(q_quant_mode) == "Mx" and str(k_quant_mode) == "Mx"
     _require(0 < q_heads <= 64, "Nq must satisfy 0 < Nq <= 64")
     _require(q_heads == 8 * k_heads, "Nq must equal 8 * Nk")
     _require(k_heads == v_heads, "Nk must equal Nv")
@@ -315,10 +370,11 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
         np.asarray(slot_mapping).shape == (token_num,),
         "slot_mapping must have shape [T]",
     )
-    _require(
-        rotation is not None and np.asarray(rotation).shape == (head_dim, head_dim),
-        "rotation must have shape [D,D]",
-    )
+    if not is_mx:
+        _require(
+            rotation is not None and np.asarray(rotation).shape == (head_dim, head_dim),
+            "rotation must have shape [D,D]",
+        )
 
     k_cache_array = np.asarray(k_cache)
     v_cache_array = np.asarray(v_cache)
@@ -333,9 +389,14 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
         v_cache_array.shape == (block_num, v_heads, block_size, head_dim),
         "v_cache must have shape [BlockNum,Nv,BlockSize,D]",
     )
+    expected_k_scale_shape = (
+        (block_num, k_heads, block_size, head_dim // 32)
+        if is_mx
+        else (block_num, k_heads, block_size, 1)
+    )
     _require(
-        k_scale_array.shape == (block_num, k_heads, block_size, 1),
-        "k_scale_cache must have shape [BlockNum,Nk,BlockSize,1]",
+        k_scale_array.shape == expected_k_scale_shape,
+        f"k_scale_cache must have shape {expected_k_scale_shape}",
     )
 
     def rms_norm(value, gamma):
@@ -351,10 +412,26 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
     cos, sin, is_mrope = _select_cos_sin(
         cos_sin, token_num, query_start_loc, seq_lens, mrope_position, mrope_section
     )
-    rotation_fp32 = to_bf16(rotation).astype(np.float32)
+    rotation_fp32 = None if is_mx else to_bf16(rotation).astype(np.float32)
     dtype_name = _normalize_dtype_name(q_out_dtype)
-    if is_mrope:
+    if is_mx:
+        _require(is_mrope, "Mx requires M-RoPE inputs")
+        _require(
+            "float8_e4m3fn" in dtype_name or dtype_name == str(GE_DT_FLOAT8_E4M3FN),
+            "Mx requires FP8 E4M3FN q_out",
+        )
+        _require(
+            np.asarray(v_scale).shape == (v_heads, head_dim),
+            "M-RoPE MX v_scale must have shape [Nv,D]",
+        )
+        v_multiplier = np.asarray(v_scale, dtype=np.float32)[None, :, :]
+        q_dtype = FP8_DTYPE
+    elif is_mrope:
         _require(str(q_quant_mode) == "NoQuant", "M-RoPE requires q_quant_mode=NoQuant")
+        _require(
+            str(k_quant_mode) == "PerTokenPerHead",
+            "M-RoPE requires k_quant_mode=PerTokenPerHead",
+        )
         _require(
             "bfloat16" in dtype_name or dtype_name in ("bf16", str(GE_DT_BF16)),
             "M-RoPE requires BF16 q_out",
@@ -372,6 +449,10 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
             "RoPE requires q_quant_mode=PerTokenPerHead",
         )
         _require(
+            str(k_quant_mode) == "PerTokenPerHead",
+            "RoPE requires k_quant_mode=PerTokenPerHead",
+        )
+        _require(
             "float8_e4m3fn" in dtype_name or dtype_name == str(GE_DT_FLOAT8_E4M3FN),
             "RoPE requires FP8 E4M3FN q_out",
         )
@@ -387,10 +468,17 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
         else (token_num, q_heads, head_dim)
     )
     q_out = np.empty(q_shape, dtype=q_dtype)
-    q_scale = None if is_mrope else np.empty(q_shape[:-1], dtype=np.float32)
+    if is_mx:
+        q_scale = np.empty(q_shape[:-1] + (head_dim // 32,), dtype=E8M0_DTYPE)
+    elif is_mrope:
+        q_scale = None
+    else:
+        q_scale = np.empty(q_shape[:-1], dtype=np.float32)
     k_cache_out = k_cache_array.copy()
     v_cache_out = v_cache_array.copy()
-    k_scale_cache_out = k_scale_array.astype(np.float32, copy=True)
+    k_scale_cache_out = (
+        k_scale_array.copy() if is_mx else k_scale_array.astype(np.float32, copy=True)
+    )
     slots = np.asarray(slot_mapping, dtype=np.int64)
     _require(
         bool(np.all(slots >= 0) and np.all(slots < block_num * block_size)),
@@ -416,13 +504,19 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
 
         q_rope = _apply_rope(rms_norm(q, q_gamma), cos[begin:end], sin[begin:end])
         k_rope = _apply_rope(rms_norm(k, k_gamma), cos[begin:end], sin[begin:end])
-        q_rot = to_bf16(q_rope).astype(np.float32) @ rotation_fp32
-        k_rot = to_bf16(k_rope).astype(np.float32) @ rotation_fp32
+        if is_mx:
+            q_rot = q_rope
+            k_rot = k_rope
+            q_chunk, q_scale_chunk = _mx_quant_cublas(q_rot)
+            k_quant, k_scale = _mx_quant_cublas(k_rot)
+        else:
+            q_rot = to_bf16(q_rope).astype(np.float32) @ rotation_fp32
+            k_rot = to_bf16(k_rope).astype(np.float32) @ rotation_fp32
 
-        if is_mrope:
+        if is_mrope and not is_mx:
             q_chunk = to_bf16(q_rot)
             k_quant, k_scale = _dynamic_quant(k_rot, "int8")
-        else:
+        elif not is_mx:
             q_chunk, q_scale_chunk = _dynamic_quant(q_rot, "fp8")
             k_quant, k_scale = _dynamic_quant(k_rot, "fp8")
         v_quant = saturating_fp8_cast(v * v_multiplier)
@@ -430,7 +524,8 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
         if out_layout == "NTD":
             q_out[:, begin:end, :] = np.transpose(q_chunk, (1, 0, 2))
             if q_scale is not None:
-                q_scale[:, begin:end] = np.transpose(q_scale_chunk, (1, 0))
+                axes = (1, 0, 2) if is_mx else (1, 0)
+                q_scale[:, begin:end] = np.transpose(q_scale_chunk, axes)
         else:
             q_out[begin:end] = q_chunk
             if q_scale is not None:
@@ -441,7 +536,10 @@ def qkv_rms_norm_rope_cache_with_k_scale_numpy(
         block_offsets = chunk_slots % block_size
         k_cache_out[block_ids, :, block_offsets, :] = k_quant
         v_cache_out[block_ids, :, block_offsets, :] = v_quant
-        k_scale_cache_out[block_ids, :, block_offsets, 0] = k_scale
+        if is_mx:
+            k_scale_cache_out[block_ids, :, block_offsets, :] = k_scale
+        else:
+            k_scale_cache_out[block_ids, :, block_offsets, 0] = k_scale
 
     return GoldenResult(q_out, q_scale, k_cache_out, v_cache_out, k_scale_cache_out)
 
@@ -495,6 +593,10 @@ def _write_back(target, value):
         source = torch.from_numpy(
             np.ascontiguousarray(value.astype(FP8_DTYPE)).view(np.uint8)
         ).view(torch.float8_e4m3fn)
+    elif "float8_e8m0" in dtype_name:
+        source = torch.from_numpy(
+            np.ascontiguousarray(value.astype(E8M0_DTYPE)).view(np.uint8)
+        ).view(torch.float8_e8m0fnu)
     else:
         source = torch.from_numpy(np.ascontiguousarray(value)).to(dtype=target.dtype)
     target.copy_(source.to(target.device).reshape(target.shape))
@@ -529,6 +631,10 @@ def _prepare(
     mrope_position,
     *,
     testcase_name=None,
+    head_nums=None,
+    layout_qkv="TND",
+    q_quant_mode="PerTokenPerHead",
+    k_quant_mode="PerTokenPerHead",
 ):
     full_meta = _full_case_meta(testcase_name)
     rng = np.random.default_rng(
@@ -538,6 +644,7 @@ def _prepare(
     token_num = int(slot_mapping.shape[0])
     head_dim = int(qkv_shape[-1])
     block_num, _, block_size, _ = tuple(k_cache.shape)
+    is_mx = str(q_quant_mode) == "Mx" and str(k_quant_mode) == "Mx"
 
     # The full-800 stress matrix leaves QKV/cache storage as generated by TTK.
     # Re-materializing a largest-case QKV tensor here would add a >10 GiB FP32
@@ -560,6 +667,79 @@ def _prepare(
         np.float32
     )
 
+    name = str(testcase_name or "")
+    if full_meta is None and head_nums is not None:
+        q_heads, k_heads, _ = (int(item) for item in head_nums)
+        qk_heads = q_heads + k_heads
+        layout = str(layout_qkv or "TND").upper()
+        if is_mx:
+            lane = np.arange(head_dim, dtype=np.int32)
+            magnitude = np.asarray([2.0**-5, 2.0**-1, 2.0**3, 2.0**7], np.float32)[
+                lane // 32
+            ]
+            row = ((lane * 13 + 7) % 29).astype(np.float32) / 29.0 + 0.5
+            row *= magnitude * np.where(lane & 1, -1.0, 1.0)
+            total_heads = q_heads + k_heads + int(head_nums[2])
+            head = (1.0 + (np.arange(total_heads, dtype=np.float32) % 5) / 64.0)[
+                None, :, None
+            ]
+            token_scale = (1.0 + (np.arange(token_num, dtype=np.float32) % 7) / 32.0)[
+                :, None, None
+            ]
+            qkv_tnd = token_scale * head * row[None, None, :]
+            qkv_data = to_bf16(
+                np.transpose(qkv_tnd, (1, 0, 2)) if layout == "NTD" else qkv_tnd
+            )
+
+        qkv_profile = np.asarray(qkv_data, dtype=np.float32).copy()
+        if "nan_qk" in name or "inf_qk" in name:
+            special = np.float32(np.nan if "nan_qk" in name else np.inf)
+            if layout == "NTD":
+                qkv_profile[:qk_heads, 0, 0] = special
+            else:
+                qkv_profile[0, :qk_heads, 0] = special
+            qkv_data = to_bf16(qkv_profile)
+        elif "zero_qk" in name:
+            if layout == "NTD":
+                qkv_profile[:qk_heads, :, :] = 0
+            else:
+                qkv_profile[:, :qk_heads, :] = 0
+            qkv_data = to_bf16(qkv_profile)
+        elif "scale_edge_qk" in name or "max_finite_qk" in name:
+            if layout == "NTD":
+                qkv_profile[:qk_heads, :, :] = 1
+            else:
+                qkv_profile[:, :qk_heads, :] = 1
+            qkv_data = to_bf16(qkv_profile)
+
+        lane = np.arange(head_dim, dtype=np.int32)
+        if "scale_order" in name:
+            q_gamma_data = np.asarray([2.0**-6, 2.0**-2, 2.0**2, 2.0**6], np.float32)[
+                lane // 32
+            ]
+            k_gamma_data = q_gamma_data[::-1].copy()
+        elif "scale_edge_qk" in name:
+            edge = np.asarray(
+                [0x04600000, 0x04600001, 0x04600002, 0x3F800000], np.uint32
+            ).view(np.float32)
+            q_gamma_data = edge[lane // 32]
+            k_gamma_data = q_gamma_data[::-1].copy()
+        elif "max_finite_qk" in name:
+            q_gamma_data.fill(np.asarray([0x7F7FFFFF], np.uint32).view(np.float32)[0])
+            k_gamma_data = q_gamma_data.copy()
+        elif "tiny_qk" in name:
+            q_gamma_data.fill(np.float32(2.0**-140))
+            k_gamma_data = q_gamma_data.copy()
+        elif "saturation_qk" in name:
+            q_gamma_data.fill(np.float32(2.0**120))
+            k_gamma_data = q_gamma_data.copy()
+
+        if any(
+            tag in name for tag in ("scale_order", "scale_edge_qk", "max_finite_qk")
+        ):
+            cos_sin_data[:, :half] = np.float32(1.0)
+            cos_sin_data[:, half:] = np.float32(0.0)
+
     capacity = block_num * block_size
     token = np.arange(token_num, dtype=np.int64)
     if full_meta is None:
@@ -577,6 +757,19 @@ def _prepare(
     else:
         slots = ((token * (capacity - 1) + 17) % capacity).astype(np.int32)
 
+    def _move_slots_to_front(values):
+        nonlocal slots
+        values = [int(value) for value in values if int(value) < capacity]
+        tail = [int(value) for value in slots if int(value) not in values]
+        slots = np.asarray(values + tail, dtype=np.int32)[:token_num]
+
+    if "slot_block_begin" in name:
+        _move_slots_to_front([0])
+    elif "slot_block_end" in name:
+        _move_slots_to_front([block_size - 1])
+    elif "slot_cross_block" in name and token_num >= 2:
+        _move_slots_to_front([block_size - 1, block_size])
+
     if full_meta is None:
         if np.dtype(to_numpy(k_cache).dtype) == np.dtype(np.int8):
             k_cache_data = rng.integers(-31, 32, size=k_cache.shape, dtype=np.int8)
@@ -587,9 +780,13 @@ def _prepare(
         v_cache_data = saturating_fp8_cast(
             rng.uniform(-4.0, 4.0, size=v_cache.shape).astype(np.float32)
         )
-        k_scale_data = rng.uniform(0.01, 0.5, size=k_scale_cache.shape).astype(
-            np.float32
-        )
+        if np.dtype(to_numpy(k_scale_cache).dtype) == E8M0_DTYPE:
+            k_scale_raw = rng.integers(1, 253, size=k_scale_cache.shape, dtype=np.uint8)
+            k_scale_data = k_scale_raw.view(E8M0_DTYPE)
+        else:
+            k_scale_data = rng.uniform(0.01, 0.5, size=k_scale_cache.shape).astype(
+                np.float32
+            )
     else:
         k_cache_data = v_cache_data = k_scale_data = None
 
@@ -619,17 +816,29 @@ def _prepare(
         _write_back(query_start_loc, starts)
         _write_back(seq_lens, seq_data)
 
-    rotation_data = to_bf16(
-        np.eye(head_dim, dtype=np.float32)
-        + rng.normal(0.0, 0.01, size=rotation.shape).astype(np.float32)
+    rotation_data = None
+    if rotation is not None:
+        rotation_data = to_bf16(
+            np.eye(head_dim, dtype=np.float32)
+            + rng.normal(0.0, 0.01, size=rotation.shape).astype(np.float32)
+        )
+    v_scale_data = (
+        None
+        if v_scale is None
+        else rng.uniform(0.5, 1.5, size=v_scale.shape).astype(np.float32)
     )
-    v_scale_data = rng.uniform(0.5, 1.5, size=v_scale.shape).astype(np.float32)
     if mrope_position is not None:
         token = np.arange(token_num, dtype=np.int64)
         position_data = np.stack(
             ((token * 3) % rows, (token * 5 + 1) % rows, (token * 7 + 2) % rows),
             axis=1,
         ).astype(np.int32)
+        if "position_1024" in name:
+            boundary = np.asarray(
+                [[1023, 1024, 1025], [1024, 1025, 1023], [1025, 1023, 1024]],
+                dtype=np.int32,
+            )
+            position_data[:] = boundary[np.arange(token_num) % len(boundary)]
         _write_back(mrope_position, position_data)
 
     for target, value in (
@@ -681,6 +890,10 @@ def kernel_customize_inputs(
         v_scale,
         mrope_position,
         testcase_name=kwargs.get("testcase_name"),
+        head_nums=kwargs.get("head_nums"),
+        layout_qkv=kwargs.get("layout_qkv", "TND"),
+        q_quant_mode=kwargs.get("q_quant_mode", "PerTokenPerHead"),
+        k_quant_mode=kwargs.get("k_quant_mode", "PerTokenPerHead"),
     )
     return (
         qkv,
@@ -722,6 +935,7 @@ TOLERANCE = {
     # Custom comparison owns the FP8/INT8 metrics.  These valid fallback
     # standards are still needed while TTK resolves the pre-hook tolerance.
     "float8_e4m3fn": {"standard": "binary_equal"},
+    "float8_e8m0": {"standard": "binary_equal"},
     "int8": {"standard": "binary_equal"},
 }
 
@@ -817,7 +1031,11 @@ def compare_outputs(*values, compare_context):
     goldens = [to_numpy(value) for value in values[output_count:]]
     attrs = dict(compare_context.attributes)
     api_name = str(compare_context.api_name)
+    if api_name.startswith("torch.ops."):
+        api_name = api_name[len("torch.ops.") :]
     q_quant_mode = attrs.get("q_quant_mode", attrs.get("qQuantMode", "PerTokenPerHead"))
+    k_quant_mode = attrs.get("k_quant_mode", attrs.get("kQuantMode", "PerTokenPerHead"))
+    is_mx = str(q_quant_mode) == "Mx" and str(k_quant_mode) == "Mx"
     is_mrope = str(q_quant_mode) == "NoQuant"
     is_kernel = api_name == "qkv_rms_norm_rope_cache_with_k_scale"
     is_pta = api_name in (PTA_FUNCTIONAL_API, PTA_INPLACE_API)
@@ -828,7 +1046,10 @@ def compare_outputs(*values, compare_context):
     inputs = compare_context.input_tensors
     slots = np.asarray(to_numpy(inputs[4]), dtype=np.int64)
 
-    if is_mrope and (is_kernel or is_pta):
+    if is_mx:
+        q_actual, qs_actual, k_actual, v_actual, ks_actual = outputs[:5]
+        q_golden, qs_golden, k_golden, v_golden, ks_golden = goldens[:5]
+    elif is_mrope and (is_kernel or is_pta):
         q_actual, _, k_actual, v_actual, ks_actual = outputs[:5]
         q_golden, _, k_golden, v_golden, ks_golden = goldens[:5]
     elif is_mrope:
@@ -846,7 +1067,24 @@ def compare_outputs(*values, compare_context):
     ks_golden_rows = _cache_rows(ks_golden, slots)
 
     metrics = {}
-    if is_mrope:
+    if is_mx:
+        metrics.update(
+            {
+                "q_fp8_close": _close_rate(q_actual, q_golden, FP8_RTOL, FP8_ATOL),
+                "q_scale_e8m0_exact": _exact_rate(qs_actual, qs_golden),
+                "k_fp8_close": _close_rate(k_rows, k_golden_rows, FP8_RTOL, FP8_ATOL),
+                "k_scale_e8m0_exact": _exact_rate(ks_rows, ks_golden_rows),
+                "v_fp8_close": _close_rate(v_rows, v_golden_rows, FP8_RTOL, FP8_ATOL),
+            }
+        )
+        thresholds = {
+            "q_fp8_close": 1.0 - FP8_PTOL,
+            "q_scale_e8m0_exact": 1.0,
+            "k_fp8_close": 1.0 - FP8_PTOL,
+            "k_scale_e8m0_exact": 1.0,
+            "v_fp8_close": 1.0 - FP8_PTOL,
+        }
+    elif is_mrope:
         metrics.update(
             {
                 "q_bf16_close": _close_rate(q_actual, q_golden, BF16_RTOL, BF16_ATOL),
@@ -955,6 +1193,7 @@ def numpy_result(
     epsilon,
     mrope_section,
     q_quant_mode,
+    k_quant_mode,
     q_out_dtype,
 ):
     """Normalize Kernel/ACLNN/PTA tensors and run the shared NumPy core."""
@@ -979,6 +1218,7 @@ def numpy_result(
         epsilon=epsilon,
         mrope_section=mrope_section,
         q_quant_mode=q_quant_mode,
+        k_quant_mode=k_quant_mode,
         q_out_dtype=q_out_dtype,
     )
 
@@ -1012,6 +1252,7 @@ class QkvRmsNormRopeCacheWithKScaleTestSpec:
         epsilon=1e-6,
         mrope_section=None,
         q_quant_mode="PerTokenPerHead",
+        k_quant_mode="PerTokenPerHead",
         q_out_dtype=GE_DT_FLOAT8_E4M3FN,
         **kwargs,
     ):
@@ -1035,6 +1276,7 @@ class QkvRmsNormRopeCacheWithKScaleTestSpec:
             epsilon=epsilon,
             mrope_section=mrope_section,
             q_quant_mode=q_quant_mode,
+            k_quant_mode=k_quant_mode,
             q_out_dtype=q_out_dtype,
         )
         q_scale = result.q_scale

@@ -24,7 +24,7 @@ ACLNN_API aclnnStatus aclnnQkvRmsNormRopeCacheWithKScaleGetWorkspaceSize(
     const aclTensor *queryStartLocOptional, const aclTensor *seqLensOptional, const aclTensor *rotationOptional,
     const aclTensor *vScaleOptional, const aclTensor *mropePositionOptional, const aclIntArray *headNums,
     const char *layoutQkv, const char *layoutQOut, float epsilon, const aclIntArray *mropeSectionOptional,
-    const char *qQuantMode, aclTensor *qOut, aclTensor *qScaleOptional, uint64_t *workspaceSize,
+    const char *qQuantMode, const char *kQuantMode, aclTensor *qOut, aclTensor *qScaleOptional, uint64_t *workspaceSize,
     aclOpExecutor **executor);
 
 ACLNN_API aclnnStatus aclnnQkvRmsNormRopeCacheWithKScale(void *workspace, uint64_t workspaceSize,

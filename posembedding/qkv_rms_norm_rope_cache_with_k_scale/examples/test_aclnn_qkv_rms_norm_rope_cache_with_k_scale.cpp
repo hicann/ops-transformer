@@ -213,8 +213,8 @@ int main()
     TensorResource vScale;
     TensorResource qOut;
     TensorResource qScale;
-    resource.tensors = {&qkv, &qGamma, &kGamma, &cosSin, &slotMapping, &kCache, &vCache,
-                        &kScaleCache, &queryStartLoc, &seqLens, &rotation, &vScale, &qOut, &qScale};
+    resource.tensors = {&qkv,         &qGamma,        &kGamma,  &cosSin,   &slotMapping, &kCache, &vCache,
+                        &kScaleCache, &queryStartLoc, &seqLens, &rotation, &vScale,      &qOut,   &qScale};
 
     ret = CreateAclTensor(qkvHostData, qkvShape, ACL_BF16, qkv);
     CHECK_RET(ret == ACL_SUCCESS, return ReturnAfterCleanup(ret, resource));
@@ -257,8 +257,8 @@ int main()
     aclnnStatus status = aclnnQkvRmsNormRopeCacheWithKScaleGetWorkspaceSize(
         qkv.tensor, qGamma.tensor, kGamma.tensor, cosSin.tensor, slotMapping.tensor, kCache.tensor, vCache.tensor,
         kScaleCache.tensor, queryStartLoc.tensor, seqLens.tensor, rotation.tensor, vScale.tensor, nullptr,
-        resource.headNums, layoutQkv, layoutQOut, epsilon, nullptr, "PerTokenPerHead", qOut.tensor, qScale.tensor,
-        &workspaceSize, &resource.executor);
+        resource.headNums, layoutQkv, layoutQOut, epsilon, nullptr, "PerTokenPerHead", "PerTokenPerHead", qOut.tensor,
+        qScale.tensor, &workspaceSize, &resource.executor);
     CHECK_RET(status == ACL_SUCCESS,
               LOG_PRINT("aclnnQkvRmsNormRopeCacheWithKScaleGetWorkspaceSize failed. ERROR: %d\n", status);
               return ReturnAfterCleanup(static_cast<int>(status), resource));

@@ -48,16 +48,6 @@ ge::graphStatus TilingPrepare4QkvRmsNormRopeCacheWithKScale(gert::TilingParseCon
             "l1Size=%llu l0cSize=%llu opWorkspaceSize=%llu.",
             compileInfo->aicNum, compileInfo->aivNum, compileInfo->ubSize, compileInfo->l1Size, compileInfo->l0cSize,
             compileInfo->opWorkspaceSize);
-    OP_CHECK_IF(compileInfo->aicNum == 0 || compileInfo->aivNum == 0 || compileInfo->ubSize == 0 ||
-                    compileInfo->l1Size == 0 || compileInfo->l0cSize == 0,
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-                    OP_NAME, "aicNum, aivNum, ubSize, l1Size, l0cSize",
-                    (std::to_string(compileInfo->aicNum) + ", " + std::to_string(compileInfo->aivNum) + ", " +
-                     std::to_string(compileInfo->ubSize) + ", " + std::to_string(compileInfo->l1Size) + ", " +
-                     std::to_string(compileInfo->l0cSize))
-                        .c_str(),
-                    "platform resources must be greater than 0"),
-                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

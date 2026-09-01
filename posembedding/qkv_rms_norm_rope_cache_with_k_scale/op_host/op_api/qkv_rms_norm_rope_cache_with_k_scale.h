@@ -12,18 +12,21 @@
 #define OP_API_INC_LEVEL0_OP_QKV_RMS_NORM_ROPE_CACHE_WITH_K_SCALE_OP_H
 
 #include <tuple>
+#include "aclnn/aclnn_base.h"
 #include "opdev/op_executor.h"
 
 namespace l0op {
-std::tuple<const aclTensor *, const aclTensor *, const aclTensor *, const aclTensor *, const aclTensor *>
-QkvRmsNormRopeCacheWithKScale(const aclTensor *qkv, const aclTensor *qGamma, const aclTensor *kGamma,
-                              const aclTensor *cosSin, const aclTensor *slotMapping, aclTensor *kCache,
-                              aclTensor *vCache, aclTensor *kScaleCache, const aclTensor *queryStartLoc,
-                              const aclTensor *seqLens, const aclTensor *rotationOptional,
-                              const aclTensor *vScaleOptional, const aclTensor *mropePositionOptional,
-                              const aclIntArray *headNums, const char *layoutQkv, const char *layoutQOut, float epsilon,
-                              const aclIntArray *mropeSectionOptional, const char *qQuantMode, int64_t qOutDtype,
-                              aclTensor *qOut, aclTensor *qScaleOptional, aclOpExecutor *executor);
-}
+using QkvRmsNormRopeCacheWithKScaleResult = std::tuple<aclnnStatus, const aclTensor *, const aclTensor *,
+                                                       const aclTensor *, const aclTensor *, const aclTensor *>;
+
+QkvRmsNormRopeCacheWithKScaleResult QkvRmsNormRopeCacheWithKScale(
+    const aclTensor *qkv, const aclTensor *qGamma, const aclTensor *kGamma, const aclTensor *cosSin,
+    const aclTensor *slotMapping, aclTensor *kCache, aclTensor *vCache, aclTensor *kScaleCache,
+    const aclTensor *queryStartLoc, const aclTensor *seqLens, const aclTensor *rotationOptional,
+    const aclTensor *vScaleOptional, const aclTensor *mropePositionOptional, const aclIntArray *headNums,
+    const char *layoutQkv, const char *layoutQOut, float epsilon, const aclIntArray *mropeSectionOptional,
+    const char *qQuantMode, const char *kQuantMode, int64_t qOutDtype, aclTensor *qOut, aclTensor *qScaleOptional,
+    aclOpExecutor *executor);
+} // namespace l0op
 
 #endif

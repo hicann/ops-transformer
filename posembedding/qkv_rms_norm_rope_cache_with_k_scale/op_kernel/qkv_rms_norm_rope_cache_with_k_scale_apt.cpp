@@ -21,15 +21,14 @@ using QkvRmsNormRopeCacheWithKScale::GlobalTensors;
 using QkvRmsNormRopeCacheWithKScale::QkvRmsNormRopeCacheWithKScaleController;
 using QkvRmsNormRopeCacheWithKScaleKernelTiling::QkvRmsNormRopeCacheWithKScaleTilingData;
 
-template <uint32_t HEAD_DIM, uint32_t QKV_LAYOUT, uint32_t Q_OUT_LAYOUT, uint32_t ROPE_MODE, uint32_t K_QUANT_MODE,
-          uint32_t Q_QUANT_MODE>
+template <uint32_t HEAD_DIM, uint32_t QKV_LAYOUT, uint32_t Q_OUT_LAYOUT, uint32_t ROPE_MODE, uint32_t K_CACHE_DTYPE,
+          uint32_t Q_QUANT_MODE, uint32_t K_QUANT_MODE>
 __global__ __aicore__ void qkv_rms_norm_rope_cache_with_k_scale(
     GM_ADDR qkv, GM_ADDR q_gamma, GM_ADDR k_gamma, GM_ADDR cos_sin, GM_ADDR slot_mapping, GM_ADDR k_cache_in,
     GM_ADDR v_cache_in, GM_ADDR k_scale_cache_in, GM_ADDR query_start_loc, GM_ADDR seq_lens, GM_ADDR rotation,
     GM_ADDR v_scale, GM_ADDR mrope_position, GM_ADDR q_out, GM_ADDR q_scale, GM_ADDR k_cache_out, GM_ADDR v_cache_out,
     GM_ADDR k_scale_cache_out, GM_ADDR workspace, GM_ADDR tiling)
 {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     REGISTER_TILING_DEFAULT(QkvRmsNormRopeCacheWithKScaleTilingData);
     AscendC::InitSocState();
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
@@ -39,28 +38,15 @@ __global__ __aicore__ void qkv_rms_norm_rope_cache_with_k_scale(
     const QkvRmsNormRopeCacheWithKScaleTilingData *tilingData = &tilingDataIn;
 
     const GlobalTensors tensors = {
-        qkv,
-        q_gamma,
-        k_gamma,
-        cos_sin,
-        slot_mapping,
-        k_cache_in,
-        v_cache_in,
-        k_scale_cache_in,
-        query_start_loc,
-        seq_lens,
-        rotation,
-        v_scale,
-        mrope_position,
-        q_out,
-        q_scale,
-        k_cache_out,
-        v_cache_out,
-        k_scale_cache_out,
-        workspace,
+        qkv,         q_gamma,     k_gamma,           cos_sin,         slot_mapping,
+        k_cache_in,  v_cache_in,  k_scale_cache_in,  query_start_loc, seq_lens,
+        rotation,    v_scale,     mrope_position,    q_out,           q_scale,
+        k_cache_out, v_cache_out, k_scale_cache_out, workspace,
     };
 
-    QkvRmsNormRopeCacheWithKScaleController<QKV_LAYOUT, Q_OUT_LAYOUT, ROPE_MODE, K_QUANT_MODE, Q_QUANT_MODE> controller;
+    QkvRmsNormRopeCacheWithKScaleController<HEAD_DIM, QKV_LAYOUT, Q_OUT_LAYOUT, ROPE_MODE, K_CACHE_DTYPE, Q_QUANT_MODE,
+                                            K_QUANT_MODE>
+        controller;
     controller.Process(tensors, tilingData);
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
 }

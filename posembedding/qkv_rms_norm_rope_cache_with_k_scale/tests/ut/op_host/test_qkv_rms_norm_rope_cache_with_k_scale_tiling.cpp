@@ -13,9 +13,12 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "op_common/op_host/util/math_util.h"
@@ -24,6 +27,7 @@
 
 #include "../../../op_host/op_tiling/arch35/qkv_rms_norm_rope_cache_with_k_scale_base_tiling.h"
 #include "../../../op_host/op_tiling/arch35/qkv_rms_norm_rope_cache_with_k_scale_tiling.h"
+#include "../../../op_kernel/arch35/qkv_rms_norm_rope_cache_with_k_scale_mrope_mx_layout.h"
 
 namespace {
 using QkvTiling = optiling::QkvRmsNormRopeCacheWithKScale::QkvRmsNormRopeCacheWithKScaleBaseTiling;
@@ -37,6 +41,10 @@ constexpr uint64_t TEST_LAYOUT_NTD = 0U;
 constexpr uint64_t TEST_LAYOUT_TND = 1U;
 constexpr int64_t EXPECT_UNSET = -1;
 constexpr float DEFAULT_EPSILON = 1e-6F;
+constexpr uint64_t TEST_UB_SIZE = 262144U;
+constexpr uint64_t TEST_L1_SIZE = 524288U;
+constexpr uint64_t TEST_L0C_SIZE = 131072U;
+constexpr uint64_t MROPE_MX_VECTOR_TILING_KEY = 302059776ULL;
 
 int64_t ReadExpected(const csv_map &csvMap, const std::string &key)
 {
@@ -44,9 +52,15 @@ int64_t ReadExpected(const csv_map &csvMap, const std::string &key)
     return value.empty() ? EXPECT_UNSET : std::stoll(value);
 }
 
-bool IsNullValue(const std::string &value) { return value.empty() || value == "<null>"; }
+bool IsNullValue(const std::string &value)
+{
+    return value.empty() || value == "<null>";
+}
 
-std::string DecodeString(const std::string &value) { return value == "<empty>" ? std::string() : value; }
+std::string DecodeString(const std::string &value)
+{
+    return value == "<empty>" ? std::string() : value;
+}
 
 std::vector<int64_t> ParseIntList(const std::string &value)
 {
@@ -108,9 +122,14 @@ struct QkvTilingCase : public HostUtParamBase {
     std::string epsilon;
     std::string mropeSection;
     std::string qQuantMode;
+    std::string kQuantMode;
     std::string qOutDtypeAttr;
     uint32_t aicNum = 32U;
     uint32_t aivNum = aicNum * QkvTiling::AIV_PER_AIC;
+    uint64_t ubSize = TEST_UB_SIZE;
+    uint64_t l1Size = TEST_L1_SIZE;
+    uint64_t l0cSize = TEST_L0C_SIZE;
+    uint64_t opWorkspaceSize = TEST_OP_WORKSPACE_SIZE;
     std::string socVersion = "Ascend950";
     ExpectedTiling expected;
 
@@ -135,6 +154,9 @@ struct QkvTilingCase : public HostUtParamBase {
         inputInstance.emplace_back(GetTensorGE(csvMap, "vScale_shape", "vScale_dtype", "vScale_format", vScale));
         inputInstance.emplace_back(
             GetTensorGE(csvMap, "mropePosition_shape", "mropePosition_dtype", "mropePosition_format", mropePosition));
+        ApplyStrideFromCsv(csvMap, "kCache_stride", kCache);
+        ApplyStrideFromCsv(csvMap, "vCache_stride", vCache);
+        ApplyStrideFromCsv(csvMap, "kScaleCache_stride", kScaleCache);
 
         outputInstance.emplace_back(GetTensorGE(csvMap, "qOut_shape", "qOut_dtype", "qOut_format", qOut));
         outputInstance.emplace_back(GetTensorGE(csvMap, "qScale_shape", "qScale_dtype", "qScale_format", qScale));
@@ -148,11 +170,16 @@ struct QkvTilingCase : public HostUtParamBase {
         epsilon = ReadMap(csvMap, "epsilon");
         mropeSection = ReadMap(csvMap, "mrope_section");
         qQuantMode = ReadMap(csvMap, "q_quant_mode");
+        kQuantMode = ReadMap(csvMap, "k_quant_mode");
         qOutDtypeAttr = ReadMap(csvMap, "q_out_dtype_attr");
         aicNum = static_cast<uint32_t>(std::stoull(ReadMap(csvMap, "aic_num", "32")));
         const std::string aivNumValue = ReadMap(csvMap, "aiv_num");
         aivNum = IsNullValue(aivNumValue) ? aicNum * QkvTiling::AIV_PER_AIC :
                                             static_cast<uint32_t>(std::stoull(aivNumValue));
+        ubSize = std::stoull(ReadMap(csvMap, "ub_size", std::to_string(TEST_UB_SIZE)));
+        l1Size = std::stoull(ReadMap(csvMap, "l1_size", std::to_string(TEST_L1_SIZE)));
+        l0cSize = std::stoull(ReadMap(csvMap, "l0c_size", std::to_string(TEST_L0C_SIZE)));
+        opWorkspaceSize = std::stoull(ReadMap(csvMap, "op_workspace_size", std::to_string(TEST_OP_WORKSPACE_SIZE)));
         socVersion = ReadMap(csvMap, "soc_version", "Ascend950");
 
         expected.tilingKey = ReadExpected(csvMap, "expectTilingKey");
@@ -207,11 +234,17 @@ std::vector<gert::TilingContextPara::OpAttr> BuildAttrs(const QkvTilingCase &tes
     }
     attrs.emplace_back("q_quant_mode",
                        Ops::Transformer::AnyValue::CreateFrom<std::string>(DecodeString(testCase.qQuantMode)));
-    if (IsNullValue(testCase.qOutDtypeAttr)) {
+    if (IsNullValue(testCase.qOutDtypeAttr) && IsNullValue(testCase.kQuantMode)) {
         return attrs;
     }
-    attrs.emplace_back("q_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(
-                                          static_cast<int64_t>(Str2DTypeGE(testCase.qOutDtypeAttr))));
+    attrs.emplace_back("q_out_dtype",
+                       Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(Str2DTypeGE(
+                           IsNullValue(testCase.qOutDtypeAttr) ? "FLOAT8_E4M3FN" : testCase.qOutDtypeAttr))));
+    if (IsNullValue(testCase.kQuantMode)) {
+        return attrs;
+    }
+    attrs.emplace_back("k_quant_mode",
+                       Ops::Transformer::AnyValue::CreateFrom<std::string>(DecodeString(testCase.kQuantMode)));
     return attrs;
 }
 
@@ -220,10 +253,10 @@ CompileInfo BuildCompileInfo(const QkvTilingCase &testCase)
     CompileInfo compileInfo;
     compileInfo.aicNum = testCase.aicNum;
     compileInfo.aivNum = testCase.aivNum;
-    compileInfo.ubSize = 262144U;
-    compileInfo.l1Size = 524288U;
-    compileInfo.l0cSize = 131072U;
-    compileInfo.opWorkspaceSize = TEST_OP_WORKSPACE_SIZE;
+    compileInfo.ubSize = testCase.ubSize;
+    compileInfo.l1Size = testCase.l1Size;
+    compileInfo.l0cSize = testCase.l0cSize;
+    compileInfo.opWorkspaceSize = testCase.opWorkspaceSize;
     return compileInfo;
 }
 
@@ -308,7 +341,7 @@ void ExpectTilingResult(const QkvTilingCase &testCase, const TilingInfo &tilingI
         EXPECT_EQ(tilingInfo.workspaceSizes[0], expected.workspaceSize) << "caseName=" << testCase.case_name;
     }
 
-    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(TilingData)) << "caseName=" << testCase.case_name;
+    ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(TilingData)) << "caseName=" << testCase.case_name;
     ASSERT_NE(tilingInfo.tilingData, nullptr) << "caseName=" << testCase.case_name;
     if (expected.tilingDataZero == 1) {
         const auto *begin = tilingInfo.tilingData.get();
@@ -333,6 +366,7 @@ void ExpectTilingResult(const QkvTilingCase &testCase, const TilingInfo &tilingI
         EXPECT_EQ(tiling.mropeSectionW, static_cast<uint64_t>(mropeSection[2])) << "caseName=" << testCase.case_name;
     }
 
+    const bool isMropeMx = DecodeString(testCase.qQuantMode) == "Mx" && DecodeString(testCase.kQuantMode) == "Mx";
     const uint64_t tokenTilePerAiv = Ops::Base::CeilDiv(tiling.tokenTile, QkvTiling::AIV_PER_AIC);
     const uint64_t qkHeadNum = tiling.qHeadNum + tiling.kvHeadNum;
     const uint64_t rowTile = tiling.tokenTile * qkHeadNum;
@@ -343,15 +377,39 @@ void ExpectTilingResult(const QkvTilingCase &testCase, const TilingInfo &tilingI
     ExpectU64(testCase.case_name, "coreTokenTile", expected.coreTokenTile, tiling.coreTokenTile);
     ExpectU64(testCase.case_name, "coreGroupNum", expected.coreGroupNum, tiling.coreGroupNum);
 
-    const uint64_t qPreprocessRows = tokenTilePerAiv * tiling.qHeadNum;
-    const uint64_t kPreprocessRows = tokenTilePerAiv * tiling.kvHeadNum;
-    EXPECT_LE(CalcQkPreprocessNzBytes(qPreprocessRows) + CalcQkPreprocessNzBytes(kPreprocessRows),
-              QkvTiling::QK_PREPROCESS_UB_BYTES);
-    EXPECT_LE(tokenTilePerAiv * qkHeadNum, QkvTiling::QK_OUTPUT_ROWS_PER_AIV);
-    const uint64_t qkvInputRowsPerAiv =
-        mropeSection.size() == 3U ? QkvTiling::MROPE_COMPACT_INPUT_ROWS_PER_AIV : QkvTiling::QKV_INPUT_ROWS_PER_AIV;
-    EXPECT_LE(tokenTilePerAiv * (qkHeadNum + tiling.kvHeadNum), qkvInputRowsPerAiv);
-    EXPECT_LE(tokenTilePerAiv * tiling.kvHeadNum, QkvTiling::V_OUTPUT_ROWS_PER_AIV);
+    if (isMropeMx) {
+        EXPECT_EQ(tiling.batch, 0U);
+        EXPECT_EQ(tiling.coreTokenTile, 0U);
+        EXPECT_EQ(tiling.coreGroupNum, 0U);
+        EXPECT_EQ(tilingInfo.blockNum, std::min(input.totalTokens, static_cast<uint64_t>(testCase.aivNum)));
+        ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout layout{};
+        const bool hasQTail = (tiling.qHeadNum & 15U) == 8U;
+        const bool layoutOk = hasQTail ?
+                                  ::QkvRmsNormRopeCacheWithKScale::TryMakeMropeMxQGlobalTileWaveUbLayout(
+                                      tiling.tokenTile, tiling.qHeadNum, tiling.kvHeadNum, tiling.headDim, layout) :
+                                  ::QkvRmsNormRopeCacheWithKScale::TryMakeMropeMxUbLayout(
+                                      tiling.tokenTile, tiling.qHeadNum, tiling.kvHeadNum, tiling.headDim, layout);
+        ASSERT_TRUE(layoutOk);
+        EXPECT_LE(layout.totalBytes, testCase.ubSize);
+        EXPECT_EQ(layout.totalBytes % 32U, 0U);
+        const uint64_t kScaleTokenStrideBytes =
+            Ops::Base::CeilAlign(tiling.kvHeadNum * ::QkvRmsNormRopeCacheWithKScale::MROPE_MX_SCALE_COUNT_D128,
+                                 ::QkvRmsNormRopeCacheWithKScale::MROPE_MX_UB_ALIGN_BYTES);
+        EXPECT_EQ(layout.kScaleOffsetBytes % ::QkvRmsNormRopeCacheWithKScale::MROPE_MX_UB_ALIGN_BYTES, 0U);
+        EXPECT_EQ(kScaleTokenStrideBytes % ::QkvRmsNormRopeCacheWithKScale::MROPE_MX_UB_ALIGN_BYTES, 0U);
+        EXPECT_LE(layout.kScaleOffsetBytes - layout.kDataOffsetBytes + tiling.tokenTile * kScaleTokenStrideBytes,
+                  layout.kSlotBytes);
+    } else {
+        const uint64_t qPreprocessRows = tokenTilePerAiv * tiling.qHeadNum;
+        const uint64_t kPreprocessRows = tokenTilePerAiv * tiling.kvHeadNum;
+        EXPECT_LE(CalcQkPreprocessNzBytes(qPreprocessRows) + CalcQkPreprocessNzBytes(kPreprocessRows),
+                  QkvTiling::QK_PREPROCESS_UB_BYTES);
+        EXPECT_LE(tokenTilePerAiv * qkHeadNum, QkvTiling::QK_OUTPUT_ROWS_PER_AIV);
+        const uint64_t qkvInputRowsPerAiv =
+            mropeSection.size() == 3U ? QkvTiling::MROPE_COMPACT_INPUT_ROWS_PER_AIV : QkvTiling::QKV_INPUT_ROWS_PER_AIV;
+        EXPECT_LE(tokenTilePerAiv * (qkHeadNum + tiling.kvHeadNum), qkvInputRowsPerAiv);
+        EXPECT_LE(tokenTilePerAiv * tiling.kvHeadNum, QkvTiling::V_OUTPUT_ROWS_PER_AIV);
+    }
 
     ExpectU64(testCase.case_name, "kvCacheStrideBlock", expected.kvStrideBlock, tiling.kvCacheStrideBlock);
     ExpectU64(testCase.case_name, "kvCacheStrideHead", expected.kvStrideHead, tiling.kvCacheStrideHead);
@@ -428,16 +486,62 @@ TEST_P(QkvRmsNormRopeCacheWithKScaleCsvTiling, RunsCase)
 INSTANTIATE_TEST_SUITE_P(CsvCases, QkvRmsNormRopeCacheWithKScaleCsvTiling, testing::ValuesIn(GetTilingCases()),
                          PrintCaseInfoString<QkvTilingCase>);
 
+TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxHeadRoutesSelectSingleVectorKey)
+{
+    const std::array<std::pair<const char *, uint64_t>, 8> routes = {{
+        {"mrope_mx_h8_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+        {"mrope_mx_h16_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+        {"mrope_mx_h24_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+        {"mrope_mx_h32_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+        {"mrope_mx_h40_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+        {"mrope_mx_h48_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+        {"mrope_mx_h56_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+        {"mrope_mx_h64_t129_current_route", MROPE_MX_VECTOR_TILING_KEY},
+    }};
+    for (const auto &[caseName, expectedKey] : routes) {
+        const auto *testCase = FindTilingCase(caseName);
+        ASSERT_NE(testCase, nullptr) << "caseName=" << caseName;
+        TilingInfo tilingInfo;
+        ASSERT_TRUE(RunTiling(*testCase, tilingInfo)) << "caseName=" << caseName;
+        EXPECT_EQ(tilingInfo.tilingKey, expectedKey) << "caseName=" << caseName;
+    }
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxQTailWaveFallsBackToSingleTokenUnderUbPressure)
+{
+    const auto *baseCase = FindTilingCase("mrope_mx_h8_t129_current_route");
+    ASSERT_NE(baseCase, nullptr);
+    ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout oneToken{};
+    ::QkvRmsNormRopeCacheWithKScale::MropeMxUbLayout twoTokens{};
+    ASSERT_TRUE(::QkvRmsNormRopeCacheWithKScale::TryMakeMropeMxQGlobalTileWaveUbLayout(1U, 8U, 1U, 128U, oneToken));
+    ASSERT_TRUE(::QkvRmsNormRopeCacheWithKScale::TryMakeMropeMxQGlobalTileWaveUbLayout(2U, 8U, 1U, 128U, twoTokens));
+    ASSERT_LT(oneToken.totalBytes, twoTokens.totalBytes);
+
+    QkvTilingCase lowUbCase = *baseCase;
+    lowUbCase.ubSize = oneToken.totalBytes;
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(RunTiling(lowUbCase, tilingInfo));
+    ASSERT_NE(tilingInfo.tilingData, nullptr);
+    const auto *tiling = reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+    EXPECT_EQ(tilingInfo.tilingKey, MROPE_MX_VECTOR_TILING_KEY);
+    EXPECT_EQ(tiling->tokenTile, 1U);
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleTilingDataAbi, Remains144BytesWithFrozenOffsets)
+{
+    EXPECT_EQ(sizeof(TilingData), 144U);
+    EXPECT_EQ(offsetof(TilingData, tokenTile), 112U);
+    EXPECT_EQ(offsetof(TilingData, epsilon), 120U);
+    EXPECT_EQ(offsetof(TilingData, mropeSectionH), 128U);
+}
+
 TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, RealTilingIsStableAcrossThreads)
 {
     constexpr uint32_t THREAD_COUNT = 8U;
     constexpr uint32_t ITERATIONS = 64U;
-    const std::array<std::string, 5> caseNames = {
-        "q16_k2_v2_basic",
-        "t512_q64_k8",
-        "t1024_q16_k2",
-        "too_many_q_heads",
-        "unsupported_head_dim",
+    const std::array<std::string, 6> caseNames = {
+        "q16_k2_v2_basic",  "t512_q64_k8",          "t1024_q16_k2", "mrope_mx_h8_t129_current_route",
+        "too_many_q_heads", "unsupported_head_dim",
     };
     std::array<const QkvTilingCase *, caseNames.size()> cases = {};
     for (size_t i = 0; i < caseNames.size(); ++i) {

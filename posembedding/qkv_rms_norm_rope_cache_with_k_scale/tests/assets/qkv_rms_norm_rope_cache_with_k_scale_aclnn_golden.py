@@ -40,6 +40,7 @@ def aclnn_customize_inputs(
     epsilon=1e-6,
     mropeSectionOptional=None,
     qQuantMode="PerTokenPerHead",
+    kQuantMode="PerTokenPerHead",
     qOut=None,
     qScaleOptional=None,
     **kwargs,
@@ -61,6 +62,10 @@ def aclnn_customize_inputs(
         vScaleOptional,
         mropePositionOptional,
         testcase_name=kwargs.get("testcase_name"),
+        head_nums=headNums,
+        layout_qkv=layoutQkv,
+        q_quant_mode=qQuantMode,
+        k_quant_mode=kQuantMode,
     )
 
 
@@ -96,6 +101,7 @@ class AclnnQkvRmsNormRopeCacheWithKScaleTestSpec:
         epsilon=1e-6,
         mropeSectionOptional=None,
         qQuantMode="PerTokenPerHead",
+        kQuantMode="PerTokenPerHead",
         qOut=None,
         qScaleOptional=None,
         **kwargs,
@@ -127,6 +133,7 @@ class AclnnQkvRmsNormRopeCacheWithKScaleTestSpec:
             epsilon=epsilon,
             mrope_section=mropeSectionOptional,
             q_quant_mode=qQuantMode,
+            k_quant_mode=kQuantMode,
             q_out_dtype=q_out_dtype,
         )
         outputs = [result.q_out]

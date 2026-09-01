@@ -12,6 +12,7 @@
 #define QKV_RMS_NORM_ROPE_CACHE_WITH_K_SCALE_TILING_DATA_H_
 
 #ifndef __CCE_AICORE__
+#include <cstddef>
 #include <cstdint>
 #endif
 
@@ -44,6 +45,15 @@ struct QkvRmsNormRopeCacheWithKScaleTilingData {
     uint64_t mropeSectionW = 0;
 };
 #pragma pack(pop)
+
+static_assert(sizeof(QkvRmsNormRopeCacheWithKScaleTilingData) == 144U,
+              "QkvRmsNormRopeCacheWithKScaleTilingData ABI size changed");
+static_assert(__builtin_offsetof(QkvRmsNormRopeCacheWithKScaleTilingData, tokenTile) == 112U,
+              "tokenTile ABI offset changed");
+static_assert(__builtin_offsetof(QkvRmsNormRopeCacheWithKScaleTilingData, epsilon) == 120U,
+              "epsilon ABI offset changed");
+static_assert(__builtin_offsetof(QkvRmsNormRopeCacheWithKScaleTilingData, mropeSectionH) == 128U,
+              "mropeSectionH ABI offset changed");
 
 } // namespace QkvRmsNormRopeCacheWithKScaleKernelTiling
 

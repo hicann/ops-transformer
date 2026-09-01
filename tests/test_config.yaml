@@ -1396,6 +1396,22 @@ posembedding:
     options:
       - qkv_rms_norm_rope_cache
 
+  qkv_rms_norm_rope_cache_with_k_scale:
+    module: True
+    src:
+      - posembedding/qkv_rms_norm_rope_cache_with_k_scale
+    exclude:
+      - posembedding/qkv_rms_norm_rope_cache_with_k_scale/docs
+      - posembedding/qkv_rms_norm_rope_cache_with_k_scale/README.md
+    ut_cov_exclude:
+      - posembedding/qkv_rms_norm_rope_cache_with_k_scale/op_kernel
+      - posembedding/qkv_rms_norm_rope_cache_with_k_scale/op_host/qkv_rms_norm_rope_cache_with_k_scale_def.cpp
+    test:
+      examples: False
+      ut: True
+    options:
+      - qkv_rms_norm_rope_cache_with_k_scale
+
   und_gen_qkv_rms_norm_rope_cache:
     module: True
     src:
