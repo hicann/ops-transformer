@@ -171,7 +171,12 @@ class SparseFlashAttentionInputAdapter:
             int(kwargs["rope_head_dim"]),
         )
         generated = pytest_golden.generate_input_tensors(params)
-        outputs, generated, _ = pytest_golden.compute_cpu(generated, params)
+        # cross_check 模式下让 compute_cpu 在同一次调用里额外产出三方标杆:
+        # sparse_indices/block_table 是随机生成并原地写回的,重调一次会换随机值。
+        compute_bench = golden_module.compare_method_is_cross_check()
+        outputs, generated, _ = pytest_golden.compute_cpu(
+            generated, params, return_bench=compute_bench
+        )
         if outputs is None:
             raise RuntimeError("SparseFlashAttention pytest compute_cpu failed")
 
@@ -205,14 +210,23 @@ class SparseFlashAttentionInputAdapter:
         if sinks is not None:
             self.copy_tensor(sinks, generated.get("sinks"), "sinks")
 
-        golden_module.CASE_DATA.put(
-            testcase_name,
-            {
-                "golden": golden_module.normalize_pytest_outputs(
-                    outputs, query, params["return_softmax_lse"]
-                )
-            },
-        )
+        # 三方标杆与 golden 走同一套输出归一化(clamp + cast 到 query dtype)，
+        # 差异仅来自 exp 量化路径，与 NPU 输出可直接三方比对。
+        bench_raw = None
+        if compute_bench and isinstance(outputs, (tuple, list)) and len(outputs) == 4:
+            bench_raw = (outputs[3], outputs[1], outputs[2])
+            outputs = tuple(outputs[:3])
+
+        entry = {
+            "golden": golden_module.normalize_pytest_outputs(
+                outputs, query, params["return_softmax_lse"]
+            )
+        }
+        if bench_raw is not None:
+            entry["bench"] = golden_module.normalize_pytest_outputs(
+                bench_raw, query, params["return_softmax_lse"]
+            )
+        golden_module.CASE_DATA.put(testcase_name, entry)
 
 
 def generate_sfa_inputs(

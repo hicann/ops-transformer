@@ -342,9 +342,9 @@ def generate_input_tensors(params):
     return result
 
 
-def compute_cpu(input_tensor_dict, params):
+def compute_cpu(input_tensor_dict, params, return_bench=False):
     try:
-        out_data = compute_golden(input_tensor_dict, params)
+        out_data = compute_golden(input_tensor_dict, params, return_bench=return_bench)
         return out_data, input_tensor_dict, params
     except Exception as e:
         import traceback
@@ -552,7 +552,7 @@ def _generate_block_table_and_cache(
         kv_nopa_preprocessing(input_tensor_dict, fa_param)
 
 
-def compute_golden(input_tensor_dict, params):
+def compute_golden(input_tensor_dict, params, return_bench=False):
     print("cpu执行中...")
 
     def _to_cpu_float32_tensor(val):
@@ -594,7 +594,17 @@ def compute_golden(input_tensor_dict, params):
     y_all = trans_bnsd_to_layout(
         y_all, out_shape, layoutQuery, fa_param["actualSeqLengths_q"]
     )
-    return y_all, softmax_max, softmax_sum
+    if not return_bench:
+        return y_all, softmax_max, softmax_sum
+    # 三方标杆(cross_check 用):同一份已生成的输入数据上,去掉 exp 量化重算一遍。
+    # 必须在同一次 compute_golden 内完成——sparse_indices/block_table/kv_cache 由
+    # 上面的随机生成步骤原地写入,外层重调会用新的随机值,三方就不再对齐同一份数据。
+    print("[INFO]:cross_check 开启，计算高精度三方标杆...")
+    y_bench, _, _ = _t_increattention_bnsd(fa_param, quantize_exp=False)
+    y_bench = trans_bnsd_to_layout(
+        y_bench, out_shape, layoutQuery, fa_param["actualSeqLengths_q"]
+    )
+    return y_all, softmax_max, softmax_sum, y_bench
 
 
 def gatherKV(
@@ -684,7 +694,7 @@ def bmm1(q_curr, k_sparse, calc_dtype):
         return cpu_matmul
 
 
-def _t_increattention_bnsd(fa_param):
+def _t_increattention_bnsd(fa_param, quantize_exp=True):
     batch_size = fa_param["b"]
     numheads = fa_param["numHeads"]
     numKeyValueHeads = fa_param["numKeyValueHeads"]
@@ -775,11 +785,16 @@ def _t_increattention_bnsd(fa_param):
                 _, x_max, x_sum = softmax(scaleRes, cur_sinks)
                 # 与算子softmax的数值链对齐: 未归一化 exp(x-max) 先量化为 P 的计算精度,bmm2 用 fp32 累加,最后除以fp32的sum
                 exp_unnorm = torch.exp(scaleRes - x_max)
-                if fa_param["q_dtype"] == "float16":
-                    exp_quantized = exp_unnorm.to(torch.float16).float()
-                elif fa_param["q_dtype"] == "bfloat16":
-                    exp_quantized = exp_unnorm.to(torch.bfloat16).float()
+                if quantize_exp:
+                    if fa_param["q_dtype"] == "float16":
+                        exp_quantized = exp_unnorm.to(torch.float16).float()
+                    elif fa_param["q_dtype"] == "bfloat16":
+                        exp_quantized = exp_unnorm.to(torch.bfloat16).float()
+                    else:
+                        exp_quantized = exp_unnorm
                 else:
+                    # 三方标杆高精度路径: exp(x-max) 保持 fp32 直接参与 bmm2,
+                    # 不量化到算子计算精度(对齐其他测试工具的高精度参考分支)
                     exp_quantized = exp_unnorm
                 bmm2Res = torch.matmul(exp_quantized, v_sparse.float()) / x_sum
                 y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = bmm2Res

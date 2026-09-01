@@ -21,6 +21,24 @@ from pathlib import Path
 
 import torch
 
+try:
+    from ttk.utilities.container_utils import get_global_storage
+except Exception:
+    get_global_storage = None
+
+
+def _get_compare_method():
+    if get_global_storage is not None:
+        try:
+            return getattr(get_global_storage(), "compare_method", None)
+        except Exception:
+            return None
+    return None
+
+
+def compare_method_is_cross_check():
+    return _get_compare_method() == "cross_check"
+
 
 class CaseDataStore:
     """Keep the pytest-generated result paired with its TTK testcase."""
@@ -43,6 +61,16 @@ class CaseDataStore:
                 "before golden generation"
             )
         return data
+
+
+def peek_bench(testcase_name):
+    """取当前用例的三方标杆输出(cross_check 用)；未生成或未开启三方时返回 None。"""
+    if testcase_name is None:
+        return None
+    entry = CASE_DATA.cases.get(str(testcase_name))
+    if not entry:
+        return None
+    return entry.get("bench")
 
 
 CASE_DATA = CaseDataStore()

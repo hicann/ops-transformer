@@ -47,15 +47,49 @@ inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
 
 
+# cross_check 三方精度标准（L0）：NPU 对标杆的 mare/mere/rmse 不得超过
+# golden 对标杆的 10/2/2 倍，小值域错误点数不超过 2 倍。
+CROSS_CHECK_TOLERANCE = {
+    "float16": {
+        "standard": "cross_check",
+        "level": "L0",
+        "mare_ratio": 10.0,
+        "mere_ratio": 2.0,
+        "rmse_ratio": 2.0,
+        "small_value": 2**-10,
+        "small_value_atol": 2**-16,
+    },
+    "bfloat16": {
+        "standard": "cross_check",
+        "level": "L0",
+        "mare_ratio": 10.0,
+        "mere_ratio": 2.0,
+        "rmse_ratio": 2.0,
+        "small_value": 2**-10,
+        "small_value_atol": 2**-16,
+    },
+}
+
+
+def _sfa_compare(*outputs, compare_context=None, **kwargs):
+    testcase_name = (
+        getattr(compare_context, "testcase_name", None)
+        if compare_context is not None
+        else None
+    )
+    return compare_module.dispatch(
+        *outputs,
+        bench_outputs=golden_module.peek_bench(testcase_name),
+        spec_tolerance=CROSS_CHECK_TOLERANCE,
+    )
+
+
 class SparseFlashAttentionSpec:
     golden = golden_module.cpu_sparse_flash_attention
     customize_inputs = inputs_module.generate_sfa_inputs
-    tolerance = {
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
+    tolerance = CROSS_CHECK_TOLERANCE
 
-    compare = staticmethod(compare_module.compare)
+    compare = staticmethod(_sfa_compare)
 
 
 class SparseFlashAttentionAclnnV2Spec:
@@ -66,8 +100,8 @@ class SparseFlashAttentionAclnnV2Spec:
 
     golden = golden_module.cpu_sparse_flash_attention_aclnn
     customize_inputs = inputs_module.generate_sfa_inputs_aclnn_v2
-    tolerance = SparseFlashAttentionSpec.tolerance
-    compare = staticmethod(compare_module.compare)
+    tolerance = CROSS_CHECK_TOLERANCE
+    compare = staticmethod(_sfa_compare)
 
 
 class SparseFlashAttentionAclnnSpec(SparseFlashAttentionAclnnV2Spec):
