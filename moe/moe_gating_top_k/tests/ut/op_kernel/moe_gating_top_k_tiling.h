@@ -66,6 +66,9 @@ struct MoeGatingTopKRegbaseTilingData {
     int64_t vmsCount = 0;
     float routedScalingFactor = 0;
     float eps = 0;
+    bool hashFlag = false;
+    SoftMaxTiling softmaxTilingData;
+    int64_t batchRows = 0;
 };
 #pragma pack()
 
@@ -99,12 +102,12 @@ inline void InitTilingData(uint8_t *tiling, MoeGatingTopKRegbaseTilingData *cons
 }
 #endif
 
-#define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg)                                            \
-    tiling_struct tiling_data;                                                                                         \
+#define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \
+    tiling_struct tiling_data; \
     InitTilingData(tiling_arg, &tiling_data)
 
-#define GET_TILING_DATA(tiling_data, tiling_arg)                                                                       \
-    MoeGatingTopKTilingData tiling_data;                                                                               \
+#define GET_TILING_DATA(tiling_data, tiling_arg) \
+    MoeGatingTopKTilingData tiling_data; \
     InitTilingData(tiling_arg, &tiling_data)
 
 #define DTYPE_X float

@@ -25,6 +25,8 @@
 
 namespace optiling {
 const static uint64_t MOE_GATING_TOP_K_REGBASE_TILING_KEY = 10000;
+const static uint64_t MOE_GATING_TOP_K_WITHOUT_GROUP_REGBASE_TILING_KEY = 10005;
+const static uint64_t MOE_GATING_TOP_K_E_K_FULLLOAD_REGBASE_TILING_KEY = 10010;
 const static int64_t TILINGKEY_INT32_INT64_SUFFIX = 1;
 const static int64_t TILINGKEY_INT32_INT32_SUFFIX = 2;
 const static int64_t TILINGKEY_INT64_INT64_SUFFIX = 3;
@@ -39,6 +41,11 @@ const static int64_t NORM_TYPE_SIGMOID = 1;
 const static int64_t NORM_TYPE_SOFTPLUS = 2;
 const static int64_t OUT_FLAG_FALSE = 0;
 const static int64_t OUT_FLAG_TRUE = 1;
+const static int64_t EK_FULLLOAD_EXPERT_COUNT = 256;
+const static int64_t EK_FULLLOAD_GROUP_COUNT = 8;
+const static int64_t EK_FULLLOAD_K_GROUP = 4;
+const static int64_t EK_FULLLOAD_MAX_K = 32;
+const static int64_t WITHOUT_GROUP_K = 1;
 const static size_t X_INPUT_DIMS = 2;
 const static size_t BIAS_INPUT_DIMS = 1;
 const static size_t Y_OUTPUT_DIMS = 2;
@@ -65,7 +72,9 @@ const static int64_t OUT_FLAG_ATTR_INDEX = 6;
 const static int64_t ROUTED_SCALING_FACTOR_ATTR_INDEX = 7;
 const static int64_t EPS_ATTR_INDEX = 8;
 const static int64_t DEFAULT_WORKSPACE_SIZE = static_cast<int64_t>(16 * 1024 * 1024); // 预留16M空间
-
+const static int64_t DEFAULT_BATCH_ROWS = 4;
+const static int64_t MAX_BATCH_ROWS = 128;
+const static int64_t MAX_SINGLE_EXPERT_BATCH_ROWS = 4096;
 
 class MoeGatingTopKTilingRegbase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
@@ -232,11 +241,11 @@ ge::graphStatus MoeGatingTopKTilingRegbase::CheckAttrBasic()
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "group_count", std::to_string(groupCount_),
                                           "greater than 0"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(expertCount_ % groupCount_ != 0,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_count",
-                                                      std::to_string(expertCount_),
-                                                      "expert_count must be divisible by group_count"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        expertCount_ % groupCount_ != 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_count", std::to_string(expertCount_),
+                                              "expert_count must be divisible by group_count"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(kGroup_ > groupCount_,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k_group", std::to_string(kGroup_),
                                           "less than or equal to group_count"),
@@ -586,11 +595,11 @@ ge::graphStatus MoeGatingTopKTilingRegbase::CheckOutShape()
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "y dim[0]", std::to_string(yShape_->GetDim(0)),
                                           std::to_string(xShape_->GetDim(0))),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF((expertIdxShape_->GetDim(0) != xShape_->GetDim(0)),
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expert_idx dim[0]",
-                                          std::to_string(expertIdxShape_->GetDim(0)),
-                                          std::to_string(xShape_->GetDim(0))),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (expertIdxShape_->GetDim(0) != xShape_->GetDim(0)),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expert_idx dim[0]",
+                                  std::to_string(expertIdxShape_->GetDim(0)), std::to_string(xShape_->GetDim(0))),
+        return ge::GRAPH_FAILED);
     if (outFlag_ && outShape_ != nullptr) {
         OP_CHECK_IF((outShape_->GetDim(0) != xShape_->GetDim(0)),
                     OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "out dim[0]",
@@ -647,6 +656,39 @@ void MoeGatingTopKTilingRegbase::SplitRows()
         }
     }
     moeGatingTopKTilingData_.set_vmsCount(vmsCount);
+
+    int64_t expertCountAlign = Ops::Base::CeilAlign(expertCount_, 32L);
+    int64_t batchRows = DEFAULT_BATCH_ROWS;
+    if (expertCount_ == 1) {
+        // expertCount==1: no alignment, per-row UB = (xIn + yOut + expertIdx + out) * depth(2)
+        // all queues use double buffer
+        int64_t perRowUbSize = (inputDtypeSize_ + inputDtypeSize_ + sizeof(int32_t) + sizeof(float)) * 2;
+        int64_t maxBatchByUb = static_cast<int64_t>(aicoreParams_.ubSize) / perRowUbSize;
+        // reserve 20% UB for pipe/event overhead
+        maxBatchByUb = maxBatchByUb * 4 / 5;
+        batchRows = std::min(std::max(maxBatchByUb, static_cast<int64_t>(1)), MAX_SINGLE_EXPERT_BATCH_ROWS);
+    } else {
+        bool isSimplifiedPath = (kGroup_ == groupCount_ || groupCount_ == expertCount_);
+        if (isSimplifiedPath && k_ == WITHOUT_GROUP_K && !hashFlag_) {
+            // without_group path: batchRows scales xIn/yOut/expertIdx, fixed buffers occupy UB too
+            // all queues use double buffer
+            int64_t dtypeRatio = sizeof(float) / inputDtypeSize_;
+            int64_t blockElements = 32 / inputDtypeSize_;
+            int64_t kStride = Ops::Base::CeilAlign(k_, blockElements);
+            // fixed: outOutQueue + biasBuf + xNormBuf + xNormWithBiasBuf + sortedBuf + calcTmpBuf + indexBuf
+            int64_t fixedUb = expertCountAlign * sizeof(float) * (16 + dtypeRatio);
+            // per-row: xInQueue + yOutQueue + expertIdxOutQueue (all double buffered)
+            int64_t perRowUb =
+                (expertCountAlign * sizeof(float) * dtypeRatio + kStride * sizeof(float) + kStride * sizeof(int32_t)) *
+                2;
+            int64_t availableUb = static_cast<int64_t>(aicoreParams_.ubSize) - fixedUb;
+            if (perRowUb > 0 && availableUb > 0) {
+                int64_t maxBatchByUb = availableUb / perRowUb;
+                batchRows = std::min(std::max(maxBatchByUb, static_cast<int64_t>(1)), MAX_BATCH_ROWS);
+            }
+        }
+    }
+    moeGatingTopKTilingData_.set_batchRows(batchRows);
 }
 
 ge::graphStatus MoeGatingTopKTilingRegbase::DoOpTiling()
@@ -697,6 +739,16 @@ ge::graphStatus MoeGatingTopKTilingRegbase::PostTiling()
 uint64_t MoeGatingTopKTilingRegbase::GetTilingKey() const
 {
     if (!hashFlag_) {
+        if (expertCount_ == EK_FULLLOAD_EXPERT_COUNT && groupCount_ == EK_FULLLOAD_GROUP_COUNT &&
+            kGroup_ == EK_FULLLOAD_K_GROUP && k_ <= EK_FULLLOAD_MAX_K && addBias_ &&
+            groupSelectMode_ == GROUP_SELECT_MODE_SUM && renorm_ == RENORM_NO && normType_ == NORM_TYPE_SIGMOID &&
+            outFlag_ == OUT_FLAG_FALSE) {
+            return MOE_GATING_TOP_K_E_K_FULLLOAD_REGBASE_TILING_KEY;
+        }
+        bool isSimplifiedPath = (kGroup_ == groupCount_ || groupCount_ == expertCount_);
+        if (isSimplifiedPath && k_ == WITHOUT_GROUP_K) {
+            return MOE_GATING_TOP_K_WITHOUT_GROUP_REGBASE_TILING_KEY;
+        }
         return MOE_GATING_TOP_K_REGBASE_TILING_KEY;
     }
 

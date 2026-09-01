@@ -29,7 +29,6 @@ constexpr int32_t CONSTANT_TWO = 2;
 constexpr int32_t CONSTANT_THREE = 3;
 constexpr int32_t CONSTANT_FOUR = 4;
 constexpr int32_t CONSTANT_EIGHT = 8;
-constexpr uint32_t VL_FLOAT_SIZE = VECTOR_REG_WIDTH / sizeof(float);
 constexpr MicroAPI::DivSpecificMode mode = {MicroAPI::MaskMergeMode::ZEROING, true};
 
 template <typename T, typename U1 = int32_t, typename U2 = int32_t>
@@ -108,10 +107,10 @@ private:
     __aicore__ inline void largeKAlignEVF(LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor,
                                           LocalTensor<int32_t> expertIdxTensor, LocalTensor<T> yTensor, uint32_t k,
                                           float eps, float routedScalingFactor);
-    __aicore__ inline void LargeKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor,
+    __aicore__ inline void largeKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor,
                                                 LocalTensor<int32_t> expertIdxTensor, LocalTensor<T> yTensor,
                                                 uint32_t k, float routedScalingFactor);
-    __aicore__ inline void LargeKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor,
+    __aicore__ inline void largeKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor,
                                                   LocalTensor<int32_t> expertIdxTensor, LocalTensor<T> yTensor,
                                                   uint32_t k, float eps, float routedScalingFactor);
     __aicore__ inline void smallKNotAlignEVF(LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor,
@@ -1069,20 +1068,7 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVFNoNorm(Loc
     __ubuf__ T *outputAddr = (__ubuf__ T *)yTensor.GetPhyAddr();
     __ubuf__ uint32_t *mrgSortAddr = (__ubuf__ uint32_t *)mrgSortTensor.GetPhyAddr();
     __ubuf__ uint32_t *expertIdxAddr = (__ubuf__ uint32_t *)expertIdxTensor.GetPhyAddr();
-
-    __VEC_SCOPE__
-    {
-        RegTensor<uint32_t> vreg0;
-        RegTensor<uint32_t> vreg1;
-        RegTensor<float> vreg2;
-
-        MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<float>(k);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr);
-        MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-        MicroAPI::Muls(vreg2, vreg2, routedScalingFactor, preg0);
-        ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg0, 0);
-        MicroAPI::StoreAlign(expertIdxAddr, vreg1, preg0);
-    }
+    SmallKAlignEVFNoNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, routedScalingFactor);
 }
 
 template <typename T, typename U1, typename U2>
@@ -1096,122 +1082,35 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVFWithNorm(L
     __ubuf__ T *outputAddr = (__ubuf__ T *)yTensor.GetPhyAddr();
     __ubuf__ uint32_t *mrgSortAddr = (__ubuf__ uint32_t *)mrgSortTensor.GetPhyAddr();
     __ubuf__ uint32_t *expertIdxAddr = (__ubuf__ uint32_t *)expertIdxTensor.GetPhyAddr();
-
-    __VEC_SCOPE__
-    {
-        RegTensor<uint32_t> vreg0;
-        RegTensor<uint32_t> vreg1;
-        RegTensor<float> vreg2;
-        RegTensor<float> vreg3;
-        RegTensor<float> vreg4;
-
-        MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<float>(k);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr);
-        MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-        Reg::Reduce<Reg::ReduceType::SUM>(vreg3, vreg2, preg0);
-        MicroAPI::Adds(vreg3, vreg3, eps, preg0);
-        MicroAPI::Duplicate(vreg4, vreg3, preg0);
-        MicroAPI::Div(vreg4, vreg2, vreg4, preg0);
-        MicroAPI::Muls(vreg4, vreg4, routedScalingFactor, preg0);
-        ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg4, preg0, 0);
-        MicroAPI::StoreAlign(expertIdxAddr, vreg1, preg0);
-    }
+    SmallKAlignEVFWithNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, eps, routedScalingFactor);
 }
 
 template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
+__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
                                                                              LocalTensor<int32_t> mrgSortTensor,
                                                                              LocalTensor<int32_t> expertIdxTensor,
                                                                              LocalTensor<T> yTensor, uint32_t k,
                                                                              float routedScalingFactor)
 {
-    uint32_t k1 = k_;
     __ubuf__ float *inputAddr = (__ubuf__ float *)xSigmoidTensor.GetPhyAddr();
-    __ubuf__ uint32_t *mrgSortAddr = (__ubuf__ uint32_t *)mrgSortTensor.GetPhyAddr();
     __ubuf__ T *outputAddr = (__ubuf__ T *)yTensor.GetPhyAddr();
+    __ubuf__ uint32_t *mrgSortAddr = (__ubuf__ uint32_t *)mrgSortTensor.GetPhyAddr();
     __ubuf__ uint32_t *expertIdxAddr = (__ubuf__ uint32_t *)expertIdxTensor.GetPhyAddr();
-
-    __VEC_SCOPE__
-    {
-        RegTensor<float> vregSum;
-        RegTensor<uint32_t> vreg0;
-        RegTensor<uint32_t> vreg1;
-        RegTensor<float> vreg2;
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::MaskReg preg1 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate(vregSum, static_cast<float>(0), preg0);
-        uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(k, VL_FLOAT_SIZE));
-
-        for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<uint32_t>(k);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               mrgSortAddr + i * 2 * VL_FLOAT_SIZE);
-            MicroAPI::Duplicate(vreg2, static_cast<float>(0), preg1);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-            MicroAPI::Add(vregSum, vregSum, vreg2, preg1);
-        }
-
-        for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg1 = MicroAPI::UpdateMask<uint32_t>(k1);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               mrgSortAddr + i * 2 * VL_FLOAT_SIZE);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg1);
-            MicroAPI::Muls(vreg2, vreg2, routedScalingFactor, preg1);
-            ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg1, i * VL_FLOAT_SIZE);
-            MicroAPI::StoreAlign(expertIdxAddr + i * VL_FLOAT_SIZE, vreg1, preg1);
-        }
-    }
+    LargeKAlignEVFNoNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, routedScalingFactor);
 }
 
 template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor,
+__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor,
                                                                                LocalTensor<int32_t> mrgSortTensor,
                                                                                LocalTensor<int32_t> expertIdxTensor,
                                                                                LocalTensor<T> yTensor, uint32_t k,
                                                                                float eps, float routedScalingFactor)
 {
-    uint32_t k1 = k_;
     __ubuf__ float *inputAddr = (__ubuf__ float *)xSigmoidTensor.GetPhyAddr();
-    __ubuf__ uint32_t *mrgSortAddr = (__ubuf__ uint32_t *)mrgSortTensor.GetPhyAddr();
     __ubuf__ T *outputAddr = (__ubuf__ T *)yTensor.GetPhyAddr();
+    __ubuf__ uint32_t *mrgSortAddr = (__ubuf__ uint32_t *)mrgSortTensor.GetPhyAddr();
     __ubuf__ uint32_t *expertIdxAddr = (__ubuf__ uint32_t *)expertIdxTensor.GetPhyAddr();
-
-    __VEC_SCOPE__
-    {
-        RegTensor<float> vreg2;
-        RegTensor<float> vreg4;
-        RegTensor<float> vregOutput;
-        RegTensor<float> vregSum;
-        RegTensor<uint32_t> vreg0;
-        RegTensor<uint32_t> vreg1;
-
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::MaskReg preg1 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate(vregSum, static_cast<float>(0), preg0);
-        uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(k, VL_FLOAT_SIZE));
-
-        for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<uint32_t>(k);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               2 * i * VL_FLOAT_SIZE + mrgSortAddr);
-            MicroAPI::Duplicate(vreg2, static_cast<float>(0), preg1);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-            MicroAPI::Add(vregSum, vregSum, vreg2, preg1);
-        }
-        Reg::Reduce<Reg::ReduceType::SUM>(vregSum, vregSum, preg1);
-        MicroAPI::Adds(vregSum, vregSum, eps, preg1);
-        MicroAPI::Duplicate(vreg4, vregSum, preg1);
-        for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg1 = MicroAPI::UpdateMask<uint32_t>(k1);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               mrgSortAddr + i * 2 * VL_FLOAT_SIZE);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg1);
-            MicroAPI::Div(vregOutput, vreg2, vreg4, preg1);
-            MicroAPI::Muls(vregOutput, vregOutput, routedScalingFactor, preg1);
-            ops::StoreOneTensorForDtypeT<T>(outputAddr, vregOutput, preg1, i * VL_FLOAT_SIZE);
-            MicroAPI::StoreAlign(expertIdxAddr + i * VL_FLOAT_SIZE, vreg1, preg1);
-        }
-    }
+    LargeKAlignEVFWithNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, eps, routedScalingFactor);
 }
 
 template <typename T, typename U1, typename U2>
@@ -1222,9 +1121,9 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVF(LocalTens
                                                                        float routedScalingFactor)
 {
     if (noNorm_) {
-        LargeKAlignEVFNoNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, routedScalingFactor);
+        largeKAlignEVFNoNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, routedScalingFactor);
     } else {
-        LargeKAlignEVFWithNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, eps, routedScalingFactor);
+        largeKAlignEVFWithNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, eps, routedScalingFactor);
     }
 }
 template <typename T, typename U1, typename U2>
