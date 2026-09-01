@@ -40,6 +40,7 @@
 #include "aclnn_common.h"
 
 // torch_npu stream utilities
+#include "torch_npu/csrc/aten/common/from_blob.h"
 #include "torch_npu/csrc/core/npu/NPUStream.h"
 
 namespace Mc2Api {
@@ -480,23 +481,27 @@ public:
         GetCommProtocol(hcclComm, protocol);
 
         MoeCommContext context;
-        BuildContext(hcclComm, groupName, "moe_dispatch_combine_multi_channel", protocol, context, cclBufferSize);
         rankNumPerServer_ = rankNumPerUbDomain_;
-        TORCH_CHECK(rankNumPerServer_ > 0, "rank_num_per_server must be positive after building MoE context");
+        TORCH_CHECK(rankNumPerServer_ > 0, "rank_num_per_server must be positive after resolving MoE topology");
         context.rankSizePerServer = rankNumPerServer_;
         rankSizePerServer = rankNumPerServer_;
 
-        return CreateCommContextTensor(context);
+        void *ctx = nullptr;
+        BuildContext(hcclComm, groupName, "moe_dispatch_combine_multi_channel", protocol, context, cclBufferSize, ctx);
+        TORCH_CHECK(ctx != nullptr, "Create MoE context tensor failed: ctx is nullptr");
+        int64_t numElements = (sizeof(MoeCommContext) + sizeof(int32_t) - 1) / sizeof(int32_t);
+        auto options = at::TensorOptions().dtype(at::kInt).device(c10::DeviceType::PrivateUse1);
+        // HCCL owns ctx; the tensor only provides a non-owning view of the cached device context.
+        return at_npu::native::from_blob(ctx, {numElements}, options);
     }
 
 private:
     void BuildContext(const HcclComm &commHandle, const std::string &groupName, const std::string &opName,
-                      const CommProtocol &protocol, MoeCommContext &context, int64_t &cclBufferSize)
+                      const CommProtocol &protocol, MoeCommContext &context, int64_t &cclBufferSize, void *&ctx)
     {
         std::string contextTag = groupName + opName;
         CheckContextTag(contextTag);
         CommEngine engine = CommEngine::COMM_ENGINE_AIV;
-        void *ctx = nullptr;
         uint64_t hcclBufferSize = 0;
 
         GetOrCreateContext(commHandle, contextTag, engine, protocol, ctx, hcclBufferSize, context);
