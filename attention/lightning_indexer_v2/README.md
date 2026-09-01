@@ -195,7 +195,7 @@
 
 - 参数q的N支持1~64，k的N支持1。
 - headdim支持128。
-- pa_kv_cache支持0轴非连续；pa_block_size支持1~1024，满足block大小32B对齐。
+- pa_kv_cache支持0轴非连续；pa_block_size支持1~1024，满足block大小32Byte对齐。
 - 参数q、k的数据类型应保持一致。
 - sparseIndices无效部分填-1；sparseValues无效部分填-inf。
 - 传入的cmpResidualKOptional中的每一个元素的值都应小于传入的压缩率cmpRatio。

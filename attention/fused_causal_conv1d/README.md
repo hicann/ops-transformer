@@ -33,7 +33,6 @@
     block_idx_last_scheduled_token: 不开APC:None,开APC:[batch]
     initial_state_idx: 不开APC:None,开APC:[batch]
     activation_mode:（无作用）
-    pad_slot_id: 默认值 -1
     run_mode:（无作用）
     residual_connection: 不做残差: 0,做残差：1
     block_size: 典型值128/256
@@ -59,11 +58,11 @@
     block_idx_last_scheduled_token: 不开APC:None,开APC:[batch]
     initial_state_idx: 不开APC:None,开APC:[batch]
     activation_mode:（无作用）
-    pad_slot_id: 默认值 -1
     run_mode:（无作用）
     residual_connection: 不做残差: 0,做残差：1
     block_size: 典型值128/256
     conv_mode：Qwen3-Next模式: 0, Pangu V2: 1
+    max_draft_tokens: 投机个数（multiTokenNum），取值范围[0, 16]
     y: [cu_seq_len, dim]
     ```
 
@@ -85,11 +84,11 @@
     block_idx_last_scheduled_token: 不开APC:None,开APC:[batch]
     initial_state_idx: 不开APC:None,开APC:[batch]
     activation_mode:（无作用）
-    pad_slot_id: 默认值 -1
     run_mode:（无作用）
     residual_connection: 不做残差: 0,做残差：1
     block_size: 典型值128/256
     conv_mode：Qwen3-Next模式: 0, Pangu V2: 1
+    max_draft_tokens: 投机个数（multiTokenNum），取值范围[0, 16]
     y: [cu_seq_len, dim]
     ```
 
@@ -111,11 +110,11 @@
     block_idx_last_scheduled_token: 不开APC:None,开APC:[batch]
     initial_state_idx: 不开APC:None,开APC:[batch]
     activation_mode:（无作用）
-    pad_slot_id: 默认值 -1
     run_mode:（无作用）
     residual_connection: 不做残差: 0,做残差：1
     block_size: 典型值128/256
     conv_mode：Qwen3-Next模式: 0, Pangu V2: 1
+    max_draft_tokens: 投机个数（multiTokenNum），取值范围[0, 16]
     y: [batch, m+1, dim]
     ```
 
@@ -426,6 +425,13 @@
       <td>-</td>
     </tr>
     <tr>
+      <td>max_draft_tokens（int64_t）</td>
+      <td>属性</td>
+      <td>最大投机个数。</td>
+      <td>INT64</td>
+      <td>-</td>
+    </tr>
+    <tr>
       <td>y</td>
       <td>输出</td>
       <td>x经过conv1d计算后的结果。</td>
@@ -446,7 +452,7 @@
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
-    - max_query_len > 8。
+    - max_query_len > max_draft_tokens + 1。
   - prefill和decode混合场景：
     - x支持2维[cu_seq_len, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
@@ -455,24 +461,24 @@
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
-    - max_query_len > 8。
+    - max_query_len > max_draft_tokens + 1。
   - decode场景（变长序列）：
     - x支持2维[cu_seq_len, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
     - conv_states必须是3维[..., k-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, batch * 8]，每个batch的seq_len范围为[1, 8]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
+    - cu_seq_len范围[batch, batch * (max_draft_tokens + 1)]，每个batch的seq_len范围为[1, max_draft_tokens + 1]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
-    - max_query_len范围[1, 8]。
+    - max_query_len范围[1, max_draft_tokens + 1]。
   - decode场景（固定batch）：
     - x支持3维[batch, m+1, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
     - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - m范围[0, 7]，dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
+    - m范围[0, max_draft_tokens]，dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
-    - max_query_len范围[1, 8]，可为-1。
+    - max_query_len范围[1, max_draft_tokens + 1]，可为-1。
 
 - 输入值域限制：
   - query_start_loc是累计偏移量，取值范围[0, cu_seq_len]，长度为batch+1，query_start_loc[i]表示第i个序列的起始偏移，query_start_loc[batch+1]表示最后一个序列的结束位置。
@@ -487,6 +493,7 @@
   - num_computed_tokens中每个元素取值大于等于0。
   - cache_indices的取值范围为[0, conv_states.dim[0]-1],且值均不能相等（除非等于pad_slot_id）。
   - max_query_len = batch中的最大seq_len。
+  - max_draft_tokens的取值范围为[0, 16]。
   - Pangu V2 模式（conv_mode = 1）下，num_computed_tokens不能为 None。
   - 算子入参与中间计算结果，在对应数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。
   - 算子输入不支持有±inf和nan的情况。
@@ -495,5 +502,5 @@
 
   | 调用方式  | 样例代码                                                     | 说明                                                         |
   | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-  | aclnn接口 | [test_aclnn_fused_causal_conv1d](./examples/test_aclnn_fused_causal_conv1d.cpp) | 通过[aclnnFusedCausalConv1d](./docs/aclnnFusedCausalConv1d.md)调用FusedCausalConv1d算子 |
+  | aclnn接口 | [test_aclnn_fused_causal_conv1d](./examples/test_aclnn_fused_causal_conv1d.cpp) / [test_aclnn_fused_causal_conv1d_v2](./examples/test_aclnn_fused_causal_conv1d_v2.cpp)| 通过[aclnnFusedCausalConv1d](./docs/aclnnFusedCausalConv1d.md)或[aclnnFusedCausalConv1dV2](./docs/aclnnFusedCausalConv1dV2.md)调用FusedCausalConv1d算子 |
   | 图模式 | - | 通过[算子IR](./op_graph/fused_causal_conv1d_proto.h)构图方式调用FusedCausalConv1d算子 |
