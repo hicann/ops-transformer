@@ -34,7 +34,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnLightningIndexerV2MetadataGetWorkspaceSize"获取workspace大小，在调用"aclnnLightningIndexerV2Metadata"执行计算
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnLightningIndexerV2MetadataGetWorkspaceSize"获取workspace大小，再调用"aclnnLightningIndexerV2Metadata"执行计算
 
 ``` cpp
 aclnnStatus aclnnLightningIndexerV2MetadataGetWorkspaceSize(
@@ -702,14 +702,14 @@ int main() {
         printf("    End BN2     : %u\n", result.faData[i][LI_V2_BN2_END_INDEX]);
         printf("    End M       : %u\n", result.faData[i][LI_V2_M_END_INDEX]);
         printf("    End S2      : %u\n", result.faData[i][LI_V2_S2_END_INDEX]);
-        printf("    First Worksapce Index : %u\n", result.faData[i][LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX]);
+        printf("    First Workspace Index : %u\n", result.faData[i][LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX]);
     }
     for (uint32_t i = 0; i < AIV_CORE_MAX_NUM; ++i) {
         printf("AIV Core%u\n", i);
         printf("    Core Enable             : %u\n", result.fdData[i][LD_V2_CORE_ENABLE_INDEX]);
         printf("    FD Task BN2 Idx         : %u\n", result.fdData[i][LD_V2_BN2_IDX_INDEX]);
         printf("    FD Task M Idx           : %u\n", result.fdData[i][LD_V2_M_IDX_INDEX]);
-        printf("    FD Task S2 Idx          : %u\n", result.fdData[i][LD_V2_WORKSPACE_IDX_INDEX]);
+        printf("    FD Task Workspace Idx   : %u\n", result.fdData[i][LD_V2_WORKSPACE_IDX_INDEX]);
         printf("    FD Task Workspace Num   : %u\n", result.fdData[i][LD_V2_WORKSPACE_NUM_INDEX]);
         printf("    FD Subtask M Start      : %u\n", result.fdData[i][LD_V2_M_START_INDEX]);
         printf("    FD Subtask M Num        : %u\n", result.fdData[i][LD_V2_M_NUM_INDEX]);

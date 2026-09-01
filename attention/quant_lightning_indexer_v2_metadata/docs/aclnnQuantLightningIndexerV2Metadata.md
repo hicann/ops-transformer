@@ -30,11 +30,11 @@
   **该算子不建议单独使用，建议与aclnnQuantLightningIndexerV2算子配合使用，形成完整的工作流。**
     1. 接受aclnnQuantLightningIndexerV2算子接口输入数据shape信息，包含batchSize、qSeqlen、kSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnQuantLightningIndexerV2算子的整体计算耗时，并提高硬件利用率。
     2. 分配结果输出后，后续作为输入供aclnnQuantLightningIndexerV2算子使用。
-    3. 分配结果包含每个AIC核基本块的起始点和终止点，已经每个AIV核的FD任务信息。详细内容可以参考[调用示例](#调用示例)。
+    3. 分配结果包含每个AIC核基本块的起始点和终止点，以及每个AIV核的FD任务信息。详细内容可以参考[调用示例](#调用示例)。
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize"获取workspace大小，在调用"aclnnQuantLightningIndexerV2Metadata"执行计算
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize"获取workspace大小，再调用"aclnnQuantLightningIndexerV2Metadata"执行计算
 
 ``` cpp
 aclnnStatus aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
@@ -725,14 +725,14 @@ int main() {
         printf("    End BN2     : %u\n", result.faData[i][QLI_V2_BN2_END_INDEX]);
         printf("    End M       : %u\n", result.faData[i][QLI_V2_M_END_INDEX]);
         printf("    End S2      : %u\n", result.faData[i][QLI_V2_S2_END_INDEX]);
-        printf("    First Worksapce Index : %u\n", result.faData[i][QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX]);
+        printf("    First Workspace Index : %u\n", result.faData[i][QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX]);
     }
     for (uint32_t i = 0; i < AIV_CORE_MAX_NUM; ++i) {
         printf("AIV Core%u\n", i);
         printf("    Core Enable             : %u\n", result.fdData[i][QLD_V2_CORE_ENABLE_INDEX]);
         printf("    FD Task BN2 Idx         : %u\n", result.fdData[i][QLD_V2_BN2_IDX_INDEX]);
         printf("    FD Task M Idx           : %u\n", result.fdData[i][QLD_V2_M_IDX_INDEX]);
-        printf("    FD Task S2 Idx          : %u\n", result.fdData[i][QLD_V2_WORKSPACE_IDX_INDEX]);
+        printf("    FD Task Workspace Idx   : %u\n", result.fdData[i][QLD_V2_WORKSPACE_IDX_INDEX]);
         printf("    FD Task Workspace Num   : %u\n", result.fdData[i][QLD_V2_WORKSPACE_NUM_INDEX]);
         printf("    FD Subtask M Start      : %u\n", result.fdData[i][QLD_V2_M_START_INDEX]);
         printf("    FD Subtask M Num        : %u\n", result.fdData[i][QLD_V2_M_NUM_INDEX]);

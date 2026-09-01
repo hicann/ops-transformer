@@ -30,11 +30,11 @@
   **该算子不建议单独使用，建议与aclnnSparseFlashMlaGrad算子配合使用，形成完整的工作流。**
     1. 接受aclnnSparseFlashMlaGrad算子接口输入数据shape信息，包含batchSize、qSeqlen、kSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnSparseFlashMlaGrad算子的整体计算耗时，并提高硬件利用率。
     2. 分配结果输出后，后续作为输入供aclnnSparseFlashMlaGrad算子使用。
-    3. 分配结果包含每个AIC核基本块的起始点和终止点，已经每个AIV核的FD任务信息。详细内容可以参考[调用示例](#调用示例)。
+    3. 分配结果包含每个AIC核基本块的起始点和终止点，以及每个AIV核的FD任务信息。详细内容可以参考[调用示例](#调用示例)。
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnSparseFlashMlaGradMetadataGetWorkspaceSize"获取workspace大小，在调用"aclnnSparseFlashMlaGradMetadata"执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnSparseFlashMlaGradMetadataGetWorkspaceSize"获取workspace大小，再调用"aclnnSparseFlashMlaGradMetadata"执行计算。
 
 ``` cpp
 aclnnStatus aclnnSparseFlashMlaGradMetadataGetWorkspaceSize(
