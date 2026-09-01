@@ -326,8 +326,8 @@ extern "C" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp
                       IsSameType<DTYPE_X, float>::value || IsSameType<DTYPE_X, int8_t>::value) {
             TPipe csPipe;
             MoeV3CountingSortFullLoadUnquantized<DTYPE_X> csOp;
-            csOp.Init(x, expertIdx, scale, offset, expandedX, expandedRowIdx, expertTokensCountOrCumsum, expandedScale,
-                      userWS, t, &csPipe);
+            csOp.Init(x, expertIdx, scale, expandedX, expandedRowIdx, expertTokensCountOrCumsum, expandedScale, userWS,
+                      t, &csPipe);
             csOp.Process();
             csPipe.Destroy();
         }

@@ -26,9 +26,9 @@ template <typename T>
 class MoeV3CountingSortFullLoadUnquantized {
 public:
     __aicore__ inline MoeV3CountingSortFullLoadUnquantized(){};
-    __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX,
-                                GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale,
-                                GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tiling, TPipe *pipe);
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
+                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
+                                const MoeInitRoutingV3Arch35TilingData *tiling, TPipe *pipe);
     __aicore__ inline void Process();
 
 private:
@@ -48,7 +48,6 @@ private:
     __aicore__ inline void WaitXLoadCommon();
     // 聚合搬出（csAggrEnable=1 时；FullLoad 模板仅 dropless，故无 dropPad 分支）
     __aicore__ inline void BucketByExpert();
-    __aicore__ inline int64_t ComputeBatchStartNewPos(int64_t expertOffset, int64_t slotStart);
     __aicore__ inline void GatherAndWriteByExpert(LocalTensor<T> &xLocal, LocalTensor<float> &scaleLocal,
                                                   GlobalTensor<T> &expandedXGmRef,
                                                   GlobalTensor<float> &expandedScaleGmRef);
@@ -142,10 +141,12 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::Init(
-    GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-    GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
-    const MoeInitRoutingV3Arch35TilingData *tiling, TPipe *pipe)
+__aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale,
+                                                                     GM_ADDR expandedX, GM_ADDR expandedRowIdx,
+                                                                     GM_ADDR expertTokensCountOrCumsum,
+                                                                     GM_ADDR expandedScale, GM_ADDR workspace,
+                                                                     const MoeInitRoutingV3Arch35TilingData *tiling,
+                                                                     TPipe *pipe)
 {
     InitCommon(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, workspace, tiling, pipe);
 
@@ -331,10 +332,11 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::InitCommon(
     maxFilteredCount_ = coreEntries_;
     filteredCount_ = 0;
 
-    // expertTokens 缓冲：KEY_VALUE 输出 [expertId,count] 键值对，需 actualExpertNum*2 元素；COUNT/CUMSUM 为
-    // actualExpertNum。
-    expertTokensBufElems_ =
-        (expertTokensNumType_ == EXERPT_TOKENS_KEY_VALUE) ? actualExpertNum_ * EXPERT_ID_VALUE_NUM : actualExpertNum_;
+    if (expertTokensNumType_ == EXERPT_TOKENS_KEY_VALUE) {
+        expertTokensBufElems_ = Min(actualExpertNum_ + 1, expertNum_) * EXPERT_ID_VALUE_NUM;
+    } else {
+        expertTokensBufElems_ = actualExpertNum_;
+    }
     expertCountElements_ = expertTokensBufElems_;
 
     entriesAligned_ = Ceil(coreEntries_, ONE_REPEAT_COMPARE_NUM) * ONE_REPEAT_COMPARE_NUM;
@@ -598,6 +600,12 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::ComputeGlobalOff
 
     // 标量：本核在专家 e 全局起始位置
     LocalTensor<int64_t> expertTokensLocal = buf_.Get<int64_t>()[expertTokensLocalOffset_ / sizeof(int64_t)];
+    // KEY_VALUE 模式：先整块清零（含尾部哨兵 0,0），再按非零专家紧凑写入，保证末尾始终有 (0,0) 分隔。
+    if (expertTokensNumType_ == EXERPT_TOKENS_KEY_VALUE) {
+        Duplicate(expertTokensLocal.ReinterpretCast<int32_t>(), static_cast<int32_t>(0),
+                  static_cast<int32_t>(expertTokensBufElems_ * EXPERT_ID_VALUE_NUM));
+        SetWaitFlag<HardEvent::V_S>(HardEvent::V_S);
+    }
     int64_t cumulativeSum = 0;
     int64_t keyValueOffset = 0; // KEY_VALUE 模式下的紧凑写出下标（跳过 count==0 的专家）
     for (int64_t e = 0; e < actualExpertNum_; e++) {
@@ -632,11 +640,6 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::ComputeGlobalOff
         }
         cumulativeSum += totalForExpert;
     }
-
-    // KEY_VALUE 模式实际写出元素数 = 非零专家数 * 2；上限为 actualExpertNum*2。
-    if (blockIdx_ == 0 && expertTokensNumType_ == EXERPT_TOKENS_KEY_VALUE) {
-        expertCountElements_ = keyValueOffset * EXPERT_ID_VALUE_NUM;
-    }
 }
 
 template <typename T>
@@ -647,9 +650,10 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::WriteExpertToken
     }
     LocalTensor<int64_t> expertTokensLocal = buf_.Get<int64_t>()[expertTokensLocalOffset_ / sizeof(int64_t)];
     SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
-    // COUNT/CUMSUM: expertCountElements_==actualExpertNum_；KEY_VALUE: 非零专家数*2
-    DataCopyExtParams copyParams{static_cast<uint16_t>(1),
-                                 static_cast<uint32_t>(expertCountElements_ * sizeof(int64_t)), 0, 0, 0};
+    // COUNT/CUMSUM: expertCountElements_==actualExpertNum_；KEY_VALUE: 非零对*2+哨兵
+    uint32_t expertCount = static_cast<uint32_t>(expertCountElements_);
+    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(expertCount * sizeof(int64_t)), 0, 0,
+                                 0};
     DataCopyPad(expertTokensGm_, expertTokensLocal, copyParams);
 }
 
@@ -703,16 +707,6 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::BucketByExpert()
         bucketBase.SetValue(baseOff + cur, localFlatIdx);
         cursorTbl.SetValue(expertOffset, cur + 1);
     }
-}
-
-// 计算批次起始 newPos（dropless）：expertCountLocal[eo] + slotStart
-// seed 来自 ComputeGlobalOffset 的跨核归约结果。批内可递增，避免每行 GetValue。
-template <typename T>
-__aicore__ inline int64_t MoeV3CountingSortFullLoadUnquantized<T>::ComputeBatchStartNewPos(int64_t expertOffset,
-                                                                                           int64_t slotStart)
-{
-    LocalTensor<int32_t> expertCountLocal = buf_.Get<int32_t>()[expertCountLocalOffset_ / sizeof(int32_t)];
-    return static_cast<int64_t>(expertCountLocal.GetValue(expertOffset)) + slotStart;
 }
 
 // 聚合搬出主循环：外层 expertOffset，内层按 k 切批，每批一次 DataCopyPad 写连续 GM 段。
