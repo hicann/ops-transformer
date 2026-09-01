@@ -3,7 +3,7 @@
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS FILE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
@@ -59,7 +59,10 @@ aclDataType GetDataTypeDliSLse(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceDliSLse(const std::string &source) { return source != "batch_size"; }
+inline bool IsTensorSourceDliSLse(const std::string &source)
+{
+    return source != "batch_size";
+}
 
 inline int64_t GetRawShapeSizeDliSLse(const std::string &source, int64_t batchValue)
 {
@@ -81,7 +84,7 @@ inline std::string GetSourceDescDliSLse(const std::string &source)
 }
 
 int64_t GetQueryBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-    const aclTensor *sequsedQOptional, const char *layoutQOptional, std::string *source)
+                                 const aclTensor *sequsedQOptional, const char *layoutQOptional, std::string *source)
 {
     if (IsTensorExistDliSLse(sequsedQOptional)) {
         *source = "seqused_q";
@@ -98,7 +101,7 @@ int64_t GetQueryBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensQO
 }
 
 int64_t GetKeyBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensKOptional,
-    const aclTensor *sequsedKOptional, const char *layoutKOptional, std::string *source)
+                               const aclTensor *sequsedKOptional, const char *layoutKOptional, std::string *source)
 {
     if (IsTensorExistDliSLse(sequsedKOptional)) {
         *source = "seqused_k";
@@ -115,8 +118,9 @@ int64_t GetKeyBatchSizeDliSLse(int64_t batchSize, const aclTensor *cuSeqlensKOpt
 }
 
 aclnnStatus CheckSingleParamDliSLse(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, int64_t numHeadsQ,
-    int64_t numHeadsK, int64_t headDim, const char *layoutQOptional,
-    const char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, uint32_t aicCoreNum)
+                                    int64_t numHeadsK, int64_t headDim, const char *layoutQOptional,
+                                    const char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                                    uint32_t aicCoreNum)
 {
     if (aicCoreNum == 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(DLI_ACLNN_OP_NAME, "aic_core_num", std::to_string(aicCoreNum),
@@ -198,8 +202,8 @@ aclnnStatus CheckSingleParamDliSLse(int64_t batchSize, int64_t maxSeqlenQ, int64
 }
 
 aclnnStatus CheckExistenceDliSLse(int64_t maskMode, int64_t cmpRatio, const aclTensor *cuSeqlensQOptional,
-    const aclTensor *cuSeqlensKOptional, const aclTensor *cmpResidualKOptional,
-    const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
+                                  const aclTensor *cuSeqlensKOptional, const aclTensor *cmpResidualKOptional,
+                                  const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
 {
     if (strcmp(layoutQOptional, "TND") == 0) {
         if (!IsTensorExistDliSLse(cuSeqlensQOptional)) {
@@ -231,9 +235,9 @@ aclnnStatus CheckExistenceDliSLse(int64_t maskMode, int64_t cmpRatio, const aclT
 }
 
 aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-    const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional,
-    const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
+                                    const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
+                                    const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional,
+                                    const char *layoutQOptional, const char *layoutKOptional, const aclTensor *metadata)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -341,9 +345,9 @@ aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor *cuSeqlen
                 DLI_ACLNN_OP_NAME, querySource, std::to_string(GetRawShapeSizeDliSLse(querySource, queryBatchSize)),
                 GetSourceDescDliSLse(querySource) + " must be equal to batch_size");
         } else {
-            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                DLI_ACLNN_OP_NAME, keySource, std::to_string(GetRawShapeSizeDliSLse(keySource, keyBatchSize)),
-                GetSourceDescDliSLse(keySource) + " must be equal to batch_size");
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(DLI_ACLNN_OP_NAME, keySource,
+                                                      std::to_string(GetRawShapeSizeDliSLse(keySource, keyBatchSize)),
+                                                      GetSourceDescDliSLse(keySource) + " must be equal to batch_size");
         }
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -361,8 +365,7 @@ aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor *cuSeqlen
                                                   "The shape size of cu_seqlens_q must be batch_size + 1");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (IsTensorExistDliSLse(cuSeqlensKOptional) &&
-        cuSeqlensKOptional->GetViewShape().GetDim(0) != keyBatchSize + 1) {
+    if (IsTensorExistDliSLse(cuSeqlensKOptional) && cuSeqlensKOptional->GetViewShape().GetDim(0) != keyBatchSize + 1) {
         OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(DLI_ACLNN_OP_NAME, "cu_seqlens_k",
                                                   std::to_string(cuSeqlensKOptional->GetViewShape().GetDim(0)),
                                                   "The shape size of cu_seqlens_k must be batch_size + 1");
@@ -402,33 +405,33 @@ aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor *cuSeqlen
 }
 
 aclnnStatus ParamsCheckDliSLseA5(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
-    const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
-    const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
-    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-    char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-    const aclTensor *metadata, uint32_t aicCoreNum)
+                                 const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
+                                 const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+                                 int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
+                                 char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                                 const aclTensor *metadata, uint32_t aicCoreNum)
 {
     auto ret = CheckSingleParamDliSLse(batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim,
-        layoutQOptional, layoutKOptional, maskMode, cmpRatio, aicCoreNum);
+                                       layoutQOptional, layoutKOptional, maskMode, cmpRatio, aicCoreNum);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     ret = CheckExistenceDliSLse(maskMode, cmpRatio, cuSeqlensQOptional, cuSeqlensKOptional, cmpResidualKOptional,
-        layoutQOptional, layoutKOptional, metadata);
+                                layoutQOptional, layoutKOptional, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     ret = CheckConsistencyDliSLse(batchSize, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-        cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata);
+                                  cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     return ACLNN_SUCCESS;
 }
 
 aclnnStatus ParamsCheckDliSLse(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
-    const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
-    const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
-    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-    char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-    const aclTensor *metadata, uint32_t aicCoreNum, const std::string &socVersion)
+                               const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
+                               const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+                               int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
+                               char *layoutQOptional, char *layoutKOptional, int64_t maskMode, int64_t cmpRatio,
+                               const aclTensor *metadata, uint32_t aicCoreNum, const std::string &socVersion)
 {
     const std::string ascend950 = "Ascend950";
     if (socVersion.find(ascend950) == std::string::npos) {
@@ -436,8 +439,8 @@ aclnnStatus ParamsCheckDliSLse(const aclTensor *cuSeqlensQOptional, const aclTen
         return ACLNN_SUCCESS;
     }
     return ParamsCheckDliSLseA5(cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-        cmpResidualKOptional, batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim,
-        layoutQOptional, layoutKOptional, maskMode, cmpRatio, metadata, aicCoreNum);
+                                cmpResidualKOptional, batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim,
+                                layoutQOptional, layoutKOptional, maskMode, cmpRatio, metadata, aicCoreNum);
 }
 
 } // namespace

@@ -2,6 +2,9 @@
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -33,13 +36,13 @@ public:
     __aicore__ inline S8S4RowSumPreprocess() {}
     __aicore__ inline ~S8S4RowSumPreprocess() {}
 
-    __aicore__ inline void Init(const Params& params, AscendC::TPipe* pipe)
+    __aicore__ inline void Init(const Params &params, AscendC::TPipe *pipe)
     {
         m_ = params.m;
         k_ = params.k;
         enabled_ = params.enabled;
-        xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(params.xGmAddr));
-        rowSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.rowSumGmAddr));
+        xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(params.xGmAddr));
+        rowSumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.rowSumGmAddr));
         if ASCEND_IS_AIV {
             pipe->InitBuffer(xBuffer_, k_ * sizeof(int8_t));
             pipe->InitBuffer(halfBuffer_, k_ * sizeof(half));
@@ -58,8 +61,7 @@ public:
             return;
         }
         const uint64_t taskIdx = AscendC::GetBlockIdx();
-        const uint64_t taskCount =
-            static_cast<uint64_t>(AscendC::GetBlockNum()) * AscendC::GetTaskRation();
+        const uint64_t taskCount = static_cast<uint64_t>(AscendC::GetBlockNum()) * AscendC::GetTaskRation();
         if (taskCount == 0) {
             return;
         }
@@ -68,7 +70,7 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params& params, AscendC::TPipe* pipe)
+    __aicore__ inline void operator()(const Params &params, AscendC::TPipe *pipe)
     {
         Init(params, pipe);
         Process();
@@ -88,8 +90,7 @@ private:
         auto reduceOutLocal = reduceOutBuffer_.Get<float>();
         const uint32_t elementCount = static_cast<uint32_t>(k_);
         const AscendC::DataCopyPadExtParams<int8_t> padParams{false, 0, 0, 0};
-        const AscendC::DataCopyExtParams copyInParams{
-            1, static_cast<uint32_t>(elementCount * sizeof(int8_t)), 0, 0, 0};
+        const AscendC::DataCopyExtParams copyInParams{1, static_cast<uint32_t>(elementCount * sizeof(int8_t)), 0, 0, 0};
         AscendC::DataCopyPad(xLocal, xGm_[row * k_], copyInParams, padParams);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(0);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(0);
@@ -100,8 +101,7 @@ private:
         AscendC::ReduceSum(reduceOutLocal, floatLocal, reduceWorkLocal, elementCount);
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(0);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(0);
-        const AscendC::DataCopyExtParams copyOutParams{
-            1, static_cast<uint32_t>(sizeof(float)), 0, 0, 0};
+        const AscendC::DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(sizeof(float)), 0, 0, 0};
         AscendC::DataCopyPad(rowSumGm_[row], reduceOutLocal, copyOutParams);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0);

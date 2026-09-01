@@ -1,9 +1,9 @@
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software; you can redistribute it and/or modify it under the terms and conditions of
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
@@ -31,7 +31,8 @@
 class RootInfoExchanger {
 public:
     RootInfoExchanger(uint32_t rank, uint32_t rankNum, const std::string &endpoint)
-        : rank_(rank), rankNum_(rankNum)
+        : rank_(rank),
+          rankNum_(rankNum)
     {
         if (!ParseEndpoint(endpoint, ip_, port_)) {
             ERROR_LOG("invalid endpoint: %s", endpoint.c_str());
@@ -77,10 +78,14 @@ private:
     static bool ParseEndpoint(const std::string &endpoint, std::string &ip, uint16_t &port)
     {
         const std::string prefix = "tcp://";
-        if (endpoint.find(prefix) != 0) { return false; }
+        if (endpoint.find(prefix) != 0) {
+            return false;
+        }
         std::string addr = endpoint.substr(prefix.size());
         auto colonPos = addr.rfind(':');
-        if (colonPos == std::string::npos) { return false; }
+        if (colonPos == std::string::npos) {
+            return false;
+        }
         ip = addr.substr(0, colonPos);
         port = static_cast<uint16_t>(atoi(addr.substr(colonPos + 1).c_str()));
         return !ip.empty() && port > 0;
@@ -91,7 +96,9 @@ private:
         size_t sent = 0;
         while (sent < len) {
             ssize_t n = send(sock, static_cast<const char *>(buf) + sent, len - sent, 0);
-            if (n <= 0) { return -1; }
+            if (n <= 0) {
+                return -1;
+            }
             sent += static_cast<size_t>(n);
         }
         return 0;
@@ -102,7 +109,9 @@ private:
         size_t received = 0;
         while (received < len) {
             ssize_t n = recv(sock, static_cast<char *>(buf) + received, len - received, 0);
-            if (n <= 0) { return -1; }
+            if (n <= 0) {
+                return -1;
+            }
             received += static_cast<size_t>(n);
         }
         return 0;
@@ -116,10 +125,14 @@ private:
                 return -1;
             }
             for (uint32_t i = 1; i < rankNum_; i++) {
-                if (SendAll(socks_[i - 1], &rootInfo, sizeof(HcclRootInfo)) != 0) { return -1; }
+                if (SendAll(socks_[i - 1], &rootInfo, sizeof(HcclRootInfo)) != 0) {
+                    return -1;
+                }
             }
         } else {
-            if (RecvAll(socks_[0], &rootInfo, sizeof(HcclRootInfo)) != 0) { return -1; }
+            if (RecvAll(socks_[0], &rootInfo, sizeof(HcclRootInfo)) != 0) {
+                return -1;
+            }
         }
         return 0;
     }
@@ -130,15 +143,23 @@ private:
         if (rank_ == 0) {
             for (uint32_t i = 1; i < rankNum_; i++) {
                 int32_t recvFlag = 0;
-                if (RecvAll(socks_[i - 1], &recvFlag, sizeof(recvFlag)) != 0) { return -1; }
+                if (RecvAll(socks_[i - 1], &recvFlag, sizeof(recvFlag)) != 0) {
+                    return -1;
+                }
             }
             for (uint32_t i = 1; i < rankNum_; i++) {
-                if (SendAll(socks_[i - 1], &flag, sizeof(flag)) != 0) { return -1; }
+                if (SendAll(socks_[i - 1], &flag, sizeof(flag)) != 0) {
+                    return -1;
+                }
             }
         } else {
-            if (SendAll(socks_[0], &flag, sizeof(flag)) != 0) { return -1; }
+            if (SendAll(socks_[0], &flag, sizeof(flag)) != 0) {
+                return -1;
+            }
             int32_t recvFlag = 0;
-            if (RecvAll(socks_[0], &recvFlag, sizeof(recvFlag)) != 0) { return -1; }
+            if (RecvAll(socks_[0], &recvFlag, sizeof(recvFlag)) != 0) {
+                return -1;
+            }
         }
         return 0;
     }
@@ -147,7 +168,9 @@ private:
     {
         if (rank_ == 0) {
             int32_t listenSock = socket(AF_INET, SOCK_STREAM, 0);
-            if (listenSock < 0) { return -1; }
+            if (listenSock < 0) {
+                return -1;
+            }
             int32_t opt = 1;
             setsockopt(listenSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
             struct sockaddr_in addr = {};
@@ -171,7 +194,9 @@ private:
         } else {
             socks_.resize(1, -1);
             int32_t sock = socket(AF_INET, SOCK_STREAM, 0);
-            if (sock < 0) { return -1; }
+            if (sock < 0) {
+                return -1;
+            }
             struct sockaddr_in addr = {};
             addr.sin_family = AF_INET;
             addr.sin_port = htons(port_);
@@ -192,7 +217,9 @@ private:
     void CloseSocks()
     {
         for (int32_t sock : socks_) {
-            if (sock >= 0) { close(sock); }
+            if (sock >= 0) {
+                close(sock);
+            }
         }
         socks_.clear();
     }

@@ -1,7 +1,10 @@
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the License).
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -55,7 +58,7 @@ public:
     __aicore__ inline Int4WeightToInt8Preprocess() {}
     __aicore__ inline ~Int4WeightToInt8Preprocess() {}
 
-    __aicore__ inline void Init(const Params& params, AscendC::TPipe* pipe)
+    __aicore__ inline void Init(const Params &params, AscendC::TPipe *pipe)
     {
         groupNum_ = params.groupNum;
         n_ = params.n;
@@ -71,8 +74,8 @@ public:
                 nzInputNarrowBlockCount_ = CeilDiv(n_, static_cast<uint64_t>(NZ_NARROW_AXIS));
                 workItemCount_ = groupNum_ * nzInputWideBlockCount_ * nzOutputWideBlockCount_;
             } else if (inputNzC032_) {
-                elementCount_ = groupNum_ * nzOutputWideBlockCount_ * nzOutputNarrowBlockCount_ *
-                    NZ_OUTPUT_TILE_ELEMENTS;
+                elementCount_ =
+                    groupNum_ * nzOutputWideBlockCount_ * nzOutputNarrowBlockCount_ * NZ_OUTPUT_TILE_ELEMENTS;
                 workItemCount_ = CeilDiv(elementCount_, static_cast<uint64_t>(NZ_LINEAR_TILE_ELEMENTS));
             } else {
                 nzInputWideBlockCount_ = CeilDiv(n_, static_cast<uint64_t>(NZ_INT4_INNER_AXIS));
@@ -83,8 +86,8 @@ public:
             elementCount_ = groupNum_ * n_ * k_;
             workItemCount_ = CeilDiv(elementCount_, static_cast<uint64_t>(LINEAR_TILE_ELEMENTS));
         }
-        weightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t*>(params.weightGmAddr));
-        workspaceGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(params.workspaceGmAddr));
+        weightGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int4b_t *>(params.weightGmAddr));
+        workspaceGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(params.workspaceGmAddr));
         if ASCEND_IS_AIV {
             pipe->InitBuffer(weightQueue_, 1, LOCAL_TILE_ELEMENTS / INT4_ELEMENTS_PER_BYTE);
             pipe->InitBuffer(outputQueue_, 1, LOCAL_TILE_ELEMENTS * sizeof(int8_t));
@@ -105,8 +108,7 @@ public:
         }
 
         const uint64_t taskIdx = AscendC::GetBlockIdx();
-        const uint64_t taskCount =
-            static_cast<uint64_t>(AscendC::GetBlockNum()) * AscendC::GetTaskRation();
+        const uint64_t taskCount = static_cast<uint64_t>(AscendC::GetBlockNum()) * AscendC::GetTaskRation();
         if (taskCount == 0) {
             return;
         }
@@ -131,7 +133,7 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(const Params& params, AscendC::TPipe* pipe)
+    __aicore__ inline void operator()(const Params &params, AscendC::TPipe *pipe)
     {
         Init(params, pipe);
         Process();
@@ -150,8 +152,7 @@ private:
     static constexpr uint32_t NZ_LINEAR_TILE_ELEMENTS = 2 * NZ_INPUT_TILE_ELEMENTS;
     static constexpr bool WEIGHT_NZ = IsWeightNz<LayoutB>::value;
     static constexpr bool TRANS_B = IsTrans<LayoutB>::value;
-    static constexpr uint32_t LOCAL_TILE_ELEMENTS =
-        WEIGHT_NZ ? NZ_LINEAR_TILE_ELEMENTS : LINEAR_TILE_ELEMENTS;
+    static constexpr uint32_t LOCAL_TILE_ELEMENTS = WEIGHT_NZ ? NZ_LINEAR_TILE_ELEMENTS : LINEAR_TILE_ELEMENTS;
 
     template <class T>
     __aicore__ inline static T Min(T lhs, T rhs)
@@ -167,8 +168,8 @@ private:
 
     __aicore__ inline void ConvertLinearTile(uint64_t elementOffset, uint32_t actualElements)
     {
-        const uint32_t alignedElements = static_cast<uint32_t>(
-            CeilDiv(actualElements, INT4_ELEMENTS_PER_BLOCK) * INT4_ELEMENTS_PER_BLOCK);
+        const uint32_t alignedElements =
+            static_cast<uint32_t>(CeilDiv(actualElements, INT4_ELEMENTS_PER_BLOCK) * INT4_ELEMENTS_PER_BLOCK);
         auto weightLocal = weightQueue_.AllocTensor<int4b_t>();
         const AscendC::DataCopyExtParams copyInParams{
             1, static_cast<uint32_t>(CeilDiv(actualElements, INT4_ELEMENTS_PER_BYTE)), 0, 0, 0};
@@ -186,8 +187,8 @@ private:
         weightQueue_.FreeTensor(weightLocal);
 
         outputLocal = outputQueue_.DeQue<int8_t>();
-        const AscendC::DataCopyExtParams copyOutParams{
-            1, static_cast<uint32_t>(actualElements * sizeof(int8_t)), 0, 0, 0};
+        const AscendC::DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(actualElements * sizeof(int8_t)), 0, 0,
+                                                       0};
         AscendC::DataCopyPad(workspaceGm_[elementOffset], outputLocal, copyOutParams);
         outputQueue_.FreeTensor(outputLocal);
     }
@@ -204,8 +205,7 @@ private:
             NZ_INPUT_TILE_ELEMENTS;
 
         auto weightLocal = weightQueue_.AllocTensor<int4b_t>();
-        const AscendC::DataCopyExtParams copyInParams{
-            1, NZ_INPUT_TILE_ELEMENTS / INT4_ELEMENTS_PER_BYTE, 0, 0, 0};
+        const AscendC::DataCopyExtParams copyInParams{1, NZ_INPUT_TILE_ELEMENTS / INT4_ELEMENTS_PER_BYTE, 0, 0, 0};
         const AscendC::DataCopyPadExtParams<int4b_t> padParams{false, 0, 0, 0};
         AscendC::DataCopyPad(weightLocal, weightGm_[inputElementOffset], copyInParams, padParams);
         weightQueue_.EnQue(weightLocal);
@@ -223,8 +223,7 @@ private:
         const uint64_t firstOutputWideBlock = wideBlockIdx * 2;
         CopyNzHalfToGm(outputLocal, groupIdx, narrowBlockIdx, firstOutputWideBlock, 0);
         if (firstOutputWideBlock + 1 < nzOutputWideBlockCount_) {
-            CopyNzHalfToGm(
-                outputLocal, groupIdx, narrowBlockIdx, firstOutputWideBlock + 1, NZ_INT8_INNER_AXIS);
+            CopyNzHalfToGm(outputLocal, groupIdx, narrowBlockIdx, firstOutputWideBlock + 1, NZ_INT8_INNER_AXIS);
         }
         outputQueue_.FreeTensor(outputLocal);
     }
@@ -237,21 +236,20 @@ private:
         const uint64_t inputKBlockIdx = blockInGroup / nzOutputWideBlockCount_;
         const uint64_t outputN32BlockIdx = blockInGroup % nzOutputWideBlockCount_;
         const uint64_t firstInputN16BlockIdx = outputN32BlockIdx * 2;
-        const uint32_t validNHalves = static_cast<uint32_t>(Min(
-            nzInputNarrowBlockCount_ - firstInputN16BlockIdx, static_cast<uint64_t>(2)));
+        const uint32_t validNHalves =
+            static_cast<uint32_t>(Min(nzInputNarrowBlockCount_ - firstInputN16BlockIdx, static_cast<uint64_t>(2)));
 
         auto weightLocal = weightQueue_.AllocTensor<int4b_t>();
         const uint32_t inputTileElements = NZ_NARROW_AXIS * nzInputInnerAxis_;
-        const AscendC::DataCopyExtParams copyInParams{
-            1, inputTileElements / INT4_ELEMENTS_PER_BYTE, 0, 0, 0};
+        const AscendC::DataCopyExtParams copyInParams{1, inputTileElements / INT4_ELEMENTS_PER_BYTE, 0, 0, 0};
         const AscendC::DataCopyPadExtParams<int4b_t> padParams{false, 0, 0, 0};
         for (uint32_t halfIdx = 0; halfIdx < validNHalves; ++halfIdx) {
             const uint64_t inputElementOffset =
                 ((groupIdx * nzInputWideBlockCount_ + inputKBlockIdx) * nzInputNarrowBlockCount_ +
-                 firstInputN16BlockIdx + halfIdx) * inputTileElements;
-            AscendC::DataCopyPad(
-                weightLocal[halfIdx * inputTileElements], weightGm_[inputElementOffset],
-                copyInParams, padParams);
+                 firstInputN16BlockIdx + halfIdx) *
+                inputTileElements;
+            AscendC::DataCopyPad(weightLocal[halfIdx * inputTileElements], weightGm_[inputElementOffset], copyInParams,
+                                 padParams);
         }
         weightQueue_.EnQue(weightLocal);
 
@@ -278,28 +276,26 @@ private:
             AscendC::PipeBarrier<PIPE_V>();
             AscendC::SetFlag<AscendC::HardEvent::V_S>(0);
             AscendC::WaitFlag<AscendC::HardEvent::V_S>(0);
-            const uint32_t validK = static_cast<uint32_t>(Min(
-                k_ - firstK - kPart * NZ_NARROW_AXIS, static_cast<uint64_t>(NZ_NARROW_AXIS)));
+            const uint32_t validK =
+                static_cast<uint32_t>(Min(k_ - firstK - kPart * NZ_NARROW_AXIS, static_cast<uint64_t>(NZ_NARROW_AXIS)));
             const uint64_t firstN = outputN32BlockIdx * NZ_INT8_INNER_AXIS;
-            const uint32_t validN = static_cast<uint32_t>(Min(
-                n_ - firstN, static_cast<uint64_t>(NZ_INT8_INNER_AXIS)));
+            const uint32_t validN = static_cast<uint32_t>(Min(n_ - firstN, static_cast<uint64_t>(NZ_INT8_INNER_AXIS)));
             for (uint32_t kIdx = 0; kIdx < validK; ++kIdx) {
                 for (uint32_t nIdx = 0; nIdx < validN; ++nIdx) {
                     const uint32_t halfIdx = nIdx / NZ_NARROW_AXIS;
                     const uint32_t nInHalf = nIdx % NZ_NARROW_AXIS;
-                    const uint32_t sourceOffset = halfIdx * inputTileElements +
-                        nInHalf * nzInputInnerAxis_ + kPart * NZ_NARROW_AXIS + kIdx;
-                    outputLocal.SetValue(
-                        kIdx * NZ_INT8_INNER_AXIS + nIdx, sourceLocal.GetValue(sourceOffset));
+                    const uint32_t sourceOffset =
+                        halfIdx * inputTileElements + nInHalf * nzInputInnerAxis_ + kPart * NZ_NARROW_AXIS + kIdx;
+                    outputLocal.SetValue(kIdx * NZ_INT8_INNER_AXIS + nIdx, sourceLocal.GetValue(sourceOffset));
                 }
             }
             AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(0);
             AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(0);
             const uint64_t outputElementOffset =
-                ((groupIdx * nzOutputWideBlockCount_ + outputN32BlockIdx) *
-                 nzOutputNarrowBlockCount_ + outputK16BlockIdx) * NZ_OUTPUT_TILE_ELEMENTS;
-            const AscendC::DataCopyExtParams copyOutParams{
-                1, NZ_OUTPUT_TILE_ELEMENTS * sizeof(int8_t), 0, 0, 0};
+                ((groupIdx * nzOutputWideBlockCount_ + outputN32BlockIdx) * nzOutputNarrowBlockCount_ +
+                 outputK16BlockIdx) *
+                NZ_OUTPUT_TILE_ELEMENTS;
+            const AscendC::DataCopyExtParams copyOutParams{1, NZ_OUTPUT_TILE_ELEMENTS * sizeof(int8_t), 0, 0, 0};
             AscendC::DataCopyPad(workspaceGm_[outputElementOffset], outputLocal, copyOutParams);
             AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(0);
@@ -307,19 +303,17 @@ private:
         outputQueue_.FreeTensor(sourceLocal);
     }
 
-    __aicore__ inline void CopyNzHalfToGm(
-        AscendC::LocalTensor<int8_t> outputLocal, uint64_t groupIdx,
-        uint64_t narrowBlockIdx, uint64_t outputWideBlockIdx, uint32_t localElementOffset)
+    __aicore__ inline void CopyNzHalfToGm(AscendC::LocalTensor<int8_t> outputLocal, uint64_t groupIdx,
+                                          uint64_t narrowBlockIdx, uint64_t outputWideBlockIdx,
+                                          uint32_t localElementOffset)
     {
         const uint64_t outputElementOffset =
             ((groupIdx * nzOutputWideBlockCount_ + outputWideBlockIdx) * nzOutputNarrowBlockCount_ + narrowBlockIdx) *
             NZ_OUTPUT_TILE_ELEMENTS;
         // Each source row contains 64 int8 values. Copy one 32-value half
         // from all 16 rows into one contiguous int8 NZ block.
-        const AscendC::DataCopyExtParams copyOutParams{
-            NZ_NARROW_AXIS, NZ_INT8_INNER_AXIS * sizeof(int8_t), 1, 0, 0};
-        AscendC::DataCopyPad(
-            workspaceGm_[outputElementOffset], outputLocal[localElementOffset], copyOutParams);
+        const AscendC::DataCopyExtParams copyOutParams{NZ_NARROW_AXIS, NZ_INT8_INNER_AXIS * sizeof(int8_t), 1, 0, 0};
+        AscendC::DataCopyPad(workspaceGm_[outputElementOffset], outputLocal[localElementOffset], copyOutParams);
     }
 
     AscendC::GlobalTensor<int4b_t> weightGm_;

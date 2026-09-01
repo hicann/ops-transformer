@@ -1,7 +1,7 @@
 /**
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -75,7 +75,8 @@ struct AlltoAllMatmulInferShapeUtParam : public AlltoAllMatmulHostUtParamBase {
     gert::InfershapeContextPara::TensorDescription y = ID_DEFAULT;
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    explicit AlltoAllMatmulInferShapeUtParam(const csv_map &csvMap) : AlltoAllMatmulHostUtParamBase(csvMap)
+    explicit AlltoAllMatmulInferShapeUtParam(const csv_map &csvMap)
+        : AlltoAllMatmulHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x1_shape", "x1_dtype", "x1_format", x1));
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x2_shape", "x2_dtype", "x2_format", x2));
@@ -108,7 +109,8 @@ struct AlltoAllMatmulInferDataTypeUtParam : public AlltoAllMatmulHostUtParamBase
     ge::DataType y = ge::DT_UNDEFINED;
     ge::DataType alltoallout = ge::DT_UNDEFINED;
 
-    explicit AlltoAllMatmulInferDataTypeUtParam(const csv_map &csvMap) : AlltoAllMatmulHostUtParamBase(csvMap)
+    explicit AlltoAllMatmulInferDataTypeUtParam(const csv_map &csvMap)
+        : AlltoAllMatmulHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetDataTypeGE(csvMap, "x1_dtype", x1));
         this->inputInstance.emplace_back(GetDataTypeGE(csvMap, "x2_dtype", x2));

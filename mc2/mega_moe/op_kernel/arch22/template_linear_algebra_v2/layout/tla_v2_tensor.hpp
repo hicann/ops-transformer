@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -50,14 +50,15 @@ public:
     CATLASS_HOST_DEVICE
     NC1HWC0(Index batch, Index c1, Index h, Index w, Index c0, LongIndex strideBatch, LongIndex strideC1,
             LongIndex strideH, LongIndex strideW, LongIndex strideC0)
-        : shape_(MakeCoord(batch, c1, h, w, c0)), stride_(MakeCoord(strideBatch, strideC1, strideH, strideW, strideC0))
-    {
-    }
+        : shape_(MakeCoord(batch, c1, h, w, c0)),
+          stride_(MakeCoord(strideBatch, strideC1, strideH, strideW, strideC0))
+    {}
 
     CATLASS_HOST_DEVICE
-    NC1HWC0(Shape shape, Stride stride) : shape_(shape), stride_(stride)
-    {
-    }
+    NC1HWC0(Shape shape, Stride stride)
+        : shape_(shape),
+          stride_(stride)
+    {}
 
     /// Make the layout of a coordinate (batch, c1, h, w, c0)
     template <class Element>
@@ -189,13 +190,13 @@ public:
                  LongIndex strideKw, LongIndex strideCout, LongIndex strideC0)
         : shape_(MakeCoord(cin1, kh, kw, cout, c0)),
           stride_(MakeCoord(strideCin1, strideKh, strideKw, strideCout, strideC0))
-    {
-    }
+    {}
 
     CATLASS_HOST_DEVICE
-    CI1KHKWCOCI0(Shape shape, Stride stride) : shape_(shape), stride_(stride)
-    {
-    }
+    CI1KHKWCOCI0(Shape shape, Stride stride)
+        : shape_(shape),
+          stride_(stride)
+    {}
 
     /// Make the layout of a coordinate (cin1, h, w, c0)
     template <class Element>
