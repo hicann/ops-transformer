@@ -168,17 +168,13 @@
 
 ## 约束说明
 
-<!-- npu="950" id2 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
   - n目前支持4、6、8。
   - D支持1~16384范围以内，需满足D为16对齐。
-<!-- end id2 -->
-<!-- npu="A3,910b" id1 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - 参数`op_impl_mode`仅支持配置为0。
   - n目前支持4。
   - D支持100000范围以内，需满足D为128对齐。
-<!-- end id1 -->
 
 ## 调用说明
 

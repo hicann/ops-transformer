@@ -551,8 +551,8 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
                 <td>C不符合大于0 小于100000 且可以被128整除的要求。</td>
             </tr>
             <tr>
-                <td>ACLNN_ERR_INNER_TILING_ERROR</td>
-                <td>561002</td>
+                <td>ACLNN_ERR_INNER_NULLPTR</td>
+                <td>561103</td>
                 <td>sk_iter_count不等于20。</td>
             </tr>
         </tbody>

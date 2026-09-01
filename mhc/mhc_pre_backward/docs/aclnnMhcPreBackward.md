@@ -646,7 +646,7 @@ aclnnStatus aclnnMhcPreBackward(
         </tr>
         <tr>
             <td>D</td>
-            <td>D支持1~16384范围以内，要求128元素对齐。</td>
+            <td>D支持100000范围以内，要求128元素对齐。</td>
         </tr>
         <tr>
             <td>fusionSize</td>
