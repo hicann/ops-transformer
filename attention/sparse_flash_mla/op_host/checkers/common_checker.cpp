@@ -15,8 +15,14 @@
 
 namespace optiling {
 namespace sparse_mla_checker {
+constexpr uint32_t DIM_IDX_TWO = 2;
+constexpr uint32_t DIM_IDX_THREE = 3;
+
 namespace {
-const char *Op(const CheckContext &context) { return context.opName == nullptr ? "SparseMla" : context.opName; }
+const char *Op(const CheckContext &context)
+{
+    return context.opName == nullptr ? "SparseMla" : context.opName;
+}
 } // namespace
 
 ge::graphStatus CommonChecker::CheckQuery(const CheckContext &context) const
@@ -143,18 +149,18 @@ ge::graphStatus CommonChecker::CheckQueryAxes(const CheckContext &context) const
                                                               .c_str(),
                                                           "Batch and sequence dimensions must be greater than 0"),
                     return ge::GRAPH_FAILED);
-        qHeads = GetDim(context.q, 2U);
-        qDim = GetDim(context.q, 3U);
+        qHeads = GetDim(context.q, DIM_IDX_TWO);
+        qDim = GetDim(context.q, DIM_IDX_THREE);
     } else {
         OP_CHECK_IF(qSeq <= 0, OP_LOGE_FOR_INVALID_SHAPESIZE(Op(context), "q_t", std::to_string(qSeq).c_str(), "> 0"),
                     return ge::GRAPH_FAILED);
         qHeads = GetDim(context.q, 1);
-        qDim = GetDim(context.q, 2U);
+        qDim = GetDim(context.q, DIM_IDX_TWO);
     }
-    OP_CHECK_IF(qHeads <= 0 || qHeads > 128U,
+    OP_CHECK_IF(qHeads <= 0 || qHeads > 128, // 128：最大支持的注意力头数
                 OP_LOGE_FOR_INVALID_VALUE(Op(context), "q_n", std::to_string(qHeads).c_str(), "[1, 128]"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(qDim != 512U,
+    OP_CHECK_IF(qDim != 512, // 512：每个注意力头的固定维度大小
                 OP_LOGE_FOR_INVALID_VALUE(Op(context), "q head dimension", std::to_string(qDim).c_str(), "512"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
@@ -169,18 +175,18 @@ ge::graphStatus CommonChecker::CheckKvAxes(const CheckContext &context, const Te
     int64_t headDim = -1;
     if (context.kvLayout == Layout::TND) {
         numHeads = GetDim(kv, 1);
-        headDim = GetDim(kv, 2U);
+        headDim = GetDim(kv, DIM_IDX_TWO);
     } else {
-        numHeads = GetDim(kv, 2U);
-        headDim = GetDim(kv, 3U);
+        numHeads = GetDim(kv, DIM_IDX_TWO);
+        headDim = GetDim(kv, DIM_IDX_THREE);
     }
     OP_CHECK_IF(numHeads != 1,
                 OP_LOGE_FOR_INVALID_VALUE(Op(context), (std::string(name) + " kv_n").c_str(),
                                           std::to_string(numHeads).c_str(), "1"),
                 return ge::GRAPH_FAILED);
-    int64_t expectedDim = 512U;
+    int64_t expectedDim = 512; // 512：预期维度大小
     if (context.variant == OperatorVariant::MIXED_QUANT) {
-        expectedDim = context.quantMode == 1 ? 608U : 584U;
+        expectedDim = context.quantMode == 1 ? 608 : 584; // 608，584：混合量化模式下根据量化模式选择不同维度
     }
     OP_CHECK_IF(headDim != expectedDim,
                 OP_LOGE_FOR_INVALID_VALUE(Op(context), (std::string(name) + " head dimension").c_str(),

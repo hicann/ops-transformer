@@ -29,6 +29,8 @@
 
 namespace optiling {
 
+std::vector<int64_t> ToVector(const gert::Shape &shape);
+std::string ToStringRaw(const gert::Shape &shape);
 std::string MQSMLALayoutToSerialString(MQSMLALayout layout);
 
 // -----------算子TilingData定义---------------

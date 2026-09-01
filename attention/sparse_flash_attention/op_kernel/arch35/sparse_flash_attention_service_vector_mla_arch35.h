@@ -232,8 +232,9 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline int64_t SFAVectorService<TEMPLATE_ARG
     if constexpr (isPa) {
         int64_t blkTableIdx = s2Idx / blockSize;
         int64_t blkTableOffset = s2Idx % blockSize;
-        realkeyOffset = blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + blkTableIdx) *
-                        constInfo.keyStride0 + blkTableOffset; // BlockNum, BlockSize, N(1), D
+        realkeyOffset =
+            blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + blkTableIdx) * constInfo.keyStride0 +
+            blkTableOffset; // BlockNum, BlockSize, N(1), D
     } else {
         if constexpr (LAYOUT_T == SFA_LAYOUT::BSND) {
             realkeyOffset = (runInfo.boIdx * constInfo.s2Size + s2Idx); // BSN(1)D
@@ -258,7 +259,7 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
     intriParams.srcStride = 0;
     DataCopyPadExtParams<KV_T> padParams;
     // 当前仅支持COMBINE模式
-    uint32_t combineBytes = 512 * sizeof(KV_T);
+    uint32_t combineBytes = 512 * sizeof(KV_T); // 512: Key特征维度
     intriParams.blockLen = combineBytes;
     uint32_t combineDim = combineBytes / sizeof(KV_T);
     uint32_t combineDimAlign = CeilAlign(combineBytes, BUFFER_SIZE_BYTE_32B) / sizeof(KV_T);
@@ -266,14 +267,14 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
     padParams.leftPadding = 0;
     padParams.rightPadding = combineDimAlign - combineDim;
     padParams.paddingValue = 0;
-    // 512: Key特征维度; 576: 局部Buffer行跨度
-    DataCopyPad(kvInUb[startRow * 576], keyGm[keyOffset * 512], intriParams, padParams);
+    DataCopyPad(kvInUb[startRow * 576], keyGm[keyOffset * 512], intriParams,
+                padParams); // 512: Key特征维度; 576: 局部Buffer行跨度
 
     intriParams.blockLen = constInfo.sparseBlockSize * constInfo.dSizeRope * sizeof(KV_T);
     intriParams.dstStride = 512 / BUFFER_SIZE_BYTE_32B; // 512: 模型特征维度(dSize)
-    // 576: 局部Buffer行跨度（Leading Dimension）; 512: Key特征维度（dSize）; 64 :
-    // RoPE索引数据每Token/块的行跨度（Stride）
-    DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * 64], intriParams, padParams); // combineDimAlign
+    DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * 64], intriParams,
+                padParams); // 576: 局部Buffer行跨度（Leading Dimension）; 512: Key特征维度（dSize）;
+                            // 64：RoPE索引数据每Token/块的行跨度（Stride）
 }
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline uint32_t SFAVectorService<TEMPLATE_ARGS>::CopyInKvSparse(

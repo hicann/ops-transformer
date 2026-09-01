@@ -77,7 +77,10 @@ struct ScopeGuard {
         }
     }
 
-    void Dismiss() { m_isDismissed = true; }
+    void Dismiss()
+    {
+        m_isDismissed = true;
+    }
 
     std::function<void()> m_exitFunc;
     bool m_isDismissed;
@@ -222,22 +225,22 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
     aclnnStatus ret;
 
-    context.numHeadsQ = 64U;
+    context.numHeadsQ = 64; // 64: q的head个数
     context.numHeadsKv = 1;
-    context.headDim = 512U;
+    context.headDim = 512; // 512：注意力头的维度
     context.quantMode = 1;
     ret = CreateTensor(aclDataType::ACL_INT32, {MQSMLA_METADATA_TOTAL_SIZE}, context.metadata); // 1024: Fix size
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
     context.oriTopk = 0;
     context.cmpTopk = 0;
-    context.ropeHeadDim = 64U;
-    context.cmpRatio = 128U;
-    context.oriMaskMode = 4U;
-    context.cmpMaskMode = 3U;
-    context.oriWinLeft = 127U;
+    context.ropeHeadDim = 64; // 64：rope头的维度
+    context.cmpRatio = 128;   // 128：对cmp_kv的压缩率
+    context.oriMaskMode = 4;  // 4：q和ori_kv计算的mask模式，4表示sliding window模式
+    context.cmpMaskMode = 3;  // 3：q和cmp_kv计算的mask模式，3表示RightDownCausal模式
+    context.oriWinLeft = 127; // 127：q和ori_kv计算中q对过去token计算的数量
     context.oriWinRight = 0;
-    context.layoutQOptional = (char *)malloc(sizeof(char) * 16U);
-    context.layoutKvOptional = (char *)malloc(sizeof(char) * 16U);
+    context.layoutQOptional = (char *)malloc(sizeof(char) * 16); // 16：为layoutQOptional指针分配16字节内存空间
+    context.layoutKvOptional = (char *)malloc(sizeof(char) * 16); // 16：为layoutKvOptional指针分配16字节内存空间
     CHECK_LOG_RET(context.layoutQOptional != nullptr, ACL_ERROR_FAILURE, "Create layoutQOptional failed");
     CHECK_LOG_RET(context.layoutKvOptional != nullptr, ACL_ERROR_FAILURE, "Create layoutKvOptional failed");
     strcpy(context.layoutQOptional, "BSND");  // BSND,TND
@@ -245,10 +248,10 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.hasOriKv = true;
     context.hasCmpKv = true;
 
-    context.batchSize = 4U;
-    context.maxSeqlenOriKv = 1024U;
-    context.maxSeqlenCmpKv = 1024U;
-    context.maxSeqlenQ = 1024U;
+    context.batchSize = 4;         // 4：Batch数量
+    context.maxSeqlenOriKv = 1024; // 1024：ori_kv的最长Sequence Length
+    context.maxSeqlenCmpKv = 1024; // 1024：cmp_kv的最长Sequence Length
+    context.maxSeqlenQ = 1024;     // 1024：q的最长Sequence Length
 
     if (scenario.hasCuSeq) {
         // (B+1,), first element is always 0
@@ -270,7 +273,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create sequsedCmpKvOptional failed. Error: %d", ret);
     }
 
-    if (context.hasCmpKv && context.cmpRatio != 1 && context.cmpMaskMode == 3U) {
+    if (context.hasCmpKv && context.cmpRatio != 1 && context.cmpMaskMode == 3) { // 3：RightDownCausal模式
         // (B,)
         ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize}, context.cmpResidualKvOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cmpResidualKvOptional failed. Error: %d", ret);

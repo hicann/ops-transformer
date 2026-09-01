@@ -9,9 +9,9 @@
  */
 
 /*!
-* \file sparse_flash_mla_infershape.cpp
-* \brief
-*/
+ * \file sparse_flash_mla_infershape.cpp
+ * \brief
+ */
 
 #include <graph/utils/type_utils.h>
 #include <register/op_impl_registry.h>
@@ -65,15 +65,14 @@ static int64_t GetKvHeadNum(const gert::Shape *kvShape, const std::string &layou
     return kvShape->GetDim(DIM_INDEX_2);
 }
 
-const gert::Shape *GetOptionalStorageShape(gert::InferShapeContext *context, uint32_t inputIndex)
+const gert::Shape *GetOptionalStorageShape(const gert::InferShapeContext *context, uint32_t inputIndex)
 {
     return context->GetOptionalInputShape(inputIndex);
 }
 
 ge::graphStatus InferShapeSparseFlashMla(gert::InferShapeContext *context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMla", "InferShapeContext is nullptr"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMla", "InferShapeContext is nullptr"), return ge::GRAPH_FAILED);
     const gert::Shape *queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
     const gert::Shape *oriKvShape = GetOptionalStorageShape(context, ORI_KV_INPUT_INDEX);
@@ -97,10 +96,10 @@ ge::graphStatus InferShapeSparseFlashMla(gert::InferShapeContext *context)
     int64_t kvHeadNum = GetKvHeadNum(kvShape, layoutKv);
 
     OP_CHECK_IF(kvHeadNum <= 0,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("SparseFlashMla", "ori_kv or cmp_kv",
-            ToStringFunc(kvShape).c_str(),
-            "The head num of ori_kv or cmp_kv should be greater than 0 but got " + std::to_string(kvHeadNum)),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    "SparseFlashMla", "ori_kv or cmp_kv", ToStringFunc(kvShape).c_str(),
+                    "The head num of ori_kv or cmp_kv should be greater than 0 but got " + std::to_string(kvHeadNum)),
+                return ge::GRAPH_FAILED);
 
     if (returnSoftmaxLse) {
         if (queryShape->GetDimNum() == DIM_NUM_3) {
@@ -124,8 +123,7 @@ ge::graphStatus InferShapeSparseFlashMla(gert::InferShapeContext *context)
 
 ge::graphStatus InferDataTypeSparseFlashMla(gert::InferDataTypeContext *context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMla", "InferShapeContext is nullptr"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMla", "InferShapeContext is nullptr"), return ge::GRAPH_FAILED);
     const auto inputDataType = context->GetInputDataType(QUERY_INPUT_INDEX);
     context->SetOutputDataType(0, inputDataType);
     context->SetOutputDataType(1, ge::DT_FLOAT);

@@ -15,16 +15,11 @@
 #ifndef SPARSE_FLASH_MLA_TILING_H
 #define SPARSE_FLASH_MLA_TILING_H
 
-#include <graph/utils/type_utils.h>
 #include <exe_graph/runtime/tiling_context.h>
 #include <tiling/platform/platform_ascendc.h>
 #include "register/tilingdata_base.h"
-#include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
-#include "log/log.h"
-#include "log/error_code.h"
 #include "err/ops_err.h"
-#include "platform/platform_info.h"
 #include "platform/soc_spec.h"
 
 namespace optiling {
@@ -490,7 +485,7 @@ public:
     ge::graphStatus GetInOutDataType();
     ge::graphStatus GetQueryAndOutLayout();
     ge::graphStatus GetKvLayout();
-    ge::graphStatus GetSMLATemplateMode(SMLATilingInfo &smlaInfo);
+    ge::graphStatus GetSMLATemplateMode();
     void SetSMLAShape();
     ge::graphStatus GetN1Size();
     ge::graphStatus GetN2Size();
@@ -608,7 +603,7 @@ public:
 
 private:
     void SplitBalanced(SMLATilingInfo *tilingInfo);
-    void CalcUbBmm(SMLATilingInfo *tilingInfo);
+    void CalcUbBmm(const SMLATilingInfo *tilingInfo);
     uint32_t CalcFdLogicalSlotCount(const SMLATilingInfo *tilingInfo, uint32_t aicNum) const;
     uint64_t CalcFdStagingWorkspaceSize(const SMLATilingInfo *tilingInfo, uint32_t aicNum) const;
     uint64_t CalcVectorizeKvPhyAddrWorkspaceSize(const SMLATilingInfo *tilingInfo, uint32_t &vectorizeFlag) const;

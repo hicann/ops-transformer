@@ -21,6 +21,29 @@ using std::map;
 using std::pair;
 using std::string;
 namespace optiling {
+std::vector<int64_t> ToVector(const gert::Shape &shape)
+{
+    size_t shapeSize = shape.GetDimNum();
+    std::vector<int64_t> shapeVec(shapeSize, 0);
+
+    for (size_t i = 0; i < shapeSize; i++) {
+        shapeVec[i] = shape.GetDim(i);
+    }
+    return shapeVec;
+}
+
+std::string ToStringRaw(const gert::Shape &shape)
+{
+    std::ostringstream oss;
+    auto v = ToVector(shape);
+    if (v.size() > 0) {
+        for (size_t i = 0; i < v.size() - 1; ++i) {
+            oss << v[i] << ", ";
+        }
+        oss << v[v.size() - 1];
+    }
+    return oss.str();
+}
 
 std::string MQSMLALayoutToSerialString(MQSMLALayout layout)
 {

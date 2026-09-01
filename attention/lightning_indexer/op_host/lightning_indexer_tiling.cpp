@@ -549,9 +549,10 @@ ge::graphStatus LIInfoParser::CheckKeyContiguous() const
         uint64_t shapeSize = 0;
 
         if (kLayout_ == DataLayout::BnBsND) {
-            totalElements = keyStride1_ * static_cast<uint64_t>(shape.GetDim(1));
-            shapeSize = static_cast<uint64_t>(shape.GetDim(1)) * static_cast<uint64_t>(shape.GetDim(2U)) *
-                        static_cast<uint64_t>(shape.GetDim(3U));
+            totalElements = keyStride1_ * static_cast<uint64_t>(shape.GetDim(DIM_IDX_ONE));
+            shapeSize = static_cast<uint64_t>(shape.GetDim(DIM_IDX_ONE)) *
+                        static_cast<uint64_t>(shape.GetDim(DIM_IDX_TWO)) *
+                        static_cast<uint64_t>(shape.GetDim(DIM_IDX_THREE));
         } else {
             totalElements = keyStride0_ * static_cast<uint64_t>(shape.GetDim(0));
             shapeSize = context_->GetOptionalInputTensor(KEY_INDEX)->GetShapeSize();
@@ -574,7 +575,7 @@ ge::graphStatus LIInfoParser::GetN1Size()
         n1Size_ = static_cast<uint32_t>(opParamInfo_.query.shape->GetStorageShape().GetDim(DIM_IDX_TWO));
     } else {
         // TND
-        n1Size_ = static_cast<uint32_t>(opParamInfo_.query.shape->GetStorageShape().GetDim(1));
+        n1Size_ = static_cast<uint32_t>(opParamInfo_.query.shape->GetStorageShape().GetDim(DIM_IDX_ONE));
     }
     OP_LOGI(context_->GetNodeName(), "n1Size is %d", n1Size_);
     if (npuArch_ == NpuArch::DAV_3510) {
@@ -687,14 +688,14 @@ ge::graphStatus LIInfoParser::GetHeadDim()
 ge::graphStatus LIInfoParser::GetS1Size()
 {
     if (qLayout_ == DataLayout::BSND) {
-        s1Size_ = opParamInfo_.query.shape->GetStorageShape().GetDim(1);
+        s1Size_ = opParamInfo_.query.shape->GetStorageShape().GetDim(DIM_IDX_ONE);
     }
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus LIInfoParser::GetAndCheckBlockSize()
 {
-    blockSize_ = static_cast<uint32_t>(opParamInfo_.key.shape->GetStorageShape().GetDim(1));
+    blockSize_ = static_cast<uint32_t>(opParamInfo_.key.shape->GetStorageShape().GetDim(DIM_IDX_ONE));
     OP_LOGI(context_->GetNodeName(), "blockSize_ is %d", blockSize_);
 
     OP_CHECK_IF(((blockSize_ % 16 != 0) || (blockSize_ == 0) || (blockSize_ > 1024)),
@@ -725,7 +726,7 @@ ge::graphStatus LIInfoParser::GetS2SizeForPageAttention()
     if (CheckBlockCount() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    maxBlockNumPerBatch_ = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1);
+    maxBlockNumPerBatch_ = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(DIM_IDX_ONE);
     s2Size_ = maxBlockNumPerBatch_ * blockSize_;
     OP_LOGI(context_->GetNodeName(), "maxBlockNumPerBatch_ is %d, blockSize_ is %d, s2Size_ is %d",
             maxBlockNumPerBatch_, blockSize_, s2Size_);
@@ -742,7 +743,7 @@ ge::graphStatus LIInfoParser::GetS2Size()
     } else if (kLayout_ == DataLayout::TND) {
         s2Size_ = opParamInfo_.key.shape->GetStorageShape().GetDim(0);
     } else if (kLayout_ == DataLayout::BSND) {
-        s2Size_ = opParamInfo_.key.shape->GetStorageShape().GetDim(1);
+        s2Size_ = opParamInfo_.key.shape->GetStorageShape().GetDim(DIM_IDX_ONE);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -873,27 +874,28 @@ ge::graphStatus LIInfoParser::ValidateInputShapesMatchQbsnd()
                         " respectively, they must be same"),
                 return ge::GRAPH_FAILED);
     // -----------------------check S1-------------------
-    OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(1) != s1Size_) ||
-                    (opParamInfo_.attenOut.shape->GetStorageShape().GetDim(1) != s1Size_),
+    OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != s1Size_) ||
+                    (opParamInfo_.attenOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != s1Size_),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                     opName_, "query, weights and sparse_indices",
                     Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + ", " +
                         Ops::Base::ToString(opParamInfo_.weights.shape->GetStorageShape()) + " and " +
                         Ops::Base::ToString(opParamInfo_.attenOut.shape->GetStorageShape()),
                     "BSND case query, weights and sparse_indices dim 1 are " + std::to_string(s1Size_) + ", " +
-                        std::to_string(opParamInfo_.weights.shape->GetStorageShape().GetDim(1)) + ", " +
-                        std::to_string(opParamInfo_.attenOut.shape->GetStorageShape().GetDim(1)) +
+                        std::to_string(opParamInfo_.weights.shape->GetStorageShape().GetDim(DIM_IDX_ONE)) + ", " +
+                        std::to_string(opParamInfo_.attenOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE)) +
                         " respectively, they must be same"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF((opParamInfo_.valuesOut.shape->GetStorageShape().GetDim(1) != s1Size_ && (*opParamInfo_.returnValue)),
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                    opName_, "query and sparse_values",
-                    Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
-                        Ops::Base::ToString(opParamInfo_.valuesOut.shape->GetStorageShape()),
-                    "BSND case query and sparse_values dim 1 are " + std::to_string(s1Size_) + ", " +
-                        std::to_string(opParamInfo_.valuesOut.shape->GetStorageShape().GetDim(1)) +
-                        " respectively, they must be same"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (opParamInfo_.valuesOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE) != s1Size_ && (*opParamInfo_.returnValue)),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            opName_, "query and sparse_values",
+            Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
+                Ops::Base::ToString(opParamInfo_.valuesOut.shape->GetStorageShape()),
+            "BSND case query and sparse_values dim 1 are " + std::to_string(s1Size_) + ", " +
+                std::to_string(opParamInfo_.valuesOut.shape->GetStorageShape().GetDim(DIM_IDX_ONE)) +
+                " respectively, they must be same"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

@@ -22,7 +22,6 @@
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "log/log.h"
-#include "log/error_code.h"
 #include "err/ops_err.h"
 #include "platform/platform_info.h"
 #include "op_host/tiling_util.h"
@@ -175,30 +174,6 @@ constexpr uint32_t NUM_BYTES_BF16 = 2;
 constexpr uint32_t BYTE_BLOCK = 32;
 const uint32_t QSFA_MAX_AIC_CORE_NUM = 26; // 25 + 1 保证数组8字节对齐
 
-static std::vector<int64_t> ToVector(const gert::Shape &shape)
-{
-    size_t shapeSize = shape.GetDimNum();
-    std::vector<int64_t> shapeVec(shapeSize, 0);
-
-    for (size_t i = 0; i < shapeSize; i++) {
-        shapeVec[i] = shape.GetDim(i);
-    }
-    return shapeVec;
-}
-
-static std::string ToStringRaw(const gert::Shape &shape)
-{
-    std::ostringstream oss;
-    auto v = ToVector(shape);
-    if (v.size() > 0) {
-        for (size_t i = 0; i < v.size() - 1; ++i) {
-            oss << v[i] << ", ";
-        }
-        oss << v[v.size() - 1];
-    }
-    return oss.str();
-}
-
 const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_UNDEFINED, "DT_UNDEFINED"},           // Used to indicate a DataType field has not been set.
     {ge::DT_FLOAT, "DT_FLOAT"},                   // float type
@@ -248,7 +223,8 @@ const std::map<MQSMLALayout, size_t> QSMLA_LAYOUT_DIM_MAP = {
     {MQSMLALayout::TND, DIM_NUM_THREE},
     {MQSMLALayout::PA_BBND, DIM_NUM_FOUR},
 };
-
+std::vector<int64_t> ToVector(const gert::Shape &shape);
+std::string ToStringRaw(const gert::Shape &shape);
 std::string MQSMLADataTypeToSerialString(ge::DataType type);
 std::string MQSMLALayoutToSerialString(MQSMLALayout layout);
 std::string GetShapeStr(gert::Shape shape);

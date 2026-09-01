@@ -315,7 +315,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetRealCmpS2Idx(int64_t *toke
     }
 
     uint64_t topkKIdx = s2IdxInBase + curS2LoopCnt * constInfo.s2BaseSize;
-    for (uint64_t i = 0; i < 8; ++i) {
+    for (uint64_t i = 0; i < 8; ++i) { // 每次处理8个数据块
         uint64_t idx = topkBS1Idx + runInfo.s2StartIdx + topkKIdx + i;
         if (likely((topkKIdx + i < sparseBlockCount) && (s2IdxInBase + i < processS2End))) {
             tokenData[i] = sparseIndicesGm.GetValue(idx);
@@ -350,7 +350,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetRealS2Addr(int64_t *tokenD
             runInfo.boIdx * constInfo.s1Size * alignedSparseBlockCount + runInfo.s1oIdx * alignedSparseBlockCount;
     }
     uint64_t topkKIdx = s2IdxInBase + curS2LoopCnt * constInfo.s2BaseSize;
-    for (uint64_t i = 0; i < 8; ++i) {
+    for (uint64_t i = 0; i < 8; ++i) { // 每次处理8个数据块
         uint64_t idx = topkBS1Idx + runInfo.s2StartIdx + topkKIdx + i;
         if (likely((topkKIdx + i < sparseBlockCount) && (s2IdxInBase + i < processS2End))) {
             tokenData[i] = phyAddrGm64.GetValue(idx);

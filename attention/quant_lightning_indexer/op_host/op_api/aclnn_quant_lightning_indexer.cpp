@@ -31,6 +31,9 @@ extern "C" {
 #endif
 
 namespace {
+// Dim Num
+constexpr uint32_t DIM_NUM_THREE = 3;
+constexpr uint32_t DIM_NUM_FOUR = 4;
 
 extern aclnnStatus aclnnInnerQuantLightningIndexerGetWorkspaceSize(
     const aclTensor *query, const aclTensor *key, const aclTensor *weights, const aclTensor *queryDequantScale,
@@ -62,7 +65,7 @@ aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
         auto keyShape = key->GetViewShape();
         bool isPaBsnd = (layoutKeyOptional != nullptr && std::string(layoutKeyOptional) == "PA_BSND");
         size_t checkStartIdx = isPaBsnd ? 1 : 0;
-        if (keyShape.GetDimNum() == 4U) {
+        if (keyShape.GetDimNum() == DIM_NUM_FOUR) {
             int64_t expected = 1;
             for (int64_t i = 3; i >= static_cast<int64_t>(checkStartIdx); --i) {
                 if (keyStride[i] != expected) {
@@ -82,14 +85,14 @@ aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
         auto scaleShape = keyDequantScale->GetViewShape();
         bool isPaBsnd = (layoutKeyOptional != nullptr && std::string(layoutKeyOptional) == "PA_BSND");
         size_t checkStartIdx = isPaBsnd ? 1 : 0;
-        if (scaleShape.GetDimNum() == 3U) {
+        if (scaleShape.GetDimNum() == DIM_NUM_THREE) {
             int64_t expected = 1;
             for (int64_t i = 2; i >= static_cast<int64_t>(checkStartIdx); --i) {
                 if (scaleStride[i] != expected) {
                     OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                             "Key_dequant_scale only supports non-contiguous tensor on the 0-axis in PA scenarios. "
                             "axis[%ld] stride=%ld, expected=%ld",
-                            i, (long)scaleStride[i], (long)expected);
+                            i, static_cast<long>(scaleStride[i]), static_cast<long>(expected));
                     return ACLNN_ERR_PARAM_INVALID;
                 }
                 expected *= scaleShape.GetDim(i);

@@ -51,6 +51,10 @@ constexpr uint32_t PRE_TOKENS_ATTR_INDEX = 5;
 constexpr uint32_t NEXT_TOKENS_ATTR_INDEX = 6;
 constexpr uint32_t ATTENTION_MODE_ATTR_INDEX = 7;
 constexpr uint32_t RETURN_SOFTMAX_LSE_ATTR_INDEX = 8;
+// Dim Index
+constexpr uint32_t DIM_IDX_ONE = 1;
+constexpr uint32_t DIM_IDX_TWO = 2;
+constexpr uint32_t DIM_IDX_THREE = 3;
 // Dim Num
 constexpr size_t DIM_NUM_ONE = 1;
 constexpr size_t DIM_NUM_TWO = 2;
@@ -66,7 +70,13 @@ constexpr uint32_t BYTE_BLOCK = 32;
 const uint32_t SFA_MAX_AIC_CORE_NUM = 26; // 25 + 1 保证数组8字节对齐
 
 // ------------------公共定义--------------------------
-enum class SFALayout : uint32_t { BSND = 0, TND = 1, PA_BSND = 2, BNSG = 3, NTG = 4 };
+enum class SFALayout : uint32_t {
+    BSND = 0,
+    TND = 1,
+    PA_BSND = 2,
+    BNSG = 3,
+    NTG = 4
+};
 
 struct SFATilingShapeCompareParam {
     int64_t B = 1;
@@ -80,9 +90,15 @@ struct SFATilingShapeCompareParam {
     int64_t Bn = 1;
 };
 
-enum class KvStorageMode : uint32_t { BATCH_CONTINUOUS = 0, PAGE_ATTENTION = 1 };
+enum class KvStorageMode : uint32_t {
+    BATCH_CONTINUOUS = 0,
+    PAGE_ATTENTION = 1
+};
 
-enum class SFAPerfMode : uint32_t { C_TEMPLATE_MODE = 0, V_TEMPLATE_MODE };
+enum class SFAPerfMode : uint32_t {
+    C_TEMPLATE_MODE = 0,
+    V_TEMPLATE_MODE
+};
 
 enum class SFAAxis : uint32_t {
     B = 0,
@@ -280,7 +296,9 @@ struct SFATilingInfo {
 // ---------------算子Tiling类---------------
 class SFAMlaTiling {
 public:
-    explicit SFAMlaTiling(gert::TilingContext *context) : context_(context) {}
+    explicit SFAMlaTiling(gert::TilingContext *context)
+        : context_(context)
+    {}
     ge::graphStatus DoOpTiling(SFATilingInfo *sfaInfo);
 
 private:
@@ -358,7 +376,8 @@ private:
 // -----------算子Tiling入参信息解析及Check类---------------
 class SFATilingCheck {
 public:
-    explicit SFATilingCheck(const SFATilingInfo &sfaInfo) : sfaInfo_(sfaInfo) {};
+    explicit SFATilingCheck(const SFATilingInfo &sfaInfo)
+        : sfaInfo_(sfaInfo) {};
     ~SFATilingCheck() = default;
     virtual ge::graphStatus Process();
 
@@ -506,7 +525,9 @@ private:
 
 class SFAInfoParser {
 public:
-    explicit SFAInfoParser(const gert::TilingContext *context) : context_(context) {}
+    explicit SFAInfoParser(const gert::TilingContext *context)
+        : context_(context)
+    {}
     ~SFAInfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;

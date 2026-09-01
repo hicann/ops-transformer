@@ -52,7 +52,7 @@ uint16_t FloatToBf16(float f)
 {
     uint32_t bits;
     std::memcpy(&bits, &f, sizeof(bits));
-    uint32_t lsb = (bits >> 16) & 1u;
+    uint32_t lsb = (bits >> 16U) & 1u;
     uint32_t roundingBias = 0x7fffu + lsb;
     bits += roundingBias;
     return static_cast<uint16_t>(bits >> 16U);
@@ -73,7 +73,7 @@ void PrintOutResult(const std::vector<int64_t> &shape, void **deviceAddr)
     auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
                            size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
-    for (int64_t i = 0; i < size && i < 10U; i++) {
+    for (int64_t i = 0; i < size && i < 10; i++) { // 10：打印前10个值
         LOG_PRINT("result[%ld] is: %f\n", i, Bf16ToFloat(resultData[i]));
     }
 }
@@ -249,11 +249,11 @@ int main()
         cmpResidualKvHostData[i] = seqUsedOriKvHostData[i] % static_cast<int32_t>(cmpRatio);
     }
     std::vector<float> sinksHostData(N1, 1.0f);
-    std::vector<int32_t> metadataHostData(1024U, 0);
+    std::vector<int32_t> metadataHostData(1024, 0); // 1024：初始化metadataHostData，大小为1024个int32_t
     std::vector<uint16_t> attnOutHostData = MakeBf16Data(attnOutSize, 0.0f);
     std::vector<float> softmaxLseHostData(softmaxLseSize, 0.0f);
 
-    std::mt19937 gen(42U);
+    std::mt19937 gen(42); // 42：随机数种子
     for (int64_t t = 0; t < T1; t++) {
         for (int64_t n = 0; n < N2; n++) {
             for (int64_t k = 0; k < K; k++) {

@@ -351,7 +351,10 @@ void SFAMlaTiling::CalcUbBmm()
     qPreSizeMla_ = sfaInfo_->gSize * (headDimAlign_ + 64U) * sfaInfo_->s1Size;
 }
 
-void SFAMlaTiling::CheckUbSpace() { CalcUbBmm(); }
+void SFAMlaTiling::CheckUbSpace()
+{
+    CalcUbBmm();
+}
 
 void SFAMlaTiling::CalcInnerSize(uint32_t sfaS2Size)
 {
@@ -388,7 +391,10 @@ void SFAMlaTiling::SplitBalanced()
     usedCoreNum_ = aicNum_;
 }
 
-void SFAMlaTiling::Split() { SplitBalanced(); }
+void SFAMlaTiling::Split()
+{
+    SplitBalanced();
+}
 
 void SFAMlaTiling::FillTilingBaseParamsMla()
 {
@@ -430,7 +436,10 @@ void SFAMlaTiling::FillTilingSplitKVMla()
     }
 }
 
-void SFAMlaTiling::FillTilingSingleCoreParamsMla() { tilingData_.singleCoreParams.set_usedCoreNum(usedCoreNum_); }
+void SFAMlaTiling::FillTilingSingleCoreParamsMla()
+{
+    tilingData_.singleCoreParams.set_usedCoreNum(usedCoreNum_);
+}
 
 void SFAMlaTiling::FillTilingSingleCoreTensorSizeMla()
 {
@@ -465,7 +474,10 @@ void SFAMlaTiling::NormalCalcFDWorkSpace(const uint32_t actCoreNum)
     }
 }
 
-void SFAMlaTiling::CalcFDWorkSpace(const uint32_t actCoreNum) { NormalCalcFDWorkSpace(actCoreNum); }
+void SFAMlaTiling::CalcFDWorkSpace(const uint32_t actCoreNum)
+{
+    NormalCalcFDWorkSpace(actCoreNum);
+}
 
 void SFAMlaTiling::GetWorkspaceSize()
 {
@@ -756,9 +768,15 @@ ge::graphStatus SFATilingCheck::CheckSingleParaKey() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SFATilingCheck::CheckSingleParaNumHeads() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SFATilingCheck::CheckSingleParaNumHeads() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus SFATilingCheck::CheckSingleParaKvHeadNums() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SFATilingCheck::CheckSingleParaKvHeadNums() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus SFATilingCheck::CheckSingleParaSparseMode() const
 {
@@ -948,7 +966,10 @@ ge::graphStatus SFATilingCheck::CheckParaExistenceMlaNoquant() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SFATilingCheck::CheckParaExistenceMla() const { return CheckParaExistenceMlaNoquant(); }
+ge::graphStatus SFATilingCheck::CheckParaExistenceMla() const
+{
+    return CheckParaExistenceMlaNoquant();
+}
 
 ge::graphStatus SFATilingCheck::CheckParaExistence()
 {
@@ -1550,9 +1571,15 @@ ge::graphStatus SFATilingCheck::CheckFeatureMlaNoquant() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SFATilingCheck::CheckFeatureMla() const { return CheckFeatureMlaNoquant(); }
+ge::graphStatus SFATilingCheck::CheckFeatureMla() const
+{
+    return CheckFeatureMlaNoquant();
+}
 
-ge::graphStatus SFATilingCheck::CheckFeature() const { return CheckFeatureMla(); }
+ge::graphStatus SFATilingCheck::CheckFeature() const
+{
+    return CheckFeatureMla();
+}
 
 void SFATilingCheck::Init()
 {
@@ -1995,13 +2022,13 @@ ge::graphStatus SFAInfoParser::GetMaxBlockNumPerBatch()
                                                  "The shape dim of block_table must be " + std::to_string(DIM_NUM_TWO));
         return ge::GRAPH_FAILED;
     }
-    if (opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
+    if (opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(DIM_IDX_ONE) <= 0) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "block_table",
                                               ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
                                               "The second dim of block_table should be greater than 0");
         return ge::GRAPH_FAILED;
     }
-    maxBlockNumPerBatch_ = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1);
+    maxBlockNumPerBatch_ = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(DIM_IDX_ONE);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -2154,9 +2181,10 @@ ge::graphStatus SFAInfoParser::CheckContiguous() const
         uint64_t shapeSize = 0;
 
         if (kvLayout_ == SFALayout::PA_BSND) {
-            totalElements = keyStride1_ * static_cast<uint64_t>(keyShape_.GetDim(1));
-            shapeSize = static_cast<uint64_t>(keyShape_.GetDim(1)) * static_cast<uint64_t>(keyShape_.GetDim(2U)) *
-                        static_cast<uint64_t>(keyShape_.GetDim(3U));
+            totalElements = keyStride1_ * static_cast<uint64_t>(keyShape_.GetDim(DIM_IDX_ONE));
+            shapeSize = static_cast<uint64_t>(keyShape_.GetDim(DIM_IDX_ONE)) *
+                        static_cast<uint64_t>(keyShape_.GetDim(DIM_IDX_TWO)) *
+                        static_cast<uint64_t>(keyShape_.GetDim(DIM_IDX_THREE));
         } else {
             totalElements = keyStride0_ * static_cast<uint64_t>(keyShape_.GetDim(0));
             shapeSize = static_cast<uint64_t>(context_->GetOptionalInputTensor(KEY_INPUT_INDEX)->GetShapeSize());
