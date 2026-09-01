@@ -13,7 +13,6 @@
  * \brief
  */
 
-#include "aclnn_quant_flash_attn_metadata.h"
 #include "l0_quant_flash_attn_metadata.h"
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/reshape.h"
@@ -36,25 +35,23 @@ extern "C" {
 
 aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
     const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *vDescaleOptional, int64_t batchSize, int64_t maxSeqlenQ,
-    int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t quantMode, int64_t maskMode,
-    int64_t winLeft, int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
-    const char *layoutOut, bool isGradEnabled, const aclTensor *metaData, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+    int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t quantMode, int64_t maskMode, int64_t winLeft,
+    int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
+    bool isGradEnabled, const aclTensor *metaData, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    L2_DFX_PHASE_1(
-        aclnnQuantFlashAttnMetadata,
-        DFX_IN(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, vDescaleOptional,
-               batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode, maskMode, winLeft,
-               winRight, layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled),
-        DFX_OUT(metaData));
+    L2_DFX_PHASE_1(aclnnQuantFlashAttnMetadata,
+                   DFX_IN(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize,
+                          maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode, maskMode,
+                          winLeft, winRight, layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled),
+                   DFX_OUT(metaData));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     auto ret = QuantFlashAttnMetadataCheck::ParamsCheck(
-        cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, vDescaleOptional, batchSize,
-        maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode, maskMode, winLeft, winRight, layoutQ,
+        cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ,
+        maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft, winRight, layoutQ,
         layoutQDescale, layoutKv, layoutOut, isGradEnabled, metaData);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
@@ -64,8 +61,8 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
     const char *socVersion = npuInfo.GetSocLongVersion().c_str();
 
     auto output = l0op::QuantFlashAttnMetadata(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional,
-                                               sequsedKvOptional, vDescaleOptional, batchSize, maxSeqlenQ, maxSeqlenKv,
-                                               numHeadsQ, numHeadsKv, headDim, quantMode, maskMode, winLeft, winRight,
+                                               sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ,
+                                               numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft, winRight,
                                                layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled, socVersion,
                                                aicCoreNum, aivCoreNum, metaData, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);

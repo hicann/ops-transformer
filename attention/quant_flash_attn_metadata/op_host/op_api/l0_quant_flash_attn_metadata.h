@@ -16,13 +16,12 @@
 namespace l0op {
 const aclTensor *QuantFlashAttnMetadata(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
                                         const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-                                        const aclTensor *vDescaleOptional, int64_t batchSize, int64_t maxSeqlenQ,
-                                        int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim,
-                                        int64_t quantMode, int64_t maskMode, int64_t winLeft, int64_t winRight,
-                                        const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
-                                        const char *layoutOut, bool isGradEnabled, const char *socVersion,
-                                        int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor *metaData,
-                                        aclOpExecutor *executor);
+                                        int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+                                        int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t quantMode,
+                                        int64_t maskMode, int64_t winLeft, int64_t winRight, const char *layoutQ,
+                                        const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
+                                        bool isGradEnabled, const char *socVersion, int64_t aicCoreNum,
+                                        int64_t aivCoreNum, const aclTensor *metaData, aclOpExecutor *executor);
 } // namespace l0op
 
 #endif

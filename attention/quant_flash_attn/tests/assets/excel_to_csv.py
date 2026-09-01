@@ -472,6 +472,13 @@ def _build_attributes(row, cols):
     _set("N_q", _str_to_int(row.get(cols.get("num_heads_q"))))
     _set("N_kv", _str_to_int(row.get(cols.get("num_heads_kv"))))
     _set("D", _str_to_int(row.get(cols.get("head_dim"))))
+    # head_dim_v: csv 留空/省略 → None, 透传给算子; 算子内部 None 时回退 head_dim
+    _set_force(
+        "head_dim_v",
+        _str_to_int(row.get(cols.get("head_dim_v")))
+        if row.get(cols.get("head_dim_v")) is not None
+        else None,
+    )
 
     # --- wrapper 接口适配参数（不是 op 参数推导，是 wrapper 签名必选参数） ---
     layout_kv = _strip_or_none(row.get(cols.get("layout_kv")))

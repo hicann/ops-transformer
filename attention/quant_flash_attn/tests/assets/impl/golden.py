@@ -290,6 +290,7 @@ def _apply_golden_globals(attrs, quant_mode=1):
         "max_seqlen_q": "MAX_SEQLEN_Q",
         "max_seqlen_kv": "MAX_SEQLEN_KV",
         "softmax_scale": "SOFTMAX_SCALE",
+        "head_dim_v": "HEAD_DIM_V",
     }
     for attr_key, golden_key in mapping.items():
         if attr_key in attrs:

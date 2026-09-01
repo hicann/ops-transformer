@@ -13,6 +13,7 @@
 import logging
 import os
 import sys
+from typing import Optional
 
 import torch
 import torch_npu
@@ -66,6 +67,7 @@ def npu_qfa(
     N_q: int,
     N_kv: int,
     D: int,
+    head_dim_v: Optional[int] = None,
     max_seqlen_q: int,
     max_seqlen_kv: int,
     enable_pa: bool,
@@ -142,6 +144,7 @@ def npu_qfa(
             "N_q": N_q,
             "N_kv": N_kv,
             "D": D,
+            "HEAD_DIM_V": head_dim_v,
             "CU_SEQLENS_Q": cu_seqlens_q_list,
             "CU_SEQLENS_KV": cu_seqlens_kv_list,
             "SEQUSED_Q": seqused_q_list,

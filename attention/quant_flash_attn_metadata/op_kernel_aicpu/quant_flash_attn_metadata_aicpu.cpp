@@ -41,7 +41,6 @@ bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     cuSeqlensKv_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqlensKv));
     sequsedQ_ = ctx.Input(static_cast<uint32_t>(ParamId::sequsedQ));
     sequsedKv_ = ctx.Input(static_cast<uint32_t>(ParamId::sequsedKv));
-    vDescale_ = ctx.Input(static_cast<uint32_t>(ParamId::vDescale));
     metaData_ = ctx.Output(static_cast<uint32_t>(ParamId::metaData));
 
     bool requiredAttrs =
@@ -63,6 +62,7 @@ bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     GetAttrValueOpt(ctx, "layout_kv", layoutKv_);
     GetAttrValueOpt(ctx, "layout_out", layoutOut_);
     GetAttrValueOpt(ctx, "is_grad_enabled", isGradEnabled_);
+    GetAttrValueOpt(ctx, "head_dim_v", headDimV_);
     return ParamsInit();
 }
 
@@ -226,31 +226,6 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     param.fdOn = 0;
     param.outputLayout = load_balance::OutputLayout::BN2_S1G;
 
-    // 校验 v_descale: quantMode=1(MxFp8) 且 TND layout 下, dim0 应等于 sum(ceil(seqused_kv[i] / 64))
-    // HIF8 (quantMode=0): v_descale 为 per-tensor 标量, 不需要校验
-    if (quantMode_ == 1 && vDescale_ != nullptr && vDescale_->GetTensorShape() != nullptr) {
-        const int64_t V_DESCALE_GROUP_SIZE = 64;
-        bool isTndLayout = (layoutKv_ == "TND");
-        if (isTndLayout) {
-            int64_t vDescaleT = vDescale_->GetTensorShape()->GetDimSize(0) / (numHeadsKv_ * headDim_ * 2);
-            int64_t expectedT = 0;
-            if (baseInfo.isCumulativeKvSeq && batchSize_ > 0 &&
-                static_cast<int64_t>(baseInfo.actualKvSeqSize.size()) >= batchSize_) {
-                int64_t prev = 0;
-                for (int32_t i = 0; i < batchSize_; ++i) {
-                    int64_t seqUsed = baseInfo.actualKvSeqSize[i] - prev;
-                    prev = baseInfo.actualKvSeqSize[i];
-                    expectedT += (seqUsed + V_DESCALE_GROUP_SIZE - 1) / V_DESCALE_GROUP_SIZE;
-                }
-            }
-            if (expectedT > 0 && expectedT != vDescaleT) {
-                KERNEL_LOG_ERROR(
-                    "v_descale dim0 should be sum(ceil(seqused_kv[i]/64)) = %ld when layout is TND, but got %ld",
-                    expectedT, vDescaleT);
-                return false;
-            }
-        }
-    }
     if (isGradEnabled_) {
         int64_t deterMaxRound = CalDeterMaxRound();
         detail::QuantFAGMetaData quantFAGMetaData(metaData_->GetData());

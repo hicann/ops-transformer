@@ -13,8 +13,6 @@
  * \brief
  */
 
-#include "aclnn_quant_flash_attn.h"
-
 #include "opdev/common_types.h"
 #include "opdev/make_op_executor.h"
 #include "opdev/op_def.h"
@@ -31,36 +29,27 @@ extern "C" {
 // 新版本opbase存在TensorV2的新接口，用弱符号判断当前opbase是新版本还是旧版本，旧版本不支持传入非连续tensor
 bool NnopbaseSupportTensorV2() __attribute__((weak));
 
-static aclnnStatus CheckTensorContiguous(
-    const aclTensor *k, const aclTensor *v,
-    const aclTensor *kDescale, const aclTensor *vDescale)
+static aclnnStatus CheckTensorContiguous(const aclTensor *k, const aclTensor *v, const aclTensor *kDescale,
+                                         const aclTensor *vDescale)
 {
     if ((k != nullptr && !IsContiguous(k)) || (v != nullptr && !IsContiguous(v))) {
         return ACLNN_ERR_INNER;
     }
-    if ((kDescale != nullptr && !IsContiguous(kDescale)) ||
-        (vDescale != nullptr && !IsContiguous(vDescale))) {
+    if ((kDescale != nullptr && !IsContiguous(kDescale)) || (vDescale != nullptr && !IsContiguous(vDescale))) {
         return ACLNN_ERR_INNER;
     }
     return ACLNN_SUCCESS;
 }
 
 aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
-    const aclTensor *q, const aclTensor *k, const aclTensor *v,
-    const aclTensor *qDescale, const aclTensor *kDescale, const aclTensor *vDescale,
-    const aclTensor *blockTableOptional,
-    const aclTensor *pScaleOptional,
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
-    const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-    const aclTensor *sinksOptional, const aclTensor *attnMaskOptional,
-    const aclTensor *metadataOptional,
-    int64_t quantMode,
-    double softmaxScale, int64_t maskMode, int64_t winLeft, int64_t winRight,
-    int64_t maxSeqlenQ, int64_t maxSeqlenKV,
-    const char *layoutQ, const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
-    bool returnSoftmaxLse,
-    const aclTensor *attnOut, const aclTensor *softmaxLseOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor *q, const aclTensor *k, const aclTensor *v, const aclTensor *qDescale, const aclTensor *kDescale,
+    const aclTensor *vDescale, const aclTensor *blockTableOptional, const aclTensor *pScaleOptional,
+    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
+    const aclTensor *sequsedKvOptional, const aclTensor *sinksOptional, const aclTensor *attnMaskOptional,
+    const aclTensor *metadataOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
+    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ, const char *layoutQDescale,
+    const char *layoutKv, const char *layoutOut, bool returnSoftmaxLse, const aclTensor *attnOut,
+    const aclTensor *softmaxLseOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_LOGD("start aclnnQuantFlashAttnGetWorkspaceSize");
 
@@ -77,12 +66,10 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
         return ret;
     }
     ret = aclnnInnerQuantFlashAttnGetWorkspaceSize(
-        q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional,
-        cuSeqlensQOptional, cuSeqlensKvOptional,
-        sequsedQOptional, sequsedKvOptional, sinksOptional, attnMaskOptional, metadataOptional,
-        quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV,
-        layoutQ, layoutQDescale, layoutKv, layoutOut, returnSoftmaxLse,
-        attnOut, placeHolder, workspaceSize, executor);
+        q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional, cuSeqlensQOptional,
+        cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, sinksOptional, attnMaskOptional, metadataOptional,
+        quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale,
+        layoutKv, layoutOut, returnSoftmaxLse, attnOut, placeHolder, workspaceSize, executor);
 
     if (!returnSoftmaxLse) {
         aclDestroyTensor(tempTensor);

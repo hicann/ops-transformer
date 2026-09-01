@@ -33,7 +33,7 @@ try:
 
     _HAS_NPU = True
 except ImportError as e:
-    logger.warning("Failed to import cann_ops_transformer.ops: %s", e)
+    logging.warning("Failed to import cann_ops_transformer.ops: %s", e)
     _HAS_NPU = False
 
 try:
@@ -122,6 +122,8 @@ LAYOUT_Q = "TND"
 LAYOUT_Q_DESCALE = "TND"
 LAYOUT_KV = "TND"
 LAYOUT_OUT = "TND"
+# head_dim_v: csv 显式传入则用 csv 值, 否则 None → 算子内默认取 head_dim
+HEAD_DIM_V = None
 
 SOFTMAX_SCALE = None
 
@@ -1499,7 +1501,7 @@ def _call_npu_fa_op(
         cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
-        v_descale=dequant_scale_v,
+        head_dim_v=HEAD_DIM_V,
         batch_size=BATCH_SIZE,
         mask_mode=sparse_mode,
         layout_q=layout_q,
@@ -1595,7 +1597,7 @@ class Network(nn.Module):
             cu_seqlens_kv=cu_seqlens_kv,
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
-            v_descale=dequant_scale_v,
+            head_dim_v=HEAD_DIM_V,
             batch_size=BATCH_SIZE,
             mask_mode=sparse_mode,
             layout_q=layout_q,
