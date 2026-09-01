@@ -17,7 +17,7 @@
     aclnnMatmulReduceScatterV2接口是对aclnnMatmulReduceScatter接口的功能扩展，在支持x1和x2输入类型为FLOAT16/BFLOAT16的基础上，
     - <term>Ascend 950PR/Ascend 950DT</term>：
         - 新增了对低精度数据类型FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1的支持。支持pertensor、perblock、mx[量化方式](../../docs/zh/context/quant_mode_introduction.md)。
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - 新增了对低精度数据类型INT8的支持。支持pertoken/perchannel[量化方式](../../docs/zh/context/quant_mode_introduction.md)。
 
 - **计算公式**：
@@ -117,7 +117,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>x2</td>
         <td>输入</td>
         <td>MM右矩阵，即计算公式中的x2。</td>
-        <td><ul><li>当前版本仅支持二维输入， shape为[m, k]，支持转置/不转置场景。</li><li>仅支持两根轴转置情况下的非连续Tensor，其他场景的<a href="../../docs/zh/context/non_contiguous_tensor.md">[非连续的Tensor]</a>不支持。MX量化场景下x2仅支持转置输入，且k必须为偶数。</li></ul></td>
+        <td><ul><li>当前版本仅支持二维输入， shape为[m, k]，支持转置/不转置场景。</li><li>仅支持两根轴转置情况下的非连续Tensor，其他场景的<a href="../../docs/zh/context/non_contiguous_tensor.md">非连续的Tensor</a>不支持。MX量化场景下x2仅支持转置输入，且k必须为偶数。</li></ul></td>
         <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT8</td>
         <td>ND、FRACTAL_NZ</td>
         <td>2</td>
@@ -187,7 +187,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>reduceOp</td>
         <td>输入</td>
         <td>reduce操作类型。</td>
-        <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+        <td>当前版本仅支持“sum”。</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -294,7 +294,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
             $$
             groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
             $$
-            - 如果满足重新设置条件，一般情况下，当x1Scale、x2Scale输入都是2维，且数据类型都为FLOAT时，[groupSizeM，groupSizeN，groupSizeK]取值组合会推导为[128, 128, 128]，对应groupSize的值为549764202624；当x1Scale、x2Scale输入都是3维，且数据类型都为FLOAT8_E8M0时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
+            - 如果满足重新设置条件，一般情况下，当x1Scale、x2Scale输入都是2维，且数据类型都为FLOAT时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[128, 128, 128]，对应groupSize的值为549764202624；当x1Scale、x2Scale输入都是3维，且数据类型都为FLOAT8_E8M0时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
         - commMode：当前版本支持输入“ai_cpu” 或 “ccu”。
         - output：如果x1类型为FLOAT16、BFLOAT16，则output类型与x1保持一致。如果x1类型为FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1，则数据类型支持FLOAT16、BFLOAT16、FLOAT。
 

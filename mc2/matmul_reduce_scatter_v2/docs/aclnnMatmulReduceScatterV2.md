@@ -33,7 +33,7 @@
         - 新增了对低精度数据类型FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1的支持。支持pertensor、perblock、mx[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。其中mx量化支持MXFP8和MXFP4量化场景。
     <!-- end id7 -->
     <!-- npu="A3,910b" id8 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - 新增了对低精度数据类型INT8的支持。支持pertoken/perchannel[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
 
     <!-- end id8 -->
@@ -135,7 +135,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>x2(aclTensor*)</td>
         <td>输入</td>
         <td>MM右矩阵，即计算公式中的x2。</td>
-        <td><ul><li>当前版本仅支持二维输入， shape为[k, n]，支持转置/不转置场景。</li><li>仅支持两根轴转置情况下的非连续Tensor，其他场景的<a href="../../../docs/zh/context/non_contiguous_tensor.md">[非连续的Tensor]</a>不支持。MX量化场景下x2仅支持转置输入，且k必须为偶数。</li></ul></td>
+        <td><ul><li>当前版本仅支持二维输入， shape为[k, n]，支持转置/不转置场景。</li><li>仅支持两根轴转置情况下的非连续Tensor，其他场景的<a href="../../../docs/zh/context/non_contiguous_tensor.md">非连续的Tensor</a>不支持。MX量化场景下x2仅支持转置输入，且k必须为偶数。</li></ul></td>
         <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT8</td>
         <td>ND、FRACTAL_NZ</td>
         <td>2</td>
@@ -294,7 +294,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     </tbody></table>
 
     <!-- npu="A3,910b" id9 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
         - x1、x2：commMode为aiv时，数据类型支持FLOAT16、BFLOAT16、INT8，x1数据格式仅支持ND，x2数据格式支持ND、FRACTAL_NZ。
         - bias：在commMode为aiv时，当x1和x2数据类型为INT8时，bias数据类型可以是FLOAT16、BFLOAT16、FLOAT；当x1和x2数据类型为FLOAT16时，bias数据类型必须为FLOAT16、FLOAT；当x1和x2数据类型为BFLOAT16时，bias数据类型必须为BFLOAT16、FLOAT。
         - x1Scale：在commMode为aiv时，数据类型支持FLOAT。当x1和x2数据类型为FLOAT16/BFLOAT16时，仅支持输入为nullptr。在pertoken场景，shape为(m, 1)。
@@ -360,10 +360,10 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 
 - **参数说明：**
 
-    <table style="undefined;table-layout：fixed; width：1166px"> <colgroup>
-    <col style="width：173px">
-    <col style="width：133px">
-    <col style="width：860px">
+    <table style="undefined;table-layout: fixed; width: 1166px"> <colgroup>
+    <col style="width: 173px">
+    <col style="width: 133px">
+    <col style="width: 860px">
     </colgroup>
     <thead>
     <tr>
@@ -437,7 +437,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 
 <!-- end id14 -->
 <!-- npu="A3,910b" id15 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
     - 输入x1为2维，其shape为\(m, k\)，m须为卡数rank\_size的整数倍。
     - 输入x2必须是2维，其shape为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
