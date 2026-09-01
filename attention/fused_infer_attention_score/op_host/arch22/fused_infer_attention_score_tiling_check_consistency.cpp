@@ -622,7 +622,7 @@ ge::graphStatus FiaTilingCheck::CheckAttentionMask()
             }
 
             for (uint32_t i = 0; i < qSize.size(); i++) {
-                sSize += qSize[i] * qSize[i];
+                sSize += static_cast<uint64_t>(qSize[i]) * static_cast<uint64_t>(qSize[i]);
             }
         } else {
             sSize = s1Size_;

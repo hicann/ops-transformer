@@ -53,11 +53,11 @@ ge::graphStatus MaskChecker::CheckSparseMode(const FiaTilingInfo &fiaInfo) const
     // SparseMode only supports 0/1/2/3/4/9. SparseMode 9 only support in ascend910B.
     const std::vector<int32_t> sparseModeList = {SPARSE_MODE_NO_MASK,    SPARSE_MODE_ALL_MASK, SPARSE_MODE_LEFT_UP,
                                                  SPARSE_MODE_RIGHT_DOWN, SPARSE_MODE_BAND,     SPARSE_MODE_TREE};
-    OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckValueSupport(fiaInfo.sparseMode, sparseModeList),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "sparse_mode",
-                                                      std::to_string(fiaInfo.sparseMode).c_str(),
-                                                      "SparseMode only supports 0/1/2/3/4/9"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        ge::GRAPH_SUCCESS != CheckValueSupport(fiaInfo.sparseMode, sparseModeList),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "sparse_mode", std::to_string(fiaInfo.sparseMode).c_str(),
+                                              "SparseMode only supports 0/1/2/3/4/9"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -239,11 +239,11 @@ ge::graphStatus MaskChecker::CheckFeatureSparseMode(const FiaTilingInfo &fiaInfo
 
         OP_CHECK_IF(
             fiaInfo.qPaddingSizeFlag || fiaInfo.kvPaddingSizeFlag,
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "query_padding_size and kv_padding_size",
-                                                     ("In " + std::string(QuantModeToSerialString(fiaInfo.quantMode)) +
-                                                      " scenario, when sparse_mode is " + std::to_string(sparseMode) +
-                                                      ", query_padding_size and kv_padding_size must be empty")
-                                                         .c_str()),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                fiaInfo.opName, "query_padding_size and kv_padding_size",
+                ("In " + std::string(QuantModeToSerialString(fiaInfo.quantMode)) + " scenario, when sparse_mode is " +
+                 std::to_string(sparseMode) + ", query_padding_size and kv_padding_size must be empty")
+                    .c_str()),
             return ge::GRAPH_FAILED);
         // 不支持PSE
         OP_CHECK_IF(fiaInfo.pseShiftFlag,
@@ -256,11 +256,11 @@ ge::graphStatus MaskChecker::CheckFeatureSparseMode(const FiaTilingInfo &fiaInfo
 
         OP_CHECK_IF(
             fiaInfo.sysPrefixFlag,
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "key_shared_prefix and value_shared_prefix",
-                                                     ("In " + std::string(QuantModeToSerialString(fiaInfo.quantMode)) +
-                                                      " scenario, when sparse_mode is " + std::to_string(sparseMode) +
-                                                      ", key_shared_prefix and value_shared_prefix must be empty")
-                                                         .c_str()),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                fiaInfo.opName, "key_shared_prefix and value_shared_prefix",
+                ("In " + std::string(QuantModeToSerialString(fiaInfo.quantMode)) + " scenario, when sparse_mode is " +
+                 std::to_string(sparseMode) + ", key_shared_prefix and value_shared_prefix must be empty")
+                    .c_str()),
             return ge::GRAPH_FAILED);
 
         if (fiaInfo.outputType == ge::DT_INT8) {
@@ -436,7 +436,7 @@ ge::graphStatus MaskChecker::CheckAndProcessTreeMask(const FiaTilingInfo &fiaInf
         }
 
         for (uint32_t i = 0; i < fiaInfo.qSize.size(); i++) {
-            sSize += fiaInfo.qSize[i] * fiaInfo.qSize[i];
+            sSize += static_cast<uint64_t>(fiaInfo.qSize[i]) * static_cast<uint64_t>(fiaInfo.qSize[i]);
         }
     } else {
         sSize = fiaInfo.s1Size;
