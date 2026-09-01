@@ -128,7 +128,7 @@ ge::graphStatus InterleaveRopeTiling::GetShapeAttrsInfo()
     // Check cosB must be batchSize
     cosB_ = std::get<SHAPE_IDX_B>(cosShapeTuple);
     OP_CHECK_IF(
-        cosB_ != batchSize_, OP_LOGE(context_, "cos or sin batchSize must same as x batchSize."),
+        cosB_ != batchSize_, OP_LOGE(context_, "cos or sin batchSize must be the same as x batchSize."),
         return ge::GRAPH_FAILED);
     // Check cosN must be 1
     cosN_ = std::get<SHAPE_IDX_N>(cosShapeTuple);
@@ -143,7 +143,7 @@ ge::graphStatus InterleaveRopeTiling::GetShapeAttrsInfo()
     // Check cosD must be hiddenDim
     int64_t cosD = std::get<SHAPE_IDX_D>(cosShapeTuple);
     OP_CHECK_IF(
-        cosD != hiddenDim_, OP_LOGE(context_, "cos or sin hiddenDim must same as x hiddenDim."),
+        cosD != hiddenDim_, OP_LOGE(context_, "cos or sin hiddenDim must be the same as x hiddenDim."),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

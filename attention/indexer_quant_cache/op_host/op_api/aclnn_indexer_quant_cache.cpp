@@ -50,7 +50,7 @@ aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(
     OP_CHECK_NULL(slotMapping, return ACLNN_ERR_PARAM_NULLPTR);
 
     if (cacheRef->IsEmpty() || x->IsEmpty() || slotMapping->IsEmpty()) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "aclnnIndexerQuantCache do not support empty tensor!");
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "aclnnIndexerQuantCache does not support empty tensor!");
         return ACLNN_ERR_PARAM_INVALID;
     }
 

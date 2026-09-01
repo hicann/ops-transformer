@@ -195,8 +195,11 @@ void InplacePartialRotaryMulTiling::PrintInfo()
 ge::graphStatus InplacePartialRotaryMulTiling::CalTilingData()
 {
     OP_CHECK_IF(!isSpecail_, OP_LOGI("Tiling4InplacePartialRotaryMul", "not special"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!isAlign_, OP_LOGI("Tiling4InplacePartialRotaryMul", " d not align"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(xdim3_ > REPEAT_FP32, OP_LOGI("Tiling4InplacePartialRotaryMul", "D exceeds repeat threshold"),
+    OP_CHECK_IF(!isAlign_,
+                OP_LOGI("Tiling4InplacePartialRotaryMul", "d = %ld is not aligned to %ld", xdim3_, oneBlockSize_),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(xdim3_ > REPEAT_FP32,
+                OP_LOGI("Tiling4InplacePartialRotaryMul", "D = %ld exceeds repeat limit %ld", xdim3_, REPEAT_FP32),
                 return ge::GRAPH_FAILED);
     int64_t ubNum = ubSize_ / sizeof(float);
     int64_t last = ubNum - dim1_ * dim2_;
@@ -210,7 +213,9 @@ ge::graphStatus InplacePartialRotaryMulTiling::CalTilingData()
     }
 
     OP_LOGI(context_->GetNodeName(), "ubFactor_ = %ld.", ubFactor_);
-    OP_CHECK_IF(ubFactor_ <= 0, OP_LOGI("Tiling4InplacePartialRotaryMul", "is too large, not supported"),
+    OP_CHECK_IF(ubFactor_ <= 0,
+                OP_LOGI("Tiling4InplacePartialRotaryMul",
+                        "ubFactor = %ld is non-positive, input size is too large, not supported", ubFactor_),
                 return ge::GRAPH_FAILED);
     coreBUbLoopTime_ = (preCoreNumFactor + ubFactor_ - 1) / ubFactor_;
     coreBUbLoopTail_ = preCoreNumFactor % ubFactor_;
@@ -320,7 +325,9 @@ ge::graphStatus InplacePartialRotaryMulTiling::CheckInput()
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is nullptr"), return ge::GRAPH_FAILED);
     int64_t mode = *(attrs->GetAttrPointer<int64_t>(0));
-    OP_CHECK_IF(mode != 1, OP_LOGE(context_->GetNodeName(), "mode only support interleave"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(mode != 1,
+        OP_LOGE(context_->GetNodeName(), "mode = %ld is not supported, only mode = 1 (interleave) is supported", mode),
+        return ge::GRAPH_FAILED);
     // 获取slice范围：空属性时默认 [0, allHeadDim_]，与A5行为一致
     auto sliceListAttr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
     if (sliceListAttr->GetSize() == 0) {
@@ -623,7 +630,7 @@ ge::graphStatus InplacePartialRotaryMulTiling::InitSplitTilingData(int64_t &batc
         return ge::GRAPH_FAILED;
     }
     if (batchSizeOut != 1) {
-        OP_LOGE(context_->GetNodeName(), "batchSizeOut must be 1");
+        OP_LOGE(context_->GetNodeName(), "batchSizeOut must be 1, got %ld", batchSizeOut);
         return ge::GRAPH_FAILED;
     }
     tilingData_.set_batchSize(batchSizeOut);
@@ -785,8 +792,10 @@ ge::graphStatus InplacePartialRotaryMulTiling::TilingSplitMixed()
 ge::graphStatus InplacePartialRotaryMulTiling::DoTiling()
 {
     OP_LOGI(context_->GetNodeName(), "Enter InplacePartialRotaryMulTiling DoTiling");
-    OP_CHECK_IF(CheckInput() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckInputShapes is failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckInput() != ge::GRAPH_SUCCESS,
+        OP_LOGE(context_->GetNodeName(), "CheckInput failed"),
+        return ge::GRAPH_FAILED);
     // No-op: empty slice (sliceStart==sliceEnd), nothing to compute
     if (headDim_ == 0) {
         tilingKey_ = TILING_KEY_NOOP;

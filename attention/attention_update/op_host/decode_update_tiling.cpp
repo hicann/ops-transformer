@@ -64,7 +64,7 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
     }
     auto nodeName = context->GetNodeName();
-    OP_LOGD(nodeName, "Tiling initing");
+    OP_LOGD(nodeName, "Tiling initializing");
 
     auto attrs = context->GetAttrs();
     const int64_t *updateTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_UPDATETYPE_INDEX);

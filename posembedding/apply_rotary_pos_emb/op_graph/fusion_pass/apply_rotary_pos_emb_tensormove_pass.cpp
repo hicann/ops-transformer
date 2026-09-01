@@ -153,7 +153,7 @@ Status ArpeTmFusionPass::Fusion(ge::ComputeGraph& graph, Mapping& mapping, vecto
       VECTOR_FUSION_INNER_ERR_REPORT(FUSED_OP_TYPE.c_str(), "ArpeTmFusionPass failed due to input1 fail."),
       return FAILED);
   if ((result_input0 == NOT_CHANGED) && (result_input1 == NOT_CHANGED)) {
-    OP_LOGD(FUSED_OP_TYPE.c_str(), "ArpeTmFusionPass is not match.");
+    OP_LOGD(FUSED_OP_TYPE.c_str(), "ArpeTmFusionPass does not match.");
     return NOT_CHANGED;
   }
   OP_LOGI(FUSED_OP_TYPE.c_str(), "ArpeTmFusionPass success end!");

@@ -134,7 +134,7 @@ ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckShapeAllPositive()
                 OP_LOGE(context_, "q or k has non positive shape, please use rotaryPositionEmbedding operator"),
                 return ge::GRAPH_FAILED);
     // q, k 都为空Tensor，处理空tensor
-    OP_CHECK_IF(qRes != ge::GRAPH_SUCCESS, OP_LOGE(context_, "query and key has non positive shape."),
+    OP_CHECK_IF(qRes != ge::GRAPH_SUCCESS, OP_LOGE(context_, "query and key have non positive shape."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         CheckShapeAllPositive(COS_INDEX, cosShape_) != ge::GRAPH_SUCCESS,

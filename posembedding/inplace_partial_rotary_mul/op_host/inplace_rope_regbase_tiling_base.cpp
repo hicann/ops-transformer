@@ -348,7 +348,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
     int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
     OP_CHECK_IF(modeValue != static_cast<int32_t>(InplacePartialRotaryPosEmbeddingMode::INTERLEAVE),
                 OP_LOGE(context_->GetNodeName(),
-                    "InplacePartialRotaryMul only support interleave mode (mode=1), actual %d.",
+                    "InplacePartialRotaryMul only supports interleave mode (mode=1), actual %d.",
                     modeValue),
                 return ge::GRAPH_FAILED);
     rotaryMode_ = static_cast<InplacePartialRotaryPosEmbeddingMode>(modeValue);

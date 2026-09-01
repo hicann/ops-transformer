@@ -118,7 +118,7 @@ static inline bool CheckShape(const aclTensorList* lse, const aclTensorList* loc
     auto localOutSp = localOut->Size();
 
     OP_CHECK(lseSp > 0 && lseSp <= SP_MAX,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse must greater than zero and less than %ld,"
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse must be greater than zero and less than %ld, "
                                          "but which is %ld.", SP_MAX, lseSp), return false);
     OP_CHECK(localOutSp == lseSp,
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Size of lse: %ld must equal to size of localOut: %ld.", lseSp, localOutSp),
@@ -290,7 +290,7 @@ static inline bool CheckSp(const aclTensorList *lse, const aclTensorList *localO
 
     OP_CHECK(lseSp > 0 && lseSp <= SP_MAX,
              OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                     "Size of lse must greater than zero and less than %ld,"
+                     "Size of lse must be greater than zero and less than %ld, "
                      "but which is %ld.",
                      SP_MAX, lseSp),
              return false);
@@ -308,7 +308,7 @@ static inline bool CheckSp_95(const aclTensorList *lse, const aclTensorList *loc
 
     OP_CHECK(lseSp > 0 && lseSp <= SP_MAX_95,
              OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                     "Size of lse must greater than zero and less than %ld,"
+                     "Size of lse must be greater than zero and less than %ld, "
                      "but which is %ld.",
                      SP_MAX_95, lseSp),
              return false);

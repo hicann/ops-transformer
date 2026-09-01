@@ -191,7 +191,7 @@ ge::graphStatus IndexerQuantCacheTiling::GetShapeAttrsInfoInner()
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(d_ > D_LENGTH_FULL_LOAD,
-                OP_LOGE(context_->GetNodeName(), "input x tail dimension must less than 8192, got %ld", d_),
+                OP_LOGE(context_->GetNodeName(), "input x tail dimension must be less than 8192, got %ld", d_),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS,

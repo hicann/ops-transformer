@@ -568,10 +568,10 @@ protected:
             params.socVersion = aropeCompileInfo->socVersion;
         }
         OP_LOGD(context_->GetNodeName(), "totalCoreNum is %ld", params.totalCoreNum);
-        OP_CHECK_IF(params.totalCoreNum <= 0, OP_LOGE(context_->GetNodeName(), "PrepareTiling fail to get core num."),
+        OP_CHECK_IF(params.totalCoreNum <= 0, OP_LOGE(context_->GetNodeName(), "PrepareTiling failed to get core num."),
                     return ge::GRAPH_FAILED);
         OP_LOGD(context_->GetNodeName(), "totalUbSize is %ld", params.totalUbSize);
-        OP_CHECK_IF(params.totalUbSize <= 0, OP_LOGE(context_->GetNodeName(), "PrepareTiling fail to get ub size."),
+        OP_CHECK_IF(params.totalUbSize <= 0, OP_LOGE(context_->GetNodeName(), "PrepareTiling failed to get ub size."),
                     return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }

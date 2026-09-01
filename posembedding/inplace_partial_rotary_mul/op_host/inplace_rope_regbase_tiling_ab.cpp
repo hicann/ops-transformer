@@ -80,7 +80,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
         // => ubFactorBS * (ubFactorN + dSizeCosSin/dSizeX) <= ubSize/(4*dSizeX)
         int64_t effectiveCosSinOverhead = CeilDiv(dSizeCosSin, dSizeX);
         OP_CHECK_IF(baseBlockInUb < effectiveCosSinOverhead + 1,
-                    OP_LOGI(context_->GetNodeName(), "ubSize can't load mixed precision, d = %ld.", d_),
+                    OP_LOGE(context_->GetNodeName(), "ubSize can't load mixed precision, d = %ld.", d_),
                     return ge::GRAPH_FAILED);
 
         ubFactorN_ = std::min(blockFactorN_, baseBlockInUb - effectiveCosSinOverhead);
@@ -94,7 +94,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
         int64_t baseBufferSize = dSizeX;
         baseBlockInUb =
             FloorAlign(static_cast<int64_t>(aicoreParams_.ubSize / CONST_TWO / DB_FLAG), blockSize_) / baseBufferSize;
-        OP_CHECK_IF(baseBlockInUb < 1, OP_LOGI(context_->GetNodeName(), "ubSize can't load 8 d size, d = %ld.", d_),
+        OP_CHECK_IF(baseBlockInUb < 1,
+                    OP_LOGE(context_->GetNodeName(), "ubSize can't load 8 d size, d = %ld.", d_),
                     return ge::GRAPH_FAILED);
 
         ubFactorN_ = std::min(blockFactorN_, baseBlockInUb - 1);

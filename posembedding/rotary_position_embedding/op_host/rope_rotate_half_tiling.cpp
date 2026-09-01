@@ -642,7 +642,7 @@ ge::graphStatus RotateHalfTiling::CheckStrideSupport(const ge::DataType inputDty
         stride = (nSize -1) * dLength * bytePerData / BYTE_OF_BLOCK;
     }
     OP_CHECK_IF(stride > UINT16_MAX,
-                OP_LOGE(context, "DataCopy Stride should be less than [%lu], but get [%lu].", UINT16_MAX, stride),
+                OP_LOGE(context, "DataCopy Stride should be less than [%lu], but got [%lu].", UINT16_MAX, stride),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -744,11 +744,11 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
     
     OP_CHECK_IF(dLength != 32  && dLength != 64 && dLength != 96 && dLength != 128 &&
                     ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P,
-                OP_LOGE(context, "current soc only support d = 32/64/96/128."), return ge::GRAPH_FAILED);
+                OP_LOGE(context, "current soc only supports d = 32/64/96/128."), return ge::GRAPH_FAILED);
 
     ChooseTilingMode(xShape, cosShape);
     OP_CHECK_IF(tilingData_.get_tilingMode() == TILING_MODE_UNKNOWN,
-                OP_LOGE(context, "unknow input layout, unable to calculate."), return ge::GRAPH_FAILED);
+                OP_LOGE(context, "unknown input layout, unable to calculate."), return ge::GRAPH_FAILED);
     
     // block some layout=BNSD case, use small operators for higher performance
     OP_CHECK_IF(CheckBnsdBlockSkip(),
