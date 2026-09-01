@@ -37,8 +37,7 @@ constexpr static uint64_t SCATTER_BUFFER_NUM = 3;
 
 template <class TILING_CLASS, typename T1, const uint32_t INPUT_LAYOUT = 0, const uint32_t ATTEN_ENABLE = 1,
           const bool HAS_ROPE = false, const bool IS_BSND = false, const bool IS_DETERMINISTIC = false,
-          const bool KV_MERGE = false,
-          typename... Args>
+          const bool KV_MERGE = false, typename... Args>
 struct SFAG_TYPE {
     using tiling_class = TILING_CLASS;
     using t1 = T1;
@@ -75,7 +74,6 @@ struct RunInfo {
     int64_t actualSelectedBlockCount;
     int64_t changeS1 = false;
     int64_t selectedKGmOffset;
-    int64_t selectedVGmOffset;
     int64_t lastBlockSize;
     bool isLastBasicBlock;
     bool valid = false;
@@ -199,12 +197,14 @@ __aicore__ inline T AlignTo(const T n, const T alignSize)
     return (n + alignSize - 1) & (~(alignSize - 1));
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Max(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Max(T1 a, T2 b)
 {
     return (a < b) ? (b) : (a);
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Min(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Min(T1 a, T2 b)
 {
     return (a > b) ? (b) : (a);
 }
