@@ -640,19 +640,20 @@ ge::graphStatus CommonChecker::CheckAxis(const FiaTilingInfo &fiaInfo)
                                                                16U, 32U, 64U, 128U}; // ifa mla场景g轴支持范围
         static const std::set<uint32_t> SUPPORT_G_IN_IFAMLA_FP8_TND = {
             1U, 2U, 4U, 6U, 8U, 12U, 16U, 24U, 32U, 48U, 64U, 96U, 128U}; // ifa mlaTND场景g轴支持范围
-        bool isArch35NonQuant = (enableNonQuant_ && fiaInfo.npuArch == NpuArch::DAV_3510);
+        const bool isNonQuant = enableNonQuant_;
+        const bool isArch35NonQuant = isNonQuant && fiaInfo.npuArch == NpuArch::DAV_3510;
         const string inputLayout = fiaInfo.opParamInfo.layOut;
         const bool isMLAFullQuantNewTemplate = (inputLayout == "TND" && fiaInfo.inputQType == ge::DT_FLOAT8_E4M3FN);
-        if (isArch35NonQuant) {
+        if (isNonQuant) {
             if (fiaInfo.gSize < 1U || fiaInfo.gSize > 128U) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     fiaInfo.opName, "axis G", std::to_string(fiaInfo.n1Size / fiaInfo.n2Size).c_str(),
                     "The value of axis G must be in the range of [1, 128] in the Decode MLA scenario");
                 return ge::GRAPH_FAILED;
             }
-            // N1(等于 num_heads) 非 2 的幂次方时，sparse_mode 0 带自定义 mask 不支持
-            if ((fiaInfo.n1Size & (fiaInfo.n1Size - 1)) != 0 && fiaInfo.sparseMode == SPARSE_MODE_NO_MASK &&
-                fiaInfo.attenMaskFlag) {
+            // 950 上 N1(等于 num_heads) 非 2 的幂次方时，sparse_mode 0 带自定义 mask 不支持
+            if (isArch35NonQuant && (fiaInfo.n1Size & (fiaInfo.n1Size - 1)) != 0 &&
+                fiaInfo.sparseMode == SPARSE_MODE_NO_MASK && fiaInfo.attenMaskFlag) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "num_heads",
                                                       std::to_string(fiaInfo.n1Size).c_str(),
                                                       "When num_heads is not a power of 2, sparse_mode 0 with "
@@ -1129,10 +1130,10 @@ ge::graphStatus CommonChecker::CheckHeadNum(const FiaTilingInfo &fiaInfo)
                                                                       16U, 32U, 64U, 128U}; // ifa mla场景qN支持范围
         static const std::set<uint32_t> SUPPORT_NUM_HEAD_IN_IFAMLA_FP8_TND = {
             1U, 2U, 4U, 6U, 8U, 12U, 16U, 24U, 32U, 48U, 64U, 96U, 128U}; // ifa mla场景qN支持范围
-        bool isArch35NonQuant = (enableNonQuant_ && fiaInfo.npuArch == NpuArch::DAV_3510);
+        const bool isNonQuant = enableNonQuant_;
         const string inputLayout = fiaInfo.opParamInfo.layOut;
         const bool isMLAFullQuantNewTemplate = (inputLayout == "TND" && fiaInfo.inputQType == ge::DT_FLOAT8_E4M3FN);
-        if (isArch35NonQuant) {
+        if (isNonQuant) {
             if (fiaInfo.n1Size < 1U || fiaInfo.n1Size > 128U) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     fiaInfo.opName, "num_heads", std::to_string(fiaInfo.n1Size).c_str(),

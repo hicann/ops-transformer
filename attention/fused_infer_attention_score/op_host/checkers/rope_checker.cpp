@@ -520,7 +520,7 @@ ge::graphStatus RopeChecker::CheckQSSize(const FiaTilingInfo &fiaInfo) const
     return ge::GRAPH_SUCCESS;
 }
 
-// Decode MLA N1:1/2/4/8/16/32/64/128 N2:1
+// Decode MLA: non-quant N1:[1,128]; full-quant N1:1/2/4/8/16/32/64/128; N2:1
 ge::graphStatus RopeChecker::CheckNSize(const FiaTilingInfo &fiaInfo) const
 {
     if (fiaInfo.mlaMode != MlaMode::ROPE_SPLIT_D512) {
@@ -529,10 +529,10 @@ ge::graphStatus RopeChecker::CheckNSize(const FiaTilingInfo &fiaInfo) const
     static const std::set<uint32_t> supportNumHeadForMLA = {1U, 2U, 4U, 8U, 16U, 32U, 64U, 128U};
     static const std::set<uint32_t> supportNumHeadForMLAFP8TND = {1U,  2U,  4U,  6U,  8U,  12U, 16U,
                                                                   24U, 32U, 48U, 64U, 96U, 128U};
-    bool isArch35NonQuant = (enableNonQuant_ && fiaInfo.npuArch == NpuArch::DAV_3510);
+    const bool isNonQuant = enableNonQuant_;
     const string inputLayout = fiaInfo.opParamInfo.layOut;
     const bool isMLAFullQuantNewTemplate = (inputLayout == "TND" && fiaInfo.inputQType == ge::DT_FLOAT8_E4M3FN);
-    if (isArch35NonQuant) {
+    if (isNonQuant) {
         OP_CHECK_IF(
             (fiaInfo.n1Size < 1U || fiaInfo.n1Size > 128U),
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
