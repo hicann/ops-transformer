@@ -100,6 +100,7 @@ operator_group_10:
   - moe_update_expert
   - distribute_barrier
   - distribute_barrier_extend
+  - ffn_to_attention_v2
 operator_group_11:
   - fused_infer_attention_score,10-3
 operator_group_12:
