@@ -17,10 +17,13 @@
 #define ALLTO_ALL_MATMUL_KERNEL_BASE_H
 
 namespace Mc2Kernel {
-template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
+// SEP_BIAS: 是否将 bias 从 matmul 中独立出来由 add_bias 节点完成 (arch35 FP 场景)
+template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType,
+          bool SEP_BIAS = false>
 class AlltoAllMatmulKernelBase {
 public:
-    __aicore__ inline AlltoAllMatmulKernelBase(SchedulerType *pipeLine) : pipeLine_(pipeLine){};
+    __aicore__ inline AlltoAllMatmulKernelBase(SchedulerType *pipeLine)
+        : pipeLine_(pipeLine){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out,
                                 GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe);
     __aicore__ inline void Process();
@@ -43,12 +46,12 @@ private:
     __aicore__ inline void ProcessTail(uint32_t taskCnt);
 };
 
-
-template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
-__aicore__ inline void
-    AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Init(
-    GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out, GM_ADDR workspaceGM,
-    AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe)
+template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType, bool SEP_BIAS>
+__aicore__ inline void AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType,
+                                                SEP_BIAS>::Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y,
+                                                                GM_ADDR all2all_out, GM_ADDR workspaceGM,
+                                                                AlltoAllMatmulTilingDataType *tilingData,
+                                                                AscendC::TPipe *tPipe)
 {
     // 获取tilingdata数据
     tilingData_ = tilingData;
@@ -68,11 +71,16 @@ __aicore__ inline void
     // 初始化流水线
     pipeLine_->Init();
     pipeLine_->GetContext(&pipeLineContext_);
+
+    // 独立加 bias 节点: bias 每轮共享; matmulAddr/M/N/Offset 按 tile 在 ProcessTile/ProcessTail 填充
+    if constexpr (SEP_BIAS) {
+        pipeLineContext_.addBiasContext->biasAddr = bias_;
+    }
 }
 
-template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
+template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType, bool SEP_BIAS>
 __aicore__ inline void
-AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Process()
+AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType, SEP_BIAS>::Process()
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllMatmulTilingInfo;
     // 启动主块流水
@@ -89,10 +97,9 @@ AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTili
     pipeLine_->End();
 }
 
-template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
-__aicore__ inline void
-AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>
-::ProcessTile(uint32_t taskCnt)
+template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType, bool SEP_BIAS>
+__aicore__ inline void AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType,
+                                                SEP_BIAS>::ProcessTile(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllMatmulTilingInfo;
     // 复用的变量
@@ -102,7 +109,16 @@ AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTili
     pipeLineContext_.computationContext->baseData.aGM = transOutGM_;
     pipeLineContext_.computationContext->baseData.bGM = x2_;
     pipeLineContext_.computationContext->baseData.cGM = y_;
-    pipeLineContext_.computationContext->baseData.biasGM = bias_;
+    // SEP_BIAS 场景: bias 由独立 add_bias 节点处理, matmul 不再接收 bias
+    pipeLineContext_.computationContext->baseData.biasGM = SEP_BIAS ? nullptr : bias_;
+    // add_bias: 每轮处理一个主块 tile [tileM, rankN], 偏移随 task 索引递增 matmulOffset
+    if constexpr (SEP_BIAS) {
+        pipeLineContext_.addBiasContext->matmulAddr = y_;
+        pipeLineContext_.addBiasContext->matmulOffset = (uint64_t)mc2Tiling_.tileM * mc2Tiling_.rankN * sizeof(DTYPE_Y);
+        pipeLineContext_.addBiasContext->biasOffset = 0;
+        pipeLineContext_.addBiasContext->M = mc2Tiling_.tileM;
+        pipeLineContext_.addBiasContext->N = mc2Tiling_.rankN;
+    }
     pipeLineContext_.computationContext->baseData.aOffset =
         tileMMultiRankK * (uint64_t)mc2Tiling_.rankDim * sizeof(DTYPE_X1);
     pipeLineContext_.computationContext->baseData.bOffset = (uint64_t)0UL;
@@ -137,10 +153,9 @@ AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTili
     pipeLine_->Process(taskCnt);
 }
 
-template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
-__aicore__ inline void
-AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>
-::ProcessTail(uint32_t taskCnt)
+template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType, bool SEP_BIAS>
+__aicore__ inline void AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType,
+                                                SEP_BIAS>::ProcessTail(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllMatmulTilingInfo;
     // 复用的变量
@@ -159,6 +174,16 @@ AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTili
     pipeLineContext_.computationContext->baseData.cOffset =
         (uint64_t)mc2Tiling_.tailM * mc2Tiling_.rankN * sizeof(DTYPE_Y);
     pipeLineContext_.computationContext->tilingDataPtr = &(tilingData_->mc2MmV3TailTilingData);
+
+    // add_bias: 每轮处理一个尾块 tile [tailM, rankN], 起点在主块之后, 偏移随 task 索引递增 matmulOffset
+    if constexpr (SEP_BIAS) {
+        pipeLineContext_.addBiasContext->matmulAddr =
+            y_ + (uint64_t)mc2Tiling_.tileCnt * mc2Tiling_.tileM * mc2Tiling_.rankN * sizeof(DTYPE_Y);
+        pipeLineContext_.addBiasContext->matmulOffset = (uint64_t)mc2Tiling_.tailM * mc2Tiling_.rankN * sizeof(DTYPE_Y);
+        pipeLineContext_.addBiasContext->biasOffset = 0;
+        pipeLineContext_.addBiasContext->M = mc2Tiling_.tailM;
+        pipeLineContext_.addBiasContext->N = mc2Tiling_.rankN;
+    }
 
     pipeLineContext_.transposeContext->transposeSrcAddr = commOutGM_ + tileCntMultitileMMultiRankK * sizeof(DTYPE_X1);
     pipeLineContext_.transposeContext->transposeDstAddr =

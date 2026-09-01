@@ -17,6 +17,7 @@
 #define FP_MATMUL_ALLTO_ALL_TILING_BASE_H
 
 #include "securec.h"
+#include <algorithm>
 #include "mc2_matmul_tiling_cfg.h"
 #include "op_host/op_tiling/new_mc2_tiling_utils.h"
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h"
@@ -50,6 +51,7 @@ protected:
     ge::graphStatus DoMMTiling();
     ge::graphStatus SetHcclTiling();
     void SetTilingInfo(MatmulAlltoAllTilingInfo &tilingInfo) const;
+    uint8_t ChooseAddBiasSplitMode() const;
     void PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingData &outTilingData);
 
 private:

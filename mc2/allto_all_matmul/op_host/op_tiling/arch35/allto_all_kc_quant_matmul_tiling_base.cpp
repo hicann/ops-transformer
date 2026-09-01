@@ -56,9 +56,9 @@ bool AllToAllKcQuantMatmulTilingBase::IsCapable()
  */
 ge::graphStatus AllToAllKcQuantMatmulTilingBase::CheckOpInputInfo()
 {
-    OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckAttrsInfo(context_, opName_, ALLTOALL_MATMUL_INDEX_SCHEMA) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check Attrs failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        MatmulAlltoAllTilingUtil::CheckAttrsInfo(context_, opName_, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
+        OP_LOGE(opName_, "Tiling check Attrs failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckKcTensorFormat(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check format failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(AllToAllMatmulTilingBase::CheckKcQuantTensorDataType(context_, opName_) != ge::GRAPH_SUCCESS,
@@ -380,8 +380,7 @@ AlltoAllKcQuantMatmulHelper::AlltoAllKcQuantMatmulHelper(
     : Mc2AdaptiveSlidingWindowTiling(allToAllKcQuantMatmulTilingBase.context_, &data),
       tilingProcesser_(allToAllKcQuantMatmulTilingBase),
       mm_len(mm_mvalue_len)
-{
-}
+{}
 
 /**
  * @brief 打印量化matmul tiling的信息
@@ -576,8 +575,11 @@ uint64_t AllToAllKcQuantMatmulTilingBase::GetTilingKey() const
         return ge::GRAPH_FAILED;
     }
     uint8_t commMode = (hcclServerType == mc2tiling::A5_CCU_ENGINE) ? ALL2ALL_COMM_TYPE_CCU : ALL2ALL_COMM_TYPE_AICPU;
-    const uint64_t tilingKey = GET_TPL_TILING_KEY(quantMode, x2TransposeFlag, biasDType, isSmallK, commMode);
-    OP_LOGD(opName_, "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,ISSMALLK,COMMMODE: [%d,%d,%d,%d,%d], TilingKey is [%lu].",
+    const uint64_t tilingKey =
+        GET_TPL_TILING_KEY(quantMode, x2TransposeFlag, biasDType, isSmallK, commMode, false, ADDBIAS_OFF);
+    OP_LOGD(opName_,
+            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,ISSMALLK,COMMMODE,USING_APACE_IMPL,ADDBIASSPLITMODE: "
+            "[%d,%d,%d,%d,%d,0,0], TilingKey is [%lu].",
             quantMode, x2TransposeFlag, biasDType, isSmallK, commMode, tilingKey);
     return tilingKey;
 }
@@ -623,8 +625,7 @@ void AllToAllKcQuantMatmulTilingBase::SetUserWorkSpace()
  */
 AllToAllKcQuantMatmulTilingBase::AllToAllKcQuantMatmulTilingBase(gert::TilingContext *context)
     : AllToAllMatmulTilingBase(context)
-{
-}
+{}
 
 // 注册tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(AlltoAllMatmul, AllToAllKcQuantMatmulTilingBase,

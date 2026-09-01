@@ -21,7 +21,7 @@
 #include <lib/matmul_intf.h>
 #include "common.h"
 #include "../allto_all_matmul_kernel_base.h"
-#include "../allto_all_matmul_pipeline.h"
+#include "allto_all_matmul_add_bias_pipeline.h"
 #include "allto_all_matmul_tiling_key.h"
 #include "allto_all_matmul_tiling_data.h"
 #include "allto_all_kc_quant_matmul_arch35.h"
@@ -52,6 +52,32 @@ using MC2KernelTemplate::MC2AlltoAllPrimitives;
                                                                 SchedulerContextType>; \
         SchedulerType SchedulerImpl(&commImplName, &transposeImplName, &matmulImplName); \
         Mc2Kernel::AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingData> op( \
+            &SchedulerImpl); \
+        op.Init(x1, x2, bias, y, all2all_out, workspaceGM, &tilingData, &pipe); \
+        op.Process(); \
+    } while (0)
+#endif
+
+// FP 非量化 + 独立 add_bias (ADDBIASSPLITMODE != 0): add_bias pipeline, 按 SplitMode 实例化
+#ifndef ALLTO_ALL_MATMUL_APT_FP_SEP_BIAS_IMPL
+#define ALLTO_ALL_MATMUL_APT_FP_SEP_BIAS_IMPL(tilingData, pipe, hcclServerType, SplitModeEnum) \
+    do { \
+        DEFINE_MC2_HCCL_FOR_COMMUNICATION(false, hcclServerType, MC2AlltoAllContext, AlltoAllMatmulTilingData, \
+                                          MC2AlltoAllPrimitives, 0, 1, CommunicationType); \
+        CommunicationType commImplName(&tilingData); \
+        DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION(DTYPE_X1, TransposeType); \
+        TransposeType transposeImplName(&pipe); \
+        DEFINE_MC2_ADD_BIAS_FOR_MATH_COMPUTATION(DTYPE_Y, DtypeBias, SplitModeEnum, AddBiasType); \
+        AddBiasType addBiasImplName(&pipe); \
+        DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_FP(ComputationContextType); \
+        DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_FP(false, X2TRANSPOSE, ComputationType); \
+        ComputationType matmulImplName(&pipe); \
+        using SchedulerContextType = Mc2Kernel::AlltoAllMmAddBiasPipelineContext<ComputationContextType>; \
+        using SchedulerType = \
+            Mc2Kernel::AlltoAllMatmulAddBiasPipeLine<CommunicationType, TransposeType, ComputationType, AddBiasType, \
+                                                     SchedulerContextType>; \
+        SchedulerType SchedulerImpl(&commImplName, &transposeImplName, &matmulImplName, &addBiasImplName); \
+        Mc2Kernel::AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingData, true> op( \
             &SchedulerImpl); \
         op.Init(x1, x2, bias, y, all2all_out, workspaceGM, &tilingData, &pipe); \
         op.Process(); \
@@ -107,7 +133,7 @@ using MC2KernelTemplate::MC2AlltoAllPrimitives;
 #endif
 
 template <uint32_t QUANTMODE, bool X2TRANSPOSE, uint32_t DTYPEBIAS, bool ISSMALLK, uint32_t COMMTYPE,
-          bool USING_APACE_IMPL>
+          bool USING_APACE_IMPL, uint32_t ADDBIASSPLITMODE>
 __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR x1_scale, GM_ADDR x2_scale,
                                             GM_ADDR comm_scale, GM_ADDR x1_offset, GM_ADDR x2_offset, GM_ADDR y,
                                             GM_ADDR all2all_out, GM_ADDR workspaceGM, GM_ADDR tilingGM)
@@ -121,12 +147,11 @@ __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
     REGISTER_TILING_DEFAULT(AlltoAllMatmulTilingData);
     GET_TILING_DATA_WITH_STRUCT(AlltoAllMatmulTilingData, tilingData, tilingGM);
 
-    if constexpr (DTYPEBIAS == DTYPE_BIAS_SAME_WITH_X) {
-        using DtypeBias = DTYPE_X1;
+    using DtypeBias = typename std::conditional<DTYPEBIAS == DTYPE_BIAS_FP32, float, DTYPE_X1>::type;
+    if constexpr (ADDBIASSPLITMODE == ADDBIAS_OFF) {
         ALLTO_ALL_MATMUL_APT_FP_IMPL(tilingData, pipe, hcclServerType);
-    } else if constexpr (DTYPEBIAS == DTYPE_BIAS_FP32) {
-        using DtypeBias = float;
-        ALLTO_ALL_MATMUL_APT_FP_IMPL(tilingData, pipe, hcclServerType);
+    } else {
+        ALLTO_ALL_MATMUL_APT_FP_SEP_BIAS_IMPL(tilingData, pipe, hcclServerType, ADDBIASSPLITMODE);
     }
 
 #else

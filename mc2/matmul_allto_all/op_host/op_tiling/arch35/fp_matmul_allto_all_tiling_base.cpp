@@ -118,6 +118,9 @@ ge::graphStatus FpMatmulAllToAllTilingBase::DoMMTiling()
     Mc2MMRegisterCfg registerCfg{"Mc2MatMulV3", npuArch_, priorities};
 
     mc2tiling::NewUpdateMatmulV3Args(mmV3Args_, contextInfo.args_, opName_);
+    if (contextInfo.args_.isBias) {
+        mmV3Args_.hasBias = false;
+    }
 
     // tile tiling, 对于matmulAlltoAll,mvalue就是切块大小
     mmV3Args_.mValue = inferredInfo.tileM;
@@ -268,9 +271,7 @@ void FpMatmulAllToAllTilingBase::PrintMatmulAlltoAllTilingData(MatmulAlltoAllTil
  */
 uint64_t FpMatmulAllToAllTilingBase::GetTilingKey() const
 {
-    // 按照量化组合模式，是否转置，bias数据类型进行展开
     bool x2TransposeFlag = contextInfo.args_.isBTrans ? true : false;
-    // 0代表数据类型和x一致(FP16 OR BF16)，1代表FP32
     uint32_t biasDType = DTYPE_BIAS_SAME_WITH_X;
     if (contextInfo.args_.geBiasType != contextInfo.args_.geAType) {
         biasDType = DTYPE_BIAS_FP32;
@@ -283,10 +284,38 @@ uint64_t FpMatmulAllToAllTilingBase::GetTilingKey() const
     }
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? COMMMODE_CCU : COMMMODE_AICPU;
 
-    const uint64_t tilingKey = GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode);
-    OP_LOGD(opName_, "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE: [%d,%d,%d,%d], TilingKey is [%lu].", NON_QUANT_MODE,
-            x2TransposeFlag, biasDType, commMode, tilingKey);
+    uint8_t addBiasSplitMode = contextInfo.args_.isBias ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
+    const uint64_t tilingKey =
+        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode);
+    OP_LOGD(opName_, "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE,ADDBIASSPLITMODE: [%d,%d,%d,%d,%d], TilingKey is [%lu].",
+            NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, tilingKey);
     return tilingKey;
+}
+
+uint8_t FpMatmulAllToAllTilingBase::ChooseAddBiasSplitMode() const
+{
+    constexpr uint32_t ADD_BIAS_TILE_M = 64;
+    constexpr uint32_t ADD_BIAS_TILE_N = 256;
+    const uint32_t aivCoreNum = contextInfo.args_.aicCoreNum * 2;
+
+    const uint32_t M = std::max(inferredInfo.tileM, inferredInfo.tailM);
+    const uint32_t N = contextInfo.args_.nValue;
+
+    const uint32_t usedM = std::min(aivCoreNum, M);
+    const uint32_t usedN = std::min(aivCoreNum, N);
+    const uint32_t tileMCnt = (M + ADD_BIAS_TILE_M - 1) / ADD_BIAS_TILE_M;
+    const uint32_t tileNCnt = (N + ADD_BIAS_TILE_N - 1) / ADD_BIAS_TILE_N;
+    const uint64_t totalTiles64 = static_cast<uint64_t>(tileMCnt) * static_cast<uint64_t>(tileNCnt);
+    const uint32_t usedMN = static_cast<uint32_t>(std::min(static_cast<uint64_t>(aivCoreNum), totalTiles64));
+
+    const uint32_t maxUtil = std::max({usedM, usedN, usedMN});
+    if (usedMN == maxUtil) {
+        return ADDBIAS_MN_SPLIT;
+    }
+    if (usedN == maxUtil) {
+        return ADDBIAS_N_SPLIT;
+    }
+    return ADDBIAS_M_SPLIT;
 }
 
 /**

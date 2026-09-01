@@ -67,9 +67,9 @@ bool MxQuantMatmulAllToAllTilingBase::IsCapable()
  */
 ge::graphStatus MxQuantMatmulAllToAllTilingBase::CheckOpInputInfo()
 {
-    OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckAttrsInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check Attrs failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        MatmulAlltoAllTilingUtil::CheckAttrsInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
+        OP_LOGE(opName_, "Tiling check Attrs failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckX2Transpose(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check x2transpose failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMxTensorFormat(context_, opName_) != ge::GRAPH_SUCCESS,
@@ -197,12 +197,12 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::CheckMxQuantTensorDataType(cons
                     return ge::GRAPH_FAILED);
     if (x1Dtype == ge::DataType::DT_FLOAT4_E2M1 || x2Dtype == ge::DataType::DT_FLOAT4_E2M1) {
         isMxfp4_ = true;
-        OP_TILING_CHECK(x1Dtype != x2Dtype,
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            opName, "x1,x2",
-                            (Ops::Base::ToString(x1Dtype) + "," + Ops::Base::ToString(x2Dtype)).c_str(),
-                            "The dtype of x1 and x2 must be the same in mxfp4 quant mode"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            x1Dtype != x2Dtype,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                opName, "x1,x2", (Ops::Base::ToString(x1Dtype) + "," + Ops::Base::ToString(x2Dtype)).c_str(),
+                "The dtype of x1 and x2 must be the same in mxfp4 quant mode"),
+            return ge::GRAPH_FAILED);
     }
     // 校验 bias 数据类型（如果存在）
     auto biasTensorDesc = context->GetOptionalInputDesc(INPUT_BIAS_INDEX);
@@ -797,8 +797,7 @@ MxQuantMatmulAlltoAllHelper::MxQuantMatmulAlltoAllHelper(
     : Mc2AdaptiveSlidingWindowTiling(mxQuantMatmulAllToAllTilingBase.context_, &data),
       tilingProcesser_(mxQuantMatmulAllToAllTilingBase),
       mmLen_(mmMvalueLen)
-{
-}
+{}
 
 /**
  * @brief 打印量化matmul tiling的信息
@@ -978,9 +977,10 @@ uint64_t MxQuantMatmulAllToAllTilingBase::GetTilingKey() const
     }
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? COMMMODE_CCU : COMMMODE_AICPU;
 
-    const uint64_t tilingKey = GET_TPL_TILING_KEY(MX_QUANT_MODE, x2TransposeFlag, biasDType, commMode);
-    OP_LOGD(opName_, "MXQUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE: [%d,%d,%d,%d], TilingKey is [%lu].", MX_QUANT_MODE,
-            x2TransposeFlag, biasDType, commMode, tilingKey);
+    const uint64_t tilingKey = GET_TPL_TILING_KEY(MX_QUANT_MODE, x2TransposeFlag, biasDType, commMode, ADDBIAS_OFF);
+    OP_LOGD(opName_,
+            "MXQUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE,ADDBIASSPLITMODE: [%d,%d,%d,%d,0], TilingKey is [%lu].",
+            MX_QUANT_MODE, x2TransposeFlag, biasDType, commMode, tilingKey);
     return tilingKey;
 }
 
@@ -1009,8 +1009,7 @@ CutResult MxQuantMatmulAllToAllTilingBase::GetTilingResult()
  */
 MxQuantMatmulAllToAllTilingBase::MxQuantMatmulAllToAllTilingBase(gert::TilingContext *context)
     : MatmulAllToAllTilingBase(context)
-{
-}
+{}
 
 // 注册tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MatmulAlltoAll, MxQuantMatmulAllToAllTilingBase,

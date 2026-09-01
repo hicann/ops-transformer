@@ -50,6 +50,8 @@ protected:
                                      Mc2MatMulV3TilingData &tilingData);
     ge::graphStatus SetHcclTiling();
     void SetTilingInfo(AlltoAllMatmulTilingInfo &tilingInfo) const;
+    // 非量化+有bias时, 选择 add_bias 节点的分核策略
+    uint8_t ChooseAddBiasSplitMode() const;
 
 private:
     void PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingData &alltoAllMatmulTilingData);
