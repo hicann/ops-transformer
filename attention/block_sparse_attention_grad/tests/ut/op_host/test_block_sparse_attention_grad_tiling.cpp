@@ -26,12 +26,14 @@ protected:
     }
 };
 
-TEST_F(BlockSparseAttentionGradTilingTest, tiling_bnsd_case0)
+namespace {
+void RunArch35BnsdTilingCase(int64_t s, int64_t s_kv, int64_t blockX, int64_t blockY,
+                             ge::graphStatus expectedResult)
 {
     optiling::BlockSparseAttentionGradCompileInfo compileInfo;
+    compileInfo.socVersion = platform_ascendc::SocVersion::ASCEND950;
 
-    int64_t b = 1, n = 4, n_kv = 2, s = 128, s_kv = 128, d = 128;
-    int64_t blockX = 64, blockY = 64;
+    int64_t b = 1, n = 4, n_kv = 2, d = 128;
     int64_t ceilQ = (s + blockX - 1) / blockX;
     int64_t ceilKv = (s_kv + blockY - 1) / blockY;
 
@@ -53,9 +55,9 @@ TEST_F(BlockSparseAttentionGradTilingTest, tiling_bnsd_case0)
             {{{1}, {1}}, ge::DT_UINT8, ge::FORMAT_ND},
             
             // 将真实的内存地址传给框架，供 Tiling 内部解析
-            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, (void*)blockShapeData},
-            {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, (void*)actualSeqData},
-            {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, (void*)actualSeqKvData}
+            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)blockShapeData},
+            {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqData},
+            {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData}
         },
         {
             // --- Output Info ---
@@ -74,9 +76,32 @@ TEST_F(BlockSparseAttentionGradTilingTest, tiling_bnsd_case0)
             {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
             {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)}
         },
-        &compileInfo);
+        &compileInfo,
+        "3510",
+        32,
+        262144);
 
-    uint64_t expectTilingKey = 1UL;
-    
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+    constexpr uint64_t expectTilingKey = 1003UL; // FP16 BNSD on DAV_3510.
+    ExecuteTestCase(tilingContextPara, expectedResult, expectTilingKey);
+}
+} // namespace
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_block64_regression)
+{
+    RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_SUCCESS);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_block16_with_sequence_tail)
+{
+    RunArch35BnsdTilingCase(70, 70, 16, 16, ge::GRAPH_SUCCESS);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_asymmetric_block16x32)
+{
+    RunArch35BnsdTilingCase(70, 70, 16, 32, ge::GRAPH_SUCCESS);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_rejects_non_multiple_of_16)
+{
+    RunArch35BnsdTilingCase(96, 96, 24, 16, ge::GRAPH_FAILED);
 }

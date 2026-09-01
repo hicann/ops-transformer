@@ -147,9 +147,12 @@ __aicore__ inline bool IsValidBlock(const ConstInfo &const_info, const int64_t b
                                     __gm__ uint8_t *block_sparse_mask)
 
 {
+    // The public mask layout is [B, N1, Q_BLOCK, KV_BLOCK].  The Arch35 aclnn
+    // adapter transposes it to contiguous [B, N1, KV_BLOCK, Q_BLOCK] before
+    // launching this kernel.
     int64_t offset = batch_idx * (const_info.q_head_num * const_info.q_block_num * const_info.kv_block_num) +
-                      n1_idx * (const_info.q_block_num * const_info.kv_block_num) +
-                      kv_block_idx * const_info.q_block_num + q_block_idx;
+                     n1_idx * (const_info.q_block_num * const_info.kv_block_num) +
+                     kv_block_idx * const_info.q_block_num + q_block_idx;
     bool is_valid = block_sparse_mask[offset];
     return is_valid;
 }

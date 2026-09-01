@@ -43,7 +43,9 @@ __aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTe
         RegTensor<T1> vregCastEven;
         RegTensor<T1> vregCastOdd;
         RegTensor<T1> vregCastRes;
+        uint32_t exeSize = fullExeSize;
         MaskReg pregFullExe = CreateMask<T1, MaskPattern::ALL>();
+        MaskReg pregValidN = UpdateMask<T1>(exeSize);
 
         // [m,n] -> [n1,m1,16,16] -> [n1,m1*16,16] -> [n1,m1*16+1,16]
         for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
@@ -56,7 +58,7 @@ __aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTe
                (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
             // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
             DataCopy<T1, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
+                ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregValidN);
         }
     }
 }

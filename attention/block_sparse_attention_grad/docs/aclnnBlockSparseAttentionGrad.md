@@ -32,8 +32,11 @@
 * ​算子功能​：aclnnBlockSparseAttention稀疏注意力反向计算，支持灵活的块级稀疏模式，通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算。
 * ​计算公式​：
 
-  稀疏块大小：$blockShapeX×blockShapeY$，BlockSparseMask指定稀疏模式。
+  稀疏块大小为 $blockShapeX×blockShapeY$，其中blockShapeX表示Q方向的稀疏粒度，blockShapeY表示KV方向的稀疏粒度。两个方向的粒度相互独立，可以配置为不同值。
 
+  blockShapeX和blockShapeY均必须大于等于16，且为16的整数倍。除原有的128粒度外，还支持16、32、48、64、80、96、112等小于128的粒度。例如，[32, 64]表示Q方向每32个token划分一个块，KV方向每64个token划分一个块。
+
+  BlockSparseMask在逻辑块粒度上定义稀疏pattern，每个mask元素控制一个 $blockShapeX×blockShapeY$ 的连续块是否参与计算。
   已知正向计算公式为：
 
   $$
@@ -232,7 +235,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>blockSparseMaskOptional（aclTensor*）</td>
     <td>输入</td>
     <td>块状稀疏掩码，表示实际的稀疏pattern。决定哪些block实际参与注意力计算。</td>
-    <td>不支持空Tensor。<br>可选输入（当前版本为必选）：<ul><li>shape为[batch, headNum, ceilDiv(maxQSeqLength, blockShapeX), ceilDiv(maxKvSeqLength, blockShapeY)]。</li><li>表示按block划分后哪些block需要参与计算（为1），哪些block不参与计算（为0）。</li><li>如传入nullptr，则视为不开启块稀疏计算，即所有token之间的注意力分数都会被计算。</li></ul></td>
+    <td>不支持空Tensor。<br>可选输入（当前版本为必选）：<ul><li>shape为[batch, headNum, ceilDiv(maxQSeqLength, blockShapeX), ceilDiv(maxKvSeqLength, blockShapeY)]。其中第3维按Q方向粒度blockShapeX独立计算，第4维按KV方向粒度blockShapeY独立计算，两者可以不相等。</li><li>表示按block划分后哪些block需要参与计算（为1），哪些block不参与计算（为0）。</li><li>当序列长度不能被对应方向的blockShape整除时，最后一个逻辑块覆盖该方向剩余的有效token。</li><li>如传入nullptr，则视为不开启块稀疏计算，即所有token之间的注意力分数都会被计算。</li></ul></td>
     <td>BOOL</td>
     <td>ND</td>
     <td>4</td>
@@ -262,7 +265,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td><ul><li>当未配置blockSparseMaskOptional时：无论此项如何配置，算子均将忽略。</li></ul></td>
     </tr>
     <tr>
-    <td>当配置此输入时的元素要求：<ul><li>必须包含至少两个元素 [blockShapeX, blockShapeY]。</li><li>blockShapeX: Q方向块大小，值必须大于0。</li><li>blockShapeY: KV方向块大小，值必须大于0。</li></ul></td>
+    <td>当配置此输入时的元素要求：<ul><li>必须包含至少两个元素[blockShapeX, blockShapeY]。</li><li>blockShapeX：Q方向稀疏块大小，必须大于等于16且为16的整数倍。</li><li>blockShapeY：KV方向稀疏块大小，必须大于等于16且为16的整数倍。</li><li>支持16、32、48、64、80、96、112等小于128的粒度。</li><li>blockShapeX与blockShapeY相互独立，无须相等，支持如[16, 32]、[48, 80]、[96, 112]等非对称配置。</li></ul></td>
     </tr>
     <tr>
     <td>actualSeqLengthsOptional（aclIntArray*）</td>
@@ -438,12 +441,15 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
       <td>kvInputLayout为"TND"时，actualSeqLengthsKvOptional传入的是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
+      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="3">161002</td>
       <td>dout，query，key，value数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>qInputLayout或kvInputLayout输入不合法，参数有效性校验失败。</td>
+    </tr>
+    <tr>
+      <td>blockShapeOptional少于两个元素，或blockShapeX、blockShapeY小于16，或不是16的整数倍。</td>
     </tr>
   </tbody></table>
 
@@ -496,6 +502,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
 * actualSeqLengthsOptional在qInputLayout为“TND”时必选；actualSeqLengthsKvOptional在kvInputLayout为“TND”时必选。
 * softmaxLse的layout需要与query的layout保持一致。如果query的layout为"BSND"时，softmaxLse的layout应传入"BNS1"。
 * HeadDim必须等于128。
+* blockShapeOptional中的blockShapeX和blockShapeY分别表示Q方向和KV方向的稀疏粒度。两者均必须大于等于16且为16的整数倍，可以配置为不同值；BlockSparseMask的Q块数和KV块数应分别按照对应方向的稀疏粒度计算。
 * 根据算子支持的输入 Layout，query 张量 Shape 中对应的 head 维度大小记为 N1，key 和 value 张量 Shape 中对应的 head 维度大小记为 N2。必须满足N1 % N2 == 0。
   - <term>Atlas A2 训练产品</term>、<term>Atlas A3 训练产品</term>：当前只支持MHA，即N1等于N2。
 
@@ -623,11 +630,12 @@ int main() {
     int32_t batch = 1;
     int32_t numHeads = 1;
     int32_t numKvHeads = 1;
-    int32_t qSeqlen = 128;
-    int32_t kvSeqlen = 128;
+    int32_t qSeqlen = 161;
+    int32_t kvSeqlen = 161;
     int32_t headDim = 128;
-    int32_t blockShapeX = 64;
-    int32_t blockShapeY = 64;
+    // Q/KV方向采用不同的、均小于128且16对齐的稀疏粒度
+    int32_t blockShapeX = 48;
+    int32_t blockShapeY = 80;
 
     // 块数量计算
     int32_t ceilQ = (qSeqlen + blockShapeX - 1) / blockShapeX;

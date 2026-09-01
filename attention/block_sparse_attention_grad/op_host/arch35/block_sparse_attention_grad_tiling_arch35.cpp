@@ -88,9 +88,9 @@ protected:
             return false;
         }
 
-        if (blockShapeX_ % 64 != 0 || blockShapeY_ % 64 != 0) {
+        if (blockShapeX_ % 16 != 0 || blockShapeY_ % 16 != 0) {
             OP_LOGE(context_->GetNodeName(),
-                    "BlockSparseAttentionGrad only support blockShapeX_ and blockShapeY_ be multiple of 64.");
+                    "BlockSparseAttentionGrad only supports blockShapeX and blockShapeY that are multiples of 16.");
             return false;
         }
 
@@ -252,8 +252,8 @@ protected:
         uint32_t baseM = blockShapeX_ <= 128 ? blockShapeX_ : 128;
         uint32_t baseN = blockShapeY_ <= 128 ? blockShapeY_ : 128;
         uint32_t singleM = AlignTo(2048, baseM);
-        uint32_t block_num_x = q_seq_len_ / blockShapeX_;
-        uint32_t block_num_y = kv_seq_len_ / blockShapeY_;
+        // Keep all Q tiles for the current KV block/head on one cube core when
+        // possible so DK/DV can accumulate in L0 and K/V stays cached in L1.
 
         tilingData_.set_BlockX(blockShapeX_);
         tilingData_.set_BlockY(blockShapeY_);
@@ -285,7 +285,6 @@ protected:
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
         uint64_t sys_workspace_size = ascendcPlatform.GetLibApiWorkSpaceSize();
         uint64_t usr_workspace_offset = 0;
-
         if (strcmp(layout_, BSND_STR) == 0 || strcmp(layout_, BNSD_STR) == 0) {
             dq_size = batch_num_ * q_seq_len_ * q_head_num_ * head_dim_;
             dk_size = batch_num_ * kv_seq_len_ * kv_head_num_ * head_dim_;

@@ -20,6 +20,7 @@
 
   稀疏块大小：$blockShapeX×blockShapeY$，BlockSparseMask指定稀疏模式。
 
+ blockShapeX 和 blockShapeY 必须为 16 的正整数倍。BlockSparseMask 在逻辑块粒度上定义稀疏 pattern，每个 mask 元素控制一个 blockShapeX × blockShapeY 的连续块是否参与计算。
   已知正向计算公式为：
 
   $$

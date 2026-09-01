@@ -89,9 +89,9 @@ const std::array<const aclTensor *, 3> BlockSparseAttentionGrad(
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BlockSparseAttentionGrad infer shape failed, scaleValue: %f.", scaleValue);
         return {nullptr, nullptr};
     }
-    
+
     ADD_TO_LAUNCHER_LIST_AICORE(BlockSparseAttentionGrad,
-                                OP_INPUT(dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional, 
+                                OP_INPUT(dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional,
                                          attenMaskTensor, blockShapeTensor,actualSeqTensor, actualSeqKvTensor),
                                 OP_OUTPUT(dqTensor, dkTensor, dvTensor),
                                 OP_ATTR(qInputLayout, safeKvInputLayout, static_cast<uint32_t>(numKeyValueHeads),
