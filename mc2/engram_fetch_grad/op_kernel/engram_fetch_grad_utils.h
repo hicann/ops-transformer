@@ -17,15 +17,24 @@
 #include "kernel_operator.h"
 #endif
 
+#include "engram_fetch_grad_tiling_data.h"
+
+// 确定性失败兜底：用于不可恢复的容量/一致性校验（Kernel 侧无返回值路径的最后手段）
+#ifndef RUNTIME_ABORT
+#define RUNTIME_ABORT(fmt, ...) \
+    do { \
+        ascendc_assert(false, fmt, ##__VA_ARGS__); \
+        while (true) { \
+            (void)AscendC::GetSystemCycle(); \
+        } \
+    } while (0)
+#endif
+
 namespace Mc2Kernel {
-constexpr uint32_t MAX_QP_SIZE = 1024U;
-constexpr uint32_t UB_ALIGN = 32U;
-constexpr uint32_t TILE_BYTES = 64U * 1024U;
-constexpr uint32_t HCOMM_INIT_SIZE = 512U;
+// 共享布局常量已收敛至 engram_fetch_grad_tiling_data.h（单一权威定义），此处仅保留 Kernel 侧私有常量
 constexpr int32_t BITS_PER_BYTE = 8;
 constexpr uint32_t ALIGNED_LEN_256 = 256U;
 
-constexpr uint32_t STATE_OFFSET = 32U;
 constexpr uint32_t NUM_SLOTS = 8U;
 constexpr uint32_t SENDER_CHANNEL_IDX = 0U;
 constexpr uint32_t RECEIVER_CHANNEL_IDX = 1U;
@@ -34,9 +43,14 @@ constexpr int32_t ENGRAM_DT_BFLOAT16 = 27;
 constexpr int32_t ENGRAM_DT_FLOAT16 = 1;
 constexpr int32_t ENGRAM_DT_FLOAT = 0;
 
-constexpr uint32_t ENTRY_BATCH_CAP = 1024U;
 constexpr uint32_t GRAD_SUB_BATCH = 8U;
 constexpr uint32_t SENDCOUNT_STRIDE_RATIO = 8U;
+
+constexpr uint32_t MAX_BLOCK_BYTES = 65504U; // 单次 DataCopy 块上限 65535
+constexpr uint32_t MAX_PENDING_HANDLES = 8U;
+constexpr uint32_t SORT_TMP_BUCKET_BYTES = 512U;
+constexpr uint32_t SORT_TMP_BYTES_PER_ELEM = 7U;
+constexpr uint32_t SORT_COUNT_ALIGN = 32U;
 
 struct EngramCommContext {
     uint32_t rankId;
