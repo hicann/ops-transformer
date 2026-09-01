@@ -109,6 +109,7 @@ except NameError:
 import sys as _sys
 
 _legacy_map = {
+    "attention_to_ffn": "mc2.attention_to_ffn_v2",
     "causal_conv1d_fn": "mamba.causal_conv1d",
     "causal_conv1d_update": "mamba.causal_conv1d",
     "comm_context": "mc2.common",

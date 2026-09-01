@@ -986,6 +986,16 @@
     <td>AI Core</td>
     <td>一个通信域内的Attention节点对FFN节点发送数据并写状态位，以检测通信链路是否正常。</td>
   </tr>
+    <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/attention_to_ffn_v2/README.md">attention_to_ffn_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>一个通信域内的Attention节点对FFN节点发送数据并写状态位，以检测通信链路是否正常。</td>
+  </tr>
   <tr>
     <td>mc2</td>
     <td><a href="../../mc2/batch_mat_mul_reduce_scatter_allto_all/README.md">batch_mat_mul_reduce_scatter_allto_all</a></td>

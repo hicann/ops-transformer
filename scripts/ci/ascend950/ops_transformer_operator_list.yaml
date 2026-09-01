@@ -101,6 +101,7 @@ operator_group_10:
   - distribute_barrier
   - distribute_barrier_extend
   - ffn_to_attention_v2
+  - attention_to_ffn_v2
 operator_group_11:
   - fused_infer_attention_score,10-3
 operator_group_12:
