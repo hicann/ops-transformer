@@ -332,6 +332,14 @@ static ge::graphStatus GetAttrAndSetTilingData(const gert::TilingContext *contex
             isLayered, OP_LOGE_FOR_INVALID_VALUE(nodeName, "commAlg", commAlgPtr, "does not support comm with context"),
             return ge::GRAPH_FAILED);
     }
+    auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(static_cast<int>((config.attrEpWorldSizeIndex)));
+    OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "epWorldSize"),
+                    return ge::GRAPH_FAILED);
+    // 参考A2实现: 单超场景(16卡)无跨超通信收益, hierarchy自动退化为fullmesh
+    if (isLayered && (*epWorldSizePtr == RANK_NUM_PER_NODE)) {
+        isLayered = false;
+        OP_LOGI(nodeName, "epWorldSize is %ld in single supernode, degrade hierarchy to fullmesh.", *epWorldSizePtr);
+    }
 
     if (mc2tiling::GetNpuArch(context) != NpuArch::DAV_3510) {
         OP_TILING_CHECK((*commQuantModePtr != 0) && (*commQuantModePtr != INT8_COMM_QUANT),
@@ -1551,7 +1559,7 @@ static bool CheckAttrs(const gert::TilingContext *context, MoeDistributeCombineV
     OP_TILING_CHECK((*globalBsPtr != 0) && ((*globalBsPtr < static_cast<int64_t>(epWorldSize) * expertIdsDim0) ||
                                             ((*globalBsPtr) % (static_cast<int64_t>(epWorldSize)) != 0)),
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "globalBS", std::to_string(*globalBsPtr).c_str(),
-                                              "should be 0 or maxBs * epWorldSize"),
+                                              "should be 0 or configured maxBs per rank * epWorldSize"),
                     return false);
     OP_TILING_CHECK(((*globalBsPtr > (expertIdsDim0 * static_cast<int64_t>(epWorldSize))) && isActiveMask),
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "globalBS", std::to_string(*globalBsPtr).c_str(),

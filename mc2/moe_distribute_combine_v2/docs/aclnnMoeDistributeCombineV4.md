@@ -408,7 +408,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <td>globalBS</td>
     <td>输入</td>
     <td>EP域全局batch size。</td>
-    <td><ul><li>各rank BS一致时，<code>globalBS = BS * epWorldSize</code> 或0。</li><li>各rank BS不一致时，<code>globalBS = maxBS * epWorldSize</code>（maxBS为单卡BS最大值）。</li></ul></td>
+    <td><ul><li>各rank BS一致时，<code>globalBS = BS * epWorldSize</code> 或0。</li><li>各rank BS不一致时，<code>globalBS = maxBS * epWorldSize</code>（maxBS为业务配置的单rank BS容量上限，且不小于任意rank的实际BS），所有rank需传入相同且非0的globalBS。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -555,7 +555,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <summary><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：</summary>
 
     - expertScales仅支持传入形状为(BS, K)的有效Tensor并进行加权聚合，不支持空Tensor。
-    - commAlg支持""，"hierarchy"两种输入方式。""：默认值，不开启hierarchy跨超模板；"hierarchy": 开启跨超模板，该模板仅支持tpWorldSize为1、共享专家为0的场景，且不支持可变BS、二维mask、特殊专家、performanceInfo场景。
+    - commAlg支持""，"hierarchy"两种输入方式。""：默认值，不开启hierarchy跨超模板；"hierarchy": 开启跨超模板，该模板支持各rank BS不一致，仅支持tpWorldSize为1、共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的globalBS容量，并且不传xActiveMaskOptional。
     - epSendCounts的shape为(epWorldSize \* localExpertNum, )。
     - tpSendCountsOptional为预留参数，TP域通信不再支持，传空指针即可。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。

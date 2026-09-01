@@ -27,6 +27,7 @@ constexpr uint64_t MAX_OUT_DTYPE_SIZE = 2UL;
 constexpr uint64_t WIN_ADDR_ALIGN = 512UL;
 constexpr uint64_t FULL_MESH_DATA_ALIGN = 480UL;
 constexpr uint64_t UB_ALIGN = 32UL;
+constexpr uint64_t LAYERED_BS_UPPER_BOUND = 256UL;
 constexpr uint64_t SCALE_EXPAND_IDX_BUFFER = 44UL; // scale32B + 3*4expandIdx
 constexpr uint32_t EP_RANK_OFFSET_STEP = 1024;
 } // namespace
@@ -60,6 +61,7 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, co
     uint64_t epWorldSize = static_cast<uint64_t>(winSizeData.epWorldSize);
     uint64_t maxBs = static_cast<uint64_t>(winSizeData.globalBs) / epWorldSize;
     uint64_t sharedExpertNum = static_cast<uint64_t>(winSizeData.sharedExpertNum);
+    const std::string socVersion = mc2tiling::GetSocVersion(context);
     // 跨超win区计算，3代表token里拼的topK、expert_scale、实际有效token数量，32B对齐，64代表scale和flag， 404是400MB
     // win区和4MB RDMA状态区
     uint64_t actualSize =
@@ -72,10 +74,15 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, co
                 DOUBLE_DATA_BUFFER;
 
     if (winSizeData.isLayered) {
-        // 校验可变bs
         OP_TILING_CHECK(
-            (bs != maxBs),
-            OP_LOGE_WITHOUT_REPORT(nodeName, "Layered cannot support variableBs, bs is %lu, maxBs is %lu", bs, maxBs),
+            (socVersion != "Ascend910_93") && (bs != maxBs),
+            OP_LOGE_WITHOUT_REPORT(nodeName, "Layered cannot support variableBs on %s, bs is %lu, maxBs is %lu",
+                                   socVersion.c_str(), bs, maxBs),
+            return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            (maxBs > LAYERED_BS_UPPER_BOUND),
+            OP_LOGE_WITHOUT_REPORT(nodeName, "maxBs is invalid for hierarchy, should be in range [1, %lu], but got %lu",
+                                   LAYERED_BS_UPPER_BOUND, maxBs),
             return ge::GRAPH_FAILED);
         // 校验buffersize
         OP_TILING_CHECK((actualSize > maxWindowSizeEp),
@@ -88,7 +95,6 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, co
                             maxBs, h, actualSize / MB_SIZE + 1UL, hcclBufferSizeEp / MB_SIZE),
                         return ge::GRAPH_FAILED);
     } else {
-        std::string socVersion = mc2tiling::GetSocVersion(context);
         if (socVersion == "Ascend950") {
             actualSize += epWorldSize * EP_RANK_OFFSET_STEP;
             OP_TILING_CHECK(

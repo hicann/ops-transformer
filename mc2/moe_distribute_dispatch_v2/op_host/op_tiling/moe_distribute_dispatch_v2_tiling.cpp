@@ -686,6 +686,11 @@ static ge::graphStatus CheckGroupAttrParams(const gert::TilingContext *context, 
     OP_TILING_CHECK((isLayered && (epWorldSize % RANK_NUM_PER_NODE != 0)), // 校验epWorldSize是否是16整数倍
                     OP_LOGE(nodeName, "epWorldSize should be %u Aligned, but got %ld.", RANK_NUM_PER_NODE, epWorldSize),
                     return ge::GRAPH_FAILED);
+    // 参考A2实现: 单超场景(16卡)无跨超通信收益, hierarchy自动退化为fullmesh
+    if (isLayered && (epWorldSize == RANK_NUM_PER_NODE)) {
+        isLayered = false;
+        OP_LOGI(nodeName, "epWorldSize is %ld in single supernode, degrade hierarchy to fullmesh.", epWorldSize);
+    }
     OP_TILING_CHECK((*epRankIdPtr < 0) || (*epRankIdPtr >= epWorldSize),
                     OP_LOGE(nodeName, "epRankId is invalid, only support [0, %ld), but got epRankId=%ld.", epWorldSize,
                             *epRankIdPtr),
@@ -1001,15 +1006,15 @@ static ge::graphStatus CheckAttrs(const gert::TilingContext *context, const char
                     return ge::GRAPH_FAILED);
     OP_LOGD(nodeName, "MoeDistributeDispatchV2 *globalBsPtr = %ld, bs = %ld, epWorldSize = %u\n", *globalBsPtr, xDim0,
             epWorldSize);
-    OP_TILING_CHECK(
-        (*globalBsPtr != 0) && ((*globalBsPtr < xDim0 * static_cast<int64_t>(epWorldSize)) ||
-                                ((*globalBsPtr) % (static_cast<int64_t>(epWorldSize)) != 0)),
-        OP_LOGE(nodeName,
-                "globalBS is invalid, only "
-                "support 0 or maxBs(maxBs is the largest bs on all ranks) * epWorldSize, but got globalBS=%ld, "
-                "bs=%ld, epWorldSize=%u.",
-                *globalBsPtr, xDim0, epWorldSize),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK((*globalBsPtr != 0) && ((*globalBsPtr < xDim0 * static_cast<int64_t>(epWorldSize)) ||
+                                            ((*globalBsPtr) % (static_cast<int64_t>(epWorldSize)) != 0)),
+                    OP_LOGE(nodeName,
+                            "globalBS is invalid, only "
+                            "support 0 or maxBs(maxBs is the configured bs capacity per rank) * epWorldSize, but got "
+                            "globalBS=%ld, "
+                            "bs=%ld, epWorldSize=%u.",
+                            *globalBsPtr, xDim0, epWorldSize),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(((*globalBsPtr > (xDim0 * static_cast<int64_t>(epWorldSize))) && isActiveMask),
                     OP_LOGE(nodeName,
                             "Different bs on different rank cannot work when isActiveMask=true, globalBS=%ld, "
