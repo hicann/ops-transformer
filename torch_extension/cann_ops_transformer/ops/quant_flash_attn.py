@@ -96,9 +96,9 @@ class QuantFlashAttnOpBuilder(OpBuilder):
         return [
             "quant_flash_attn_metadata(int num_heads_q, int num_heads_kv, int head_dim, int quant_mode, *, "
             "Tensor? cu_seqlens_q=None, Tensor? cu_seqlens_kv=None, Tensor? seqused_q=None, "
-            "Tensor? seqused_kv=None, Tensor? v_descale=None, "
+            "Tensor? seqused_kv=None, "
             "int? batch_size=None, int? max_seqlen_q=-1, int? max_seqlen_kv=-1, "
-            "int? mask_mode=0, int? win_left=-1, int? win_right=-1, "
+            "int? head_dim_v=None, int? mask_mode=0, int? win_left=-1, int? win_right=-1, "
             'str? layout_q="BSND", str? layout_q_descale="BSND", '
             'str? layout_kv="BSND", str? layout_out="BSND") -> Tensor',
             "quant_flash_attn(Tensor q, Tensor k, Tensor v, "
@@ -129,10 +129,10 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             cu_seqlens_kv: Optional[torch.Tensor] = None,
             seqused_q: Optional[torch.Tensor] = None,
             seqused_kv: Optional[torch.Tensor] = None,
-            v_descale: Optional[torch.Tensor] = None,
             batch_size: Optional[int] = None,
             max_seqlen_q: Optional[int] = -1,
             max_seqlen_kv: Optional[int] = -1,
+            head_dim_v: Optional[int] = None,
             mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
             win_left: Optional[int] = -1,
             win_right: Optional[int] = -1,
@@ -236,10 +236,10 @@ def quant_flash_attn_metadata(
     cu_seqlens_kv: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
     seqused_kv: Optional[torch.Tensor] = None,
-    v_descale: Optional[torch.Tensor] = None,
     batch_size: Optional[int] = None,
     max_seqlen_q: Optional[int] = -1,
     max_seqlen_kv: Optional[int] = -1,
+    head_dim_v: Optional[int] = None,
     mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
     win_left: Optional[int] = -1,
     win_right: Optional[int] = -1,
@@ -263,6 +263,7 @@ def quant_flash_attn_metadata(
     layout_q_descale = "BSND" if layout_q_descale is None else layout_q_descale
     layout_kv = "BSND" if layout_kv is None else layout_kv
     layout_out = "BSND" if layout_out is None else layout_out
+    head_dim_v = head_dim if head_dim_v is None else head_dim_v
 
     metadata_size = _calculate_metadata_size()
     output = torch.empty((metadata_size,), dtype=torch.int32, device="npu")
@@ -273,13 +274,13 @@ def quant_flash_attn_metadata(
         cu_seqlens_kv,
         seqused_q,
         seqused_kv,
-        v_descale,
         batch_size,
         max_seqlen_q,
         max_seqlen_kv,
         num_heads_q,
         num_heads_kv,
         head_dim,
+        head_dim_v,
         quant_mode,
         mask_mode,
         win_left,
@@ -302,10 +303,10 @@ def quant_flash_attn_metadata_fallback(
     cu_seqlens_kv: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
     seqused_kv: Optional[torch.Tensor] = None,
-    v_descale: Optional[torch.Tensor] = None,
     batch_size: Optional[int] = None,
     max_seqlen_q: Optional[int] = -1,
     max_seqlen_kv: Optional[int] = -1,
+    head_dim_v: Optional[int] = None,
     mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
     win_left: Optional[int] = -1,
     win_right: Optional[int] = -1,
@@ -324,10 +325,10 @@ def quant_flash_attn_metadata_fallback(
         cu_seqlens_kv,
         seqused_q,
         seqused_kv,
-        v_descale,
         batch_size,
         max_seqlen_q,
         max_seqlen_kv,
+        head_dim_v,
         mask_mode,
         win_left,
         win_right,

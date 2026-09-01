@@ -91,10 +91,10 @@ cann_ops_transformer.quant_flash_attn_metadata(
     cu_seqlens_kv=None,
     seqused_q=None,
     seqused_kv=None,
-    v_descale=None,
     batch_size=None,
     max_seqlen_q=-1,
     max_seqlen_kv=-1,
+    head_dim_v=None,
     mask_mode=0,
     win_left=-1,
     win_right=-1,
@@ -192,10 +192,10 @@ cann_ops_transformer.quant_flash_attn(
 | cu_seqlens_kv | Tensor | 可选 | KV的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,) | × |
 | seqused_q | Tensor | 可选 | q的指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) | × |
 | seqused_kv | Tensor | 可选 | kv的指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) | × |
-| v_descale | Tensor | 可选 | v的反量化scale，TND layout下用于校验 | float8_e8m0/float32 | ND | - | × |
 | batch_size | int | 可选 | batch大小。若未传入，则从cu_seqlens_q或seqused_q推导。默认值为None | int32 | - | - | - |
 | max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - | - |
 | max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限 | int32 | - | - | - |
+| head_dim_v | int | 可选 | v的每个注意力头维度，默认与head_dim相等。当前仅支持与head_dim相等，传入异值会拦截 | int32 | - | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - | - |
 | win_left | int | 可选 | window左界限 | int32 | - | - | - |
 | win_right | int | 可选 | window右界限 | int32 | - | - | - |
@@ -1128,7 +1128,6 @@ mask_mode参数解释
         quant_mode=1,
         cu_seqlens_q=cu_seqlens_q,
         cu_seqlens_kv=cu_seqlens_kv,
-        v_descale=v_descale,
         batch_size=B,
         max_seqlen_q=Q_S,
         max_seqlen_kv=KV_S,
@@ -1216,7 +1215,6 @@ mask_mode参数解释
         quant_mode=1,
         cu_seqlens_q=cu_seqlens_q,
         seqused_kv=seqused_kv,
-        v_descale=v_descale,
         batch_size=B,
         max_seqlen_q=Q_S,
         max_seqlen_kv=KV_S,

@@ -40,7 +40,6 @@ bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     cuSeqlensKv_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqlensKv));
     sequsedQ_ = ctx.Input(static_cast<uint32_t>(ParamId::sequsedQ));
     sequsedKv_ = ctx.Input(static_cast<uint32_t>(ParamId::sequsedKv));
-    vDescale_ = ctx.Input(static_cast<uint32_t>(ParamId::vDescale));
     metaData_ = ctx.Output(static_cast<uint32_t>(ParamId::metaData));
 
     bool requiredAttrs =
@@ -61,6 +60,7 @@ bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     GetAttrValueOpt(ctx, "layout_q_descale", layoutQDescale_);
     GetAttrValueOpt(ctx, "layout_kv", layoutKv_);
     GetAttrValueOpt(ctx, "layout_out", layoutOut_);
+    GetAttrValueOpt(ctx, "head_dim_v", headDimV_);
     return ParamsInit();
 }
 
@@ -225,46 +225,6 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     param.fdTolerance = 300;
     param.fdOn = 0;
 
-    // 校验 v_descale: TND layout 下, dim0 应等于 sum(ceil(seqused_kv[i] / 64))
-    if (vDescale_ != nullptr && vDescale_->GetTensorShape() != nullptr) {
-        if (quantMode_ == 6) {
-            // GQA FP8 fullquant: v_descale 为 1D [N2], per-head
-            int64_t vDescaleDimNum = vDescale_->GetTensorShape()->GetDims();
-            int64_t vDescaleDim0 = vDescale_->GetTensorShape()->GetDimSize(0);
-            if (vDescaleDimNum != 1) {
-                KERNEL_LOG_ERROR("v_descale should be 1D [N2] for GQA FP8 fullquant (quant_mode=6), but got %ldD",
-                                 vDescaleDimNum);
-                return false;
-            }
-            if (vDescaleDim0 != numHeadsKv_) {
-                KERNEL_LOG_ERROR("v_descale dim0 should be num_heads_kv=%d for GQA FP8 fullquant, but got %ld",
-                                 numHeadsKv_, vDescaleDim0);
-                return false;
-            }
-        } else {
-            const int64_t V_DESCALE_GROUP_SIZE = 64;
-            bool isTndLayout = (layoutKv_ == "TND");
-            if (isTndLayout) {
-                int64_t vDescaleT = vDescale_->GetTensorShape()->GetDimSize(0) / (numHeadsKv_ * headDim_ * 2);
-                int64_t expectedT = 0;
-                if (baseInfo.isCumulativeKvSeq && batchSize_ > 0 &&
-                    static_cast<int64_t>(baseInfo.actualKvSeqSize.size()) >= batchSize_) {
-                    int64_t prev = 0;
-                    for (int32_t i = 0; i < batchSize_; ++i) {
-                        int64_t seqUsed = baseInfo.actualKvSeqSize[i] - prev;
-                        prev = baseInfo.actualKvSeqSize[i];
-                        expectedT += (seqUsed + V_DESCALE_GROUP_SIZE - 1) / V_DESCALE_GROUP_SIZE;
-                    }
-                }
-                if (expectedT > 0 && expectedT != vDescaleT) {
-                    KERNEL_LOG_ERROR(
-                        "v_descale dim0 should be sum(ceil(seqused_kv[i]/64)) = %ld when layout is TND, but got %ld",
-                        expectedT, vDescaleT);
-                    return false;
-                }
-            }
-        }
-    }
     needInitOutput_ = CheckNeedInitOutput();
     return true;
 }

@@ -28,31 +28,27 @@ OP_TYPE_REGISTER(QuantFlashAttnMetadata);
 
 const aclTensor *QuantFlashAttnMetadata(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
                                         const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-                                        const aclTensor *vDescaleOptional, int64_t batchSize,
-                                        int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
-                                        int64_t numHeadsKv, int64_t headDim, int64_t quantMode, int64_t maskMode,
-                                        int64_t winLeft, int64_t winRight, const char *layoutQ,
-                                        const char *layoutQDescale, const char *layoutKv,
-                                        const char *layoutOut, const char *socVersion, int64_t aicCoreNum,
-                                        int64_t aivCoreNum, const aclTensor *metaData, aclOpExecutor *executor)
+                                        int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+                                        int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t quantMode,
+                                        int64_t maskMode, int64_t winLeft, int64_t winRight, const char *layoutQ,
+                                        const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
+                                        const char *socVersion, int64_t aicCoreNum, int64_t aivCoreNum,
+                                        const aclTensor *metaData, aclOpExecutor *executor)
 {
     L0_DFX(QuantFlashAttnMetadata, cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
-           vDescaleOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode,
-           maskMode, winLeft, winRight, layoutQ, layoutQDescale, layoutKv, layoutOut, socVersion, aicCoreNum,
-           aivCoreNum, metaData);
+           batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft,
+           winRight, layoutQ, layoutQDescale, layoutKv, layoutOut, socVersion, aicCoreNum, aivCoreNum, metaData);
 
     static internal::AicpuTaskSpace space("QuantFlashAttnMetadata");
 
     auto ret = ADD_TO_LAUNCHER_LIST_AICPU(
         QuantFlashAttnMetadata,
-        OP_ATTR_NAMES({"batch_size", "max_seqlen_q", "max_seqlen_kv", "num_heads_q", "num_heads_kv",
-                       "head_dim", "quant_compute_mode", "mask_mode", "win_left", "win_right", "layout_q",
-                       "layout_q_descale", "layout_kv", "layout_out", "soc_version", "aic_core_num",
-                       "aiv_core_num"}),
-        OP_INPUT(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, vDescaleOptional),
-        OP_OUTPUT(metaData),
-        OP_ATTR(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode, maskMode, winLeft,
-                winRight, layoutQ, layoutQDescale, layoutKv, layoutOut, socVersion, aicCoreNum, aivCoreNum));
+        OP_ATTR_NAMES({"batch_size", "max_seqlen_q", "max_seqlen_kv", "num_heads_q", "num_heads_kv", "head_dim",
+                       "head_dim_v", "quant_compute_mode", "mask_mode", "win_left", "win_right", "layout_q",
+                       "layout_q_descale", "layout_kv", "layout_out", "soc_version", "aic_core_num", "aiv_core_num"}),
+        OP_INPUT(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional), OP_OUTPUT(metaData),
+        OP_ATTR(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode, maskMode,
+                winLeft, winRight, layoutQ, layoutQDescale, layoutKv, layoutOut, socVersion, aicCoreNum, aivCoreNum));
     OP_CHECK(ret == ACL_SUCCESS,
              OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "QuantFlashAttnMetadata"
                                               " ADD_TO_LAUNCHER_LIST_AICPU failed."),

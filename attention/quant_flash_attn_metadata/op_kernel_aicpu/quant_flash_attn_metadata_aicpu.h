@@ -63,7 +63,6 @@ private:
     Tensor *cuSeqlensKv_ = nullptr;
     Tensor *sequsedQ_ = nullptr;
     Tensor *sequsedKv_ = nullptr;
-    Tensor *vDescale_ = nullptr;
     Tensor *metaData_ = nullptr;
 
     int32_t batchSize_ = 0;
@@ -72,6 +71,7 @@ private:
     int32_t numHeadsQ_ = 0;
     int32_t numHeadsKv_ = 0;
     int32_t headDim_ = 0;
+    int32_t headDimV_ = 0;
     int32_t quantMode_ = 1;
     int32_t maskMode_ = 1;
     int32_t winLeft_ = -1;
@@ -98,7 +98,6 @@ private:
         cuSeqlensKv = 1,
         sequsedQ = 2,
         sequsedKv = 3,
-        vDescale = 4,
         metaData = 0,
     };
 };
