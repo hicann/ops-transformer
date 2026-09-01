@@ -648,8 +648,15 @@ bool AllGatherMatmulTilingBase::AnalyzeAttrs()
     gatherIndex_ = gatherIndexPtr ? static_cast<uint32_t>(*gatherIndexPtr) : 0;
     OP_TILING_CHECK((args_.isATrans != 0), OP_LOGE_WITH_INVALID_ATTR(opName_, "isTransA", "true", "false"),
                     return false);
+    // blockSize 语义:
+    //   0      - 非量化 (fp16/bf16 V2 路径)
+    //   32     - MX 量化  (fp8 QuantBmm 路径, FLOAT8_E8M0 scale, README §情形4)
+    //   packed - PerBlock 量化 (M | N<<16 | K<<32, FLOAT scale)
+    // 仅对非 fp8 输入硬拒非零值; fp8 路径由子类 IsCapable +
+    // AllGatherQuantBmmHelper::GetShapeAttrsInfo 区分校验, base 不拒 (否则 MX/PerBlock 不可达)。
     auto blockSize = *context_->GetAttrs()->GetAttrPointer<int64_t>(BLOCK_SIZE_INDEX);
-    OP_TILING_CHECK(blockSize != 0,
+    bool x1IsFp8 = CheckSupportDtype(context_->GetInputDesc(INPUT_X1)->GetDataType(), FP8_DTYPE_SUPPORT_LIST);
+    OP_TILING_CHECK(!x1IsFp8 && blockSize != 0,
                     OP_LOGE_WITH_INVALID_ATTR(opName_, "blockSize", std::to_string(blockSize).c_str(), "0"),
                     return false);
     OP_LOGD(opName_,
@@ -672,8 +679,14 @@ ge::graphStatus AllGatherMatmulTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 };
 
-ge::graphStatus AllGatherMatmulTilingBase::GetShapeAttrsInfo() { return AnalyzeShapeAttr(); };
-ge::graphStatus AllGatherMatmulTilingBase::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus AllGatherMatmulTilingBase::GetShapeAttrsInfo()
+{
+    return AnalyzeShapeAttr();
+};
+ge::graphStatus AllGatherMatmulTilingBase::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 uint64_t AllGatherMatmulTilingBase::CalcGatherLen(uint32_t dimA, uint32_t dimB, uint64_t alignAddrLen)
 {
