@@ -2787,7 +2787,7 @@ def _init_vec_tile_groups(io_d_type, group_size, d_deal_size):
     )
 
     nz_md_tile_type = pl.TileType(
-        shape=[M_BASE_SIZE, D_BASE_SIZE // Coff],
+        shape=[M_BASE_SIZE // 2 * Coff, D_BASE_SIZE // Coff],
         dtype=io_d_type,
         target_memory=pl.MemorySpace.Vec,
         valid_shape=[-1, -1],
