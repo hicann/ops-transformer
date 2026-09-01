@@ -71,9 +71,9 @@ _RANDOM_VALUE_RANGES = [[-10, 10], [-1, 1]]
 # host 内存上限驱动的 state 元素数上限。
 # 实测单 case host 峰值 ≈ baseline(1.6GB) + 10 * state_elems 字节
 #   (bf16 state 最坏: 原2E + .to(fp32)4E + .clone()4E = 10E; fp32 state 仅8E)
-# 取 2.4B -> host 峰值 ≈ 1.6 + 24 = 25.6GB < 28GB host 上限。
+# 取 2.0B -> host 峰值 ≈ 1.6 + 20 = 21.6GB < 24GB host 上限。
 # NPU HBM(123GB) 远不构成瓶颈，host 才是绑定约束。
-_STATE_ELEM_CAP = 2_400_000_000
+_STATE_ELEM_CAP = 2_000_000_000
 
 
 def _generate_random_param_dict(rng):
@@ -124,6 +124,8 @@ param_combinations = []
 if TEST_MODE == "random":
     seed_env = os.environ.get("RANDOM_SEED")
     random_seed = int(seed_env) if seed_env else random.randrange(2**31)
+    # 回写实际使用的种子，供 conftest.py 落 CSV（复现时 RANDOM_SEED=<seed> 即可）
+    os.environ["RANDOM_SEED"] = str(random_seed)
     rng = random.Random(random_seed)
     random_count = int(os.environ.get("RANDOM_CASE_COUNT", "100"))
     logger.info(

@@ -26,6 +26,9 @@ torch.npu.config.allow_internal_format = True
 logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
 
+# SKIP_GOLDEN=1 时跳过 CPU golden 计算与精度对比，仅执行 NPU 算子（用于加快随机泛化、配合 mssanitizer 检测）
+SKIP_GOLDEN = os.environ.get("SKIP_GOLDEN", "0") == "1"
+
 
 def cal_relative_diff_np_isclose(real_data, expect_data, type_str="fp16"):
     diff = abs(float(real_data) - float(expect_data))
@@ -455,6 +458,11 @@ def adjust_range(datarange):
     return [left, 0]
 
 
+# 最近一条用例的精度达标率（PctRlt），供 conftest.py 落 CSV；SKIP_GOLDEN 时保持 None
+LAST_OUT_PCT = None
+LAST_STATE_PCT = None
+
+
 def run_recurrent_gated_delta_rule_eager(
     B,
     mtp,
@@ -538,26 +546,41 @@ def run_recurrent_gated_delta_rule_eager(
             return
     # ======================== check input params finish ========================
     # ======================== gen input data start =============================
-    query = rand_range((T, nk, dk), query_datarange, data_type)
-    key = rand_range((T, nk, dk), key_datarange, data_type)
-    value = rand_range((T, nv, dv), value_datarange, data_type)
+    # SKIP_GOLDEN 模式（random_npu/memcheck）无 CPU golden 消费，直接在 NPU 上生成大张量，
+    # 省 host 峰值内存与 H2D 搬运；带 golden 模式必须保留 host 生成。
+    gen_device = "npu:%s" % DEVICE_ID if SKIP_GOLDEN else None
+    query = rand_range((T, nk, dk), query_datarange, data_type, device=gen_device)
+    key = rand_range((T, nk, dk), key_datarange, data_type, device=gen_device)
+    value = rand_range((T, nv, dv), value_datarange, data_type, device=gen_device)
     g = (
-        rand_range((T, nv), adjust_range(gamma_datarange), dtype=torch.float32)
+        rand_range(
+            (T, nv),
+            adjust_range(gamma_datarange),
+            dtype=torch.float32,
+            device=gen_device,
+        )
         if has_gamma == True
         else None
     )
     gk = (
-        rand_range((T, nv, dk), adjust_range(gamma_k_datarange), dtype=torch.float32)
+        rand_range(
+            (T, nv, dk),
+            adjust_range(gamma_k_datarange),
+            dtype=torch.float32,
+            device=gen_device,
+        )
         if has_gamma_k == True
         else None
     )
-    beta = rand_range((T, nv), beta_datarange, data_type)
+    beta = rand_range((T, nv), beta_datarange, data_type, device=gen_device)
     num_accepted_tokens = (
         torch.tensor(num_accepted_tokens, dtype=torch.int32)
         if has_num_accepted_tokens == True
         else None
     )
-    state = rand_range((block_num, nv, dv, dk), state_datarange, state_data_type)
+    state = rand_range(
+        (block_num, nv, dv, dk), state_datarange, state_data_type, device=gen_device
+    )
     act_seq_len = torch.tensor(actual_seq_lengths, dtype=torch.int32)
     ssm_state_indices = torch.tensor(ssm_state_indices, dtype=torch.int32)
 
@@ -570,19 +593,22 @@ def run_recurrent_gated_delta_rule_eager(
     # ======================== gen input data finish =============================
 
     # ======================== execute cpu start =================================
-    cpu_out, cpu_state_ouput = cpu_recurrent_gated_delta_rule(
-        query,
-        key,
-        value,
-        state,
-        beta,
-        scale_value,
-        act_seq_len,
-        ssm_state_indices,
-        num_accepted_tokens=num_accepted_tokens,
-        g=g,
-        gk=gk,
-    )
+    if SKIP_GOLDEN:
+        logger.info("SKIP_GOLDEN=1, skip cpu golden execute")
+    else:
+        cpu_out, cpu_state_ouput = cpu_recurrent_gated_delta_rule(
+            query,
+            key,
+            value,
+            state,
+            beta,
+            scale_value,
+            act_seq_len,
+            ssm_state_indices,
+            num_accepted_tokens=num_accepted_tokens,
+            g=g,
+            gk=gk,
+        )
     # ======================== execute cpu finish ================================
 
     # ======================== execute npu start =================================
@@ -654,6 +680,13 @@ def run_recurrent_gated_delta_rule_eager(
         del padded_state, init_padded
     torch.npu.empty_cache()
 
+    if SKIP_GOLDEN:
+        logger.info("SKIP_GOLDEN=1, skip precision check, npu execute finished")
+        del npu_out, npu_state_out
+        gc.collect()
+        torch.npu.empty_cache()
+        return
+
     logger.info(
         "--------------------------------------------------------------check result-------------------------------------------------------------"
     )
@@ -666,6 +699,10 @@ def run_recurrent_gated_delta_rule_eager(
         npu_state_out,
         state_data_type_str,
     )
+
+    global LAST_OUT_PCT, LAST_STATE_PCT
+    LAST_OUT_PCT = out_pct
+    LAST_STATE_PCT = state_pct
 
     del cpu_out, cpu_state_ouput, npu_out, npu_state_out
     gc.collect()
