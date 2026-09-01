@@ -56,6 +56,7 @@ TILING_DATA_FIELD_DEF(int64_t, k_pre_block_tail)
 TILING_DATA_FIELD_DEF(int64_t, v_pre_block_factor)
 TILING_DATA_FIELD_DEF(int64_t, v_pre_block_total)
 TILING_DATA_FIELD_DEF(int64_t, v_pre_block_tail)
+TILING_DATA_FIELD_DEF(int64_t, metadata_len)
 
 TILING_DATA_FIELD_DEF(int64_t, sfmg_used_core_num)
 TILING_DATA_FIELD_DEF(int64_t, sfmg_dy_buffer_len)

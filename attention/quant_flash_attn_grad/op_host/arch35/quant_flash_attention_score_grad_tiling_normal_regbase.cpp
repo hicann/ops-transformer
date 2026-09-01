@@ -31,23 +31,27 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetShapeAttrsIn
     const gert::StorageShape *keyShape = context_->GetInputShape(KEY_IDX);     // [B, N2, 1, S2, D]
     const gert::StorageShape *valueShape = context_->GetInputShape(VALUE_IDX); // [B, N2, 1, S2, D_V]
 
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
-    if (inputLayout == nullptr) {
-        inputLayout = "BSND";
+    const char *inputLayoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
+    const char *inputLayoutKV = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
+    if (inputLayoutQ == nullptr && inputLayoutKV == nullptr) {
+        inputLayoutQ = "BSND";
+    } else if (inputLayoutQ == nullptr || inputLayoutKV == nullptr || strcmp(inputLayoutQ, inputLayoutKV) != 0) {
+        OP_LOGE(context_, "inputLayoutQ and inputLayoutKV must be same.");
+        return ge::GRAPH_FAILED;
     }
     int64_t headNum = 0;
-    if (strcmp(inputLayout, "BSND") == 0) {
+    if (strcmp(inputLayoutQ, "BSND") == 0) {
         // q shape = [B, S, N, D]
         headNum = queryShape->GetStorageShape().GetDim(2);
-    } else if (strcmp(inputLayout, "BNSD") == 0) {
+    } else if (strcmp(inputLayoutQ, "BNSD") == 0) {
         // q shape = [B, N, S, D]
         headNum = queryShape->GetStorageShape().GetDim(1);
     } else {
-        OP_LOGE(context_, "Invalid layout_q: %s, only BSND/BNSD supported", inputLayout);
+        OP_LOGE(context_, "Invalid layout_q: %s, only BSND/BNSD supported", inputLayoutQ);
         return ge::GRAPH_FAILED;
     }
 
-    if (strcmp(inputLayout, "BNSD") == 0) {
+    if (strcmp(inputLayoutQ, "BNSD") == 0) {
         OP_LOGD(context_, "inputLayout == BNSD queryShape");
         fBaseParams.layoutType = INPUT_FORMAT_BN2GS2D;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(INPUT_DIM_0);
@@ -895,7 +899,7 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::SaveToTilingDat
     quantFagTilingData_->softmax_scale = fBaseParams.scaleValue;
     quantFagTilingData_->has_seq_used_q = fBaseParams.hasSequsedQ;
     quantFagTilingData_->has_seq_used_k = fBaseParams.hasSequsedKV;
-    // quantFagTilingData_->core_num = fBaseParams.coreNum;
+    quantFagTilingData_->metadata_len = fBaseParams.metadataLen;
     return ge::GRAPH_SUCCESS;
 }
 

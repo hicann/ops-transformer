@@ -50,7 +50,7 @@ constexpr uint32_t ATTEN_MASK_DIM_LENGTH_2 = 2;
 constexpr uint32_t ATTEN_MASK_DIM_LENGTH_4 = 4;
 constexpr int64_t COMPRESS_ATTEN_MASK_SIZE = 2048 * 2048;
 
-constexpr uint32_t INPUT_FORMAT_BS2N2GD = 0; // BSND BNSD
+constexpr uint32_t INPUT_FORMAT_BS2N2GD = 0; // BSND
 constexpr uint32_t INPUT_FORMAT_BN2GS2D = 1; // BNSD
 constexpr uint32_t INPUT_FORMAT_TND = 2;     // TND
 constexpr uint32_t INPUT_DIM_0 = 0;          // BSH  BSND
@@ -359,6 +359,7 @@ struct FuzzyBaseInfoParamsRegbase { // 频繁使用的基础参数
     bool isS1S2Same = false;
     bool coreDivide = false;
     int64_t deterMaxRound = 0;
+    int64_t metadataLen = 0;
 
     bool isBn2 = false;
     bool hasSink = false;

@@ -36,19 +36,41 @@ constexpr int64_t DO_DESCALE_IDX = 8;
 constexpr int64_t P_SCALE_IDX = 9;
 constexpr int64_t DS_SCALE_IDX = 10;
 constexpr int64_t SOFTMAX_LSE = 11;
+constexpr int64_t CU_SEQLENS_Q = 12;
+constexpr int64_t CU_SEQLENS_KV = 13;
+constexpr int64_t SEQUSED_Q = 14;
+constexpr int64_t SEQUSED_KV = 15;
+constexpr int64_t SINKS = 16;
 constexpr int64_t METADATA = 18;
 constexpr int64_t DQ_IDX = 0;
 constexpr int64_t DK_IDX = 1;
 constexpr int64_t DV_IDX = 2;
 constexpr int64_t DSINK_IDX = 3;
 constexpr int64_t QUANT_MODE_IDX = 0;
+constexpr int64_t MASK_MODE = 2;
+constexpr int64_t WIN_LEFT = 3;
+constexpr int64_t WIN_RIGHT = 4;
+constexpr int64_t MAX_SEQLEN_Q = 5;
+constexpr int64_t MAX_SEQLEN_KV = 6;
+constexpr int64_t WINDOW = 4;
 
 static ge::graphStatus ParseAttrs(gert::TilingContext *context, const string &opName)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *quantMode = attrs->GetAttrPointer<int64_t>(QUANT_MODE_IDX);
-    // OP_CHECK_IF(quantMode == nullptr, OP_LOGE(opName, "quantMode must be provided."), return ge::GRAPH_FAILED);
+    const int64_t *maxSeqlenQ = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_Q);
+    OP_CHECK_IF(maxSeqlenQ != nullptr && *maxSeqlenQ != -1, OP_LOGE(opName, "maxSeqlenQ not support."),
+                return ge ::GRAPH_FAILED);
+    const int64_t *maxSeqlenKV = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_KV);
+    OP_CHECK_IF(maxSeqlenKV != nullptr && *maxSeqlenKV != -1, OP_LOGE(opName, "maxSeqlenKV not support."),
+                return ge::GRAPH_FAILED);
+    const int64_t *maskMode = attrs->GetAttrPointer<int64_t>(MASK_MODE);
+    OP_CHECK_IF(maskMode != nullptr && *maskMode != 0, OP_LOGE(opName, "maskMode must be 0."), return ge::GRAPH_FAILED);
+    const int64_t *winRight = attrs->GetAttrPointer<int64_t>(WIN_RIGHT);
+    OP_CHECK_IF(winRight != nullptr && *winRight != -1, OP_LOGE(opName, "winRight not support."),
+                return ge::GRAPH_FAILED);
+    const int64_t *winLeft = attrs->GetAttrPointer<int64_t>(WIN_LEFT);
+    OP_CHECK_IF(winLeft != nullptr && *winLeft != -1, OP_LOGE(opName, "winLeft not support."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -65,8 +87,13 @@ static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, cons
     auto doDescaleDesc = context->GetInputDesc(DO_DESCALE_IDX);
     auto pScaleDesc = context->GetInputDesc(P_SCALE_IDX);
     auto dsScaleDesc = context->GetInputDesc(DS_SCALE_IDX);
-    auto softmaxLse = context->GetInputDesc(SOFTMAX_LSE);
-    // auto metadata = context->GetInputDesc(METADATA);
+    auto softmaxLseDesc = context->GetInputDesc(SOFTMAX_LSE);
+    auto cuSeqlensQDesc = context->GetOptionalInputDesc(CU_SEQLENS_Q);
+    auto cuSeqlensKVDesc = context->GetOptionalInputDesc(CU_SEQLENS_KV);
+    auto sequsedQDesc = context->GetOptionalInputDesc(SEQUSED_Q);
+    auto sequsedKVDesc = context->GetOptionalInputDesc(SEQUSED_KV);
+    auto sinksDesc = context->GetOptionalInputDesc(SINKS);
+    auto metadataDesc = context->GetOptionalInputDesc(METADATA);
 
     auto dqDesc = context->GetOutputDesc(DQ_IDX);
     auto dkDesc = context->GetOutputDesc(DK_IDX);
@@ -84,8 +111,13 @@ static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, cons
     OP_CHECK_IF(doDescaleDesc == nullptr, OP_LOGE(opName, "doDescale must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(pScaleDesc == nullptr, OP_LOGE(opName, "pScale must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(dsScaleDesc == nullptr, OP_LOGE(opName, "dsScale must be provided."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(softmaxLse == nullptr, OP_LOGE(opName, "softmaxLse must be provided."), return ge::GRAPH_FAILED);
-    // OP_CHECK_IF(metadata == nullptr, OP_LOGE(opName, "metadata must be provided."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(softmaxLseDesc == nullptr, OP_LOGE(opName, "softmaxLse must be provided."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cuSeqlensQDesc != nullptr, OP_LOGE(opName, "cuSeqlensQ not support."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cuSeqlensKVDesc != nullptr, OP_LOGE(opName, "cuSeqlensKV not support."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sequsedQDesc != nullptr, OP_LOGE(opName, "sequsedQ not support."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sequsedKVDesc != nullptr, OP_LOGE(opName, "sequsedKV not support."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sinksDesc != nullptr, OP_LOGE(opName, "sinks not support."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(metadataDesc == nullptr, OP_LOGE(opName, "metadata must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(dqDesc == nullptr, OP_LOGE(opName, "dq must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(dkDesc == nullptr, OP_LOGE(opName, "dk must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(dvDesc == nullptr, OP_LOGE(opName, "dv must be provided."), return ge::GRAPH_FAILED);
