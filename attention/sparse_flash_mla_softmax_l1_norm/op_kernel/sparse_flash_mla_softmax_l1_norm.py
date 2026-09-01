@@ -57,9 +57,9 @@ VB4_GATHER_NZ = GATHER_ROW_NUM * D_TOTAL * 2 * VEC_BUFFER_NUM  # 64KB
 
 # Cross-core event IDs
 QK_READY_FORWARD_IDS = (0, 1)
-QK_READY_BARKWARD_IDS = (2, 3)
+QK_READY_BACKWARD_IDS = (2, 3)
 GATHER_READY_FORWARD_IDS = (4, 5)
-GATHER_READY_BARKWARD_IDS = (6, 7)
+GATHER_READY_BACKWARD_IDS = (6, 7)
 
 
 def _align_up(value, align=1024):
@@ -865,7 +865,7 @@ def sparse_flash_mla_softmax_l1_norm(
         addrs=VA0,
         mutex_ids=[0, 1],
         fwd_ids=QK_READY_FORWARD_IDS,
-        bwd_ids=QK_READY_BARKWARD_IDS,
+        bwd_ids=QK_READY_BACKWARD_IDS,
     )
     if IS_SPARSE == 1:
         k_l1_db = pl.make_tile_group(
@@ -880,7 +880,7 @@ def sparse_flash_mla_softmax_l1_norm(
             addrs=MA1,
             mutex_ids=[12, 13],
             fwd_ids=GATHER_READY_FORWARD_IDS,
-            bwd_ids=GATHER_READY_BARKWARD_IDS,
+            bwd_ids=GATHER_READY_BACKWARD_IDS,
         )
     with pl.section_cube():
         if IS_SPARSE == 0:
@@ -984,15 +984,15 @@ def sparse_flash_mla_softmax_l1_norm(
     tick = 0
     q_count = 0
     with pl.section_vector():
-        pl.system.set_cross_core(pipe=pl.PipeType.V, event_id=QK_READY_BARKWARD_IDS[0])
-        pl.system.set_cross_core(pipe=pl.PipeType.V, event_id=QK_READY_BARKWARD_IDS[1])
+        pl.system.set_cross_core(pipe=pl.PipeType.V, event_id=QK_READY_BACKWARD_IDS[0])
+        pl.system.set_cross_core(pipe=pl.PipeType.V, event_id=QK_READY_BACKWARD_IDS[1])
     with pl.section_cube():
         if IS_SPARSE == 1:
             pl.system.set_cross_core(
-                pipe=pl.PipeType.MTE1, event_id=GATHER_READY_BARKWARD_IDS[0]
+                pipe=pl.PipeType.MTE1, event_id=GATHER_READY_BACKWARD_IDS[0]
             )
             pl.system.set_cross_core(
-                pipe=pl.PipeType.MTE1, event_id=GATHER_READY_BARKWARD_IDS[1]
+                pipe=pl.PipeType.MTE1, event_id=GATHER_READY_BACKWARD_IDS[1]
             )
 
     # init output start
@@ -1152,7 +1152,7 @@ def sparse_flash_mla_softmax_l1_norm(
                     if IS_SPARSE == 1:
                         pl.system.wait_cross_core(
                             pipe=pl.PipeType.MTE3,
-                            event_id=GATHER_READY_BARKWARD_IDS[_pl_sync_id % 2],
+                            event_id=GATHER_READY_BACKWARD_IDS[_pl_sync_id % 2],
                         )
                         gather_k(
                             k_l1_db,
@@ -1175,7 +1175,7 @@ def sparse_flash_mla_softmax_l1_norm(
                     )
                     pl.system.wait_cross_core(
                         pipe=pl.PipeType.FIX,
-                        event_id=QK_READY_BARKWARD_IDS[_pl_sync_id % 2],
+                        event_id=QK_READY_BACKWARD_IDS[_pl_sync_id % 2],
                     )
                     compute_qk(
                         tensor_q,
@@ -1191,7 +1191,7 @@ def sparse_flash_mla_softmax_l1_norm(
                     )
                     pl.system.set_cross_core(
                         pipe=pl.PipeType.MTE1,
-                        event_id=GATHER_READY_BARKWARD_IDS[_pl_sync_id % 2],
+                        event_id=GATHER_READY_BACKWARD_IDS[_pl_sync_id % 2],
                     )
                     pl.system.set_cross_core(
                         pipe=pl.PipeType.FIX,
@@ -1200,7 +1200,7 @@ def sparse_flash_mla_softmax_l1_norm(
                 else:
                     pl.system.wait_cross_core(
                         pipe=pl.PipeType.FIX,
-                        event_id=QK_READY_BARKWARD_IDS[_pl_sync_id % 2],
+                        event_id=QK_READY_BACKWARD_IDS[_pl_sync_id % 2],
                     )
                     compute_qk_dense(
                         tensor_q,
@@ -1246,7 +1246,7 @@ def sparse_flash_mla_softmax_l1_norm(
                         )
                     pl.system.set_cross_core(
                         pipe=pl.PipeType.V,
-                        event_id=QK_READY_BARKWARD_IDS[(_pl_sync_id + 1) % 2],
+                        event_id=QK_READY_BACKWARD_IDS[(_pl_sync_id + 1) % 2],
                     )
             tick = tick + 1
             _pl_sync_id = _pl_sync_id + 1
@@ -1281,21 +1281,21 @@ def sparse_flash_mla_softmax_l1_norm(
                 )
             pl.system.set_cross_core(
                 pipe=pl.PipeType.V,
-                event_id=QK_READY_BARKWARD_IDS[(_pl_sync_id + 1) % 2],
+                event_id=QK_READY_BACKWARD_IDS[(_pl_sync_id + 1) % 2],
             )
 
     with pl.section_cube():
         pl.system.wait_cross_core(
-            pipe=pl.PipeType.FIX, event_id=QK_READY_BARKWARD_IDS[0]
+            pipe=pl.PipeType.FIX, event_id=QK_READY_BACKWARD_IDS[0]
         )
         pl.system.wait_cross_core(
-            pipe=pl.PipeType.FIX, event_id=QK_READY_BARKWARD_IDS[1]
+            pipe=pl.PipeType.FIX, event_id=QK_READY_BACKWARD_IDS[1]
         )
     with pl.section_vector():
         if IS_SPARSE == 1:
             pl.system.wait_cross_core(
-                pipe=pl.PipeType.MTE3, event_id=GATHER_READY_BARKWARD_IDS[0]
+                pipe=pl.PipeType.MTE3, event_id=GATHER_READY_BACKWARD_IDS[0]
             )
             pl.system.wait_cross_core(
-                pipe=pl.PipeType.MTE3, event_id=GATHER_READY_BARKWARD_IDS[1]
+                pipe=pl.PipeType.MTE3, event_id=GATHER_READY_BACKWARD_IDS[1]
             )

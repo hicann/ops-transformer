@@ -23,7 +23,7 @@ constexpr uint32_t QUERY_INDEX = 0;
 constexpr uint32_t KEY_INDEX = 1;
 constexpr uint32_t SPARSE_INDICES_INDEX = 3;
 constexpr uint32_t SOFTMAX_L1_NORM_INDEX = 0;
-constexpr uint32_t ATTR_MAX_SEQLEN_K_INDEX = 4;
+constexpr uint32_t ATTR_MAX_SEQLEN_K_INDEX = 1;
 constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 4;
 
 static ge::graphStatus InferShapeSparseFlashMlaSoftmaxL1Norm(gert::InferShapeContext *context)
