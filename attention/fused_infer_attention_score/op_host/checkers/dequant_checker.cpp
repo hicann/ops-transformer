@@ -700,6 +700,12 @@ ge::graphStatus DequantChecker::CheckFeatureMXFP8Fullquant(const FiaTilingInfo &
                                                          "In MXFP8 fullquant scenario, pse_shift must be empty"),
                 return ge::GRAPH_FAILED);
 
+    // 不支持rope
+    OP_CHECK_IF(fiaInfo.mlaMode != MlaMode::NO_MLA,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "rope",
+                                                         "In MXFP8 fullquant scenario, rope is not supported"),
+                return ge::GRAPH_FAILED);
+
     OP_CHECK_IF(fiaInfo.qPaddingSizeFlag || fiaInfo.kvPaddingSizeFlag,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     fiaInfo.opName, "query_padding_size and kv_padding_size",
