@@ -108,7 +108,9 @@ bool FlashAttentionScoreGradTilingS1s2Bn2::IsCapable()
     const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                    context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                    "";
-    if (strcmp(tndSoftmaxIn, "") != 0)
+    const bool isTndSoftmaxIn = td_->opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND) &&
+                                strcmp(tndSoftmaxIn, "same_as_input") == 0;
+    if (strcmp(tndSoftmaxIn, "") != 0 && !isTndSoftmaxIn)
         return false;
 
     if (context_->GetDeterministic() == 1) {
@@ -176,7 +178,9 @@ bool FlashAttentionScoreGradTilingDeterministic::IsCapable()
     const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
                                    context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
                                    "";
-    if (strcmp(tndSoftmaxIn, "") != 0)
+    const bool isTndSoftmaxIn = td_->opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND) &&
+                                strcmp(tndSoftmaxIn, "same_as_input") == 0;
+    if (strcmp(tndSoftmaxIn, "") != 0 && !isTndSoftmaxIn)
         return false;
 
     OP_LOGD(context_, "Get deterministic flag is %d", context_->GetDeterministic());
@@ -848,6 +852,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
     if (status != ge::GRAPH_SUCCESS) {
         return status;
     }
+
+    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+                                   context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
+                                   "";
+    td_->opInfo.set_tndSoftmaxIn(td_->opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND) &&
+                                 strcmp(tndSoftmaxIn, "same_as_input") == 0);
 
     status = GetBaseShapeInfo();
     if (status != ge::GRAPH_SUCCESS) {

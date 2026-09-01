@@ -385,6 +385,7 @@ protected:
     bool unpadUseRightDownCasual{0};
     bool unpadUseBand{0};
     bool unpadEmptyInput{false};
+    bool tndSoftmaxIn{false};
 
     // l1 custom stride
     int64_t srcStrideN1;
@@ -729,7 +730,6 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2<
     MallocNodes();
 }
 
-
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
@@ -761,6 +761,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2<
     dimS2 = tilingData->opInfo.S2;
     dimG = tilingData->opInfo.G;
     dimD = tilingData->opInfo.D;
+    tndSoftmaxIn = tilingData->opInfo.tndSoftmaxIn == 1;
     // srcStrideN1: q, dq, dv gm stride. srcStrideN2: k, v, dk gm stride.
     if constexpr (LAYOUT == BNGSD) {
         srcStrideN1 = dimD;
@@ -934,7 +935,8 @@ template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
 __aicore__ inline void
 FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
-                               MM2_OUT_FORMAT, POST, L1CUSTOM>::DumpGmZero(GlobalTensor<float> &gm, int64_t num, int64_t offset)
+                               MM2_OUT_FORMAT, POST, L1CUSTOM>::DumpGmZero(GlobalTensor<float> &gm, int64_t num,
+                                                                           int64_t offset)
 {
     // dump 0 to gm by blockIdx
     int64_t perSize = (num + tilingData->opInfo.castUsedCoreNum - 1) / tilingData->opInfo.castUsedCoreNum;
@@ -988,9 +990,8 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
-__aicore__ inline void
-FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
-                               MM2_OUT_FORMAT, POST, L1CUSTOM>::EODClean()
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG,
+                                                      DROPOUT_CFG, LAYOUT, MM2_OUT_FORMAT, POST, L1CUSTOM>::EODClean()
 {
     int64_t realDimT_q = tilingData->postTilingData.t1;
     int64_t realDimT_kv = tilingData->postTilingData.t2;
@@ -1248,15 +1249,11 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
-__aicore__ inline void
-FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
-                               MM2_OUT_FORMAT, POST, L1CUSTOM>::SendMatmulDV(const uint32_t real_n,
-                                                                             const uint32_t align_n,
-                                                                             const uint32_t real_m,
-                                                                             const int64_t a_in_addr,
-                                                                             const int64_t b_in_addr,
-                                                                             const int64_t out_addr, const bool is_sync,
-                                                                             const uint8_t kvAtomic)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2<
+    T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT, MM2_OUT_FORMAT, POST,
+    L1CUSTOM>::SendMatmulDV(const uint32_t real_n, const uint32_t align_n, const uint32_t real_m,
+                            const int64_t a_in_addr, const int64_t b_in_addr, const int64_t out_addr,
+                            const bool is_sync, const uint8_t kvAtomic)
 {
     /*
     BNGSD:
@@ -1343,19 +1340,14 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
     mm_dkv.End();
 }
 
-
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
-__aicore__ inline void
-FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
-                               MM2_OUT_FORMAT, POST, L1CUSTOM>::SendMatmulDK(const uint32_t real_n,
-                                                                             const uint32_t align_n,
-                                                                             const uint32_t real_m,
-                                                                             const int64_t a_in_addr,
-                                                                             const int64_t b_in_addr,
-                                                                             const int64_t out_addr, const bool is_sync,
-                                                                             const uint8_t kvAtomic)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2<
+    T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT, MM2_OUT_FORMAT, POST,
+    L1CUSTOM>::SendMatmulDK(const uint32_t real_n, const uint32_t align_n, const uint32_t real_m,
+                            const int64_t a_in_addr, const int64_t b_in_addr, const int64_t out_addr,
+                            const bool is_sync, const uint8_t kvAtomic)
 {
     if constexpr (L1CUSTOM) {
         if ASCEND_IS_AIC {
@@ -1386,15 +1378,11 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
-__aicore__ inline void
-FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
-                               MM2_OUT_FORMAT, POST, L1CUSTOM>::SendMatmulDQ(const uint32_t real_n,
-                                                                             const uint32_t align_n,
-                                                                             const uint32_t real_m,
-                                                                             const int64_t a_in_addr,
-                                                                             const int64_t b_in_addr,
-                                                                             const int64_t out_addr, const bool is_sync,
-                                                                             const uint8_t qAtomic)
+__aicore__ inline void FlashAttentionScoreGradS1s2Bn2<
+    T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT, MM2_OUT_FORMAT, POST,
+    L1CUSTOM>::SendMatmulDQ(const uint32_t real_n, const uint32_t align_n, const uint32_t real_m,
+                            const int64_t a_in_addr, const int64_t b_in_addr, const int64_t out_addr,
+                            const bool is_sync, const uint8_t qAtomic)
 {
     /*
     BSH:
@@ -1775,7 +1763,6 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(vWaitMte2Pong);
 }
 
-
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
@@ -2069,12 +2056,16 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
                  n2Index * (dimG * dimS1 * softmax_max_sum_in_block_num) +
                  gIndex * (dimS1 * softmax_max_sum_in_block_num) + s1Idx * softmax_max_sum_in_block_num;
     if constexpr (LAYOUT == TND) {
-        int64_t dimT_q_offset = dimN2 * dimG * seqS1CurrentOffset * softmax_max_sum_in_block_num;
-        sumMaxAddr = dimT_q_offset + n2Index * (dimG * seqS1Current * softmax_max_sum_in_block_num) +
-                     gIndex * (seqS1Current * softmax_max_sum_in_block_num) + s1Idx * softmax_max_sum_in_block_num;
+        if (tndSoftmaxIn) {
+            sumMaxAddr =
+                ((n2Index * dimG + gIndex) * dimT_q + seqS1CurrentOffset + s1Idx) * softmax_max_sum_in_block_num;
+        } else {
+            int64_t dimT_q_offset = dimN2 * dimG * seqS1CurrentOffset * softmax_max_sum_in_block_num;
+            sumMaxAddr = dimT_q_offset + n2Index * (dimG * seqS1Current * softmax_max_sum_in_block_num) +
+                         gIndex * (seqS1Current * softmax_max_sum_in_block_num) + s1Idx * softmax_max_sum_in_block_num;
+        }
     }
 }
-
 
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
@@ -2341,7 +2332,6 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
              dataCopyBlockNum * c1_remain, insn.s1Inner, nd2nzParams);
     }
 }
-
 
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
@@ -2670,8 +2660,8 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
                 if (prefixCompressCanSimplify == false) {
                     uint32_t s2InnerAlign =
                         (emitInsn.s2Inner + 31) / 32 * 32; // attenmask做pad时会32对齐，故加31/32做ceil
-                        int64_t maskNum = static_cast<int64_t>(emitInsn.s1Inner) *
-                            static_cast<int64_t>(s2InnerAlign) / 2; // 除2数据量按照uint16类型折半
+                    int64_t maskNum = static_cast<int64_t>(emitInsn.s1Inner) * static_cast<int64_t>(s2InnerAlign) /
+                                      2; // 除2数据量按照uint16类型折半
 
                     AscendC::SetFlag<HardEvent::V_MTE2>(static_cast<int32_t>(eventIdMte2WaitV));
                     AscendC::WaitFlag<HardEvent::V_MTE2>(static_cast<int32_t>(eventIdMte2WaitV));
@@ -3077,7 +3067,6 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
         }
     }
 
-
     isPongFirst = pongLoop == 1;
     isPongLast = isEven ? pongLoop == totalLoops - 1 : pongLoop == totalLoops - 2;
 
@@ -3335,7 +3324,6 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
     isLastWorkSpaceFinished = false;
 }
 
-
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
           const CubeFormat MM2_OUT_FORMAT, const bool POST, const bool L1CUSTOM>
@@ -3466,7 +3454,6 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
         halfS = type == TYPE_Q ? dimS1 / 2 : dimS2 / 2;
         S = subBlockIdx == 0 ? halfS : S - halfS;
     }
-
 
     // tiling S
     uint64_t procS = postUbBaseSize / dimDAlign;
