@@ -40,7 +40,7 @@ repos:
           - "--style=file"
           - "--verbose"
           - "-i"
-        exclude: ^build/|tests/third_party/
+        exclude: ^build/|tests/third_party/|_def\.cpp$
 
   # Python 代码检查
   - repo: https://gitcode.com/gh_mirrors/ru/ruff-pre-commit
