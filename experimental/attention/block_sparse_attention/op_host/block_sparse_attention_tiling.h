@@ -104,6 +104,9 @@ TILING_DATA_FIELD_DEF(uint64_t, workSpaceSize);
 TILING_DATA_FIELD_DEF(float, log2Cx);
 TILING_DATA_FIELD_DEF(float, log2CxCeil);
 
+// V3 新增:blockEffRows(attenMask) dim2参数
+TILING_DATA_FIELD_DEF(uint32_t, maxBlockNumEff);
+
 TILING_DATA_FIELD_DEF_STRUCT(BsaMask2IdxTiling, BsaMask2IdxTileInfo);
 TILING_DATA_FIELD_DEF_STRUCT(BsaBaseTiling, BsaBaseTileInfo);
 TILING_DATA_FIELD_DEF_STRUCT(BsaMmPhaseL1Tiling, BsaMmPhaseL1TileInfo);
@@ -230,6 +233,7 @@ private:
     uint32_t totalQBlocks_ = 0;
     uint32_t maxKvBlockNum_ = 0;
     uint32_t maxQBlockNum_ = 0;
+    uint32_t maxBlockNumEff_ = 0; // 0=未启用blockEffRows(attenMask)
     uint32_t avgRowNumPerSubCore_ = 0;
     uint32_t preActivateSubCoreNum_ = 0;
     uint32_t firstQBlockNum_ = 0;

@@ -27,6 +27,8 @@ using namespace MicroAPI;
 #define VMULSCVT false
 #define DROPOUT false
 
+constexpr float FLT_MIN_VAL = 1.17549435e-38f; // 2^-126, fp32 最小正规数
+
 template <uint16_t QsBase = 128, typename Otype = bfloat16_t>
 __simd_vf__ void transpose_attn_out_vf(__ubuf__ float *atten_out_md, __ubuf__ float *atten_out_dm, __ubuf__ float *rsum)
 {
@@ -35,6 +37,8 @@ __simd_vf__ void transpose_attn_out_vf(__ubuf__ float *atten_out_md, __ubuf__ fl
     RegTensor<float> vreg_rrsum, vreg_ones;
     Duplicate(vreg_ones, (float)1.0);
     LoadAlign(vreg_rrsum, (__ubuf__ float *)rsum);
+    // rsum==0(整块无有效 key)时 1/0=+inf, O(0)*inf=NaN; 钳到极小正值使 rrsum 有限。
+    Maxs(vreg_rrsum, vreg_rrsum, FLT_MIN_VAL, preg_all32);
     Div(vreg_rrsum, vreg_ones, vreg_rrsum, preg_all32);
 
     for (uint16_t i = 0; i < QsBase / 16; i++) {

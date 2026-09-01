@@ -114,6 +114,10 @@ public:
         gSparseIdx.SetGlobalBuffer((__gm__ ElementSparseIdx *)params.workSpace);
         AscendC::GlobalTensor<ElementSparseCount> gSparseCount;
         gSparseCount.SetGlobalBuffer((__gm__ ElementSparseCount *)(params.workSpace + sparseIdxSize_));
+        AscendC::GlobalTensor<int32_t> gAttenMask;
+        if (params.attenMask != nullptr) {
+            gAttenMask.SetGlobalBuffer((__gm__ int32_t *)params.attenMask);
+        }
 
         // cross core data move dst buffers
         AscendC::LocalTensor<ElementS> ubSTensor[EpMXFP4::UB_S_BUF_CNT];
@@ -332,6 +336,23 @@ public:
                                                                                          EpMXFP4::QS_BASE_SIZE / 2);
                         auto l1PTensorTla = tla::MakeTensor(l1PTensor[l1PBufId], l1PLayoutTla, Arch::PositionL1{});
                         GemmCoord actualBlockShapeQK{curTileInfo.kvsActBaseTile, curTaskInfo.qsActBaseTile, embed_};
+                        // 反查当前两个块的有效行数值
+                        if (maxBlockNumEff_ > 0) {
+                            uint32_t gatheredYBlock = curTileInfo.pvGatheredKvSTileIdx * (kvBaseTile_ / blockShapeY_);
+                            uint32_t oriYBlock0 = static_cast<uint32_t>(
+                                gSparseIdx.GetValue(curTaskInfo.gmOffsetSparseIdx + gatheredYBlock));
+                            uint32_t oriYBlock1 = static_cast<uint32_t>(
+                                gSparseIdx.GetValue(curTaskInfo.gmOffsetSparseIdx + gatheredYBlock + 1));
+                            uint32_t effRowsBase =
+                                (curTaskInfo.batchIdx * qHeads_ + curTaskInfo.qHeadIdx) * maxBlockNumEff_ * 2;
+                            curTileInfo.validRowsY1 =
+                                static_cast<uint16_t>(gAttenMask.GetValue(effRowsBase + oriYBlock0 * 2 + 1));
+                            curTileInfo.validRowsY2 =
+                                static_cast<uint16_t>(gAttenMask.GetValue(effRowsBase + oriYBlock1 * 2 + 1));
+                        } else {
+                            curTileInfo.validRowsY1 = 128;
+                            curTileInfo.validRowsY2 = 128;
+                        }
                         epilogueOnlineSoftmax(l1PTensorTla, actualBlockShapeQK, curTileInfo, curTaskInfo);
                         AscendC::CrossCoreSetFlag<SYNC_MODE_4, PIPE_V>(CROSS_CORE_SYNC_V1_C1[mm1ResBufId]);
                     }
@@ -394,6 +415,8 @@ public:
         // base tile info
         qBaseTile_ = bsaTilingData->BsaBaseTileInfo.qBaseTile;
         kvBaseTile_ = bsaTilingData->BsaBaseTileInfo.kvBaseTile;
+        // blockEffRows(attenMask): dim2 stride, 0=未启用
+        maxBlockNumEff_ = bsaTilingData->maxBlockNumEff;
         // whether actual seqlen is provided
         actSeqAval_ = (!bsaTilingData->useUniformQSeqlen) && (!bsaTilingData->useUniformKvSeqlen);
         sparseIdxSize_ = bsaTilingData->selectIdxSize;
@@ -777,6 +800,8 @@ private:
     // base tile info
     uint32_t qBaseTile_;
     uint32_t kvBaseTile_;
+    // blockEffRows(attenMask): dim2 stride, 0=未启用
+    uint32_t maxBlockNumEff_;
     // whether actual seqlen is provided
     uint32_t actSeqAval_;
     // workspace size

@@ -353,14 +353,10 @@ static aclnnStatus ValidateMxfp4Constraints(int64_t quantMode, int64_t softmaxLs
                 innerPrecise);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    // mxfp4 量化场景下暂不支持 LSE、attenMask、pageAttention
+    // mxfp4 量化场景下暂不支持 LSE、pageAttention; attenMask(blockEffRows) 在 mxfp4 下支持
     if (softmaxLseFlag != 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "softmaxLseFlag must be 0 in mxfp4 quantMode(%lld), got %lld.", quantMode,
                 softmaxLseFlag);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-    if (attenMaskOptional != nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "attenMaskOptional must be nullptr in mxfp4 quantMode(%lld).", quantMode);
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockTableOptional != nullptr) {
@@ -370,7 +366,10 @@ static aclnnStatus ValidateMxfp4Constraints(int64_t quantMode, int64_t softmaxLs
     return ACLNN_SUCCESS;
 }
 
-static string ConvertLayoutString(char *layoutStr) { return op::ToString(layoutStr).GetString(); }
+static string ConvertLayoutString(char *layoutStr)
+{
+    return op::ToString(layoutStr).GetString();
+}
 
 } // namespace
 
