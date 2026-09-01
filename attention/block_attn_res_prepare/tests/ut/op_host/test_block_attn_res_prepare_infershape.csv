@@ -1,0 +1,11 @@
+socVersion,caseName,enable,prefix,caseType,blockResShape,validBlocksShape,pseudoQueryShape,blockResDtype,validBlocksDtype,pseudoQueryDtype,expectSuccess,expectNumeratorShape,expectLogitMaxShape,expectExpSumShape,expectOutputDtypes
+Ascend950,basic,true,basic,shape,2:8:128,1,3:128,FLOAT,UINT64,FLOAT,true,3:2:128,3:2,3:2,FLOAT|FLOAT|FLOAT
+Ascend950,empty_t,true,empty_t,shape,0:8:128,1,3:128,FLOAT,UINT64,FLOAT,true,3:0:128,3:0,3:0,FLOAT|FLOAT|FLOAT
+Ascend950,empty_s,true,empty_s,shape,2:8:128,1,0:128,FLOAT,UINT64,FLOAT,true,0:2:128,0:2,0:2,FLOAT|FLOAT|FLOAT
+Ascend950,invalid_block_res_rank,true,invalid_block_res_rank,shape,2:128,1,3:128,FLOAT,UINT64,FLOAT,false,NONE,NONE,NONE,FLOAT|FLOAT|FLOAT
+Ascend950,invalid_pseudo_query_rank,true,invalid_pseudo_query_rank,shape,2:8:128,1,3:1:128,FLOAT,UINT64,FLOAT,false,NONE,NONE,NONE,FLOAT|FLOAT|FLOAT
+Ascend950,scalar_valid_blocks,true,scalar_valid_blocks,shape,2:8:128,NONE,3:128,FLOAT,UINT64,FLOAT,false,NONE,NONE,NONE,FLOAT|FLOAT|FLOAT
+Ascend950,two_element_valid_blocks,true,two_element_valid_blocks,shape,2:8:128,2,3:128,FLOAT,UINT64,FLOAT,false,NONE,NONE,NONE,FLOAT|FLOAT|FLOAT
+Ascend950,two_dimensional_valid_blocks,true,two_dimensional_valid_blocks,shape,2:8:128,1:1,3:128,FLOAT,UINT64,FLOAT,false,NONE,NONE,NONE,FLOAT|FLOAT|FLOAT
+Ascend950,mismatched_head_dim,true,mismatched_head_dim,shape,2:8:128,1,3:64,FLOAT,UINT64,FLOAT,false,NONE,NONE,NONE,FLOAT|FLOAT|FLOAT
+Ascend950,output_dtype_is_float,true,output_dtype_is_float,dtype,2:8:128,1,3:128,FLOAT16,UINT64,FLOAT,true,NONE,NONE,NONE,FLOAT|FLOAT|FLOAT

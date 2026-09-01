@@ -1,0 +1,13 @@
+socVersion,caseName,enable,prefix,blockResShape,pseudoQueryShape,blockResDtype,validBlocksDtype,pseudoQueryDtype,eps,aicCoreNum,aivCoreNum,contextCoreNum,expectSuccess,expectTilingKey,checkMode,expectBaseD,expectQBufferNum,expectVBufferNum,expectOBufferNum,expectVCacheRows,expectBaseT,expectBaseS,expectTotalWorkUnits,expectNAlign,expectMm1NAlign,checkWorkspaceFormula
+Ascend950,network_decode,true,network_decode,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,0,vector,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,single_static_v_loop,true,single_static_v_loop,1:1:7168,18:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,0,vector,-1,1,1,1,1,-1,-1,-1,-1,-1,false
+Ascend950,multi_round_double_buffer,true,multi_round_double_buffer,8:1:7168,16:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,0,vector,-1,2,2,2,-1,-1,-1,-1,-1,-1,false
+Ascend950,network_prefill,true,network_prefill,254:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend950,mix_workspace,true,mix_workspace,254:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,1,mix,-1,-1,-1,-1,-1,2,24,-1,16,16,true
+Ascend950,mix_t_grouping,true,mix_t_grouping,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,1,mix,-1,-1,-1,-1,-1,1,-1,32,-1,-1,true
+Ascend950,cv_ratio_fallback_to_vector,true,cv_ratio_fallback_to_vector,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,1,1,true,0,vector,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend950,too_many_blocks,true,too_many_blocks,1:65:7168,18:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend950,mismatched_d,true,mismatched_d,1:8:7168,18:4096,FLOAT,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend950,non_positive_eps,true,non_positive_eps,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,0,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend950,invalid_dtype,true,invalid_dtype,1:8:7168,18:7168,FLOAT16,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend950,work_count_exceeds_int64,true,work_count_exceeds_int64,4294967295:1:1,4294967295:1,FLOAT,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
