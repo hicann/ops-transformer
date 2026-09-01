@@ -64,7 +64,7 @@ cd build_out
 
 ### 2. torch 扩展包构建与安装
 
-使用 torch 接口（`import cann_ops_transformer`）前必做。完整脚本：
+使用 torch 接口前必做。在仓根目录构建 torch 扩展 whl 并安装：
 
 ```bash
 # 前置：加载 CANN 环境
@@ -73,19 +73,30 @@ source ${CANN_DIR}/cann/set_env.sh
 # 清理 torch 扩展缓存（~ 为当前用户 home，需与安装/运行 torch 的用户一致，避免加载过期编译产物）
 rm -rf ~/.cache/torch_extensions/*
 
-# 构建 wheel 并安装
-cd torch_extension
-python3 -m build --wheel -n
-python3 -m pip install dist/*.whl --force-reinstall --no-deps
+# 构建 torch 扩展 whl（全量包，包名 cann_ops_transformer 保持不变，whl 输出至 build_out/）
+bash build.sh --torch_extension --soc=ascend950
+
+# 安装
+python3 -m pip install build_out/*.whl --force-reinstall --no-deps
 ```
 
-安装完成后即可在 Python 中 `import cann_ops_transformer` 并按[接口调用](#3-接口调用)使用。
+**安装后验证**：
+
+```bash
+python3 -c "from cann_ops_transformer.ops import flash_attn, flash_attn_metadata; print('ok')"
+```
 
 ### 3. 接口调用
 
 - **torch 接口**（`flash_attn_metadata` + `flash_attn` 的函数原型、参数说明、返回值说明）：[flash_attn.md](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)
 
 调用分两步：先用`flash_attn_metadata`生成负载均衡metadata，再调用`flash_attn`主算子。完整调用示例（含代码）见接口文档的[调用示例](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md#调用示例)章节。
+
+导入路径与安装包名一致（按步骤 2 构建的全量包）：
+
+```python
+from cann_ops_transformer.ops import flash_attn, flash_attn_metadata
+```
 
 ### 4. NPU上板运行算子精度测试
 
@@ -100,7 +111,7 @@ source ${CANN_DIR}/vendors/custom_transformer/bin/set_env.bash
 
 ```bash
 cd attention/flash_attn/tests/pytests
-python3 test_flash_attn.py --case_files functional_redline_infer --case_id Prefill_D256_FP16_BNSD_1024_1024
+python3 test_flash_attn.py --case_files functional_redline_infer --case_id Decode_Unquant_BF16_BF16_L0_1_5_1_1_2048_BNSD_BSND_000004
 python3 test_flash_attn.py --device_id 0            # 跑全部functional用例
 python3 test_flash_attn.py --device_id 0 --case_id <id>   # 跑单个用例
 python3 test_flash_attn.py --device_id 0 --use_gpu --gpu_device 0   # 用GPU端flash_attn库对照
