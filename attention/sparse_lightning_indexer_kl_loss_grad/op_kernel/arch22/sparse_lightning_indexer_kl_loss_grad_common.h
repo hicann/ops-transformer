@@ -25,8 +25,6 @@ using namespace AscendC;
 // 将isCheckTiling设置为false, 输入输出的max&sum&exp的shape为(m, 1)
 constexpr SoftmaxConfig SFA_SOFTMAX_FLASHV2_CFG_WITHOUT_BRC = {false, 0, 0, SoftmaxMode::SOFTMAX_OUTPUT_WITHOUT_BRC};
 
-// V0 -> C1 P
-constexpr uint8_t SYNC_V0_TO_C1_P_FLAG[2] = {0, 1};
 // V0 -> C1 SY
 constexpr uint8_t SYNC_V0_TO_C1_SY_FLAG[2] = {2, 3};
 // C1 -> V1 P
