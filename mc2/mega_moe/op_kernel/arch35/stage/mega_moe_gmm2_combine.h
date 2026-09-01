@@ -253,6 +253,7 @@ struct WaveCombineScratch {
 };
 
 constexpr uint32_t WAVE_COMBINE_MIN_ROW_BUFFER_COUNT = 2U;
+constexpr uint32_t WAVE_COMBINE_STEADY_ROW_BUFFER_COUNT = 1U;
 constexpr uint32_t WAVE_COMBINE_MAX_ROW_BUFFER_COUNT = 6U;
 constexpr uint32_t WAVE_COMBINE_UB_BASE = 64U * 1024U;
 // [64 KiB, 184 KiB) is dedicated to the Combine row ring and quant scratch.
@@ -262,10 +263,12 @@ constexpr uint32_t WAVE_COMBINE_META_INFO_TOKEN_CAPACITY = 1536U;
 
 // 非 layered 路径统一使用的 Combine 行环。常规 Wave 只有 AIV1 建立并使用这些 UB 视图；
 // 最后一轮不再与 GMM1/SwiGLU 并行时，调用方才为 AIV0 补充初始化。
-template <uint8_t CombineMode, bool IncludeAiv0 = false>
+template <uint8_t CombineMode, bool IncludeAiv0 = false, uint32_t MaxRowBufferCount = WAVE_COMBINE_MAX_ROW_BUFFER_COUNT>
 __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageCommonConfig &common,
                                                                  WaveCombineScratch &scratch)
 {
+    static_assert(MaxRowBufferCount > 0U && MaxRowBufferCount <= WAVE_COMBINE_MAX_ROW_BUFFER_COUNT,
+                  "invalid Combine row buffer count");
     WaveCombineBufferConfig bufferConfig{};
     if constexpr (g_coreType == AIC) {
         return bufferConfig;
@@ -288,17 +291,18 @@ __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageC
         bufferConfig.quantTempElements =
             Ops::Base::CeilAlign(storedScaleBytes, static_cast<uint32_t>(ALIGN_32)) + storedScaleBytes / 2U;
     }
-    bufferConfig.rowBufferCount = WAVE_COMBINE_MAX_ROW_BUFFER_COUNT;
+    bufferConfig.rowBufferCount = MaxRowBufferCount;
     if constexpr (CombineMode != COMBINE_NO_QUANT) {
         uint32_t quantTempBytes = bufferConfig.quantTempElements * sizeof(float);
         uint32_t rowRingBudgetBytes = WAVE_COMBINE_UB_LIMIT - WAVE_COMBINE_UB_BASE - quantTempBytes;
+        constexpr uint32_t minRowBufferCount = MaxRowBufferCount < WAVE_COMBINE_MIN_ROW_BUFFER_COUNT ?
+                                                   MaxRowBufferCount :
+                                                   WAVE_COMBINE_MIN_ROW_BUFFER_COUNT;
         bufferConfig.rowBufferCount = rowRingBudgetBytes / bufferConfig.slotStrideBytes;
-        bufferConfig.rowBufferCount = bufferConfig.rowBufferCount < WAVE_COMBINE_MIN_ROW_BUFFER_COUNT ?
-                                          WAVE_COMBINE_MIN_ROW_BUFFER_COUNT :
-                                          bufferConfig.rowBufferCount;
-        bufferConfig.rowBufferCount = bufferConfig.rowBufferCount > WAVE_COMBINE_MAX_ROW_BUFFER_COUNT ?
-                                          WAVE_COMBINE_MAX_ROW_BUFFER_COUNT :
-                                          bufferConfig.rowBufferCount;
+        bufferConfig.rowBufferCount =
+            bufferConfig.rowBufferCount < minRowBufferCount ? minRowBufferCount : bufferConfig.rowBufferCount;
+        bufferConfig.rowBufferCount =
+            bufferConfig.rowBufferCount > MaxRowBufferCount ? MaxRowBufferCount : bufferConfig.rowBufferCount;
     }
     uint32_t rowRingBytes = bufferConfig.rowBufferCount * bufferConfig.slotStrideBytes;
     scratch.rowBufferTensor =
@@ -312,15 +316,16 @@ __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageC
     return bufferConfig;
 }
 
-// AIV1 复用既有配置；AIV0 仅在最终 Combine 到来时绑定同布局的私有 UB 视图。
-template <uint8_t CombineMode>
+// 默认由 AIV1 复用既有配置，仅为 AIV0 绑定最终 Combine 的 UB 视图。steady Wave 使用较小行环，
+// 调用方排空旧行环后通过 ReinitializeAllAiv 让两个 AIV 都恢复最终 Wave 的最大容量。
+template <uint8_t CombineMode, bool ReinitializeAllAiv = false>
 __aicore__ inline WaveCombineBufferConfig PrepareFinalWaveCombineBuffers(
     const MoeStageCommonConfig &common, const WaveCombineBufferConfig &currentBufferConfig, WaveCombineScratch &scratch)
 {
     if constexpr (g_coreType == AIC) {
         return currentBufferConfig;
     }
-    if (GetSubBlockIdx() == 0U) {
+    if (ReinitializeAllAiv || GetSubBlockIdx() == 0U) {
         return InitWaveCombineBuffers<CombineMode, true>(common, scratch);
     }
     return currentBufferConfig;

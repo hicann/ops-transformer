@@ -134,9 +134,12 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::RunGmm2
                 /* A4W4 复用同一 W4 prologue UB；Final Combine 覆盖前等待该 MTE3 搬运完成。 */
                 SyncFuncStatic<HardEvent::MTE3_MTE2, SYNC_EVENT_ID0>();
             }
+            // Final Combine restores the maximum-capacity row ring on both AIVs. Drain the steady ring so
+            // rowSequence and its MTE3_MTE2 events restart from slot 0 under the new modulo.
+            DrainCombineRowBuffers(combineRowSequence, combineBufferConfig.rowBufferCount);
         }
-        combineBufferConfig =
-            PrepareFinalWaveCombineBuffers<CombineQuantMode>(commonConfig_, combineBufferConfig, waveCombineScratch_);
+        combineBufferConfig = PrepareFinalWaveCombineBuffers<CombineQuantMode, true>(commonConfig_, combineBufferConfig,
+                                                                                     waveCombineScratch_);
         RunWaveExpertCombineStage<CombineQuantMode, true>(commonConfig_, waveCombineJob_, combineBufferConfig,
                                                           waveCombineScratch_, params_, gmmAddrInfo, state,
                                                           state.expertIdx, combineRowSequence);
@@ -165,7 +168,8 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
     DispatchBuffInit();
     PrepareMoeExpertTokenCountTable<true>(commonConfig_, countWorkspace_, params_, tokenDispatchScratch_);
     WaveCombineBufferConfig combineBufferConfig =
-        InitWaveCombineBuffers<CombineQuantMode>(commonConfig_, waveCombineScratch_);
+        InitWaveCombineBuffers<CombineQuantMode, false, WAVE_COMBINE_STEADY_ROW_BUFFER_COUNT>(commonConfig_,
+                                                                                              waveCombineScratch_);
     uint32_t combineRowSequence = 0U;
 
     ExpertLoopState gmm1State = CreateExpertLoopState(commonConfig_);

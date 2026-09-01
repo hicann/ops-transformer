@@ -377,7 +377,8 @@ template <TemplateMegaMoeA8W8WaveTypeClass>
 __aicore__ inline typename MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::CombineBufferConfig
 MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::InitCombineBuffers()
 {
-    return InitWaveCombineBuffers<CombineQuantMode>(commonConfig_, waveCombineScratch_);
+    return InitWaveCombineBuffers<CombineQuantMode, false, WAVE_COMBINE_STEADY_ROW_BUFFER_COUNT>(commonConfig_,
+                                                                                                 waveCombineScratch_);
 }
 
 // ======================================================================================
@@ -764,8 +765,11 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Process
         bool useAllAivCores = expertIdx == allCoreCombineExpertIndex;
         UpdateMoeExpertCombineGlobalBuffer(params_.workspaceInfo, combineAddrInfo, combineState);
         if (useAllAivCores) {
-            activeBufferConfig =
-                PrepareFinalWaveCombineBuffers<CombineQuantMode>(commonConfig_, bufferConfig, waveCombineScratch_);
+            // AIV1 has used the steady ring for preceding experts. Final Combine restores the maximum-capacity ring;
+            // drain and reset first so the new modulo never waits on an event that the old ring did not produce.
+            DrainCombineRowBuffers(rowSequence, activeBufferConfig.rowBufferCount);
+            activeBufferConfig = PrepareFinalWaveCombineBuffers<CombineQuantMode, true>(
+                commonConfig_, activeBufferConfig, waveCombineScratch_);
             RunWaveExpertCombineStage<CombineQuantMode, true>(commonConfig_, waveCombineJob_, activeBufferConfig,
                                                               waveCombineScratch_, params_, combineAddrInfo,
                                                               combineState, combineState.expertIdx, rowSequence);
