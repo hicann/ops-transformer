@@ -481,7 +481,7 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::VectorBufferInit()
 
     if constexpr (IsFullQuantMode<rmsNormCkvOutputType, dequantScaleType, false>()) {
         if constexpr (std::is_same<mmCkvKrOutputType, int32_t>::value ||
-                      (std::is_same<mmCkvKrOutputType, float>::value && !isFp8E8m0)) {
+                      std::is_same<mmCkvKrOutputType, float>::value) {
             pipe_->InitBuffer(quantScaleCkvBuffer_, ALIGN_BLOCK_SIZE);
         } else {
             pipe_->InitBuffer(quantScaleCkvBuffer_, baseParams_->headSizeCkv * sizeof(float)); // [1, 512]
@@ -1101,7 +1101,7 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::CopyGlobalParams()
 
     if constexpr (IsFullQuantMode<rmsNormCkvOutputType, dequantScaleType, false>() && !isPertile) {
         if constexpr (std::is_same<mmCkvKrOutputType, int32_t>::value ||
-                      (std::is_same<mmCkvKrOutputType, float>::value && !isFp8E8m0)) {
+                      std::is_same<mmCkvKrOutputType, float>::value) {
             DataCopyExtParams quantCopyParams{1, sizeof(float), 0, 0, 0};
             DataCopyPadExtParams<float> quantPadParams{false, 0, 0, 0};
             DataCopyPad(quantScaleCkvLocal_, quantScaleCkvGm_, quantCopyParams, quantPadParams);
@@ -1227,12 +1227,12 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::ComputeBlkScatterOffsets(Global
         batchSeqSize = baseParams_->seq1Size;
         batchIndexOffset = batchIndex * CeilDivT(batchSeqSize, static_cast<int64_t>(baseParams_->blockSize));
     } else {
-        while (actSeqState_.curBatch + 1 < static_cast<int64_t>(baseParams_->batchSize) &&
+        while (actSeqState_.curBatch < static_cast<int64_t>(baseParams_->batchSize) &&
                tokenIndex >= actSeqState_.curPrefix) {
-            actSeqState_.curBatch += 1;
             actSeqState_.prevPrefix = actSeqState_.curPrefix;
-            actSeqState_.curPrefix = actualSeqLenGm_(actSeqState_.curBatch);
             actSeqState_.prevIndexOffset = actSeqState_.curIndexOffset;
+            actSeqState_.curPrefix = actualSeqLenGm_(actSeqState_.curBatch);
+            actSeqState_.curBatch += 1;
             actSeqState_.curIndexOffset += CeilDivT(actSeqState_.curPrefix - actSeqState_.prevPrefix,
                                                     static_cast<int64_t>(baseParams_->blockSize));
         }
