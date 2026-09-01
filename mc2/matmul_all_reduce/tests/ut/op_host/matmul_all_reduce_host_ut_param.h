@@ -102,7 +102,8 @@ struct MatmulAllReduceTilingUtParam : public MatmulAllReduceHostUtParamBase {
         this->ranksize = stoull(ReadMap(csvMap, "ranksize"));
 
         if (this->expectResult == ge::GRAPH_SUCCESS) {
-            this->expectTilingKey = stoull(ReadMap(csvMap, "expectTilingKey"));
+            auto tilingKeyStr = ReadMap(csvMap, "expectTilingKey");
+            this->expectTilingKey = tilingKeyStr.empty() ? UINT64_MAX : stoull(tilingKeyStr);
             this->expectTilingDataHash = ReadMap(csvMap, "expectTilingDataHash");
         }
     }

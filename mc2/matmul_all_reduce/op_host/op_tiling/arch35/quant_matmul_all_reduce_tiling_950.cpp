@@ -161,11 +161,11 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2Hcomm()
         mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         isUseA2APath = false;
     }
-    OP_TILING_CHECK(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) ==
-                        mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(args_.geCType).c_str(),
-                                              "FLOAT16, BF16, FLOAT or INT8"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) == mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(args_.geCType).c_str(),
+                                  "FLOAT16, BF16, FLOAT or INT8"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(context_->GetAttrs() == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"),
                     return ge::GRAPH_FAILED);
     const char *groupName = context_->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
@@ -202,6 +202,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::DoOpTiling()
     DoRCSTiling();
     MC2_CHECK_LOG_RET(opName_, CheckHCCLSize());
     DoSplitMTiling();
+
     MC2_CHECK_LOG_RET(opName_, AdjustHCCLLimit());
     MC2_CHECK_LOG_RET(opName_, DoQuantTiling());
     if (MutableRCSTilingData().isInputCommQuantScale == 1) {
@@ -224,11 +225,11 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckHCCLSize()
     }
     // 如果1行数据就超通信数据量限制，那么任何M切分方式都无法满足
     uint64_t sizeOfSingleM = static_cast<uint64_t>(param.rankN) * args_.rankDim;
-    OP_TILING_CHECK(sizeOfSingleM > mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "matmul output size",
-                                                          std::to_string(sizeOfSingleM).c_str(),
-                                                          "The value of matmul output size must not exceed 256MB"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        sizeOfSingleM > mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "matmul output size", std::to_string(sizeOfSingleM).c_str(),
+                                              "The value of matmul output size must not exceed 256MB"),
+        return ge::GRAPH_FAILED);
     // 如果按通信最大次数切分，能够满足通信数据量限制，那么继续做tiling
     uint64_t sizeOfSplitM =
         Ops::Base::CeilDiv(static_cast<uint64_t>(param.rankM), mc2tiling::ALL_GATHER_HCCL_NUM_LIMIT) * sizeOfSingleM;
@@ -801,11 +802,11 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckX1X2()
     }
     if (scenario_ == AllReduceScenario::MXFP4) {
         uint64_t x1K = GetKValue();
-        OP_TILING_CHECK(Ops::Base::CeilDiv(x1K, MX_GROUP_SIZE_K) % 2 != 0,
-                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "x1",
-                                                              ("k=" + std::to_string(x1K)).c_str(),
-                                                              "The value of k of x1 ceildivided by 32 must be even"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            Ops::Base::CeilDiv(x1K, MX_GROUP_SIZE_K) % 2 != 0,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "x1", ("k=" + std::to_string(x1K)).c_str(),
+                                                  "The value of k of x1 ceildivided by 32 must be even"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -830,16 +831,16 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckInput()
 }
 
 QuantMatmulAllReduceTilingA5::QuantMatmulAllReduceTilingA5(gert::TilingContext *context)
-    : MatmulAllReduceTilingBase(context), quantMatmulAllReduceTilingData_(quantMatmulAllReduceTilingDataSelf_)
-{
-}
+    : MatmulAllReduceTilingBase(context),
+      quantMatmulAllReduceTilingData_(quantMatmulAllReduceTilingDataSelf_)
+{}
 
 // 使用外部传入的tilingdata和ctxinfo
 QuantMatmulAllReduceTilingA5::QuantMatmulAllReduceTilingA5(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
                                                            QuantMatmulAllReduceTilingDataA5 *out)
-    : MatmulAllReduceTilingBase(context, mmrCtxInfo), quantMatmulAllReduceTilingData_(*out)
-{
-}
+    : MatmulAllReduceTilingBase(context, mmrCtxInfo),
+      quantMatmulAllReduceTilingData_(*out)
+{}
 
 const gert::Shape QuantTilingTransferHelperA5::GetX1Shape(const size_t index)
 {
@@ -991,26 +992,27 @@ CutResult QuantMatmulAllReduceTilingA5::GetTilingResult()
     const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
     const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     auto &&param = MutableRCSTilingData();
+    uint8_t commMode = GetCommMode();
+    bool isPertileFp8 = (param.isInputCommQuantScale == QUANT_MODE_FP8);
+    bool isAlign = (isPerBlock_ || (scenario_ == AllReduceScenario::MXFP4) || (scenario_ == AllReduceScenario::MXFP8) ||
+                    isPertileFp8);
     if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
         MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, KernelType::ALL_REDUCE_VIA_TWO_SHOT,
-                                                        TopoType::STANDARD_CARD);
-        allReduceTilingHccl.SetIsAlign((isPerBlock_ || (scenario_ == AllReduceScenario::MXFP4) ||
-                                        (scenario_ == AllReduceScenario::MXFP8) ||
-                                        (param.isInputCommQuantScale == QUANT_MODE_FP8)));
+                                                        TopoType::STANDARD_CARD, SocVersion::SOC950, commMode,
+                                                        isPertileFp8);
+        allReduceTilingHccl.SetIsAlign(isAlign);
         mCutAllreduce = allReduceTilingHccl.GetTiling();
     } else if (mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         const uint64_t k = MatmulAllReduceTilingBase::GetKValue();
-        uint8_t commMode = GetCommMode();
         KernelType kernelType;
         if (commMode == Mc2Comm::COMM_MODE_CCU && k >= QUANT_A2APATH_CRITICAL_K && !param.isInputCommQuantScale) {
             kernelType = KernelType::ALL_REDUCE;
         } else {
             kernelType = KernelType::ALL_REDUCE_VIA_TWO_SHOT;
         }
-        MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, kernelType, TopoType::EIGHT_P);
-        allReduceTilingHccl.SetIsAlign((isPerBlock_ || (scenario_ == AllReduceScenario::MXFP4) ||
-                                        (scenario_ == AllReduceScenario::MXFP8) ||
-                                        (param.isInputCommQuantScale == QUANT_MODE_FP8)));
+        MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, kernelType, TopoType::EIGHT_P, SocVersion::SOC950,
+                                                        commMode, isPertileFp8);
+        allReduceTilingHccl.SetIsAlign(isAlign);
         mCutAllreduce = allReduceTilingHccl.GetTiling();
     } else {
         MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, inputSocVersion, isPerBlock_);

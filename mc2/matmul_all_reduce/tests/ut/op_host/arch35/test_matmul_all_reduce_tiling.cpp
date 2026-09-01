@@ -87,7 +87,7 @@ TEST_P(MatmulAllReduceArch35TilingTest, param)
          {"group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.group_size)},
          {"y_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.y_dtype)},
          {"comm_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.comm_quant_mode)},
-         {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("ccu")}},
+         {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.comm_mode)}},
         param.inputInstance, param.outputInstance, &compileInfo, param.soc, param.coreNum, param.ubsize);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", param.ranksize}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, param.expectResult, param.expectTilingKey,

@@ -111,12 +111,44 @@ void MMAllReduceFitBalanceTiling::AdjustLongShortTileLen()
     tilingM_.FitTileLengthDiscrete(false, goodLinearityShape);
     SetCommBoundTile();
     AlignLongTileLen();
+    AdjustAicpuPertileEqualSplit();
+
     // When the long and short tiles are equal, merge them
     if (tilingM_.cutRes.shortTileLen == tilingM_.cutRes.longTileLen) {
         tilingM_.cutRes.shortTileLen = 0U;
         tilingM_.cutRes.numShortTile = 0U;
         tilingM_.cutRes.numLongTile++;
     }
+}
+
+void MMAllReduceFitBalanceTiling::AdjustAicpuPertileEqualSplit()
+{
+    // AICPU通信优化后，等分切分时相同大小的tile可复用缓存，效率更高；
+    // 8卡及以上场景通信膨胀开销显著，强制等分切分以降低该开销
+    if (!isAicpuMode_ || !isPertileFp8_ || rankDim_ < AICPU_PERTILE_MIN_RANK_DIM) {
+        return;
+    }
+    uint64_t totalLen = mmInfo_.mValue;
+    uint64_t alignedBlocks = (totalLen + AICPU_PERTILE_ALIGN_BASE - 1) / AICPU_PERTILE_ALIGN_BASE;
+    if (alignedBlocks < AICPU_PERTILE_MAX_TILE_CNT) {
+        return;
+    }
+    uint64_t longTileLen = ((alignedBlocks + 1) / AICPU_PERTILE_MAX_TILE_CNT) * AICPU_PERTILE_ALIGN_BASE;
+    uint64_t tailLen = totalLen - longTileLen * (AICPU_PERTILE_MAX_TILE_CNT - 1);
+    if (longTileLen == 0 || tailLen == 0) {
+        return;
+    }
+    tilingM_.cutRes.longTileLen = longTileLen;
+    tilingM_.cutRes.numLongTile = AICPU_PERTILE_MAX_TILE_CNT - 1;
+    tilingM_.cutRes.shortTileLen = tailLen;
+    tilingM_.cutRes.numShortTile = 1;
+    tilingM_.cutRes.shortTileAtBack = true;
+    tilingM_.cutRes.totalTileCnt = AICPU_PERTILE_MAX_TILE_CNT;
+    OP_LOGD("MMAllReduceFitBalanceTiling",
+            "AICPU pertile equal split: M=%lu, longTileLen=%lu, numLongTile=%lu, "
+            "shortTileLen=%lu, numShortTile=%lu",
+            totalLen, tilingM_.cutRes.longTileLen, tilingM_.cutRes.numLongTile, tilingM_.cutRes.shortTileLen,
+            tilingM_.cutRes.numShortTile);
 }
 
 void MMAllReduceFitBalanceTiling::AlignLongTileLen()
