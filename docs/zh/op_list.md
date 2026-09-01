@@ -748,6 +748,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/quant_flash_attn_grad/README.md">quant_flash_attn_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算量化注意力（QuantFlashAttention）的反向梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/sparse_flash_mla_softmax_l1_norm_metadata/README.md">sparse_flash_mla_softmax_l1_norm_metadata</a></td>
     <td>✓</td>
     <td>✓</td>

@@ -26,6 +26,11 @@
 - **接口功能**:
 
   `quant_flash_attn_grad`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttnGrad`算子完成HIFLOAT8量化场景下的注意力反向梯度计算。该接口为`quant_flash_attn`正向算子的配套反向接口，用于计算Query、Key、Value的梯度（dq、dk、dv）以及sink梯度（dsink）。当前支持HIFLOAT8量化数据类型，支持BSND、BNSD两种数据排布格式。
+   `quant_flash_attn_grad`的元数据生成接口复用`quant_flash_attn_metadata`，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
+
+  1. 准备`q`、`k`、`v`等输入。
+  2. 调用`quant_flash_attn_metadata`生成`metadata`。
+  3. 调用`quant_flash_attn_grad`，将上一步得到的`metadata`传入主算子。
 
 - **计算公式**:
 
@@ -102,6 +107,33 @@
 > Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim。Q_S表示输入q tensor的序列长度，Q_N表示输入q tensor的头数，KV_S表示输入k/v tensor的序列长度，KV_N表示输入k/v tensor的头数。
 
 ## 函数原型
+调用quant_flash_attn_grad接口之前，请先调用前置接口quant_flash_attn_metadata，完成quant_flash_attn_grad负载均衡的计算。
+
+```python
+cann_ops_transformer.quant_flash_attn_metadata(
+    num_heads_q,
+    num_heads_kv,
+    head_dim,
+    quant_mode,
+    *,
+    cu_seqlens_q=None,
+    cu_seqlens_kv=None,
+    seqused_q=None,
+    seqused_kv=None,
+    v_descale=None,
+    batch_size=None,
+    max_seqlen_q=-1,
+    max_seqlen_kv=-1,
+    mask_mode=0,
+    win_left=-1,
+    win_right=-1,
+    layout_q="BSND",
+    layout_q_descale="BSND",
+    layout_kv="BSND",
+    layout_out="BSND",
+    is_grad_enabled=True
+) -> Tensor
+```
 
 ```python
 cann_ops_transformer.quant_flash_attn_grad(
@@ -220,6 +252,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 - 入参为空处理：q为空Tensor时直接返回。
 - 仅支持BSND或BNSD layout，且layout_q与layout_kv必须保持一致。
 - 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。
+- quant_flash_attn_metadata和quant_flash_attn_grad的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 
 ### 特性参数组
 
@@ -700,6 +733,10 @@ mask_mode参数解释
     import torch
     import torch_npu
     import cann_ops_transformer
+    import logging
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
     torch_npu.npu.set_device(0)
 
@@ -728,8 +765,27 @@ mask_mode参数解释
     # softmax_lse: FP32, shape=(B, Q_N, Q_S, 1)
     softmax_lse = torch.zeros(B, Q_N, Q_S, 1, dtype=torch.float32, device="npu")
 
-    # metadata: INT32
-    metadata = torch.zeros(2, 64, dtype=torch.int32, device="npu")
+    try:
+        metadata = cann_ops_transformer.quant_flash_attn_metadata(
+            num_heads_q=Q_N,
+            num_heads_kv=KV_N,
+            head_dim=D,
+            quant_mode=0,
+            cu_seqlens_q=None,
+            cu_seqlens_kv=None,
+            seqused_q=None,
+            seqused_kv=None,
+            batch_size=B,
+            max_seqlen_q=Q_S,
+            max_seqlen_kv=KV_S,
+            mask_mode=0,
+            layout_q="BSND",
+            layout_kv="BSND",
+            is_grad_enabled=True
+        )
+    except Exception as e:
+        logger.error("[MAIN_WRAPPER] quant_flash_attn_metadata 重建失败: %s", str(e))
+        raise
 
     dq, dk, dv, dsink = cann_ops_transformer.ops.quant_flash_attn_grad(
         q, k, v, dout, attn_out,
@@ -749,7 +805,5 @@ mask_mode参数解释
     assert dq.shape == (B, Q_S, Q_N, D)
     assert dk.shape == (B, KV_S, KV_N, D)
     assert dv.shape == (B, KV_S, KV_N, D)
-    assert dsink.shape == (Q_N,)
     assert dq.dtype == torch.bfloat16
-    assert dsink.dtype == torch.float32
     ```

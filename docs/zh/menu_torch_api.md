@@ -31,6 +31,7 @@
 - [qkv_rms_norm_rope_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/qkv_rms_norm_rope_cache_with_k_scale.md)
 - [quant_compressor](../../torch_extension/cann_ops_transformer/docs/zh/quant_compressor.md)
 - [quant_flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/quant_flash_attn.md)
+- [quant_flash_attn_grad](../../torch_extension/cann_ops_transformer/docs/zh/quant_flash_attn_grad.md)
 - [quant_lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/quant_lightning_indexer.md)
 - [quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/quant_sparse_flash_mla.md)
 - [recurrent_kda](../../torch_extension/cann_ops_transformer/docs/zh/recurrent_kda.md)
