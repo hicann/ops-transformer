@@ -175,12 +175,10 @@ private:
     static constexpr uint32_t GMM1_TILE_M = L1_TILE_M_256;
     static constexpr uint32_t EPILOGUE_TILE_M = TopkWeightsPrefetch ? L1_TILE_M_128 : L1_TILE_M_256;
 
-    using BlockEpilogue =
-        BlockEpilogueActivationMxQuant<ActivationType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
-                                       EPILOGUE_TILE_M, L1_TILE_N, TopkWeightsPrefetch, GMM1_INTERLEAVED>;
+    using BlockEpilogue = BlockEpilogueActivationMxQuant<ActivationType, bfloat16_t, EPILOGUE_TILE_M, L1_TILE_N,
+                                                         TopkWeightsPrefetch, GMM1_INTERLEAVED>;
     using SharedBlockEpilogue =
-        BlockEpilogueActivationMxQuant<ActivationType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
-                                       L1_TILE_M_256, L1_TILE_N, false, GMM1_INTERLEAVED>;
+        BlockEpilogueActivationMxQuant<ActivationType, bfloat16_t, L1_TILE_M_256, L1_TILE_N, false, GMM1_INTERLEAVED>;
     BlockEpilogue epilogueOp_;
     SharedBlockEpilogue sharedEpilogueOp_;
     MegaMoeImpl::ExceptionDumpEngine exceptionDump_;
@@ -268,9 +266,6 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Init(
     params_.tilingData = tilingData;
     epilogueOp_.Init({.yGmAddr = params_.workspaceInfo.activationQuantDataPtr,
                       .yScaleGmAddr = params_.workspaceInfo.activationQuantScalePtr,
-                      .x2ScaleGmAddr = nullptr,
-                      .x1ScaleGmAddr = nullptr,
-                      .biasGmAddr = nullptr,
                       .clampLimit = tilingData->clampLimit,
                       .actMode = tilingData->actMode,
                       .actSubMode = tilingData->actSubMode,
@@ -490,9 +485,6 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Process
     typename SharedBlockEpilogue::Params epilogueParams{
         .yGmAddr = params_.workspaceInfo.sharedExpertActivationDataPtr,
         .yScaleGmAddr = params_.workspaceInfo.sharedExpertActivationScalePtr,
-        .x2ScaleGmAddr = nullptr,
-        .x1ScaleGmAddr = nullptr,
-        .biasGmAddr = nullptr,
         .clampLimit = params_.tilingData->clampLimit,
         .actMode = params_.tilingData->actMode,
         .actSubMode = params_.tilingData->actSubMode,
