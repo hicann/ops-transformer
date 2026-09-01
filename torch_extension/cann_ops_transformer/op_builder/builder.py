@@ -50,6 +50,9 @@ class OpBuilder(ABC):
             self.register_meta()
         self._initialized = True
 
+    def ensure_initialized(self):
+        self._ensure_initialized()
+
     def get_cann_path(self):
         if ASCEND_HOME_PATH in os.environ and os.path.exists(
             os.environ[ASCEND_HOME_PATH]

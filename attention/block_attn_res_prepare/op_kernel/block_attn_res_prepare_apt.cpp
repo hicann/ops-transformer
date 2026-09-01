@@ -23,13 +23,12 @@ __global__ __aicore__ void block_attn_res_prepare(GM_ADDR blockRes, GM_ADDR vali
                                                   GM_ADDR workspace, GM_ADDR tiling)
 {
     AscendC::InitSocState();
-    REGISTER_TILING_DEFAULT(optiling::BlockAttnResPrepareMixTilingData);
+    REGISTER_NONE_TILING;
     if constexpr (TEMPLATE_MODE == BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR) {
         GET_TILING_DATA_WITH_STRUCT(optiling::BlockAttnResPrepareTilingData, tilingData, tiling);
         BlockAttnResPrepare::BlockAttnResPrepareVector op(&tilingData);
         op.Init(blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum);
         op.Process();
-        AscendC::PipeBarrier<PIPE_ALL>();
     } else if constexpr (TEMPLATE_MODE == BLOCK_ATTN_RES_PREPARE_TPL_MIX) {
         AscendC::SetSysWorkspace(workspace);
         GM_ADDR userWorkspace = AscendC::GetUserWorkspace(workspace);
@@ -37,4 +36,5 @@ __global__ __aicore__ void block_attn_res_prepare(GM_ADDR blockRes, GM_ADDR vali
         BlockAttnResPrepare::BlockAttnResPrepareTensorApiBlazeKernel(blockRes, validBlocks, pseudoQuery, numerator,
                                                                      logitMax, expSum, userWorkspace, mixTilingData);
     }
+    AscendC::PipeBarrier<PIPE_ALL>();
 }

@@ -1,6 +1,7 @@
 # Transformer类接口
 
 - [Transformer类torch接口列表](torch_api_list.md)
+- [block_attn_res_prepare](../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_prepare.md)
 - [block_attn_res_update](../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_update.md)
 - [apply_rotary_pos_emb](../../torch_extension/cann_ops_transformer/docs/zh/apply_rotary_pos_emb.md)
 - [apply_rotary_pos_emb_grad](../../torch_extension/cann_ops_transformer/docs/zh/apply_rotary_pos_emb_grad.md)

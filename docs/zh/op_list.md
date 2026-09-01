@@ -68,6 +68,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/block_attn_res_prepare/README.md">block_attn_res_prepare</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>BlockAttnRes第一阶段准备算子，用于并行计算全部目标slot的块间注意力，输出softmax加权分子及统计量，供下一阶段融合当前残差。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/block_attn_res_update/README.md">block_attn_res_update</a></td>
     <td>✓</td>
     <td>✓</td>
