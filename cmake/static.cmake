@@ -94,7 +94,7 @@ if (TARGET ${OPHOST_NAME}_static OR TARGET ${OPAPI_NAME}_static)
                         COMMAND ${CMAKE_AR} x ${CMAKE_BINARY_DIR}/libops_aclnn.a
                         COMMAND ${CMAKE_AR} qcs lib${OPSTATIC_NAME}.a *.o
                         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin_tmp/${compute_unit})
-        if (ENABLE_PACKAGE)
+        if (ENABLE_BUILD_PKG)
             install(FILES ${CMAKE_BINARY_DIR}/bin_tmp/${compute_unit}/lib${OPSTATIC_NAME}.a
                     DESTINATION ${CMAKE_BINARY_DIR}/static_library_files/lib64
                     OPTIONAL)
