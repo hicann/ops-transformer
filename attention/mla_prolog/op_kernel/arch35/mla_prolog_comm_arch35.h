@@ -124,7 +124,7 @@ constexpr int SYNC_MODE_CUBE_VEC = 0x2;
 constexpr int SYNC_MODE_ALL_VEC = 0x0;
 
 constexpr int FINISH_MM_CQ = 0x6;
-constexpr int FINISH_MM_CKVKR = 0x6;
+constexpr int FINISH_MM_CKVKR = 0x4;
 constexpr int FINISH_MM_QCQR = 0x6;
 constexpr int FINISH_MM_QR = 0x8; // 算力分组场景
 constexpr int FINISH_MM_QC = 0x6; // 算力分组场景
