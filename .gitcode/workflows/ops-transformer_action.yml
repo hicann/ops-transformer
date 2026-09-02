@@ -41,7 +41,8 @@ stages:
             with:
               repo_name: ${{ env.repo_name }}
               target_branch: ${{ env.TARGET_BRANCH }}
-              repo_url: ${{ vars.CI_PATH }}
+              comment: ${{ atomgit.event.comment.body }}
+              token: ${{ secrets.TESTTOKEN }}
           -
             name: show_output
             run: |
@@ -85,7 +86,6 @@ stages:
           package_name: 'cann-ops-transformer_experimental_linux-x86_64.run'
       JOB_arm_experimental_compile:
         name: Compile_experimental_arm
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_ARM_experimental'
@@ -95,7 +95,6 @@ stages:
           package_name: 'cann-ops-transformer_experimental_linux-aarch64.run'
       JOB_Pre_Compile:
         name: Compile_pre
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Pre_Compile'
@@ -104,7 +103,6 @@ stages:
           spec: '2xlarge'
       JOB_x86_compile_ubuntu24:
         name: Compile_x86_ubuntu24
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_X86_ubuntu24'
@@ -113,7 +111,6 @@ stages:
           package_name: 'cann-ops-transformer_linux-x86_64_ubuntu24.run'
       JOB_arm_compile_ubuntu24:
         name: Compile_arm_ubuntu24
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_ARM_ubuntu24'
@@ -122,7 +119,6 @@ stages:
           package_name: 'cann-ops-transformer_linux-aarch64_ubuntu24.run'
       JOB_experimental_compile_ubuntu24:
         name: Compile_experimental_x86_ubuntu24
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_X86_experimental_ubuntu24'
@@ -132,7 +128,6 @@ stages:
           package_name: 'cann-ops-transformer_experimental_linux-x86_64_ubuntu24.run'
       JOB_arm_experimental_compile_ubuntu24:
         name: Compile_experimental_arm_ubuntu24
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_ARM_experimental_ubuntu24'
@@ -142,7 +137,6 @@ stages:
           package_name: 'cann-ops-transformer_experimental_linux-aarch64_ubuntu24.run'
       JOB_monitor_910b_compile:
         name: Compile_monitor_910b
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'monitor'
@@ -151,7 +145,6 @@ stages:
           package_name: 'cann-ops-transformer-monitor-910b_linux-x86_64.run'
       JOB_monitor_910c_compile:
         name: Compile_monitor_910c
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'monitor_910c'
@@ -186,7 +179,6 @@ stages:
           package_name: 'cann-ops-transformer_experimental_950_linux-aarch64.run'
       JOB_experimental_950_compile_ubuntu24:
         name: Compile_experimental_950_x86_ubuntu24
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_X86_experimental_ubuntu24'
@@ -196,7 +188,6 @@ stages:
           package_name: 'cann-ops-transformer_experimental_950_linux-x86_64_ubuntu24.run'
       JOB_arm_experimental_950_compile_ubuntu24:
         name: Compile_experimental_950_arm_ubuntu24
-        needs: []
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_ARM_experimental_ubuntu24'
@@ -269,6 +260,7 @@ stages:
       JOB_ut:
         name: UT_ops-transformer
         uses: .gitcode/workflows/ut_action.yml
+        timeout-minutes: 90
         with:
           image_version: ${{ jobs.JOB_image.outputs.UT_Test }}
       A2_smoke:
