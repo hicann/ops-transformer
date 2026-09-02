@@ -15,7 +15,6 @@
 #include "matmul_allto_all_tiling_base.h"
 #include "mc2_log.h"
 
-
 using namespace AscendC;
 using namespace ge;
 using namespace Mc2Tiling;
@@ -72,7 +71,7 @@ ge::graphStatus MatmulAllToAllTilingBase::GetWorkspaceSize()
     SetUserWorkSpace();
     uint64_t workspaceSize_ = libApiWorkSpaceSize_ + inferredInfo.mmResultLen + inferredInfo.permuteLen;
     workspaces[0] = workspaceSize_;
-    OP_LOGD(opName_, "Workspaces[0] size=%ld, mmResultLen=%d", workspaces[0], inferredInfo.mmResultLen);
+    OP_LOGD(opName_, "Workspaces[0] size=%zu, mmResultLen=%lu", workspaces[0], inferredInfo.mmResultLen);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -154,12 +153,12 @@ ge::graphStatus MatmulAllToAllTilingBase::Check2DMatrixMulShapes(const gert::Til
                                                           "The value of n must be divisible by rankSize"),
                     return ge::GRAPH_FAILED);
     // MatmulAlltoAll: x1Dim1 = x2 K-axis
-    OP_TILING_CHECK((shapeInfo.x1Dim1 != kAxis),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        opName, "x1dim1 and x2Kdim",
-                        (std::to_string(shapeInfo.x1Dim1) + " vs " + std::to_string(kAxis)).c_str(),
-                        "The second dim of x1 must be equal to the K-axis dim of x2"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (shapeInfo.x1Dim1 != kAxis),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName, "x1dim1 and x2Kdim", (std::to_string(shapeInfo.x1Dim1) + " vs " + std::to_string(kAxis)).c_str(),
+            "The second dim of x1 must be equal to the K-axis dim of x2"),
+        return ge::GRAPH_FAILED);
     // MatmulAlltoAll: yDim0 = x1Dim0 * rankDim and x2 N-axis = yDim1 * rankDim
     OP_TILING_CHECK(
         (((shapeInfo.x1Dim0 * rankDim) != shapeInfo.yDim0) || (nAxis != (shapeInfo.yDim1 * rankDim))),
@@ -212,12 +211,12 @@ ge::graphStatus MatmulAllToAllTilingBase::CheckKcQuantScaleShapes(const gert::Ti
     const gert::StorageShape *x2ScaleShape = context->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
     uint64_t x1ScaleDim = x1ScaleShape->GetStorageShape().GetDim(0);
     uint64_t x2ScaleDim = x2ScaleShape->GetStorageShape().GetDim(0);
-    OP_TILING_CHECK((x1ScaleDim != shapeInfo.x1Dim0),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        opName, "x1Scale",
-                        (std::to_string(x1ScaleDim) + " vs " + std::to_string(shapeInfo.x1Dim0)).c_str(),
-                        "The dim of x1Scale must be equal to the first dim of x1"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (x1ScaleDim != shapeInfo.x1Dim0),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName, "x1Scale", (std::to_string(x1ScaleDim) + " vs " + std::to_string(shapeInfo.x1Dim0)).c_str(),
+            "The dim of x1Scale must be equal to the first dim of x1"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK((x2ScaleDim != nAxis),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         opName, "x2Scale", (std::to_string(x2ScaleDim) + " vs " + std::to_string(nAxis)).c_str(),

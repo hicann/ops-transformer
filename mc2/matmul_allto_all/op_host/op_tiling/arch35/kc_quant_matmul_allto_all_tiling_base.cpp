@@ -393,11 +393,11 @@ void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMatmulAlltoAllTilingInfo(const
     OP_LOGD(opName, "tilingInfo.rankM: %u", tilingInfo.rankM);
     OP_LOGD(opName, "tilingInfo.rankN: %u", tilingInfo.rankN);
     OP_LOGD(opName, "tilingInfo.rankK: %u", tilingInfo.rankK);
-    OP_LOGD(opName, "tilingInfo.mmResultLen: %u", tilingInfo.mmResultLen);
-    OP_LOGD(opName, "tilingInfo.permuteLen: %u", tilingInfo.permuteLen);
+    OP_LOGD(opName, "tilingInfo.mmResultLen: %lu", tilingInfo.mmResultLen);
+    OP_LOGD(opName, "tilingInfo.permuteLen: %lu", tilingInfo.permuteLen);
     OP_LOGD(opName, "tilingInfo.biasLen: %u", tilingInfo.biasLen);
     OP_LOGD(opName, "tilingInfo.aicCoreNum: %u", tilingInfo.aicCoreNum);
-    OP_LOGD(opName, "tilingInfo.hcclDataType: %u", tilingInfo.hcclDataType);
+    OP_LOGD(opName, "tilingInfo.hcclDataType: %lu", tilingInfo.hcclDataType);
 }
 
 /**

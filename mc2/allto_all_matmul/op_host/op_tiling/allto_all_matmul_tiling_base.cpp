@@ -79,7 +79,7 @@ ge::graphStatus AllToAllMatmulTilingBase::GetWorkspaceSize()
     uint64_t workspaceSize =
         libApiWorkSpaceSize_ + inferredInfo_.commLen + inferredInfo_.permuteLen + inferredInfo_.biasLen;
     workspaces[0] = workspaceSize;
-    OP_LOGD(opName_, "Workspaces[0] size=%ld, biasLen=%d, commlen=%d", workspaces[0], inferredInfo_.biasLen,
+    OP_LOGD(opName_, "Workspaces[0] size=%zu, biasLen=%u, commlen=%lu", workspaces[0], inferredInfo_.biasLen,
             inferredInfo_.commLen);
 
     return ge::GRAPH_SUCCESS;
@@ -217,21 +217,21 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOut(const gert::TilingCon
         OP_TILING_CHECK((allToAllOutDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "alltoAllOut"),
                         return ge::GRAPH_FAILED);
         ge::DataType allToAlloutDtype = allToAllOutDesc->GetDataType();
-        OP_TILING_CHECK((allToAlloutDtype != x1DType),
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "alltoAllOut",
-                                                              Ops::Base::ToString(allToAlloutDtype).c_str(),
-                                                              "The dtype of allToAllOut must be same as input x"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            (allToAlloutDtype != x1DType),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "alltoAllOut", Ops::Base::ToString(allToAlloutDtype).c_str(),
+                                                  "The dtype of allToAllOut must be same as input x"),
+            return ge::GRAPH_FAILED);
         // dim维度校验
         const gert::StorageShape *allToAllOutShape = context->GetOutputShape(ALLTO_ALL_OUT_INDEX);
         OP_TILING_CHECK((allToAllOutShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "allToAllOut"),
                         return ge::GRAPH_FAILED);
         uint64_t dimNum = allToAllOutShape->GetStorageShape().GetDimNum();
-        OP_TILING_CHECK((dimNum != TWO_DIMS),
-                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "allToAllOut",
-                                                                 (std::to_string(dimNum) + "D").c_str(),
-                                                                 "The shape dim of allToAllOut must be 2D"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            (dimNum != TWO_DIMS),
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "allToAllOut", (std::to_string(dimNum) + "D").c_str(),
+                                                     "The shape dim of allToAllOut must be 2D"),
+            return ge::GRAPH_FAILED);
         // shape校验
         OP_TILING_CHECK(CheckAlltoAllOutShape(context, opName) != ge::GRAPH_SUCCESS,
                         OP_LOGE(opName_, "Tiling check allToAllOutShape failed."), return ge::GRAPH_FAILED);
@@ -277,13 +277,13 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckMatrixMulShapes(const gert::Tilin
                         "The shape of x1 and x2 must satisfy K-axis of x2 equals second dim of x1 times rankSize"),
                     return ge::GRAPH_FAILED);
     // AlltoAllMatmul: x1Dim0 = yDim0 * rankDim and x2 N-axis = yDim1
-    OP_TILING_CHECK(((shapeInfo.x1Dim0 != (shapeInfo.yDim0 * rankDim)) || (nAxis != shapeInfo.yDim1)),
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        opName, "x1, x2 and y",
-                        (std::to_string(shapeInfo.x1Dim0) + ", " + std::to_string(nAxis)).c_str(),
-                        "The shapes of x1, x2 and y must satisfy first dim of x1 equals rankDim times first dim of y "
-                        "and N-axis of x2 equals second dim of y"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        ((shapeInfo.x1Dim0 != (shapeInfo.yDim0 * rankDim)) || (nAxis != shapeInfo.yDim1)),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            opName, "x1, x2 and y", (std::to_string(shapeInfo.x1Dim0) + ", " + std::to_string(nAxis)).c_str(),
+            "The shapes of x1, x2 and y must satisfy first dim of x1 equals rankDim times first dim of y "
+            "and N-axis of x2 equals second dim of y"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -384,9 +384,9 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantTensorDataType(const gert:
 ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantShapeInfo(const gert::TilingContext *context, const char *opName,
                                                                 const OpAttrIndexSchema &indexSchema)
 {
-    OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckShapeInfo(context, opName, ALLTOALL_MATMUL_INDEX_SCHEMA) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName, "Tiling common info check shape failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        MatmulAlltoAllTilingUtil::CheckShapeInfo(context, opName, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
+        OP_LOGE(opName, "Tiling common info check shape failed."), return ge::GRAPH_FAILED);
     ge::graphStatus status;
     const gert::StorageShape *x1Shape = context->GetInputShape(INPUT_X1_INDEX);
     const gert::StorageShape *x2Shape = context->GetInputShape(INPUT_X2_INDEX);
@@ -397,11 +397,11 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantShapeInfo(const gert::Tili
     uint64_t x2Dim0 = x2Shape->GetStorageShape().GetDim(0);
     uint64_t x2Dim1 = x2Shape->GetStorageShape().GetDim(1);
     uint64_t x2ScaleDimNum = x2ScaleShape->GetStorageShape().GetDimNum();
-    OP_TILING_CHECK((x2ScaleDimNum != 1),
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "x2Scale",
-                                                             (std::to_string(x2ScaleDimNum) + "D").c_str(),
-                                                             "The shape dim of x2Scale must be 1D"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (x2ScaleDimNum != 1),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "x2Scale", (std::to_string(x2ScaleDimNum) + "D").c_str(),
+                                                 "The shape dim of x2Scale must be 1D"),
+        return ge::GRAPH_FAILED);
     uint64_t x2ScaleDim0 = x2ScaleShape->GetStorageShape().GetDim(0);
     bool x2IsTransFlag = false;
     const gert::RuntimeAttrs *attrs = context->GetAttrs();

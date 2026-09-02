@@ -107,7 +107,10 @@ ge::graphStatus AllToAllKcQuantMatmulTilingBase::SetKcDataTypeInfo(const gert::T
                                                                    const char *opName, TilingContextInfo &contextInfo)
 {
     const gert::StorageShape *matrixBias = context->GetOptionalInputShape(INPUT_BIAS_INDEX);
-    int64_t aDTypeNum = *context_->GetAttrs()->GetAttrPointer<int64_t>(ALLTOALLMATMUL_ATTR_X1_QUANTDTYPE_INDEX);
+    auto aDTypePtr = context_->GetAttrs()->GetAttrPointer<int64_t>(ALLTOALLMATMUL_ATTR_X1_QUANTDTYPE_INDEX);
+    OP_TILING_CHECK(aDTypePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName, "x1 quant dtype attr"),
+                    return ge::GRAPH_FAILED);
+    int64_t aDTypeNum = *aDTypePtr;
     ge::DataType biasType;
     // 这是针对matmul的数据类型
     ge::DataType aType = static_cast<ge::DataType>(aDTypeNum);
@@ -320,7 +323,10 @@ ge::graphStatus AlltoAllKcQuantMatmulHelper::GetShapeAttrsInfo()
     inputParams_.libApiWorkSpaceSize = tilingProcesser_.libApiWorkSpaceSize_;
     inputParams_.aDtype = tilingArgs.geAType;
     inputParams_.bDtype = tilingArgs.geBType;
-    int64_t yDType = *context_->GetAttrs()->GetAttrPointer<int64_t>(ATTR_Y_DTYPE_INDEX);
+    auto yDtypePtr = context_->GetAttrs()->GetAttrPointer<int64_t>(ATTR_Y_DTYPE_INDEX);
+    OP_TILING_CHECK(yDtypePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "yDtype attr"),
+                    return ge::GRAPH_FAILED);
+    int64_t yDType = *yDtypePtr;
     auto scaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
     OP_TILING_CHECK((scaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "scale tensor"),
                     return ge::GRAPH_FAILED);
@@ -463,10 +469,10 @@ void AllToAllKcQuantMatmulTilingBase::PrintAlltoAllKcQuantMatmulTilingInfo(const
     OP_LOGD(opName, "TilingInfo.rankM: %u", tilingInfo.rankM);
     OP_LOGD(opName, "TilingInfo.rankN: %u", tilingInfo.rankN);
     OP_LOGD(opName, "TilingInfo.rankK: %u", tilingInfo.rankK);
-    OP_LOGD(opName, "TilingInfo.commLen: %u", tilingInfo.commLen);
-    OP_LOGD(opName, "TilingInfo.permuteLen: %u", tilingInfo.permuteLen);
-    OP_LOGD(opName, "tilingInfo.x1ScaleOptionalLen: %u", tilingInfo.x1ScaleOptionalLen);
-    OP_LOGD(opName, "TilingInfo.hcclDataType: %u", tilingInfo.hcclDataType);
+    OP_LOGD(opName, "TilingInfo.commLen: %lu", tilingInfo.commLen);
+    OP_LOGD(opName, "TilingInfo.permuteLen: %lu", tilingInfo.permuteLen);
+    OP_LOGD(opName, "tilingInfo.x1ScaleOptionalLen: %lu", tilingInfo.x1ScaleOptionalLen);
+    OP_LOGD(opName, "TilingInfo.hcclDataType: %lu", tilingInfo.hcclDataType);
 }
 
 /**

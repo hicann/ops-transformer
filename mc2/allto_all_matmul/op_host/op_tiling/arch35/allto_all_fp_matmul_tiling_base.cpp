@@ -382,10 +382,10 @@ void AllToAllFpMatmulTilingBase::PrintAlltoAllMatmulTilingInfo(const std::string
     OP_LOGD(opName, "TilingInfo.rankM: %u", tilingInfo.rankM);
     OP_LOGD(opName, "TilingInfo.rankN: %u", tilingInfo.rankN);
     OP_LOGD(opName, "TilingInfo.rankK: %u", tilingInfo.rankK);
-    OP_LOGD(opName, "TilingInfo.commLen: %u", tilingInfo.commLen);
-    OP_LOGD(opName, "TilingInfo.permuteLen: %u", tilingInfo.permuteLen);
+    OP_LOGD(opName, "TilingInfo.commLen: %lu", tilingInfo.commLen);
+    OP_LOGD(opName, "TilingInfo.permuteLen: %lu", tilingInfo.permuteLen);
     OP_LOGD(opName, "TilingInfo.biasLen: %u", tilingInfo.biasLen);
-    OP_LOGD(opName, "TilingInfo.hcclDataType: %u", tilingInfo.hcclDataType);
+    OP_LOGD(opName, "TilingInfo.hcclDataType: %lu", tilingInfo.hcclDataType);
 }
 
 /**
