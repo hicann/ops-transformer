@@ -72,6 +72,7 @@
 - [aclnnFusedInferAttentionScoreV5](../../attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV5.md)
 - [aclnnGatherPaKvCache](../../attention/gather_pa_kv_cache/docs/aclnnGatherPaKvCache.md)
 - [aclnnGenericBlockSparseAttention](../../attention/generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md)
+- [aclnnGenericBlockSparseAttentionMetadata](../../attention/generic_block_sparse_attention_metadata/docs/aclnnGenericBlockSparseAttentionMetadata.md)
 - [aclnnGroupedMatMulAllReduce](../../mc2/grouped_mat_mul_all_reduce/docs/aclnnGroupedMatMulAllReduce.md)
 - [aclnnGroupedMatMulAlltoAllv](../../mc2/grouped_mat_mul_allto_allv/docs/aclnnGroupedMatMulAlltoAllv.md)
 - [aclnnGroupedMatMulAlltoAllvV2](../../mc2/grouped_mat_mul_allto_allv/docs/aclnnGroupedMatMulAlltoAllvV2.md)

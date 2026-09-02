@@ -25,6 +25,9 @@ constexpr int64_t GBSA_TND_SPARSE_BLOCK_IDX_DIM_NUM = 3;
 constexpr int64_t GBSA_TND_SPARSE_BLOCK_COUNT_DIM_NUM = 2;
 constexpr int64_t GBSA_BATCHED_SPARSE_BLOCK_IDX_DIM_NUM = 4;
 constexpr int64_t GBSA_BATCHED_SPARSE_BLOCK_COUNT_DIM_NUM = 3;
+constexpr int64_t GBSA_TND_BLOCK_CAPACITY_DIM_INDEX = 2;
+constexpr int64_t GBSA_BATCHED_Q_BLOCK_DIM_INDEX = 2;
+constexpr int64_t GBSA_BATCHED_BLOCK_CAPACITY_DIM_INDEX = 3;
 
 constexpr int64_t GBSA_CURRENT_HEAD_DIM = 128;
 constexpr int64_t GBSA_CURRENT_MAX_GROUP_SIZE = 128;
@@ -249,7 +252,7 @@ aclnnStatus CheckGbsaSparseTensorShapes(const aclTensor *sparseBlockIdx, const a
         if (sparseBlockIdx->GetViewShape().GetDim(0) != sparseHeads ||
             sparseBlockCount->GetViewShape().GetDim(0) != sparseHeads ||
             sparseBlockIdx->GetViewShape().GetDim(1) != sparseBlockCount->GetViewShape().GetDim(1) ||
-            sparseBlockIdx->GetViewShape().GetDim(2) <= 0) {
+            sparseBlockIdx->GetViewShape().GetDim(GBSA_TND_BLOCK_CAPACITY_DIM_INDEX) <= 0) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "TND sparse block tensor shapes do not match attrs.");
             return ACLNN_ERR_PARAM_INVALID;
         }
@@ -265,8 +268,9 @@ aclnnStatus CheckGbsaSparseTensorShapes(const aclTensor *sparseBlockIdx, const a
     if (sparseBlockIdx->GetViewShape().GetDim(0) != batch || sparseBlockCount->GetViewShape().GetDim(0) != batch ||
         sparseBlockIdx->GetViewShape().GetDim(1) != sparseHeads ||
         sparseBlockCount->GetViewShape().GetDim(1) != sparseHeads ||
-        sparseBlockIdx->GetViewShape().GetDim(2) != qBlocks || sparseBlockCount->GetViewShape().GetDim(2) != qBlocks ||
-        sparseBlockIdx->GetViewShape().GetDim(3) <= 0) {
+        sparseBlockIdx->GetViewShape().GetDim(GBSA_BATCHED_Q_BLOCK_DIM_INDEX) != qBlocks ||
+        sparseBlockCount->GetViewShape().GetDim(GBSA_BATCHED_Q_BLOCK_DIM_INDEX) != qBlocks ||
+        sparseBlockIdx->GetViewShape().GetDim(GBSA_BATCHED_BLOCK_CAPACITY_DIM_INDEX) <= 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BSND/BNSD sparse block tensor shapes do not match attrs.");
         return ACLNN_ERR_PARAM_INVALID;
     }

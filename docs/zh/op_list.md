@@ -208,6 +208,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/generic_block_sparse_attention_metadata/README.md">generic_block_sparse_attention_metadata</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI CPU</td>
+    <td>generic_block_sparse_attention接口的前置接口，用于计算generic_block_sparse_attention的负载均衡。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/generic_block_sparse_attention/README.md">generic_block_sparse_attention</a></td>
     <td>✓</td>
     <td>✓</td>
