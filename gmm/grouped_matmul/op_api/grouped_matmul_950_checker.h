@@ -76,6 +76,7 @@ private:
     aclnnStatus CheckInputParamsForV3Version() const;
     aclnnStatus CheckInputShapeForV3Version() const;
     aclnnStatus CheckInputAndOutputDtypeForV3Version() const;
+    aclnnStatus CheckInputTensorsNotNull() const;
     bool CheckTensorListSizeForEachInput() const;
     bool IsSpecialMXCase(const T *tensorList) const;
     bool IsMxfp4() const;

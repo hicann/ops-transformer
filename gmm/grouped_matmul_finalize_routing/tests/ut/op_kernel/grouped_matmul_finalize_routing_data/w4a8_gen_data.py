@@ -42,13 +42,17 @@ def generate_data(groupNum, batch, topK, m, k, n):
     shareInputOffset = batch // 2
     logits_ori = np.random.normal(0, 0.1, [batch, topK]).astype(np.float32)
     routing = np.argsort(logits_ori, axis=1, kind="stable")[:, -topK:].astype(np.int32)
-    logits = softmax(logits_ori[np.arange(batch).reshape(-1, 1).repeat(topK, axis=1), routing],
-                     axis=1).astype(np.float32)
+    logits = softmax(
+        logits_ori[np.arange(batch).reshape(-1, 1).repeat(topK, axis=1), routing],
+        axis=1,
+    ).astype(np.float32)
     logits = logits.reshape(m)
     logits = np.ones(m).astype(np.float32)
     logits = torch.from_numpy(logits)
 
-    sourceRow = (np.argsort(routing.reshape(-1), kind="stable") // topK).astype(np.int64)
+    sourceRow = (np.argsort(routing.reshape(-1), kind="stable") // topK).astype(
+        np.int64
+    )
     sourceRow = torch.from_numpy(sourceRow)
     residSacle = 0
     residual_ori = np.random.normal(0, 0.1, (max(batch // 4, 1), n)).astype(np.float32)
@@ -69,4 +73,6 @@ def generate_data(groupNum, batch, topK, m, k, n):
     y = torch.from_numpy(y)
     torch.save(y, "y.bin")
 
-generate_data(8, 72, 8, 576, 2048, 7168)
+
+if __name__ == "__main__":
+    generate_data(8, 72, 8, 576, 2048, 7168)

@@ -28,14 +28,16 @@ def generate_data(groupNum, batch, topK, m, k, n):
     offset = batch // 2
     logits_ori = np.random.normal(0, 0.1, [batch, groupNum]).astype(np.float32)
     routing = np.argsort(logits_ori, axis=1)[:, -topK:].astype(np.int32)
-    logits = softmax(logits_ori[np.arange(batch).reshape(-1, 1).repeat(topK, axis=1), routing],
-                     axis=1).astype(np.float32)
+    logits = softmax(
+        logits_ori[np.arange(batch).reshape(-1, 1).repeat(topK, axis=1), routing],
+        axis=1,
+    ).astype(np.float32)
     logits = logits.reshape(m)
     sourceRow = (np.argsort(routing.reshape(-1)) // topK).astype(np.int64)
     sourceRow_int32 = (np.argsort(routing.reshape(-1)) // topK).astype(np.int32)
     residSacle = 1
-    resigual_ori = np.random.normal(0, 0.1, (batch // 4, n)).astype(np.float32)
-    residual = resigual_ori.astype(bfloat16)
+    residual_ori = np.random.normal(0, 0.1, (batch // 4, n)).astype(np.float32)
+    residual = residual_ori.astype(bfloat16)
 
     x.tofile("./x.bin")
     weight.tofile("./weight.bin")
@@ -52,7 +54,9 @@ def generate_data(groupNum, batch, topK, m, k, n):
         y = np.zeros((batch, n)).astype(np.float32)
     y.tofile("./y.bin")
 
-datalist = [[1, 1024, 1, 1024, 1024, 8192], [8, 768, 8, 6144, 2048, 7168]]
-arg = sys.argv[1]
-groupNum_in, batch_in, topK_in, m_in, k_in, n_in = datalist[int(arg)]
-generate_data(groupNum_in, batch_in, topK_in, m_in, k_in, n_in)
+
+if __name__ == "__main__":
+    datalist = [[1, 1024, 1, 1024, 1024, 8192], [8, 768, 8, 6144, 2048, 7168]]
+    arg = sys.argv[1]
+    groupNum_in, batch_in, topK_in, m_in, k_in, n_in = datalist[int(arg)]
+    generate_data(groupNum_in, batch_in, topK_in, m_in, k_in, n_in)

@@ -2977,6 +2977,9 @@ static aclnnStatus GetGMMResultByL0Api(gmm::GroupedMatmulParams &params, uint64_
             uniqueExecutor->ConvertToTensor(params.groupListOptional, op::ToOpDataType(ACL_INT64));
         CHECK_RET(params.groupTensorOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
+    CHECK_COND(params.perTokenScaleOptional != nullptr && params.perTokenScaleOptional->Size() > 0 &&
+                   (*params.perTokenScaleOptional)[0] != nullptr,
+               ACLNN_ERR_INNER_NULLPTR, "Create empty perTokenScale tensor failed.");
     auto perTokenScaleOptional =
         (*params.perTokenScaleOptional)[0]->IsEmpty() ? nullptr : (*params.perTokenScaleOptional)[0];
     // Invoke l0 operator GroupedMatmul for calculation.
