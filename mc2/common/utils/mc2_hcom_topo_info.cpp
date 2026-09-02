@@ -49,14 +49,14 @@ static const string GetLibPath()
     const char *ascendPath = std::getenv("ASCEND_HOME_PATH");
     if (ascendPath == nullptr) {
         OP_LOGE("", "Ascend home path doesn't exist.");
-        return nullptr;
+        return "";
     }
 #if defined(__x86_64__)
     std::string hcclPathPostfix = "/x86_64-linux/lib64/libhccl_fwk.so";
 #elif defined(__aarch64__)
     std::string hcclPathPostfix = "/aarch64-linux/lib64/libhccl_fwk.so";
 #else
-    return nullptr;
+    return "";
 #endif
     std::string fullPath = ascendPath + hcclPathPostfix;
     OP_LOGI("", "Loading lib in path %s.", fullPath.c_str());
@@ -124,8 +124,8 @@ MC2HcomTopology::MC2HcomTopology(const char *libPath)
 
 MC2HcomTopology &MC2HcomTopology::GetInstance()
 {
-    static const char *libPath = GetLibPath().c_str();
-    static MC2HcomTopology loader(libPath);
+    static const std::string libPathStr = GetLibPath();
+    static MC2HcomTopology loader(libPathStr.c_str());
     return loader;
 }
 
