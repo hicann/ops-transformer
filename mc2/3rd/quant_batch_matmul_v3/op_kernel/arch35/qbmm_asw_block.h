@@ -195,6 +195,9 @@ __aicore__ inline void Mc2QuantBmmAswBlock::UpdateBlockParams(uint64_t roundIdx)
                 singleCoreNSplit = DequantBmm::Align(singleCoreNSplit, static_cast<uint64_t>(K0_INT8));
             }
         }
+        if (tilingData_->adaptiveSlidingWin.alignNTailSplit) {
+            singleCoreNSplit = DequantBmm::Align(singleCoreNSplit, static_cast<uint64_t>(BMM_BLOCK_NUM));
+        }
         uint64_t mSplitIdx = (blockIdx_ % params_.totalTailTile) % tilingData_->adaptiveSlidingWin.mTailTile;
         uint64_t nSplitIdx = (blockIdx_ % params_.totalTailTile) / tilingData_->adaptiveSlidingWin.mTailTile;
         params_.mSplitAddrOffset = mSplitIdx * singleCoreMSplit;
@@ -242,6 +245,9 @@ __aicore__ inline void Mc2QuantBmmAswBlock::UpdateBlockParams4AL1FullLoad(uint64
             } else {
                 singleCoreNSplit = DequantBmm::Align(singleCoreNSplit, static_cast<uint64_t>(K0_INT8));
             }
+        }
+        if (tilingData_->adaptiveSlidingWin.alignNTailSplit) {
+            singleCoreNSplit = DequantBmm::Align(singleCoreNSplit, static_cast<uint64_t>(BMM_BLOCK_NUM));
         }
         uint64_t mSplitIdx = blockIdx_ % params_.mCnt;
         uint64_t nSplitIdx = blockIdx_ / params_.mCnt % tilingData_->adaptiveSlidingWin.nTailTile;

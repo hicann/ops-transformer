@@ -74,6 +74,7 @@ struct Mc2L2cacheTileParams {
 struct Mc2SlidingWindowParams {
     uint32_t mTailTile = 0;
     uint32_t nTailTile = 0;
+    uint32_t alignNTailSplit = 0;
 };
 #pragma pack(pop)
 
