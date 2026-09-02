@@ -75,6 +75,8 @@ public:
     GlobalTensor<uint32_t> fdMetaDataGm_;
     // metadata
     uint32_t sectionNum_;
+    uint32_t metadata_aic_num_;
+    uint32_t metadata_aiv_num_;
     // fa metadata
     uint32_t bN2Start_;
     uint32_t bN2End_;
@@ -115,12 +117,15 @@ public:
 
         InitConstInfo();
 
-        sectionNum_ = ((__gm__ uint32_t *)fiaMetaData)[0];
-        constInfo_.enableFlashDecode = static_cast<bool>(((__gm__ uint32_t *)fiaMetaData)[1]);
+        sectionNum_ = ((__gm__ uint32_t *)fiaMetaData)[METADATA_HEADER_SECTION_NUM_INDEX];
+        metadata_aic_num_ = ((__gm__ uint32_t *)fiaMetaData)[METADATA_HEADER_AIC_NUM_INDEX];
+        metadata_aiv_num_ = ((__gm__ uint32_t *)fiaMetaData)[METADATA_HEADER_AIV_NUM_INDEX];
+        constInfo_.enableFlashDecode =
+            static_cast<bool>(((__gm__ uint32_t *)fiaMetaData)[METADATA_HEADER_HAS_FD_INDEX]);
         constInfo_.learnableSinkFlag = (learnableSink != nullptr);
 
-        faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t *)(fiaMetaData + FA_METADATA_HEADER_OFFSET),
-                                      FA_AIC_CORE_NUM * 16U * sectionNum_);
+        faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t *)(fiaMetaData + METADATA_HEADER_OFFSET),
+                                      sectionNum_ * metadata_aic_num_ * METADATA_STRIDE);
 
         qSeqLensTool_.Init(cuSeqLensQ, constInfo_.cuSeqLensQSize, seqUsedQ, constInfo_.seqUsedQSize, constInfo_.s1Size);
         kvSeqLensTool_.Init(cuSeqLensKv, constInfo_.cuSeqLensKVSize, seqUsedKv, constInfo_.seqUsedKvSize,
@@ -134,9 +139,9 @@ public:
             vecFaBlock_.ClearOutput();
             if (constInfo_.enableFlashDecode) {
                 fdMetaDataGm_.SetGlobalBuffer(
-                    (__gm__ uint32_t *)(fiaMetaData + FA_METADATA_HEADER_OFFSET +
-                                        FLASH_ATTN_METADATA_SIZE * FA_AIC_CORE_NUM * sectionNum_ * sizeof(uint32_t)),
-                    FA_AIV_CORE_NUM * 16U * sectionNum_);
+                    (__gm__ uint32_t *)(fiaMetaData + METADATA_HEADER_OFFSET +
+                                        sectionNum_ * metadata_aic_num_ * METADATA_STRIDE * sizeof(uint32_t)),
+                    sectionNum_ * metadata_aiv_num_ * METADATA_STRIDE);
                 vecFdBlock_.InitBlock(learnableSink, softmaxLse, attentionOut);
                 vecFdBlock_.InitGlobalTensor(vecFaBlock_.softmaxFDMaxGm_, vecFaBlock_.softmaxFDSumGm_,
                                              vecFaBlock_.accumOutGm_);
@@ -203,11 +208,11 @@ public:
     {
         // AICPU metadata format: 16 fields per AIC core, 0-indexed (no leading CORE_ENABLE).
         // Kernel field constants ( FLASH_ATTN_BN2_START_INDEX=1, etc.) are 1-based, so subtract 1.
-        return FLASH_ATTN_METADATA_SIZE * FA_AIC_CORE_NUM * sectionIdx + 16U * coreIdx + metaIdx;
+        return METADATA_STRIDE * metadata_aic_num_ * sectionIdx + METADATA_STRIDE * coreIdx + metaIdx;
     }
     __aicore__ inline uint32_t GetFDMetaDataIndex(uint32_t coreIdx, uint32_t metaIdx, uint32_t sectionIdx)
     {
-        return FA_FD_METADATA_SIZE * FA_AIV_CORE_NUM * sectionIdx + FA_FD_METADATA_SIZE * coreIdx + metaIdx;
+        return METADATA_STRIDE * metadata_aiv_num_ * sectionIdx + METADATA_STRIDE * coreIdx + metaIdx;
     }
 
     __aicore__ inline void FlashAttention(uint32_t sectionIdx)
