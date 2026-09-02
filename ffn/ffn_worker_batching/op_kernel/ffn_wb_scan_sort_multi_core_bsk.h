@@ -32,23 +32,23 @@ class KernelScanSortMaskMultiCoreBsK : public SortMaskBase {
 public:
     __aicore__ inline KernelScanSortMaskMultiCoreBsK(){};
     __aicore__ inline void Init(GM_ADDR tokenInfoGm, GM_ADDR workspace, SortCustomTilingDataKernel *tilingData,
-                                const ScheduleContextInfo *contextInfo, TPipe *tPipe); 
-    __aicore__ inline void Process(); 
+                                const ScheduleContextInfo *contextInfo, TPipe *tPipe);
+    __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void VBSProcess(); 
-    __aicore__ inline void UBSortProcess(int64_t progress, int64_t size,int64_t sortNum, int64_t loopSessionCnt); 
-    __aicore__ inline void OneCoreVMSProcess(int64_t listNum, int64_t perListElements, int64_t lastListElements); 
-    __aicore__ inline void VMSProcess(); 
-    __aicore__ inline void SortOutProcess(); 
-    __aicore__ inline void VBSCopyInAndClear(int64_t progress, int64_t size, int64_t sortNum, int64_t loopSessionCnt); 
-    __aicore__ inline void UBSortCompute(int64_t progress, int64_t size, int64_t sortNum); 
-    __aicore__ inline void VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum); 
-    __aicore__ inline void InitSortMaskMrgSort(SortCustomMrgsort *sorter, int64_t listNum,
-        int64_t coreOffset, int64_t sortNumCoreOffset, int64_t loopOffset, int64_t loopIdxOffset); 
-    __aicore__ inline void InitSortMaskMrgSortOut(SortCustomMrgsortOut *sorter, int64_t listNum, int64_t coreOffset); 
-    __aicore__ inline void CopyOutValidCount(); 
-    __aicore__ inline void ClearTokenInfoFlag(); 
+    __aicore__ inline void VBSProcess();
+    __aicore__ inline void UBSortProcess(int64_t progress, int64_t size, int64_t sortNum, int64_t loopSessionCnt);
+    __aicore__ inline void OneCoreVMSProcess(int64_t listNum, int64_t perListElements, int64_t lastListElements);
+    __aicore__ inline void VMSProcess();
+    __aicore__ inline void SortOutProcess();
+    __aicore__ inline void VBSCopyInAndClear(int64_t progress, int64_t size, int64_t sortNum, int64_t loopSessionCnt);
+    __aicore__ inline void UBSortCompute(int64_t progress, int64_t size, int64_t sortNum);
+    __aicore__ inline void VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum);
+    __aicore__ inline void InitSortMaskMrgSort(SortCustomMrgsort *sorter, int64_t listNum, int64_t coreOffset,
+                                               int64_t sortNumCoreOffset, int64_t loopOffset, int64_t loopIdxOffset);
+    __aicore__ inline void InitSortMaskMrgSortOut(SortCustomMrgsortOut *sorter, int64_t listNum, int64_t coreOffset);
+    __aicore__ inline void CopyOutValidCount();
+    __aicore__ inline void ClearTokenInfoFlag();
 
 private:
     GlobalTensor<float> workspaceGms[NUM_TWO];
@@ -66,10 +66,10 @@ private:
 
     int64_t perCoreSortNum = 0; // perCoreSessionNum * BsKLenWithPading 主核 每个核排序的元素总个数; 不保证32个数对齐
     int64_t lastCoreSortNum = 0; // lastCoreSessionNum * BsKLenWithPading;
-    int64_t sessionLoops = 0; // 当前核 ub循环次数
+    int64_t sessionLoops = 0;    // 当前核 ub循环次数
 
-    int64_t perLoopElements = 0; 
-    int64_t lastLoopElement = 0; 
+    int64_t perLoopElements = 0;
+    int64_t lastLoopElement = 0;
 
     // for MoeMrgsort
     SortCustomMrgsort mrgsorter;
@@ -84,45 +84,48 @@ private:
     int64_t lastListElements = 0;
     int64_t vmsSortNumStride_ = 0; // 核间
 
-    int64_t perCorePad_ = 0; // 记录pad
+    int64_t perCorePad_ = 0;  // 记录pad
     int64_t lastCorePad_ = 0; // 记录pad
-    int64_t splitNum_ = 1; // 原始块被切分后的块数
-    int64_t recordCnt_ = 0; // 记录1个原始块的有效专家数
-    
+    int64_t splitNum_ = 1;    // 原始块被切分后的块数
+    int64_t recordCnt_ = 0;   // 记录1个原始块的有效专家数
+
     static constexpr int64_t MAX_MRGSORT_LIST = 4;
 };
 
 __aicore__ inline void KernelScanSortMaskMultiCoreBsK::VBSCopyInAndClear(int64_t progress, int64_t size,
-    int64_t sortNum, int64_t loopSessionCnt)
+                                                                         int64_t sortNum, int64_t loopSessionCnt)
 {
     int64_t curCorePad = 0;
-    
+
     // 根据当前块位置计算参数
     if ((progress % splitNum_) != (splitNum_ - 1)) {
         curCorePad = perCorePad_;
     } else {
         curCorePad = lastCorePad_;
     }
-    
+
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
     int64_t inOffset = 0;
-    
-    // 偏移量应该是上一次实际参与排序的元素个数（不包含pad）
-    inOffset = (progress % splitNum_) * (perLoopElements - perCorePad_) + (progress / splitNum_) * (contextInfo_->M * this->F); // 单循环处理元素个数
 
-    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(loopSessionCnt), // 搬运块数 = 1
-        static_cast<uint32_t>((size - curCorePad) * sizeof(int32_t)), // 实际元素个数
-        0, 0, 0};
-    DataCopyPadExtParams<int32_t> dataCopyPadParams{true, 0, static_cast<uint8_t>(curCorePad), INT_MAX}; // 当前pad长度=perCorePad_
-    
+    // 偏移量应该是上一次实际参与排序的元素个数（不包含pad）
+    inOffset = (progress % splitNum_) * (perLoopElements - perCorePad_) +
+               (progress / splitNum_) * (contextInfo_->M * this->F); // 单循环处理元素个数
+
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(loopSessionCnt),                        // 搬运块数 = 1
+                                     static_cast<uint32_t>((size - curCorePad) * sizeof(int32_t)), // 实际元素个数
+                                     0, 0, 0};
+    DataCopyPadExtParams<int32_t> dataCopyPadParams{true, 0, static_cast<uint8_t>(curCorePad),
+                                                    INT_MAX}; // 当前pad长度=perCorePad_
+
     DataCopyPad(inLocal[0], expertIdsGm[inOffset], dataCopyParams, dataCopyPadParams);
-    
+
     LocalTensor<int32_t> rowIdsLocal = inLocal[sortNum];
     // 索引生成只有(A, BsKPad)
-    
+
     int64_t startValue = blockIdx_ * tilingData_->perCoreSessionNum * BsKLenWithPading +
-                        (progress % splitNum_) * perLoopElements + (progress / splitNum_) * BsKLenWithPading; // 起始值为上一次参与排序的元素个数（包括pad）
-                        
+                         (progress % splitNum_) * perLoopElements +
+                         (progress / splitNum_) * BsKLenWithPading; // 起始值为上一次参与排序的元素个数（包括pad）
+
     // size是向上32位补齐后的元素个数
     ArithProgression<int32_t>(rowIdsLocal, startValue, 1, size); // size包括: BsKLenWithPading
 
@@ -135,13 +138,13 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::VBSCopyInAndClear(int64_t
     sortDataCopyOutQueue.EnQue(clearLocal);
 
     clearLocal = sortDataCopyOutQueue.DeQue<int32_t>();
-    
+
     DataCopyExtParams copyoutParams{static_cast<uint16_t>(loopSessionCnt),
-        static_cast<uint32_t>((size - curCorePad) * sizeof(int32_t)), // 实际元素个数
-        0, 0, 0};
+                                    static_cast<uint32_t>((size - curCorePad) * sizeof(int32_t)), // 实际元素个数
+                                    0, 0, 0};
     SetWaitFlag<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
     DataCopyPad(expertIdsGm[inOffset], clearLocal, copyoutParams);
-    
+
     sortDataCopyOutQueue.FreeTensor(clearLocal);
 }
 
@@ -162,21 +165,18 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::UBSortCompute(int64_t pro
 
     LocalTensor<uint8_t> maskLocalTensorUInt8 = maskLocalTensor.ReinterpretCast<uint8_t>();
 
-    AscendC::CompareScalar(maskLocalTensorUInt8,
-        expertIdsLocalFp32,
-        static_cast<float>(-expertStart_),
-        AscendC::CMPMODE::GT,
-        (size + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
-    
+    AscendC::CompareScalar(maskLocalTensorUInt8, expertIdsLocalFp32, static_cast<float>(-expertStart_),
+                           AscendC::CMPMODE::GT,
+                           (size + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
+
     GatherMaskParams gatherMaskParams;
     gatherMaskParams.repeatTimes = 1;
     gatherMaskParams.src0BlockStride = 1;
     gatherMaskParams.src0RepeatStride = 8; // 8 blocks
     gatherMaskParams.src1RepeatStride = 0;
 
-    GatherMask(
-        expertIdsLocalFp32, expertIdsLocalFp32, maskLocalTensor, true, size, gatherMaskParams, rsvdCnt);
-    
+    GatherMask(expertIdsLocalFp32, expertIdsLocalFp32, maskLocalTensor, true, size, gatherMaskParams, rsvdCnt);
+
     curValidCnt_ = rsvdCnt;
 
     if (rsvdCnt == 0) {
@@ -213,11 +213,11 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::VBSCopyOut(int64_t progre
 {
     if (curValidCnt_ > 0) {
         LocalTensor<float> outLocal = sortDataCopyOutQueue.DeQue<float>();
-        DataCopyExtParams copyParams{1, static_cast<uint32_t>(GetSortLen<float>(curValidCnt_) * sizeof(int32_t)),
-                                    0, 0, 0};
-        int64_t wkOffset = blockIdx_ * GetSortLen<float>(perCoreSortNum) + 
-                            GetSortLen<float>(progress * (perLoopElements));
-        
+        DataCopyExtParams copyParams{1, static_cast<uint32_t>(GetSortLen<float>(curValidCnt_) * sizeof(int32_t)), 0, 0,
+                                     0};
+        int64_t wkOffset =
+            blockIdx_ * GetSortLen<float>(perCoreSortNum) + GetSortLen<float>(progress * (perLoopElements));
+
         DataCopyPad(workspaceGms[0][wkOffset], outLocal, copyParams);
 
         sortDataCopyOutQueue.FreeTensor(outLocal);
@@ -229,16 +229,17 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::VBSCopyOut(int64_t progre
     tempTensor.SetValue(0, curValidCnt_);
     SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
     DataCopyExtParams copyParams1{static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(int32_t)), 0, 0, 0};
-    DataCopyPad(workspaceSortNumGm_[blockIdx_ * tilingData_->sortNumWorkSpacePerCore + progress],
-                tempTensor, copyParams1);
+    DataCopyPad(workspaceSortNumGm_[blockIdx_ * tilingData_->sortNumWorkSpacePerCore + progress], tempTensor,
+                copyParams1);
 }
 
 __aicore__ inline void KernelScanSortMaskMultiCoreBsK::InitSortMaskMrgSort(SortCustomMrgsort *sorter, int64_t listNum,
-    int64_t coreOffset, int64_t sortNumCoreOffset, int64_t loopOffset, int64_t loopIdxOffset)
+                                                                           int64_t coreOffset,
+                                                                           int64_t sortNumCoreOffset,
+                                                                           int64_t loopOffset, int64_t loopIdxOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx_ * coreOffset + loopOffset];
-    GlobalTensor<int32_t> srcSortNumGm = workspaceSortNumGm_[blockIdx_ * sortNumCoreOffset +
-                                                             loopIdxOffset];
+    GlobalTensor<int32_t> srcSortNumGm = workspaceSortNumGm_[blockIdx_ * sortNumCoreOffset + loopIdxOffset];
     LocalTensor<float> inLocal = sortDataCopyInQueue.AllocTensor<float>();
     LocalTensor<float> outLocal = sortDataCopyOutQueue.AllocTensor<float>();
     for (int64_t i = 0; i < listNum; i++) {
@@ -253,8 +254,8 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::InitSortMaskMrgSort(SortC
     tempBuffer.FreeTensor(outSortNumLocal);
 }
 
-__aicore__ inline void KernelScanSortMaskMultiCoreBsK::InitSortMaskMrgSortOut(
-    SortCustomMrgsortOut *sorter, int64_t listNum, int64_t coreOffset)
+__aicore__ inline void KernelScanSortMaskMultiCoreBsK::InitSortMaskMrgSortOut(SortCustomMrgsortOut *sorter,
+                                                                              int64_t listNum, int64_t coreOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex];
     GlobalTensor<int32_t> srcSortNumGm = workspaceSortNumGm_;
@@ -276,8 +277,8 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::InitSortMaskMrgSortOut(
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void KernelScanSortMaskMultiCoreBsK::OneCoreVMSProcess(
-    int64_t listNum, int64_t perListElements, int64_t lastListElements)
+__aicore__ inline void KernelScanSortMaskMultiCoreBsK::OneCoreVMSProcess(int64_t listNum, int64_t perListElements,
+                                                                         int64_t lastListElements)
 {
     int64_t coreOffset = GetSortLen<float>(perCoreSortNum);
     int64_t sortNumCoreOffset = tilingData_->sortNumWorkSpacePerCore;
@@ -296,14 +297,14 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::OneCoreVMSProcess(
         int64_t loopOffset = GetSortLen<float>(mrgsortParam.perListElements * MAX_MRGSORT_LIST);
         int64_t loopIdxOffset = mrgsortParam.sortNumStride * MAX_MRGSORT_LIST;
         for (int64_t loop = 0; loop < loops - 1; loop++) {
-            InitSortMaskMrgSort(&mrgsorter, MAX_MRGSORT_LIST, coreOffset, sortNumCoreOffset, 
-                                loop * loopOffset, loop * loopIdxOffset);
+            InitSortMaskMrgSort(&mrgsorter, MAX_MRGSORT_LIST, coreOffset, sortNumCoreOffset, loop * loopOffset,
+                                loop * loopIdxOffset);
             mrgsorter.Init(&mrgsortParam);
             mrgsorter.Process();
         }
 
-        InitSortMaskMrgSort(&mrgsorter, remainListNum, coreOffset, sortNumCoreOffset,
-                            (loops - 1) * loopOffset, (loops - 1) * loopIdxOffset);
+        InitSortMaskMrgSort(&mrgsorter, remainListNum, coreOffset, sortNumCoreOffset, (loops - 1) * loopOffset,
+                            (loops - 1) * loopIdxOffset);
         mrgsorter.Init(&mrgsortParam);
         mrgsorter.Process();
 
@@ -340,14 +341,14 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::OneCoreVMSProcess(
             intriParamsOut.blockCount = 1;
             intriParamsOut.blockLen = GetSortLen<float>(this->totalValidCnt_ * NUM_TWO) * sizeof(float);
             DataCopyPad(dstWsGm, inLocal, intriParamsOut);
-            
+
             sortDataCopyInQueue.FreeTensor(inLocal);
         }
     }
 }
 
-__aicore__ inline void KernelScanSortMaskMultiCoreBsK::UBSortProcess(int64_t progress, int64_t size,
-    int64_t sortNum, int64_t loopSessionCnt)
+__aicore__ inline void KernelScanSortMaskMultiCoreBsK::UBSortProcess(int64_t progress, int64_t size, int64_t sortNum,
+                                                                     int64_t loopSessionCnt)
 {
     VBSCopyInAndClear(progress, size, sortNum, loopSessionCnt);
     UBSortCompute(progress, size, sortNum);
@@ -448,7 +449,8 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::CopyOutValidCount()
 }
 
 __aicore__ inline void KernelScanSortMaskMultiCoreBsK::Init(GM_ADDR tokenInfoGm, GM_ADDR workspace,
-    SortCustomTilingDataKernel *tilingData, const ScheduleContextInfo *contextInfo, TPipe *tPipe)
+                                                            SortCustomTilingDataKernel *tilingData,
+                                                            const ScheduleContextInfo *contextInfo, TPipe *tPipe)
 {
     this->pipe = tPipe;
     tilingData_ = tilingData;
@@ -470,8 +472,10 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::Init(GM_ADDR tokenInfoGm,
 
     int64_t perCoreBsKLen = contextInfo_->sortLoopMaxElement;
     // 尾块也单独占一个UB
-    perCoreSortNum = tilingData_->perCoreSessionNum * CeilDiv(contextInfo_->BS * contextInfo_->K, perCoreBsKLen) * perCoreBsKLen;
-    lastCoreSortNum = tilingData_->lastCoreSessionNum * CeilDiv(contextInfo_->BS * contextInfo_->K, perCoreBsKLen) * perCoreBsKLen;
+    perCoreSortNum =
+        tilingData_->perCoreSessionNum * CeilDiv(contextInfo_->BS * contextInfo_->K, perCoreBsKLen) * perCoreBsKLen;
+    lastCoreSortNum =
+        tilingData_->lastCoreSessionNum * CeilDiv(contextInfo_->BS * contextInfo_->K, perCoreBsKLen) * perCoreBsKLen;
 
     // 切BS*K，计算每个循环可容纳BS*K大小
     // 非尾块元素个数均为UB最大元素个数
@@ -490,34 +494,36 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::Init(GM_ADDR tokenInfoGm,
 
     // 原始块被切分后的块数
     splitNum_ = CeilDiv(contextInfo_->BS * contextInfo_->K, perCoreBsKLen);
-    
+
     // 重新计算单核排序所需变量
     // 需要循环多少次，ub总数 = 原始session数 * 原始块被切分后的块数
-    sessionLoops = curCoreSessionNum * splitNum_; 
-    
+    sessionLoops = curCoreSessionNum * splitNum_;
+
     int64_t expertIdStartPos = contextInfo_->curMicroBatchID * F + 1 + 1;
     expertIdsGmFStart_.SetGlobalBuffer((__gm__ int32_t *)tokenInfoGm + contextInfo_->curMicroBatchID * F);
     expertIdsGm.SetGlobalBuffer((__gm__ int32_t *)tokenInfoGm + expertIdStartPos +
-                blockIdx_ * tilingData_->perCoreSessionNum * contextInfo_->M * F);
+                                blockIdx_ * tilingData_->perCoreSessionNum * contextInfo_->M * F);
     // rsvdCntGm 在scan阶段已经清零
     rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), SCAN_BATCHID_GM_OFFSET);
     workspaceSortNumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS,
                                         contextInfo_->sortNumWorkSpace);
 
-    sortedexpertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
-                                    contextInfo_->sortNumWorkSpace, this->totalLength);
+    sortedexpertIdsGm.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
+        this->totalLength);
     sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
-        contextInfo_->sortNumWorkSpace + this->totalLength, this->totalLength);
+                                       contextInfo_->sortNumWorkSpace + this->totalLength,
+                                   this->totalLength);
 
     workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace + OFFSET_SORTED_EXPERT_IDS +
-        contextInfo_->sortNumWorkSpace + this->totalLength * NUM_TWO, this->totalLength * NUM_TWO);
+                                        contextInfo_->sortNumWorkSpace + this->totalLength * NUM_TWO,
+                                    this->totalLength * NUM_TWO);
     workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace + OFFSET_SORTED_EXPERT_IDS +
-        contextInfo_->sortNumWorkSpace + this->totalLength * (NUM_TWO + NUM_TWO),
-        this->totalLength * NUM_TWO);
+                                        contextInfo_->sortNumWorkSpace + this->totalLength * (NUM_TWO + NUM_TWO),
+                                    this->totalLength * NUM_TWO);
 
-    bufferSize_ = Ceil(Max(tilingData_->oneLoopMaxElementsMrg * MAX_MRGSORT_LIST, perCoreBsKLen),
-                             ONE_REPEAT_SORT_NUM) *
-                         ONE_REPEAT_SORT_NUM * sizeof(int32_t) * NUM_TWO;
+    bufferSize_ = Ceil(Max(tilingData_->oneLoopMaxElementsMrg * MAX_MRGSORT_LIST, perCoreBsKLen), ONE_REPEAT_SORT_NUM) *
+                  ONE_REPEAT_SORT_NUM * sizeof(int32_t) * NUM_TWO;
     pipe->InitBuffer(sortDataCopyInQueue, bufferNum, bufferSize_);
     pipe->InitBuffer(sortDataCopyOutQueue, bufferNum, bufferSize_);
     pipe->InitBuffer(sortedBuffer, bufferSize_);
@@ -528,7 +534,7 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::ClearTokenInfoFlag()
 {
     // 用最后一个核清理flag. 一个block一个有效数(0, int32_t). 总共需要A个block.
     if (blockIdx_ == contextInfo_->coreNum - 1) {
-        int64_t perLoopElement = bufferSize_ / BLOCK_SIZE;      // buffer总共可以支持的block个数
+        int64_t perLoopElement = bufferSize_ / BLOCK_SIZE; // buffer总共可以支持的block个数
         int64_t loops = Ceil(contextInfo_->A, perLoopElement);
         int64_t lastLoopElement = contextInfo_->A - (loops - 1) * perLoopElement;
         int64_t duplicateNum = Min(static_cast<int64_t>(contextInfo_->A), perLoopElement) * 8; // 8: block num
@@ -545,9 +551,8 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::ClearTokenInfoFlag()
             }
 
             DataCopyExtParams copyOutParams{static_cast<uint16_t>(curElementA), static_cast<uint32_t>(sizeof(int32_t)),
-                0, static_cast<uint32_t>((contextInfo_->M * F - 1) * sizeof(int32_t)), 0};
-            DataCopyPad(expertIdsGmFStart_[idx * perLoopElement * contextInfo_->M * F],
-                        clearLocal, copyOutParams);
+                                            0, static_cast<uint32_t>((contextInfo_->M * F - 1) * sizeof(int32_t)), 0};
+            DataCopyPad(expertIdsGmFStart_[idx * perLoopElement * contextInfo_->M * F], clearLocal, copyOutParams);
         }
     }
 }
@@ -559,5 +564,5 @@ __aicore__ inline void KernelScanSortMaskMultiCoreBsK::Process()
     VMSProcess();
     SortOutProcess();
 }
-}  // namespace FfnWbBatching
-#endif  // OP_KERNEL_FFN_WB_SCAN_SORT_MULTI_CORE_BSK_H
+} // namespace FfnWbBatching
+#endif // OP_KERNEL_FFN_WB_SCAN_SORT_MULTI_CORE_BSK_H

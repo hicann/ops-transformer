@@ -23,17 +23,18 @@ namespace RotaryPositionEmbeddingGrad {
 using namespace AscendC;
 
 template <typename T>
-class RopeGradRotaryX
-{
+class RopeGradRotaryX {
 public:
-    __aicore__ inline RopeGradRotaryX(TPipe* pipe, const RotaryXParams* tiling) : pipe_(pipe), tilingData_(tiling){};
+    __aicore__ inline RopeGradRotaryX(TPipe *pipe, const RotaryXParams *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR workspace);
     __aicore__ inline void Process();
 
 private:
     constexpr static int32_t bufferNum = 2;
-    const RotaryXParams* tilingData_;
-    TPipe* pipe_;
+    const RotaryXParams *tilingData_;
+    TPipe *pipe_;
     int64_t blockIdx_ = 0;
     int64_t dSplitCoef_ = 1; // 切分系数初始化为1
     uint32_t dSplitSize_ = 0;
@@ -48,8 +49,8 @@ private:
     TQue<QuePosition::VECOUT, 1> xRotary2ndOutQue_;
 
 private:
-    __aicore__ inline void ComputeRotaryX(
-        const LocalTensor<T>& xTensor, const LocalTensor<T>& xRotaryTensor, const uint32_t currDNum);
+    __aicore__ inline void ComputeRotaryX(const LocalTensor<T> &xTensor, const LocalTensor<T> &xRotaryTensor,
+                                          const uint32_t currDNum);
 };
 
 template <typename T>
@@ -70,12 +71,12 @@ __aicore__ inline void RopeGradRotaryX<T>::Init(GM_ADDR x, GM_ADDR workspace)
     dAlign_ = Ops::Base::CeilAlign<int64_t>(tilingData_->d / dSplitCoef_, BLOCK_TYPE_SIZE / sizeof(T)) * dSplitCoef_;
     int64_t gmOffset = blockIdx_ * tilingData_->blockFactorN * tilingData_->d;
     ubFactorN_ = tilingData_->ubFactorN;
-    xGm_.SetGlobalBuffer((__gm__ T*)x + gmOffset);
-    xRotaryWorkSpace_.SetGlobalBuffer((__gm__ T*)workspace + gmOffset, workSpaceSize_);
+    xGm_.SetGlobalBuffer((__gm__ T *)x + gmOffset);
+    xRotaryWorkSpace_.SetGlobalBuffer((__gm__ T *)workspace + gmOffset, workSpaceSize_);
     pipe_->InitBuffer(xInQue_, bufferNum, ubFactorN_ * dAlign_ * sizeof(T));
     pipe_->InitBuffer(xRotaryOutQue_, bufferNum, ubFactorN_ * dAlign_ * sizeof(T));
     if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {
-        xRotary2ndWorkSpace_.SetGlobalBuffer((__gm__ T*)workspace + workSpaceSize_ + gmOffset, workSpaceSize_);
+        xRotary2ndWorkSpace_.SetGlobalBuffer((__gm__ T *)workspace + workSpaceSize_ + gmOffset, workSpaceSize_);
         pipe_->InitBuffer(xRotary2ndOutQue_, bufferNum, ubFactorN_ * dAlign_ * sizeof(T));
     }
 }
@@ -126,8 +127,8 @@ __aicore__ inline void RopeGradRotaryX<T>::Process()
 }
 
 template <typename T>
-__aicore__ inline void RopeGradRotaryX<T>::ComputeRotaryX(
-    const LocalTensor<T>& xTensor, const LocalTensor<T>& xRotaryTensor, const uint32_t currDNum)
+__aicore__ inline void RopeGradRotaryX<T>::ComputeRotaryX(const LocalTensor<T> &xTensor,
+                                                          const LocalTensor<T> &xRotaryTensor, const uint32_t currDNum)
 {
     if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::HALF)) {
         HalfRotaryVF<T>(xTensor, xRotaryTensor, tilingData_->d, dAlign_, currDNum);

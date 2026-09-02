@@ -51,14 +51,11 @@ private:
 __aicore__ inline void KernelScanSortMaskOneCore::CopyInAndClear()
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{
-            static_cast<uint16_t>(contextInfo_->A),
-            static_cast<uint32_t>(contextInfo_->BS * contextInfo_->K * INT32_SIZE),
-            static_cast<uint32_t>(((contextInfo_->M - 1) * F_ + NUM_TWO) * INT32_SIZE),
-            0, 0};
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(contextInfo_->A),
+                                     static_cast<uint32_t>(contextInfo_->BS * contextInfo_->K * INT32_SIZE),
+                                     static_cast<uint32_t>(((contextInfo_->M - 1) * F_ + NUM_TWO) * INT32_SIZE), 0, 0};
     DataCopyPadExtParams dataCopyPadParams{true, 0, static_cast<uint8_t>(contextInfo_->BsKPaddingCount), INT_MAX};
-    DataCopyPad(inLocal, expertIdsGm[contextInfo_->curMicroBatchID * F_ + NUM_TWO],
-                dataCopyParams, dataCopyPadParams);
+    DataCopyPad(inLocal, expertIdsGm[contextInfo_->curMicroBatchID * F_ + NUM_TWO], dataCopyParams, dataCopyPadParams);
 
     LocalTensor<int32_t> rowIdsLocal = inLocal[this->sortNum];
     ArithProgression<int32_t>(rowIdsLocal, 0, 1, this->totalLength);
@@ -71,13 +68,12 @@ __aicore__ inline void KernelScanSortMaskOneCore::CopyInAndClear()
     sortDataCopyOutQueue.EnQue(clearLocal);
 
     clearLocal = sortDataCopyOutQueue.DeQue<int32_t>();
-    DataCopyExtParams copyoutParams{static_cast<uint16_t>(contextInfo_->A),
-        static_cast<uint32_t>(contextInfo_->BS * contextInfo_->K * sizeof(int32_t)),
-        0,
-        static_cast<uint32_t>((contextInfo_->M * F_ - contextInfo_->BS * contextInfo_->K) * sizeof(int32_t)),
-        0};
-    DataCopyExtParams copyOutParamsF{static_cast<uint16_t>(contextInfo_->A), static_cast<uint32_t>(sizeof(int32_t)),
-        0, static_cast<uint32_t>((contextInfo_->M * F_ - 1) * sizeof(int32_t)), 0};
+    DataCopyExtParams copyoutParams{
+        static_cast<uint16_t>(contextInfo_->A),
+        static_cast<uint32_t>(contextInfo_->BS * contextInfo_->K * sizeof(int32_t)), 0,
+        static_cast<uint32_t>((contextInfo_->M * F_ - contextInfo_->BS * contextInfo_->K) * sizeof(int32_t)), 0};
+    DataCopyExtParams copyOutParamsF{static_cast<uint16_t>(contextInfo_->A), static_cast<uint32_t>(sizeof(int32_t)), 0,
+                                     static_cast<uint32_t>((contextInfo_->M * F_ - 1) * sizeof(int32_t)), 0};
 
     SetWaitFlag<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
     DataCopyPad(expertIdsGm[contextInfo_->curMicroBatchID * F_ + NUM_TWO], clearLocal, copyoutParams);
@@ -101,10 +97,8 @@ __aicore__ inline void KernelScanSortMaskOneCore::SortCompute()
     PipeBarrier<PIPE_V>();
 
     LocalTensor<uint8_t> maskLocalTensorUInt8 = maskLocalUInt32.ReinterpretCast<uint8_t>();
-    AscendC::CompareScalar(maskLocalTensorUInt8,
-        expertIdsFp32,
-        static_cast<float>(-expertStart_),
-        AscendC::CMPMODE::GT,
+    AscendC::CompareScalar(
+        maskLocalTensorUInt8, expertIdsFp32, static_cast<float>(-expertStart_), AscendC::CMPMODE::GT,
         (this->totalLength + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
     PipeBarrier<PIPE_V>();
 
@@ -173,11 +167,13 @@ __aicore__ inline void KernelScanSortMaskOneCore::CopyOut()
     }
 
     rsvdCntGm.SetValue(0, this->validCnt);
-    DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(rsvdCntGm);
+    DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(
+        rsvdCntGm);
 }
 
 __aicore__ inline void KernelScanSortMaskOneCore::Init(GM_ADDR tokenInfoGm, GM_ADDR workspace,
-    SortCustomTilingDataKernel *tilingData, const ScheduleContextInfo *contextInfo, TPipe *tPipe)
+                                                       SortCustomTilingDataKernel *tilingData,
+                                                       const ScheduleContextInfo *contextInfo, TPipe *tPipe)
 {
     this->pipe = tPipe;
     contextInfo_ = contextInfo;
@@ -190,10 +186,12 @@ __aicore__ inline void KernelScanSortMaskOneCore::Init(GM_ADDR tokenInfoGm, GM_A
 
     expertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(tokenInfoGm));
     rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), OFFSET_SORTED_EXPERT_IDS);
-    sortedexpertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
-                                    contextInfo_->sortNumWorkSpace, this->totalLength);
+    sortedexpertIdsGm.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
+        this->totalLength);
     sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
-                                    contextInfo_->sortNumWorkSpace + this->totalLength, this->totalLength);
+                                       contextInfo_->sortNumWorkSpace + this->totalLength,
+                                   this->totalLength);
 
     if (needCoreNum_ == 0 && GetBlockIdx() == 0) {
         rsvdCntGm.SetValue(0, 0);
@@ -218,5 +216,5 @@ __aicore__ inline void KernelScanSortMaskOneCore::Process()
     }
     SyncAll();
 }
-}  // namespace FfnWbBatching
-#endif  // OP_KERNEL_FFN_WB_SCAN_SORT_ONE_CORE_H
+} // namespace FfnWbBatching
+#endif // OP_KERNEL_FFN_WB_SCAN_SORT_ONE_CORE_H

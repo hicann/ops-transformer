@@ -44,13 +44,12 @@
 namespace UndGenQkvRmsNormRopeCache {
 namespace MicroAPI = AscendC::MicroAPI;
 
-constexpr static MicroAPI::CastTrait CAST_B16_TO_B32 = {
-    MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN, MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::UNKNOWN};
+constexpr static MicroAPI::CastTrait CAST_B16_TO_B32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
+                                                        MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
 
-constexpr static MicroAPI::CastTrait CAST_FP32_TO_B16 = {
-    MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT, MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT};
+constexpr static MicroAPI::CastTrait CAST_FP32_TO_B16 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
+                                                         MicroAPI::MaskMergeMode::ZEROING,
+                                                         AscendC::RoundMode::CAST_RINT};
 
 /**
  * @brief 本次调用的 UB 起址，逐 tile 变化
@@ -59,13 +58,13 @@ constexpr static MicroAPI::CastTrait CAST_FP32_TO_B16 = {
  * 输出的 q/k/v 三段各自独立，由调用方按 outLocal 的分段布局给出。
  */
 struct QkvMropeTileAddr {
-    __ubuf__ bfloat16_t* qkvIn;      // tile 内首 token 的输入行首，[token][N][D]
-    __ubuf__ float* gammaAll;        // 4 份常驻 gamma，[undQ|undK|genQ|genK][D]，各 D 个 float
-    __ubuf__ float* rawCosSin;       // 首 token 的三轴原始 cos_sin，[token][3][D]
-    __ubuf__ uint32_t* gatherIndex;  // axisLut 展开成的元素索引，[D/2]
-    __ubuf__ bfloat16_t* qOut;       // 输出 q 段起址，[token][Hq][D]
-    __ubuf__ bfloat16_t* kOut;       // 输出 k 段起址，[token][Hk][D]
-    __ubuf__ bfloat16_t* vOut;       // 输出 v 段起址，[token][Hv][D]
+    __ubuf__ bfloat16_t *qkvIn;     // tile 内首 token 的输入行首，[token][N][D]
+    __ubuf__ float *gammaAll;       // 4 份常驻 gamma，[undQ|undK|genQ|genK][D]，各 D 个 float
+    __ubuf__ float *rawCosSin;      // 首 token 的三轴原始 cos_sin，[token][3][D]
+    __ubuf__ uint32_t *gatherIndex; // axisLut 展开成的元素索引，[D/2]
+    __ubuf__ bfloat16_t *qOut;      // 输出 q 段起址，[token][Hq][D]
+    __ubuf__ bfloat16_t *kOut;      // 输出 k 段起址，[token][Hk][D]
+    __ubuf__ bfloat16_t *vOut;      // 输出 v 段起址，[token][Hv][D]
 };
 
 /**
@@ -75,18 +74,18 @@ struct QkvMropeTileAddr {
  * 不需要每个 tile 重算。步长单位一律是「元素」而非字节。
  */
 struct QkvMropeTileShape {
-    uint16_t qHeadNum;           // Hq
-    uint16_t kHeadNum;           // Hk
-    uint16_t vHeadNum;           // Hv
-    uint32_t inTokenStride;      // 输入 token 步长 = N*D
-    uint32_t cosSinTokenStride;  // cos_sin token 步长 = 3*D
-    uint32_t qOutTokenStride;    // q 段 token 步长 = Hq*D
-    uint32_t kOutTokenStride;    // k 段 token 步长 = Hk*D
-    uint32_t vOutTokenStride;    // v 段 token 步长 = Hv*D
-    uint32_t headStride;         // head 步长 = D，输入与输出相同
-    uint32_t halfDim;            // D/2，必须等于 VL_FP32
-    float epsilon;               // RMSNorm eps
-    float reciprocal;            // 1/D
+    uint16_t qHeadNum;          // Hq
+    uint16_t kHeadNum;          // Hk
+    uint16_t vHeadNum;          // Hv
+    uint32_t inTokenStride;     // 输入 token 步长 = N*D
+    uint32_t cosSinTokenStride; // cos_sin token 步长 = 3*D
+    uint32_t qOutTokenStride;   // q 段 token 步长 = Hq*D
+    uint32_t kOutTokenStride;   // k 段 token 步长 = Hk*D
+    uint32_t vOutTokenStride;   // v 段 token 步长 = Hv*D
+    uint32_t headStride;        // head 步长 = D，输入与输出相同
+    uint32_t halfDim;           // D/2，必须等于 VL_FP32
+    float epsilon;              // RMSNorm eps
+    float reciprocal;           // 1/D
 };
 
 /**
@@ -98,7 +97,7 @@ struct QkvMropeTileShape {
 struct MropeTokenRegs {
     MicroAPI::RegTensor<float> cosValue;
     MicroAPI::RegTensor<float> sinValue;
-    MicroAPI::RegTensor<float> sinNeg;  // -sin，用于把低半 RoPE 的减法折进乘加
+    MicroAPI::RegTensor<float> sinNeg; // -sin，用于把低半 RoPE 的减法折进乘加
     MicroAPI::RegTensor<float> qGammaLow;
     MicroAPI::RegTensor<float> qGammaHigh;
     MicroAPI::RegTensor<float> kGammaLow;
@@ -120,10 +119,9 @@ struct MropeTokenRegs {
  *       低半、高半两次访存各推 halfDim，两次之后正好走过 headStride（= D = 2*halfDim），
  *       所以调用方的 head 循环不需要再算 h * headStride，直接反复调用即可。
  */
-__aicore__ inline void RmsNormRopeOneHead(__ubuf__ bfloat16_t*& inHead, __ubuf__ bfloat16_t*& outHead,
-                                          MicroAPI::RegTensor<float>& gammaLow, MicroAPI::RegTensor<float>& gammaHigh,
-                                          MropeTokenRegs& regs, const QkvMropeTileShape& shape,
-                                          MicroAPI::MaskReg pFull)
+__aicore__ inline void RmsNormRopeOneHead(__ubuf__ bfloat16_t *&inHead, __ubuf__ bfloat16_t *&outHead,
+                                          MicroAPI::RegTensor<float> &gammaLow, MicroAPI::RegTensor<float> &gammaHigh,
+                                          MropeTokenRegs &regs, const QkvMropeTileShape &shape, MicroAPI::MaskReg pFull)
 {
     const int32_t halfStep = static_cast<int32_t>(shape.halfDim);
     MicroAPI::RegTensor<bfloat16_t> xLowB16;
@@ -198,7 +196,7 @@ __aicore__ inline void RmsNormRopeOneHead(__ubuf__ bfloat16_t*& inHead, __ubuf__
  *                  und 的 gamma。由 CopyIn 顺带产出（那里本来就要读 cat_indices 算源行），
  *                  省掉一次 GM 标量读。tokenSize <= 64 由 host tiling 保证
  */
-__aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr& addr, const QkvMropeTileShape& shape,
+__aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr &addr, const QkvMropeTileShape &shape,
                                             uint16_t tokenSize, uint64_t undMask)
 {
     if (tokenSize == 0) {
@@ -225,11 +223,11 @@ __aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr& addr, const 
         //   1) cos_sin 用 Gather，而 Gather 只有 (dst, baseAddr, index, mask) 一个原型，
         //      既没有 post-update 也没有 AddrReg 重载，只能保留显式指针每 token 推一次；
         //   2) gamma 的基址由 undMask 决定，不是单调前进，同样只能显式算。
-        __ubuf__ bfloat16_t* inPtr = addr.qkvIn;
-        __ubuf__ bfloat16_t* qOutPtr = addr.qOut;
-        __ubuf__ bfloat16_t* kOutPtr = addr.kOut;
-        __ubuf__ bfloat16_t* vOutPtr = addr.vOut;
-        __ubuf__ float* cosSinPtr = addr.rawCosSin;
+        __ubuf__ bfloat16_t *inPtr = addr.qkvIn;
+        __ubuf__ bfloat16_t *qOutPtr = addr.qOut;
+        __ubuf__ bfloat16_t *kOutPtr = addr.kOut;
+        __ubuf__ bfloat16_t *vOutPtr = addr.vOut;
+        __ubuf__ float *cosSinPtr = addr.rawCosSin;
         // gen 的 gamma 在 UB 上正好排在 und 之后 2*D 处（[undQ|undK|genQ|genK]）
         const uint32_t genGammaOffset = static_cast<uint32_t>(headStep) * 2U;
 
@@ -250,7 +248,7 @@ __aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr& addr, const 
             // 组内四份（q低|q高|k低|k高）在 UB 上连续，同一个指针连推 4 次 halfDim 取完；
             // 最后一次自增走出组尾，下个 token 会重新定基址，丢掉即可
             const uint32_t undBit = static_cast<uint32_t>((undMask >> t) & 1ULL);
-            __ubuf__ float* gammaPtr = addr.gammaAll + (1U - undBit) * genGammaOffset;
+            __ubuf__ float *gammaPtr = addr.gammaAll + (1U - undBit) * genGammaOffset;
             MicroAPI::LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
                 regs.qGammaLow, gammaPtr, halfStep);
             MicroAPI::LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(

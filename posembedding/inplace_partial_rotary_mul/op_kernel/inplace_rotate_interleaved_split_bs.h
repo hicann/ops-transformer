@@ -39,7 +39,7 @@ protected:
     TBuf<TPosition::VECCALC> tmpFp32Buf2;
     TBuf<TPosition::VECCALC> tmpFp32Buf3;
     TBuf<TPosition::VECCALC> gatherOffsetBuf;
-    const InplacePartialRopeRegbaseTilingData* tiling_;
+    const InplacePartialRopeRegbaseTilingData *tiling_;
 
     // tilingdata
     uint64_t batchSize;
@@ -99,8 +99,8 @@ __aicore__ inline void InterleavedSplitBS<T>::Init(GM_ADDR x, GM_ADDR cos, GM_AD
     } else if (coreCalcTail != 0) {
         ubCalcSeqLoop = coreCalcTail;
         ioOffset = frontCoreNum * coreCalcNum * bufferNdSize + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSize;
-        ioOffsetAll = frontCoreNum * coreCalcNum * bufferNdSizeAll
-            + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
+        ioOffsetAll =
+            frontCoreNum * coreCalcNum * bufferNdSizeAll + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
         triOffset = frontCoreNum * coreCalcNum * headDim + (blockIdx - frontCoreNum) * coreCalcTail * headDim;
     }
 
@@ -157,7 +157,7 @@ __aicore__ inline void InterleavedSplitBS<T>::CopyInX(LocalTensor<T> &x, uint32_
         dataCopyParams.srcStride = (allHeadDim - headDim) * sizeof(T);
         dataCopyParams.dstStride = 0;
         DataCopyPad(x[loopIdx * numHeads * headDim], xGm[startOffset + loopIdx * seqLen * bufferNdSizeAll + start],
-                        dataCopyParams, {false, 0, 0, 0});
+                    dataCopyParams, {false, 0, 0, 0});
     }
     event_t eventIdMTE2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
     SetFlag<HardEvent::MTE2_V>(eventIdMTE2ToV);
@@ -210,7 +210,7 @@ __aicore__ inline void InterleavedSplitBS<T>::CopyOut(uint32_t seqIdx, uint32_t 
         dataCopyParams.srcStride = 0;
         dataCopyParams.dstStride = (allHeadDim - headDim) * sizeof(T);
         DataCopyPad(yGm[startOffset + loopIdx * seqLen * bufferNdSizeAll + start], y[loopIdx * numHeads * headDim],
-                        dataCopyParams);
+                    dataCopyParams);
     }
     outQueY.FreeTensor(y);
 }

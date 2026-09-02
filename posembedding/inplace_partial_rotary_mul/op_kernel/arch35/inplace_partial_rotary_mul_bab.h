@@ -57,12 +57,11 @@ private:
 private:
     __aicore__ inline void PrePareParams();
     __aicore__ inline void ProcessNLoop(const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
-    __aicore__ inline void Compute(
-        const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const LocalTensor<T> &inTensor,
-        const LocalTensor<T> &outTensor, const uint32_t currSNum, const uint32_t currDNum);
-    __aicore__ inline void ProcessN(
-        const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const uint32_t bIdx, const uint32_t sIdx,
-        const uint32_t currSNum);
+    __aicore__ inline void Compute(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                   const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor,
+                                   const uint32_t currSNum, const uint32_t currDNum);
+    __aicore__ inline void ProcessN(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                    const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
 };
 
 template <typename T>
@@ -76,9 +75,8 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::Init(GM_ADDR x, GM_ADDR co
         this->dSplitCoef_ = QUARTER_MODE_COEF;
     }
     this->dSplitSize_ = tilingData_->sliceLength / dSplitCoef_ * sizeof(T);
-    this->dAlign_ = ops::CeilAlign<int64_t>(tilingData_->sliceLength / dSplitCoef_,
-                                            BLOCK_TYPE_SIZE / sizeof(T)) *
-                    dSplitCoef_;
+    this->dAlign_ =
+        ops::CeilAlign<int64_t>(tilingData_->sliceLength / dSplitCoef_, BLOCK_TYPE_SIZE / sizeof(T)) * dSplitCoef_;
     ubFactorN_ = tilingData_->ubFactorN;
     ubFactorS_ = tilingData_->ubFactorS;
     this->xGm_.SetGlobalBuffer((__gm__ T *)x);
@@ -122,8 +120,8 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::Process()
 }
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessNLoop(
-    const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum)
+__aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessNLoop(const uint32_t bIdx, const uint32_t sIdx,
+                                                                   const uint32_t currSNum)
 {
     LocalTensor<T> sinTensor = sinInQue_.AllocTensor<T>();
     LocalTensor<T> cosTensor = cosInQue_.AllocTensor<T>();
@@ -142,9 +140,9 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessNLoop(
 }
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessN(
-    const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const uint32_t bIdx, const uint32_t sIdx,
-    const uint32_t currSNum)
+__aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessN(const LocalTensor<T> &sinTensor,
+                                                               const LocalTensor<T> &cosTensor, const uint32_t bIdx,
+                                                               const uint32_t sIdx, const uint32_t currSNum)
 {
     LocalTensor<T> xTensor;
     LocalTensor<T> yTensor;
@@ -154,12 +152,14 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessN(
         int64_t offset = baseOffset + idxN * ubFactorN_ * tilingData_->D;
         xTensor = xInQue_.AllocTensor<T>();
         DataCopyExtParams copyInParams{static_cast<uint16_t>(currSNum * currDNum * dSplitCoef_), dSplitSize_,
-                                       static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0, 0};
+                                       static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)),
+                                       0, 0};
         DataCopyExtParams copyOutParams{static_cast<uint16_t>(currSNum * currDNum * dSplitCoef_), dSplitSize_, 0,
-                                        static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0};
+                                        static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)),
+                                        0};
         // deepseekInterleave 场景，copyIn时按照D对齐，copyOut 时，按照 d/2 对齐
-        if (
-            tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {
+        if (tilingData_->rotaryMode ==
+            static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {
             copyInParams = {static_cast<uint16_t>(currSNum * currDNum), tilingData_->sliceLength * sizeof(T),
                             static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0, 0};
         }
@@ -178,9 +178,11 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessN(
 }
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingBAB<T>::Compute(
-    const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const LocalTensor<T> &inTensor,
-    const LocalTensor<T> &outTensor, const uint32_t currSNum, const uint32_t currDNum)
+__aicore__ inline void RotaryPositionEmbeddingBAB<T>::Compute(const LocalTensor<T> &sinTensor,
+                                                              const LocalTensor<T> &cosTensor,
+                                                              const LocalTensor<T> &inTensor,
+                                                              const LocalTensor<T> &outTensor, const uint32_t currSNum,
+                                                              const uint32_t currDNum)
 {
     if (tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::HALF)) {
         HalfAlignVF<T>(sinTensor, cosTensor, inTensor, outTensor, tilingData_->sliceLength, dAlign_, currSNum,

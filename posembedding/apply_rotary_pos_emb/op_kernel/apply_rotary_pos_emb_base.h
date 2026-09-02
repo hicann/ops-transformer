@@ -27,7 +27,7 @@ public:
 
 protected:
     template <typename T1, typename T2>
-    __aicore__ inline void LocalTensor2NewTensor(LocalTensor<T1>& tensor_new, const LocalTensor<T2>& tensor_old)
+    __aicore__ inline void LocalTensor2NewTensor(LocalTensor<T1> &tensor_new, const LocalTensor<T2> &tensor_old)
     {
         tensor_new = tensor_old.template ReinterpretCast<T1>();
     };

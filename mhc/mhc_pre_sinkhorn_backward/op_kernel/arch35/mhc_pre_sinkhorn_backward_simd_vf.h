@@ -25,24 +25,22 @@ constexpr int32_t BLOCKNUM_PER_VL = VEC_LENGTH / UB_BLOCK_BYTE_SIZE;
 constexpr int32_t FP32_PER_VL = VEC_LENGTH / FP32_BYTE_SIZE;
 } // namespace
 
-template<typename T>
-__aicore__ inline void ComputeGradSigmoidVf(
-    LocalTensor<T> gradSigmoidLocal1, LocalTensor<T> gradSigmoidLocal2,
-    LocalTensor<T> fusedHPre2AndHPost2Local, LocalTensor<T> invRmsLocal,
-    LocalTensor<T> alphaLocal, LocalTensor<T> biasLocal,
-    uint16_t repeatTimes, uint32_t totalElements)
+template <typename T>
+__aicore__ inline void ComputeGradSigmoidVf(LocalTensor<T> gradSigmoidLocal1, LocalTensor<T> gradSigmoidLocal2,
+                                            LocalTensor<T> fusedHPre2AndHPost2Local, LocalTensor<T> invRmsLocal,
+                                            LocalTensor<T> alphaLocal, LocalTensor<T> biasLocal, uint16_t repeatTimes,
+                                            uint32_t totalElements)
 {
-    __local_mem__ T* gradSigmoidPtr1 = (__local_mem__ T*) gradSigmoidLocal1.GetPhyAddr();
-    __local_mem__ T* gradSigmoidPtr2 = (__local_mem__ T*) gradSigmoidLocal2.GetPhyAddr();
+    __local_mem__ T *gradSigmoidPtr1 = (__local_mem__ T *)gradSigmoidLocal1.GetPhyAddr();
+    __local_mem__ T *gradSigmoidPtr2 = (__local_mem__ T *)gradSigmoidLocal2.GetPhyAddr();
 
-    __local_mem__ T* invRmsPtr = (__local_mem__ T*) invRmsLocal.GetPhyAddr();
-    __local_mem__ T* fusedHPre2AndHPost2Ptr =
-        (__local_mem__ T*) fusedHPre2AndHPost2Local.GetPhyAddr();
-    __local_mem__ T* alphaPtr = (__local_mem__ T*) alphaLocal.GetPhyAddr();
-    __local_mem__ T* biasPtr = (__local_mem__ T*) biasLocal.GetPhyAddr();
-    
-    __VEC_SCOPE__ {
-        
+    __local_mem__ T *invRmsPtr = (__local_mem__ T *)invRmsLocal.GetPhyAddr();
+    __local_mem__ T *fusedHPre2AndHPost2Ptr = (__local_mem__ T *)fusedHPre2AndHPost2Local.GetPhyAddr();
+    __local_mem__ T *alphaPtr = (__local_mem__ T *)alphaLocal.GetPhyAddr();
+    __local_mem__ T *biasPtr = (__local_mem__ T *)biasLocal.GetPhyAddr();
+
+    __VEC_SCOPE__
+    {
         RegTensor<T> invRmsBrcbReg;
         RegTensor<T> fusedHPre2AndHPost2Reg;
         RegTensor<T> alphaReg;
@@ -76,7 +74,7 @@ __aicore__ inline void ComputeGradSigmoidVf(
 
         for (uint16_t i = 0; i < repeatTimes; i++) {
             MicroAPI::MaskReg mask1 = MicroAPI::UpdateMask<T>(totalElements);
-            
+
             MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_E2B_B32>(invRmsBrcbReg, invRmsPtr + i * BLOCKNUM_PER_VL);
             MicroAPI::DataCopy(fusedHPre2AndHPost2Reg, fusedHPre2AndHPost2Ptr + i * FP32_PER_VL);
 
@@ -91,7 +89,7 @@ __aicore__ inline void ComputeGradSigmoidVf(
             MicroAPI::Mul(tmpReg, gradSigmoidReg1, gradSigmoidReg1, mask);
             MicroAPI::Sub(gradSigmoidReg1, gradSigmoidReg1, tmpReg, mask);
             MicroAPI::Mul(gradSigmoidReg1, gradSigmoidReg1, mulMaskReg, mask);
-            
+
             MicroAPI::Mul(gradSigmoidReg2, gradSigmoidReg1, h2ValNormedReg, mask);
 
             MicroAPI::DataCopy(gradSigmoidPtr1 + i * FP32_PER_VL, gradSigmoidReg1, mask1);
@@ -100,15 +98,16 @@ __aicore__ inline void ComputeGradSigmoidVf(
     }
 }
 
-template<typename T, typename U>
+template <typename T, typename U>
 __aicore__ inline void ComputeGradPreVf(LocalTensor<T> gradHPreLocal, LocalTensor<U> xLocal,
-    LocalTensor<U> gradHinLocal, int32_t n, uint16_t repeatTimes)
+                                        LocalTensor<U> gradHinLocal, int32_t n, uint16_t repeatTimes)
 {
-    __local_mem__ U* xPtr = (__local_mem__ U*) xLocal.GetPhyAddr();
-    __local_mem__ U* hinGradPtr = (__local_mem__ U*) gradHinLocal.GetPhyAddr();
-    __local_mem__ T* gradHPrePtr = (__local_mem__ T*) gradHPreLocal.GetPhyAddr();
+    __local_mem__ U *xPtr = (__local_mem__ U *)xLocal.GetPhyAddr();
+    __local_mem__ U *hinGradPtr = (__local_mem__ U *)gradHinLocal.GetPhyAddr();
+    __local_mem__ T *gradHPrePtr = (__local_mem__ T *)gradHPreLocal.GetPhyAddr();
 
-    __VEC_SCOPE__ {
+    __VEC_SCOPE__
+    {
         RegTensor<U> xReg0, xReg1, xReg2, xReg3;
         RegTensor<T> xFp32Reg0, xFp32Reg1, xFp32Reg2, xFp32Reg3;
         RegTensor<T> gradHinCastReg;
@@ -117,9 +116,8 @@ __aicore__ inline void ComputeGradPreVf(LocalTensor<T> gradHPreLocal, LocalTenso
 
         RegTensor<T> gradHPreReg0, gradHPreReg1, gradHPreReg2, gradHPreReg3;
 
-        static constexpr MicroAPI::CastTrait castTrait =
-            {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-            MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
+        static constexpr MicroAPI::CastTrait castTrait = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
+                                                          MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
         MaskReg mask = MicroAPI::CreateMask<T, MaskPattern::ALL>();
 
         MicroAPI::Duplicate(gradHPreReg0, 0);
@@ -169,17 +167,18 @@ __aicore__ inline void ComputeGradPreVf(LocalTensor<T> gradHPreLocal, LocalTenso
     }
 }
 
-
-template<typename T, typename U>
+template <typename T, typename U>
 __aicore__ inline void ComputeGradXVf(LocalTensor<U> gradXLocal, LocalTensor<U> xLocal, LocalTensor<U> gradHinLocal,
-    LocalTensor<T> hPreLocal, const T gradInvRmsVal, const T gradRMSNormVal, const int32_t c, uint16_t repeatTimes)
+                                      LocalTensor<T> hPreLocal, const T gradInvRmsVal, const T gradRMSNormVal,
+                                      const int32_t c, uint16_t repeatTimes)
 {
-    __local_mem__ U* gradXPtr = (__local_mem__ U*) gradXLocal.GetPhyAddr();
-    __local_mem__ U* xPtr = (__local_mem__ U*) xLocal.GetPhyAddr();
-    __local_mem__ U* gradHinPtr = (__local_mem__ U*) gradHinLocal.GetPhyAddr();
-    __local_mem__ T* hPrePtr = (__local_mem__ T*) hPreLocal.GetPhyAddr();
+    __local_mem__ U *gradXPtr = (__local_mem__ U *)gradXLocal.GetPhyAddr();
+    __local_mem__ U *xPtr = (__local_mem__ U *)xLocal.GetPhyAddr();
+    __local_mem__ U *gradHinPtr = (__local_mem__ U *)gradHinLocal.GetPhyAddr();
+    __local_mem__ T *hPrePtr = (__local_mem__ T *)hPreLocal.GetPhyAddr();
 
-    __VEC_SCOPE__ {
+    __VEC_SCOPE__
+    {
         RegTensor<U> xReg;
         RegTensor<T> xFp32Reg;
         RegTensor<T> gradXReg;
@@ -192,12 +191,10 @@ __aicore__ inline void ComputeGradXVf(LocalTensor<U> gradXLocal, LocalTensor<U> 
         MaskReg mask = MicroAPI::CreateMask<T, MaskPattern::ALL>();
         MaskReg maskCast = MicroAPI::CreateMask<U, MaskPattern::VL64>();
 
-        static constexpr MicroAPI::CastTrait castTrait1 =
-            {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-            MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
-        static constexpr MicroAPI::CastTrait castTrait2 =
-            {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-            MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_RINT};
+        static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
+                                                           MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
+        static constexpr MicroAPI::CastTrait castTrait2 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
+                                                           MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_RINT};
 
         MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BRC_B32>(preReg, hPrePtr);
 

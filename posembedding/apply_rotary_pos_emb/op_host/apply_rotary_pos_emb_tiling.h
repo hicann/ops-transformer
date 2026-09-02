@@ -151,12 +151,10 @@ enum class ApplyRotaryPosEmbRotaryMode : int64_t {
 
 class ApplyRotaryPosEmbRegbaseTilingBaseClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbRegbaseTilingBaseClass(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
-    virtual ~ApplyRotaryPosEmbRegbaseTilingBaseClass()
-    {
-    }
+    explicit ApplyRotaryPosEmbRegbaseTilingBaseClass(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
+    virtual ~ApplyRotaryPosEmbRegbaseTilingBaseClass() {}
 
     void Reset(gert::TilingContext *context) override
     {

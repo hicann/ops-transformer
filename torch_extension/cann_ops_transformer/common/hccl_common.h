@@ -103,9 +103,15 @@ static _HcclBarrier HcclBarrierFunc = nullptr;
 static _HcclCommMemReg HcclCommMemRegFunc = nullptr;
 static _HcclChannelGetRemoteMems HcclChannelGetRemoteMemsFunc = nullptr;
 
-inline const char *GetHcclLibName(void) { return "libhccl.so"; }
+inline const char *GetHcclLibName(void)
+{
+    return "libhccl.so";
+}
 
-inline const char *GetHcclFwkLibName(void) { return "libhccl_fwk.so"; }
+inline const char *GetHcclFwkLibName(void)
+{
+    return "libhccl_fwk.so";
+}
 
 template <typename T>
 inline T GetFuncAddr(void *opApiHandler, const char *libName, const char *apiName)

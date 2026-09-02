@@ -27,38 +27,37 @@ namespace FfnWbBatching {
 using namespace AscendC;
 
 class SortMaskBase {
- public:
-   __aicore__ inline SortMaskBase(){};
+public:
+    __aicore__ inline SortMaskBase(){};
 
- protected:
-   TPipe* pipe;
-   TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
-   TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
-   TBuf<TPosition::VECCALC> tempBuffer;
-   TBuf<TPosition::VECCALC> sortedBuffer;
+protected:
+    TPipe *pipe;
+    TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
+    TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
+    TBuf<TPosition::VECCALC> tempBuffer;
+    TBuf<TPosition::VECCALC> sortedBuffer;
 
-   GlobalTensor<int32_t> expertIdsGm;
-   GlobalTensor<int32_t> rsvdCntGm;
-   GlobalTensor<int32_t> sortedexpertIdsGm;
-   GlobalTensor<int32_t> sortedRowIdsGm;
-   GlobalTensor<int32_t> groupListTmpGm;
+    GlobalTensor<int32_t> expertIdsGm;
+    GlobalTensor<int32_t> rsvdCntGm;
+    GlobalTensor<int32_t> sortedexpertIdsGm;
+    GlobalTensor<int32_t> sortedRowIdsGm;
+    GlobalTensor<int32_t> groupListTmpGm;
 
-   int64_t bufferNum = 1;
-   int64_t totalLength = 0;
+    int64_t bufferNum = 1;
+    int64_t totalLength = 0;
 
-   int64_t expertStart_ = 1000000;
-   int64_t n = 0;
-   int64_t k = 0;
-   int64_t rowIdxType_ = 0;
+    int64_t expertStart_ = 1000000;
+    int64_t n = 0;
+    int64_t k = 0;
+    int64_t rowIdxType_ = 0;
 
-   static constexpr int64_t SYNC_GM_NUM = 2;
-   static constexpr int64_t WORK_GM_NUM = 2;
-   static constexpr int64_t DST_BLK_STRIDE = 1;
-   static constexpr int64_t DST_REP_STRIDE = 8;
-   static constexpr int32_t INT_MAX = 2147483647;
-   static constexpr uint32_t BLOCK_SIZE = 32;
+    static constexpr int64_t SYNC_GM_NUM = 2;
+    static constexpr int64_t WORK_GM_NUM = 2;
+    static constexpr int64_t DST_BLK_STRIDE = 1;
+    static constexpr int64_t DST_REP_STRIDE = 8;
+    static constexpr int32_t INT_MAX = 2147483647;
+    static constexpr uint32_t BLOCK_SIZE = 32;
 };
 
-
-}  // namespace FfnWbBatching
-#endif  // OP_KERNEL_FFN_WB_SORT_BASE_H
+} // namespace FfnWbBatching
+#endif // OP_KERNEL_FFN_WB_SORT_BASE_H

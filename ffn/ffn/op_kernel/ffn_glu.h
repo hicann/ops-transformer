@@ -24,9 +24,7 @@ using namespace matmul;
 template <typename T>
 class FFNGlu {
 public:
-    __aicore__ inline FFNGlu()
-    {
-    }
+    __aicore__ inline FFNGlu() {}
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
                                 __gm__ uint8_t *bias1, __gm__ uint8_t *bias2, __gm__ uint8_t *y,
                                 __gm__ uint8_t *workSpace, const FFNTilingData *__restrict tiling, TPipe *tPipe);

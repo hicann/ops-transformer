@@ -30,11 +30,10 @@ namespace l0op {
  * @param [in] h_post: Post processing matrix, shape is [T, n] or [B, S, n], dtype is FP32
  * @param [in] executor: Op executor
  */
-const std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*> MhcPostBackward(const aclTensor *gradOutput,
-    const aclTensor *x, const aclTensor *hRes,
-    const aclTensor *hOut, const aclTensor *hPost,
-    aclOpExecutor *executor);
+const std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *> MhcPostBackward(
+    const aclTensor *gradOutput, const aclTensor *x, const aclTensor *hRes, const aclTensor *hOut,
+    const aclTensor *hPost, aclOpExecutor *executor);
 
-}
+} // namespace l0op
 
 #endif

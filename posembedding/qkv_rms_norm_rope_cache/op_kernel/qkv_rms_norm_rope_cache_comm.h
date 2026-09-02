@@ -66,16 +66,18 @@ __aicore__ inline void SToMTE3Sync()
 
 // Template Branch Levels:
 //  1) K/V TYPE Consistency
-//  2) Quant Mode Availability: Differentiated Quant Implementation according to Tensor Fractal and Quant Inputs.  
+//  2) Quant Mode Availability: Differentiated Quant Implementation according to Tensor Fractal and Quant Inputs.
 
 template <typename QKV_DTYPE, typename K_DTYPE, typename V_DTYPE>
-class KernelQkvRmsNormRopeCacheBase{
+class KernelQkvRmsNormRopeCacheBase {
 public:
-    __aicore__ inline KernelQkvRmsNormRopeCacheBase(TPipe* pipe, const QkvRmsNormRopeCacheTilingData* tiling)
-        : pipe_(pipe), tilingData_(tiling)
+    __aicore__ inline KernelQkvRmsNormRopeCacheBase(TPipe *pipe, const QkvRmsNormRopeCacheTilingData *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling)
     {}
 
-    __aicore__ inline void InitSharedData(){
+    __aicore__ inline void InitSharedData()
+    {
         this->rmsNormLength = this->tilingData_->qkvDim;
         this->ropeLength = this->tilingData_->ropeRange;
         this->numHead = this->tilingData_->numHead;
@@ -87,38 +89,38 @@ public:
 protected:
     int64_t rmsNormLength{128};
     int64_t ropeLength{128};
-    int64_t numHead {18};
-    int64_t numHeadQ {16};
+    int64_t numHead{18};
+    int64_t numHeadQ{16};
     int64_t numHeadK{1};
     int64_t numHeadV{1};
 
     // Sahred members
-    TPipe* pipe_ = nullptr;
-    const QkvRmsNormRopeCacheTilingData* tilingData_;
+    TPipe *pipe_ = nullptr;
+    const QkvRmsNormRopeCacheTilingData *tilingData_;
 
     GlobalTensor<QKV_DTYPE> qkvGm, gammaQGm, gammaKGm, cosGm, sinGm, qOutGm;
     GlobalTensor<K_DTYPE> kCacheGm;
     GlobalTensor<V_DTYPE> vCacheGm;
     GlobalTensor<int64_t> indexGm;
 
-    TQue<QuePosition::VECIN, 1> inQueueX;       // (ubFator * rms_len) or max(ubFactorQ, ubFactorK, ubFactorV) * rms_len
-    TQue<QuePosition::VECIN, 1> inQueueY;       // (ubFator * rms_len) or max(ubFactorQ, ubFactorK, ubFactorV) * rms_len 
+    TQue<QuePosition::VECIN, 1> inQueueX; // (ubFator * rms_len) or max(ubFactorQ, ubFactorK, ubFactorV) * rms_len
+    TQue<QuePosition::VECIN, 1> inQueueY; // (ubFator * rms_len) or max(ubFactorQ, ubFactorK, ubFactorV) * rms_len
 };
 
 template <typename QKV_DTYPE, typename K_DTYPE, typename V_DTYPE>
 class KernelQkvRmsNormRopeCacheCutBSN : public KernelQkvRmsNormRopeCacheBase<QKV_DTYPE, K_DTYPE, V_DTYPE> {
 public:
-    __aicore__ inline KernelQkvRmsNormRopeCacheCutBSN(TPipe* pipe, const QkvRmsNormRopeCacheTilingData* tiling)
+    __aicore__ inline KernelQkvRmsNormRopeCacheCutBSN(TPipe *pipe, const QkvRmsNormRopeCacheTilingData *tiling)
         : KernelQkvRmsNormRopeCacheBase<QKV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
     {}
-    
+
 protected:
-    TBuf<TPosition::VECCALC> locBuf0;  // (ubFactor * rms_len) 
-    TBuf<TPosition::VECCALC> locBuf1;  // (ubFactor * rms_len) 
-    TBuf<TPosition::VECCALC> locBuf2;  // (ubFactor * rms_len) 
-    TBuf<TPosition::VECCALC> locBuf3;  // (ubFactor * rms_len) 
-    // Specialized buffer 
-    TBuf<TPosition::VECCALC> gammaBuf; // rms_len -> gmmma
+    TBuf<TPosition::VECCALC> locBuf0; // (ubFactor * rms_len)
+    TBuf<TPosition::VECCALC> locBuf1; // (ubFactor * rms_len)
+    TBuf<TPosition::VECCALC> locBuf2; // (ubFactor * rms_len)
+    TBuf<TPosition::VECCALC> locBuf3; // (ubFactor * rms_len)
+    // Specialized buffer
+    TBuf<TPosition::VECCALC> gammaBuf;     // rms_len -> gmmma
     TQue<QuePosition::VECOUT, 1> outQueue; // (ubFactor * rms_len) * (half)
 
     int64_t ubLoopQ{1};
@@ -135,8 +137,8 @@ protected:
     int64_t ubTailV{0};
     int64_t isV{0};
 
-    GlobalTensor<float> kScaleGm, vScaleGm;       // SYMMETRIC QUANT
-    GlobalTensor<float> kOffsetGm, vOffsetGm;     // ASYMMETRIC QUANT: Missing implementation
+    GlobalTensor<float> kScaleGm, vScaleGm;   // SYMMETRIC QUANT
+    GlobalTensor<float> kOffsetGm, vOffsetGm; // ASYMMETRIC QUANT: Missing implementation
     GlobalTensor<QKV_DTYPE> qCacheGmNd, kCacheGmNd, vCacheGmNd;
 };
 

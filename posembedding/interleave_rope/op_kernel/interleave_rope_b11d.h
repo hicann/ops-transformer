@@ -26,8 +26,9 @@ constexpr uint64_t SPLIT_NS = 1;
 template <typename T>
 class KernelInterleaveRopeB11D {
 public:
-    __aicore__ inline KernelInterleaveRopeB11D(TPipe* pipe, const InterleaveRopeTilingData* tiling)
-        : pipe_(pipe), tilingData_(tiling)
+    __aicore__ inline KernelInterleaveRopeB11D(TPipe *pipe, const InterleaveRopeTilingData *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y)
@@ -63,10 +64,10 @@ public:
             sinCosIdxOffsetBase_ = GetBlockIdx() * batchsPerBlock_;
         }
 
-        xGm.SetGlobalBuffer((__gm__ T*)x);
-        yGm.SetGlobalBuffer((__gm__ T*)y);
-        cosGm.SetGlobalBuffer((__gm__ T*)cos);
-        sinGm.SetGlobalBuffer((__gm__ T*)sin);
+        xGm.SetGlobalBuffer((__gm__ T *)x);
+        yGm.SetGlobalBuffer((__gm__ T *)y);
+        cosGm.SetGlobalBuffer((__gm__ T *)cos);
+        sinGm.SetGlobalBuffer((__gm__ T *)sin);
 
         // init pipe
         pipe_->InitBuffer(inQueueX, 1, hiddenDimCountPerLoop_ * hiddenDim * sizeof(T));
@@ -123,18 +124,14 @@ public:
             LocalTensor<float> imagLocal = bufferImag.Get<float>();
             LocalTensor<float> buf_ = buffer_.Get<float>();
             uint64_t rsvdCnt = 0;
-            GatherMask(
-                realLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, 1, true,
-                factor * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
-            GatherMask(
-                imagLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, numTwo, true,
-                factor * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
-            Cast(
-                realLocal, realLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(),
-                RoundMode::CAST_NONE, factor * hiddenDimHalf);
-            Cast(
-                imagLocal, imagLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(),
-                RoundMode::CAST_NONE, factor * hiddenDimHalf);
+            GatherMask(realLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, 1, true,
+                       factor * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
+            GatherMask(imagLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, numTwo,
+                       true, factor * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
+            Cast(realLocal, realLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(),
+                 RoundMode::CAST_NONE, factor * hiddenDimHalf);
+            Cast(imagLocal, imagLocal[hiddenDimCountPerLoop_ * hiddenDimHalf].template ReinterpretCast<T>(),
+                 RoundMode::CAST_NONE, factor * hiddenDimHalf);
             inQueueX.FreeTensor(xLocal);
 
             uint64_t mask[numTwo] = {0xffffffff, 0}; // mask hiddenDimHalf Elements
@@ -151,16 +148,14 @@ public:
 
             Add(outLocal, outLocal, buf_, factor * hiddenDim);
             PipeBarrier<PIPE_V>();
-            Cast(
-                outLocal[hiddenDimCountPerLoop_ * hiddenDim].template ReinterpretCast<T>(), outLocal,
-                RoundMode::CAST_RINT, factor * hiddenDim);
+            Cast(outLocal[hiddenDimCountPerLoop_ * hiddenDim].template ReinterpretCast<T>(), outLocal,
+                 RoundMode::CAST_RINT, factor * hiddenDim);
             PipeBarrier<PIPE_V>();
 
             outQueueY.EnQue(outLocal);
             outLocal = outQueueY.DeQue<float>();
-            DataCopy(
-                yGm[xOffset], outLocal[hiddenDimCountPerLoop_ * hiddenDim].template ReinterpretCast<T>(),
-                factor * hiddenDim);
+            DataCopy(yGm[xOffset], outLocal[hiddenDimCountPerLoop_ * hiddenDim].template ReinterpretCast<T>(),
+                     factor * hiddenDim);
             outQueueY.FreeTensor(outLocal);
         }
         inQueueCos.FreeTensor(cosLocal);
@@ -168,8 +163,8 @@ public:
     }
 
 private:
-    TPipe* pipe_ = nullptr;
-    const InterleaveRopeTilingData* tilingData_;
+    TPipe *pipe_ = nullptr;
+    const InterleaveRopeTilingData *tilingData_;
     GlobalTensor<T> xGm;
     GlobalTensor<T> yGm;
     GlobalTensor<T> cosGm;

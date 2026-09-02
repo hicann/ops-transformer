@@ -25,50 +25,49 @@
 
 namespace optiling {
 
-
 BEGIN_TILING_DATA_DEF(SwinTransformerLnQKVBaseInfo)
-    TILING_DATA_FIELD_DEF(uint32_t, inputsize);  // [B,S,H]
-    TILING_DATA_FIELD_DEF(uint32_t, hSize);     // layernorm [H]
-    TILING_DATA_FIELD_DEF(uint32_t, baseLoopNum);   // for every vec block
-    TILING_DATA_FIELD_DEF(uint32_t, remainderBlockNum);   // remainder for some vec
+TILING_DATA_FIELD_DEF(uint32_t, inputsize);         // [B,S,H]
+TILING_DATA_FIELD_DEF(uint32_t, hSize);             // layernorm [H]
+TILING_DATA_FIELD_DEF(uint32_t, baseLoopNum);       // for every vec block
+TILING_DATA_FIELD_DEF(uint32_t, remainderBlockNum); // remainder for some vec
 
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(SwinTransformerLnQKVBaseInfoOp, SwinTransformerLnQKVBaseInfo)
 
 BEGIN_TILING_DATA_DEF(SwinTransformerLnQKVLayernormTilingData)
-    TILING_DATA_FIELD_DEF(uint32_t, bLength);
-    TILING_DATA_FIELD_DEF(uint32_t, sLength);
-    TILING_DATA_FIELD_DEF(uint32_t, hLength);
-    TILING_DATA_FIELD_DEF(uint32_t, bsLength);
-    TILING_DATA_FIELD_DEF(uint32_t, shLength);
-    TILING_DATA_FIELD_DEF(uint32_t, loopSize);
-    TILING_DATA_FIELD_DEF(uint32_t, elementPerBlock);
-    TILING_DATA_FIELD_DEF(uint32_t, remainderElementPerBlock);
-    TILING_DATA_FIELD_DEF(uint32_t, innerLoopLength);
-    TILING_DATA_FIELD_DEF(uint32_t, innerLoopNum);     //  8
-    TILING_DATA_FIELD_DEF(uint32_t, normalBlockElementOffset);
-    TILING_DATA_FIELD_DEF(uint32_t, rollOffset);
+TILING_DATA_FIELD_DEF(uint32_t, bLength);
+TILING_DATA_FIELD_DEF(uint32_t, sLength);
+TILING_DATA_FIELD_DEF(uint32_t, hLength);
+TILING_DATA_FIELD_DEF(uint32_t, bsLength);
+TILING_DATA_FIELD_DEF(uint32_t, shLength);
+TILING_DATA_FIELD_DEF(uint32_t, loopSize);
+TILING_DATA_FIELD_DEF(uint32_t, elementPerBlock);
+TILING_DATA_FIELD_DEF(uint32_t, remainderElementPerBlock);
+TILING_DATA_FIELD_DEF(uint32_t, innerLoopLength);
+TILING_DATA_FIELD_DEF(uint32_t, innerLoopNum); //  8
+TILING_DATA_FIELD_DEF(uint32_t, normalBlockElementOffset);
+TILING_DATA_FIELD_DEF(uint32_t, rollOffset);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(SwinTransformerLnQKVLayernormTilingDataOp, SwinTransformerLnQKVLayernormTilingData)
 
 BEGIN_TILING_DATA_DEF(SwinTransformerLnQKVMatmulTilingData)
-    TILING_DATA_FIELD_DEF(uint32_t, bLength);
-    TILING_DATA_FIELD_DEF(uint32_t, biasLength);
+TILING_DATA_FIELD_DEF(uint32_t, bLength);
+TILING_DATA_FIELD_DEF(uint32_t, biasLength);
 
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(SwinTransformerLnQKVMatmulTilingDataOp, SwinTransformerLnQKVMatmulTilingData)
 
 BEGIN_TILING_DATA_DEF(SwinTransformerLnQKVTilingData)
-    TILING_DATA_FIELD_DEF(uint32_t, maxCoreNum);
-    TILING_DATA_FIELD_DEF(uint32_t, useVectorNum);
-    TILING_DATA_FIELD_DEF(uint32_t, workspaceSize);
-    TILING_DATA_FIELD_DEF(uint32_t, inputSizeSum);
-    TILING_DATA_FIELD_DEF_STRUCT(SwinTransformerLnQKVBaseInfo, opBaseInfo);
-    TILING_DATA_FIELD_DEF_STRUCT(SwinTransformerLnQKVLayernormTilingData, layernormTilingParams);
-    TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, mmTilingParams);
+TILING_DATA_FIELD_DEF(uint32_t, maxCoreNum);
+TILING_DATA_FIELD_DEF(uint32_t, useVectorNum);
+TILING_DATA_FIELD_DEF(uint32_t, workspaceSize);
+TILING_DATA_FIELD_DEF(uint32_t, inputSizeSum);
+TILING_DATA_FIELD_DEF_STRUCT(SwinTransformerLnQKVBaseInfo, opBaseInfo);
+TILING_DATA_FIELD_DEF_STRUCT(SwinTransformerLnQKVLayernormTilingData, layernormTilingParams);
+TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, mmTilingParams);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(SwinTransformerLnQKV, SwinTransformerLnQKVTilingData)
-}
+} // namespace optiling
 
-#endif   // SWIN_TRANSFORMER_LN_QKV_TILING_H_
+#endif // SWIN_TRANSFORMER_LN_QKV_TILING_H_

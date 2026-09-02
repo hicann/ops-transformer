@@ -27,32 +27,32 @@
 #pragma pack()
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct* tilingDataPointer =                              \
-        reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
+    __ubuf__ tilingStruct *tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                                   \
-    InterleaveRopeTilingData tilingData;                                                             \
-    INIT_TILING_DATA(InterleaveRopeTilingData, tilingDataPointer, tilingPointer);                    \
-    (tilingData).blockDim = tilingDataPointer->blockDim;                                             \
-    (tilingData).splitAxis = tilingDataPointer->splitAxis;                                           \
-    (tilingData).batchSize = tilingDataPointer->batchSize;                                           \
-    (tilingData).numHead = tilingDataPointer->numHead;                                               \
-    (tilingData).seqLength = tilingDataPointer->seqLength;                                           \
-    (tilingData).hiddenDim = tilingDataPointer->hiddenDim;                                           \
-    (tilingData).batchsPerBlock = tilingDataPointer->batchsPerBlock;                                 \
-    (tilingData).batchsLastBlock = tilingDataPointer->batchsLastBlock;                               \
-    (tilingData).batchLoops = tilingDataPointer->batchLoops;                                         \
-    (tilingData).batchPerLoop = tilingDataPointer->batchPerLoop;                                     \
-    (tilingData).batchLastLoop = tilingDataPointer->batchLastLoop;                                   \
-    (tilingData).hiddenDimCountPerBlock = tilingDataPointer->hiddenDimCountPerBlock;                 \
-    (tilingData).hiddenDimCountLastBlock = tilingDataPointer->hiddenDimCountLastBlock;               \
-    (tilingData).hiddenDimLoopsPerBlock = tilingDataPointer->hiddenDimLoopsPerBlock;                 \
-    (tilingData).hiddenDimCountPerLoopPerBlock = tilingDataPointer->hiddenDimCountPerLoopPerBlock;   \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    InterleaveRopeTilingData tilingData; \
+    INIT_TILING_DATA(InterleaveRopeTilingData, tilingDataPointer, tilingPointer); \
+    (tilingData).blockDim = tilingDataPointer->blockDim; \
+    (tilingData).splitAxis = tilingDataPointer->splitAxis; \
+    (tilingData).batchSize = tilingDataPointer->batchSize; \
+    (tilingData).numHead = tilingDataPointer->numHead; \
+    (tilingData).seqLength = tilingDataPointer->seqLength; \
+    (tilingData).hiddenDim = tilingDataPointer->hiddenDim; \
+    (tilingData).batchsPerBlock = tilingDataPointer->batchsPerBlock; \
+    (tilingData).batchsLastBlock = tilingDataPointer->batchsLastBlock; \
+    (tilingData).batchLoops = tilingDataPointer->batchLoops; \
+    (tilingData).batchPerLoop = tilingDataPointer->batchPerLoop; \
+    (tilingData).batchLastLoop = tilingDataPointer->batchLastLoop; \
+    (tilingData).hiddenDimCountPerBlock = tilingDataPointer->hiddenDimCountPerBlock; \
+    (tilingData).hiddenDimCountLastBlock = tilingDataPointer->hiddenDimCountLastBlock; \
+    (tilingData).hiddenDimLoopsPerBlock = tilingDataPointer->hiddenDimLoopsPerBlock; \
+    (tilingData).hiddenDimCountPerLoopPerBlock = tilingDataPointer->hiddenDimCountPerLoopPerBlock; \
     (tilingData).hiddenDimCountLastLoopPerBlock = tilingDataPointer->hiddenDimCountLastLoopPerBlock; \
-    (tilingData).hiddenDimLoopsLastBlock = tilingDataPointer->hiddenDimLoopsLastBlock;               \
+    (tilingData).hiddenDimLoopsLastBlock = tilingDataPointer->hiddenDimLoopsLastBlock; \
     (tilingData).hiddenDimCountPerLoopLastBlock = tilingDataPointer->hiddenDimCountPerLoopLastBlock; \
     (tilingData).hiddenDimCountLastLoopLastBlock = tilingDataPointer->hiddenDimCountLastLoopLastBlock;
 

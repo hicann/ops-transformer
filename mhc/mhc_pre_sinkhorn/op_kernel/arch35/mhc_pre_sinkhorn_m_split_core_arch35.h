@@ -26,9 +26,7 @@ using namespace AscendC;
 template <typename T>
 class MhcPreSinkhornMSplitCorePart1 {
 public:
-    __aicore__ inline MhcPreSinkhornMSplitCorePart1()
-    {
-    }
+    __aicore__ inline MhcPreSinkhornMSplitCorePart1() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcFn, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post,
                                 GM_ADDR combFrag, const MhcPreSinkhornRegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
@@ -150,8 +148,8 @@ public:
             if ASCEND_IS_AIV {
                 tbufPool1.Reset();
                 tbufPool1.InitBuffer(xQue, 2, tilingData->mUbSize * RoundUp<T>(tilingData->kUbSize) * sizeof(T));
-                tbufPool1.InitBuffer(castBuf, tilingData->mUbSize *
-                                                  (RoundUp<float>(tilingData->kUbSize) * sizeof(float) + BLOCK_SIZE));
+                tbufPool1.InitBuffer(
+                    castBuf, tilingData->mUbSize * (RoundUp<float>(tilingData->kUbSize) * sizeof(float) + BLOCK_SIZE));
                 tbufPool1.InitBuffer(nd2NzBuf, nd2NzBufSize * sizeof(float) * DOUBLE_BUFFER);
 
                 xCastLocal = castBuf.Get<float>();
@@ -269,14 +267,14 @@ public:
                 CrossCoreWaitFlag<SYNC_MODE4, PIPE_V>(SYNC_AIC_AIV_PRE_POST_FLAG);
                 // mm计算结果存入mmXLocal，mmXLocal每轮循环需要累加;
                 tbufPool1.Reset();
-                tbufPool1.InitBuffer(xQue, 2,
-                                     tilingData->rowInnerFactor * tilingData->hcMult * RoundUp<T>(tilingData->dFactor) *
-                                         sizeof(T));
+                tbufPool1.InitBuffer(
+                    xQue, 2,
+                    tilingData->rowInnerFactor * tilingData->hcMult * RoundUp<T>(tilingData->dFactor) * sizeof(T));
                 tbufPool1.InitBuffer(yQue, 2, tilingData->rowInnerFactor * RoundUp<T>(tilingData->dFactor) * sizeof(T));
                 tbufPool1.InitBuffer(postQue, 2, tilingData->rowInnerFactor * tilingData->hcMultAlign * sizeof(float));
-                tbufPool1.InitBuffer(combFragQue, 2,
-                                     tilingData->rowInnerFactor * tilingData->hcMult * tilingData->hcMultAlign *
-                                         sizeof(float));
+                tbufPool1.InitBuffer(
+                    combFragQue, 2,
+                    tilingData->rowInnerFactor * tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
 
                 // TBuf
                 tbufPool1.InitBuffer(mixesBuf,

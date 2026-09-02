@@ -22,9 +22,12 @@ public:
     public:
         TensorDescription(const gert::StorageShape &shape, ge::DataType dtype, ge::Format format, bool isConst = false,
                           void *constValue = nullptr)
-            : shape_(shape), dtype_(dtype), format_(format), isConst_(isConst), constValue_(constValue)
-        {
-        }
+            : shape_(shape),
+              dtype_(dtype),
+              format_(format),
+              isConst_(isConst),
+              constValue_(constValue)
+        {}
 
     public:
         gert::StorageShape shape_;
@@ -36,9 +39,10 @@ public:
 
     class OpAttr {
     public:
-        OpAttr(const std::string &attrName, const Ops::Transformer::AnyValue &attr) : attrName_(attrName), attr_(attr)
-        {
-        }
+        OpAttr(const std::string &attrName, const Ops::Transformer::AnyValue &attr)
+            : attrName_(attrName),
+              attr_(attr)
+        {}
 
     public:
         std::string attrName_;
@@ -48,31 +52,39 @@ public:
 public:
     InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                           const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs)
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc), attrs_(attrs)
-    {
-    }
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          attrs_(attrs)
+    {}
 
     InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                           const std::vector<TensorDescription> &outputTensorDesc)
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc)
-    {
-    }
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc)
+    {}
 
     InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                           const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs,
                           const std::vector<uint32_t> &inputInstanceNum, const std::vector<uint32_t> &outputInstanceNum)
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc), attrs_(attrs),
-          inputInstanceNum_(inputInstanceNum), outputInstanceNum_(outputInstanceNum)
-    {
-    }
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          attrs_(attrs),
+          inputInstanceNum_(inputInstanceNum),
+          outputInstanceNum_(outputInstanceNum)
+    {}
 
     InfershapeContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                           const std::vector<TensorDescription> &outputTensorDesc,
                           const std::vector<uint32_t> &inputInstanceNum, const std::vector<uint32_t> &outputInstanceNum)
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc),
-          inputInstanceNum_(inputInstanceNum), outputInstanceNum_(outputInstanceNum)
-    {
-    }
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          inputInstanceNum_(inputInstanceNum),
+          outputInstanceNum_(outputInstanceNum)
+    {}
 
 public:
     std::string opName_;

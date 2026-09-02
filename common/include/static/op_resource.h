@@ -15,26 +15,26 @@
 #ifndef COMMON_NN_OP_RESOURCE_H
 #define COMMON_NN_OP_RESOURCE_H
 
-#define EXTERN_OP_RESOURCE(kernelName)                                                                                 \
-    namespace l0op {                                                                                                   \
-    extern void *kernelName##TilingRegisterResource();                                                                 \
-    extern void *kernelName##InferShapeRegisterResource();                                                             \
-    extern void *kernelName##TuningRegisterResource();                                                                 \
-    extern const OP_BINARY_RES &kernelName##KernelResource();                                                          \
-    extern const OP_RUNTIME_KB_RES &kernelName##TuningResource();                                                      \
-    [[maybe_unused]] uint32_t kernelName##_kernelName_Be_Defined_Multi_Times___;                                       \
+#define EXTERN_OP_RESOURCE(kernelName) \
+    namespace l0op { \
+    extern void *kernelName##TilingRegisterResource(); \
+    extern void *kernelName##InferShapeRegisterResource(); \
+    extern void *kernelName##TuningRegisterResource(); \
+    extern const OP_BINARY_RES &kernelName##KernelResource(); \
+    extern const OP_RUNTIME_KB_RES &kernelName##TuningResource(); \
+    [[maybe_unused]] uint32_t kernelName##_kernelName_Be_Defined_Multi_Times___; \
     }
 
-#define AUTO_GEN_OP_RESOURCE(kernelName)                                                                               \
-    {                                                                                                                  \
-        {                                                                                                              \
-            #kernelName,                                                                                               \
-            {                                                                                                          \
-                {l0op::kernelName##TilingRegisterResource(), l0op::kernelName##InferShapeRegisterResource(),           \
-                 l0op::kernelName##TuningRegisterResource()},                                                          \
-                    l0op::kernelName##KernelResource(), l0op::kernelName##TuningResource()                             \
-            }                                                                                                          \
-        }                                                                                                              \
+#define AUTO_GEN_OP_RESOURCE(kernelName) \
+    { \
+        { \
+            #kernelName, \
+            { \
+                {l0op::kernelName##TilingRegisterResource(), l0op::kernelName##InferShapeRegisterResource(), \
+                 l0op::kernelName##TuningRegisterResource()}, \
+                    l0op::kernelName##KernelResource(), l0op::kernelName##TuningResource() \
+            } \
+        } \
     }
 
 #endif // COMMON_NN_OP_RESOURCE_H

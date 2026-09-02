@@ -37,9 +37,9 @@ using TilingClassCase = std::unique_ptr<TilingBaseClass> (*)(gert::TilingContext
 
 class TilingCases {
 public:
-    explicit TilingCases(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit TilingCases(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
     template <typename T>
     void AddTiling(int32_t priority)
@@ -147,9 +147,9 @@ private:
 
 class RegisterArch {
 public:
-    explicit RegisterArch(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit RegisterArch(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
     template <typename T>
     RegisterArch &tiling(int32_t priority, int32_t arch)
@@ -301,9 +301,9 @@ private:
 
 class RegisterNew {
 public:
-    explicit RegisterNew(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit RegisterNew(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
     template <typename T>
     RegisterNew &tiling(int32_t priority, int32_t soc_version)
@@ -413,9 +413,9 @@ private:
 
 class Register {
 public:
-    explicit Register(std::string op_type) : op_type_(std::move(op_type))
-    {
-    }
+    explicit Register(std::string op_type)
+        : op_type_(std::move(op_type))
+    {}
 
     template <typename T>
     Register &tiling(int32_t priority)
@@ -436,38 +436,38 @@ private:
 
 // op_type: 算子名称， class_name: 注册的 tiling 类, arch：芯片架构号
 // priority: tiling 类的优先级, 越小表示优先级越高, 即会优先选择这个tiling类
-#define REGISTER_TILING_TEMPLATE_WITH_ARCH(op_type, class_name, archs, priority)                                       \
-    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority;                            \
-    static Ops::Transformer::OpTiling::RegisterArch VAR_UNUSED##op_type##class_name##priority_register =               \
+#define REGISTER_TILING_TEMPLATE_WITH_ARCH(op_type, class_name, archs, priority) \
+    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority; \
+    static Ops::Transformer::OpTiling::RegisterArch VAR_UNUSED##op_type##class_name##priority_register = \
         Ops::Transformer::OpTiling::RegisterArch(#op_type).tiling<class_name>(priority, archs)
 
 // op_type: 算子名称， class_name: 注册的 tiling 类, soc_version：芯片版本号
 // priority: tiling 类的优先级, 越小表示优先级越高, 即会优先选择这个tiling类
-#define REGISTER_TILING_TEMPLATE_WITH_SOCVERSION(op_type, class_name, soc_versions, priority)                          \
-    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority;                            \
-    static Ops::Transformer::OpTiling::RegisterNew VAR_UNUSED##op_type##class_name##priority_register =                \
+#define REGISTER_TILING_TEMPLATE_WITH_SOCVERSION(op_type, class_name, soc_versions, priority) \
+    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority; \
+    static Ops::Transformer::OpTiling::RegisterNew VAR_UNUSED##op_type##class_name##priority_register = \
         Ops::Transformer::OpTiling::RegisterNew(#op_type).tiling<class_name>(priority, soc_versions)
 
 // op_type: 算子名称， class_name: 注册的 tiling 类,
 // priority: tiling 类的优先级, 越小表示优先级越高, 即被选中的概率越大
-#define REGISTER_TILING_TEMPLATE(op_type, class_name, priority)                                                        \
-    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority;                            \
-    static Ops::Transformer::OpTiling::Register VAR_UNUSED##op_type_##class_name##priority_register =                  \
+#define REGISTER_TILING_TEMPLATE(op_type, class_name, priority) \
+    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority; \
+    static Ops::Transformer::OpTiling::Register VAR_UNUSED##op_type_##class_name##priority_register = \
         Ops::Transformer::OpTiling::Register(op_type).tiling<class_name>(priority)
 
 // op_type: 算子名称， class_name: 注册的 tiling 类,
 // soc_version: soc版本，用于区分不同的soc
 // priority: tiling 类的优先级, 越小表示优先级越高, 即会优先选择这个tiling类
-#define REGISTER_TILING_TEMPLATE_NEW(op_type, class_name, soc_version, priority)                                       \
-    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority;                            \
-    static Ops::Transformer::OpTiling::RegisterNew VAR_UNUSED##op_type##class_name##priority_register =                \
+#define REGISTER_TILING_TEMPLATE_NEW(op_type, class_name, soc_version, priority) \
+    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority; \
+    static Ops::Transformer::OpTiling::RegisterNew VAR_UNUSED##op_type##class_name##priority_register = \
         Ops::Transformer::OpTiling::RegisterNew(#op_type).tiling<class_name>(priority, soc_version)
 
 // op_type: 算子名称， class_name: 注册的 tiling 类,
 // priority: tiling 类的优先级, 越小表示优先级越高, 即被选中的概率越大
 // 取代 REGISTER_TILING_TEMPLATE , 传入的op_type如果是字符串常量，需要去掉引号
-#define REGISTER_OPS_TILING_TEMPLATE(op_type, class_name, priority)                                                    \
-    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority;                            \
-    static Ops::Transformer::OpTiling::Register                                                                        \
-        __attribute__((unused)) tiling_##op_type##_##class_name##_##priority##_register =                              \
+#define REGISTER_OPS_TILING_TEMPLATE(op_type, class_name, priority) \
+    [[maybe_unused]] uint32_t op_impl_register_template_##op_type##_##class_name##priority; \
+    static Ops::Transformer::OpTiling::Register \
+        __attribute__((unused)) tiling_##op_type##_##class_name##_##priority##_register = \
             Ops::Transformer::OpTiling::Register(#op_type).tiling<class_name>(priority)

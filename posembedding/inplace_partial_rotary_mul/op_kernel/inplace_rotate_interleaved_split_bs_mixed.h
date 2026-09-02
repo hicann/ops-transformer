@@ -38,7 +38,7 @@ protected:
     TBuf<TPosition::VECCALC> tmpFp32Buf1;
     TBuf<TPosition::VECCALC> tmpFp32Buf3;
     TBuf<TPosition::VECCALC> gatherOffsetBuf;
-    const InplacePartialRopeRegbaseTilingData* tiling_;
+    const InplacePartialRopeRegbaseTilingData *tiling_;
 
     // tilingdata
     uint64_t batchSize;
@@ -81,7 +81,7 @@ protected:
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBSMixed<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                                   const InplacePartialRopeRegbaseTilingData *tiling, TPipe *pipe)
+                                                        const InplacePartialRopeRegbaseTilingData *tiling, TPipe *pipe)
 {
     InitData(tiling);
 
@@ -143,7 +143,7 @@ __aicore__ inline void InterleavedSplitBSMixed<T>::InitData(const InplacePartial
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBSMixed<T>::CopyInX(LocalTensor<T> &x, uint32_t seqIdx, uint32_t batchIdx,
-                                                      uint32_t calcLen)
+                                                           uint32_t calcLen)
 {
     uint64_t startOffset = batchIdx * ubCalcBNum * seqLen * bufferNdSizeAll + seqIdx * bufferNdSizeAll;
     DataCopyExtParams dataCopyParams;
@@ -153,7 +153,7 @@ __aicore__ inline void InterleavedSplitBSMixed<T>::CopyInX(LocalTensor<T> &x, ui
         dataCopyParams.srcStride = (allHeadDim - headDim) * sizeof(T);
         dataCopyParams.dstStride = 0;
         DataCopyPad(x[loopIdx * numHeads * headDim], xGm[startOffset + loopIdx * seqLen * bufferNdSizeAll + start],
-                        dataCopyParams, {false, 0, 0, 0});
+                    dataCopyParams, {false, 0, 0, 0});
     }
     event_t eventIdMTE2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
     SetFlag<HardEvent::MTE2_V>(eventIdMTE2ToV);
@@ -206,7 +206,7 @@ __aicore__ inline void InterleavedSplitBSMixed<T>::CopyOut(uint32_t seqIdx, uint
         dataCopyParams.srcStride = 0;
         dataCopyParams.dstStride = (allHeadDim - headDim) * sizeof(T);
         DataCopyPad(yGm[startOffset + loopIdx * seqLen * bufferNdSizeAll + start], y[loopIdx * numHeads * headDim],
-                        dataCopyParams);
+                    dataCopyParams);
     }
     outQueY.FreeTensor(y);
 }
@@ -245,7 +245,7 @@ __aicore__ inline void InterleavedSplitBSMixed<T>::Process()
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBSMixed<T>::Compute(uint32_t seqIdx, uint32_t batchIdx,
-                                                      LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+                                                           LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
 {
     uint64_t calcTotalNum = calcLen * bufferNdSize;
 
@@ -273,7 +273,8 @@ __aicore__ inline void InterleavedSplitBSMixed<T>::Compute(uint32_t seqIdx, uint
 
 template <typename T>
 __aicore__ inline void InterleavedSplitBSMixed<T>::ComputeCastFp32(uint32_t seqIdx, uint32_t batchIdx,
-                                                              LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+                                                                   LocalTensor<uint32_t> &gatherOffsetCast,
+                                                                   uint32_t calcLen)
 {
     uint64_t calcTotalNum = calcLen * bufferNdSize;
 

@@ -91,7 +91,6 @@ struct IbVerbsData {
     uint8_t res[24];
 };
 
-
 constexpr int8_t INVALID_HANDLE_ID = -1;
 constexpr uint32_t HCCL_GROUP_ID_0 = 0;
 constexpr uint32_t HCCL_MAX_RANK_NUM = 32U;
@@ -150,13 +149,9 @@ public:
         return 0;
     }
 
-    __aicore__ void Init(GM_ADDR context, __gm__ void *initTiling = nullptr)
-    {
-    }
+    __aicore__ void Init(GM_ADDR context, __gm__ void *initTiling = nullptr) {}
 
-    __aicore__ void InitV2(GM_ADDR context, const void *initTiling)
-    {
-    }
+    __aicore__ void InitV2(GM_ADDR context, const void *initTiling) {}
 
     __aicore__ int32_t SetCcTiling(__gm__ void *ccOpTilingData)
     {
@@ -168,9 +163,7 @@ public:
         return 0;
     }
 
-    __aicore__ void Commit(HcclHandle handleId)
-    {
-    }
+    __aicore__ void Commit(HcclHandle handleId) {}
 
     __aicore__ int32_t Wait(HcclHandle handleId)
     {
@@ -182,14 +175,11 @@ public:
         return 1;
     }
 
-    __aicore__ void InterHcclGroupSync(int8_t srcGroupID, HcclHandle srcHandleID)
-    {
-    }
+    __aicore__ void InterHcclGroupSync(int8_t srcGroupID, HcclHandle srcHandleID) {}
 
     template <ScopeType type = ScopeType::ALL>
     __aicore__ void QueueBarrier(uint16_t queueID)
-    {
-    }
+    {}
 
     template <bool sync = true>
     __aicore__ int32_t Iterate(HcclHandle handleId, uint16_t *seqSlices, uint16_t seqSliceLen)
@@ -199,8 +189,7 @@ public:
 
     template <bool sync = true>
     __aicore__ void Finalize()
-    {
-    }
+    {}
 
     __aicore__ GM_ADDR GetWindowsInAddr(uint32_t rankId)
     {

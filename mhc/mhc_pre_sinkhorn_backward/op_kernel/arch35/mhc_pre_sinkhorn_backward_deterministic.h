@@ -337,12 +337,9 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::I
     int64_t gradBiasOffset = gradAlphaOffset + 3 * usedAivNum_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradXFromHinOffset =
         gradBiasOffset + (2 * usedAivNum_ * n_ + usedAivNum_ * n_ * n_) + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
-    int64_t gradXFromRmsOffset =
-        gradXFromHinOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
-    int64_t gradXFromMatmulOffset =
-        gradXFromRmsOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
-    int64_t gradHcBeforeNormOffset =
-        gradXFromMatmulOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+    int64_t gradXFromRmsOffset = gradXFromHinOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+    int64_t gradXFromMatmulOffset = gradXFromRmsOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+    int64_t gradHcBeforeNormOffset = gradXFromMatmulOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradNormOutOffset =
         gradHcBeforeNormOffset + bsCount_ * (2 * n_ + n_ * n_) + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
 
@@ -780,7 +777,7 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::C
                     AscendC::MicroAPI::DataCopy<X_T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(xReg, xAddrStart);
                     AscendC::MicroAPI::Cast<U, X_T, castTrait16ToFloat>(xCastReg, xReg, valueMaskReg);
                     AscendC::MicroAPI::Muls(gradXFromHinReg, gradHInCastReg, hPre,
-                                            valueMaskReg);                                       // grad_h_in_f32 * h_pre
+                                            valueMaskReg); // grad_h_in_f32 * h_pre
                     AscendC::MicroAPI::Mul(gradHPreReg, xCastReg, gradHInCastReg, valueMaskReg); // x_f32 *
                                                                                                  // grad_h_in_f32
                     AscendC::MicroAPI::Reduce<MicroAPI::ReduceType::SUM, U, U>(gradHPreReg, gradHPreReg,

@@ -334,7 +334,10 @@ struct RankData {
 // ============================================================
 class MockContextBuilder {
 public:
-    ~MockContextBuilder() { Destroy(); }
+    ~MockContextBuilder()
+    {
+        Destroy();
+    }
 
     bool Build(uint32_t rankNum = 1, uint32_t rankId = 0)
     {
@@ -399,10 +402,22 @@ public:
         devWorkspaceAligned_ = nullptr;
     }
 
-    void *GetContextAddr() const { return devContext_; }
-    void *GetWorkspaceAligned() const { return devWorkspaceAligned_; }
-    void *GetWindowMem() const { return devWindowMem_; }
-    uint32_t GetRankNum() const { return rankNum_; }
+    void *GetContextAddr() const
+    {
+        return devContext_;
+    }
+    void *GetWorkspaceAligned() const
+    {
+        return devWorkspaceAligned_;
+    }
+    void *GetWindowMem() const
+    {
+        return devWindowMem_;
+    }
+    uint32_t GetRankNum() const
+    {
+        return rankNum_;
+    }
 
 private:
     void *devContext_{nullptr};
@@ -430,7 +445,10 @@ private:
 // ============================================================
 class MultiRankMockContext {
 public:
-    ~MultiRankMockContext() { Destroy(); }
+    ~MultiRankMockContext()
+    {
+        Destroy();
+    }
 
     bool Build(uint32_t rankNum)
     {
@@ -518,10 +536,22 @@ public:
         devWindows_.clear();
     }
 
-    void *GetContextAddr(uint32_t rank) const { return devContexts_[rank]; }
-    void *GetWindowMem(uint32_t rank) const { return devWindows_[rank]; }
-    void *GetWorkspaceAligned(uint32_t rank) const { return devWorkspaceAligned_[rank]; }
-    uint32_t GetRankNum() const { return rankNum_; }
+    void *GetContextAddr(uint32_t rank) const
+    {
+        return devContexts_[rank];
+    }
+    void *GetWindowMem(uint32_t rank) const
+    {
+        return devWindows_[rank];
+    }
+    void *GetWorkspaceAligned(uint32_t rank) const
+    {
+        return devWorkspaceAligned_[rank];
+    }
+    uint32_t GetRankNum() const
+    {
+        return rankNum_;
+    }
 
 private:
     uint32_t rankNum_{0};
@@ -554,7 +584,10 @@ public:
           deviceId_(deviceId)
     {}
 
-    ~MockHcclServer() { Stop(); }
+    ~MockHcclServer()
+    {
+        Stop();
+    }
 
     void Start()
     {
@@ -572,8 +605,14 @@ public:
         printf("[MockServer] Stopped. Processed %u messages.\n", msgCount_.load());
     }
 
-    bool IsFinalized() const { return finalized_.load(); }
-    uint32_t GetMsgCount() const { return msgCount_.load(); }
+    bool IsFinalized() const
+    {
+        return finalized_.load();
+    }
+    uint32_t GetMsgCount() const
+    {
+        return msgCount_.load();
+    }
 
     // Block until the kernel signals Finalize, then respond.
     bool WaitForFinalize(uint32_t slot = 0, uint32_t timeoutMs = 5000)

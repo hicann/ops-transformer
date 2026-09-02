@@ -30,9 +30,10 @@ using namespace MhcPreBackwardUtils;
 template <class T, class P>
 class MhcPreBackwardKernel {
 public:
-    __aicore__ inline MhcPreBackwardKernel(MT_C0 &matmul0, MT_C1 &matmul1) : mm0(matmul0), mm1(matmul1)
-    {
-    }
+    __aicore__ inline MhcPreBackwardKernel(MT_C0 &matmul0, MT_C1 &matmul1)
+        : mm0(matmul0),
+          mm1(matmul1)
+    {}
     // 入口函数
     __aicore__ inline void Init(InitParams initParams);
     __aicore__ inline void Process();
@@ -390,8 +391,8 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::VFDoPreProcessV0(__ubuf__ P *
             for (uint16_t vfBlockIdx = 0; vfBlockIdx < dLoopCnt; vfBlockIdx++) {
                 MicroAPI::MaskReg mask = MicroAPI::UpdateMask<P>(curLenD);
 
-                MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(xInB16Reg, xB16InAddr + offsetN * lenD +
-                                                                                           vfBlockIdx * eleNumPerVf);
+                MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    xInB16Reg, xB16InAddr + offsetN * lenD + vfBlockIdx * eleNumPerVf);
                 MicroAPI::Cast<float, T, ctHalf2Fp32Zero>(xFp32Reg, xInB16Reg, mask);
 
                 MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(
@@ -400,7 +401,7 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::VFDoPreProcessV0(__ubuf__ P *
 
                 MicroAPI::Mul(mulReg, xFp32Reg, gradHInFp32Reg, mask); // mulReg[1,lenD] 0-63
                 MicroAPI::Reduce<MicroAPI::ReduceType::SUM>(tmpSumPerVfReg, mulReg,
-                                                            mask);   // 每个vfBlockIdx循环的临时求和，每64个元素的和
+                                                            mask); // 每个vfBlockIdx循环的临时求和，每64个元素的和
                 MicroAPI::Add(sumReg, sumReg, tmpSumPerVfReg, mask); // D方向上的reduceSum
             }
             uint32_t bufIdx = offset + offsetN;
@@ -959,7 +960,6 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessC0C1Pipeline()
     }
 }
 
-
 template <class T, class P>
 __aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessC0(uint32_t offsetND, uint32_t currentNDBlock,
                                                              uint32_t offsetBS, uint32_t currentBSBlock,
@@ -1097,10 +1097,11 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::VFDoV2XCastAndMulGamma(
 
 template <class T, class P>
 template <bool hasGamma>
-__aicore__ inline void
-MhcPreBackwardKernel<T, P>::VFDoV2GammaMulXRsGradMm(__ubuf__ P *xRsGradUbAddr, __ubuf__ P *xRsGradMmAddr,
-                                                    __ubuf__ P *gammaInAddr, uint32_t currentChunkSize,
-                                                    uint32_t copySizeND)
+__aicore__ inline void MhcPreBackwardKernel<T, P>::VFDoV2GammaMulXRsGradMm(__ubuf__ P *xRsGradUbAddr,
+                                                                           __ubuf__ P *xRsGradMmAddr,
+                                                                           __ubuf__ P *gammaInAddr,
+                                                                           uint32_t currentChunkSize,
+                                                                           uint32_t copySizeND)
 {
     uint32_t eleNumPerVf = 64;
     uint16_t vfLoopCnt = CeilDiv(copySizeND, eleNumPerVf);
@@ -1128,10 +1129,11 @@ MhcPreBackwardKernel<T, P>::VFDoV2GammaMulXRsGradMm(__ubuf__ P *xRsGradUbAddr, _
 }
 
 template <class T, class P>
-__aicore__ inline void
-MhcPreBackwardKernel<T, P>::VFDoV2HInMulHPre(__ubuf__ P *xGradVec3BufAddr, __ubuf__ T *hInGradInBufAddr,
-                                             __ubuf__ P *hPreUbAddr, uint32_t currentChunkSize, uint32_t copySizeND,
-                                             uint32_t currentN, uint32_t bsGlobalOffset)
+__aicore__ inline void MhcPreBackwardKernel<T, P>::VFDoV2HInMulHPre(__ubuf__ P *xGradVec3BufAddr,
+                                                                    __ubuf__ T *hInGradInBufAddr,
+                                                                    __ubuf__ P *hPreUbAddr, uint32_t currentChunkSize,
+                                                                    uint32_t copySizeND, uint32_t currentN,
+                                                                    uint32_t bsGlobalOffset)
 {
     uint16_t vfLoopCnt = CeilDiv(copySizeND, static_cast<uint32_t>(eleNumPerVf_));
     __VEC_SCOPE__
@@ -1235,10 +1237,11 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2(uint32_t offsetND, 
 }
 
 template <class T, class P>
-__aicore__ inline void
-MhcPreBackwardKernel<T, P>::ProcessV2ChunkLoop(uint32_t offsetND, uint32_t copySizeND, uint32_t bsStart,
-                                               uint32_t bsChunkStart, uint32_t currentChunkSize, uint32_t chunkNDSize,
-                                               uint32_t currentN, uint32_t buffId, LocalTensor<P> &sumBuf)
+__aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2ChunkLoop(uint32_t offsetND, uint32_t copySizeND,
+                                                                      uint32_t bsStart, uint32_t bsChunkStart,
+                                                                      uint32_t currentChunkSize, uint32_t chunkNDSize,
+                                                                      uint32_t currentN, uint32_t buffId,
+                                                                      LocalTensor<P> &sumBuf)
 {
     // 1. 加载inv_rms和inv_rms_grad
     ProcessV2ChunkLoadInvRms(bsChunkStart, currentChunkSize);
@@ -1294,9 +1297,10 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2ChunkLoadInvRms(uint
 
 // 子函数2: 加载hInGrad并进行向量计算
 template <class T, class P>
-__aicore__ inline void
-MhcPreBackwardKernel<T, P>::ProcessV2ChunkLoadHInGrad(uint32_t offsetND, uint32_t copySizeND, uint32_t bsChunkStart,
-                                                      uint32_t currentChunkSize, uint32_t currentN, uint32_t bsStart)
+__aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2ChunkLoadHInGrad(uint32_t offsetND, uint32_t copySizeND,
+                                                                             uint32_t bsChunkStart,
+                                                                             uint32_t currentChunkSize,
+                                                                             uint32_t currentN, uint32_t bsStart)
 {
     DataCopyPadParams dataCopyPadParams;
     dataCopyPadParams.isPad = false;
@@ -1406,10 +1410,9 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2ChunkComputeXRsGrad(
 
 // 子函数5: 处理xRsGradMm
 template <class T, class P>
-__aicore__ inline void
-MhcPreBackwardKernel<T, P>::ProcessV2ChunkProcessXRsGradMm(uint32_t bsStart, uint32_t bsChunkStart, uint32_t copySizeND,
-                                                           uint32_t currentChunkSize, uint32_t chunkNDSize,
-                                                           uint32_t buffId, LocalTensor<P> &sumBuf)
+__aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2ChunkProcessXRsGradMm(
+    uint32_t bsStart, uint32_t bsChunkStart, uint32_t copySizeND, uint32_t currentChunkSize, uint32_t chunkNDSize,
+    uint32_t buffId, LocalTensor<P> &sumBuf)
 {
     DataCopyPadParams dataCopyPadParams;
     dataCopyPadParams.isPad = false;
@@ -1485,9 +1488,10 @@ __aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2ChunkProcessGradXPos
 
 // 子函数7: 输出grad_x
 template <class T, class P>
-__aicore__ inline void
-MhcPreBackwardKernel<T, P>::ProcessV2ChunkOutputXGrad(uint32_t offsetND, uint32_t copySizeND, uint32_t bsChunkStart,
-                                                      uint32_t currentChunkSize, uint32_t chunkNDSize)
+__aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessV2ChunkOutputXGrad(uint32_t offsetND, uint32_t copySizeND,
+                                                                             uint32_t bsChunkStart,
+                                                                             uint32_t currentChunkSize,
+                                                                             uint32_t chunkNDSize)
 {
     bf16OutputBuf_ = vecOutQueue1_.AllocTensor<T>();
     Cast(bf16OutputBuf_, xGradVec3Buf_, RoundMode::CAST_RINT, chunkNDSize);

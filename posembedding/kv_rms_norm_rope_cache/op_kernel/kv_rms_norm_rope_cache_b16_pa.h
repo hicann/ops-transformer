@@ -28,24 +28,24 @@ constexpr int64_t D1_SIZE32_PA = 32;
 constexpr int64_t D0_SIZE16_PA = 16;
 
 template <bool isPagedAttention, typename KV_DTYPE, int64_t scatterType>
-class KernelKvRmsNormRopeCacheB16PA : public KernelKvRmsNormRopeCacheCutBSScatter<isPagedAttention, KV_DTYPE, KV_DTYPE, KV_DTYPE>
-{
+class KernelKvRmsNormRopeCacheB16PA
+    : public KernelKvRmsNormRopeCacheCutBSScatter<isPagedAttention, KV_DTYPE, KV_DTYPE, KV_DTYPE> {
     // Simple scatter without quant: probable incomplete implemetation?
 public:
-    __aicore__ inline KernelKvRmsNormRopeCacheB16PA(TPipe* pipe, const KvRmsNormRopeCacheTilingData* tiling)
+    __aicore__ inline KernelKvRmsNormRopeCacheB16PA(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
         : KernelKvRmsNormRopeCacheCutBSScatter<isPagedAttention, KV_DTYPE, KV_DTYPE, KV_DTYPE>(pipe, tiling)
     {}
 
-    __aicore__ inline void Init(
-        GM_ADDR kv, GM_ADDR gamma, GM_ADDR cos, GM_ADDR sin, GM_ADDR index, GM_ADDR k_cache, GM_ADDR v_cache,
-        GM_ADDR optional_k_rope, GM_ADDR optional_c_kv, GM_ADDR optional_v)
+    __aicore__ inline void Init(GM_ADDR kv, GM_ADDR gamma, GM_ADDR cos, GM_ADDR sin, GM_ADDR index, GM_ADDR k_cache,
+                                GM_ADDR v_cache, GM_ADDR optional_k_rope, GM_ADDR optional_c_kv, GM_ADDR optional_v)
     {
         methodMode = optional_v == nullptr ? 0 : 1;
-        this->InitSharedData(methodMode);                 
+        this->InitSharedData(methodMode);
         int64_t currentBlockFactor = this->tilingData_->blockFactor;
         if (GetBlockIdx() == (this->tilingData_->numBlocks - 1)) {
-            currentBlockFactor = this->tilingData_->batchSize * this->tilingData_->seqLength * this->tilingData_->numHead -
-                                 (this->tilingData_->numBlocks - 1) * this->tilingData_->blockFactor;
+            currentBlockFactor =
+                this->tilingData_->batchSize * this->tilingData_->seqLength * this->tilingData_->numHead -
+                (this->tilingData_->numBlocks - 1) * this->tilingData_->blockFactor;
         }
 
         this->ubFactor = this->tilingData_->ubFactor;
@@ -54,30 +54,38 @@ public:
 
         // init global memory
         if (methodMode == METHOD_V1) {
-            this->kvGm.SetGlobalBuffer(
-                (__gm__ KV_DTYPE*)kv + GetBlockIdx() * this->tilingData_->blockFactor * (this->RMS_NORM_LENGTH + this->ROPE_LENGTH));
+            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE *)kv + GetBlockIdx() * this->tilingData_->blockFactor *
+                                                                   (this->RMS_NORM_LENGTH + this->ROPE_LENGTH));
         } else {
-            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE*)kv + GetBlockIdx() * this->tilingData_->blockFactor * this->RMS_NORM_LENGTH);
-            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_v + GetBlockIdx() * this->tilingData_->blockFactor * this->V_LENGTH);
+            this->kvGm.SetGlobalBuffer((__gm__ KV_DTYPE *)kv +
+                                       GetBlockIdx() * this->tilingData_->blockFactor * this->RMS_NORM_LENGTH);
+            this->vGm.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_v +
+                                      GetBlockIdx() * this->tilingData_->blockFactor * this->V_LENGTH);
         }
-        this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE*)gamma);
-        this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE*)cos + GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
-        this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE*)sin + GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
-        this->indexGm.SetGlobalBuffer((__gm__ int64_t*)index);
-        this->kCacheGm.SetGlobalBuffer((__gm__ KV_DTYPE*)k_cache);
-        this->vCacheGm.SetGlobalBuffer((__gm__ KV_DTYPE*)v_cache);
+        this->gammaGm.SetGlobalBuffer((__gm__ KV_DTYPE *)gamma);
+        this->cosGm.SetGlobalBuffer((__gm__ KV_DTYPE *)cos +
+                                    GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
+        this->sinGm.SetGlobalBuffer((__gm__ KV_DTYPE *)sin +
+                                    GetBlockIdx() * this->tilingData_->blockFactor * this->ROPE_LENGTH);
+        this->indexGm.SetGlobalBuffer((__gm__ int64_t *)index);
+        this->kCacheGm.SetGlobalBuffer((__gm__ KV_DTYPE *)k_cache);
+        this->vCacheGm.SetGlobalBuffer((__gm__ KV_DTYPE *)v_cache);
         if (this->tilingData_->isOutputKv) {
-            this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_k_rope);
-            this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE*)optional_c_kv);
+            this->kCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_k_rope);
+            this->vCacheGmNd.SetGlobalBuffer((__gm__ KV_DTYPE *)optional_c_kv);
         }
 
         // init pipe
-        this->pipe_->InitBuffer(this->inQueueGamma, 2, this->RMS_NORM_LENGTH * sizeof(float));                 // 2*512*4/1024=4
-        this->pipe_->InitBuffer(this->inQueueX, 2, this->ubFactor * this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)); // 2*16*512*2/1024=32
-        this->pipe_->InitBuffer(this->outQueue, 2, this->ubFactor * this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)); // 2*16*512*2/1024=32
-        this->pipe_->InitBuffer(this->wsBuffer, 3 * this->ubFactor * this->RMS_NORM_LENGTH * sizeof(float));   // 3*16*512*4/1024=96
+        this->pipe_->InitBuffer(this->inQueueGamma, 2, this->RMS_NORM_LENGTH * sizeof(float)); // 2*512*4/1024=4
+        this->pipe_->InitBuffer(this->inQueueX, 2,
+                                this->ubFactor * this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)); // 2*16*512*2/1024=32
+        this->pipe_->InitBuffer(this->outQueue, 2,
+                                this->ubFactor * this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)); // 2*16*512*2/1024=32
+        this->pipe_->InitBuffer(this->wsBuffer,
+                                3 * this->ubFactor * this->RMS_NORM_LENGTH * sizeof(float)); // 3*16*512*4/1024=96
         if (methodMode == METHOD_V2) {
-            this->pipe_->InitBuffer(this->inQueueV, 2, this->ubFactor * this->V_LENGTH * sizeof(KV_DTYPE)); // 2*40*128*2/1024=20
+            this->pipe_->InitBuffer(this->inQueueV, 2,
+                                    this->ubFactor * this->V_LENGTH * sizeof(KV_DTYPE)); // 2*40*128*2/1024=20
         }
     }
 
@@ -88,8 +96,8 @@ public:
         } else {
             ProcessV2();
         }
-    }  
-    
+    }
+
     __aicore__ inline void ProcessV1()
     {
         DataCopyPadExtParams<KV_DTYPE> padParams{false, 0, 0, 0};
@@ -117,11 +125,12 @@ public:
             LocalTensor<KV_DTYPE> cosLocal = ropeLocal[this->ubFactor * this->ROPE_LENGTH];
             LocalTensor<KV_DTYPE> sinLocal = cosLocal[this->ubFactor * this->ROPE_LENGTH];
             // CopyIn x/cos/sin [this->ubFactor, this->ROPE_LENGTH]
-            DataCopyExtParams copyParams{/* blockCount */ static_cast<uint16_t>(this->ubFactor),
-                                         /* blockLen (Byte) */ static_cast<uint32_t>(this->ROPE_LENGTH * sizeof(KV_DTYPE)),
-                                         /* srcStride */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
-                                         /* dstStride */ 0,
-                                         /* rsv */ 0};
+            DataCopyExtParams copyParams{
+                /* blockCount */ static_cast<uint16_t>(this->ubFactor),
+                /* blockLen (Byte) */ static_cast<uint32_t>(this->ROPE_LENGTH * sizeof(KV_DTYPE)),
+                /* srcStride */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
+                /* dstStride */ 0,
+                /* rsv */ 0};
             DataCopyPad(ropeLocal, this->kvGm[kvGlobalMemoryOffset + this->RMS_NORM_LENGTH], copyParams, padParams);
             copyParamsContinguous.blockLen = this->ubFactor * this->ROPE_LENGTH * sizeof(KV_DTYPE);
             DataCopyPad(cosLocal, this->cosGm[freqGlobalMemoryOffset], copyParamsContinguous, padParams);
@@ -133,14 +142,15 @@ public:
 
             // Calc: RoPE
             LocalTensor<KV_DTYPE> outLocal = this->outQueue.template AllocTensor<KV_DTYPE>();
-            RoPE<KV_DTYPE, true>(outLocal, ropeLocal, cosLocal, sinLocal, workspaceBuffer, this->ubFactor, this->ROPE_LENGTH);
+            RoPE<KV_DTYPE, true>(outLocal, ropeLocal, cosLocal, sinLocal, workspaceBuffer, this->ubFactor,
+                                 this->ROPE_LENGTH);
             this->inQueueX.FreeTensor(ropeLocal);
             this->outQueue.EnQue(outLocal);
             outLocal = this->outQueue.template DeQue<KV_DTYPE>();
 
             // Scatter Update kCache
-            DoScatter<KV_DTYPE, D1_SIZE4_PA, D0_SIZE16_PA>(
-                this->kCacheGm, this->kCacheGmNd, outLocal, startIdx, this->ubFactor, this->ROPE_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE4_PA, D0_SIZE16_PA>(this->kCacheGm, this->kCacheGmNd, outLocal, startIdx,
+                                                           this->ubFactor, this->ROPE_LENGTH);
 
             this->outQueue.FreeTensor(outLocal);
 
@@ -162,8 +172,8 @@ public:
             outLocal = this->outQueue.template DeQue<KV_DTYPE>();
 
             // Scatter Update vCache
-            DoScatter<KV_DTYPE, D1_SIZE32_PA, D0_SIZE16_PA>(
-                this->vCacheGm, this->vCacheGmNd, outLocal, startIdx, this->ubFactor, this->RMS_NORM_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE32_PA, D0_SIZE16_PA>(this->vCacheGm, this->vCacheGmNd, outLocal, startIdx,
+                                                            this->ubFactor, this->RMS_NORM_LENGTH);
             this->outQueue.FreeTensor(outLocal);
         }
         if (this->ubTail > 0) {
@@ -176,11 +186,12 @@ public:
             LocalTensor<KV_DTYPE> cosLocal = ropeLocal[this->ubTail * this->ROPE_LENGTH];
             LocalTensor<KV_DTYPE> sinLocal = cosLocal[this->ubTail * this->ROPE_LENGTH];
             // CopyIn x/cos/sin [this->ubTail, this->ROPE_LENGTH]
-            DataCopyExtParams copyParams{/* blockCount */ static_cast<uint16_t>(this->ubTail),
-                                         /* blockLen (Byte) */ static_cast<uint32_t>(this->ROPE_LENGTH * sizeof(KV_DTYPE)),
-                                         /* srcStride */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
-                                         /* dstStride */ 0,
-                                         /* rsv */ 0};
+            DataCopyExtParams copyParams{
+                /* blockCount */ static_cast<uint16_t>(this->ubTail),
+                /* blockLen (Byte) */ static_cast<uint32_t>(this->ROPE_LENGTH * sizeof(KV_DTYPE)),
+                /* srcStride */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
+                /* dstStride */ 0,
+                /* rsv */ 0};
             DataCopyPad(ropeLocal, this->kvGm[kvGlobalMemoryOffset + this->RMS_NORM_LENGTH], copyParams, padParams);
             copyParamsContinguous.blockLen = this->ubTail * this->ROPE_LENGTH * sizeof(KV_DTYPE);
             DataCopyPad(cosLocal, this->cosGm[freqGlobalMemoryOffset], copyParamsContinguous, padParams);
@@ -192,14 +203,15 @@ public:
 
             // Calc: RoPE
             LocalTensor<KV_DTYPE> outLocal = this->outQueue.template AllocTensor<KV_DTYPE>();
-            RoPE<KV_DTYPE, true>(outLocal, ropeLocal, cosLocal, sinLocal, workspaceBuffer, this->ubTail, this->ROPE_LENGTH);
+            RoPE<KV_DTYPE, true>(outLocal, ropeLocal, cosLocal, sinLocal, workspaceBuffer, this->ubTail,
+                                 this->ROPE_LENGTH);
             this->inQueueX.FreeTensor(ropeLocal);
             this->outQueue.EnQue(outLocal);
             outLocal = this->outQueue.template DeQue<KV_DTYPE>();
 
             // Scatter Update kCache
-            DoScatter<KV_DTYPE, D1_SIZE4_PA, D0_SIZE16_PA>(
-                this->kCacheGm, this->kCacheGmNd, outLocal, startIdx, this->ubTail, this->ROPE_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE4_PA, D0_SIZE16_PA>(this->kCacheGm, this->kCacheGmNd, outLocal, startIdx,
+                                                           this->ubTail, this->ROPE_LENGTH);
             this->outQueue.FreeTensor(outLocal);
 
             // CopyIn x: [this->ubTail, RmsLength]
@@ -220,8 +232,8 @@ public:
             outLocal = this->outQueue.template DeQue<KV_DTYPE>();
 
             // Scatter Update vCache
-            DoScatter<KV_DTYPE, D1_SIZE32_PA, D0_SIZE16_PA>(
-                this->vCacheGm, this->vCacheGmNd, outLocal, startIdx, this->ubTail, this->RMS_NORM_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE32_PA, D0_SIZE16_PA>(this->vCacheGm, this->vCacheGmNd, outLocal, startIdx,
+                                                            this->ubTail, this->RMS_NORM_LENGTH);
             this->outQueue.FreeTensor(outLocal);
         }
         this->inQueueGamma.FreeTensor(gammaLocalFp32);
@@ -253,11 +265,12 @@ public:
 
             // CopyIn x [this->ubFactor, this->RMS_NORM_LENGTH]
             LocalTensor<KV_DTYPE> rmsNormLocal = this->inQueueX.template AllocTensor<KV_DTYPE>();
-            DataCopyExtParams copyParams{/* blockCount */ static_cast<uint16_t>(this->ubFactor),
-                                /* blockLen (Byte) */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
-                                /* srcStride */ 0,
-                                /* dstStride */ 0,
-                                /* rsv */ 0};
+            DataCopyExtParams copyParams{
+                /* blockCount */ static_cast<uint16_t>(this->ubFactor),
+                /* blockLen (Byte) */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
+                /* srcStride */ 0,
+                /* dstStride */ 0,
+                /* rsv */ 0};
             DataCopyPad(rmsNormLocal, this->kvGm[kvGlobalMemoryOffset], copyParams, padParams);
             this->inQueueX.EnQue(rmsNormLocal);
             rmsNormLocal = this->inQueueX.template DeQue<KV_DTYPE>();
@@ -274,14 +287,16 @@ public:
 
             // Calc: RmsNorm and RoPE
             LocalTensor<KV_DTYPE> outLocal = this->outQueue.template AllocTensor<KV_DTYPE>();
-            RmsNormAndRoPE<KV_DTYPE, true>(outLocal, rmsNormLocal, gammaLocalFp32, cosLocal, sinLocal, workspaceBuffer, this->ubFactor, this->RMS_NORM_LENGTH, this->ROPE_LENGTH);
+            RmsNormAndRoPE<KV_DTYPE, true>(outLocal, rmsNormLocal, gammaLocalFp32, cosLocal, sinLocal, workspaceBuffer,
+                                           this->ubFactor, this->RMS_NORM_LENGTH, this->ROPE_LENGTH);
             this->inQueueV.FreeTensor(cosLocal);
             this->inQueueX.FreeTensor(rmsNormLocal);
             this->outQueue.EnQue(outLocal);
             outLocal = this->outQueue.template DeQue<KV_DTYPE>();
 
             // Scatter Update kCache
-            DoScatter<KV_DTYPE, D1_SIZE12_PA, D0_SIZE16_PA>(this->kCacheGm, this->kCacheGmNd, outLocal, startIdx, this->ubFactor, this->RMS_NORM_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE12_PA, D0_SIZE16_PA>(this->kCacheGm, this->kCacheGmNd, outLocal, startIdx,
+                                                            this->ubFactor, this->RMS_NORM_LENGTH);
             this->outQueue.FreeTensor(outLocal);
 
             // CopyIn v
@@ -295,8 +310,8 @@ public:
             vLocal = this->inQueueV.template DeQue<KV_DTYPE>();
 
             // Scatter Update vCache
-            DoScatter<KV_DTYPE, D1_SIZE8_PA, D0_SIZE16_PA>(
-                this->vCacheGm, this->vCacheGmNd, vLocal, startIdx, this->ubFactor, this->V_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE8_PA, D0_SIZE16_PA>(this->vCacheGm, this->vCacheGmNd, vLocal, startIdx,
+                                                           this->ubFactor, this->V_LENGTH);
             this->inQueueV.FreeTensor(vLocal);
         }
         if (this->ubTail > 0) {
@@ -308,11 +323,12 @@ public:
 
             // CopyIn x [this->ubTail, this->RMS_NORM_LENGTH]
             LocalTensor<KV_DTYPE> rmsNormLocal = this->inQueueX.template AllocTensor<KV_DTYPE>();
-            DataCopyExtParams copyParams{/* blockCount */ static_cast<uint16_t>(this->ubTail),
-                                /* blockLen (Byte) */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
-                                /* srcStride */ 0,
-                                /* dstStride */ 0,
-                                /* rsv */ 0};
+            DataCopyExtParams copyParams{
+                /* blockCount */ static_cast<uint16_t>(this->ubTail),
+                /* blockLen (Byte) */ static_cast<uint32_t>(this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)),
+                /* srcStride */ 0,
+                /* dstStride */ 0,
+                /* rsv */ 0};
             DataCopyPad(rmsNormLocal, this->kvGm[kvGlobalMemoryOffset], copyParams, padParams);
             this->inQueueX.EnQue(rmsNormLocal);
             rmsNormLocal = this->inQueueX.template DeQue<KV_DTYPE>();
@@ -329,14 +345,16 @@ public:
 
             // Calc: RmsNorm and RoPE
             LocalTensor<KV_DTYPE> outLocal = this->outQueue.template AllocTensor<KV_DTYPE>();
-            RmsNormAndRoPE<KV_DTYPE, true>(outLocal, rmsNormLocal, gammaLocalFp32, cosLocal, sinLocal, workspaceBuffer, this->ubTail, this->RMS_NORM_LENGTH, this->ROPE_LENGTH);
+            RmsNormAndRoPE<KV_DTYPE, true>(outLocal, rmsNormLocal, gammaLocalFp32, cosLocal, sinLocal, workspaceBuffer,
+                                           this->ubTail, this->RMS_NORM_LENGTH, this->ROPE_LENGTH);
             this->inQueueV.FreeTensor(cosLocal);
             this->inQueueX.FreeTensor(rmsNormLocal);
             this->outQueue.EnQue(outLocal);
             outLocal = this->outQueue.template DeQue<KV_DTYPE>();
 
             // Scatter Update kCache
-            DoScatter<KV_DTYPE, D1_SIZE12_PA, D0_SIZE16_PA>(this->kCacheGm, this->kCacheGmNd, outLocal, startIdx, this->ubTail, this->RMS_NORM_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE12_PA, D0_SIZE16_PA>(this->kCacheGm, this->kCacheGmNd, outLocal, startIdx,
+                                                            this->ubTail, this->RMS_NORM_LENGTH);
             this->outQueue.FreeTensor(outLocal);
 
             // CopyIn v
@@ -346,21 +364,23 @@ public:
             copyParams.srcStride = 0;
             copyParams.dstStride = 0;
             DataCopyPad(vLocal, this->vGm[vGlobalMemoryOffset], copyParams, padParams);
-            //SetWaitFlag<HardEvent::V_V>(HardEvent::V_V);
+            // SetWaitFlag<HardEvent::V_V>(HardEvent::V_V);
             this->inQueueV.EnQue(vLocal);
             vLocal = this->inQueueV.template DeQue<KV_DTYPE>();
 
             // Scatter Update vCache
-            DoScatter<KV_DTYPE, D1_SIZE8_PA, D0_SIZE16_PA>(this->vCacheGm, this->vCacheGmNd, vLocal, startIdx, this->ubTail, this->V_LENGTH);
+            DoScatter<KV_DTYPE, D1_SIZE8_PA, D0_SIZE16_PA>(this->vCacheGm, this->vCacheGmNd, vLocal, startIdx,
+                                                           this->ubTail, this->V_LENGTH);
             this->inQueueV.FreeTensor(vLocal);
         }
         this->inQueueGamma.FreeTensor(gammaLocalFp32);
     }
 
     template <typename T, bool isElementWise = true>
-    __aicore__ inline void RmsNormAndRoPE(
-        const LocalTensor<T>& outLocal, const LocalTensor<T>& xLocal, const LocalTensor<float>& gammaLocal, 
-        const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal, const LocalTensor<float>& wsLocal, int64_t rows, int64_t headSize, int64_t ropeLen)
+    __aicore__ inline void RmsNormAndRoPE(const LocalTensor<T> &outLocal, const LocalTensor<T> &xLocal,
+                                          const LocalTensor<float> &gammaLocal, const LocalTensor<T> &cosLocal,
+                                          const LocalTensor<T> &sinLocal, const LocalTensor<float> &wsLocal,
+                                          int64_t rows, int64_t headSize, int64_t ropeLen)
     {
         constexpr static int64_t NUM_ONE = 1;
         constexpr static int64_t NUM_TWO = 2;
@@ -372,11 +392,11 @@ public:
         constexpr static int64_t NUM_TWENTY_FOUR = 24;
         constexpr static int64_t NUM_FOURTY_EIGHT = 48;
         constexpr static int64_t NUM_SIXTY_FOUR = 64;
-        constexpr static int64_t NUM_ONE_HUNDRED_TWENTY_EIGHT = 128;       
+        constexpr static int64_t NUM_ONE_HUNDRED_TWENTY_EIGHT = 128;
         constexpr static int64_t BLOCK_SIZE = 32;
-                      
-        int64_t xLocalFp32Offset = 0;   // [0, rows * headSize]
-        int64_t xSquareLocalOffset = rows * headSize;   // [rows * headSize, rows * headSize * 2]
+
+        int64_t xLocalFp32Offset = 0;                  // [0, rows * headSize]
+        int64_t xSquareLocalOffset = rows * headSize;  // [rows * headSize, rows * headSize * 2]
         int64_t xSumLocalOffset = rows * headSize * 2; // [rows * headSize * 2, rows * headSize * 3]
         LocalTensor<float> xLocalFp32 = wsLocal[xLocalFp32Offset];
         LocalTensor<float> xSquareLocal = wsLocal[xSquareLocalOffset];
@@ -434,14 +454,14 @@ public:
              * realLocalFp32: [rows * ropeLen * 4, rows * ropeLen * 5]
              * imagLocalFp32: [rows * ropeLen * 5, rows * ropeLen * 6]
              */
-            
+
             xLocalFp32Offset = rows * headSize;
             int64_t cosLocalFp32Offset = xLocalFp32Offset + rows * ropeLen * 0;
             int64_t sinLocalFp32Offset = xLocalFp32Offset + rows * ropeLen * 1;
-            int64_t y0Offset =  xLocalFp32Offset +  rows * ropeLen * 2;
-            int64_t y1Offset =  xLocalFp32Offset +  rows * ropeLen * 3;
-            int64_t realLocalFp32Offset =  xLocalFp32Offset + rows * ropeLen * 4;
-            int64_t imagLocalFp32Offset =  xLocalFp32Offset + rows * ropeLen * 5;
+            int64_t y0Offset = xLocalFp32Offset + rows * ropeLen * 2;
+            int64_t y1Offset = xLocalFp32Offset + rows * ropeLen * 3;
+            int64_t realLocalFp32Offset = xLocalFp32Offset + rows * ropeLen * 4;
+            int64_t imagLocalFp32Offset = xLocalFp32Offset + rows * ropeLen * 5;
 
             LocalTensor<float> cosLocalFp32 = wsLocal[cosLocalFp32Offset];
             LocalTensor<float> sinLocalFp32 = wsLocal[sinLocalFp32Offset];
@@ -457,8 +477,10 @@ public:
 
             // step #2: Gather out real and imag
             uint64_t rsvdCnt = 0;
-            GatherMask(realLocalFp32, xLocalFp32, NUM_ONE, true, ropeLen, {1, static_cast<uint16_t>(rows), NUM_TWENTY_FOUR, 0}, rsvdCnt);
-            GatherMask(imagLocalFp32, xLocalFp32, NUM_TWO, true, ropeLen, {1, static_cast<uint16_t>(rows), NUM_TWENTY_FOUR, 0}, rsvdCnt);
+            GatherMask(realLocalFp32, xLocalFp32, NUM_ONE, true, ropeLen,
+                       {1, static_cast<uint16_t>(rows), NUM_TWENTY_FOUR, 0}, rsvdCnt);
+            GatherMask(imagLocalFp32, xLocalFp32, NUM_TWO, true, ropeLen,
+                       {1, static_cast<uint16_t>(rows), NUM_TWENTY_FOUR, 0}, rsvdCnt);
             PipeBarrier<PIPE_V>();
 
             // step #4: y0 = (realLocalFp32, imagLocalFp32) * cosLocalFp32
@@ -480,7 +502,7 @@ public:
             // step #6: y0 = y0 + y1
             Add(y0, y0, y1, rows * ropeLen);
             PipeBarrier<PIPE_V>();
-            
+
             struct DataCopyParams copyInParams(rows, 0, 0, 0);
             copyInParams.blockLen = ropeLen * sizeof(float) / BLOCK_SIZE;
             copyInParams.dstStride = static_cast<uint16_t>(NUM_ONE_HUNDRED_TWENTY_EIGHT * sizeof(float) / BLOCK_SIZE);
@@ -497,9 +519,9 @@ public:
     }
 
     template <typename T, bool isElementWise = true>
-    __aicore__ inline void RoPE(
-        const LocalTensor<T>& outLocal, const LocalTensor<T>& xLocal, const LocalTensor<T>& cosLocal,
-        const LocalTensor<T>& sinLocal, const LocalTensor<float>& wsLocal, int64_t rows, int64_t headSize)
+    __aicore__ inline void RoPE(const LocalTensor<T> &outLocal, const LocalTensor<T> &xLocal,
+                                const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal,
+                                const LocalTensor<float> &wsLocal, int64_t rows, int64_t headSize)
     {
         constexpr static int64_t NUM_ONE = 1;
         constexpr static int64_t NUM_TWO = 2;
@@ -580,13 +602,14 @@ public:
     }
 
     template <typename T, int64_t D1, int64_t D0>
-    __aicore__ inline void ScatterUpdatePANZ(
-        const GlobalTensor<T>& dst, const GlobalTensor<T>& dstNd, const LocalTensor<T>& outLocal, int64_t startIdx,
-        int64_t rows, int64_t headSize)
+    __aicore__ inline void ScatterUpdatePANZ(const GlobalTensor<T> &dst, const GlobalTensor<T> &dstNd,
+                                             const LocalTensor<T> &outLocal, int64_t startIdx, int64_t rows,
+                                             int64_t headSize)
     {
-        DataCopyExtParams copyParamsNz{
-            static_cast<uint16_t>(D1), static_cast<uint32_t>(D0 * sizeof(T)), 0,
-            static_cast<uint32_t>(this->tilingData_->blockSize * D0 * sizeof(T)) - static_cast<uint32_t>(D0 * sizeof(T)), 0};
+        DataCopyExtParams copyParamsNz{static_cast<uint16_t>(D1), static_cast<uint32_t>(D0 * sizeof(T)), 0,
+                                       static_cast<uint32_t>(this->tilingData_->blockSize * D0 * sizeof(T)) -
+                                           static_cast<uint32_t>(D0 * sizeof(T)),
+                                       0};
         DataCopyExtParams copyParamsNd{1, static_cast<uint32_t>(headSize * sizeof(T)), 0, 0, 0};
         int64_t pageIdOffset = D1 * this->tilingData_->blockSize * D0 * this->tilingData_->numHead;
         for (int64_t i = 0; i < rows; i++) {
@@ -601,17 +624,17 @@ public:
             // Cache: (bn, bs, N, D) -> (bn, N, D1, bs, D0) N>1
             int64_t tokensPerBatch = this->tilingData_->seqLength * this->tilingData_->numHead;
             int64_t batchId = tokenId / tokensPerBatch;
-            int64_t tokenInBatch = tokenId % tokensPerBatch;                                             //token in batch
-            int64_t headIdx = tokenInBatch / this->tilingData_->seqLength;                               //numHead
-            int64_t seqIdx = tokenInBatch % this->tilingData_->seqLength;                                //seq
+            int64_t tokenInBatch = tokenId % tokensPerBatch;               // token in batch
+            int64_t headIdx = tokenInBatch / this->tilingData_->seqLength; // numHead
+            int64_t seqIdx = tokenInBatch % this->tilingData_->seqLength;  // seq
 
-            int64_t pageOffset = this->indexGm(batchId * this->tilingData_->seqLength + seqIdx);         //[batch, seq]
+            int64_t pageOffset = this->indexGm(batchId * this->tilingData_->seqLength + seqIdx); //[batch, seq]
             int64_t pageId = pageOffset / this->tilingData_->blockSize;
             int64_t tokenOffsetInCurrentPage = pageOffset % this->tilingData_->blockSize;
             if (pageOffset >= 0) {
-                int64_t gmOffsetNz = pageId * pageIdOffset +                               //begin
-                                     headIdx * D1 * this->tilingData_->blockSize * D0 +    //head
-                                     tokenOffsetInCurrentPage * D0;                        //token
+                int64_t gmOffsetNz = pageId * pageIdOffset +                            // begin
+                                     headIdx * D1 * this->tilingData_->blockSize * D0 + // head
+                                     tokenOffsetInCurrentPage * D0;                     // token
                 SToMTE3Sync();
                 DataCopyPad(dst[gmOffsetNz], outLocal[ubOffset], copyParamsNz);
             }
@@ -619,12 +642,13 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void ScatterUpdatePABlkBnsd(
-        const GlobalTensor<T>& dst, const GlobalTensor<T>& dstNd, const LocalTensor<T>& outLocal, int64_t startIdx,
-        int64_t rows, int64_t headSize)
+    __aicore__ inline void ScatterUpdatePABlkBnsd(const GlobalTensor<T> &dst, const GlobalTensor<T> &dstNd,
+                                                  const LocalTensor<T> &outLocal, int64_t startIdx, int64_t rows,
+                                                  int64_t headSize)
     {
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(headSize * sizeof(T)), 0, 0, 0};
-        int64_t indexPageLength = (this->tilingData_->seqLength + this->tilingData_->blockSize - 1) / this->tilingData_->blockSize;
+        int64_t indexPageLength =
+            (this->tilingData_->seqLength + this->tilingData_->blockSize - 1) / this->tilingData_->blockSize;
         int64_t pageIdOffset = this->tilingData_->blockSize * headSize * this->tilingData_->numHead;
         for (int64_t i = 0; i < rows; i++) {
             int64_t tokenId = startIdx + i;
@@ -638,9 +662,9 @@ public:
             // Cache[𝐼𝑛𝑑𝑒𝑥[𝑏∗(𝑠/𝑏𝑠)],𝑠%𝑏𝑠,𝑛,𝑑]=𝑉𝑎𝑙𝑢𝑒[𝑏,𝑛,𝑠,𝑑]
             int64_t tokensPerBatch = this->tilingData_->seqLength * this->tilingData_->numHead;
             int64_t batchId = tokenId / tokensPerBatch;
-            int64_t tokenInBatch = tokenId % tokensPerBatch;                                             //token in batch
-            int64_t headIdx = tokenInBatch / this->tilingData_->seqLength;                               //numHead
-            int64_t seqIdx = tokenInBatch % this->tilingData_->seqLength;                                //seq
+            int64_t tokenInBatch = tokenId % tokensPerBatch;               // token in batch
+            int64_t headIdx = tokenInBatch / this->tilingData_->seqLength; // numHead
+            int64_t seqIdx = tokenInBatch % this->tilingData_->seqLength;  // seq
 
             int64_t indexPageId = seqIdx / this->tilingData_->blockSize;
             int64_t indexOffset = batchId * indexPageLength + indexPageId;
@@ -650,8 +674,8 @@ public:
             if (pageOffset >= 0) {
                 // [BlockNum, BlockSize, N, headSize]
                 int64_t gmOffset = pageId * pageIdOffset +
-                                  tokenOffsetInCurrentPage * this->tilingData_->numHead * headSize +
-                                  headIdx * headSize;
+                                   tokenOffsetInCurrentPage * this->tilingData_->numHead * headSize +
+                                   headIdx * headSize;
                 SToMTE3Sync();
                 DataCopyPad(dst[gmOffset], outLocal[ubOffset], copyParams);
             }
@@ -659,9 +683,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void ScatterUpdatePABnsd(
-        const GlobalTensor<T>& dst, const GlobalTensor<T>& dstNd, const LocalTensor<T>& outLocal, int64_t startIdx,
-        int64_t rows, int64_t headSize)
+    __aicore__ inline void ScatterUpdatePABnsd(const GlobalTensor<T> &dst, const GlobalTensor<T> &dstNd,
+                                               const LocalTensor<T> &outLocal, int64_t startIdx, int64_t rows,
+                                               int64_t headSize)
     {
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(headSize * sizeof(T)), 0, 0, 0};
         for (int64_t i = 0; i < rows; i++) {
@@ -674,10 +698,10 @@ public:
 
             int64_t tokensPerBatch = this->tilingData_->seqLength * this->tilingData_->numHead;
             int64_t batchId = tokenId / tokensPerBatch;
-            int64_t tokenInBatch = tokenId % tokensPerBatch;                                             //token in batch
-            int64_t headIdx = tokenInBatch / this->tilingData_->seqLength;                               //numHead
-            int64_t seqIdx = tokenInBatch % this->tilingData_->seqLength;                                //seq
-            int64_t offset = this->indexGm(batchId * this->tilingData_->seqLength + seqIdx);             //[batch, seq]
+            int64_t tokenInBatch = tokenId % tokensPerBatch;                                 // token in batch
+            int64_t headIdx = tokenInBatch / this->tilingData_->seqLength;                   // numHead
+            int64_t seqIdx = tokenInBatch % this->tilingData_->seqLength;                    // seq
+            int64_t offset = this->indexGm(batchId * this->tilingData_->seqLength + seqIdx); //[batch, seq]
             if (offset >= 0) {
                 int64_t gmOffset = offset * headSize * this->tilingData_->numHead + headIdx * headSize;
                 SToMTE3Sync();
@@ -687,9 +711,8 @@ public:
     }
 
     template <typename T, int64_t D1, int64_t D0>
-    __aicore__ inline void DoScatter(
-        const GlobalTensor<T>& dst, const GlobalTensor<T>& dstNd, const LocalTensor<T>& outLocal, int64_t startIdx,
-        int64_t rows, int64_t headSize)
+    __aicore__ inline void DoScatter(const GlobalTensor<T> &dst, const GlobalTensor<T> &dstNd,
+                                     const LocalTensor<T> &outLocal, int64_t startIdx, int64_t rows, int64_t headSize)
     {
         PipeBarrier<PIPE_ALL>();
         if constexpr (scatterType == PA_NZ_NO_QUANT) {
@@ -703,9 +726,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RmsNorm(
-        const LocalTensor<T>& outLocal, const LocalTensor<T>& xLocal, const LocalTensor<float>& gammaLocal,
-        const LocalTensor<float>& wsLocal, int64_t rows, int64_t headSize)
+    __aicore__ inline void RmsNorm(const LocalTensor<T> &outLocal, const LocalTensor<T> &xLocal,
+                                   const LocalTensor<float> &gammaLocal, const LocalTensor<float> &wsLocal,
+                                   int64_t rows, int64_t headSize)
     {
         constexpr static int64_t NUM_EIGHT = 8;
         constexpr static int64_t NUM_SIXTEEN = 16;

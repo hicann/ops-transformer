@@ -65,19 +65,19 @@ struct ApplyRotaryPosEmbRegbaseABTilingData {
 
 #define DTYPE_QUERY float
 
-inline void InitTilingData(uint8_t* tiling, ApplyRotaryPosEmbRegbaseTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, ApplyRotaryPosEmbRegbaseTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(ApplyRotaryPosEmbRegbaseTilingData));
 }
 
-inline void InitTilingData(uint8_t* tiling, ApplyRotaryPosEmbRegbaseABTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, ApplyRotaryPosEmbRegbaseABTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(ApplyRotaryPosEmbRegbaseABTilingData));
 }
 
 #undef GET_TILING_DATA_WITH_STRUCT
 #define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \
-    tiling_struct tiling_data;                                              \
+    tiling_struct tiling_data; \
     InitTilingData(tiling_arg, &tiling_data)
 
 #endif

@@ -63,7 +63,8 @@ struct InterleaveRopeCompileInfo {
 
 class InterleaveRopeTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit InterleaveRopeTiling(gert::TilingContext* p_context_) : TilingBaseClass(p_context_)
+    explicit InterleaveRopeTiling(gert::TilingContext *p_context_)
+        : TilingBaseClass(p_context_)
     {}
     ~InterleaveRopeTiling() override = default;
 
@@ -91,9 +92,8 @@ protected:
     ge::graphStatus SplitBlockForBatch();
     ge::graphStatus SplitBlockForNS();
     ge::graphStatus SplitHiddenDim();
-    ge::graphStatus SplitHiddenDimInblock(
-        int64_t hiddenDimCount, int64_t& hiddenDimLoops, int64_t& hiddenDimCountPerLoop,
-        int64_t& hiddenDimCountLastLoop);
+    ge::graphStatus SplitHiddenDimInblock(int64_t hiddenDimCount, int64_t &hiddenDimLoops,
+                                          int64_t &hiddenDimCountPerLoop, int64_t &hiddenDimCountLastLoop);
 
 private:
     InterleaveRopeTilingData tilingData_;

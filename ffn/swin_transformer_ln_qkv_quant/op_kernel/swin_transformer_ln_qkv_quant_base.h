@@ -13,7 +13,6 @@
  * \brief
  */
 
-
 #ifndef SWIN_TRANSFORMER_LN_QKV_QUANT_BASE_H
 #define SWIN_TRANSFORMER_LN_QKV_QUANT_BASE_H
 
@@ -56,25 +55,23 @@ __aicore__ inline uint32_t DivUp(uint32_t num, uint32_t align)
 
 template <typename aDType, typename bDType, typename cDType, bool aTrans, bool bTrans, bool isReuseSource = false>
 class SwinTransformerLnQkvQuantBase {
-    public:
-    __aicore__ inline SwinTransformerLnQkvQuantBase() {};
+public:
+    __aicore__ inline SwinTransformerLnQkvQuantBase(){};
     __aicore__ inline void CopyND2NZ(LocalTensor<int8_t> &dst, const GlobalTensor<int8_t> &src,
-                                        LocalTensor<int8_t> &transTensor, const int row,
-                                        const int col, const int height, const int width, const int gCol);
+                                     LocalTensor<int8_t> &transTensor, const int row, const int col, const int height,
+                                     const int width, const int gCol);
     __aicore__ inline void NDPadZeros(LocalTensor<bDType> &dst, const int height, const int calcWidth, const int gCol,
-                                        const int width, bool isBankConflict);
+                                      const int width, bool isBankConflict);
     __aicore__ inline void NDTrans2NZ(LocalTensor<bDType> &dst, LocalTensor<bDType> &src, const int calcHigh,
-                                        const int calcWidth, const bool isBankConflict);
+                                      const int calcWidth, const bool isBankConflict);
     __aicore__ inline void VecND2NZ(LocalTensor<int8_t> &dst, LocalTensor<int8_t> &src, const int height,
-                                        const int width, const int gCol);
+                                    const int width, const int gCol);
 };
 
-
 template <typename aDType, typename bDType, typename cDType, bool aTrans, bool bTrans, bool isReuseSource>
-__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans,
-                            isReuseSource>::CopyND2NZ(LocalTensor<int8_t> &dst, const GlobalTensor<int8_t> &src,
-                            LocalTensor<int8_t> &transTensor, const int row,
-                            const int col, const int height, const int width, const int gCol)
+__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans, isReuseSource>::CopyND2NZ(
+    LocalTensor<int8_t> &dst, const GlobalTensor<int8_t> &src, LocalTensor<int8_t> &transTensor, const int row,
+    const int col, const int height, const int width, const int gCol)
 {
     auto srcOffset = ((int64_t)row * (int64_t)gCol + (int64_t)col);
     bool isBankConflict = false;
@@ -91,9 +88,8 @@ __aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTr
 }
 
 template <typename aDType, typename bDType, typename cDType, bool aTrans, bool bTrans, bool isReuseSource>
-__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans,
-                            isReuseSource>::VecND2NZ(LocalTensor<int8_t> &dst, LocalTensor<int8_t> &src,
-                                                    const int height, const int width, const int gCol)
+__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans, isReuseSource>::VecND2NZ(
+    LocalTensor<int8_t> &dst, LocalTensor<int8_t> &src, const int height, const int width, const int gCol)
 {
     int calcHigh = DivUp(height, BLOCK_NUM_PER_FRACTAL);
     int calcWidth = DivUp(width, BLOCK_SIZE_32);
@@ -106,9 +102,9 @@ __aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTr
 }
 
 template <typename aDType, typename bDType, typename cDType, bool aTrans, bool bTrans, bool isReuseSource>
-__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans,
-                            isReuseSource>::NDPadZeros(LocalTensor<bDType> &dst, const int height,
-                                    const int calcWidth, const int gCol, const int width, bool isBankConflict)
+__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans, isReuseSource>::NDPadZeros(
+    LocalTensor<bDType> &dst, const int height, const int calcWidth, const int gCol, const int width,
+    bool isBankConflict)
 {
     const int C0_SIZE = BLOCK_SIZE_32 / sizeof(int8_t);
     if (gCol % BLOCK_NUM_PER_FRACTAL) {
@@ -127,7 +123,7 @@ __aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTr
             int stride = calcWidth * (C0_SIZE * sizeof(bDType) / BLOCK_SIZE_32);
             if (masktail != 0) {
                 if constexpr (IsSameType<bDType, int8_t>::value) {
-                    LocalTensor <int16_t> tmpTrnasTensor = dst.template ReinterpretCast<int16_t>();
+                    LocalTensor<int16_t> tmpTrnasTensor = dst.template ReinterpretCast<int16_t>();
                     if (stride < 32) {
                         Duplicate(tmpTrnasTensor[offset], (int16_t)0, mask, DivUp(height, 8), stride, 8 * stride);
                     } else {
@@ -147,27 +143,26 @@ __aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTr
     if (tailHigh) {
         auto dstOffset = height * calcWidth * BLOCK_CUBE;
         if constexpr (IsSameType<bDType, int8_t>::value) {
-            LocalTensor <int16_t> tmpDst = dst.template ReinterpretCast<int16_t>();
+            LocalTensor<int16_t> tmpDst = dst.template ReinterpretCast<int16_t>();
             Duplicate(tmpDst[dstOffset], (int16_t)0,
-                (BLOCK_NUM_PER_FRACTAL - tailHigh) * calcWidth * BLOCK_NUM_PER_FRACTAL);
+                      (BLOCK_NUM_PER_FRACTAL - tailHigh) * calcWidth * BLOCK_NUM_PER_FRACTAL);
         } else {
             Duplicate(dst[dstOffset], (bDType)0,
-                (BLOCK_NUM_PER_FRACTAL - tailHigh) * calcWidth * BLOCK_NUM_PER_FRACTAL);
+                      (BLOCK_NUM_PER_FRACTAL - tailHigh) * calcWidth * BLOCK_NUM_PER_FRACTAL);
         }
     }
 }
 
-
 template <typename aDType, typename bDType, typename cDType, bool aTrans, bool bTrans, bool isReuseSource>
-__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans,
-                            isReuseSource>::NDTrans2NZ(LocalTensor<bDType> &dst, LocalTensor<bDType> &src,
-                                        const int calcHigh, const int calcWidth, const bool isBankConflict)
+__aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTrans, bTrans, isReuseSource>::NDTrans2NZ(
+    LocalTensor<bDType> &dst, LocalTensor<bDType> &src, const int calcHigh, const int calcWidth,
+    const bool isBankConflict)
 {
     const int C0_SIZE = BLOCK_SIZE_32 / sizeof(bDType);
     if constexpr (IsSameType<bDType, int8_t>::value) {
         struct UnaryRepeatParams intriParams;
         uint64_t mask[2] = {uint64_t(-1), uint64_t(-1)};
-        int blkStride = isBankConflict ? calcWidth + 1: calcWidth;
+        int blkStride = isBankConflict ? calcWidth + 1 : calcWidth;
         intriParams.dstBlkStride = 1;
         intriParams.srcBlkStride = blkStride;
         intriParams.dstRepStride = intriParams.dstBlkStride * DEFAULT_BLK_NUM;
@@ -200,6 +195,5 @@ __aicore__ inline void SwinTransformerLnQkvQuantBase<aDType, bDType, cDType, aTr
         }
     }
 }
-
 
 #endif // SWIN_TRANSFORMER_LN_QKV_QUANT_BASE_H

@@ -48,9 +48,7 @@ constexpr int64_t IDX_I_LANES = 3;  // aIdx/bsIdx/kIdx
 template <bool isScanFlag = false>
 class FfnWbA5Gather {
 public:
-    __aicore__ inline FfnWbA5Gather()
-    {
-    }
+    __aicore__ inline FfnWbA5Gather() {}
     __aicore__ inline void Init(GM_ADDR expertid_idx, GM_ADDR y, GM_ADDR session_ids, GM_ADDR micro_batch_ids,
                                 GM_ADDR token_ids, GM_ADDR expert_offsets, GM_ADDR dynamic_scale,
                                 const ScheduleContextInfo *contextInfo, TPipe *pipe, uint32_t usedCoreNum)

@@ -15,11 +15,11 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::tuple<aclTensor*, aclTensor*, aclTensor*> QkvRmsNormRopeCache(
-    const aclTensor* qkv, const aclTensor* qGamma, const aclTensor* kGamma, const aclTensor* cos, const aclTensor* sin,
-    const aclTensor* index, aclTensor* qOut, aclTensor* kCache, aclTensor* vCache, const aclTensor* kScaleOptional,
-    const aclTensor* vScaleOptional, const aclTensor* kOffsetOptional, const aclTensor* vOffsetOptional,
-    const aclIntArray* qkvSize, const aclIntArray* headNums, double epsilon, char* cacheModeOptional, bool isOutputQkv,
-    aclOpExecutor* executor);
+const std::tuple<aclTensor *, aclTensor *, aclTensor *> QkvRmsNormRopeCache(
+    const aclTensor *qkv, const aclTensor *qGamma, const aclTensor *kGamma, const aclTensor *cos, const aclTensor *sin,
+    const aclTensor *index, aclTensor *qOut, aclTensor *kCache, aclTensor *vCache, const aclTensor *kScaleOptional,
+    const aclTensor *vScaleOptional, const aclTensor *kOffsetOptional, const aclTensor *vOffsetOptional,
+    const aclIntArray *qkvSize, const aclIntArray *headNums, double epsilon, char *cacheModeOptional, bool isOutputQkv,
+    aclOpExecutor *executor);
 } // namespace l0op
 #endif // OP_API_INC_LEVEL0_QKV_RMS_NORM_ROPE_CACHE_H_

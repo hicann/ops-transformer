@@ -189,7 +189,7 @@ __aicore__ inline T PowerOfFourCeil(T x)
     return result;
 }
 
-__aicore__ inline void TilingOneCoreSort(SortCustomTilingDataKernel* tilingData, const int64_t totalLength)
+__aicore__ inline void TilingOneCoreSort(SortCustomTilingDataKernel *tilingData, const int64_t totalLength)
 {
     tilingData->needCoreNum = totalLength == 0 ? 0 : 1;
     tilingData->perCoreElements = totalLength;
@@ -202,8 +202,8 @@ __aicore__ inline void TilingOneCoreSort(SortCustomTilingDataKernel* tilingData,
     tilingData->lastCoreLastLoopElements = totalLength;
 }
 
-__aicore__ inline void TilingMultiCoreSort(
-    SortCustomTilingDataKernel* tilingData, const int64_t totalLength, const ScheduleContextInfo* contextInfo)
+__aicore__ inline void TilingMultiCoreSort(SortCustomTilingDataKernel *tilingData, const int64_t totalLength,
+                                           const ScheduleContextInfo *contextInfo)
 {
     int64_t needCoreNum = CeilDiv(totalLength, contextInfo->sortLoopMaxElement); // 向上取整
     needCoreNum = PowerOfFourCeil(needCoreNum);           // 用到多核时，核数最多是4^x, 计算不小于
@@ -254,9 +254,8 @@ __aicore__ inline void TilingMultiCoreSort(
     tilingData->oneLoopMaxElementsMrg = MGR_SORT_MAX_ELEMENT;
 }
 
-__aicore__ inline void TilingScanMultiCoreSort(
-    SortCustomTilingDataKernel* tilingdataSort,
-    const ScheduleContextInfo* contextInfo)
+__aicore__ inline void TilingScanMultiCoreSort(SortCustomTilingDataKernel *tilingdataSort,
+                                               const ScheduleContextInfo *contextInfo)
 {
     // 按A分核
     // 1. 计算每次排序可以放下多少个 session_num
@@ -283,7 +282,7 @@ __aicore__ inline void TilingScanMultiCoreSort(
     tilingdataSort->oneLoopMaxElementsMrg = MGR_SORT_MAX_ELEMENT;
 }
 
-__aicore__ inline void TilingSort(SortCustomTilingDataKernel* tilingdataSort, const ScheduleContextInfo* contextInfo)
+__aicore__ inline void TilingSort(SortCustomTilingDataKernel *tilingdataSort, const ScheduleContextInfo *contextInfo)
 {
     auto totalLength = contextInfo->outNum * contextInfo->BS * contextInfo->K;
     tilingdataSort->totalLength = totalLength;
@@ -297,8 +296,8 @@ __aicore__ inline void TilingSort(SortCustomTilingDataKernel* tilingdataSort, co
     }
 }
 
-__aicore__ inline void TilingScanSort(
-    SortCustomTilingDataKernel* tilingdataSort, const ScheduleContextInfo* contextInfo)
+__aicore__ inline void TilingScanSort(SortCustomTilingDataKernel *tilingdataSort,
+                                      const ScheduleContextInfo *contextInfo)
 {
     tilingdataSort->totalLengthWithPad =
         contextInfo->A * (contextInfo->BS * contextInfo->K + contextInfo->BsKPaddingCount);
@@ -316,14 +315,14 @@ __aicore__ inline void TilingScanSort(
     }
 }
 
-__aicore__ inline void ValidGatherIdxLengthCompute(
-    GM_ADDR work_space, ScheduleContextInfo& contextInfo, GM_ADDR actual_token_num)
+__aicore__ inline void ValidGatherIdxLengthCompute(GM_ADDR work_space, ScheduleContextInfo &contextInfo,
+                                                   GM_ADDR actual_token_num)
 {
     GlobalTensor<int32_t> workSpace;
     GlobalTensor<int64_t> actualTokenNumGm;
 
-    workSpace.SetGlobalBuffer((__gm__ int32_t*)work_space, OFFSET_SORTED_EXPERT_IDS);
-    actualTokenNumGm.SetGlobalBuffer((__gm__ int64_t*)actual_token_num);
+    workSpace.SetGlobalBuffer((__gm__ int32_t *)work_space, OFFSET_SORTED_EXPERT_IDS);
+    actualTokenNumGm.SetGlobalBuffer((__gm__ int64_t *)actual_token_num);
 
     DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(
         workSpace);
@@ -336,8 +335,8 @@ __aicore__ inline void ValidGatherIdxLengthCompute(
     }
 }
 
-__aicore__ inline void Tiling4SrcToDstCompute(
-    const ScheduleContextInfo* tilingData, FfnWBGroupListingTileInfo& tilingInfo)
+__aicore__ inline void Tiling4SrcToDstCompute(const ScheduleContextInfo *tilingData,
+                                              FfnWBGroupListingTileInfo &tilingInfo)
 {
     int64_t ubSizePlatForm = tilingData->ubSize;
     int64_t validGatherIdxLength = tilingData->validGatherIdxLength;

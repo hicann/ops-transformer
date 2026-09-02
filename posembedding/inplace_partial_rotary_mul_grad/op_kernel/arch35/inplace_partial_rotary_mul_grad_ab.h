@@ -29,7 +29,8 @@ class InplacePartialRotaryMulGradAB {
 public:
     __aicore__ inline InplacePartialRotaryMulGradAB(TPipe *pipe,
                                                     const InplacePartialRotaryMulGradRegbaseTilingDataAb *tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR dy, GM_ADDR cos, GM_ADDR sin, GM_ADDR dx);
     __aicore__ inline void Process();
 
@@ -148,10 +149,11 @@ __aicore__ inline void InplacePartialRotaryMulGradAB<TDY, TCOS>::Process()
 }
 
 template <typename TDY, typename TCOS>
-__aicore__ inline void
-InplacePartialRotaryMulGradAB<TDY, TCOS>::ProcessLoop(int64_t dyGmOffset, LocalTensor<TCOS> &cosBuffer,
-                                                      LocalTensor<TCOS> &sinBuffer, int64_t ubIdx, int64_t bsCount,
-                                                      int64_t nCount)
+__aicore__ inline void InplacePartialRotaryMulGradAB<TDY, TCOS>::ProcessLoop(int64_t dyGmOffset,
+                                                                             LocalTensor<TCOS> &cosBuffer,
+                                                                             LocalTensor<TCOS> &sinBuffer,
+                                                                             int64_t ubIdx, int64_t bsCount,
+                                                                             int64_t nCount)
 {
     uint32_t totalRows = static_cast<uint32_t>(bsCount * nCount);
 
@@ -183,10 +185,11 @@ InplacePartialRotaryMulGradAB<TDY, TCOS>::ProcessLoop(int64_t dyGmOffset, LocalT
 }
 
 template <typename TDY, typename TCOS>
-__aicore__ inline void
-InplacePartialRotaryMulGradAB<TDY, TCOS>::Compute(LocalTensor<TCOS> &sinTensor, LocalTensor<TCOS> &cosTensor,
-                                                  LocalTensor<TDY> &dyTensor, LocalTensor<TDY> &dxTensor,
-                                                  uint32_t bsCount, uint32_t nCount)
+__aicore__ inline void InplacePartialRotaryMulGradAB<TDY, TCOS>::Compute(LocalTensor<TCOS> &sinTensor,
+                                                                         LocalTensor<TCOS> &cosTensor,
+                                                                         LocalTensor<TDY> &dyTensor,
+                                                                         LocalTensor<TDY> &dxTensor, uint32_t bsCount,
+                                                                         uint32_t nCount)
 {
     InterleaveModeGradVF<TDY, TCOS>(sinTensor, cosTensor, dyTensor, dxTensor, tilingData_->sliceLength, dSplitCoef_,
                                     static_cast<uint16_t>(bsCount), static_cast<uint16_t>(nCount));

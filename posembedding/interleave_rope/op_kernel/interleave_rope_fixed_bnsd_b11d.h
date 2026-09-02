@@ -23,8 +23,9 @@ using namespace AscendC;
 template <typename T>
 class KernelInterleaveRopeFixBNSD {
 public:
-    __aicore__ inline KernelInterleaveRopeFixBNSD(TPipe* pipe, const InterleaveRopeTilingData* tiling)
-        : pipe_(pipe), tilingData_(tiling)
+    __aicore__ inline KernelInterleaveRopeFixBNSD(TPipe *pipe, const InterleaveRopeTilingData *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y)
@@ -43,18 +44,14 @@ public:
          */
 
         // init global memory
-        xGm.SetGlobalBuffer(
-            (__gm__ T*)x + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
-            tilingData_->batchsPerBlock * numHead * hiddenDim);
-        cosGm.SetGlobalBuffer(
-            (__gm__ T*)cos + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
-            tilingData_->batchsPerBlock * hiddenDim);
-        sinGm.SetGlobalBuffer(
-            (__gm__ T*)sin + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
-            tilingData_->batchsPerBlock * hiddenDim);
-        yGm.SetGlobalBuffer(
-            (__gm__ T*)y + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
-            tilingData_->batchsPerBlock * numHead * hiddenDim);
+        xGm.SetGlobalBuffer((__gm__ T *)x + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
+                            tilingData_->batchsPerBlock * numHead * hiddenDim);
+        cosGm.SetGlobalBuffer((__gm__ T *)cos + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
+                              tilingData_->batchsPerBlock * hiddenDim);
+        sinGm.SetGlobalBuffer((__gm__ T *)sin + GetBlockIdx() * tilingData_->batchsPerBlock * hiddenDim,
+                              tilingData_->batchsPerBlock * hiddenDim);
+        yGm.SetGlobalBuffer((__gm__ T *)y + GetBlockIdx() * tilingData_->batchsPerBlock * numHead * hiddenDim,
+                            tilingData_->batchsPerBlock * numHead * hiddenDim);
 
         // init pipe
         pipe_->InitBuffer(inQueueX, 1, tilingData_->batchsPerBlock * numHead * hiddenDim * sizeof(T));
@@ -86,34 +83,28 @@ public:
         LocalTensor<float> imagLocal = bufferImag.Get<float>();
         LocalTensor<float> buf_ = buffer_.Get<float>();
         uint64_t rsvdCnt = 0;
-        GatherMask(
-            realLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, 1,
-            true, tilingData_->batchsPerBlock * numHead * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
-        GatherMask(
-            imagLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(), xLocal,
-            numTwo, true, tilingData_->batchsPerBlock * numHead * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
+        GatherMask(realLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(),
+                   xLocal, 1, true, tilingData_->batchsPerBlock * numHead * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
+        GatherMask(imagLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(),
+                   xLocal, numTwo, true, tilingData_->batchsPerBlock * numHead * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
         PipeBarrier<PIPE_V>();
-        Cast(
-            realLocal, realLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(),
-            RoundMode::CAST_NONE, tilingData_->batchsPerBlock * numHead * hiddenDimHalf);
-        Cast(
-            imagLocal, imagLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(),
-            RoundMode::CAST_NONE, tilingData_->batchsPerBlock * numHead * hiddenDimHalf);
+        Cast(realLocal, realLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(),
+             RoundMode::CAST_NONE, tilingData_->batchsPerBlock * numHead * hiddenDimHalf);
+        Cast(imagLocal, imagLocal[tilingData_->batchsPerBlock * numHead * hiddenDimHalf].template ReinterpretCast<T>(),
+             RoundMode::CAST_NONE, tilingData_->batchsPerBlock * numHead * hiddenDimHalf);
 
         inQueueX.FreeTensor(xLocal);
 
         // rope
         LocalTensor<float> cosLocal = inQueueCos.AllocTensor<float>();
-        DataCopy(
-            cosLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(), cosGm,
-            tilingData_->batchsPerBlock * hiddenDim);
+        DataCopy(cosLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(), cosGm,
+                 tilingData_->batchsPerBlock * hiddenDim);
 
         inQueueCos.EnQue(cosLocal);
         cosLocal = inQueueCos.DeQue<float>();
 
-        Cast(
-            cosLocal, cosLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(),
-            RoundMode::CAST_NONE, tilingData_->batchsPerBlock * hiddenDim);
+        Cast(cosLocal, cosLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(),
+             RoundMode::CAST_NONE, tilingData_->batchsPerBlock * hiddenDim);
         PipeBarrier<PIPE_V>();
         uint64_t mask[numTwo] = {0xffffffff, 0};
         LocalTensor<float> outLocal = outQueueY.AllocTensor<float>();
@@ -128,15 +119,13 @@ public:
 
         LocalTensor<float> sinLocal = inQueueSin.AllocTensor<float>();
 
-        DataCopy(
-            sinLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(), sinGm,
-            tilingData_->batchsPerBlock * hiddenDim);
+        DataCopy(sinLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(), sinGm,
+                 tilingData_->batchsPerBlock * hiddenDim);
 
         inQueueSin.EnQue(sinLocal);
         sinLocal = inQueueSin.DeQue<float>();
-        Cast(
-            sinLocal, sinLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(),
-            RoundMode::CAST_NONE, tilingData_->batchsPerBlock * hiddenDim);
+        Cast(sinLocal, sinLocal[tilingData_->batchsPerBlock * hiddenDim].template ReinterpretCast<T>(),
+             RoundMode::CAST_NONE, tilingData_->batchsPerBlock * hiddenDim);
         PipeBarrier<PIPE_V>();
         Muls<float>(imagLocal, imagLocal, -1.0f, tilingData_->batchsPerBlock * numHead * hiddenDimHalf);
         PipeBarrier<PIPE_V>();
@@ -150,20 +139,18 @@ public:
         inQueueSin.FreeTensor(sinLocal);
         Add(outLocal, outLocal, buf_, tilingData_->batchsPerBlock * numHead * hiddenDim);
         PipeBarrier<PIPE_V>();
-        Cast(
-            outLocal[tilingData_->batchsPerBlock * numHead * hiddenDim].template ReinterpretCast<T>(), outLocal,
-            RoundMode::CAST_RINT, tilingData_->batchsPerBlock * numHead * hiddenDim);
+        Cast(outLocal[tilingData_->batchsPerBlock * numHead * hiddenDim].template ReinterpretCast<T>(), outLocal,
+             RoundMode::CAST_RINT, tilingData_->batchsPerBlock * numHead * hiddenDim);
         outQueueY.EnQue(outLocal);
         outLocal = outQueueY.DeQue<float>();
-        DataCopy(
-            yGm, outLocal[tilingData_->batchsPerBlock * numHead * hiddenDim].template ReinterpretCast<T>(),
-            tilingData_->batchsPerBlock * numHead * hiddenDim);
+        DataCopy(yGm, outLocal[tilingData_->batchsPerBlock * numHead * hiddenDim].template ReinterpretCast<T>(),
+                 tilingData_->batchsPerBlock * numHead * hiddenDim);
         outQueueY.FreeTensor(outLocal);
     }
 
 private:
-    TPipe* pipe_ = nullptr;
-    const InterleaveRopeTilingData* tilingData_;
+    TPipe *pipe_ = nullptr;
+    const InterleaveRopeTilingData *tilingData_;
     GlobalTensor<T> xGm;
     GlobalTensor<T> yGm;
     GlobalTensor<T> cosGm;

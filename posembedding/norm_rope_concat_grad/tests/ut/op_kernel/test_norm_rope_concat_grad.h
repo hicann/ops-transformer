@@ -24,7 +24,7 @@ inline void InitNormRopeConcatGradTilingData(uint8_t *tiling, NormRopeConcatGrad
     memcpy(const_data, tiling, sizeof(NormRopeConcatGradTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                                                     \
-    NormRopeConcatGradTilingData tilingData;                                                                      \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    NormRopeConcatGradTilingData tilingData; \
     InitNormRopeConcatGradTilingData(tilingPointer, &tilingData)
 #endif

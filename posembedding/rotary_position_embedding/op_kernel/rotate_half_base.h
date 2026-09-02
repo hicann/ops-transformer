@@ -113,7 +113,7 @@ protected:
     DataCopyPadExtParams<OriT> noPadParams{false, 0, 0, 0};
     // small shape optimization fields (FullLoadXD)
     uint64_t axisLenX3;
-    uint64_t ropeEleNum;  // RoPE elements(indiced by ar1 * ar2 * ar3) processed by current core
+    uint64_t ropeEleNum; // RoPE elements(indiced by ar1 * ar2 * ar3) processed by current core
     uint64_t xGmBase;
     uint64_t rGmBase;
     uint64_t xCount;
@@ -165,8 +165,7 @@ __aicore__ inline void RotateHalfBase<OriT, CmpT>::BaseMemberInit(const RotaryPo
 
 // FullLoadXD: initData
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfBase<OriT, CmpT>::FullLoadXDInit(
-    const RotaryPositionEmbeddingTilingData &tilingData)
+__aicore__ inline void RotateHalfBase<OriT, CmpT>::FullLoadXDInit(const RotaryPositionEmbeddingTilingData &tilingData)
 {
     const RotateHalfParams &tiling = tilingData.rotateHalfParams;
 

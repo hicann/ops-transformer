@@ -271,9 +271,10 @@ __aicore__ inline void InterleavedSplitBSNPad<T>::Compute(uint32_t batchIdx, uin
 }
 
 template <typename T>
-__aicore__ inline void
-InterleavedSplitBSNPad<T>::ComputeCastFp32(uint32_t batchIdx, uint32_t seqIdx, uint32_t numHeadsIdx,
-                                           LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+__aicore__ inline void InterleavedSplitBSNPad<T>::ComputeCastFp32(uint32_t batchIdx, uint32_t seqIdx,
+                                                                  uint32_t numHeadsIdx,
+                                                                  LocalTensor<uint32_t> &gatherOffsetCast,
+                                                                  uint32_t calcLen)
 {
     uint64_t totalCount = calcLen * headDimAlign;
 

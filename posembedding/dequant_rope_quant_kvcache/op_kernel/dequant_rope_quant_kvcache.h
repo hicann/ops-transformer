@@ -33,7 +33,7 @@ constexpr int64_t INDICES_MAX__NUM = 512;
 constexpr int64_t OFFSET_OVERRIDE = 2;
 
 template <typename T>
-__aicore__ inline T GetDiv(const T& value1, const T& value2)
+__aicore__ inline T GetDiv(const T &value1, const T &value2)
 {
     if (value2 == 0) {
         return value2;
@@ -42,7 +42,7 @@ __aicore__ inline T GetDiv(const T& value1, const T& value2)
 }
 
 template <typename T>
-__aicore__ inline T GetCeilInt(const T& value1, const T& value2)
+__aicore__ inline T GetCeilInt(const T &value1, const T &value2)
 {
     if (value2 == 0) {
         return value2;
@@ -51,7 +51,7 @@ __aicore__ inline T GetCeilInt(const T& value1, const T& value2)
 }
 
 template <typename T>
-__aicore__ inline T GetRem(const T& value1, const T& value2)
+__aicore__ inline T GetRem(const T &value1, const T &value2)
 {
     if (value2 == 0) {
         return value2;
@@ -70,7 +70,7 @@ struct queType<half> {
 template <typename XTYPE, typename BIASTYPE, typename COSTYPE>
 class RopeQuantKvcacheV2 {
 public:
-    __aicore__ inline RopeQuantKvcacheV2(const DequantRopeQuantKvcacheTilingData* tilingData)
+    __aicore__ inline RopeQuantKvcacheV2(const DequantRopeQuantKvcacheTilingData *tilingData)
     {
         this->cacheSeqlen = tilingData->cacheSeqlen;
         this->seqlen = tilingData->seqlen;
@@ -97,10 +97,10 @@ public:
         this->batch = tilingData->batch;
     }
 
-    __aicore__ inline void Init(
-        GM_ADDR qkv, GM_ADDR cos, GM_ADDR sin, GM_ADDR k_cache, GM_ADDR v_cache, GM_ADDR indice, GM_ADDR weight_scale,
-        GM_ADDR activation_scale, GM_ADDR bias, GM_ADDR quant_scale_k, GM_ADDR quant_scale_v, GM_ADDR quant_offset_k,
-        GM_ADDR quant_offset_v, GM_ADDR q_out, GM_ADDR k_out, GM_ADDR v_out, GM_ADDR k_cache_out, GM_ADDR v_cache_out)
+    __aicore__ inline void Init(GM_ADDR qkv, GM_ADDR cos, GM_ADDR sin, GM_ADDR k_cache, GM_ADDR v_cache, GM_ADDR indice,
+                                GM_ADDR weight_scale, GM_ADDR activation_scale, GM_ADDR bias, GM_ADDR quant_scale_k,
+                                GM_ADDR quant_scale_v, GM_ADDR quant_offset_k, GM_ADDR quant_offset_v, GM_ADDR q_out,
+                                GM_ADDR k_out, GM_ADDR v_out, GM_ADDR k_cache_out, GM_ADDR v_cache_out)
     {
         auto blockIdx = GetBlockIdx();
         if (blockIdx > this->frontCoreNum - 1) {
@@ -123,44 +123,44 @@ public:
         this->indiceUbNum = ((onceB + FP32_ONE_BLOCK_NUM - 1) / FP32_ONE_BLOCK_NUM) * FP32_ONE_BLOCK_NUM;
         uint64_t qDataNum = OnceUBMaxS * this->qHeadNum * this->hiddenSize;
         uint64_t qBlockOffset = blockIdx * qDataNum;
-        inputGm.SetGlobalBuffer((__gm__ XTYPE*)qkv + qkvBlockOffset);
-        cosGm.SetGlobalBuffer((__gm__ COSTYPE*)cos + cossinBlockOffset, this->blockFactor * this->hiddenSize);
+        inputGm.SetGlobalBuffer((__gm__ XTYPE *)qkv + qkvBlockOffset);
+        cosGm.SetGlobalBuffer((__gm__ COSTYPE *)cos + cossinBlockOffset, this->blockFactor * this->hiddenSize);
         cosGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-        sinGm.SetGlobalBuffer((__gm__ COSTYPE*)sin + cossinBlockOffset, this->blockFactor * this->hiddenSize);
+        sinGm.SetGlobalBuffer((__gm__ COSTYPE *)sin + cossinBlockOffset, this->blockFactor * this->hiddenSize);
         sinGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-        quantScaleKGm.SetGlobalBuffer((__gm__ float*)quant_scale_k, this->kHiddenSize);
+        quantScaleKGm.SetGlobalBuffer((__gm__ float *)quant_scale_k, this->kHiddenSize);
         quantScaleKGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-        quantScaleVGm.SetGlobalBuffer((__gm__ float*)quant_scale_v, this->kHiddenSize);
+        quantScaleVGm.SetGlobalBuffer((__gm__ float *)quant_scale_v, this->kHiddenSize);
         quantScaleVGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
         if (this->hasQuantOffset == true) {
-            quantOffsetKGm.SetGlobalBuffer((__gm__ float*)quant_offset_k, this->kHiddenSize);
+            quantOffsetKGm.SetGlobalBuffer((__gm__ float *)quant_offset_k, this->kHiddenSize);
             quantOffsetKGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-            quantOffsetVGm.SetGlobalBuffer((__gm__ float*)quant_offset_v, this->kHiddenSize);
+            quantOffsetVGm.SetGlobalBuffer((__gm__ float *)quant_offset_v, this->kHiddenSize);
             quantOffsetVGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
             pipe.InitBuffer(offsetKQueue, this->kHiddenSize * sizeof(float));
             pipe.InitBuffer(offsetVQueue, this->kHiddenSize * sizeof(float));
         }
 
-        indiceGm.SetGlobalBuffer((__gm__ int32_t*)indice);
+        indiceGm.SetGlobalBuffer((__gm__ int32_t *)indice);
         indiceGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-        outputGm.SetGlobalBuffer((__gm__ COSTYPE*)q_out + sCoreOffset * this->qHiddenSize);
-        outputKGm.SetGlobalBuffer((__gm__ COSTYPE*)k_out + sCoreOffset * this->kHiddenSize);
-        outputVGm.SetGlobalBuffer((__gm__ COSTYPE*)v_out + sCoreOffset * this->vHiddenSize);
-        vCacheGm.SetGlobalBuffer((__gm__ int8_t*)v_cache_out);
-        kCacheGm.SetGlobalBuffer((__gm__ int8_t*)k_cache_out);
+        outputGm.SetGlobalBuffer((__gm__ COSTYPE *)q_out + sCoreOffset * this->qHiddenSize);
+        outputKGm.SetGlobalBuffer((__gm__ COSTYPE *)k_out + sCoreOffset * this->kHiddenSize);
+        outputVGm.SetGlobalBuffer((__gm__ COSTYPE *)v_out + sCoreOffset * this->vHiddenSize);
+        vCacheGm.SetGlobalBuffer((__gm__ int8_t *)v_cache_out);
+        kCacheGm.SetGlobalBuffer((__gm__ int8_t *)k_cache_out);
 
         if constexpr (IsSameType<XTYPE, int32_t>::value) {
             if (this->hasBias == true) {
-                biasGM.SetGlobalBuffer((__gm__ BIASTYPE*)bias);
+                biasGM.SetGlobalBuffer((__gm__ BIASTYPE *)bias);
             }
             if (this->hasAS == true) {
-                asGM.SetGlobalBuffer((__gm__ float*)activation_scale + sCoreOffset);
+                asGM.SetGlobalBuffer((__gm__ float *)activation_scale + sCoreOffset);
             }
-            wsGM.SetGlobalBuffer((__gm__ float*)weight_scale);
+            wsGM.SetGlobalBuffer((__gm__ float *)weight_scale);
         }
 
         if constexpr (IsSameType<COSTYPE, half>::value && !IsSameType<XTYPE, int32_t>::value) {
@@ -283,20 +283,15 @@ public:
             SetFlag<HardEvent::MTE3_MTE2>(eventIdMTE3ToMTE2V);
         }
 
-        dataCopyParamsK_ = {
-            (uint16_t)OnceUBMaxS, static_cast<uint32_t>(this->kHiddenSize * sizeof(XTYPE)),
-            static_cast<uint32_t>((this->vHiddenSize + this->qHiddenSize) * sizeof(XTYPE)), 0, 0};
-        dataCopyParamsQ_ = {
-            (uint16_t)OnceUBMaxS, static_cast<uint32_t>(this->qHiddenSize * sizeof(XTYPE)),
-            static_cast<uint32_t>((this->kHiddenSize + this->vHiddenSize) * sizeof(XTYPE)), 0, 0};
-        dataCopyParamsV_ = {
-            (uint16_t)OnceUBMaxS, static_cast<uint32_t>(this->vHiddenSize * sizeof(XTYPE)),
-            static_cast<uint32_t>((this->qHiddenSize + this->kHiddenSize) * sizeof(XTYPE)), 0, 0};
+        dataCopyParamsK_ = {(uint16_t)OnceUBMaxS, static_cast<uint32_t>(this->kHiddenSize * sizeof(XTYPE)),
+                            static_cast<uint32_t>((this->vHiddenSize + this->qHiddenSize) * sizeof(XTYPE)), 0, 0};
+        dataCopyParamsQ_ = {(uint16_t)OnceUBMaxS, static_cast<uint32_t>(this->qHiddenSize * sizeof(XTYPE)),
+                            static_cast<uint32_t>((this->kHiddenSize + this->vHiddenSize) * sizeof(XTYPE)), 0, 0};
+        dataCopyParamsV_ = {(uint16_t)OnceUBMaxS, static_cast<uint32_t>(this->vHiddenSize * sizeof(XTYPE)),
+                            static_cast<uint32_t>((this->qHiddenSize + this->kHiddenSize) * sizeof(XTYPE)), 0, 0};
         if (!this->isPA) {
             dataCopyParamsIndice_ = {
-                1, static_cast<uint32_t>(
-                    AscendC::Std::min(OnceUBMaxS, this->batch - this->bOffset) * sizeof(int32_t)
-                ),
+                1, static_cast<uint32_t>(AscendC::Std::min(OnceUBMaxS, this->batch - this->bOffset) * sizeof(int32_t)),
                 0, 0, 0};
         } else {
             dataCopyParamsIndice_ = {1, static_cast<uint32_t>(OnceUBMaxS * sizeof(int32_t)), 0, 0, 0};
@@ -306,20 +301,17 @@ public:
             computeQKV(OnceUBMaxS);
         }
 
-        dataCopyParamsK_ = {
-            (uint16_t)coreCalcSLastNum, static_cast<uint32_t>(this->kHiddenSize * sizeof(XTYPE)),
-            static_cast<uint32_t>((this->vHiddenSize + this->qHiddenSize) * sizeof(XTYPE)), 0, 0};
-        dataCopyParamsQ_ = {
-            (uint16_t)coreCalcSLastNum, static_cast<uint32_t>(this->qHiddenSize * sizeof(XTYPE)),
-            static_cast<uint32_t>((this->kHiddenSize + this->vHiddenSize) * sizeof(XTYPE)), 0, 0};
-        dataCopyParamsV_ = {
-            (uint16_t)coreCalcSLastNum, static_cast<uint32_t>(this->vHiddenSize * sizeof(XTYPE)),
-            static_cast<uint32_t>((this->qHiddenSize + this->kHiddenSize) * sizeof(XTYPE)), 0, 0};
+        dataCopyParamsK_ = {(uint16_t)coreCalcSLastNum, static_cast<uint32_t>(this->kHiddenSize * sizeof(XTYPE)),
+                            static_cast<uint32_t>((this->vHiddenSize + this->qHiddenSize) * sizeof(XTYPE)), 0, 0};
+        dataCopyParamsQ_ = {(uint16_t)coreCalcSLastNum, static_cast<uint32_t>(this->qHiddenSize * sizeof(XTYPE)),
+                            static_cast<uint32_t>((this->kHiddenSize + this->vHiddenSize) * sizeof(XTYPE)), 0, 0};
+        dataCopyParamsV_ = {(uint16_t)coreCalcSLastNum, static_cast<uint32_t>(this->vHiddenSize * sizeof(XTYPE)),
+                            static_cast<uint32_t>((this->qHiddenSize + this->kHiddenSize) * sizeof(XTYPE)), 0, 0};
         if (!this->isPA) {
             dataCopyParamsIndice_ = {
-                1, static_cast<uint32_t>(
-                    AscendC::Std::min(coreCalcSLastNum, this->batch - this->bOffset) * sizeof(int32_t)
-                ),
+                1,
+                static_cast<uint32_t>(AscendC::Std::min(coreCalcSLastNum, this->batch - this->bOffset) *
+                                      sizeof(int32_t)),
                 0, 0, 0};
         } else {
             dataCopyParamsIndice_ = {1, static_cast<uint32_t>(coreCalcSLastNum * sizeof(int32_t)), 0, 0, 0};
@@ -338,29 +330,26 @@ public:
     }
 
 private:
-    __aicore__ inline void copyOutcache(
-        int64_t bIndex, int64_t sNum, int64_t sIndex, int64_t sIndexUb, LocalTensor<int8_t> vOut,
-        LocalTensor<int8_t> kOut)
+    __aicore__ inline void copyOutcache(int64_t bIndex, int64_t sNum, int64_t sIndex, int64_t sIndexUb,
+                                        LocalTensor<int8_t> vOut, LocalTensor<int8_t> kOut)
     {
         int64_t index = indiceUb.GetValue(bIndex);
         if (this->isPA == true) {
             if (index >= 0) {
-                DataCopy(
-                    vCacheGm[index * this->kvHeadNum * this->hiddenSize],
-                    vOut[sIndexUb * this->kvHeadNum * this->hiddenSize], sNum * this->kvHeadNum * this->hiddenSize);
-                DataCopy(
-                    kCacheGm[index * this->kvHeadNum * this->hiddenSize],
-                    kOut[sIndexUb * this->kvHeadNum * this->hiddenSize], sNum * this->kvHeadNum * this->hiddenSize);
+                DataCopy(vCacheGm[index * this->kvHeadNum * this->hiddenSize],
+                         vOut[sIndexUb * this->kvHeadNum * this->hiddenSize],
+                         sNum * this->kvHeadNum * this->hiddenSize);
+                DataCopy(kCacheGm[index * this->kvHeadNum * this->hiddenSize],
+                         kOut[sIndexUb * this->kvHeadNum * this->hiddenSize],
+                         sNum * this->kvHeadNum * this->hiddenSize);
             }
         } else {
-            DataCopy(
-                vCacheGm
-                    [((bOffset + bIndex) * this->cacheSeqlen + index + sIndex) * this->kvHeadNum * this->hiddenSize],
-                vOut[sIndexUb * this->kvHeadNum * this->hiddenSize], sNum * this->kvHeadNum * this->hiddenSize);
-            DataCopy(
-                kCacheGm
-                    [((bOffset + bIndex) * this->cacheSeqlen + index + sIndex) * this->kvHeadNum * this->hiddenSize],
-                kOut[sIndexUb * this->kvHeadNum * this->hiddenSize], sNum * this->kvHeadNum * this->hiddenSize);
+            DataCopy(vCacheGm[((bOffset + bIndex) * this->cacheSeqlen + index + sIndex) * this->kvHeadNum *
+                              this->hiddenSize],
+                     vOut[sIndexUb * this->kvHeadNum * this->hiddenSize], sNum * this->kvHeadNum * this->hiddenSize);
+            DataCopy(kCacheGm[((bOffset + bIndex) * this->cacheSeqlen + index + sIndex) * this->kvHeadNum *
+                              this->hiddenSize],
+                     kOut[sIndexUb * this->kvHeadNum * this->hiddenSize], sNum * this->kvHeadNum * this->hiddenSize);
         }
     }
 
@@ -408,8 +397,8 @@ private:
         }
 
         LocalTensor<XTYPE> kCopyInUb = kQueue.AllocTensor<XTYPE>();
-        DataCopyPad(
-            kCopyInUb[kUbOffset], inputGm[sOffset * inputHiddenSize + qHiddenSize], dataCopyParamsK_, padParamsK_);
+        DataCopyPad(kCopyInUb[kUbOffset], inputGm[sOffset * inputHiddenSize + qHiddenSize], dataCopyParamsK_,
+                    padParamsK_);
 
         kQueue.EnQue(kCopyInUb);
         qQueue.EnQue(qCopyInUb);
@@ -429,9 +418,8 @@ private:
                 Muls(sinUb[r * hiddenSize], sinUb[r * hiddenSize], (typename queType<COSTYPE>::type) - 1.0, halfSize);
             }
         } else {
-            Muls(
-                sinUb, sinUb, (typename queType<COSTYPE>::type) - 1.0, halfSize, onceS,
-                {1, 1, repeatStride, repeatStride});
+            Muls(sinUb, sinUb, (typename queType<COSTYPE>::type) - 1.0, halfSize, onceS,
+                 {1, 1, repeatStride, repeatStride});
         }
         int64_t firstS = GetRem(sCoreOffset, seqlen);
         int64_t firstStepSeq = seqlen - firstS < onceS ? seqlen - firstS : onceS;
@@ -479,18 +467,15 @@ private:
             AscendC::SetMaskNorm();
             SetVectorMask<typename queType<COSTYPE>::type>(halfSize);
 
-            Mul<typename queType<COSTYPE>::type, false>(
-                kOutUbF16, kInUb[halfSize], sinUb, halfSize, onceS,
-                {1, 1, 1, repeatStride, repeatStride, repeatStride});
-            Mul<typename queType<COSTYPE>::type, false>(
-                kOutUbF16[halfSize], kInUb, sinUb[halfSize], halfSize, onceS,
-                {1, 1, 1, repeatStride, repeatStride, repeatStride});
+            Mul<typename queType<COSTYPE>::type, false>(kOutUbF16, kInUb[halfSize], sinUb, halfSize, onceS,
+                                                        {1, 1, 1, repeatStride, repeatStride, repeatStride});
+            Mul<typename queType<COSTYPE>::type, false>(kOutUbF16[halfSize], kInUb, sinUb[halfSize], halfSize, onceS,
+                                                        {1, 1, 1, repeatStride, repeatStride, repeatStride});
             PipeBarrier<PIPE_V>();
-            Mul<typename queType<COSTYPE>::type, false>(
-                kInUb, kInUb, cosUb, halfSize, onceS, {1, 1, 1, repeatStride, repeatStride, repeatStride});
-            Mul<typename queType<COSTYPE>::type, false>(
-                kInUb[halfSize], kInUb[halfSize], cosUb[halfSize], halfSize, onceS,
-                {1, 1, 1, repeatStride, repeatStride, repeatStride});
+            Mul<typename queType<COSTYPE>::type, false>(kInUb, kInUb, cosUb, halfSize, onceS,
+                                                        {1, 1, 1, repeatStride, repeatStride, repeatStride});
+            Mul<typename queType<COSTYPE>::type, false>(kInUb[halfSize], kInUb[halfSize], cosUb[halfSize], halfSize,
+                                                        onceS, {1, 1, 1, repeatStride, repeatStride, repeatStride});
         } else {
             for (uint64_t loopS = 0; loopS < onceS; loopS++) {
                 for (uint64_t loopH = 0; loopH < this->kvHeadNum; loopH++) {
@@ -542,18 +527,16 @@ private:
             AscendC::SetMaskNorm();
             SetVectorMask<float>(FP32_ONE_REPEAT_NUM);
             for (uint32_t r = 0; r < hRepeatTime; r++) {
-                Div<float, false>(
-                    tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
-                    quantScaleKUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
-                    {1, 1, 1, repeatStrideF, repeatStrideF, 0});
+                Div<float, false>(tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
+                                  quantScaleKUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
+                                  {1, 1, 1, repeatStrideF, repeatStrideF, 0});
             }
             PipeBarrier<PIPE_V>();
             if (this->hasQuantOffset == true) {
                 for (uint32_t r = 0; r < hRepeatTime; r++) {
-                    Add<float, false>(
-                        tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
-                        offsetKUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
-                        {1, 1, 1, repeatStrideF, repeatStrideF, 0});
+                    Add<float, false>(tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
+                                      offsetKUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
+                                      {1, 1, 1, repeatStrideF, repeatStrideF, 0});
                 }
             }
         } else {
@@ -590,9 +573,8 @@ private:
             WaitFlag<HardEvent::MTE3_MTE2>(eventIdMTE3ToMTE2V);
         }
         LocalTensor<XTYPE> vCopyInUb = vQueue.AllocTensor<XTYPE>();
-        DataCopyPad(
-            vCopyInUb, inputGm[sOffset * inputHiddenSize + this->qHiddenSize + this->kHiddenSize], dataCopyParamsV_,
-            padParamsV_);
+        DataCopyPad(vCopyInUb, inputGm[sOffset * inputHiddenSize + this->qHiddenSize + this->kHiddenSize],
+                    dataCopyParamsV_, padParamsV_);
         if (this->ifKVout == true) {
             SetFlag<HardEvent::MTE2_MTE3>(eventIdMTE2ToMTE3V);
         }
@@ -607,20 +589,20 @@ private:
                 Mul<typename queType<COSTYPE>::type, false>(
                     qOutUb[r * this->qHiddenSize], qInUb[r * this->qHiddenSize + halfSize], sinUb[r * this->hiddenSize],
                     halfSize, this->qHeadNum, {1, 1, 1, repeatStride, repeatStride, 0});
-                Mul<typename queType<COSTYPE>::type, false>(
-                    qOutUb[r * this->qHiddenSize + halfSize], qInUb[r * this->qHiddenSize],
-                    sinUb[r * this->hiddenSize + halfSize], halfSize, this->qHeadNum,
-                    {1, 1, 1, repeatStride, repeatStride, 0});
+                Mul<typename queType<COSTYPE>::type, false>(qOutUb[r * this->qHiddenSize + halfSize],
+                                                            qInUb[r * this->qHiddenSize],
+                                                            sinUb[r * this->hiddenSize + halfSize], halfSize,
+                                                            this->qHeadNum, {1, 1, 1, repeatStride, repeatStride, 0});
             }
             PipeBarrier<PIPE_V>();
             for (uint32_t r = 0; r < onceS; r++) {
-                Mul<typename queType<COSTYPE>::type, false>(
-                    qInUb[r * this->qHiddenSize], qInUb[r * this->qHiddenSize], cosUb[r * this->hiddenSize], halfSize,
-                    this->qHeadNum, {1, 1, 1, repeatStride, repeatStride, 0});
-                Mul<typename queType<COSTYPE>::type, false>(
-                    qInUb[r * this->qHiddenSize + halfSize], qInUb[r * this->qHiddenSize + halfSize],
-                    cosUb[r * this->hiddenSize + halfSize], halfSize, this->qHeadNum,
-                    {1, 1, 1, repeatStride, repeatStride, 0});
+                Mul<typename queType<COSTYPE>::type, false>(qInUb[r * this->qHiddenSize], qInUb[r * this->qHiddenSize],
+                                                            cosUb[r * this->hiddenSize], halfSize, this->qHeadNum,
+                                                            {1, 1, 1, repeatStride, repeatStride, 0});
+                Mul<typename queType<COSTYPE>::type, false>(qInUb[r * this->qHiddenSize + halfSize],
+                                                            qInUb[r * this->qHiddenSize + halfSize],
+                                                            cosUb[r * this->hiddenSize + halfSize], halfSize,
+                                                            this->qHeadNum, {1, 1, 1, repeatStride, repeatStride, 0});
             }
         } else {
             for (uint64_t loopS = 0; loopS < onceS; loopS++) {
@@ -704,18 +686,16 @@ private:
             AscendC::SetMaskNorm();
             SetVectorMask<float>(FP32_ONE_REPEAT_NUM);
             for (uint32_t r = 0; r < hRepeatTime; r++) {
-                Div<float, false>(
-                    tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
-                    quantScaleVUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
-                    {1, 1, 1, repeatStrideF, repeatStrideF, 0});
+                Div<float, false>(tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
+                                  quantScaleVUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
+                                  {1, 1, 1, repeatStrideF, repeatStrideF, 0});
             }
             PipeBarrier<PIPE_V>();
             if (this->hasQuantOffset == true) {
                 for (uint32_t r = 0; r < hRepeatTime; r++) {
-                    Add<float, false>(
-                        tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
-                        offsetVUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
-                        {1, 1, 1, repeatStrideF, repeatStrideF, 0});
+                    Add<float, false>(tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
+                                      offsetVUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
+                                      {1, 1, 1, repeatStrideF, repeatStrideF, 0});
                 }
             }
         } else {
@@ -770,9 +750,8 @@ private:
         sOffset += onceS;
     }
 
-    __aicore__ inline void dequantUb(
-        LocalTensor<XTYPE> copyInUb, LocalTensor<BIASTYPE> curBiasUb, LocalTensor<float> curWsUb, int64_t onceS,
-        int64_t calcSize)
+    __aicore__ inline void dequantUb(LocalTensor<XTYPE> copyInUb, LocalTensor<BIASTYPE> curBiasUb,
+                                     LocalTensor<float> curWsUb, int64_t onceS, int64_t calcSize)
     {
         int64_t offset = 0;
         PipeBarrier<PIPE_ALL>();

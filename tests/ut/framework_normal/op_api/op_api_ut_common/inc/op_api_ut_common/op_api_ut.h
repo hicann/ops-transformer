@@ -139,7 +139,9 @@ int SaveResult(tuple<Ts...> &t, size_t input_count, const string &file_prefix,
 
 struct Enter {
     Enter(const string &info, void (*cleanup_func)(const string &), const string &cleanup_args)
-        : info_(info), cleanup_func_(cleanup_func), cleanup_args_(cleanup_args)
+        : info_(info),
+          cleanup_func_(cleanup_func),
+          cleanup_args_(cleanup_args)
     {
         cout << "=== ENTER " << info_ << " ===" << endl;
     }
@@ -166,8 +168,13 @@ public:
     OpApiUt(const string &test_suite_name, const string &test_case_name, const string &op_name,
             GET_F get_workspace_size_func, API_F api_func, const INPUT_T &inputs, const OUTPUT_T &outputs,
             [[maybe_unused]] const ACL_ARGS_T &wrapper_args, const EXTRA_T &extra_args)
-        : op_name_(op_name), case_name_(test_suite_name + "_" + test_case_name), api_func_(api_func),
-          get_workspace_size_func_(get_workspace_size_func), inputs_(inputs), outputs_(outputs), extra_args_(extra_args)
+        : op_name_(op_name),
+          case_name_(test_suite_name + "_" + test_case_name),
+          api_func_(api_func),
+          get_workspace_size_func_(get_workspace_size_func),
+          inputs_(inputs),
+          outputs_(outputs),
+          extra_args_(extra_args)
     {
         tmp_file_prefix_ = op_name_ + "_" + case_name_;
         case_location_ = GetOpUtSrcPath() + "/" + op_name_;
@@ -373,9 +380,9 @@ private:
     size_t input_count_;
 };
 
-#define OP_API_UT(api, input, output, ...)                                                                             \
-    OpApiUt(testing::UnitTest::GetInstance()->current_test_info()->test_case_name(),                                   \
-            testing::UnitTest::GetInstance()->current_test_info()->name(), #api, api##GetWorkspaceSize, api, input,    \
+#define OP_API_UT(api, input, output, ...) \
+    OpApiUt(testing::UnitTest::GetInstance()->current_test_info()->test_case_name(), \
+            testing::UnitTest::GetInstance()->current_test_info()->name(), #api, api##GetWorkspaceSize, api, input, \
             output, InferAclTypes(tuple_cat(input, output)), make_tuple(__VA_ARGS__))
 
 #define INPUT(...) make_tuple(__VA_ARGS__)

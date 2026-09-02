@@ -45,42 +45,42 @@ private:
     __aicore__ inline void VBSCopyIn(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void UBSortCompute(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum);
-    __aicore__ inline void InitSortMaskMrgSort(SortCustomMrgsort *sorter, int64_t listNum, 
-            int64_t coreOffset, int64_t sortNumCoreOffset, int64_t loopOffset, int64_t loopIdxOffset);
+    __aicore__ inline void InitSortMaskMrgSort(SortCustomMrgsort *sorter, int64_t listNum, int64_t coreOffset,
+                                               int64_t sortNumCoreOffset, int64_t loopOffset, int64_t loopIdxOffset);
     __aicore__ inline void InitSortMaskMrgSortOut(SortCustomMrgsortOut *sorter, int64_t listNum, int64_t coreOffset);
     __aicore__ inline void CopyOutValidCount();
 
 private:
-        GlobalTensor<float> workspaceGms[2];
-        GlobalTensor<int32_t> workspaceSortNumGm_;
+    GlobalTensor<float> workspaceGms[2];
+    GlobalTensor<int32_t> workspaceSortNumGm_;
 
-        SortCustomTilingDataKernel *tilingData_ = nullptr;
-        const ScheduleContextInfo *contextInfo_ = nullptr;
+    SortCustomTilingDataKernel *tilingData_ = nullptr;
+    const ScheduleContextInfo *contextInfo_ = nullptr;
 
-        int32_t totalValidCnt_ = 0;
-        int32_t curValidCnt_ = 0;
+    int32_t totalValidCnt_ = 0;
+    int32_t curValidCnt_ = 0;
 
-        SortCustomMrgsort mrgsorter;
-        SortCustomMrgsortParam mrgsortParam;
+    SortCustomMrgsort mrgsorter;
+    SortCustomMrgsortParam mrgsortParam;
 
-        int64_t blockIdx_ = 0;
-        int64_t srcWsIndex = 0;
+    int64_t blockIdx_ = 0;
+    int64_t srcWsIndex = 0;
 
-        int64_t listNum;
-        int64_t perListElements;
-        int64_t lastListElements;
-        int64_t vmsSortNumStride_ = 0;
+    int64_t listNum;
+    int64_t perListElements;
+    int64_t lastListElements;
+    int64_t vmsSortNumStride_ = 0;
 
-        int64_t sortTotalLength;
-        int64_t sortCoreLoops;
-        int64_t sortCoreLoopElements;
-        int64_t sortCoreLastLoopElements;
+    int64_t sortTotalLength;
+    int64_t sortCoreLoops;
+    int64_t sortCoreLoopElements;
+    int64_t sortCoreLastLoopElements;
 
-        int64_t perCoreExpert;
-        int64_t needInitExpertCore;
-        int64_t currentCoreExpert;
+    int64_t perCoreExpert;
+    int64_t needInitExpertCore;
+    int64_t currentCoreExpert;
 
-        static constexpr int64_t MAX_MRGSORT_LIST = 4;
+    static constexpr int64_t MAX_MRGSORT_LIST = 4;
 };
 
 __aicore__ inline void KernelSortMaskMultiCore::VBSCopyIn(int64_t progress, int64_t size, int64_t sortNum)
@@ -112,19 +112,16 @@ __aicore__ inline void KernelSortMaskMultiCore::UBSortCompute(int64_t progress, 
     Muls(expertIdsLocalFp32, expertIdsLocalFp32, (float)-1, size);
 
     LocalTensor<uint8_t> maskLocalTensorUInt8 = maskLocalTensor.ReinterpretCast<uint8_t>();
-    AscendC::CompareScalar(maskLocalTensorUInt8,
-        expertIdsLocalFp32,
-        static_cast<float>(-expertStart_),
-        AscendC::CMPMODE::GT,
-        (size + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
+    AscendC::CompareScalar(maskLocalTensorUInt8, expertIdsLocalFp32, static_cast<float>(-expertStart_),
+                           AscendC::CMPMODE::GT,
+                           (size + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
 
     GatherMaskParams gatherMaskParams;
     gatherMaskParams.repeatTimes = 1;
     gatherMaskParams.src0BlockStride = 1;
     gatherMaskParams.src0RepeatStride = 8; // 8 blocks
     gatherMaskParams.src1RepeatStride = 0;
-    GatherMask (
-        expertIdsLocalFp32, expertIdsLocalFp32, maskLocalTensor, true, size, gatherMaskParams, rsvdCnt);
+    GatherMask(expertIdsLocalFp32, expertIdsLocalFp32, maskLocalTensor, true, size, gatherMaskParams, rsvdCnt);
     curValidCnt_ = rsvdCnt;
     if (rsvdCnt == 0) {
         sortDataCopyInQueue.FreeTensor(inLocal);
@@ -147,7 +144,7 @@ __aicore__ inline void KernelSortMaskMultiCore::UBSortCompute(int64_t progress, 
     LocalTensor<float> concatLocal = expertIdsLocalFp32;
     LocalTensor<float> sortedLocal = sortedBuffer.Get<float>(GetSortLen<float>(sortNum));
     LocalTensor<float> outLocal = sortDataCopyOutQueue.AllocTensor<float>();
-    Sort<float, true>(outLocal, concatLocal, rowIdsLocal,sortedLocal, selectedCnt / ONE_REPEAT_SORT_NUM);
+    Sort<float, true>(outLocal, concatLocal, rowIdsLocal, sortedLocal, selectedCnt / ONE_REPEAT_SORT_NUM);
 
     sortDataCopyOutQueue.EnQue<float>(outLocal);
     sortDataCopyInQueue.FreeTensor(inLocal);
@@ -157,10 +154,10 @@ __aicore__ inline void KernelSortMaskMultiCore::VBSCopyOut(int64_t progress, int
 {
     if (curValidCnt_ > 0) {
         LocalTensor<float> outLocal = sortDataCopyOutQueue.DeQue<float>();
-        DataCopyExtParams copyParams{1, static_cast<uint32_t>(GetSortLen<float>(curValidCnt_) * sizeof(int32_t)),
-                                     0, 0, 0};
-        int64_t wkOffset = blockIdx_ * GetSortLen<float>(tilingData_->perCoreElements) + 
-                            GetSortLen<float>(progress * sortCoreLoopElements);
+        DataCopyExtParams copyParams{1, static_cast<uint32_t>(GetSortLen<float>(curValidCnt_) * sizeof(int32_t)), 0, 0,
+                                     0};
+        int64_t wkOffset = blockIdx_ * GetSortLen<float>(tilingData_->perCoreElements) +
+                           GetSortLen<float>(progress * sortCoreLoopElements);
         DataCopyPad(workspaceGms[0][wkOffset], outLocal, copyParams);
         sortDataCopyOutQueue.FreeTensor(outLocal);
     }
@@ -169,16 +166,16 @@ __aicore__ inline void KernelSortMaskMultiCore::VBSCopyOut(int64_t progress, int
     tempTensor.SetValue(0, curValidCnt_);
     SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
     DataCopyExtParams copyParams1{static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(int32_t)), 0, 0, 0};
-    DataCopyPad(workspaceSortNumGm_[blockIdx_ * tilingData_->sortNumWorkSpacePerCore + progress],
-                tempTensor, copyParams1);
+    DataCopyPad(workspaceSortNumGm_[blockIdx_ * tilingData_->sortNumWorkSpacePerCore + progress], tempTensor,
+                copyParams1);
 }
 
-__aicore__ inline void KernelSortMaskMultiCore::InitSortMaskMrgSort(SortCustomMrgsort * sorter, int64_t listNum, 
-    int64_t coreOffset, int64_t sortNumCoreOffset, int64_t loopOffset, int64_t loopIdxOffset)
+__aicore__ inline void KernelSortMaskMultiCore::InitSortMaskMrgSort(SortCustomMrgsort *sorter, int64_t listNum,
+                                                                    int64_t coreOffset, int64_t sortNumCoreOffset,
+                                                                    int64_t loopOffset, int64_t loopIdxOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx_ * coreOffset + loopOffset];
-    GlobalTensor<int32_t> srcSortNumGm = workspaceSortNumGm_[blockIdx_ * sortNumCoreOffset + 
-                                                             loopIdxOffset];
+    GlobalTensor<int32_t> srcSortNumGm = workspaceSortNumGm_[blockIdx_ * sortNumCoreOffset + loopIdxOffset];
     LocalTensor<float> inLocal = sortDataCopyInQueue.AllocTensor<float>();
     LocalTensor<float> outLocal = sortDataCopyOutQueue.AllocTensor<float>();
     for (int64_t i = 0; i < listNum; i++) {
@@ -193,8 +190,8 @@ __aicore__ inline void KernelSortMaskMultiCore::InitSortMaskMrgSort(SortCustomMr
     tempBuffer.FreeTensor(outSortNumLocal);
 }
 
-__aicore__ inline void KernelSortMaskMultiCore::InitSortMaskMrgSortOut(
-    SortCustomMrgsortOut *sorter, int64_t listNum, int64_t coreOffset)
+__aicore__ inline void KernelSortMaskMultiCore::InitSortMaskMrgSortOut(SortCustomMrgsortOut *sorter, int64_t listNum,
+                                                                       int64_t coreOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex];
     GlobalTensor<int32_t> srcSortNumGm = workspaceSortNumGm_;
@@ -209,15 +206,15 @@ __aicore__ inline void KernelSortMaskMultiCore::InitSortMaskMrgSortOut(
     LocalTensor<float> outLocalV = outLocal[tilingData_->oneLoopMaxElementsMrg * MAX_MRGSORT_LIST];
     sorter->SetOutput(this->sortedexpertIdsGm, this->sortedRowIdsGm, outLocal, outLocalV);
 
-    LocalTensor<float> tempBuffer = 
+    LocalTensor<float> tempBuffer =
         sortedBuffer.Get<float>(GetSortLen<float>(tilingData_->oneLoopMaxElementsMrg) * MAX_MRGSORT_LIST);
     sorter->SetBuffer(tempBuffer);
     sortDataCopyInQueue.FreeTensor(inLocal);
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void KernelSortMaskMultiCore::OneCoreVMSProcess(
-    int64_t listNum, int64_t perListElements, int64_t lastListElements)
+__aicore__ inline void KernelSortMaskMultiCore::OneCoreVMSProcess(int64_t listNum, int64_t perListElements,
+                                                                  int64_t lastListElements)
 {
     int64_t coreOffset = GetSortLen<float>(tilingData_->perCoreElements);
     int64_t sortNumCoreOffset = tilingData_->sortNumWorkSpacePerCore;
@@ -232,16 +229,16 @@ __aicore__ inline void KernelSortMaskMultiCore::OneCoreVMSProcess(
         mrgsortParam.sortNumStride = curSortNumStride;
 
         int64_t loopOffset = GetSortLen<float>(mrgsortParam.perListElements * MAX_MRGSORT_LIST);
-        int64_t loopIdxOffset = mrgsortParam.sortNumStride * MAX_MRGSORT_LIST; 
+        int64_t loopIdxOffset = mrgsortParam.sortNumStride * MAX_MRGSORT_LIST;
         for (int64_t loop = 0; loop < loops - 1; loop++) {
-            InitSortMaskMrgSort(&mrgsorter, MAX_MRGSORT_LIST, coreOffset, sortNumCoreOffset,
-                                loop * loopOffset, loop * loopIdxOffset);
+            InitSortMaskMrgSort(&mrgsorter, MAX_MRGSORT_LIST, coreOffset, sortNumCoreOffset, loop * loopOffset,
+                                loop * loopIdxOffset);
             mrgsorter.Init(&mrgsortParam);
             mrgsorter.Process();
         }
 
-        InitSortMaskMrgSort(&mrgsorter, remainListNum, coreOffset, sortNumCoreOffset,
-                            (loops - 1) * loopOffset, (loops - 1) * loopIdxOffset);
+        InitSortMaskMrgSort(&mrgsorter, remainListNum, coreOffset, sortNumCoreOffset, (loops - 1) * loopOffset,
+                            (loops - 1) * loopIdxOffset);
         mrgsorter.Init(&mrgsortParam);
         mrgsorter.Process();
 
@@ -346,8 +343,9 @@ __aicore__ inline void KernelSortMaskMultiCore::CopyOutValidCount()
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void KernelSortMaskMultiCore::Init(GM_ADDR expert_ids, GM_ADDR workspace, 
-    SortCustomTilingDataKernel *tilingData, const ScheduleContextInfo *contextInfo, TPipe *tPipe)
+__aicore__ inline void KernelSortMaskMultiCore::Init(GM_ADDR expert_ids, GM_ADDR workspace,
+                                                     SortCustomTilingDataKernel *tilingData,
+                                                     const ScheduleContextInfo *contextInfo, TPipe *tPipe)
 {
     this->pipe = tPipe;
     contextInfo_ = contextInfo;
@@ -368,17 +366,17 @@ __aicore__ inline void KernelSortMaskMultiCore::Init(GM_ADDR expert_ids, GM_ADDR
         this->sortTotalLength = tilingData_->perCoreElements;
     }
 
-    expertIdsGm.SetGlobalBuffer(
-        (__gm__ int32_t *)expert_ids + blockIdx_ * tilingData_->perCoreElements, this->sortTotalLength);
-    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace), OFFSET_SORTED_EXPERT_IDS);
+    expertIdsGm.SetGlobalBuffer((__gm__ int32_t *)expert_ids + blockIdx_ * tilingData_->perCoreElements,
+                                this->sortTotalLength);
+    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), OFFSET_SORTED_EXPERT_IDS);
     workspaceSortNumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS,
                                         contextInfo_->sortNumWorkSpace);
 
     if (blockIdx_ == 0) {
         InitGlobalMemory(rsvdCntGm, OFFSET_SORTED_EXPERT_IDS, 0);
-        GM_ADDR targetAddr = workspace + OFFSET_SORTED_EXPERT_IDS * sizeof(int32_t) + 
+        GM_ADDR targetAddr = workspace + OFFSET_SORTED_EXPERT_IDS * sizeof(int32_t) +
                              contextInfo_->sortNumWorkSpace * sizeof(int32_t) * (NUM_TWO * NUM_FOUR + 1);
-        groupListTmpGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(targetAddr), contextInfo_->expertNum);
+        groupListTmpGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(targetAddr), contextInfo_->expertNum);
         InitGlobalMemory(groupListTmpGm, contextInfo_->expertNum, 0);
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
     }
@@ -387,21 +385,21 @@ __aicore__ inline void KernelSortMaskMultiCore::Init(GM_ADDR expert_ids, GM_ADDR
     sortedexpertIdsGm.SetGlobalBuffer(
         reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
         this->totalLength);
-    sortedRowIdsGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace +
-        this->totalLength, this->totalLength);
-    
+    sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
+                                       contextInfo_->sortNumWorkSpace + this->totalLength,
+                                   this->totalLength);
+
     int64_t kvFactor = 2;
-    workspaceGms[0].SetGlobalBuffer(
-        reinterpret_cast<__gm__ float *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace +
-        this->totalLength * kvFactor, this->totalLength * kvFactor);
-    workspaceGms[1].SetGlobalBuffer(
-        reinterpret_cast<__gm__ float *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace +
-        this->totalLength * (kvFactor + kvFactor), this->totalLength * kvFactor);
-    
-    int64_t bufferSize = Ceil(Max(tilingData_->oneLoopMaxElementsMrg * MAX_MRGSORT_LIST, sortCoreLoopElements),
-                        ONE_REPEAT_SORT_NUM) * 
-                        ONE_REPEAT_SORT_NUM * sizeof(int32_t) * kvFactor;
+    workspaceGms[0].SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
+                                        contextInfo_->sortNumWorkSpace + this->totalLength * kvFactor,
+                                    this->totalLength * kvFactor);
+    workspaceGms[1].SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
+                                        contextInfo_->sortNumWorkSpace + this->totalLength * (kvFactor + kvFactor),
+                                    this->totalLength * kvFactor);
+
+    int64_t bufferSize =
+        Ceil(Max(tilingData_->oneLoopMaxElementsMrg * MAX_MRGSORT_LIST, sortCoreLoopElements), ONE_REPEAT_SORT_NUM) *
+        ONE_REPEAT_SORT_NUM * sizeof(int32_t) * kvFactor;
     pipe->InitBuffer(sortDataCopyInQueue, bufferNum, bufferSize);
     pipe->InitBuffer(sortDataCopyOutQueue, bufferNum, bufferSize);
     pipe->InitBuffer(sortedBuffer, bufferSize);

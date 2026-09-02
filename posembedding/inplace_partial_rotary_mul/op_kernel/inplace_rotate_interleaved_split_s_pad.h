@@ -39,7 +39,7 @@ protected:
     TBuf<TPosition::VECCALC> tmpFp32Buf2;
     TBuf<TPosition::VECCALC> tmpFp32Buf3;
     TBuf<TPosition::VECCALC> gatherOffsetBuf;
-    const InplacePartialRopeRegbaseTilingData* tiling_;
+    const InplacePartialRopeRegbaseTilingData *tiling_;
 
     // tilingdata
     uint64_t batchSize;
@@ -110,8 +110,8 @@ __aicore__ inline void InterleavedSplitSPad<T>::Init(GM_ADDR x, GM_ADDR cos, GM_
         ubCalcSeqTail = ubCalcTailTail;
         ubCalcSeqLoop = ubCalcTailLoop;
         ioOffset = frontCoreNum * coreCalcNum * bufferNdSize + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSize;
-        ioOffsetAll = frontCoreNum * coreCalcNum * bufferNdSizeAll
-            + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
+        ioOffsetAll =
+            frontCoreNum * coreCalcNum * bufferNdSizeAll + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
         triOffset = frontCoreNum * coreCalcNum * headDim + (blockIdx - frontCoreNum) * coreCalcTail * headDim;
     }
 
@@ -170,12 +170,11 @@ __aicore__ inline void InterleavedSplitSPad<T>::CopyInX(LocalTensor<T> &x, uint3
     for (uint32_t batchIdx = 0; batchIdx < batchSize; ++batchIdx) {
         dataCopyParams.blockCount = calcLen * numHeads;
         dataCopyParams.blockLen = headDim * sizeof(T);
-        dataCopyParams.srcStride = (allHeadDim -  headDim)* sizeof(T);
+        dataCopyParams.srcStride = (allHeadDim - headDim) * sizeof(T);
         dataCopyParams.dstStride = 0;
         DataCopyPad(x[batchIdx * calcLen * numHeads * headDimAlign],
                     xGm[batchIdx * seqLen * bufferNdSizeAll + loopIdx * ubCalcSeq * bufferNdSizeAll + start],
-                        dataCopyParams,
-                    {false, 0, 0, 0});
+                    dataCopyParams, {false, 0, 0, 0});
     }
     event_t eventIdMTE2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
     SetFlag<HardEvent::MTE2_V>(eventIdMTE2ToV);
@@ -224,7 +223,7 @@ __aicore__ inline void InterleavedSplitSPad<T>::CopyOut(uint32_t loopIdx, uint32
         dataCopyParams.blockCount = calcLen * numHeads;
         dataCopyParams.blockLen = headDim * sizeof(T);
         dataCopyParams.srcStride = 0;
-        dataCopyParams.dstStride = (allHeadDim -  headDim)* sizeof(T);
+        dataCopyParams.dstStride = (allHeadDim - headDim) * sizeof(T);
         DataCopyPad(yGm[batchIdx * seqLen * bufferNdSizeAll + loopIdx * ubCalcSeq * bufferNdSizeAll + start],
                     y[batchIdx * calcLen * numHeads * headDimAlign], dataCopyParams);
     }
@@ -288,8 +287,9 @@ __aicore__ inline void InterleavedSplitSPad<T>::Compute(uint32_t loopIdx, LocalT
 }
 
 template <typename T>
-__aicore__ inline void
-InterleavedSplitSPad<T>::ComputeCastFp32(uint32_t loopIdx, LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+__aicore__ inline void InterleavedSplitSPad<T>::ComputeCastFp32(uint32_t loopIdx,
+                                                                LocalTensor<uint32_t> &gatherOffsetCast,
+                                                                uint32_t calcLen)
 {
     uint64_t totalCount = calcLen * batchSize * numHeads * headDimAlign;
 

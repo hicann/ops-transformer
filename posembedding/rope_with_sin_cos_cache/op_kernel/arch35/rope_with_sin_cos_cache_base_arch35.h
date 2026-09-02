@@ -107,7 +107,8 @@ __aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCos
     num_kheads_each_loop = tilingData.num_kheads_each_loop;
     num_kheads_last_loop = tilingData.num_kheads_last_loop;
     num_heads_each_loop = num_qheads_each_loop > num_kheads_each_loop ? num_qheads_each_loop : num_kheads_each_loop;
-    num_tokens_current_core = (blockIdx_ < front_core) ? tilingData.num_tokens_each_front_core : tilingData.num_tokens_each_tail_core;
+    num_tokens_current_core =
+        (blockIdx_ < front_core) ? tilingData.num_tokens_each_front_core : tilingData.num_tokens_each_tail_core;
 }
 
 template <typename T>

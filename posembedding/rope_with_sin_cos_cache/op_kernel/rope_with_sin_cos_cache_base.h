@@ -23,12 +23,11 @@ using AscendC::Duplicate;
 using AscendC::HardEvent;
 
 template <typename T>
-class RopeWithSinCosCacheBase
-{
+class RopeWithSinCosCacheBase {
 public:
     // 构造函数
     __aicore__ inline RopeWithSinCosCacheBase(){};
-    __aicore__ inline void InitData(const RopeWithSinCosCacheTilingData& tilingData);
+    __aicore__ inline void InitData(const RopeWithSinCosCacheTilingData &tilingData);
     __aicore__ inline void SToMTE2Sync();
     __aicore__ inline void MTE2ToSSync();
     __aicore__ inline void SToMTE3Sync();
@@ -76,7 +75,7 @@ protected:
 };
 
 template <typename T>
-__aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCosCacheTilingData& tilingData)
+__aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCosCacheTilingData &tilingData)
 {
     blockIdx_ = AscendC::GetBlockIdx();
 
@@ -114,7 +113,8 @@ __aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCos
     num_kheads_each_loop = tilingData.num_kheads_each_loop;
     num_kheads_last_loop = tilingData.num_kheads_last_loop;
     num_heads_each_loop = num_qheads_each_loop > num_kheads_each_loop ? num_qheads_each_loop : num_kheads_each_loop;
-    num_tokens_current_core = (blockIdx_ < front_core) ? tilingData.num_tokens_each_front_core : tilingData.num_tokens_each_tail_core;
+    num_tokens_current_core =
+        (blockIdx_ < front_core) ? tilingData.num_tokens_each_front_core : tilingData.num_tokens_each_tail_core;
 }
 
 template <typename T>

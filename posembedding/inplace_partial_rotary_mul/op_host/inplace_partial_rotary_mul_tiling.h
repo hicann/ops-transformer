@@ -15,7 +15,6 @@
 #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 #define OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 
-
 #include "register/tilingdata_base.h"
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
@@ -93,7 +92,7 @@ END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(InplacePartialRotaryMul, InplacePartialRopeRegbaseTilingData)
 
-ge::graphStatus Tiling4InplacePartialRotaryMul(gert::TilingContext* context);
+ge::graphStatus Tiling4InplacePartialRotaryMul(gert::TilingContext *context);
 struct InplacePartialRotaryPositionEmbeddingCompileInfo {
     int64_t blockDim;
     uint64_t ubSize;
@@ -127,13 +126,13 @@ enum class InplacePartialRotaryPosEmbeddingMode : uint8_t {
 template <typename T>
 static inline T CeilDiv(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd)));
 }
 
 template <typename T>
 static inline T CeilAlign(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd)) * (rnd));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd)) * (rnd));
 }
 
 template <typename T>
@@ -156,9 +155,9 @@ static inline T FloorAlign(T x, T y)
 
 class InplacePartialRotaryPosEmbeddingMembaseTilingClass {
 public:
-    explicit InplacePartialRotaryPosEmbeddingMembaseTilingClass(gert::TilingContext *context) : context_(context)
-    {
-    }
+    explicit InplacePartialRotaryPosEmbeddingMembaseTilingClass(gert::TilingContext *context)
+        : context_(context)
+    {}
 
     void Reset(gert::TilingContext *context)
     {
@@ -202,7 +201,7 @@ public:
 protected:
     static const uint32_t MODE_ROTATE_INTERLEAVED = 1;
     uint32_t inputMode_ = 0;
-    gert::TilingContext* context_ = nullptr;
+    gert::TilingContext *context_ = nullptr;
     std::unique_ptr<platform_ascendc::PlatformAscendC> ascendcPlatform_{nullptr};
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
@@ -212,9 +211,9 @@ protected:
 
 class InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClass(gert::TilingContext *context) : context_(context)
-    {
-    }
+    explicit InplacePartialRopeRegBaseTilingClass(gert::TilingContext *context)
+        : context_(context)
+    {}
 
     void Reset(gert::TilingContext *context)
     {
@@ -289,13 +288,13 @@ public:
             noopTiling.set_rotaryMode(static_cast<int64_t>(rotaryMode_));
             noopTiling.set_D(d_);
             context_->SetBlockDim(1);
-            context_->SetTilingKey(20040);  // TILING_KEY_A: valid key, kernel will check sliceLength==0
+            context_->SetTilingKey(20040); // TILING_KEY_A: valid key, kernel will check sliceLength==0
             size_t *workspaces = context_->GetWorkspaceSizes(1);
             if (workspaces != nullptr) {
                 workspaces[0] = static_cast<size_t>(16) * 1024 * 1024;
             }
             noopTiling.SaveToBuffer(context_->GetRawTilingData()->GetData(),
-                context_->GetRawTilingData()->GetCapacity());
+                                    context_->GetRawTilingData()->GetCapacity());
             context_->GetRawTilingData()->SetDataSize(noopTiling.GetDataSize());
             return ge::GRAPH_SUCCESS;
         }
@@ -339,7 +338,7 @@ protected:
     int64_t blockSize_;
     int64_t dSplitCoef_;
     bool is1snd_ = false;
-    gert::TilingContext* context_ = nullptr;
+    gert::TilingContext *context_ = nullptr;
     std::unique_ptr<platform_ascendc::PlatformAscendC> ascendcPlatform_{nullptr};
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
@@ -355,10 +354,9 @@ protected:
 
 class InplacePartialRopeRegBaseTilingClassAAndB : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassAAndB(
-        gert::TilingContext *context) : InplacePartialRopeRegBaseTilingClass(context)
-    {
-    }
+    explicit InplacePartialRopeRegBaseTilingClassAAndB(gert::TilingContext *context)
+        : InplacePartialRopeRegBaseTilingClass(context)
+    {}
 
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
@@ -391,10 +389,9 @@ private:
 
 class InplacePartialRopeRegBaseTilingClassAB : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassAB(
-        gert::TilingContext *context) : InplacePartialRopeRegBaseTilingClass(context)
-    {
-    }
+    explicit InplacePartialRopeRegBaseTilingClassAB(gert::TilingContext *context)
+        : InplacePartialRopeRegBaseTilingClass(context)
+    {}
 
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
@@ -416,10 +413,9 @@ private:
 
 class InplacePartialRopeRegBaseTilingClassABAAndBA : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassABAAndBA(
-        gert::TilingContext *context) : InplacePartialRopeRegBaseTilingClass(context)
-    {
-    }
+    explicit InplacePartialRopeRegBaseTilingClassABAAndBA(gert::TilingContext *context)
+        : InplacePartialRopeRegBaseTilingClass(context)
+    {}
 
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
@@ -451,10 +447,9 @@ private:
 
 class InplacePartialRopeRegBaseTilingClassBAB : public InplacePartialRopeRegBaseTilingClass {
 public:
-    explicit InplacePartialRopeRegBaseTilingClassBAB(
-        gert::TilingContext *context_) : InplacePartialRopeRegBaseTilingClass(context_)
-    {
-    }
+    explicit InplacePartialRopeRegBaseTilingClassBAB(gert::TilingContext *context_)
+        : InplacePartialRopeRegBaseTilingClass(context_)
+    {}
 
     // 计算数据切分
     ge::graphStatus DoOpTiling() override;
@@ -466,8 +461,7 @@ public:
     bool IsCapable() override
     {
         // BSND format, 1s1d模版，后续可扩展支持所有bab类型的boardcast
-        if (IsRegbaseSocVersion() && (layout_ == InplacePartialRopeLayout::BSND) &&
-            (cosb_ == 1)) {
+        if (IsRegbaseSocVersion() && (layout_ == InplacePartialRopeLayout::BSND) && (cosb_ == 1)) {
             return true;
         }
         return false;

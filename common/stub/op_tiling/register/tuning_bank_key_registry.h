@@ -23,16 +23,16 @@
 
 #define REGISTER_OP_BANK_KEY_CONVERT_FUN_UNIQ_HELPER(optype, opfunc) REGISTER_OP_BANK_KEY_UNIQ(optype, (opfunc))
 
-#define REGISTER_OP_BANK_KEY_UNIQ(optype, opfunc)                                                                      \
+#define REGISTER_OP_BANK_KEY_UNIQ(optype, opfunc) \
     static tuningtiling::OpBankKeyFuncRegistry g_##optype##BankKeyRegistryInterf(#optype, (opfunc))
 
-#define REGISTER_OP_BANK_KEY_PARSE_FUN(op, parse_func, load_func)                                                      \
+#define REGISTER_OP_BANK_KEY_PARSE_FUN(op, parse_func, load_func) \
     REGISTER_OP_BANK_KEY_PARSE_FUN_UNIQ_HELPER(op, (parse_func), (load_func))
 
-#define REGISTER_OP_BANK_KEY_PARSE_FUN_UNIQ_HELPER(optype, parse_func, load_func)                                      \
+#define REGISTER_OP_BANK_KEY_PARSE_FUN_UNIQ_HELPER(optype, parse_func, load_func) \
     REGISTER_OP_BANK_KEY_PARSE_UNIQ(optype, (parse_func), (load_func))
 
-#define REGISTER_OP_BANK_KEY_PARSE_UNIQ(optype, parse_func, load_func)                                                 \
+#define REGISTER_OP_BANK_KEY_PARSE_UNIQ(optype, parse_func, load_func) \
     static tuningtiling::OpBankKeyFuncRegistry g_##optype##BankParseInterf(#optype, (parse_func), (load_func))
 
 // v2
@@ -40,89 +40,87 @@
 
 #define REGISTER_OP_BANK_KEY_CONVERT_FUN_UNIQ_HELPER_V2(optype, opfunc) REGISTER_OP_BANK_KEY_UNIQ_V2(optype, (opfunc))
 
-#define REGISTER_OP_BANK_KEY_UNIQ_V2(optype, opfunc)                                                                   \
+#define REGISTER_OP_BANK_KEY_UNIQ_V2(optype, opfunc) \
     static tuningtiling::OpBankKeyFuncRegistryV2 g_##optype##BankKeyRegistryInterf(#optype, (opfunc))
 
-#define REGISTER_OP_BANK_KEY_PARSE_FUN_V2(op, parse_func, load_func)                                                   \
+#define REGISTER_OP_BANK_KEY_PARSE_FUN_V2(op, parse_func, load_func) \
     REGISTER_OP_BANK_KEY_PARSE_FUN_UNIQ_HELPER_V2(op, (parse_func), (load_func))
 
-#define REGISTER_OP_BANK_KEY_PARSE_FUN_UNIQ_HELPER_V2(optype, parse_func, load_func)                                   \
+#define REGISTER_OP_BANK_KEY_PARSE_FUN_UNIQ_HELPER_V2(optype, parse_func, load_func) \
     REGISTER_OP_BANK_KEY_PARSE_UNIQ_V2(optype, (parse_func), (load_func))
 
-#define REGISTER_OP_BANK_KEY_PARSE_UNIQ_V2(optype, parse_func, load_func)                                              \
+#define REGISTER_OP_BANK_KEY_PARSE_UNIQ_V2(optype, parse_func, load_func) \
     static tuningtiling::OpBankKeyFuncRegistryV2 g_##optype##BankParseInterf(#optype, (parse_func), (load_func))
 
-#define TUNING_TILING_MAKE_SHARED(exec_expr0, exec_expr1)                                                              \
-    do {                                                                                                               \
-        try {                                                                                                          \
-            exec_expr0;                                                                                                \
-        } catch (...) {                                                                                                \
-            exec_expr1;                                                                                                \
-        }                                                                                                              \
+#define TUNING_TILING_MAKE_SHARED(exec_expr0, exec_expr1) \
+    do { \
+        try { \
+            exec_expr0; \
+        } catch (...) { \
+            exec_expr1; \
+        } \
     } while (0)
 
 // v1 stub
-#define DECLARE_STRUCT_RELATE_WITH_OP(op, bank_key, ...)                                                               \
-    do {                                                                                                               \
-        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(bank_key, __VA_ARGS__);                                                     \
-        static bool ParseFunc##op##bank_key(const std::shared_ptr<void> &in_args, size_t len,                          \
-                                            ge::AscendString &bank_key_str)                                            \
-        {                                                                                                              \
-            if (sizeof(bank_key_str) != len || in_args == nullptr) {                                                   \
-                return false;                                                                                          \
-            }                                                                                                          \
-            return false;                                                                                              \
-        }                                                                                                              \
-        static bool LoadFunc##op##bank_key(std::shared_ptr<void> &in_args, size_t &len,                                \
-                                           const ge::AscendString &bank_key_str)                                       \
-        {                                                                                                              \
-            len = sizeof(bank_key_str);                                                                                \
-            TUNING_TILING_MAKE_SHARED(in_args = std::make_shared<bank_key>(), return false);                           \
-            auto op_ky = std::static_pointer_cast<bank_key>(in_args);                                                  \
-            return false;                                                                                              \
-        }                                                                                                              \
-        REGISTER_OP_BANK_KEY_PARSE_FUN(op, ParseFunc##op##bank_key, LoadFunc##op##bank_key)                            \
+#define DECLARE_STRUCT_RELATE_WITH_OP(op, bank_key, ...) \
+    do { \
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(bank_key, __VA_ARGS__); \
+        static bool ParseFunc##op##bank_key(const std::shared_ptr<void> &in_args, size_t len, \
+                                            ge::AscendString &bank_key_str) \
+        { \
+            if (sizeof(bank_key_str) != len || in_args == nullptr) { \
+                return false; \
+            } \
+            return false; \
+        } \
+        static bool LoadFunc##op##bank_key(std::shared_ptr<void> &in_args, size_t &len, \
+                                           const ge::AscendString &bank_key_str) \
+        { \
+            len = sizeof(bank_key_str); \
+            TUNING_TILING_MAKE_SHARED(in_args = std::make_shared<bank_key>(), return false); \
+            auto op_ky = std::static_pointer_cast<bank_key>(in_args); \
+            return false; \
+        } \
+        REGISTER_OP_BANK_KEY_PARSE_FUN(op, ParseFunc##op##bank_key, LoadFunc##op##bank_key) \
     } while (0)
-
 
 // v2
-#define DECLARE_STRUCT_RELATE_WITH_OP_V2(op, bank_key, ...)                                                            \
-    do {                                                                                                               \
-        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(bank_key, __VA_ARGS__);                                                     \
-        static bool ParseFuncV2##op##bank_key(const std::shared_ptr<void> &in_args, size_t len,                        \
-                                              ge::AscendString &bank_key_json_str)                                     \
-        {                                                                                                              \
-            if (sizeof(bank_key) != len || in_args == nullptr) {                                                       \
-                return false;                                                                                          \
-            }                                                                                                          \
-            nlohmann::json bank_key_json;                                                                              \
-            bank_key_json = *(std::static_pointer_cast<bank_key>(in_args));                                            \
-            try {                                                                                                      \
-                std::string json_dump_str = bank_key_json.dump();                                                      \
-                bank_key_json_str = ge::AscendString(json_dump_str.c_str());                                           \
-            } catch (std::exception & e) {                                                                             \
-                return false;                                                                                          \
-            }                                                                                                          \
-            return true;                                                                                               \
-        }                                                                                                              \
-        static bool LoadFuncV2##op##bank_key(std::shared_ptr<void> &in_args, size_t &len,                              \
-                                             const ge::AscendString &bank_key_json_str)                                \
-        {                                                                                                              \
-            len = sizeof(bank_key);                                                                                    \
-            TUNING_TILING_MAKE_SHARED(in_args = std::make_shared<bank_key>(), return false);                           \
-            nlohmann::json bank_key_json;                                                                              \
-            try {                                                                                                      \
-                bank_key_json = nlohmann::json::parse(bank_key_json_str.GetString());                                  \
-                auto op_ky = std::static_pointer_cast<bank_key>(in_args);                                              \
-                *op_ky = bank_key_json.get<bank_key>();                                                                \
-            } catch (std::exception & e) {                                                                             \
-                return false;                                                                                          \
-            }                                                                                                          \
-            return true;                                                                                               \
-        }                                                                                                              \
-        REGISTER_OP_BANK_KEY_PARSE_FUN_V2(op, ParseFuncV2##op##bank_key, LoadFuncV2##op##bank_key)                     \
+#define DECLARE_STRUCT_RELATE_WITH_OP_V2(op, bank_key, ...) \
+    do { \
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(bank_key, __VA_ARGS__); \
+        static bool ParseFuncV2##op##bank_key(const std::shared_ptr<void> &in_args, size_t len, \
+                                              ge::AscendString &bank_key_json_str) \
+        { \
+            if (sizeof(bank_key) != len || in_args == nullptr) { \
+                return false; \
+            } \
+            nlohmann::json bank_key_json; \
+            bank_key_json = *(std::static_pointer_cast<bank_key>(in_args)); \
+            try { \
+                std::string json_dump_str = bank_key_json.dump(); \
+                bank_key_json_str = ge::AscendString(json_dump_str.c_str()); \
+            } catch (std::exception & e) { \
+                return false; \
+            } \
+            return true; \
+        } \
+        static bool LoadFuncV2##op##bank_key(std::shared_ptr<void> &in_args, size_t &len, \
+                                             const ge::AscendString &bank_key_json_str) \
+        { \
+            len = sizeof(bank_key); \
+            TUNING_TILING_MAKE_SHARED(in_args = std::make_shared<bank_key>(), return false); \
+            nlohmann::json bank_key_json; \
+            try { \
+                bank_key_json = nlohmann::json::parse(bank_key_json_str.GetString()); \
+                auto op_ky = std::static_pointer_cast<bank_key>(in_args); \
+                *op_ky = bank_key_json.get<bank_key>(); \
+            } catch (std::exception & e) { \
+                return false; \
+            } \
+            return true; \
+        } \
+        REGISTER_OP_BANK_KEY_PARSE_FUN_V2(op, ParseFuncV2##op##bank_key, LoadFuncV2##op##bank_key) \
     } while (0)
-
 
 namespace tuningtiling {
 // v1兼容老版本om

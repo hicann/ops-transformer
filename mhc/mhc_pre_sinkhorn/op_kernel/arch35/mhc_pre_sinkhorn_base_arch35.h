@@ -43,7 +43,10 @@ __aicore__ inline uint64_t CeilDiv(uint64_t a, uint64_t b)
     return (a + b - 1) / b;
 }
 
-__aicore__ inline uint64_t CeilAlign(uint64_t a, uint64_t b) { return CeilDiv(a, b) * b; }
+__aicore__ inline uint64_t CeilAlign(uint64_t a, uint64_t b)
+{
+    return CeilDiv(a, b) * b;
+}
 
 template <typename T>
 __aicore__ inline int32_t RoundUp(int32_t num)

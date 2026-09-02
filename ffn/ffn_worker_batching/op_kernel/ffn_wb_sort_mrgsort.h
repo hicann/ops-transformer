@@ -36,12 +36,12 @@ struct SortCustomMrgsortParam {
 class SortCustomMrgsort {
 public:
     __aicore__ inline SortCustomMrgsort(){};
-    __aicore__ inline void Init(SortCustomMrgsortParam* param);
+    __aicore__ inline void Init(SortCustomMrgsortParam *param);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, GlobalTensor<int32_t>& gmSortNum,
-                                    LocalTensor<float>& ubInput);
-    __aicore__ inline void SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput,
-                                    LocalTensor<int32_t>& outSortNumLocal);
+    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, GlobalTensor<int32_t> &gmSortNum,
+                                    LocalTensor<float> &ubInput);
+    __aicore__ inline void SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput,
+                                     LocalTensor<int32_t> &outSortNumLocal);
 
 private:
     __aicore__ inline void CopyOutSortNum();
@@ -53,7 +53,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    SortCustomMrgsortParam* param = nullptr;
+    SortCustomMrgsortParam *param = nullptr;
 
     GlobalTensor<float> gmInputs[4];
     GlobalTensor<float> gmOutput;
@@ -85,8 +85,8 @@ __aicore__ inline void SortCustomMrgsort::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void SortCustomMrgsort::SetInput(GlobalTensor<float>& gmInput, GlobalTensor<int32_t>& gmSortNum,
-                                LocalTensor<float>& ubInput)
+__aicore__ inline void SortCustomMrgsort::SetInput(GlobalTensor<float> &gmInput, GlobalTensor<int32_t> &gmSortNum,
+                                                   LocalTensor<float> &ubInput)
 {
     this->gmInputs[listNum] = gmInput;
     this->ubInputs[listNum] = ubInput;
@@ -94,8 +94,8 @@ __aicore__ inline void SortCustomMrgsort::SetInput(GlobalTensor<float>& gmInput,
     this->listNum += 1;
 }
 
-__aicore__ inline void SortCustomMrgsort::SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput,
-                                 LocalTensor<int32_t>& outSortNumLocal)
+__aicore__ inline void SortCustomMrgsort::SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput,
+                                                    LocalTensor<int32_t> &outSortNumLocal)
 {
     this->gmOutput = gmOutput;
     this->ubOutput = ubOutput;
@@ -125,7 +125,8 @@ __aicore__ inline void SortCustomMrgsort::CopyIn()
     for (int64_t i = 0, j = 0; i < listNum; i++) {
         lengths[i] = Min(param->oneLoopMaxElements, listRemainElements[i]);
         if (lengths[i] > 0) {
-            DataCopy(this->ubInputs[i], this->gmInputs[i][offsets[i]], Align(GetSortLen<float>(lengths[i]), sizeof(float)));
+            DataCopy(this->ubInputs[i], this->gmInputs[i][offsets[i]],
+                     Align(GetSortLen<float>(lengths[i]), sizeof(float)));
             tmpUbInputs[j] = this->ubInputs[i];
             elementCountListTail[j] = lengths[i];
             this->remainListNum += 1;
@@ -141,7 +142,7 @@ __aicore__ inline void SortCustomMrgsort::MrgsortCompute()
         MrgSortSrcList sortListTail = MrgSortSrcList(tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[0], tmpUbInputs[0]);
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else if (this->remainListNum == MERGE_LIST_THREE) {
-        MrgSortSrcList sortListTail = 
+        MrgSortSrcList sortListTail =
             MrgSortSrcList(tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[MERGE_LIST_IDX_TWO], tmpUbInputs[0]);
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else if (this->remainListNum == MERGE_LIST_FOUR) {
@@ -150,7 +151,8 @@ __aicore__ inline void SortCustomMrgsort::MrgsortCompute()
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else {
         if (elementCountListTail[0] > 0) {
-            DataCopy(this->ubOutput, this->tmpUbInputs[0], Align(GetSortLen<float>(elementCountListTail[0]), sizeof(float)));
+            DataCopy(this->ubOutput, this->tmpUbInputs[0],
+                     Align(GetSortLen<float>(elementCountListTail[0]), sizeof(float)));
         }
         listSortedNums[0] = elementCountListTail[0];
     }
@@ -187,19 +189,20 @@ __aicore__ inline void SortCustomMrgsort::CopyOut()
 
 __aicore__ inline void SortCustomMrgsort::CopyOutSortNum()
 {
-   ubOutSortNum_.SetValue(0, allRemainElements);
-   SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
-   DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(int32_t)), 0, 0, 0};
-   DataCopyPad(gmActualSortNum_, ubOutSortNum_, copyParams);
+    ubOutSortNum_.SetValue(0, allRemainElements);
+    SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(int32_t)), 0, 0, 0};
+    DataCopyPad(gmActualSortNum_, ubOutSortNum_, copyParams);
 }
 
-__aicore__ inline void SortCustomMrgsort::Init(SortCustomMrgsortParam* param)
+__aicore__ inline void SortCustomMrgsort::Init(SortCustomMrgsortParam *param)
 {
-    this->param= param;
+    this->param = param;
     this->remainListNum = listNum;
     for (int64_t i = 0; i < listNum; i++) {
         offsets[i] = GetSortOffset<float>(param->perListElements * i);
-        DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(gmActualSortNum_[param->sortNumStride * i]);
+        DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(
+            gmActualSortNum_[param->sortNumStride * i]);
         listRemainElements[i] = gmActualSortNum_.GetValue(param->sortNumStride * i);
         allRemainElements += listRemainElements[i];
     }

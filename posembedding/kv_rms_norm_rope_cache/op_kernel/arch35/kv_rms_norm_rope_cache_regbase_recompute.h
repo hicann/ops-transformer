@@ -215,9 +215,8 @@ public:
         }
     }
 
-    __aicore__ inline void CalculateVOutVF(__ubuf__ T_KV *&yPtr, __ubuf__ T_KV *&xPtr,
-                                           __ubuf__ T_KV *&gammaPtr, __ubuf__ float *&xSumPtr,
-                                           uint32_t ubFactor)
+    __aicore__ inline void CalculateVOutVF(__ubuf__ T_KV *&yPtr, __ubuf__ T_KV *&xPtr, __ubuf__ T_KV *&gammaPtr,
+                                           __ubuf__ float *&xSumPtr, uint32_t ubFactor)
     {
         float reciprocal = this->reciprocal;
         float epsilon = this->epsilon;
@@ -445,8 +444,7 @@ public:
     // 需要中间结果+量化+偏移
     __aicore__ inline void CalculateVOutAsymQuantWithKvVF(__ubuf__ T_KV *&outPtr, __ubuf__ T_KV *&xPtr,
                                                           __ubuf__ T_KV *&gammaPtr, __ubuf__ float *&xSumPtr,
-                                                          __ubuf__ float *&vScalePtr,
-                                                          __ubuf__ float *&vOffsetPtr,
+                                                          __ubuf__ float *&vScalePtr, __ubuf__ float *&vOffsetPtr,
                                                           __ubuf__ T_V_CACHE *&vQuantPtr, uint32_t ubFactor)
     {
         float reciprocal = this->reciprocal;
@@ -610,8 +608,8 @@ public:
     // 需要中间结果 + 量化
     __aicore__ inline void CalculateVOutSymQuantWithKvVF(__ubuf__ T_KV *&outPtr, __ubuf__ T_KV *&xPtr,
                                                          __ubuf__ T_KV *&gammaPtr, __ubuf__ float *&xSumPtr,
-                                                         __ubuf__ float *&vScalePtr,
-                                                         __ubuf__ T_V_CACHE *&vQuantPtr, uint32_t ubFactor)
+                                                         __ubuf__ float *&vScalePtr, __ubuf__ T_V_CACHE *&vQuantPtr,
+                                                         uint32_t ubFactor)
     {
         float reciprocal = this->reciprocal;
         float epsilon = this->epsilon;
@@ -753,8 +751,8 @@ public:
     // 不需要中间结果+量化+偏移
     __aicore__ inline void CalculateVOutAsymQuantVF(__ubuf__ T_KV *&xPtr, __ubuf__ T_KV *&gammaPtr,
                                                     __ubuf__ float *&xSumPtr, __ubuf__ float *&vScalePtr,
-                                                    __ubuf__ float *&vOffsetPtr,
-                                                    __ubuf__ T_V_CACHE *&vQuantPtr, uint32_t ubFactor)
+                                                    __ubuf__ float *&vOffsetPtr, __ubuf__ T_V_CACHE *&vQuantPtr,
+                                                    uint32_t ubFactor)
     {
         float reciprocal = this->reciprocal;
         float epsilon = this->epsilon;
@@ -1181,9 +1179,8 @@ public:
         }
     }
 
-    __aicore__ inline void RopeVF(__ubuf__ T_KV *&outPtr1, __ubuf__ T_KV *&outPtr2,
-                                  __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1,
-                                  __ubuf__ T_KV *&cosPtr2, __ubuf__ T_KV *&sinPtr1,
+    __aicore__ inline void RopeVF(__ubuf__ T_KV *&outPtr1, __ubuf__ T_KV *&outPtr2, __ubuf__ T_KV *&ropePtr,
+                                  __ubuf__ T_KV *&cosPtr1, __ubuf__ T_KV *&cosPtr2, __ubuf__ T_KV *&sinPtr1,
                                   __ubuf__ T_KV *&sinPtr2, __ubuf__ float *&tmpBufferPtr, uint32_t ubFactor)
     {
         uint32_t vlStride = VL_FP32 * CONST_TWO;
@@ -1275,11 +1272,9 @@ public:
     }
 
     __aicore__ inline void RopeSymQuantVF(__ubuf__ T_K_CACHE *&quantPtr1, __ubuf__ T_K_CACHE *&quantPtr2,
-                                          __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1,
-                                          __ubuf__ T_KV *&cosPtr2, __ubuf__ T_KV *&sinPtr1,
-                                          __ubuf__ T_KV *&sinPtr2, __ubuf__ float *&scalePtr1,
-                                          __ubuf__ float *&scalePtr2, __ubuf__ float *&tmpBufferPtr,
-                                          uint32_t ubFactor)
+                                          __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1, __ubuf__ T_KV *&cosPtr2,
+                                          __ubuf__ T_KV *&sinPtr1, __ubuf__ T_KV *&sinPtr2, __ubuf__ float *&scalePtr1,
+                                          __ubuf__ float *&scalePtr2, __ubuf__ float *&tmpBufferPtr, uint32_t ubFactor)
     {
         uint32_t vlStride = VL_FP32 * CONST_TWO;
         uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
@@ -1393,11 +1388,10 @@ public:
 
     __aicore__ inline void RopeSymQuantWithVF(__ubuf__ T_KV *&outPtr1, __ubuf__ T_KV *&outPtr2,
                                               __ubuf__ T_K_CACHE *&quantPtr1, __ubuf__ T_K_CACHE *&quantPtr2,
-                                              __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1,
-                                              __ubuf__ T_KV *&cosPtr2, __ubuf__ T_KV *&sinPtr1,
-                                              __ubuf__ T_KV *&sinPtr2, __ubuf__ float *&scalePtr1,
-                                              __ubuf__ float *&scalePtr2, __ubuf__ float *&tmpBufferPtr,
-                                              uint32_t ubFactor)
+                                              __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1, __ubuf__ T_KV *&cosPtr2,
+                                              __ubuf__ T_KV *&sinPtr1, __ubuf__ T_KV *&sinPtr2,
+                                              __ubuf__ float *&scalePtr1, __ubuf__ float *&scalePtr2,
+                                              __ubuf__ float *&tmpBufferPtr, uint32_t ubFactor)
     {
         uint32_t vlStride = VL_FP32 * CONST_TWO;
         uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
@@ -1623,9 +1617,8 @@ public:
     }
 
     __aicore__ inline void RopeAsymQuantVF(__ubuf__ T_K_CACHE *&quantPtr1, __ubuf__ T_K_CACHE *&quantPtr2,
-                                           __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1,
-                                           __ubuf__ T_KV *&cosPtr2, __ubuf__ T_KV *&sinPtr1,
-                                           __ubuf__ T_KV *&sinPtr2, __ubuf__ float *&scalePtr1,
+                                           __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1, __ubuf__ T_KV *&cosPtr2,
+                                           __ubuf__ T_KV *&sinPtr1, __ubuf__ T_KV *&sinPtr2, __ubuf__ float *&scalePtr1,
                                            __ubuf__ float *&scalePtr2, __ubuf__ float *&offsetPtr1,
                                            __ubuf__ float *&offsetPtr2, __ubuf__ float *&tmpBufferPtr,
                                            uint32_t ubFactor)
@@ -2263,14 +2256,11 @@ public:
         }
     }
 
-    __aicore__ inline void RopeAsymQuantWithKvVF(__ubuf__ T_KV *&outPtr1, __ubuf__ T_KV *&outPtr2,
-                                                 __ubuf__ T_K_CACHE *&quantPtr1,
-                                                 __ubuf__ T_K_CACHE *&quantPtr2, __ubuf__ T_KV *&ropePtr,
-                                                 __ubuf__ T_KV *&cosPtr1, __ubuf__ T_KV *&cosPtr2,
-                                                 __ubuf__ T_KV *&sinPtr1, __ubuf__ T_KV *&sinPtr2,
-                                                 __ubuf__ float *&scalePtr1, __ubuf__ float *&scalePtr2,
-                                                 __ubuf__ float *&offsetPtr1, __ubuf__ float *&offsetPtr2,
-                                                 __ubuf__ float *&tmpBufferPtr, uint32_t ubFactor)
+    __aicore__ inline void RopeAsymQuantWithKvVF(
+        __ubuf__ T_KV *&outPtr1, __ubuf__ T_KV *&outPtr2, __ubuf__ T_K_CACHE *&quantPtr1,
+        __ubuf__ T_K_CACHE *&quantPtr2, __ubuf__ T_KV *&ropePtr, __ubuf__ T_KV *&cosPtr1, __ubuf__ T_KV *&cosPtr2,
+        __ubuf__ T_KV *&sinPtr1, __ubuf__ T_KV *&sinPtr2, __ubuf__ float *&scalePtr1, __ubuf__ float *&scalePtr2,
+        __ubuf__ float *&offsetPtr1, __ubuf__ float *&offsetPtr2, __ubuf__ float *&tmpBufferPtr, uint32_t ubFactor)
     {
         uint32_t vlStride = VL_FP32 * CONST_TWO;
         uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);

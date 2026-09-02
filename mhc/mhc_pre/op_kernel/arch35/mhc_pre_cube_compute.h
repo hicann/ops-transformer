@@ -51,7 +51,10 @@ public:
 
     __aicore__ inline MhcPreCubeCompute() {}
 
-    __aicore__ inline uint8_t GetBL1BufferId() { return bL1BufferID_; }
+    __aicore__ inline uint8_t GetBL1BufferId()
+    {
+        return bL1BufferID_;
+    }
 
     __aicore__ inline void CopyInA1Nd2Nz(uint64_t m, uint64_t currentK, const AscendC::GlobalTensor<float> &aGlobal,
                                          const AscendC::LocalTensor<float> &al1Local)

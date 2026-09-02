@@ -24,8 +24,7 @@ class FFNHighPerformence : public FFNBase<T, mm1Type, mm2Type, c1T, c2T, BiasT> 
 public:
     __aicore__ inline FFNHighPerformence(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_)
         : FFNBase<T, mm1Type, mm2Type, c1T, c2T, BiasT>(mm1_, mm2_)
-    {
-    }
+    {}
 
     /** @brief main entry function.
      */

@@ -44,8 +44,7 @@ public:
     __aicore__ inline FFNAntiQuant(mm1Type &mm1_, mm2Type &mm2_)
         : mm1(mm1_),
           mm2(mm2_)
-    {
-    }
+    {}
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
                                 __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
                                 __gm__ uint8_t *antiQuantScale1, __gm__ uint8_t *antiQuantScale2,
@@ -318,8 +317,8 @@ protected:
         if (isMatMul1) {
             n1Loops = nLoops;
             m1Loops = mLoops;
-            singleM1 = singleM;                               // compute C matrix block length along m direction for each cube
-            singleN1 = singleN;                               // compute C matrix block length along n direction for each cube
+            singleM1 = singleM; // compute C matrix block length along m direction for each cube
+            singleN1 = singleN; // compute C matrix block length along n direction for each cube
             singleM1Tail = tokens - (m1Loops - 1) * singleM1; // recompute last block length along m direction
             singleN1Tail = n1 - (n1Loops - 1) * singleN1;     // recompute last block length along n direction
             castWeightSingleN1 = n1;

@@ -333,7 +333,10 @@ private:
         int64_t start = 0;
         int64_t num = 0;
         int64_t maskSlot = 0;
-        __aicore__ inline bool Valid() const { return num > 0; }
+        __aicore__ inline bool Valid() const
+        {
+            return num > 0;
+        }
     };
 
     /*
@@ -566,7 +569,10 @@ private:
     align：对齐粒度，须为正
     返回不小于 value 的最小 align 整数倍
     */
-    __aicore__ inline int64_t AlignUp(int64_t value, int64_t align) { return (value + align - 1) / align * align; }
+    __aicore__ inline int64_t AlignUp(int64_t value, int64_t align)
+    {
+        return (value + align - 1) / align * align;
+    }
 
 private:
     TPipe *pipe_ = nullptr;

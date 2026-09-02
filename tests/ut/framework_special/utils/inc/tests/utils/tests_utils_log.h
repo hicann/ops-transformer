@@ -26,40 +26,40 @@ void AddLogErrCnt();
 
 bool ChkLogErrCnt();
 
-#define LOG_ERR(fmt, args...)                                                                                          \
-    do {                                                                                                               \
-        fprintf(stdout, "%s:%d [ERROR] " fmt "\n", __FILE__, __LINE__, ##args);                                        \
-        ops::adv::tests::utils::AddLogErrCnt();                                                                        \
+#define LOG_ERR(fmt, args...) \
+    do { \
+        fprintf(stdout, "%s:%d [ERROR] " fmt "\n", __FILE__, __LINE__, ##args); \
+        ops::adv::tests::utils::AddLogErrCnt(); \
     } while (0)
 
-#define LOG_DBG(fmt, args...)                                                                                          \
-    do {                                                                                                               \
-        OP_LOGD(stdout, "%s:%d [DEBUG] " fmt "\n", __FILE__, __LINE__, ##args);                                        \
+#define LOG_DBG(fmt, args...) \
+    do { \
+        OP_LOGD(stdout, "%s:%d [DEBUG] " fmt "\n", __FILE__, __LINE__, ##args); \
     } while (0)
 
-#define LOG_IF(COND, LOG_FUNC)                                                                                         \
-    static_assert(std::is_same<bool, std::decay<decltype(COND)>::type>::value, "condition should be bool");            \
-    do {                                                                                                               \
-        if (__builtin_expect((COND), 0)) {                                                                             \
-            LOG_FUNC;                                                                                                  \
-        }                                                                                                              \
+#define LOG_IF(COND, LOG_FUNC) \
+    static_assert(std::is_same<bool, std::decay<decltype(COND)>::type>::value, "condition should be bool"); \
+    do { \
+        if (__builtin_expect((COND), 0)) { \
+            LOG_FUNC; \
+        } \
     } while (0)
 
-#define LOG_IF_EXPR(COND, LOG_FUNC, EXPR)                                                                              \
-    static_assert(std::is_same<bool, std::decay<decltype(COND)>::type>::value, "condition should be bool");            \
-    do {                                                                                                               \
-        if (__builtin_expect((COND), 0)) {                                                                             \
-            LOG_FUNC;                                                                                                  \
-            EXPR;                                                                                                      \
-        }                                                                                                              \
+#define LOG_IF_EXPR(COND, LOG_FUNC, EXPR) \
+    static_assert(std::is_same<bool, std::decay<decltype(COND)>::type>::value, "condition should be bool"); \
+    do { \
+        if (__builtin_expect((COND), 0)) { \
+            LOG_FUNC; \
+            EXPR; \
+        } \
     } while (0)
 
-#define IF_EXPR(COND, EXPR)                                                                                            \
-    static_assert(std::is_same<bool, std::decay<decltype(COND)>::type>::value, "condition should be bool");            \
-    do {                                                                                                               \
-        if (__builtin_expect((COND), 0)) {                                                                             \
-            EXPR;                                                                                                      \
-        }                                                                                                              \
+#define IF_EXPR(COND, EXPR) \
+    static_assert(std::is_same<bool, std::decay<decltype(COND)>::type>::value, "condition should be bool"); \
+    do { \
+        if (__builtin_expect((COND), 0)) { \
+            EXPR; \
+        } \
     } while (0)
 
 } // namespace ops::adv::tests::utils

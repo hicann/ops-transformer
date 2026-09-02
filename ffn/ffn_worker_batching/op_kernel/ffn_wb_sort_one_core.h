@@ -24,7 +24,6 @@
 #include "ffn_wb_sort_base.h"
 #include "ffn_wb_common.h"
 
-
 namespace FfnWbBatching {
 using namespace AscendC;
 
@@ -51,8 +50,8 @@ private:
 __aicore__ inline void KernelSortMaskOneCore::CopyIn()
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+                                     static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
     DataCopyPadExtParams dataCopyPadParams{false, 0, 0, 0};
     DataCopyPad(inLocal[0], expertIdsGm, dataCopyParams, dataCopyPadParams);
 
@@ -75,12 +74,10 @@ __aicore__ inline void KernelSortMaskOneCore::SortCompute()
     PipeBarrier<PIPE_V>();
 
     LocalTensor<uint8_t> maskLocalTensorUInt8 = maskLocalUInt32.ReinterpretCast<uint8_t>();
-    AscendC::CompareScalar(maskLocalTensorUInt8,
-        expertIdsFp32,
-        static_cast<float>(-expertStart_),
-        AscendC::CMPMODE::GT,
+    AscendC::CompareScalar(
+        maskLocalTensorUInt8, expertIdsFp32, static_cast<float>(-expertStart_), AscendC::CMPMODE::GT,
         (this->totalLength + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
-        PipeBarrier<PIPE_V>();
+    PipeBarrier<PIPE_V>();
 
     GatherMaskParams gatherMaskParams;
     gatherMaskParams.repeatTimes = 1;
@@ -144,11 +141,13 @@ __aicore__ inline void KernelSortMaskOneCore::CopyOut()
     }
 
     rsvdCntGm.SetValue(0, this->validCnt);
-    DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(rsvdCntGm);
+    DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(
+        rsvdCntGm);
 }
 
-__aicore__ inline void KernelSortMaskOneCore::Init(GM_ADDR expert_ids, GM_ADDR workspace, 
-    const SortCustomTilingDataKernel *tilingData, const ScheduleContextInfo *contextInfo, TPipe *tPipe)
+__aicore__ inline void KernelSortMaskOneCore::Init(GM_ADDR expert_ids, GM_ADDR workspace,
+                                                   const SortCustomTilingDataKernel *tilingData,
+                                                   const ScheduleContextInfo *contextInfo, TPipe *tPipe)
 {
     this->pipe = tPipe;
     contextInfo_ = contextInfo;
@@ -159,10 +158,12 @@ __aicore__ inline void KernelSortMaskOneCore::Init(GM_ADDR expert_ids, GM_ADDR w
 
     expertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(expert_ids), this->totalLength);
     rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), OFFSET_SORTED_EXPERT_IDS);
-    sortedexpertIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
-                                    contextInfo_->sortNumWorkSpace, this->totalLength);
+    sortedexpertIdsGm.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
+        this->totalLength);
     sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
-                                    contextInfo_->sortNumWorkSpace + this->totalLength, this->totalLength);
+                                       contextInfo_->sortNumWorkSpace + this->totalLength,
+                                   this->totalLength);
 
     if (GetBlockIdx() == 0) {
         GM_ADDR targetAddr = workspace + OFFSET_SORTED_EXPERT_IDS * sizeof(int32_t) +
@@ -197,4 +198,3 @@ __aicore__ inline void KernelSortMaskOneCore::Process()
 }
 } // namespace FfnWbBatching
 #endif // OP_KERNEL_FFN_WB_SORT_ONE_CORE_H
-

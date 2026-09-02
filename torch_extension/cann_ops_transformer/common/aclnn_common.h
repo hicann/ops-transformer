@@ -277,11 +277,20 @@ inline aclDataType GetAclDataType(int64_t t)
     return ConvertToAclDataType(static_cast<at::ScalarType>(t));
 }
 
-inline const char *GetOpApiLibName(void) { return "libopapi.so"; }
+inline const char *GetOpApiLibName(void)
+{
+    return "libopapi.so";
+}
 
-inline const char *GetTransformerOpApiLibName(void) { return "libopapi_transformer.so"; }
+inline const char *GetTransformerOpApiLibName(void)
+{
+    return "libopapi_transformer.so";
+}
 
-inline const char *GetCustOpApiLibName(void) { return "libcust_opapi.so"; }
+inline const char *GetCustOpApiLibName(void)
+{
+    return "libcust_opapi.so";
+}
 
 inline void *GetOpApiFuncAddrInLib(void *handler, const char *libName, const char *apiName)
 {
@@ -670,9 +679,15 @@ inline aclScalar *ConvertType(const c10::optional<at::Scalar> &opt_scalar)
     return nullptr;
 }
 
-inline aclDataType ConvertType(const at::ScalarType scalarType) { return ConvertToAclDataType(scalarType); }
+inline aclDataType ConvertType(const at::ScalarType scalarType)
+{
+    return ConvertToAclDataType(scalarType);
+}
 
-inline const char *ConvertType(const string &str) { return str.c_str(); }
+inline const char *ConvertType(const string &str)
+{
+    return str.c_str();
+}
 
 aclTensor *ConvertType(const TensorWrapper &tensor_r)
 {

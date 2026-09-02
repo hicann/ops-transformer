@@ -24,13 +24,13 @@ namespace optiling {
 BEGIN_TILING_DATA_DEF(QkvRmsNormRopeCacheTilingData)
 TILING_DATA_FIELD_DEF(int64_t, batchSize); // Bqkv
 TILING_DATA_FIELD_DEF(int64_t, seqLength); // Sqkv
-TILING_DATA_FIELD_DEF(int64_t, numHead); // Nqkv
-TILING_DATA_FIELD_DEF(int64_t, qkvDim); // D
+TILING_DATA_FIELD_DEF(int64_t, numHead);   // Nqkv
+TILING_DATA_FIELD_DEF(int64_t, qkvDim);    // D
 TILING_DATA_FIELD_DEF(int64_t, ropeRange); // D
-TILING_DATA_FIELD_DEF(int64_t, numHeadQ); // Nq
-TILING_DATA_FIELD_DEF(int64_t, numHeadK); // Nk
-TILING_DATA_FIELD_DEF(int64_t, numHeadV); //Nv
-TILING_DATA_FIELD_DEF(int64_t, blockNum); // k_cache/v_cache的blockNum
+TILING_DATA_FIELD_DEF(int64_t, numHeadQ);  // Nq
+TILING_DATA_FIELD_DEF(int64_t, numHeadK);  // Nk
+TILING_DATA_FIELD_DEF(int64_t, numHeadV);  // Nv
+TILING_DATA_FIELD_DEF(int64_t, blockNum);  // k_cache/v_cache的blockNum
 TILING_DATA_FIELD_DEF(int64_t, blockSize); // k_cache/v_cache的blockSize
 TILING_DATA_FIELD_DEF(float, epsilon);
 TILING_DATA_FIELD_DEF(int64_t, blockFactor);
@@ -60,8 +60,7 @@ struct QkvRmsNormRopeCacheCompileInfo {
     int64_t ubSize = 0;
 };
 
-enum CacheMode
-{
+enum CacheMode {
     Norm = 0,
     PA = 1,
     PA_NZ = 2,
@@ -81,15 +80,15 @@ constexpr int64_t SIN_INDEX = 4;
 constexpr int64_t INDEX_INDEX = 5;
 // In-place inputs
 constexpr int64_t Q_OUT_INDEX = 6;
-constexpr int64_t K_CACHE_INDEX = 7;     
-constexpr int64_t V_CACHE_INDEX = 8;    
+constexpr int64_t K_CACHE_INDEX = 7;
+constexpr int64_t V_CACHE_INDEX = 8;
 // Quant Scale
-constexpr int64_t K_SCALE_IDX = 9; 
-constexpr int64_t V_SCALE_IDX = 10;   
+constexpr int64_t K_SCALE_IDX = 9;
+constexpr int64_t V_SCALE_IDX = 10;
 // Quant Offset
-constexpr int64_t K_OFFSET_IDX = 11;   
-constexpr int64_t V_OFFSET_IDX = 12;  
-constexpr float FAC_K = 0.6;  // K路和V路计算量的比例
+constexpr int64_t K_OFFSET_IDX = 11;
+constexpr int64_t V_OFFSET_IDX = 12;
+constexpr float FAC_K = 0.6; // K路和V路计算量的比例
 constexpr float NEAR_ONE = 0.999999f;
 
 // Attr Indices
@@ -133,10 +132,10 @@ static constexpr int64_t UB_RESERVED_BYTES = 1 * BYTES_PER_KILO_BYTE; // 多留1
 
 class QkvRmsNormRopeCacheTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit QkvRmsNormRopeCacheTilingBase(gert::TilingContext* tillingContext) : TilingBaseClass(tillingContext)
+    explicit QkvRmsNormRopeCacheTilingBase(gert::TilingContext *tillingContext)
+        : TilingBaseClass(tillingContext)
     {}
-    ~QkvRmsNormRopeCacheTilingBase() override
-    {}
+    ~QkvRmsNormRopeCacheTilingBase() override {}
     uint64_t tilingKey_{0};
     uint64_t coreNum_ = 0;
     uint64_t ubSize_ = 0;
@@ -173,7 +172,7 @@ public:
     int64_t isVQuant_ = 1;
 
     ge::DataType qkvDtype_{ge::DataType::DT_FLOAT16};
-    int64_t qkvDtypeSize_{0};// qkv数据类型所占字节数
+    int64_t qkvDtypeSize_{0}; // qkv数据类型所占字节数
 
 protected:
     ge::graphStatus GetShapeAttrsInfo() override
@@ -205,18 +204,17 @@ protected:
     void DumpTilingInfo() override {}
 
 protected:
-    std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(
-        const gert::TilingContext* context, const int64_t index = 0);
-    std::tuple<int64_t, int64_t> GetShapeTupleOfTH(
-        const gert::TilingContext* context, const int64_t index = 0);
+    std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(const gert::TilingContext *context,
+                                                                 const int64_t index = 0);
+    std::tuple<int64_t, int64_t> GetShapeTupleOfTH(const gert::TilingContext *context, const int64_t index = 0);
 };
 
 class QkvRmsNormRopeCacheTilingDs : virtual public QkvRmsNormRopeCacheTilingBase {
 public:
-    explicit QkvRmsNormRopeCacheTilingDs(gert::TilingContext* tillingContext) : QkvRmsNormRopeCacheTilingBase(tillingContext)
+    explicit QkvRmsNormRopeCacheTilingDs(gert::TilingContext *tillingContext)
+        : QkvRmsNormRopeCacheTilingBase(tillingContext)
     {}
-    ~QkvRmsNormRopeCacheTilingDs()
-    {}
+    ~QkvRmsNormRopeCacheTilingDs() {}
 
 protected:
     bool IsCapable() override;

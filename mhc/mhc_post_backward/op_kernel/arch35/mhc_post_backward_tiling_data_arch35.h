@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- /*!
+/*!
  * \file mhc_post_backward_tiling_data.h
  * \brief mhc_post_backward
  */
@@ -28,8 +28,8 @@ public:
     uint32_t nTilesD{0};
     uint32_t alignedD{0};
     uint32_t lastTileD{0};
-    uint32_t alignedN{0};      // n aligned to 8 for float32 vector ops
-    uint32_t alignedNN{0};     // n*n aligned to 8 for float32 vector ops
+    uint32_t alignedN{0};  // n aligned to 8 for float32 vector ops
+    uint32_t alignedNN{0}; // n*n aligned to 8 for float32 vector ops
     uint32_t itemsPerAic{0};
     uint32_t remainderItemsAic{0};
     TCubeTiling matmulTiling{};

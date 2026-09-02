@@ -21,9 +21,9 @@ namespace optiling {
 
 class RopeRotateHalfTilingClass : public RotaryPosEmbeddingMembaseTilingClass {
 public:
-    explicit RopeRotateHalfTilingClass(gert::TilingContext *context) : RotaryPosEmbeddingMembaseTilingClass(context)
-    {
-    }
+    explicit RopeRotateHalfTilingClass(gert::TilingContext *context)
+        : RotaryPosEmbeddingMembaseTilingClass(context)
+    {}
 
     void Reset(gert::TilingContext *context) override
     {
@@ -37,7 +37,8 @@ protected:
              socVersion_ == platform_ascendc::SocVersion::ASCEND910_93 ||
              socVersion_ == platform_ascendc::SocVersion::ASCEND310P ||
              socVersion_ == platform_ascendc::SocVersion::KIRINX90 ||
-             socVersion_ == platform_ascendc::SocVersion::KIRIN9030) && inputMode_ != MODE_ROTATE_INTERLEAVED) {
+             socVersion_ == platform_ascendc::SocVersion::KIRIN9030) &&
+            inputMode_ != MODE_ROTATE_INTERLEAVED) {
             return true;
         }
         return false;

@@ -23,8 +23,9 @@ using namespace AscendC;
 template <typename T>
 class KernelInterleaveRopeB1SD {
 public:
-    __aicore__ inline KernelInterleaveRopeB1SD(TPipe* pipe, const InterleaveRopeTilingData* tiling)
-        : pipe_(pipe), tilingData_(tiling)
+    __aicore__ inline KernelInterleaveRopeB1SD(TPipe *pipe, const InterleaveRopeTilingData *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y)
@@ -56,10 +57,10 @@ public:
             hiddenDimCountLastLoop_ = tilingData_->hiddenDimCountLastLoopLastBlock;
         }
 
-        xGm.SetGlobalBuffer((__gm__ T*)x);
-        yGm.SetGlobalBuffer((__gm__ T*)y);
-        cosGm.SetGlobalBuffer((__gm__ T*)cos);
-        sinGm.SetGlobalBuffer((__gm__ T*)sin);
+        xGm.SetGlobalBuffer((__gm__ T *)x);
+        yGm.SetGlobalBuffer((__gm__ T *)y);
+        cosGm.SetGlobalBuffer((__gm__ T *)cos);
+        sinGm.SetGlobalBuffer((__gm__ T *)sin);
 
         // init pipe
         pipe_->InitBuffer(inQueueX, 1, hiddenDimCountPerLoop_ * hiddenDim * sizeof(T));
@@ -90,25 +91,21 @@ public:
                                        hiddenDimLoop * hiddenDimCountPerLoop_) *
                                       hiddenDim;
             LocalTensor<float> cosLocal = inQueueCos.AllocTensor<float>();
-            DataCopy(
-                cosLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), cosGm[sinCosIdxOffset],
-                hiddenDimCount * hiddenDim);
+            DataCopy(cosLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), cosGm[sinCosIdxOffset],
+                     hiddenDimCount * hiddenDim);
 
             inQueueCos.EnQue(cosLocal);
             cosLocal = inQueueCos.DeQue<float>();
-            Cast(
-                cosLocal, cosLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), RoundMode::CAST_NONE,
-                hiddenDimCount * hiddenDim);
+            Cast(cosLocal, cosLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), RoundMode::CAST_NONE,
+                 hiddenDimCount * hiddenDim);
 
             LocalTensor<float> sinLocal = inQueueSin.AllocTensor<float>();
-            DataCopy(
-                sinLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), sinGm[sinCosIdxOffset],
-                hiddenDimCount * hiddenDim);
+            DataCopy(sinLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), sinGm[sinCosIdxOffset],
+                     hiddenDimCount * hiddenDim);
             inQueueSin.EnQue(sinLocal);
             sinLocal = inQueueSin.DeQue<float>();
-            Cast(
-                sinLocal, sinLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), RoundMode::CAST_NONE,
-                hiddenDimCount * hiddenDim);
+            Cast(sinLocal, sinLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), RoundMode::CAST_NONE,
+                 hiddenDimCount * hiddenDim);
 
             int64_t batchOffset = (GetBlockIdx() * tilingData_->batchsPerBlock + idx) * numHead_ * seqLength_;
             for (int64_t nIdx = 0; nIdx < numHead_; nIdx++) {
@@ -125,18 +122,14 @@ public:
                 LocalTensor<float> imagLocal = bufferImag.Get<float>();
                 LocalTensor<float> buf_ = buffer_.Get<float>();
                 uint64_t rsvdCnt = 0;
-                GatherMask(
-                    realLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, 1, true,
-                    hiddenDimCount * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
-                GatherMask(
-                    imagLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, numTwo, true,
-                    hiddenDimCount * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
-                Cast(
-                    realLocal, realLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(),
-                    RoundMode::CAST_NONE, hiddenDimCount * hiddenDimHalf);
-                Cast(
-                    imagLocal, imagLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(),
-                    RoundMode::CAST_NONE, hiddenDimCount * hiddenDimHalf);
+                GatherMask(realLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, 1, true,
+                           hiddenDimCount * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
+                GatherMask(imagLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(), xLocal, numTwo,
+                           true, hiddenDimCount * hiddenDim, {1, 1, 8, 0}, rsvdCnt);
+                Cast(realLocal, realLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(),
+                     RoundMode::CAST_NONE, hiddenDimCount * hiddenDimHalf);
+                Cast(imagLocal, imagLocal[hiddenDimCount * hiddenDimHalf].template ReinterpretCast<T>(),
+                     RoundMode::CAST_NONE, hiddenDimCount * hiddenDimHalf);
                 inQueueX.FreeTensor(xLocal);
 
                 uint64_t mask[numTwo] = {0xffffffff, 0}; // mask hiddenDimHalf Elements
@@ -152,15 +145,13 @@ public:
                 PipeBarrier<PIPE_V>();
                 Add(outLocal, outLocal, buf_, hiddenDimCount * hiddenDim);
                 PipeBarrier<PIPE_V>();
-                Cast(
-                    outLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), outLocal, RoundMode::CAST_RINT,
-                    hiddenDimCount * hiddenDim);
+                Cast(outLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(), outLocal, RoundMode::CAST_RINT,
+                     hiddenDimCount * hiddenDim);
                 PipeBarrier<PIPE_V>();
                 outQueueY.EnQue(outLocal);
                 outLocal = outQueueY.DeQue<float>();
-                DataCopy(
-                    yGm[xOffset], outLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(),
-                    hiddenDimCount * hiddenDim);
+                DataCopy(yGm[xOffset], outLocal[hiddenDimCount * hiddenDim].template ReinterpretCast<T>(),
+                         hiddenDimCount * hiddenDim);
                 outQueueY.FreeTensor(outLocal);
             }
             inQueueCos.FreeTensor(cosLocal);
@@ -169,8 +160,8 @@ public:
     }
 
 private:
-    TPipe* pipe_ = nullptr;
-    const InterleaveRopeTilingData* tilingData_;
+    TPipe *pipe_ = nullptr;
+    const InterleaveRopeTilingData *tilingData_;
     GlobalTensor<T> xGm;
     GlobalTensor<T> yGm;
     GlobalTensor<T> cosGm;

@@ -7,10 +7,10 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- /*!
+/*!
  * \file mhc_sinkhorn_struct.h
  * \brief mhc_sinkhorn
- */ 
+ */
 
 #ifndef MHC_SINKHORN_STRUCT_H
 #define MHC_SINKHORN_STRUCT_H

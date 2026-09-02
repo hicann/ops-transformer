@@ -244,6 +244,6 @@ struct WorkspaceBuffer {
                (coreId * DOUBLE_BUFFER + buffId) * SINGLE_M * ND_BLOCK_SIZE;
     }
 };
-}
+} // namespace MhcPreBackwardUtils
 
-#endif  // ASCENDC_MHC_PRE_BACKWARD_UTILS_H
+#endif // ASCENDC_MHC_PRE_BACKWARD_UTILS_H

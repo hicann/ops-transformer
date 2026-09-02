@@ -27,13 +27,11 @@
 namespace FfnWbBatching {
 using namespace AscendC;
 
-class KernelScanGetValidExperts : public SortMaskBase
-{
+class KernelScanGetValidExperts : public SortMaskBase {
 public:
     __aicore__ inline KernelScanGetValidExperts(){};
-    __aicore__ inline void Init(
-        GM_ADDR tokenInfoGm, GM_ADDR workspace, GM_ADDR groupList, const ScheduleContextInfo* contextInfo,
-        TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR tokenInfoGm, GM_ADDR workspace, GM_ADDR groupList,
+                                const ScheduleContextInfo *contextInfo, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -55,7 +53,7 @@ private:
 
     GlobalTensor<int64_t> groupListGm_;
 
-    const ScheduleContextInfo* contextInfo_ = nullptr;
+    const ScheduleContextInfo *contextInfo_ = nullptr;
 
     int32_t totalValidCnt_ = 0;
     int32_t curValidCnt_ = 0;
@@ -64,7 +62,7 @@ private:
     int64_t BsKLenWithPading_ = 0; // BS*K_plus_1按block对齐后的个数
 
     int64_t perCoreSortNum_ = 0; // perCoreSessionNum * BsKLenWithPading_ 主核 每个核排序的元素总个数; 不保证32个数对齐
-    int64_t sessionLoops_ = 0;   // 当前核 ub循环次数
+    int64_t sessionLoops_ = 0; // 当前核 ub循环次数
 
     int64_t perLoopSessionNum_ = 0;  // 当前核 一次ub处理A中的几个
     int64_t lastLoopSessionNum_ = 0; // 当前核 尾ub处理A中的几个
@@ -80,8 +78,8 @@ private:
     int64_t curCoreSessionNum_ = 0;
 };
 
-__aicore__ inline void KernelScanGetValidExperts::VBSCopyInAndClear(
-    int64_t progress, int64_t size, int64_t loopSessionCnt)
+__aicore__ inline void KernelScanGetValidExperts::VBSCopyInAndClear(int64_t progress, int64_t size,
+                                                                    int64_t loopSessionCnt)
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
     int64_t inOffset = progress * perLoopSessionNum_ * contextInfo_->M * F_;
@@ -89,8 +87,8 @@ __aicore__ inline void KernelScanGetValidExperts::VBSCopyInAndClear(
         static_cast<uint16_t>(loopSessionCnt),
         static_cast<uint32_t>(contextInfo_->BS * contextInfo_->K * sizeof(int32_t)),
         static_cast<uint32_t>((contextInfo_->M * F_ - contextInfo_->BS * contextInfo_->K) * sizeof(int32_t)), 0, 0};
-    DataCopyPadExtParams<int32_t> dataCopyPadParams{
-        true, 0, static_cast<uint8_t>(contextInfo_->BsKPaddingCount), INT_MAX};
+    DataCopyPadExtParams<int32_t> dataCopyPadParams{true, 0, static_cast<uint8_t>(contextInfo_->BsKPaddingCount),
+                                                    INT_MAX};
     DataCopyPad(inLocal[0], expertIdsGm[inOffset], dataCopyParams, dataCopyPadParams);
 
     int64_t interVal = bufferSize_ / NUM_TWO / sizeof(int32_t);
@@ -132,9 +130,9 @@ __aicore__ inline void KernelScanGetValidExperts::UBSortCompute(int64_t progress
     PipeBarrier<PIPE_V>();
 
     LocalTensor<uint8_t> maskLocalTensorUInt8 = maskLocalTensor.ReinterpretCast<uint8_t>();
-    AscendC::CompareScalar(
-        maskLocalTensorUInt8, expertIdsLocalFp32, static_cast<float>(-expertStart_), AscendC::CMPMODE::GT,
-        (size + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
+    AscendC::CompareScalar(maskLocalTensorUInt8, expertIdsLocalFp32, static_cast<float>(-expertStart_),
+                           AscendC::CMPMODE::GT,
+                           (size + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
     PipeBarrier<PIPE_V>();
 
     GatherMaskParams gatherMaskParams;
@@ -218,19 +216,17 @@ __aicore__ inline void KernelScanGetValidExperts::GatherOutProcess()
                 srcSortNumGm[0]);
             int32_t vNum = srcSortNumGm.GetValue(0);
             if (vNum > 0) {
-                DataCopyExtParams dataCopyParams{
-                    static_cast<uint16_t>(1), static_cast<uint32_t>(vNum * sizeof(int32_t)), 0, 0, 0};
+                DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+                                                 static_cast<uint32_t>(vNum * sizeof(int32_t)), 0, 0, 0};
                 int32_t padCnt = Align(vNum, sizeof(int32_t)) - vNum;
                 // 太大，不支持，走排序流程
                 ASSERT_MSG((inOffset + vNum + padCnt) <= interVal, "gather valid num too big");
                 DataCopyPadExtParams<int32_t> dataCopyPadParams{true, 0, static_cast<uint8_t>(padCnt), INT_MAX};
 
-                DataCopyPad(
-                    inLocal[inOffset], workspaceGms[0][i * GetSortLen<float>(perCoreSortNum_)], dataCopyParams,
-                    dataCopyPadParams);
-                DataCopyPad(
-                    inLocal[interVal + inOffset], workspaceGms[1][i * GetSortLen<float>(perCoreSortNum_)],
-                    dataCopyParams, dataCopyPadParams);
+                DataCopyPad(inLocal[inOffset], workspaceGms[0][i * GetSortLen<float>(perCoreSortNum_)], dataCopyParams,
+                            dataCopyPadParams);
+                DataCopyPad(inLocal[interVal + inOffset], workspaceGms[1][i * GetSortLen<float>(perCoreSortNum_)],
+                            dataCopyParams, dataCopyPadParams);
 
                 inOffset += vNum + padCnt;
             }
@@ -292,8 +288,8 @@ __aicore__ inline void KernelScanGetValidExperts::GatherOutProcess()
                 (rsvdCnt + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
             PipeBarrier<PIPE_V>();
             GatherMask(outLocal, inLocal, maskLocalUInt32, true, rsvdCnt, gatherMaskParams, rsvdCnt2);
-            GatherMask(
-                outLocal[interVal], inLocal[interVal], maskLocalUInt32, true, rsvdCnt, gatherMaskParams, rsvdCnt2);
+            GatherMask(outLocal[interVal], inLocal[interVal], maskLocalUInt32, true, rsvdCnt, gatherMaskParams,
+                       rsvdCnt2);
             PipeBarrier<PIPE_V>();
             SetWaitFlag<HardEvent::V_S>(HardEvent::V_S);
             groupListOutLocal.SetValue(curExpertIdOffset, i);
@@ -303,8 +299,8 @@ __aicore__ inline void KernelScanGetValidExperts::GatherOutProcess()
             sortDataCopyOutQueue.EnQue(outLocal);
             outLocal = sortDataCopyOutQueue.DeQue<int32_t>();
 
-            DataCopyExtParams dataCopyParams{
-                static_cast<uint16_t>(1), static_cast<uint32_t>(rsvdCnt2 * sizeof(int32_t)), 0, 0, 0};
+            DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+                                             static_cast<uint32_t>(rsvdCnt2 * sizeof(int32_t)), 0, 0, 0};
             DataCopyPad(sortedexpertIdsGm[outOffset], outLocal, dataCopyParams);
             DataCopyPad(sortedRowIdsGm[outOffset], outLocal[interVal], dataCopyParams);
             outOffset += rsvdCnt2;
@@ -317,8 +313,8 @@ __aicore__ inline void KernelScanGetValidExperts::GatherOutProcess()
             curExpertIdOffset += NUM_TWO;
         }
 
-        DataCopyExtParams copyParams{
-            static_cast<uint16_t>(1), static_cast<uint32_t>(curExpertIdOffset * sizeof(int64_t)), 0, 0, 0};
+        DataCopyExtParams copyParams{static_cast<uint16_t>(1),
+                                     static_cast<uint32_t>(curExpertIdOffset * sizeof(int64_t)), 0, 0, 0};
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
         DataCopyPad(groupListGm_, groupListOutLocal, copyParams);
 
@@ -348,8 +344,8 @@ __aicore__ inline void KernelScanGetValidExperts::CopyOutValidCount()
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void KernelScanGetValidExperts::Init(
-    GM_ADDR tokenInfoGm, GM_ADDR workspace, GM_ADDR groupList, const ScheduleContextInfo* contextInfo, TPipe* tPipe)
+__aicore__ inline void KernelScanGetValidExperts::Init(GM_ADDR tokenInfoGm, GM_ADDR workspace, GM_ADDR groupList,
+                                                       const ScheduleContextInfo *contextInfo, TPipe *tPipe)
 {
     this->pipe = tPipe;
     contextInfo_ = contextInfo;
@@ -390,33 +386,30 @@ __aicore__ inline void KernelScanGetValidExperts::Init(
     }
 
     int64_t expertIdStartPos = contextInfo_->curMicroBatchID * F_ + 1 + 1;
-    expertIdsGmFStart_.SetGlobalBuffer((__gm__ int32_t*)tokenInfoGm + contextInfo_->curMicroBatchID * F_);
-    expertIdsGm.SetGlobalBuffer(
-        (__gm__ int32_t*)tokenInfoGm + expertIdStartPos + blockIdx_ * perCoreSessionNum_ * contextInfo_->M * F_);
+    expertIdsGmFStart_.SetGlobalBuffer((__gm__ int32_t *)tokenInfoGm + contextInfo_->curMicroBatchID * F_);
+    expertIdsGm.SetGlobalBuffer((__gm__ int32_t *)tokenInfoGm + expertIdStartPos +
+                                blockIdx_ * perCoreSessionNum_ * contextInfo_->M * F_);
     // rsvdCntGm 在scan阶段已经清零
-    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace), SCAN_BATCHID_GM_OFFSET);
-    workspaceSortNumGm_.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t*>(workspace) + OFFSET_SORTED_EXPERT_IDS, contextInfo_->sortNumWorkSpace);
+    rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), SCAN_BATCHID_GM_OFFSET);
+    workspaceSortNumGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS,
+                                        contextInfo_->sortNumWorkSpace);
 
     sortedexpertIdsGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t*>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
+        reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace,
         this->totalLength);
-    sortedRowIdsGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t*>(workspace) + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace +
-            this->totalLength,
-        this->totalLength);
+    sortedRowIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) + OFFSET_SORTED_EXPERT_IDS +
+                                       contextInfo_->sortNumWorkSpace + this->totalLength,
+                                   this->totalLength);
 
-    groupListGm_.SetGlobalBuffer((__gm__ int64_t*)groupList, contextInfo_->expertNum * NUM_TWO);
+    groupListGm_.SetGlobalBuffer((__gm__ int64_t *)groupList, contextInfo_->expertNum * NUM_TWO);
 
     // key and value
-    workspaceGms[0].SetGlobalBuffer(
-        (__gm__ int32_t*)workspace + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace +
-            this->totalLength * NUM_TWO,
-        this->totalLength * NUM_TWO);
-    workspaceGms[1].SetGlobalBuffer(
-        (__gm__ int32_t*)workspace + OFFSET_SORTED_EXPERT_IDS + contextInfo_->sortNumWorkSpace +
-            this->totalLength * (NUM_TWO + NUM_TWO),
-        this->totalLength * NUM_TWO);
+    workspaceGms[0].SetGlobalBuffer((__gm__ int32_t *)workspace + OFFSET_SORTED_EXPERT_IDS +
+                                        contextInfo_->sortNumWorkSpace + this->totalLength * NUM_TWO,
+                                    this->totalLength * NUM_TWO);
+    workspaceGms[1].SetGlobalBuffer((__gm__ int32_t *)workspace + OFFSET_SORTED_EXPERT_IDS +
+                                        contextInfo_->sortNumWorkSpace + this->totalLength * (NUM_TWO + NUM_TWO),
+                                    this->totalLength * NUM_TWO);
 
     bufferSize_ =
         Ceil(contextInfo_->sortLoopMaxElement, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM * sizeof(int32_t) * NUM_TWO;
@@ -446,9 +439,8 @@ __aicore__ inline void KernelScanGetValidExperts::ClearTokenInfoFlag()
                 curElementA = lastLoopANum;
             }
 
-            DataCopyExtParams copyOutParams{
-                static_cast<uint16_t>(curElementA), static_cast<uint32_t>(sizeof(int32_t)), 0,
-                static_cast<uint32_t>((contextInfo_->M * F_ - 1) * sizeof(int32_t)), 0};
+            DataCopyExtParams copyOutParams{static_cast<uint16_t>(curElementA), static_cast<uint32_t>(sizeof(int32_t)),
+                                            0, static_cast<uint32_t>((contextInfo_->M * F_ - 1) * sizeof(int32_t)), 0};
             DataCopyPad(expertIdsGmFStart_[idx * perLoopANum * contextInfo_->M * F_], clearLocal, copyOutParams);
         }
     }

@@ -47,48 +47,48 @@ struct KvRmsNormRopeCacheTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, KvRmsNormRopeCacheTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, KvRmsNormRopeCacheTilingData *const_data)
 {
-    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
-    uint32_t* dst = (uint32_t*)const_data;
+    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
+    uint32_t *dst = (uint32_t *)const_data;
     for (auto i = 0; i < sizeof(KvRmsNormRopeCacheTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, KvRmsNormRopeCacheTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, KvRmsNormRopeCacheTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(KvRmsNormRopeCacheTilingData));
 }
 #endif
 
 #define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \
-    tiling_struct tiling_data;                                              \
+    tiling_struct tiling_data; \
     InitTilingData(tiling_arg, &tiling_data)
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct* tilingDataPointer =                              \
-        reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
+    __ubuf__ tilingStruct *tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                    \
-    KvRmsNormRopeCacheTilingData tilingData;                                          \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    KvRmsNormRopeCacheTilingData tilingData; \
     INIT_TILING_DATA(KvRmsNormRopeCacheTilingData, tilingDataPointer, tilingPointer); \
-    (tilingData).blockDim = tilingDataPointer->blockDim;                              \
-    (tilingData).rowsPerBlock = tilingDataPointer->rowsPerBlock;                      \
-    (tilingData).cacheLength = tilingDataPointer->cacheLength;                        \
-    (tilingData).batchSize = tilingDataPointer->batchSize;                            \
-    (tilingData).numHead = tilingDataPointer->numHead;                                \
-    (tilingData).seqLength = tilingDataPointer->seqLength;                            \
-    (tilingData).blockSize = tilingDataPointer->blockSize;                            \
-    (tilingData).blockFactor = tilingDataPointer->blockFactor;                        \
-    (tilingData).ubFactor = tilingDataPointer->ubFactor;                              \
-    (tilingData).epsilon = tilingDataPointer->epsilon;                                \
-    (tilingData).reciprocal = tilingDataPointer->reciprocal;                          \
-    (tilingData).isOutputKv = tilingDataPointer->isOutputKv;                          \
-    (tilingData).isKQuant = tilingDataPointer->isKQuant;                              \
-    (tilingData).isVQuant = tilingDataPointer->isVQuant;                              \
+    (tilingData).blockDim = tilingDataPointer->blockDim; \
+    (tilingData).rowsPerBlock = tilingDataPointer->rowsPerBlock; \
+    (tilingData).cacheLength = tilingDataPointer->cacheLength; \
+    (tilingData).batchSize = tilingDataPointer->batchSize; \
+    (tilingData).numHead = tilingDataPointer->numHead; \
+    (tilingData).seqLength = tilingDataPointer->seqLength; \
+    (tilingData).blockSize = tilingDataPointer->blockSize; \
+    (tilingData).blockFactor = tilingDataPointer->blockFactor; \
+    (tilingData).ubFactor = tilingDataPointer->ubFactor; \
+    (tilingData).epsilon = tilingDataPointer->epsilon; \
+    (tilingData).reciprocal = tilingDataPointer->reciprocal; \
+    (tilingData).isOutputKv = tilingDataPointer->isOutputKv; \
+    (tilingData).isKQuant = tilingDataPointer->isKQuant; \
+    (tilingData).isVQuant = tilingDataPointer->isVQuant; \
     (tilingData).methodMode = tilingDataPointer->methodMode;
 #endif
 
@@ -126,28 +126,28 @@ struct KvRmsNormRopeCacheTilingData {
 #pragma pack()
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct* tilingDataPointer =                              \
-        reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
+    __ubuf__ tilingStruct *tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                    \
-    KvRmsNormRopeCacheTilingData tilingData;                                          \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    KvRmsNormRopeCacheTilingData tilingData; \
     INIT_TILING_DATA(KvRmsNormRopeCacheTilingData, tilingDataPointer, tilingPointer); \
-    (tilingData).blockDim = tilingDataPointer->blockDim;                              \
-    (tilingData).rowsPerBlock = tilingDataPointer->rowsPerBlock;                      \
-    (tilingData).cacheLength = tilingDataPointer->cacheLength;                        \
-    (tilingData).batchSize = tilingDataPointer->batchSize;                            \
-    (tilingData).numHead = tilingDataPointer->numHead;                                \
-    (tilingData).seqLength = tilingDataPointer->seqLength;                            \
-    (tilingData).blockSize = tilingDataPointer->blockSize;                            \
-    (tilingData).blockFactor = tilingDataPointer->blockFactor;                        \
-    (tilingData).ubFactor = tilingDataPointer->ubFactor;                              \
-    (tilingData).epsilon = tilingDataPointer->epsilon;                                \
-    (tilingData).reciprocal = tilingDataPointer->reciprocal;                          \
-    (tilingData).isOutputKv = tilingDataPointer->isOutputKv;                          \
-    (tilingData).isKQuant = tilingDataPointer->isKQuant;                              \
-    (tilingData).isVQuant = tilingDataPointer->isVQuant;                              \
+    (tilingData).blockDim = tilingDataPointer->blockDim; \
+    (tilingData).rowsPerBlock = tilingDataPointer->rowsPerBlock; \
+    (tilingData).cacheLength = tilingDataPointer->cacheLength; \
+    (tilingData).batchSize = tilingDataPointer->batchSize; \
+    (tilingData).numHead = tilingDataPointer->numHead; \
+    (tilingData).seqLength = tilingDataPointer->seqLength; \
+    (tilingData).blockSize = tilingDataPointer->blockSize; \
+    (tilingData).blockFactor = tilingDataPointer->blockFactor; \
+    (tilingData).ubFactor = tilingDataPointer->ubFactor; \
+    (tilingData).epsilon = tilingDataPointer->epsilon; \
+    (tilingData).reciprocal = tilingDataPointer->reciprocal; \
+    (tilingData).isOutputKv = tilingDataPointer->isOutputKv; \
+    (tilingData).isKQuant = tilingDataPointer->isKQuant; \
+    (tilingData).isVQuant = tilingDataPointer->isVQuant; \
     (tilingData).methodMode = tilingDataPointer->methodMode;
 #endif

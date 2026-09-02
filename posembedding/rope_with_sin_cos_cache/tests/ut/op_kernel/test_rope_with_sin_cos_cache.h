@@ -21,12 +21,12 @@
 #define __CCE_UT_TEST__
 #define ORIG_DTYPE_QUERYIN DT_FLOAT
 
-inline void InitRopeWithSinCosCacheTilingData(uint8_t* tiling, RopeWithSinCosCacheTilingData* const_data)
+inline void InitRopeWithSinCosCacheTilingData(uint8_t *tiling, RopeWithSinCosCacheTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(RopeWithSinCosCacheTilingData));
 }
 
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-    RopeWithSinCosCacheTilingData tilingData;      \
+    RopeWithSinCosCacheTilingData tilingData; \
     InitRopeWithSinCosCacheTilingData(tilingPointer, &tilingData)
 #endif

@@ -29,7 +29,8 @@ class InplacePartialRotaryMulGradBAB {
 public:
     __aicore__ inline InplacePartialRotaryMulGradBAB(TPipe *pipe,
                                                      const InplacePartialRotaryMulGradRegbaseTilingData *tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR dy, GM_ADDR cos, GM_ADDR sin, GM_ADDR dx);
     __aicore__ inline void Process();
 
@@ -103,7 +104,6 @@ __aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::Process()
         return;
     }
 
-
     this->bIdx_ = blockIdx_ % tilingData_->blockNumB;
     this->sIdx_ = blockIdx_ / tilingData_->blockNumB;
     this->bNum_ = tilingData_->blockFactorB;
@@ -151,9 +151,10 @@ __aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessNLoop(c
 }
 
 template <typename TDY, typename TCOS>
-__aicore__ inline void
-InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessN(LocalTensor<TCOS> &sinTensor, LocalTensor<TCOS> &cosTensor,
-                                                    const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum)
+__aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessN(LocalTensor<TCOS> &sinTensor,
+                                                                           LocalTensor<TCOS> &cosTensor,
+                                                                           const uint32_t bIdx, const uint32_t sIdx,
+                                                                           const uint32_t currSNum)
 {
     LocalTensor<TDY> dyTensor, dxTensor;
 
@@ -183,10 +184,9 @@ InplacePartialRotaryMulGradBAB<TDY, TCOS>::ProcessN(LocalTensor<TCOS> &sinTensor
 }
 
 template <typename TDY, typename TCOS>
-__aicore__ inline void
-InplacePartialRotaryMulGradBAB<TDY, TCOS>::Compute(LocalTensor<TCOS> &sinTensor, LocalTensor<TCOS> &cosTensor,
-                                                   LocalTensor<TDY> &dyTensor, LocalTensor<TDY> &dxTensor,
-                                                   const uint32_t currSNum, const uint32_t currNNum)
+__aicore__ inline void InplacePartialRotaryMulGradBAB<TDY, TCOS>::Compute(
+    LocalTensor<TCOS> &sinTensor, LocalTensor<TCOS> &cosTensor, LocalTensor<TDY> &dyTensor, LocalTensor<TDY> &dxTensor,
+    const uint32_t currSNum, const uint32_t currNNum)
 {
     InterleaveModeGradVF<TDY, TCOS>(sinTensor, cosTensor, dyTensor, dxTensor, tilingData_->sliceLength, dSplitCoef_,
                                     static_cast<uint16_t>(currSNum), static_cast<uint16_t>(currNNum));

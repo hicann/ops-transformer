@@ -367,9 +367,10 @@ __aicore__ inline void NormOperationBackward<normType>::AffineAccSum(const Local
 }
 
 template <NormType normType>
-__aicore__ inline void
-NormOperationBackward<normType>::PostProcess(const LocalTensor<float> &x, const GlobalTensor<float> &workspaceAffineGM,
-                                             const GlobalTensor<float> &workspaceGM, uint32_t workspaceId)
+__aicore__ inline void NormOperationBackward<normType>::PostProcess(const LocalTensor<float> &x,
+                                                                    const GlobalTensor<float> &workspaceAffineGM,
+                                                                    const GlobalTensor<float> &workspaceGM,
+                                                                    uint32_t workspaceId)
 {
     if constexpr (normType != NormType::LAYER_NORM_AFFINE && normType != NormType::LAYER_NORM_AFFINE_ACROSS_HEADS) {
         return;
@@ -537,8 +538,7 @@ public:
           gradNormAddedKeyWeight_(grad_norm_added_key_weight),
           gradNormAddedKeyBias_(grad_norm_added_key_bias),
           workspace_(workspace)
-    {
-    }
+    {}
 
     __aicore__ inline void Init(TPipe *pipe, const NormRopeConcatGradTilingData &tilingData);
     __aicore__ inline void Prepare();
@@ -668,9 +668,8 @@ private:
 };
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder>
-__aicore__ inline void
-NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::Init(TPipe *pipe,
-                                                                         const NormRopeConcatGradTilingData &tilingData)
+__aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::Init(
+    TPipe *pipe, const NormRopeConcatGradTilingData &tilingData)
 {
     pipe_ = pipe;
     blockIdx_ = GetBlockIdx();
@@ -762,8 +761,8 @@ NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::Init(TPipe *
             avgHeadsLow_ <<= 1;
         }
 
-        uint64_t headDimNums = static_cast<uint64_t>(batch_) *
-                               ((maxAffineSeq + GetBlockNum() - 1) / GetBlockNum()) * splitHeadNum_;
+        uint64_t headDimNums =
+            static_cast<uint64_t>(batch_) * ((maxAffineSeq + GetBlockNum() - 1) / GetBlockNum()) * splitHeadNum_;
         uint64_t current = 1;
         while (current < headDimNums && avgHeadsLow_ != 1) {
             current *= avgHeadsLow_;
@@ -779,9 +778,8 @@ NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::Init(TPipe *
 }
 
 template <NormType normType, NormType addedNormType, RopeType ropeType, ConcatOrder concatOrder>
-__aicore__ inline void
-NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::GetSeqRange(uint32_t &startSeq, uint32_t &endSeq,
-                                                                                uint32_t totalSeq, uint32_t usedCore)
+__aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, concatOrder>::GetSeqRange(
+    uint32_t &startSeq, uint32_t &endSeq, uint32_t totalSeq, uint32_t usedCore)
 {
     uint32_t eachCoreSeq = totalSeq / usedCore;
     uint32_t tailCoreSeq = totalSeq % usedCore;

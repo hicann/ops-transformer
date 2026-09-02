@@ -25,17 +25,17 @@ template <typename OriT, typename CmpT>
 class RotateHalfRopeFullLoadXd : public RotateHalfBase<OriT, CmpT> {
 public:
     __aicore__ inline RotateHalfRopeFullLoadXd(){};
-    
-    __aicore__ inline void Init(
-        GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, const RotaryPositionEmbeddingTilingData &tilingData);
+
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
+                                const RotaryPositionEmbeddingTilingData &tilingData);
     __aicore__ inline void Process();
 
 private:
     // ---- Helper methods ----
     __aicore__ inline void CopyInRope(LocalTensor<CmpT> &cosFp32Out, LocalTensor<CmpT> &sinFp32Out);
     __aicore__ inline void CopyInX();
-    __aicore__ inline void BroadcastMul(
-        LocalTensor<CmpT> &xFp32, LocalTensor<CmpT> &rotL, LocalTensor<CmpT> &cosFp32, LocalTensor<CmpT> &sinFp32);
+    __aicore__ inline void BroadcastMul(LocalTensor<CmpT> &xFp32, LocalTensor<CmpT> &rotL, LocalTensor<CmpT> &cosFp32,
+                                        LocalTensor<CmpT> &sinFp32);
     __aicore__ inline void CopyOut(LocalTensor<CmpT> &result);
 
     // ---- Data members (FullLoadXD-specific, base class provides the rest) ----
@@ -57,8 +57,8 @@ private:
 };
 
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::Init(
-    GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, const RotaryPositionEmbeddingTilingData &tilingData)
+__aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
+                                                                  const RotaryPositionEmbeddingTilingData &tilingData)
 {
     this->FullLoadXDInit(tilingData);
 
@@ -95,8 +95,8 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::Init(
 // CopyInRope: load cos/sin → cosBufFp32 / sinBufFp32
 // ============================================================================
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::CopyInRope(
-    LocalTensor<CmpT> &cosFp32Out, LocalTensor<CmpT> &sinFp32Out)
+__aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::CopyInRope(LocalTensor<CmpT> &cosFp32Out,
+                                                                        LocalTensor<CmpT> &sinFp32Out)
 {
     if constexpr (IsSameType<OriT, CmpT>::value) {
         // FP32 path — DataCopy directly to TBuf, then wait MTE2→V
@@ -143,8 +143,8 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::CopyInX()
         if (this->isAligned) {
             DataCopy(xFp32, xGm[0], static_cast<uint32_t>(this->xCount));
         } else {
-            DataCopyExtParams copyP{
-                static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0, 0};
+            DataCopyExtParams copyP{static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0,
+                                    0};
             DataCopyPad(xFp32, xGm[0], copyP, this->noPadParams);
         }
     } else {
@@ -152,8 +152,8 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::CopyInX()
         if (this->isAligned) {
             DataCopy(xLocal, xGm[0], static_cast<uint32_t>(this->xCount));
         } else {
-            DataCopyExtParams copyP{
-                static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0, 0};
+            DataCopyExtParams copyP{static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0,
+                                    0};
             DataCopyPad(xLocal, xGm[0], copyP, this->noPadParams);
         }
         inQueueX.EnQue(xLocal);
@@ -163,13 +163,14 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::CopyInX()
     }
 }
 
-
 // ============================================================================
 // Perform broadcast multiplication: x *= cos and rotL *= sin
 // ============================================================================
 template <typename OriT, typename CmpT>
-__aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::BroadcastMul(
-    LocalTensor<CmpT> &xFp32, LocalTensor<CmpT> &rotL, LocalTensor<CmpT> &cosFp32, LocalTensor<CmpT> &sinFp32)
+__aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::BroadcastMul(LocalTensor<CmpT> &xFp32,
+                                                                          LocalTensor<CmpT> &rotL,
+                                                                          LocalTensor<CmpT> &cosFp32,
+                                                                          LocalTensor<CmpT> &sinFp32)
 {
     const uint64_t N = this->axisLenX3;
     const uint32_t count = static_cast<uint32_t>(this->dPadLength);
@@ -210,10 +211,10 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::BroadcastMul(
                 while (nRemain > 0) {
                     uint64_t chunkN = (nRemain > REPEAT_MAX) ? REPEAT_MAX : nRemain;
                     uint64_t xChunkOff = gXOff + nOff * this->dPadLength;
-                    Mul(xFp32[xChunkOff], xFp32[xChunkOff], cosFp32[gROff],
-                        count, static_cast<uint8_t>(chunkN), repeatParams);
-                    Mul(rotL[xChunkOff], rotL[xChunkOff], sinFp32[gROff],
-                        count, static_cast<uint8_t>(chunkN), repeatParams);
+                    Mul(xFp32[xChunkOff], xFp32[xChunkOff], cosFp32[gROff], count, static_cast<uint8_t>(chunkN),
+                        repeatParams);
+                    Mul(rotL[xChunkOff], rotL[xChunkOff], sinFp32[gROff], count, static_cast<uint8_t>(chunkN),
+                        repeatParams);
                     nRemain -= chunkN;
                     nOff += chunkN;
                 }
@@ -258,8 +259,8 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::CopyOut(LocalTensor
         if (this->isAligned) {
             DataCopy(yGm[0], outLocal, static_cast<uint32_t>(this->xCount));
         } else {
-            DataCopyExtParams copyP{
-                static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0, 0};
+            DataCopyExtParams copyP{static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0,
+                                    0};
             DataCopyPad(yGm[0], outLocal, copyP);
         }
         outQueueY.FreeTensor(result);
@@ -273,8 +274,8 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::CopyOut(LocalTensor
         if (this->isAligned) {
             DataCopy(yGm[0], outOri, static_cast<uint32_t>(this->xCount));
         } else {
-            DataCopyExtParams copyP{
-                static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0, 0};
+            DataCopyExtParams copyP{static_cast<uint16_t>(2 * this->ubLoop * this->axisLenX3), this->halfDBytes, 0, 0,
+                                    0};
             DataCopyPad(yGm[0], outOri, copyP);
         }
         outQueueY.FreeTensor(result);
@@ -298,7 +299,7 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::Process()
 
     // STEP 2: Load x → xBufFp32
     CopyInX();
-    
+
     if constexpr (IsSameType<OriT, CmpT>::value) {
         SetWaitFlag<HardEvent::MTE2_V>(HardEvent::MTE2_V);
     }
@@ -329,5 +330,5 @@ __aicore__ inline void RotateHalfRopeFullLoadXd<OriT, CmpT>::Process()
     CopyOut(rotL);
 }
 
-}  // namespace RotateHalfN
-#endif  // ROTATE_HALF_ROPE_FULLLOAD_XD_H
+} // namespace RotateHalfN
+#endif // ROTATE_HALF_ROPE_FULLLOAD_XD_H

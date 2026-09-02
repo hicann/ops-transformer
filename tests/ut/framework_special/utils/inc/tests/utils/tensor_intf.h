@@ -24,7 +24,6 @@
 
 namespace ops::adv::tests::utils {
 
-
 class TensorIntf {
 public:
     enum class TensorType {

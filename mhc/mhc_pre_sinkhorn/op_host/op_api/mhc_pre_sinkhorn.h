@@ -40,19 +40,19 @@ namespace l0op {
  * @param [out] hPre: H_pre after sigmoid (optional), shape is [T, n] or [B, S, n], dtype is FP32
  * @param [out] hcBeforeNorm: Result of x @ phi (optional), shape is [T, n, D] or [B, S, n, D], dtype is FP32
  * @param [out] invRms: 1/r result of RmsNorm (optional), shape is [T, n, D] or [B, S, n, D], dtype is FP32
- * @param [out] sumOut: Intermediate sum results from Sinkhorn (optional), shape is [T, n, D] or [B, S, n, D], dtype is FP32
- * @param [out] normOut: Intermediate norm results from Sinkhorn (optional), shape is [T, n, D] or [B, S, n, D], dtype is FP32
+ * @param [out] sumOut: Intermediate sum results from Sinkhorn (optional), shape is [T, n, D] or [B, S, n, D], dtype is
+ * FP32
+ * @param [out] normOut: Intermediate norm results from Sinkhorn (optional), shape is [T, n, D] or [B, S, n, D], dtype
+ * is FP32
  * @param [in] executor: Op executor
  * @return aclTensor*: Output tensor hin
  */
-const aclTensor *MhcPreSinkhorn(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
-                                const aclTensor *bias, int64_t hcMult, int64_t numIters, double hcEps,
-                                double normEps, bool needBackward,
-                                aclTensor *hin, aclTensor *hPost, aclTensor *hRes,
-                                aclTensor *hPre, aclTensor *hcBeforeNorm, aclTensor *invRms,
-                                aclTensor *sumOut, aclTensor *normOut,
+const aclTensor *MhcPreSinkhorn(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
+                                int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool needBackward,
+                                aclTensor *hin, aclTensor *hPost, aclTensor *hRes, aclTensor *hPre,
+                                aclTensor *hcBeforeNorm, aclTensor *invRms, aclTensor *sumOut, aclTensor *normOut,
                                 aclOpExecutor *executor);
 
-}
+} // namespace l0op
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_MHC_PRE_SINKHORN_OP_H_

@@ -31,10 +31,10 @@ const aclTensor *BNInferGrad(const aclTensor *gradOut, const aclTensor *weight, 
                              aclOpExecutor *executor);
 
 constexpr size_t BN_GRAD_V3_OUTPUT_NUM = 3;
-const std::array<aclTensor *, BN_GRAD_V3_OUTPUT_NUM>
-BatchNormGradV3(const aclTensor *gradOut, const aclTensor *input, const aclTensor *weight, const aclTensor *runningMean,
-                const aclTensor *runningVar, const aclTensor *saveMean, const aclTensor *saveInvstd, bool training,
-                float eps, aclOpExecutor *executor);
+const std::array<aclTensor *, BN_GRAD_V3_OUTPUT_NUM> BatchNormGradV3(
+    const aclTensor *gradOut, const aclTensor *input, const aclTensor *weight, const aclTensor *runningMean,
+    const aclTensor *runningVar, const aclTensor *saveMean, const aclTensor *saveInvstd, bool training, float eps,
+    aclOpExecutor *executor);
 } // namespace l0op
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_BATCH_NORM_GRAD_OP_H_

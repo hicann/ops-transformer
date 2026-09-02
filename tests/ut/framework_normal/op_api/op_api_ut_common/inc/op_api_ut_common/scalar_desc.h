@@ -21,50 +21,58 @@ using namespace nlohmann;
 
 class ScalarDesc {
 public:
-    ScalarDesc(bool val = false) : data_type_(ACL_BOOL)
+    ScalarDesc(bool val = false)
+        : data_type_(ACL_BOOL)
     {
         val_.b = val;
     }
-    ScalarDesc(int8_t val = 0) : data_type_(ACL_INT8)
+    ScalarDesc(int8_t val = 0)
+        : data_type_(ACL_INT8)
     {
         SetInt8Value(&val);
     }
-    ScalarDesc(uint8_t val = 0) : data_type_(ACL_UINT8)
+    ScalarDesc(uint8_t val = 0)
+        : data_type_(ACL_UINT8)
     {
         SetInt8Value(&val);
     }
-    ScalarDesc(int16_t val = 0) : data_type_(ACL_INT16)
+    ScalarDesc(int16_t val = 0)
+        : data_type_(ACL_INT16)
     {
         SetInt16Value(&val);
     }
-    ScalarDesc(uint16_t val = 0) : data_type_(ACL_UINT16)
+    ScalarDesc(uint16_t val = 0)
+        : data_type_(ACL_UINT16)
     {
         SetInt16Value(&val);
     }
-    ScalarDesc(int32_t val = 0) : data_type_(ACL_INT32)
+    ScalarDesc(int32_t val = 0)
+        : data_type_(ACL_INT32)
     {
         SetInt32Value(&val);
     }
-    ScalarDesc(uint32_t val = 0) : data_type_(ACL_UINT32)
+    ScalarDesc(uint32_t val = 0)
+        : data_type_(ACL_UINT32)
     {
         SetInt32Value(&val);
     }
-    ScalarDesc(int64_t val = 0) : data_type_(ACL_INT64)
+    ScalarDesc(int64_t val = 0)
+        : data_type_(ACL_INT64)
     {
         SetInt64Value(&val);
     }
-    ScalarDesc(uint64_t val = 0) : data_type_(ACL_UINT64)
+    ScalarDesc(uint64_t val = 0)
+        : data_type_(ACL_UINT64)
     {
         SetInt64Value(&val);
     }
     ScalarDesc(float val = 0, aclDataType data_type = ACL_FLOAT);
-    ScalarDesc(double val = 0) : data_type_(ACL_DOUBLE)
+    ScalarDesc(double val = 0)
+        : data_type_(ACL_DOUBLE)
     {
         val_.d = val;
     }
-    ~ScalarDesc()
-    {
-    }
+    ~ScalarDesc() {}
 
     unique_ptr<aclScalar, void (*)(aclScalar *)> ToAclType() const;
     aclScalar *ToAclTypeRawPtr() const;

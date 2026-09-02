@@ -636,7 +636,10 @@ private:
         return vector_.tiling_->multCoreSplitKSize >= MHC_PRE_MK_SEQUENTIAL_PARTIAL_THRESHOLD;
     }
 
-    __aicore__ inline bool UseGmStage() const { return vector_.tiling_->mkUseGmStage != 0U; }
+    __aicore__ inline bool UseGmStage() const
+    {
+        return vector_.tiling_->mkUseGmStage != 0U;
+    }
 
     __aicore__ inline void ProcessAic(uint32_t mStart, uint32_t mReal, uint32_t kIndex, uint32_t kStart, uint32_t kEnd)
     {

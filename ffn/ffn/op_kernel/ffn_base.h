@@ -70,8 +70,7 @@ public:
     __aicore__ inline FFNBase(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_)
         : mm1(mm1_),
           mm2(mm2_)
-    {
-    }
+    {}
 
     /** Init function before process function
      * @param x: input 2D matrix.

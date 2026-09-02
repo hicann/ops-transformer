@@ -28,22 +28,19 @@ namespace RotaryPositionEmbedding {
 using namespace AscendC;
 
 template <typename T>
-class RotaryPositionEmbeddingAB
-{
+class RotaryPositionEmbeddingAB {
 public:
     __aicore__ inline RotaryPositionEmbeddingAB(){};
-    __aicore__ inline void Init(
-        GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, GM_ADDR workspace, const RopeRegbaseABTilingData* tilingData,
-        TPipe* pipe);
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, GM_ADDR workspace,
+                                const RopeRegbaseABTilingData *tilingData, TPipe *pipe);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void ProcessLoop(
-        int64_t xGmOffset, LocalTensor<T> cosBuffer, LocalTensor<T> sinBuffer, int64_t ubIdx, int64_t bsCount,
-        int64_t nCount);
+    __aicore__ inline void ProcessLoop(int64_t xGmOffset, LocalTensor<T> cosBuffer, LocalTensor<T> sinBuffer,
+                                       int64_t ubIdx, int64_t bsCount, int64_t nCount);
 
 private:
-    TPipe* pipe_;
+    TPipe *pipe_;
     TQue<QuePosition::VECIN, 1> xInQueue_;
     TQue<QuePosition::VECIN, 1> cosInQueue_;
     TQue<QuePosition::VECIN, 1> sinInQueue_;
@@ -53,7 +50,7 @@ private:
     GlobalTensor<T> cosGm_;
     GlobalTensor<T> sinGm_;
     GlobalTensor<T> yGm_;
-    const RopeRegbaseABTilingData* tilingData_;
+    const RopeRegbaseABTilingData *tilingData_;
     DataCopyPadExtParams<T> padParams_ = {false, 0, 0, static_cast<T>(0)};
     uint8_t DB_FLAG = 2;
     uint32_t dSplitSize_ = 0;
@@ -62,9 +59,9 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingAB<T>::Init(
-    GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y, GM_ADDR workspace, const RopeRegbaseABTilingData* tilingData,
-    TPipe* pipe)
+__aicore__ inline void RotaryPositionEmbeddingAB<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
+                                                          GM_ADDR workspace, const RopeRegbaseABTilingData *tilingData,
+                                                          TPipe *pipe)
 {
     pipe_ = pipe;
     tilingData_ = tilingData;
@@ -76,10 +73,10 @@ __aicore__ inline void RotaryPositionEmbeddingAB<T>::Init(
 
     int64_t cosOffset = blockDimBS * tilingData_->blockFactorBS * tilingData_->D;
     int64_t xOffset = cosOffset * tilingData_->N + blockDimN * tilingData_->blockFactorN * tilingData_->D;
-    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos + cosOffset);
-    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin + cosOffset);
-    this->xGm_.SetGlobalBuffer((__gm__ T*)x + xOffset);
-    this->yGm_.SetGlobalBuffer((__gm__ T*)y + xOffset);
+    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos + cosOffset);
+    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin + cosOffset);
+    this->xGm_.SetGlobalBuffer((__gm__ T *)x + xOffset);
+    this->yGm_.SetGlobalBuffer((__gm__ T *)y + xOffset);
 
     int64_t bufferSize = tilingData_->dAlign * sizeof(T) * tilingData_->ubFactorBS;
     pipe_->InitBuffer(xInQueue_, DB_FLAG, bufferSize * tilingData_->ubFactorN);
@@ -98,8 +95,8 @@ __aicore__ inline void RotaryPositionEmbeddingAB<T>::Process()
         uint32_t currBSNum = (bsLoopIdx != bsLoopCnt - 1) ? tilingData_->ubFactorBS :
                                                             bsBlockCount_ - (bsLoopIdx * tilingData_->ubFactorBS);
 
-        DataCopyExtParams cosParams = {
-            static_cast<uint16_t>(currBSNum * tilingData_->dSplitCoef), dSplitSize_, 0, 0, 0};
+        DataCopyExtParams cosParams = {static_cast<uint16_t>(currBSNum * tilingData_->dSplitCoef), dSplitSize_, 0, 0,
+                                       0};
 
         LocalTensor<T> cosBuffer = cosInQueue_.AllocTensor<T>();
         LocalTensor<T> sinBuffer = sinInQueue_.AllocTensor<T>();
@@ -122,9 +119,9 @@ __aicore__ inline void RotaryPositionEmbeddingAB<T>::Process()
 }
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingAB<T>::ProcessLoop(
-    int64_t xGmOffset, LocalTensor<T> cosBuffer, LocalTensor<T> sinBuffer, int64_t ubIdx, int64_t bsCount,
-    int64_t nCount)
+__aicore__ inline void RotaryPositionEmbeddingAB<T>::ProcessLoop(int64_t xGmOffset, LocalTensor<T> cosBuffer,
+                                                                 LocalTensor<T> sinBuffer, int64_t ubIdx,
+                                                                 int64_t bsCount, int64_t nCount)
 {
     int64_t totalCount = bsCount * nCount;
     DataCopyExtParams inParams = {static_cast<uint16_t>(totalCount * tilingData_->dSplitCoef), dSplitSize_, 0, 0, 0};

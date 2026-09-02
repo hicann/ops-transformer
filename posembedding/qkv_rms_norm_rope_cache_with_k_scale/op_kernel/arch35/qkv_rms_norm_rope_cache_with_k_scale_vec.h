@@ -118,8 +118,7 @@ public:
         }
         const uint32_t inputBufferId = static_cast<uint32_t>(inputBufferUseId_ % INPUT_BUFFER_NUM);
         const uint32_t cosSinBufferId = static_cast<uint32_t>(cosSinBufferUseId_ % COS_SIN_BUFFER_NUM);
-        const uint32_t slotMappingBufferId =
-            static_cast<uint32_t>(slotMappingBufferUseId_ % SLOT_MAPPING_BUFFER_NUM);
+        const uint32_t slotMappingBufferId = static_cast<uint32_t>(slotMappingBufferUseId_ % SLOT_MAPPING_BUFFER_NUM);
 
         if constexpr (IS_MROPE) {
             EnsureMropePositionWindow(tile);
@@ -328,8 +327,7 @@ private:
             DataCopyGmToUb2D(input, qkvGm_[tile.aivTokenOffset * headDim_], qkvHeadNum, tile.aivTokenSize * headDim_,
                              totalTokens_ * headDim_);
         }
-        DataCopyGmToUb2D(slotMapping, slotMappingGm_[tile.aivTokenOffset], 1U, tile.aivTokenSize,
-                         tile.aivTokenSize);
+        DataCopyGmToUb2D(slotMapping, slotMappingGm_[tile.aivTokenOffset], 1U, tile.aivTokenSize, tile.aivTokenSize);
     }
 
     __aicore__ inline void CopyMropeCosSinTile(const TileParam &tile, uint32_t cosSinBufferId)
@@ -470,8 +468,7 @@ private:
     {
         const LocalTensor<bfloat16_t> input = inputPoolUb_[inputBufferId * INPUT_ONE_BUFFER_ELEMENTS];
         const LocalTensor<float> gamma = gammaUb_;
-        const LocalTensor<float> rawCosSin =
-            cosSinDbPoolUb_[cosSinBufferId * QKV_K_SCALE_COS_SIN_ONE_BUFFER_ELEMENTS];
+        const LocalTensor<float> rawCosSin = cosSinDbPoolUb_[cosSinBufferId * QKV_K_SCALE_COS_SIN_ONE_BUFFER_ELEMENTS];
         const LocalTensor<bfloat16_t> qRopeNz = outputUb.template ReinterpretCast<bfloat16_t>();
         const LocalTensor<bfloat16_t> kRopeNz = qRopeNz[qPreprocessElements_];
         const LocalTensor<uint16_t> kNzScatterIndex = qkNzScatterIndexUb_[QK_PREPROCESS_SCATTER_INDEX_TABLE_ELEMENTS];
@@ -778,9 +775,8 @@ private:
             TPosition::LCM,
             QKV_K_SCALE_MROPE_COMPACT_RESERVE_UB_OFFSET + QKV_K_SCALE_MROPE_COMPACT_V_OUT_DB_POOL_OFFSET,
             QKV_K_SCALE_MROPE_COMPACT_V_OUT_DB_POOL_ELEMENTS);
-        mropePositionDbPoolUb_ =
-            LocalTensor<int32_t>(TPosition::LCM, QKV_K_SCALE_MROPE_POSITION_CACHE_OFFSET,
-                                 QKV_K_SCALE_MROPE_POSITION_CACHE_ELEMENTS);
+        mropePositionDbPoolUb_ = LocalTensor<int32_t>(TPosition::LCM, QKV_K_SCALE_MROPE_POSITION_CACHE_OFFSET,
+                                                      QKV_K_SCALE_MROPE_POSITION_CACHE_ELEMENTS);
         mropeGatherIndexUb_ = LocalTensor<uint32_t>(
             TPosition::LCM,
             QKV_K_SCALE_MROPE_COMPACT_RESERVE_UB_OFFSET + QKV_K_SCALE_MROPE_COMPACT_GATHER_INDEX_UB_OFFSET,
@@ -798,12 +794,11 @@ private:
         // 0x34000-0x3E000 reserve 40K
         // Reserve: gamma@0x0000, cos/sin (2 x 0x1800) @0x0400, slot (2 x 0x200) @0x3400,
         // V-scale@0x3800, Q/K index@0x3A00, V-out (2 x 0x2800) @0x3C00; 0x8C00-0xA000 unused.
-        inputPoolUb_ = LocalTensor<bfloat16_t>(TPosition::LCM, QKV_K_SCALE_INPUT_POOL_OFFSET,
-                                               QKV_K_SCALE_INPUT_POOL_ELEMENTS);
+        inputPoolUb_ =
+            LocalTensor<bfloat16_t>(TPosition::LCM, QKV_K_SCALE_INPUT_POOL_OFFSET, QKV_K_SCALE_INPUT_POOL_ELEMENTS);
         gammaUb_ = LocalTensor<float>(TPosition::LCM, QKV_K_SCALE_RESERVE_UB_OFFSET + QKV_K_SCALE_GAMMA_UB_OFFSET,
                                       QKV_K_SCALE_GAMMA_UB_ELEMENTS);
-        vScaleUb_ = LocalTensor<float>(TPosition::LCM,
-                                       QKV_K_SCALE_RESERVE_UB_OFFSET + QKV_K_SCALE_V_SCALE_UB_OFFSET,
+        vScaleUb_ = LocalTensor<float>(TPosition::LCM, QKV_K_SCALE_RESERVE_UB_OFFSET + QKV_K_SCALE_V_SCALE_UB_OFFSET,
                                        QKV_K_SCALE_V_SCALE_UB_ELEMENTS);
         qkNzScatterIndexUb_ = LocalTensor<uint16_t>(
             TPosition::LCM, QKV_K_SCALE_RESERVE_UB_OFFSET + QKV_K_SCALE_QK_NZ_SCATTER_INDEX_UB_OFFSET,
@@ -815,8 +810,7 @@ private:
             TPosition::LCM, QKV_K_SCALE_RESERVE_UB_OFFSET + QKV_K_SCALE_SLOT_MAPPING_DB_POOL_OFFSET,
             QKV_K_SCALE_SLOT_MAPPING_DB_POOL_ELEMENTS);
         vOutDbPoolUb_ =
-            LocalTensor<fp8_e4m3fn_t>(TPosition::LCM,
-                                      QKV_K_SCALE_RESERVE_UB_OFFSET + QKV_K_SCALE_V_OUT_DB_POOL_OFFSET,
+            LocalTensor<fp8_e4m3fn_t>(TPosition::LCM, QKV_K_SCALE_RESERVE_UB_OFFSET + QKV_K_SCALE_V_OUT_DB_POOL_OFFSET,
                                       QKV_K_SCALE_V_OUT_DB_POOL_ELEMENTS);
     }
 

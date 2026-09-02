@@ -39,7 +39,7 @@ protected:
     TBuf<TPosition::VECCALC> tmpFp32Buf2;
     TBuf<TPosition::VECCALC> tmpFp32Buf3;
     TBuf<TPosition::VECCALC> gatherOffsetBuf;
-    const InplacePartialRopeRegbaseTilingData* tiling_;
+    const InplacePartialRopeRegbaseTilingData *tiling_;
 
     // tilingdata
     uint64_t batchSize;
@@ -107,8 +107,8 @@ __aicore__ inline void InterleavedSplitS<T>::Init(GM_ADDR x, GM_ADDR cos, GM_ADD
         ubCalcSeqTail = ubCalcTailTail;
         ubCalcSeqLoop = ubCalcTailLoop;
         ioOffset = frontCoreNum * coreCalcNum * bufferNdSize + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSize;
-        ioOffsetAll = frontCoreNum * coreCalcNum * bufferNdSizeAll
-            + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
+        ioOffsetAll =
+            frontCoreNum * coreCalcNum * bufferNdSizeAll + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
         triOffset = frontCoreNum * coreCalcNum * headDim + (blockIdx - frontCoreNum) * coreCalcTail * headDim;
     }
 
@@ -140,9 +140,9 @@ __aicore__ inline void InterleavedSplitS<T>::InitData(const InplacePartialRopeRe
 {
     tiling_ = tiling;
     batchSize = tiling_->batchSize; // B
-    seqLen = tiling_->seqLen;  // S
-    numHeads = tiling_->numHeads;  // N
-    headDim = tiling_->headDim;  // D
+    seqLen = tiling_->seqLen;       // S
+    numHeads = tiling_->numHeads;   // N
+    headDim = tiling_->headDim;     // D
     frontCoreNum = tiling_->frontCoreNum;
     tailCoreNum = tiling_->tailCoreNum;
     coreCalcNum = tiling_->coreCalcNum;
@@ -161,9 +161,9 @@ template <typename T>
 __aicore__ inline void InterleavedSplitS<T>::CopyInX(LocalTensor<T> &x, uint32_t loopIdx, uint32_t calcLen)
 {
     DataCopyExtParams dataCopyParams;
-    dataCopyParams.blockCount = calcLen*numHeads;
+    dataCopyParams.blockCount = calcLen * numHeads;
     dataCopyParams.blockLen = headDim * sizeof(T);
-    dataCopyParams.srcStride = (allHeadDim -  headDim)* sizeof(T);
+    dataCopyParams.srcStride = (allHeadDim - headDim) * sizeof(T);
     dataCopyParams.dstStride = 0;
     DataCopyPad(x, xGm[loopIdx * ubCalcSeq * bufferNdSizeAll + start], dataCopyParams, {false, 0, 0, 0});
     event_t eventIdMTE2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
@@ -208,10 +208,10 @@ template <typename T>
 __aicore__ inline void InterleavedSplitS<T>::CopyOut(uint32_t loopIdx, uint32_t calcLen)
 {
     DataCopyExtParams dataCopyParams;
-    dataCopyParams.blockCount = calcLen*numHeads;
+    dataCopyParams.blockCount = calcLen * numHeads;
     dataCopyParams.blockLen = headDim * sizeof(T);
     dataCopyParams.srcStride = 0;
-    dataCopyParams.dstStride = (allHeadDim -  headDim) * sizeof(T);
+    dataCopyParams.dstStride = (allHeadDim - headDim) * sizeof(T);
     LocalTensor<T> y = outQueY.DeQue<T>();
     DataCopyPad(yGm[loopIdx * ubCalcSeq * bufferNdSizeAll + start], y, dataCopyParams);
     outQueY.FreeTensor(y);

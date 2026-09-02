@@ -15,8 +15,8 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor* RotaryPositionEmbedding(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
-    const aclTensor *rotate, int64_t mode, aclOpExecutor *executor);
+const aclTensor *RotaryPositionEmbedding(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
+                                         const aclTensor *rotate, int64_t mode, aclOpExecutor *executor);
 
 }
 

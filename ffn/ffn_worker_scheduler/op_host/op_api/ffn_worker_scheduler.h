@@ -17,10 +17,9 @@
 
 #include "opdev/op_executor.h"
 
-namespace l0op
-{
-const aclTensor* FfnWorkerScheduler(const aclTensor* scheduleContext, int32_t syncGroupSize, int32_t executeMode,
-                                    aclTensor* scheduleContextOut, aclOpExecutor* executor);
-}  // namespace l0op
+namespace l0op {
+const aclTensor *FfnWorkerScheduler(const aclTensor *scheduleContext, int32_t syncGroupSize, int32_t executeMode,
+                                    aclTensor *scheduleContextOut, aclOpExecutor *executor);
+} // namespace l0op
 
-#endif  // OP_API_INC_LEVEL0_OP_FFN_WORKER_SCHEDULER_OP_H_
+#endif // OP_API_INC_LEVEL0_OP_FFN_WORKER_SCHEDULER_OP_H_

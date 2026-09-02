@@ -22,7 +22,7 @@
 #include "err/ops_err.h"
 
 namespace optiling {
-ge::graphStatus TilingMhcPreSinkhornBackwardArch22(gert::TilingContext* context);
+ge::graphStatus TilingMhcPreSinkhornBackwardArch22(gert::TilingContext *context);
 }
 
 #endif // MHC_PRE_SINKHORN_BACKWARD_ARCH22_TILING_H_

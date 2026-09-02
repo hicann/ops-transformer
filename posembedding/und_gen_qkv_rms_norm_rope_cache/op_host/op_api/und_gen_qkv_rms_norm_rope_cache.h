@@ -14,12 +14,13 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-aclnnStatus UndGenQkvRmsNormRopeCache(
-    const aclTensor* undQkv, const aclTensor* undWeightsQ, const aclTensor* undWeightsK,
-    const aclTensor* cosSinCache, aclTensor* kCacheRef, aclTensor* vCacheRef, const aclTensor* slotMapping,
-    const aclTensor* positions, const aclTensor* genQkv, const aclTensor* genWeightsQ, const aclTensor* genWeightsK,
-    const aclTensor* catIndices, int64_t numHeadsQ, int64_t numHeadsK, int64_t numHeadsV, double normEps,
-    const aclIntArray* mropeSection, aclTensor* qOut, aclOpExecutor* executor);
+aclnnStatus UndGenQkvRmsNormRopeCache(const aclTensor *undQkv, const aclTensor *undWeightsQ,
+                                      const aclTensor *undWeightsK, const aclTensor *cosSinCache, aclTensor *kCacheRef,
+                                      aclTensor *vCacheRef, const aclTensor *slotMapping, const aclTensor *positions,
+                                      const aclTensor *genQkv, const aclTensor *genWeightsQ,
+                                      const aclTensor *genWeightsK, const aclTensor *catIndices, int64_t numHeadsQ,
+                                      int64_t numHeadsK, int64_t numHeadsV, double normEps,
+                                      const aclIntArray *mropeSection, aclTensor *qOut, aclOpExecutor *executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_UND_GEN_QKV_RMS_NORM_ROPE_CACHE_H_

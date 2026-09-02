@@ -24,8 +24,7 @@ class KvRmsNormRopeCacheB16MTP : public KernelKvRmsNormRopeCacheMTP<isPagedAtten
 public:
     __aicore__ inline KvRmsNormRopeCacheB16MTP(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
         : KernelKvRmsNormRopeCacheMTP<isPagedAttention, KV_DTYPE, KV_DTYPE, KV_DTYPE>(pipe, tiling)
-    {
-    }
+    {}
 
     __aicore__ inline void Init(GM_ADDR kv, GM_ADDR gamma, GM_ADDR cos, GM_ADDR sin, GM_ADDR index, GM_ADDR k_cache,
                                 GM_ADDR v_cache, GM_ADDR v)
@@ -104,31 +103,31 @@ public:
             }
 
             // init pipe
-            this->pipe_->InitBuffer(this->inQueueX, 1,
-                                    this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH *
-                                        sizeof(float)); // 4 * 192 * 4 / 1024 = 3
-            this->pipe_->InitBuffer(this->inQueueV, 1,
-                                    this->tilingData_->rowsPerBlock * this->V_LENGTH *
-                                        sizeof(float)); // 4 * 128 * 4 / 1024 = 2
+            this->pipe_->InitBuffer(
+                this->inQueueX, 1,
+                this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH * sizeof(float)); // 4 * 192 * 4 / 1024 = 3
+            this->pipe_->InitBuffer(
+                this->inQueueV, 1,
+                this->tilingData_->rowsPerBlock * this->V_LENGTH * sizeof(float)); // 4 * 128 * 4 / 1024 = 2
             this->pipe_->InitBuffer(this->inQueueGamma, 1,
                                     this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)); // 192 * 2 / 1024 = 0.375
             this->pipe_->InitBuffer(this->CosSin, 1,
                                     4 * this->tilingData_->rowsPerBlock * this->ROPE_LENGTH * sizeof(KV_DTYPE));
-            this->pipe_->InitBuffer(this->bufferXFp32,
-                                    this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH *
-                                        sizeof(float)); // 4 * 192 * 4 / 1024 = 3
-            this->pipe_->InitBuffer(this->bufferXSquare,
-                                    this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH *
-                                        sizeof(float)); // 4 * 192 * 4 / 1024 = 3
+            this->pipe_->InitBuffer(
+                this->bufferXFp32,
+                this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH * sizeof(float)); // 4 * 192 * 4 / 1024 = 3
+            this->pipe_->InitBuffer(
+                this->bufferXSquare,
+                this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH * sizeof(float)); // 4 * 192 * 4 / 1024 = 3
             this->pipe_->InitBuffer(this->bufferSum,
                                     ((this->tilingData_->rowsPerBlock + NUM_EIGHT - 1) / NUM_EIGHT) * NUM_EIGHT *
                                         sizeof(float)); // 8 * 4 / 1024 = 0.03125
-            this->pipe_->InitBuffer(this->outQueueV, 1,
-                                    this->tilingData_->rowsPerBlock * this->V_LENGTH *
-                                        sizeof(KV_DTYPE)); // 4 * 128 * 2 / 1024 = 1
-            this->pipe_->InitBuffer(this->outQueueK, 1,
-                                    this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH *
-                                        sizeof(KV_DTYPE)); // 4 * 192 * 2 / 1024 = 1.5
+            this->pipe_->InitBuffer(
+                this->outQueueV, 1,
+                this->tilingData_->rowsPerBlock * this->V_LENGTH * sizeof(KV_DTYPE)); // 4 * 128 * 2 / 1024 = 1
+            this->pipe_->InitBuffer(
+                this->outQueueK, 1,
+                this->tilingData_->rowsPerBlock * this->RMS_NORM_LENGTH * sizeof(KV_DTYPE)); // 4 * 192 * 2 / 1024 = 1.5
         } else {
             // exception
         }

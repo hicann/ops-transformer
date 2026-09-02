@@ -136,7 +136,6 @@ REG_OP(Data)
                              DT_UINT16, DT_COMPLEX128, DT_FLOAT16, DT_BF16,   DT_UINT32, DT_UINT64, DT_STRING}))
     .OP_END_FACTORY_REG(Fill)
 
-
 } // namespace ge
 
 #endif // MATH_COMMON_STUB_OPS_H

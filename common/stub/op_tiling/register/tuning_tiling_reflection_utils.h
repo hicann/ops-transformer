@@ -52,13 +52,13 @@ struct StructInfo {
     }
 };
 
-#define DECLARE_SCHEMA(Struct, ...)                                                                                    \
-    template <>                                                                                                        \
-    struct StructInfo<Struct> {                                                                                        \
-        static decltype(std::make_tuple(__VA_ARGS__)) Info()                                                           \
-        {                                                                                                              \
-            return std::make_tuple(__VA_ARGS__);                                                                       \
-        }                                                                                                              \
+#define DECLARE_SCHEMA(Struct, ...) \
+    template <> \
+    struct StructInfo<Struct> { \
+        static decltype(std::make_tuple(__VA_ARGS__)) Info() \
+        { \
+            return std::make_tuple(__VA_ARGS__); \
+        } \
     };
 
 #define FIELD(class, FieldName) std::make_tuple(#FieldName, &class ::FieldName)
@@ -135,9 +135,9 @@ void DumpObj(T &&obj, const std::string &field_name, Js &j)
 
 template <typename T>
 struct DumpFunctor {
-    explicit DumpFunctor(T &j) : js(j)
-    {
-    }
+    explicit DumpFunctor(T &j)
+        : js(j)
+    {}
     template <typename Name, typename Field>
     void operator()(Name &&name, Field &&field) const
     {
@@ -174,9 +174,9 @@ void FromJsonImpl(T &&obj, const std::string &field_name, const Js &j)
 
 template <typename Js>
 struct FromJsonFunctor {
-    explicit FromJsonFunctor(const Js &j) : js(j)
-    {
-    }
+    explicit FromJsonFunctor(const Js &j)
+        : js(j)
+    {}
     template <typename Name, typename Field>
     void operator()(Name &&name, Field &&field) const
     {

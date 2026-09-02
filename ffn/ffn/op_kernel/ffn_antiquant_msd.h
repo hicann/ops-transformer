@@ -98,8 +98,7 @@ public:
     __aicore__ inline FFNAntiQuantMSD(mm1Type &mm1_, mm2Type &mm2_)
         : mm1(mm1_),
           mm2(mm2_)
-    {
-    }
+    {}
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
                                 __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
                                 __gm__ uint8_t *antiQuantScale1, __gm__ uint8_t *antiQuantScale2,
@@ -323,8 +322,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::GetMaxToken(__gm__ uint8_t *expertTokens)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::GetMaxToken(
+    __gm__ uint8_t *expertTokens)
 {
     uint32_t expertTokensUbSize = AlignUp<UB_BLOCK_UNIT_SIZE>(expertNum * sizeof(int64_t));
     pipe->InitBuffer(eTokens64Buf, expertTokensUbSize); // 32Byte alignment
@@ -350,8 +349,8 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::GetMaxToken(__gm__ ui
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::InitWorkspace(__gm__ uint8_t *workSpace)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::InitWorkspace(
+    __gm__ uint8_t *workSpace)
 {
     // init global buffer
     uint32_t maxParallelExpertNum1 = Max<uint32_t>(cubeCoreNum / Ceil(n1, tilingData->mm1TilingData.baseN), 1);
@@ -413,23 +412,22 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     countOfFloatUbCalcShape += 1;
     middleResultFP16 =
         tmpBuff_.GetWithOffset<half>(ubCalcShape_, countOfFloatUbCalcShape * ubCalcShape_ * sizeof(float));
-    aMax = tmpBuff_.GetWithOffset<float>(maxTokens * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE,
-                                         countOfFloatUbCalcShape * ubCalcShape_ * sizeof(float) +
-                                             ubCalcShape_ * sizeof(half));
+    aMax = tmpBuff_.GetWithOffset<float>(
+        maxTokens * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE,
+        countOfFloatUbCalcShape * ubCalcShape_ * sizeof(float) + ubCalcShape_ * sizeof(half));
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1VectorTiling(TilingConfig &tilingParams)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1VectorTiling(
+    TilingConfig &tilingParams)
 {
     uint32_t vecBlockDimK_ = tilingParams.aivNumPerExpert;
     uint32_t vecBaseK_ = Ceil(tilingParams.k, vecBlockDimK_);
     // baseK 128 align up
     vecBaseK_ = (vecBaseK_ + NUM_ALIGN_TO_ONE_HUNDRED_TWEENTY_EIGHT) & (~NUM_ALIGN_TO_ONE_HUNDRED_TWEENTY_EIGHT);
-    vecBlockDimK_ = Ceil(tilingParams.k, vecBaseK_); // recompute coreNum in K-axis
-    uint32_t vecBlockDimM_ =
-        tilingParams.aivNumPerExpert / vecBlockDimK_; // recompute coreNum in M-axis
-                                                      // recompute singleM and M-axis coreNum
+    vecBlockDimK_ = Ceil(tilingParams.k, vecBaseK_);                       // recompute coreNum in K-axis
+    uint32_t vecBlockDimM_ = tilingParams.aivNumPerExpert / vecBlockDimK_; // recompute coreNum in M-axis
+                                                                           // recompute singleM and M-axis coreNum
     uint32_t vecSingleM_ = Ceil(tilingParams.mVec, vecBlockDimM_);
     vecBlockDimM_ = Ceil(tilingParams.mVec, vecSingleM_);
     uint32_t vecSingleMTail_ = tilingParams.mVec - (vecBlockDimM_ - 1) * vecSingleM_;
@@ -444,9 +442,8 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1VectorTiling(Tilin
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM2VectorTiling(uint32_t curV2BaseN, uint32_t blockDimK,
-                                                                           uint32_t v2BaseM, TilingConfig &tilingParams)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM2VectorTiling(
+    uint32_t curV2BaseN, uint32_t blockDimK, uint32_t v2BaseM, TilingConfig &tilingParams)
 {
     tilingParams.vecBaseK = curV2BaseN;
     tilingParams.vecBaseM = v2BaseM;
@@ -494,9 +491,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcTailBlock(TilingConfig tilingParams,
-                                                                         uint32_t &curSingleM, uint32_t &curBaseK)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcTailBlock(
+    TilingConfig tilingParams, uint32_t &curSingleM, uint32_t &curBaseK)
 {
     if (vec1BlockMIdx_ == tilingParams.vecBlockDimM - 1) {
         curSingleM = tilingParams.vecSingleMTail;
@@ -507,9 +503,8 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcTailBlock(TilingC
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::PreProcessMM1(TilingConfig tilingParams,
-                                                                         ExpertParallInfo mmExpertParallInfo)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::PreProcessMM1(
+    TilingConfig tilingParams, ExpertParallInfo mmExpertParallInfo)
 {
     MM1VectorTiling(tilingParams);
     vec1BlockKIdx_ = (coreIdx - expertIdxInParaGroupMM1Pre * tilingParams.aivNumPerExpert) % tilingParams.vecBlockDimK;
@@ -745,10 +740,9 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1Compute(uint32_t curCubeSingleCoreN, uint32_t offsetN,
-                                                                      const TilingConfig &tilingParams,
-                                                                      ExpertParallInfo mmExpertParallInfo)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1Compute(
+    uint32_t curCubeSingleCoreN, uint32_t offsetN, const TilingConfig &tilingParams,
+    ExpertParallInfo mmExpertParallInfo)
 {
     uint32_t AMatrixMM1Offset =
         mmExpertParallInfo.LocalOffset[expertIdxInParaGroupMM1] * ANTIQUANT_MSD_STEP * tilingParams.k;
@@ -969,9 +963,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CopyOutFinalResult(uint32_t curV2BaseM, uint32_t curV2BaseN,
-                                                                              uint32_t yOffset, uint32_t n)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CopyOutFinalResult(
+    uint32_t curV2BaseM, uint32_t curV2BaseN, uint32_t yOffset, uint32_t n)
 {
     uint32_t curBaseNAligned = (curV2BaseN + NUM_ALIGN_TO_THIRTYTWO) & (~NUM_ALIGN_TO_THIRTYTWO);
     LocalTensor<yT> outputInUb = outQueueY_.AllocTensor<yT>();
@@ -989,8 +982,8 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CopyOutFinalResult(ui
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ActivationCompute(uint32_t computeSize)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ActivationCompute(
+    uint32_t computeSize)
 {
     uint32_t usedTmpBufferSize =
         (countOfFloatUbCalcShape * ubCalcShape_ + maxTokens * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE) * sizeof(float) +
@@ -1159,15 +1152,14 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertMM2(TilingConfig &tilingParams2,
-                                                                            ExpertParallInfo mm2ExpertParallInfo)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertMM2(
+    TilingConfig &tilingParams2, ExpertParallInfo mm2ExpertParallInfo)
 {
     uint32_t curIterCount = 0;
     for (uint32_t i = mm2ExpertParallInfo.start; i < mm2ExpertParallInfo.size;
          i += mm2ExpertParallInfo.expertParallelism) {
-        expertIdxInParaGroupMM2 = Min<uint32_t>(coreIdx / tilingParams2.aicNumPerExpert,
-                                                mm2ExpertParallInfo.expertParallelism - 1);
+        expertIdxInParaGroupMM2 =
+            Min<uint32_t>(coreIdx / tilingParams2.aicNumPerExpert, mm2ExpertParallInfo.expertParallelism - 1);
         expertIdxInParaGroupMM2 += curIterCount * mm2ExpertParallInfo.expertParallelism;
         expertIdxInParaGroupMM2 = Min<uint32_t>(expertIdxInParaGroupMM2, mm2ExpertParallInfo.size - 1);
         currentExpertMM2 = mm2ExpertParallInfo.expertIdxBuf[expertIdxInParaGroupMM2];
@@ -1242,9 +1234,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpert(ExpertParallInfo mm1ExpertParallInfo,
-                                                                         ExpertParallInfo mm2ExpertParallInfo)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpert(
+    ExpertParallInfo mm1ExpertParallInfo, ExpertParallInfo mm2ExpertParallInfo)
 {
     TilingConfig tilingParams1;
     TilingConfig tilingParams2;
@@ -1276,9 +1267,8 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpert(ExpertP
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
-__aicore__ inline void
-FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertParallNum(const uint32_t expertI,
-                                                                                  ExpertParallInfo &expertParallInfo)
+__aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertParallNum(
+    const uint32_t expertI, ExpertParallInfo &expertParallInfo)
 {
     if (expertI == expertNum) {
         expertParallInfo.expertParallelism = Min(expertParallInfo.size, expertParallInfo.maxExpertParallelism);

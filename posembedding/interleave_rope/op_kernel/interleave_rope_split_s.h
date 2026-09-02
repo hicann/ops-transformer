@@ -23,8 +23,9 @@ using namespace AscendC;
 template <typename T>
 class KernelInterleaveRopeSplitS {
 public:
-    __aicore__ inline KernelInterleaveRopeSplitS(TPipe* pipe, const InterleaveRopeTilingData* tiling)
-        : pipe_(pipe), tilingData_(tiling)
+    __aicore__ inline KernelInterleaveRopeSplitS(TPipe *pipe, const InterleaveRopeTilingData *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y)
@@ -46,10 +47,10 @@ public:
         ubLoop = currentBlockFactor / ubFactor;
         ubTail = currentBlockFactor - ubFactor * ubLoop;
 
-        xGm.SetGlobalBuffer((__gm__ T*)x + GetBlockIdx() * blockFactor * ROPE_LENGTH);
-        yGm.SetGlobalBuffer((__gm__ T*)y + GetBlockIdx() * blockFactor * ROPE_LENGTH);
-        cosGm.SetGlobalBuffer((__gm__ T*)cos + GetBlockIdx() * blockFactor * ROPE_LENGTH);
-        sinGm.SetGlobalBuffer((__gm__ T*)sin + GetBlockIdx() * blockFactor * ROPE_LENGTH);
+        xGm.SetGlobalBuffer((__gm__ T *)x + GetBlockIdx() * blockFactor * ROPE_LENGTH);
+        yGm.SetGlobalBuffer((__gm__ T *)y + GetBlockIdx() * blockFactor * ROPE_LENGTH);
+        cosGm.SetGlobalBuffer((__gm__ T *)cos + GetBlockIdx() * blockFactor * ROPE_LENGTH);
+        sinGm.SetGlobalBuffer((__gm__ T *)sin + GetBlockIdx() * blockFactor * ROPE_LENGTH);
 
         // init pipe
         pipe_->InitBuffer(inQueueX, 2, ubFactor * ROPE_LENGTH * sizeof(T));          // 2*ubFactor*64*2=256*ubFactor
@@ -144,9 +145,9 @@ public:
     }
 
     template <typename T1, bool isElementWise = true, int64_t headSize>
-    __aicore__ inline void RoPE(
-        const LocalTensor<T1>& outLocal, const LocalTensor<T1>& xLocal, const LocalTensor<T1>& cosLocal,
-        const LocalTensor<T1>& sinLocal, const LocalTensor<float>& wsLocal, int64_t rows)
+    __aicore__ inline void RoPE(const LocalTensor<T1> &outLocal, const LocalTensor<T1> &xLocal,
+                                const LocalTensor<T1> &cosLocal, const LocalTensor<T1> &sinLocal,
+                                const LocalTensor<float> &wsLocal, int64_t rows)
     {
         constexpr static int64_t NUM_ONE = 1;
         constexpr static int64_t NUM_TWO = 2;
@@ -228,8 +229,8 @@ public:
     }
 
 private:
-    TPipe* pipe_ = nullptr;
-    const InterleaveRopeTilingData* tilingData_;
+    TPipe *pipe_ = nullptr;
+    const InterleaveRopeTilingData *tilingData_;
     constexpr static int64_t ROPE_LENGTH = 64;
     GlobalTensor<T> xGm;
     GlobalTensor<T> yGm;

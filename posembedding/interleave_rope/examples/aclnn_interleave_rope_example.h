@@ -37,9 +37,9 @@ extern "C" {
  * @param [out] executor: 返回op执行器，包含算子计算流程。
  * @return aclnnStatus: 返回状态码。
  */
-ACLNN_API aclnnStatus aclnnInterleaveRopeGetWorkspaceSize(
-    const aclTensor* x, const aclTensor* cos, const aclTensor* sin, aclTensor* out, uint64_t* workspaceSize,
-    aclOpExecutor** executor);
+ACLNN_API aclnnStatus aclnnInterleaveRopeGetWorkspaceSize(const aclTensor *x, const aclTensor *cos,
+                                                          const aclTensor *sin, aclTensor *out, uint64_t *workspaceSize,
+                                                          aclOpExecutor **executor);
 
 /* @brief aclnnInterleaveRope的第二段接口，用于执行计算.
  * @param [in] workspace: 在npu device侧申请的workspace内存起址
@@ -48,8 +48,8 @@ ACLNN_API aclnnStatus aclnnInterleaveRopeGetWorkspaceSize(
  * @param [in] stream: acl stream流.
  * @return aclnnStatus: 返回状态码。
  */
-ACLNN_API aclnnStatus
-aclnnInterleaveRope(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnInterleaveRope(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                          aclrtStream stream);
 
 #ifdef __cplusplus
 }

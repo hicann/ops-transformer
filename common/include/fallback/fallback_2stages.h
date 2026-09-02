@@ -87,43 +87,43 @@ void CollectConvertedTypes(Tuple &t, std::vector<OpApiAnyValue> &params)
     CallCollect(t, std_utils::make_index_sequence<size>{}, params);
 }
 
-#define EXEC_OPAPI_PREPARE_CMD(aclnn_api, ...)                                                                         \
-    ({                                                                                                                 \
-        static auto ret = GRAPH_SUCCESS;                                                                               \
-        do {                                                                                                           \
-            static const auto ResetCacheThreadLocalAddr = GetOpApiFuncAddr("ResetCacheThreadLocal");                   \
-            static const auto getWorkspaceSizeFuncAddr = GetOpApiFuncAddr(#aclnn_api "GetWorkspaceSize");              \
-            static const auto opApiFuncAddr = GetOpApiFuncAddr(#aclnn_api);                                            \
-            if (getWorkspaceSizeFuncAddr == nullptr || opApiFuncAddr == nullptr ||                                     \
-                ResetCacheThreadLocalAddr == nullptr) {                                                                \
-                OP_LOGE("aclnnfallback", "%s or %s not in  %s or %s  or ResetCacheThreadLocal not found.",             \
-                        #aclnn_api "GetWorkspaceSize", #aclnn_api, GetOpApiLibName(), GetOpApiLibName());              \
-                ret = GRAPH_FAILED;                                                                                    \
-                break;                                                                                                 \
-            }                                                                                                          \
-            auto *op_api_params = new (std::nothrow) OpApiParams();                                                    \
-            auto ResetCacheThreadLocalFunc = reinterpret_cast<ResetCacheThreadLocal>(ResetCacheThreadLocalAddr);       \
-            ResetCacheThreadLocalFunc();                                                                               \
-            op_api_params->op_api_func = reinterpret_cast<OpApiFunc>(opApiFuncAddr);                                   \
-            uint64_t workspace_size = 0;                                                                               \
-            uint64_t *workspace_size_addr = &workspace_size;                                                           \
-            aclOpExecutor **executor_addr = &op_api_params->executor;                                                  \
-            auto converted_params = ConvertTypes(__VA_ARGS__, workspace_size_addr, executor_addr);                     \
-            using TupleT = decltype(converted_params);                                                                 \
-            constexpr size_t tuple_size = std::tuple_size<TupleT>::value;                                              \
-            op_api_params->converted_params.reserve(tuple_size);                                                       \
-            CollectConvertedTypes(converted_params, op_api_params->converted_params);                                  \
-            host_api_ctx->SetOpApiParamsWithDefaultDeleter<OpApiParams>(op_api_params);                                \
-            static auto getWorkspaceSizeFunc = ConvertToOpApiFunc(converted_params, getWorkspaceSizeFuncAddr);         \
-            auto workspace_status = call(getWorkspaceSizeFunc, converted_params);                                      \
-            if (workspace_status != 0) {                                                                               \
-                OP_LOGE("aclnnfallback", "call %s failed:", #aclnn_api);                                               \
-                ret = GRAPH_FAILED;                                                                                    \
-                break;                                                                                                 \
-            }                                                                                                          \
-            ret = host_api_ctx->SetWorkspaceSizes({workspace_size});                                                   \
-        } while (false);                                                                                               \
-        (ret);                                                                                                         \
+#define EXEC_OPAPI_PREPARE_CMD(aclnn_api, ...) \
+    ({ \
+        static auto ret = GRAPH_SUCCESS; \
+        do { \
+            static const auto ResetCacheThreadLocalAddr = GetOpApiFuncAddr("ResetCacheThreadLocal"); \
+            static const auto getWorkspaceSizeFuncAddr = GetOpApiFuncAddr(#aclnn_api "GetWorkspaceSize"); \
+            static const auto opApiFuncAddr = GetOpApiFuncAddr(#aclnn_api); \
+            if (getWorkspaceSizeFuncAddr == nullptr || opApiFuncAddr == nullptr || \
+                ResetCacheThreadLocalAddr == nullptr) { \
+                OP_LOGE("aclnnfallback", "%s or %s not in  %s or %s  or ResetCacheThreadLocal not found.", \
+                        #aclnn_api "GetWorkspaceSize", #aclnn_api, GetOpApiLibName(), GetOpApiLibName()); \
+                ret = GRAPH_FAILED; \
+                break; \
+            } \
+            auto *op_api_params = new (std::nothrow) OpApiParams(); \
+            auto ResetCacheThreadLocalFunc = reinterpret_cast<ResetCacheThreadLocal>(ResetCacheThreadLocalAddr); \
+            ResetCacheThreadLocalFunc(); \
+            op_api_params->op_api_func = reinterpret_cast<OpApiFunc>(opApiFuncAddr); \
+            uint64_t workspace_size = 0; \
+            uint64_t *workspace_size_addr = &workspace_size; \
+            aclOpExecutor **executor_addr = &op_api_params->executor; \
+            auto converted_params = ConvertTypes(__VA_ARGS__, workspace_size_addr, executor_addr); \
+            using TupleT = decltype(converted_params); \
+            constexpr size_t tuple_size = std::tuple_size<TupleT>::value; \
+            op_api_params->converted_params.reserve(tuple_size); \
+            CollectConvertedTypes(converted_params, op_api_params->converted_params); \
+            host_api_ctx->SetOpApiParamsWithDefaultDeleter<OpApiParams>(op_api_params); \
+            static auto getWorkspaceSizeFunc = ConvertToOpApiFunc(converted_params, getWorkspaceSizeFuncAddr); \
+            auto workspace_status = call(getWorkspaceSizeFunc, converted_params); \
+            if (workspace_status != 0) { \
+                OP_LOGE("aclnnfallback", "call %s failed:", #aclnn_api); \
+                ret = GRAPH_FAILED; \
+                break; \
+            } \
+            ret = host_api_ctx->SetWorkspaceSizes({workspace_size}); \
+        } while (false); \
+        (ret); \
     })
 
 } // namespace fallback

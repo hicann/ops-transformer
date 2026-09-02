@@ -46,24 +46,22 @@ struct SwinAttentionFFNTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, SwinAttentionFFNTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, SwinAttentionFFNTilingData *const_data)
 {
-    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
-    uint32_t* dst = (uint32_t*)const_data;
+    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
+    uint32_t *dst = (uint32_t *)const_data;
     for (auto i = 0; i < sizeof(SwinAttentionFFNTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, SwinAttentionFFNTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, SwinAttentionFFNTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(SwinAttentionFFNTilingData));
 }
 #endif
 
-
 #define GET_TILING_DATA(tiling_data, tiling_arg) \
-    SwinAttentionFFNTilingData tiling_data;        \
+    SwinAttentionFFNTilingData tiling_data; \
     InitTilingData(tiling_arg, &tiling_data)
-
 
 #endif

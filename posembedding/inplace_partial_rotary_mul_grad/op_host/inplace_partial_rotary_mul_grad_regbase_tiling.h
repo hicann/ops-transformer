@@ -98,22 +98,40 @@ public:
         : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext *context) override { TilingBaseClass::Reset(context); }
+    void Reset(gert::TilingContext *context) override
+    {
+        TilingBaseClass::Reset(context);
+    }
 
 protected:
     ge::graphStatus GetPlatformInfo() override;
     ge::graphStatus GetShapeAttrsInfo() override;
-    ge::graphStatus GetWorkspaceSize() override { return ge::GRAPH_SUCCESS; }
+    ge::graphStatus GetWorkspaceSize() override
+    {
+        return ge::GRAPH_SUCCESS;
+    }
 
-    ge::graphStatus DoLibApiTiling() override { return ge::GRAPH_SUCCESS; }
+    ge::graphStatus DoLibApiTiling() override
+    {
+        return ge::GRAPH_SUCCESS;
+    }
 
-    ge::graphStatus DoOpTiling() override { return ge::GRAPH_SUCCESS; }
+    ge::graphStatus DoOpTiling() override
+    {
+        return ge::GRAPH_SUCCESS;
+    }
 
     uint64_t GetTilingKey() const override;
 
-    ge::graphStatus PostTiling() override { return ge::GRAPH_SUCCESS; }
+    ge::graphStatus PostTiling() override
+    {
+        return ge::GRAPH_SUCCESS;
+    }
 
-    bool IsCapable() override { return true; }
+    bool IsCapable() override
+    {
+        return true;
+    }
     const static int64_t MAX_COPY_BLOCK_COUNT = 4095;
     int64_t b_{0};
     int64_t s_{0};

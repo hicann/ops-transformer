@@ -21,42 +21,40 @@
 using namespace AscendC;
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
-class RotateHalfGrad
-{
+class RotateHalfGrad {
 public:
     __aicore__ inline RotateHalfGrad(){};
-    __aicore__ inline void Init(
-        GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR x, GM_ADDR xGrad, GM_ADDR cosGrad, GM_ADDR sinGrad,
-        GM_ADDR workspace, const RotaryPositionEmbeddingGradTilingData& tiling);
+    __aicore__ inline void Init(GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR x, GM_ADDR xGrad, GM_ADDR cosGrad,
+                                GM_ADDR sinGrad, GM_ADDR workspace,
+                                const RotaryPositionEmbeddingGradTilingData &tiling);
     __aicore__ inline void Process();
-    __aicore__ inline void LoopProcess(uint64_t& loopIdx, uint64_t& elementNum);
-    __aicore__ inline void Compute(
-        uint64_t& outerOffset, uint64_t& innerOffset, uint64_t& elementNum, uint64_t& ubPerReserveNum,
-        uint64_t& blockLenInner);
-    __aicore__ inline void ComputeInner(
-        const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal, uint64_t& offset, uint64_t& elementNum,
-        uint64_t& ubPerReserveNum, uint64_t& blockLenInner);
-    __aicore__ inline void CopyInOuter(uint64_t& offset, uint64_t& elementNum);
-    __aicore__ inline void CopyInInner(
-        uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
-    __aicore__ inline void CopyOutInner(
-        uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
-    __aicore__ inline void CopyOutOuter(uint64_t& offset, uint64_t& elementNum);
-    __aicore__ inline void CopyInPadOuter(
-        uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
-    __aicore__ inline void CopyInPadInner(
-        uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
-    __aicore__ inline void CopyOutPadInner(
-        uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
-    __aicore__ inline void CopyOutPadOuter(
-        uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
-    __aicore__ inline void DataChunkCat(
-        const LocalTensor<float>& dstLocal, const LocalTensor<float>& src1Local, const LocalTensor<float>& src2Local,
-        uint64_t offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
-    __aicore__ inline void InitCastInOuter(
-        const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal, uint64_t& elementNum);
-    __aicore__ inline void CastOutOuter(
-        const LocalTensor<T>& cosGradLocal, const LocalTensor<T>& sinGradLocal, uint64_t& elementNum);
+    __aicore__ inline void LoopProcess(uint64_t &loopIdx, uint64_t &elementNum);
+    __aicore__ inline void Compute(uint64_t &outerOffset, uint64_t &innerOffset, uint64_t &elementNum,
+                                   uint64_t &ubPerReserveNum, uint64_t &blockLenInner);
+    __aicore__ inline void ComputeInner(const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal,
+                                        uint64_t &offset, uint64_t &elementNum, uint64_t &ubPerReserveNum,
+                                        uint64_t &blockLenInner);
+    __aicore__ inline void CopyInOuter(uint64_t &offset, uint64_t &elementNum);
+    __aicore__ inline void CopyInInner(uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride,
+                                       uint32_t dstStride);
+    __aicore__ inline void CopyOutInner(uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride,
+                                        uint32_t dstStride);
+    __aicore__ inline void CopyOutOuter(uint64_t &offset, uint64_t &elementNum);
+    __aicore__ inline void CopyInPadOuter(uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride,
+                                          uint32_t dstStride);
+    __aicore__ inline void CopyInPadInner(uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride,
+                                          uint32_t dstStride);
+    __aicore__ inline void CopyOutPadInner(uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride,
+                                           uint32_t dstStride);
+    __aicore__ inline void CopyOutPadOuter(uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride,
+                                           uint32_t dstStride);
+    __aicore__ inline void DataChunkCat(const LocalTensor<float> &dstLocal, const LocalTensor<float> &src1Local,
+                                        const LocalTensor<float> &src2Local, uint64_t offset, uint16_t blockCount,
+                                        uint32_t blockLen, uint32_t srcStride, uint32_t dstStride);
+    __aicore__ inline void InitCastInOuter(const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal,
+                                           uint64_t &elementNum);
+    __aicore__ inline void CastOutOuter(const LocalTensor<T> &cosGradLocal, const LocalTensor<T> &sinGradLocal,
+                                        uint64_t &elementNum);
 
 protected:
     // define const value
@@ -134,7 +132,7 @@ protected:
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::Init(
     GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR x, GM_ADDR xGrad, GM_ADDR cosGrad, GM_ADDR sinGrad,
-    GM_ADDR workspace, const RotaryPositionEmbeddingGradTilingData& tiling)
+    GM_ADDR workspace, const RotaryPositionEmbeddingGradTilingData &tiling)
 {
     // set const
     outerOffset = 0;
@@ -150,7 +148,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
     tailNum = 0;
 
     // set tiling data
-    const RopeHalfGradParams& rotateHalfGradTiling = tiling.ropeHalfGradParams;
+    const RopeHalfGradParams &rotateHalfGradTiling = tiling.ropeHalfGradParams;
     xShapeSize = rotateHalfGradTiling.xShapeSize;
     cosShapeSize = rotateHalfGradTiling.cosShapeSize;
     dimB = rotateHalfGradTiling.dimB;
@@ -181,14 +179,14 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
     stridePadInner = rotateHalfGradTiling.stridePadInner;
 
     // set gm tensor
-    gradGm.SetGlobalBuffer((__gm__ T*)grad, xShapeSize);
-    cosGm.SetGlobalBuffer((__gm__ T*)cos, cosShapeSize);
-    sinGm.SetGlobalBuffer((__gm__ T*)sin, cosShapeSize);
-    xGm.SetGlobalBuffer((__gm__ T*)x, xShapeSize);
+    gradGm.SetGlobalBuffer((__gm__ T *)grad, xShapeSize);
+    cosGm.SetGlobalBuffer((__gm__ T *)cos, cosShapeSize);
+    sinGm.SetGlobalBuffer((__gm__ T *)sin, cosShapeSize);
+    xGm.SetGlobalBuffer((__gm__ T *)x, xShapeSize);
 
-    xGradGm.SetGlobalBuffer((__gm__ T*)xGrad, xShapeSize);
-    cosGradGm.SetGlobalBuffer((__gm__ T*)cosGrad, cosShapeSize);
-    sinGradGm.SetGlobalBuffer((__gm__ T*)sinGrad, cosShapeSize);
+    xGradGm.SetGlobalBuffer((__gm__ T *)xGrad, xShapeSize);
+    cosGradGm.SetGlobalBuffer((__gm__ T *)cosGrad, cosShapeSize);
+    sinGradGm.SetGlobalBuffer((__gm__ T *)sinGrad, cosShapeSize);
 
     if (GetBlockIdx() != coreUsed - 1) {
         loopNum = copyLoop;
@@ -250,8 +248,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 }
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
-__aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::LoopProcess(
-    uint64_t& loopIdx, uint64_t& elementNum)
+__aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::LoopProcess(uint64_t &loopIdx,
+                                                                                                   uint64_t &elementNum)
 {
     outerOffset = GetBlockIdx() * coreData + loopIdx * calcUbSize;
     innerOffset = GetBlockIdx() * coreData * secondReduce + loopIdx * calcUbSize * secondReduce;
@@ -269,8 +267,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::Compute(
-    uint64_t& outerOffset, uint64_t& innerOffset, uint64_t& elementNum, uint64_t& ubPerReserveNum,
-    uint64_t& blockLenInner)
+    uint64_t &outerOffset, uint64_t &innerOffset, uint64_t &elementNum, uint64_t &ubPerReserveNum,
+    uint64_t &blockLenInner)
 {
     if (LAYOUT == LAYOUT_BNSD && cosDimB != 1 && cosDimN == 1) {
         for (uint64_t firstReduceIdx = 0; firstReduceIdx < cosDimB; ++firstReduceIdx) {
@@ -279,9 +277,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
             if constexpr (IF_ALIGN) {
                 CopyInOuter(firstReduceOuterOffset, elementNum);
             } else {
-                CopyInPadOuter(
-                    firstReduceOuterOffset, static_cast<uint16_t>(ubPerReserveNum * 2),
-                    static_cast<uint32_t>(blockLenPadInner), 0, 0);
+                CopyInPadOuter(firstReduceOuterOffset, static_cast<uint16_t>(ubPerReserveNum * 2),
+                               static_cast<uint32_t>(blockLenPadInner), 0, 0);
             }
             LocalTensor<T> cosLocal = inQueueCos.DeQue<T>();
             LocalTensor<T> sinLocal = inQueueSin.DeQue<T>();
@@ -289,14 +286,12 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
             for (uint64_t secondReduceIdx = 0; secondReduceIdx < dimN; ++secondReduceIdx) {
                 secondReduceOffset = firstReduceOffset + secondReduceIdx * dimS * dimD;
                 if constexpr (IF_ALIGN) {
-                    CopyInInner(
-                        secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
-                        static_cast<uint32_t>(blockLenInner), static_cast<uint32_t>(strideInner), 0);
+                    CopyInInner(secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
+                                static_cast<uint32_t>(blockLenInner), static_cast<uint32_t>(strideInner), 0);
                 } else {
-                    CopyInPadInner(
-                        secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
-                        static_cast<uint32_t>(blockLenPadInner), static_cast<uint32_t>(stridePadInner),
-                        static_cast<uint32_t>(halfDimDAlignNum / dataEachBlock));
+                    CopyInPadInner(secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
+                                   static_cast<uint32_t>(blockLenPadInner), static_cast<uint32_t>(stridePadInner),
+                                   static_cast<uint32_t>(halfDimDAlignNum / dataEachBlock));
                 }
                 ComputeInner(cosLocal, sinLocal, secondReduceOffset, elementNum, ubPerReserveNum, blockLenInner);
             }
@@ -312,9 +307,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
                 if constexpr (IF_ALIGN) {
                     CopyOutOuter(firstReduceOuterOffset, elementNum);
                 } else {
-                    CopyOutPadOuter(
-                        firstReduceOuterOffset, static_cast<uint16_t>(ubPerReserveNum * 2),
-                        static_cast<uint32_t>(blockLenPadInner), 0, 0);
+                    CopyOutPadOuter(firstReduceOuterOffset, static_cast<uint16_t>(ubPerReserveNum * 2),
+                                    static_cast<uint32_t>(blockLenPadInner), 0, 0);
                 }
             }
         }
@@ -322,8 +316,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
         if constexpr (IF_ALIGN) {
             CopyInOuter(outerOffset, elementNum);
         } else {
-            CopyInPadOuter(
-                outerOffset, static_cast<uint16_t>(ubPerReserveNum * 2), static_cast<uint32_t>(blockLenPadInner), 0, 0);
+            CopyInPadOuter(outerOffset, static_cast<uint16_t>(ubPerReserveNum * 2),
+                           static_cast<uint32_t>(blockLenPadInner), 0, 0);
         }
         LocalTensor<T> cosLocal = inQueueCos.DeQue<T>();
         LocalTensor<T> sinLocal = inQueueSin.DeQue<T>();
@@ -333,14 +327,12 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
             for (uint64_t secondReduceIdx = 0; secondReduceIdx < secondReduce; ++secondReduceIdx) {
                 secondReduceOffset = firstReduceOffset + secondReduceIdx * dimD;
                 if constexpr (IF_ALIGN) {
-                    CopyInInner(
-                        secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
-                        static_cast<uint32_t>(blockLenInner), static_cast<uint32_t>(strideInner), 0);
+                    CopyInInner(secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
+                                static_cast<uint32_t>(blockLenInner), static_cast<uint32_t>(strideInner), 0);
                 } else {
-                    CopyInPadInner(
-                        secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
-                        static_cast<uint32_t>(blockLenPadInner), static_cast<uint32_t>(stridePadInner),
-                        static_cast<uint32_t>(halfDimDAlignNum / dataEachBlock));
+                    CopyInPadInner(secondReduceOffset, static_cast<uint16_t>(ubPerReserveNum),
+                                   static_cast<uint32_t>(blockLenPadInner), static_cast<uint32_t>(stridePadInner),
+                                   static_cast<uint32_t>(halfDimDAlignNum / dataEachBlock));
                 }
                 ComputeInner(cosLocal, sinLocal, secondReduceOffset, elementNum, ubPerReserveNum, blockLenInner);
             }
@@ -357,9 +349,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
             if constexpr (IF_ALIGN) {
                 CopyOutOuter(outerOffset, elementNum);
             } else {
-                CopyOutPadOuter(
-                    outerOffset, static_cast<uint16_t>(ubPerReserveNum * 2), static_cast<uint32_t>(blockLenPadInner), 0,
-                    0);
+                CopyOutPadOuter(outerOffset, static_cast<uint16_t>(ubPerReserveNum * 2),
+                                static_cast<uint32_t>(blockLenPadInner), 0, 0);
             }
         }
     }
@@ -367,8 +358,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::ComputeInner(
-    const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal, uint64_t& offset, uint64_t& elementNum,
-    uint64_t& ubPerReserveNum, uint64_t& blockLenInner)
+    const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal, uint64_t &offset, uint64_t &elementNum,
+    uint64_t &ubPerReserveNum, uint64_t &blockLenInner)
 {
     // compute xGrad, cosGrad, sinGrad
 
@@ -398,11 +389,10 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
     PipeBarrier<PIPE_V>();
     Muls(tmpLocalA, tmpLocalB, (float)-1.0, elementNum);
     PipeBarrier<PIPE_V>();
-    DataChunkCat(
-        tmpLocalC, tmpLocalB, tmpLocalA, halfDimDAlignNum, static_cast<uint16_t>(ubPerReserveNum),
-        static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
-        static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
-        static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32));
+    DataChunkCat(tmpLocalC, tmpLocalB, tmpLocalA, halfDimDAlignNum, static_cast<uint16_t>(ubPerReserveNum),
+                 static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
+                 static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
+                 static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32));
     PipeBarrier<PIPE_V>();
     if constexpr (IF_CAST) {
         Add(tmpCastRes, tmpLocalC, tmpCastRes, elementNum);
@@ -413,13 +403,11 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
     }
     outQueueXGrad.EnQue<T>(xGradLocal);
     if constexpr (IF_ALIGN) {
-        CopyOutInner(
-            offset, static_cast<uint16_t>(ubPerReserveNum), static_cast<uint32_t>(blockLenInner), 0,
-            static_cast<uint32_t>(strideInner));
+        CopyOutInner(offset, static_cast<uint16_t>(ubPerReserveNum), static_cast<uint32_t>(blockLenInner), 0,
+                     static_cast<uint32_t>(strideInner));
     } else {
-        CopyOutPadInner(
-            offset, static_cast<uint16_t>(ubPerReserveNum), static_cast<uint32_t>(blockLenPadInner),
-            static_cast<uint32_t>(halfDimDAlignNum / dataEachBlock), static_cast<uint32_t>(stridePadInner));
+        CopyOutPadInner(offset, static_cast<uint16_t>(ubPerReserveNum), static_cast<uint32_t>(blockLenPadInner),
+                        static_cast<uint32_t>(halfDimDAlignNum / dataEachBlock), static_cast<uint32_t>(stridePadInner));
     }
 
     if constexpr (IF_NEED_BACKWARD) {
@@ -444,11 +432,10 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
         if constexpr (IF_CAST) {
             Muls(tmpLocalA, tmpLocalC, (float)-1.0, elementNum);
             PipeBarrier<PIPE_V>();
-            DataChunkCat(
-                tmpLocalB, tmpLocalA, tmpLocalC, halfDimDAlignNum, static_cast<uint16_t>(ubPerReserveNum),
-                static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
-                static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
-                static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32));
+            DataChunkCat(tmpLocalB, tmpLocalA, tmpLocalC, halfDimDAlignNum, static_cast<uint16_t>(ubPerReserveNum),
+                         static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
+                         static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
+                         static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32));
             PipeBarrier<PIPE_V>();
             Mul(tmpCastRes, tmpLocalB, gradCast, elementNum);
             PipeBarrier<PIPE_V>();
@@ -456,11 +443,10 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
         } else {
             Muls(tmpLocalA, xLocal, (float)-1.0, elementNum);
             PipeBarrier<PIPE_V>();
-            DataChunkCat(
-                tmpLocalB, tmpLocalA, xLocal, halfDimDAlignNum, static_cast<uint16_t>(ubPerReserveNum),
-                static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
-                static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
-                static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32));
+            DataChunkCat(tmpLocalB, tmpLocalA, xLocal, halfDimDAlignNum, static_cast<uint16_t>(ubPerReserveNum),
+                         static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
+                         static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32),
+                         static_cast<uint32_t>(halfDimDAlignNum / dataEachBlockFP32));
             inQueueX.FreeTensor(xLocal);
             PipeBarrier<PIPE_V>();
             Mul(tmpLocalA, tmpLocalB, gradLocal, elementNum);
@@ -472,8 +458,8 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 }
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
-__aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyInOuter(
-    uint64_t& offset, uint64_t& elementNum)
+__aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyInOuter(uint64_t &offset,
+                                                                                                   uint64_t &elementNum)
 {
     // copy in cos, sin
 
@@ -487,7 +473,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyInInner(
-    uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
+    uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
 {
     // copy in x, grad
 
@@ -513,7 +499,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyOutInner(
-    uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
+    uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
 {
     // copy out xGrad
 
@@ -534,7 +520,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyOutOuter(
-    uint64_t& offset, uint64_t& elementNum)
+    uint64_t &offset, uint64_t &elementNum)
 {
     // copy out cos_grad, sin_grad
 
@@ -548,7 +534,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyInPadOuter(
-    uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
+    uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
 {
     // copy pad in cos, sin
 
@@ -570,7 +556,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyInPadInner(
-    uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
+    uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
 {
     // copy pad in x, grad
 
@@ -596,7 +582,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyOutPadInner(
-    uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
+    uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
 {
     // copy pad out xGrad
 
@@ -614,7 +600,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CopyOutPadOuter(
-    uint64_t& offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
+    uint64_t &offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
 {
     // copy pad out cos, sin
 
@@ -634,7 +620,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::DataChunkCat(
-    const LocalTensor<float>& dstLocal, const LocalTensor<float>& src1Local, const LocalTensor<float>& src2Local,
+    const LocalTensor<float> &dstLocal, const LocalTensor<float> &src1Local, const LocalTensor<float> &src2Local,
     uint64_t offset, uint16_t blockCount, uint32_t blockLen, uint32_t srcStride, uint32_t dstStride)
 {
     // chunk and concatenate
@@ -651,7 +637,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::InitCastInOuter(
-    const LocalTensor<T>& cosLocal, const LocalTensor<T>& sinLocal, uint64_t& elementNum)
+    const LocalTensor<T> &cosLocal, const LocalTensor<T> &sinLocal, uint64_t &elementNum)
 {
     // init tmp tensor as all zero and cast in cos, sin
 
@@ -667,7 +653,7 @@ __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_A
 
 template <typename T, int LAYOUT, bool IF_NEED_BACKWARD, bool IF_CAST, bool IF_ALIGN>
 __aicore__ inline void RotateHalfGrad<T, LAYOUT, IF_NEED_BACKWARD, IF_CAST, IF_ALIGN>::CastOutOuter(
-    const LocalTensor<T>& cosGradLocal, const LocalTensor<T>& sinGradLocal, uint64_t& elementNum)
+    const LocalTensor<T> &cosGradLocal, const LocalTensor<T> &sinGradLocal, uint64_t &elementNum)
 {
     // cast out cos, sin
 

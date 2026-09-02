@@ -30,7 +30,10 @@ __aicore__ inline constexpr uint32_t GetVRegSize()
 #endif
 }
 
-__aicore__ inline constexpr uint32_t GetUbBlockSize() { return 32U; }
+__aicore__ inline constexpr uint32_t GetUbBlockSize()
+{
+    return 32U;
+}
 
 constexpr uint32_t VL_FLOAT32_SIZE = GetVRegSize() / sizeof(float);
 constexpr uint32_t VL_FLOAT16_SIZE = GetVRegSize() / sizeof(half);

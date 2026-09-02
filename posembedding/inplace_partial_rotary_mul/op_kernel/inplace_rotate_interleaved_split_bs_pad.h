@@ -39,7 +39,7 @@ protected:
     TBuf<TPosition::VECCALC> tmpFp32Buf2;
     TBuf<TPosition::VECCALC> tmpFp32Buf3;
     TBuf<TPosition::VECCALC> gatherOffsetBuf;
-    const InplacePartialRopeRegbaseTilingData* tiling_;
+    const InplacePartialRopeRegbaseTilingData *tiling_;
     uint64_t allHeadDim;
     uint64_t start;
     uint64_t ioOffsetAll;
@@ -104,8 +104,8 @@ __aicore__ inline void InterleavedSplitBSPad<T>::Init(GM_ADDR x, GM_ADDR cos, GM
     } else if (coreCalcTail != 0) {
         ubCalcSeqLoop = coreCalcTail;
         ioOffset = frontCoreNum * coreCalcNum * bufferNdSize + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSize;
-        ioOffsetAll = frontCoreNum * coreCalcNum * bufferNdSizeAll
-            + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
+        ioOffsetAll =
+            frontCoreNum * coreCalcNum * bufferNdSizeAll + (blockIdx - frontCoreNum) * coreCalcTail * bufferNdSizeAll;
         triOffset = frontCoreNum * coreCalcNum * headDim + (blockIdx - frontCoreNum) * coreCalcTail * headDim;
     }
 
@@ -217,7 +217,7 @@ __aicore__ inline void InterleavedSplitBSPad<T>::CopyOut(uint32_t seqIdx, uint32
         dataCopyParams.blockCount = numHeads;
         dataCopyParams.blockLen = headDim * sizeof(T);
         dataCopyParams.srcStride = 0;
-        dataCopyParams.dstStride =(allHeadDim - headDim) * sizeof(T);
+        dataCopyParams.dstStride = (allHeadDim - headDim) * sizeof(T);
         DataCopyPad(yGm[startOffset + loopIdx * seqLen * bufferNdSizeAll + start], y[loopIdx * numHeads * headDimAlign],
                     dataCopyParams);
     }

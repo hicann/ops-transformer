@@ -83,13 +83,13 @@ struct RotaryPositionEmbeddingGradUTTilingData {
     RopeInterleavedGradUTParams ropeInterleavedGradParams;
 };
 
-inline void InitRotaryPositionEmbeddingGradTilingData(
-    uint8_t* tiling, RotaryPositionEmbeddingGradUTTilingData* const_data)
+inline void InitRotaryPositionEmbeddingGradTilingData(uint8_t *tiling,
+                                                      RotaryPositionEmbeddingGradUTTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(RotaryPositionEmbeddingGradUTTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingPointer)    \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
     RotaryPositionEmbeddingGradUTTilingData tilingData; \
     InitRotaryPositionEmbeddingGradTilingData(tilingPointer, &tilingData)
 #endif

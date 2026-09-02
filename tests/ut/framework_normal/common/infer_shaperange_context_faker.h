@@ -58,8 +58,8 @@ public:
 
     InferShapeRangeContextFaker &OutputShapeRanges(const std::vector<Range<Shape> *> &outputShapeRanges);
 
-    InferShapeRangeContextFaker &
-    NodeAttrs(const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>> &attrs);
+    InferShapeRangeContextFaker &NodeAttrs(
+        const std::vector<std::pair<std::string, Ops::Transformer::AnyValue>> &attrs);
 
     KernelRunContextHolder Build();
 };

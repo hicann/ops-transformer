@@ -32,12 +32,11 @@ constexpr int32_t FP32_PER_REPEAT = 64;
 
 constexpr MatmulConfig MHC_PRE_GRAD_MM1_CFG = GetMDLConfig(false, false, 0, true, false, false, true);
 constexpr MatmulConfig MHC_PRE_GRAD_MM2_CFG = GetMDLConfig(false, false, 0, true, false, false, true);
-}
+} // namespace
 
-template<typename T, typename U>
+template <typename T, typename U>
 class MhcPreSinkhornBackwardOneStage {
 public:
-    
     using A0Type = matmul::MatmulType<TPosition::GM, CubeFormat::ND, T>;
     using A1Type = matmul::MatmulType<TPosition::GM, CubeFormat::ND, T, true>;
     using BType = matmul::MatmulType<TPosition::GM, CubeFormat::ND, T>;
@@ -50,17 +49,17 @@ public:
     __aicore__ inline MhcPreSinkhornBackwardOneStage() = default;
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR phi, GM_ADDR hPre, GM_ADDR gradHin, GM_ADDR gradHPost,
-        GM_ADDR gradHRes, GM_ADDR alpha, GM_ADDR bias, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut,
-        GM_ADDR normOut, GM_ADDR gradX, GM_ADDR gradPhi, GM_ADDR gradAlpha, GM_ADDR gradBias,
-        GM_ADDR workspace, const MhcPreSinkhornBackwardArch35TilingData* tilingData, TPipe* pipe)
+                                GM_ADDR gradHRes, GM_ADDR alpha, GM_ADDR bias, GM_ADDR hcBeforeNorm, GM_ADDR invRms,
+                                GM_ADDR sumOut, GM_ADDR normOut, GM_ADDR gradX, GM_ADDR gradPhi, GM_ADDR gradAlpha,
+                                GM_ADDR gradBias, GM_ADDR workspace,
+                                const MhcPreSinkhornBackwardArch35TilingData *tilingData, TPipe *pipe)
     {
         pipe_ = pipe;
         blkIdx_ = GetBlockIdx();
 
         InitTiling(tilingData);
-        InitGM(x, phi, hPre, gradHin, gradHPost, gradHRes, alpha,
-            bias, hcBeforeNorm, invRms, sumOut, normOut, gradX, gradPhi,
-            gradAlpha, gradBias, workspace);
+        InitGM(x, phi, hPre, gradHin, gradHPost, gradHRes, alpha, bias, hcBeforeNorm, invRms, sumOut, normOut, gradX,
+               gradPhi, gradAlpha, gradBias, workspace);
         InitBuffer();
     }
     __aicore__ inline void Process();
@@ -68,7 +67,7 @@ public:
 protected:
     int8_t ping1_ = 0;
     int64_t blkIdx_, aivNum_, aicNum_;
-    TPipe* pipe_;
+    TPipe *pipe_;
     int64_t batchSize_, seqLength_, totalTasks_, totalTasksAligned_;
     int64_t c_, n_, c0_, c1_;
     int64_t tile_, tileAligned_;
@@ -96,7 +95,7 @@ protected:
     LocalTensor<T> fusedGradHPreAndGradHPostLocal_, gradHResLocal_;
     LocalTensor<T> biasLocal_, alphaLocal_;
     LocalTensor<T> gradBiasLocal_, gradAlphaLocal_;
-    
+
     LocalTensor<T> invRmsLocal_, gradInvRmsLocal_;
     LocalTensor<T> gradH2Local_;
     LocalTensor<T> fusedHPre2AndHPost2Local_, hRes2Local_;
@@ -122,7 +121,7 @@ protected:
     GlobalTensor<T> phiGlobal_;
 
 private:
-    __aicore__ inline void InitTiling(const MhcPreSinkhornBackwardArch35TilingData* tilingData)
+    __aicore__ inline void InitTiling(const MhcPreSinkhornBackwardArch35TilingData *tilingData)
     {
         batchSize_ = tilingData->batchSize;
         seqLength_ = tilingData->seqLength;
@@ -137,7 +136,7 @@ private:
         tileAligned_ = AlignUp(tile_, BYTE_SIZE_PER_BLOCK / sizeof(T));
         totalTasks_ = batchSize_ * seqLength_;
         totalTasksAligned_ = AlignUp(totalTasks_, aivNum_ * tile_);
-        
+
         if ASCEND_IS_AIC {
             mm1K_ = n_ * n_ + 2 * n_;
             mm1M_ = tile_ * 2;
@@ -150,37 +149,37 @@ private:
     }
 
     __aicore__ inline void InitGM(GM_ADDR x, GM_ADDR phi, GM_ADDR hPre, GM_ADDR gradHin, GM_ADDR gradHPost,
-        GM_ADDR gradHRes, GM_ADDR alpha, GM_ADDR bias, GM_ADDR hcBeforeNorm, GM_ADDR invRms,
-        GM_ADDR sumOut, GM_ADDR normOut, GM_ADDR gradX, GM_ADDR gradPhi,
-        GM_ADDR gradAlpha, GM_ADDR gradBias, GM_ADDR workspace)
+                                  GM_ADDR gradHRes, GM_ADDR alpha, GM_ADDR bias, GM_ADDR hcBeforeNorm, GM_ADDR invRms,
+                                  GM_ADDR sumOut, GM_ADDR normOut, GM_ADDR gradX, GM_ADDR gradPhi, GM_ADDR gradAlpha,
+                                  GM_ADDR gradBias, GM_ADDR workspace)
     {
         // cube 和 vector 共用
-        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U*>(x));               // fp32
-        xFp32Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace));               // fp32
-        gradPhiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradPhi));  // fp32
-        phiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(phi));  // fp32
-        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U*>(gradX));   // fp32
-        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace) + batchSize_ * seqLength_ * n_ * c_);
+        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(x));             // fp32
+        xFp32Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace)); // fp32
+        gradPhiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradPhi)); // fp32
+        phiGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(phi));         // fp32
+        gradXGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(gradX));     // fp32
+        gradH2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace) + batchSize_ * seqLength_ * n_ * c_);
 
         if ASCEND_IS_AIV {
-            hPreGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(hPre));        // fp32
-            gradHinGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U*>(gradHin));   // fp32
-            
-            gradHPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradHPost));   // fp32
+            hPreGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(hPre));       // fp32
+            gradHinGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(gradHin)); // fp32
 
-            alphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(alpha));   // fp32
-            biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(bias));   // fp32
+            gradHPostGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradHPost)); // fp32
 
-            invRmsGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(invRms));   // fp32
-            gradAlphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradAlpha));
-            gradBiasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradBias));
+            alphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(alpha)); // fp32
+            biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(bias));   // fp32
 
-            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(hcBeforeNorm));   // fp32
+            invRmsGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(invRms)); // fp32
+            gradAlphaGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradAlpha));
+            gradBiasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradBias));
 
-            skNormGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(normOut));   // fp32
-            skSumGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(sumOut));   // fp32
+            h2Global_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(hcBeforeNorm)); // fp32
 
-            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gradHRes));   // fp32
+            skNormGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(normOut)); // fp32
+            skSumGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(sumOut));   // fp32
+
+            gradHResGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gradHRes)); // fp32
         }
     }
 
@@ -211,7 +210,7 @@ private:
             pipe_->InitBuffer(fusedHPre2AndHPost2Buf_, tile_ * 2 * n_ * sizeof(T));
             pipe_->InitBuffer(gradAlphaBuf_, 8 * sizeof(T));
             pipe_->InitBuffer(gradBiasBuf_, 2 * n_ * sizeof(T));
-            pipe_->InitBuffer(gradRMSNormBuf_, tile_* sizeof(T));
+            pipe_->InitBuffer(gradRMSNormBuf_, tile_ * sizeof(T));
 
             xLocal_ = xBuf_.Get<U>();
             xFp32Local_ = xFp32Buf_.Get<T>();
@@ -225,9 +224,9 @@ private:
 
             gradH2Local_ = gradH2Buf_.Get<T>();
             tmpLocal_ = tmpBuf_.Get<T>();
-            
+
             gradHResLocal_ = gradHResBuf_.Get<T>();
-            
+
             invRmsLocal_ = invRmsBuf_.Get<T>();
             gradInvRmsLocal_ = gradInvRmsBuf_.Get<T>();
 
@@ -251,40 +250,44 @@ private:
     __aicore__ inline void ComputeGradSigmoid(const int32_t taskOffset, const int32_t tileTaskCount);
     __aicore__ inline T ComputeGradInvRms(const int32_t i);
     __aicore__ inline void ComputeGradRMSNorm(const int32_t tileTaskCount);
-    __aicore__ inline void ComputeGradXVector(
-        const T gradRsqrtVal, const T gradRMSNormVal, const int32_t taskOffset, bool copyNext);
+    __aicore__ inline void ComputeGradXVector(const T gradRsqrtVal, const T gradRMSNormVal, const int32_t taskOffset,
+                                              bool copyNext);
     __aicore__ inline void ProcessMatmul1(const int32_t taskOffset, const int32_t mm1M);
     __aicore__ inline void ProcessMatmul2(const int32_t taskOffset, const int32_t mm2K);
 };
 
-template<typename T, typename U>
+template <typename T, typename U>
 __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::GetAlphaAndBias()
 {
     // HcBase 常驻 UB
     alphaPre_ = alphaGlobal_.GetValue(0);
     alphaPost_ = alphaGlobal_.GetValue(1);
     alphaRes_ = alphaGlobal_.GetValue(2);
-    DataCopyPad(biasLocal_, biasGlobal_, {static_cast<uint16_t>(1),
-        static_cast<uint32_t>((n_ * n_ + 2 * n_) * sizeof(T)), 0, 0, 0}, {false, 0, 0, 0});
-    
+    DataCopyPad(biasLocal_, biasGlobal_,
+                {static_cast<uint16_t>(1), static_cast<uint32_t>((n_ * n_ + 2 * n_) * sizeof(T)), 0, 0, 0},
+                {false, 0, 0, 0});
+
     for (int32_t i = 0; i < n_; i++) {
         alphaLocal_.SetValue(i, alphaPre_);
         alphaLocal_.SetValue(i + n_, alphaPost_);
     }
 }
 
-template<typename T, typename U>
-__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradResHHat2(
-    const int32_t taskOffset, const int32_t tileTaskCount)
+template <typename T, typename U>
+__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradResHHat2(const int32_t taskOffset,
+                                                                                 const int32_t tileTaskCount)
 {
     // Compute sigmoidGrad
     DataCopyPad(hRes2Local_, h2Global_[taskOffset * (n_ * n_ + 2 * n_) + 2 * n_],
-        {static_cast<uint16_t>(tileTaskCount), static_cast<uint32_t>(n_ * n_ * sizeof(T)),
-        static_cast<int64_t>(2 * n_ * sizeof(T)), 0, 0}, {false, 0, 0, 0});
-    DataCopyPad(gradHResLocal_, gradHResGlobal_[taskOffset * n_ * n_], {static_cast<uint16_t>(tileTaskCount),
-        static_cast<uint32_t>(n_ * n_ * sizeof(T)), 0, 0, 0}, {false, 0, 0, 0});
-    DataCopyPad(invRmsLocal_, invRmsGlobal_[taskOffset], {static_cast<uint16_t>(1),
-        static_cast<uint32_t>(tileTaskCount * sizeof(T)), 0, 0, 0}, {false, 0, 0, 0});
+                {static_cast<uint16_t>(tileTaskCount), static_cast<uint32_t>(n_ * n_ * sizeof(T)),
+                 static_cast<int64_t>(2 * n_ * sizeof(T)), 0, 0},
+                {false, 0, 0, 0});
+    DataCopyPad(gradHResLocal_, gradHResGlobal_[taskOffset * n_ * n_],
+                {static_cast<uint16_t>(tileTaskCount), static_cast<uint32_t>(n_ * n_ * sizeof(T)), 0, 0, 0},
+                {false, 0, 0, 0});
+    DataCopyPad(invRmsLocal_, invRmsGlobal_[taskOffset],
+                {static_cast<uint16_t>(1), static_cast<uint32_t>(tileTaskCount * sizeof(T)), 0, 0, 0},
+                {false, 0, 0, 0});
 
     SetFlag<HardEvent::MTE2_V>(0);
     WaitFlag<HardEvent::MTE2_V>(0);
@@ -294,53 +297,48 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradResHHat2
     uint32_t yThreadCount = thread_num / xThreadCount;
 
     Duplicate(gradInvRmsLocal_, 0.f, tileTaskCount);
-    Simt::VF_CALL<SinkhornKnoppSimt<T>>(Simt::Dim3{xThreadCount, yThreadCount},
-        (__ubuf__ T*) gradH2Local_.GetPhyAddr(),
-        (__ubuf__ T*) gradInvRmsLocal_.GetPhyAddr(),
-        (__gm__ T*) gradAlphaGlobal_[2].GetPhyAddr(),
-        (__gm__ T*) gradBiasGlobal_[n_ * 2].GetPhyAddr(),
-        (__gm__ T*) skSumGlobal_.GetPhyAddr(),
-        (__gm__ T*) skNormGlobal_.GetPhyAddr(),
-        (__ubuf__ T*) gradHResLocal_.GetPhyAddr(),
-        (__ubuf__ T*) hRes2Local_.GetPhyAddr(),
-        (__ubuf__ T*) invRmsLocal_.GetPhyAddr(),
-        (__ubuf__ T*) biasLocal_[n_ * 2].GetPhyAddr(),
-        (__ubuf__ T*) tmpLocal_.GetPhyAddr(),
-        alphaRes_, totalTasks_, taskOffset, tileTaskCount, skIterCount_, n_);
+    Simt::VF_CALL<SinkhornKnoppSimt<T>>(
+        Simt::Dim3{xThreadCount, yThreadCount}, (__ubuf__ T *)gradH2Local_.GetPhyAddr(),
+        (__ubuf__ T *)gradInvRmsLocal_.GetPhyAddr(), (__gm__ T *)gradAlphaGlobal_[2].GetPhyAddr(),
+        (__gm__ T *)gradBiasGlobal_[n_ * 2].GetPhyAddr(), (__gm__ T *)skSumGlobal_.GetPhyAddr(),
+        (__gm__ T *)skNormGlobal_.GetPhyAddr(), (__ubuf__ T *)gradHResLocal_.GetPhyAddr(),
+        (__ubuf__ T *)hRes2Local_.GetPhyAddr(), (__ubuf__ T *)invRmsLocal_.GetPhyAddr(),
+        (__ubuf__ T *)biasLocal_[n_ * 2].GetPhyAddr(), (__ubuf__ T *)tmpLocal_.GetPhyAddr(), alphaRes_, totalTasks_,
+        taskOffset, tileTaskCount, skIterCount_, n_);
 }
 
-template<typename T, typename U>
-__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradSigmoid(
-    const int32_t taskOffset, const int32_t tileTaskCount)
+template <typename T, typename U>
+__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradSigmoid(const int32_t taskOffset,
+                                                                                const int32_t tileTaskCount)
 {
     DataCopyPad(fusedHPre2AndHPost2Local_, h2Global_[taskOffset * (n_ * n_ + 2 * n_)],
-        {static_cast<uint16_t>(tileTaskCount), static_cast<uint32_t>(2 * n_ * sizeof(T)),
-        static_cast<int64_t>(n_ * n_ * sizeof(T)), 0, 0}, {false, 0, 0, 0});
+                {static_cast<uint16_t>(tileTaskCount), static_cast<uint32_t>(2 * n_ * sizeof(T)),
+                 static_cast<int64_t>(n_ * n_ * sizeof(T)), 0, 0},
+                {false, 0, 0, 0});
 
     SetFlag<HardEvent::MTE2_V>(0);
     WaitFlag<HardEvent::MTE2_V>(0);
-    
+
     uint16_t repeatTimes = Ceil(tileTaskCount * n_ * 2, FP32_PER_VL);
     ComputeGradSigmoidVf<T>(gradSigmoidLocal1_, gradSigmoidLocal2_, fusedHPre2AndHPost2Local_, invRmsLocal_,
-        alphaLocal_, biasLocal_, repeatTimes, tileTaskCount * n_ * 2);
+                            alphaLocal_, biasLocal_, repeatTimes, tileTaskCount * n_ * 2);
 }
 
-template<typename T, typename U>
-__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradRMSNorm(
-    const int32_t tileTaskCount)
+template <typename T, typename U>
+__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradRMSNorm(const int32_t tileTaskCount)
 {
     Mul(gradRMSNormLocal_, invRmsLocal_, invRmsLocal_, tileTaskCount);
     Mul(gradRMSNormLocal_, gradRMSNormLocal_, invRmsLocal_, tileTaskCount);
     Muls(gradRMSNormLocal_, gradRMSNormLocal_, -1.f / static_cast<T>(n_ * c_), tileTaskCount);
 }
 
-template<typename T, typename U>
+template <typename T, typename U>
 __aicore__ inline T MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradInvRms(const int32_t i)
 {
-    Mul(gradSigmoidLocal1_[i * 2 * n_], fusedGradHPreAndGradHPostLocal_[i * 2 * n_],
-        gradSigmoidLocal1_[i * 2 * n_], 2 * n_);
-    Mul(gradSigmoidLocal2_[i * 2 * n_], fusedGradHPreAndGradHPostLocal_[i * 2 * n_],
-        gradSigmoidLocal2_[i * 2 * n_], 2 * n_);
+    Mul(gradSigmoidLocal1_[i * 2 * n_], fusedGradHPreAndGradHPostLocal_[i * 2 * n_], gradSigmoidLocal1_[i * 2 * n_],
+        2 * n_);
+    Mul(gradSigmoidLocal2_[i * 2 * n_], fusedGradHPreAndGradHPostLocal_[i * 2 * n_], gradSigmoidLocal2_[i * 2 * n_],
+        2 * n_);
     Mul(tmpLocal_[i * 2 * n_], gradSigmoidLocal1_[i * 2 * n_], alphaLocal_, 2 * n_);
     Muls(gradH2Local_[i * (2 * n_ + n_ * n_)], tmpLocal_[i * 2 * n_], invRmsLocal_.GetValue(i), 2 * n_);
     Mul(tmpLocal_[i * 2 * n_], tmpLocal_[i * 2 * n_], fusedHPre2AndHPost2Local_[i * 2 * n_], 2 * n_);
@@ -349,9 +347,10 @@ __aicore__ inline T MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradInvRms(cons
     return gradRsqrtVal;
 }
 
-template<typename T, typename U>
-__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradXVector(
-    const T gradRsqrtVal, const T gradRMSNormVal, const int32_t taskOffset, bool copyNext)
+template <typename T, typename U>
+__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradXVector(const T gradRsqrtVal,
+                                                                                const T gradRMSNormVal,
+                                                                                const int32_t taskOffset, bool copyNext)
 {
     int8_t ping = 0;
 
@@ -361,17 +360,17 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradXVector(
         WaitFlag<HardEvent::MTE3_V>(ping);
 
         ComputeGradXVf<T, U>(gradXLocal_[ping * c_], xLocal_[i * c_], gradHinLocal_[ping1_ * c_],
-            hPreLocal_[ping1_ * 8 + i], gradRsqrtVal, gradRMSNormVal, c_, c1_);
+                             hPreLocal_[ping1_ * 8 + i], gradRsqrtVal, gradRMSNormVal, c_, c1_);
         Cast(xFp32Local_[ping * c_], xLocal_[i * c_], RoundMode::CAST_NONE, c_);
 
         SetFlag<HardEvent::V_MTE3>(0);
         SetFlag<HardEvent::V_MTE2>(0);
         WaitFlag<HardEvent::V_MTE3>(0);
-        
-        DataCopyPad(gradXGlobal_[taskOffset * n_ * c_ + i * c_], gradXLocal_[ping * c_], {static_cast<uint16_t>(1),
-            static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0});
-        DataCopyPad(xFp32Global_[taskOffset * n_ * c_ + i * c_], xFp32Local_[ping * c_], {static_cast<uint16_t>(1),
-            static_cast<uint32_t>(c_ * sizeof(T)), 0, 0, 0});
+
+        DataCopyPad(gradXGlobal_[taskOffset * n_ * c_ + i * c_], gradXLocal_[ping * c_],
+                    {static_cast<uint16_t>(1), static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0});
+        DataCopyPad(xFp32Global_[taskOffset * n_ * c_ + i * c_], xFp32Local_[ping * c_],
+                    {static_cast<uint16_t>(1), static_cast<uint32_t>(c_ * sizeof(T)), 0, 0, 0});
 
         SetFlag<HardEvent::MTE3_V>(ping);
         WaitFlag<HardEvent::V_MTE2>(0);
@@ -380,10 +379,10 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradXVector(
         WaitFlag<HardEvent::MTE3_MTE2>(0);
 
         if (copyNext) {
-            DataCopyPad(xLocal_[i * c_], xGlobal_[(taskOffset + 1) * n_ * c_ + i * c_], {static_cast<uint16_t>(1),
-                        static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0}, {false, 0, 0, 0});
+            DataCopyPad(xLocal_[i * c_], xGlobal_[(taskOffset + 1) * n_ * c_ + i * c_],
+                        {static_cast<uint16_t>(1), static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0}, {false, 0, 0, 0});
         }
-        
+
         ping = 1 - ping;
     }
     WaitFlag<HardEvent::MTE3_V>(0);
@@ -395,7 +394,7 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ComputeGradXVector(
     c: c >= 64 && c % 64 == 0
     n: n == 4
 */
-template<typename T, typename U>
+template <typename T, typename U>
 __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
 {
     if ASCEND_IS_AIV {
@@ -420,29 +419,31 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
                 ComputeGradRMSNorm(tileTaskCount);
 
                 DataCopyPad(fusedGradHPreAndGradHPostLocal_, gradHPostGlobal_[taskOffset * n_],
-                    {static_cast<uint16_t>(tileTaskCount),
-                    static_cast<uint32_t>(n_ * sizeof(T)), 0, 0, 0},
-                    {true, static_cast<uint8_t>(ELEMENTS_SIZE_PER_BLOCK - n_), 0, 0});
-                DataCopyPad(xLocal_, xGlobal_[taskOffset * n_ * c_], {static_cast<uint16_t>(n_),
-                        static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0}, {false, 0, 0, 0});
+                            {static_cast<uint16_t>(tileTaskCount), static_cast<uint32_t>(n_ * sizeof(T)), 0, 0, 0},
+                            {true, static_cast<uint8_t>(ELEMENTS_SIZE_PER_BLOCK - n_), 0, 0});
+                DataCopyPad(xLocal_, xGlobal_[taskOffset * n_ * c_],
+                            {static_cast<uint16_t>(n_), static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0},
+                            {false, 0, 0, 0});
 
                 SetFlag<HardEvent::V_MTE2>(0);
                 SetFlag<HardEvent::V_MTE2>(1);
                 for (int32_t i = 0; i < tileTaskCount; i++) {
                     WaitFlag<HardEvent::V_MTE2>(ping1_);
-                    DataCopyPad(hPreLocal_[ping1_ * 8], hPreGlobal_[(taskOffset + i) * n_], {static_cast<uint16_t>(1),
-                        static_cast<uint32_t>(n_ * sizeof(T)), 0, 0, 0}, {false, 0, 0, 0});
+                    DataCopyPad(hPreLocal_[ping1_ * 8], hPreGlobal_[(taskOffset + i) * n_],
+                                {static_cast<uint16_t>(1), static_cast<uint32_t>(n_ * sizeof(T)), 0, 0, 0},
+                                {false, 0, 0, 0});
                     DataCopyPad(gradHinLocal_[ping1_ * c_], gradHinGlobal_[(taskOffset + i) * c_],
-                        {static_cast<uint16_t>(1), static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0}, {false, 0, 0, 0});
-                        
+                                {static_cast<uint16_t>(1), static_cast<uint32_t>(c_ * sizeof(U)), 0, 0, 0},
+                                {false, 0, 0, 0});
+
                     SetFlag<HardEvent::MTE2_V>(0);
                     WaitFlag<HardEvent::MTE2_V>(0);
 
                     ComputeGradPreVf<T>(fusedGradHPreAndGradHPostLocal_[i * 2 * n_], xLocal_,
-                        gradHinLocal_[ping1_ * c_], n_, c_ / FP32_PER_VL);
+                                        gradHinLocal_[ping1_ * c_], n_, c_ / FP32_PER_VL);
                     T gradRsqrtVal = ComputeGradInvRms(i);
-                    ComputeGradXVector(
-                        gradRsqrtVal, gradRMSNormLocal_.GetValue(i), taskOffset + i, i != tileTaskCount - 1);
+                    ComputeGradXVector(gradRsqrtVal, gradRMSNormLocal_.GetValue(i), taskOffset + i,
+                                       i != tileTaskCount - 1);
                     SetFlag<HardEvent::V_MTE2>(ping1_);
                     ping1_ = 1 - ping1_;
                 }
@@ -450,9 +451,9 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
                 WaitFlag<HardEvent::V_MTE3>(0);
 
                 DataCopyPad(gradH2Global_[taskOffset * (n_ * n_ + 2 * n_)], gradH2Local_,
-                    {static_cast<uint16_t>(tileTaskCount),
-                    static_cast<uint32_t>((n_ * n_ + 2 * n_) * sizeof(T)), 0, 0, 0});
-                
+                            {static_cast<uint16_t>(tileTaskCount),
+                             static_cast<uint32_t>((n_ * n_ + 2 * n_) * sizeof(T)), 0, 0, 0});
+
                 WaitFlag<HardEvent::V_MTE2>(0);
                 WaitFlag<HardEvent::V_MTE2>(1);
             }
@@ -470,17 +471,17 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
                 uint64_t postMask[] = {0XF0F0F0F0F0F0F0F0};
                 ReduceSum<T>(gradAlphaLocal_, gradSigmoidLocal2_, tmpLocal_, preMask, repeatTimes, 8);
                 ReduceSum<T>(gradAlphaLocal_[1], gradSigmoidLocal2_, tmpLocal_, postMask, repeatTimes, 8);
-                uint32_t shape[] = { static_cast<uint32_t>(tileTaskCount), static_cast<uint32_t>(2 * n_) };
-                ReduceSum<T, Pattern::Reduce::RA, true>(
-                    gradBiasLocal_, gradSigmoidLocal1_, tmpLocal_.template ReinterpretCast<uint8_t>(), shape, true);
+                uint32_t shape[] = {static_cast<uint32_t>(tileTaskCount), static_cast<uint32_t>(2 * n_)};
+                ReduceSum<T, Pattern::Reduce::RA, true>(gradBiasLocal_, gradSigmoidLocal1_,
+                                                        tmpLocal_.template ReinterpretCast<uint8_t>(), shape, true);
 
                 SetFlag<HardEvent::V_MTE3>(0);
                 WaitFlag<HardEvent::V_MTE3>(0);
                 SetAtomicAdd<T>();
                 DataCopyPad(gradAlphaGlobal_, gradAlphaLocal_,
-                    {static_cast<uint16_t>(1), static_cast<uint32_t>(2 * sizeof(T)), 0, 0, 0});
+                            {static_cast<uint16_t>(1), static_cast<uint32_t>(2 * sizeof(T)), 0, 0, 0});
                 DataCopyPad(gradBiasGlobal_, gradBiasLocal_,
-                    {static_cast<uint16_t>(1), static_cast<uint32_t>(2 * n_ * sizeof(T)), 0, 0, 0});
+                            {static_cast<uint16_t>(1), static_cast<uint32_t>(2 * n_ * sizeof(T)), 0, 0, 0});
                 SetAtomicNone();
             }
         }
@@ -488,9 +489,8 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
 
     if ASCEND_IS_AIC {
         int8_t ping = 0;
-        for (int32_t taskOffset = blkIdx_ * 2 * tile_;
-            taskOffset < totalTasksAligned_; taskOffset += aicNum_ * 2 * tile_) {
-
+        for (int32_t taskOffset = blkIdx_ * 2 * tile_; taskOffset < totalTasksAligned_;
+             taskOffset += aicNum_ * 2 * tile_) {
             int32_t tileTaskCount = min(2 * tile_, totalTasks_ - taskOffset);
             CrossCoreWaitFlag<0x2>(ping);
             ping = (ping + 1) % 10;
@@ -510,9 +510,9 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
 // mm2K_ = tile_ * 2;
 // mm2M_ = n_ * n_ + 2 * n_;
 // mm2N_ = n_ * c_;
-template<typename T, typename U>
-__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ProcessMatmul1(
-    const int32_t taskOffset, const int32_t mm1M)
+template <typename T, typename U>
+__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ProcessMatmul1(const int32_t taskOffset,
+                                                                            const int32_t mm1M)
 {
     if (mm1M <= 0)
         return;
@@ -521,13 +521,13 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ProcessMatmul1(
     mm1_.SetTensorB(phiGlobal_);
     mm1_.SetHF32(true, 1);
     mm1_.SetSingleShape(mm1M, mm1N_, mm1K_);
-    mm1_.template IterateAll<false> (gradXGlobal_[taskOffset * (n_ * c_)], 1);
+    mm1_.template IterateAll<false>(gradXGlobal_[taskOffset * (n_ * c_)], 1);
     mm1_.End();
 }
 
-template<typename T, typename U>
-__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ProcessMatmul2(
-    const int32_t taskOffset, const int32_t mm2K)
+template <typename T, typename U>
+__aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ProcessMatmul2(const int32_t taskOffset,
+                                                                            const int32_t mm2K)
 {
     if (mm2K <= 0)
         return;
@@ -536,7 +536,7 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::ProcessMatmul2(
     mm2_.SetTensorB(xFp32Global_[taskOffset * mm2N_]);
     mm2_.SetHF32(true, 1);
     mm2_.SetSingleShape(mm2M_, mm2N_, mm2K);
-    mm2_.template IterateAll<false> (gradPhiGlobal_, 1);
+    mm2_.template IterateAll<false>(gradPhiGlobal_, 1);
     mm2_.End();
 }
 

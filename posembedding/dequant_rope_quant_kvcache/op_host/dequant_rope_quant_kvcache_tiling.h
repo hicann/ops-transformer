@@ -20,8 +20,7 @@
 #include "tiling/tiling_api.h"
 
 namespace optiling {
-struct DequantRopeQuantKvcacheCompileInfo {
-};
+struct DequantRopeQuantKvcacheCompileInfo {};
 
 BEGIN_TILING_DATA_DEF(DequantRopeQuantKvcacheTilingData)
 TILING_DATA_FIELD_DEF(int64_t, qHeadNum);

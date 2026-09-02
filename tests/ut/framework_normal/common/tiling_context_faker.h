@@ -23,9 +23,12 @@ public:
     public:
         TensorDescription(const gert::StorageShape &shape, ge::DataType dtype, ge::Format format, bool isConst = false,
                           void *constValue = nullptr)
-            : shape_(shape), dtype_(dtype), format_(format), isConst_(isConst), constValue_(constValue)
-        {
-        }
+            : shape_(shape),
+              dtype_(dtype),
+              format_(format),
+              isConst_(isConst),
+              constValue_(constValue)
+        {}
 
     public:
         gert::StorageShape shape_;
@@ -39,9 +42,10 @@ public:
 
     class OpAttr {
     public:
-        OpAttr(const std::string &attrName, const Ops::Transformer::AnyValue &attr) : attrName_(attrName), attr_(attr)
-        {
-        }
+        OpAttr(const std::string &attrName, const Ops::Transformer::AnyValue &attr)
+            : attrName_(attrName),
+              attr_(attr)
+        {}
 
     public:
         std::string attrName_;
@@ -53,65 +57,98 @@ public:
                       const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs,
                       void *compileInfo = nullptr, const std::string &socVersion = "Ascend910B", uint64_t coreNum = 64,
                       uint64_t ubSize = 262144, uint64_t tilingDataSize = 4096, const std::string socInfoString = "")
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc), attrs_(attrs),
-          socVersion_(socVersion), socInfoString_(socInfoString), compileInfo_(compileInfo), coreNum_(coreNum),
-          ubSize_(ubSize), tilingDataSize_(tilingDataSize)
-    {
-    }
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          attrs_(attrs),
+          socVersion_(socVersion),
+          socInfoString_(socInfoString),
+          compileInfo_(compileInfo),
+          coreNum_(coreNum),
+          ubSize_(ubSize),
+          tilingDataSize_(tilingDataSize)
+    {}
 
     TilingContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                       const std::vector<TensorDescription> &outputTensorDesc, void *compileInfo = nullptr,
                       const std::string &socVersion = "Ascend910B", uint64_t coreNum = 64, uint64_t ubSize = 262144,
                       uint64_t tilingDataSize = 4096, const std::string socInfoString = "")
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc),
-          compileInfo_(compileInfo), socVersion_(socVersion), socInfoString_(socInfoString), coreNum_(coreNum),
-          ubSize_(ubSize), tilingDataSize_(tilingDataSize)
-    {
-    }
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          compileInfo_(compileInfo),
+          socVersion_(socVersion),
+          socInfoString_(socInfoString),
+          coreNum_(coreNum),
+          ubSize_(ubSize),
+          tilingDataSize_(tilingDataSize)
+    {}
 
     TilingContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                       const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs,
                       const std::vector<uint32_t> &inputInstanceNum, const std::vector<uint32_t> &outputInstanceNum,
                       void *compileInfo = nullptr, const std::string &socVersion = "Ascend910B", uint64_t coreNum = 64,
                       uint64_t ubSize = 262144, uint64_t tilingDataSize = 4096, const std::string socInfoString = "")
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc), attrs_(attrs),
-          inputInstanceNum_(inputInstanceNum), outputInstanceNum_(outputInstanceNum), socVersion_(socVersion),
-          socInfoString_(socInfoString), compileInfo_(compileInfo), coreNum_(coreNum), ubSize_(ubSize),
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          attrs_(attrs),
+          inputInstanceNum_(inputInstanceNum),
+          outputInstanceNum_(outputInstanceNum),
+          socVersion_(socVersion),
+          socInfoString_(socInfoString),
+          compileInfo_(compileInfo),
+          coreNum_(coreNum),
+          ubSize_(ubSize),
           tilingDataSize_(tilingDataSize)
-    {
-    }
+    {}
 
     TilingContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                       const std::vector<TensorDescription> &outputTensorDesc,
                       const std::vector<uint32_t> &inputInstanceNum, const std::vector<uint32_t> &outputInstanceNum,
                       void *compileInfo = nullptr, const std::string &socVersion = "Ascend910B", uint64_t coreNum = 64,
                       uint64_t ubSize = 262144, uint64_t tilingDataSize = 4096, const std::string socInfoString = "")
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc),
-          inputInstanceNum_(inputInstanceNum), outputInstanceNum_(outputInstanceNum), compileInfo_(compileInfo),
-          socVersion_(socVersion), socInfoString_(socInfoString), coreNum_(coreNum), ubSize_(ubSize),
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          inputInstanceNum_(inputInstanceNum),
+          outputInstanceNum_(outputInstanceNum),
+          compileInfo_(compileInfo),
+          socVersion_(socVersion),
+          socInfoString_(socInfoString),
+          coreNum_(coreNum),
+          ubSize_(ubSize),
           tilingDataSize_(tilingDataSize)
-    {
-    }
+    {}
 
     TilingContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                       const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs,
                       void *compileInfo, const std::string &socVersion, const std::string socInfoString,
                       uint64_t tilingDataSize)
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc), attrs_(attrs),
-          compileInfo_(compileInfo), socVersion_(socVersion), socInfoString_(socInfoString),
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          attrs_(attrs),
+          compileInfo_(compileInfo),
+          socVersion_(socVersion),
+          socInfoString_(socInfoString),
           tilingDataSize_(tilingDataSize)
-    {
-    }
+    {}
 
     TilingContextPara(const std::string &opName, const std::vector<TensorDescription> &inputTensorDesc,
                       const std::vector<TensorDescription> &outputTensorDesc, const std::vector<OpAttr> &attrs,
                       void *compileInfo, const std::string &socVersion, const std::string socInfoString,
                       uint64_t tilingDataSize, int32_t deterministicInfo)
-        : opName_(opName), inputTensorDesc_(inputTensorDesc), outputTensorDesc_(outputTensorDesc), attrs_(attrs),
-          compileInfo_(compileInfo), socVersion_(socVersion), socInfoString_(socInfoString),
-          tilingDataSize_(tilingDataSize), deterministicInfo_(deterministicInfo)
-    {
-    }
+        : opName_(opName),
+          inputTensorDesc_(inputTensorDesc),
+          outputTensorDesc_(outputTensorDesc),
+          attrs_(attrs),
+          compileInfo_(compileInfo),
+          socVersion_(socVersion),
+          socInfoString_(socInfoString),
+          tilingDataSize_(tilingDataSize),
+          deterministicInfo_(deterministicInfo)
+    {}
 
 public:
     std::string opName_;

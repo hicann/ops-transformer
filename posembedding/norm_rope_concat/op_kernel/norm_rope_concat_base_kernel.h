@@ -88,9 +88,8 @@ __aicore__ inline T CeilAlign(T a, T b)
 template <RopeType ropeType>
 class RopeOperation {
 public:
-    __aicore__ inline RopeOperation(TPipe *pipe, GM_ADDR sin, GM_ADDR cos, uint32_t actualSeq,
-                                    uint32_t ropeDim, uint32_t ropeNum,
-                                    uint32_t alignedRopeDim)
+    __aicore__ inline RopeOperation(TPipe *pipe, GM_ADDR sin, GM_ADDR cos, uint32_t actualSeq, uint32_t ropeDim,
+                                    uint32_t ropeNum, uint32_t alignedRopeDim)
         : ropeDim_(ropeDim),
           ropeNum_(ropeNum),
           alignedRopeDim_(alignedRopeDim),
@@ -220,8 +219,7 @@ public:
           normNum_(normNum),
           alignedNormDim_(alignedNormDim),
           alignedNormNum_(alignedNormNum)
-    {
-    }
+    {}
 
 protected:
     GlobalTensor<DTYPE_QUERY> xGm_;

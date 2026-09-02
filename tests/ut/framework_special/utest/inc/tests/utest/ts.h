@@ -126,7 +126,6 @@ protected:
     }
 };
 
-
 /**
  * 支持 TEST_P 类型用例的 TestSuite
  */
@@ -171,7 +170,6 @@ protected:
         Ts_WithParam<C>::SetUp();
     }
 };
-
 
 template <class C>
 class Ts_WithParam_Ascend310P3 : public Ts_WithParam<C> {

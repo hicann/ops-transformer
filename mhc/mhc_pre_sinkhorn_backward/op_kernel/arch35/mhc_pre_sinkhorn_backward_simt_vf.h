@@ -21,18 +21,16 @@ using namespace AscendC;
 namespace {
 constexpr int32_t THREAD_NUM = 1024;
 constexpr int32_t WARP_SIZE = 32;
-};
+}; // namespace
 
-
-template<typename T>
+template <typename T>
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
-    __ubuf__ T* gradHRes2Local, __ubuf__ T* gradInvRmsLocal, __gm__ T* gradAlphaGlobal,
-    __gm__ T* gradBiasGlobal, __gm__ T* skSumGlobal, __gm__ T* skNormGlobal_,
-    __ubuf__ T* gradResLocal, __ubuf__ T* hRes2Local, __ubuf__ T* invRmsLocal,
-    __ubuf__ T* biasLocal, __ubuf__ T* tmpLocal, const T hcScaleRes, const int32_t totalTasks,
+    __ubuf__ T *gradHRes2Local, __ubuf__ T *gradInvRmsLocal, __gm__ T *gradAlphaGlobal, __gm__ T *gradBiasGlobal,
+    __gm__ T *skSumGlobal, __gm__ T *skNormGlobal_, __ubuf__ T *gradResLocal, __ubuf__ T *hRes2Local,
+    __ubuf__ T *invRmsLocal, __ubuf__ T *biasLocal, __ubuf__ T *tmpLocal, const T hcScaleRes, const int32_t totalTasks,
     const int32_t taskOffset, const int32_t taskCount, const int32_t skIterCount, const int32_t n)
 {
-    int32_t xTid = threadIdx.x; // 16
+    int32_t xTid = threadIdx.x;   // 16
     int32_t hinTid = threadIdx.y; // THREAD_NUM // 16
     int32_t yBlockDim = blockDim.y;
     int32_t xBlockDim = blockDim.x;
@@ -50,7 +48,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
             int32_t offsetCol = baseOffset2 + i * n + xTid % n;
 
             T gradResVal = gradResLocal[hOffset];
-            
+
             T skRowNormVal = skNormGlobal_[hOffset + baseOffset1];
             T skRowSumVal = skSumGlobal[offsetRow];
             // T skColNormVal = skNormGlobal_[hOffset + baseOffset1 + totalTasks * n * n];
@@ -73,7 +71,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
             gradResLocal[hOffset] = gradSinkhorn;
         }
     }
-    
+
     T alphaVal = hcScaleRes;
     T biasVal = biasLocal[xTid];
 
@@ -91,23 +89,23 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
         T hRes2 = asc_shfl(hRes, 2, 4);
         T hRes3 = asc_shfl(hRes, 3, 4);
 
-        int32_t maxIdx01 = hRes0 >= hRes1? 0 : 1;
+        int32_t maxIdx01 = hRes0 >= hRes1 ? 0 : 1;
         T hResMaxVal01 = fmaxf(hRes0, hRes1);
 
-        int32_t maxIdx012 = hResMaxVal01 >= hRes2? maxIdx01 : 2;
+        int32_t maxIdx012 = hResMaxVal01 >= hRes2 ? maxIdx01 : 2;
         T hResMaxVal012 = fmaxf(hResMaxVal01, hRes2);
 
-        int32_t maxIdx0123 = hResMaxVal012 >= hRes3? maxIdx012 : 3;
+        int32_t maxIdx0123 = hResMaxVal012 >= hRes3 ? maxIdx012 : 3;
         T hResMaxVal0123 = fmaxf(hResMaxVal012, hRes3);
 
-        T mask = maxIdx0123 != (xTid % n)? 1 : 0;
+        T mask = maxIdx0123 != (xTid % n) ? 1 : 0;
         T safeHRes = expf(hRes - hResMaxVal0123);
         T gradMax = safeHRes * mask * gradSinkhorn;
 
         T gradMaxReduceSum = gradMax + asc_shfl_xor(gradMax, 1, 16);
         gradMaxReduceSum = -(gradMaxReduceSum + asc_shfl_xor(gradMaxReduceSum, 2, 16));
 
-        gradMaxReduceSum = mask == 1? safeHRes * gradSinkhorn : gradMaxReduceSum;
+        gradMaxReduceSum = mask == 1 ? safeHRes * gradSinkhorn : gradMaxReduceSum;
 
         // compute grad_invRms
         T gradInvRms = gradMaxReduceSum * alphaVal * h2Val;
@@ -115,8 +113,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
         gradInvRmsReduceSum = gradInvRmsReduceSum + asc_shfl_xor(gradInvRmsReduceSum, 2, 16);
         gradInvRmsReduceSum = gradInvRmsReduceSum + asc_shfl_xor(gradInvRmsReduceSum, 4, 16);
         gradInvRmsReduceSum = gradInvRmsReduceSum + asc_shfl_xor(gradInvRmsReduceSum, 8, 16);
-        
-        
+
         // 暂存
         if (i == hinTid) {
             gradResLocal[tid] = gradMaxReduceSum;
@@ -127,7 +124,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
         }
 
         gradHRes2Local[i * taskWidth + n * 2 + xTid] = gradMaxReduceSum * alphaVal * invRmsVal;
-        
+
         if (xTid == 0) {
             Simt::AtomicAdd(gradInvRmsLocal + hinTid, gradInvRmsReduceSum);
         }
@@ -142,7 +139,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SinkhornKnoppSimt(
     for (; validTask > 1; validTask = (validTask + 1) / 2) {
         if (hinTid + s < validTask) {
             int32_t otherOffset = (hinTid + s) * xBlockDim + xTid;
-            
+
             gradResLocal[tid] += gradResLocal[otherOffset];
             tmpLocal[tid] += tmpLocal[otherOffset];
             s = (s + 1) / 2;

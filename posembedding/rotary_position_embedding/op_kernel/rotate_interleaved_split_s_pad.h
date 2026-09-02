@@ -274,8 +274,9 @@ __aicore__ inline void InterleavedSplitSPad<T>::Compute(uint32_t loopIdx, LocalT
 }
 
 template <typename T>
-__aicore__ inline void
-InterleavedSplitSPad<T>::ComputeCastFp32(uint32_t loopIdx, LocalTensor<uint32_t> &gatherOffsetCast, uint32_t calcLen)
+__aicore__ inline void InterleavedSplitSPad<T>::ComputeCastFp32(uint32_t loopIdx,
+                                                                LocalTensor<uint32_t> &gatherOffsetCast,
+                                                                uint32_t calcLen)
 {
     uint64_t totalCount = calcLen * batchSize * numHeads * headDimAlign;
 

@@ -25,8 +25,7 @@ class KvRmsNormRopeCacheB16MTPQUANT
 public:
     __aicore__ inline KvRmsNormRopeCacheB16MTPQUANT(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
         : KernelKvRmsNormRopeCacheMTPQuant<isPagedAttention, KV_DTYPE, K_DTYPE, V_DTYPE>(pipe, tiling)
-    {
-    }
+    {}
 
     __aicore__ inline void Init(GM_ADDR kv, GM_ADDR gamma, GM_ADDR cos, GM_ADDR sin, GM_ADDR index, GM_ADDR k_cache,
                                 GM_ADDR v_cache, GM_ADDR optional_k_rope, GM_ADDR optional_c_kv, GM_ADDR k_rope_scale,

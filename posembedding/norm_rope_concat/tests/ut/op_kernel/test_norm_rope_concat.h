@@ -26,36 +26,36 @@
 
 #pragma pack()
 
-#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                            \
-    __ubuf__ tilingStruct *tilingDataPointer =                                                                         \
+#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
+    __ubuf__ tilingStruct *tilingDataPointer = \
         reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
-#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                               \
+#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                                                     \
-    NormRopeConcatTilingData tilingData;                                                                               \
-    INIT_TILING_DATA(NormRopeConcatTilingData, tilingDataPointer, tilingPointer);                                      \
-    (tilingData).batch = tilingDataPointer->batch;                                                                     \
-    (tilingData).querySeq = tilingDataPointer->querySeq;                                                               \
-    (tilingData).keySeq = tilingDataPointer->keySeq;                                                                   \
-    (tilingData).valueSeq = tilingDataPointer->valueSeq;                                                               \
-    (tilingData).encoderQuerySeq = tilingDataPointer->encoderQuerySeq;                                                 \
-    (tilingData).encoderKeySeq = tilingDataPointer->encoderKeySeq;                                                     \
-    (tilingData).encoderValueSeq = tilingDataPointer->encoderValueSeq;                                                 \
-    (tilingData).totalQuerySeq = tilingDataPointer->totalQuerySeq;                                                     \
-    (tilingData).totalKeySeq = tilingDataPointer->totalKeySeq;                                                         \
-    (tilingData).totalValueSeq = tilingDataPointer->totalValueSeq;                                                     \
-    (tilingData).ropeActualSeq = tilingDataPointer->ropeActualSeq;                                                     \
-    (tilingData).splitHeadNum = tilingDataPointer->splitHeadNum;                                                       \
-    (tilingData).avgHeads = tilingDataPointer->avgHeads;                                                               \
-    (tilingData).tailHeads = tilingDataPointer->tailHeads;                                                             \
-    (tilingData).normDim = tilingDataPointer->normDim;                                                                 \
-    (tilingData).ropeDim = tilingDataPointer->ropeDim;                                                                 \
-    (tilingData).headNum = tilingDataPointer->headNum;                                                                 \
-    (tilingData).headDim = tilingDataPointer->headDim;                                                                 \
-    (tilingData).usedCore = tilingDataPointer->usedCore;                                                               \
-    (tilingData).eps = tilingDataPointer->eps;                                                                         \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    NormRopeConcatTilingData tilingData; \
+    INIT_TILING_DATA(NormRopeConcatTilingData, tilingDataPointer, tilingPointer); \
+    (tilingData).batch = tilingDataPointer->batch; \
+    (tilingData).querySeq = tilingDataPointer->querySeq; \
+    (tilingData).keySeq = tilingDataPointer->keySeq; \
+    (tilingData).valueSeq = tilingDataPointer->valueSeq; \
+    (tilingData).encoderQuerySeq = tilingDataPointer->encoderQuerySeq; \
+    (tilingData).encoderKeySeq = tilingDataPointer->encoderKeySeq; \
+    (tilingData).encoderValueSeq = tilingDataPointer->encoderValueSeq; \
+    (tilingData).totalQuerySeq = tilingDataPointer->totalQuerySeq; \
+    (tilingData).totalKeySeq = tilingDataPointer->totalKeySeq; \
+    (tilingData).totalValueSeq = tilingDataPointer->totalValueSeq; \
+    (tilingData).ropeActualSeq = tilingDataPointer->ropeActualSeq; \
+    (tilingData).splitHeadNum = tilingDataPointer->splitHeadNum; \
+    (tilingData).avgHeads = tilingDataPointer->avgHeads; \
+    (tilingData).tailHeads = tilingDataPointer->tailHeads; \
+    (tilingData).normDim = tilingDataPointer->normDim; \
+    (tilingData).ropeDim = tilingDataPointer->ropeDim; \
+    (tilingData).headNum = tilingDataPointer->headNum; \
+    (tilingData).headDim = tilingDataPointer->headDim; \
+    (tilingData).usedCore = tilingDataPointer->usedCore; \
+    (tilingData).eps = tilingDataPointer->eps; \
     (tilingData).scale = tilingDataPointer->scale;
 
 #endif

@@ -71,8 +71,7 @@ public:
                 // AIV waits until AIC returns the slot through X_CONSUMED_FLAG.
                 if ASCEND_IS_AIV {
                     if (vector_.vectorCount_ >= 2) {
-                        AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE3>(
-                            MHC_PRE_X_CONSUMED_FLAG);
+                        AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE3>(MHC_PRE_X_CONSUMED_FLAG);
                     }
                     vector_.V0Prologue(curNdLen, offsetNd);
                     CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE3>(MHC_PRE_X_READY_FLAG);
@@ -81,12 +80,12 @@ public:
 
                 if ASCEND_IS_AIC {
                     AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_READY_FLAG);
-                    AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(
-                        MHC_PRE_X_READY_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                    AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_READY_FLAG +
+                                                                                        MHC_PRE_SUBBLOCK_FLAG_OFFSET);
                     AICProcessBasicApi(offsetNd, partialIndex);
                     CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_CONSUMED_FLAG);
-                    CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(
-                        MHC_PRE_X_CONSUMED_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                    CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_CONSUMED_FLAG +
+                                                                              MHC_PRE_SUBBLOCK_FLAG_OFFSET);
                 }
                 if (isPartialEnd) {
                     partialIndex++;
@@ -95,8 +94,8 @@ public:
             vector_.mmCount_++;
             if ASCEND_IS_AIC {
                 CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_FIX>(MHC_PRE_MM_READY_FLAG);
-                CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_FIX>(
-                    MHC_PRE_MM_READY_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_FIX>(MHC_PRE_MM_READY_FLAG +
+                                                                         MHC_PRE_SUBBLOCK_FLAG_OFFSET);
             }
 
             if ASCEND_IS_AIV {
@@ -122,33 +121,26 @@ private:
             return;
         }
 
-        vector_.pipe_->InitBuffer(
-            vector_.xInQueue_, vector_.kDoubleBufferCount, vector_.kXInQueueBufferBytes);
-        vector_.pipe_->InitBuffer(
-            vector_.outQueue_, vector_.kDoubleBufferCount, vector_.kOutQueueBufferBytes);
+        vector_.pipe_->InitBuffer(vector_.xInQueue_, vector_.kDoubleBufferCount, vector_.kXInQueueBufferBytes);
+        vector_.pipe_->InitBuffer(vector_.outQueue_, vector_.kDoubleBufferCount, vector_.kOutQueueBufferBytes);
 
-        uint32_t invRmsRows =
-            (vector_.curSingleT_ + vector_.kHalfSplitDivisor - 1U) / vector_.kHalfSplitDivisor;
-        uint32_t invRmsBytes = MhcPreAlign(
-            invRmsRows, vector_.kAlignmentBytes / sizeof(P)) * sizeof(P);
+        uint32_t invRmsRows = (vector_.curSingleT_ + vector_.kHalfSplitDivisor - 1U) / vector_.kHalfSplitDivisor;
+        uint32_t invRmsBytes = MhcPreAlign(invRmsRows, vector_.kAlignmentBytes / sizeof(P)) * sizeof(P);
         vector_.pipe_->InitBuffer(vector_.invRmsOutQueue_, vector_.kSingleBufferCount, invRmsBytes);
 
         if (vector_.hasGamma_) {
-            vector_.pipe_->InitBuffer(vector_.gammaInQueue_, vector_.kSingleBufferCount,
-                                      vector_.ND_LENGTH * sizeof(P));
+            vector_.pipe_->InitBuffer(vector_.gammaInQueue_, vector_.kSingleBufferCount, vector_.ND_LENGTH * sizeof(P));
         }
 
-        uint32_t parameterBufferBytes = MhcPreAlign(
-            vector_.mnConfig_.n * sizeof(P), vector_.kAlignmentBytes);
+        uint32_t parameterBufferBytes = MhcPreAlign(vector_.mnConfig_.n * sizeof(P), vector_.kAlignmentBytes);
         vector_.pipe_->InitBuffer(vector_.biasInQue_, vector_.kSingleBufferCount, parameterBufferBytes);
         vector_.pipe_->InitBuffer(vector_.alphaBuf_, parameterBufferBytes);
         vector_.alphaInUb_ = vector_.alphaBuf_.template Get<P>();
 
-        uint32_t hSegmentBytes = MhcPreAlign(
-            vector_.V1_BASE_T * vector_.N_ * sizeof(P), vector_.kAlignmentBytes);
+        uint32_t hSegmentBytes = MhcPreAlign(vector_.V1_BASE_T * vector_.N_ * sizeof(P), vector_.kAlignmentBytes);
         vector_.pipe_->InitBuffer(vector_.tmpBuff_, 2U * hSegmentBytes);
-        vector_.hPreBuff_ = vector_.tmpBuff_.template GetWithOffset<P>(
-            static_cast<uint32_t>(vector_.V1_BASE_T * vector_.N_), 0);
+        vector_.hPreBuff_ =
+            vector_.tmpBuff_.template GetWithOffset<P>(static_cast<uint32_t>(vector_.V1_BASE_T * vector_.N_), 0);
         vector_.hPostBuff_ = vector_.tmpBuff_.template GetWithOffset<P>(
             static_cast<uint32_t>(vector_.V1_BASE_T * vector_.N_), hSegmentBytes);
     }
@@ -190,10 +182,9 @@ private:
 
         LocalTensor<float> currentAL1 = aL1_[aL1BufferId * MHC_PRE_BASIC_API_L1_BUF_OFFSET];
         LocalTensor<float> currentBL1 = bL1_[bL1BufferId * MHC_PRE_BASIC_API_L1_BUF_OFFSET];
-        mmService_.CopyInA1Nd2Nz(vector_.mnConfig_.curSingleCoreM, currentK,
-                                 vector_.xFloatGm_[xOffset], currentAL1);
-        mmService_.CopyInB1Nd2Nz(vector_.mnConfig_.k, currentK, vector_.mnConfig_.n,
-                                 vector_.phiGm_[offsetNd], currentBL1);
+        mmService_.CopyInA1Nd2Nz(vector_.mnConfig_.curSingleCoreM, currentK, vector_.xFloatGm_[xOffset], currentAL1);
+        mmService_.CopyInB1Nd2Nz(vector_.mnConfig_.k, currentK, vector_.mnConfig_.n, vector_.phiGm_[offsetNd],
+                                 currentBL1);
 
         bool isFirstKL1 = offsetNd % MHC_PRE_BS_SEQUENTIAL_PARTIAL_K == 0U;
         bool isLastKL1 = IsSequentialPartialEnd(offsetNd, currentK);
@@ -201,8 +192,8 @@ private:
         uint64_t nAlign = BasicApiAlign(vector_.mnConfig_.n, AscendC::BLOCK_CUBE);
         // Fill available L0 from the live M/N footprint instead of hard-coding baseK for one shape.
         uint64_t baseK = (256 / AscendC::Std::max(mAlign, nAlign)) * 32;
-        mmService_.Process(vector_.mnConfig_.curSingleCoreM, vector_.mnConfig_.n,
-                           vector_.mnConfig_.curSingleCoreM, baseK, isFirstKL1, isLastKL1, currentAL1, currentBL1);
+        mmService_.Process(vector_.mnConfig_.curSingleCoreM, vector_.mnConfig_.n, vector_.mnConfig_.curSingleCoreM,
+                           baseK, isFirstKL1, isLastKL1, currentAL1, currentBL1);
 
         if (isLastKL1) {
             // Emit ordered K=1024 partials. Later partials atomically accumulate into the same compact
@@ -226,15 +217,15 @@ private:
         }
 
         uint64_t localOffset = 0;
-        for (uint64_t offsetT = vector_.vectorOffset_.offsetMStart;
-             offsetT < vector_.vectorOffset_.offsetMEnd; offsetT += vector_.V1_BASE_T) {
-            uint64_t lenT = AscendC::Std::min(static_cast<uint64_t>(vector_.V1_BASE_T),
-                                              vector_.vectorOffset_.offsetMEnd - offsetT);
+        for (uint64_t offsetT = vector_.vectorOffset_.offsetMStart; offsetT < vector_.vectorOffset_.offsetMEnd;
+             offsetT += vector_.V1_BASE_T) {
+            uint64_t lenT =
+                AscendC::Std::min(static_cast<uint64_t>(vector_.V1_BASE_T), vector_.vectorOffset_.offsetMEnd - offsetT);
             uint64_t hMixOffset = (vector_.globalOffsetM_ + offsetT) * vector_.mnConfig_.n;
             vector_.HMixCopyIn(hMixOffset, lenT);
             LocalTensor<P> hMixLocal = vector_.xInQueue_.template DeQue<P>();
-            vector_.AIV1PostProcessTile(
-                hMixLocal, offsetT, lenT, static_cast<uint32_t>(localOffset), vector_.mnConfig_.n);
+            vector_.AIV1PostProcessTile(hMixLocal, offsetT, lenT, static_cast<uint32_t>(localOffset),
+                                        vector_.mnConfig_.n);
             vector_.xInQueue_.FreeTensor(hMixLocal);
             localOffset += lenT;
         }

@@ -57,7 +57,9 @@ private:
 
 template <typename TX>
 __aicore__ inline void RotaryPositionEmbeddingABMixed<TX>::Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y,
-                                                                GM_ADDR workspace, const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe)
+                                                                GM_ADDR workspace,
+                                                                const InplacePartialRopeRegbaseTilingData *tilingData,
+                                                                TPipe *pipe)
 {
     pipe_ = pipe;
     tilingData_ = tilingData;
@@ -96,28 +98,26 @@ __aicore__ inline void RotaryPositionEmbeddingABMixed<TX>::Process()
     uint32_t nLoopCnt = ops::CeilDiv(nBlockCount_, tilingData_->ubFactorN);
     for (uint32_t bsLoopIdx = 0; bsLoopIdx < bsLoopCnt; bsLoopIdx++) {
         int64_t xGmOffset = bsLoopIdx * tilingData_->ubFactorBS * tilingData_->N * tilingData_->D;
-        uint32_t currBSNum = (bsLoopIdx != bsLoopCnt - 1) ? tilingData_->ubFactorBS : bsBlockCount_ - (bsLoopIdx * tilingData_->ubFactorBS);
+        uint32_t currBSNum = (bsLoopIdx != bsLoopCnt - 1) ? tilingData_->ubFactorBS :
+                                                            bsBlockCount_ - (bsLoopIdx * tilingData_->ubFactorBS);
 
-        DataCopyExtParams cosParams = {
-            static_cast<uint16_t>(currBSNum * tilingData_->dSplitCoef), dSplitSizeFloat_, 0, 0, 0};
+        DataCopyExtParams cosParams = {static_cast<uint16_t>(currBSNum * tilingData_->dSplitCoef), dSplitSizeFloat_, 0,
+                                       0, 0};
 
         LocalTensor<float> cosBuffer = cosInQueue_.AllocTensor<float>();
         LocalTensor<float> sinBuffer = sinInQueue_.AllocTensor<float>();
-        DataCopyPad(cosBuffer,
-                    cosGm_[bsLoopIdx * tilingData_->ubFactorBS * tilingData_->sliceLength],
-                    cosParams,
+        DataCopyPad(cosBuffer, cosGm_[bsLoopIdx * tilingData_->ubFactorBS * tilingData_->sliceLength], cosParams,
                     padParamsFloat_);
         cosInQueue_.EnQue(cosBuffer);
         cosBuffer = cosInQueue_.DeQue<float>();
-        DataCopyPad(sinBuffer,
-                    sinGm_[bsLoopIdx * tilingData_->ubFactorBS * tilingData_->sliceLength],
-                    cosParams,
+        DataCopyPad(sinBuffer, sinGm_[bsLoopIdx * tilingData_->ubFactorBS * tilingData_->sliceLength], cosParams,
                     padParamsFloat_);
         sinInQueue_.EnQue(sinBuffer);
         sinBuffer = sinInQueue_.DeQue<float>();
 
         for (int64_t nLoopIdx = 0; nLoopIdx < nLoopCnt; nLoopIdx++) {
-            int64_t currNNum = (nLoopIdx != nLoopCnt - 1) ? tilingData_->ubFactorN : nBlockCount_ - (nLoopIdx * tilingData_->ubFactorN);
+            int64_t currNNum = (nLoopIdx != nLoopCnt - 1) ? tilingData_->ubFactorN :
+                                                            nBlockCount_ - (nLoopIdx * tilingData_->ubFactorN);
             ProcessLoop(xGmOffset, cosBuffer, sinBuffer, nLoopIdx, currBSNum, currNNum);
         }
 
@@ -128,25 +128,18 @@ __aicore__ inline void RotaryPositionEmbeddingABMixed<TX>::Process()
 
 template <typename TX>
 __aicore__ inline void RotaryPositionEmbeddingABMixed<TX>::ProcessLoop(int64_t xGmOffset, LocalTensor<float> cosBuffer,
-                                                                       LocalTensor<float> sinBuffer, int64_t ubIdx, int64_t bsCount, int64_t nCount)
+                                                                       LocalTensor<float> sinBuffer, int64_t ubIdx,
+                                                                       int64_t bsCount, int64_t nCount)
 {
     int64_t totalCount = bsCount * nCount;
-    DataCopyExtParams inParams = {static_cast<uint16_t>(totalCount * tilingData_->dSplitCoef),
-                                  dSplitSizeTX_,
-                                  static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(TX)),
-                                  0,
+    DataCopyExtParams inParams = {static_cast<uint16_t>(totalCount * tilingData_->dSplitCoef), dSplitSizeTX_,
+                                  static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(TX)), 0,
                                   0};
-    DataCopyExtParams outParams = {static_cast<uint16_t>(totalCount * tilingData_->dSplitCoef),
-                                   dSplitSizeTX_,
-                                   0,
-                                   static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(TX)),
-                                   0};
+    DataCopyExtParams outParams = {static_cast<uint16_t>(totalCount * tilingData_->dSplitCoef), dSplitSizeTX_, 0,
+                                   static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(TX)), 0};
     if (tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {
-        inParams = {static_cast<uint16_t>(totalCount),
-                    tilingData_->D * sizeof(TX),
-                    static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(TX)),
-                    0,
-                    0};
+        inParams = {static_cast<uint16_t>(totalCount), tilingData_->D * sizeof(TX),
+                    static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(TX)), 0, 0};
     }
 
     LocalTensor<TX> inBuffer = xInQueue_.AllocTensor<TX>();

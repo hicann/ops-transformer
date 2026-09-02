@@ -259,9 +259,9 @@ public:
         const int64_t loopFloats = GetSortLen<float>(param_.oneLoopMaxElements);
         pipe_->InitBuffer(inQue_, 1, loopFloats * MRG_LIST_NUM * sizeof(float) + ONE_BLK_SIZE);
         pipe_->InitBuffer(outQue_, 1, loopFloats * MRG_LIST_NUM * sizeof(float) + ONE_BLK_SIZE);
-        pipe_->InitBuffer(cntBuf_,
-                          Align(param_.segNum * (ONE_BLK_SIZE / sizeof(int32_t)), sizeof(int32_t)) * sizeof(int32_t) +
-                              ONE_BLK_SIZE);
+        pipe_->InitBuffer(
+            cntBuf_,
+            Align(param_.segNum * (ONE_BLK_SIZE / sizeof(int32_t)), sizeof(int32_t)) * sizeof(int32_t) + ONE_BLK_SIZE);
     }
 
     // 跑完全部归并轮次;返回最终结果所在的工作区序号(0=wsA,1=wsB)。

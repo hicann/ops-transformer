@@ -77,7 +77,8 @@ private:
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
     __aicore__ inline void DoMulAddVfCall(const LocalTensor<float> &x, uint32_t heads);
-    __simd_vf__ inline void DoMulAddVf(__ubuf__ float *xBuf, __ubuf__ float *weightBuf, __ubuf__ float *biasBuf, uint32_t heads);
+    __simd_vf__ inline void DoMulAddVf(__ubuf__ float *xBuf, __ubuf__ float *weightBuf, __ubuf__ float *biasBuf,
+                                       uint32_t heads);
 #endif
 private:
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> inQue_;
@@ -127,8 +128,8 @@ __aicore__ inline void NormOperationForward<isTraining>::DoMulAdd(const LocalTen
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 template <bool isTraining>
-__simd_vf__ inline void NormOperationForward<isTraining>::DoMulAddVf(
-    __ubuf__ float *xBuf, __ubuf__ float *weightBuf, __ubuf__ float *biasBuf, uint32_t heads)
+__simd_vf__ inline void NormOperationForward<isTraining>::DoMulAddVf(__ubuf__ float *xBuf, __ubuf__ float *weightBuf,
+                                                                     __ubuf__ float *biasBuf, uint32_t heads)
 {
     RegTensor<float> xRegTensor;
     RegTensor<float> weightRegTensor;
@@ -168,7 +169,8 @@ __aicore__ inline void NormOperationForward<isTraining>::DoMul(const LocalTensor
     if (isAligned64_) {
         for (uint32_t i = 0; i < rptTimes_; ++i) {
             Mul(x[i * B32_DATA_NUM_PER_REPEAT], x[i * B32_DATA_NUM_PER_REPEAT], weight_[i * B32_DATA_NUM_PER_REPEAT],
-                B32_DATA_NUM_PER_REPEAT, heads, {1, 1, 1, static_cast<uint8_t>(this->normDim_ / 8), static_cast<uint8_t>(this->normDim_ / 8), 0});
+                B32_DATA_NUM_PER_REPEAT, heads,
+                {1, 1, 1, static_cast<uint8_t>(this->normDim_ / 8), static_cast<uint8_t>(this->normDim_ / 8), 0});
         }
     } else {
         for (uint32_t i = 0; i < heads; ++i) {
@@ -179,8 +181,8 @@ __aicore__ inline void NormOperationForward<isTraining>::DoMul(const LocalTensor
 
 template <bool isTraining>
 template <NormType normType>
-__aicore__ inline void NormOperationForward<isTraining>::Prepare(GM_ADDR x, GM_ADDR weight, GM_ADDR bias,
-                                                                 GM_ADDR mean, GM_ADDR rstd)
+__aicore__ inline void NormOperationForward<isTraining>::Prepare(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR mean,
+                                                                 GM_ADDR rstd)
 {
     this->xGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)x);
     this->weightGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)weight);
@@ -192,8 +194,8 @@ __aicore__ inline void NormOperationForward<isTraining>::Prepare(GM_ADDR x, GM_A
     }
     // if affine, copy weight & bias
     DataCopyExtParams copyParams{1, static_cast<uint32_t>(this->normDim_ * sizeof(DTYPE_QUERY)), 0, 0, 0};
-    DataCopyPadExtParams<DTYPE_QUERY> padParams{true, 0,
-                                                static_cast<uint8_t>(this->alignedNormDim_ - this->normDim_), 0};
+    DataCopyPadExtParams<DTYPE_QUERY> padParams{true, 0, static_cast<uint8_t>(this->alignedNormDim_ - this->normDim_),
+                                                0};
     if constexpr (normType == NormType::LAYER_NORM_AFFINE || normType == NormType::LAYER_NORM_AFFINE_ACROSS_HEADS) {
         LocalTensor<DTYPE_QUERY> norm = normQue_.AllocTensor<DTYPE_QUERY>();
         DataCopyPad(norm, this->weightGm_, copyParams, padParams);
@@ -224,9 +226,8 @@ __aicore__ inline void NormOperationForward<isTraining>::Prepare(GM_ADDR x, GM_A
 
 template <bool isTraining>
 template <NormType normType>
-__aicore__ inline void NormOperationForward<isTraining>::Process(const LocalTensor<float> &x,
-                                                                 int64_t inOffset, int64_t normOffset,
-                                                                 uint32_t heads)
+__aicore__ inline void NormOperationForward<isTraining>::Process(const LocalTensor<float> &x, int64_t inOffset,
+                                                                 int64_t normOffset, uint32_t heads)
 {
     CopyIn(inOffset, heads);
     Compute<normType>(x, heads);
@@ -416,8 +417,8 @@ private:
 
 template <RopeType ropeType>
 template <RopeType actualRopeType>
-__aicore__ inline void RopeOperationForward<ropeType>::Process(const LocalTensor<float> &x,
-                                                               int64_t outOffset, uint32_t heads)
+__aicore__ inline void RopeOperationForward<ropeType>::Process(const LocalTensor<float> &x, int64_t outOffset,
+                                                               uint32_t heads)
 {
     Compute<actualRopeType>(x, heads);
     CopyOut(outOffset, heads);
@@ -425,8 +426,7 @@ __aicore__ inline void RopeOperationForward<ropeType>::Process(const LocalTensor
 
 template <RopeType ropeType>
 template <RopeType actualRopeType>
-__aicore__ inline void RopeOperationForward<ropeType>::Compute(const LocalTensor<float> &x,
-                                                               uint32_t heads)
+__aicore__ inline void RopeOperationForward<ropeType>::Compute(const LocalTensor<float> &x, uint32_t heads)
 {
     LocalTensor<DTYPE_QUERY> output = outQue_.AllocTensor<DTYPE_QUERY>();
     uint32_t size = this->alignedRopeDim_ * heads;
@@ -499,8 +499,7 @@ public:
           normAddedQueryRstd_(norm_added_query_rstd),
           normAddedKeyMean_(norm_added_key_mean),
           normAddedKeyRstd_(norm_added_key_rstd)
-    {
-    }
+    {}
 
     __aicore__ inline void Init(TPipe *pipe, const NormRopeConcatTilingData &tilingData);
     __aicore__ inline void Process();

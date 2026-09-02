@@ -143,7 +143,6 @@ END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(KvRmsNormRopeCache_20000, KvRmsNormRopeCacheRegbaseRecomputeTilingData)
 
-
 constexpr int32_t TEMPLATE_DS_PRIORITY = 1000;
 constexpr int32_t TEMPLATE_D_FULL_LOAD_PRIORITY = 2000;
 constexpr int32_t TEMPLATE_D_RECOMPUTE_PRIORITY = 3000;
@@ -206,12 +205,10 @@ static constexpr int64_t NON_FULL_LOAD_BASE_TILING_KEY = 20000;
 
 class KvRmsNormRopeCacheTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit KvRmsNormRopeCacheTilingBase(gert::TilingContext *tillingContext) : TilingBaseClass(tillingContext)
-    {
-    }
-    ~KvRmsNormRopeCacheTilingBase() override
-    {
-    }
+    explicit KvRmsNormRopeCacheTilingBase(gert::TilingContext *tillingContext)
+        : TilingBaseClass(tillingContext)
+    {}
+    ~KvRmsNormRopeCacheTilingBase() override {}
 
     uint64_t coreNum_ = 0;
     uint64_t ubSize_ = 0;
@@ -299,11 +296,8 @@ class KvRmsNormRopeCacheTilingDs : virtual public KvRmsNormRopeCacheTilingBase {
 public:
     explicit KvRmsNormRopeCacheTilingDs(gert::TilingContext *tillingContext)
         : KvRmsNormRopeCacheTilingBase(tillingContext)
-    {
-    }
-    ~KvRmsNormRopeCacheTilingDs() override
-    {
-    }
+    {}
+    ~KvRmsNormRopeCacheTilingDs() override {}
 
 protected:
     bool IsCapable() override;
@@ -323,11 +317,8 @@ class KvRmsNormRopeCacheRegbaseFullLoadTiling : virtual public KvRmsNormRopeCach
 public:
     explicit KvRmsNormRopeCacheRegbaseFullLoadTiling(gert::TilingContext *tillingContext)
         : KvRmsNormRopeCacheTilingBase(tillingContext)
-    {
-    }
-    ~KvRmsNormRopeCacheRegbaseFullLoadTiling() override
-    {
-    }
+    {}
+    ~KvRmsNormRopeCacheRegbaseFullLoadTiling() override {}
 
     uint64_t usedCoreNum_ = 0;
     int64_t kScaleType_ = 0;
@@ -354,11 +345,8 @@ class KvRmsNormRopeCacheRegbaseRecomputeTiling : virtual public KvRmsNormRopeCac
 public:
     explicit KvRmsNormRopeCacheRegbaseRecomputeTiling(gert::TilingContext *tillingContext)
         : KvRmsNormRopeCacheTilingBase(tillingContext)
-    {
-    }
-    ~KvRmsNormRopeCacheRegbaseRecomputeTiling() override
-    {
-    }
+    {}
+    ~KvRmsNormRopeCacheRegbaseRecomputeTiling() override {}
 
     uint64_t usedCoreNum_ = 0;
     int64_t kScaleType_ = 0;

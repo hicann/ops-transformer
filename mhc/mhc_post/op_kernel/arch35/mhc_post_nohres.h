@@ -70,13 +70,14 @@ private:
 
     int64_t curBS_;
     uint32_t blockIdx_;
-    constexpr static AscendC::MicroAPI::CastTrait castB16ToB32 = { AscendC::MicroAPI::RegLayout::ZERO,
-        AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN };
+    constexpr static AscendC::MicroAPI::CastTrait castB16ToB32 = {
+        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN,
+        AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
 };
 
 NOHRES_TEMPLATE_DECLARE
-__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::Init(
-    GM_ADDR x, GM_ADDR hOut, GM_ADDR hPost, GM_ADDR output, GM_ADDR workspace)
+__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::Init(GM_ADDR x, GM_ADDR hOut, GM_ADDR hPost, GM_ADDR output,
+                                                                 GM_ADDR workspace)
 {
     blockIdx_ = GetBlockIdx();
     if (blockIdx_ >= tilingData_->usedCoreNum) {
@@ -108,8 +109,8 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::Init(
 }
 
 NOHRES_TEMPLATE_DECLARE
-__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::DoMulAndAdd(
-    LocalTensor<float> hPostUb, int64_t nNum, int64_t dNum)
+__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::DoMulAndAdd(LocalTensor<float> hPostUb, int64_t nNum,
+                                                                        int64_t dNum)
 {
     uint16_t nTimes = static_cast<uint16_t>(nNum);
     uint16_t dRepeatTimes = static_cast<uint16_t>(Ops::Base::CeilDiv(dNum, static_cast<int64_t>(VL_FP32)));
@@ -119,10 +120,10 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::DoMulAndAdd(
     LocalTensor<T> hOutUb = hOutTileQueue_.DeQue<T>();
     LocalTensor<float> yTileBuf = yTileBuf_.Get<float>();
 
-    auto xAddr = (__ubuf__ T*)xUb.GetPhyAddr();
-    auto hPostAddr = (__ubuf__ float*)hPostUb.GetPhyAddr();
-    auto hOutAddr = (__ubuf__ T*)hOutUb.GetPhyAddr();
-    auto yAddr = (__ubuf__ float*)yTileBuf.GetPhyAddr();
+    auto xAddr = (__ubuf__ T *)xUb.GetPhyAddr();
+    auto hPostAddr = (__ubuf__ float *)hPostUb.GetPhyAddr();
+    auto hOutAddr = (__ubuf__ T *)hOutUb.GetPhyAddr();
+    auto yAddr = (__ubuf__ float *)yTileBuf.GetPhyAddr();
 
     __VEC_SCOPE__
     {
@@ -139,17 +140,15 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::DoMulAndAdd(
             uint32_t dNumU32 = static_cast<uint32_t>(dAlign);
 
             // Load hPost[nIndex] to register (broadcast)
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                hPostReg, hPostAddr + nIndex);
+            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(hPostReg, hPostAddr + nIndex);
 
             for (uint16_t j = 0; j < dRepeatTimes; j++) {
                 pMask = AscendC::MicroAPI::UpdateMask<float>(dNumU32);
 
                 // Load hOut[dBlock] and cast to FP32
-                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    hOutReg, hOutAddr + j * VL_FP32);
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(
-                    hOutRegFloat, hOutReg, pMask);
+                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(hOutReg,
+                                                                                             hOutAddr + j * VL_FP32);
+                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(hOutRegFloat, hOutReg, pMask);
 
                 // Post Mapping: out = hOut * hPost[nIndex]
                 AscendC::MicroAPI::Mul(outRegFloat, hOutRegFloat, hPostReg, pMask);
@@ -157,13 +156,11 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::DoMulAndAdd(
                 // Direct add x[nIndex] (no inner j loop, no hRes)
                 AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
                     xReg, xAddr + nIndex * dAlign + j * VL_FP32);
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(
-                    xRegFloat, xReg, pMask);
+                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(xRegFloat, xReg, pMask);
                 AscendC::MicroAPI::Add(outRegFloat, outRegFloat, xRegFloat, pMask);
 
                 // Store to yTileBuf
-                AscendC::MicroAPI::DataCopy(
-                    yAddr + nIndex * dAlign + j * VL_FP32, outRegFloat, pMask);
+                AscendC::MicroAPI::DataCopy(yAddr + nIndex * dAlign + j * VL_FP32, outRegFloat, pMask);
             }
         }
     }
@@ -211,8 +208,7 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::Process()
 }
 
 NOHRES_TEMPLATE_DECLARE
-__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInHOut(
-    int64_t bsIdx, int64_t dIdx, int64_t dNum)
+__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInHOut(int64_t bsIdx, int64_t dIdx, int64_t dNum)
 {
     int64_t hOutOffset = bsIdx * tilingData_->d + dIdx * tilingData_->dInner;
     LocalTensor<T> hOutTileLocal = hOutTileQueue_.AllocTensor<T>();
@@ -224,8 +220,7 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInHOut(
 }
 
 NOHRES_TEMPLATE_DECLARE
-__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInHPost(
-    int64_t bsIdx, int64_t nIdx, int64_t nNum)
+__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInHPost(int64_t bsIdx, int64_t nIdx, int64_t nNum)
 {
     int64_t hPostOffset = bsIdx * tilingData_->n + nIdx * tilingData_->nInner;
     LocalTensor<float> hPostTileLocal = hPostTileQueue_.AllocTensor<float>();
@@ -236,8 +231,8 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInHPost(
 }
 
 NOHRES_TEMPLATE_DECLARE
-__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInX(
-    int64_t bsIdx, int64_t nIdx, int64_t nNum, int64_t dIdx, int64_t dNum)
+__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInX(int64_t bsIdx, int64_t nIdx, int64_t nNum,
+                                                                    int64_t dIdx, int64_t dNum)
 {
     int64_t dStart = dIdx * tilingData_->dInner;
     int64_t nStart = nIdx * tilingData_->nInner * tilingData_->d;
@@ -252,22 +247,22 @@ __aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyInX(
 }
 
 NOHRES_TEMPLATE_DECLARE
-__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyOutY(
-    int64_t bsIdx, int64_t nIdx, int64_t nNum, int64_t dIdx, int64_t dNum)
+__aicore__ inline void MhcPostNoHRes<NOHRES_TEMPLATE_ARGS>::CopyOutY(int64_t bsIdx, int64_t nIdx, int64_t nNum,
+                                                                     int64_t dIdx, int64_t dNum)
 {
     int64_t dStart = dIdx * tilingData_->dInner;
     int64_t nStart = nIdx * tilingData_->nInner * tilingData_->d;
     int64_t yBase = bsIdx * tilingData_->n * tilingData_->d;
     int64_t yOffset = yBase + nStart + dStart;
     LocalTensor<T> yTileLocal = yTileQueue_.DeQue<T>();
-    DataCopyExtParams copyParams = {static_cast<uint16_t>(nNum), static_cast<uint32_t>(dNum * sizeof(T)),
-                                    0, static_cast<uint32_t>((tilingData_->d - dNum) * sizeof(T)), 0};
+    DataCopyExtParams copyParams = {static_cast<uint16_t>(nNum), static_cast<uint32_t>(dNum * sizeof(T)), 0,
+                                    static_cast<uint32_t>((tilingData_->d - dNum) * sizeof(T)), 0};
 
     DataCopyPad(outputGm_[yOffset], yTileLocal, copyParams);
 
     yTileQueue_.FreeTensor(yTileLocal);
 }
 
-}  // namespace MhcPost
+} // namespace MhcPost
 
-#endif  // ASCENDC_MHC_POST_NOHRES_H
+#endif // ASCENDC_MHC_POST_NOHRES_H

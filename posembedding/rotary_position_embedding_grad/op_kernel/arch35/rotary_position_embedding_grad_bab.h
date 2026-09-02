@@ -23,18 +23,18 @@ namespace RotaryPositionEmbeddingGrad {
 using namespace AscendC;
 
 template <typename T>
-class RotaryPositionEmbeddingGradBAB
-{
+class RotaryPositionEmbeddingGradBAB {
 public:
-    __aicore__ inline RotaryPositionEmbeddingGradBAB(TPipe* pipe, const RopeGradRegbaseParams* tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+    __aicore__ inline RotaryPositionEmbeddingGradBAB(TPipe *pipe, const RopeGradRegbaseParams *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR xGrad);
     __aicore__ inline void Process();
 
 private:
     constexpr static int32_t bufferNum = 2;
-    const RopeGradRegbaseParams* tilingData_;
-    TPipe* pipe_;
+    const RopeGradRegbaseParams *tilingData_;
+    TPipe *pipe_;
     int64_t blockIdx_ = 0;
     int64_t dSplitCoef_ = 1; // 切分系数初始化为1
     uint32_t dSplitSize_ = 0;
@@ -58,12 +58,11 @@ private:
 private:
     __aicore__ inline void PrePareParams();
     __aicore__ inline void ProcessNLoop(const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
-    __aicore__ inline void Compute(
-        const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-        const LocalTensor<T>& outTensor, const uint32_t currSNum, const uint32_t currDNum);
-    __aicore__ inline void ProcessN(
-        const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const uint32_t bIdx, const uint32_t sIdx,
-        const uint32_t currSNum);
+    __aicore__ inline void Compute(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                   const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor,
+                                   const uint32_t currSNum, const uint32_t currDNum);
+    __aicore__ inline void ProcessN(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                    const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
 };
 
 template <typename T>
@@ -80,13 +79,14 @@ __aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::Init(GM_ADDR grad, GM_
         this->dSplitCoef_ = QUARTER_MODE_COEF;
     }
     this->dSplitSize_ = tilingData_->d / dSplitCoef_ * sizeof(T);
-    this->dAlign_ = Ops::Base::CeilAlign<int64_t>(tilingData_->d / dSplitCoef_, BLOCK_TYPE_SIZE / sizeof(T)) * dSplitCoef_;
+    this->dAlign_ =
+        Ops::Base::CeilAlign<int64_t>(tilingData_->d / dSplitCoef_, BLOCK_TYPE_SIZE / sizeof(T)) * dSplitCoef_;
     ubFactorN_ = tilingData_->ubFactorN;
     ubFactorS_ = tilingData_->ubFactorS;
-    this->gradGm_.SetGlobalBuffer((__gm__ T*)grad);
-    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin);
-    this->xGradOutGm_.SetGlobalBuffer((__gm__ T*)xGrad);
+    this->gradGm_.SetGlobalBuffer((__gm__ T *)grad);
+    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin);
+    this->xGradOutGm_.SetGlobalBuffer((__gm__ T *)xGrad);
     this->pipe_->InitBuffer(gradInQue_, bufferNum, ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
     this->pipe_->InitBuffer(cosInQue_, bufferNum, ubFactorS_ * dAlign_ * sizeof(T));
     this->pipe_->InitBuffer(sinInQue_, bufferNum, ubFactorS_ * dAlign_ * sizeof(T));
@@ -127,8 +127,8 @@ __aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::Process()
 }
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::ProcessNLoop(
-    const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum)
+__aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::ProcessNLoop(const uint32_t bIdx, const uint32_t sIdx,
+                                                                       const uint32_t currSNum)
 {
     LocalTensor<T> sinTensor = sinInQue_.AllocTensor<T>();
     LocalTensor<T> cosTensor = cosInQue_.AllocTensor<T>();
@@ -147,9 +147,9 @@ __aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::ProcessNLoop(
 }
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::ProcessN(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const uint32_t bIdx, const uint32_t sIdx,
-    const uint32_t currSNum)
+__aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::ProcessN(const LocalTensor<T> &sinTensor,
+                                                                   const LocalTensor<T> &cosTensor, const uint32_t bIdx,
+                                                                   const uint32_t sIdx, const uint32_t currSNum)
 {
     LocalTensor<T> gradInTensor;
     LocalTensor<T> xGradOutTensor;
@@ -179,9 +179,11 @@ __aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::ProcessN(
 }
 
 template <typename T>
-__aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::Compute(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-    const LocalTensor<T>& outTensor, const uint32_t currSNum, const uint32_t currDNum)
+__aicore__ inline void RotaryPositionEmbeddingGradBAB<T>::Compute(const LocalTensor<T> &sinTensor,
+                                                                  const LocalTensor<T> &cosTensor,
+                                                                  const LocalTensor<T> &inTensor,
+                                                                  const LocalTensor<T> &outTensor,
+                                                                  const uint32_t currSNum, const uint32_t currDNum)
 {
     if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::HALF)) {
         HalfGradAlignVF<T>(sinTensor, cosTensor, inTensor, outTensor, tilingData_->d, dAlign_, currSNum, currDNum);
