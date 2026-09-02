@@ -2350,7 +2350,7 @@ uint64_t SparseFlashMlaTiling::CalcVectorizeKvPhyAddrWorkspaceSize(const SMLATil
         return 0ULL;
     }
     constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
-    constexpr uint32_t UB_SIZE = 248 * 1024;
+    constexpr uint32_t UB_SIZE = 184 * 1024;
     uint32_t alignedOriSparseBlockCount = (tilingInfo->oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
                                           SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
     uint32_t alignedCmpSparseBlockCount = (tilingInfo->cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
