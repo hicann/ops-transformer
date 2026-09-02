@@ -35,6 +35,7 @@ const static size_t Y_OUTPUT_DIMS = 2;
 const static size_t EXPERT_IDX_OUTPUY_DIMS = 2;
 const static size_t OUT_OUTPUT_DIMS = 2;
 const static int64_t MAX_EXPERT_COUNT = 2048;
+const static int64_t MAX_K_FOR_HASH = 64;
 
 const static int64_t X_INPUT_INDEX = 0;
 const static int64_t BIAS_INPUT_INDEX = 1;
@@ -77,7 +78,8 @@ inline static int64_t CeilLog4(int64_t x)
 
 class MoeGatingTopKTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeGatingTopKTilingBase(gert::TilingContext *context) : Ops::Transformer::OpTiling::TilingBaseClass(context)
+    explicit MoeGatingTopKTilingBase(gert::TilingContext *context)
+        : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         Reset();
     }
@@ -166,13 +168,12 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckInputShape()
         size_t biasDimNum = biasShape_->GetDimNum();
         OP_CHECK_IF(biasDimNum != BIAS_INPUT_DIMS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "bias", std::to_string(biasDimNum),
-                                                std::to_string(BIAS_INPUT_DIMS)),
+                                                 std::to_string(BIAS_INPUT_DIMS)),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            biasShape_->GetDim(0) != expertCount_,
-            OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "bias dim[0]", std::to_string(biasShape_->GetDim(0)),
-                                      std::to_string(expertCount_)),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(biasShape_->GetDim(0) != expertCount_,
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "bias dim[0]",
+                                              std::to_string(biasShape_->GetDim(0)), std::to_string(expertCount_)),
+                    return ge::GRAPH_FAILED);
     }
     moeGatingTopKTilingData_.set_addBias(addBias_);
 
@@ -182,46 +183,48 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckInputShape()
     moeGatingTopKTilingData_.set_hashFlag(hashFlag_);
 
     if (hashFlag_ == 1) {
+        OP_CHECK_IF(k_ > MAX_K_FOR_HASH,
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k", std::to_string(k_),
+                                              "less than or equal to 64 for hash mode"),
+                    return ge::GRAPH_FAILED);
         if (tid2eidShape_->GetDim(1) != k_) {
-            std::string reasonMsg =
-                "The 1st axis of input tid2eid must be equal to the value of attribute k, "
-                "which is " + std::to_string(k_);
+            std::string reasonMsg = "The 1st axis of input tid2eid must be equal to the value of attribute k, "
+                                    "which is " +
+                                    std::to_string(k_);
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "tid2eid",
-                Ops::Base::ToString(*tid2eidShape_), reasonMsg.c_str());
+                                                  Ops::Base::ToString(*tid2eidShape_), reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
         if (inputIdsShape_->GetDim(0) != rows_) {
-            std::string reasonMsg =
-                "The 0th axis of input input_ids must be equal to the 0th axis of input x " +
-                Ops::Base::ToString(*xShape_);
+            std::string reasonMsg = "The 0th axis of input input_ids must be equal to the 0th axis of input x " +
+                                    Ops::Base::ToString(*xShape_);
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "input_ids",
-                Ops::Base::ToString(*inputIdsShape_), reasonMsg.c_str());
+                                                  Ops::Base::ToString(*inputIdsShape_), reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
     }
 
-    OP_CHECK_IF(k_ > expertCount_,
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k", std::to_string(k_),
-                                        "less than or equal to expert num"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        k_ > expertCount_,
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k", std::to_string(k_), "less than or equal to expert num"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MoeGatingTopKTilingBase::CheckAttr()
 {
-    OP_CHECK_IF(
-        expertCount_ > MAX_EXPERT_COUNT,
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expert_count", std::to_string(expertCount_),
-                                  ("less than or equal to " + std::to_string(MAX_EXPERT_COUNT))),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(expertCount_ > MAX_EXPERT_COUNT,
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expert_count", std::to_string(expertCount_),
+                                          ("less than or equal to " + std::to_string(MAX_EXPERT_COUNT))),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(k_ <= 0, OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k", std::to_string(k_), "greater than 0"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(kGroup_ <= 0,
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k_group", std::to_string(kGroup_),
-                                          "greater than 0"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        kGroup_ <= 0,
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k_group", std::to_string(kGroup_), "greater than 0"),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(kGroup_ > groupCount_,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k_group", std::to_string(kGroup_),
@@ -234,37 +237,41 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckAttr()
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(normType_ != NORM_TYPE_SOFTMAX && normType_ != NORM_TYPE_SIGMOID,
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "norm_type", std::to_string(normType_),
-                                          "0 or 1"),
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "norm_type", std::to_string(normType_), "0 or 1"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(groupSelectMode_ != GROUP_SELECT_MODE_SUM && groupSelectMode_ != GROUP_SELECT_MODE_MAX,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "group_select_mode",
-                                          std::to_string(groupSelectMode_),
-                                          "0 or 1"),
+                                          std::to_string(groupSelectMode_), "0 or 1"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(renorm_ != RENORM_NO && renorm_ != RENORM_L1,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "renorm", std::to_string(renorm_), "0 or 1"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(expertCount_ % groupCount_ != 0,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_count",
-                                                      std::to_string(expertCount_),
-                                                      "expert_count must be divisible by group_count"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        expertCount_ % groupCount_ != 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_count", std::to_string(expertCount_),
+                                              "expert_count must be divisible by group_count"),
+        return ge::GRAPH_FAILED);
     perGroupExpertCount_ = expertCount_ / groupCount_;
+
+    bool isSimplifiedPath = (kGroup_ == groupCount_ || groupCount_ == expertCount_);
+    OP_CHECK_IF(hashFlag_ == 1 && !isSimplifiedPath,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "hash mode", "hash mode only supports simplified path",
+                    "k_group must equal group_count or group_count must equal expert_count"),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(perGroupExpertCount_ < 1,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "group_expert_count",
                                           std::to_string(perGroupExpertCount_), "greater than 0"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        groupSelectMode_ == GROUP_SELECT_MODE_SUM && perGroupExpertCount_ < 2,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "group_expert_count",
-                                              std::to_string(perGroupExpertCount_),
-                                              "group expert count should be greater than 1"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(groupSelectMode_ == GROUP_SELECT_MODE_SUM && perGroupExpertCount_ < 2,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "group_expert_count",
+                                                      std::to_string(perGroupExpertCount_),
+                                                      "group expert count should be greater than 1"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(k_ > kGroup_ * perGroupExpertCount_,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "k", std::to_string(k_),
                                           "less than or equal to k_group * group_expert_count"),
@@ -323,8 +330,7 @@ ge::graphStatus MoeGatingTopKTilingBase::GetShapeAttrsInfo()
     if (biasShapePtr != nullptr) {
         auto biasDtype = context_->GetOptionalInputDesc(BIAS_INPUT_INDEX)->GetDataType();
         OP_CHECK_IF((biasDtype != xDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "bias",
-                                              Ops::Base::ToString(biasDtype).c_str(),
+                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "bias", Ops::Base::ToString(biasDtype).c_str(),
                                               Ops::Base::ToString(xDtype).c_str()),
                     return ge::GRAPH_FAILED);
     }
@@ -348,8 +354,7 @@ ge::graphStatus MoeGatingTopKTilingBase::GetShapeAttrsInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, yDesc);
     auto yDtype = yDesc->GetDataType();
     OP_CHECK_IF((yDtype != xDtype),
-                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "y",
-                                          Ops::Base::ToString(yDtype).c_str(),
+                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "y", Ops::Base::ToString(yDtype).c_str(),
                                           Ops::Base::ToString(xDtype).c_str()),
                 return ge::GRAPH_FAILED);
 
@@ -364,10 +369,10 @@ ge::graphStatus MoeGatingTopKTilingBase::GetShapeAttrsInfo()
     auto normOutDesc = context_->GetOutputDesc(OUT_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, normOutDesc);
     auto normOutDtype = normOutDesc->GetDataType();
-    OP_CHECK_IF((normOutDtype != ge::DataType::DT_FLOAT),
-                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "out",
-                                          Ops::Base::ToString(normOutDtype).c_str(), "float"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (normOutDtype != ge::DataType::DT_FLOAT),
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "out", Ops::Base::ToString(normOutDtype).c_str(), "float"),
+        return ge::GRAPH_FAILED);
 
     // 获取属性
     auto attrs = context_->GetAttrs();
@@ -465,8 +470,7 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckOutShape()
                 return ge::GRAPH_FAILED);
     if (outShape_ != nullptr) {
         OP_CHECK_IF((outShape_->GetDimNum() != xShape_->GetDimNum()),
-                    OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "out",
-                                                 std::to_string(outShape_->GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "out", std::to_string(outShape_->GetDimNum()),
                                                  std::to_string(xShape_->GetDimNum())),
                     return ge::GRAPH_FAILED);
     }
@@ -475,16 +479,15 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckOutShape()
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "y dim[0]", std::to_string(yShape_->GetDim(0)),
                                           std::to_string(xShape_->GetDim(0))),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF((expertIdxShape_->GetDim(0) != xShape_->GetDim(0)),
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expert_idx dim[0]",
-                                          std::to_string(expertIdxShape_->GetDim(0)),
-                                          std::to_string(xShape_->GetDim(0))),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (expertIdxShape_->GetDim(0) != xShape_->GetDim(0)),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expert_idx dim[0]",
+                                  std::to_string(expertIdxShape_->GetDim(0)), std::to_string(xShape_->GetDim(0))),
+        return ge::GRAPH_FAILED);
     if (outFlag_ && outShape_ != nullptr) {
         OP_CHECK_IF((outShape_->GetDim(0) != xShape_->GetDim(0)),
                     OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "out dim[0]",
-                                              std::to_string(outShape_->GetDim(0)),
-                                              std::to_string(xShape_->GetDim(0))),
+                                              std::to_string(outShape_->GetDim(0)), std::to_string(xShape_->GetDim(0))),
                     return ge::GRAPH_FAILED);
     }
 
@@ -499,8 +502,7 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckOutShape()
     if (outFlag_ && outShape_ != nullptr) {
         OP_CHECK_IF((outShape_->GetDim(1) != xShape_->GetDim(1)),
                     OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "out dim[1]",
-                                              std::to_string(outShape_->GetDim(1)),
-                                              std::to_string(xShape_->GetDim(1))),
+                                              std::to_string(outShape_->GetDim(1)), std::to_string(xShape_->GetDim(1))),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
