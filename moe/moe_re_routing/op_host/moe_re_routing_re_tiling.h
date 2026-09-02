@@ -21,7 +21,8 @@ namespace optiling {
 
 class MoeReRoutingReTiling : public MoeReRoutingTilingBase {
 public:
-    explicit MoeReRoutingReTiling(gert::TilingContext *contextReRoutingReTiling) : MoeReRoutingTilingBase(contextReRoutingReTiling)
+    explicit MoeReRoutingReTiling(gert::TilingContext *contextReRoutingReTiling)
+        : MoeReRoutingTilingBase(contextReRoutingReTiling)
     {}
     ~MoeReRoutingReTiling() override = default;
 
@@ -49,6 +50,6 @@ private:
     MoeReRoutingReTilingData tilingData_;
 };
 
-}  // namespace optiling
+} // namespace optiling
 
-#endif  // OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_RE_RE_TILING_H_
+#endif // OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_RE_RE_TILING_H_

@@ -20,15 +20,14 @@
 namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;
 
-class MoeV2FullLoadQuantBase
-{
+class MoeV2FullLoadQuantBase {
 public:
     __aicore__ inline MoeV2FullLoadQuantBase(){};
 
 protected:
-    __aicore__ inline void InitBase(
-        GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
-        GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void InitBase(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
+                                    GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
+                                    const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void ProcessBase();
     __aicore__ inline void CopyIn();
     __aicore__ inline void SortCompute();
@@ -37,9 +36,9 @@ protected:
     __aicore__ inline void ComputeExpertTokenCountOrCumsum();
 
 protected:
-    const InnerMoeV2GatherOutComputeTilingData* gatherOutTilingData;
+    const InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData;
 
-    TPipe* pipe;
+    TPipe *pipe;
     int64_t tileLength;
     int64_t bufferNum = 1;
     int64_t totalLength;
@@ -83,8 +82,8 @@ protected:
 __aicore__ inline void MoeV2FullLoadQuantBase::CopyIn()
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+                                     static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
     DataCopyPadExtParams<int32_t> dataCopyPadParams{false, 0, 0, 0};
     DataCopyPad(inLocal[0], expertIdxGm, dataCopyParams, dataCopyPadParams);
     SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
@@ -134,9 +133,8 @@ __aicore__ inline void MoeV2FullLoadQuantBase::SortCompute()
     PipeBarrier<PIPE_V>();
     Extract(expandedExpertIdxLocal, expandDstToSrcRowLocal, sortedLocal, this->sortNum / ONE_REPEAT_SORT_NUM);
     PipeBarrier<PIPE_V>();
-    Cast(
-        expandDstToSrcRowLocalFp32, expandDstToSrcRowLocal.ReinterpretCast<int32_t>(), RoundMode::CAST_ROUND,
-        this->totalLength);
+    Cast(expandDstToSrcRowLocalFp32, expandDstToSrcRowLocal.ReinterpretCast<int32_t>(), RoundMode::CAST_ROUND,
+         this->totalLength);
     PipeBarrier<PIPE_V>();
     Muls(expandedExpertIdxLocal, expandedExpertIdxLocal, (float)-1, this->totalLength);
     PipeBarrier<PIPE_V>();
@@ -229,8 +227,8 @@ __aicore__ inline void MoeV2FullLoadQuantBase::ComputeExpertTokenCountOrCumsum()
             lastExpertId++;
         }
     }
-    DataCopyExtParams copyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(this->expertNum * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(this->expertNum * sizeof(int32_t)), 0,
+                                 0, 0};
     if (this->expertTokensCountOrCumsumFlag > 0) {
         SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
         WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
@@ -246,9 +244,10 @@ __aicore__ inline void MoeV2FullLoadQuantBase::CopyOutEmpty()
     expandedExpertIdxCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void MoeV2FullLoadQuantBase::InitBase(
-    GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
-    GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeV2FullLoadQuantBase::InitBase(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX,
+                                                        GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
+                                                        GM_ADDR workspace,
+                                                        const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe)
 {
     this->gatherOutTilingData = &(tilingData->gatherOutComputeParamsOp);
     this->blockIdx = GetBlockIdx();
@@ -272,14 +271,14 @@ __aicore__ inline void MoeV2FullLoadQuantBase::InitBase(
     this->totalLength = tilingData->n * tilingData->k;
     this->pipe = tPipe;
 
-    expertIdxGm.SetGlobalBuffer((__gm__ int32_t*)expertIdx, this->tileLength);
+    expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx, this->tileLength);
 
-    expandedXGm.SetGlobalBuffer((__gm__ int8_t*)expandedX);
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, this->tileLength);
+    expandedXGm.SetGlobalBuffer((__gm__ int8_t *)expandedX);
+    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, this->tileLength);
     if (this->expertTokensCountOrCumsumFlag > 0) {
         // dropless
-        expertTokensCountOrCumsumGm.SetGlobalBuffer(
-            (__gm__ int32_t*)expertTokensCountOrCumsum, Align(this->expertNum, sizeof(int32_t)));
+        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum,
+                                                    Align(this->expertNum, sizeof(int32_t)));
     }
 
     int64_t kvFactor = 2;

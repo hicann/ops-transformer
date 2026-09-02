@@ -107,13 +107,9 @@ public:
     // params
     using Params = Arguments;
 
-    __aicore__ inline BlockMmadBuilder()
-    {
-    }
+    __aicore__ inline BlockMmadBuilder() {}
 
-    __aicore__ inline ~BlockMmadBuilder()
-    {
-    }
+    __aicore__ inline ~BlockMmadBuilder() {}
 };
 } // namespace Block
 } // namespace Gemm

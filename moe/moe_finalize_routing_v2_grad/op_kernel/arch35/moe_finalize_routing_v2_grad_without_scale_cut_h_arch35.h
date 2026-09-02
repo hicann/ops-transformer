@@ -21,14 +21,11 @@ namespace MoeFinalizeRoutingV2Grad {
 using namespace AscendC;
 
 template <typename T1, typename T2>
-class MoeFinalizeRoutingV2GradWithoutScaleCutH : public MoeFinalizeRoutingV2GradBase<T1, T2>
-{
+class MoeFinalizeRoutingV2GradWithoutScaleCutH : public MoeFinalizeRoutingV2GradBase<T1, T2> {
 public:
-    __aicore__ inline MoeFinalizeRoutingV2GradWithoutScaleCutH()
-    {}
-    __aicore__ inline void Init(
-        GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, GM_ADDR workspace,
-        const MoeFinalizeRoutingV2GradTilingData* tilingData, TPipe* pipe);
+    __aicore__ inline MoeFinalizeRoutingV2GradWithoutScaleCutH() {}
+    __aicore__ inline void Init(GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, GM_ADDR workspace,
+                                const MoeFinalizeRoutingV2GradTilingData *tilingData, TPipe *pipe);
     __aicore__ inline void Process();
 
 private:
@@ -39,7 +36,7 @@ private:
 template <typename T1, typename T2>
 __aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleCutH<T1, T2>::Init(
     GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, GM_ADDR workspace,
-    const MoeFinalizeRoutingV2GradTilingData* tilingData, TPipe* pipe)
+    const MoeFinalizeRoutingV2GradTilingData *tilingData, TPipe *pipe)
 {
     this->SubInit(gradY, expandedRowIdx, gradExpandedX, tilingData, pipe);
     if (this->tilingData_->dropPadMode == 1) {
@@ -67,8 +64,8 @@ __aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleCutH<T1, T2>::Process
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleCutH<T1, T2>::CopyIn(
-    int64_t batchIdx, int64_t innerLoopIdx, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleCutH<T1, T2>::CopyIn(int64_t batchIdx, int64_t innerLoopIdx,
+                                                                                int64_t innerLoopCopyNum)
 {
     LocalTensor<T1> gradYUb = this->gradYInQueue_.template AllocTensor<T1>();
     LocalTensor<T2> expandedRowIdxUb = this->expandedRowIdxInQueue_.template AllocTensor<T2>();
@@ -90,8 +87,8 @@ __aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleCutH<T1, T2>::CopyIn(
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleCutH<T1, T2>::CopyOut(
-    int64_t innerLoopIdx, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleCutH<T1, T2>::CopyOut(int64_t innerLoopIdx,
+                                                                                 int64_t innerLoopCopyNum)
 {
     LocalTensor<T1> gradYUb = this->gradYInQueue_.template DeQue<T1>();
     LocalTensor<T2> expandedRowIdxUb = this->expandedRowIdxInQueue_.template DeQue<T2>();

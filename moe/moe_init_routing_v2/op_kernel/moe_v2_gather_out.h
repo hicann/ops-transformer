@@ -170,9 +170,9 @@ __aicore__ inline void MoeV2GatherOut<T>::Init(GM_ADDR inputX, GM_ADDR expandedR
 
     inputXGm.SetGlobalBuffer((__gm__ T *)inputX, this->coreRows * this->cols);
     expandedXGm.SetGlobalBuffer((__gm__ T *)expandedX, tilingData->n * tilingData->k * this->cols);
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx +
-                                         this->blockIdx * this->gatherOutTilingData->perCoreRows,
-                                     Align(this->coreRows, sizeof(int32_t)));
+    expandedRowIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)expandedRowIdx + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+        Align(this->coreRows, sizeof(int32_t)));
 
     pipe->InitBuffer(inputActivationsCopyInQueue, BUFFER_NUM, AlignBytes(this->perLoopCols, sizeof(T)));
     pipe->InitBuffer(expandDstToSrcRowCopyInQueue, BUFFER_NUM, AlignBytes(this->perLoopRows, sizeof(int32_t)));

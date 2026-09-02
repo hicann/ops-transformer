@@ -23,7 +23,8 @@
 
 namespace ops::adv::tests::quant_grouped_matmul_inplace_add {
 
-class AclnnQGMMInplaceAddCase : public ops::adv::tests::quant_grouped_matmul_inplace_add::QuantGroupedMatmulInplaceAddCase {
+class AclnnQGMMInplaceAddCase
+    : public ops::adv::tests::quant_grouped_matmul_inplace_add::QuantGroupedMatmulInplaceAddCase {
 public:
     using AclnnContext = ops::adv::tests::utils::AclnnContext;
 
@@ -37,8 +38,8 @@ public:
 public:
     AclnnQGMMInplaceAddCase();
     AclnnQGMMInplaceAddCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo,
-                           AclnnQGMMInplaceAddParam param,
-                           int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
+                            AclnnQGMMInplaceAddParam param,
+                            int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     bool Run() override;
 
 protected:

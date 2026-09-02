@@ -52,8 +52,8 @@
 #if (ORIG_DTYPE_X != DT_INT8 && ORIG_DTYPE_SCALE == DT_FLOAT)
 #define V310_GMM_QUANT_PERTILE
 #endif
-#elif defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(DT_INT4) && \
-    ORIG_DTYPE_X == DT_INT4 && ORIG_DTYPE_WEIGHT == DT_INT4
+#elif defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(DT_INT4) && ORIG_DTYPE_X == DT_INT4 && \
+    ORIG_DTYPE_WEIGHT == DT_INT4
 #define V310_GMM_QUANT_S4S4
 #else
 #define V310_GMM_QUANT_CUBE
@@ -177,7 +177,7 @@ constexpr MatmulConfig matmulCFGUnitFlag{.doMultiDataLoad = true, .enUnitFlag = 
 #else
 constexpr MatmulConfig NZ_CFG_MDL = GetMDLConfig(false, false, 0, true, false, false, true);
 constexpr MatmulConfig matmulCFGUnitFlag{false, false, true, 0, 0, 0, false, false, false, false,
-                                         false, 0, 0, 0, 0, 0, 0, 0, true};
+                                         false, 0,     0,    0, 0, 0, 0,     0,     true};
 #endif
 
 constexpr uint64_t SYNC_AIV_AIC_FLAG = 3;

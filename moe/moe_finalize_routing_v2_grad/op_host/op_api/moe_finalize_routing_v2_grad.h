@@ -20,10 +20,10 @@
 
 namespace l0op {
 const std::array<const aclTensor *, 2> MoeFinalizeRoutingV2Grad(
-    const aclTensor* grad_y, const aclTensor* expanded_row_idx, const aclTensor* expanded_x,
-    const aclTensor* scales, const aclTensor* expert_idx, const aclTensor* bias,
-    int64_t drop_pad_mode, int64_t active_num, int64_t expert_num, int64_t expert_capacity,
-    const aclTensor* grad_expanded_x_out, const aclTensor* grad_scales_out, aclOpExecutor *executor);
+    const aclTensor *grad_y, const aclTensor *expanded_row_idx, const aclTensor *expanded_x, const aclTensor *scales,
+    const aclTensor *expert_idx, const aclTensor *bias, int64_t drop_pad_mode, int64_t active_num, int64_t expert_num,
+    int64_t expert_capacity, const aclTensor *grad_expanded_x_out, const aclTensor *grad_scales_out,
+    aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_MOE_FINALIZE_ROUTING_V2_GRAD_H_

@@ -203,6 +203,5 @@ __aicore__ inline void FixL0CToDst(const LocalTensor<DstType> &outTensor, const 
     AscendC::Fixpipe<DstType, SrcType, CFG_ROW_MAJOR_UB>(outTensor, cL0Tensor, fixParams);
 }
 
-
 } // namespace GMMSQWeightQuant
 #endif

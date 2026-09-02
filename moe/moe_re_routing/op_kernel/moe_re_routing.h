@@ -22,12 +22,14 @@ using namespace AscendC;
 template <typename T1, typename T2, typename TScale>
 class KernelMoeReRouting {
 public:
-    __aicore__ inline KernelMoeReRouting()
-    {}
-    __aicore__ inline KernelMoeReRouting(TPipe *pipe, const MoeReRoutingTilingData *tiling) : pipe_(pipe), tl_(tiling)
+    __aicore__ inline KernelMoeReRouting() {}
+    __aicore__ inline KernelMoeReRouting(TPipe *pipe, const MoeReRoutingTilingData *tiling)
+        : pipe_(pipe),
+          tl_(tiling)
     {}
     __aicore__ inline void Init(GM_ADDR tokens, GM_ADDR expertTokensNumPerRank, GM_ADDR perTokenScales,
-        GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx, GM_ADDR expertTokenNum);
+                                GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
+                                GM_ADDR expertTokenNum);
 
     __aicore__ inline void Process();
 
@@ -60,8 +62,9 @@ protected:
 
 template <typename T1, typename T2, typename TScale>
 __aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::Init(GM_ADDR tokens, GM_ADDR expertTokensNumPerRank,
-    GM_ADDR perTokenScales, GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
-    GM_ADDR expertTokenNum)
+                                                                GM_ADDR perTokenScales, GM_ADDR permuteTokens,
+                                                                GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
+                                                                GM_ADDR expertTokenNum)
 {
     srcGm.SetGlobalBuffer((__gm__ T1 *)tokens);
     dstGm.SetGlobalBuffer((__gm__ T1 *)permuteTokens);
@@ -71,10 +74,9 @@ __aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::Init(GM_ADDR tokens, 
     if (tl_->hasScale == 1) {
         srcScaleGm.SetGlobalBuffer((__gm__ TScale *)perTokenScales);
         dstScaleGm.SetGlobalBuffer((__gm__ TScale *)permutePerTokenScales);
-        this->pipe_->InitBuffer(queBind,
-            2,
-            AlignUp(tl_->ubFactor * tl_->tokensSize * sizeof(T1), blockSize) +
-                AlignUp(tl_->ubFactor * sizeof(TScale), blockSize));
+        this->pipe_->InitBuffer(queBind, 2,
+                                AlignUp(tl_->ubFactor * tl_->tokensSize * sizeof(T1), blockSize) +
+                                    AlignUp(tl_->ubFactor * sizeof(TScale), blockSize));
     } else {
         this->pipe_->InitBuffer(queBind, 2, AlignUp(tl_->ubFactor * tl_->tokensSize * sizeof(T1), blockSize));
     }
@@ -112,16 +114,14 @@ __aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::Process()
                 ubTail = tokenNums % tl_->ubFactor;
                 for (int64_t i = 0; i < ubLoop; i++) {
                     CopyIn(tl_->ubFactor, (tokenTotalNumsSrc + i * tl_->ubFactor));
-                    ComputeAndCopyOutIndex(tl_->ubFactor,
-                        (tokenTotalNumsDst + i * tl_->ubFactor),
-                        (tokenTotalNumsSrc + i * tl_->ubFactor));
+                    ComputeAndCopyOutIndex(tl_->ubFactor, (tokenTotalNumsDst + i * tl_->ubFactor),
+                                           (tokenTotalNumsSrc + i * tl_->ubFactor));
                     CopyOut(tl_->ubFactor, (tokenTotalNumsDst + i * tl_->ubFactor));
                 }
                 if (ubTail != 0) {
                     CopyIn(ubTail, (tokenTotalNumsSrc + ubLoop * tl_->ubFactor));
-                    ComputeAndCopyOutIndex(ubTail,
-                        (tokenTotalNumsDst + ubLoop * tl_->ubFactor),
-                        (tokenTotalNumsSrc + ubLoop * tl_->ubFactor));
+                    ComputeAndCopyOutIndex(ubTail, (tokenTotalNumsDst + ubLoop * tl_->ubFactor),
+                                           (tokenTotalNumsSrc + ubLoop * tl_->ubFactor));
                     CopyOut(ubTail, (tokenTotalNumsDst + ubLoop * tl_->ubFactor));
                 }
                 tokenTotalNumsSrc += tokenNums;
@@ -178,8 +178,8 @@ __aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::CopyOut(int64_t rows,
 }
 
 template <typename T1, typename T2, typename TScale>
-__aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::ComputeAndCopyOutIndex(
-    int64_t rows, int64_t offset, int64_t head)
+__aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::ComputeAndCopyOutIndex(int64_t rows, int64_t offset,
+                                                                                  int64_t head)
 {
     LocalTensor indexLocal = idxOutQue.AllocTensor<int32_t>();
     CreateVecIndex(indexLocal, static_cast<int32_t>(head), rows);
@@ -190,4 +190,4 @@ __aicore__ inline void KernelMoeReRouting<T1, T2, TScale>::ComputeAndCopyOutInde
     idxOutQue.FreeTensor(indexLocal);
 }
 
-#endif  // MOE_RE_ROUTING_H
+#endif // MOE_RE_ROUTING_H

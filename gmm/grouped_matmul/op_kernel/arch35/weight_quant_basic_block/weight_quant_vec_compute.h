@@ -59,11 +59,11 @@ constexpr uint16_t PERGROUP_SIZE_64 = 64;
 constexpr uint16_t PERGROUP_SIZE_128 = 128;
 constexpr uint16_t PERGROUP_SIZE_256 = 256;
 
-#define GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM                                                        \
-    template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,          \
+#define GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM \
+    template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType, \
               const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
 
-#define GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS                                                                 \
+#define GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS \
     BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
@@ -412,10 +412,9 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::SetVToMTE
 }
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyGmToUb(uint64_t ubMte2NSize, uint64_t ubMte2KSize,
-                                                           uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
-                                                           const BasicBlockOffsetParam &offsetParam)
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyGmToUb(
+    uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
+    const BasicBlockOffsetParam &offsetParam)
 {
     // ubMte2NSize和ubMte2KSize为实际MTE2搬运到UB的有效数据，
     // 其按照ubMte2InnerSize进行跳写，垃圾数据无需操作，搬出的时搬运有效数据即可。
@@ -459,10 +458,9 @@ GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyGmToUb(uint64_t ubMte2NSize,
  * @param offsetParam 存储Weight矩阵的原始N,K,kAlign信息,用于搬运时GM上地址偏移的计算
  */
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightGmToUb(uint64_t ubMte2NSize, uint64_t ubMte2KSize,
-                                                                 uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
-                                                                 const BasicBlockOffsetParam &offsetParam)
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightGmToUb(
+    uint64_t ubMte2NSize, uint64_t ubMte2KSize, uint64_t ubMte2NOffset, uint64_t ubMte2KOffset,
+    const BasicBlockOffsetParam &offsetParam)
 {
     if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ) {
         if constexpr (!wqmmConfig.bTrans) {
@@ -768,9 +766,8 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::TransWeig
 }
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightMxScaleUbToL1(LocalTensor<uint16_t> &scaleL1,
-                                                                        uint64_t l1NOffset, uint64_t nSize)
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyWeightMxScaleUbToL1(
+    LocalTensor<uint16_t> &scaleL1, uint64_t l1NOffset, uint64_t nSize)
 {
     event_t eventIdVToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID<HardEvent::V_MTE3>());
     SetFlag<HardEvent::V_MTE3>(eventIdVToMTE3);
@@ -991,8 +988,8 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
 }
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuantProcessNzMxA8W4(const UbConsumeConfig &ubConsumeConfig)
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuantProcessNzMxA8W4(
+    const UbConsumeConfig &ubConsumeConfig)
 {
     MxA8W4NzParams<xType, wType, biasType> mxA8W4NzParams;
     uint64_t ubMte2BufferIdx = (ubMte2LoopIdx_ - 1) & (vecConfig.ubMte2BufferNum - 1);
@@ -1370,8 +1367,8 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::AntiQuant
 }
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalAddrForYVf(LocalAddressYParam<yType> &localAddressParam)
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalAddrForYVf(
+    LocalAddressYParam<yType> &localAddressParam)
 {
     uint64_t mte3BufIdx = (ubMte2AntiquantYLoopIdx_ - 1) & (UB_ANTI_QUANT_Y_BUFFER_NUM - 1);
     uint64_t antiquantParamOffset = mte3BufIdx * ANTI_QUANT_Y_PER_CHANNEL_SCALE_SINGLE_BUFFER_SIZE;
@@ -1388,10 +1385,9 @@ GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CalLocalAddrForYVf(LocalAddressY
 }
 
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyYUbToGm(uint64_t nRealL0Size, uint64_t mRealL0Size,
-                                                            __gm__ half *yGm, const BasicBlockOffsetParam &offsetParam,
-                                                            uint64_t aivMOffset)
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::CopyYUbToGm(
+    uint64_t nRealL0Size, uint64_t mRealL0Size, __gm__ half *yGm, const BasicBlockOffsetParam &offsetParam,
+    uint64_t aivMOffset)
 {
     if (unlikely(mRealL0Size == 0)) {
         return;

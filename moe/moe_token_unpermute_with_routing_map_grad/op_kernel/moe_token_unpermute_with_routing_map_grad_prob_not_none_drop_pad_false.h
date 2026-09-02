@@ -67,7 +67,8 @@ protected:
     event_t eventIdProbsVMte2 = EVENT_ID2;        // eventid 2 3用于probs的v和mte2之间同步
     event_t eventIdUnpermuteVMte2 = EVENT_ID4;    // eventid 4 5用于unpermuteOutputD的v和mte2之间同步
     event_t eventIdPermuteTokenVMte2 = EVENT_ID6; // eventid 6 7用于permute_token的v和mte2之间同步
-    int64_t indicesArray[INDICES_PROBS_MAX_RESERVE_NUM]; // 存储indicesNumPerLoop个indices值, 最大512,为避免GetValue操作设置
+    int64_t
+        indicesArray[INDICES_PROBS_MAX_RESERVE_NUM]; // 存储indicesNumPerLoop个indices值, 最大512,为避免GetValue操作设置
     float probsArray[INDICES_PROBS_MAX_RESERVE_NUM]; // 存储indicesNumPerLoop个probs值, 最大512, 为避免GetValue操作设置
     int64_t probsAddrArray[INDICES_PROBS_MAX_RESERVE_NUM];
 };
@@ -209,19 +210,16 @@ MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<PermutedTokenT, IdxT,
                 inQueueUnpermutedLocal = inQueueUnpermuted.GetWithOffset<PermutedTokenT>(
                     this->hiddenSizeAlign, this->hiddenSizeAlign * this->inputTypeSize * pingPongFlagUnpermute);
                 copyParams.blockLen = (uint32_t)hiddensizeLoopNum * this->inputTypeSize;
-                DataCopyPad(
-                    inQueueUnpermutedLocal, this->unpermutedTokensGradGm[unpermutedOutputDloopOffset], copyParams,
-                    this->inputPadParams);
+                DataCopyPad(inQueueUnpermutedLocal, this->unpermutedTokensGradGm[unpermutedOutputDloopOffset],
+                            copyParams, this->inputPadParams);
                 SetFlag<HardEvent::MTE2_V>(eventIdUnpermuteVMte2);
                 WaitFlag<HardEvent::MTE2_V>(eventIdUnpermuteVMte2);
                 if constexpr (IsSameType<PermutedTokenT, float>::value) { // fp32类型输入做Copy
-                    Copy(
-                        tmpBufferUnpermutedFp32, inQueueUnpermutedLocal, 64, this->hiddensizeAlignFp32RepeatTimes,
-                        {1, 1, 8, 8});
-                    Copy(
-                        tmpBufferUnpermutedFp32[this->hiddensizeAlignFp32TailOffset],
-                        inQueueUnpermutedLocal[this->hiddensizeAlignFp32TailOffset], this->hiddensizeAlignFp32TailMask,
-                        1, {1, 1, 8, 8});
+                    Copy(tmpBufferUnpermutedFp32, inQueueUnpermutedLocal, 64, this->hiddensizeAlignFp32RepeatTimes,
+                         {1, 1, 8, 8});
+                    Copy(tmpBufferUnpermutedFp32[this->hiddensizeAlignFp32TailOffset],
+                         inQueueUnpermutedLocal[this->hiddensizeAlignFp32TailOffset], this->hiddensizeAlignFp32TailMask,
+                         1, {1, 1, 8, 8});
                 } else { // fp16和bf16类型输入做cast
                     Cast(tmpBufferUnpermutedFp32, inQueueUnpermutedLocal, RoundMode::CAST_NONE, hiddensizeLoopNum);
                 }
@@ -234,9 +232,8 @@ MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<PermutedTokenT, IdxT,
                     if (permutedTokenOffset < 0) {
                         continue;
                     }
-                    Muls(
-                        tmpBufferPermutedTokensGradFp32, tmpBufferUnpermutedFp32, probsArray[indicesOffset],
-                        hiddensizeLoopNum);
+                    Muls(tmpBufferPermutedTokensGradFp32, tmpBufferUnpermutedFp32, probsArray[indicesOffset],
+                         hiddensizeLoopNum);
                     // copy out permuted_tokens_grad
                     // eventIdVMte3用于控制permuted_tokens_grads的2块空间的同步，取值0和1
                     // pingPongFlagPermuteTokenGrad用于控制permuted_tokens_grad的2块空间的切换
@@ -246,17 +243,14 @@ MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<PermutedTokenT, IdxT,
                         this->hiddenSizeAlign,
                         this->hiddenSizeAlign * this->inputTypeSize * pingPongFlagPermuteTokenGrad);
                     if constexpr (IsSameType<PermutedTokenT, float>::value) { // fp32类型输入做Copy
-                        Copy(
-                            permutedTokensGradLocal, tmpBufferPermutedTokensGradFp32, 64,
-                            this->hiddensizeAlignFp32RepeatTimes, {1, 1, 8, 8});
-                        Copy(
-                            permutedTokensGradLocal[this->hiddensizeAlignFp32TailOffset],
-                            tmpBufferPermutedTokensGradFp32[this->hiddensizeAlignFp32TailOffset],
-                            this->hiddensizeAlignFp32TailMask, 1, {1, 1, 8, 8});
+                        Copy(permutedTokensGradLocal, tmpBufferPermutedTokensGradFp32, 64,
+                             this->hiddensizeAlignFp32RepeatTimes, {1, 1, 8, 8});
+                        Copy(permutedTokensGradLocal[this->hiddensizeAlignFp32TailOffset],
+                             tmpBufferPermutedTokensGradFp32[this->hiddensizeAlignFp32TailOffset],
+                             this->hiddensizeAlignFp32TailMask, 1, {1, 1, 8, 8});
                     } else { // fp16和bf16类型输入做cast
-                        Cast(
-                            permutedTokensGradLocal, tmpBufferPermutedTokensGradFp32, RoundMode::CAST_RINT,
-                            hiddensizeLoopNum);
+                        Cast(permutedTokensGradLocal, tmpBufferPermutedTokensGradFp32, RoundMode::CAST_RINT,
+                             hiddensizeLoopNum);
                     }
                     SetFlag<HardEvent::V_MTE3>(eventIdVMte3);
                     WaitFlag<HardEvent::V_MTE3>(eventIdVMte3);
@@ -273,25 +267,21 @@ MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<PermutedTokenT, IdxT,
                     inQueuePermutedTokensLocal = inQueuePermutedTokens.GetWithOffset<PermutedTokenT>(
                         this->hiddenSizeAlign, this->hiddenSizeAlign * this->inputTypeSize * pingPongFlagPermuteToken);
                     copyParams.blockLen = (uint32_t)hiddensizeLoopNum * this->inputTypeSize;
-                    DataCopyPad(
-                        inQueuePermutedTokensLocal,
-                        this->permutedTokensGm[permutedTokenOffset * this->hiddenSize + hiddensizeLoopOffset],
-                        copyParams, this->inputPadParams);
+                    DataCopyPad(inQueuePermutedTokensLocal,
+                                this->permutedTokensGm[permutedTokenOffset * this->hiddenSize + hiddensizeLoopOffset],
+                                copyParams, this->inputPadParams);
                     SetFlag<HardEvent::MTE2_V>(eventIdPermuteTokenVMte2);
                     WaitFlag<HardEvent::MTE2_V>(eventIdPermuteTokenVMte2); // 等待permuted_tokens的搬运完成
                     // permuted_tokens的cast操作
                     if constexpr (IsSameType<PermutedTokenT, float>::value) {
-                        Copy(
-                            tmpBufferPermutedTokensFp32, inQueuePermutedTokensLocal, 64,
-                            this->hiddensizeAlignFp32RepeatTimes, {1, 1, 8, 8});
-                        Copy(
-                            tmpBufferPermutedTokensFp32[this->hiddensizeAlignFp32TailOffset],
-                            inQueuePermutedTokensLocal[this->hiddensizeAlignFp32TailOffset],
-                            this->hiddensizeAlignFp32TailMask, 1, {1, 1, 8, 8});
+                        Copy(tmpBufferPermutedTokensFp32, inQueuePermutedTokensLocal, 64,
+                             this->hiddensizeAlignFp32RepeatTimes, {1, 1, 8, 8});
+                        Copy(tmpBufferPermutedTokensFp32[this->hiddensizeAlignFp32TailOffset],
+                             inQueuePermutedTokensLocal[this->hiddensizeAlignFp32TailOffset],
+                             this->hiddensizeAlignFp32TailMask, 1, {1, 1, 8, 8});
                     } else {
-                        Cast(
-                            tmpBufferPermutedTokensFp32, inQueuePermutedTokensLocal, RoundMode::CAST_NONE,
-                            hiddensizeLoopNum);
+                        Cast(tmpBufferPermutedTokensFp32, inQueuePermutedTokensLocal, RoundMode::CAST_NONE,
+                             hiddensizeLoopNum);
                     }
                     SetFlag<HardEvent::V_MTE2>(eventIdPermuteTokenVMte2);    // 触发permuted_tokens的下一次搬运
                     pingPongFlagPermuteToken = 1 - pingPongFlagPermuteToken; // permuted_tokens的空间切换
@@ -299,8 +289,8 @@ MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<PermutedTokenT, IdxT,
                     // calculate prob_grad
                     Mul(tmpBufferPermutedTokensFp32, tmpBufferPermutedTokensFp32, tmpBufferUnpermutedFp32,
                         hiddensizeLoopNum);
-                    this->ReduceSumFunc(
-                        tmpBufferProbGradFp32[indicesOffset], tmpBufferPermutedTokensFp32, hiddensizeLoopNum);
+                    this->ReduceSumFunc(tmpBufferProbGradFp32[indicesOffset], tmpBufferPermutedTokensFp32,
+                                        hiddensizeLoopNum);
                 }
             }
             Add(tmpBufferProbGradReduceSumFp32, tmpBufferProbGradReduceSumFp32, tmpBufferProbGradFp32,
@@ -310,13 +300,11 @@ MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadFalse<PermutedTokenT, IdxT,
         // pingPongFlagProbsGrad用于控制prob_grad的2块空间的切换
         probGradLocal = outQueueProbGrad.Get<ProbsT>();
         if constexpr (IsSameType<ProbsT, float>::value) {
-            Copy(
-                probGradLocal, tmpBufferProbGradReduceSumFp32, 64, this->indicesReserveNumAlignFp32RepeatTimes,
-                {1, 1, 8, 8});
-            Copy(
-                probGradLocal[this->indicesReserveNumAlignFp32TailOffset],
-                tmpBufferProbGradReduceSumFp32[this->indicesReserveNumAlignFp32TailOffset],
-                this->indicesReserveNumAlignFp32TailMask, 1, {1, 1, 8, 8});
+            Copy(probGradLocal, tmpBufferProbGradReduceSumFp32, 64, this->indicesReserveNumAlignFp32RepeatTimes,
+                 {1, 1, 8, 8});
+            Copy(probGradLocal[this->indicesReserveNumAlignFp32TailOffset],
+                 tmpBufferProbGradReduceSumFp32[this->indicesReserveNumAlignFp32TailOffset],
+                 this->indicesReserveNumAlignFp32TailMask, 1, {1, 1, 8, 8});
         } else {
             Cast(probGradLocal, tmpBufferProbGradReduceSumFp32, RoundMode::CAST_RINT, indicesNumLoop);
         }

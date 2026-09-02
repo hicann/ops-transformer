@@ -21,8 +21,9 @@
 namespace GROUPED_MATMUL {
 
 template <typename T>
-__aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const GMMTilingData* __restrict tiling) {
-    const GMMBaseParams* __restrict gmmBaseParams = &tiling->gmmBaseParams;
+__aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const GMMTilingData *__restrict tiling)
+{
+    const GMMBaseParams *__restrict gmmBaseParams = &tiling->gmmBaseParams;
     // In the V2 interface, groupType is -1 after host is grouped. Thus, groupType can be either -1 or 2.
     if (groupListPtr == nullptr || gmmBaseParams->groupType == 0) {
         return;
@@ -32,7 +33,7 @@ __aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const
     GlobalTensor<int64_t> groupListGm;
     yGm.SetGlobalBuffer(GetTensorAddr<T>(0, y));
     if (groupListPtr != nullptr) {
-        groupListGm.SetGlobalBuffer((__gm__ int64_t*)groupListPtr);
+        groupListGm.SetGlobalBuffer((__gm__ int64_t *)groupListPtr);
     }
     uint64_t yBaseOffset = 0;
     int32_t preOffset = 0;
@@ -54,8 +55,8 @@ __aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const
     uint32_t groupListShapeSize = gmmBaseParams->groupNum * groupListInnerShape;
     for (uint32_t groupIdx = 0; groupIdx < groupListShapeSize; groupIdx += groupListInnerShape) {
         int32_t splitValue = GetSplitValueFromGroupList(groupIdx, preOffset, gmmBaseParams, groupListGm);
-        uint32_t m = isAllSingleTensor && gmmBaseParams->groupType == 2 ?
-            *ubM : *(ubM + groupIdx / groupListInnerShape);
+        uint32_t m =
+            isAllSingleTensor && gmmBaseParams->groupType == 2 ? *ubM : *(ubM + groupIdx / groupListInnerShape);
         uint32_t k = *ubK < 0 && gmmBaseParams->groupType == 2 ? splitValue : *(ubK + groupIdx / groupListInnerShape);
         uint32_t n = isAllSingleTensor ? *ubN : *(ubN + groupIdx / groupListInnerShape);
 
@@ -75,6 +76,6 @@ __aicore__ inline void EmptyTensorCompute(GM_ADDR groupListPtr, GM_ADDR y, const
     }
 }
 
-}  // namespace GROUPED_MATMUL
+} // namespace GROUPED_MATMUL
 
-#endif  // ASCENDC_GROUPED_MATMUL_VECTOR_H
+#endif // ASCENDC_GROUPED_MATMUL_VECTOR_H

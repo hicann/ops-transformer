@@ -193,7 +193,6 @@ private:
     uint32_t l0cHalfElems_ = 0; // = Mb*Nb (int32 elems per L0C half when dbL0c_)
 };
 
-
 // ============================================================
 // Process - iter-level work distribution across all experts.
 // Aggregates ceil(tokens_per_expert / Mb) into a global iter count, then

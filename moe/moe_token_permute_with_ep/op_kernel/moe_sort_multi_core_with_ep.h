@@ -22,13 +22,11 @@
 namespace MoeTokenPermuteWithEp {
 using namespace AscendC;
 template <typename T>
-class MoeSortMultiCore : public MoeSortBase
-{
+class MoeSortMultiCore : public MoeSortBase {
 public:
     __aicore__ inline MoeSortMultiCore(){};
-    __aicore__ inline void Init(
-        GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
-        const MoeTokenPermuteWithEpTilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
+                                const MoeTokenPermuteWithEpTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -40,16 +38,16 @@ private:
     __aicore__ inline void VBSCopyIn(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void UBSortCompute(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum);
-    __aicore__ inline void InitMoeMrgSort(MoeMrgsort* sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
-    __aicore__ inline void InitMoeMrgSortOut(
-        MoeMrgsortOut<int32_t, int32_t>* sorter, int64_t listNum, int64_t coreOffset);
+    __aicore__ inline void InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
+    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t> *sorter, int64_t listNum,
+                                             int64_t coreOffset);
 
 private:
     GlobalTensor<float> workspaceGms[2];
 
-    const PermuteVBSComputeTilingEPData* vbsTilingData;
-    const PermuteVMSMiddleComputeTilingEPData* vmsTilingData;
-    const PermuteSortOutComputeTilingEPData* sortOutTilingData;
+    const PermuteVBSComputeTilingEPData *vbsTilingData;
+    const PermuteVMSMiddleComputeTilingEPData *vmsTilingData;
+    const PermuteSortOutComputeTilingEPData *sortOutTilingData;
 
     // for MoeMrgsort
     MoeMrgsort mrgsorter;
@@ -138,8 +136,8 @@ __aicore__ inline void MoeSortMultiCore<T>::UBSortCompute(int64_t progress, int6
     LocalTensor<uint32_t> sourceRowLocal = indexLocal.ReinterpretCast<uint32_t>();
     PipeBarrier<PIPE_V>();
 
-    Sort<float, true>(
-        outLocal, expertForSourceRowLocalFp32, sourceRowLocal, sortedLocal, sortNum / ONE_REPEAT_SORT_NUM);
+    Sort<float, true>(outLocal, expertForSourceRowLocalFp32, sourceRowLocal, sortedLocal,
+                      sortNum / ONE_REPEAT_SORT_NUM);
 
     sortDataCopyOutQueue.EnQue<float>(outLocal);
 }
@@ -148,17 +146,15 @@ template <typename T>
 __aicore__ inline void MoeSortMultiCore<T>::VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum)
 {
     LocalTensor<float> outLocal = sortDataCopyOutQueue.DeQue<float>();
-    DataCopy(
-        workspaceGms[srcWsIndex]
-                    [this->blockIdx * GetSortLen<float>(this->vbsTilingData->perCoreElements) +
-                     GetSortLen<float>(progress * sortCoreLoopElements)],
-        outLocal, Align(GetSortLen<float>(size), sizeof(float)));
+    DataCopy(workspaceGms[srcWsIndex][this->blockIdx * GetSortLen<float>(this->vbsTilingData->perCoreElements) +
+                                      GetSortLen<float>(progress * sortCoreLoopElements)],
+             outLocal, Align(GetSortLen<float>(size), sizeof(float)));
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSort(
-    MoeMrgsort* sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset)
+__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum, int64_t coreOffset,
+                                                           int64_t loopOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx * coreOffset + loopOffset];
     LocalTensor<float> inLocal = sortedBuffer.Get<float>();
@@ -174,8 +170,8 @@ __aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSort(
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSortOut(
-    MoeMrgsortOut<int32_t, int32_t>* sorter, int64_t listNum, int64_t coreOffset)
+__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t> *sorter, int64_t listNum,
+                                                              int64_t coreOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex];
     LocalTensor<float> inLocal = indexConcatBuffer.Get<float>();
@@ -196,8 +192,8 @@ __aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSortOut(
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiCore<T>::OneCoreVMSProcess(
-    int64_t listNum, int64_t perListElements, int64_t lastListElements)
+__aicore__ inline void MoeSortMultiCore<T>::OneCoreVMSProcess(int64_t listNum, int64_t perListElements,
+                                                              int64_t lastListElements)
 {
     int64_t coreOffset = GetSortLen<float>(this->vbsTilingData->perCoreElements);
     mrgsortParam.oneLoopMaxElements = this->sortOutTilingData->oneLoopMaxElements;
@@ -246,9 +242,8 @@ __aicore__ inline void MoeSortMultiCore<T>::VBSProcess()
 {
     if (this->blockIdx < this->vbsTilingData->needCoreNum) {
         int64_t sortNum = Ceil(sortCoreLoopElements, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM;
-        ArithProgressionSupportInt32<int32_t>(
-            indexLocal, static_cast<int32_t>(this->blockIdx * blockFactor), static_cast<int32_t>(1),
-            sortCoreLoopElements);
+        ArithProgressionSupportInt32<int32_t>(indexLocal, static_cast<int32_t>(this->blockIdx * blockFactor),
+                                              static_cast<int32_t>(1), sortCoreLoopElements);
         for (int64_t loop = 0; loop < sortCoreLoops - 1; loop++) {
             UBSortProcess(loop, sortCoreLoopElements, sortNum);
             PipeBarrier<PIPE_V>();
@@ -319,9 +314,9 @@ __aicore__ inline void MoeSortMultiCore<T>::SortOutProcess()
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiCore<T>::Init(
-    GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
-    const MoeTokenPermuteWithEpTilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeSortMultiCore<T>::Init(GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow,
+                                                 GM_ADDR workspace, const MoeTokenPermuteWithEpTilingData *tilingData,
+                                                 TPipe *tPipe)
 {
     expertForSourceRow1 = expertForSourceRow;
     this->totalLength = tilingData->n * tilingData->topK;
@@ -350,22 +345,20 @@ __aicore__ inline void MoeSortMultiCore<T>::Init(
     int64_t coreNum = GetBlockNum();
     blockFactor = tilingData->vbsComputeParamsOp.perCoreElements;
     expertForSourceRowGm.SetGlobalBuffer(
-        (__gm__ T*)expertForSourceRow + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
+        (__gm__ T *)expertForSourceRow + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
         this->sortTotalLength);
-    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t*)sortedExpertForSourceRow, this->totalLength);
+    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t *)sortedExpertForSourceRow, this->totalLength);
     // for sort: expandDstToSrcRowGm.SetGlobalBuffer((__gm__ int32_t*)workspace, Align(this->totalLength,
     // sizeof(int32_t)));
 
     int64_t kvFactor = 2;
 
-    workspaceGms[0].SetGlobalBuffer((__gm__ float*)workspace, Align(this->totalLength, sizeof(int32_t)) * kvFactor);
-    workspaceGms[1].SetGlobalBuffer(
-        (__gm__ float*)workspace + Align(this->totalLength, sizeof(int32_t)) * kvFactor,
-        Align(this->totalLength, sizeof(int32_t)) * kvFactor);
+    workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace, Align(this->totalLength, sizeof(int32_t)) * kvFactor);
+    workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * kvFactor,
+                                    Align(this->totalLength, sizeof(int32_t)) * kvFactor);
 
-    int64_t indexNum = Ceil(
-                           Max(this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),
-                           ONE_REPEAT_SORT_NUM) *
+    int64_t indexNum = Ceil(Max(this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),
+                            ONE_REPEAT_SORT_NUM) *
                        ONE_REPEAT_SORT_NUM;
     int64_t indexBufferSize = indexNum * sizeof(int32_t);
     int64_t sortDataBufferSize = indexNum * sizeof(int64_t);

@@ -17,6 +17,6 @@ constexpr bool DEPENDENT_BOOL_VALUE = VALUE;
 
 template <class... Args>
 constexpr bool DEPENDENT_FALSE = DEPENDENT_BOOL_VALUE<false, Args...>;
-}
+} // namespace Catlass
 
-#endif  // GMM_DETAIL_DEPENDENT_FALSE_HPP
+#endif // GMM_DETAIL_DEPENDENT_FALSE_HPP

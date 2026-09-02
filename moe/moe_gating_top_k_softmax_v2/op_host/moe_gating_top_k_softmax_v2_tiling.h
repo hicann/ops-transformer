@@ -177,7 +177,7 @@ const int TOPK_SOFTMAX_TILING_KEY_BASE_COL_SMALLER_THAN_8 = 1;
 const int TOPK_SOFTMAX_TILING_KEY_BASE_COL_FROM_8_TO_64 = 2;
 const int TOPK_SOFTMAX_TILING_KEY_BASE_COL_BIGGER_THAN_64 = 3;
 
-inline int dtypeKey(const ge::DataType& dtype)
+inline int dtypeKey(const ge::DataType &dtype)
 {
     if (dtype == ge::DataType::DT_FLOAT) {
         return 1;
@@ -189,7 +189,7 @@ inline int dtypeKey(const ge::DataType& dtype)
     return 0;
 }
 
-inline int colNumKey(const uint32_t& col)
+inline int colNumKey(const uint32_t &col)
 {
     if (col <= BLOCK_B32_SIZE) {
         return TOPK_SOFTMAX_TILING_KEY_BASE_COL_SMALLER_THAN_8;
@@ -200,18 +200,18 @@ inline int colNumKey(const uint32_t& col)
     }
 }
 
-class MoeGatingTopKSoftmaxV2BaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass
-{
+class MoeGatingTopKSoftmaxV2BaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeGatingTopKSoftmaxV2BaseTiling(gert::TilingContext* context) : TilingBaseClass(context)
+    explicit MoeGatingTopKSoftmaxV2BaseTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {}
 
 protected:
     ge::graphStatus GetPlatformInfo() override;
     ge::graphStatus GetShapeAttrsInfo() override;
-    ge::graphStatus CheckOutShape(const gert::Shape&, gert::Shape&, bool, const char*);
-    ge::graphStatus CheckInShape(const gert::Shape&);
-    ge::graphStatus CheckOptionalAttr(gert::Shape&);
+    ge::graphStatus CheckOutShape(const gert::Shape &, gert::Shape &, bool, const char *);
+    ge::graphStatus CheckInShape(const gert::Shape &);
+    ge::graphStatus CheckOptionalAttr(gert::Shape &);
 
 protected:
     int coreNum;

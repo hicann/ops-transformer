@@ -60,9 +60,7 @@ struct ASWOffsetParam {
 
 class QuantASWBlockSch {
 public:
-    __aicore__ inline QuantASWBlockSch()
-    {
-    }
+    __aicore__ inline QuantASWBlockSch() {}
     template <bool isGmm>
     __aicore__ inline void Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx);
     // 每一个group需要更新mm的group偏移和MNK

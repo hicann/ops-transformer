@@ -273,11 +273,12 @@ __aicore__ inline void CastS8RegTensorToF16RegTensor(RegTensor<xType> &weightF16
 }
 
 template <typename xType, typename wType, const WqmmConfig &wqmmConfig>
-__aicore__ inline void
-AddMulWeightF16RegTensorNdKn(RegTensor<xType> &weightF16Vreg0, RegTensor<xType> &weightF16Vreg1,
-                             RegTensor<xType> &antiQuantScaleVreg, RegTensor<xType> &antiQuantOffsetVreg,
-                             RegTensor<xType> &antiQuantScaleVreg1, RegTensor<xType> &antiQuantOffsetVreg1,
-                             MicroAPI::MaskReg &maskAll, const xType &offsetValue)
+__aicore__ inline void AddMulWeightF16RegTensorNdKn(RegTensor<xType> &weightF16Vreg0, RegTensor<xType> &weightF16Vreg1,
+                                                    RegTensor<xType> &antiQuantScaleVreg,
+                                                    RegTensor<xType> &antiQuantOffsetVreg,
+                                                    RegTensor<xType> &antiQuantScaleVreg1,
+                                                    RegTensor<xType> &antiQuantOffsetVreg1, MicroAPI::MaskReg &maskAll,
+                                                    const xType &offsetValue)
 {
     if constexpr (wqmmConfig.hasAntiQuantOffset) {
         if constexpr (wqmmConfig.antiQuantType == QuantType::PER_TENSOR) {
@@ -344,11 +345,13 @@ __aicore__ inline void NdNkLoadScaleOffset(__local_mem__ xType *antiQuantScaleBa
 }
 
 template <typename xType, const WqmmConfig &wqmmConfig>
-__aicore__ inline void
-NdKnLoadScaleOffset(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_mem__ xType *antiQuantScaleBasePhyAddr1,
-                    __local_mem__ xType *antiQuantOffsetBasePhyAddr, __local_mem__ xType *antiQuantOffsetBasePhyAddr1,
-                    RegTensor<xType> &antiQuantScaleVreg, RegTensor<xType> &antiQuantScaleVreg1,
-                    RegTensor<xType> &antiQuantOffsetVreg, RegTensor<xType> &antiQuantOffsetVreg1, xType scaleValue)
+__aicore__ inline void NdKnLoadScaleOffset(__local_mem__ xType *antiQuantScaleBasePhyAddr,
+                                           __local_mem__ xType *antiQuantScaleBasePhyAddr1,
+                                           __local_mem__ xType *antiQuantOffsetBasePhyAddr,
+                                           __local_mem__ xType *antiQuantOffsetBasePhyAddr1,
+                                           RegTensor<xType> &antiQuantScaleVreg, RegTensor<xType> &antiQuantScaleVreg1,
+                                           RegTensor<xType> &antiQuantOffsetVreg,
+                                           RegTensor<xType> &antiQuantOffsetVreg1, xType scaleValue)
 {
     if constexpr (wqmmConfig.hasAntiQuantOffset) {
         MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_NORM>(antiQuantOffsetVreg, antiQuantOffsetBasePhyAddr);
@@ -369,10 +372,11 @@ NdKnLoadScaleOffset(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_mem_
 }
 
 template <typename xType, typename wType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-AntiQuantB8CommonNdKn(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_mem__ xType *antiQuantOffsetBasePhyAddr,
-                      __local_mem__ wType *weightLowBitPhyAddr0, __local_mem__ xType *weightF16PhyAddr0,
-                      xType scaleValue, xType offsetValue, uint64_t ubLoopK)
+__aicore__ inline void AntiQuantB8CommonNdKn(__local_mem__ xType *antiQuantScaleBasePhyAddr,
+                                             __local_mem__ xType *antiQuantOffsetBasePhyAddr,
+                                             __local_mem__ wType *weightLowBitPhyAddr0,
+                                             __local_mem__ xType *weightF16PhyAddr0, xType scaleValue,
+                                             xType offsetValue, uint64_t ubLoopK)
 {
     __local_mem__ xType *antiQuantScaleBasePhyAddr1 = antiQuantScaleBasePhyAddr + VEC_MAX_ELEM_B16;
     __local_mem__ xType *antiQuantOffsetBasePhyAddr1 = antiQuantOffsetBasePhyAddr + VEC_MAX_ELEM_B16;
@@ -418,10 +422,11 @@ AntiQuantB8CommonNdKn(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_me
 }
 
 template <typename xType, typename wType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-AntiQuantB8CommonNdNk(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_mem__ xType *antiQuantOffsetBasePhyAddr,
-                      __local_mem__ wType *weightLowBitPhyAddr0, __local_mem__ xType *weightF16PhyAddr0,
-                      xType scaleValue, xType offsetValue, uint64_t ubLoopN)
+__aicore__ inline void AntiQuantB8CommonNdNk(__local_mem__ xType *antiQuantScaleBasePhyAddr,
+                                             __local_mem__ xType *antiQuantOffsetBasePhyAddr,
+                                             __local_mem__ wType *weightLowBitPhyAddr0,
+                                             __local_mem__ xType *weightF16PhyAddr0, xType scaleValue,
+                                             xType offsetValue, uint64_t ubLoopN)
 {
     __local_mem__ wType *weightLowBitPhyAddr1 = weightLowBitPhyAddr0 + (VECTOR_REG_WIDTH >> 1);
     __local_mem__ xType *weightF16PhyAddr1 = weightF16PhyAddr0 + WEIGHT_F16_UB_NZ_STRIDE * (VECTOR_REG_WIDTH >> 1);
@@ -461,10 +466,11 @@ AntiQuantB8CommonNdNk(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_me
 }
 
 template <typename xType, typename wType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-AntiQuantInt4NdNk(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_mem__ xType *antiQuantOffsetBasePhyAddr,
-                  __local_mem__ wType *weightLowBitPhyAddr0, __local_mem__ xType *weightF16PhyAddr0, xType scaleValue,
-                  xType offsetValue, uint64_t ubLoopN)
+__aicore__ inline void AntiQuantInt4NdNk(__local_mem__ xType *antiQuantScaleBasePhyAddr,
+                                         __local_mem__ xType *antiQuantOffsetBasePhyAddr,
+                                         __local_mem__ wType *weightLowBitPhyAddr0,
+                                         __local_mem__ xType *weightF16PhyAddr0, xType scaleValue, xType offsetValue,
+                                         uint64_t ubLoopN)
 {
     // int4每次处理128个数即为64B, 256>>2=64
     __local_mem__ wType *weightLowBitPhyAddr1 = weightLowBitPhyAddr0 + (VECTOR_REG_WIDTH >> 2);
@@ -511,10 +517,11 @@ AntiQuantInt4NdNk(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_mem__ 
 }
 
 template <typename xType, typename wType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-AntiQuantInt4NdKn(__local_mem__ xType *antiQuantScaleBasePhyAddr, __local_mem__ xType *antiQuantOffsetBasePhyAddr,
-                  __local_mem__ wType *weightLowBitPhyAddr0, __local_mem__ xType *weightF16PhyAddr0, xType scaleValue,
-                  xType offsetValue, uint64_t ubLoopK)
+__aicore__ inline void AntiQuantInt4NdKn(__local_mem__ xType *antiQuantScaleBasePhyAddr,
+                                         __local_mem__ xType *antiQuantOffsetBasePhyAddr,
+                                         __local_mem__ wType *weightLowBitPhyAddr0,
+                                         __local_mem__ xType *weightF16PhyAddr0, xType scaleValue, xType offsetValue,
+                                         uint64_t ubLoopK)
 {
     __local_mem__ xType *antiQuantScaleBasePhyAddr1 = antiQuantScaleBasePhyAddr + VEC_MAX_ELEM_B16;
     __local_mem__ xType *antiQuantOffsetBasePhyAddr1 = antiQuantOffsetBasePhyAddr + VEC_MAX_ELEM_B16;
@@ -844,11 +851,12 @@ __simd_vf__ inline void AntiQuantInt4PerGroupNdNkGs64(__local_mem__ xType *antiQ
 // 每个 group 32 K 元素 = 1/4 向量寄存器
 // GMM [G,N] 布局下不能用 DIST_E2B_B16；每个 128K 向量使用 4 次 DIST_BRC_B16 + Select 拼接
 template <typename xType>
-__simd_callee__ inline void
-SelectNdNkGs32FourGroups(RegTensor<xType> &dstVreg, RegTensor<xType> &tmp01Vreg, RegTensor<xType> &tmp23Vreg,
-                         RegTensor<xType> &group0Vreg, RegTensor<xType> &group1Vreg, RegTensor<xType> &group2Vreg,
-                         RegTensor<xType> &group3Vreg, MicroAPI::MaskReg &maskRegSelect32,
-                         MicroAPI::MaskReg &maskRegSelect96, MicroAPI::MaskReg &maskRegSelectH)
+__simd_callee__ inline void SelectNdNkGs32FourGroups(RegTensor<xType> &dstVreg, RegTensor<xType> &tmp01Vreg,
+                                                     RegTensor<xType> &tmp23Vreg, RegTensor<xType> &group0Vreg,
+                                                     RegTensor<xType> &group1Vreg, RegTensor<xType> &group2Vreg,
+                                                     RegTensor<xType> &group3Vreg, MicroAPI::MaskReg &maskRegSelect32,
+                                                     MicroAPI::MaskReg &maskRegSelect96,
+                                                     MicroAPI::MaskReg &maskRegSelectH)
 {
     // tmp01: [group0 x 32, group1 x 96], tmp23: [group2 x 96, group3 x 32].
     MicroAPI::Select(tmp01Vreg, group0Vreg, group1Vreg, maskRegSelect32);

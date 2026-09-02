@@ -28,21 +28,20 @@ constexpr int64_t FP32_ONE_REPEAT = 64;
 constexpr int64_t INDICES_PROBS_MAX_RESERVE_NUM = 512;
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT>
-class MoeTokenUnpermuteWithRoutingMapGradBase
-{
+class MoeTokenUnpermuteWithRoutingMapGradBase {
 public:
     __aicore__ inline MoeTokenUnpermuteWithRoutingMapGradBase(){};
-    __aicore__ inline void Init(
-        GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId, GM_ADDR routing_map,
-        GM_ADDR permuted_tokens, GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-        const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data);
+    __aicore__ inline void Init(GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId,
+                                GM_ADDR routing_map, GM_ADDR permuted_tokens, GM_ADDR probs,
+                                GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
+                                const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data);
     __aicore__ inline int32_t AlignUp(int32_t a, int32_t b);
     __aicore__ inline int32_t CeilDiv(int32_t a, int32_t b);
     __aicore__ inline int32_t SafeDiv(int32_t a, int32_t b);
-    __aicore__ inline void BinaryAddFunc(
-        LocalTensor<float> tmpBuffer, int32_t hiddensizeLen, int32_t threshold, int32_t offset);
-    __aicore__ inline void ReduceSumFunc(
-        LocalTensor<float> dstBuffer, LocalTensor<float> tmpBuffer, int32_t hiddensizeLen);
+    __aicore__ inline void BinaryAddFunc(LocalTensor<float> tmpBuffer, int32_t hiddensizeLen, int32_t threshold,
+                                         int32_t offset);
+    __aicore__ inline void ReduceSumFunc(LocalTensor<float> dstBuffer, LocalTensor<float> tmpBuffer,
+                                         int32_t hiddensizeLen);
 
 protected:
     TPipe pipe;
@@ -94,7 +93,8 @@ protected:
 };
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT>
-__aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::AlignUp(int32_t a, int32_t b)
+__aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::AlignUp(int32_t a,
+                                                                                                         int32_t b)
 {
     if (unlikely(b == 0)) {
         return a;
@@ -103,7 +103,8 @@ __aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT
 }
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT>
-__aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::CeilDiv(int32_t a, int32_t b)
+__aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::CeilDiv(int32_t a,
+                                                                                                         int32_t b)
 {
     if (unlikely(b == 0)) {
         return 0;
@@ -112,7 +113,8 @@ __aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT
 }
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT>
-__aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::SafeDiv(int32_t a, int32_t b)
+__aicore__ inline int32_t MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::SafeDiv(int32_t a,
+                                                                                                         int32_t b)
 {
     if (unlikely(b == 0)) {
         return 0;
@@ -215,7 +217,7 @@ template <typename PermutedTokenT, typename IdxT, typename ProbsT>
 __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::Init(
     GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId, GM_ADDR routing_map,
     GM_ADDR permuted_tokens, GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-    const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data)
+    const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data)
 {
     tokensNum = tiling_data.tokensNum;
     topK = tiling_data.topK;
@@ -248,15 +250,15 @@ __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, I
     hiddensizeAlignFp32TailMask = this->hiddenSizeAlign % FP32_ONE_REPEAT;
     hiddensizeAlignFp32TailOffset = hiddensizeAlignFp32RepeatTimes * FP32_ONE_REPEAT;
 
-    unpermutedTokensGradGm.SetGlobalBuffer((__gm__ PermutedTokenT*)unpermuted_tokens_grad);
-    sortedTwiceIndexGm.SetGlobalBuffer((__gm__ IdxT*)outIndex);
-    sortedTwiceIndicesGm.SetGlobalBuffer((__gm__ IdxT*)permuteTokenId);
-    permutedTokensGm.SetGlobalBuffer((__gm__ PermutedTokenT*)permuted_tokens);
-    probGm.SetGlobalBuffer((__gm__ ProbsT*)probs);
-    routingMapGm.SetGlobalBuffer((__gm__ int8_t*)routing_map);
+    unpermutedTokensGradGm.SetGlobalBuffer((__gm__ PermutedTokenT *)unpermuted_tokens_grad);
+    sortedTwiceIndexGm.SetGlobalBuffer((__gm__ IdxT *)outIndex);
+    sortedTwiceIndicesGm.SetGlobalBuffer((__gm__ IdxT *)permuteTokenId);
+    permutedTokensGm.SetGlobalBuffer((__gm__ PermutedTokenT *)permuted_tokens);
+    probGm.SetGlobalBuffer((__gm__ ProbsT *)probs);
+    routingMapGm.SetGlobalBuffer((__gm__ int8_t *)routing_map);
 
-    permutedTokensGradGm.SetGlobalBuffer((__gm__ PermutedTokenT*)permuted_tokens_grad);
-    probGradGm.SetGlobalBuffer((__gm__ ProbsT*)probs_grad);
+    permutedTokensGradGm.SetGlobalBuffer((__gm__ PermutedTokenT *)permuted_tokens_grad);
+    probGradGm.SetGlobalBuffer((__gm__ ProbsT *)probs_grad);
 
     if (coreIndex < formerCoreNum) {
         rowIdMapStartOffset = coreIndex * rowIdMapEachCore;

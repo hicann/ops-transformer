@@ -39,13 +39,13 @@ using AscendC::TPosition;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
 
-#define GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM                                                                              \
-    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType,                         \
-              typename perTokenScaleType, typename biasType, typename yType, const WqmmConfig &wqmmConfig,             \
+#define GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM \
+    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType, \
+              typename perTokenScaleType, typename biasType, typename yType, const WqmmConfig &wqmmConfig, \
               const VecAntiQuantConfig &vecConfig>
 
-#define GMM_WQ_BASIC_BLOCK_CLASS                                                                                       \
-    WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType,       \
+#define GMM_WQ_BASIC_BLOCK_CLASS \
+    WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType, \
                                 wqmmConfig, vecConfig>
 
 GMM_WQ_BASIC_BLOCK_TEMPLATE_PARAM

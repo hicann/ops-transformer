@@ -44,7 +44,6 @@ TILING_DATA_FIELD_DEF_STRUCT(InnerMoeV2GatherOutComputeTilingData, srcToDstCapac
 TILING_DATA_FIELD_DEF_STRUCT(InnerMoeV2GatherOutComputeTilingData, gatherOutComputeParamsOp);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(MoeInitRoutingQuantV2, MoeInitRoutingQuantV2TilingData)
-struct MoeInitRoutingQuantV2CompileInfo {
-};
+struct MoeInitRoutingQuantV2CompileInfo {};
 } // namespace optiling
 #endif // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INIT_ROUTING_QUANT_V2_H

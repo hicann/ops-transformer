@@ -57,10 +57,10 @@ static constexpr AscendC::MicroAPI::CastTrait ctHalf2Fp32OneES = {
 
 using namespace AscendC;
 
-#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS                                                 \
-    template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,       \
+#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS \
+    template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_, \
               typename DataTypeBias_, typename DataTypeRowIndex_>
-#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS                                                  \
+#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS \
     DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, DataTypeBias_, DataTypeRowIndex_
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
@@ -177,9 +177,8 @@ __aicore__ inline BlockEpilogueDequantFinalizeRouting<
 }
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::Init(
-    Params const &params)
+__aicore__ inline void BlockEpilogueDequantFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::Init(Params const &params)
 {
     if ASCEND_IS_AIC {
         return;
@@ -218,18 +217,15 @@ BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_
 }
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateNextProblem(
-    const ProblemShape &problemShape)
+__aicore__ inline void BlockEpilogueDequantFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateNextProblem(const ProblemShape &problemShape)
 {
     n_ = Get<MNK_N>(problemShape);
 }
 
-
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
-    const BlockCoord &baseOffset)
+__aicore__ inline void BlockEpilogueDequantFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(const BlockCoord &baseOffset)
 {
     if ASCEND_IS_AIV {
         logitGlobal_.SetGlobalBuffer((__gm__ float *)params_->logitGmAddr + Get<LOGIT_INDEXS>(baseOffset));
@@ -468,9 +464,11 @@ BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_
 }
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::
-    CopyX1ScaleFromGm2Ub(LocalTensor<DataTypeX1Scale> &dst, uint64_t blockLen, uint64_t offset)
+__aicore__ inline void BlockEpilogueDequantFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::CopyX1ScaleFromGm2Ub(LocalTensor<DataTypeX1Scale>
+                                                                                             &dst,
+                                                                                         uint64_t blockLen,
+                                                                                         uint64_t offset)
 {
     DataCopyParams ptScale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -479,9 +477,10 @@ BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_
 }
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::
-    CopyX2ScaleFromGm2Ub(LocalTensor<DataTypeX2Scale> &dst, uint64_t offset)
+__aicore__ inline void BlockEpilogueDequantFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::CopyX2ScaleFromGm2Ub(LocalTensor<DataTypeX2Scale>
+                                                                                             &dst,
+                                                                                         uint64_t offset)
 {
     DataCopyParams scale2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;
@@ -490,9 +489,8 @@ BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_
 }
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequantFinalizeRouting<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::CopyBiasFromGm2Ub(
-    LocalTensor<BiasDtype> &dst)
+__aicore__ inline void BlockEpilogueDequantFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::CopyBiasFromGm2Ub(LocalTensor<BiasDtype> &dst)
 {
     DataCopyParams bias2UbParams{1, 0, 0, 0};
     DataCopyPadParams padParams;

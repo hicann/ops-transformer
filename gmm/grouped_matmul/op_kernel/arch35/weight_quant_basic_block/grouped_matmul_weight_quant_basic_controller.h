@@ -18,7 +18,6 @@
 #include "weight_quant_basic_block.h"
 #include "../grouped_matmul_tiling_data_apt.h"
 
-
 using WeightQuantBatchMatmulV2::Arch35::BasicBlockOffsetParam;
 using WeightQuantBatchMatmulV2::Arch35::CeilDivide;
 using WeightQuantBatchMatmulV2::Arch35::DOUBLE_BUFFER_NUM;
@@ -158,9 +157,8 @@ __aicore__ inline void GMMWeightQuantBasicController<xType, wType, biasType, yTy
 
 template <typename xType, typename wType, typename biasType, typename yType, const WqmmConfig &wqmmConfig,
           const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-GMMWeightQuantBasicController<xType, wType, biasType, yType, wqmmConfig, vecConfig>::InitOffsetParam(
-    BasicBlockOffsetParam &offsetParam)
+__aicore__ inline void GMMWeightQuantBasicController<xType, wType, biasType, yType, wqmmConfig,
+                                                     vecConfig>::InitOffsetParam(BasicBlockOffsetParam &offsetParam)
 {
     // 单的场景不需要频繁取值，n/k轴在开始的时候获取一次即可
     if (gmmBaseTiling_->singleWeight == 1) {
@@ -249,9 +247,9 @@ __aicore__ inline void GMMWeightQuantBasicController<xType, wType, biasType, yTy
 
 template <typename xType, typename wType, typename biasType, typename yType, const WqmmConfig &wqmmConfig,
           const VecAntiQuantConfig &vecConfig>
-__aicore__ inline uint64_t
-GMMWeightQuantBasicController<xType, wType, biasType, yType, wqmmConfig, vecConfig>::GetSplitValueFromGroupList(
-    uint64_t groupIdx, uint64_t &preOffset)
+__aicore__ inline uint64_t GMMWeightQuantBasicController<xType, wType, biasType, yType, wqmmConfig,
+                                                         vecConfig>::GetSplitValueFromGroupList(uint64_t groupIdx,
+                                                                                                uint64_t &preOffset)
 {
     uint64_t splitValue = 0;
     if (likely(gmmBaseTiling_->groupType != -1)) {

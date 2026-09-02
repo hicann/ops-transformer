@@ -61,7 +61,7 @@ constexpr size_t GMM_SPLIT_M_SINGLE_WEIGHT_DIM = 3UL;
 constexpr size_t GMM_SPLIT_K_SINGLE_WEIGHT_DIM = 2UL;
 constexpr size_t LAST_DIM = 1UL;
 constexpr size_t PENULTIMATE_DIM = 2UL;
-constexpr size_t ANTEPENULTIMATE_DIM = 3UL; 
+constexpr size_t ANTEPENULTIMATE_DIM = 3UL;
 constexpr int64_t PERTILE_GROUP_SIZE = 128UL;
 constexpr size_t GMM_A8W4_OFFSET_DIM_NUM = 3UL;
 constexpr size_t GMM_A8W4_BIAS_DIM_NUM = 2UL;
@@ -114,8 +114,8 @@ const std::initializer_list<ge::DataType> BIAS_DTYPE_SUPPORT_LIST = {ge::DataTyp
 class GroupedMatmulCommonUtil {
 public:
     GMMAttrs attrsInfo;
-    GroupedMatmulCommonUtil(){};
-    ~GroupedMatmulCommonUtil(){};
+    GroupedMatmulCommonUtil() {};
+    ~GroupedMatmulCommonUtil() {};
 
 private:
 };

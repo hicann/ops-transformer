@@ -112,8 +112,8 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
     WaitFlag<event>(eventId);
 }
 
-__aicore__ inline void ArithProgressionPerf(
-    const LocalTensor<int32_t>& dst, const int32_t firstValue, const int32_t diffValue, int32_t countAlign)
+__aicore__ inline void ArithProgressionPerf(const LocalTensor<int32_t> &dst, const int32_t firstValue,
+                                            const int32_t diffValue, int32_t countAlign)
 {
     // countAlign must be eight aligned
     countAlign = (countAlign + CONSTANT_SEVEN) / BLOCK_B32_SIZE * BLOCK_B32_SIZE;

@@ -55,9 +55,7 @@ constexpr uint32_t GEMV_THRESHOLD = 8;
 class QuantMatmulDequantBase {
 public:
     TPipe pipe;
-    __aicore__ inline QuantMatmulDequantBase()
-    {
-    }
+    __aicore__ inline QuantMatmulDequantBase() {}
 
 protected:
     __aicore__ inline void InitSyncWs()

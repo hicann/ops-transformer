@@ -55,28 +55,29 @@ struct MoeTokenUnpermuteWithRoutingMapPadTilingData {
 };
 
 struct MoeTokenUnpermuteWithRoutingMapTilingData {
-  int64_t hidden_size = 0;
-  int64_t top_k = 0;
-  int64_t num_out_tokens = 0;
-  int64_t hidden_splited_length = 0;
-  int64_t hidden_splited_num = 0;
-  int64_t hidden_splited_remain = 0;
-  int64_t tokens_core_length = 0;
-  int64_t tokens_core_remain = 0;
-  int64_t tokens_splited_length = 0;
-  int64_t tokens_splited_num = 0;
-  int64_t tokens_splited_remain = 0;
-  int64_t used_core_num = 0;
-  int64_t buffer_num = 0;
-  MaskedSelectMTUTilingData maskedSelectParamsOp;
-  MoeTokenUnpermuteWithRoutingMapPadTilingData moeTokenUnpermuteWithRoutingMapPadTilingData;
+    int64_t hidden_size = 0;
+    int64_t top_k = 0;
+    int64_t num_out_tokens = 0;
+    int64_t hidden_splited_length = 0;
+    int64_t hidden_splited_num = 0;
+    int64_t hidden_splited_remain = 0;
+    int64_t tokens_core_length = 0;
+    int64_t tokens_core_remain = 0;
+    int64_t tokens_splited_length = 0;
+    int64_t tokens_splited_num = 0;
+    int64_t tokens_splited_remain = 0;
+    int64_t used_core_num = 0;
+    int64_t buffer_num = 0;
+    MaskedSelectMTUTilingData maskedSelectParamsOp;
+    MoeTokenUnpermuteWithRoutingMapPadTilingData moeTokenUnpermuteWithRoutingMapPadTilingData;
 };
 
-inline void InitMoeTokenUnpermuteTilingData(uint8_t* tiling, MoeTokenUnpermuteWithRoutingMapTilingData* const_data) {
-  memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteWithRoutingMapTilingData));
+inline void InitMoeTokenUnpermuteTilingData(uint8_t *tiling, MoeTokenUnpermuteWithRoutingMapTilingData *const_data)
+{
+    memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteWithRoutingMapTilingData));
 }
 
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-MoeTokenUnpermuteWithRoutingMapTilingData tilingData;          \
-  InitMoeTokenUnpermuteTilingData(tilingPointer, &tilingData)
+    MoeTokenUnpermuteWithRoutingMapTilingData tilingData; \
+    InitMoeTokenUnpermuteTilingData(tilingPointer, &tilingData)
 #endif

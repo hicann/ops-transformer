@@ -32,10 +32,11 @@
 
 namespace optiling {
 BEGIN_TILING_DATA_DEF(MoeGatingTopKBackwardTilingData)
-TILING_DATA_FIELD_DEF(int64_t, needCoreNum);    // 所需要的总核数
-TILING_DATA_FIELD_DEF(int64_t, perCoreRows);    // 头核需要处理的 token 数
-TILING_DATA_FIELD_DEF(int64_t, lastCoreRows);   // 尾核需要处理的 token 数
-TILING_DATA_FIELD_DEF(int64_t, baseRows);       // 头核、尾核的头 loop 一次搬运的 token 数，同时也是一个 UB 可以处理的最多 token 数
+TILING_DATA_FIELD_DEF(int64_t, needCoreNum);  // 所需要的总核数
+TILING_DATA_FIELD_DEF(int64_t, perCoreRows);  // 头核需要处理的 token 数
+TILING_DATA_FIELD_DEF(int64_t, lastCoreRows); // 尾核需要处理的 token 数
+TILING_DATA_FIELD_DEF(int64_t,
+                      baseRows); // 头核、尾核的头 loop 一次搬运的 token 数，同时也是一个 UB 可以处理的最多 token 数
 TILING_DATA_FIELD_DEF(int64_t, perLoopTimes);   // 头核需要 loop 的次数
 TILING_DATA_FIELD_DEF(int64_t, perTailRows);    // 头核尾 loop 一次搬运的 token 数
 TILING_DATA_FIELD_DEF(int64_t, lastLoopTimes);  // 尾核需要 loop 的次数

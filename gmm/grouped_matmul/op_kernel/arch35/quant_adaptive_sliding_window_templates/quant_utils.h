@@ -22,7 +22,7 @@
 #endif
 #include "lib/matmul_intf.h"
 
-#define LOCAL_TEMPLATE_CLASS_PARAMS                                                                                    \
+#define LOCAL_TEMPLATE_CLASS_PARAMS \
     template <class xType, class wType, class biasType, class scaleType, class yType, CubeFormat wFormat, bool aTrans, \
               bool bTrans>
 #define LOCAL_TEMPLATE_FUNC_PARAMS xType, wType, biasType, scaleType, yType, wFormat, aTrans, bTrans
@@ -181,8 +181,7 @@ __aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, 
     uint64_t perCoreSize = QuantUtils::CeilDiv(ySize, usedCoreNum);
     perCoreSize = GROUPED_MATMUL::AlignUp<QuantUtils::UB_ALIGN_SIZE>(perCoreSize * sizeof(T)) / sizeof(T);
     initSize = QuantUtils::Min(initSize, perCoreSize);
-    uint64_t realCoreNum =
-        QuantUtils::Min(QuantUtils::CeilDiv(ySize, initSize), static_cast<uint64_t>(usedCoreNum));
+    uint64_t realCoreNum = QuantUtils::Min(QuantUtils::CeilDiv(ySize, initSize), static_cast<uint64_t>(usedCoreNum));
     if (blockIndex >= realCoreNum) { // 多余核数返回，每个核上最少32B
         return;
     }

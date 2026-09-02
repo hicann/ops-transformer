@@ -21,14 +21,13 @@ using namespace AscendC;
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT>
 class MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue
-    : protected MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>
-{
+    : protected MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT> {
 public:
     __aicore__ inline MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue(){};
-    __aicore__ inline void Init(
-        GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId, GM_ADDR routing_map,
-        GM_ADDR permuted_tokens, GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-        const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data);
+    __aicore__ inline void Init(GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId,
+                                GM_ADDR routing_map, GM_ADDR permuted_tokens, GM_ADDR probs,
+                                GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
+                                const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data);
     __aicore__ inline void Process();
 
 protected:
@@ -49,7 +48,7 @@ template <typename PermutedTokenT, typename IdxT, typename ProbsT>
 __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue<PermutedTokenT, IdxT, ProbsT>::Init(
     GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId, GM_ADDR routing_map,
     GM_ADDR permuted_tokens, GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-    const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data)
+    const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data)
 {
     MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::Init(
         unpermuted_tokens_grad, outIndex, permuteTokenId, routing_map, permuted_tokens, probs, permuted_tokens_grad,
@@ -61,14 +60,14 @@ __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue
     this->pipe.InitBuffer(permutedTokensGradTQue, DOUBLE_BUFFER, this->hiddenSizeAlign * this->inputTypeSize);
     this->pipe.InitBuffer(probGradOutTBuf, BLOCK_SIZE_32);
 
-    InitOutput<ProbsT>(
-        this->probGradGm[this->unpermutedOutputDStartOffset * this->numExpert], this->tokensNum * this->numExpert,
-        ProbsT(0));
+    InitOutput<ProbsT>(this->probGradGm[this->unpermutedOutputDStartOffset * this->numExpert],
+                       this->tokensNum * this->numExpert, ProbsT(0));
     SyncAll();
 }
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT>
-__aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue<PermutedTokenT, IdxT, ProbsT>::Process()
+__aicore__ inline void
+MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue<PermutedTokenT, IdxT, ProbsT>::Process()
 {
     int64_t outNumCurrentCore = this->coreIndex < this->formerCoreNum ? this->rowIdMapEachCore : this->rowIdMapTailCore;
     probGradOutLocal = probGradOutTBuf.Get<ProbsT>();
@@ -104,30 +103,26 @@ __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNotNoneDropPadTrue
             LocalTensor<float> unpermutedGradLocalFp32 = unpermutedGradTQue.template AllocTensor<float>();
             LocalTensor<float> permutedTokensLocalFp32 = permutedTokensTQue.template AllocTensor<float>();
             if constexpr (IsSameType<PermutedTokenT, float>::value) {
-                DataCopyPad(
-                    unpermutedGradLocalFp32, this->unpermutedTokensGradGm[unpermutedTokensGradOffset], copyParams,
-                    this->inputPadParams);
-                DataCopyPad(
-                    permutedTokensLocalFp32, this->permutedTokensGm[permutedTokensOffset], copyParams,
-                    this->inputPadParams);
+                DataCopyPad(unpermutedGradLocalFp32, this->unpermutedTokensGradGm[unpermutedTokensGradOffset],
+                            copyParams, this->inputPadParams);
+                DataCopyPad(permutedTokensLocalFp32, this->permutedTokensGm[permutedTokensOffset], copyParams,
+                            this->inputPadParams);
                 MTE2ToVSync();
             } else {
-                LocalTensor<PermutedTokenT> unpermutedGradLocal = unpermutedGradLocalFp32.ReinterpretCast<PermutedTokenT>();
-                DataCopyPad(
-                    unpermutedGradLocal[this->hiddenSizeAlign],
-                    this->unpermutedTokensGradGm[unpermutedTokensGradOffset], copyParams, this->inputPadParams);
+                LocalTensor<PermutedTokenT> unpermutedGradLocal =
+                    unpermutedGradLocalFp32.ReinterpretCast<PermutedTokenT>();
+                DataCopyPad(unpermutedGradLocal[this->hiddenSizeAlign],
+                            this->unpermutedTokensGradGm[unpermutedTokensGradOffset], copyParams, this->inputPadParams);
                 MTE2ToVSync();
-                Cast(
-                    unpermutedGradLocalFp32, unpermutedGradLocal[this->hiddenSizeAlign], RoundMode::CAST_NONE,
-                    hiddenLoopNum);
-                LocalTensor<PermutedTokenT> permutedTokensLocal = permutedTokensLocalFp32.template ReinterpretCast<PermutedTokenT>();
-                DataCopyPad(
-                    permutedTokensLocal[this->hiddenSizeAlign], this->permutedTokensGm[permutedTokensOffset],
-                    copyParams, this->inputPadParams);
+                Cast(unpermutedGradLocalFp32, unpermutedGradLocal[this->hiddenSizeAlign], RoundMode::CAST_NONE,
+                     hiddenLoopNum);
+                LocalTensor<PermutedTokenT> permutedTokensLocal =
+                    permutedTokensLocalFp32.template ReinterpretCast<PermutedTokenT>();
+                DataCopyPad(permutedTokensLocal[this->hiddenSizeAlign], this->permutedTokensGm[permutedTokensOffset],
+                            copyParams, this->inputPadParams);
                 MTE2ToVSync();
-                Cast(
-                    permutedTokensLocalFp32, permutedTokensLocal[this->hiddenSizeAlign], RoundMode::CAST_NONE,
-                    hiddenLoopNum);
+                Cast(permutedTokensLocalFp32, permutedTokensLocal[this->hiddenSizeAlign], RoundMode::CAST_NONE,
+                     hiddenLoopNum);
             }
 
             // prob梯度等于unpermutedTokensGrad、permutedTokens对应行点乘，再做ReduceSum（每块切分h做一次ReduceSum，最后再一起累加）

@@ -76,7 +76,6 @@ struct QuantMatmulWithTileMultiBlock {
     constexpr static bool enableInputDataLenCheck = false;
 };
 
-
 /**
  * @struct MatmulNaivePipelineWithLayout
  * @brief Structure for a naive matrix multiplication pipeline with layout

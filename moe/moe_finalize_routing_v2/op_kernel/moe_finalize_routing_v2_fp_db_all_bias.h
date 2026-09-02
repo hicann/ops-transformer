@@ -23,14 +23,14 @@ namespace MoeFinalizeRoutingV2 {
 using namespace AscendC;
 
 template <typename T, const bool ISBIASEXIST>
-class MoeFinalizeRoutingV2FpDbAllBias
-{
+class MoeFinalizeRoutingV2FpDbAllBias {
 public:
-    __aicore__ inline MoeFinalizeRoutingV2FpDbAllBias(const MoeFinalizeRoutingV2TilingData& tilingData, TPipe& pipe)
-        : tilingData_(tilingData), pipe_(pipe){};
-    __aicore__ inline void Init(
-        GM_ADDR expandedPermutedRows, GM_ADDR expandedSrcToDstRow, GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
-        GM_ADDR scales, GM_ADDR expertForSourceRow, GM_ADDR out, GM_ADDR workspace);
+    __aicore__ inline MoeFinalizeRoutingV2FpDbAllBias(const MoeFinalizeRoutingV2TilingData &tilingData, TPipe &pipe)
+        : tilingData_(tilingData),
+          pipe_(pipe){};
+    __aicore__ inline void Init(GM_ADDR expandedPermutedRows, GM_ADDR expandedSrcToDstRow, GM_ADDR skip1, GM_ADDR skip2,
+                                GM_ADDR bias, GM_ADDR scales, GM_ADDR expertForSourceRow, GM_ADDR out,
+                                GM_ADDR workspace);
     __aicore__ inline void Process();
 
 private:
@@ -43,8 +43,8 @@ private:
     __aicore__ inline void CalcPaddingPara();
 
 private:
-    TPipe& pipe_;
-    const MoeFinalizeRoutingV2TilingData& tilingData_;
+    TPipe &pipe_;
+    const MoeFinalizeRoutingV2TilingData &tilingData_;
     TQue<QuePosition::VECIN, 1> skip1Queue_;
     TQue<QuePosition::VECIN, 1> skip2Queue_;
     TQue<QuePosition::VECIN, 1> scalesQueue_;
@@ -138,9 +138,11 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::CalcPadd
 }
 
 template <typename T, const bool ISBIASEXIST>
-__aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Init(
-    GM_ADDR expandedPermutedRows, GM_ADDR expandedSrcToDstRow, GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
-    GM_ADDR scales, GM_ADDR expertForSourceRow, GM_ADDR out, GM_ADDR workspace)
+__aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Init(GM_ADDR expandedPermutedRows,
+                                                                             GM_ADDR expandedSrcToDstRow, GM_ADDR skip1,
+                                                                             GM_ADDR skip2, GM_ADDR bias,
+                                                                             GM_ADDR scales, GM_ADDR expertForSourceRow,
+                                                                             GM_ADDR out, GM_ADDR workspace)
 {
     if (GetBlockIdx() + 1 == tilingData_.usedCoreNum) {
         curCoreHandleNumPerLoop_ = tilingData_.tailCoreHandleNumPerLoop;
@@ -155,64 +157,62 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Init(
     // gmInput分核 && 输入偏移量初始化
     inputSkipIdx_ = GetBlockIdx() * tilingData_.normalCoreHandleNum * tilingData_.H;
     if (tilingData_.skip1IsNull == 0) {
-        gmSkip1_.SetGlobalBuffer((__gm__ T*)skip1 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
+        gmSkip1_.SetGlobalBuffer((__gm__ T *)skip1 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
     }
-    pipe_.InitBuffer(
-        skip1Queue_, 1, tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.H) * sizeof(T));
+    pipe_.InitBuffer(skip1Queue_, 1,
+                     tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.H) * sizeof(T));
     if (tilingData_.skip2IsNull == 0) {
-        gmSkip2_.SetGlobalBuffer((__gm__ T*)skip2 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
-        pipe_.InitBuffer(
-            skip2Queue_, 1, tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.H) * sizeof(T));
+        gmSkip2_.SetGlobalBuffer((__gm__ T *)skip2 + inputSkipIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
+        pipe_.InitBuffer(skip2Queue_, 1,
+                         tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.H) * sizeof(T));
     }
 
     inputScalesAndExpertIdx_ = GetBlockIdx() * tilingData_.normalCoreHandleNum * tilingData_.K;
     if (tilingData_.scalesIsNull == 0) {
-        gmScales_.SetGlobalBuffer(
-            (__gm__ T*)scales + inputScalesAndExpertIdx_, tilingData_.normalCoreHandleNum * tilingData_.K);
-        pipe_.InitBuffer(
-            scalesQueue_, BUFFER_NUM,
-            tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.K) * sizeof(T));
+        gmScales_.SetGlobalBuffer((__gm__ T *)scales + inputScalesAndExpertIdx_,
+                                  tilingData_.normalCoreHandleNum * tilingData_.K);
+        pipe_.InitBuffer(scalesQueue_, BUFFER_NUM,
+                         tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.K) * sizeof(T));
     }
 
-    gmExpandedSrcToDstRow_.SetGlobalBuffer(
-        (__gm__ int32_t*)expandedSrcToDstRow, tilingData_.totalRowNum * tilingData_.K);
+    gmExpandedSrcToDstRow_.SetGlobalBuffer((__gm__ int32_t *)expandedSrcToDstRow,
+                                           tilingData_.totalRowNum * tilingData_.K);
 
     outputIdx_ = GetBlockIdx() * tilingData_.normalCoreHandleNum * tilingData_.H;
-    gmOut_.SetGlobalBuffer((__gm__ T*)out + outputIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
+    gmOut_.SetGlobalBuffer((__gm__ T *)out + outputIdx_, tilingData_.normalCoreHandleNum * tilingData_.H);
 
-    gmExpandedPermutedRows_.SetGlobalBuffer(
-        (__gm__ T*)expandedPermutedRows, tilingData_.totalRowNum * tilingData_.K * tilingData_.H);
+    gmExpandedPermutedRows_.SetGlobalBuffer((__gm__ T *)expandedPermutedRows,
+                                            tilingData_.totalRowNum * tilingData_.K * tilingData_.H);
     if constexpr (ISBIASEXIST) {
-        gmBias_.SetGlobalBuffer((__gm__ T*)bias, tilingData_.biasRowNum * tilingData_.H);
+        gmBias_.SetGlobalBuffer((__gm__ T *)bias, tilingData_.biasRowNum * tilingData_.H);
         pipe_.InitBuffer(biasBufDb0_, AlignmentProcess(tilingData_.H) * sizeof(T));
         pipe_.InitBuffer(biasBufDb1_, AlignmentProcess(tilingData_.H) * sizeof(T));
-        gmExpertForSourceRow_.SetGlobalBuffer(
-            (__gm__ int32_t*)expertForSourceRow + inputScalesAndExpertIdx_,
-            tilingData_.normalCoreHandleNum * tilingData_.K);
+        gmExpertForSourceRow_.SetGlobalBuffer((__gm__ int32_t *)expertForSourceRow + inputScalesAndExpertIdx_,
+                                              tilingData_.normalCoreHandleNum * tilingData_.K);
         pipe_.InitBuffer(
             expertForSourceRowQueue_, BUFFER_NUM,
             tilingData_.normalCoreHandleNumPerLoop * Int32AlignmentProcess(tilingData_.K) * sizeof(int32_t));
     }
 
     // 申请 buffer 空间
-    pipe_.InitBuffer(
-        outQueue_, BUFFER_NUM, tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.H) * sizeof(T));
+    pipe_.InitBuffer(outQueue_, BUFFER_NUM,
+                     tilingData_.normalCoreHandleNumPerLoop * AlignmentProcess(tilingData_.H) * sizeof(T));
 
     pipe_.InitBuffer(expandedPermutedRowsBufDb0_, AlignmentProcess(tilingData_.H) * sizeof(T));
 
     pipe_.InitBuffer(expandedPermutedRowsBufDb1_, AlignmentProcess(tilingData_.H) * sizeof(T));
     pipe_.InitBuffer(tmpBuf_, AlignmentProcess(tilingData_.H) * sizeof(T));
 
-    pipe_.InitBuffer(
-        expandedSrcToDstRowBuff_, Int32AlignmentProcess(curCoreHandleNum_) * tilingData_.K * sizeof(int32_t));
+    pipe_.InitBuffer(expandedSrcToDstRowBuff_,
+                     Int32AlignmentProcess(curCoreHandleNum_) * tilingData_.K * sizeof(int32_t));
 }
 
 template <typename T, const bool ISBIASEXIST>
 __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::PrepareData()
 {
     expandedSrcToDstRow_ = expandedSrcToDstRowBuff_.Get<int32_t>();
-    DataCopyPadExtParams<int32_t> padParamsSrcToDstRow{
-        isPadSourceToDstRow_, 0, static_cast<uint8_t>(rightPaddingSourceToDstRow_), 0};
+    DataCopyPadExtParams<int32_t> padParamsSrcToDstRow{isPadSourceToDstRow_, 0,
+                                                       static_cast<uint8_t>(rightPaddingSourceToDstRow_), 0};
     if (tilingData_.dropPadMode == MODE_VALUE_0 || tilingData_.dropPadMode == MODE_VALUE_1) {
         DataCopyExtParams copyParamsSrcToDstRow{
             static_cast<uint16_t>(tilingData_.K), static_cast<uint32_t>(curCoreHandleNum_ * sizeof(int32_t)),
@@ -253,33 +253,33 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::CopyIn(i
     }
 
     // ---------------------------- [Skip] -------------------------------
-    DataCopyParams copyParamsSkip{
-        static_cast<uint16_t>(curRepeatTimes), static_cast<uint16_t>(tilingData_.H * sizeof(T)), 0, 0};
+    DataCopyParams copyParamsSkip{static_cast<uint16_t>(curRepeatTimes),
+                                  static_cast<uint16_t>(tilingData_.H * sizeof(T)), 0, 0};
     DataCopyPadParams padParamsSkip{isPadH_, 0, static_cast<uint8_t>(rightPaddingH_), 0};
 
     if (tilingData_.skip1IsNull == 0) {
-        DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (
+        DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
             skip1Local, gmSkip1_[nLoopIdx * curCoreHandleNumPerLoop_ * tilingData_.H], copyParamsSkip, padParamsSkip);
     }
 
     if (tilingData_.skip2IsNull == 0) {
-        DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (
+        DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
             skip2Local, gmSkip2_[nLoopIdx * curCoreHandleNumPerLoop_ * tilingData_.H], copyParamsSkip, padParamsSkip);
     }
 
     // ---------------------------- [Scales] -------------------------------
     if (tilingData_.scalesIsNull == 0) {
-        DataCopyParams copyParamsScales{
-            static_cast<uint16_t>(curRepeatTimes), static_cast<uint16_t>(tilingData_.K * sizeof(T)), 0, 0};
+        DataCopyParams copyParamsScales{static_cast<uint16_t>(curRepeatTimes),
+                                        static_cast<uint16_t>(tilingData_.K * sizeof(T)), 0, 0};
         DataCopyPadParams padParamsScales{isPadK_, 0, static_cast<uint8_t>(rightPaddingK_), 0};
-        DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (
+        DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
             scalesLocal, gmScales_[nLoopIdx * curCoreHandleNumPerLoop_ * tilingData_.K], copyParamsScales,
             padParamsScales);
     }
     // ---------------------------- [Expert] -------------------------------
     if constexpr (ISBIASEXIST) {
-        DataCopyParams copyParamsExpert{
-            static_cast<uint16_t>(curRepeatTimes), static_cast<uint16_t>(tilingData_.K * sizeof(int32_t)), 0, 0};
+        DataCopyParams copyParamsExpert{static_cast<uint16_t>(curRepeatTimes),
+                                        static_cast<uint16_t>(tilingData_.K * sizeof(int32_t)), 0, 0};
         DataCopyPadParams padParamsExpert{isPadKInt32_, 0, static_cast<uint8_t>(rightPaddingKInt32_), 0};
         DataCopyPadCustom<int32_t, DataCopyParams, DataCopyPadParams>(
             expertForSourceRowLocal, gmExpertForSourceRow_[nLoopIdx * curCoreHandleNumPerLoop_ * tilingData_.K],
@@ -291,8 +291,8 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::CopyIn(i
 }
 
 template <typename T, const bool ISBIASEXIST>
-__aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Compute(
-    int64_t nLoopIdx, int64_t curRepeatTimes)
+__aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Compute(int64_t nLoopIdx,
+                                                                                int64_t curRepeatTimes)
 {
     LocalTensor<T> outLocal = outQueue_.AllocTensor<T>();
     LocalTensor<T> scalesLocal;
@@ -378,12 +378,13 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Compute(
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID2);
             if (expandedPermutedRowsIndexDb0 != INVALID_ROW_INDEX) {
-                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (
+                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
                     expandedPermutedTmpUbDb0, gmExpandedPermutedRows_[expandedPermutedRowsIndexDb0 * tilingData_.H],
                     copyParams, padParams);
             }
             if constexpr (ISBIASEXIST) {
-                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (biasTmpUbDb0, gmBias_[biasIndexDb0 * tilingData_.H], copyParams, padParams);
+                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
+                    biasTmpUbDb0, gmBias_[biasIndexDb0 * tilingData_.H], copyParams, padParams);
             }
             SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
 
@@ -416,12 +417,13 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Compute(
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID1);
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID3);
             if (expandedPermutedRowsIndexDb1 != INVALID_ROW_INDEX) {
-                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (
+                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
                     expandedPermutedTmpUbDb1, gmExpandedPermutedRows_[expandedPermutedRowsIndexDb1 * tilingData_.H],
                     copyParams, padParams);
             }
             if constexpr (ISBIASEXIST) {
-                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (biasTmpUbDb1, gmBias_[biasIndexDb1 * tilingData_.H], copyParams, padParams);
+                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
+                    biasTmpUbDb1, gmBias_[biasIndexDb1 * tilingData_.H], copyParams, padParams);
             }
             SetFlag<HardEvent::MTE2_V>(EVENT_ID1);
 
@@ -509,12 +511,13 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Compute(
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID2);
             if (expandedPermutedRowsIndexDb0 != INVALID_ROW_INDEX) {
-                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (
+                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
                     expandedPermutedTmpUbDb0, gmExpandedPermutedRows_[expandedPermutedRowsIndexDb0 * tilingData_.H],
                     copyParams, padParams);
             }
             if constexpr (ISBIASEXIST) {
-                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams> (biasTmpUbDb0, gmBias_[biasIndexDb0 * tilingData_.H], copyParams, padParams);
+                DataCopyPadCustom<T, DataCopyParams, DataCopyPadParams>(
+                    biasTmpUbDb0, gmBias_[biasIndexDb0 * tilingData_.H], copyParams, padParams);
             }
             SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
 
@@ -574,12 +577,12 @@ __aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::Compute(
 }
 
 template <typename T, const bool ISBIASEXIST>
-__aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::CopyOut(
-    int64_t nLoopIdx, int64_t curRepeatTimes)
+__aicore__ inline void MoeFinalizeRoutingV2FpDbAllBias<T, ISBIASEXIST>::CopyOut(int64_t nLoopIdx,
+                                                                                int64_t curRepeatTimes)
 {
     LocalTensor<T> outLocal = outQueue_.DeQue<T>();
-    DataCopyParams copyParams{
-        static_cast<uint16_t>(curRepeatTimes), static_cast<uint16_t>(tilingData_.H * sizeof(T)), 0, 0};
+    DataCopyParams copyParams{static_cast<uint16_t>(curRepeatTimes), static_cast<uint16_t>(tilingData_.H * sizeof(T)),
+                              0, 0};
     DataCopyPadCustom<T>(gmOut_[nLoopIdx * tilingData_.H * curCoreHandleNumPerLoop_], outLocal, copyParams);
     outQueue_.FreeTensor(outLocal);
 }

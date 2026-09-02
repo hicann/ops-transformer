@@ -29,31 +29,31 @@ constexpr int64_t FLOAT_MASK = 64;
 constexpr int64_t ALIGN_FACTOR = 32;
 
 template <typename T, int32_t bufferNum, int32_t renorm>
-class MoeGatingTopKSoftmaxV2EKFullLoad
-{
+class MoeGatingTopKSoftmaxV2EKFullLoad {
 public:
     __aicore__ inline MoeGatingTopKSoftmaxV2EKFullLoad(){};
-    __aicore__ inline void Init(
-        GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR softmaxOut, GM_ADDR workspace,
-        const MoeGatingTopKSoftmaxV2EKFullLoadTilingData* __restrict tilingData)
+    __aicore__ inline void Init(GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR softmaxOut,
+                                GM_ADDR workspace,
+                                const MoeGatingTopKSoftmaxV2EKFullLoadTilingData *__restrict tilingData)
     {
         ParesTiling(tilingData);
         //   计算核块大小，获取当前核的起始索引
         int64_t formerblockLength = blockFormer * col;
         int64_t blockLength = (GetBlockIdx() != blockNum - 1) ? formerblockLength : blockTail * col;
-        gatingTensorGM.SetGlobalBuffer((__gm__ T*)gating + formerblockLength * GetBlockIdx(), blockLength);
+        gatingTensorGM.SetGlobalBuffer((__gm__ T *)gating + formerblockLength * GetBlockIdx(), blockLength);
         if (finished != nullptr) {
             exitFinished = true;
             int64_t blockLengthFinished = (GetBlockIdx() != blockNum - 1) ? blockFormer : blockTail;
-            finishedTensorGM.SetGlobalBuffer((__gm__ bool*)finished + blockFormer * GetBlockIdx(), blockLengthFinished);
+            finishedTensorGM.SetGlobalBuffer((__gm__ bool *)finished + blockFormer * GetBlockIdx(),
+                                             blockLengthFinished);
         }
 
         int64_t outFormerBlockLength = blockFormer * k;
         int64_t outBlockLength = (GetBlockIdx() != blockNum - 1) ? outFormerBlockLength : blockTail * k;
-        outTensorGM.SetGlobalBuffer((__gm__ T*)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
-        indicesOutTensorGM.SetGlobalBuffer(
-            (__gm__ int32_t*)indicesOut + outFormerBlockLength * GetBlockIdx(), outBlockLength);
-        softmaxOutTensorGM.SetGlobalBuffer((__gm__ float*)softmaxOut + formerblockLength * GetBlockIdx(), blockLength);
+        outTensorGM.SetGlobalBuffer((__gm__ T *)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
+        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t *)indicesOut + outFormerBlockLength * GetBlockIdx(),
+                                           outBlockLength);
+        softmaxOutTensorGM.SetGlobalBuffer((__gm__ float *)softmaxOut + formerblockLength * GetBlockIdx(), blockLength);
 
         if constexpr (renorm == 0 || IsSameType<T, bfloat16_t>::value) {
             pipe.InitBuffer(gatingQueue, bufferNum, ubFormer * colAlign * sizeof(float));
@@ -61,8 +61,8 @@ public:
             pipe.InitBuffer(gatingQueue, bufferNum, ubFormer * colAlign * sizeof(T));
         }
 
-        pipe.InitBuffer(
-            finishedQueue, bufferNum, (ubFormer * sizeof(bool) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE);
+        pipe.InitBuffer(finishedQueue, bufferNum,
+                        (ubFormer * sizeof(bool) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE);
         pipe.InitBuffer(outQueue, bufferNum, ubFormer * tilingData->kAlignT);
         pipe.InitBuffer(indicesOutQueue, bufferNum, ubFormer * kAlignB32);
         pipe.InitBuffer(softmaxOutQueue, bufferNum, ubFormer * colAlign * sizeof(float));
@@ -72,8 +72,8 @@ public:
     __aicore__ inline void Process()
     {
         int32_t curRowNum = ubFormer;
-        SoftMaxTiling* softmaxTilingData = &formerSoftmaxTilingData;
-        TopkTiling* topKTilingData = &formerTopkTilingData;
+        SoftMaxTiling *softmaxTilingData = &formerSoftmaxTilingData;
+        TopkTiling *topKTilingData = &formerTopkTilingData;
         int64_t ubLoopCount = (GetBlockIdx() == blockNum - 1) ? ubLoopOfTailBlock : ubLoopOfFormerBlock;
 
         for (int64_t i = 0; i < ubLoopCount - 1; i++) {
@@ -122,8 +122,8 @@ public:
 
 private:
     template <typename U>
-    __aicore__ inline void CastComputeAlignmentBefore(
-        LocalTensor<float>& dst, LocalTensor<U>& src, const int32_t rowCount, const int32_t colCount)
+    __aicore__ inline void CastComputeAlignmentBefore(LocalTensor<float> &dst, LocalTensor<U> &src,
+                                                      const int32_t rowCount, const int32_t colCount)
     {
         int32_t repeatTimesOneRow = (colCount * sizeof(float) + COUNTINUOUS_DATA - 1) / COUNTINUOUS_DATA;
         int32_t colCountAlign = (colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE;
@@ -135,10 +135,9 @@ private:
                 repeatParams.srcBlkStride = 1;
                 repeatParams.dstRepStride = COUNTINUOUS_DATA / ALIGNMENT_SIZE;
                 repeatParams.srcRepStride = (COUNTINUOUS_DATA / FLOAT_BYTES) * sizeof(U) / ALIGNMENT_SIZE;
-                Cast(
-                    dst[i * ((colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE)],
-                    src[i * ((colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE)], RoundMode::CAST_NONE,
-                    FLOAT_MASK, repeatTimesOneRow - 1, repeatParams);
+                Cast(dst[i * ((colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE)],
+                     src[i * ((colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE)], RoundMode::CAST_NONE,
+                     FLOAT_MASK, repeatTimesOneRow - 1, repeatParams);
             }
 
             repeatParams.dstBlkStride = 1;
@@ -147,16 +146,14 @@ private:
             repeatParams.srcRepStride = (colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * sizeof(U);
             int32_t mask = colCount - FLOAT_MASK * (repeatTimesOneRow - 1);
             if ((colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * sizeof(float) <= REPEAT_MAX) {
-                Cast(
-                    dst[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES],
-                    src[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES], RoundMode::CAST_NONE, mask, rowCount,
-                    repeatParams);
+                Cast(dst[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES],
+                     src[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES], RoundMode::CAST_NONE, mask,
+                     rowCount, repeatParams);
             } else {
                 for (int32_t i = 0; i < rowCount; i++) {
-                    Cast(
-                        dst[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES + i * colCountAlign],
-                        src[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES + i * colCountAlign],
-                        RoundMode::CAST_NONE, mask, 1, {1, 1, 1, 1});
+                    Cast(dst[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES + i * colCountAlign],
+                         src[(repeatTimesOneRow - 1) * COUNTINUOUS_DATA / FLOAT_BYTES + i * colCountAlign],
+                         RoundMode::CAST_NONE, mask, 1, {1, 1, 1, 1});
                 }
             }
         } else {
@@ -165,22 +162,20 @@ private:
                 repeatParams.srcBlkStride = 1;
                 repeatParams.dstRepStride = (colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * sizeof(float);
                 repeatParams.srcRepStride = (colCount + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * sizeof(U);
-                Cast(
-                    dst[i * (COUNTINUOUS_DATA / FLOAT_BYTES)], src[i * (COUNTINUOUS_DATA / FLOAT_BYTES)],
-                    RoundMode::CAST_NONE, FLOAT_MASK, rowCount, repeatParams);
+                Cast(dst[i * (COUNTINUOUS_DATA / FLOAT_BYTES)], src[i * (COUNTINUOUS_DATA / FLOAT_BYTES)],
+                     RoundMode::CAST_NONE, FLOAT_MASK, rowCount, repeatParams);
             }
 
             int32_t mask = colCount - FLOAT_MASK * (repeatTimesOneRow - 1);
-            Cast(
-                dst[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)],
-                src[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)], RoundMode::CAST_NONE, mask, rowCount,
-                repeatParams);
+            Cast(dst[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)],
+                 src[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)], RoundMode::CAST_NONE, mask, rowCount,
+                 repeatParams);
         }
     }
 
     template <typename U>
-    __aicore__ inline void CastComputeAlignmentAfter(
-        LocalTensor<U>& dst, LocalTensor<float>& src, const int32_t rowCount, const int32_t colCount)
+    __aicore__ inline void CastComputeAlignmentAfter(LocalTensor<U> &dst, LocalTensor<float> &src,
+                                                     const int32_t rowCount, const int32_t colCount)
     {
         int32_t repeatTimesOneRow = (colCount * sizeof(float) + COUNTINUOUS_DATA - 1) / COUNTINUOUS_DATA;
 
@@ -191,12 +186,11 @@ private:
                 repeatParams.srcBlkStride = 1;
                 repeatParams.dstRepStride = (COUNTINUOUS_DATA / FLOAT_BYTES) * sizeof(U) / ALIGNMENT_SIZE;
                 repeatParams.srcRepStride = COUNTINUOUS_DATA / ALIGNMENT_SIZE;
-                Cast(
-                    dst[i * ((colCount * sizeof(U) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE) /
-                        sizeof(U)],
-                    src[i * ((colCount * sizeof(float) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE) /
-                        sizeof(float)],
-                    RoundMode::CAST_ROUND, FLOAT_MASK, repeatTimesOneRow - 1, repeatParams);
+                Cast(dst[i * ((colCount * sizeof(U) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE) /
+                         sizeof(U)],
+                     src[i * ((colCount * sizeof(float) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE * ALIGNMENT_SIZE) /
+                         sizeof(float)],
+                     RoundMode::CAST_ROUND, FLOAT_MASK, repeatTimesOneRow - 1, repeatParams);
             }
 
             repeatParams.dstBlkStride = 1;
@@ -205,51 +199,48 @@ private:
             repeatParams.srcRepStride = (colCount * sizeof(float) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE;
             int32_t mask =
                 FLOAT_MASK - (((repeatTimesOneRow * COUNTINUOUS_DATA) - (colCount * FLOAT_BYTES)) / FLOAT_BYTES);
-            Cast(
-                dst[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)],
-                src[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)], RoundMode::CAST_ROUND, mask, rowCount,
-                repeatParams);
+            Cast(dst[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)],
+                 src[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)], RoundMode::CAST_ROUND, mask, rowCount,
+                 repeatParams);
         } else {
             for (int32_t i = 0; i < repeatTimesOneRow - 1; i++) {
                 repeatParams.dstBlkStride = 1;
                 repeatParams.srcBlkStride = 1;
                 repeatParams.dstRepStride = (colCount * sizeof(U) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE;
                 repeatParams.srcRepStride = (colCount * sizeof(float) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE;
-                Cast(
-                    dst[i * (COUNTINUOUS_DATA / FLOAT_BYTES)], src[i * (COUNTINUOUS_DATA / FLOAT_BYTES)],
-                    RoundMode::CAST_ROUND, FLOAT_MASK, rowCount, repeatParams);
+                Cast(dst[i * (COUNTINUOUS_DATA / FLOAT_BYTES)], src[i * (COUNTINUOUS_DATA / FLOAT_BYTES)],
+                     RoundMode::CAST_ROUND, FLOAT_MASK, rowCount, repeatParams);
             }
 
             int32_t mask =
                 FLOAT_MASK - (((repeatTimesOneRow * COUNTINUOUS_DATA) - (colCount * FLOAT_BYTES)) / FLOAT_BYTES);
-            Cast(
-                dst[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)],
-                src[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)], RoundMode::CAST_ROUND, mask, rowCount,
-                repeatParams);
+            Cast(dst[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)],
+                 src[(repeatTimesOneRow - 1) * (COUNTINUOUS_DATA / FLOAT_BYTES)], RoundMode::CAST_ROUND, mask, rowCount,
+                 repeatParams);
         }
     }
 
     template <typename U>
-    __aicore__ inline void VectorDup(LocalTensor<U>& dst, const int32_t rowCount, const int32_t colCount)
+    __aicore__ inline void VectorDup(LocalTensor<U> &dst, const int32_t rowCount, const int32_t colCount)
     {
         if (colAlign - colCount != 0) {
             U scalar;
             if constexpr (IsSameType<U, half>::value) {
                 uint16_t tmp = 0xFC00; // -inf
-                scalar = *((half*)&tmp);
+                scalar = *((half *)&tmp);
             } else if constexpr (IsSameType<U, bfloat16_t>::value) {
                 uint16_t tmp = 0xFF80; // -inf
-                scalar = *((bfloat16_t*)&tmp);
+                scalar = *((bfloat16_t *)&tmp);
             } else {
                 uint32_t tmp = 0xFF800000; // -inf
-                scalar = *((float*)&tmp);
+                scalar = *((float *)&tmp);
             }
             // 当对齐后大小与实际大小不一致，需要将 colCount到colAlign之间的数据掩成-1
-            uint64_t mask[2] = {
-                (((uint64_t)1 << (colAlign - colCount)) - 1) << (ALIGN_FACTOR - (colAlign - colCount)), 0};
+            uint64_t mask[2] = {(((uint64_t)1 << (colAlign - colCount)) - 1) << (ALIGN_FACTOR - (colAlign - colCount)),
+                                0};
             if (colAlign * sizeof(U) / ALIGNMENT_SIZE <= REPEAT_MAX) {
-                Duplicate(
-                    dst[colAlign - ALIGN_FACTOR], scalar, mask, rowCount, 1, colAlign * sizeof(U) / ALIGNMENT_SIZE);
+                Duplicate(dst[colAlign - ALIGN_FACTOR], scalar, mask, rowCount, 1,
+                          colAlign * sizeof(U) / ALIGNMENT_SIZE);
             } else {
                 for (int32_t i = 0; i < rowCount; i++) {
                     Duplicate(dst[i * colAlign + colAlign - ALIGN_FACTOR], scalar, mask, 1, 1, 1);
@@ -282,8 +273,8 @@ private:
         }
     }
 
-    __aicore__ inline void Compute(
-        int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData, const TopkTiling* topKTilingData)
+    __aicore__ inline void Compute(int32_t progress, int32_t curRowsNum, const SoftMaxTiling *softmaxTilingData,
+                                   const TopkTiling *topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData{(uint32_t)curRowsNum, colAlign, (uint32_t)curRowsNum, col};
         TopKInfo topKInfoData{curRowsNum, (int32_t)colAlign, (int32_t)col};
@@ -323,13 +314,11 @@ private:
         PipeBarrier<PIPE_V>();
 
         if (exitFinished) {
-            TopK<T, true, true, true, TopKMode::TOPK_NORMAL>(
-                outLocal, indicesOutLocal, softmaxOutBuffer, oneDimTensor, finishedLocal, k, *topKTilingData,
-                topKInfoData, true);
+            TopK<T, true, true, true, TopKMode::TOPK_NORMAL>(outLocal, indicesOutLocal, softmaxOutBuffer, oneDimTensor,
+                                                             finishedLocal, k, *topKTilingData, topKInfoData, true);
         } else {
-            TopK<T, true, false, true, TopKMode::TOPK_NORMAL>(
-                outLocal, indicesOutLocal, softmaxOutBuffer, oneDimTensor, finishedLocal, k, *topKTilingData,
-                topKInfoData, true);
+            TopK<T, true, false, true, TopKMode::TOPK_NORMAL>(outLocal, indicesOutLocal, softmaxOutBuffer, oneDimTensor,
+                                                              finishedLocal, k, *topKTilingData, topKInfoData, true);
         }
         PipeBarrier<PIPE_V>();
         softmaxOutQueue.FreeTensor(softmaxOutBuffer);
@@ -342,8 +331,8 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeCast(
-        int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData, const TopkTiling* topKTilingData)
+    __aicore__ inline void ComputeCast(int32_t progress, int32_t curRowsNum, const SoftMaxTiling *softmaxTilingData,
+                                       const TopkTiling *topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData{(uint32_t)curRowsNum, colAlign, (uint32_t)curRowsNum, col};
         TopKInfo topKInfoData{curRowsNum, (int32_t)colAlign, (int32_t)col};
@@ -368,8 +357,8 @@ private:
         PipeBarrier<PIPE_V>();
 
         if (softmaxFlag == 1) {
-            DataCopyParams intriParams{
-                static_cast<uint16_t>(curRowsNum), static_cast<uint16_t>(col * sizeof(float)), 0, 0};
+            DataCopyParams intriParams{static_cast<uint16_t>(curRowsNum), static_cast<uint16_t>(col * sizeof(float)), 0,
+                                       0};
             intriParams.srcStride = (colAlign * sizeof(float) -
                                      (((col * sizeof(float) + ALIGNMENT_SIZE - 1) / ALIGNMENT_SIZE) * ALIGNMENT_SIZE)) /
                                     ALIGNMENT_SIZE;
@@ -389,13 +378,13 @@ private:
         PipeBarrier<PIPE_V>();
 
         if (exitFinished) {
-            TopK<float, true, true, true, TopKMode::TOPK_NORMAL>(
-                castBuffer, indicesOutLocal, softmaxOutBuffer, oneDimTensor, finishedLocal, k, *topKTilingData,
-                topKInfoData, true);
+            TopK<float, true, true, true, TopKMode::TOPK_NORMAL>(castBuffer, indicesOutLocal, softmaxOutBuffer,
+                                                                 oneDimTensor, finishedLocal, k, *topKTilingData,
+                                                                 topKInfoData, true);
         } else {
-            TopK<float, true, false, true, TopKMode::TOPK_NORMAL>(
-                castBuffer, indicesOutLocal, softmaxOutBuffer, oneDimTensor, finishedLocal, k, *topKTilingData,
-                topKInfoData, true);
+            TopK<float, true, false, true, TopKMode::TOPK_NORMAL>(castBuffer, indicesOutLocal, softmaxOutBuffer,
+                                                                  oneDimTensor, finishedLocal, k, *topKTilingData,
+                                                                  topKInfoData, true);
         }
         PipeBarrier<PIPE_V>();
 
@@ -411,8 +400,8 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeRenorm(
-        int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData, const TopkTiling* topKTilingData)
+    __aicore__ inline void ComputeRenorm(int32_t progress, int32_t curRowsNum, const SoftMaxTiling *softmaxTilingData,
+                                         const TopkTiling *topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData;
         if constexpr (IsSameType<T, half>::value) {
@@ -446,13 +435,11 @@ private:
 
         LocalTensor<T> topkBuffer = softmaxOutQueue.template AllocTensor<T>();
         if (exitFinished) {
-            TopK<T, true, true, true, TopKMode::TOPK_NORMAL>(
-                topkBuffer, indicesOutLocal, gatingLocal, oneDimTensor, finishedLocal, k, *topKTilingData, topKInfoData,
-                true);
+            TopK<T, true, true, true, TopKMode::TOPK_NORMAL>(topkBuffer, indicesOutLocal, gatingLocal, oneDimTensor,
+                                                             finishedLocal, k, *topKTilingData, topKInfoData, true);
         } else {
-            TopK<T, true, false, true, TopKMode::TOPK_NORMAL>(
-                topkBuffer, indicesOutLocal, gatingLocal, oneDimTensor, finishedLocal, k, *topKTilingData, topKInfoData,
-                true);
+            TopK<T, true, false, true, TopKMode::TOPK_NORMAL>(topkBuffer, indicesOutLocal, gatingLocal, oneDimTensor,
+                                                              finishedLocal, k, *topKTilingData, topKInfoData, true);
         }
         PipeBarrier<PIPE_V>();
 
@@ -469,8 +456,8 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeRenormCast(
-        int32_t progress, int32_t curRowsNum, const SoftMaxTiling* softmaxTilingData, const TopkTiling* topKTilingData)
+    __aicore__ inline void ComputeRenormCast(int32_t progress, int32_t curRowsNum,
+                                             const SoftMaxTiling *softmaxTilingData, const TopkTiling *topKTilingData)
     {
         SoftMaxShapeInfo softmaxShapeInfoData;
         if constexpr (IsSameType<T, half>::value) {
@@ -509,13 +496,12 @@ private:
 
         LocalTensor<float> topkBuffer = gatingQueue.template AllocTensor<float>();
         if (exitFinished) {
-            TopK<float, true, true, true, TopKMode::TOPK_NORMAL>(
-                topkBuffer, indicesOutLocal, castBuffer, oneDimTensor, finishedLocal, k, *topKTilingData, topKInfoData,
-                true);
+            TopK<float, true, true, true, TopKMode::TOPK_NORMAL>(topkBuffer, indicesOutLocal, castBuffer, oneDimTensor,
+                                                                 finishedLocal, k, *topKTilingData, topKInfoData, true);
         } else {
-            TopK<float, true, false, true, TopKMode::TOPK_NORMAL>(
-                topkBuffer, indicesOutLocal, castBuffer, oneDimTensor, finishedLocal, k, *topKTilingData, topKInfoData,
-                true);
+            TopK<float, true, false, true, TopKMode::TOPK_NORMAL>(topkBuffer, indicesOutLocal, castBuffer, oneDimTensor,
+                                                                  finishedLocal, k, *topKTilingData, topKInfoData,
+                                                                  true);
         }
         PipeBarrier<PIPE_V>();
 
@@ -548,7 +534,7 @@ private:
         indicesOutQueue.FreeTensor(newIndicesOutLocal);
     }
 
-    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2EKFullLoadTilingData* __restrict tilingData)
+    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2EKFullLoadTilingData *__restrict tilingData)
     {
         row = tilingData->row;
         col = tilingData->col;

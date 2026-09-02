@@ -24,7 +24,8 @@ namespace GroupedMatmulSwigluQuantV2Tiling {
 
 class GroupedMatmulSwigluQuantV2BaseTiling : public GroupedMatmulSwigluQuantV2Tiling {
 public:
-    explicit GroupedMatmulSwigluQuantV2BaseTiling(gert::TilingContext* context) : GroupedMatmulSwigluQuantV2Tiling(context) {};
+    explicit GroupedMatmulSwigluQuantV2BaseTiling(gert::TilingContext *context)
+        : GroupedMatmulSwigluQuantV2Tiling(context) {};
 
     ~GroupedMatmulSwigluQuantV2BaseTiling() override = default;
 
@@ -45,8 +46,8 @@ protected:
     int64_t CalMaxRowInUb(const uint64_t ubSize, const uint64_t n) const;
     int32_t FindBestSingleN(const uint32_t &aicNum, int64_t baseM, int64_t baseN) const;
     bool TryFullLoadA(int32_t baseM, int64_t baseN, int64_t baseK, uint64_t l1Size);
-    ge::graphStatus DynamicTilingSingleN(gert::TilingContext *context, const uint32_t &aicNum,
-                    int64_t baseM, int64_t baseN, int64_t baseK);
+    ge::graphStatus DynamicTilingSingleN(gert::TilingContext *context, const uint32_t &aicNum, int64_t baseM,
+                                         int64_t baseN, int64_t baseK);
 
 private:
     GMMSwigluQuantV2TilingData tilingData_;
@@ -71,6 +72,6 @@ private:
     bool isSplitWorkSpace_ = false;
 };
 
-}
-}
+} // namespace GroupedMatmulSwigluQuantV2Tiling
+} // namespace optiling
 #endif // __OP_HOST_OP_TILING_GROUPED_MATMUL_SWIGLU_QUANT_V2_BASE_TILING_H__

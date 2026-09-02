@@ -21,142 +21,148 @@ namespace MoeInitRouting {
 using namespace AscendC;
 
 class MoeSrcToDstOp {
- public:
-  __aicore__ inline MoeSrcToDstOp(){};
-  __aicore__ inline void Init(GM_ADDR expandSrcToDstRow, GM_ADDR workspace, const MoeInitRoutingTilingData* tilingData,
-                              TPipe* tPipe);
-  __aicore__ inline void Process();
+public:
+    __aicore__ inline MoeSrcToDstOp(){};
+    __aicore__ inline void Init(GM_ADDR expandSrcToDstRow, GM_ADDR workspace,
+                                const MoeInitRoutingTilingData *tilingData, TPipe *tPipe);
+    __aicore__ inline void Process();
 
- private:
-  __aicore__ inline void CopyIn(int64_t progress);
-  __aicore__ inline void Compute(int64_t progress);
-  __aicore__ inline void CopyOut();
-  __aicore__ inline void AssistInit();
+private:
+    __aicore__ inline void CopyIn(int64_t progress);
+    __aicore__ inline void Compute(int64_t progress);
+    __aicore__ inline void CopyOut();
+    __aicore__ inline void AssistInit();
 
- private:
-  TPipe* pipe;
-  TQue<QuePosition::VECIN, 1> copyInQueue;
-  TQue<QuePosition::VECOUT, 1> copyOutQueue;
-  TBuf<TPosition::VECCALC> assistBuffer;
+private:
+    TPipe *pipe;
+    TQue<QuePosition::VECIN, 1> copyInQueue;
+    TQue<QuePosition::VECOUT, 1> copyOutQueue;
+    TBuf<TPosition::VECCALC> assistBuffer;
 
-  GlobalTensor<int32_t> expandDstToSrcRowGm;
-  GlobalTensor<int32_t> expandSrcToDstRowGm;
-  GlobalTensor<int32_t> assistGm;
+    GlobalTensor<int32_t> expandDstToSrcRowGm;
+    GlobalTensor<int32_t> expandSrcToDstRowGm;
+    GlobalTensor<int32_t> assistGm;
 
-  LocalTensor<float> tempTensor1;
+    LocalTensor<float> tempTensor1;
 
-  const GatherOutComputeTilingData* srcToDstTilingData;
+    const GatherOutComputeTilingData *srcToDstTilingData;
 
-  event_t eventIdMte2ToS_;
+    event_t eventIdMte2ToS_;
 
-  int64_t blockIdx;
-  int64_t totalLength;
-  int64_t currentLoopRows;
-  int64_t coreRows;
-  int64_t perLoopRows;
-  int64_t lastLoopRows;
+    int64_t blockIdx;
+    int64_t totalLength;
+    int64_t currentLoopRows;
+    int64_t coreRows;
+    int64_t perLoopRows;
+    int64_t lastLoopRows;
 };
 
-__aicore__ inline void MoeSrcToDstOp::AssistInit() {
+__aicore__ inline void MoeSrcToDstOp::AssistInit()
+{
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
     OOMCheckAddrRange(assistGm.GetPhyAddr(), ASSIST_NUM * sizeof(int32_t));
 #endif
-  LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
-  DataCopy(assistTensor, assistGm, ASSIST_NUM);
-  event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
-  SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
-  WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
-  Adds(assistTensor, assistTensor, (int32_t)(this->blockIdx * this->srcToDstTilingData->perCoreRows), ASSIST_NUM);
+    LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
+    DataCopy(assistTensor, assistGm, ASSIST_NUM);
+    event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
+    SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
+    WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
+    Adds(assistTensor, assistTensor, (int32_t)(this->blockIdx * this->srcToDstTilingData->perCoreRows), ASSIST_NUM);
 }
 
-__aicore__ inline void MoeSrcToDstOp::CopyIn(int64_t progress) {
-  LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
-  event_t eventIdSToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE2));
-  SetFlag<HardEvent::S_MTE2>(eventIdSToMte2);
-  WaitFlag<HardEvent::S_MTE2>(eventIdSToMte2);
-  DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], Align(currentLoopRows, sizeof(int32_t)));
-  SetFlag<HardEvent::MTE2_S>(eventIdMte2ToS_);
-  copyInQueue.EnQue<int32_t>(inLocal);
+__aicore__ inline void MoeSrcToDstOp::CopyIn(int64_t progress)
+{
+    LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
+    event_t eventIdSToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE2));
+    SetFlag<HardEvent::S_MTE2>(eventIdSToMte2);
+    WaitFlag<HardEvent::S_MTE2>(eventIdSToMte2);
+    DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], Align(currentLoopRows, sizeof(int32_t)));
+    SetFlag<HardEvent::MTE2_S>(eventIdMte2ToS_);
+    copyInQueue.EnQue<int32_t>(inLocal);
 }
 
-__aicore__ inline void MoeSrcToDstOp::Compute(int64_t progress) {
-  LocalTensor<int32_t> outLocal = copyOutQueue.AllocTensor<int32_t>();
-  LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
+__aicore__ inline void MoeSrcToDstOp::Compute(int64_t progress)
+{
+    LocalTensor<int32_t> outLocal = copyOutQueue.AllocTensor<int32_t>();
+    LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
 
-  int64_t loops = Ceil(currentLoopRows, ASSIST_INDEX_NUM);
-  for (int64_t i = 0; i < loops; i++) {
-    Adds(outLocal[i * ASSIST_NUM], assistTensor,
-         static_cast<int32_t>(this->perLoopRows * progress + i * ASSIST_INDEX_NUM), ASSIST_NUM);
-  }
-  copyOutQueue.EnQue<int32_t>(outLocal);
+    int64_t loops = Ceil(currentLoopRows, ASSIST_INDEX_NUM);
+    for (int64_t i = 0; i < loops; i++) {
+        Adds(outLocal[i * ASSIST_NUM], assistTensor,
+             static_cast<int32_t>(this->perLoopRows * progress + i * ASSIST_INDEX_NUM), ASSIST_NUM);
+    }
+    copyOutQueue.EnQue<int32_t>(outLocal);
 }
 
-__aicore__ inline void MoeSrcToDstOp::CopyOut() {
-  LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
-  LocalTensor<int32_t> outLocal = copyOutQueue.DeQue<int32_t>();
-  DataCopyParams intriParams;
-  intriParams.blockCount = 1;
-  intriParams.blockLen = sizeof(int32_t);
-  uint32_t outOffset;
-  WaitFlag<HardEvent::MTE2_S>(eventIdMte2ToS_);
-  for (int64_t idx = 0; idx < currentLoopRows; idx++) {
-    outOffset = inLocal.GetValue(idx);
-    event_t eventIdSToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
-    SetFlag<HardEvent::S_MTE3>(eventIdSToMte3);
-    WaitFlag<HardEvent::S_MTE3>(eventIdSToMte3);
-    DataCopyPad(expandSrcToDstRowGm[outOffset], outLocal[idx * INT32_ONE_BLOCK_NUM], intriParams);
-  }
+__aicore__ inline void MoeSrcToDstOp::CopyOut()
+{
+    LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
+    LocalTensor<int32_t> outLocal = copyOutQueue.DeQue<int32_t>();
+    DataCopyParams intriParams;
+    intriParams.blockCount = 1;
+    intriParams.blockLen = sizeof(int32_t);
+    uint32_t outOffset;
+    WaitFlag<HardEvent::MTE2_S>(eventIdMte2ToS_);
+    for (int64_t idx = 0; idx < currentLoopRows; idx++) {
+        outOffset = inLocal.GetValue(idx);
+        event_t eventIdSToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
+        SetFlag<HardEvent::S_MTE3>(eventIdSToMte3);
+        WaitFlag<HardEvent::S_MTE3>(eventIdSToMte3);
+        DataCopyPad(expandSrcToDstRowGm[outOffset], outLocal[idx * INT32_ONE_BLOCK_NUM], intriParams);
+    }
 
-  copyInQueue.FreeTensor(inLocal);
-  copyOutQueue.FreeTensor(outLocal);
+    copyInQueue.FreeTensor(inLocal);
+    copyOutQueue.FreeTensor(outLocal);
 }
 
 __aicore__ inline void MoeSrcToDstOp::Init(GM_ADDR expandSrcToDstRow, GM_ADDR workspace,
-                                           const MoeInitRoutingTilingData* tilingData, TPipe* tPipe) {
-  int64_t blockNum = GetBlockNum();
-  this->pipe = tPipe;
-  this->blockIdx = GetBlockIdx();
+                                           const MoeInitRoutingTilingData *tilingData, TPipe *tPipe)
+{
+    int64_t blockNum = GetBlockNum();
+    this->pipe = tPipe;
+    this->blockIdx = GetBlockIdx();
 
-  this->totalLength = tilingData->n * tilingData->k;
-  this->srcToDstTilingData = &(tilingData->srcToDstComputeParamsOp);
+    this->totalLength = tilingData->n * tilingData->k;
+    this->srcToDstTilingData = &(tilingData->srcToDstComputeParamsOp);
 
-  if (this->blockIdx == this->srcToDstTilingData->needCoreNum - 1) {
-    this->coreRows = this->srcToDstTilingData->lastCoreRows;
-    this->perLoopRows = this->srcToDstTilingData->lastCorePerLoopRows;
-    this->lastLoopRows = this->srcToDstTilingData->lastCoreLastLoopRows;
-  } else {
-    this->coreRows = this->srcToDstTilingData->perCoreRows;
-    this->perLoopRows = this->srcToDstTilingData->perCorePerLoopRows;
-    this->lastLoopRows = this->srcToDstTilingData->perCoreLastLoopRows;
-  }
-
-  expandSrcToDstRowGm.SetGlobalBuffer((__gm__ int32_t*)expandSrcToDstRow, Align(this->totalLength, sizeof(int32_t)));
-  expandDstToSrcRowGm.SetGlobalBuffer(
-      (__gm__ int32_t*)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
-      Align(this->coreRows, sizeof(int32_t)));
-  assistGm.SetGlobalBuffer((__gm__ int32_t*)assist, ASSIST_NUM);
-
-  pipe->InitBuffer(copyInQueue, 1, this->perLoopRows * BLOCK_BYTES);
-  pipe->InitBuffer(copyOutQueue, 1, Ceil(this->perLoopRows, ASSIST_NUM) * ASSIST_NUM * BLOCK_BYTES);
-  pipe->InitBuffer(assistBuffer, ASSIST_NUM * sizeof(int32_t));
-  eventIdMte2ToS_ = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));
-}
-
-__aicore__ inline void MoeSrcToDstOp::Process() {
-  if (this->blockIdx < this->srcToDstTilingData->needCoreNum) {
-    int64_t loops = (coreRows + perLoopRows - 1) / perLoopRows;
-    currentLoopRows = perLoopRows;
-    AssistInit();
-    for (int64_t loop = 0; loop < loops - 1; loop++) {
-      CopyIn(loop);
-      Compute(loop);
-      CopyOut();
+    if (this->blockIdx == this->srcToDstTilingData->needCoreNum - 1) {
+        this->coreRows = this->srcToDstTilingData->lastCoreRows;
+        this->perLoopRows = this->srcToDstTilingData->lastCorePerLoopRows;
+        this->lastLoopRows = this->srcToDstTilingData->lastCoreLastLoopRows;
+    } else {
+        this->coreRows = this->srcToDstTilingData->perCoreRows;
+        this->perLoopRows = this->srcToDstTilingData->perCorePerLoopRows;
+        this->lastLoopRows = this->srcToDstTilingData->perCoreLastLoopRows;
     }
-    currentLoopRows = lastLoopRows;
-    CopyIn(loops - 1);
-    Compute(loops - 1);
-    CopyOut();
-  }
+
+    expandSrcToDstRowGm.SetGlobalBuffer((__gm__ int32_t *)expandSrcToDstRow, Align(this->totalLength, sizeof(int32_t)));
+    expandDstToSrcRowGm.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        Align(this->coreRows, sizeof(int32_t)));
+    assistGm.SetGlobalBuffer((__gm__ int32_t *)assist, ASSIST_NUM);
+
+    pipe->InitBuffer(copyInQueue, 1, this->perLoopRows * BLOCK_BYTES);
+    pipe->InitBuffer(copyOutQueue, 1, Ceil(this->perLoopRows, ASSIST_NUM) * ASSIST_NUM * BLOCK_BYTES);
+    pipe->InitBuffer(assistBuffer, ASSIST_NUM * sizeof(int32_t));
+    eventIdMte2ToS_ = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));
 }
-}  // namespace MoeInitRouting
-#endif  // MOE_SRC_TO_DST_ARCH35_H
+
+__aicore__ inline void MoeSrcToDstOp::Process()
+{
+    if (this->blockIdx < this->srcToDstTilingData->needCoreNum) {
+        int64_t loops = (coreRows + perLoopRows - 1) / perLoopRows;
+        currentLoopRows = perLoopRows;
+        AssistInit();
+        for (int64_t loop = 0; loop < loops - 1; loop++) {
+            CopyIn(loop);
+            Compute(loop);
+            CopyOut();
+        }
+        currentLoopRows = lastLoopRows;
+        CopyIn(loops - 1);
+        Compute(loops - 1);
+        CopyOut();
+    }
+}
+} // namespace MoeInitRouting
+#endif // MOE_SRC_TO_DST_ARCH35_H

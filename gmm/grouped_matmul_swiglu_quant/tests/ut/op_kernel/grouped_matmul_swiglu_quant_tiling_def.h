@@ -19,13 +19,12 @@
 
 constexpr uint16_t GMM_MAX_TENSOR_LIST_SIZE = 128;
 
-
-inline void InitGMMSwigluQuantTilingDataTilingData(uint8_t* tiling, GMMSwigluQuantTilingData* const_data)
+inline void InitGMMSwigluQuantTilingDataTilingData(uint8_t *tiling, GMMSwigluQuantTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(GMMSwigluQuantTilingData));
 }
 
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-    GMMSwigluQuantTilingData tilingData;         \
+    GMMSwigluQuantTilingData tilingData; \
     InitGMMSwigluQuantTilingDataTilingData(tilingPointer, &tilingData)
 #endif

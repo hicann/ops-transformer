@@ -32,9 +32,9 @@ public:
     using bT = typename mmType::BT;
 
 public:
-    __aicore__ inline GMMA4W4MidProcess(typename mmType::MT &matmul) : mm(matmul)
-    {
-    }
+    __aicore__ inline GMMA4W4MidProcess(typename mmType::MT &matmul)
+        : mm(matmul)
+    {}
     __aicore__ inline void Init(const GMAddrParams gmAddrParams,
                                 const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN);
     __aicore__ inline void Process(WorkSpaceSplitConfig &workspaceSplitConfig, int64_t workspaceSplitLoopIdx);
@@ -71,9 +71,8 @@ private:
 };
 
 template <typename mmType>
-__aicore__ inline void
-GMMA4W4MidProcess<mmType>::Init(const GMAddrParams gmAddrParams,
-                                const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN)
+__aicore__ inline void GMMA4W4MidProcess<mmType>::Init(
+    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN)
 {
     if ASCEND_IS_AIC {
         gmmSwigluQuantV2BaseParams = gmmSwigluQuantV2BaseParamsIN;
@@ -119,8 +118,9 @@ __aicore__ inline void GMMA4W4MidProcess<mmType>::SetMNConfig(const int32_t spli
     mnConfig.baseM = gmmSwigluQuantV2BaseParams->baseM;
     mnConfig.baseN = gmmSwigluQuantV2BaseParams->baseN;
     mnConfig.singleM = gmmSwigluQuantV2BaseParams->baseM;
-    mnConfig.singleN = gmmSwigluQuantV2BaseParams->singleN != 0 && gmmSwigluQuantV2BaseParams->quantGroupNum == 1? 
-                         gmmSwigluQuantV2BaseParams->singleN : gmmSwigluQuantV2BaseParams->baseN;                    
+    mnConfig.singleN = gmmSwigluQuantV2BaseParams->singleN != 0 && gmmSwigluQuantV2BaseParams->quantGroupNum == 1 ?
+                           gmmSwigluQuantV2BaseParams->singleN :
+                           gmmSwigluQuantV2BaseParams->baseN;
 }
 
 template <typename mmType>
@@ -135,8 +135,9 @@ __aicore__ inline void GMMA4W4MidProcess<mmType>::Process(WorkSpaceSplitConfig &
         mnConfig.baseM = gmmSwigluQuantV2BaseParams->baseM;
         mnConfig.baseN = gmmSwigluQuantV2BaseParams->baseN;
         mnConfig.singleM = gmmSwigluQuantV2BaseParams->baseM;
-        mnConfig.singleN = gmmSwigluQuantV2BaseParams->singleN != 0 && gmmSwigluQuantV2BaseParams->quantGroupNum == 1? 
-                            gmmSwigluQuantV2BaseParams->singleN : gmmSwigluQuantV2BaseParams->baseN;
+        mnConfig.singleN = gmmSwigluQuantV2BaseParams->singleN != 0 && gmmSwigluQuantV2BaseParams->quantGroupNum == 1 ?
+                               gmmSwigluQuantV2BaseParams->singleN :
+                               gmmSwigluQuantV2BaseParams->baseN;
         mnConfig.k = gmmSwigluQuantV2BaseParams->K; // tilingData
         mnConfig.n = gmmSwigluQuantV2BaseParams->N; // tilingData
         mnConfig.blockDimN = Ceil(mnConfig.n, mnConfig.singleN);
@@ -221,8 +222,9 @@ __aicore__ inline void GMMA4W4MidProcess<mmType>::MMCompute(uint32_t groupIdx, M
             }
         } else {
             if constexpr (mmType::BT::format == CubeFormat::NZ && mmType::BT::isTrans == true) {
-                weightOffset = static_cast<uint64_t>(groupIdx) * gmmSwigluQuantV2BaseParams->N * gmmSwigluQuantV2BaseParams->K +
-                               tailN * 64;
+                weightOffset =
+                    static_cast<uint64_t>(groupIdx) * gmmSwigluQuantV2BaseParams->N * gmmSwigluQuantV2BaseParams->K +
+                    tailN * 64;
                 weightSlice = weightGM[weightOffset + loopK * quantGroupSize * gmmSwigluQuantV2BaseParams->N];
             } else if constexpr (mmType::BT::format == CubeFormat::NZ && mmType::BT::isTrans == false) {
                 weightOffset =

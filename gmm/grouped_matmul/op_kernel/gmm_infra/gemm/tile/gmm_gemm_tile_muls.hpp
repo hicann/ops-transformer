@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 #ifndef GMM_GEMM_TILE_TILE_MULS_HPP
 #define GMM_GEMM_TILE_TILE_MULS_HPP
 
@@ -25,23 +24,16 @@ struct TileMuls {
     static constexpr uint32_t COMPUTE_LENGTH = COMPUTE_LENGTH_;
 
     CATLASS_DEVICE
-    TileMuls()
-    {
-    }
+    TileMuls() {}
 
     CATLASS_DEVICE
-    void operator()(
-        AscendC::LocalTensor<Element> dstTensor,
-        AscendC::LocalTensor<Element> srcTensor,
-        Element scalar,
-        uint32_t len
-    )
+    void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor, Element scalar,
+                    uint32_t len)
     {
         AscendC::SetMaskCount();
         AscendC::SetVectorMask<Element, AscendC::MaskMode::COUNTER>(len);
-        AscendC::Muls<Element, false>(
-            dstTensor, srcTensor, scalar, AscendC::MASK_PLACEHOLDER, 1, AscendC::UnaryRepeatParams{}
-        );
+        AscendC::Muls<Element, false>(dstTensor, srcTensor, scalar, AscendC::MASK_PLACEHOLDER, 1,
+                                      AscendC::UnaryRepeatParams{});
         AscendC::SetMaskNorm();
         AscendC::ResetMask();
     }

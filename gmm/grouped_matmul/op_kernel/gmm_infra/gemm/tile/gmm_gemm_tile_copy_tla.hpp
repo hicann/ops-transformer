@@ -15,25 +15,14 @@
 
 namespace Catlass::Gemm::Tile {
 
-template <
-    class ArchTag,
-    class TensorSrc,
-    class TensorDst,
-    class Enable = void
->
+template <class ArchTag, class TensorSrc, class TensorDst, class Enable = void>
 struct TileCopyTla {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported TileCopyTla, can not find the specialization.");
 };
 
 // Extended template for TileCopyTla that supports manually specifying LayoutTagSrc and LayoutTagDst.
 // Users can specialize the copy class by LayoutTagSrc and LayoutTagDst.
-template <
-    class ArchTag,
-    class TensorSrc,
-    class TensorDst,
-    class LayoutTagSrc,
-    class LayoutTagDst
->
+template <class ArchTag, class TensorSrc, class TensorDst, class LayoutTagSrc, class LayoutTagDst>
 struct TileCopyTlaExt {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported TileCopyTlaExt, can not find the specialization.");
 };

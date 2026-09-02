@@ -38,29 +38,29 @@ struct GroupedMatmulFinalizeRoutingCompileInfo {
 };
 
 BEGIN_TILING_DATA_DEF(GroupMatmulFRTilingData)
-  TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, matmulTiling);
-  TILING_DATA_FIELD_DEF(uint32_t, coreNum);
-  TILING_DATA_FIELD_DEF(uint32_t, groupNum);
-  TILING_DATA_FIELD_DEF(uint32_t, totalInGroup);
-  TILING_DATA_FIELD_DEF(uint32_t, batch);
-  TILING_DATA_FIELD_DEF(uint32_t, k);
-  TILING_DATA_FIELD_DEF(uint32_t, n);
-  TILING_DATA_FIELD_DEF(uint32_t, vBaseM);
-  TILING_DATA_FIELD_DEF(uint32_t, ubCalSize);
-  TILING_DATA_FIELD_DEF(uint32_t, ubRestBytes);
-  TILING_DATA_FIELD_DEF(uint32_t, parallNum);
-  TILING_DATA_FIELD_DEF(uint32_t, sharedInputOffset);
-  TILING_DATA_FIELD_DEF(uint32_t, sharedInputLen);
-  TILING_DATA_FIELD_DEF(float, residualScale);
-  TILING_DATA_FIELD_DEF(uint32_t, quantGroupNum);
-  TILING_DATA_FIELD_DEF(uint32_t, withOffset);
-  TILING_DATA_FIELD_DEF(uint32_t, hasPertokenScale);
-  TILING_DATA_FIELD_DEF(uint32_t, hasBias);
-  TILING_DATA_FIELD_DEF(uint32_t, deterministicFlag);
-  TILING_DATA_FIELD_DEF(uint32_t, deterWorkspaceSize);
+TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, matmulTiling);
+TILING_DATA_FIELD_DEF(uint32_t, coreNum);
+TILING_DATA_FIELD_DEF(uint32_t, groupNum);
+TILING_DATA_FIELD_DEF(uint32_t, totalInGroup);
+TILING_DATA_FIELD_DEF(uint32_t, batch);
+TILING_DATA_FIELD_DEF(uint32_t, k);
+TILING_DATA_FIELD_DEF(uint32_t, n);
+TILING_DATA_FIELD_DEF(uint32_t, vBaseM);
+TILING_DATA_FIELD_DEF(uint32_t, ubCalSize);
+TILING_DATA_FIELD_DEF(uint32_t, ubRestBytes);
+TILING_DATA_FIELD_DEF(uint32_t, parallNum);
+TILING_DATA_FIELD_DEF(uint32_t, sharedInputOffset);
+TILING_DATA_FIELD_DEF(uint32_t, sharedInputLen);
+TILING_DATA_FIELD_DEF(float, residualScale);
+TILING_DATA_FIELD_DEF(uint32_t, quantGroupNum);
+TILING_DATA_FIELD_DEF(uint32_t, withOffset);
+TILING_DATA_FIELD_DEF(uint32_t, hasPertokenScale);
+TILING_DATA_FIELD_DEF(uint32_t, hasBias);
+TILING_DATA_FIELD_DEF(uint32_t, deterministicFlag);
+TILING_DATA_FIELD_DEF(uint32_t, deterWorkspaceSize);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(GroupedMatmulFinalizeRouting, GroupMatmulFRTilingData)
 REGISTER_TILING_DATA_CLASS(GroupMatmulFRTilingDataOp, GroupMatmulFRTilingData)
-}
+} // namespace optiling
 #endif // __OP_HOST_GROUPED_MATMUL_FINALIZE_ROUTING_TILING_H__

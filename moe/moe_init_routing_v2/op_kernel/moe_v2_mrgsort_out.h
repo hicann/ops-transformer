@@ -203,9 +203,11 @@ __aicore__ inline void MoeV2MrgsortOut::CopyOut()
     SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200
     if (needCopyOut) {
-        DataCopyCustom<int32_t,true,false>(this->gmOutput1[outOffset], this->ubOutputInt1, intriParams.blockCount, intriParams.blockLen);
+        DataCopyCustom<int32_t, true, false>(this->gmOutput1[outOffset], this->ubOutputInt1, intriParams.blockCount,
+                                             intriParams.blockLen);
     }
-    DataCopyCustom<int32_t,true,false>(this->gmOutput2[outOffset], this->ubOutputInt2, intriParams.blockCount, intriParams.blockLen);
+    DataCopyCustom<int32_t, true, false>(this->gmOutput2[outOffset], this->ubOutputInt2, intriParams.blockCount,
+                                         intriParams.blockLen);
 #else
     DataCopyPad(this->gmOutput2[outOffset], this->ubOutputInt2, intriParams);
     DataCopyPad(this->gmOutput1[outOffset], this->ubOutputInt1, intriParams);

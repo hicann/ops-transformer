@@ -28,16 +28,15 @@ public:
 
 public:
     /* 输入输出 */
-    AclnnTensor aclnnX1, aclnnX2, aclnnScale2, aclnnGroupList,
-        aclnnScale1, aclnnY;
-    aclTensor* x1 = nullptr;
-    aclTensor* scale1 = nullptr;
+    AclnnTensor aclnnX1, aclnnX2, aclnnScale2, aclnnGroupList, aclnnScale1, aclnnY;
+    aclTensor *x1 = nullptr;
+    aclTensor *scale1 = nullptr;
     std::map<std::string, Tensor> mTensors;
 
 public:
     AclnnQGMMInplaceAddParam() = default;
-    AclnnQGMMInplaceAddParam(std::vector<Tensor> inputs, std::vector<int64_t> groupListData,
-                            int32_t groupListType, int32_t groupSize);
+    AclnnQGMMInplaceAddParam(std::vector<Tensor> inputs, std::vector<int64_t> groupListData, int32_t groupListType,
+                             int32_t groupSize);
 
     ~AclnnQGMMInplaceAddParam();
 

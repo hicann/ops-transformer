@@ -77,27 +77,27 @@ private:
 
     TBuf<> ubBuffer_;
 
-    LocalTensor<float> aF32TmpTensor_;      // 49k
-    LocalTensor<xType> aOriginTensor_;      // 24k 49-73k分配给xType的a矩阵
-    LocalTensor<float> aFp32ReduceTensor_;  // 24k 73-97分配给float的reduce后的a矩阵
-    LocalTensor<half> aFp16Tensor_;         // 24k 73-97k分配给half的a矩阵 空间复用
+    LocalTensor<float> aF32TmpTensor_;     // 49k
+    LocalTensor<xType> aOriginTensor_;     // 24k 49-73k分配给xType的a矩阵
+    LocalTensor<float> aFp32ReduceTensor_; // 24k 73-97分配给float的reduce后的a矩阵
+    LocalTensor<half> aFp16Tensor_;        // 24k 73-97k分配给half的a矩阵 空间复用
     // 24k 97-121k分配给unfold的a矩阵
     LocalTensor<int8_t> aUnfoldLocalTensor_;
-    LocalTensor<float> aMaxTensor_;  // 8k 121-129k分配给aMax的a矩阵
-    LocalTensor<float> aSumTensor_;  // 8k 129-137k分配给aSum的a矩阵
-    LocalTensor<float> aF32Tensor_;  // 49k 137-186k分配给float的a矩阵
+    LocalTensor<float> aMaxTensor_; // 8k 121-129k分配给aMax的a矩阵
+    LocalTensor<float> aSumTensor_; // 8k 129-137k分配给aSum的a矩阵
+    LocalTensor<float> aF32Tensor_; // 49k 137-186k分配给float的a矩阵
 
-    LocalTensor<wType> wS4Ub_;             // 16k * 2 读入ub
-    LocalTensor<CUBE_FIXP_DTYPE> cF32Ub_;  // 32k * 2 同地址
+    LocalTensor<wType> wS4Ub_;            // 16k * 2 读入ub
+    LocalTensor<CUBE_FIXP_DTYPE> cF32Ub_; // 32k * 2 同地址
 
-    LocalTensor<float> aMaxUb_;  // 1k * 2 读入ub
+    LocalTensor<float> aMaxUb_; // 1k * 2 读入ub
 
-    LocalTensor<int8_t> wS8Ub_;  // 32k * 2 写出ub
+    LocalTensor<int8_t> wS8Ub_; // 32k * 2 写出ub
 
-    LocalTensor<half> wF16Ub_;          // 32k 计算ub
-    LocalTensor<float> cF32ComputeUb_;  // 32k 计算ub 同地址
+    LocalTensor<half> wF16Ub_;         // 32k 计算ub
+    LocalTensor<float> cF32ComputeUb_; // 32k 计算ub 同地址
 
-    LocalTensor<CUBE_FIXP_DTYPE> cF32UbSum_;  // 20k k轴累加 16 * 320 fp32
+    LocalTensor<CUBE_FIXP_DTYPE> cF32UbSum_; // 20k k轴累加 16 * 320 fp32
     LocalTensor<xType> cOutputUb_;
 
     BinaryRepeatParams commonRepeatParams_;
@@ -128,15 +128,15 @@ GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
 __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitPreProcess(TPipe *tPipe)
 {
     tPipe->InitBuffer(ubBuffer_, 192 * 1024);
-    aF32TmpTensor_ = ubBuffer_.Get<float>();                               // 49k 0-49k分配给float的aTmp矩阵
-    aOriginTensor_ = ubBuffer_.Get<xType>()[49 * GetKBUnit<half>()];       // 24k 49-73k分配给xType的a矩阵
-    aFp32ReduceTensor_ = ubBuffer_.Get<float>()[73 * GetKBUnit<float>()];  // 24k 73-97分配给float的reduce后的a矩阵
-    aFp16Tensor_ = ubBuffer_.Get<half>()[73 * GetKBUnit<half>()];          // 24k 73-97k分配给half的a矩阵 空间复用
+    aF32TmpTensor_ = ubBuffer_.Get<float>();                              // 49k 0-49k分配给float的aTmp矩阵
+    aOriginTensor_ = ubBuffer_.Get<xType>()[49 * GetKBUnit<half>()];      // 24k 49-73k分配给xType的a矩阵
+    aFp32ReduceTensor_ = ubBuffer_.Get<float>()[73 * GetKBUnit<float>()]; // 24k 73-97分配给float的reduce后的a矩阵
+    aFp16Tensor_ = ubBuffer_.Get<half>()[73 * GetKBUnit<half>()]; // 24k 73-97k分配给half的a矩阵 空间复用
     // 24k 97-121k分配给unfold的a矩阵
     aUnfoldLocalTensor_ = ubBuffer_.Get<int8_t>()[97 * GetKBUnit<int8_t>()];
-    aMaxTensor_ = ubBuffer_.Get<float>()[121 * GetKBUnit<float>()];  // 8k 121-129k分配给aMax的a矩阵
-    aSumTensor_ = ubBuffer_.Get<float>()[129 * GetKBUnit<float>()];  // 8k 129-137k分配给aSum的a矩阵
-    aF32Tensor_ = ubBuffer_.Get<float>()[137 * GetKBUnit<float>()];  // 49k 137-186k分配给float的a矩阵
+    aMaxTensor_ = ubBuffer_.Get<float>()[121 * GetKBUnit<float>()]; // 8k 121-129k分配给aMax的a矩阵
+    aSumTensor_ = ubBuffer_.Get<float>()[129 * GetKBUnit<float>()]; // 8k 129-137k分配给aSum的a矩阵
+    aF32Tensor_ = ubBuffer_.Get<float>()[137 * GetKBUnit<float>()]; // 49k 137-186k分配给float的a矩阵
 
     commonRepeatParams_.dstBlkStride = 1;
     commonRepeatParams_.src0BlkStride = 1;
@@ -388,9 +388,9 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::CastW4ToW8(
     for (uint64_t ubMte2NOffset = GetSubBlockIdx() * WEIGHT_UB_CAST_N; ubMte2NOffset < curOffsetParam.nL1Size;
          ubMte2NOffset += 2 * WEIGHT_UB_CAST_N) {
         WaitFlag<HardEvent::V_MTE2>(V_MTE2_EVENT + mte2BufIdx_ % WEIGHT_BUFFER_NUM);
-        uint64_t nMte2RealSize = ubMte2NOffset + WEIGHT_UB_CAST_N > curOffsetParam.nL1Size
-                                     ? curOffsetParam.nL1Size - ubMte2NOffset
-                                     : WEIGHT_UB_CAST_N;
+        uint64_t nMte2RealSize = ubMte2NOffset + WEIGHT_UB_CAST_N > curOffsetParam.nL1Size ?
+                                     curOffsetParam.nL1Size - ubMte2NOffset :
+                                     WEIGHT_UB_CAST_N;
         DataCopyPad2D(wS4Ub_[(mte2BufIdx_ % WEIGHT_BUFFER_NUM) * WEIGHT_S4_UB_OFFSET],
                       wS4Gm_[(ubMte2NOffset + curOffsetParam.nOffset) * constParams.kSize + curOffsetParam.kOffset],
                       nMte2RealSize, curOffsetParam.kUbSize, BASE_KUB_SIZE, constParams.kSize);
@@ -401,9 +401,9 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::CastW4ToW8(
         WaitFlag<HardEvent::MTE2_V>(MTE2_V_EVENT);
         for (uint64_t weightUbOffset = 0; weightUbOffset < nMte2RealSize * curOffsetParam.kUbSize;
              weightUbOffset += WEIGHT_CAST_BASE_SIZE) {
-            uint64_t weightCastCount = weightUbOffset + WEIGHT_CAST_BASE_SIZE > nMte2RealSize * curOffsetParam.kUbSize
-                                           ? nMte2RealSize * curOffsetParam.kUbSize - weightUbOffset
-                                           : WEIGHT_CAST_BASE_SIZE;
+            uint64_t weightCastCount = weightUbOffset + WEIGHT_CAST_BASE_SIZE > nMte2RealSize * curOffsetParam.kUbSize ?
+                                           nMte2RealSize * curOffsetParam.kUbSize - weightUbOffset :
+                                           WEIGHT_CAST_BASE_SIZE;
             Cast(wF16Ub_, wS4Ub_[(mte2BufIdx_ % WEIGHT_BUFFER_NUM) * WEIGHT_S4_UB_OFFSET + weightUbOffset],
                  RoundMode::CAST_NONE, weightCastCount);
             PipeBarrier<PIPE_V>();
@@ -455,9 +455,9 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::PostProcess(
     outputGm_.SetGlobalBuffer((__gm__ xType *)curOffsetParam.yGmAddr);
     scaleGm_.SetGlobalBuffer((__gm__ xType *)curOffsetParam.antiquantScaleGm);
     for (uint64_t quantGroupOffset = 0; quantGroupOffset < BASE_KUB_SIZE / 32; quantGroupOffset += groupNumBatch) {
-        uint64_t realQuantGroup = quantGroupOffset + groupNumBatch > BASE_KUB_SIZE / 32
-                                      ? BASE_KUB_SIZE / 32 - quantGroupOffset
-                                      : groupNumBatch;
+        uint64_t realQuantGroup = quantGroupOffset + groupNumBatch > BASE_KUB_SIZE / 32 ?
+                                      BASE_KUB_SIZE / 32 - quantGroupOffset :
+                                      groupNumBatch;
         WaitFlag<HardEvent::V_MTE2>(V_MTE2_EVENT + mte2BufIdx_ % WEIGHT_BUFFER_NUM);
         LocalTensor<float> cF32Ub = cF32Ub_[(mte2BufIdx_ % WEIGHT_BUFFER_NUM) * C_F32_UB_OFFSET + scaleBufOffset];
         DataCopyPad2D(
@@ -549,6 +549,6 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::EndMsd()
     WaitFlag<HardEvent::MTE3_V>(MTE3_V_EVENT);
     WaitFlag<HardEvent::MTE3_V>(MTE3_V_EVENT + 1);
 }
-}  // namespace GROUPED_MATMUL::A16W4Msd
+} // namespace GROUPED_MATMUL::A16W4Msd
 
-#endif  // GROUPED_MATMUL_WEIGHT_QUANT_VEC_COMPUTE_H
+#endif // GROUPED_MATMUL_WEIGHT_QUANT_VEC_COMPUTE_H

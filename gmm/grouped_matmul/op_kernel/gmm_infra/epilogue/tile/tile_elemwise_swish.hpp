@@ -31,8 +31,8 @@ struct TileElemWiseSwish {
     TileElemWiseSwish() {}
 
     CATLASS_DEVICE
-    void operator () (AscendC::LocalTensor<ElementCompute> const & dstLocal,
-        AscendC::LocalTensor<ElementCompute> const & srcLocal)
+    void operator()(AscendC::LocalTensor<ElementCompute> const &dstLocal,
+                    AscendC::LocalTensor<ElementCompute> const &srcLocal)
     {
         using namespace AscendC;
         // d: -x, s: x

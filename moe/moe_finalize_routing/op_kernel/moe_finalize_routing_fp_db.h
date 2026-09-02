@@ -182,7 +182,7 @@ __aicore__ inline void MoeFinalizeRoutingFpDb<T>::Init(GM_ADDR expandedPermutedR
     gmSkip1_.SetGlobalBuffer((__gm__ T *)skip1 + inputSkipIdx_, normalCoreHandleNum_ * H_);
 #ifndef __CCE_KT_TEST__
     pipe.InitBuffer(skip1Queue_, 1, normalCoreHandleNumPerLoop_ * AlignmentProcess(H_) * sizeof(T));
-#else 
+#else
     pipe.InitBuffer(skip1Queue_, 1, ONE_BLK_SIZE);
 #endif
     if (skip2IsNull_ == 0) {
@@ -209,7 +209,7 @@ __aicore__ inline void MoeFinalizeRoutingFpDb<T>::Init(GM_ADDR expandedPermutedR
     pipe.InitBuffer(expertForSourceRowQueue_, BUFFER_NUM,
                     normalCoreHandleNumPerLoop_ * Int32AlignmentProcess(K_) * sizeof(int32_t));
     pipe.InitBuffer(outQueue_, BUFFER_NUM, normalCoreHandleNumPerLoop_ * AlignmentProcess(H_) * sizeof(T));
-#else 
+#else
     pipe.InitBuffer(scalesQueue_, BUFFER_NUM, ONE_BLK_SIZE);
     pipe.InitBuffer(expertForSourceRowQueue_, BUFFER_NUM, ONE_BLK_SIZE);
     pipe.InitBuffer(outQueue_, BUFFER_NUM, ONE_BLK_SIZE);

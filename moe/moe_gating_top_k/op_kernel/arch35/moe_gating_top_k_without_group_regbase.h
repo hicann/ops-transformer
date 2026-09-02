@@ -46,8 +46,8 @@ private:
     __aicore__ inline void ComputeNorm(LocalTensor<float> xInTensor, int64_t rowInBatch);
     __aicore__ inline void ComputeNormSigmoid(__ubuf__ float *xRowAddr, __ubuf__ float *xNormAddr);
     __aicore__ inline void ComputeNormSoftMax(__ubuf__ float *xRowAddr, __ubuf__ float *xNormAddr,
-                                               __ubuf__ float *xNormWithBiasAddr, __ubuf__ float *biasAddr,
-                                               int64_t duplicateNum);
+                                              __ubuf__ float *xNormWithBiasAddr, __ubuf__ float *biasAddr,
+                                              int64_t duplicateNum);
     __aicore__ inline void ComputeNormSoftplus(__ubuf__ float *xRowAddr, __ubuf__ float *xNormAddr);
     __aicore__ inline void ApplyBiasAndPad(LocalTensor<float> xNormWithBiasTensor, LocalTensor<float> xNormTensor,
                                            LocalTensor<float> biasTensor, int64_t duplicateNum, int64_t duplicateIndex);
@@ -166,7 +166,7 @@ __aicore__ inline void MoeGatingTopKWithoutGroupRegbase<T>::CopyInXBatch(int64_t
 
 template <typename T>
 __aicore__ inline void MoeGatingTopKWithoutGroupRegbase<T>::ComputeNormSigmoid(__ubuf__ float *xRowAddr,
-                                                                                __ubuf__ float *xNormAddr)
+                                                                               __ubuf__ float *xNormAddr)
 {
     uint32_t expertCountU32 = static_cast<uint32_t>(expertCountAlign_);
     uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(expertCountU32, VL_FLOAT_SIZE));
@@ -197,10 +197,10 @@ __aicore__ inline void MoeGatingTopKWithoutGroupRegbase<T>::ComputeNormSigmoid(_
 
 template <typename T>
 __aicore__ inline void MoeGatingTopKWithoutGroupRegbase<T>::ComputeNormSoftMax(__ubuf__ float *xRowAddr,
-                                                                                __ubuf__ float *xNormAddr,
-                                                                                __ubuf__ float *xNormWithBiasAddr,
-                                                                                __ubuf__ float *biasAddr,
-                                                                                int64_t duplicateNum)
+                                                                               __ubuf__ float *xNormAddr,
+                                                                               __ubuf__ float *xNormWithBiasAddr,
+                                                                               __ubuf__ float *biasAddr,
+                                                                               int64_t duplicateNum)
 {
     uint32_t size = static_cast<uint32_t>(expertCountAlign_);
 

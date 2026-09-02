@@ -33,11 +33,11 @@ using namespace WeightQuantBatchMatmulV2::Arch35;
 
 namespace GMMSQWeightQuant {
 
-#define GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM                                                                        \
-    template <typename xType, typename wType, typename weightScaleType, typename xScaleType, typename yType,           \
+#define GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM \
+    template <typename xType, typename wType, typename weightScaleType, typename xScaleType, typename yType, \
               typename yScaleType, const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
 
-#define GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS                                                                                 \
+#define GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS \
     GMMSQWeightQuantVcvBasicBlock<xType, wType, weightScaleType, xScaleType, yType, yScaleType, wqmmConfig, vecConfig>
 
 GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
@@ -145,9 +145,8 @@ __aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::UpdateGlobalAddr(__gm__ x
 }
 
 GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::ComputeBasicBlock(const BasicBlockOffsetParam &curOffsetParam,
-                                                  const BasicBlockOffsetParam &previousOffsetParam)
+__aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::ComputeBasicBlock(
+    const BasicBlockOffsetParam &curOffsetParam, const BasicBlockOffsetParam &previousOffsetParam)
 {
     if ASCEND_IS_AIV {
         IterateNzNkWithAiv(curOffsetParam, previousOffsetParam);
@@ -157,9 +156,8 @@ GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::ComputeBasicBlock(const BasicBlockOffsetParam &c
 }
 
 GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::IterateNzNkWithAiv(const BasicBlockOffsetParam &curOffsetParam,
-                                                   const BasicBlockOffsetParam &previousOffsetParam)
+__aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::IterateNzNkWithAiv(
+    const BasicBlockOffsetParam &curOffsetParam, const BasicBlockOffsetParam &previousOffsetParam)
 {
     uint64_t kMte2Offset = 0;
     uint64_t curCvLoopIdx = cvLoopIdx_;
@@ -186,9 +184,8 @@ GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::IterateNzNkWithAiv(const BasicBlockOffsetParam &
 }
 
 GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::VecComputeNzNkWithStartLimit(uint64_t &kMte2Offset, uint64_t kMte2Limit,
-                                                             const BasicBlockOffsetParam &curOffsetParam)
+__aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::VecComputeNzNkWithStartLimit(
+    uint64_t &kMte2Offset, uint64_t kMte2Limit, const BasicBlockOffsetParam &curOffsetParam)
 {
     uint64_t kMte2BaseSize = curOffsetParam.kbL1Size / DOUBLE_BUFFER_NUM;
     uint64_t nL1AlignSize = CeilAlign(curOffsetParam.nL1Size, static_cast<uint64_t>(BLOCK_CUBE));
@@ -214,9 +211,8 @@ GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::VecComputeNzNkWithStartLimit(uint64_t &kMte2Offs
 }
 
 GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::IterateNzNkWithKAic(const BasicBlockOffsetParam &curOffsetParam,
-                                                    const BasicBlockOffsetParam &previousOffsetParam)
+__aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::IterateNzNkWithKAic(
+    const BasicBlockOffsetParam &curOffsetParam, const BasicBlockOffsetParam &previousOffsetParam)
 {
     if (cvLoopIdx_ > 0) {
         WaitAivToAic<PIPE_FIX>(SYNC_AIV_MTE3_AIC_FIX_FLAG);

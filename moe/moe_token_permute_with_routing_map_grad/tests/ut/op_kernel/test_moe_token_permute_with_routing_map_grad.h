@@ -66,12 +66,12 @@
 //     memcpy(tilingdata, p_tilingdata, sizeof(T));
 // }
 
-#define GET_TILING_DATA_MEMBER(tiling_type, member, var, tiling)           \
-    auto var = ((tiling_type*)((uint8_t*)AscendC::GmAlloc(1024)))->member; \
-    size_t offset##var = (size_t)(&((tiling_type*)0)->member);             \
+#define GET_TILING_DATA_MEMBER(tiling_type, member, var, tiling) \
+    auto var = ((tiling_type *)((uint8_t *)AscendC::GmAlloc(1024)))->member; \
+    size_t offset##var = (size_t)(&((tiling_type *)0)->member); \
     InitTilingData<decltype(var)>(tiling + offset##var, &var);
 
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-    MoeTokenPermuteWithRoutingMapGradTilingData tilingData;        \
+    MoeTokenPermuteWithRoutingMapGradTilingData tilingData; \
     InitMoeTokenUnpermuteTilingData(tilingPointer, &tilingData)
 #endif

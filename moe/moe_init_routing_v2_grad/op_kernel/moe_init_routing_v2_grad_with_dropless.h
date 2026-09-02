@@ -21,27 +21,25 @@ namespace MoeInitRoutingV2Grad {
 using namespace AscendC;
 
 template <typename T>
-class MoeInitRoutingV2GradDroplessCompute : public MoeInitRoutingV2GradBase<T>
-{
+class MoeInitRoutingV2GradDroplessCompute : public MoeInitRoutingV2GradBase<T> {
 public:
     __aicore__ inline MoeInitRoutingV2GradDroplessCompute(){};
-    __aicore__ inline void Init(
-        GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx, GM_ADDR gradX, const MoeInitRoutingV2GradTilingData* tilingData,
-        TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx, GM_ADDR gradX,
+                                const MoeInitRoutingV2GradTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void TokenLoopProcess(
-        int64_t elementIdx, int64_t tokenBinBuffSizeOffset, int64_t tokenTmpBuffSizeOffset);
-    __aicore__ inline void GradProcess(
-        int64_t elementIdx, int64_t tokenBinBuffSizeOffset, int64_t tokenTmpBuffSizeOffset, int64_t cpyCols,
-        int64_t colOffset, int64_t outOffset);
-    __aicore__ inline void GradProcessTokenAccumulate(
-        int64_t tokenIdxStart, int64_t tokenIdxEnd, int64_t tokenBinBuffSizeOffset, int64_t tokenTmpBuffSizeOffset,
-        int64_t colOffset, int64_t cpyCols);
+    __aicore__ inline void TokenLoopProcess(int64_t elementIdx, int64_t tokenBinBuffSizeOffset,
+                                            int64_t tokenTmpBuffSizeOffset);
+    __aicore__ inline void GradProcess(int64_t elementIdx, int64_t tokenBinBuffSizeOffset,
+                                       int64_t tokenTmpBuffSizeOffset, int64_t cpyCols, int64_t colOffset,
+                                       int64_t outOffset);
+    __aicore__ inline void GradProcessTokenAccumulate(int64_t tokenIdxStart, int64_t tokenIdxEnd,
+                                                      int64_t tokenBinBuffSizeOffset, int64_t tokenTmpBuffSizeOffset,
+                                                      int64_t colOffset, int64_t cpyCols);
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
 
     int64_t perTokenUseBinBuffSize;
     int64_t perTokenUseTmpBuffSize;
@@ -52,16 +50,17 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::Init(
-    GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx, GM_ADDR gradX, const MoeInitRoutingV2GradTilingData* tilingData,
-    TPipe* tPipe)
+__aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::Init(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx,
+                                                                    GM_ADDR gradX,
+                                                                    const MoeInitRoutingV2GradTilingData *tilingData,
+                                                                    TPipe *tPipe)
 {
     this->pipe = tPipe;
     this->ParseTilingData(tilingData);
 
-    this->gradExpandedXGm.SetGlobalBuffer(
-        (__gm__ T*)gradExpandedX, this->n * this->k * this->cols);               // input: {B*S*K, H}
-    this->gradXGm.SetGlobalBuffer((__gm__ T*)gradX, tilingData->n * this->cols); // output: {B*S, H}
+    this->gradExpandedXGm.SetGlobalBuffer((__gm__ T *)gradExpandedX,
+                                          this->n * this->k * this->cols);        // input: {B*S*K, H}
+    this->gradXGm.SetGlobalBuffer((__gm__ T *)gradX, tilingData->n * this->cols); // output: {B*S, H}
     expandedRowIdxAddr = expandedRowIdx;
 
     this->perTokenUseBinBuffSize = this->binBufferNum * this->perBuffSize;
@@ -81,7 +80,7 @@ __aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::GradProcessTokenA
     int64_t tokenIdx = tokenIdxStart;
     for (; tokenIdx < tokenIdxEnd; tokenIdx += this->baseStride) {
         int64_t binIdx = ((tokenIdx - tokenIdxStart) / this->baseStride) % this->binBufferNum;
-        int32_t xRow = ((__gm__ int32_t*)expandedRowIdxAddr)[tokenIdx];
+        int32_t xRow = ((__gm__ int32_t *)expandedRowIdxAddr)[tokenIdx];
         int64_t binBuffOffset = tokenBinBuffSizeOffset + this->perBuffSize * binIdx;
         int64_t tmpBuffOffset =
             (this->multiTmpBuff) ? (tokenTmpBuffSizeOffset + this->perBuffSize * binIdx) : tokenTmpBuffSizeOffset;
@@ -94,9 +93,11 @@ __aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::GradProcessTokenA
 }
 
 template <typename T>
-__aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::GradProcess(
-    int64_t elementIdx, int64_t tokenBinBuffSizeOffset, int64_t tokenTmpBuffSizeOffset, int64_t cpyCols,
-    int64_t colOffset, int64_t outOffset)
+__aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::GradProcess(int64_t elementIdx,
+                                                                           int64_t tokenBinBuffSizeOffset,
+                                                                           int64_t tokenTmpBuffSizeOffset,
+                                                                           int64_t cpyCols, int64_t colOffset,
+                                                                           int64_t outOffset)
 {
     event_t eventMte2V = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
     event_t eventVS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));
@@ -107,7 +108,7 @@ __aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::GradProcess(
     int64_t tokenIdx = tokenIdxStart;
     int64_t binIdx = 0;
     for (; tokenIdx < tokenIdxEnd && binIdx < this->binBufferNum; tokenIdx += this->baseStride, binIdx++) {
-        int32_t xRow = ((__gm__ int32_t*)expandedRowIdxAddr)[tokenIdx];
+        int32_t xRow = ((__gm__ int32_t *)expandedRowIdxAddr)[tokenIdx];
         int64_t binBuffOffset = tokenBinBuffSizeOffset + this->perBuffSize * binIdx;
         LocalTensor<float> xLocal = this->binBuff.template GetWithOffset<float>(this->perCpyCols, binBuffOffset);
         LocalTensor<T> xLocalT =
@@ -118,12 +119,12 @@ __aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::GradProcess(
     }
 
     // S2：K超过累加buffer的情况下，多出的部分，被加数位置，直接累加到对应的buffer中
-    GradProcessTokenAccumulate(
-        tokenIdx, tokenIdxEnd, tokenBinBuffSizeOffset, tokenTmpBuffSizeOffset, colOffset, cpyCols);
+    GradProcessTokenAccumulate(tokenIdx, tokenIdxEnd, tokenBinBuffSizeOffset, tokenTmpBuffSizeOffset, colOffset,
+                               cpyCols);
 
     // S3：拷贝加数，累加到对应的被加数buffer中
-    GradProcessTokenAccumulate(
-        tokenIdxStart + 1, tokenIdxEnd, tokenBinBuffSizeOffset, tokenTmpBuffSizeOffset, colOffset, cpyCols);
+    GradProcessTokenAccumulate(tokenIdxStart + 1, tokenIdxEnd, tokenBinBuffSizeOffset, tokenTmpBuffSizeOffset,
+                               colOffset, cpyCols);
     SetFlag<HardEvent::V_S>(eventVS);
     WaitFlag<HardEvent::V_S>(eventVS);
 
@@ -150,8 +151,9 @@ __aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::GradProcess(
 }
 
 template <typename T>
-__aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::TokenLoopProcess(
-    int64_t elementIdx, int64_t tokenBinBuffSizeOffset, int64_t tokenTmpBuffSizeOffset)
+__aicore__ inline void MoeInitRoutingV2GradDroplessCompute<T>::TokenLoopProcess(int64_t elementIdx,
+                                                                                int64_t tokenBinBuffSizeOffset,
+                                                                                int64_t tokenTmpBuffSizeOffset)
 {
     /*
       expanded_x: [6, 4] expanded_row_idx:[6] grad_x:[3, 4] K:2

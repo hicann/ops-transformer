@@ -13,13 +13,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*> MoeTokenUnpermuteWithRoutingMap(const aclTensor* permutedTokens,
-                                                                                                 const aclTensor* sortedIndices,
-                                                                                                 const aclTensor* routingMapOptional,
-                                                                                                 const aclTensor* probsOptional, 
-                                                                                                 bool paddedMode,
-                                                                                                 const aclIntArray* restoreShapeOptional, 
-                                                                                                 aclOpExecutor *executor);
+const std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *> MoeTokenUnpermuteWithRoutingMap(
+    const aclTensor *permutedTokens, const aclTensor *sortedIndices, const aclTensor *routingMapOptional,
+    const aclTensor *probsOptional, bool paddedMode, const aclIntArray *restoreShapeOptional, aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_MOE_TOKEN_UNPERMUTE_WITH_ROTING_MAP_H_

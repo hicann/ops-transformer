@@ -30,5 +30,5 @@ static constexpr volatile __gm__ int16_t C1C2_EYE_DIAG[256] = {
     7176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     7176, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7176};
 
-}  // namespace GROUPED_MATMUL::A16W4Msd
-#endif  // GROUPED_MATMUL_WEIGHT_QUANT_BASIC_BLOCK_CONFIG_H
+} // namespace GROUPED_MATMUL::A16W4Msd
+#endif // GROUPED_MATMUL_WEIGHT_QUANT_BASIC_BLOCK_CONFIG_H

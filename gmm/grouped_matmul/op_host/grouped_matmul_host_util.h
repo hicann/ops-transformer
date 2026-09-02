@@ -130,7 +130,10 @@ constexpr int32_t STATIC_TILING_DEPTH_A1_B1 = 8;
 constexpr int32_t STATIC_TILING_STEP_KA_KB = 4;
 constexpr int32_t STATIC_TILING_MAX_K = 8192;
 
-constexpr uint64_t RecursiveSum() { return 0; }
+constexpr uint64_t RecursiveSum()
+{
+    return 0;
+}
 
 template <typename T, typename... Args>
 constexpr uint64_t RecursiveSum(T templateId, Args... templateIds)

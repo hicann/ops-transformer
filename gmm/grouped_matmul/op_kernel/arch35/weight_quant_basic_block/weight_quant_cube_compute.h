@@ -42,12 +42,12 @@ using AscendC::WaitFlag;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
 
-#define WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM                                                                              \
-    template <typename xType, typename biasType, typename antiQuantScaleType, typename perTokenScaleType,              \
+#define WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM \
+    template <typename xType, typename biasType, typename antiQuantScaleType, typename perTokenScaleType, \
               typename yType, const WqmmConfig &wqmmConfig, typename MatmulImplType>
 
-#define WQBMM_CUBE_COMPUTE_CLASS                                                                                       \
-    WeightQuantBatchMatmulV2CubeCompute<xType, biasType, antiQuantScaleType, perTokenScaleType, yType, wqmmConfig,     \
+#define WQBMM_CUBE_COMPUTE_CLASS \
+    WeightQuantBatchMatmulV2CubeCompute<xType, biasType, antiQuantScaleType, perTokenScaleType, yType, wqmmConfig, \
                                         MatmulImplType>
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
@@ -402,10 +402,9 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::InitSync()
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void
-WQBMM_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(__gm__ xType *x, __gm__ yType *y, __gm__ biasType *bias,
-                                           __gm__ antiQuantScaleType *antiquantScale, __gm__ uint64_t *quantScale,
-                                           __gm__ perTokenScaleType *perTokenScale, const bool isBias)
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(
+    __gm__ xType *x, __gm__ yType *y, __gm__ biasType *bias, __gm__ antiQuantScaleType *antiquantScale,
+    __gm__ uint64_t *quantScale, __gm__ perTokenScaleType *perTokenScale, const bool isBias)
 {
     isBias_ = isBias;
     xGlobal_.SetGlobalBuffer(x);
@@ -460,10 +459,9 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::PrefetchA(uint64_t aPrefetchSiz
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void
-WQBMM_CUBE_COMPUTE_CLASS::MxA8W4Init(uint64_t l1RemainSize, uint64_t l1StartSize, uint64_t mxBiasL1DbOffset,
-                                     const TCubeTiling *__restrict matmulTiling, const LocalTensor<biasType> &biasL1,
-                                     uint64_t mxScaleBL1DbOffset, const LocalTensor<fp8_e8m0_t> &mxScaleBL1)
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::MxA8W4Init(
+    uint64_t l1RemainSize, uint64_t l1StartSize, uint64_t mxBiasL1DbOffset, const TCubeTiling *__restrict matmulTiling,
+    const LocalTensor<biasType> &biasL1, uint64_t mxScaleBL1DbOffset, const LocalTensor<fp8_e8m0_t> &mxScaleBL1)
 {
     //  MxA8W4场景空间分配: 其中 weight\Bias为全局分配，此处不感知
     //  L1 (0~512KB): WeightL1_P0(64KB) |    Bias_P0(4KB)   | ScaleAL1_P0(32KB) | ScaleBL1_P0(32KB) | AL1_P0(80KB) |

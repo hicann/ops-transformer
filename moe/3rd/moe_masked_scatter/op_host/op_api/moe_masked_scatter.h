@@ -17,7 +17,7 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor* MoeMaskedScatter(
-    const aclTensor* self, const aclTensor* mask, const aclTensor* source, aclOpExecutor* executor);
+const aclTensor *MoeMaskedScatter(const aclTensor *self, const aclTensor *mask, const aclTensor *source,
+                                  aclOpExecutor *executor);
 }
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_MOE_MASKED_SCATTER_OP_H_

@@ -20,11 +20,12 @@
 #define ORIG_DTYPE_START DT_BF16
 #define __CCE_UT_TEST__
 
-inline void InitMoeTokenPermuteGradTilingData(uint8_t* tiling, MoeTokenPermuteGradTilingData* const_data) {
-  memcpy(const_data, tiling, sizeof(MoeTokenPermuteGradTilingData));
+inline void InitMoeTokenPermuteGradTilingData(uint8_t *tiling, MoeTokenPermuteGradTilingData *const_data)
+{
+    memcpy(const_data, tiling, sizeof(MoeTokenPermuteGradTilingData));
 }
 
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-  MoeTokenPermuteGradTilingData tilingData;          \
-  InitMoeTokenPermuteGradTilingData(tilingPointer, &tilingData)
+    MoeTokenPermuteGradTilingData tilingData; \
+    InitMoeTokenPermuteGradTilingData(tilingPointer, &tilingData)
 #endif

@@ -79,7 +79,8 @@ struct GroupedMatmulSwigluQuantParamsBase {
 class GroupedMatmulSwigluQuantParamsBuilder {
 public:
     static GroupedMatmulSwigluQuantParamsBuilder Create(const aclTensor *x, const aclTensorList *weight,
-        const aclTensorList *weightScale, const aclTensor *output, const aclTensor *outputScale)
+                                                        const aclTensorList *weightScale, const aclTensor *output,
+                                                        const aclTensor *outputScale)
     {
         GroupedMatmulSwigluQuantParamsBuilder b;
         b.p_.x = x;
@@ -155,17 +156,17 @@ public:
     GroupedMatmulSwigluQuantParamsBuilder &SetScenario()
     {
         p_.isA8W4 = ((this->p_.x->GetDataType() == DataType::DT_INT8 &&
-                    ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT4) ||
-                    (this->p_.x->GetDataType() == DataType::DT_INT8 &&
-                    ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT32));
+                      ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT4) ||
+                     (this->p_.x->GetDataType() == DataType::DT_INT8 &&
+                      ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT32));
         p_.isA4W4 = ((this->p_.x->GetDataType() == DataType::DT_INT4 &&
-                    ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT4) ||
-                    (this->p_.x->GetDataType() == DataType::DT_INT4 &&
-                    ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT32) ||
-                    (this->p_.x->GetDataType() == DataType::DT_INT32 &&
-                    ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT4) ||
-                    (this->p_.x->GetDataType() == DataType::DT_INT32 &&
-                    ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT32));
+                      ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT4) ||
+                     (this->p_.x->GetDataType() == DataType::DT_INT4 &&
+                      ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT32) ||
+                     (this->p_.x->GetDataType() == DataType::DT_INT32 &&
+                      ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT4) ||
+                     (this->p_.x->GetDataType() == DataType::DT_INT32 &&
+                      ((*this->p_.weight)[0])->GetDataType() == DataType::DT_INT32));
         p_.isMxA8W4 = (this->p_.x->GetDataType() == DataType::DT_FLOAT8_E4M3FN &&
                        ((*this->p_.weight)[0])->GetDataType() == DataType::DT_FLOAT4_E2M1);
         return *this;
@@ -221,8 +222,8 @@ protected:
         }
 
         if (!gmmDsqParams_.weight || !gmmDsqParams_.weightScale) {
-            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
-                    "In op [%s], [%s] must not be nullptr.", opName_.c_str(), "weight or weightScale");
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "In op [%s], [%s] must not be nullptr.", opName_.c_str(),
+                    "weight or weightScale");
             return false;
         }
         return true;
@@ -232,15 +233,15 @@ protected:
     {
         for (size_t i = 0; i < gmmDsqParams_.weight->Size(); i++) {
             if ((*gmmDsqParams_.weight)[i]->IsEmpty()) {
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                        "In op [%s], weight[%zu] must not be an empty container.", opName_.c_str(), i);
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], weight[%zu] must not be an empty container.",
+                        opName_.c_str(), i);
                 return false;
             }
         }
         for (size_t i = 0; i < gmmDsqParams_.weightScale->Size(); i++) {
             if ((*gmmDsqParams_.weightScale)[i]->IsEmpty()) {
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                        "In op [%s], weightScale[%zu] must not be an empty container.", opName_.c_str(), i);
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], weightScale[%zu] must not be an empty container.",
+                        opName_.c_str(), i);
                 return false;
             }
         }
@@ -290,13 +291,13 @@ protected:
     }
 
     aclnnStatus CreateEmptyTensor(const aclDataType dataType, const aclTensorList *&tensorList,
-            aclTensorList *&emptyTensorList) const
+                                  aclTensorList *&emptyTensorList) const
     {
         if (tensorList != nullptr) {
             return ACLNN_SUCCESS;
         }
 
-        FVector<aclTensor*> emptyTensors;
+        FVector<aclTensor *> emptyTensors;
         aclTensor *emptyTensor = l0Executor_->AllocTensor({0}, static_cast<op::DataType>(dataType));
         CHECK_RET(emptyTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
         emptyTensors.emplace_back(emptyTensor);
@@ -345,15 +346,16 @@ protected:
         aclTensorList *emptyWeightAssistMatrixList = nullptr;
         CheckOptionalTensorListEmpty(gmmDsqParams_.weightAssistMatrix);
         CHECK_RET(CreateEmptyTensor(aclDataType::ACL_FLOAT, gmmDsqParams_.weightAssistMatrix,
-            emptyWeightAssistMatrixList) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
+                                    emptyWeightAssistMatrixList) == ACLNN_SUCCESS,
+                  ACLNN_ERR_INNER_NULLPTR);
 
         CHECK_COND(DataContiguousWeight(gmmDsqParams_.weight) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR,
-                    "Contiguous weight failed.");
+                   "Contiguous weight failed.");
         CHECK_COND(DataContiguous(gmmDsqParams_.weightScale) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR,
-                    "Contiguous weightScale failed.");
+                   "Contiguous weightScale failed.");
         if (gmmDsqParams_.weightAssistMatrix != nullptr && gmmDsqParams_.weightAssistMatrix->Size() != 0) {
             CHECK_COND(DataContiguous(gmmDsqParams_.weightAssistMatrix) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR,
-                    "Contiguous weightAssistMatrix failed.");
+                       "Contiguous weightAssistMatrix failed.");
         }
 
         gmmDsqParams_.x = l0op::Contiguous(gmmDsqParams_.x, l0Executor_);
@@ -412,7 +414,8 @@ public:
         PrepareOriginalShapesBeforeContiguous();
 
         // 空Tensor场景
-        if (gmmDsqParams_.output->IsEmpty() || gmmDsqParams_.groupList->IsEmpty() || gmmDsqParams_.outputScale->IsEmpty()) {
+        if (gmmDsqParams_.output->IsEmpty() || gmmDsqParams_.groupList->IsEmpty() ||
+            gmmDsqParams_.outputScale->IsEmpty()) {
             *workspaceSize_ = 0ULL;
             uniqueExecutor.ReleaseTo(executor_);
             return ACLNN_SUCCESS;
@@ -421,14 +424,12 @@ public:
         ret = CovertDataContiguous();
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
         RestoreOriginalShapesAfterContiguous();
-        auto ret0 = l0op::GroupedMatmulSwigluQuantV2(gmmDsqParams_.x, gmmDsqParams_.weight, gmmDsqParams_.weightScale,
-                                                gmmDsqParams_.xScale, gmmDsqParams_.weightAssistMatrix,
-                                                gmmDsqParams_.bias,
-                                                gmmDsqParams_.smoothScale, gmmDsqParams_.groupList,
-                                                gmmDsqParams_.dequantMode, gmmDsqParams_.dequantDtype,
-                                                gmmDsqParams_.quantMode, gmmDsqParams_.quantDtype,
-                                                gmmDsqParams_.transposeWeight, gmmDsqParams_.groupListType,
-                                                gmmDsqParams_.tuningConfig, uniqueExecutor.get());
+        auto ret0 = l0op::GroupedMatmulSwigluQuantV2(
+            gmmDsqParams_.x, gmmDsqParams_.weight, gmmDsqParams_.weightScale, gmmDsqParams_.xScale,
+            gmmDsqParams_.weightAssistMatrix, gmmDsqParams_.bias, gmmDsqParams_.smoothScale, gmmDsqParams_.groupList,
+            gmmDsqParams_.dequantMode, gmmDsqParams_.dequantDtype, gmmDsqParams_.quantMode, gmmDsqParams_.quantDtype,
+            gmmDsqParams_.transposeWeight, gmmDsqParams_.groupListType, gmmDsqParams_.tuningConfig,
+            uniqueExecutor.get());
         CHECK_RET(ret0 != std::tuple(nullptr, nullptr), ACLNN_ERR_INNER_NULLPTR);
 
         auto out0 = std::get<OUTPUT_IDX_0>(ret0);

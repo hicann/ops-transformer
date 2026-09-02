@@ -22,14 +22,12 @@ using namespace AscendC;
 
 constexpr int64_t EXPERT_ID_VALUE_NUM = 2;
 
-class MoeV2ExpertTokenOut
-{
+class MoeV2ExpertTokenOut {
 public:
     __aicore__ inline MoeV2ExpertTokenOut(){};
     template <typename TilingData>
-    __aicore__ inline void Init(
-        GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity, GM_ADDR expandedRowIdx,
-        GM_ADDR workspace, const TilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity,
+                                GM_ADDR expandedRowIdx, GM_ADDR workspace, const TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -43,7 +41,7 @@ private:
     __aicore__ inline void CopyOutExpertTokensCount(bool isTail);
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
     TQue<QuePosition::VECIN, 1> copyInQueue;
     TQue<QuePosition::VECIN, 1> expertTokenIdxCopyInQueue;
     TQue<QuePosition::VECOUT, 1> expertTokenIdxCopyOutQueue;
@@ -56,7 +54,7 @@ private:
 
     LocalTensor<int32_t> expertTokenIdxOutLocal;
 
-    const InnerMoeV2GatherOutComputeTilingData* srcToDstTilingData;
+    const InnerMoeV2GatherOutComputeTilingData *srcToDstTilingData;
 
     int64_t coreNum;
     int64_t blockIdx;
@@ -101,11 +99,10 @@ __aicore__ inline void MoeV2ExpertTokenOut::InitLocal()
         if (loop == loops - 1) {
             copyLength = lastLoopRows;
         }
-        DataCopyExtParams copyParams{
-            static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0, 0};
-        DataCopyPad(
-            expandedRowIdxGm[this->blockIdx * this->srcToDstTilingData->perCoreRows + loop * perLoopRows], outLocal,
-            copyParams);
+        DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0,
+                                     0, 0};
+        DataCopyPad(expandedRowIdxGm[this->blockIdx * this->srcToDstTilingData->perCoreRows + loop * perLoopRows],
+                    outLocal, copyParams);
     }
     SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
     copyInQueue.FreeTensor(outLocal);
@@ -223,8 +220,8 @@ __aicore__ inline void MoeV2ExpertTokenOut::CopyOutExpertTokensCumsum(bool isTai
         copyLength = end;
         SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
     }
-    DataCopyExtParams copyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0,
+                                 0};
     SetAtomicAdd<int32_t>();
     SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
     WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
@@ -241,12 +238,11 @@ __aicore__ inline void MoeV2ExpertTokenOut::CopyOutExpertTokensCumsum(bool isTai
         int64_t loopTimes = remainderLength / this->expertNumUbAlign + 1;
         for (int64_t i = 0; i < loopTimes; i++) {
             copyLength = i == loopTimes - 1 ? remainderLength - this->expertNumUbAlign * i : this->expertNumUbAlign;
-            DataCopyExtParams params{
-                static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0, 0};
+            DataCopyExtParams params{static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0,
+                                     0, 0};
             SetAtomicAdd<int32_t>();
-            DataCopyPad(
-                expertTokensCountOrCumsumGm[this->lastExpertId + 1 + this->expertNumUbAlign * i],
-                this->expertTokenIdxOutLocal, params);
+            DataCopyPad(expertTokensCountOrCumsumGm[this->lastExpertId + 1 + this->expertNumUbAlign * i],
+                        this->expertTokenIdxOutLocal, params);
             SetAtomicNone();
         }
     }
@@ -255,8 +251,8 @@ __aicore__ inline void MoeV2ExpertTokenOut::CopyOutExpertTokensCumsum(bool isTai
 __aicore__ inline void MoeV2ExpertTokenOut::CopyOutExpertTokensCount(bool isTail)
 {
     int64_t copyLength = isTail ? this->lastExpertId - this->firstExpertId + 1 : this->expertNumUbAlign;
-    DataCopyExtParams copyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0,
+                                 0};
     SetAtomicAdd<int32_t>();
     if (this->dropPadMode == DROP_PAD_MODE && expertTokensBeforeCapacityFlag > EXERPT_TOKENS_NONE) {
         SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
@@ -281,14 +277,13 @@ __aicore__ inline void MoeV2ExpertTokenOut::CopyOutTokenGm()
     }
     this->expertTokenIdxOutLocal.SetValue(this->expertNumUbAlign, this->lastExpertId);
     this->expertTokenIdxOutLocal.SetValue(this->expertNumUbAlign + 1, this->tokenCount);
-    DataCopyExtParams copyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(EXPERT_ID_VALUE_NUM * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(EXPERT_ID_VALUE_NUM * sizeof(int32_t)),
+                                 0, 0, 0};
     SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
     SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
     WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
-    DataCopyPad(
-        expertIdxValueGm[this->blockIdx * EXPERT_ID_VALUE_NUM], this->expertTokenIdxOutLocal[this->expertNumUbAlign],
-        copyParams);
+    DataCopyPad(expertIdxValueGm[this->blockIdx * EXPERT_ID_VALUE_NUM],
+                this->expertTokenIdxOutLocal[this->expertNumUbAlign], copyParams);
     CopyOutExpertTokensCount(true);
 }
 
@@ -303,9 +298,9 @@ __aicore__ inline void MoeV2ExpertTokenOut::SyncAll()
 }
 
 template <typename TilingData>
-__aicore__ inline void MoeV2ExpertTokenOut::Init(
-    GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity, GM_ADDR expandedRowIdx, GM_ADDR workspace,
-    const TilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeV2ExpertTokenOut::Init(GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity,
+                                                 GM_ADDR expandedRowIdx, GM_ADDR workspace,
+                                                 const TilingData *tilingData, TPipe *tPipe)
 {
     int64_t blockNum = GetBlockNum();
     this->pipe = tPipe;
@@ -329,19 +324,19 @@ __aicore__ inline void MoeV2ExpertTokenOut::Init(
         this->lastLoopRows = this->srcToDstTilingData->perCoreLastLoopRows;
     }
 
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, Align(this->totalLength, sizeof(int32_t)));
+    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, Align(this->totalLength, sizeof(int32_t)));
     if (this->dropPadMode == DROPLESS_MODE && this->expertTokensCountOrCumsumFlag > EXERPT_TOKENS_NONE) {
-        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t*)expertTokensCountOrCumsum, this->expertNum);
+        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum, this->expertNum);
     }
     if (this->dropPadMode == DROP_PAD_MODE && this->expertTokensBeforeCapacityFlag == EXERPT_TOKENS_BEFORE_CAPACITY) {
-        expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t*)expertTokensBeforeCapacity, this->expertNum);
+        expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensBeforeCapacity, this->expertNum);
     }
 
     expandedExpertIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t*)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        (__gm__ int32_t *)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
-    expertIdxValueGm.SetGlobalBuffer(
-        (__gm__ int32_t*)workspace + Align(this->totalLength, sizeof(int32_t)) * 2, this->coreNum * 2);
+    expertIdxValueGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
+                                     this->coreNum * 2);
 
     this->expertNumUbAlign = Min(Align(this->expertNum, sizeof(int32_t)), MAX_EXPERT_NUM);
     pipe->InitBuffer(copyInQueue, 1, this->perLoopRows * BLOCK_BYTES);

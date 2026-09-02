@@ -52,8 +52,8 @@ constexpr size_t SMOOTH_SCALE_2D_DIM_LIMIT = 2UL;
 
 const std::initializer_list<DataType> X_DTYPE_SUPPORT_LIST = {DataType::DT_INT8, DataType::DT_INT4};
 const std::initializer_list<DataType> WEIGHT_DTYPE_SUPPORT_LIST = {DataType::DT_INT8, DataType::DT_INT4};
-const std::initializer_list<DataType> WEIGHT_SCALE_DTYPE_SUPPORT_LIST = {
-    DataType::DT_FLOAT, DataType::DT_FLOAT16, DataType::DT_BF16};
+const std::initializer_list<DataType> WEIGHT_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT, DataType::DT_FLOAT16,
+                                                                         DataType::DT_BF16};
 const std::initializer_list<DataType> WEIGHT_SCALE_A8W4_DTYPE_SUPPORT_LIST = {DataType::DT_UINT64};
 const std::initializer_list<DataType> X_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
 const std::initializer_list<DataType> GROUP_LIST_DTYPE_SUPPORT_LIST = {DataType::DT_INT64};
@@ -69,8 +69,8 @@ protected:
         OP_CHECK_WRONG_DIMENSION(gmmDsqParams_.x, X_DIM_LIMIT, return false);
         size_t wLength = gmmDsqParams_.weight->Size();
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor* w = (*gmmDsqParams_.weight)[i];
-            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor *w = (*gmmDsqParams_.weight)[i];
+            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
             op::Format wFormat = w->GetViewFormat();
             if (wLength == static_cast<size_t>(1)) { // 单Tensor场景
                 if (IsPrivateFormat(wFormat)) {
@@ -101,38 +101,40 @@ protected:
         OP_CHECK_WRONG_DIMENSION(gmmDsqParams_.x, X_DIM_LIMIT, return false);
         std::string scenario = gmmDsqParams_.isA4W4 ? "A4W4" : "A8W4";
         if (gmmDsqParams_.isA4W4 && gmmDsqParams_.weightAssistMatrix != nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], when %s, [%s] must be nullptr.", opName_.c_str(), scenario.c_str(),
-                    "weightAssistMatrix");
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when %s, [%s] must be nullptr.", opName_.c_str(),
+                    scenario.c_str(), "weightAssistMatrix");
             return false;
         } else if (gmmDsqParams_.isA8W4 && gmmDsqParams_.weightAssistMatrix == nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], when %s, [%s] must not be nullptr.", opName_.c_str(), scenario.c_str(),
-                    "weightAssistMatrix");
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when %s, [%s] must not be nullptr.", opName_.c_str(),
+                    scenario.c_str(), "weightAssistMatrix");
             return false;
         }
         size_t wLength = gmmDsqParams_.weight->Size();
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor* w = (*gmmDsqParams_.weight)[i];
-            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor *w = (*gmmDsqParams_.weight)[i];
+            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
             op::Format weightViewFormat = w->GetViewFormat();
             bool isSingle = (wLength == 1);
             // 检查权重维度
-            OP_CHECK_WRONG_DIMENSION(w, 
-                (isSingle ? 
-                    (IsPrivateFormat(weightViewFormat) ? WEIGHT_NZ_DIM_LIMIT : WEIGHT_ND_DIM_LIMIT) :
-                    (IsPrivateFormat(weightViewFormat) ? MULTI_WEIGHT_NZ_DIM_LIMIT : MULTI_WEIGHT_ND_DIM_LIMIT)), 
+            OP_CHECK_WRONG_DIMENSION(
+                w,
+                (isSingle ?
+                     (IsPrivateFormat(weightViewFormat) ? WEIGHT_NZ_DIM_LIMIT : WEIGHT_ND_DIM_LIMIT) :
+                     (IsPrivateFormat(weightViewFormat) ? MULTI_WEIGHT_NZ_DIM_LIMIT : MULTI_WEIGHT_ND_DIM_LIMIT)),
                 return false);
             // 检查权重Scale维度
-            OP_CHECK_WRONG_DIMENSION(wScale,
-                (isSingle ?
-                    (gmmDsqParams_.dequantMode == 0 ? SINGLE_WEIGHT_SCALE_PERCHANNEL_DIM_LIMIT : SINGLE_WEIGHT_SCALE_PERGROUP_DIM_LIMIT) :
-                    (gmmDsqParams_.dequantMode == 0 ? MULTI_WEIGHT_SCALE_PERCHANNEL_DIM_LIMIT : MULTI_WEIGHT_SCALE_PERGROUP_DIM_LIMIT)),
+            OP_CHECK_WRONG_DIMENSION(
+                wScale,
+                (isSingle ? (gmmDsqParams_.dequantMode == 0 ? SINGLE_WEIGHT_SCALE_PERCHANNEL_DIM_LIMIT :
+                                                              SINGLE_WEIGHT_SCALE_PERGROUP_DIM_LIMIT) :
+                            (gmmDsqParams_.dequantMode == 0 ? MULTI_WEIGHT_SCALE_PERCHANNEL_DIM_LIMIT :
+                                                              MULTI_WEIGHT_SCALE_PERGROUP_DIM_LIMIT)),
                 return false);
             // 检查辅助矩阵（A8W4模式）
             if (gmmDsqParams_.isA8W4) {
-                const aclTensor* weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
-                OP_CHECK_WRONG_DIMENSION(weightAssistMatrix,
+                const aclTensor *weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
+                OP_CHECK_WRONG_DIMENSION(
+                    weightAssistMatrix,
                     (isSingle ? SINGLE_WEIGHT_ASSIST_MATRIX_DIM_LIMIT : MULTI_WEIGHT_ASSIST_MATRIX_DIM_LIMIT),
                     return false);
             }
@@ -149,20 +151,20 @@ protected:
         // weight的NDshape期望为[E, K, N]
         op::Shape weightNDExpectShape1 = {e, k, n};
         // 单tesnsor weight的NZshape期望为[E, N // 32, K // 16, 16, 32]
-        op::Shape weightNZExpectShape1 = {e, static_cast<int64_t>(n / NZ_DIM_4_INT8), static_cast<int64_t>(k / NZ_DIM_3),
-                                        NZ_DIM_3, NZ_DIM_4_INT8};
+        op::Shape weightNZExpectShape1 = {e, static_cast<int64_t>(n / NZ_DIM_4_INT8),
+                                          static_cast<int64_t>(k / NZ_DIM_3), NZ_DIM_3, NZ_DIM_4_INT8};
         // weight的NDshape期望为[K, N]
         op::Shape weightNDExpectShape2 = {k, n};
         // weight的NZshape期望为[N // 32, K // 16, 16, 32]
         op::Shape weightNZExpectShape2 = {static_cast<int64_t>(n / NZ_DIM_4_INT8), static_cast<int64_t>(k / NZ_DIM_3),
-                                        NZ_DIM_3, NZ_DIM_4_INT8};
+                                          NZ_DIM_3, NZ_DIM_4_INT8};
 
         // weightScale的shape期望为[E, N]
         op::Shape weightScaleExpectShape1 = {e, n};
         op::Shape weightScaleExpectShape2 = {n};
 
-        const aclTensor* w = (*gmmDsqParams_.weight)[0]; 
-        const aclTensor* wScale = (*gmmDsqParams_.weightScale)[0];
+        const aclTensor *w = (*gmmDsqParams_.weight)[0];
+        const aclTensor *wScale = (*gmmDsqParams_.weightScale)[0];
 
         op::Format wFormat = w->GetViewFormat();
         op::Format storageFormat = w->GetStorageFormat();
@@ -194,9 +196,8 @@ protected:
             if (IsPrivateFormat(storageFormat) && (k % NZ_ALIGN_K != 0 || n % NZ_ALIGN_N != 0)) {
                 std::string gotStr = BuildLogValues("K", k, "N", n);
                 OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                        "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                        opName_.c_str(), "weight, x", gotStr.c_str(),
-                        "K should align to 16 and N should align to 32 when A8W8 NZ");
+                        "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                        "weight, x", gotStr.c_str(), "K should align to 16 and N should align to 32 when A8W8 NZ");
                 return false;
             }
         }
@@ -207,9 +208,8 @@ protected:
                        << op::ToString(weightScaleExpectShape2).GetString() << " when A8W8";
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "weightScale", op::ToString(wScale->GetViewShape()).GetString(),
-                    constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "weightScale", op::ToString(wScale->GetViewShape()).GetString(), constraintStr.c_str());
             return false;
         }
         return true;
@@ -221,15 +221,15 @@ protected:
         op::Shape weightNDExpectShape = {k, n};
         // weight的NZshape期望为[N // 32, K // 16, 16, 32]
         op::Shape weightNZExpectShape = {static_cast<int64_t>(n / NZ_DIM_4_INT8), static_cast<int64_t>(k / NZ_DIM_3),
-                                        NZ_DIM_3, NZ_DIM_4_INT8};
+                                         NZ_DIM_3, NZ_DIM_4_INT8};
 
         // weightScale的shape期望为[N]
         op::Shape weightScaleExpectShape = {n};
         size_t wLength = gmmDsqParams_.weight->Size();
 
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor* w = (*gmmDsqParams_.weight)[0]; 
-            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[0];
+            const aclTensor *w = (*gmmDsqParams_.weight)[0];
+            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[0];
             op::Format wFormat = w->GetViewFormat();
             op::Format storageFormat = w->GetStorageFormat();
             if (IsPrivateFormat(wFormat)) {
@@ -251,7 +251,7 @@ protected:
         return true;
     }
 
-    bool CheckTensorListShapeA8W8(int64_t e,int64_t k, int64_t n)
+    bool CheckTensorListShapeA8W8(int64_t e, int64_t k, int64_t n)
     {
         size_t wLength = gmmDsqParams_.weight->Size();
         if (wLength == static_cast<size_t>(1)) {
@@ -275,8 +275,8 @@ protected:
         if (n % SPLIT != 0) {
             std::string gotStr = BuildLogValue("N", n);
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "weightScale", gotStr.c_str(), "N must be even when A8W8");
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "weightScale", gotStr.c_str(), "N must be even when A8W8");
             return false;
         }
         int64_t nAfterHalve = static_cast<int64_t>(n / SPLIT);
@@ -306,8 +306,8 @@ protected:
             constraint << "groupList length should be in range of [1, " << e << "] when A8W8";
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "groupList", gotStr.c_str(), constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "groupList", gotStr.c_str(), constraintStr.c_str());
             return false;
         }
         if (n > N_LIMIT) {
@@ -316,8 +316,8 @@ protected:
             constraint << "N must be less than or equal to " << N_LIMIT << " when A8W8";
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "weightScale", gotStr.c_str(), constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "weightScale", gotStr.c_str(), constraintStr.c_str());
             return false;
         }
         if (k >= K_LIMIT_A8W8) {
@@ -326,13 +326,12 @@ protected:
             constraint << "tail axis dimension must be lower than " << K_LIMIT_A8W8 << " when A8W8";
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "x", gotStr.c_str(), constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(), "x",
+                    gotStr.c_str(), constraintStr.c_str());
             return false;
         }
         if (gmmDsqParams_.smoothScale != nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], when A8W8, smoothScale must be nullptr.", opName_.c_str());
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when A8W8, smoothScale must be nullptr.", opName_.c_str());
             return false;
         }
         return true;
@@ -344,35 +343,36 @@ protected:
         op::Shape weightNDExpectShape = {e, k, n};
         // 单tesnsor weight的NZshape期望为[E, N // 64, K // 16, 16, 64]
         op::Shape weightNZExpectShape = {e, static_cast<int64_t>(n / NZ_DIM_4_INT4), static_cast<int64_t>(k / NZ_DIM_3),
-                                        NZ_DIM_3, NZ_DIM_4_INT4};
+                                         NZ_DIM_3, NZ_DIM_4_INT4};
         // 单tensor NZ转置
-        op::Shape weightNZTransposeExpectShape1 = {e, static_cast<int64_t>(k / NZ_DIM_4_INT4), static_cast<int64_t>(n / NZ_DIM_3),
-                                        NZ_DIM_4_INT4, NZ_DIM_3};
-        op::Shape weightNZTransposeExpectShape2 = {e, static_cast<int64_t>(k / NZ_DIM_4_INT4), static_cast<int64_t>(n / NZ_DIM_3),
-                                        NZ_DIM_3, NZ_DIM_4_INT4};
+        op::Shape weightNZTransposeExpectShape1 = {e, static_cast<int64_t>(k / NZ_DIM_4_INT4),
+                                                   static_cast<int64_t>(n / NZ_DIM_3), NZ_DIM_4_INT4, NZ_DIM_3};
+        op::Shape weightNZTransposeExpectShape2 = {e, static_cast<int64_t>(k / NZ_DIM_4_INT4),
+                                                   static_cast<int64_t>(n / NZ_DIM_3), NZ_DIM_3, NZ_DIM_4_INT4};
 
         // 辅助矩阵的shape期望为[E, N]
         op::Shape weightAssistMatrixExpectShape = {e, n};
 
-        const aclTensor* w = (*gmmDsqParams_.weight)[0]; 
-        const aclTensor* weightAssistMatrix = nullptr;
+        const aclTensor *w = (*gmmDsqParams_.weight)[0];
+        const aclTensor *weightAssistMatrix = nullptr;
         if (gmmDsqParams_.weightAssistMatrix != nullptr && (*gmmDsqParams_.weightAssistMatrix)[0] != nullptr) {
             weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[0];
-            OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(weightAssistMatrix, weightAssistMatrixExpectShape, return false);
+            OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(weightAssistMatrix, weightAssistMatrixExpectShape,
+                                                        return false);
         }
         op::Format weightViewFormat = w->GetViewFormat();
         std::string scenario = gmmDsqParams_.isA4W4 ? "A4W4" : "A8W4";
         if (IsPrivateFormat(weightViewFormat)) {
-            if (!(w->GetViewShape() == weightNZExpectShape || w->GetViewShape() == weightNZTransposeExpectShape1 || w->GetViewShape() == weightNZTransposeExpectShape2)) {
+            if (!(w->GetViewShape() == weightNZExpectShape || w->GetViewShape() == weightNZTransposeExpectShape1 ||
+                  w->GetViewShape() == weightNZTransposeExpectShape2)) {
                 std::ostringstream constraint;
                 constraint << "expected " << op::ToString(weightNZExpectShape).GetString() << ", "
                            << op::ToString(weightNZTransposeExpectShape1).GetString() << " or "
-                           << op::ToString(weightNZTransposeExpectShape2).GetString() << " when " << scenario
-                           << " NZ";
+                           << op::ToString(weightNZTransposeExpectShape2).GetString() << " when " << scenario << " NZ";
                 std::string constraintStr = constraint.str();
                 OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                        "In op [%s], the shape of weight is not supported, got [%s]. Constraint:[%s]",
-                        opName_.c_str(), op::ToString(w->GetViewShape()).GetString(), constraintStr.c_str());
+                        "In op [%s], the shape of weight is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                        op::ToString(w->GetViewShape()).GetString(), constraintStr.c_str());
                 return false;
             }
         } else {
@@ -387,17 +387,18 @@ protected:
         op::Shape weightNDExpectShape = {k, n};
         // weight的NZshape期望为[N // 64, K // 16, 16, 64]
         op::Shape weightNZExpectShape = {static_cast<int64_t>(n / NZ_DIM_4_INT4), static_cast<int64_t>(k / NZ_DIM_3),
-                                        NZ_DIM_3, NZ_DIM_4_INT4};
+                                         NZ_DIM_3, NZ_DIM_4_INT4};
 
         op::Shape weightAssistMatrixExpectShape = {n};
         size_t wLength = gmmDsqParams_.weight->Size();
 
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor* w = (*gmmDsqParams_.weight)[i]; 
-            const aclTensor* weightAssistMatrix = nullptr;
+            const aclTensor *w = (*gmmDsqParams_.weight)[i];
+            const aclTensor *weightAssistMatrix = nullptr;
             if (gmmDsqParams_.weightAssistMatrix != nullptr && (*gmmDsqParams_.weightAssistMatrix)[i] != nullptr) {
                 weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
-                OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(weightAssistMatrix, weightAssistMatrixExpectShape, return false);
+                OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(weightAssistMatrix, weightAssistMatrixExpectShape,
+                                                            return false);
             }
             op::Format weightViewFormat = w->GetViewFormat();
             if (IsPrivateFormat(weightViewFormat)) {
@@ -426,8 +427,8 @@ protected:
         } else {
             std::string gotStr = BuildLogValue("dim num", dimNum);
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "smoothScale", gotStr.c_str(), "dim num should be 1 or 2 when A4W4");
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "smoothScale", gotStr.c_str(), "dim num should be 1 or 2 when A4W4");
             return false;
         }
         return true;
@@ -480,12 +481,11 @@ protected:
             weightScaleExpectShape = {KGroupCount, n}; // 多
         }
         if (KGroupCount == 0 || k % KGroupCount != 0) {
-            OP_LOGE(
-                ACLNN_ERR_PARAM_INVALID,
-                "In op [%s], when %s, the number of groups along the k-axis is %ld, and the length of the k-axis "
-                "is %ld. The number of groups must be greater than 0, and k-axis length %% number of groups == 0 "
-                "must be true.",
-                opName_.c_str(), scenario.c_str(), KGroupCount, k);
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "In op [%s], when %s, the number of groups along the k-axis is %ld, and the length of the k-axis "
+                    "is %ld. The number of groups must be greater than 0, and k-axis length %% number of groups == 0 "
+                    "must be true.",
+                    opName_.c_str(), scenario.c_str(), KGroupCount, k);
             return false;
         }
         if (n % SPLIT != 0) {
@@ -494,8 +494,8 @@ protected:
             constraint << "N must be even when " << scenario;
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "weightScale", gotStr.c_str(), constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "weightScale", gotStr.c_str(), constraintStr.c_str());
             return false;
         }
         int64_t nAfterHalve = static_cast<int64_t>(n / SPLIT);
@@ -513,7 +513,7 @@ protected:
         }
 
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
             OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(wScale, weightScaleExpectShape, return false);
         }
         OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(gmmDsqParams_.x, xExpectShape, return false);
@@ -528,8 +528,8 @@ protected:
             constraint << "groupList length should be in range of [1, " << e << "] when " << scenario;
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "groupList", gotStr.c_str(), constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "groupList", gotStr.c_str(), constraintStr.c_str());
             return false;
         }
         if (n > N_LIMIT) {
@@ -538,8 +538,8 @@ protected:
             constraint << "N must be less than or equal to " << N_LIMIT << " when " << scenario;
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "weightScale", gotStr.c_str(), constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(),
+                    "weightScale", gotStr.c_str(), constraintStr.c_str());
             return false;
         }
         if (k >= K_LIMIT_A8W4) {
@@ -548,8 +548,8 @@ protected:
             constraint << "tail axis dimension must be lower than " << K_LIMIT_A8W4 << " when " << scenario;
             std::string constraintStr = constraint.str();
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]",
-                    opName_.c_str(), "x", gotStr.c_str(), constraintStr.c_str());
+                    "In op [%s], the shape of [%s] is not supported, got [%s]. Constraint:[%s]", opName_.c_str(), "x",
+                    gotStr.c_str(), constraintStr.c_str());
             return false;
         }
         if (gmmDsqParams_.isA4W4) {
@@ -557,8 +557,7 @@ protected:
                 return false;
             }
         } else if (gmmDsqParams_.isA8W4 && gmmDsqParams_.smoothScale != nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], when A8W4, smoothScale must be nullptr.", opName_.c_str());
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when A8W4, smoothScale must be nullptr.", opName_.c_str());
             return false;
         }
         (void)KGroupSize;
@@ -603,7 +602,7 @@ protected:
         bool isNz = tensorS4->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ;
         tensorS4->SetViewShape(tensorShape);
         tensorS4->SetDataType(DataType::DT_INT4);
-        if (isNz){
+        if (isNz) {
             OP_LOGD("Reset %s storageShape because tensor is NZ format.", tensorType.c_str());
             auto storageShape = tensorS4->GetStorageShape();
             size_t storageShapeDim = storageShape.GetDimNum();
@@ -625,8 +624,8 @@ protected:
 
     bool CheckInputOutDims() override
     {
-        if (gmmDsqParams_.x->GetDataType() == DataType::DT_INT8
-                && ((*gmmDsqParams_.weight)[0])->GetDataType() == DataType::DT_INT8) {
+        if (gmmDsqParams_.x->GetDataType() == DataType::DT_INT8 &&
+            ((*gmmDsqParams_.weight)[0])->GetDataType() == DataType::DT_INT8) {
             return CheckInputOutDimsA8W8();
         }
         // A8W4或者A4W4场景 INT32为兼容torch_npu考虑，实际计算时，1个INT32数据会被视为8个INT4数据
@@ -644,21 +643,19 @@ protected:
                     UnpackInt32ToInt4(w, "weight");
                 }
             }
-            
-            if (transposeWeight == true){
+
+            if (transposeWeight == true) {
                 std::string scenario = gmmDsqParams_.isA4W4 ? "A4W4" : "A8W4";
-                const aclTensor* w = (*gmmDsqParams_.weight)[0];
+                const aclTensor *w = (*gmmDsqParams_.weight)[0];
                 bool isNZ = w->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ;
                 if (!isNZ) {
                     OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                             "In op [%s], when transpose weight, the format of weight is not supported, got [%s]",
-                            opName_.c_str(),
-                            op::ToString(w->GetStorageFormat()).GetString());
+                            opName_.c_str(), op::ToString(w->GetStorageFormat()).GetString());
                     return false;
                 }
                 if (!gmmDsqParams_.isA4W4) {
-                    OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                            "In op [%s], when %s, [%s] is not supported, got [%s]",
+                    OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when %s, [%s] is not supported, got [%s]",
                             opName_.c_str(), scenario.c_str(), "weight transpose", "true");
                     return false;
                 }
@@ -677,8 +674,8 @@ protected:
 
     bool CheckInputOutShape() override
     {
-        if (gmmDsqParams_.x->GetDataType() == DataType::DT_INT8
-                && ((*gmmDsqParams_.weight)[0])->GetDataType() == DataType::DT_INT8) {
+        if (gmmDsqParams_.x->GetDataType() == DataType::DT_INT8 &&
+            ((*gmmDsqParams_.weight)[0])->GetDataType() == DataType::DT_INT8) {
             return CheckInputOutShapeA8W8();
         }
         // A8W4场景或A4W4场景
@@ -692,15 +689,15 @@ protected:
     {
         size_t wLength = gmmDsqParams_.weight->Size();
         for (size_t i = 0; i < wLength; i++) {
-            const aclTensor* wScale = (*gmmDsqParams_.weightScale)[i];
-            const aclTensor* w = (*gmmDsqParams_.weight)[i];
+            const aclTensor *wScale = (*gmmDsqParams_.weightScale)[i];
+            const aclTensor *w = (*gmmDsqParams_.weight)[i];
 
             OP_CHECK_DTYPE_NOT_SUPPORT(w, WEIGHT_DTYPE_SUPPORT_LIST, return false);
 
             if (w->GetDataType() == DataType::DT_INT4) {
                 OP_CHECK_DTYPE_NOT_SUPPORT(wScale, WEIGHT_SCALE_A8W4_DTYPE_SUPPORT_LIST, return false);
                 if (gmmDsqParams_.weightAssistMatrix != nullptr && (*gmmDsqParams_.weightAssistMatrix)[i] != nullptr) {
-                    const aclTensor* weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
+                    const aclTensor *weightAssistMatrix = (*gmmDsqParams_.weightAssistMatrix)[i];
                     OP_CHECK_DTYPE_NOT_SUPPORT(weightAssistMatrix, WEIGHT_ASSIST_DTYPE_SUPPORT_LIST, return false);
                 }
             } else if (w->GetDataType() == DataType::DT_INT8) {
@@ -718,30 +715,26 @@ protected:
 
     bool CheckFormat() override
     {
-        const aclTensor* w = (*gmmDsqParams_.weight)[0];
+        const aclTensor *w = (*gmmDsqParams_.weight)[0];
         bool isNZ = w->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ;
         if ((gmmDsqParams_.x->GetDataType() == DataType::DT_INT8 && w->GetDataType() == DataType::DT_INT8) && !isNZ) {
             // fp16 in fp32 out that is split k template, not precision-advanced now
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], when A8W8, the format of weight is not supported, got [%s]",
-                    opName_.c_str(),
-                    op::ToString(w->GetStorageFormat()).GetString());
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], when A8W8, the format of weight is not supported, got [%s]",
+                    opName_.c_str(), op::ToString(w->GetStorageFormat()).GetString());
             return false;
         }
         if (IsPrivateFormat(gmmDsqParams_.x->GetStorageFormat())) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the format of [%s] is not supported, got [%s]",
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], the format of [%s] is not supported, got [%s]",
                     opName_.c_str(), "x", op::ToString(gmmDsqParams_.x->GetStorageFormat()).GetString());
             return false;
         }
         if (IsPrivateFormat(gmmDsqParams_.output->GetStorageFormat())) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "In op [%s], the format of [%s] is not supported, got [%s]",
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In op [%s], the format of [%s] is not supported, got [%s]",
                     opName_.c_str(), "output", op::ToString(gmmDsqParams_.output->GetStorageFormat()).GetString());
             return false;
         }
         return true;
     }
 };
-}
+} // namespace gmm_dsq_base
 #endif

@@ -27,11 +27,9 @@ struct integral_constant {
 using true_type = integral_constant<bool, true>;
 using false_type = integral_constant<bool, false>;
 template <typename, typename>
-struct is_same : public false_type {
-};
+struct is_same : public false_type {};
 template <typename Tp>
-struct is_same<Tp, Tp> : public true_type {
-};
+struct is_same<Tp, Tp> : public true_type {};
 
 constexpr int64_t BUFFER_NUM = 1; // tensor num for each queue
 constexpr int64_t BLOCK_SIZE = 32;

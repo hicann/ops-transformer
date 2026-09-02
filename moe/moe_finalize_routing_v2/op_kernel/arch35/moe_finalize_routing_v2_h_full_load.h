@@ -23,14 +23,12 @@ using namespace AscendC;
 template <typename T, typename S, int32_t dropPadMode>
 class MoeFinalizeRoutingV2HFullLoad {
 public:
-    __aicore__ inline MoeFinalizeRoutingV2HFullLoad()
-    {}
+    __aicore__ inline MoeFinalizeRoutingV2HFullLoad() {}
 
-    __aicore__ inline void Init(
-        GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
-        GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v,
-        GM_ADDR y, GM_ADDR workspace, const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr,
-        TPipe *pipePtr)
+    __aicore__ inline void Init(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
+                                GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1,
+                                GM_ADDR constExpertAlpha2, GM_ADDR v, GM_ADDR y, GM_ADDR workspace,
+                                const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
@@ -149,8 +147,8 @@ private:
         if (hasScales) {
             scalesLocal = scalesQue.AllocTensor<S>();
             int64_t scalesGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->k +
-                                     rowOuterIdx * tilingData->rowFactor * tilingData->k +
-                                     rowInnerIdx * tilingData->k + kOuterIdx * tilingData->kFactor;
+                                     rowOuterIdx * tilingData->rowFactor * tilingData->k + rowInnerIdx * tilingData->k +
+                                     kOuterIdx * tilingData->kFactor;
             CopyIn(scalesGm[scalesGmOffset], scalesLocal, 1, curKFactor);
             scalesQue.EnQue(scalesLocal);
             scalesLocal = scalesQue.DeQue<S>();
@@ -174,9 +172,8 @@ private:
             SetFlag<HardEvent::S_V>(eventId);
             WaitFlag<HardEvent::S_V>(eventId);
         }
-        ProcessExpandXBiasScaleOptimized<T>(
-            yLocal[rowInnerIdx * tilingData->h], expandedXLocal, biasLocal, scalesLocal, validK, tilingData->h,
-            hasBiasAndExpertIdx, hasScales);
+        ProcessExpandXBiasScaleOptimized<T>(yLocal[rowInnerIdx * tilingData->h], expandedXLocal, biasLocal, scalesLocal,
+                                            validK, tilingData->h, hasBiasAndExpertIdx, hasScales);
         FreeKTensors();
     }
 
@@ -228,8 +225,8 @@ private:
         }
     }
 
-    __aicore__ inline void CopyExpanedXAndBiasScales(
-        int64_t curKFactor, int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t kOuterIdx)
+    __aicore__ inline void CopyExpanedXAndBiasScales(int64_t curKFactor, int64_t rowOuterIdx, int64_t rowInnerIdx,
+                                                     int64_t kOuterIdx)
     {
         validK = 0;
         for (int64_t kInnerIdx = 0; kInnerIdx < curKFactor; kInnerIdx += 1) {
@@ -261,16 +258,16 @@ private:
                 return;
             } else if (expertIdx >= tilingData->copyExpertStart && expertIdx < tilingData->copyExpertEnd) {
                 CopyCopyExpertToExpandedX(rowOuterIdx, rowInnerIdx);
-            } else if (hasConstExpert && expertIdx >= tilingData->constantExpertStart && expertIdx < tilingData->constantExpertEnd) {
+            } else if (hasConstExpert && expertIdx >= tilingData->constantExpertStart &&
+                       expertIdx < tilingData->constantExpertEnd) {
                 CopyConstantExpertToExpandedX(rowOuterIdx, rowInnerIdx, expertIdx);
             } else {
                 CopyIn(expandedXGm[gmValueOfExpandedRowIdx * tilingData->h],
                        expandedXLocal[validK * tilingData->hAligned], 1, tilingData->h);
             }
         } else {
-            CopyIn(
-                expandedXGm[gmValueOfExpandedRowIdx * tilingData->h],
-                expandedXLocal[validK * tilingData->hAligned], 1, tilingData->h);
+            CopyIn(expandedXGm[gmValueOfExpandedRowIdx * tilingData->h], expandedXLocal[validK * tilingData->hAligned],
+                   1, tilingData->h);
         }
         if (hasBiasAndExpertIdx) {
             if (expertIdx < 0 || expertIdx >= tilingData->e) {
@@ -289,16 +286,14 @@ private:
     __aicore__ inline void CopyCopyExpertToExpandedX(int64_t rowOuterIdx, int64_t rowInnerIdx)
     {
         int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h +
-                            rowOuterIdx * tilingData->rowFactor * tilingData->h +
-                            rowInnerIdx * tilingData->h;
+                            rowOuterIdx * tilingData->rowFactor * tilingData->h + rowInnerIdx * tilingData->h;
         CopyIn(xGm[xGmOffset], expandedXLocal[validK * tilingData->hAligned], 1, tilingData->h);
     }
 
     __aicore__ inline void CopyConstantExpertToExpandedX(int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t expertIdx)
     {
         int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h +
-                            rowOuterIdx * tilingData->rowFactor * tilingData->h +
-                            rowInnerIdx * tilingData->h;
+                            rowOuterIdx * tilingData->rowFactor * tilingData->h + rowInnerIdx * tilingData->h;
         CopyIn(xGm[xGmOffset], xLocal, 1, tilingData->h);
         int64_t constExpertGmOffset = (expertIdx - tilingData->constantExpertStart) * tilingData->h;
         CopyIn(constExpertAlpha1Gm[constExpertGmOffset], constExpertAlpha1Local, 1, tilingData->h);
@@ -311,8 +306,8 @@ private:
         AscendC::Copy(expandedXLocal[validK * tilingData->hAligned], xLocal, tilingData->h);
     }
 
-    __aicore__ inline void SetExpandedRowIdxOffset(
-        int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t kOuterIdx, int64_t kInnerIdx)
+    __aicore__ inline void SetExpandedRowIdxOffset(int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t kOuterIdx,
+                                                   int64_t kInnerIdx)
     {
         if constexpr (dropPadMode == DROPLESS_COLUMN || dropPadMode == DROP_PAD_COLUMN) {
             expandedRowIdxOffset = GetBlockIdx() * tilingData->rowOfFormerBlock + rowOuterIdx * tilingData->rowFactor +
@@ -324,8 +319,8 @@ private:
         }
     }
 
-    __aicore__ inline void SetOffsetForExpertIdx(
-        int64_t kOuterIdx, int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t kInnerIdx)
+    __aicore__ inline void SetOffsetForExpertIdx(int64_t kOuterIdx, int64_t rowOuterIdx, int64_t rowInnerIdx,
+                                                 int64_t kInnerIdx)
     {
         if constexpr (dropPadMode == DROPLESS_COLUMN || dropPadMode == DROP_PAD_COLUMN) {
             expertIdxOffset = rowInnerIdx * tilingData->k + kOuterIdx * tilingData->kFactor + kInnerIdx +

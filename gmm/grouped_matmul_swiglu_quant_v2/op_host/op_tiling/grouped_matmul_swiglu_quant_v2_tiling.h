@@ -196,18 +196,31 @@ constexpr int64_t SIZE_OF_HALF_2 = 2;
 
 class GroupedMatmulSwigluQuantV2Tiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GroupedMatmulSwigluQuantV2Tiling(gert::TilingContext* context) : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
+    explicit GroupedMatmulSwigluQuantV2Tiling(gert::TilingContext *context)
+        : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
     ~GroupedMatmulSwigluQuantV2Tiling() override = default;
 
 protected:
-    ge::graphStatus GetPlatformInfo() override {return ge::GRAPH_SUCCESS;};
+    ge::graphStatus GetPlatformInfo() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
 
-    ge::graphStatus GetShapeAttrsInfo() override {return ge::GRAPH_SUCCESS;};
+    ge::graphStatus GetShapeAttrsInfo() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
 
-    ge::graphStatus DoLibApiTiling() override {return ge::GRAPH_SUCCESS;};
+    ge::graphStatus DoLibApiTiling() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
 
-    ge::graphStatus GetWorkspaceSize() override {return ge::GRAPH_SUCCESS;};
+    ge::graphStatus GetWorkspaceSize() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
 
     virtual void FillTilingData() = 0;
     virtual void PrintTilingData() = 0;

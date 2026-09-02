@@ -13,24 +13,13 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensorList *GroupedMatmul(const aclTensorList *x,
-                                   const aclTensorList *weight,
-                                   const aclTensorList *biasOptional,
-                                   const aclTensorList *scaleOptional,
-                                   const aclTensorList *offsetOptional,
-                                   const aclTensorList *antiquantScaleOptional,
-                                   const aclTensorList *antiquantOffsetOptional,
-                                   const aclTensor *groupListOptional,
-                                   const aclTensor *perTokenScaleOptional,
-                                   int64_t splitItem,
-                                   op::DataType yDtype,
-                                   bool transposeWeight,
-                                   bool transposeX,
-                                   int64_t groupType,
-                                   int64_t groupListType,
-                                   int64_t actType,
-                                   const aclIntArray *tuningConfig,
-                                   size_t outLength,
+const aclTensorList *GroupedMatmul(const aclTensorList *x, const aclTensorList *weight,
+                                   const aclTensorList *biasOptional, const aclTensorList *scaleOptional,
+                                   const aclTensorList *offsetOptional, const aclTensorList *antiquantScaleOptional,
+                                   const aclTensorList *antiquantOffsetOptional, const aclTensor *groupListOptional,
+                                   const aclTensor *perTokenScaleOptional, int64_t splitItem, op::DataType yDtype,
+                                   bool transposeWeight, bool transposeX, int64_t groupType, int64_t groupListType,
+                                   int64_t actType, const aclIntArray *tuningConfig, size_t outLength,
                                    aclOpExecutor *executor);
 }
 

@@ -22,8 +22,8 @@
 namespace optiling {
 
 struct MoeMaskedScatterCompileInfo {
-  int64_t coreNum{ 0 };
-  int64_t ubSize{ 0 };
+    int64_t coreNum{0};
+    int64_t ubSize{0};
 };
 
 BEGIN_TILING_DATA_DEF(MoeMaskedScatterTilingData)
@@ -45,7 +45,9 @@ ge::graphStatus MoeMaskedScatterTilingForAscendC(gert::TilingContext *context);
 
 class MoeMaskedScatterTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeMaskedScatterTiling(gert::TilingContext *context) : TilingBaseClass(context) {}
+    explicit MoeMaskedScatterTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
 
 protected:
     bool IsCapable() override;
@@ -57,6 +59,7 @@ protected:
     ge::graphStatus GetWorkspaceSize() override;
     ge::graphStatus PostTiling() override;
     void DumpTilingInfo() override;
+
 private:
     ge::graphStatus CheckDataType();
     ge::graphStatus CheckOutputShape();

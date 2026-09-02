@@ -75,9 +75,9 @@ public:
     using bT = typename mmType::BT;
 
 public:
-    __aicore__ inline GMMA8W4MidProcess(typename mmType::MT &matmul) : mm(matmul)
-    {
-    }
+    __aicore__ inline GMMA8W4MidProcess(typename mmType::MT &matmul)
+        : mm(matmul)
+    {}
     __aicore__ inline void Init(const GMAddrParams gmAddrParams,
                                 const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN);
     __aicore__ inline void Process(WorkSpaceSplitConfig &workspaceSplitConfig, int64_t workspaceSplitLoopIdx);
@@ -114,9 +114,8 @@ private:
 };
 
 template <typename mmType>
-__aicore__ inline void
-GMMA8W4MidProcess<mmType>::Init(const GMAddrParams gmAddrParams,
-                                const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN)
+__aicore__ inline void GMMA8W4MidProcess<mmType>::Init(
+    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN)
 {
     if ASCEND_IS_AIC {
         gmmSwigluQuantV2BaseParams = gmmSwigluQuantV2BaseParamsIN;

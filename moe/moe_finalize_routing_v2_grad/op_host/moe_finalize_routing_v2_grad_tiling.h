@@ -36,11 +36,11 @@ TILING_DATA_FIELD_DEF(int64_t, computeModCoreNum);       // 运算过程中需�
 TILING_DATA_FIELD_DEF(int64_t, dropPadMode);             // drop_pad_mode
 TILING_DATA_FIELD_DEF(int64_t, topK);                    // k的大小 单位元素个数
 TILING_DATA_FIELD_DEF(int64_t, hidden);                  // H的大小 单位元素个数
-TILING_DATA_FIELD_DEF(int64_t, expandedXDim0);           // grad_expanded_x除最后一维外，其余维度合成一维后的大小
-TILING_DATA_FIELD_DEF(int64_t, hiddenPrePart);           // hidden切分后前块元素个数 单位元素个数
-TILING_DATA_FIELD_DEF(int64_t, hiddenInnerLoops);        // hidden切分后前块循环次数
-TILING_DATA_FIELD_DEF(int64_t, hiddenLastPart);          // hidden切分后尾块元素个数 单位元素个数
-TILING_DATA_FIELD_DEF(int64_t, tilingKey);               // 模板
+TILING_DATA_FIELD_DEF(int64_t, expandedXDim0); // grad_expanded_x除最后一维外，其余维度合成一维后的大小
+TILING_DATA_FIELD_DEF(int64_t, hiddenPrePart);    // hidden切分后前块元素个数 单位元素个数
+TILING_DATA_FIELD_DEF(int64_t, hiddenInnerLoops); // hidden切分后前块循环次数
+TILING_DATA_FIELD_DEF(int64_t, hiddenLastPart);   // hidden切分后尾块元素个数 单位元素个数
+TILING_DATA_FIELD_DEF(int64_t, tilingKey);        // 模板
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeFinalizeRoutingV2Grad, MoeFinalizeRoutingV2GradTilingData);
@@ -55,7 +55,7 @@ TILING_DATA_FIELD_DEF(int64_t, computeModCoreNum);       // 运算过程中需�
 TILING_DATA_FIELD_DEF(int64_t, dropPadMode);             // drop_pad_mode
 TILING_DATA_FIELD_DEF(int64_t, topK);                    // k的大小 单位元素个数
 TILING_DATA_FIELD_DEF(int64_t, hidden);                  // H的大小 单位元素个数
-TILING_DATA_FIELD_DEF(int64_t, expandedXDim0);           // grad_expanded_x除最后一维外，其余维度合成一维后的大小
+TILING_DATA_FIELD_DEF(int64_t, expandedXDim0); // grad_expanded_x除最后一维外，其余维度合成一维后的大小
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeFinalizeRoutingV2GradBaseTilingDataOp, MoeFinalizeRoutingV2GradBaseTilingData)
@@ -100,13 +100,13 @@ constexpr int64_t BUFFER_NUM_WITH_BIAS = 4;    // gradY + expandedX + gradExpand
 constexpr int64_t BUFFER_NUM_WITHOUT_BIAS = 3; // gradY + expandedX + gradExpandedX
 constexpr int64_t ULONG_BIT_LEN = 64;
 
-class MoeFinalizeRoutingV2GradTiling : public Ops::Transformer::OpTiling::TilingBaseClass
-{
+class MoeFinalizeRoutingV2GradTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeFinalizeRoutingV2GradTiling(gert::TilingContext* context)
-        : TilingBaseClass(context), nodeName_(context->GetNodeName()) {};
+    explicit MoeFinalizeRoutingV2GradTiling(gert::TilingContext *context)
+        : TilingBaseClass(context),
+          nodeName_(context->GetNodeName()) {};
 
-    void Reset(gert::TilingContext* context) override
+    void Reset(gert::TilingContext *context) override
     {
         TilingBaseClass::Reset(context);
         nodeName_ = context->GetNodeName();
@@ -123,7 +123,7 @@ protected:
     ge::graphStatus PostTiling() override;
     // 内部计算方法
     virtual void CalcBaseInfo();
-    void SetBinaryAddParams(MoeFinalizeRoutingV2GradBinaryAddTilingData& params, int64_t factor);
+    void SetBinaryAddParams(MoeFinalizeRoutingV2GradBinaryAddTilingData &params, int64_t factor);
     virtual ge::graphStatus CalcTilingKey() = 0;
     ge::graphStatus GetRequiredTensorInfo();
     ge::graphStatus GetOptionalTensorInfo();
@@ -151,7 +151,7 @@ protected:
     {
         return Ops::Base::ToString(dtype);
     }
-    std::string ShapeToString(const gert::Shape& shape) const
+    std::string ShapeToString(const gert::Shape &shape) const
     {
         return Ops::Base::ToString(shape);
     }

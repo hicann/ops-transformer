@@ -24,9 +24,9 @@
 namespace AscendC {
 
 template <bool HasPertoken, bool HasSmooth, bool ScaleIsU64, bool BlockedZN_, bool SmallM_, bool UseXZNStage_>
-__aicore__ inline void
-QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_, UseXZNStage_>::LoadScaleToUB(
-    uint32_t groupIdx, uint32_t cbIdx, uint64_t curColCount, bool usePing)
+__aicore__ inline void QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_,
+                                                 UseXZNStage_>::LoadScaleToUB(uint32_t groupIdx, uint32_t cbIdx,
+                                                                              uint64_t curColCount, bool usePing)
 {
     // MTE2 scale GM -> UB into the ping or pong uint64 slot.
     //   ScaleIsU64 = true  : direct uint64 copy; VDEQ16 reads it as-is.
@@ -63,9 +63,9 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
 }
 
 template <bool HasPertoken, bool HasSmooth, bool ScaleIsU64, bool BlockedZN_, bool SmallM_, bool UseXZNStage_>
-__aicore__ inline void
-QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_, UseXZNStage_>::DequantAndScatter(
-    uint64_t mCount, uint64_t curColCount, bool usePing)
+__aicore__ inline void QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_,
+                                                 UseXZNStage_>::DequantAndScatter(uint64_t mCount, uint64_t curColCount,
+                                                                                  bool usePing)
 {
     (void)mCount;
     (void)curColCount;

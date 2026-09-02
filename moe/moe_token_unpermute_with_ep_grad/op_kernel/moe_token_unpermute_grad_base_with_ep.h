@@ -28,19 +28,18 @@ constexpr int64_t FP32_ONE_REPEAT = 64;
 constexpr int64_t INDICES_PROBS_MAX_RESERVE_NUM = 512;
 
 template <typename OriT, typename IdxT, typename ProbT = OriT>
-class MoeTokenUnpermuteGradBase
-{
+class MoeTokenUnpermuteGradBase {
 public:
     __aicore__ inline MoeTokenUnpermuteGradBase(){};
-    __aicore__ inline void Init(
-        GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices, GM_ADDR probs,
-        GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, const MoeTokenUnpermuteWithEpGradTilingData& tilingData);
+    __aicore__ inline void Init(GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices,
+                                GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
+                                const MoeTokenUnpermuteWithEpGradTilingData &tilingData);
     __aicore__ inline int32_t AlignUp(int32_t a, int32_t b);
     __aicore__ inline int32_t CeilDiv(int32_t a, int32_t b);
-    __aicore__ inline void BinaryAddFunc(
-        LocalTensor<float> tmpBuffer, int32_t hiddensizeLen, int32_t threshold, int32_t offset);
-    __aicore__ inline void ReduceSumFunc(
-        LocalTensor<float> dstBuffer, LocalTensor<float> tmpBuffer, int32_t hiddensizeLen);
+    __aicore__ inline void BinaryAddFunc(LocalTensor<float> tmpBuffer, int32_t hiddensizeLen, int32_t threshold,
+                                         int32_t offset);
+    __aicore__ inline void ReduceSumFunc(LocalTensor<float> dstBuffer, LocalTensor<float> tmpBuffer,
+                                         int32_t hiddensizeLen);
 
 protected:
     TPipe pipe;
@@ -107,8 +106,9 @@ __aicore__ inline int32_t MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::CeilDiv(
 
 // 二分累加到2 * offset以内，再累加成offset大小
 template <typename OriT, typename IdxT, typename ProbT>
-__aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::BinaryAddFunc(
-    LocalTensor<float> tmpBuffer, int32_t hiddensizeLen, int32_t threshold, int32_t offset)
+__aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::BinaryAddFunc(LocalTensor<float> tmpBuffer,
+                                                                                   int32_t hiddensizeLen,
+                                                                                   int32_t threshold, int32_t offset)
 {
     int32_t totalLen = hiddensizeLen;
     int32_t halfLen = this->AlignUp(this->CeilDiv(totalLen, 2), BUFFER_32B_CALNUM);
@@ -121,8 +121,9 @@ __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::BinaryAddFu
 }
 
 template <typename OriT, typename IdxT, typename ProbT>
-__aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::ReduceSumFunc(
-    LocalTensor<float> dstBuffer, LocalTensor<float> tmpBuffer, int32_t hiddensizeLen)
+__aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::ReduceSumFunc(LocalTensor<float> dstBuffer,
+                                                                                   LocalTensor<float> tmpBuffer,
+                                                                                   int32_t hiddensizeLen)
 {
     if (hiddensizeLen >= 4096) { // 二分累加到8192以内，再累加成4096大小，用blockreducesum
         this->BinaryAddFunc(tmpBuffer, hiddensizeLen, 8192, 4096); // 累加成4096大小
@@ -131,13 +132,13 @@ __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::ReduceSumFu
         BlockReduceSum(tmpBuffer, tmpBuffer, 8, 64, 1, 1, 8);  // 输出64
         BlockReduceSum(tmpBuffer, tmpBuffer, 1, 64, 1, 1, 8);  // 输出8
         WholeReduceSum(dstBuffer, tmpBuffer, 8, 1, 1, 1, 8);   // 输出1
-    } else if (hiddensizeLen >= 512) {                         // 二分累加到1024以内，再累加成512大小，用blockreducesum
+    } else if (hiddensizeLen >= 512) { // 二分累加到1024以内，再累加成512大小，用blockreducesum
         this->BinaryAddFunc(tmpBuffer, hiddensizeLen, 1024, 512); // 累加成512大小
         // 用BlockReduceSum+WholeReduceSum 把512 reduce成1个
-        BlockReduceSum(tmpBuffer, tmpBuffer, 8, 64, 1, 1, 8);   // 输出64
-        BlockReduceSum(tmpBuffer, tmpBuffer, 1, 64, 1, 1, 8);   // 输出8
-        WholeReduceSum(dstBuffer, tmpBuffer, 8, 1, 1, 1, 8);    // 输出1
-    } else if (hiddensizeLen >= 64) {                           // 二分累加到128以内，再累加成64大小，用blockreducesum
+        BlockReduceSum(tmpBuffer, tmpBuffer, 8, 64, 1, 1, 8); // 输出64
+        BlockReduceSum(tmpBuffer, tmpBuffer, 1, 64, 1, 1, 8); // 输出8
+        WholeReduceSum(dstBuffer, tmpBuffer, 8, 1, 1, 1, 8);  // 输出1
+    } else if (hiddensizeLen >= 64) { // 二分累加到128以内，再累加成64大小，用blockreducesum
         this->BinaryAddFunc(tmpBuffer, hiddensizeLen, 128, 64); // 累加成64大小
         // 用BlockReduceSum+WholeReduceSum 把64 reduce成1个
         BlockReduceSum(tmpBuffer, tmpBuffer, 1, 64, 1, 1, 8); // 输出8
@@ -150,7 +151,7 @@ __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::ReduceSumFu
 template <typename OriT, typename IdxT, typename ProbT>
 __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::Init(
     GM_ADDR permuted_tokens, GM_ADDR unpermuted_tokens_grad, GM_ADDR sorted_indices, GM_ADDR probs,
-    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, const MoeTokenUnpermuteWithEpGradTilingData& tilingData)
+    GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad, const MoeTokenUnpermuteWithEpGradTilingData &tilingData)
 {
     tokensNum = tilingData.tokensNum;
     topK = tilingData.topK;
@@ -182,12 +183,12 @@ __aicore__ inline void MoeTokenUnpermuteGradBase<OriT, IdxT, ProbT>::Init(
     hiddensizeAlignFp32TailMask = this->hiddenSizeAlign % FP32_ONE_REPEAT;
     hiddensizeAlignFp32TailOffset = hiddensizeAlignFp32RepeatTimes * FP32_ONE_REPEAT;
 
-    permutedTokensGm.SetGlobalBuffer((__gm__ OriT*)permuted_tokens);
-    unpermutedOutputDGm.SetGlobalBuffer((__gm__ OriT*)unpermuted_tokens_grad);
-    sortedIndicesGm.SetGlobalBuffer((__gm__ IdxT*)sorted_indices);
-    permutedTokensGradGm.SetGlobalBuffer((__gm__ OriT*)permuted_tokens_grad);
-    probGm.SetGlobalBuffer((__gm__ ProbT*)probs);
-    probGradGm.SetGlobalBuffer((__gm__ ProbT*)probs_grad);
+    permutedTokensGm.SetGlobalBuffer((__gm__ OriT *)permuted_tokens);
+    unpermutedOutputDGm.SetGlobalBuffer((__gm__ OriT *)unpermuted_tokens_grad);
+    sortedIndicesGm.SetGlobalBuffer((__gm__ IdxT *)sorted_indices);
+    permutedTokensGradGm.SetGlobalBuffer((__gm__ OriT *)permuted_tokens_grad);
+    probGm.SetGlobalBuffer((__gm__ ProbT *)probs);
+    probGradGm.SetGlobalBuffer((__gm__ ProbT *)probs_grad);
 
     if (coreIndex < formerCoreNum) {
         rowIdMapStartOffset = coreIndex * rowIdMapEachCore;

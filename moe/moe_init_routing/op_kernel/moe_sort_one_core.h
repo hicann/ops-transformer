@@ -20,13 +20,11 @@
 namespace MoeInitRouting {
 using namespace AscendC;
 
-class MoeSortOneCore : public MoeSortBase
-{
+class MoeSortOneCore : public MoeSortBase {
 public:
     __aicore__ inline MoeSortOneCore(){};
-    __aicore__ inline void Init(
-        GM_ADDR expertForSourceRow, GM_ADDR sourceRow, GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
-        const MoeInitRoutingTilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR expertForSourceRow, GM_ADDR sourceRow, GM_ADDR sortedExpertForSourceRow,
+                                GM_ADDR workspace, const MoeInitRoutingTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -41,8 +39,8 @@ private:
 __aicore__ inline void MoeSortOneCore::CopyIn()
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+                                     static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
     DataCopyPadExtParams dataCopyPadParams{false, 0, 0, 0};
     DataCopyPad(inLocal[0], expertForSourceRowGm, dataCopyParams, dataCopyPadParams);
     DataCopyPad(inLocal[this->sortNum], sourceRowGm, dataCopyParams, dataCopyPadParams);
@@ -102,9 +100,9 @@ __aicore__ inline void MoeSortOneCore::CopyOut()
     sortDataCopyOutQueue.FreeTensor(outLocal);
 }
 
-__aicore__ inline void MoeSortOneCore::Init(
-    GM_ADDR expertForSourceRow, GM_ADDR sourceRow, GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
-    const MoeInitRoutingTilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeSortOneCore::Init(GM_ADDR expertForSourceRow, GM_ADDR sourceRow,
+                                            GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
+                                            const MoeInitRoutingTilingData *tilingData, TPipe *tPipe)
 {
     this->tileLength = Align(tilingData->vbsComputeParamsOp.lastCorePerLoopElements, sizeof(int32_t));
     this->sortNum = Ceil(this->tileLength, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM;
@@ -112,10 +110,10 @@ __aicore__ inline void MoeSortOneCore::Init(
     this->coreNum = tilingData->coreNum;
     this->pipe = tPipe;
 
-    expertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t*)expertForSourceRow, this->tileLength);
-    sourceRowGm.SetGlobalBuffer((__gm__ int32_t*)sourceRow, this->tileLength);
-    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t*)sortedExpertForSourceRow, this->tileLength);
-    expandDstToSrcRowGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace), this->tileLength);
+    expertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t *)expertForSourceRow, this->tileLength);
+    sourceRowGm.SetGlobalBuffer((__gm__ int32_t *)sourceRow, this->tileLength);
+    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t *)sortedExpertForSourceRow, this->tileLength);
+    expandDstToSrcRowGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), this->tileLength);
 
     int64_t coreNum = GetBlockNum();
 

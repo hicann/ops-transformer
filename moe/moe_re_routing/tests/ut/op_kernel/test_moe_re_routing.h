@@ -34,21 +34,21 @@ struct MoeReRoutingTilingData {
 #pragma pack()
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct *tilingDataPointer =                              \
+    __ubuf__ tilingStruct *tilingDataPointer = \
         reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                              \
-    MoeReRoutingTilingData tilingData;                                          \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    MoeReRoutingTilingData tilingData; \
     INIT_TILING_DATA(MoeReRoutingTilingData, tilingDataPointer, tilingPointer); \
-    (tilingData).coreNum = tilingDataPointer->coreNum;                          \
-    (tilingData).ubFactor = tilingDataPointer->ubFactor;                        \
-    (tilingData).tokensNum = tilingDataPointer->tokensNum;                      \
-    (tilingData).tokensSize = tilingDataPointer->tokensSize;                    \
-    (tilingData).rankNum = tilingDataPointer->rankNum;                          \
-    (tilingData).expertNumPerRank = tilingDataPointer->expertNumPerRank;        \
+    (tilingData).coreNum = tilingDataPointer->coreNum; \
+    (tilingData).ubFactor = tilingDataPointer->ubFactor; \
+    (tilingData).tokensNum = tilingDataPointer->tokensNum; \
+    (tilingData).tokensSize = tilingDataPointer->tokensSize; \
+    (tilingData).rankNum = tilingDataPointer->rankNum; \
+    (tilingData).expertNumPerRank = tilingDataPointer->expertNumPerRank; \
     (tilingData).hasScale = tilingDataPointer->hasScale;
 
 #endif

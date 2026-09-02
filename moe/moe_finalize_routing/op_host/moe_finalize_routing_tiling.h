@@ -47,24 +47,24 @@ BEGIN_TILING_DATA_DEF(MoeFinalizeRoutingTilingData)
 TILING_DATA_FIELD_DEF(int64_t, totalCoreNum);
 TILING_DATA_FIELD_DEF(int64_t, usedCoreNum);
 TILING_DATA_FIELD_DEF(int64_t, skip2IsNull);
-TILING_DATA_FIELD_DEF(int64_t, biasRowNum);                  // bias的行数
-TILING_DATA_FIELD_DEF(int64_t, totalRowNum);                 // skip1的行数
-TILING_DATA_FIELD_DEF(int64_t, H);                           // skip1的列数
-TILING_DATA_FIELD_DEF(int64_t, normalH);                     // skip1的列数切分后满载的列数大小
-TILING_DATA_FIELD_DEF(int64_t, unnormalH);                   // skip1的列数切分后满载后剩余的列数大小
-TILING_DATA_FIELD_DEF(int64_t, hSliceNum);                   // skip1的列数切分的次数
-TILING_DATA_FIELD_DEF(int64_t, normalK);                     // scales的列数切分后满载的列数大小
-TILING_DATA_FIELD_DEF(int64_t, unnormalK);                   // scales的列数切分后满载后剩余的列数大小
-TILING_DATA_FIELD_DEF(int64_t, kSliceNum);                   // scales的列数切片的数量
-TILING_DATA_FIELD_DEF(int64_t, K);                           // scales的列数
-TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNum);         // 非尾核，每个核处理的skip1行数
-TILING_DATA_FIELD_DEF(int64_t, normalCoreLoopNum);           // 非尾核，每个核需要的循环次数
-TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNumPerLoop);  // 非尾核，每个核，非尾Loop，每次loop需要处理的skip1行数
+TILING_DATA_FIELD_DEF(int64_t, biasRowNum);          // bias的行数
+TILING_DATA_FIELD_DEF(int64_t, totalRowNum);         // skip1的行数
+TILING_DATA_FIELD_DEF(int64_t, H);                   // skip1的列数
+TILING_DATA_FIELD_DEF(int64_t, normalH);             // skip1的列数切分后满载的列数大小
+TILING_DATA_FIELD_DEF(int64_t, unnormalH);           // skip1的列数切分后满载后剩余的列数大小
+TILING_DATA_FIELD_DEF(int64_t, hSliceNum);           // skip1的列数切分的次数
+TILING_DATA_FIELD_DEF(int64_t, normalK);             // scales的列数切分后满载的列数大小
+TILING_DATA_FIELD_DEF(int64_t, unnormalK);           // scales的列数切分后满载后剩余的列数大小
+TILING_DATA_FIELD_DEF(int64_t, kSliceNum);           // scales的列数切片的数量
+TILING_DATA_FIELD_DEF(int64_t, K);                   // scales的列数
+TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNum); // 非尾核，每个核处理的skip1行数
+TILING_DATA_FIELD_DEF(int64_t, normalCoreLoopNum);   // 非尾核，每个核需要的循环次数
+TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNumPerLoop); // 非尾核，每个核，非尾Loop，每次loop需要处理的skip1行数
 TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNumTailLoop); // 非尾核，每个核，尾Loop需要处理的skip1行数
 TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNum);           // 尾核处理的skip1行数
 TILING_DATA_FIELD_DEF(int64_t, tailCoreLoopNum);             // 尾核，每个核需要的循环次数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumPerLoop);    // 尾核，每个核，非尾Loop需要处理的skip1行数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumTailLoop);   // 尾核，每个核，尾Loop需要处理的skip1行数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumPerLoop);  // 尾核，每个核，非尾Loop需要处理的skip1行数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumTailLoop); // 尾核，每个核，尾Loop需要处理的skip1行数
 TILING_DATA_FIELD_DEF(int64_t, tilingKey)
 END_TILING_DATA_DEF;
 

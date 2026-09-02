@@ -74,13 +74,9 @@ class KernelGmmFinalizeRouting<
     ProblemShape_, BlockMmadBuilder_, BlockPrologue_, BlockEpilogue_, BlockScheduler_,
     AscendC::Std::enable_if_t<AscendC::Std::is_same_v<BlockScheduler_, GroupedMatmulAswtWithTailSplitScheduler>>> {
 public:
-    __aicore__ inline KernelGmmFinalizeRouting()
-    {
-    }
+    __aicore__ inline KernelGmmFinalizeRouting() {}
 
-    __aicore__ inline ~KernelGmmFinalizeRouting()
-    {
-    }
+    __aicore__ inline ~KernelGmmFinalizeRouting() {}
 
     using BlockPrologue = BlockPrologue_;
     using BlockEpilogue = BlockEpilogue_;
@@ -146,15 +142,16 @@ public:
         int32_t baseK;
         uint8_t hasBias;
         const TCubeTiling *__restrict matmulTiling;
-        __aicore__ GMMTiling()
-        {
-        }
+        __aicore__ GMMTiling() {}
         __aicore__ GMMTiling(uint32_t groupNum_, uint8_t groupListType_, int32_t baseM_, int32_t baseN_, int32_t baseK_,
                              uint8_t hasBias_)
-            : groupNum(groupNum_), groupListType(groupListType_), baseM(baseM_), baseN(baseN_), baseK(baseK_),
+            : groupNum(groupNum_),
+              groupListType(groupListType_),
+              baseM(baseM_),
+              baseN(baseN_),
+              baseK(baseK_),
               hasBias(hasBias_)
-        {
-        }
+        {}
     };
 
     struct Arguments {

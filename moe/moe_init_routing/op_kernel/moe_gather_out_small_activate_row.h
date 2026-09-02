@@ -22,20 +22,18 @@ namespace MoeInitRouting {
 using namespace AscendC;
 
 template <typename T>
-class MoeGatherOutSmallActiveRow
-{
+class MoeGatherOutSmallActiveRow {
 public:
     __aicore__ inline MoeGatherOutSmallActiveRow(){};
-    __aicore__ inline void Init(
-        GM_ADDR inputActivations, GM_ADDR workspace, GM_ADDR expandSrcToDstRow, GM_ADDR expandedActivations,
-        const MoeInitRoutingTilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR inputActivations, GM_ADDR workspace, GM_ADDR expandSrcToDstRow,
+                                GM_ADDR expandedActivations, const MoeInitRoutingTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyInIndices(int64_t progress);
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
     TQue<QuePosition::VECIN, BUFFER_NUM> inputActivationsCopyInQueue;
     TQue<QuePosition::VECIN, BUFFER_NUM> expandDstToSrcRowCopyInQueue;
 
@@ -43,7 +41,7 @@ private:
     GlobalTensor<T> expandedActivationsGm;
     GlobalTensor<int32_t> expandDstToSrcRowGm;
 
-    const GatherOutComputeTilingData* gatherOutTilingData;
+    const GatherOutComputeTilingData *gatherOutTilingData;
 
     int64_t needCoreNum;
     int64_t blockIdx;
@@ -76,9 +74,9 @@ __aicore__ inline void MoeGatherOutSmallActiveRow<T>::CopyInIndices(int64_t prog
 }
 
 template <typename T>
-__aicore__ inline void MoeGatherOutSmallActiveRow<T>::Init(
-    GM_ADDR inputActivations, GM_ADDR workspace, GM_ADDR expandSrcToDstRow, GM_ADDR expandedActivations,
-    const MoeInitRoutingTilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeGatherOutSmallActiveRow<T>::Init(GM_ADDR inputActivations, GM_ADDR workspace,
+                                                           GM_ADDR expandSrcToDstRow, GM_ADDR expandedActivations,
+                                                           const MoeInitRoutingTilingData *tilingData, TPipe *tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx = GetBlockIdx();
@@ -101,14 +99,14 @@ __aicore__ inline void MoeGatherOutSmallActiveRow<T>::Init(
         this->lastLoopRows = this->gatherOutTilingData->perCoreLastLoopRows;
     }
 
-    inputActivationsGm.SetGlobalBuffer((__gm__ T*)inputActivations, this->coreRows * this->cols);
+    inputActivationsGm.SetGlobalBuffer((__gm__ T *)inputActivations, this->coreRows * this->cols);
 
     expandedActivationsGm.SetGlobalBuffer(
-        (__gm__ T*)expandedActivations + this->blockIdx * this->gatherOutTilingData->perCoreRows * this->cols,
+        (__gm__ T *)expandedActivations + this->blockIdx * this->gatherOutTilingData->perCoreRows * this->cols,
         tilingData->n * tilingData->k * this->cols);
 
     expandDstToSrcRowGm.SetGlobalBuffer(
-        (__gm__ int32_t*)workspace + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+        (__gm__ int32_t *)workspace + this->blockIdx * this->gatherOutTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
 
     pipe->InitBuffer(inputActivationsCopyInQueue, BUFFER_NUM, AlignBytes(this->maxColsOneLoop, sizeof(T)));

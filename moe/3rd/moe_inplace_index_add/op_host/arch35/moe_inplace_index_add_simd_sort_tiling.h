@@ -18,8 +18,7 @@
 
 #include "moe_inplace_index_add_tiling_arch35.h"
 
-namespace optiling
-{
+namespace optiling {
 BEGIN_TILING_DATA_DEF(MoeInplaceIndexAddSimdSortTilingData)
 TILING_DATA_FIELD_DEF(int64_t, preAxis);
 TILING_DATA_FIELD_DEF(int64_t, varInAxis);
@@ -58,10 +57,10 @@ END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd_200000, MoeInplaceIndexAddSimdSortTilingData)
 
-class MoeInplaceIndexAddSimdSortTiling : public MoeInplaceIndexAddTiling
-{
+class MoeInplaceIndexAddSimdSortTiling : public MoeInplaceIndexAddTiling {
 public:
-    explicit MoeInplaceIndexAddSimdSortTiling(gert::TilingContext* context) : MoeInplaceIndexAddTiling(context)
+    explicit MoeInplaceIndexAddSimdSortTiling(gert::TilingContext *context)
+        : MoeInplaceIndexAddTiling(context)
     {}
     ~MoeInplaceIndexAddSimdSortTiling() override = default;
 
@@ -81,5 +80,5 @@ protected:
     void SetTilingData();
     MoeInplaceIndexAddSimdSortTilingData tilingData_;
 };
-}  // namespace optiling
-#endif  // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INPLACE_INDEX_ADD_TILING_H_
+} // namespace optiling
+#endif // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INPLACE_INDEX_ADD_TILING_H_

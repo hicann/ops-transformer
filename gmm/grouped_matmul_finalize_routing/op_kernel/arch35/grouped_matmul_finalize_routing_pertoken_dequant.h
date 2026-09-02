@@ -79,15 +79,15 @@ __aicore__ inline void grouped_matmul_finalize_routing_pertoken_dequant(
                             gmmFinalizeRoutingQuantParams_.deterWorkspaceSize,
                             static_cast<uint32_t>(matmulTiling_.usedCoreNum)};
         gmmParams.matmulTiling = &matmulTiling_;
-        Params params = {{1, 1, 1, 1},                // problem shape
-                         {x, w, y, bias, group_list}, // BlockMmadParams
-                         {share_input, y, gmmFinalizeRoutingQuantParams_.sharedInputOffset,
-                          gmmFinalizeRoutingQuantParams_.sharedInputLen, matmulTiling_.N,
-                          gmmFinalizeRoutingQuantParams_.batch,
-                          gmmFinalizeRoutingQuantParams_.residualScale}, // prologue params
-                         {y, w_scale, x_scale, bias, logit, row_index, matmulTiling_.baseM, matmulTiling_.baseN,
-                          userWorkspace, gmmFinalizeRoutingQuantParams_.deterWorkspaceSize}, // epilogue params
-                         gmmParams};
+        Params params = {
+            {1, 1, 1, 1},                // problem shape
+            {x, w, y, bias, group_list}, // BlockMmadParams
+            {share_input, y, gmmFinalizeRoutingQuantParams_.sharedInputOffset,
+             gmmFinalizeRoutingQuantParams_.sharedInputLen, matmulTiling_.N, gmmFinalizeRoutingQuantParams_.batch,
+             gmmFinalizeRoutingQuantParams_.residualScale}, // prologue params
+            {y, w_scale, x_scale, bias, logit, row_index, matmulTiling_.baseM, matmulTiling_.baseN, userWorkspace,
+             gmmFinalizeRoutingQuantParams_.deterWorkspaceSize}, // epilogue params
+            gmmParams};
         GmmKernel gmm;
         gmm(params);
     } else {

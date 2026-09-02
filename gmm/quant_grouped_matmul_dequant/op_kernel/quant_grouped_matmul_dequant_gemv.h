@@ -23,9 +23,7 @@ using namespace AscendC;
 namespace AscendC {
 class QuantMatmulDequantGemv : public QuantMatmulDequantBase {
 public:
-    __aicore__ inline QuantMatmulDequantGemv()
-    {
-    }
+    __aicore__ inline QuantMatmulDequantGemv() {}
 
     __aicore__ inline void Process()
     {

@@ -17,10 +17,7 @@
 
 namespace Catlass::Gemm::Tile {
 
-template <
-    class ArchTag,
-    class GmType
->
+template <class ArchTag, class GmType>
 struct CopyGm2Ub {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy gm to ub, can not find the specialization.");
 };
@@ -36,24 +33,15 @@ struct CopyGm2Ub<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout>> {
     CopyGm2Ub() = default;
 
     CATLASS_DEVICE
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        layout::VectorLayout const &layoutDst,
-        layout::VectorLayout const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::GlobalTensor<Element> const &srcTensor,
+                    layout::VectorLayout const &layoutDst, layout::VectorLayout const &layoutSrc)
     {
-        AscendC::DataCopyExtParams dataCopyParams(
-            1,
-            layoutSrc.shape(0) * sizeof(Element),
-            0,
-            0,
-            0
-        );
+        AscendC::DataCopyExtParams dataCopyParams(1, layoutSrc.shape(0) * sizeof(Element), 0, 0, 0);
         AscendC::DataCopyPadExtParams<Element> padParams(false, 0, 0, 0);
         AscendC::DataCopyPad(dstTensor, srcTensor, dataCopyParams, padParams);
     };
 };
 
-}  // Catlass::Gemm::Tile
+} // namespace Catlass::Gemm::Tile
 
 #endif // GMM_COPY_GM_TO_UB_HPP

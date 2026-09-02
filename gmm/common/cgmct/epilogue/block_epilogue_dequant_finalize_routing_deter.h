@@ -59,10 +59,10 @@ static constexpr AscendC::MicroAPI::CastTrait ctHalf2Fp32OneESD = {
 
 using namespace AscendC;
 
-#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_CLASS_LOCAL_PARAMS                                           \
-    template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,       \
+#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_CLASS_LOCAL_PARAMS \
+    template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_, \
               typename DataTypeBias_, typename DataTypeRowIndex_>
-#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_FUNC_LOCAL_PARAMS                                            \
+#define GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_FUNC_LOCAL_PARAMS \
     DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, DataTypeBias_, DataTypeRowIndex_
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_CLASS_LOCAL_PARAMS
@@ -231,9 +231,9 @@ __aicore__ inline auto BlockEpilogueDequantFinalizeRoutingDeter<
 }
 
 GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequantFinalizeRoutingDeter<GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_FUNC_LOCAL_PARAMS>::
-    UpdateNextProblem(const ProblemShape &problemShape)
+__aicore__ inline void BlockEpilogueDequantFinalizeRoutingDeter<
+    GMM_BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_FUNC_LOCAL_PARAMS>::UpdateNextProblem(const ProblemShape
+                                                                                                &problemShape)
 {
     n_ = Get<MNK_N>(problemShape);
 }

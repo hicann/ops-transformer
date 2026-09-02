@@ -24,13 +24,11 @@ using namespace AscendC;
 constexpr int64_t BUFFER_NUM = 2;
 
 template <typename T>
-class MoeV2GatherOut
-{
+class MoeV2GatherOut {
 public:
     __aicore__ inline MoeV2GatherOut(){};
-    __aicore__ inline void Init(
-        GM_ADDR inputX, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR workspace,
-        const InnerMoeInitRoutingV2TilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR workspace,
+                                const InnerMoeInitRoutingV2TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -38,7 +36,7 @@ private:
     __aicore__ inline void CopyOut(int64_t progress);
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, BUFFER_NUM> inputActivationsCopyInQueue;
     TQue<QuePosition::VECIN, BUFFER_NUM> expandDstToSrcRowCopyInQueue;
 
@@ -46,7 +44,7 @@ private:
     GlobalTensor<T> expandedXGm;
     GlobalTensor<int32_t> expandedRowIdxGm;
 
-    const InnerMoeV2GatherOutComputeTilingData* gatherOutTilingData;
+    const InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData;
 
     int64_t needCoreNum;
     int64_t blockIdx;
@@ -123,9 +121,9 @@ __aicore__ inline void MoeV2GatherOut<T>::CopyOut(int64_t progress)
 }
 
 template <typename T>
-__aicore__ inline void MoeV2GatherOut<T>::Init(
-    GM_ADDR inputX, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR workspace,
-    const InnerMoeInitRoutingV2TilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeV2GatherOut<T>::Init(GM_ADDR inputX, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
+                                               GM_ADDR workspace, const InnerMoeInitRoutingV2TilingData *tilingData,
+                                               TPipe *tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx = GetBlockIdx();
@@ -153,10 +151,10 @@ __aicore__ inline void MoeV2GatherOut<T>::Init(
     this->lastLoopCols = this->gatherOutTilingData->lastLoopCols;
     this->colLoops = this->gatherOutTilingData->colLoops;
 
-    inputXGm.SetGlobalBuffer((__gm__ T*)inputX, this->coreRows * this->cols);
-    expandedXGm.SetGlobalBuffer((__gm__ T*)expandedX, tilingData->n * tilingData->k * this->cols);
+    inputXGm.SetGlobalBuffer((__gm__ T *)inputX, this->coreRows * this->cols);
+    expandedXGm.SetGlobalBuffer((__gm__ T *)expandedX, tilingData->n * tilingData->k * this->cols);
     expandedRowIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t*)expandedRowIdx + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+        (__gm__ int32_t *)expandedRowIdx + this->blockIdx * this->gatherOutTilingData->perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
 
     pipe->InitBuffer(inputActivationsCopyInQueue, BUFFER_NUM, AlignBytes(this->perLoopCols, sizeof(T)));

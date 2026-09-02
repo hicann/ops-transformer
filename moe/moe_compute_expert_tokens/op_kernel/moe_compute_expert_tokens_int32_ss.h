@@ -23,35 +23,38 @@ namespace MoeCompute {
 using namespace AscendC;
 
 template <typename T>
-class MoeComputeExpertTokensInt32SS
-{
+class MoeComputeExpertTokensInt32SS {
 public:
     __aicore__ inline MoeComputeExpertTokensInt32SS(){};
-    __aicore__ inline void Init(
-        GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace, const MoeComputeExpertTokensTilingData* tilingData);
+    __aicore__ inline void Init(GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace,
+                                const MoeComputeExpertTokensTilingData *tilingData);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyIn();
     __aicore__ inline void Compute();
-    __aicore__ inline void InitComputeTensor(LocalTensor<T>& input, LocalTensor<T>& output,
-        LocalTensor<float>& oneBuf, LocalTensor<float>& inputCast);
-    __aicore__ inline void ProcessSingleTarget(LocalTensor<T>& output, LocalTensor<uint8_t>& mask1,
-        LocalTensor<float>& workLocal, LocalTensor<float>& inputCast, LocalTensor<float>& targetBuf,
-        LocalTensor<float>& oneBuf, LocalTensor<float>& reduceMaxAnsBuf, LocalTensor<float>& reduceSumAnsBuf,
-        LocalTensor<float>& resultBuf, float target, uint64_t mask, int32_t repeat,
-        BinaryRepeatParams& repeatParamsCompare, BinaryRepeatParams& repeatParamsSelect, int32_t startOffset,
-        int32_t& lastIdx, int32_t& lastVal);
-    __aicore__ inline void ProcessTargetRange(LocalTensor<T>& output, LocalTensor<uint8_t>& mask1,
-        LocalTensor<float>& workLocal, LocalTensor<float>& inputCast, LocalTensor<float>& targetBuf,
-        LocalTensor<float>& oneBuf, LocalTensor<float>& reduceMaxAnsBuf, LocalTensor<float>& reduceSumAnsBuf,
-        LocalTensor<float>& resultBuf, float startTarget, float endTarget, int32_t startOffset, int32_t repeat);
-    __aicore__ inline void FillOutputAfterLastTarget(LocalTensor<T>& output, int32_t lastIdx, int32_t lastVal);
+    __aicore__ inline void InitComputeTensor(LocalTensor<T> &input, LocalTensor<T> &output, LocalTensor<float> &oneBuf,
+                                             LocalTensor<float> &inputCast);
+    __aicore__ inline void ProcessSingleTarget(LocalTensor<T> &output, LocalTensor<uint8_t> &mask1,
+                                               LocalTensor<float> &workLocal, LocalTensor<float> &inputCast,
+                                               LocalTensor<float> &targetBuf, LocalTensor<float> &oneBuf,
+                                               LocalTensor<float> &reduceMaxAnsBuf, LocalTensor<float> &reduceSumAnsBuf,
+                                               LocalTensor<float> &resultBuf, float target, uint64_t mask,
+                                               int32_t repeat, BinaryRepeatParams &repeatParamsCompare,
+                                               BinaryRepeatParams &repeatParamsSelect, int32_t startOffset,
+                                               int32_t &lastIdx, int32_t &lastVal);
+    __aicore__ inline void ProcessTargetRange(LocalTensor<T> &output, LocalTensor<uint8_t> &mask1,
+                                              LocalTensor<float> &workLocal, LocalTensor<float> &inputCast,
+                                              LocalTensor<float> &targetBuf, LocalTensor<float> &oneBuf,
+                                              LocalTensor<float> &reduceMaxAnsBuf, LocalTensor<float> &reduceSumAnsBuf,
+                                              LocalTensor<float> &resultBuf, float startTarget, float endTarget,
+                                              int32_t startOffset, int32_t repeat);
+    __aicore__ inline void FillOutputAfterLastTarget(LocalTensor<T> &output, int32_t lastIdx, int32_t lastVal);
     __aicore__ inline void CopyOut();
     __aicore__ inline int64_t Int32AlignmentProcess(int64_t param);
     __aicore__ inline int64_t Int256AlignmentProcess(int64_t param);
     __aicore__ inline int64_t PadProcessInt32(int64_t param);
-    __aicore__ inline void ParseTilingData(const MoeComputeExpertTokensTilingData* tilingData);
+    __aicore__ inline void ParseTilingData(const MoeComputeExpertTokensTilingData *tilingData);
 
 private:
     TPipe pipe_;
@@ -111,7 +114,7 @@ __aicore__ inline int64_t MoeComputeExpertTokensInt32SS<T>::Int256AlignmentProce
 
 template <typename T>
 __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ParseTilingData(
-    const MoeComputeExpertTokensTilingData* tilingData)
+    const MoeComputeExpertTokensTilingData *tilingData)
 {
     // 使用核数
     usedCoreNumBefore_ = tilingData->usedCoreNumBefore;
@@ -130,17 +133,17 @@ __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ParseTilingData(
 }
 
 template <typename T>
-__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::Init(
-    GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace, const MoeComputeExpertTokensTilingData* tilingData)
+__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::Init(GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace,
+                                                              const MoeComputeExpertTokensTilingData *tilingData)
 {
     // init tiling data
     ParseTilingData(tilingData);
     workspace_ = workspace;
 
     // SetGlobalBuffer
-    gmInput_.SetGlobalBuffer((__gm__ T*)sortExperts + GetBlockIdx() * handleNumPerCoreBefore_);
-    gmWorkspace_.SetGlobalBuffer((__gm__ T*)workspace);
-    gmOutput_.SetGlobalBuffer((__gm__ T*)out);
+    gmInput_.SetGlobalBuffer((__gm__ T *)sortExperts + GetBlockIdx() * handleNumPerCoreBefore_);
+    gmWorkspace_.SetGlobalBuffer((__gm__ T *)workspace);
+    gmOutput_.SetGlobalBuffer((__gm__ T *)out);
 
     // InitBuffer
     handleNum_ = (GetBlockIdx() != usedCoreNumBefore_ - 1) ? handleNumPerCoreBefore_ : handleNumTailCoreBefore_;
@@ -172,8 +175,10 @@ __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::CopyIn()
 }
 
 template <typename T>
-__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::InitComputeTensor(LocalTensor<T>& input,
-    LocalTensor<T>& output, LocalTensor<float>& oneBuf, LocalTensor<float>& inputCast)
+__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::InitComputeTensor(LocalTensor<T> &input,
+                                                                           LocalTensor<T> &output,
+                                                                           LocalTensor<float> &oneBuf,
+                                                                           LocalTensor<float> &inputCast)
 {
     Duplicate(oneBuf, static_cast<float>(1), 8);
     Cast(inputCast, input, RoundMode::CAST_NONE, handleNum_);
@@ -181,19 +186,19 @@ __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::InitComputeTensor(Local
 }
 
 template <typename T>
-__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ProcessSingleTarget(LocalTensor<T>& output,
-    LocalTensor<uint8_t>& mask1, LocalTensor<float>& workLocal, LocalTensor<float>& inputCast,
-    LocalTensor<float>& targetBuf, LocalTensor<float>& oneBuf, LocalTensor<float>& reduceMaxAnsBuf,
-    LocalTensor<float>& reduceSumAnsBuf, LocalTensor<float>& resultBuf, float target, uint64_t mask, int32_t repeat,
-    BinaryRepeatParams& repeatParamsCompare, BinaryRepeatParams& repeatParamsSelect, int32_t startOffset,
-    int32_t& lastIdx, int32_t& lastVal)
+__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ProcessSingleTarget(
+    LocalTensor<T> &output, LocalTensor<uint8_t> &mask1, LocalTensor<float> &workLocal, LocalTensor<float> &inputCast,
+    LocalTensor<float> &targetBuf, LocalTensor<float> &oneBuf, LocalTensor<float> &reduceMaxAnsBuf,
+    LocalTensor<float> &reduceSumAnsBuf, LocalTensor<float> &resultBuf, float target, uint64_t mask, int32_t repeat,
+    BinaryRepeatParams &repeatParamsCompare, BinaryRepeatParams &repeatParamsSelect, int32_t startOffset,
+    int32_t &lastIdx, int32_t &lastVal)
 {
     Duplicate(targetBuf, target, 8);
     PipeBarrier<PIPE_V>();
     Compare(mask1, inputCast, targetBuf, CMPMODE::EQ, mask, repeat, repeatParamsCompare);
     PipeBarrier<PIPE_V>();
     Select<float>(resultBuf, mask1, oneBuf, static_cast<float>(0), SELMODE::VSEL_TENSOR_SCALAR_MODE, mask, repeat,
-        repeatParamsSelect);
+                  repeatParamsSelect);
     PipeBarrier<PIPE_V>();
     ReduceMax<float>(reduceMaxAnsBuf, resultBuf, workLocal, handleNum_, true);
     SetFlag<HardEvent::V_S>(EVENT_ID0);
@@ -209,17 +214,17 @@ __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ProcessSingleTarget(Loc
     WaitFlag<HardEvent::V_S>(EVENT_ID0);
     float index = reduceMaxAnsBuf.GetValue(1);
     float sumNum = reduceSumAnsBuf.GetValue(0);
-    int32_t targetLocation = (reinterpret_cast<int32_t&>(index) + sumNum);
+    int32_t targetLocation = (reinterpret_cast<int32_t &>(index) + sumNum);
     lastVal = startOffset + targetLocation;
     lastIdx = target;
     output.SetValue(static_cast<int32_t>(target), lastVal);
 }
 
 template <typename T>
-__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ProcessTargetRange(LocalTensor<T>& output,
-    LocalTensor<uint8_t>& mask1, LocalTensor<float>& workLocal, LocalTensor<float>& inputCast,
-    LocalTensor<float>& targetBuf, LocalTensor<float>& oneBuf, LocalTensor<float>& reduceMaxAnsBuf,
-    LocalTensor<float>& reduceSumAnsBuf, LocalTensor<float>& resultBuf, float startTarget, float endTarget,
+__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ProcessTargetRange(
+    LocalTensor<T> &output, LocalTensor<uint8_t> &mask1, LocalTensor<float> &workLocal, LocalTensor<float> &inputCast,
+    LocalTensor<float> &targetBuf, LocalTensor<float> &oneBuf, LocalTensor<float> &reduceMaxAnsBuf,
+    LocalTensor<float> &reduceSumAnsBuf, LocalTensor<float> &resultBuf, float startTarget, float endTarget,
     int32_t startOffset, int32_t repeat)
 {
     int32_t lastIdx = 0;
@@ -229,14 +234,15 @@ __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::ProcessTargetRange(Loca
     BinaryRepeatParams repeatParamsSelect = {1, 0, 0, 8, 0, 0};
     for (float target = startTarget; target <= endTarget; target++) {
         ProcessSingleTarget(output, mask1, workLocal, inputCast, targetBuf, oneBuf, reduceMaxAnsBuf, reduceSumAnsBuf,
-            resultBuf, target, mask, repeat, repeatParamsCompare, repeatParamsSelect, startOffset, lastIdx, lastVal);
+                            resultBuf, target, mask, repeat, repeatParamsCompare, repeatParamsSelect, startOffset,
+                            lastIdx, lastVal);
     }
     FillOutputAfterLastTarget(output, lastIdx, lastVal);
 }
 
 template <typename T>
-__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::FillOutputAfterLastTarget(
-    LocalTensor<T>& output, int32_t lastIdx, int32_t lastVal)
+__aicore__ inline void MoeComputeExpertTokensInt32SS<T>::FillOutputAfterLastTarget(LocalTensor<T> &output,
+                                                                                   int32_t lastIdx, int32_t lastVal)
 {
     for (int k = lastIdx + 1; k < numOfExpert_; k++) {
         output.SetValue(k, lastVal);
@@ -268,7 +274,7 @@ __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::Compute()
     float startTarget = inputCast.GetValue(0);
     float endTarget = inputCast.GetValue(handleNum_ - 1);
     ProcessTargetRange(output, mask1, workLocal, inputCast, targetBuf, oneBuf, reduceMaxAnsBuf, reduceSumAnsBuf,
-        resultBuf, startTarget, endTarget, startOffset, repeat);
+                       resultBuf, startTarget, endTarget, startOffset, repeat);
 
     tmpOutQueue_.EnQue<T>(output);
     inputQueue_.FreeTensor(input);

@@ -20,8 +20,7 @@
 namespace MoeInitRouting {
 using namespace AscendC;
 
-class MoeSortBase
-{
+class MoeSortBase {
 public:
     __aicore__ inline MoeSortBase(){};
     __aicore__ inline int64_t GetSyncRound();
@@ -31,7 +30,7 @@ protected:
     __aicore__ inline void SyncAll();
 
 protected:
-    TPipe* pipe;
+    TPipe *pipe;
     TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
     TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
     TBuf<TPosition::VECCALC> tempBuffer;

@@ -49,9 +49,7 @@ using namespace AscendC;
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
 class BlockEpilogueFinalizeRouting {
 public:
-    __aicore__ inline BlockEpilogueFinalizeRouting()
-    {
-    }
+    __aicore__ inline BlockEpilogueFinalizeRouting() {}
 
     struct Arguments {
         GM_ADDR yGMAddr{nullptr};
@@ -114,8 +112,8 @@ private:
 };
 
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::Init(Params const &params)
+__aicore__ inline void BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::Init(
+    Params const &params)
 {
     if ASCEND_IS_AIC {
         return;
@@ -142,18 +140,15 @@ BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARA
 }
 
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateNextProblem(
-    const ProblemShape &problemShape)
+__aicore__ inline void BlockEpilogueFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateNextProblem(const ProblemShape &problemShape)
 {
     n_ = Get<MNK_N>(problemShape);
 }
 
-
 GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
-    const BlockCoord &baseOffset)
+__aicore__ inline void BlockEpilogueFinalizeRouting<
+    GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(const BlockCoord &baseOffset)
 {
     if ASCEND_IS_AIV {
         logitGlobal_.SetGlobalBuffer((__gm__ float *)params_->logitGmAddr + Get<LOGIT_INDEX>(baseOffset));

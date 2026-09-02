@@ -76,13 +76,9 @@ class KernelGmmSwiGluMixOnlineDynamic<
     ProblemShape_, BlockMmadBuilder_, BlockEpilogue_, BlockScheduler_,
     AscendC::Std::enable_if_t<AscendC::Std::is_same_v<BlockScheduler_, GroupedMatmulAswtWithTailSplitScheduler>>> {
 public:
-    __aicore__ inline KernelGmmSwiGluMixOnlineDynamic()
-    {
-    }
+    __aicore__ inline KernelGmmSwiGluMixOnlineDynamic() {}
 
-    __aicore__ inline ~KernelGmmSwiGluMixOnlineDynamic()
-    {
-    }
+    __aicore__ inline ~KernelGmmSwiGluMixOnlineDynamic() {}
 
     using BlockEpilogue = BlockEpilogue_;
     using BlockMmadBuilder = BlockMmadBuilder_;
@@ -150,15 +146,16 @@ public:
         int32_t baseK;
         uint8_t isMxWeightNzMultiTensor;
         const TCubeTiling *__restrict matmulTiling;
-        __aicore__ GMMTiling()
-        {
-        }
+        __aicore__ GMMTiling() {}
         __aicore__ GMMTiling(uint32_t groupNum_, uint8_t groupListType_, int32_t baseM_, int32_t baseN_, int32_t baseK_,
                              uint8_t isMxWeightNzMultiTensor_ = 0)
-            : groupNum(groupNum_), groupListType(groupListType_), baseM(baseM_), baseN(baseN_), baseK(baseK_),
+            : groupNum(groupNum_),
+              groupListType(groupListType_),
+              baseM(baseM_),
+              baseN(baseN_),
+              baseK(baseK_),
               isMxWeightNzMultiTensor(isMxWeightNzMultiTensor_)
-        {
-        }
+        {}
     };
 
     struct Arguments {

@@ -81,7 +81,6 @@ TILING_DATA_FIELD_DEF_STRUCT(GatherOutComputeTilingData, srcToDstComputeParamsOp
 TILING_DATA_FIELD_DEF_STRUCT(GatherOutComputeTilingData, gatherOutComputeParamsOp);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(MoeInitRouting, MoeInitRoutingTilingData)
-struct MoeInitRoutingCompileInfo {
-};
+struct MoeInitRoutingCompileInfo {};
 } // namespace optiling
 #endif // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INIT_ROUTING_H

@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- /*!
+/*!
  * \file grouped_matmul_utils.h
  * \brief GroupedMatmul 测试工具.
  */
@@ -45,48 +45,48 @@ namespace gmmTestUtils {
 #define GROUPED_MATMUL_CUBE_ONLY 0
 #define GROUPED_MATMUL_AIV_AIC_RATIO_1 1
 #define GROUPED_MATMUL_AIV_AIC_RATIO_2 2
-    inline uint64_t GMMEncodeTilingKey(int xDtype, int weightDtype, int yDtype, int transX, int transWeight,
-                                int groupListType, int isStaticTilingApi, int a8w4KernelTemplate,
-                                int a16w8KernelTemplate, int aivAicRatio, bool isEnableFixedAxis) {
-        uint64_t value = 0;
-        int shift = 0;
+inline uint64_t GMMEncodeTilingKey(int xDtype, int weightDtype, int yDtype, int transX, int transWeight,
+                                   int groupListType, int isStaticTilingApi, int a8w4KernelTemplate,
+                                   int a16w8KernelTemplate, int aivAicRatio, bool isEnableFixedAxis)
+{
+    uint64_t value = 0;
+    int shift = 0;
 
-        value |= (uint64_t)(xDtype & 0xFF) << shift;
-        shift += 8;
+    value |= (uint64_t)(xDtype & 0xFF) << shift;
+    shift += 8;
 
-        value |= (uint64_t)(weightDtype & 0xFF) << shift;
-        shift += 8;
+    value |= (uint64_t)(weightDtype & 0xFF) << shift;
+    shift += 8;
 
-        value |= (uint64_t)(yDtype & 0xFF) << shift;
-        shift += 8;
+    value |= (uint64_t)(yDtype & 0xFF) << shift;
+    shift += 8;
 
-        value |= (uint64_t)(transX & 0x1) << shift;
-        shift += 1;
+    value |= (uint64_t)(transX & 0x1) << shift;
+    shift += 1;
 
-        value |= (uint64_t)(transWeight & 0x1) << shift;
-        shift += 1;
+    value |= (uint64_t)(transWeight & 0x1) << shift;
+    shift += 1;
 
-        value |= (uint64_t)(groupListType & 0x3) << shift;
-        shift += 2;
+    value |= (uint64_t)(groupListType & 0x3) << shift;
+    shift += 2;
 
-        value |= (uint64_t)(isStaticTilingApi & 0x1) << shift;
-        shift += 1;
+    value |= (uint64_t)(isStaticTilingApi & 0x1) << shift;
+    shift += 1;
 
-        value |= (uint64_t)(a8w4KernelTemplate & 0xF) << shift;
-        shift += 4;
+    value |= (uint64_t)(a8w4KernelTemplate & 0xF) << shift;
+    shift += 4;
 
-        value |= (uint64_t)(a16w8KernelTemplate & 0x3) << shift;
-        shift += 2;
+    value |= (uint64_t)(a16w8KernelTemplate & 0x3) << shift;
+    shift += 2;
 
-        value |= (uint64_t)(aivAicRatio & 0x3) << shift;
-        shift += 2;
+    value |= (uint64_t)(aivAicRatio & 0x3) << shift;
+    shift += 2;
 
-        value |= (uint64_t)(isEnableFixedAxis & 0x1) << shift;
-        shift += 1;
+    value |= (uint64_t)(isEnableFixedAxis & 0x1) << shift;
+    shift += 1;
 
-        return value;
-    }
-
-
+    return value;
 }
+
+} // namespace gmmTestUtils
 #endif // UTEST_GROUPED_MATMUL_UTILS_H

@@ -21,21 +21,20 @@
 namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;
 
-class MoeV2SrcToDstOpSimt
-{
+class MoeV2SrcToDstOpSimt {
 public:
     __aicore__ inline MoeV2SrcToDstOpSimt(){};
     template <typename TilingData>
-    __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR expandDstToSrcRow, const TilingData* tilingData);
+    __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR expandDstToSrcRow, const TilingData *tilingData);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void SyncAll();
 
 private:
-    __gm__ int32_t* expandDstToSrcRowGm_;
-    __gm__ int32_t* expandedRowIdxGm_;
-    const InnerMoeV2GatherOutComputeTilingData* srcToDstTilingData_;
+    __gm__ int32_t *expandDstToSrcRowGm_;
+    __gm__ int32_t *expandedRowIdxGm_;
+    const InnerMoeV2GatherOutComputeTilingData *srcToDstTilingData_;
 
     int64_t coreNum_;
     int64_t blockIdx_;
@@ -55,8 +54,8 @@ __aicore__ inline void MoeV2SrcToDstOpSimt::SyncAll()
 }
 
 template <typename TilingData>
-__aicore__ inline void MoeV2SrcToDstOpSimt::Init(
-    GM_ADDR expandedRowIdx, GM_ADDR expandDstToSrcRow, const TilingData* tilingData)
+__aicore__ inline void MoeV2SrcToDstOpSimt::Init(GM_ADDR expandedRowIdx, GM_ADDR expandDstToSrcRow,
+                                                 const TilingData *tilingData)
 {
     this->blockIdx_ = GetBlockIdx();
     this->coreNum_ = tilingData->coreNum;
@@ -71,12 +70,13 @@ __aicore__ inline void MoeV2SrcToDstOpSimt::Init(
     startIndex_ = this->blockIdx_ * this->perCoreRows_;
     this->threadNum_ = THREAD_NUM < this->coreRows_ ? THREAD_NUM : this->coreRows_;
 
-    expandedRowIdxGm_ = (__gm__ int32_t*)expandedRowIdx;
-    expandDstToSrcRowGm_ = (__gm__ int32_t*)expandDstToSrcRow + Align(this->totalLength_, sizeof(int32_t));
+    expandedRowIdxGm_ = (__gm__ int32_t *)expandedRowIdx;
+    expandDstToSrcRowGm_ = (__gm__ int32_t *)expandDstToSrcRow + Align(this->totalLength_, sizeof(int32_t));
 }
 
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ComputeSimt(
-    int64_t coreRows, int64_t startIndex, __gm__ int32_t* expandDstToSrcRowGm, __gm__ int32_t* expandedRowIdxGm)
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ComputeSimt(int64_t coreRows, int64_t startIndex,
+                                                                        __gm__ int32_t *expandDstToSrcRowGm,
+                                                                        __gm__ int32_t *expandedRowIdxGm)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
          index += static_cast<int32_t>(blockDim.x)) {
@@ -89,9 +89,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ComputeSimt(
 __aicore__ inline void MoeV2SrcToDstOpSimt::Process()
 {
     if (this->blockIdx_ < this->srcToDstTilingData_->needCoreNum) {
-        asc_vf_call<ComputeSimt>(
-            dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_, this->startIndex_,
-            expandDstToSrcRowGm_, expandedRowIdxGm_);
+        asc_vf_call<ComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_,
+                                 this->startIndex_, expandDstToSrcRowGm_, expandedRowIdxGm_);
     }
     this->SyncAll();
 }

@@ -48,20 +48,20 @@ inline void InitGroupedMatmulAddTilingData(uint8_t *tiling, GroupedMatmulAddTili
 }
 #endif
 
-#define COPY_ARR(arrA, arrB, count)                                                                                    \
-    for (uint16_t i = 0; i < count; i++) {                                                                             \
-        arrA[i] = arrB[i];                                                                                             \
+#define COPY_ARR(arrA, arrB, count) \
+    for (uint16_t i = 0; i < count; i++) { \
+        arrA[i] = arrB[i]; \
     }
 
-#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                            \
-    __ubuf__ tilingStruct *tilingDataPointer =                                                                         \
+#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
+    __ubuf__ tilingStruct *tilingDataPointer = \
         reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
-#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                               \
+#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                                                     \
-    GroupedMatmulAddTilingData tilingData;                                                                             \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    GroupedMatmulAddTilingData tilingData; \
     InitGroupedMatmulAddTilingData(tilingPointer, &tilingData)
 
 #endif

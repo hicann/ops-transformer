@@ -21,13 +21,11 @@ namespace MoeFinalizeRoutingV2Grad {
 using namespace AscendC;
 
 template <typename T1, typename T2>
-class MoeFinalizeRoutingV2GradWithoutScaleNotCutH : public MoeFinalizeRoutingV2GradBase<T1, T2>
-{
+class MoeFinalizeRoutingV2GradWithoutScaleNotCutH : public MoeFinalizeRoutingV2GradBase<T1, T2> {
 public:
     __aicore__ inline MoeFinalizeRoutingV2GradWithoutScaleNotCutH(){};
-    __aicore__ inline void Init(
-        GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, GM_ADDR workspace,
-        const MoeFinalizeRoutingV2GradTilingData* tilingData, TPipe* pipe);
+    __aicore__ inline void Init(GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, GM_ADDR workspace,
+                                const MoeFinalizeRoutingV2GradTilingData *tilingData, TPipe *pipe);
     __aicore__ inline void Process();
 
 private:
@@ -38,7 +36,7 @@ private:
 template <typename T1, typename T2>
 __aicore__ inline void MoeFinalizeRoutingV2GradWithoutScaleNotCutH<T1, T2>::Init(
     GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, GM_ADDR workspace,
-    const MoeFinalizeRoutingV2GradTilingData* tilingData, TPipe* pipe)
+    const MoeFinalizeRoutingV2GradTilingData *tilingData, TPipe *pipe)
 {
     this->SubInit(gradY, expandedRowIdx, gradExpandedX, tilingData, pipe);
     if (this->tilingData_->dropPadMode == 1) {

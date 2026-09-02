@@ -28,9 +28,9 @@ template <typename T>
 class MoeV3GatherOutMxFp4 {
 public:
     __aicore__ inline MoeV3GatherOutMxFp4(){};
-    __aicore__ inline void Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx,
-                                GM_ADDR expandedX, GM_ADDR expandedScale,
-                                const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
+                                GM_ADDR expandedScale, const MoeInitRoutingV3Arch35TilingData *tilingData,
+                                TPipe *tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyExpertIn(int64_t curExpertLoopOffset, int64_t curLoopElements);
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols);
@@ -102,8 +102,9 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::InitBasicParams(GM_ADDR workspace
     lastLoopCols_ = tilingData->gatherOutComputeParamsOp.lastLoopCols;
 
     actualExpertNum_ = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 +
-                                         Align(actualExpertNum_, sizeof(int32_t)), 1);
+    expertTotalCountGm_.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
+        1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
         expertTotalCountGm_);
     expertTotalCount_ = expertTotalCountGm_.GetValue(0);
@@ -128,16 +129,17 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::InitBasicParams(GM_ADDR workspace
 
 template <typename T>
 __aicore__ inline void MoeV3GatherOutMxFp4<T>::Init(GM_ADDR x, GM_ADDR scale, GM_ADDR workspace, GM_ADDR expandedRowIdx,
-                                             GM_ADDR expandedX, GM_ADDR expandedScale,
-                                             const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                                    GM_ADDR expandedX, GM_ADDR expandedScale,
+                                                    const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
 {
     InitBasicParams(workspace, tilingData, tPipe);
     xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t *)x, n_ * cols_ / NUM_TWO);
     xGscaleGm_.SetGlobalBuffer((__gm__ uint8_t *)scale, n_ * cols_ / SCALE_FACTOR_WITH_X);
     expandedXGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_ / NUM_TWO,
                                  curCoreIndicesElements_ * cols_ / NUM_TWO);
-    expandedScaleGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedScale + blockIdx_ * perCoreIndicesElements_ * cols_ /
-                                     SCALE_FACTOR_WITH_X, curCoreIndicesElements_ * cols_ / SCALE_FACTOR_WITH_X);
+    expandedScaleGm_.SetGlobalBuffer(
+        (__gm__ uint8_t *)expandedScale + blockIdx_ * perCoreIndicesElements_ * cols_ / SCALE_FACTOR_WITH_X,
+        curCoreIndicesElements_ * cols_ / SCALE_FACTOR_WITH_X);
 
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_OUT_BUFFER_NUM,
                       AlignBytes(curCorePerLoopIndicesElements_, sizeof(int32_t)));
@@ -152,9 +154,9 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::Init(GM_ADDR x, GM_ADDR scale, GM
         expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                           Align(curCoreIndicesElements_, sizeof(int32_t)));
     } else {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) +
-                                          blockIdx_ * perCoreIndicesElements_,
-                                          Align(curCoreIndicesElements_, sizeof(int32_t)));
+        expandedRowIdxGm_.SetGlobalBuffer(
+            (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+            Align(curCoreIndicesElements_, sizeof(int32_t)));
     }
 }
 
@@ -172,9 +174,8 @@ template <typename T>
 __aicore__ inline void MoeV3GatherOutMxFp4<T>::CopyXIn(int64_t xSrcOffset, int64_t curLoopCols)
 {
     LocalTensor<uint8_t> xLocal = xCopyInQueue_.AllocTensor<uint8_t>();
-    DataCopyExtParams copyParams0{static_cast<uint16_t>(1),
-                                  static_cast<uint32_t>(curLoopCols * sizeof(uint8_t)),
-                                  0, 0, 0};
+    DataCopyExtParams copyParams0{static_cast<uint16_t>(1), static_cast<uint32_t>(curLoopCols * sizeof(uint8_t)), 0, 0,
+                                  0};
     DataCopyPadExtParams<uint8_t> padParams0{false, 0, 0, 0};
     DataCopyPad(xLocal, xUint8tGm_[xSrcOffset], copyParams0, padParams0);
     xCopyInQueue_.EnQue(xLocal);
@@ -193,9 +194,8 @@ template <typename T>
 __aicore__ inline void MoeV3GatherOutMxFp4<T>::CopyScaleIn(int64_t scaleSrcOffset, int64_t curLoopCols)
 {
     LocalTensor<uint8_t> scaleLocal = scaleCopyInQueue_.AllocTensor<uint8_t>();
-    DataCopyExtParams copyParams1{static_cast<uint16_t>(1),
-                                  static_cast<uint32_t>(curLoopCols * sizeof(uint8_t)),
-                                  0, 0, 0};
+    DataCopyExtParams copyParams1{static_cast<uint16_t>(1), static_cast<uint32_t>(curLoopCols * sizeof(uint8_t)), 0, 0,
+                                  0};
     DataCopyPadExtParams<uint8_t> padParams1{false, 0, 0, 0};
     DataCopyPad(scaleLocal, xGscaleGm_[scaleSrcOffset], copyParams1, padParams1);
     scaleCopyInQueue_.EnQue(scaleLocal);

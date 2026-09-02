@@ -112,13 +112,25 @@ __aicore__ inline void GmmsqSetWaitFlag()
 // These barriers protect GM workspace stages shared by all cube and vector cores.
 // A paired CrossCoreSetFlag/CrossCoreWaitFlag only models one producer-consumer edge,
 // so it is not equivalent until the workspace is partitioned into per-producer slots.
-__aicore__ inline void GmmsqAllCoreCubeVecStageBarrier() { SyncAll<false>(); }
+__aicore__ inline void GmmsqAllCoreCubeVecStageBarrier()
+{
+    SyncAll<false>();
+}
 
-__aicore__ inline void GmmsqAllCoreWorkspaceReuseBarrier() { SyncAll<false>(); }
+__aicore__ inline void GmmsqAllCoreWorkspaceReuseBarrier()
+{
+    SyncAll<false>();
+}
 
-__aicore__ inline void GmmsqAllCorePipelineStageBarrier() { SyncAll<false>(); }
+__aicore__ inline void GmmsqAllCorePipelineStageBarrier()
+{
+    SyncAll<false>();
+}
 
-__aicore__ inline void GmmsqAllCorePipelineWorkspaceBarrier() { SyncAll<true>(); }
+__aicore__ inline void GmmsqAllCorePipelineWorkspaceBarrier()
+{
+    SyncAll<true>();
+}
 
 template <class AT_, class BT_, class CT_>
 struct MMImplTypeStatic {

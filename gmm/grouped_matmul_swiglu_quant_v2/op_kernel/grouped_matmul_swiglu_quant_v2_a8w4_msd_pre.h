@@ -74,9 +74,8 @@ private:
     uint32_t groupNum{0};
 };
 
-__aicore__ inline void
-GMMA8W4PreProcess::Init(const GMAddrParams gmAddrParams,
-                        const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN)
+__aicore__ inline void GMMA8W4PreProcess::Init(
+    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN)
 {
     if ASCEND_IS_AIV {
         xGM.SetGlobalBuffer((__gm__ int8_t *)gmAddrParams.xGM);
@@ -95,13 +94,12 @@ __aicore__ inline void GMMA8W4PreProcess::CustomInitBuffer(TPipe *pipe)
     pipe->InitBuffer(vecInQueueX, BUFFER_NUM_A8W4_PRE, vK * sizeof(int8_t));    // K * 1B
     pipe->InitBuffer(vecOutQueueA1, BUFFER_NUM_A8W4_PRE, vK * sizeof(int4b_t)); // K * 0.5B
     pipe->InitBuffer(vecOutQueueA2, BUFFER_NUM_A8W4_PRE, vK * sizeof(int4b_t)); // K * 0.5B
-    pipe->InitBuffer(vecOutQueueA3, BUFFER_NUM_A8W4_PRE, vK * SIZE_OF_HALF_2);    // K * 2B
+    pipe->InitBuffer(vecOutQueueA3, BUFFER_NUM_A8W4_PRE, vK * SIZE_OF_HALF_2);  // K * 2B
     // xLowHalfTensor, xLowHalfTensor2 and xHighFloatTensor share the same buffer
     pipe->InitBuffer(tempBuff, vK * sizeof(float)); // K * 4B
     constexpr int BUFFER_SIZE_256B = 128 * sizeof(int16_t);
     pipe->InitBuffer(vecOutQueue0F, BUFFER_NUM_A8W4_PRE, BUFFER_SIZE_256B); // 256B
 }
-
 
 __aicore__ inline void GMMA8W4PreProcess::CalculateTaskInfoEachCore(uint32_t &curCoreTaskNum_,
                                                                     uint32_t &curCoreStartOffset_)

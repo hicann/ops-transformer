@@ -25,16 +25,14 @@ struct SizeOfBits {
 
 /// Returns the number of bytes required to hold a specified number of bits
 template <typename ReturnType = size_t, typename T>
-CATLASS_HOST_DEVICE
-constexpr ReturnType BitsToBytes(T bits) 
+CATLASS_HOST_DEVICE constexpr ReturnType BitsToBytes(T bits)
 {
     return (static_cast<ReturnType>(bits) + static_cast<ReturnType>(7)) / static_cast<ReturnType>(8);
 }
 
 /// Returns the number of bits required to hold a specified number of bytes
 template <typename ReturnType = size_t, typename T>
-CATLASS_HOST_DEVICE
-constexpr ReturnType BytesToBits(T bytes) 
+CATLASS_HOST_DEVICE constexpr ReturnType BytesToBits(T bytes)
 {
     return static_cast<ReturnType>(bytes) * static_cast<ReturnType>(8);
 }

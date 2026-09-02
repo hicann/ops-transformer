@@ -40,13 +40,13 @@ using WeightQuantBatchMatmulV2::Arch35::WqmmConfig;
 using GMMFRTiling = GMMFinalizeRoutingArch35Tiling::GMMFinalizeRoutingWeightQuantTilingData;
 
 namespace GROUPED_MATMUL_FINALIZE_ROUTING {
-#define GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM                                                          \
-    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType,                         \
-              typename perTokenScaleType, typename biasType, typename yType, typename sharedInputDType,                \
-              typename logitsType, typename rowIndexType, bool hasBias, const WqmmConfig &wqmmConfig,                  \
+#define GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM \
+    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType, \
+              typename perTokenScaleType, typename biasType, typename yType, typename sharedInputDType, \
+              typename logitsType, typename rowIndexType, bool hasBias, const WqmmConfig &wqmmConfig, \
               const VecAntiQuantConfig &vecConfig>
 
-#define GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS                                                                   \
+#define GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS \
     GMMFRWeightQuantResplitController<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType, \
                                       sharedInputDType, logitsType, rowIndexType, hasBias, wqmmConfig, vecConfig>
 
@@ -98,11 +98,10 @@ private:
 };
 
 GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR bias,
-                                                   GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR logitsAddr,
-                                                   GM_ADDR rowIndexAddr, GM_ADDR y, GM_ADDR shareInput,
-                                                   const GMMFinalizeRoutingWeightQuantTilingData *__restrict baseTiling)
+__aicore__ inline void GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::Init(
+    GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR bias, GM_ADDR groupList, GM_ADDR perTokenScale,
+    GM_ADDR logitsAddr, GM_ADDR rowIndexAddr, GM_ADDR y, GM_ADDR shareInput,
+    const GMMFinalizeRoutingWeightQuantTilingData *__restrict baseTiling)
 {
     tiling_ = baseTiling;
 
@@ -277,8 +276,8 @@ __aicore__ inline uint64_t GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::GetSpli
 }
 
 GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_TEMPLATE_PARAM
-__aicore__ inline uint64_t
-GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::GetSwitchedProcessId(const BasicBlockControlParam &ctrlParam)
+__aicore__ inline uint64_t GMM_FR_WEIGHT_QUANT_RESPLIT_CONTROLLER_CLASS::GetSwitchedProcessId(
+    const BasicBlockControlParam &ctrlParam)
 {
     return 1 - ctrlParam.processId;
 }

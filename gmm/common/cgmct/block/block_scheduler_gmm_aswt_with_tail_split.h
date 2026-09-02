@@ -70,9 +70,10 @@ private:
 
 public:
     __aicore__ inline BlockSchedulerGmmAswtWithTailSplit(int32_t baseM, int32_t baseN, int32_t baseK)
-        : baseM_(baseM), baseN_(baseN), baseK_(baseK)
-    {
-    }
+        : baseM_(baseM),
+          baseN_(baseN),
+          baseK_(baseK)
+    {}
 
     __aicore__ inline void UpdateNextProblem(const TupleShape &problemShape)
     {

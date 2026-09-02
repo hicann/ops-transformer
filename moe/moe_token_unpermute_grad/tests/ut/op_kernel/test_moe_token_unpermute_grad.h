@@ -24,13 +24,13 @@
 #define ORIG_DTYPE_START DT_BF16
 #define __CCE_UT_TEST__
 
-inline void InitMoeTokenUnpermuteGradTilingData(uint8_t* tiling, MoeTokenUnpermuteGradTilingData* const_data)
+inline void InitMoeTokenUnpermuteGradTilingData(uint8_t *tiling, MoeTokenUnpermuteGradTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteGradTilingData));
 }
 #define DTYPE_PERMUTED_TOKENS bfloat16_t
 #define DTYPE_PROBS float
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-    MoeTokenUnpermuteGradTilingData tilingData;    \
+    MoeTokenUnpermuteGradTilingData tilingData; \
     InitMoeTokenUnpermuteGradTilingData(tilingPointer, &tilingData)
 #endif

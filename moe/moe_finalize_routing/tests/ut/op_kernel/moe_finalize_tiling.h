@@ -17,36 +17,36 @@
 #pragma pack()
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-  __ubuf__ tilingStruct* tilingDataPointer =                                \
-      reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
+    __ubuf__ tilingStruct *tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-  CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
+    CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                           \
-  MoeFinalizeRoutingTilingData tilingData;                                               \
-  INIT_TILING_DATA(MoeFinalizeRoutingTilingData, tilingDataPointer, tilingPointer);      \
-  (tilingData).totalCoreNum = tilingDataPointer->totalCoreNum;  \
-  (tilingData).usedCoreNum = tilingDataPointer->usedCoreNum;  \
-  (tilingData).biasRowNum = tilingDataPointer->biasRowNum;     \
-  (tilingData).totalRowNum = tilingDataPointer->totalRowNum;     \
-  (tilingData).H = tilingDataPointer->H;          \
-  (tilingData).K = tilingDataPointer->K;     \
-  (tilingData).normalCoreHandleNum = tilingDataPointer->normalCoreHandleNum;    \
-  (tilingData).normalCoreLoopNum = tilingDataPointer->normalCoreLoopNum;     \
-  (tilingData).normalCoreHandleNumPerLoop = tilingDataPointer->normalCoreHandleNumPerLoop;    \
-  (tilingData).normalCoreHandleNumTailLoop = tilingDataPointer->normalCoreHandleNumTailLoop;   \
-  (tilingData).tailCoreHandleNum = tilingDataPointer->tailCoreHandleNum;     \
-  (tilingData).tailCoreLoopNum = tilingDataPointer->tailCoreLoopNum;    \
-  (tilingData).tailCoreHandleNumPerLoop = tilingDataPointer->tailCoreHandleNumPerLoop;     \
-  (tilingData).tailCoreHandleNumTailLoop = tilingDataPointer->tailCoreHandleNumTailLoop;   \
-  (tilingData).tilingKey = tilingDataPointer->tilingKey; \
-  (tilingData).skip2IsNull = tilingDataPointer->skip2IsNull; \
-  (tilingData).normalH = tilingDataPointer->normalH; \
-  (tilingData).unnormalH = tilingDataPointer->unnormalH; \
-  (tilingData).hSliceNum = tilingDataPointer->hSliceNum; \
-  (tilingData).normalK = tilingDataPointer->normalK; \
-  (tilingData).unnormalK = tilingDataPointer->unnormalK; \
-  (tilingData).kSliceNum = tilingDataPointer->kSliceNum; 
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    MoeFinalizeRoutingTilingData tilingData; \
+    INIT_TILING_DATA(MoeFinalizeRoutingTilingData, tilingDataPointer, tilingPointer); \
+    (tilingData).totalCoreNum = tilingDataPointer->totalCoreNum; \
+    (tilingData).usedCoreNum = tilingDataPointer->usedCoreNum; \
+    (tilingData).biasRowNum = tilingDataPointer->biasRowNum; \
+    (tilingData).totalRowNum = tilingDataPointer->totalRowNum; \
+    (tilingData).H = tilingDataPointer->H; \
+    (tilingData).K = tilingDataPointer->K; \
+    (tilingData).normalCoreHandleNum = tilingDataPointer->normalCoreHandleNum; \
+    (tilingData).normalCoreLoopNum = tilingDataPointer->normalCoreLoopNum; \
+    (tilingData).normalCoreHandleNumPerLoop = tilingDataPointer->normalCoreHandleNumPerLoop; \
+    (tilingData).normalCoreHandleNumTailLoop = tilingDataPointer->normalCoreHandleNumTailLoop; \
+    (tilingData).tailCoreHandleNum = tilingDataPointer->tailCoreHandleNum; \
+    (tilingData).tailCoreLoopNum = tilingDataPointer->tailCoreLoopNum; \
+    (tilingData).tailCoreHandleNumPerLoop = tilingDataPointer->tailCoreHandleNumPerLoop; \
+    (tilingData).tailCoreHandleNumTailLoop = tilingDataPointer->tailCoreHandleNumTailLoop; \
+    (tilingData).tilingKey = tilingDataPointer->tilingKey; \
+    (tilingData).skip2IsNull = tilingDataPointer->skip2IsNull; \
+    (tilingData).normalH = tilingDataPointer->normalH; \
+    (tilingData).unnormalH = tilingDataPointer->unnormalH; \
+    (tilingData).hSliceNum = tilingDataPointer->hSliceNum; \
+    (tilingData).normalK = tilingDataPointer->normalK; \
+    (tilingData).unnormalK = tilingDataPointer->unnormalK; \
+    (tilingData).kSliceNum = tilingDataPointer->kSliceNum;
 
 #endif // UT_MOE_FINALIZE_ROUTING_TILING_H_

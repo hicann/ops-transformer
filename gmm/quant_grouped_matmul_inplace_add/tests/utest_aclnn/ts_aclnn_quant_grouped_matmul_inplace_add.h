@@ -26,6 +26,6 @@ using AclnnQGMMInplaceAddParam = ops::adv::tests::quant_grouped_matmul_inplace_a
 
 namespace qgmmInplaceAddTestParam {
 class Ts_Aclnn_QGMMInplaceAdd_WithParam_Ascend910_9591 : public Ts_WithParam_Ascend910_9591<AclnnQGMMInplaceAddCase> {};
-}  // namespace gmmTestParam
+} // namespace qgmmInplaceAddTestParam
 
-#endif  // UTEST_TS_QGMM_INPLACE_ADD_H
+#endif // UTEST_TS_QGMM_INPLACE_ADD_H

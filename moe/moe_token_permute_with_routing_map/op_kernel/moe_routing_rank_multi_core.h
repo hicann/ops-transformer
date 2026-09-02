@@ -31,19 +31,18 @@ class MoeRoutingRankMultiCore {
 public:
     __aicore__ inline MoeRoutingRankMultiCore() {}
 
-    __aicore__ inline void Init(
-        GM_ADDR routingMap, GM_ADDR workspace, const MaskedSelectRMTilingData* maskedSelectTilingData,
-        int64_t numExperts, int64_t topKIn, TPipe* tPipeIn);
+    __aicore__ inline void Init(GM_ADDR routingMap, GM_ADDR workspace,
+                                const MaskedSelectRMTilingData *maskedSelectTilingData, int64_t numExperts,
+                                int64_t topKIn, TPipe *tPipeIn);
 
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline int64_t GetExpertStart() const;
     __aicore__ inline int64_t GetExpertCount() const;
-    __aicore__ inline void GetTokenTileParams(
-        int64_t tileIdx, int64_t& tokenStart, int64_t& tileLen) const;
-    __aicore__ inline void CastMaskRowToInt32(
-        const LocalTensor<int32_t>& maskInt32, const LocalTensor<uint8_t>& rowMask, int64_t tileLen);
+    __aicore__ inline void GetTokenTileParams(int64_t tileIdx, int64_t &tokenStart, int64_t &tileLen) const;
+    __aicore__ inline void CastMaskRowToInt32(const LocalTensor<int32_t> &maskInt32,
+                                              const LocalTensor<uint8_t> &rowMask, int64_t tileLen);
     __aicore__ inline void CopyInMaskRow(int64_t gmOffset, int64_t tileLen);
     __aicore__ inline void CopyInPartial(int64_t coreId, int64_t tokenStart, int64_t tileLen);
     __aicore__ inline void ComputeAccumulateMask(int64_t tileLen);
@@ -57,7 +56,7 @@ private:
     __aicore__ inline void BuildSortPosition();
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
     TQue<QuePosition::VECIN, 1> inQueueMask;
     TQue<QuePosition::VECIN, 1> inQueueInt32;
     TQue<QuePosition::VECOUT, 1> outQueueInt32;
@@ -121,15 +120,15 @@ __aicore__ inline int64_t MoeRoutingRankMultiCore::GetExpertCount() const
     return expertsPerTail;
 }
 
-__aicore__ inline void MoeRoutingRankMultiCore::GetTokenTileParams(
-    int64_t tileIdx, int64_t& tokenStart, int64_t& tileLen) const
+__aicore__ inline void MoeRoutingRankMultiCore::GetTokenTileParams(int64_t tileIdx, int64_t &tokenStart,
+                                                                   int64_t &tileLen) const
 {
     tokenStart = tileIdx * tokenTileLength;
     tileLen = (tileIdx == tokenTileNum - 1) ? lastTokenTileLength : tokenTileLength;
 }
 
-__aicore__ inline void MoeRoutingRankMultiCore::CastMaskRowToInt32(
-    const LocalTensor<int32_t>& maskInt32, const LocalTensor<uint8_t>& rowMask, int64_t tileLen)
+__aicore__ inline void MoeRoutingRankMultiCore::CastMaskRowToInt32(const LocalTensor<int32_t> &maskInt32,
+                                                                   const LocalTensor<uint8_t> &rowMask, int64_t tileLen)
 {
     LocalTensor<half> maskHalf = maskCastHalfBuf.Get<half>();
     LocalTensor<float> maskFloat = maskFloatBuf.Get<float>();
@@ -229,9 +228,9 @@ __aicore__ inline void MoeRoutingRankMultiCore::CopyOutSortRow(int64_t gmOffset,
     outQueueInt32.FreeTensor(sortRow);
 }
 
-__aicore__ inline void MoeRoutingRankMultiCore::Init(
-    GM_ADDR routingMap, GM_ADDR workspace, const MaskedSelectRMTilingData* maskedSelectTilingData,
-    int64_t numExpertsIn, int64_t topKIn, TPipe* tPipeIn)
+__aicore__ inline void MoeRoutingRankMultiCore::Init(GM_ADDR routingMap, GM_ADDR workspace,
+                                                     const MaskedSelectRMTilingData *maskedSelectTilingData,
+                                                     int64_t numExpertsIn, int64_t topKIn, TPipe *tPipeIn)
 {
     pipe = tPipeIn;
     blockIdx = GetBlockIdx();
@@ -263,9 +262,9 @@ __aicore__ inline void MoeRoutingRankMultiCore::Init(
     partialOffset = Align(needCoreNum, sizeof(int32_t));
     sortPositionOffset = partialOffset + needCoreNum * numTokens;
 
-    maskGlobal.SetGlobalBuffer((__gm__ uint8_t*)routingMap, numExperts * numTokens);
-    partialGm.SetGlobalBuffer((__gm__ int32_t*)workspace + partialOffset, needCoreNum * numTokens);
-    sortPositionGm.SetGlobalBuffer((__gm__ int32_t*)workspace + sortPositionOffset, numExperts * numTokens);
+    maskGlobal.SetGlobalBuffer((__gm__ uint8_t *)routingMap, numExperts * numTokens);
+    partialGm.SetGlobalBuffer((__gm__ int32_t *)workspace + partialOffset, needCoreNum * numTokens);
+    sortPositionGm.SetGlobalBuffer((__gm__ int32_t *)workspace + sortPositionOffset, numExperts * numTokens);
 
     pipe->InitBuffer(inQueueMask, 1, calcLength);
     pipe->InitBuffer(inQueueInt32, 1, calcLength * sizeof(int32_t));
@@ -322,9 +321,8 @@ __aicore__ inline void MoeRoutingRankMultiCore::BuildSortPosition()
         }
 
         LocalTensor<int32_t> tokenBase = tokenBaseBuf.Get<int32_t>();
-        ArithProgressionSupportInt32<int32_t>(
-            tokenBase, static_cast<int32_t>(tokenStart * topK), static_cast<int32_t>(topK),
-            static_cast<int32_t>(tileLen));
+        ArithProgressionSupportInt32<int32_t>(tokenBase, static_cast<int32_t>(tokenStart * topK),
+                                              static_cast<int32_t>(topK), static_cast<int32_t>(tileLen));
         PipeBarrier<PIPE_V>();
 
         for (int64_t e = 0; e < expertCount; ++e) {

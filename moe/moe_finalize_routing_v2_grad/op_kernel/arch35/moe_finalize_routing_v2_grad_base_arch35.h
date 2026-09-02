@@ -28,29 +28,27 @@ constexpr uint32_t STRIDE = 8;
 constexpr uint32_t BLOCK_NUM_ONE_RPT = 8;
 
 template <typename T1, typename T2>
-class MoeFinalizeRoutingV2GradBase
-{
+class MoeFinalizeRoutingV2GradBase {
 public:
     __aicore__ inline MoeFinalizeRoutingV2GradBase(){};
 
 protected:
-    __aicore__ inline void SubInit(
-        GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX,
-        const MoeFinalizeRoutingV2GradTilingData* tilingData, TPipe* pipe);
+    __aicore__ inline void SubInit(GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX,
+                                   const MoeFinalizeRoutingV2GradTilingData *tilingData, TPipe *pipe);
     __aicore__ inline void GetInitOutBatches();
     __aicore__ inline void GetSubProcessBatches();
     __aicore__ inline void InitOutCutH();
     __aicore__ inline void InitOutNotCutH();
     __aicore__ inline void Mte3ToMte2();
     __aicore__ inline void WaitMte2ToVec();
-    __aicore__ inline void ReduceCalc(
-        LocalTensor<float>& inputUb, LocalTensor<float>& tempUb, int64_t innerLoopCopyNum);
+    __aicore__ inline void ReduceCalc(LocalTensor<float> &inputUb, LocalTensor<float> &tempUb,
+                                      int64_t innerLoopCopyNum);
     __aicore__ inline void CopyInWithBias(int64_t batchIdx, int64_t innerOffset, int64_t innerLoopCopyNum);
     __aicore__ inline void CopyInWithOutBias(int64_t batchIdx, int64_t innerOffset, int64_t innerLoopCopyNum);
-    __aicore__ inline void ComputeGradExpandedX(
-        LocalTensor<T1>& gradYUb, LocalTensor<T1>& tempUb, LocalTensor<T1>& gradExpandedXUb, int64_t innerLoopCopyNum);
-    __aicore__ inline void DoComputeOnlyWithBias(
-        LocalTensor<float>& gradYUb, LocalTensor<float>& biasUb, int64_t innerLoopCopyNum);
+    __aicore__ inline void ComputeGradExpandedX(LocalTensor<T1> &gradYUb, LocalTensor<T1> &tempUb,
+                                                LocalTensor<T1> &gradExpandedXUb, int64_t innerLoopCopyNum);
+    __aicore__ inline void DoComputeOnlyWithBias(LocalTensor<float> &gradYUb, LocalTensor<float> &biasUb,
+                                                 int64_t innerLoopCopyNum);
     __aicore__ inline void ComputeWithOutBias(int64_t innerOffset, int64_t innerLoopCopyNum);
     __aicore__ inline void ComputeWithBias(int64_t innerOffset, int64_t innerLoopCopyNum);
     __aicore__ inline void CopyOutGradScales(int64_t batchIdx);
@@ -67,9 +65,9 @@ protected:
     GlobalTensor<T1> gradExpandedXInitGm_;
     GlobalTensor<T1> gradScalesGm_;
 
-    const MoeFinalizeRoutingV2GradTilingData* tilingData_;
+    const MoeFinalizeRoutingV2GradTilingData *tilingData_;
 
-    TPipe* pipe_;
+    TPipe *pipe_;
     TQue<QuePosition::VECIN, 1> gradYInQueue_;
     TQue<QuePosition::VECIN, 1> expandedRowIdxInQueue_;
     TQue<QuePosition::VECIN, 1> expandedXInQueue_;
@@ -94,12 +92,12 @@ protected:
 
 template <typename T1, typename T2>
 __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::SubInit(
-    GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, const MoeFinalizeRoutingV2GradTilingData* tilingData,
-    TPipe* pipe)
+    GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR gradExpandedX, const MoeFinalizeRoutingV2GradTilingData *tilingData,
+    TPipe *pipe)
 {
-    gradYGm_.SetGlobalBuffer((__gm__ T1*)gradY);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ T2*)expandedRowIdx);
-    gradExpandedXGm_.SetGlobalBuffer((__gm__ T1*)gradExpandedX);
+    gradYGm_.SetGlobalBuffer((__gm__ T1 *)gradY);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ T2 *)expandedRowIdx);
+    gradExpandedXGm_.SetGlobalBuffer((__gm__ T1 *)gradExpandedX);
     tilingData_ = tilingData;
     pipe_ = pipe;
     blockIdx_ = GetBlockIdx();
@@ -181,8 +179,8 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::WaitMte2ToVec()
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyInWithBias(
-    int64_t batchIdx, int64_t innerOffset, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyInWithBias(int64_t batchIdx, int64_t innerOffset,
+                                                                            int64_t innerLoopCopyNum)
 {
     LocalTensor<T1> gradYUb = gradYInQueue_.template AllocTensor<T1>();
     LocalTensor<T2> expandedRowIdxUb = expandedRowIdxInQueue_.template AllocTensor<T2>();
@@ -223,8 +221,8 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyInWithBias(
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyInWithOutBias(
-    int64_t batchIdx, int64_t innerOffset, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyInWithOutBias(int64_t batchIdx, int64_t innerOffset,
+                                                                               int64_t innerLoopCopyNum)
 {
     LocalTensor<T1> gradYUb = gradYInQueue_.template AllocTensor<T1>();
     LocalTensor<T2> expandedRowIdxUb = expandedRowIdxInQueue_.template AllocTensor<T2>();
@@ -254,8 +252,10 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyInWithOutBias(
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeGradExpandedX(
-    LocalTensor<T1>& gradYUb, LocalTensor<T1>& tempUb, LocalTensor<T1>& gradExpandedXUb, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeGradExpandedX(LocalTensor<T1> &gradYUb,
+                                                                                  LocalTensor<T1> &tempUb,
+                                                                                  LocalTensor<T1> &gradExpandedXUb,
+                                                                                  int64_t innerLoopCopyNum)
 {
     auto gradYUbF32 = gradYUb.template ReinterpretCast<float>();
     auto tempUbF32 = tempUb.template ReinterpretCast<float>();
@@ -276,8 +276,9 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeGradExpanded
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ReduceCalc(
-    LocalTensor<float>& inputUb, LocalTensor<float>& tempUb, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ReduceCalc(LocalTensor<float> &inputUb,
+                                                                        LocalTensor<float> &tempUb,
+                                                                        int64_t innerLoopCopyNum)
 {
     int32_t repeat = innerLoopCopyNum / MASK_FLOAT_ONE_REPEAT;
     uint32_t modNum = innerLoopCopyNum % MASK_FLOAT_ONE_REPEAT;
@@ -288,17 +289,15 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ReduceCalc(
     if (maxRptNum != 0) {
         for (uint32_t rptIdx = 0; rptIdx < maxRptNum; rptIdx++) {
             offset = rptIdx * MAX_REPEAT * MASK_FLOAT_ONE_REPEAT;
-            BlockReduceSum<float>(
-                tempUb[rptIdx * MAX_REPEAT * BLOCK_NUM_ONE_RPT], inputUb[offset], MAX_REPEAT, MASK_FLOAT_ONE_REPEAT, 1,
-                1, STRIDE);
+            BlockReduceSum<float>(tempUb[rptIdx * MAX_REPEAT * BLOCK_NUM_ONE_RPT], inputUb[offset], MAX_REPEAT,
+                                  MASK_FLOAT_ONE_REPEAT, 1, 1, STRIDE);
         }
     }
 
     if (modRptNum != 0) {
         offset = maxRptNum * MAX_REPEAT * MASK_FLOAT_ONE_REPEAT;
-        BlockReduceSum<float>(
-            tempUb[maxRptNum * MAX_REPEAT * BLOCK_NUM_ONE_RPT], inputUb[offset], modRptNum, MASK_FLOAT_ONE_REPEAT, 1, 1,
-            STRIDE);
+        BlockReduceSum<float>(tempUb[maxRptNum * MAX_REPEAT * BLOCK_NUM_ONE_RPT], inputUb[offset], modRptNum,
+                              MASK_FLOAT_ONE_REPEAT, 1, 1, STRIDE);
     }
 
     if (modNum != 0) {
@@ -311,8 +310,8 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ReduceCalc(
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeWithOutBias(
-    int64_t innerOffset, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeWithOutBias(int64_t innerOffset,
+                                                                                int64_t innerLoopCopyNum)
 {
     LocalTensor<T1> gradYUb = gradYInQueue_.template DeQue<T1>();
     LocalTensor<T1> expandedXUb = expandedXInQueue_.template AllocTensor<T1>();
@@ -346,16 +345,17 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeWithOutBias(
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::DoComputeOnlyWithBias(
-    LocalTensor<float>& gradYUb, LocalTensor<float>& biasUb, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::DoComputeOnlyWithBias(LocalTensor<float> &gradYUb,
+                                                                                   LocalTensor<float> &biasUb,
+                                                                                   int64_t innerLoopCopyNum)
 {
     Mul(biasUb, biasUb, gradYUb, innerLoopCopyNum);
     ReduceCalc(biasUb, gradYUb, innerLoopCopyNum);
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeWithBias(
-    int64_t innerOffset, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::ComputeWithBias(int64_t innerOffset,
+                                                                             int64_t innerLoopCopyNum)
 {
     LocalTensor<T1> gradYUb = gradYInQueue_.template DeQue<T1>();
     LocalTensor<T1> expandedXUb = expandedXInQueue_.template AllocTensor<T1>();
@@ -425,8 +425,8 @@ __aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyOutGradScales(i
 }
 
 template <typename T1, typename T2>
-__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyOutGradExpandedX(
-    int64_t innerOffset, int64_t innerLoopCopyNum)
+__aicore__ inline void MoeFinalizeRoutingV2GradBase<T1, T2>::CopyOutGradExpandedX(int64_t innerOffset,
+                                                                                  int64_t innerLoopCopyNum)
 {
     LocalTensor<T1> gradExpandedXUb = gradExpandedXOutQueue_.template DeQue<T1>();
 

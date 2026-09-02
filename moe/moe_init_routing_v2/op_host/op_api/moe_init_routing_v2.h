@@ -20,11 +20,10 @@
 
 namespace l0op {
 const std::array<const aclTensor *, 4> MoeInitRoutingV2(
-    const aclTensor* x, const aclTensor* expert_idx,
-    int64_t active_num, int64_t expert_capacity, int64_t expert_num, int64_t drop_pad_mode,
-    int64_t expert_tokens_count_or_cumsum_flag, bool expert_tokens_before_capacity_flag,
-    const aclTensor* expanded_x_out, const aclTensor* expanded_row_idx_out,
-    const aclTensor* expert_tokens_count_or_cumsum_out, const aclTensor* expert_tokens_before_capacity_out,
+    const aclTensor *x, const aclTensor *expert_idx, int64_t active_num, int64_t expert_capacity, int64_t expert_num,
+    int64_t drop_pad_mode, int64_t expert_tokens_count_or_cumsum_flag, bool expert_tokens_before_capacity_flag,
+    const aclTensor *expanded_x_out, const aclTensor *expanded_row_idx_out,
+    const aclTensor *expert_tokens_count_or_cumsum_out, const aclTensor *expert_tokens_before_capacity_out,
     aclOpExecutor *executor);
 }
 

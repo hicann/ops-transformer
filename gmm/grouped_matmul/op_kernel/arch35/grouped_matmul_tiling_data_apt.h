@@ -177,11 +177,11 @@ struct GMMBaseParamsS4S4 {
     uint32_t baseM = 0;
     uint32_t baseN = 0;
     uint32_t baseK = 0;
-    uint32_t ubCalSize = 0;        // epilogue 单次计算元素数
-    uint32_t ubRestBytes = 0;      // 留给 prologue 的 UB (byte)
-    uint32_t quantGroupNum = 1;    // perchannel=1, pergroup=k/256
-    uint32_t singleN = 0;          // perchannel 动态分块
-    uint32_t isPerTokenQuant = 0;  // perTokenScale 是否存在
+    uint32_t ubCalSize = 0;       // epilogue 单次计算元素数
+    uint32_t ubRestBytes = 0;     // 留给 prologue 的 UB (byte)
+    uint32_t quantGroupNum = 1;   // perchannel=1, pergroup=k/256
+    uint32_t singleN = 0;         // perchannel 动态分块
+    uint32_t isPerTokenQuant = 0; // perTokenScale 是否存在
     uint32_t isS4S4Optimize = 0;
     int32_t groupType = 0;
     uint32_t groupListType = 0;

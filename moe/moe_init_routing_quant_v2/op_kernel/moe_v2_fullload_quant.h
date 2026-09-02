@@ -21,14 +21,12 @@ namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;
 
 template <typename T>
-class MoeV2FullLoadQuant : public MoeV2FullLoadQuantBase
-{
+class MoeV2FullLoadQuant : public MoeV2FullLoadQuantBase {
 public:
     __aicore__ inline MoeV2FullLoadQuant(){};
-    __aicore__ inline void Init(
-        GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-        GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData* tilingData,
-        TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX,
+                                GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
+                                const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -110,8 +108,8 @@ __aicore__ inline void MoeV2FullLoadQuant<T>::CopyOutX()
     int64_t endXRow = (curRowsStart + this->coreRows - 1) / this->k;
 
     uint32_t dstStride = (inFactor * sizeof(T) - AlignBytes(this->cols, sizeof(T))) / BLOCK_BYTES;
-    DataCopyExtParams dataXCopyParams{
-        static_cast<uint16_t>(endXRow - startXRow + 1), static_cast<uint32_t>(this->cols * sizeof(T)), 0, dstStride, 0};
+    DataCopyExtParams dataXCopyParams{static_cast<uint16_t>(endXRow - startXRow + 1),
+                                      static_cast<uint32_t>(this->cols * sizeof(T)), 0, dstStride, 0};
     DataCopyPadExtParams<T> dataXCopyPadParams{false, 0, 0, 0};
     DataCopyPad(xLocal, xGm[startXRow * this->cols], dataXCopyParams, dataXCopyPadParams);
     xCopyInQueue.EnQue(xLocal);
@@ -136,15 +134,15 @@ __aicore__ inline void MoeV2FullLoadQuant<T>::CopyOutX()
 }
 
 template <typename T>
-__aicore__ inline void MoeV2FullLoadQuant<T>::Init(
-    GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-    GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData* tilingData,
-    TPipe* tPipe)
+__aicore__ inline void MoeV2FullLoadQuant<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset,
+                                                   GM_ADDR expandedX, GM_ADDR expandedRowIdx,
+                                                   GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
+                                                   const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe)
 {
     this->InitBase(x, expertIdx, expandedX, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
-    xGm.SetGlobalBuffer((__gm__ T*)x);
-    scaleGm.SetGlobalBuffer((__gm__ float*)scale, 1);
-    offsetGm.SetGlobalBuffer((__gm__ float*)offset, 1);
+    xGm.SetGlobalBuffer((__gm__ T *)x);
+    scaleGm.SetGlobalBuffer((__gm__ float *)scale, 1);
+    offsetGm.SetGlobalBuffer((__gm__ float *)offset, 1);
     this->scale = scaleGm.GetValue(0);
     this->offset = offsetGm.GetValue(0);
 

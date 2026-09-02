@@ -35,8 +35,8 @@ using namespace WeightQuantBatchMatmulV2::Arch35;
 
 namespace GMMSQWeightQuant {
 
-#define GMMSQ_WQ_CUBE_COMPUTE_TEMPLATE_PARAM                                                                           \
-    template <typename xType, typename weightScaleType, typename xScaleType, typename yType,                           \
+#define GMMSQ_WQ_CUBE_COMPUTE_TEMPLATE_PARAM \
+    template <typename xType, typename weightScaleType, typename xScaleType, typename yType, \
               const WqmmConfig &wqmmConfig>
 
 #define GMMSQ_WQ_CUBE_COMPUTE_CLASS GMMSQWeightQuantCubeCompute<xType, weightScaleType, xScaleType, yType, wqmmConfig>

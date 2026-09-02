@@ -208,9 +208,8 @@ __aicore__ inline uint32_t MatMulCommonParam<aTrans, bTrans>::CalcBL1Offset(uint
 }
 
 template <bool aTrans, bool bTrans>
-__aicore__ inline void
-MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsA(AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset,
-                                                     bool isTailAL1)
+__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsA(
+    AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset, bool isTailAL1)
 {
     uint64_t currM = AscendC::Std::min(Get<MNK_M>(actualSingleShape_), Get<MNK_M>(l0Shape_));
     uint64_t currK =
@@ -232,9 +231,8 @@ MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsA(AscendC::LoadData2DParamsV2
 }
 
 template <bool aTrans, bool bTrans>
-__aicore__ inline void
-MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsB(AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset,
-                                                     bool isTailBL1)
+__aicore__ inline void MatMulCommonParam<aTrans, bTrans>::LoadData2dParamsB(
+    AscendC::LoadData2DParamsV2 &loadData2dParams, uint64_t kOffset, bool isTailBL1)
 {
     uint64_t currN = AscendC::Std::min(Get<MNK_N>(actualSingleShape_), Get<MNK_N>(l0Shape_));
     uint64_t currK =

@@ -15,56 +15,53 @@
 
 namespace Catlass {
 template <uint32_t ALIGN, typename T>
-CATLASS_HOST_DEVICE
-constexpr T RoundUp(const T &val)
+CATLASS_HOST_DEVICE constexpr T RoundUp(const T &val)
 {
     static_assert(ALIGN != 0, "ALIGN must not be 0");
     return (val + ALIGN - 1) / ALIGN * ALIGN;
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE
-constexpr auto RoundUp(T const &val, U const &align)
+CATLASS_HOST_DEVICE constexpr auto RoundUp(T const &val, U const &align)
 {
-	if (align == 0) return (val + align - 1);
+    if (align == 0)
+        return (val + align - 1);
     return (val + align - 1) / align * align;
 }
 
 template <uint32_t ALIGN, typename T>
-CATLASS_HOST_DEVICE
-constexpr T RoundDown(const T val)
+CATLASS_HOST_DEVICE constexpr T RoundDown(const T val)
 {
     static_assert(ALIGN != 0, "ALIGN must not be 0");
     return val / ALIGN * ALIGN;
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE
-constexpr auto RoundDown(T const &val, U const &align)
+CATLASS_HOST_DEVICE constexpr auto RoundDown(T const &val, U const &align)
 {
-	if (align == 0) return val;
+    if (align == 0)
+        return val;
     return val / align * align;
 }
 
 template <uint32_t DIVISOR, typename T>
-CATLASS_HOST_DEVICE
-constexpr T CeilDiv(const T dividend)
+CATLASS_HOST_DEVICE constexpr T CeilDiv(const T dividend)
 {
     static_assert(DIVISOR != 0, "DIVISOR must not be 0");
     return (dividend + DIVISOR - 1) / DIVISOR;
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE
-constexpr auto CeilDiv(T const &dividend, U const &divisor)
+CATLASS_HOST_DEVICE constexpr auto CeilDiv(T const &dividend, U const &divisor)
 {
-	if (divisor == 0) return (dividend + divisor - 1);
+    if (divisor == 0)
+        return (dividend + divisor - 1);
     return (dividend + divisor - 1) / divisor;
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE
-constexpr auto Max(T const &a, U const &b) {
+CATLASS_HOST_DEVICE constexpr auto Max(T const &a, U const &b)
+{
     if (a > b) {
         return a;
     } else {
@@ -73,13 +70,13 @@ constexpr auto Max(T const &a, U const &b) {
 }
 
 template <class T, class U>
-CATLASS_HOST_DEVICE
-constexpr auto Min(T const &a, U const &b) {
+CATLASS_HOST_DEVICE constexpr auto Min(T const &a, U const &b)
+{
     if (a < b) {
         return a;
     } else {
         return b;
     }
 }
-}
-#endif  // CATLASS_ALIGNMENT_HPP
+} // namespace Catlass
+#endif // CATLASS_ALIGNMENT_HPP

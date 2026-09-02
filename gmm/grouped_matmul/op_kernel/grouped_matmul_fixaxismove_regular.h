@@ -94,34 +94,39 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(uint32_t m_, uint32_t k_, uint32_t n_, uint32_t problemCount_, uint32_t workspaceStages_,
                GM_ADDR ptrGroupList_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrScale_, LayoutScale layoutScale_, GM_ADDR ptrPerTokenScale_,
                LayoutPerTokenScale layoutPerTokenScale_, GM_ADDR ptrD_, LayoutD layoutD_, GM_ADDR ptrWorkspace_)
-            : m(m_), k(k_), n(n_), problemCount(problemCount_), workspaceStages(workspaceStages_),
-              ptrGroupList(reinterpret_cast<__gm__ ElementGroupList *>(ptrGroupList_)), ptrA((ptrA_)),
-              layoutA(layoutA_), ptrB((ptrB_)), layoutB(layoutB_), ptrScale((ptrScale_)), layoutScale(layoutScale_),
+            : m(m_),
+              k(k_),
+              n(n_),
+              problemCount(problemCount_),
+              workspaceStages(workspaceStages_),
+              ptrGroupList(reinterpret_cast<__gm__ ElementGroupList *>(ptrGroupList_)),
+              ptrA((ptrA_)),
+              layoutA(layoutA_),
+              ptrB((ptrB_)),
+              layoutB(layoutB_),
+              ptrScale((ptrScale_)),
+              layoutScale(layoutScale_),
               ptrPerTokenScale(reinterpret_cast<__gm__ ElementPerTokenScale *>(ptrPerTokenScale_)),
-              layoutPerTokenScale(layoutPerTokenScale_), ptrD((ptrD_)), layoutD(layoutD_), ptrWorkspace(ptrWorkspace_)
-        {
-        }
+              layoutPerTokenScale(layoutPerTokenScale_),
+              ptrD((ptrD_)),
+              layoutD(layoutD_),
+              ptrWorkspace(ptrWorkspace_)
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    GroupedMatmulSliceMPerTokenDequantFixAxisMove()
-    {
-    }
+    GroupedMatmulSliceMPerTokenDequantFixAxisMove() {}
 
     CATLASS_DEVICE
-    ~GroupedMatmulSliceMPerTokenDequantFixAxisMove()
-    {
-    }
+    ~GroupedMatmulSliceMPerTokenDequantFixAxisMove() {}
 
     template <typename T>
     CATLASS_DEVICE __gm__ T *GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)

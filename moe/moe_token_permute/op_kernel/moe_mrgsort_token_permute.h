@@ -27,14 +27,13 @@ struct MoeMrgsortParam {
     int64_t oneLoopMaxElements;
 };
 
-class MoeMrgsort
-{
+class MoeMrgsort {
 public:
     __aicore__ inline MoeMrgsort(){};
-    __aicore__ inline void Init(MoeMrgsortParam* param);
+    __aicore__ inline void Init(MoeMrgsortParam *param);
     __aicore__ inline void Process();
-    __aicore__ inline void SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput);
-    __aicore__ inline void SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput);
+    __aicore__ inline void SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput);
+    __aicore__ inline void SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput);
 
 private:
     __aicore__ inline void CopyIn();
@@ -45,7 +44,7 @@ private:
     __aicore__ inline void ClearCache();
 
 private:
-    MoeMrgsortParam* param = nullptr;
+    MoeMrgsortParam *param = nullptr;
 
     GlobalTensor<float> gmInputs[4];
     GlobalTensor<float> gmOutput;
@@ -76,14 +75,14 @@ __aicore__ inline void MoeMrgsort::ClearCache()
     this->outOffset = 0;
 }
 
-__aicore__ inline void MoeMrgsort::SetInput(GlobalTensor<float>& gmInput, LocalTensor<float>& ubInput)
+__aicore__ inline void MoeMrgsort::SetInput(GlobalTensor<float> &gmInput, LocalTensor<float> &ubInput)
 {
     this->gmInputs[listNum] = gmInput;
     this->ubInputs[listNum] = ubInput;
     this->listNum += 1;
 }
 
-__aicore__ inline void MoeMrgsort::SetOutput(GlobalTensor<float>& gmOutput, LocalTensor<float>& ubOutput)
+__aicore__ inline void MoeMrgsort::SetOutput(GlobalTensor<float> &gmOutput, LocalTensor<float> &ubOutput)
 {
     this->gmOutput = gmOutput;
     this->ubOutput = ubOutput;
@@ -114,8 +113,8 @@ __aicore__ inline void MoeMrgsort::CopyIn()
     for (int64_t i = 0, j = 0; i < listNum; i++) {
         lengths[i] = Min(param->oneLoopMaxElements, listRemainElements[i]);
         if (lengths[i] > 0) {
-            DataCopy(
-                this->ubInputs[i], this->gmInputs[i][offsets[i]], Align(GetSortLen<float>(lengths[i]), sizeof(float)));
+            DataCopy(this->ubInputs[i], this->gmInputs[i][offsets[i]],
+                     Align(GetSortLen<float>(lengths[i]), sizeof(float)));
             tmpUbInputs[j] = this->ubInputs[i];
             elementCountListTail[j] = lengths[i];
             this->remainListNum += 1;
@@ -137,12 +136,12 @@ __aicore__ inline void MoeMrgsort::MrgsortCompute()
             MrgSortSrcList(tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[MERGE_LIST_IDX_TWO], tmpUbInputs[0]);
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else if (this->remainListNum == MERGE_LIST_FOUR) {
-        MrgSortSrcList sortListTail = MrgSortSrcList(
-            tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[MERGE_LIST_IDX_TWO], tmpUbInputs[MERGE_LIST_IDX_THREE]);
+        MrgSortSrcList sortListTail = MrgSortSrcList(tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[MERGE_LIST_IDX_TWO],
+                                                     tmpUbInputs[MERGE_LIST_IDX_THREE]);
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else {
-        DataCopy(
-            this->ubOutput, this->tmpUbInputs[0], Align(GetSortLen<float>(elementCountListTail[0]), sizeof(float)));
+        DataCopy(this->ubOutput, this->tmpUbInputs[0],
+                 Align(GetSortLen<float>(elementCountListTail[0]), sizeof(float)));
         listSortedNums[0] = elementCountListTail[0];
     }
 }
@@ -176,7 +175,7 @@ __aicore__ inline void MoeMrgsort::CopyOut()
     outOffset += GetSortLen<float>(curLoopSortedNum);
 }
 
-__aicore__ inline void MoeMrgsort::Init(MoeMrgsortParam* param)
+__aicore__ inline void MoeMrgsort::Init(MoeMrgsortParam *param)
 {
     this->param = param;
     this->remainListNum = listNum;

@@ -19,18 +19,18 @@
 #include <cstdint>
 
 struct MoeFinalizeRoutingV2RegbaseTilingData {
-    int64_t row = 0;                        // BS
-    int64_t e = 0;                          // E
-    int64_t c = 0;                          // C
-    int64_t h = 0;                          // H
-    int64_t hAligned = 0;                   // H按block对齐后的大小
-    int64_t k = 0;                          // K
-    int64_t rowOfFormerBlock = 0;           // 整核处理的BS数
-    int64_t rowOfTailBlock = 0;             // 尾核处理的BS数
-    int64_t rowLoopOfFormerBlock = 0;       // 整核BS的循环次数
-    int64_t rowLoopOfTailBlock = 0;         // 尾核BS的循环次数
-    int64_t rowFactor = 0;                  // 每次循环处理的BS数
-    int64_t constExpertRangeFactor = 0;     // 每次循环处理的const专家数，等于rowFactor和constExpertRangeNum的最小值
+    int64_t row = 0;                  // BS
+    int64_t e = 0;                    // E
+    int64_t c = 0;                    // C
+    int64_t h = 0;                    // H
+    int64_t hAligned = 0;             // H按block对齐后的大小
+    int64_t k = 0;                    // K
+    int64_t rowOfFormerBlock = 0;     // 整核处理的BS数
+    int64_t rowOfTailBlock = 0;       // 尾核处理的BS数
+    int64_t rowLoopOfFormerBlock = 0; // 整核BS的循环次数
+    int64_t rowLoopOfTailBlock = 0;   // 尾核BS的循环次数
+    int64_t rowFactor = 0;            // 每次循环处理的BS数
+    int64_t constExpertRangeFactor = 0; // 每次循环处理的const专家数，等于rowFactor和constExpertRangeNum的最小值
     int64_t tailRowFactorOfFormerBlock = 0; // 整核处理的BS尾块数
     int64_t tailRowFactorOfTailBlock = 0;   // 尾核处理的BS尾块数
     int64_t hLoop = 0;                      // H循环次数

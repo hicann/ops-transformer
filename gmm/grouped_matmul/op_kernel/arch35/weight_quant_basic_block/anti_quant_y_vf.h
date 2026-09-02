@@ -62,8 +62,8 @@ __aicore__ inline void AntiQuantYB32(LocalAddressYParam<yType> &localAddressPara
         uint32_t nRealL0Temp = nRealL0Size;
         for (uint16_t nId = 0; nId < ubLoopN; nId++) {
             if constexpr (hasBias) {
-                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_NORM>(biasVreg, localAddressParam.biasPhyAddr +
-                                                                                       nId * nRealVRegSize);
+                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_NORM>(
+                    biasVreg, localAddressParam.biasPhyAddr + nId * nRealVRegSize);
             }
             MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_NORM>(
                 antiQuantCScaleVreg, localAddressParam.cScalePhyAddr + nId * nRealVRegSize);

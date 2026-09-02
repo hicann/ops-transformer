@@ -81,10 +81,9 @@ private:
     GM_ADDR weightAuxiliaryMatrixTensorPtr;
 };
 
-__aicore__ inline void
-GMMA8W4PostProcess::Init(const GMAddrParams gmAddrParams,
-                         const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN,
-                         const GMMSwigluQuantV2 *__restrict gmmSwigluIN)
+__aicore__ inline void GMMA8W4PostProcess::Init(
+    const GMAddrParams gmAddrParams, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN,
+    const GMMSwigluQuantV2 *__restrict gmmSwigluIN)
 {
     if ASCEND_IS_AIV {
         aicCoreNum = GetBlockNum();
@@ -99,9 +98,9 @@ GMMA8W4PostProcess::Init(const GMAddrParams gmAddrParams,
         mmOutGM2.SetGlobalBuffer(
             (__gm__ half *)((__gm__ int8_t *)gmAddrParams.workSpaceGM + gmAddrParams.workSpaceOffset3));
         perTokenScaleGM.SetGlobalBuffer((__gm__ float *)gmAddrParams.xScaleGM, gmmSwigluQuantV2BaseParams->M);
-        quantOutputGM.SetGlobalBuffer((__gm__ int8_t *)gmAddrParams.yGM, gmmSwigluQuantV2BaseParams->M *
-                                                                             gmmSwigluQuantV2->tokenLen /
-                                                                             SWIGLU_REDUCE_FACTOR);
+        quantOutputGM.SetGlobalBuffer(
+            (__gm__ int8_t *)gmAddrParams.yGM,
+            gmmSwigluQuantV2BaseParams->M * gmmSwigluQuantV2->tokenLen / SWIGLU_REDUCE_FACTOR);
         quantScaleOutputGM.SetGlobalBuffer((__gm__ float *)gmAddrParams.yScaleGM, gmmSwigluQuantV2BaseParams->M);
         weightAuxiliaryMatrixTensorPtr = gmAddrParams.weightAuxiliaryMatrixGM;
     }
@@ -292,9 +291,9 @@ __aicore__ inline void GMMA8W4PostProcess::UpdateVecConfig(uint32_t blockIdx, Ve
     // n / 2 *sizeof(float) + 64 < 191 * 1024
     pipe->InitBuffer(mmOutQueue, 1,
                      2 * gmmSwigluQuantV2->maxProcessRowNum * gmmSwigluQuantV2->tokenLen * sizeof(float));
-    pipe->InitBuffer(quantOutQueue, 1,
-                     gmmSwigluQuantV2->maxProcessRowNum * gmmSwigluQuantV2->tokenLen / SWIGLU_REDUCE_FACTOR *
-                         sizeof(int8_t));
+    pipe->InitBuffer(
+        quantOutQueue, 1,
+        gmmSwigluQuantV2->maxProcessRowNum * gmmSwigluQuantV2->tokenLen / SWIGLU_REDUCE_FACTOR * sizeof(int8_t));
     pipe->InitBuffer(quantScaleOutQueue, 1,
                      AlignUp<int32_t>(gmmSwigluQuantV2->maxProcessRowNum, ALIGN_8_ELE) * sizeof(float));
     pipe->InitBuffer(weightAuxiliaryMatrixInQueue, 1, gmmSwigluQuantV2->tokenLen * sizeof(float));

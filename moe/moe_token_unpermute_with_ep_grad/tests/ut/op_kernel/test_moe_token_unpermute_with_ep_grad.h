@@ -25,14 +25,14 @@
 
 #define __CCE_UT_TEST__
 
-inline void InitMoeTokenUnpermuteWithEpGradTilingData(
-    uint8_t* tiling, MoeTokenUnpermuteWithEpGradTilingData* const_data)
+inline void InitMoeTokenUnpermuteWithEpGradTilingData(uint8_t *tiling,
+                                                      MoeTokenUnpermuteWithEpGradTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteWithEpGradTilingData));
 }
 #define DTYPE_PERMUTED_TOKENS bfloat16_t
 #define DTYPE_PROBS float
-#define GET_TILING_DATA(tilingData, tilingPointer)    \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
     MoeTokenUnpermuteWithEpGradTilingData tilingData; \
     InitMoeTokenUnpermuteWithEpGradTilingData(tilingPointer, &tilingData)
 #endif

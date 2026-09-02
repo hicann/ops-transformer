@@ -22,15 +22,13 @@ using namespace AscendC;
 template <typename T, typename S, int32_t dropPadMode>
 class MoeFinalizeRoutingV2RowKHFullLoad {
 public:
-    __aicore__ inline MoeFinalizeRoutingV2RowKHFullLoad()
-    {}
+    __aicore__ inline MoeFinalizeRoutingV2RowKHFullLoad() {}
 
     // expandX/bias 全部载入ub，避免多次小段搬运, 此时对应的Que不开db
-    __aicore__ inline void Init(
-        GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
-        GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v,
-        GM_ADDR y, GM_ADDR workspace, const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr,
-        TPipe *pipePtr)
+    __aicore__ inline void Init(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
+                                GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1,
+                                GM_ADDR constExpertAlpha2, GM_ADDR v, GM_ADDR y, GM_ADDR workspace,
+                                const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
@@ -43,8 +41,8 @@ public:
         hasX = (x != nullptr);
         hasConstExpert = (constExpertAlpha1 != nullptr) && (constExpertAlpha2 != nullptr) && (v != nullptr);
 
-        SetGlobalBuffers(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx, x,
-                         constExpertAlpha1, constExpertAlpha2, v, y);
+        SetGlobalBuffers(expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx, x, constExpertAlpha1,
+                         constExpertAlpha2, v, y);
         InitQueBuffers();
     }
 
@@ -213,14 +211,14 @@ private:
                        expertIdx < tilingData->constantExpertEnd) {
                 ProcessConstantExpert(rowOuterIdx, rowInnerIdx, expertIdx, innerBiasLocal, scale);
             } else {
-                ProcessExpandXBiasScale<T, S>(
-                    yLocal[rowInnerIdx * tilingData->h], expandedXLocal[expandedRowIdxGmValue * tilingData->h],
-                    innerBiasLocal, scale, tilingData->h, hasBiasAndExpertIdx, hasScales);
+                ProcessExpandXBiasScale<T, S>(yLocal[rowInnerIdx * tilingData->h],
+                                              expandedXLocal[expandedRowIdxGmValue * tilingData->h], innerBiasLocal,
+                                              scale, tilingData->h, hasBiasAndExpertIdx, hasScales);
             }
         } else {
-            ProcessExpandXBiasScale<T, S>(
-                yLocal[rowInnerIdx * tilingData->h], expandedXLocal[expandedRowIdxGmValue * tilingData->h],
-                innerBiasLocal, scale, tilingData->h, hasBiasAndExpertIdx, hasScales);
+            ProcessExpandXBiasScale<T, S>(yLocal[rowInnerIdx * tilingData->h],
+                                          expandedXLocal[expandedRowIdxGmValue * tilingData->h], innerBiasLocal, scale,
+                                          tilingData->h, hasBiasAndExpertIdx, hasScales);
         }
     }
 
@@ -232,9 +230,8 @@ private:
         CopyIn(xGm[xGmOffset], xLocal, 1, tilingData->h);
         xQue.EnQue(xLocal);
         xLocal = xQue.DeQue<T>();
-        ProcessExpandXBiasScale<T, S>(
-            yLocal[rowInnerIdx * tilingData->h], xLocal,
-            innerBiasLocal, scale, tilingData->h, hasBiasAndExpertIdx, hasScales);
+        ProcessExpandXBiasScale<T, S>(yLocal[rowInnerIdx * tilingData->h], xLocal, innerBiasLocal, scale, tilingData->h,
+                                      hasBiasAndExpertIdx, hasScales);
     }
 
     __aicore__ inline void ProcessConstantExpert(int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t expertIdx,
@@ -260,9 +257,8 @@ private:
         vLocal = vQue.DeQue<T>();
         xQue.EnQue(xLocal);
         xLocal = xQue.DeQue<T>();
-        ProcessExpandXBiasScale<T, S>(
-            yLocal[rowInnerIdx * tilingData->h], xLocal,
-            innerBiasLocal, scale, tilingData->h, hasBiasAndExpertIdx, hasScales);
+        ProcessExpandXBiasScale<T, S>(yLocal[rowInnerIdx * tilingData->h], xLocal, innerBiasLocal, scale, tilingData->h,
+                                      hasBiasAndExpertIdx, hasScales);
     }
 
     __aicore__ inline void CastYOutput(int64_t rowInnerLoop)
@@ -295,10 +291,9 @@ private:
         }
     }
 
-    __aicore__ inline void SetGlobalBuffers(
-        GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
-        GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v,
-        GM_ADDR y)
+    __aicore__ inline void SetGlobalBuffers(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2,
+                                            GM_ADDR bias, GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR x,
+                                            GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v, GM_ADDR y)
     {
         expandedXGm.SetGlobalBuffer((__gm__ T *)expandedX);
         expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx);

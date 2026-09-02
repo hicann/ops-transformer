@@ -16,11 +16,11 @@
 #ifndef __GROUPED_MATMUL_FINALIZE_ROUTING_KERNEL_UTILS_H_
 #define __GROUPED_MATMUL_FINALIZE_ROUTING_KERNEL_UTILS_H_
 
-constexpr uint32_t thresholdBlockNum = 8;   // 8 is obtained by tests, indicating the threshold of basic block numbers
-                                            // in both directions when assigning data blocks to cube cores when using
-                                            // diagnal strategy
-constexpr uint32_t thresholdDimM = 5;       // 5 is obtained by tests, indicating the threshold for distinguishing
-                                            // strategies for large/small shapes
+constexpr uint32_t thresholdBlockNum = 8; // 8 is obtained by tests, indicating the threshold of basic block numbers
+                                          // in both directions when assigning data blocks to cube cores when using
+                                          // diagnal strategy
+constexpr uint32_t thresholdDimM = 5;     // 5 is obtained by tests, indicating the threshold for distinguishing
+                                          // strategies for large/small shapes
 
 namespace GroupedMatmulFinalizeRouting {
 using namespace AscendC;
@@ -41,32 +41,31 @@ struct MNConfig {
     uint32_t singleM = 0;
     uint32_t singleN = 0;
     uint32_t offsetM = 0;
-    uint32_t baseNEachSingleN = 0;    
+    uint32_t baseNEachSingleN = 0;
     uint64_t workSpaceOffset = 0;
     uint64_t curBlockM = 0;
 };
 
 struct SyncConfig {
-    uint64_t curM = 0;      // M of valid data in the sliding window
-    uint64_t curGroup = 0;  // Current group in sliding window
-    uint64_t curGroupM = 0; // The last line of curGroup
-    uint64_t lowBoundM = 0; // Lower bound of sliding window
-    uint64_t windowSize = 0;      // Maximum num of rows in deterministic workspace
-    uint64_t baseN = 0;     // Finalize Routing BaseN
+    uint64_t curM = 0;       // M of valid data in the sliding window
+    uint64_t curGroup = 0;   // Current group in sliding window
+    uint64_t curGroupM = 0;  // The last line of curGroup
+    uint64_t lowBoundM = 0;  // Lower bound of sliding window
+    uint64_t windowSize = 0; // Maximum num of rows in deterministic workspace
+    uint64_t baseN = 0;      // Finalize Routing BaseN
 };
 
-template<class AT_, class BT_, class CT_, class BiasT_, const auto& MM_CFG = CFG_MDL,
-         bool groupListType_ = false, bool sharedInputIsNone_ = false>
+template <class AT_, class BT_, class CT_, class BiasT_, const auto &MM_CFG = CFG_MDL, bool groupListType_ = false,
+          bool sharedInputIsNone_ = false>
 struct MMImplType {
-  using AT = AT_;
-  using BT = BT_;
-  using CT = CT_;
-  using BiasT = BiasT_;
-  using MT = matmul::MatmulImpl<AT, BT, CT, BiasT, MM_CFG>;
-  static const bool groupListType = groupListType_;
-  static const bool sharedInputIsNone = sharedInputIsNone_;
+    using AT = AT_;
+    using BT = BT_;
+    using CT = CT_;
+    using BiasT = BiasT_;
+    using MT = matmul::MatmulImpl<AT, BT, CT, BiasT, MM_CFG>;
+    static const bool groupListType = groupListType_;
+    static const bool sharedInputIsNone = sharedInputIsNone_;
 };
-
 
 struct DataCopy2DDimParams {
     uint32_t dim1;
@@ -75,18 +74,18 @@ struct DataCopy2DDimParams {
 };
 
 struct MMInitParams {
-  GM_ADDR x;
-  GM_ADDR weight;
-  GM_ADDR bias;
-  GM_ADDR group_tokens;
-  GM_ADDR scale;          // notice
-  GM_ADDR pertoken_scale;
-  GM_ADDR offset;
-  GM_ADDR logits;
-  GM_ADDR token_ranks;
-  GM_ADDR residual;
-  GM_ADDR y;
-  GM_ADDR workspace;
+    GM_ADDR x;
+    GM_ADDR weight;
+    GM_ADDR bias;
+    GM_ADDR group_tokens;
+    GM_ADDR scale; // notice
+    GM_ADDR pertoken_scale;
+    GM_ADDR offset;
+    GM_ADDR logits;
+    GM_ADDR token_ranks;
+    GM_ADDR residual;
+    GM_ADDR y;
+    GM_ADDR workspace;
 };
 
 struct VectorAtomicParams {
@@ -99,7 +98,7 @@ struct VectorAtomicParams {
     uint64_t yGmOffset1;
 };
 
-struct VectorOffsetParams{
+struct VectorOffsetParams {
     uint32_t singleCoreM;
     uint32_t perTokenOffsetM;
     uint32_t offsetMStart;
@@ -137,7 +136,7 @@ __aicore__ inline T AlignDown(T a, T base)
     return a / base * base;
 }
 
-__aicore__ inline void MNBlockIdxCompute(MNConfig& mnConfig, const uint32_t curBlock, const uint32_t count,
+__aicore__ inline void MNBlockIdxCompute(MNConfig &mnConfig, const uint32_t curBlock, const uint32_t count,
                                          const uint32_t thresholdMDimN, const uint32_t deterministicFlag)
 {
     if (mnConfig.blockDimM <= thresholdDimM || thresholdDimM == 1 || deterministicFlag == 1) {
@@ -146,11 +145,13 @@ __aicore__ inline void MNBlockIdxCompute(MNConfig& mnConfig, const uint32_t curB
     } else {
         uint32_t relativeBlock = curBlock - count;
         uint32_t curThresholdM = relativeBlock >= AlignDown(mnConfig.blockDimM * mnConfig.blockDimN, thresholdMDimN) ?
-                                     mnConfig.blockDimM % thresholdBlockNum : thresholdBlockNum;
+                                     mnConfig.blockDimM % thresholdBlockNum :
+                                     thresholdBlockNum;
         uint32_t curThresholdMThresholdN = curThresholdM * thresholdBlockNum;
         uint32_t curThresholdN =
             relativeBlock % thresholdMDimN >= AlignDown(curThresholdM * mnConfig.blockDimN, curThresholdMThresholdN) ?
-                mnConfig.blockDimN % thresholdBlockNum : thresholdBlockNum;
+                mnConfig.blockDimN % thresholdBlockNum :
+                thresholdBlockNum;
 
         uint32_t localRelativeBlock = relativeBlock % thresholdMDimN % curThresholdMThresholdN;
         mnConfig.mIdx = localRelativeBlock % curThresholdM + relativeBlock / thresholdMDimN * thresholdBlockNum;
@@ -162,7 +163,8 @@ __aicore__ inline void MNBlockIdxCompute(MNConfig& mnConfig, const uint32_t curB
 
 template <typename T>
 __aicore__ inline void DataCopyPad2DA8W4(const LocalTensor<T> &dst, const GlobalTensor<T> &src,
-                                         const DataCopy2DDimParams& copyDimParams) {
+                                         const DataCopy2DDimParams &copyDimParams)
+{
     DataCopyExtParams datacopyParams;
     datacopyParams.blockCount = copyDimParams.dim1;
     datacopyParams.blockLen = copyDimParams.dim0 * sizeof(T);
@@ -176,7 +178,8 @@ __aicore__ inline void DataCopyPad2DA8W4(const LocalTensor<T> &dst, const Global
 
 template <typename T>
 __aicore__ inline void DataCopyPad2DA8W4ND(const LocalTensor<T> &dst, const GlobalTensor<T> &src,
-                                           const DataCopy2DDimParams& copyDimParams) {
+                                           const DataCopy2DDimParams &copyDimParams)
+{
     DataCopyExtParams params;
     params.blockCount = copyDimParams.dim1;
     params.blockLen = copyDimParams.dim0 * sizeof(T);
@@ -190,7 +193,8 @@ __aicore__ inline void DataCopyPad2DA8W4ND(const LocalTensor<T> &dst, const Glob
 
 template <typename T>
 __aicore__ inline void DataCopyPad2DA8W4(const GlobalTensor<T> &dst, const LocalTensor<T> &src,
-                                         const DataCopy2DDimParams& copyDimParams, uint32_t dstDim0) {
+                                         const DataCopy2DDimParams &copyDimParams, uint32_t dstDim0)
+{
     DataCopyExtParams params;
     params.blockCount = copyDimParams.dim1;
     params.blockLen = copyDimParams.dim0 * sizeof(T);

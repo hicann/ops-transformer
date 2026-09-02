@@ -21,14 +21,12 @@
 namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;
 
-class MoeV2ExpertTokenOutSimt
-{
+class MoeV2ExpertTokenOutSimt {
 public:
     __aicore__ inline MoeV2ExpertTokenOutSimt(){};
     template <typename TilingData>
-    __aicore__ inline void Init(
-        GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity, GM_ADDR expandedRowIdx,
-        GM_ADDR workspace, const TilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity,
+                                GM_ADDR expandedRowIdx, GM_ADDR workspace, const TilingData *tilingData, TPipe *tPipe);
     template <bool CALCHIST = true>
     __aicore__ inline void Process();
 
@@ -37,17 +35,17 @@ private:
     __aicore__ inline void InitLocal();
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
     GlobalTensor<int32_t> expandedRowIdxGmGT_;
     GlobalTensor<int32_t> expandedExpertIdxGmGT_;
-    __gm__ int32_t* expandedRowIdxGm_;
-    __gm__ int32_t* expandedExpertIdxGm_;
-    __gm__ int32_t* expertTokensBeforeCapacityGm_;
-    __gm__ int32_t* expertTokensCountOrCumsumGm_;
+    __gm__ int32_t *expandedRowIdxGm_;
+    __gm__ int32_t *expandedExpertIdxGm_;
+    __gm__ int32_t *expertTokensBeforeCapacityGm_;
+    __gm__ int32_t *expertTokensCountOrCumsumGm_;
     GlobalTensor<int32_t> expertTokensCountOrCumsumGmOut;
-    __gm__ int32_t* expertFirstIndexGm_;
+    __gm__ int32_t *expertFirstIndexGm_;
 
-    const InnerMoeV2GatherOutComputeTilingData* srcToDstTilingData;
+    const InnerMoeV2GatherOutComputeTilingData *srcToDstTilingData;
 
     int64_t coreNum_;
     int64_t blockIdx_;
@@ -87,9 +85,9 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::SyncAll()
 }
 
 template <typename TilingData>
-__aicore__ inline void MoeV2ExpertTokenOutSimt::Init(
-    GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity, GM_ADDR expandedRowIdx, GM_ADDR workspace,
-    const TilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeV2ExpertTokenOutSimt::Init(GM_ADDR expertTokensCountOrCumsum,
+                                                     GM_ADDR expertTokensBeforeCapacity, GM_ADDR expandedRowIdx,
+                                                     GM_ADDR workspace, const TilingData *tilingData, TPipe *tPipe)
 {
     this->pipe = tPipe;
     this->blockIdx_ = GetBlockIdx();
@@ -116,34 +114,34 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Init(
     }
     this->threadNum_ = this->coreRows_ > THREAD_NUM ? THREAD_NUM : this->coreRows_;
 
-    expandedRowIdxGmGT_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, Align(this->totalLength_, sizeof(int32_t)));
-    expandedRowIdxGm_ = (__gm__ int32_t*)expandedRowIdx;
+    expandedRowIdxGmGT_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, Align(this->totalLength_, sizeof(int32_t)));
+    expandedRowIdxGm_ = (__gm__ int32_t *)expandedRowIdx;
 
     if (this->dropPadMode_ == DROPLESS_MODE && this->expertTokensCountOrCumsumFlag_ > EXERPT_TOKENS_NONE) {
         if (this->expertTokensCountOrCumsumFlag_ == EXERPT_TOKENS_COUNT) {
-            expertTokensBeforeCapacityGm_ = (__gm__ int32_t*)expertTokensCountOrCumsum;
+            expertTokensBeforeCapacityGm_ = (__gm__ int32_t *)expertTokensCountOrCumsum;
             this->expertCount_ = true;
         } else {
-            expertTokensCountOrCumsumGm_ = (__gm__ int32_t*)expertTokensCountOrCumsum;
-            expertTokensCountOrCumsumGmOut.SetGlobalBuffer(
-                (__gm__ int32_t*)expertTokensCountOrCumsum, this->expertNum_);
+            expertTokensCountOrCumsumGm_ = (__gm__ int32_t *)expertTokensCountOrCumsum;
+            expertTokensCountOrCumsumGmOut.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum,
+                                                           this->expertNum_);
             this->expertCumsum_ = true;
         }
     }
 
     if (this->dropPadMode_ == DROP_PAD_MODE && this->expertTokensBeforeCapacityFlag_ == EXERPT_TOKENS_BEFORE_CAPACITY) {
-        expertTokensBeforeCapacityGm_ = (__gm__ int32_t*)expertTokensBeforeCapacity;
+        expertTokensBeforeCapacityGm_ = (__gm__ int32_t *)expertTokensBeforeCapacity;
         this->expertCount_ = true;
     }
 
-    expertFirstIndexGm_ = (__gm__ int32_t*)workspace + Align(this->totalLength_, sizeof(int32_t)) * 2;
-    expandedExpertIdxGm_ = (__gm__ int32_t*)workspace;
-    expandedExpertIdxGmGT_.SetGlobalBuffer((__gm__ int32_t*)workspace, Align(this->totalLength_, sizeof(int32_t)));
+    expertFirstIndexGm_ = (__gm__ int32_t *)workspace + Align(this->totalLength_, sizeof(int32_t)) * 2;
+    expandedExpertIdxGm_ = (__gm__ int32_t *)workspace;
+    expandedExpertIdxGmGT_.SetGlobalBuffer((__gm__ int32_t *)workspace, Align(this->totalLength_, sizeof(int32_t)));
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ExpertFirstIndexComputeSimt(
-    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t* expertFirstIndexGm,
-    __gm__ int32_t* expandedExpertIdxGm)
+    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t *expertFirstIndexGm,
+    __gm__ int32_t *expandedExpertIdxGm)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
          index += static_cast<int32_t>(blockDim.x)) {
@@ -164,8 +162,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ExpertFirstIndexComp
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void TokensComputeSimt(
-    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t* expertFirstIndexGm,
-    __gm__ int32_t* expandedExpertIdxGm, __gm__ int32_t* expertTokensBeforeCapacityGm)
+    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t *expertFirstIndexGm,
+    __gm__ int32_t *expandedExpertIdxGm, __gm__ int32_t *expertTokensBeforeCapacityGm)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
          index += static_cast<int32_t>(blockDim.x)) {
@@ -184,8 +182,8 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void TokensComputeSimt(
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void CumsumComputeSimt(
-    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t* expandedExpertIdxGm,
-    __gm__ int32_t* expertTokensCountOrCumsumGm)
+    int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t *expandedExpertIdxGm,
+    __gm__ int32_t *expertTokensCountOrCumsumGm)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
          index += static_cast<int32_t>(blockDim.x)) {
@@ -213,9 +211,9 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Process()
     }
 
     if (this->blockIdx_ < this->needCoreNum_) {
-        asc_vf_call<ExpertFirstIndexComputeSimt>(
-            dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_, this->startIndex_,
-            this->totalLength_, expertFirstIndexGm_, expandedExpertIdxGm_);
+        asc_vf_call<ExpertFirstIndexComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_,
+                                                 this->startIndex_, this->totalLength_, expertFirstIndexGm_,
+                                                 expandedExpertIdxGm_);
     }
 
     this->SyncAll();
@@ -225,9 +223,9 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Process()
     }
 
     if (this->expertCount_ && this->blockIdx_ < this->needCoreNum_) {
-        asc_vf_call<TokensComputeSimt>(
-            dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_, this->startIndex_,
-            this->totalLength_, expertFirstIndexGm_, expandedExpertIdxGm_, expertTokensBeforeCapacityGm_);
+        asc_vf_call<TokensComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_,
+                                       this->startIndex_, this->totalLength_, expertFirstIndexGm_, expandedExpertIdxGm_,
+                                       expertTokensBeforeCapacityGm_);
     }
 
     if (this->expertCumsum_ && this->blockIdx_ < this->needCoreNum_) {

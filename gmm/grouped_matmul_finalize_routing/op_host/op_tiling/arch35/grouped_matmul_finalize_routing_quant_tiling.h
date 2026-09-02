@@ -68,7 +68,8 @@ constexpr float DETER_WORKSPACE_RATIO = 0.8f; // 减去系统开销后，确定�
 
 class GroupedMatmulFinalizeRoutingQuantTiling : public GroupedQmmTiling {
 public:
-    explicit GroupedMatmulFinalizeRoutingQuantTiling(gert::TilingContext *context) : GroupedQmmTiling(context)
+    explicit GroupedMatmulFinalizeRoutingQuantTiling(gert::TilingContext *context)
+        : GroupedQmmTiling(context)
     {
         Reset();
     }

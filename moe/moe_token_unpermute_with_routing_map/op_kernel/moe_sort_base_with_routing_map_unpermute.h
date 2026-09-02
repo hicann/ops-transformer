@@ -20,18 +20,18 @@ namespace MoeTokenPermute {
 using namespace AscendC;
 
 template <typename T>
-__aicore__ inline void GetBaseArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue, const T diffValue,
-    const int32_t count)
+__aicore__ inline void GetBaseArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue,
+                                                           const T diffValue, const int32_t count)
 {
     for (int i = 0; i < count; i++) {
-        dstLocal.SetValue(i, static_cast<T>(firstValue) +
-            static_cast<T>(diffValue) * static_cast<T>(i)); // 数据有可能会截断。
+        dstLocal.SetValue(
+            i, static_cast<T>(firstValue) + static_cast<T>(diffValue) * static_cast<T>(i)); // 数据有可能会截断。
     }
 }
 
 template <typename T>
-__aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue, const T diffValue,
-    const int32_t count)
+__aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue,
+                                                    const T diffValue, const int32_t count)
 {
     struct UnaryRepeatParams addsParamsStride1(1, 1, 1, 1);
     struct UnaryRepeatParams addsParamsStride8(1, 1, DEFAULT_REPEAT_STRIDE, DEFAULT_REPEAT_STRIDE);
@@ -50,8 +50,8 @@ __aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLoc
             PipeBarrier<PIPE_V>();
             for (int i = 0; i < DEFAULT_BLK_NUM - 1; i++) {
                 Adds<T, false>(dstLocal[(i + 1) * BLOCK_NUM], dstLocal[i * BLOCK_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride1);
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride1);
                 PipeBarrier<PIPE_V>();
             }
             int32_t repeat = count / REPEAT_NUM;
@@ -61,8 +61,8 @@ __aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLoc
             // Fills the following arithmetic progression with 8 block size arithmetic progressions
             for (int i = 0; i < repeat - 1; i++) {
                 Adds<T, false>(dstLocal[(i + 1) * REPEAT_NUM], dstLocal[i * REPEAT_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride8);
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride8);
                 PipeBarrier<PIPE_V>();
             }
             if (tail > 0) {
@@ -70,8 +70,8 @@ __aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLoc
                 SetVectorMask<T>(tail_aligned);
                 PipeBarrier<PIPE_V>();
                 Adds<T, false>(dstLocal[repeat * REPEAT_NUM], dstLocal[(repeat - 1) * REPEAT_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride8);
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride8);
                 PipeBarrier<PIPE_V>();
             }
         } else {
@@ -82,8 +82,8 @@ __aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLoc
             PipeBarrier<PIPE_V>();
             for (int i = 0; i < repeat - 1; i++) {
                 Adds<T, false>(dstLocal[(i + 1) * BLOCK_NUM], dstLocal[i * BLOCK_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride1);
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride1);
                 PipeBarrier<PIPE_V>();
             }
         }
@@ -95,61 +95,66 @@ __aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLoc
 
 template <typename T>
 __aicore__ inline __inout_pipe__(MTE2) void DataCopyB64(const LocalTensor<T> &dstLocal,
-    const GlobalTensor<T> &srcGlobal, const DataCopyExtParams &dataCopyParams, const DataCopyPadExtParams<int32_t> &padParams)
+                                                        const GlobalTensor<T> &srcGlobal,
+                                                        const DataCopyExtParams &dataCopyParams,
+                                                        const DataCopyPadExtParams<int32_t> &padParams)
 {
 #ifndef __CCE_KT_TEST__
-  DataCopyPadGm2UBImpl((__ubuf__ int32_t*)dstLocal.GetPhyAddr(), (__gm__ int32_t*)srcGlobal.GetPhyAddr(), dataCopyParams,
-      padParams);
+    DataCopyPadGm2UBImpl((__ubuf__ int32_t *)dstLocal.GetPhyAddr(), (__gm__ int32_t *)srcGlobal.GetPhyAddr(),
+                         dataCopyParams, padParams);
 #endif
 }
 
 template <typename T>
 __aicore__ inline __inout_pipe__(MTE3) void DataCopyB64(const GlobalTensor<T> &dstGlobal,
-    const LocalTensor<T> &srcLocal, const DataCopyExtParams &dataCopyParams)
+                                                        const LocalTensor<T> &srcLocal,
+                                                        const DataCopyExtParams &dataCopyParams)
 {
 #ifndef __CCE_KT_TEST__
-  DataCopyPadUB2GMImpl((__gm__ int32_t*)dstGlobal.GetPhyAddr(), (__ubuf__ int32_t*)srcLocal.GetPhyAddr(), dataCopyParams);
+    DataCopyPadUB2GMImpl((__gm__ int32_t *)dstGlobal.GetPhyAddr(), (__ubuf__ int32_t *)srcLocal.GetPhyAddr(),
+                         dataCopyParams);
 #endif
 }
 
 class MoeSortBase {
- public:
-  __aicore__ inline MoeSortBase(){};
+public:
+    __aicore__ inline MoeSortBase(){};
 
- protected:
-  __aicore__ inline void CleanWSCache();
-  __aicore__ inline void SyncAll();
+protected:
+    __aicore__ inline void CleanWSCache();
+    __aicore__ inline void SyncAll();
 
- protected:
-  TPipe* pipe;
-  TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
-  TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
-  TBuf<TPosition::VECCALC> tempBuffer;
-  TBuf<TPosition::VECCALC> sortedBuffer;
+protected:
+    TPipe *pipe;
+    TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
+    TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
+    TBuf<TPosition::VECCALC> tempBuffer;
+    TBuf<TPosition::VECCALC> sortedBuffer;
 
-  GlobalTensor<int32_t> sourceRowGm;
-  GlobalTensor<int32_t> sortedExpertForSourceRowGm;
-  GlobalTensor<int32_t> expandDstToSrcRowGm;
+    GlobalTensor<int32_t> sourceRowGm;
+    GlobalTensor<int32_t> sortedExpertForSourceRowGm;
+    GlobalTensor<int32_t> expandDstToSrcRowGm;
 
-  int64_t tileLength;
-  int64_t bufferNum = 1;
-  int64_t totalLength;
-  int64_t coreNum;
+    int64_t tileLength;
+    int64_t bufferNum = 1;
+    int64_t totalLength;
+    int64_t coreNum;
 
-  static constexpr int64_t SYNC_GM_NUM = 2;
-  static constexpr int64_t WORK_GM_NUM = 2;
-  static constexpr int64_t DST_BLK_STRIDE = 1;
-  static constexpr int64_t DST_REP_STRIDE = 8;
+    static constexpr int64_t SYNC_GM_NUM = 2;
+    static constexpr int64_t WORK_GM_NUM = 2;
+    static constexpr int64_t DST_BLK_STRIDE = 1;
+    static constexpr int64_t DST_REP_STRIDE = 8;
 };
 
-__aicore__ inline void MoeSortBase::SyncAll() {
-  if (coreNum == 1) {
-    return;
-  }
+__aicore__ inline void MoeSortBase::SyncAll()
+{
+    if (coreNum == 1) {
+        return;
+    }
 #ifndef __CCE_KT_TEST__
-  AscendC::SyncAll();
+    AscendC::SyncAll();
 #endif
 }
 
-}  // namespace MoeTokenPermuteWithRoutingMap
-#endif  // MOE_SORT_BASE_WITH_ROUTING_MAP_UNPERMUTE_H
+} // namespace MoeTokenPermute
+#endif // MOE_SORT_BASE_WITH_ROUTING_MAP_UNPERMUTE_H

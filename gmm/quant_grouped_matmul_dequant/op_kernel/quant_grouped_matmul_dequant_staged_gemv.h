@@ -23,9 +23,7 @@ namespace AscendC {
 namespace qgmmd_staged {
 class QuantMatmulDequantGemv : public QuantMatmulDequantBase {
 public:
-    __aicore__ inline QuantMatmulDequantGemv()
-    {
-    }
+    __aicore__ inline QuantMatmulDequantGemv() {}
 
     __aicore__ inline void Process()
     {

@@ -13,12 +13,12 @@
 
 #include "kernel_tiling/kernel_tiling.h"
 
-inline void InitGroupedMatmulFRTilingData(uint8_t* tiling, GroupMatmulFRTilingData* const_data)
+inline void InitGroupedMatmulFRTilingData(uint8_t *tiling, GroupMatmulFRTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(GroupMatmulFRTilingData));
 }
 
-#define GET_TILING_DATA(tiling_data, tiling_arg)                                       \
-    GroupMatmulFRTilingData tiling_data;                                                 \
+#define GET_TILING_DATA(tiling_data, tiling_arg) \
+    GroupMatmulFRTilingData tiling_data; \
     InitGroupedMatmulFRTilingData(tiling_arg, &tiling_data)
 #endif

@@ -22,14 +22,12 @@ using namespace AscendC;
 template <typename T, typename S, int32_t dropPadMode>
 class MoeFinalizeRoutingV2HPartialLoad {
 public:
-    __aicore__ inline MoeFinalizeRoutingV2HPartialLoad()
-    {}
+    __aicore__ inline MoeFinalizeRoutingV2HPartialLoad() {}
 
-    __aicore__ inline void Init(
-        GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
-        GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v,
-        GM_ADDR y, GM_ADDR workspace, const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr,
-        TPipe *pipePtr)
+    __aicore__ inline void Init(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
+                                GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1,
+                                GM_ADDR constExpertAlpha2, GM_ADDR v, GM_ADDR y, GM_ADDR workspace,
+                                const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr, TPipe *pipePtr)
     {
         hasBiasAndExpertIdx = (bias != nullptr) && (expertIdx != nullptr);
         hasScales = scales != nullptr;
@@ -155,9 +153,8 @@ private:
             }
         } else {
             expandedXLocal = expandedXQue.AllocTensor<T>();
-            CopyIn(
-                expandedXGm[expandedRowIdxGmValue * tilingData->h + hIdx * tilingData->hFactor], expandedXLocal, 1,
-                hFactor);
+            CopyIn(expandedXGm[expandedRowIdxGmValue * tilingData->h + hIdx * tilingData->hFactor], expandedXLocal, 1,
+                   hFactor);
         }
         expandedXQue.EnQue(expandedXLocal);
         expandedXLocal = expandedXQue.DeQue<T>();
@@ -177,8 +174,8 @@ private:
         if (hasBiasAndExpertIdx) {
             biasLocal = biasQue.DeQue<T>();
         }
-        ProcessExpandXBiasScale<T, S>(
-            yLocal, expandedXLocal, biasLocal, scale, hFactor, hasBiasAndExpertIdx, hasScales);
+        ProcessExpandXBiasScale<T, S>(yLocal, expandedXLocal, biasLocal, scale, hFactor, hasBiasAndExpertIdx,
+                                      hasScales);
         expandedXQue.FreeTensor(expandedXLocal);
         if (hasBiasAndExpertIdx) {
             biasQue.FreeTensor(biasLocal);
@@ -198,17 +195,16 @@ private:
                    expertIdx < tilingData->constantExpertEnd) {
             CopyConstantExpert(rowOuterIdx, hIdx, hFactor, expertIdx);
         } else {
-            CopyIn(
-                expandedXGm[expandedRowIdxGmValue * tilingData->h + hIdx * tilingData->hFactor],
-                expandedXLocal, 1, hFactor);
+            CopyIn(expandedXGm[expandedRowIdxGmValue * tilingData->h + hIdx * tilingData->hFactor], expandedXLocal, 1,
+                   hFactor);
         }
         return true;
     }
 
     __aicore__ inline void CopyCopyExpert(int64_t rowOuterIdx, int64_t hIdx, int64_t hFactor)
     {
-        int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h +
-                            rowOuterIdx * tilingData->h + hIdx * tilingData->hFactor;
+        int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h + rowOuterIdx * tilingData->h +
+                            hIdx * tilingData->hFactor;
         CopyIn(xGm[xGmOffset], expandedXLocal, 1, hFactor);
     }
 
@@ -218,11 +214,11 @@ private:
         constExpertAlpha2Local = constExpertAlpha2Que.AllocTensor<T>();
         vLocal = vQue.AllocTensor<T>();
 
-        int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h +
-                            rowOuterIdx * tilingData->h + hIdx * tilingData->hFactor;
+        int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h + rowOuterIdx * tilingData->h +
+                            hIdx * tilingData->hFactor;
         CopyIn(xGm[xGmOffset], expandedXLocal, 1, hFactor);
-        int64_t constExpertGmOffset = (expertIdx - tilingData->constantExpertStart) * tilingData->h +
-                                      hIdx * tilingData->hFactor;
+        int64_t constExpertGmOffset =
+            (expertIdx - tilingData->constantExpertStart) * tilingData->h + hIdx * tilingData->hFactor;
         CopyIn(constExpertAlpha1Gm[constExpertGmOffset], constExpertAlpha1Local, 1, hFactor);
         CopyIn(constExpertAlpha2Gm[constExpertGmOffset], constExpertAlpha2Local, 1, hFactor);
         CopyIn(vGm[constExpertGmOffset], vLocal, 1, hFactor);

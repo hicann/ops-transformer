@@ -245,10 +245,11 @@ __simd_vf__ inline void TransMxScaleLayoutVf(__ubuf__ int8_t *srcAddr, __ubuf__ 
  * \param[in] elementAfterReduce  Element count after reduction.
  */
 template <typename DataTypeOut>
-__simd_vf__ inline void
-ComputeDataForQuantTargetFp8Vf(__ubuf__ bfloat16_t *srcAddr, __ubuf__ uint16_t *halfScaleLocalAddr,
-                               __ubuf__ int8_t *outLocalAddr, uint32_t totalCountInUB, uint16_t loopNum,
-                               uint32_t vlForHalfNumber, uint16_t elementAfterReduce)
+__simd_vf__ inline void ComputeDataForQuantTargetFp8Vf(__ubuf__ bfloat16_t *srcAddr,
+                                                       __ubuf__ uint16_t *halfScaleLocalAddr,
+                                                       __ubuf__ int8_t *outLocalAddr, uint32_t totalCountInUB,
+                                                       uint16_t loopNum, uint32_t vlForHalfNumber,
+                                                       uint16_t elementAfterReduce)
 {
     uint32_t totalCountInUB2 = totalCountInUB * 2;
 

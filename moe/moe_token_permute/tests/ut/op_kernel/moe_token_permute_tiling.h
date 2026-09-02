@@ -81,6 +81,5 @@ struct MoeTokenPermuteTilingData {
     IndexCopyComputeTilingData indexCopyComputeParamsOp;
 };
 
-#define GET_TILING_DATA(tilingData, tilingPointer) \
-    MoeTokenPermuteTilingData tilingData;
+#define GET_TILING_DATA(tilingData, tilingPointer) MoeTokenPermuteTilingData tilingData;
 #endif

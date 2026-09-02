@@ -35,13 +35,13 @@ using AscendC::TPipe;
 using AscendC::TPosition;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
-#define GMM_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM                                                                          \
-    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType,                         \
-              typename perTokenScaleType, typename biasType, typename yType, const WqmmConfig &wqmmConfig,             \
+#define GMM_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM \
+    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType, \
+              typename perTokenScaleType, typename biasType, typename yType, const WqmmConfig &wqmmConfig, \
               const VecAntiQuantConfig &vecConfig>
 
-#define GMM_WQ_VCV_BASIC_BLOCK_CLASS                                                                                   \
-    WeightQuantVcvMatmulBasicBlock<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType,    \
+#define GMM_WQ_VCV_BASIC_BLOCK_CLASS \
+    WeightQuantVcvMatmulBasicBlock<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType, \
                                    wqmmConfig, vecConfig>
 
 GMM_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
@@ -171,9 +171,8 @@ __aicore__ inline void GMM_WQ_VCV_BASIC_BLOCK_CLASS::ComputeBasicBlock(const Bas
 }
 
 GMM_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_VCV_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNzKn(const BasicBlockOffsetParam &curOffsetParam,
-                                                       const BasicBlockOffsetParam &lastOffsetParam)
+__aicore__ inline void GMM_WQ_VCV_BASIC_BLOCK_CLASS::ComputeBasicBlockAivNzKn(
+    const BasicBlockOffsetParam &curOffsetParam, const BasicBlockOffsetParam &lastOffsetParam)
 {
     uint64_t kMte2Offset = 0;
     uint64_t curCvLoopIdx = cvLoopIdx_;

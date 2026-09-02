@@ -15,11 +15,14 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor* GroupedMatmulFinalizeRouting(const aclTensor *x1, const aclTensor *x2, const aclTensor *scale,
-    const aclTensor *bias, const aclTensor *pertokenScale, const aclTensor *groupList, const aclTensor *shareInput, 
-    const aclTensor *logit, const aclTensor *rowIndex, const aclTensor *offset, int64_t dtype, float sharedInputWeight, 
-    int64_t sharedInputOffset, bool transposeX1, bool transposeX2, int64_t outputBS, int64_t groupListType,
-    const aclIntArray* tuningConfig, aclOpExecutor *executor);
+const aclTensor *GroupedMatmulFinalizeRouting(const aclTensor *x1, const aclTensor *x2, const aclTensor *scale,
+                                              const aclTensor *bias, const aclTensor *pertokenScale,
+                                              const aclTensor *groupList, const aclTensor *shareInput,
+                                              const aclTensor *logit, const aclTensor *rowIndex,
+                                              const aclTensor *offset, int64_t dtype, float sharedInputWeight,
+                                              int64_t sharedInputOffset, bool transposeX1, bool transposeX2,
+                                              int64_t outputBS, int64_t groupListType, const aclIntArray *tuningConfig,
+                                              aclOpExecutor *executor);
 
 }
 

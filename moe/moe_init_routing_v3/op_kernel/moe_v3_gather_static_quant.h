@@ -146,9 +146,9 @@ __aicore__ inline void MoeGatherOutQuant<T, EP>::Init(GM_ADDR inputX, GM_ADDR sc
             expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
                                               Align(coreRows_, sizeof(int32_t)));
         } else {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) +
-                                                  blockIdx_ * perCoreRow_,
-                                              Align(coreRows_, sizeof(int32_t)));
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                Align(coreRows_, sizeof(int32_t)));
         }
     } else {
         // 获取gather索引
@@ -156,12 +156,11 @@ __aicore__ inline void MoeGatherOutQuant<T, EP>::Init(GM_ADDR inputX, GM_ADDR sc
             expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
                                               Align(coreRows_, sizeof(int32_t)));
         } else {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) +
-                                                  blockIdx_ * perCoreRow_,
-                                              Align(coreRows_, sizeof(int32_t)));
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                Align(coreRows_, sizeof(int32_t)));
         }
     }
-
 
     scaleGm_.SetGlobalBuffer((__gm__ float *)scale, 1);
     offsetGm_.SetGlobalBuffer((__gm__ float *)offset, 1);

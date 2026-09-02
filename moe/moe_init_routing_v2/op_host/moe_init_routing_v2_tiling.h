@@ -90,7 +90,8 @@ struct MoeInitRoutingV2CompileInfo {
 
 class MoeInitRoutingV2TilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeInitRoutingV2TilingBase(gert::TilingContext *context) : TilingBaseClass(context)
+    explicit MoeInitRoutingV2TilingBase(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {
         Reset();
     }

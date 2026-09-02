@@ -336,9 +336,9 @@ __aicore__ inline void MoeSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR expende
     }
 
     this->pipe = tPipe;
-    expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx +
-                                    this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
-                                this->sortTotalLength);
+    expertIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)expertIdx + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
+        this->sortTotalLength);
     sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace),
                                       Align(this->totalLength, sizeof(int32_t)));
     if (this->rowIdxType_ == SCATTER) {
@@ -357,9 +357,9 @@ __aicore__ inline void MoeSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR expende
 
     if (this->expertTokensNumFlag) {
         expertCountTempGm.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                            Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2 +
-                                            this->blockIdx * this->perCoreExpert,
-                                            this->currentCoreExpert);
+                                              Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2 +
+                                              this->blockIdx * this->perCoreExpert,
+                                          this->currentCoreExpert);
     }
 
     // key and value

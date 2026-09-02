@@ -21,14 +21,12 @@ namespace MoeFinalizeRoutingV2Grad {
 using namespace AscendC;
 
 template <typename T1, typename T2>
-class MoeFinalizeRoutingV2GradWithScaleNotCutH : MoeFinalizeRoutingV2GradBase<T1, T2>
-{
+class MoeFinalizeRoutingV2GradWithScaleNotCutH : MoeFinalizeRoutingV2GradBase<T1, T2> {
 public:
     __aicore__ inline MoeFinalizeRoutingV2GradWithScaleNotCutH(){};
-    __aicore__ inline void Init(
-        GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR bias,
-        GM_ADDR gradExpandedX, GM_ADDR gradScales, GM_ADDR workspace,
-        const MoeFinalizeRoutingV2GradTilingData* tilingData, TPipe* pipe);
+    __aicore__ inline void Init(GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR scales,
+                                GM_ADDR expertIdx, GM_ADDR bias, GM_ADDR gradExpandedX, GM_ADDR gradScales,
+                                GM_ADDR workspace, const MoeFinalizeRoutingV2GradTilingData *tilingData, TPipe *pipe);
     __aicore__ inline void Process();
 
 private:
@@ -40,15 +38,15 @@ private:
 template <typename T1, typename T2>
 __aicore__ inline void MoeFinalizeRoutingV2GradWithScaleNotCutH<T1, T2>::Init(
     GM_ADDR gradY, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR scales, GM_ADDR expertIdx, GM_ADDR bias,
-    GM_ADDR gradExpandedX, GM_ADDR gradScales, GM_ADDR workspace, const MoeFinalizeRoutingV2GradTilingData* tilingData,
-    TPipe* pipe)
+    GM_ADDR gradExpandedX, GM_ADDR gradScales, GM_ADDR workspace, const MoeFinalizeRoutingV2GradTilingData *tilingData,
+    TPipe *pipe)
 {
     this->SubInit(gradY, expandedRowIdx, gradExpandedX, tilingData, pipe);
-    this->expandedXGm_.SetGlobalBuffer((__gm__ T1*)expandedX);
-    this->scalesGm_.SetGlobalBuffer((__gm__ T1*)scales);
-    this->biasGm_.SetGlobalBuffer((__gm__ T1*)bias);
-    this->gradScalesGm_.SetGlobalBuffer((__gm__ T1*)gradScales);
-    this->expertIdxGm_.SetGlobalBuffer((__gm__ T2*)expertIdx);
+    this->expandedXGm_.SetGlobalBuffer((__gm__ T1 *)expandedX);
+    this->scalesGm_.SetGlobalBuffer((__gm__ T1 *)scales);
+    this->biasGm_.SetGlobalBuffer((__gm__ T1 *)bias);
+    this->gradScalesGm_.SetGlobalBuffer((__gm__ T1 *)gradScales);
+    this->expertIdxGm_.SetGlobalBuffer((__gm__ T2 *)expertIdx);
     this->pipe_->InitBuffer(this->gradYInQueue_, 1, this->tilingData_->hiddenPrePart * sizeof(float));
     this->pipe_->InitBuffer(this->expandedRowIdxInQueue_, 1, BYTE_BLOCK);
     this->pipe_->InitBuffer(this->scalesInQueue_, 1, BYTE_BLOCK);

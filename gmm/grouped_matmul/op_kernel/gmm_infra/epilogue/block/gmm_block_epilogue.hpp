@@ -15,16 +15,13 @@
 
 namespace Catlass::Epilogue::Block {
 
-template <
-    class DispatchPolicy,
-    class... Args
->
+template <class DispatchPolicy, class... Args>
 class BlockEpilogue {
     static_assert(DEPENDENT_FALSE<DispatchPolicy>, "Could not find an epilogue specialization");
 };
 
-}  // namespace Catlass::Epilogue::Block
+} // namespace Catlass::Epilogue::Block
 
 #include "../../../gmm_infra/epilogue/block/gmm_block_epilogue_per_token_dequant.hpp"
 #include "../../../gmm_infra/epilogue/block/block_epilogue_per_token_dequant_add.hpp"
-#endif  // GMM_EPILOGUE_BLOCK_BLOCK_EPILOGUE_HPP
+#endif // GMM_EPILOGUE_BLOCK_BLOCK_EPILOGUE_HPP

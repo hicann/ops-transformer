@@ -92,24 +92,24 @@ REGISTER_TILING_DATA_CLASS(MoeInitRoutingV2Grad_400001, MoeInitRoutingV2GradRegb
 REGISTER_TILING_DATA_CLASS(MoeInitRoutingV2Grad_400002, MoeInitRoutingV2GradRegbaseTilingData)
 REGISTER_TILING_DATA_CLASS(MoeInitRoutingV2Grad_400003, MoeInitRoutingV2GradRegbaseTilingData)
 
-class MoeInitRoutingV2GradTilingBaseClass : public Ops::Transformer::OpTiling::TilingBaseClass
-{
+class MoeInitRoutingV2GradTilingBaseClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeInitRoutingV2GradTilingBaseClass(gert::TilingContext* context) : TilingBaseClass(context)
+    explicit MoeInitRoutingV2GradTilingBaseClass(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {}
 
-    void Reset(gert::TilingContext* context) override
+    void Reset(gert::TilingContext *context) override
     {
         TilingBaseClass::Reset(context);
     }
 
 private:
-    ge::graphStatus CheckParamsValidity(
-        const gert::Shape& xShape, const gert::Shape& rowIdxShape, const gert::Shape& gradXShape) const;
+    ge::graphStatus CheckParamsValidity(const gert::Shape &xShape, const gert::Shape &rowIdxShape,
+                                        const gert::Shape &gradXShape) const;
     ge::graphStatus CheckDtypeValidity();
-    ge::graphStatus CheckShapeAllPositive(const gert::Shape& shape, std::string name);
-    ge::graphStatus CheckShapeValidity(
-        const gert::Shape& xShape, const gert::Shape& rowIdxShape, const gert::Shape& gradXShape);
+    ge::graphStatus CheckShapeAllPositive(const gert::Shape &shape, std::string name);
+    ge::graphStatus CheckShapeValidity(const gert::Shape &xShape, const gert::Shape &rowIdxShape,
+                                       const gert::Shape &gradXShape);
 
 protected:
     ge::graphStatus GetPlatformInfo() override;
@@ -130,7 +130,7 @@ protected:
     int64_t E = 0;
     int64_t C = 0;
     ge::DataType inDtype = ge::DT_FLOAT;
-    const char* opName = "";
+    const char *opName = "";
     platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
 };
 

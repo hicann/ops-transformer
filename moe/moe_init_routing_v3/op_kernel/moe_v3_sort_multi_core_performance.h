@@ -149,9 +149,9 @@ __aicore__ inline void MoeSortMultiCorePerformance::Init(GM_ADDR expendedRowIdx,
     workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace, Align(this->totalLength, sizeof(float)) * kvFactor);
     workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(float)) * kvFactor,
                                     Align(this->totalLength, sizeof(float)) * kvFactor);
-    workspaceGatheredSortNumGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                                    Align(this->totalLength, sizeof(int32_t)) * kvFactor * kvFactor,
-                                                MAX_MRGSORT_LIST_TOTAL);
+    workspaceGatheredSortNumGm_.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * kvFactor * kvFactor,
+        MAX_MRGSORT_LIST_TOTAL);
     // 直方图临时空间
     expertCountTempGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
                                       expertEnd_ - expertStart_);

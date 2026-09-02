@@ -77,10 +77,10 @@ constexpr AscendC::MicroAPI::CastTrait ctHalf2Fp32One = {
     AscendC::MicroAPI::RegLayout::ONE, AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN};
 
-#define QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS                                                                  \
-    template <typename L0TileShape_, typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_,           \
+#define QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS \
+    template <typename L0TileShape_, typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, \
               typename DataTypeX1Scale_, typename DataTypeBias_, bool IsTensorList_>
-#define QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS                                                                   \
+#define QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS \
     L0TileShape_, DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, DataTypeBias_, IsTensorList_
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
@@ -212,8 +212,8 @@ __aicore__ inline BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PAR
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensorListGlobalBuffer(Params const &params)
+__aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensorListGlobalBuffer(
+    Params const &params)
 {
     if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
         DataTypeX2Scale x2ScaleValue =
@@ -244,8 +244,8 @@ BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensor
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensorGlobalBuffer(Params const &params)
+__aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensorGlobalBuffer(
+    Params const &params)
 {
     if (dequantTiling_->x2QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
         DataTypeX2Scale x2ScaleValue = *((__gm__ DataTypeX2Scale *)params.x2ScaleGmAddr + groupIdx_);
@@ -274,8 +274,8 @@ BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateTensor
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalBuffer(Params const &params)
+__aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalBuffer(
+    Params const &params)
 {
     if constexpr (IsTensorList_) {
         UpdateTensorListGlobalBuffer(params);
@@ -667,21 +667,18 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
         l0cOutUbAddr = l0cOutUbAddr + offsetL0c;
 
         switch (dequantTiling_->x1QuantMode) {
-            case (Qmm::QuantMode::PERTOKEN_MODE):
-                {
-                    uint64_t offsetPtScale = i * mSizeForOnce;
-                    VFDoDequantWithX1Pertoken(dequantOutInUbAddr, l0cOutUbAddr, offsetPtScale, mSize);
-                    break;
-                }
-            case (Qmm::QuantMode::PERTENSOR_MODE):
-                {
-                    VFDoDequantWithX1Pertensor(dequantOutInUbAddr, l0cOutUbAddr, mSize);
-                    break;
-                }
-            default:
-                {
-                    VFDoDequantWithoutX1Scale(dequantOutInUbAddr, l0cOutUbAddr, mSize);
-                }
+            case (Qmm::QuantMode::PERTOKEN_MODE): {
+                uint64_t offsetPtScale = i * mSizeForOnce;
+                VFDoDequantWithX1Pertoken(dequantOutInUbAddr, l0cOutUbAddr, offsetPtScale, mSize);
+                break;
+            }
+            case (Qmm::QuantMode::PERTENSOR_MODE): {
+                VFDoDequantWithX1Pertensor(dequantOutInUbAddr, l0cOutUbAddr, mSize);
+                break;
+            }
+            default: {
+                VFDoDequantWithoutX1Scale(dequantOutInUbAddr, l0cOutUbAddr, mSize);
+            }
         }
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(dequantOutInUBPingPongID_);
         // mmDequant result: UB -> GM
@@ -706,9 +703,8 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
 }
 
 QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::operator()(BlockShape &blockShape,
-                                                                               BlockCoord &blockCoord)
+__aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::operator()(
+    BlockShape &blockShape, BlockCoord &blockCoord)
 {
     Run(blockShape, blockCoord);
     return;

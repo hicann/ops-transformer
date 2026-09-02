@@ -101,13 +101,9 @@ public:
     // params
     using Params = Arguments;
 
-    __aicore__ inline BlockQuantMatmulBuilder()
-    {
-    }
+    __aicore__ inline BlockQuantMatmulBuilder() {}
 
-    __aicore__ inline ~BlockQuantMatmulBuilder()
-    {
-    }
+    __aicore__ inline ~BlockQuantMatmulBuilder() {}
 };
 } // namespace Block
 } // namespace Gemm

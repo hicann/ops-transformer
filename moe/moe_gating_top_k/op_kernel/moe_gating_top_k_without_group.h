@@ -24,10 +24,9 @@ template <typename T, typename U1 = int32_t, typename U2 = int32_t>
 class MoeGatingTopKWithoutGroup {
 public:
     __aicore__ inline MoeGatingTopKWithoutGroup(){};
-    __aicore__ inline void Init(
-        GM_ADDR x, GM_ADDR bias, GM_ADDR inputIds, GM_ADDR tid2eid,
-        GM_ADDR y, GM_ADDR expertIdx, GM_ADDR out, GM_ADDR workspace,
-        const MoeGatingTopKTilingData *tilingData, TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR bias, GM_ADDR inputIds, GM_ADDR tid2eid, GM_ADDR y,
+                                GM_ADDR expertIdx, GM_ADDR out, GM_ADDR workspace,
+                                const MoeGatingTopKTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -302,10 +301,11 @@ __aicore__ inline void MoeGatingTopKWithoutGroup<T, U1, U2>::CopyOut(int64_t row
 }
 
 template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKWithoutGroup<T, U1, U2>::Init(
-    GM_ADDR x, GM_ADDR bias, GM_ADDR inputIds, GM_ADDR tid2eid,
-    GM_ADDR y, GM_ADDR expertIdx, GM_ADDR out, GM_ADDR workspace,
-    const MoeGatingTopKTilingData *tilingData, TPipe *tPipe)
+__aicore__ inline void MoeGatingTopKWithoutGroup<T, U1, U2>::Init(GM_ADDR x, GM_ADDR bias, GM_ADDR inputIds,
+                                                                  GM_ADDR tid2eid, GM_ADDR y, GM_ADDR expertIdx,
+                                                                  GM_ADDR out, GM_ADDR workspace,
+                                                                  const MoeGatingTopKTilingData *tilingData,
+                                                                  TPipe *tPipe)
 {
     tilingData_ = tilingData;
     pipe_ = tPipe;

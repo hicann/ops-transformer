@@ -135,8 +135,8 @@ __aicore__ inline int64_t MoeFinalizeRoutingFpCuthK2Optimized<T>::PadProcessT(in
 }
 
 template <typename T>
-__aicore__ inline void
-MoeFinalizeRoutingFpCuthK2Optimized<T>::ParseTilingData(const MoeFinalizeRoutingTilingData *tilingData)
+__aicore__ inline void MoeFinalizeRoutingFpCuthK2Optimized<T>::ParseTilingData(
+    const MoeFinalizeRoutingTilingData *tilingData)
 {
     skip2IsNull_ = tilingData->skip2IsNull;
     BS_ = tilingData->totalRowNum;
@@ -193,11 +193,12 @@ __aicore__ inline void MoeFinalizeRoutingFpCuthK2Optimized<T>::CkechColAlignment
 }
 
 template <typename T>
-__aicore__ inline void
-MoeFinalizeRoutingFpCuthK2Optimized<T>::Init(GM_ADDR expandedPermutedRows, GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
-                                             GM_ADDR scales, GM_ADDR expandedSrcToDstRow, GM_ADDR expertForSourceRow,
-                                             GM_ADDR out, GM_ADDR workspace,
-                                             const MoeFinalizeRoutingTilingData *tilingData)
+__aicore__ inline void MoeFinalizeRoutingFpCuthK2Optimized<T>::Init(GM_ADDR expandedPermutedRows, GM_ADDR skip1,
+                                                                    GM_ADDR skip2, GM_ADDR bias, GM_ADDR scales,
+                                                                    GM_ADDR expandedSrcToDstRow,
+                                                                    GM_ADDR expertForSourceRow, GM_ADDR out,
+                                                                    GM_ADDR workspace,
+                                                                    const MoeFinalizeRoutingTilingData *tilingData)
 {
     // init tiling data
     ParseTilingData(tilingData);

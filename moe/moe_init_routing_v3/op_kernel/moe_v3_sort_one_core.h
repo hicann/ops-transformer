@@ -59,9 +59,9 @@ __aicore__ inline void MoeSortOneCore::SortCompute()
 
     if (ep_) {
         LocalTensor<uint8_t> maskLocalTensor = sortedBuffer.Get<uint8_t>();
-        AscendC::CompareScalar(maskLocalTensor, expertIdxFp32, static_cast<float>(-expertStart_), AscendC::CMPMODE::GT,
-                               (this->totalLength + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM *
-                                   ONE_REPEAT_COMPARE_NUM);
+        AscendC::CompareScalar(
+            maskLocalTensor, expertIdxFp32, static_cast<float>(-expertStart_), AscendC::CMPMODE::GT,
+            (this->totalLength + ONE_REPEAT_COMPARE_NUM - 1) / ONE_REPEAT_COMPARE_NUM * ONE_REPEAT_COMPARE_NUM);
         LocalTensor<float> floatMinLocalTensor = tempBuffer.Get<float>();
         Duplicate(floatMinLocalTensor, MIN_FP32, this->tileLength);
         Select(expertIdxFp32, maskLocalTensor, floatMinLocalTensor, expertIdxFp32, SELMODE::VSEL_TENSOR_TENSOR_MODE,
@@ -136,9 +136,9 @@ __aicore__ inline void MoeSortOneCore::Init(GM_ADDR expertIdx, GM_ADDR expendedR
     }
 
     if (GetBlockIdx() == 0) {
-        expertCountTempGm.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                              Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
-                                          tilingData->actualExpertNum);
+        expertCountTempGm.SetGlobalBuffer(
+            (__gm__ int32_t *)workspace + Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
+            tilingData->actualExpertNum);
         InitGlobalMemory(expertCountTempGm, tilingData->actualExpertNum, 0);
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
     }

@@ -99,9 +99,9 @@ __aicore__ inline void MoeV2SortMultiCore<T>::InitBuffers(GM_ADDR expertIdx, GM_
                                 this->sortTotalLength);
     sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace),
                                       Align(this->totalLength, sizeof(int32_t)));
-    expandDstToSrcRowGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) +
-                                            Align(this->totalLength, sizeof(int32_t)),
-                                        Align(this->totalLength, sizeof(int32_t)));
+    expandDstToSrcRowGm.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(workspace) + Align(this->totalLength, sizeof(int32_t)),
+        Align(this->totalLength, sizeof(int32_t)));
 
     if (this->expertTokensCountOrCumsumFlag > EXERPT_TOKENS_NONE ||
         this->expertTokensBeforeCapacityFlag == EXERPT_TOKENS_BEFORE_CAPACITY) {
@@ -113,21 +113,22 @@ __aicore__ inline void MoeV2SortMultiCore<T>::InitBuffers(GM_ADDR expertIdx, GM_
         }
     }
     if (this->expertTokensCountOrCumsumFlag > EXERPT_TOKENS_NONE) {
-        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum +
-                                                        this->blockIdx * this->perCoreExpert,
-                                                    this->currentCoreExpert);
+        expertTokensCountOrCumsumGm.SetGlobalBuffer(
+            (__gm__ int32_t *)expertTokensCountOrCumsum + this->blockIdx * this->perCoreExpert,
+            this->currentCoreExpert);
     }
     if (this->expertTokensBeforeCapacityFlag == EXERPT_TOKENS_BEFORE_CAPACITY) {
-        expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensBeforeCapacity +
-                                                     this->blockIdx * this->perCoreExpert, this->currentCoreExpert);
+        expertTokensBeforeCapacityGm.SetGlobalBuffer(
+            (__gm__ int32_t *)expertTokensBeforeCapacity + this->blockIdx * this->perCoreExpert,
+            this->currentCoreExpert);
     }
 
     int64_t kvFactor = 2;
     workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
                                     Align(this->totalLength, sizeof(int32_t)) * kvFactor);
-    workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace +
-                                        Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2),
-                                    Align(this->totalLength, sizeof(int32_t)) * kvFactor);
+    workspaceGms[1].SetGlobalBuffer(
+        (__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2),
+        Align(this->totalLength, sizeof(int32_t)) * kvFactor);
 
     int64_t bufferSize = Ceil(Max(this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),
                               ONE_REPEAT_SORT_NUM) *

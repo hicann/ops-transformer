@@ -37,12 +37,8 @@ public:
 
     struct Params {};
 
-    __aicore__ inline void Init(Params const &params, int64_t calcM, int64_t calcN, int64_t n)
-    {
-    }
-    __aicore__ inline void InitBuffers()
-    {
-    }
+    __aicore__ inline void Init(Params const &params, int64_t calcM, int64_t calcN, int64_t n) {}
+    __aicore__ inline void InitBuffers() {}
     __aicore__ inline int64_t GetUbSizeOneM(int64_t ubCalcN)
     {
         return 0;

@@ -379,9 +379,9 @@ __aicore__ inline void MoeGatingTopKEKFullload<T>::Init(GM_ADDR x, GM_ADDR bias,
 
     pipe_->InitBuffer(sigmoidTmpQueue_, 2, AlignBytes(expertCount_, sizeof(float)));
     pipe_->InitBuffer(sortedInGroupQueue_, 2, AlignBytes(expertCount_, sizeof(float)) * 2);
-    pipe_->InitBuffer(sortedGroupQueue_, 2,
-                      (groupCount_ + ONE_REPEAT_SORT_NUM - 1) / ONE_REPEAT_SORT_NUM * ONE_REPEAT_SORT_NUM *
-                          sizeof(float) * 2);
+    pipe_->InitBuffer(
+        sortedGroupQueue_, 2,
+        (groupCount_ + ONE_REPEAT_SORT_NUM - 1) / ONE_REPEAT_SORT_NUM * ONE_REPEAT_SORT_NUM * sizeof(float) * 2);
 
     pipe_->InitBuffer(calcTmpBuffer_, tilingData_->calTmpBufUbSize);
 }

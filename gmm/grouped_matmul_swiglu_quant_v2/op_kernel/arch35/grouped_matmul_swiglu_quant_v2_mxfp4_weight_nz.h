@@ -56,11 +56,12 @@ public:
     }
 
     template <typename SingleShape>
-    __aicore__ inline void
-    operator()(const AscendC::GlobalTensor<AType> &aGlobal, const AscendC::GlobalTensor<BType> &bGlobal,
-               const AscendC::GlobalTensor<AscendC::fp8_e8m0_t> &scaleAGlobal,
-               const AscendC::GlobalTensor<AscendC::fp8_e8m0_t> &scaleBGlobal,
-               const AscendC::LocalTensor<CType> &cLocal, const SingleShape &singleShape, bool transA, bool transB)
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType> &aGlobal,
+                                      const AscendC::GlobalTensor<BType> &bGlobal,
+                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t> &scaleAGlobal,
+                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t> &scaleBGlobal,
+                                      const AscendC::LocalTensor<CType> &cLocal, const SingleShape &singleShape,
+                                      bool transA, bool transB)
     {
         (void)transA;
         (void)transB;

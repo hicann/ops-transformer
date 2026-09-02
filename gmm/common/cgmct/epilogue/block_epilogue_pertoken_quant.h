@@ -80,9 +80,9 @@ constexpr float NEG_INFINITY = -INFINITY;
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
 class BlockEpiloguePertokenQuant {
 public:
-    __aicore__ inline BlockEpiloguePertokenQuant(TPipe *pipe) : pPipe_(pipe)
-    {
-    }
+    __aicore__ inline BlockEpiloguePertokenQuant(TPipe *pipe)
+        : pPipe_(pipe)
+    {}
 
     struct Arguments {
         GM_ADDR workSpaceGMAddr{nullptr};
@@ -150,8 +150,8 @@ private:
 };
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::Init(Params const &params)
+__aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::Init(
+    Params const &params)
 {
     if ASCEND_IS_AIC {
         return;
@@ -161,8 +161,8 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
 }
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::operator()(uint32_t realM)
+__aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::operator()(
+    uint32_t realM)
 {
     if ASCEND_IS_AIC {
         return;
@@ -191,8 +191,8 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
 }
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::CalParams(uint32_t realM)
+__aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::CalParams(
+    uint32_t realM)
 {
     uint32_t rowNum = realM;
     uint32_t vectorCoreNum = uint32_t(GetBlockNum() * GetTaskRation());
@@ -276,9 +276,9 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
         baseRow_ = headCoreNum_ * rowPerHeadCore_ + (blockIdx_ - headCoreNum_) * rowPerTailCore_;
         inGm_.SetGlobalBuffer((__gm__ XDtype *)x + headCoreNum_ * lenHead_ + (blockIdx_ - headCoreNum_) * lenTail_,
                               lenTail_);
-        outGm_.SetGlobalBuffer((__gm__ YCopyDtype *)y + headCoreNum_ * outLenHead_ +
-                                   (blockIdx_ - headCoreNum_) * outLenTail_,
-                               outLenTail_);
+        outGm_.SetGlobalBuffer(
+            (__gm__ YCopyDtype *)y + headCoreNum_ * outLenHead_ + (blockIdx_ - headCoreNum_) * outLenTail_,
+            outLenTail_);
         yScaleGm_.SetGlobalBuffer((__gm__ float *)scale + baseRow_, rowPerTailCore_);
     }
 
@@ -293,9 +293,8 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
 }
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::LoopProcess(int32_t multiRow,
-                                                                                             int32_t loopNum)
+__aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::LoopProcess(
+    int32_t multiRow, int32_t loopNum)
 {
     CopyIn(multiRow, loopNum);
     Compute(multiRow);
@@ -303,9 +302,8 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
 }
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::CopyIn(int32_t multiRow,
-                                                                                        int32_t loopNum)
+__aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::CopyIn(
+    int32_t multiRow, int32_t loopNum)
 {
     LocalTensor<XDtype> inLocal = inQueue.template AllocTensor<XDtype>();
     DataCopyExtParams copyParams = {static_cast<uint16_t>(multiRow),
@@ -316,8 +314,8 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
 }
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::Compute(int32_t multiRow)
+__aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::Compute(
+    int32_t multiRow)
 {
     uint32_t index = 0;
     LocalTensor<float> scaleLocal = scaleQueue.template AllocTensor<float>();
@@ -329,7 +327,6 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
     __local_mem__ YCopyDtype *yAddr = (__local_mem__ YCopyDtype *)yLocal.GetPhyAddr();
     __local_mem__ float *scaleAddr = (__local_mem__ float *)scaleLocal.GetPhyAddr();
 
-
     ComputeVF(xAddr, yAddr, scaleAddr, multiRow);
 
     outQueue.template EnQue<YCopyDtype>(yLocal);
@@ -338,9 +335,8 @@ BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>:
 }
 
 QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::CopyOut(int32_t multiRow,
-                                                                                         int32_t loopCount)
+__aicore__ inline void BlockEpiloguePertokenQuant<QMM_BLOCK_EPILOGUE_PERTOKEN_QUANT_FUNC_LOCAL_PARAMS>::CopyOut(
+    int32_t multiRow, int32_t loopCount)
 {
     LocalTensor<YCopyDtype> yLocal = outQueue.template DeQue<YCopyDtype>();
     LocalTensor<float> scaleLocal = scaleQueue.template DeQue<float>();

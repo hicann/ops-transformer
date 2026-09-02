@@ -38,12 +38,12 @@ struct PerBlockMmParam {
     uint64_t ndNum;
 };
 
-#define QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS                                                                             \
-    template <class AType_, class LayoutA_, class BType_, class LayoutB_, class CType_, class LayoutC_,                \
+#define QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS \
+    template <class AType_, class LayoutA_, class BType_, class LayoutB_, class CType_, class LayoutC_, \
               class BiasType_, class LayoutBias_, class L1TileShape_, class L0TileShape_, class TileCopyParam_>
 
-#define QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS                                                                              \
-    GMMPerTile<>, AType_, LayoutA_, BType_, LayoutB_, CType_, LayoutC_, BiasType_, LayoutBias_, L1TileShape_,          \
+#define QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS \
+    GMMPerTile<>, AType_, LayoutA_, BType_, LayoutB_, CType_, LayoutC_, BiasType_, LayoutBias_, L1TileShape_, \
         L0TileShape_, TileCopyParam_
 
 using namespace Cgmct::Gemm::GroupedMatmul;
@@ -204,10 +204,10 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::Init(con
         bL1Ping_ = AscendC::LocalTensor<BType>(AscendC::TPosition::B1,
                                                baseM_ * baseK_ * stepKa_ * sizeof(AType) * GMM_BUFFER_NUM,
                                                baseN_ * baseK_ * stepKb_);
-        bL1Pong_ = AscendC::LocalTensor<BType>(AscendC::TPosition::B1,
-                                               baseM_ * baseK_ * stepKa_ * sizeof(AType) * GMM_BUFFER_NUM +
-                                                   baseN_ * baseK_ * stepKb_ * sizeof(BType),
-                                               baseN_ * baseK_ * stepKb_);
+        bL1Pong_ = AscendC::LocalTensor<BType>(
+            AscendC::TPosition::B1,
+            baseM_ * baseK_ * stepKa_ * sizeof(AType) * GMM_BUFFER_NUM + baseN_ * baseK_ * stepKb_ * sizeof(BType),
+            baseN_ * baseK_ * stepKb_);
         aL0Ping_ = AscendC::LocalTensor<AType>(AscendC::TPosition::A2, 0, baseM_ * baseK_);
         aL0Pong_ =
             AscendC::LocalTensor<AType>(AscendC::TPosition::A2, baseM_ * baseK_ * sizeof(AType), baseM_ * baseK_);
@@ -221,8 +221,8 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::Init(con
 }
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::UpdateParamsForNextProblem(const TupleShape &problemShape)
+__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::UpdateParamsForNextProblem(
+    const TupleShape &problemShape)
 {
     problemShape_ = problemShape;
     matmulParam_.UpdateForNextGroup(problemShape_);
@@ -255,10 +255,9 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::UpdatePe
 }
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::operator()(const TupleShape &actualSingleShape,
-                                                            const AscendC::GlobalTensor<AType> &aGlobal,
-                                                            const AscendC::GlobalTensor<BType> &bGlobal)
+__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::operator()(
+    const TupleShape &actualSingleShape, const AscendC::GlobalTensor<AType> &aGlobal,
+    const AscendC::GlobalTensor<BType> &bGlobal)
 {
     actualSingleShape_ = actualSingleShape;
     matmulParam_.UpdateNextBlockParams(actualSingleShape_);
@@ -390,9 +389,8 @@ __aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::MmadBase
 }
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA1Nd2Nz(const AscendC::GlobalTensor<AType> &aGlobal,
-                                                               uint64_t kOffset, bool isTailAL1)
+__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA1Nd2Nz(
+    const AscendC::GlobalTensor<AType> &aGlobal, uint64_t kOffset, bool isTailAL1)
 {
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(aL1PingPongID_);
     uint64_t offset = matmulParam_.CalcAGMOffsetInnerLoop(0, kOffset);
@@ -404,9 +402,8 @@ BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInA1Nd2Nz(const AscendC::Gl
 }
 
 QGMM_BLOCK_MMAD_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInB1Nd2Nz(const AscendC::GlobalTensor<BType> &bGlobal,
-                                                               uint64_t kOffset, bool isTailBL1)
+__aicore__ inline void BlockMmadGmm<QGMM_BLOCK_MMAD_FUNC_LOCAL_PARAMS>::CopyInB1Nd2Nz(
+    const AscendC::GlobalTensor<BType> &bGlobal, uint64_t kOffset, bool isTailBL1)
 {
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(bL1PingPongID_ + GMM_BUFFER_NUM);
     uint64_t offset = matmulParam_.CalcBGMOffsetInnerLoop(0, kOffset);

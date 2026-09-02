@@ -43,21 +43,19 @@ struct Callback {
 };
 
 template <typename Func>
-CATLASS_DEVICE
-static void FuncWrapper(void const *func)
+CATLASS_DEVICE static void FuncWrapper(void const *func)
 {
     (*static_cast<Func const *>(func))();
 }
 
 // Use this to make a callback
 template <typename Func>
-CATLASS_DEVICE
-Callback MakeCallback(Func *func)
+CATLASS_DEVICE Callback MakeCallback(Func *func)
 {
     Callback callback;
     callback.func = func;
     callback.caller = &FuncWrapper<Func>;
     return callback;
 }
-}
+} // namespace Catlass
 #endif // GMM_DETAIL_CALLBACK_HPP

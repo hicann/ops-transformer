@@ -295,6 +295,5 @@ private:
     QuantMatmulDequantParam _Params;
 };
 
-
 } // namespace optiling
 #endif // OPS_BUILT_IN_OP_TILING_RUNTIME_QUANT_MATMUL_DEQUANT_H

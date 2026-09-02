@@ -59,12 +59,13 @@ __aicore__ inline constexpr uint32_t GetVRegSize()
 /**
  * Check whether the type is supported by atomic add for simd
  */
-template<typename T>
+template <typename T>
 __aicore__ inline constexpr bool IsSupportAtomicAddTypeSIMD()
 {
 #if __CCE_AICORE__ == 310
-    return AscendC::IsSameType<T, float>::value || AscendC::IsSameType<T, half>::value || AscendC::IsSameType<T, int16_t>::value ||
-        AscendC::IsSameType<T, int32_t>::value || AscendC::IsSameType<T, int8_t>::value || AscendC::IsSameType<T, bfloat16_t>::value;
+    return AscendC::IsSameType<T, float>::value || AscendC::IsSameType<T, half>::value ||
+           AscendC::IsSameType<T, int16_t>::value || AscendC::IsSameType<T, int32_t>::value ||
+           AscendC::IsSameType<T, int8_t>::value || AscendC::IsSameType<T, bfloat16_t>::value;
 #else
     return false;
 #endif
@@ -78,6 +79,6 @@ __aicore__ inline constexpr bool IsDataCopyPadSupport()
     return platform::IsDataCopyPadSupport();
 }
 
-}
+} // namespace PlatformSocInfo
 
-#endif  // OPS_BUILT_IN_OP_ASCENDC_PLATFORM_INFO_H_
+#endif // OPS_BUILT_IN_OP_ASCENDC_PLATFORM_INFO_H_

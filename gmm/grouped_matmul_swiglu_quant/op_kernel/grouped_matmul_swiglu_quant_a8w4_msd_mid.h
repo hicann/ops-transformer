@@ -75,9 +75,9 @@ public:
     using bT = typename mmType::BT;
 
 public:
-    __aicore__ inline GMMA8W4MidProcess(typename mmType::MT &matmul) : mm(matmul)
-    {
-    }
+    __aicore__ inline GMMA8W4MidProcess(typename mmType::MT &matmul)
+        : mm(matmul)
+    {}
     __aicore__ inline void Init(const GMAddrParams gmAddrParams,
                                 const GMMSwigluBaseParams *__restrict gmmSwigluBaseParamsIN);
     __aicore__ inline void Process(WorkSpaceSplitConfig &workspaceSplitConfig, int64_t workspaceSplitLoopIdx);

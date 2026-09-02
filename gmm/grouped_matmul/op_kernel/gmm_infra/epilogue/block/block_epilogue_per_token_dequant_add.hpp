@@ -22,27 +22,10 @@
 
 namespace Catlass::Epilogue::Block {
 
-template <
-    uint32_t UB_STAGES_,
-    uint32_t M_MAX_,
-    class CType_,
-    class PerTokenScaleType_,
-    class DType_,
-    class TileBroadcastOneBlk_,
-    class TileOneBlkColumnBroadcastMul_,
-    class TileCopy_,
-    class EpilogueTileSwizzle_
->
-class BlockEpilogue <
-    EpilogueAtlasA2PerTokenDequantAdd<UB_STAGES_, M_MAX_>,
-    CType_,
-    PerTokenScaleType_,
-    DType_,
-    TileBroadcastOneBlk_,
-    TileOneBlkColumnBroadcastMul_,
-    TileCopy_,
-    EpilogueTileSwizzle_
-> {
+template <uint32_t UB_STAGES_, uint32_t M_MAX_, class CType_, class PerTokenScaleType_, class DType_,
+          class TileBroadcastOneBlk_, class TileOneBlkColumnBroadcastMul_, class TileCopy_, class EpilogueTileSwizzle_>
+class BlockEpilogue<EpilogueAtlasA2PerTokenDequantAdd<UB_STAGES_, M_MAX_>, CType_, PerTokenScaleType_, DType_,
+                    TileBroadcastOneBlk_, TileOneBlkColumnBroadcastMul_, TileCopy_, EpilogueTileSwizzle_> {
 public:
     using DispatchPolicy = EpilogueAtlasA2PerTokenDequantAdd<UB_STAGES_, M_MAX_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
@@ -67,16 +50,13 @@ public:
     using LayoutD = typename DType_::Layout;
 
     // Check data infos
-    static_assert(
-        std::is_same_v<ElementC, half> && std::is_same_v<ElementD, bfloat16_t> &&
-            std::is_same_v<ElementPerTokenScale, float>,
-        "The element type template parameters of BlockEpilogue are wrong"
-    );
-    static_assert(
-        std::is_same_v<LayoutC, layout::RowMajor> &&
-            std::is_same_v<LayoutPerTokenScale, layout::VectorLayout> && std::is_same_v<LayoutD, layout::RowMajor>,
-        "The layout template parameters of BlockEpilogue are wrong"
-    );
+    static_assert(std::is_same_v<ElementC, half> && std::is_same_v<ElementD, bfloat16_t> &&
+                      std::is_same_v<ElementPerTokenScale, float>,
+                  "The element type template parameters of BlockEpilogue are wrong");
+    static_assert(std::is_same_v<LayoutC, layout::RowMajor> &&
+                      std::is_same_v<LayoutPerTokenScale, layout::VectorLayout> &&
+                      std::is_same_v<LayoutD, layout::RowMajor>,
+                  "The layout template parameters of BlockEpilogue are wrong");
 
     // Tile compute ops
     using TileBroadcastOneBlk = TileBroadcastOneBlk_;
@@ -94,20 +74,14 @@ public:
     static constexpr uint32_t UBC_ADD_PER_NUM = TileShape::COUNT;
     static constexpr uint32_t UBC_ADD_BLOCK_NUM = M_MAX * TileShape::COLUMN * sizeof(ElementC);
 
-    static_assert(
-        TileShape::ROW == TileBroadcastOneBlk::COMPUTE_LENGTH,
-        "TileShape must be consistent for all tile compute ops"
-    );
+    static_assert(TileShape::ROW == TileBroadcastOneBlk::COMPUTE_LENGTH,
+                  "TileShape must be consistent for all tile compute ops");
 
-    static_assert(
-        (UBC_ADD_BLOCK_NUM 
-            + UB_STAGES * (TileShape::COUNT * sizeof(ElementC)
-            + TileShape::ROW * sizeof(ElementPerTokenScale) + TileShape::COUNT * sizeof(ElementD))
-            + TileShape::COUNT * sizeof(float)
-            + TileShape::ROW * BYTE_PER_BLK)
-        <= ArchTag::UB_SIZE,
-        "TileShape is too large to fit in UB"
-    );
+    static_assert((UBC_ADD_BLOCK_NUM +
+                   UB_STAGES * (TileShape::COUNT * sizeof(ElementC) + TileShape::ROW * sizeof(ElementPerTokenScale) +
+                                TileShape::COUNT * sizeof(ElementD)) +
+                   TileShape::COUNT * sizeof(float) + TileShape::ROW * BYTE_PER_BLK) <= ArchTag::UB_SIZE,
+                  "TileShape is too large to fit in UB");
 
     struct Params {
         __gm__ ElementPerTokenScale *ptrPerTokenScale{nullptr};
@@ -119,15 +93,18 @@ public:
         Params() {};
 
         CATLASS_DEVICE
-        Params(
-            __gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
-            AscendC::GlobalTensor<ElementD> gmD_, LayoutD const &layoutD_
-        ) : ptrPerTokenScale(ptrPerTokenScale_), layoutPerTokenScale(layoutPerTokenScale_),
-            gmD(gmD_), layoutD(layoutD_) {}
+        Params(__gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
+               AscendC::GlobalTensor<ElementD> gmD_, LayoutD const &layoutD_)
+            : ptrPerTokenScale(ptrPerTokenScale_),
+              layoutPerTokenScale(layoutPerTokenScale_),
+              gmD(gmD_),
+              layoutD(layoutD_)
+        {}
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{}) : params(params)
+    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+        : params(params)
     {
         size_t ubOffset = 0;
         int32_t eventVMTE2 = 0;
@@ -156,7 +133,8 @@ public:
             if (V_MTE2_UBC_ADD_FLAG) {
                 AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCAddVMTE2List[i]);
             } else {
-                // AscendC::printf("BlockEpilogue SetFlag V_MTE2 eventUbCAddVMTE2List[i] %d\n", eventUbCAddVMTE2List[i]);
+                // AscendC::printf("BlockEpilogue SetFlag V_MTE2 eventUbCAddVMTE2List[i] %d\n",
+                // eventUbCAddVMTE2List[i]);
             }
 
             if (V_MTE2_UBC_FLAG) {
@@ -167,12 +145,14 @@ public:
             if (V_MTE2_PERTOKEN_FLAG) {
                 AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbPerTokenScaleVMTE2List[i]);
             } else {
-                // AscendC::printf("BlockEpilogue SetFlag V_MTE2 eventUbPerTokenScaleVMTE2List[i] %d\n", eventUbPerTokenScaleVMTE2List[i]);
+                // AscendC::printf("BlockEpilogue SetFlag V_MTE2 eventUbPerTokenScaleVMTE2List[i] %d\n",
+                // eventUbPerTokenScaleVMTE2List[i]);
             }
             if (MTE3_MTE2_FLAG) {
                 AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(eventUbDMTE3MTE2List[i]);
             } else {
-                // AscendC::printf("BlockEpilogue SetFlag MTE3_MTE2 eventUbDMTE3MTE2List[i] %d\n", eventUbDMTE3MTE2List[i]);
+                // AscendC::printf("BlockEpilogue SetFlag MTE3_MTE2 eventUbDMTE3MTE2List[i] %d\n",
+                // eventUbDMTE3MTE2List[i]);
             }
         }
         ubCFp32 = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
@@ -194,17 +174,20 @@ public:
             if (V_MTE2_PERTOKEN_FLAG) {
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbPerTokenScaleVMTE2List[i]);
             } else {
-                // AscendC::printf("~BlockEpilogue WaitFlag V_MTE2 eventUbPerTokenScaleVMTE2List[i] %d\n", eventUbPerTokenScaleVMTE2List[i]);
+                // AscendC::printf("~BlockEpilogue WaitFlag V_MTE2 eventUbPerTokenScaleVMTE2List[i] %d\n",
+                // eventUbPerTokenScaleVMTE2List[i]);
             }
             if (MTE3_MTE2_FLAG) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(eventUbDMTE3MTE2List[i]);
             } else {
-                // AscendC::printf("~BlockEpilogue WaitFlag MTE3_MTE2 eventUbDMTE3MTE2List[i] %d\n", eventUbDMTE3MTE2List[i]);
+                // AscendC::printf("~BlockEpilogue WaitFlag MTE3_MTE2 eventUbDMTE3MTE2List[i] %d\n",
+                // eventUbDMTE3MTE2List[i]);
             }
             if (V_MTE2_UBC_ADD_FLAG) {
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCAddVMTE2List[i]);
             } else {
-                // AscendC::printf("~BlockEpilogue WaitFlag V_MTE2 eventUbCAddVMTE2List[i] %d\n", eventUbCAddVMTE2List[i]);
+                // AscendC::printf("~BlockEpilogue WaitFlag V_MTE2 eventUbCAddVMTE2List[i] %d\n",
+                // eventUbCAddVMTE2List[i]);
             }
         }
     }
@@ -216,15 +199,10 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator() (
-        GemmCoord const &blockShapeMNK,
-        GemmCoord const &blockCoordMNK,
-        GemmCoord const &actualBlockShapeMNK,
-        AscendC::GlobalTensor<ElementC> const &gmBlockC,
-        LayoutC const &layoutBlockC,
-        bool isFirstLoopK, bool isSecondLoopK, bool isLastLoopK,
-        Callback &&callback = Callback{}
-    )
+    void operator()(GemmCoord const &blockShapeMNK, GemmCoord const &blockCoordMNK,
+                    GemmCoord const &actualBlockShapeMNK, AscendC::GlobalTensor<ElementC> const &gmBlockC,
+                    LayoutC const &layoutBlockC, bool isFirstLoopK, bool isSecondLoopK, bool isLastLoopK,
+                    Callback &&callback = Callback{})
     {
         if (actualBlockShapeMNK.k() == 0) {
             return;
@@ -257,7 +235,7 @@ public:
             auto layoutGmTileC = layoutBlockC.GetTileLayout(actualTileShape);
 
             LayoutC layoutUbC{actualTileShape, ubTileStride};
-            
+
             if (isFirstLoopK) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(eventUbDMTE3MTE2List[ubListId]);
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCAddVMTE2List[ubListId]);
@@ -280,22 +258,23 @@ public:
                 if (isSecondLoopK) {
                     AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCAddVMTE2List[ubListId]);
                 }
-            } 
+            }
 
             if (isLastLoopK) {
                 auto perTokenScaleTileOffset = tileOffset.template GetCoordByAxis<0>();
                 auto perTokenScaleTileShape = actualTileShape.template GetCoordByAxis<0>();
 
-                auto gmTilePerTokenScale = gmPerTokenScale[params.layoutPerTokenScale.GetOffset(perTokenScaleTileOffset)];
+                auto gmTilePerTokenScale =
+                    gmPerTokenScale[params.layoutPerTokenScale.GetOffset(perTokenScaleTileOffset)];
                 auto layoutGmTilePerTokenScale = params.layoutPerTokenScale.GetTileLayout(perTokenScaleTileShape);
 
                 auto &ubPerTokenScale = ubPerTokenScaleList[ubListId];
-                auto layoutUbPerTokenScale = LayoutPerTokenScale::template MakeLayoutInUb<ElementPerTokenScale>(
-                    perTokenScaleTileShape);
-                
+                auto layoutUbPerTokenScale =
+                    LayoutPerTokenScale::template MakeLayoutInUb<ElementPerTokenScale>(perTokenScaleTileShape);
+
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbPerTokenScaleVMTE2List[ubListId]);
                 copyGmToUbPerTokenScale(ubPerTokenScale, gmTilePerTokenScale, layoutUbPerTokenScale,
-                    layoutGmTilePerTokenScale);
+                                        layoutGmTilePerTokenScale);
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbPerTokenScaleMTE2VList[ubListId]);
 
                 if (isFirstLoopK) {
@@ -365,6 +344,6 @@ private:
     CopyUbToGmD copyUbToGmD;
 };
 
-}  // namespace Catlass::Epilogue::Block
+} // namespace Catlass::Epilogue::Block
 
-#endif  // GMM_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_DEQUANT_HPP
+#endif // GMM_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_DEQUANT_HPP

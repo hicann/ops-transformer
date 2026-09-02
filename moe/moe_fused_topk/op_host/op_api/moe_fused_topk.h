@@ -19,10 +19,11 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::array<const aclTensor *, 2> MoeFusedTopk(
-    const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum, const aclTensor* mappingTable,
-    uint32_t groupNum, uint32_t groupTopk, uint32_t topN, uint32_t topK, uint32_t activateType, 
-    bool isNorm, float scale, bool enableExpertMapping, aclOpExecutor *executor);
+const std::array<const aclTensor *, 2> MoeFusedTopk(const aclTensor *x, const aclTensor *addNum,
+                                                    const aclTensor *mappingNum, const aclTensor *mappingTable,
+                                                    uint32_t groupNum, uint32_t groupTopk, uint32_t topN, uint32_t topK,
+                                                    uint32_t activateType, bool isNorm, float scale,
+                                                    bool enableExpertMapping, aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_MOE_FUSED_TOPK_H_

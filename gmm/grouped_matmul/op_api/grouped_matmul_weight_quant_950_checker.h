@@ -55,8 +55,7 @@ private:
     aclnnStatus CheckS8S4GroupListType() const;
     aclnnStatus CheckS8S4GroupSize(size_t idx) const;
     static aclnnStatus CheckOptionalListSize(const aclTensorList *optional, const aclTensorList *reference,
-                                             const char *optionalName, const char *referenceName,
-                                             const char *opName);
+                                             const char *optionalName, const char *referenceName, const char *opName);
     aclnnStatus CheckGroupSize(size_t idx) const;
     aclnnStatus CheckDimValueAllOne(const aclTensorList *tensorList, const size_t idx,
                                     const std::string &paramName) const;

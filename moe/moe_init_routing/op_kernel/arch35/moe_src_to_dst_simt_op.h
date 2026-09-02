@@ -27,7 +27,7 @@ class MoeSrcToDstSimtOp {
 public:
     __aicore__ inline MoeSrcToDstSimtOp(){};
     __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR expandDstToSrcRow,
-        const MoeInitRoutingTilingData *tilingData);
+                                const MoeInitRoutingTilingData *tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -44,7 +44,7 @@ private:
 };
 
 __aicore__ inline void MoeSrcToDstSimtOp::Init(GM_ADDR expandedRowIdx, GM_ADDR expandDstToSrcRow,
-    const MoeInitRoutingTilingData *tilingData)
+                                               const MoeInitRoutingTilingData *tilingData)
 {
     int64_t blockNum_ = GetBlockNum();
     this->blockIdx_ = GetBlockIdx();
@@ -64,11 +64,11 @@ __aicore__ inline void MoeSrcToDstSimtOp::Init(GM_ADDR expandedRowIdx, GM_ADDR e
 }
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ComputeSimt(int64_t coreRows, int64_t startIndex,
-                                                                        __gm__ int32_t* expandDstToSrcRowGm,
-                                                                        __gm__ int32_t* expandedRowIdxGm)
+                                                                        __gm__ int32_t *expandDstToSrcRowGm,
+                                                                        __gm__ int32_t *expandedRowIdxGm)
 {
     for (int32_t index = static_cast<int32_t>(threadIdx.x); index < static_cast<int32_t>(coreRows);
-        index += static_cast<int32_t>(blockDim.x)) {
+         index += static_cast<int32_t>(blockDim.x)) {
         int32_t srcIndex = index + startIndex;
         int32_t dstIndex = expandDstToSrcRowGm[srcIndex];
         expandedRowIdxGm[dstIndex] = srcIndex;
@@ -79,8 +79,8 @@ __aicore__ inline void MoeSrcToDstSimtOp::Process()
 {
     if (this->blockIdx_ < this->srcToDstTilingData_->needCoreNum) {
         int32_t startIndex = this->blockIdx_ * this->perCoreRows_;
-        asc_vf_call<ComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_,
-                                   startIndex, expandDstToSrcRowGm_, expandedRowIdxGm_);
+        asc_vf_call<ComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_, startIndex,
+                                 expandDstToSrcRowGm_, expandedRowIdxGm_);
     }
 }
 } // namespace MoeInitRouting

@@ -203,9 +203,9 @@ __aicore__ inline void MoeGatherDroppadQuant<T>::Init(GM_ADDR inputX, GM_ADDR sc
 
     inputXGm_.SetGlobalBuffer((__gm__ T *)inputX);
     expandedXGm_.SetGlobalBuffer((__gm__ int8_t *)expandedX);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx +
-                                          blockIdx_ * gatherOutTilingData_->perCoreIndicesElements,
-                                      Align(coreRows_, sizeof(int32_t)));
+    expandedRowIdxGm_.SetGlobalBuffer(
+        (__gm__ int32_t *)expandedRowIdx + blockIdx_ * gatherOutTilingData_->perCoreIndicesElements,
+        Align(coreRows_, sizeof(int32_t)));
     scaleGm_.SetGlobalBuffer((__gm__ float *)scale, 1);
     offsetGm_.SetGlobalBuffer((__gm__ float *)offset, 1);
     scale_ = scaleGm_.GetValue(0);

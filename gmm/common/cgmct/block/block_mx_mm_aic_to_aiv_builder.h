@@ -16,7 +16,6 @@
 #ifndef BLOCK_MX_MM_AIC_TO_AIV_BUILDER_H
 #define BLOCK_MX_MM_AIC_TO_AIV_BUILDER_H
 
-
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else
@@ -103,13 +102,9 @@ public:
     // params
     using Params = Arguments;
 
-    __aicore__ inline BlockMxMmAicToAivBuilder()
-    {
-    }
+    __aicore__ inline BlockMxMmAicToAivBuilder() {}
 
-    __aicore__ inline ~BlockMxMmAicToAivBuilder()
-    {
-    }
+    __aicore__ inline ~BlockMxMmAicToAivBuilder() {}
 };
 } // namespace Block
 } // namespace Gemm

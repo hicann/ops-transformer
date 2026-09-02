@@ -17,17 +17,10 @@
 
 namespace Catlass::Gemm::Block {
 
-template <
-    class DispatchPolicy,
-    class L1TileShape,
-    class L0TileShape,
-    class AType,
-    class BType,
-    class CType,
-    class BiasType = void,
-    class TileCopy = Gemm::Tile::TileCopy<typename DispatchPolicy::ArchTag, AType, BType, CType, BiasType>,
-    class TileMmad = Gemm::Tile::TileMmad<typename DispatchPolicy::ArchTag, AType, BType, BiasType>
->
+template <class DispatchPolicy, class L1TileShape, class L0TileShape, class AType, class BType, class CType,
+          class BiasType = void,
+          class TileCopy = Gemm::Tile::TileCopy<typename DispatchPolicy::ArchTag, AType, BType, CType, BiasType>,
+          class TileMmad = Gemm::Tile::TileMmad<typename DispatchPolicy::ArchTag, AType, BType, BiasType> >
 struct BlockMmad {
     static_assert(DEPENDENT_FALSE<DispatchPolicy>, "BlockMmad is not implemented for this DispatchPolicy");
 };

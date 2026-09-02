@@ -34,10 +34,9 @@ constexpr int64_t SCATTER_PER_LOOP_ALIGN = 512;
 
 __aicore__ inline int64_t CalcScatterPerLoopMaxRows(int64_t useCoreNum)
 {
-    int64_t perLoopMaxRows =
-        (SCATTER_UB_SIZE - ASSIST_NUM * static_cast<int64_t>(sizeof(float)) -
-         SCATTER_PER_LOOP_ALIGN * static_cast<int64_t>(sizeof(float))) /
-        (SORT32_ALIGN_ELEMENT * 2) / 2;
+    int64_t perLoopMaxRows = (SCATTER_UB_SIZE - ASSIST_NUM * static_cast<int64_t>(sizeof(float)) -
+                              SCATTER_PER_LOOP_ALIGN * static_cast<int64_t>(sizeof(float))) /
+                             (SORT32_ALIGN_ELEMENT * 2) / 2;
     return (perLoopMaxRows / SCATTER_PER_LOOP_ALIGN) * SCATTER_PER_LOOP_ALIGN;
 }
 
@@ -102,8 +101,8 @@ __aicore__ inline T Max(T a, T b)
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPadCustom(
-    LocalTensor<T> inLocal, GlobalTensor<T> dstGm, DataCopyExtParams tokenCopyParams, DataCopyPadExtParams<T> padParams)
+__aicore__ inline void DataCopyPadCustom(LocalTensor<T> inLocal, GlobalTensor<T> dstGm,
+                                         DataCopyExtParams tokenCopyParams, DataCopyPadExtParams<T> padParams)
 {
 #ifndef __CCE_KT_TEST__
     DataCopyPad(inLocal, dstGm, tokenCopyParams, padParams);
@@ -111,8 +110,8 @@ __aicore__ inline void DataCopyPadCustom(
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPadCustom(
-    GlobalTensor<T> dstGm, LocalTensor<T> inLocal, DataCopyExtParams tokenCopyParams)
+__aicore__ inline void DataCopyPadCustom(GlobalTensor<T> dstGm, LocalTensor<T> inLocal,
+                                         DataCopyExtParams tokenCopyParams)
 {
 #ifndef __CCE_KT_TEST__
     DataCopyPad(dstGm, inLocal, tokenCopyParams);

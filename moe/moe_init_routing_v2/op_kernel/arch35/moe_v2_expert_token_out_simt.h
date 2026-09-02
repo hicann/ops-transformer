@@ -145,7 +145,6 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Init(GM_ADDR expertTokensCountOr
     lastExpertIdCunsumAddr_ = (__ubuf__ int32_t *)lastExpertIdCunsum_.GetPhyAddr();
 }
 
-
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ExpertFirstIndexComputeSimt(
     int64_t coreRows, int64_t startIndex, int64_t totalLength, __gm__ int32_t *expertFirstIndexGm,
     __gm__ int32_t *expandedExpertIdxGm)
@@ -222,9 +221,9 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Process()
     }
 
     if (this->blockIdx_ < this->needCoreNum_) {
-        asc_vf_call<ExpertFirstIndexComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1},
-                                                   this->coreRows_, this->startIndex_, this->totalLength_,
-                                                   expertFirstIndexGm_, expandedExpertIdxGm_);
+        asc_vf_call<ExpertFirstIndexComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_,
+                                                 this->startIndex_, this->totalLength_, expertFirstIndexGm_,
+                                                 expandedExpertIdxGm_);
     }
 
     this->SyncAll();
@@ -235,8 +234,8 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Process()
 
     if (this->expertCount_ && this->blockIdx_ < this->needCoreNum_) {
         asc_vf_call<TokensComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_,
-                                         this->startIndex_, this->totalLength_, expertFirstIndexGm_,
-                                         expandedExpertIdxGm_, expertTokensBeforeCapacityGm_);
+                                       this->startIndex_, this->totalLength_, expertFirstIndexGm_, expandedExpertIdxGm_,
+                                       expertTokensBeforeCapacityGm_);
     }
 
     if (this->expertCumsum_ && this->blockIdx_ < this->needCoreNum_) {

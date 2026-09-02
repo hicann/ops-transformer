@@ -28,7 +28,8 @@ namespace optiling {
 using namespace Ops::Transformer::OpTiling;
 class QuantGroupedInplaceAddTiling : public GroupedQmmTiling {
 public:
-    explicit QuantGroupedInplaceAddTiling(gert::TilingContext *context) : GroupedQmmTiling(context)
+    explicit QuantGroupedInplaceAddTiling(gert::TilingContext *context)
+        : GroupedQmmTiling(context)
     {
         Reset();
     }

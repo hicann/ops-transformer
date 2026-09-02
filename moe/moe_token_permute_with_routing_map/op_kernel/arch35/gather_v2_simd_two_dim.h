@@ -36,7 +36,8 @@ constexpr int32_t BUFFER_NUM_SIMD_TWO_DIM = 2;
 template <typename INDICES_T>
 class Gatherv2SimdTwoDim {
 public:
-    __aicore__ inline Gatherv2SimdTwoDim(TPipe *pipe) : pipe_(pipe){};
+    __aicore__ inline Gatherv2SimdTwoDim(TPipe *pipe)
+        : pipe_(pipe){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR indices, GM_ADDR y,
                                 const MoeTokenPermuteWithRoutingMapTilingData *tilingData);
     __aicore__ inline void Process();
@@ -45,7 +46,7 @@ public:
                                   uint32_t copyLen);
     __aicore__ inline INDICES_T GetIndex(int64_t idx, int64_t endIdx);
     __aicore__ inline void CopyOut(int64_t offset, uint32_t nBurst, uint32_t copyLen);
-    __aicore__ inline void CalculateCoreRange(int64_t& yStart, int64_t& yEnd);
+    __aicore__ inline void CalculateCoreRange(int64_t &yStart, int64_t &yEnd);
     __aicore__ inline void NoSplitColProcess(int64_t colsAlign);
     __aicore__ inline void SplitColProcess(int64_t colsAlign);
 
@@ -132,7 +133,7 @@ __aicore__ inline INDICES_T Gatherv2SimdTwoDim<INDICES_T>::GetIndex(int64_t idx,
 }
 
 template <typename INDICES_T>
-__aicore__ inline void Gatherv2SimdTwoDim<INDICES_T>::CalculateCoreRange(int64_t& yStart, int64_t& yEnd)
+__aicore__ inline void Gatherv2SimdTwoDim<INDICES_T>::CalculateCoreRange(int64_t &yStart, int64_t &yEnd)
 {
     if (GetBlockIdx() < indexCopyTilingData->tailCoreNum) {
         yStart = (indexCopyTilingData->coreCalcNum + 1) * GetBlockIdx();

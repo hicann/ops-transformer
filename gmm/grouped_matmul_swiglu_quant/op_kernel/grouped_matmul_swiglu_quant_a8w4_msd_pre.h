@@ -102,7 +102,6 @@ __aicore__ inline void GMMA8W4PreProcess::CustomInitBuffer(TPipe *pipe)
     pipe->InitBuffer(vecOutQueue0F, BUFFER_NUM_A8W4_PRE, BUFFER_SIZE_256B); // 256B
 }
 
-
 __aicore__ inline void GMMA8W4PreProcess::CalculateTaskInfoEachCore(uint32_t &curCoreTaskNum_,
                                                                     uint32_t &curCoreStartOffset_)
 {

@@ -21,41 +21,42 @@ namespace MoeInitRouting {
 using namespace AscendC;
 
 class MoeSortBase {
- public:
-  __aicore__ inline MoeSortBase(){};
+public:
+    __aicore__ inline MoeSortBase(){};
 
- protected:
-  __aicore__ inline void SyncAll();
+protected:
+    __aicore__ inline void SyncAll();
 
- protected:
-  TPipe* pipe;
-  TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
-  TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
-  TBuf<TPosition::VECCALC> tempBuffer;
-  TBuf<TPosition::VECCALC> sortedBuffer;
+protected:
+    TPipe *pipe;
+    TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
+    TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
+    TBuf<TPosition::VECCALC> tempBuffer;
+    TBuf<TPosition::VECCALC> sortedBuffer;
 
-  GlobalTensor<int32_t> expertForSourceRowGm;
-  GlobalTensor<int32_t> sourceRowGm;
-  GlobalTensor<int32_t> sortedExpertForSourceRowGm;
-  GlobalTensor<int32_t> expandDstToSrcRowGm;
+    GlobalTensor<int32_t> expertForSourceRowGm;
+    GlobalTensor<int32_t> sourceRowGm;
+    GlobalTensor<int32_t> sortedExpertForSourceRowGm;
+    GlobalTensor<int32_t> expandDstToSrcRowGm;
 
-  int64_t tileLength;
-  int64_t bufferNum = 1;
-  int64_t totalLength;
-  int64_t coreNum;
+    int64_t tileLength;
+    int64_t bufferNum = 1;
+    int64_t totalLength;
+    int64_t coreNum;
 
-  static constexpr int64_t SYNC_GM_NUM = 2;
-  static constexpr int64_t WORK_GM_NUM = 2;
-  static constexpr int64_t DST_BLK_STRIDE = 1;
-  static constexpr int64_t DST_REP_STRIDE = 8;
+    static constexpr int64_t SYNC_GM_NUM = 2;
+    static constexpr int64_t WORK_GM_NUM = 2;
+    static constexpr int64_t DST_BLK_STRIDE = 1;
+    static constexpr int64_t DST_REP_STRIDE = 8;
 };
 
-__aicore__ inline void MoeSortBase::SyncAll() {
-  if (coreNum == 1) {
-    return;
-  }
-  AscendC::SyncAll();
+__aicore__ inline void MoeSortBase::SyncAll()
+{
+    if (coreNum == 1) {
+        return;
+    }
+    AscendC::SyncAll();
 }
 
-}  // namespace MoeInitRouting
-#endif  // MOE_SORT_BASE_H
+} // namespace MoeInitRouting
+#endif // MOE_SORT_BASE_H

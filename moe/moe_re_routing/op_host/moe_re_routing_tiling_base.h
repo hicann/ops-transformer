@@ -21,10 +21,11 @@ namespace optiling {
 
 class MoeReRoutingTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeReRoutingTilingBase(gert::TilingContext *contextReRouting) : TilingBaseClass(contextReRouting)
+    explicit MoeReRoutingTilingBase(gert::TilingContext *contextReRouting)
+        : TilingBaseClass(contextReRouting)
     {}
     ~MoeReRoutingTilingBase() override = default;
-    
+
     void Reset(gert::TilingContext *context) override
     {
         TilingBaseClass::Reset(context);
@@ -72,6 +73,6 @@ protected:
     ge::DataType topkWeightDtype_ = ge::DT_UNDEFINED;
 };
 
-}  // namespace optiling
+} // namespace optiling
 
-#endif  // OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_RE_ROUTING_BASE_H_
+#endif // OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_RE_ROUTING_BASE_H_

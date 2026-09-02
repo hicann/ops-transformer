@@ -49,5 +49,5 @@ struct A16W4MsdBasicBlockOffsetParam {
     GM_ADDR antiquantScaleGm;
     GM_ADDR aMaxGmAddr;
 };
-}  // namespace GROUPED_MATMUL::A16W4Msd
-#endif  // GROUPED_MATMUL_WEIGHT_QUANT_BASIC_BLOCK_CONFIG_H
+} // namespace GROUPED_MATMUL::A16W4Msd
+#endif // GROUPED_MATMUL_WEIGHT_QUANT_BASIC_BLOCK_CONFIG_H

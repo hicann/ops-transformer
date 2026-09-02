@@ -47,7 +47,6 @@ std::string PrintShape(const gert::Shape &shape)
     return oss.str();
 }
 
-
 std::string PrintTensorDesc(const gert::StorageShape *shape, const gert::CompileTimeTensorDesc *tensor)
 {
     if (shape == nullptr || tensor == nullptr) {

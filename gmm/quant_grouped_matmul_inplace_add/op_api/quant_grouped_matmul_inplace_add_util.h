@@ -23,5 +23,5 @@ struct QuantGroupedMatmulInplaceAddParams {
     int64_t groupListType = 0;
     int64_t groupSize = 0;
 };
-}
+} // namespace QGmmInPlaceAdd
 #endif

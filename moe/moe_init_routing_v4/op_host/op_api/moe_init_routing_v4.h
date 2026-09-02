@@ -15,18 +15,12 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*>
-MoeInitRoutingV4(const aclTensor *x, const aclTensor *expertIdx,
-                 const aclTensor *scale, const aclTensor *offset,
-                 const aclTensor *activeNum, const aclTensor *topkWeight,
-                 int64_t expertCapacity, int64_t expertNum, int64_t dropPadMode,
-                 int64_t expertTokensNumType, bool expertTokensNumFlag,
-                 int64_t quantMode, const aclIntArray *activeExpertRange,
-                 int64_t rowIdxType, const aclTensor *expandedX,
-                 const aclTensor *expandedRowIdx,
-                 const aclTensor *expertTokensCountOrCumsum,
-                 const aclTensor *expandedScale,
-                 const aclTensor *expandedTopkWeight,
-                 aclOpExecutor *executor);
-}  // namespace l0op
+std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *, aclTensor *> MoeInitRoutingV4(
+    const aclTensor *x, const aclTensor *expertIdx, const aclTensor *scale, const aclTensor *offset,
+    const aclTensor *activeNum, const aclTensor *topkWeight, int64_t expertCapacity, int64_t expertNum,
+    int64_t dropPadMode, int64_t expertTokensNumType, bool expertTokensNumFlag, int64_t quantMode,
+    const aclIntArray *activeExpertRange, int64_t rowIdxType, const aclTensor *expandedX,
+    const aclTensor *expandedRowIdx, const aclTensor *expertTokensCountOrCumsum, const aclTensor *expandedScale,
+    const aclTensor *expandedTopkWeight, aclOpExecutor *executor);
+} // namespace l0op
 #endif // OP_API_INC_LEVEL0_MOE_INIT_ROUTING_V4_H

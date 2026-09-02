@@ -28,9 +28,7 @@ constexpr uint32_t TILING2_THRESHOLD = 96;
 
 class QuantMatmulDequantGrouped : public QuantMatmulDequantNormal {
 public:
-    __aicore__ inline QuantMatmulDequantGrouped()
-    {
-    }
+    __aicore__ inline QuantMatmulDequantGrouped() {}
 
     __aicore__ inline void Process()
     {
@@ -151,9 +149,9 @@ protected:
                         tilingData->originKAligned32;
         InitCommonGlobalTensors(x, quantized_weight, weight_scale, bias, x_scale, x_offset, smooth_scale, y,
                                 usrWorkspace);
-        quantizedWeightGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(quantized_weight),
-                                          tilingData->originE * tilingData->fracK * tilingData->fracN *
-                                              NM_FRACTAL_INT8 * K_FRACTAL_INT8);
+        quantizedWeightGm.SetGlobalBuffer(
+            reinterpret_cast<__gm__ int8_t *>(quantized_weight),
+            tilingData->originE * tilingData->fracK * tilingData->fracN * NM_FRACTAL_INT8 * K_FRACTAL_INT8);
         if (isWScaleInt64) {
             wScaleGmInt64.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(weight_scale),
                                           tilingData->originE * tilingData->originN);
@@ -292,7 +290,7 @@ protected:
                 uint32_t BaseMFractalN_ = (singleCoreM + baseMNum - 1) / baseMNum + 1;
                 while (baseNNum > 1 &&
                        BaseMFractalN_ * ((singleCoreN + baseNNum - NUMBER_2) / (baseNNum - 1) + extraN) <=
-                       l0CMNFractal) {
+                           l0CMNFractal) {
                     baseNNum -= 1;
                 }
                 uint32_t BaseNFractalN_ = (singleCoreN + baseNNum - 1) / baseNNum + extraN;
@@ -309,7 +307,7 @@ protected:
                 uint32_t BaseMFractalN_ = (singleCoreM + baseMNum - 1) / baseMNum + 1;
                 while (baseNNum > 1 &&
                        BaseMFractalN_ * ((singleCoreN + baseNNum - NUMBER_2) / (baseNNum - 1) + extraN) <=
-                       l0CMNFractal) {
+                           l0CMNFractal) {
                     baseNNum -= 1;
                 }
             }

@@ -19,10 +19,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor* MoeInitRoutingV2Grad(
-    const aclTensor* grad_expanded_x, const aclTensor* expanded_row_idx,
-    int64_t top_k, int64_t drop_pad_mode, int64_t active_num,
-    const aclTensor* out, aclOpExecutor *executor);
+const aclTensor *MoeInitRoutingV2Grad(const aclTensor *grad_expanded_x, const aclTensor *expanded_row_idx,
+                                      int64_t top_k, int64_t drop_pad_mode, int64_t active_num, const aclTensor *out,
+                                      aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_MOE_INIT_ROUTING_V2_GRAD_H_

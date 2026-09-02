@@ -84,14 +84,12 @@ __aicore__ inline void MoeGatingTopKBackward<T>::Init(GM_ADDR xNorm, GM_ADDR gra
     expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
     gradXGm_.SetGlobalBuffer((__gm__ T *)gradX + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
     pipe_->InitBuffer(gradYQue_, 2, tilingData_->baseRows * AlignBytes(tilingData_->k, tilingData_->gradYDtypeSize));
-    pipe_->InitBuffer(indicesQue_, 2,
-                      tilingData_->baseRows * AlignBytes(tilingData_->k, SIZE_OF_INT32));
+    pipe_->InitBuffer(indicesQue_, 2, tilingData_->baseRows * AlignBytes(tilingData_->k, SIZE_OF_INT32));
     pipe_->InitBuffer(xQue_, 2, AlignBytes(tilingData_->baseRows * tilingData_->expertCount, SIZE_OF_FLOAT32));
     pipe_->InitBuffer(outQue_, 1,
                       AlignBytes(tilingData_->baseRows * tilingData_->expertCount, tilingData_->gradYDtypeSize));
     pipe_->InitBuffer(gradNormXBuf_, AlignBytes(tilingData_->baseRows * tilingData_->expertCount, SIZE_OF_FLOAT32));
-    pipe_->InitBuffer(wPrimeCache_,
-                      tilingData_->baseRows * AlignBytes(tilingData_->k, SIZE_OF_FLOAT32));
+    pipe_->InitBuffer(wPrimeCache_, tilingData_->baseRows * AlignBytes(tilingData_->k, SIZE_OF_FLOAT32));
 }
 
 template <typename T>
@@ -153,7 +151,8 @@ __aicore__ inline void MoeGatingTopKBackward<T>::CopyInXNorm(int64_t loopIdx)
     copyParams.srcStride = static_cast<uint32_t>(0);
     copyParams.dstStride = static_cast<uint32_t>(0);
     DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
-    DataCopyPad(xNormLocal_, xNormGm_[loopIdx * tilingData_->baseRows * tilingData_->expertCount], copyParams, padParams);
+    DataCopyPad(xNormLocal_, xNormGm_[loopIdx * tilingData_->baseRows * tilingData_->expertCount], copyParams,
+                padParams);
     xQue_.EnQue(xNormLocal_);
     xNormLocal_ = xQue_.DeQue<float>();
 }
@@ -168,8 +167,7 @@ __aicore__ inline void MoeGatingTopKBackward<T>::CopyInExpertIdx(int64_t loopIdx
     copyParams.srcStride = static_cast<uint32_t>(0);
     copyParams.dstStride = static_cast<uint32_t>(0);
     DataCopyPadExtParams<int32_t> padParams{true, 0, static_cast<uint8_t>(kAlign_ - tilingData_->k), 0};
-    DataCopyPad(expertIdxLocal_, expertIdxGm_[loopIdx * tilingData_->baseRows * tilingData_->k], copyParams,
-                padParams);
+    DataCopyPad(expertIdxLocal_, expertIdxGm_[loopIdx * tilingData_->baseRows * tilingData_->k], copyParams, padParams);
     indicesQue_.EnQue(expertIdxLocal_);
     expertIdxLocal_ = indicesQue_.DeQue<int32_t>();
 }

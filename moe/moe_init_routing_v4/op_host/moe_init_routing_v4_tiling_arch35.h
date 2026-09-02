@@ -39,6 +39,6 @@ constexpr int64_t V4_OUTPUT_EXPANDED_ROW_IDX_INDEX = 1LL;
 constexpr int64_t V4_OUTPUT_EXPERT_TOKENS_COUNT_INDEX = 2LL;
 constexpr int64_t V4_OUTPUT_EXPANDED_SCALE_INDEX = 3LL;
 constexpr int64_t V4_OUTPUT_EXPANDED_TOPK_WEIGHT_INDEX = 4LL;
-}
+} // namespace optiling
 
 #endif

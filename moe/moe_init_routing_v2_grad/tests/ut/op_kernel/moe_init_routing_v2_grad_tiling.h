@@ -37,14 +37,15 @@ struct MoeV2GradComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline [aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeV2GradComputeTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeV2GradComputeTilingData *const_data)
 {
     const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(MoeV2GradComputeTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(MoeV2GradComputeTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, MoeV2GradComputeTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, MoeV2GradComputeTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeV2GradComputeTilingData));
 }
@@ -64,28 +65,27 @@ struct MoeInitRoutingV2GradTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline [aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeInitRoutingV2GradTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeInitRoutingV2GradTilingData *const_data)
 {
     const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(MoeInitRoutingV2GradTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(MoeInitRoutingV2GradTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, MoeInitRoutingV2GradTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, MoeInitRoutingV2GradTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeInitRoutingV2GradTilingData));
 }
 #endif
 
-
 #define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \
-tiling_struct tiling_data; \
-InitTilingData(tiling_arg, &tiling_data)
-
+    tiling_struct tiling_data; \
+    InitTilingData(tiling_arg, &tiling_data)
 
 #define GET_TILING_DATA(tiling_data, tiling_arg) \
-MoeInitRoutingV2GradTilingData tiling_data; \
-InitTilingData(tiling_arg, &tiling_data)
+    MoeInitRoutingV2GradTilingData tiling_data; \
+    InitTilingData(tiling_arg, &tiling_data)
 
 #define DTYPE_GRAD_EXPANDED_X float
 

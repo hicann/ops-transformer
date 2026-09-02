@@ -24,25 +24,23 @@ using namespace AscendC;
 constexpr int64_t BUFFER_NUM = 1;
 
 template <typename T>
-class MoeGatherOut
-{
+class MoeGatherOut {
 public:
     __aicore__ inline MoeGatherOut(){};
-    __aicore__ inline void Init(
-        GM_ADDR inputActivations, GM_ADDR expandSrcToDstRow, GM_ADDR expandedActivations,
-        const MoeInitRoutingQuantTilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR inputActivations, GM_ADDR expandSrcToDstRow, GM_ADDR expandedActivations,
+                                const MoeInitRoutingQuantTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyInIndices(int64_t progress, int64_t kProcess);
     __aicore__ inline void CopyIn(int64_t progress, int64_t colsProgress);
     __aicore__ inline void Compute();
-    __aicore__ inline void CopyOut(int64_t progress, int64_t colsProgress, LocalTensor<int32_t>& indicesLocal);
+    __aicore__ inline void CopyOut(int64_t progress, int64_t colsProgress, LocalTensor<int32_t> &indicesLocal);
     __aicore__ inline void UpdataOffset(int64_t progress, int64_t colsProgress);
-    __aicore__ inline void ParseTilingData(const MoeInitRoutingQuantTilingData* tilingData);
+    __aicore__ inline void ParseTilingData(const MoeInitRoutingQuantTilingData *tilingData);
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
     TQue<QuePosition::VECIN, BUFFER_NUM> inputActivationsCopyInQueue;
     TQue<QuePosition::VECIN, BUFFER_NUM> expandSrcToDstRowCopyInQueue;
     TQue<QuePosition::VECOUT, BUFFER_NUM> inputActivationsCopyOutQueue;
@@ -53,7 +51,7 @@ private:
     GlobalTensor<int32_t> expandSrcToDstRowGm;
     GlobalTensor<int8_t> expandedActivationsGm;
 
-    const QuantGatherOutComputeTilingData* gatherOutTilingData;
+    const QuantGatherOutComputeTilingData *gatherOutTilingData;
 
     int64_t needCoreNum;
     int64_t blockIdx;
@@ -93,9 +91,9 @@ __aicore__ inline void MoeGatherOut<T>::CopyInIndices(int64_t progress, int64_t 
 {
     this->indicesOffset = progress * this->perLoopRows + kProcess * this->perLoopK * this->n;
     LocalTensor<int32_t> indicesLocal = expandSrcToDstRowCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{
-        static_cast<uint16_t>(kTileLength), static_cast<uint32_t>(this->currentLoopRows * sizeof(int32_t)),
-        static_cast<uint32_t>((this->n - this->currentLoopRows) * sizeof(int32_t)), 0, 0};
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(kTileLength),
+                                     static_cast<uint32_t>(this->currentLoopRows * sizeof(int32_t)),
+                                     static_cast<uint32_t>((this->n - this->currentLoopRows) * sizeof(int32_t)), 0, 0};
     DataCopyPadExtParams dataCopyPadParams{false, 0, 0, 0};
     DataCopyPad(indicesLocal, expandSrcToDstRowGm[indicesOffset], dataCopyParams, dataCopyPadParams);
     expandSrcToDstRowCopyInQueue.EnQue<int32_t>(indicesLocal);
@@ -151,8 +149,8 @@ __aicore__ inline void MoeGatherOut<T>::Compute()
 }
 
 template <typename T>
-__aicore__ inline void MoeGatherOut<T>::CopyOut(
-    int64_t progress, int64_t colsProgress, LocalTensor<int32_t>& indicesLocal)
+__aicore__ inline void MoeGatherOut<T>::CopyOut(int64_t progress, int64_t colsProgress,
+                                                LocalTensor<int32_t> &indicesLocal)
 {
     LocalTensor<int8_t> outLocal = inputActivationsCopyOutQueue.DeQue<int8_t>();
     int64_t colsOffset = colsProgress * maxColsOneLoop;
@@ -186,8 +184,7 @@ __aicore__ inline void MoeGatherOut<T>::CopyOut(
 }
 
 template <typename T>
-__aicore__ inline void MoeGatherOut<T>::ParseTilingData(
-    const MoeInitRoutingQuantTilingData* tilingData)
+__aicore__ inline void MoeGatherOut<T>::ParseTilingData(const MoeInitRoutingQuantTilingData *tilingData)
 {
     this->blockIdx = GetBlockIdx();
     this->gatherOutTilingData = &(tilingData->gatherOutComputeParamsOp);
@@ -220,38 +217,38 @@ __aicore__ inline void MoeGatherOut<T>::ParseTilingData(
 }
 
 template <typename T>
-__aicore__ inline void MoeGatherOut<T>::Init(
-    GM_ADDR inputActivations, GM_ADDR expandSrcToDstRow, GM_ADDR expandedActivations,
-    const MoeInitRoutingQuantTilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeGatherOut<T>::Init(GM_ADDR inputActivations, GM_ADDR expandSrcToDstRow,
+                                             GM_ADDR expandedActivations,
+                                             const MoeInitRoutingQuantTilingData *tilingData, TPipe *tPipe)
 {
     this->pipe = tPipe;
     ParseTilingData(tilingData);
 
     if (this->gatherOutTilingData->splitFlag == SPLIT_N) {
         inputActivationsGm.SetGlobalBuffer(
-            (__gm__ T*)inputActivations + this->blockIdx * this->gatherOutTilingData->perCoreRows * this->cols,
+            (__gm__ T *)inputActivations + this->blockIdx * this->gatherOutTilingData->perCoreRows * this->cols,
             this->coreRows * this->cols);
         expandSrcToDstRowGm.SetGlobalBuffer(
-            (__gm__ int32_t*)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+            (__gm__ int32_t *)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreRows,
             tilingData->n * tilingData->k);
     } else if (this->gatherOutTilingData->splitFlag == SPLIT_K) {
-        inputActivationsGm.SetGlobalBuffer((__gm__ T*)inputActivations, this->coreRows * this->cols);
+        inputActivationsGm.SetGlobalBuffer((__gm__ T *)inputActivations, this->coreRows * this->cols);
         expandSrcToDstRowGm.SetGlobalBuffer(
-            (__gm__ int32_t*)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreK * this->n,
+            (__gm__ int32_t *)expandSrcToDstRow + this->blockIdx * this->gatherOutTilingData->perCoreK * this->n,
             tilingData->n * tilingData->k);
     }
 
-    expandedActivationsGm.SetGlobalBuffer((__gm__ int8_t*)expandedActivations, this->n * this->k * this->cols);
+    expandedActivationsGm.SetGlobalBuffer((__gm__ int8_t *)expandedActivations, this->n * this->k * this->cols);
     pipe->InitBuffer(inputActivationsCopyInQueue, BUFFER_NUM,
-        this->perLoopRows * Align(this->maxColsOneLoop, sizeof(int8_t)) * sizeof(T));
-    pipe->InitBuffer(
-        floatQueue, BUFFER_NUM, this->perLoopRows * Align(this->maxColsOneLoop, sizeof(int8_t)) * sizeof(float));
-    pipe->InitBuffer(
-        halfQueue, BUFFER_NUM, this->perLoopRows * Align(this->maxColsOneLoop, sizeof(int8_t)) * sizeof(half));
-    pipe->InitBuffer(
-        inputActivationsCopyOutQueue, BUFFER_NUM, this->perLoopRows * AlignBytes(this->maxColsOneLoop, sizeof(T)));
-    pipe->InitBuffer(
-        expandSrcToDstRowCopyInQueue, BUFFER_NUM, this->perLoopK * AlignBytes(this->perLoopRows, sizeof(int32_t)));
+                     this->perLoopRows * Align(this->maxColsOneLoop, sizeof(int8_t)) * sizeof(T));
+    pipe->InitBuffer(floatQueue, BUFFER_NUM,
+                     this->perLoopRows * Align(this->maxColsOneLoop, sizeof(int8_t)) * sizeof(float));
+    pipe->InitBuffer(halfQueue, BUFFER_NUM,
+                     this->perLoopRows * Align(this->maxColsOneLoop, sizeof(int8_t)) * sizeof(half));
+    pipe->InitBuffer(inputActivationsCopyOutQueue, BUFFER_NUM,
+                     this->perLoopRows * AlignBytes(this->maxColsOneLoop, sizeof(T)));
+    pipe->InitBuffer(expandSrcToDstRowCopyInQueue, BUFFER_NUM,
+                     this->perLoopK * AlignBytes(this->perLoopRows, sizeof(int32_t)));
 }
 
 template <typename T>

@@ -16,4 +16,4 @@
 #include "../../gmm_infra/layout/gmm_vector.hpp"
 #include "../../gmm_infra/layout/gmm_layout_tensor.hpp"
 
-#endif  // GMM_LAYOUT_LAYOUT_HPP
+#endif // GMM_LAYOUT_LAYOUT_HPP

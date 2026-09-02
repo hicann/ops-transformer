@@ -28,9 +28,9 @@ template <typename T, typename TIndex, typename TScale, bool hasScales>
 class MoeReRoutingReRegbase {
 public:
     __aicore__ inline MoeReRoutingReRegbase(TPipe *pipe, const MoeReRoutingReTilingData *tiling)
-        : pipe_(pipe), tilingData_(tiling)
-    {
-    }
+        : pipe_(pipe),
+          tilingData_(tiling)
+    {}
     __aicore__ inline void Init(GM_ADDR tokens, GM_ADDR expertTokenNumPerRank, GM_ADDR perTokenScales,
                                 GM_ADDR expertTopkWeight, GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales,
                                 GM_ADDR permuteTokenIdx, GM_ADDR expertTokenNum, GM_ADDR permuteTopkWeight);
@@ -115,8 +115,8 @@ __aicore__ inline void MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::Init
 }
 
 template <typename T, typename TIndex, typename TScale, bool hasScales>
-__aicore__ inline int64_t
-MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::CalTokenOffset(const int64_t tokenOffset) const
+__aicore__ inline int64_t MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::CalTokenOffset(
+    const int64_t tokenOffset) const
 {
     if constexpr (IsSameType<T, int8_t>::value) {
         if (tokenSizeOrigin_ > 0) {
@@ -201,9 +201,8 @@ __aicore__ inline void MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::Proc
 }
 
 template <typename T, typename TIndex, typename TScale, bool hasScales>
-__aicore__ inline void
-MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::ProcessTokenScale(const int64_t currTokenNum,
-                                                                       const int64_t tokSclSize, const bool isScale)
+__aicore__ inline void MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::ProcessTokenScale(
+    const int64_t currTokenNum, const int64_t tokSclSize, const bool isScale)
 {
     int64_t ubFactor = 0;
     if (isScale) {
@@ -342,8 +341,9 @@ __aicore__ inline void MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::Copy
 }
 
 template <typename T, typename TIndex, typename TScale, bool hasScales>
-__aicore__ inline void MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::CopyTopkWeight(
-    const int64_t rows, const int64_t srcOffset, const int64_t dstOffset)
+__aicore__ inline void MoeReRoutingReRegbase<T, TIndex, TScale, hasScales>::CopyTopkWeight(const int64_t rows,
+                                                                                           const int64_t srcOffset,
+                                                                                           const int64_t dstOffset)
 {
     int64_t loopCnt = Ops::Base::CeilDiv(rows, INDEX_UB_SIZE);
     int64_t subRows = INDEX_UB_SIZE;

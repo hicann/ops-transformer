@@ -28,9 +28,8 @@ namespace MoeFinalizeRoutingV2UnpermuteFastCommon {
 constexpr int64_t BLOCK_BYTES = 32;
 
 template <typename T>
-__aicore__ inline void DataCopyPadCustom(
-    LocalTensor<T> inLocal, GlobalTensor<T> srcGm, DataCopyExtParams tokenCopyParams,
-    DataCopyPadExtParams<T> padParams)
+__aicore__ inline void DataCopyPadCustom(LocalTensor<T> inLocal, GlobalTensor<T> srcGm,
+                                         DataCopyExtParams tokenCopyParams, DataCopyPadExtParams<T> padParams)
 {
     int64_t elem = tokenCopyParams.blockLen / sizeof(T);
     int64_t numPerBlock = BLOCK_BYTES / sizeof(T);
@@ -48,20 +47,20 @@ __aicore__ inline void DataCopyPadCustom(
 }
 
 template <typename T>
-__aicore__ inline void DataCopyCustom(
-    GlobalTensor<T> dstGm, LocalTensor<T> inLocal, int64_t blockCount, int64_t blockLen)
+__aicore__ inline void DataCopyCustom(GlobalTensor<T> dstGm, LocalTensor<T> inLocal, int64_t blockCount,
+                                      int64_t blockLen)
 {
     int64_t elem = blockLen / sizeof(T);
     int64_t numPerBlock = BLOCK_BYTES / sizeof(T);
     int64_t alignElem = AlignUp(elem, numPerBlock);
 
     if (likely(alignElem == elem)) {
-        DataCopyParams copyParams = {
-            static_cast<uint16_t>(blockCount), static_cast<uint16_t>(alignElem / numPerBlock), 0, 0};
+        DataCopyParams copyParams = {static_cast<uint16_t>(blockCount), static_cast<uint16_t>(alignElem / numPerBlock),
+                                     0, 0};
         DataCopy(dstGm, inLocal, copyParams);
     } else if (blockCount == 1) {
-        DataCopyParams copyParams = {
-            static_cast<uint16_t>(blockCount), static_cast<uint16_t>(alignElem / numPerBlock), 0, 0};
+        DataCopyParams copyParams = {static_cast<uint16_t>(blockCount), static_cast<uint16_t>(alignElem / numPerBlock),
+                                     0, 0};
         DataCopy(dstGm, inLocal, copyParams);
     } else {
         DataCopyParams copyParams = {1, static_cast<uint16_t>(alignElem / numPerBlock), 0, 0};
@@ -78,19 +77,18 @@ __aicore__ inline void DataCopyCustom(
 template <typename T1, typename T2, typename T3, bool PROBS>
 class MoeFinalizeRoutingV2UnpermuteFast {
 public:
-    __aicore__ inline MoeFinalizeRoutingV2UnpermuteFast()
-    {}
+    __aicore__ inline MoeFinalizeRoutingV2UnpermuteFast() {}
 
-    __aicore__ inline void Init(
-        GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs, GM_ADDR unpermuted_tokens,
-        const MoeFinalizeRoutingV2TilingData* __restrict tiling_data, TPipe* pipe);
+    __aicore__ inline void Init(GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs,
+                                GM_ADDR unpermuted_tokens, const MoeFinalizeRoutingV2TilingData *__restrict tiling_data,
+                                TPipe *pipe);
     __aicore__ inline void Process();
 
 protected:
     __aicore__ inline void CalMultiOutToken(const int64_t out_offset, const int64_t out_tokens_number);
     __aicore__ inline void CalSingleOutToken(const int64_t start_token, const int64_t out_token_idx);
-    __aicore__ inline void CalPartOutToken(
-        const int64_t start_token, const int64_t h_index, const int64_t h_length, const int64_t out_token_index);
+    __aicore__ inline void CalPartOutToken(const int64_t start_token, const int64_t h_index, const int64_t h_length,
+                                           const int64_t out_token_index);
     __aicore__ inline void CopyTokenIn(const T2 in_token_index, const int64_t h_index, const int64_t h_length);
     __aicore__ inline void CalFirstToken(const float prob_value, const int64_t h_length);
     __aicore__ inline void CalToken(const float prob_value, const int64_t h_length);
@@ -128,7 +126,7 @@ protected:
 template <typename T1, typename T2, typename T3, bool PROBS>
 __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Init(
     GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs, GM_ADDR unpermuted_tokens,
-    const MoeFinalizeRoutingV2TilingData* __restrict tiling_data, TPipe* pipe)
+    const MoeFinalizeRoutingV2TilingData *__restrict tiling_data, TPipe *pipe)
 {
     ASSERT(GetBlockNum() != 0 && "block dim can not be zero!");
     // Map MoeFinalizeRoutingV2 key 20050 fields to MoeTokenUnpermute quantities.
@@ -169,8 +167,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Ini
         block_offset = block_length * GetBlockIdx();
     }
 
-    this->tokensGM.SetGlobalBuffer((__gm__ T1*)permuted_tokens);
-    this->indicesGM.SetGlobalBuffer((__gm__ T2*)sorted_indices + block_offset, block_length);
+    this->tokensGM.SetGlobalBuffer((__gm__ T1 *)permuted_tokens);
+    this->indicesGM.SetGlobalBuffer((__gm__ T2 *)sorted_indices + block_offset, block_length);
 
     int64_t out_block_offset;
     if (this->tokens_core_remain > 0) {
@@ -185,8 +183,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Ini
         out_block_offset = this->tokens_core_length * GetBlockIdx() * hidden_size;
     }
 
-    this->outGM.SetGlobalBuffer(
-        (__gm__ T1*)unpermuted_tokens + out_block_offset, this->tokens_core_length * this->hidden_size);
+    this->outGM.SetGlobalBuffer((__gm__ T1 *)unpermuted_tokens + out_block_offset,
+                                this->tokens_core_length * this->hidden_size);
 
     pipe->InitBuffer(tokens_inque, tiling_data->normalK, hidden_splited_length_align512 * sizeof(T1));
     pipe->InitBuffer(indices_inque, 1, block_splited_length * (sizeof(T2)));
@@ -200,7 +198,7 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Ini
     }
 
     if constexpr (PROBS) {
-        this->probsGM.SetGlobalBuffer((__gm__ T3*)probs + block_offset, block_length);
+        this->probsGM.SetGlobalBuffer((__gm__ T3 *)probs + block_offset, block_length);
         pipe->InitBuffer(probs_inque, 1, block_splited_length * (sizeof(T3)));
         if constexpr (!IsSameType<T3, float>::value) {
             pipe->InitBuffer(temp_buffer2, block_splited_length * sizeof(float));
@@ -228,8 +226,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cal
     int64_t in_offset = out_offset * this->top_k;
     this->copyParams.blockLen = out_tokens_number * this->top_k * sizeof(T2);
 #if __CCE_AICORE__ == 200
-    MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyPadCustom(
-        this->indicesLocal, this->indicesGM[in_offset], this->copyParams, this->extParams2);
+    MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyPadCustom(this->indicesLocal, this->indicesGM[in_offset],
+                                                               this->copyParams, this->extParams2);
 #else
     DataCopyPad(this->indicesLocal, this->indicesGM[in_offset], this->copyParams, this->extParams2);
 #endif
@@ -239,8 +237,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cal
         LocalTensor<T3> temp_probs_tensor = this->probs_inque.template AllocTensor<T3>();
         this->copyParams.blockLen = out_tokens_number * this->top_k * sizeof(T3);
 #if __CCE_AICORE__ == 200
-        MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyPadCustom(
-            temp_probs_tensor, this->probsGM[in_offset], this->copyParams, this->extParams3);
+        MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyPadCustom(temp_probs_tensor, this->probsGM[in_offset],
+                                                                   this->copyParams, this->extParams3);
 #else
         DataCopyPad(temp_probs_tensor, this->probsGM[in_offset], this->copyParams, this->extParams3);
 #endif
@@ -259,8 +257,7 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cal
     // sorted_indices is consumed by scalar GetValue below. The VECIN queue
     // synchronization does not guarantee MTE2-to-Scalar visibility, so wait
     // once per indices tile before reading it.
-    event_t eventIdMte2ToScalar =
-        static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));
+    event_t eventIdMte2ToScalar = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));
     SetFlag<HardEvent::MTE2_S>(eventIdMte2ToScalar);
     WaitFlag<HardEvent::MTE2_S>(eventIdMte2ToScalar);
     for (int64_t out_token_idx = 0; out_token_idx < out_tokens_number; ++out_token_idx) {
@@ -328,8 +325,9 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cal
 }
 
 template <typename T1, typename T2, typename T3, bool PROBS>
-__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CopyTokenIn(
-    const T2 in_token_index, const int64_t h_index, const int64_t h_length)
+__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CopyTokenIn(const T2 in_token_index,
+                                                                                         const int64_t h_index,
+                                                                                         const int64_t h_length)
 {
     LocalTensor<T1> tokensLocal = this->tokens_inque.template AllocTensor<T1>();
     int64_t offset = in_token_index * this->hidden_size + h_index * this->hidden_splited_length;
@@ -339,8 +337,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cop
     } else {
         this->copyParams.blockLen = h_length * sizeof(T1);
 #if __CCE_AICORE__ == 200
-        MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyPadCustom(
-            tokensLocal, this->tokensGM[offset], this->copyParams, this->extParams1);
+        MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyPadCustom(tokensLocal, this->tokensGM[offset],
+                                                                   this->copyParams, this->extParams1);
 #else
         DataCopyPad(tokensLocal, this->tokensGM[offset], this->copyParams, this->extParams1);
 #endif
@@ -350,8 +348,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cop
 }
 
 template <typename T1, typename T2, typename T3, bool PROBS>
-__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CalFirstToken(
-    const float prob_value, const int64_t h_length)
+__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CalFirstToken(const float prob_value,
+                                                                                           const int64_t h_length)
 {
     LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
 
@@ -371,8 +369,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cal
 }
 
 template <typename T1, typename T2, typename T3, bool PROBS>
-__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CalToken(
-    const float prob_value, const int64_t h_length)
+__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CalToken(const float prob_value,
+                                                                                      const int64_t h_length)
 {
     LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
 
@@ -396,8 +394,9 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cal
 }
 
 template <typename T1, typename T2, typename T3, bool PROBS>
-__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CopyOut(
-    const int64_t out_token_index, const int64_t h_index, const int64_t h_length)
+__aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::CopyOut(const int64_t out_token_index,
+                                                                                     const int64_t h_index,
+                                                                                     const int64_t h_length)
 {
     LocalTensor<T1> temp_out_tensors;
     if constexpr (!IsSameType<T1, float>::value) {
@@ -421,8 +420,8 @@ __aicore__ inline void MoeFinalizeRoutingV2UnpermuteFast<T1, T2, T3, PROBS>::Cop
     } else {
         this->copyParams.blockLen = h_length * sizeof(T1);
 #if __CCE_AICORE__ == 200
-        MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyCustom(
-            this->outGM[offset], temp_out_tensors, this->copyParams.blockCount, this->copyParams.blockLen);
+        MoeFinalizeRoutingV2UnpermuteFastCommon::DataCopyCustom(this->outGM[offset], temp_out_tensors,
+                                                                this->copyParams.blockCount, this->copyParams.blockLen);
 #else
         DataCopyPad(this->outGM[offset], temp_out_tensors, this->copyParams);
 #endif

@@ -18,7 +18,8 @@ namespace gmm {
 template <typename T>
 class AclnnGroupedMatmulDAV3510Checker {
 public:
-    explicit AclnnGroupedMatmulDAV3510Checker(const GroupedMatmulParamsBase<T> &gmmParams) : gmmParams_(gmmParams) {};
+    explicit AclnnGroupedMatmulDAV3510Checker(const GroupedMatmulParamsBase<T> &gmmParams)
+        : gmmParams_(gmmParams) {};
     ~AclnnGroupedMatmulDAV3510Checker() {};
     aclnnStatus CheckGroupedMatmulDAV3510() const;
     bool IsPerTileQuantMode() const;

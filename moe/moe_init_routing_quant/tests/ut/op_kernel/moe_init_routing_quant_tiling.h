@@ -36,14 +36,15 @@ struct QuantVBSComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline [aicore] void InitTilingData(const __gm__ uint8_t* tiling, QuantVBSComputeTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, QuantVBSComputeTilingData *const_data)
 {
     const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(QuantVBSComputeTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(QuantVBSComputeTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, QuantVBSComputeTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, QuantVBSComputeTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(QuantVBSComputeTilingData));
 }
@@ -56,14 +57,15 @@ struct QuantVMSMiddleComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline [aicore] void InitTilingData(const __gm__ uint8_t* tiling, QuantVMSMiddleComputeTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, QuantVMSMiddleComputeTilingData *const_data)
 {
     const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(QuantVMSMiddleComputeTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(QuantVMSMiddleComputeTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, QuantVMSMiddleComputeTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, QuantVMSMiddleComputeTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(QuantVMSMiddleComputeTilingData));
 }
@@ -76,14 +78,15 @@ struct QuantSortOutComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline [aicore] void InitTilingData(const __gm__ uint8_t* tiling, QuantSortOutComputeTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, QuantSortOutComputeTilingData *const_data)
 {
     const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(QuantSortOutComputeTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(QuantSortOutComputeTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, QuantSortOutComputeTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, QuantSortOutComputeTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(QuantSortOutComputeTilingData));
 }
@@ -111,14 +114,15 @@ struct QuantGatherOutComputeTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline [aicore] void InitTilingData(const __gm__ uint8_t* tiling, QuantGatherOutComputeTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, QuantGatherOutComputeTilingData *const_data)
 {
     const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(QuantGatherOutComputeTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(QuantGatherOutComputeTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, QuantGatherOutComputeTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, QuantGatherOutComputeTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(QuantGatherOutComputeTilingData));
 }
@@ -141,28 +145,27 @@ struct MoeInitRoutingQuantTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline [aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeInitRoutingQuantTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeInitRoutingQuantTilingData *const_data)
 {
     const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(MoeInitRoutingQuantTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(MoeInitRoutingQuantTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, MoeInitRoutingQuantTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, MoeInitRoutingQuantTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeInitRoutingQuantTilingData));
 }
 #endif
 
-
 #define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \
-tiling_struct tiling_data; \
-InitTilingData(tiling_arg, &tiling_data)
-
+    tiling_struct tiling_data; \
+    InitTilingData(tiling_arg, &tiling_data)
 
 #define GET_TILING_DATA(tiling_data, tiling_arg) \
-MoeInitRoutingQuantTilingData tiling_data; \
-InitTilingData(tiling_arg, &tiling_data)
+    MoeInitRoutingQuantTilingData tiling_data; \
+    InitTilingData(tiling_arg, &tiling_data)
 
 #define DTYPE_X float
 

@@ -28,8 +28,7 @@
 #include <nlohmann/json.hpp>
 #include "../../../inc/moe_log.h"
 #include "platform/platform_info.h"
-namespace optiling
-{
+namespace optiling {
 BEGIN_TILING_DATA_DEF(MoeInplaceIndexAddForAscendcTilingData)
 TILING_DATA_FIELD_DEF(int64_t, preAxis);
 TILING_DATA_FIELD_DEF(int64_t, varInAxis);
@@ -47,11 +46,13 @@ REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd, MoeInplaceIndexAddForAscendcTilin
  * @param [in] context: gert::TilingContext
  * @return bool: std::unique_ptr<nlohmann::json>;
  */
-inline std::unique_ptr<nlohmann::json> MoeGetCompileInfoJson(gert::TilingParseContext* context) {
-  auto json_str = context->GetCompiledJson();
-  MOE_OPS_CHECK_NULL_WITH_CONTEXT_RET(context, json_str, nullptr);
-  std::unique_ptr<nlohmann::json> parsed_object_cinfo = std::make_unique<nlohmann::json>(nlohmann::json::parse(json_str));
-  return parsed_object_cinfo;
+inline std::unique_ptr<nlohmann::json> MoeGetCompileInfoJson(gert::TilingParseContext *context)
+{
+    auto json_str = context->GetCompiledJson();
+    MOE_OPS_CHECK_NULL_WITH_CONTEXT_RET(context, json_str, nullptr);
+    std::unique_ptr<nlohmann::json> parsed_object_cinfo =
+        std::make_unique<nlohmann::json>(nlohmann::json::parse(json_str));
+    return parsed_object_cinfo;
 }
 
 /*
@@ -62,24 +63,26 @@ inline std::unique_ptr<nlohmann::json> MoeGetCompileInfoJson(gert::TilingParseCo
  * @return bool: success or failed
  */
 template <typename T>
-bool MoeReadCompileItem(const nlohmann::json& all_vars, const std::string& name, T& value) {
-  if (all_vars.empty()) {
-    return false;
-  }
+bool MoeReadCompileItem(const nlohmann::json &all_vars, const std::string &name, T &value)
+{
+    if (all_vars.empty()) {
+        return false;
+    }
 
-  if (all_vars.count(name) == 0) {
-    return false;
-  }
+    if (all_vars.count(name) == 0) {
+        return false;
+    }
 
-  value = all_vars[name].get<T>();
-  return true;
+    value = all_vars[name].get<T>();
+    return true;
 }
 
 template <typename T1, typename T2>
-void MoeReadCompileItem(const nlohmann::json& all_vars, const std::string& name, T1& value, const T2 default_value) {
-  if (!MoeReadCompileItem(all_vars, name, value)) {
-    value = static_cast<T1>(default_value);
-  }
+void MoeReadCompileItem(const nlohmann::json &all_vars, const std::string &name, T1 &value, const T2 default_value)
+{
+    if (!MoeReadCompileItem(all_vars, name, value)) {
+        value = static_cast<T1>(default_value);
+    }
 }
 
 /*
@@ -88,14 +91,14 @@ void MoeReadCompileItem(const nlohmann::json& all_vars, const std::string& name,
  * @param [out] int64_t: running core number
  * @return bool: result
  */
-bool MoeGetTilingCoreNum(const gert::TilingParseContext* context, uint32_t& core_num);
+bool MoeGetTilingCoreNum(const gert::TilingParseContext *context, uint32_t &core_num);
 
-ge::graphStatus MoeInplaceIndexAddTilingForAscendC(gert::TilingContext* context);
+ge::graphStatus MoeInplaceIndexAddTilingForAscendC(gert::TilingContext *context);
 
-class MoeInplaceIndexAddTiling : public Ops::Transformer::OpTiling::TilingBaseClass
-{
+class MoeInplaceIndexAddTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MoeInplaceIndexAddTiling(gert::TilingContext* context) : TilingBaseClass(context)
+    explicit MoeInplaceIndexAddTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {}
     ~MoeInplaceIndexAddTiling() override = default;
 
@@ -108,13 +111,12 @@ protected:
     uint64_t GetTilingKey() const override;
     ge::graphStatus GetWorkspaceSize() override;
     ge::graphStatus PostTiling() override;
-    void DumpTilingInfo() override
-    {}
+    void DumpTilingInfo() override {}
     void SelTemplateByInput();
     ge::graphStatus CheckInputDtype();
     ge::graphStatus CheckInputShape();
-    bool CompareShape(const gert::Shape& shape1, const gert::Shape& shape2, int64_t dim = static_cast<int64_t>(-1));
-    void CombineAxis(const gert::Shape& varShape, const gert::Shape& updatesShape);
+    bool CompareShape(const gert::Shape &shape1, const gert::Shape &shape2, int64_t dim = static_cast<int64_t>(-1));
+    void CombineAxis(const gert::Shape &varShape, const gert::Shape &updatesShape);
     void GetCastTypeSize();
     uint32_t GetSortTmpSize(ge::DataType dataType, uint32_t lastAxisNum, bool isDescend);
     void GetCastTypeForSort();
@@ -184,12 +186,13 @@ public:
     int64_t ubVarOptiFactor_ = 0;
     int64_t isOpti_ = 0;
     int64_t indicesStride_ = 1;
-    uint64_t indicesCastMode_ = 0;  // 0: 不Cast; 1：int32 Cast int16; 2：int64 Cast int32; 3：int64 Cast int16; 4:int32 Cast uint8; 5:int64 Cast uint8.
+    uint64_t indicesCastMode_ = 0; // 0: 不Cast; 1：int32 Cast int16; 2：int64 Cast int32; 3：int64 Cast int16; 4:int32
+                                   // Cast uint8; 5:int64 Cast uint8.
     int64_t indicesCastDtypeSize_ = 0;
 
     ge::DataType dtype_ = ge::DT_UNDEFINED;
     ge::DataType indicesDtype_ = ge::DT_UNDEFINED;
     ge::DataType indicesCastDtype_ = ge::DT_UNDEFINED;
 };
-}  // namespace optiling
-#endif  // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INPLACE_INDEX_ADD_TILING_H_
+} // namespace optiling
+#endif // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INPLACE_INDEX_ADD_TILING_H_

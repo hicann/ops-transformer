@@ -13,10 +13,10 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::array<const aclTensor*, 2> MoeTokenPermuteWithRoutingMapGrad(
-    const aclTensor* permutedTokenOutputGrad, const aclTensor* permutedProbsOutputGradOptional,
-    const aclTensor* sortedIndices, const aclTensor* routingMapOptional, int64_t numExperts, int64_t tokensNum,
-    bool dropAndPad, const aclTensor* tokensGradOut, const aclTensor* probsGradOut, aclOpExecutor* executor);
+const std::array<const aclTensor *, 2> MoeTokenPermuteWithRoutingMapGrad(
+    const aclTensor *permutedTokenOutputGrad, const aclTensor *permutedProbsOutputGradOptional,
+    const aclTensor *sortedIndices, const aclTensor *routingMapOptional, int64_t numExperts, int64_t tokensNum,
+    bool dropAndPad, const aclTensor *tokensGradOut, const aclTensor *probsGradOut, aclOpExecutor *executor);
 } // namespace l0op
 
 #endif // MOE_TOKEN_PERMUTE_WITH_ROUTING_MAP_GRAD_H

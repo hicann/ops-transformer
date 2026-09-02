@@ -102,8 +102,9 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyInExpandedE
     DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(currentLoopRows_ * sizeof(int32_t)), 0, 0, 0};
     DataCopyPadExtParams<int32_t> dataCopyPadParams{false, 0, 0, 0};
     DataCopyPad(indicesLocal, expandedRowIdxGm_[indicesOffset_], dataCopyParams, dataCopyPadParams);
-    if constexpr (COPYOUTTYPE == SCATTER) { 
-        DataCopyPad(indicesLocal[currentLoopRowsAlign_], expandedExpertIdxGm_[indicesOffset_], dataCopyParams, dataCopyPadParams); 
+    if constexpr (COPYOUTTYPE == SCATTER) {
+        DataCopyPad(indicesLocal[currentLoopRowsAlign_], expandedExpertIdxGm_[indicesOffset_], dataCopyParams,
+                    dataCopyPadParams);
     }
     expandRowIdxInQueue_.EnQue<int32_t>(indicesLocal);
 }
@@ -267,10 +268,11 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyOutXDynamic
 }
 
 template <typename T, const int COPYOUTTYPE>
-__aicore__ inline float
-MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeMax(LocalTensor<float> &inLocal, LocalTensor<float> &tempLocal,
-                                                     LocalTensor<float> &scaleLocal, int32_t srcIdx, int32_t expertIdx,
-                                                     int64_t j)
+__aicore__ inline float MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeMax(LocalTensor<float> &inLocal,
+                                                                             LocalTensor<float> &tempLocal,
+                                                                             LocalTensor<float> &scaleLocal,
+                                                                             int32_t srcIdx, int32_t expertIdx,
+                                                                             int64_t j)
 {
     LocalTensor<float> smoothLocal = smoothInQueue_.AllocTensor<float>();
 
@@ -316,9 +318,10 @@ MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeMax(LocalTensor<float> &inLocal
 }
 
 template <typename T, const int COPYOUTTYPE>
-__aicore__ inline void
-MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeScale(LocalTensor<float> &inLocal, LocalTensor<float> &tempLocal,
-                                                       float scaleTemp, int64_t dstIndex, int64_t j)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeScale(LocalTensor<float> &inLocal,
+                                                                              LocalTensor<float> &tempLocal,
+                                                                              float scaleTemp, int64_t dstIndex,
+                                                                              int64_t j)
 {
     DataCopyExtParams copyInParams{1, static_cast<uint32_t>(colsTileLength_ * sizeof(float)), 0, 0, 0};
     DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(colsTileLength_ * sizeof(int8_t)), 0, 0, 0};
@@ -349,8 +352,8 @@ MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::ComputeScale(LocalTensor<float> &inLoc
 }
 
 template <typename T, const int COPYOUTTYPE>
-__aicore__ inline void
-MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyOutXPartialDynamicQuantFromScatter(int64_t progress)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyOutXPartialDynamicQuantFromScatter(
+    int64_t progress)
 {
     LocalTensor<int32_t> indicesLocal = expandRowIdxInQueue_.DeQue<int32_t>();
     for (int64_t i = 0; i < currentLoopRows_; i++) {
@@ -458,10 +461,11 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::CopyOutXPartial
 }
 
 template <typename T, const int COPYOUTTYPE>
-__aicore__ inline void
-MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Init(GM_ADDR inputX, GM_ADDR quantSmooth, GM_ADDR sortedExpertIdx,
-                                               GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR expandedScale,
-                                               const MoeInitRoutingV3TilingData *tilingData, TPipe *tPipe)
+__aicore__ inline void MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Init(GM_ADDR inputX, GM_ADDR quantSmooth,
+                                                                      GM_ADDR sortedExpertIdx, GM_ADDR expandedRowIdx,
+                                                                      GM_ADDR expandedX, GM_ADDR expandedScale,
+                                                                      const MoeInitRoutingV3TilingData *tilingData,
+                                                                      TPipe *tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -528,9 +532,9 @@ MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Init(GM_ADDR inputX, GM_ADDR quantSmoo
             expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
                                               Align(perCoreRow_, sizeof(int32_t)));
         } else {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) +
-                                                  blockIdx_ * perCoreRow_,
-                                              Align(perCoreRow_, sizeof(int32_t)));
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                Align(perCoreRow_, sizeof(int32_t)));
         }
     } else {
         // 获取gather索引
@@ -538,9 +542,9 @@ MoeGatherOutDynamicQuant<T, COPYOUTTYPE>::Init(GM_ADDR inputX, GM_ADDR quantSmoo
             expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreRow_,
                                               Align(perCoreRow_, sizeof(int32_t)));
         } else {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) +
-                                                  blockIdx_ * perCoreRow_,
-                                              Align(perCoreRow_, sizeof(int32_t)));
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)sortedExpertIdx + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                Align(perCoreRow_, sizeof(int32_t)));
         }
     }
 

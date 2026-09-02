@@ -79,9 +79,10 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void
-MoeGatingTopKBackwardKernel<T>::Init(GM_ADDR xNorm, GM_ADDR gradY, GM_ADDR expertIdx, GM_ADDR gradX,
-                                     const MoeGatingTopKBackwardTilingData *tilingData, TPipe *tPipe)
+__aicore__ inline void MoeGatingTopKBackwardKernel<T>::Init(GM_ADDR xNorm, GM_ADDR gradY, GM_ADDR expertIdx,
+                                                            GM_ADDR gradX,
+                                                            const MoeGatingTopKBackwardTilingData *tilingData,
+                                                            TPipe *tPipe)
 {
     tilingData_ = tilingData;
     pipe_ = tPipe;

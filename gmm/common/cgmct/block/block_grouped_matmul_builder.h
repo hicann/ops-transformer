@@ -100,13 +100,9 @@ public:
     // params
     using Params = Arguments;
 
-    __aicore__ inline BlockGroupedMatmulBuilder()
-    {
-    }
+    __aicore__ inline BlockGroupedMatmulBuilder() {}
 
-    __aicore__ inline ~BlockGroupedMatmulBuilder()
-    {
-    }
+    __aicore__ inline ~BlockGroupedMatmulBuilder() {}
 };
 } // namespace Block
 } // namespace Gemm

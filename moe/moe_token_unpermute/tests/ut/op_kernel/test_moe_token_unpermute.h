@@ -24,11 +24,12 @@
 #define ORIG_DTYPE_START DT_BF16
 #define __CCE_UT_TEST__
 
-inline void InitMoeTokenUnpermuteTilingData(uint8_t* tiling, MoeTokenUnpermuteTilingData* const_data) {
-  memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteTilingData));
+inline void InitMoeTokenUnpermuteTilingData(uint8_t *tiling, MoeTokenUnpermuteTilingData *const_data)
+{
+    memcpy(const_data, tiling, sizeof(MoeTokenUnpermuteTilingData));
 }
 
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-  MoeTokenUnpermuteTilingData tilingData;          \
-  InitMoeTokenUnpermuteTilingData(tilingPointer, &tilingData)
+    MoeTokenUnpermuteTilingData tilingData; \
+    InitMoeTokenUnpermuteTilingData(tilingPointer, &tilingData)
 #endif

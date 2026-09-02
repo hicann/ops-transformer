@@ -42,9 +42,7 @@ public:
         Params() = default;
     };
 
-    __aicore__ inline BlockEpilogueEmpty()
-    {
-    }
+    __aicore__ inline BlockEpilogueEmpty() {}
 
     __aicore__ inline void Run()
     {

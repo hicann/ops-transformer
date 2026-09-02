@@ -22,14 +22,13 @@ using namespace AscendC;
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT = PermutedTokenT>
 class MoeTokenUnpermuteWithRoutingMapGradProbNoneDropPadTrue
-    : protected MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>
-{
+    : protected MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT> {
 public:
     __aicore__ inline MoeTokenUnpermuteWithRoutingMapGradProbNoneDropPadTrue(){};
-    __aicore__ inline void Init(
-        GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId, GM_ADDR routing_map,
-        GM_ADDR permuted_tokens, GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-        const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data);
+    __aicore__ inline void Init(GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId,
+                                GM_ADDR routing_map, GM_ADDR permuted_tokens, GM_ADDR probs,
+                                GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
+                                const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data);
     __aicore__ inline void Process();
 
 protected:
@@ -42,13 +41,13 @@ template <typename PermutedTokenT, typename IdxT, typename ProbsT>
 __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNoneDropPadTrue<PermutedTokenT, IdxT, ProbsT>::Init(
     GM_ADDR unpermuted_tokens_grad, GM_ADDR outIndex, GM_ADDR permuteTokenId, GM_ADDR routing_map,
     GM_ADDR permuted_tokens, GM_ADDR probs, GM_ADDR permuted_tokens_grad, GM_ADDR probs_grad,
-    const MoeTokenUnpermuteWithRoutingMapGradTilingData& tiling_data)
+    const MoeTokenUnpermuteWithRoutingMapGradTilingData &tiling_data)
 {
     MoeTokenUnpermuteWithRoutingMapGradBase<PermutedTokenT, IdxT, ProbsT>::Init(
         unpermuted_tokens_grad, outIndex, permuteTokenId, routing_map, permuted_tokens, probs, permuted_tokens_grad,
         probs_grad, tiling_data);
-    this->pipe.InitBuffer(
-        padTrueInOutque, DOUBLE_BUFFER, (this->inputReserveNum * this->hiddenSizeAlign) * this->inputTypeSize);
+    this->pipe.InitBuffer(padTrueInOutque, DOUBLE_BUFFER,
+                          (this->inputReserveNum * this->hiddenSizeAlign) * this->inputTypeSize);
 }
 
 template <typename PermutedTokenT, typename IdxT, typename ProbsT>
@@ -70,8 +69,8 @@ __aicore__ inline void MoeTokenUnpermuteWithRoutingMapGradProbNoneDropPadTrue<Pe
             inOutLocal = padTrueInOutque.AllocTensor<PermutedTokenT>();
             copyParams.blockLen = hiddenLoopBlockLen;
             int64_t unpermutedTokensGradOffset = tokenId * this->hiddenSize + hiddenLoopOffset;
-            DataCopyPad(
-                inOutLocal, this->unpermutedTokensGradGm[unpermutedTokensGradOffset], copyParams, this->inputPadParams);
+            DataCopyPad(inOutLocal, this->unpermutedTokensGradGm[unpermutedTokensGradOffset], copyParams,
+                        this->inputPadParams);
             padTrueInOutque.EnQue<QuePosition::VECIN, QuePosition::VECOUT, PermutedTokenT>(inOutLocal);
             inOutLocal = padTrueInOutque.DeQue<QuePosition::VECIN, QuePosition::VECOUT, PermutedTokenT>();
             int64_t permutedTokensGradOffset = permuteTokenId * this->hiddenSize + hiddenLoopOffset;

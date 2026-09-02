@@ -185,10 +185,11 @@ __aicore__ inline void MoeFinalizeRoutingBF16AllBias<T>::CkechColAlignment()
 }
 
 template <typename T>
-__aicore__ inline void
-MoeFinalizeRoutingBF16AllBias<T>::Init(GM_ADDR expandedPermutedRows, GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
-                                       GM_ADDR scales, GM_ADDR expandedSrcToDstRow, GM_ADDR expertForSourceRow,
-                                       GM_ADDR out, GM_ADDR workspace, const MoeFinalizeRoutingTilingData *tilingData)
+__aicore__ inline void MoeFinalizeRoutingBF16AllBias<T>::Init(GM_ADDR expandedPermutedRows, GM_ADDR skip1,
+                                                              GM_ADDR skip2, GM_ADDR bias, GM_ADDR scales,
+                                                              GM_ADDR expandedSrcToDstRow, GM_ADDR expertForSourceRow,
+                                                              GM_ADDR out, GM_ADDR workspace,
+                                                              const MoeFinalizeRoutingTilingData *tilingData)
 {
     // init tiling data
     ParseTilingData(tilingData);

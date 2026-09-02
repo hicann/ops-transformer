@@ -89,15 +89,15 @@ template <typename T>
 __aicore__ constexpr uint32_t GetKBUnit()
 {
     if constexpr (IsSameType<T, int4b_t>::value) {
-        return 2048;  // 2048个int4是1kb
+        return 2048; // 2048个int4是1kb
     }
     if constexpr (IsSameType<T, int8_t>::value) {
-        return 1024;  // 1024个B8是1kb
+        return 1024; // 1024个B8是1kb
     }
     if constexpr (IsSameType<T, float>::value) {
-        return 256;  // 256个float是1kb
+        return 256; // 256个float是1kb
     }
-    return 512;  // 512个half是1kb
+    return 512; // 512个half是1kb
 }
-}  // namespace GROUPED_MATMUL::A16W4Msd
+} // namespace GROUPED_MATMUL::A16W4Msd
 #endif

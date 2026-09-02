@@ -23,12 +23,11 @@ namespace MoeCompute {
 using namespace AscendC;
 
 template <typename T>
-class MoeComputeExpertTokensInt32M
-{
+class MoeComputeExpertTokensInt32M {
 public:
     __aicore__ inline MoeComputeExpertTokensInt32M(){};
-    __aicore__ inline void Init(
-        GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace, const MoeComputeExpertTokensTilingData* tilingData);
+    __aicore__ inline void Init(GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace,
+                                const MoeComputeExpertTokensTilingData *tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -44,7 +43,7 @@ private:
     __aicore__ inline void CopyOutAfter(int64_t loopIdx, int64_t numOfLoop);
     __aicore__ inline int64_t Int32AlignmentProcess(int64_t param);
     __aicore__ inline int64_t PadProcessInt32(int64_t param);
-    __aicore__ inline void ParseTilingData(const MoeComputeExpertTokensTilingData* tilingData);
+    __aicore__ inline void ParseTilingData(const MoeComputeExpertTokensTilingData *tilingData);
 
 private:
     TPipe pipe_;
@@ -141,7 +140,7 @@ __aicore__ inline int64_t MoeComputeExpertTokensInt32M<T>::Int32AlignmentProcess
 
 template <typename T>
 __aicore__ inline void MoeComputeExpertTokensInt32M<T>::ParseTilingData(
-    const MoeComputeExpertTokensTilingData* tilingData)
+    const MoeComputeExpertTokensTilingData *tilingData)
 {
     // 使用核数
     usedCoreNumBefore_ = tilingData->usedCoreNumBefore;
@@ -196,7 +195,7 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::SyncAllCore()
 {
     // set workspace as 0, each core handle workspace 32bytes
     constexpr int32_t EACH_CORE_HANDLE_NUM = 32 / sizeof(int32_t);
-    syncGlobal_.SetGlobalBuffer((__gm__ int32_t*)workspace_ + (numOfExpert_ * usedCoreNumBefore_));
+    syncGlobal_.SetGlobalBuffer((__gm__ int32_t *)workspace_ + (numOfExpert_ * usedCoreNumBefore_));
     InitOutput<int32_t>(syncGlobal_[EACH_CORE_HANDLE_NUM * GetBlockIdx()], EACH_CORE_HANDLE_NUM, (int32_t)0);
 
     // set workspace for sync
@@ -207,8 +206,8 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::SyncAllCore()
 }
 
 template <typename T>
-__aicore__ inline void MoeComputeExpertTokensInt32M<T>::Init(
-    GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace, const MoeComputeExpertTokensTilingData* tilingData)
+__aicore__ inline void MoeComputeExpertTokensInt32M<T>::Init(GM_ADDR sortExperts, GM_ADDR out, GM_ADDR workspace,
+                                                             const MoeComputeExpertTokensTilingData *tilingData)
 {
     // init tiling data
     ParseTilingData(tilingData);
@@ -216,8 +215,8 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::Init(
 
     // syncall before
     int64_t inputIdx = GetBlockIdx() * normalCoreHandleNumBefore_;
-    gmInput_.SetGlobalBuffer((__gm__ T*)sortExperts + inputIdx, curCoreHandleNumBefore_);
-    gmWorkspace_.SetGlobalBuffer((__gm__ T*)workspace);
+    gmInput_.SetGlobalBuffer((__gm__ T *)sortExperts + inputIdx, curCoreHandleNumBefore_);
+    gmWorkspace_.SetGlobalBuffer((__gm__ T *)workspace);
 
     // gmWorkspace_清零
     int64_t n = numOfExpert_ * totalCoreNum_;
@@ -226,13 +225,13 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::Init(
         InitOutput<int32_t>(gmWorkspace_[n / GetBlockNum() * GetBlockIdx()], n / GetBlockNum(), initValue);
     }
     if ((GetBlockIdx() + 1) == GetBlockNum()) {
-        InitOutput<int32_t>(
-            gmWorkspace_[n / GetBlockNum() * GetBlockIdx()], n - n / GetBlockNum() * (GetBlockNum() - 1), initValue);
+        InitOutput<int32_t>(gmWorkspace_[n / GetBlockNum() * GetBlockIdx()],
+                            n - n / GetBlockNum() * (GetBlockNum() - 1), initValue);
     }
     SyncAll();
 
-    pipe_.InitBuffer(
-        inputQueue_, 1, (curCoreHandleNumPerLoopBefore_ * sizeof(T) + ONE_BLK_SIZE - 1) / ONE_BLK_SIZE * ONE_BLK_SIZE);
+    pipe_.InitBuffer(inputQueue_, 1,
+                     (curCoreHandleNumPerLoopBefore_ * sizeof(T) + ONE_BLK_SIZE - 1) / ONE_BLK_SIZE * ONE_BLK_SIZE);
 
     // syncall after
     if (GetBlockIdx() + 1 == usedCoreNumAfter_) {
@@ -249,14 +248,14 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::Init(
 
     // output 初始化
     outputIndex_ = GetBlockIdx() * normalCoreHandleNum_;
-    gmOutput_.SetGlobalBuffer((__gm__ T*)out + outputIndex_, curCoreHandleNum_);
+    gmOutput_.SetGlobalBuffer((__gm__ T *)out + outputIndex_, curCoreHandleNum_);
 
     // 申请buffer空间
-    pipe_.InitBuffer(
-        workspaceQueue_, 1, curCoreHandleNumPerLoop_ * Int32AlignmentProcess(usedCoreNumBefore_) * sizeof(int32_t));
+    pipe_.InitBuffer(workspaceQueue_, 1,
+                     curCoreHandleNumPerLoop_ * Int32AlignmentProcess(usedCoreNumBefore_) * sizeof(int32_t));
     pipe_.InitBuffer(outputQueue_, 1, curCoreHandleNumPerLoop_ * sizeof(int32_t));
-    pipe_.InitBuffer(
-        inputCastTmpBuf_, curCoreHandleNumPerLoop_ * Int32AlignmentProcess(usedCoreNumBefore_) * sizeof(float));
+    pipe_.InitBuffer(inputCastTmpBuf_,
+                     curCoreHandleNumPerLoop_ * Int32AlignmentProcess(usedCoreNumBefore_) * sizeof(float));
     pipe_.InitBuffer(outputCastTmpBuf_, curCoreHandleNumPerLoop_ * sizeof(float));
     pipe_.InitBuffer(tmpOutBuf_, (8 * numOfExpert_ * sizeof(int32_t)));
     outputQueueBefore_ = tmpOutBuf_.Get<T>();
@@ -376,11 +375,11 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::CopyInAfter(int64_t loop
         rightPaddingAfter_ = PadProcessInt32(usedCoreNumBefore_);
     }
 
-    DataCopyParams copyParams{
-        static_cast<uint16_t>(numOfLoop), static_cast<uint16_t>(usedCoreNumBefore_ * sizeof(T)), 0, 0};
+    DataCopyParams copyParams{static_cast<uint16_t>(numOfLoop), static_cast<uint16_t>(usedCoreNumBefore_ * sizeof(T)),
+                              0, 0};
     DataCopyPadParams padParams{isPaddingAfter_, 0, static_cast<uint8_t>(rightPaddingAfter_), 0};
-    DataCopyPad(
-        inputLocal, gmWorkspace_[loopIdx * curCoreHandleNumPerLoop_ * usedCoreNumBefore_], copyParams, padParams);
+    DataCopyPad(inputLocal, gmWorkspace_[loopIdx * curCoreHandleNumPerLoop_ * usedCoreNumBefore_], copyParams,
+                padParams);
     workspaceQueue_.EnQue(inputLocal);
 }
 
@@ -401,9 +400,8 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::ComputeAfter(int64_t loo
     int32_t srcRepStride = Int32AlignmentProcess(usedCoreNumBefore_) * sizeof(float) / 32;
 
     PipeBarrier<PIPE_V>();
-    WholeReduceMax<float>(
-        outputCastTmpUb, inputCastTmpUb, mask, repeatTimes, dstRepStride, srcBlkStride, srcRepStride,
-        ReduceOrder::ORDER_ONLY_VALUE);
+    WholeReduceMax<float>(outputCastTmpUb, inputCastTmpUb, mask, repeatTimes, dstRepStride, srcBlkStride, srcRepStride,
+                          ReduceOrder::ORDER_ONLY_VALUE);
     PipeBarrier<PIPE_V>();
     Cast(outputLocal, outputCastTmpUb, RoundMode::CAST_ROUND, Int32AlignmentProcess(numOfLoop));
     outputQueue_.EnQue(outputLocal);
@@ -427,8 +425,8 @@ __aicore__ inline void MoeComputeExpertTokensInt32M<T>::ProcessAfter()
     }
 
     int64_t inputIdx = GetBlockIdx() * normalCoreHandleNum_ * usedCoreNumBefore_;
-    gmWorkspace_.SetGlobalBuffer(
-        (__gm__ T*)workspace_ + inputIdx, curCoreHandleNum_ * Int32AlignmentProcess(usedCoreNumBefore_));
+    gmWorkspace_.SetGlobalBuffer((__gm__ T *)workspace_ + inputIdx,
+                                 curCoreHandleNum_ * Int32AlignmentProcess(usedCoreNumBefore_));
 
     auto numOfLoop = curCoreHandleNumPerLoop_;
     for (int64_t n = 0; n < loopCount_; n++) {

@@ -28,11 +28,11 @@
 namespace Cgmct {
 namespace Gemm {
 namespace Block {
-#define QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS                                                                         \
-    template <typename L0TileShape_, typename DataTypeOut_, typename DataTypeIn_, typename DataTypeBias_,              \
+#define QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS \
+    template <typename L0TileShape_, typename DataTypeOut_, typename DataTypeIn_, typename DataTypeBias_, \
               typename DataTypeX1Scale_, typename DataTypeX2Scale_, typename LayoutX1Scale_, typename LayoutX2Scale_>
-#define QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS                                                                          \
-    L0TileShape_, DataTypeOut_, DataTypeIn_, DataTypeBias_, DataTypeX1Scale_, DataTypeX2Scale_, LayoutX1Scale_,        \
+#define QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS \
+    L0TileShape_, DataTypeOut_, DataTypeIn_, DataTypeBias_, DataTypeX1Scale_, DataTypeX2Scale_, LayoutX1Scale_, \
         LayoutX2Scale_
 
 using namespace Cgmct::Gemm::GroupedMatmul;
@@ -240,8 +240,8 @@ __aicore__ inline auto BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
 }
 
 QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::UpdateParamsForNextProblem(const TupleShape &problemShape)
+__aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::UpdateParamsForNextProblem(
+    const TupleShape &problemShape)
 {
     problemShape_ = problemShape;
 
@@ -251,8 +251,8 @@ BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::UpdateParamsForNext
 }
 
 QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(const BlockCoord &baseOffset)
+__aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
+    const BlockCoord &baseOffset)
 {
     if ASCEND_IS_AIV {
         x1ScaleGlobal_.SetGlobalBuffer((__gm__ X1ScaleType *)params_->x1ScaleGmAddr + Get<X1SCALE_IDX>(baseOffset));
@@ -291,8 +291,8 @@ __aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
 
 QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS
 template <class T>
-__aicore__ inline __ubuf__ T *
-BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::CopyInX1Scale(uint64_t srcOffset, uint64_t m, uint64_t k)
+__aicore__ inline __ubuf__ T *BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::CopyInX1Scale(
+    uint64_t srcOffset, uint64_t m, uint64_t k)
 {
     AscendC::DataCopyExtParams x1ScaleGm2UbParams;
     AscendC::DataCopyPadExtParams<X1ScaleType> padParams;
@@ -406,9 +406,8 @@ __aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
 }
 
 QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::operator()(const TupleShape &actualSingleShape,
-                                                                        const BlockCoord &blockCoord)
+__aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::operator()(
+    const TupleShape &actualSingleShape, const BlockCoord &blockCoord)
 {
     actualSingleShape_ = actualSingleShape;
     blockCoord_ = blockCoord;
@@ -428,9 +427,8 @@ BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::operator()(const Tu
 
 QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS
 template <class T>
-__aicore__ inline __ubuf__ T *
-BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::GetX1ScaleUbAddrPerGroup(int64_t x1ScaleOffset,
-                                                                                      uint64_t kOffset, uint64_t kElem)
+__aicore__ inline __ubuf__ T *BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::GetX1ScaleUbAddrPerGroup(
+    int64_t x1ScaleOffset, uint64_t kOffset, uint64_t kElem)
 {
     uint64_t scaleX1GmOffset;
     if constexpr (transA) {
@@ -663,8 +661,8 @@ __aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
 }
 
 QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::AivPostProcess(const AscendC::LocalTensor<CType> &mmAddUb)
+__aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::AivPostProcess(
+    const AscendC::LocalTensor<CType> &mmAddUb)
 {
     if (ubParams_.validM == 0) {
         return;
@@ -706,8 +704,8 @@ __aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
 }
 
 QGMM_BLOCK_EPILOGUE_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::CastAndCopyOut(const AscendC::LocalTensor<CType> &mmAddUb)
+__aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAMS>::CastAndCopyOut(
+    const AscendC::LocalTensor<CType> &mmAddUb)
 {
     if (ubParams_.ndNum == 2 && !ubParams_.CopyOutWithSplitN) { // 2: 2ND, opt branch with splitM
         uint32_t sumN = ubParams_.validN[0] + ubParams_.validN[1];

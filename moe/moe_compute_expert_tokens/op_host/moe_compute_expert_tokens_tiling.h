@@ -39,36 +39,36 @@ TILING_DATA_FIELD_DEF(int64_t, normalCoreLoopNumAfter);   // syncall后，非尾
 TILING_DATA_FIELD_DEF(
     int64_t, normalCoreHandleNumPerLoopAfter); // syncall后，非尾核，每个核，非尾Loop，每次loop需要处理的元素个数
 TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNumTailLoopAfter); // syncall后，非尾核，每个核，尾Loop需要处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumAfter);           // syncall后，尾核，处理的个数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreLoopNumAfter);             // syncall后，尾核，每个核需要的Loop循环次数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumPerLoopAfter);    // syncall后，尾核，每个核，非尾Loop需要处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumTailLoopAfter);   // syncall后，尾核，每个核，尾Loop需要处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, numOfExpert);                      // 输入的专家个数E
-TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNumBefore);        // syncall前，非尾核，每个核处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, normalCoreLoopNumBefore);          // syncall前，非尾核，每个核需要的Loop循环次数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumAfter); // syncall后，尾核，处理的个数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreLoopNumAfter);   // syncall后，尾核，每个核需要的Loop循环次数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumPerLoopAfter); // syncall后，尾核，每个核，非尾Loop需要处理的元素个数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumTailLoopAfter); // syncall后，尾核，每个核，尾Loop需要处理的元素个数
+TILING_DATA_FIELD_DEF(int64_t, numOfExpert);                    // 输入的专家个数E
+TILING_DATA_FIELD_DEF(int64_t, normalCoreHandleNumBefore); // syncall前，非尾核，每个核处理的元素个数
+TILING_DATA_FIELD_DEF(int64_t, normalCoreLoopNumBefore); // syncall前，非尾核，每个核需要的Loop循环次数
 TILING_DATA_FIELD_DEF(
     int64_t, normalCoreHandleNumPerLoopBefore); // syncall前，非尾核，每个核，非尾Loop，每次loop需要处理的元素个数
-TILING_DATA_FIELD_DEF(
-    int64_t, normalCoreHandleNumTailLoopBefore);                 // syncall前，非尾核，每个核，尾Loop需要处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumBefore);         // syncall前，尾核，处理的个数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreLoopNumBefore);           // syncall前，尾核，每个核需要的Loop循环次数
-TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumPerLoopBefore);  // syncall前，尾核，每个核，非尾Loop需要处理的元素个数
+TILING_DATA_FIELD_DEF(int64_t,
+                      normalCoreHandleNumTailLoopBefore); // syncall前，非尾核，每个核，尾Loop需要处理的元素个数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumBefore); // syncall前，尾核，处理的个数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreLoopNumBefore);   // syncall前，尾核，每个核需要的Loop循环次数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumPerLoopBefore); // syncall前，尾核，每个核，非尾Loop需要处理的元素个数
 TILING_DATA_FIELD_DEF(int64_t, tailCoreHandleNumTailLoopBefore); // syncall前，尾核，每个核，尾Loop需要处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, handleNumPerCoreBefore);          // syncall前，模板3，非尾核需要处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, handleNumTailCoreBefore);         // syncall前，模板3，尾核需要处理的元素个数
-TILING_DATA_FIELD_DEF(int64_t, loopCountBefore);                 // syncall前，模板3，非尾核处理sorted_expert的loop次数
-TILING_DATA_FIELD_DEF(int64_t, loopCountTailBefore);             // syncall前，模板3，尾核处理sorted_expert的loop次数
+TILING_DATA_FIELD_DEF(int64_t, handleNumPerCoreBefore);  // syncall前，模板3，非尾核需要处理的元素个数
+TILING_DATA_FIELD_DEF(int64_t, handleNumTailCoreBefore); // syncall前，模板3，尾核需要处理的元素个数
+TILING_DATA_FIELD_DEF(int64_t, loopCountBefore);     // syncall前，模板3，非尾核处理sorted_expert的loop次数
+TILING_DATA_FIELD_DEF(int64_t, loopCountTailBefore); // syncall前，模板3，尾核处理sorted_expert的loop次数
 TILING_DATA_FIELD_DEF(int64_t, handleNumPerLoopBefore); // syncall前，模板3，非尾核每次loop处理的sorted_expert数量
 TILING_DATA_FIELD_DEF(int64_t, handleNumTailCorePerLoopBefore); // syncall前，模板3，尾核每次loop处理的sorted_expert数量
 TILING_DATA_FIELD_DEF(int64_t, handleExpertNumLoopCount);       // syncall前，模板3，切E需要的loop次数
 TILING_DATA_FIELD_DEF(int64_t, handleExpertNumMainCorePerLoop); // syncall前，模板3，非尾loop切分处理的E的个数
 TILING_DATA_FIELD_DEF(int64_t, handleExpertNumTailCorePerLoop); // syncall前，模板3，尾loop切分处理的E的个数
 TILING_DATA_FIELD_DEF(int64_t, loopCountTailCoreMainLoop);      // syncall前，模板3，尾核主loop的次数
-TILING_DATA_FIELD_DEF(int64_t, handleNumTailCoreMainLoop);      // syncall前，模板3，尾核主loop每次处理个数
-TILING_DATA_FIELD_DEF(int64_t, loopCountTailCoreTailLoop);      // syncall前，模板3，尾核尾loop的次数
-TILING_DATA_FIELD_DEF(int64_t, handleNumTailCoreTailLoop);      // syncall前，模板3，尾核尾loop每次处理个数
-TILING_DATA_FIELD_DEF(int64_t, userWorkspaceSize);              // 使用的workspace
-TILING_DATA_FIELD_DEF(int64_t, tilingKey);                      // 使用的字段tilingKey
+TILING_DATA_FIELD_DEF(int64_t, handleNumTailCoreMainLoop); // syncall前，模板3，尾核主loop每次处理个数
+TILING_DATA_FIELD_DEF(int64_t, loopCountTailCoreTailLoop); // syncall前，模板3，尾核尾loop的次数
+TILING_DATA_FIELD_DEF(int64_t, handleNumTailCoreTailLoop); // syncall前，模板3，尾核尾loop每次处理个数
+TILING_DATA_FIELD_DEF(int64_t, userWorkspaceSize);         // 使用的workspace
+TILING_DATA_FIELD_DEF(int64_t, tilingKey);                 // 使用的字段tilingKey
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeComputeExpertTokens, MoeComputeExpertTokensTilingData)

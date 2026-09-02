@@ -52,7 +52,7 @@ TILING_DATA_FIELD_DEF(uint32_t, withOffset);
 TILING_DATA_FIELD_DEF(uint32_t, isOutputDisableL2Cache);
 TILING_DATA_FIELD_DEF(uint64_t, isA4W4Optimize);
 TILING_DATA_FIELD_DEF(int64_t, isSingleTensor);
-TILING_DATA_FIELD_DEF(uint64_t, isA8W4MSDPreNZ);       // for A8->A4 <ND>
+TILING_DATA_FIELD_DEF(uint64_t, isA8W4MSDPreNZ); // for A8->A4 <ND>
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GMMBaseParamsOp, GMMBaseParams)
 

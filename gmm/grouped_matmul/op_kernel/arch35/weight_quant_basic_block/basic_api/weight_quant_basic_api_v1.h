@@ -47,7 +47,7 @@ struct BasicApiParamsV1 {
     uint64_t l0MSize;
 };
 
-#define WQBMM_BASIC_API_V1_TEMPLATE_PARAM                                                                              \
+#define WQBMM_BASIC_API_V1_TEMPLATE_PARAM \
     template <typename xType, typename biasType, typename yType, bool aTrans, bool bTrans>
 
 #define WQBMM_BASIC_API_V1_CLASS WqbmmBasicApiV1<xType, biasType, yType, aTrans, bTrans>

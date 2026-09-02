@@ -18,8 +18,7 @@
 
 #include "moe_inplace_index_add_tiling_arch35.h"
 
-namespace optiling
-{
+namespace optiling {
 BEGIN_TILING_DATA_DEF(MoeInplaceIndexAddDeterminsticTilingData)
 TILING_DATA_FIELD_DEF(int64_t, preAxis);
 TILING_DATA_FIELD_DEF(int64_t, varInAxis);
@@ -62,10 +61,10 @@ REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd_300000, MoeInplaceIndexAddDetermin
 REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd_300001, MoeInplaceIndexAddDeterminsticTilingData)
 REGISTER_TILING_DATA_CLASS(MoeInplaceIndexAdd_300002, MoeInplaceIndexAddDeterminsticTilingData)
 
-class MoeInplaceIndexAddDeterminsticTiling : public MoeInplaceIndexAddTiling
-{
+class MoeInplaceIndexAddDeterminsticTiling : public MoeInplaceIndexAddTiling {
 public:
-    explicit MoeInplaceIndexAddDeterminsticTiling(gert::TilingContext* context) : MoeInplaceIndexAddTiling(context)
+    explicit MoeInplaceIndexAddDeterminsticTiling(gert::TilingContext *context)
+        : MoeInplaceIndexAddTiling(context)
     {}
     ~MoeInplaceIndexAddDeterminsticTiling() override = default;
 
@@ -78,14 +77,15 @@ protected:
     ge::graphStatus PostTiling() override;
     void DumpTilingInfo() override;
 
-    int64_t GetRestAvailableSize(int64_t sampleNum, int64_t valueTypeBytes,
-            int64_t originalSize, int64_t postAxisSize, ge::DataType idType);
+    int64_t GetRestAvailableSize(int64_t sampleNum, int64_t valueTypeBytes, int64_t originalSize, int64_t postAxisSize,
+                                 ge::DataType idType);
     void DoOpTilingForDeterminsticSplitPre();
     void DoOpTilingForDeterminsticSplitAfter();
     void DoOpTilingForDeterminstic();
     void SetTilingData();
+
 private:
     MoeInplaceIndexAddDeterminsticTilingData tilingData_;
 };
-}  // namespace optiling
-#endif  // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INPLACE_INDEX_ADD_TILING_H_
+} // namespace optiling
+#endif // AIR_CXX_RUNTIME_V2_OP_IMPL_MOE_INPLACE_INDEX_ADD_TILING_H_

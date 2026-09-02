@@ -18,7 +18,10 @@ using namespace op;
 
 namespace MoeFinalizeRoutingCheck {
 
-static inline bool Is310P() { return GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND310P; }
+static inline bool Is310P()
+{
+    return GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND310P;
+}
 
 static inline bool IsCommonValidationChip()
 {
@@ -127,7 +130,10 @@ static inline bool CheckConstExpertDtype(const aclTensor *expandedX, const aclTe
     return true;
 }
 
-static inline bool IsExpandedX3D(int64_t dropPadMode) { return dropPadMode != 0 && dropPadMode != 2; }
+static inline bool IsExpandedX3D(int64_t dropPadMode)
+{
+    return dropPadMode != 0 && dropPadMode != 2;
+}
 
 static inline bool CheckFormatValid(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
                                     const aclTensor *x1Optional, const aclTensor *x2Optional,

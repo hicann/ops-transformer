@@ -23,9 +23,10 @@
 namespace AscendC {
 
 template <bool HasPertoken, bool HasSmooth, bool ScaleIsU64, bool BlockedZN_, bool SmallM_, bool UseXZNStage_>
-__aicore__ inline void
-QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_, UseXZNStage_>::ProcessGroup(
-    uint32_t groupIdx, uint64_t mStart, uint64_t mCount, uint32_t nCoreIdx, uint32_t nCoreNum)
+__aicore__ inline void QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_,
+                                                 UseXZNStage_>::ProcessGroup(uint32_t groupIdx, uint64_t mStart,
+                                                                             uint64_t mCount, uint32_t nCoreIdx,
+                                                                             uint32_t nCoreNum)
 {
     // Early-return when this core's cb-slice is empty: NCoreNum may exceed
     // numCbs, so cores with nCoreIdx >= cbRem (and cbPerNCore=0) have no cbs.
@@ -65,10 +66,11 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
     SetFlag<HardEvent::V_MTE2>(EVENT_ID5);
 }
 template <bool HasPertoken, bool HasSmooth, bool ScaleIsU64, bool BlockedZN_, bool SmallM_, bool UseXZNStage_>
-__aicore__ inline void
-QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_, UseXZNStage_>::ProcessColBatch(
-    uint32_t groupIdx, uint32_t cbIdx, uint64_t mStart, uint64_t mCount, uint64_t curColCount, uint32_t numCbs,
-    uint32_t cbStart)
+__aicore__ inline void QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_,
+                                                 UseXZNStage_>::ProcessColBatch(uint32_t groupIdx, uint32_t cbIdx,
+                                                                                uint64_t mStart, uint64_t mCount,
+                                                                                uint64_t curColCount, uint32_t numCbs,
+                                                                                uint32_t cbStart)
 {
     // First cb in this core's nCore slice: the first-cb gates (MTE3_MTE1
     // wait for xL1 ready, own-MTE2 path) fire once per slice on its FIRST
@@ -131,14 +133,14 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
     // MTE2_MTE1(1); the kp loop's wait below consumes that token.
     if (cbIdx == cbStart) {
         PrefetchWeightToL1<BlockedZN_>(curWL1, weightGm_, expertBaseOff,
-                                       /* colBatch= */cbIdx,
-                                       /* nSize= */nSize,
-                                       /* baseNG= */nStart / N_FRACTAL,
-                                       /* N1= */fracN_,
-                                       /* K1q= */kp0K1Count,
-                                       /* K= */K_,
-                                       /* weightBlockN1= */weightBlockN1_,
-                                       /* k1Start= */0);
+                                       /* colBatch= */ cbIdx,
+                                       /* nSize= */ nSize,
+                                       /* baseNG= */ nStart / N_FRACTAL,
+                                       /* N1= */ fracN_,
+                                       /* K1q= */ kp0K1Count,
+                                       /* K= */ K_,
+                                       /* weightBlockN1= */ weightBlockN1_,
+                                       /* k1Start= */ 0);
         SetFlag<HardEvent::MTE2_MTE1>(EVENT_ID1); // weight L1[ZN] ready
     }
     SetFlag<HardEvent::MTE2_V>(EVENT_ID4); // scale UB ready
@@ -189,14 +191,14 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
                 const uint32_t k1NxToLoad = (k1PerChunk_ < k1NxRemain) ? k1PerChunk_ : k1NxRemain;
                 WaitFlag<HardEvent::MTE1_MTE2>((nxBuf == 0u) ? EVENT_ID0 : EVENT_ID1);
                 PrefetchWeightToL1<BlockedZN_>(nxWL1, weightGm_, expertBaseOff,
-                                               /* colBatch= */cbIdx,
-                                               /* nSize= */nSize,
-                                               /* baseNG= */nStart / N_FRACTAL,
-                                               /* N1= */fracN_,
-                                               /* K1q= */k1NxToLoad,
-                                               /* K= */K_,
-                                               /* weightBlockN1= */weightBlockN1_,
-                                               /* k1Start= */k1NxStart);
+                                               /* colBatch= */ cbIdx,
+                                               /* nSize= */ nSize,
+                                               /* baseNG= */ nStart / N_FRACTAL,
+                                               /* N1= */ fracN_,
+                                               /* K1q= */ k1NxToLoad,
+                                               /* K= */ K_,
+                                               /* weightBlockN1= */ weightBlockN1_,
+                                               /* k1Start= */ k1NxStart);
                 SetFlag<HardEvent::MTE2_MTE1>(EVENT_ID1);
                 nxFired = true;
             } else if (cbIdx + 1 < numCbs) {
@@ -205,14 +207,14 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
                 const uint32_t nxColCount = (N_ - nxNStart < Nb_) ? (N_ - nxNStart) : Nb_;
                 WaitFlag<HardEvent::MTE1_MTE2>((nxBuf == 0u) ? EVENT_ID0 : EVENT_ID1);
                 PrefetchWeightToL1<BlockedZN_>(nxWL1, weightGm_, expertBaseOff,
-                                               /* colBatch= */nxCb,
-                                               /* nSize= */nxColCount,
-                                               /* baseNG= */nxNStart / N_FRACTAL,
-                                               /* N1= */fracN_,
-                                               /* K1q= */kp0K1Count,
-                                               /* K= */K_,
-                                               /* weightBlockN1= */weightBlockN1_,
-                                               /* k1Start= */0);
+                                               /* colBatch= */ nxCb,
+                                               /* nSize= */ nxColCount,
+                                               /* baseNG= */ nxNStart / N_FRACTAL,
+                                               /* N1= */ fracN_,
+                                               /* K1q= */ kp0K1Count,
+                                               /* K= */ K_,
+                                               /* weightBlockN1= */ weightBlockN1_,
+                                               /* k1Start= */ 0);
                 SetFlag<HardEvent::MTE2_MTE1>(EVENT_ID1);
                 nxFired = true;
             }
@@ -271,14 +273,14 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
                 const uint32_t k1NxToLoad = (k1PerChunk_ < k1NxRemain) ? k1PerChunk_ : k1NxRemain;
                 WaitFlag<HardEvent::MTE1_MTE2>((nxBuf == 0u) ? EVENT_ID0 : EVENT_ID1);
                 PrefetchWeightToL1<BlockedZN_>(nxWL1, weightGm_, expertBaseOff,
-                                               /* colBatch= */cbIdx,
-                                               /* nSize= */nSize,
-                                               /* baseNG= */nStart / N_FRACTAL,
-                                               /* N1= */fracN_,
-                                               /* K1q= */k1NxToLoad,
-                                               /* K= */K_,
-                                               /* weightBlockN1= */weightBlockN1_,
-                                               /* k1Start= */k1NxStart);
+                                               /* colBatch= */ cbIdx,
+                                               /* nSize= */ nSize,
+                                               /* baseNG= */ nStart / N_FRACTAL,
+                                               /* N1= */ fracN_,
+                                               /* K1q= */ k1NxToLoad,
+                                               /* K= */ K_,
+                                               /* weightBlockN1= */ weightBlockN1_,
+                                               /* k1Start= */ k1NxStart);
                 SetFlag<HardEvent::MTE2_MTE1>(EVENT_ID1);
                 nxFired = true;
             } else if (cbIdx + 1 < numCbs) {
@@ -287,14 +289,14 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
                 const uint32_t nxColCount = (N_ - nxNStart < Nb_) ? (N_ - nxNStart) : Nb_;
                 WaitFlag<HardEvent::MTE1_MTE2>((nxBuf == 0u) ? EVENT_ID0 : EVENT_ID1);
                 PrefetchWeightToL1<BlockedZN_>(nxWL1, weightGm_, expertBaseOff,
-                                               /* colBatch= */nxCb,
-                                               /* nSize= */nxColCount,
-                                               /* baseNG= */nxNStart / N_FRACTAL,
-                                               /* N1= */fracN_,
-                                               /* K1q= */kp0K1Count,
-                                               /* K= */K_,
-                                               /* weightBlockN1= */weightBlockN1_,
-                                               /* k1Start= */0);
+                                               /* colBatch= */ nxCb,
+                                               /* nSize= */ nxColCount,
+                                               /* baseNG= */ nxNStart / N_FRACTAL,
+                                               /* N1= */ fracN_,
+                                               /* K1q= */ kp0K1Count,
+                                               /* K= */ K_,
+                                               /* weightBlockN1= */ weightBlockN1_,
+                                               /* k1Start= */ 0);
                 SetFlag<HardEvent::MTE2_MTE1>(EVENT_ID1);
                 nxFired = true;
             }

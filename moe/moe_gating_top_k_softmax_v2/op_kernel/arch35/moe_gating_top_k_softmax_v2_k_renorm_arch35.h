@@ -23,30 +23,30 @@ using namespace AscendC;
 constexpr int32_t DB_RENORM = 2;
 
 template <typename T, int32_t renorm>
-class MoeGatingTopKSoftmaxV2KRenorm
-{
+class MoeGatingTopKSoftmaxV2KRenorm {
 public:
     __aicore__ inline MoeGatingTopKSoftmaxV2KRenorm(){};
-    __aicore__ inline void Init(
-        GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR softmaxOut, GM_ADDR workspace,
-        const MoeGatingTopKSoftmaxV2KFullLoadTilingData* __restrict tilingData)
+    __aicore__ inline void Init(GM_ADDR gating, GM_ADDR finished, GM_ADDR out, GM_ADDR indicesOut, GM_ADDR softmaxOut,
+                                GM_ADDR workspace,
+                                const MoeGatingTopKSoftmaxV2KFullLoadTilingData *__restrict tilingData)
     {
         ParesTiling(tilingData);
         //  计算核块大小，获取当前核的起始索引
         int64_t formerblockLength = blockFormer * col;
         int64_t blockLength = (GetBlockIdx() != blockNum - 1) ? formerblockLength : blockTail * col;
-        gatingTensorGM.SetGlobalBuffer((__gm__ T*)gating + formerblockLength * GetBlockIdx(), blockLength);
+        gatingTensorGM.SetGlobalBuffer((__gm__ T *)gating + formerblockLength * GetBlockIdx(), blockLength);
         if (finished != nullptr) {
             int64_t blockLengthFinished = (GetBlockIdx() != blockNum - 1) ? blockFormer : blockTail;
-            finishedTensorGM.SetGlobalBuffer((__gm__ bool*)finished + blockFormer * GetBlockIdx(), blockLengthFinished);
+            finishedTensorGM.SetGlobalBuffer((__gm__ bool *)finished + blockFormer * GetBlockIdx(),
+                                             blockLengthFinished);
             exitFinished = true;
         }
 
         int64_t outFormerBlockLength = blockFormer * k;
         int64_t outBlockLength = (GetBlockIdx() != blockNum - 1) ? outFormerBlockLength : blockTail * k;
-        outTensorGM.SetGlobalBuffer((__gm__ T*)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
-        indicesOutTensorGM.SetGlobalBuffer(
-            (__gm__ int32_t*)indicesOut + outFormerBlockLength * GetBlockIdx(), outBlockLength);
+        outTensorGM.SetGlobalBuffer((__gm__ T *)out + outFormerBlockLength * GetBlockIdx(), outBlockLength);
+        indicesOutTensorGM.SetGlobalBuffer((__gm__ int32_t *)indicesOut + outFormerBlockLength * GetBlockIdx(),
+                                           outBlockLength);
 
         pipe.InitBuffer(gatingQueue, DB_RENORM, (kAlign + ubFormerAlign) * sizeof(float));
         pipe.InitBuffer(finishedQueue, DB_RENORM, ALIGNMENT_SIZE);
@@ -105,18 +105,18 @@ private:
     }
 
     template <typename U>
-    __aicore__ inline U VectorDup(LocalTensor<U>& dst, const int32_t colCount, const int32_t colCountAlign)
+    __aicore__ inline U VectorDup(LocalTensor<U> &dst, const int32_t colCount, const int32_t colCountAlign)
     {
         U scalar;
         if constexpr (IsSameType<U, half>::value) {
             uint16_t tmp = 0xFC00; // -inf
-            scalar = *((half*)&tmp);
+            scalar = *((half *)&tmp);
         } else if constexpr (IsSameType<U, bfloat16_t>::value) {
             uint16_t tmp = 0xFF80; // -inf
-            scalar = *((bfloat16_t*)&tmp);
+            scalar = *((bfloat16_t *)&tmp);
         } else {
             uint32_t tmp = 0xFF800000; // -inf
-            scalar = *((float*)&tmp);
+            scalar = *((float *)&tmp);
         }
         if (colCountAlign - colCount != 0) {
             // 当对齐后大小与实际大小不一致，需要将 colCount到colAlign之间的数据掩成-1
@@ -139,15 +139,14 @@ private:
     }
 
     template <typename U>
-    __aicore__ inline void CopyInGating(int32_t progress, int32_t ubIdx, int32_t curCol, LocalTensor<U>& gatingLocal)
+    __aicore__ inline void CopyInGating(int32_t progress, int32_t ubIdx, int32_t curCol, LocalTensor<U> &gatingLocal)
     {
         DataCopyPadExtParams<T> padParams{false, 0, 0, (T)0};
         DataCopyExtParams intriParams{1, static_cast<uint32_t>(curCol * sizeof(T)), 0, 0, 0};
 
         if constexpr (IsSameType<T, bfloat16_t>::value) {
-            DataCopyPad(
-                gatingLocal.template ReinterpretCast<bfloat16_t>()[kAlign * 2 + ubFormerAlign],
-                gatingTensorGM[col * progress + ubFormer * ubIdx], intriParams, padParams);
+            DataCopyPad(gatingLocal.template ReinterpretCast<bfloat16_t>()[kAlign * 2 + ubFormerAlign],
+                        gatingTensorGM[col * progress + ubFormer * ubIdx], intriParams, padParams);
         } else {
             DataCopyPad(gatingLocal[kAlign], gatingTensorGM[col * progress + ubFormer * ubIdx], intriParams, padParams);
         }
@@ -155,22 +154,20 @@ private:
     }
 
     template <typename U>
-    __aicore__ inline void ComputeTopK(
-        int32_t progress, int32_t ubIdx, int32_t curCol, LocalTensor<int32_t>& indicesOutLocal,
-        LocalTensor<bool>& finishedLocal)
+    __aicore__ inline void ComputeTopK(int32_t progress, int32_t ubIdx, int32_t curCol,
+                                       LocalTensor<int32_t> &indicesOutLocal, LocalTensor<bool> &finishedLocal)
     {
         TopKInfo topKInfoData;
         topKInfoData.outter = 1;
         topKInfoData.inner = (ubIdx < ubLoop - 1) ? kAlign + ubFormerAlign : kAlign + ubTailAlign;
         topKInfoData.n = (ubIdx < ubLoop - 1) ? kAlign + ubFormer : kAlign + ubTail;
-        TopkTiling* topKTilingData = (ubIdx < ubLoop - 1) ? &topkFormerTilingData : &topkTailTilingData;
+        TopkTiling *topKTilingData = (ubIdx < ubLoop - 1) ? &topkFormerTilingData : &topkTailTilingData;
 
         LocalTensor<U> gatingLocal = gatingQueue.template DeQue<U>();
 
         if constexpr (IsSameType<T, bfloat16_t>::value) {
-            Cast(
-                gatingLocal[kAlign], gatingLocal.template ReinterpretCast<T>()[kAlign * 2 + ubFormerAlign],
-                RoundMode::CAST_NONE, curCol);
+            Cast(gatingLocal[kAlign], gatingLocal.template ReinterpretCast<T>()[kAlign * 2 + ubFormerAlign],
+                 RoundMode::CAST_NONE, curCol);
         }
 
         int32_t curColAlign = (ubIdx < ubLoop - 1) ? ubFormerAlign : ubTailAlign;
@@ -182,13 +179,12 @@ private:
         int32_t firstValue = ubIdx * ubFormer;
         ArithProgression(indicesOutLocal[kAlign], firstValue, 1, curColAlign);
 
-        TopK<U, true, false, false, TopKMode::TOPK_NORMAL>(
-            gatingLocal, indicesOutLocal, gatingLocal, indicesOutLocal, finishedLocal, kAlign, *topKTilingData,
-            topKInfoData, true);
+        TopK<U, true, false, false, TopKMode::TOPK_NORMAL>(gatingLocal, indicesOutLocal, gatingLocal, indicesOutLocal,
+                                                           finishedLocal, kAlign, *topKTilingData, topKInfoData, true);
     }
 
     template <typename U>
-    __aicore__ inline void ComputeSoftmax(LocalTensor<U>& gatingLocal)
+    __aicore__ inline void ComputeSoftmax(LocalTensor<U> &gatingLocal)
     {
         LocalTensor<U> outLocal = outQueue.template AllocTensor<U>();
         SoftMaxShapeInfo softmaxShapeInfoData;
@@ -226,7 +222,7 @@ private:
         indicesOutQueue.FreeTensor(newIndicesOutLocal);
     }
 
-    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2KFullLoadTilingData* __restrict tilingData)
+    __aicore__ inline void ParesTiling(const MoeGatingTopKSoftmaxV2KFullLoadTilingData *__restrict tilingData)
     {
         row = tilingData->row;
         col = tilingData->col;

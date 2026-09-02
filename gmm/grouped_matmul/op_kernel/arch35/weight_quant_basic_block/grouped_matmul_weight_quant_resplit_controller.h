@@ -40,19 +40,19 @@ using WeightQuantBatchMatmulV2::Arch35::WqmmConfig;
 using GMMWeightQuantParam = GroupedMatmulTilingData::GMMWeightQuantParam;
 
 namespace GROUPED_MATMUL {
-#define GMM_WQ_BASIC_BLOCK_TEMPLATE_CLASS                                                                              \
-    template <typename xType0, typename wType0, typename antiQuantScaleType0, typename scaleType0,                     \
-              typename perTokenScaleType0, typename biasType0, typename yType0, const WqmmConfig &wqmmConfig0,         \
-              const VecAntiQuantConfig &vecConfig0>                                                                    \
+#define GMM_WQ_BASIC_BLOCK_TEMPLATE_CLASS \
+    template <typename xType0, typename wType0, typename antiQuantScaleType0, typename scaleType0, \
+              typename perTokenScaleType0, typename biasType0, typename yType0, const WqmmConfig &wqmmConfig0, \
+              const VecAntiQuantConfig &vecConfig0> \
     class
-#define GMM_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM                                                                       \
-    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType,                         \
-              typename perTokenScaleType, typename biasType, typename yType,                                           \
-              GMM_WQ_BASIC_BLOCK_TEMPLATE_CLASS BasicBlock, const WqmmConfig &wqmmConfig,                              \
+#define GMM_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM \
+    template <typename xType, typename wType, typename antiQuantScaleType, typename scaleType, \
+              typename perTokenScaleType, typename biasType, typename yType, \
+              GMM_WQ_BASIC_BLOCK_TEMPLATE_CLASS BasicBlock, const WqmmConfig &wqmmConfig, \
               const VecAntiQuantConfig &vecConfig, bool isSingleMultiSingle>
 
-#define GMM_WQ_RESPLIT_CONTROLLER_CLASS                                                                                \
-    GMMWeightQuantResplitController<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType,   \
+#define GMM_WQ_RESPLIT_CONTROLLER_CLASS \
+    GMMWeightQuantResplitController<xType, wType, antiQuantScaleType, scaleType, perTokenScaleType, biasType, yType, \
                                     BasicBlock, wqmmConfig, vecConfig, isSingleMultiSingle>
 
 GMM_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
@@ -102,11 +102,10 @@ private:
 };
 
 GMM_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_RESPLIT_CONTROLLER_CLASS::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR scale, GM_ADDR antiquantScale,
-                                      GM_ADDR antiquantOffset, GM_ADDR bias, GM_ADDR groupList, GM_ADDR perTokenScale,
-                                      GM_ADDR y, const GMMWeightQuantParam *__restrict baseTiling,
-                                      const TCubeTiling *__restrict mmTiling, GM_ADDR tiling, TPipe *tPipe)
+__aicore__ inline void GMM_WQ_RESPLIT_CONTROLLER_CLASS::Init(
+    GM_ADDR x, GM_ADDR weight, GM_ADDR scale, GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR bias,
+    GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y, const GMMWeightQuantParam *__restrict baseTiling,
+    const TCubeTiling *__restrict mmTiling, GM_ADDR tiling, TPipe *tPipe)
 {
     gmmBaseTiling_ = baseTiling;
 
@@ -188,8 +187,8 @@ __aicore__ inline void GMM_WQ_RESPLIT_CONTROLLER_CLASS::Process()
 }
 
 GMM_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_RESPLIT_CONTROLLER_CLASS::InitOffsetParam(BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM])
+__aicore__ inline void GMM_WQ_RESPLIT_CONTROLLER_CLASS::InitOffsetParam(
+    BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM])
 {
     offsetParam[0].kbL1Size = mmTiling_->baseK * mmTiling_->stepKb;
     offsetParam[0].kaL1Size = offsetParam[0].kbL1Size; // 当前实现a矩阵切分保持b矩阵一致
@@ -209,10 +208,9 @@ GMM_WQ_RESPLIT_CONTROLLER_CLASS::InitOffsetParam(BasicBlockOffsetParam offsetPar
 }
 
 GMM_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
-__aicore__ inline void
-GMM_WQ_RESPLIT_CONTROLLER_CLASS::SplitNByMultiCore(BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM],
-                                                   BasicBlockControlParam &ctrlParam, uint64_t basicBlockCount,
-                                                   uint64_t basicBlockSize)
+__aicore__ inline void GMM_WQ_RESPLIT_CONTROLLER_CLASS::SplitNByMultiCore(
+    BasicBlockOffsetParam offsetParam[BASIC_BLOCK_PROCESS_NUM], BasicBlockControlParam &ctrlParam,
+    uint64_t basicBlockCount, uint64_t basicBlockSize)
 {
     for (; ctrlParam.curBasicBlockId < ctrlParam.basicBlockLimit + basicBlockCount;
          ctrlParam.curBasicBlockId += gmmBaseTiling_->coreNum) {
@@ -341,8 +339,8 @@ __aicore__ inline uint64_t GMM_WQ_RESPLIT_CONTROLLER_CLASS::GetSplitValueFromGro
 }
 
 GMM_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
-__aicore__ inline uint64_t
-GMM_WQ_RESPLIT_CONTROLLER_CLASS::GetSwitchedProcessId(const BasicBlockControlParam &ctrlParam)
+__aicore__ inline uint64_t GMM_WQ_RESPLIT_CONTROLLER_CLASS::GetSwitchedProcessId(
+    const BasicBlockControlParam &ctrlParam)
 {
     // vcv流水0/1倒换，vc流水ctrlParam.processId始终取0
     if constexpr (std::is_base_of_v<WeightQuantVcvMatmulBasicBlockBaseClass,

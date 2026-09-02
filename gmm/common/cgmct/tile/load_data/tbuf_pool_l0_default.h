@@ -101,9 +101,7 @@ public:
     /**
      * @brief Reset the cache
      */
-    __aicore__ inline void ResetCache()
-    {
-    }
+    __aicore__ inline void ResetCache() {}
 
     /**
      * @brief Enqueue a buffer

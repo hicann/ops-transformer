@@ -36,7 +36,7 @@
 namespace Cgmct {
 namespace Gemm {
 namespace Kernel {
-#define QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS                                                                    \
+#define QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS \
     template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 #define QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler
 
@@ -51,12 +51,8 @@ constexpr uint32_t DEQSCALE_HIGH19_MASK = 0xFFFFE000U;
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
 class KernelQGmmInplaceAddFixpipeDequant {
 public:
-    __aicore__ inline KernelQGmmInplaceAddFixpipeDequant()
-    {
-    }
-    __aicore__ inline ~KernelQGmmInplaceAddFixpipeDequant()
-    {
-    }
+    __aicore__ inline KernelQGmmInplaceAddFixpipeDequant() {}
+    __aicore__ inline ~KernelQGmmInplaceAddFixpipeDequant() {}
 
     static constexpr bool transA = BlockMmad::transA;
     static constexpr bool transB = BlockMmad::transB;
@@ -93,16 +89,22 @@ public:
         uint32_t kBL1;
         uint8_t dbL0C;
         uint8_t groupListType;
-        __aicore__ GMMTiling()
-        {
-        }
+        __aicore__ GMMTiling() {}
         __aicore__ GMMTiling(uint32_t groupNum_, uint32_t m_, uint32_t n_, uint32_t k_, uint32_t baseM_,
                              uint32_t baseN_, uint32_t baseK_, uint32_t kAL1_, uint32_t kBL1_, uint8_t dbL0C_,
                              uint8_t groupListType_)
-            : groupNum(groupNum_), m(m_), n(n_), k(k_), baseM(baseM_), baseN(baseN_), baseK(baseK_), kAL1(kAL1_),
-              kBL1(kBL1_), dbL0C(dbL0C_), groupListType(groupListType_)
-        {
-        }
+            : groupNum(groupNum_),
+              m(m_),
+              n(n_),
+              k(k_),
+              baseM(baseM_),
+              baseN(baseN_),
+              baseK(baseK_),
+              kAL1(kAL1_),
+              kBL1(kBL1_),
+              dbL0C(dbL0C_),
+              groupListType(groupListType_)
+        {}
     };
 
     struct Params {
@@ -159,8 +161,8 @@ private:
 };
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
-__aicore__ inline void
-KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Run(const Params &params)
+__aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Run(
+    const Params &params)
 {
     Init(params);
     BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
@@ -189,8 +191,8 @@ KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>:
 }
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
-__aicore__ inline void
-KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Init(const Params &params)
+__aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Init(
+    const Params &params)
 {
     xTensorPtr_ = params.mmadParams.aGmAddr;
     wTensorPtr_ = params.mmadParams.bGmAddr;
@@ -216,17 +218,16 @@ KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>:
 }
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
-__aicore__ inline bool
-KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::IsLastGroupAndNeedSplit(
-    const BlockSchedulerOp &bs, uint32_t groupIdx)
+__aicore__ inline bool KernelQGmmInplaceAddFixpipeDequant<
+    QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::IsLastGroupAndNeedSplit(const BlockSchedulerOp &bs, uint32_t groupIdx)
 {
     // Consider tail split only when at least half of the cores are still available.
     return groupIdx == groupNum_ - 1 && (bs.GetEndBlockIdx() + 1) <= AscendC::GetBlockNum() >> 1;
 }
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
-__aicore__ inline void
-KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::UpdateOffset(uint32_t groupIdx)
+__aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::UpdateOffset(
+    uint32_t groupIdx)
 {
     // baseOffset is 0 when groupIdx = 0
     if (groupIdx == 0) {
@@ -266,9 +267,8 @@ KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>:
 }
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
-__aicore__ inline void
-KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Iterate(int64_t singleCoreM,
-                                                                                         int64_t singleCoreN)
+__aicore__ inline void KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::Iterate(
+    int64_t singleCoreM, int64_t singleCoreN)
 {
     AscendC::Std::tuple<int64_t, int64_t, int64_t> blockShape{singleCoreM, singleCoreN,
                                                               static_cast<int64_t>(Get<MNK_K>(problemShape_))};
@@ -295,9 +295,8 @@ KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>:
 }
 
 QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_TEM_PARAMS
-__aicore__ inline int32_t
-KernelQGmmInplaceAddFixpipeDequant<QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::GetSplitValueFromGroupList(
-    uint32_t groupIdx)
+__aicore__ inline int32_t KernelQGmmInplaceAddFixpipeDequant<
+    QGMM_INPLACE_ADD_FIXPIPE_DEQUANT_FUN_PARAMS>::GetSplitValueFromGroupList(uint32_t groupIdx)
 {
     int32_t splitValue = 0;
     if (groupListType_ == 0) {

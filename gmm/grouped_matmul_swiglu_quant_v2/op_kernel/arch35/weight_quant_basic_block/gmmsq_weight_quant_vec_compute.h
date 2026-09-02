@@ -276,9 +276,8 @@ __aicore__ inline void GMMSQ_WQ_VEC_COMPUTE_CLASS::AntiQuantProcessNzMxA8W4(uint
 }
 
 GMMSQ_WQ_VEC_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void
-GMMSQ_WQ_VEC_COMPUTE_CLASS::CopyWeightHighBitForAligned(uint64_t antiQuantRealN, uint64_t antiQuantRealK,
-                                                        const LocalTensor<xType> &weightHighBitL1)
+__aicore__ inline void GMMSQ_WQ_VEC_COMPUTE_CLASS::CopyWeightHighBitForAligned(
+    uint64_t antiQuantRealN, uint64_t antiQuantRealK, const LocalTensor<xType> &weightHighBitL1)
 {
     DataCopyParams params;
     params.blockCount = CeilAlign(antiQuantRealK, static_cast<uint64_t>(C0_SIZE)) *

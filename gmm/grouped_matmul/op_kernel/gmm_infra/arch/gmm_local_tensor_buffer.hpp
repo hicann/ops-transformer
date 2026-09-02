@@ -19,8 +19,7 @@ namespace Catlass::Arch {
 struct LocalTensorBufferBase {
 public:
     template <class Element = half>
-    CATLASS_DEVICE
-    AscendC::LocalTensor<Element> GetBufferByByte(const uint32_t offset) const
+    CATLASS_DEVICE AscendC::LocalTensor<Element> GetBufferByByte(const uint32_t offset) const
     {
         return tensor[offset].template ReinterpretCast<Element>();
     }
@@ -32,10 +31,7 @@ protected:
     AscendC::LocalTensor<uint8_t> tensor;
 };
 
-template <
-    class ArchTag,
-    AscendC::TPosition Position
->
+template <class ArchTag, AscendC::TPosition Position>
 struct LocalTensorBuffer {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported local tensor buffer, can not find the specialization.");
 };
@@ -228,6 +224,6 @@ public:
     }
 };
 
-}  // namespace Catlass::Arch
+} // namespace Catlass::Arch
 
-#endif  // INCLUDE_CATLASS_ARCH_MEMORY_H
+#endif // INCLUDE_CATLASS_ARCH_MEMORY_H

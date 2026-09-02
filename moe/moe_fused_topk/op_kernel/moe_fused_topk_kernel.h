@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- /*!
+/*!
  * \file moe_fused_topk_kernel.h
  * \brief
  */
@@ -42,8 +42,9 @@ template <typename inputT, typename calT, uint32_t enableExpertMapping>
 class MoeFusedTopk {
 public:
     __aicore__ inline MoeFusedTopk(){};
-    __aicore__ inline void InitTilingData(MoeFusedTopkTilingData *tilingData, GM_ADDR x,
-        GM_ADDR addNum, GM_ADDR mappingNum, GM_ADDR mappingTable, GM_ADDR y, GM_ADDR indices, GM_ADDR workspace);
+    __aicore__ inline void InitTilingData(MoeFusedTopkTilingData *tilingData, GM_ADDR x, GM_ADDR addNum,
+                                          GM_ADDR mappingNum, GM_ADDR mappingTable, GM_ADDR y, GM_ADDR indices,
+                                          GM_ADDR workspace);
     __aicore__ inline void InitBuffer(TPipe *inputPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyInAddNum();
@@ -57,9 +58,9 @@ public:
     __aicore__ inline void CopyToWorkspace();
     __aicore__ inline void CopyOut(const int32_t loop);
     __aicore__ inline void CopyInMappingNum();
- 
+
     __aicore__ inline void ProcessSortAlign();
- 
+
     template <typename T1, typename T2>
     __aicore__ inline T1 CeilDiv(T1 a, T2 b)
     {
@@ -132,9 +133,8 @@ private:
 
 template <typename inputT, typename calT, uint32_t enableExpertMapping>
 __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::InitTilingData(
-    MoeFusedTopkTilingData *tilingData, GM_ADDR x, GM_ADDR addNum,
-    GM_ADDR mappingNum, GM_ADDR mappingTable, GM_ADDR y, GM_ADDR indices,
-    GM_ADDR workspace)
+    MoeFusedTopkTilingData *tilingData, GM_ADDR x, GM_ADDR addNum, GM_ADDR mappingNum, GM_ADDR mappingTable, GM_ADDR y,
+    GM_ADDR indices, GM_ADDR workspace)
 {
     secondDimSize_ = tilingData->secondDimSize;
     groupNum_ = tilingData->groupNum;
@@ -160,8 +160,7 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::InitTili
     if (blockIdx < tailBatch) {
         loopBatch_ = batchPerCore + 1;
         batchOffset_ = blockIdx * loopBatch_;
-    }
-    else {
+    } else {
         loopBatch_ = batchPerCore;
         batchOffset_ = blockIdx * batchPerCore + tailBatch;
     }
@@ -225,8 +224,8 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::CopyInAd
         WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
     } else {
         LocalTensor<inputT> addNumLocalInputT = addNumLocal.template ReinterpretCast<inputT>();
-        DataCopyPad(addNumLocalInputT[secondAlignBlockCountFp16_], mGmAddNum_,
-                    {1, secondDimSizeInputBytes, 0, 0, 0}, {false, 0, 0, 0});
+        DataCopyPad(addNumLocalInputT[secondAlignBlockCountFp16_], mGmAddNum_, {1, secondDimSizeInputBytes, 0, 0, 0},
+                    {false, 0, 0, 0});
         event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
         SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
         WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
@@ -248,8 +247,8 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::CopyInX(
         WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
     } else {
         LocalTensor<inputT> xLocalInputT = xLocal.template ReinterpretCast<inputT>();
-        DataCopyPad(xLocalInputT[secondAlignBlockCountFp16_], mGmX_[xOffset],
-                    {1, secondDimSizeInputBytes, 0, 0, 0}, {false, 0, 0, 0});
+        DataCopyPad(xLocalInputT[secondAlignBlockCountFp16_], mGmX_[xOffset], {1, secondDimSizeInputBytes, 0, 0, 0},
+                    {false, 0, 0, 0});
         event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
         SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
         WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
@@ -288,7 +287,7 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::CopyFrom
     LocalTensor<float> xLocal = xInBuf_.Get<float>();
     DataCopyExtParams xWorkspaceGroupCopyParams{(uint16_t)1, (uint32_t)(groupEles_ * sizeof(float)), 0, 0, 0};
     DataCopyPadExtParams<float> xWorkspaceGroupPadParams{true, 0, (uint8_t)(groupElesAlignBlockCountFp32_ - groupEles_),
-                                                          floatNegativeInf_};
+                                                         floatNegativeInf_};
     event_t eventIDMTE3ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));
     SetFlag<HardEvent::MTE3_V>(eventIDMTE3ToV);
     WaitFlag<HardEvent::MTE3_V>(eventIDMTE3ToV);
@@ -315,8 +314,8 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::GroupRed
     LocalTensor<int32_t> indicesLocal;
     LocalTensor<bool> finishLocal;
     AscendC::TopKInfo topkInfo = {static_cast<int32_t>(groupNum_),
-                                    CeilAlign(static_cast<int32_t>(groupEles_), SORT_UNIT), 
-                                    static_cast<int32_t>(groupEles_)};
+                                  CeilAlign(static_cast<int32_t>(groupEles_), SORT_UNIT),
+                                  static_cast<int32_t>(groupEles_)};
     // xLocal shape 需要为outter * inner 即 groupNum_ * CeilAlign(groupEles_, 32)
     // sortedTensor shape 需要为outter * topnPad 即 groupNum_ * CeilAlign(n_, 32 / sizeof(calT))
     AscendC::TopK<calT, false, false, false, TopKMode::TOPK_NORMAL>(
@@ -327,7 +326,8 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::GroupRed
     AscendC::PipeBarrier<PIPE_V>();
 
     for (size_t i = 0; i < groupNum_; i++) {
-        ReduceSum<calT>(topkGroupValue[i], sortedTensor[i * topnPad_], tempTensor.template ReinterpretCast<float>(), n_);
+        ReduceSum<calT>(topkGroupValue[i], sortedTensor[i * topnPad_], tempTensor.template ReinterpretCast<float>(),
+                        n_);
     }
     AscendC::PipeBarrier<PIPE_V>();
 }
@@ -473,7 +473,7 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::Process(
         GroupReduceSumInternelImpl();
         GroupTopkImpl();
         GatherSigmoidImpl();
- 
+
         if (isNorm_ == 1) {
             NormImpl();
         }

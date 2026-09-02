@@ -24,9 +24,10 @@ namespace Gemm {
 constexpr uint32_t OUTER_SIZE = 16;
 
 template <class BlockCoord_, class ProblemShape_, class ATensorType_, class BTensorType_, class CTensorType_>
-__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t>
-GetOffset(BlockCoord_ blockCoord, ProblemShape_ problemShape, ATensorType_ aTensor, BTensorType_ bTensor,
-          CTensorType_ cTensor, bool transA, bool transB)
+__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t> GetOffset(BlockCoord_ blockCoord,
+                                                                      ProblemShape_ problemShape, ATensorType_ aTensor,
+                                                                      BTensorType_ bTensor, CTensorType_ cTensor,
+                                                                      bool transA, bool transB)
 {
     int64_t m = Get<MNK_M>(problemShape);
     int64_t n = Get<MNK_N>(problemShape);
@@ -54,9 +55,9 @@ GetOffset(BlockCoord_ blockCoord, ProblemShape_ problemShape, ATensorType_ aTens
 }
 // GetOffsetWithoutLayout
 template <class BlockCoord, class ProblemShape, class ATensorType, class BTensorType, class CTensorType>
-__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t, int64_t>
-GetOffsetWithoutLayout(BlockCoord blockCoord, ProblemShape problemShape, ATensorType aTensor, BTensorType bTensor,
-                       CTensorType cTensor, bool transA, bool transB, bool isBias)
+__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t, int64_t> GetOffsetWithoutLayout(
+    BlockCoord blockCoord, ProblemShape problemShape, ATensorType aTensor, BTensorType bTensor, CTensorType cTensor,
+    bool transA, bool transB, bool isBias)
 {
     int64_t m = Get<MNK_M>(problemShape);
     int64_t n = Get<MNK_N>(problemShape);
@@ -84,10 +85,10 @@ GetOffsetWithoutLayout(BlockCoord blockCoord, ProblemShape problemShape, ATensor
 
 // GetOffsetStreamK
 template <class BlockCoord_, class ProblemShape_, class ATensorType_, class BTensorType_, class CTensorType_>
-__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t, int64_t>
-GetOffsetStreamK(BlockCoord_ blockCoord, ProblemShape_ problemShape,
-                 AscendC::Shape<int64_t, int64_t, int64_t, int64_t> tileL1, int64_t kSingleCore, ATensorType_ aTensor,
-                 BTensorType_ bTensor, CTensorType_ cTensor, bool transA, bool transB, bool isBias)
+__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t, int64_t> GetOffsetStreamK(
+    BlockCoord_ blockCoord, ProblemShape_ problemShape, AscendC::Shape<int64_t, int64_t, int64_t, int64_t> tileL1,
+    int64_t kSingleCore, ATensorType_ aTensor, BTensorType_ bTensor, CTensorType_ cTensor, bool transA, bool transB,
+    bool isBias)
 {
     int64_t m = Get<MNK_M>(problemShape);
     int64_t n = Get<MNK_N>(problemShape);
@@ -122,9 +123,10 @@ GetOffsetStreamK(BlockCoord_ blockCoord, ProblemShape_ problemShape,
 
 // GetOffsetIterBatch
 template <class BlockCoord, class ProblemShape, class ATensorType, class BTensorType, class CTensorType>
-__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t>
-GetOffsetIterBatch(BlockCoord blockCoord, ProblemShape problemShape, ATensorType aTensor, BTensorType bTensor,
-                   CTensorType cTensor)
+__aicore__ inline AscendC::Coord<int64_t, int64_t, int64_t> GetOffsetIterBatch(BlockCoord blockCoord,
+                                                                               ProblemShape problemShape,
+                                                                               ATensorType aTensor, BTensorType bTensor,
+                                                                               CTensorType cTensor)
 {
     int64_t m = Get<MNK_M>(problemShape);
     int64_t n = Get<MNK_N>(problemShape);
@@ -139,9 +141,13 @@ template <bool isTransA_, bool isTransB_, CubeFormat layoutA_, CubeFormat layout
 class Coordinate {
 public:
     __aicore__ inline Coordinate(int64_t m, int64_t n, int64_t k, int64_t l1M, int64_t l1N, int64_t l1K)
-        : m(m), n(n), k(k), l1M(l1M), l1N(l1N), l1K(l1K)
-    {
-    }
+        : m(m),
+          n(n),
+          k(k),
+          l1M(l1M),
+          l1N(l1N),
+          l1K(l1K)
+    {}
 
     static constexpr bool isTransA = isTransA_;
     static constexpr bool isTransB = isTransB_;
@@ -188,9 +194,9 @@ public:
     }
 
     template <GroupedMatmul::QuantMode aQuantMode>
-    __aicore__ inline void
-    CalOffsetOfAIV(int64_t mOffset, int64_t nOffset,
-                   AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> &offset)
+    __aicore__ inline void CalOffsetOfAIV(
+        int64_t mOffset, int64_t nOffset,
+        AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> &offset)
     {
         int64_t x1ScaleMOffset = mOffset;
         if constexpr (aQuantMode == GroupedMatmul::QuantMode::PERBLOCK_MODE) {
@@ -228,8 +234,8 @@ public:
     }
 
     template <GroupedMatmul::QuantMode aQuantMode, int64_t bC0Align = MATMUL_MNK_ALIGN_INT8>
-    __aicore__ inline AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>
-    GetQuantOffset(int64_t mTileIdx, int64_t nTileIdx, int64_t mSplitOffset = 0, int64_t nSplitOffset = 0)
+    __aicore__ inline AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> GetQuantOffset(
+        int64_t mTileIdx, int64_t nTileIdx, int64_t mSplitOffset = 0, int64_t nSplitOffset = 0)
     {
         int64_t mOffset = mTileIdx * l1M + mSplitOffset;
         int64_t nOffset = nTileIdx * l1N + nSplitOffset;

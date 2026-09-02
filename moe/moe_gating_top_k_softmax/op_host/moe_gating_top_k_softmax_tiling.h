@@ -20,8 +20,7 @@
 #include "tiling/tiling_api.h"
 
 namespace optiling {
-enum MoeGatingTopKSoftmaxTilingKey
-{
+enum MoeGatingTopKSoftmaxTilingKey {
     MOE_GATING_SOFTMAX_FLOAT = 0,
     MOE_GATING_SOFTMAX_FLOAT_DOUBLE_BUFFER = 1,
     MOE_GATING_SOFTMAX_FLOAT16 = 2,

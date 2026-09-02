@@ -47,15 +47,15 @@ struct MoeGatingTopKSoftmaxEKFullLoadTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeGatingTopKSoftmaxEKFullLoadTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeGatingTopKSoftmaxEKFullLoadTilingData *const_data)
 {
-    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
-    uint32_t* dst = (uint32_t*)const_data;
+    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
+    uint32_t *dst = (uint32_t *)const_data;
     for (auto i = 0; i < sizeof(MoeGatingTopKSoftmaxEKFullLoadTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, MoeGatingTopKSoftmaxEKFullLoadTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, MoeGatingTopKSoftmaxEKFullLoadTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeGatingTopKSoftmaxEKFullLoadTilingData));
 }
@@ -119,15 +119,15 @@ struct MoeGatingTopKSoftmaxKFullLoadTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeGatingTopKSoftmaxKFullLoadTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeGatingTopKSoftmaxKFullLoadTilingData *const_data)
 {
-    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
-    uint32_t* dst = (uint32_t*)const_data;
+    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
+    uint32_t *dst = (uint32_t *)const_data;
     for (auto i = 0; i < sizeof(MoeGatingTopKSoftmaxKFullLoadTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, MoeGatingTopKSoftmaxKFullLoadTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, MoeGatingTopKSoftmaxKFullLoadTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeGatingTopKSoftmaxKFullLoadTilingData));
 }
@@ -159,26 +159,26 @@ struct MoeGatingTopKSoftmaxPerfTilingData {
 #pragma pack()
 
 #ifdef __NPU_TILING__
-inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, MoeGatingTopKSoftmaxPerfTilingData* const_data)
+inline[aicore] void InitTilingData(const __gm__ uint8_t *tiling, MoeGatingTopKSoftmaxPerfTilingData *const_data)
 {
-    const __gm__ uint32_t* src = (const __gm__ uint32_t*)tiling;
-    uint32_t* dst = (uint32_t*)const_data;
+    const __gm__ uint32_t *src = (const __gm__ uint32_t *)tiling;
+    uint32_t *dst = (uint32_t *)const_data;
     for (auto i = 0; i < sizeof(MoeGatingTopKSoftmaxPerfTilingData) / 4; i++)
         *(dst + i) = *(src + i);
 }
 #else
-inline void InitTilingData(uint8_t* tiling, MoeGatingTopKSoftmaxPerfTilingData* const_data)
+inline void InitTilingData(uint8_t *tiling, MoeGatingTopKSoftmaxPerfTilingData *const_data)
 {
     memcpy(const_data, tiling, sizeof(MoeGatingTopKSoftmaxPerfTilingData));
 }
 #endif
 
 #define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \
-    tiling_struct tiling_data;                                              \
+    tiling_struct tiling_data; \
     InitTilingData(tiling_arg, &tiling_data)
 
 #define GET_TILING_DATA(tiling_data, tiling_arg) \
-    MoeInitRoutingTilingData tiling_data;        \
+    MoeInitRoutingTilingData tiling_data; \
     InitTilingData(tiling_arg, &tiling_data)
 
 #define DTYPE_X float

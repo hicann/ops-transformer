@@ -21,8 +21,8 @@ namespace MoeTokenPermute {
 using namespace AscendC;
 
 template <typename T>
-__aicore__ inline void GetBaseArithProgressionSupportInt32(
-    const LocalTensor<T>& dstLocal, const T firstValue, const T diffValue, const int32_t count)
+__aicore__ inline void GetBaseArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue,
+                                                           const T diffValue, const int32_t count)
 {
     for (int i = 0; i < count; i++) {
         dstLocal.SetValue(
@@ -31,8 +31,8 @@ __aicore__ inline void GetBaseArithProgressionSupportInt32(
 }
 
 template <typename T>
-__aicore__ inline void ArithProgressionSupportInt32(
-    const LocalTensor<T>& dstLocal, const T firstValue, const T diffValue, const int32_t count)
+__aicore__ inline void ArithProgressionSupportInt32(const LocalTensor<T> &dstLocal, const T firstValue,
+                                                    const T diffValue, const int32_t count)
 {
     struct UnaryRepeatParams addsParamsStride1(1, 1, 1, 1);
     struct UnaryRepeatParams addsParamsStride8(1, 1, DEFAULT_REPEAT_STRIDE, DEFAULT_REPEAT_STRIDE);
@@ -50,10 +50,9 @@ __aicore__ inline void ArithProgressionSupportInt32(
             SetVectorMask<T>(0, (((static_cast<uint64_t>(1)) << static_cast<uint32_t>(BLOCK_NUM)) - 1));
             PipeBarrier<PIPE_V>();
             for (int i = 0; i < DEFAULT_BLK_NUM - 1; i++) {
-                Adds<T, false>(
-                    dstLocal[(i + 1) * BLOCK_NUM], dstLocal[i * BLOCK_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride1);
+                Adds<T, false>(dstLocal[(i + 1) * BLOCK_NUM], dstLocal[i * BLOCK_NUM],
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride1);
                 PipeBarrier<PIPE_V>();
             }
             int32_t repeat = count / REPEAT_NUM;
@@ -62,20 +61,18 @@ __aicore__ inline void ArithProgressionSupportInt32(
             PipeBarrier<PIPE_V>();
             // Fills the following arithmetic progression with 8 block size arithmetic progressions
             for (int i = 0; i < repeat - 1; i++) {
-                Adds<T, false>(
-                    dstLocal[(i + 1) * REPEAT_NUM], dstLocal[i * REPEAT_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride8);
+                Adds<T, false>(dstLocal[(i + 1) * REPEAT_NUM], dstLocal[i * REPEAT_NUM],
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride8);
                 PipeBarrier<PIPE_V>();
             }
             if (tail > 0) {
                 int32_t tail_aligned = (tail + BLOCK_NUM - 1) / BLOCK_NUM * BLOCK_NUM;
                 SetVectorMask<T>(tail_aligned);
                 PipeBarrier<PIPE_V>();
-                Adds<T, false>(
-                    dstLocal[repeat * REPEAT_NUM], dstLocal[(repeat - 1) * REPEAT_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride8);
+                Adds<T, false>(dstLocal[repeat * REPEAT_NUM], dstLocal[(repeat - 1) * REPEAT_NUM],
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(REPEAT_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride8);
                 PipeBarrier<PIPE_V>();
             }
         } else {
@@ -85,10 +82,9 @@ __aicore__ inline void ArithProgressionSupportInt32(
             SetVectorMask<T>(0, (((static_cast<uint64_t>(1)) << static_cast<uint32_t>(BLOCK_NUM)) - 1));
             PipeBarrier<PIPE_V>();
             for (int i = 0; i < repeat - 1; i++) {
-                Adds<T, false>(
-                    dstLocal[(i + 1) * BLOCK_NUM], dstLocal[i * BLOCK_NUM],
-                    static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)), MASK_PLACEHOLDER,
-                    (uint16_t)1, addsParamsStride1);
+                Adds<T, false>(dstLocal[(i + 1) * BLOCK_NUM], dstLocal[i * BLOCK_NUM],
+                               static_cast<T>(static_cast<float>(diffValue) * static_cast<float>(BLOCK_NUM)),
+                               MASK_PLACEHOLDER, (uint16_t)1, addsParamsStride1);
                 PipeBarrier<PIPE_V>();
             }
         }
@@ -99,24 +95,25 @@ __aicore__ inline void ArithProgressionSupportInt32(
 }
 
 template <typename T>
-__aicore__ inline __inout_pipe__(MTE2) void DataCopyB64(
-    const LocalTensor<T>& dstLocal, const GlobalTensor<T>& srcGlobal, const DataCopyExtParams& dataCopyParams,
-    const DataCopyPadExtParams<int32_t>& padParams)
+__aicore__ inline __inout_pipe__(MTE2) void DataCopyB64(const LocalTensor<T> &dstLocal,
+                                                        const GlobalTensor<T> &srcGlobal,
+                                                        const DataCopyExtParams &dataCopyParams,
+                                                        const DataCopyPadExtParams<int32_t> &padParams)
 {
-    DataCopyPadGm2UBImpl(
-        (__ubuf__ int32_t*)dstLocal.GetPhyAddr(), (__gm__ int32_t*)srcGlobal.GetPhyAddr(), dataCopyParams, padParams);
+    DataCopyPadGm2UBImpl((__ubuf__ int32_t *)dstLocal.GetPhyAddr(), (__gm__ int32_t *)srcGlobal.GetPhyAddr(),
+                         dataCopyParams, padParams);
 }
 
 template <typename T>
-__aicore__ inline __inout_pipe__(MTE3) void DataCopyB64(
-    const GlobalTensor<T>& dstGlobal, const LocalTensor<T>& srcLocal, const DataCopyExtParams& dataCopyParams)
+__aicore__ inline __inout_pipe__(MTE3) void DataCopyB64(const GlobalTensor<T> &dstGlobal,
+                                                        const LocalTensor<T> &srcLocal,
+                                                        const DataCopyExtParams &dataCopyParams)
 {
-    DataCopyPadUB2GMImpl(
-        (__gm__ int32_t*)dstGlobal.GetPhyAddr(), (__ubuf__ int32_t*)srcLocal.GetPhyAddr(), dataCopyParams);
+    DataCopyPadUB2GMImpl((__gm__ int32_t *)dstGlobal.GetPhyAddr(), (__ubuf__ int32_t *)srcLocal.GetPhyAddr(),
+                         dataCopyParams);
 }
 
-class MoeSortBase
-{
+class MoeSortBase {
 public:
     __aicore__ inline MoeSortBase(){};
 
@@ -125,7 +122,7 @@ protected:
     __aicore__ inline void SyncAll();
 
 protected:
-    TPipe* pipe;
+    TPipe *pipe;
     TQue<QuePosition::VECIN, 1> sortDataCopyInQueue;
     TQue<QuePosition::VECOUT, 1> sortDataCopyOutQueue;
     TBuf<TPosition::VECCALC> tempBuffer;

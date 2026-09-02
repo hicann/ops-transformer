@@ -63,6 +63,6 @@ private:
     QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData tilingData_;
 };
 
-}  // namespace optiling
+} // namespace optiling
 
-#endif  // QUANT_GROUPED_MATMUL_INPLACE_ADD_BASIC_API_TILING_H
+#endif // QUANT_GROUPED_MATMUL_INPLACE_ADD_BASIC_API_TILING_H

@@ -32,7 +32,7 @@
 namespace Cgmct {
 namespace Gemm {
 namespace Kernel {
-#define QGMM_PERTILE_KERNEL_CLASS_TEM_PARAMS                                                                           \
+#define QGMM_PERTILE_KERNEL_CLASS_TEM_PARAMS \
     template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 #define QGMM_PERTILE_KERNEL_FUN_TEM_PARAMS ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler
 
@@ -58,12 +58,8 @@ constexpr uint64_t IDX_N_TAIL_SPLIT_TILEIDX = 3UL;
 QGMM_PERTILE_KERNEL_CLASS_TEM_PARAMS
 class QuantMmGroupedPerTile {
 public:
-    __aicore__ inline QuantMmGroupedPerTile()
-    {
-    }
-    __aicore__ inline ~QuantMmGroupedPerTile()
-    {
-    }
+    __aicore__ inline QuantMmGroupedPerTile() {}
+    __aicore__ inline ~QuantMmGroupedPerTile() {}
 
     static constexpr bool transA = BlockMmad::transA;
     static constexpr bool transB = BlockMmad::transB;
@@ -104,17 +100,24 @@ public:
         uint32_t groupNum;
         int8_t groupType;
         uint8_t groupListType;
-        __aicore__ GMMTiling()
-        {
-        }
+        __aicore__ GMMTiling() {}
         __aicore__ GMMTiling(int32_t m_, int32_t n_, int32_t k_, int32_t baseM_, int32_t baseN_, int32_t baseK_,
                              int32_t stepM_, int32_t stepN_, int32_t stepKa_, int32_t stepKb_, uint32_t groupNum_,
                              int8_t groupType_, uint8_t groupListType_)
-            : m(m_), n(n_), k(k_), baseM(baseM_), baseN(baseN_), baseK(baseK_), stepM(stepM_), stepN(stepN_),
-              stepKa(stepKa_), stepKb(stepKb_), groupNum(groupNum_), groupType(groupType_),
+            : m(m_),
+              n(n_),
+              k(k_),
+              baseM(baseM_),
+              baseN(baseN_),
+              baseK(baseK_),
+              stepM(stepM_),
+              stepN(stepN_),
+              stepKa(stepKa_),
+              stepKb(stepKb_),
+              groupNum(groupNum_),
+              groupType(groupType_),
               groupListType(groupListType_)
-        {
-        }
+        {}
     };
 
     struct Params {
@@ -306,9 +309,8 @@ __aicore__ inline void QuantMmGroupedPerTile<QGMM_PERTILE_KERNEL_FUN_TEM_PARAMS>
 }
 
 QGMM_PERTILE_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void
-QuantMmGroupedPerTile<QGMM_PERTILE_KERNEL_FUN_TEM_PARAMS>::ProcessSingleGroup(const Params &params,
-                                                                              BlockSchedulerOp &bs, uint32_t groupIdx)
+__aicore__ inline void QuantMmGroupedPerTile<QGMM_PERTILE_KERNEL_FUN_TEM_PARAMS>::ProcessSingleGroup(
+    const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx)
 {
     CoordClass coord(Get<MNK_M>(problemShape_), Get<MNK_N>(problemShape_), Get<MNK_K>(problemShape_),
                      params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
@@ -380,8 +382,8 @@ __aicore__ inline void QuantMmGroupedPerTile<QGMM_PERTILE_KERNEL_FUN_TEM_PARAMS>
 }
 
 QGMM_PERTILE_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline int32_t
-QuantMmGroupedPerTile<QGMM_PERTILE_KERNEL_FUN_TEM_PARAMS>::GetSplitValueFromGroupList(uint32_t groupIdx)
+__aicore__ inline int32_t QuantMmGroupedPerTile<QGMM_PERTILE_KERNEL_FUN_TEM_PARAMS>::GetSplitValueFromGroupList(
+    uint32_t groupIdx)
 {
     int32_t splitValue = 0;
     if (likely(groupType_ != -1)) { // -1: no  need to split

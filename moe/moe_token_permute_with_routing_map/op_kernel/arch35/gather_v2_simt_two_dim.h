@@ -159,10 +159,9 @@ __aicore__ inline void Gatherv2SimtTwoDim<X_T, INDICES_T, INDEX_SIZE_T>::Process
     if (blockIdxVal < needCoreNum) {
         INDEX_SIZE_T yIndexBase = blockIdxVal * CoreElements;
 
-        asc_vf_call<GatherSimt<false>>(dim3(threadNum), yIndexBase, currentCoreElements, m0, shift0,
-                                                  innerSize, (__gm__ X_T *)(xGm_.GetPhyAddr()),
-                                                  (__gm__ INDICES_T *)(indicesGm_.GetPhyAddr()),
-                                                  (__gm__ volatile X_T *)(yGm_.GetPhyAddr()));
+        asc_vf_call<GatherSimt<false>>(dim3(threadNum), yIndexBase, currentCoreElements, m0, shift0, innerSize,
+                                       (__gm__ X_T *)(xGm_.GetPhyAddr()), (__gm__ INDICES_T *)(indicesGm_.GetPhyAddr()),
+                                       (__gm__ volatile X_T *)(yGm_.GetPhyAddr()));
     }
 }
 
@@ -172,10 +171,9 @@ __aicore__ inline void Gatherv2SimtTwoDim<X_T, INDICES_T, INDEX_SIZE_T>::ProbPro
     if (blockIdxVal < needCoreNum) {
         INDEX_SIZE_T yIndexBase = blockIdxVal * CoreElements;
 
-        asc_vf_call<GatherSimtProb<false>>(dim3(threadNum), yIndexBase, currentCoreElements, m0,
-                                                      shift0, tokenNum, (__gm__ X_T *)(xGm_.GetPhyAddr()),
-                                                      (__gm__ INDICES_T *)(indicesGm_.GetPhyAddr()),
-                                                      (__gm__ volatile X_T *)(yGm_.GetPhyAddr()));
+        asc_vf_call<GatherSimtProb<false>>(
+            dim3(threadNum), yIndexBase, currentCoreElements, m0, shift0, tokenNum, (__gm__ X_T *)(xGm_.GetPhyAddr()),
+            (__gm__ INDICES_T *)(indicesGm_.GetPhyAddr()), (__gm__ volatile X_T *)(yGm_.GetPhyAddr()));
     }
 }
 } // namespace gatherv2

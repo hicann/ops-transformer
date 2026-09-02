@@ -19,9 +19,11 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::array<const aclTensor*, 3> MoeTokenPermuteWithRoutingMap(
-    const aclTensor* tokens, const aclTensor* routingMap, const aclTensor* probsOptional, int64_t numOutTokens,
-    bool dropAndPad, aclOpExecutor* executor);
+const std::array<const aclTensor *, 3> MoeTokenPermuteWithRoutingMap(const aclTensor *tokens,
+                                                                     const aclTensor *routingMap,
+                                                                     const aclTensor *probsOptional,
+                                                                     int64_t numOutTokens, bool dropAndPad,
+                                                                     aclOpExecutor *executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_MOE_TOKEN_PERMUTE_WITH_ROUTING_MAP_H_

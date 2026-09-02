@@ -16,7 +16,7 @@
 
 namespace Catlass::Arch {
 
-template<class ArchTag>
+template <class ArchTag>
 struct Resource {
 public:
     AscendC::TPipe pipe;

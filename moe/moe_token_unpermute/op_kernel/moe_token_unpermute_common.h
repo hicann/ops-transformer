@@ -31,8 +31,8 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPadCustom(
-    LocalTensor<T> inLocal, GlobalTensor<T> srcGm, DataCopyExtParams tokenCopyParams, DataCopyPadExtParams<T> padParams)
+__aicore__ inline void DataCopyPadCustom(LocalTensor<T> inLocal, GlobalTensor<T> srcGm,
+                                         DataCopyExtParams tokenCopyParams, DataCopyPadExtParams<T> padParams)
 {
 #if __CCE_AICORE__ == 220 || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
     DataCopyPad(inLocal, srcGm, tokenCopyParams, padParams);
@@ -54,24 +54,23 @@ __aicore__ inline void DataCopyPadCustom(
 }
 
 template <typename T>
-__aicore__ inline void DataCopyCustom(
-    GlobalTensor<T> dstGm, LocalTensor<T> inLocal, int64_t blockCount, int64_t blockLen)
+__aicore__ inline void DataCopyCustom(GlobalTensor<T> dstGm, LocalTensor<T> inLocal, int64_t blockCount,
+                                      int64_t blockLen)
 {
     int64_t elem = blockLen / sizeof(T);
     int64_t numPerBlock = sizeof(T) == 0 ? 1 : BLOCK_BYTES / sizeof(T);
     int64_t alignElem = AlignUp(elem, numPerBlock);
 
     if (likely(alignElem == elem)) {
-        DataCopyParams copyParams = {
-            static_cast<uint16_t>(blockCount), static_cast<uint16_t>(alignElem / numPerBlock), 0, 0};
+        DataCopyParams copyParams = {static_cast<uint16_t>(blockCount), static_cast<uint16_t>(alignElem / numPerBlock),
+                                     0, 0};
         DataCopy(dstGm, inLocal, copyParams);
     } else {
         if (blockCount == 1) {
-            DataCopyParams copyParams = {
-                static_cast<uint16_t>(blockCount), static_cast<uint16_t>(alignElem / numPerBlock), 0, 0};
+            DataCopyParams copyParams = {static_cast<uint16_t>(blockCount),
+                                         static_cast<uint16_t>(alignElem / numPerBlock), 0, 0};
             DataCopy(dstGm, inLocal, copyParams);
-        }
-        else {
+        } else {
             DataCopyParams copyParams = {1, static_cast<uint16_t>(alignElem / numPerBlock), 0, 0};
             for (uint32_t i = 0; i < blockCount; i++) {
                 DataCopy(dstGm[i * elem], inLocal[i * alignElem], copyParams);

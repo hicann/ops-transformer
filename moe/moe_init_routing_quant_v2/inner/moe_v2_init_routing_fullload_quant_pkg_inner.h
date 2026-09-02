@@ -21,13 +21,12 @@ namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;
 
 template <typename T>
-class MoeV2FullLoad : public MoeV2SortBase
-{
+class MoeV2FullLoad : public MoeV2SortBase {
 public:
     __aicore__ inline MoeV2FullLoad(){};
-    __aicore__ inline void Init(
-        GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
-        GM_ADDR workspace, const InnerMoeInitRoutingV2TilingData* tilingData, TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
+                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
+                                const InnerMoeInitRoutingV2TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -40,7 +39,7 @@ private:
 
 private:
     int64_t sortNum_;
-    const InnerMoeV2GatherOutComputeTilingData* gatherOutTilingData_;
+    const InnerMoeV2GatherOutComputeTilingData *gatherOutTilingData_;
     int64_t blockIdx_;
     int64_t needCoreNum_;
     int64_t coreRows_;
@@ -76,8 +75,8 @@ template <typename T>
 __aicore__ inline void MoeV2FullLoad<T>::CopyIn()
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+                                     static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
     DataCopyPadExtParams<int32_t> dataCopyPadParams{false, 0, 0, 0};
     DataCopyPad(inLocal[0], expertIdxGm_, dataCopyParams, dataCopyPadParams);
     ArithProgression<int32_t>(inLocal[this->sortNum_], 0, 1, this->totalLength);
@@ -117,9 +116,8 @@ __aicore__ inline void MoeV2FullLoad<T>::SortCompute()
     LocalTensor<float> expandDstToSrcRowLocalFp32 = expandDstToSrcRowLocal.ReinterpretCast<float>();
     Extract(expandedExpertIdxLocal, expandDstToSrcRowLocal, sortedLocal, this->sortNum_ / ONE_REPEAT_SORT_NUM);
     PipeBarrier<PIPE_V>();
-    Cast(
-        expandDstToSrcRowLocalFp32, expandDstToSrcRowLocal.ReinterpretCast<int32_t>(), RoundMode::CAST_ROUND,
-        this->totalLength);
+    Cast(expandDstToSrcRowLocalFp32, expandDstToSrcRowLocal.ReinterpretCast<int32_t>(), RoundMode::CAST_ROUND,
+         this->totalLength);
     PipeBarrier<PIPE_V>();
     Muls(expandedExpertIdxLocal, expandedExpertIdxLocal, (float)-1, this->totalLength);
     PipeBarrier<PIPE_V>();
@@ -199,8 +197,8 @@ __aicore__ inline void MoeV2FullLoad<T>::ComputeExpertTokenCountOrCumsum()
             lastExpertId++;
         }
     }
-    DataCopyExtParams copyParams{
-        static_cast<uint16_t>(1), static_cast<uint32_t>(this->expertNum * sizeof(int32_t)), 0, 0, 0};
+    DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(this->expertNum * sizeof(int32_t)), 0,
+                                 0, 0};
     if (this->expertTokensCountOrCumsumFlag > 0) {
         DataCopyPad(expertTokensCountOrCumsumGm, expertTokensCount, copyParams);
     }
@@ -221,8 +219,8 @@ __aicore__ inline void MoeV2FullLoad<T>::CopyOutX()
     int64_t startXRow = curRowsStart / this->k_;
     int64_t endXRow = (curRowsStart + this->coreRows_ - 1) / this->k_;
 
-    DataCopyExtParams dataXCopyParams{
-        static_cast<uint16_t>(endXRow - startXRow + 1), static_cast<uint32_t>(this->cols_ * sizeof(T)), 0, 0, 0};
+    DataCopyExtParams dataXCopyParams{static_cast<uint16_t>(endXRow - startXRow + 1),
+                                      static_cast<uint32_t>(this->cols_ * sizeof(T)), 0, 0, 0};
     DataCopyPadExtParams<T> dataXCopyPadParams{false, 0, 0, 0};
     DataCopyPad(xLocal, xGm_[startXRow * this->cols_], dataXCopyParams, dataXCopyPadParams);
     SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
@@ -248,9 +246,9 @@ __aicore__ inline void MoeV2FullLoad<T>::CopyOutEmpty()
 }
 
 template <typename T>
-__aicore__ inline void MoeV2FullLoad<T>::Init(
-    GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
-    GM_ADDR workspace, const InnerMoeInitRoutingV2TilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoeV2FullLoad<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
+                                              GM_ADDR expertTokensCountOrCumsum, GM_ADDR workspace,
+                                              const InnerMoeInitRoutingV2TilingData *tilingData, TPipe *tPipe)
 {
     this->gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     this->blockIdx_ = GetBlockIdx();
@@ -274,15 +272,15 @@ __aicore__ inline void MoeV2FullLoad<T>::Init(
     this->totalLength = tilingData->n * tilingData->k;
     this->pipe = tPipe;
 
-    xGm_.SetGlobalBuffer((__gm__ T*)x);
-    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx, this->tileLength);
+    xGm_.SetGlobalBuffer((__gm__ T *)x);
+    expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx, this->tileLength);
 
-    expandedXGm_.SetGlobalBuffer((__gm__ T*)expandedX);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, this->tileLength);
+    expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX);
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, this->tileLength);
     if (this->expertTokensCountOrCumsumFlag > 0) {
         // dropless
-        expertTokensCountOrCumsumGm.SetGlobalBuffer(
-            (__gm__ int32_t*)expertTokensCountOrCumsum, Align(this->expertNum, sizeof(int32_t)));
+        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum,
+                                                    Align(this->expertNum, sizeof(int32_t)));
     }
 
     int64_t kvFactor = 2;

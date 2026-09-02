@@ -150,9 +150,9 @@ __aicore__ inline void MoeGatherOutDroppad<T>::Init(GM_ADDR inputX, GM_ADDR scal
 
     inputXGm_.SetGlobalBuffer((__gm__ T *)inputX, coreRows_ * cols_);
     expandedXGm_.SetGlobalBuffer((__gm__ T *)expandedX, n_ * k_ * cols_);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx +
-                                          blockIdx_ * gatherOutTilingData_->perCoreIndicesElements,
-                                      Align(coreRows_, sizeof(int32_t)));
+    expandedRowIdxGm_.SetGlobalBuffer(
+        (__gm__ int32_t *)expandedRowIdx + blockIdx_ * gatherOutTilingData_->perCoreIndicesElements,
+        Align(coreRows_, sizeof(int32_t)));
 
     pipe_->InitBuffer(xCopyInQueue_, GATHER_OUT_DROPPAD_BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(T)));
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_OUT_DROPPAD_BUFFER_NUM,

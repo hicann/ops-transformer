@@ -29,11 +29,13 @@ constexpr int32_t CONSTANT_FIVE = 5;
 constexpr int32_t CONSTANT_SIX = 6;
 constexpr int32_t CONSTANT_SEVEN = 7;
 
-template <typename T> class MoeFullLoad : public MoeSortBase {
+template <typename T>
+class MoeFullLoad : public MoeSortBase {
 public:
     __aicore__ inline MoeFullLoad(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-        GM_ADDR expandedExpertIdx, GM_ADDR workspace, const MoeInitRoutingTilingData *tilingData, TPipe *tPipe);
+                                GM_ADDR expandedExpertIdx, GM_ADDR workspace,
+                                const MoeInitRoutingTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -43,7 +45,7 @@ private:
     __aicore__ inline void CopyOutEmpty();
     __aicore__ inline void CopyOutX();
     __aicore__ inline void ArithProgressionPerf(const LocalTensor<int32_t> &dst, const int32_t firstValue,
-        const int32_t diffValue, int32_t countAlign);
+                                                const int32_t diffValue, int32_t countAlign);
 
 private:
     int64_t sortNum_;
@@ -76,7 +78,7 @@ private:
 
 template <typename T>
 __aicore__ inline void MoeFullLoad<T>::ArithProgressionPerf(const LocalTensor<int32_t> &dst, const int32_t firstValue,
-    const int32_t diffValue, int32_t countAlign)
+                                                            const int32_t diffValue, int32_t countAlign)
 {
     // countAlign must be eight aligned
     countAlign = (countAlign + CONSTANT_SEVEN) / BLOCK_B32_SIZE * BLOCK_B32_SIZE;
@@ -91,37 +93,38 @@ __aicore__ inline void MoeFullLoad<T>::ArithProgressionPerf(const LocalTensor<in
         if (countAlign > REPEAT_B32_SIZE) {
             for (int32_t i = 1; i < BLOCK_B32_SIZE; i++) {
                 offset = i * BLOCK_B32_SIZE;
-                Adds(dst[offset], dst, diffValue * offset, BLOCK_B32_SIZE, 1, { 1, 1, 1, 1 });
+                Adds(dst[offset], dst, diffValue * offset, BLOCK_B32_SIZE, 1, {1, 1, 1, 1});
             }
             int32_t loopTimes = (countAlign + REPEAT_B32_SIZE - 1) / REPEAT_B32_SIZE;
             for (int32_t i = 1; i < loopTimes - 1; i++) {
                 offset = i * REPEAT_B32_SIZE;
-                Adds(dst[offset], dst, diffValue * offset, REPEAT_B32_SIZE, 1, { 1, 1, 1, 1 });
+                Adds(dst[offset], dst, diffValue * offset, REPEAT_B32_SIZE, 1, {1, 1, 1, 1});
             }
             offset = (loopTimes - 1) * REPEAT_B32_SIZE;
-            Adds(dst[offset], dst, diffValue * offset, countAlign - offset, 1, { 1, 1, 1, 1 });
+            Adds(dst[offset], dst, diffValue * offset, countAlign - offset, 1, {1, 1, 1, 1});
         } else {
             for (int32_t i = 1; i < countAlign / BLOCK_B32_SIZE; i++) {
                 offset = i * BLOCK_B32_SIZE;
-                Adds(dst[offset], dst, diffValue * offset, BLOCK_B32_SIZE, 1, { 1, 1, 1, 1 });
+                Adds(dst[offset], dst, diffValue * offset, BLOCK_B32_SIZE, 1, {1, 1, 1, 1});
             }
         }
     }
 }
 
-template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyIn()
+template <typename T>
+__aicore__ inline void MoeFullLoad<T>::CopyIn()
 {
     LocalTensor<T> xLocal = xCopyInQueue_.AllocTensor<T>();
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{ static_cast<uint16_t>(1),
-        static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0 };
-    DataCopyPadExtParams<int32_t> dataCopyPadParams{ false, 0, 0, 0 };
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(1),
+                                     static_cast<uint32_t>(this->totalLength * sizeof(int32_t)), 0, 0, 0};
+    DataCopyPadExtParams<int32_t> dataCopyPadParams{false, 0, 0, 0};
     DataCopyPad(inLocal[0], expertIdxGm_, dataCopyParams, dataCopyPadParams);
     DataCopyPad(inLocal[this->sortNum_], rowIdxGm_, dataCopyParams, dataCopyPadParams);
 
-    DataCopyExtParams dataXCopyParams{ static_cast<uint16_t>(this->coreRows_),
-        static_cast<uint32_t>(this->cols_ * sizeof(T)), 0, 0, 0 };
-    DataCopyPadExtParams<T> dataXCopyPadParams{ false, 0, 0, static_cast<T>(0) };
+    DataCopyExtParams dataXCopyParams{static_cast<uint16_t>(this->coreRows_),
+                                      static_cast<uint32_t>(this->cols_ * sizeof(T)), 0, 0, 0};
+    DataCopyPadExtParams<T> dataXCopyPadParams{false, 0, 0, static_cast<T>(0)};
     int64_t outIndex = 0;
     if (this->splitFlag_ == SPLIT_N) {
         outIndex = this->blockIdx_ * this->perCoreRows_ * this->cols_;
@@ -131,7 +134,8 @@ template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyIn()
     sortDataCopyInQueue.EnQue(inLocal);
 }
 
-template <typename T> __aicore__ inline void MoeFullLoad<T>::SortCompute()
+template <typename T>
+__aicore__ inline void MoeFullLoad<T>::SortCompute()
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.DeQue<int32_t>();
     LocalTensor<int32_t> expertIdxLocal = inLocal[0];
@@ -156,7 +160,7 @@ template <typename T> __aicore__ inline void MoeFullLoad<T>::SortCompute()
     LocalTensor<float> expandDstToSrcRowLocalFp32 = expandDstToSrcRowLocal.ReinterpretCast<float>();
     Extract(expandedExpertIdxLocal, expandDstToSrcRowLocal, sortedLocal, this->sortNum_ / ONE_REPEAT_SORT_NUM);
     Cast(expandDstToSrcRowLocalFp32, expandDstToSrcRowLocal.ReinterpretCast<int32_t>(), RoundMode::CAST_ROUND,
-        this->totalLength);
+         this->totalLength);
     Muls(expandedExpertIdxLocal, expandedExpertIdxLocal, (float)-1, this->totalLength);
     LocalTensor<int32_t> expandedExpertIdxLocalInt32;
     expandedExpertIdxLocalInt32 = expandedExpertIdxLocal.ReinterpretCast<int32_t>();
@@ -182,7 +186,8 @@ template <typename T> __aicore__ inline void MoeFullLoad<T>::SortCompute()
     expandDstToSrcRowQueue_.FreeTensor(expandDstToSrcRowLocal);
 }
 
-template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyOutIdx()
+template <typename T>
+__aicore__ inline void MoeFullLoad<T>::CopyOutIdx()
 {
     LocalTensor<int32_t> expandedExpertIdx = expandedExpertIdxCopyOutQueue_.DeQue<int32_t>();
     LocalTensor<int32_t> expandedRowIdx = expandedRowIdxCopyOutQueue_.DeQue<int32_t>();
@@ -195,7 +200,8 @@ template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyOutIdx()
     expandedRowIdxCopyOutQueue_.EnQue(expandedRowIdx);
 }
 
-template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyOutX()
+template <typename T>
+__aicore__ inline void MoeFullLoad<T>::CopyOutX()
 {
     LocalTensor<int32_t> expendRowIdx = expandedRowIdxCopyOutQueue_.DeQue<int32_t>();
     LocalTensor<T> x = xCopyInQueue_.DeQue<T>();
@@ -225,7 +231,8 @@ template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyOutX()
     xCopyInQueue_.FreeTensor(x);
 }
 
-template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyOutEmpty()
+template <typename T>
+__aicore__ inline void MoeFullLoad<T>::CopyOutEmpty()
 {
     LocalTensor<int32_t> outLocal = expandedExpertIdxCopyOutQueue_.DeQue<int32_t>();
     expandedExpertIdxCopyOutQueue_.FreeTensor(outLocal);
@@ -233,8 +240,8 @@ template <typename T> __aicore__ inline void MoeFullLoad<T>::CopyOutEmpty()
 
 template <typename T>
 __aicore__ inline void MoeFullLoad<T>::Init(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR expertIdx, GM_ADDR expandedX,
-    GM_ADDR expandedRowIdx, GM_ADDR expandedExpertIdx, GM_ADDR workspace, const MoeInitRoutingTilingData *tilingData,
-    TPipe *tPipe)
+                                            GM_ADDR expandedRowIdx, GM_ADDR expandedExpertIdx, GM_ADDR workspace,
+                                            const MoeInitRoutingTilingData *tilingData, TPipe *tPipe)
 {
     this->gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     this->blockIdx_ = GetBlockIdx();
@@ -253,7 +260,6 @@ __aicore__ inline void MoeFullLoad<T>::Init(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR e
         this->coreRows_ = this->gatherOutTilingData_->perCoreRows;
         this->coreK_ = this->gatherOutTilingData_->perCoreK;
     }
-
 
     this->tileLength = Align(tilingData->vbsComputeParamsOp.lastCorePerLoopElements, sizeof(int32_t));
     this->sortNum_ = Ceil(this->tileLength, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM;
@@ -280,7 +286,8 @@ __aicore__ inline void MoeFullLoad<T>::Init(GM_ADDR x, GM_ADDR rowIdx, GM_ADDR e
     pipe->InitBuffer(sortedBuffer, buffSize * kvFactor);
 }
 
-template <typename T> __aicore__ inline void MoeFullLoad<T>::Process()
+template <typename T>
+__aicore__ inline void MoeFullLoad<T>::Process()
 {
     if (this->totalLength <= 0) {
         return;

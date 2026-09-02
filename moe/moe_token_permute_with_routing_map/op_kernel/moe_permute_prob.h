@@ -24,13 +24,11 @@ constexpr int32_t BUFFER_NUM_DB = 2;
 constexpr int32_t BUFFER_LEN_DB = 1024 * 2;
 
 template <typename T>
-class MoePermuteProb
-{
+class MoePermuteProb {
 public:
     __aicore__ inline MoePermuteProb(){};
-    __aicore__ inline void Init(
-        GM_ADDR src, GM_ADDR indices, GM_ADDR dst, const MoeTokenPermuteWithRoutingMapTilingData* tilingData,
-        TPipe* tPipe);
+    __aicore__ inline void Init(GM_ADDR src, GM_ADDR indices, GM_ADDR dst,
+                                const MoeTokenPermuteWithRoutingMapTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -42,7 +40,7 @@ private:
     __aicore__ inline void ReleaseEvent();
 
 private:
-    TPipe* pipe;
+    TPipe *pipe;
 
     event_t eventIdICopyin;
     event_t eventIdPCopyin;
@@ -68,7 +66,7 @@ private:
     LocalTensor<T> xLocal;
     LocalTensor<T> yLocal;
 
-    const PermuteVBSComputeRMTilingData* vbsTilingData;
+    const PermuteVBSComputeRMTilingData *vbsTilingData;
 
     int64_t coreTaskNum;
     int64_t coreTaskNumFront;
@@ -146,8 +144,8 @@ __aicore__ inline void MoePermuteProb<T>::CopyOut()
 }
 
 template <typename T>
-__aicore__ inline void MoePermuteProb<T>::Init(
-    GM_ADDR dst, GM_ADDR src, GM_ADDR indices, const MoeTokenPermuteWithRoutingMapTilingData* tilingData, TPipe* tPipe)
+__aicore__ inline void MoePermuteProb<T>::Init(GM_ADDR dst, GM_ADDR src, GM_ADDR indices,
+                                               const MoeTokenPermuteWithRoutingMapTilingData *tilingData, TPipe *tPipe)
 {
     this->tokenNum = tilingData->n;
     this->coreNum = tilingData->vbsComputeParamsOp.needCoreNum;
@@ -167,9 +165,10 @@ __aicore__ inline void MoePermuteProb<T>::Init(
     allProblen = coreTaskNum * tokenNum;
 
     this->pipe = tPipe;
-    srcGm.SetGlobalBuffer((__gm__ T*)src + (this->blockIdx * tailcoreTask + coreTaskNumFront) * tokenNum);
-    dstGm.SetGlobalBuffer((__gm__ T*)dst + (this->blockIdx * tailcoreTask + coreTaskNumFront) * capacity);
-    indicesGm.SetGlobalBuffer((__gm__ int32_t*)indices + (this->blockIdx * tailcoreTask + coreTaskNumFront) * capacity);
+    srcGm.SetGlobalBuffer((__gm__ T *)src + (this->blockIdx * tailcoreTask + coreTaskNumFront) * tokenNum);
+    dstGm.SetGlobalBuffer((__gm__ T *)dst + (this->blockIdx * tailcoreTask + coreTaskNumFront) * capacity);
+    indicesGm.SetGlobalBuffer((__gm__ int32_t *)indices +
+                              (this->blockIdx * tailcoreTask + coreTaskNumFront) * capacity);
 
     pipe->InitBuffer(inQue, BUFFER_LEN * sizeof(T));
     pipe->InitBuffer(indiceQue, BUFFER_LEN * sizeof(int32_t));

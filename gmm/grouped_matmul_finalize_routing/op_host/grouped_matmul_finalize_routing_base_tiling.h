@@ -23,27 +23,41 @@ namespace optiling {
 namespace grouped_matmul_finalize_routing {
 class GroupedMatmulFinalizeRoutingBaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
- public:
-    explicit GroupedMatmulFinalizeRoutingBaseTiling(gert::TilingContext* context) : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
+public:
+    explicit GroupedMatmulFinalizeRoutingBaseTiling(gert::TilingContext *context)
+        : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
     ~GroupedMatmulFinalizeRoutingBaseTiling() override = default;
 
 protected:
-    bool IsCapable() override { 
-        return true; 
+    bool IsCapable() override
+    {
+        return true;
     }
     // 1、获取平台信息比如CoreNum、UB/L1/L0C资源大小
-    ge::graphStatus GetPlatformInfo() override {return ge::GRAPH_SUCCESS;};
+    ge::graphStatus GetPlatformInfo() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
     // 2、获取INPUT/OUTPUT/ATTR信息
-    ge::graphStatus GetShapeAttrsInfo() override{return ge::GRAPH_SUCCESS;};
+    ge::graphStatus GetShapeAttrsInfo() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
     // 3、计算数据切分TilingData
     ge::graphStatus DoOpTiling() override;
     // 4、计算高阶API的TilingData
-    ge::graphStatus DoLibApiTiling() override{return ge::GRAPH_SUCCESS;};
+    ge::graphStatus DoLibApiTiling() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
     // 5、计算TilingKey
     uint64_t GetTilingKey() const override;
     // 6、计算Workspace 大小
-    ge::graphStatus GetWorkspaceSize() override{return ge::GRAPH_SUCCESS;};
+    ge::graphStatus GetWorkspaceSize() override
+    {
+        return ge::GRAPH_SUCCESS;
+    };
     // 7、保存Tiling数据
     ge::graphStatus PostTiling() override;
 
@@ -60,8 +74,8 @@ protected:
     void FillTilingData();
     void FillTilingDataL1Opt();
     void PrintTilingData();
-protected:
 
+protected:
 private:
     GroupMatmulFRTilingData tilingData_;
     bool failFlag_;
@@ -86,10 +100,11 @@ private:
     uint32_t hasBias_;
     uint32_t deterministicFlag_;
     uint32_t deterWorkspaceSize_;
-    bool useL1OptKernel_;    
+    bool useL1OptKernel_;
+
 protected:
     matmul_tiling::MultiCoreMatmulTiling mm_;
 };
-}
-}
+} // namespace grouped_matmul_finalize_routing
+} // namespace optiling
 #endif // __OP_HOST_GROUPED_MATMUL_FINALIZE_ROUTING_BASE_TILING_H__

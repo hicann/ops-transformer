@@ -48,7 +48,6 @@ __aicore__ inline void grouped_matmul_finalize_routing_mx(GM_ADDR x, GM_ADDR w, 
     using weightscaleType = AscendC::fp8_e8m0_t;
     using BiasType = bfloat16_t;
 
-
     using ProblemShape = Cgmct::Gemm::MatmulShape;
 
     using BlockScheduler = Cgmct::Gemm::GroupedMatmulAswtWithTailSplitScheduler;

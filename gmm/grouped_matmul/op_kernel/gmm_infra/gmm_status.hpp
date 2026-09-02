@@ -11,9 +11,12 @@
 #ifndef GMM_STATUS_HPP
 #define GMM_STATUS_HPP
 
-namespace Catlass{
+namespace Catlass {
 
-enum class Status{ kSuccess, kInvalid };
+enum class Status {
+    kSuccess,
+    kInvalid
+};
 
 } // namespace Catlass
 

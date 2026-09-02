@@ -22,5 +22,5 @@ struct GroupedMatmulAddParams {
     int64_t groupType = 2;
     int64_t groupListType = 0;
 };
-}
+} // namespace gmm_add_advanced
 #endif

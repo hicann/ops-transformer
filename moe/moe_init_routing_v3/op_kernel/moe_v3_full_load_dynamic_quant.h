@@ -116,8 +116,8 @@ __aicore__ inline void MoeV3FullLoadDynamicQuant<T, COPYOUTTYPE, SMOOTHTYPE>::Pr
 }
 
 template <typename T, const int COPYOUTTYPE, const int SMOOTHTYPE>
-__aicore__ inline void
-MoeV3FullLoadDynamicQuant<T, COPYOUTTYPE, SMOOTHTYPE>::ComputeQuant(LocalTensor<float> &smoothLocal)
+__aicore__ inline void MoeV3FullLoadDynamicQuant<T, COPYOUTTYPE, SMOOTHTYPE>::ComputeQuant(
+    LocalTensor<float> &smoothLocal)
 {
     LocalTensor<float> tempLocal = tmpBuff_.Get<float>();
     LocalTensor<int8_t> outLocal = inputXOutQueue_.AllocTensor<int8_t>();

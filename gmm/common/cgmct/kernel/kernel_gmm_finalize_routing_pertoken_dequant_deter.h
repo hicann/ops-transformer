@@ -89,15 +89,15 @@ public:
     struct GMMTiling : Base::GMMTiling {
         uint32_t deterWorkspaceSize;
         uint32_t coreNum;
-        __aicore__ GMMTiling() : Base::GMMTiling()
-        {
-        }
+        __aicore__ GMMTiling()
+            : Base::GMMTiling()
+        {}
         __aicore__ GMMTiling(uint32_t groupNum_, uint8_t groupListType_, int32_t baseM_, int32_t baseN_, int32_t baseK_,
                              uint8_t hasBias_, uint32_t deterWsSize_, uint32_t coreNum_)
             : Base::GMMTiling(groupNum_, groupListType_, baseM_, baseN_, baseK_, hasBias_),
-              deterWorkspaceSize(deterWsSize_), coreNum(coreNum_)
-        {
-        }
+              deterWorkspaceSize(deterWsSize_),
+              coreNum(coreNum_)
+        {}
     };
 
     struct Arguments {

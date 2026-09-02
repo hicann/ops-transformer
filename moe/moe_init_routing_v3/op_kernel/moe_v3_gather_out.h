@@ -154,18 +154,18 @@ __aicore__ inline void MoeGatherOut<T, EP>::Init(GM_ADDR x, GM_ADDR scale, GM_AD
             expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                               Align(curCoreIndicesElements_, sizeof(int32_t)));
         } else {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) +
-                                                  blockIdx_ * perCoreIndicesElements_,
-                                              Align(curCoreIndicesElements_, sizeof(int32_t)));
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+                Align(curCoreIndicesElements_, sizeof(int32_t)));
         }
     } else { // 获取gather索引
         if (rowIdxType_ == GATHER) {
             expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                               Align(curCoreIndicesElements_, sizeof(int32_t)));
         } else {
-            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) +
-                                                  blockIdx_ * perCoreIndicesElements_,
-                                              Align(curCoreIndicesElements_, sizeof(int32_t)));
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+                Align(curCoreIndicesElements_, sizeof(int32_t)));
         }
     }
 }

@@ -120,9 +120,11 @@ __aicore__ inline void MoeV2SortOneCore::CopyOut()
     intriParams.blockCount = 1;
     intriParams.blockLen = this->totalLength * sizeof(int32_t);
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200
-    DataCopyCustom<int32_t,true,false>(expandDstToSrcRowGm, outLocal[this->sortNum], intriParams.blockCount, intriParams.blockLen);
+    DataCopyCustom<int32_t, true, false>(expandDstToSrcRowGm, outLocal[this->sortNum], intriParams.blockCount,
+                                         intriParams.blockLen);
     if (this->needCopy) {
-        DataCopyCustom<int32_t,true,false>(sortedexpertIdxGm, outLocal[0], intriParams.blockCount, intriParams.blockLen);
+        DataCopyCustom<int32_t, true, false>(sortedexpertIdxGm, outLocal[0], intriParams.blockCount,
+                                             intriParams.blockLen);
     }
 #else
     DataCopyPad(sortedexpertIdxGm, outLocal[0], intriParams);

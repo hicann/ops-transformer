@@ -50,7 +50,6 @@ enum class ScenarioType {
     MX_A8W4_WEIGHT_NZ = 1,
 };
 
-
 struct GMMFRWeightQuantInputParams {
     std::string opName;
     ge::DataType xDtype = ge::DT_INT8;
@@ -106,7 +105,6 @@ public:
     }
 };
 
-
 template <typename T>
 auto CeilDiv(T a, T b) -> T
 {
@@ -133,10 +131,10 @@ enum class DataSize {
 
 DataSize GetSizeByDataType(ge::DataType dType);
 
-
 class GMMFRWeightQuantTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GMMFRWeightQuantTiling(gert::TilingContext *context) : Ops::Transformer::OpTiling::TilingBaseClass(context)
+    explicit GMMFRWeightQuantTiling(gert::TilingContext *context)
+        : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         Reset();
     }

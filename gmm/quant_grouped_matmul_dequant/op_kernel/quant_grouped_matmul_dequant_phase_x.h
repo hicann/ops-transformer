@@ -21,9 +21,8 @@
 namespace AscendC {
 
 template <bool HasPertoken, bool HasSmooth, bool ScaleIsU64, bool BlockedZN_, bool SmallM_, bool UseXZNStage_>
-__aicore__ inline void
-QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_, UseXZNStage_>::PhaseXDynamicQuant(
-    uint64_t mStart, uint64_t mCount)
+__aicore__ inline void QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_,
+                                                 UseXZNStage_>::PhaseXDynamicQuant(uint64_t mStart, uint64_t mCount)
 {
     // Per-row single-rounding DynamicQuant, streamed through phaseXChunk so
     // UB fits even when K > 4096. For row m:
@@ -259,9 +258,8 @@ QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM
 }
 
 template <bool HasPertoken, bool HasSmooth, bool ScaleIsU64, bool BlockedZN_, bool SmallM_, bool UseXZNStage_>
-__aicore__ inline void
-QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_, UseXZNStage_>::PhaseXWriteXL1(
-    uint64_t mCount)
+__aicore__ inline void QuantGroupedMatmulDequant<HasPertoken, HasSmooth, ScaleIsU64, BlockedZN_, SmallM_,
+                                                 UseXZNStage_>::PhaseXWriteXL1(uint64_t mCount)
 {
     // xL1 is populated by Pass 2's per-chunk scatter; this only emits the
     // cross-pipe SetFlags gating downstream work on Phase X finishing:

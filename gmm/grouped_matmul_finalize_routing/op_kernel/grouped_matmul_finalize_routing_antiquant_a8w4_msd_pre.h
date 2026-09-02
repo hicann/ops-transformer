@@ -24,7 +24,7 @@ constexpr int TWO = 2;
 constexpr int EIGHT = 8;
 constexpr float ONE_EIGHT = 0.0625;
 constexpr int BUFFER_NUM_A8W4_PRE = 1;
-constexpr size_t LEN_128 = 128;     // 16bit operator
+constexpr size_t LEN_128 = 128; // 16bit operator
 constexpr int DATA_BLOCK_SIZE_32 = 32;
 constexpr int ROW_SUM_REPEAT_LEN = 256;
 
@@ -44,11 +44,12 @@ template <class P>
 class GMMA8W4PreProcess {
 public:
     __aicore__ inline GMMA8W4PreProcess(){};
-    __aicore__ inline void Init(MMPreInitParams& preInitParams, const GroupMatmulFRTilingData& tilingData, TPipe *pipe);
+    __aicore__ inline void Init(MMPreInitParams &preInitParams, const GroupMatmulFRTilingData &tilingData, TPipe *pipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessLoop();
     __aicore__ inline void ProcessPerToken(uint32_t xloop);
     __aicore__ inline void ComputeTotalGroup();
+
 private:
     TQue<QuePosition::VECIN, 1> vecInQueueX;
     TQue<QuePosition::VECIN, 1> vecInQueueXBak;
@@ -94,27 +95,31 @@ private:
 };
 
 template <class P>
-__aicore__ inline void GMMA8W4PreProcess<P>::Init(MMPreInitParams& preInitParams, const GroupMatmulFRTilingData& tilingData, TPipe *pipe){
+__aicore__ inline void GMMA8W4PreProcess<P>::Init(MMPreInitParams &preInitParams,
+                                                  const GroupMatmulFRTilingData &tilingData, TPipe *pipe)
+{
     xGm.SetGlobalBuffer((__gm__ int8_t *)preInitParams.x);
     yGm.SetGlobalBuffer((__gm__ int8_t *)preInitParams.y);
     groupListGm.SetGlobalBuffer((__gm__ int64_t *)preInitParams.groupList);
 
     vK = tilingData.k;
     withOffset = tilingData.withOffset;
-    lenVk = (vK / 2) / 128;   // align to 128
+    lenVk = (vK / 2) / 128; // align to 128
     lastLenVk = (vK % ROW_SUM_REPEAT_LEN) / 2;
     oneEight = static_cast<half>(ONE_EIGHT);
-    pipe->InitBuffer(vecInQueueX, BUFFER_NUM_A8W4_PRE, vK * sizeof(int8_t)); // 2KB
+    pipe->InitBuffer(vecInQueueX, BUFFER_NUM_A8W4_PRE, vK * sizeof(int8_t));    // 2KB
     pipe->InitBuffer(vecOutQueueA1, BUFFER_NUM_A8W4_PRE, vK * sizeof(int4b_t)); // 1KB
     pipe->InitBuffer(vecOutQueueA2, BUFFER_NUM_A8W4_PRE, vK * sizeof(int4b_t)); // 1KB
-    pipe->InitBuffer(vecOutQueueA3, BUFFER_NUM_A8W4_PRE, vK * sizeof(half)); // 4 KB
+    pipe->InitBuffer(vecOutQueueA3, BUFFER_NUM_A8W4_PRE, vK * sizeof(half));    // 4 KB
 
     constexpr int BUFFER_SIZE_256B = 128 * sizeof(int16_t);
     pipe->InitBuffer(vecOutQueue0F, BUFFER_NUM_A8W4_PRE, BUFFER_SIZE_256B); // 256 B
-    pipe->InitBuffer(sharedVkBuff, vK * sizeof(float)); // 256 B
+    pipe->InitBuffer(sharedVkBuff, vK * sizeof(float));                     // 256 B
     groupNum = static_cast<uint32_t>(tilingData.groupNum);
-    pipe->InitBuffer(vecInQueueG, BUFFER_NUM_A8W4_PRE, Ceil(groupNum * sizeof(int64_t), DATA_BLOCK_SIZE_32) * DATA_BLOCK_SIZE_32);
-    pipe->InitBuffer(vecInQueueGF, BUFFER_NUM_A8W4_PRE, Ceil(groupNum * sizeof(float), DATA_BLOCK_SIZE_32) * DATA_BLOCK_SIZE_32);
+    pipe->InitBuffer(vecInQueueG, BUFFER_NUM_A8W4_PRE,
+                     Ceil(groupNum * sizeof(int64_t), DATA_BLOCK_SIZE_32) * DATA_BLOCK_SIZE_32);
+    pipe->InitBuffer(vecInQueueGF, BUFFER_NUM_A8W4_PRE,
+                     Ceil(groupNum * sizeof(float), DATA_BLOCK_SIZE_32) * DATA_BLOCK_SIZE_32);
     pipe->InitBuffer(vecInWork, BUFFER_NUM_A8W4_PRE, BUFFER_SIZE_256B * sizeof(float));
     if (withOffset == uint32_t(1)) {
         xRowSumGm.SetGlobalBuffer((__gm__ float *)preInitParams.workspace);
@@ -156,28 +161,30 @@ __aicore__ inline void GMMA8W4PreProcess<P>::ProcessPerToken(uint32_t xloop)
     Cast(xHighI4Tensor, xHighHalfTensor, AscendC::RoundMode::CAST_FLOOR, vK);
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
-    DataCopy(yGm[startAddr], xHighI4Tensor.ReinterpretCast<int8_t>(), vK / 2);  // 2: size int8 -> int4
+    DataCopy(yGm[startAddr], xHighI4Tensor.ReinterpretCast<int8_t>(), vK / 2); // 2: size int8 -> int4
     SetFlag<HardEvent::MTE3_V>(EVENT_ID1);
     // INT8中低4bit转为int4
-    And(xLowHalfTensor.ReinterpretCast<int16_t>(), xTensor.ReinterpretCast<int16_t>(),
-            xLowI16Tensor, LEN_128, lenVk, {1, 1, 1, 8, 8, 0});
+    And(xLowHalfTensor.ReinterpretCast<int16_t>(), xTensor.ReinterpretCast<int16_t>(), xLowI16Tensor, LEN_128, lenVk,
+        {1, 1, 1, 8, 8, 0});
     if (lastLenVk > 0) {
-        And(xLowHalfTensor[lenVk * LEN_128].ReinterpretCast<int16_t>(), xTensor[lenVk * LEN_128 * TWO].ReinterpretCast<int16_t>(),
-                xLowI16Tensor, LEN_128, lastLenVk, {1, 1, 1, 8, 8, 0});
+        And(xLowHalfTensor[lenVk * LEN_128].ReinterpretCast<int16_t>(),
+            xTensor[lenVk * LEN_128 * TWO].ReinterpretCast<int16_t>(), xLowI16Tensor, LEN_128, lastLenVk,
+            {1, 1, 1, 8, 8, 0});
     }
     PipeBarrier<PIPE_V>();
     SetFlag<HardEvent::V_MTE2>(EVENT_ID0);
-    Cast(xLowHalfTensor2.ReinterpretCast<half>(), xLowHalfTensor.ReinterpretCast<int8_t>(), AscendC::RoundMode::CAST_NONE, vK);
+    Cast(xLowHalfTensor2.ReinterpretCast<half>(), xLowHalfTensor.ReinterpretCast<int8_t>(),
+         AscendC::RoundMode::CAST_NONE, vK);
     PipeBarrier<PIPE_V>();
     // uint4转为int4,需要减8
-    const half MINUS_EIGHT = static_cast<half>(-8);     // shrink 0~15 to -8~7
+    const half MINUS_EIGHT = static_cast<half>(-8); // shrink 0~15 to -8~7
     Adds(xHighHalfTensor, xLowHalfTensor2, MINUS_EIGHT, vK);
     PipeBarrier<PIPE_V>();
     WaitFlag<HardEvent::MTE3_V>(EVENT_ID0);
     Cast(xLowI4Tensor, xHighHalfTensor.ReinterpretCast<half>(), AscendC::RoundMode::CAST_NONE, vK);
     SetFlag<HardEvent::V_MTE3>(EVENT_ID1);
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID1);
-    DataCopy(yGm[startAddr + vK / TWO], xLowI4Tensor.ReinterpretCast<int8_t>(), vK / TWO);                          
+    DataCopy(yGm[startAddr + vK / TWO], xLowI4Tensor.ReinterpretCast<int8_t>(), vK / TWO);
     SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
 }
 
@@ -187,7 +194,7 @@ __aicore__ inline void GMMA8W4PreProcess<P>::ProcessLoop()
     SetFlag<HardEvent::V_MTE2>(EVENT_ID0);
     SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
     SetFlag<HardEvent::MTE3_V>(EVENT_ID1);
-    for(uint32_t xloop = startNum; xloop < totalGroup; xloop += blockDim) {
+    for (uint32_t xloop = startNum; xloop < totalGroup; xloop += blockDim) {
         ProcessPerToken(xloop);
     }
     WaitFlag<HardEvent::V_MTE2>(EVENT_ID0);
@@ -197,7 +204,8 @@ __aicore__ inline void GMMA8W4PreProcess<P>::ProcessLoop()
 }
 
 template <class P>
-__aicore__ inline void GMMA8W4PreProcess<P>::ComputeTotalGroup(){
+__aicore__ inline void GMMA8W4PreProcess<P>::ComputeTotalGroup()
+{
     if constexpr (P::groupListType) {
         totalGroup = static_cast<int32_t>(groupListGm.GetValue(groupNum - 1));
         SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
@@ -239,8 +247,8 @@ __aicore__ inline void GMMA8W4PreProcess<P>::Process()
         xHighFloatTensor = sharedVkBuff.GetWithOffset<float>(vK * sizeof(float), 0);
         xRowSumTensor = vecOutQueueRowSum.AllocTensor<float>();
     }
-    Duplicate(xLowI16Tensor, static_cast<int16_t>(0x0F0F), MASK);   // get rid of high 4 bits in every int8
-    //先计算要处理的group数
+    Duplicate(xLowI16Tensor, static_cast<int16_t>(0x0F0F), MASK); // get rid of high 4 bits in every int8
+    // 先计算要处理的group数
     ComputeTotalGroup();
     ProcessLoop();
     vecInQueueX.FreeTensor(xTensor);
@@ -258,5 +266,5 @@ __aicore__ inline void GMMA8W4PreProcess<P>::Process()
     }
 }
 
-} // namespace
+} // namespace GroupedMatmulFinalizeRouting
 #endif

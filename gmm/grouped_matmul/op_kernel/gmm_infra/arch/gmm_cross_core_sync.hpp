@@ -16,9 +16,9 @@
 namespace Catlass::Arch {
 
 // A certain cross core flag can be continuously set up to 15 times without waiting. In scenarios where there is only
-// one-way synchronization between cores and the synchronization operation is executed multiple times, if the core 
+// one-way synchronization between cores and the synchronization operation is executed multiple times, if the core
 // performing the set operation runs faster, it may result in the flag being set more than 15 times consecutively,
-// leading to a system freeze. To prevent such a freeze, we need to wait for the waiting cores to perform a reverse 
+// leading to a system freeze. To prevent such a freeze, we need to wait for the waiting cores to perform a reverse
 // synchronization operation after executing the set operation MAX_REVERSE_DEPTH times.
 constexpr uint32_t MAX_REVERSE_DEPTH = 16;
 
@@ -30,10 +30,14 @@ constexpr FlagID FFTS_MAX_FLAG = 7;
 
 struct CrossCoreFlag {
     CATLASS_DEVICE
-    CrossCoreFlag() : id(0) {}
+    CrossCoreFlag()
+        : id(0)
+    {}
 
     CATLASS_DEVICE
-    CrossCoreFlag(FlagID id) : id(id) {}
+    CrossCoreFlag(FlagID id)
+        : id(id)
+    {}
 
     FlagID id;
 };
@@ -41,14 +45,20 @@ struct CrossCoreFlag {
 template <uint32_t REVERSE_DEPTH_ = MAX_REVERSE_DEPTH>
 struct CrossCoreFlagWithReverse {
     CATLASS_DEVICE
-    CrossCoreFlagWithReverse() : id(0), reverseId(0) {}
+    CrossCoreFlagWithReverse()
+        : id(0),
+          reverseId(0)
+    {}
 
     CATLASS_DEVICE
-    CrossCoreFlagWithReverse(FlagID id, FlagID reverseId) : id(id), reverseId(reverseId) {}
+    CrossCoreFlagWithReverse(FlagID id, FlagID reverseId)
+        : id(id),
+          reverseId(reverseId)
+    {}
 
     FlagID id;
     FlagID reverseId;
-    uint32_t count{ 0 };
+    uint32_t count{0};
 };
 
 template <uint8_t MODE, int32_t CORE_TYPE>
@@ -72,8 +82,7 @@ struct BarrierFlag<0x1, AscendC::AIV> {
 };
 
 template <uint8_t MODE, pipe_t PIPE>
-CATLASS_DEVICE
-void CrossCoreBarrier()
+CATLASS_DEVICE void CrossCoreBarrier()
 {
     constexpr FlagID flagId = BarrierFlag<MODE, g_coreType>::ID;
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flagId);
@@ -81,8 +90,7 @@ void CrossCoreBarrier()
 }
 
 template <uint8_t MODE, pipe_t PIPE>
-CATLASS_DEVICE
-void CrossCoreSetFlag(CrossCoreFlag &flag)
+CATLASS_DEVICE void CrossCoreSetFlag(CrossCoreFlag &flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
 }
@@ -94,8 +102,7 @@ void CrossCoreWaitFlag(CrossCoreFlag &flag)
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-CATLASS_DEVICE
-void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+CATLASS_DEVICE void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {
@@ -105,8 +112,7 @@ void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-CATLASS_DEVICE
-void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+CATLASS_DEVICE void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
 {
     AscendC::CrossCoreWaitFlag(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {
@@ -115,6 +121,6 @@ void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
     }
 }
 
-}  // namespace Catlass::Arch
+} // namespace Catlass::Arch
 
 #endif // GMM_ARCH_CROSS_CORE_SYNC_HPP

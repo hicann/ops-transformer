@@ -17,12 +17,14 @@
 namespace gmm {
 class AclnnGroupedMatmulNoQuantDAV3510Checker {
 public:
-    explicit AclnnGroupedMatmulNoQuantDAV3510Checker(const GroupedMatmulParams &gmmParams) : gmmParams_(gmmParams){};
-    ~AclnnGroupedMatmulNoQuantDAV3510Checker(){};
+    explicit AclnnGroupedMatmulNoQuantDAV3510Checker(const GroupedMatmulParams &gmmParams)
+        : gmmParams_(gmmParams) {};
+    ~AclnnGroupedMatmulNoQuantDAV3510Checker() {};
     aclnnStatus CheckGroupedMatmulGroupSizeNoQuantDAV3510();
 
 private:
     aclnnStatus CheckTensorListLength(const aclTensorList *tensorList, const char *paramName) const;
+
 private:
     GroupedMatmulParams gmmParams_;
 };

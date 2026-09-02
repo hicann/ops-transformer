@@ -53,10 +53,12 @@ public:
     __aicore__ inline GMMSwigluQuantPipelineSchedule(
         typename mmType::MT &mm_, const GMMSwigluQuantV2BaseParams *__restrict gmmSwigluQuantV2BaseParamsIN,
         const GMMSwigluQuantV2 *__restrict gmmSwigluIN, TPipe *tPipeIN)
-        : mm(mm_), midProcess(mm), gmmSwigluQuantV2BaseParams(gmmSwigluQuantV2BaseParamsIN),
-          gmmSwigluQuantV2(gmmSwigluIN), pipe(tPipeIN)
-    {
-    }
+        : mm(mm_),
+          midProcess(mm),
+          gmmSwigluQuantV2BaseParams(gmmSwigluQuantV2BaseParamsIN),
+          gmmSwigluQuantV2(gmmSwigluIN),
+          pipe(tPipeIN)
+    {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR weightScale, GM_ADDR xScale,
                                 GM_ADDR weightAssistanceMatrix, GM_ADDR groupList, GM_ADDR smoothScale, GM_ADDR y,
                                 GM_ADDR yScale, GM_ADDR workspace);
@@ -132,8 +134,8 @@ __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::Process()
 }
 
 template <class mmType>
-__aicore__ inline void
-GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSplitConfig(
+    WorkSpaceSplitConfig &workspaceSplitConfig)
 {
     if (gmmSwigluQuantV2BaseParams->groupListType == 0) {
         workspaceSplitConfig.M = groupListGM.GetValue(gmmSwigluQuantV2->groupListLen - 1);
@@ -155,9 +157,8 @@ GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSplitConfig(WorkSpaceSplitC
 }
 
 template <class mmType>
-__aicore__ inline void
-GMMSwigluQuantPipelineSchedule<mmType>::UpdateWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig,
-                                                                   int32_t workspaceSplitLoopIdx)
+__aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::UpdateWorkSpaceSplitConfig(
+    WorkSpaceSplitConfig &workspaceSplitConfig, int32_t workspaceSplitLoopIdx)
 {
     if (workspaceSplitLoopIdx < 0)
         return;

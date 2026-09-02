@@ -22,16 +22,16 @@
 #if defined(GMM_QUANT_BF16) || defined(GMM_QUANT_FLOAT16)
 namespace GROUPED_MATMUL {
 /*@brief store variables for core split configuration
-*/
+ */
 constexpr int32_t PIPELINE_NUM = 4;
 constexpr uint32_t BROADCAST_DIM = 2;
 constexpr uint32_t FP32_PER_REPEAT = 64;
 
 /** @brief intenal computation class
-*/
+ */
 template <class mmType, bool sync = false>
 class GMMQuantMixCoreCompute : public GMMCompute<mmType, sync> {
- public:
+public:
     using AT = typename mmType::AT::T;
     using BT = typename mmType::BT::T;
     using B = typename mmType::BT;
@@ -42,34 +42,36 @@ class GMMQuantMixCoreCompute : public GMMCompute<mmType, sync> {
     constexpr static bool transposeW = mmType::BT::isTrans;
 
     /** @brief constructor */
-    __aicore__ inline GMMQuantMixCoreCompute(typename mmType::MT& mm_) : GMMCompute<mmType, sync>(mm_) {}
+    __aicore__ inline GMMQuantMixCoreCompute(typename mmType::MT &mm_)
+        : GMMCompute<mmType, sync>(mm_)
+    {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset,
                                 GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR group_list,
                                 GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                const GMMBaseParams* __restrict gmmBaseParams,
-                                const TCubeTiling* __restrict mmTilingData, TPipe* tPipe);
+                                const GMMBaseParams *__restrict gmmBaseParams,
+                                const TCubeTiling *__restrict mmTilingData, TPipe *tPipe);
 
-    __aicore__ inline void InitStaticTiling(const GMMBaseParams* __restrict gmmBaseParams, GM_ADDR workspace,
+    __aicore__ inline void InitStaticTiling(const GMMBaseParams *__restrict gmmBaseParams, GM_ADDR workspace,
                                             int32_t baseM, int32_t baseN);
 
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig, uint32_t coreIdx, uint32_t listIndex = 0);
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig, uint32_t coreIdx, uint32_t listIndex = 0);
 
-    __aicore__ inline void VectorCompute(MNConfig& mnConfig);
+    __aicore__ inline void VectorCompute(MNConfig &mnConfig);
 
     __aicore__ inline void PostCompute();
 
- private:
-    __aicore__ inline void Dequant(MNConfig& mnConfig);
+private:
+    __aicore__ inline void Dequant(MNConfig &mnConfig);
 
-    __aicore__ inline void SetPerTokenQuantStaticBuffer(const GMMBaseParams* __restrict gmmBaseParams,
+    __aicore__ inline void SetPerTokenQuantStaticBuffer(const GMMBaseParams *__restrict gmmBaseParams,
                                                         GM_ADDR workspace);
 
     __aicore__ inline void DataCopyScale(uint32_t curBaseN, uint32_t alignBaseN, uint64_t scaleOffset);
 
     __aicore__ inline void DataCopyBias(uint32_t curBaseN, uint32_t alignBaseN, uint64_t biasOffset);
 
-    __aicore__ inline void DataCopyPerTokenScaleAndBrcb(MNConfig& mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
+    __aicore__ inline void DataCopyPerTokenScaleAndBrcb(MNConfig &mnConfig, uint32_t curBaseM, uint32_t alignBaseN,
                                                         uint32_t offsetM);
 
     __aicore__ inline void SetPerTokenQuantRefreshedBuffer(const MNConfig mnConfig);
@@ -77,16 +79,16 @@ class GMMQuantMixCoreCompute : public GMMCompute<mmType, sync> {
     __aicore__ inline void ActivationCompute(uint32_t computeSize, LocalTensor<float> preResUb,
                                              LocalTensor<uint8_t> actTmpLocal);
 
-    __aicore__ inline void ComputeDequantAndActivate(MNConfig& mnConfig, uint32_t curVecBaseM, uint32_t alignBaseN, uint32_t curVecBaseN,
-                                                     uint32_t offsetM);
+    __aicore__ inline void ComputeDequantAndActivate(MNConfig &mnConfig, uint32_t curVecBaseM, uint32_t alignBaseN,
+                                                     uint32_t curVecBaseN, uint32_t offsetM);
 
     __aicore__ inline void PerTokenQuant(uint32_t curVecBaseM, uint32_t alignBaseN);
 
-    __aicore__ inline void DataCopyOut(MNConfig& mnConfig, uint32_t curVecBaseM, uint32_t curVecBaseN,
+    __aicore__ inline void DataCopyOut(MNConfig &mnConfig, uint32_t curVecBaseM, uint32_t curVecBaseN,
                                        uint32_t alignBaseN, uint64_t outOffset);
 
-    __aicore__ inline void VectorTilingCalc(MNConfig& mnConfig, uint32_t& curCubeSingleN, uint32_t& curCubeSingleM,
-                                            uint32_t& vecBaseN, uint32_t& vecBaseM);
+    __aicore__ inline void VectorTilingCalc(MNConfig &mnConfig, uint32_t &curCubeSingleN, uint32_t &curCubeSingleM,
+                                            uint32_t &vecBaseN, uint32_t &vecBaseM);
 
     GM_ADDR scaleTensorPtr;
     GM_ADDR perTokenScaleTensorPtr;
@@ -115,7 +117,7 @@ class GMMQuantMixCoreCompute : public GMMCompute<mmType, sync> {
     LocalTensor<float> actResultLocal;
     bool sequentialWrite = true;
     bool isPerTokenQuant;
-    uint32_t cubeNum;  // Matmul completions on the kernel
+    uint32_t cubeNum; // Matmul completions on the kernel
     uint32_t nOffset; // antiquant n offset
     uint32_t baseM_ = 0;
     uint32_t baseN_ = 0;
@@ -126,15 +128,13 @@ class GMMQuantMixCoreCompute : public GMMCompute<mmType, sync> {
 };
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias,
-                                                                  GM_ADDR scale, GM_ADDR offset, GM_ADDR antiquantScale,
-                                                                  GM_ADDR antiquantOffset, GM_ADDR groupList,
-                                                                  GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
-                                                                  const GMMBaseParams* __restrict gmmBaseParams,
-                                                                  const TCubeTiling* __restrict mmTilingData,
-                                                                  TPipe* tPipe) {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Init(
+    GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR offset, GM_ADDR antiquantScale,
+    GM_ADDR antiquantOffset, GM_ADDR groupList, GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace,
+    const GMMBaseParams *__restrict gmmBaseParams, const TCubeTiling *__restrict mmTilingData, TPipe *tPipe)
+{
     this->GMMCompute<mmType, sync>::Init(x, weight, bias, scale, offset, antiquantScale, antiquantOffset, groupList,
-        perTokenScale, y, workspace, gmmBaseParams, mmTilingData, tPipe);
+                                         perTokenScale, y, workspace, gmmBaseParams, mmTilingData, tPipe);
     isPerTokenQuant = gmmBaseParams->quantParam == 1;
     singleWeight = gmmBaseParams->singleWeight;
     scaleTensorPtr = scale;
@@ -148,7 +148,8 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Init(GM_ADDR x, GM_
         if (this->GMMCompute<mmType, sync>::isA8W4FakeQuant == true) {
             workspace_offset = gmmBaseParams->groupNum * gmmBaseParams->k * gmmBaseParams->n * sizeof(int8_t) +
                                gmmBaseParams->groupNum * gmmBaseParams->n * sizeof(float);
-            scaleTensorPtr = scaleTensorPtr + gmmBaseParams->groupNum * gmmBaseParams->k * gmmBaseParams->n * sizeof(int8_t);
+            scaleTensorPtr =
+                scaleTensorPtr + gmmBaseParams->groupNum * gmmBaseParams->k * gmmBaseParams->n * sizeof(int8_t);
             isPerTokenQuant = true;
         }
         SetPerTokenQuantStaticBuffer(gmmBaseParams, workspace + workspace_offset);
@@ -156,15 +157,17 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Init(GM_ADDR x, GM_
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::InitStaticTiling(const GMMBaseParams* __restrict gmmBaseParams,
-                                                                              GM_ADDR workspace, int32_t baseM, int32_t baseN) {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::InitStaticTiling(
+    const GMMBaseParams *__restrict gmmBaseParams, GM_ADDR workspace, int32_t baseM, int32_t baseN)
+{
     baseM_ = static_cast<uint32_t>(baseM);
     baseN_ = static_cast<uint32_t>(baseN);
     SetPerTokenQuantStaticBuffer(gmmBaseParams, workspace);
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::PostCompute() {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::PostCompute()
+{
     if ASCEND_IS_AIC {
         for (int32_t idx = 0; idx < Min<int32_t>(cubeNum, PIPELINE_NUM); ++idx) {
             CrossCoreWaitFlag(SYNC_AIV_AIC_FLAG);
@@ -173,12 +176,13 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::PostCompute() {
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig,
-                                                                       uint32_t coreIdx, uint32_t listIndex) {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig,
+                                                                       uint32_t coreIdx, uint32_t listIndex)
+{
     uint32_t tailN = mnConfig.nIdx * mnConfig.singleN;
     uint32_t curSingleN = mnConfig.nIdx < mnConfig.blockDimN - 1 ? mnConfig.singleN : mnConfig.n - tailN;
-    uint32_t curSingleM = mnConfig.mIdx < mnConfig.blockDimM - 1 ? mnConfig.singleM
-                                                                 : mnConfig.m - mnConfig.mIdx * mnConfig.singleM;
+    uint32_t curSingleM =
+        mnConfig.mIdx < mnConfig.blockDimM - 1 ? mnConfig.singleM : mnConfig.m - mnConfig.mIdx * mnConfig.singleM;
     uint64_t xOffset = mnConfig.mIdx * mnConfig.singleM * mnConfig.k;
     if constexpr (transposeX) {
         xOffset = mnConfig.mIdx * mnConfig.singleM;
@@ -199,8 +203,8 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::MMCompute(uint32_t 
         this->SetGlobalBufferBias(groupIdx, tailN, mnConfig);
         while (this->mm.Iterate()) {
             if (sequentialWrite) {
-                mnConfig.workSpaceOffset = mnConfig.baseN * mnConfig.baseM * \
-                                           (coreIdx + (cubeNum % PIPELINE_NUM) * this->coreNum);
+                mnConfig.workSpaceOffset =
+                    mnConfig.baseN * mnConfig.baseM * (coreIdx + (cubeNum % PIPELINE_NUM) * this->coreNum);
             } else {
                 mnConfig.workSpaceOffset = outOffset + mnConfig.yBaseOffset;
             }
@@ -215,12 +219,13 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::MMCompute(uint32_t 
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::VectorCompute(MNConfig& mnConfig) {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::VectorCompute(MNConfig &mnConfig)
+{
     nOffset = 0;
     uint32_t tailN = mnConfig.nIdx * mnConfig.singleN;
     uint32_t curSingleN = mnConfig.nIdx < mnConfig.blockDimN - 1 ? mnConfig.singleN : mnConfig.n - tailN;
-    uint32_t curSingleM = mnConfig.mIdx < mnConfig.blockDimM - 1 ? mnConfig.singleM
-                                                                 : mnConfig.m - mnConfig.mIdx * mnConfig.singleM;
+    uint32_t curSingleM =
+        mnConfig.mIdx < mnConfig.blockDimM - 1 ? mnConfig.singleM : mnConfig.m - mnConfig.mIdx * mnConfig.singleM;
     int nDim = Ceil(curSingleN, mnConfig.baseN);
 
     uint64_t xOffset = mnConfig.mIdx * mnConfig.singleM * mnConfig.k;
@@ -230,9 +235,9 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::VectorCompute(MNCon
     uint64_t outOffset = mnConfig.mIdx * mnConfig.singleM * mnConfig.n + tailN;
     if ASCEND_IS_AIV {
         SetPerTokenQuantRefreshedBuffer(mnConfig);
-        for(int i = 0; i < nDim; i++) {
+        for (int i = 0; i < nDim; i++) {
             if (sequentialWrite) {
-                mnConfig.workSpaceOffset = mnConfig.baseN * mnConfig.baseM * \
+                mnConfig.workSpaceOffset = mnConfig.baseN * mnConfig.baseM *
                                            (GetBlockIdx() / GetTaskRation() + (cubeNum % PIPELINE_NUM) * this->coreNum);
             } else {
                 mnConfig.workSpaceOffset = outOffset + mnConfig.yBaseOffset;
@@ -246,20 +251,21 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::VectorCompute(MNCon
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::ComputeDequantAndActivate(MNConfig& mnConfig,
-    uint32_t curVecBaseM, uint32_t alignBaseN, uint32_t curVecBaseN, uint32_t offsetM) {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::ComputeDequantAndActivate(
+    MNConfig &mnConfig, uint32_t curVecBaseM, uint32_t alignBaseN, uint32_t curVecBaseN, uint32_t offsetM)
+{
     DataCopyPerTokenScaleAndBrcb(mnConfig, curVecBaseM, alignBaseN, offsetM);
     mmOutInUb = vecInQueue.DeQue<CT>();
     LocalTensor<DTYPE_Y> yLocalInUb = vecOutQueue.AllocTensor<DTYPE_Y>();
 
-    #if defined(GMM_QUANT_BF16)
-    if (!isPerTokenQuant && this->activeType == 0) {  // BF16 static quantization without activation.
+#if defined(GMM_QUANT_BF16)
+    if (!isPerTokenQuant && this->activeType == 0) { // BF16 static quantization without activation.
         AscendDequant(yLocalInUb, mmOutInUb, scaleInUb, sharedTmpLocal, {curVecBaseM, alignBaseN, curVecBaseN});
         vecInQueue.FreeTensor(mmOutInUb);
         vecOutQueue.EnQue(yLocalInUb);
         return;
     }
-    #endif
+#endif
     AscendDequant(dequantMiddleResult, mmOutInUb, scaleInUb, sharedTmpLocal, {curVecBaseM, alignBaseN, curVecBaseN});
     PipeBarrier<PIPE_V>();
     LocalTensor<float> preResUb = dequantMiddleResult;
@@ -278,12 +284,12 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::ComputeDequantAndAc
         ActivationCompute(computeSize, preResUb, actTmpLocal);
         yFP32LocalInUb = actResultLocal;
     }
-    // get final output after Cast
-    #if defined(GMM_QUANT_BF16)
-        Cast(yLocalInUb, yFP32LocalInUb, RoundMode::CAST_RINT, curVecBaseM * alignBaseN);
-    #elif defined(GMM_QUANT_FLOAT16)
-        Cast(yLocalInUb, yFP32LocalInUb, RoundMode::CAST_NONE, curVecBaseM * alignBaseN);
-    #endif
+// get final output after Cast
+#if defined(GMM_QUANT_BF16)
+    Cast(yLocalInUb, yFP32LocalInUb, RoundMode::CAST_RINT, curVecBaseM * alignBaseN);
+#elif defined(GMM_QUANT_FLOAT16)
+    Cast(yLocalInUb, yFP32LocalInUb, RoundMode::CAST_NONE, curVecBaseM * alignBaseN);
+#endif
     PipeBarrier<PIPE_V>();
     vecInQueue.FreeTensor(mmOutInUb);
     vecOutQueue.EnQue(yLocalInUb);
@@ -316,20 +322,23 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::PerTokenQuant(uint3
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::VectorTilingCalc(
-    MNConfig& mnConfig, uint32_t& curCubeSingleN, uint32_t& curCubeSingleM, uint32_t& vecBaseN,
-    uint32_t& vecBaseM) {
-    curCubeSingleN = mnConfig.nIdx == mnConfig.blockDimN - 1 ?
-                              mnConfig.n - mnConfig.nIdx * mnConfig.singleN : mnConfig.singleN;
-    curCubeSingleM = mnConfig.mIdx == mnConfig.blockDimM - 1 ?
-                              mnConfig.m - mnConfig.mIdx * mnConfig.singleM : mnConfig.singleM;
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::VectorTilingCalc(MNConfig &mnConfig,
+                                                                              uint32_t &curCubeSingleN,
+                                                                              uint32_t &curCubeSingleM,
+                                                                              uint32_t &vecBaseN, uint32_t &vecBaseM)
+{
+    curCubeSingleN =
+        mnConfig.nIdx == mnConfig.blockDimN - 1 ? mnConfig.n - mnConfig.nIdx * mnConfig.singleN : mnConfig.singleN;
+    curCubeSingleM =
+        mnConfig.mIdx == mnConfig.blockDimM - 1 ? mnConfig.m - mnConfig.mIdx * mnConfig.singleM : mnConfig.singleM;
     vecBaseN = mnConfig.baseN;
     vecBaseM = this->ubCalSize / AlignUp(vecBaseN, static_cast<uint32_t>(UB_BLOCK_DOUBLE_UNIT_SIZE / sizeof(int32_t)));
     vecBaseM = Min(vecBaseM, curCubeSingleM);
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Dequant(MNConfig& mnConfig) {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Dequant(MNConfig &mnConfig)
+{
     uint32_t curCubeSingleN;
     uint32_t curCubeSingleM;
     uint32_t vecBaseN;
@@ -368,8 +377,8 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Dequant(MNConfig& m
             DataCopyPad2D(mmOutLocal, mmOutGm[mmOutOffset], curVecBaseM, curVecBaseN, rowLength);
             vecInQueue.EnQue(mmOutLocal);
             ComputeDequantAndActivate(mnConfig, curVecBaseM, alignBaseN, curVecBaseN, offsetM);
-            uint64_t outOffset = (mnConfig.mIdx * mnConfig.singleM + offsetM) * mnConfig.n + \
-                                  mnConfig.nIdx * mnConfig.singleN + offsetN;
+            uint64_t outOffset =
+                (mnConfig.mIdx * mnConfig.singleM + offsetM) * mnConfig.n + mnConfig.nIdx * mnConfig.singleN + offsetN;
             DataCopyOut(mnConfig, curVecBaseM, curVecBaseN, alignBaseN, outOffset);
         }
         scaleInQueue.FreeTensor(scaleInUb);
@@ -379,9 +388,10 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::Dequant(MNConfig& m
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyOut(MNConfig& mnConfig, uint32_t curVecBaseM,
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyOut(MNConfig &mnConfig, uint32_t curVecBaseM,
                                                                          uint32_t curVecBaseN, uint32_t alignBaseN,
-                                                                         uint64_t outOffset) {
+                                                                         uint64_t outOffset)
+{
     // Copy the result of vector to yGm.
     LocalTensor<DTYPE_Y> yLocal = vecOutQueue.DeQue<DTYPE_Y>();
     DataCopyPad2D(this->yGm[outOffset], yLocal, curVecBaseM, curVecBaseN, alignBaseN, mnConfig.n);
@@ -391,7 +401,8 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyOut(MNConfi
 template <typename mmType, bool sync>
 __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::ActivationCompute(uint32_t computeSize,
                                                                                LocalTensor<float> preResUb,
-                                                                               LocalTensor<uint8_t> actTmpLocal) {
+                                                                               LocalTensor<uint8_t> actTmpLocal)
+{
     ActiveType active = ActiveType(this->activeType);
     if (active == ActiveType::FASTGELU) {
         FasterGelu(actResultLocal, preResUb, actTmpLocal, computeSize);
@@ -407,7 +418,8 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::ActivationCompute(u
 
 template <typename mmType, bool sync>
 __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::SetPerTokenQuantStaticBuffer(
-    const GMMBaseParams* __restrict gmmBaseParams, GM_ADDR workspace) {
+    const GMMBaseParams *__restrict gmmBaseParams, GM_ADDR workspace)
+{
     // Initialize ub and gm memories that do not need to be reinitialized due to changes in groupidx.
     if ASCEND_IS_AIV {
         // 2: enabling double buffer, occupying two buffer.
@@ -425,11 +437,11 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::SetPerTokenQuantSta
         this->pipe->InitBuffer(vecOutQueue, 2, this->ubCalSize * sizeof(DTYPE_Y));
         this->pipe->InitBuffer(tmpBuff, gmmBaseParams->ubRestBytes);
         dequantMiddleResult = tmpBuff.GetWithOffset<float>(this->ubCalSize, 0);
-        #if defined(GMM_QUANT_FLOAT16)
+#if defined(GMM_QUANT_FLOAT16)
         uint32_t factor = 1;
-        #else
+#else
         uint32_t factor = 0;
-        #endif
+#endif
         // 2: Indicates the first two blocks of ub are already occupied.
         factor = !isPerTokenQuant && this->activeType == 0 ? factor : 2;
         uint32_t ubCalSizeFloat = this->ubCalSize * sizeof(float);
@@ -454,7 +466,8 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::SetPerTokenQuantSta
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::SetPerTokenQuantRefreshedBuffer(const MNConfig mnConfig) {
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::SetPerTokenQuantRefreshedBuffer(const MNConfig mnConfig)
+{
     // Initialize gm memories that need to be reinitialized due to changes in groupidx.
     // Currently, pertoken quant only supports single-tensor mode,
     // hence set according to x and weight single-tensor mode.
@@ -477,8 +490,7 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::SetPerTokenQuantRef
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyScale(uint32_t curBaseN,
-                                                                           uint32_t alignBaseN,
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyScale(uint32_t curBaseN, uint32_t alignBaseN,
                                                                            uint64_t scaleOffset)
 {
     // GM copy scale
@@ -518,7 +530,7 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyBias(uint32
 }
 
 template <typename mmType, bool sync>
-__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyPerTokenScaleAndBrcb(MNConfig& mnConfig,
+__aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyPerTokenScaleAndBrcb(MNConfig &mnConfig,
                                                                                           uint32_t curBaseM,
                                                                                           uint32_t alignBaseN,
                                                                                           uint32_t offsetM)
@@ -540,11 +552,11 @@ __aicore__ inline void GMMQuantMixCoreCompute<mmType, sync>::DataCopyPerTokenSca
 
     perTokenScaleInUb = perTokenScaleInQueue.DeQue<float>();
     uint8_t repeatTimes = Ceil(curBaseM, 8); // curBaseM is 8 aligned;
-    Brcb(pertokenBrcbLocal, perTokenScaleInUb, repeatTimes, {1,8});
+    Brcb(pertokenBrcbLocal, perTokenScaleInUb, repeatTimes, {1, 8});
     perTokenScaleInQueue.FreeTensor(perTokenScaleInUb);
 }
 
-}  // namespace GROUPED_MATMUL
+} // namespace GROUPED_MATMUL
 
 #endif
-#endif  // ASCENDC_GROUPED_MATMUL_QUANT_MIXCORE_H
+#endif // ASCENDC_GROUPED_MATMUL_QUANT_MIXCORE_H
