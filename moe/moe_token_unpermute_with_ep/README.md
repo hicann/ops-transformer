@@ -48,7 +48,14 @@ $$
 
 ## 参数说明
 
-  <table style="table-layout: auto; width: 100%">
+  <table style="table-layout: fixed; width: 1576px">
+  <colgroup>
+    <col style="width: 170px">
+    <col style="width: 170px">
+    <col style="width: 200px">
+    <col style="width: 200px">
+    <col style="width: 170px">
+  </colgroup>
   <thead>
     <tr>
       <th style="white-space: nowrap">参数名</th>
@@ -121,12 +128,13 @@ $$
 
 ## 约束说明
 
-- numTopk <= 512。
+- numTopk必须大于等于1；probsOptional非空时，numTopk必须小于等于512。
+- 不支持Broadcast。
 - 不支持paddedMode为`True`。
-- 当rangeOptional为空时，忽略numTopk，执行逻辑回退到[aclnnMoeTokenUnpermute](../moe_token_unpermute/docs/aclnnMoeTokenUnpermute.md)。
+- 当rangeOptional为空时，使用默认值{0,0}，输出为全0，不会回退调用其他算子。
 
 ## 调用说明
 
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
-| aclnn接口  | [test_aclnn_moe_token_unpermute_with_ep](examples/test_aclnn_moe_token_unpermute_with_ep.cpp) | 通过[aclnnMoeTokenUnpermuteWithEp](docs/aclnnMoeTokenUnpermuteWithEp.md)接口方式调用MoeTokenUnpermuteWithEp算子。 |
+| aclnn API  | [test_aclnn_moe_token_unpermute_with_ep](examples/test_aclnn_moe_token_unpermute_with_ep.cpp) | 通过[aclnnMoeTokenUnpermuteWithEp](docs/aclnnMoeTokenUnpermuteWithEp.md)接口方式调用MoeTokenUnpermuteWithEp算子。 |

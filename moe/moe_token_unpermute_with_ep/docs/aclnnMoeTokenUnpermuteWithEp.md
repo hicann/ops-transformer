@@ -112,20 +112,20 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>permutedTokens</td>
       <td>输入</td>
       <td>表示经过扩展并排序过的tokens。</td>
-      <td>shape支持2D维度，不支持空tensor。</td>
+      <td>shape支持2D维度，不支持空Tensor。rangeOptional非空时，第0维长度不小于rangeOptional[1]-rangeOptional[0]。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
-      <td>（（rangeOptional[1] - rangeOptional[0]）*topK_num，hidden_size）</td>
+      <td>（num_permuted_tokens，hidden_size）</td>
       <td>√</td>
   </tr>
   <tr>
       <td>sortedIndices</td>
       <td>输入</td>
       <td>表示需要计算的数据在permutedTokens中的位置。</td>
-      <td>shape支持1D维度，要求元素值大于等于0小于2134372523，num_tokens为原tokens的数目，不支持空Tensor。</td>
+      <td>shape支持1D维度，长度为num_tokens*numTopk，不支持空Tensor。元素值不在rangeOptional表示的范围内时，对应的输出贡献为0。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>（num_tokens * topK_num）</td>
+      <td>（num_tokens*numTopk）</td>
       <td>√</td>
   </tr>
   <tr>
@@ -133,19 +133,19 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>可选输入</td>
       <td>表示输入tokens对应的专家概率。</td>
       <td>
-      shape支持2D维度，num_tokens为原tokens的数目。<br>
+      shape支持2D维度，不支持空Tensor，num_tokens为原tokens的数目，第1维长度必须等于numTopk。<br>
       传入非空并合法的Tensor时，permutedTokens中的输入数据与probsOptional相乘。<br>
-      传入空时，permutedTokens中的输入数据不进行乘法。</td>
+      传入空指针时，permutedTokens中的输入数据不进行乘法。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
-      <td>（num_tokens，topK_num）</td>
+      <td>（num_tokens，numTopk）</td>
       <td>√</td>
   </tr>
   <tr>
       <td>numTopk</td>
       <td>输入</td>
       <td>被选中的专家个数。</td>
-      <td>-</td>
+      <td>取值必须大于等于1；probsOptional非空时，取值必须小于等于512。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -153,9 +153,9 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
   </tr>
     <tr>
       <td>rangeOptional</td>
-      <td>输入</td>
-      <td>ep切分的有效范围， size为2。</td>
-      <td>为空时，忽略numTopk，执行逻辑回退到<a href="../../moe_token_unpermute/docs/aclnnMoeTokenUnpermute.md">aclnnMoeTokenUnpermute</a>。</td>
+      <td>可选输入</td>
+      <td>ep切分的有效范围，size为2。</td>
+      <td>允许传入空指针；传入空指针时使用默认值{0,0}，输出为全0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -173,9 +173,9 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
   </tr>
   <tr>
       <td>restoreShapeOptional</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>-</td>
-      <td>paddedMode=true时生效，否则不会对其进行操作，目前仅支持nullptr。</td>
+      <td>预留参数，当前仅支持传入空指针。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -185,14 +185,11 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>out</td>
       <td>输出</td>
       <td>表示permutedTokens反重排的输出结果。</td>
-      <td>shape支持2D维度。</td>
-      <td>BFLOAT16、FLOAT16、FLOAT32</td>
+      <td>shape支持2D维度，不支持空Tensor。</td>
+      <td>与permutedTokens一致</td>
       <td>ND</td>
-      <td>
-        paddedMode=false时：（num_tokens，hidden_size）<br>
-        paddedMode=true时：与restoreShapeOptional保持一致
-      </td>
-      <td>√</td>
+      <td>（num_tokens，hidden_size）</td>
+      <td>×</td>
   </tr>
   <tr>
       <td>workspaceSize</td>
@@ -239,7 +236,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
           <tr>
           <td> ACLNN_ERR_PARAM_NULLPTR </td>
           <td> 161001 </td>
-          <td>传入的必选输入、必选输出或者必选属性，是空指针。</td>
+          <td>permutedTokens、sortedIndices、out或executor为空指针。</td>
           </tr>
           <tr>
           <td> ACLNN_ERR_PARAM_INVALID </td>
@@ -296,13 +293,15 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
 - 确定性计算：
   - aclnnMoeTokenUnpermuteWithEp默认确定性实现。
 
-- topK_num <= 512。
+- numTopk必须大于等于1；probsOptional非空时，numTopk必须小于等于512。
+- 不支持Broadcast。
+- aclTensor的shape不支持使用-1表示动态维度或使用-2表示动态Rank。
 - 不支持paddedMode为`True`。
-- 当rangeOptional为空时，忽略numTopk，执行逻辑回退到[aclnnMoeTokenUnpermute](../../moe_token_unpermute/docs/aclnnMoeTokenUnpermute.md)。
+- 当rangeOptional为空时，使用默认值{0,0}，输出为全0，不会回退调用其他算子。
 
 ## 调用示例
 
-示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+以下示例展示基本调用流程，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 ```Cpp
 
