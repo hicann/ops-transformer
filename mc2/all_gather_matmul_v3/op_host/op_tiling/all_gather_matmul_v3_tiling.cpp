@@ -733,6 +733,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     if (context->GetInputDesc(IDX_INPUT_X1)->GetDataType() == ge::DT_FLOAT4_E2M1) {
         QuantMatmulTilingSwat<mm::DataType::DT_FLOAT4_E2M1, mm::DataType::DT_FLOAT4_E2M1> tilingEngine;
+        tilingEngine.SetPlatformInfoPtr(context->GetPlatformInfo());
         tilingEngine.SetCoreLimit(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv());
         tilingEngine.SetOptimizeEnable(false);
         tilingEngine.SetMTailAlignEnable(true);
@@ -740,6 +741,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
         tilingEngine.GetTilingData(totalLogicalM, n, k, tilingData->mmTile);
     } else {
         QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;
+        tilingEngine.SetPlatformInfoPtr(context->GetPlatformInfo());
         tilingEngine.SetCoreLimit(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv());
         tilingEngine.SetOptimizeEnable(false);
         tilingEngine.SetMTailAlignEnable(true);

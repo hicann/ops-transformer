@@ -103,7 +103,7 @@ TEST(AlltoAllMatmulV2SmallTilingDataTest, CapacityTooSmall)
          {"transpose_x1", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
          {"transpose_x2", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
          {"group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4295032864)},
-         {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("urma")},
+         {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("aiv_urma")},
          {"precision_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
     // Case 1: tilingDataSize=1 → covers L656-657 (capacity too small)

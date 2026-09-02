@@ -63,7 +63,7 @@ TEST_P(InferShapeTest, param)
          {"transpose_x1", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
          {"transpose_x2", Ops::Transformer::AnyValue::CreateFrom<bool>(param.transpose_x2)},
          {"group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("urma")},
+         {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("aiv_urma")},
          {"precision_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
         param.inputInstance, param.outputInstance);
 

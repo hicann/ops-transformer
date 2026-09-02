@@ -103,7 +103,7 @@ TEST(AclnnAlltoAllMatmulV2NullptrTest, NullWorkspaceSizeAndExecutor)
     aclOpExecutor *executor = nullptr;
     auto ret1 = AlltoAllMatmulV2GetWorkspaceSize(context.ToAclTypeRawPtr(), x1.ToAclTypeRawPtr(), x2.ToAclTypeRawPtr(),
                                                  nullptr, x1Scale.ToAclTypeRawPtr(), x2Scale.ToAclTypeRawPtr(), "group",
-                                                 2, 0, 6, 6, 4295032864, "urma", 0, output.ToAclTypeRawPtr(),
+                                                 2, 0, 6, 6, 4295032864, "aiv_urma", 0, output.ToAclTypeRawPtr(),
                                                  alltoAllOut.ToAclTypeRawPtr(), nullptr, &executor);
     EXPECT_EQ(ACLNN_ERR_PARAM_NULLPTR, ret1);
 
@@ -111,7 +111,7 @@ TEST(AclnnAlltoAllMatmulV2NullptrTest, NullWorkspaceSizeAndExecutor)
     uint64_t workspaceSize = 0;
     auto ret2 = AlltoAllMatmulV2GetWorkspaceSize(context.ToAclTypeRawPtr(), x1.ToAclTypeRawPtr(), x2.ToAclTypeRawPtr(),
                                                  nullptr, x1Scale.ToAclTypeRawPtr(), x2Scale.ToAclTypeRawPtr(), "group",
-                                                 2, 0, 6, 6, 4295032864, "urma", 0, output.ToAclTypeRawPtr(),
+                                                 2, 0, 6, 6, 4295032864, "aiv_urma", 0, output.ToAclTypeRawPtr(),
                                                  alltoAllOut.ToAclTypeRawPtr(), &workspaceSize, nullptr);
     EXPECT_EQ(ACLNN_ERR_PARAM_NULLPTR, ret2);
 }

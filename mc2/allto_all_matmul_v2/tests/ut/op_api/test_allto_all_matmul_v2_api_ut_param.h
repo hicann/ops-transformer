@@ -67,7 +67,7 @@ struct AlltoAllMatmulV2ApiUtParam {
         this->x1QuantMode = stoll(ReadMap(csvMap, "x1_quant_mode", "6"));
         this->x2QuantMode = stoll(ReadMap(csvMap, "x2_quant_mode", "6"));
         this->groupSize = stoll(ReadMap(csvMap, "group_size", "0"));
-        this->commMode = ReadMap(csvMap, "comm_mode", "urma");
+        this->commMode = ReadMap(csvMap, "comm_mode", "aiv_urma");
         this->precisionMode = stoll(ReadMap(csvMap, "precision_mode", "0"));
         this->soc = GetCaseSocVersion(csvMap, "soc");
         this->expectResult = GetAclnnRet(csvMap, "expect_result");

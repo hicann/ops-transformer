@@ -128,9 +128,9 @@ extern "C" aclnnStatus AlltoAllMatmulV2GetWorkspaceSize(
         }
     }
 
-    const char *effectiveCommMode = commMode != nullptr ? commMode : "urma";
-    if (strcmp(effectiveCommMode, "urma") != 0) {
-        OP_LOGE_WITH_INVALID_ATTR("AlltoAllMatmulV2", "commMode", effectiveCommMode, "'urma'");
+    const char *effectiveCommMode = commMode != nullptr ? commMode : "aiv_urma";
+    if (strcmp(effectiveCommMode, "aiv_urma") != 0) {
+        OP_LOGE_WITH_INVALID_ATTR("AlltoAllMatmulV2", "commMode", effectiveCommMode, "'aiv_urma'");
         return ACLNN_ERR_PARAM_INVALID;
     }
 

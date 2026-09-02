@@ -63,7 +63,7 @@ struct AlltoAllMatmulV2TilingUtParam {
         this->transposeX1 = StrToBoolIgnoreCase(ReadMap(csvMap, "transpose_x1", "false"));
         this->transposeX2 = StrToBoolIgnoreCase(ReadMap(csvMap, "transpose_x2", "true"));
         this->groupSize = stoll(ReadMap(csvMap, "group_size", "0"));
-        this->commMode = ReadMap(csvMap, "comm_mode", "urma");
+        this->commMode = ReadMap(csvMap, "comm_mode", "aiv_urma");
         this->precisionMode = stoll(ReadMap(csvMap, "precision_mode", "0"));
         this->soc = ReadMap(csvMap, "soc_version", "3510");
         this->coreNum = stoull(ReadMap(csvMap, "core_num", "64"));
