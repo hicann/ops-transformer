@@ -25,27 +25,30 @@
 #include "lib/matmul_intf.h"
 using namespace AscendC;
 
-template<typename T>
+template <typename T>
 class PromptFlashAttentionDummy {
 public:
-    __aicore__ inline PromptFlashAttentionDummy() {};
-    __aicore__ inline void Init(__gm__ uint8_t* attentionOut, const FlashAttentionScoreSimplifiedTilingData* __restrict tiling);
+    __aicore__ inline PromptFlashAttentionDummy(){};
+    __aicore__ inline void Init(__gm__ uint8_t *attentionOut,
+                                const FlashAttentionScoreSimplifiedTilingData *__restrict tiling);
     __aicore__ inline void Process();
 
 protected:
-    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData;
+    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData;
     GlobalTensor<T> attentionOutGm;
 };
 
-template<typename T>
-__aicore__ inline void PromptFlashAttentionDummy<T>::Init(__gm__ uint8_t *attentionOut,
-    const FlashAttentionScoreSimplifiedTilingData* __restrict tiling) {
-    attentionOutGm.SetGlobalBuffer((__gm__ T*)attentionOut);
+template <typename T>
+__aicore__ inline void PromptFlashAttentionDummy<T>::Init(
+    __gm__ uint8_t *attentionOut, const FlashAttentionScoreSimplifiedTilingData *__restrict tiling)
+{
+    attentionOutGm.SetGlobalBuffer((__gm__ T *)attentionOut);
     tilingData = tiling;
 }
 
-template<typename T>
-__aicore__ inline void PromptFlashAttentionDummy<T>::Process() {
+template <typename T>
+__aicore__ inline void PromptFlashAttentionDummy<T>::Process()
+{
     uint32_t blockIdx = GetBlockIdx();
 }
-#endif  // PROMPT_FLASH_ATTENTION_DUMMY_H
+#endif // PROMPT_FLASH_ATTENTION_DUMMY_H

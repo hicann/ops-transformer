@@ -32,7 +32,8 @@ class QuantCompressorKernel {
 public:
     __aicore__ inline QuantCompressorKernel(TPipe *pipe,
                                             const optiling::QuantCompressorTilingData *__restrict tilingData)
-        : pipe_(pipe), tilingData_(tilingData)
+        : pipe_(pipe),
+          tilingData_(tilingData)
     {}
 
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
@@ -130,8 +131,8 @@ __aicore__ inline void QuantCompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm
 
     // 剔除尾部的无效batch
     for (; constInfo.batchSize > 0; --constInfo.batchSize) {
-        uint32_t bSeqUsed = tools_.isExistSeqUsed_ ? tools_.GetSeqUsed(constInfo.batchSize - 1)
-                                                    : tools_.GetSeqLength(constInfo.batchSize - 1);
+        uint32_t bSeqUsed = tools_.isExistSeqUsed_ ? tools_.GetSeqUsed(constInfo.batchSize - 1) :
+                                                     tools_.GetSeqLength(constInfo.batchSize - 1);
         if (bSeqUsed > 0) {
             break;
         }
@@ -303,8 +304,7 @@ __aicore__ inline BasicBlockInfo QuantCompressorKernel<COMP>::SkipOneLoop(BatchI
                 alignSeq = constInfo.cmpRatio - batchInfo.headHolderSeq;
             }
             if (quota > alignSeq) {
-                uint32_t delta =
-                    (batchInfo.bStartPos + batchInfo.sIdx + quota) % constInfo.cmpRatio; // 超出对齐的部分
+                uint32_t delta = (batchInfo.bStartPos + batchInfo.sIdx + quota) % constInfo.cmpRatio; // 超出对齐的部分
                 curDealSeq = quota - delta;
                 quota -= curDealSeq;
                 curDealTcNum = (curDealSeq + constInfo.cmpRatio - 1) / constInfo.cmpRatio;

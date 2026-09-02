@@ -20,17 +20,19 @@
 
 // INPUT_T - means data type for input
 // T       - means data type when calc
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T = INPUT_T,
-          CubeFormat bmm1Format = CubeFormat::NZ, MmPolicyType mmPolicyType = MmPolicyType::NORMAL>
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T = INPUT_T, CubeFormat bmm1Format = CubeFormat::NZ,
+          MmPolicyType mmPolicyType = MmPolicyType::NORMAL>
 class PromptFlashAttentionVarLenScoreSameAB
     : public MlaS1s2Bn2gs1SameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType> {
 public:
     __aicore__ inline PromptFlashAttentionVarLenScoreSameAB(){};
 
-    __aicore__ inline void
-    UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *attenMask,
-               __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-               __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, const TILING_TYPE *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
+                                      __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
+                                      __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope,
+                                      __gm__ uint8_t *keyRope, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
+                                      __gm__ uint8_t *workspace, const TILING_TYPE *__restrict tiling, TPipe *tPipe);
 
     __aicore__ inline void Process();
 
@@ -62,13 +64,18 @@ protected:
     GlobalTensor<int64_t> kvListGm;
 };
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType>::UnpackInit(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *attentionOut, 
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, const TILING_TYPE *__restrict tiling, TPipe *tPipe)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                      mmPolicyType>::UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key,
+                                                                __gm__ uint8_t *value, __gm__ uint8_t *attenMask,
+                                                                __gm__ uint8_t *actualSeqLengths,
+                                                                __gm__ uint8_t *actualSeqLengthsKv,
+                                                                __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+                                                                __gm__ uint8_t *attentionOut,
+                                                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
+                                                                const TILING_TYPE *__restrict tiling, TPipe *tPipe)
 {
     this->InitInput(query, key, value, attenMask, attentionOut, softmaxLse, workspace, tiling, tPipe); // gm设置
     this->ComputeConstexpr();
@@ -86,15 +93,16 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
             if (actualS1Len < 0 && accumSize > 0) {
                 actualS1Len = this->s1Size - accumSize;
             }
-            AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2],
-                                         actualS1Len * this->n2GD2, static_cast<INPUT_T>(0.0));
+            AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2], actualS1Len * this->n2GD2,
+                                         static_cast<INPUT_T>(0.0));
         }
     }
 
     if (this->tilingData->PFAinputParams.isSoftMaxLseEnable) {
         SyncAll(); // synchronize for attentionOutGm
         int64_t tmpBlockIdx = GetBlockIdx();
-        const int64_t totalSoftMaxLseOutputSize = ((__gm__ int64_t *)actualSeqQlenAddr)[this->tilingData->PFAinputParams.bSize - 1] * this->n2G;
+        const int64_t totalSoftMaxLseOutputSize =
+            ((__gm__ int64_t *)actualSeqQlenAddr)[this->tilingData->PFAinputParams.bSize - 1] * this->n2G;
         int64_t coreNum = this->tilingData->PFAmultiCoreParams.coreNum;
         if (coreNum != 0 && tmpBlockIdx < coreNum) {
             int64_t singleCoreLseSize = totalSoftMaxLseOutputSize / coreNum;
@@ -103,8 +111,9 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
             }
             const int64_t singleCoreLseSizeFinal = singleCoreLseSize;
             AscendC::InitOutput<float>(this->softmaxLseGm[tmpBlockIdx * (totalSoftMaxLseOutputSize / coreNum)],
-                                        singleCoreLseSizeFinal, static_cast<float>(3e+99)); // 3e+99:set the value of invalid batch to inf
-            SyncAll(); // synchronize for softmaxLseGm
+                                       singleCoreLseSizeFinal,
+                                       static_cast<float>(3e+99)); // 3e+99:set the value of invalid batch to inf
+            SyncAll();                                             // synchronize for softmaxLseGm
         }
     }
     this->InitBuffer();
@@ -116,8 +125,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
     return;
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
                                                              bmm1Format, mmPolicyType>::ComputeConstexpr()
 {
@@ -148,13 +157,12 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
     }
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
-PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                        bmm1Format, mmPolicyType>::GetSeqQlenKvlenByBoidx(int64_t boIdx,
-                                                                                            int64_t &actualSeqQlen,
-                                                                                            int64_t &actualSeqKvlen)
+PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                      mmPolicyType>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen,
+                                                                            int64_t &actualSeqKvlen)
 {
     if (boIdx == 0) {
         actualSeqQlen = qListGm.GetValue(0);
@@ -167,10 +175,10 @@ PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtte
 }
 
 // 初始化s1方向上的累加值
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType>::CalS1OuterSize(int64_t offset)
+                                                             bmm1Format, mmPolicyType>::CalS1OuterSize(int64_t offset)
 {
     int64_t actualS1Outersize = 0;
     // 用于取actualS1Len下标
@@ -198,10 +206,11 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
     return;
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, 
-                                                        bmm1Format, mmPolicyType>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                      mmPolicyType>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -225,8 +234,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
     GetSeqQlenKvlenByBoidx(this->boIdx, this->s1Size, this->s2Size);
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
                                                              bmm1Format, mmPolicyType>::GetS2LoopRange()
 {
@@ -240,10 +249,10 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
         this->s2StartIdx = 0;
         this->s2EndIdx = Min((this->s1oIdx + 1) * this->cubeS1BaseSize + actualS2Len - actualS1Len, actualS2Len);
     } else if (this->tilingData->PFAinputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND)) {
-        this->s2StartIdx = Max(
-            this->s1oIdx * this->cubeS1BaseSize - this->tilingData->PFAcoreParams.s1SparseValidSize, 0);
-        this->s2EndIdx =
-            Min((this->s1oIdx + 1) * this->cubeS1BaseSize + this->tilingData->PFAcoreParams.s2SparseValidSize, actualS2Len);
+        this->s2StartIdx =
+            Max(this->s1oIdx * this->cubeS1BaseSize - this->tilingData->PFAcoreParams.s1SparseValidSize, 0);
+        this->s2EndIdx = Min(
+            (this->s1oIdx + 1) * this->cubeS1BaseSize + this->tilingData->PFAcoreParams.s2SparseValidSize, actualS2Len);
         // s1baseSize行都无效时，需要将startIdx设置为0，,endIdx设置为S2realSize
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
             this->s2StartIdx = 0;
@@ -272,7 +281,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
             this->s2StartIdx = 0;
             this->s2EndIdx = Min((this->s1oIdx + 1) * this->cubeS1BaseSize + actualS2Len - actualS1Len, actualS2Len);
         }
-    } else if (this->tilingData->PFAinputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL)) {
+    } else if (this->tilingData->PFAinputParams.sparseType ==
+               static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL)) {
         if (this->boIdx == this->tilingData->PFAinputParams.bandIndex) {
             this->s2StartIdx = 0;
             this->s2EndIdx = Min((this->s1oIdx + 1) * this->cubeS1BaseSize + actualS2Len -
@@ -284,8 +294,7 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
         }
     } else if (this->tilingData->PFAinputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->s2StartIdx = 0;
-        this->s2EndIdx =
-            Max((this->s1oIdx + 1) * this->cubeS1BaseSize - actualS1Len + actualS2Len,
+        this->s2EndIdx = Max((this->s1oIdx + 1) * this->cubeS1BaseSize - actualS1Len + actualS2Len,
                              ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
         this->s2EndIdx = Min(this->s2EndIdx, this->s2Size);
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
@@ -301,8 +310,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
     return;
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
                                                              bmm1Format, mmPolicyType>::Process()
 {
@@ -383,11 +392,13 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
     }
 };
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType>::SetExtraInfo(
-    SplitSameABExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                      mmPolicyType>::SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId,
+                                                                  int64_t s2LoopCount, int64_t s2LoopLimit,
+                                                                  int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
     extraInfo.s2EndIdx = this->s2EndIdx;
@@ -422,10 +433,11 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMo
     this->ComputeBmm1Tail(extraInfo);
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameAB<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                      mmPolicyType>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
 {
     extraInfo.s1RealSize = (extraInfo.cubeS1RealSize + 1) / 2;
     extraInfo.vecCoreOffset = this->cubeSubIdx * extraInfo.s1RealSize;

@@ -32,7 +32,8 @@ using AscendC::CacheMode;
 using AscendC::CrossCoreSetFlag;
 using AscendC::CrossCoreWaitFlag;
 
-template <typename SLIT> class SparseLightningIndexerGradKLLossBase {
+template <typename SLIT>
+class SparseLightningIndexerGradKLLossBase {
 public:
     // 中间计算数据类型为float，高精度模式
     using T = float;
@@ -53,15 +54,12 @@ public:
     static constexpr SLILayout KV_LAYOUT_T = SLIT::inputKLayout;
 
     __aicore__ inline SparseLightningIndexerGradKLLossBase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key,
-                                __gm__ uint8_t *queryIndex, __gm__ uint8_t *keyIndex,
-                                __gm__ uint8_t *weight, __gm__ uint8_t *sparseIndices,
-                                __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
-                                __gm__ uint8_t* actualSeqLengthsQuery,
-                                __gm__ uint8_t* actualSeqLengthsKey,
-                                __gm__ uint8_t *dQueryIndex, __gm__ uint8_t *dKeyIndex,
-                                __gm__ uint8_t *dWeight, __gm__ uint8_t *loss,
+    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *queryIndex,
+                                __gm__ uint8_t *keyIndex, __gm__ uint8_t *weight, __gm__ uint8_t *sparseIndices,
+                                __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *queryRope,
+                                __gm__ uint8_t *keyRope, __gm__ uint8_t *actualSeqLengthsQuery,
+                                __gm__ uint8_t *actualSeqLengthsKey, __gm__ uint8_t *dQueryIndex,
+                                __gm__ uint8_t *dKeyIndex, __gm__ uint8_t *dWeight, __gm__ uint8_t *loss,
                                 __gm__ uint8_t *workspace,
                                 const optiling::SparseLightningIndexerGradKLLossTilingData *__restrict tiling,
                                 TPipe *tPipe);
@@ -71,18 +69,22 @@ public:
     __aicore__ inline void Process();
     __aicore__ inline void MainProcess();
     __aicore__ inline void DeterProcess();
-    __aicore__ inline void GetRunInfo(int64_t taskId, int64_t bIdx, int64_t s1Idx, int64_t s1IdxEnd, int64_t accumS1Len, int64_t accumS2Len, 
-        int32_t actualSeqLensQ, int32_t actualSeqLensK, SLIGradKLLossRunInfo &runInfo);
+    __aicore__ inline void GetRunInfo(int64_t taskId, int64_t bIdx, int64_t s1Idx, int64_t s1IdxEnd, int64_t accumS1Len,
+                                      int64_t accumS2Len, int32_t actualSeqLensQ, int32_t actualSeqLensK,
+                                      SLIGradKLLossRunInfo &runInfo);
 
 private:
     __aicore__ inline int32_t GetActualSeqLens(int32_t bIdx, int32_t defaultLens,
-        GlobalTensor<int64_t> &actualSeqLensGm, SLILayout layout, int64_t &accumLen);
-    __aicore__ inline int32_t GetS2SparseLen(int32_t s1Idx, int32_t actualSeqLensQ, int32_t actualSeqLensK, SLISparseMode sparseMode);
+                                               GlobalTensor<int64_t> &actualSeqLensGm, SLILayout layout,
+                                               int64_t &accumLen);
+    __aicore__ inline int32_t GetS2SparseLen(int32_t s1Idx, int32_t actualSeqLensQ, int32_t actualSeqLensK,
+                                             SLISparseMode sparseMode);
     __aicore__ inline int64_t FindBIndex(int64_t bIndex, int64_t curIndex, int64_t &accumulateLen);
     __aicore__ inline int64_t GetEndS1(int64_t bIdx);
-    __aicore__ inline int64_t GetEndS1Etx(int32_t bIdx, int32_t defaultLens,
-        GlobalTensor<int64_t> &actualSeqLensGm, SLILayout layout);
-    __aicore__ inline void CalcMultiCoreOffset(int64_t &bStartIdx, int64_t &s1StartIdx, int64_t &bEndIdx, int64_t &s1EndIdx);
+    __aicore__ inline int64_t GetEndS1Etx(int32_t bIdx, int32_t defaultLens, GlobalTensor<int64_t> &actualSeqLensGm,
+                                          SLILayout layout);
+    __aicore__ inline void CalcMultiCoreOffset(int64_t &bStartIdx, int64_t &s1StartIdx, int64_t &bEndIdx,
+                                               int64_t &s1EndIdx);
     __aicore__ inline int64_t CalcBS1Loop();
 
     TPipe *pipe = nullptr;
@@ -123,27 +125,21 @@ private:
     TBuf<> gatherTbuf;
     TBuf<> mm1Tbuf;
     TBuf<> lossSumTBuf;
-    TBuf<> mm2TBuf;         // 复用 -> mm4 scatterAdd reluGrad
+    TBuf<> mm2TBuf; // 复用 -> mm4 scatterAdd reluGrad
 };
 
 template <typename SLIT>
 __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key,
-    __gm__ uint8_t *queryIndex, __gm__ uint8_t *keyIndex,
-    __gm__ uint8_t *weight, __gm__ uint8_t *sparseIndices,
-    __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-    __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
-    __gm__ uint8_t* actualSeqLengthsQuery,
-    __gm__ uint8_t* actualSeqLengthsKey,
-    __gm__ uint8_t *dQueryIndex, __gm__ uint8_t *dKeyIndex,
-    __gm__ uint8_t *dWeight, __gm__ uint8_t *loss,
-    __gm__ uint8_t *workspace,
-    const optiling::SparseLightningIndexerGradKLLossTilingData *__restrict tiling,
-    TPipe *tPipe)
+    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *queryIndex, __gm__ uint8_t *keyIndex,
+    __gm__ uint8_t *weight, __gm__ uint8_t *sparseIndices, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
+    __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *actualSeqLengthsQuery,
+    __gm__ uint8_t *actualSeqLengthsKey, __gm__ uint8_t *dQueryIndex, __gm__ uint8_t *dKeyIndex,
+    __gm__ uint8_t *dWeight, __gm__ uint8_t *loss, __gm__ uint8_t *workspace,
+    const optiling::SparseLightningIndexerGradKLLossTilingData *__restrict tiling, TPipe *tPipe)
 {
     // init tiling data
     pipe = tPipe;
-    tilingData = tiling;    
+    tilingData = tiling;
 
     InitConstInfo();
 
@@ -194,7 +190,8 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::Init(
             int64_t dQOutputOffset = (t1PadLenSum + actualLen) * constInfo.gSizeQueryIndex * constInfo.dSizeQueryIndex;
             int64_t dWOutputOffset = (t1PadLenSum + actualLen) * constInfo.gSizeQueryIndex;
 
-            AscendC::InitOutput<OUT_T>(dQueryIndexGm[dQOutputOffset], currentCoreT1PadLen * constInfo.gSizeQueryIndex * constInfo.dSizeQueryIndex, 0);
+            AscendC::InitOutput<OUT_T>(dQueryIndexGm[dQOutputOffset],
+                                       currentCoreT1PadLen * constInfo.gSizeQueryIndex * constInfo.dSizeQueryIndex, 0);
             AscendC::InitOutput<W_T>(dWeightGm[dWOutputOffset], currentCoreT1PadLen * constInfo.gSizeQueryIndex, 0);
         }
         if (t2Size > actuaKlLen) {
@@ -209,24 +206,26 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::Init(
             AscendC::InitOutput<OUT_T>(dKeyIndexGm[dKOutputOffset], currentCoreT2PadLen * constInfo.dSizeQueryIndex, 0);
         }
     }
-    AscendC::DataCacheCleanAndInvalid<T, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(lossGm);
+    AscendC::DataCacheCleanAndInvalid<T, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
+        lossGm);
     InitWorkspace(workspace);
     InitBuffer(pipe);
 
     if ASCEND_IS_AIV {
         // InitVecOP
         vectorService.InitParams(constInfo, tilingData);
-        vectorService.InitVector0GM(keyGm, keyRopeGm, keyIndexGm, topKIndexGm,
-                                    actualSeqLengthsQueryGm, actualSeqLengthsKeyGm,
-                                    gatherPRes, gatherSYRes);
-        vectorService.InitVector1GM(bmm1Res, softmaxMaxGm, softmaxSumGm, bmm2Res, weightGm, psySyncGm,
-                                    lossGm, dWeightGm, reluGm, reluGradRes, actualSeqLengthsQueryGm, actualSeqLengthsKeyGm, lossRes);
+        vectorService.InitVector0GM(keyGm, keyRopeGm, keyIndexGm, topKIndexGm, actualSeqLengthsQueryGm,
+                                    actualSeqLengthsKeyGm, gatherPRes, gatherSYRes);
+        vectorService.InitVector1GM(bmm1Res, softmaxMaxGm, softmaxSumGm, bmm2Res, weightGm, psySyncGm, lossGm,
+                                    dWeightGm, reluGm, reluGradRes, actualSeqLengthsQueryGm, actualSeqLengthsKeyGm,
+                                    lossRes);
         vectorService.InitVector2GM(bmm3Res, topKIndexGm, scatterAddRes, scatterAddResPong);
     } else if ASCEND_IS_AIC {
         // initCubeOP
         matmulService.InitParams(constInfo);
-        
-        matmulService.InitMm1GlobalTensor(queryGm, gatherPRes, queryRopeGm, actualSeqLengthsQueryGm, actualSeqLengthsKeyGm, bmm1Res, dKeyIndex);
+
+        matmulService.InitMm1GlobalTensor(queryGm, gatherPRes, queryRopeGm, actualSeqLengthsQueryGm,
+                                          actualSeqLengthsKeyGm, bmm1Res, dKeyIndex);
         matmulService.InitMm2GlobalTensor(queryIndexGm, gatherSYRes, bmm2Res);
         matmulService.InitMm5GlobalTensor(reluGradRes, queryIndexGm, bmm3Res, topKIndexGm);
         matmulService.InitMm6GlobalTensor(reluGradRes, gatherSYRes, dQueryIndexGm);
@@ -269,13 +268,13 @@ template <typename SLIT>
 __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::InitWorkspace(__gm__ uint8_t *workspace)
 {
     int64_t pOffset = topKSize * (constInfo.dSizeQuery + constInfo.dSizeQueryRope) * sizeof(KV_T); // * 2;
-    int64_t syOffset = topKSize * constInfo.dSizeQueryIndex * sizeof(KV_T); // * 2;
-    int64_t bmm1Offset = constInfo.gSizeQuery * topKSize * sizeof(float); // * 2;
+    int64_t syOffset = topKSize * constInfo.dSizeQueryIndex * sizeof(KV_T);                        // * 2;
+    int64_t bmm1Offset = constInfo.gSizeQuery * topKSize * sizeof(float);                          // * 2;
     int64_t psySyncSize = topKSize * sizeof(float) * 2;
-    int64_t bmm2Offset = constInfo.gSizeQueryIndex * topKSize * sizeof(float); // * 2;
+    int64_t bmm2Offset = constInfo.gSizeQueryIndex * topKSize * sizeof(float);     // * 2;
     int64_t reluGradOffset = constInfo.gSizeQueryIndex * topKSize * sizeof(float); // * 2;
-    int64_t bmm3Offset =  topKSize * constInfo.dSizeQueryIndex * sizeof(float); // * 2;
-    int64_t lossOffset = sizeof(float) * 128; // 为了512Byte对齐
+    int64_t bmm3Offset = topKSize * constInfo.dSizeQueryIndex * sizeof(float);     // * 2;
+    int64_t lossOffset = sizeof(float) * 128;                                      // 为了512Byte对齐
     int64_t scatterAddOffset;
 
     int64_t bS2Len = 0;
@@ -286,69 +285,60 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::InitWorkspace
     }
     scatterAddOffset = bS2Len * constInfo.dSizeQueryIndex * sizeof(float);
 
-    int64_t coreTotalOffset = constInfo.aicIdx *
-            (pOffset * constInfo.gatherKeyDbNum + syOffset * constInfo.gatherKeyIndexDbNum +
-            bmm1Offset * 2 + bmm2Offset * 2 + reluGradOffset * 2 + psySyncSize * 2);
+    int64_t coreTotalOffset =
+        constInfo.aicIdx * (pOffset * constInfo.gatherKeyDbNum + syOffset * constInfo.gatherKeyIndexDbNum +
+                            bmm1Offset * 2 + bmm2Offset * 2 + reluGradOffset * 2 + psySyncSize * 2);
 
-    int64_t totalOffset = GetBlockNum() *
-            (pOffset * constInfo.gatherKeyDbNum + syOffset * constInfo.gatherKeyIndexDbNum +
-            bmm1Offset * 2 + bmm2Offset * 2 + reluGradOffset * 2 + psySyncSize * 2);
+    int64_t totalOffset =
+        GetBlockNum() * (pOffset * constInfo.gatherKeyDbNum + syOffset * constInfo.gatherKeyIndexDbNum +
+                         bmm1Offset * 2 + bmm2Offset * 2 + reluGradOffset * 2 + psySyncSize * 2);
 
     uint64_t offset = 0;
     // workspace 按核分, 每个核内不同workspace相邻
-    gatherPRes.SetGlobalBuffer(
-        (__gm__ KV_T *)(workspace + offset + coreTotalOffset));
+    gatherPRes.SetGlobalBuffer((__gm__ KV_T *)(workspace + offset + coreTotalOffset));
     offset += pOffset * constInfo.gatherKeyDbNum;
 
-    gatherSYRes.SetGlobalBuffer(
-        (__gm__ KV_T *)(workspace + offset + coreTotalOffset));
+    gatherSYRes.SetGlobalBuffer((__gm__ KV_T *)(workspace + offset + coreTotalOffset));
     offset += syOffset * constInfo.gatherKeyIndexDbNum;
 
-    bmm1Res.SetGlobalBuffer(
-        (__gm__ MM12_OUT_T *)(workspace + offset + coreTotalOffset));
+    bmm1Res.SetGlobalBuffer((__gm__ MM12_OUT_T *)(workspace + offset + coreTotalOffset));
     offset += bmm1Offset * 2;
 
-    psySyncGm.SetGlobalBuffer(
-        (__gm__ T *)(workspace + offset + coreTotalOffset));
+    psySyncGm.SetGlobalBuffer((__gm__ T *)(workspace + offset + coreTotalOffset));
     offset += psySyncSize * 2;
 
-    bmm2Res.SetGlobalBuffer(
-        (__gm__ MM12_OUT_T *)(workspace + offset + coreTotalOffset));
-    reluGm.SetGlobalBuffer(
-        (__gm__ T *)(bmm2Res.GetPhyAddr()));
+    bmm2Res.SetGlobalBuffer((__gm__ MM12_OUT_T *)(workspace + offset + coreTotalOffset));
+    reluGm.SetGlobalBuffer((__gm__ T *)(bmm2Res.GetPhyAddr()));
     offset += bmm2Offset * 2;
 
-    reluGradRes.SetGlobalBuffer(
-        (__gm__ OUT_T *)(workspace + offset + coreTotalOffset));
+    reluGradRes.SetGlobalBuffer((__gm__ OUT_T *)(workspace + offset + coreTotalOffset));
     offset += reluGradOffset * 2;
 
-    bmm3Res.SetGlobalBuffer(
-        (__gm__ MM3_OUT_T *)(workspace + totalOffset));
+    bmm3Res.SetGlobalBuffer((__gm__ MM3_OUT_T *)(workspace + totalOffset));
     totalOffset += bmm3Offset * GetBlockNum() * 2;
 
-    lossRes.SetGlobalBuffer(
-        (__gm__ T *)(workspace + totalOffset));
+    lossRes.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
     totalOffset += lossOffset;
 
     if constexpr (deterministic) {
-        scatterAddResPong.SetGlobalBuffer(
-            (__gm__ T *)(workspace + totalOffset));
+        scatterAddResPong.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
         totalOffset += scatterAddOffset;
     }
 
-    scatterAddRes.SetGlobalBuffer(
-        (__gm__ T *)(workspace + totalOffset));
+    scatterAddRes.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
     if ASCEND_IS_AIV {
         int64_t totalCost = bS2Len;
-        
+
         int64_t totalCoreNum = GetBlockNum() * GetTaskRation();
         int64_t avgCost = CeilDiv(totalCost, totalCoreNum);
 
         int32_t t2Start = Min(constInfo.aivIdx * avgCost, totalCost);
         int32_t t2End = Min(t2Start + avgCost, totalCost);
-        AscendC::InitOutput(scatterAddRes[t2Start * constInfo.dSizeQueryIndex], constInfo.dSizeQueryIndex * (t2End - t2Start), static_cast<T>(0));
+        AscendC::InitOutput(scatterAddRes[t2Start * constInfo.dSizeQueryIndex],
+                            constInfo.dSizeQueryIndex * (t2End - t2Start), static_cast<T>(0));
         if constexpr (deterministic) {
-            AscendC::InitOutput(scatterAddResPong[t2Start * constInfo.dSizeQueryIndex], constInfo.dSizeQueryIndex * (t2End - t2Start), static_cast<T>(0));
+            AscendC::InitOutput(scatterAddResPong[t2Start * constInfo.dSizeQueryIndex],
+                                constInfo.dSizeQueryIndex * (t2End - t2Start), static_cast<T>(0));
         }
         AscendC::InitOutput(lossRes[constInfo.aivIdx], 1, static_cast<T>(0));
     }
@@ -365,7 +355,8 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::InitBuffer(TP
     }
 }
 template <typename SLIT>
-__aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::FindBIndex(int64_t bIndex, int64_t curIndex, int64_t &accumulateLen)
+__aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::FindBIndex(int64_t bIndex, int64_t curIndex,
+                                                                                 int64_t &accumulateLen)
 {
     for (int index = bIndex; index < constInfo.bSize; index++) {
         int64_t actualLen = this->actualSeqLengthsQueryGm.GetValue(index);
@@ -381,13 +372,13 @@ template <typename SLIT>
 __aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::GetEndS1(int64_t bIdx)
 {
     return constInfo.aicIdx + 1 < optiling::MAX_CORE_NUM ?
-               tilingData->multiCoreParams.bS1Index[bIdx + 1] : tilingData->multiCoreParams.totalSize
-               - tilingData->multiCoreParams.bS1Index[bIdx];
+               tilingData->multiCoreParams.bS1Index[bIdx + 1] :
+               tilingData->multiCoreParams.totalSize - tilingData->multiCoreParams.bS1Index[bIdx];
 }
 
 template <typename SLIT>
-__aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::GetEndS1Etx(int32_t bIdx,
-    int32_t defaultLens, GlobalTensor<int64_t> &actualSeqLensGm, SLILayout layout)
+__aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::GetEndS1Etx(
+    int32_t bIdx, int32_t defaultLens, GlobalTensor<int64_t> &actualSeqLensGm, SLILayout layout)
 {
     if (actualSeqLensGm.GetSize() <= 0) {
         return defaultLens;
@@ -406,12 +397,16 @@ __aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::GetEndS1Et
 }
 
 template <typename SLIT>
-__aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::CalcMultiCoreOffset(int64_t &bStartIdx, int64_t &s1StartIdx, int64_t &bEndIdx, int64_t &s1EndIdx)
+__aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::CalcMultiCoreOffset(int64_t &bStartIdx,
+                                                                                       int64_t &s1StartIdx,
+                                                                                       int64_t &bEndIdx,
+                                                                                       int64_t &s1EndIdx)
 {
     int64_t actualSum = 0;
     int64_t bS1Index = tilingData->multiCoreParams.bS1Index[constInfo.aicIdx];
     int64_t bS1EndIndex = constInfo.aicIdx + 1 < optiling::MAX_CORE_NUM ?
-                tilingData->multiCoreParams.bS1Index[constInfo.aicIdx + 1] : tilingData->multiCoreParams.totalSize;
+                              tilingData->multiCoreParams.bS1Index[constInfo.aicIdx + 1] :
+                              tilingData->multiCoreParams.totalSize;
     if constexpr (LAYOUT_T == SLILayout::TND) {
         bStartIdx = FindBIndex(0, bS1Index, actualSum);
         s1StartIdx = bS1Index - actualSum;
@@ -419,21 +414,22 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::CalcMultiCore
         s1EndIdx = bS1EndIndex - actualSum;
     } else {
         bStartIdx = bS1Index / constInfo.s1Size;
-        bEndIdx = (bS1EndIndex-1) / constInfo.s1Size;
+        bEndIdx = (bS1EndIndex - 1) / constInfo.s1Size;
         s1StartIdx = bS1Index - bStartIdx * constInfo.s1Size;
         s1EndIdx = bS1EndIndex - bEndIdx * constInfo.s1Size;
     }
 }
 
 template <typename SLIT>
-__aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::CalcBS1Loop() {
+__aicore__ inline int64_t SparseLightningIndexerGradKLLossBase<SLIT>::CalcBS1Loop()
+{
     int64_t maxLoop = 0;
     int32_t coreNum = GetBlockNum();
     int64_t bS1Index, bS1EndIndex;
     for (int32_t aicIdx = 0; aicIdx < coreNum; aicIdx++) {
         bS1Index = tilingData->multiCoreParams.bS1Index[aicIdx];
-        bS1EndIndex = aicIdx + 1 < optiling::MAX_CORE_NUM ?
-                tilingData->multiCoreParams.bS1Index[aicIdx + 1] : tilingData->multiCoreParams.totalSize;
+        bS1EndIndex = aicIdx + 1 < optiling::MAX_CORE_NUM ? tilingData->multiCoreParams.bS1Index[aicIdx + 1] :
+                                                            tilingData->multiCoreParams.totalSize;
         maxLoop = Max(maxLoop, bS1EndIndex - bS1Index);
     }
     return maxLoop;
@@ -474,8 +470,10 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::DeterProcess(
             if constexpr (LAYOUT_T == SLILayout::TND) {
                 bIdx = FindBIndex(bIdx, bS1Idx, actualBS1Sum);
                 s1Idx = bS1Idx - actualBS1Sum;
-                actualSeqLensQ = GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1Len);
-                actualSeqLensK = GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2Len);
+                actualSeqLensQ =
+                    GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1Len);
+                actualSeqLensK =
+                    GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2Len);
             } else {
                 bIdx = bS1Idx / constInfo.s1Size;
                 s1Idx = bS1Idx - bIdx * constInfo.s1Size;
@@ -485,9 +483,9 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::DeterProcess(
             s1Idx = bS1TotalSize;
         }
 
-        SLIGradKLLossRunInfo &runInfoNeg2 = runInfos[(taskId + 1) % 3];       // 上2轮
-        SLIGradKLLossRunInfo &runInfoNeg1 = runInfos[(taskId + 2) % 3];       // 上1轮
-        SLIGradKLLossRunInfo &runInfo0 = runInfos[taskId % 3];                // 当前轮
+        SLIGradKLLossRunInfo &runInfoNeg2 = runInfos[(taskId + 1) % 3]; // 上2轮
+        SLIGradKLLossRunInfo &runInfoNeg1 = runInfos[(taskId + 2) % 3]; // 上1轮
+        SLIGradKLLossRunInfo &runInfo0 = runInfos[taskId % 3];          // 当前轮
 
         GetRunInfo(taskId, bIdx, s1Idx, bS1TotalSize, accumS1Len, accumS2Len, actualSeqLensQ, actualSeqLensK, runInfo0);
 
@@ -499,14 +497,14 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::DeterProcess(
 
         if (runInfo0.isValid) {
             if ASCEND_IS_AIV {
-                vectorService.ProcessVector0(runInfo0);  // V0
+                vectorService.ProcessVector0(runInfo0); // V0
             }
         }
 
         if (runInfoNeg1.isValid) {
             if ASCEND_IS_AIC {
-                matmulService.ComputeMm1(runInfoNeg1);   // C1
-                matmulService.ComputeMm2(runInfoNeg1);   // C1
+                matmulService.ComputeMm1(runInfoNeg1); // C1
+                matmulService.ComputeMm2(runInfoNeg1); // C1
             }
 
             if ASCEND_IS_AIV {
@@ -540,7 +538,6 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::DeterProcess(
         }
     }
 
-
     if ASCEND_IS_AIV {
         vectorService.FreeEventID();
     } else {
@@ -548,8 +545,8 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::DeterProcess(
     }
     if ASCEND_IS_AIV {
         vector2Service.InitParams(constInfo, tilingData);
-        vector2Service.InitVector2GM(scatterAddRes, topKIndexGm, dKeyIndexGm, actualSeqLengthsQueryGm, actualSeqLengthsKeyGm,
-            lossRes, lossGm, scatterAddResPong);
+        vector2Service.InitVector2GM(scatterAddRes, topKIndexGm, dKeyIndexGm, actualSeqLengthsQueryGm,
+                                     actualSeqLengthsKeyGm, lossRes, lossGm, scatterAddResPong);
         vector2Service.InitBuffers(pipe);
     }
     SyncAll<false>();
@@ -585,7 +582,8 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::MainProcess()
         int32_t actualSeqLensK = 0;
         if constexpr (LAYOUT_T == SLILayout::TND) {
             s1StartIdxThisBatch = (bIdx == bStartIdx) ? s1StartIdx : 0;
-            s1EndIdxThisBatch = (!lastB) ? GetEndS1Etx(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T) : s1EndIdx;
+            s1EndIdxThisBatch =
+                (!lastB) ? GetEndS1Etx(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T) : s1EndIdx;
             actualSeqLensQ = GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1Len);
             actualSeqLensK = GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2Len);
         } else if constexpr (LAYOUT_T == SLILayout::BSND) {
@@ -593,15 +591,16 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::MainProcess()
             s1EndIdxThisBatch = (!lastB) ? constInfo.s1Size : s1EndIdx;
         }
         if (lastB) {
-            extraLoopTimes = 2;// 最后一个Batch需要额外循环两次，因为preload方式会产生尾巴
+            extraLoopTimes = 2; // 最后一个Batch需要额外循环两次，因为preload方式会产生尾巴
         }
 
         for (int64_t s1Idx = s1StartIdxThisBatch; s1Idx < s1EndIdxThisBatch + extraLoopTimes; s1Idx++) {
-            SLIGradKLLossRunInfo &runInfoNeg2 = runInfos[(taskId + 1) % 3];       // 上2轮
-            SLIGradKLLossRunInfo &runInfoNeg1 = runInfos[(taskId + 2) % 3];       // 上1轮
-            SLIGradKLLossRunInfo &runInfo0 = runInfos[taskId % 3];                // 当前轮
-            
-            GetRunInfo(taskId, bIdx, s1Idx, s1EndIdxThisBatch, accumS1Len, accumS2Len, actualSeqLensQ, actualSeqLensK, runInfo0);
+            SLIGradKLLossRunInfo &runInfoNeg2 = runInfos[(taskId + 1) % 3]; // 上2轮
+            SLIGradKLLossRunInfo &runInfoNeg1 = runInfos[(taskId + 2) % 3]; // 上1轮
+            SLIGradKLLossRunInfo &runInfo0 = runInfos[taskId % 3];          // 当前轮
+
+            GetRunInfo(taskId, bIdx, s1Idx, s1EndIdxThisBatch, accumS1Len, accumS2Len, actualSeqLensQ, actualSeqLensK,
+                       runInfo0);
             if ASCEND_IS_AIV {
                 CrossCoreWaitFlag<2, PIPE_MTE3>(14);
             } else {
@@ -610,14 +609,14 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::MainProcess()
 
             if (runInfo0.isValid) {
                 if ASCEND_IS_AIV {
-                    vectorService.ProcessVector0(runInfo0);  // V0
+                    vectorService.ProcessVector0(runInfo0); // V0
                 }
             }
 
             if (runInfoNeg1.isValid) {
                 if ASCEND_IS_AIC {
-                    matmulService.ComputeMm1(runInfoNeg1);   // C1
-                    matmulService.ComputeMm2(runInfoNeg1);   // C1
+                    matmulService.ComputeMm1(runInfoNeg1); // C1
+                    matmulService.ComputeMm2(runInfoNeg1); // C1
                 }
 
                 if ASCEND_IS_AIV {
@@ -635,7 +634,7 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::MainProcess()
                     runInfoNeg2.isValid = false;
                 }
             }
-            
+
             taskId++;
         }
     }
@@ -647,8 +646,8 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::MainProcess()
     }
     if ASCEND_IS_AIV {
         vector2Service.InitParams(constInfo, tilingData);
-        vector2Service.InitVector2GM(scatterAddRes, topKIndexGm, dKeyIndexGm, actualSeqLengthsQueryGm, actualSeqLengthsKeyGm,
-            lossRes, lossGm, scatterAddResPong);
+        vector2Service.InitVector2GM(scatterAddRes, topKIndexGm, dKeyIndexGm, actualSeqLengthsQueryGm,
+                                     actualSeqLengthsKeyGm, lossRes, lossGm, scatterAddResPong);
         vector2Service.InitBuffers(pipe);
     }
     SyncAll<false>();
@@ -660,13 +659,13 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::MainProcess()
 }
 
 template <typename SLIT>
-__aicore__ inline int32_t SparseLightningIndexerGradKLLossBase<SLIT>::GetActualSeqLens(int32_t bIdx,
-    int32_t defaultLens, GlobalTensor<int64_t> &actualSeqLensGm, SLILayout layout, int64_t &accumLen)
+__aicore__ inline int32_t SparseLightningIndexerGradKLLossBase<SLIT>::GetActualSeqLens(
+    int32_t bIdx, int32_t defaultLens, GlobalTensor<int64_t> &actualSeqLensGm, SLILayout layout, int64_t &accumLen)
 {
     if (actualSeqLensGm.GetSize() <= 0) {
         return defaultLens;
     }
-    
+
     if (layout == SLILayout::TND) {
         if (bIdx == 0) {
             accumLen = 0;
@@ -682,7 +681,9 @@ __aicore__ inline int32_t SparseLightningIndexerGradKLLossBase<SLIT>::GetActualS
 
 template <typename SLIT>
 __aicore__ inline int32_t SparseLightningIndexerGradKLLossBase<SLIT>::GetS2SparseLen(int32_t s1Idx,
-    int32_t actualSeqLensQ, int32_t actualSeqLensK, SLISparseMode sparseMode)
+                                                                                     int32_t actualSeqLensQ,
+                                                                                     int32_t actualSeqLensK,
+                                                                                     SLISparseMode sparseMode)
 {
     if (sparseMode == SLISparseMode::RightDown) {
         return Max(actualSeqLensK - actualSeqLensQ + s1Idx + 1, 0);
@@ -692,10 +693,11 @@ __aicore__ inline int32_t SparseLightningIndexerGradKLLossBase<SLIT>::GetS2Spars
 }
 
 template <typename SLIT>
-__aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::GetRunInfo(int64_t taskId, int64_t bIdx, int64_t s1Idx, 
-    int64_t s1IdxEnd, int64_t accumS1Len, int64_t accumS2Len, int32_t actualSeqLensQ, int32_t actualSeqLensK, SLIGradKLLossRunInfo &runInfo)
+__aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::GetRunInfo(
+    int64_t taskId, int64_t bIdx, int64_t s1Idx, int64_t s1IdxEnd, int64_t accumS1Len, int64_t accumS2Len,
+    int32_t actualSeqLensQ, int32_t actualSeqLensK, SLIGradKLLossRunInfo &runInfo)
 {
-    if (s1Idx >= s1IdxEnd) {        // extra循环阶段，不生产任务
+    if (s1Idx >= s1IdxEnd) { // extra循环阶段，不生产任务
         runInfo.isValid = false;
         return;
     }
@@ -723,25 +725,25 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::GetRunInfo(in
     runInfo.kRealSize = runInfo.s2RealSize;
     runInfo.kRealSizeAlign8 = (runInfo.kRealSize + 7) >> 3 << 3;
     runInfo.s2LoopTimes = CeilDiv(runInfo.s2RealSize, constInfo.s2BaseSize);
-    runInfo.s2TailSize = (runInfo.s2RealSize % constInfo.s2BaseSize == 0) ?
-        constInfo.s2BaseSize : (runInfo.s2RealSize % constInfo.s2BaseSize);
+    runInfo.s2TailSize = (runInfo.s2RealSize % constInfo.s2BaseSize == 0) ? constInfo.s2BaseSize :
+                                                                            (runInfo.s2RealSize % constInfo.s2BaseSize);
 
     runInfo.kLoopTimes = CeilDiv(runInfo.kRealSize, runInfo.kBaseSize);
-    runInfo.kTailSize = (runInfo.kRealSize % runInfo.kBaseSize == 0) ?
-        runInfo.kBaseSize : (runInfo.kRealSize % runInfo.kBaseSize);
+    runInfo.kTailSize =
+        (runInfo.kRealSize % runInfo.kBaseSize == 0) ? runInfo.kBaseSize : (runInfo.kRealSize % runInfo.kBaseSize);
 
     if constexpr (LAYOUT_T == SLILayout::TND) {
         runInfo.queryTensorOffset = runInfo.accumS1Idx * static_cast<int64_t>(constInfo.gSizeQuery) *
                                     static_cast<int64_t>(constInfo.dSizeQuery);
         runInfo.queryRopeTensorOffset = runInfo.accumS1Idx * static_cast<int64_t>(constInfo.gSizeQuery) *
-                                      static_cast<int64_t>(constInfo.dSizeQueryRope);
+                                        static_cast<int64_t>(constInfo.dSizeQueryRope);
         runInfo.queryIndexTensorOffset = runInfo.accumS1Idx * static_cast<int64_t>(constInfo.gSizeQueryIndex) *
                                          static_cast<int64_t>(constInfo.dSizeQueryIndex);
     } else if constexpr (LAYOUT_T == SLILayout::BSND) {
         runInfo.queryTensorOffset = runInfo.accumS1Idx * static_cast<int64_t>(constInfo.gSizeQuery) *
                                     static_cast<int64_t>(constInfo.dSizeQuery);
         runInfo.queryRopeTensorOffset = runInfo.accumS1Idx * static_cast<int64_t>(constInfo.gSizeQuery) *
-                                      static_cast<int64_t>(constInfo.dSizeQueryRope);
+                                        static_cast<int64_t>(constInfo.dSizeQueryRope);
         runInfo.queryIndexTensorOffset = runInfo.accumS1Idx * static_cast<int64_t>(constInfo.gSizeQueryIndex) *
                                          static_cast<int64_t>(constInfo.dSizeQueryIndex);
     }
@@ -749,13 +751,13 @@ __aicore__ inline void SparseLightningIndexerGradKLLossBase<SLIT>::GetRunInfo(in
     if constexpr (LAYOUT_T == SLILayout::TND) {
         runInfo.topkGmBaseOffset = runInfo.accumS1Idx * static_cast<int64_t>(topKSize);
     } else {
-        runInfo.topkGmBaseOffset = runInfo.bIdx * static_cast<int64_t>(constInfo.s1Size) *
-                                   static_cast<int64_t>(topKSize) +
-                                   runInfo.s1Idx * static_cast<int64_t>(topKSize);
+        runInfo.topkGmBaseOffset =
+            runInfo.bIdx * static_cast<int64_t>(constInfo.s1Size) * static_cast<int64_t>(topKSize) +
+            runInfo.s1Idx * static_cast<int64_t>(topKSize);
     }
 
     runInfo.calcP = ((runInfo.taskIdMod2 == 0 && constInfo.subBlockIdx == 0) ||
-        (runInfo.taskIdMod2 != 0 && constInfo.subBlockIdx != 0));
+                     (runInfo.taskIdMod2 != 0 && constInfo.subBlockIdx != 0));
 
     runInfo.isValid = true;
 }

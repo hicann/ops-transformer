@@ -14,8 +14,7 @@
 #include "../../attn_infra/rain_base_defs.hpp"
 #include "../../attn_infra/rain_coord.hpp"
 
-namespace NpuArch::layout 
-{
+namespace NpuArch::layout {
 
 struct VectorLayout {
 public:
@@ -41,14 +40,19 @@ public:
     // Methods
 
     HOST_DEVICE
-    VectorLayout(Index size = 0) : shape_(MakeCoord(size)), stride_(MakeCoord(LongIndex(1))) {}
+    VectorLayout(Index size = 0)
+        : shape_(MakeCoord(size)),
+          stride_(MakeCoord(LongIndex(1)))
+    {}
 
     HOST_DEVICE
-    VectorLayout(Shape shape, Stride stride) : shape_(shape), stride_(stride) {}
+    VectorLayout(Shape shape, Stride stride)
+        : shape_(shape),
+          stride_(stride)
+    {}
 
     template <class Element>
-    HOST_DEVICE
-    static VectorLayout MakeLayoutInUb(TensorCoord const &tileShape)
+    HOST_DEVICE static VectorLayout MakeLayoutInUb(TensorCoord const &tileShape)
     {
         return VectorLayout{RoundUp<BYTE_PER_BLK / sizeof(Element)>(tileShape[0])};
     }
@@ -130,4 +134,4 @@ private:
 
 } // namespace NpuArch::layout
 
-#endif  // LAYOUT_VECTOR_HPP
+#endif // LAYOUT_VECTOR_HPP

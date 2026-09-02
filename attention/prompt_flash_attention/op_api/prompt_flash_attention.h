@@ -13,29 +13,18 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *PromptFlashAttention(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *pseShift,
-    const aclTensor *attenMask, // attenMask of pfa
-    const aclIntArray *actualSeqLengths,
-    const aclIntArray *actualSeqLengthsKv,
-    const aclTensor *deqScale1,
-    const aclTensor *quantScale1,
-    const aclTensor *deqScale2,
-    const aclTensor *quantScale2,
-    const aclTensor *quantOffset2,
-    int64_t numHeads, // q_n
-    double scaleValue,
-    int64_t preTokens,
-    int64_t nextTokens,
-    const char *inputLayout,
-    int64_t numKeyValueHeads, // kv_n
-    int64_t sparseMode,
-    int64_t innerPrecise,
-    const aclTensor *attentionOut,
-    aclOpExecutor *executor);
+const aclTensor *PromptFlashAttention(const aclTensor *query, const aclTensor *key, const aclTensor *value,
+                                      const aclTensor *pseShift,
+                                      const aclTensor *attenMask, // attenMask of pfa
+                                      const aclIntArray *actualSeqLengths, const aclIntArray *actualSeqLengthsKv,
+                                      const aclTensor *deqScale1, const aclTensor *quantScale1,
+                                      const aclTensor *deqScale2, const aclTensor *quantScale2,
+                                      const aclTensor *quantOffset2,
+                                      int64_t numHeads, // q_n
+                                      double scaleValue, int64_t preTokens, int64_t nextTokens, const char *inputLayout,
+                                      int64_t numKeyValueHeads, // kv_n
+                                      int64_t sparseMode, int64_t innerPrecise, const aclTensor *attentionOut,
+                                      aclOpExecutor *executor);
 }
 
 #endif /* OP_API_INC_LEVEL0_OP_PROMPT_FLASH_ATTENTION_OP_H_ */

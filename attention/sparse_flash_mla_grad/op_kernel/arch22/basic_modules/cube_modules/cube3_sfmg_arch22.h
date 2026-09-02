@@ -16,10 +16,9 @@
  * l0_c： dimG * selectedBlockSize * sizof(T1) (0-4k / 48k-52k)
  */
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube3Process(const int64_t keyGmOffset,
-                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx, 
-                         const int64_t lastBlockSize, const bool isLastBasicBlock, const RunInfo &runInfo)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube3Process(
+    const int64_t keyGmOffset, const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx,
+    const int64_t lastBlockSize, const bool isLastBasicBlock, const RunInfo &runInfo)
 {
     uint32_t dLoopTimes = (dimDTotal + 127) / N_SPLIT_SIZE;
     uint32_t perLoopDSize = N_SPLIT_SIZE;
@@ -35,7 +34,7 @@ CubeOp<T1>::cube3Process(const int64_t keyGmOffset,
     int64_t dsL1Offset = 0;
     int64_t dsL1CachedSize = 0;
 
-    LocalTensor<T1> current_l1_ds_tensor, l1_key_tensor; 
+    LocalTensor<T1> current_l1_ds_tensor, l1_key_tensor;
     // l1_ds_tensor已经在mm4搬完，mm3不需要再搬（当dSL1TotalSize可全载时）
     // 切N
     for (int32_t dIdx = 0; dIdx < dLoopTimes; dIdx++) {
@@ -47,9 +46,9 @@ CubeOp<T1>::cube3Process(const int64_t keyGmOffset,
         int64_t currentOutGmOffset = outGmOffset + dIdx * perLoopDSize;
         dsL1CachedSize = 0;
         // selectedBlockSize较小时，nIdx需要+2或者更多
-        for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx+=blockOffset) {
-            int64_t l1Offset = static_cast<int64_t>(nIdx - blkCntOffset) *
-                selectedBlockSize * AlignTo<int64_t>(mmParam.singleM, SIZE_16);
+        for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
+            int64_t l1Offset = static_cast<int64_t>(nIdx - blkCntOffset) * selectedBlockSize *
+                               AlignTo<int64_t>(mmParam.singleM, SIZE_16);
             bool isFirstLoop = (nIdx == blkCntOffset);
             bool isLastLoop = (nIdx + blockOffset >= blkCntOffset + selectedCntOffset);
 
@@ -57,7 +56,8 @@ CubeOp<T1>::cube3Process(const int64_t keyGmOffset,
             if (isLastBasicBlock && isLastLoop) {
                 totalSel = totalSel - selectedBlockSize + lastBlockSize;
             }
-            mmParam.singleK = min(selectedBlockSize * blockOffset, totalSel - (nIdx - blkCntOffset) * selectedBlockSize);
+            mmParam.singleK =
+                min(selectedBlockSize * blockOffset, totalSel - (nIdx - blkCntOffset) * selectedBlockSize);
 
             if (dSL1TotalSize <= 128 * 512) {
                 current_l1_ds_tensor = l1_ds_tensor[l1Offset];
@@ -65,19 +65,22 @@ CubeOp<T1>::cube3Process(const int64_t keyGmOffset,
                 if (l1Offset >= dsL1CachedSize) {
                     SetFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
                     WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
-                    CopyGmToL1(l1_ds_tensor, dsWorkspaceGm[runInfo.mm345GmOffset + (nIdx - blkCntOffset)], mmParam.singleM, 512, singleN);
+                    CopyGmToL1(l1_ds_tensor, dsWorkspaceGm[runInfo.mm345GmOffset + (nIdx - blkCntOffset)],
+                               mmParam.singleM, 512, singleN);
                     dsL1CachedSize += 512 * AlignTo<int64_t>(mmParam.singleM, SIZE_16);
                     dsL1Offset = l1Offset;
                 }
                 current_l1_ds_tensor = l1_ds_tensor[l1Offset - dsL1Offset];
             }
             l1_key_tensor = l1_common_tensors[ping_pong_flag_l1_common_];
-            int64_t currentKeyOffset = keyGmOffset + (nIdx - blkCntOffset) * selectedBlockSize * dimDTotal + dIdx * perLoopDSize;
-            
+            int64_t currentKeyOffset =
+                keyGmOffset + (nIdx - blkCntOffset) * selectedBlockSize * dimDTotal + dIdx * perLoopDSize;
+
             WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
             if constexpr (MODE == SMLAG_SCFA_MODE) {
                 if (!runInfo.isOri) {
-                    CopyGmToL1(l1_key_tensor, selectedKWorkspaceGm[currentKeyOffset], mmParam.singleK, mmParam.singleN, dimDTotal);
+                    CopyGmToL1(l1_key_tensor, selectedKWorkspaceGm[currentKeyOffset], mmParam.singleK, mmParam.singleN,
+                               dimDTotal);
                 } else {
                     CopyGmToL1(l1_key_tensor, oriKvGm[currentKeyOffset], mmParam.singleK, mmParam.singleN, dimDTotal);
                 }
@@ -90,9 +93,9 @@ CubeOp<T1>::cube3Process(const int64_t keyGmOffset,
             mmParam.isOutKFisrt = isFirstLoop;
             mmParam.isFixOut = isLastLoop;
 
-            MmadInnerWithSync<T1, true>(l0cTensor, current_l1_ds_tensor, l1_key_tensor,
-                                aL0TensorPingPong, bL0TensorPingPong,
-                                mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true, dqWorkspaceGm[currentOutGmOffset]); 
+            MmadInnerWithSync<T1, true>(l0cTensor, current_l1_ds_tensor, l1_key_tensor, aL0TensorPingPong,
+                                        bL0TensorPingPong, mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_,
+                                        ping_pong_flag_l0c_, true, dqWorkspaceGm[currentOutGmOffset]);
             SetFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
             UpdatePingPongFlag(ping_pong_flag_l1_common_);
         }

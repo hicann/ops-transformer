@@ -109,8 +109,7 @@ template <typename T>
 __aicore__ inline void CalculateDsink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &pTensor,
                                       const LocalTensor<T> &dpTensor, const LocalTensor<T> &softmaxSinkTensor,
                                       int64_t realN, uint64_t realM)
-{
-}
+{}
 #endif
 } // namespace AscendC
 

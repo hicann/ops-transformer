@@ -16,8 +16,10 @@
  * l0_c： dimG * dimDqk * sizof(float) (0-12k / 64k-76k)
  */
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube5Process(const int64_t pGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx, const RunInfo &runInfo)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(const int64_t pGmOffset,
+                                                                               const int32_t blkCntOffset,
+                                                                               const int32_t mmPingPongIdx,
+                                                                               const RunInfo &runInfo)
 {
     uint32_t dLoopTimes = (dimDv + 127) / N_SPLIT_SIZE;
     uint32_t perLoopDSize = N_SPLIT_SIZE;
@@ -36,44 +38,48 @@ CubeOp<T1>::cube5Process(const int64_t pGmOffset, const int32_t blkCntOffset, co
     int64_t mm5ResOutBaseOffset;
     if constexpr (MODE == SMLAG_SCFA_MODE) {
         if (!runInfo.isOri) {
-            mm5ResOutBaseOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * dimDv + cBlockIdx * selectedBlockCount * dimDv;
+            mm5ResOutBaseOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * dimDv +
+                                  cBlockIdx * selectedBlockCount * dimDv;
             mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm5ResAddr);
         } else {
             mm5ResOutBaseOffset = runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal;
             mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dkAddr);
         }
     } else {
-        mm5ResOutBaseOffset = runInfo.isOri ? 
-                              runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal :
-                              runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal + dOriKvSize;
+        mm5ResOutBaseOffset = runInfo.isOri ?
+                                  runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal :
+                                  runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal + dOriKvSize;
     }
 
     LocalTensor<T1> l1_dy_tensor = l1_dy_tensors[mmPingPongIdx];
-    for (int32_t mIdx = blkCntOffset; mIdx < blkCntOffset + selectedCntOffset; mIdx+=blockOffset) {
+    for (int32_t mIdx = blkCntOffset; mIdx < blkCntOffset + selectedCntOffset; mIdx += blockOffset) {
         LocalTensor<T1> current_l1_dy_tensor, l1_p_tensor;
         l1_p_tensor = l1_common_tensors[ping_pong_flag_l1_common_];
 
-        mmParam.singleM = min(selectedBlockSize * blockOffset, selectedCntOffset * selectedBlockSize - (mIdx - blkCntOffset) * selectedBlockSize);
+        mmParam.singleM = min(selectedBlockSize * blockOffset,
+                              selectedCntOffset * selectedBlockSize - (mIdx - blkCntOffset) * selectedBlockSize);
 
         int64_t mm5ResOutOffset = mm5ResOutBaseOffset + mIdx * selectedBlockSize * dimDv;
         WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
-        CopyGmToL1(l1_p_tensor, pWorkspaceGm[pGmOffset + (mIdx - blkCntOffset) * selectedBlockSize], mmParam.singleK, mmParam.singleM, singleN);
+        CopyGmToL1(l1_p_tensor, pWorkspaceGm[pGmOffset + (mIdx - blkCntOffset) * selectedBlockSize], mmParam.singleK,
+                   mmParam.singleM, singleN);
 
         for (int32_t dIdx = 0; dIdx < dLoopTimes; dIdx++) {
             current_l1_dy_tensor = l1_dy_tensor[dIdx * perLoopDSize * AlignTo<int64_t>(mmParam.singleK, SIZE_16)];
             LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_ & 1];
-            
+
             int64_t currentOutGmOffset = mm5ResOutOffset + dIdx * perLoopDSize;
             // l0a复用
             uint32_t l0a_ping_pong_flag = ping_pong_flag_l0a_;
             if (runInfo.isOri) {
-                MmadInnerWithSync<T1, true>(l0cTensor, l1_p_tensor, current_l1_dy_tensor,
-                    aL0TensorPingPong, bL0TensorPingPong,
-                    mmParam, l0a_ping_pong_flag, ping_pong_flag_l0b_, ping_pong_flag_l0c_, dIdx == 0, mm5ResWorkspaceGm[currentOutGmOffset]);
+                MmadInnerWithSync<T1, true>(l0cTensor, l1_p_tensor, current_l1_dy_tensor, aL0TensorPingPong,
+                                            bL0TensorPingPong, mmParam, l0a_ping_pong_flag, ping_pong_flag_l0b_,
+                                            ping_pong_flag_l0c_, dIdx == 0, mm5ResWorkspaceGm[currentOutGmOffset]);
             } else {
-                MmadInnerWithSync<T1, MODE!=SMLAG_SCFA_MODE>(l0cTensor, l1_p_tensor, current_l1_dy_tensor,
-                    aL0TensorPingPong, bL0TensorPingPong,
-                    mmParam, l0a_ping_pong_flag, ping_pong_flag_l0b_, ping_pong_flag_l0c_, dIdx == 0, mm5ResWorkspaceGm[currentOutGmOffset]);
+                MmadInnerWithSync<T1, MODE != SMLAG_SCFA_MODE>(
+                    l0cTensor, l1_p_tensor, current_l1_dy_tensor, aL0TensorPingPong, bL0TensorPingPong, mmParam,
+                    l0a_ping_pong_flag, ping_pong_flag_l0b_, ping_pong_flag_l0c_, dIdx == 0,
+                    mm5ResWorkspaceGm[currentOutGmOffset]);
             }
             UpdatePingPongFlag(ping_pong_flag_l0c_);
         }

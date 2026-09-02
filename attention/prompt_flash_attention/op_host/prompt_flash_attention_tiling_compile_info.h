@@ -22,7 +22,7 @@
 #include "tiling/tiling_api.h"
 #include "register/op_def_registry.h"
 
-namespace optiling { 
+namespace optiling {
 
 struct PromptFlashAttentionCompileInfo {
     uint32_t aivNum;
@@ -36,6 +36,6 @@ struct PromptFlashAttentionCompileInfo {
     platform_ascendc::SocVersion socShortName;
 };
 
-}
+} // namespace optiling
 
-#endif  // PROMPT_FLASH_ATTENTION_TILING_STRUCT_COMPILE_INFO_H
+#endif // PROMPT_FLASH_ATTENTION_TILING_STRUCT_COMPILE_INFO_H

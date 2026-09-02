@@ -34,7 +34,10 @@ enum class SmlaLayout {
     TND = 1,
 };
 
-enum class ValidSocVersion { ASCEND910 = 0, ASCEND950 };
+enum class ValidSocVersion {
+    ASCEND910 = 0,
+    ASCEND950
+};
 
 inline bool IsTensorValid(Tensor *tensor)
 {

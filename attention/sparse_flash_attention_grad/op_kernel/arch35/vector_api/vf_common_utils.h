@@ -21,17 +21,17 @@ namespace AscendC {
 using namespace MicroAPI;
 
 constexpr static AscendC::MicroAPI::CastTrait castTraitB162B32Odd = {
-AscendC::MicroAPI::RegLayout::ONE,
-AscendC::MicroAPI::SatMode::UNKNOWN,
-AscendC::MicroAPI::MaskMergeMode::ZEROING,
-AscendC::RoundMode::UNKNOWN,
+    AscendC::MicroAPI::RegLayout::ONE,
+    AscendC::MicroAPI::SatMode::UNKNOWN,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::UNKNOWN,
 };
 constexpr static AscendC::MicroAPI::CastTrait castTraitB162B32Even = {
-AscendC::MicroAPI::RegLayout::ZERO,
-AscendC::MicroAPI::SatMode::UNKNOWN,
-AscendC::MicroAPI::MaskMergeMode::ZEROING,
-AscendC::RoundMode::UNKNOWN,
+    AscendC::MicroAPI::RegLayout::ZERO,
+    AscendC::MicroAPI::SatMode::UNKNOWN,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::UNKNOWN,
 };
-} // namespace
+} // namespace AscendC
 
 #endif // VF_COMMON_UTILS_H

@@ -24,17 +24,15 @@ template <typename T1, typename IndexDtype, bool NCT = false>
 class ScatterPaKvCacheNormalSiso : public ScatterPaKvCacheNormalCommon {
 public:
     __aicore__ inline ScatterPaKvCacheNormalSiso(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict__ tilingData)
-    : ScatterPaKvCacheNormalCommon(pipe, tilingData)
-    {
-    }
+        : ScatterPaKvCacheNormalCommon(pipe, tilingData)
+    {}
 
     __aicore__ inline void Init(GM_ADDR keyIn, GM_ADDR slotMapping, GM_ADDR keyCacheOut)
     {
         int64_t coreNums = GetBlockNum(); // 用的核数
-        int64_t blockId = GetBlockIdx(); //当前核
-        curBlockFactor_ =
-            (blockId == coreNums - 1) ? tilingData_->tailBlockFactor : tilingData_->blockFactor;
-        startTaskId_ = blockId * tilingData_->blockFactor; //当前核起始token
+        int64_t blockId = GetBlockIdx();  // 当前核
+        curBlockFactor_ = (blockId == coreNums - 1) ? tilingData_->tailBlockFactor : tilingData_->blockFactor;
+        startTaskId_ = blockId * tilingData_->blockFactor; // 当前核起始token
 
         keyInGm_.SetGlobalBuffer((__gm__ T1 *)keyIn);
         keyCacheOutGm_.SetGlobalBuffer((__gm__ T1 *)keyCacheOut);
@@ -75,7 +73,7 @@ public:
         TEventID eventIdMTE2ToMTE3_ = pipe_->FetchEventID(HardEvent::MTE2_MTE3);
         TEventID eventIdMTE3ToMTE2_ = pipe_->FetchEventID(HardEvent::MTE3_MTE2);
         // Key
-        int64_t kTokenSize = tilingData_->numHead * tilingData_->kHeadSize; // Key一个token大小
+        int64_t kTokenSize = tilingData_->numHead * tilingData_->kHeadSize;    // Key一个token大小
         int64_t kTokenSizeAlign = (kTokenSize + kAlign - 1) / kAlign * kAlign; // Key一个token大小对齐
         DataCopyExtParams kCopyParam = {1, static_cast<uint32_t>(kTokenSize * sizeof(T1)), 0, 0, 0};
         DataCopyPadExtParams<T1> kPadParams = {false, 0, 0, 0};

@@ -20,24 +20,31 @@
 
 // INPUT_T - means data type for input
 // T       - means data type when calc
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T = INPUT_T,
-          CubeFormat bmm1Format = CubeFormat::NZ, MmPolicyType mmPolicyType = MmPolicyType::NORMAL, bool pageAttention = false>
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T = INPUT_T, CubeFormat bmm1Format = CubeFormat::NZ,
+          MmPolicyType mmPolicyType = MmPolicyType::NORMAL, bool pageAttention = false>
 class PromptFlashAttentionVarLenScoreSameABBaseApi
-    : public MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType, pageAttention> {
-    using Base = MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType, pageAttention>;
+    : public MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                        mmPolicyType, pageAttention> {
+    using Base = MlaS1s2Bn2gs1SameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                            mmPolicyType, pageAttention>;
     using Base::BMM1_OUT_ISFIXED_ND;
     using Base::BMM2_OUT_ISFIXED_ND;
     using Base::BMM2_A_ISFIXED_ND;
     using Base::STAGE2_TBUF_SIZE;
     static constexpr CubeFormat BMM2_A_FORMAT = BMM2_A_ISFIXED_ND ? CubeFormat::ND : CubeFormat::NZ;
     static constexpr CubeFormat BMM2_OUT_FORMAT = BMM2_OUT_ISFIXED_ND ? CubeFormat::ND : CubeFormat::NZ;
+
 public:
     __aicore__ inline PromptFlashAttentionVarLenScoreSameABBaseApi(){};
 
-    __aicore__ inline void
-    UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *attenMask,
-               __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *blockTable, __gm__ uint8_t* learnableSink,
-               __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, const TILING_TYPE *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
+                                      __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
+                                      __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope,
+                                      __gm__ uint8_t *keyRope, __gm__ uint8_t *blockTable,
+                                      __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut,
+                                      __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
+                                      const TILING_TYPE *__restrict tiling, TPipe *tPipe);
 
     __aicore__ inline void Process();
 
@@ -53,7 +60,7 @@ protected:
 
     __aicore__ inline void SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
                                         int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
-    
+
     __aicore__ inline void SetPaCacheLayout(SplitSameABExtraInfo &extraInfo);
 
     __aicore__ inline void CloneExtraInfo(SplitSameABExtraInfo &extraInfo, const SplitSameABExtraInfo &srcInfo,
@@ -77,15 +84,19 @@ protected:
     GlobalTensor<int64_t> kvListGm;
 };
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType, pageAttention>::UnpackInit(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *blockTable, __gm__ uint8_t* learnableSink, __gm__ uint8_t *attentionOut, 
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, const TILING_TYPE *__restrict tiling, TPipe *tPipe)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
+    TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
+    pageAttention>::UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
+                               __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
+                               __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+                               __gm__ uint8_t *blockTable, __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut,
+                               __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
+                               const TILING_TYPE *__restrict tiling, TPipe *tPipe)
 {
-    this->InitInput(query, key, value, queryRope, keyRope, attenMask, blockTable, learnableSink, attentionOut, softmaxLse, workspace, tiling, tPipe); // gm设置
+    this->InitInput(query, key, value, queryRope, keyRope, attenMask, blockTable, learnableSink, attentionOut,
+                    softmaxLse, workspace, tiling, tPipe); // gm设置
     this->ComputeConstexpr();
     qListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths);
     kvListGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKv);
@@ -103,15 +114,16 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
                 if (actualS1Len < 0 && accumSize > 0) {
                     actualS1Len = this->s1Size - accumSize;
                 }
-                AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2],
-                                            actualS1Len * this->n2GD2, static_cast<INPUT_T>(0.0));
+                AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2], actualS1Len * this->n2GD2,
+                                             static_cast<INPUT_T>(0.0));
             }
         }
 
         if (this->tilingData->PFAinputParams.isSoftMaxLseEnable) {
             SyncAll(); // synchronize for attentionOutGm
             int64_t tmpBlockIdx = GetBlockIdx();
-            const int64_t totalSoftMaxLseOutputSize = ((__gm__ int64_t *)actualSeqQlenAddr)[this->tilingData->PFAinputParams.bSize - 1] * this->n2G;
+            const int64_t totalSoftMaxLseOutputSize =
+                ((__gm__ int64_t *)actualSeqQlenAddr)[this->tilingData->PFAinputParams.bSize - 1] * this->n2G;
             int64_t coreNum = this->tilingData->PFAmultiCoreParams.coreNum;
             if (coreNum != 0 && tmpBlockIdx < coreNum) {
                 int64_t singleCoreLseSize = totalSoftMaxLseOutputSize / coreNum;
@@ -120,12 +132,13 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
                 }
                 const int64_t singleCoreLseSizeFinal = singleCoreLseSize;
                 AscendC::InitOutput<float>(this->softmaxLseGm[tmpBlockIdx * (totalSoftMaxLseOutputSize / coreNum)],
-                                            singleCoreLseSizeFinal, static_cast<float>(3e+99)); // 3e+99:set the value of invalid batch to inf
-                SyncAll(); // synchronize for softmaxLseGm
+                                           singleCoreLseSizeFinal,
+                                           static_cast<float>(3e+99)); // 3e+99:set the value of invalid batch to inf
+                SyncAll();                                             // synchronize for softmaxLseGm
             }
         }
     }
-    
+
     this->InitBuffer();
 
     if ASCEND_IS_AIV {
@@ -137,10 +150,11 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     return;
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                             bmm1Format, mmPolicyType, pageAttention>::ComputeConstexpr()
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                             mmPolicyType, pageAttention>::ComputeConstexpr()
 {
     this->gD = this->tilingData->PFAinputParams.gSize * this->dSize;
     this->n2D = this->tilingData->PFAinputParams.n2Size * this->dSize;
@@ -211,14 +225,17 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     this->softmaxReduceSize = 1;
 
     if ASCEND_IS_AIC {
-        this->matmulService.InitParams(this->dSize, this->valueDSize, this->ropeHeadSize, this->tilingData->PFAinputParams.n2Size, this->mm1Ka, this->mm1Kb, this->mm1RopeKa, this->mm1RopeKb, this->mm2Kb);
+        this->matmulService.InitParams(this->dSize, this->valueDSize, this->ropeHeadSize,
+                                       this->tilingData->PFAinputParams.n2Size, this->mm1Ka, this->mm1Kb,
+                                       this->mm1RopeKa, this->mm1RopeKb, this->mm2Kb);
     }
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline int64_t PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                                       bmm1Format, mmPolicyType, pageAttention>::GetKS2BaseStride()
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline int64_t
+PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                             mmPolicyType, pageAttention>::GetKS2BaseStride()
 {
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
         return this->s2BaseNratioN2D;
@@ -227,10 +244,11 @@ __aicore__ inline int64_t PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TY
     }
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline int64_t PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                                       bmm1Format, mmPolicyType, pageAttention>::GetKRopeS2BaseStride()
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline int64_t
+PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                             mmPolicyType, pageAttention>::GetKRopeS2BaseStride()
 {
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
         return this->s2BaseNratioN2RopeD;
@@ -239,10 +257,11 @@ __aicore__ inline int64_t PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TY
     }
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>                                                                       
-__aicore__ inline int64_t PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                                       bmm1Format, mmPolicyType, pageAttention>::GetVS2BaseStride()
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline int64_t
+PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                             mmPolicyType, pageAttention>::GetVS2BaseStride()
 {
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
         return this->s2BaseNRatioSize * this->n2D2;
@@ -251,13 +270,11 @@ __aicore__ inline int64_t PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TY
     }
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void
-PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                        bmm1Format, mmPolicyType, pageAttention>::GetSeqQlenKvlenByBoidx(int64_t boIdx,
-                                                                                            int64_t &actualSeqQlen,
-                                                                                            int64_t &actualSeqKvlen)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
+    TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
+    pageAttention>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen)
 {
     if (boIdx == 0) {
         actualSeqQlen = qListGm.GetValue(0);
@@ -274,10 +291,11 @@ PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, 
 }
 
 // 初始化s1方向上的累加值
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType, pageAttention>::CalS1OuterSize(int64_t offset)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                             mmPolicyType, pageAttention>::CalS1OuterSize(int64_t offset)
 {
     int64_t actualS1Outersize = 0;
     // 用于取actualS1Len下标
@@ -305,15 +323,17 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     return;
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, 
-                                                        bmm1Format, mmPolicyType, pageAttention>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                             mmPolicyType, pageAttention>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
     GetSeqQlenKvlenByBoidx(this->boIdx, actualS1Len, actualS2Len);
-    int64_t actualS1Outersize = this->s1OuterSizeAcc + (CeilDiv(actualS1Len, this->cubeS1BaseSize) * this->n2GOuterSize);
+    int64_t actualS1Outersize =
+        this->s1OuterSizeAcc + (CeilDiv(actualS1Len, this->cubeS1BaseSize) * this->n2GOuterSize);
     while (multiCoreInnerIdx >= actualS1Outersize) {
         this->s1OuterSizeAcc = actualS1Outersize;
         this->s1SizeAcc += actualS1Len;
@@ -332,10 +352,10 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     GetSeqQlenKvlenByBoidx(this->boIdx, this->s1Size, this->s2Size);
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                             bmm1Format, mmPolicyType, pageAttention>::GetS2LoopRange()
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
+    TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType, pageAttention>::GetS2LoopRange()
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -359,7 +379,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
 
         if ((layOutType == LayOutTypeEnum::LAYOUT_TND) || (layOutType == LayOutTypeEnum::LAYOUT_NTD_TND)) {
             // preTonke < 0 或者 nextToken < q_s - kv_s 则为 sparseMode4的行无效场景，设置行无效标记
-            if ((this->tilingData->PFAinputParams.preTokens < 0) || (this->tilingData->PFAinputParams.nextTokens < actualS1Len - actualS2Len)) {
+            if ((this->tilingData->PFAinputParams.preTokens < 0) ||
+                (this->tilingData->PFAinputParams.nextTokens < actualS1Len - actualS2Len)) {
                 this->hasSparse4InvalidLine = true;
             }
         }
@@ -386,7 +407,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
             this->s2StartIdx = 0;
             this->s2EndIdx = Min((this->s1oIdx + 1) * this->cubeS1BaseSize + actualS2Len - actualS1Len, actualS2Len);
         }
-    } else if (this->tilingData->PFAinputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL)) {
+    } else if (this->tilingData->PFAinputParams.sparseType ==
+               static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL)) {
         if (this->boIdx == this->tilingData->PFAinputParams.bandIndex) {
             this->s2StartIdx = 0;
             this->s2EndIdx = Min((this->s1oIdx + 1) * this->cubeS1BaseSize + actualS2Len -
@@ -398,8 +420,7 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
         }
     } else if (this->tilingData->PFAinputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->s2StartIdx = 0;
-        this->s2EndIdx =
-            Max((this->s1oIdx + 1) * this->cubeS1BaseSize - actualS1Len + actualS2Len,
+        this->s2EndIdx = Max((this->s1oIdx + 1) * this->cubeS1BaseSize - actualS1Len + actualS2Len,
                              ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
         this->s2EndIdx = Min(this->s2EndIdx, this->s2Size);
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
@@ -415,10 +436,10 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     return;
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                             bmm1Format, mmPolicyType, pageAttention>::Process()
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
+    TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType, pageAttention>::Process()
 {
     this->AllocEvent();
     if ASCEND_IS_AIC {
@@ -444,7 +465,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
 
     SplitSameABExtraInfo extraInfo[3];
     int64_t taskId = 0;
-    for (int64_t multiCoreInnerIdx = multiCoreInnerOffset; multiCoreInnerIdx < multiCoreInnerLimit; ++multiCoreInnerIdx) {
+    for (int64_t multiCoreInnerIdx = multiCoreInnerOffset; multiCoreInnerIdx < multiCoreInnerLimit;
+         ++multiCoreInnerIdx) {
         this->softMaxCheckRes = SOFTMAX_CHECK_RES_DEFAULT_VALUE;
         this->ComputeAxisIdx(multiCoreInnerIdx);
         // s2轴循环计数, 支持sparse和非sparse场景
@@ -487,7 +509,8 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
             if ASCEND_IS_AIC {
                 if (taskId > 0) {
                     CrossCoreWaitFlag(Base::SYNC_V1_C2_FLAG);
-                    this->matmulService.template ComputeMm2<BMM2_A_FORMAT, BMM2_OUT_FORMAT>(extraInfo[(taskId + 2) % 3]);
+                    this->matmulService.template ComputeMm2<BMM2_A_FORMAT, BMM2_OUT_FORMAT>(
+                        extraInfo[(taskId + 2) % 3]);
                     CrossCoreSetFlag<Base::SYNC_MODE2, PIPE_FIX>(Base::SYNC_C2_V2_FLAG);
                 }
             }
@@ -502,7 +525,7 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
             this->ProcessVec1(extraInfo[(taskId + 2) % 3]);
             CrossCoreSetFlag<Base::SYNC_MODE2, PIPE_MTE3>(Base::SYNC_V1_C2_FLAG);
         }
-        
+
         if ASCEND_IS_AIC {
             CrossCoreWaitFlag(Base::SYNC_V1_C2_FLAG);
             this->matmulService.template ComputeMm2<BMM2_A_FORMAT, BMM2_OUT_FORMAT>(extraInfo[(taskId + 2) % 3]);
@@ -527,13 +550,14 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     if ASCEND_IS_AIC {
         this->matmulService.FreeEventID();
     }
-    this->FreeEvent();   
+    this->FreeEvent();
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType, pageAttention>::SetPaCacheLayout(SplitSameABExtraInfo &extraInfo)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
+    TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
+    pageAttention>::SetPaCacheLayout(SplitSameABExtraInfo &extraInfo)
 {
     if (this->tilingData->PFAinputParams.paCacheLayoutType == paCacheBBH) {
         extraInfo.paCacheLayoutType = PaCacheLayoutType::PA_BBH;
@@ -544,11 +568,15 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     }
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType, pageAttention>::SetExtraInfo(
-    SplitSameABExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void
+PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format,
+                                             mmPolicyType, pageAttention>::SetExtraInfo(SplitSameABExtraInfo &extraInfo,
+                                                                                        int64_t taskId,
+                                                                                        int64_t s2LoopCount,
+                                                                                        int64_t s2LoopLimit,
+                                                                                        int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
     extraInfo.s2EndIdx = this->s2EndIdx;
@@ -594,11 +622,12 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     this->SetPaCacheLayout(extraInfo);
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType, pageAttention>::CloneExtraInfo(SplitSameABExtraInfo &extraInfo, 
-                                                        const SplitSameABExtraInfo &srcInfo, int64_t taskId, int64_t s2LoopCount)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
+    TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
+    pageAttention>::CloneExtraInfo(SplitSameABExtraInfo &extraInfo, const SplitSameABExtraInfo &srcInfo, int64_t taskId,
+                                   int64_t s2LoopCount)
 {
     extraInfo.s2StartIdx = srcInfo.s2StartIdx;
     extraInfo.s2EndIdx = srcInfo.s2EndIdx;
@@ -632,25 +661,27 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
         extraInfo.s2RealSizeFloorAlign8 = extraInfo.s2RealSize / 8 * 8;
         extraInfo.s2LastLoop = true;
 
-        extraInfo.duplicateMask = 
+        extraInfo.duplicateMask =
             (((uint64_t)1 << (extraInfo.s2RealSizeAlign64 - extraInfo.s2RealSizeFloorAlign8)) - 1) &
             (~(((uint64_t)1 << (extraInfo.s2RealSize - extraInfo.s2RealSizeFloorAlign8)) - 1));
         if (extraInfo.s2RealSizeAlign64 - extraInfo.s2RealSizeFloorAlign8 == 64) {
-            extraInfo.duplicateMask = 
+            extraInfo.duplicateMask =
                 0xffffffffffffffff & (~(((uint64_t)1 << (extraInfo.s2RealSize - extraInfo.s2RealSizeFloorAlign8)) - 1));
         }
 
         if (unlikely(extraInfo.s2RealSize < fp32BaseSize)) {
-            extraInfo.vec1S1BaseSize = Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize); // Maximize the ub
+            extraInfo.vec1S1BaseSize =
+                Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize); // Maximize the ub
             extraInfo.realSplitN = CeilDiv(extraInfo.s1RealSize, extraInfo.vec1S1BaseSize);
         } else {
-            extraInfo.vec1S1BaseSize = Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize); // Maximize the ub
+            extraInfo.vec1S1BaseSize =
+                Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize); // Maximize the ub
             extraInfo.realSplitN = CeilDiv(extraInfo.s1RealSize, extraInfo.vec1S1BaseSize);
         }
     }
 
     extraInfo.vec2S1BaseSize = srcInfo.vec2S1BaseSize;
-    
+
     extraInfo.s2LoopLimit = srcInfo.s2LoopLimit;
     extraInfo.multiCoreInnerIdx = srcInfo.multiCoreInnerIdx;
 
@@ -675,10 +706,11 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     extraInfo.gBaseSize = srcInfo.gBaseSize;
 }
 
-template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T, typename T,
-          CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
-__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T,
-                                                        bmm1Format, mmPolicyType, pageAttention>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
+template <typename TILING_TYPE, ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasAtten, typename INPUT_T,
+          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, bool pageAttention>
+__aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<
+    TILING_TYPE, implMode, layOutType, hasAtten, INPUT_T, T, bmm1Format, mmPolicyType,
+    pageAttention>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
 {
     extraInfo.s1RealSize = (extraInfo.cubeS1RealSize + 1) / 2;
     extraInfo.vecCoreOffset = this->cubeSubIdx * extraInfo.s1RealSize * extraInfo.gBaseSize;
@@ -713,17 +745,19 @@ __aicore__ inline void PromptFlashAttentionVarLenScoreSameABBaseApi<TILING_TYPE,
     // In scenes where s2 is less than 8, when traversing s1basesize for computation, there is a memory issue.
     // Therefore, it's changed to compute once
     if (unlikely(extraInfo.s2RealSize < fp32BaseSize)) {
-        extraInfo.vec1S1BaseSize = Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize * this->gBaseSize); // Maximize the ub
+        extraInfo.vec1S1BaseSize =
+            Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize * this->gBaseSize); // Maximize the ub
         extraInfo.realSplitN = CeilDiv(extraInfo.s1RealSize * this->gBaseSize, extraInfo.vec1S1BaseSize);
     } else {
-        extraInfo.vec1S1BaseSize = Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize * this->gBaseSize); // Maximize the ub
+        extraInfo.vec1S1BaseSize =
+            Min(1024 / extraInfo.s2RealSizeAlign64 * 8, extraInfo.s1RealSize * this->gBaseSize); // Maximize the ub
         extraInfo.realSplitN = CeilDiv(extraInfo.s1RealSize * this->gBaseSize, extraInfo.vec1S1BaseSize);
     }
 
     if (unlikely(this->notSplitG)) {
         extraInfo.vec2S1BaseSize = extraInfo.s1RealSize;
     } else {
-        extraInfo.vec2S1BaseSize = STAGE2_TBUF_SIZE / this->valueDSizeAlign16;   // 32 * 128 / 64 = 64
+        extraInfo.vec2S1BaseSize = STAGE2_TBUF_SIZE / this->valueDSizeAlign16; // 32 * 128 / 64 = 64
     }
     extraInfo.needNz2Nd = (BMM1_OUT_ISFIXED_ND || (extraInfo.s2RealSize % 64 == 0)) ? 0 : 1;
     return;

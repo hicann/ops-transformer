@@ -21,8 +21,9 @@ namespace AscendC {
 using namespace MicroAPI;
 
 template <typename T, bool isAlign>
-__simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T * dstUb, __ubuf__ T * srcUb, __ubuf__ T * srcOtherUb, __ubuf__ T * reduceSumUb, uint32_t alignCnt,
-    uint32_t tailSize, float maxValue, uint32_t lossSize)
+__simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ T *srcOtherUb,
+                                           __ubuf__ T *reduceSumUb, uint32_t alignCnt, uint32_t tailSize,
+                                           float maxValue, uint32_t lossSize)
 {
     RegTensor<float> vreg_input_x1;
     RegTensor<float> vreg_input_x1_new;
@@ -86,19 +87,21 @@ __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T * dstUb, __ubuf__ T * srcU
         Mul(vreg_output_x_new, vreg_tmp2, vreg_input_x2_new, preg_all_b32);
         Add(vreg_output_x, vreg_output_x_new, vreg_output_x, preg_all_b32);
     }
-    Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(
-            vreg_output, vreg_output_x, preg_all_b32);
+    Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_output, vreg_output_x,
+                                                                                      preg_all_b32);
     Add(vreg_dst, vreg_output, vreg_dst, preg_all_b32);
     StoreAlign(((__ubuf__ T *&)dstUb), vreg_dst, preg_loss);
 }
 
 template <typename T, bool isAlign>
-__aicore__ inline void ProcessVec5Vf(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& srcOtherTensor, const LocalTensor<T>& reduceSumTensor, const uint32_t m)
+__aicore__ inline void ProcessVec5Vf(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
+                                     const LocalTensor<T> &srcOtherTensor, const LocalTensor<T> &reduceSumTensor,
+                                     const uint32_t m)
 {
-    __ubuf__ T * dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
-    __ubuf__ T * srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
-    __ubuf__ T * srcOtherUb = (__ubuf__ T*)srcOtherTensor.GetPhyAddr();
-    __ubuf__ T * reduceSumUb = (__ubuf__ T*)reduceSumTensor.GetPhyAddr();
+    __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
+    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ T *srcOtherUb = (__ubuf__ T *)srcOtherTensor.GetPhyAddr();
+    __ubuf__ T *reduceSumUb = (__ubuf__ T *)reduceSumTensor.GetPhyAddr();
     uint32_t alignCnt = m >> 6;
     uint32_t tailSize = m - (m >> 6 << 6);
     float maxValue = 1e-8;
@@ -106,6 +109,6 @@ __aicore__ inline void ProcessVec5Vf(const LocalTensor<T>& dstTensor, const Loca
 
     ProcessVec5BasicVF<T, isAlign>(dstUb, srcUb, srcOtherUb, reduceSumUb, alignCnt, tailSize, maxValue, lossSize);
 }
-} // namespace
+} // namespace AscendC
 
 #endif // VF_PROCESS_VEC5_H

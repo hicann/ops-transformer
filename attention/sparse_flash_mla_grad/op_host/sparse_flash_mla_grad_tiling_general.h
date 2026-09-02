@@ -59,7 +59,8 @@ struct AiCoreParams {
 
 class SparseFlashMlaGradBasicTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit SparseFlashMlaGradBasicTiling(gert::TilingContext *context) : TilingBaseClass(context) {};
+    explicit SparseFlashMlaGradBasicTiling(gert::TilingContext *context)
+        : TilingBaseClass(context) {};
     SparseFlashMlaGradTilingData tilingData;
 
 protected:

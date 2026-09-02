@@ -50,12 +50,13 @@ __aicore__ inline uint32_t DivUp(uint32_t num, uint32_t align)
 }
 
 template <typename DTYPE_IN, typename DTYPE_OUT, typename DTYPE_SCALE, typename DTYPE_BIAS, typename DTYPE_MASK,
-    bool HAS_BIAS1>
+          bool HAS_BIAS1>
 class SwinAttentionScoreQuant;
 
 template <typename DTYPE>
 __aicore__ inline int CopyNDBlock(AscendC::LocalTensor<DTYPE> &transTensor, const AscendC::GlobalTensor<DTYPE> &src,
-    int64_t srcOffset, const int height, const int width, const int gCol, const bool isBankConflict)
+                                  int64_t srcOffset, const int height, const int width, const int gCol,
+                                  const bool isBankConflict)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
     int calcWidth = DivUp(width, c0Size);
@@ -64,8 +65,8 @@ __aicore__ inline int CopyNDBlock(AscendC::LocalTensor<DTYPE> &transTensor, cons
         int blockLen = calcWidth;
         int dstOffset = 0;
         int bankConflictPadSize = isBankConflict ? (BLOCK_SIZE_32 / sizeof(DTYPE)) : 0;
-        for (int i = 0; i< height; i++) {
-            AscendC::DataCopy(transTensor[dstOffset], src[srcOffset], { 1, static_cast<uint16_t>(blockLen), 0, 0 });
+        for (int i = 0; i < height; i++) {
+            AscendC::DataCopy(transTensor[dstOffset], src[srcOffset], {1, static_cast<uint16_t>(blockLen), 0, 0});
             dstOffset += (RoundUp(width, c0Size) + bankConflictPadSize);
             srcOffset += gCol;
         }
@@ -77,8 +78,8 @@ __aicore__ inline int CopyNDBlock(AscendC::LocalTensor<DTYPE> &transTensor, cons
         int blockLen = DivUp(width * sizeof(DTYPE), BLOCK_SIZE_32);
         uint16_t dstStride = isBankConflict ? 1 : 0;
         AscendC::DataCopy(transTensor, src[srcOffset],
-            { static_cast<uint16_t>(height), static_cast<uint16_t>(blockLen), static_cast<uint16_t>(srcStride),
-            dstStride });
+                          {static_cast<uint16_t>(height), static_cast<uint16_t>(blockLen),
+                           static_cast<uint16_t>(srcStride), dstStride});
         event_t enQueEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(AscendC::HardEvent::MTE2_V));
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(enQueEvtID);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(enQueEvtID);
@@ -88,7 +89,7 @@ __aicore__ inline int CopyNDBlock(AscendC::LocalTensor<DTYPE> &transTensor, cons
 
 template <typename DTYPE>
 __aicore__ inline void NDPadZeros(AscendC::LocalTensor<DTYPE> &dst, const int height, const int calcWidth,
-    const int width)
+                                  const int width)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
     int tail = width % c0Size;
@@ -100,18 +101,19 @@ __aicore__ inline void NDPadZeros(AscendC::LocalTensor<DTYPE> &dst, const int he
         uint64_t mask[2];
         uint16_t mask_tail = ~((1 << tail) - 1);
         uint64_t masktail = mask_tail;
-        mask[0] = masktail + (masktail << 16) + (masktail << 32) + (masktail << 48);    // 将masktail左移16、32、48位填充mask
+        mask[0] =
+            masktail + (masktail << 16) + (masktail << 32) + (masktail << 48); // 将masktail左移16、32、48位填充mask
         mask[1] = mask[0];
         if (masktail != 0) {
             if (calcWidth >= maxSrcBlkStride0) {
-                AscendC::Duplicate(dst[offset], (DTYPE)0, mask, DivUp(height, 2),
-                    calcWidth, 2 * calcWidth); // 每次处理2个block的数据
+                AscendC::Duplicate(dst[offset], (DTYPE)0, mask, DivUp(height, 2), calcWidth,
+                                   2 * calcWidth); // 每次处理2个block的数据
             } else if (calcWidth >= maxSrcBlkStride1) {
-                AscendC::Duplicate(dst[offset], (DTYPE)0, mask, DivUp(height, 4),
-                    calcWidth, 4 * calcWidth); // 每次处理4个block的数据
+                AscendC::Duplicate(dst[offset], (DTYPE)0, mask, DivUp(height, 4), calcWidth,
+                                   4 * calcWidth); // 每次处理4个block的数据
             } else {
-                AscendC::Duplicate(dst[offset], (DTYPE)0, mask, DivUp(height, BLOCK_NUM_PER_VEC),
-                    calcWidth, BLOCK_NUM_PER_VEC * calcWidth);
+                AscendC::Duplicate(dst[offset], (DTYPE)0, mask, DivUp(height, BLOCK_NUM_PER_VEC), calcWidth,
+                                   BLOCK_NUM_PER_VEC * calcWidth);
             }
         }
     }
@@ -124,12 +126,12 @@ __aicore__ inline void NDPadZeros(AscendC::LocalTensor<DTYPE> &dst, const int he
 
 template <typename DTYPE>
 __aicore__ inline void NDTrans2NZ(AscendC::LocalTensor<DTYPE> &dst, AscendC::LocalTensor<DTYPE> &src,
-    const int calcHigh, const int calcWidth, const bool isBankConflict)
+                                  const int calcHigh, const int calcWidth, const bool isBankConflict)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
     const int cubeNum = FRACTAL_SIZE / sizeof(DTYPE);
     struct AscendC::UnaryRepeatParams intriParams;
-    uint64_t mask[2] = { uint64_t(-1), uint64_t(-1) };
+    uint64_t mask[2] = {uint64_t(-1), uint64_t(-1)};
     int32_t padBlock = 1;
 
     int actualWidth = isBankConflict ? calcWidth + padBlock : calcWidth;
@@ -144,37 +146,37 @@ __aicore__ inline void NDTrans2NZ(AscendC::LocalTensor<DTYPE> &dst, AscendC::Loc
     if (intriParams.srcBlkStride >= maxSrcBlkStride0) {
         mask[0] = 0xffffffff;
         mask[1] = 0;
-        intriParams.dstRepStride = intriParams.dstBlkStride * 2;    // vec每次处理2个block的数据
-        intriParams.srcRepStride = intriParams.srcBlkStride * 2;    // vec每次处理2个block的数据
+        intriParams.dstRepStride = intriParams.dstBlkStride * 2; // vec每次处理2个block的数据
+        intriParams.srcRepStride = intriParams.srcBlkStride * 2; // vec每次处理2个block的数据
 
         for (int i = 0; i < calcWidth; i++) {
             dstOffset = i * calcHigh * cubeNum;
             srcOffset = i * c0Size;
-            Muls(dst[dstOffset], src[srcOffset], (DTYPE)1, mask, 8 * calcHigh, intriParams);    // 每个calcHigh repeat 8次
+            Muls(dst[dstOffset], src[srcOffset], (DTYPE)1, mask, 8 * calcHigh, intriParams); // 每个calcHigh repeat 8次
         }
     } else if (intriParams.srcBlkStride >= maxSrcBlkStride1) {
         mask[1] = 0;
-        intriParams.dstRepStride = intriParams.dstBlkStride * 4;    // vec每次处理4个block的数据
-        intriParams.srcRepStride = intriParams.srcBlkStride * 4;    // vec每次处理4个block的数据
+        intriParams.dstRepStride = intriParams.dstBlkStride * 4; // vec每次处理4个block的数据
+        intriParams.srcRepStride = intriParams.srcBlkStride * 4; // vec每次处理4个block的数据
 
         for (int i = 0; i < calcWidth; i++) {
             dstOffset = i * calcHigh * cubeNum;
             srcOffset = i * c0Size;
-            Muls(dst[dstOffset], src[srcOffset], (DTYPE)1, mask, 4 * calcHigh, intriParams);    // 每个calcHigh repeat 4次
+            Muls(dst[dstOffset], src[srcOffset], (DTYPE)1, mask, 4 * calcHigh, intriParams); // 每个calcHigh repeat 4次
         }
     } else {
         for (int i = 0; i < calcWidth; i++) {
             dstOffset = i * calcHigh * cubeNum;
             srcOffset = i * c0Size;
-            Muls(dst[dstOffset], src[srcOffset], (DTYPE)1, mask, 2 * calcHigh, intriParams);    // 每个calcHigh repeat 2次
+            Muls(dst[dstOffset], src[srcOffset], (DTYPE)1, mask, 2 * calcHigh, intriParams); // 每个calcHigh repeat 2次
         }
     }
 }
 
 template <typename DTYPE>
 __aicore__ inline void CopyND2NZ(AscendC::LocalTensor<DTYPE> &dst, const AscendC::GlobalTensor<DTYPE> &src,
-    AscendC::LocalTensor<DTYPE> &transTensor, const int row, const int col,
-    const int height, const int width, const int gCol)
+                                 AscendC::LocalTensor<DTYPE> &transTensor, const int row, const int col,
+                                 const int height, const int width, const int gCol)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
     auto srcOffset = ((int64_t)row * (int64_t)gCol + (int64_t)col);
@@ -193,8 +195,8 @@ __aicore__ inline void CopyND2NZ(AscendC::LocalTensor<DTYPE> &dst, const AscendC
 
 template <typename DTYPE>
 __aicore__ inline void CopyND2NZOnTheFly(const AscendC::LocalTensor<DTYPE> &dst,
-    const AscendC::GlobalTensor<DTYPE> &src, const int row,
-    const int col, const int height, const int width, const int gCol)
+                                         const AscendC::GlobalTensor<DTYPE> &src, const int row, const int col,
+                                         const int height, const int width, const int gCol)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
     int calcWidth = width / c0Size;
@@ -217,7 +219,7 @@ __aicore__ inline void CopyND2NZOnTheFly(const AscendC::LocalTensor<DTYPE> &dst,
         int64_t oriDstOffset = dstOffset;
         for (int i = 0; i < calcWidth; i++) {
             for (int j = 0; j < height; j++) {
-                AscendC::DataCopy(dst[dstOffset], src[srcOffset], { 1, 1, 0, 0 });
+                AscendC::DataCopy(dst[dstOffset], src[srcOffset], {1, 1, 0, 0});
                 dstOffset += c0Size;
                 srcOffset += gCol;
             }
@@ -227,9 +229,9 @@ __aicore__ inline void CopyND2NZOnTheFly(const AscendC::LocalTensor<DTYPE> &dst,
     } else {
         for (int i = 0; i < calcWidth; i++) {
             AscendC::DataCopy(dst[dstOffset], src[srcOffset],
-                { static_cast<uint16_t>(height), 1, static_cast<uint16_t>(srcGap), 0 });
-                dstOffset += calcHeightExr * BLOCK_NUM_PER_FRACTAL * c0Size;
-                srcOffset += c0Size;
+                              {static_cast<uint16_t>(height), 1, static_cast<uint16_t>(srcGap), 0});
+            dstOffset += calcHeightExr * BLOCK_NUM_PER_FRACTAL * c0Size;
+            srcOffset += c0Size;
         }
     }
     event_t eventIDMte2ToMte1 = static_cast<event_t>(GetTPipePtr()->FetchEventID(AscendC::HardEvent::MTE2_MTE1));
@@ -241,8 +243,8 @@ __aicore__ inline void CopyND2NZOnTheFly(const AscendC::LocalTensor<DTYPE> &dst,
 }
 
 template <typename DTYPE>
-__aicore__ inline void TransDataBMatrix(const AscendC::LocalTensor<DTYPE> &dst,
-    const AscendC::LocalTensor<DTYPE> &src, int height, int width)
+__aicore__ inline void TransDataBMatrix(const AscendC::LocalTensor<DTYPE> &dst, const AscendC::LocalTensor<DTYPE> &src,
+                                        int height, int width)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
     int iterK = DivUp(height, c0Size);
@@ -335,8 +337,8 @@ __aicore__ inline void TransDataBMatrix(const AscendC::LocalTensor<DTYPE> &dst,
 }
 
 template <typename DTYPE>
-__aicore__ inline void CopyNZ2NZ(const AscendC::LocalTensor<DTYPE> &dst, const AscendC::LocalTensor<DTYPE> & src,
-    const int row, const int col, const int height, const int width, const int gRow)
+__aicore__ inline void CopyNZ2NZ(const AscendC::LocalTensor<DTYPE> &dst, const AscendC::LocalTensor<DTYPE> &src,
+                                 const int row, const int col, const int height, const int width, const int gRow)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
     int srcOffset = row * c0Size + col * gRow;
@@ -347,12 +349,12 @@ __aicore__ inline void CopyNZ2NZ(const AscendC::LocalTensor<DTYPE> &dst, const A
     if (srcStride >= UINT16_MAX) {
         for (int i = 0; i < width / c0Size; i++) {
             AscendC::DataCopy(dst[i * alignHeight * c0Size], src[srcOffset + i * gRow * c0Size],
-                { 1, static_cast<uint16_t>(blockLen), 0, 0 });
+                              {1, static_cast<uint16_t>(blockLen), 0, 0});
         }
     } else {
         AscendC::DataCopy(dst, src[srcOffset],
-            { static_cast<uint16_t>(DivUp(width, c0Size)), static_cast<uint16_t>(blockLen),
-            static_cast<uint16_t>(srcStride), 0 });
+                          {static_cast<uint16_t>(DivUp(width, c0Size)), static_cast<uint16_t>(blockLen),
+                           static_cast<uint16_t>(srcStride), 0});
     }
 }
 #endif

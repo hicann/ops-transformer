@@ -64,7 +64,10 @@ aclDataType GetDataTypeSmlag(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceSmlag(const std::string &source) { return source != "batch_size"; }
+inline bool IsTensorSourceSmlag(const std::string &source)
+{
+    return source != "batch_size";
+}
 
 inline int64_t GetRawShapeSizeSmlag(const std::string &source, int64_t batchValue)
 {
@@ -106,15 +109,13 @@ aclnnStatus CheckSingleParamSmlag(int64_t batchSize, int64_t maxSeqlenQ, int64_t
     }
     // max_seqlen_ori_kv >= 0
     if (maxSeqlenOriKv < 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_ori_kv",
-                                              std::to_string(maxSeqlenOriKv),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_ori_kv", std::to_string(maxSeqlenOriKv),
                                               "The value of max_seqlen_ori_kv must be greater than or equal to 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
     // max_seqlen_cmp_kv >= 0
     if (maxSeqlenCmpKv < 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_cmp_kv",
-                                              std::to_string(maxSeqlenCmpKv),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_cmp_kv", std::to_string(maxSeqlenCmpKv),
                                               "The value of max_seqlen_cmp_kv must be greater than or equal to 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -149,24 +150,21 @@ aclnnStatus CheckSingleParamSmlag(int64_t batchSize, int64_t maxSeqlenQ, int64_t
         if (oriMaskMode != static_cast<int64_t>(SparseModeSmlag::DEFAULT_MASK) &&
             oriMaskMode != static_cast<int64_t>(SparseModeSmlag::RIGHT_DOWN_CAUSAL) &&
             oriMaskMode != static_cast<int64_t>(SparseModeSmlag::BAND)) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "ori_mask_mode",
-                                                  std::to_string(oriMaskMode),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "ori_mask_mode", std::to_string(oriMaskMode),
                                                   "When has_ori_kv is true, the value of ori_mask_mode "
                                                   "must be in [0, 3, 4]");
             return ACLNN_ERR_PARAM_INVALID;
         }
         // ori_win_left >= -1
         if (oriWinLeft < -1) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "ori_win_left",
-                                                  std::to_string(oriWinLeft),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "ori_win_left", std::to_string(oriWinLeft),
                                                   "When has_ori_kv is true, the value of ori_win_left "
                                                   "must be greater than or equal to -1");
             return ACLNN_ERR_PARAM_INVALID;
         }
         // ori_win_right >= -1
         if (oriWinRight < -1) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "ori_win_right",
-                                                  std::to_string(oriWinRight),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "ori_win_right", std::to_string(oriWinRight),
                                                   "When has_ori_kv is true, the value of ori_win_right "
                                                   "must be greater than or equal to -1");
             return ACLNN_ERR_PARAM_INVALID;
@@ -183,8 +181,7 @@ aclnnStatus CheckSingleParamSmlag(int64_t batchSize, int64_t maxSeqlenQ, int64_t
         // cmp_mask_mode: 0 or 3
         if (cmpMaskMode != static_cast<int64_t>(SparseModeSmlag::DEFAULT_MASK) &&
             cmpMaskMode != static_cast<int64_t>(SparseModeSmlag::RIGHT_DOWN_CAUSAL)) {
-            OP_LOGE_FOR_INVALID_VALUE(SMLAG_ACLNN_OP_NAME, "cmp_mask_mode", std::to_string(cmpMaskMode),
-                                      "0 or 3");
+            OP_LOGE_FOR_INVALID_VALUE(SMLAG_ACLNN_OP_NAME, "cmp_mask_mode", std::to_string(cmpMaskMode), "0 or 3");
             return ACLNN_ERR_PARAM_INVALID;
         }
         // cmp_ratio: 1~128
@@ -231,8 +228,7 @@ aclnnStatus CheckSingleParamSmlag(int64_t batchSize, int64_t maxSeqlenQ, int64_t
     }
     // 校验 has_ori_kv 且 layout_kv 为 BSND 时，max_seqlen_ori_kv 必须大于 0
     if (hasOriKv && strcmp(layoutKvOptional, "BSND") == 0 && maxSeqlenOriKv <= 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_ori_kv",
-                                              std::to_string(maxSeqlenOriKv),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_ori_kv", std::to_string(maxSeqlenOriKv),
                                               "When has_ori_kv is true and layout_kv is BSND, "
                                               "the value of max_seqlen_ori_kv "
                                               "must be equal to the size of the second axis of ori_kv");
@@ -240,8 +236,7 @@ aclnnStatus CheckSingleParamSmlag(int64_t batchSize, int64_t maxSeqlenQ, int64_t
     }
     // 校验 has_cmp_kv 且 layout_kv 为 BSND 时，max_seqlen_cmp_kv 必须大于 0
     if (hasCmpKv && strcmp(layoutKvOptional, "BSND") == 0 && maxSeqlenCmpKv <= 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_cmp_kv",
-                                              std::to_string(maxSeqlenCmpKv),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLAG_ACLNN_OP_NAME, "max_seqlen_cmp_kv", std::to_string(maxSeqlenCmpKv),
                                               "When has_cmp_kv is true and layout_kv is BSND, "
                                               "the value of max_seqlen_cmp_kv "
                                               "must be equal to the size of the second axis of cmp_kv");
@@ -406,15 +401,13 @@ aclnnStatus CheckTopkLengthFirstDimSmlag(const aclTensor *topkLengthOptional, co
     }
     std::string incorrectShape = TopkLengthShapeToStringSmlag(topkLengthOptional);
     if (IsTensorSourceSmlag(querySource)) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            SMLAG_ACLNN_OP_NAME, topkLengthName, incorrectShape,
-            "When layout_q is BSND, the size of the first axis of " + topkLengthName +
-                " must be equal to " + GetSourceDescSmlag(querySource));
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(SMLAG_ACLNN_OP_NAME, topkLengthName, incorrectShape,
+                                              "When layout_q is BSND, the size of the first axis of " + topkLengthName +
+                                                  " must be equal to " + GetSourceDescSmlag(querySource));
     } else {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
             SMLAG_ACLNN_OP_NAME, topkLengthName, incorrectShape,
-            "When layout_q is BSND, the size of the first axis of " + topkLengthName +
-                " must be equal to batch_size");
+            "When layout_q is BSND, the size of the first axis of " + topkLengthName + " must be equal to batch_size");
     }
     return ACLNN_ERR_PARAM_INVALID;
 }
@@ -435,10 +428,10 @@ aclnnStatus CheckTopkLengthSingleDimSmlag(const aclTensor *topkLengthOptional, c
         return ACLNN_SUCCESS;
     }
     std::string incorrectShape = TopkLengthShapeToStringSmlag(topkLengthOptional);
-    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-        SMLAG_ACLNN_OP_NAME, topkLengthName, incorrectShape,
-        "When layout_q is " + std::string(layoutQOptional) + ", the size of the " + axis.desc + " axis of " +
-            topkLengthName + " must be equal to " + expectedDesc);
+    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(SMLAG_ACLNN_OP_NAME, topkLengthName, incorrectShape,
+                                          "When layout_q is " + std::string(layoutQOptional) + ", the size of the " +
+                                              axis.desc + " axis of " + topkLengthName + " must be equal to " +
+                                              expectedDesc);
     return ACLNN_ERR_PARAM_INVALID;
 }
 
@@ -493,8 +486,7 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
             // 校验 cu_seqlens_ori_kv 维度
             dimNum = GetDimNumSmlag(cuSeqlensOriKvOptional);
             if (dimNum != 1) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "cu_seqlens_ori_kv", std::to_string(dimNum),
-                                             "1");
+                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "cu_seqlens_ori_kv", std::to_string(dimNum), "1");
                 return ACLNN_ERR_PARAM_INVALID;
             }
             // 校验 cu_seqlens_ori_kv 数据类型
@@ -511,8 +503,7 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
             // 校验 seqused_ori_kv 维度
             dimNum = GetDimNumSmlag(sequsedOriKvOptional);
             if (dimNum != 1) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "seqused_ori_kv", std::to_string(dimNum),
-                                             "1");
+                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "seqused_ori_kv", std::to_string(dimNum), "1");
                 return ACLNN_ERR_PARAM_INVALID;
             }
             // 校验 seqused_ori_kv 数据类型
@@ -563,8 +554,7 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
             // 校验 cu_seqlens_cmp_kv 维度
             dimNum = GetDimNumSmlag(cuSeqlensCmpKvOptional);
             if (dimNum != 1) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "cu_seqlens_cmp_kv", std::to_string(dimNum),
-                                             "1");
+                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "cu_seqlens_cmp_kv", std::to_string(dimNum), "1");
                 return ACLNN_ERR_PARAM_INVALID;
             }
             // 校验 cu_seqlens_cmp_kv 数据类型
@@ -581,8 +571,7 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
             // 校验 seqused_cmp_kv 维度
             dimNum = GetDimNumSmlag(sequsedCmpKvOptional);
             if (dimNum != 1) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "seqused_cmp_kv", std::to_string(dimNum),
-                                             "1");
+                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "seqused_cmp_kv", std::to_string(dimNum), "1");
                 return ACLNN_ERR_PARAM_INVALID;
             }
             // 校验 seqused_cmp_kv 数据类型
@@ -599,8 +588,7 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
             // 校验 cmp_residual_kv 维度
             dimNum = GetDimNumSmlag(cmpResidualKvOptional);
             if (dimNum != 1) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "cmp_residual_kv", std::to_string(dimNum),
-                                             "1");
+                OP_LOGE_FOR_INVALID_SHAPEDIM(SMLAG_ACLNN_OP_NAME, "cmp_residual_kv", std::to_string(dimNum), "1");
                 return ACLNN_ERR_PARAM_INVALID;
             }
             // 校验 cmp_residual_kv 数据类型
@@ -700,13 +688,11 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
                         GetSourceDescSmlag(oriKvSource));
             } else if (IsTensorSourceSmlag(querySource)) {
                 OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                    SMLAG_ACLNN_OP_NAME, querySource,
-                    std::to_string(GetRawShapeSizeSmlag(querySource, queryBatchSize)),
+                    SMLAG_ACLNN_OP_NAME, querySource, std::to_string(GetRawShapeSizeSmlag(querySource, queryBatchSize)),
                     "When has_ori_kv is true, " + GetSourceDescSmlag(querySource) + " must be equal to batch_size");
             } else {
                 OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                    SMLAG_ACLNN_OP_NAME, oriKvSource,
-                    std::to_string(GetRawShapeSizeSmlag(oriKvSource, oriKvBatchSize)),
+                    SMLAG_ACLNN_OP_NAME, oriKvSource, std::to_string(GetRawShapeSizeSmlag(oriKvSource, oriKvBatchSize)),
                     "When has_ori_kv is true, " + GetSourceDescSmlag(oriKvSource) + " must be equal to batch_size");
             }
             return ACLNN_ERR_PARAM_INVALID;
@@ -726,13 +712,12 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
             }
         }
         // 校验 ori_topk_length 维度一致性
-        if (oriTopk != 0 &&
-            oriMaskMode == static_cast<int64_t>(SparseModeSmlag::DEFAULT_MASK) &&
+        if (oriTopk != 0 && oriMaskMode == static_cast<int64_t>(SparseModeSmlag::DEFAULT_MASK) &&
             IsTensorExistSmlag(oriTopkLengthOptional)) {
             if (strcmp(layoutQOptional, "BSND") == 0) {
                 // 校验 ori_topk_length 第一个维度
-                aclnnStatus ret = CheckTopkLengthFirstDimSmlag(oriTopkLengthOptional, "ori_topk_length",
-                                                               queryBatchSize, querySource);
+                aclnnStatus ret =
+                    CheckTopkLengthFirstDimSmlag(oriTopkLengthOptional, "ori_topk_length", queryBatchSize, querySource);
                 if (ret != ACLNN_SUCCESS) {
                     return ret;
                 }
@@ -776,13 +761,11 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
                         GetSourceDescSmlag(cmpKvSource));
             } else if (IsTensorSourceSmlag(querySource)) {
                 OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                    SMLAG_ACLNN_OP_NAME, querySource,
-                    std::to_string(GetRawShapeSizeSmlag(querySource, queryBatchSize)),
+                    SMLAG_ACLNN_OP_NAME, querySource, std::to_string(GetRawShapeSizeSmlag(querySource, queryBatchSize)),
                     "When has_cmp_kv is true, " + GetSourceDescSmlag(querySource) + " must be equal to batch_size");
             } else {
                 OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                    SMLAG_ACLNN_OP_NAME, cmpKvSource,
-                    std::to_string(GetRawShapeSizeSmlag(cmpKvSource, cmpKvBatchSize)),
+                    SMLAG_ACLNN_OP_NAME, cmpKvSource, std::to_string(GetRawShapeSizeSmlag(cmpKvSource, cmpKvBatchSize)),
                     "When has_cmp_kv is true, " + GetSourceDescSmlag(cmpKvSource) + " must be equal to batch_size");
             }
             return ACLNN_ERR_PARAM_INVALID;
@@ -821,13 +804,12 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
             }
         }
         // 校验 cmp_topk_length 维度一致性
-        if (cmpTopk != 0 &&
-            cmpMaskMode == static_cast<int64_t>(SparseModeSmlag::DEFAULT_MASK) &&
+        if (cmpTopk != 0 && cmpMaskMode == static_cast<int64_t>(SparseModeSmlag::DEFAULT_MASK) &&
             IsTensorExistSmlag(cmpTopkLengthOptional)) {
             if (strcmp(layoutQOptional, "BSND") == 0) {
                 // 校验 cmp_topk_length 第一个维度
-                aclnnStatus ret = CheckTopkLengthFirstDimSmlag(cmpTopkLengthOptional, "cmp_topk_length",
-                                                               queryBatchSize, querySource);
+                aclnnStatus ret =
+                    CheckTopkLengthFirstDimSmlag(cmpTopkLengthOptional, "cmp_topk_length", queryBatchSize, querySource);
                 if (ret != ACLNN_SUCCESS) {
                     return ret;
                 }

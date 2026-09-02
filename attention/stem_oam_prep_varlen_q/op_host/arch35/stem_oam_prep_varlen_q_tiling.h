@@ -26,7 +26,9 @@ using namespace Ops::Transformer::OpTiling;
 
 class StemOamPrepVarlenQTiling : public TilingBaseClass {
 public:
-    explicit StemOamPrepVarlenQTiling(gert::TilingContext *context) : TilingBaseClass(context) {}
+    explicit StemOamPrepVarlenQTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
     ~StemOamPrepVarlenQTiling() override = default;
 
 protected:

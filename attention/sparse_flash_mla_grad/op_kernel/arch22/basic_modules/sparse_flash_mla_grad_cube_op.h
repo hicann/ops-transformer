@@ -30,38 +30,29 @@ class CubeOp {
 
 public:
     __aicore__ inline CubeOp(){};
-    __aicore__ inline void Init(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out_grad, GM_ADDR workspace, 
-                                const TILING_CLASS *__restrict tilingData, TPipe *pipe);
+    __aicore__ inline void Init(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out_grad,
+                                GM_ADDR workspace, const TILING_CLASS *__restrict tilingData, TPipe *pipe);
 
     __aicore__ inline __attribute__((always_inline)) void cube12Process(const RunInfo &runInfo,
-                                                                       const int32_t blkCntOffset,
-                                                                       const int32_t mmPingPongIdx);
+                                                                        const int32_t blkCntOffset,
+                                                                        const int32_t mmPingPongIdx);
 
     __aicore__ inline __attribute__((always_inline)) void cube345Process(const RunInfo &runInfo,
-                                                                         const int32_t blkCntOffset, 
+                                                                         const int32_t blkCntOffset,
                                                                          const int32_t mmPingPongIdx);
+
 private:
-    __aicore__ inline __attribute__((always_inline)) void cube1Process(const int64_t queryGmOffset,
-                                                                       const int64_t keyGmOffset,
-                                                                       const int64_t outGmOffset, 
-                                                                       const int32_t blkCntOffset,
-                                                                       const int32_t mmPingPongIdx,
-                                                                       const RunInfo &runInfo);
+    __aicore__ inline __attribute__((always_inline)) void cube1Process(
+        const int64_t queryGmOffset, const int64_t keyGmOffset, const int64_t outGmOffset, const int32_t blkCntOffset,
+        const int32_t mmPingPongIdx, const RunInfo &runInfo);
 
-    __aicore__ inline __attribute__((always_inline)) void cube2Process(const int64_t dyGmOffset,
-                                                                       const int64_t valueGmOffset,
-                                                                       const int64_t outGmOffset, 
-                                                                       const int32_t blkCntOffset,
-                                                                       const int32_t mmPingPongIdx,
-                                                                       const RunInfo &runInfo);
+    __aicore__ inline __attribute__((always_inline)) void cube2Process(
+        const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t outGmOffset, const int32_t blkCntOffset,
+        const int32_t mmPingPongIdx, const RunInfo &runInfo);
 
-    __aicore__ inline __attribute__((always_inline)) void cube3Process(const int64_t keyGmOffset,
-                                                                       const int64_t outGmOffset,
-                                                                       const int32_t blkCntOffset,
-                                                                       const int32_t mmPingPongIdx,
-                                                                       const int64_t lastBlockSize,
-                                                                       const bool isLastBasicBlock,
-                                                                       const RunInfo &runInfo);
+    __aicore__ inline __attribute__((always_inline)) void cube3Process(
+        const int64_t keyGmOffset, const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx,
+        const int64_t lastBlockSize, const bool isLastBasicBlock, const RunInfo &runInfo);
 
     __aicore__ inline __attribute__((always_inline)) void cube4Process(const int64_t dsGmOffset,
                                                                        const int64_t queryGmOffset,
@@ -74,50 +65,15 @@ private:
                                                                        const int32_t mmPingPongIdx,
                                                                        const RunInfo &runInfo);
 
-    __aicore__ inline void InitGMBuffer(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv,
-                                        GM_ADDR attention_out_grad,
+    __aicore__ inline void InitGMBuffer(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out_grad,
                                         GM_ADDR workspace);
     __aicore__ inline void InitLocalTensor();
 
-    AscendC::Nd2NzParams commonNd2NzParams {
-        1,
-        0,
-        0,
-        0,
-        128,
-        128,
-        1,
-        0
-    };
-    AscendC::Nd2NzParams cube1Nd2NzParams{
-        1,
-        0,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0
-    };
-    AscendC::LoadData2dParams commonLoadData2dParamsNoTranspose {
-        0,
-        128,
-        128,
-        0,
-        0,
-        false,
-        0
-    };
+    AscendC::Nd2NzParams commonNd2NzParams{1, 0, 0, 0, 128, 128, 1, 0};
+    AscendC::Nd2NzParams cube1Nd2NzParams{1, 0, 0, 0, 0, 0, 1, 0};
+    AscendC::LoadData2dParams commonLoadData2dParamsNoTranspose{0, 128, 128, 0, 0, false, 0};
 
-    AscendC::LoadData2dParams commonLoadData2dParamsTrans {
-        0,
-        128,
-        128,
-        0,
-        0,
-        true,
-        0
-    };
+    AscendC::LoadData2dParams commonLoadData2dParamsTrans{0, 128, 128, 0, 0, true, 0};
     /* clang-format on */
     // Gm Addr
     GlobalTensor<T1> queryGm;
@@ -153,7 +109,7 @@ private:
     static constexpr uint32_t M_SPLIT_SIZE = 128;     // m方向切分
     static constexpr uint32_t N_SPLIT_SIZE = 128;     // n方向切分
     static constexpr uint32_t K_SPLIT_SIZE = 128;     // k方向切分
-    static constexpr uint32_t TOTAL_BLOCK_SIZE = 512;     // blocksize * blockcount
+    static constexpr uint32_t TOTAL_BLOCK_SIZE = 512; // blocksize * blockcount
 
     uint32_t ping_pong_flag_l1_query_ = 0;
     uint32_t ping_pong_flag_l1_common_ = 0;
@@ -215,12 +171,12 @@ private:
     int64_t dqAddr;
     int64_t dkAddr;
 
-    GM_ADDR workspace;                                          
+    GM_ADDR workspace;
 };
 
 template <typename SMLAGT>
-__aicore__ inline void CubeOp<SMLAGT>::Init(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out_grad, GM_ADDR workspace,
-                                           const TILING_CLASS *__restrict tilingData, TPipe *pipe)
+__aicore__ inline void CubeOp<SMLAGT>::Init(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out_grad,
+                                            GM_ADDR workspace, const TILING_CLASS *__restrict tilingData, TPipe *pipe)
 {
     dimB = tilingData->opInfo.B;
     dimG = tilingData->opInfo.G;
@@ -260,20 +216,22 @@ __aicore__ inline void CubeOp<SMLAGT>::Init(GM_ADDR query, GM_ADDR ori_kv, GM_AD
 }
 
 template <typename SMLAGT>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<SMLAGT>::cube12Process(const RunInfo &runInfo,
-                             const int32_t blkCntOffset, const int32_t mmPingPongIdx)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<SMLAGT>::cube12Process(const RunInfo &runInfo,
+                                                                                    const int32_t blkCntOffset,
+                                                                                    const int32_t mmPingPongIdx)
 {
     selectedCntOffset = runInfo.actualSelCntOffset;
-    cube1Process(runInfo.queryGmOffset, runInfo.selectedKGmOffset, runInfo.mm12GmOffset, blkCntOffset, mmPingPongIdx, runInfo);
+    cube1Process(runInfo.queryGmOffset, runInfo.selectedKGmOffset, runInfo.mm12GmOffset, blkCntOffset, mmPingPongIdx,
+                 runInfo);
     WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_DY_EVENTS[mmPingPongIdx]);
-    cube2Process(runInfo.dyGmOffset, runInfo.selectedVGmOffset, runInfo.mm12GmOffset, blkCntOffset, mmPingPongIdx, runInfo);
+    cube2Process(runInfo.dyGmOffset, runInfo.selectedVGmOffset, runInfo.mm12GmOffset, blkCntOffset, mmPingPongIdx,
+                 runInfo);
 }
 
 template <typename SMLAGT>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<SMLAGT>::cube345Process(const RunInfo &runInfo,
-                              const int32_t blkCntOffset, const int32_t mmPingPongIdx)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<SMLAGT>::cube345Process(const RunInfo &runInfo,
+                                                                                     const int32_t blkCntOffset,
+                                                                                     const int32_t mmPingPongIdx)
 {
     selectedCntOffset = runInfo.actualSelCntOffset;
     cube5Process(runInfo.mm345GmOffset, blkCntOffset, mmPingPongIdx, runInfo);
@@ -281,12 +239,14 @@ CubeOp<SMLAGT>::cube345Process(const RunInfo &runInfo,
 
     WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
     cube4Process(runInfo.mm345GmOffset, runInfo.queryGmOffset, blkCntOffset, mmPingPongIdx, runInfo);
-    cube3Process(runInfo.selectedKGmOffset, runInfo.dqOutGmOffset, blkCntOffset, mmPingPongIdx, runInfo.lastBlockSize, runInfo.isLastBasicBlock, runInfo);
+    cube3Process(runInfo.selectedKGmOffset, runInfo.dqOutGmOffset, blkCntOffset, mmPingPongIdx, runInfo.lastBlockSize,
+                 runInfo.isLastBasicBlock, runInfo);
     SetFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
 }
 
 template <typename SMLAGT>
-__aicore__ inline void CubeOp<SMLAGT>::InitGMBuffer(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out_grad, GM_ADDR workspace)
+__aicore__ inline void CubeOp<SMLAGT>::InitGMBuffer(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv,
+                                                    GM_ADDR attention_out_grad, GM_ADDR workspace)
 {
     // 必选输入初始化
     queryGm.SetGlobalBuffer((__gm__ T1 *)query);

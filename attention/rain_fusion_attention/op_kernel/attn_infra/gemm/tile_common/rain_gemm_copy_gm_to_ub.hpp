@@ -14,9 +14,6 @@
 #include "../../../attn_infra/rain_base_defs.hpp"
 #include "../../../attn_infra/arch/rain_arch.hpp"
 #include "../../../attn_infra/gemm/tile_common/rain_tile_copy_tla.hpp"
-namespace NpuArch::Gemm::Tile {
-
-
-}  // NpuArch::Gemm::Tile
+namespace NpuArch::Gemm::Tile {} // namespace NpuArch::Gemm::Tile
 
 #endif // GEMM_TILE_COPY_GM_TO_UB_HPP

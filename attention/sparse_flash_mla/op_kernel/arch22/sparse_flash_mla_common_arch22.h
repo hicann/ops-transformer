@@ -177,13 +177,9 @@ __aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPABySlots(LocalTensor<T> &dstTensor,
-                                         GlobalTensor<T> &srcTensor,
-                                         GlobalTensor<int32_t> &blockTableGm,
-                                         GlobalTensor<int32_t> &sparseIndicesGm,
-                                         const PAShape &shape,
-                                         const Position &startPos,
-                                         uint64_t sparseIndexBaseOffset,
+__aicore__ inline void DataCopyPABySlots(LocalTensor<T> &dstTensor, GlobalTensor<T> &srcTensor,
+                                         GlobalTensor<int32_t> &blockTableGm, GlobalTensor<int32_t> &sparseIndicesGm,
+                                         const PAShape &shape, const Position &startPos, uint64_t sparseIndexBaseOffset,
                                          uint32_t sparseIndexStart)
 {
     uint32_t blockElementCnt = 32 / sizeof(T);
@@ -197,13 +193,12 @@ __aicore__ inline void DataCopyPABySlots(LocalTensor<T> &dstTensor,
         uint64_t inBlockIdx = static_cast<uint64_t>(logicalIdx) % shape.blockSize;
         uint64_t idInBlockTable = blockTableGm.GetValue(blockTableBaseOffset + blockTableIdx);
         uint64_t offset = idInBlockTable * shape.kvStride;
-        offset += static_cast<uint64_t>(startPos.n2Idx * shape.headDim * shape.blockSize) +
-                  inBlockIdx * shape.headDim + startPos.dIdx;
+        offset += static_cast<uint64_t>(startPos.n2Idx * shape.headDim * shape.blockSize) + inBlockIdx * shape.headDim +
+                  startPos.dIdx;
 
         LocalTensor<T> tmpDstTensor = dstTensor[row * blockElementCnt];
         GlobalTensor<T> tmpSrcTensor = srcTensor[offset];
-        DataCopyGmNDToL1<T>(tmpDstTensor, tmpSrcTensor, 1, shape.copyRowNumAlign,
-                            shape.actHeadDim, shape.headDim);
+        DataCopyGmNDToL1<T>(tmpDstTensor, tmpSrcTensor, 1, shape.copyRowNumAlign, shape.actHeadDim, shape.headDim);
     }
 }
 

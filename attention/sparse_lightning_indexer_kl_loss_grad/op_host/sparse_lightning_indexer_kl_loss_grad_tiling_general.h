@@ -79,7 +79,10 @@ public:
     }
 
     // 更新 context
-    virtual void Reset(gert::TilingContext *context) { context_ = context; }
+    virtual void Reset(gert::TilingContext *context)
+    {
+        context_ = context;
+    }
 
 protected:
     virtual bool IsCapable() = 0;
@@ -250,8 +253,14 @@ protected:
         keyLayout = nullptr;
     }
 
-    [[nodiscard]] gert::TilingContext *GetContext() { return context_; }
-    bool IsCapable() { return true; }
+    [[nodiscard]] gert::TilingContext *GetContext()
+    {
+        return context_;
+    }
+    bool IsCapable()
+    {
+        return true;
+    }
     // 1、获取平台信息比如CoreNum、UB/L1/L0C资源大小
     ge::graphStatus GetPlatformInfo() override;
     // 2、获取INPUT/OUTPUT/ATTR信息

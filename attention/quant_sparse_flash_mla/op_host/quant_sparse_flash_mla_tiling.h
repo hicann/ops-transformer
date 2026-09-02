@@ -68,7 +68,8 @@ REGISTER_TILING_DATA_CLASS(QuantSparseFlashMla, QuantSparseFlashMlaTilingData)
 // ---------------算子Tiling类---------------
 class QuantSparseFlashMlaTiling {
 public:
-    explicit QuantSparseFlashMlaTiling(gert::TilingContext *context) : context_(context) {};
+    explicit QuantSparseFlashMlaTiling(gert::TilingContext *context)
+        : context_(context) {};
     ge::graphStatus DoOpTiling(QSMLATilingInfo *tilingInfo);
 
 private:

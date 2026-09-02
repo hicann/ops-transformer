@@ -44,16 +44,14 @@ constexpr uint8_t SYNC_C2_TO_V2_DETER_SA_FLAG_MOD0[2] = {0, 1};
 constexpr uint8_t SYNC_V2_TO_V2_DETER_SA_FLAG_MOD0 = 2;
 
 static constexpr uint32_t N_WORKSPACE_SIZE = 1024; // n方向切分
-static constexpr uint32_t K_BASE_SIZE = 2048; // n方向切分
+static constexpr uint32_t K_BASE_SIZE = 2048;      // n方向切分
 
-enum class SLILayout
-{
+enum class SLILayout {
     BSND = 0,
     TND = 1
 };
 
-enum class SLITopKRange
-{
+enum class SLITopKRange {
     TOPK_1k = 1024,
     TOPK_2k = 2048,
     TOPK_3k = 3072,
@@ -64,8 +62,7 @@ enum class SLITopKRange
     TOPK_8k = 8192
 };
 
-enum class SLISparseMode
-{
+enum class SLISparseMode {
     RightDown = 3
 };
 
@@ -80,13 +77,10 @@ struct GatherParams {
 /** @name 模版类型定义
  *  @{
  */
-template <typename InputQT, typename InputKT, typename InputWT, typename OutT,
-          SLITopKRange TopKRange,
-	      SLILayout LayoutQT = SLILayout::TND,
-          SLILayout LayoutKT = SLILayout::TND,
-          SLISparseMode SparseMode = SLISparseMode::RightDown,
-          const bool HasRope = false, const bool Deterministic = false,
-          typename... Args>
+template <typename InputQT, typename InputKT, typename InputWT, typename OutT, SLITopKRange TopKRange,
+          SLILayout LayoutQT = SLILayout::TND, SLILayout LayoutKT = SLILayout::TND,
+          SLISparseMode SparseMode = SLISparseMode::RightDown, const bool HasRope = false,
+          const bool Deterministic = false, typename... Args>
 struct SLIType {
     using inputQT = InputQT;
     using inputKT = InputKT;
@@ -124,14 +118,14 @@ struct SLIGradKLLossConstInfo {
     uint32_t subBlockIdx;
 
     /** \brief TilingData中的信息 */
-	uint32_t bSize;
-	uint32_t n2Size; // 现阶段n2Size默认等于1
-    uint32_t gSizeQuery; // 128或者64
-    uint32_t gSizeQueryIndex; // 64或者32
-    uint32_t s1Size; // 支持泛化
-    uint32_t s2Size; // 支持泛化
-    uint32_t dSizeQuery; // 默认不带Rope，固定等于512
-    uint32_t dSizeQueryIndex; // 默认不带Rope，固定等于128
+    uint32_t bSize;
+    uint32_t n2Size;              // 现阶段n2Size默认等于1
+    uint32_t gSizeQuery;          // 128或者64
+    uint32_t gSizeQueryIndex;     // 64或者32
+    uint32_t s1Size;              // 支持泛化
+    uint32_t s2Size;              // 支持泛化
+    uint32_t dSizeQuery;          // 默认不带Rope，固定等于512
+    uint32_t dSizeQueryIndex;     // 默认不带Rope，固定等于128
     uint32_t dSizeQueryRope = 64; // Rope，固定等于64
     uint32_t kSize;
     SLISparseMode sparseMode; // 0或者3
@@ -139,8 +133,8 @@ struct SLIGradKLLossConstInfo {
     SoftMaxTiling tilingInfo;
     SoftMaxTiling simpleSoftMaxTilingInfo;
 
-    // 轴的乘积提取一些公共信息，减少scalar  
-    uint32_t gSizeQueryIndexAlign16; 
+    // 轴的乘积提取一些公共信息，减少scalar
+    uint32_t gSizeQueryIndexAlign16;
     int32_t gatherKeySize;
     int32_t gatherKeyIndexSize;
     static constexpr int32_t gatherKeyIndexDbNum = 2;
@@ -153,7 +147,7 @@ struct SLIGradKLLossConstInfo {
 struct SLIGradKLLossRunInfo {
     uint32_t taskId;
     uint32_t taskIdMod2;
-	uint32_t bIdx;
+    uint32_t bIdx;
     uint32_t s1Idx;
     uint32_t kIdx;
     int64_t accumS1Idx; // 当前循环累加的T1
@@ -165,14 +159,14 @@ struct SLIGradKLLossRunInfo {
     uint32_t kTailSize; // k切分之后的尾块大小，在P和KLLoss阶段
     uint32_t kRealSizeAlign8;
     uint32_t kLoopTimes; // k方向的循环次数，在P和KLLoss阶段
-    
+
     static constexpr uint32_t nBaseSizeP = 4;
     static constexpr uint32_t nRealSizeP = 128;
     static constexpr uint32_t nBaseSizeSY = 0;
     static constexpr uint32_t nRealSizeSY = 0;
     static constexpr uint32_t nIdxP = 0;
     static constexpr uint32_t nIdxSY = 0;
-    
+
     // 存放一些offset，减少重复计算
     int32_t s2SparseLen;
     int32_t s2RealSize;
@@ -195,75 +189,79 @@ struct SLIGradKLLossRunInfo {
  */
 template <bool isTopkLess2k>
 struct UBAllocPolicy {
-    static constexpr int32_t gatherUbSize = 0;         // gather专用
-    static constexpr int32_t mm1UbSize = 0;            // MTE2 -> V
-    static constexpr int32_t mm2UbSize = 0;            // MTE2 -> V
-    static constexpr int32_t sharedUbSize = 0;         // V计算共享
-    static constexpr int32_t resPSYUbSize = 0;         // V计算专用
-    static constexpr int32_t reduceSumDwUbSize = 0;      // V计算专用
-    static constexpr int32_t v1TmpUbSize = 0;          // V计算专用
-    static constexpr int32_t reluGradUbSize = 0;       // V -> MTE3
-    static constexpr int32_t lossSumUbSize = 0;        // V -> MTE3
-    static constexpr int32_t weightUbSize = 0;         // V计算专用
-    static constexpr int32_t weightInUbSize = 0;         // MTE2 weight专用
-    static constexpr int32_t dwUbSize = 0;             // V -> MTE3
-    static constexpr int32_t maskUbSize = 0;           // V计算专用
+    static constexpr int32_t gatherUbSize = 0;      // gather专用
+    static constexpr int32_t mm1UbSize = 0;         // MTE2 -> V
+    static constexpr int32_t mm2UbSize = 0;         // MTE2 -> V
+    static constexpr int32_t sharedUbSize = 0;      // V计算共享
+    static constexpr int32_t resPSYUbSize = 0;      // V计算专用
+    static constexpr int32_t reduceSumDwUbSize = 0; // V计算专用
+    static constexpr int32_t v1TmpUbSize = 0;       // V计算专用
+    static constexpr int32_t reluGradUbSize = 0;    // V -> MTE3
+    static constexpr int32_t lossSumUbSize = 0;     // V -> MTE3
+    static constexpr int32_t weightUbSize = 0;      // V计算专用
+    static constexpr int32_t weightInUbSize = 0;    // MTE2 weight专用
+    static constexpr int32_t dwUbSize = 0;          // V -> MTE3
+    static constexpr int32_t maskUbSize = 0;        // V计算专用
 };
 
 template <>
 struct UBAllocPolicy<true> {
-    static constexpr int32_t gatherUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_11K * 2;    // gather专用
-    static constexpr int32_t mm1UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;       // MTE2 -> V
-    static constexpr int32_t mm2UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;           // MTE2 -> V
-    static constexpr int32_t sharedUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;        // V计算共享
-    static constexpr int32_t resPSYUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_8K;     // V计算专用
-    static constexpr int32_t reduceSumDwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;      // V计算专用
-    static constexpr int32_t v1TmpUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_8K;          // V计算专用
-    static constexpr int32_t reluGradUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;       // V -> MTE3
-    static constexpr int32_t lossSumUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_64;        // V -> MTE3
-    static constexpr int32_t weightUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_512;        // V计算专用
-    static constexpr int32_t weightInUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;        // V计算专用
-    static constexpr int32_t dwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;             // V -> MTE3
-    static constexpr int32_t maskUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;          // V计算专用
-    static constexpr int32_t scatterAddUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_16K;    // ScatterAdd专用
+    static constexpr int32_t gatherUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_11K * 2; // gather专用
+    static constexpr int32_t mm1UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;        // MTE2 -> V
+    static constexpr int32_t mm2UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;        // MTE2 -> V
+    static constexpr int32_t sharedUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;     // V计算共享
+    static constexpr int32_t resPSYUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_8K;      // V计算专用
+    static constexpr int32_t reduceSumDwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K; // V计算专用
+    static constexpr int32_t v1TmpUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_8K;       // V计算专用
+    static constexpr int32_t reluGradUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;    // V -> MTE3
+    static constexpr int32_t lossSumUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_64;     // V -> MTE3
+    static constexpr int32_t weightUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_512;     // V计算专用
+    static constexpr int32_t weightInUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;   // V计算专用
+    static constexpr int32_t dwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;          // V -> MTE3
+    static constexpr int32_t maskUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;       // V计算专用
+    static constexpr int32_t scatterAddUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_16K; // ScatterAdd专用
 };
 
 template <>
 struct UBAllocPolicy<false> {
-    static constexpr int32_t gatherUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_11K * 2;    // gather专用
-    static constexpr int32_t mm1UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;       // MTE2 -> V
-    static constexpr int32_t mm2UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;           // MTE2 -> V
-    static constexpr int32_t sharedUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_33K;        // V计算共享
-    static constexpr int32_t resPSYUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;    // V计算专用
-    static constexpr int32_t reduceSumDwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;      // V计算专用
-    static constexpr int32_t v1TmpUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_8K;          // V计算专用
-    static constexpr int32_t reluGradUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;       // V -> MTE3
-    static constexpr int32_t lossSumUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_64;        // V -> MTE3
-    static constexpr int32_t weightUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_512;        // MTE2 -> V
-    static constexpr int32_t weightInUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;        // MTE2 -> V
-    static constexpr int32_t dwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;             // V -> MTE3
-    static constexpr int32_t maskUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;          // V计算专用
-    static constexpr int32_t scatterAddUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_16K;     // ScatterAdd专用
+    static constexpr int32_t gatherUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_11K * 2; // gather专用
+    static constexpr int32_t mm1UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;        // MTE2 -> V
+    static constexpr int32_t mm2UbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;        // MTE2 -> V
+    static constexpr int32_t sharedUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_33K;     // V计算共享
+    static constexpr int32_t resPSYUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_32K;     // V计算专用
+    static constexpr int32_t reduceSumDwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K; // V计算专用
+    static constexpr int32_t v1TmpUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_8K;       // V计算专用
+    static constexpr int32_t reluGradUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;    // V -> MTE3
+    static constexpr int32_t lossSumUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_64;     // V -> MTE3
+    static constexpr int32_t weightUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_512;     // MTE2 -> V
+    static constexpr int32_t weightInUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;   // MTE2 -> V
+    static constexpr int32_t dwUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_4K;          // V -> MTE3
+    static constexpr int32_t maskUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_256;       // V计算专用
+    static constexpr int32_t scatterAddUbSize = SLIGradKLLossConstInfo::BUFFER_SIZE_BYTE_16K; // ScatterAdd专用
 };
 /// @}
 
 // ================================Util functions==================================
-template <typename T> __aicore__ inline T SLIGAlign(T num, T rnd)
+template <typename T>
+__aicore__ inline T SLIGAlign(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Max(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Max(T1 a, T2 b)
 {
     return (a < b) ? (b) : (a);
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Min(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Min(T1 a, T2 b)
 {
     return (a > b) ? (b) : (a);
 }
 
-template <typename T> __aicore__ inline size_t BlockAlign(size_t s)
+template <typename T>
+__aicore__ inline size_t BlockAlign(size_t s)
 {
     if constexpr (IsSameType<T, int4b_t>::value) {
         return (s + 63) / 64 * 64;

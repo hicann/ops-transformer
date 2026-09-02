@@ -15,13 +15,13 @@
 #ifndef SWIN_ATTENTION_SCORE_QUANT_TILING_H
 #define SWIN_ATTENTION_SCORE_QUANT_TILING_H
 
-#include "log/log.h" 
+#include "log/log.h"
 #include "register/op_impl_registry.h"
 #include "tiling/tiling_api.h"
 #include "op_host/tiling_type.h"
 #include "register/tilingdata_base.h"
 #include "register/op_def_registry.h"
-#include "util/math_util.h" 
+#include "util/math_util.h"
 #include "platform/platform_info.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "platform/platform_infos_def.h"
@@ -47,5 +47,5 @@ TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, pvBmmTilingData);
 TILING_DATA_FIELD_DEF_STRUCT(SoftMaxTiling, softmaxTilingData);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(SwinAttentionScoreQuant, SwinAttentionScoreQuantTilingData)
-}
+} // namespace optiling
 #endif

@@ -16,16 +16,14 @@
 #include "../../attn_infra/detail/rain_macros.hpp"
 
 template <uint32_t ALIGN, typename T>
-HOST_DEVICE
-constexpr T RoundDown(const T val)
+HOST_DEVICE constexpr T RoundDown(const T val)
 {
     static_assert(ALIGN != 0U, "ALIGN must not be 0");
     return val / ALIGN * ALIGN;
 }
 
 template <class T>
-HOST_DEVICE
-constexpr T RoundDown(const T val, const T align)
+HOST_DEVICE constexpr T RoundDown(const T val, const T align)
 {
     if (align == 0) {
         return val;
@@ -34,8 +32,7 @@ constexpr T RoundDown(const T val, const T align)
 }
 
 template <uint32_t ALIGN, typename T = uint32_t>
-HOST_DEVICE
-constexpr T RoundUp(const T val)
+HOST_DEVICE constexpr T RoundUp(const T val)
 {
     static_assert(ALIGN != 0U, "ALIGN must not be 0");
     T align = ALIGN;
@@ -46,8 +43,7 @@ constexpr T RoundUp(const T val)
 }
 
 template <class T>
-HOST_DEVICE
-constexpr T RoundUp(const T val, const T align)
+HOST_DEVICE constexpr T RoundUp(const T val, const T align)
 {
     if (align == 0 || val + align - 1 < val) {
         return val;
@@ -56,8 +52,7 @@ constexpr T RoundUp(const T val, const T align)
 }
 
 template <uint32_t DIVISOR, typename T = uint32_t>
-HOST_DEVICE
-constexpr T CeilDiv(const T dividend)
+HOST_DEVICE constexpr T CeilDiv(const T dividend)
 {
     static_assert(DIVISOR != 0U, "DIVISOR must not be 0");
     T divisor = DIVISOR;
@@ -68,8 +63,7 @@ constexpr T CeilDiv(const T dividend)
 }
 
 template <class T>
-HOST_DEVICE
-constexpr T CeilDiv(const T dividend, const T divisor)
+HOST_DEVICE constexpr T CeilDiv(const T dividend, const T divisor)
 {
     if (divisor == 0 || dividend + divisor - 1 < dividend) {
         return std::numeric_limits<T>::max();
@@ -77,4 +71,4 @@ constexpr T CeilDiv(const T dividend, const T divisor)
     return (dividend + divisor - 1) / divisor;
 }
 
-#endif  // ALIGNMENT_HPP
+#endif // ALIGNMENT_HPP

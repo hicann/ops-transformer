@@ -15,4 +15,4 @@
 #include "../../attn_infra/layout/rain_matrix.hpp"
 #include "../../attn_infra/layout/rain_vector.hpp"
 
-#endif  // LAYOUT_LAYOUT_HPP
+#endif // LAYOUT_LAYOUT_HPP

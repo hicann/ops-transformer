@@ -24,17 +24,16 @@ template <typename T1, typename T2, typename IndexDtype, bool NCT = false>
 class ScatterPaKvCacheNormal : public ScatterPaKvCacheNormalCommon {
 public:
     __aicore__ inline ScatterPaKvCacheNormal(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict__ tilingData)
-    : ScatterPaKvCacheNormalCommon(pipe, tilingData)
-    {
-    }
+        : ScatterPaKvCacheNormalCommon(pipe, tilingData)
+    {}
 
-    __aicore__ inline void Init(GM_ADDR keyIn, GM_ADDR valueIn, GM_ADDR slotMapping, GM_ADDR keyCacheOut, GM_ADDR valueCacheOut)
+    __aicore__ inline void Init(GM_ADDR keyIn, GM_ADDR valueIn, GM_ADDR slotMapping, GM_ADDR keyCacheOut,
+                                GM_ADDR valueCacheOut)
     {
         int64_t coreNums = GetBlockNum(); // 用的核数
-        int64_t blockId = GetBlockIdx(); //当前核
-        curBlockFactor_ =
-            (blockId == coreNums - 1) ? tilingData_->tailBlockFactor : tilingData_->blockFactor;
-        startTaskId_ = blockId * tilingData_->blockFactor; //当前核起始token
+        int64_t blockId = GetBlockIdx();  // 当前核
+        curBlockFactor_ = (blockId == coreNums - 1) ? tilingData_->tailBlockFactor : tilingData_->blockFactor;
+        startTaskId_ = blockId * tilingData_->blockFactor; // 当前核起始token
 
         keyInGm_.SetGlobalBuffer((__gm__ T1 *)keyIn);
         keyCacheOutGm_.SetGlobalBuffer((__gm__ T1 *)keyCacheOut);
@@ -53,7 +52,8 @@ public:
         int64_t kUbLoop = kTokenSize * sizeof(T1) / usedUbSize_;
         int64_t kUbTail = kTokenSize * sizeof(T1) % usedUbSize_;
         // value
-        uint64_t vTokenSize = static_cast<uint64_t>(tilingData_->numHead) * tilingData_->vHeadSize; // Value一个token大小
+        uint64_t vTokenSize =
+            static_cast<uint64_t>(tilingData_->numHead) * tilingData_->vHeadSize; // Value一个token大小
         int64_t vUbLoop = vTokenSize * sizeof(T2) / usedUbSize_;
         int64_t vUbTail = vTokenSize * sizeof(T2) % usedUbSize_;
 
@@ -87,13 +87,13 @@ public:
         TEventID eventIdMTE2ToMTE3_ = pipe_->FetchEventID(HardEvent::MTE2_MTE3);
         TEventID eventIdMTE3ToMTE2_ = pipe_->FetchEventID(HardEvent::MTE3_MTE2);
         // Key
-        int64_t kTokenSize = tilingData_->numHead * tilingData_->kHeadSize; // Key一个token大小
+        int64_t kTokenSize = tilingData_->numHead * tilingData_->kHeadSize;    // Key一个token大小
         int64_t kTokenSizeAlign = (kTokenSize + kAlign - 1) / kAlign * kAlign; // Key一个token大小对齐
         DataCopyExtParams kCopyParam = {1, static_cast<uint32_t>(kTokenSize * sizeof(T1)), 0, 0, 0};
         DataCopyPadExtParams<T1> kPadParams = {false, 0, 0, 0};
         auto kLocal = tokenBuf.Get<T1>(kTokenSizeAlign);
         // Value
-        int64_t vTokenSize = tilingData_->numHead * tilingData_->vHeadSize; // Value一个token大小
+        int64_t vTokenSize = tilingData_->numHead * tilingData_->vHeadSize;    // Value一个token大小
         int64_t vTokenSizeAlign = (vTokenSize + vAlign - 1) / vAlign * vAlign; // Value一个token大小对齐
         DataCopyExtParams vCopyParam = {1, static_cast<uint32_t>(vTokenSize * sizeof(T2)), 0, 0, 0};
         auto vLocal = tokenBuf.GetWithOffset<T2>(vTokenSizeAlign, kTokenSizeAlign * sizeof(T1));
@@ -135,7 +135,7 @@ private:
             int64_t blockIndex = slotValue / tilingData_->blockSize;
             int64_t blockOffset = slotValue % tilingData_->blockSize;
             return static_cast<uint64_t>(blockIndex) * static_cast<uint64_t>(cacheBlockStride) +
-                static_cast<uint64_t>(blockOffset) * tokenSize;
+                   static_cast<uint64_t>(blockOffset) * tokenSize;
         }
         return static_cast<uint64_t>(slotValue) * tokenSize;
     }

@@ -22,9 +22,7 @@ namespace ScatterPaKvCache {
 template <typename T>
 class ScatterPaKvCacheCompressOmni : public ScatterPaKvCacheCompressCommon {
 public:
-    __aicore__ inline ScatterPaKvCacheCompressOmni()
-    {
-    }
+    __aicore__ inline ScatterPaKvCacheCompressOmni() {}
 
     template <bool PHASE>
     __aicore__ inline void Copy2Cache(AscendC::GlobalTensor<T> &inputCache, AscendC::GlobalTensor<T> &outputCache,

@@ -17,26 +17,12 @@
 namespace l0op {
 
 const std::array<const aclTensor *, 2> RainFusionAttention(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *selectIdx,
-    const aclTensor *selectNumIdx,
-    const aclIntArray *blockShape,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *blockTableOptional,
-    const char *qInputLayout,
-    const char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t innerPrecise,
-    int64_t blockSize,
-    aclOpExecutor *executor);
+    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *selectIdx,
+    const aclTensor *selectNumIdx, const aclIntArray *blockShape, const aclTensor *attenMaskOptional,
+    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional,
+    const aclTensor *blockTableOptional, const char *qInputLayout, const char *kvInputLayout, int64_t numKeyValueHeads,
+    int64_t maskType, double scaleValue, int64_t innerPrecise, int64_t blockSize, aclOpExecutor *executor);
 
 } // namespace l0op
 
-#endif  // RAIN_FUSION_ATTENTION_H_
-
+#endif // RAIN_FUSION_ATTENTION_H_

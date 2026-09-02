@@ -33,13 +33,14 @@ param [in] src input LocalTensor
 param [in] tiling softmaxtiling
 */
 template <typename T1, typename T, uint32_t srcN, bool hasAtten, bool hasPse, bool isDeter, bool IsSparseIndicesExist>
-__simd_vf__ inline void
-MulsSelVFPseType1(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t softmaxL1LocalInt, uint64_t sumLocalInt,
-                  uint64_t maxLocalInt, uint64_t maskLocalInt, uint64_t srcLocalIntTail, uint64_t dstLocalIntTail,
-                  uint64_t softmaxL1LocalIntTail, uint64_t dstLocalIntTailZero, uint64_t maskLocalIntTail,
-                  uint64_t pseLocalInt, uint64_t pseLocalIntTail, uint32_t tailSize, uint32_t pseStride,
-                  uint16_t repeatTimes, const T scale, const T minValue, uint32_t pseTailStride, uint32_t srcM,
-                  int64_t lseLocalInt, float pScalar)
+__simd_vf__ inline void MulsSelVFPseType1(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t softmaxL1LocalInt,
+                                          uint64_t sumLocalInt, uint64_t maxLocalInt, uint64_t maskLocalInt,
+                                          uint64_t srcLocalIntTail, uint64_t dstLocalIntTail,
+                                          uint64_t softmaxL1LocalIntTail, uint64_t dstLocalIntTailZero,
+                                          uint64_t maskLocalIntTail, uint64_t pseLocalInt, uint64_t pseLocalIntTail,
+                                          uint32_t tailSize, uint32_t pseStride, uint16_t repeatTimes, const T scale,
+                                          const T minValue, uint32_t pseTailStride, uint32_t srcM, int64_t lseLocalInt,
+                                          float pScalar)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregMax;
@@ -172,8 +173,7 @@ __aicore__ inline void MulsSelSimpleSoftMax(const LocalTensor<float> &dstTensor,
                                             uint32_t srcM, uint32_t realN = srcN, float pScalar = 1.0,
                                             uint32_t pseType = 1, uint32_t pse_layout_type = 1, float posShift = -1.0,
                                             float slopes = -1.0)
-{
-}
+{}
 #endif
 } // namespace AscendC
 

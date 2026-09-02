@@ -438,12 +438,11 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ScatterAddDeter(const GlobalT
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline bool
-FAGBlockVec<TEMPLATE_ARGS>::GetBS1Index(int64_t usedT1Index, int64_t &bIdx, int64_t &s1Idx, int64_t &bS1Index,
-                                        int64_t &accumS1Len, int64_t &accumS2Len, int64_t &accumS3Len,
-                                        int64_t &actualSeqLensQ, int64_t &actualSeqOriLensK, int64_t &actualSeqCmpLensK,
-                                        int64_t &actualOriSelectedBlockCount, int64_t &actualCmpSelectedBlockCount,
-                                        int64_t &winStart, int64_t taskId, FagConstInfo &constInfo)
+__aicore__ inline bool FAGBlockVec<TEMPLATE_ARGS>::GetBS1Index(
+    int64_t usedT1Index, int64_t &bIdx, int64_t &s1Idx, int64_t &bS1Index, int64_t &accumS1Len, int64_t &accumS2Len,
+    int64_t &accumS3Len, int64_t &actualSeqLensQ, int64_t &actualSeqOriLensK, int64_t &actualSeqCmpLensK,
+    int64_t &actualOriSelectedBlockCount, int64_t &actualCmpSelectedBlockCount, int64_t &winStart, int64_t taskId,
+    FagConstInfo &constInfo)
 {
     int64_t t1Offset = 0;
     int64_t t2Offset = 0;
@@ -592,8 +591,7 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::GetRunInfo(int64_t bIdx, int6
                                                               FagConstInfo &constInfo, int64_t accumS2Len,
                                                               int32_t actualSeqLensQ, int32_t actualSeqLensOriK,
                                                               int32_t actualSeqLensCmpK)
-{
-}
+{}
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline int32_t FAGBlockVec<TEMPLATE_ARGS>::GetActualSeqLens(int64_t bIdx,
@@ -965,17 +963,16 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVecSink(LocalTensor<CA
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::InitCubeVecSharedParams(FagRunInfo &runInfo, int32_t s2RealSize)
-{
-}
+__aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::InitCubeVecSharedParams(FagRunInfo &runInfo, int32_t s2RealSize) {}
 
 TEMPLATES_DEF_NO_DEFAULT
 template <const bool IS_SPARSE>
-__aicore__ inline void
-FAGBlockVec<TEMPLATE_ARGS>::ScatterAdd(const GlobalTensor<CALC_TYPE> &mm4ResWorkSpaceGm,
-                                       const GlobalTensor<CALC_TYPE> &mm5ResWorkSpaceGm,
-                                       const GlobalTensor<CALC_TYPE> &dkWorkSpaceGm, LocalTensor<CALC_TYPE> &dkInTensor,
-                                       LocalTensor<CALC_TYPE> &dvInTensor, FagConstInfo &constInfo, FagRunInfo &runInfo)
+__aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ScatterAdd(const GlobalTensor<CALC_TYPE> &mm4ResWorkSpaceGm,
+                                                              const GlobalTensor<CALC_TYPE> &mm5ResWorkSpaceGm,
+                                                              const GlobalTensor<CALC_TYPE> &dkWorkSpaceGm,
+                                                              LocalTensor<CALC_TYPE> &dkInTensor,
+                                                              LocalTensor<CALC_TYPE> &dvInTensor,
+                                                              FagConstInfo &constInfo, FagRunInfo &runInfo)
 {
     int64_t UB_ROW_SIZE = 8;
     int64_t s2RealSize = runInfo.commonRunInfo.s2RealSize;
@@ -1090,10 +1087,11 @@ public:
         return 0;
     };
     template <const bool IS_SPARSE = true>
-    __aicore__ inline void
-    ScatterAdd(const GlobalTensor<CALC_TYPE> &mm4ResWorkSpaceGm, const GlobalTensor<CALC_TYPE> &mm5ResWorkSpaceGm,
-               const GlobalTensor<CALC_TYPE> &dkWorkSpaceGm, LocalTensor<CALC_TYPE> &dkInTensor,
-               LocalTensor<CALC_TYPE> &dvInTensor, FagConstInfo &constInfo, FagRunInfo &runInfo) {};
+    __aicore__ inline void ScatterAdd(const GlobalTensor<CALC_TYPE> &mm4ResWorkSpaceGm,
+                                      const GlobalTensor<CALC_TYPE> &mm5ResWorkSpaceGm,
+                                      const GlobalTensor<CALC_TYPE> &dkWorkSpaceGm, LocalTensor<CALC_TYPE> &dkInTensor,
+                                      LocalTensor<CALC_TYPE> &dvInTensor, FagConstInfo &constInfo,
+                                      FagRunInfo &runInfo) {};
     __aicore__ inline void ScatterAddDeter(const GlobalTensor<CALC_TYPE> &mm4ResWorkSpaceGm,
                                            const GlobalTensor<CALC_TYPE> &mm5ResWorkSpaceGm,
                                            const GlobalTensor<CALC_TYPE> &dkWorOriKSpaceGm,

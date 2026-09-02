@@ -21,8 +21,8 @@ namespace AscendC {
 using namespace MicroAPI;
 
 template <typename T>
-__simd_vf__ inline void ProcessVec4BasicVF(__ubuf__ T * dstUb, __ubuf__ T * srcUb, __ubuf__ T * maxUb, __ubuf__ T * sumUb,
-    float scaleValue, float pScaler, uint32_t m, const uint32_t nBaseSize)
+__simd_vf__ inline void ProcessVec4BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ T *maxUb, __ubuf__ T *sumUb,
+                                           float scaleValue, float pScaler, uint32_t m, const uint32_t nBaseSize)
 {
     RegTensor<float> vreg_input_x1;
     RegTensor<float> vreg_input_x2;
@@ -58,16 +58,18 @@ __simd_vf__ inline void ProcessVec4BasicVF(__ubuf__ T * dstUb, __ubuf__ T * srcU
 }
 
 template <typename T>
-__aicore__ inline void ProcessVec4Vf(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& maxTensor,
-    const LocalTensor<T>& sumTensor, const float scaleValue, const float pScaler, const uint32_t m, const uint32_t nBaseSize)
+__aicore__ inline void ProcessVec4Vf(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
+                                     const LocalTensor<T> &maxTensor, const LocalTensor<T> &sumTensor,
+                                     const float scaleValue, const float pScaler, const uint32_t m,
+                                     const uint32_t nBaseSize)
 {
-    __ubuf__ T * dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
-    __ubuf__ T * srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
-    __ubuf__ T * maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
-    __ubuf__ T * sumUb = (__ubuf__ T*)sumTensor.GetPhyAddr();
+    __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
+    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
+    __ubuf__ T *sumUb = (__ubuf__ T *)sumTensor.GetPhyAddr();
 
     ProcessVec4BasicVF<T>(dstUb, srcUb, maxUb, sumUb, scaleValue, pScaler, m, nBaseSize);
 }
-} // namespace
+} // namespace AscendC
 
 #endif // VF_PROCESS_VEC4_H

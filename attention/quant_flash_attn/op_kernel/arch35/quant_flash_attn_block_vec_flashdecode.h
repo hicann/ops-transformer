@@ -49,8 +49,8 @@ template <typename INPUT_T, typename T, typename OUTPUT_T, LayOutTypeEnum layout
           LayOutTypeEnum outLayout = LayOutTypeEnum::None, S1TemplateType s1TemplateType = S1TemplateType::Aligned128,
           S2TemplateType s2TemplateType = S2TemplateType::Aligned128,
           DTemplateType dTemplateType = DTemplateType::Aligned128,
-          DTemplateType dVTemplateType = DTemplateType::Aligned128,
-          bool hasAtten = false, uint8_t KvLayoutType = 0, bool useDn = false>
+          DTemplateType dVTemplateType = DTemplateType::Aligned128, bool hasAtten = false, uint8_t KvLayoutType = 0,
+          bool useDn = false>
 class QuantFlashAttnBlockVecFlashDecode {
 public:
     // =================================类型定义区=================================
@@ -176,7 +176,10 @@ public:
         this->kvActSeqLensParser_ = &kvParser;
     }
 
-    __aicore__ inline void InitSoftmaxLseGm(GlobalTensor<float> softmaxLseGm) { this->softmaxLseGm_ = softmaxLseGm; }
+    __aicore__ inline void InitSoftmaxLseGm(GlobalTensor<float> softmaxLseGm)
+    {
+        this->softmaxLseGm_ = softmaxLseGm;
+    }
     __aicore__ inline void InitLearnableSinkGm(GlobalTensor<SINK_T> learnableSink)
     {
         learnableSinkFlag_ = true;
@@ -441,8 +444,7 @@ protected:
         for (int64_t row = 0; row < dealRowCount; ++row) {
             if constexpr ((Q_FORMAT == GmFormat::BSNGD) || (Q_FORMAT == GmFormat::TNGD)) { // 内存按照S1G排布
                 gIdx = (taskInfo_.gS1Idx + startRow + row) % constInfo_.gSize;
-            } else if constexpr ((Q_FORMAT == GmFormat::BNGSD) ||
-                                 (Q_FORMAT == GmFormat::NGTD)) { // 内存按照GS1排布
+            } else if constexpr ((Q_FORMAT == GmFormat::BNGSD) || (Q_FORMAT == GmFormat::NGTD)) { // 内存按照GS1排布
                 int64_t actS1Size = qActSeqLensParser_->GetActualSeqLength(taskInfo_.bIdx);
                 gIdx = (taskInfo_.gS1Idx + startRow + row) / actS1Size;
             }
@@ -553,8 +555,7 @@ public:
                 if constexpr (layout == LayOutTypeEnum::LAYOUT_TND) {
                     // LSE 输出改为 N-major 排布 [N2*G, T]: N 在外, T 在内
                     uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(taskInfo_.bIdx);
-                    uint64_t bN2Offset =
-                        taskInfo_.n2Idx * constInfo_.gSize * constInfo_.t1Size + prefixBS1;
+                    uint64_t bN2Offset = taskInfo_.n2Idx * constInfo_.gSize * constInfo_.t1Size + prefixBS1;
                     DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge<T, ConstInfoX>(softmaxLseGm_, maxLseUb, bN2Offset,
                                                                              mOffset, actualGSplitSize, constInfo_);
                 } else if constexpr (layout == LayOutTypeEnum::LAYOUT_NTD) {
@@ -605,8 +606,8 @@ template <typename INPUT_T, typename T, typename OUTPUT_T, LayOutTypeEnum layout
           LayOutTypeEnum outLayout = LayOutTypeEnum::None, S1TemplateType s1TemplateType = S1TemplateType::Aligned128,
           S2TemplateType s2TemplateType = S2TemplateType::Aligned128,
           DTemplateType dTemplateType = DTemplateType::Aligned128,
-          DTemplateType dVTemplateType = DTemplateType::Aligned128,
-          bool hasAtten = false, uint8_t KvLayoutType = 0, bool useDn = false>
+          DTemplateType dVTemplateType = DTemplateType::Aligned128, bool hasAtten = false, uint8_t KvLayoutType = 0,
+          bool useDn = false>
 class QuantFlashAttnBlockVecFlashDecodeDummy {
 public:
     using ConstInfoX = ConstInfo_t;

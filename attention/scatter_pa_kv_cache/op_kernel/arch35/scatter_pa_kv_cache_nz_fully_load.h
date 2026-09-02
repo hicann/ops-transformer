@@ -10,11 +10,10 @@
 /*!
  * \file scatter_pa_kv_cache_nz_fully_load.h
  * \brief
-*/
+ */
 
 #ifndef SCATTER_PA_KV_CACHE_NZ_FULLY_LOAD_H_
 #define SCATTER_PA_KV_CACHE_NZ_FULLY_LOAD_H_
-
 
 #include "kernel_operator.h"
 #include "scatter_pa_kv_cache_arch35_common.h"
@@ -25,11 +24,11 @@ using namespace AscendC;
 template <typename T1, typename T2, typename IndexDtype, int64_t InOutMode>
 class ScatterPaKvCacheNzFullyLoad {
 public:
-    __aicore__ inline ScatterPaKvCacheNzFullyLoad(TPipe *pipe,
-                                                        const ScatterPaKvCacheTilingData *__restrict tiling)
-        : pipe_(pipe), tilingData_(tiling){};
-    __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value,
-                                GM_ADDR key_cache_out, GM_ADDR value_cache_out);
+    __aicore__ inline ScatterPaKvCacheNzFullyLoad(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
+        : pipe_(pipe),
+          tilingData_(tiling){};
+    __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value, GM_ADDR key_cache_out,
+                                GM_ADDR value_cache_out);
     __aicore__ inline void Process();
 
 private:
@@ -84,10 +83,10 @@ __aicore__ inline void ScatterPaKvCacheNzFullyLoad<T1, T2, IndexDtype, InOutMode
 
     DataCopyExtParams copyParamsInK{1, static_cast<uint32_t>(tokenSizeK_ * sizeof(T1)), 0, 0, 0};
     DataCopyExtParams copyParamsOutK{static_cast<uint16_t>(tokenSizeK_ / lastDimK_), BLOCK_SIZE, 0,
-                                  static_cast<int64_t>((tilingData_->blockSize - 1) * BLOCK_SIZE), 0};
+                                     static_cast<int64_t>((tilingData_->blockSize - 1) * BLOCK_SIZE), 0};
     DataCopyExtParams copyParamsInV{1, static_cast<uint32_t>(tokenSizeV_ * sizeof(T2)), 0, 0, 0};
     DataCopyExtParams copyParamsOutV{static_cast<uint16_t>(tokenSizeV_ / lastDimV_), BLOCK_SIZE, 0,
-                                  static_cast<int64_t>((tilingData_->blockSize - 1) * BLOCK_SIZE), 0};
+                                     static_cast<int64_t>((tilingData_->blockSize - 1) * BLOCK_SIZE), 0};
     DataCopyPadExtParams<T1> kPadParams;
     kPadParams.isPad = 0;
     kPadParams.leftPadding = 0;

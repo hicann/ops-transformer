@@ -25,20 +25,21 @@ template <typename T1, typename T2, typename IndexDtype, int64_t InOutMode, bool
 class ScatterPaKvCacheNzNonContiguous {
 public:
     __aicore__ inline ScatterPaKvCacheNzNonContiguous(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
-        : pipe_(pipe), tilingData_(tiling){};
-    __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value,
-                                GM_ADDR key_cache_out, GM_ADDR value_cache_out);
+        : pipe_(pipe),
+          tilingData_(tiling){};
+    __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value, GM_ADDR key_cache_out,
+                                GM_ADDR value_cache_out);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void CopyInKeyNz(
-        int64_t tokenIdx, int64_t headIdx, int64_t lastDimIdx, int64_t headNum, int64_t lastDimNum);
+    __aicore__ inline void CopyInKeyNz(int64_t tokenIdx, int64_t headIdx, int64_t lastDimIdx, int64_t headNum,
+                                       int64_t lastDimNum);
     __aicore__ inline void CopyOutKeyNz(int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t lastDimIdx,
-        int64_t headNum, int64_t lastDimNum);
-    __aicore__ inline void CopyInValueNz(
-        int64_t tokenIdx, int64_t headIdx, int64_t lastDimIdx, int64_t headNum, int64_t lastDimNum);
+                                        int64_t headNum, int64_t lastDimNum);
+    __aicore__ inline void CopyInValueNz(int64_t tokenIdx, int64_t headIdx, int64_t lastDimIdx, int64_t headNum,
+                                         int64_t lastDimNum);
     __aicore__ inline void CopyOutValueNz(int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t lastDimIdx,
-        int64_t headNum, int64_t lastDimNum);
+                                          int64_t headNum, int64_t lastDimNum);
     __aicore__ inline void InitLoopInfo();
     __aicore__ inline void ProcessKey(int64_t tokenIdx, int64_t blockIdx, int64_t blockOffset);
     __aicore__ inline void ProcessValue(int64_t tokenIdx, int64_t blockIdx, int64_t blockOffset);
@@ -110,9 +111,9 @@ __aicore__ inline void ScatterPaKvCacheNzNonContiguous<T1, T2, IndexDtype, InOut
 {
     int64_t ubHandleSize = maxHandleSize_ / sizeof(T1);
     int64_t kElementsPerHead = kHeadLastDimLoop_ * lastDimK_;
-    
+
     kFullyLoad_ = (kElementsPerHead <= ubHandleSize);
-    
+
     if (kFullyLoad_) {
         kLastDimIn_ = kHeadLastDimLoop_;
         kLastDimLoop_ = 1;
@@ -135,9 +136,9 @@ __aicore__ inline void ScatterPaKvCacheNzNonContiguous<T1, T2, IndexDtype, InOut
     if constexpr (InOutMode == DUAL_IN_OUT) {
         int64_t ubHandleSizeV = maxHandleSize_ / sizeof(T2);
         int64_t vElementsPerHead = vHeadLastDimLoop_ * lastDimV_;
-        
+
         vFullyLoad_ = (vElementsPerHead <= ubHandleSizeV);
-        
+
         if (vFullyLoad_) {
             vLastDimIn_ = vHeadLastDimLoop_;
             vLastDimLoop_ = 1;
@@ -165,16 +166,11 @@ __aicore__ inline void ScatterPaKvCacheNzNonContiguous<T1, T2, IndexDtype, InOut
 {
     LocalTensor<T1> inputLocal = keyQue_.AllocTensor<T1>();
 
-    int64_t keyOffset = tokenIdx * tilingData_->keyStride0 +
-                        headIdx * tilingData_->keyStride1 +
-                        lastDimIdx * lastDimK_;
+    int64_t keyOffset = tokenIdx * tilingData_->keyStride0 + headIdx * tilingData_->keyStride1 + lastDimIdx * lastDimK_;
 
     DataCopyExtParams copyParams = {
-        static_cast<uint16_t>(headNum),
-        static_cast<uint32_t>(lastDimNum * lastDimK_ * sizeof(T1)),
-        static_cast<uint32_t>((tilingData_->keyStride1 - lastDimNum * lastDimK_) * sizeof(T1)),
-        0, 0
-    };
+        static_cast<uint16_t>(headNum), static_cast<uint32_t>(lastDimNum * lastDimK_ * sizeof(T1)),
+        static_cast<uint32_t>((tilingData_->keyStride1 - lastDimNum * lastDimK_) * sizeof(T1)), 0, 0};
     DataCopyPadExtParams<T1> padParams = {false, 0, 0, static_cast<T1>(0)};
     DataCopyPad(inputLocal, keyGm_[keyOffset], copyParams, padParams);
 
@@ -188,7 +184,7 @@ __aicore__ inline void ScatterPaKvCacheNzNonContiguous<T1, T2, IndexDtype, InOut
     LocalTensor<T1> inputLocal = keyQue_.DeQue<T1>();
 
     int64_t dstStride = 0;
-    if constexpr (FIVE_DIM)  {
+    if constexpr (FIVE_DIM) {
         dstStride = tilingData_->keyCacheStride2 * sizeof(T1) - BLOCK_SIZE;
     } else {
         dstStride = tilingData_->keyCacheStride1 * sizeof(T1) - BLOCK_SIZE;
@@ -206,13 +202,7 @@ __aicore__ inline void ScatterPaKvCacheNzNonContiguous<T1, T2, IndexDtype, InOut
         }
 
         int64_t ubOffset = h * lastDimNum * lastDimK_;
-        DataCopyExtParams copyParams = {
-            static_cast<uint16_t>(lastDimNum),
-            BLOCK_SIZE,
-            0,
-            dstStride,
-            0
-        };
+        DataCopyExtParams copyParams = {static_cast<uint16_t>(lastDimNum), BLOCK_SIZE, 0, dstStride, 0};
 
         DataCopyPad(keyCacheOutGm_[keyCacheOffset], inputLocal[ubOffset], copyParams);
     }
@@ -226,16 +216,12 @@ __aicore__ inline void ScatterPaKvCacheNzNonContiguous<T1, T2, IndexDtype, InOut
 {
     LocalTensor<T2> inputLocal = valueQue_.AllocTensor<T2>();
 
-    int64_t valueOffset = tokenIdx * tilingData_->valueStride0 +
-                          headIdx * tilingData_->valueStride1 +
-                          lastDimIdx * lastDimV_;
+    int64_t valueOffset =
+        tokenIdx * tilingData_->valueStride0 + headIdx * tilingData_->valueStride1 + lastDimIdx * lastDimV_;
 
     DataCopyExtParams copyParams = {
-        static_cast<uint16_t>(headNum),
-        static_cast<uint32_t>(lastDimNum * lastDimV_ * sizeof(T2)),
-        static_cast<uint32_t>((tilingData_->valueStride1 - lastDimNum * lastDimV_) * sizeof(T2)),
-        0, 0
-    };
+        static_cast<uint16_t>(headNum), static_cast<uint32_t>(lastDimNum * lastDimV_ * sizeof(T2)),
+        static_cast<uint32_t>((tilingData_->valueStride1 - lastDimNum * lastDimV_) * sizeof(T2)), 0, 0};
     DataCopyPadExtParams<T2> padParams = {false, 0, 0, static_cast<T2>(0)};
     DataCopyPad(inputLocal, valueGm_[valueOffset], copyParams, padParams);
 
@@ -269,13 +255,7 @@ __aicore__ inline void ScatterPaKvCacheNzNonContiguous<T1, T2, IndexDtype, InOut
 
         int64_t ubOffset = h * lastDimNum * lastDimV_;
 
-        DataCopyExtParams copyParams = {
-            static_cast<uint16_t>(lastDimNum),
-            BLOCK_SIZE,
-            0,
-            dstStride,
-            0
-        };
+        DataCopyExtParams copyParams = {static_cast<uint16_t>(lastDimNum), BLOCK_SIZE, 0, dstStride, 0};
 
         DataCopyPad(valueCacheOutGm_[valueCacheOffset], inputLocal[ubOffset], copyParams);
     }

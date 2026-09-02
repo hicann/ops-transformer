@@ -14,8 +14,7 @@
 #include "../../attn_infra/rain_base_defs.hpp"
 #include "../../attn_infra/arch/rain_arch.hpp"
 
-namespace NpuArch::Gemm 
-{
+namespace NpuArch::Gemm {
 
 // Block Mmad Policies
 
@@ -69,6 +68,6 @@ struct MmadAtlasA2SFAIPV : public MmadAtlasA2 {
     static constexpr bool ENABLE_UNIT_FLAG = ENABLE_UNIT_FLAG_;
 };
 
-}  // namespace NpuArch::Gemm
+} // namespace NpuArch::Gemm
 
-#endif  // GEMM_DISPATCH_POLICY_HPP
+#endif // GEMM_DISPATCH_POLICY_HPP

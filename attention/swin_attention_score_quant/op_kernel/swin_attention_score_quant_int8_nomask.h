@@ -20,13 +20,14 @@
 template <typename DTYPE_OUT, typename DTYPE_SCALE, typename DTYPE_BIAS, typename DTYPE_MASK>
 class SwinAttentionScoreQuant<int8_t, DTYPE_OUT, DTYPE_SCALE, DTYPE_BIAS, DTYPE_MASK, false> {
     using DTYPE_IN = int8_t;
+
 public:
-    __aicore__ inline SwinAttentionScoreQuant() {};
+    __aicore__ inline SwinAttentionScoreQuant(){};
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-        __gm__ uint8_t *scaleQuant, __gm__ uint8_t *scaleDequant1, __gm__ uint8_t *scaleDequant2,
-        __gm__ uint8_t *biasQuant, __gm__ uint8_t *biasDequant1, __gm__ uint8_t *biasDequant2,
-        __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-        const SwinAttentionScoreQuantTilingData *tiling, AscendC::TPipe *tPipe)
+                                __gm__ uint8_t *scaleQuant, __gm__ uint8_t *scaleDequant1,
+                                __gm__ uint8_t *scaleDequant2, __gm__ uint8_t *biasQuant, __gm__ uint8_t *biasDequant1,
+                                __gm__ uint8_t *biasDequant2, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                                const SwinAttentionScoreQuantTilingData *tiling, AscendC::TPipe *tPipe)
     {
         coreIdx = AscendC::GetBlockIdx();
         blockDim = AscendC::GetBlockNum();
@@ -115,15 +116,17 @@ public:
     matmul::Matmul<qType, kType, qkType, qkBiasType> qkBmm;
     // define pvBmm
     using pType = matmul::MatmulType<AscendC::TPosition::TSCM, CubeFormat::NZ, DTYPE_IN, false>;
-    using vType = matmul::MatmulType<AscendC::TPosition::TSCM, CubeFormat::NZ, DTYPE_IN, true> ;
+    using vType = matmul::MatmulType<AscendC::TPosition::TSCM, CubeFormat::NZ, DTYPE_IN, true>;
     using pvType = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_OUT>;
     using pvBiasType = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS>;
     matmul::Matmul<pType, vType, pvType, pvBiasType, CFG_ENVECND2NZ> pvBmm;
 
     const uint32_t C0_SIZE = BLOCK_SIZE_32 / sizeof(DTYPE_IN);
+
 protected:
     __aicore__ inline void Stage1BmmQK(uint32_t bIdx, uint32_t sIdx, uint32_t bOffset,
-        AscendC::LocalTensor<DTYPE_IN> &qL1Tensor, AscendC::LocalTensor<DTYPE_IN> &kL1Tensor)
+                                       AscendC::LocalTensor<DTYPE_IN> &qL1Tensor,
+                                       AscendC::LocalTensor<DTYPE_IN> &kL1Tensor)
     {
         AscendC::LocalTensor<DTYPE_MASK> pUbTensor = pUbTBuf.template Get<DTYPE_MASK>();
 
@@ -139,26 +142,28 @@ protected:
     }
 
     __aicore__ inline void Stage2AscendQuantNz(AscendC::LocalTensor<DTYPE_IN> &dst,
-        AscendC::LocalTensor<DTYPE_MASK> &src, AscendC::LocalTensor<DTYPE_MASK> &scaleQuantUb,
-        AscendC::LocalTensor<DTYPE_MASK> &biasQuantUb)
+                                               AscendC::LocalTensor<DTYPE_MASK> &src,
+                                               AscendC::LocalTensor<DTYPE_MASK> &scaleQuantUb,
+                                               AscendC::LocalTensor<DTYPE_MASK> &biasQuantUb)
     {
         uint64_t mask0 = 128;
-        uint64_t mask1[2] = { 0xffffffff, 0 };
+        uint64_t mask1[2] = {0xffffffff, 0};
         bool halfBlockIn = true;
         for (uint32_t j = 0; j < round16S / BLOCK_SIZE_16; j++) {
             Mul(src[j * roundM * BLOCK_SIZE_16], src[j * roundM * BLOCK_SIZE_16], scaleQuantUb[j * BLOCK_SIZE_16],
-                mask0, roundM / BLOCK_NUM_PER_VEC, { 1, 1, 0, BLOCK_NUM_PER_VEC, BLOCK_NUM_PER_VEC, 0 });
-            Add(src[j * roundM * BLOCK_SIZE_16], src[j * roundM * BLOCK_SIZE_16], biasQuantUb[j * BLOCK_SIZE_16],
-                mask0, roundM / BLOCK_NUM_PER_VEC, { 1, 1, 0, BLOCK_NUM_PER_VEC, BLOCK_NUM_PER_VEC, 0 });
+                mask0, roundM / BLOCK_NUM_PER_VEC, {1, 1, 0, BLOCK_NUM_PER_VEC, BLOCK_NUM_PER_VEC, 0});
+            Add(src[j * roundM * BLOCK_SIZE_16], src[j * roundM * BLOCK_SIZE_16], biasQuantUb[j * BLOCK_SIZE_16], mask0,
+                roundM / BLOCK_NUM_PER_VEC, {1, 1, 0, BLOCK_NUM_PER_VEC, BLOCK_NUM_PER_VEC, 0});
         }
-        for (uint32_t j = 0; j < round16S / BLOCK_SIZE_16; j+=2) {  // 将2个BLOCK的fp16数据转成1个BLOCK的int8数据
+        for (uint32_t j = 0; j < round16S / BLOCK_SIZE_16; j += 2) { // 将2个BLOCK的fp16数据转成1个BLOCK的int8数据
             Cast(dst[j / 2 * roundM * BLOCK_SIZE_32], src[j * roundM * BLOCK_SIZE_16], AscendC::RoundMode::CAST_NONE,
-                mask1, roundM, { 1, (uint16_t)roundM, 1, 1 });      // 输出每次循环偏移2列
+                 mask1, roundM, {1, (uint16_t)roundM, 1, 1}); // 输出每次循环偏移2列
         }
     }
 
     __aicore__ inline void Stage2Vec(uint32_t bIdx, uint32_t sIdx, uint32_t bOffset,
-        AscendC::LocalTensor<DTYPE_IN> &pL1Tensor, AscendC::LocalTensor<DTYPE_IN> &vL1Tensor)
+                                     AscendC::LocalTensor<DTYPE_IN> &pL1Tensor,
+                                     AscendC::LocalTensor<DTYPE_IN> &vL1Tensor)
     {
         AscendC::LocalTensor<DTYPE_MASK> pUbTensor = pUbTBuf.template Get<DTYPE_MASK>();
         AscendC::LocalTensor<DTYPE_IN> pInt8 = pUbTBuf.template Get<DTYPE_IN>();
@@ -172,9 +177,9 @@ protected:
 
         AscendC::DataCopy(rightMatrix, valueGm[bOffset], s * h);
 
-        AscendC::SoftMax<DTYPE_MASK, true, false, true>(pUbTensor, softmaxSumUb, softmaxMaxUb,
-            pUbTensor, softmaxSharedUb, tilingData->softmaxTilingData,
-            AscendC::SoftMaxShapeInfo { roundM, round16S, actualM, s });
+        AscendC::SoftMax<DTYPE_MASK, true, false, true>(pUbTensor, softmaxSumUb, softmaxMaxUb, pUbTensor,
+                                                        softmaxSharedUb, tilingData->softmaxTilingData,
+                                                        AscendC::SoftMaxShapeInfo{roundM, round16S, actualM, s});
         Stage2AscendQuantNz(pInt8, pUbTensor, scaleQuantUb, biasQuantUb);
 
         event_t pEventIDVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(AscendC::HardEvent::V_MTE3));
@@ -202,7 +207,8 @@ protected:
     }
 
     __aicore__ inline void Stage3BmmPV(uint32_t bIdx, uint32_t sIdx, uint32_t bOffset,
-        AscendC::LocalTensor<DTYPE_IN> &pL1Tensor, AscendC::LocalTensor<DTYPE_IN> &vL1Tensor)
+                                       AscendC::LocalTensor<DTYPE_IN> &pL1Tensor,
+                                       AscendC::LocalTensor<DTYPE_IN> &vL1Tensor)
     {
         pvBmm.SetTail(actualM, h, s);
         pvBmm.SetOrgShape(roundM, h, round32S, round32S);
@@ -237,24 +243,24 @@ protected:
     AscendC::GlobalTensor<DTYPE_BIAS> biasDequant2Gm;
     AscendC::GlobalTensor<DTYPE_OUT> attentionOutGm;
 
-    uint32_t coreIdx { 0 };
-    uint32_t blockDim { 0 };
-    uint32_t coreLoops { 0 };
-    uint32_t b { 0 };
-    uint32_t n { 0 };
-    uint32_t s { 0 };
-    uint32_t h { 0 };
-    uint32_t round16S { 0 };
-    uint32_t round32S { 0 };
-    uint32_t roundM { 0 };
-    uint32_t singleCoreM { 0 };
-    uint32_t actualM { 0 };
-    uint32_t singleMTail { 0 };
-    uint32_t numPerS { 0 };
-    uint32_t qSize { 0 };
-    uint32_t kSize { 0 };
-    uint32_t pSize { 0 };
-    uint32_t vSize { 0 };
+    uint32_t coreIdx{0};
+    uint32_t blockDim{0};
+    uint32_t coreLoops{0};
+    uint32_t b{0};
+    uint32_t n{0};
+    uint32_t s{0};
+    uint32_t h{0};
+    uint32_t round16S{0};
+    uint32_t round32S{0};
+    uint32_t roundM{0};
+    uint32_t singleCoreM{0};
+    uint32_t actualM{0};
+    uint32_t singleMTail{0};
+    uint32_t numPerS{0};
+    uint32_t qSize{0};
+    uint32_t kSize{0};
+    uint32_t pSize{0};
+    uint32_t vSize{0};
 };
 
 #endif

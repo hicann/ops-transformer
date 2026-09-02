@@ -14,12 +14,12 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "../../../../op_kernel/arch35/scatter_pa_kv_cache_with_k_scale_tiling_data.h"
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                        \
-    ScatterPaKvCacheWithKScaleTilingData tilingData;                                                   \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    ScatterPaKvCacheWithKScaleTilingData tilingData; \
     memcpy(&tilingData, tilingArg, sizeof(ScatterPaKvCacheWithKScaleTilingData))
 
-#define GET_TILING_DATA_WITH_STRUCT(TilingDataStru, tilingData, tilingArg)       \
-    TilingDataStru tilingData;                                                 \
+#define GET_TILING_DATA_WITH_STRUCT(TilingDataStru, tilingData, tilingArg) \
+    TilingDataStru tilingData; \
     memcpy(&tilingData, tilingArg, sizeof(TilingDataStru))
 
 #endif // SCATTER_PA_KV_CACHE_WITH_K_SCALE_TILING_DEF_H

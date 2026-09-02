@@ -18,7 +18,7 @@
 #include "prompt_flash_attention_base.h"
 
 using namespace matmul;
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M = OptimizationMode::HighPerformance>
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M = OptimizationMode::HighPerformance>
 class PromptFlashAttentionBNSTillingNSWithBNSDTail : public PromptFlashAttentionBase<T, U, FORMAT, O, M> {
 public:
     // define datatype
@@ -28,7 +28,7 @@ public:
     using softmaxType = typename PromptFlashAttentionTypeTraits<T, M>::softmaxType;
     using pseShiftType = typename PromptFlashAttentionTypeTraits<T, M>::pseShiftType;
     using pseShiftCastType = typename PromptFlashAttentionTypeTraits<T, M>::pseShiftCastType;
-    __aicore__ inline PromptFlashAttentionBNSTillingNSWithBNSDTail() {};
+    __aicore__ inline PromptFlashAttentionBNSTillingNSWithBNSDTail(){};
     __aicore__ inline void Process();
 
 protected:
@@ -36,14 +36,18 @@ protected:
 
     __aicore__ inline void PseShiftCopyIn(uint64_t offset, uint32_t sinnerSize, uint32_t sInnerLoopIdx);
 
-    __aicore__ inline void PseShiftProcess(int64_t sInnerLoopIdx, uint32_t computeSize, LocalTensor<mmOutputType>& mmResUb);
+    __aicore__ inline void PseShiftProcess(int64_t sInnerLoopIdx, uint32_t computeSize,
+                                           LocalTensor<mmOutputType> &mmResUb);
 
-    __aicore__ inline void Bmm1ResDoVecBmm2Compute(LocalTensor<mmOutputType>& mmResUb, LocalTensor<float>& softmaxMaxUb,
-                                            LocalTensor<float>& softmaxSumUb, LocalTensor<softmaxType>& softmaxExpUb,
-                                            bool isLast, bool isSecond, event_t eventID, int64_t sInnerLoopIdx);
+    __aicore__ inline void Bmm1ResDoVecBmm2Compute(LocalTensor<mmOutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb,
+                                                   LocalTensor<float> &softmaxSumUb,
+                                                   LocalTensor<softmaxType> &softmaxExpUb, bool isLast, bool isSecond,
+                                                   event_t eventID, int64_t sInnerLoopIdx);
 
-    __aicore__ inline void Bmm1ResDoVecBmm2ComputeFirst(LocalTensor<mmOutputType>& mmResUb, LocalTensor<float>& softmaxMaxUb,
-                                            LocalTensor<float>& softmaxSumUb, bool isLast, event_t eventID, int64_t sInnerLoopIdx);
+    __aicore__ inline void Bmm1ResDoVecBmm2ComputeFirst(LocalTensor<mmOutputType> &mmResUb,
+                                                        LocalTensor<float> &softmaxMaxUb,
+                                                        LocalTensor<float> &softmaxSumUb, bool isLast, event_t eventID,
+                                                        int64_t sInnerLoopIdx);
 
     __aicore__ inline void ComputeEachCoreSInnerLoop(uint32_t startIndex, uint32_t endIndex);
 
@@ -54,20 +58,21 @@ protected:
     __aicore__ inline void ComputeEachCoreBalance(uint32_t coreIdx);
 };
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::Process() {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::Process()
+{
     if (this->headNumRatio != 1 || this->tilingData->promptAttentionInitOutputParams.needInit ||
         this->tilingData->promptAttentionBaseParams.batchSize != 1) {
         ComputeEachCore(this->tmp_block_idx);
-    }
-    else {
+    } else {
         ComputeEachCoreBalance(this->tmp_block_idx);
     }
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::PseShiftCopyIn(uint64_t offset, uint32_t sinnerSize,
-                                                                           uint32_t sInnerLoopIdx) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::PseShiftCopyIn(
+    uint64_t offset, uint32_t sinnerSize, uint32_t sInnerLoopIdx)
+{
     if (!(this->usePseShift)) {
         return;
     }
@@ -99,9 +104,10 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     this->attenMaskQueue.EnQue(pseShiftUb);
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::PseShiftProcess(int64_t sInnerLoopIdx,
-    uint32_t computeSize, LocalTensor<mmOutputType>& mmResUb) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::PseShiftProcess(
+    int64_t sInnerLoopIdx, uint32_t computeSize, LocalTensor<mmOutputType> &mmResUb)
+{
     if (this->usePseShift) {
         this->PseShiftCopyIn(this->pseShiftOffset, this->pseShiftCopyInCol, sInnerLoopIdx);
         LocalTensor<pseShiftType> pseShiftUb = this->attenMaskQueue.template DeQue<pseShiftType>();
@@ -119,10 +125,10 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     }
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::AttenMaskCopyIn(uint64_t offset,
-                                                                                           uint32_t sinnerSize,
-                                                                                           uint32_t sInnerLoopIdx) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::AttenMaskCopyIn(
+    uint64_t offset, uint32_t sinnerSize, uint32_t sInnerLoopIdx)
+{
     if (this->useMask == false) {
         return;
     }
@@ -133,11 +139,10 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
 
     intriParams.blockLen = sinnerSize * sizeof(U);
 
-    intriParams.srcStride = (this->attentionMaskStride - sinnerSize) *sizeof(U);
+    intriParams.srcStride = (this->attentionMaskStride - sinnerSize) * sizeof(U);
     if (sInnerLoopIdx == this->maxInnerLoopTimes - 1) {
         intriParams.blockLen = this->unalignSInner * sizeof(U);
-        intriParams.srcStride = (this->attentionMaskStride -
-                                 this->unalignSInner) * sizeof(U);
+        intriParams.srcStride = (this->attentionMaskStride - this->unalignSInner) * sizeof(U);
     }
 
     intriParams.dstStride = 0;
@@ -154,24 +159,26 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     this->attenMaskQueue.EnQue(attenMaskUb);
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::Bmm1ResDoVecBmm2ComputeFirst(LocalTensor<mmOutputType>& mmResUb,
-                                            LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb,
-                                            bool isLast, event_t eventID, int64_t sInnerLoopIdx) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::Bmm1ResDoVecBmm2ComputeFirst(
+    LocalTensor<mmOutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb, LocalTensor<float> &softmaxSumUb, bool isLast,
+    event_t eventID, int64_t sInnerLoopIdx)
+{
     WaitFlag<HardEvent::MTE3_MTE2>(eventID);
     this->mm.template GetTensorC<false>(mmResUb, false, false);
 
     uint32_t computeSize = this->singleProcessSInnerSizeNow * this->singleProcessSOuterSize;
     // Fill in atten: mask block ->atten block
 
-    Muls(mmResUb, mmResUb, static_cast<mmOutputType>(this->tilingData->promptAttentionBaseParams.scaleValue), computeSize);
+    Muls(mmResUb, mmResUb, static_cast<mmOutputType>(this->tilingData->promptAttentionBaseParams.scaleValue),
+         computeSize);
     PipeBarrier<PIPE_V>();
 
     this->PseShiftProcess(sInnerLoopIdx, computeSize, mmResUb);
 
     this->AttenMaskCopyIn(this->attenMaskOffset, this->maskCopyInCol, sInnerLoopIdx);
 
-    if(this->attentionMaskType == 4){ // 4   :band mode of sparseMode
+    if (this->attentionMaskType == 4) { // 4   :band mode of sparseMode
         this->ElewiseCompute(mmResUb, computeSize, 0);
 
         this->AttenMaskCopyIn(this->attenMaskOffsetPre, this->maskCopyInCol, sInnerLoopIdx);
@@ -183,15 +190,16 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     PipeBarrier<PIPE_V>();
 
     uint32_t alignSInner = (this->unalignSInner + this->typeByteNum - 1) / this->typeByteNum * this->typeByteNum;
-    SoftMaxShapeInfo shapeInfo = {this->singleProcessSOuterSize, alignSInner,
-                                  this->singleProcessSOuterSize, this->unalignSInner};
+    SoftMaxShapeInfo shapeInfo = {this->singleProcessSOuterSize, alignSInner, this->singleProcessSOuterSize,
+                                  this->unalignSInner};
     // Calculate the intermediate result of softmax: softmaxExp,softmaxMaxUb, softmaxSumUb
-    if (this->IsSoftmaxFlashBasic()
-        && this->singleProcessSInnerBmmTail == this->singleProcessSInnerSize
-        && this->singleProcessSOuterSize % 8 == 0) {
-        this->SoftmaxBasicComputeFirstNoTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, shapeInfo);  // Calculate the entire block
+    if (this->IsSoftmaxFlashBasic() && this->singleProcessSInnerBmmTail == this->singleProcessSInnerSize &&
+        this->singleProcessSOuterSize % 8 == 0) {
+        this->SoftmaxBasicComputeFirstNoTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb,
+                                             shapeInfo); // Calculate the entire block
     } else {
-        this->SoftmaxComputeFirstTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, shapeInfo); // Calculate the tail block
+        this->SoftmaxComputeFirstTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb,
+                                      shapeInfo); // Calculate the tail block
     }
 
     // Set BMM2 calculation parameters
@@ -204,11 +212,12 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         LocalTensor<mmOutputType> bmm2ResUb = this->tempBmm2Queue.template AllocTensor<mmOutputType>();
         if (this->tilingData->promptAttentionBaseParams.headSize ==
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
-                this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
+            this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // Adapt to non aligned scenarios in D, enable template parameter to do pad when copying to ub with GetTensorC, and pass in the original width and height
-            this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
-                this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
+            // Adapt to non aligned scenarios in D, enable template parameter to do pad when copying to ub with
+            // GetTensorC, and pass in the original width and height
+            this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false, this->singleProcessSOuterSize,
+                                                        this->tilingData->promptAttentionBaseParams.headSize);
         }
 
         // Release internal resources of API
@@ -220,7 +229,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         SetFlag<HardEvent::V_MTE3>(enQueEvtID);
         WaitFlag<HardEvent::V_MTE3>(enQueEvtID);
 
-         // Copy UB memory to GM, no Enque/deque required here???
+        // Copy UB memory to GM, no Enque/deque required here???
         this->DataCopyOutWithBNSD(bmm2ResUb);
         this->tempBmm2Queue.FreeTensor(bmm2ResUb);
     }
@@ -228,24 +237,25 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     SetFlag<HardEvent::MTE3_MTE2>(eventID);
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::Bmm1ResDoVecBmm2Compute(LocalTensor<mmOutputType>& mmResUb,
-                                            LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb,
-                                            LocalTensor<softmaxType>& softmaxExpUb, bool isLast,
-                                            bool isSecond, event_t eventID, int64_t sInnerLoopIdx) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::Bmm1ResDoVecBmm2Compute(
+    LocalTensor<mmOutputType> &mmResUb, LocalTensor<float> &softmaxMaxUb, LocalTensor<float> &softmaxSumUb,
+    LocalTensor<softmaxType> &softmaxExpUb, bool isLast, bool isSecond, event_t eventID, int64_t sInnerLoopIdx)
+{
     WaitFlag<HardEvent::MTE3_MTE2>(eventID);
     this->mm.template GetTensorC<false>(mmResUb, false, false);
 
     uint32_t computeSize = this->singleProcessSInnerSizeNow * this->singleProcessSOuterSize;
 
-    Muls(mmResUb, mmResUb, static_cast<mmOutputType>(this->tilingData->promptAttentionBaseParams.scaleValue), computeSize);
+    Muls(mmResUb, mmResUb, static_cast<mmOutputType>(this->tilingData->promptAttentionBaseParams.scaleValue),
+         computeSize);
     PipeBarrier<PIPE_V>();
 
     this->PseShiftProcess(sInnerLoopIdx, computeSize, mmResUb);
 
     this->AttenMaskCopyIn(this->attenMaskOffset, this->maskCopyInCol, sInnerLoopIdx);
 
-    if(this->attentionMaskType == 4){ // 4    :band mode of sparseMode
+    if (this->attentionMaskType == 4) { // 4    :band mode of sparseMode
         this->ElewiseCompute(mmResUb, computeSize, 0);
 
         this->AttenMaskCopyIn(this->attenMaskOffsetPre, this->maskCopyInCol, sInnerLoopIdx);
@@ -259,9 +269,8 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     SoftMaxShapeInfo shapeInfo = {this->singleProcessSOuterSize, this->singleProcessSInnerSize,
                                   this->singleProcessSOuterSize, this->singleProcessSInnerSize};
     // Calculate the intermediate result of softmax: softmaxExp, softmaxMaxUb, softmaxSumUb
-    if (this->IsSoftmaxFlashBasic()
-        && this->singleProcessSInnerBmmTail == this->singleProcessSInnerSize
-        && this->singleProcessSOuterSize % 8 == 0) {
+    if (this->IsSoftmaxFlashBasic() && this->singleProcessSInnerBmmTail == this->singleProcessSInnerSize &&
+        this->singleProcessSOuterSize % 8 == 0) {
         this->SoftmaxBasicComputeNoTail(mmResUb, softmaxMaxUb, softmaxSumUb, softmaxExpUb, shapeInfo);
     } else {
         this->SoftmaxComputeTail(mmResUb, softmaxMaxUb, softmaxSumUb, softmaxExpUb, shapeInfo);
@@ -278,14 +287,14 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         bmm2ResUb = this->tempBmm2Queue.template AllocTensor<mmOutputType>();
     }
 
-
     if (this->tilingData->promptAttentionBaseParams.headSize ==
         this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
-            this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
+        this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
     } else {
-        // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad when copying the GetTensorC to ub, and pass in the original width and height
-        this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
-            this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
+        // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad when
+        // copying the GetTensorC to ub, and pass in the original width and height
+        this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false, this->singleProcessSOuterSize,
+                                                    this->tilingData->promptAttentionBaseParams.headSize);
     }
 
     // End the previous calculation and release internal resources of the API
@@ -295,7 +304,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     // Perform a calculation once
     this->bmm2.template Iterate<false>();
 
-    if(!isSecond) {
+    if (!isSecond) {
         this->Bmm2UpdateAdd(bmm2ResUb);
         this->tempBmm2Queue.FreeTensor(bmm2ResUb);
     }
@@ -307,11 +316,12 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
 
         if (this->tilingData->promptAttentionBaseParams.headSize ==
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
-                this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
+            this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad when copying the GetTensorC to ub, and pass in the original width and height
-            this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
-                this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
+            // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad
+            // when copying the GetTensorC to ub, and pass in the original width and height
+            this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false, this->singleProcessSOuterSize,
+                                                        this->tilingData->promptAttentionBaseParams.headSize);
         }
 
         this->bmm2.End();
@@ -335,9 +345,10 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     SetFlag<HardEvent::MTE3_MTE2>(eventID);
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::SInnerLoopFunc(int32_t startIndex,
-                                                                                          int32_t endIndex) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::SInnerLoopFunc(
+    int32_t startIndex, int32_t endIndex)
+{
     if (startIndex < 0) {
         startIndex = 0;
     }
@@ -350,8 +361,8 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         return;
     }
     this->tensorAOffset = this->tensorACoreOffset;
-    this->tensorBOffset = this->tensorBCoreOffset +
-        startIndex * this->singleProcessSInnerSize * this->tilingData->promptAttentionBaseParams.headSize;
+    this->tensorBOffset = this->tensorBCoreOffset + startIndex * this->singleProcessSInnerSize *
+                                                        this->tilingData->promptAttentionBaseParams.headSize;
 
     this->mm.SetTensorA(this->queryGm[this->tensorAOffset]);
     this->mm.SetTensorB(this->keyGm[this->tensorBOffset], true);
@@ -376,9 +387,10 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     ComputeEachCoreSInnerLoop(startIndex, endIndex);
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::ComputeEachCoreSInnerLoop(uint32_t startIndex,
-                                                                                     uint32_t endIndex) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::ComputeEachCoreSInnerLoop(
+    uint32_t startIndex, uint32_t endIndex)
+{
     bool isSecond = true;
     event_t eventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
     SetFlag<HardEvent::MTE3_MTE2>(eventID);
@@ -394,8 +406,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
             this->singleProcessSInnerBmmTail = this->unalignSInner;
             this->maskCopyInCol = this->maskInnerTailAlign;
             this->pseShiftCopyInCol = this->pseShiftInnerTailAlign;
-        }
-        else {
+        } else {
             this->singleProcessSInnerSizeNow = this->singleProcessSInnerSize;
             this->singleProcessSInnerBmmTail = this->singleProcessSInnerSize;
             this->maskCopyInCol = this->singleProcessSInnerSize;
@@ -405,8 +416,9 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
 
         if (sInnerLoopIdx == startIndex) {
             Bmm1ResDoVecBmm2ComputeFirst(mmResUb, softmaxMaxUb, softmaxSumUb, isLast, eventID, sInnerLoopIdx);
-        }else {
-            Bmm1ResDoVecBmm2Compute(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, isLast, isSecond, eventID, sInnerLoopIdx);
+        } else {
+            Bmm1ResDoVecBmm2Compute(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, isLast, isSecond, eventID,
+                                    sInnerLoopIdx);
             isSecond = false;
         }
         this->Bmm1Queue.FreeTensor(mmResUb);
@@ -415,19 +427,25 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     WaitFlag<HardEvent::MTE3_MTE2>(eventID);
 }
 
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::ComputeEachCore(uint32_t coreIdx) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::ComputeEachCore(
+    uint32_t coreIdx)
+{
     this->spmTmpSize = this->tilingData->promptAttentionTensorSizeRect.spmTmpSize;
     this->mmResUbSize = this->tilingData->promptAttentionTensorSizeRect.mmResUbSize;
     this->bmm2ResUbSize = this->tilingData->promptAttentionTensorSizeRect.bmm2ResUbSize;
     int reuseWorkspaceRatio = this->tilingData->promptAttentionSingleCoreParams.multiSmaxsInnerLoopTimes;
-    this->mm.SetWorkspace((__gm__ uint8_t*)this->workspaceGm[GetBlockNum() * GetTaskRation() * this->spmTmpSize +
-        coreIdx * this->mmResUbSize * reuseWorkspaceRatio].GetPhyAddr(), this->mmResUbSize * reuseWorkspaceRatio);
+    this->mm.SetWorkspace((__gm__ uint8_t *)this
+                              ->workspaceGm[GetBlockNum() * GetTaskRation() * this->spmTmpSize +
+                                            coreIdx * this->mmResUbSize * reuseWorkspaceRatio]
+                              .GetPhyAddr(),
+                          this->mmResUbSize * reuseWorkspaceRatio);
 
-    uint32_t buff_offset = GetBlockNum() * GetTaskRation() * (this->spmTmpSize +
-                           this->mmResUbSize * reuseWorkspaceRatio);
-    this->bmm2.SetWorkspace((__gm__ uint8_t*)this->workspaceGm[buff_offset +
-                            coreIdx * this->bmm2ResUbSize].GetPhyAddr(), this->bmm2ResUbSize);
+    uint32_t buff_offset =
+        GetBlockNum() * GetTaskRation() * (this->spmTmpSize + this->mmResUbSize * reuseWorkspaceRatio);
+    this->bmm2.SetWorkspace(
+        (__gm__ uint8_t *)this->workspaceGm[buff_offset + coreIdx * this->bmm2ResUbSize].GetPhyAddr(),
+        this->bmm2ResUbSize);
 
     int actualCoreNums = this->tilingData->promptAttentionSingleCoreParams.actualCoreNums;
     if (g_coreType == AIV && coreIdx >= actualCoreNums) {
@@ -465,14 +483,18 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         for (int sIdx = sIdStart; sIdx < tmpSLoopEnd; sIdx++) {
             this->GetSingleCoreParam(sIdx);
             this->GetSparseParam(&preTokens, &nextTokens);
-            actualSeqLengthsIdx = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(sIdx);
-            actualSeqLengthsIdx = (this->attentionMaskType == 0 && (int64_t)actualSeqLengthsIdx >
-                               (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
-                               (int64_t)this->tilingData->promptAttentionBaseParams.preTokens) ?
-                            this->tilingData->promptAttentionBaseParams.seqInnerSize + this->tilingData->promptAttentionBaseParams.preTokens :
-                            actualSeqLengthsIdx;
-            int sOuterBlockNum = (actualSeqLengthsIdx + this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
-                                  this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
+            actualSeqLengthsIdx = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize :
+                                                              this->actualSeqLengthsGm.GetValue(sIdx);
+            actualSeqLengthsIdx =
+                (this->attentionMaskType == 0 &&
+                 (int64_t)actualSeqLengthsIdx > (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                                                    (int64_t)this->tilingData->promptAttentionBaseParams.preTokens) ?
+                    this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                        this->tilingData->promptAttentionBaseParams.preTokens :
+                    actualSeqLengthsIdx;
+            int sOuterBlockNum =
+                (actualSeqLengthsIdx + this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
+                this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
             this->multiSeqOffset = this->actualSeqOffsets[sIdx];
             if (isLast && sIdx == tmpSLoopEnd - 1) {
                 tmpOuterLoopEnd = outerLoopEnd;
@@ -487,13 +509,13 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
                 }
                 this->sOuterOffset = sOuterLoopIdx * this->singleProcessSOuterSizeWhole;
                 this->ComputeTokenOffset();
-                if (nextTokens < 0 && this->sOuterOffset < ((nextTokens * (-1)) /
-                    this->singleProcessSOuterSizeWhole * this->singleProcessSOuterSizeWhole)) {
+                if (nextTokens < 0 && this->sOuterOffset < ((nextTokens * (-1)) / this->singleProcessSOuterSizeWhole *
+                                                            this->singleProcessSOuterSizeWhole)) {
                     continue;
                 }
                 int32_t start_idx = (this->sOuterOffset - preTokens) / (int32_t)(this->singleProcessSInnerSize);
                 int32_t end_idx = (this->sOuterOffset + nextTokens + this->singleProcessSOuterSize +
-                                  (int32_t)(this->singleProcessSInnerSize) - 1) /
+                                   (int32_t)(this->singleProcessSInnerSize) - 1) /
                                   (int32_t)(this->singleProcessSInnerSize);
                 this->LoopSOuterOffsetInitWithBNSD(this->actualSeqOffsets[sIdx], sIdx);
                 SInnerLoopFunc(start_idx, end_idx);
@@ -504,12 +526,13 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     }
 }
 
-
-template<typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
-__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::ComputeEachCoreBalance(uint32_t coreIdx) {
+template <typename T, typename U, CubeFormat FORMAT, typename O, OptimizationMode M>
+__aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT, O, M>::ComputeEachCoreBalance(
+    uint32_t coreIdx)
+{
     int sNum = this->tilingData->promptAttentionBaseParams.dimNumOfseq;
     if (sNum == 0) {
-	    return;
+        return;
     }
     int32_t blockNum = GetBlockNum() * GetTaskRation();
     if (coreIdx % 2 == 1) {
@@ -519,12 +542,16 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     this->mmResUbSize = this->tilingData->promptAttentionTensorSizeRect.mmResUbSize;
     this->bmm2ResUbSize = this->tilingData->promptAttentionTensorSizeRect.bmm2ResUbSize;
     int reuseWorkspaceRatio = this->tilingData->promptAttentionSingleCoreParams.multiSmaxsInnerLoopTimes;
-    this->mm.SetWorkspace((__gm__ uint8_t*)this->workspaceGm[blockNum * this->spmTmpSize +
-        coreIdx * this->mmResUbSize * reuseWorkspaceRatio].GetPhyAddr(), this->mmResUbSize * reuseWorkspaceRatio);
+    this->mm.SetWorkspace(
+        (__gm__ uint8_t *)this
+            ->workspaceGm[blockNum * this->spmTmpSize + coreIdx * this->mmResUbSize * reuseWorkspaceRatio]
+            .GetPhyAddr(),
+        this->mmResUbSize * reuseWorkspaceRatio);
 
-    uint32_t buff_offset = blockNum * (this->spmTmpSize +
-                           this->mmResUbSize * reuseWorkspaceRatio);
-    this->bmm2.SetWorkspace((__gm__ uint8_t*)this->workspaceGm[buff_offset + coreIdx * this->bmm2ResUbSize].GetPhyAddr(), this->bmm2ResUbSize);
+    uint32_t buff_offset = blockNum * (this->spmTmpSize + this->mmResUbSize * reuseWorkspaceRatio);
+    this->bmm2.SetWorkspace(
+        (__gm__ uint8_t *)this->workspaceGm[buff_offset + coreIdx * this->bmm2ResUbSize].GetPhyAddr(),
+        this->bmm2ResUbSize);
 
     int32_t preTokens = (int32_t)(this->tilingData->promptAttentionBaseParams.preTokens);
     int32_t nextTokens = (int32_t)(this->tilingData->promptAttentionBaseParams.nextTokens);
@@ -545,36 +572,40 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         }
         this->GetSingleCoreParam(sIdx);
         this->GetSparseParam(&preTokens, &nextTokens);
-        actualSeqLengthsIdx = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(sIdx);
-        actualSeqLengthsIdx = (this->attentionMaskType == 0 && (int64_t)actualSeqLengthsIdx >
-                               (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
-                               (int64_t)this->tilingData->promptAttentionBaseParams.preTokens) ?
-                            this->tilingData->promptAttentionBaseParams.seqInnerSize + this->tilingData->promptAttentionBaseParams.preTokens :
-                            actualSeqLengthsIdx;
-        int sOuterBlockNum = (actualSeqLengthsIdx +
-                              this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
-                              this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
+        actualSeqLengthsIdx = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize :
+                                                          this->actualSeqLengthsGm.GetValue(sIdx);
+        actualSeqLengthsIdx =
+            (this->attentionMaskType == 0 &&
+             (int64_t)actualSeqLengthsIdx > (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                                                (int64_t)this->tilingData->promptAttentionBaseParams.preTokens) ?
+                this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                    this->tilingData->promptAttentionBaseParams.preTokens :
+                actualSeqLengthsIdx;
+        int sOuterBlockNum =
+            (actualSeqLengthsIdx + this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
+            this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
         this->multiSeqOffset = this->actualSeqOffsets[sIdx];
 
-        uint32_t sOuterLoopIdx = sOuterBlockNum - 1
-             - ((tilingIdx - preAccumSOuterNum) /
-                this->tilingData->promptAttentionBaseParams.headNumSize);
+        uint32_t sOuterLoopIdx =
+            sOuterBlockNum - 1 -
+            ((tilingIdx - preAccumSOuterNum) / this->tilingData->promptAttentionBaseParams.headNumSize);
 
         if (sOuterLoopIdx == 0) {
             this->singleProcessSOuterSize = this->singleProcessSOuterSizeTail;
             this->sOuterOffset = 0;
         } else {
             this->singleProcessSOuterSize = this->singleProcessSOuterSizeWhole;
-            this->sOuterOffset = this->singleProcessSOuterSizeTail + (sOuterLoopIdx - 1) * this->singleProcessSOuterSizeWhole;
+            this->sOuterOffset =
+                this->singleProcessSOuterSizeTail + (sOuterLoopIdx - 1) * this->singleProcessSOuterSizeWhole;
         }
         this->ComputeTokenOffset();
-        if (nextTokens < 0 && this->sOuterOffset < ((nextTokens * (-1)) /
-            this->singleProcessSOuterSizeWhole * this->singleProcessSOuterSizeWhole)) {
+        if (nextTokens < 0 && this->sOuterOffset < ((nextTokens * (-1)) / this->singleProcessSOuterSizeWhole *
+                                                    this->singleProcessSOuterSizeWhole)) {
             continue;
         }
         int32_t start_idx = (this->sOuterOffset - preTokens) / (int32_t)(this->singleProcessSInnerSize);
         int32_t end_idx = (this->sOuterOffset + nextTokens + this->singleProcessSOuterSize +
-                          (int32_t)(this->singleProcessSInnerSize) - 1) /
+                           (int32_t)(this->singleProcessSInnerSize) - 1) /
                           (int32_t)(this->singleProcessSInnerSize);
         this->LoopSOuterOffsetInitWithBNSD(this->actualSeqOffsets[sIdx], sIdx);
         this->SInnerLoopFunc(start_idx, end_idx);
@@ -583,4 +614,4 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     }
 }
 
-#endif  // PROMPT_FLASH_ATTENTION_SCORE_BNSTILLING_N_S_WITHBNSD_TAIL_H
+#endif // PROMPT_FLASH_ATTENTION_SCORE_BNSTILLING_N_S_WITHBNSD_TAIL_H

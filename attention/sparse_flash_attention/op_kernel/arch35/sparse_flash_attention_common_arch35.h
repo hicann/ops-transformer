@@ -38,7 +38,11 @@ enum class SFA_LAYOUT {
     PA_BSND = 2,
 };
 
-enum class SFATemplateMode { SWA_TEMPLATE_MODE = 0, CFA_TEMPLATE_MODE = 1, SCFA_TEMPLATE_MODE = 2 };
+enum class SFATemplateMode {
+    SWA_TEMPLATE_MODE = 0,
+    CFA_TEMPLATE_MODE = 1,
+    SCFA_TEMPLATE_MODE = 2
+};
 
 namespace BaseApi {
 __aicore__ constexpr uint64_t Align2Func(uint64_t data)

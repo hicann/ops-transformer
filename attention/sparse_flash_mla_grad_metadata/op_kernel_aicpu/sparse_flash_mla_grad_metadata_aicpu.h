@@ -60,13 +60,13 @@ enum class ValidSocVersion {
     ASCEND950
 };
 
-template<class T>
+template <class T>
 using Range = std::pair<T, T>;
 
-template<class T>
+template <class T>
 using BlockCost = std::array<std::array<T, static_cast<size_t>(BLOCK_MAX_TYPE)>, static_cast<size_t>(BLOCK_MAX_TYPE)>;
 
-template<typename T>
+template <typename T>
 T Clip(T value, T minValue, T maxValue)
 {
     if (value < minValue) {
@@ -78,7 +78,7 @@ T Clip(T value, T minValue, T maxValue)
     return value;
 }
 
-template<typename T>
+template <typename T>
 inline bool IsWithinTolerance(T limit, T tolerance, T value)
 {
     return limit + tolerance >= value;
@@ -92,156 +92,160 @@ inline T CeilDiv(T num, T rnd)
 
 // 分核功能模块输出：FD信息，包含需要归约的数据索引及其分核信息
 struct FlashDecodeResult {
-    uint32_t fdUsedVecNum { 0U };             // 归约过程使用的vector数量
+    uint32_t fdUsedVecNum{0U}; // 归约过程使用的vector数量
     // 1、归约任务的索引信息
-    std::vector<uint32_t> fdBN2Idx {};          // 每个归约任务的BN2索引，脚标为归约任务的序号，最大为核数-1
-    std::vector<uint32_t> fdMIdx {};            // 每个归约任务的GS1索引，脚标为归约任务的序号
-    std::vector<uint32_t> fdWorkspaceIdx {};    // 每个归约任务在workspace中的存放位置
-    std::vector<uint32_t> fdS2SplitNum {};      // 每个归约任务的S2核间切分份数，脚标为归约任务的序号
-    std::vector<uint32_t> fdMSize {};           // 每个归约任务m轴大小，脚标为归约任务的序号
+    std::vector<uint32_t> fdBN2Idx{}; // 每个归约任务的BN2索引，脚标为归约任务的序号，最大为核数-1
+    std::vector<uint32_t> fdMIdx{};         // 每个归约任务的GS1索引，脚标为归约任务的序号
+    std::vector<uint32_t> fdWorkspaceIdx{}; // 每个归约任务在workspace中的存放位置
+    std::vector<uint32_t> fdS2SplitNum{}; // 每个归约任务的S2核间切分份数，脚标为归约任务的序号
+    std::vector<uint32_t> fdMSize{};      // 每个归约任务m轴大小，脚标为归约任务的序号
     // 2、FD负载均衡阶段，归约任务的分核（vec）信息
-    std::vector<uint32_t> fdIdx {};             // FD负载均衡阶段，每个vector处理的归约任务对应ID
-    std::vector<uint32_t> fdMStart {};          // FD负载均衡阶段，每个vector处理的归约任务的m轴起点
-    std::vector<uint32_t> fdMNum {};            // FD负载均衡阶段，每个vector处理的归约任务的m轴行数
+    std::vector<uint32_t> fdIdx{};    // FD负载均衡阶段，每个vector处理的归约任务对应ID
+    std::vector<uint32_t> fdMStart{}; // FD负载均衡阶段，每个vector处理的归约任务的m轴起点
+    std::vector<uint32_t> fdMNum{};   // FD负载均衡阶段，每个vector处理的归约任务的m轴行数
 
     FlashDecodeResult(uint32_t aicNum, uint32_t aivNum)
         : fdBN2Idx(aicNum),
-        fdMIdx(aicNum),
-        fdWorkspaceIdx(aicNum),
-        fdS2SplitNum(aicNum),
-        fdMSize(aicNum),
-        fdIdx(aivNum),
-        fdMStart(aivNum),
-        fdMNum(aivNum) {}
+          fdMIdx(aicNum),
+          fdWorkspaceIdx(aicNum),
+          fdS2SplitNum(aicNum),
+          fdMSize(aicNum),
+          fdIdx(aivNum),
+          fdMStart(aivNum),
+          fdMNum(aivNum)
+    {}
 };
 
 // 分核功能模块输出：FA阶段的核间分核信息
 struct SplitResult {
-    uint32_t usedCoreNum { 0U };        // 使用的核数量
-    std::vector<uint32_t> bN2End {};    // 每个核处理数据的BN2结束点
-    std::vector<uint32_t> gS1End {};    // 每个核处理数据的GS1结束点
-    std::vector<uint32_t> s2End {};     // 每个核处理数据的S2结束点
-    std::vector<uint32_t> firstFdDataWorkspaceIdx {};     // 每个核第一份归约任务的存放位置
-    int64_t maxCost { 0 };            // 慢核开销
-    uint32_t numOfFdHead { 0U };        // 归约任务数量
-    uint32_t maxS2SplitNum { 0U };      // 单个归约任务最大分核数量
-    uint32_t maxS2GBaseNum { 0U };      // 单个核最大s2基本块数量
-    FlashDecodeResult fdRes { 0U, 0U };     // FD信息
+    uint32_t usedCoreNum{0U};                        // 使用的核数量
+    std::vector<uint32_t> bN2End{};                  // 每个核处理数据的BN2结束点
+    std::vector<uint32_t> gS1End{};                  // 每个核处理数据的GS1结束点
+    std::vector<uint32_t> s2End{};                   // 每个核处理数据的S2结束点
+    std::vector<uint32_t> firstFdDataWorkspaceIdx{}; // 每个核第一份归约任务的存放位置
+    int64_t maxCost{0};                              // 慢核开销
+    uint32_t numOfFdHead{0U};                        // 归约任务数量
+    uint32_t maxS2SplitNum{0U};                      // 单个归约任务最大分核数量
+    uint32_t maxS2GBaseNum{0U};                      // 单个核最大s2基本块数量
+    FlashDecodeResult fdRes{0U, 0U};                 // FD信息
 
     SplitResult(uint32_t aicNum, uint32_t aivNum)
         : bN2End(aicNum),
-        gS1End(aicNum),
-        s2End(aicNum),
-        firstFdDataWorkspaceIdx(aicNum),
-        fdRes(aicNum, aivNum) {};
+          gS1End(aicNum),
+          s2End(aicNum),
+          firstFdDataWorkspaceIdx(aicNum),
+          fdRes(aicNum, aivNum) {};
 };
 
 // 分核功能模块内部使用：记录切分信息
 struct SplitInfo {
-    std::vector<uint32_t> s1GBaseNum {};                   // S1G方向，切了多少个基本块
-    std::vector<uint32_t> oriS2BaseNum {};                    // oriS2方向，切了多少个基本块
-    std::vector<uint32_t> cmpS2BaseNum {};                    // cmpS2方向，切了多少个基本块
-    std::vector<uint32_t> s1GTailSize {};                  // S1G方向，尾块size
-    std::vector<uint32_t> oriS2TailSize {};                   // oriS2方向，尾块size
-    std::vector<uint32_t> cmpS2TailSize {};                   // cmpS2方向，尾块size
-    bool isKvSeqAllZero { true };
+    std::vector<uint32_t> s1GBaseNum{};    // S1G方向，切了多少个基本块
+    std::vector<uint32_t> oriS2BaseNum{};  // oriS2方向，切了多少个基本块
+    std::vector<uint32_t> cmpS2BaseNum{};  // cmpS2方向，切了多少个基本块
+    std::vector<uint32_t> s1GTailSize{};   // S1G方向，尾块size
+    std::vector<uint32_t> oriS2TailSize{}; // oriS2方向，尾块size
+    std::vector<uint32_t> cmpS2TailSize{}; // cmpS2方向，尾块size
+    bool isKvSeqAllZero{true};
 
     explicit SplitInfo(uint32_t batchSize)
         : s1GBaseNum(batchSize),
-        oriS2BaseNum(batchSize),
-        cmpS2BaseNum(batchSize),
-        s1GTailSize(batchSize),
-        oriS2TailSize(batchSize),
-        cmpS2TailSize(batchSize) {}
+          oriS2BaseNum(batchSize),
+          cmpS2BaseNum(batchSize),
+          s1GTailSize(batchSize),
+          oriS2TailSize(batchSize),
+          cmpS2TailSize(batchSize)
+    {}
 };
 
 // 分核功能模块内部使用：记录batch的开销信息
 struct CostInfo {
-    std::vector<int64_t> bN2CostOfEachBatch {};           // 整个batch的开销
-    std::vector<uint32_t> bN2BlockOfEachBatch {};          // 整个batch的开销
-    std::vector<int64_t> bN2LastBlockCostOfEachBatch {};  // batch最后一块的开销
-    uint32_t totalBlockNum { 0U };
-    int64_t totalCost { 0 };
-    int64_t maxS1GCost { 0 };  // 记录所有S1G行中的最大开销
+    std::vector<int64_t> bN2CostOfEachBatch{};          // 整个batch的开销
+    std::vector<uint32_t> bN2BlockOfEachBatch{};        // 整个batch的开销
+    std::vector<int64_t> bN2LastBlockCostOfEachBatch{}; // batch最后一块的开销
+    uint32_t totalBlockNum{0U};
+    int64_t totalCost{0};
+    int64_t maxS1GCost{0}; // 记录所有S1G行中的最大开销
 
     explicit CostInfo(uint32_t batchSize)
         : bN2CostOfEachBatch(batchSize),
-        bN2BlockOfEachBatch(batchSize),
-        bN2LastBlockCostOfEachBatch(batchSize) {}
+          bN2BlockOfEachBatch(batchSize),
+          bN2LastBlockCostOfEachBatch(batchSize)
+    {}
 };
 
 // 分核功能模块内部使用：分核过程中，case基本信息的上下文信息，组合以减少接口传参数量
 struct SplitContext {
-    SplitInfo splitInfo { 0U };
-    CostInfo costInfo { 0U };
+    SplitInfo splitInfo{0U};
+    CostInfo costInfo{0U};
 
     explicit SplitContext(uint32_t batchSize)
         : splitInfo(batchSize),
-        costInfo(batchSize) {}
+          costInfo(batchSize)
+    {}
 };
 
 // 分核功能模块内部使用：记录batch相关的临时信息
 struct BatchCache {
-    uint32_t bIdx { 0U };
-    uint32_t s1Size { 0U };
-    uint32_t oriS2Size { 0U };
-    uint64_t cmpRevertS2Size { 0U };
-    int64_t oriPreTokenLeftUp { 0 };
-    int64_t oriNextTokenLeftUp { 0 };
-    int64_t cmpPreTokenLeftUp { 0 };
-    int64_t cmpNextTokenLeftUp { 0 };
-    BlockCost<int64_t> typeCost {};
+    uint32_t bIdx{0U};
+    uint32_t s1Size{0U};
+    uint32_t oriS2Size{0U};
+    uint64_t cmpRevertS2Size{0U};
+    int64_t oriPreTokenLeftUp{0};
+    int64_t oriNextTokenLeftUp{0};
+    int64_t cmpPreTokenLeftUp{0};
+    int64_t cmpNextTokenLeftUp{0};
+    BlockCost<int64_t> typeCost{};
 };
 
 // 分核功能模块内部使用：记录当前行（S1G）的临时信息
 struct S1GCache {
-    uint32_t bIdx { 0U };
-    uint32_t s1GIdx { 0U };
-    uint32_t s2Start { 0U };
-    uint32_t s2End { 0U };
-    uint32_t oriS2Start { 0U };
-    uint32_t oriS2End { 0U };
-    uint32_t cmpS2Start { 0U };  // win部分与cmp部分的切分点
-    uint32_t cmpS2End { 0U };
-    int64_t s1GCost { 0 };
-    int64_t s1GLastBlockCost { 0 };
-    uint32_t s1GBlock { 0U };
-    uint32_t oriS1GBlock { 0U };
-    int64_t oriS1GCost { 0 };
-    int64_t oriS1GLastBlockCost { 0 };
-    int64_t oriS1GNormalBlockCost { 0 };
-    uint32_t cmpS1GBlock { 0U };
-    int64_t cmpS1GCost { 0 };
-    int64_t cmpS1GLastBlockCost { 0 };
-    int64_t cmpS1GNormalBlockCost { 0 };
-    int64_t oriS2TailSize {0};
-    int64_t cmpS2TailSize {0};
+    uint32_t bIdx{0U};
+    uint32_t s1GIdx{0U};
+    uint32_t s2Start{0U};
+    uint32_t s2End{0U};
+    uint32_t oriS2Start{0U};
+    uint32_t oriS2End{0U};
+    uint32_t cmpS2Start{0U}; // win部分与cmp部分的切分点
+    uint32_t cmpS2End{0U};
+    int64_t s1GCost{0};
+    int64_t s1GLastBlockCost{0};
+    uint32_t s1GBlock{0U};
+    uint32_t oriS1GBlock{0U};
+    int64_t oriS1GCost{0};
+    int64_t oriS1GLastBlockCost{0};
+    int64_t oriS1GNormalBlockCost{0};
+    uint32_t cmpS1GBlock{0U};
+    int64_t cmpS1GCost{0};
+    int64_t cmpS1GLastBlockCost{0};
+    int64_t cmpS1GNormalBlockCost{0};
+    int64_t oriS2TailSize{0};
+    int64_t cmpS2TailSize{0};
 };
 
 // 分核功能模块内部使用：记录分配过程中，当前核的负载信息
 struct CoreCache {
-    int64_t costLimit { 0 };  // 负载上限
-    int64_t cost { 0 };       // 已分配负载
-    uint32_t block { 0U };      // 已分配块数
+    int64_t costLimit{0}; // 负载上限
+    int64_t cost{0};      // 已分配负载
+    uint32_t block{0U};   // 已分配块数
 };
 
 // 分核功能模块内部使用：记录分配过程中的上下文信息
 struct AssignContext {
-    uint32_t curBIdx { 0U };
-    uint32_t curBN2Idx { 0U };
-    uint32_t curS1GIdx { 0U };
-    uint32_t curS2Idx { 0U };
-    uint32_t curCoreIdx { 0U };
-    int64_t unassignedCost { 0 };
-    uint32_t curKvSplitPart { 1U };
-    uint32_t preFdDataNum { 0U };
+    uint32_t curBIdx{0U};
+    uint32_t curBN2Idx{0U};
+    uint32_t curS1GIdx{0U};
+    uint32_t curS2Idx{0U};
+    uint32_t curCoreIdx{0U};
+    int64_t unassignedCost{0};
+    uint32_t curKvSplitPart{1U};
+    uint32_t preFdDataNum{0U};
 
-    int64_t bN2Cost { 0 };
-    uint32_t bN2Block { 0U };
-    bool isFinished { false };
-    BatchCache batchCache {};
-    S1GCache s1GCache {};
-    CoreCache coreCache {};
+    int64_t bN2Cost{0};
+    uint32_t bN2Block{0U};
+    bool isFinished{false};
+    BatchCache batchCache{};
+    S1GCache s1GCache{};
+    CoreCache coreCache{};
 };
 
 class SparseFlashMlaGradMetadataCpuKernel : public CpuKernel {
@@ -281,7 +285,7 @@ private:
     void CalcOriBlockRange(const Range<int64_t> &oriS2TokenRange, const BatchCache &batchCache, S1GCache &s1GCache);
     void CalcCmpBlockRange(const Range<int64_t> &cmpS2TokenRange, const BatchCache &batchCache, S1GCache &s1GCache);
     void CalcS1GCache(uint32_t s1GIdx, const SplitContext &splitContext, const BatchCache &batchCache,
-        S1GCache &s1GCache);
+                      S1GCache &s1GCache);
 
     // preprocess
     void CalcSplitInfo(SplitContext &splitContext);
@@ -347,18 +351,18 @@ private:
 
 private:
     enum class ParamId : uint32_t {
-    // input
-    cuSeqlensQ = 0,
-    cuSeqlensOriKv = 1,
-    cuSeqlensCmpKv = 2,
-    sequsedQ = 3,
-    sequsedOriKv = 4,
-    sequsedCmpKv = 5,
-    cmpResidualKv = 6,
-    oriTopkLength = 7,
-    cmpTopkLength = 8,
-    // output
-    metaData = 0,
+        // input
+        cuSeqlensQ = 0,
+        cuSeqlensOriKv = 1,
+        cuSeqlensCmpKv = 2,
+        sequsedQ = 3,
+        sequsedOriKv = 4,
+        sequsedCmpKv = 5,
+        cmpResidualKv = 6,
+        oriTopkLength = 7,
+        cmpTopkLength = 8,
+        // output
+        metaData = 0,
     };
 };
 } // namespace aicpu

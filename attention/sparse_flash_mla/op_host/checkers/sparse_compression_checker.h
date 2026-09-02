@@ -27,8 +27,7 @@ private:
     ge::graphStatus CheckIndex(const CheckContext &context, const TensorParam &param, const char *name) const;
     ge::graphStatus CheckTopkLength(const CheckContext &context, const TensorParam &param, const char *name) const;
     ge::graphStatus CheckIndexShape(const CheckContext &context, const TensorParam &param, const char *name) const;
-    ge::graphStatus CheckTopkLengthShape(const CheckContext &context, const TensorParam &param,
-                                         const char *name) const;
+    ge::graphStatus CheckTopkLengthShape(const CheckContext &context, const TensorParam &param, const char *name) const;
 };
 
 } // namespace sparse_mla_checker

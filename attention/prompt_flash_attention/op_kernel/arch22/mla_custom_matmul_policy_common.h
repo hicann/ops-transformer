@@ -9,9 +9,9 @@
  */
 
 /*!
-* \file mla_custom_matmul_policy_common.h
-* \brief
-*/
+ * \file mla_custom_matmul_policy_common.h
+ * \brief
+ */
 
 #ifndef MLA_CUSTOM_MATMUL_POLICY_COMMON_H
 #define MLA_CUSTOM_MATMUL_POLICY_COMMON_H
@@ -32,10 +32,10 @@ constexpr uint32_t BLOCK_CEILDIV_NUM = 15;
 
 // 定义L1 buffer全局管理结构体
 struct GlobalL1Array {
-    __aicore__ inline GlobalL1Array() {};
+    __aicore__ inline GlobalL1Array(){};
     TQue<TPosition::A1, 1> localQue;
     TBuffAddr srcAddr;
-    int32_t cacheSize{0}; // 表示已缓存base块的个数
+    int32_t cacheSize{0};  // 表示已缓存base块的个数
     int32_t bufferSize{0}; // base块元素个数
 };
 
@@ -55,9 +55,11 @@ template <typename IMPL, class INPUT_TYPE, const auto &MM_CFG>
 class MlaCubeInBuffer {
     MATMUL_USE_MODULE(Context);
     using SrcT = typename INPUT_TYPE::TRANS_T;
+
 public:
     __aicore__ inline MlaCubeInBuffer() {}
-    __aicore__ inline void Init(int32_t baseBlockSize, int32_t cacheSize, int32_t reduceAxisCnt) {
+    __aicore__ inline void Init(int32_t baseBlockSize, int32_t cacheSize, int32_t reduceAxisCnt)
+    {
         baseBlockSize_ = baseBlockSize;
     }
 
@@ -85,17 +87,19 @@ public:
     __aicore__ inline LocalTensor<SrcT> AllocTensor(int32_t bufferPos = -1)
     {
         if constexpr (INPUT_TYPE::TAG == InputTypeTag::A) {
-            LocalTensor<SrcT> aL1Buffer = l1Global[MATMUL_MODULE(Context)->l1IndexA].localQue.template AllocTensor<SrcT>();
+            LocalTensor<SrcT> aL1Buffer =
+                l1Global[MATMUL_MODULE(Context)->l1IndexA].localQue.template AllocTensor<SrcT>();
             return aL1Buffer[bufferPos * MATMUL_MODULE(Context)->baseBlockSizeA];
         }
 
         if constexpr (INPUT_TYPE::TAG == InputTypeTag::B) {
-            LocalTensor<SrcT> bL1Buffer = l1Global[MATMUL_MODULE(Context)->l1IndexB].localQue.template AllocTensor<SrcT>();
+            LocalTensor<SrcT> bL1Buffer =
+                l1Global[MATMUL_MODULE(Context)->l1IndexB].localQue.template AllocTensor<SrcT>();
             return bL1Buffer[bufferPos * MATMUL_MODULE(Context)->baseBlockSizeB];
         }
     }
 
-    __aicore__ inline void FreeTensor(int32_t bufferPos = -1, const LocalTensor<SrcT>& tensor = LocalTensor<SrcT>{})
+    __aicore__ inline void FreeTensor(int32_t bufferPos = -1, const LocalTensor<SrcT> &tensor = LocalTensor<SrcT>{})
     {
         if constexpr (INPUT_TYPE::TAG == InputTypeTag::A) {
             if (MATMUL_MODULE(Context)->needFreeA) {
@@ -110,7 +114,7 @@ public:
         }
     }
 
-    __aicore__ inline void EnQue(LocalTensor<SrcT>& tensor) {}
+    __aicore__ inline void EnQue(LocalTensor<SrcT> &tensor) {}
 
     __aicore__ inline void DeQue() {}
 
@@ -145,8 +149,8 @@ public:
     bool isLastBaseBlockB{false};
     int32_t baseBlockSizeB{0};
 };
-}
-}
-}
+} // namespace Detail
+} // namespace Impl
+} // namespace AscendC
 
 #endif // MLA_CUSTOM_MATMUL_POLICY_COMMON_H

@@ -149,8 +149,8 @@ SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist, isCmpKVExist, IsOriKV
 
 template <typename T1, typename T2, const uint32_t IS_TND, const bool isOriKVExist, const bool isCmpKVExist,
           const bool IsOriKVSparse, const bool IsCmpKVSparse>
-__aicore__ inline void SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse,
-                                                    IsCmpKVSparse>::Process()
+__aicore__ inline void
+SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse, IsCmpKVSparse>::Process()
 {
     // process
     if (g_coreType == AIV) {
@@ -177,8 +177,8 @@ __aicore__ inline void SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist
 
 template <typename T1, typename T2, const uint32_t IS_TND, const bool isOriKVExist, const bool isCmpKVExist,
           const bool IsOriKVSparse, const bool IsCmpKVSparse>
-__aicore__ inline void SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse,
-                                                    IsCmpKVSparse>::SyncALLCores()
+__aicore__ inline void
+SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse, IsCmpKVSparse>::SyncALLCores()
 {
     SyncAll<false>();
 }

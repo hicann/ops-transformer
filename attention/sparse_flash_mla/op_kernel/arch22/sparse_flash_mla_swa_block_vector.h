@@ -50,9 +50,8 @@ public:
                                                 GlobalTensor<int32_t> oriSparseIndicesGm);
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<KV_T> vec1ResGm,
                                                 GlobalTensor<int32_t> actualSeqLengthsQGm,
-                                                GlobalTensor<int32_t> actualSeqLengthsKVGm,
-                                                GlobalTensor<T> sinksGm, GlobalTensor<T> softmaxLseGm,
-                                                GlobalTensor<int32_t> oriSparseIndicesGm,
+                                                GlobalTensor<int32_t> actualSeqLengthsKVGm, GlobalTensor<T> sinksGm,
+                                                GlobalTensor<T> softmaxLseGm, GlobalTensor<int32_t> oriSparseIndicesGm,
                                                 GlobalTensor<int32_t> oriTopkLengthGm);
     __aicore__ inline void InitVec2GlobalTensor(GlobalTensor<T> accumOutGm, GlobalTensor<UPDATE_T> vec2ResGm,
                                                 GlobalTensor<MM2_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
@@ -75,8 +74,8 @@ public:
                                                  uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
                                                  uint32_t actualColumnCount);
     __aicore__ inline void ElewiseCompute(const RunInfo &info, const MSplitInfo &mSplitInfo,
-                                          const LocalTensor<T> &mmResUb, uint32_t dealRowCount,
-                                          uint32_t startRow, uint32_t columnCount);
+                                          const LocalTensor<T> &mmResUb, uint32_t dealRowCount, uint32_t startRow,
+                                          uint32_t columnCount);
     __aicore__ inline void ProcessLse(const RunInfo &info, const MSplitInfo &mSplitInfo);
     // ================================Vecotr2==========================================
     __aicore__ inline void ProcessVec2SingleBuf(const RunInfo &info, const MSplitInfo &mSplitInfo);
@@ -242,10 +241,10 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::InitParams(const struct ConstInfo 
 }
 
 template <typename SMLAT>
-__aicore__ inline void
-SWAVectorBlock<SMLAT>::InitVec0GlobalTensor(GlobalTensor<KV_T> kvMergeGm, GlobalTensor<KV_T> oriKvGm,
-                                            GlobalTensor<int32_t> oriBlockTableGm,
-                                            GlobalTensor<int32_t> oriSparseIndicesGm)
+__aicore__ inline void SWAVectorBlock<SMLAT>::InitVec0GlobalTensor(GlobalTensor<KV_T> kvMergeGm,
+                                                                   GlobalTensor<KV_T> oriKvGm,
+                                                                   GlobalTensor<int32_t> oriBlockTableGm,
+                                                                   GlobalTensor<int32_t> oriSparseIndicesGm)
 {
     this->kvMergeGm_ = kvMergeGm;
     this->oriKvGm_ = oriKvGm;
@@ -280,8 +279,8 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::CopyInSingleOriSparseRow(int64_t &
 {
     int64_t keyOffset = GetOriSparseKeyGmOffset(logicalIdx, runInfo);
     if (keyOffset >= 0) {
-        int64_t ubRowOffset = mergeMte3Idx % 2 * INPUT1_BUFFER_OFFSET / sizeof(KV_T) +
-                              (mte2Size - mte3Size) * constInfo.headDim;
+        int64_t ubRowOffset =
+            mergeMte3Idx % 2 * INPUT1_BUFFER_OFFSET / sizeof(KV_T) + (mte2Size - mte3Size) * constInfo.headDim;
         DataCopyExtParams copyInParams;
         copyInParams.blockCount = 1;
         copyInParams.blockLen = constInfo.headDim * sizeof(KV_T);
@@ -373,15 +372,13 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::LoadOriSparseIndicesGmToUb(uint64_
     if (loadCount <= 0 || constInfo.oriSparseIndexWidth == 0) {
         return;
     }
-    int32_t remain =
-        static_cast<int32_t>(constInfo.oriSparseIndexWidth) - static_cast<int32_t>(gmColStart);
+    int32_t remain = static_cast<int32_t>(constInfo.oriSparseIndexWidth) - static_cast<int32_t>(gmColStart);
     int32_t validCount = (remain < loadCount) ? remain : loadCount;
     if (validCount <= 0) {
         return;
     }
     int32_t alignedCount = AlignOriSparseIndexLoadCount(loadCount);
-    uint64_t gmOffset =
-        (qTokenOffset * constInfo.kvHeadNum + n2Idx) * constInfo.oriSparseIndexWidth + gmColStart;
+    uint64_t gmOffset = (qTokenOffset * constInfo.kvHeadNum + n2Idx) * constInfo.oriSparseIndexWidth + gmColStart;
     DataCopyExtParams copyParams;
     copyParams.blockCount = 1;
     copyParams.blockLen = static_cast<uint32_t>(validCount) * sizeof(int32_t);
@@ -407,8 +404,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec0L(const RunInfo &runInf
     if (s2ProcessSize <= 0) {
         return;
     }
-    uint32_t sparseColStart =
-        runInfo.s2Idx * constInfo.s2BaseSize + static_cast<uint32_t>(runInfo.v0S2Start);
+    uint32_t sparseColStart = runInfo.s2Idx * constInfo.s2BaseSize + static_cast<uint32_t>(runInfo.v0S2Start);
     int64_t s2Pair = CeilDiv(s2ProcessSize, 2 * constInfo.sparseBlockSize);
     int64_t s2SplitPoint = SMLAAlign(s2Pair, 2) * constInfo.sparseBlockSize;
     int64_t s2GmStartOffset = GetSubBlockIdx() == 0 ? 0 : s2SplitPoint;
@@ -429,8 +425,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec0L(const RunInfo &runInf
     int64_t mte2Size = 0;
     int64_t mte3Size = 0;
     bool needWaitMte3ToMte2 = true;
-    for (int64_t s2GmOffsetArray = 0; s2GmOffsetArray < s2LocalSize;
-         s2GmOffsetArray += 2 * constInfo.sparseBlockSize) {
+    for (int64_t s2GmOffsetArray = 0; s2GmOffsetArray < s2LocalSize; s2GmOffsetArray += 2 * constInfo.sparseBlockSize) {
         if (needWaitMte3ToMte2) {
             WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mergeMte3Idx % 2 + SYNC_INPUT_BUF2_FLAG);
             needWaitMte3ToMte2 = false;
@@ -455,13 +450,10 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec0L(const RunInfo &runInf
 }
 
 template <typename SMLAT>
-__aicore__ inline void
-SWAVectorBlock<SMLAT>::InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<KV_T> vec1ResGm,
-                                            GlobalTensor<int32_t> actualSeqLengthsQGm,
-                                            GlobalTensor<int32_t> actualSeqLengthsKVGm,
-                                            GlobalTensor<SINKS_T> sinksGm, GlobalTensor<T> softmaxLseGm,
-                                            GlobalTensor<int32_t> oriSparseIndicesGm,
-                                            GlobalTensor<int32_t> oriTopkLengthGm)
+__aicore__ inline void SWAVectorBlock<SMLAT>::InitVec1GlobalTensor(
+    GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<KV_T> vec1ResGm, GlobalTensor<int32_t> actualSeqLengthsQGm,
+    GlobalTensor<int32_t> actualSeqLengthsKVGm, GlobalTensor<SINKS_T> sinksGm, GlobalTensor<T> softmaxLseGm,
+    GlobalTensor<int32_t> oriSparseIndicesGm, GlobalTensor<int32_t> oriTopkLengthGm)
 {
     this->mm1ResGm = mm1ResGm;
     this->vec1ResGm = vec1ResGm;
@@ -474,9 +466,10 @@ SWAVectorBlock<SMLAT>::InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm, Gl
 }
 
 template <typename SMLAT>
-__aicore__ inline void
-SWAVectorBlock<SMLAT>::InitVec2GlobalTensor(GlobalTensor<T> accumOutGm, GlobalTensor<UPDATE_T> vec2ResGm,
-                                            GlobalTensor<MM2_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm)
+__aicore__ inline void SWAVectorBlock<SMLAT>::InitVec2GlobalTensor(GlobalTensor<T> accumOutGm,
+                                                                   GlobalTensor<UPDATE_T> vec2ResGm,
+                                                                   GlobalTensor<MM2_OUT_T> mm2ResGm,
+                                                                   GlobalTensor<OUT_T> attentionOutGm)
 {
     this->accumOutGm = accumOutGm;
     this->vec2ResGm = vec2ResGm;
@@ -569,8 +562,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::InitSoftmaxDefaultBuffer()
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info,
-                                                             const MSplitInfo &mSplitInfo,
+__aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info, const MSplitInfo &mSplitInfo,
                                                              const LocalTensor<T> &mmResUb, uint32_t startRow,
                                                              uint32_t dealRowCount, uint32_t columnCount)
 {
@@ -598,17 +590,16 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info
                 }
                 uint64_t qTokenOffsetForS1 = 0;
                 if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
-                    qTokenOffsetForS1 = static_cast<uint64_t>(actualSeqLengthsQGm.GetValue(info.bIdx)) +
-                                        static_cast<uint64_t>(i);
+                    qTokenOffsetForS1 =
+                        static_cast<uint64_t>(actualSeqLengthsQGm.GetValue(info.bIdx)) + static_cast<uint64_t>(i);
                 } else {
-                    qTokenOffsetForS1 = static_cast<uint64_t>(info.bIdx) * constInfo.qSeqSize +
-                                        static_cast<uint64_t>(i);
+                    qTokenOffsetForS1 =
+                        static_cast<uint64_t>(info.bIdx) * constInfo.qSeqSize + static_cast<uint64_t>(i);
                 }
                 uint64_t topkLenOffset = qTokenOffsetForS1 * constInfo.kvHeadNum + info.n2IdxReal;
                 int32_t rowLen = oriTopkLengthGm.GetValue(topkLenOffset);
                 if (rowLen <= 0) {
-                    SetInfInBlk(mmResUb[ubOffset], dealTempSize, columnCount, 0,
-                                static_cast<int64_t>(columnCount - 1));
+                    SetInfInBlk(mmResUb[ubOffset], dealTempSize, columnCount, 0, static_cast<int64_t>(columnCount - 1));
                     ubOffset += dealTempSize * columnCount;
                     gStartIdx = 0;
                     continue;
@@ -699,8 +690,8 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info
         int32_t right = 0;
         // relativeS2Idx is the cmp tile index relative to the current batch.
         // s2Idx may include the global task index.
-        int64_t cmpTileStart = static_cast<int64_t>(info.relativeS2Idx) * constInfo.s2BaseSize +
-                               static_cast<int64_t>(info.s2StartPoint);
+        int64_t cmpTileStart =
+            static_cast<int64_t>(info.relativeS2Idx) * constInfo.s2BaseSize + static_cast<int64_t>(info.s2StartPoint);
         for (uint32_t i = s1StartIdx; i <= s1EndIdx; i++) {
             actNoMaskCmpSize = noMaskCmpSize / constInfo.cmpRatio;
             if (actNoMaskCmpSize <= 0) {
@@ -724,9 +715,8 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::SetInfInBlk(const LocalTensor<T> &mmResUb,
-                                                          uint32_t dealRowCount, uint32_t columnCount,
-                                                          int64_t startId, int64_t endId)
+__aicore__ inline void SWAVectorBlock<SMLAT>::SetInfInBlk(const LocalTensor<T> &mmResUb, uint32_t dealRowCount,
+                                                          uint32_t columnCount, int64_t startId, int64_t endId)
 {
     //       startId     endId
     // x x x   0      0   0     x x x
@@ -751,17 +741,17 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::SetInfInBlk(const LocalTensor<T> &
         uint64_t preMask = (1llu << (curStart - blockStart)) - 1;
         uint64_t postMask = ~((1llu << (blockEnd - blockStart + 1)) - 1);
         uint64_t mask[1] = {~(preMask | postMask)};
-        Duplicate(mmResUb[blockStart], SOFTMAX_MIN_NUM, mask,
-                  dealRowCount, 1, columnCount / BLOCK_ELEMENT_NUM);
+        Duplicate(mmResUb[blockStart], SOFTMAX_MIN_NUM, mask, dealRowCount, 1, columnCount / BLOCK_ELEMENT_NUM);
         curStart = blockEnd + 1;
     }
 }
 
 template <typename SMLAT>
-__aicore__ inline void
-SWAVectorBlock<SMLAT>::SoftmaxFlashV2Compute(const RunInfo &info, const MSplitInfo &mSplitInfo, LocalTensor<T> &mmResUb,
-                                             LocalTensor<uint8_t> &softmaxTmpUb, uint32_t startRow,
-                                             uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
+__aicore__ inline void SWAVectorBlock<SMLAT>::SoftmaxFlashV2Compute(const RunInfo &info, const MSplitInfo &mSplitInfo,
+                                                                    LocalTensor<T> &mmResUb,
+                                                                    LocalTensor<uint8_t> &softmaxTmpUb,
+                                                                    uint32_t startRow, uint32_t dealRowCount,
+                                                                    uint32_t columnCount, uint32_t actualColumnCount)
 {
     LocalTensor<T> inSumTensor;
     LocalTensor<T> inMaxTensor;
@@ -800,12 +790,10 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessLse(const RunInfo &info, co
     uint64_t lseOffset;
     if (constInfo.outputLayout == SMLA_LAYOUT::TND) {
         uint32_t tBase = actualSeqLengthsQGm.GetValue(info.bIdx);
-        lseOffset = (tBase + info.s1Idx) * constInfo.gSize +
-                    info.n2IdxReal * constInfo.qSeqSize * constInfo.gSize;
+        lseOffset = (tBase + info.s1Idx) * constInfo.gSize + info.n2IdxReal * constInfo.qSeqSize * constInfo.gSize;
     } else if (constInfo.outputLayout == SMLA_LAYOUT::BSND) {
         lseOffset = info.bIdx * constInfo.qSeqSize * constInfo.kvHeadNum * constInfo.gSize +
-                    info.n2IdxReal * constInfo.qSeqSize * constInfo.gSize +
-                    info.s1Idx * constInfo.gSize;
+                    info.n2IdxReal * constInfo.qSeqSize * constInfo.gSize + info.s1Idx * constInfo.gSize;
     }
     lseOffset = lseOffset + mSplitInfo.nBufferStartM + mSplitInfo.vecStartM;
     uint32_t baseOffset = mSplitInfo.nBufferStartM / 2;
@@ -888,10 +876,9 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec1SingleBuf(const RunInfo
     uint32_t loopCount = (mSplitInfo.vecDealM + mSplitSize - 1) / mSplitSize;
     uint32_t tailSplitSize = mSplitInfo.vecDealM - (loopCount - 1) * mSplitSize;
 
-    uint32_t sinkHeadIdx = (info.n2IdxReal * constInfo.gSize + mSplitInfo.nBufferStartM + mSplitInfo.vecStartM) %
-                           constInfo.qHeadNum;
-    SliceAndContactSinksValue(sinkHeadIdx,
-                              mSplitInfo.vecDealM);
+    uint32_t sinkHeadIdx =
+        (info.n2IdxReal * constInfo.gSize + mSplitInfo.nBufferStartM + mSplitInfo.vecStartM) % constInfo.qHeadNum;
+    SliceAndContactSinksValue(sinkHeadIdx, mSplitInfo.vecDealM);
 
     for (uint32_t i = 0, dealSize = mSplitSize; i < loopCount; i++) {
         if (i == (loopCount - 1)) {
@@ -1198,9 +1185,9 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::RowDivs(LocalTensor<float> dstUb, 
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, LocalTensor<T> src1Ub,
-                                                      uint32_t dealRowCount, uint32_t columnCount,
-                                                      uint32_t actualColumnCount)
+__aicore__ inline void SWAVectorBlock<SMLAT>::RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub,
+                                                      LocalTensor<T> src1Ub, uint32_t dealRowCount,
+                                                      uint32_t columnCount, uint32_t actualColumnCount)
 {
     // muls by row, 每行的元素乘以相同的元素
     // dstUb[i, (j * 8) : (j * 8 + 7)] = src0Ub[i, (j * 8) : (j * 8 + 7)] * src1Ub[i, 0 : 7]

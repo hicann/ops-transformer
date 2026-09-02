@@ -53,7 +53,8 @@ bool EnableOptimizedScatterPath(const TempParams &tmpData);
 
 class SparseFlashAttentionGradBasicTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit SparseFlashAttentionGradBasicTiling(gert::TilingContext *context) : TilingBaseClass(context) {};
+    explicit SparseFlashAttentionGradBasicTiling(gert::TilingContext *context)
+        : TilingBaseClass(context) {};
     SparseFlashAttentionGradBasicTilingData tilingData;
 
 protected:

@@ -113,8 +113,8 @@ TILING_DATA_FIELD_DEF(int64_t, N2);
 TILING_DATA_FIELD_DEF(int64_t, S1);
 TILING_DATA_FIELD_DEF(int64_t, S2);
 TILING_DATA_FIELD_DEF(int64_t, G);
-TILING_DATA_FIELD_DEF(int64_t, D);  // qk_dim
-TILING_DATA_FIELD_DEF(int64_t, D2); // v_dim
+TILING_DATA_FIELD_DEF(int64_t, D);     // qk_dim
+TILING_DATA_FIELD_DEF(int64_t, D2);    // v_dim
 TILING_DATA_FIELD_DEF(int64_t, ropeD); // rope_dim
 TILING_DATA_FIELD_DEF(float, scaleValue);
 TILING_DATA_FIELD_DEF(uint32_t, layout);

@@ -23,8 +23,7 @@ public:
     ge::graphStatus CheckMultiPara(const CheckContext &context) const override;
 
 private:
-    ge::graphStatus CheckBlockTable(const CheckContext &context, const TensorParam &param,
-                                    const char *name) const;
+    ge::graphStatus CheckBlockTable(const CheckContext &context, const TensorParam &param, const char *name) const;
 };
 
 } // namespace sparse_mla_checker

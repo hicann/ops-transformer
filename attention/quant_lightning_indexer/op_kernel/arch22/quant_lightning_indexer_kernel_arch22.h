@@ -204,8 +204,7 @@ __aicore__ inline void QLIPreload<QLIT>::InitActualSeqLen(__gm__ uint8_t *actual
 }
 
 template <typename QLIT>
-__aicore__ inline uint32_t QLIPreload<QLIT>::GetActualSeqLen(uint32_t bIdx, uint32_t actualLenDims,
-                                                             bool isAccumSeq,
+__aicore__ inline uint32_t QLIPreload<QLIT>::GetActualSeqLen(uint32_t bIdx, uint32_t actualLenDims, bool isAccumSeq,
                                                              GlobalTensor<uint32_t> &actualSeqLengthsGm,
                                                              uint32_t defaultSeqLen)
 {
@@ -627,8 +626,7 @@ __aicore__ inline void QLIPreload<QLIT>::ProcessMain()
                 if (bN2LoopIdx == splitCoreInfo.bN2End && gloop > 0) {
                     CrossCoreWaitFlag(constInfo.syncC1V1);
                     vectorService.ProcessVec1(runInfo[1 - gloop % LI_QUANT_PRELOAD_TASK_CACHE_SIZE]);
-                    CrossCoreSetFlag<QLICommon::ConstInfo::FIA_SYNC_MODE2, PIPE_MTE3>(
-                        constInfo.syncV1C1); // 反向同步 1
+                    CrossCoreSetFlag<QLICommon::ConstInfo::FIA_SYNC_MODE2, PIPE_MTE3>(constInfo.syncV1C1); // 反向同步 1
                 }
             }
             continue;

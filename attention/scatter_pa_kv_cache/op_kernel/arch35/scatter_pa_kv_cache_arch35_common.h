@@ -19,11 +19,11 @@
 #ifndef SCATTER_PA_KV_CACHE_ARCH35_COMMON_H
 #define SCATTER_PA_KV_CACHE_ARCH35_COMMON_H
 namespace ScatterPaKvCache {
-    constexpr int32_t B8 = 1;
-    constexpr int32_t B16 = 2;
-    constexpr int32_t B32 = 4;
-    constexpr int64_t DUAL_IN_OUT = 2;
-    constexpr int64_t DOUBLE_BUFFER = 2;
-    static constexpr uint32_t BLOCK_SIZE = Ops::Base::GetUbBlockSize();
-}
+constexpr int32_t B8 = 1;
+constexpr int32_t B16 = 2;
+constexpr int32_t B32 = 4;
+constexpr int64_t DUAL_IN_OUT = 2;
+constexpr int64_t DOUBLE_BUFFER = 2;
+static constexpr uint32_t BLOCK_SIZE = Ops::Base::GetUbBlockSize();
+} // namespace ScatterPaKvCache
 #endif // SCATTER_PA_KV_CACHE_ARCH35_COMMON_H

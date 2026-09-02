@@ -25,9 +25,8 @@ enum class LI_LAYOUT : uint32_t {
 };
 
 template <typename Q_T, typename K_T, typename OUT_T, const bool PAGE_ATTENTION = false,
-          LI_LAYOUT Q_LAYOUT_T = LI_LAYOUT::BSND, LI_LAYOUT K_LAYOUT_T = LI_LAYOUT::PA_BSND, 
-          typename W_T = half, typename SCALE_T = half, typename QK_T = int32_t, typename SCORE_T = uint16_t,
-          typename... Args>
+          LI_LAYOUT Q_LAYOUT_T = LI_LAYOUT::BSND, LI_LAYOUT K_LAYOUT_T = LI_LAYOUT::PA_BSND, typename W_T = half,
+          typename SCALE_T = half, typename QK_T = int32_t, typename SCORE_T = uint16_t, typename... Args>
 struct QLIType {
     using queryType = Q_T;
     using keyType = K_T;
@@ -48,14 +47,14 @@ struct RunInfo {
     uint32_t n2Idx = 0;
     uint32_t gS1Idx;
     uint32_t s2Idx;
-    uint32_t s2Start;  // S2的起始位置
+    uint32_t s2Start; // S2的起始位置
     uint32_t validS2Len;
     uint32_t qScaleLoop;
     uint32_t kScaleLoop;
 
     uint32_t actS1Size = 1;
     uint32_t actS2Size = 1;
-    uint32_t actS2SizeOrig = 1; 
+    uint32_t actS2SizeOrig = 1;
     uint32_t actMBaseSize;
     uint32_t actualSingleProcessSInnerSize;
     uint32_t actualSingleProcessSInnerSizeAlign;
@@ -112,30 +111,30 @@ struct ConstInfo {
     uint64_t headDim;
     uint64_t keyStride0;
     uint64_t keyDequantScaleStride0;
-    uint64_t sparseCount;              // topK选取大小
-    uint64_t kSeqSize = 0ULL;          // kv最大S长度
-    uint64_t qSeqSize = 1ULL;          // q最大S长度
-    uint32_t kCacheBlockSize = 0;      // PA场景的block size
-    uint32_t maxBlockNumPerBatch = 0;  // PA场景的最大单batch block number
-    LI_LAYOUT outputLayout;            // 输出的格式
+    uint64_t sparseCount;             // topK选取大小
+    uint64_t kSeqSize = 0ULL;         // kv最大S长度
+    uint64_t qSeqSize = 1ULL;         // q最大S长度
+    uint32_t kCacheBlockSize = 0;     // PA场景的block size
+    uint32_t maxBlockNumPerBatch = 0; // PA场景的最大单batch block number
+    LI_LAYOUT outputLayout;           // 输出的格式
     bool attenMaskFlag = false;
     bool setL2DisableFlag = false;
-    
-    uint32_t actualLenQDims = 0U;  // query的actualSeqLength 的维度
-    uint32_t actualLenDims = 0U;   // KV 的actualSeqLength 的维度
-    bool isAccumSeqS1 = false;     // 是否累加模式
-    bool isAccumSeqS2 = false;     // 是否累加模式
+
+    uint32_t actualLenQDims = 0U; // query的actualSeqLength 的维度
+    uint32_t actualLenDims = 0U;  // KV 的actualSeqLength 的维度
+    bool isAccumSeqS1 = false;    // 是否累加模式
+    bool isAccumSeqS2 = false;    // 是否累加模式
     bool isLDOpen = false;
 };
 
 struct SplitCoreInfo {
-    uint32_t s2Start = 0U;  // S2的起始位置
-    uint32_t s2End = 0U;    // S2循环index上限
+    uint32_t s2Start = 0U; // S2的起始位置
+    uint32_t s2End = 0U;   // S2循环index上限
     uint32_t bN2Start = 0U;
     uint32_t bN2End = 0U;
     uint32_t gS1Start = 0U;
     uint32_t gS1End = 0U;
-    bool isLD = false;  // 当前核是否需要进行Decode归约任务
+    bool isLD = false; // 当前核是否需要进行Decode归约任务
     bool isCoreEnable = false;
 };
 
@@ -162,19 +161,19 @@ __aicore__ inline T CeilDiv(T num, T rnd)
 {
     return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd)));
 }
-}  // namespace QLICommon
+} // namespace QLICommon
 
 // bank冲突优化
 // david 256KB bank layout
 // shape  (             bank_depth  (            banks  bank_groups  block))  (512  (  2   8  32))
 // stride (banks*bank_groups*block  (bank_groups*block        block      1))  (512  (256  32   1))
-#define UB_BLOCK              32   // 32B
-#define UB_BANK_GROUPS        8
-#define UB_BANKS              2
-#define UB_BANK_DEPTH         512
+#define UB_BLOCK 32 // 32B
+#define UB_BANK_GROUPS 8
+#define UB_BANKS 2
+#define UB_BANK_DEPTH 512
 
-#define UB_BANK_GROUP_STRIDE  UB_BLOCK                                   // 32B
-#define UB_BANK_STRIDE        (UB_BANK_GROUPS * UB_BLOCK)               // 256B
-#define UB_BANK_DEPTH_STRIDE  (UB_BANKS * UB_BANK_GROUPS * UB_BLOCK)    // 512B
+#define UB_BANK_GROUP_STRIDE UB_BLOCK                               // 32B
+#define UB_BANK_STRIDE (UB_BANK_GROUPS * UB_BLOCK)                  // 256B
+#define UB_BANK_DEPTH_STRIDE (UB_BANKS * UB_BANK_GROUPS * UB_BLOCK) // 512B
 
-#endif  // QUANT_LIGHTNING_INDEXER_COMMON_H
+#endif // QUANT_LIGHTNING_INDEXER_COMMON_H

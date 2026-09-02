@@ -13,7 +13,7 @@
 
 /**
  * RainFusionAttention TilingKey 定义
- * 
+ *
  * TilingKey编码规则 (64-bit):
  * 位域: AAAABBBBCCCCDDDDEEEE
  * - [0-1]   Q Layout: 2=TND, 3=BNSD
@@ -45,5 +45,4 @@
 // BF16, Q=BNSD, KV=BNSD, No PagedCache, Float Softmax, No Mask
 #define QBF16_KVBF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING 9000000050022223
 
-#endif  // RAIN_FUSION_ATTENTION_TILINGKEY_H_
-
+#endif // RAIN_FUSION_ATTENTION_TILINGKEY_H_

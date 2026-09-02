@@ -15,16 +15,10 @@
 
 namespace l0op {
 
-const std::array<const aclTensor *, 3> RingAttentionUpdate(const aclTensor *prevAttnOut,
-                                                           const aclTensor *prevSoftmaxMax,
-                                                           const aclTensor *prevSoftmaxSum,
-                                                           const aclTensor *curAttnOut,
-                                                           const aclTensor *curSoftmaxMax,
-                                                           const aclTensor *curSoftmaxSum,
-                                                           const aclTensor *actualSeqQlen,
-                                                           const char *inputLayout,
-                                                           const char *inputSoftmaxLayout,
-                                                           aclOpExecutor *executor);
+const std::array<const aclTensor *, 3> RingAttentionUpdate(
+    const aclTensor *prevAttnOut, const aclTensor *prevSoftmaxMax, const aclTensor *prevSoftmaxSum,
+    const aclTensor *curAttnOut, const aclTensor *curSoftmaxMax, const aclTensor *curSoftmaxSum,
+    const aclTensor *actualSeqQlen, const char *inputLayout, const char *inputSoftmaxLayout, aclOpExecutor *executor);
 
 }
 

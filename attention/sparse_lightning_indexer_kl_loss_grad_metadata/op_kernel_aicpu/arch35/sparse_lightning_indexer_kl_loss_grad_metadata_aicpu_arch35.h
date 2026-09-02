@@ -43,10 +43,10 @@ enum class ValidSocVersion {
     RESERVED_VERSION = 99999
 };
 
-template<class T>
+template <class T>
 using Range = std::pair<T, T>;
 
-template<class T>
+template <class T>
 using BlockCost = std::array<std::array<T, static_cast<size_t>(BLOCK_MAX_TYPE)>, static_cast<size_t>(BLOCK_MAX_TYPE)>;
 
 class SparseLightningIndexerKLLossGradMetadataCpuKernelArch35 : public CpuKernel {
@@ -67,7 +67,7 @@ private:
     uint32_t GetS2SeqSize(uint32_t bIdx);
     void CalcSplitInfo();
 
-    CpuKernelContext* context_ = nullptr;
+    CpuKernelContext *context_ = nullptr;
     Tensor *cuSeqlensQ_ = nullptr;
     Tensor *cuSeqlensK_ = nullptr;
     Tensor *sequsedQ_ = nullptr;
@@ -130,12 +130,10 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::Prepare(Cpu
     cmpResidualK_ = ctx.Input(static_cast<uint32_t>(ParamId::cmpResidualK));
     metadata_ = ctx.Output(static_cast<uint32_t>(ParamId::metadata));
 
-    bool requiredAttrs = GetAttrValue(ctx, "aic_core_num", aicCoreNum_) &&
-                         GetAttrValue(ctx, "aiv_core_num", aivCoreNum_) &&
-                         GetAttrValue(ctx, "soc_version", socVersion_) &&
-                         GetAttrValue(ctx, "num_heads_q", numHeadsQ_) &&
-                         GetAttrValue(ctx, "num_heads_k", numHeadsK_) &&
-                         GetAttrValue(ctx, "head_dim", headDim_);
+    bool requiredAttrs =
+        GetAttrValue(ctx, "aic_core_num", aicCoreNum_) && GetAttrValue(ctx, "aiv_core_num", aivCoreNum_) &&
+        GetAttrValue(ctx, "soc_version", socVersion_) && GetAttrValue(ctx, "num_heads_q", numHeadsQ_) &&
+        GetAttrValue(ctx, "num_heads_k", numHeadsK_) && GetAttrValue(ctx, "head_dim", headDim_);
     if (!requiredAttrs) {
         return false;
     }
@@ -166,7 +164,7 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     // 校验 cu_seqlens_q 元素
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *cuSeqlensQPtr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
+            const int32_t *cuSeqlensQPtr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
             // 校验 cu_seqlens_q 首元素为 0
             if (cuSeqlensQPtr[0] != 0) {
                 KERNEL_LOG_ERROR("The first element of cu_seqlens_q should be 0, but got %d", cuSeqlensQPtr[0]);
@@ -176,8 +174,8 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
                 // 校验 cu_seqlens_q 元素递增
                 if (i > 0 && cuSeqlensQPtr[i - 1] > cuSeqlensQPtr[i]) {
                     KERNEL_LOG_ERROR("The elements in cu_seqlens_q must be in ascending order, "
-                        "but got cu_seqlens_q[%d] = %d, cu_seqlens_q[%d] = %d",
-                        i - 1, cuSeqlensQPtr[i - 1], i, cuSeqlensQPtr[i]);
+                                     "but got cu_seqlens_q[%d] = %d, cu_seqlens_q[%d] = %d",
+                                     i - 1, cuSeqlensQPtr[i - 1], i, cuSeqlensQPtr[i]);
                     return false;
                 }
             }
@@ -186,7 +184,7 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     // 校验 cu_seqlens_k 元素
     if (layoutK_ == "TND") {
         if (cuSeqlensK_ != nullptr && cuSeqlensK_->GetData() != nullptr) {
-            const int32_t *cuSeqlensKPtr = static_cast<const int32_t*>(cuSeqlensK_->GetData());
+            const int32_t *cuSeqlensKPtr = static_cast<const int32_t *>(cuSeqlensK_->GetData());
             // 校验 cu_seqlens_k 首元素为 0
             if (cuSeqlensKPtr[0] != 0) {
                 KERNEL_LOG_ERROR("The first element of cu_seqlens_k should be 0, but got %d", cuSeqlensKPtr[0]);
@@ -196,8 +194,8 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
                 // 校验 cu_seqlens_k 元素递增
                 if (i > 0 && cuSeqlensKPtr[i - 1] > cuSeqlensKPtr[i]) {
                     KERNEL_LOG_ERROR("The elements in cu_seqlens_k must be in ascending order, "
-                        "but got cu_seqlens_k[%d] = %d, cu_seqlens_k[%d] = %d",
-                        i - 1, cuSeqlensKPtr[i - 1], i, cuSeqlensKPtr[i]);
+                                     "but got cu_seqlens_k[%d] = %d, cu_seqlens_k[%d] = %d",
+                                     i - 1, cuSeqlensKPtr[i - 1], i, cuSeqlensKPtr[i]);
                     return false;
                 }
             }
@@ -205,27 +203,30 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     }
     // 校验 seqused_q 元素非负
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *sequsedQPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
-        const int32_t *cuSeqlensQPtr = (layoutQ_ == "TND" && cuSeqlensQ_ != nullptr &&
-                                        cuSeqlensQ_->GetData() != nullptr) ?
-                                           static_cast<const int32_t*>(cuSeqlensQ_->GetData()) : nullptr;
+        const int32_t *sequsedQPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+        const int32_t *cuSeqlensQPtr =
+            (layoutQ_ == "TND" && cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) ?
+                static_cast<const int32_t *>(cuSeqlensQ_->GetData()) :
+                nullptr;
         for (int i = 0; i < batchSize; i++) {
             if (sequsedQPtr[i] < 0) {
-                KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%d] = %d",
-                    i, sequsedQPtr[i]);
+                KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%d] = %d", i,
+                                 sequsedQPtr[i]);
                 return false;
             }
             // 校验 seqused_q 元素不大于 max_seqlen_q (BSND) 或 cu_seqlens_q 序列长度 (TND)
             if (layoutQ_ == "BSND" && sequsedQPtr[i] > maxSeqlenQ_) {
                 KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than max_seqlen_q %d, "
-                                 "but got seqused_q[%d] = %d", maxSeqlenQ_, i, sequsedQPtr[i]);
+                                 "but got seqused_q[%d] = %d",
+                                 maxSeqlenQ_, i, sequsedQPtr[i]);
                 return false;
             }
             if (cuSeqlensQPtr != nullptr) {
                 int32_t seqLen = cuSeqlensQPtr[i + 1] - cuSeqlensQPtr[i];
                 if (sequsedQPtr[i] > seqLen) {
                     KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than the sequence length "
-                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d", seqLen, i, sequsedQPtr[i]);
+                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d",
+                                     seqLen, i, sequsedQPtr[i]);
                     return false;
                 }
             }
@@ -233,22 +234,22 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     }
     // 校验 seqused_k 元素非负
     if (sequsedK_ != nullptr && sequsedK_->GetData() != nullptr) {
-        const int32_t *sequsedKPtr = static_cast<const int32_t*>(sequsedK_->GetData());
+        const int32_t *sequsedKPtr = static_cast<const int32_t *>(sequsedK_->GetData());
         for (int i = 0; i < batchSize; i++) {
             if (sequsedKPtr[i] < 0) {
-                KERNEL_LOG_ERROR("The elements in seqused_k should be >= 0, but got seqused_k[%d] = %d",
-                    i, sequsedKPtr[i]);
+                KERNEL_LOG_ERROR("The elements in seqused_k should be >= 0, but got seqused_k[%d] = %d", i,
+                                 sequsedKPtr[i]);
                 return false;
             }
         }
     }
     // 校验 cmp_residual_k 元素非负
     if (cmpResidualK_ != nullptr && cmpResidualK_->GetData() != nullptr) {
-        const int32_t *cmpResidualKPtr = static_cast<const int32_t*>(cmpResidualK_->GetData());
+        const int32_t *cmpResidualKPtr = static_cast<const int32_t *>(cmpResidualK_->GetData());
         for (int i = 0; i < batchSize; i++) {
             if (cmpResidualKPtr[i] < 0) {
-                KERNEL_LOG_ERROR("The elements in cmp_residual_k should be >= 0, but got cmp_residual_k[%d] = %d",
-                    i, cmpResidualKPtr[i]);
+                KERNEL_LOG_ERROR("The elements in cmp_residual_k should be >= 0, but got cmp_residual_k[%d] = %d", i,
+                                 cmpResidualKPtr[i]);
                 return false;
             }
         }
@@ -307,12 +308,12 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsInit(
 inline uint32_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::GetS1SeqSize(uint32_t bIdx)
 {
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
+        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *s1Ptr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
+            const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
             return static_cast<uint32_t>(s1Ptr[bIdx + 1U] - s1Ptr[bIdx]);
         }
     }
@@ -322,12 +323,12 @@ inline uint32_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::GetS1Se
 inline uint32_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::GetS2SeqSize(uint32_t bIdx)
 {
     if (sequsedK_ != nullptr && sequsedK_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t*>(sequsedK_->GetData());
+        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedK_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
     if (layoutK_ == "TND") {
         if (cuSeqlensK_ != nullptr && cuSeqlensK_->GetData() != nullptr) {
-            const int32_t *s2Ptr = static_cast<const int32_t*>(cuSeqlensK_->GetData());
+            const int32_t *s2Ptr = static_cast<const int32_t *>(cuSeqlensK_->GetData());
             return static_cast<uint32_t>(s2Ptr[bIdx + 1U] - s2Ptr[bIdx]);
         }
     }
@@ -351,8 +352,8 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::BalanceSche
 
 inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::GenMetadata()
 {
-    optiling::detail::SlikgMetadata* gradMetadataPtr =
-        static_cast<optiling::detail::SlikgMetadata*>(metadata_->GetData());
+    optiling::detail::SlikgMetadata *gradMetadataPtr =
+        static_cast<optiling::detail::SlikgMetadata *>(metadata_->GetData());
     uint32_t formerCoreProcessNum = CeilDiv(totalNum, aicCoreNum_);
     uint32_t remainCoreProcessNum = formerCoreProcessNum - 1;
     uint32_t remainCoreNum = formerCoreProcessNum * aicCoreNum_ - totalNum;

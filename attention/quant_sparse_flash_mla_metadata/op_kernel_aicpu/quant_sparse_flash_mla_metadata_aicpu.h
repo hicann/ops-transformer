@@ -84,11 +84,11 @@ inline bool IsWithinTolerance(T limit, T tolerance, T value)
 struct FlashDecodeResult {
     uint32_t fdUsedVecNum{0U}; // 归约过程使用的vector数量
     // 1、归约任务的索引信息
-    std::vector<uint32_t> fdBN2Idx{};       // 每个归约任务的BN2索引，脚标为归约任务的序号，最大为核数-1
+    std::vector<uint32_t> fdBN2Idx{}; // 每个归约任务的BN2索引，脚标为归约任务的序号，最大为核数-1
     std::vector<uint32_t> fdMIdx{};         // 每个归约任务的GS1索引，脚标为归约任务的序号
     std::vector<uint32_t> fdWorkspaceIdx{}; // 每个归约任务在workspace中的存放位置
-    std::vector<uint32_t> fdS2SplitNum{};   // 每个归约任务的S2核间切分份数，脚标为归约任务的序号
-    std::vector<uint32_t> fdMSize{};        // 每个归约任务m轴大小，脚标为归约任务的序号
+    std::vector<uint32_t> fdS2SplitNum{}; // 每个归约任务的S2核间切分份数，脚标为归约任务的序号
+    std::vector<uint32_t> fdMSize{};      // 每个归约任务m轴大小，脚标为归约任务的序号
     // 2、FD负载均衡阶段，归约任务的分核（vec）信息
     std::vector<uint32_t> fdIdx{};    // FD负载均衡阶段，每个vector处理的归约任务对应ID
     std::vector<uint32_t> fdMStart{}; // FD负载均衡阶段，每个vector处理的归约任务的m轴起点

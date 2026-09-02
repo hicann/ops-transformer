@@ -22,7 +22,6 @@
 #include "../../../attn_infra/gemm/tile_common/rain_gemm_copy_ub_to_gm.hpp"
 #include "../../../attn_infra/gemm/rain_helper.hpp"
 
-
 namespace NpuArch::Gemm::Tile {
 
 template <
@@ -35,8 +34,7 @@ template <
     /// GemmType type for C matrix operand
     class CType,
     /// GemmType type for Bias operand
-    class BiasType = void
->
+    class BiasType = void>
 struct TileCopy {
     using ElementA = typename AType::Element;
     using ElementB = typename BType::Element;
@@ -45,17 +43,13 @@ struct TileCopy {
 
     using CopyGmToL1A = Gemm::Tile::CopyGmToL1<ArchTag, AType>;
     using CopyGmToL1B = Gemm::Tile::CopyGmToL1<ArchTag, BType>;
-    using CopyL1ToL0A = Gemm::Tile::CopyL1ToL0A<
-        ArchTag, typename helper::L1ATypeSelector<AType>::L1AType>;
-    using CopyL1ToL0B = Gemm::Tile::CopyL1ToL0B<
-        ArchTag, typename helper::L1BTypeSelector<BType>::L1BType>;
+    using CopyL1ToL0A = Gemm::Tile::CopyL1ToL0A<ArchTag, typename helper::L1ATypeSelector<AType>::L1AType>;
+    using CopyL1ToL0B = Gemm::Tile::CopyL1ToL0B<ArchTag, typename helper::L1BTypeSelector<BType>::L1BType>;
     using CopyL0CToGm = Gemm::Tile::CopyL0CToGm<ArchTag, ElementAccumulator, CType>;
     using BiasTypeSelector = helper::L1BiasTypeSelector<BiasType, ElementAccumulator>;
-    using CopyGmToL1Bias = std::conditional_t<std::is_same_v<BiasType, void>,
-        void,
-        Gemm::Tile::CopyGmToL1<ArchTag,
-            typename BiasTypeSelector::GMBiasType,
-            typename BiasTypeSelector::L1BiasType>>;
+    using CopyGmToL1Bias = std::conditional_t<
+        std::is_same_v<BiasType, void>, void,
+        Gemm::Tile::CopyGmToL1<ArchTag, typename BiasTypeSelector::GMBiasType, typename BiasTypeSelector::L1BiasType>>;
 };
 
 //////////////////////////////

@@ -128,8 +128,7 @@ template <typename T, uint32_t srcN, const bool IS_DETER_OLD = 0>
 __aicore__ inline void BroadcastSubMul(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
                                        const LocalTensor<T> &gradTensor, const LocalTensor<T> &sfmTensor, uint32_t srcM,
                                        uint32_t realN = srcN)
-{
-}
+{}
 #endif
 } // namespace AscendC
 

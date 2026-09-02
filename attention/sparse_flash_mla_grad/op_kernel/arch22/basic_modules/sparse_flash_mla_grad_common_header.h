@@ -36,7 +36,8 @@ constexpr static uint64_t MAX_CORE_NUM = 24;
 // common struct
 /////////////////////////////////////////////////////
 
-template <class TILING_CLASS, typename T1, const bool IS_BSND = false, const uint32_t MODE = SMLAG_SCFA_MODE, typename... Args>
+template <class TILING_CLASS, typename T1, const bool IS_BSND = false, const uint32_t MODE = SMLAG_SCFA_MODE,
+          typename... Args>
 struct SMLAG_TYPE {
     using tiling_class = TILING_CLASS;
     using t1 = T1;
@@ -178,12 +179,14 @@ __aicore__ inline T AlignTo(const T n, const T alignSize)
     return (n + alignSize - 1) & (~(alignSize - 1));
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Max(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Max(T1 a, T2 b)
 {
     return (a < b) ? (b) : (a);
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Min(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Min(T1 a, T2 b)
 {
     return (a > b) ? (b) : (a);
 }

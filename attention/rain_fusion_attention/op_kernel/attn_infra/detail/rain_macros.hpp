@@ -11,6 +11,6 @@
 #ifndef RAIN_MACROS_HPP
 #define RAIN_MACROS_HPP
 
-#define HOST_DEVICE __forceinline__ [host, aicore]
+#define HOST_DEVICE __forceinline__[host, aicore]
 
-#endif  // DETAIL_MACROS_HPP
+#endif // DETAIL_MACROS_HPP

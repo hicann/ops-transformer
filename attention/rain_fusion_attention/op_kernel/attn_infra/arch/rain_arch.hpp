@@ -13,8 +13,7 @@
 
 #include "../../attn_infra/rain_base_defs.hpp"
 
-namespace NpuArch::Arch
-{
+namespace NpuArch::Arch {
 
 struct AtlasA2 {
     static constexpr uint32_t BIAS_SIZE = 1024;

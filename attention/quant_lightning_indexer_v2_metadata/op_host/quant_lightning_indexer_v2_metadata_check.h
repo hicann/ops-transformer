@@ -66,7 +66,10 @@ aclDataType GetDataTypeQliV2(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceQLiV2(const std::string &source) { return source != "batch_size"; }
+inline bool IsTensorSourceQLiV2(const std::string &source)
+{
+    return source != "batch_size";
+}
 
 inline int64_t GetRawShapeSizeQLiV2(const std::string &source, int64_t batchValue)
 {

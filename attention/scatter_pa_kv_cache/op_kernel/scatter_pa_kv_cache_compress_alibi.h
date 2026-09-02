@@ -20,9 +20,7 @@ namespace ScatterPaKvCache {
 template <typename T>
 class ScatterPaKvCacheCompressAlibi : public ScatterPaKvCacheCompressCommon {
 public:
-    __aicore__ inline ScatterPaKvCacheCompressAlibi()
-    {
-    }
+    __aicore__ inline ScatterPaKvCacheCompressAlibi() {}
 
     __aicore__ inline void Process(GM_ADDR keyIn, GM_ADDR valueIn, GM_ADDR keyCacheIn, GM_ADDR valueCacheIn,
                                    GM_ADDR slotMapping, GM_ADDR winsIn, GM_ADDR seqLenIn, GM_ADDR keyCacheOut,

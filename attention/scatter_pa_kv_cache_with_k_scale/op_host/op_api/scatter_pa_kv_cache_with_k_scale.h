@@ -15,8 +15,9 @@
 #include <tuple>
 
 namespace l0op {
-std::tuple<const aclTensor *, const aclTensor *, const aclTensor *> ScatterPaKvCacheWithKScale(const aclTensor *key,
-    const aclTensor *value, aclTensor *keyCacheRef, aclTensor *valueCacheRef, const aclTensor *slotMapping,
-    aclTensor *keyScale, aclTensor *keyScaleCacheRef, char *cacheLayoutOptional, aclOpExecutor *executor);
+std::tuple<const aclTensor *, const aclTensor *, const aclTensor *> ScatterPaKvCacheWithKScale(
+    const aclTensor *key, const aclTensor *value, aclTensor *keyCacheRef, aclTensor *valueCacheRef,
+    const aclTensor *slotMapping, aclTensor *keyScale, aclTensor *keyScaleCacheRef, char *cacheLayoutOptional,
+    aclOpExecutor *executor);
 }
 #endif

@@ -221,7 +221,10 @@ private:
     LocalTensor<MM_OUT_T> cL0TensorPingPong;
 
     // L0AB m <> mte1 EventID
-    __aicore__ inline uint32_t Mte1MmABEventId(uint32_t idx) { return (L0AB_EVENT0 + idx); }
+    __aicore__ inline uint32_t Mte1MmABEventId(uint32_t idx)
+    {
+        return (L0AB_EVENT0 + idx);
+    }
 
     __aicore__ inline uint32_t GetQPL1RealIdx(uint32_t mIdx, uint32_t k1Idx)
     {

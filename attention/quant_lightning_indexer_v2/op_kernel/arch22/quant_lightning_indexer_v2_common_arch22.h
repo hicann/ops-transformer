@@ -25,8 +25,8 @@ enum class LI_LAYOUT : uint32_t {
 };
 
 template <typename Q_T, typename K_T, typename QK_T, typename SCORE_T, typename OUT_T,
-    const bool PAGE_ATTENTION = false,
-          LI_LAYOUT Q_LAYOUT_T = LI_LAYOUT::BSND, LI_LAYOUT K_LAYOUT_T = LI_LAYOUT::PA_BBND, typename... Args>
+          const bool PAGE_ATTENTION = false, LI_LAYOUT Q_LAYOUT_T = LI_LAYOUT::BSND,
+          LI_LAYOUT K_LAYOUT_T = LI_LAYOUT::PA_BBND, typename... Args>
 struct QLIV2Type {
     using queryType = Q_T;
     using keyType = K_T;
@@ -97,20 +97,20 @@ struct ConstInfo {
     uint64_t qHeadNum = 0ULL;
     uint64_t kHeadNum;
     uint64_t headDim;
-    uint64_t sparseCount;              // topK选取大小
-    uint64_t kSeqSize = 0ULL;          // kv最大S长度
-    uint64_t qSeqSize = 1ULL;          // q最大S长度
-    uint32_t kCacheBlockSize = 0;      // PA场景的block size
-    uint32_t maxBlockNumPerBatch = 0;  // PA场景的最大单batch block number
-    LI_LAYOUT outputLayout;            // 输出的格式
+    uint64_t sparseCount;             // topK选取大小
+    uint64_t kSeqSize = 0ULL;         // kv最大S长度
+    uint64_t qSeqSize = 1ULL;         // q最大S长度
+    uint32_t kCacheBlockSize = 0;     // PA场景的block size
+    uint32_t maxBlockNumPerBatch = 0; // PA场景的最大单batch block number
+    LI_LAYOUT outputLayout;           // 输出的格式
     bool attenMaskFlag = false;
-    uint32_t cmpRatio = 1;             // 压缩率
+    uint32_t cmpRatio = 1; // 压缩率
 
-    uint32_t actualLenQDims = 0U;  // query的actualSeqLength 的维度
-    uint32_t actualLenDims = 0U;   // KV 的actualSeqLength 的维度
-    uint32_t cmpResiduaKLenDims = 0U;   // cmpResidualK的维度
-    bool isAccumSeqS1 = false;     // 是否累加模式
-    bool isAccumSeqS2 = false;     // 是否累加模式
+    uint32_t actualLenQDims = 0U;     // query的actualSeqLength 的维度
+    uint32_t actualLenDims = 0U;      // KV 的actualSeqLength 的维度
+    uint32_t cmpResiduaKLenDims = 0U; // cmpResidualK的维度
+    bool isAccumSeqS1 = false;        // 是否累加模式
+    bool isAccumSeqS2 = false;        // 是否累加模式
 
     uint32_t s2Start = 0U;
     uint32_t s2End = 0U;
@@ -122,23 +122,23 @@ struct ConstInfo {
 };
 
 struct LdSplitCoreInfo {
-        bool isLdCoreEnable = false;     // 当前核是否参与规约任务
-        uint32_t saveWorkSpaceIdx = 0U;  // 存放LD参数的地址
-        uint32_t bn2Idx = 0U;            // 归约任务
-        uint32_t bIdx = 0U;
-        uint32_t n2Idx = 0U;
-        uint32_t mIdx = 0U;
-        uint32_t workspaceIdx = 0U;      // 当前AIV核上规约任务的索引
-        uint32_t workspaceNum = 0U;      // 当前AIV核上规约任务的S2切分数量
-        uint32_t mStart = 0U;
-        uint32_t mNum = 0U;
-        uint64_t indiceOutCoreOffset = 0U;  // 最终输出索引搬出Topk的初始偏移地址
-    };
+    bool isLdCoreEnable = false;    // 当前核是否参与规约任务
+    uint32_t saveWorkSpaceIdx = 0U; // 存放LD参数的地址
+    uint32_t bn2Idx = 0U;           // 归约任务
+    uint32_t bIdx = 0U;
+    uint32_t n2Idx = 0U;
+    uint32_t mIdx = 0U;
+    uint32_t workspaceIdx = 0U; // 当前AIV核上规约任务的索引
+    uint32_t workspaceNum = 0U; // 当前AIV核上规约任务的S2切分数量
+    uint32_t mStart = 0U;
+    uint32_t mNum = 0U;
+    uint64_t indiceOutCoreOffset = 0U; // 最终输出索引搬出Topk的初始偏移地址
+};
 
 template <typename T1, typename T2>
 __aicore__ inline T1 Align(T1 num, T2 rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
 template <typename T1, typename T2>
@@ -158,6 +158,6 @@ __aicore__ inline T CeilDiv(T num, T rnd)
 {
     return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd)));
 }
-}  // namespace QLIV2Common
+} // namespace QLIV2Common
 
-#endif  // QUANT_LIGHTNING_INDEXER_V2_COMMON_H
+#endif // QUANT_LIGHTNING_INDEXER_V2_COMMON_H

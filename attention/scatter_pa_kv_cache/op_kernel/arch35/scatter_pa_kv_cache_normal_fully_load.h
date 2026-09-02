@@ -25,7 +25,8 @@ template <typename T, typename IndexDtype, int64_t InOutMode, bool NCT = false>
 class ScatterPaKvCacheNormalFullyLoad {
 public:
     __aicore__ inline ScatterPaKvCacheNormalFullyLoad(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
                                 GM_ADDR value_cache_in, GM_ADDR compress_lens, GM_ADDR compress_seq_offset,
                                 GM_ADDR seq_lens, GM_ADDR key_cache_out, GM_ADDR value_cache_out);
@@ -105,12 +106,12 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, InOutMode,
 {
     LocalTensor<T> inputKeyLocal = inputKeyQueue_.AllocTensor<T>();
 
-    DataCopyExtParams kParams = {
-        static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->kHandleNumPerCore * sizeof(T)), static_cast<uint32_t>(0),
-        static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
-    DataCopyExtParams vParams = {
-        static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->vHandleNumPerCore * sizeof(T)), static_cast<uint32_t>(0),
-        static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+    DataCopyExtParams kParams = {static_cast<uint16_t>(1),
+                                 static_cast<uint32_t>(tilingData_->kHandleNumPerCore * sizeof(T)),
+                                 static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+    DataCopyExtParams vParams = {static_cast<uint16_t>(1),
+                                 static_cast<uint32_t>(tilingData_->vHandleNumPerCore * sizeof(T)),
+                                 static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
     DataCopyPadExtParams<T> padParams;
     padParams.isPad = 0;
     padParams.leftPadding = 0;
@@ -124,8 +125,8 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, InOutMode,
                 continue;
             }
         }
-        DataCopyPad(inputKeyLocal[i * RoundUp(tilingData_->kHandleNumPerCore)],
-                 inputKeyGm_[kOffsetIn], kParams, padParams);
+        DataCopyPad(inputKeyLocal[i * RoundUp(tilingData_->kHandleNumPerCore)], inputKeyGm_[kOffsetIn], kParams,
+                    padParams);
     }
     inputKeyQueue_.EnQue(inputKeyLocal);
     if constexpr (InOutMode == DUAL_IN_OUT) {
@@ -138,8 +139,8 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, InOutMode,
                     continue;
                 }
             }
-            DataCopyPad(inputValueLocal[i * RoundUp(tilingData_->vHandleNumPerCore)],
-                     inputValueGm_[vOffsetIn], vParams, padParams);
+            DataCopyPad(inputValueLocal[i * RoundUp(tilingData_->vHandleNumPerCore)], inputValueGm_[vOffsetIn], vParams,
+                        padParams);
         }
         inputValueQueue_.EnQue(inputValueLocal);
     }

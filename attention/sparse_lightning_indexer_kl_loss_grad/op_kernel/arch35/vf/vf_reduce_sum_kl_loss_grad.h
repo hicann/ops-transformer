@@ -20,7 +20,7 @@
 namespace AscendC {
 template <typename T>
 __simd_vf__ inline void ReduceSumBasicVF(uint64_t dstLocalInt, uint64_t srcLocalInt, uint64_t srcLocalIntTail,
-    uint32_t loopTimes, uint32_t tailSize)
+                                         uint32_t loopTimes, uint32_t tailSize)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregSrcTail;
@@ -58,6 +58,6 @@ __aicore__ inline void ReduceSumVf(const LocalTensor<OUT_T> &dstTensor, const Lo
 
     ReduceSumBasicVF<T>(dstLocalInt, srcLocalInt, srcLocalIntTail, loopTimes, tailSize);
 }
-} // namespace
+} // namespace AscendC
 
 #endif // VF_CAST_DUP_H

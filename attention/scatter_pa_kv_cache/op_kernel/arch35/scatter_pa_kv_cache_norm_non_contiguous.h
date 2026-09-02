@@ -25,21 +25,22 @@ template <typename T, typename IndexDtype, int64_t InOutMode>
 class ScatterPaKvCacheNormNonContiguous {
 public:
     __aicore__ inline ScatterPaKvCacheNormNonContiguous(TPipe *pipe,
-                                                         const ScatterPaKvCacheTilingData *__restrict tiling)
-        : pipe_(pipe), tilingData_(tiling){};
-    __aicore__ inline void Init(
-        GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value, GM_ADDR key_cache_out, GM_ADDR value_cache_out);
+                                                        const ScatterPaKvCacheTilingData *__restrict tiling)
+        : pipe_(pipe),
+          tilingData_(tiling){};
+    __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value, GM_ADDR key_cache_out,
+                                GM_ADDR value_cache_out);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void CopyInKey(
-        int64_t tokenIdx, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize);
-    __aicore__ inline void CopyOutKey(
-        int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize);
-    __aicore__ inline void CopyInValue(
-        int64_t tokenIdx, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize);
-    __aicore__ inline void CopyOutValue(
-        int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize);
+    __aicore__ inline void CopyInKey(int64_t tokenIdx, int64_t headIdx, int64_t sizeOffset, int64_t headNum,
+                                     int64_t headSize);
+    __aicore__ inline void CopyOutKey(int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t sizeOffset,
+                                      int64_t headNum, int64_t headSize);
+    __aicore__ inline void CopyInValue(int64_t tokenIdx, int64_t headIdx, int64_t sizeOffset, int64_t headNum,
+                                       int64_t headSize);
+    __aicore__ inline void CopyOutValue(int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t sizeOffset,
+                                        int64_t headNum, int64_t headSize);
     __aicore__ inline int64_t RoundUp(int64_t x);
     __aicore__ inline void InitLoopInfo();
     __aicore__ inline void ProcessKey(int64_t tokenIdx, int64_t blockIdx, int64_t blockOffset);
@@ -110,11 +111,8 @@ __aicore__ inline int64_t ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOut
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyInKey(int64_t tokenIdx,
-                                                                                             int64_t headIdx,
-                                                                                             int64_t sizeOffset,
-                                                                                             int64_t headNum,
-                                                                                             int64_t headSize)
+__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyInKey(
+    int64_t tokenIdx, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize)
 {
     LocalTensor<T> inputKeyLocal = keyQue_.AllocTensor<T>();
 
@@ -131,24 +129,17 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyOutKey(int64_t blockIdx,
-                                                                                              int64_t blockOffset,
-                                                                                              int64_t headIdx,
-                                                                                              int64_t sizeOffset,
-                                                                                              int64_t headNum,
-                                                                                              int64_t headSize)
+__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyOutKey(
+    int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize)
 {
     LocalTensor<T> inputKeyLocal = keyQue_.DeQue<T>();
 
-    int64_t keyCacheOffset = blockIdx * tilingData_->keyCacheStride0 +
-                             blockOffset * tilingData_->keyCacheStride1 +
+    int64_t keyCacheOffset = blockIdx * tilingData_->keyCacheStride0 + blockOffset * tilingData_->keyCacheStride1 +
                              headIdx * tilingData_->keyCacheStride2 + sizeOffset;
 
     DataCopyExtParams outKeyCacheParams = {
-        static_cast<uint16_t>(headNum), static_cast<uint32_t>(headSize * sizeof(T)),
-        static_cast<uint32_t>(0),
-        static_cast<uint32_t>((tilingData_->keyCacheStride2 - headSize) * sizeof(T)),
-        static_cast<uint32_t>(0)};
+        static_cast<uint16_t>(headNum), static_cast<uint32_t>(headSize * sizeof(T)), static_cast<uint32_t>(0),
+        static_cast<uint32_t>((tilingData_->keyCacheStride2 - headSize) * sizeof(T)), static_cast<uint32_t>(0)};
 
     DataCopyPad(keyCacheOutGm_[keyCacheOffset], inputKeyLocal, outKeyCacheParams);
 
@@ -156,11 +147,8 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyInValue(int64_t tokenIdx,
-                                                                                               int64_t headIdx,
-                                                                                               int64_t sizeOffset,
-                                                                                               int64_t headNum,
-                                                                                               int64_t headSize)
+__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyInValue(
+    int64_t tokenIdx, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize)
 {
     LocalTensor<T> inputValueLocal = valueQue_.AllocTensor<T>();
 
@@ -177,23 +165,17 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyOutValue(int64_t blockIdx,
-                                                                                                int64_t blockOffset,
-                                                                                                int64_t headIdx,
-                                                                                                int64_t sizeOffset,
-                                                                                                int64_t headNum,
-                                                                                                int64_t headSize)
+__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::CopyOutValue(
+    int64_t blockIdx, int64_t blockOffset, int64_t headIdx, int64_t sizeOffset, int64_t headNum, int64_t headSize)
 {
     LocalTensor<T> inputValueLocal = valueQue_.DeQue<T>();
     int64_t valueCacheOffset = blockIdx * tilingData_->valueCacheStride0 +
-                               blockOffset * tilingData_->valueCacheStride1 +
-                               headIdx * tilingData_->valueCacheStride2 + sizeOffset;
+                               blockOffset * tilingData_->valueCacheStride1 + headIdx * tilingData_->valueCacheStride2 +
+                               sizeOffset;
 
     DataCopyExtParams outValueCacheParams = {
-        static_cast<uint16_t>(headNum), static_cast<uint32_t>(headSize * sizeof(T)),
-        static_cast<uint32_t>(0),
-        static_cast<uint32_t>((tilingData_->valueCacheStride2 - headSize) * sizeof(T)),
-        static_cast<uint32_t>(0)};
+        static_cast<uint16_t>(headNum), static_cast<uint32_t>(headSize * sizeof(T)), static_cast<uint32_t>(0),
+        static_cast<uint32_t>((tilingData_->valueCacheStride2 - headSize) * sizeof(T)), static_cast<uint32_t>(0)};
 
     DataCopyPad(valueCacheOutGm_[valueCacheOffset], inputValueLocal, outValueCacheParams);
 
@@ -201,13 +183,14 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::InitLoopInfo() {
+__aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::InitLoopInfo()
+{
     int64_t ubHandleSize = maxHandleSize_ / BLOCK_SIZE * BLOCK_SIZE;
     ubHandleSize = ubHandleSize / sizeof(T);
     alignKHeadSize_ = RoundUp(tilingData_->kHeadSize);
-    
+
     kFullyLoad_ = (alignKHeadSize_ <= ubHandleSize);
-    
+
     if (kFullyLoad_) {
         kHeadSizeIn_ = tilingData_->kHeadSize;
         kHeadSizeloop_ = 1;
@@ -229,9 +212,9 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 
     if constexpr (InOutMode == DUAL_IN_OUT) {
         alignVHeadSize_ = RoundUp(tilingData_->vHeadSize);
-        
+
         vFullyLoad_ = (alignVHeadSize_ <= ubHandleSize);
-        
+
         if (vFullyLoad_) {
             vHeadSizeIn_ = tilingData_->vHeadSize;
             vHeadSizeloop_ = 1;
@@ -255,8 +238,8 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
 __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::ProcessKey(int64_t tokenIdx,
-                                                                                              int64_t blockIdx,
-                                                                                              int64_t blockOffset)
+                                                                                               int64_t blockIdx,
+                                                                                               int64_t blockOffset)
 {
     if (kFullyLoad_) {
         for (int64_t headLoop = 0; headLoop < kNumHeadLoop_; headLoop++) {
@@ -288,8 +271,8 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
 __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMode>::ProcessValue(int64_t tokenIdx,
-                                                                                                int64_t blockIdx,
-                                                                                                int64_t blockOffset)
+                                                                                                 int64_t blockIdx,
+                                                                                                 int64_t blockOffset)
 {
     if (vFullyLoad_) {
         for (int64_t headLoop = 0; headLoop < vNumHeadLoop_; headLoop++) {

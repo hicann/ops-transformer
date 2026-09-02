@@ -26,7 +26,8 @@ class ScatterPaKvCacheNormalNotFullyLoad {
 public:
     __aicore__ inline ScatterPaKvCacheNormalNotFullyLoad(TPipe *pipe,
                                                          const ScatterPaKvCacheTilingData *__restrict tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
                                 GM_ADDR value_cache_in, GM_ADDR compress_lens, GM_ADDR compress_seq_offset,
                                 GM_ADDR seq_lens, GM_ADDR key_cache_out, GM_ADDR value_cache_out);
@@ -91,9 +92,8 @@ __aicore__ inline int64_t ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOu
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode, bool NCT>
-__aicore__ inline void ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyInKey(int64_t iter,
-                                                                                               int64_t blockOffset,
-                                                                                               int64_t handleNumPerLoop)
+__aicore__ inline void ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyInKey(
+    int64_t iter, int64_t blockOffset, int64_t handleNumPerLoop)
 {
     LocalTensor<T> inputKeyLocal = keyQueue_.AllocTensor<T>();
 
@@ -107,9 +107,8 @@ __aicore__ inline void ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMo
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode, bool NCT>
-__aicore__ inline void
-ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyOutKey(int64_t iter, int64_t kStartIdx,
-                                                                         int64_t handleNumPerLoop)
+__aicore__ inline void ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyOutKey(
+    int64_t iter, int64_t kStartIdx, int64_t handleNumPerLoop)
 {
     LocalTensor<T> inputKeyLocal = keyQueue_.DeQue<T>();
 
@@ -127,9 +126,8 @@ ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyOutKey(in
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode, bool NCT>
-__aicore__ inline void
-ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyInValue(int64_t iter, int64_t blockOffset,
-                                                                          int64_t handleNumPerLoop)
+__aicore__ inline void ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyInValue(
+    int64_t iter, int64_t blockOffset, int64_t handleNumPerLoop)
 {
     LocalTensor<T> inputValueLocal = valueQueue_.AllocTensor<T>();
     DataCopyExtParams keyParams = {static_cast<uint16_t>(1), static_cast<uint32_t>(handleNumPerLoop * sizeof(T)),
@@ -142,9 +140,8 @@ ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyInValue(i
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode, bool NCT>
-__aicore__ inline void
-ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyOutValue(int64_t iter, int64_t vStartIdx,
-                                                                           int64_t handleNumPerLoop)
+__aicore__ inline void ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMode, NCT>::CopyOutValue(
+    int64_t iter, int64_t vStartIdx, int64_t handleNumPerLoop)
 {
     LocalTensor<T> inputValueLocal = valueQueue_.DeQue<T>();
 

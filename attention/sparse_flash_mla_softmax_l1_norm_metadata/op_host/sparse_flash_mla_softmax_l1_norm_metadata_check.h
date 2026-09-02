@@ -145,16 +145,16 @@ aclnnStatus CheckConsistencySmlaL1Norm(int64_t batchSize, const aclTensor *cuSeq
 
     if (IsTensorExistSmlaL1Norm(cuSeqLensQOptional)) {
         dimNum = GetDimNumSmlaL1Norm(cuSeqLensQOptional);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID,
-                   "The dim num of cu_seq_lens_q must be 1, but got %lld", dimNum);
+        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of cu_seq_lens_q must be 1, but got %lld",
+                   dimNum);
         dataType = GetDataTypeSmlaL1Norm(cuSeqLensQOptional);
         CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
                    "The data type of cu_seq_lens_q must be int32, but got %d", static_cast<int32_t>(dataType));
     }
     if (IsTensorExistSmlaL1Norm(cuSeqLensKOptional)) {
         dimNum = GetDimNumSmlaL1Norm(cuSeqLensKOptional);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID,
-                   "The dim num of cu_seq_lens_k must be 1, but got %lld", dimNum);
+        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of cu_seq_lens_k must be 1, but got %lld",
+                   dimNum);
         dataType = GetDataTypeSmlaL1Norm(cuSeqLensKOptional);
         CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
                    "The data type of cu_seq_lens_k must be int32, but got %d", static_cast<int32_t>(dataType));
@@ -252,8 +252,8 @@ aclnnStatus ParamsCheckSmlaL1Norm(const aclTensor *cuSeqLensQOptional, const acl
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     ret = CheckConsistencySmlaL1Norm(batchSize, cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional,
-                                     seqUsedKOptional, cmpResidualKOptional, topkLengthOptional, layoutQ,
-                                     layoutK, metadata);
+                                     seqUsedKOptional, cmpResidualKOptional, topkLengthOptional, layoutQ, layoutK,
+                                     metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     return ACLNN_SUCCESS;

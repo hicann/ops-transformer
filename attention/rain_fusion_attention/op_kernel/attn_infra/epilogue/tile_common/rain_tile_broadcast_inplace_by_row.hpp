@@ -13,8 +13,7 @@
 
 #include "../../../attn_infra/rain_base_defs.hpp"
 
-namespace NpuArch::Epilogue::Tile 
-{
+namespace NpuArch::Epilogue::Tile {
 
 template <
     /// Tag indicating architecture
@@ -22,22 +21,18 @@ template <
     /// Compute data type
     class ComputeType_,
     /// Length of the compute buffer
-    class TileShape_
->
+    class TileShape_>
 struct TileBroadcastInplaceByRow {
     using ArchTag = ArchTag_;
     using ElementCompute = typename ComputeType_::Element;
     using TileShape = TileShape_;
 
-    __aicore__ inline
-    TileBroadcastInplaceByRow() {}
+    __aicore__ inline TileBroadcastInplaceByRow() {}
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<ElementCompute> const &ubInOut
-    )
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubInOut)
     {
-        constexpr uint32_t eleNumPerVectorFractal = static_cast<uint32_t>(BYTE_PER_VECTOR_FRACTAL) / static_cast<uint32_t>(sizeof(ElementCompute));
+        constexpr uint32_t eleNumPerVectorFractal =
+            static_cast<uint32_t>(BYTE_PER_VECTOR_FRACTAL) / static_cast<uint32_t>(sizeof(ElementCompute));
 
         constexpr uint64_t mask = eleNumPerVectorFractal;
         constexpr uint8_t repeatTimes = TileShape::COLUMN / eleNumPerVectorFractal;

@@ -14,29 +14,23 @@
 #include "../../attn_infra/rain_base_defs.hpp"
 #include "../../attn_infra/arch/rain_arch.hpp"
 
-namespace NpuArch::Arch
-{
+namespace NpuArch::Arch {
 
 struct LocalTensorBufferBase {
 public:
     template <class Element = half>
-    __aicore__ inline
-    AscendC::LocalTensor<Element> GetBufferByByte(const uint32_t offset) const
+    __aicore__ inline AscendC::LocalTensor<Element> GetBufferByByte(const uint32_t offset) const
     {
         return tensor[offset].template ReinterpretCast<Element>();
     }
 
 protected:
-    __aicore__ inline
-    LocalTensorBufferBase() = default;
+    __aicore__ inline LocalTensorBufferBase() = default;
 
     AscendC::LocalTensor<uint8_t> tensor;
 };
 
-template <
-    class ArchTag,
-    AscendC::TPosition Position
->
+template <class ArchTag, AscendC::TPosition Position>
 struct LocalTensorBuffer {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported local tensor buffer, can not find the specialization.");
 };
@@ -47,8 +41,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::A1> : LocalTensorBufferBas
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::A1;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::A1> tbufA1;
         GetTPipePtr()->InitBuffer(tbufA1, ArchTag::L1_SIZE);
@@ -64,8 +57,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::A2> : LocalTensorBufferBas
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::A2;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::A2> tbufA2;
         GetTPipePtr()->InitBuffer(tbufA2, ArchTag::L0A_SIZE);
@@ -81,8 +73,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::B1> : LocalTensorBufferBas
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::B1;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::B1> tbufB1;
         GetTPipePtr()->InitBuffer(tbufB1, ArchTag::L1_SIZE);
@@ -98,8 +89,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::B2> : LocalTensorBufferBas
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::B2;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::B2> tbufB2;
         GetTPipePtr()->InitBuffer(tbufB2, ArchTag::L0B_SIZE);
@@ -116,8 +106,7 @@ public:
     using ArchTag = Arch::AtlasA2;
     static constexpr AscendC::TPosition Position = AscendC::TPosition::C1;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::C1> tbufC1;
         GetTPipePtr()->InitBuffer(tbufC1, ArchTag::L1_SIZE);
@@ -134,8 +123,7 @@ public:
     using ArchTag = Arch::AtlasA2;
     static constexpr AscendC::TPosition Position = AscendC::TPosition::C2;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::C2> tbufC2;
         GetTPipePtr()->InitBuffer(tbufC2, ArchTag::BIAS_SIZE);
@@ -151,8 +139,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::CO1> : LocalTensorBufferBa
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::CO1;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::CO1> tbufCO1;
         GetTPipePtr()->InitBuffer(tbufCO1, ArchTag::L0C_SIZE);
@@ -169,8 +156,7 @@ public:
     using ArchTag = Arch::AtlasA2;
     static constexpr AscendC::TPosition Position = AscendC::TPosition::C2PIPE2GM;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::C2PIPE2GM> tbufC2PIPE2GM;
         GetTPipePtr()->InitBuffer(tbufC2PIPE2GM, ArchTag::FIXBUF_SIZE);
@@ -186,8 +172,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::VECIN> : LocalTensorBuffer
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::VECIN;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::VECIN> tbufVECIN;
         GetTPipePtr()->InitBuffer(tbufVECIN, ArchTag::UB_SIZE);
@@ -203,8 +188,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::VECOUT> : LocalTensorBuffe
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::VECOUT;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::VECOUT> tbufVECOUT;
         GetTPipePtr()->InitBuffer(tbufVECOUT, ArchTag::UB_SIZE);
@@ -220,8 +204,7 @@ struct LocalTensorBuffer<ArchTag, AscendC::TPosition::VECCALC> : LocalTensorBuff
 public:
     static constexpr AscendC::TPosition Position = AscendC::TPosition::VECCALC;
 
-    __aicore__ inline
-    LocalTensorBuffer()
+    __aicore__ inline LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::VECCALC> tbufVECCALC;
         GetTPipePtr()->InitBuffer(tbufVECCALC, ArchTag::UB_SIZE);
@@ -229,6 +212,6 @@ public:
     }
 };
 
-}  // namespace NpuArch::Arch
+} // namespace NpuArch::Arch
 
-#endif  // INCLUDE_ARCH_MEMORY_H
+#endif // INCLUDE_ARCH_MEMORY_H

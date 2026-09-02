@@ -18,22 +18,23 @@ extern "C" {
 #endif
 
 /**
- * @brief The first interface of InnerPromptFlashAttention is used to calculate the workspace size based on the specific calculation process.
+ * @brief The first interface of InnerPromptFlashAttention is used to calculate the workspace size based on the specific
+ * calculation process.
  * @domain aclnn_math
  */
 ACLNN_API aclnnStatus InnerPromptFlashAttentionGetWorkspaceSize(
-    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* pseShift,
-    const aclTensor* attenMask, const aclIntArray* actualSeqLengths, const aclIntArray* actualSeqLengthsKv,
-    const aclTensor* deqScale1, const aclTensor* quantScale1, const aclTensor* deqScale2, const aclTensor* quantScale2,
-    const aclTensor* quantOffset2, int64_t numHeads, double scaleValue, int64_t preTokens, int64_t nextTokens,
-    char* inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    const aclTensor* attentionOut, uint64_t* workspaceSize, aclOpExecutor** executor);
+    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *pseShift,
+    const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclIntArray *actualSeqLengthsKv,
+    const aclTensor *deqScale1, const aclTensor *quantScale1, const aclTensor *deqScale2, const aclTensor *quantScale2,
+    const aclTensor *quantOffset2, int64_t numHeads, double scaleValue, int64_t preTokens, int64_t nextTokens,
+    char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
+    const aclTensor *attentionOut, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /**
  * @brief The second interface of InnerPromptFlashAttention is used to perform calculations.
  */
-ACLNN_API aclnnStatus InnerPromptFlashAttention(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
-                                                     const aclrtStream stream);
+ACLNN_API aclnnStatus InnerPromptFlashAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                                const aclrtStream stream);
 
 #ifdef __cplusplus
 }

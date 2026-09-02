@@ -150,8 +150,8 @@ __aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &ru
             int32_t blockId = blockTableGm.GetValue(blockTableBatchOffset + startBlockTableIdx + i);
             SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
             uint64_t kScaleOffset = blockId * constInfo_.keyDequantScaleStride0;
-            AscendC::DataCopyPad(resUb[resUbBaseOffset + i * kCacheBlockSize_], kScaleGm[kScaleOffset],
-                                 copyInParams, padParams);
+            AscendC::DataCopyPad(resUb[resUbBaseOffset + i * kCacheBlockSize_], kScaleGm[kScaleOffset], copyInParams,
+                                 padParams);
         }
     } else {
         copyInParams.blockCount = 1;
@@ -253,13 +253,11 @@ __aicore__ inline void QLIVector<QLIT>::InitVecWorkspaceTensor(GlobalTensor<half
 
 template <typename QLIT>
 __aicore__ inline void QLIVector<QLIT>::AllocEventID()
-{
-}
+{}
 
 template <typename QLIT>
 __aicore__ inline void QLIVector<QLIT>::FreeEventID()
-{
-}
+{}
 
 template <typename QLIT>
 __aicore__ inline void QLIVector<QLIT>::CleanInvalidOutput(int64_t invalidS1offset)
@@ -431,10 +429,9 @@ __aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo &in
                     (blockId_ / 2) * s1BaseSize_ * 2 * BASE_TOPK_VALUE_IDX_SIZE +       // 2个AIV共同地址偏移
                     (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * BASE_TOPK_VALUE_IDX_SIZE + // 每个AIV的地址偏移，S1方向
                     (ldS1Offset + innerS1Idx) * 2 * BASE_TOPK_VALUE_IDX_SIZE;
-                int64_t wsInfoOffset =
-                    (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +       // 2个AIV共同地址偏移
-                    (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_ + // 每个AIV的地址偏移，S1方向
-                    (ldS1Offset + innerS1Idx) * 2 * paramNum_;
+                int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ + // 2个AIV共同地址偏移
+                                       (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_ + // 每个AIV的地址偏移，S1方向
+                                       (ldS1Offset + innerS1Idx) * 2 * paramNum_;
 
                 LocalTensor<int64_t> tmpiBuff = paramBuf_.Get<int64_t>();
                 SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);

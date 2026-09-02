@@ -25,31 +25,33 @@
 #include "lib/matmul_intf.h"
 #include "../kernel_data_copy_transpose.h"
 
-template<typename T>
+template <typename T>
 class PromptFlashAttentionEmptyTensor {
 public:
-    __aicore__ inline PromptFlashAttentionEmptyTensor() {};
+    __aicore__ inline PromptFlashAttentionEmptyTensor(){};
     __aicore__ inline void Init(__gm__ uint8_t *attentionOut, const PromptFlashAttentionTilingData *__restrict tiling,
                                 TPipe *tPipe);
     __aicore__ inline void Process();
 
 protected:
     TPipe *pipe;
-    const PromptFlashAttentionTilingData* __restrict tilingData;
+    const PromptFlashAttentionTilingData *__restrict tilingData;
     GlobalTensor<T> attentionOutGm;
 };
 
-template<typename T>
-__aicore__ inline void PromptFlashAttentionEmptyTensor<T>::Init(__gm__ uint8_t*  attentionOut,
-                                                                const PromptFlashAttentionTilingData* __restrict tiling,
-                                                                TPipe *tPipe) {
+template <typename T>
+__aicore__ inline void PromptFlashAttentionEmptyTensor<T>::Init(__gm__ uint8_t *attentionOut,
+                                                                const PromptFlashAttentionTilingData *__restrict tiling,
+                                                                TPipe *tPipe)
+{
     pipe = tPipe;
-    attentionOutGm.SetGlobalBuffer((__gm__ T*)attentionOut);
+    attentionOutGm.SetGlobalBuffer((__gm__ T *)attentionOut);
     tilingData = tiling;
 }
 
-template<typename T>
-__aicore__ inline void PromptFlashAttentionEmptyTensor<T>::Process() {
+template <typename T>
+__aicore__ inline void PromptFlashAttentionEmptyTensor<T>::Process()
+{
     uint32_t tmp_block_idx = GetBlockIdx();
     auto &initParams = tilingData->promptAttentionInitOutputParams;
     int32_t tailSize = (int32_t)initParams.totalOutputSize - tmp_block_idx * (int32_t)initParams.singleCoreSize;
@@ -59,4 +61,4 @@ __aicore__ inline void PromptFlashAttentionEmptyTensor<T>::Process() {
         InitOutput<T>(attentionOutGm[tmp_block_idx * (int64_t)initParams.singleCoreSize], singleInitOutputSize, 0);
     }
 }
-#endif  // PROMPT_FLASH_ATTENTION_EMPTY_TENSOR_H
+#endif // PROMPT_FLASH_ATTENTION_EMPTY_TENSOR_H

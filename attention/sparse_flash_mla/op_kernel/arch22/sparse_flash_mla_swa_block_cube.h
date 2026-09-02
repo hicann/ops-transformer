@@ -85,7 +85,7 @@ private:
     static constexpr uint32_t L0AB_EVENT0 = EVENT_ID3;
     static constexpr uint32_t L0AB_EVENT1 = EVENT_ID4;
 
-    static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true};                    // isSetFMatrix isSetPadding;
+    static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true}; // isSetFMatrix isSetPadding;
     static constexpr uint32_t mte21QPIds[4] = {L1_EVENT0, L1_EVENT1, L1_EVENT2, L1_EVENT3}; // mte12复用
     static constexpr uint32_t mte21KVIds[3] = {L1_EVENT4, L1_EVENT5, L1_EVENT6};
 
@@ -183,11 +183,10 @@ __aicore__ inline void SWACubeBlock<SMLAT>::InitMm2GlobalTensor(GlobalTensor<KV_
 }
 
 template <typename SMLAT>
-__aicore__ inline void
-SWACubeBlock<SMLAT>::InitPageAttentionInfo(GlobalTensor<KV_T> oriKvGm,
-                                           GlobalTensor<KV_T> kvMergeGm,
-                                           GlobalTensor<int32_t> oriBlockTableGm,
-                                           GlobalTensor<int32_t> cmpBlockTableGm)
+__aicore__ inline void SWACubeBlock<SMLAT>::InitPageAttentionInfo(GlobalTensor<KV_T> oriKvGm,
+                                                                  GlobalTensor<KV_T> kvMergeGm,
+                                                                  GlobalTensor<int32_t> oriBlockTableGm,
+                                                                  GlobalTensor<int32_t> cmpBlockTableGm)
 {
     this->oriKvGm = oriKvGm;
     this->kvMergeGm_ = kvMergeGm;
@@ -439,9 +438,9 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, cons
                                       (uint64_t)info.n2Idx * headStride + kL1 * D_SPLIT_SIZE;
                     DataCopy(bL1Tensor, oriKvGm[offset], nd2nzPara);
                 } else if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::TND) {
-                    uint64_t curS2Offset = static_cast<uint64_t>(info.s2Idx) *
-                                               static_cast<uint64_t>(constInfo.s2BaseSize) +
-                                           info.s2StartPoint + nL1 * N_SPLIT_SIZE;
+                    uint64_t curS2Offset =
+                        static_cast<uint64_t>(info.s2Idx) * static_cast<uint64_t>(constInfo.s2BaseSize) +
+                        info.s2StartPoint + nL1 * N_SPLIT_SIZE;
                     Nd2NzParams nd2nzPara;
                     nd2nzPara.ndNum = 1;
                     nd2nzPara.nValue = nL1Size;
@@ -452,7 +451,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, cons
                     nd2nzPara.srcNdMatrixStride = 0;
                     nd2nzPara.dstNzMatrixStride = 0;
                     DataCopy(bL1Tensor,
-                             oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim + kL1 * D_SPLIT_SIZE], nd2nzPara);
+                             oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim + kL1 * D_SPLIT_SIZE],
+                             nd2nzPara);
                 }
             } else if (info.isOriCmpMix) {
                 uint32_t cumNl1LoopSize = nL1 * N_SPLIT_SIZE;
@@ -461,8 +461,9 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, cons
                                           (info.actualSingleProcessSInnerOriSize - cumNl1LoopSize);
                 oriSizeCur = (oriSizeCur > nL1Size) ? nL1Size : oriSizeCur;
                 uint32_t cmpSizeCur = nL1Size - oriSizeCur;
-                cmpSizeCur = (cmpSizeCur < info.actualSingleProcessSInnerCmpSize) ? cmpSizeCur :
-                                                                                    info.actualSingleProcessSInnerCmpSize;
+                cmpSizeCur = (cmpSizeCur < info.actualSingleProcessSInnerCmpSize) ?
+                                 cmpSizeCur :
+                                 info.actualSingleProcessSInnerCmpSize;
                 if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
                     LocalTensor<KV_T> kTensor;
                     uint32_t copyRowCnt = 0;
@@ -502,7 +503,10 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, cons
                         uint32_t cmpMixsizeCur = N_SPLIT_SIZE - info.actualSingleProcessSInnerOriSize % N_SPLIT_SIZE;
                         uint32_t oriOnlyLoopTimes = info.actualSingleProcessSInnerOriSize / N_SPLIT_SIZE;
                         uint32_t cmpLoopTimes = nL1 - oriOnlyLoopTimes;
-                        uint64_t curS2Offset = (cmpLoopTimes == 0) ? 0 : (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * N_SPLIT_SIZE);
+                        uint64_t curS2Offset =
+                            (cmpLoopTimes == 0) ?
+                                0 :
+                                (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * N_SPLIT_SIZE);
                         uint32_t copyFinishRowCnt = 0;
                         while (copyFinishRowCnt < cmpSizeCur) {
                             // 由于ori_left的存在， 即使第一块搬运也可能并非是pa_block的零点位
@@ -591,7 +595,10 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, cons
                         uint32_t cmpMixsizeCur = N_SPLIT_SIZE - info.actualSingleProcessSInnerOriSize % N_SPLIT_SIZE;
                         uint32_t oriOnlyLoopTimes = info.actualSingleProcessSInnerOriSize / N_SPLIT_SIZE;
                         uint32_t cmpLoopTimes = nL1 - oriOnlyLoopTimes;
-                        uint64_t curS2Offset = (cmpLoopTimes == 0) ? 0 : (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * N_SPLIT_SIZE);
+                        uint64_t curS2Offset =
+                            (cmpLoopTimes == 0) ?
+                                0 :
+                                (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * N_SPLIT_SIZE);
                         DataCopy(bL1Tensor[oriSizeCur * 16],
                                  cmpKvGm[info.tensorCmpBOffset + curS2Offset * constInfo.headDim + kL1 * D_SPLIT_SIZE],
                                  nd2nzPara);
@@ -830,9 +837,9 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                             uint32_t blockElementCnt = 32U / sizeof(KV_T);
                             subvTensor = bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE];
                             for (uint32_t row = 0; row < kL0Size; ++row) {
-                                uint64_t mergeOffset = mergeBase +
-                                                       static_cast<uint64_t>(kL1 * K_L0_SPLIT_SIZE + row) * constInfo.headDim +
-                                                       nL1 * N_SPLIT_SIZE;
+                                uint64_t mergeOffset =
+                                    mergeBase + static_cast<uint64_t>(kL1 * K_L0_SPLIT_SIZE + row) * constInfo.headDim +
+                                    nL1 * N_SPLIT_SIZE;
                                 GlobalTensor<KV_T> mergeSrcGm = kvMergeGm_[mergeOffset];
                                 LocalTensor<KV_T> dstTensor = subvTensor[row * blockElementCnt];
                                 DataCopyGmNDToL1<KV_T>(dstTensor, mergeSrcGm, 1, kL0SizeAlign, nL1Size,
@@ -848,7 +855,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                                 startPos.bIdx = info.bIdx;
                                 startPos.n2Idx = info.n2Idx;
                                 startPos.s2Idx = curS2Offset;
-                                startPos.dIdx = nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
+                                startPos.dIdx =
+                                    nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
                                 PAShape shape;
                                 shape.blockSize = constInfo.paOriBlockSize;
                                 shape.headNum = constInfo.kvHeadNum;
@@ -858,7 +866,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                                 shape.maxblockNumPerBatch = constInfo.oriMaxBlockNumPerBatch;
                                 shape.copyRowNum = copyRowCnt;
                                 shape.copyRowNumAlign = kL0SizeAlign;
-                                subvTensor = bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE + copyFinishRowCnt * 16];
+                                subvTensor =
+                                    bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE + copyFinishRowCnt * 16];
                                 DataCopyPA<KV_T>(subvTensor, oriKvGm, oriBlockTableGm, shape, startPos);
 
                                 // 更新循环变量
@@ -900,8 +909,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                         nd2nzPara.srcNdMatrixStride = 0;
                         nd2nzPara.dstNzMatrixStride = 0;
                         DataCopy(bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE],
-                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
-                                         nL1 * N_SPLIT_SIZE],
+                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim + nL1 * N_SPLIT_SIZE],
                                  nd2nzPara);
                     }
                 } else if (info.isOriCmpMix) {
@@ -911,8 +919,9 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                                               (info.actualSingleProcessSInnerOriSize - cumKl0LoopSize);
                     oriSizeCur = (oriSizeCur > kL0Size) ? kL0Size : oriSizeCur;
                     uint32_t cmpSizeCur = kL0Size - oriSizeCur;
-                    cmpSizeCur = (cmpSizeCur < info.actualSingleProcessSInnerCmpSize) ? cmpSizeCur :
-                                                                                        info.actualSingleProcessSInnerCmpSize;
+                    cmpSizeCur = (cmpSizeCur < info.actualSingleProcessSInnerCmpSize) ?
+                                     cmpSizeCur :
+                                     info.actualSingleProcessSInnerCmpSize;
                     if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
                         if (oriSizeCur > 0) {
                             copyFinishRowCnt = 0;
@@ -926,7 +935,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                                 startPos.bIdx = info.bIdx;
                                 startPos.n2Idx = info.n2Idx;
                                 startPos.s2Idx = curS2Offset;
-                                startPos.dIdx = nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
+                                startPos.dIdx =
+                                    nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
                                 PAShape shape;
                                 shape.blockSize = constInfo.paOriBlockSize;
                                 shape.headNum = constInfo.kvHeadNum;
@@ -936,8 +946,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                                 shape.maxblockNumPerBatch = constInfo.oriMaxBlockNumPerBatch;
                                 shape.copyRowNum = copyRowCnt;
                                 shape.copyRowNumAlign = kL0SizeAlign;
-                                subvTensor = bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE +
-                                                       copyFinishRowCnt * 16];
+                                subvTensor =
+                                    bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE + copyFinishRowCnt * 16];
                                 DataCopyPA<KV_T>(subvTensor, oriKvGm, oriBlockTableGm, shape, startPos);
 
                                 // 更新循环变量
@@ -947,11 +957,14 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                         }
                         if (cmpSizeCur > 0) {
                             copyFinishRowCnt = 0;
-                            uint32_t cmpMixsizeCur = K_L0_SPLIT_SIZE -
-                                                     info.actualSingleProcessSInnerOriSize % K_L0_SPLIT_SIZE;
+                            uint32_t cmpMixsizeCur =
+                                K_L0_SPLIT_SIZE - info.actualSingleProcessSInnerOriSize % K_L0_SPLIT_SIZE;
                             uint32_t oriOnlyLoopTimes = info.actualSingleProcessSInnerOriSize / K_L0_SPLIT_SIZE;
                             uint32_t cmpLoopTimes = kL1 - oriOnlyLoopTimes;
-                            uint64_t curS2Offset = (cmpLoopTimes == 0) ? 0 : (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * K_L0_SPLIT_SIZE);
+                            uint64_t curS2Offset =
+                                (cmpLoopTimes == 0) ?
+                                    0 :
+                                    (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * K_L0_SPLIT_SIZE);
                             while (copyFinishRowCnt < cmpSizeCur) {
                                 copyRowCnt = constInfo.paCmpBlockSize - curS2Offset % constInfo.paCmpBlockSize;
                                 if (copyFinishRowCnt + copyRowCnt > cmpSizeCur) {
@@ -963,7 +976,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                                 startPos.n2Idx = info.n2Idx;
                                 startPos.s2Idx = curS2Offset;
                                 // 256、32等待7buf命名更改
-                                startPos.dIdx = nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
+                                startPos.dIdx =
+                                    nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
 
                                 PAShape shape;
                                 shape.blockSize = constInfo.paCmpBlockSize;
@@ -1012,11 +1026,14 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                             uint64_t batchStride = (constInfo.cmpKvStride0 == 0) ?
                                                        static_cast<uint64_t>(constInfo.cmpSeqSize) * seqStride :
                                                        constInfo.cmpKvStride0;
-                            uint32_t cmpMixsizeCur = K_L0_SPLIT_SIZE -
-                                                     info.actualSingleProcessSInnerOriSize % K_L0_SPLIT_SIZE;
+                            uint32_t cmpMixsizeCur =
+                                K_L0_SPLIT_SIZE - info.actualSingleProcessSInnerOriSize % K_L0_SPLIT_SIZE;
                             uint32_t oriOnlyLoopTimes = info.actualSingleProcessSInnerOriSize / K_L0_SPLIT_SIZE;
                             uint32_t cmpLoopTimes = kL1 - oriOnlyLoopTimes;
-                            uint64_t curS2 = (cmpLoopTimes == 0) ? 0 : (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * K_L0_SPLIT_SIZE);
+                            uint64_t curS2 =
+                                (cmpLoopTimes == 0) ?
+                                    0 :
+                                    (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * K_L0_SPLIT_SIZE);
                             uint64_t offset = (uint64_t)info.bIdx * batchStride + (uint64_t)curS2 * seqStride +
                                               (uint64_t)info.n2Idx * headStride + nL1 * N_SPLIT_SIZE;
                             DataCopy(subvTensor, cmpKvGm[offset], nd2nzPara);
@@ -1041,15 +1058,18 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                         }
                         if (cmpSizeCur > 0) {
                             nd2nzPara.nValue = cmpSizeCur;
-                            uint32_t cmpMixsizeCur = K_L0_SPLIT_SIZE -
-                                                     info.actualSingleProcessSInnerOriSize % K_L0_SPLIT_SIZE;
+                            uint32_t cmpMixsizeCur =
+                                K_L0_SPLIT_SIZE - info.actualSingleProcessSInnerOriSize % K_L0_SPLIT_SIZE;
                             uint32_t oriOnlyLoopTimes = info.actualSingleProcessSInnerOriSize / K_L0_SPLIT_SIZE;
                             uint32_t cmpLoopTimes = kL1 - oriOnlyLoopTimes;
-                            uint64_t curS2Offset = (cmpLoopTimes == 0) ? 0 : (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * K_L0_SPLIT_SIZE);
-                            DataCopy(bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE + oriSizeCur * 16],
-                                     cmpKvGm[info.tensorCmpBOffset + curS2Offset * constInfo.headDim +
-                                             nL1 * N_SPLIT_SIZE],
-                                     nd2nzPara);
+                            uint64_t curS2Offset =
+                                (cmpLoopTimes == 0) ?
+                                    0 :
+                                    (cmpMixsizeCur + static_cast<uint64_t>(cmpLoopTimes - 1) * K_L0_SPLIT_SIZE);
+                            DataCopy(
+                                bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE + oriSizeCur * 16],
+                                cmpKvGm[info.tensorCmpBOffset + curS2Offset * constInfo.headDim + nL1 * N_SPLIT_SIZE],
+                                nd2nzPara);
                         }
                     }
                 } else {
@@ -1067,7 +1087,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                             startPos.n2Idx = info.n2Idx;
                             startPos.s2Idx = curS2Offset;
                             // 256、32等待7buf命名更改
-                            startPos.dIdx = nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
+                            startPos.dIdx =
+                                nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
 
                             PAShape shape;
                             shape.blockSize = constInfo.paCmpBlockSize;
@@ -1078,7 +1099,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                             shape.maxblockNumPerBatch = constInfo.cmpMaxBlockNumPerBatch;
                             shape.copyRowNum = copyRowCnt;
                             shape.copyRowNumAlign = kL0SizeAlign;
-                            subvTensor = bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE + copyFinishRowCnt * 16];
+                            subvTensor =
+                                bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE + copyFinishRowCnt * 16];
                             DataCopyPA<KV_T>(subvTensor, cmpKvGm, cmpBlockTableGm, shape, startPos);
                             // 更新循环变量
                             copyFinishRowCnt += copyRowCnt;
@@ -1120,8 +1142,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                         nd2nzPara.srcNdMatrixStride = 0;
                         nd2nzPara.dstNzMatrixStride = 0;
                         DataCopy(bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE],
-                                 cmpKvGm[info.tensorCmpBOffset + curS2Offset * constInfo.headDim +
-                                         nL1 * N_SPLIT_SIZE],
+                                 cmpKvGm[info.tensorCmpBOffset + curS2Offset * constInfo.headDim + nL1 * N_SPLIT_SIZE],
                                  nd2nzPara);
                     }
                 }
@@ -1202,15 +1223,15 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                     loadData3DParamsForA.kExtension = kL0SizeAlign; // 在目的操作数width维度的传输长度
                     loadData3DParamsForA.mStartPt = 0;              // 卷积核在目的操作数width维度的起点
                     loadData3DParamsForA.kStartPt = 0;              // 卷积核在目的操作数height维度的起点
-                    loadData3DParamsForA.strideW = 1;               // 卷积核在源操作数width维度滑动的步长
-                    loadData3DParamsForA.strideH = 1;               // 卷积核在源操作数height维度滑动的步长
-                    loadData3DParamsForA.filterW = 1;               // 卷积核width
-                    loadData3DParamsForA.filterSizeW = false;       // 是否在filterW的基础上将卷积核width增加256个元素
-                    loadData3DParamsForA.filterH = 1;               // 卷积核height
-                    loadData3DParamsForA.filterSizeH = false;       // 是否在filterH的基础上将卷积核height增加256个元素
-                    loadData3DParamsForA.dilationFilterW = 1;       // 卷积核width膨胀系数
-                    loadData3DParamsForA.dilationFilterH = 1;       // 卷积核height膨胀系数
-                    loadData3DParamsForA.enTranspose = 0;           // 是否启用转置功能，对整个目标矩阵进行转置
+                    loadData3DParamsForA.strideW = 1;         // 卷积核在源操作数width维度滑动的步长
+                    loadData3DParamsForA.strideH = 1;         // 卷积核在源操作数height维度滑动的步长
+                    loadData3DParamsForA.filterW = 1;         // 卷积核width
+                    loadData3DParamsForA.filterSizeW = false; // 是否在filterW的基础上将卷积核width增加256个元素
+                    loadData3DParamsForA.filterH = 1;         // 卷积核height
+                    loadData3DParamsForA.filterSizeH = false; // 是否在filterH的基础上将卷积核height增加256个元素
+                    loadData3DParamsForA.dilationFilterW = 1; // 卷积核width膨胀系数
+                    loadData3DParamsForA.dilationFilterH = 1; // 卷积核height膨胀系数
+                    loadData3DParamsForA.enTranspose = 0; // 是否启用转置功能，对整个目标矩阵进行转置
                     loadData3DParamsForA.fMatrixCtrl = 0;
                     loadData3DParamsForA.channelSize =
                         kL0SizeAlign; // 源操作数的通道数。膨胀系数为1时，目的weight为filterW*filterH*channelSize
@@ -1235,7 +1256,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, cons
                     abL0BufIter++;
                 }
 
-                if (nL1 == (nL1Loops - 1)) {                       // nL1最后一轮, 需要将B驻留在L1中, 用于下一轮的计算？
+                if (nL1 == (nL1Loops - 1)) { // nL1最后一轮, 需要将B驻留在L1中, 用于下一轮的计算？
                     SetFlag<HardEvent::MTE1_MTE2>(mte21QPIds[ka]); // 反向同步, 表示L1中的A已经被mte1消费完
                 }
 

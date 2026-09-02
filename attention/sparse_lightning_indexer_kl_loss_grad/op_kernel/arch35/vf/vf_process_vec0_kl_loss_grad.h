@@ -67,10 +67,9 @@ __simd_vf__ inline void Ub2UbNd2Nz512(__ubuf__ INPUT_T *dstUb, __ubuf__ INPUT_T 
     }
 }
 
-
 template <typename INPUT_T>
 __aicore__ inline void Ub2UbNd2Nz(const LocalTensor<INPUT_T> &dstTensor, const LocalTensor<INPUT_T> &srcTensor,
-    uint32_t m, uint32_t n)
+                                  uint32_t m, uint32_t n)
 {
     __ubuf__ INPUT_T *dstUb = (__ubuf__ INPUT_T *)dstTensor.GetPhyAddr();
     __ubuf__ INPUT_T *srcUb = (__ubuf__ INPUT_T *)srcTensor.GetPhyAddr();
@@ -81,6 +80,6 @@ __aicore__ inline void Ub2UbNd2Nz(const LocalTensor<INPUT_T> &dstTensor, const L
         Ub2UbNd2Nz128<INPUT_T>(dstUb, srcUb, m, n);
     }
 }
-} // namespace
+} // namespace AscendC
 
 #endif // VF_PROCESS_VEC0_KL_LOSS_GRAD_H

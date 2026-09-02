@@ -59,8 +59,7 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
 } // namespace SMLAKernel
 
 #define TEMPLATE_INTF \
-    template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, \
-              bool IS_FD, SMLA_LAYOUT LAYOUT_T, \
+    template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, bool IS_FD, SMLA_LAYOUT LAYOUT_T, \
               SMLA_LAYOUT KV_LAYOUT_T, SMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, bool IS_BATCH_CONSISTENCY, \
               bool IS_VEC_S2PHYADDR>
 
@@ -88,8 +87,8 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
 #define GEN_CONST_PARAM(name, type, default_val) type name = default_val,
 
 #define TEMPLATES_DEF \
-    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) \
-                  CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = true>
+    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = \
+                  true>
 
 /* 2. 生成不带带默认值的模版Template */
 #define GEN_TEMPLATE_TYPE_NODEF(name) typename name,

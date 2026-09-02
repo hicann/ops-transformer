@@ -287,8 +287,8 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::InitCVCommonGlobalBuffer(GM_ADDR workspace)
+__aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::InitCVCommonGlobalBuffer(
+    GM_ADDR workspace)
 {
     // init workspace address
     dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
@@ -331,9 +331,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::SetOptionalInfo()
-{
-}
-
+{}
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::SetConstInfo()
@@ -448,8 +446,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetSeqQlenKvlenByBidx(
+__aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetSeqQlenKvlenByBidx(
     int64_t bIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen)
 {
     if (unlikely(bIdx == 0)) {
@@ -563,30 +560,30 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <bool IS_MM1_MM2>
-__aicore__ inline int64_t
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryOffset(FagRunInfo &runInfo)
+__aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryOffset(
+    FagRunInfo &runInfo)
 {
     return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.commonConstInfo.dSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryRopeOffset(FagRunInfo &runInfo)
+__aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryRopeOffset(
+    FagRunInfo &runInfo)
 {
     return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.dRopeSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetDxOffset(FagRunInfo &runInfo)
+__aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetDxOffset(
+    FagRunInfo &runInfo)
 {
     return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.commonConstInfo.dSizeV;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <const bool IS_ORI_KV>
-__aicore__ inline int64_t
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyOffset(FagRunInfo &runInfo)
+__aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyOffset(
+    FagRunInfo &runInfo)
 {
     if constexpr (IS_ORI_KV) {
         return runInfo.t2Index * constInfo.n2Size * constInfo.commonConstInfo.dSize;
@@ -596,15 +593,15 @@ SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyOff
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyRopeOffset(FagRunInfo &runInfo)
+__aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyRopeOffset(
+    FagRunInfo &runInfo)
 {
     return runInfo.t2Index * constInfo.n2Size * constInfo.dRopeSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetValueOffset(FagRunInfo &runInfo)
+__aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetValueOffset(
+    FagRunInfo &runInfo)
 {
     return runInfo.t2Index * constInfo.n2Size * constInfo.commonConstInfo.dSizeV;
 }
@@ -633,9 +630,8 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetTndSeqLen(const int64_t t1Idx,
-                                                                                         int64_t &bIdx)
+__aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetTndSeqLen(
+    const int64_t t1Idx, int64_t &bIdx)
 {
     int64_t t1Offset = 0;
     int64_t t2Offset = 0;

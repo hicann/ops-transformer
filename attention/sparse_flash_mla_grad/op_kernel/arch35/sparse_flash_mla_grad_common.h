@@ -48,61 +48,60 @@ struct DqkvResPos {
 };
 
 // max(mm1, mm2, mm3) + mm4 + mm5
-#define IS_DKV_RESIDENT_L0C(CUBE_BASEM, CUBE_BASEN, HEAD_DIM_ALIGN)                                                    \
-    (((CUBE_BASEM) * (HEAD_DIM_ALIGN) * sizeof(float)) + ((CUBE_BASEN) * (HEAD_DIM_ALIGN) * sizeof(float)) +           \
-     ((CUBE_BASEN) > (HEAD_DIM_ALIGN) ? (CUBE_BASEM) * (CUBE_BASEN) * sizeof(float) :                                  \
+#define IS_DKV_RESIDENT_L0C(CUBE_BASEM, CUBE_BASEN, HEAD_DIM_ALIGN) \
+    (((CUBE_BASEM) * (HEAD_DIM_ALIGN) * sizeof(float)) + ((CUBE_BASEN) * (HEAD_DIM_ALIGN) * sizeof(float)) + \
+     ((CUBE_BASEN) > (HEAD_DIM_ALIGN) ? (CUBE_BASEM) * (CUBE_BASEN) * sizeof(float) : \
                                         (CUBE_BASEM) * (HEAD_DIM_ALIGN) * sizeof(float))) <= L0C_MAX_SIZE
 
 #define SFagTilingType const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict
 
-#define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X)                                                                               \
-    X(INPUT_TYPE)                                                                                                      \
-    X(CALC_TYPE)                                                                                                       \
+#define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X) \
+    X(INPUT_TYPE) \
+    X(CALC_TYPE) \
     X(OUTDTYPE)
 
-#define CUBE_BLOCK_TRAITS_CONST_FIELDS(X)                                                                              \
-    X(IS_TND, bool, false)                                                                                             \
-    X(s2TemplateType, S2TemplateType, S2TemplateType::Aligned128)                                                      \
-    X(dTemplateType, DTemplateType, DTemplateType::Aligned128)                                                         \
-    X(IsOriKVExist, bool, false)                                                                                       \
-    X(IsCmpKVExist, bool, false)                                                                                       \
-    X(IsOriKVSparse, bool, false)                                                                                      \
-    X(IsCmpKVSparse, bool, false)                                                                                      \
+#define CUBE_BLOCK_TRAITS_CONST_FIELDS(X) \
+    X(IS_TND, bool, false) \
+    X(s2TemplateType, S2TemplateType, S2TemplateType::Aligned128) \
+    X(dTemplateType, DTemplateType, DTemplateType::Aligned128) \
+    X(IsOriKVExist, bool, false) \
+    X(IsCmpKVExist, bool, false) \
+    X(IsOriKVSparse, bool, false) \
+    X(IsCmpKVSparse, bool, false) \
     X(IsDETER, bool, false)
 
 /* 1. 生成带默认值的模版Template */
 #define GEN_TYPE_PARAM(name) typename name,
 #define GEN_CONST_PARAM(name, type, default_val) type(name) = (default_val),
-#define TEMPLATES_DEF                                                                                                  \
+#define TEMPLATES_DEF \
     template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = \
                   true>
 
 /* 2. 生成不带带默认值的模版Template */
 #define GEN_TEMPLATE_TYPE_NODEF(name) typename name,
 #define GEN_TEMPLATE_CONST_NODEF(name, type, default_val) type name,
-#define TEMPLATES_DEF_NO_DEFAULT                                                                                       \
-    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF)                                                   \
-                CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
+#define TEMPLATES_DEF_NO_DEFAULT \
+    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF) \
+                  CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
 
 /* 3. 生成有默认值, 不带ChildClass的Args */
 #define GEN_ARG_NAME(name, ...) name,
-#define TEMPLATE_ARGS                                                                                                  \
-    CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME)                                                                        \
+#define TEMPLATE_ARGS \
+    CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME) \
     CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) end
 
 /* 4. 生成BASE的有默认值的Template, BASE带ChildClass*/
-#define TEMPLATES_DEF_BASE                                                                                             \
-    template <typename ChildClass, CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM)                                       \
-                                    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = true>
+#define TEMPLATES_DEF_BASE \
+    template <typename ChildClass, CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) \
+                                       CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = true>
 
 /* 5. 生成BASE的没有默认值的Template, BASE带ChildClass */
-#define TEMPLATES_DEF_BASE_NO_DEFAULT                                                                                  \
-    template <typename ChildClass, CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF)                              \
-                                    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
+#define TEMPLATES_DEF_BASE_NO_DEFAULT \
+    template <typename ChildClass, CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF) \
+                                       CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
 
 /* 6. 生成BASE的BaseArgs, BASE带ChildClass */
-#define TEMPLATE_BASE_ARGS                                                                                             \
+#define TEMPLATE_BASE_ARGS \
     ChildClass, CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME) CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) end
-
 
 #endif // SPARSE_FLASH_MLA_GRAD_COMMON_H

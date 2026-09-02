@@ -86,9 +86,9 @@ struct ScatterPaKvCacheCompileInfo {
 class ScatterPaKvCacheTiling : public TilingBaseClass {
 public:
     explicit ScatterPaKvCacheTiling(gert::TilingContext *context, int64_t inOutMode)
-        : TilingBaseClass(context), inOutMode_(inOutMode)
-    {
-    }
+        : TilingBaseClass(context),
+          inOutMode_(inOutMode)
+    {}
 
 protected:
     bool IsCapable() override;
@@ -233,9 +233,9 @@ struct ScatterPaKvCacheMembaseParams {
 
 class ScatterPaKvCacheMembaseTiling : public TilingBaseClass {
 public:
-    explicit ScatterPaKvCacheMembaseTiling(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit ScatterPaKvCacheMembaseTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
 
 protected:
     bool IsCapable() override;
@@ -269,6 +269,7 @@ private:
     ge::graphStatus DoCompressRopeAndOmniOpTiling();
     ge::graphStatus CheckInputShapeNHSD();
     ge::graphStatus DoNHSDOpTiling();
+
 private:
     ScatterPaKvCacheMembaseParams params_;
     ScatterPaKvCacheTilingData tilingData_;

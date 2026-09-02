@@ -41,7 +41,7 @@ constexpr uint32_t QFA_FD_M_NUM_INDEX = 5;
 struct StridesParams {
     uint64_t bnStride = 0;
     uint64_t n2Stride = 0;
- 
+
     void set_bnStride(uint64_t bnStride)
     {
         this->bnStride = bnStride;

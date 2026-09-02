@@ -97,17 +97,17 @@ protected:
     bool AnalyzeAttrs();
     bool CrossShapeVerify();
     bool AnalyzeDimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &weightsShape,
-        const gert::Shape &topKShape, size_t layoutLen);
+                          const gert::Shape &topKShape, size_t layoutLen);
     bool AnalyzeDtype();
     bool AnalyzeLayout();
     int64_t GetS2RealSize(int32_t sparseMode, int32_t s1Size, int32_t s2Size, int32_t s1Idx);
     bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray);
     inline bool InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t validAicNum, int64_t totalSize,
-        const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue);
+                              const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue);
     bool BalanceLoad(const std::vector<int64_t> &sparseValidArray, std::vector<int64_t> &localValue,
-        std::vector<int64_t> &sparseStartIdx);
+                     std::vector<int64_t> &sparseStartIdx);
     bool Balance4DLoad(std::vector<int64_t> &tmpSparseValue, const std::vector<int64_t> sparseValidArray,
-        const int64_t balanceNum);
+                       const int64_t balanceNum);
     bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, int64_t maxCoreNum);
     void SetSparseParamsRegbase(int64_t maxCoreNum);
     int64_t CalcTotalSize();
@@ -167,5 +167,5 @@ protected:
     SLIGradBaseParamsRegbase *sliGradBaseParams_ = &tilingData->baseParams;
     SLIGradMultiCoreParamsRegbase *sliGradMultiCoreParams_ = &tilingData->multiCoreParams;
 };
-} // optiling
+} // namespace optiling
 #endif

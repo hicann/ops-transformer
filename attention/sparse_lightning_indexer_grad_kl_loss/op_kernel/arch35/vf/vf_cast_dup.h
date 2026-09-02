@@ -19,7 +19,7 @@
 
 namespace AscendC {
 template <typename T, typename WEIGHT_T>
-__simd_vf__ inline void CastDupBasicVF(__ubuf__ WEIGHT_T * dstUb, __ubuf__ T * srcUb, uint32_t m, uint32_t maskScaler)
+__simd_vf__ inline void CastDupBasicVF(__ubuf__ WEIGHT_T *dstUb, __ubuf__ T *srcUb, uint32_t m, uint32_t maskScaler)
 {
     RegTensor<float> vreg_input;
     RegTensor<float> vreg_input_new;
@@ -53,15 +53,15 @@ __simd_vf__ inline void CastDupBasicVF(__ubuf__ WEIGHT_T * dstUb, __ubuf__ T * s
 }
 
 template <typename T, typename WEIGHT_T>
-__aicore__ inline void CastDupVf(const LocalTensor<WEIGHT_T>& dstTensor, const LocalTensor<T>& srcTensor,
-    const uint32_t m)
+__aicore__ inline void CastDupVf(const LocalTensor<WEIGHT_T> &dstTensor, const LocalTensor<T> &srcTensor,
+                                 const uint32_t m)
 {
-    __ubuf__ WEIGHT_T * dstUb = (__ubuf__ WEIGHT_T*)dstTensor.GetPhyAddr();
-    __ubuf__ T * srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ WEIGHT_T *dstUb = (__ubuf__ WEIGHT_T *)dstTensor.GetPhyAddr();
+    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
     uint32_t maskScaler = m;
 
     CastDupBasicVF<T, WEIGHT_T>(dstUb, srcUb, m, maskScaler);
 }
-} // namespace
+} // namespace AscendC
 
 #endif // VF_CAST_DUP_H

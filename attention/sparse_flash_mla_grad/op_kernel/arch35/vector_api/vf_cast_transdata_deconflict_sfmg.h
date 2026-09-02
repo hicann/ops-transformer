@@ -190,8 +190,7 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor,
 template <typename T1, typename T, uint32_t srcN>
 __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1> &dstTensor, const LocalTensor<T> &srcTensor,
                                                const LocalTensor<uint8_t> &selrIndexesTensor, uint32_t srcM)
-{
-}
+{}
 #endif
 } // namespace AscendC
 

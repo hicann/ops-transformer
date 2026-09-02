@@ -16,9 +16,7 @@
 #include "../../../attn_infra/layout/rain_layout.hpp"
 #include "../../../attn_infra/gemm/rain_gemm_type.hpp"
 
-
 namespace NpuArch::Gemm::Tile {
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

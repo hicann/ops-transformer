@@ -36,8 +36,7 @@ template <typename INPUT_T, typename T, LayOutTypeEnum layout = LayOutTypeEnum::
           S1TemplateType s1TemplateType = S1TemplateType::Aligned128,
           S2TemplateType s2TemplateType = S2TemplateType::Aligned128,
           DTemplateType dTemplateType = DTemplateType::Aligned128,
-          DTemplateType dVTemplateType = DTemplateType::Aligned128, uint8_t KvLayoutType = 0,
-          bool useDn = false>
+          DTemplateType dVTemplateType = DTemplateType::Aligned128, uint8_t KvLayoutType = 0, bool useDn = false>
 class QuantFlashAttnBlockCubeGqaFp8 {
 public:
     /* ============确定L0A的类型============= */
@@ -94,14 +93,12 @@ public:
     static constexpr ActualSeqLensMode Q_PARSER_MODE = GetQActSeqMode<LAYOUT>();
     static constexpr ActualSeqLensMode KV_PARSER_MODE = GetKvActSeqMode<LAYOUT, PAGE_ATTENTION>();
 
-    using QSeqParserType =
-        typename std::conditional<IS_TND_LAYOUT, ActualSeqLensParser<Q_PARSER_MODE, int32_t, true>,
-                                  ActualSeqLensParser<Q_PARSER_MODE, int32_t>>::type;
+    using QSeqParserType = typename std::conditional<IS_TND_LAYOUT, ActualSeqLensParser<Q_PARSER_MODE, int32_t, true>,
+                                                     ActualSeqLensParser<Q_PARSER_MODE, int32_t>>::type;
 
-    using KvSeqParserType =
-        typename std::conditional<(!PAGE_ATTENTION && IS_TND_LAYOUT),
-                                  ActualSeqLensParser<KV_PARSER_MODE, int32_t, true>,
-                                  ActualSeqLensParser<KV_PARSER_MODE, int32_t>>::type;
+    using KvSeqParserType = typename std::conditional<(!PAGE_ATTENTION && IS_TND_LAYOUT),
+                                                      ActualSeqLensParser<KV_PARSER_MODE, int32_t, true>,
+                                                      ActualSeqLensParser<KV_PARSER_MODE, int32_t>>::type;
 
     using FaGmTensorQ = FaGmTensor<Q_T, Q_FORMAT, int32_t, Q_NEEDS_WZH>;
     using FaGmTensorKV = FaGmTensor<KV_T, KV_FORMAT, int32_t, KV_NEEDS_WZH>;
@@ -434,8 +431,7 @@ template <typename INPUT_T, typename T, LayOutTypeEnum layout = LayOutTypeEnum::
           S1TemplateType s1TemplateType = S1TemplateType::Aligned128,
           S2TemplateType s2TemplateType = S2TemplateType::Aligned128,
           DTemplateType dTemplateType = DTemplateType::Aligned128,
-          DTemplateType dVTemplateType = DTemplateType::Aligned128, uint8_t KvLayoutType = 0,
-          bool useDn = false>
+          DTemplateType dVTemplateType = DTemplateType::Aligned128, uint8_t KvLayoutType = 0, bool useDn = false>
 class QuantFlashAttnBlockCubeGqaFp8Dummy {
 public:
     static constexpr uint32_t mBaseSize = (uint32_t)s1TemplateType;

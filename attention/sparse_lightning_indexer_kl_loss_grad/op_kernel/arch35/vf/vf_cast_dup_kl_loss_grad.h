@@ -64,6 +64,6 @@ __aicore__ inline void CastDupVf(const LocalTensor<OUT_T> &dstTensor, const Loca
 
     CastDupBasicVF<T, OUT_T>(dstUb, srcUb, m, maskScaler);
 }
-} // namespace
+} // namespace AscendC
 
 #endif // VF_CAST_DUP_KL_LOSS_GRAD_H

@@ -38,10 +38,10 @@ __aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx)
 #endif
 
 namespace detail {
-    struct SlikgMetadata {
-        uint32_t gradMetadata[GRAD_METADATA_SIZE];
-    };
+struct SlikgMetadata {
+    uint32_t gradMetadata[GRAD_METADATA_SIZE];
 };
+}; // namespace detail
 
 static_assert(SLIKG_METADATA_SIZE * sizeof(SLIKG_METADATA_T) >= sizeof(detail::SlikgMetadata));
 

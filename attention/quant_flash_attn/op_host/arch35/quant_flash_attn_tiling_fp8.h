@@ -28,9 +28,9 @@ namespace quant_flash_attn {
 
 class QuantFlashAttnTilingFp8Impl : public FiaTilingBase {
 public:
-    explicit QuantFlashAttnTilingFp8Impl(gert::TilingContext *context) : FiaTilingBase(context)
-    {
-    }
+    explicit QuantFlashAttnTilingFp8Impl(gert::TilingContext *context)
+        : FiaTilingBase(context)
+    {}
     ~QuantFlashAttnTilingFp8Impl() override = default;
 
     void InitTilingInfo(TilingInfo *tilingInfo) override;

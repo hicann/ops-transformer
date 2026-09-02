@@ -44,16 +44,16 @@ __aicore__ inline void CopyInSoftmaxGrad(FagConstInfo &constInfo, FagRunInfo &ru
     uint32_t dstBlockStride = (HEAD_DIM_ALIGN - constInfo.dAlignToBlock) * sizeof(T1) / 32;
     uint32_t dstBlockStrideForOut = (HEAD_DIM_ALIGN - constInfo.dAlignToBlockForFp8) * sizeof(OUTDTYPE) / 32;
 
-    DataCopyPad(dxTensor, dxGm[srcGmOffset],
-                {static_cast<uint16_t>(curLoopSize),
-                 static_cast<uint32_t>(constInfo.commonConstInfo.dSizeV * sizeof(T1)),
-                 static_cast<uint32_t>(transpose_stride), dstBlockStride, 0},
-                {true, 0, static_cast<uint8_t>((constInfo.dAlignToBlock - constInfo.commonConstInfo.dSizeV)), 0});
-    DataCopyPad(yTensor, yGm[srcGmOffset],
-                {static_cast<uint16_t>(curLoopSize),
-                 static_cast<uint32_t>(constInfo.commonConstInfo.dSizeV * sizeof(OUTDTYPE)),
-                 static_cast<uint32_t>(transpose_stride_for_out), dstBlockStrideForOut, 0},
-                {true, 0, static_cast<uint8_t>((constInfo.dAlignToBlockForFp8 - constInfo.commonConstInfo.dSizeV)), 0});
+    DataCopyPad(
+        dxTensor, dxGm[srcGmOffset],
+        {static_cast<uint16_t>(curLoopSize), static_cast<uint32_t>(constInfo.commonConstInfo.dSizeV * sizeof(T1)),
+         static_cast<uint32_t>(transpose_stride), dstBlockStride, 0},
+        {true, 0, static_cast<uint8_t>((constInfo.dAlignToBlock - constInfo.commonConstInfo.dSizeV)), 0});
+    DataCopyPad(
+        yTensor, yGm[srcGmOffset],
+        {static_cast<uint16_t>(curLoopSize), static_cast<uint32_t>(constInfo.commonConstInfo.dSizeV * sizeof(OUTDTYPE)),
+         static_cast<uint32_t>(transpose_stride_for_out), dstBlockStrideForOut, 0},
+        {true, 0, static_cast<uint8_t>((constInfo.dAlignToBlockForFp8 - constInfo.commonConstInfo.dSizeV)), 0});
 
     yInQue.EnQue(yTensor);
     dxInQue.EnQue(dxTensor);

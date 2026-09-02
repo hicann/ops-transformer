@@ -46,7 +46,7 @@ struct ContextParamsForPFATiling {
     const gert::Tensor *valueAntiquantScale = nullptr;
     const gert::Tensor *KeyAntiquantOffset = nullptr;
     const gert::Tensor *valueAntiquantOffset = nullptr;
-    const gert::Tensor *dequantScaleQuery =nullptr;
+    const gert::Tensor *dequantScaleQuery = nullptr;
 
     const gert::Tensor *qStartIdx = nullptr;
     const gert::Tensor *kvStartIdx = nullptr;
@@ -90,7 +90,7 @@ struct ContextParamsForPFATiling {
     const gert::StorageShape *queryRope = nullptr;
     const gert::StorageShape *keyRope = nullptr;
     const gert::StorageShape *learnableSinkShape = nullptr;
-    ge::DataType dequantScaleQueryType = ge::DataType::DT_FLOAT16;   
+    ge::DataType dequantScaleQueryType = ge::DataType::DT_FLOAT16;
     ge::DataType KeyAntiquantScaleType = ge::DataType::DT_FLOAT16;
     ge::DataType valueAntiquantScaleType = ge::DataType::DT_FLOAT16;
     ge::DataType KeyAntiquantOffsetType = ge::DataType::DT_FLOAT16;
@@ -122,7 +122,8 @@ struct ContextParamsForPFATiling {
     uint32_t transposeLayout = 0;
     const bool *softmaxLseFlag = nullptr;
     bool isSoftMaxLseEnable = false;
-    uint32_t fromTilingSink = 0; // Flag indicating whether it is the step to enter the workspace calculation from tiling sinking
+    uint32_t fromTilingSink =
+        0; // Flag indicating whether it is the step to enter the workspace calculation from tiling sinking
     bool hasKeyAntiquantScale = 0;
     bool hasValueAntiquantScale = 0;
     uint32_t isMsd = 0;

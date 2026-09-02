@@ -23,9 +23,7 @@ namespace ScatterPaKvCache {
 template <typename T>
 class ScatterPaKvCacheCompressRope : public ScatterPaKvCacheCompressCommon {
 public:
-    __aicore__ inline ScatterPaKvCacheCompressRope()
-    {
-    }
+    __aicore__ inline ScatterPaKvCacheCompressRope() {}
 
     __aicore__ inline void ComputeAvg(AscendC::GlobalTensor<T> &src, AscendC::GlobalTensor<T> &dst,
                                       uint32_t startTaskOffset)

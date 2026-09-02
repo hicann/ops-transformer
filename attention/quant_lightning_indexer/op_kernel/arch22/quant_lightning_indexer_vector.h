@@ -178,8 +178,8 @@ __aicore__ inline void ExtractIndex(const LocalTensor<uint32_t> &idxULocal, cons
     gatherMaskParams.src0BlockStride = 1;
     gatherMaskParams.src0RepeatStride = B32_VEC_REPEAT_STRIDE;
     gatherMaskParams.src1RepeatStride = 0;
-    uint64_t rsvdCnt = 0;     // 用于保存筛选后保留下来的元素个数
-    uint8_t src1Pattern = 2;  // 固定模式2,表示筛选出奇数索引的数
+    uint64_t rsvdCnt = 0;    // 用于保存筛选后保留下来的元素个数
+    uint8_t src1Pattern = 2; // 固定模式2,表示筛选出奇数索引的数
     AscendC::GatherMask(idxULocal, sortLocal, src1Pattern, false, static_cast<uint32_t>(0), gatherMaskParams, rsvdCnt);
     AscendC::PipeBarrier<PIPE_V>();
 }
@@ -192,5 +192,5 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
     AscendC::WaitFlag<event>(eventId);
 }
 
-}  // namespace QLIServiceVec
-#endif  // quant_lightning_indexer_VECTOR_H
+} // namespace QLIServiceVec
+#endif // quant_lightning_indexer_VECTOR_H

@@ -32,9 +32,9 @@ public:
     Buffer<BufferType::L1> sYQL1Buffer;
     LocalTensor<INPUT_T> sYQL1Tensor;
 
-    static constexpr uint32_t M_SPLIT_SIZE = 128;    // m方向切分
-    static constexpr uint32_t N_SPLIT_SIZE = 128;    // n方向切分
-    static constexpr uint32_t K_SPLIT_SIZE = 128;    // k方向切分
+    static constexpr uint32_t M_SPLIT_SIZE = 128;     // m方向切分
+    static constexpr uint32_t N_SPLIT_SIZE = 128;     // n方向切分
+    static constexpr uint32_t K_SPLIT_SIZE = 128;     // k方向切分
     static constexpr uint32_t QUERY_INDEX_SIZE = 128; // k方向切分
     static constexpr uint32_t DROPE_SIZE = 64;
 
@@ -70,32 +70,34 @@ public:
     __aicore__ inline void SetCubeBlockParams(TPipe *tPipe, BufferManager<BufferType::L1> *l1BuffMgr);
     __aicore__ inline void InitCubeBuffers();
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR dQuery, GlobalTensor<T> &bmm2Res,
-        GlobalTensor<INPUT_T> &gatherSYResGm, GlobalTensor<T> &bmm3Res);
+                                            GlobalTensor<INPUT_T> &gatherSYResGm, GlobalTensor<T> &bmm3Res);
     __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm2ResBuf,
-        BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf, SLIGradRunInfo &runInfo,
-        SLIGradConstInfo &constInfo, SLIGradKRunInfo &syRunInfo);
+                                       BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf,
+                                       SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo,
+                                       SLIGradKRunInfo &syRunInfo);
     __aicore__ inline void ComputeMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm3Buf,
-        Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf, SLIGradRunInfo &runInfo,
-        SLIGradConstInfo &constInfo, SLIGradKRunInfo &pRunInfo);
+                                      Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
+                                      SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo, SLIGradKRunInfo &pRunInfo);
     __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
-        SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo, SLIGradKRunInfo &pRunInfo, bool isFixOut);
+                                      SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo, SLIGradKRunInfo &pRunInfo,
+                                      bool isFixOut);
 
 private:
     __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
-        uint32_t srcD, uint32_t srcDstride);
+                                      uint32_t srcD, uint32_t srcDstride);
     __aicore__ inline void CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor, const SLIGradRunInfo &info,
-        SLIGradConstInfo &constInfo);
+                                          SLIGradConstInfo &constInfo);
     __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<INPUT_T> &l1Tensor, const SLIGradRunInfo &info,
-        SLIGradConstInfo &constInfo);
+                                              SLIGradConstInfo &constInfo);
     __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor, const SLIGradRunInfo &info,
-        SLIGradConstInfo &constInfo);
+                                          SLIGradConstInfo &constInfo);
     __aicore__ inline void CopyInMm4BToL1(LocalTensor<INPUT_T> &l1Tensor, uint64_t gatherOffset, uint32_t mSizeAct,
-        uint32_t realDSize, uint32_t headOffset);
+                                          uint32_t realDSize, uint32_t headOffset);
 };
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::SetCubeBlockParams(TPipe *tPipe,
-    BufferManager<BufferType::L1> *l1BuffMgr)
+                                                                        BufferManager<BufferType::L1> *l1BuffMgr)
 {
     this->pipe = tPipe;
     this->l1BufferManagerPtr = l1BuffMgr;
@@ -122,7 +124,9 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::InitCubeBuffers()
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR query, GM_ADDR dQuery,
-    GlobalTensor<T> &bmm2Res, GlobalTensor<INPUT_T> &gatherSYResGm, GlobalTensor<T> &bmm3Res)
+                                                                      GlobalTensor<T> &bmm2Res,
+                                                                      GlobalTensor<INPUT_T> &gatherSYResGm,
+                                                                      GlobalTensor<T> &bmm3Res)
 {
     queryIndexGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
     mm4ResGm.SetGlobalBuffer((__gm__ OUT_T *)dQuery);
@@ -133,7 +137,8 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR qu
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor,
-    GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
+                                                                GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
+                                                                uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -149,7 +154,8 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTensor<INPU
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor,
-    const SLIGradRunInfo &info, SLIGradConstInfo &constInfo)
+                                                                    const SLIGradRunInfo &info,
+                                                                    SLIGradConstInfo &constInfo)
 {
     auto srcGm = queryIndexGm[info.queryIndexTensorOffset];
     CopyGmToL1(l1Tensor, srcGm, constInfo.gSizeQueryIndex, constInfo.dSizeQueryIndex, constInfo.dSizeQueryIndex);
@@ -157,7 +163,8 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::CopyInMm2AToL1(LocalTensor<
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::CopyInMm4BToL1(LocalTensor<INPUT_T> &l1Tensor,
-    uint64_t gatherOffset, uint32_t mSizeAct, uint32_t realDSize, uint32_t headOffset)
+                                                                    uint64_t gatherOffset, uint32_t mSizeAct,
+                                                                    uint32_t realDSize, uint32_t headOffset)
 {
     auto srcGm = gatherSYResGm[gatherOffset];
     CopyGmToL1(l1Tensor, srcGm, mSizeAct, realDSize, headOffset);
@@ -174,8 +181,8 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::ComputeMmSy(
     uint32_t kLoopTimes = CeilDiv(kSize, VEC_SY_BASESIZE);               // 循环次数，循环累计kSize行搬出UB
     uint32_t tailLoopKSize = kSize - (kLoopTimes - 1) * VEC_SY_BASESIZE; // 尾块大小
     LocalTensor<T> outTensor = bmm2ResBuf.template GetTensor<T>();
-    MMParam mmParam = { constInfo.gSizeQueryIndex, VEC_SY_BASESIZE, constInfo.dSizeQueryIndex, false, true, true, true,
-        UNITFLAG_DISABLE };
+    MMParam mmParam = {constInfo.gSizeQueryIndex, VEC_SY_BASESIZE, constInfo.dSizeQueryIndex, false, true, true, true,
+                       UNITFLAG_DISABLE};
     if (syRunInfo.kTaskId == 0) { // 首次搬运query_index
         sYQL1Buffer = sYQueryL1Buf.Get();
         sYQL1Buffer.Wait<HardEvent::MTE1_MTE2>();
@@ -240,8 +247,8 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::ComputeMm3(
     uint32_t kLoopTimes = CeilDiv(kSize, VEC_P_BASESIZE);               // 循环次数，循环累计kSize行搬出UB
     uint32_t tailLoopKSize = kSize - (kLoopTimes - 1) * VEC_P_BASESIZE; // 尾块大小
     LocalTensor<INPUT_T> reluGradL1Tensor;
-    MMParam mmParam = { M_SPLIT_SIZE, constInfo.dSizeQueryIndex, constInfo.gSizeQueryIndex, true, false, true,
-        true,         UNITFLAG_DISABLE };
+    MMParam mmParam = {M_SPLIT_SIZE, constInfo.dSizeQueryIndex, constInfo.gSizeQueryIndex, true, false, true,
+                       true,         UNITFLAG_DISABLE};
     CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(SYNC_V6_TO_C3_FLAG);
     for (uint32_t kIdx = 0; kIdx < kLoopTimes; kIdx++) {
         if (kIdx == kLoopTimes - 1) {
@@ -278,8 +285,8 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::ComputeMm3(
             CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C3_TO_V7_FLAG[pRunInfo.kTaskIdMod2]);
         } else {
             int64_t gmOffset = (runInfo.taskIdMod2 * constInfo.kSize + pRunInfo.kTaskId * constInfo.pKBaseSize +
-                kIdx * VEC_P_BASESIZE) *
-                constInfo.dSizeQueryIndex;
+                                kIdx * VEC_P_BASESIZE) *
+                               constInfo.dSizeQueryIndex;
             FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipe2GmParams;
             fixpipe2GmParams.nSize = mmParam.singleN;
             fixpipe2GmParams.mSize = mmParam.singleM;
@@ -290,7 +297,7 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::ComputeMm3(
             fixpipe2GmParams.params.srcNdStride = 0;
             fixpipe2GmParams.params.dstNdStride = 0;
             Fixpipe<T, T, PFA_CFG_ROW_MAJOR_GM>(mm3DeterResGm[constInfo.bmm3BaseOffset + gmOffset],
-                mm3L0CBuffer.GetTensor<T>(), fixpipe2GmParams);
+                                                mm3L0CBuffer.GetTensor<T>(), fixpipe2GmParams);
             mm3L0CBuffer.Set<HardEvent::FIX_M>();
         }
     }
@@ -312,7 +319,7 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::ComputeMm4(
     LocalTensor<INPUT_T> reluGradL1Tensor;
     Buffer<BufferType::L1> sYGatherL1Buffer = sYGatherResBuf.Get();
     LocalTensor<INPUT_T> sYGatherResTensor = sYGatherL1Buffer.GetTensor<INPUT_T>();
-    MMParam mmParam = { constInfo.gSizeQueryIndex, dSize, K_SPLIT_SIZE, false, false, true, true, UNITFLAG_DISABLE };
+    MMParam mmParam = {constInfo.gSizeQueryIndex, dSize, K_SPLIT_SIZE, false, false, true, true, UNITFLAG_DISABLE};
     Buffer<BufferType::L0C> mm4L0CBuffer = mm4L0CSpecialBuf.Get();
     for (uint32_t kIdx = 0; kIdx < kLoopTimes; kIdx++) { // 2048 / 128
         if (kIdx == kLoopTimes - 1) {
@@ -360,7 +367,7 @@ __aicore__ inline void SligBlockCube<TEMPLATE_ARGS>::ComputeMm4(
             fixpipe2GmParams.quantPre = QuantMode_t::F322BF16;
         }
         Fixpipe<OUT_T, T, PFA_CFG_ROW_MAJOR_GM>(mm4ResGm[runInfo.queryIndexTensorOffset], mm4L0CBuffer.GetTensor<T>(),
-            fixpipe2GmParams);
+                                                fixpipe2GmParams);
         mm4L0CBuffer.Set<HardEvent::FIX_M>();
     }
 };
@@ -369,31 +376,35 @@ TEMPLATES_DEF
 class SligBlockCubeDummy {
 public:
     __aicore__ inline SligBlockCubeDummy(){};
-    __aicore__ inline void SetCubeBlockParams(TPipe *tPipe, BufferManager<BufferType::L1> *l1BuffMgr){};
-    __aicore__ inline void InitCubeBuffers(){};
+    __aicore__ inline void SetCubeBlockParams(TPipe *tPipe, BufferManager<BufferType::L1> *l1BuffMgr) {};
+    __aicore__ inline void InitCubeBuffers() {};
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR dQuery, GlobalTensor<T> &bmm2Res,
-        GlobalTensor<INPUT_T> &gatherSYResGm, GlobalTensor<T> &bmm3Res){};
+                                            GlobalTensor<INPUT_T> &gatherSYResGm, GlobalTensor<T> &bmm3Res) {};
     __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm2ResBuf,
-        BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf, SLIGradRunInfo &runInfo,
-        SLIGradConstInfo &constInfo, SLIGradKRunInfo &syRunInfo){};
+                                       BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf,
+                                       SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo,
+                                       SLIGradKRunInfo &syRunInfo) {};
     __aicore__ inline void ComputeMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm3Buf,
-        Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf, SLIGradRunInfo &runInfo,
-        SLIGradConstInfo &constInfo, SLIGradKRunInfo &pRunInfo){};
+                                      Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
+                                      SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo,
+                                      SLIGradKRunInfo &pRunInfo) {};
     __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
-        SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo, SLIGradKRunInfo &pRunInfo, bool isFixOut){};
+                                      SLIGradRunInfo &runInfo, SLIGradConstInfo &constInfo, SLIGradKRunInfo &pRunInfo,
+                                      bool isFixOut) {};
 };
 
-template <typename T> struct CubeBlockTraits; // 声明
+template <typename T>
+struct CubeBlockTraits; // 声明
 
 /* 生成CubeBlockTraits */
 #define GEN_TRAIT_TYPE(name, ...) using name##_TRAITS = name;
 #define GEN_TRAIT_CONST(name, type, ...) static constexpr type name##Traits = name;
 
-#define DEFINE_CUBE_BLOCK_TRAITS(CUBE_BLOCK_CLASS)            \
-    TEMPLATES_DEF_NO_DEFAULT                                  \
+#define DEFINE_CUBE_BLOCK_TRAITS(CUBE_BLOCK_CLASS) \
+    TEMPLATES_DEF_NO_DEFAULT \
     struct CubeBlockTraits<CUBE_BLOCK_CLASS<TEMPLATE_ARGS>> { \
-        CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TRAIT_TYPE)         \
-        CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TRAIT_CONST)       \
+        CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TRAIT_TYPE) \
+        CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TRAIT_CONST) \
     };
 
 DEFINE_CUBE_BLOCK_TRAITS(SligBlockCube);
@@ -402,8 +413,8 @@ DEFINE_CUBE_BLOCK_TRAITS(SligBlockCubeDummy);
 // /* 生成Arg Traits, kernel中只需要调用ARGS_TRAITS就可以获取所有CubeBlock中的模板参数 */
 #define GEN_ARGS_TYPE(name, ...) using name = typename CubeBlockTraits<CubeBlockType>::name##_TRAITS;
 #define GEN_ARGS_CONST(name, type, ...) static constexpr type name = CubeBlockTraits<CubeBlockType>::name##Traits;
-#define ARGS_TRAITS                              \
+#define ARGS_TRAITS \
     CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARGS_TYPE) \
     CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARGS_CONST)
-}
+} // namespace Slig
 #endif

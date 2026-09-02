@@ -22,7 +22,7 @@ using namespace MicroAPI;
 
 template <typename T, bool isAlign>
 __simd_vf__ inline void ProcessVec2BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ T *srcOtherUb,
-    const uint32_t alignCnt, uint32_t tailSize, float minValue)
+                                           const uint32_t alignCnt, uint32_t tailSize, float minValue)
 {
     RegTensor<float> vreg_input_other;
     RegTensor<float> vreg_input_other_new;
@@ -61,7 +61,7 @@ __simd_vf__ inline void ProcessVec2BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
     Reduce<MicroAPI::ReduceType::MAX, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_max, vreg_tmp,
-        preg_all_b32);
+                                                                                      preg_all_b32);
     Duplicate(vreg_max, vreg_input_max, preg_all_b32);
     for (uint16_t i = 0; i < alignCnt; ++i) {
         LoadAlign(vreg_input_x, srcUb + i * floatRepSize);
@@ -76,7 +76,7 @@ __simd_vf__ inline void ProcessVec2BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
         Add(vreg_tmp_sum, vreg_tmp, vreg_tmp_sum, preg_all_b32);
     }
     Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_sum, vreg_tmp_sum,
-        preg_all_b32);
+                                                                                      preg_all_b32);
     Duplicate(vreg_sum, vreg_input_sum, preg_all_b32);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     for (uint16_t i = 0; i < alignCnt; ++i) {
@@ -93,7 +93,7 @@ __simd_vf__ inline void ProcessVec2BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
 
 template <typename T, bool isAlign>
 __aicore__ inline void ProcessVec2Vf(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-    const LocalTensor<T> &srcOtherTensor, const uint32_t m)
+                                     const LocalTensor<T> &srcOtherTensor, const uint32_t m)
 {
     __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
     __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
@@ -105,6 +105,6 @@ __aicore__ inline void ProcessVec2Vf(const LocalTensor<T> &dstTensor, const Loca
 
     ProcessVec2BasicVF<T, isAlign>(dstUb, srcUb, srcOtherUb, alignCnt, tailSize, minValue);
 }
-} // namespace
+} // namespace AscendC
 
 #endif // VF_PROCESS_VEC2_KL_LOSS_GRAD_H

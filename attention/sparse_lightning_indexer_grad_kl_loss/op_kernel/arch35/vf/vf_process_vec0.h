@@ -23,8 +23,8 @@ using namespace MicroAPI;
 static constexpr uint32_t FLOAT_REP_SIZE_128 = 128;
 
 template <typename INPUT_T>
-__simd_vf__ inline void Ub2UbNd2Nz128(__ubuf__ INPUT_T *dstUb, __ubuf__ INPUT_T *srcUb,
-                                       uint32_t m, uint32_t n) {
+__simd_vf__ inline void Ub2UbNd2Nz128(__ubuf__ INPUT_T *dstUb, __ubuf__ INPUT_T *srcUb, uint32_t m, uint32_t n)
+{
     RegTensor<INPUT_T> vreg_input_x1;
     uint32_t blockStride = m;
     uint32_t repeatStride = 1;
@@ -33,13 +33,13 @@ __simd_vf__ inline void Ub2UbNd2Nz128(__ubuf__ INPUT_T *dstUb, __ubuf__ INPUT_T 
     for (uint16_t i = 0; i < m; ++i) {
         LoadAlign(vreg_input_x1, srcUb + i * n);
         StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ INPUT_T *&)dstUb), vreg_input_x1, blockStride, repeatStride, preg16);
+            ((__ubuf__ INPUT_T *&)dstUb), vreg_input_x1, blockStride, repeatStride, preg16);
     }
 }
 
 template <typename INPUT_T>
-__simd_vf__ inline void Ub2UbNd2Nz512(__ubuf__ INPUT_T *dstUb, __ubuf__ INPUT_T *srcUb,
-                                       uint32_t m, uint32_t n) {
+__simd_vf__ inline void Ub2UbNd2Nz512(__ubuf__ INPUT_T *dstUb, __ubuf__ INPUT_T *srcUb, uint32_t m, uint32_t n)
+{
     RegTensor<INPUT_T> vreg_input_x1;
     RegTensor<INPUT_T> vreg_input_x2;
     RegTensor<INPUT_T> vreg_input_x3;
@@ -57,23 +57,22 @@ __simd_vf__ inline void Ub2UbNd2Nz512(__ubuf__ INPUT_T *dstUb, __ubuf__ INPUT_T 
         LoadAlign(vreg_input_x3, srcUb + i * n + FLOAT_REP_SIZE_128 * 2);
         LoadAlign(vreg_input_x4, srcUb + i * n + FLOAT_REP_SIZE_128 * 3);
         StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ INPUT_T *&)dstUb), vreg_input_x1, blockStride, repeatStride, preg16);
+            ((__ubuf__ INPUT_T *&)dstUb), vreg_input_x1, blockStride, repeatStride, preg16);
         StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ INPUT_T *&)dstUb2), vreg_input_x2, blockStride, repeatStride, preg16);
+            ((__ubuf__ INPUT_T *&)dstUb2), vreg_input_x2, blockStride, repeatStride, preg16);
         StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ INPUT_T *&)dstUb3), vreg_input_x3, blockStride, repeatStride, preg16);
+            ((__ubuf__ INPUT_T *&)dstUb3), vreg_input_x3, blockStride, repeatStride, preg16);
         StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ INPUT_T *&)dstUb4), vreg_input_x4, blockStride, repeatStride, preg16);
+            ((__ubuf__ INPUT_T *&)dstUb4), vreg_input_x4, blockStride, repeatStride, preg16);
     }
 }
 
-
 template <typename INPUT_T>
-__aicore__ inline void Ub2UbNd2Nz(const LocalTensor<INPUT_T>& dstTensor, const LocalTensor<INPUT_T>& srcTensor,
+__aicore__ inline void Ub2UbNd2Nz(const LocalTensor<INPUT_T> &dstTensor, const LocalTensor<INPUT_T> &srcTensor,
                                   uint32_t m, uint32_t n)
 {
-    __ubuf__ INPUT_T *dstUb = (__ubuf__ INPUT_T*) dstTensor.GetPhyAddr();
-    __ubuf__ INPUT_T *srcUb = (__ubuf__ INPUT_T*) srcTensor.GetPhyAddr();
+    __ubuf__ INPUT_T *dstUb = (__ubuf__ INPUT_T *)dstTensor.GetPhyAddr();
+    __ubuf__ INPUT_T *srcUb = (__ubuf__ INPUT_T *)srcTensor.GetPhyAddr();
     if (n == 512) {
         Ub2UbNd2Nz512<INPUT_T>(dstUb, srcUb, m, n);
     }
@@ -82,6 +81,6 @@ __aicore__ inline void Ub2UbNd2Nz(const LocalTensor<INPUT_T>& dstTensor, const L
     }
 }
 
-} // namespace
+} // namespace AscendC
 
 #endif // VF_PROCESS_VEC0_H

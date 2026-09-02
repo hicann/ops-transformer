@@ -10,7 +10,7 @@
 /*!
  * \file scatter_pa_kv_cache_omni_fully_load.h
  * \brief
-*/
+ */
 
 #ifndef SCATTER_PA_KV_CACHE_OMNI_FULLY_LOAD_H_
 #define SCATTER_PA_KV_CACHE_OMNI_FULLY_LOAD_H_
@@ -25,7 +25,8 @@ template <typename T, typename IndexDtype, int64_t InOutMode>
 class ScatterPaKvCacheOmniFullyLoad {
 public:
     __aicore__ inline ScatterPaKvCacheOmniFullyLoad(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
                                 GM_ADDR value_cache_in, GM_ADDR compress_lens, GM_ADDR compress_seq_offset,
                                 GM_ADDR seq_lens, GM_ADDR key_cache_out, GM_ADDR value_cache_out);
@@ -105,9 +106,8 @@ __aicore__ inline int64_t ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CalcStartIdx(LocalTensor<IndexDtype> slotMappingLocal,
-                                                                      int64_t curBlockFactor)
+__aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CalcStartIdx(
+    LocalTensor<IndexDtype> slotMappingLocal, int64_t curBlockFactor)
 {
     DataCopyExtParams slotMappingParams = {
         static_cast<uint16_t>(1), static_cast<uint32_t>(curBlockFactor * sizeof(IndexDtype)), static_cast<uint32_t>(0),
@@ -129,14 +129,15 @@ __aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyInKey(int64_t iter, int64_t offsetIndex, int64_t startIdx,
-                                                                   int64_t curBlockFactor)
+__aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyInKey(int64_t iter,
+                                                                                          int64_t offsetIndex,
+                                                                                          int64_t startIdx,
+                                                                                          int64_t curBlockFactor)
 {
     LocalTensor<T> inputKeyLocal = inputKeyQueue_.AllocTensor<T>();
-    DataCopyExtParams inKeyParams = {
-        static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->kHeadSize * sizeof(T)), static_cast<uint32_t>(0),
-        static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+    DataCopyExtParams inKeyParams = {static_cast<uint16_t>(1),
+                                     static_cast<uint32_t>(tilingData_->kHeadSize * sizeof(T)),
+                                     static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
     DataCopyPadExtParams<T> padParams;
     padParams.isPad = 0;
     padParams.leftPadding = 0;
@@ -150,21 +151,22 @@ ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyInKey(int64_t iter,
             break;
         }
         DataCopyPad(inputKeyLocal[(k - startIdx) * RoundUp(tilingData_->kHeadSize)],
-                 inputKeyGm_[offset + k * tilingData_->keyStride1], inKeyParams, padParams);
+                    inputKeyGm_[offset + k * tilingData_->keyStride1], inKeyParams, padParams);
     }
     inputKeyQueue_.EnQue(inputKeyLocal);
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyInValue(int64_t iter, int64_t offsetIndex,
-                                                                     int64_t startIdx, int64_t curBlockFactor)
+__aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyInValue(int64_t iter,
+                                                                                            int64_t offsetIndex,
+                                                                                            int64_t startIdx,
+                                                                                            int64_t curBlockFactor)
 {
     LocalTensor<T> inputValueLocal = inputValueQueue_.AllocTensor<T>();
 
-    DataCopyExtParams inValueParams = {
-        static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->vHeadSize * sizeof(T)), static_cast<uint32_t>(0),
-        static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+    DataCopyExtParams inValueParams = {static_cast<uint16_t>(1),
+                                       static_cast<uint32_t>(tilingData_->vHeadSize * sizeof(T)),
+                                       static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
     DataCopyPadExtParams<T> padParams;
     padParams.isPad = 0;
     padParams.leftPadding = 0;
@@ -177,15 +179,16 @@ ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyInValue(int64_t ite
             break;
         }
         DataCopyPad(inputValueLocal[(k - startIdx) * RoundUp(tilingData_->vHeadSize)],
-                 inputValueGm_[offset + k * tilingData_->valueStride1], inValueParams, padParams);
+                    inputValueGm_[offset + k * tilingData_->valueStride1], inValueParams, padParams);
     }
     inputValueQueue_.EnQue(inputValueLocal);
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyOutKey(int64_t iter, int64_t offsetIndex,
-                                                                    int64_t startOffset, int64_t curBlockFactor)
+__aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyOutKey(int64_t iter,
+                                                                                           int64_t offsetIndex,
+                                                                                           int64_t startOffset,
+                                                                                           int64_t curBlockFactor)
 {
     LocalTensor<T> inputKeyLocal = inputKeyQueue_.DeQue<T>();
     LocalTensor<IndexDtype> slotMappingLocal = slotMappingBuf_.Get<IndexDtype>();
@@ -209,9 +212,10 @@ ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyOutKey(int64_t iter
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyOutValue(int64_t iter, int64_t offsetIndex,
-                                                                      int64_t startOffset, int64_t curBlockFactor)
+__aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::CopyOutValue(int64_t iter,
+                                                                                             int64_t offsetIndex,
+                                                                                             int64_t startOffset,
+                                                                                             int64_t curBlockFactor)
 {
     LocalTensor<T> inputValueLocal = inputValueQueue_.DeQue<T>();
     LocalTensor<IndexDtype> slotMappingLocal = slotMappingBuf_.Get<IndexDtype>();

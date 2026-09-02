@@ -19,7 +19,9 @@ namespace ScatterPaKvCacheWithKScaleUT {
 struct ScatterPaKvCacheWithKScaleHostUtParamBase : public HostUtParamBase {
     std::string cache_layout;
 
-    ScatterPaKvCacheWithKScaleHostUtParamBase(const csv_map &csvMap) : HostUtParamBase(csvMap) {
+    ScatterPaKvCacheWithKScaleHostUtParamBase(const csv_map &csvMap)
+        : HostUtParamBase(csvMap)
+    {
         this->cache_layout = ReadMap(csvMap, "cache_layout", "BNBD");
     }
 };
@@ -40,18 +42,29 @@ struct ScatterPaKvCacheWithKScaleTilingUtParam : public ScatterPaKvCacheWithKSca
     uint64_t expectTilingKey;
     std::string expectTilingDataHash;
 
-    ScatterPaKvCacheWithKScaleTilingUtParam(const csv_map &csvMap) : ScatterPaKvCacheWithKScaleHostUtParamBase(csvMap) {
+    ScatterPaKvCacheWithKScaleTilingUtParam(const csv_map &csvMap)
+        : ScatterPaKvCacheWithKScaleHostUtParamBase(csvMap)
+    {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_shape", "key_dtype", "key_format", this->key));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "value_shape", "value_dtype", "value_format", this->value));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_cache_shape", "key_cache_dtype", "key_cache_format", this->key_cache));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "value_cache_shape", "value_cache_dtype", "value_cache_format", this->value_cache));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "slot_mapping_shape", "slot_mapping_dtype", "slot_mapping_format", this->slot_mapping));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_shape", "key_scale_dtype", "key_scale_format", this->key_scale));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_shape", "key_scale_cache_dtype", "key_scale_cache_format", this->key_scale_cache));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "value_shape", "value_dtype", "value_format", this->value));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "key_cache_shape", "key_cache_dtype", "key_cache_format", this->key_cache));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "value_cache_shape", "value_cache_dtype", "value_cache_format", this->value_cache));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "slot_mapping_shape", "slot_mapping_dtype", "slot_mapping_format", this->slot_mapping));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "key_scale_shape", "key_scale_dtype", "key_scale_format", this->key_scale));
+        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_shape", "key_scale_cache_dtype",
+                                                     "key_scale_cache_format", this->key_scale_cache));
 
-        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_cache_out_shape", "key_cache_out_dtype", "key_cache_out_format", this->key_cache_out));
-        this->outputInstance.emplace_back(GetTensorGE(csvMap, "value_cache_out_shape", "value_cache_out_dtype", "value_cache_out_format", this->value_cache_out));
-        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_out_shape", "key_scale_cache_out_dtype", "key_scale_cache_out_format", this->key_scale_cache_out));
+        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_cache_out_shape", "key_cache_out_dtype",
+                                                      "key_cache_out_format", this->key_cache_out));
+        this->outputInstance.emplace_back(GetTensorGE(csvMap, "value_cache_out_shape", "value_cache_out_dtype",
+                                                      "value_cache_out_format", this->value_cache_out));
+        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_out_shape", "key_scale_cache_out_dtype",
+                                                      "key_scale_cache_out_format", this->key_scale_cache_out));
 
         if (this->expectResult == ge::GRAPH_SUCCESS) {
             this->expectTilingKey = std::stoull(ReadMap(csvMap, "expectTilingKey"));
@@ -75,25 +88,34 @@ struct ScatterPaKvCacheWithKScaleInferShapeUtParam : public ScatterPaKvCacheWith
 
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    ScatterPaKvCacheWithKScaleInferShapeUtParam(const csv_map &csvMap) : ScatterPaKvCacheWithKScaleHostUtParamBase(csvMap) {
+    ScatterPaKvCacheWithKScaleInferShapeUtParam(const csv_map &csvMap)
+        : ScatterPaKvCacheWithKScaleHostUtParamBase(csvMap)
+    {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_shape", "key_dtype", "key_format", this->key));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "value_shape", "value_dtype", "value_format", this->value));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_cache_shape", "key_cache_dtype", "key_cache_format", this->key_cache));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "value_cache_shape", "value_cache_dtype", "value_cache_format", this->value_cache));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "slot_mapping_shape", "slot_mapping_dtype", "slot_mapping_format", this->slot_mapping));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_shape", "key_scale_dtype", "key_scale_format", this->key_scale));
-        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_shape", "key_scale_cache_dtype", "key_scale_cache_format", this->key_scale_cache));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "value_shape", "value_dtype", "value_format", this->value));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "key_cache_shape", "key_cache_dtype", "key_cache_format", this->key_cache));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "value_cache_shape", "value_cache_dtype", "value_cache_format", this->value_cache));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "slot_mapping_shape", "slot_mapping_dtype", "slot_mapping_format", this->slot_mapping));
+        this->inputInstance.emplace_back(
+            GetTensorGE(csvMap, "key_scale_shape", "key_scale_dtype", "key_scale_format", this->key_scale));
+        this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_shape", "key_scale_cache_dtype",
+                                                     "key_scale_cache_format", this->key_scale_cache));
 
-        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_cache_out_shape", "key_cache_out_dtype", "key_cache_out_format", this->key_cache_out));
-        this->outputInstance.emplace_back(GetTensorGE(csvMap, "value_cache_out_shape", "value_cache_out_dtype", "value_cache_out_format", this->value_cache_out));
-        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_out_shape", "key_scale_cache_out_dtype", "key_scale_cache_out_format", this->key_scale_cache_out));
+        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_cache_out_shape", "key_cache_out_dtype",
+                                                      "key_cache_out_format", this->key_cache_out));
+        this->outputInstance.emplace_back(GetTensorGE(csvMap, "value_cache_out_shape", "value_cache_out_dtype",
+                                                      "value_cache_out_format", this->value_cache_out));
+        this->outputInstance.emplace_back(GetTensorGE(csvMap, "key_scale_cache_out_shape", "key_scale_cache_out_dtype",
+                                                      "key_scale_cache_out_format", this->key_scale_cache_out));
 
         if (this->expectResult == ge::GRAPH_SUCCESS) {
-            this->expectOutputShape = {
-                GetShapeArr(ReadMap(csvMap, "key_cache_out_shape")),
-                GetShapeArr(ReadMap(csvMap, "value_cache_out_shape")),
-                GetShapeArr(ReadMap(csvMap, "key_scale_cache_out_shape"))
-            };
+            this->expectOutputShape = {GetShapeArr(ReadMap(csvMap, "key_cache_out_shape")),
+                                       GetShapeArr(ReadMap(csvMap, "value_cache_out_shape")),
+                                       GetShapeArr(ReadMap(csvMap, "key_scale_cache_out_shape"))};
         }
     }
 };

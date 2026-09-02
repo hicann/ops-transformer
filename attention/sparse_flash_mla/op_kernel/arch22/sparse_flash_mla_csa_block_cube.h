@@ -62,7 +62,7 @@ private:
     static constexpr uint32_t K_L0_SPLIT_SIZE = 128;  // k方向L0切分
     static constexpr uint32_t K_L1_SPLIT_SIZE = 256;  // k方向L1切分
     static constexpr uint32_t N_WORKSPACE_SIZE = 512; // n方向切分
-    static constexpr uint32_t D_SPLIT_SIZE = 256; // d轴切分
+    static constexpr uint32_t D_SPLIT_SIZE = 256;     // d轴切分
 
     static constexpr uint32_t L1_BLOCK_SIZE = (64 * 512 * sizeof(Q_T));
     static constexpr uint32_t L1_BLOCK_OFFSET = 64 * 512;
@@ -160,8 +160,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::InitParams(const ConstInfo &constIn
 
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::InitMm1GlobalTensor(GlobalTensor<Q_T> queryGm, GlobalTensor<KV_T> oriKvGm,
-                                                               GlobalTensor<KV_T> cmpKvGm,
-                                                               GlobalTensor<MM_OUT_T> mm1ResGm)
+                                                                 GlobalTensor<KV_T> cmpKvGm,
+                                                                 GlobalTensor<MM_OUT_T> mm1ResGm)
 {
     // mm1
     this->queryGm = queryGm;
@@ -172,8 +172,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::InitMm1GlobalTensor(GlobalTensor<Q_
 
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm,
-                                                               GlobalTensor<MM_OUT_T> mm2ResGm,
-                                                               GlobalTensor<OUT_T> attentionOutGm)
+                                                                 GlobalTensor<MM_OUT_T> mm2ResGm,
+                                                                 GlobalTensor<OUT_T> attentionOutGm)
 {
     // mm2
     this->vec1ResGm = vec1ResGm;
@@ -182,9 +182,10 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::InitMm2GlobalTensor(GlobalTensor<KV
 }
 
 template <typename SMLAT>
-__aicore__ inline void
-SMLACubeBlock<SMLAT>::InitPageAttentionInfo(GlobalTensor<KV_T> oriKvGm, const GlobalTensor<KV_T> &kvMergeGm,
-                                          GlobalTensor<int32_t> oriBlockTableGm, GlobalTensor<int32_t> cmpBlockTableGm)
+__aicore__ inline void SMLACubeBlock<SMLAT>::InitPageAttentionInfo(GlobalTensor<KV_T> oriKvGm,
+                                                                   const GlobalTensor<KV_T> &kvMergeGm,
+                                                                   GlobalTensor<int32_t> oriBlockTableGm,
+                                                                   GlobalTensor<int32_t> cmpBlockTableGm)
 {
     this->oriKvGm = oriKvGm;
     this->kvMergeGm_ = kvMergeGm;
@@ -241,7 +242,7 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::FreeEventID()
 
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor,
-                                                      uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
+                                                        uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -257,8 +258,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::CopyGmToL1(LocalTensor<KV_T> &l1Ten
 
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor, const RunInfo &info,
-                                                          uint32_t mSeqIdx, uint32_t mSizeAct, uint32_t headSize,
-                                                          uint32_t headOffset)
+                                                            uint32_t mSeqIdx, uint32_t mSizeAct, uint32_t headSize,
+                                                            uint32_t headOffset)
 {
     auto srcGm = queryGm[info.tensorAOffset + mSeqIdx * constInfo.headDim + headOffset];
     CopyGmToL1(l1Tensor, srcGm, mSizeAct, headSize, constInfo.headDim);
@@ -266,8 +267,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l
 
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor,
-                                                        uint32_t idx, uint32_t kSplitSize, uint32_t mSize,
-                                                        uint32_t kSize)
+                                                          uint32_t idx, uint32_t kSplitSize, uint32_t mSize,
+                                                          uint32_t kSize)
 {
     LocalTensor<KV_T> srcTensor = aL1Tensor[mSize * kSplitSize * idx];
     LoadData3DParamsV2<KV_T> loadData3DParams;
@@ -300,8 +301,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::LoadDataMm1A(LocalTensor<KV_T> &aL0
 
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::LoadDataMm1B(LocalTensor<KV_T> &l0Tensor, LocalTensor<KV_T> &l1Tensor,
-                                                        uint32_t idx, uint32_t kSplitSize, uint32_t kSize,
-                                                        uint32_t nSize)
+                                                          uint32_t idx, uint32_t kSplitSize, uint32_t kSize,
+                                                          uint32_t nSize)
 {
     // N 方向全载
     LocalTensor<KV_T> srcTensor = l1Tensor[nSize * kSplitSize * idx];
@@ -317,8 +318,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::LoadDataMm1B(LocalTensor<KV_T> &l0T
 
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &info,
-                                                          uint32_t mSeqIdx, uint32_t subMSizeAct, uint32_t nSize,
-                                                          uint32_t nOffset)
+                                                            uint32_t mSeqIdx, uint32_t subMSizeAct, uint32_t nSize,
+                                                            uint32_t nOffset)
 {
     auto srcGm = vec1ResGm[(info.loop % constInfo.preLoadNum) * constInfo.mmResUbSize +
                            mSeqIdx * info.actualSingleProcessSInnerSizeAlign + nOffset];
@@ -390,7 +391,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, con
                         startPos.bIdx = info.bIdx;
                         startPos.n2Idx = info.n2Idx;
                         startPos.s2Idx = curS2Offset;
-                        startPos.dIdx = kL1 * D_SPLIT_SIZE;  // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
+                        startPos.dIdx =
+                            kL1 * D_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
                         DataCopyPA<KV_T>(kTensor, oriKvGm, oriBlockTableGm, shape, startPos);
 
                         // 更新循环变量
@@ -408,14 +410,15 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, con
                     nd2nzPara.srcNdMatrixStride = 0;
                     nd2nzPara.dstNzMatrixStride = 0;
 
-                    uint32_t headStride  = constInfo.headDim;
-                    uint32_t seqStride   = constInfo.kvHeadNum * constInfo.headDim;
+                    uint32_t headStride = constInfo.headDim;
+                    uint32_t seqStride = constInfo.kvHeadNum * constInfo.headDim;
                     uint64_t batchStride = (constInfo.oriKvStride0 == 0) ?
-                        static_cast<uint64_t>(constInfo.kvSeqSize) * seqStride : constInfo.oriKvStride0;
+                                               static_cast<uint64_t>(constInfo.kvSeqSize) * seqStride :
+                                               constInfo.oriKvStride0;
 
                     uint32_t curS2 = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint;
                     uint64_t offset = (uint64_t)info.bIdx * batchStride + (uint64_t)curS2 * seqStride +
-                        (uint64_t)info.n2Idx * headStride + kL1 * D_SPLIT_SIZE;
+                                      (uint64_t)info.n2Idx * headStride + kL1 * D_SPLIT_SIZE;
                     DataCopy(bL1Tensor, oriKvGm[offset], nd2nzPara);
                 } else if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::TND) {
                     uint32_t curS2Offset = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint;
@@ -429,8 +432,10 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, con
                         nd2nzPara.dstNzNStride = 1;
                         nd2nzPara.srcNdMatrixStride = 0;
                         nd2nzPara.dstNzMatrixStride = 0;
-                        DataCopy(bL1Tensor, oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
-                                nL1 * N_SPLIT_SIZE * constInfo.headDim], nd2nzPara);
+                        DataCopy(bL1Tensor,
+                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
+                                         nL1 * N_SPLIT_SIZE * constInfo.headDim],
+                                 nd2nzPara);
                     } else {
                         Nd2NzParams nd2nzPara;
                         nd2nzPara.ndNum = 1;
@@ -442,9 +447,9 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, con
                         nd2nzPara.srcNdMatrixStride = 0;
                         nd2nzPara.dstNzMatrixStride = 0;
                         DataCopy(bL1Tensor,
-                                    oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
-                                        (constInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE *
-                                        constInfo.headDim], nd2nzPara);
+                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
+                                         (constInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE * constInfo.headDim],
+                                 nd2nzPara);
                     }
                 }
             } else {
@@ -567,7 +572,6 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, con
     qpL1BufIter += mL1Loops;
 }
 
-
 template <typename SMLAT>
 __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, const MSplitInfo mSplitInfo)
 {
@@ -642,7 +646,8 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, con
                             startPos.bIdx = info.bIdx;
                             startPos.n2Idx = info.n2Idx;
                             startPos.s2Idx = curS2Offset;
-                            startPos.dIdx = nL1 * N_SPLIT_SIZE;  // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
+                            startPos.dIdx =
+                                nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
                             PAShape shape;
                             shape.blockSize = constInfo.paOriBlockSize;
                             shape.headNum = constInfo.kvHeadNum;
@@ -671,15 +676,15 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, con
                         nd2nzPara.srcNdMatrixStride = 0;
                         nd2nzPara.dstNzMatrixStride = 0;
 
-                        uint32_t headStride  = constInfo.headDim;
-                        uint32_t seqStride   = constInfo.kvHeadNum * constInfo.headDim;
+                        uint32_t headStride = constInfo.headDim;
+                        uint32_t seqStride = constInfo.kvHeadNum * constInfo.headDim;
                         uint64_t batchStride = (constInfo.oriKvStride0 == 0) ?
-                            static_cast<uint64_t>(constInfo.kvSeqSize) * seqStride : constInfo.oriKvStride0;
+                                                   static_cast<uint64_t>(constInfo.kvSeqSize) * seqStride :
+                                                   constInfo.oriKvStride0;
 
                         uint32_t curS2 = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint;
-                        uint64_t offset = (uint64_t)info.bIdx * batchStride +
-                            (uint64_t)curS2 * seqStride +
-                            (uint64_t)info.n2Idx * headStride + nL1 * N_SPLIT_SIZE;
+                        uint64_t offset = (uint64_t)info.bIdx * batchStride + (uint64_t)curS2 * seqStride +
+                                          (uint64_t)info.n2Idx * headStride + nL1 * N_SPLIT_SIZE;
                         subvTensor = bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE];
                         DataCopy(subvTensor, oriKvGm[offset], nd2nzPara);
                     } else if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::TND) {
@@ -694,9 +699,9 @@ __aicore__ inline void SMLACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, con
                         nd2nzPara.srcNdMatrixStride = 0;
                         nd2nzPara.dstNzMatrixStride = 0;
                         DataCopy(bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE],
-                                oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
-                                kL1 * 128 * constInfo.headDim +
-                                nL1 * N_SPLIT_SIZE], nd2nzPara);
+                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
+                                         kL1 * 128 * constInfo.headDim + nL1 * N_SPLIT_SIZE],
+                                 nd2nzPara);
                     }
                 } else {
                     Nd2NzParams nd2nzPara;

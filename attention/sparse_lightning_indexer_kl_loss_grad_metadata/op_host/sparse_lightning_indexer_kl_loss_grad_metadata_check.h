@@ -59,7 +59,10 @@ aclDataType GetDataTypeSli(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceSli(const std::string &source) { return source != "batch_size"; }
+inline bool IsTensorSourceSli(const std::string &source)
+{
+    return source != "batch_size";
+}
 
 inline int64_t GetRawShapeSizeSli(const std::string &source, int64_t batchValue)
 {
@@ -376,13 +379,13 @@ aclnnStatus CheckConsistencySli(int64_t batchSize, const aclTensor *cuSeqlensQOp
                     std::to_string(GetRawShapeSizeSli(keySource, keyBatchSize)),
                 GetSourceDescSli(querySource) + " must be equal to " + GetSourceDescSli(keySource));
         } else if (IsTensorSourceSli(querySource)) {
-            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                SLI_ACLNN_OP_NAME, querySource, std::to_string(GetRawShapeSizeSli(querySource, queryBatchSize)),
-                GetSourceDescSli(querySource) + " must be equal to batch_size");
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(SLI_ACLNN_OP_NAME, querySource,
+                                                      std::to_string(GetRawShapeSizeSli(querySource, queryBatchSize)),
+                                                      GetSourceDescSli(querySource) + " must be equal to batch_size");
         } else {
-            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                SLI_ACLNN_OP_NAME, keySource, std::to_string(GetRawShapeSizeSli(keySource, keyBatchSize)),
-                GetSourceDescSli(keySource) + " must be equal to batch_size");
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(SLI_ACLNN_OP_NAME, keySource,
+                                                      std::to_string(GetRawShapeSizeSli(keySource, keyBatchSize)),
+                                                      GetSourceDescSli(keySource) + " must be equal to batch_size");
         }
         return ACLNN_ERR_PARAM_INVALID;
     }

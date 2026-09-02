@@ -56,8 +56,8 @@ public:
 
     // L1无法容纳整个A矩阵，需要分多次alloc、free
     __aicore__ inline LocalTensor<TransT> LoadPartDataA(int32_t curRow, int32_t curCol, int32_t tileHeight,
-        int32_t tileWidth, uint8_t l1Index, int32_t posL1,
-        int32_t baseBlockSize)
+                                                        int32_t tileWidth, uint8_t l1Index, int32_t posL1,
+                                                        int32_t baseBlockSize)
     {
         MATMUL_MODULE(Context)->l1IndexA = l1Index;
         int32_t baseBlockNum = l1Global[l1Index].bufferSize / baseBlockSize;
@@ -89,8 +89,8 @@ public:
             MATMUL_MODULE(Context)->CurrentTensorA = aL1Tensor[posL1 * baseBlockSize];
         }
 
-        MATMUL_MODULE(DataCopyUtils)->CopyTileToCube(MATMUL_MODULE(Context)->CurrentTensorA, curRow, curCol,
-            tileHeight, tileWidth);
+        MATMUL_MODULE(DataCopyUtils)
+            ->CopyTileToCube(MATMUL_MODULE(Context)->CurrentTensorA, curRow, curCol, tileHeight, tileWidth);
         if (posL1 == 0) {
             l1Global[l1Index].srcAddr = MATMUL_MODULE(Context)->CurrentTensorA.address_;
             l1Global[l1Index].bufferSize = MATMUL_MODULE(Context)->CurrentTensorA.GetSize();
@@ -103,14 +103,14 @@ public:
 
     // L1可以容纳整个B矩阵，全局alloc一次，free一次
     __aicore__ inline LocalTensor<TransT> LoadFullDataB(int32_t curRow, int32_t curCol, int32_t tileHeight,
-        int32_t tileWidth, uint8_t l1Index, int32_t posL1,
-        int32_t baseBlockSize)
+                                                        int32_t tileWidth, uint8_t l1Index, int32_t posL1,
+                                                        int32_t baseBlockSize)
     {
         MATMUL_MODULE(Context)->l1IndexB = l1Index;
-        MATMUL_MODULE(Context)->needAllocB = MATMUL_MODULE(Context)->isFirstBaseBlockA &&
-            MATMUL_MODULE(Context)->isFirstBaseBlockB;
-        MATMUL_MODULE(Context)->needFreeB = MATMUL_MODULE(Context)->isLastBaseBlockA &&
-            MATMUL_MODULE(Context)->isLastBaseBlockB;
+        MATMUL_MODULE(Context)->needAllocB =
+            MATMUL_MODULE(Context)->isFirstBaseBlockA && MATMUL_MODULE(Context)->isFirstBaseBlockB;
+        MATMUL_MODULE(Context)->needFreeB =
+            MATMUL_MODULE(Context)->isLastBaseBlockA && MATMUL_MODULE(Context)->isLastBaseBlockB;
 
         // single块内的base块复用，需要在搬运之前判断是否命中cache
         if (posL1 < l1Global[l1Index].cacheSize) {
@@ -125,8 +125,8 @@ public:
             bL1Tensor.SetAddr(l1Global[l1Index].srcAddr);
             MATMUL_MODULE(Context)->CurrentTensorB = bL1Tensor[posL1 * baseBlockSize];
         }
-        MATMUL_MODULE(DataCopyUtils)->CopyTileToCube(MATMUL_MODULE(Context)->CurrentTensorB, curRow, curCol,
-            tileHeight, tileWidth);
+        MATMUL_MODULE(DataCopyUtils)
+            ->CopyTileToCube(MATMUL_MODULE(Context)->CurrentTensorB, curRow, curCol, tileHeight, tileWidth);
         if (posL1 == 0) {
             l1Global[l1Index].srcAddr = MATMUL_MODULE(Context)->CurrentTensorB.address_;
             l1Global[l1Index].bufferSize = MATMUL_MODULE(Context)->CurrentTensorB.GetSize();
@@ -140,8 +140,8 @@ public:
         return MATMUL_MODULE(Context)->CurrentTensorB;
     }
 
-    __aicore__ inline LocalTensor<TransT> LoadData(int32_t curRow, int32_t curCol,
-        int32_t tileHeight, int32_t tileWidth)
+    __aicore__ inline LocalTensor<TransT> LoadData(int32_t curRow, int32_t curCol, int32_t tileHeight,
+                                                   int32_t tileWidth)
     {
         LocalTensor<TransT> CurrentTensor;
         uint8_t l1Index = -1;
@@ -149,7 +149,7 @@ public:
         int32_t baseBlockSize = MATMUL_MODULE(CopyCubeInParams)->GetBufferSize();
         bool isFirstBaseBlock = curRow == 0 && curCol == 0;
         bool isLastBaseBlock = (curRow == MATMUL_MODULE(CopyCubeInParams)->GetTotalRow() - 1) &&
-            (curCol == MATMUL_MODULE(CopyCubeInParams)->GetTotalCol() - 1);
+                               (curCol == MATMUL_MODULE(CopyCubeInParams)->GetTotalCol() - 1);
         MATMUL_MODULE(Context)->mmIdx = static_cast<int32_t>(MATMUL_MODULE(MatmulUserDefineInfo)->GetSelfDefineData());
         singleHeight_ = MATMUL_MODULE(CopyCubeInParams)->GetSingleHeight();
         singleWidth_ = MATMUL_MODULE(CopyCubeInParams)->GetSingleWidth();
@@ -158,8 +158,8 @@ public:
             MATMUL_MODULE(Context)->baseBlockSizeA = baseBlockSize;
             MATMUL_MODULE(Context)->isFirstBaseBlockA = isFirstBaseBlock;
             MATMUL_MODULE(Context)->isLastBaseBlockA = isLastBaseBlock;
-            MATMUL_MODULE(Context)->needAllocA = MATMUL_MODULE(Context)->isFirstBaseBlockA &&
-                MATMUL_MODULE(Context)->isFirstBaseBlockB;
+            MATMUL_MODULE(Context)->needAllocA =
+                MATMUL_MODULE(Context)->isFirstBaseBlockA && MATMUL_MODULE(Context)->isFirstBaseBlockB;
             posL1 = curRow * MATMUL_MODULE(CopyCubeInParams)->GetTotalCol() + curCol;
             l1Index = Q_VEC1_INDEX;
             return LoadPartDataA(curRow, curCol, tileHeight, tileWidth, l1Index, posL1, baseBlockSize);
@@ -171,8 +171,8 @@ public:
             MATMUL_MODULE(Context)->isLastBaseBlockB = isLastBaseBlock;
             posL1 = curCol * MATMUL_MODULE(CopyCubeInParams)->GetTotalRow() + curRow;
             l1Index = K_V_INDEX;
-            MATMUL_MODULE(Context)->needFreeA = MATMUL_MODULE(Context)->isLastBaseBlockA &&
-                MATMUL_MODULE(Context)->isLastBaseBlockB;
+            MATMUL_MODULE(Context)->needFreeA =
+                MATMUL_MODULE(Context)->isLastBaseBlockA && MATMUL_MODULE(Context)->isLastBaseBlockB;
             if (MATMUL_MODULE(Context)->isBufferFullA) {
                 MATMUL_MODULE(Context)->needFreeA = true;
             }
@@ -181,8 +181,8 @@ public:
         return CurrentTensor;
     }
 
-    __aicore__ inline void ClearLoadData(const LocalTensor<TransT> &tensor = LocalTensor<TransT>{},
-        int32_t curRow = 0, int32_t curCol = 0)
+    __aicore__ inline void ClearLoadData(const LocalTensor<TransT> &tensor = LocalTensor<TransT>{}, int32_t curRow = 0,
+                                         int32_t curCol = 0)
     {
         MATMUL_MODULE(CubeInBuffer)->FreeTensor();
     }
@@ -212,7 +212,8 @@ class FaCubeInBufferMM2HeadDim128 {
 public:
     __aicore__ inline FaCubeInBufferMM2HeadDim128() {}
 
-    __aicore__ inline void Init(int32_t baseBlockSize, int32_t cacheSize, int32_t reduceAxisCnt) {
+    __aicore__ inline void Init(int32_t baseBlockSize, int32_t cacheSize, int32_t reduceAxisCnt)
+    {
         baseBlockSize_ = baseBlockSize;
     }
 
@@ -241,12 +242,14 @@ public:
     __aicore__ inline LocalTensor<SrcT> AllocTensor(int32_t bufferPos = -1)
     {
         if constexpr (INPUT_TYPE::TAG == InputTypeTag::A) {
-            LocalTensor<SrcT> aL1Buffer = l1Global[MATMUL_MODULE(Context)->l1IndexA].localQue.template AllocTensor<SrcT>();
+            LocalTensor<SrcT> aL1Buffer =
+                l1Global[MATMUL_MODULE(Context)->l1IndexA].localQue.template AllocTensor<SrcT>();
             return aL1Buffer[bufferPos * MATMUL_MODULE(Context)->baseBlockSizeA];
         }
 
         if constexpr (INPUT_TYPE::TAG == InputTypeTag::B) {
-            LocalTensor<SrcT> bL1Buffer = l1Global[MATMUL_MODULE(Context)->l1IndexB].localQue.template AllocTensor<SrcT>();
+            LocalTensor<SrcT> bL1Buffer =
+                l1Global[MATMUL_MODULE(Context)->l1IndexB].localQue.template AllocTensor<SrcT>();
             return bL1Buffer[bufferPos * MATMUL_MODULE(Context)->baseBlockSizeB];
         }
     }
@@ -275,8 +278,7 @@ private:
 };
 
 template <const auto &MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>
-class MlaMatmulPolicyMM2HeadDim128 : public MatmulPolicy<MM_CFG, IMPL, A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>
-{
+class MlaMatmulPolicyMM2HeadDim128 : public MatmulPolicy<MM_CFG, IMPL, A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE> {
 public:
     using Context = MlaContext<IMPL, MatmulInputAType<A_TYPE, typename A_TYPE::T>, MM_CFG>;
     using CopyCubeInA = MlaCopyCubeInMM2HeadDim128<IMPL, MatmulInputAType<A_TYPE, typename A_TYPE::T>, MM_CFG>;
@@ -284,8 +286,8 @@ public:
     using CubeInBufferA = MlaCubeInBuffer<IMPL, MatmulInputAType<A_TYPE, typename A_TYPE::T>, MM_CFG>;
     using CubeInBufferB = MlaCubeInBuffer<IMPL, MatmulInputBType<B_TYPE, typename A_TYPE::T>, MM_CFG>;
 };
-}
-}
-}
+} // namespace Detail
+} // namespace Impl
+} // namespace AscendC
 
 #endif // MLA_CUSTOM_MATMUL_POLICY_D128_H

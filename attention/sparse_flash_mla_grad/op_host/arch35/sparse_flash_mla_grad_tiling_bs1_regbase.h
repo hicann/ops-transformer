@@ -75,7 +75,8 @@ struct AiCoreParams {
 
 class SparseFlashMlaGradTilingBs1Regbase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit SparseFlashMlaGradTilingBs1Regbase(gert::TilingContext *context) : TilingBaseClass(context) {};
+    explicit SparseFlashMlaGradTilingBs1Regbase(gert::TilingContext *context)
+        : TilingBaseClass(context) {};
     SparseFlashMlaGradTilingDataRegbase *tilingData = context_->GetTilingData<SparseFlashMlaGradTilingDataRegbase>();
     SparseFlashMlaGradBaseParamsRegbase *baseParams_ = &tilingData->baseParams;
     PreParamsRegbase *preTilingData_ = &tilingData->preTilingData;

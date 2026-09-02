@@ -26,7 +26,8 @@ class ScatterPaKvCacheAlibiNotFullyLoad {
 public:
     __aicore__ inline ScatterPaKvCacheAlibiNotFullyLoad(TPipe *pipe,
                                                         const ScatterPaKvCacheTilingData *__restrict tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
                                 GM_ADDR value_cache_in, GM_ADDR compress_lens, GM_ADDR compress_seq_offset,
                                 GM_ADDR seq_lens, GM_ADDR key_cache_out, GM_ADDR value_cache_out);
@@ -112,9 +113,10 @@ __aicore__ inline void ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMod
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMode>::CopyInKey(int64_t iter, int64_t loopIdx, int64_t curOffset,
-                                                                       int64_t handleNumPerLoop)
+__aicore__ inline void ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMode>::CopyInKey(int64_t iter,
+                                                                                              int64_t loopIdx,
+                                                                                              int64_t curOffset,
+                                                                                              int64_t handleNumPerLoop)
 {
     LocalTensor<T> inputKeyLocal = inputKeyQueue_.AllocTensor<T>();
     int64_t offset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->keyStride0 +
@@ -130,9 +132,8 @@ ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMode>::CopyInKey(int64_t i
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMode>::CopyInValue(int64_t iter, int64_t loopIdx,
-                                                                         int64_t curOffset, int64_t handleNumPerLoop)
+__aicore__ inline void ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMode>::CopyInValue(
+    int64_t iter, int64_t loopIdx, int64_t curOffset, int64_t handleNumPerLoop)
 {
     LocalTensor<T> inputValueLocal = inputValueQueue_.AllocTensor<T>();
     int64_t offset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->valueStride0 +
@@ -164,9 +165,8 @@ __aicore__ inline void ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMod
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
-__aicore__ inline void
-ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMode>::CopyOutValue(int64_t loopIdx, int64_t startIdx,
-                                                                          int64_t handleNumPerLoop)
+__aicore__ inline void ScatterPaKvCacheAlibiNotFullyLoad<T, IndexDtype, InOutMode>::CopyOutValue(
+    int64_t loopIdx, int64_t startIdx, int64_t handleNumPerLoop)
 {
     LocalTensor<T> inputValueLocal = inputValueQueue_.DeQue<T>();
 

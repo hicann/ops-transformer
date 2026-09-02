@@ -308,9 +308,10 @@ __simd_vf__ inline void CastAligned512F16VF512(uint64_t srcLocalInt, uint64_t ds
 }
 
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void
-MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                    const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
+__aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor,
+                                                           const LocalTensor<T1> &gradTensor,
+                                                           const LocalTensor<T1> &srcTensor, uint32_t srcM,
+                                                           uint32_t realN = srcN)
 {
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
@@ -351,11 +352,11 @@ MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor, const Local
 }
 #else
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void
-MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                    const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
-{
-}
+__aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor,
+                                                           const LocalTensor<T1> &gradTensor,
+                                                           const LocalTensor<T1> &srcTensor, uint32_t srcM,
+                                                           uint32_t realN = srcN)
+{}
 #endif
 } // namespace AscendC
 

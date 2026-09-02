@@ -22,14 +22,15 @@ using namespace AscendC;
 
 class ScatterPaKvCacheNormalCommon {
 public:
-    __aicore__ inline ScatterPaKvCacheNormalCommon(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict__ tilingData)
-    : pipe_(pipe), tilingData_(tilingData)
-    {
-    }
+    __aicore__ inline ScatterPaKvCacheNormalCommon(TPipe *pipe,
+                                                   const ScatterPaKvCacheTilingData *__restrict__ tilingData)
+        : pipe_(pipe),
+          tilingData_(tilingData)
+    {}
 
     template <typename T>
     __aicore__ inline void CopyToCache(uint64_t offsetIn, uint64_t offsetOut, int64_t ubLoop, int64_t ubTail,
-                                      GlobalTensor<T> &inGm, GlobalTensor<T> &outGm)
+                                       GlobalTensor<T> &inGm, GlobalTensor<T> &outGm)
     {
         DataCopyExtParams copyParam = {1, static_cast<uint32_t>(usedUbSize_), 0, 0, 0};
         DataCopyPadExtParams<T> padParams = {false, 0, 0, 0};
@@ -59,7 +60,7 @@ protected:
     int64_t startTaskId_;
     int64_t curBlockFactor_;
     int64_t usedUbSize_;
-    const ScatterPaKvCacheTilingData* tilingData_;
+    const ScatterPaKvCacheTilingData *tilingData_;
 
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, BUFFER_NUM> queBind_;
 };

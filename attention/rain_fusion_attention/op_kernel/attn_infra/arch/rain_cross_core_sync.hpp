@@ -13,8 +13,7 @@
 
 #include "../../attn_infra/rain_base_defs.hpp"
 
-namespace NpuArch::Arch
-{
+namespace NpuArch::Arch {
 
 constexpr uint32_t MAX_REVERSE_DEPTH = 16;
 
@@ -25,26 +24,32 @@ constexpr FlagID AIV_INTER_SUBBLOCK_BARRIER = 10;
 constexpr FlagID FFTS_MAX_FLAG = 7;
 
 struct CrossCoreFlag {
-    __aicore__ inline
-    CrossCoreFlag() : id(0) {}
+    __aicore__ inline CrossCoreFlag()
+        : id(0)
+    {}
 
-    __aicore__ inline
-    CrossCoreFlag(FlagID id) : id(id) {}
+    __aicore__ inline CrossCoreFlag(FlagID id)
+        : id(id)
+    {}
 
     FlagID id;
 };
 
 template <uint32_t REVERSE_DEPTH_ = MAX_REVERSE_DEPTH>
 struct CrossCoreFlagWithReverse {
-    __aicore__ inline
-    CrossCoreFlagWithReverse() : id(0), reverseId(0) {}
+    __aicore__ inline CrossCoreFlagWithReverse()
+        : id(0),
+          reverseId(0)
+    {}
 
-    __aicore__ inline
-    CrossCoreFlagWithReverse(FlagID id, FlagID reverseId) : id(id), reverseId(reverseId) {}
+    __aicore__ inline CrossCoreFlagWithReverse(FlagID id, FlagID reverseId)
+        : id(id),
+          reverseId(reverseId)
+    {}
 
     FlagID id;
     FlagID reverseId;
-    uint32_t count{ 0 };
+    uint32_t count{0};
 };
 
 template <uint8_t MODE, int32_t CORE_TYPE>
@@ -68,8 +73,7 @@ struct BarrierFlag<0x1, AscendC::AIV> {
 };
 
 template <uint8_t MODE, pipe_t PIPE>
-__aicore__ inline
-void CrossCoreBarrier()
+__aicore__ inline void CrossCoreBarrier()
 {
     constexpr FlagID flagId = BarrierFlag<MODE, g_coreType>::ID;
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flagId);
@@ -77,8 +81,7 @@ void CrossCoreBarrier()
 }
 
 template <uint8_t MODE, pipe_t PIPE>
-__aicore__ inline
-void CrossCoreSetFlag(CrossCoreFlag &flag)
+__aicore__ inline void CrossCoreSetFlag(CrossCoreFlag &flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
 }
@@ -89,8 +92,7 @@ __aicore__ inline void CrossCoreWaitFlag(CrossCoreFlag &flag)
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-__aicore__ inline
-void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+__aicore__ inline void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {
@@ -100,8 +102,7 @@ void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-__aicore__ inline
-void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+__aicore__ inline void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
 {
     AscendC::CrossCoreWaitFlag(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {
@@ -110,6 +111,6 @@ void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
     }
 }
 
-}  // namespace NpuArch::Arch
+} // namespace NpuArch::Arch
 
 #endif // ARCH_CROSS_CORE_SYNC_HPP

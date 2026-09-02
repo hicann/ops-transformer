@@ -31,8 +31,10 @@ class PromptAttentionPrefill {
 public:
     __aicore__ inline PromptAttentionPrefill(){};
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t* _actualSeqLengths, __gm__ uint8_t* _actualSeqLengthsKV, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *workspace, const PromptFlashAttentionBaseApiTilingData* __restrict tiling);
+                                __gm__ uint8_t *attenMask, __gm__ uint8_t *_actualSeqLengths,
+                                __gm__ uint8_t *_actualSeqLengthsKV, __gm__ uint8_t *attentionOut,
+                                __gm__ uint8_t *workspace,
+                                const PromptFlashAttentionBaseApiTilingData *__restrict tiling);
     __aicore__ inline void Process();
 
     using T = typename PFATypeNZ::inputType;
@@ -45,11 +47,11 @@ protected:
     const PromptFlashAttentionBaseApiTilingData *__restrict tilingData = nullptr;
 
     uint32_t long_seq = 0;
-    uint32_t is_triu=0;
-    uint32_t alibi_compress_offset=0;
-    uint32_t q_tight=0;
-    uint32_t is_sqrt=0;
-    uint32_t alibi_left_align=0;
+    uint32_t is_triu = 0;
+    uint32_t alibi_compress_offset = 0;
+    uint32_t q_tight = 0;
+    uint32_t is_sqrt = 0;
+    uint32_t alibi_left_align = 0;
 
     uint32_t embeddingSize = 0;
     half tor = 0;
@@ -65,12 +67,12 @@ protected:
     uint32_t qTokens = 0;
     uint32_t kvHead = 0;
     int64_t heads = 0;
-    int32_t kv_real_heads=0;
+    int32_t kv_real_heads = 0;
     uint32_t maxSeqlen = 0;
     uint32_t windowLen = 0;
     uint32_t cacheType = 0;
     uint32_t maxKvSeqlen = 0;
-    int32_t group_num=0;
+    int32_t group_num = 0;
     bool batchContinuous = true;
 
     uint32_t startBlk = 0;
@@ -97,17 +99,19 @@ protected:
     AscendC::GlobalTensor<int64_t> actualSeqLengthsGm;
     AscendC::GlobalTensor<int64_t> actualSeqLengthsKVGm;
 
-    template <typename T> __aicore__ inline T Align(T num, T rnd)
+    template <typename T>
+    __aicore__ inline T Align(T num, T rnd)
     {
-        return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+        return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
     }
     __aicore__ inline void InitTilingData();
 };
 
 template <typename T, PrecType prec_type2>
-__aicore__ inline void PromptAttentionPrefill<T, prec_type2>::Init(__gm__ uint8_t *_query, __gm__ uint8_t *_key,
-                                __gm__ uint8_t *_value, __gm__ uint8_t *_attenMask, __gm__ uint8_t* _actualSeqLengths, __gm__ uint8_t* _actualSeqLengthsKV, __gm__ uint8_t *_attentionOut, __gm__ uint8_t *workspace,
-                                const PromptFlashAttentionBaseApiTilingData* __restrict tiling)
+__aicore__ inline void PromptAttentionPrefill<T, prec_type2>::Init(
+    __gm__ uint8_t *_query, __gm__ uint8_t *_key, __gm__ uint8_t *_value, __gm__ uint8_t *_attenMask,
+    __gm__ uint8_t *_actualSeqLengths, __gm__ uint8_t *_actualSeqLengthsKV, __gm__ uint8_t *_attentionOut,
+    __gm__ uint8_t *workspace, const PromptFlashAttentionBaseApiTilingData *__restrict tiling)
 {
     tilingData = tiling;
 
@@ -120,7 +124,6 @@ __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::Init(__gm__ uint8_
     this->actualSeqLengths = _actualSeqLengths;
     this->actualSeqLengthsKV = _actualSeqLengthsKV;
 }
-
 
 template <typename T, PrecType prec_type2>
 __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::Process()
@@ -138,18 +141,15 @@ __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::Process()
     headMaskStride = headMaskStride * maxSeqlen;
     batchMaskStride = batchMaskStride * maxSeqlen;
     if (prec_type2 == PrecType::BMM1_FP16_EXP_FP32) {
-        UnpadFlashAttentionCommon<float, half, PrecType::BMM1_FP16_EXP_FP32, PrecType::BMM1_FP16_EXP_FP32> flashAttentionEncoder(query, key, value, attenMask, nullptr, nullptr, nullptr, attentionOut);
-        flashAttentionEncoder.Run(
-            tilingData,
-            nullptr, //alibi_coeff_gm,
-            actualSeqLengthsGm, actualSeqLengthsKVGm,
-            maskType, windowLen, long_seq,
-            stride_qo, stride_kv, headMaskStride, batchMaskStride,
-            startBatch, endBatch, startBlk, endBlk,
-            is_triu, alibi_compress_offset, group_num,
-            maskStride, qTokens, embeddingSize, q_tight, scaleType,
-            tor, kv_copy_stride, is_sqrt, heads,
-            maxSeqlen, batchSize, kv_real_heads, alibi_left_align, inputLayout);
+        UnpadFlashAttentionCommon<float, half, PrecType::BMM1_FP16_EXP_FP32, PrecType::BMM1_FP16_EXP_FP32>
+            flashAttentionEncoder(query, key, value, attenMask, nullptr, nullptr, nullptr, attentionOut);
+        flashAttentionEncoder.Run(tilingData,
+                                  nullptr, // alibi_coeff_gm,
+                                  actualSeqLengthsGm, actualSeqLengthsKVGm, maskType, windowLen, long_seq, stride_qo,
+                                  stride_kv, headMaskStride, batchMaskStride, startBatch, endBatch, startBlk, endBlk,
+                                  is_triu, alibi_compress_offset, group_num, maskStride, qTokens, embeddingSize,
+                                  q_tight, scaleType, tor, kv_copy_stride, is_sqrt, heads, maxSeqlen, batchSize,
+                                  kv_real_heads, alibi_left_align, inputLayout);
     }
 }
 
@@ -166,7 +166,7 @@ __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::InitTilingData()
     endBlk = tilingData->promptAttentionSplitCoreParams.endBlkArray[tmpBlockIdx];
     headNum = tilingData->promptAttentionBaseApiBaseParams.headNumSize;
     startBatch = static_cast<uint32_t>(startBlk / headNum);
-    endBatch = static_cast<uint32_t>((endBlk- 1) / headNum);
+    endBatch = static_cast<uint32_t>((endBlk - 1) / headNum);
 
     kvHead = tilingData->promptAttentionBaseApiBaseParams.kvHeadNumSize;
     heads = tilingData->promptAttentionBaseApiBaseParams.headNumSize;
@@ -178,10 +178,10 @@ __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::InitTilingData()
     qTokens = maxSeqlen;
 
     long_seq = tilingData->promptAttentionBaseApiBaseParams.isLongSeq;
-    is_triu=tilingData->promptAttentionBaseApiBaseParams.isTriuMask;
-    alibi_compress_offset=tilingData->promptAttentionBaseApiBaseParams.alibiCompressOffset;
+    is_triu = tilingData->promptAttentionBaseApiBaseParams.isTriuMask;
+    alibi_compress_offset = tilingData->promptAttentionBaseApiBaseParams.alibiCompressOffset;
 
-    alibi_left_align=tilingData->promptAttentionBaseApiBaseParams.alibiLeftAlign;
+    alibi_left_align = tilingData->promptAttentionBaseApiBaseParams.alibiLeftAlign;
 
     maskType = tilingData->promptAttentionBaseApiBaseParams.maskType;
     maskStride = maxSeqlen;
@@ -190,7 +190,7 @@ __aicore__ inline void PromptAttentionPrefill<T, prec_type2>::InitTilingData()
     scaleType = 0;
     inputLayout = tilingData->promptAttentionBaseApiBaseParams.inputLayoutType;
 
-    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths, batchSize);
-    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV, batchSize);
+    actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengths, batchSize);
+    actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKV, batchSize);
 }
 #endif

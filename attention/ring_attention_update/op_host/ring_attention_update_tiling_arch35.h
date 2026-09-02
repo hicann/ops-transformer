@@ -16,7 +16,7 @@
 #define OPS_BUILT_IN_OP_TILING_RUNTIME_RING_ATTENTION_UPDATE_REGBASE_H_
 
 namespace optiling {
-    ge::graphStatus Tiling4RingAttentionUpdateRegbase(gert::TilingContext* context);
+ge::graphStatus Tiling4RingAttentionUpdateRegbase(gert::TilingContext *context);
 }
 
 #endif // OPS_BUILT_IN_OP_TILING_RUNTIME_RING_ATTENTION_UPDATE_REGBASE_H_

@@ -203,22 +203,26 @@ struct SplitSameABExtraInfo {
 template <typename T>
 struct CaptureThis {
     using SELF = T;
-    __aicore__ inline CaptureThis(T* self) : self_(self) {}
-    T* self_;
+    __aicore__ inline CaptureThis(T *self)
+        : self_(self)
+    {}
+    T *self_;
 };
 
-#define DEF_LAMBDA_WITHTHIS(LambdaName)    \
-    using LambdaName##FunctorBase = CaptureThis<std::remove_reference_t<decltype(*this)>>;    \
-    using LambdaName##Self = typename CaptureThis<std::remove_reference_t<decltype(*this)>>::SELF;    \
-    struct LambdaName##Functor : public LambdaName##FunctorBase {    \
-        using LambdaName##FunctorBase::self_;    \
-        __aicore__ inline LambdaName##Functor(LambdaName##Self* self) : LambdaName##FunctorBase(self) {}   \
+#define DEF_LAMBDA_WITHTHIS(LambdaName) \
+    using LambdaName##FunctorBase = CaptureThis<std::remove_reference_t<decltype(*this)>>; \
+    using LambdaName##Self = typename CaptureThis<std::remove_reference_t<decltype(*this)>>::SELF; \
+    struct LambdaName##Functor : public LambdaName##FunctorBase { \
+        using LambdaName##FunctorBase::self_; \
+        __aicore__ inline LambdaName##Functor(LambdaName##Self *self) \
+            : LambdaName##FunctorBase(self) \
+        {} \
         __aicore__ inline auto operator()
 
 #define DEF_LAMBDA_END(LambdaName) \
-    };   \
+    } \
+    ; \
     auto LambdaName = LambdaName##Functor(this)
-
 
 template <typename SrcT>
 __aicore__ inline constexpr uint32_t GetC0Num()
@@ -261,7 +265,8 @@ __aicore__ inline bool IsIncludeInvalidLine(uint16_t softMaxCheckRes, uint32_t b
     }
 }
 
-template <typename T> __aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
+template <typename T>
+__aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
 {
     if constexpr (IsSameType<T, float>::value) {
         uint32_t tmp1 = MLA_NEGATIVE_MIN_VAULE_FP32;
@@ -310,11 +315,13 @@ __aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t &delta, 
 {
     // attenMask S1 is same to S2
     if (delta <= 0) {
-        return attenMaskS2Size * attenMaskS2Size + attenMaskS2Size / 2;  // 2 is the attenMaskS2Size factor to calculate the Offset
+        return attenMaskS2Size * attenMaskS2Size +
+               attenMaskS2Size / 2; // 2 is the attenMaskS2Size factor to calculate the Offset
     } else if (delta >= s2BaseSize) {
         return attenMaskS2Size * attenMaskS2Size;
     } else {
-        return attenMaskS2Size * attenMaskS2Size + attenMaskS2Size / 2 - delta;  // 2 is the attenMaskS2Size factor to calculate the Offset
+        return attenMaskS2Size * attenMaskS2Size + attenMaskS2Size / 2 -
+               delta; // 2 is the attenMaskS2Size factor to calculate the Offset
     }
 }
 
@@ -329,8 +336,7 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
     dataCopyParams.blockLen = nz2NdInfo.ndFirstAxisLoopSize * 2;
     dataCopyParams.srcStride = (nz2NdInfo.ndFirstAxisRealSize - nz2NdInfo.ndFirstAxisLoopSize) * 2;
     dataCopyParams.dstStride = 1;
-    int64_t bmmResOffset = nz2NdInfo.vecCoreOffset * 16 +
-                           nz2NdInfo.loopIdx * nz2NdInfo.ndFirstAxisBaseSize * 16;
+    int64_t bmmResOffset = nz2NdInfo.vecCoreOffset * 16 + nz2NdInfo.loopIdx * nz2NdInfo.ndFirstAxisBaseSize * 16;
     int64_t innerLoop = nzFirstAxis / 8L;
     int64_t innerRemain = nzFirstAxis % 8L;
 
@@ -354,13 +360,13 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
         for (int64_t i = 0; i < 2; ++i) {
             for (int64_t j = 0; j < innerLoop; ++j) {
                 AscendC::Copy(bmmResUb[outerIndex * outerBmmOffset + j * 128 + i * 8],
-                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize,
-                     repeatMaxTimes, repeatParams);
+                              tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize, repeatMaxTimes,
+                              repeatParams);
             }
             if (likely(innerRemain)) {
                 AscendC::Copy(bmmResUb[outerIndex * outerBmmOffset + innerLoop * 128 + i * 8],
-                     tempUb[outerIndex * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
-                     repeatMaxTimes, repeatParams);
+                              tempUb[outerIndex * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
+                              repeatMaxTimes, repeatParams);
             }
         }
     }
@@ -368,13 +374,13 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
         for (int64_t i = 0; i < 2; ++i) {
             for (int64_t j = 0; j < innerLoop; ++j) {
                 AscendC::Copy(bmmResUb[outerLoop * outerBmmOffset + j * 128 + i * 8],
-                     tempUb[outerLoop * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize, outerRemain,
-                     repeatParams);
+                              tempUb[outerLoop * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize, outerRemain,
+                              repeatParams);
             }
             if (likely(innerRemain)) {
                 AscendC::Copy(bmmResUb[outerLoop * outerBmmOffset + innerLoop * 128 + i * 8],
-                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
-                     outerRemain, repeatParams);
+                              tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
+                              outerRemain, repeatParams);
             }
         }
     }

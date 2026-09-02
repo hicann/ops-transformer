@@ -17,10 +17,9 @@
  */
 
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube2ProcessSparse(const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t indicesGmOffset,
-                               const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx,
-                               const int32_t lastBlockSize, const bool isLastBasicBlock)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2ProcessSparse(
+    const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx, const int32_t lastBlockSize, const bool isLastBasicBlock)
 {
     uint32_t dLoopTimes = (dimDqk + 127) / K_SPLIT_SIZE;
     uint32_t perLoopDSize = K_SPLIT_SIZE;
@@ -58,9 +57,9 @@ CubeOp<T1>::cube2ProcessSparse(const int64_t dyGmOffset, const int64_t valueGmOf
             CopyGmToL1(l1_v_tensor, selectedKWorkspaceGm[currentVOffset], mmParam.singleN, K_SPLIT_SIZE, dimDqk);
             current_l1_dy_tensor = l1_dy_tensor[currentDyOffset];
 
-            MmadInnerWithSync<T1>(l0cTensor, current_l1_dy_tensor, l1_v_tensor,
-                                  aL0TensorPingPong, bL0TensorPingPong,
-                                  mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true, mm2WorkspaceGm[mm2WorkspaceGmOffset]);
+            MmadInnerWithSync<T1>(l0cTensor, current_l1_dy_tensor, l1_v_tensor, aL0TensorPingPong, bL0TensorPingPong,
+                                  mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true,
+                                  mm2WorkspaceGm[mm2WorkspaceGmOffset]);
             SetFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
             UpdatePingPongFlag(ping_pong_flag_l1_common_);
         }
@@ -69,8 +68,9 @@ CubeOp<T1>::cube2ProcessSparse(const int64_t dyGmOffset, const int64_t valueGmOf
 }
 
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube2ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPongIdx, const RunInfo &runInfo)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2ProcessDense(const int32_t blkCntOffset,
+                                                                                    const int32_t mmPingPongIdx,
+                                                                                    const RunInfo &runInfo)
 {
     const int64_t dyGmOffset = runInfo.dyGmOffset;
     const int64_t valueGmOffset = runInfo.valueGmOffset;
@@ -109,7 +109,8 @@ CubeOp<T1>::cube2ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
             l1_v_tensor = l1_common_tensors[ping_pong_flag_l1_common_];
 
             currentDyOffset = dIdx * dimGAlign * K_SPLIT_SIZE;
-            currentVOffset = valueGmOffset + (blkCntOffset * dimN2 + nIdx - blkCntOffset) * selectedBlockSizeDqk + dIdx * K_SPLIT_SIZE;
+            currentVOffset = valueGmOffset + (blkCntOffset * dimN2 + nIdx - blkCntOffset) * selectedBlockSizeDqk +
+                             dIdx * K_SPLIT_SIZE;
 
             WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
 
@@ -117,9 +118,9 @@ CubeOp<T1>::cube2ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
 
             current_l1_dy_tensor = l1_dy_tensor[currentDyOffset];
 
-            MmadInnerWithSync<T1>(l0cTensor, current_l1_dy_tensor, l1_v_tensor,
-                                  aL0TensorPingPong, bL0TensorPingPong,
-                                  mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true, mm2WorkspaceGm[mm2WorkspaceGmOffset]);
+            MmadInnerWithSync<T1>(l0cTensor, current_l1_dy_tensor, l1_v_tensor, aL0TensorPingPong, bL0TensorPingPong,
+                                  mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true,
+                                  mm2WorkspaceGm[mm2WorkspaceGmOffset]);
             SetFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
             UpdatePingPongFlag(ping_pong_flag_l1_common_);
         }
@@ -128,12 +129,13 @@ CubeOp<T1>::cube2ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
 }
 
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube2Process(const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t indicesGmOffset,
-                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx, const RunInfo &runInfo)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2Process(
+    const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx, const RunInfo &runInfo)
 {
     if (!runInfo.isSmallS2) {
-        cube2ProcessSparse(dyGmOffset, valueGmOffset, indicesGmOffset, outGmOffset, blkCntOffset, mmPingPongIdx, runInfo.lastBlockSize, runInfo.isLastBasicBlock);
+        cube2ProcessSparse(dyGmOffset, valueGmOffset, indicesGmOffset, outGmOffset, blkCntOffset, mmPingPongIdx,
+                           runInfo.lastBlockSize, runInfo.isLastBasicBlock);
     } else {
         cube2ProcessDense(blkCntOffset, mmPingPongIdx, runInfo);
     }

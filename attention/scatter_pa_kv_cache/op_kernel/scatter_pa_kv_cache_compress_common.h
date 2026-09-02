@@ -21,9 +21,7 @@
 namespace ScatterPaKvCache {
 class ScatterPaKvCacheCompressCommon {
 public:
-    __aicore__ inline ScatterPaKvCacheCompressCommon()
-    {
-    }
+    __aicore__ inline ScatterPaKvCacheCompressCommon() {}
 
     __aicore__ inline uint32_t RoundUp(uint32_t x, uint32_t y = 16)
     {
@@ -146,10 +144,11 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void
-    RopeInitBuf(AscendC::LocalTensor<T> &copyLocalPing_, AscendC::LocalTensor<T> &copyLocalPong_,
-                AscendC::LocalTensor<T> &tokenLocal_, AscendC::LocalTensor<float> &tokenCompressLocal_,
-                AscendC::LocalTensor<float> &tokenSumLocal_, uint16_t &repeatDivisor, uint16_t &addNumPerLoop)
+    __aicore__ inline void RopeInitBuf(AscendC::LocalTensor<T> &copyLocalPing_, AscendC::LocalTensor<T> &copyLocalPong_,
+                                       AscendC::LocalTensor<T> &tokenLocal_,
+                                       AscendC::LocalTensor<float> &tokenCompressLocal_,
+                                       AscendC::LocalTensor<float> &tokenSumLocal_, uint16_t &repeatDivisor,
+                                       uint16_t &addNumPerLoop)
     {
         uint32_t computeBufStart = 0;
         uint32_t copyBufStart = 0;

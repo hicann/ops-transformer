@@ -68,13 +68,13 @@ __aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, b
 #endif
 
 namespace detail {
-    struct SmlaMetadata {
-        uint32_t faMetadata[AIC_CORE_MAX_NUM][FA_METADATA_SIZE];
-        uint32_t fdMetadata[AIV_CORE_MAX_NUM][FD_METADATA_SIZE];
-    };
+struct SmlaMetadata {
+    uint32_t faMetadata[AIC_CORE_MAX_NUM][FA_METADATA_SIZE];
+    uint32_t fdMetadata[AIV_CORE_MAX_NUM][FD_METADATA_SIZE];
 };
+}; // namespace detail
 
 static_assert(SMLA_METADATA_TOTAL_SIZE * sizeof(SMLA_METADATA_T) >= sizeof(detail::SmlaMetadata));
-};
+}; // namespace optiling
 
 #endif // SPARSE_FLASH_MLA_KERNEL_METADATA_H

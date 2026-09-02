@@ -9,47 +9,43 @@
   */
 
 /*!
-* \file vf_topk.h
-* \brief
-*/
+ * \file vf_topk.h
+ * \brief
+ */
 
 #ifndef VF_TOP_K_H
 #define VF_TOP_K_H
 
 namespace topkb32 {
-__simd_callee__ inline void StoreHistogramResult(__ubuf__ uint32_t* histogramsBuf,
-                                                 MicroAPI::RegTensor<uint16_t>& cout0,
-                                                 MicroAPI::RegTensor<uint16_t>& cout1,
-                                                 MicroAPI::MaskReg& pregB16,
-                                                 MicroAPI::MaskReg& pregB32)
+__simd_callee__ inline void StoreHistogramResult(__ubuf__ uint32_t *histogramsBuf, MicroAPI::RegTensor<uint16_t> &cout0,
+                                                 MicroAPI::RegTensor<uint16_t> &cout1, MicroAPI::MaskReg &pregB16,
+                                                 MicroAPI::MaskReg &pregB32)
 {
     MicroAPI::RegTensor<uint32_t> cout0U32Even;
     MicroAPI::RegTensor<uint32_t> cout0U32Odd;
     MicroAPI::RegTensor<uint32_t> cout1U32Even;
     MicroAPI::RegTensor<uint32_t> cout1U32Odd;
 
-    static constexpr MicroAPI::CastTrait CAST_TRAIT_UINT16_TOUINT32_EVEN = {MicroAPI::RegLayout::ZERO,
-                MicroAPI::SatMode::UNKNOWN, MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+    static constexpr MicroAPI::CastTrait CAST_TRAIT_UINT16_TOUINT32_EVEN = {
+        MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN, MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
-    static constexpr MicroAPI::CastTrait CAST_TRAIT_UINT16_TOUINT32_ODD = {MicroAPI::RegLayout::ONE,
-                MicroAPI::SatMode::UNKNOWN, MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+    static constexpr MicroAPI::CastTrait CAST_TRAIT_UINT16_TOUINT32_ODD = {
+        MicroAPI::RegLayout::ONE, MicroAPI::SatMode::UNKNOWN, MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
     MicroAPI::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout0U32Even, cout0, pregB16);
     MicroAPI::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout0U32Odd, cout0, pregB16);
     MicroAPI::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout1U32Even, cout1, pregB16);
     MicroAPI::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout1U32Odd, cout1, pregB16);
 
-    MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_INTLV_B32>(histogramsBuf,
-                                                                        cout0U32Even, cout0U32Odd, pregB32);
-    MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_INTLV_B32>(histogramsBuf + 128,
-                                                                        cout1U32Even, cout1U32Odd, pregB32);
+    MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_INTLV_B32>(histogramsBuf, cout0U32Even, cout0U32Odd,
+                                                                        pregB32);
+    MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_INTLV_B32>(histogramsBuf + 128, cout1U32Even, cout1U32Odd,
+                                                                        pregB32);
 }
 
-__simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t* idxBuf,
-                                                        __ubuf__ uint32_t* nkValueBuf,
-                                                        __ubuf__ uint32_t* histogramsBuf,
-                                                        MicroAPI::RegTensor<uint32_t>& btmK,
-                                                        MicroAPI::MaskReg& pregB32)
+__simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t *idxBuf, __ubuf__ uint32_t *nkValueBuf,
+                                                        __ubuf__ uint32_t *histogramsBuf,
+                                                        MicroAPI::RegTensor<uint32_t> &btmK, MicroAPI::MaskReg &pregB32)
 {
     MicroAPI::ClearSpr<AscendC::SpecialPurposeReg::AR>();
 
@@ -65,8 +61,8 @@ __simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t* idxBu
         MicroAPI::Arange(idxC, i * 64);
         MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_NORM>(cout, histogramsBuf + i * 64);
         MicroAPI::Compare<uint32_t, CMPMODE::GE>(pregGE, cout, btmK, pregB32);
-        MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(
-                                                sqzIdx, (MicroAPI::RegTensor<uint32_t>&)idxC, pregGE);
+        MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(sqzIdx, (MicroAPI::RegTensor<uint32_t> &)idxC,
+                                                                         pregGE);
         MicroAPI::StoreUnAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(idxBuf, sqzIdx, alignIdx);
     }
     MicroAPI::StoreUnAlignPost(idxBuf, alignIdx);
@@ -86,7 +82,7 @@ __simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t* idxBu
 
     MicroAPI::MaskReg pregZero = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
     MicroAPI::Compare<uint32_t, CMPMODE::EQ>(pregZero, idx, zeroAll, pregB32);
-    MicroAPI::Sub(idxPrev, idx, (MicroAPI::RegTensor<uint32_t>&)idxAll1, pregB32);
+    MicroAPI::Sub(idxPrev, idx, (MicroAPI::RegTensor<uint32_t> &)idxAll1, pregB32);
     MicroAPI::ShiftRights(idxPrev, idxPrev, (int16_t)24, pregB32);
 
     MicroAPI::Gather(prevBinValue, histogramsBuf, idxPrev, pregB32);
@@ -97,10 +93,9 @@ __simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t* idxBu
     MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_NORM>(nkValueBuf, nextK, pregB32);
 }
 
-template<typename T>
-__simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t* histogramsBuf,
-                                       __ubuf__ uint32_t* inputBuf,
-                                       uint16_t vfLoop, bool init)
+template <typename T>
+__simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__ uint32_t *inputBuf, uint16_t vfLoop,
+                                       bool init)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
     MicroAPI::MaskReg pregB16 = MicroAPI::CreateMask<uint16_t, MicroAPI::MaskPattern::ALL>();
@@ -126,12 +121,11 @@ __simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t* histogramsBuf,
 
     for (uint16_t i = 0; i < vfLoop; ++i) {
         MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(
-                                                        vreg3U16, vreg2U16, inputBuf + (i * 256) + 128);
+        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg3U16, vreg2U16,
+                                                                           inputBuf + (i * 256) + 128);
 
-        MicroAPI::DeInterleave(vreg1, vreg0,
-                                (MicroAPI::RegTensor<uint8_t>&)vreg0U16,
-                                (MicroAPI::RegTensor<uint8_t>&)vreg2U16);
+        MicroAPI::DeInterleave(vreg1, vreg0, (MicroAPI::RegTensor<uint8_t> &)vreg0U16,
+                               (MicroAPI::RegTensor<uint8_t> &)vreg2U16);
 
         MicroAPI::Histograms<uint8_t, uint16_t, MicroAPI::HistogramsBinType::BIN0,
                              MicroAPI::HistogramsType::ACCUMULATE>(cout0, vreg0, pregB8);
@@ -142,9 +136,8 @@ __simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t* histogramsBuf,
     StoreHistogramResult(histogramsBuf, cout0, cout1, pregB16, pregB32);
 }
 
-__simd_vf__ void FindFirstTargetBinVFImpl(__ubuf__ uint32_t* idx0Buf,
-                                          __ubuf__ uint32_t* nkValueBuf, __ubuf__ uint32_t*
-                                          histogramsBuf, uint32_t bottomK)
+__simd_vf__ void FindFirstTargetBinVFImpl(__ubuf__ uint32_t *idx0Buf, __ubuf__ uint32_t *nkValueBuf,
+                                          __ubuf__ uint32_t *histogramsBuf, uint32_t bottomK)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -154,10 +147,9 @@ __simd_vf__ void FindFirstTargetBinVFImpl(__ubuf__ uint32_t* idx0Buf,
     FindTargetBinAndUpdateNextK(idx0Buf, nkValueBuf, histogramsBuf, btmK, pregB32);
 }
 
-template<typename T>
-__simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t* histogramsBuf,
-                                        __ubuf__ uint32_t* inputBuf, __ubuf__ uint32_t* idx0Buf,
-                                        uint16_t vfLoop, bool init)
+template <typename T>
+__simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__ uint32_t *inputBuf,
+                                        __ubuf__ uint32_t *idx0Buf, uint16_t vfLoop, bool init)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
     MicroAPI::MaskReg pregB16 = MicroAPI::CreateMask<uint16_t, MicroAPI::MaskPattern::ALL>();
@@ -184,17 +176,15 @@ __simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t* histogramsBuf,
     MicroAPI::RegTensor<uint8_t> vreg3;
 
     for (uint16_t i = 0; i < vfLoop; ++i) {
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg1U16,
-                                                                            vreg0U16, inputBuf + i * 256);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg3U16,
-                                                                            vreg2U16, inputBuf + (i * 256) + 128);
+        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
+        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg3U16, vreg2U16,
+                                                                           inputBuf + (i * 256) + 128);
 
-        MicroAPI::DeInterleave(vreg1, vreg0,
-                                (MicroAPI::RegTensor<uint8_t>&)vreg0U16,
-                                (MicroAPI::RegTensor<uint8_t>&)vreg2U16);
+        MicroAPI::DeInterleave(vreg1, vreg0, (MicroAPI::RegTensor<uint8_t> &)vreg0U16,
+                               (MicroAPI::RegTensor<uint8_t> &)vreg2U16);
 
         MicroAPI::MaskReg pregEQ = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ, vreg0, (MicroAPI::RegTensor<uint8_t>&)idx0, pregB8);
+        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ, vreg0, (MicroAPI::RegTensor<uint8_t> &)idx0, pregB8);
 
         MicroAPI::Histograms<uint8_t, uint16_t, MicroAPI::HistogramsBinType::BIN0,
                              MicroAPI::HistogramsType::ACCUMULATE>(cout0, vreg1, pregEQ);
@@ -206,9 +196,8 @@ __simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t* histogramsBuf,
 }
 
 // kValue新的bottomK
-__simd_vf__ void FindSecondTargetBinVFImpl(__ubuf__ uint32_t* idx1Buf,
-                                            __ubuf__ uint32_t* nkValueBuf,  __ubuf__ uint32_t* kValue,
-                                            __ubuf__ uint32_t* histogramsBuf)
+__simd_vf__ void FindSecondTargetBinVFImpl(__ubuf__ uint32_t *idx1Buf, __ubuf__ uint32_t *nkValueBuf,
+                                           __ubuf__ uint32_t *kValue, __ubuf__ uint32_t *histogramsBuf)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -218,10 +207,10 @@ __simd_vf__ void FindSecondTargetBinVFImpl(__ubuf__ uint32_t* idx1Buf,
     FindTargetBinAndUpdateNextK(idx1Buf, nkValueBuf, histogramsBuf, btmK1, pregB32);
 }
 
-template<typename T>
-__simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t* histogramsBuf,
-                                         __ubuf__ uint32_t* inputBuf, __ubuf__ uint32_t* idx0Buf,
-                                         __ubuf__ uint32_t* idx1Buf, uint16_t vfLoop, bool init)
+template <typename T>
+__simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__ uint32_t *inputBuf,
+                                       __ubuf__ uint32_t *idx0Buf, __ubuf__ uint32_t *idx1Buf, uint16_t vfLoop,
+                                       bool init)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
     MicroAPI::MaskReg pregB16 = MicroAPI::CreateMask<uint16_t, MicroAPI::MaskPattern::ALL>();
@@ -250,20 +239,19 @@ __simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t* histogramsBuf,
     MicroAPI::RegTensor<uint32_t> vreg3U16;
 
     for (uint16_t i = 0; i < vfLoop; ++i) {
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg1U16,
-                                                                             vreg0U16, inputBuf + i * 256);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg3U16,
-                                                                             vreg2U16, inputBuf + (i * 256) + 128);
+        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
+        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg3U16, vreg2U16,
+                                                                           inputBuf + (i * 256) + 128);
 
-        MicroAPI::DeInterleave(vreg1, vreg0, (MicroAPI::RegTensor<uint8_t>&)vreg0U16,
-                                             (MicroAPI::RegTensor<uint8_t>&)vreg2U16);
-        MicroAPI::DeInterleave(vreg3, vreg2, (MicroAPI::RegTensor<uint8_t>&)vreg1U16,
-                                             (MicroAPI::RegTensor<uint8_t>&)vreg3U16);
+        MicroAPI::DeInterleave(vreg1, vreg0, (MicroAPI::RegTensor<uint8_t> &)vreg0U16,
+                               (MicroAPI::RegTensor<uint8_t> &)vreg2U16);
+        MicroAPI::DeInterleave(vreg3, vreg2, (MicroAPI::RegTensor<uint8_t> &)vreg1U16,
+                               (MicroAPI::RegTensor<uint8_t> &)vreg3U16);
 
         MicroAPI::MaskReg pregEQ0 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
         MicroAPI::MaskReg pregEQ1 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, vreg0, (MicroAPI::RegTensor<uint8_t>&)idx0, pregB8);
-        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, vreg1, (MicroAPI::RegTensor<uint8_t>&)idx1, pregB8);
+        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, vreg0, (MicroAPI::RegTensor<uint8_t> &)idx0, pregB8);
+        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, vreg1, (MicroAPI::RegTensor<uint8_t> &)idx1, pregB8);
 
         MicroAPI::MaskReg pregEQ = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
         MicroAPI::And(pregEQ, pregEQ0, pregEQ1, pregB8);
@@ -277,9 +265,8 @@ __simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t* histogramsBuf,
     StoreHistogramResult(histogramsBuf, cout0, cout1, pregB16, pregB32);
 }
 
-__simd_vf__ void FindThirdTargetBinVFImpl(__ubuf__ uint32_t* idx2Buf,
-                                          __ubuf__ uint32_t* nkValueBuf, __ubuf__ uint32_t* kValue,
-                                          __ubuf__ uint32_t* histogramsBuf)
+__simd_vf__ void FindThirdTargetBinVFImpl(__ubuf__ uint32_t *idx2Buf, __ubuf__ uint32_t *nkValueBuf,
+                                          __ubuf__ uint32_t *kValue, __ubuf__ uint32_t *histogramsBuf)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -289,11 +276,10 @@ __simd_vf__ void FindThirdTargetBinVFImpl(__ubuf__ uint32_t* idx2Buf,
     FindTargetBinAndUpdateNextK(idx2Buf, nkValueBuf, histogramsBuf, btmK2, pregB32);
 }
 
-template<typename T>
-__simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t* histogramsBuf,
-                                      __ubuf__ uint32_t* inputBuf, __ubuf__ uint32_t* idx0Buf,
-                                      __ubuf__ uint32_t* idx1Buf, __ubuf__ uint32_t* idx2Buf,
-                                      uint16_t vfLoop, bool init)
+template <typename T>
+__simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__ uint32_t *inputBuf,
+                                      __ubuf__ uint32_t *idx0Buf, __ubuf__ uint32_t *idx1Buf,
+                                      __ubuf__ uint32_t *idx2Buf, uint16_t vfLoop, bool init)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
     MicroAPI::MaskReg pregB16 = MicroAPI::CreateMask<uint16_t, MicroAPI::MaskPattern::ALL>();
@@ -325,22 +311,20 @@ __simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t* histogramsBuf,
 
     for (uint16_t i = 0; i < vfLoop; ++i) {
         MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg3U16,
-                                                                             vreg2U16, inputBuf + (i * 256) + 128);
+        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B16>(vreg3U16, vreg2U16,
+                                                                           inputBuf + (i * 256) + 128);
 
-        MicroAPI::DeInterleave(vreg1, vreg0,
-         (MicroAPI::RegTensor<uint8_t>&)vreg0U16,
-         (MicroAPI::RegTensor<uint8_t>&)vreg2U16);
-        MicroAPI::DeInterleave(vreg3, vreg2,
-         (MicroAPI::RegTensor<uint8_t>&)vreg1U16,
-         (MicroAPI::RegTensor<uint8_t>&)vreg3U16);
+        MicroAPI::DeInterleave(vreg1, vreg0, (MicroAPI::RegTensor<uint8_t> &)vreg0U16,
+                               (MicroAPI::RegTensor<uint8_t> &)vreg2U16);
+        MicroAPI::DeInterleave(vreg3, vreg2, (MicroAPI::RegTensor<uint8_t> &)vreg1U16,
+                               (MicroAPI::RegTensor<uint8_t> &)vreg3U16);
 
         MicroAPI::MaskReg pregEQ0 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
         MicroAPI::MaskReg pregEQ1 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
         MicroAPI::MaskReg pregEQ2 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, vreg0, (MicroAPI::RegTensor<uint8_t>&)idx0, pregB8);
-        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, vreg1, (MicroAPI::RegTensor<uint8_t>&)idx1, pregB8);
-        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ2, vreg2, (MicroAPI::RegTensor<uint8_t>&)idx2, pregB8);
+        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, vreg0, (MicroAPI::RegTensor<uint8_t> &)idx0, pregB8);
+        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, vreg1, (MicroAPI::RegTensor<uint8_t> &)idx1, pregB8);
+        MicroAPI::Compare<uint8_t, CMPMODE::EQ>(pregEQ2, vreg2, (MicroAPI::RegTensor<uint8_t> &)idx2, pregB8);
 
         MicroAPI::MaskReg pregEQ0And1 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
         MicroAPI::MaskReg pregEQAll = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
@@ -356,10 +340,8 @@ __simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t* histogramsBuf,
     StoreHistogramResult(histogramsBuf, cout0, cout1, pregB16, pregB32);
 }
 
-__simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t* kValue,
-                                 __ubuf__ uint32_t* histogramsBuf, __ubuf__ uint32_t* idx0Buf,
-                                 __ubuf__ uint32_t* idx1Buf, __ubuf__ uint32_t* idx2Buf,
-                                 __ubuf__ uint32_t* idx3Buf)
+__simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *kValue, __ubuf__ uint32_t *histogramsBuf, __ubuf__ uint32_t *idx0Buf,
+                               __ubuf__ uint32_t *idx1Buf, __ubuf__ uint32_t *idx2Buf, __ubuf__ uint32_t *idx3Buf)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -380,8 +362,8 @@ __simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t* kValue,
         MicroAPI::Arange(idxC, i * 64);
         MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_NORM>(cout, histogramsBuf + i * 64);
         MicroAPI::Compare<uint32_t, CMPMODE::GE>(pregGE, cout, btmK3, pregB32);
-        MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(sqzIdx3,
-                                                                         (MicroAPI::RegTensor<uint32_t>&)idxC, pregGE);
+        MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(sqzIdx3, (MicroAPI::RegTensor<uint32_t> &)idxC,
+                                                                         pregGE);
         MicroAPI::StoreUnAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(idx3Buf, sqzIdx3, alignIdx3);
     }
     MicroAPI::StoreUnAlignPost(idx3Buf, alignIdx3);
@@ -409,9 +391,8 @@ __simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t* kValue,
     MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_NORM>(kValue, idx0, pregB32);
 }
 
-__simd_vf__ void FindIdxGTOutputVFImpl(__ubuf__ uint32_t* outputIdxBuf,
-                                        __ubuf__ uint32_t* inputBuf, uint32_t beginIdx,
-                                        __ubuf__ uint32_t* kValue, uint16_t vfLoop)
+__simd_vf__ void FindIdxGTOutputVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__ uint32_t *inputBuf, uint32_t beginIdx,
+                                       __ubuf__ uint32_t *kValue, uint16_t vfLoop)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -436,15 +417,14 @@ __simd_vf__ void FindIdxGTOutputVFImpl(__ubuf__ uint32_t* outputIdxBuf,
         MicroAPI::Compare<uint32_t, CMPMODE::GT>(poutGT, vregInput, kthValue, pregB32);
 
         MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(sqzIdxOut,
-                                                                         (MicroAPI::RegTensor<uint32_t>&)idxC, poutGT);
+                                                                         (MicroAPI::RegTensor<uint32_t> &)idxC, poutGT);
         MicroAPI::StoreUnAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputIdxBuf, sqzIdxOut, alignIdx);
     }
     MicroAPI::StoreUnAlignPost(outputIdxBuf, alignIdx);
 }
 
-__simd_vf__ void FindIdxEQOutputVFImpl(__ubuf__ uint32_t* outputIdxBuf,
-                                        __ubuf__ uint32_t* inputBuf, uint32_t beginIdx,
-                                        __ubuf__ uint32_t* kValue)
+__simd_vf__ void FindIdxEQOutputVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__ uint32_t *inputBuf, uint32_t beginIdx,
+                                       __ubuf__ uint32_t *kValue)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -465,15 +445,14 @@ __simd_vf__ void FindIdxEQOutputVFImpl(__ubuf__ uint32_t* outputIdxBuf,
     MicroAPI::RegTensor<uint32_t> sqzIdxOut;
     MicroAPI::Compare<uint32_t, CMPMODE::EQ>(poutEQ, vregInput, kthValue, pregB32);
 
-    MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(sqzIdxOut,
-                                                                     (MicroAPI::RegTensor<uint32_t>&)idxC, poutEQ);
+    MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(sqzIdxOut, (MicroAPI::RegTensor<uint32_t> &)idxC,
+                                                                     poutEQ);
     MicroAPI::StoreUnAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputIdxBuf, sqzIdxOut, alignIdx);
     MicroAPI::StoreUnAlignPost(outputIdxBuf, alignIdx);
 }
 
-__simd_vf__ void FindValueGTOutputVFImpl(__ubuf__ uint32_t* outputValueBuf,
-                                         __ubuf__ uint32_t* inputBuf, __ubuf__ uint32_t* kValue,
-                                         uint16_t vfLoop)
+__simd_vf__ void FindValueGTOutputVFImpl(__ubuf__ uint32_t *outputValueBuf, __ubuf__ uint32_t *inputBuf,
+                                         __ubuf__ uint32_t *kValue, uint16_t vfLoop)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -495,14 +474,14 @@ __simd_vf__ void FindValueGTOutputVFImpl(__ubuf__ uint32_t* outputValueBuf,
         MicroAPI::Compare<uint32_t, CMPMODE::GT>(poutGT, vregInput, kthValue, pregB32);
 
         MicroAPI::Squeeze<uint32_t, MicroAPI::GatherMaskMode::STORE_REG>(sqzValueOut, vregInput, poutGT);
-        MicroAPI::StoreUnAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputValueBuf,
-                                                                                     sqzValueOut, alignValue);
+        MicroAPI::StoreUnAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputValueBuf, sqzValueOut,
+                                                                                  alignValue);
     }
     MicroAPI::StoreUnAlignPost(outputValueBuf, alignValue);
 }
 
-__simd_vf__ void FindValueEQOutputVFImpl(__ubuf__ uint32_t* outputValueBuf,
-                                         __ubuf__ uint32_t* inputBuf, __ubuf__ uint32_t* kValue)
+__simd_vf__ void FindValueEQOutputVFImpl(__ubuf__ uint32_t *outputValueBuf, __ubuf__ uint32_t *inputBuf,
+                                         __ubuf__ uint32_t *kValue)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
@@ -525,31 +504,25 @@ __simd_vf__ void FindValueEQOutputVFImpl(__ubuf__ uint32_t* outputValueBuf,
     MicroAPI::StoreUnAlignPost(outputValueBuf, alignValue);
 }
 
-__aicore__ inline void LiTopKVF(const LocalTensor<uint32_t>& outputIdxLocal,
-                                const LocalTensor<uint32_t>& outputValueLocal,
-                                const LocalTensor<uint32_t>& inputLocal,
-                                const LocalTensor<uint32_t>& tmpIdxLocal,
-                                const LocalTensor<uint32_t>& tmpValueLocal,
-                                const LocalTensor<uint32_t>& histogramsLocal,
-                                const LocalTensor<uint32_t>& idx0Local,
-                                const LocalTensor<uint32_t>& idx1Local,
-                                const LocalTensor<uint32_t>& idx2Local,
-                                const LocalTensor<uint32_t>& idx3Local,
-                                const LocalTensor<uint32_t>& nkValueLocal,
-                                uint32_t topK,
-                                uint32_t s2SeqLen)
+__aicore__ inline void LiTopKVF(const LocalTensor<uint32_t> &outputIdxLocal,
+                                const LocalTensor<uint32_t> &outputValueLocal, const LocalTensor<uint32_t> &inputLocal,
+                                const LocalTensor<uint32_t> &tmpIdxLocal, const LocalTensor<uint32_t> &tmpValueLocal,
+                                const LocalTensor<uint32_t> &histogramsLocal, const LocalTensor<uint32_t> &idx0Local,
+                                const LocalTensor<uint32_t> &idx1Local, const LocalTensor<uint32_t> &idx2Local,
+                                const LocalTensor<uint32_t> &idx3Local, const LocalTensor<uint32_t> &nkValueLocal,
+                                uint32_t topK, uint32_t s2SeqLen)
 {
-    __ubuf__ uint32_t* outputIdxBuf = (__ubuf__ uint32_t*)outputIdxLocal.GetPhyAddr();
-    __ubuf__ uint32_t* outputValueBuf = (__ubuf__ uint32_t*)outputValueLocal.GetPhyAddr();
-    __ubuf__ uint32_t* inputBuf = (__ubuf__ uint32_t*)inputLocal.GetPhyAddr();
-    __ubuf__ uint32_t* tmpIdxBuf = (__ubuf__ uint32_t*)tmpIdxLocal.GetPhyAddr();
-    __ubuf__ uint32_t* tmpValueBuf = (__ubuf__ uint32_t*)tmpValueLocal.GetPhyAddr();
-    __ubuf__ uint32_t* histogramsBuf = (__ubuf__ uint32_t*)histogramsLocal.GetPhyAddr();
-    __ubuf__ uint32_t* idx0Buf = (__ubuf__ uint32_t*)idx0Local.GetPhyAddr();
-    __ubuf__ uint32_t* idx1Buf = (__ubuf__ uint32_t*)idx1Local.GetPhyAddr();
-    __ubuf__ uint32_t* idx2Buf = (__ubuf__ uint32_t*)idx2Local.GetPhyAddr();
-    __ubuf__ uint32_t* idx3Buf = (__ubuf__ uint32_t*)idx3Local.GetPhyAddr();
-    __ubuf__ uint32_t* nkValueBuf = (__ubuf__ uint32_t*)nkValueLocal.GetPhyAddr();
+    __ubuf__ uint32_t *outputIdxBuf = (__ubuf__ uint32_t *)outputIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t *outputValueBuf = (__ubuf__ uint32_t *)outputValueLocal.GetPhyAddr();
+    __ubuf__ uint32_t *inputBuf = (__ubuf__ uint32_t *)inputLocal.GetPhyAddr();
+    __ubuf__ uint32_t *tmpIdxBuf = (__ubuf__ uint32_t *)tmpIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t *tmpValueBuf = (__ubuf__ uint32_t *)tmpValueLocal.GetPhyAddr();
+    __ubuf__ uint32_t *histogramsBuf = (__ubuf__ uint32_t *)histogramsLocal.GetPhyAddr();
+    __ubuf__ uint32_t *idx0Buf = (__ubuf__ uint32_t *)idx0Local.GetPhyAddr();
+    __ubuf__ uint32_t *idx1Buf = (__ubuf__ uint32_t *)idx1Local.GetPhyAddr();
+    __ubuf__ uint32_t *idx2Buf = (__ubuf__ uint32_t *)idx2Local.GetPhyAddr();
+    __ubuf__ uint32_t *idx3Buf = (__ubuf__ uint32_t *)idx3Local.GetPhyAddr();
+    __ubuf__ uint32_t *nkValueBuf = (__ubuf__ uint32_t *)nkValueLocal.GetPhyAddr();
 
     uint32_t bottomK = s2SeqLen - topK + 1;
     uint32_t beginIdx = 0;
@@ -598,12 +571,12 @@ __aicore__ inline void LiTopKVF(const LocalTensor<uint32_t>& outputIdxLocal,
         int64_t arIdxNumPerLoop = AscendC::GetSpr<AscendC::SpecialPurposeReg::AR>();
         if (((arIdxNumPerLoop - arIdxNum) / sizeof(uint32_t)) < remainIdxNum) {
             // 调用一次查找等于k-value情况的过程
-            beginIdx = i * 64; // 64: 块起始偏移量
+            beginIdx = i * 64;                                                            // 64: 块起始偏移量
             FindIdxEQOutputVFImpl(outputIdxBuf, inputBuf + i * 64, beginIdx, nkValueBuf); // 64: 块起始偏移量
         } else {
             break;
         }
     }
 }
-}
+} // namespace topkb32
 #endif

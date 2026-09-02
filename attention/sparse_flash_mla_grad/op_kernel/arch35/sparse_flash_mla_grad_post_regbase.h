@@ -55,8 +55,7 @@ public:
 
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
           const bool isCmpKVExist>
-__aicore__ inline void
-SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::Init(
+__aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::Init(
     __gm__ uint8_t *dq, __gm__ uint8_t *dori_kv, __gm__ uint8_t *dcmp_kv, __gm__ uint8_t *dsinks,
     __gm__ uint8_t *workspace, const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict ordTilingData,
     TPipe *pipe_in)
@@ -223,8 +222,7 @@ SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExi
 }
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
           const bool isCmpKVExist>
-__aicore__ inline void
-SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::Process()
+__aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::Process()
 {
     if (g_coreType != AIV) {
         return;
