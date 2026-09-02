@@ -701,7 +701,7 @@ ge::graphStatus DequantChecker::CheckFeatureMXFP8Fullquant(const FiaTilingInfo &
                 return ge::GRAPH_FAILED);
 
     // 不支持rope
-    OP_CHECK_IF(fiaInfo.mlaMode != MlaMode::NO_MLA,
+    OP_CHECK_IF(fiaInfo.ropeMode != RopeMode::NO_ROPE,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "rope",
                                                          "In MXFP8 fullquant scenario, rope is not supported"),
                 return ge::GRAPH_FAILED);
