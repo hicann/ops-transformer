@@ -13,6 +13,10 @@
 #include "arch35/minimax_sparse_attention_split_kv_kernel_arch35.h"
 #endif
 
+#if (__CCE_AICORE__ == 220)
+#include "arch22/minimax_sparse_attention_split_kv_kernel_a2.h"
+#endif
+
 #if (__CCE_AICORE__ == 310)
 
 using namespace NpuArch;
@@ -39,6 +43,40 @@ __global__ __aicore__ void MinimaxSaSplitKvInferIntf(GM_ADDR q, GM_ADDR k, GM_AD
                                                                              KernelBlockMmadPV, KernelEpilogueRescaleO>;
 
     MinimaxSaSplitKvKernelParamsArch35 params{
+        q, k,          v,         blockTable, k2qRowPtr, k2qQIndices, k2qSlotIndices, actualQseqlen, actualKvseqlen,
+        o, softmaxLse, workspace, tiling};
+    MinimaxSaSplitKvKernel minimaxSaSplitKvKernel;
+    minimaxSaSplitKvKernel(params);
+}
+
+#endif
+
+#if (__CCE_AICORE__ == 220)
+
+using namespace NpuArch;
+using namespace MinimaxSaSplitKvKernelA2;
+
+template <class InDtype, class SMDtype, class REDtype>
+__global__ __aicore__ void MinimaxSaSplitKvInferIntf(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR blockTable,
+                                                     GM_ADDR k2qRowPtr, GM_ADDR k2qQIndices, GM_ADDR k2qSlotIndices,
+                                                     GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen, GM_ADDR o,
+                                                     GM_ADDR softmaxLse, GM_ADDR workspace, GM_ADDR tiling)
+{
+    using KernelBlockMmadQK = Gemm::Block::BlockMmadQKPrefillA2<InDtype, InDtype, SMDtype>;
+    using KernelBlockMmadPV = Gemm::Block::BlockMmadPVPrefillA2<InDtype, InDtype, REDtype>;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxPrefillA2;
+    using LayoutS = layout::RowMajor;
+    using LayoutPDummy = layout::zN;
+    using PType = Gemm::GemmType<InDtype, LayoutPDummy>;
+    using SType = Gemm::GemmType<SMDtype, LayoutS>;
+    using KernelEpilogueSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
+    using DispatchPolicyRescaleO = Epilogue::EpilogueRescaleOPrefillA2;
+    using KernelEpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, InDtype, REDtype>;
+
+    using MinimaxSaSplitKvKernel = MinimaxSaSplitKvRegularKernelA2<KernelBlockMmadQK, KernelEpilogueSoftmax,
+                                                                   KernelBlockMmadPV, KernelEpilogueRescaleO>;
+
+    MinimaxSaSplitKvKernelParamsA2 params{
         q, k,          v,         blockTable, k2qRowPtr, k2qQIndices, k2qSlotIndices, actualQseqlen, actualKvseqlen,
         o, softmaxLse, workspace, tiling};
     MinimaxSaSplitKvKernel minimaxSaSplitKvKernel;

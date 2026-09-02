@@ -16,24 +16,25 @@ using namespace ge;
 
 namespace ops {
 
-static constexpr uint32_t QUERY_INDEX = 0;
-static constexpr uint32_t ATTENTION_OUT_INDEX = 0;
-static constexpr uint32_t SOFTMAX_LSE_INDEX = 1;
-static constexpr uint32_t TND_DIM_NUM = 3;
-static constexpr uint32_t RANK4_DIM_NUM = 4;
-static constexpr uint32_t LSE_DIM_NUM = 3;
-static constexpr uint32_t LSE_RANK4_DIM_NUM = 4;
-static constexpr int32_t UNKNOWN_DIMS = -2;
+// 算子输入/输出的索引常量，便于在推断逻辑中按索引获取形状与数据类型。
+static constexpr uint32_t QUERY_INDEX = 0;         // query 输入索引
+static constexpr uint32_t ATTENTION_OUT_INDEX = 0; // attentionOut 输出索引
+static constexpr uint32_t SOFTMAX_LSE_INDEX = 1;   // softmaxLse 输出索引
+static constexpr uint32_t TND_DIM_NUM = 3;         // TND 布局的维度数（T, N, D）
+static constexpr uint32_t RANK4_DIM_NUM = 4;       // BNSD/BSND 布局的维度数
+static constexpr uint32_t LSE_DIM_NUM = 3;         // TND softmaxLse 维度数
+static constexpr uint32_t LSE_RANK4_DIM_NUM = 4;   // BNSD/BSND softmaxLse 维度数
+static constexpr int32_t UNKNOWN_DIMS = -2;        // 未知维度标记，用于动态形状场景
 static constexpr int64_t NUM_0 = 0;
 static constexpr int64_t NUM_1 = 1;
 // Matches op_def Attr order: numKeyValueHeads, scaleValue, blockSize, topK,
 // innerPrecise, softmaxLseFlag, inputLayout.
-static constexpr uint32_t ATTR_SOFTMAX_LSE_FLAG_INDEX = 5;
-static constexpr uint32_t ATTR_INPUT_LAYOUT_INDEX = 6;
+static constexpr uint32_t ATTR_SOFTMAX_LSE_FLAG_INDEX = 5; // softmaxLseFlag 属性索引
+static constexpr uint32_t ATTR_INPUT_LAYOUT_INDEX = 6;     // inputLayout 属性索引
 
-static constexpr uint32_t LAYOUT_TND = 0;
-static constexpr uint32_t LAYOUT_BNSD = 1;
-static constexpr uint32_t LAYOUT_BSND = 2;
+static constexpr uint32_t LAYOUT_TND = 0;  // TND [T, N, D]
+static constexpr uint32_t LAYOUT_BNSD = 1; // BNSD [B, N, S, D]
+static constexpr uint32_t LAYOUT_BSND = 2; // BSND [B, S, N, D]
 
 static bool ParseInputLayout(const char *layoutStr, uint32_t &layoutType)
 {
@@ -56,6 +57,10 @@ static bool ParseInputLayout(const char *layoutStr, uint32_t &layoutType)
     return false;
 }
 
+// InferShapeMinimaxSparseAttentionSplitKv: 输出形状推断函数。
+// 推断规则：输出 attentionOut 的形状等于输入 query 的形状（TND 布局: [total_q_tokens, num_q_heads, D]）。
+// 特殊处理：当 query 为未知维度（UNKNOWN_DIMS, 即 -2）时，输出也设为单维未知，用于图编译期的动态形状场景。
+// 校验：query 必须为 3 维（TND_DIM_NUM），否则返回 GRAPH_FAILED。
 static ge::graphStatus InferShapeMinimaxSparseAttentionSplitKv(gert::InferShapeContext *context)
 {
     if (context == nullptr) {
@@ -63,15 +68,16 @@ static ge::graphStatus InferShapeMinimaxSparseAttentionSplitKv(gert::InferShapeC
         return ge::GRAPH_FAILED;
     }
 
+    // 获取输入 query 的形状，作为输出形状推断的依据。
     const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-
+    // 获取输出 attentionOut 的形状对象，待填充。
     gert::Shape *attentionOutShape = context->GetOutputShape(ATTENTION_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
-
     gert::Shape *softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
 
+    // 动态形状场景：query 整体未知时，输出同样标记为未知维度，直接返回成功。
     if (queryShape->GetDimNum() == 1 && queryShape->GetDim(0) == UNKNOWN_DIMS) {
         attentionOutShape->SetDimNum(1);
         (*attentionOutShape)[0] = UNKNOWN_DIMS;
@@ -99,6 +105,7 @@ static ge::graphStatus InferShapeMinimaxSparseAttentionSplitKv(gert::InferShapeC
         return ge::GRAPH_FAILED;
     }
 
+    // 输出形状直接等于 query 形状（TND）。
     *attentionOutShape = *queryShape;
 
     const bool *softmaxLsePtr = attrs->GetAttrPointer<bool>(ATTR_SOFTMAX_LSE_FLAG_INDEX);
@@ -124,11 +131,14 @@ static ge::graphStatus InferShapeMinimaxSparseAttentionSplitKv(gert::InferShapeC
     return ge::GRAPH_SUCCESS;
 }
 
+// InferDataTypeMinimaxSparseAttentionSplitKv: 输出数据类型推断函数。
+// 推断规则：输出 attentionOut 的数据类型等于输入 query 的数据类型（bf16）。
 static ge::graphStatus InferDataTypeMinimaxSparseAttentionSplitKv(gert::InferDataTypeContext *context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
+    // 取 query 的数据类型并赋给输出 attentionOut。
     auto dtype = context->GetInputDataType(QUERY_INDEX);
     if (dtype == ge::DT_FLOAT8_E4M3FN) {
         context->SetOutputDataType(ATTENTION_OUT_INDEX, ge::DT_BF16);
@@ -139,6 +149,7 @@ static ge::graphStatus InferDataTypeMinimaxSparseAttentionSplitKv(gert::InferDat
     return ge::GRAPH_SUCCESS;
 }
 
+// 注册算子的 InferShape 与 InferDataType 回调到 GE。
 IMPL_OP_INFERSHAPE(MinimaxSparseAttentionSplitKv)
     .InferShape(InferShapeMinimaxSparseAttentionSplitKv)
     .InferDataType(InferDataTypeMinimaxSparseAttentionSplitKv);

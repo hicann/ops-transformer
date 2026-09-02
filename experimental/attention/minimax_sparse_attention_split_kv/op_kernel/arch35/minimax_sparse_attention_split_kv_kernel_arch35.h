@@ -12,8 +12,8 @@
 #define MINIMAX_SPARSE_ATTENTION_SPLIT_KV_KERNEL_ARCH35_H
 
 #include <type_traits>
-#include "kernel_utils.hpp"
-#include "../kernel_common.hpp"
+#include "msa_split_kv_kernel_utils_arch35.hpp"
+#include "../msa_split_kv_kernel_common.hpp"
 
 using namespace NpuArch;
 using namespace tla;
