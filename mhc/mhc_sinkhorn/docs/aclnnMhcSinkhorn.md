@@ -317,13 +317,11 @@ int main() {
   void* output_device_addr = nullptr;
   aclTensor* output_tensor = nullptr;
 
-  // 可选输出：norm_out（out_flag=1时有效）
-  std::vector<int64_t> norm_out_shape = {40, 4, 8, 1024};  // 2*num_iters=40, n=4, n_align=8, T=1024
+  std::vector<int64_t> norm_out_shape = {40 * 4 * 8 * 1024};  // 2*num_iters=40, n=4, n_align=8, T=1024
   void* norm_out_device_addr = nullptr;
   aclTensor* norm_out_tensor = nullptr;
 
-  // 可选输出：sum_out（out_flag=1时有效）
-  std::vector<int64_t> sum_out_shape = {40, 8, 1024};  // 2*num_iters=40, n_align=8, T=1024
+  std::vector<int64_t> sum_out_shape = {40 * 8 * 1024};  // 2*num_iters=40, n_align=8, T=1024
   void* sum_out_device_addr = nullptr;
   aclTensor* sum_out_tensor = nullptr;
 
@@ -347,7 +345,6 @@ int main() {
       output_device_addr
   );
 
-  // 可选输出norm_out/sum_out的Tensor（out_flag=1）
   ret = aclrtMalloc(&norm_out_device_addr, GetShapeSize(norm_out_shape)*sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
   CHECK_RET(ret == ACL_SUCCESS,
             LOG_PRINT("Malloc norm_out failed, error: %d\n", ret);
