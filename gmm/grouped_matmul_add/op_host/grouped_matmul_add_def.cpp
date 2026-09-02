@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /*!
  * \file grouped_matmul_add_def.cpp
  * \brief
@@ -18,10 +17,10 @@
 
 namespace ops {
 constexpr int64_t INDEX_GROUP_LIST = 2;
-class GroupedMatmulAdd : public OpDef
-{
+class GroupedMatmulAdd : public OpDef {
 public:
-    explicit GroupedMatmulAdd(const char* name) : OpDef(name)
+    explicit GroupedMatmulAdd(const char *name)
+        : OpDef(name)
     {
         this->Input("x")
             .ParamType(REQUIRED)
@@ -67,6 +66,7 @@ public:
             .ExtendCfgInfo("prebuildPattern.value", "Opaque")
             .ExtendCfgInfo("coreType.value", "AiCore");
         this->AICore().AddConfig("ascend950", config91095);
+        this->AICore().AddConfig("ascend350", config91095);
     }
 };
 OP_ADD(GroupedMatmulAdd);

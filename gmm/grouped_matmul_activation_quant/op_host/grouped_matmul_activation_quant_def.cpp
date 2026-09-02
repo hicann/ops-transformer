@@ -138,6 +138,7 @@ public:
             .ExtendCfgInfo("coreType.value", "AiCore")
             .ExtendCfgInfo("opFile.value", "grouped_matmul_activation_quant_apt");
         this->AICore().AddConfig("ascend950", config950);
+        this->AICore().AddConfig("ascend350", config950);
     }
 };
 

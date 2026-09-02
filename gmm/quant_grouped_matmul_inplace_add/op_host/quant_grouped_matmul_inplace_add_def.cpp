@@ -17,7 +17,8 @@
 namespace ops {
 class QuantGroupedMatmulInplaceAdd : public OpDef {
 public:
-    explicit QuantGroupedMatmulInplaceAdd(const char *name) : OpDef(name)
+    explicit QuantGroupedMatmulInplaceAdd(const char *name)
+        : OpDef(name)
     {
         this->Input("x1")
             .ParamType(REQUIRED)
@@ -43,8 +44,7 @@ public:
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
         this->Input("scale1")
             .ParamType(OPTIONAL)
-            .DataType(
-                {ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
         this->Output("y")
             .ParamType(REQUIRED)
@@ -52,7 +52,7 @@ public:
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
         this->Attr("group_list_type")
             .AttrType(OPTIONAL)
-            .Int(0);  // Indicates whether the value in group_dist is cumsum or count.
+            .Int(0); // Indicates whether the value in group_dist is cumsum or count.
         this->Attr("group_size").AttrType(OPTIONAL).Int(0);
         OpAICoreConfig config91095;
         config91095.DynamicCompileStaticFlag(true)
@@ -64,8 +64,9 @@ public:
             .ExtendCfgInfo("prebuildPattern.value", "Opaque")
             .ExtendCfgInfo("coreType.value", "AiCore")
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("opFile.value","quant_grouped_matmul_inplace_add_apt");
+            .ExtendCfgInfo("opFile.value", "quant_grouped_matmul_inplace_add_apt");
         this->AICore().AddConfig("ascend950", config91095);
+        this->AICore().AddConfig("ascend350", config91095);
     }
 };
 
