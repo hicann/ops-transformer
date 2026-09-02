@@ -168,6 +168,10 @@ bool MatmulAllReduceCheckDtypeValid(const aclTensor *x1, const aclTensor *x2, co
 // 检查传入的reduction数值是否在可选范围内
 bool MatmulAllReduceCheckAttr(const char *reduceOp, int64_t streamMode)
 {
+    if (reduceOp == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE("MatmulAllReduce", "reduceOp", "nullptr", "\"sum\"");
+        return false;
+    }
     bool flag = (strcmp(reduceOp, REDUCE_OP_SUM) == 0);
     if (!flag) {
         OP_LOGE_FOR_INVALID_VALUE("MatmulAllReduce", "reduceOp", reduceOp, "\"sum\"");

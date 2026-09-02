@@ -94,6 +94,10 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
 // 检查传入的reduction数值是否在可选范围内
 static bool CheckAttr(const char *reduceOp, int64_t streamMode, int64_t antiquantGroupSize, const aclTensor *x1)
 {
+    if (reduceOp == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE("aclnnWeightQuantMatmulAllReduce", "reduceOp", "nullptr", "\"sum\"");
+        return false;
+    }
     if (strcmp(reduceOp, REDUCE_OP_SUM) != 0) {
         OP_LOGE_FOR_INVALID_VALUE("aclnnWeightQuantMatmulAllReduce", "reduceOp", reduceOp, "\"sum\"");
         return false;

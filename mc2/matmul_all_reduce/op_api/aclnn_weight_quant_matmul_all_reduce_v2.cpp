@@ -96,6 +96,10 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
 // 检查传入的reduction数值是否在可选范围内
 static bool CheckAttr(const char *reduceOp, int64_t streamMode, int64_t antiquantGroupSize, const aclTensor *x1)
 {
+    if (reduceOp == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Expected reduceOp to be sum, but got nullptr.");
+        return false;
+    }
     if (strcmp(reduceOp, REDUCE_OP_SUM) != 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Expected reduceOp to be sum, but got %s.", reduceOp);
         return false;

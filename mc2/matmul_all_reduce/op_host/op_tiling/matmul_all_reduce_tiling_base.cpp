@@ -1581,6 +1581,7 @@ ge::graphStatus MatmulAllReduceTilingBase::GetAndConvertCommMode(uint8_t &commMo
     if (commModeStr == nullptr) {
         commMode = Mc2Comm::COMM_MODE_AICPU;
         OP_LOGI(opName_, "The input attr comm_mode is nullptr, commMode will use default AICPU.");
+        return ge::GRAPH_SUCCESS;
     }
     if (std::strcmp(commModeStr, "ai_cpu") == 0) {
         commMode = Mc2Comm::COMM_MODE_AICPU;
