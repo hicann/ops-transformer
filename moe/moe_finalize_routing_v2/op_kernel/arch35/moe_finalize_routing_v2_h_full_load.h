@@ -270,9 +270,6 @@ private:
                    1, tilingData->h);
         }
         if (hasBiasAndExpertIdx) {
-            if (expertIdx < 0 || expertIdx >= tilingData->e) {
-                return;
-            }
             int64_t biasGmOffset = expertIdx * tilingData->h;
             CopyIn(biasGm[biasGmOffset], biasLocal[validK * tilingData->hAligned], 1, tilingData->h);
         }

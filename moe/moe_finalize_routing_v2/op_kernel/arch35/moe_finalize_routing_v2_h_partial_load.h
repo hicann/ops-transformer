@@ -159,9 +159,6 @@ private:
         expandedXQue.EnQue(expandedXLocal);
         expandedXLocal = expandedXQue.DeQue<T>();
         if (hasBiasAndExpertIdx) {
-            if (expertIdx < 0 || expertIdx >= tilingData->e) {
-                return;
-            }
             int64_t biasGmOffset = expertIdx * tilingData->h + hIdx * tilingData->hFactor;
             biasLocal = biasQue.AllocTensor<T>();
             CopyIn(biasGm[biasGmOffset], biasLocal, 1, hFactor);

@@ -191,9 +191,6 @@ private:
         }
 
         if (hasBiasAndExpertIdx) {
-            if (expertIdx < 0 || expertIdx >= tilingData->e) {
-                return;
-            }
             biasGmOffset = expertIdx * tilingData->h;
         }
         if (hasScales) {

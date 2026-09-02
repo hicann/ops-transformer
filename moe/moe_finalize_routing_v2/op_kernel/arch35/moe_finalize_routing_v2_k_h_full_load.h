@@ -442,9 +442,6 @@ private:
             }
 
             if (hasBiasAndExpertIdx) {
-                if (expertIdx < 0 || expertIdx >= tilingData->e) {
-                    continue;
-                }
                 int64_t biasGmOffset = expertIdx * tilingData->h;
                 CopyIn(biasGm[biasGmOffset], biasLocal[offset + validK * tilingData->hAligned], 1, tilingData->h);
             }
@@ -552,9 +549,6 @@ private:
             CopyIn(expandedXGm[expandedRowIdxValue * h], expandedXLocal[khAlignedOffset], 1, h);
         }
         if (hasBiasAndExpertIdx) {
-            if (expertIdx < 0 || expertIdx >= tilingData->e) {
-                return;
-            }
             int64_t biasGmOffset = expertIdx * h;
             CopyIn(biasGm[biasGmOffset], biasLocal[khAlignedOffset], 1, h);
         }
