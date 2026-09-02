@@ -235,13 +235,15 @@ struct WorkspaceInfo {
         if (tilingData->topoType == TOPO_TYPE_URMA) {
             maskSlotPtr = base + workspaceSize;
             int64_t sendTotalNum = static_cast<int64_t>(tilingData->bs) * tilingData->topK;
-            int64_t compareCount = Ops::Base::CeilAlign(sendTotalNum * (int64_t)sizeof(int32_t), (int64_t)ALIGN_256) /
-                                   (int64_t)sizeof(int32_t);
-            int64_t maskAlignSize = Ops::Base::CeilAlign(compareCount / 8, (int64_t)ALIGN_32);
-            int64_t maskSlotSize = maskAlignSize + (int64_t)ALIGN_32; // mask + 32B count
+            int64_t compareCount = Ops::Base::CeilAlign(sendTotalNum * static_cast<int64_t>(sizeof(int32_t)),
+                                                        static_cast<int64_t>(ALIGN_256)) /
+                                   static_cast<int64_t>(sizeof(int32_t));
+            int64_t maskAlignSize = Ops::Base::CeilAlign(compareCount / 8, static_cast<int64_t>(ALIGN_32));
+            int64_t maskSlotSize = maskAlignSize + static_cast<int64_t>(ALIGN_32); // mask + 32B count
 
             workspaceSize += Ops::Base::CeilAlign(
-                (int64_t)tilingData->moeExpertPerRank * tilingData->epWorldSize * maskSlotSize, (int64_t)ALIGN_512);
+                static_cast<int64_t>(tilingData->moeExpertPerRank) * tilingData->epWorldSize * maskSlotSize,
+                static_cast<int64_t>(ALIGN_512));
 
             dispatchL1CommPtr = base + workspaceSize;
             int64_t serverWorkspaceBytes =

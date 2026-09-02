@@ -2366,7 +2366,8 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
     context->SetTilingKey(tilingKey);
 
     // WorkspaceSize
-    WorkspaceInfo workspaceInfo((uint8_t *)0, tilingData);
+    // 以地址 0 作为虚拟基址，使构造出的指针值等于各 workspace 分区偏移。
+    WorkspaceInfo workspaceInfo(reinterpret_cast<uint8_t *>(0U), tilingData);
     OP_TILING_CHECK(SetWorkspace(context, workspaceInfo, nodeName) == ge::GRAPH_FAILED,
                     OP_LOGE(nodeName, "Tiling set workspace Failed"), return ge::GRAPH_FAILED);
 
