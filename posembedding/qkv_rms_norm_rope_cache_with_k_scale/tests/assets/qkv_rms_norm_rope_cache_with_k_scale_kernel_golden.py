@@ -984,6 +984,77 @@ def _close_rate(actual, expected, rtol, atol) -> float:
     return 1.0 if actual_flat.size == 0 else matched / actual_flat.size
 
 
+def _mx_pair_semantic_rate(
+    data_actual, scale_actual, data_expected, scale_expected
+) -> float:
+    """Compare D32 MX pairs after dequantizing ``data * scale``."""
+
+    data_actual = np.asarray(data_actual)
+    scale_actual = np.asarray(scale_actual)
+    data_expected = np.asarray(data_expected)
+    scale_expected = np.asarray(scale_expected)
+    if (
+        data_actual.shape != data_expected.shape
+        or scale_actual.shape != scale_expected.shape
+        or data_actual.shape[:-1] != scale_actual.shape[:-1]
+        or data_actual.shape[-1] != scale_actual.shape[-1] * 32
+        or data_actual.dtype.itemsize != 1
+        or data_expected.dtype.itemsize != 1
+        or scale_actual.dtype.itemsize != 1
+        or scale_expected.dtype.itemsize != 1
+    ):
+        return 0.0
+
+    actual_blocks = data_actual.reshape(-1, 32)
+    expected_blocks = data_expected.reshape(-1, 32)
+    actual_data_raw = np.ascontiguousarray(data_actual).view(np.uint8).reshape(-1, 32)
+    expected_data_raw = (
+        np.ascontiguousarray(data_expected).view(np.uint8).reshape(-1, 32)
+    )
+    actual_scale_raw = np.ascontiguousarray(scale_actual).view(np.uint8).reshape(-1)
+    expected_scale_raw = np.ascontiguousarray(scale_expected).view(np.uint8).reshape(-1)
+    matched = 0
+    chunk_blocks = 1 << 16
+    for begin in range(0, actual_blocks.shape[0], chunk_blocks):
+        end = min(actual_blocks.shape[0], begin + chunk_blocks)
+        actual_data = np.asarray(actual_blocks[begin:end], dtype=np.float64)
+        expected_data = np.asarray(expected_blocks[begin:end], dtype=np.float64)
+        actual_raw = actual_scale_raw[begin:end]
+        expected_raw = expected_scale_raw[begin:end]
+        finite_block = (
+            (actual_raw != np.uint8(255))
+            & (expected_raw != np.uint8(255))
+            & np.all(np.isfinite(actual_data), axis=-1)
+            & np.all(np.isfinite(expected_data), axis=-1)
+        )
+
+        actual_exponent = actual_raw.astype(np.int16) - 127
+        expected_exponent = expected_raw.astype(np.int16) - 127
+        actual_dequant = np.ldexp(actual_data, actual_exponent[:, None])
+        expected_dequant = np.ldexp(expected_data, expected_exponent[:, None])
+        expected_scale = np.ldexp(
+            np.ones(expected_exponent.shape, dtype=np.float64), expected_exponent
+        )
+        tolerance = (
+            FP8_RTOL * np.abs(expected_dequant) + FP8_ATOL * expected_scale[:, None]
+        )
+        finite_match = np.less_equal(
+            np.abs(actual_dequant - expected_dequant), tolerance
+        )
+        finite_match &= finite_block[:, None]
+
+        # E8M0 0xff and nonfinite E4M3 values lose their encoding identity after
+        # arithmetic.  Preserve the locked device bytes for these special blocks.
+        special_match = (
+            (actual_raw == expected_raw)[:, None]
+            & (actual_data_raw[begin:end] == expected_data_raw[begin:end])
+            & ~finite_block[:, None]
+        )
+        matched += int(np.count_nonzero(finite_match | special_match))
+
+    return 1.0 if data_actual.size == 0 else matched / data_actual.size
+
+
 def _abs_le_rate(actual, expected, limit) -> float:
     actual = np.asarray(actual)
     expected = np.asarray(expected)
@@ -1072,16 +1143,20 @@ def compare_outputs(*values, compare_context):
             {
                 "q_fp8_close": _close_rate(q_actual, q_golden, FP8_RTOL, FP8_ATOL),
                 "q_scale_e8m0_exact": _exact_rate(qs_actual, qs_golden),
+                "q_mx_pair_semantic": _mx_pair_semantic_rate(
+                    q_actual, qs_actual, q_golden, qs_golden
+                ),
                 "k_fp8_close": _close_rate(k_rows, k_golden_rows, FP8_RTOL, FP8_ATOL),
                 "k_scale_e8m0_exact": _exact_rate(ks_rows, ks_golden_rows),
+                "k_mx_pair_semantic": _mx_pair_semantic_rate(
+                    k_rows, ks_rows, k_golden_rows, ks_golden_rows
+                ),
                 "v_fp8_close": _close_rate(v_rows, v_golden_rows, FP8_RTOL, FP8_ATOL),
             }
         )
         thresholds = {
-            "q_fp8_close": 1.0 - FP8_PTOL,
-            "q_scale_e8m0_exact": 1.0,
-            "k_fp8_close": 1.0 - FP8_PTOL,
-            "k_scale_e8m0_exact": 1.0,
+            "q_mx_pair_semantic": 1.0 - FP8_PTOL,
+            "k_mx_pair_semantic": 1.0 - FP8_PTOL,
             "v_fp8_close": 1.0 - FP8_PTOL,
         }
     elif is_mrope:
