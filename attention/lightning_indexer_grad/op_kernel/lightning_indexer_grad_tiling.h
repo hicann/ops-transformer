@@ -17,6 +17,8 @@
 #include <stdint.h>
 
 namespace optiling {
+constexpr uint32_t LIG_MAX_CORE_NUM = 64;
+
 // -----------算子TilingData定义---------------
 class LIGTilingData {
 public:
@@ -39,6 +41,8 @@ public:
     int64_t scatterAddWorkspaceOffset;
     uint64_t sparseMode;
     bool deterministic;
+    uint64_t totalS1;
+    uint64_t coreS1StartIdx[LIG_MAX_CORE_NUM + 1];
 
     // ========================
     // Getter & Setter 方法
@@ -214,6 +218,20 @@ public:
         this->deterministic = deterministic;
     }
 
+    uint64_t get_totalS1() const
+    {
+        return totalS1;
+    }
+    void set_totalS1(uint64_t totalS1)
+    {
+        this->totalS1 = totalS1;
+    }
+
+    uint64_t *get_coreS1StartIdxPtr()
+    {
+        return coreS1StartIdx;
+    }
+
     void reset()
     {
         set_batch(0);
@@ -234,6 +252,10 @@ public:
         set_groupNum(0);
         set_headNumK(0);
         set_deterministic(false);
+        set_totalS1(0);
+        for (uint32_t i = 0; i <= LIG_MAX_CORE_NUM; i++) {
+            coreS1StartIdx[i] = 0;
+        }
     }
 };
 } // namespace optiling
