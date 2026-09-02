@@ -40,7 +40,7 @@ struct AllGatherMatmulV3HostUtParamBase {
         this->rankSize = stoll(ReadMap(csvMap, "rank_size", "4"));
         this->groupSize = stoll(ReadMap(csvMap, "group_size", "4295032864"));
         this->yDtypeAttr = stoll(ReadMap(csvMap, "y_dtype_attr", "27"));
-        this->commMode = ReadMap(csvMap, "comm_mode", "urma");
+        this->commMode = ReadMap(csvMap, "comm_mode", "aiv_urma");
         this->rankNum = static_cast<uint64_t>(stoull(ReadMap(csvMap, "rank_num", "4")));
     }
 };

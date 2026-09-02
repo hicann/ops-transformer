@@ -141,7 +141,7 @@ aclnnStatus CheckTensorDimNum(const aclTensor *tensor, const char *paramName, in
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
             "aclnnAllGatherQuantMatmulV3", paramName,
             (std::to_string(tensor->GetViewShape().GetDimNum()) + "D").c_str(),
-            ("The shape of " + std::string(paramName) + " must be " + std::to_string(expectedDimNum) + "D.").c_str());
+            ("The shape of " + std::string(paramName) + " must be " + std::to_string(expectedDimNum) + "D").c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -230,13 +230,13 @@ aclnnStatus CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor
                                                (std::string(op::ToString(x1->GetViewShape()).GetString()) + ", " +
                                                 op::ToString(x2->GetViewShape()).GetString())
                                                    .c_str(),
-                                               "K mismatch, x2 must be [N, K] layout.");
+                                               "K mismatch, x2 must be [N, K] layout");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (output->GetViewShape().GetDim(1) != nVal) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("aclnnAllGatherQuantMatmulV3", "output",
                                               op::ToString(output->GetViewShape()).GetString(),
-                                              "output.N must be equal to x2.N.");
+                                              "output.N must be equal to x2.N");
         return ACLNN_ERR_PARAM_INVALID;
     }
     // scale: x1Scale [M, Ceil(K/64), 2]; x2Scale [N, Ceil(K/64), 2]

@@ -61,7 +61,7 @@ struct AllGatherMatmulV3ApiUtParam {
         this->rankSize = stoll(ReadMap(csvMap, "rank_size", "4"));
         this->hcclBufferSize = stoll(ReadMap(csvMap, "hccl_buffer_size", "200"));
         this->groupSize = stoll(ReadMap(csvMap, "group_size", "4295032864"));
-        this->commMode = ReadMap(csvMap, "comm_mode", "urma");
+        this->commMode = ReadMap(csvMap, "comm_mode", "aiv_urma");
         this->expectResult = GetAclnnRet(csvMap, "expect_result");
     }
 };

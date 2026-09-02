@@ -84,6 +84,19 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> NpuAllGatherQuantMatmul(
     std::string groupStr = std::string(group);
     char *groupPtr = const_cast<char *>(groupStr.c_str());
 
+    // x1/x2 原始 dtype 校验：仅支持原生 fp8 (e4m3fn/e5m2) 或 uint8 (fp4 packed, 搭配 296 枚举)。
+    // 必须在使用 dtype 枚举覆盖之前校验，防止 fp32 等非法 dtype 用枚举掩盖后放行。
+    TORCH_CHECK(x1.scalar_type() == at::ScalarType::Float8_e4m3fn || x1.scalar_type() == at::ScalarType::Float8_e5m2 ||
+                    x1.scalar_type() == at::kByte,
+                "x1 only supports torch.float8_e4m3fn, torch.float8_e5m2 or torch.uint8 (fp4 packed, pass "
+                "x1_dtype=296), but got tensor dtype ",
+                x1.scalar_type(), ". Dtype enum cannot override an unsupported storage dtype.");
+    TORCH_CHECK(x2.scalar_type() == at::ScalarType::Float8_e4m3fn || x2.scalar_type() == at::ScalarType::Float8_e5m2 ||
+                    x2.scalar_type() == at::kByte,
+                "x2 only supports torch.float8_e4m3fn, torch.float8_e5m2 or torch.uint8 (fp4 packed, pass "
+                "x2_dtype=296), but got tensor dtype ",
+                x2.scalar_type(), ". Dtype enum cannot override an unsupported storage dtype.");
+
     aclDataType x1AclDtype =
         x1Dtype.has_value() ? GetAclDataType(x1Dtype.value()) : ConvertToAclDataType(x1.scalar_type());
     aclDataType x2AclDtype =
@@ -96,6 +109,24 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> NpuAllGatherQuantMatmul(
 
     const at::Tensor &x1ScaleReal = x1ScaleOptional.value_or(at::Tensor());
     const at::Tensor &x2ScaleReal = x2ScaleOptional.value_or(at::Tensor());
+
+    // scale 原始 dtype 校验：仅支持 uint8(packed, 搭配 e8m0 枚举) 或原生 float8_e8m0fnu。
+    // 必须在使用 dtype 枚举覆盖之前校验，防止 fp32 等非法 dtype 用枚举掩盖后放行。
+    if (x1ScaleReal.defined()) {
+        auto scaleSt = x1ScaleReal.scalar_type();
+        TORCH_CHECK(scaleSt == at::kByte || scaleSt == at::ScalarType::Float8_e8m0fnu,
+                    "x1_scale only supports torch.uint8 (packed, pass x1_scale_dtype=293) or "
+                    "torch.float8_e8m0fnu, but got tensor dtype ",
+                    scaleSt, ". Dtype enum cannot override an unsupported storage dtype.");
+    }
+    if (x2ScaleReal.defined()) {
+        auto scaleSt = x2ScaleReal.scalar_type();
+        TORCH_CHECK(scaleSt == at::kByte || scaleSt == at::ScalarType::Float8_e8m0fnu,
+                    "x2_scale only supports torch.uint8 (packed, pass x2_scale_dtype=293) or "
+                    "torch.float8_e8m0fnu, but got tensor dtype ",
+                    scaleSt, ". Dtype enum cannot override an unsupported storage dtype.");
+    }
+
     aclDataType x1ScaleAclDtype =
         x1ScaleDtype.has_value() ?
             GetAclDataType(x1ScaleDtype.value()) :

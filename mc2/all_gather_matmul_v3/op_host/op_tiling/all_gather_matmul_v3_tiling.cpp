@@ -45,7 +45,6 @@ constexpr uint32_t IDX_INPUT_X2_SCALE = 5U;
 constexpr uint32_t IDX_OUTPUT_Y = 0U;
 
 // ---- attr indices (must match def order) ----
-// group(0) hccl_buffer_size(1) is_trans_a(2) is_trans_b(3) rank_size(4) group_size(5) y_dtype(6) comm_mode(7)
 constexpr uint32_t ATTR_GROUP_INDEX = 0U;
 constexpr uint32_t ATTR_HCCL_BUFFER_SIZE_INDEX = 1U;
 constexpr uint32_t ATTR_IS_TRANS_B_INDEX = 3U;
@@ -79,8 +78,6 @@ static bool IsContains(const std::vector<ge::DataType> &list, ge::DataType value
 {
     return std::find(list.begin(), list.end(), value) != list.end();
 }
-
-// ---- shape info struct ----
 struct ShapeInfo {
     int64_t mPerRank{0};
     int64_t k{0};
@@ -130,20 +127,20 @@ static ge::graphStatus CheckTensorDataType(const gert::TilingContext *context)
     OP_TILING_CHECK(!IsContains(X_DTYPE_LIST, x1Dtype),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                         nodeName, "x1", Ops::Base::ToString(x1Dtype).c_str(),
-                        "The dtype of x1 must be DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2 or DT_FLOAT4_E2M1."),
+                        "The dtype of x1 must be DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2 or DT_FLOAT4_E2M1"),
                     return ge::GRAPH_FAILED);
 
     ge::DataType x2Dtype = x2Desc->GetDataType();
     OP_TILING_CHECK(!IsContains(X_DTYPE_LIST, x2Dtype),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                         nodeName, "x2", Ops::Base::ToString(x2Dtype).c_str(),
-                        "The dtype of x2 must be DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2 or DT_FLOAT4_E2M1."),
+                        "The dtype of x2 must be DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2 or DT_FLOAT4_E2M1"),
                     return ge::GRAPH_FAILED);
 
     // FP4 要求 x1/x2 同时为 FP4
     OP_TILING_CHECK((x1Dtype == ge::DT_FLOAT4_E2M1) != (x2Dtype == ge::DT_FLOAT4_E2M1),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x1/x2", Ops::Base::ToString(x1Dtype).c_str(),
-                                                          "FP4 requires both x1 and x2 to be DT_FLOAT4_E2M1."),
+                                                          "FP4 requires both x1 and x2 to be DT_FLOAT4_E2M1"),
                     return ge::GRAPH_FAILED);
 
     // scale dtype
@@ -151,20 +148,20 @@ static ge::graphStatus CheckTensorDataType(const gert::TilingContext *context)
     OP_TILING_CHECK(x1ScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x1_scale",
                                                           Ops::Base::ToString(x1ScaleDesc->GetDataType()).c_str(),
-                                                          "The dtype of x1_scale must be DT_FLOAT8_E8M0."),
+                                                          "The dtype of x1_scale must be DT_FLOAT8_E8M0"),
                     return ge::GRAPH_FAILED);
     auto x2ScaleDesc = context->GetOptionalInputDesc(IDX_INPUT_X2_SCALE);
     OP_TILING_CHECK(x2ScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x2_scale",
                                                           Ops::Base::ToString(x2ScaleDesc->GetDataType()).c_str(),
-                                                          "The dtype of x2_scale must be DT_FLOAT8_E8M0."),
+                                                          "The dtype of x2_scale must be DT_FLOAT8_E8M0"),
                     return ge::GRAPH_FAILED);
 
     // output dtype
     ge::DataType yDtype = yDesc->GetDataType();
     OP_TILING_CHECK(!IsContains(OUT_DTYPE_LIST, yDtype),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "y", Ops::Base::ToString(yDtype).c_str(),
-                                                          "The dtype of y must be DT_BF16 or DT_FLOAT16."),
+                                                          "The dtype of y must be DT_BF16 or DT_FLOAT16"),
                     return ge::GRAPH_FAILED);
 
     // bias dtype (optional, 若非空，则必须为 DT_FLOAT)
@@ -173,7 +170,7 @@ static ge::graphStatus CheckTensorDataType(const gert::TilingContext *context)
         OP_TILING_CHECK(biasDesc->GetDataType() != ge::DT_FLOAT,
                         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "bias",
                                                               Ops::Base::ToString(biasDesc->GetDataType()).c_str(),
-                                                              "The dtype of bias must be DT_FLOAT."),
+                                                              "The dtype of bias must be DT_FLOAT"),
                         return ge::GRAPH_FAILED);
     }
 
@@ -188,8 +185,7 @@ static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context)
     const char *nodeName = context->GetNodeName();
 
     auto contextDesc = context->GetInputDesc(IDX_INPUT_CONTEXT);
-    ge::Format contextFormat = static_cast<ge::Format>(
-        ge::GetPrimaryFormat(contextDesc->GetStorageFormat())); // todo: 这里到底需要primaryFormat吗？
+    ge::Format contextFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(contextDesc->GetStorageFormat()));
     OP_TILING_CHECK(contextFormat != ge::FORMAT_ND,
                     OP_LOGE_FOR_INVALID_FORMAT(nodeName, "context", Ops::Base::ToString(contextFormat).c_str(), "ND"),
                     return ge::GRAPH_FAILED);
@@ -251,7 +247,7 @@ static ge::graphStatus CheckOneScaleShape(const gert::StorageShape *scaleShape, 
     OP_TILING_CHECK(scaleShape->GetStorageShape().GetDimNum() != SCALE_DIM_NUM,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                         nodeName, paramName, (std::to_string(scaleShape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                        "The shape dim of scale must be 3D."),
+                        "The shape dim of scale must be 3D"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(scaleShape->GetStorageShape().GetDim(0) != dim0 ||
                         scaleShape->GetStorageShape().GetDim(1) != scaleKDim ||
@@ -295,7 +291,7 @@ static ge::graphStatus CheckInputShape(const gert::TilingContext *context, Shape
     OP_TILING_CHECK(x1Shape->GetStorageShape().GetDimNum() != DIM_TWO,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                         nodeName, "x1", (std::to_string(x1Shape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                        "The shape dim of x1 must be 2D."),
+                        "The shape dim of x1 must be 2D"),
                     return ge::GRAPH_FAILED);
 
     const gert::StorageShape *x2Shape = context->GetInputShape(IDX_INPUT_X2);
@@ -303,7 +299,7 @@ static ge::graphStatus CheckInputShape(const gert::TilingContext *context, Shape
     OP_TILING_CHECK(x2Shape->GetStorageShape().GetDimNum() != DIM_TWO,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                         nodeName, "x2", (std::to_string(x2Shape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                        "The shape dim of x2 must be 2D."),
+                        "The shape dim of x2 must be 2D"),
                     return ge::GRAPH_FAILED);
 
     int64_t mPerRank = x1Shape->GetStorageShape().GetDim(0);
@@ -323,15 +319,15 @@ static ge::graphStatus CheckInputShape(const gert::TilingContext *context, Shape
     OP_TILING_CHECK(kX1 != kX2,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         nodeName, "x1 and x2", (std::to_string(kX1) + " and " + std::to_string(kX2)).c_str(),
-                        "The k-axis of x1 and x2 must be the same."),
+                        "The k-axis of x1 and x2 must be the same"),
                     return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(kX1 < K_MIN_VAL || kX1 >= K_MAX_VAL,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "K", std::to_string(kX1).c_str(),
-                                              (std::string("must be in range [") + std::to_string(K_MIN_VAL) + ", " +
-                                               std::to_string(K_MAX_VAL) + ")")
-                                                  .c_str()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        kX1 < K_MIN_VAL || kX1 >= K_MAX_VAL,
+        OP_LOGE_FOR_INVALID_VALUE(
+            nodeName, "K", std::to_string(kX1).c_str(),
+            (std::string("in range [") + std::to_string(K_MIN_VAL) + ", " + std::to_string(K_MAX_VAL) + ")").c_str()),
+        return ge::GRAPH_FAILED);
 
     // fp4 要求 K 为偶数
     auto x1Dtype = context->GetInputDesc(IDX_INPUT_X1)->GetDataType();
@@ -351,7 +347,7 @@ static ge::graphStatus CheckInputShape(const gert::TilingContext *context, Shape
     // rank_size: 直接读取外界传入的 attr
     int64_t rankSize = 0;
     OP_TILING_CHECK(ResolveRankSize(context, rankSize) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "resolve rank_size failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "resolve rank_size failed"), return ge::GRAPH_FAILED);
 
     shapeInfo.mPerRank = mPerRank;
     shapeInfo.k = kX1;
@@ -373,7 +369,7 @@ static ge::graphStatus CheckOutputShape(const gert::TilingContext *context, cons
     OP_TILING_CHECK(yShape->GetStorageShape().GetDimNum() != DIM_TWO,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                         nodeName, "y", (std::to_string(yShape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                        "The shape dim of y must be 2D."),
+                        "The shape dim of y must be 2D"),
                     return ge::GRAPH_FAILED);
 
     int64_t yM = yShape->GetStorageShape().GetDim(0);
@@ -402,7 +398,7 @@ static ge::graphStatus CheckBiasShape(const gert::TilingContext *context, const 
         OP_TILING_CHECK(biasShape->GetStorageShape().GetDimNum() != 1,
                         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                             nodeName, "bias", (std::to_string(biasShape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                            "The shape dim of bias must be 1D."),
+                            "The shape dim of bias must be 1D"),
                         return ge::GRAPH_FAILED);
         OP_TILING_CHECK(
             biasShape->GetStorageShape().GetDim(0) != shapeInfo.n,
@@ -424,10 +420,10 @@ static ge::graphStatus CheckScaleShapes(const gert::TilingContext *context, cons
     int64_t scaleKDim = (shapeInfo.k + static_cast<int64_t>(MX_SCALE_BLOCK) - 1) / static_cast<int64_t>(MX_SCALE_BLOCK);
     OP_TILING_CHECK(CheckOneScaleShape(context->GetOptionalInputShape(IDX_INPUT_X1_SCALE), nodeName, "x1_scale",
                                        shapeInfo.mPerRank, scaleKDim) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check x1_scale shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check x1_scale shape failed"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOneScaleShape(context->GetOptionalInputShape(IDX_INPUT_X2_SCALE), nodeName, "x2_scale",
                                        shapeInfo.n, scaleKDim) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check x2_scale shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check x2_scale shape failed"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -440,13 +436,13 @@ static ge::graphStatus CheckTensorShape(const gert::TilingContext *context, Shap
     const char *nodeName = context->GetNodeName();
 
     OP_TILING_CHECK(CheckInputShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check input shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check input shape failed"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOutputShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check output shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check output shape failed"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckBiasShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check bias shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check bias shape failed"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckScaleShapes(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check scale shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check scale shape failed"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -459,13 +455,13 @@ static ge::graphStatus CheckTensor(const gert::TilingContext *context, ShapeInfo
     const char *nodeName = context->GetNodeName();
 
     OP_TILING_CHECK(CheckTensorPtrNullptr(context) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check tensor nullptr failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckTensorDataType(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check tensor dtype failed."),
+                    OP_LOGE(nodeName, "check tensor nullptr failed"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckTensorDataType(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check tensor dtype failed"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckTensorFormat(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check tensor format failed."),
+    OP_TILING_CHECK(CheckTensorFormat(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check tensor format failed"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckTensorShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check tensor shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check tensor shape failed"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -480,7 +476,7 @@ static ge::graphStatus CheckRankSizeAttr(const gert::TilingContext *context)
     // rank_size: 仅校验外界传入的 attr，不做 group 反查
     int64_t rankSize = 0;
     OP_TILING_CHECK(ResolveRankSize(context, rankSize) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "resolve rank_size failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "resolve rank_size failed"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(rankSize != 2 && rankSize != 4 && rankSize != 8 && rankSize != 16,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "rank_size", std::to_string(rankSize).c_str(), "2/4/8/16"),
                     return ge::GRAPH_FAILED);
@@ -511,11 +507,8 @@ static ge::graphStatus CheckIsTransBAttr(const gert::TilingContext *context)
     auto attrs = context->GetAttrs();
 
     auto isTransBPtr = attrs->GetAttrPointer<bool>(ATTR_IS_TRANS_B_INDEX);
-    OP_TILING_CHECK(
-        isTransBPtr == nullptr,
-        OP_LOGE_WITH_INVALID_INPUT(nodeName, "is_trans_b"), // todo: 还要讨论下这个到底是通过推导后自己构造的is
-                                                            // transb传入aclnninner,还是通过用户透传下来的
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(isTransBPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "is_trans_b"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!(*isTransBPtr),
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "is_trans_b", "false", "true (x2 must be [N,K] layout)"),
                     return ge::GRAPH_FAILED);
@@ -533,8 +526,8 @@ static ge::graphStatus CheckCommModeAttr(const gert::TilingContext *context)
 
     auto commModePtr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
     OP_TILING_CHECK(commModePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "comm_mode"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(std::strcmp(commModePtr, "urma") != 0,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "comm_mode", commModePtr, "urma"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(std::strcmp(commModePtr, "aiv_urma") != 0,
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "comm_mode", commModePtr, "aiv_urma"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -601,7 +594,7 @@ static ge::graphStatus CheckGroupSizeAttr(const gert::TilingContext *context)
         gsK = static_cast<uint64_t>(kValue / scaleKValue);
     }
 
-    OP_LOGI(nodeName, "group_size: attr=[%lu,%lu,%lu], inferred [M=%lu N=%lu K=%lu].",
+    OP_LOGI(nodeName, "group_size: attr=[%lu,%lu,%lu], inferred [M=%lu N=%lu K=%lu]",
             (gs >> GROUP_M_OFFSET) & GROUP_MNK_BIT_SIZE, (gs >> GROUP_N_OFFSET) & GROUP_MNK_BIT_SIZE,
             gs & GROUP_MNK_BIT_SIZE, gsM, gsN, gsK);
     OP_TILING_CHECK(gsM != MX_GROUP_M || gsN != MX_GROUP_N || gsK != MX_GROUP_K,
@@ -665,7 +658,7 @@ static ge::graphStatus CheckHcclBufferSizeAttr(const gert::TilingContext *contex
                     return ge::GRAPH_FAILED);
 
     OP_LOGI(nodeName,
-            "hccl_buffer_size check: hcclBufferSize=%ld bytes, commDataBytes=%lu, reserved=%lu, needBytes=%lu, PASS.",
+            "hccl_buffer_size check: hcclBufferSize=%ld bytes, commDataBytes=%lu, reserved=%lu, needBytes=%lu, PASS",
             hcclBufferSize, commDataBytes, HCCL_BUFFER_RESERVED_BYTES, needBytes);
     return ge::GRAPH_SUCCESS;
 }
@@ -679,16 +672,16 @@ static ge::graphStatus CheckAttrs(const gert::TilingContext *context, const Shap
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckRankSizeAttr(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check rank_size attr failed."),
+    OP_TILING_CHECK(CheckRankSizeAttr(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check rank_size attr failed"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckIsTransBAttr(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check is_trans_b attr failed."),
+    OP_TILING_CHECK(CheckIsTransBAttr(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check is_trans_b attr failed"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckCommModeAttr(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check comm_mode attr failed."),
+    OP_TILING_CHECK(CheckCommModeAttr(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check comm_mode attr failed"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckGroupSizeAttr(context) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check group_size attr failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckGroupSizeAttr(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check group_size attr failed"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckHcclBufferSizeAttr(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check hccl_buffer_size attr failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check hccl_buffer_size attr failed"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -717,7 +710,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
     uint64_t n = static_cast<uint64_t>(shapeInfo.n);
     uint64_t rankSize = shapeInfo.rankSize;
 
-    OP_LOGI(nodeName, "quant dtype: x1=%s x2=%s y=%s, m=%lu k=%lu n=%lu rankSize=%lu.",
+    OP_LOGI(nodeName, "quant dtype: x1=%s x2=%s y=%s, m=%lu k=%lu n=%lu rankSize=%lu",
             Ops::Base::ToString(context->GetInputDesc(IDX_INPUT_X1)->GetDataType()).c_str(),
             Ops::Base::ToString(context->GetInputDesc(IDX_INPUT_X2)->GetDataType()).c_str(),
             Ops::Base::ToString(context->GetOutputDesc(IDX_OUTPUT_Y)->GetDataType()).c_str(), m, k, n, rankSize);
@@ -753,7 +746,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
         tilingEngine.SetAdjustBasicBlockEnable(false);
         tilingEngine.GetTilingData(totalLogicalM, n, k, tilingData->mmTile);
     }
-    OP_LOGD(nodeName, "mmTile(swat): baseM=%u baseN=%u baseK=%u dbL0c=%u swatUsedCoreNum=%u.",
+    OP_LOGD(nodeName, "mmTile(swat): baseM=%u baseN=%u baseK=%u dbL0c=%u swatUsedCoreNum=%u",
             static_cast<uint32_t>(tilingData->mmTile.baseM), static_cast<uint32_t>(tilingData->mmTile.baseN),
             static_cast<uint32_t>(tilingData->mmTile.baseK), static_cast<uint32_t>(tilingData->mmTile.dbL0c),
             static_cast<uint32_t>(tilingData->mmTile.usedCoreNum));
@@ -791,7 +784,7 @@ static void SetTilingKey(gert::TilingContext *context)
 {
     const uint64_t tilingKey = GET_TPL_TILING_KEY(MX_QUANT_MODE);
     context->SetTilingKey(tilingKey);
-    OP_LOGD(context->GetNodeName(), "tilingKey is [%lu].", tilingKey);
+    OP_LOGD(context->GetNodeName(), "tilingKey is [%lu]", tilingKey);
 }
 
 /**
@@ -802,10 +795,10 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context)
     platform_ascendc::PlatformAscendC ascendcPlatform(context->GetPlatformInfo());
     uint64_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     size_t *workSpaces = context->GetWorkspaceSizes(1);
-    OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(context->GetNodeName(), "workSpaces is nullptr."),
+    OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(context->GetNodeName(), "workSpaces is nullptr"),
                     return ge::GRAPH_FAILED);
     workSpaces[0] = workspaceSize;
-    OP_LOGD(context->GetNodeName(), "workspace size is %lu.", workspaceSize);
+    OP_LOGD(context->GetNodeName(), "workspace size is %lu", workspaceSize);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -814,34 +807,34 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context)
  */
 static ge::graphStatus AllGatherMatmulV3TilingFunc(gert::TilingContext *context)
 {
-    OP_TILING_CHECK(context == nullptr, OP_LOGE("AllGatherMatmulV3", "failed to get tiling context."),
+    OP_TILING_CHECK(context == nullptr, OP_LOGE("AllGatherMatmulV3", "failed to get tiling context"),
                     return ge::GRAPH_FAILED);
     const char *nodeName = context->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "nodeName"), return ge::GRAPH_FAILED);
 
-    OP_LOGI(nodeName, "Enter AllGatherMatmulV3 tiling func.");
+    OP_LOGI(nodeName, "Enter AllGatherMatmulV3 tiling func");
 
     // 1. tensor check (ptr + dtype + format + shape)
     ShapeInfo shapeInfo;
     OP_TILING_CHECK(CheckTensor(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check input/output failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "check input/output failed"), return ge::GRAPH_FAILED);
 
     // 2. attr check
-    OP_TILING_CHECK(CheckAttrs(context, shapeInfo) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check attrs failed."),
+    OP_TILING_CHECK(CheckAttrs(context, shapeInfo) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check attrs failed"),
                     return ge::GRAPH_FAILED);
 
     // 3. set tiling data
-    OP_TILING_CHECK(SetTilingData(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "set tiling data failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(SetTilingData(context, shapeInfo) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "set tiling data failed"),
+                    return ge::GRAPH_FAILED);
 
     // 4. set tiling key
     SetTilingKey(context);
 
     // 5. set workspace
-    OP_TILING_CHECK(SetWorkSpace(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "set workspace failed."),
+    OP_TILING_CHECK(SetWorkSpace(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "set workspace failed"),
                     return ge::GRAPH_FAILED);
 
-    OP_LOGI(nodeName, "AllGatherMatmulV3 tiling end.");
+    OP_LOGI(nodeName, "AllGatherMatmulV3 tiling end");
     return ge::GRAPH_SUCCESS;
 }
 
