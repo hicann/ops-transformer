@@ -49,7 +49,9 @@ public:
     __aicore__ inline AllGatherMatmulBase(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs,
                                           Mc2Tiling::AllGatherMatmulTilingDataFp8 *tilingData, GM_ADDR contextGM,
                                           TPipe *tPipe)
-        : addrs_(addrs), quantAddrs_(quantAddrs), tPipe_(tPipe)
+        : addrs_(addrs),
+          quantAddrs_(quantAddrs),
+          tPipe_(tPipe)
     {
         tilingData_ = tilingData;
         paramInTiling_ = &tilingData->param;

@@ -58,9 +58,7 @@ template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTr
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
 class Mc2WeightQuantBatchMatmulV2FixpipeKernel {
 public:
-    __aicore__ inline Mc2WeightQuantBatchMatmulV2FixpipeKernel()
-    {
-    }
+    __aicore__ inline Mc2WeightQuantBatchMatmulV2FixpipeKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
                                 const Mc2WeightQuantBatchMatmulV2FixpipeTilingData *tilingData, TPipe *tPipe);
@@ -413,10 +411,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::ReviseOffsetParams(OffsetParam &offsetParam)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::ReviseOffsetParams(OffsetParam &offsetParam)
 {
     // 求解真实的baseM
     offsetParam.realBaseM =
@@ -433,10 +430,9 @@ Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, 
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::LoadDiag(const LocalTensor<int8_t> &diagL0b)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::LoadDiag(const LocalTensor<int8_t> &diagL0b)
 {
     // 初始化l0a空间
     InitConstValueParams<int32_t> initDiagParams;
@@ -489,10 +485,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::WeightGmToL1(const OffsetParam &offsetParam)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::WeightGmToL1(const OffsetParam &offsetParam)
 {
     LocalTensor<DTYPE_WEIGHT> weightS8L1;
     weightS8L1 = (taskId_ & 1) == 0 ? weightS8L1Ping_ : weightS8L1Pong_;
@@ -526,10 +521,9 @@ Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, 
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::AGmToL1(const OffsetParam &offsetParam)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::AGmToL1(const OffsetParam &offsetParam)
 {
     LocalTensor<DTYPE_X> aF16L1;
     aF16L1 = (taskId_ & 1) == 0 ? aF16L1Ping_ : aF16L1Pong_;
@@ -557,10 +551,9 @@ Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, 
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::AntiqScaleOffsetGmToL1(const OffsetParam &offsetParam)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::AntiqScaleOffsetGmToL1(const OffsetParam &offsetParam)
 {
     LocalTensor<uint64_t> antiquantScaleL1;
     antiquantScaleL1 = (taskId_ & 1) == 0 ? antiScaleL1Ping_ : antiScaleL1Pong_;
@@ -608,10 +601,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::BiasGmToL1(const OffsetParam &offsetParam)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::BiasGmToL1(const OffsetParam &offsetParam)
 {
     if constexpr (!hasBias) {
         return;
@@ -734,10 +726,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::WaitStage1FixpFlag(const TEventID &stage1FixpId)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::WaitStage1FixpFlag(const TEventID &stage1FixpId)
 {
     if (unlikely(stage1SyncCount_ == 1)) {
         // s1只有一拍，属于尾块场景，通过同步隔离s1s2
@@ -818,10 +809,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2FixpipeKernel<
 
 template <typename antiquantOffsetType, typename biasType, bool aTrans, bool bTrans, Mc2QuantType antiquantType,
           Mc2QuantType quantType, bool hasAntiquantOffset, bool hasBias, CubeFormat weightFormat, bool aFullLoad>
-__aicore__ inline bool
-Mc2WeightQuantBatchMatmulV2FixpipeKernel<antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType,
-                                         hasAntiquantOffset, hasBias, weightFormat,
-                                         aFullLoad>::Iterate(OffsetParam &curOffsetParam, OffsetParam &preOffsetParam)
+__aicore__ inline bool Mc2WeightQuantBatchMatmulV2FixpipeKernel<
+    antiquantOffsetType, biasType, aTrans, bTrans, antiquantType, quantType, hasAntiquantOffset, hasBias, weightFormat,
+    aFullLoad>::Iterate(OffsetParam &curOffsetParam, OffsetParam &preOffsetParam)
 {
     curOffsetParam.kOffset = preOffsetParam.kOffset + tiling_->baseK;
     if (curOffsetParam.kOffset >= tiling_->kSize) {

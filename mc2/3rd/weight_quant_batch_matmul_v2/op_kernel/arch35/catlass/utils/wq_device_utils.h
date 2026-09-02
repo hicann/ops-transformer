@@ -14,21 +14,21 @@
 
 #if defined(__CCE_KT_TEST__)
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define X_LOG(format, ...)                                                                                             \
-    do {                                                                                                               \
-        std::string coreType = "";                                                                                     \
-        std::string blockId = "Block_";                                                                                \
-        if (g_coreType == AscendC::AIC_TYPE) {                                                                         \
-            coreType = "AIC_";                                                                                         \
-        } else if (g_coreType == AscendC::AIV_TYPE) {                                                                  \
-            coreType = "AIV_";                                                                                         \
-        } else {                                                                                                       \
-            coreType = "MIX_";                                                                                         \
-        }                                                                                                              \
-        coreType += std::to_string(sub_block_idx);                                                                     \
-        blockId += std::to_string(block_idx);                                                                          \
-        printf("[%s][%s][%s:%d][%s][%ld] " format "\n", blockId.c_str(), coreType.c_str(), FILENAME, __LINE__,         \
-               __FUNCTION__, (long)getpid(), ##__VA_ARGS__);                                                           \
+#define X_LOG(format, ...) \
+    do { \
+        std::string coreType = ""; \
+        std::string blockId = "Block_"; \
+        if (g_coreType == AscendC::AIC_TYPE) { \
+            coreType = "AIC_"; \
+        } else if (g_coreType == AscendC::AIV_TYPE) { \
+            coreType = "AIV_"; \
+        } else { \
+            coreType = "MIX_"; \
+        } \
+        coreType += std::to_string(sub_block_idx); \
+        blockId += std::to_string(block_idx); \
+        printf("[%s][%s][%s:%d][%s][%ld] " format "\n", blockId.c_str(), coreType.c_str(), FILENAME, __LINE__, \
+               __FUNCTION__, (long)getpid(), ##__VA_ARGS__); \
     } while (0)
 
 #else

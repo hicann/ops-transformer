@@ -26,9 +26,9 @@ namespace MC2Tiling {
 
 class MatmulAllToAllTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MatmulAllToAllTilingBase(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit MatmulAllToAllTilingBase(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
     void Reset(gert::TilingContext *context) override
     {
         TilingBaseClass::Reset(context);

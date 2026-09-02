@@ -54,9 +54,7 @@ struct Mc2ASWOffsetParam {
 
 class Mc2WeightQuantBmmAswBlock {
 public:
-    __aicore__ inline Mc2WeightQuantBmmAswBlock()
-    {
-    }
+    __aicore__ inline Mc2WeightQuantBmmAswBlock() {}
     __aicore__ inline void Init(const WeightQuantBatchMatmulV2ASWTilingData *tilingData, uint32_t blockIdx);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx);
     __aicore__ inline void UpdateBlockParams(uint64_t roundIdx);

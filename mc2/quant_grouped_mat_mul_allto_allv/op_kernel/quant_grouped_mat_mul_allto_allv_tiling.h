@@ -15,7 +15,6 @@
 #ifndef QUANT_GROUPED_MAT_MUL_ALLTO_ALLV_TILING_H__
 #define QUANT_GROUPED_MAT_MUL_ALLTO_ALLV_TILING_H__
 
-
 #include "../../allto_allv_quant_grouped_mat_mul/op_kernel/mc2_templates/common/a2av_common_tiling.h"
 
 #pragma once

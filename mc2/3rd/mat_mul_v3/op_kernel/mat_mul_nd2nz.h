@@ -110,10 +110,11 @@ __aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &dstGlobal, const Glob
 
 #if defined(__CCE_AICORE__) && (__CCE_AICORE__ > 200)
 template <>
-__aicore__ inline void
-CopyPadNd2Nz<bfloat16_t>(const GlobalTensor<bfloat16_t> &dstGlobal, const GlobalTensor<bfloat16_t> &srcGlobal,
-                         uint32_t baseH, uint32_t baseW, uint32_t orgHeight, uint32_t orgWidth,
-                         LocalTensor<bfloat16_t> ubLocal1, LocalTensor<bfloat16_t> ubLocal2, uint8_t padH, uint8_t padW)
+__aicore__ inline void CopyPadNd2Nz<bfloat16_t>(const GlobalTensor<bfloat16_t> &dstGlobal,
+                                                const GlobalTensor<bfloat16_t> &srcGlobal, uint32_t baseH,
+                                                uint32_t baseW, uint32_t orgHeight, uint32_t orgWidth,
+                                                LocalTensor<bfloat16_t> ubLocal1, LocalTensor<bfloat16_t> ubLocal2,
+                                                uint8_t padH, uint8_t padW)
 {
     GlobalTensor<half> dstGlobalTrans;
     GlobalTensor<half> srcGlobalTrans;

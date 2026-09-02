@@ -20,9 +20,7 @@
 namespace AscendC {
 class Mc2QuantBatchMatmulV3BaseBlock {
 public:
-    __aicore__ inline Mc2QuantBatchMatmulV3BaseBlock()
-    {
-    }
+    __aicore__ inline Mc2QuantBatchMatmulV3BaseBlock() {}
     __aicore__ inline void Init(const Mc2QuantBatchMatmulV3TilingData *tilingData);
     __aicore__ inline void Init(const Mc2L2cacheTileParam *tilingL2, const TCubeTiling *matmulTilingData);
     __aicore__ inline void UpdateBlockCnt(uint64_t mTileIndex, uint64_t nTileIndex);

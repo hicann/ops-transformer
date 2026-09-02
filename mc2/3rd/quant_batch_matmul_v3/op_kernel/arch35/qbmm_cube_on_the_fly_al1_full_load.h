@@ -28,9 +28,7 @@ using namespace matmul;
 LOCAL_TEMPLATE_CLASS_PARAMS
 class MatmulAswKernelAL1FullLoad : public MatMulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS> {
 public:
-    __aicore__ inline MatmulAswKernelAL1FullLoad()
-    {
-    }
+    __aicore__ inline MatmulAswKernelAL1FullLoad() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
                                 GM_ADDR cGM, GM_ADDR workspace, const void *tilingData, TPipe *pipe);
     __aicore__ inline void Process();

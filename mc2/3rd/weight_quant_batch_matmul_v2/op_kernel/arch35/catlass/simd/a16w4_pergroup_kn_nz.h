@@ -125,8 +125,8 @@ template <typename DtypeDst, bool hasAntiQuantOffset>
 DEVICE void ProcessTailGroup(uint16_t n1Idx, Regs<DtypeDst> &reg, const VfParams &param, TailAddr<DtypeDst> &addr,
                              MicroAPI::MaskReg &preg)
 {
-    MicroAPI::DataCopy<DtypeDst, MicroAPI::LoadDist::DIST_BLK>(reg.scale, addr.tailScaleBaseAddr +
-                                                                              n1Idx * ONE_BLK_ELEM<DtypeDst>::value);
+    MicroAPI::DataCopy<DtypeDst, MicroAPI::LoadDist::DIST_BLK>(
+        reg.scale, addr.tailScaleBaseAddr + n1Idx * ONE_BLK_ELEM<DtypeDst>::value);
     if constexpr (hasAntiQuantOffset) {
         MicroAPI::DataCopy<DtypeDst, MicroAPI::LoadDist::DIST_BLK>(
             reg.offset, addr.tailOffsetBaseAddr + n1Idx * ONE_BLK_ELEM<DtypeDst>::value);

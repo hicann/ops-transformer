@@ -30,14 +30,14 @@ constexpr FlagID FFTS_MAX_FLAG = 7;
 
 struct CrossCoreFlag {
     CATLASS_DEVICE
-    CrossCoreFlag() : id(0)
-    {
-    }
+    CrossCoreFlag()
+        : id(0)
+    {}
 
     CATLASS_DEVICE
-    CrossCoreFlag(FlagID id) : id(id)
-    {
-    }
+    CrossCoreFlag(FlagID id)
+        : id(id)
+    {}
 
     FlagID id;
 };
@@ -45,14 +45,16 @@ struct CrossCoreFlag {
 template <uint32_t REVERSE_DEPTH_ = MAX_REVERSE_DEPTH>
 struct CrossCoreFlagWithReverse {
     CATLASS_DEVICE
-    CrossCoreFlagWithReverse() : id(0), reverseId(0)
-    {
-    }
+    CrossCoreFlagWithReverse()
+        : id(0),
+          reverseId(0)
+    {}
 
     CATLASS_DEVICE
-    CrossCoreFlagWithReverse(FlagID id, FlagID reverseId) : id(id), reverseId(reverseId)
-    {
-    }
+    CrossCoreFlagWithReverse(FlagID id, FlagID reverseId)
+        : id(id),
+          reverseId(reverseId)
+    {}
 
     FlagID id;
     FlagID reverseId;

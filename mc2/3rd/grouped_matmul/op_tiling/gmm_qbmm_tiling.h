@@ -152,7 +152,8 @@ struct GQmmInputInfo {
 
 class Mc2GroupedQbmmTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit Mc2GroupedQbmmTiling(gert::TilingContext *context) : Ops::Transformer::OpTiling::TilingBaseClass(context)
+    explicit Mc2GroupedQbmmTiling(gert::TilingContext *context)
+        : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         Reset();
     }

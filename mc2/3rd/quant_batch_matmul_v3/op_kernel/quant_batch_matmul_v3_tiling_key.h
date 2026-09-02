@@ -34,24 +34,23 @@
 #define QUANT_BATCH_MATMUL_V3_NEED_ATOMICLEAN 1
 #define QUANT_BATCH_MATMUL_V3_IS_AICAIV_1_2 2
 
-#define SET_NOT_PERTOKEN_ATTR_NONE                                                                                     \
-    ASCENDC_TPL_UINT_SEL(PERTOKEN, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_NOT_PERTOKEN),                           \
+#define SET_NOT_PERTOKEN_ATTR_NONE \
+    ASCENDC_TPL_UINT_SEL(PERTOKEN, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_NOT_PERTOKEN), \
         ASCENDC_TPL_UINT_SEL(OPTION_ATTRS, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_OPTION_ATTR_NONE),
 
-#define SET_CUBE_ONLY_ATTR_NONE(trans, kernel_template_type, pertoken)                                                 \
-    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIC_ONLY), ASCENDC_TPL_UINT_SEL(TRANS, ASCENDC_TPL_UI_LIST, trans),        \
-        ASCENDC_TPL_UINT_SEL(KERNEL_TEMPLATE_TYPE, ASCENDC_TPL_UI_LIST,                                                \
-                             QUANT_BATCH_MATMUl_V3_KERNEL_TEMPLATE_TYPE_##kernel_template_type),                       \
-        ASCENDC_TPL_UINT_SEL(PERTOKEN, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_##pertoken),                         \
+#define SET_CUBE_ONLY_ATTR_NONE(trans, kernel_template_type, pertoken) \
+    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIC_ONLY), ASCENDC_TPL_UINT_SEL(TRANS, ASCENDC_TPL_UI_LIST, trans), \
+        ASCENDC_TPL_UINT_SEL(KERNEL_TEMPLATE_TYPE, ASCENDC_TPL_UI_LIST, \
+                             QUANT_BATCH_MATMUl_V3_KERNEL_TEMPLATE_TYPE_##kernel_template_type), \
+        ASCENDC_TPL_UINT_SEL(PERTOKEN, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_##pertoken), \
         ASCENDC_TPL_UINT_SEL(OPTION_ATTRS, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_OPTION_ATTR_NONE),
 
-#define SET_CV11_ATTR_NONE(trans, kernel_template_type, pertoken)                                                      \
-    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_1), ASCENDC_TPL_UINT_SEL(TRANS, ASCENDC_TPL_UI_LIST, trans),     \
-        ASCENDC_TPL_UINT_SEL(KERNEL_TEMPLATE_TYPE, ASCENDC_TPL_UI_LIST,                                                \
-                             QUANT_BATCH_MATMUl_V3_KERNEL_TEMPLATE_TYPE_##kernel_template_type),                       \
-        ASCENDC_TPL_UINT_SEL(PERTOKEN, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_##pertoken),                         \
+#define SET_CV11_ATTR_NONE(trans, kernel_template_type, pertoken) \
+    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_1), ASCENDC_TPL_UINT_SEL(TRANS, ASCENDC_TPL_UI_LIST, trans), \
+        ASCENDC_TPL_UINT_SEL(KERNEL_TEMPLATE_TYPE, ASCENDC_TPL_UI_LIST, \
+                             QUANT_BATCH_MATMUl_V3_KERNEL_TEMPLATE_TYPE_##kernel_template_type), \
+        ASCENDC_TPL_UINT_SEL(PERTOKEN, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_##pertoken), \
         ASCENDC_TPL_UINT_SEL(OPTION_ATTRS, ASCENDC_TPL_UI_LIST, QUANT_BATCH_MATMUL_V3_OPTION_ATTR_NONE),
-
 
 ASCENDC_TPL_ARGS_DECL(Mc2QuantBatchMatmulV3,
                       ASCENDC_TPL_UINT_DECL(TRANS, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,

@@ -31,9 +31,9 @@ struct MatmulAlltoAllTilingValue {
     int32_t value = -1;
     std::map<int, std::vector<std::vector<int>>> conditionMap = {};
     explicit MatmulAlltoAllTilingValue(int32_t v = -1, std::map<int, std::vector<std::vector<int>>> m = {})
-        : value(v), conditionMap(std::move(m))
-    {
-    }
+        : value(v),
+          conditionMap(std::move(m))
+    {}
 };
 
 class MatmulAlltoAllTiling910B : public MatmulAllToAllTilingBase {

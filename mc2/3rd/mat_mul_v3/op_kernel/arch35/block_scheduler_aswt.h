@@ -86,7 +86,8 @@ public:
 public:
     __aicore__ inline Mc2BlockSchedulerAswtBuiltIn(const ProblemShape &shape, int64_t blockIdx, int64_t blockNum,
                                                    const Params &params)
-        : blockIdx_(blockIdx), blockNum_(blockNum)
+        : blockIdx_(blockIdx),
+          blockNum_(blockNum)
     {
         k_ = shape.k;
         batch_ = AscendC::Std::max(shape.b, 1L);

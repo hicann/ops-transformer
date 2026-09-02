@@ -37,8 +37,7 @@ public:
     CATLASS_DEVICE
     explicit Bf16BiasCaster(Arch::Resource<ArchTag> &resource_)
         : resource(resource_)
-    {
-    }
+    {}
 
     CATLASS_DEVICE
     void operator()(GM_ADDR ptrDst, GM_ADDR ptrSrc, uint32_t biasLength)
@@ -59,8 +58,7 @@ public:
         gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(ptrDst));
 
         auto srcLocal = resource.ubBuf.template GetBufferByByte<bfloat16_t>(0);
-        auto dstLocal = resource.ubBuf.template GetBufferByByte<float>(
-            BIAS_CAST_TILE_ELEMENTS * sizeof(bfloat16_t));
+        auto dstLocal = resource.ubBuf.template GetBufferByByte<float>(BIAS_CAST_TILE_ELEMENTS * sizeof(bfloat16_t));
 
         AscendC::TEventID eventSrc = EVENT_ID0;
         AscendC::TEventID eventDst = EVENT_ID1;
@@ -68,8 +66,8 @@ public:
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventDst);
 
         for (uint64_t offset = start; offset < end; offset += BIAS_CAST_TILE_ELEMENTS) {
-            uint32_t actual = static_cast<uint32_t>(
-                end - offset < BIAS_CAST_TILE_ELEMENTS ? end - offset : BIAS_CAST_TILE_ELEMENTS);
+            uint32_t actual =
+                static_cast<uint32_t>(end - offset < BIAS_CAST_TILE_ELEMENTS ? end - offset : BIAS_CAST_TILE_ELEMENTS);
             AscendC::DataCopyExtParams copyInParams(1, actual * sizeof(bfloat16_t), 0, 0, 0);
             AscendC::DataCopyPadExtParams<bfloat16_t> padParams;
 
@@ -131,9 +129,7 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_, GM_ADDR ptrWA_, LayoutA layoutWA_,
@@ -153,15 +149,12 @@ public:
               biasLength(biasLength_),
               ptrBias(ptrBias_),
               ptrBiasCast(ptrBiasCast_)
-        {
-        }
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    TemplatePadder()
-    {
-    }
+    TemplatePadder() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -227,9 +220,9 @@ public:
             LayoutB layoutWB{matrixBK, matrixBNAlign};
 
             using TemplatePadder = Gemm::Kernel::TemplatePadder<ArchTag, AType, BType>;
-            typename TemplatePadder::Params params{gmA, layoutA, gmB, layoutB, gmAAlign,
-                                                   layoutWA, gmBAlign, layoutWB, alignedA, alignedB,
-                                                   castBias, biasLength, gmBias, gmBiasCast};
+            typename TemplatePadder::Params params{gmA,      layoutA,    gmB,      layoutB,   gmAAlign,
+                                                   layoutWA, gmBAlign,   layoutWB, alignedA,  alignedB,
+                                                   castBias, biasLength, gmBias,   gmBiasCast};
             TemplatePadder padder;
             padder(params);
         } else if (!transA && transB) {
@@ -243,9 +236,9 @@ public:
             LayoutB layoutWB{matrixBKAlign, matrixBN};
 
             using TemplatePadder = Gemm::Kernel::TemplatePadder<ArchTag, AType, BType>;
-            typename TemplatePadder::Params params{gmA, layoutA, gmB, layoutB, gmAAlign,
-                                                   layoutWA, gmBAlign, layoutWB, alignedA, alignedB,
-                                                   castBias, biasLength, gmBias, gmBiasCast};
+            typename TemplatePadder::Params params{gmA,      layoutA,    gmB,      layoutB,   gmAAlign,
+                                                   layoutWA, gmBAlign,   layoutWB, alignedA,  alignedB,
+                                                   castBias, biasLength, gmBias,   gmBiasCast};
             TemplatePadder padder;
             padder(params);
         } else if (transA && !transB) {
@@ -259,9 +252,9 @@ public:
             LayoutB layoutWB{matrixBK, matrixBNAlign};
 
             using TemplatePadder = Gemm::Kernel::TemplatePadder<ArchTag, AType, BType>;
-            typename TemplatePadder::Params params{gmA, layoutA, gmB, layoutB, gmAAlign,
-                                                   layoutWA, gmBAlign, layoutWB, alignedA, alignedB,
-                                                   castBias, biasLength, gmBias, gmBiasCast};
+            typename TemplatePadder::Params params{gmA,      layoutA,    gmB,      layoutB,   gmAAlign,
+                                                   layoutWA, gmBAlign,   layoutWB, alignedA,  alignedB,
+                                                   castBias, biasLength, gmBias,   gmBiasCast};
             TemplatePadder padder;
             padder(params);
         } else {
@@ -275,9 +268,9 @@ public:
             LayoutB layoutWB{matrixBKAlign, matrixBN};
 
             using TemplatePadder = Gemm::Kernel::TemplatePadder<ArchTag, AType, BType>;
-            typename TemplatePadder::Params params{gmA, layoutA, gmB, layoutB, gmAAlign,
-                                                   layoutWA, gmBAlign, layoutWB, alignedA, alignedB,
-                                                   castBias, biasLength, gmBias, gmBiasCast};
+            typename TemplatePadder::Params params{gmA,      layoutA,    gmB,      layoutB,   gmAAlign,
+                                                   layoutWA, gmBAlign,   layoutWB, alignedA,  alignedB,
+                                                   castBias, biasLength, gmBias,   gmBiasCast};
             TemplatePadder padder;
             padder(params);
         }

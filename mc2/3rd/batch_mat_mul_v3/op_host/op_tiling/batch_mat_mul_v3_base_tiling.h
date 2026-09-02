@@ -95,20 +95,19 @@ class Mc2BatchMatmulV3BaseTiling : public mc2_matmul_v3::Mc2MatmulV3BaseTiling {
 public:
 public:
     explicit Mc2BatchMatmulV3BaseTiling(gert::TilingContext *context)
-        : Mc2MatmulV3BaseTiling(context, &bmmTilingDataSelf_.matmulTiling), bmmTilingData_(bmmTilingDataSelf_)
-    {
-    }
+        : Mc2MatmulV3BaseTiling(context, &bmmTilingDataSelf_.matmulTiling),
+          bmmTilingData_(bmmTilingDataSelf_)
+    {}
 
     Mc2BatchMatmulV3BaseTiling(gert::TilingContext *context, Mc2BatchMatmulTilingData &bmmTilingData,
                                Mc2TilingCalcSelect tilingSelect = Mc2TilingCalcSelect::COMMON)
-        : Mc2MatmulV3BaseTiling(context, &bmmTilingData.matmulTiling), bmmTilingData_(bmmTilingData)
+        : Mc2MatmulV3BaseTiling(context, &bmmTilingData.matmulTiling),
+          bmmTilingData_(bmmTilingData)
     {
         tilingSelect_ = tilingSelect;
     }
 
-    ~Mc2BatchMatmulV3BaseTiling() override
-    {
-    }
+    ~Mc2BatchMatmulV3BaseTiling() override {}
 
 protected:
     // 2、获取INPUT/OUTPUT/ATTR信息

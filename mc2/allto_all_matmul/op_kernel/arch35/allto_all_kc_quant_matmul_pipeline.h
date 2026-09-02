@@ -38,7 +38,9 @@ public:
     __aicore__ inline AlltoAllKCQuantMatmulPipeLine(CommunicationType *commStage,
                                                     TransposeAndQuantizeType *transAndQuantStage,
                                                     ComputationType *computeStage)
-        : commStage_(commStage), transAndQuantStage_(transAndQuantStage), computeStage_(computeStage){};
+        : commStage_(commStage),
+          transAndQuantStage_(transAndQuantStage),
+          computeStage_(computeStage){};
 
     __aicore__ inline void Init();
 
@@ -63,9 +65,8 @@ AlltoAllKCQuantMatmulPipeLine<CommunicationType, TransposeAndQuantizeType, Compu
 }
 
 template <typename CommunicationType, typename TransposeAndQuantizeType, typename ComputationType, typename ContextType>
-__aicore__ inline void
-AlltoAllKCQuantMatmulPipeLine<CommunicationType, TransposeAndQuantizeType, ComputationType, ContextType>::GetContext(
-    ContextType *context)
+__aicore__ inline void AlltoAllKCQuantMatmulPipeLine<CommunicationType, TransposeAndQuantizeType, ComputationType,
+                                                     ContextType>::GetContext(ContextType *context)
 {
     context->communicationContext = commStage_->GetContextPtr();
     context->quantizationContext = transAndQuantStage_->GetContextPtr();
@@ -73,9 +74,8 @@ AlltoAllKCQuantMatmulPipeLine<CommunicationType, TransposeAndQuantizeType, Compu
 }
 
 template <typename CommunicationType, typename TransposeAndQuantizeType, typename ComputationType, typename ContextType>
-__aicore__ inline void
-AlltoAllKCQuantMatmulPipeLine<CommunicationType, TransposeAndQuantizeType, ComputationType, ContextType>::Process(
-    uint32_t taskCnt)
+__aicore__ inline void AlltoAllKCQuantMatmulPipeLine<CommunicationType, TransposeAndQuantizeType, ComputationType,
+                                                     ContextType>::Process(uint32_t taskCnt)
 {
     commStage_->PrepareAll(taskCnt);
     uint32_t index;

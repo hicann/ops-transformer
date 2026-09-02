@@ -21,15 +21,15 @@
 namespace optiling {
 struct Mc2QuantBatchMatmulV3BitField {
     // 这里要保证是32bit
-    uint16_t transA      : 1;
-    uint16_t transB      : 1;
-    uint16_t hasBias     : 1;
-    uint16_t aFormatNd   : 1;
-    uint16_t bFormatNd   : 1;
-    uint16_t cFormatNd   : 1;
+    uint16_t transA : 1;
+    uint16_t transB : 1;
+    uint16_t hasBias : 1;
+    uint16_t aFormatNd : 1;
+    uint16_t bFormatNd : 1;
+    uint16_t cFormatNd : 1;
     uint16_t isPerTensor : 1;
-    uint16_t isPertoken  : 1;
-    uint32_t reserved    : 24;
+    uint16_t isPertoken : 1;
+    uint32_t reserved : 24;
 };
 
 class Mc2QuantBatchMatmulV3HashInput {
@@ -73,8 +73,7 @@ public:
     explicit Mc2QuantBatchMatmulV3HashItem(const Mc2QuantBatchMatmulInfo &params,
                                            const Ops::Transformer::OpTiling::AiCoreParams &aicoreParams)
         : hashKey_(params, aicoreParams)
-    {
-    }
+    {}
     const Mc2QuantBatchMatmulV3HashInput &input() const
     {
         return hashKey_;

@@ -73,20 +73,23 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(ElementScalar alpha_, ElementScalar beta_, GM_ADDR ptrY_, LayoutC layoutY_, GM_ADDR ptrZ_,
                LayoutZ layoutZ_)
-            : alpha(alpha_), beta(beta_), ptrY(ptrY_), layoutY(layoutY_), ptrZ(ptrZ_), layoutZ(layoutZ_)
-        {
-        }
+            : alpha(alpha_),
+              beta(beta_),
+              ptrY(ptrY_),
+              layoutY(layoutY_),
+              ptrZ(ptrZ_),
+              layoutZ(layoutZ_)
+        {}
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, Params const &params) : params(params)
+    BlockEpilogue(Arch::Resource<ArchTag> &resource, Params const &params)
+        : params(params)
     {
         ubC = resource.ubBuf.template GetBufferByByte<ElementC>(0);
         ubY = resource.ubBuf.template GetBufferByByte<ElementY>(COMPUTE_LENGTH * sizeof(ElementC));

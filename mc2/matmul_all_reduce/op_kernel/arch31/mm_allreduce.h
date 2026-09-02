@@ -27,12 +27,13 @@ namespace AscendC {
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool Mc2L2Cache = false, bool IS_QUANT = false,
           bool IS_PER_TENSOR = false, bool WeightQuant = false, AntiQuantType antiQuantType = AntiQuantType::NONE,
           bool hasAntiQuantOffset = false>
-__aicore__ inline void
-MatMulKernel_AllReduce_WeightQuant(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR dequantGM,
-                                   AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg,
-                                   Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling, HcclServer *hcclServer,
-                                   uint32_t tileCnt, bool isTail, const LocalTensor<uint8_t> &mmFormatUb,
-                                   GM_ADDR antiquantScale, GM_ADDR antiquantOffset)
+__aicore__ inline void MatMulKernel_AllReduce_WeightQuant(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM,
+                                                          GM_ADDR dequantGM, AscendC::tiling::TCubeTiling &tiling,
+                                                          Mc2Tiling::RCSTiling &cfg,
+                                                          Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling,
+                                                          HcclServer *hcclServer, uint32_t tileCnt, bool isTail,
+                                                          const LocalTensor<uint8_t> &mmFormatUb,
+                                                          GM_ADDR antiquantScale, GM_ADDR antiquantOffset)
 {
     using A_T = typename A_TYPE::T;
     using B_T = typename B_TYPE::T;

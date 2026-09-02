@@ -40,7 +40,8 @@ public:
 
 class Mc2WeightQuantBatchMatmulV2WeightNz : public TilingBaseClass {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2WeightNz(gert::TilingContext *context) : TilingBaseClass(context)
+    explicit Mc2WeightQuantBatchMatmulV2WeightNz(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {
         Reset();
         if (context->GetCompileInfo() == nullptr) {

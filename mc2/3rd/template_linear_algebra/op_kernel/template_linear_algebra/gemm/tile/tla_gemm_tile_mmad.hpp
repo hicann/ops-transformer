@@ -35,9 +35,7 @@ struct TileMmad {
     // Methods
 
     CATLASS_DEVICE
-    TileMmad()
-    {
-    }
+    TileMmad() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,

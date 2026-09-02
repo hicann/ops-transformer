@@ -276,9 +276,8 @@ __aicore__ inline uint64_t BLOCK_PROLOGUE_MX_FP8FP4_SPECIALIZATION::CalcDynamicK
 
 BLOCK_PROLOGUE_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename GMWeightTensorType>
-__aicore__ inline void
-BLOCK_PROLOGUE_MX_FP8FP4_SPECIALIZATION::ComputeBasicBlockAivNdKnNzNk(const PrologueMxCastWOffsetParam &param,
-                                                                      const GMWeightTensorType &gmWeightTensor)
+__aicore__ inline void BLOCK_PROLOGUE_MX_FP8FP4_SPECIALIZATION::ComputeBasicBlockAivNdKnNzNk(
+    const PrologueMxCastWOffsetParam &param, const GMWeightTensorType &gmWeightTensor)
 {
     // A single V core preserves the original half-K granularity for UB fit,
     // but processes the two halves serially before notifying the cube core.
@@ -390,9 +389,8 @@ __aicore__ inline void BLOCK_PROLOGUE_MX_FP8FP4_SPECIALIZATION::CopyGmToUb(
 
 BLOCK_PROLOGUE_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename Weight4BitTensorType, typename Weight8BitTensorType>
-__aicore__ inline void
-BLOCK_PROLOGUE_MX_FP8FP4_SPECIALIZATION::WeightAntiQuantComputeNzNk(const Weight4BitTensorType &weight4BitTensor,
-                                                                    const Weight8BitTensorType &weight8BitTensor)
+__aicore__ inline void BLOCK_PROLOGUE_MX_FP8FP4_SPECIALIZATION::WeightAntiQuantComputeNzNk(
+    const Weight4BitTensorType &weight4BitTensor, const Weight8BitTensorType &weight8BitTensor)
 {
     WaitFlag<HardEvent::MTE3_V>(vecEventIdMte3ToV_ + (ubComputeLoopIdx_ & (WEIGHT_8BIT_BUFFER_NUM - 1)));
 

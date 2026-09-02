@@ -92,9 +92,7 @@ __aicore__ inline constexpr uint32_t GetVectorRegSize()
 
 class Mc2QuantBmmAswBlock {
 public:
-    __aicore__ inline Mc2QuantBmmAswBlock()
-    {
-    }
+    __aicore__ inline Mc2QuantBmmAswBlock() {}
     __aicore__ inline void Init(const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *tilingData, uint32_t blockIdx);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx);
     __aicore__ inline void UpdateBasicIndex4AL1FullLoad(uint64_t roundIdx);

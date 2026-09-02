@@ -33,18 +33,18 @@
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tla_gemm_gemm_type.hpp"
 #include "all_gather_matmul_aiv_mode_block_epilogue_dequant.h"
 
-#define DEQUANT_ARGS_CALL()                                                                                            \
-    rowNum, colNum, perChannelScale, perTokenScale, workspace, reinterpret_cast<GM_ADDR>(output), tileM0, tileN0,      \
-        pValue, swizzlDirect, swizzlCount, blockSt, blockSize, blockStInWorkspace, blockSizeInWorkspace, blockIdx,     \
+#define DEQUANT_ARGS_CALL() \
+    rowNum, colNum, perChannelScale, perTokenScale, workspace, reinterpret_cast<GM_ADDR>(output), tileM0, tileN0, \
+        pValue, swizzlDirect, swizzlCount, blockSt, blockSize, blockStInWorkspace, blockSizeInWorkspace, blockIdx, \
         coreNum, worldSize, resource, needPerChannel, needPerToken, isInt4Type
 
 #define DEQUANT_ARGS_FUN() \
     uint32_t rowNum, uint32_t colNum, __gm__ float32_t *perChannelScale, __gm__ float32_t *perTokenScale, \
-    __gm__ int32_t *workspace, GM_ADDR output,                                                            \
-    uint32_t tileM0, uint32_t tileN0, uint32_t pValue, uint32_t swizzlDirect, uint32_t swizzlCount,       \
-    int64_t blockSt, int64_t blockSize, int64_t blockStInWorkspace, int64_t blockSizeInWorkspace,         \
-    uint32_t blockIdx, uint32_t coreNum, uint32_t worldSize, Arch::Resource<Arch::AtlasA2> resource,      \
-    bool needPerChannel = false, bool needPerToken = false, bool isInt4Type = false
+        __gm__ int32_t *workspace, GM_ADDR output, uint32_t tileM0, uint32_t tileN0, uint32_t pValue, \
+        uint32_t swizzlDirect, uint32_t swizzlCount, int64_t blockSt, int64_t blockSize, int64_t blockStInWorkspace, \
+        int64_t blockSizeInWorkspace, uint32_t blockIdx, uint32_t coreNum, uint32_t worldSize, \
+        Arch::Resource<Arch::AtlasA2> resource, bool needPerChannel = false, bool needPerToken = false, \
+                                                     bool isInt4Type = false
 
 template <typename OutputType>
 class DequantRunner {

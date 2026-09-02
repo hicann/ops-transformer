@@ -20,7 +20,8 @@ namespace Mc2Kernel {
 template <typename SchedulerType, typename SchedulerContextType, typename MatmulAlltoAllTilingDataType>
 class KcQuantMatmulAlltoAllArch35 {
 public:
-    __aicore__ inline KcQuantMatmulAlltoAllArch35(SchedulerType *pipeLine) : pipeLine_(pipeLine){};
+    __aicore__ inline KcQuantMatmulAlltoAllArch35(SchedulerType *pipeLine)
+        : pipeLine_(pipeLine){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR x1_scale, GM_ADDR x2_scale,
                                 GM_ADDR x2_offset, GM_ADDR workspaceGM, MatmulAlltoAllTilingDataType *tilingData,
                                 AscendC::TPipe *tPipe);
@@ -46,7 +47,6 @@ private:
     __aicore__ inline void ProcessTile(uint32_t taskCnt);
     __aicore__ inline void ProcessTail(uint32_t taskCnt);
 };
-
 
 template <typename SchedulerType, typename SchedulerContextType, typename MatmulAlltoAllTilingDataType>
 __aicore__ inline void
@@ -94,9 +94,8 @@ KcQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType, MatmulAlltoAllT
 }
 
 template <typename SchedulerType, typename SchedulerContextType, typename MatmulAlltoAllTilingDataType>
-__aicore__ inline void
-KcQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType>::ProcessTile(
-    uint32_t taskCnt)
+__aicore__ inline void KcQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType,
+                                                   MatmulAlltoAllTilingDataType>::ProcessTile(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
     // 复用的中间量
@@ -148,9 +147,8 @@ KcQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType, MatmulAlltoAllT
 }
 
 template <typename SchedulerType, typename SchedulerContextType, typename MatmulAlltoAllTilingDataType>
-__aicore__ inline void
-KcQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType>::ProcessTail(
-    uint32_t taskCnt)
+__aicore__ inline void KcQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType,
+                                                   MatmulAlltoAllTilingDataType>::ProcessTail(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
     // 复用的中间量

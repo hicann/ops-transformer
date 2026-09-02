@@ -57,12 +57,9 @@ struct StreamKAicArgs {
     uint64_t alignSingleCoreN = 0;
 };
 
-
 class MatmulStreamKBlock : public Mc2MatmulAswBlock {
 public:
-    __aicore__ inline MatmulStreamKBlock()
-    {
-    }
+    __aicore__ inline MatmulStreamKBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void Init(const void *tilingData);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx);

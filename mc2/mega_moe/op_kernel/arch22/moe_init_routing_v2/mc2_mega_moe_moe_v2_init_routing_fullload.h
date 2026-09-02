@@ -22,7 +22,6 @@ namespace MoeInitRoutingV2 {
 using namespace AscendC;
 using namespace Mc2Tiling;
 
-
 template <typename T>
 class MoeV2FullLoad : public MoeV2SortBase {
 public:

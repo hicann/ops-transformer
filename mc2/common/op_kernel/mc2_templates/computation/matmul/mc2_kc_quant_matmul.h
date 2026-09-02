@@ -29,7 +29,8 @@ struct KCQuantMMAdditionalData {
 template <typename MMTilingType, typename MMType>
 class MC2KCQuantMatmul {
 public:
-    __aicore__ inline MC2KCQuantMatmul(AscendC::TPipe *tPipe) : tPipePtr_(tPipe){};
+    __aicore__ inline MC2KCQuantMatmul(AscendC::TPipe *tPipe)
+        : tPipePtr_(tPipe){};
     // 初始化方法
     __aicore__ inline void Init();
     // 获取数据上下文引用
@@ -47,8 +48,7 @@ protected:
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ void MC2KCQuantMatmul<MMTilingType, MMType>::Init()
-{
-}
+{}
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ MC2MMContext<KCQuantMMAdditionalData, MMTilingType> *
@@ -72,22 +72,21 @@ inline __aicore__ void MC2KCQuantMatmul<MMTilingType, MMType>::Process(uint32_t 
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ void MC2KCQuantMatmul<MMTilingType, MMType>::End()
-{
-}
+{}
 
 // 计算节点的上下文数据类型声明
 #ifndef DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_QUANT
-#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_QUANT(ContextType)                                            \
-    using ContextType = MC2KernelTemplate::MC2MMContext<MC2KernelTemplate::KCQuantMMAdditionalData,                    \
+#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_QUANT(ContextType) \
+    using ContextType = MC2KernelTemplate::MC2MMContext<MC2KernelTemplate::KCQuantMMAdditionalData, \
                                                         DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams>
 #endif
 
 // 使用QuantBatchMatmulV3算子作为计算节点的计算实现，是否转置的参数通过算子的模板参数获取
 #ifndef DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_QUANT
-#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_QUANT(ComputationType, MMDtypeX1, MMDtypeX2)                          \
-    using ComputationType = MC2KernelTemplate::MC2KCQuantMatmul<                                                       \
-        DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams,                                                             \
-        Mc2QuantBatchMatmulV3::Mc2QuantBmmPertokenRegbaseKernel<                                                       \
+#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_QUANT(ComputationType, MMDtypeX1, MMDtypeX2) \
+    using ComputationType = MC2KernelTemplate::MC2KCQuantMatmul< \
+        DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams, \
+        Mc2QuantBatchMatmulV3::Mc2QuantBmmPertokenRegbaseKernel< \
             MMDtypeX1, MMDtypeX2, float, float, float, DTYPE_Y, CubeFormat::ND, CubeFormat::ND, CubeFormat::ND, false, \
             X2TRANSPOSE, float, Mc2QuantBatchMatmulV3::Mc2QuantBmmAswBlock>>
 #endif

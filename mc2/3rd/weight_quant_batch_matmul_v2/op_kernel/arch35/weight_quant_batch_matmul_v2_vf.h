@@ -512,8 +512,8 @@ __aicore__ inline void AntiquantW4Pergroup32NK(ParamsGroupSize32<XType, WType> &
                 // SRC ： 0 1 2 3 4 5 6 7
                 // DST ： 00000000000000001111111111111111222222222222222233333333333333333.............7777777777777777
 
-                MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_E2B_B16>(scale0, p.scaleBaseAddr0 + innerIdx * 8 +
-                                                                                        outerIdx * p.outerStrideScale);
+                MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_E2B_B16>(
+                    scale0, p.scaleBaseAddr0 + innerIdx * 8 + outerIdx * p.outerStrideScale);
                 // Interleave后变为
                 // scale0:
                 // 00000000000000000000000000000000111111111111111111111111111111111.............333333333333333333333333333333333
@@ -664,8 +664,8 @@ __aicore__ inline void AntiquantW4Pergroup128NK(ParamsGroupSize128And256<XType, 
                     MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(
                         offset, p.offsetBaseAddr + groupIdx + nBubIdx * p.outerStrideScale);
                 }
-                MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(scale, p.scaleBaseAddr + groupIdx +
-                                                                                       nBubIdx * p.outerStrideScale);
+                MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(
+                    scale, p.scaleBaseAddr + groupIdx + nBubIdx * p.outerStrideScale);
 
                 MicroAPI::DataCopy<typename RegTensorActualT<WType>::T, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
                     weightB4, (__local_mem__ typename RegTensorActualT<WType>::T *)(p.weightInBaseAddr +
@@ -722,8 +722,8 @@ __aicore__ inline void AntiquantW4Pergroup256NK(ParamsGroupSize128And256<XType, 
                     MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(
                         offset, p.offsetBaseAddr + groupIdx + nBubIdx * p.outerStrideScale);
                 }
-                MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(scale, p.scaleBaseAddr + groupIdx +
-                                                                                       nBubIdx * p.outerStrideScale);
+                MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(
+                    scale, p.scaleBaseAddr + groupIdx + nBubIdx * p.outerStrideScale);
 
                 MicroAPI::DataCopy<typename RegTensorActualT<WType>::T, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
                     weightB4, (__local_mem__ typename RegTensorActualT<WType>::T *)(p.weightInBaseAddr +
@@ -775,8 +775,8 @@ __aicore__ inline void AntiquantW4PergroupGt128NKCase1(ParamsGroupSizeGt128<XTyp
                 MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(
                     offset, p.offsetBaseAddr + nBubIdx * p.groupNumBub + groupIdx);
             }
-            MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(scale, p.scaleBaseAddr +
-                                                                                   nBubIdx * p.groupNumBub + groupIdx);
+            MicroAPI::DataCopy<XType, MicroAPI::LoadDist::DIST_BRC_B16>(
+                scale, p.scaleBaseAddr + nBubIdx * p.groupNumBub + groupIdx);
             // 处理一个 group_size 中 128 对齐部分
             for (uint16_t vlIdx = 0; vlIdx < p.numVLInGroup; ++vlIdx) {
                 MicroAPI::DataCopy<typename RegTensorActualT<WType>::T, MicroAPI::LoadDist::DIST_UNPACK4_B8>(

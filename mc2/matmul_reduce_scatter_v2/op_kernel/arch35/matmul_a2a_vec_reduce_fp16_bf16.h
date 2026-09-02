@@ -27,7 +27,7 @@
 #include "../matmul_reduce_scatter_v2_c_tiling.h"
 #include "../../../common/op_kernel/reduce_sum_cast_fp32.h"
 
-#define TEMPLATE_CLASS_PARAMS                                                                                          \
+#define TEMPLATE_CLASS_PARAMS \
     template <typename AType, typename BType, typename BiasType, typename CType, int TPL_COMM_MODE>
 #define TEMPLATE_FUNC_PARAMS AType, BType, BiasType, CType, TPL_COMM_MODE
 
@@ -275,10 +275,9 @@ __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::Execute
 }
 
 TEMPLATE_CLASS_PARAMS
-__aicore__ inline void
-MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::MatMulV3Compute(GM_ADDR recvGMAddr, Mc2MatMulV3TilingData &tiling,
-                                                                  const uint32_t count, GM_ADDR sendGMAddr,
-                                                                  const bool isLast, const bool isTail)
+__aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::MatMulV3Compute(
+    GM_ADDR recvGMAddr, Mc2MatMulV3TilingData &tiling, const uint32_t count, GM_ADDR sendGMAddr, const bool isLast,
+    const bool isTail)
 {
     // [AIC 阶段] 执行 MatMul 计算流水线
     if ASCEND_IS_AIC {

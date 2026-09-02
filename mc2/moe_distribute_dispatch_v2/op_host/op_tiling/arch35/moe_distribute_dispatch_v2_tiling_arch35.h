@@ -26,7 +26,8 @@ ge::graphStatus MoeDistributeDispatchTilingImpl(gert::TilingContext *context, ui
 
 class MoeDistributeDispatchTilingA5 : public MoeTilingBase {
 public:
-    explicit MoeDistributeDispatchTilingA5(gert::TilingContext *context) : MoeTilingBase(context) {};
+    explicit MoeDistributeDispatchTilingA5(gert::TilingContext *context)
+        : MoeTilingBase(context) {};
 
 protected:
     ge::graphStatus DoOpTiling() override;

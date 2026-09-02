@@ -513,9 +513,7 @@ __aicore__ inline void WaitForCube()
 template <typename T, PrecisionType precisionType = PrecisionType::NONE>
 class Mc2PreprocessKernel {
 public:
-    __aicore__ inline Mc2PreprocessKernel()
-    {
-    }
+    __aicore__ inline Mc2PreprocessKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR workspace,
                                 const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
@@ -550,9 +548,8 @@ public:
 };
 
 template <typename T, PrecisionType precisionType>
-__aicore__ inline void
-Mc2PreprocessKernel<T, precisionType>::Init(GM_ADDR x, GM_ADDR workspace,
-                                            const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe)
+__aicore__ inline void Mc2PreprocessKernel<T, precisionType>::Init(
+    GM_ADDR x, GM_ADDR workspace, const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe)
 {
     pipe = tPipe;
     tiling_ = tilingData;
@@ -729,9 +726,7 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           PrecisionType precisionType = PrecisionType::NONE>
 class Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel {
 public:
-    __aicore__ inline Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel()
-    {
-    }
+    __aicore__ inline Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
                                 const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe);
@@ -896,10 +891,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           PrecisionType precisionType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                              hasAntiQuantOffset, quantType, weightFormat,
-                                              precisionType>::BL1PreLoad(TPipe *tPipe)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    precisionType>::BL1PreLoad(TPipe *tPipe)
 {
     if ASCEND_IS_AIV {
         return;
@@ -921,10 +915,9 @@ Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTr
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           PrecisionType precisionType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                              hasAntiQuantOffset, quantType, weightFormat,
-                                              precisionType>::BL1PreLoadNd(TPipe *tPipe)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    precisionType>::BL1PreLoadNd(TPipe *tPipe)
 {
     uint64_t weightOffset;
     uint32_t nValue;
@@ -981,10 +974,9 @@ Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTr
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           PrecisionType precisionType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                              hasAntiQuantOffset, quantType, weightFormat,
-                                              precisionType>::BL1PreLoadNz(TPipe *tPipe)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    precisionType>::BL1PreLoadNz(TPipe *tPipe)
 {
     uint64_t weightOffset;
     uint32_t hValue;
@@ -1070,10 +1062,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           PrecisionType precisionType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                              hasAntiQuantOffset, quantType, weightFormat,
-                                              precisionType>::LoadMaxSumToUb(uint32_t n)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    precisionType>::LoadMaxSumToUb(uint32_t n)
 {
     tnsMax_ = inQueMaxSum_.AllocTensor<float>();
     DataCopyPadExtParams<float> padParams;
@@ -1092,10 +1083,9 @@ Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTr
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           PrecisionType precisionType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                              hasAntiQuantOffset, quantType, weightFormat,
-                                              precisionType>::LoadAntiQuantOffsetScaleToUb(uint32_t offsetN, uint32_t n)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    precisionType>::LoadAntiQuantOffsetScaleToUb(uint32_t offsetN, uint32_t n)
 {
     DataCopyPadExtParams<xType> padParams;
     DataCopyExtParams copyParams;

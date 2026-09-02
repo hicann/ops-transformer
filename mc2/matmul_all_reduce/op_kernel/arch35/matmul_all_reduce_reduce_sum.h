@@ -51,9 +51,7 @@ public:
     TQue<QuePosition::VECIN, 1> inQueueX_;
     TQue<QuePosition::VECOUT, 1> outQueueZ_;
 
-    __aicore__ inline MatmulAllReduceReduceSum()
-    {
-    }
+    __aicore__ inline MatmulAllReduceReduceSum() {}
 
     __aicore__ inline void Init(GM_ADDR dequantOut, GM_ADDR output, uint64_t dataCnt, uint64_t rankNum,
                                 uint64_t coreNum, TPipe *tPipe)

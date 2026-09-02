@@ -36,8 +36,7 @@ public:
     static constexpr uint32_t TILE_LENGTH = DispatchPolicy::TILE_LENGTH;
     static constexpr uint32_t SCALE_BUFFER_COUNT = 2;
     static constexpr uint32_t SCALE_BATCH_COUNT = 256;
-    static constexpr uint32_t SCALE_BUFFER_BYTES =
-        (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
+    static constexpr uint32_t SCALE_BUFFER_BYTES = (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
     static constexpr uint32_t ROW_MAX_BYTES = BYTE_PER_BLK;
 
     using ElementC = typename CType_::Element;
@@ -86,8 +85,7 @@ public:
               layoutPerTokenScale(layoutPerTokenScale_),
               ptrD(ptrD_),
               layoutD(layoutD_)
-        {
-        }
+        {}
     };
 
     CATLASS_DEVICE
@@ -137,9 +135,7 @@ public:
         }
     }
 
-    CATLASS_DEVICE ~BlockEpilogue()
-    {
-    }
+    CATLASS_DEVICE ~BlockEpilogue() {}
 
     CATLASS_DEVICE
     void UpdateParams(Params const &params_)
@@ -236,8 +232,7 @@ public:
             }
         }
         if (scaleBatchCount > 0) {
-            FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount,
-                            scaleBatchIndex % SCALE_BUFFER_COUNT);
+            FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount, scaleBatchIndex % SCALE_BUFFER_COUNT);
             ++scaleBatchIndex;
         }
         DrainScaleBuffers(scaleBatchIndex);
@@ -248,8 +243,8 @@ public:
                     AscendC::GlobalTensor<ElementD> const &gmD, Arch::Resource<ArchTag> const &resource,
                     uint32_t epilogueCoreNum = 40, float activationClamp = 0.0f, uint32_t activationCode = 0,
                     float activationParams1 = SwigluOaiActivation::DEFAULT_ALPHA,
-                    float activationParams2 = SituActivation::DEFAULT_BETA,
-                    uint32_t gmmOutPreRowStride = 1, Callback &&callback = Callback{})
+                    float activationParams2 = SituActivation::DEFAULT_BETA, uint32_t gmmOutPreRowStride = 1,
+                    Callback &&callback = Callback{})
     {
         (void)resource;
         activationCode_ = activationCode;

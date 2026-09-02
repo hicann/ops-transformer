@@ -289,9 +289,9 @@ __aicore__ inline void MoeV2ExpertTokenOut::Init(GM_ADDR expertTokensCountOrCums
         expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensBeforeCapacity, this->expertNum);
     }
 
-    expandedExpertIdxGm.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                            this->blockIdx * this->srcToDstTilingData->perCoreRows,
-                                        Align(this->coreRows, sizeof(int32_t)));
+    expandedExpertIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        Align(this->coreRows, sizeof(int32_t)));
     expertIdxValueGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
                                      this->coreNum * 2);
 

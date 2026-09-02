@@ -119,9 +119,9 @@ class Mc2WeightQuantBatchMatmulV2Tiling : public TilingBaseClass {
 public:
     using TilingBaseClass::Reset;
 
-    explicit Mc2WeightQuantBatchMatmulV2Tiling(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit Mc2WeightQuantBatchMatmulV2Tiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
 
     ~Mc2WeightQuantBatchMatmulV2Tiling() override = default;
 

@@ -22,9 +22,7 @@ public:
     int64_t strides[2];
 
     CATLASS_DEVICE
-    Layout3D()
-    {
-    }
+    Layout3D() {}
 
     CATLASS_DEVICE
     Layout3D(int64_t stride0, int64_t stride1)

@@ -26,8 +26,8 @@
 #include "lib/matmul_intf.h"
 #include "qbmv3_tiling_data.h"
 
-#define TemplateBasicType                                                                                              \
-    typename x1Type, typename x2Type, typename scaleType, typename yType, int x1Format, int x2Format, bool aTrans,     \
+#define TemplateBasicType \
+    typename x1Type, typename x2Type, typename scaleType, typename yType, int x1Format, int x2Format, bool aTrans, \
         bool bTrans, class UPDATE_TYPE
 #define TemplateBasicValue x1Type, x2Type, scaleType, yType, x1Format, x2Format, aTrans, bTrans, UPDATE_TYPE
 
@@ -202,7 +202,6 @@ __aicore__ inline constexpr uint32_t GetTaskRation()
     return 1U;
 #endif
 }
-
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
 template <typename T>

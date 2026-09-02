@@ -47,21 +47,19 @@ template <typename xType, typename wType, int fFormat, int wFormat, typename sca
           typename commType, bool aTrans, bool bTrans>
 class MatmulAllReduceQuantBF16CommInt8 {
 public:
-    __aicore__ inline MatmulAllReduceQuantBF16CommInt8()
-    {
-    }
+    __aicore__ inline MatmulAllReduceQuantBF16CommInt8() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR addGM, GM_ADDR dequantScaleGM,
                                 GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM, GM_ADDR cGM, GM_ADDR workspaceGM,
                                 Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData, TPipe *tPipe);
-    __aicore__ inline void
-    Process(BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &opTile,
-            BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &opTail);
+    __aicore__ inline void Process(
+        BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &opTile,
+        BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &opTail);
 
 private:
-    __aicore__ inline void
-    InnerProcess(BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &op,
-                 uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData *mmTiling, uint32_t isAdd, uint32_t needUbBuffer,
-                 uint32_t curPadM, bool isTailFlag);
+    __aicore__ inline void InnerProcess(
+        BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &op, uint32_t tileCnt,
+        Mc2QuantBatchMatmulV3TilingData *mmTiling, uint32_t isAdd, uint32_t needUbBuffer, uint32_t curPadM,
+        bool isTailFlag);
     __aicore__ inline void PrepareInit();
     __aicore__ inline uint32_t SendCountCheck(uint32_t prepareIndex);
 
@@ -102,11 +100,11 @@ private:
 
 template <typename xType, typename wType, int fFormat, int wFormat, typename scaleType, typename yType,
           typename commType, bool aTrans, bool bTrans>
-__aicore__ inline void
-MatmulAllReduceQuantBF16CommInt8<xType, wType, fFormat, wFormat, scaleType, yType, commType, aTrans, bTrans>::
-    InnerProcess(BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &op,
-                 uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData *mmTiling, uint32_t isAdd, uint32_t needUbBuffer,
-                 uint32_t curPadM, bool isTailFlag)
+__aicore__ inline void MatmulAllReduceQuantBF16CommInt8<
+    xType, wType, fFormat, wFormat, scaleType, yType, commType, aTrans,
+    bTrans>::InnerProcess(BmmDequantBf16<xType, wType, fFormat, wFormat, yType, yType, aTrans, bTrans, true> &op,
+                          uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData *mmTiling, uint32_t isAdd,
+                          uint32_t needUbBuffer, uint32_t curPadM, bool isTailFlag)
 {
     const uint64_t aOffset = CalcShapeOffset(sizeof(xType), mmTiling->matmulTiling.M, mmTiling->matmulTiling.Ka);
     const uint64_t cOffset = CalcShapeOffset(sizeof(yType), mmTiling->matmulTiling.M, mmTiling->matmulTiling.N);

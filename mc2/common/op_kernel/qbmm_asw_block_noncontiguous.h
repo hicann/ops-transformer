@@ -23,9 +23,7 @@ namespace Mc2QuantBatchMatmulV3 {
 
 class Mc2QuantBmmAswBlockNonContiguous : public Mc2QuantBmmAswBlock {
 public:
-    __aicore__ inline Mc2QuantBmmAswBlockNonContiguous()
-    {
-    }
+    __aicore__ inline Mc2QuantBmmAswBlockNonContiguous() {}
     template <bool aTrans, bool bTrans, class x1Type, class scaleType, CubeFormat formatX2>
     __aicore__ inline void CalcGMOffset(const uint32_t strideCount, const uint32_t *batchWeight);
 };

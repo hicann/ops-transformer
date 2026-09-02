@@ -58,17 +58,19 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA const &layoutA_, GM_ADDR ptrB_,
                LayoutB const &layoutB_, GM_ADDR ptrWorkspace_, EpilogueParams const &epilogueParams_)
-            : problemShape(problemShape_), ptrA(ptrA_), layoutA(layoutA_), ptrB(ptrB_), layoutB(layoutB_),
-              ptrWorkspace(ptrWorkspace_), epilogueParams(epilogueParams_)
-        {
-        }
+            : problemShape(problemShape_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrB(ptrB_),
+              layoutB(layoutB_),
+              ptrWorkspace(ptrWorkspace_),
+              epilogueParams(epilogueParams_)
+        {}
     };
 
     struct Arguments {
@@ -105,9 +107,7 @@ public:
 
     // Methods
     CATLASS_DEVICE
-    MatmulEpilogue()
-    {
-    }
+    MatmulEpilogue() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);

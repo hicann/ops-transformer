@@ -34,9 +34,7 @@ constexpr uint32_t BYTE32_ALIGN = 32;
 template <class T, int commMode> // commQuantScaleType = yType bf16/fp16
 class MatmulAllReduceQuantReduceSum {
 public:
-    __aicore__ inline MatmulAllReduceQuantReduceSum()
-    {
-    }
+    __aicore__ inline MatmulAllReduceQuantReduceSum() {}
     __aicore__ inline void Init(TPipe *tPipe, uint32_t quantUbSize)
     {
         pipe = tPipe;
@@ -142,9 +140,9 @@ public:
             curScaleCnt = blockCntSplitMN;
             curScaleAddrOffset = scaleAddrOffsetSplitMN;
         }
-        tempBufferGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(this->tempBufferGM) + curBlockAddrOffset,
-                                         static_cast<int64_t>(this->M) * static_cast<int64_t>(this->N) -
-                                             curBlockAddrOffset);
+        tempBufferGlobal.SetGlobalBuffer(
+            reinterpret_cast<__gm__ int8_t *>(this->tempBufferGM) + curBlockAddrOffset,
+            static_cast<int64_t>(this->M) * static_cast<int64_t>(this->N) - curBlockAddrOffset);
         if (((loopIdx == 0) && (this->splitMode == SPLIT_M_MATMUL_ALLREDUCE_INT8)) ||
             (this->splitMode == SPLIT_MN_MATMUL_ALLREDUCE_INT8)) {
             quantScale1Global.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(this->quantScale1GM) + curScaleAddrOffset,

@@ -27,7 +27,6 @@
 #include "../../op_kernel/quant_grouped_mat_mul_allto_allv_tiling.h"
 #include "register/tilingdata_base.h"
 
-
 namespace Mc2Tiling {
 // 引用3rd目录中的定义
 using namespace optiling::Mc2GroupedMatmulTiling::GmmConstant;
@@ -37,7 +36,8 @@ using optiling::Mc2GroupedMatmulTiling::QuantMode;
 namespace Mc2GroupedMatmul {
 class QuantGroupedMatmulAllToAllvAdapter : public Mc2GroupedQbmmTiling {
 public:
-    explicit QuantGroupedMatmulAllToAllvAdapter(gert::TilingContext *context) : Mc2GroupedQbmmTiling(context) {};
+    explicit QuantGroupedMatmulAllToAllvAdapter(gert::TilingContext *context)
+        : Mc2GroupedQbmmTiling(context) {};
 
     ~QuantGroupedMatmulAllToAllvAdapter() override = default;
 
@@ -58,9 +58,7 @@ public:
     {
         return true;
     }
-    void Reset() override
-    {
-    }
+    void Reset() override {}
 
     ge::graphStatus Process();
     ge::graphStatus SetCommonInputParams(const QuantGmmAlltoAllvParamsInfo &params);

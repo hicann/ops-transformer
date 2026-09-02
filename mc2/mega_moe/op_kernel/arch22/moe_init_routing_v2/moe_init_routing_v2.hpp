@@ -42,7 +42,6 @@ using namespace AscendC;
 using namespace MoeInitRoutingV2;
 using namespace Mc2Tiling;
 
-
 template <class DTYPE_X = bfloat16_t>
 __aicore__ inline void moe_init_routing_v2(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
                                            GM_ADDR expertTokensCountOrCumsum, GM_ADDR expertTokensBeforeCapacity,

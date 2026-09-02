@@ -98,4 +98,3 @@ struct QuantMatmulRunInfo {
     // Whether the current shape allows the "A full load" fast path.
     bool isAFullLoad{false};
 };
-

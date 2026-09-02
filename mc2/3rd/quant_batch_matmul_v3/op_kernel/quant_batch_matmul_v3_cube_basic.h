@@ -22,9 +22,7 @@ namespace AscendC {
 template <TemplateBasicType>
 class Mc2QuantBatchMatmulV3BaseKernel { // 纯cube kernel，无pertoken，输出int8/fp16/int32
 public:
-    __aicore__ inline Mc2QuantBatchMatmulV3BaseKernel()
-    {
-    }
+    __aicore__ inline Mc2QuantBatchMatmulV3BaseKernel() {}
 
     __aicore__ inline void InitInputs(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale, GM_ADDR bias, GM_ADDR y);
 

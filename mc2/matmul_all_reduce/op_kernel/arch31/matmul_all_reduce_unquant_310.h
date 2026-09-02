@@ -36,9 +36,7 @@ using namespace AscendC;
 template <typename aType, typename bType, typename biasType, typename cType, bool mixNdNz>
 class MatmulAllReduceUnquant310 {
 public:
-    __aicore__ inline MatmulAllReduceUnquant310()
-    {
-    }
+    __aicore__ inline MatmulAllReduceUnquant310() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR workspaceGM,
                                 Mc2Tiling::UnQuantMatmulAllReduceTilingData *tilingData, TPipe *tPipe,
                                 HcclServer *hcclServer);
@@ -105,19 +103,19 @@ __aicore__ inline void MatmulAllReduceUnquant310<aType, bType, biasType, cType, 
     }
 }
 
-#define MATMUL_ALL_REDUCE_TEMPLATE(mmop, tileCnt, tPipe, aGM, bGM, cGM, biasGM, workspaceGM, mm_tiling, hcclServer,    \
-                                   shift, aOffset, cOffset)                                                            \
-    for (uint32_t i = 0; i < tileCnt; i++) {                                                                           \
-        if (i == 0) {                                                                                                  \
-            tPipe_->Reset();                                                                                           \
-            mmop.Init(aGM_, bGM_, cGM_, biasGM_, nullptr, workspaceGM_, &mm_tiling, tPipe_);                           \
-        } else {                                                                                                       \
-            mmop.UpdateGlobalTensor(aGM_, bGM_, cGM_, biasGM_, nullptr, workspaceGM_);                                 \
-        }                                                                                                              \
-        mmop.Process();                                                                                                \
-        hcclServer_->TurnNotifyRun(block_idx, GetBlockNum(), i + 1 + shift);                                           \
-        aGM_ += aOffset;                                                                                               \
-        cGM_ += cOffset;                                                                                               \
+#define MATMUL_ALL_REDUCE_TEMPLATE(mmop, tileCnt, tPipe, aGM, bGM, cGM, biasGM, workspaceGM, mm_tiling, hcclServer, \
+                                   shift, aOffset, cOffset) \
+    for (uint32_t i = 0; i < tileCnt; i++) { \
+        if (i == 0) { \
+            tPipe_->Reset(); \
+            mmop.Init(aGM_, bGM_, cGM_, biasGM_, nullptr, workspaceGM_, &mm_tiling, tPipe_); \
+        } else { \
+            mmop.UpdateGlobalTensor(aGM_, bGM_, cGM_, biasGM_, nullptr, workspaceGM_); \
+        } \
+        mmop.Process(); \
+        hcclServer_->TurnNotifyRun(block_idx, GetBlockNum(), i + 1 + shift); \
+        aGM_ += aOffset; \
+        cGM_ += cOffset; \
     }
 
 template <typename aType, typename bType, typename biasType, typename cType, bool mixNdNz>
@@ -234,16 +232,16 @@ __aicore__ inline void MatMulEmptyTensorKernelUnquantNz(GM_ADDR biasGM, GM_ADDR 
     }
 }
 
-#define INVOKE_UNQUANT_BMM_OP_IMPL_310(templateClass)                                                                  \
-    do {                                                                                                               \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::UnQuantMatmulAllReduceTilingData, msg, msg, tilingGM);                       \
-        if (msg.debugMode == static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) {                                  \
-            continue;                                                                                                  \
-        }                                                                                                              \
-        GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::UnQuantMatmulAllReduceTilingData, tilingData, tilingGM);                \
-        templateClass<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_Y, MIXND2NZ> op;                                              \
-        op.Init(aGM, bGM, biasGM, cGM, userWS, &tilingData, &tPipe, &hcclServer);                                      \
-        op.Process();                                                                                                  \
+#define INVOKE_UNQUANT_BMM_OP_IMPL_310(templateClass) \
+    do { \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::UnQuantMatmulAllReduceTilingData, msg, msg, tilingGM); \
+        if (msg.debugMode == static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
+            continue; \
+        } \
+        GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::UnQuantMatmulAllReduceTilingData, tilingData, tilingGM); \
+        templateClass<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_Y, MIXND2NZ> op; \
+        op.Init(aGM, bGM, biasGM, cGM, userWS, &tilingData, &tPipe, &hcclServer); \
+        op.Process(); \
     } while (0)
 } // namespace MatmulAllReduceImpl
 #endif // MATMUL_ALL_REDUCE_UNQUANT_310_H

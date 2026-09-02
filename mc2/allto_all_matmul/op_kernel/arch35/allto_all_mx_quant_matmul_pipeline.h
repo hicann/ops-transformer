@@ -39,7 +39,9 @@ class AlltoAllMXQuantMatmulPipeLine {
 public:
     __aicore__ inline AlltoAllMXQuantMatmulPipeLine(CommunicationType *commStage, TransposeType *transStage,
                                                     ScaleTransposeType *scaleTransStage, ComputationType *computeStage)
-        : commStage_(commStage), transStage_(transStage), scaleTransStage_(scaleTransStage),
+        : commStage_(commStage),
+          transStage_(transStage),
+          scaleTransStage_(scaleTransStage),
           computeStage_(computeStage){};
 
     __aicore__ inline void Init();

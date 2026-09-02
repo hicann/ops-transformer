@@ -58,4 +58,3 @@ struct alignas(8) QuantMatmulTilingData {
     uint8_t dbL0c{0};
 };
 #pragma pack(pop)
-

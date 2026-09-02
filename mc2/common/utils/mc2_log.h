@@ -81,35 +81,35 @@ inline const char *ConvertStringToCstr(const std::string &str)
 }
 
 #if !defined(__ANDROID__) && !defined(ANDROID)
-#define CUBE_INNER_ERR_REPORT(op_name, err_msg, ...)                                                                   \
-    do {                                                                                                               \
-        D_OP_LOGE(op_name, err_msg, ##__VA_ARGS__);                                                                    \
-        REPORT_INNER_ERR_MSG("E69999", "op[%s], " err_msg, ConvertStringToCstr(Ops::Base::GetOpInfo(op_name)),         \
-                             ##__VA_ARGS__);                                                                           \
+#define CUBE_INNER_ERR_REPORT(op_name, err_msg, ...) \
+    do { \
+        D_OP_LOGE(op_name, err_msg, ##__VA_ARGS__); \
+        REPORT_INNER_ERR_MSG("E69999", "op[%s], " err_msg, ConvertStringToCstr(Ops::Base::GetOpInfo(op_name)), \
+                             ##__VA_ARGS__); \
     } while (0)
 
-#define VECTOR_INFER_SHAPE_INNER_ERR_REPORT(op_name, err_msg)                                                          \
-    do {                                                                                                               \
-        OP_LOGE_WITHOUT_REPORT(op_name, "%s", ConvertStringToCstr(err_msg));                                           \
-        std::string errorStr = "E89999";                                                                               \
-        REPORT_INNER_ERR_MSG(errorStr.c_str(), "%s", ConcatString("op[", op_name, "],", err_msg).c_str());             \
+#define VECTOR_INFER_SHAPE_INNER_ERR_REPORT(op_name, err_msg) \
+    do { \
+        OP_LOGE_WITHOUT_REPORT(op_name, "%s", ConvertStringToCstr(err_msg)); \
+        std::string errorStr = "E89999"; \
+        REPORT_INNER_ERR_MSG(errorStr.c_str(), "%s", ConcatString("op[", op_name, "],", err_msg).c_str()); \
     } while (0)
 
 #define OPS_REPORT_VECTOR_INNER_ERR(opName, ...) OPS_LOG_E(opName, ##__VA_ARGS__)
 #define OPS_REPORT_CUBE_INNER_ERR(opName, ...) OPS_LOG_E(opName, ##__VA_ARGS__)
 namespace optiling {
-#define VECTOR_INNER_ERR_REPORT_TILING(op_name, err_msg, ...)                                                          \
-    do {                                                                                                               \
-        OP_LOGE_WITHOUT_REPORT(op_name, err_msg, ##__VA_ARGS__);                                                       \
-        REPORT_INNER_ERR_MSG("E89999", "op[%s], " err_msg, ConvertStringToCstr(Ops::Base::GetOpInfo(op_name)),         \
-                             ##__VA_ARGS__);                                                                           \
+#define VECTOR_INNER_ERR_REPORT_TILING(op_name, err_msg, ...) \
+    do { \
+        OP_LOGE_WITHOUT_REPORT(op_name, err_msg, ##__VA_ARGS__); \
+        REPORT_INNER_ERR_MSG("E89999", "op[%s], " err_msg, ConvertStringToCstr(Ops::Base::GetOpInfo(op_name)), \
+                             ##__VA_ARGS__); \
     } while (0)
-#define OP_TILING_CHECK(cond, log_func, expr)                                                                          \
-    do {                                                                                                               \
-        if (cond) {                                                                                                    \
-            log_func;                                                                                                  \
-            expr;                                                                                                      \
-        }                                                                                                              \
+#define OP_TILING_CHECK(cond, log_func, expr) \
+    do { \
+        if (cond) { \
+            log_func; \
+            expr; \
+        } \
     } while (0)
 } // namespace optiling
 

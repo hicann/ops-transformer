@@ -267,7 +267,8 @@ struct SoCInfo {
 class MatmulFormulaicTiling {
 public:
     // Constructor
-    explicit MatmulFormulaicTiling(std::string opName) : opName_(opName) {};
+    explicit MatmulFormulaicTiling(std::string opName)
+        : opName_(opName) {};
     static uint32_t GetRankSize(const char *group);
     void SetWeightFormat(const matmul_tiling::CubeFormat weightFormat);
     void SetSocVersion(const platform_ascendc::SocVersion &version)

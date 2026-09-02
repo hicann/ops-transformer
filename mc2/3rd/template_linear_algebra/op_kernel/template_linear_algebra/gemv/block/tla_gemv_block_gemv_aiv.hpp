@@ -52,9 +52,7 @@ public:
     static constexpr uint32_t Ybuf_SIZE_ = 16 * 1024;
     static constexpr uint32_t workspace_SIZE_ = 32 * 1024;
     CATLASS_DEVICE
-    BlockGemv()
-    {
-    }
+    BlockGemv() {}
     /// Construct
     CATLASS_DEVICE
     BlockGemv(Arch::Resource<ArchTag> &resource, uint32_t UBufAddrStart = 0)

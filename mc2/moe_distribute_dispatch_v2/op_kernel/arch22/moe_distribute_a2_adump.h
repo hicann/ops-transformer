@@ -172,5 +172,4 @@ private:
 };
 } // namespace Mc2A2Kernel
 
-
 #endif

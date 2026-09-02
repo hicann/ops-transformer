@@ -13,7 +13,6 @@
  * \brief
  */
 
-
 #ifndef __OP_HOST_BATCH_MATMUL_V3_ITERBATCH_TILING_H__
 #define __OP_HOST_BATCH_MATMUL_V3_ITERBATCH_TILING_H__
 

@@ -103,9 +103,7 @@ private:
     TBuf<TPosition::TSCM> l1TBuf_;
 
 public:
-    DEVICE BlockMmad()
-    {
-    }
+    DEVICE BlockMmad() {}
 
     struct Params {
         __gm__ DtypeB *bGmAddr = nullptr;
@@ -247,8 +245,7 @@ public:
 
     template <class ProblemShape>
     DEVICE static Params GetParams(ProblemShape &problemShape, Arguments const &args)
-    {
-    }
+    {}
 
     template <class ProblemShape>
     DEVICE auto Init(ProblemShape const &problemShape, Params const &params)
@@ -580,11 +577,11 @@ private:
             if constexpr (Base::isTransB) {
             } else {
                 // (n1, k1, k0, n0)
-                CopyUbToL1IntervalDataCopy(weightF16L1_[offsetWeightL1], tensorWeightOutUb[offsetWeightUb],
-                                           CeilAlign(tileSizeK, ONE_BLOCK_ELEM) * CeilAlign(tileSizeN, ONE_BLOCK_ELEM) /
-                                               ONE_REG_ELEM,
-                                           ONE_REG_ELEM / ONE_BLOCK_ELEM, 0,
-                                           (UB_WEIGHT_OUTPUT_F16BUFFER_NUM - 1) * ONE_REG_ELEM / ONE_BLOCK_ELEM);
+                CopyUbToL1IntervalDataCopy(
+                    weightF16L1_[offsetWeightL1], tensorWeightOutUb[offsetWeightUb],
+                    CeilAlign(tileSizeK, ONE_BLOCK_ELEM) * CeilAlign(tileSizeN, ONE_BLOCK_ELEM) / ONE_REG_ELEM,
+                    ONE_REG_ELEM / ONE_BLOCK_ELEM, 0,
+                    (UB_WEIGHT_OUTPUT_F16BUFFER_NUM - 1) * ONE_REG_ELEM / ONE_BLOCK_ELEM);
             }
         }
     }

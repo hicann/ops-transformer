@@ -33,8 +33,12 @@ struct AddRmsNormTilingInputFromMM {
 struct AddRMSNormTilingDepend {
     AddRMSNormTilingDepend(const char *name, fe::PlatFormInfos &infos, ARNCtxInfo info, AddRmsNormTilingInputFromMM mm,
                            bool b, bool half)
-        : nodeName(name), platFormInfos(infos), arnCtxInfo(info), addRmsNormTilingInputFromMm(mm),
-          useMmOutputAsX1Input(b), useHalfNumBlocks(half) {};
+        : nodeName(name),
+          platFormInfos(infos),
+          arnCtxInfo(info),
+          addRmsNormTilingInputFromMm(mm),
+          useMmOutputAsX1Input(b),
+          useHalfNumBlocks(half) {};
     const char *nodeName;
     fe::PlatFormInfos &platFormInfos;
     ARNCtxInfo arnCtxInfo;

@@ -20,8 +20,8 @@ inline void InitDistributeBarrierTilingData(uint8_t *tiling, DistributeBarrierTi
     memcpy(constData, tiling, sizeof(DistributeBarrierTilingData));
 }
 
-#define GET_TILING_DATA_WITH_STRUCT(DistributeBarrierTilingData, tilingData, tilingArg)                                \
-    DistributeBarrierTilingData tilingData;                                                                            \
+#define GET_TILING_DATA_WITH_STRUCT(DistributeBarrierTilingData, tilingData, tilingArg) \
+    DistributeBarrierTilingData tilingData; \
     InitDistributeBarrierTilingData(tilingArg, &tilingData)
 
 #endif

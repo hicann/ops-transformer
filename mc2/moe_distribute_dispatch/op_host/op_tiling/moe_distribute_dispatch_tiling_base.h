@@ -33,7 +33,8 @@
 namespace optiling {
 class MoeDistributeDispatchTilingBase : public MoeTilingBase {
 public:
-    explicit MoeDistributeDispatchTilingBase(gert::TilingContext *context) : MoeTilingBase(context) {};
+    explicit MoeDistributeDispatchTilingBase(gert::TilingContext *context)
+        : MoeTilingBase(context) {};
     ge::graphStatus CheckAttrs(gert::TilingContext *context, const char *nodeName,
                                MoeDistributeDispatchTilingData &tilingData, uint32_t &localMoeExpertNum);
     ge::graphStatus MoeDistributeDispatchA3A5TilingCheckAttr(gert::TilingContext *context, uint32_t &quantMode,

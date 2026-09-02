@@ -113,9 +113,8 @@ protected:
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::ComputeConstexpr()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::ComputeConstexpr()
 {
     this->nF16AlignTo512bSize = this->CeilDiv(this->tiling_->nSize, 256) * 256;
     this->weightCacheSizeAlign_ = this->tiling_->cubeBlockDimK * this->tiling_->groupSize * this->nF16AlignTo512bSize;
@@ -124,9 +123,8 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::InitBuffer()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::InitBuffer()
 {
     this->pipe_->InitBuffer(this->scaleComputeTbuf_, 2048);
     this->scaleComputeTensor_ = this->scaleComputeTbuf_.template Get<biasType>();
@@ -144,8 +142,8 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 
     this->pipe_->InitBuffer(this->weight16Tbuf_, 256 + 32 * 1024);
 
-    this->pipe_->InitBuffer(a1Tbuf_, this->CeilDiv(this->tiling_->mSize, 16UL) * 16UL * this->tiling_->vecSingleK *
-                                         sizeof(xType));
+    this->pipe_->InitBuffer(
+        a1Tbuf_, this->CeilDiv(this->tiling_->mSize, 16UL) * 16UL * this->tiling_->vecSingleK * sizeof(xType));
     this->pipe_->InitBuffer(inQueueBL1_, DOUBLE_BUFFER_NUM, 128 * 1024);
 }
 
@@ -184,15 +182,10 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::UpdateGlobalAddr(GM_ADDR x, GM_ADDR weight,
-                                                                                            GM_ADDR antiquantScale,
-                                                                                            GM_ADDR antiquantOffset,
-                                                                                            GM_ADDR quantScale,
-                                                                                            GM_ADDR quantOffset,
-                                                                                            GM_ADDR bias, GM_ADDR y,
-                                                                                            GM_ADDR workspace)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset,
+    quantType>::UpdateGlobalAddr(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
+                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace)
 {
     this->InitInput(x, weight, antiquantScale, antiquantOffset, quantScale, quantOffset, bias, y);
     this->InitWorkSpace(workspace);
@@ -200,9 +193,8 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::ProcessVector()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::ProcessVector()
 {
     uint64_t initTotalSize = this->tiling_->mSize * this->tiling_->nSize;
     InitAtomicAddr(matmulAtomicAddResult_, initTotalSize, this->curBlockIdx_);
@@ -310,10 +302,9 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::ProcessAntiquantParams(uint32_t
-                                                                                                      singleCoreRealN)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset,
+    quantType>::ProcessAntiquantParams(uint32_t singleCoreRealN)
 {
     LocalTensor<xType> offsetInput = this->offsetQueue_.template DeQue<xType>();
     LocalTensor<float> offsetTmp = this->offsetTmpBuf_.template Get<float>();
@@ -389,9 +380,8 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::ProcessMatmulResult()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::ProcessMatmulResult()
 {
     uint64_t singleCoreN = 256;
     uint64_t singleCoreRealN = 256;
@@ -427,9 +417,8 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::ProcessCube()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::ProcessCube()
 {
     // mte2 流水
     cubeKDimIdx_ = this->curBlockIdx_ / this->tiling_->cubeBlockDimN;
@@ -543,9 +532,8 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType>::Process()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::Process()
 {
     if ASCEND_IS_AIV {
         ProcessVector();

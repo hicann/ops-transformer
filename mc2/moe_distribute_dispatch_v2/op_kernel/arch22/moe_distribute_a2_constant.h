@@ -89,5 +89,4 @@ constexpr static int32_t DUMP_FLAG_VALUE = 0xFFFFFFFF;
 constexpr static int64_t TIMEOUT = 1000000 * 60 * 1; // 1 mins
 } // namespace Mc2A2Kernel
 
-
 #endif

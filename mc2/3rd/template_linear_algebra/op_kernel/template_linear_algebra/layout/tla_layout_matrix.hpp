@@ -41,22 +41,23 @@ public:
     /// Constructor
     CATLASS_HOST_DEVICE
     RowMajor(Index rows = 0, Index cols = 0)
-        : shape_(MakeCoord(rows, cols)), stride_(MakeCoord(LongIndex(cols), LongIndex(1)))
-    {
-    }
+        : shape_(MakeCoord(rows, cols)),
+          stride_(MakeCoord(LongIndex(cols), LongIndex(1)))
+    {}
 
     /// Constructor
     CATLASS_HOST_DEVICE
     RowMajor(Index rows, Index cols, LongIndex ldm)
-        : shape_(MakeCoord(rows, cols)), stride_(MakeCoord(ldm, LongIndex(1)))
-    {
-    }
+        : shape_(MakeCoord(rows, cols)),
+          stride_(MakeCoord(ldm, LongIndex(1)))
+    {}
 
     /// Ctor
     CATLASS_HOST_DEVICE
-    RowMajor(Shape shape, Stride stride) : shape_(shape), stride_(stride)
-    {
-    }
+    RowMajor(Shape shape, Stride stride)
+        : shape_(shape),
+          stride_(stride)
+    {}
 
     template <class Element>
     CATLASS_HOST_DEVICE static RowMajor MakeLayoutInUb(MatrixCoord const &shape)
@@ -172,22 +173,23 @@ public:
     /// Constructor
     CATLASS_HOST_DEVICE
     ColumnMajor(Index rows = 0, Index cols = 0)
-        : shape_(MakeCoord(rows, cols)), stride_(MakeCoord(LongIndex(1), LongIndex(rows)))
-    {
-    }
+        : shape_(MakeCoord(rows, cols)),
+          stride_(MakeCoord(LongIndex(1), LongIndex(rows)))
+    {}
 
     /// Constructor
     CATLASS_HOST_DEVICE
     ColumnMajor(Index rows, Index cols, LongIndex ldm)
-        : shape_(MakeCoord(rows, cols)), stride_(MakeCoord(LongIndex(1), ldm))
-    {
-    }
+        : shape_(MakeCoord(rows, cols)),
+          stride_(MakeCoord(LongIndex(1), ldm))
+    {}
 
     /// Ctor
     CATLASS_HOST_DEVICE
-    ColumnMajor(Shape shape, Stride stride) : shape_(shape), stride_(stride)
-    {
-    }
+    ColumnMajor(Shape shape, Stride stride)
+        : shape_(shape),
+          stride_(stride)
+    {}
 
     /// Returns the offset of a coordinate in linear memory.
     /// Assumes coordinate has convention (row, column)
@@ -314,14 +316,14 @@ public:
         : orgShape_(MakeCoord(orgRows, orgCols)),
           shape_(MakeCoord(rowsInFractal, rowsByFractal, colsInFractal, colsByFractal)),
           stride_(MakeCoord(strideRowsInFractal, strideRowsByFractal, strideColsInFractal, strideColsByFractal))
-    {
-    }
+    {}
 
     /// Ctor
     CATLASS_HOST_DEVICE constexpr nZ(OrgShape orgShape, Shape shape, Stride stride)
-        : orgShape_(orgShape), shape_(shape), stride_(stride)
-    {
-    }
+        : orgShape_(orgShape),
+          shape_(shape),
+          stride_(stride)
+    {}
 
     /// Make the layout of a coordinate (row, column)
     template <class Element>
@@ -477,14 +479,14 @@ public:
         : orgShape_(MakeCoord(orgRows, orgCols)),
           shape_(MakeCoord(rowsInFractal, rowsByFractal, colsInFractal, colsByFractal)),
           stride_(MakeCoord(strideRowsInFractal, strideRowsByFractal, strideColsInFractal, strideColsByFractal))
-    {
-    }
+    {}
 
     /// Ctor
     CATLASS_HOST_DEVICE constexpr zN(OrgShape orgShape, Shape shape, Stride stride)
-        : orgShape_(orgShape), shape_(shape), stride_(stride)
-    {
-    }
+        : orgShape_(orgShape),
+          shape_(shape),
+          stride_(stride)
+    {}
 
     /// Make the layout of a coordinate (row, column)
     template <class Element>
@@ -648,14 +650,14 @@ public:
         : orgShape_(MakeCoord(orgRows, orgCols)),
           shape_(MakeCoord(rowsInFractal, rowsByFractal, colsInFractal, colsByFractal)),
           stride_(MakeCoord(strideRowsInFractal, strideRowsByFractal, strideColsInFractal, strideColsByFractal))
-    {
-    }
+    {}
 
     /// Ctor
     CATLASS_HOST_DEVICE constexpr zZ(OrgShape orgShape, Shape shape, Stride stride)
-        : orgShape_(orgShape), shape_(shape), stride_(stride)
-    {
-    }
+        : orgShape_(orgShape),
+          shape_(shape),
+          stride_(stride)
+    {}
 
     /// Make the layout of a coordinate (row, column)
     template <class Element>
@@ -793,8 +795,7 @@ public:
           shape_(MakeCoord(blockRows, CeilDiv(orgRows, blockRows), blockCols, CeilDiv(orgCols, blockCols))),
           stride_(MakeCoord((LongIndex)blockCols, (LongIndex)blockRows * (LongIndex)RoundUp(orgCols, blockCols),
                             (LongIndex)1, (LongIndex)blockRows * (LongIndex)blockCols))
-    {
-    }
+    {}
 
     /// Returns the offset of a coordinate in linear memory.
     /// Assumes coordinate has convention (row, column)
@@ -932,8 +933,7 @@ public:
           shape_(MakeCoord(blockRows, CeilDiv(orgRows, blockRows), blockCols, CeilDiv(orgCols, blockCols))),
           stride_(MakeCoord((LongIndex)1, (LongIndex)blockRows * (LongIndex)blockCols, (LongIndex)blockRows,
                             (LongIndex)RoundUp(orgRows, blockRows) * (LongIndex)blockCols))
-    {
-    }
+    {}
 
     /// Returns the offset of a coordinate in linear memory.
     /// Assumes coordinate has convention (row, column)
@@ -1022,7 +1022,6 @@ public:
         return stride_[idx];
     }
 
-
 private:
     //
     // Data members
@@ -1084,14 +1083,15 @@ public:
         : orgShape_(MakeCoord(orgRows, orgCols)),
           shape_(MakeCoord(rowsInFractal, rowsByFractal, colsInFractal, colsByFractal)),
           stride_(MakeCoord(strideRowsInFractal, strideRowsByFractal, strideColsInFractal, strideColsByFractal))
-    {
-    }
+    {}
 
     /// Ctor
     CATLASS_HOST_DEVICE
-    nN(OrgShape orgShape, Shape shape, Stride stride) : orgShape_(orgShape), shape_(shape), stride_(stride)
-    {
-    }
+    nN(OrgShape orgShape, Shape shape, Stride stride)
+        : orgShape_(orgShape),
+          shape_(shape),
+          stride_(stride)
+    {}
 
     /// Make the layout of a coordinate (row, column)
     template <class Element>

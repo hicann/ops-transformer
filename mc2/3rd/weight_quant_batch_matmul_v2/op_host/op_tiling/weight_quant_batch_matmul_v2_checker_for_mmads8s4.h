@@ -20,9 +20,9 @@ namespace optiling {
 
 class Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4 {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4(gert::TilingContext *context) : context_(context)
-    {
-    }
+    explicit Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4(gert::TilingContext *context)
+        : context_(context)
+    {}
 
     ~Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4() = default;
 

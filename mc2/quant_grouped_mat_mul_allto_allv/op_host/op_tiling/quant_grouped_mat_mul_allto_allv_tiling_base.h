@@ -97,7 +97,6 @@ constexpr uint32_t DIM_TWO = 2;
 constexpr uint32_t DIM_THREE = 3;
 constexpr uint32_t DIM_FOUR = 4;
 
-
 constexpr uint32_t HCCL_CMD_ALLGATHER = 6U;
 constexpr uint32_t HCCL_CMD_ALLTOALLV = 8;
 

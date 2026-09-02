@@ -22,9 +22,7 @@ struct TileBroadcastOneBlk {
     static constexpr uint32_t COMPUTE_LENGTH = COMPUTE_LENGTH_;
 
     CATLASS_DEVICE
-    TileBroadcastOneBlk()
-    {
-    }
+    TileBroadcastOneBlk() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut, AscendC::LocalTensor<ElementCompute> const &ubIn)

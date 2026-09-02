@@ -81,7 +81,9 @@ struct MatmulParameters {
 
 struct MinMatmulShapeParameters {
     MinMatmulShapeParameters()
-        : mmMinDataSize1(MIN_DATA_PAR1), mmMinDataSize2(MIN_DATA_PAR2), minMSize(MIN_M_SIZE_SOC310P) {};
+        : mmMinDataSize1(MIN_DATA_PAR1),
+          mmMinDataSize2(MIN_DATA_PAR2),
+          minMSize(MIN_M_SIZE_SOC310P) {};
     uint64_t mmMinDataSize1;
     uint64_t mmMinDataSize2;
     uint64_t minMSize;

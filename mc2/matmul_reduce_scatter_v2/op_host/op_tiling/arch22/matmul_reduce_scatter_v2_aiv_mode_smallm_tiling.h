@@ -47,7 +47,6 @@ constexpr int32_t DEFAULT_UBMOVENUM = 4;
 constexpr int32_t DEFAULT_COMMNPUSPLIT = 1;
 constexpr int32_t DEFAULT_COMMDATASPLIT = 16;
 
-
 union NodeValue {
     float threshold;  // 内部节点的阈值
     int return_value; // 叶子节点的返回值
@@ -107,7 +106,6 @@ inline int TraverseDecisionTree(const DecisionNode (&decision_rules)[N], int m, 
     }
     return default_value;
 }
-
 
 namespace Tiling_Rank2_A2 {
 const DecisionNode m0Rule[] = {
@@ -693,7 +691,6 @@ inline int GetOptimalUbmovenum(int m, int k, int n)
 }
 
 } // namespace Tiling_Rank2_A2
-
 
 namespace Tiling_Rank4_A2 {
 // m0优化参数的决策树规则（使用特征：）

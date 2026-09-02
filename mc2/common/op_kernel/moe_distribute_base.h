@@ -395,7 +395,6 @@ struct hns_roce_rc_sq_wqe {
     uint64_t remoteVA;
 };
 
-
 struct hns_roce_lite_wqe_data_seg {
     uint32_t len;
     uint32_t lkey;

@@ -100,26 +100,32 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrBias_, GM_ADDR ptrC_, GM_ADDR ptrScale_, int32_t pValue_, int32_t swizzlCount_,
                int32_t swizzlDirect_, int32_t rankIdx_, int32_t rankSize_, bool needFixpipe_)
-            : problemShape(problemShape_), ptrA(ptrA_), layoutA(layoutA_), ptrB(ptrB_), layoutB(layoutB_),
-              ptrBias(ptrBias_), ptrC(ptrC_), ptrScale(ptrScale_), pValue(pValue_), swizzlCount(swizzlCount_),
-              swizzlDirect(swizzlDirect_), rankIdx(rankIdx_), rankSize(rankSize_), needFixpipe(needFixpipe_)
-        {
-        }
+            : problemShape(problemShape_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrB(ptrB_),
+              layoutB(layoutB_),
+              ptrBias(ptrBias_),
+              ptrC(ptrC_),
+              ptrScale(ptrScale_),
+              pValue(pValue_),
+              swizzlCount(swizzlCount_),
+              swizzlDirect(swizzlDirect_),
+              rankIdx(rankIdx_),
+              rankSize(rankSize_),
+              needFixpipe(needFixpipe_)
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    MatmulReduceScatterAivModeSmallM()
-    {
-    }
+    MatmulReduceScatterAivModeSmallM() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);

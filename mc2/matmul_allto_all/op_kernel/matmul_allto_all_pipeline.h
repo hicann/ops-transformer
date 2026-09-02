@@ -30,7 +30,6 @@ struct MatmulAlltoAllPipelineContext {
     MC2KernelTemplate::MC2AlltoAllContext *communicationContext;
 };
 
-
 // 计算转置通信模板
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename ContextType,
           bool IsKCQuantMode = false>
@@ -38,7 +37,9 @@ class MatmulAlltoAllPipeLine {
 public:
     __aicore__ inline MatmulAlltoAllPipeLine(ComputationType *computeStage, TransposeType *transStage,
                                              CommunicationType *commStage)
-        : computeStage_(computeStage), transStage_(transStage), commStage_(commStage){};
+        : computeStage_(computeStage),
+          transStage_(transStage),
+          commStage_(commStage){};
 
     __aicore__ inline void Init();
 
@@ -67,9 +68,8 @@ MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, Contex
 
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename ContextType,
           bool IsKCQuantMode>
-__aicore__ inline void
-MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType, IsKCQuantMode>::GetContext(
-    ContextType *context)
+__aicore__ inline void MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType,
+                                              IsKCQuantMode>::GetContext(ContextType *context)
 {
     context->computationContext = computeStage_->GetContextPtr();
     context->transposeContext = transStage_->GetContextPtr();
@@ -78,9 +78,8 @@ MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, Contex
 
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename ContextType,
           bool IsKCQuantMode>
-__aicore__ inline void
-MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType, IsKCQuantMode>::Process(
-    uint32_t taskCnt)
+__aicore__ inline void MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType,
+                                              IsKCQuantMode>::Process(uint32_t taskCnt)
 {
     if constexpr (IsKCQuantMode) {
         ProcessKC(taskCnt);
@@ -91,9 +90,8 @@ MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, Contex
 
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename ContextType,
           bool IsKCQuantMode>
-__aicore__ inline void
-MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType, IsKCQuantMode>::ProcessDefault(
-    uint32_t taskCnt)
+__aicore__ inline void MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType,
+                                              IsKCQuantMode>::ProcessDefault(uint32_t taskCnt)
 {
     commStage_->PrepareAll(taskCnt);
     for (uint32_t index = 0; index < taskCnt; index++) {
@@ -114,9 +112,8 @@ MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, Contex
 
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename ContextType,
           bool IsKCQuantMode>
-__aicore__ inline void
-MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType, IsKCQuantMode>::ProcessKC(
-    uint32_t taskCnt)
+__aicore__ inline void MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType,
+                                              IsKCQuantMode>::ProcessKC(uint32_t taskCnt)
 {
     commStage_->PrepareAll(taskCnt);
     for (uint32_t index = 0; index < taskCnt; index++) {

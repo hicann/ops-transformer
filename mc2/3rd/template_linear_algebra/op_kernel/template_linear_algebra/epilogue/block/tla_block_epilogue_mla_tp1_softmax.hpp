@@ -83,9 +83,7 @@ public:
     }
 
     CATLASS_DEVICE
-    ~BlockEpilogue()
-    {
-    }
+    ~BlockEpilogue() {}
 
     CATLASS_DEVICE
     void SetVecMask(int32_t len)

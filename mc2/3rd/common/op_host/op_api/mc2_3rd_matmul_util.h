@@ -134,5 +134,4 @@ op::FVector<int64_t> GetShape(const aclTensor *tensor);
 } // namespace Transformer
 } // namespace Ops
 
-
 #endif // MC2_3RD_MATMUL_UTIL_H_

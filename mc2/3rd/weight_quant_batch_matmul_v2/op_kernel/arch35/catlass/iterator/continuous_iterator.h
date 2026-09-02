@@ -25,26 +25,32 @@ struct ContinuousIterator {
     Index offset = 0;
     Index size = 1; // 避免重复计算
 
-    DEVICE ContinuousIterator()
-    {
-    }
+    DEVICE ContinuousIterator() {}
 
-    DEVICE ContinuousIterator(Index stop) : stop(stop)
-    {
-    }
+    DEVICE ContinuousIterator(Index stop)
+        : stop(stop)
+    {}
 
-    DEVICE ContinuousIterator(Index stop, Index step) : step(step), stop(stop)
+    DEVICE ContinuousIterator(Index stop, Index step)
+        : step(step),
+          stop(stop)
     {
         UpdateSize();
     }
 
-    DEVICE ContinuousIterator(Index start, Index stop, Index step) : step(step), stop(stop), start(start)
+    DEVICE ContinuousIterator(Index start, Index stop, Index step)
+        : step(step),
+          stop(stop),
+          start(start)
     {
         UpdateSize();
     }
 
     DEVICE ContinuousIterator(Index start, Index stop, Index step, Index offset)
-        : step(step), stop(stop), start(start), offset(offset)
+        : step(step),
+          stop(stop),
+          start(start),
+          offset(offset)
     {
         UpdateSize();
     }

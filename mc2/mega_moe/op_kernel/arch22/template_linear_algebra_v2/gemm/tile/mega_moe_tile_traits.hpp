@@ -39,8 +39,7 @@ struct PrologueTraits<void> {
 
     template <class... Args>
     CATLASS_DEVICE PrologueTraits(Args...)
-    {
-    }
+    {}
 };
 
 } // namespace Catlass::Gemm::Tile

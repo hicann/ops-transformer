@@ -64,5 +64,4 @@ private:
 };
 } // namespace optiling
 
-
 #endif // __MATMUL_REDUCE_SCATTER_V2_TILING_H__

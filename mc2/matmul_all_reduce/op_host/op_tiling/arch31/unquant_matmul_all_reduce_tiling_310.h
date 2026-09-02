@@ -30,8 +30,7 @@ class UnQuantMatmulAllReduceTiling310 : public MatmulAllReduceTilingBase {
                                     Mc2MatmulV3TilingData &data)
             : Mc2MatmulV3BaseTiling(unquantMatmulAllReduceTiling.context_, &data),
               tilingProcesser_(unquantMatmulAllReduceTiling)
-        {
-        }
+        {}
 
         ge::graphStatus CheckInputInfo()
         {
@@ -87,9 +86,9 @@ class UnQuantMatmulAllReduceTiling310 : public MatmulAllReduceTilingBase {
     };
 
 public:
-    explicit UnQuantMatmulAllReduceTiling310(gert::TilingContext *context) : MatmulAllReduceTilingBase(context)
-    {
-    }
+    explicit UnQuantMatmulAllReduceTiling310(gert::TilingContext *context)
+        : MatmulAllReduceTilingBase(context)
+    {}
     ~UnQuantMatmulAllReduceTiling310() override = default;
 
 protected:

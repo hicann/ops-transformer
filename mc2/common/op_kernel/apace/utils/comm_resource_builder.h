@@ -46,9 +46,15 @@ struct HcclCombinOpParam {
 namespace Apace {
 using HcclOpParam = HcclCombinOpParam;
 
-__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam *winContext) { return winContext->rankId; }
+__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam *winContext)
+{
+    return winContext->rankId;
+}
 
-__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam *winContext) { return winContext->rankDim; }
+__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam *winContext)
+{
+    return winContext->rankDim;
+}
 
 __aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam *winContext, const int32_t rankId)
 {

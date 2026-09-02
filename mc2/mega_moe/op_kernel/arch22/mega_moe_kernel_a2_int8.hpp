@@ -122,9 +122,7 @@ public:
         GM_ADDR tilingGM{nullptr};
         MoeInitRoutingQuantV2TilingData moeInitRoutingQuantV2TilingData;
 
-        CATLASS_HOST_DEVICE Params()
-        {
-        }
+        CATLASS_HOST_DEVICE Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord problemShape_, uint32_t EP_, uint32_t listLen_, uint32_t expertPerRank_,
@@ -140,23 +138,46 @@ public:
                float swigluLimit_ = std::numeric_limits<float>::infinity(), uint32_t activationCode_ = 0,
                float activationParams1_ = Epilogue::SwigluOaiActivation::DEFAULT_ALPHA,
                float activationParams2_ = Epilogue::SituActivation::DEFAULT_BETA, GM_ADDR tilingGM_ = nullptr)
-            : problemShape(problemShape_), EP(EP_), listLen(listLen_), expertPerRank(expertPerRank_),
-              maxOutputSize(maxOutputSize_), topK(topK_), initRoutingQuantTilingKey(initRoutingQuantTilingKey_),
-              epilogueCoreNum(epilogueCoreNum_), epilogueGranularity(epilogueGranularity_), swigluLimit(swigluLimit_),
-              activationCode(activationCode_), activationParams1(activationParams1_),
+            : problemShape(problemShape_),
+              EP(EP_),
+              listLen(listLen_),
+              expertPerRank(expertPerRank_),
+              maxOutputSize(maxOutputSize_),
+              topK(topK_),
+              initRoutingQuantTilingKey(initRoutingQuantTilingKey_),
+              epilogueCoreNum(epilogueCoreNum_),
+              epilogueGranularity(epilogueGranularity_),
+              swigluLimit(swigluLimit_),
+              activationCode(activationCode_),
+              activationParams1(activationParams1_),
               activationParams2(activationParams2_),
-              contextGM(contextGM_), tilingGM(tilingGM_), ptrA(reinterpret_cast<__gm__ ElementABefore *>(ptrA_)),
-              layoutA(layoutA_), layoutA2(layoutA2_), ptrB1(reinterpret_cast<__gm__ ElementB *>(ptrB1_)),
-              layoutB1(layoutB1_), ptrBias1(reinterpret_cast<__gm__ float *>(ptrBias1_)),
-              ptrB2(reinterpret_cast<__gm__ ElementB *>(ptrB2_)), layoutB2(layoutB2_),
+              contextGM(contextGM_),
+              tilingGM(tilingGM_),
+              ptrA(reinterpret_cast<__gm__ ElementABefore *>(ptrA_)),
+              layoutA(layoutA_),
+              layoutA2(layoutA2_),
+              ptrB1(reinterpret_cast<__gm__ ElementB *>(ptrB1_)),
+              layoutB1(layoutB1_),
+              ptrBias1(reinterpret_cast<__gm__ float *>(ptrBias1_)),
+              ptrB2(reinterpret_cast<__gm__ ElementB *>(ptrB2_)),
+              layoutB2(layoutB2_),
               ptrBias2(reinterpret_cast<__gm__ float *>(ptrBias2_)),
-              ptrScale1(reinterpret_cast<__gm__ ElementScale *>(ptrScale1_)), layoutScale1(layoutScale1_),
-              ptrScale2(reinterpret_cast<__gm__ ElementScale *>(ptrScale2_)), layoutScale2(layoutScale2_),
-              ptrOutput(reinterpret_cast<__gm__ ElementD2 *>(ptrOutput_)), layoutD1(layoutD1_), layoutD2(layoutD2_),
-              expertIdx(expertIdx_), moeInitRoutingQuantV2Scale(moeInitRoutingQuantV2Scale_),
+              ptrScale1(reinterpret_cast<__gm__ ElementScale *>(ptrScale1_)),
+              layoutScale1(layoutScale1_),
+              ptrScale2(reinterpret_cast<__gm__ ElementScale *>(ptrScale2_)),
+              layoutScale2(layoutScale2_),
+              ptrOutput(reinterpret_cast<__gm__ ElementD2 *>(ptrOutput_)),
+              layoutD1(layoutD1_),
+              layoutD2(layoutD2_),
+              expertIdx(expertIdx_),
+              moeInitRoutingQuantV2Scale(moeInitRoutingQuantV2Scale_),
               moeInitRoutingQuantV2Offset(moeInitRoutingQuantV2Offset_),
-              expertTokensBeforeCapacity(expertTokensBeforeCapacity_), probs(probs_), ptrXActiveMask(ptrXActiveMask_),
-              ptrScales(ptrScales_), ptrWorkspace(ptrWorkspace_), ptrExpertTokenNums(gmExpertTokenNums_),
+              expertTokensBeforeCapacity(expertTokensBeforeCapacity_),
+              probs(probs_),
+              ptrXActiveMask(ptrXActiveMask_),
+              ptrScales(ptrScales_),
+              ptrWorkspace(ptrWorkspace_),
+              ptrExpertTokenNums(gmExpertTokenNums_),
               moeInitRoutingQuantV2TilingData(moeInitRoutingQuantV2TilingData_)
         {
             gmmOutPreRowStride = problemShape.n() > problemShape.k() ? problemShape.n() : problemShape.k();
@@ -179,9 +200,7 @@ public:
     }
 
     CATLASS_DEVICE
-    ~MegaMoeKernelA2Int8()
-    {
-    }
+    ~MegaMoeKernelA2Int8() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -295,14 +314,14 @@ private:
     //   - 路径 C（跨 server）：批量 RDMA 数据，再 RDMA epoch flag
     // ============================================================
     template <typename T>
-    CATLASS_DEVICE void
-    SendTokensV3(AscendC::GlobalTensor<T> dst, // 目标 rank peer mem（已含 rowStart * copyInNum 偏移）
-                 AscendC::GlobalTensor<T> src, // 本 rank windowsOut（已含 rowSrc * copyInNum 偏移）
-                 int32_t rows,                 // 发送 token 数
-                 uint32_t hiddenSize, int32_t dstEpIdx,
-                 int32_t groupIdx, // 当前专家组轮次（用于 epoch flag 值）
-                 int32_t rowStart, // dst 起始行号（路径 A 写 scale 时使用）
-                 const Params &params)
+    CATLASS_DEVICE void SendTokensV3(
+        AscendC::GlobalTensor<T> dst, // 目标 rank peer mem（已含 rowStart * copyInNum 偏移）
+        AscendC::GlobalTensor<T> src, // 本 rank windowsOut（已含 rowSrc * copyInNum 偏移）
+        int32_t rows,                 // 发送 token 数
+        uint32_t hiddenSize, int32_t dstEpIdx,
+        int32_t groupIdx, // 当前专家组轮次（用于 epoch flag 值）
+        int32_t rowStart, // dst 起始行号（路径 A 写 scale 时使用）
+        const Params &params)
     {
         // rows == 0：无 token 可发，不写 flag，对端 RecvTokensV3 同样 rows2==0 会提前 return
         if (rows == 0)
@@ -524,14 +543,12 @@ private:
             uint32_t remainingExpertNum = totalExpertNum - expertOffset;
             uint32_t currentExpertNum =
                 remainingExpertNum < maxExpertNumPerLoop ? remainingExpertNum : maxExpertNumPerLoop;
-            uint32_t currentExpertNumAligned =
-                (currentExpertNum + int32PerBlock - 1) / int32PerBlock * int32PerBlock;
+            uint32_t currentExpertNumAligned = (currentExpertNum + int32PerBlock - 1) / int32PerBlock * int32PerBlock;
 
-            AscendC::DataCopyPad(
-                tmpBuffer1, tokenPerExpert[expertOffset],
-                {U16(EP), U16(currentExpertNum * sizeof(int32_t)),
-                 U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t)), 0},
-                {});
+            AscendC::DataCopyPad(tmpBuffer1, tokenPerExpert[expertOffset],
+                                 {U16(EP), U16(currentExpertNum * sizeof(int32_t)),
+                                  U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t)), 0},
+                                 {});
 
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
@@ -545,10 +562,9 @@ private:
             AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
 
-            AscendC::DataCopyPad(
-                result[expertOffset], tmpBuffer1,
-                {U16(EP), U16(currentExpertNum * sizeof(int32_t)), 0,
-                 U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t))});
+            AscendC::DataCopyPad(result[expertOffset], tmpBuffer1,
+                                 {U16(EP), U16(currentExpertNum * sizeof(int32_t)), 0,
+                                  U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t))});
             // The next loop reuses the same UB range for MTE2. Wait until MTE3 has consumed it.
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
@@ -773,12 +789,13 @@ private:
         AscendC::LocalTensor<int32_t> prevSumBuf = tmpBuffer[numPerCore];
         uint64_t ubOffet = 2 * numPerCore * sizeof(uint32_t);
         AscendC::LocalTensor<uint64_t> rdmaUbLocal = resource.ubBuf.template GetBufferByByte<uint64_t>(ubOffet);
-        AscendC::LocalTensor<uint32_t> rdmaUbLocalHead = resource.ubBuf.template GetBufferByByte<uint32_t>(ubOffet + UB_ALIGN);
+        AscendC::LocalTensor<uint32_t> rdmaUbLocalHead =
+            resource.ubBuf.template GetBufferByByte<uint32_t>(ubOffet + UB_ALIGN);
         // flagUb：用于路径 C 拼 32B flag payload，放在 rdmaUbLocalHead 之后
         AscendC::LocalTensor<int32_t> flagUb = resource.ubBuf.template GetBufferByByte<int32_t>(ubOffet + 2 * UB_ALIGN);
 
         // ── Stage 1：发送（每 core 处理若干 dstEpIdx）──────────────
-        for(int32_t dstEpIdx = coreIdx, dstServerId = 0; dstEpIdx < params.EP; dstEpIdx += coreNum) {
+        for (int32_t dstEpIdx = coreIdx, dstServerId = 0; dstEpIdx < params.EP; dstEpIdx += coreNum) {
             dstServerId = dstEpIdx / SERVER_RANK_SIZE_A2;
             AscendC::GlobalTensor<int32_t> srcAddress;
             int64_t localTokenPerExpertWinOutOffset = peermemInfo.offsetWinOutPeerTokenPerExpert +
@@ -803,16 +820,12 @@ private:
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
 
-            copyGmToUb(tmpBuffer, srcAddress[0],
-                layout::RowMajor{ 1, numPerCore},
-                layout::RowMajor{1, numPerCore});
+            copyGmToUb(tmpBuffer, srcAddress[0], layout::RowMajor{1, numPerCore}, layout::RowMajor{1, numPerCore});
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(EVENT_ID0);
             if (dstEpIdx == static_cast<int32_t>(RuntimeRank(params))) {
                 // ── 路径 A：self-rank，本地搬运，无 flag ──
-                copyUbToGm(dstAddress, tmpBuffer,
-                    layout::RowMajor{ 1, numPerCore},
-                    layout::RowMajor{1, numPerCore});
+                copyUbToGm(dstAddress, tmpBuffer, layout::RowMajor{1, numPerCore}, layout::RowMajor{1, numPerCore});
                 AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             } else if (dstServerId == serverId_) {
@@ -1232,9 +1245,8 @@ private:
                 int64_t gmOffsetC = layoutC.GetOffset(offsetC);
                 int64_t gmOffsetD = params.layoutD1.GetOffset(offsetC);
                 blockEpilogue1(gmC[gmOffsetC], shapeC, gmPerTokenScale1[rowStartThisCore], gmPermutedToken[gmOffsetD],
-                               gmPerTokenScale2[rowStartThisCore], coreNum, params.swigluLimit,
-                               params.activationCode, params.activationParams1, params.activationParams2,
-                               params.gmmOutPreRowStride);
+                               gmPerTokenScale2[rowStartThisCore], coreNum, params.swigluLimit, params.activationCode,
+                               params.activationParams1, params.activationParams2, params.gmmOutPreRowStride);
             }
             AscendC::SyncAll<true>();
             // Synchronization signal: SwiGLU notifies GMM2 [2]
@@ -1395,9 +1407,7 @@ private:
         __gm__ float *ptrSoftFlagBase;
 
         CATLASS_DEVICE
-        WorkspaceInfo()
-        {
-        }
+        WorkspaceInfo() {}
 
         CATLASS_DEVICE
         WorkspaceInfo(const Params &params)
@@ -1447,17 +1457,15 @@ private:
         static constexpr int64_t kFlagSlotI32 = 16;
         // 跨 server RDMA 时一次写入的 payload 大小：8 个 int32 = 32B，首 4B 为 magic，其余为 padding
         static constexpr int64_t kFlagPayloadI32 = 8;
-        int64_t offsetWinOutA;                   // A tensor in winOut (dispatch, outgoing tokens)
-        int64_t offsetWinOutD;                   // D tensor in winOut (combine, outgoing FFN results)
+        int64_t offsetWinOutA; // A tensor in winOut (dispatch, outgoing tokens)
+        int64_t offsetWinOutD; // D tensor in winOut (combine, outgoing FFN results)
         int64_t offsetAllgatherFlag;
         int64_t offsetWinOutPeerPerTokenScale;  // per-token scale in winOut
         int64_t offsetWinOutFlag;               // Dispatch Flag 区 in winOut
         int64_t offsetWinOutPeerTokenPerExpert; // TPE 区 in winOut
 
         CATLASS_DEVICE
-        PeermemInfo()
-        {
-        }
+        PeermemInfo() {}
 
         CATLASS_DEVICE
         PeermemInfo(const Params &params, const HcclShmem<true> &shmem)

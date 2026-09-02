@@ -99,9 +99,7 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           typename preciseType = HighPreciseType>
 class Mc2WeightQuantBatchMatmulV2MsdSplitKKernel {
 public:
-    __aicore__ inline Mc2WeightQuantBatchMatmulV2MsdSplitKKernel()
-    {
-    }
+    __aicore__ inline Mc2WeightQuantBatchMatmulV2MsdSplitKKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
                                 const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe);
@@ -656,10 +654,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType, weightFormat,
-                                           preciseType>::CopyInSumMax(uint64_t baseMOffset, uint64_t singleCorerealM)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::CopyInSumMax(uint64_t baseMOffset, uint64_t singleCorerealM)
 {
     if constexpr (hasAntiQuantOffset) {
         DataCopyPad2D(aSumComputeOffsetTensor_, reduceSumWorkspaceGm_[baseMOffset * FP32_BLOCK_SIZE], kBlockNum_,
@@ -913,10 +910,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType, weightFormat,
-                                           preciseType>::GetSumOrMaxAParamPerGroup(BinaryRepeatParams &param)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::GetSumOrMaxAParamPerGroup(BinaryRepeatParams &param)
 {
     param.dstBlkStride = 1;
     param.src0BlkStride = 1;
@@ -1330,10 +1326,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType, weightFormat,
-                                           preciseType>::BL1PreLoad(const CubeProcessParams<wType> &cubeProcessParams)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::BL1PreLoad(const CubeProcessParams<wType> &cubeProcessParams)
 {
     uint64_t kBlockNum = InitMatmulParams();
     uint64_t preloadTimes = 0;
@@ -1716,10 +1711,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType, weightFormat,
-                                           preciseType>::SumMaxMul(uint64_t taskSingleCoreNSize, uint64_t realM)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::SumMaxMul(uint64_t taskSingleCoreNSize, uint64_t realM)
 {
     uint64_t repeatTimes = tiling_->taskSingleCoreNSize / FP32_MAX_MASK_SIZE;
     BinaryRepeatParams repeatParams;
@@ -1799,11 +1793,10 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType, weightFormat,
-                                           preciseType>::ProcessC1C2(uint64_t taskSingleCoreNSize, uint64_t nOffset,
-                                                                     uint64_t baseMOffset, uint64_t singleCorerealM)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::ProcessC1C2(uint64_t taskSingleCoreNSize, uint64_t nOffset, uint64_t baseMOffset,
+                              uint64_t singleCorerealM)
 {
     event_t eventIdMte3ToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
     SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
@@ -2168,11 +2161,10 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                           hasAntiQuantOffset, quantType, weightFormat,
-                                           preciseType>::CopyOutResult(uint64_t taskSingleCoreNSize, uint64_t nOffset,
-                                                                       uint64_t baseMOffset, uint64_t singleCorerealM)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdSplitKKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::CopyOutResult(uint64_t taskSingleCoreNSize, uint64_t nOffset, uint64_t baseMOffset,
+                                uint64_t singleCorerealM)
 {
     if (tiling_->hasBias) {
         event_t eventIdVToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));

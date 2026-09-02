@@ -24,7 +24,8 @@ namespace optiling {
 class MoeDistributeDispatchSetupTilingBase : public MoeTilingBase {
 public:
     explicit MoeDistributeDispatchSetupTilingBase(gert::TilingContext *context)
-        : MoeTilingBase(context), nodeName_(context->GetNodeName()) {};
+        : MoeTilingBase(context),
+          nodeName_(context->GetNodeName()) {};
     enum class TensorType {
         INPUT = 0,
         OUTPUT = 1,

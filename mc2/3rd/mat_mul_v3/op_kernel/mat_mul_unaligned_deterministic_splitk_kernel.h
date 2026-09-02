@@ -20,9 +20,10 @@
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE,
           FIXPIPE_OPT_SELECT FIXPIPE_OPT = FIXPIPE_OPT_SELECT::BASE>
-__aicore__ inline void
-Mc2MatMulUnAlignedKernelDeterministicSplitK(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM,
-                                            const Mc2MatmulV3TilingData &matmulTilingData, GM_ADDR workspaceGM)
+__aicore__ inline void Mc2MatMulUnAlignedKernelDeterministicSplitK(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM,
+                                                                   GM_ADDR biasGM,
+                                                                   const Mc2MatmulV3TilingData &matmulTilingData,
+                                                                   GM_ADDR workspaceGM)
 {
     const TCubeTiling &tiling = matmulTilingData.matmulTiling;
     using A_T = typename A_TYPE::T;

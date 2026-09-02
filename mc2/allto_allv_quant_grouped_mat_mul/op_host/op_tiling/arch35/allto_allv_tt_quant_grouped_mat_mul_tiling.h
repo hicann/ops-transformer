@@ -21,7 +21,8 @@ namespace optiling {
 
 class AlltoAllvTTQuantGmmTiling : public AlltoAllvQuantGmmTilingCommon {
 public:
-    explicit AlltoAllvTTQuantGmmTiling(gert::TilingContext *context) : AlltoAllvQuantGmmTilingCommon(context) {};
+    explicit AlltoAllvTTQuantGmmTiling(gert::TilingContext *context)
+        : AlltoAllvQuantGmmTilingCommon(context) {};
 
 protected:
     // Tiling base
@@ -38,10 +39,10 @@ protected:
 private:
     void SetGMMQuantParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
                            uint32_t groupNum = 1) const;
-    void SetTilingArray(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
-                        uint64_t M, uint64_t N, uint64_t K, uint32_t groupNum = 1) const;
-    void SetTilingParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
-                         uint64_t M, uint64_t N, uint64_t K, bool transB) const;
+    void SetTilingArray(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData, uint64_t M, uint64_t N,
+                        uint64_t K, uint32_t groupNum = 1) const;
+    void SetTilingParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData, uint64_t M, uint64_t N,
+                         uint64_t K, bool transB) const;
 };
 } // namespace optiling
 #endif // ALLTO_ALLV_TT_GROUPED_MATMUL_QUANT_TILING_H

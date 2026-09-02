@@ -24,9 +24,7 @@ using namespace matmul;
 
 class Mc2MatmulDaswBlock : public Mc2MatmulAswBlock {
 public:
-    __aicore__ inline Mc2MatmulDaswBlock()
-    {
-    }
+    __aicore__ inline Mc2MatmulDaswBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void Init(const void *tilingData);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx, uint64_t newBlockIdx);

@@ -85,7 +85,6 @@ struct EpilogueAtlasA2PerTokenDequant {
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
-
 // For AtlasA2, W4A4 epilogue process
 struct EpilogueAtlasA2W4A4PerTokenPerChannelDequant {
     using ArchTag = Arch::AtlasA2;

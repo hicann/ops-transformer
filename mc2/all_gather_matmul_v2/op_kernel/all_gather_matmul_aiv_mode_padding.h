@@ -25,12 +25,12 @@
 
 using namespace AscendC;
 using namespace Catlass;
-#define PADDING_ARGS_FUN()                                                                                             \
-    bool transA, bool transB, bool alignedA, bool alignedB, uint32_t matrixAM, uint32_t matrixAK, uint32_t matrixBK,   \
-        uint32_t matrixBN, uint32_t matrixAMAlign, uint32_t matrixAKAlign, uint32_t matrixBKAlign,                     \
+#define PADDING_ARGS_FUN() \
+    bool transA, bool transB, bool alignedA, bool alignedB, uint32_t matrixAM, uint32_t matrixAK, uint32_t matrixBK, \
+        uint32_t matrixBN, uint32_t matrixAMAlign, uint32_t matrixAKAlign, uint32_t matrixBKAlign, \
         uint32_t matrixBNAlign, GM_ADDR gmA, GM_ADDR gmB, GM_ADDR gmAAlign, GM_ADDR gmBAlign
-#define PADDING_ARGS_CALL()                                                                                            \
-    transA, transB, alignedA, alignedB, matrixAM, matrixAK, matrixBK, matrixBN, matrixAMAlign, matrixAKAlign,          \
+#define PADDING_ARGS_CALL() \
+    transA, transB, alignedA, alignedB, matrixAM, matrixAK, matrixBK, matrixBN, matrixAMAlign, matrixAKAlign, \
         matrixBKAlign, matrixBNAlign, gmA, gmB, gmAAlign, gmBAlign
 namespace Catlass::Gemm::Kernel {
 template <class ArchTag_, class AType_, class BType_>
@@ -60,22 +60,25 @@ public:
         bool alignB;      // B矩阵是否padding
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
         CATLASS_HOST_DEVICE
         Params(GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_, GM_ADDR ptrWA_, LayoutA layoutWA_,
                GM_ADDR ptrWB_, LayoutB layoutWB_, bool alignA_, bool alignB_)
-            : ptrA(ptrA_), layoutA(layoutA_), ptrB(ptrB_), layoutB(layoutB_), ptrWA(ptrWA_), layoutWA(layoutWA_),
-              ptrWB(ptrWB_), layoutWB(layoutWB_), alignA(alignA_), alignB(alignB_)
-        {
-        }
+            : ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrB(ptrB_),
+              layoutB(layoutB_),
+              ptrWA(ptrWA_),
+              layoutWA(layoutWA_),
+              ptrWB(ptrWB_),
+              layoutWB(layoutWB_),
+              alignA(alignA_),
+              alignB(alignB_)
+        {}
     };
     // Methods
     CATLASS_DEVICE
-    TemplatePadder()
-    {
-    }
+    TemplatePadder() {}
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
     template <>

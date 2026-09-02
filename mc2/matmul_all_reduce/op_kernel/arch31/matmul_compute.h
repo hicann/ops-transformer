@@ -73,9 +73,7 @@ class MatmulCompute {
     using BiasT = typename BIAS_TYPE::T;
 
 public:
-    __aicore__ inline MatmulCompute()
-    {
-    }
+    __aicore__ inline MatmulCompute() {}
     __aicore__ inline void Init(AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg,
                                 Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling,
                                 const LocalTensor<uint8_t> &mmFormatUb);
@@ -153,10 +151,11 @@ __aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, Mc2L2Cac
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool Mc2L2Cache, bool WeightQuant,
           AntiQuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, Mc2L2Cache, WeightQuant, antiQuantType, hasAntiQuantOffset>::Init(
-    AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg, Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling,
-    const LocalTensor<uint8_t> &mmFormatUb)
+__aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, Mc2L2Cache, WeightQuant, antiQuantType,
+                                     hasAntiQuantOffset>::Init(AscendC::tiling::TCubeTiling &tiling,
+                                                               Mc2Tiling::RCSTiling &cfg,
+                                                               Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling,
+                                                               const LocalTensor<uint8_t> &mmFormatUb)
 {
     // MatmulImpl初始化
     mm.SetSubBlockIdx(0);
@@ -216,9 +215,8 @@ __aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, Mc2L2Cac
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool Mc2L2Cache, bool WeightQuant,
           AntiQuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, Mc2L2Cache, WeightQuant, antiQuantType, hasAntiQuantOffset>::Compute(
-    uint32_t index, uint8_t enAtomic)
+__aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, Mc2L2Cache, WeightQuant, antiQuantType,
+                                     hasAntiQuantOffset>::Compute(uint32_t index, uint8_t enAtomic)
 {
     if constexpr (Mc2L2Cache) {
         ComputeWithL2Cache(index, enAtomic);

@@ -25,7 +25,6 @@ struct BlockMmad {
     static_assert(DEPENDENT_FALSE<DispatchPolicy>, "BlockMmad is not implemented for this DispatchPolicy");
 };
 
-
 /// new add for the reason that i am using the dispatchpolicy which is same as the policy of the optimized_matmul
 // so i add a new one class to avoid the conflict
 template <class DispatchPolicy, class L1TileShape, class L0TileShape, class AType, class BType, class CType,
@@ -43,6 +42,5 @@ struct BlockMmadAiv {
 };
 
 } // namespace Catlass::Gemm::Block
-
 
 #endif // CATLASS_MEGA_MOE_GEMM_BLOCK_BLOCK_MMAD_HPP

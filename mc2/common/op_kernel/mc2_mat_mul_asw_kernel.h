@@ -29,9 +29,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK
           const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
 class MC2MatmulAswKernelDerive : public Mc2MatmulAswKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG> {
 public:
-    __aicore__ inline MC2MatmulAswKernelDerive()
-    {
-    }
+    __aicore__ inline MC2MatmulAswKernelDerive() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetGM,
                                 GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe, Mc2Tiling::RCSTiling cfg,
                                 bool isTail, bool isGather);
@@ -72,15 +70,15 @@ __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYP
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::UpdateSlice(uint32_t idx, bool isTail)
+__aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::UpdateSlice(
+    uint32_t idx, bool isTail)
 {
     this->block_.UpdateOffset(idx, isTail);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(bool isLast, uint8_t enAtomic)
+__aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(
+    bool isLast, uint8_t enAtomic)
 {
     if ASCEND_IS_AIV {
         return;

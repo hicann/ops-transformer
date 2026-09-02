@@ -25,8 +25,8 @@
 #include "../../../common/op_kernel/qbmm_mix_perblock_noncontiguous.h"
 #include "../matmul_reduce_scatter_v2_c_tiling.h"
 
-#define TEMPLATE_CLASS_PARAMS                                                                                          \
-    template <typename AType, typename BType, typename CType, typename ScaleType, class MMClass, bool IsPerBlock,      \
+#define TEMPLATE_CLASS_PARAMS \
+    template <typename AType, typename BType, typename CType, typename ScaleType, class MMClass, bool IsPerBlock, \
               bool ATrans, bool BTrans, int TPL_COMM_MODE>
 #define TEMPLATE_FUNC_PARAMS AType, BType, CType, ScaleType, MMClass, IsPerBlock, ATrans, BTrans, TPL_COMM_MODE
 
@@ -36,9 +36,7 @@ using namespace AscendC;
 TEMPLATE_CLASS_PARAMS
 class QuantBMMReduceScatter {
 public:
-    __aicore__ inline QuantBMMReduceScatter()
-    {
-    }
+    __aicore__ inline QuantBMMReduceScatter() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR x1ScaleGM, GM_ADDR x2ScaleGM,
                                 GM_ADDR cGM, GM_ADDR contextGM, GM_ADDR workspaceGM,
                                 Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData *tilingData, TPipe *tpipe);
@@ -50,14 +48,12 @@ private:
     __aicore__ inline void MatMulComputReduceScatter(GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM,
                                                      DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling,
                                                      uint32_t tileCnt, GM_ADDR gmToFloat, bool isLast, bool isTail);
-    __aicore__ inline void
-    MatMulComputReduceScatterPertensor(GM_ADDR aGM, GM_ADDR cGM,
-                                       DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling, uint32_t tileCnt,
-                                       GM_ADDR gmToFloat, bool isLast, bool isTail);
-    __aicore__ inline void
-    MatMulComputReduceScatterPerblock(GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM,
-                                      DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling, uint32_t tileCnt,
-                                      GM_ADDR gmToFloat, bool isTail);
+    __aicore__ inline void MatMulComputReduceScatterPertensor(
+        GM_ADDR aGM, GM_ADDR cGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling, uint32_t tileCnt,
+        GM_ADDR gmToFloat, bool isLast, bool isTail);
+    __aicore__ inline void MatMulComputReduceScatterPerblock(
+        GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling,
+        uint32_t tileCnt, GM_ADDR gmToFloat, bool isTail);
     __aicore__ inline void PostProcess(); // 计算后处理，等待通信结束，并终止hcclserver
 
 private:

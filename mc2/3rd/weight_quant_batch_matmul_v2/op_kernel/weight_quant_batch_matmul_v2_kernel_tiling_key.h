@@ -141,7 +141,7 @@ ASCENDC_TPL_ARGS_DECL(
 
 #if defined(__CCE_AICORE__)
 #if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220)
-#if (defined(ORIG_DTYPE_ANTIQUANT_SCALE) &&                                                                            \
+#if (defined(ORIG_DTYPE_ANTIQUANT_SCALE) && \
      ((ORIG_DTYPE_ANTIQUANT_SCALE == DT_UINT64) || (ORIG_DTYPE_ANTIQUANT_SCALE == DT_INT64)))
 // fixp方案
 #if ((ORIG_DTYPE_X == DT_FLOAT16) && (ORIG_DTYPE_Y == DT_FLOAT16) && (ORIG_DTYPE_WEIGHT == DT_INT8))

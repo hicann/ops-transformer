@@ -257,18 +257,19 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyAAndScaleAL1ToL0
         AscendC::Te::MakeMemPtr<AscendC::Te::Location::L0ScaleA, fp8_e8m0_t>((l0BufIdx_ * L0_BUF_OFFSET) >> 4),
         layoutScaleAL0);
     auto tensorBlockScaleAL1 = tensorScaleAL1_.Slice(
-        AscendC::Te::MakeCoord(0, CeilDiv(((l1KOffset + kbOffset) % param.scaleKL1Size), MXFP_DIVISOR_SIZE) *
-                                      MXFP_MULTI_BASE_SIZE),
+        AscendC::Te::MakeCoord(
+            0, CeilDiv(((l1KOffset + kbOffset) % param.scaleKL1Size), MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE),
         AscendC::Te::MakeShape(param.mL1Size, realL0ScaleK));
     AscendC::Te::Copy(AscendC::Te::MakeCopy(AscendC::Te::CopyL12L0ScaleA{}), tensorScaleAL0, tensorBlockScaleAL1);
 }
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorBL1Type>
-__aicore__ inline void
-BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyBAndScaleBL1ToL0(const TensorBL1Type &tensorBL1, uint64_t l1KOffset,
-                                                          uint64_t kbOffset, uint64_t realL0K, uint64_t realL0ScaleK,
-                                                          const BlockMmadOffsetParam &param)
+__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyBAndScaleBL1ToL0(const TensorBL1Type &tensorBL1,
+                                                                                 uint64_t l1KOffset, uint64_t kbOffset,
+                                                                                 uint64_t realL0K,
+                                                                                 uint64_t realL0ScaleK,
+                                                                                 const BlockMmadOffsetParam &param)
 {
     auto layoutBL0 = MakeLayoutBL0{}(realL0K, param.nL1Size);
     auto tensorBL0 = AscendC::Te::MakeTensor(

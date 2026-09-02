@@ -21,9 +21,7 @@ using namespace AscendC;
 template <typename T>
 class KernelAddRmsNorm {
 public:
-    __aicore__ inline KernelAddRmsNorm()
-    {
-    }
+    __aicore__ inline KernelAddRmsNorm() {}
     __aicore__ inline void Init(GM_ADDR gamma, Mc2Tiling::AddRMSNormTilingData &tilingData, TPipe *Ppipe,
                                 uint32_t numBlocks)
     {

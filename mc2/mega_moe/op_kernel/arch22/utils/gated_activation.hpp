@@ -205,8 +205,8 @@ struct GatedActivation {
     template <class Element>
     CATLASS_DEVICE static void PrepareBranches(AscendC::LocalTensor<float> const &gate,
                                                AscendC::LocalTensor<float> const &up,
-                                               AscendC::LocalTensor<Element> const &packedInput,
-                                               uint32_t branchStride, uint32_t dataLength)
+                                               AscendC::LocalTensor<Element> const &packedInput, uint32_t branchStride,
+                                               uint32_t dataLength)
     {
         AscendC::Cast(gate, packedInput, AscendC::RoundMode::CAST_NONE, dataLength);
         AscendC::Cast(up, packedInput[branchStride], AscendC::RoundMode::CAST_NONE, dataLength);

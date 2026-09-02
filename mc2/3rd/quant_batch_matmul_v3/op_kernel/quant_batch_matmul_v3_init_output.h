@@ -21,9 +21,7 @@ namespace AscendC {
 template <typename yType>
 class BmmDequantInitOutput {
 public:
-    __aicore__ inline BmmDequantInitOutput()
-    {
-    }
+    __aicore__ inline BmmDequantInitOutput() {}
     __aicore__ inline void Init(GM_ADDR y, GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData *tilingData,
                                 TPipe *tPipe)
     {

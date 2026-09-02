@@ -101,8 +101,8 @@ __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::Init(GM_ADDR x, G
 }
 
 template <TemplateTypeClass>
-__aicore__ inline void
-QuantAllReduceMteOneShot<TemplateType>::ParseTilingInfo(const QuantAllReduceTilingData *tilingData)
+__aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::ParseTilingInfo(
+    const QuantAllReduceTilingData *tilingData)
 {
     auto &&info = tilingData->quantAllReduceTilingInfo;
     totalWinSize_ = info.totalWinSize;
@@ -111,8 +111,8 @@ QuantAllReduceMteOneShot<TemplateType>::ParseTilingInfo(const QuantAllReduceTili
 }
 
 template <TemplateTypeClass>
-__aicore__ inline void
-QuantAllReduceMteOneShot<TemplateType>::ComputeXPerBlock(const QuantAllReduceTilingData *tilingData, TPipe *tPipe)
+__aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::ComputeXPerBlock(
+    const QuantAllReduceTilingData *tilingData, TPipe *tPipe)
 {
     auto &&info = tilingData->quantAllReduceTilingInfo;
 

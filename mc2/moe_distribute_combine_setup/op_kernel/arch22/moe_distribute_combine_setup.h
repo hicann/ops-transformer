@@ -142,11 +142,10 @@ private:
 };
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void
-MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine,
-                                                     GM_ADDR quantExpandX, GM_ADDR commCmdInfoOut, GM_ADDR workspaceGM,
-                                                     TPipe *pipe, const MoeDistributeCombineSetupTilingData *tilingData,
-                                                     __gm__ void *mc2InitTiling, __gm__ void *mc2CcTiling)
+__aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(
+    GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine, GM_ADDR quantExpandX, GM_ADDR commCmdInfoOut,
+    GM_ADDR workspaceGM, TPipe *pipe, const MoeDistributeCombineSetupTilingData *tilingData, __gm__ void *mc2InitTiling,
+    __gm__ void *mc2CcTiling)
 {
     tpipe_ = pipe;
     coreIdx_ = GetBlockIdx();
@@ -294,9 +293,10 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Dispatch(
 }
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void
-MoeDistributeCombineSetup<TemplateMC2TypeFunc>::ExpertAlltoAllDispatch(uint32_t tokenNumLoop, uint32_t srcStartTokenIdx,
-                                                                       uint32_t ep, uint32_t expertIdx)
+__aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::ExpertAlltoAllDispatch(uint32_t tokenNumLoop,
+                                                                                              uint32_t srcStartTokenIdx,
+                                                                                              uint32_t ep,
+                                                                                              uint32_t expertIdx)
 {
     // 获取对应卡上 window 的首地址
     GM_ADDR rankGM = GetWinAddrByRankId(ep, expertIdx) + epDataOffsetOnWin_;

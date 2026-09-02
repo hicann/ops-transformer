@@ -84,9 +84,7 @@ public:
     }
 
     CATLASS_DEVICE
-    ~BlockEpilogue()
-    {
-    }
+    ~BlockEpilogue() {}
 
     CATLASS_DEVICE
     void SetMask(int32_t len)
@@ -116,10 +114,10 @@ public:
             AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
         } else {
             for (uint32_t rowsum_idx = 1; rowsum_idx < kSeqTile / FLOAT_VECTOR_SIZE; ++rowsum_idx) {
-                AscendC::Add<float, false>(src, src, src[rowsum_idx * FLOAT_VECTOR_SIZE], (uint64_t)0, curRowNum,
-                                           AscendC::BinaryRepeatParams(1, 1, 1, kSeqTileRound / FLOAT_BLOCK_SIZE,
-                                                                       kSeqTileRound / FLOAT_BLOCK_SIZE,
-                                                                       kSeqTileRound / FLOAT_BLOCK_SIZE));
+                AscendC::Add<float, false>(
+                    src, src, src[rowsum_idx * FLOAT_VECTOR_SIZE], (uint64_t)0, curRowNum,
+                    AscendC::BinaryRepeatParams(1, 1, 1, kSeqTileRound / FLOAT_BLOCK_SIZE,
+                                                kSeqTileRound / FLOAT_BLOCK_SIZE, kSeqTileRound / FLOAT_BLOCK_SIZE));
                 AscendC::PipeBarrier<PIPE_V>();
             }
             if (kSeqTile % FLOAT_VECTOR_SIZE > 0) {

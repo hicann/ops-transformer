@@ -47,9 +47,9 @@ constexpr static uint64_t REDUCE_SCATTER_V2_HCCL_NUM_LIMIT = 63;
 
 class MatmulReduceScatterTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MatmulReduceScatterTilingBase(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit MatmulReduceScatterTilingBase(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
     ~MatmulReduceScatterTilingBase() override = default;
 
     void Reset(gert::TilingContext *context) override

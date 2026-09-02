@@ -27,9 +27,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK
           const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
 class Mc2MatmulAswKernelAL1FullLoad {
 public:
-    __aicore__ inline Mc2MatmulAswKernelAL1FullLoad()
-    {
-    }
+    __aicore__ inline Mc2MatmulAswKernelAL1FullLoad() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                 GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
     __aicore__ inline void Process(uint8_t enAtomic = 0);
@@ -51,7 +49,6 @@ protected:
     LocalTensor<A_T> al1Local_;
 };
 
-
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
 __aicore__ inline void Mc2MatmulAswKernelAL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
@@ -59,21 +56,21 @@ __aicore__ inline void Mc2MatmulAswKernelAL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIA
 {
     pipe_ = pipe;
     block_.template Init<A_TYPE_NEW, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.Ka);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
+    aGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ A_T *>(aGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.Ka);
+    bGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ B_T *>(bGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) * block_.matmulTilingData_->tCubeTiling.N);
+    cGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ C_T *>(cGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.N);
     biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), block_.matmulTilingData_->tCubeTiling.N);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2MatmulAswKernelAL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(uint8_t enAtomic)
+__aicore__ inline void Mc2MatmulAswKernelAL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(
+    uint8_t enAtomic)
 {
     if ASCEND_IS_AIV {
         return;
@@ -92,9 +89,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK
           const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
 class Mc2MatmulAswKernelBL1FullLoad {
 public:
-    __aicore__ inline Mc2MatmulAswKernelBL1FullLoad()
-    {
-    }
+    __aicore__ inline Mc2MatmulAswKernelBL1FullLoad() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                 GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
     __aicore__ inline void Process(uint8_t enAtomic = 0);
@@ -123,21 +118,21 @@ __aicore__ inline void Mc2MatmulAswKernelBL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIA
 {
     pipe_ = pipe;
     block_.template Init<A_TYPE, B_TYPE_NEW, C_TYPE, BIAS_TYPE>(tilingData);
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.Ka);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
+    aGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ A_T *>(aGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.Ka);
+    bGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ B_T *>(bGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) * block_.matmulTilingData_->tCubeTiling.N);
+    cGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ C_T *>(cGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.N);
     biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), block_.matmulTilingData_->tCubeTiling.N);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2MatmulAswKernelBL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(uint8_t enAtomic)
+__aicore__ inline void Mc2MatmulAswKernelBL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(
+    uint8_t enAtomic)
 {
     if ASCEND_IS_AIV {
         return;
@@ -156,9 +151,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK
           const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
 class Mc2MatmulAswKernelABL1FullLoad {
 public:
-    __aicore__ inline Mc2MatmulAswKernelABL1FullLoad()
-    {
-    }
+    __aicore__ inline Mc2MatmulAswKernelABL1FullLoad() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                 GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
     __aicore__ inline void Process(uint8_t enAtomic = 0);
@@ -196,21 +189,21 @@ __aicore__ inline void Mc2MatmulAswKernelABL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BI
 {
     pipe_ = pipe;
     block_.template Init<A_TYPE_NEW, B_TYPE_NEW, C_TYPE, BIAS_TYPE_NEW>(tilingData);
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.Ka);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
+    aGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ A_T *>(aGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.Ka);
+    bGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ B_T *>(bGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) * block_.matmulTilingData_->tCubeTiling.N);
+    cGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ C_T *>(cGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.N);
     biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), block_.matmulTilingData_->tCubeTiling.N);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2MatmulAswKernelABL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(uint8_t enAtomic)
+__aicore__ inline void Mc2MatmulAswKernelABL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(
+    uint8_t enAtomic)
 {
     if ASCEND_IS_AIV {
         return;
@@ -262,9 +255,9 @@ Mc2MatmulAswKernelABL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2MatmulAswKernelABL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::CopyInBias(
-    const Mc2MatMulV3TilingData &matmulTilingData, bool isNMultiCore)
+__aicore__ inline void Mc2MatmulAswKernelABL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
+                                                      MM_CFG>::CopyInBias(const Mc2MatMulV3TilingData &matmulTilingData,
+                                                                          bool isNMultiCore)
 {
     uint64_t nAligned = MMV3CeilAlign(matmulTilingData.tCubeTiling.singleCoreN, block_.params_.nAlignSize);
     pipe_->InitBuffer(InQueueBiasL1_, 1, nAligned * sizeof(BiasT));

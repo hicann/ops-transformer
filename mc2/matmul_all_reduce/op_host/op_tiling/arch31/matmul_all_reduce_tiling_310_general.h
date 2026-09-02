@@ -18,9 +18,9 @@
 namespace optiling {
 class MatmulAllReduceTiling310General : public MatmulAllReduceTilingBase {
 public:
-    explicit MatmulAllReduceTiling310General(gert::TilingContext *context) : MatmulAllReduceTilingBase(context)
-    {
-    }
+    explicit MatmulAllReduceTiling310General(gert::TilingContext *context)
+        : MatmulAllReduceTilingBase(context)
+    {}
     ~MatmulAllReduceTiling310General() override = default;
 
 protected:

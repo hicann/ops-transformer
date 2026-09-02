@@ -90,7 +90,10 @@ public:
 
     __aicore__ inline void Init(const Params &params);
     __aicore__ inline void Run(const Params &params);
-    __aicore__ inline void operator()(const Params &params) { Run(params); }
+    __aicore__ inline void operator()(const Params &params)
+    {
+        Run(params);
+    }
 
 private:
     static constexpr bool WEIGHT_NZ = IsWeightNz<LayoutB>::value;

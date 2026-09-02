@@ -85,26 +85,31 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrBias_, GM_ADDR ptrC_, LayoutC layoutC_, int32_t pValue_, int32_t swizzlCount_,
                int32_t swizzlDirect_, int32_t rankSize_, int32_t pipeDepth_)
-            : problemShape(problemShape_), ptrA(ptrA_), layoutA(layoutA_), ptrB(ptrB_), layoutB(layoutB_),
-              ptrBias(ptrBias_), ptrC(ptrC_), layoutC(layoutC_), pValue(pValue_), swizzlCount(swizzlCount_),
-              swizzlDirect(swizzlDirect_), rankSize(rankSize_), pipeDepth(pipeDepth_)
-        {
-        }
+            : problemShape(problemShape_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrB(ptrB_),
+              layoutB(layoutB_),
+              ptrBias(ptrBias_),
+              ptrC(ptrC_),
+              layoutC(layoutC_),
+              pValue(pValue_),
+              swizzlCount(swizzlCount_),
+              swizzlDirect(swizzlDirect_),
+              rankSize(rankSize_),
+              pipeDepth(pipeDepth_)
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    AlltoAllMatmulKernel()
-    {
-    }
+    AlltoAllMatmulKernel() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -192,8 +197,7 @@ public:
         int32_t coreNum = AscendC::GetBlockNum();
         int32_t mLoops = (params.problemShape.m() + L1TileShape::M - 1) / L1TileShape::M;
         uint32_t nLoops = (params.problemShape.n() + L1TileShape::N - 1) / L1TileShape::N;
-        int64_t pingPongBlockSize =
-            static_cast<int64_t>(L1TileShape::M) * params.pValue * params.problemShape.k();
+        int64_t pingPongBlockSize = static_cast<int64_t>(L1TileShape::M) * params.pValue * params.problemShape.k();
 
         int32_t commCount = (mLoops + params.pValue - 1) / params.pValue;
 

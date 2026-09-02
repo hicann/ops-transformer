@@ -49,7 +49,6 @@ constexpr uint32_t TOKEN_INFO_TABLE_RS = 2;             // tokenInfoTable前2位
 constexpr uint32_t TOKEN_INFO_TABLE_COPY_BLOCK_CNT = 2; // tokenInfoTable在DataCopy时每次搬运2个int32
 constexpr float INT8_MAX_VALUE = 127.0f;
 
-
 #define TemplateAttentionToFFNTypeClass typename XType, bool isQuant, bool isSync, bool isActiveMask
 #define TemplateAttentionToFFNTypeFunc XType, isQuant, isSync, isActiveMask
 
@@ -180,8 +179,8 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::QuantInit
 }
 
 template <TemplateAttentionToFFNTypeClass>
-__aicore__ inline void
-AttentionToFFN<TemplateAttentionToFFNTypeFunc>::InitByTinglingData(const AttentionToFFNTilingData *tilingData)
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::InitByTinglingData(
+    const AttentionToFFNTilingData *tilingData)
 {
     aivId_ = GetBlockIdx();
     auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
@@ -296,8 +295,8 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::ActiveMas
 }
 
 template <TemplateAttentionToFFNTypeClass>
-__aicore__ inline void
-AttentionToFFN<TemplateAttentionToFFNTypeFunc>::ReduceMaxInplace(const LocalTensor<float> &srcLocal, uint32_t count)
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::ReduceMaxInplace(
+    const LocalTensor<float> &srcLocal, uint32_t count)
 {
     uint64_t repsFp32 = count >> 6;       // 6 is count / elemPerRefFp32
     uint64_t offsetsFp32 = repsFp32 << 6; // 6 is repsFp32 * elemPerRefFp32
@@ -393,8 +392,9 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SplitToCo
 }
 
 template <TemplateAttentionToFFNTypeClass>
-__aicore__ inline void
-AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SetExpertAndRank(uint32_t tokenIdx, uint32_t tokenId, uint32_t topkId)
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SetExpertAndRank(uint32_t tokenIdx,
+                                                                                        uint32_t tokenId,
+                                                                                        uint32_t topkId)
 {
     if (tokenIdx == 0) {
         SyncFunc<AscendC::HardEvent::MTE2_S>(); // 等待前面的expertIdsTensor_的搬入
@@ -415,9 +415,8 @@ AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SetExpertAndRank(uint32_t tokenI
 }
 
 template <TemplateAttentionToFFNTypeClass>
-__aicore__ inline void
-AttentionToFFN<TemplateAttentionToFFNTypeFunc>::CheckFlagAndSetTableGM(int32_t toRankId, GM_ADDR &toRankAddr,
-                                                                       GlobalTensor<int32_t> &tokenInfoTableGMTensor)
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::CheckFlagAndSetTableGM(
+    int32_t toRankId, GM_ADDR &toRankAddr, GlobalTensor<int32_t> &tokenInfoTableGMTensor)
 {
     if (winContext_->userMemType == 0) {
         toRankAddr = (GM_ADDR)(((HcclRankRelationResV2 *)(winContext_->remoteRes[toRankId].nextDevicePtr))->windowsIn);

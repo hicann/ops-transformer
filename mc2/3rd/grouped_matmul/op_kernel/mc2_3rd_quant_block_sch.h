@@ -61,7 +61,8 @@ struct ASWOffsetParam {
 class QuantASWBlockSch {
 public:
     __aicore__ inline QuantASWBlockSch() {}
-    template <bool isGmm> __aicore__ inline void Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx);
+    template <bool isGmm>
+    __aicore__ inline void Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx);
     __aicore__ inline void SetRankFirstLayout(uint32_t rankDim, const __gm__ uint64_t *cGroupOffsetTableGm)
     {
         rankDim_ = rankDim;
@@ -77,7 +78,8 @@ public:
     }
     template <bool aTrans, bool bTrans, class xType, class scaleType, CubeFormat wFormat = CubeFormat::ND>
     __aicore__ inline void UpdateGroupOffset(int32_t m, int32_t n, int32_t k, uint32_t groupIdx);
-    template <bool isGmm> __aicore__ inline void UpdateGroupParams();
+    template <bool isGmm>
+    __aicore__ inline void UpdateGroupParams();
     __aicore__ inline void UpdateTailTile();
     template <bool isGmm>
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx, bool isLastGroupRound);
@@ -160,15 +162,13 @@ __aicore__ inline void QuantASWBlockSch::UpdateGroupOffset(int32_t m, int32_t n,
             if constexpr (wFormat == CubeFormat::NZ) {
                 if (isExpertBoundary) {
                     if constexpr (bTrans) {
-                        params_.bGroupAddrOffset +=
-                            Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_32) *
-                            Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_16) *
-                            Mc2QuantUtils::WEIGHTNZ_N0_K0;
+                        params_.bGroupAddrOffset += Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_32) *
+                                                    Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_16) *
+                                                    Mc2QuantUtils::WEIGHTNZ_N0_K0;
                     } else {
-                        params_.bGroupAddrOffset +=
-                            Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_32) *
-                            Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_16) *
-                            Mc2QuantUtils::WEIGHTNZ_N0_K0;
+                        params_.bGroupAddrOffset += Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_32) *
+                                                    Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_16) *
+                                                    Mc2QuantUtils::WEIGHTNZ_N0_K0;
                     }
                 }
             } else {

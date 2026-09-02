@@ -250,14 +250,10 @@ protected:
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::InitInputs(GM_ADDR x, GM_ADDR weight,
-                                                                                         GM_ADDR antiquantScale,
-                                                                                         GM_ADDR antiquantOffset,
-                                                                                         GM_ADDR quantScale,
-                                                                                         GM_ADDR quantOffset,
-                                                                                         GM_ADDR bias, GM_ADDR y)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
+    hasAntiQuantOffset>::InitInputs(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
+                                    GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y)
 {
     xGM_ = x;
     weightGM_ = weight;
@@ -286,9 +282,8 @@ Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType,
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::InitUbOffset()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::InitUbOffset()
 {
     elemsAubCopyInPing_ = aubDataSize_;
     offsetAubCopyInPing_ = 0;
@@ -359,9 +354,8 @@ Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType,
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::InitTilingData()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::InitTilingData()
 {
     // core tiling_ data
     mSingleCore_ = CeilDiv(tiling_->mSize, tiling_->cubeBlockDimM * tiling_->mAL1Size);
@@ -477,11 +471,10 @@ Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType,
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::CopyInAddMul(int64_t addOffset,
-                                                                                           int32_t realNLen,
-                                                                                           int64_t groupIdx)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::CopyInAddMul(int64_t addOffset,
+                                                                                                    int32_t realNLen,
+                                                                                                    int64_t groupIdx)
 {
     DataCopyParams intriParamsAdd;
     intriParamsAdd.blockCount = 1;
@@ -1030,12 +1023,11 @@ inline __aicore__ void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::PostProcess(int32_t mL0Len,
-                                                                                          int32_t nL0Len,
-                                                                                          int32_t mAL1Offset,
-                                                                                          int32_t nBL1Offset)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::PostProcess(int32_t mL0Len,
+                                                                                                   int32_t nL0Len,
+                                                                                                   int32_t mAL1Offset,
+                                                                                                   int32_t nBL1Offset)
 {
     LocalTensor<xType> resCNz = apiTmpBuf_.template GetWithOffset<xType>(resCNzElem_, resCNzOffset_);
     TransNz2Nd(resCNz);
@@ -1132,25 +1124,19 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::UpdateGlobalAddr(GM_ADDR x,
-                                                                                               GM_ADDR weight,
-                                                                                               GM_ADDR antiquantScale,
-                                                                                               GM_ADDR antiquantOffset,
-                                                                                               GM_ADDR quantScale,
-                                                                                               GM_ADDR quantOffset,
-                                                                                               GM_ADDR bias, GM_ADDR y,
-                                                                                               GM_ADDR workspace)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
+    hasAntiQuantOffset>::UpdateGlobalAddr(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
+                                          GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y,
+                                          GM_ADDR workspace)
 {
     InitInputs(x, weight, antiquantScale, antiquantOffset, quantScale, quantOffset, bias, y);
 }
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline int64_t
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::CeilDiv(int64_t x, int64_t y)
+__aicore__ inline int64_t Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::CeilDiv(int64_t x, int64_t y)
 {
     if (y == 0) {
         return 0;
@@ -1160,18 +1146,16 @@ Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType,
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline int32_t
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::max(int32_t a, int32_t b)
+__aicore__ inline int32_t Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::max(int32_t a, int32_t b)
 {
     return a > b ? a : b;
 }
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline int32_t
-Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                         hasAntiQuantOffset>::min(int32_t a, int32_t b)
+__aicore__ inline int32_t Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::min(int32_t a, int32_t b)
 {
     return a > b ? b : a;
 }

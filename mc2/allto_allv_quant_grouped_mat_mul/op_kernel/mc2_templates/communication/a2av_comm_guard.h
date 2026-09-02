@@ -11,13 +11,19 @@
 #ifndef A2AV_COMM_GUARD_H
 #define A2AV_COMM_GUARD_H
 
-#define A2AV_AIV_ONLY()                     \
-    if ASCEND_IS_AIC { return; }            \
-    if ASCEND_IS_AIV {                      \
-        if (GetBlockIdx() != 0) { return; } \
+#define A2AV_AIV_ONLY() \
+    if ASCEND_IS_AIC { \
+        return; \
+    } \
+    if ASCEND_IS_AIV { \
+        if (GetBlockIdx() != 0) { \
+            return; \
+        } \
     }
 
-#define A2AV_AIV_ALL()                      \
-    if ASCEND_IS_AIC { return; }
+#define A2AV_AIV_ALL() \
+    if ASCEND_IS_AIC { \
+        return; \
+    }
 
 #endif // A2AV_COMM_GUARD_H

@@ -24,9 +24,7 @@ struct TileMuls {
     static constexpr uint32_t COMPUTE_LENGTH = COMPUTE_LENGTH_;
 
     CATLASS_DEVICE
-    TileMuls()
-    {
-    }
+    TileMuls() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor, Element scalar,

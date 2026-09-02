@@ -15,7 +15,6 @@
 #include "opdev/common_types.h"
 #include "opdev/platform.h"
 
-
 // These are used to check repo hit
 const int32_t FP16_BF16_FLAG = 1;
 const int32_t FP32_FLAG = 0;

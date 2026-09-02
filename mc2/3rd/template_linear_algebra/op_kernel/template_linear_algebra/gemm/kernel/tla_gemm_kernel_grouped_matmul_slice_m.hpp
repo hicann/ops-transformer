@@ -57,27 +57,26 @@ public:
 
         // Methods
         CATLASS_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_DEVICE
         Params(GemmCoord const &problemShape_, uint32_t problemCount_, GM_ADDR ptrGroupList_, GM_ADDR ptrA_,
                LayoutA const &layoutA_, GM_ADDR ptrB_, LayoutB const &layoutB_, GM_ADDR ptrC_, LayoutC const &layoutC_)
-            : problemShape(problemShape_), problemCount(problemCount_),
+            : problemShape(problemShape_),
+              problemCount(problemCount_),
               ptrGroupList(reinterpret_cast<__gm__ ElementGroupList *>(ptrGroupList_)),
-              ptrA(reinterpret_cast<__gm__ ElementA *>(ptrA_)), layoutA(layoutA_),
-              ptrB(reinterpret_cast<__gm__ ElementB *>(ptrB_)), layoutB(layoutB_),
-              ptrC(reinterpret_cast<__gm__ ElementC *>(ptrC_)), layoutC(layoutC_)
-        {
-        }
+              ptrA(reinterpret_cast<__gm__ ElementA *>(ptrA_)),
+              layoutA(layoutA_),
+              ptrB(reinterpret_cast<__gm__ ElementB *>(ptrB_)),
+              layoutB(layoutB_),
+              ptrC(reinterpret_cast<__gm__ ElementC *>(ptrC_)),
+              layoutC(layoutC_)
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    GroupedMatmulSliceM()
-    {
-    }
+    GroupedMatmulSliceM() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -162,8 +161,7 @@ public:
 
     template <>
     CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
-    {
-    }
+    {}
 };
 
 } // namespace Catlass::Gemm::Kernel

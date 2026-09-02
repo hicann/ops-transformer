@@ -33,7 +33,8 @@ template <bool AICSync, AscendC::HcclServerType ServerType, typename ContextType
 class HcclCommunicator {
 public:
     // 通信器构造方法
-    __aicore__ inline HcclCommunicator(TilingDataType *tiling) : tiling_(tiling){};
+    __aicore__ inline HcclCommunicator(TilingDataType *tiling)
+        : tiling_(tiling){};
     // 初始化通信器参数
     __aicore__ inline void Init();
     // 获取上下文指针
@@ -110,9 +111,8 @@ HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, Se
 
 template <bool AICSync, AscendC::HcclServerType ServerType, typename ContextType, typename TilingDataType,
           template <typename> class Primitive, uint32_t SendCnt, uint32_t RecvCnt>
-__aicore__ inline void
-HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt, RecvCnt>::PrepareAll(
-    uint32_t taskCnt)
+__aicore__ inline void HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt,
+                                        RecvCnt>::PrepareAll(uint32_t taskCnt)
 {
     // 只有通信核参与通信
     if (!notifyFlag_) {
@@ -134,9 +134,8 @@ HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, Se
 
 template <bool AICSync, AscendC::HcclServerType ServerType, typename ContextType, typename TilingDataType,
           template <typename> class Primitive, uint32_t SendCnt, uint32_t RecvCnt>
-__aicore__ inline void
-HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt, RecvCnt>::Process(
-    uint32_t taskIndex)
+__aicore__ inline void HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt,
+                                        RecvCnt>::Process(uint32_t taskIndex)
 {
     // 只有通信核参与通信
     if (!notifyFlag_) {
@@ -153,9 +152,8 @@ HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, Se
 
 template <bool AICSync, AscendC::HcclServerType ServerType, typename ContextType, typename TilingDataType,
           template <typename> class Primitive, uint32_t SendCnt, uint32_t RecvCnt>
-__aicore__ inline void
-HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt, RecvCnt>::ProcessWithPrepare(
-    uint32_t taskIndex)
+__aicore__ inline void HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt,
+                                        RecvCnt>::ProcessWithPrepare(uint32_t taskIndex)
 {
     // 只有通信核参与通信
     if (!notifyFlag_) {
@@ -172,9 +170,8 @@ HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, Se
 
 template <bool AICSync, AscendC::HcclServerType ServerType, typename ContextType, typename TilingDataType,
           template <typename> class Primitive, uint32_t SendCnt, uint32_t RecvCnt>
-__aicore__ inline void
-HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt, RecvCnt>::AddIndex(
-    uint32_t taskCnt)
+__aicore__ inline void HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt,
+                                        RecvCnt>::AddIndex(uint32_t taskCnt)
 {
     // 只有通信核参与通信
     if (!notifyFlag_) {
@@ -241,10 +238,10 @@ HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, Se
 }
 
 #ifndef DEFINE_MC2_HCCL_FOR_COMMUNICATION
-#define DEFINE_MC2_HCCL_FOR_COMMUNICATION(AICSync, ServerType, HcclContextType, TilingDataType, Primitive,             \
-                                          sendCntPerTask, recvCntPerTask, CommunicationType)                           \
-    using CommunicationType =                                                                                          \
-        MC2KernelTemplate::HcclCommunicator<AICSync, ServerType, HcclContextType, TilingDataType, Primitive,           \
+#define DEFINE_MC2_HCCL_FOR_COMMUNICATION(AICSync, ServerType, HcclContextType, TilingDataType, Primitive, \
+                                          sendCntPerTask, recvCntPerTask, CommunicationType) \
+    using CommunicationType = \
+        MC2KernelTemplate::HcclCommunicator<AICSync, ServerType, HcclContextType, TilingDataType, Primitive, \
                                             sendCntPerTask, recvCntPerTask>
 #endif
 }; // namespace MC2KernelTemplate

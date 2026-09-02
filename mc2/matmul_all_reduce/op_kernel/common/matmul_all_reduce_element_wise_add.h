@@ -21,9 +21,7 @@ namespace AscendC {
 template <typename xDtype, typename yDtype>
 class MatmulAllReduceElementWiseAdd {
 public:
-    __aicore__ inline MatmulAllReduceElementWiseAdd()
-    {
-    }
+    __aicore__ inline MatmulAllReduceElementWiseAdd() {}
 
     __aicore__ inline void Init(GM_ADDR left, GM_ADDR right, uint64_t totalCnt, uint64_t tileCnt, TPipe *tPipe,
                                 uint32_t coreNum)

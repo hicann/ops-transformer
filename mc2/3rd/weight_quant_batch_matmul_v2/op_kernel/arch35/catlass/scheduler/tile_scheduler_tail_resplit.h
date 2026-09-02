@@ -63,8 +63,7 @@ public:
     template <typename ProblemShape, typename TilingShape,
               AscendC::Std::enable_if_t<AscendC::Std::is_tuple_v<TilingShape>, bool> = true>
     DEVICE TileSchedulerTailResplit(ProblemShape const &problemShape, TilingShape const &tiling)
-    {
-    }
+    {}
 
     DEVICE bool IsValid()
     {

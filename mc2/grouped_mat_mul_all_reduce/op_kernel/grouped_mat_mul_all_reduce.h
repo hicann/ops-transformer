@@ -64,9 +64,9 @@ private:
 
 public:
     /** @brief constructor */
-    __aicore__ inline GMMProcess(ComputeType &computeOp_) : computeOp(computeOp_)
-    {
-    }
+    __aicore__ inline GMMProcess(ComputeType &computeOp_)
+        : computeOp(computeOp_)
+    {}
 
     __aicore__ inline void Init(const GMMAllReduceCoreTiling *__restrict tiling, TPipe *tPipe);
 
@@ -153,9 +153,9 @@ public:
     using BiasT = typename mmType::BiasT::T;
 
     /** @brief constructor */
-    __aicore__ inline GMMCompute(typename mmType::MT &mm_) : mm(mm_)
-    {
-    }
+    __aicore__ inline GMMCompute(typename mmType::MT &mm_)
+        : mm(mm_)
+    {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace);
 

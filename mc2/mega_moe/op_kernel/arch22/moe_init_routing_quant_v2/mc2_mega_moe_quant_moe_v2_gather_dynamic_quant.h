@@ -498,23 +498,23 @@ __aicore__ inline void MoeV2GatherDynamicQuant<T>::Init(GM_ADDR inputX, GM_ADDR 
     inputXGm.SetGlobalBuffer((__gm__ T *)inputX);
     expandedXGm.SetGlobalBuffer((__gm__ int8_t *)expandedX);
 
-    expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx +
-                                         this->blockIdx * this->gatherOutTilingData->perCoreRows,
-                                     Align(this->coreRows, sizeof(int32_t)));
+    expandedRowIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)expandedRowIdx + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+        Align(this->coreRows, sizeof(int32_t)));
 
     quantSmoothGm.SetGlobalBuffer((__gm__ float *)quantSmooth);
     dynamicQuantScaleGm.SetGlobalBuffer((__gm__ float *)dynamicQuantScale);
 
-    expandedExpertIdxGm.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                            this->blockIdx * this->gatherOutTilingData->perCoreRows,
-                                        Align(this->coreRows, sizeof(int32_t)));
+    expandedExpertIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + this->blockIdx * this->gatherOutTilingData->perCoreRows,
+        Align(this->coreRows, sizeof(int32_t)));
     sortedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) +
                                        this->blockIdx * this->gatherOutTilingData->perCoreRows,
                                    Align(this->coreRows, sizeof(int32_t)));
     if (this->cols > 1) {
-        quantSrcGm.SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 +
-                                       this->blockIdx * this->cols,
-                                   this->cols * sizeof(float));
+        quantSrcGm.SetGlobalBuffer(
+            (__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 + this->blockIdx * this->cols,
+            this->cols * sizeof(float));
     }
 
     this->currentLoopRowsAlign = Align(this->perLoopRows, sizeof(int32_t));

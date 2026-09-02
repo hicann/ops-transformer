@@ -52,7 +52,7 @@
 #define VEC_EPILOGUE_WITH_CUSTOM_MM 4
 
 // weight_quant_matmul_allreduce 模板参数簇
-#define TPL_APT_PARAMS_WEIGHT_QUANT_MM                                                                                 \
+#define TPL_APT_PARAMS_WEIGHT_QUANT_MM \
     uint8_t TEMPLATE_CUSTOM, uint8_t ANTIQUANT_TYPE, uint8_t QUANTTYPE, bool HAS_ANTIQUANT_OFFSET, bool BAIS_IS_FP32
 #define APT_PARAMS_WEIGHT_QUANT_MM TEMPLATE_CUSTOM, ANTIQUANT_TYPE, QUANTTYPE, HAS_ANTIQUANT_OFFSET, BAIS_IS_FP32
 
@@ -108,14 +108,14 @@ ASCENDC_TPL_ARGS_DECL(
 // 用于调用GET_TPL_TILING_KEY获取TilingKey时，接口内部校验TilingKey是否合法
 #define SET_NOT_USE_FP_MM_TPL_SEL ASCENDC_TPL_BOOL_SEL(MATMUL_WITH_ADD, 0)
 
-#define SET_NOT_USE_QUANT_MM_TPL_SEL                                                                                   \
-    ASCENDC_TPL_UINT_SEL(KERNEL_TYPE, ASCENDC_TPL_UI_LIST, 0UL),                                                       \
+#define SET_NOT_USE_QUANT_MM_TPL_SEL \
+    ASCENDC_TPL_UINT_SEL(KERNEL_TYPE, ASCENDC_TPL_UI_LIST, 0UL), \
         ASCENDC_TPL_UINT_SEL(COMMDTPYE, ASCENDC_TPL_UI_LIST, 0UL), ASCENDC_TPL_BOOL_SEL(SCENARIO_MXFP8, 0)
 
-#define SET_NOT_USE_WEIGHT_QUANT_MM_TPL_SEL                                                                            \
-    ASCENDC_TPL_UINT_SEL(TEMPLATE_CUSTOM, ASCENDC_TPL_UI_LIST, 0UL),                                                   \
-        ASCENDC_TPL_UINT_SEL(ANTIQUANT_TYPE, ASCENDC_TPL_UI_LIST, 0UL),                                                \
-        ASCENDC_TPL_UINT_SEL(QUANTTYPE, ASCENDC_TPL_UI_LIST, 0UL), ASCENDC_TPL_BOOL_SEL(HAS_ANTIQUANT_OFFSET, 0),      \
+#define SET_NOT_USE_WEIGHT_QUANT_MM_TPL_SEL \
+    ASCENDC_TPL_UINT_SEL(TEMPLATE_CUSTOM, ASCENDC_TPL_UI_LIST, 0UL), \
+        ASCENDC_TPL_UINT_SEL(ANTIQUANT_TYPE, ASCENDC_TPL_UI_LIST, 0UL), \
+        ASCENDC_TPL_UINT_SEL(QUANTTYPE, ASCENDC_TPL_UI_LIST, 0UL), ASCENDC_TPL_BOOL_SEL(HAS_ANTIQUANT_OFFSET, 0), \
         ASCENDC_TPL_BOOL_SEL(BAIS_IS_FP32, 0)
 
 ASCENDC_TPL_SEL(

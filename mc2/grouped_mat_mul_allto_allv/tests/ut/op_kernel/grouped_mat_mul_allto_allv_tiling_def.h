@@ -22,7 +22,7 @@ inline void InitAlltoAllvGroupedMatMulTilingData(uint8_t *tiling, GroupedMatMulA
     memcpy(constData, tiling, sizeof(GroupedMatMulAlltoAllvTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    GroupedMatMulAlltoAllvTilingData tilingData;                                                                       \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    GroupedMatMulAlltoAllvTilingData tilingData; \
     InitAlltoAllvGroupedMatMulTilingData(tilingArg, &tilingData)
 #endif // GROUPED_MAT_MUL_ALL_TO_ALLV_TILING_DEF_H

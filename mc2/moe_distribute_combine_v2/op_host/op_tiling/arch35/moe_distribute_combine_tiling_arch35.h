@@ -25,7 +25,8 @@ ge::graphStatus MoeDistributeCombineTilingImpl(gert::TilingContext *context, con
 
 class MoeDistributeCombineTilingA5 : public MoeTilingBase {
 public:
-    explicit MoeDistributeCombineTilingA5(gert::TilingContext *context) : MoeTilingBase(context) {};
+    explicit MoeDistributeCombineTilingA5(gert::TilingContext *context)
+        : MoeTilingBase(context) {};
 
 protected:
     ge::graphStatus DoOpTiling() override;

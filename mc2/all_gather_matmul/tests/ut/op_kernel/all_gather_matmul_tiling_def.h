@@ -26,7 +26,7 @@ inline void InitAllGatherMatmulTilingData(uint8_t *tiling, Mc2Tiling::AllGatherM
     memcpy(constData, tiling, sizeof(Mc2Tiling::AllGatherMatmulTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    Mc2Tiling::AllGatherMatmulTilingData tilingData;                                                                   \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    Mc2Tiling::AllGatherMatmulTilingData tilingData; \
     InitAllGatherMatmulTilingData(tilingArg, &tilingData)
 #endif // FOREACH_MINIMUM_SCALAR_TILING_DEF_H

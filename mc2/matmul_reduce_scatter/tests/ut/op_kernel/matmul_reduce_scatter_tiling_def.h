@@ -25,7 +25,7 @@ inline void InitMatmulReduceScatterTilingData(uint8_t *tiling, MatmulReduceScatt
     memcpy(constData, tiling, sizeof(MatmulReduceScatterTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    MatmulReduceScatterTilingData tilingData;                                                                          \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    MatmulReduceScatterTilingData tilingData; \
     InitMatmulReduceScatterTilingData(tilingArg, &tilingData)
 #endif // FOREACH_MINIMUM_SCALAR_TILING_DEF_H

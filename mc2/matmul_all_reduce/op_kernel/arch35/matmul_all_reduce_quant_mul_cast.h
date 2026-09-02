@@ -33,9 +33,7 @@ constexpr uint32_t BYTE32_ALIGN = 32;
 template <class T>
 class MatmulAllReduceQuantMulCast {
 public:
-    __aicore__ inline MatmulAllReduceQuantMulCast()
-    {
-    }
+    __aicore__ inline MatmulAllReduceQuantMulCast() {}
     __aicore__ inline void Init(TPipe *tPipe, uint32_t quantUbSize)
     {
         pipe_ = tPipe;
@@ -244,11 +242,12 @@ public:
     }
 
     template <int commMode>
-    __aicore__ inline void
-    SetParams(GM_ADDR inputGM, GM_ADDR quantScale1GM, GM_ADDR quantScale2GM, GM_ADDR outputGM, uint32_t M, uint32_t N,
-              typename HcclTypeSelector<commMode>::type &hccl, uint32_t aivCoreNum, uint32_t &tileBlockCnt,
-              uint32_t &tailBlockCnt, uint32_t &aivLoopNum, int64_t &blockAddrOffset, uint32_t &tailCalCntM,
-              uint32_t &tileCalCntM, uint32_t &needAivCoreNum, uint32_t &blockNumPerRow, int32_t &nowQuantUbSize)
+    __aicore__ inline void SetParams(GM_ADDR inputGM, GM_ADDR quantScale1GM, GM_ADDR quantScale2GM, GM_ADDR outputGM,
+                                     uint32_t M, uint32_t N, typename HcclTypeSelector<commMode>::type &hccl,
+                                     uint32_t aivCoreNum, uint32_t &tileBlockCnt, uint32_t &tailBlockCnt,
+                                     uint32_t &aivLoopNum, int64_t &blockAddrOffset, uint32_t &tailCalCntM,
+                                     uint32_t &tileCalCntM, uint32_t &needAivCoreNum, uint32_t &blockNumPerRow,
+                                     int32_t &nowQuantUbSize)
     {
         int32_t nowAlginN = Ceil(N * sizeof(float), BYTE512_MATMUL_ALLREDUCE_INT8) * BYTE512_MATMUL_ALLREDUCE_INT8;
         nowQuantUbSize =

@@ -30,9 +30,7 @@ struct BlockOffset {
 
 class MatmulBlock {
 public:
-    __aicore__ inline MatmulBlock()
-    {
-    }
+    __aicore__ inline MatmulBlock() {}
     __aicore__ inline void Init(AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg,
                                 Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling);
     __aicore__ inline void UpdateBlockIndex();
@@ -41,9 +39,7 @@ public:
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void CalcGMOffset(int32_t mTileIndex = 0, int32_t nTileIndex = 0);
     __aicore__ inline void UpdateBlockCnt(uint32_t index, int32_t mTileIndex = 0, int32_t nTileIndex = 0);
-    __aicore__ inline void UpdateL2cacheTail()
-    {
-    }
+    __aicore__ inline void UpdateL2cacheTail() {}
 
 public:
     BlockOffset offset;

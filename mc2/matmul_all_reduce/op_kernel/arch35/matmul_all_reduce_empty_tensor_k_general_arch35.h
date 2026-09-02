@@ -32,7 +32,8 @@ template <typename YType, int commMode>
 class MatmulAllReduceEmptyTensorKGeneral {
 public:
     __aicore__ inline MatmulAllReduceEmptyTensorKGeneral(MC2GmAddrs *addrs, MC2TilingHeader *tilingData, TPipe *tPipe)
-        : addrs_(addrs), tPipe_(tPipe)
+        : addrs_(addrs),
+          tPipe_(tPipe)
     {
         param_ = &(tilingData->param);
         cOffset_ = (uint64_t)param_->rankN * (uint64_t)param_->rankM;
@@ -158,20 +159,20 @@ private:
 };
 
 #if (defined MC2_WEIGHT_QUANT) || (defined WEIGHT_F8)
-#define GET_TILING_DATA_FOR_EMPTY_TENSOR()                                                                             \
+#define GET_TILING_DATA_FOR_EMPTY_TENSOR() \
     GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::WeightQuantMatmulAllReduceA5Fp8TilingData, tilingData, tilingGM)
 #else
-#define GET_TILING_DATA_FOR_EMPTY_TENSOR()                                                                             \
+#define GET_TILING_DATA_FOR_EMPTY_TENSOR() \
     GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::MatmulAllReduce910TilingDataA5, tilingData, tilingGM)
 #endif
 
-#define INVOKE_MC2_EMPTY_TENSOR_OP_IMPL(commMode)                                                                      \
-    do {                                                                                                               \
-        GET_TILING_DATA_FOR_EMPTY_TENSOR();                                                                            \
-        MC2GmAddrs addrs = {nullptr, nullptr, biasGM, addGM, cGM, nullptr, cGM};                                       \
-        MatmulAllReduceEmptyTensorKGeneral<DTYPE_Y, commMode> op(&addrs, (MC2TilingHeader *)&tilingData, &tPipe);      \
-        op.Init();                                                                                                     \
-        op.Process();                                                                                                  \
+#define INVOKE_MC2_EMPTY_TENSOR_OP_IMPL(commMode) \
+    do { \
+        GET_TILING_DATA_FOR_EMPTY_TENSOR(); \
+        MC2GmAddrs addrs = {nullptr, nullptr, biasGM, addGM, cGM, nullptr, cGM}; \
+        MatmulAllReduceEmptyTensorKGeneral<DTYPE_Y, commMode> op(&addrs, (MC2TilingHeader *)&tilingData, &tPipe); \
+        op.Init(); \
+        op.Process(); \
     } while (0)
 } // namespace MatmulAllReduceImpl
 #endif // MATMUL_ALL_REDUCE_EMPTY_TENSOR_K_GENERAL_H

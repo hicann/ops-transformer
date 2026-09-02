@@ -21,7 +21,8 @@
 namespace optiling {
 class MoeDistributeDispatchTilingA5 : public MoeDistributeDispatchTilingBase {
 public:
-    explicit MoeDistributeDispatchTilingA5(gert::TilingContext *context) : MoeDistributeDispatchTilingBase(context) {};
+    explicit MoeDistributeDispatchTilingA5(gert::TilingContext *context)
+        : MoeDistributeDispatchTilingBase(context) {};
     ge::graphStatus MoeDistributeDispatchTilingFunc(gert::TilingContext *context) override;
     ge::graphStatus CheckEpWorldSizeAttrs(const char *nodeName, MoeDistributeDispatchTilingData &tilingData) override;
 };

@@ -14,12 +14,12 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "../../../op_kernel/moe_distribute_combine_v2_tiling.h"
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    MoeDistributeCombineV2TilingData tilingData;                                                                       \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    MoeDistributeCombineV2TilingData tilingData; \
     memcpy(&tilingData, tilingArg, sizeof(MoeDistributeCombineV2TilingData))
 
-#define GET_TILING_DATA_WITH_STRUCT(TilingDataStru, tilingData, tilingArg)                                             \
-    TilingDataStru tilingData;                                                                                         \
+#define GET_TILING_DATA_WITH_STRUCT(TilingDataStru, tilingData, tilingArg) \
+    TilingDataStru tilingData; \
     memcpy(&tilingData, tilingArg, sizeof(TilingDataStru))
 
 #endif

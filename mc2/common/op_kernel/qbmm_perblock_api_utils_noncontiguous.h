@@ -117,6 +117,5 @@ __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>:
     this->vecQueAdd_.FreeTensor(mmAddUb);
 }
 
-
 } // namespace Mc2QuantBatchMatmulV3
 #endif // QBMM_PERBLOCK_API_UTILS_NONCONTIGUOUS_H

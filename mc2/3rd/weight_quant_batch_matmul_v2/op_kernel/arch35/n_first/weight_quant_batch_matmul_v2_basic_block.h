@@ -71,9 +71,10 @@ protected:
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
           const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>::Init(
-    uint64_t aPreloadSize, const TCubeTiling *__restrict matmulTiling, TPipe *tPipe)
+__aicore__ inline void WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig,
+                                                   vecConfig>::Init(uint64_t aPreloadSize,
+                                                                    const TCubeTiling *__restrict matmulTiling,
+                                                                    TPipe *tPipe)
 {
     TBuf<TPosition::TSCM> l1Tbuf;
     uint64_t weightL1Space = matmulTiling->baseN * matmulTiling->stepKb * matmulTiling->baseK; // weight单块大小

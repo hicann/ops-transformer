@@ -6,7 +6,7 @@
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
-  */
+ */
 
 /* !
  * \file gmm_a2av_scheduler.h
@@ -29,7 +29,10 @@ class GmmA2avScheduler {
 public:
     __aicore__ inline GmmA2avScheduler(CommOpType &hcclOp, ComputationOpType &computeOp,
                                        SharedComputationOpType &shareComputeOp, TaskTilingInfo *taskTilingInfo)
-        : hcclOp_(hcclOp), computeOp_(computeOp), shareComputeOp_(shareComputeOp), taskTilingInfo_(taskTilingInfo){};
+        : hcclOp_(hcclOp),
+          computeOp_(computeOp),
+          shareComputeOp_(shareComputeOp),
+          taskTilingInfo_(taskTilingInfo){};
 
     __aicore__ inline void Process()
     {

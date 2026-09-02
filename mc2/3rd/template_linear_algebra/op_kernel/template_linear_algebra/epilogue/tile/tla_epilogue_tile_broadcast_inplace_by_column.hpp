@@ -28,9 +28,7 @@ struct TileBroadcastInplaceByColumn {
     using TileShape = TileShape_;
 
     CATLASS_DEVICE
-    TileBroadcastInplaceByColumn()
-    {
-    }
+    TileBroadcastInplaceByColumn() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementCompute> const &ubInOut)

@@ -57,7 +57,8 @@ struct TileCastInt8ToFp16Dequant {
 
     /// Construct
     CATLASS_DEVICE
-    TileCastInt8ToFp16Dequant(Arch::Resource<ArchTag> const &resource, Params const &params_) : params(params_)
+    TileCastInt8ToFp16Dequant(Arch::Resource<ArchTag> const &resource, Params const &params_)
+        : params(params_)
     {
         if constexpr (g_coreType == AscendC::AIV) {
             uint32_t ubOffset = 0;

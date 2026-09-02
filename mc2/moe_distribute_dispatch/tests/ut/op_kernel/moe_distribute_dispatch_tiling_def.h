@@ -18,8 +18,8 @@ inline void InitMoeDistributeDispatchTilingData(uint8_t *tiling, MoeDistributeDi
     memcpy(constData, tiling, sizeof(MoeDistributeDispatchA2TilingData));
 }
 
-#define GET_TILINGDATA_WITH_STRUCT(MoeDistributeDispatchA2TilingData, tilingData, tilingArg)                           \
-    MoeDistributeDispatchA2TilingData tilingData;                                                                      \
+#define GET_TILINGDATA_WITH_STRUCT(MoeDistributeDispatchA2TilingData, tilingData, tilingArg) \
+    MoeDistributeDispatchA2TilingData tilingData; \
     InitMoeDistributeDispatchTilingData(tilingArg, &tilingData)
 
 #endif

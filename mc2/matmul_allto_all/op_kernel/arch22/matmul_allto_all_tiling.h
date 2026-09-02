@@ -30,7 +30,6 @@ struct CoCTiling {
     int32_t ubMoveNum = -1;
 };
 
-
 struct MatmulAlltoAllTilingData {
     Mc2InitTiling mc2InitTiling;
     Mc2CcTiling mc2CcTiling;

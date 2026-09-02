@@ -44,9 +44,7 @@ using namespace AscendC;
 template <UPDATE_EXPERT_DECLARE>
 class MoeUpdateExpert {
 public:
-    __aicore__ inline MoeUpdateExpert()
-    {
-    }
+    __aicore__ inline MoeUpdateExpert() {}
     __aicore__ inline void Init(GM_ADDR expertIdsGM, GM_ADDR eplbTableGM, GM_ADDR expertScalesGM,
                                 GM_ADDR pruningThresholdGM, GM_ADDR activeMaskGM, GM_ADDR balancedExpertIdsOutGM,
                                 GM_ADDR balancedActiveMaskOutGM, GM_ADDR workspaceGM,

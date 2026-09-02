@@ -64,9 +64,11 @@ struct SubShapePara {
     int64_t start;
     int64_t end;
     int64_t stride;
-    SubShapePara(int st, int e, int str) : start(st), end(e), stride(str)
-    {
-    }
+    SubShapePara(int st, int e, int str)
+        : start(st),
+          end(e),
+          stride(str)
+    {}
 };
 
 // Do infershape for OP which is single-input single-output and in-shape equal out-shape.
@@ -151,7 +153,6 @@ inline bool IsUnknownRank(const gert::Shape *check_shape)
     return check_shape->GetDimNum() == 1 && check_shape->GetDim(0) == UNKNOWN_RANK_DIM_VALUE_;
 }
 
-
 /**
  * Check whether Shape's rank is at least rank
  * @param tensor Input tensor
@@ -179,7 +180,6 @@ ge::graphStatus WithRank(const gert::Shape *tensor, int64_t rank, gert::Shape *o
  * @return status whether this operation success
  */
 ge::graphStatus Add(int64_t dim1, int64_t dim2, int64_t &out);
-
 
 /**
  * Get SubShape according to start end index and step size stride

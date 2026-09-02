@@ -24,7 +24,6 @@ namespace MoeInitRoutingV2 {
 using namespace AscendC;
 using namespace Mc2Tiling;
 
-
 class MoeV2SortMultiCore : public MoeV2SortBase {
 public:
     __aicore__ inline MoeV2SortMultiCore(){};
@@ -437,14 +436,14 @@ __aicore__ inline void MoeV2SortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR exper
     }
 
     this->pipe = tPipe;
-    expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx +
-                                    this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
-                                this->sortTotalLength);
+    expertIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)expertIdx + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
+        this->sortTotalLength);
     sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace),
                                       Align(this->totalLength, sizeof(int32_t)));
-    expandDstToSrcRowGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace) +
-                                            Align(this->totalLength, sizeof(int32_t)),
-                                        Align(this->totalLength, sizeof(int32_t)));
+    expandDstToSrcRowGm.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(workspace) + Align(this->totalLength, sizeof(int32_t)),
+        Align(this->totalLength, sizeof(int32_t)));
 
     this->perCoreExpert = Align((this->expertNum + this->coreNum - 1) / this->coreNum, sizeof(int32_t));
     this->needInitExpertCore = (this->expertNum + this->perCoreExpert - 1) / this->perCoreExpert;
@@ -453,14 +452,14 @@ __aicore__ inline void MoeV2SortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR exper
         this->currentCoreExpert = this->expertNum - (this->needInitExpertCore - 1) * this->perCoreExpert;
     }
     if (this->expertTokensCountOrCumsumFlag > EXERPT_TOKENS_NONE) {
-        expertTokensCountOrCumsumGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensCountOrCumsum +
-                                                        this->blockIdx * this->perCoreExpert,
-                                                    this->currentCoreExpert);
+        expertTokensCountOrCumsumGm.SetGlobalBuffer(
+            (__gm__ int32_t *)expertTokensCountOrCumsum + this->blockIdx * this->perCoreExpert,
+            this->currentCoreExpert);
     }
     if (this->expertTokensBeforeCapacityFlag == EXERPT_TOKENS_BEFORE_CAPACITY) {
-        expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensBeforeCapacity +
-                                                         this->blockIdx * this->perCoreExpert,
-                                                     this->currentCoreExpert);
+        expertTokensBeforeCapacityGm.SetGlobalBuffer(
+            (__gm__ int32_t *)expertTokensBeforeCapacity + this->blockIdx * this->perCoreExpert,
+            this->currentCoreExpert);
     }
     // key and value
     int64_t kvFactor = 2;
@@ -474,18 +473,18 @@ __aicore__ inline void MoeV2SortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR exper
 #else
     workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2,
                                     Align(this->totalLength, sizeof(int32_t)) * kvFactor);
-    workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace +
-                                        Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2),
-                                    Align(this->totalLength, sizeof(int32_t)) * kvFactor);
+    workspaceGms[1].SetGlobalBuffer(
+        (__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2),
+        Align(this->totalLength, sizeof(int32_t)) * kvFactor);
 #endif
 
     int64_t bufferSize = Ceil(Max(this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),
                               ONE_REPEAT_SORT_NUM) *
                          ONE_REPEAT_SORT_NUM * sizeof(int32_t) * kvFactor;
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200
-    syncTmpSpaceGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 +
-                                        2 * workspaceLen,
-                                    INT32_ONE_BLOCK_NUM * GetBlockNum() * BLOCK_BYTES);
+    syncTmpSpaceGm_.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 + 2 * workspaceLen,
+        INT32_ONE_BLOCK_NUM * GetBlockNum() * BLOCK_BYTES);
     pipe->InitBuffer(sortDataCopyInQueue, bufferNum, bufferSize);
     pipe->InitBuffer(sortDataCopyOutQueue, bufferNum, bufferSize);
     pipe->InitBuffer(tempBuffer, bufferSize * REGIONP_ROPOSAL_KV_RATIO);

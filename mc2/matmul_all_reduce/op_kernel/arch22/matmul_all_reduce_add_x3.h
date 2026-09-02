@@ -22,9 +22,7 @@ constexpr uint32_t DOUBLE_BUFFER = 2;
 template <class T>
 class MatmulAllReduceAddX3 {
 public:
-    __aicore__ inline MatmulAllReduceAddX3()
-    {
-    }
+    __aicore__ inline MatmulAllReduceAddX3() {}
     __aicore__ inline void Init(GM_ADDR mmOutput, GM_ADDR add, uint64_t totalCnt, uint64_t tileCnt, TPipe *tPipe,
                                 uint32_t coreNum)
     {

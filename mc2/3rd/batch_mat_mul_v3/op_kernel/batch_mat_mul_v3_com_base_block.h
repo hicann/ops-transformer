@@ -30,9 +30,7 @@ using namespace matmul;
 
 class Mc2BatchMatMulCommonBaseBlock {
 public:
-    __aicore__ inline Mc2BatchMatMulCommonBaseBlock()
-    {
-    }
+    __aicore__ inline Mc2BatchMatMulCommonBaseBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void Init(const void *tilingData);
     template <class C_TYPE>

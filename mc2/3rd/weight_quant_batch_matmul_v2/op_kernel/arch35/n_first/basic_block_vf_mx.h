@@ -148,12 +148,12 @@ __aicore__ inline void MxNkScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdNkScalePara
         MxScaleVf(antiQuantScaleE8m0Vreg0, antiQuantScaleE8m0Vreg1, antiQuantScaleF16Vreg0, antiQuantScaleF16Vreg1,
                   maskAll);
 
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr0 +
-                                                                          ubLoopNIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg0, maskAll);
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr1 +
-                                                                          ubLoopNIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg1, maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr0 + ubLoopNIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg0,
+            maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr1 + ubLoopNIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg1,
+            maskAll);
     }
 }
 
@@ -177,12 +177,12 @@ __aicore__ inline void MxKnScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdScaleParams
         MxScaleVf(antiQuantScaleE8m0Vreg0, antiQuantScaleE8m0Vreg1, antiQuantScaleF16Vreg0, antiQuantScaleF16Vreg1,
                   maskAll);
 
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdScaleParams.antiQuantScaleF16PhyAddr0 +
-                                                                          ubLoopKIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg0, maskAll);
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdScaleParams.antiQuantScaleF16PhyAddr1 +
-                                                                          ubLoopKIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg1, maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdScaleParams.antiQuantScaleF16PhyAddr0 + ubLoopKIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg0,
+            maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdScaleParams.antiQuantScaleF16PhyAddr1 + ubLoopKIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg1,
+            maskAll);
     }
 }
 
@@ -204,12 +204,12 @@ __aicore__ inline void MxNkWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdNk
         // Vn  1 2 3 4 5 6 7 8
         // Vd
         // 11111111111111112222222222222233333333333333334444444444444444455555555555555666666666666666677777777777777
-        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(antiQuantScaleF16Vreg0,
-                                                                    mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr0 +
-                                                                        ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
-        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(antiQuantScaleF16Vreg1,
-                                                                    mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr1 +
-                                                                        ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
+        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(
+            antiQuantScaleF16Vreg0,
+            mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr0 + ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
+        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(
+            antiQuantScaleF16Vreg1,
+            mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr1 + ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
 
         // DIST_UNPK_B8 表示按照如下形式载入, 其中Vn中一个数字为4bit:
         // Vn  1 2 3 4 5 6 7 8 9 a b c d e f g .....

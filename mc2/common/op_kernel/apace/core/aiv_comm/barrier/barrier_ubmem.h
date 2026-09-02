@@ -27,11 +27,10 @@ constexpr uint32_t BARRIER_FLAG_ELEMS = BARRIER_FLAG_SIZE / sizeof(int32_t);
 
 class TeamBarrier {
 public:
-    __aicore__ inline TeamBarrier()
-    {}
+    __aicore__ inline TeamBarrier() {}
 
-    __aicore__ inline void Init(
-        __ubuf__ uint8_t *syncBuf, __gm__ CommUbmemContext *ctx, uint32_t totalJobs, uint32_t jobIndex);
+    __aicore__ inline void Init(__ubuf__ uint8_t *syncBuf, __gm__ CommUbmemContext *ctx, uint32_t totalJobs,
+                                uint32_t jobIndex);
 
     __aicore__ inline void CrossDevice();
 
@@ -46,8 +45,8 @@ private:
     __aicore__ inline void CrossDeviceExecute(int64_t count);
 };
 
-__aicore__ inline void TeamBarrier::Init(
-    __ubuf__ uint8_t *syncBuf, __gm__ CommUbmemContext *ctx, uint32_t totalJobs, uint32_t jobIndex)
+__aicore__ inline void TeamBarrier::Init(__ubuf__ uint8_t *syncBuf, __gm__ CommUbmemContext *ctx, uint32_t totalJobs,
+                                         uint32_t jobIndex)
 {
     syncBuf_ = syncBuf;
     ctx_ = ctx;
@@ -62,7 +61,9 @@ __aicore__ inline void TeamBarrier::CrossDevice()
             return;
         }
 
-        __gm__ int32_t *teamSyncCounter = (__gm__ int32_t *)(ctx_->commBufferAddrs[ctx_->rankId] + ctx_->rankSize * BARRIER_FLAG_SIZE + jobIndex_ * BARRIER_FLAG_SIZE);
+        __gm__ int32_t *teamSyncCounter =
+            (__gm__ int32_t *)(ctx_->commBufferAddrs[ctx_->rankId] + ctx_->rankSize * BARRIER_FLAG_SIZE +
+                               jobIndex_ * BARRIER_FLAG_SIZE);
 
         auto copyGM2UB = Te::MakeCopy(Te::CopyGM2UB{});
         auto copyUB2GM = Te::MakeCopy(Te::CopyUB2GM{});
@@ -96,7 +97,8 @@ __aicore__ inline void TeamBarrier::CrossCore()
         if (jobIndex_ >= totalJobs_) {
             return;
         }
-        uint64_t crossCoreBase = reinterpret_cast<uint64_t>(ctx_->commBufferAddrs[ctx_->rankId]) + ctx_->rankSize * BARRIER_FLAG_SIZE + totalJobs_ * BARRIER_FLAG_SIZE;
+        uint64_t crossCoreBase = reinterpret_cast<uint64_t>(ctx_->commBufferAddrs[ctx_->rankId]) +
+                                 ctx_->rankSize * BARRIER_FLAG_SIZE + totalJobs_ * BARRIER_FLAG_SIZE;
         __gm__ int32_t *localFlag = (__gm__ int32_t *)(crossCoreBase + jobIndex_ * BARRIER_FLAG_SIZE);
 
         auto copyGM2UB = Te::MakeCopy(Te::CopyGM2UB{});

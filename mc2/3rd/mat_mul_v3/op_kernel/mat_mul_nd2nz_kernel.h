@@ -364,5 +364,4 @@ __aicore__ inline void Mc2KernelND2NZMM<T>::ProcessNoDBReuse()
     }
 }
 
-
 #endif

@@ -36,17 +36,17 @@ inline void InitMatmulAllReduceTilingData(uint8_t *tiling, Mc2Tiling::MatmulAllR
     memcpy(const_data, tiling, sizeof(Mc2Tiling::MatmulAllReduceTilingData));
 }
 
-#define GET_TILING_DATA(tiling_data, tiling_arg)                                                                       \
-    Mc2Tiling::MatmulAllReduceTilingData tiling_data;                                                                  \
+#define GET_TILING_DATA(tiling_data, tiling_arg) \
+    Mc2Tiling::MatmulAllReduceTilingData tiling_data; \
     InitMatmulAllReduceTilingData(tiling_arg, &tiling_data)
 
-#define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg)                                            \
-    tiling_struct tiling_data;                                                                                         \
+#define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \
+    tiling_struct tiling_data; \
     InitTilingData<tiling_struct>(tiling_arg, &tiling_data);
 
-#define GET_TILING_DATA_MEMBER(tiling_type, member, var, tiling)                                                       \
-    auto var = ((tiling_type *)((uint8_t *)AscendC::GmAlloc(1024)))->member;                                           \
-    size_t offset##var = (size_t)(&((tiling_type *)0)->member);                                                        \
+#define GET_TILING_DATA_MEMBER(tiling_type, member, var, tiling) \
+    auto var = ((tiling_type *)((uint8_t *)AscendC::GmAlloc(1024)))->member; \
+    size_t offset##var = (size_t)(&((tiling_type *)0)->member); \
     InitTilingData<decltype(var)>(tiling + offset##var, &var);
 
 #endif // FOREACH_MINIMUM_SCALAR_TILING_DEF_H

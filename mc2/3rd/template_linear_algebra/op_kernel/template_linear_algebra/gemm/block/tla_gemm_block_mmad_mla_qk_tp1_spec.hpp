@@ -92,9 +92,7 @@ public:
 
     /// Destructor
     CATLASS_DEVICE
-    ~BlockMmad()
-    {
-    }
+    ~BlockMmad() {}
 
     /// Perform a block-scoped matrix multiply-accumulate
     CATLASS_DEVICE

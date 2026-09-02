@@ -35,7 +35,8 @@ struct CopyL0CToGmPerChannel {
     CopyL0CToGmPerChannel() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGmPerChannel(Params const &params_) : params(params_) {};
+    CopyL0CToGmPerChannel(Params const &params_)
+        : params(params_) {};
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,

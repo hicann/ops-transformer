@@ -20,9 +20,7 @@ using namespace AscendC;
 template <typename T>
 class KernelAddRmsNormSplitD {
 public:
-    __aicore__ inline KernelAddRmsNormSplitD()
-    {
-    }
+    __aicore__ inline KernelAddRmsNormSplitD() {}
     __aicore__ inline void Init(GM_ADDR gamma, Mc2Tiling::AddRMSNormTilingData &tilingData, TPipe *Ppipe,
                                 uint32_t numBlocks)
     {

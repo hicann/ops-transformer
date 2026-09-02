@@ -130,9 +130,7 @@ public:
     using PipelineAiv2Aic = PipelineStageMixCore<PIPE_MTE3, PIPE_MTE1, SubBlockNum>;
 
 public:
-    DEVICE BlockMmad()
-    {
-    }
+    DEVICE BlockMmad() {}
 
     template <class ProblemShape, typename TilingData>
     DEVICE static Params GetParams(ProblemShape const &problemShape, Arguments const &args, TilingData const &tiling)
@@ -192,8 +190,7 @@ public:
 
     template <class ProblemShape>
     DEVICE static Params GetParams(ProblemShape const &problemShape, Arguments const &args)
-    {
-    }
+    {}
 
     template <class ProblemShape>
     DEVICE auto Init(ProblemShape const &problemShape, Params const &params)

@@ -104,9 +104,7 @@ public:
     void CommBoundShortAlign();
     void FitTileLengthContinuous(bool kGreaterThanN, bool largeCalcCommRatio = true, bool soc310Flag = false);
 
-    virtual ~FormPartition()
-    {
-    }
+    virtual ~FormPartition() {}
 };
 
 // 单通信域算子通信轮次切分基类，每个算子各有一个派生类
@@ -125,7 +123,9 @@ public:
     // Constructor
     explicit OneCalcOneCommBase(const mc2tiling::TilingArgs &args, uint32_t inputRankDim, KernelType inputKernelType,
                                 SocVersion inputSocVersion = SocVersion::SOC910_B)
-        : matmulPerf_(args, inputSocVersion), commPerf_(inputRankDim, inputKernelType, inputSocVersion), tilingM_(args)
+        : matmulPerf_(args, inputSocVersion),
+          commPerf_(inputRankDim, inputKernelType, inputSocVersion),
+          tilingM_(args)
     {
         rankDim_ = inputRankDim;
         clusterInfo_ = matmulPerf_.mmShapeInfo_;
@@ -144,9 +144,7 @@ public:
     // 调用函数
     void GetTiling();
 
-    virtual ~OneCalcOneCommBase()
-    {
-    }
+    virtual ~OneCalcOneCommBase() {}
 };
 
 #endif // __HCCL_FORMULAIC_TILING_H__

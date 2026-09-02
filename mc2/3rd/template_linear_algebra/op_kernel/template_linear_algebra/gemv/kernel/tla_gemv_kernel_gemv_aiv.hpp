@@ -32,7 +32,6 @@ public:
     using LayoutY = typename BlockGemv::LayoutY;
     using ElementAccumulator = typename BlockGemv::ElementAccumulator;
 
-
     /// Parameters structure
     struct Params {
         // Data members
@@ -50,25 +49,28 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemvCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrX_, LayoutX layoutX_,
                GM_ADDR ptrY_, LayoutY layoutY_, GM_ADDR ptrY_read_, float alpha_, float beta_, uint32_t split_)
-            : problemShape(problemShape_), ptrA(ptrA_), layoutA(layoutA_), ptrX(ptrX_), layoutX(layoutX_), ptrY(ptrY_),
-              layoutY(layoutY_), ptrY_read(ptrY_read_), alpha(alpha_), beta(beta_), split(split_)
-        {
-        }
+            : problemShape(problemShape_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrX(ptrX_),
+              layoutX(layoutX_),
+              ptrY(ptrY_),
+              layoutY(layoutY_),
+              ptrY_read(ptrY_read_),
+              alpha(alpha_),
+              beta(beta_),
+              split(split_)
+        {}
     };
-
 
     // Methods
     CATLASS_DEVICE
-    KernelGemvAiv()
-    {
-    }
+    KernelGemvAiv() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params) {};
@@ -76,8 +78,7 @@ public:
     /// Executes one Matmul
     template <>
     CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
-    {
-    }
+    {}
 
     template <>
     CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)

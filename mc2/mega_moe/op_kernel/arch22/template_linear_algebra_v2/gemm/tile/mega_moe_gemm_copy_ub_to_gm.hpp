@@ -44,7 +44,6 @@ struct CopyUb2Gm<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {
     }
 };
 
-
 } // namespace Catlass::Gemm::Tile
 
 #endif // CATLASS_MEGA_MOE_GEMM_TILE_COPY_UB_TO_GM_HPP

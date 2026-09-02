@@ -373,8 +373,8 @@ __aicore__ inline uint32_t MoeDistributeCombineA2<TemplateMC2TypeA2Func>::GetRan
 }
 
 template <TemplateMC2TypeA2Class>
-__aicore__ inline void
-MoeDistributeCombineA2<TemplateMC2TypeA2Func>::SingleServerDispatch(LocalTensor<ExpandIdxType> &sendCountInfo)
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::SingleServerDispatch(
+    LocalTensor<ExpandIdxType> &sendCountInfo)
 {
     int32_t eventId = 0;
     GlobalTensor<uint32_t> tokenNumInWindow;
@@ -419,8 +419,8 @@ MoeDistributeCombineA2<TemplateMC2TypeA2Func>::SingleServerDispatch(LocalTensor<
 }
 
 template <TemplateMC2TypeA2Class>
-__aicore__ inline void
-MoeDistributeCombineA2<TemplateMC2TypeA2Func>::ConstructBatchWriteInfo(LocalTensor<ExpandIdxType> &sendCountInfo)
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::ConstructBatchWriteInfo(
+    LocalTensor<ExpandIdxType> &sendCountInfo)
 {
     GlobalTensor<uint32_t> tokenNumOutWindow;
     LocalTensor<uint32_t> tokenNumTensor = aDumpTensor_.ReinterpretCast<uint32_t>();
@@ -458,8 +458,8 @@ MoeDistributeCombineA2<TemplateMC2TypeA2Func>::ConstructBatchWriteInfo(LocalTens
 }
 
 template <TemplateMC2TypeA2Class>
-__aicore__ inline void
-MoeDistributeCombineA2<TemplateMC2TypeA2Func>::MultiServerDispatch(LocalTensor<ExpandIdxType> &sendCountInfo)
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::MultiServerDispatch(
+    LocalTensor<ExpandIdxType> &sendCountInfo)
 {
     if (coreIdx_ == 0) {
         HcclHandle handleId = hccl_.BatchWrite<true>((GM_ADDR)(workspaceGlobal_.GetPhyAddr()), worldSize_);
@@ -580,7 +580,6 @@ __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::CalRecvCou
               worldSizeTaskInfo_.taskNum * localMoeExpertNum_);
     SyncAll<true>();
 }
-
 
 template <TemplateMC2TypeA2Class>
 __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::CopyStatusToADump()

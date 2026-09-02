@@ -479,8 +479,7 @@ public:
           m_unitBlocksN(unitBlocksN),
           m_totalUnitBlocks(unitBlocksM * unitBlocksN),
           m_n_max(n_max)
-    {
-    }
+    {}
 
     /**
      * 计算指定任务索引在n维度上的起始位置

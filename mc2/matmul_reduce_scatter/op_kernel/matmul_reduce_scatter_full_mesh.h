@@ -28,9 +28,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz
 class MatmulReduceScatterFullMesh
     : public MatmulReduceScatterBase<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float> {
 public:
-    __aicore__ inline MatmulReduceScatterFullMesh()
-    {
-    }
+    __aicore__ inline MatmulReduceScatterFullMesh() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR workspaceGM,
                                 GM_ADDR contextGM, MatmulReduceScatterTilingData *tilingData, TPipe *tPipe,
                                 __gm__ void *mc2InitTiling, __gm__ void *mc2CcTiling);

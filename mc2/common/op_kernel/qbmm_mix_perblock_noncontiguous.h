@@ -32,9 +32,7 @@ template <typename x1Type, typename x2Type, typename biasType, typename yType, C
 class MatMulPerBlockASWNonContiguous
     : public MatMulPerBlockASW<x1Type, x2Type, biasType, yType, formatX1, formatX2, formatY, aTrans, bTrans> {
 public:
-    __aicore__ inline MatMulPerBlockASWNonContiguous()
-    {
-    }
+    __aicore__ inline MatMulPerBlockASWNonContiguous() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
                                 GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *que,
                                 const uint32_t *batchWeight, const uint32_t strideCount, const bool offsetFlag);

@@ -95,8 +95,7 @@ public:
                                     Mc2WeightQuantBatchMatmulV2TilingData &data)
         : Mc2WeightQuantBatchMatmulV2TilingCustom(weightQuantMatmulAllReduceTiling.context_, &data),
           tilingProcesser_(weightQuantMatmulAllReduceTiling)
-    {
-    }
+    {}
     ge::graphStatus GetShapeAttrsInfo() override;
     void PrintTilingInputParam(Mc2WeightQuantBatchMatmulInfo &weightQuantBatchMatmulInfo);
     ge::graphStatus PostTiling() override;

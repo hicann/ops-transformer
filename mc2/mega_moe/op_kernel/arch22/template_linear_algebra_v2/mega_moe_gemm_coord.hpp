@@ -81,21 +81,19 @@ struct GemmCoord : public Coord<3, uint32_t> {
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    GemmCoord()
-    {
-    }
+    GemmCoord() {}
 
     /// Constructs from Coord<3> and a batch
     CATLASS_HOST_DEVICE
-    GemmCoord(Coord<3, Index> const &coord) : Base(coord)
-    {
-    }
+    GemmCoord(Coord<3, Index> const &coord)
+        : Base(coord)
+    {}
 
     /// Helper to construct from a K, N, M, batch variables
     CATLASS_HOST_DEVICE
-    GemmCoord(Index m, Index n, Index k) : Base(MakeCoord(m, n, k))
-    {
-    }
+    GemmCoord(Index m, Index n, Index k)
+        : Base(MakeCoord(m, n, k))
+    {}
 
     /// Returns the Gemm M coordinate
     CATLASS_HOST_DEVICE

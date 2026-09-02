@@ -25,7 +25,8 @@ struct FpMMAdditionalData {};
 template <typename MMTilingType, typename MMType>
 class MC2FpMatmul {
 public:
-    __aicore__ inline MC2FpMatmul(AscendC::TPipe *tPipe) : tPipePtr_(tPipe){};
+    __aicore__ inline MC2FpMatmul(AscendC::TPipe *tPipe)
+        : tPipePtr_(tPipe){};
     // 初始化方法
     __aicore__ inline void Init();
     // 获取数据上下文引用
@@ -43,8 +44,7 @@ protected:
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ void MC2FpMatmul<MMTilingType, MMType>::Init()
-{
-}
+{}
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ MC2MMContext<FpMMAdditionalData, MMTilingType> *MC2FpMatmul<MMTilingType, MMType>::GetContextPtr()
@@ -77,36 +77,36 @@ inline __aicore__ void MC2FpMatmul<MMTilingType, MMType>::End()
 
 // 计算节点的上下文数据类型声明
 #ifndef DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_FP
-#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_FP(ContextType)                                               \
+#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_FP(ContextType) \
     using ContextType = MC2KernelTemplate::MC2MMContext<MC2KernelTemplate::FpMMAdditionalData, Mc2MatMulV3TilingData>
 #endif
 
 // 使用matmulv3算子作为计算节点的计算实现，是否转置的参数通过算子的模板参数获取
 #ifndef DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_FP
-#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_FP(x1Transpose, x2Transpose, ComputationType)                         \
-    using ComputationType =                                                                                            \
-        MC2KernelTemplate::MC2FpMatmul<Mc2MatMulV3TilingData,                                                          \
-                                       Mc2MatmulV3Advanced::Mc2MatmulAswKernel<                                        \
-                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X1, x1Transpose>,  \
-                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X2, x2Transpose>,  \
-                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_Y>,                \
-                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DtypeBias>,              \
+#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_FP(x1Transpose, x2Transpose, ComputationType) \
+    using ComputationType = \
+        MC2KernelTemplate::MC2FpMatmul<Mc2MatMulV3TilingData, \
+                                       Mc2MatmulV3Advanced::Mc2MatmulAswKernel< \
+                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X1, x1Transpose>, \
+                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X2, x2Transpose>, \
+                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_Y>, \
+                                           MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DtypeBias>, \
                                            Mc2MatmulV3Advanced::Mc2MatmulAswBlock, MM_CFG_NO_PRELOAD>>
 #endif
 
 #ifndef DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_A3_FP
-#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_A3_FP(ContextType)                                            \
+#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_A3_FP(ContextType) \
     using ContextType = MC2KernelTemplate::MC2MMContext<MC2KernelTemplate::FpMMAdditionalData, Mc2MatmulV3TilingData>
 #endif
 
 #ifndef DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_A3_FP
-#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_A3_FP(x1Transpose, x2Transpose, ComputationType)                      \
-    using ComputationType = MC2KernelTemplate::MC2FpMatmul<                                                            \
-        Mc2MatmulV3TilingData,                                                                                         \
-        Mc2MatmulBaseKernel<MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X1, x1Transpose>,                 \
-                            MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X2, x2Transpose>,                 \
-                            MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_Y>,                               \
-                            MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DtypeBias>, Mc2MatmulBaseBlock,         \
+#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_A3_FP(x1Transpose, x2Transpose, ComputationType) \
+    using ComputationType = MC2KernelTemplate::MC2FpMatmul< \
+        Mc2MatmulV3TilingData, \
+        Mc2MatmulBaseKernel<MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X1, x1Transpose>, \
+                            MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X2, x2Transpose>, \
+                            MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_Y>, \
+                            MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DtypeBias>, Mc2MatmulBaseBlock, \
                             MM_CFG_NO_PRELOAD>>
 #endif
 }; // namespace MC2KernelTemplate

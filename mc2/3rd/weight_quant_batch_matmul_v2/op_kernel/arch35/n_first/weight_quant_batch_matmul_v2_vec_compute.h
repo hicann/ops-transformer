@@ -248,9 +248,8 @@ BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqm
  */
 template <typename xType, typename wType, typename antiQuantScaleType, typename yType, const WqmmConfig &wqmmConfig,
           const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig, vecConfig>::InitMX(
-    TBuf<> &ubBuffer)
+__aicore__ inline void BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig,
+                                                           vecConfig>::InitMX(TBuf<> &ubBuffer)
 {
     if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ) {
         ubWeightInputLowBitTotalBuffer_ =
@@ -516,9 +515,9 @@ BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqm
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename yType, const WqmmConfig &wqmmConfig,
           const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig, vecConfig>::MxScaleProcess(
-    uint64_t ubMte2NSize, uint64_t ubMte2KSize)
+__aicore__ inline void BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig,
+                                                           vecConfig>::MxScaleProcess(uint64_t ubMte2NSize,
+                                                                                      uint64_t ubMte2KSize)
 {
     uint64_t ubMte2BufferIdx = ubMte2LoopIdx_ % vecConfig.ubMte2BufferNum;
     MxFp4NdScaleParams<xType> mxFp4NdScaleParams;
@@ -556,10 +555,11 @@ BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqm
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename yType, const WqmmConfig &wqmmConfig,
           const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig,
-                                    vecConfig>::CopyKcScaleBiasGmToUb(uint64_t nRealL0Size, uint64_t mRealL0Size,
-                                                                      uint64_t nOffset, uint64_t mOffset)
+__aicore__ inline void BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig,
+                                                           vecConfig>::CopyKcScaleBiasGmToUb(uint64_t nRealL0Size,
+                                                                                             uint64_t mRealL0Size,
+                                                                                             uint64_t nOffset,
+                                                                                             uint64_t mOffset)
 {
     if (ubMte2AntiquantYLoopIdx_ >= UB_ANTI_QUANT_Y_BUFFER_NUM) {
         WaitFlag<HardEvent::V_MTE2>(
@@ -913,10 +913,10 @@ BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqm
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename yType, const WqmmConfig &wqmmConfig,
           const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig, vecConfig>::
-    CalInt4NzKnLocalAddrForVf(uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset,
-                              Int4NzParams<xType, wType, antiQuantScaleType> &int4NzParams)
+__aicore__ inline void BasicBlockLibVectorAntiQuantCompute<
+    xType, wType, antiQuantScaleType, yType, wqmmConfig,
+    vecConfig>::CalInt4NzKnLocalAddrForVf(uint64_t nWeightLowBitUbOffset, uint64_t kWeightLowBitUbOffset,
+                                          Int4NzParams<xType, wType, antiQuantScaleType> &int4NzParams)
 {
     uint64_t ubMte2BufferIdx;
     if constexpr (IsSameType<xType, int8_t>::value) {
@@ -1093,9 +1093,9 @@ BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqm
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename yType, const WqmmConfig &wqmmConfig,
           const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void
-BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig, vecConfig>::AntiQuantYWithKc(
-    uint64_t nRealL0Size, uint64_t mRealL0Size)
+__aicore__ inline void BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig,
+                                                           vecConfig>::AntiQuantYWithKc(uint64_t nRealL0Size,
+                                                                                        uint64_t mRealL0Size)
 {
     if (unlikely(mRealL0Size == 0)) {
         SetFlag<HardEvent::V_MTE2>(

@@ -34,8 +34,8 @@ enum class DataType {
 #define CHECK_COND(cond, msg) \
     do { \
         if (!(cond)) { \
-            throw std::runtime_error( \
-                std::string("Error: ") + msg + "\nFile: " + __FILE__ + "\nLine: " + std::to_string(__LINE__)); \
+            throw std::runtime_error(std::string("Error: ") + msg + "\nFile: " + __FILE__ + \
+                                     "\nLine: " + std::to_string(__LINE__)); \
         } \
     } while (0)
 

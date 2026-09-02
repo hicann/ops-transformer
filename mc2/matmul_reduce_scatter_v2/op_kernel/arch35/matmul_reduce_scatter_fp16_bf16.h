@@ -32,9 +32,7 @@ using namespace AscendC;
 template <typename AType, typename BType, typename BiasType, typename CType, int TPL_COMM_MODE>
 class MatmulReduceScatterFP16BF16 {
 public:
-    __aicore__ inline MatmulReduceScatterFP16BF16()
-    {
-    }
+    __aicore__ inline MatmulReduceScatterFP16BF16() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR contextGM,
                                 GM_ADDR workspaceGM, Mc2Tiling::MatmulReduceScatterV2TilingData *tilingData,
                                 TPipe *tpipe);

@@ -23,7 +23,6 @@ namespace MoeInitRoutingV2 {
 using namespace AscendC;
 using namespace Mc2Tiling;
 
-
 class MoeV2SortOneCore : public MoeV2SortBase {
 public:
     __aicore__ inline MoeV2SortOneCore(){};

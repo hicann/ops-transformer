@@ -77,8 +77,7 @@ struct MatmulReduceScatterV2AivModeTilingValue {
                                                      std::map<int, std::vector<std::vector<int>>> m = {})
         : value(v),
           conditionMap(std::move(m))
-    {
-    }
+    {}
 };
 
 constexpr int32_t REDUCESCATTER_M0_DEFAULT = 128;

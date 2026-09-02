@@ -39,8 +39,7 @@ public:
     static constexpr uint32_t TILE_LENGTH = DispatchPolicy::TILE_LENGTH;
     static constexpr uint32_t SCALE_BUFFER_COUNT = 2;
     static constexpr uint32_t SCALE_BATCH_COUNT = 256;
-    static constexpr uint32_t SCALE_BUFFER_BYTES =
-        (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
+    static constexpr uint32_t SCALE_BUFFER_BYTES = (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
     static constexpr uint32_t ROW_MAX_BYTES = BYTE_PER_BLK;
 
     using ElementC = typename CType_::Element;
@@ -89,8 +88,7 @@ public:
               layoutPerTokenScale(layoutPerTokenScale_),
               ptrD(ptrD_),
               layoutD(layoutD_)
-        {
-        }
+        {}
     };
 
     CATLASS_DEVICE
@@ -145,9 +143,7 @@ public:
         }
     }
 
-    CATLASS_DEVICE ~BlockEpilogue()
-    {
-    }
+    CATLASS_DEVICE ~BlockEpilogue() {}
 
     CATLASS_DEVICE
     void UpdateParams(Params const &params_)
@@ -258,8 +254,7 @@ public:
             }
         }
         if (scaleBatchCount > 0) {
-            FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount,
-                            scaleBatchIndex % SCALE_BUFFER_COUNT);
+            FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount, scaleBatchIndex % SCALE_BUFFER_COUNT);
             ++scaleBatchIndex;
         }
         DrainScaleBuffers(scaleBatchIndex);
@@ -348,8 +343,8 @@ private:
         AscendC::Muls(ubGate, ubGate, perTokenScale, tileLength);
         AscendC::Muls(ubUp, ubUp, perTokenScale, tileLength);
         AscendC::PipeBarrier<PIPE_V>();
-        Activation::Compute(ubActivation, ubGate, ubUp, sharedTmpBuffer, tileLength, activationClamp,
-                            activationCode_, activationParams1_, activationParams2_);
+        Activation::Compute(ubActivation, ubGate, ubUp, sharedTmpBuffer, tileLength, activationClamp, activationCode_,
+                            activationParams1_, activationParams2_);
     }
 
     CATLASS_DEVICE

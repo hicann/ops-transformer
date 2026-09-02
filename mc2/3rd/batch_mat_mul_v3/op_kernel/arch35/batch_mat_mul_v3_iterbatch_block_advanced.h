@@ -51,9 +51,7 @@ struct Mc2MatMulMultiBatchBaseBlockArgs {
 
 class Mc2BatchMatMulMultiBatchBaseBlock {
 public:
-    __aicore__ inline Mc2BatchMatMulMultiBatchBaseBlock()
-    {
-    }
+    __aicore__ inline Mc2BatchMatMulMultiBatchBaseBlock() {}
     __aicore__ inline void Init(const void *tilingData);
     __aicore__ inline void GetMultiBatchInfo(uint64_t loopIndex);
     __aicore__ inline void CalcGMOffset();

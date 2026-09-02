@@ -16,7 +16,6 @@
 #ifndef MOE_DISTRIBUTE_V2_CONSTANT_H
 #define MOE_DISTRIBUTE_V2_CONSTANT_H
 
-
 namespace Mc2Kernel {
 constexpr uint32_t STATE_SIZE = 1024 * 1024; // 1M
 constexpr uint64_t TIMEOUT_OFFSET = 1000UL * 1024UL;

@@ -37,8 +37,7 @@ public:
     static constexpr uint32_t TILE_LENGTH = DispatchPolicy::TILE_LENGTH;
     static constexpr uint32_t SCALE_BUFFER_COUNT = 2;
     static constexpr uint32_t SCALE_BATCH_COUNT = 256;
-    static constexpr uint32_t SCALE_BUFFER_BYTES =
-        (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
+    static constexpr uint32_t SCALE_BUFFER_BYTES = (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
     static constexpr uint32_t ROW_MAX_BYTES = BYTE_PER_BLK;
 
     using ElementC = typename CType_::Element;
@@ -59,8 +58,7 @@ public:
     static_assert(BUFFER_SIZE + Activation::MIN_SHARED_TMP_BYTES <= ArchTag::UB_SIZE,
                   "The tiled W4A8 activation buffers and workspace exceed UB capacity");
 
-    static_assert((std::is_same_v<ElementC, half> ||
-                   std::is_same_v<ElementC, bfloat16_t>) &&
+    static_assert((std::is_same_v<ElementC, half> || std::is_same_v<ElementC, bfloat16_t>) &&
                       std::is_same_v<ElementD, int8_t>,
                   "The element type template parameters of BlockEpilogue are wrong");
     static_assert(std::is_same_v<LayoutC, layout::RowMajor> &&
@@ -89,8 +87,7 @@ public:
               ptrD(ptrD_),
               layoutD(layoutD_),
               expertPerRank(expertPerRank_)
-        {
-        }
+        {}
     };
 
     CATLASS_DEVICE
@@ -158,9 +155,7 @@ public:
         }
     }
 
-    CATLASS_DEVICE ~BlockEpilogue()
-    {
-    }
+    CATLASS_DEVICE ~BlockEpilogue() {}
 
     CATLASS_DEVICE
     void UpdateParams(Params const &params_)
@@ -273,8 +268,7 @@ public:
             }
         }
         if (scaleBatchCount > 0) {
-            FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount,
-                            scaleBatchIndex % SCALE_BUFFER_COUNT);
+            FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount, scaleBatchIndex % SCALE_BUFFER_COUNT);
             ++scaleBatchIndex;
         }
         DrainScaleBuffers(scaleBatchIndex);

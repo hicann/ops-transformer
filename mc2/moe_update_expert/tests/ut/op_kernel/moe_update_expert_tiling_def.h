@@ -23,7 +23,7 @@ inline void InitMoeUpdateExpertTilingData(uint8_t *tiling, MoeUpdateExpertTiling
     memcpy(constData, tiling, sizeof(MoeUpdateExpertTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    MoeUpdateExpertTilingData tilingData;                                                                              \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    MoeUpdateExpertTilingData tilingData; \
     InitMoeUpdateExpertTilingData(tilingArg, &tilingData)
 #endif // MOE_UPDATE_EXPERT_TILING_DEF_H

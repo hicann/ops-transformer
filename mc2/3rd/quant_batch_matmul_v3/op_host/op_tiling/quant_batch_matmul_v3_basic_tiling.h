@@ -50,13 +50,13 @@ enum class BasicTilingMode : uint32_t {
 class Mc2QuantBatchMatmulV3BasicTiling : public Mc2QuantBatchMatmulV3Tiling {
 public:
     explicit Mc2QuantBatchMatmulV3BasicTiling(gert::TilingContext *contextIn)
-        : Mc2QuantBatchMatmulV3Tiling(contextIn), context(contextIn)
-    {
-    }
+        : Mc2QuantBatchMatmulV3Tiling(contextIn),
+          context(contextIn)
+    {}
     Mc2QuantBatchMatmulV3BasicTiling(gert::TilingContext *contextIn, Mc2QuantBatchMatmulV3TilingData *out)
-        : Mc2QuantBatchMatmulV3Tiling(contextIn, out), context(contextIn)
-    {
-    }
+        : Mc2QuantBatchMatmulV3Tiling(contextIn, out),
+          context(contextIn)
+    {}
     ~Mc2QuantBatchMatmulV3BasicTiling() override = default;
 
     BasicTiling basicTiling_;

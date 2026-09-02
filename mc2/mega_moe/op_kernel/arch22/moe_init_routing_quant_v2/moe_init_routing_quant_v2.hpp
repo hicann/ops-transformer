@@ -32,7 +32,6 @@ using namespace AscendC;
 using namespace MoeInitRoutingQuantV2;
 using namespace Mc2Tiling;
 
-
 template <class DTYPE_X = bfloat16_t>
 __aicore__ inline void moe_init_routing_quant_v2(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR offset,
                                                  GM_ADDR expandedX, GM_ADDR expandedRowIdx,
@@ -58,7 +57,6 @@ __aicore__ inline void moe_init_routing_quant_v2(GM_ADDR x, GM_ADDR expertIdx, G
         sortPipe.Destroy();
         return;
     }
-
 
     else if (tilingKey == 21000) { // dynamic quant full load
         TPipe sortPipe;

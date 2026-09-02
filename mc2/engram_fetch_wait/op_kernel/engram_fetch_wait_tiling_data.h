@@ -13,7 +13,6 @@
  * \brief engram_fetch_wait算子tiling数据结构定义
  */
 
-
 #ifndef ASCENDC_ENGRAM_FETCH_WAIT_TILING_H
 #define ASCENDC_ENGRAM_FETCH_WAIT_TILING_H
 

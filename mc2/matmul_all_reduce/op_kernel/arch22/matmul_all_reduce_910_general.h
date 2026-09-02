@@ -81,28 +81,28 @@ private:
     Mc2Tiling::MatmulAllReduce910TilingData *mc2TilingData_;
 };
 
-#define INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, bTransFlag, coreType)                                           \
-    do {                                                                                                               \
-        using aType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X1, false>;                             \
-        using bType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X2, bTransFlag>;                        \
-        using cType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_Y>;                                     \
-        using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS_FOR_MC2>;                       \
-        using opType = opTemplateClass<aType, bType, cType, biasType, Mc2MatmulBaseBlock, MM_CFG_NO_PRELOAD>;          \
-        MC2GmAddrs addrs = {aGM, bGM, biasGM, addGM, cGM, workspaceGM, cGM};                                           \
-        MatmulAllReduce910General<DTYPE_X1, DTYPE_X2, DTYPE_Y, opType, coreType> op(                                   \
-            &addrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe);                                                  \
-        op.Init();                                                                                                     \
-        op.Process();                                                                                                  \
+#define INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, bTransFlag, coreType) \
+    do { \
+        using aType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X1, false>; \
+        using bType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_X2, bTransFlag>; \
+        using cType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_Y>; \
+        using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS_FOR_MC2>; \
+        using opType = opTemplateClass<aType, bType, cType, biasType, Mc2MatmulBaseBlock, MM_CFG_NO_PRELOAD>; \
+        MC2GmAddrs addrs = {aGM, bGM, biasGM, addGM, cGM, workspaceGM, cGM}; \
+        MatmulAllReduce910General<DTYPE_X1, DTYPE_X2, DTYPE_Y, opType, coreType> op( \
+            &addrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe); \
+        op.Init(); \
+        op.Process(); \
     } while (0)
 
-#define INVOKE_MC2_910_OP_IMPL(opTemplateClass, coreType)                                                              \
-    do {                                                                                                               \
-        GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::MatmulAllReduce910TilingData, tilingData, tilingGM);                    \
-        if (tilingData.tilematmulTiling.matmulRunInfo.transB != 0U) {                                                  \
-            INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, true, coreType);                                            \
-        } else {                                                                                                       \
-            INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, false, coreType);                                           \
-        }                                                                                                              \
+#define INVOKE_MC2_910_OP_IMPL(opTemplateClass, coreType) \
+    do { \
+        GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::MatmulAllReduce910TilingData, tilingData, tilingGM); \
+        if (tilingData.tilematmulTiling.matmulRunInfo.transB != 0U) { \
+            INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, true, coreType); \
+        } else { \
+            INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, false, coreType); \
+        } \
     } while (0)
 } // namespace MatmulAllReduceImpl
 #endif // MATMUL_ALL_REDUCE_910_GENERAL_H

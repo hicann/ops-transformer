@@ -32,18 +32,16 @@ public:
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzPerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                     hasAntiQuantOffset>::Process()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzPerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::Process()
 {
     OneProcess();
 }
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2WeightNzPerformanceKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                                     hasAntiQuantOffset>::OneProcess()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzPerformanceKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset>::OneProcess()
 {
     LocalTensor<xType> bL1Local = this->InBufBL1_.template Get<xType>();
     LocalTensor<xType> aL1Local = this->InBufAL1_.template Get<xType>();

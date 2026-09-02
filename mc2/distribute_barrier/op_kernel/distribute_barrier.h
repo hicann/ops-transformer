@@ -242,10 +242,9 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Spl
 }
 
 template <TemplateDistributeBarrierTypeClass>
-__aicore__ inline void
-DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Init(GM_ADDR mc2Context, GM_ADDR timeOut, GM_ADDR elasticInfo,
-                                                           GM_ADDR workspaceGM, TPipe *pipe,
-                                                           const DistributeBarrierTilingData *tilingData)
+__aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Init(
+    GM_ADDR mc2Context, GM_ADDR timeOut, GM_ADDR elasticInfo, GM_ADDR workspaceGM, TPipe *pipe,
+    const DistributeBarrierTilingData *tilingData)
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();

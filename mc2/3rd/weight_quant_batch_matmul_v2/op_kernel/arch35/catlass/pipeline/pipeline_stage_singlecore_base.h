@@ -30,9 +30,7 @@ struct PipelineStageSingleCoreBase {
     TEventID backwardEventId[Stages];
 
     DEVICE
-    PipelineStageSingleCoreBase()
-    {
-    }
+    PipelineStageSingleCoreBase() {}
 
     DEVICE
     void ProducerWait(PipelineState<Stages> const &state) const

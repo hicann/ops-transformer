@@ -38,7 +38,7 @@ struct MoeDistributeDispatchV2Info {
     bool isPerformance;           // whether performance or not
     bool isQuant;                 // whether quant or not
     bool isMc2Context;
-    bool hasExpertScales;               // has expertScales or not
+    bool hasExpertScales; // has expertScales or not
     bool reserved1;
     uint64_t totalUbSize; // epWorldSize
     uint64_t totalWinSizeEp;
@@ -49,7 +49,7 @@ struct MoeDistributeDispatchV2Info {
     uint64_t scalesCol;
     uint32_t scalesTypeSize;
     uint64_t scalesCount;
-    uint32_t cumsumTmpMinSize;    // cumsum min tmp size, 0 means no cumsum
+    uint32_t cumsumTmpMinSize; // cumsum min tmp size, 0 means no cumsum
 };
 
 struct MoeDistributeDispatchV2TilingData {

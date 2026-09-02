@@ -25,9 +25,7 @@ constexpr uint64_t SINGLE_N_BUFFER_SIZE = (SINGLE_N_NUM_BLOCK - 1) * SINGLE_N_BL
 template <typename T>
 class KernelAddRmsNormSingleN {
 public:
-    __aicore__ inline KernelAddRmsNormSingleN()
-    {
-    }
+    __aicore__ inline KernelAddRmsNormSingleN() {}
     __aicore__ inline void Init(GM_ADDR gammaGM, Mc2Tiling::AddRMSNormTilingData &tiling, TPipe *pipe,
                                 uint32_t numBlocks)
     {

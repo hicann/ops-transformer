@@ -32,22 +32,22 @@ struct GemmIdentityBlockSwizzle {
     /// Methods
 
     CATLASS_DEVICE
-    GemmIdentityBlockSwizzle()
-    {
-    }
+    GemmIdentityBlockSwizzle() {}
 
     CATLASS_DEVICE
     GemmIdentityBlockSwizzle(GemmCoord const &problemShape_, MatrixCoord const &tileMN_)
-        : problemShape(problemShape_), tileMN(tileMN_)
+        : problemShape(problemShape_),
+          tileMN(tileMN_)
     {
         loopsMN = CeilDiv(MatrixCoord(problemShape.GetCoordMN()), tileMN);
     }
 
     CATLASS_DEVICE
     GemmIdentityBlockSwizzle(GemmCoord const &problemShape_, MatrixCoord const &tileMN_, MatrixCoord const &loopsMN_)
-        : problemShape(problemShape_), tileMN(tileMN_), loopsMN(loopsMN_)
-    {
-    }
+        : problemShape(problemShape_),
+          tileMN(tileMN_),
+          loopsMN(loopsMN_)
+    {}
 
     CATLASS_DEVICE
     void Update(GemmCoord const &problemShape_, MatrixCoord const &tileMN_)
@@ -141,14 +141,14 @@ struct SplitkGemmIdentityBlockSwizzle {
     /// Methods
 
     CATLASS_DEVICE
-    SplitkGemmIdentityBlockSwizzle()
-    {
-    }
+    SplitkGemmIdentityBlockSwizzle() {}
 
     CATLASS_DEVICE
     SplitkGemmIdentityBlockSwizzle(GemmCoord const &problemShape_, GemmCoord const &tileShape_,
                                    uint32_t splitkFactor_ = 1)
-        : problemShape(problemShape_), tileShape(tileShape_), splitkFactor(splitkFactor_)
+        : problemShape(problemShape_),
+          tileShape(tileShape_),
+          splitkFactor(splitkFactor_)
     {
         loopsMNK = CeilDiv(problemShape, tileShape);
     }

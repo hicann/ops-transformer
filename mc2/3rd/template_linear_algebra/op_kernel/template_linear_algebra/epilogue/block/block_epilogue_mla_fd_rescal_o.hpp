@@ -163,11 +163,11 @@ public:
 
         // preload
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
-        AscendC::DataCopyPad(oIn[0], gOCoreTmp,
-                             AscendC::DataCopyExtParams(actualHeads, headSize * sizeof(ElementInput),
-                                                        (kvSplitCoreNum * headSize - headSize) * sizeof(ElementInput),
-                                                        0, 0),
-                             AscendC::DataCopyPadExtParams<ElementInput>(false, 0, 0, 0));
+        AscendC::DataCopyPad(
+            oIn[0], gOCoreTmp,
+            AscendC::DataCopyExtParams(actualHeads, headSize * sizeof(ElementInput),
+                                       (kvSplitCoreNum * headSize - headSize) * sizeof(ElementInput), 0, 0),
+            AscendC::DataCopyPadExtParams<ElementInput>(false, 0, 0, 0));
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
 
         AscendC::SetFlag<AscendC::HardEvent::V_S>(EVENT_ID2);

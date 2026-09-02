@@ -83,7 +83,6 @@ struct L1AlignHelper<Element, layout::CI1KHKWCOCI0> {
     static constexpr uint32_t COUT_ALIGNED = C0_NUM_PER_FRACTAL;
 };
 
-
 template <class ElementA, class ElementB>
 struct ElementAccumulatorSelector {
     static_assert(DEPENDENT_FALSE<ElementA>,

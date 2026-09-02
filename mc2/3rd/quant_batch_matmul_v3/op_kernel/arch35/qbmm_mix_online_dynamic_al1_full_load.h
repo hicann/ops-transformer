@@ -30,9 +30,7 @@ class Mc2QuantBmmPertokenAL1FullLoad
     : public Mc2QuantBmmPertokenRegbaseKernel<aType, bType, scaleType, biasType, ptScaleType, cType, aFormat, bFormat,
                                               cFormat, aTrans, bTrans, l0cDtype, blockType, mmCfg> {
 public:
-    __aicore__ inline Mc2QuantBmmPertokenAL1FullLoad()
-    {
-    }
+    __aicore__ inline Mc2QuantBmmPertokenAL1FullLoad() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR scale, GM_ADDR offset, GM_ADDR bias, GM_ADDR ptScale,
                                 GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *pipe);
     __aicore__ inline void InitBuffer();

@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /* !
  * \file matmul_v3_stream_k_tiling.h
  * \brief
@@ -24,12 +23,9 @@ class Mc2MatMulV3StreamKTiling : public Mc2MatMulV3BaseTiling {
 public:
     Mc2MatMulV3StreamKTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
         : Mc2MatMulV3BaseTiling(context, cfg)
-    {
-    }
+    {}
 
-    ~Mc2MatMulV3StreamKTiling() override
-    {
-    }
+    ~Mc2MatMulV3StreamKTiling() override {}
 
 protected:
     bool IsCapable() override;

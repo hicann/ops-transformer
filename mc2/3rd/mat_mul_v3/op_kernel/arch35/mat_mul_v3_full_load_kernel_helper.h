@@ -69,12 +69,11 @@ __aicore__ inline void AswAL1FullLoadKernelCopyInA1(BLOCK_TYPE &block, const Mc2
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2AswAL1FullLoadKernelMainLoop(MatmulImpl<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, MM_CFG> &mm, BLOCK_TYPE &block,
-                                const Mc2MatMulV3TilingData *matmulv3TilingData,
-                                GlobalTensor<typename B_TYPE::T> &bGlobal, GlobalTensor<typename C_TYPE::T> &cGlobal,
-                                GlobalTensor<typename BIAS_TYPE::T> &biasGlobal, TQue<QuePosition::A1, 1> &InQueueAL1,
-                                LocalTensor<typename A_TYPE::T> &al1Local, uint8_t enAtomic)
+__aicore__ inline void Mc2AswAL1FullLoadKernelMainLoop(
+    MatmulImpl<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, MM_CFG> &mm, BLOCK_TYPE &block,
+    const Mc2MatMulV3TilingData *matmulv3TilingData, GlobalTensor<typename B_TYPE::T> &bGlobal,
+    GlobalTensor<typename C_TYPE::T> &cGlobal, GlobalTensor<typename BIAS_TYPE::T> &biasGlobal,
+    TQue<QuePosition::A1, 1> &InQueueAL1, LocalTensor<typename A_TYPE::T> &al1Local, uint8_t enAtomic)
 {
     mm.SetSubBlockIdx(0);
     mm.Init(&matmulv3TilingData->tCubeTiling, GetTPipePtr());
@@ -154,7 +153,6 @@ __aicore__ inline void AswBL1FullLoadKernelCopyInB1(BLOCK_TYPE &block, const Mc2
     uint64_t kAligned = MMV3CeilAlign(matmulv3TilingData->tCubeTiling.Kb, block.params_.kbAlignSize);
     uint64_t nAligned = MMV3CeilAlign(matmulv3TilingData->tCubeTiling.singleCoreN, block.params_.nAlignSize);
 
-
     GetTPipePtr()->InitBuffer(InQueueBL1, 1, kAligned * nAligned * sizeof(B_T));
     bl1Local = InQueueBL1.AllocTensor<B_T>();
 
@@ -188,12 +186,13 @@ __aicore__ inline void AswBL1FullLoadKernelCopyInB1(BLOCK_TYPE &block, const Mc2
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-AswBL1FullLoadKernelMainLoop(MatmulImpl<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, MM_CFG> &mm, BLOCK_TYPE &block,
-                             const Mc2MatMulV3TilingData *matmulv3TilingData, GlobalTensor<typename A_TYPE::T> &aGlobal,
-                             GlobalTensor<typename C_TYPE::T> &cGlobal, GlobalTensor<typename BIAS_TYPE::T> &biasGlobal,
-                             TQue<QuePosition::B1, 1> &InQueueBL1, LocalTensor<typename B_TYPE::T> &bl1Local,
-                             uint8_t enAtomic)
+__aicore__ inline void AswBL1FullLoadKernelMainLoop(MatmulImpl<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, MM_CFG> &mm,
+                                                    BLOCK_TYPE &block, const Mc2MatMulV3TilingData *matmulv3TilingData,
+                                                    GlobalTensor<typename A_TYPE::T> &aGlobal,
+                                                    GlobalTensor<typename C_TYPE::T> &cGlobal,
+                                                    GlobalTensor<typename BIAS_TYPE::T> &biasGlobal,
+                                                    TQue<QuePosition::B1, 1> &InQueueBL1,
+                                                    LocalTensor<typename B_TYPE::T> &bl1Local, uint8_t enAtomic)
 {
     mm.SetSubBlockIdx(0);
     mm.SetHF32(matmulv3TilingData->isHf32, 1);

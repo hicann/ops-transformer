@@ -24,7 +24,8 @@ namespace MC2Tiling {
 class MoeDistributeCombineSetupTilingBase : public optiling::MoeTilingBase {
 public:
     explicit MoeDistributeCombineSetupTilingBase(gert::TilingContext *context)
-        : optiling::MoeTilingBase(context), nodeName_(context->GetNodeName()) {};
+        : optiling::MoeTilingBase(context),
+          nodeName_(context->GetNodeName()) {};
 
 protected:
     enum TensorType {

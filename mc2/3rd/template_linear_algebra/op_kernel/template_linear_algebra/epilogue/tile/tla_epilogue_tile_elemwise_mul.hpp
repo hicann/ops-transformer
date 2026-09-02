@@ -28,9 +28,7 @@ struct TileElemwiseMul {
     using TileShape = TileShape_;
 
     CATLASS_DEVICE
-    TileElemwiseMul()
-    {
-    }
+    TileElemwiseMul() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,

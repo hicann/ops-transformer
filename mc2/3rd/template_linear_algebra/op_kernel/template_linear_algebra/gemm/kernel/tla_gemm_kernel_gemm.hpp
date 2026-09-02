@@ -139,9 +139,7 @@ public:
     }
 
     CATLASS_DEVICE
-    ~PaddingMatrix()
-    {
-    }
+    ~PaddingMatrix() {}
 
 private:
     static const uint32_t BUFFER_NUM = 2;
@@ -200,31 +198,31 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR gmWorkspace_, GM_ADDR ptrWA_, LayoutA layoutWA_, GM_ADDR ptrWB_, LayoutB layoutWB_,
                EpilogueParams epilogueParams_)
-            : problemShape(problemShape_), ptrA(ptrA_), layoutA(layoutA_), ptrB(ptrB_), layoutB(layoutB_),
-              gmWorkspace(gmWorkspace_), ptrWA(ptrWA_), layoutWA(layoutWA_), ptrWB(ptrWB_), layoutWB(layoutWB_),
+            : problemShape(problemShape_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrB(ptrB_),
+              layoutB(layoutB_),
+              gmWorkspace(gmWorkspace_),
+              ptrWA(ptrWA_),
+              layoutWA(layoutWA_),
+              ptrWB(ptrWB_),
+              layoutWB(layoutWB_),
               epilogueParams(epilogueParams_)
-        {
-        }
+        {}
     };
 
+    CATLASS_DEVICE
+    KernelGemm() {}
 
     CATLASS_DEVICE
-    KernelGemm()
-    {
-    }
-
-    CATLASS_DEVICE
-    ~KernelGemm()
-    {
-    }
+    ~KernelGemm() {}
 
     CATLASS_DEVICE
     bool IsSameStride(layout::RowMajor layout1, layout::RowMajor layout2)
@@ -239,8 +237,7 @@ public:
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params &params)
-    {
-    }
+    {}
 
     template <>
     CATLASS_DEVICE void operator()<AscendC::AIC>(Params &params)

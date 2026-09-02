@@ -18,12 +18,12 @@ inline void InitMoeDistributeCombineTilingData(uint8_t *tiling, MoeDistributeCom
     memcpy(constData, tiling, sizeof(MoeDistributeCombineTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    MoeDistributeCombineTilingData tilingData;                                                                         \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    MoeDistributeCombineTilingData tilingData; \
     InitMoeDistributeCombineTilingData(tilingArg, &tilingData)
 
-#define GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineTilingData, tilingData, tilingArg)                             \
-    MoeDistributeCombineTilingData tilingData;                                                                         \
+#define GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineTilingData, tilingData, tilingArg) \
+    MoeDistributeCombineTilingData tilingData; \
     InitMoeDistributeCombineTilingData(tilingArg, &tilingData)
 
 #endif

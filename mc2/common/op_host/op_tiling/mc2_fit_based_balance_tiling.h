@@ -37,7 +37,9 @@ public:
     explicit Mc2FitBasedBalanceTiling(const mc2tiling::TilingArgs &args, KernelType kernelType,
                                       TopoType topoType = TopoType::STANDARD_CARD,
                                       SocVersion socVersion = SocVersion::SOC950)
-        : matmulPerf_(args, socVersion), commPerf_(args.rankDim, kernelType, socVersion, topoType), tilingM_(args)
+        : matmulPerf_(args, socVersion),
+          commPerf_(args.rankDim, kernelType, socVersion, topoType),
+          tilingM_(args)
     {
         rankDim_ = args.rankDim;
         mmInfo_ = matmulPerf_.mmShapeInfo_;
@@ -52,9 +54,7 @@ public:
     virtual void SetLongTileLen() {};
     virtual void AdjustLongShortTileLen() {};
 
-    virtual ~Mc2FitBasedBalanceTiling()
-    {
-    }
+    virtual ~Mc2FitBasedBalanceTiling() {}
 };
 
 #endif // __MC2_FIT_BALANCE_TILING_H__

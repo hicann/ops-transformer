@@ -52,7 +52,8 @@ struct MMTilingParams {
 
 class AlltoAllvGmmTilingBase : public AlltoAllvQuantGmmTilingBase {
 public:
-    explicit AlltoAllvGmmTilingBase(gert::TilingContext *context) : AlltoAllvQuantGmmTilingBase(context) {};
+    explicit AlltoAllvGmmTilingBase(gert::TilingContext *context)
+        : AlltoAllvQuantGmmTilingBase(context) {};
 
 protected:
     ge::graphStatus GetShapeAttrsInfo() override;

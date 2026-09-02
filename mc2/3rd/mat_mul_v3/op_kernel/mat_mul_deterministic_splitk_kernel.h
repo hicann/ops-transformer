@@ -64,11 +64,12 @@ __aicore__ inline uint64_t ComputOffsetL2cache(uint64_t gmSrcOffset, uint64_t si
 }
 
 template <class T>
-__aicore__ inline void
-SplitKVectorProcess(LocalTensor<float> ubSrc1, LocalTensor<float> ubSrc2, GlobalTensor<float> gmSrc,
-                    LocalTensor<T> ubDst, GlobalTensor<T> gmDst, uint64_t vIndex, uint64_t index, uint64_t currentLoop,
-                    uint64_t dataSizeToMove, uint64_t dataSize, uint64_t coreSize, uint64_t singleSize,
-                    uint64_t singleCoreNum, uint64_t singleCoreN, uint64_t n, uint64_t cnt, bool orderFlag)
+__aicore__ inline void SplitKVectorProcess(LocalTensor<float> ubSrc1, LocalTensor<float> ubSrc2,
+                                           GlobalTensor<float> gmSrc, LocalTensor<T> ubDst, GlobalTensor<T> gmDst,
+                                           uint64_t vIndex, uint64_t index, uint64_t currentLoop,
+                                           uint64_t dataSizeToMove, uint64_t dataSize, uint64_t coreSize,
+                                           uint64_t singleSize, uint64_t singleCoreNum, uint64_t singleCoreN,
+                                           uint64_t n, uint64_t cnt, bool orderFlag)
 {
     uint64_t dstOffset = 0;
     uint64_t burst = 1;
@@ -194,7 +195,6 @@ __aicore__ inline void SplitKVectorNZProcess(GlobalTensor<float> gmSrc, GlobalTe
         TPipeSetWaitFlag<HardEvent::MTE3_MTE2>();
     }
 }
-
 
 template <class C_TYPE>
 __aicore__ inline void ReduceKInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSize, uint64_t singleSize,
@@ -334,7 +334,6 @@ __aicore__ inline void ReduceKNzInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSiz
 {
     using T = typename C_TYPE::T;
     uint64_t totalVecCoreNum = tiling.usedCoreNum * NUM_AIV_TO_AIC_RATIO; // 40
-
 
     uint64_t mCoreTail = tiling.M - (mCnt - 1) * tiling.singleCoreM;
     uint64_t nCoreTail = n - (cnt - 1) * singleCoreN;
@@ -698,12 +697,13 @@ __aicore__ inline void AddTail(LocalTensor<float> &ubSrc1, LocalTensor<float> &u
 }
 
 template <class T>
-__aicore__ inline void
-SplitKVectorProcessL2cache(LocalTensor<float> ubSrc1, LocalTensor<float> ubSrc2, GlobalTensor<float> gmSrc,
-                           LocalTensor<T> ubDst, GlobalTensor<T> gmDst, uint64_t vIndex, uint64_t index,
-                           uint64_t currentLoop, uint64_t dataSizeToMove, uint64_t dataSize, uint64_t coreSize,
-                           uint64_t singleSize, uint64_t singleCoreNum, uint64_t singleCoreN, uint64_t singleCoreM,
-                           uint64_t n, uint64_t mCnt, bool orderNMFlag, uint64_t nIndex, uint64_t nCnt)
+__aicore__ inline void SplitKVectorProcessL2cache(LocalTensor<float> ubSrc1, LocalTensor<float> ubSrc2,
+                                                  GlobalTensor<float> gmSrc, LocalTensor<T> ubDst,
+                                                  GlobalTensor<T> gmDst, uint64_t vIndex, uint64_t index,
+                                                  uint64_t currentLoop, uint64_t dataSizeToMove, uint64_t dataSize,
+                                                  uint64_t coreSize, uint64_t singleSize, uint64_t singleCoreNum,
+                                                  uint64_t singleCoreN, uint64_t singleCoreM, uint64_t n, uint64_t mCnt,
+                                                  bool orderNMFlag, uint64_t nIndex, uint64_t nCnt)
 {
     uint64_t dstOffset = 0;
     uint64_t burst = 1;
@@ -735,7 +735,6 @@ SplitKVectorProcessL2cache(LocalTensor<float> ubSrc1, LocalTensor<float> ubSrc2,
         Cast(ubDst, ubSrc1, RoundMode::CAST_RINT, burst * burstLen);
     }
     TPipeSetWaitFlag<HardEvent::V_MTE3>();
-
 
     dstOffset = ComputOffsetL2cache(gmOffset, singleCoreN, n, nIndex, singleCoreM, index);
     burst = (dataSizeToMove / singleCoreN);
@@ -877,7 +876,6 @@ __aicore__ inline void ReduceKInUbNzL2cache(GM_ADDR cGM, GM_ADDR mmGM, uint64_t 
             SetFlag<HardEvent::MTE3_MTE2>(eventMTE3toMTE2Zero);
             auto eventMTE3toMTE2One = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
             SetFlag<HardEvent::MTE3_MTE2>(eventMTE3toMTE2One);
-
 
             for (uint64_t processIdx = vIndex; processIdx < colBlockNum; processIdx += totalVecCoreNum) {
                 if (pIndex == 0) {

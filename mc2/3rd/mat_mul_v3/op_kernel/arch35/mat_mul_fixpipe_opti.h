@@ -30,9 +30,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK
           const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
 class Mc2MatmulFixpipeOptiKernel {
 public:
-    __aicore__ inline Mc2MatmulFixpipeOptiKernel()
-    {
-    }
+    __aicore__ inline Mc2MatmulFixpipeOptiKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                 GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
     __aicore__ inline void AicProcess(bool aicNeedWaitAiv);
@@ -63,23 +61,23 @@ __aicore__ inline void Mc2MatmulFixpipeOptiKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_T
     pipe_ = pipe;
     pipe_->InitBuffer(ubBuf_, TOTAL_UB_SIZE);
     block_.template Init<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.Ka);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
+    aGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ A_T *>(aGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.Ka);
+    bGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ B_T *>(bGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) * block_.matmulTilingData_->tCubeTiling.N);
+    cGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ C_T *>(cGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.N);
     biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), block_.matmulTilingData_->tCubeTiling.N);
     mm_.SetSubBlockIdx(0);
     mm_.Init(&block_.matmulTilingData_->tCubeTiling, pipe_);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2MatmulFixpipeOptiKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::AivProcess(uint64_t roundIdx)
+__aicore__ inline void Mc2MatmulFixpipeOptiKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::AivProcess(
+    uint64_t roundIdx)
 {
     if ASCEND_IS_AIV {
         uint64_t subIdx = GetSubBlockIdx();
@@ -101,8 +99,8 @@ Mc2MatmulFixpipeOptiKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2MatmulFixpipeOptiKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::AicProcess(bool aicNeedWaitAiv)
+__aicore__ inline void Mc2MatmulFixpipeOptiKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::AicProcess(
+    bool aicNeedWaitAiv)
 {
     if ASCEND_IS_AIC {
         // fixpipe_l0c2ub
@@ -153,14 +151,11 @@ __aicore__ inline void Mc2MatmulFixpipeOptiKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_T
     return;
 }
 
-
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE = Mc2MatmulAswBlock,
           const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
 class Mc2MatmulFixpipeOptiDualDstKernel {
 public:
-    __aicore__ inline Mc2MatmulFixpipeOptiDualDstKernel()
-    {
-    }
+    __aicore__ inline Mc2MatmulFixpipeOptiDualDstKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                 GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
     __aicore__ inline void AicProcess(bool aicNeedWaitAiv);
@@ -193,15 +188,15 @@ __aicore__ inline void Mc2MatmulFixpipeOptiDualDstKernel<A_TYPE, B_TYPE, C_TYPE,
     pipe_ = pipe;
     pipe_->InitBuffer(ubBuf_, TOTAL_UB_SIZE);
     block_.template Init<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.Ka);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
-                             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
-                                 block_.matmulTilingData_->tCubeTiling.N);
+    aGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ A_T *>(aGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.Ka);
+    bGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ B_T *>(bGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) * block_.matmulTilingData_->tCubeTiling.N);
+    cGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ C_T *>(cGM),
+        static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.N);
     biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), block_.matmulTilingData_->tCubeTiling.N);
     mm_.SetSubBlockIdx(0);
     mm_.Init(&block_.matmulTilingData_->tCubeTiling, pipe_);
@@ -231,9 +226,8 @@ Mc2MatmulFixpipeOptiDualDstKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2MatmulFixpipeOptiDualDstKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::AicProcess(
-    bool aicNeedWaitAiv)
+__aicore__ inline void Mc2MatmulFixpipeOptiDualDstKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
+                                                         MM_CFG>::AicProcess(bool aicNeedWaitAiv)
 {
     if ASCEND_IS_AIC {
         // fixpipe_l0c2ub

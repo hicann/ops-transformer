@@ -21,7 +21,6 @@
 #define TILINGKEY_TPL_CCU 0
 #define TILINGKEY_TPL_AICPU 1
 
-
 ASCENDC_TPL_ARGS_DECL(AlltoAllvQuantGroupedMatMul,
                       ASCENDC_TPL_BOOL_DECL( // gmm计算转置场景
                           TILINGKEY_GMM_WEIGHT_TRANSPOSE, 0, 1),
@@ -29,7 +28,6 @@ ASCENDC_TPL_ARGS_DECL(AlltoAllvQuantGroupedMatMul,
                           TILINGKEY_MM_WEIGHT_TRANSPOSE, 0, 1),
                       ASCENDC_TPL_UINT_DECL(TILINGKEY_COMM_MODE, ASCENDC_TPL_1_BW, ASCENDC_TPL_UI_LIST,
                                             TILINGKEY_TPL_CCU, TILINGKEY_TPL_AICPU), );
-
 
 ASCENDC_TPL_SEL(
     ASCENDC_TPL_ARGS_SEL(

@@ -182,34 +182,20 @@ public:
     int lastCnt;
     int lastReadCnt;
 
-    __aicore__ inline void Init(GM_ADDR win, uint8_t debugMode)
-    {
-    }
+    __aicore__ inline void Init(GM_ADDR win, uint8_t debugMode) {}
 
-    __aicore__ inline void TurnNotifyRun(uint32_t blockIdx)
-    {
-    }
+    __aicore__ inline void TurnNotifyRun(uint32_t blockIdx) {}
 
-    __aicore__ inline void TurnNotifyRun(uint32_t blockIdx, uint32_t usedCoreNum)
-    {
-    }
+    __aicore__ inline void TurnNotifyRun(uint32_t blockIdx, uint32_t usedCoreNum) {}
 
-    __aicore__ inline void TurnNotifyRun(uint32_t blockIdx, uint32_t usedCoreNum, uint32_t curTurn)
-    {
-    }
+    __aicore__ inline void TurnNotifyRun(uint32_t blockIdx, uint32_t usedCoreNum, uint32_t curTurn) {}
 
-    __aicore__ inline void TurnNotifyRunA8W8Bf16(uint32_t blockIdx, uint32_t usedCoreNum, uint32_t curTurn)
-    {
-    }
+    __aicore__ inline void TurnNotifyRunA8W8Bf16(uint32_t blockIdx, uint32_t usedCoreNum, uint32_t curTurn) {}
 
     // 等待aicpu执行完成1次任务
-    __aicore__ inline void TurnWait(uint32_t turn)
-    {
-    }
+    __aicore__ inline void TurnWait(uint32_t turn) {}
 
-    __aicore__ inline void SetQueue()
-    {
-    }
+    __aicore__ inline void SetQueue() {}
 };
 
 #endif // _RAC_SERVET_STUB_H_

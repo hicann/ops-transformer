@@ -23,7 +23,6 @@
 #include "lib/matmul_intf.h"
 #include "mat_mul_v3_tiling_data.h"
 
-
 using namespace AscendC;
 using namespace matmul;
 #if defined(__CCE_KT_TEST__)
@@ -389,7 +388,6 @@ __aicore__ inline void UnAlignedCast32to16V220(__gm__ T *dst, __gm__ float *src,
 }
 
 #endif
-
 
 template <typename T1, typename T2>
 __aicore__ inline void CopyRemovePad(const GlobalTensor<T2> &outputGlobal, const GlobalTensor<T1> &inputGlobal,

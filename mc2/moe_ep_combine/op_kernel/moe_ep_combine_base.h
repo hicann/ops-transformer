@@ -23,7 +23,6 @@
 #include "../../common/op_kernel/mc2_moe_context.h"
 #endif
 
-
 __aicore__ inline GM_ADDR GetWinCombineDataAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *ctx)
 {
     return (GM_ADDR)ctx->epHcclBuffer[0];
@@ -33,6 +32,5 @@ __aicore__ inline GM_ADDR GetWinCombineStateAddrByRankId(__gm__ Mc2Aclnn::MoeCom
 {
     return (GM_ADDR)ctx->epHcclBuffer[0];
 }
-
 
 #endif // MOE_EP_COMBINE_BASE_H

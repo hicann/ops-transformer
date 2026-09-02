@@ -20,13 +20,10 @@
 #include "mc2_mega_moe_moe_token_unpermute_tiling.h"
 using namespace AscendC;
 
-
 template <typename T1, typename T2, typename T3, bool PROBS>
 class KernelMoeTokenUnpermute {
 public:
-    __aicore__ inline KernelMoeTokenUnpermute()
-    {
-    }
+    __aicore__ inline KernelMoeTokenUnpermute() {}
 
     __aicore__ inline void Init(GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs,
                                 GM_ADDR unpermuted_tokens, const MoeTokenUnpermuteTilingData *__restrict tiling_data,
@@ -133,7 +130,6 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::Init(
     this->tokensGM.SetGlobalBuffer((__gm__ T1 *)permuted_tokens);
     this->indicesGM.SetGlobalBuffer((__gm__ T2 *)sorted_indices + block_offset, block_length);
 
-
     int64_t out_block_offset;
     if (this->tokens_core_remain > 0) {
         if (blockIdx < this->tokens_core_remain) {
@@ -212,7 +208,6 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalMultiOutTo
     }
     this->indicesLocal = this->indices_inque.template DeQue<T2>();
 
-
     for (int64_t out_token_idx = 0; out_token_idx < out_tokens_number; ++out_token_idx) {
         CalSingleOutToken(out_token_idx * this->top_k, out_offset + out_token_idx);
     }
@@ -237,9 +232,10 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalSingleOutT
 }
 
 template <typename T1, typename T2, typename T3, bool PROBS>
-__aicore__ inline void
-KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalPartOutToken(const int64_t start_token, const int64_t h_index,
-                                                            const int64_t h_length, const int64_t out_token_index)
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalPartOutToken(const int64_t start_token,
+                                                                                   const int64_t h_index,
+                                                                                   const int64_t h_length,
+                                                                                   const int64_t out_token_index)
 {
     if constexpr (IsSameType<T1, float>::value) {
         this->token_tensor0 = this->outque.template AllocTensor<T1>();

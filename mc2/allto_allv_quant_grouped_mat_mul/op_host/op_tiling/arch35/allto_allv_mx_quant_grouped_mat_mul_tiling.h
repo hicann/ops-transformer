@@ -23,7 +23,8 @@ class AlltoAllvMXQuantGmmTiling : public AlltoAllvQuantGmmTilingCommon {
     friend class AlltoAllvMXQuantGmmTilingHelper;
 
 public:
-    explicit AlltoAllvMXQuantGmmTiling(gert::TilingContext *context) : AlltoAllvQuantGmmTilingCommon(context) {};
+    explicit AlltoAllvMXQuantGmmTiling(gert::TilingContext *context)
+        : AlltoAllvQuantGmmTilingCommon(context) {};
 
 protected:
     // tiling base
@@ -53,8 +54,7 @@ class AlltoAllvMXQuantGmmTilingHelper : public Mc2GroupedMatmulTiling::Mc2Groupe
 public:
     AlltoAllvMXQuantGmmTilingHelper(AlltoAllvMXQuantGmmTiling &AlltoAllvMXQuantGmmTiling)
         : Mc2GroupedQbmmTiling(AlltoAllvMXQuantGmmTiling.context_)
-    {
-    }
+    {}
     const Mc2GroupedMatmulTilingData::GMMQuantTilingData &GetAlltoAllvQuantHelperData() const
     {
         return tilingData_;
@@ -71,12 +71,14 @@ public:
     {
         return true;
     }
-    void Reset() override
-    {
-    }
+    void Reset() override {}
     ge::graphStatus SetInputParams(uint64_t M, uint64_t N, uint64_t K, bool transB);
     ge::graphStatus Process();
-    void SetGroupNum(uint32_t groupNum) { gmmGroupNum_ = groupNum; }
+    void SetGroupNum(uint32_t groupNum)
+    {
+        gmmGroupNum_ = groupNum;
+    }
+
 private:
     uint32_t gmmGroupNum_ = 1;
 };

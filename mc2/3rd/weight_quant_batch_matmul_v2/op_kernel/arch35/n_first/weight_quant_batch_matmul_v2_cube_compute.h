@@ -39,7 +39,7 @@ using matmul::MatmulType;
 
 namespace Mc2WeightQuantBatchMatmulV2::Arch35 {
 
-#define WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM                                                                              \
+#define WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM \
     template <typename xType, typename biasType, typename yType, const WqmmConfig &wqmmConfig, typename MatmulImplType>
 
 #define WQBMM_CUBE_COMPUTE_CLASS WeightQuantBatchMatmulV2CubeCompute<xType, biasType, yType, wqmmConfig, MatmulImplType>

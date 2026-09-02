@@ -26,8 +26,8 @@
 #include "../matmul_reduce_scatter_v2_c_tiling.h"
 #include "../../../common/op_kernel/reduce_sum_cast_fp32.h"
 
-#define TEMPLATE_CLASS_PARAMS                                                                                          \
-    template <typename AType, typename BType, typename CType, typename ScaleType, class MMClass, bool IsPerBlock,      \
+#define TEMPLATE_CLASS_PARAMS \
+    template <typename AType, typename BType, typename CType, typename ScaleType, class MMClass, bool IsPerBlock, \
               bool ATrans, bool BTrans, int TPL_COMM_MODE>
 #define TEMPLATE_FUNC_PARAMS AType, BType, CType, ScaleType, MMClass, IsPerBlock, ATrans, BTrans, TPL_COMM_MODE
 
@@ -43,9 +43,7 @@ static constexpr uint64_t SYNC_MODE2 = 2;                 // 核间同步模式 
 TEMPLATE_CLASS_PARAMS
 class QuantBmmA2AVecReduceFP8HiF8 {
 public:
-    __aicore__ inline QuantBmmA2AVecReduceFP8HiF8()
-    {
-    }
+    __aicore__ inline QuantBmmA2AVecReduceFP8HiF8() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR x1ScaleGM, GM_ADDR x2ScaleGM,
                                 GM_ADDR cGM, GM_ADDR contextGM, GM_ADDR workspaceGM,
                                 Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData *tilingData, TPipe *tpipe);
@@ -58,13 +56,12 @@ private:
                                                      DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBmmTiling,
                                                      const uint32_t count, GM_ADDR sendGM, const bool isLast,
                                                      const bool isTail);
-    __aicore__ inline void
-    MatMulComputReduceScatterPertensor(GM_ADDR recvGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBmmTiling,
-                                       const uint32_t count, GM_ADDR sendGM, const bool isLast, const bool isTail);
-    __aicore__ inline void
-    MatMulComputReduceScatterPerblock(GM_ADDR aGM, GM_ADDR recvGM, GM_ADDR x1ScaleGM,
-                                      DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBmmTiling,
-                                      const uint32_t count, GM_ADDR sendGM, const bool isTail);
+    __aicore__ inline void MatMulComputReduceScatterPertensor(
+        GM_ADDR recvGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBmmTiling, const uint32_t count,
+        GM_ADDR sendGM, const bool isLast, const bool isTail);
+    __aicore__ inline void MatMulComputReduceScatterPerblock(
+        GM_ADDR aGM, GM_ADDR recvGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBmmTiling,
+        const uint32_t count, GM_ADDR sendGM, const bool isTail);
     __aicore__ inline void PostProcess();
     __aicore__ inline void PrepareTailConfig(DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBmmTiling,
                                              const bool isTail);
@@ -175,7 +172,6 @@ __aicore__ inline void QuantBmmA2AVecReduceFP8HiF8<TEMPLATE_FUNC_PARAMS>::PostPr
         const uint64_t tileElemCount =
             isSerial ? static_cast<uint64_t>(tiling.M / cfg.rankDim) * static_cast<uint64_t>(tiling.N) :
                        static_cast<uint64_t>(tiling.M) * static_cast<uint64_t>(tiling.N);
-
 
         const uint64_t tileByteSize = tileElemCount * sizeof(CType);
         const uint64_t tileStrideBytes = tileByteSize * cfg.rankDim; // 输入指针步长 (连续，rankDim 份数据)

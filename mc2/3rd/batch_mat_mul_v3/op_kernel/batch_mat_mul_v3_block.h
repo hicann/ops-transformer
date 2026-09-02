@@ -61,9 +61,7 @@ struct Mc2MulMultiBatchBaseBlockArgs {
 
 class Mc2BatchMatMulMultiBatchFullLoadBlock {
 public:
-    __aicore__ inline Mc2BatchMatMulMultiBatchFullLoadBlock()
-    {
-    }
+    __aicore__ inline Mc2BatchMatMulMultiBatchFullLoadBlock() {}
     __aicore__ inline void Init(const void *tilingData);
     __aicore__ inline void SetC0(uint64_t c0Size)
     {
@@ -166,9 +164,7 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchFullLoadBlock::CalcGMOffset()
 
 class Mc2BatchMatMulMultiBatchBaseBlock {
 public:
-    __aicore__ inline Mc2BatchMatMulMultiBatchBaseBlock()
-    {
-    }
+    __aicore__ inline Mc2BatchMatMulMultiBatchBaseBlock() {}
     __aicore__ inline void Init(const void *tilingData);
     __aicore__ inline void GetMultiBatchInfo(uint64_t loopIndex);
     __aicore__ inline void CalcGMOffset();
@@ -242,12 +238,9 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchBaseBlock::CalcGMOffset()
     offset_.offsetBias = params_.batchIndex * params_.singleBiasSize + params_.batchOffset * params_.singleBiasSize;
 }
 
-
 class Mc2BatchMatMulUnalignedMultiBatchBaseBlock : public Mc2BatchMatMulMultiBatchBaseBlock {
 public:
-    __aicore__ inline Mc2BatchMatMulUnalignedMultiBatchBaseBlock()
-    {
-    }
+    __aicore__ inline Mc2BatchMatMulUnalignedMultiBatchBaseBlock() {}
     __aicore__ inline void Init(const void *tilingData);
     __aicore__ inline void SetC0(uint64_t c0Size)
     {

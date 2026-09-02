@@ -63,24 +63,25 @@ public:
 
         // Methods
         CATLASS_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_DEVICE
         Params(uint32_t problemCount_, GM_ADDR ptrProblemShape_, GM_ADDR ptrA_, GM_ADDR ptrLayoutA_, GM_ADDR ptrB_,
                GM_ADDR ptrLayoutB_, GM_ADDR ptrC_, GM_ADDR ptrLayoutC_)
-            : problemCount(problemCount_), ptrProblemShape(ptrProblemShape_), ptrA(ptrA_), ptrLayoutA(ptrLayoutA_),
-              ptrB(ptrB_), ptrLayoutB(ptrLayoutB_), ptrC(ptrC_), ptrLayoutC(ptrLayoutC_)
-        {
-        }
+            : problemCount(problemCount_),
+              ptrProblemShape(ptrProblemShape_),
+              ptrA(ptrA_),
+              ptrLayoutA(ptrLayoutA_),
+              ptrB(ptrB_),
+              ptrLayoutB(ptrLayoutB_),
+              ptrC(ptrC_),
+              ptrLayoutC(ptrLayoutC_)
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    GroupedMatmul()
-    {
-    }
+    GroupedMatmul() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -168,8 +169,7 @@ public:
 
     template <>
     CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
-    {
-    }
+    {}
 };
 
 } // namespace Catlass::Gemm::Kernel

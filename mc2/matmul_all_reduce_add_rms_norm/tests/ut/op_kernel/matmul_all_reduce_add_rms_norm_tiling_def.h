@@ -50,22 +50,22 @@ struct AddRMSNormTilingData {
 
 #pragma pack()
 
-#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                            \
-    __ubuf__ tilingStruct *tilingDataPointer =                                                                         \
+#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
+    __ubuf__ tilingStruct *tilingDataPointer = \
         reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
-#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                               \
+#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                                                     \
-    AddRMSNormTilingData tilingData;                                                                                   \
-    INIT_TILING_DATA(AddRMSNormTilingData, tilingDataPointer, tilingPointer);                                          \
-    (tilingData).numRow = tilingDataPointer->numRow;                                                                   \
-    (tilingData).numCol = tilingDataPointer->numCol;                                                                   \
-    (tilingData).blockFactor = tilingDataPointer->blockFactor;                                                         \
-    (tilingData).rowFactor = tilingDataPointer->rowFactor;                                                             \
-    (tilingData).ubFactor = tilingDataPointer->ubFactor;                                                               \
-    (tilingData).epsilon = tilingDataPointer->epsilon;                                                                 \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    AddRMSNormTilingData tilingData; \
+    INIT_TILING_DATA(AddRMSNormTilingData, tilingDataPointer, tilingPointer); \
+    (tilingData).numRow = tilingDataPointer->numRow; \
+    (tilingData).numCol = tilingDataPointer->numCol; \
+    (tilingData).blockFactor = tilingDataPointer->blockFactor; \
+    (tilingData).rowFactor = tilingDataPointer->rowFactor; \
+    (tilingData).ubFactor = tilingDataPointer->ubFactor; \
+    (tilingData).epsilon = tilingDataPointer->epsilon; \
     (tilingData).avgFactor = tilingDataPointer->avgFactor;
 #endif
 
@@ -82,13 +82,13 @@ inline void InitMatmulAllReduceAddRmsNormTilingData(uint8_t *tiling,
     memcpy(constData, tiling, sizeof(Mc2Tiling::MatmulAllReduceAddRmsNormTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    MatmulAllReduceAddRmsNormTilingData tilingData;                                                                    \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    MatmulAllReduceAddRmsNormTilingData tilingData; \
     InitMatmulAllReduceAddRmsNormTilingData(tilingArg, &tilingData)
 
-#define GET_TILING_DATA_MEMBER(tilingType, member, var, tiling)                                                        \
-    auto var = ((tilingType *)((uint8_t *)AscendC::GmAlloc(1024)))->member;                                            \
-    size_t offset##var = (size_t)(&((tilingType *)0)->member);                                                         \
+#define GET_TILING_DATA_MEMBER(tilingType, member, var, tiling) \
+    auto var = ((tilingType *)((uint8_t *)AscendC::GmAlloc(1024)))->member; \
+    size_t offset##var = (size_t)(&((tilingType *)0)->member); \
     InitTilingData<decltype(var)>(tiling + offset##var, &var);
 
 #endif // FOREACH_MINIMUM_SCALAR_TILING_DEF_H

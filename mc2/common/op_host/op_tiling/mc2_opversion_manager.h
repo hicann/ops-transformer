@@ -42,9 +42,9 @@ public:
 
 private:
     uint32_t opVersion;
-    explicit OpVersionManager(uint32_t version) : opVersion(version)
-    {
-    }
+    explicit OpVersionManager(uint32_t version)
+        : opVersion(version)
+    {}
 };
 
 #endif // __MC2_OPVERSION_MANAGER_H__

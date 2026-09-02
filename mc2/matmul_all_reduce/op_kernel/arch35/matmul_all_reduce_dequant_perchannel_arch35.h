@@ -34,9 +34,7 @@ constexpr uint32_t SPLIT_MN_MATMUL_ALLREDUCE_INT8 = 2;
 template <class T>
 class MatmulAllReduceDequantPerchannel {
 public:
-    __aicore__ inline MatmulAllReduceDequantPerchannel()
-    {
-    }
+    __aicore__ inline MatmulAllReduceDequantPerchannel() {}
     __aicore__ inline void Init(TPipe *tPipe, uint32_t quantUbSize)
     {
         pipe_ = tPipe;

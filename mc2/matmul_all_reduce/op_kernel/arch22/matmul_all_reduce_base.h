@@ -34,7 +34,10 @@ class MatmulAllReduceBase {
 public:
     __aicore__ inline MatmulAllReduceBase(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs, ArnGmAddrs *arnAddrs,
                                           MC2TilingHeader *tilingData, TPipe *tPipe)
-        : addrs_(addrs), quantAddrs_(quantAddrs), arnAddrs_(arnAddrs), tPipe_(tPipe)
+        : addrs_(addrs),
+          quantAddrs_(quantAddrs),
+          arnAddrs_(arnAddrs),
+          tPipe_(tPipe)
     {
         if constexpr (coreType == Mc2CoreType::ON_CUBE) {
             notifyFlag_ = (GetBlockIdx() == 0);

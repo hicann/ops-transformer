@@ -45,7 +45,6 @@ public:
     using ElementAccumulator =
         typename Gemm::helper::ElementAccumulatorSelector<ElementA, ElementX>::ElementAccumulator;
 
-
     struct Params {
         // Data members
         GemvCoord problemShape;
@@ -58,24 +57,24 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemvCoord const &problemShape_, GM_ADDR ptrX_, LayoutX layoutX_, GM_ADDR ptrA_, LayoutA layoutA_,
                GM_ADDR ptrWorkspace_, EpilogueParams const &epilogueParams_)
-            : problemShape(problemShape_), ptrX(ptrX_), layoutX(layoutX_), ptrA(ptrA_), layoutA(layoutA_),
-              ptrWorkspace(ptrWorkspace_), epilogueParams(epilogueParams_)
-        {
-        }
+            : problemShape(problemShape_),
+              ptrX(ptrX_),
+              layoutX(layoutX_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrWorkspace(ptrWorkspace_),
+              epilogueParams(epilogueParams_)
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    KernelGemvAic()
-    {
-    }
+    KernelGemvAic() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);

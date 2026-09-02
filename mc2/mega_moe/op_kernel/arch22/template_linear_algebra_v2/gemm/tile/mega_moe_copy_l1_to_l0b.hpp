@@ -35,9 +35,7 @@ struct CopyL1ToL0B<ArchTag, Catlass::Gemm::GemmType<Element, layout::zZ, AscendC
     static constexpr uint32_t ELE_NUM_PER_C0 = BytesToBits(BYTE_PER_C0) / SizeOfBits<Element>::value;
 
     CATLASS_DEVICE
-    CopyL1ToL0B()
-    {
-    }
+    CopyL1ToL0B() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
@@ -67,9 +65,7 @@ struct CopyL1ToL0B<ArchTag, Catlass::Gemm::GemmType<float, layout::zZ, AscendC::
     static constexpr uint32_t ELE_NUM_PER_C0 = BytesToBits(BYTE_PER_C0) / SizeOfBits<Element>::value;
 
     CATLASS_DEVICE
-    CopyL1ToL0B()
-    {
-    }
+    CopyL1ToL0B() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
@@ -88,7 +84,6 @@ struct CopyL1ToL0B<ArchTag, Catlass::Gemm::GemmType<float, layout::zZ, AscendC::
     }
 };
 
-
 template <class ArchTag>
 struct CopyL1ToL0B<ArchTag, Catlass::Gemm::GemmType<int8_t, layout::zN, AscendC::TPosition::B1>,
                    Catlass::Gemm::GemmType<int8_t, layout::nZ, AscendC::TPosition::B2>> {
@@ -100,9 +95,7 @@ struct CopyL1ToL0B<ArchTag, Catlass::Gemm::GemmType<int8_t, layout::zN, AscendC:
     static constexpr uint32_t ELE_NUM_PER_FRACTAL = BytesToBits(BYTE_PER_FRACTAL) / SizeOfBits<Element>::value;
 
     CATLASS_DEVICE
-    CopyL1ToL0B()
-    {
-    }
+    CopyL1ToL0B() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
@@ -481,7 +474,6 @@ struct CopyL1ToL0B<ArchTag, Gemm::GemmType<Element, layout::nZ, AscendC::TPositi
         }
     }
 };
-
 
 } // namespace Catlass::Gemm::Tile
 

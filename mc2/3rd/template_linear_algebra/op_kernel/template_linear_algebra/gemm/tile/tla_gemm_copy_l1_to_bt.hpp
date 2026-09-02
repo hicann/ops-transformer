@@ -33,9 +33,7 @@ struct CopyL1ToBT<ArchTag, Catlass::Gemm::GemmType<ElementSrc, layout::VectorLay
     static constexpr uint32_t ELE_NUM_PER_C2 = BYTE_PER_C2 / sizeof(ElementSrc);
 
     CATLASS_DEVICE
-    CopyL1ToBT()
-    {
-    }
+    CopyL1ToBT() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementDst> dstTensor, AscendC::LocalTensor<ElementSrc> srcTensor,
@@ -49,7 +47,6 @@ struct CopyL1ToBT<ArchTag, Catlass::Gemm::GemmType<ElementSrc, layout::VectorLay
         AscendC::DataCopy(dstTensor, srcTensor, intriParams);
     }
 };
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

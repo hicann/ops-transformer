@@ -19,10 +19,10 @@
 #include "../../3rd/quant_batch_matmul_v3/op_kernel/quant_batch_matmul_v3_base.h"
 #include "mc2_quant_batch_matmul_asw_block.h"
 
-#define LOCAL_TEMPLATE_CLASS_PARAMS                                                                                    \
-    template <class X1Type, class X2Type, class ScaleType, class BiasType, class YType, CubeFormat FormatX1,           \
+#define LOCAL_TEMPLATE_CLASS_PARAMS \
+    template <class X1Type, class X2Type, class ScaleType, class BiasType, class YType, CubeFormat FormatX1, \
               CubeFormat FormatX2, CubeFormat FormatY, bool ATrans, bool BTrans>
-#define LOCAL_TEMPLATE_FUNC_PARAMS                                                                                     \
+#define LOCAL_TEMPLATE_FUNC_PARAMS \
     X1Type, X2Type, ScaleType, BiasType, YType, FormatX1, FormatX2, FormatY, ATrans, BTrans
 namespace Mc2MatmulV3 {
 
@@ -31,9 +31,7 @@ using namespace AscendC;
 LOCAL_TEMPLATE_CLASS_PARAMS
 class Mc2QuantBatchMatmulASWKernel {
 public:
-    __aicore__ inline Mc2QuantBatchMatmulASWKernel()
-    {
-    }
+    __aicore__ inline Mc2QuantBatchMatmulASWKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
                                 GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *que,
                                 const Mc2Tiling::RCSTiling &cfg, bool isTail, bool isGather, uint64_t preCoreNum);
@@ -102,7 +100,6 @@ __aicore__ inline uint64_t Mc2QuantBatchMatmulASWKernel<LOCAL_TEMPLATE_FUNC_PARA
 {
     return block_.preCoreNum_;
 }
-
 
 LOCAL_TEMPLATE_CLASS_PARAMS
 __aicore__ inline void Mc2QuantBatchMatmulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::UpdateGlobalAddr(

@@ -54,7 +54,6 @@ struct TileCopyGemvAiv {
     using MatrixCopyGmToUb = Gemv::Tile::MatrixCopyGmToUB<ArchTag, AType>;
 };
 
-
 template <
     /// Tag indicating architecture
     class ArchTag,
@@ -77,7 +76,6 @@ struct TileCopyGemvAic {
     using L1AType = typename Gemv::helper::L1AndL0TypeSelectorGemv<XType, AType>::L1BType;
     using L0AType = typename Gemv::helper::L1AndL0TypeSelectorGemv<XType, AType>::L0AType;
     using L0BType = typename Gemv::helper::L1AndL0TypeSelectorGemv<XType, AType>::L0BType;
-
 
     using CopyGmToL1A = Gemm::Tile::CopyGmToL1<ArchTag, XType, L1XType>;
     using CopyGmToL1B = Gemm::Tile::CopyGmToL1<ArchTag, AType, L1AType>;

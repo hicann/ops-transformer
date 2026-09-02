@@ -64,19 +64,20 @@ public:
         LayoutD layoutD;
 
         CATLASS_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_DEVICE
         Params(GM_ADDR ptrX_, LayoutX const &layoutX_, GM_ADDR ptrD_, LayoutD const &layoutD_)
-            : ptrX(ptrX_), layoutX(layoutX_), ptrD(ptrD_), layoutD(layoutD_)
-        {
-        }
+            : ptrX(ptrX_),
+              layoutX(layoutX_),
+              ptrD(ptrD_),
+              layoutD(layoutD_)
+        {}
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, Params const &params) : params(params)
+    BlockEpilogue(Arch::Resource<ArchTag> &resource, Params const &params)
+        : params(params)
     {
         ubC = resource.ubBuf.template GetBufferByByte<ElementC>(0);
         ubX = resource.ubBuf.template GetBufferByByte<ElementX>(COMPUTE_LENGTH * sizeof(ElementC));

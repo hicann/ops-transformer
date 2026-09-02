@@ -18,8 +18,8 @@ inline void InitAllGatherMatmulTilingData(uint8_t *tiling, optiling::AlltoAllAll
     memcpy(constData, tiling, sizeof(optiling::AlltoAllAllGatherBatchMatMulTilingData));
 }
 
-#define GET_TILING_DATA(tilingData, tilingArg)                                                                         \
-    optiling::AlltoAllAllGatherBatchMatMulTilingData tilingData;                                                       \
+#define GET_TILING_DATA(tilingData, tilingArg) \
+    optiling::AlltoAllAllGatherBatchMatMulTilingData tilingData; \
     InitAllGatherMatmulTilingData(tilingArg, &tilingData)
 
 #endif

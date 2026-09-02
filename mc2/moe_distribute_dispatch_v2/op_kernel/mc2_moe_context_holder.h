@@ -45,9 +45,7 @@ public:
         epWorldSize_ = epWorldSize;
     }
 
-    __aicore__ inline void Check(uint64_t /* totalWinSize */, TPipe * /* pipe */, GM_ADDR /* exceptionAddr */)
-    {
-    }
+    __aicore__ inline void Check(uint64_t /* totalWinSize */, TPipe * /* pipe */, GM_ADDR /* exceptionAddr */) {}
 
     __aicore__ inline GM_ADDR GetStatusDataSpaceGm()
     {

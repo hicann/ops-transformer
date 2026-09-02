@@ -28,9 +28,7 @@ struct QBmmUpdateInfo {
 
 class Mc2QuantBatchMatmulV3Update {
 public:
-    __aicore__ inline Mc2QuantBatchMatmulV3Update()
-    {
-    }
+    __aicore__ inline Mc2QuantBatchMatmulV3Update() {}
     template <int x1Format, int x2Format, bool aTrans, bool bTrans>
     __aicore__ inline void Init(const TCubeTiling *mmTiling, const QBmmBaseBlockArgs &params);
     template <int x1Format, int x2Format, bool aTrans, bool bTrans>
@@ -66,9 +64,10 @@ __aicore__ inline void Mc2QuantBatchMatmulV3Update::Init(const TCubeTiling *mmTi
 }
 
 template <int x1Format, int x2Format, bool aTrans, bool bTrans>
-__aicore__ inline void
-Mc2QuantBatchMatmulV3Update::UpdateBlockParamsAndCalcGmOffset(QBmmBaseBlockArgs &params, QBmmBlockOffset &offset,
-                                                              uint64_t mTileIndex, uint64_t nTileIndex)
+__aicore__ inline void Mc2QuantBatchMatmulV3Update::UpdateBlockParamsAndCalcGmOffset(QBmmBaseBlockArgs &params,
+                                                                                     QBmmBlockOffset &offset,
+                                                                                     uint64_t mTileIndex,
+                                                                                     uint64_t nTileIndex)
 {
     UpdateBlockParams(params, mTileIndex, nTileIndex);
     CalcGMOffset<x1Format, x2Format, aTrans, bTrans>(params, offset);

@@ -28,7 +28,7 @@
 
 namespace MoeDistributeDispatchA2Impl {
 
-#define TemplateMC2TypeA2layeredAicpuClass                                                                             \
+#define TemplateMC2TypeA2layeredAicpuClass \
     typename XType, typename ExpandXOutType, bool StaticQuant, bool DynamicQuant, bool IsSmoothScaleExist
 #define TemplateMC2TypeA2layeredAicpuFunc XType, ExpandXOutType, StaticQuant, DynamicQuant, IsSmoothScaleExist
 
@@ -367,7 +367,6 @@ __aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2laye
     DataCopy(magicGt, tempLocal, UB_32B_ALIGN / sizeof(uint64_t));
     PipeBarrier<PIPE_ALL>();
 }
-
 
 template <TemplateMC2TypeA2layeredAicpuClass>
 __aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::CreateInnerReduceInfo()
@@ -841,7 +840,6 @@ __aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2laye
     }
 }
 
-
 template <TemplateMC2TypeA2layeredAicpuClass>
 __aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::CopyTokenToWinOut(
     uint32_t localTokenIdx, uint32_t globalTokenIdx, uint32_t dstServerId)
@@ -980,30 +978,29 @@ __aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2laye
 }
 
 template <TemplateMC2TypeA2layeredAicpuClass>
-__aicore__ inline uint32_t
-MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::GetExpRank(uint32_t expertId)
+__aicore__ inline uint32_t MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::GetExpRank(
+    uint32_t expertId)
 {
     return expertId / localMoeExpertNum_;
 }
 
 template <TemplateMC2TypeA2layeredAicpuClass>
-__aicore__ inline bool
-MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::IsInSameServer(uint32_t targetRankId)
+__aicore__ inline bool MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::IsInSameServer(
+    uint32_t targetRankId)
 {
     return targetRankId / SERVER_RANK_SIZE == rankId_ / SERVER_RANK_SIZE;
 }
 
 template <TemplateMC2TypeA2layeredAicpuClass>
-__aicore__ inline uint64_t
-MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::MergeMagicWithValue(uint64_t magic,
-                                                                                            uint64_t value)
+__aicore__ inline uint64_t MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::MergeMagicWithValue(
+    uint64_t magic, uint64_t value)
 {
     return (magic * 2ULL + value);
 }
 
 template <TemplateMC2TypeA2layeredAicpuClass>
-__aicore__ inline void
-MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::SetIpcFlag(uint64_t flagVal)
+__aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::SetIpcFlag(
+    uint64_t flagVal)
 {
     if (aivId_ >= SERVER_RANK_SIZE) {
         return;
@@ -1022,8 +1019,8 @@ MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::SetIpcFl
 }
 
 template <TemplateMC2TypeA2layeredAicpuClass>
-__aicore__ inline void
-MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::WaitIpcFlag(uint64_t flagVal)
+__aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::WaitIpcFlag(
+    uint64_t flagVal)
 {
     uint64_t waitVal = MergeMagicWithValue(magicVal_, flagVal);
     if (aivId_ >= SERVER_RANK_SIZE) {
@@ -1049,8 +1046,8 @@ MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::WaitIpcF
 }
 
 template <TemplateMC2TypeA2layeredAicpuClass>
-__aicore__ inline void
-MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::SetTokenCnt(GlobalTensor<int32_t> globalSet)
+__aicore__ inline void MoeDistributeDispatchA2LayeredAicpu<TemplateMC2TypeA2layeredAicpuFunc>::SetTokenCnt(
+    GlobalTensor<int32_t> globalSet)
 {
     AscendC::SetAtomicAdd<int32_t>();
     LocalTensor<int32_t> localSet = tBuf.GetWithOffset<int32_t>(EXP_TOKEN_COUNT_FLAG_CNT, 0);

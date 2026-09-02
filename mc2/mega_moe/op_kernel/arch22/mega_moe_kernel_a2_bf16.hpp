@@ -121,9 +121,7 @@ public:
         GM_ADDR tilingGM{nullptr};
         MoeInitRoutingV2TilingData moeInitRoutingV2TilingData;
 
-        CATLASS_HOST_DEVICE Params()
-        {
-        }
+        CATLASS_HOST_DEVICE Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord problemShape_, uint32_t EP_, uint32_t listLen_, uint32_t expertPerRank_,
@@ -136,26 +134,48 @@ public:
                GM_ADDR expertTokensBeforeCapacity_, GM_ADDR probs_, GM_ADDR ptrWorkspace_, GM_ADDR gmExpertTokenNums_,
                GM_ADDR ptrXActiveMask_, GM_ADDR ptrScales_, MoeInitRoutingV2TilingData moeInitRoutingV2TilingData_,
                uint32_t epilogueGranularity_ = 0, float swigluLimit_ = std::numeric_limits<float>::infinity(),
-               uint32_t activationCode_ = 0,
-               float activationParams1_ = Epilogue::SwigluOaiActivation::DEFAULT_ALPHA,
+               uint32_t activationCode_ = 0, float activationParams1_ = Epilogue::SwigluOaiActivation::DEFAULT_ALPHA,
                float activationParams2_ = Epilogue::SituActivation::DEFAULT_BETA, GM_ADDR tilingGM_ = nullptr)
-            : problemShape(problemShape_), EP(EP_), listLen(listLen_), expertPerRank(expertPerRank_),
-              maxOutputSize(maxOutputSize_), topK(topK_), initRoutingQuantTilingKey(initRoutingQuantTilingKey_),
-              epilogueCoreNum(epilogueCoreNum_), epilogueGranularity(epilogueGranularity_), swigluLimit(swigluLimit_),
-              activationCode(activationCode_), activationParams1(activationParams1_),
+            : problemShape(problemShape_),
+              EP(EP_),
+              listLen(listLen_),
+              expertPerRank(expertPerRank_),
+              maxOutputSize(maxOutputSize_),
+              topK(topK_),
+              initRoutingQuantTilingKey(initRoutingQuantTilingKey_),
+              epilogueCoreNum(epilogueCoreNum_),
+              epilogueGranularity(epilogueGranularity_),
+              swigluLimit(swigluLimit_),
+              activationCode(activationCode_),
+              activationParams1(activationParams1_),
               activationParams2(activationParams2_),
-              contextGM(contextGM_), tilingGM(tilingGM_), ptrA(reinterpret_cast<__gm__ ElementABefore *>(ptrA_)),
-              layoutA(layoutA_), layoutA2(layoutA2_), ptrB1(reinterpret_cast<__gm__ ElementB *>(ptrB1_)),
-              layoutB1(layoutB1_), ptrBias1(reinterpret_cast<__gm__ float *>(ptrBias1_)),
-              ptrB2(reinterpret_cast<__gm__ ElementB *>(ptrB2_)), layoutB2(layoutB2_),
+              contextGM(contextGM_),
+              tilingGM(tilingGM_),
+              ptrA(reinterpret_cast<__gm__ ElementABefore *>(ptrA_)),
+              layoutA(layoutA_),
+              layoutA2(layoutA2_),
+              ptrB1(reinterpret_cast<__gm__ ElementB *>(ptrB1_)),
+              layoutB1(layoutB1_),
+              ptrBias1(reinterpret_cast<__gm__ float *>(ptrBias1_)),
+              ptrB2(reinterpret_cast<__gm__ ElementB *>(ptrB2_)),
+              layoutB2(layoutB2_),
               ptrBias2(reinterpret_cast<__gm__ float *>(ptrBias2_)),
-              ptrScale1(reinterpret_cast<__gm__ ElementScale *>(ptrScale1_)), layoutScale1(layoutScale1_),
-              ptrScale2(reinterpret_cast<__gm__ ElementScale *>(ptrScale2_)), layoutScale2(layoutScale2_),
-              ptrOutput(reinterpret_cast<__gm__ ElementD2 *>(ptrOutput_)), layoutD1(layoutD1_), layoutD2(layoutD2_),
-              expertIdx(expertIdx_), moeInitRoutingQuantV2Scale(moeInitRoutingQuantV2Scale_),
+              ptrScale1(reinterpret_cast<__gm__ ElementScale *>(ptrScale1_)),
+              layoutScale1(layoutScale1_),
+              ptrScale2(reinterpret_cast<__gm__ ElementScale *>(ptrScale2_)),
+              layoutScale2(layoutScale2_),
+              ptrOutput(reinterpret_cast<__gm__ ElementD2 *>(ptrOutput_)),
+              layoutD1(layoutD1_),
+              layoutD2(layoutD2_),
+              expertIdx(expertIdx_),
+              moeInitRoutingQuantV2Scale(moeInitRoutingQuantV2Scale_),
               moeInitRoutingQuantV2Offset(moeInitRoutingQuantV2Offset_),
-              expertTokensBeforeCapacity(expertTokensBeforeCapacity_), probs(probs_), ptrXActiveMask(ptrXActiveMask_),
-              ptrScales(ptrScales_), ptrWorkspace(ptrWorkspace_), ptrExpertTokenNums(gmExpertTokenNums_),
+              expertTokensBeforeCapacity(expertTokensBeforeCapacity_),
+              probs(probs_),
+              ptrXActiveMask(ptrXActiveMask_),
+              ptrScales(ptrScales_),
+              ptrWorkspace(ptrWorkspace_),
+              ptrExpertTokenNums(gmExpertTokenNums_),
               moeInitRoutingV2TilingData(moeInitRoutingV2TilingData_)
         {
             moeInitRoutingV2TilingData_.vbsComputeParamsOp = moeInitRoutingV2TilingData_.vbsComputeParamsOp;
@@ -186,9 +206,7 @@ public:
         initBuffer(params);
     }
 
-    CATLASS_DEVICE ~MegaMoeKernelA2BF16()
-    {
-    }
+    CATLASS_DEVICE ~MegaMoeKernelA2BF16() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -301,14 +319,14 @@ private:
     //   - flag 槽 64B 独占 cache line（kFlagSlotI32 = 16 个 int32），slotIdx = rank * eR + groupIdx
     // ============================================================
     template <typename T>
-    CATLASS_DEVICE void
-    SendTokensV3(AscendC::GlobalTensor<T> dst, // 目标 rank peer mem（已含 rowStart * copyInNum 偏移）
-                 AscendC::GlobalTensor<T> src, // 本 rank windowsOut（已含 rowSrc * copyInNum 偏移）
-                 int32_t rows,                 // 发送 token 数
-                 uint32_t hiddenSize, int32_t dstEpIdx,
-                 int32_t groupIdx, // 当前专家组轮次（用于 epoch flag 值）
-                 int32_t rowStart, // dst 起始行号（路径 A 写 scale 时使用）
-                 const Params &params)
+    CATLASS_DEVICE void SendTokensV3(
+        AscendC::GlobalTensor<T> dst, // 目标 rank peer mem（已含 rowStart * copyInNum 偏移）
+        AscendC::GlobalTensor<T> src, // 本 rank windowsOut（已含 rowSrc * copyInNum 偏移）
+        int32_t rows,                 // 发送 token 数
+        uint32_t hiddenSize, int32_t dstEpIdx,
+        int32_t groupIdx, // 当前专家组轮次（用于 epoch flag 值）
+        int32_t rowStart, // dst 起始行号（路径 A 写 scale 时使用）
+        const Params &params)
     {
         // rows == 0：无 token 可发，不写 flag，对端 RecvTokensV3 同样 rows2==0 会提前 return
         if (rows == 0)
@@ -489,14 +507,12 @@ private:
             uint32_t remainingExpertNum = totalExpertNum - expertOffset;
             uint32_t currentExpertNum =
                 remainingExpertNum < maxExpertNumPerLoop ? remainingExpertNum : maxExpertNumPerLoop;
-            uint32_t currentExpertNumAligned =
-                (currentExpertNum + int32PerBlock - 1) / int32PerBlock * int32PerBlock;
+            uint32_t currentExpertNumAligned = (currentExpertNum + int32PerBlock - 1) / int32PerBlock * int32PerBlock;
 
-            AscendC::DataCopyPad(
-                tmpBuffer1, tokenPerExpert[expertOffset],
-                {U16(EP), U16(currentExpertNum * sizeof(int32_t)),
-                 U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t)), 0},
-                {});
+            AscendC::DataCopyPad(tmpBuffer1, tokenPerExpert[expertOffset],
+                                 {U16(EP), U16(currentExpertNum * sizeof(int32_t)),
+                                  U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t)), 0},
+                                 {});
 
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
@@ -510,10 +526,9 @@ private:
             AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
 
-            AscendC::DataCopyPad(
-                result[expertOffset], tmpBuffer1,
-                {U16(EP), U16(currentExpertNum * sizeof(int32_t)), 0,
-                 U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t))});
+            AscendC::DataCopyPad(result[expertOffset], tmpBuffer1,
+                                 {U16(EP), U16(currentExpertNum * sizeof(int32_t)), 0,
+                                  U16((paddedExpertNumAligned - currentExpertNum) * sizeof(int32_t))});
             // The next loop reuses the same UB range for MTE2. Wait until MTE3 has consumed it.
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
@@ -1197,8 +1212,7 @@ private:
             int64_t gmOffsetD = params.layoutD1.GetOffset(offsetC);
             blockEpilogue1(gmC[gmOffsetC], shapeC, gmPermutedToken[gmOffsetD], params.epilogueCoreNum,
                            params.swigluLimit, params.activationCode, params.activationParams1,
-                           params.activationParams2,
-                           params.gmmOutPreRowStride);
+                           params.activationParams2, params.gmmOutPreRowStride);
         }
         AscendC::SyncAll<true>();
         // Synchronization signal: SwiGLU notifies GMM2 [1]
@@ -1378,9 +1392,7 @@ private:
         __gm__ float *ptrSoftFlagBase;
 
         CATLASS_DEVICE
-        WorkspaceInfo()
-        {
-        }
+        WorkspaceInfo() {}
 
         CATLASS_DEVICE
         WorkspaceInfo(const Params &params)
@@ -1434,9 +1446,7 @@ private:
         static constexpr int64_t kFlagPayloadI32 = 8;
 
         CATLASS_DEVICE
-        PeermemInfo()
-        {
-        }
+        PeermemInfo() {}
 
         CATLASS_DEVICE
         PeermemInfo(const Params &params, const HcclShmem<true> &shmem)

@@ -228,7 +228,6 @@ AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardType, IsTransposeWeight,
     handleOffset = nonLocalC.tileCnt + nonLocalC.tailCnt;
 }
 
-
 template <typename DataType1, typename DataType2, int64_t ShardType, bool IsTransposeWeight, bool IsNeedBias,
           bool IsNeedY2, bool IsNeedY3>
 __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardType, IsTransposeWeight, IsNeedBias,

@@ -57,7 +57,6 @@ __aicore__ inline void CopyGmToUbufAlignMc2(const LocalTensor<T> &dst, const Glo
     DataCopyPad(dst, src, dataCopyExtParams, dataCopyPadExtParams);
 }
 
-
 template <typename T>
 __aicore__ inline void CopyUbufToGmAlignMc2(const GlobalTensor<T> &dst, const LocalTensor<T> &src, uint16_t nBurst,
                                             uint32_t lenBurst, uint8_t leftPaddingNum, uint8_t rightPaddingNum,

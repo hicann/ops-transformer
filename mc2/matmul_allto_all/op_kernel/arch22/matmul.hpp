@@ -84,26 +84,30 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrBias_, GM_ADDR ptrC_, LayoutC layoutC_, int32_t pValue_, int32_t rankSize_,
                int32_t pipeDepth_, bool transB_)
-            : problemShape(problemShape_), ptrA(ptrA_), layoutA(layoutA_), ptrB(ptrB_), layoutB(layoutB_),
-              ptrBias(ptrBias_), ptrC(ptrC_), layoutC(layoutC_), pValue(pValue_), rankSize(rankSize_),
-              pipeDepth(pipeDepth_), transB(transB_)
-        {
-        }
+            : problemShape(problemShape_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrB(ptrB_),
+              layoutB(layoutB_),
+              ptrBias(ptrBias_),
+              ptrC(ptrC_),
+              layoutC(layoutC_),
+              pValue(pValue_),
+              rankSize(rankSize_),
+              pipeDepth(pipeDepth_),
+              transB(transB_)
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    MatmulAlltoAllKernel()
-    {
-    }
+    MatmulAlltoAllKernel() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -154,8 +158,7 @@ public:
             if (commIdx >= params.pipeDepth) {
                 WaitEvent(flagIdx);
             }
-            int64_t gmAPingpongSize =
-                static_cast<int64_t>(L1TileShape::M) * params.pValue * params.problemShape.n();
+            int64_t gmAPingpongSize = static_cast<int64_t>(L1TileShape::M) * params.pValue * params.problemShape.n();
 
             int32_t actualLoopNum = actualPValue * nLoops;
 
@@ -184,13 +187,11 @@ public:
 
                 MatrixCoord offsetA{blockIdxCoord.m() * L1TileShape::M, blockIdxCoord.k() * L1TileShape::K};
                 MatrixCoord offsetC{blockIdxCoord.m() * L1TileShape::M, blockIdxCoord.n() * L1TileShape::N};
-                int64_t gmOffsetA = params.layoutA.GetOffset(offsetA) +
-                                    static_cast<int64_t>(commIdx) * L1TileShape::M * params.pValue *
-                                        params.problemShape.k();
-                int64_t gmOffsetB =
-                    (static_cast<int64_t>(blockIdxCoord.n() / nLoopPerRank) *
-                         (params.problemShape.n() / params.rankSize) +
-                     static_cast<int64_t>(blockIdxCoord.n() % nLoopPerRank) * L1TileShape::N) *
+                int64_t gmOffsetA = params.layoutA.GetOffset(offsetA) + static_cast<int64_t>(commIdx) * L1TileShape::M *
+                                                                            params.pValue * params.problemShape.k();
+                int64_t gmOffsetB = (static_cast<int64_t>(blockIdxCoord.n() / nLoopPerRank) *
+                                         (params.problemShape.n() / params.rankSize) +
+                                     static_cast<int64_t>(blockIdxCoord.n() % nLoopPerRank) * L1TileShape::N) *
                                     (params.transB ? params.problemShape.k() : 1);
 
                 int64_t rankOffset = gmAPingpongSize / params.rankSize;
@@ -198,10 +199,10 @@ public:
                 int64_t rankOffsetInRank = blockIdxCoord.n() % nLoopPerRank;
                 int64_t gmOffsetC =
                     static_cast<int64_t>(flagIdx) * L1TileShape::M * params.pValue * params.problemShape.n() +
-                                    rankIdx * rankOffset +
-                                    static_cast<int64_t>(blockIdxCoord.m()) * L1TileShape::M *
-                                        (params.problemShape.n() / params.rankSize) +
-                                    blockIdxCoord.n() % nLoopPerRank * L1TileShape::N;
+                    rankIdx * rankOffset +
+                    static_cast<int64_t>(blockIdxCoord.m()) * L1TileShape::M *
+                        (params.problemShape.n() / params.rankSize) +
+                    blockIdxCoord.n() % nLoopPerRank * L1TileShape::N;
 
                 if constexpr (HasBias) {
                     int64_t gmOffsetBias =
@@ -235,9 +236,9 @@ public:
                                             nextBlockIdCoord.k() * L1TileShape::K};
                     MatrixCoord offsetNextB{nextBlockIdCoord.k() * L1TileShape::K,
                                             nextBlockIdCoord.n() * L1TileShape::N};
-                    int64_t gmOffsetNextA = params.layoutA.GetOffset(offsetNextA) +
-                                            static_cast<int64_t>(commIdx) * L1TileShape::M * params.pValue *
-                                                params.problemShape.k();
+                    int64_t gmOffsetNextA = params.layoutA.GetOffset(offsetNextA) + static_cast<int64_t>(commIdx) *
+                                                                                        L1TileShape::M * params.pValue *
+                                                                                        params.problemShape.k();
                     int64_t gmOffsetNextB =
                         (static_cast<int64_t>(nextBlockIdCoord.n() / nLoopPerRank) *
                              (params.problemShape.n() / params.rankSize) +

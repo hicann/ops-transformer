@@ -54,9 +54,7 @@ public:
     TBuf<TPosition::VECCALC> tempScaleBuf_;
     TBuf<TPosition::VECCALC> tempMskBuf_;
 
-    __aicore__ inline MatmulAllReduceDynamicQuantPertile()
-    {
-    }
+    __aicore__ inline MatmulAllReduceDynamicQuantPertile() {}
 
     __aicore__ inline void Init(GM_ADDR inputAddr, GM_ADDR outputAddr, uint32_t tileM, uint32_t tileN,
                                 uint32_t oneLineScaleCnt, uint32_t coreNum, uint32_t maxProcRows, bool isQuant,

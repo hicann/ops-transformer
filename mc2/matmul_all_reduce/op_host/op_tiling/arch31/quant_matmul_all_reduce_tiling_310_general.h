@@ -25,8 +25,7 @@ class QuantMatmulAllReduceTiling310General : public MatmulAllReduceTilingBase {
                                   Mc2QuantBatchMatmulV3TilingData &data)
             : Mc2QuantBatchMatmulV3Tiling(quantMatmulAllReduceTiling.context_, &data),
               tilingProcesser_(quantMatmulAllReduceTiling)
-        {
-        }
+        {}
 
         ge::graphStatus CheckInputInfo()
         {
@@ -120,9 +119,9 @@ class QuantMatmulAllReduceTiling310General : public MatmulAllReduceTilingBase {
     };
 
 public:
-    explicit QuantMatmulAllReduceTiling310General(gert::TilingContext *context) : MatmulAllReduceTilingBase(context)
-    {
-    }
+    explicit QuantMatmulAllReduceTiling310General(gert::TilingContext *context)
+        : MatmulAllReduceTilingBase(context)
+    {}
     ~QuantMatmulAllReduceTiling310General() override = default;
 
 protected:

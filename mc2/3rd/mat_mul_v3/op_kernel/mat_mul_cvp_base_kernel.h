@@ -15,14 +15,12 @@
 #ifndef __OP_KERNEL_MATMUL_V3_CVP_BASE_KERNEL__H__
 #define __OP_KERNEL_MATMUL_V3_CVP_BASE_KERNEL__H__
 
-
 #include "mat_mul_base_block.h"
 #include "mat_mul_l1_full_load.h"
 #include "mat_mul_nd2nz.h"
 
 using namespace AscendC;
 using namespace matmul;
-
 
 namespace Mc2MatmulV3 {
 
@@ -176,9 +174,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK
 class Mc2MatmulCvpBaseKernel
     : public Mc2MatmulBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB> {
 public:
-    __aicore__ inline Mc2MatmulCvpBaseKernel()
-    {
-    }
+    __aicore__ inline Mc2MatmulCvpBaseKernel() {}
 
     __aicore__ inline void InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR workspaceGM);
 
@@ -243,9 +239,9 @@ __aicore__ inline void Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE,
 
     oneBufferSize = AlignUp((aNz ? singleCoreM : singleCoreN), ALIGNED_H) * AlignUp(singleCoreK, c0Size);
     wsBufferSize = oneBufferSize * PP_GM * usedCoreNum; // 开启double buffer
-    wsGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(workspaceGM) +
-                                  GetCurrentBlockIdx() * oneBufferSize * PP_GM,
-                              static_cast<uint64_t>(oneBufferSize * PP_GM));
+    wsGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ A_T *>(workspaceGM) + GetCurrentBlockIdx() * oneBufferSize * PP_GM,
+        static_cast<uint64_t>(oneBufferSize * PP_GM));
 
     this->biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM),
                                       this->block_.matmulTilingData_->matmulTiling.N);
@@ -255,9 +251,8 @@ __aicore__ inline void Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE,
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
           class MM_CB>
-__aicore__ inline void
-Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::Process(uint64_t index,
-                                                                                              uint8_t enAtomic)
+__aicore__ inline void Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::Process(
+    uint64_t index, uint8_t enAtomic)
 {
     this->mm_.SetHF32(false, 0);
     if (this->block_.params_.isHf32) {
@@ -304,9 +299,8 @@ Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
           class MM_CB>
-__aicore__ inline void
-Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::AicProcess(uint32_t pingpong_gm,
-                                                                                                 uint8_t enAtomic)
+__aicore__ inline void Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::AicProcess(
+    uint32_t pingpong_gm, uint8_t enAtomic)
 {
     if ASCEND_IS_AIV {
         return;
@@ -334,8 +328,8 @@ Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
           class MM_CB>
-__aicore__ inline void
-Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::AivProcess(uint32_t pingpong_gm)
+__aicore__ inline void Mc2MatmulCvpBaseKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::AivProcess(
+    uint32_t pingpong_gm)
 {
     if ASCEND_IS_AIC {
         return;

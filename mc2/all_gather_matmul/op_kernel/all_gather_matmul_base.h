@@ -27,9 +27,7 @@ constexpr uint8_t MC2_DEBUG_ONLY_AICPU = 4; // 只通信不计算
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
 class AllGatherMatmulBase {
 public:
-    __aicore__ inline AllGatherMatmulBase()
-    {
-    }
+    __aicore__ inline AllGatherMatmulBase() {}
     __aicore__ inline void InitBase(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR gatherGM,
                                     GM_ADDR workspaceGM, GM_ADDR contextGM,
                                     Mc2Tiling::AllGatherMatmulTilingData *tilingData, TPipe *tPipe);
@@ -93,8 +91,8 @@ __aicore__ inline void AllGatherMatmulBase<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BN
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
-__aicore__ inline void
-AllGatherMatmulBase<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::MatmulLocalCompute(GM_ADDR aGM, GM_ADDR cGM)
+__aicore__ inline void AllGatherMatmulBase<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::MatmulLocalCompute(
+    GM_ADDR aGM, GM_ADDR cGM)
 {
     auto &&tiling = tilingData_->localTiling;
     auto &&cfg = tilingData_->param;

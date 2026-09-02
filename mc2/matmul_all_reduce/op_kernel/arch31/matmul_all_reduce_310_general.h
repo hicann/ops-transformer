@@ -34,9 +34,7 @@ template <class A_TYPE, class B_TYPE, class BIAS_TYPE, class C_TYPE, bool Mc2L2C
           AntiQuantType antiQuantType, bool hasAntiQuantOffset>
 class MatmulAllReduce310General {
 public:
-    __aicore__ inline MatmulAllReduce310General()
-    {
-    }
+    __aicore__ inline MatmulAllReduce310General() {}
     __aicore__ inline void Init(GM_ADDR workspaceGM, Mc2Tiling::RCSTiling *cfg, Mc2Tiling::Mc2Msg *msg,
                                 AscendC::tiling::TCubeTiling *tiling, HcclServer *hcclServer);
     __aicore__ inline void Process(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR dequantGM,
@@ -172,20 +170,20 @@ __aicore__ inline void MatMulEmptyTensorKernel(GM_ADDR biasGM, GM_ADDR cGM, GM_A
     }
 }
 
-#define INVOKE_MATMUL_ALL_REDUCE_OP_IMPL(templateClass, ...)                                                           \
-    do {                                                                                                               \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, matmulTiling, tiling, tilingGM);                  \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, tailTiling, tailTiling, tilingGM);                \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, msg, msg, tilingGM);                              \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, tailL2cacheTiling, tailL2cacheTiling, tilingGM);  \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, tileL2cacheTiling, tileL2cacheTiling, tilingGM);  \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, param, cfg, tilingGM);                            \
-        if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) {                                  \
-            templateClass<aType, bType, biasType, cType, __VA_ARGS__> op;                                              \
-            op.Init(workspaceGM, &cfg, &msg, &tiling, &hcclServer);                                                    \
+#define INVOKE_MATMUL_ALL_REDUCE_OP_IMPL(templateClass, ...) \
+    do { \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, matmulTiling, tiling, tilingGM); \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, tailTiling, tailTiling, tilingGM); \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, msg, msg, tilingGM); \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, tailL2cacheTiling, tailL2cacheTiling, tilingGM); \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, tileL2cacheTiling, tileL2cacheTiling, tilingGM); \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::MatmulAllReduceTilingData, param, cfg, tilingGM); \
+        if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
+            templateClass<aType, bType, biasType, cType, __VA_ARGS__> op; \
+            op.Init(workspaceGM, &cfg, &msg, &tiling, &hcclServer); \
             op.Process(aGM, bGM, biasGM, dequantGM, antiquantScaleGM, antiquantOffsetGM, cGM, workspaceGM, &cfg, &msg, \
-                       &tiling, &tailTiling, &tileL2cacheTiling, &tailL2cacheTiling, &tPipe, &hcclServer);             \
-        }                                                                                                              \
+                       &tiling, &tailTiling, &tileL2cacheTiling, &tailL2cacheTiling, &tPipe, &hcclServer); \
+        } \
     } while (0)
 } // namespace MatmulAllReduceImpl
 #endif // MATMUL_ALL_REDUCE_310_GENERAL_H

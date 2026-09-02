@@ -36,21 +36,21 @@ struct AddRMSNormTilingData {
 
 #pragma pack()
 
-#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                            \
-    __ubuf__ tilingStruct *tilingDataPointer =                                                                         \
+#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
+    __ubuf__ tilingStruct *tilingDataPointer = \
         reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
-#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                               \
+#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                                                     \
-    AddRMSNormTilingData tilingData;                                                                                   \
-    INIT_TILING_DATA(AddRMSNormTilingData, tilingDataPointer, tilingPointer);                                          \
-    (tilingData).numRow = tilingDataPointer->numRow;                                                                   \
-    (tilingData).numCol = tilingDataPointer->numCol;                                                                   \
-    (tilingData).blockFactor = tilingDataPointer->blockFactor;                                                         \
-    (tilingData).rowDactor = tilingDataPointer->rowDactor;                                                             \
-    (tilingData).ubFactor = tilingDataPointer->ubFactor;                                                               \
-    (tilingData).epsilon = tilingDataPointer->epsilon;                                                                 \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    AddRMSNormTilingData tilingData; \
+    INIT_TILING_DATA(AddRMSNormTilingData, tilingDataPointer, tilingPointer); \
+    (tilingData).numRow = tilingDataPointer->numRow; \
+    (tilingData).numCol = tilingDataPointer->numCol; \
+    (tilingData).blockFactor = tilingDataPointer->blockFactor; \
+    (tilingData).rowDactor = tilingDataPointer->rowDactor; \
+    (tilingData).ubFactor = tilingDataPointer->ubFactor; \
+    (tilingData).epsilon = tilingDataPointer->epsilon; \
     (tilingData).avgFactor = tilingDataPointer->avgFactor;
 #endif

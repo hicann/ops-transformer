@@ -32,9 +32,7 @@ using AscendC::MmadParams;
 template <bool hasAntiqOffset>
 class Mc2WeightQuantBatchMatmulV2FixpipeStage1 {
 public:
-    __aicore__ inline Mc2WeightQuantBatchMatmulV2FixpipeStage1()
-    {
-    }
+    __aicore__ inline Mc2WeightQuantBatchMatmulV2FixpipeStage1() {}
 
     __aicore__ inline void Init(const LocalTensor<int8_t> &weightS8L0a, const LocalTensor<int8_t> &diagS8L0b,
                                 const LocalTensor<int32_t> &antiqOffsetBT, const LocalTensor<uint64_t> &antiqScaleFP,

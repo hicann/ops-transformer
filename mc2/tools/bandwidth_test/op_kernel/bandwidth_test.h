@@ -275,7 +275,6 @@ __aicore__ inline void BandwidthTest<TemplateBandwidthTestTypeFunc>::SplitToCore
     endTokenId = startTokenId + sendTokenNum;
 }
 
-
 template <TemplateBandwidthTestTypeClass>
 __aicore__ inline void BandwidthTest<TemplateBandwidthTestTypeFunc>::ProcessToken(GlobalTensor<XType> &outTokenGT,
                                                                                   uint32_t tokenIndex)

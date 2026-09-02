@@ -54,21 +54,19 @@ struct GemvCoord : public Coord<2, uint32_t> {
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    GemvCoord()
-    {
-    }
+    GemvCoord() {}
 
     /// Constructs from Coord<2> and a batch
     CATLASS_HOST_DEVICE
-    GemvCoord(Coord<2, Index> const &coord) : Base(coord)
-    {
-    }
+    GemvCoord(Coord<2, Index> const &coord)
+        : Base(coord)
+    {}
 
     /// Helper to construct from M, N coordinates
     CATLASS_HOST_DEVICE
-    GemvCoord(Index m, Index n) : Base(MakeCoord(m, n))
-    {
-    }
+    GemvCoord(Index m, Index n)
+        : Base(MakeCoord(m, n))
+    {}
 
     /// Returns the GEMV M coordinate (row of the result y)
     CATLASS_HOST_DEVICE

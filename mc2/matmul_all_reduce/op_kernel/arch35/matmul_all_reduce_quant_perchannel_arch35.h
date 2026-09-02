@@ -34,9 +34,7 @@ constexpr uint32_t BYTE512_MATMUL_ALLREDUCE_INT8 = 512;
 template <class T>
 class MatmulAllReduceQuantPerchannel {
 public:
-    __aicore__ inline MatmulAllReduceQuantPerchannel()
-    {
-    }
+    __aicore__ inline MatmulAllReduceQuantPerchannel() {}
     __aicore__ inline void Init(TPipe *tPipe, uint32_t quantUbSize)
     {
         pipe_ = tPipe;

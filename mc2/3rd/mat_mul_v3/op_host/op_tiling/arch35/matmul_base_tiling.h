@@ -22,7 +22,9 @@
 namespace optiling {
 class Mc2MatMulBaseTiling {
 public:
-    Mc2MatMulBaseTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg) : context_(context), cfg_(cfg) {};
+    Mc2MatMulBaseTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+        : context_(context),
+          cfg_(cfg) {};
 
     virtual ~Mc2MatMulBaseTiling() {};
 

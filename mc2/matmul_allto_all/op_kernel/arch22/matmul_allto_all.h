@@ -54,7 +54,7 @@ using namespace Catlass;
 namespace Mc2Kernel {
 
 // MMA2A : MatmulAlltoAll
-#define TemplateMMA2AClass                                                                                             \
+#define TemplateMMA2AClass \
     typename AType, typename BType, typename BiasType, typename pertokenScaleType, typename scaleType, typename cType, \
         bool hasBias, bool TB
 #define TemplateMMA2AFunc AType, BType, BiasType, pertokenScaleType, scaleType, cType, hasBias, TB
@@ -100,7 +100,6 @@ private:
     bool TA;
     static constexpr bool has_bias = hasBias;
 };
-
 
 template <TemplateMMA2AClass>
 __aicore__ inline void MatmulAlltoAll<TemplateMMA2AFunc>::Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM,
@@ -409,9 +408,8 @@ __aicore__ inline void MatmulAlltoAll<TemplateMMA2AFunc>::Process()
 
                 int64_t token_total = static_cast<int64_t>(commUtil.p_value) * commUtil.m0 * commUtil.n;
                 if (commIdx == commCount - 1) {
-                    token_total = (commUtil.m -
-                                   static_cast<int64_t>(commIdx) * commUtil.m0 * commUtil.p_value) *
-                                  commUtil.n;
+                    token_total =
+                        (commUtil.m - static_cast<int64_t>(commIdx) * commUtil.m0 * commUtil.p_value) * commUtil.n;
                 }
                 int64_t token_per_rank = token_total / rank_size;
 
@@ -426,9 +424,9 @@ __aicore__ inline void MatmulAlltoAll<TemplateMMA2AFunc>::Process()
                 if (commUtil.aiv_idx == 0 && commUtil.core_idx < rank_size) {
                     int64_t src_offset = static_cast<int64_t>(flag_idx) * commUtil.gm_a_pingpong_size +
                                          commUtil.gm_a_pingpong_size / rank_size * rank;
-                    int64_t dst_offset = commUtil.core_idx * rank_offset +
-                                         static_cast<int64_t>(commIdx) * commUtil.m0 * commUtil.p_value *
-                                         (commUtil.n / rank_size);
+                    int64_t dst_offset = commUtil.core_idx * rank_offset + static_cast<int64_t>(commIdx) * commUtil.m0 *
+                                                                               commUtil.p_value *
+                                                                               (commUtil.n / rank_size);
                     commUtil.CopyGMToGM((__gm__ cType *)commUtil.buff[commUtil.core_idx] + src_offset,
                                         reinterpret_cast<__gm__ cType *>(cGM_) + dst_offset, token_per_rank);
                 }

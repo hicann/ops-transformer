@@ -29,9 +29,7 @@ struct TileCast {
     using TileShape = TileShape_;
 
     CATLASS_DEVICE
-    TileCast()
-    {
-    }
+    TileCast() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementDst> const &ubOut, AscendC::LocalTensor<ElementSrc> const &ubIn)

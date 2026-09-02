@@ -122,8 +122,7 @@ namespace Mc2Kernel {
 using MoeEpDispatchBase::GetCommHandle;
 using MoeEpDispatchBase::GetExpertFreq;
 
-__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId,
-                                             uint64_t offset)
+__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId, uint64_t offset)
 {
     return MoeEpDispatchBase::GetWindowAddrByRankId(context, rankId, offset);
 }

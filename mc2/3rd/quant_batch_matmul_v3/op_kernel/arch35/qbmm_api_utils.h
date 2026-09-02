@@ -18,7 +18,6 @@
 #include "../quant_batch_matmul_v3_base.h"
 #include "qbmm_asw_block.h"
 
-
 namespace Mc2QuantBatchMatmulV3 {
 
 using namespace AscendC;

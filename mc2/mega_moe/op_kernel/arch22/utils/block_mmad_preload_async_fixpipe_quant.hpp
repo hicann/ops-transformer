@@ -24,7 +24,6 @@
 #include "../template_linear_algebra_v2/gemm/mega_moe_gemm_helper.hpp"
 #include "dispatch_policy_custom.hpp"
 
-
 namespace Catlass::Gemm::Block {
 
 template <AscendC::HardEvent event>

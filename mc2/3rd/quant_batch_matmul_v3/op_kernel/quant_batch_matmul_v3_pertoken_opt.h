@@ -24,9 +24,7 @@ template <typename xType, typename wType, int fFormat, int wFormat, typename sca
           bool bTrans, bool isAllAiv = false>
 class BmmDequantPertokenOpt {
 public:
-    __aicore__ inline BmmDequantPertokenOpt()
-    {
-    }
+    __aicore__ inline BmmDequantPertokenOpt() {}
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scale, GM_ADDR pertokenScale, GM_ADDR y,
                                 GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData,
                                 TPipe *tPipe)

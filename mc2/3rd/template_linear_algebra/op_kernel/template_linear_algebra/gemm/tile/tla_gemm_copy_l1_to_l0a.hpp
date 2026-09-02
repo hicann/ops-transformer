@@ -15,7 +15,6 @@
 #include "../../layout/tla_layout_layout.hpp"
 #include "../../gemm/tla_gemm_gemm_type.hpp"
 
-
 namespace Catlass::Gemm::Tile {
 
 template <class ArchTag, class L1Type, class L0Type = void>
@@ -35,9 +34,7 @@ struct CopyL1ToL0A<ArchTag, Catlass::Gemm::GemmType<Element, layout::zN, AscendC
     static constexpr uint32_t ELE_NUM_PER_FRCATLASSAL = BytesToBits(BYTE_PER_FRCATLASSAL) / SizeOfBits<Element>::value;
 
     CATLASS_DEVICE
-    CopyL1ToL0A()
-    {
-    }
+    CopyL1ToL0A() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
@@ -67,9 +64,7 @@ struct CopyL1ToL0A<ArchTag, Catlass::Gemm::GemmType<Element, layout::nN, AscendC
     static constexpr uint32_t ELE_NUM_PER_C0 = BytesToBits(BYTE_PER_C0) / SizeOfBits<Element>::value;
 
     CATLASS_DEVICE
-    CopyL1ToL0A()
-    {
-    }
+    CopyL1ToL0A() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
@@ -100,9 +95,7 @@ struct CopyL1ToL0A<ArchTag, Catlass::Gemm::GemmType<float, layout::nN, AscendC::
     static constexpr uint32_t ELE_NUM_PER_C0 = BytesToBits(BYTE_PER_C0) / SizeOfBits<Element>::value;
 
     CATLASS_DEVICE
-    CopyL1ToL0A()
-    {
-    }
+    CopyL1ToL0A() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
@@ -131,9 +124,7 @@ struct CopyL1ToL0A<ArchTag, Catlass::Gemm::GemmType<int8_t, layout::nZ, AscendC:
     static constexpr uint32_t ELE_NUM_PER_C0 = BytesToBits(BYTE_PER_C0) / SizeOfBits<Element>::value;
 
     CATLASS_DEVICE
-    CopyL1ToL0A()
-    {
-    }
+    CopyL1ToL0A() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,

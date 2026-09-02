@@ -84,9 +84,7 @@ public:
 
         // Methods
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
@@ -94,20 +92,31 @@ public:
                LayoutA layoutPeerMem_, GM_ADDR ptrWorkSpace_, int32_t pValue_, int32_t swizzlCount_,
                int32_t swizzlDirect_, int32_t rankIdx_, int32_t rankSize_, bool needFixpipe_,
                bool accumWorkSpacePingPong_)
-            : problemShape(problemShape_), ptrA(ptrA_), layoutA(layoutA_), ptrB(ptrB_), layoutB(layoutB_), ptrC(ptrC_),
-              layoutC(layoutC_), ptrScale(ptrScale_), layoutScale(layoutScale_), ptrPeerMem(ptrPeerMem_),
-              layoutPeerMem(layoutPeerMem_), ptrWorkSpace(ptrWorkSpace_), pValue(pValue_), swizzlCount(swizzlCount_),
-              swizzlDirect(swizzlDirect_), rankIdx(rankIdx_), rankSize(rankSize_), needFixpipe(needFixpipe_),
+            : problemShape(problemShape_),
+              ptrA(ptrA_),
+              layoutA(layoutA_),
+              ptrB(ptrB_),
+              layoutB(layoutB_),
+              ptrC(ptrC_),
+              layoutC(layoutC_),
+              ptrScale(ptrScale_),
+              layoutScale(layoutScale_),
+              ptrPeerMem(ptrPeerMem_),
+              layoutPeerMem(layoutPeerMem_),
+              ptrWorkSpace(ptrWorkSpace_),
+              pValue(pValue_),
+              swizzlCount(swizzlCount_),
+              swizzlDirect(swizzlDirect_),
+              rankIdx(rankIdx_),
+              rankSize(rankSize_),
+              needFixpipe(needFixpipe_),
               accumWorkSpacePingPong(accumWorkSpacePingPong_)
-        {
-        }
+        {}
     };
 
     // Methods
     CATLASS_DEVICE
-    AllGatherMatmulV2()
-    {
-    }
+    AllGatherMatmulV2() {}
 
     template <int32_t CORE_TYPE = g_coreType>
     CATLASS_DEVICE void operator()(Params const &params);
@@ -385,10 +394,9 @@ public:
                 uint64_t gmOffsetB = params.layoutB.GetOffset(offsetB);
                 int64_t gmOffsetC = dstBlockIdx * mnSize + calIdx * outputBlockSize + params.layoutC.GetOffset(offsetC);
                 if (params.accumWorkSpacePingPong) {
-                    gmOffsetC =
-                        (static_cast<int64_t>(dstBlockIdx) + static_cast<int64_t>(flagIdx) * params.rankSize) *
-                            outputBlockSize +
-                        params.layoutC.GetOffset(offsetC);
+                    gmOffsetC = (static_cast<int64_t>(dstBlockIdx) + static_cast<int64_t>(flagIdx) * params.rankSize) *
+                                    outputBlockSize +
+                                params.layoutC.GetOffset(offsetC);
                 }
 
                 AscendC::GlobalTensor<ElementA> gmAIn = gmPeerMem;

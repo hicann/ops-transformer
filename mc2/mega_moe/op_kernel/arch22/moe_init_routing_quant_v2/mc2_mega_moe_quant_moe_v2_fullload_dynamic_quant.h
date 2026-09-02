@@ -319,11 +319,12 @@ __aicore__ inline void MoeV2FullLoadDynamicQuant<T>::CopyOutXQuant1H()
 }
 
 template <typename T>
-__aicore__ inline void
-MoeV2FullLoadDynamicQuant<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-                                   GM_ADDR expertTokensCountOrCumsum, GM_ADDR quantSmooth, GM_ADDR dynamicQuantScale,
-                                   GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData *tilingData, TPipe *tPipe,
-                                   int64_t colsAlign)
+__aicore__ inline void MoeV2FullLoadDynamicQuant<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR expandedX,
+                                                          GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
+                                                          GM_ADDR quantSmooth, GM_ADDR dynamicQuantScale,
+                                                          GM_ADDR workspace,
+                                                          const MoeInitRoutingQuantV2TilingData *tilingData,
+                                                          TPipe *tPipe, int64_t colsAlign)
 {
     this->gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     // this->blockIdx_ = GetBlockIdx();

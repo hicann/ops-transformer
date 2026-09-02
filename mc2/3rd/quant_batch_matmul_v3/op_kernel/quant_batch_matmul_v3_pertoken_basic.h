@@ -22,9 +22,7 @@ namespace AscendC {
 template <TemplateBasicType>
 class BmmDequantPertokenBasic {
 public:
-    __aicore__ inline BmmDequantPertokenBasic()
-    {
-    }
+    __aicore__ inline BmmDequantPertokenBasic() {}
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale, GM_ADDR bias, GM_ADDR pertokenScale, GM_ADDR y,
                                 GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData,
                                 TPipe *tPipe)
@@ -296,9 +294,9 @@ private:
             LocalTensor<uint8_t> tmpLocal = vecQueTmp_.Get<uint8_t>();
             // datacopypad 32B aligned
             DequantBmm::SetGm2UbParams(gm2UbParams, curAivM, curAivN);
-            DequantBmm::CopyMmOutToLocal(srcLocal, curMmOutGm, gm2UbParams, padParams,
-                                         offsetWorkspaceC_ + mUbLoopIdx * ubCalcM_ * curAicN +
-                                             subBlockoffset * curAicN);
+            DequantBmm::CopyMmOutToLocal(
+                srcLocal, curMmOutGm, gm2UbParams, padParams,
+                offsetWorkspaceC_ + mUbLoopIdx * ubCalcM_ * curAicN + subBlockoffset * curAicN);
 
             if (biasDtype_ != DT_INT32) {
                 BiasTensorInit(dstLocalFp32, biasFp32, oriBiasBf16, oriBiasFp16, oriBiasFp32);

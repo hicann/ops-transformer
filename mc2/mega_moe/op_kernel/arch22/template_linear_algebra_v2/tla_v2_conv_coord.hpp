@@ -44,11 +44,12 @@ public:
                  Index strideH = 1, Index strideW = 1, Index dilationD = 1, Index dilationH = 1, Index dilationW = 1)
         : fmap6HDShape_(MakeCoord(BATCH, Di, Cin1, Hi, Wi, C0)),
           filterFracZ3DShape_(MakeCoord(Kd, Cin1, Kh, Kw, N1, N0, C0)),
-          out6HDShape_(MakeCoord(BATCH, Do, Cout1, Ho, Wo, C0)), cout_(Cout),
-          pads_(MakeCoord(padHead, padTop, padLeft)), strides_(MakeCoord(strideD, strideH, strideW)),
+          out6HDShape_(MakeCoord(BATCH, Do, Cout1, Ho, Wo, C0)),
+          cout_(Cout),
+          pads_(MakeCoord(padHead, padTop, padLeft)),
+          strides_(MakeCoord(strideD, strideH, strideW)),
           dilations_(MakeCoord(dilationD, dilationH, dilationW))
-    {
-    }
+    {}
 
     CATLASS_HOST_DEVICE
     static Conv3dParams MakeConvCoord(const uint32_t *fmapShape, const uint32_t *filterShape, const uint32_t *paddings,
@@ -63,7 +64,6 @@ public:
             CeilDiv(filterShape[3], fmapShape[5]), filterShape[3], paddings[0], paddings[1], paddings[2], strides[0],
             strides[1], strides[2], dilations[0], dilations[1], dilations[2]);
     }
-
 
     // fmapShape
     CATLASS_HOST_DEVICE
@@ -365,19 +365,17 @@ struct Conv3d6HdCoord : public Coord<4, uint32_t> {
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    Conv3d6HdCoord()
-    {
-    }
+    Conv3d6HdCoord() {}
 
     CATLASS_HOST_DEVICE
-    Conv3d6HdCoord(Coord<4, Index> const &coord) : Base(coord)
-    {
-    }
+    Conv3d6HdCoord(Coord<4, Index> const &coord)
+        : Base(coord)
+    {}
 
     CATLASS_HOST_DEVICE
-    Conv3d6HdCoord(Index n, Index d, Index c1, Index hw) : Base(MakeCoord(n, d, c1, hw))
-    {
-    }
+    Conv3d6HdCoord(Index n, Index d, Index c1, Index hw)
+        : Base(MakeCoord(n, d, c1, hw))
+    {}
 
     CATLASS_HOST_DEVICE
     Index const &n() const
@@ -434,14 +432,12 @@ struct Conv3dFracZ3dCoord : public Coord<2, uint32_t> {
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    Conv3dFracZ3dCoord()
-    {
-    }
+    Conv3dFracZ3dCoord() {}
 
     CATLASS_HOST_DEVICE
-    Conv3dFracZ3dCoord(Index kdc1khkw, Index n1) : Base(MakeCoord(kdc1khkw, n1))
-    {
-    }
+    Conv3dFracZ3dCoord(Index kdc1khkw, Index n1)
+        : Base(MakeCoord(kdc1khkw, n1))
+    {}
 
     CATLASS_HOST_DEVICE
     Index const &kdc1khkw() const
@@ -531,27 +527,24 @@ public:
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    Conv2dFmapCoord()
-    {
-    }
+    Conv2dFmapCoord() {}
 
     /// Constructs from Coord<5>
     CATLASS_HOST_DEVICE
-    Conv2dFmapCoord(Coord<5, Index> const &coord) : Base(coord)
-    {
-    }
+    Conv2dFmapCoord(Coord<5, Index> const &coord)
+        : Base(coord)
+    {}
 
     /// Helper to construct from C1, H, W, C0
     CATLASS_HOST_DEVICE
-    Conv2dFmapCoord(Index batch, Index c1, Index h, Index w, Index c0) : Base(MakeCoord(batch, c1, h, w, c0))
-    {
-    }
+    Conv2dFmapCoord(Index batch, Index c1, Index h, Index w, Index c0)
+        : Base(MakeCoord(batch, c1, h, w, c0))
+    {}
 
     CATLASS_HOST_DEVICE
     Conv2dFmapCoord(LongIndex batch, LongIndex c1, LongIndex h, LongIndex w, LongIndex c0)
         : Base(MakeCoord(Index(batch), Index(c1), Index(h), Index(w), Index(c0)))
-    {
-    }
+    {}
 
     CATLASS_HOST_DEVICE
     Index const &c1() const
@@ -644,27 +637,24 @@ public:
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    Conv2dFilterCoord()
-    {
-    }
+    Conv2dFilterCoord() {}
 
     /// Constructs from Coord<5>
     CATLASS_HOST_DEVICE
-    Conv2dFilterCoord(Coord<5, Index> const &coord) : Base(coord)
-    {
-    }
+    Conv2dFilterCoord(Coord<5, Index> const &coord)
+        : Base(coord)
+    {}
 
     /// Helper to construct from Cin1, Kh, Kw, Cout, C0
     CATLASS_HOST_DEVICE
-    Conv2dFilterCoord(Index cin1, Index kh, Index kw, Index cout, Index c0) : Base(MakeCoord(cin1, kh, kw, cout, c0))
-    {
-    }
+    Conv2dFilterCoord(Index cin1, Index kh, Index kw, Index cout, Index c0)
+        : Base(MakeCoord(cin1, kh, kw, cout, c0))
+    {}
 
     CATLASS_HOST_DEVICE
     Conv2dFilterCoord(LongIndex cin1, LongIndex kh, LongIndex kw, LongIndex cout, LongIndex c0)
         : Base(MakeCoord(Index(cin1), Index(kh), Index(kw), Index(cout), Index(c0)))
-    {
-    }
+    {}
 
     CATLASS_HOST_DEVICE
     Index const &cin1() const
@@ -755,26 +745,24 @@ public:
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    Conv2dHoWoCoCoord()
-    {
-    }
+    Conv2dHoWoCoCoord() {}
 
     /// Constructs from Coord<3>
     CATLASS_HOST_DEVICE
-    Conv2dHoWoCoCoord(Coord<3, Index> const &coord) : Base(coord)
-    {
-    }
+    Conv2dHoWoCoCoord(Coord<3, Index> const &coord)
+        : Base(coord)
+    {}
 
     /// Helper to construct from Ho, Wo, Cout
     CATLASS_HOST_DEVICE
-    Conv2dHoWoCoCoord(Index ho, Index wo, Index cout) : Base(MakeCoord(ho, wo, cout))
-    {
-    }
+    Conv2dHoWoCoCoord(Index ho, Index wo, Index cout)
+        : Base(MakeCoord(ho, wo, cout))
+    {}
 
     CATLASS_HOST_DEVICE
-    Conv2dHoWoCoCoord(LongIndex ho, LongIndex wo, LongIndex cout) : Base(MakeCoord(Index(ho), Index(wo), Index(cout)))
-    {
-    }
+    Conv2dHoWoCoCoord(LongIndex ho, LongIndex wo, LongIndex cout)
+        : Base(MakeCoord(Index(ho), Index(wo), Index(cout)))
+    {}
 
     CATLASS_HOST_DEVICE
     Index const &ho() const
@@ -854,27 +842,24 @@ public:
 
     /// Default ctor
     CATLASS_HOST_DEVICE
-    Conv2dCoord()
-    {
-    }
+    Conv2dCoord() {}
 
     /// Constructs from Coord<5>
     CATLASS_HOST_DEVICE
-    Conv2dCoord(Coord<5, Index> const &coord) : Base(coord)
-    {
-    }
+    Conv2dCoord(Coord<5, Index> const &coord)
+        : Base(coord)
+    {}
 
     /// Helper to construct from Batch, H, W, Cout, Cin1
     CATLASS_HOST_DEVICE
-    Conv2dCoord(Index batch, Index h, Index w, Index cout, Index cin1) : Base(MakeCoord(batch, h, w, cout, cin1))
-    {
-    }
+    Conv2dCoord(Index batch, Index h, Index w, Index cout, Index cin1)
+        : Base(MakeCoord(batch, h, w, cout, cin1))
+    {}
 
     CATLASS_HOST_DEVICE
     Conv2dCoord(LongIndex batch, LongIndex h, LongIndex w, LongIndex cout, LongIndex cin1)
         : Base(MakeCoord(Index(batch), Index(h), Index(w), Index(cout), Index(cin1)))
-    {
-    }
+    {}
 
     CATLASS_HOST_DEVICE
     Index const &batch() const
@@ -973,10 +958,11 @@ public:
     Conv2dFilterParams(ShortIndex kh = 0, ShortIndex kw = 0, ShortIndex padLeft = 0, ShortIndex padRight = 0,
                        ShortIndex padTop = 0, ShortIndex padBottom = 0, ShortIndex strideH = 0, ShortIndex strideW = 0,
                        ShortIndex dilationH = 0, ShortIndex dilationW = 0)
-        : ks(MakeCoord(kh, kw)), pads(MakeCoord(padLeft, padRight, padTop, padBottom)),
-          strides(MakeCoord(strideH, strideW)), dilations(MakeCoord(dilationH, dilationW))
-    {
-    }
+        : ks(MakeCoord(kh, kw)),
+          pads(MakeCoord(padLeft, padRight, padTop, padBottom)),
+          strides(MakeCoord(strideH, strideW)),
+          dilations(MakeCoord(dilationH, dilationW))
+    {}
 
     CATLASS_HOST_DEVICE
     ShortIndex const &kh() const
@@ -1108,9 +1094,7 @@ private:
 public:
     /// Default ctor
     CATLASS_HOST_DEVICE
-    Conv2dParams()
-    {
-    }
+    Conv2dParams() {}
 
     CATLASS_HOST_DEVICE
     Conv2dParams(Index batch, Index hi, Index wi, Index cin, Index cout, ShortIndex kh, ShortIndex kw,

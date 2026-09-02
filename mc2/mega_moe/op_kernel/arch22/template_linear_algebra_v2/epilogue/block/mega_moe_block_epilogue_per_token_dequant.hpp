@@ -93,14 +93,18 @@ public:
         Params(__gm__ ElementScale *ptrScale_, LayoutScale const &layoutScale_,
                __gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
                __gm__ ElementD *ptrD_, LayoutD const &layoutD_)
-            : ptrScale(ptrScale_), layoutScale(layoutScale_), ptrPerTokenScale(ptrPerTokenScale_),
-              layoutPerTokenScale(layoutPerTokenScale_), ptrD(ptrD_), layoutD(layoutD_)
-        {
-        }
+            : ptrScale(ptrScale_),
+              layoutScale(layoutScale_),
+              ptrPerTokenScale(ptrPerTokenScale_),
+              layoutPerTokenScale(layoutPerTokenScale_),
+              ptrD(ptrD_),
+              layoutD(layoutD_)
+        {}
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{}) : params(params)
+    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+        : params(params)
     {
         size_t ubOffset = 0;
         int32_t eventVMTE2 = 0;
@@ -377,14 +381,18 @@ public:
         Params(__gm__ ElementScale *ptrScale_, LayoutScale const &layoutScale_,
                __gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
                __gm__ ElementD *ptrD_, LayoutD const &layoutD_)
-            : ptrScale(ptrScale_), layoutScale(layoutScale_), ptrPerTokenScale(ptrPerTokenScale_),
-              layoutPerTokenScale(layoutPerTokenScale_), ptrD(ptrD_), layoutD(layoutD_)
-        {
-        }
+            : ptrScale(ptrScale_),
+              layoutScale(layoutScale_),
+              ptrPerTokenScale(ptrPerTokenScale_),
+              layoutPerTokenScale(layoutPerTokenScale_),
+              ptrD(ptrD_),
+              layoutD(layoutD_)
+        {}
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{}) : params(params)
+    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+        : params(params)
     {
         size_t ubOffset = 0;
         int32_t eventVMTE2 = 0;

@@ -20,7 +20,8 @@ namespace Mc2Kernel {
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
 class AlltoAllKcQuantMatmulArch35 {
 public:
-    __aicore__ inline AlltoAllKcQuantMatmulArch35(SchedulerType *pipeLine) : pipeLine_(pipeLine){};
+    __aicore__ inline AlltoAllKcQuantMatmulArch35(SchedulerType *pipeLine)
+        : pipeLine_(pipeLine){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out,
                                 GM_ADDR smooth_scale, GM_ADDR x2_scale, GM_ADDR x2_offset, GM_ADDR workspaceGM,
                                 AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe);
@@ -98,9 +99,8 @@ AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulT
 }
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
-__aicore__ inline void
-AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::ProcessTile(
-    uint32_t taskCnt)
+__aicore__ inline void AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType,
+                                                   AlltoAllMatmulTilingDataType>::ProcessTile(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     // 复用的变量
@@ -154,9 +154,8 @@ AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulT
 }
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
-__aicore__ inline void
-AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::ProcessTail(
-    uint32_t taskCnt)
+__aicore__ inline void AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType,
+                                                   AlltoAllMatmulTilingDataType>::ProcessTail(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     uint64_t tailMMultiRankK = (uint64_t)mc2Tiling_.tailM * (uint64_t)mc2Tiling_.rankK;

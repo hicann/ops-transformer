@@ -129,5 +129,4 @@ private:
 };
 } // namespace optiling
 
-
 #endif //__QUANT_BMM_REDUCE_SCATTER_TILING_H__

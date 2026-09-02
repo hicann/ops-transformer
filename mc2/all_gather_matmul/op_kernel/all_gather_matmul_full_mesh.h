@@ -22,9 +22,7 @@ namespace AscendC {
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
 class AllGatherMatmulFullMesh : public AllGatherMatmulBase<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float> {
 public:
-    __aicore__ inline AllGatherMatmulFullMesh()
-    {
-    }
+    __aicore__ inline AllGatherMatmulFullMesh() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR gatherGM,
                                 GM_ADDR workspaceGM, GM_ADDR contextGM,
                                 Mc2Tiling::AllGatherMatmulTilingData *tilingData, __gm__ void *mc2InitTiling,
@@ -128,10 +126,11 @@ __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
-__aicore__ inline void
-AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::MatmulKernelCompute(
-    GM_ADDR aGM, GM_ADDR cGM, TCubeTiling &tiling, Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
-    uint32_t tileCnt)
+__aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz,
+                                               Bias2Float>::MatmulKernelCompute(GM_ADDR aGM, GM_ADDR cGM,
+                                                                                TCubeTiling &tiling,
+                                                                                Mc2Tiling::TileL2Tiling &l2Tiling,
+                                                                                HcclHandle &handleId, uint32_t tileCnt)
 {
     using A_T = typename A_TYPE::T;
     using C_T = typename C_TYPE::T;
@@ -207,10 +206,11 @@ AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
-__aicore__ inline void
-AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::MatmulKernelGather(
-    GM_ADDR aGM, GM_ADDR cGM, TCubeTiling &tiling, Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
-    uint32_t tileCnt)
+__aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz,
+                                               Bias2Float>::MatmulKernelGather(GM_ADDR aGM, GM_ADDR cGM,
+                                                                               TCubeTiling &tiling,
+                                                                               Mc2Tiling::TileL2Tiling &l2Tiling,
+                                                                               HcclHandle &handleId, uint32_t tileCnt)
 {
     if (GetBlockIdx() >= tiling.usedCoreNum) {
         return;

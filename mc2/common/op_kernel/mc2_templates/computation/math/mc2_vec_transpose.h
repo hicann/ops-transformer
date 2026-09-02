@@ -36,7 +36,8 @@ struct MC2TransposeContext {
 template <typename transposeDataType>
 class MC2VecTranspose {
 public:
-    __aicore__ inline MC2VecTranspose(TPipe *tPipe) : tPipe_(tPipe){};
+    __aicore__ inline MC2VecTranspose(TPipe *tPipe)
+        : tPipe_(tPipe){};
     __aicore__ inline MC2TransposeContext *GetContextPtr();
     __aicore__ inline void Init() {};
     __aicore__ inline void Process(uint32_t taskIndex);
@@ -218,7 +219,7 @@ __aicore__ inline void MC2VecTranspose<transposeDataType>::Destroy()
 
 // 使用vec_trans算子作为计算节点的计算实现
 #ifndef DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION
-#define DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION(TransposeDataType, TransposeType)                                    \
+#define DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION(TransposeDataType, TransposeType) \
     using TransposeType = MC2KernelTemplate::MC2VecTranspose<TransposeDataType>
 #endif
 } // namespace MC2KernelTemplate

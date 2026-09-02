@@ -111,15 +111,10 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2CustomKernel<
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2CustomKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                        hasAntiQuantOffset, quantType>::UpdateGlobalAddr(GM_ADDR x, GM_ADDR weight,
-                                                                                         GM_ADDR antiquantScale,
-                                                                                         GM_ADDR antiquantOffset,
-                                                                                         GM_ADDR quantScale,
-                                                                                         GM_ADDR quantOffset,
-                                                                                         GM_ADDR bias, GM_ADDR y,
-                                                                                         GM_ADDR workspace)
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2CustomKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset,
+    quantType>::UpdateGlobalAddr(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
+                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace)
 {
     this->InitInput(x, weight, antiquantScale, antiquantOffset, quantScale, quantOffset, bias, y);
     this->InitWorkSpace(workspace);
@@ -127,9 +122,8 @@ Mc2WeightQuantBatchMatmulV2CustomKernel<xType, wType, biasType, yType, aTrans, b
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2CustomKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                        hasAntiQuantOffset, quantType>::ProcessVector()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2CustomKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::ProcessVector()
 {
     uint64_t nBaseSize = this->tiling_->matmulTiling.singleCoreN * this->tiling_->cubeBlockDimN;
     uint64_t nRealSize = nBaseSize;
@@ -238,9 +232,8 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2CustomKernel<
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2CustomKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                        hasAntiQuantOffset, quantType>::NotifyCube()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2CustomKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::NotifyCube()
 {
     this->WaitFlagDevLocal(this->SYNC_AIV_ONLY_ALL_FLAG);
 
@@ -249,9 +242,8 @@ Mc2WeightQuantBatchMatmulV2CustomKernel<xType, wType, biasType, yType, aTrans, b
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatmulV2CustomKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                        hasAntiQuantOffset, quantType>::ProcessCube()
+__aicore__ inline void Mc2WeightQuantBatchMatmulV2CustomKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType>::ProcessCube()
 {
     uint64_t mOffset = this->cubeMDimIdx_ * this->tiling_->matmulTiling.singleCoreM;
     uint64_t aOffset = mOffset;

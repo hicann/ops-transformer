@@ -20,9 +20,7 @@ namespace AscendC {
 namespace MC2 {
 class MatmulBlockL2Cache : public MatmulBlock {
 public:
-    __aicore__ inline MatmulBlockL2Cache()
-    {
-    }
+    __aicore__ inline MatmulBlockL2Cache() {}
     __aicore__ inline void Init(AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg,
                                 Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling);
     __aicore__ inline void UpdateBlockIndex();

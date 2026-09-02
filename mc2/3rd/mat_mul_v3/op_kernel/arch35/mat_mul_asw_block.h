@@ -73,9 +73,7 @@ struct AswBlockArgs {
 
 class Mc2MatmulAswBlock {
 public:
-    __aicore__ inline Mc2MatmulAswBlock()
-    {
-    }
+    __aicore__ inline Mc2MatmulAswBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void Init(const void *tilingData);
     template <class A_TYPE, class B_TYPE>

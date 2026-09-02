@@ -48,7 +48,6 @@ TILING_DATA_FIELD_DEF_ARR(uint8_t, 8, reserved); // 保留字段
 END_TILING_DATA_DEF;                             // 16 bytes
 REGISTER_TILING_DATA_CLASS(MC2ServerCfgOp, MC2ServerCfg)
 
-
 /**
  * @deprecated MC2HcommCfg 结构体在后续版本中将不再支持，请不要使用
  */

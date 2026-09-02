@@ -191,43 +191,43 @@ std::string Mc2DoPrintData(const GlobalTensor<half> &tensor, size_t count, size_
     return oss.str();
 }
 
-#define PRINT_DATA(data, count, stride, elementsPerRow, format, ...)                                                   \
-    do {                                                                                                               \
-        uint64_t coreId = AscendC::GetBlockIdx();                                                                      \
-        std::string core_type = "";                                                                                    \
-        std::string block_id = "Block_";                                                                               \
-        if (g_coreType == AscendC::AIC_TYPE) {                                                                         \
-            core_type = "AIC_";                                                                                        \
-        } else if (g_coreType == AscendC::AIV_TYPE) {                                                                  \
-            core_type = "AIV_";                                                                                        \
-            coreId = coreId / 2;                                                                                       \
-        } else {                                                                                                       \
-            core_type = "MIX_";                                                                                        \
-        }                                                                                                              \
-        core_type += std::to_string(AscendC::GetSubBlockIdx());                                                        \
-        block_id += std::to_string(coreId);                                                                            \
-        printf("[%s][%s][%s:%d][%s][%ld] " format "\n%s\n", block_id.c_str(), core_type.c_str(), FILENAME, __LINE__,   \
-               __FUNCTION__, (long)getpid(), ##__VA_ARGS__,                                                            \
-               Mc2DoPrintData(data, count, stride, elementsPerRow, block_id, core_type).c_str());                      \
+#define PRINT_DATA(data, count, stride, elementsPerRow, format, ...) \
+    do { \
+        uint64_t coreId = AscendC::GetBlockIdx(); \
+        std::string core_type = ""; \
+        std::string block_id = "Block_"; \
+        if (g_coreType == AscendC::AIC_TYPE) { \
+            core_type = "AIC_"; \
+        } else if (g_coreType == AscendC::AIV_TYPE) { \
+            core_type = "AIV_"; \
+            coreId = coreId / 2; \
+        } else { \
+            core_type = "MIX_"; \
+        } \
+        core_type += std::to_string(AscendC::GetSubBlockIdx()); \
+        block_id += std::to_string(coreId); \
+        printf("[%s][%s][%s:%d][%s][%ld] " format "\n%s\n", block_id.c_str(), core_type.c_str(), FILENAME, __LINE__, \
+               __FUNCTION__, (long)getpid(), ##__VA_ARGS__, \
+               Mc2DoPrintData(data, count, stride, elementsPerRow, block_id, core_type).c_str()); \
     } while (0)
 
-#define SHORT_MIX_LOG(format, ...)                                                                                     \
-    do {                                                                                                               \
-        uint64_t coreId = AscendC::GetBlockIdx();                                                                      \
-        std::string core_type = "";                                                                                    \
-        std::string block_id = "Block_";                                                                               \
-        if (g_coreType == AscendC::AIC_TYPE) {                                                                         \
-            core_type = "AIC_";                                                                                        \
-        } else if (g_coreType == AscendC::AIV_TYPE) {                                                                  \
-            core_type = "AIV_";                                                                                        \
-            coreId = coreId / 2;                                                                                       \
-        } else {                                                                                                       \
-            core_type = "MIX_";                                                                                        \
-        }                                                                                                              \
-        core_type += std::to_string(AscendC::GetSubBlockIdx());                                                        \
-        block_id += std::to_string(coreId);                                                                            \
-        printf("[%s][%s][%s:%d][%s][%ld] " format "\n", block_id.c_str(), core_type.c_str(), FILENAME, __LINE__,       \
-               __FUNCTION__, (long)getpid(), ##__VA_ARGS__);                                                           \
+#define SHORT_MIX_LOG(format, ...) \
+    do { \
+        uint64_t coreId = AscendC::GetBlockIdx(); \
+        std::string core_type = ""; \
+        std::string block_id = "Block_"; \
+        if (g_coreType == AscendC::AIC_TYPE) { \
+            core_type = "AIC_"; \
+        } else if (g_coreType == AscendC::AIV_TYPE) { \
+            core_type = "AIV_"; \
+            coreId = coreId / 2; \
+        } else { \
+            core_type = "MIX_"; \
+        } \
+        core_type += std::to_string(AscendC::GetSubBlockIdx()); \
+        block_id += std::to_string(coreId); \
+        printf("[%s][%s][%s:%d][%s][%ld] " format "\n", block_id.c_str(), core_type.c_str(), FILENAME, __LINE__, \
+               __FUNCTION__, (long)getpid(), ##__VA_ARGS__); \
     } while (0)
 
 #else
@@ -482,9 +482,7 @@ constexpr int32_t GetBlockSize()
 template <HardEvent event>
 class SyncProcessor {
 public:
-    __aicore__ inline SyncProcessor()
-    {
-    }
+    __aicore__ inline SyncProcessor() {}
     TEventID eventIds_[DOUBLE_BUFFER_NUM];
     uint32_t doubleBufferNum_ = DOUBLE_BUFFER_NUM;
     uint64_t setTaskId_ = 0;

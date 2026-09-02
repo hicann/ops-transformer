@@ -43,9 +43,7 @@ template <typename AType, typename BType, typename BiasType, typename CType, uin
 
 class AllGatherMatmulFP16BF16 {
 public:
-    __aicore__ inline AllGatherMatmulFP16BF16()
-    {
-    }
+    __aicore__ inline AllGatherMatmulFP16BF16() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR contextGM,
                                 GM_ADDR workspaceGM, GM_ADDR gatherOut,
                                 Mc2Tiling::AllGatherMatmulTilingDataV2 *tilingData, __gm__ void *mc2InitTiling,

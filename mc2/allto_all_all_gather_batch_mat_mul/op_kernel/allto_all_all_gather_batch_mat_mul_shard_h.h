@@ -351,7 +351,6 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMulShardH<DataType1, DataType2, 
         alltoallRdisplsTail[i] = i * dataCountsTailTemp;
     }
 
-
     HcclHandle alltoallHandle;
     HcclHandle alltoallHandleList[MAX_HCCL_HANDLE];
     for (uint32_t eIdx = 0U; eIdx < nonLocalE.tileCnt; eIdx++) {
@@ -689,7 +688,6 @@ AlltoAllAllGatherBatchMatMulShardH<DataType1, DataType2, ShardType, IsTransposeW
         factorIn = epRankSize;
         factorOut = epRankSize - 1U;
     }
-
 
     DataCopyExtParams dataCopyInParams = {1U, 0U, 0U, 0U, 0U};
     DataCopyExtParams dataCopyOutParams = {1U, 0U, 0U, 0U, 0U};

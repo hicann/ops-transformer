@@ -65,14 +65,14 @@ constexpr uint32_t MIN_LOOP_COUNT = 2U;
 
 class AlltoAllvQuantGmmTilingCommon : public AlltoAllvQuantGmmTilingBase {
 public:
-    explicit AlltoAllvQuantGmmTilingCommon(gert::TilingContext *context) : AlltoAllvQuantGmmTilingBase(context)
+    explicit AlltoAllvQuantGmmTilingCommon(gert::TilingContext *context)
+        : AlltoAllvQuantGmmTilingBase(context)
     {
         tilingData = context_->GetTilingData<QuantAlltoAllvGroupedMatmulTilingData>();
     };
     QuantAlltoAllvGroupedMatmulTilingData *tilingData;
 
-    static uint32_t CalcExpertNum(uint64_t e, uint64_t epWorldSize, uint64_t bsk, uint64_t n1,
-                                  uint32_t packFactor = 1U)
+    static uint32_t CalcExpertNum(uint64_t e, uint64_t epWorldSize, uint64_t bsk, uint64_t n1, uint32_t packFactor = 1U)
     {
         if (e == 0 || e == 1) {
             return 1U;
@@ -80,20 +80,19 @@ public:
         if (e <= SMALL_EXPERT_THRESHOLD) {
             return 1U;
         }
-        uint32_t originalLoopCount = static_cast<uint32_t>((e + DEFAULT_MERGED_EXPERT_NUM - 1U)
-            / DEFAULT_MERGED_EXPERT_NUM);
+        uint32_t originalLoopCount =
+            static_cast<uint32_t>((e + DEFAULT_MERGED_EXPERT_NUM - 1U) / DEFAULT_MERGED_EXPERT_NUM);
         if (originalLoopCount <= ORIGINAL_LOOP_THRESHOLD) {
             return DEFAULT_MERGED_EXPERT_NUM;
         }
 
         uint64_t perRankTokens = (epWorldSize == 0) ? bsk : bsk / epWorldSize;
-        uint64_t perRankTotalMN = (packFactor == 0) ? perRankTokens * n1
-            : perRankTokens * n1 / packFactor;
+        uint64_t perRankTotalMN = (packFactor == 0) ? perRankTokens * n1 : perRankTokens * n1 / packFactor;
 
         uint32_t expertNum = DEFAULT_MERGED_EXPERT_NUM;
         if (perRankTotalMN < PER_RANK_TOTAL_MN_THRESHOLD) {
-            uint32_t upperByArray = (epWorldSize == 0) ? GMM_ARRAY_MAX_NUM
-                : static_cast<uint32_t>(GMM_ARRAY_MAX_NUM / epWorldSize);
+            uint32_t upperByArray =
+                (epWorldSize == 0) ? GMM_ARRAY_MAX_NUM : static_cast<uint32_t>(GMM_ARRAY_MAX_NUM / epWorldSize);
             uint32_t upperByLoop = static_cast<uint32_t>(e / MIN_LOOP_COUNT);
             uint32_t upperBound = std::min({static_cast<uint32_t>(e), upperByArray, upperByLoop});
             expertNum = std::max(upperBound, 1U);

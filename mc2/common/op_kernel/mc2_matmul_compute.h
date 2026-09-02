@@ -27,9 +27,7 @@ class MatmulCompute {
     using BiasT = typename BIAS_TYPE::T;
 
 public:
-    __aicore__ inline MatmulCompute()
-    {
-    }
+    __aicore__ inline MatmulCompute() {}
     __aicore__ inline void Init(Mc2Tiling::RCSTiling &cfg, TCubeTiling &tiling, Mc2Tiling::TileL2Tiling &l2Tiling,
                                 uint32_t rankID);
     __aicore__ inline void InitGlobalTensor(GM_ADDR bGM, GM_ADDR biasGM);
@@ -65,18 +63,20 @@ __aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::Init
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, SplitType T>
-__aicore__ inline void
-MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::InitGlobalTensor(GM_ADDR aGM, uint64_t aSize, GM_ADDR cGM,
-                                                                      uint64_t cSize)
+__aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::InitGlobalTensor(GM_ADDR aGM,
+                                                                                             uint64_t aSize,
+                                                                                             GM_ADDR cGM,
+                                                                                             uint64_t cSize)
 {
     aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM), aSize);
     cGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM), cSize);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, SplitType T>
-__aicore__ inline void
-MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::Init(Mc2Tiling::RCSTiling &cfg, TCubeTiling &tiling,
-                                                          Mc2Tiling::TileL2Tiling &l2Tiling, uint32_t rankID)
+__aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::Init(Mc2Tiling::RCSTiling &cfg,
+                                                                                 TCubeTiling &tiling,
+                                                                                 Mc2Tiling::TileL2Tiling &l2Tiling,
+                                                                                 uint32_t rankID)
 {
     // MatmulImpl初始化
     mm_.SetSubBlockIdx(0);

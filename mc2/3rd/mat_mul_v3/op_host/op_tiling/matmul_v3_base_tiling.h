@@ -27,19 +27,18 @@ class Mc2MatmulV3BaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass
 public:
 public:
     explicit Mc2MatmulV3BaseTiling(gert::TilingContext *context)
-        : TilingBaseClass(context), tilingData_(tilingDataSelf_)
-    {
-    }
+        : TilingBaseClass(context),
+          tilingData_(tilingDataSelf_)
+    {}
     Mc2MatmulV3BaseTiling(gert::TilingContext *context, Mc2MatmulV3TilingData *tilingData,
                           Mc2TilingCalcSelect tilingSelect = Mc2TilingCalcSelect::BASE)
-        : TilingBaseClass(context), tilingData_(*tilingData)
+        : TilingBaseClass(context),
+          tilingData_(*tilingData)
     {
         InitCompileInfo();
         tilingSelect_ = tilingSelect;
     }
-    ~Mc2MatmulV3BaseTiling() override
-    {
-    }
+    ~Mc2MatmulV3BaseTiling() override {}
 
 protected:
     bool IsCapable() override

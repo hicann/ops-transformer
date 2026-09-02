@@ -23,15 +23,14 @@ struct TailResplitIterator {
     static constexpr int32_t STAGE_THREE = 2;
     static constexpr int32_t STAGE_END = 3;
 
-    DEVICE TailResplitIterator()
-    {
-    }
+    DEVICE TailResplitIterator() {}
 
     DEVICE
     TailResplitIterator(Index mainBlockCount, Index firstTailBlockCount, Index secondTailBlockCount,
                         Index mainBlockSize, Index firstTailBlockSize, Index secondTailBlockSize, Index blockDim,
                         Index stop)
-        : blockDim(blockDim), stop(stop)
+        : blockDim(blockDim),
+          stop(stop)
     {
         sizes[STAGE_ONE] = mainBlockSize;
         sizes[STAGE_TWO] = firstTailBlockSize;

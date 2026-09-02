@@ -44,7 +44,6 @@ struct CopyUb2Gm<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {
     }
 };
 
-
 // new add vectorlayout version
 template <typename Element>
 struct CopyUb2Gm<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout>> {
@@ -64,7 +63,6 @@ struct CopyUb2Gm<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout>> {
         AscendC::DataCopyPad(dstTensor, srcTensor, dataCopyParams);
     };
 };
-
 
 template <class ArchTag, class GmType>
 struct CopyUb2GmAligned {

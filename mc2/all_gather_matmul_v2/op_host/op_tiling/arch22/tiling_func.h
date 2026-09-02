@@ -29,9 +29,10 @@ struct TilingValue {
 
     // 添加构造函数
     TilingValue() = default;
-    TilingValue(int32_t v, std::map<int, std::vector<std::vector<int>>> m = {}) : value(v), conditionMap(std::move(m))
-    {
-    }
+    TilingValue(int32_t v, std::map<int, std::vector<std::vector<int>>> m = {})
+        : value(v),
+          conditionMap(std::move(m))
+    {}
 };
 
 inline int ClampValue(int32_t value, int32_t min, int32_t max)

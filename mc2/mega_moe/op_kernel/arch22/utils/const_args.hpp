@@ -13,7 +13,6 @@
  * \brief
  */
 
-
 #ifndef CONST_ARGS_HPP
 #define CONST_ARGS_HPP
 constexpr static uint64_t MB_SIZE = 1024 * 1024UL;
@@ -36,4 +35,3 @@ constexpr static uint64_t RESERVED_SPACE_SIZE = 10 * 1024 * 1024;
 // ResetTokenPerExpert 每轮清零 flag 区，确保上一轮残留不会撞上本值
 constexpr static int32_t FLAG_VALUE_MAGIC = 123456789; // 0x075BCD15
 #endif
-

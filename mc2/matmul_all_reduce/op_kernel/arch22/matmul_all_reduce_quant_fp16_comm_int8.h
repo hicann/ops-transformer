@@ -44,9 +44,7 @@ template <typename aType, typename bType, typename biasType, typename cType, typ
           bool bTrans>
 class MatmulAllReduceQuantFP16CommInt8 {
 public:
-    __aicore__ inline MatmulAllReduceQuantFP16CommInt8()
-    {
-    }
+    __aicore__ inline MatmulAllReduceQuantFP16CommInt8() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR dequantGM, GM_ADDR biasGM, GM_ADDR addGM, GM_ADDR cGM,
                                 GM_ADDR workspaceGM, Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData,
                                 TPipe *tPipe);
@@ -132,9 +130,9 @@ __aicore__ inline void MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, 
 
 template <typename aType, typename bType, typename biasType, typename cType, typename commType, bool aTrans,
           bool bTrans>
-__aicore__ inline void
-MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans, bTrans>::InitScale(
-    GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM)
+__aicore__ inline void MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans,
+                                                        bTrans>::InitScale(GM_ADDR commQuantScale1GM,
+                                                                           GM_ADDR commQuantScale2GM)
 {
     commQuantScale1GM_ = commQuantScale1GM;
     commQuantScale2GM_ = commQuantScale2GM;
@@ -142,9 +140,8 @@ MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans
 
 template <typename aType, typename bType, typename biasType, typename cType, typename commType, bool aTrans,
           bool bTrans>
-__aicore__ inline uint32_t
-MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans, bTrans>::SendCountCheck(
-    uint32_t prepareIndex)
+__aicore__ inline uint32_t MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans,
+                                                            bTrans>::SendCountCheck(uint32_t prepareIndex)
 {
     uint32_t sendCount = tilePadDataCnt_ / tilingData_->param.rankDim;
     if (prepareIndex >= tilingData_->param.tileCnt) {

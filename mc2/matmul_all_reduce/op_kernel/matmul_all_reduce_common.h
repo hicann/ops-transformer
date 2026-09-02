@@ -161,12 +161,12 @@ __aicore__ __inline__ GM_ADDR GetTailC(GM_ADDR cGM, AscendC::tiling::TCubeTiling
 #define MC2_WEIGHT_QUANT
 #endif
 
-#if (((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)) &&                                                  \
+#if (((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)) && \
      ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2) || (ORIG_DTYPE_X2 == DT_HIFLOAT8)))
 #define WEIGHT_F8
 #endif
 
-#if (((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)) &&                                                  \
+#if (((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)) && \
      ((ORIG_DTYPE_X2 == DT_INT8) || (ORIG_DTYPE_X2 == DT_INT4)))
 #define WEIGHT_W4_W8
 #endif

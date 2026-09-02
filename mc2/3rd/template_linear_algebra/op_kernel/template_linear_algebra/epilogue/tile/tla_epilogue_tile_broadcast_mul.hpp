@@ -31,9 +31,7 @@ struct TileRowBroadcastMul {
     using TileShape = TileShape_;
 
     CATLASS_DEVICE
-    TileRowBroadcastMul()
-    {
-    }
+    TileRowBroadcastMul() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,
@@ -80,9 +78,7 @@ struct TileOneBlkColumnBroadcastMul {
     using TileShape = TileShape_;
 
     CATLASS_DEVICE
-    TileOneBlkColumnBroadcastMul()
-    {
-    }
+    TileOneBlkColumnBroadcastMul() {}
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,

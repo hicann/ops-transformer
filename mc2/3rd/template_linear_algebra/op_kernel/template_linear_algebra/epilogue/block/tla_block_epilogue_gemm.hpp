@@ -65,22 +65,25 @@ public:
         LayoutD layoutD;
 
         CATLASS_HOST_DEVICE
-        Params()
-        {
-        }
+        Params() {}
 
         CATLASS_HOST_DEVICE
         Params(ElementScalar alpha_, ElementScalar beta_, GM_ADDR ptrX_, LayoutX layoutX_, GM_ADDR ptrD_,
                LayoutD layoutD_)
-            : alpha(alpha_), beta(beta_), ptrX(ptrX_), layoutX(layoutX_), ptrD(ptrD_), layoutD(layoutD_)
-        {
-        }
+            : alpha(alpha_),
+              beta(beta_),
+              ptrX(ptrX_),
+              layoutX(layoutX_),
+              ptrD(ptrD_),
+              layoutD(layoutD_)
+        {}
     };
 
     CATLASS_DEVICE
     BlockEpilogue(Arch::Resource<ArchTag> &resource, GemmCoord blockShape_, Params const &params_,
                   uint32_t ubByteStart = 0)
-        : blockShapeMNK(blockShape_), params(params_)
+        : blockShapeMNK(blockShape_),
+          params(params_)
     {
         uint32_t maxMPerBlock = blockShapeMNK.m();
         uint32_t maxNPerBlock = blockShapeMNK.n();

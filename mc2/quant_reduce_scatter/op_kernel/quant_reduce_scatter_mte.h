@@ -101,8 +101,8 @@ __aicore__ inline void QuantReduceScatterMte<TemplateType>::Init(GM_ADDR x, GM_A
 }
 
 template <TemplateTypeClass>
-__aicore__ inline void
-QuantReduceScatterMte<TemplateType>::ParseTilingInfo(const QuantReduceScatterTilingData *tilingData)
+__aicore__ inline void QuantReduceScatterMte<TemplateType>::ParseTilingInfo(
+    const QuantReduceScatterTilingData *tilingData)
 {
     auto &&info = tilingData->quantReduceScatterTilingInfo;
     totalWinSize_ = info.totalWinSize;
@@ -117,8 +117,8 @@ QuantReduceScatterMte<TemplateType>::ParseTilingInfo(const QuantReduceScatterTil
 }
 
 template <TemplateTypeClass>
-__aicore__ inline void
-QuantReduceScatterMte<TemplateType>::ComputeXPerBlock(const QuantReduceScatterTilingData *tilingData, TPipe *tPipe)
+__aicore__ inline void QuantReduceScatterMte<TemplateType>::ComputeXPerBlock(
+    const QuantReduceScatterTilingData *tilingData, TPipe *tPipe)
 {
     auto &&info = tilingData->quantReduceScatterTilingInfo;
 
@@ -241,7 +241,6 @@ __aicore__ inline void QuantReduceScatterMte<TemplateType>::ReadDataBlockReduceS
     xInQueue_.FreeTensor(xTmpTensor);
     scaleInQue_.FreeTensor(scaleTmpTensor);
 }
-
 
 template <TemplateTypeClass>
 __aicore__ inline void QuantReduceScatterMte<TemplateType>::ClearSumTensor()

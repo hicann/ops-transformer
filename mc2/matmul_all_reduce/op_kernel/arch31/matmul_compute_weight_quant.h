@@ -28,9 +28,7 @@ class MatmulComputeWeightQuant : public MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BI
     using BiasT = typename BIAS_TYPE::T;
 
 public:
-    __aicore__ inline MatmulComputeWeightQuant()
-    {
-    }
+    __aicore__ inline MatmulComputeWeightQuant() {}
     __aicore__ inline void Init(AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg,
                                 Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling,
                                 const LocalTensor<uint8_t> &mmFormatUb);

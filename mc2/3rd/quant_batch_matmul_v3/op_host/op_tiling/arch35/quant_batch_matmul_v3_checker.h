@@ -24,9 +24,9 @@ namespace optiling {
 class Mc2QuantBatchMatmulV3Checker {
 public:
     Mc2QuantBatchMatmulV3Checker(gert::TilingContext *context, const Mc2QuantBatchMatmulInfo &inputParams)
-        : context_(context), inputParams_(inputParams)
-    {
-    }
+        : context_(context),
+          inputParams_(inputParams)
+    {}
 
     ~Mc2QuantBatchMatmulV3Checker() = default;
     bool CheckDtype() const;

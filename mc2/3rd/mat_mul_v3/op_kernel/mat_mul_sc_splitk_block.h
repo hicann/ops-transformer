@@ -20,7 +20,6 @@
 using namespace AscendC;
 using namespace matmul;
 
-
 struct SingleCoreSplitKBaseBlockArgs {
     bool isTransposeA;
     bool isTransposeB;
@@ -71,9 +70,7 @@ struct SingleCoreSplitKBaseBlockArgs {
 
 class Mc2MatmulSingleCoreSplitKBaseBlock {
 public:
-    __aicore__ inline Mc2MatmulSingleCoreSplitKBaseBlock()
-    {
-    }
+    __aicore__ inline Mc2MatmulSingleCoreSplitKBaseBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void Init(const Mc2MatmulV3TilingData *matmulTilingData);
     __aicore__ inline void UpdateBlockCnt();

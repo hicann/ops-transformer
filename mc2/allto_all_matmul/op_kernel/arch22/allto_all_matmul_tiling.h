@@ -50,7 +50,6 @@ struct CoCTiling {
     int32_t swizzlDirect = -1;
 };
 
-
 struct AlltoAllMatmulTilingData {
     Mc2InitTiling mc2InitTiling;
     Mc2CcTiling mc2CcTiling;

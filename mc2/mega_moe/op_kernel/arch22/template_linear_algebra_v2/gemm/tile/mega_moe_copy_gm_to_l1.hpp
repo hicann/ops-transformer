@@ -755,23 +755,18 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout>,
     }
 };
 
-
 template <class ArchTag, class Element>
 struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout, AscendC::TPosition::GM>,
                   Gemm::GemmType<Element, layout::VectorLayout, AscendC::TPosition::A1>> {
     using LayoutDst = layout::VectorLayout;
     using LayoutSrc = layout::VectorLayout;
 
-
     static constexpr uint32_t ELE_NUM_PER_C0 = BytesToBits(BYTE_PER_C0) / SizeOfBits<Element>::value;
-
 
     // Mehtods
 
-
     CATLASS_DEVICE
     CopyGmToL1() {};
-
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::GlobalTensor<Element> const &srcTensor,
@@ -785,7 +780,6 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout, AscendC
         AscendC::DataCopy(dstTensor, srcTensor, intriParams);
     }
 };
-
 
 template <class ArchTag, class Element>
 struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::NDC1HWC0, AscendC::TPosition::GM>> {
@@ -1224,7 +1218,6 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::zN>> {
         }
     }
 };
-
 
 /// Partial specialization for nZ in and nZ out.
 template <class ArchTag, class Element>

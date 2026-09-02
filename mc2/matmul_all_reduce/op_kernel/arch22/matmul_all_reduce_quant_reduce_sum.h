@@ -32,9 +32,7 @@ constexpr uint32_t BYTE32_ALIGN = 32;
 template <class T> // commQuantScaleType = yType bf16/fp16
 class MatmulAllReduceReduceSum {
 public:
-    __aicore__ inline MatmulAllReduceReduceSum()
-    {
-    }
+    __aicore__ inline MatmulAllReduceReduceSum() {}
     __aicore__ inline void Init(TPipe *tPipe, uint32_t quantUbSize)
     {
         pipe = tPipe;

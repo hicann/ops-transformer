@@ -30,7 +30,7 @@ inline void InitQuantMatmulAllReduceTilingData(uint8_t *tiling, Mc2Tiling::Quant
     memcpy(const_data, tiling, sizeof(Mc2Tiling::QuantMatmulAllReduceTilingData));
 }
 
-#define GET_TILING_DATA(tiling_data, tiling_arg)                                                                       \
-    Mc2Tiling::QuantMatmulAllReduceTilingData tiling_data;                                                             \
+#define GET_TILING_DATA(tiling_data, tiling_arg) \
+    Mc2Tiling::QuantMatmulAllReduceTilingData tiling_data; \
     InitQuantMatmulAllReduceTilingData(tiling_arg, &tiling_data)
 #endif // QUANT_BATCH_MATMUL_V3_TILING_DEF_H

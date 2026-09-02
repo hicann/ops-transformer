@@ -30,7 +30,8 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 class AlltoAllMxQuantMatmulArch35 {
 public:
     __aicore__ inline AlltoAllMxQuantMatmulArch35(SchedulerType *pipeLine, uint64_t x1HcclDataType)
-        : pipeLine_(pipeLine), x1HcclDataType_(x1HcclDataType){};
+        : pipeLine_(pipeLine),
+          x1HcclDataType_(x1HcclDataType){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out, GM_ADDR x1_scale,
                                 GM_ADDR x2_scale, GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType *tilingData,
                                 AscendC::TPipe *tPipe);
@@ -172,9 +173,8 @@ AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulT
 }
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType, bool IsMxFp4>
-__aicore__ inline void
-AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType, IsMxFp4>::ProcessTile(
-    uint32_t taskCnt)
+__aicore__ inline void AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType,
+                                                   IsMxFp4>::ProcessTile(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     // 复用的变量
@@ -226,9 +226,8 @@ AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulT
 }
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType, bool IsMxFp4>
-__aicore__ inline void
-AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType, IsMxFp4>::ProcessTail(
-    uint32_t taskCnt)
+__aicore__ inline void AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType,
+                                                   IsMxFp4>::ProcessTail(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     uint64_t tailMMultiRankK = static_cast<uint64_t>(mc2Tiling_.tailM) * rankForComm_;

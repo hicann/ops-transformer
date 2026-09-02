@@ -28,20 +28,20 @@
 #else
 #define DTYPE_L0C_LOCAL float
 #endif
-#if defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(DT_FLOAT8_E5M2) && defined(DT_FLOAT8_E4M3FN) &&     \
-    defined(DT_HIFLOAT8) && defined(DT_INT8) && defined(DT_FLOAT4_E2M1) && defined(DT_FLOAT4_E1M2) &&                  \
-    defined(DT_INT4) &&                                                                                                \
-    ((ORIG_DTYPE_X == DT_INT8 && ORIG_DTYPE_WEIGHT == DT_INT8) ||                                                      \
-     (ORIG_DTYPE_X == DT_HIFLOAT8 && ORIG_DTYPE_WEIGHT == DT_HIFLOAT8) ||                                              \
-     ((ORIG_DTYPE_X == DT_FLOAT8_E5M2 || ORIG_DTYPE_X == DT_FLOAT8_E4M3FN) &&                                          \
-      (ORIG_DTYPE_WEIGHT == DT_FLOAT8_E5M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT8_E4M3FN)) ||                               \
-     ((ORIG_DTYPE_X == DT_FLOAT4_E2M1 || ORIG_DTYPE_X == DT_FLOAT4_E1M2) &&                                            \
-      (ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || ORIG_DTYPE_WEIGHT == DT_FLOAT4_E1M2)) ||                                 \
+#if defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(DT_FLOAT8_E5M2) && defined(DT_FLOAT8_E4M3FN) && \
+    defined(DT_HIFLOAT8) && defined(DT_INT8) && defined(DT_FLOAT4_E2M1) && defined(DT_FLOAT4_E1M2) && \
+    defined(DT_INT4) && \
+    ((ORIG_DTYPE_X == DT_INT8 && ORIG_DTYPE_WEIGHT == DT_INT8) || \
+     (ORIG_DTYPE_X == DT_HIFLOAT8 && ORIG_DTYPE_WEIGHT == DT_HIFLOAT8) || \
+     ((ORIG_DTYPE_X == DT_FLOAT8_E5M2 || ORIG_DTYPE_X == DT_FLOAT8_E4M3FN) && \
+      (ORIG_DTYPE_WEIGHT == DT_FLOAT8_E5M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT8_E4M3FN)) || \
+     ((ORIG_DTYPE_X == DT_FLOAT4_E2M1 || ORIG_DTYPE_X == DT_FLOAT4_E1M2) && \
+      (ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || ORIG_DTYPE_WEIGHT == DT_FLOAT4_E1M2)) || \
      (ORIG_DTYPE_X == DT_INT4 && ORIG_DTYPE_WEIGHT == DT_INT4))
 #define V310_GMM_QUANT
 #if defined(ORIG_DTYPE_SCALE) && defined(DT_FLOAT8_E8M0) && ORIG_DTYPE_SCALE == DT_FLOAT8_E8M0
 #define V310_GMM_QUANT_MX
-#elif defined(ORIG_DTYPE_SCALE) && defined(DT_UINT64) && defined(DT_INT64) &&                                          \
+#elif defined(ORIG_DTYPE_SCALE) && defined(DT_UINT64) && defined(DT_INT64) && \
     (ORIG_DTYPE_SCALE != DT_UINT64 && ORIG_DTYPE_SCALE != DT_INT64)
 #define V310_GMM_QUANT_MIX
 #define V310_GMM_QUANT_PERTENSOR_CUBE
@@ -54,19 +54,19 @@
 #endif
 
 #if defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && ORIG_DTYPE_X != ORIG_DTYPE_WEIGHT
-#if ((ORIG_DTYPE_X == DT_FLOAT16 || ORIG_DTYPE_X == DT_BF16) &&                                                        \
-     (ORIG_DTYPE_WEIGHT == DT_FLOAT8_E5M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT8_E4M3FN ||                                  \
-      ORIG_DTYPE_WEIGHT == DT_HIFLOAT8 || ORIG_DTYPE_WEIGHT == DT_INT8 || ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 ||       \
-      ORIG_DTYPE_WEIGHT == DT_FLOAT4_E1M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT || ORIG_DTYPE_WEIGHT == DT_INT32 ||         \
-      ORIG_DTYPE_WEIGHT == DT_INT4)) ||                                                                                \
-    (ORIG_DTYPE_X == DT_INT8 && (ORIG_DTYPE_WEIGHT == DT_INT4 || ORIG_DTYPE_WEIGHT == DT_INT32)) ||                    \
+#if ((ORIG_DTYPE_X == DT_FLOAT16 || ORIG_DTYPE_X == DT_BF16) && \
+     (ORIG_DTYPE_WEIGHT == DT_FLOAT8_E5M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT8_E4M3FN || \
+      ORIG_DTYPE_WEIGHT == DT_HIFLOAT8 || ORIG_DTYPE_WEIGHT == DT_INT8 || ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || \
+      ORIG_DTYPE_WEIGHT == DT_FLOAT4_E1M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT || ORIG_DTYPE_WEIGHT == DT_INT32 || \
+      ORIG_DTYPE_WEIGHT == DT_INT4)) || \
+    (ORIG_DTYPE_X == DT_INT8 && (ORIG_DTYPE_WEIGHT == DT_INT4 || ORIG_DTYPE_WEIGHT == DT_INT32)) || \
     (ORIG_DTYPE_X == DT_FLOAT8_E4M3FN && (ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || ORIG_DTYPE_WEIGHT == DT_FLOAT))
 #define V310_GMM_ANTI_QUANT
 #endif
 #endif
 #endif
 
-#if defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(ORIG_DTYPE_Y) && defined(DT_INT8) &&                \
+#if defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(ORIG_DTYPE_Y) && defined(DT_INT8) && \
     defined(DT_BF16) && defined(DT_INT4)
 #if ORIG_DTYPE_X == ORIG_DTYPE_WEIGHT
 #if ORIG_DTYPE_X == DT_INT8
@@ -113,7 +113,7 @@
 #define MM_DTYPE_Y DTYPE_Y
 #endif
 
-#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) ||                                                              \
+#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || \
     (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
 #ifdef GMM_ANTI_QUANT_A8W4_MSD_OUT_BF16
 #undef DTYPE_SCALE
@@ -132,17 +132,17 @@
 
 #if defined(CONST_TILING)
 #if defined(V310_GMM_ANTI_QUANT)
-#define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling)                                                   \
-    GET_TILING_DATA_MEMBER(GMMWeightQuantTilingData, member, obj, tiling);                                             \
+#define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
+    GET_TILING_DATA_MEMBER(GMMWeightQuantTilingData, member, obj, tiling); \
     const int32_t *(var) = (const int32_t *)((const uint8_t *)&obj);
 #else
-#define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling)                                                   \
-    GET_TILING_DATA_MEMBER(tilingType, member, obj, tiling);                                                           \
+#define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
+    GET_TILING_DATA_MEMBER(tilingType, member, obj, tiling); \
     const int32_t *(var) = (const int32_t *)((const uint8_t *)&obj);
 #endif
 #else
-#define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling)                                                   \
-    size_t offset##var = (size_t)(&((tilingType *)0)->member);                                                         \
+#define GET_TILING_DATA_MEMBER_ADDR(tilingType, member, var, tiling) \
+    size_t offset##var = (size_t)(&((tilingType *)0)->member); \
     __gm__ int32_t *(var) = (__gm__ int32_t *)((tiling) + (offset##var));
 #endif
 
@@ -154,8 +154,8 @@ constexpr int32_t MKN_LIST_LEN = 128;                                // 128: pre
 constexpr uint32_t UB_BLOCK_UNIT_SIZE = 32;                          // 32: a block has 32 bytes data
 constexpr uint32_t UB_BLOCK_DOUBLE_UNIT_SIZE = 64;                   // 64: a block has 64 bytes data
 constexpr uint32_t HALF_UB_BLOCK_UNIT_SIZE = UB_BLOCK_UNIT_SIZE / 2; // 2: a float16 data has two bytes
-#if ((defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) ||                                                             \
-     (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))) &&                                     \
+#if ((defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || \
+     (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))) && \
     defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && ORIG_DTYPE_X == DT_INT8 && ORIG_DTYPE_WEIGHT == DT_INT8
 constexpr MatmulConfig NZ_CFG_MDL =
     GetMDLConfig(false, false, 0, true, false, false, true, true, true, false, false, true);

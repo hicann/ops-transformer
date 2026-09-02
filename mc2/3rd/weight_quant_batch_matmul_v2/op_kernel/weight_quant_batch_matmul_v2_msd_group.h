@@ -62,9 +62,7 @@ class Mc2WeightQuantBatchMatMulV2MsdGroupKernel {
     static constexpr uint64_t GROUP_DIM = 32;
 
 public:
-    __aicore__ inline Mc2WeightQuantBatchMatMulV2MsdGroupKernel()
-    {
-    }
+    __aicore__ inline Mc2WeightQuantBatchMatMulV2MsdGroupKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
                                 const Mc2WeightQuantBatchMatmulV2MsdGroupTilingData *tilingData, TPipe *tPipe);
@@ -460,10 +458,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatMulV2MsdGroupKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                          hasAntiQuantOffset, quantType, weightFormat,
-                                          preciseType>::CopyInAL1(uint64_t realSingleCoreK, uint64_t kOffset)
+__aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::CopyInAL1(uint64_t realSingleCoreK, uint64_t kOffset)
 {
     Nd2NzParams nd2nzParams;
     nd2nzParams.ndNum = 1;
@@ -1011,10 +1008,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
           Mc2QuantType antiQuantType, bool hasAntiQuantOffset, Mc2QuantType quantType, CubeFormat weightFormat,
           typename preciseType>
-__aicore__ inline void
-Mc2WeightQuantBatchMatMulV2MsdGroupKernel<xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
-                                          hasAntiQuantOffset, quantType, weightFormat,
-                                          preciseType>::ProcessVector5(int32_t singleCoreRealN)
+__aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
+    xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
+    preciseType>::ProcessVector5(int32_t singleCoreRealN)
 {
     uint64_t atomicWorkspaceOffset = vecNDimIdx_ * tiling_->vecSingleCoreN;
     DataCopyPad2D(resF32Tensor_, workspaceAtomicGlobal_[atomicWorkspaceOffset], tiling_->mSize, singleCoreRealN,

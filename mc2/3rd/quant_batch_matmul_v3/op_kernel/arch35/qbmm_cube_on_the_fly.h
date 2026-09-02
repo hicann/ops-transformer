@@ -19,10 +19,10 @@
 #include "../quant_batch_matmul_v3_base.h"
 #include "qbmm_asw_block.h"
 
-#define LOCAL_TEMPLATE_CLASS_PARAMS                                                                                    \
-    template <class x1Type, class x2Type, class inputScaleType, class biasType, class yType, CubeFormat formatX1,      \
+#define LOCAL_TEMPLATE_CLASS_PARAMS \
+    template <class x1Type, class x2Type, class inputScaleType, class biasType, class yType, CubeFormat formatX1, \
               CubeFormat formatX2, CubeFormat formatY, bool aTrans, bool bTrans>
-#define LOCAL_TEMPLATE_FUNC_PARAMS                                                                                     \
+#define LOCAL_TEMPLATE_FUNC_PARAMS \
     x1Type, x2Type, inputScaleType, biasType, yType, formatX1, formatX2, formatY, aTrans, bTrans
 namespace AscendC {
 
@@ -31,9 +31,7 @@ constexpr uint64_t DEQ_SCALE_MUL = 0xFFFFE000;
 LOCAL_TEMPLATE_CLASS_PARAMS
 class MatMulASWKernel {
 public:
-    __aicore__ inline MatMulASWKernel()
-    {
-    }
+    __aicore__ inline MatMulASWKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
                                 GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *que);
     __aicore__ inline void UpdateGlobalAddr(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR perTokenScale,

@@ -32,7 +32,8 @@ public:
                                             SocVersion socVersion = SocVersion::SOC950,
                                             uint8_t commMode = mc2tiling::A5_AICPU_TS_ENGINE)
         : Mc2FitBasedBalanceTiling(args, KernelType::ALL_TO_ALL, topoType, socVersion),
-          matmulQuantType_(matmulQuantType), commMode_(commMode)
+          matmulQuantType_(matmulQuantType),
+          commMode_(commMode)
     {
         commPerf_.SetCommShapeLen(mmInfo_.kValue);
         commPerf_.SetCommDTypeSize(mmInfo_.inMatrixADtypeSize);

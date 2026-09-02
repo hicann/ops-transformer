@@ -19,7 +19,7 @@
 #include "mc2_3rd_grouped_matmul_utils.h"
 #include "lib/matmul_intf.h"
 
-#define LOCAL_TEMPLATE_CLASS_PARAMS                                                                                    \
+#define LOCAL_TEMPLATE_CLASS_PARAMS \
     template <class xType, class wType, class biasType, class scaleType, class yType, CubeFormat wFormat, bool aTrans, \
               bool bTrans>
 #define LOCAL_TEMPLATE_FUNC_PARAMS xType, wType, biasType, scaleType, yType, wFormat, aTrans, bTrans

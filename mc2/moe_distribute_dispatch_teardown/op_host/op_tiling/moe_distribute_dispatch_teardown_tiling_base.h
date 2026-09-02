@@ -24,7 +24,8 @@ namespace optiling {
 class MoeDistributeDispatchTeardownTilingBase : public MoeTilingBase {
 public:
     explicit MoeDistributeDispatchTeardownTilingBase(gert::TilingContext *context)
-        : MoeTilingBase(context), nodeName_(context->GetNodeName()) {};
+        : MoeTilingBase(context),
+          nodeName_(context->GetNodeName()) {};
 
 protected:
     const char *socTilingName_;

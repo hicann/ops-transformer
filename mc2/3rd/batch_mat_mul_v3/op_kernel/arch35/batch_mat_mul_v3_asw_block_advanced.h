@@ -79,12 +79,9 @@ struct Mc2BmmAswBlockArgs {
     uint64_t nAlignSize = 0;
 };
 
-
 class Mc2BatchMatMulAswBlock {
 public:
-    __aicore__ inline Mc2BatchMatMulAswBlock()
-    {
-    }
+    __aicore__ inline Mc2BatchMatMulAswBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void Init(const void *tilingData);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx, uint64_t newBlockIdx);

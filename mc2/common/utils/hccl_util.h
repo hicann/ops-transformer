@@ -18,11 +18,11 @@ extern "C" {
 #endif
 
 namespace op {
-#define OP_API_CHECK(cond, exec_expr)                                                                                  \
-    do {                                                                                                               \
-        if (cond) {                                                                                                    \
-            exec_expr;                                                                                                 \
-        }                                                                                                              \
+#define OP_API_CHECK(cond, exec_expr) \
+    do { \
+        if (cond) { \
+            exec_expr; \
+        } \
     } while (0)
 } // namespace op
 

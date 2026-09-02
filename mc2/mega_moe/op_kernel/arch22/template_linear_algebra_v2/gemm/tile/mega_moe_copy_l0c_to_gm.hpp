@@ -144,7 +144,8 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_) : params(params_) {};
+    CopyL0CToGm(Params const &params_)
+        : params(params_) {};
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
@@ -198,7 +199,8 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_) : params(params_) {};
+    CopyL0CToGm(Params const &params_)
+        : params(params_) {};
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
@@ -242,7 +244,8 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_) : params(params_) {};
+    CopyL0CToGm(Params const &params_)
+        : params(params_) {};
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
@@ -288,7 +291,8 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_) : params(params_) {};
+    CopyL0CToGm(Params const &params_)
+        : params(params_) {};
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
@@ -335,7 +339,8 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
     CopyL0CToGm() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGm(Params const &params_) : params(params_) {};
+    CopyL0CToGm(Params const &params_)
+        : params(params_) {};
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,

@@ -798,9 +798,8 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAll<BMMRSATAT>::OnLocalReduc
 }
 
 template <typename BMMRSATAT>
-__aicore__ inline void
-BatchMatMulReduceScatterAlltoAll<BMMRSATAT>::AddTransposeBeforeAlltoAll(bool isLocal, bool isCTail, uint64_t biasOffset,
-                                                                        uint64_t rsOutGM, uint64_t transOutOffset)
+__aicore__ inline void BatchMatMulReduceScatterAlltoAll<BMMRSATAT>::AddTransposeBeforeAlltoAll(
+    bool isLocal, bool isCTail, uint64_t biasOffset, uint64_t rsOutGM, uint64_t transOutOffset)
 {
     uint64_t cLength = 0U;
     uint64_t eLength = 0U;
@@ -855,9 +854,10 @@ BatchMatMulReduceScatterAlltoAll<BMMRSATAT>::AddTransposeBeforeAlltoAll(bool isL
 }
 
 template <typename BMMRSATAT>
-__aicore__ inline void
-BatchMatMulReduceScatterAlltoAll<BMMRSATAT>::AddTranspose(uint64_t rsOutOffset, uint64_t biasOffset,
-                                                          uint64_t transOutOffset, uint64_t dataCnt, bool isLocal)
+__aicore__ inline void BatchMatMulReduceScatterAlltoAll<BMMRSATAT>::AddTranspose(uint64_t rsOutOffset,
+                                                                                 uint64_t biasOffset,
+                                                                                 uint64_t transOutOffset,
+                                                                                 uint64_t dataCnt, bool isLocal)
 {
     GlobalTensor<X_T> rsOutStartGM =
         (isLocal ? reduceScatterLocalOut[rsOutOffset] : reduceScatterNonLocalOut[rsOutOffset]);

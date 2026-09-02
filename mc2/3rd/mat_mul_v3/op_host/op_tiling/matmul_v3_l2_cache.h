@@ -22,9 +22,10 @@ namespace optiling {
 namespace mc2_matmul_v3 {
 class Mc2L2Cache {
 public:
-    Mc2L2Cache(Mc2MatmulV3Args &args, Mc2MatmulV3TilingData &tilingData) : args_(args), tilingData_(tilingData)
-    {
-    }
+    Mc2L2Cache(Mc2MatmulV3Args &args, Mc2MatmulV3TilingData &tilingData)
+        : args_(args),
+          tilingData_(tilingData)
+    {}
     void SetL2CacheFlag(Mc2TilingEnable tilingEnable, uint64_t l2Size, uint32_t &l2CacheFlag);
 
 private:

@@ -107,7 +107,8 @@ public:
     WeightQuantTilingTransferHelperA5(WeightQuantMatmulAllReduceTilingA5 &weightQuantMatmulAllReduceTiling,
                                       Mc2WeightQuantBatchMatmulV2RegBaseTilingData &data)
         : Mc2WeightQuantBatchMatmulV2RegBase(weightQuantMatmulAllReduceTiling.context_),
-          tilingProcesser_(weightQuantMatmulAllReduceTiling), data_(data)
+          tilingProcesser_(weightQuantMatmulAllReduceTiling),
+          data_(data)
     {
         Mc2WeightQuantBatchMatmulV2RegBase::InitCompileInfo();
     }
@@ -174,7 +175,8 @@ public:
     WeightQuantAsTilingTransferHelper(WeightQuantMatmulAllReduceTilingA5 &weightQuantMatmulAllReduceTiling,
                                       Mc2WeightQuantBatchMatmulV2ASTilingData &data)
         : Mc2WeightQuantBatchMatmulV2TilingAS(weightQuantMatmulAllReduceTiling.context_),
-          tilingProcesser_(weightQuantMatmulAllReduceTiling), mmASTilingdata_(data)
+          tilingProcesser_(weightQuantMatmulAllReduceTiling),
+          mmASTilingdata_(data)
     {
         Mc2WeightQuantBatchMatmulV2TilingAS::InitCompileInfo();
     }

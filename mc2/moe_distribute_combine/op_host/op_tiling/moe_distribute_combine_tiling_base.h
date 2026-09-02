@@ -25,7 +25,8 @@
 namespace optiling {
 class MoeDistributeCombineTilingBase : public MoeTilingBase {
 public:
-    explicit MoeDistributeCombineTilingBase(gert::TilingContext *context) : MoeTilingBase(context) {};
+    explicit MoeDistributeCombineTilingBase(gert::TilingContext *context)
+        : MoeTilingBase(context) {};
     ge::graphStatus MoeDistributeCombineTilingFunc(gert::TilingContext *context);
     bool CheckEpWorldSizeAttrs(gert::TilingContext *context, MoeDistributeCombineTilingData &tilingData,
                                const char *nodeName);

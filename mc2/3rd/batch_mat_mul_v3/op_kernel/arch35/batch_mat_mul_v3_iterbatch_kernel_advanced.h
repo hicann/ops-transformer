@@ -32,9 +32,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE,
           const MatmulConfig &MM_CFG = MM_CFG_MULTI_BATCH_OUT_BATCH_BIAS>
 class Mc2BatchMatMulMultiBatchKernel {
 public:
-    __aicore__ inline Mc2BatchMatMulMultiBatchKernel()
-    {
-    }
+    __aicore__ inline Mc2BatchMatMulMultiBatchKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                 GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
     __aicore__ inline void UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
@@ -83,11 +81,9 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BI
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::InitInputs(GM_ADDR aGM,
-                                                                                                  GM_ADDR bGM,
-                                                                                                  GM_ADDR cGM,
-                                                                                                  GM_ADDR biasGM)
+__aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
+                                                      MM_CFG>::InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM,
+                                                                          GM_ADDR biasGM)
 {
     using A_T = typename A_TYPE::T;
     using B_T = typename B_TYPE::T;
@@ -105,9 +101,9 @@ Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM
                              static_cast<uint64_t>(block_.batchMatmulTilingData_->matMulTilingData.tCubeTiling.M) *
                                  block_.batchMatmulTilingData_->matMulTilingData.tCubeTiling.N *
                                  block_.batchMatmulTilingData_->cBatchDimAll);
-    biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM),
-                                block_.batchMatmulTilingData_->matMulTilingData.tCubeTiling.N *
-                                    block_.batchMatmulTilingData_->biasBatchDimAll);
+    biasGlobal_.SetGlobalBuffer(
+        reinterpret_cast<__gm__ BiasT *>(biasGM),
+        block_.batchMatmulTilingData_->matMulTilingData.tCubeTiling.N * block_.batchMatmulTilingData_->biasBatchDimAll);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>

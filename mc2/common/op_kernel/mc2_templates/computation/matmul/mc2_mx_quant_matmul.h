@@ -29,7 +29,8 @@ struct MXQuantMMAdditionalData {
 template <typename MMTilingType, typename MMType>
 class MC2MXQuantMatmul {
 public:
-    __aicore__ inline MC2MXQuantMatmul(AscendC::TPipe *tPipe) : tPipePtr_(tPipe){};
+    __aicore__ inline MC2MXQuantMatmul(AscendC::TPipe *tPipe)
+        : tPipePtr_(tPipe){};
     // 初始化方法
     __aicore__ inline void Init();
     // 获取数据上下文引用
@@ -47,8 +48,7 @@ protected:
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ void MC2MXQuantMatmul<MMTilingType, MMType>::Init()
-{
-}
+{}
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ MC2MMContext<MXQuantMMAdditionalData, MMTilingType> *
@@ -72,21 +72,20 @@ inline __aicore__ void MC2MXQuantMatmul<MMTilingType, MMType>::Process(uint32_t 
 
 template <typename MMTilingType, typename MMType>
 inline __aicore__ void MC2MXQuantMatmul<MMTilingType, MMType>::End()
-{
-}
+{}
 
 // 计算节点的上下文数据类型声明
 #ifndef DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_MX_QUANT
-#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_MX_QUANT(ContextType)                                         \
-    using ContextType = MC2KernelTemplate::MC2MMContext<MC2KernelTemplate::MXQuantMMAdditionalData,                    \
+#define DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_MX_QUANT(ContextType) \
+    using ContextType = MC2KernelTemplate::MC2MMContext<MC2KernelTemplate::MXQuantMMAdditionalData, \
                                                         DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams>
 #endif
 // 使用MatMulASWKernel算子作为计算节点的计算实现
 #ifndef DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_MX_QUANT
-#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_MX_QUANT(ComputationType)                                             \
-    using ComputationType = MC2KernelTemplate::MC2MXQuantMatmul<                                                       \
-        DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams,                                                             \
-        AscendC::MatMulASWKernel<DTYPE_X1, DTYPE_X2, AscendC::fp8_e8m0_t, float, DTYPE_Y, CubeFormat::ND,              \
+#define DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_MX_QUANT(ComputationType) \
+    using ComputationType = MC2KernelTemplate::MC2MXQuantMatmul< \
+        DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams, \
+        AscendC::MatMulASWKernel<DTYPE_X1, DTYPE_X2, AscendC::fp8_e8m0_t, float, DTYPE_Y, CubeFormat::ND, \
                                  CubeFormat::ND, CubeFormat::ND, false, X2TRANSPOSE>>
 #endif
 }; // namespace MC2KernelTemplate
