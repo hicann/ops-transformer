@@ -23,22 +23,22 @@ namespace l0op {
 OP_TYPE_REGISTER(RotaryPositionEmbedding);
 
 const aclTensor *RotaryPositionEmbedding(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
-    const aclTensor *rotate, int64_t mode, aclOpExecutor *executor)
+                                         const aclTensor *rotate, int64_t mode, aclOpExecutor *executor)
 {
     L0_DFX(RotaryPositionEmbedding, x, cos, sin, rotate, mode);
+    OP_CHECK_NULL(x, return nullptr);
+    OP_CHECK_NULL(cos, return nullptr);
+    OP_CHECK_NULL(sin, return nullptr);
     DataType outType = x->GetDataType();
     Format format = x->GetStorageFormat();
     auto output = executor->AllocTensor(outType, format, format);
 
-    auto ret = INFER_SHAPE(RotaryPositionEmbedding,
-        OP_INPUT(x, cos, sin, rotate), OP_OUTPUT(output),
-        OP_ATTR(mode));
+    auto ret = INFER_SHAPE(RotaryPositionEmbedding, OP_INPUT(x, cos, sin, rotate), OP_OUTPUT(output), OP_ATTR(mode));
     OP_CHECK_INFERSHAPE(ret != ACLNN_SUCCESS, return nullptr, "RotaryPositionEmbedding InferShape failed.");
-    ret = ADD_TO_LAUNCHER_LIST_AICORE(RotaryPositionEmbedding,
-        OP_INPUT(x, cos, sin, rotate), OP_OUTPUT(output),
-        OP_ATTR(mode));
+    ret = ADD_TO_LAUNCHER_LIST_AICORE(RotaryPositionEmbedding, OP_INPUT(x, cos, sin, rotate), OP_OUTPUT(output),
+                                      OP_ATTR(mode));
     OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return nullptr,
-        "RotaryPositionEmbedding ADD_TO_LAUNCHER_LIST_AICORE failed.");
+                                         "RotaryPositionEmbedding ADD_TO_LAUNCHER_LIST_AICORE failed.");
     return output;
 }
-}
+} // namespace l0op

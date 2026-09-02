@@ -47,8 +47,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         aicoreParams_.ubSize = ubSizePlatForm;
     } else {
-        auto compileInfoPtr = reinterpret_cast<const InplacePartialRotaryPositionEmbeddingCompileInfo
-            *>(context_->GetCompileInfo());
+        auto compileInfoPtr =
+            reinterpret_cast<const InplacePartialRotaryPositionEmbeddingCompileInfo *>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.blockDim = compileInfoPtr->blockDim;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
@@ -77,11 +77,11 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckShapeAllPositive(cons
     auto shape = context_->GetInputShape(idx)->GetStorageShape();
     for (size_t i = 0; i < shape.GetDimNum(); i++) {
         if (shape.GetDim(i) <= 0) {
-            std::string reasonMsg = "All dimensions of input must be positive, but dim " +
-                std::to_string(i) + " is " + std::to_string(shape.GetDim(i));
-            const char* tensorName = (idx == X_INDEX) ? "x" : (idx == COS_INDEX) ? "cos" : "sin";
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), tensorName,
-                ToString(shape).c_str(), reasonMsg.c_str());
+            std::string reasonMsg = "All dimensions of input must be positive, but dim " + std::to_string(i) + " is " +
+                                    std::to_string(shape.GetDim(i));
+            const char *tensorName = (idx == X_INDEX) ? "x" : (idx == COS_INDEX) ? "cos" : "sin";
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), tensorName, ToString(shape).c_str(),
+                                                  reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -114,19 +114,18 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckShapeAllPositive() co
     auto yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
     for (size_t i = 0; i < yShape.GetDimNum(); i++) {
         if (yShape.GetDim(i) <= 0) {
-            std::string reasonMsg = "All dimensions of output must be positive, but dim " +
-                std::to_string(i) + " is " + std::to_string(yShape.GetDim(i));
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "output",
-                ToString(yShape).c_str(), reasonMsg.c_str());
+            std::string reasonMsg = "All dimensions of output must be positive, but dim " + std::to_string(i) + " is " +
+                                    std::to_string(yShape.GetDim(i));
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "output", ToString(yShape).c_str(),
+                                                  reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeLayoutByShape(
-    const gert::Shape &xShape,
-    const gert::Shape &cosShape)
+ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape &xShape,
+                                                                         const gert::Shape &cosShape)
 {
     uint64_t xShape0 = xShape.GetDim(DIM_0);
     uint64_t xShape1 = xShape.GetDim(DIM_1);
@@ -153,7 +152,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeLayoutByShape(
     } else {
         std::string shapeMsg = ToString(xShape) + " and " + ToString(cosShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and cos", shapeMsg.c_str(),
-            "The shapes of input x and cos do not satisfy the broadcast rule");
+                                               "The shapes of input x and cos do not satisfy the broadcast rule");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -166,28 +165,28 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckShape()
     auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
     auto &yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
     if (xShape.GetDimNum() != DIM_NUM || cosShape.GetDimNum() != DIM_NUM || sinShape.GetDimNum() != DIM_NUM) {
-        std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " +
-            std::to_string(cosShape.GetDimNum()) + " and " + std::to_string(sinShape.GetDimNum());
+        std::string dimNumMsg = std::to_string(xShape.GetDimNum()) + ", " + std::to_string(cosShape.GetDimNum()) +
+                                " and " + std::to_string(sinShape.GetDimNum());
         OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context_->GetNodeName(), "x, cos and sin", dimNumMsg.c_str(),
-            "The shape dims of input x, cos and sin should all be 4D");
+                                                  "The shape dims of input x, cos and sin should all be 4D");
         return ge::GRAPH_FAILED;
     }
     if (yShape.GetDimNum() != DIM_NUM) {
         std::string dimNumMsg = std::to_string(yShape.GetDimNum());
         OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context_->GetNodeName(), "output", dimNumMsg.c_str(),
-            "The shape dims of output should be 4D");
+                                                  "The shape dims of output should be 4D");
         return ge::GRAPH_FAILED;
     }
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "cos and sin", shapeMsg.c_str(),
-            "The shapes of input cos and input sin should be the same");
+                                               "The shapes of input cos and input sin should be the same");
         return ge::GRAPH_FAILED;
     }
     if (xShape != yShape) {
         std::string shapeMsg = ToString(xShape) + " and " + ToString(yShape);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and output", shapeMsg.c_str(),
-            "The shapes of input x and output should be the same");
+                                               "The shapes of input x and output should be the same");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -198,43 +197,41 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckDtypeAndAttr()
     dtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
     if (std::find(SUPPORT_DTYPE.begin(), SUPPORT_DTYPE.end(), dtype_) == SUPPORT_DTYPE.end()) {
         std::string inputDtypeStr = ToString(dtype_);
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "x", inputDtypeStr.c_str(),
-            "FLOAT, BF16, FLOAT16");
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "x", inputDtypeStr.c_str(), "FLOAT, BF16, FLOAT16");
         return ge::GRAPH_FAILED;
     }
-    
+
     auto cosType = context_->GetInputDesc(COS_INDEX)->GetDataType();
     auto sinType = context_->GetInputDesc(SIN_INDEX)->GetDataType();
     // Check cos/sin dtype: same type, and must be F32, BF16, or F16
     if (cosType != sinType) {
         std::string dtypeMsg = ToString(cosType) + " and " + ToString(sinType);
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "cos and sin", dtypeMsg.c_str(),
-            "The dtypes of input cos and input sin should be the same");
+                                               "The dtypes of input cos and input sin should be the same");
         return ge::GRAPH_FAILED;
     }
     if (std::find(SUPPORT_DTYPE.begin(), SUPPORT_DTYPE.end(), cosType) == SUPPORT_DTYPE.end()) {
         std::string cosDtypeStr = ToString(cosType);
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "cos", cosDtypeStr.c_str(),
-            "FLOAT, BF16, FLOAT16");
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "cos", cosDtypeStr.c_str(), "FLOAT, BF16, FLOAT16");
         return ge::GRAPH_FAILED;
     }
-    
+
     // Mixed precision: x is BF16/FP16, cos/sin are FP32
     bool isMixedPrecision = (dtype_ == ge::DT_BF16 || dtype_ == ge::DT_FLOAT16) && cosType == ge::DT_FLOAT;
     bool isSamePrecision = (dtype_ == cosType);
-    
+
     if (!isSamePrecision && !isMixedPrecision) {
         std::string dtypeMsg = ToString(dtype_) + " and " + ToString(cosType);
-        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "x and cos", dtypeMsg.c_str(),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            context_->GetNodeName(), "x and cos", dtypeMsg.c_str(),
             "Unsupported dtype combination: supported combinations are same type, or x=BF16/FP16 with cos/sin=FP32");
         return ge::GRAPH_FAILED;
     }
-    
+
     auto outputType = context_->GetOutputDesc(Y_INDEX)->GetDataType();
     if (outputType != dtype_) {
         std::string outputDtypeStr = ToString(outputType);
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "output", outputDtypeStr.c_str(),
-            ToString(dtype_).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "output", outputDtypeStr.c_str(), ToString(dtype_).c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -259,31 +256,31 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckRotaryModeShapeRelati
 {
     if (d > D_LIMIT) {
         std::string reasonMsg = "The D axis of input x can not be greater than " + std::to_string(D_LIMIT) +
-            ", where D refers to the last dim";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-            ("D=" + std::to_string(d)).c_str(), reasonMsg.c_str());
+                                ", where D refers to the last dim";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", ("D=" + std::to_string(d)).c_str(),
+                                              reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     if (rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::HALF ||
         rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::INTERLEAVE ||
         rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE) {
         if (d % HALF_INTERLEAVE_MODE_COEF != 0) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-                ("D=" + std::to_string(d)).c_str(),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "x", ("D=" + std::to_string(d)).c_str(),
                 "D must be multiples of 2 in half, interleave and interleave-half mode, "
                 "where D refers to the last dim");
             return ge::GRAPH_FAILED;
         }
     } else if (rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::QUARTER) {
         if (d % QUARTER_MODE_COEF != 0) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-                ("D=" + std::to_string(d)).c_str(),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "x", ("D=" + std::to_string(d)).c_str(),
                 "D must be multiples of 4 in quarter mode, where D refers to the last dim");
             return ge::GRAPH_FAILED;
         }
     }
-    if (rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::HALF
-        || rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE) {
+    if (rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::HALF ||
+        rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE) {
         dSplitCoef_ = HALF_INTERLEAVE_MODE_COEF;
     } else if (rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::QUARTER) {
         dSplitCoef_ = QUARTER_MODE_COEF;
@@ -298,9 +295,10 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeSliceInfo()
     OP_LOGI(context_, "TEST LOG, sliceStart_ =  %ld. sliceEnd_ =  %ld", sliceStart_, sliceEnd_);
     isNoOp_ = false;
     if (sliceStart_ < 0 || sliceEnd_ < 0 || sliceLength_ < 0 || sliceEnd_ > d_) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-            ("slice=[" + std::to_string(sliceStart_) + ", " +
-                std::to_string(sliceEnd_) + "), D=" + std::to_string(d_)).c_str(),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "x",
+            ("slice=[" + std::to_string(sliceStart_) + ", " + std::to_string(sliceEnd_) + "), D=" + std::to_string(d_))
+                .c_str(),
             "Slice range is invalid: sliceStart/sliceEnd must be >= 0, "
             "sliceLength must be >= 0, and sliceEnd must be <= D");
         return ge::GRAPH_FAILED;
@@ -310,9 +308,10 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeSliceInfo()
         return ge::GRAPH_SUCCESS;
     }
     if (sliceLength_ > 0 && (cosd_ != sind_ || cosd_ != sliceLength_)) {
-        std::string shapesMsg = std::to_string(sliceLength_) + " (slice), " +
-            std::to_string(cosd_) + " (cos_D) and " + std::to_string(sind_) + " (sin_D)";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "slice, cos and sin", shapesMsg.c_str(),
+        std::string shapesMsg = std::to_string(sliceLength_) + " (slice), " + std::to_string(cosd_) + " (cos_D) and " +
+                                std::to_string(sind_) + " (sin_D)";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context_->GetNodeName(), "slice, cos and sin", shapesMsg.c_str(),
             "When sliceLength > 0, the D axes of cos and sin must equal sliceLength");
         return ge::GRAPH_FAILED;
     }
@@ -321,8 +320,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeSliceInfo()
             rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::INTERLEAVE ||
             rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE) {
             if (sliceLength_ % HALF_INTERLEAVE_MODE_COEF != 0) {
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-                    ("sliceLength=" + std::to_string(sliceLength_)).c_str(),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "x", ("sliceLength=" + std::to_string(sliceLength_)).c_str(),
                     "sliceLength must be multiples of 2 in half, interleave and interleave-half mode, "
                     "where sliceLength refers to partialSlice[1] - partialSlice[0]");
                 return ge::GRAPH_FAILED;
@@ -330,9 +329,9 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::JudgeSliceInfo()
         } else if (rotaryMode_ == InplacePartialRotaryPosEmbeddingMode::QUARTER) {
             if (sliceLength_ % QUARTER_MODE_COEF != 0) {
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-                    ("sliceLength=" + std::to_string(sliceLength_)).c_str(),
-                    "sliceLength must be multiples of 4 in quarter mode, "
-                    "where sliceLength refers to partialSlice[1] - partialSlice[0]");
+                                                      ("sliceLength=" + std::to_string(sliceLength_)).c_str(),
+                                                      "sliceLength must be multiples of 4 in quarter mode, "
+                                                      "where sliceLength refers to partialSlice[1] - partialSlice[0]");
                 return ge::GRAPH_FAILED;
             }
         }
@@ -348,8 +347,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
     int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
     OP_CHECK_IF(modeValue != static_cast<int32_t>(InplacePartialRotaryPosEmbeddingMode::INTERLEAVE),
                 OP_LOGE(context_->GetNodeName(),
-                    "InplacePartialRotaryMul only supports interleave mode (mode=1), actual %d.",
-                    modeValue),
+                        "InplacePartialRotaryMul only supports interleave mode (mode=1), actual %d.", modeValue),
                 return ge::GRAPH_FAILED);
     rotaryMode_ = static_cast<InplacePartialRotaryPosEmbeddingMode>(modeValue);
 
@@ -366,7 +364,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
 
     // 获取slice
     const gert::ContinuousVector *sliceRangeListPtr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
-    if (sliceRangeListPtr->GetSize() == 0) {
+    if (sliceRangeListPtr == nullptr || sliceRangeListPtr->GetSize() == 0) {
         sliceStart_ = 0;
         sliceEnd_ = d_;
     } else {
@@ -375,13 +373,13 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
         sliceEnd_ = expertRangeList[1];
     }
     sliceLength_ = sliceEnd_ - sliceStart_;
-    OP_CHECK_IF(JudgeSliceInfo() != ge::GRAPH_SUCCESS,
-               OP_LOGE(context_, "JudgeSliceInfo fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(JudgeSliceInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "JudgeSliceInfo fail."),
+                return ge::GRAPH_FAILED);
     if (!IsNoOp()) {
         OP_CHECK_IF(CheckRotaryModeShapeRelation(d_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context_, "CheckRotaryModeShapeRelation fail."), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "CheckShapeAllPositive fail."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeAllPositive fail."),
+                    return ge::GRAPH_FAILED);
         OP_CHECK_IF(JudgeLayoutByShape(xShape, cosShape) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
 
