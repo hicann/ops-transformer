@@ -42,9 +42,7 @@ constexpr uint32_t PREFIX_NUM = 2;
 template <typename T>
 class MaskedCausalConv1d {
 public:
-    __aicore__ inline MaskedCausalConv1d()
-    {
-    }
+    __aicore__ inline MaskedCausalConv1d() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR mask, GM_ADDR y,
                                 const MaskedCausalConv1dTilingData *tiling);

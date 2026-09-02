@@ -14,14 +14,9 @@ struct gm_to_l1<ArchTag, DataType, DataFormat::ND, DataFormat::ND> {
     using HardwareParams = HardwareInfo<ArchTag>;
     static constexpr uint32_t BLOCK_SIZE = HardwareParams::l1l0BlockSize / sizeof(DataType);
 
-    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor,
-                        AscendC::GlobalTensor<DataType> gmTensor,
-                        uint32_t nTileActual,
-                        uint32_t nTileCeil,
-                        uint32_t nVal,
-                        uint32_t dTileActual,
-                        uint32_t dTileCeil,
-                        uint32_t dVal)
+    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor, AscendC::GlobalTensor<DataType> gmTensor,
+                        uint32_t nTileActual, uint32_t nTileCeil, uint32_t nVal, uint32_t dTileActual,
+                        uint32_t dTileCeil, uint32_t dVal)
     {
         AscendC::DataCopy(l1Tensor,                                                               // dst
                           gmTensor,                                                               // src
@@ -39,14 +34,9 @@ struct gm_to_l1<ArchTag, DataType, DataFormat::NZ, DataFormat::NZ> {
     static constexpr uint32_t BLOCK_SIZE = HardwareParams::l1l0BlockSize / sizeof(DataType);
     static constexpr uint32_t STRIDE_LIMIT = 65536;
 
-    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor,
-                        AscendC::GlobalTensor<DataType> gmTensor,
-                        uint32_t nTileActual,
-                        uint32_t nTileCeil,
-                        uint32_t nVal,
-                        uint32_t dTileActual,
-                        uint32_t dTileCeil,
-                        uint32_t dVal)
+    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor, AscendC::GlobalTensor<DataType> gmTensor,
+                        uint32_t nTileActual, uint32_t nTileCeil, uint32_t nVal, uint32_t dTileActual,
+                        uint32_t dTileCeil, uint32_t dVal)
     {
         uint64_t srcStride = nVal - nTileCeil;
         if (srcStride < STRIDE_LIMIT) {
@@ -78,18 +68,12 @@ struct gm_to_l1<ArchTag, DataType, DataFormat::ND, DataFormat::NZ> {
     static constexpr uint32_t BLOCK_SIZE = HardwareParams::l1l0BlockSize / sizeof(DataType);
     static constexpr uint32_t STRIDE_LIMIT = 65536;
 
-    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor,
-                        AscendC::GlobalTensor<DataType> gmTensor,
-                        uint32_t nTileActual,
-                        uint32_t nTileCeil,
-                        uint32_t nVal,
-                        uint32_t dTileActual,
-                        uint32_t dTileCeil,
-                        uint32_t dVal)
+    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor, AscendC::GlobalTensor<DataType> gmTensor,
+                        uint32_t nTileActual, uint32_t nTileCeil, uint32_t nVal, uint32_t dTileActual,
+                        uint32_t dTileCeil, uint32_t dVal)
     {
         if (dVal < STRIDE_LIMIT) {
-            AscendC::DataCopy(l1Tensor,
-                              gmTensor,
+            AscendC::DataCopy(l1Tensor, gmTensor,
                               AscendC::Nd2NzParams(1,           // ndNum
                                                    nTileActual, // nValue
                                                    dTileActual, // dValue
@@ -100,8 +84,7 @@ struct gm_to_l1<ArchTag, DataType, DataFormat::ND, DataFormat::NZ> {
                                                    0));         // dstNzMatrixStride, unused
         } else {
             for (uint32_t i = 0; i < nTileActual; i++) {
-                AscendC::DataCopy(l1Tensor[i * BLOCK_SIZE],
-                                  gmTensor[i * dVal],
+                AscendC::DataCopy(l1Tensor[i * BLOCK_SIZE], gmTensor[i * dVal],
                                   AscendC::Nd2NzParams(1,           // ndNum
                                                        1,           // nValue
                                                        dTileActual, // dValue
@@ -122,18 +105,12 @@ struct gm_to_l1<ArchTag, DataType, DataFormat::ND, DataFormat::ZN> {
     static constexpr uint32_t BLOCK_SIZE = HardwareParams::l1l0BlockSize / sizeof(DataType);
     static constexpr uint32_t STRIDE_LIMIT = 65536;
 
-    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor,
-                        AscendC::GlobalTensor<DataType> gmTensor,
-                        uint32_t nTileActual,
-                        uint32_t nTileCeil,
-                        uint32_t nVal,
-                        uint32_t dTileActual,
-                        uint32_t dTileCeil,
-                        uint32_t dVal)
+    __aicore__ gm_to_l1(AscendC::LocalTensor<DataType> l1Tensor, AscendC::GlobalTensor<DataType> gmTensor,
+                        uint32_t nTileActual, uint32_t nTileCeil, uint32_t nVal, uint32_t dTileActual,
+                        uint32_t dTileCeil, uint32_t dVal)
     {
         if (dVal < STRIDE_LIMIT) {
-            AscendC::DataCopy(l1Tensor,
-                              gmTensor,
+            AscendC::DataCopy(l1Tensor, gmTensor,
                               AscendC::Nd2NzParams(1,           // ndNum
                                                    nTileActual, // nValue
                                                    dTileActual, // dValue
@@ -144,8 +121,7 @@ struct gm_to_l1<ArchTag, DataType, DataFormat::ND, DataFormat::ZN> {
                                                    0));         // dstNzMatrixStride, unused
         } else {
             for (uint32_t i = 0; i < nTileActual; ++i) {
-                AscendC::DataCopy(l1Tensor,
-                                  gmTensor,
+                AscendC::DataCopy(l1Tensor, gmTensor,
                                   AscendC::Nd2NzParams(1,           // ndNum
                                                        1,           // nValue
                                                        dTileActual, // dValue

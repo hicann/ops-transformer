@@ -14,12 +14,13 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *LightningIndexerV2Metadata(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional, int64_t numHeadsQ, int64_t numHeadsK,
-    int64_t headDim, int64_t topk, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, char *layoutQOptional,
-    char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t aicCoreNum, int64_t aivCoreNum,
-    const char *socVersion, const aclTensor *metadata, aclOpExecutor *executor);
+const aclTensor *LightningIndexerV2Metadata(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional,
+                                            const aclTensor *sequsedQOptional, const aclTensor *sequsedKOptional,
+                                            const aclTensor *cmpResidualKOptional, int64_t numHeadsQ, int64_t numHeadsK,
+                                            int64_t headDim, int64_t topk, int64_t batchSize, int64_t maxSeqlenQ,
+                                            int64_t maxSeqlenK, char *layoutQOptional, char *layoutKOptional,
+                                            int64_t maskMode, int64_t cmpRatio, int64_t aicCoreNum, int64_t aivCoreNum,
+                                            const char *socVersion, const aclTensor *metadata, aclOpExecutor *executor);
 } // namespace l0op
 
 #endif

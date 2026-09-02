@@ -28,7 +28,8 @@ constexpr uint16_t DATA_COPY_MAX_BLKCNT = 4095;
 template <typename T>
 class GatherPaKvCacheNz {
 public:
-    __aicore__ inline GatherPaKvCacheNz(AscendC::TPipe *p) : pipe(p){};
+    __aicore__ inline GatherPaKvCacheNz(AscendC::TPipe *p)
+        : pipe(p){};
     __aicore__ inline void Init(GM_ADDR keyCacheInGm, GM_ADDR valueCacheInGm, GM_ADDR blockTablesInGm,
                                 GM_ADDR seqLensInGm, GM_ADDR seqOffsetInGm, GM_ADDR keyOutGm, GM_ADDR valueOutGm,
                                 const GatherPaKvCacheTilingData *__restrict tilingData);
@@ -134,7 +135,6 @@ __aicore__ inline void GatherPaKvCacheNz<T>::CopyLocateInfoIn(int32_t tokenId)
     AscendC::PipeBarrier<PIPE_ALL>();
 }
 
-
 template <typename T>
 __aicore__ inline void GatherPaKvCacheNz<T>::RestoreDataFromCache(int32_t blkTabValue, int32_t blockOffset,
                                                                   int32_t numRsltProc, int32_t ctxtId, bool isKeyValue)
@@ -181,7 +181,6 @@ __aicore__ inline void GatherPaKvCacheNz<T>::RestoreDataFromCache(int32_t blkTab
     DataCopy(outGM[start], this->tmpTensor, copyOutParams);
     AscendC::PipeBarrier<PIPE_ALL>();
 }
-
 
 template <typename T>
 __aicore__ inline void GatherPaKvCacheNz<T>::Process()

@@ -285,7 +285,8 @@ public:
 
                                 record_cube3(s1Idx, s2Idx, kx, ROW_4, kx * ROW_4 - have_ur_block, ur, lastBatchQSum,
                                              lastBatchKSum);
-                                record(s1Idx, s2Idx, kx, ROW_2, kx * ROW_2 - have_ur_block, ur, lastBatchQSum, lastBatchKSum);
+                                record(s1Idx, s2Idx, kx, ROW_2, kx * ROW_2 - have_ur_block, ur, lastBatchQSum,
+                                       lastBatchKSum);
                                 num += kx * ROW_2 - have_ur_block;
                                 record(s1Idx + ROW_2, s2Idx, kx, ROW_2, kx * ROW_2, true, lastBatchQSum, lastBatchKSum);
                                 num += kx * ROW_2;
@@ -323,10 +324,10 @@ public:
                         lastBatchQSum = getTotalLen(batchIdx, seqLenQ);
                         lastBatchKSum = getTotalLen(batchIdx, seqLenK);
                         batchIdx += 1;
-                        if(batchIdx < batchNum){
+                        if (batchIdx < batchNum) {
                             s1 = getSeqLen(batchIdx, seqLenQ);
                             s2 = getSeqLen(batchIdx, seqLenK);
-                        }else{
+                        } else {
                             s1 = 0;
                             s2 = 0;
                         }
@@ -354,7 +355,6 @@ public:
         roundId++;
         return having;
     }
-
 
     __aicore__ void init(int32_t batchSize, int32_t heads, int32_t gin, int32_t headDims, int32_t core_index,
                          __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *actual_seq_kvlen, int32_t cubeNum,
@@ -386,7 +386,6 @@ public:
         lastBatchQSum = 0;
         lastBatchKSum = 0;
     }
-
 
 protected:
     __aicore__ void clear_calc_info()

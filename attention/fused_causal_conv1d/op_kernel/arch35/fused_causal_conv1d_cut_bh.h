@@ -34,7 +34,8 @@ constexpr int32_t CAST_REP_SIZE = 64;
 template <typename T>
 class FusedCausalConv1dCutBH {
 public:
-    __aicore__ inline FusedCausalConv1dCutBH(TPipe *pipe) : pipe_(pipe){};
+    __aicore__ inline FusedCausalConv1dCutBH(TPipe *pipe)
+        : pipe_(pipe){};
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR queryStartLoc,
                                 GM_ADDR cacheIndices, GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
@@ -50,12 +51,14 @@ private:
 
     // ========== 三阶段流水线函数 ==========
     __aicore__ inline void CopyIn(int32_t batchLoop, int32_t dimLoop, uint16_t blockCount, int64_t xOffset);
-    __aicore__ inline void
-    Compute(int32_t batchLoop, int32_t dimLoop, const LocalTensor<int32_t> &indicesLocal,
-            const LocalTensor<int32_t> &acceptTokenLocal, const LocalTensor<int32_t> &queryStartLocLocal,
-            const LocalTensor<int32_t> &numComputedTokensLocal, const LocalTensor<int32_t> &blockIdxFirstLocal,
-            const LocalTensor<int32_t> &blockIdxLastLocal, const LocalTensor<int32_t> &initialStateIdxLocal,
-            uint16_t yBlockCount, int64_t yOffset, int64_t xOffset);
+    __aicore__ inline void Compute(int32_t batchLoop, int32_t dimLoop, const LocalTensor<int32_t> &indicesLocal,
+                                   const LocalTensor<int32_t> &acceptTokenLocal,
+                                   const LocalTensor<int32_t> &queryStartLocLocal,
+                                   const LocalTensor<int32_t> &numComputedTokensLocal,
+                                   const LocalTensor<int32_t> &blockIdxFirstLocal,
+                                   const LocalTensor<int32_t> &blockIdxLastLocal,
+                                   const LocalTensor<int32_t> &initialStateIdxLocal, uint16_t yBlockCount,
+                                   int64_t yOffset, int64_t xOffset);
 
     __aicore__ inline void UpdateConvStates(const LocalTensor<T> &xLocal, const LocalTensor<T> &convStatesLocal,
                                             int32_t curBatchUbOffset, int64_t writeCacheLine, int32_t curBatchSeq,
@@ -161,11 +164,12 @@ private:
 };
 
 template <typename T>
-__aicore__ inline void
-FusedCausalConv1dCutBH<T>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR queryStartLoc,
-                                GM_ADDR cacheIndices, GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
-                                GM_ADDR blockIdxFirstScheduledToken, GM_ADDR blockIdxLastScheduledToken,
-                                GM_ADDR initialStateIdx, GM_ADDR y, const FusedCausalConv1dCutBHTilingData *tilingData)
+__aicore__ inline void FusedCausalConv1dCutBH<T>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates,
+                                                       GM_ADDR queryStartLoc, GM_ADDR cacheIndices,
+                                                       GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
+                                                       GM_ADDR blockIdxFirstScheduledToken,
+                                                       GM_ADDR blockIdxLastScheduledToken, GM_ADDR initialStateIdx,
+                                                       GM_ADDR y, const FusedCausalConv1dCutBHTilingData *tilingData)
 {
     InitParams(tilingData);
 

@@ -210,11 +210,17 @@ public:
 
     // Member acces operator
     CATLASS_HOST_DEVICE
-    Index &operator[](int dim) { return idx[dim]; }
+    Index &operator[](int dim)
+    {
+        return idx[dim];
+    }
 
     // Member access operator
     CATLASS_HOST_DEVICE
-    Index const &operator[](int dim) const { return idx[dim]; }
+    Index const &operator[](int dim) const
+    {
+        return idx[dim];
+    }
 
     // Gets the index of a given Coord element
     template <int DIM>
@@ -225,7 +231,10 @@ public:
 
     // Access via index; may limit unrolling potential
     CATLASS_HOST_DEVICE
-    Index &At(int dim) { return idx[dim]; }
+    Index &At(int dim)
+    {
+        return idx[dim];
+    }
 
     // Gets the index of a given Coord element
     template <int DIM>
@@ -236,7 +245,10 @@ public:
 
     // Access via index; may limit unrolling potential
     CATLASS_HOST_DEVICE
-    Index const &At(int dim) const { return idx[dim]; }
+    Index const &At(int dim) const
+    {
+        return idx[dim];
+    }
 
     template <int... Is>
     CATLASS_HOST_DEVICE auto GetCoordByAxis() const

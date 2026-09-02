@@ -20,24 +20,14 @@
 
 namespace l0op {
 
-const aclTensor* NsaSelectedAttentionInfer(const aclTensor *query, 
-                                        const aclTensor *key, 
-                                        const aclTensor *value, 
-                                        const aclTensor *topkIndices, 
-                                        const aclTensor *attenMaskOptional,
-                                        const aclTensor *blockTableOptional,
-                                        const aclIntArray *actualQSeqLenOptional, 
-                                        const aclIntArray *actualKvSeqLenOptional, 
-                                        char *layoutOptional,
-                                        int64_t numHeads,
-                                        int64_t numKeyValueHeads,
-                                        int64_t selectBlockSize,
-                                        int64_t selectBlockCount,
-                                        int64_t pageBlockSize,
-                                        double scaleValue,
-                                        int64_t sparseMode,
-                                        aclOpExecutor *executor);
+const aclTensor *NsaSelectedAttentionInfer(const aclTensor *query, const aclTensor *key, const aclTensor *value,
+                                           const aclTensor *topkIndices, const aclTensor *attenMaskOptional,
+                                           const aclTensor *blockTableOptional,
+                                           const aclIntArray *actualQSeqLenOptional,
+                                           const aclIntArray *actualKvSeqLenOptional, char *layoutOptional,
+                                           int64_t numHeads, int64_t numKeyValueHeads, int64_t selectBlockSize,
+                                           int64_t selectBlockCount, int64_t pageBlockSize, double scaleValue,
+                                           int64_t sparseMode, aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_OP_NSA_SELECTED_ATTENTION_INFER_OP_H_
- 

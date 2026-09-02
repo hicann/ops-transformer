@@ -23,7 +23,8 @@ class FusedFloydAttentionGradPre {
 public:
     __aicore__ inline FusedFloydAttentionGradPre(){};
     __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dk_1,
-                            __gm__ uint8_t *dv_1, __gm__ uint8_t *workspace, const TILING_TYPE *ordTilingData, TPipe *pipe_in);
+                                __gm__ uint8_t *dv_1, __gm__ uint8_t *workspace, const TILING_TYPE *ordTilingData,
+                                TPipe *pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
@@ -108,15 +109,15 @@ __aicore__ inline void FusedFloydAttentionGradPre<T1, T2, TILING_TYPE, INIT_OUTP
         k1v1SizeAlign = TilingData->postTilingData.k1v1SizeAlign;
 
         dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
+                                      TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
         dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
+                                      TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
         dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
+                                      TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
         dk1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dk1WorkSpaceOffset / sizeof(float));
+                                       TilingData->postTilingData.dk1WorkSpaceOffset / sizeof(float));
         dv1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dv1WorkSpaceOffset / sizeof(float));
+                                       TilingData->postTilingData.dv1WorkSpaceOffset / sizeof(float));
 
         initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
         dqOffset = ((int64_t)cBlockIdx) * qPreBlockFactor;
@@ -125,9 +126,7 @@ __aicore__ inline void FusedFloydAttentionGradPre<T1, T2, TILING_TYPE, INIT_OUTP
         initdk1v1Size = cBlockIdx == k1v1PreBlockTotal - 1 ? k1v1PreBlockTail : k1v1PreBlockFactor;
         dk1v1Offset = ((int64_t)cBlockIdx) * k1v1PreBlockFactor;
     }
-
 }
-
 
 template <typename T1, typename T2, typename TILING_TYPE, const bool INIT_OUTPUT>
 __aicore__ inline void FusedFloydAttentionGradPre<T1, T2, TILING_TYPE, INIT_OUTPUT>::Process()
@@ -152,7 +151,6 @@ __aicore__ inline void FusedFloydAttentionGradPre<T1, T2, TILING_TYPE, INIT_OUTP
             }
         }
     }
-
 }
 
 template <typename T1, typename T2, typename TILING_TYPE, const bool INIT_OUTPUT>

@@ -79,43 +79,73 @@ public:
 
     /// Returns the layout of a tile.
     CATLASS_HOST_DEVICE
-    NC1HWC0 GetTileLayout(Conv2dFmapCoord const &tileShape) const { return NC1HWC0(tileShape, stride()); }
+    NC1HWC0 GetTileLayout(Conv2dFmapCoord const &tileShape) const
+    {
+        return NC1HWC0(tileShape, stride());
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
     /// Returns the length of the layout
     CATLASS_HOST_DEVICE
-    size_t Capacity() { return static_cast<size_t>(shape_[0]) * stride_[0]; }
+    size_t Capacity()
+    {
+        return static_cast<size_t>(shape_[0]) * stride_[0];
+    }
 
 private:
     /// Shape data member
@@ -187,43 +217,73 @@ public:
 
     /// Returns the layout of a tile.
     CATLASS_HOST_DEVICE
-    CI1KHKWCOCI0 GetTileLayout(Conv2dFilterCoord const &tileShape) const { return CI1KHKWCOCI0(tileShape, stride()); }
+    CI1KHKWCOCI0 GetTileLayout(Conv2dFilterCoord const &tileShape) const
+    {
+        return CI1KHKWCOCI0(tileShape, stride());
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
     /// Returns the length of the layout
     CATLASS_HOST_DEVICE
-    size_t Capacity() { return static_cast<size_t>(shape_[0]) * stride_[0]; }
+    size_t Capacity()
+    {
+        return static_cast<size_t>(shape_[0]) * stride_[0];
+    }
 
 private:
     /// Shape data member

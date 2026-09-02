@@ -45,14 +45,14 @@ public:
     static constexpr uint64_t L0_BUF_NUM = 2;
 
     static constexpr uint32_t KEY_MTE1_MTE2_EVENT = EVENT_ID2;
-    static constexpr uint32_t QUERY_MTE1_MTE2_EVENT = EVENT_ID5;         // KEY_MTE1_MTE2_EVENT + KEY_BUF_NUM;
+    static constexpr uint32_t QUERY_MTE1_MTE2_EVENT = EVENT_ID5; // KEY_MTE1_MTE2_EVENT + KEY_BUF_NUM;
     static constexpr uint32_t M_MTE1_EVENT = EVENT_ID3;
 
     static constexpr uint32_t MTE2_MTE1_EVENT = EVENT_ID2;
     static constexpr uint32_t MTE1_M_EVENT = EVENT_ID2;
     static constexpr uint32_t FIX_M_EVENT = EVENT_ID2;
     static constexpr uint32_t M_FIX_EVENT = EVENT_ID3;
-    
+
     static constexpr uint64_t M_BASIC_BLOCK = 256;
     static constexpr uint64_t D_BASIC_BLOCK = 128;
     static constexpr uint64_t S2_BASIC_BLOCK = 128;
@@ -63,7 +63,7 @@ public:
 
     static constexpr uint64_t FP16_BLOCK_CUBE = 16;
     static constexpr FixpipeConfig LI_CFG_ROW_MAJOR_UB = {CO2Layout::ROW_MAJOR, true};
-    
+
     static constexpr uint64_t QUERY_BUFFER_OFFSET = M_BASIC_BLOCK * D_BASIC_BLOCK;
     static constexpr uint64_t KEY_BUFFER_OFFSET = S2_BASIC_BLOCK * D_BASIC_BLOCK;
     static constexpr uint64_t L0AB_BUFFER_OFFSET = M_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0;
@@ -121,9 +121,8 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::InitParams(const ConstI
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::InitBuffers(TPipe *pipe)
 {
-    pipe->InitBuffer(bufUB_, 2 *CeilDiv(constInfo_.mBaseSize, 2) *
-                                constInfo_.s2BaseSize *
-                                sizeof(float));  // 大小：2(开dB) * 2 * 64 * 128 * 4 = 128KB
+    pipe->InitBuffer(bufUB_, 2 * CeilDiv(constInfo_.mBaseSize, 2) * constInfo_.s2BaseSize *
+                                 sizeof(float)); // 大小：2(开dB) * 2 * 64 * 128 * 4 = 128KB
     mm1ResUB_ = bufUB_.Get<float>();
     pipe->InitBuffer(bufQL1_, QUERY_BUF_NUM * M_BASIC_BLOCK * D_BASIC_BLOCK * sizeof(Q_T));
     queryL1_ = bufQL1_.Get<Q_T>();
@@ -140,9 +139,9 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::InitBuffers(TPipe *pipe
 }
 
 template <typename LIT>
-__aicore__ inline void
-LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm,
-                                                      const GlobalTensor<K_T> &keyGm, const GlobalTensor<Q_T> &queryGm)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm,
+                                                                             const GlobalTensor<K_T> &keyGm,
+                                                                             const GlobalTensor<Q_T> &queryGm)
 {
     blkTableGm_ = blkTableGm;
     keyGm_ = keyGm;
@@ -152,12 +151,10 @@ LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(const GlobalTensor<int32_t
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LICommon::RunInfo &runInfo)
 {
+    CrossCoreWaitFlag<LICommon::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(LICommon::ConstInfo::CROSS_VC_EVENT +
+                                                                    runInfo.loop % 2);
     CrossCoreWaitFlag<LICommon::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(
-                                                    LICommon::ConstInfo::CROSS_VC_EVENT + runInfo.loop % 2);
-    CrossCoreWaitFlag<LICommon::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(
-                                                    LICommon::ConstInfo::CROSS_VC_EVENT +
-                                                    runInfo.loop % 2 +
-                                                    LICommon::ConstInfo::AIV0_AIV1_OFFSET);
+        LICommon::ConstInfo::CROSS_VC_EVENT + runInfo.loop % 2 + LICommon::ConstInfo::AIV0_AIV1_OFFSET);
     uint64_t s2GmBaseOffset = runInfo.s2Idx * constInfo_.s2BaseSize;
     uint64_t s1gProcessSize = runInfo.actMBaseSize;
     uint64_t s2ProcessSize = runInfo.actualSingleProcessSInnerSize;
@@ -167,7 +164,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
             s2GmOffset + S2_BASIC_BLOCK > s2ProcessSize ? s2ProcessSize - s2GmOffset : S2_BASIC_BLOCK;
         if (PAGE_ATTENTION) {
             KeyNd2NzForPA(s2L1RealSize, s2GmBaseOffset + s2GmOffset, runInfo);
-        }else {
+        } else {
             KeyNd2Nz(s2L1RealSize, s2GmOffset, runInfo);
         }
 
@@ -175,10 +172,9 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
         WaitFlag<HardEvent::MTE2_MTE1>(MTE2_MTE1_EVENT);
         // s1gProcessSize当前必定不会超过2倍的s1g basic block
         for (uint64_t s1gGmOffset = 0; s1gGmOffset < s1gProcessSize; s1gGmOffset += constInfo_.mBaseSize) {
-            uint64_t s1gL1RealSize =
-                s1gGmOffset + constInfo_.mBaseSize > s1gProcessSize
-                                                   ? s1gProcessSize - s1gGmOffset
-                                                   : constInfo_.mBaseSize;
+            uint64_t s1gL1RealSize = s1gGmOffset + constInfo_.mBaseSize > s1gProcessSize ?
+                                         s1gProcessSize - s1gGmOffset :
+                                         constInfo_.mBaseSize;
             uint64_t s1gL1SizeAlign2G = CeilAlign(s1gL1RealSize, 2 * constInfo_.gSize);
             if (runInfo.isFirstS2InnerLoop && s2GmOffset == 0) {
                 queryL1Mte2BufIdx_++;
@@ -194,18 +190,17 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
             for (uint64_t s2L1Offset = 0; s2L1Offset < s2L1RealSize; s2L1Offset += S2_BASIC_BLOCK_L0) {
                 uint64_t s2L0RealSize =
                     s2L1Offset + S2_BASIC_BLOCK_L0 > s2L1RealSize ? s2L1RealSize - s2L1Offset : S2_BASIC_BLOCK_L0;
-                
+
                 uint64_t l0Stride = constInfo_.mBaseSize;
                 if (constInfo_.splitMFlag) {
                     l0Stride /= 2;
                 }
-                
+
                 for (uint64_t s1gL1Offset = 0; s1gL1Offset < s1gL1SizeAlign2G; s1gL1Offset += l0Stride) {
                     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + l0BufIdx_ % L0_BUF_NUM);
-                    uint64_t s1gL0RealSize =
-                        s1gL1Offset + constInfo_.mBaseSize > s1gL1SizeAlign2G
-                                                           ? s1gL1SizeAlign2G - s1gL1Offset
-                                                           : constInfo_.mBaseSize;
+                    uint64_t s1gL0RealSize = s1gL1Offset + constInfo_.mBaseSize > s1gL1SizeAlign2G ?
+                                                 s1gL1SizeAlign2G - s1gL1Offset :
+                                                 constInfo_.mBaseSize;
                     if (constInfo_.splitMFlag) {
                         s1gL0RealSize = 128; // g=64, topK=2k时固定m=128
                     }
@@ -216,7 +211,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
 
                     SetFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
                     WaitFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
-                    
+
                     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + l0BufIdx_ % L0_BUF_NUM);
                     ComputeL0c(s1gL0RealSize, s2L0RealSize, runInfo);
 
@@ -239,18 +234,15 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
         SetFlag<HardEvent::MTE1_MTE2>(KEY_MTE1_MTE2_EVENT + keyL1BufIdx_ % KEY_BUF_NUM);
         keyL1BufIdx_++;
     }
+    CrossCoreSetFlag<LICommon::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(LICommon::ConstInfo::CROSS_CV_EVENT +
+                                                                   runInfo.loop % 2);
     CrossCoreSetFlag<LICommon::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(
-                                                LICommon::ConstInfo::CROSS_CV_EVENT +
-                                                runInfo.loop % 2);
-    CrossCoreSetFlag<LICommon::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(
-                                                LICommon::ConstInfo::CROSS_CV_EVENT +
-                                                runInfo.loop % 2 +
-                                                LICommon::ConstInfo::AIV0_AIV1_OFFSET);
+        LICommon::ConstInfo::CROSS_CV_EVENT + runInfo.loop % 2 + LICommon::ConstInfo::AIV0_AIV1_OFFSET);
 }
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                    const LICommon::RunInfo &runInfo)
+                                                                  const LICommon::RunInfo &runInfo)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -269,19 +261,19 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1R
 // blkNum, blkSize, N2, D
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                    const LICommon::RunInfo &runInfo)
+                                                                       const LICommon::RunInfo &runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
         uint64_t s2BlkId = (s2L1Offset + s2GmOffset) / constInfo_.kCacheBlockSize;
         uint64_t s2BlkOffset = (s2L1Offset + s2GmOffset) % constInfo_.kCacheBlockSize;
-        uint64_t keyGmOffset = blkTableGm_.GetValue(runInfo.bIdx * constInfo_.maxBlockNumPerBatch + s2BlkId) *
-                               constInfo_.keyStride0 + s2BlkOffset * constInfo_.headDim;
+        uint64_t keyGmOffset =
+            blkTableGm_.GetValue(runInfo.bIdx * constInfo_.maxBlockNumPerBatch + s2BlkId) * constInfo_.keyStride0 +
+            s2BlkOffset * constInfo_.headDim;
 
         uint64_t s2Mte2Size = s2L1RealSize - s2L1Offset;
-        s2Mte2Size = s2BlkOffset + s2Mte2Size >= constInfo_.kCacheBlockSize
-                                                ? constInfo_.kCacheBlockSize - s2BlkOffset
-                                                : s2Mte2Size;
+        s2Mte2Size = s2BlkOffset + s2Mte2Size >= constInfo_.kCacheBlockSize ? constInfo_.kCacheBlockSize - s2BlkOffset :
+                                                                              s2Mte2Size;
         Nd2NzParams nd2nzPara;
         nd2nzPara.ndNum = 1;
         nd2nzPara.nValue = s2Mte2Size; // 行数
@@ -301,7 +293,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t 
 // batch, s1, n2, g, d
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
-                                                 const LICommon::RunInfo &runInfo)
+                                                                    const LICommon::RunInfo &runInfo)
 {
     uint64_t dstNzC0Stride = CeilAlign(s1gL1RealSize, 2 * constInfo_.gSize);
     Nd2NzParams nd2nzPara;
@@ -315,13 +307,13 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1g
     nd2nzPara.dstNzMatrixStride = 0;
     // 默认一块buf最多放两份
     DataCopy(queryL1_[(queryL1Mte2BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET],
-    queryGm_[runInfo.tensorQueryOffset + s1gGmOffset * constInfo_.headDim], nd2nzPara);
+             queryGm_[runInfo.tensorQueryOffset + s1gGmOffset * constInfo_.headDim], nd2nzPara);
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s1gGmOffset,
-                                                     uint64_t s1gL1Offset, uint64_t s1gL1RealSize,
-                                                     uint64_t s1gL0RealSize, const LICommon::RunInfo &runInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s1gGmOffset, uint64_t s1gL1Offset,
+                                                                        uint64_t s1gL1RealSize, uint64_t s1gL0RealSize,
+                                                                        const LICommon::RunInfo &runInfo)
 {
     LoadData2DParamsV2 loadData2DParamsV2;
     if (constInfo_.splitMFlag && runInfo.actMBaseSize > 128) { // 非尾块，切M
@@ -335,9 +327,9 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t
         for (int i = 0; i < 2; i++) {
             loadData2DParamsV2.mStartPosition = CeilDiv((s1gL1Offset / 2) + i * 128, BLOCK_CUBE);
             dstOffset = i * 64 * 16;
-    
+
             LoadData(queryL0_[(l0BufIdx_ % L0_BUF_NUM) * L0AB_BUFFER_OFFSET + dstOffset],
-                queryL1_[(queryL1Mte1BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET], loadData2DParamsV2);
+                     queryL1_[(queryL1Mte1BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET], loadData2DParamsV2);
         }
     } else {
         loadData2DParamsV2.mStartPosition = CeilDiv(s1gL1Offset, BLOCK_CUBE);
@@ -347,16 +339,16 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t
         loadData2DParamsV2.srcStride = CeilDiv(s1gL1RealSize, BLOCK_CUBE);
         loadData2DParamsV2.dstStride = CeilDiv(s1gL0RealSize, BLOCK_CUBE);
         loadData2DParamsV2.ifTranspose = false;
-    
+
         LoadData(queryL0_[(l0BufIdx_ % L0_BUF_NUM) * L0AB_BUFFER_OFFSET],
-            queryL1_[(queryL1Mte1BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET], loadData2DParamsV2);
+                 queryL1_[(queryL1Mte1BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET], loadData2DParamsV2);
     }
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s2L1Offset,
-                                                     uint64_t s2L1RealSize, uint64_t s2L0RealSize,
-                                                     const LICommon::RunInfo &runInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s2L1Offset, uint64_t s2L1RealSize,
+                                                                      uint64_t s2L0RealSize,
+                                                                      const LICommon::RunInfo &runInfo)
 {
     LoadData2DParamsV2 loadData2DParamsV2;
     loadData2DParamsV2.mStartPosition = CeilDiv(s2L1Offset, BLOCK_CUBE);
@@ -366,14 +358,14 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s
     loadData2DParamsV2.srcStride = CeilDiv(s2L1RealSize, BLOCK_CUBE);
     loadData2DParamsV2.dstStride = CeilDiv(s2L0RealSize, BLOCK_CUBE);
     loadData2DParamsV2.ifTranspose = false;
-    
+
     LoadData(keyL0_[(kl0BufIdx_ % L0_BUF_NUM) * L0AB_BUFFER_OFFSET],
              keyL1_[(keyL1BufIdx_ % KEY_BUF_NUM) * KEY_BUFFER_OFFSET], loadData2DParamsV2);
 }
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                const LICommon::RunInfo &runInfo)
+                                                                    const LICommon::RunInfo &runInfo)
 {
     MmadParams mmadParams;
     mmadParams.m = CeilAlign(s1gL0RealSize, BLOCK_CUBE);
@@ -389,9 +381,9 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeL0c(uint64_t s1g
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::Fixp(uint64_t s1gGmOffset,
-                                            uint64_t s2GmOffset, uint64_t s1gL0RealSize,
-                                            uint64_t s2L0RealSize, const LICommon::RunInfo &runInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::Fixp(uint64_t s1gGmOffset, uint64_t s2GmOffset,
+                                                              uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
+                                                              const LICommon::RunInfo &runInfo)
 {
     SetFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);
     WaitFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);
@@ -412,10 +404,10 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::Fixp(uint64_t s1gGmOffs
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
-        Fixpipe<float, float, LI_CFG_ROW_MAJOR_UB>(mm1ResUB_[(runInfo.loop % 2) *
-                                                    CeilDiv(constInfo_.mBaseSize, 2) * constInfo_.s2BaseSize +
-                                                    CeilDiv(s1gGmOffset, 2) * fixpipeParams.dstStride + s2GmOffset],
-                                            cL0_[(l0BufIdx_ % L0_BUF_NUM) * L0C_BUFFER_OFFSET], fixpipeParams);
+        Fixpipe<float, float, LI_CFG_ROW_MAJOR_UB>(
+            mm1ResUB_[(runInfo.loop % 2) * CeilDiv(constInfo_.mBaseSize, 2) * constInfo_.s2BaseSize +
+                      CeilDiv(s1gGmOffset, 2) * fixpipeParams.dstStride + s2GmOffset],
+            cL0_[(l0BufIdx_ % L0_BUF_NUM) * L0C_BUFFER_OFFSET], fixpipeParams);
     }
 }
 
@@ -432,7 +424,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::AllocEventID()
 
     SetFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 0);
     SetFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 1);
-    
+
     SetFlag<HardEvent::FIX_M>(FIX_M_EVENT + 0);
     SetFlag<HardEvent::FIX_M>(FIX_M_EVENT + 1);
 }
@@ -450,7 +442,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::FreeEventID()
 
     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 0);
     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 1);
-    
+
     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + 0);
     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + 1);
 }

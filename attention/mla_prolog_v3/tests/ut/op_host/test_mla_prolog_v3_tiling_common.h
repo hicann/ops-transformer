@@ -67,9 +67,15 @@ static std::string MlaPrologV3_tiling_950SocInfo = "{\n"
                                                    "}";
 class MlaPrologV3 : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "MlaPrologV3 SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "MlaPrologV3 SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "MlaPrologV3 TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "MlaPrologV3 TearDown" << std::endl;
+    }
 };
 
 #endif // UTEST_MLA_PROLOG_V3_TILING_COMMON_H

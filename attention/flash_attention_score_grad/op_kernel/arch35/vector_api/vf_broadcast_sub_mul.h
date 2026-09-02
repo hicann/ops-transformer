@@ -30,7 +30,8 @@ param [in] gradTensor input grad LocalTensor
 param [in] srcTensor input src LocalTensor
 */
 template <typename T, uint32_t srcN, const bool IS_DETER_OLD>
-__simd_vf__ inline void BroadcastSubMulVF64(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t dstLocalIntZero, uint64_t gradLocalInt, uint64_t sfmLocalInt, uint32_t srcM, uint32_t realN)
+__simd_vf__ inline void BroadcastSubMulVF64(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t dstLocalIntZero,
+                                            uint64_t gradLocalInt, uint64_t sfmLocalInt, uint32_t srcM, uint32_t realN)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregGrad;
@@ -52,18 +53,19 @@ __simd_vf__ inline void BroadcastSubMulVF64(uint64_t srcLocalInt, uint64_t dstLo
         Sub(vregSub, vregSrc, vregGrad, pregTailExe);
         LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSfm, ((__ubuf__ float *&)sfmLocalInt), 128);
         Mul(vregMul, vregSub, vregSfm, pregTailExe);
-        StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ float *&)dstLocalInt), vregMul, 128, pregFullExe);
+        StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalInt), vregMul, 128,
+                                                                   pregFullExe);
         if constexpr (IS_DETER_OLD) { // 确定性计算需要将64~128的数据补零， 否则会有脏数据inf
             Duplicate(vregMul, 0);
-            StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                (__ubuf__ float *&)dstLocalIntZero, vregMul, 128, pregFullExe);
+            StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ float *&)dstLocalIntZero, vregMul, 128,
+                                                                       pregFullExe);
         }
     }
 }
 
 template <typename T, uint32_t srcN, const bool IS_DETER_OLD>
-__simd_vf__ inline void BroadcastSubMulVF128(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t sfmLocalInt, uint32_t realTailSize, uint32_t srcM)
+__simd_vf__ inline void BroadcastSubMulVF128(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt,
+                                             uint64_t sfmLocalInt, uint32_t realTailSize, uint32_t srcM)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregGrad;
@@ -86,22 +88,22 @@ __simd_vf__ inline void BroadcastSubMulVF128(uint64_t srcLocalInt, uint64_t dstL
         Sub(vregSub, vregSrc, vregGrad, pregFullExe);
         LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSfm, ((__ubuf__ float *&)sfmLocalInt), 64);
         Mul(vregMul, vregSub, vregSfm, pregFullExe);
-        StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ float *&)dstLocalInt), vregMul, 64, pregFullExe);
+        StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalInt), vregMul, 64,
+                                                                   pregFullExe);
         // 尾块
         LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrc, ((__ubuf__ float *&)srcLocalInt), 64);
         Sub(vregSub, vregSrc, vregGrad, pregTailExe);
         LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSfm, ((__ubuf__ float *&)sfmLocalInt), 64);
         Mul(vregMul, vregSub, vregSfm, pregTailExe);
-        StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ float *&)dstLocalInt), vregMul, 64, pregFullExe);
-    }    
+        StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalInt), vregMul, 64,
+                                                                   pregFullExe);
+    }
 }
 
 template <typename T, uint16_t srcN, const bool IS_DETER_OLD = 0, const bool IS_FP8_INPUT = false>
 __aicore__ inline void BroadcastSubMul(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-                                       const LocalTensor<T> &gradTensor, const LocalTensor<T> &sfmTensor,
-                                       uint32_t srcM, uint32_t realN = srcN)
+                                       const LocalTensor<T> &gradTensor, const LocalTensor<T> &sfmTensor, uint32_t srcM,
+                                       uint32_t realN = srcN)
 {
     const uint16_t fullExeSize = 64;
     uint16_t loopTimes = CeilDivision(srcN, fullExeSize);
@@ -125,54 +127,53 @@ __aicore__ inline void BroadcastSubMul(const LocalTensor<T> &dstTensor, const Lo
             RegTensor<float> vregSub;
             RegTensor<float> vregMul;
             RegTensor<float> vregSfm;
- 
+
             // tail reg
             RegTensor<float> vregSrcTail;
             RegTensor<float> vregSubTail;
             RegTensor<float> vregMulTail;
             RegTensor<float> vregSfmTail;
- 
- 
+
             MaskReg pregFullExe = CreateMask<float, MaskPattern::ALL>();
             MaskReg pregTailExe = UpdateMask<float>(realTailSize);
- 
+
             for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
                 DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_BRC_B32>(
-                        vregGrad, ((__ubuf__ float *&)gradLocalInt), 1);
+                    vregGrad, ((__ubuf__ float *&)gradLocalInt), 1);
                 for (uint16_t n = 0; n < loopTimes; n++) {
                     DataCopy(vregSrc, ((__ubuf__ float *&)srcLocalInt + m * srcN + n * fullExeSize));
                     Sub(vregSub, vregSrc, vregGrad, pregFullExe);
                     DataCopy(vregSfm, ((__ubuf__ float *&)sfmLocalInt + m * srcN + n * fullExeSize));
                     Mul(vregMul, vregSub, vregSfm, pregFullExe);
-                    DataCopy(
-                        ((__ubuf__ float *&)dstLocalInt + m * srcN + n * fullExeSize), vregMul, pregFullExe);
+                    DataCopy(((__ubuf__ float *&)dstLocalInt + m * srcN + n * fullExeSize), vregMul, pregFullExe);
                 }
                 // 尾块
-                DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    vregSrcTail, ((__ubuf__ float *&)srcLocalIntTail), srcN);
+                DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcTail,
+                                                                         ((__ubuf__ float *&)srcLocalIntTail), srcN);
                 Sub(vregSubTail, vregSrcTail, vregGrad, pregTailExe);
-                DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    vregSfmTail, ((__ubuf__ float *&)sfmLocalIntTail), srcN);
+                DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSfmTail,
+                                                                         ((__ubuf__ float *&)sfmLocalIntTail), srcN);
                 Mul(vregMulTail, vregSubTail, vregSfmTail, pregTailExe);
-                DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ float *&)dstLocalIntTail), vregMulTail, srcN, pregFullExe);
+                DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalIntTail),
+                                                                         vregMulTail, srcN, pregFullExe);
             }
         }
     } else if constexpr (srcN == 64) {
-        BroadcastSubMulVF64<T, srcN, IS_DETER_OLD>(srcLocalInt, dstLocalInt, dstLocalIntZero, gradLocalInt, sfmLocalInt, srcM, realN);
+        BroadcastSubMulVF64<T, srcN, IS_DETER_OLD>(srcLocalInt, dstLocalInt, dstLocalIntZero, gradLocalInt, sfmLocalInt,
+                                                   srcM, realN);
     } else if constexpr (srcN == 128) {
         uint32_t tailSize = realN % fullExeSize;
         uint32_t realTailSize = tailSize == 0 ? fullExeSize : tailSize;
-        BroadcastSubMulVF128<T, srcN, IS_DETER_OLD>(srcLocalInt, dstLocalInt, gradLocalInt, sfmLocalInt, realTailSize, srcM);
+        BroadcastSubMulVF128<T, srcN, IS_DETER_OLD>(srcLocalInt, dstLocalInt, gradLocalInt, sfmLocalInt, realTailSize,
+                                                    srcM);
     }
 }
 #else
 template <typename T, uint16_t srcN, const bool IS_DETER_OLD = 0, const bool IS_FP8_INPUT = false>
 __aicore__ inline void BroadcastSubMul(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-                                       const LocalTensor<T> &gradTensor, const LocalTensor<T> &sfmTensor,
-                                       uint32_t srcM, uint32_t realN = srcN)
-{
-}
+                                       const LocalTensor<T> &gradTensor, const LocalTensor<T> &sfmTensor, uint32_t srcM,
+                                       uint32_t realN = srcN)
+{}
 #endif
 } // namespace AscendC
 

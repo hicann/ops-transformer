@@ -15,20 +15,11 @@
 
 namespace l0op {
 
-const std::array<const aclTensor *, 3> NsaSelectedAttention(const aclTensor *query, 
-                                                            const aclTensor *key, 
-                                                            const aclTensor *value, 
-                                                            const aclTensor *topkIndices, 
-                                                            const aclTensor *attenMaskOptional,
-                                                            const aclIntArray *actualSeqQLenOptional, 
-                                                            const aclIntArray *actualSeqKvLenOptional, 
-                                                            double scaleValue, 
-                                                            int64_t headNum,
-                                                            const char *inputLayout,
-                                                            int64_t sparseMode, 
-                                                            int64_t selectedBlockSize, 
-                                                            int64_t selectedBlockCount,
-                                                            aclOpExecutor *executor);
+const std::array<const aclTensor *, 3> NsaSelectedAttention(
+    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *topkIndices,
+    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqQLenOptional,
+    const aclIntArray *actualSeqKvLenOptional, double scaleValue, int64_t headNum, const char *inputLayout,
+    int64_t sparseMode, int64_t selectedBlockSize, int64_t selectedBlockCount, aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_OP_NSA_SELECTED_ATTENTION_OP_H_

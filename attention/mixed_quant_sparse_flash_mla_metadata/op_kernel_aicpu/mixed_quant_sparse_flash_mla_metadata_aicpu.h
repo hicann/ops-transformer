@@ -35,7 +35,13 @@ constexpr bool CMP_KV = true;
 constexpr uint32_t NO_MASK = 0;
 constexpr uint32_t HAS_MASK = 1;
 
-enum BlockType : uint32_t { ORI_NORMAL_BLOCK = 0, ORI_TAIL_BLOCK, CMP_NORMAL_BLOCK, CMP_TAIL_BLOCK, BLOCK_MAX_TYPE };
+enum BlockType : uint32_t {
+    ORI_NORMAL_BLOCK = 0,
+    ORI_TAIL_BLOCK,
+    CMP_NORMAL_BLOCK,
+    CMP_TAIL_BLOCK,
+    BLOCK_MAX_TYPE
+};
 
 enum class SparseMode : uint8_t {
     DEFAULT_MASK = 0,
@@ -46,7 +52,10 @@ enum class SparseMode : uint8_t {
     SPARSE_BUTT,
 };
 
-enum class ValidSocVersion { ASCEND910 = 0, ASCEND950 };
+enum class ValidSocVersion {
+    ASCEND910 = 0,
+    ASCEND950
+};
 
 template <class T>
 using Range = std::pair<T, T>;
@@ -112,7 +121,11 @@ struct SplitResult {
     FlashDecodeResult fdRes{0U, 0U};                 // FD信息
 
     SplitResult(uint32_t aicNum, uint32_t aivNum)
-        : bN2End(aicNum), gS1End(aicNum), s2End(aicNum), firstFdDataWorkspaceIdx(aicNum), fdRes(aicNum, aivNum) {};
+        : bN2End(aicNum),
+          gS1End(aicNum),
+          s2End(aicNum),
+          firstFdDataWorkspaceIdx(aicNum),
+          fdRes(aicNum, aivNum) {};
 };
 
 // 分核功能模块内部使用：记录切分信息
@@ -158,7 +171,10 @@ struct SplitContext {
     SplitInfo splitInfo{0U};
     CostInfo costInfo{0U};
 
-    explicit SplitContext(uint32_t batchSize) : splitInfo(batchSize), costInfo(batchSize) {}
+    explicit SplitContext(uint32_t batchSize)
+        : splitInfo(batchSize),
+          costInfo(batchSize)
+    {}
 };
 
 // 分核功能模块内部使用：记录batch相关的临时信息

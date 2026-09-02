@@ -22,10 +22,10 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
     const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
     const aclIntArray *kvStartIdxOptional, const aclTensor *dScaleQOptional, const aclTensor *dScaleKOptional,
     const aclTensor *dScaleVOptional, const aclTensor *pScaleOptional, const aclTensor *queryRopeOptional,
-    const aclTensor *keyRopeOptional, double scaleValue, double keepProb, int64_t preTockens,
-    int64_t nextTockens, int64_t headNum, const char *inputLayout, int64_t innerPrecise,
-    int64_t sparseMode, int64_t pseType, int64_t seed, int64_t offset, int64_t outDtype, const char *softmaxOutLayout,
-    aclOpExecutor *executor, bool isMaxWorkspace = false);
+    const aclTensor *keyRopeOptional, double scaleValue, double keepProb, int64_t preTockens, int64_t nextTockens,
+    int64_t headNum, const char *inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType, int64_t seed,
+    int64_t offset, int64_t outDtype, const char *softmaxOutLayout, aclOpExecutor *executor,
+    bool isMaxWorkspace = false);
 }
 
 #endif // OP_API_INC_LEVEL0_OP_FLASH_ATTENTION_SCORE_OP_H_

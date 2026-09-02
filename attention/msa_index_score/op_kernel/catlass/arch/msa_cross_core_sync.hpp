@@ -96,7 +96,10 @@ CATLASS_DEVICE void CrossCoreSetFlag(CrossCoreFlag &flag)
 }
 
 CATLASS_DEVICE
-void CrossCoreWaitFlag(CrossCoreFlag &flag) { AscendC::CrossCoreWaitFlag(flag.id); }
+void CrossCoreWaitFlag(CrossCoreFlag &flag)
+{
+    AscendC::CrossCoreWaitFlag(flag.id);
+}
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
 CATLASS_DEVICE void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)

@@ -76,7 +76,8 @@ TILING_DATA_FIELD_DEF(int64_t, gOuter);
 TILING_DATA_FIELD_DEF(int64_t, bmmS1base);
 END_TILING_DATA_DEF;
 // 固定写法不能换行，会失败
-REGISTER_TILING_DATA_CLASS(FusedFloydAttentionGradS1S2BNGS1S2SplitCoreParamsOp,FusedFloydAttentionGradS1S2BNGS1S2SplitCoreParams)
+REGISTER_TILING_DATA_CLASS(FusedFloydAttentionGradS1S2BNGS1S2SplitCoreParamsOp,
+                           FusedFloydAttentionGradS1S2BNGS1S2SplitCoreParams)
 
 BEGIN_TILING_DATA_DEF(BlockNumListParams)
 TILING_DATA_FIELD_DEF_ARR(int64_t, 50, blockStarts);

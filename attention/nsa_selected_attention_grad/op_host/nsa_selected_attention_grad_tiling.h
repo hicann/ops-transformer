@@ -117,7 +117,6 @@ TILING_DATA_FIELD_DEF_STRUCT(SoftMaxTiling, softmaxGradTilingData);
 END_TILING_DATA_DEF;
 //======================== norm template tiling data def end ========================//
 
-
 //======================== basic template tiling data def start ========================//
 BEGIN_TILING_DATA_DEF(NsaSelectedAttentionGradBaseBasicParams)
 TILING_DATA_FIELD_DEF(uint32_t, usedCoreNum);

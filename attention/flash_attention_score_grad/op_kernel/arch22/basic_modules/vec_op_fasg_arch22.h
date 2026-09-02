@@ -317,10 +317,11 @@ __aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CopyInSoftMax(LocalTensor<fl
 }
 
 template <typename IN_TYPE, class TILING_TYPE>
-__aicore__ inline void
-VecOp<IN_TYPE, TILING_TYPE>::CalcSoftMax(LocalTensor<float> &dstTensor, LocalTensor<float> &src0Tensor,
-                                         LocalTensor<float> &src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
-                                         uint32_t s2ExtendAlign, const SoftMaxTiling &tiling)
+__aicore__ inline void VecOp<IN_TYPE, TILING_TYPE>::CalcSoftMax(LocalTensor<float> &dstTensor,
+                                                                LocalTensor<float> &src0Tensor,
+                                                                LocalTensor<float> &src1Tensor, uint32_t s1Extend,
+                                                                uint32_t s2Extend, uint32_t s2ExtendAlign,
+                                                                const SoftMaxTiling &tiling)
 {
     bool isBasicBlock = (s1Extend % 8 == 0) && (s2Extend % 64 == 0);
     if (isBasicBlock) {

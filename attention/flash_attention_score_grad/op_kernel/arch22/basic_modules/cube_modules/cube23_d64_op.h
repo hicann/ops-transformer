@@ -19,8 +19,9 @@
 // M->MTE1 eventId flag begin from 3 for the reason of tpipe init
 // MTE1->MTE2 eventId flag begin from 0
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ TYPE *right1,  __gm__ TYPE *right2, __gm__ float *out1, __gm__ float *out2)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Compute(
+    const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ TYPE *right1, __gm__ TYPE *right2, __gm__ float *out1,
+    __gm__ float *out2)
 {
     __gm__ TYPE *gm_matrixA = left + (shapeInfo.out + globalBlockOffset) * 2;
     __gm__ TYPE *gm_matrixB1 = right1 + shapeInfo.right;
@@ -56,7 +57,7 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
     // cube2:
     // left matrix is matrixA(ky, kx)
     // right matrix is matrixB1(kx, 64)
-    
+
     // cube3:
     // left matrix is matrixA^T(kx, ky)
     // right matrix is matrixB2(ky, 64)
@@ -69,7 +70,7 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
     int32_t kn_tail = (kn % BASE_BLOCK_LENGTH) == 0 ? BASE_BLOCK_LENGTH : (kn % BASE_BLOCK_LENGTH);
     int32_t km_align_tail = (km_tail + C0_SIZE - 1) / C0_SIZE * C0_SIZE;
     int32_t kn_align_tail = (kn_tail + C0_SIZE - 1) / C0_SIZE * C0_SIZE;
-    
+
     int32_t s1_loop = CeilDiv(km, BASE_BLOCK_LENGTH);
     int32_t s2_loop = CeilDiv(kn, BASE_BLOCK_LENGTH);
 
@@ -89,11 +90,7 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
         commonNd2NzParams.dValue = headDim;
         commonNd2NzParams.dstNzC0Stride = km_align;
         commonNd2NzParams.srcDValue = qHeadNum * headDim;
-        AscendC::DataCopy(
-            (*l1_b2_buf_tensor)[0],
-            temp_tensor_bf16[matrixB2_offset], 
-            commonNd2NzParams
-        );
+        AscendC::DataCopy((*l1_b2_buf_tensor)[0], temp_tensor_bf16[matrixB2_offset], commonNd2NzParams);
         SET_FLAG(MTE2, MTE1, L1B2_matrix_pingpong_flag + L1B2_FLAG_SHIFT);
 
         // The calculation of dQ is isolated from the calculation of dK.
@@ -111,49 +108,48 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
 
                 int32_t s1_block_length = (s1_idx == inner_s1Loop - 1) ? km_tail : BASE_BLOCK_LENGTH;
                 int32_t s2_block_length = (s2_idx == s2_loop - 1) ? kn_tail : BASE_BLOCK_LENGTH;
-                int32_t s1_block_align_length = (s1_block_length + C0_SIZE -  1) / C0_SIZE * C0_SIZE;
-                int32_t s2_block_align_length = (s2_block_length + C0_SIZE -  1) / C0_SIZE * C0_SIZE;
+                int32_t s1_block_align_length = (s1_block_length + C0_SIZE - 1) / C0_SIZE * C0_SIZE;
+                int32_t s2_block_align_length = (s2_block_length + C0_SIZE - 1) / C0_SIZE * C0_SIZE;
 
                 ///////////////////////////////// dQ /////////////////////////
-                
+
                 // load matrixA from gm -> L1
                 // dS in workspace is divided by two part in s1 axis
                 WAIT_FLAG(MTE1, MTE2, L1A_matrix_pingpong_flag + L1A_FLAG_SHIFT);
-                AscendC::LocalTensor<TYPE> *l1_a_buf_tensor = L1A_matrix_pingpong_flag ? &l1_a_pong_tensor : &l1_a_ping_tensor;
+                AscendC::LocalTensor<TYPE> *l1_a_buf_tensor =
+                    L1A_matrix_pingpong_flag ? &l1_a_pong_tensor : &l1_a_ping_tensor;
                 int32_t s1_block_up = (s1_block_length + 1) / 2;
                 int32_t s1_block_down = s1_block_length - s1_block_up;
                 commonNd2NzParams.dValue = s2_block_length;
                 commonNd2NzParams.dstNzC0Stride = s1_block_align_length;
                 commonNd2NzParams.srcDValue = BASE_BLOCK_LENGTH;
                 commonNd2NzParams.nValue = s1_block_up;
-                AscendC::DataCopy(
-                    *l1_a_buf_tensor,
-                    temp_tensor_bf16[matrixA_offset + 2 * (s2_idx * inner_s1Loop + s1_idx) * BASE_BLOCK_LENGTH * BASE_BLOCK_LENGTH],
-                    commonNd2NzParams
-                );
+                AscendC::DataCopy(*l1_a_buf_tensor,
+                                  temp_tensor_bf16[matrixA_offset + 2 * (s2_idx * inner_s1Loop + s1_idx) *
+                                                                        BASE_BLOCK_LENGTH * BASE_BLOCK_LENGTH],
+                                  commonNd2NzParams);
                 if (s1_block_down > 0) {
                     commonNd2NzParams.nValue = s1_block_down;
                     AscendC::DataCopy(
                         (*l1_a_buf_tensor)[s1_block_up * C0_SIZE],
-                        temp_tensor_bf16[matrixA_offset + 2 * (s2_idx * inner_s1Loop + s1_idx) * BASE_BLOCK_LENGTH * BASE_BLOCK_LENGTH +
+                        temp_tensor_bf16[matrixA_offset +
+                                         2 * (s2_idx * inner_s1Loop + s1_idx) * BASE_BLOCK_LENGTH * BASE_BLOCK_LENGTH +
                                          2 * s1_block_up * BASE_BLOCK_LENGTH],
-                        commonNd2NzParams
-                    );
+                        commonNd2NzParams);
                 }
                 SET_FLAG(MTE2, MTE1, L1A_matrix_pingpong_flag + L1A_FLAG_SHIFT);
 
                 // load matrixB1 from gm -> L1
                 WAIT_FLAG(MTE1, MTE2, L1B1_matrix_pingpong_flag + L1B1_FLAG_SHIFT);
-                LocalTensor<TYPE> *l1_b1_buf_tensor = L1B1_matrix_pingpong_flag ? &l1_b1_pong_tensor : &l1_b1_ping_tensor;
+                LocalTensor<TYPE> *l1_b1_buf_tensor =
+                    L1B1_matrix_pingpong_flag ? &l1_b1_pong_tensor : &l1_b1_ping_tensor;
                 commonNd2NzParams.nValue = s2_block_length;
                 commonNd2NzParams.dValue = headDim;
                 commonNd2NzParams.srcDValue = kvHeadNum * headDim;
                 commonNd2NzParams.dstNzC0Stride = s2_block_align_length;
-                AscendC::DataCopy(
-                    *l1_b1_buf_tensor, 
-                    temp_tensor_bf16[matrixB1_offset + s2_idx * BASE_BLOCK_LENGTH * kvHeadNum * headDim],
-                    commonNd2NzParams
-                );
+                AscendC::DataCopy(*l1_b1_buf_tensor,
+                                  temp_tensor_bf16[matrixB1_offset + s2_idx * BASE_BLOCK_LENGTH * kvHeadNum * headDim],
+                                  commonNd2NzParams);
                 SET_FLAG(MTE2, MTE1, L1B1_matrix_pingpong_flag + L1B1_FLAG_SHIFT);
 
                 // load matrixA from L1 -> L0A(ping) l0_a_ping_tensor
@@ -162,11 +158,8 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
                 commonLoadData2dParamsNoTranspose.repeatTimes = s2_block_align_length / C0_SIZE;
                 commonLoadData2dParamsNoTranspose.srcStride = s1_block_align_length / C0_SIZE;
                 for (int32_t i = 0; i < s1_block_align_length / C0_SIZE; i++) {
-                    AscendC::LoadData(
-                        (l0_a_ping_tensor)[i * s2_block_align_length * C0_SIZE], 
-                        (*l1_a_buf_tensor)[i * C0_SIZE * C0_SIZE],
-                        commonLoadData2dParamsNoTranspose
-                    );
+                    AscendC::LoadData((l0_a_ping_tensor)[i * s2_block_align_length * C0_SIZE],
+                                      (*l1_a_buf_tensor)[i * C0_SIZE * C0_SIZE], commonLoadData2dParamsNoTranspose);
                 }
                 SET_FLAG(MTE1, M, L0A_matrix_ping_flag);
 
@@ -176,11 +169,8 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
                 commonLoadData2dParamsTranspose.repeatTimes = headDim / C0_SIZE;
                 commonLoadData2dParamsTranspose.srcStride = s2_block_align_length / C0_SIZE;
                 for (int32_t i = 0; i < s2_block_align_length / C0_SIZE; i++) {
-                    AscendC::LoadData(
-                        (l0_b_ping_tensor)[i * headDim * C0_SIZE], 
-                        (*l1_b1_buf_tensor)[i * C0_SIZE * C0_SIZE],
-                        commonLoadData2dParamsTranspose
-                    );
+                    AscendC::LoadData((l0_b_ping_tensor)[i * headDim * C0_SIZE],
+                                      (*l1_b1_buf_tensor)[i * C0_SIZE * C0_SIZE], commonLoadData2dParamsTranspose);
                 }
                 SET_FLAG(MTE1, MTE2, L1B1_matrix_pingpong_flag + L1B1_FLAG_SHIFT);
                 SET_FLAG(MTE1, M, L0B_matrix_ping_flag);
@@ -189,7 +179,8 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
                 // (s1_block_length, s2_block_length) X (s2_block_length, headDim)
                 WAIT_FLAG(MTE1, M, L0A_matrix_ping_flag);
                 WAIT_FLAG(MTE1, M, L0B_matrix_ping_flag);
-                AscendC::LocalTensor<float> *l0_c1_buf_tensor = L0C_matrixC1_pingpong_flag ? &l0_c1_pong_tensor : &l0_c1_ping_tensor;
+                AscendC::LocalTensor<float> *l0_c1_buf_tensor =
+                    L0C_matrixC1_pingpong_flag ? &l0_c1_pong_tensor : &l0_c1_ping_tensor;
                 uint16_t s1_modify = (s1_block_length == 1) ? 2 : s1_block_length;
                 bool l0_c1_init_flag = (s2_idx == 0);
                 bool l0_c1_last_flag = (s2_idx == (s2_loop - 1));
@@ -198,30 +189,23 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
                 commonMadParams.k = s2_block_length;
                 commonMadParams.unitFlag = l0_c1_last_flag ? 3 : 2;
                 commonMadParams.cmatrixInitVal = l0_c1_init_flag;
-                AscendC::Mmad(
-                    *l0_c1_buf_tensor, 
-                    l0_a_ping_tensor, 
-                    l0_b_ping_tensor,
-                    commonMadParams
-                );
+                AscendC::Mmad(*l0_c1_buf_tensor, l0_a_ping_tensor, l0_b_ping_tensor, commonMadParams);
 
                 // fixpipe Mad(matrixA, matrixB1) from l0C1 -> gm_out
-                if (l0_c1_last_flag) {                    
+                if (l0_c1_last_flag) {
                     commonFixpipeParamsV220.mSize = s1_block_length;
                     commonFixpipeParamsV220.nSize = headDim;
                     commonFixpipeParamsV220.srcStride = s1_block_align_length;
                     commonFixpipeParamsV220.dstStride = qHeadNum * headDim;
                     AscendC::SetAtomicType<float>();
                     AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(
-                        temp_tensor_fp32[matrixC1_offset + s1_idx * BASE_BLOCK_LENGTH * qHeadNum * headDim], 
-                        *l0_c1_buf_tensor,
-                        commonFixpipeParamsV220
-                    );
+                        temp_tensor_fp32[matrixC1_offset + s1_idx * BASE_BLOCK_LENGTH * qHeadNum * headDim],
+                        *l0_c1_buf_tensor, commonFixpipeParamsV220);
                     AscendC::SetAtomicNone();
                 }
                 SET_FLAG(M, MTE1, L0A_matrix_ping_flag);
                 SET_FLAG(M, MTE1, L0B_matrix_ping_flag);
-                
+
                 ///////////////////////////////// dQ /////////////////////////
 
                 ///////////////////////////////// dK /////////////////////////
@@ -232,14 +216,10 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
                 uint32_t s2_c0_loop = (s2_block_length + C0_SIZE - 1) / C0_SIZE;
                 commonLoadData2dParamsTranspose.repeatTimes = s1_c0_loop * s2_c0_loop;
                 commonLoadData2dParamsTranspose.srcStride = 1;
-                AscendC::LoadData(
-                    l0_a_pong_tensor,
-                    (*l1_a_buf_tensor), 
-                    commonLoadData2dParamsTranspose
-                );
+                AscendC::LoadData(l0_a_pong_tensor, (*l1_a_buf_tensor), commonLoadData2dParamsTranspose);
                 SET_FLAG(MTE1, MTE2, L1A_matrix_pingpong_flag + L1A_FLAG_SHIFT);
                 SET_FLAG(MTE1, M, L0A_matrix_pong_flag);
-                
+
                 // load matrixB2 from L1 -> L0B(pong) l0_b_pong_tensor
                 WAIT_FLAG(M, MTE1, L0B_matrix_pong_flag);
                 if (s1_idx == 0 && s2_idx == 0) {
@@ -249,41 +229,30 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
                 commonLoadData2dParamsTranspose.repeatTimes = headDim / C0_SIZE;
                 commonLoadData2dParamsTranspose.srcStride = km_align / C0_SIZE;
                 for (int32_t i = 0; i < s1_block_align_length / C0_SIZE; i++) {
-                    AscendC::LoadData(
-                        (l0_b_pong_tensor)[i * C0_SIZE * headDim],
-                        (*l1_b2_buf_tensor)[l1_b2_buf_offset + i * C0_SIZE * C0_SIZE],
-                        commonLoadData2dParamsTranspose
-                    );
+                    AscendC::LoadData((l0_b_pong_tensor)[i * C0_SIZE * headDim],
+                                      (*l1_b2_buf_tensor)[l1_b2_buf_offset + i * C0_SIZE * C0_SIZE],
+                                      commonLoadData2dParamsTranspose);
                 }
                 if (s1_idx == inner_s1Loop - 1 && s2_idx == s2_loop - 1) {
                     SET_FLAG(MTE1, MTE2, L1B2_matrix_pingpong_flag + L1B2_FLAG_SHIFT);
                 }
                 SET_FLAG(MTE1, M, L0B_matrix_pong_flag);
-                
-                // mad (matrixA^T, matrixB2) -> l0_c2_buf_tensor 
+
+                // mad (matrixA^T, matrixB2) -> l0_c2_buf_tensor
                 // (s2_block_length, s1_block_length) X (s1_block_length, headDim)
                 WAIT_FLAG(MTE1, M, L0A_matrix_pong_flag);
                 WAIT_FLAG(MTE1, M, L0B_matrix_pong_flag);
-                AscendC::LocalTensor<float> *l0_c2_buf_tensor = L0C_matrixC2_pingpong_flag ? &l0_c2_pong_tensor : &l0_c2_ping_tensor;
+                AscendC::LocalTensor<float> *l0_c2_buf_tensor =
+                    L0C_matrixC2_pingpong_flag ? &l0_c2_pong_tensor : &l0_c2_ping_tensor;
                 uint16_t s2_modify = (s2_block_length == 1) ? 2 : s2_block_length;
                 bool l0_c2_init_flag = (s1_idx == 0);
                 bool l0_c2_last_flag = (s1_idx == inner_s1Loop - 1);
 
-                AscendC::Mmad(
-                    *l0_c2_buf_tensor, 
-                    l0_a_pong_tensor, 
-                    l0_b_pong_tensor,
-                    AscendC::MmadParams(
-                        s2_modify, 
-                        headDim,
-                        s1_block_length, 
-                        l0_c2_last_flag ? 3 : 2,
-                        false,
-                        l0_c2_init_flag
-                    )
-                );
+                AscendC::Mmad(*l0_c2_buf_tensor, l0_a_pong_tensor, l0_b_pong_tensor,
+                              AscendC::MmadParams(s2_modify, headDim, s1_block_length, l0_c2_last_flag ? 3 : 2, false,
+                                                  l0_c2_init_flag));
                 PipeBarrier<PIPE_M>();
-                
+
                 // fixpipe Mad(matrixA^T, matrixB2) from l0C2 -> gm_out
                 if (s1_idx == inner_s1Loop - 1) {
                     commonFixpipeParamsV220.mSize = s2_block_length;
@@ -292,10 +261,8 @@ CubeOp<TYPE>::Cube23Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__
                     commonFixpipeParamsV220.dstStride = kvHeadNum * headDim;
                     AscendC::SetAtomicType<float>();
                     AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(
-                        temp_tensor_fp32[matrixC2_offset + s2_idx * BASE_BLOCK_LENGTH * kvHeadNum * headDim], 
-                        *l0_c2_buf_tensor,
-                        commonFixpipeParamsV220
-                    );
+                        temp_tensor_fp32[matrixC2_offset + s2_idx * BASE_BLOCK_LENGTH * kvHeadNum * headDim],
+                        *l0_c2_buf_tensor, commonFixpipeParamsV220);
                     AscendC::SetAtomicNone();
                 }
 

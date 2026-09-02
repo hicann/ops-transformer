@@ -27,7 +27,9 @@ using namespace AscendC;
 template <typename LIGT>
 class LIGVectorPost {
 public:
-    __aicore__ inline LIGVectorPost() : tilingData(nullptr), pipe(nullptr) {};
+    __aicore__ inline LIGVectorPost()
+        : tilingData(nullptr),
+          pipe(nullptr){};
     __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dk, __gm__ uint8_t *workspace,
                                 const LIGTilingData *__restrict ordTilingData);
     __aicore__ inline void Process();

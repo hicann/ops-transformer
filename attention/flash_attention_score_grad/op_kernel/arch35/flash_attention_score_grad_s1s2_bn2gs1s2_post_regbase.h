@@ -21,22 +21,23 @@
 #include "kernel_operator.h"
 #endif
 
-#define FAG_POST_CLASS_TEMPLATE                                                                                             \
-    template <typename T1, typename T2, typename OUTDTYPE=T1, const uint8_t SPLIT_AXIS = 0, const bool IS_ROPE = false,     \
-        const uint8_t DETER_SPARSE_TYPE = 0, const bool IS_TND = 0, const bool IS_TND_SWIZZLE = 0>
-#define FAG_POST_FUNCTION_TEMPLATE                                                                                          \
-    template <typename T1, typename T2, typename OUTDTYPE, const uint8_t SPLIT_AXIS, bool IS_ROPE,                          \
-        const uint8_t DETER_SPARSE_TYPE, const bool IS_TND, const bool IS_TND_SWIZZLE>
-#define FAG_POST_FUNCTION_PARAMS_TEMPLATE T1, T2, OUTDTYPE, SPLIT_AXIS, IS_ROPE, DETER_SPARSE_TYPE, IS_TND, IS_TND_SWIZZLE
+#define FAG_POST_CLASS_TEMPLATE \
+    template <typename T1, typename T2, typename OUTDTYPE = T1, const uint8_t SPLIT_AXIS = 0, \
+              const bool IS_ROPE = false, const uint8_t DETER_SPARSE_TYPE = 0, const bool IS_TND = 0, \
+              const bool IS_TND_SWIZZLE = 0>
+#define FAG_POST_FUNCTION_TEMPLATE \
+    template <typename T1, typename T2, typename OUTDTYPE, const uint8_t SPLIT_AXIS, bool IS_ROPE, \
+              const uint8_t DETER_SPARSE_TYPE, const bool IS_TND, const bool IS_TND_SWIZZLE>
+#define FAG_POST_FUNCTION_PARAMS_TEMPLATE \
+    T1, T2, OUTDTYPE, SPLIT_AXIS, IS_ROPE, DETER_SPARSE_TYPE, IS_TND, IS_TND_SWIZZLE
 
-FAG_POST_CLASS_TEMPLATE 
+FAG_POST_CLASS_TEMPLATE
 class FlashAttentionScoreGradS1S2BNGS1S2PostRegbase {
 public:
     __aicore__ inline FlashAttentionScoreGradS1S2BNGS1S2PostRegbase(){};
     __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dqRope,
                                 __gm__ uint8_t *dkRope, __gm__ uint8_t *dsink, __gm__ uint8_t *workspace,
-                                FagTilingType ordTilingData,
-                                TPipe *pipe_in);
+                                FagTilingType ordTilingData, TPipe *pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessSink();
     __aicore__ inline void ProcessDqkv();
@@ -73,9 +74,8 @@ public:
 
 FAG_POST_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FUNCTION_PARAMS_TEMPLATE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dqRope,
-    __gm__ uint8_t *dkRope, __gm__ uint8_t *dsink,  __gm__ uint8_t *workspace,
-    FagTilingType ordTilingData, TPipe *pipe_in)
+    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dqRope, __gm__ uint8_t *dkRope,
+    __gm__ uint8_t *dsink, __gm__ uint8_t *workspace, FagTilingType ordTilingData, TPipe *pipe_in)
 {
     vBlockIdx = GetBlockIdx();
     tilingData = ordTilingData;
@@ -92,9 +92,12 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
     inputTotalSize = tilingData->postTilingData.qPostBlockTotal;
     qPostTailNum = tilingData->postTilingData.qPostTailNum;
 
-    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float *)workspace + tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
-    dqkvWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace + tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
-    dqkvWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace + tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
+    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float *)workspace +
+                                     tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
+    dqkvWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace +
+                                     tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
+    dqkvWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace +
+                                     tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
 
     if constexpr (IS_ROPE) {
         REGBASE_POST_BASE = POST_S_BASE * (ROPE_DIM + VALUE_DIM);
@@ -102,8 +105,8 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
 
     isSink = tilingData->s1s2BNGS1S2BaseParams.sinkOptional;
     if (unlikely(isSink)) {
-        dsinkWorkspace.SetGlobalBuffer(
-            (__gm__ float *)workspace + tilingData->postTilingData.dsinkWorkSpaceOffset / sizeof(float));
+        dsinkWorkspace.SetGlobalBuffer((__gm__ float *)workspace +
+                                       tilingData->postTilingData.dsinkWorkSpaceOffset / sizeof(float));
         dsinkGm.SetGlobalBuffer((__gm__ float *)dsink);
         s1SinkOuter = tilingData->s1s2BNGS1S2BaseParams.s1SinkOuter;
         s2SinkOuter = tilingData->s1s2BNGS1S2BaseParams.s2SinkOuter;
@@ -139,8 +142,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
         WaitFlag<HardEvent::MTE3_S>(eventIDMte3ToS);
         float dsinkAccu = 0.0;
         uint64_t dsinkBaseOffset = nIdx * bSinkSize * s1SinkOuter * s2SinkOuter;
-        for (uint64_t pingIdx = 0; pingIdx < sinkReduceAxis;
-            pingIdx = pingIdx + (REGBASE_POST_BASE << 1)) {
+        for (uint64_t pingIdx = 0; pingIdx < sinkReduceAxis; pingIdx = pingIdx + (REGBASE_POST_BASE << 1)) {
             LocalTensor<float> vecInPing = inQueuePing.AllocTensor<float>();
             uint64_t pongIdx = pingIdx + REGBASE_POST_BASE;
             uint64_t pingSize = pongIdx < sinkReduceAxis ? REGBASE_POST_BASE : sinkPostTailNum;
@@ -198,8 +200,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
         dsinkResTensor.SetValue(0, dsinkAccu);
         SetFlag<HardEvent::S_MTE3>(eventIDSToMte3);
         WaitFlag<HardEvent::S_MTE3>(eventIDSToMte3);
-        DataCopyPad(dsinkGm[nIdx], dsinkResTensor,
-                    {1, static_cast<uint32_t>(sizeof(float)), 0, 0, 0});
+        DataCopyPad(dsinkGm[nIdx], dsinkResTensor, {1, static_cast<uint32_t>(sizeof(float)), 0, 0, 0});
     }
 }
 
@@ -255,7 +256,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
             if constexpr (IS_ROPE) {
                 if (qkvIdx == 2) {
                     DataCopy(dqkv[qkvIdx][pingIdx], vecOutPing, pingSize);
-                }  else {
+                } else {
                     // 96 * (128 + 64)基本块
                     DataCopyParams dataCopyParams;
                     dataCopyParams.blockCount = seqPingSize;
@@ -289,7 +290,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
                 if constexpr (IS_ROPE) {
                     if (qkvIdx == 2) {
                         DataCopy(dqkv[qkvIdx][pongIdx], vecOutPong, pongSize);
-                    }  else {
+                    } else {
                         // 96 * (128 + 64)基本块
                         DataCopyParams dataCopyParams;
                         dataCopyParams.blockCount = seqPongSize;
@@ -298,7 +299,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PostRegbase<FAG_POST_FU
                         // 64 * sizeof(OUTDTYPE) / 32B
                         dataCopyParams.srcStride = 2 * sizeof(OUTDTYPE);
                         DataCopy(dqkv[qkvIdx][dqPongGmOffset], vecOutPong, dataCopyParams);
-    
+
                         dataCopyParams.blockLen = 2 * sizeof(OUTDTYPE);
                         dataCopyParams.srcStride = 4 * sizeof(OUTDTYPE);
                         DataCopy(dqkRope[qkvIdx][dqPongGmOffset / 2], vecOutPong[128], dataCopyParams);

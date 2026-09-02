@@ -28,7 +28,6 @@
 
 namespace optiling {
 
-
 struct MaskedCausalConv1dBackwardArch35CompileInfo {
     uint64_t coreNum = 0;
     uint64_t ubSize = 0;
@@ -63,9 +62,9 @@ constexpr int64_t NUM_3 = 3;
 
 class MaskedCausalConv1dBackwardTilingArch35 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MaskedCausalConv1dBackwardTilingArch35(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit MaskedCausalConv1dBackwardTilingArch35(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
 
 protected:
     bool IsCapable() override;

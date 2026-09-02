@@ -42,16 +42,28 @@ struct GemmShape {
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<GEMM_COORD_RANK> ToCoord() { return MakeCoord(M, N, K); }
+    static Coord<GEMM_COORD_RANK> ToCoord()
+    {
+        return MakeCoord(M, N, K);
+    }
 
     CATLASS_HOST_DEVICE
-    static Coord<GEMM_MAT_RANK> ToCoordMN() { return MakeCoord(M, N); }
+    static Coord<GEMM_MAT_RANK> ToCoordMN()
+    {
+        return MakeCoord(M, N);
+    }
 
     CATLASS_HOST_DEVICE
-    static Coord<GEMM_MAT_RANK> ToCoordMK() { return MakeCoord(M, K); }
+    static Coord<GEMM_MAT_RANK> ToCoordMK()
+    {
+        return MakeCoord(M, K);
+    }
 
     CATLASS_HOST_DEVICE
-    static Coord<GEMM_MAT_RANK> ToCoordKN() { return MakeCoord(K, N); }
+    static Coord<GEMM_MAT_RANK> ToCoordKN()
+    {
+        return MakeCoord(K, N);
+    }
 };
 
 /// GemmCoord is a structure derived from Coord<GEMM_COORD_RANK> that specifies a location within the
@@ -90,36 +102,63 @@ struct GemmCoord : public Coord<GEMM_COORD_RANK, uint32_t> {
 
     /// Returns the Gemm M coordinate
     CATLASS_HOST_DEVICE
-    Index const &m() const { return this->At(M_INDEX); }
+    Index const &m() const
+    {
+        return this->At(M_INDEX);
+    }
 
     /// Returns reference to the Gemm M coordinate
     CATLASS_HOST_DEVICE
-    Index &m() { return this->At(M_INDEX); }
+    Index &m()
+    {
+        return this->At(M_INDEX);
+    }
 
     /// Returns the Gemm N coordinate
     CATLASS_HOST_DEVICE
-    Index const &n() const { return this->At(N_INDEX); }
+    Index const &n() const
+    {
+        return this->At(N_INDEX);
+    }
 
     /// Returns reference to the Gemm N coordinate
     CATLASS_HOST_DEVICE
-    Index &n() { return this->At(N_INDEX); }
+    Index &n()
+    {
+        return this->At(N_INDEX);
+    }
 
     /// Returns the Gemm K coordinate
     CATLASS_HOST_DEVICE
-    Index const &k() const { return this->At(K_INDEX); }
+    Index const &k() const
+    {
+        return this->At(K_INDEX);
+    }
 
     /// Returns reference to the Gemm K coordinate
     CATLASS_HOST_DEVICE
-    Index &k() { return this->At(K_INDEX); }
+    Index &k()
+    {
+        return this->At(K_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    auto GetCoordMN() const { return this->GetCoordByAxis<M_INDEX, N_INDEX>(); }
+    auto GetCoordMN() const
+    {
+        return this->GetCoordByAxis<M_INDEX, N_INDEX>();
+    }
 
     CATLASS_HOST_DEVICE
-    auto GetCoordMK() const { return this->GetCoordByAxis<M_INDEX, K_INDEX>(); }
+    auto GetCoordMK() const
+    {
+        return this->GetCoordByAxis<M_INDEX, K_INDEX>();
+    }
 
     CATLASS_HOST_DEVICE
-    auto GetCoordKN() const { return this->GetCoordByAxis<K_INDEX, N_INDEX>(); }
+    auto GetCoordKN() const
+    {
+        return this->GetCoordByAxis<K_INDEX, N_INDEX>();
+    }
 };
 
 } // namespace Catlass

@@ -68,13 +68,13 @@ __aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, b
 #endif
 
 namespace detail {
-    struct MqsmlaMetadata {
-        uint32_t faMetadata[AIC_CORE_MAX_NUM][FA_METADATA_SIZE];
-        uint32_t fdMetadata[AIV_CORE_MAX_NUM][FD_METADATA_SIZE];
-    };
+struct MqsmlaMetadata {
+    uint32_t faMetadata[AIC_CORE_MAX_NUM][FA_METADATA_SIZE];
+    uint32_t fdMetadata[AIV_CORE_MAX_NUM][FD_METADATA_SIZE];
 };
+}; // namespace detail
 
 static_assert(MQSMLA_METADATA_TOTAL_SIZE * sizeof(MQSMLA_METADATA_T) >= sizeof(detail::MqsmlaMetadata));
-};
+}; // namespace optiling
 
 #endif // MIXED_QUANT_SPARSE_FLASH_MLA_METADATA_H

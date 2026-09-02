@@ -266,8 +266,7 @@ __simd_callee__ inline void BroadcastLane(AscendC::MicroAPI::RegTensor<bfloat16_
     AscendC::MicroAPI::Gather(dst, src, brcGatherIndex);
 }
 
-__simd_callee__ inline void BroadcastLane(AscendC::MicroAPI::RegTensor<float>& dst,
-                                          __ubuf__ float* src,
+__simd_callee__ inline void BroadcastLane(AscendC::MicroAPI::RegTensor<float> &dst, __ubuf__ float *src,
                                           uint16_t laneIdx)
 {
     AscendC::MicroAPI::LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + laneIdx);

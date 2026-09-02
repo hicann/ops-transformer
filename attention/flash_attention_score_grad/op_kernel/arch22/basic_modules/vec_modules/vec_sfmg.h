@@ -18,7 +18,8 @@
 
 #include "kernel_operator.h"
 
-template <typename TYPE, class TILING_TYPE> class VectorSoftmaxGrad {
+template <typename TYPE, class TILING_TYPE>
+class VectorSoftmaxGrad {
 public:
     __aicore__ inline VectorSoftmaxGrad(){};
     __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dy, __gm__ uint8_t *attenIn,
@@ -77,10 +78,11 @@ protected:
 };
 
 template <typename TYPE, class TILING_TYPE>
-__aicore__ inline void
-VectorSoftmaxGrad<TYPE, TILING_TYPE>::Init(TPipe *pipe_in, __gm__ uint8_t *dy, __gm__ uint8_t *attenIn,
-                                           __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *workspace, int32_t batchIn,
-                                           const TILING_TYPE *orgTilingData)
+__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::Init(TPipe *pipe_in, __gm__ uint8_t *dy,
+                                                                  __gm__ uint8_t *attenIn,
+                                                                  __gm__ uint8_t *actual_seq_qlen,
+                                                                  __gm__ uint8_t *workspace, int32_t batchIn,
+                                                                  const TILING_TYPE *orgTilingData)
 {
     cBlockIdx = GetBlockIdx();
     tilingData = orgTilingData;
@@ -201,7 +203,8 @@ __aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::CopyInSfmg(int64_t 
     }
 }
 
-template <typename TYPE, class TILING_TYPE> __aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::Process()
+template <typename TYPE, class TILING_TYPE>
+__aicore__ inline void VectorSoftmaxGrad<TYPE, TILING_TYPE>::Process()
 {
     AscendC::PipeBarrier<PIPE_ALL>(); // 去掉pre和sfmg之间的SyncALL，这里需要增加pipeALL
 

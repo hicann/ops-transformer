@@ -60,7 +60,10 @@ aclDataType GetDataTypeLiV2(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceLiV2(const std::string &source) { return source != "batch_size"; }
+inline bool IsTensorSourceLiV2(const std::string &source)
+{
+    return source != "batch_size";
+}
 
 inline int64_t GetRawShapeSizeLiV2(const std::string &source, int64_t batchValue)
 {

@@ -10,7 +10,8 @@
 
 /*!
  * \file lightning_indexer_v2_common_arch22.h
- * \brief LIV2公共定义：Layout枚举、类型模板LIV2Type、运行时信息RunInfo/ConstInfo/SplitCoreInfo、工具函数Align/Min/Max/CeilDiv
+ * \brief
+ * LIV2公共定义：Layout枚举、类型模板LIV2Type、运行时信息RunInfo/ConstInfo/SplitCoreInfo、工具函数Align/Min/Max/CeilDiv
  */
 #ifndef LIGHTNING_INDEXER_V2_COMMON_ARCH22_H
 #define LIGHTNING_INDEXER_V2_COMMON_ARCH22_H
@@ -28,7 +29,7 @@ template <typename Q_T, typename K_T, typename OUT_T, typename QK_T, typename SC
           const bool PAGE_ATTENTION = false, LI_V2_LAYOUT LAYOUT_T = LI_V2_LAYOUT::BSND,
           LI_V2_LAYOUT K_LAYOUT_T = LI_V2_LAYOUT::PA_BBND, bool DT_W_FLAG = false, typename... Args>
 struct LIV2Type {
-    static constexpr bool weightsTypeFlag = DT_W_FLAG;   // weight的dtype是否为FP32
+    static constexpr bool weightsTypeFlag = DT_W_FLAG; // weight的dtype是否为FP32
     using queryType = Q_T;
     using keyType = K_T;
     using outputType = OUT_T;
@@ -94,19 +95,19 @@ struct ConstInfo {
     uint64_t qSeqSize = 1ULL;         // q最大S长度
     uint32_t kCacheBlockSize = 0;     // PA场景的block size
     uint32_t maxBlockNumPerBatch = 0; // PA场景的最大单batch block number
-    LI_V2_LAYOUT outputLayout;           // 输出的格式
+    LI_V2_LAYOUT outputLayout;        // 输出的格式
     bool attenMaskFlag = false;
     int64_t preTokens = INT64_MAX;
     int64_t nextTokens = INT64_MAX;
     bool returnValue = false;
     int64_t cmpRatio = INT64_MAX;
 
-    uint32_t actualLenQDims = 0U; // query的actualSeqLength 的维度
-    uint32_t actualLenDims = 0U;  // KV 的actualSeqLength 的维度
-    uint32_t usedLenKDims = 0U;  // KV 的used_seq_len 的维度
-    bool isAccumSeqS1 = false;    // 是否累加模式
-    bool isAccumSeqS2 = false;    // 是否累加模式
-    bool isSparseCountOver2K = false;     // sparseCount小于等于2048为false
+    uint32_t actualLenQDims = 0U;                         // query的actualSeqLength 的维度
+    uint32_t actualLenDims = 0U;                          // KV 的actualSeqLength 的维度
+    uint32_t usedLenKDims = 0U;                           // KV 的used_seq_len 的维度
+    bool isAccumSeqS1 = false;                            // 是否累加模式
+    bool isAccumSeqS2 = false;                            // 是否累加模式
+    bool isSparseCountOver2K = false;                     // sparseCount小于等于2048为false
     static constexpr uint32_t NEG_INF_FLOAT = 0xFF800000; // float负无穷
 };
 
@@ -117,7 +118,7 @@ struct SplitCoreInfo {
     uint32_t bN2End = 0U;
     uint32_t gS1Start = 0U;
     uint32_t gS1End = 0U;
-    bool isLD = false;     // 当前核是否需要进行Decode归约任务
+    bool isLD = false; // 当前核是否需要进行Decode归约任务
 };
 
 template <typename T>

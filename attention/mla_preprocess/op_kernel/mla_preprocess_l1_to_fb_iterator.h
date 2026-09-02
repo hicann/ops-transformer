@@ -15,16 +15,11 @@
 // Partial specialization for V220
 template <typename DataType>
 struct l1_to_fb<ArchType::ASCEND_V220, DataType> {
-    __aicore__ l1_to_fb(AscendC::LocalTensor<DataType> &dst,
-                        AscendC::LocalTensor<DataType> &src,
-                        uint16_t burstNum,
-                        uint16_t burstLen,
-                        uint16_t srcGap,
-                        uint16_t dstGap)
+    __aicore__ l1_to_fb(AscendC::LocalTensor<DataType> &dst, AscendC::LocalTensor<DataType> &src, uint16_t burstNum,
+                        uint16_t burstLen, uint16_t srcGap, uint16_t dstGap)
     {
         dst.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::C2PIPE2GM);
-        AscendC::DataCopy(dst,
-                          src,
+        AscendC::DataCopy(dst, src,
                           AscendC::DataCopyParams(burstNum, // nBurst
                                                   burstLen, // lenBurst
                                                   srcGap,   // srcGap

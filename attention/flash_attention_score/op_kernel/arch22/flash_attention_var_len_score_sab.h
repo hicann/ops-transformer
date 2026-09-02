@@ -20,40 +20,44 @@
 
 // INPUT_T - means data type for input
 // T       - means data type when calc
-#define Q_EVENT0  EVENT_ID2
+#define Q_EVENT0 EVENT_ID2
 #define KV_EVENT0 EVENT_ID4
-#define P_EVENT0  EVENT_ID6
+#define P_EVENT0 EVENT_ID6
 template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T = INPUT_T,
           CubeFormat bmm1Format = CubeFormat::NZ, MmPolicyType mmPolicyType = MmPolicyType::NORMAL,
           ImplModeEnum implMode = ImplModeEnum::AA_HIGH_PRECISION, bool hasRope = false>
 class FlashAttentionVarLenScoreSameAB
     : public FlashAttentionScoreS1s2Bn2gs1SameAB<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                           bmm1Format, mmPolicyType, hasRope> {
+                                                 bmm1Format, mmPolicyType, hasRope> {
 public:
     __aicore__ inline FlashAttentionVarLenScoreSameAB(){};
 
-    __aicore__ inline void
-    UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key, __gm__ uint8_t *keyRope,
-               __gm__ uint8_t *value, __gm__ uint8_t *pse,
-               __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
-               __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax,
-               __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
-               __gm__ uint8_t *workspace, const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,
+                                      __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *pse,
+                                      __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
+                                      __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *actualSeqLengths,
+                                      __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax,
+                                      __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
+                                      __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                                      const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
 
     __aicore__ inline void Process();
 
-    static constexpr MatmulConfig CFG_CUSTOM_EXCEED = (mmPolicyType == MmPolicyType::UNSPLITK) ? CFG_DIS_UNIT_FLAG_EXCEED : CFG_EXCEED;
+    static constexpr MatmulConfig CFG_CUSTOM_EXCEED =
+        (mmPolicyType == MmPolicyType::UNSPLITK) ? CFG_DIS_UNIT_FLAG_EXCEED : CFG_EXCEED;
 
-     // define matmul
+    // define matmul
     using a1TypeL1Carry = MatmulType<TPosition::A1, CubeFormat::NZ, INPUT_T, false, LayoutMode::NONE, true>;
-    using b1TypeL1Carry = MatmulType<TPosition::B1, CubeFormat::NZ, INPUT_T, true,  LayoutMode::NONE, true>;
+    using b1TypeL1Carry = MatmulType<TPosition::B1, CubeFormat::NZ, INPUT_T, true, LayoutMode::NONE, true>;
     using bias1TypeL1Carry = MatmulType<TPosition::GM, CubeFormat::ND, float>;
     using c1TypeL1Carry = MatmulType<TPosition::GM, CubeFormat::ND, T>;
-    using mm1TypeL1Carry = matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, c1TypeL1Carry, bias1TypeL1Carry, CFG_CUSTOM_EXCEED>;
+    using mm1TypeL1Carry =
+        matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, c1TypeL1Carry, bias1TypeL1Carry, CFG_CUSTOM_EXCEED>;
     mm1TypeL1Carry bmm1L1Carry;
 
     using c1NzTypeL1Carry = MatmulType<TPosition::GM, CubeFormat::NZ, T>;
-    using mm1NzTypeL1Carry = matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, c1NzTypeL1Carry, bias1TypeL1Carry, CFG_CUSTOM_EXCEED>;
+    using mm1NzTypeL1Carry =
+        matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, c1NzTypeL1Carry, bias1TypeL1Carry, CFG_CUSTOM_EXCEED>;
     mm1NzTypeL1Carry bmm1NzL1Carry;
 
     // define batchmatmul
@@ -61,9 +65,10 @@ public:
     using b2TypeL1Carry = MatmulType<TPosition::B1, CubeFormat::NZ, INPUT_T, false, LayoutMode::NONE, true>;
     using bias2TypeL1Carry = MatmulType<TPosition::GM, CubeFormat::ND, float>;
     using c2NzTypeL1Carry = MatmulType<TPosition::GM, CubeFormat::NZ, T>;
-    using mm2TypeL1Carry = matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzTypeL1Carry, bias2TypeL1Carry, CFG_MDL_EXCEED>;
+    using mm2TypeL1Carry =
+        matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzTypeL1Carry, bias2TypeL1Carry, CFG_MDL_EXCEED>;
     mm2TypeL1Carry bmm2L1Carry;
-    
+
 protected:
     __aicore__ inline void ComputeConstexpr();
 
@@ -80,18 +85,20 @@ protected:
 
     __aicore__ inline void GetS2LoopRange();
     template <typename T2>
-    __aicore__ inline void ComputeMm1(SplitSameABExtraInfo &extraInfo, 
-                                      matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1TypeL1Carry, CFG_CUSTOM_EXCEED> &bmm1);
+    __aicore__ inline void ComputeMm1(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1TypeL1Carry, CFG_CUSTOM_EXCEED> &bmm1);
     __aicore__ inline void CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor, SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &extraInfo, 
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor, const SplitSameABExtraInfo &extraInfo,
                                           uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize);
-    __aicore__ inline void ComputeMm2(SplitSameABExtraInfo &extraInfo,
-                                      matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzTypeL1Carry, bias2TypeL1Carry, CFG_MDL_EXCEED> &bmm2);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &al1Tensor, SplitSameABExtraInfo &extraInfo, 
+    __aicore__ inline void ComputeMm2(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzTypeL1Carry, bias2TypeL1Carry, CFG_MDL_EXCEED> &bmm2);
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &al1Tensor, SplitSameABExtraInfo &extraInfo,
                                           uint32_t subKid, uint32_t subKSize, uint32_t kSplitSize);
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor,  
-                                          uint32_t subKid, uint32_t subKSize, uint32_t kSplitSize, uint32_t nLoopIdx, bool isLastN);
-    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN, 
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor, uint32_t subKid, uint32_t subKSize,
+                                          uint32_t kSplitSize, uint32_t nLoopIdx, bool isLastN);
+    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
     // Unpack 用参数
     GM_ADDR actualSeqQlenAddr;
@@ -131,28 +138,29 @@ protected:
 
 template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
           CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::UnpackInit(
-    __gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
-    __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-    __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-    const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
+__aicore__ inline void FlashAttentionVarLenScoreSameAB<
+    layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+    hasRope>::UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key, __gm__ uint8_t *keyRope,
+                         __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
+                         __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask,
+                         __gm__ uint8_t *sink, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv,
+                         __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
+                         __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                         const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
 {
-    this->InitInput(query, queryRope, key, keyRope, value, pse, dropMask, paddingMask, prefix, attenMask, sink, softmaxMax, softmaxSum,
-                    softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
+    this->InitInput(query, queryRope, key, keyRope, value, pse, dropMask, paddingMask, prefix, attenMask, sink,
+                    softmaxMax, softmaxSum, softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
     if ASCEND_IS_AIC {
         if constexpr (hasRope == false) { // Only enable L1Carry feature when has no rope.
-            if (this->cubeS1BaseSize <= 256 && 
-               (this->dSize == 192 || this->dSize == 128 || this->dSize == 88 || this->dSize == 80)) {
+            if (this->cubeS1BaseSize <= 256 &&
+                (this->dSize == 192 || this->dSize == 128 || this->dSize == 88 || this->dSize == 80)) {
                 this->needL1Carry = true;
-                this->bmm1L1Carry .SetSubBlockIdx(0);
-                this->bmm1L1Carry .Init(&tiling->bmm1TilingData, tPipe);
-                this->bmm1NzL1Carry .SetSubBlockIdx(0);
-                this->bmm1NzL1Carry .Init(&tiling->bmm1TilingData, tPipe);
-                this->bmm2L1Carry .SetSubBlockIdx(0);
-                this->bmm2L1Carry .Init(&tiling->bmm2TilingData, tPipe);
+                this->bmm1L1Carry.SetSubBlockIdx(0);
+                this->bmm1L1Carry.Init(&tiling->bmm1TilingData, tPipe);
+                this->bmm1NzL1Carry.SetSubBlockIdx(0);
+                this->bmm1NzL1Carry.Init(&tiling->bmm1TilingData, tPipe);
+                this->bmm2L1Carry.SetSubBlockIdx(0);
+                this->bmm2L1Carry.Init(&tiling->bmm2TilingData, tPipe);
             }
         }
     }
@@ -171,23 +179,23 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
         if (actualS2Len <= 0 && actualS1Len != 0) {
             int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[i - 1];
             if (actualS1Len < 0 && accumSize > 0) {
-                actualS1Len = this->s1Size -accumSize;
+                actualS1Len = this->s1Size - accumSize;
                 int64_t frontCoreNum = actualS1Len % this->tilingData->multiCoreParams.coreNum;
                 int64_t splitFactor = frontCoreNum > 0 ? 1 : 0;
                 int64_t s1SizeInner = (actualS1Len / this->tilingData->multiCoreParams.coreNum);
-                int64_t innerOffset1 = (s1SizeInner + splitFactor) * (this->vecBlockIdx >= frontCoreNum ?
-                                       frontCoreNum : this->vecBlockIdx);
-                int64_t innerOffset2 = s1SizeInner * (this->vecBlockIdx >= frontCoreNum ?
-                                       this->vecBlockIdx - frontCoreNum : 0);
+                int64_t innerOffset1 = (s1SizeInner + splitFactor) *
+                                       (this->vecBlockIdx >= frontCoreNum ? frontCoreNum : this->vecBlockIdx);
+                int64_t innerOffset2 =
+                    s1SizeInner * (this->vecBlockIdx >= frontCoreNum ? this->vecBlockIdx - frontCoreNum : 0);
                 accumSize = accumSize + innerOffset1 + innerOffset2;
                 actualS1Len = s1SizeInner + (this->vecBlockIdx >= frontCoreNum ? 0 : splitFactor);
             }
-            AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2],
-                                         actualS1Len * this->n2GD2, static_cast<INPUT_T>(0.0));
-            AscendC::InitOutput<float>(this->softmaxMaxGm[accumSize * this->n2G * 8],
-                                       actualS1Len * this->n2G * 8, static_cast<float>(0.0));
-            AscendC::InitOutput<float>(this->softmaxSumGm[accumSize * this->n2G * 8],
-                                       actualS1Len * this->n2G * 8, static_cast<float>(0.0));
+            AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2], actualS1Len * this->n2GD2,
+                                         static_cast<INPUT_T>(0.0));
+            AscendC::InitOutput<float>(this->softmaxMaxGm[accumSize * this->n2G * 8], actualS1Len * this->n2G * 8,
+                                       static_cast<float>(0.0));
+            AscendC::InitOutput<float>(this->softmaxSumGm[accumSize * this->n2G * 8], actualS1Len * this->n2G * 8,
+                                       static_cast<float>(0.0));
         }
     }
     this->InitBuffer();
@@ -212,10 +220,10 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     return;
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::ComputeConstexpr()
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format,
+                                                       mmPolicyType, implMode, hasRope>::ComputeConstexpr()
 {
     this->gD = this->tilingData->inputParams.gSize * this->dSize;
     this->n2D = this->tilingData->inputParams.n2Size * this->dSize;
@@ -241,7 +249,7 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
         this->s2BaseN2DRope = this->s2BaseSize * this->n2DRope;
         this->s1BaseN2GDRope = this->cubeS1BaseSize * this->n2GDRope;
         this->s2BaseNratioN2DRope = this->s2BaseN2DRope * this->tilingData->coreParams.nRatio;
-        
+
         this->mm1Ka2 = this->n2GDRope;
         this->mm1Kb2 = this->n2DRope;
     }
@@ -276,13 +284,12 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     }
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
 __aicore__ inline void
-FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                bmm1Format, mmPolicyType, implMode, hasRope>::GetSeqQlenKvlenByBoidx(int64_t boIdx,
-                                                                                  int64_t &actualSeqQlen,
-                                                                                  int64_t &actualSeqKvlen)
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen,
+                                                                 int64_t &actualSeqKvlen)
 {
     if (boIdx == 0) {
         actualSeqQlen = qListGm.GetValue(0);
@@ -295,10 +302,10 @@ FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, 
 }
 
 // 初始化s1方向上的累加值
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::CalS1OuterSize(int64_t offset)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format,
+                                                       mmPolicyType, implMode, hasRope>::CalS1OuterSize(int64_t offset)
 {
     int64_t actualS1Outersize = 0;
     // 用于取actualS1Len下标
@@ -326,10 +333,11 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     return;
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -353,10 +361,10 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     GetSeqQlenKvlenByBoidx(this->boIdx, this->s1Size, this->s2Size);
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::GetS2LoopRange()
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format,
+                                                       mmPolicyType, implMode, hasRope>::GetS2LoopRange()
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -368,10 +376,9 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
         this->s2StartIdx = 0;
         this->s2EndIdx = Min((this->s1oIdx + 1) * this->cubeS1BaseSize + actualS2Len - actualS1Len, actualS2Len);
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND)) {
-        this->s2StartIdx = Max(
-            this->s1oIdx * this->cubeS1BaseSize - this->tilingData->coreParams.s1SparseValidSize, 0);
-        this->s2EndIdx =
-            Min((this->s1oIdx + 1) * this->cubeS1BaseSize + this->tilingData->coreParams.s2SparseValidSize, actualS2Len);
+        this->s2StartIdx = Max(this->s1oIdx * this->cubeS1BaseSize - this->tilingData->coreParams.s1SparseValidSize, 0);
+        this->s2EndIdx = Min((this->s1oIdx + 1) * this->cubeS1BaseSize + this->tilingData->coreParams.s2SparseValidSize,
+                             actualS2Len);
         // s1baseSize行都无效时，需要将startIdx设置为0，,endIdx设置为S2realSize
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
             this->s2StartIdx = 0;
@@ -412,9 +419,8 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
         }
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->s2StartIdx = 0;
-        this->s2EndIdx =
-            Max((this->s1oIdx + 1) * this->cubeS1BaseSize - actualS1Len + actualS2Len,
-                ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
+        this->s2EndIdx = Max((this->s1oIdx + 1) * this->cubeS1BaseSize - actualS1Len + actualS2Len,
+                             ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
         this->s2EndIdx = Min(this->s2EndIdx, this->s2Size);
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
             this->s2StartIdx = 0;
@@ -429,10 +435,10 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     return;
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::Process()
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format,
+                                                       mmPolicyType, implMode, hasRope>::Process()
 {
     // 确定核内切分起点
     int64_t multiCoreInnerOffset = this->cubeBlockIdx * this->tilingData->multiCoreParams.splitFactorSize;
@@ -476,31 +482,31 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
             this->SetExtraInfo(extraInfo[taskId % 3], taskId, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
 
             if (extraInfo[taskId % 3].needNz2Nd == 1) {
-                if ASCEND_IS_AIC { 
+                if ASCEND_IS_AIC {
                     if (this->needL1Carry) {
                         this->ComputeMm1(extraInfo[taskId % 3], this->bmm1NzL1Carry);
                     } else {
                         this->IterateBmm1(extraInfo[taskId % 3], this->bmm1Nz);
                     }
                     CrossCoreSetFlag<2, PIPE_FIX>(SYNC_C1_V1_FLAG[taskId % 3]);
-                }  
-            } else {    
-                if ASCEND_IS_AIC {  
+                }
+            } else {
+                if ASCEND_IS_AIC {
                     if (this->needL1Carry) {
                         this->ComputeMm1(extraInfo[taskId % 3], this->bmm1L1Carry);
                     } else {
                         this->IterateBmm1(extraInfo[taskId % 3], this->bmm1);
-                    }                    
+                    }
                     CrossCoreSetFlag<2, PIPE_FIX>(SYNC_C1_V1_FLAG[taskId % 3]);
-                }  
+                }
             }
 
             if (taskId > 0) {
                 if ASCEND_IS_AIV {
                     this->ProcessVec1(extraInfo[(taskId + 2) % 3]);
-                    SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);                
+                    SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
                     CrossCoreSetFlag<2, PIPE_MTE3>(SYNC_V1_C2_FLAG[(taskId + 2) % 3]);
-                }       
+                }
             }
             if (taskId > 1) {
                 if ASCEND_IS_AIV {
@@ -512,7 +518,7 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
                 if ASCEND_IS_AIV {
                     WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
                 }
-                
+
                 if ASCEND_IS_AIC {
                     CrossCoreWaitFlag(SYNC_V1_C2_FLAG[(taskId + 2) % 3]);
                     if (this->needL1Carry) {
@@ -521,9 +527,9 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
                         this->IterateBmm2(extraInfo[(taskId + 2) % 3], this->bmm2);
                     }
                     CrossCoreSetFlag<2, PIPE_FIX>(SYNC_C2_V2_FLAG[(taskId + 2) % 3]);
-                }      
+                }
             }
-            
+
             if (taskId > 1) {
                 if ASCEND_IS_AIV {
                     this->ProcessVec2(extraInfo[(taskId + 1) % 3]);
@@ -556,7 +562,7 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
                 this->IterateBmm2(extraInfo[(taskId + 2) % 3], this->bmm2);
             }
             CrossCoreSetFlag<2, PIPE_FIX>(SYNC_C2_V2_FLAG[(taskId + 2) % 3]);
-        }     
+        }
         if (taskId > 1) {
             if ASCEND_IS_AIV {
                 this->ProcessVec2(extraInfo[(taskId + 1) % 3]);
@@ -589,11 +595,13 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     }
 };
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::SetExtraInfo(
-    SplitSameABExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::SetExtraInfo(SplitSameABExtraInfo &extraInfo, int64_t taskId,
+                                                       int64_t s2LoopCount, int64_t s2LoopLimit,
+                                                       int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
     extraInfo.s2EndIdx = this->s2EndIdx;
@@ -628,10 +636,11 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     this->ComputeBmm1Tail(extraInfo);
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo)
 {
     extraInfo.s1RealSize = (extraInfo.cubeS1RealSize + 1) / 2;
     extraInfo.vecCoreOffset = this->cubeSubIdx * extraInfo.s1RealSize;
@@ -682,14 +691,15 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     return;
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
 template <typename T2>
 __aicore__ inline void
-FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                bmm1Format, mmPolicyType, implMode, hasRope>::ComputeMm1(SplitSameABExtraInfo &extraInfo, 
-                                    matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1TypeL1Carry, CFG_CUSTOM_EXCEED> &bmm1) {
-
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::ComputeMm1(SplitSameABExtraInfo &extraInfo,
+                                                     matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2,
+                                                                        bias1TypeL1Carry, CFG_CUSTOM_EXCEED> &bmm1)
+{
     bmm1.SetOrgShape(extraInfo.cubeS1RealSize, this->mm1Kb, this->mm1Ka1, this->mm1Kb1, extraInfo.s2RealSize);
 
     LocalTensor<INPUT_T> qTensor = qL1Tensor;
@@ -700,7 +710,7 @@ FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, 
         SetFlag<HardEvent::MTE2_MTE1>(Q_EVENT0);
         WaitFlag<HardEvent::MTE2_MTE1>(Q_EVENT0);
     }
-    
+
     // 计算gm上的offset
     int64_t bOffset = 0;
     int64_t n2Offset = 0;
@@ -721,10 +731,10 @@ FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, 
         if (n == nloops - 1) {
             subNSizeAct = nTail;
         }
- 
+
         WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + (kvL1BufIter % 2));
         LocalTensor<INPUT_T> kTensor = kvL1Tensor[(kvL1BufIter % 2) * (L1_KV_SIZE / sizeof(INPUT_T))];
- 
+
         CopyInMm1BToL1(kTensor, extraInfo, n, subNSizeAct, nSplitSize); // 拷贝 256 * 192
 
         SetFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + (kvL1BufIter % 2));
@@ -733,9 +743,10 @@ FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, 
         bmm1.SetTensorB(kTensor, true);
         bmm1.SetTail(extraInfo.cubeS1RealSize, subNSizeAct);
 
-        if(extraInfo.needNz2Nd == 1){
-            bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2][extraInfo.cubeS1RealSize * n * nSplitSize]);
-        }else{
+        if (extraInfo.needNz2Nd == 1) {
+            bmm1.template IterateAll<false>(
+                this->mm1Res[extraInfo.taskIdMod2][extraInfo.cubeS1RealSize * n * nSplitSize]);
+        } else {
             bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2][n * nSplitSize]);
         }
         bmm1.End();
@@ -747,11 +758,13 @@ FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, 
     }
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                       bmm1Format, mmPolicyType, implMode, hasRope>::ComputeMm2(SplitSameABExtraInfo &extraInfo,
-                                                            matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzTypeL1Carry, bias2TypeL1Carry, CFG_MDL_EXCEED> &bmm2)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::ComputeMm2(SplitSameABExtraInfo &extraInfo,
+                                                     matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzTypeL1Carry,
+                                                                        bias2TypeL1Carry, CFG_MDL_EXCEED> &bmm2)
 {
     int64_t bOffset = 0;
     int64_t n2Offset = 0;
@@ -796,29 +809,30 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
                 subKSizeAct = kTail;
                 subKSizeActAligned = CeilDiv(kTail, 16) * 16;
             }
-            
+
             WaitFlag<HardEvent::MTE1_MTE2>(P_EVENT0 + (pL1BufIter % 2));
             LocalTensor<INPUT_T> pTensor = pL1Tensor[(pL1BufIter % 2) * (L1_P_SIZE / sizeof(INPUT_T))];
             CopyInMm2AToL1(pTensor, extraInfo, k, subKSizeActAligned, kSplitSize); // s1 * kSplitSize
-            
+
             SetFlag<HardEvent::MTE2_MTE1>(P_EVENT0 + (pL1BufIter % 2));
             WaitFlag<HardEvent::MTE2_MTE1>(P_EVENT0 + (pL1BufIter % 2));
-            
+
             WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + (kvL1BufIter % 2));
             LocalTensor vTensor = kvL1Tensor[(kvL1BufIter % 2) * (L1_KV_SIZE / sizeof(INPUT_T))];
             CopyInMm2BToL1(vTensor, k, subKSizeAct, kSplitSize, n, isLastN); // kSplitSize * dSize
-            
+
             SetFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + (kvL1BufIter % 2));
             WaitFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + (kvL1BufIter % 2));
 
-            bmm2.SetOrgShape(extraInfo.cubeS1RealSize, this->d2Size, subKSizeActAligned, subKSizeActAligned, this->d2Size);
+            bmm2.SetOrgShape(extraInfo.cubeS1RealSize, this->d2Size, subKSizeActAligned, subKSizeActAligned,
+                             this->d2Size);
             bmm2.SetTail(extraInfo.cubeS1RealSize, subNSizeAct, subKSizeAct);
 
             bmm2.SetTensorA(pTensor);
             bmm2.SetTensorB(vTensor);
-            
-            bmm2.template Iterate(k!=0, oTensor);
-            
+
+            bmm2.template Iterate(k != 0, oTensor);
+
             SetFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + (kvL1BufIter % 2));
             SetFlag<HardEvent::MTE1_MTE2>(P_EVENT0 + (pL1BufIter % 2));
             kvL1BufIter++;
@@ -830,12 +844,12 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAt
     bmm2.End();
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void 
-FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                bmm1Format, mmPolicyType, implMode, hasRope>::CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                                    SplitSameABExtraInfo &extraInfo)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor,
+                                                         SplitSameABExtraInfo &extraInfo)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -848,43 +862,45 @@ FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, 
     s1Offset = extraInfo.s1oIdx * this->s1BaseN2GD;
     n2Offset = extraInfo.n2oIdx * this->gD;
     gOffset = extraInfo.goIdx * this->dSize;
-    
+
     this->qCoreOffset = bOffset + n2Offset + gOffset + s1Offset;
     extraInfo.qCoreOffset = this->qCoreOffset;
     auto srcGm = this->queryGm[extraInfo.qCoreOffset];
     CopyGmToL1(l1Tensor, srcGm, extraInfo.cubeS1RealSize, this->dSize, this->n2GD);
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void 
-FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                bmm1Format, mmPolicyType, implMode, hasRope>::CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor,
-                                                                                const SplitSameABExtraInfo &extraInfo, uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::CopyInMm1BToL1(LocalTensor<INPUT_T> &bL1Tensor,
+                                                         const SplitSameABExtraInfo &extraInfo, uint32_t subNid,
+                                                         uint32_t subNSize, uint32_t nSplitSize)
 {
     auto srcGm = this->keyGm[this->kCoreOffset + subNid * nSplitSize * this->n2D];
     CopyGmToL1(bL1Tensor, srcGm, subNSize, this->dSize, this->n2D);
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void 
-FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                bmm1Format, mmPolicyType, implMode, hasRope>::CopyInMm2AToL1(LocalTensor<INPUT_T> &al1Tensor,
-                                                                                    SplitSameABExtraInfo &extraInfo, uint32_t subKid, uint32_t subKSize, uint32_t kSplitSize)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::CopyInMm2AToL1(LocalTensor<INPUT_T> &al1Tensor,
+                                                         SplitSameABExtraInfo &extraInfo, uint32_t subKid,
+                                                         uint32_t subKSize, uint32_t kSplitSize)
 {
     int64_t cubeS1RealSizeAligned = CeilDiv(extraInfo.cubeS1RealSize, 16) * 16;
-    auto srcGm = this->stage1Res[extraInfo.taskIdMod2][cubeS1RealSizeAligned*subKid*kSplitSize];
-    DataCopy(al1Tensor, srcGm, cubeS1RealSizeAligned*subKSize);
+    auto srcGm = this->stage1Res[extraInfo.taskIdMod2][cubeS1RealSizeAligned * subKid * kSplitSize];
+    DataCopy(al1Tensor, srcGm, cubeS1RealSizeAligned * subKSize);
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void 
-FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                bmm1Format, mmPolicyType, implMode, hasRope>::CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor,
-                                                                                uint32_t subKid, uint32_t subKSize, uint32_t kSplitSize,
-                                                                                uint32_t nLoopIdx, bool isLastN)
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::CopyInMm2BToL1(LocalTensor<INPUT_T> &bL1Tensor, uint32_t subKid,
+                                                         uint32_t subKSize, uint32_t kSplitSize, uint32_t nLoopIdx,
+                                                         bool isLastN)
 {
     uint32_t nSplitSize = 128;
     uint32_t nStartOffset = nLoopIdx * nSplitSize;
@@ -895,11 +911,11 @@ FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, 
     CopyGmToL1(bL1Tensor, srcGm, subKSize, nSplitSize, this->n2D2);
 }
 
-template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
-__aicore__ inline void 
-FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                bmm1Format, mmPolicyType, implMode, hasRope>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor,
+template <LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType, ImplModeEnum implMode, bool hasRope>
+__aicore__ inline void
+FlashAttentionVarLenScoreSameAB<layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, bmm1Format, mmPolicyType, implMode,
+                                hasRope>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor,
                                                      uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;

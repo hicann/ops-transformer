@@ -22,16 +22,13 @@
 
 using namespace AscendC;
 
-#define FAG_PRE_CLASS_TEMPLATE                                                                                         \
-    template <typename T1, typename T2, const uint8_t DETER_SPARSE_TYPE = 0, const uint32_t IS_TND = 0,                \
-        const uint8_t SPLIT_AXIS = 0, const bool IS_TND_SWIZZLE = 0,                           \
-        const bool IS_ATTEN_MASK = 0>
-#define FAG_PRE_FUNCTION_TEMPLATE                                                                                      \
-    template <typename T1, typename T2, const uint8_t DETER_SPARSE_TYPE,                                               \
-        const uint32_t IS_TND, const uint8_t SPLIT_AXIS, const bool IS_TND_SWIZZLE,                \
-        const bool IS_ATTEN_MASK>
-#define FAG_PRE_FUNCTION_PARAMS_TEMPLATE T1, T2, DETER_SPARSE_TYPE, IS_TND, SPLIT_AXIS, IS_TND_SWIZZLE,       \
-    IS_ATTEN_MASK
+#define FAG_PRE_CLASS_TEMPLATE \
+    template <typename T1, typename T2, const uint8_t DETER_SPARSE_TYPE = 0, const uint32_t IS_TND = 0, \
+              const uint8_t SPLIT_AXIS = 0, const bool IS_TND_SWIZZLE = 0, const bool IS_ATTEN_MASK = 0>
+#define FAG_PRE_FUNCTION_TEMPLATE \
+    template <typename T1, typename T2, const uint8_t DETER_SPARSE_TYPE, const uint32_t IS_TND, \
+              const uint8_t SPLIT_AXIS, const bool IS_TND_SWIZZLE, const bool IS_ATTEN_MASK>
+#define FAG_PRE_FUNCTION_PARAMS_TEMPLATE T1, T2, DETER_SPARSE_TYPE, IS_TND, SPLIT_AXIS, IS_TND_SWIZZLE, IS_ATTEN_MASK
 
 FAG_PRE_CLASS_TEMPLATE
 class FlashAttentionScoreGradS1S2BNGS1S2PreRegbase {
@@ -39,8 +36,7 @@ public:
     __aicore__ inline FlashAttentionScoreGradS1S2BNGS1S2PreRegbase(){};
     __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
                                 __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace,
-                                FagTilingType ordTilingData,
-                                TPipe *pipeIn);
+                                FagTilingType ordTilingData, TPipe *pipeIn);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
@@ -107,8 +103,7 @@ public:
 FAG_PRE_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNCTION_PARAMS_TEMPLATE>::Init(
     __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *actual_seq_kvlen,
-    __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace,
-    FagTilingType orgTilingData, TPipe *pipeIn)
+    __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace, FagTilingType orgTilingData, TPipe *pipeIn)
 {
     cBlockIdx = GetBlockIdx();
 
@@ -134,7 +129,7 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNC
         sinkPreBlockTotal = tilingData->preTilingData.sinkPreBlockTotal;
         sinkPreBlockTail = tilingData->preTilingData.sinkPreBlockTail;
         dsinkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-            tilingData->postTilingData.dsinkWorkSpaceOffset / sizeof(float));
+                                         tilingData->postTilingData.dsinkWorkSpaceOffset / sizeof(float));
         initdsinkSize = cBlockIdx == sinkPreBlockTotal - 1 ? sinkPreBlockTail : sinkPreBlockFactor;
         dsinkOffset = ((uint64_t)cBlockIdx) * sinkPreBlockFactor;
     }
@@ -146,9 +141,12 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNC
     dkGm.SetGlobalBuffer((__gm__ T1 *)dk);
     dvGm.SetGlobalBuffer((__gm__ T1 *)dv);
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
-    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
+    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
 
     initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
     dqOffset = ((uint64_t)cBlockIdx) * qPreBlockFactor;
@@ -205,10 +203,10 @@ __aicore__ inline void FlashAttentionScoreGradS1S2BNGS1S2PreRegbase<FAG_PRE_FUNC
             InitOutput<float>(dqWorkSpaceGm[dqOffset], initdqSize, 0);
             if constexpr (SPLIT_AXIS == 0) {
                 InitOutput<float>(dkWorkSpaceGm[dkOffset], initdkSize, 0);
-                InitOutput<float>(dvWorkSpaceGm[dvOffset], initdvSize, 0);    
+                InitOutput<float>(dvWorkSpaceGm[dvOffset], initdvSize, 0);
             } else if constexpr (SPLIT_AXIS == 5) {
                 if (tilingData->preTilingData.sValueZeroUnderTND ||
-                        (IS_DETER_NEW(DETER_SPARSE_TYPE) && tilingData->preTilingData.hasInvalidCol)) {
+                    (IS_DETER_NEW(DETER_SPARSE_TYPE) && tilingData->preTilingData.hasInvalidCol)) {
                     // BN2S2针对TND中有S为0的场景 或 newDeter与无效列叠加场景，增加gm清零
                     InitOutput<T1>(dkGm[dkOffset], initdkSize, 0);
                     InitOutput<T1>(dvGm[dvOffset], initdvSize, 0);

@@ -17,9 +17,11 @@
  */
 
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::Cube5LoadAData(const int64_t pGmOffset, const int64_t dyGmOffset, const int64_t indicesGmOffset,
-                           const int64_t outGmOffset, const int32_t blkCntOffset)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::Cube5LoadAData(const int64_t pGmOffset,
+                                                                                 const int64_t dyGmOffset,
+                                                                                 const int64_t indicesGmOffset,
+                                                                                 const int64_t outGmOffset,
+                                                                                 const int32_t blkCntOffset)
 {
     LocalTensor<T1> l0_a_tensor;
     LocalTensor<T1> l0_b_tensor = l0_b_dung_tensor;
@@ -81,9 +83,9 @@ CubeOp<T1>::Cube5LoadAData(const int64_t pGmOffset, const int64_t dyGmOffset, co
 }
 
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube5Process(const int64_t pGmOffset, const int64_t dyGmOffset, const int64_t indicesGmOffset,
-                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(
+    const int64_t pGmOffset, const int64_t dyGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx)
 {
     LocalTensor<T1> l1_dy_tensor = mmPingPongIdx ? l1_dy_ping_tensor : l1_dy_pong_tensor;
     LocalTensor<T1> l0_b_tensor = l0_b_dung_tensor;

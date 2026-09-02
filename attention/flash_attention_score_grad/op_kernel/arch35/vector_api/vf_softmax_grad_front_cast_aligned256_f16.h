@@ -31,7 +31,8 @@ param [in] gradTensor input grad LocalTensor
 param [in] srcTensor input src LocalTensor
 */
 template <typename T1>
-__simd_vf__ inline void CastAligned256F16VF128(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt, const uint32_t fullExeSize, uint32_t reduceSize, uint32_t srcM)
+__simd_vf__ inline void CastAligned256F16VF128(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt,
+                                               const uint32_t fullExeSize, uint32_t reduceSize, uint32_t srcM)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregGrad;
@@ -56,15 +57,19 @@ __simd_vf__ inline void CastAligned256F16VF128(uint64_t srcLocalInt, uint64_t ds
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         // 手动unroll 128个数分64个数做mul和add
         if constexpr (IsSameType<T1, half>::value) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf, ((__ubuf__ T1 *&)srcLocalInt), fullExeSize);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf, ((__ubuf__ T1 *&)gradLocalInt), fullExeSize);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf, ((__ubuf__ T1 *&)srcLocalInt),
+                                                                   fullExeSize);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf, ((__ubuf__ T1 *&)gradLocalInt),
+                                                                   fullExeSize);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregGrad1, vregGradHalf, pregFullExeB16);
         } else if constexpr (IsSameType<T1, bfloat16_t>::value) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf, ((__ubuf__ T1 *&)srcLocalInt), fullExeSize);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf, ((__ubuf__ T1 *&)gradLocalInt), fullExeSize);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf, ((__ubuf__ T1 *&)srcLocalInt),
+                                                                   fullExeSize);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf, ((__ubuf__ T1 *&)gradLocalInt),
+                                                                   fullExeSize);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcBf, pregFullExeB16);
@@ -74,15 +79,16 @@ __simd_vf__ inline void CastAligned256F16VF128(uint64_t srcLocalInt, uint64_t ds
         Mul(vregMul2, vregGrad1, vregSrc1, pregTailExe);
         Add(vregAdd, vregMul, vregMul2, pregFullExe);
         ReduceSum(vregReduceSum, vregAdd, pregTailExe);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ float *&)dstLocalInt), vregReduceSum, uregReduceSum, 1);
+        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalInt), vregReduceSum,
+                                                                     uregReduceSum, 1);
     }
     vstas(uregReduceSum, ((__ubuf__ float *&)dstLocalInt), 0, POST_UPDATE);
 }
 
 template <typename T1, uint32_t srcN>
-__simd_vf__ inline void CastAligned256F16VF256(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt, const uint32_t fullExeSize, uint32_t reduceSize,
-                                         uint64_t srcLocalIntTail, uint64_t gradLocalIntTail, uint32_t srcM)
+__simd_vf__ inline void CastAligned256F16VF256(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt,
+                                               const uint32_t fullExeSize, uint32_t reduceSize,
+                                               uint64_t srcLocalIntTail, uint64_t gradLocalIntTail, uint32_t srcM)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregGrad;
@@ -123,8 +129,10 @@ __simd_vf__ inline void CastAligned256F16VF256(uint64_t srcLocalInt, uint64_t ds
         if constexpr (IsSameType<T1, half>::value) {
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf, ((__ubuf__ T1 *&)srcLocalInt), srcN);
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf, ((__ubuf__ T1 *&)gradLocalInt), srcN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalfTail, ((__ubuf__ T1 *&)srcLocalIntTail), srcN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalfTail, ((__ubuf__ T1 *&)gradLocalIntTail), srcN);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalfTail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                                   srcN);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalfTail, ((__ubuf__ T1 *&)gradLocalIntTail),
+                                                                   srcN);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradHalf, pregFullExeB16);
@@ -133,11 +141,13 @@ __simd_vf__ inline void CastAligned256F16VF256(uint64_t srcLocalInt, uint64_t ds
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1Tail, vregSrcHalfTail, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGradTail, vregGradHalfTail, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregGrad1Tail, vregGradHalfTail, pregFullExeB16);
-            } else if constexpr (IsSameType<T1, bfloat16_t>::value) {
+        } else if constexpr (IsSameType<T1, bfloat16_t>::value) {
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf, ((__ubuf__ T1 *&)srcLocalInt), srcN);
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf, ((__ubuf__ T1 *&)gradLocalInt), srcN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBfTail, ((__ubuf__ T1 *&)srcLocalIntTail), srcN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBfTail, ((__ubuf__ T1 *&)gradLocalIntTail), srcN);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBfTail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                                   srcN);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBfTail, ((__ubuf__ T1 *&)gradLocalIntTail),
+                                                                   srcN);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcBf, pregFullExeB16);
@@ -157,15 +167,17 @@ __simd_vf__ inline void CastAligned256F16VF256(uint64_t srcLocalInt, uint64_t ds
         Add(vregAddLast, vregAdd, vregAddTail, pregFullExe);
 
         ReduceSum(vregReduceSum, vregAddLast, pregFullExe);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ float *&)dstLocalInt), vregReduceSum, uregReduceSum, 1);
+        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalInt), vregReduceSum,
+                                                                     uregReduceSum, 1);
     }
     vstas(uregReduceSum, ((__ubuf__ float *&)dstLocalInt), 0, POST_UPDATE);
 }
 
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void MySoftmaxGradFrontCastAligned256F16(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                                const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
+__aicore__ inline void MySoftmaxGradFrontCastAligned256F16(const LocalTensor<T> &dstTensor,
+                                                           const LocalTensor<T1> &gradTensor,
+                                                           const LocalTensor<T1> &srcTensor, uint32_t srcM,
+                                                           uint32_t realN = srcN)
 {
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
@@ -185,15 +197,17 @@ __aicore__ inline void MySoftmaxGradFrontCastAligned256F16(const LocalTensor<T> 
         if (realN == fullExeSize * 2) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        CastAligned256F16VF256<T1, srcN>(srcLocalInt, dstLocalInt, gradLocalInt, fullExeSize, reduceSize, srcLocalIntTail, gradLocalIntTail, srcM);
+        CastAligned256F16VF256<T1, srcN>(srcLocalInt, dstLocalInt, gradLocalInt, fullExeSize, reduceSize,
+                                         srcLocalIntTail, gradLocalIntTail, srcM);
     }
 }
 #else
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void MySoftmaxGradFrontCastAligned256F16(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                                const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
-{
-}
+__aicore__ inline void MySoftmaxGradFrontCastAligned256F16(const LocalTensor<T> &dstTensor,
+                                                           const LocalTensor<T1> &gradTensor,
+                                                           const LocalTensor<T1> &srcTensor, uint32_t srcM,
+                                                           uint32_t realN = srcN)
+{}
 #endif
 } // namespace AscendC
 

@@ -52,7 +52,7 @@ struct LigParaInfo {
     TilingOptionalParaInfo actualSeqLengthsQ = {nullptr, nullptr};
     TilingOptionalParaInfo actualSeqLengthsK = {nullptr, nullptr};
     TilingRequiredParaInfo dQuery = {nullptr, nullptr};
-    TilingRequiredParaInfo dKey= {nullptr, nullptr};
+    TilingRequiredParaInfo dKey = {nullptr, nullptr};
     TilingRequiredParaInfo dWeights = {nullptr, nullptr};
 
     int64_t headNum = 0;
@@ -108,7 +108,8 @@ struct LIGCompileInfo {};
 // ---------------算子Tiling类---------------
 class LightningIndexerGradTiling {
 public:
-    explicit LightningIndexerGradTiling(gert::TilingContext *context) : context_(context){};
+    explicit LightningIndexerGradTiling(gert::TilingContext *context)
+        : context_(context) {};
     ge::graphStatus DoTiling();
 
     uint32_t batch = 0;

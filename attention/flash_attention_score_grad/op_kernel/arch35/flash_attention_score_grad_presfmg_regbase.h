@@ -21,12 +21,12 @@
 #include "flash_attention_score_grad_common.h"
 using namespace AscendC;
 
-#define PRE_FUNCTION_TEMPLATE                                                                                          \
-    template <typename T1, typename T2, typename OUTDTYPE, DTemplateType dTemplateType, const int8_t IS_D_NO_EQUAL,    \
-              const uint8_t DETER_SPARSE_TYPE, const uint32_t IS_TND, const uint8_t SPLIT_AXIS,                        \
+#define PRE_FUNCTION_TEMPLATE \
+    template <typename T1, typename T2, typename OUTDTYPE, DTemplateType dTemplateType, const int8_t IS_D_NO_EQUAL, \
+              const uint8_t DETER_SPARSE_TYPE, const uint32_t IS_TND, const uint8_t SPLIT_AXIS, \
               const uint8_t IS_TND_SWIZZLE>
 
-#define PRE_FUNCTION_ARGS_TEMPLATE                                                                                     \
+#define PRE_FUNCTION_ARGS_TEMPLATE \
     T1, T2, OUTDTYPE, dTemplateType, IS_D_NO_EQUAL, DETER_SPARSE_TYPE, IS_TND, SPLIT_AXIS, IS_TND_SWIZZLE
 
 template <typename T1, typename T2, typename OUTDTYPE, DTemplateType dTemplateType = DTemplateType::Aligned128,
@@ -35,11 +35,9 @@ template <typename T1, typename T2, typename OUTDTYPE, DTemplateType dTemplateTy
 class FlashAttentionScoreGradPresfmgRegbase {
 public:
     __aicore__ inline FlashAttentionScoreGradPresfmgRegbase(){};
-    __aicore__ inline void
-    Init(GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dx, GM_ADDR y, GM_ADDR deqScaleDy, GM_ADDR actual_seq_qlen,
-         GM_ADDR workspace,
-         FagTilingType ordTilingData,
-         TPipe *pipe_in);
+    __aicore__ inline void Init(GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dx, GM_ADDR y, GM_ADDR deqScaleDy,
+                                GM_ADDR actual_seq_qlen, GM_ADDR workspace, FagTilingType ordTilingData,
+                                TPipe *pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
@@ -47,11 +45,11 @@ public:
     __aicore__ inline void InitIndex(uint64_t startIdx, uint64_t &curS);
     __aicore__ inline void CopyInSfmg(uint64_t leftNburst, uint64_t &curS);
     __aicore__ inline void DoCopyIn(uint64_t curS, uint64_t curNBurst, uint64_t dstOffset);
-    __aicore__ inline void CalculateSoftmaxGrad(uint64_t taskId, uint64_t sfmgOutputOffset,
-                                                uint64_t curNBurst, uint64_t deqScaleIdx = 0);
+    __aicore__ inline void CalculateSoftmaxGrad(uint64_t taskId, uint64_t sfmgOutputOffset, uint64_t curNBurst,
+                                                uint64_t deqScaleIdx = 0);
     __aicore__ inline void DoSoftmaxGrad();
     template <uint8_t GM_IDX>
-    __aicore__ inline void CopyDqkvToGm(const uint64_t& loopIdx);
+    __aicore__ inline void CopyDqkvToGm(const uint64_t &loopIdx);
 
     constexpr static uint32_t HEAD_DIM_ALIGN = static_cast<uint32_t>(dTemplateType);
     constexpr static uint64_t BLOCK_BYTE_SIZE = 32;
@@ -129,9 +127,7 @@ public:
 PRE_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::Init(
     GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dx, GM_ADDR y, GM_ADDR deqScaleDy, GM_ADDR actual_seq_qlen,
-    GM_ADDR workspace,
-    FagTilingType orgTilingData,
-    TPipe *pipe_in)
+    GM_ADDR workspace, FagTilingType orgTilingData, TPipe *pipe_in)
 {
     if (g_coreType == AIV) {
         vBlockIdx = GetBlockIdx();
@@ -176,11 +172,11 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
         deqScaleDyGm.SetGlobalBuffer((__gm__ float *)deqScaleDy);
 
         dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                    tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
+                                      tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
         dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                    tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
+                                      tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
         dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                    tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
+                                      tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
         sfmgWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace +
                                         tilingData->postTilingData.sfmgWorkSpaceOffset / sizeof(T2));
 
@@ -191,13 +187,12 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
         initdvSize = vBlockIdx == vPreBlockTotal - 1 ? vPreBlockTail : vPreBlockFactor;
         dvOffset = ((uint64_t)vBlockIdx) * vPreBlockFactor;
         if (SPLIT_AXIS == BN2S2 && !(tilingData->preTilingData.sValueZeroUnderTND ||
-                (IS_DETER_NEW(DETER_SPARSE_TYPE) && tilingData->preTilingData.hasInvalidCol))) {
+                                     (IS_DETER_NEW(DETER_SPARSE_TYPE) && tilingData->preTilingData.hasInvalidCol))) {
             singleInitSize = PRE_INIT_UB_SIZE * NUM_THREE / sizeof(T2);
             dqLoopNum = Ceil(initdqSize, singleInitSize);
             dkLoopNum = 0;
             dvLoopNum = 0;
-            dqBlockTail = initdqSize % singleInitSize == 0 ?
-                singleInitSize : initdqSize % singleInitSize;
+            dqBlockTail = initdqSize % singleInitSize == 0 ? singleInitSize : initdqSize % singleInitSize;
             dkBlockTail = 0;
             dvBlockTail = 0;
             pipe->InitBuffer(dqInitBuf, PRE_INIT_UB_SIZE * NUM_THREE);
@@ -207,12 +202,9 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
             dqLoopNum = Ceil(initdqSize, singleInitSize);
             dkLoopNum = Ceil(initdkSize, singleInitSize);
             dvLoopNum = Ceil(initdvSize, singleInitSize);
-            dqBlockTail = initdqSize % singleInitSize == 0 ?
-                singleInitSize : initdqSize % singleInitSize;
-            dkBlockTail = initdkSize % singleInitSize == 0 ?
-                singleInitSize : initdkSize % singleInitSize;
-            dvBlockTail = initdvSize % singleInitSize == 0 ?
-                singleInitSize : initdvSize % singleInitSize;
+            dqBlockTail = initdqSize % singleInitSize == 0 ? singleInitSize : initdqSize % singleInitSize;
+            dkBlockTail = initdkSize % singleInitSize == 0 ? singleInitSize : initdkSize % singleInitSize;
+            dvBlockTail = initdvSize % singleInitSize == 0 ? singleInitSize : initdvSize % singleInitSize;
             pipe->InitBuffer(dqInitBuf, PRE_INIT_UB_SIZE);
             pipe->InitBuffer(dkInitBuf, PRE_INIT_UB_SIZE);
             pipe->InitBuffer(dvInitBuf, PRE_INIT_UB_SIZE);
@@ -220,8 +212,7 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
             dkTensor = dkInitBuf.template Get<T2>();
             dvTensor = dvInitBuf.template Get<T2>();
         }
-        eventIDVToMte3 =
-            static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
+        eventIDVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
         pipe->InitBuffer(input1Que[0], 1, tilingData->preTilingData.sfmgYBufferLen);
         pipe->InitBuffer(input1Que[1], 1, tilingData->preTilingData.sfmgYBufferLen);
         pipe->InitBuffer(input2Que[0], 1, tilingData->preTilingData.sfmgDyBufferLen);
@@ -247,7 +238,7 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
                 Duplicate<T2>(dvTensor, 0, singleInitSize);
             } else {
                 if (tilingData->preTilingData.sValueZeroUnderTND ||
-                        (IS_DETER_NEW(DETER_SPARSE_TYPE) && tilingData->preTilingData.hasInvalidCol)) {
+                    (IS_DETER_NEW(DETER_SPARSE_TYPE) && tilingData->preTilingData.hasInvalidCol)) {
                     // BN2S2针对TND中有S为0的场景 或 newDeter与无效列叠加场景，增加gm清零
                     Duplicate<T2>(dkTensor, 0, singleInitSize);
                     Duplicate<T2>(dvTensor, 0, singleInitSize);
@@ -271,8 +262,8 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
 }
 
 PRE_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::InitIndex(uint64_t startIdx, uint64_t &curS)
+__aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::InitIndex(uint64_t startIdx,
+                                                                                                    uint64_t &curS)
 {
     if constexpr (IS_TND) {
         uint64_t totalLen = 0;
@@ -300,9 +291,9 @@ FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::InitIndex(uin
 }
 
 PRE_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::DoCopyIn(uint64_t curS, uint64_t curNBurst,
-                                                                                   uint64_t dstOffset)
+__aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::DoCopyIn(uint64_t curS,
+                                                                                                   uint64_t curNBurst,
+                                                                                                   uint64_t dstOffset)
 {
     uint64_t srcOffset = 0;
     uint64_t transposeStride = 0;
@@ -329,20 +320,20 @@ FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::DoCopyIn(uint
     }
     uint64_t dstBlockStrideB16 = (tempDimAlign - dAlignToBlockB16) * sizeof(OUTDTYPE) / BLOCK_BYTE_SIZE;
     uint64_t dstBlockStride = (tempDimAlign - dAlignToBlock) * sizeof(T1) / BLOCK_BYTE_SIZE;
-    DataCopyPad(input1Buf[dstOffset], yGm[srcOffset], {static_cast<uint16_t>(curNBurst),
-                static_cast<uint32_t>(d * sizeof(OUTDTYPE)), static_cast<uint32_t>(transposeStrideB16),
-                static_cast<uint32_t>(dstBlockStrideB16), 0},
+    DataCopyPad(input1Buf[dstOffset], yGm[srcOffset],
+                {static_cast<uint16_t>(curNBurst), static_cast<uint32_t>(d * sizeof(OUTDTYPE)),
+                 static_cast<uint32_t>(transposeStrideB16), static_cast<uint32_t>(dstBlockStrideB16), 0},
                 {true, 0, static_cast<uint8_t>((dAlignToBlockB16 - d)), 0});
     DataCopyPad(input2Buf[dstOffset].template ReinterpretCast<uint8_t>(),
                 dxGm[srcOffset].template ReinterpretCast<uint8_t>(),
                 {static_cast<uint16_t>(curNBurst), static_cast<uint32_t>(d * sizeof(T1)),
-                static_cast<uint32_t>(transposeStride), static_cast<uint32_t>(dstBlockStride), 0},
+                 static_cast<uint32_t>(transposeStride), static_cast<uint32_t>(dstBlockStride), 0},
                 {true, 0, static_cast<uint8_t>((dAlignToBlock - d)), 0});
 }
 
 PRE_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::CopyInSfmg(uint64_t leftNburst, uint64_t &curS)
+__aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::CopyInSfmg(
+    uint64_t leftNburst, uint64_t &curS)
 {
     uint64_t dstOffset = 0;
     while (leftNburst > 0) {
@@ -393,16 +384,16 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
     } else {
         if (d <= 384) {
             AscendC::MySoftmaxGradFrontCast<T1, T2, 384, HEAD_DIM_ALIGN>(output1Buf, yInTensor, dxInTensor,
-                                                                            static_cast<uint32_t>(curNBurst),
-                                                                            static_cast<uint32_t>(dAlignToBlockB16));
+                                                                         static_cast<uint32_t>(curNBurst),
+                                                                         static_cast<uint32_t>(dAlignToBlockB16));
         } else if (d <= 512) {
             AscendC::MySoftmaxGradFrontCast<T1, T2, 512, HEAD_DIM_ALIGN>(output1Buf, yInTensor, dxInTensor,
-                                                                            static_cast<uint32_t>(curNBurst),
-                                                                            static_cast<uint32_t>(dAlignToBlockB16));
+                                                                         static_cast<uint32_t>(curNBurst),
+                                                                         static_cast<uint32_t>(dAlignToBlockB16));
         } else if (d <= 640) {
             AscendC::MySoftmaxGradFrontCast<T1, T2, 640, HEAD_DIM_ALIGN>(output1Buf, yInTensor, dxInTensor,
-                                                                            static_cast<uint32_t>(curNBurst),
-                                                                            static_cast<uint32_t>(dAlignToBlockB16));
+                                                                         static_cast<uint32_t>(curNBurst),
+                                                                         static_cast<uint32_t>(dAlignToBlockB16));
         } else {
             AscendC::MySoftmaxGradFrontCast<T1, T2, HEAD_DIM_ALIGN, HEAD_DIM_ALIGN>(
                 output1Buf, yInTensor, dxInTensor, static_cast<uint32_t>(curNBurst),
@@ -419,7 +410,7 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
 PRE_FUNCTION_TEMPLATE
 template <uint8_t GM_IDX>
 __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_TEMPLATE>::CopyDqkvToGm(
-    const uint64_t& loopIdx)
+    const uint64_t &loopIdx)
 {
     if constexpr (IsSameType<T1, float>::value) {
         if constexpr (GM_IDX == DQ_IDX) {
@@ -477,15 +468,16 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
     if (vBlockIdx < usedCoreNum) {
         uint64_t singleCoreLoopTimes, singleCoreLastLoopNBurstNum;
         if (vBlockIdx == usedCoreNum - 1) {
-            singleCoreLoopTimes = tilingData->preTilingData.tailCoreLoopTimes;  // 尾核loop次数
+            singleCoreLoopTimes = tilingData->preTilingData.tailCoreLoopTimes;                 // 尾核loop次数
             singleCoreLastLoopNBurstNum = tilingData->preTilingData.tailCoreLastLoopNBurstNum; // 尾核最后一次处理s1大小
         } else {
-            singleCoreLoopTimes = tilingData->preTilingData.normalCoreLoopTimes;  // 非尾核loop次数
-            singleCoreLastLoopNBurstNum = tilingData->preTilingData.normalCoreLastLoopNBurstNum; // 非尾核最后一次处理s1大小
+            singleCoreLoopTimes = tilingData->preTilingData.normalCoreLoopTimes; // 非尾核loop次数
+            singleCoreLastLoopNBurstNum =
+                tilingData->preTilingData.normalCoreLastLoopNBurstNum; // 非尾核最后一次处理s1大小
         }
 
-        uint64_t sfmgOutputOffset = vBlockIdx * tilingData->preTilingData.normalCoreNBurstNums;  // 核间起始地址
-        uint64_t nBurst = tilingData->preTilingData.singleLoopNBurstNum;  // 一次普通loop处理多少个D
+        uint64_t sfmgOutputOffset = vBlockIdx * tilingData->preTilingData.normalCoreNBurstNums; // 核间起始地址
+        uint64_t nBurst = tilingData->preTilingData.singleLoopNBurstNum; // 一次普通loop处理多少个D
         uint64_t curS = s1;
         uint64_t taskId = 0;
         if constexpr (IS_D_NO_EQUAL) {
@@ -495,7 +487,7 @@ __aicore__ inline void FlashAttentionScoreGradPresfmgRegbase<PRE_FUNCTION_ARGS_T
             Duplicate<T1>(input2Buf, 0, nBurst * tempDimAlign);
             input1Que[0].FreeTensor(input1Buf);
             input2Que[0].FreeTensor(input2Buf);
-            
+
             input1Buf = input1Que[1].AllocTensor<OUTDTYPE>();
             input2Buf = input2Que[1].AllocTensor<T1>();
             Duplicate<OUTDTYPE>(input1Buf, 0, nBurst * tempDimAlign);

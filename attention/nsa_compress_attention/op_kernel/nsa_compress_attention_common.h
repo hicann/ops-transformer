@@ -50,7 +50,8 @@ constexpr uint32_t NEGATIVE_MIN_VAULE_FP16 = 0xFBFF;
 constexpr uint32_t POSITIVE_MAX_VALUE_FP32 = 0x7F7FFFFF;
 constexpr uint32_t POSITIVE_MAX_VALUE_FP16 = 0x7BFF;
 
-template <typename T> __aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
+template <typename T>
+__aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
 {
     if constexpr (IsSameType<T, float>::value) {
         uint32_t tmp1 = NEGATIVE_MIN_VAULE_FP32;

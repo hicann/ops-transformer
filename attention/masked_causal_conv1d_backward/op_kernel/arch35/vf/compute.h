@@ -296,7 +296,6 @@ __aicore__ inline void DoCastToDT(LocalTensor<float> &inUb, uint32_t dimLen, Loc
     CastRowB32ToDT<T>(src, dst, dimLen);
 }
 
-
 } // namespace MaskedCausalConv1dBackwardVF
 
 #endif

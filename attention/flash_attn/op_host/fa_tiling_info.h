@@ -116,12 +116,9 @@ using FaTilingShapeCompareParam = FiaTilingShapeCompareParam;
 using FaTilingShape = FiaTilingShape;
 using FaTilingShapeCompare = FiaTilingShapeCompare;
 
-const std::map<std::string, FaLayout> layoutMap = {{"BSND", FaLayout::BSND},
-                                                   {"BNSD", FaLayout::BNSD},
-                                                   {"TND", FaLayout::TND},
-                                                   {"PA_BBND", FaLayout::PA_BBND},
-                                                   {"PA_BNBD", FaLayout::PA_BNBD},
-                                                   {"PA_NZ", FaLayout::PA_NZ}};
+const std::map<std::string, FaLayout> layoutMap = {{"BSND", FaLayout::BSND},       {"BNSD", FaLayout::BNSD},
+                                                   {"TND", FaLayout::TND},         {"PA_BBND", FaLayout::PA_BBND},
+                                                   {"PA_BNBD", FaLayout::PA_BNBD}, {"PA_NZ", FaLayout::PA_NZ}};
 
 enum class FaQuantMode : uint32_t {
     NO_QUANT = 0,
@@ -401,12 +398,9 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {{ge::DT_UNDE
                                                                     {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"}};
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
-    {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
-    {KEY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
-    {VALUE_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
-    {ATTN_MASK_NAME, {ge::DT_INT8}},
-    {BLOCK_TABLE_NAME, {ge::DT_INT32}},
-    {ATTN_OUT_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}}, {KEY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {VALUE_NAME, {ge::DT_FLOAT16, ge::DT_BF16}}, {ATTN_MASK_NAME, {ge::DT_INT8}},
+    {BLOCK_TABLE_NAME, {ge::DT_INT32}},          {ATTN_OUT_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
     {SOFTMAX_LSE_NAME, {ge::DT_FLOAT}},
 };
 

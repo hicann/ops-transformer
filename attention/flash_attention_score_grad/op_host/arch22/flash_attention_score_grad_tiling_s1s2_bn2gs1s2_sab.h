@@ -18,7 +18,6 @@
 #include "flash_attention_score_grad_tiling_common.h"
 #include "op_host/tiling_base.h"
 
-
 using namespace Ops::Transformer::OpTiling;
 
 namespace optiling {
@@ -126,11 +125,13 @@ struct SameAbFuzzyBaseInfoParams { // 频繁使用的基础参数
 
 class FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb : public TilingBaseClass {
 public:
-    explicit FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb(gert::TilingContext *context) : TilingBaseClass(context)
+    explicit FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {
         tilingData->reset();
     }
-    FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb *tilingData = context_->GetTilingData<FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb>();
+    FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb *tilingData =
+        context_->GetTilingData<FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb>();
 
 protected:
     bool IsCapable() override;
@@ -143,7 +144,7 @@ protected:
     ge::graphStatus PostTiling() override;
 
     ge::graphStatus DoSplit();
-    void SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling* mmTiling);
+    void SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling *mmTiling);
     ge::graphStatus DoPreTiling();
     ge::graphStatus DoPostTiling();
     void DetermineMode();
@@ -175,8 +176,7 @@ class FlashAttentionScoreGradTilingSameABDeterministic : public FlashAttentionSc
 public:
     explicit FlashAttentionScoreGradTilingSameABDeterministic(gert::TilingContext *context)
         : FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb(context)
-    {
-    }
+    {}
 
 protected:
     bool IsCapable() override;

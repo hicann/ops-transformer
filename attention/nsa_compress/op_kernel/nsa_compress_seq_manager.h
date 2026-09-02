@@ -20,7 +20,6 @@
 #include "nsa_compress_common.h"
 #include "nsa_compress_tiling.h"
 
-
 namespace NASCompress {
 
 struct SampleManager_st {

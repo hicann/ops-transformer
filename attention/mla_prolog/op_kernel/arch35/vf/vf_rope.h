@@ -72,7 +72,6 @@ __simd_vf__ inline void RopeVFImpl(__ubuf__ C *outputUb, __ubuf__ C *inputUb, __
     }
 }
 
-
 // col == 64
 template <typename C>
 __aicore__ inline void RotaryPosEmbVF(const LocalTensor<C> &outputLocal, const LocalTensor<C> &inputLocal,

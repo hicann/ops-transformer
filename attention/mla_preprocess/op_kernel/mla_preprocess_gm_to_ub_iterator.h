@@ -8,7 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-template <ArchType ArchTag, typename DType> struct gm_to_ub {
+template <ArchType ArchTag, typename DType>
+struct gm_to_ub {
     __aicore__ inline gm_to_ub(AscendC::LocalTensor<DType> dstTensor, AscendC::GlobalTensor<DType> srcTensor,
                                uint8_t sid, uint16_t nBurst, uint16_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
@@ -16,7 +17,8 @@ template <ArchType ArchTag, typename DType> struct gm_to_ub {
     };
 };
 
-template <ArchType ArchTag, typename DType> struct gm_to_ub_align {
+template <ArchType ArchTag, typename DType>
+struct gm_to_ub_align {
     __aicore__ inline gm_to_ub_align(AscendC::LocalTensor<DType> dstTensor, AscendC::GlobalTensor<DType> srcTensor,
                                      uint8_t sid, uint16_t nBurst, uint32_t lenBurst, uint8_t leftPaddingNum,
                                      uint8_t rightPaddingNum, uint32_t srcGap, uint32_t dstGap)
@@ -26,7 +28,8 @@ template <ArchType ArchTag, typename DType> struct gm_to_ub_align {
     };
 };
 
-template <ArchType ArchTag, typename DType> struct ub_to_ub {
+template <ArchType ArchTag, typename DType>
+struct ub_to_ub {
     __aicore__ inline ub_to_ub(AscendC::LocalTensor<DType> dstTensor, AscendC::LocalTensor<DType> srcTensor,
                                uint8_t sid, uint16_t nBurst, uint16_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
@@ -44,7 +47,8 @@ struct ub_to_gm {
     };
 };
 
-template <ArchType ArchTag, typename DataType> struct ub_to_gm<ArchTag, DataType, DataFormat::NZ, DataFormat::NZ> {
+template <ArchType ArchTag, typename DataType>
+struct ub_to_gm<ArchTag, DataType, DataFormat::NZ, DataFormat::NZ> {
     using HardwareParams = HardwareInfo<ArchTag>;
     static constexpr uint32_t BLOCK_SIZE = HardwareParams::l1l0BlockSize / sizeof(DataType);
 
@@ -76,7 +80,8 @@ template <ArchType ArchTag, typename DataType> struct ub_to_gm<ArchTag, DataType
     };
 };
 
-template <ArchType ArchTag, typename DType> struct ub_to_gm_align {
+template <ArchType ArchTag, typename DType>
+struct ub_to_gm_align {
     __aicore__ inline ub_to_gm_align(AscendC::GlobalTensor<DType> dstTensor, AscendC::LocalTensor<DType> srcTensor,
                                      uint8_t sid, uint16_t nBurst, uint32_t lenBurst, uint8_t leftPaddingNum,
                                      uint8_t rightPaddingNum, uint32_t srcGap, uint32_t dstGap)

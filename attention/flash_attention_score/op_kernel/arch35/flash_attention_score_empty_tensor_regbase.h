@@ -30,7 +30,8 @@
 #endif
 using namespace optiling;
 
-template <typename INPUT_T> class FlashAttentionScoreEmptyTensorRegbase {
+template <typename INPUT_T>
+class FlashAttentionScoreEmptyTensorRegbase {
 public:
     __aicore__ inline FlashAttentionScoreEmptyTensorRegbase(){};
     __aicore__ inline void Init(__gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut,
@@ -47,10 +48,9 @@ protected:
 };
 
 template <typename INPUT_T>
-__aicore__ inline void
-FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::Init(__gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                              __gm__ uint8_t *attentionOut,
-                                              const FlashAttentionScoreEmptyInputTilingDataRegbase *__restrict tiling)
+__aicore__ inline void FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::Init(
+    __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut,
+    const FlashAttentionScoreEmptyInputTilingDataRegbase *__restrict tiling)
 {
     tmpBlockIdx = AscendC::GetBlockIdx();
     tilingData = tiling;
@@ -59,7 +59,8 @@ FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::Init(__gm__ uint8_t *softmaxMax,
     attentionOutGm.SetGlobalBuffer((__gm__ INPUT_T *)attentionOut);
 }
 
-template <typename INPUT_T> __aicore__ inline void FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::ComputeEachCore()
+template <typename INPUT_T>
+__aicore__ inline void FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::ComputeEachCore()
 {
     uint32_t coreNum = tilingData->coreNum;
     uint32_t attentionOutFormerNum = tilingData->attentionOutFormerNum;
@@ -102,24 +103,21 @@ template <typename INPUT_T> __aicore__ inline void FlashAttentionScoreEmptyTenso
         return;
     } else if (tmpBlockIdx < softmaxMaxFormerNum) {
         AscendC::InitOutput<float>(softmaxMaxGm[tmpBlockIdx * softmaxMaxSingleCoreDataSize],
-                                   tilingData->softmaxMaxSingleCoreDataSize,
-                                   static_cast<float>(0.0));
+                                   tilingData->softmaxMaxSingleCoreDataSize, static_cast<float>(0.0));
         AscendC::InitOutput<float>(softmaxSumGm[tmpBlockIdx * softmaxMaxSingleCoreDataSize],
-                                   tilingData->softmaxMaxSingleCoreDataSize,
-                                   static_cast<float>(0.0));
+                                   tilingData->softmaxMaxSingleCoreDataSize, static_cast<float>(0.0));
     } else {
         AscendC::InitOutput<float>(softmaxMaxGm[softmaxMaxFormerNum * softmaxMaxSingleCoreDataSize +
                                                 (tmpBlockIdx - softmaxMaxFormerNum) * softmaxMaxTailCoreDataSize],
-                                   tilingData->softmaxMaxTailCoreDataSize,
-                                   static_cast<float>(0.0));
+                                   tilingData->softmaxMaxTailCoreDataSize, static_cast<float>(0.0));
         AscendC::InitOutput<float>(softmaxSumGm[softmaxMaxFormerNum * softmaxMaxSingleCoreDataSize +
                                                 (tmpBlockIdx - softmaxMaxFormerNum) * softmaxMaxTailCoreDataSize],
-                                   tilingData->softmaxMaxTailCoreDataSize,
-                                   static_cast<float>(0.0));
+                                   tilingData->softmaxMaxTailCoreDataSize, static_cast<float>(0.0));
     }
 }
 
-template <typename INPUT_T> __aicore__ inline void FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::Process()
+template <typename INPUT_T>
+__aicore__ inline void FlashAttentionScoreEmptyTensorRegbase<INPUT_T>::Process()
 {
     ComputeEachCore();
 }

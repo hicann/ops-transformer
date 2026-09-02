@@ -74,11 +74,12 @@ __aicore__ inline void DynamicQuantMultiRow(const GlobalTensor<O> &outputGm, con
 }
 
 template <typename T, typename C>
-__aicore__ inline void
-MulQr(const GlobalTensor<T> &outputGmRope, const GlobalTensor<T> &inputGmRope, LocalTensor<T> outputLocalRope,
-      const LocalTensor<T> &qrInputLocal, const LocalTensor<C> &qrFp32Local, const LocalTensor<C> &reciprocalLocal,
-      const LocalTensor<C> &dequantScaleBrcbLocal, uint64_t row, uint64_t colRope, uint64_t subRowRope,
-      uint64_t qrOutputStrideRope, float quantScaleCkvRope, uint32_t MUL_QR_INPUT_COPY_READY, uint32_t MUL_QR)
+__aicore__ inline void MulQr(const GlobalTensor<T> &outputGmRope, const GlobalTensor<T> &inputGmRope,
+                             LocalTensor<T> outputLocalRope, const LocalTensor<T> &qrInputLocal,
+                             const LocalTensor<C> &qrFp32Local, const LocalTensor<C> &reciprocalLocal,
+                             const LocalTensor<C> &dequantScaleBrcbLocal, uint64_t row, uint64_t colRope,
+                             uint64_t subRowRope, uint64_t qrOutputStrideRope, float quantScaleCkvRope,
+                             uint32_t MUL_QR_INPUT_COPY_READY, uint32_t MUL_QR)
 {
     constexpr uint64_t inputBlockAlign = (ALIGN_BLOCK_SIZE / sizeof(T));
     constexpr uint64_t computeBlockAlign = (ALIGN_BLOCK_SIZE / sizeof(C));
@@ -96,7 +97,6 @@ MulQr(const GlobalTensor<T> &outputGmRope, const GlobalTensor<T> &inputGmRope, L
     uint64_t inputGmRopeOffset = 0;
     uint64_t dequantScaleOffset = 0;
     uint64_t inputLocalRopeOffset = 0;
-
 
     WaitFlag<HardEvent::V_MTE2>(MUL_QR_INPUT_COPY_READY);
     DataCopy(qrInputLocal, inputGmRope, inputParamsRope);

@@ -26,7 +26,7 @@ __simd_vf__ inline void DsAbsReduceMaxVF64(uint64_t srcLocalInt, uint64_t dstLoc
     RegTensor<T> vregInputAbs;
     RegTensor<T> vregInputMax;
     RegTensor<T> vregMax;
-    
+
     MaskReg pregFullExe = CreateMask<T, MaskPattern::ALL>();
     MaskReg pregTailExe = UpdateMask<T>(realN);
     MaskReg pregLen1 = CreateMask<T, MicroAPI::MaskPattern::VL1>();
@@ -45,7 +45,8 @@ __simd_vf__ inline void DsAbsReduceMaxVF64(uint64_t srcLocalInt, uint64_t dstLoc
 }
 
 template <typename T, uint32_t srcN>
-__simd_vf__ inline void DsAbsReduceMaxVFnot64(uint64_t srcLocalInt, uint64_t dstLocalInt, uint16_t repeatTimes, uint32_t tailSize, uint64_t srcLocalIntTail, uint32_t srcM)
+__simd_vf__ inline void DsAbsReduceMaxVFnot64(uint64_t srcLocalInt, uint64_t dstLocalInt, uint16_t repeatTimes,
+                                              uint32_t tailSize, uint64_t srcLocalIntTail, uint32_t srcM)
 {
     RegTensor<T> vregInput;
     RegTensor<T> vregInputTail;
@@ -73,21 +74,21 @@ __simd_vf__ inline void DsAbsReduceMaxVFnot64(uint64_t srcLocalInt, uint64_t dst
         Max<T, MicroAPI::MaskMergeMode::ZEROING>(vregInputMax, vregMaxTmp, vregInputMax, pregFullExe);
     }
     ReduceMax<T, MicroAPI::MaskMergeMode::ZEROING>(vregMax, vregInputMax, pregFullExe);
-    
+
     vstus(uregReduceSum, 1, vregMax, ((__ubuf__ T *&)dstLocalInt), POST_UPDATE);
     vstas(uregReduceSum, ((__ubuf__ T *&)dstLocalInt), 0, POST_UPDATE);
 }
 
 template <typename T, uint16_t srcN>
 __aicore__ inline void DsAbsReduceMax(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint32_t srcM,
-    uint32_t realN = srcN)
+                                      uint32_t realN = srcN)
 {
     const uint32_t bytesOfType = sizeof(T);
     const uint32_t regBytes = 256;
     const uint32_t fullExeSize = regBytes / bytesOfType;
     uint16_t repeatTimes = (realN + fullExeSize - 1) / fullExeSize - 1;
     uint32_t tailSize = realN % fullExeSize == 0 ? fullExeSize : realN % fullExeSize;
- 
+
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
     uint64_t srcLocalIntTail = srcTensor.GetPhyAddr() + fullExeSize * bytesOfType * repeatTimes;
@@ -115,7 +116,7 @@ __aicore__ inline void DsAbsReduceMax(const LocalTensor<T> &dstTensor, const Loc
             Max<T, MicroAPI::MaskMergeMode::ZEROING>(vregMaxTmp, vregInputTailAbs, vregMaxTmp, pregFullExe);
         }
         ReduceMax<T, MicroAPI::MaskMergeMode::ZEROING>(vregMax, vregMaxTmp, pregFullExe);
-        
+
         vstus(uregReduceSum, 1, vregMax, ((__ubuf__ T *&)dstLocalInt), POST_UPDATE);
         vstas(uregReduceSum, ((__ubuf__ T *&)dstLocalInt), 0, POST_UPDATE);
     }
@@ -123,9 +124,8 @@ __aicore__ inline void DsAbsReduceMax(const LocalTensor<T> &dstTensor, const Loc
 #else
 template <typename T, uint16_t srcN>
 __aicore__ inline void DsAbsReduceMax(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint64_t srcM,
-    uint64_t realN = srcN)
-{
-}
+                                      uint64_t realN = srcN)
+{}
 #endif
 } // namespace AscendC
 

@@ -9,9 +9,9 @@
  */
 
 /*!
-* \file nsa_selected_attention_common.h
-* \brief
-*/
+ * \file nsa_selected_attention_common.h
+ * \brief
+ */
 
 #ifndef NSA_SELECTED_ATTENTION_COMMON_H
 #define NSA_SELECTED_ATTENTION_COMMON_H
@@ -95,7 +95,7 @@ enum class SparseModeEnum : uint32_t {
     BAND_LEFT_UP_CAUSAL = 9
 };
 
-template <typename T> 
+template <typename T>
 __aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
 {
     if constexpr (AscendC::IsSameType<T, float>::value) {

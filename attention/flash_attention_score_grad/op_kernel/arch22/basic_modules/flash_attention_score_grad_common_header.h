@@ -16,7 +16,6 @@
 #ifndef _COMMON_HEADER_H_
 #define _COMMON_HEADER_H_
 
-
 #include <limits>
 #include <type_traits>
 #include "kernel_operator.h"
@@ -104,8 +103,8 @@ struct DetGroup {
     int32_t accumList[24];
     int32_t accumNum{0};
     int32_t recoderS{0};
-    int32_t existFirstBlock{0};  // 用于判断是否存在第一块累加的数据
-    int32_t existLastBlock{0};    // 用于判断是否存在最后一块累加的数据
+    int32_t existFirstBlock{0}; // 用于判断是否存在第一块累加的数据
+    int32_t existLastBlock{0};  // 用于判断是否存在最后一块累加的数据
     uint64_t outAddr{0};
 };
 
@@ -127,17 +126,17 @@ struct VecBlockInfoDet {
 struct CubeAddrInfoDet {
     int32_t taskId{0};
     int32_t blockLength{0};
-    int32_t enableCausalOpt{0};              // 针对sparseMode=3的优化使能开关
-    int32_t atmoicAdd{0};                    // 如果只存在一个块，则跳过detVec2，直接累加到GM上
-    int32_t s1Idx{0};                        // 需要计算的左上角顶点s1Idx
-    int32_t s2Idx{0};                        // 需要计算的左上角顶点s2Idx
-    int32_t s1Len{0};                        // 需要计算S1方向的长度
-    int32_t s2Len{0};                        // 需要计算S2方向的长度
-    int64_t s1GmAddr{0};                     // s1方向对应的GM偏移地址
-    int64_t s2GmAddr{0};                     // s2方向对应的GM偏移地址
-    int64_t sparseLeftBound{0};              // preToken对应的计算参数
-    int64_t sparseRightBound{0};             // nextToken对应的计算参数
-    DetGroup detS2GroupList[24];             // 确定性计算所需结构体
+    int32_t enableCausalOpt{0};  // 针对sparseMode=3的优化使能开关
+    int32_t atmoicAdd{0};        // 如果只存在一个块，则跳过detVec2，直接累加到GM上
+    int32_t s1Idx{0};            // 需要计算的左上角顶点s1Idx
+    int32_t s2Idx{0};            // 需要计算的左上角顶点s2Idx
+    int32_t s1Len{0};            // 需要计算S1方向的长度
+    int32_t s2Len{0};            // 需要计算S2方向的长度
+    int64_t s1GmAddr{0};         // s1方向对应的GM偏移地址
+    int64_t s2GmAddr{0};         // s2方向对应的GM偏移地址
+    int64_t sparseLeftBound{0};  // preToken对应的计算参数
+    int64_t sparseRightBound{0}; // nextToken对应的计算参数
+    DetGroup detS2GroupList[24]; // 确定性计算所需结构体
 };
 
 struct VecAddrInfoDet {
@@ -160,7 +159,6 @@ constexpr uint32_t CUBE2VEC = 7;
 constexpr uint32_t VEC2CUBE = 8;
 constexpr uint32_t CUBE2POST = 9;
 
-
 /////////////////////////////////////////////////////
 // hardware
 /////////////////////////////////////////////////////
@@ -170,7 +168,8 @@ enum class ArchType {
     ASCEND_M200
 };
 
-template <ArchType ArchTag> struct HardwareInfo {
+template <ArchType ArchTag>
+struct HardwareInfo {
     static uint32_t const l2BW = 5;
     static uint32_t const hbmBW = 1;
     static uint32_t const supportMix = 0;
@@ -188,7 +187,6 @@ template <ArchType ArchTag> struct HardwareInfo {
     static uint32_t const fbBlockSize = 128;
 };
 
-
 /////////////////////////////////////////////////////
 // mem
 /////////////////////////////////////////////////////
@@ -201,7 +199,8 @@ enum class BufferType {
     ASCEND_MAX
 };
 
-template <ArchType ArchTag> struct AsdopsBuffer {
+template <ArchType ArchTag>
+struct AsdopsBuffer {
 public:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -247,12 +246,12 @@ public:
     AscendC::LocalTensor<uint8_t> tensor[(uint32_t)BufferType::ASCEND_MAX];
 };
 
-
 /////////////////////////////////////////////////////
 // common function
 /////////////////////////////////////////////////////
 
-template <typename T> inline __aicore__ T RoundUp(const T val, const T align)
+template <typename T>
+inline __aicore__ T RoundUp(const T val, const T align)
 {
     static_assert(std::is_arithmetic<T>::value, "T must be an arithmetic type");
     if (align == 0 || val + align - 1 < val) {
@@ -261,9 +260,11 @@ template <typename T> inline __aicore__ T RoundUp(const T val, const T align)
     return (val + align - 1) / align * align;
 }
 
-template <typename T> constexpr T T_MAX = std::numeric_limits<T>::max();
+template <typename T>
+constexpr T T_MAX = std::numeric_limits<T>::max();
 
-template <typename T> inline __aicore__ T CeilDiv(const T dividend, const T divisor)
+template <typename T>
+inline __aicore__ T CeilDiv(const T dividend, const T divisor)
 {
     static_assert(std::is_arithmetic<T>::value, "T must be an arithmetic type");
     if (divisor == 0 || dividend + divisor - 1 < dividend) {
@@ -272,7 +273,8 @@ template <typename T> inline __aicore__ T CeilDiv(const T dividend, const T divi
     return (dividend + divisor - 1) / divisor;
 }
 
-template <typename T> __aicore__ inline T Min(const T lhs, const T rhs)
+template <typename T>
+__aicore__ inline T Min(const T lhs, const T rhs)
 {
     return lhs < rhs ? lhs : rhs;
 }
@@ -307,11 +309,9 @@ __aicore__ inline bool isRightDownOverTouchRight(const int32_t s1Idx, const int3
     return s1Idx <= (s2Idx + rightBound) ? true : false;
 }
 
-__aicore__ inline bool IsFullMaskBlock(const int32_t s1Idx, const int32_t s2Idx,
-                                       const int32_t s1Len, const int32_t s2Len,
-                                       const int32_t leftBound, const int32_t rightBound,
-                                       const uint32_t sparseMode
-                                      )
+__aicore__ inline bool IsFullMaskBlock(const int32_t s1Idx, const int32_t s2Idx, const int32_t s1Len,
+                                       const int32_t s2Len, const int32_t leftBound, const int32_t rightBound,
+                                       const uint32_t sparseMode)
 {
     if (sparseMode == 0) {
         // no mask 需要全部计算

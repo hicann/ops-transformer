@@ -16,8 +16,9 @@
 #define _CUBE3_OP_H_
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ TYPE *right, __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo,
+                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
+                                                                                 __gm__ float *out)
 {
     ping_pong_flag_l0_b_ = 0;
     ping_pong_flag_l0_b_last = 0;
@@ -36,10 +37,8 @@ CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ 
     int32_t l1_m_block_size_align_tail = (l1_m_size_align % 128) == 0 ? 128 : (l1_m_size_align % 128);
     int32_t l1_n_block_size_align_tail = (l1_n_size_align % 128) == 0 ? 128 : (l1_n_size_align % 128);
 
-
     int32_t m_loop = CeilDiv(km, SIZE_128);
     int32_t n_loop = CeilDiv(kn, SIZE_128);
-
 
     __gm__ TYPE *gm_a = left + (shapeInfo.out + globalBlockOffset) * 2;
     __gm__ TYPE *gm_b = right + shapeInfo.left;
@@ -79,7 +78,6 @@ CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ 
         }
     }
 
-
     // n: k方向
     // m: q方向
     for (uint32_t n_loop_index = 0; n_loop_index < n_loop; n_loop_index++) {
@@ -91,12 +89,10 @@ CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ 
                 continue;
             }
 
-
             LocalTensor<TYPE> *l1_a_buf_tensor = ping_pong_flag_l1_a_ ? &l1_a_pong_tensor : &l1_a_ping_tensor;
             LocalTensor<TYPE> *l0_a_buf_tensor = ping_pong_flag_l0_a_ ? &l0_a_pong_tensor : &l0_a_ping_tensor;
             LocalTensor<TYPE> *l0_b_buf_tensor = (ping_pong_flag_l0_b_last) ? &l0_b_ping_tensor : &l0_b_pong_tensor;
             LocalTensor<float> *l0_c_buf_tensor = ping_pong_flag_l0_c_ ? &l0_c_pong_tensor : &l0_c_ping_tensor;
-
 
             if (!is_skip) {
                 WAIT_FLAG(M, MTE1, ping_pong_flag_l0_b_last + 2 + FLAG_SHIFT);
@@ -120,10 +116,8 @@ CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ 
             uint32_t real_m_align = (m_loop_index == m_loop - 1) ? l1_m_block_size_align_tail : 128;
             uint32_t real_n_align = (n_loop_index == n_loop - 1) ? l1_n_block_size_align_tail : 128;
 
-
             bool init_c = (m_loop_index == 0 || (sparseType != 0 && (s2Idx + n_loop_index == s1Idx + m_loop_index)));
             bool out_c = (m_loop_index == (m_loop - 1));
-
 
             if (!is_skip) {
                 WAIT_FLAG(MTE1, MTE2, ping_pong_flag_l1_a_ + 2);
@@ -184,10 +178,8 @@ CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ 
                 PipeBarrier<PIPE_M>();
                 ping_pong_flag_l0_b_last = 1 - ping_pong_flag_l0_b_last;
 
-
                 SET_FLAG(M, MTE1, ping_pong_flag_l0_a_ + FLAG_SHIFT);
             }
-
 
             if (!is_skip && out_c) {
                 commonFixpipeParamsV220.mSize = real_n;
@@ -204,7 +196,6 @@ CubeOp<TYPE>::Cube3Compute(const AddrInfo &shapeInfo, __gm__ TYPE *left, __gm__ 
             ping_pong_flag_l1_a_ = 1 - ping_pong_flag_l1_a_;
             ping_pong_flag_l0_a_ = 1 - ping_pong_flag_l0_a_;
         }
-
 
         ping_pong_flag_l0_c_ = 1 - ping_pong_flag_l0_c_;
     }

@@ -20,9 +20,9 @@
 
 // INPUT_T - means data type for input
 // T       - means data type when calc
-#define Q_EVENT0  EVENT_ID2
+#define Q_EVENT0 EVENT_ID2
 #define KV_EVENT0 EVENT_ID4
-#define P_EVENT0  EVENT_ID6
+#define P_EVENT0 EVENT_ID6
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T = INPUT_T, bool isBasicBlock = false, CubeFormat bmm1Format = CubeFormat::NZ, bool hasRope = false>
@@ -32,36 +32,37 @@ class FlashAttentionVarLenScore
 public:
     __aicore__ inline FlashAttentionVarLenScore(){};
 
-    __aicore__ inline void
-    UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key, __gm__ uint8_t *keyRope,
-               __gm__ uint8_t *value, __gm__ uint8_t *pse,
-               __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
-               __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax,
-               __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
-               __gm__ uint8_t *workspace, const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,
+                                      __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *pse,
+                                      __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
+                                      __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *actualSeqLengths,
+                                      __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax,
+                                      __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
+                                      __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                                      const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
 
     __aicore__ inline void Process();
     __aicore__ inline void ProcessL1Carry();
 
     using a1TypeL1Carry = MatmulType<TPosition::A1, CubeFormat::NZ, INPUT_T>;
     using b1TypeL1Carry = MatmulType<TPosition::B1, CubeFormat::NZ, INPUT_T, true>;
-    using bias1Type = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
-                                                             bmm1Format, false, hasRope>::bias1Type;
-    using c1Type = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
-                                                          bmm1Format, false, hasRope>::c1Type;
+    using bias1Type = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T,
+                                                             T, isBasicBlock, bmm1Format, false, hasRope>::bias1Type;
+    using c1Type = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                          isBasicBlock, bmm1Format, false, hasRope>::c1Type;
     matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, c1Type, bias1Type, CFG_EXCEED> bmm1L1Carry;
 
-    using c1NzType = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
-                                                            bmm1Format, false, hasRope>::c1NzType;                                                                          
+    using c1NzType = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                            isBasicBlock, bmm1Format, false, hasRope>::c1NzType;
     matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, c1NzType, bias1Type, CFG_EXCEED> bmm1NzL1Carry;
 
     using a2TypeL1Carry = MatmulType<TPosition::A1, CubeFormat::NZ, INPUT_T>;
     using b2TypeL1Carry = MatmulType<TPosition::B1, CubeFormat::NZ, INPUT_T>;
-    using bias2Type = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
-                                                             bmm1Format, false, hasRope>::bias2Type;
-    using c2NzType = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
-                                                            bmm1Format, false, hasRope>::c2NzType;
-    matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzType, bias2Type, CFG_MDL_EXCEED> bmm2L1Carry;   
+    using bias2Type = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T,
+                                                             T, isBasicBlock, bmm1Format, false, hasRope>::bias2Type;
+    using c2NzType = typename FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                            isBasicBlock, bmm1Format, false, hasRope>::c2NzType;
+    matmul::MatmulImpl<a2TypeL1Carry, b2TypeL1Carry, c2NzType, bias2Type, CFG_MDL_EXCEED> bmm2L1Carry;
 
 protected:
     __aicore__ inline void ComputeConstexpr();
@@ -90,8 +91,9 @@ protected:
     __aicore__ inline void CalcKRopeCoreOffset(const SplitExtraInfo &extraInfo);
 
     template <typename T2>
-    __aicore__ inline void ComputeMm1(const SplitExtraInfo &extraInfo, 
-                                      matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED> &bmm1, int32_t cubeSubIdx);
+    __aicore__ inline void ComputeMm1(const SplitExtraInfo &extraInfo,
+                                      matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED> &bmm1,
+                                      int32_t cubeSubIdx);
 
     __aicore__ inline void ComputeMm2(const SplitExtraInfo &extraInfo, int32_t cubeSubIdx);
 
@@ -104,22 +106,22 @@ protected:
                                           uint32_t subKid, uint32_t subKSize, int32_t cubeSubIdx);
 
     __aicore__ inline void CopyInMm2BToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
-                                          uint32_t subKid, uint32_t subKSize); 
+                                          uint32_t subKid, uint32_t subKSize);
 
-    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor,
-                                      uint32_t srcN, uint32_t srcD, uint32_t srcDstride); 
+    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
+                                      uint32_t srcD, uint32_t srcDstride);
 
     __aicore__ inline void PairComputeAxisIdx(int64_t multiCoreInnerIdx);
 
     __aicore__ inline void PairSetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
                                             int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
 
-    __aicore__ inline void PairCalS1OuterSize(int64_t offset);     
+    __aicore__ inline void PairCalS1OuterSize(int64_t offset);
 
     __aicore__ inline void PairGetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit);
 
-    __aicore__ inline void PairGetS2LoopRange();       
-                                                                                                                                                           
+    __aicore__ inline void PairGetS2LoopRange();
+
     // Unpack 用参数
     GM_ADDR actualSeqQlenAddr;
     GM_ADDR actualSeqKvlenAddr;
@@ -174,17 +176,21 @@ protected:
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::UnpackInit(
-    __gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
-    __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-    __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-    const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::UnpackInit(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,
+                                               __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *pse,
+                                               __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask,
+                                               __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
+                                               __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv,
+                                               __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
+                                               __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
+                                               __gm__ uint8_t *workspace,
+                                               const FlashAttentionScoreGeneralTilingData *__restrict tiling,
+                                               TPipe *tPipe)
 {
-    this->InitInput(query, queryRope, key, keyRope, value, pse, dropMask, paddingMask, prefix, attenMask, sink, softmaxMax, softmaxSum,
-                    softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
+    this->InitInput(query, queryRope, key, keyRope, value, pse, dropMask, paddingMask, prefix, attenMask, sink,
+                    softmaxMax, softmaxSum, softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
     if ASCEND_IS_AIC {
         if (this->tilingData->inputParams.needL1Carry) {
             this->bmm1L1Carry.SetSubBlockIdx(0);
@@ -217,19 +223,19 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
                 int64_t frontCoreNum = actualS1Len % this->tilingData->multiCoreParams.coreNum;
                 int64_t splitFactor = frontCoreNum > 0 ? 1 : 0;
                 int64_t s1SizeInner = (actualS1Len / this->tilingData->multiCoreParams.coreNum);
-                int64_t innerOffset1 = (s1SizeInner + splitFactor) * (this->blockIdx >= frontCoreNum ?
-                                       frontCoreNum : this->blockIdx);
-                int64_t innerOffset2 = s1SizeInner * (this->blockIdx >= frontCoreNum ?
-                                       this->blockIdx - frontCoreNum : 0);
+                int64_t innerOffset1 =
+                    (s1SizeInner + splitFactor) * (this->blockIdx >= frontCoreNum ? frontCoreNum : this->blockIdx);
+                int64_t innerOffset2 =
+                    s1SizeInner * (this->blockIdx >= frontCoreNum ? this->blockIdx - frontCoreNum : 0);
                 accumSize = accumSize + innerOffset1 + innerOffset2;
                 actualS1Len = s1SizeInner + (this->blockIdx >= frontCoreNum ? 0 : splitFactor);
             }
-            AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2],
-                                         actualS1Len * this->n2GD2, static_cast<INPUT_T>(0.0));
-            AscendC::InitOutput<float>(this->softmaxMaxGm[accumSize * this->n2G * 8],
-                                       actualS1Len * this->n2G * 8, static_cast<float>(0.0));
-            AscendC::InitOutput<float>(this->softmaxSumGm[accumSize * this->n2G * 8],
-                                       actualS1Len * this->n2G * 8, static_cast<float>(0.0));
+            AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2], actualS1Len * this->n2GD2,
+                                         static_cast<INPUT_T>(0.0));
+            AscendC::InitOutput<float>(this->softmaxMaxGm[accumSize * this->n2G * 8], actualS1Len * this->n2G * 8,
+                                       static_cast<float>(0.0));
+            AscendC::InitOutput<float>(this->softmaxSumGm[accumSize * this->n2G * 8], actualS1Len * this->n2G * 8,
+                                       static_cast<float>(0.0));
         }
     }
     this->InitBuffer();
@@ -321,10 +327,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
 __aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
-                          bmm1Format, hasRope>::GetSeqQlenKvlenByBoidx(int64_t boIdx,
-                                                                       int64_t &actualSeqQlen,
-                                                                       int64_t &actualSeqKvlen)
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen,
+                                                           int64_t &actualSeqKvlen)
 {
     if (boIdx == 0) {
         actualSeqQlen = qListGm.GetValue(0);
@@ -369,8 +374,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -453,9 +459,8 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         }
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->s2StartIdx = 0;
-        this->s2EndIdx =
-            Max((this->s1oIdx + 1) * this->s1BaseSize - actualS1Len + actualS2Len,
-                ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
+        this->s2EndIdx = Max((this->s1oIdx + 1) * this->s1BaseSize - actualS1Len + actualS2Len,
+                             ((__gm__ int64_t *)prefixNAddr)[this->boIdx]);
         this->s2EndIdx = Min(this->s2EndIdx, this->s2Size);
         if (this->s2EndIdx - this->s2StartIdx <= 0) {
             this->s2StartIdx = 0;
@@ -585,7 +590,10 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
     this->PairCalS1OuterSize(pairMultiCoreInnerOffset);
 
     int64_t realMultiCoreInnerLimit = multiCoreInnerLimit;
-    multiCoreInnerLimit = (pairMultiCoreInnerLimit - pairMultiCoreInnerOffset) > (multiCoreInnerLimit - multiCoreInnerOffset) ? multiCoreInnerOffset + pairMultiCoreInnerLimit - pairMultiCoreInnerOffset : multiCoreInnerLimit;
+    multiCoreInnerLimit =
+        (pairMultiCoreInnerLimit - pairMultiCoreInnerOffset) > (multiCoreInnerLimit - multiCoreInnerOffset) ?
+            multiCoreInnerOffset + pairMultiCoreInnerLimit - pairMultiCoreInnerOffset :
+            multiCoreInnerLimit;
     int64_t pairMultiCoreInnerIdx = pairMultiCoreInnerOffset;
 
     int64_t taskId = 0;
@@ -625,7 +633,8 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
             }
             if ASCEND_IS_AIV {
                 if (pairTaskId > 0 && needPair) {
-                    CrossCoreSetFlag<SYNC_MODE2, PIPE_MTE3>(SYNC_V1_C2_FLAG[(pairTaskId + 1) & 1][!(this->blockIdx & 1)]);
+                    CrossCoreSetFlag<SYNC_MODE2, PIPE_MTE3>(
+                        SYNC_V1_C2_FLAG[(pairTaskId + 1) & 1][!(this->blockIdx & 1)]);
                 }
                 if (taskId > 0 && needExec) {
                     CrossCoreWaitFlag(SYNC_C1_V1_FLAG[(taskId + 1) & 1][this->blockIdx & 1]);
@@ -644,13 +653,14 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
                     CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C1_V1_FLAG[taskId & 1][0]);
                 }
                 if (needPair) {
-                    this->PairSetExtraInfo(pairExtraInfo[pairTaskId % 3], pairTaskId, s2LoopCount, pairS2LoopLimit, pairMultiCoreInnerIdx);
-                     if (pairExtraInfo[pairTaskId % 3].needNz2Nd == 1) {
+                    this->PairSetExtraInfo(pairExtraInfo[pairTaskId % 3], pairTaskId, s2LoopCount, pairS2LoopLimit,
+                                           pairMultiCoreInnerIdx);
+                    if (pairExtraInfo[pairTaskId % 3].needNz2Nd == 1) {
                         this->ComputeMm1(pairExtraInfo[pairTaskId % 3], this->bmm1NzL1Carry, 1);
                     } else {
                         this->ComputeMm1(pairExtraInfo[pairTaskId % 3], this->bmm1L1Carry, 1);
                     }
-                    CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C1_V1_FLAG[pairTaskId & 1][1]);                   
+                    CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C1_V1_FLAG[pairTaskId & 1][1]);
                 }
             }
             if ASCEND_IS_AIV {
@@ -680,7 +690,7 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
                 if (pairTaskId > 0 && needPair) {
                     CrossCoreWaitFlag(SYNC_V1_C2_FLAG[(pairTaskId + 1) & 1][1]);
                     this->ComputeMm2(pairExtraInfo[(pairTaskId + 2) % 3], 1);
-                    CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C2_V2_FLAG[(pairTaskId + 1) & 1][1]);                    
+                    CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C2_V2_FLAG[(pairTaskId + 1) & 1][1]);
                 }
             }
             if (needExec) {
@@ -723,7 +733,7 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         if ASCEND_IS_AIC {
             CrossCoreWaitFlag(SYNC_V1_C2_FLAG[(pairTaskId + 1) & 1][1]);
             this->ComputeMm2(pairExtraInfo[(pairTaskId + 2) % 3], 1);
-            CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C2_V2_FLAG[(pairTaskId + 1) & 1][1]);               
+            CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C2_V2_FLAG[(pairTaskId + 1) & 1][1]);
         }
     }
     taskId++;
@@ -748,14 +758,15 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
             WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + 1);
             WaitFlag<HardEvent::MTE1_MTE2>(P_EVENT0 + 1);
         }
-    }   
+    }
 };
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::SetExtraInfo(SplitExtraInfo &extraInfo,
-                                                                                                  int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::SetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+                                                 int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
     extraInfo.s2EndIdx = this->s2EndIdx;
@@ -789,8 +800,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::ComputeBmm1Tail(SplitExtraInfo &extraInfo)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::ComputeBmm1Tail(SplitExtraInfo &extraInfo)
 {
     extraInfo.s1RealSize = this->s1BaseSize;
     if (extraInfo.s1Size < (extraInfo.s1oIdx + 1) * this->s1BaseSize) {
@@ -822,8 +834,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CalcQCoreOffset(const SplitExtraInfo &extraInfo)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CalcQCoreOffset(const SplitExtraInfo &extraInfo)
 {
     int64_t bOffset = extraInfo.s1SizeAcc * this->n2GD;
     int64_t s1Offset = extraInfo.s1oIdx * this->s1BaseN2GD;
@@ -835,8 +848,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CalcKCoreOffset(const SplitExtraInfo &extraInfo)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CalcKCoreOffset(const SplitExtraInfo &extraInfo)
 {
     int64_t bOffset = extraInfo.s2SizeAcc * this->n2D;
     int64_t s2Offset = extraInfo.s2StartIdx * this->n2D + extraInfo.s2LoopCount * this->s2BaseNratioN2D;
@@ -847,8 +861,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CalcVCoreOffset(const SplitExtraInfo &extraInfo)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CalcVCoreOffset(const SplitExtraInfo &extraInfo)
 {
     int64_t bOffset = extraInfo.s2SizeAcc * this->n2D2;
     int64_t s2Offset = extraInfo.s2StartIdx * this->n2D2 + extraInfo.s2LoopCount * this->s2BaseNratioSize * this->n2D2;
@@ -859,10 +874,12 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-template <typename T2>          
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::ComputeMm1(const SplitExtraInfo &extraInfo,
-                                                 matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED> &bmm1, int32_t cubeSubIdx)
+template <typename T2>
+__aicore__ inline void FlashAttentionVarLenScore<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+    hasRope>::ComputeMm1(const SplitExtraInfo &extraInfo,
+                         matmul::MatmulImpl<a1TypeL1Carry, b1TypeL1Carry, T2, bias1Type, CFG_EXCEED> &bmm1,
+                         int32_t cubeSubIdx)
 {
     bmm1.SetOrgShape(extraInfo.s1RealSize, this->mm1Kb, this->mm1Ka1, this->mm1Kb1, extraInfo.s2RealSize);
     LocalTensor<INPUT_T> qTensor = qL1Tensor[cubeSubIdx * L1_Q_SIZE / sizeof(INPUT_T)];
@@ -888,9 +905,12 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         bmm1.SetTensorB(kTensor, true);
         bmm1.SetTail(extraInfo.s1RealSize, subNSizeAct);
         if (extraInfo.needNz2Nd == 1) {
-            bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2][cubeSubIdx * this->totalOffset / sizeof(T) + extraInfo.s1RealSize * n * N_SPLIT_SIZE]);
-        }else{
-            bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2][cubeSubIdx * this->totalOffset / sizeof(T) + n * N_SPLIT_SIZE]);
+            bmm1.template IterateAll<false>(
+                this->mm1Res[extraInfo.taskIdMod2]
+                            [cubeSubIdx * this->totalOffset / sizeof(T) + extraInfo.s1RealSize * n * N_SPLIT_SIZE]);
+        } else {
+            bmm1.template IterateAll<false>(
+                this->mm1Res[extraInfo.taskIdMod2][cubeSubIdx * this->totalOffset / sizeof(T) + n * N_SPLIT_SIZE]);
         }
         bmm1.End();
         SetFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + (kvL1BufIter % 2));
@@ -898,15 +918,17 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
     }
     if (extraInfo.s2LoopCount == extraInfo.s2LoopLimit) {
         SetFlag<HardEvent::MTE1_MTE2>(Q_EVENT0 + cubeSubIdx);
-    }    
+    }
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::ComputeMm2(const SplitExtraInfo &extraInfo, int32_t cubeSubIdx)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::ComputeMm2(const SplitExtraInfo &extraInfo, int32_t cubeSubIdx)
 {
-    this->bmm2L1Carry.SetOrgShape(extraInfo.s1RealSize, this->mm2Kb, extraInfo.s2AlignedSize, this->mm2Kb, this->d2Size);
+    this->bmm2L1Carry.SetOrgShape(extraInfo.s1RealSize, this->mm2Kb, extraInfo.s2AlignedSize, this->mm2Kb,
+                                  this->d2Size);
     // 切K
     uint32_t kLoops = (extraInfo.s2RealSize + K_SPLIT_SIZE - 1) / K_SPLIT_SIZE;
     uint32_t kTail = extraInfo.s2RealSize - (kLoops - 1) * K_SPLIT_SIZE;
@@ -936,16 +958,17 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         SetFlag<HardEvent::MTE1_MTE2>(P_EVENT0 + (pL1BufIter % 2));
         kvL1BufIter++;
         pL1BufIter++;
-    }    
-    this->bmm2L1Carry.template GetTensorC(this->mm2Res[extraInfo.taskIdMod2][cubeSubIdx * this->totalOffset / sizeof(T)]);
+    }
+    this->bmm2L1Carry.template GetTensorC(
+        this->mm2Res[extraInfo.taskIdMod2][cubeSubIdx * this->totalOffset / sizeof(T)]);
     this->bmm2L1Carry.End();
-}         
+}
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                                                    const SplitExtraInfo &extraInfo)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo)
 {
     CalcQCoreOffset(extraInfo);
     auto srcGm = this->queryGm[this->qCoreOffset];
@@ -954,9 +977,10 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CopyInMm1BToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                                                    const SplitExtraInfo &extraInfo, uint32_t subNid, uint32_t subNSize)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CopyInMm1BToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+                                                   uint32_t subNid, uint32_t subNSize)
 {
     CalcKCoreOffset(extraInfo);
     auto srcGm = this->keyGm[this->kCoreOffset + subNid * N_SPLIT_SIZE * this->n2D];
@@ -965,20 +989,23 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                                                    const SplitExtraInfo &extraInfo, uint32_t subKid, uint32_t subKSize, int32_t cubeSubIdx)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+                                                   uint32_t subKid, uint32_t subKSize, int32_t cubeSubIdx)
 {
-    int64_t s1RealSizeAligned = CeilDiv(extraInfo.s1RealSize, 16) * 16; 
-    auto srcGm = this->stage1Res[extraInfo.taskIdMod2][cubeSubIdx * this->totalOffset / sizeof(INPUT_T) + s1RealSizeAligned * subKid * K_SPLIT_SIZE];        
+    int64_t s1RealSizeAligned = CeilDiv(extraInfo.s1RealSize, 16) * 16;
+    auto srcGm = this->stage1Res[extraInfo.taskIdMod2][cubeSubIdx * this->totalOffset / sizeof(INPUT_T) +
+                                                       s1RealSizeAligned * subKid * K_SPLIT_SIZE];
     DataCopy(l1Tensor, srcGm, s1RealSizeAligned * subKSize);
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CopyInMm2BToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                                                    const SplitExtraInfo &extraInfo, uint32_t subKid, uint32_t subKSize)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CopyInMm2BToL1(LocalTensor<INPUT_T> &l1Tensor, const SplitExtraInfo &extraInfo,
+                                                   uint32_t subKid, uint32_t subKSize)
 {
     CalcVCoreOffset(extraInfo);
     auto srcGm = this->valueGm[this->vCoreOffset + subKid * K_SPLIT_SIZE * this->n2D2];
@@ -987,9 +1014,10 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor,
-                                                                                                uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor,
+                                               uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -1005,15 +1033,16 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::PairGetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::PairGetS1LoopRange(int64_t &multiCoreInnerOffset, int64_t &multiCoreInnerLimit)
 {
     multiCoreInnerOffset = this->tilingData->multiCoreParams.sparseStartIdx[this->pairBlockIdx];
     if (likely((this->tilingData->multiCoreParams.coreNum - 1) > this->pairBlockIdx)) {
         multiCoreInnerLimit = this->tilingData->multiCoreParams.sparseStartIdx[this->pairBlockIdx + 1];
     } else {
         multiCoreInnerLimit = this->tilingData->multiCoreParams.totalSize;
-    }    
+    }
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
@@ -1048,8 +1077,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::PairComputeAxisIdx(int64_t multiCoreInnerIdx)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::PairComputeAxisIdx(int64_t multiCoreInnerIdx)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -1089,9 +1119,10 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         this->pairS2EndIdx = Min((this->pairS1oIdx + 1) * this->s1BaseSize + actualS2Len - actualS1Len, actualS2Len);
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND)) {
         this->pairS2StartIdx = Max(
-            this->pairS1oIdx * this->tilingData->coreParams.s1BaseSize - this->tilingData->coreParams.s1SparseValidSize, 0);
-        this->pairS2EndIdx =
-            Min((this->pairS1oIdx + 1) * this->s1BaseSize + this->tilingData->coreParams.s2SparseValidSize, actualS2Len);
+            this->pairS1oIdx * this->tilingData->coreParams.s1BaseSize - this->tilingData->coreParams.s1SparseValidSize,
+            0);
+        this->pairS2EndIdx = Min(
+            (this->pairS1oIdx + 1) * this->s1BaseSize + this->tilingData->coreParams.s2SparseValidSize, actualS2Len);
         // s1baseSize行都无效时，需要将startIdx设置为0，,endIdx设置为S2realSize
         if (this->pairS2EndIdx - this->pairS2StartIdx <= 0) {
             this->pairS2StartIdx = 0;
@@ -1099,11 +1130,11 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         }
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND_COMPRESS)) {
         this->pairS2StartIdx = Max(this->pairS1oIdx * this->tilingData->coreParams.s1BaseSize - actualS1Len +
-                                   Max(actualS2Len - this->tilingData->inputParams.preTokens, 0),
-                               0);
+                                       Max(actualS2Len - this->tilingData->inputParams.preTokens, 0),
+                                   0);
         this->pairS2EndIdx = Min((this->pairS1oIdx + 1) * this->s1BaseSize + actualS2Len -
-                                 Max(actualS1Len - this->tilingData->inputParams.nextTokens, 0),
-                             actualS2Len);
+                                     Max(actualS1Len - this->tilingData->inputParams.nextTokens, 0),
+                                 actualS2Len);
         // s1baseSize行都无效时，需要将startIdx设置为0，,endIdx设置为S2realSize
         if (this->pairS2EndIdx - this->pairS2StartIdx <= 0) {
             this->pairS2StartIdx = 0;
@@ -1114,27 +1145,27 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         if (this->pairBoIdx == this->tilingData->inputParams.bandIndex) {
             this->pairS2StartIdx = 0;
             this->pairS2EndIdx = Min((this->pairS1oIdx + 1) * this->s1BaseSize + actualS2Len +
-                                     this->tilingData->inputParams.nextTokens - actualS1Len,
-                                 actualS2Len);
+                                         this->tilingData->inputParams.nextTokens - actualS1Len,
+                                     actualS2Len);
         } else {
             this->pairS2StartIdx = 0;
-            this->pairS2EndIdx = Min((this->pairS1oIdx + 1) * this->s1BaseSize + actualS2Len - actualS1Len, actualS2Len);
+            this->pairS2EndIdx =
+                Min((this->pairS1oIdx + 1) * this->s1BaseSize + actualS2Len - actualS1Len, actualS2Len);
         }
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL)) {
         if (this->pairBoIdx == this->tilingData->inputParams.bandIndex) {
             this->pairS2StartIdx = 0;
             this->pairS2EndIdx = Min((this->pairS1oIdx + 1) * this->s1BaseSize + actualS2Len -
-                                     Max(actualS1Len - this->tilingData->inputParams.nextTokens, 0),
-                                 actualS2Len);
+                                         Max(actualS1Len - this->tilingData->inputParams.nextTokens, 0),
+                                     actualS2Len);
         } else {
             this->pairS2StartIdx = 0;
             this->pairS2EndIdx = Min((this->pairS1oIdx + 1) * this->s1BaseSize, actualS2Len);
         }
     } else if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::PREFIX)) {
         this->pairS2StartIdx = 0;
-        this->pairS2EndIdx =
-            Max((this->pairS1oIdx + 1) * this->s1BaseSize - actualS1Len + actualS2Len,
-                ((__gm__ int64_t *)prefixNAddr)[this->pairBoIdx]);
+        this->pairS2EndIdx = Max((this->pairS1oIdx + 1) * this->s1BaseSize - actualS1Len + actualS2Len,
+                                 ((__gm__ int64_t *)prefixNAddr)[this->pairBoIdx]);
         this->pairS2EndIdx = Min(this->pairS2EndIdx, this->s2Size);
         if (this->pairS2EndIdx - this->pairS2StartIdx <= 0) {
             this->pairS2StartIdx = 0;
@@ -1151,9 +1182,10 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool hasRope>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock, bmm1Format, hasRope>::PairSetExtraInfo(SplitExtraInfo &extraInfo,
-                                                                                                      int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                          hasRope>::PairSetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
+                                                     int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->pairS2StartIdx;
     extraInfo.s2EndIdx = this->pairS2EndIdx;

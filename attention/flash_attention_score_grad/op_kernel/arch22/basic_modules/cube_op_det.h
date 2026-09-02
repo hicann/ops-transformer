@@ -29,11 +29,12 @@ class CubeOpDet {
     using INPUT_TYPE = typename FAGT::input_type;
     static constexpr bool DROP_ENABLE = FAGT::drop_enable;
     static constexpr bool DETERMINISTIC_ENABLE = FAGT::deterministic_enable;
+
 private:
     AscendC::Nd2NzParams commonNd2NzParams{1, SIZE_128, SIZE_128, 0, SIZE_128, SIZE_128, 1, 0};
     AscendC::LoadData2dParams commonLoadData2dParamsTranspose{0, SIZE_128, SIZE_128, 0, 0, true, 0};
     AscendC::LoadData2dParams commonLoadData2dParamsNoTranspose{0, SIZE_128, SIZE_128, 0, 0, false, 0};
-    AscendC::FixpipeParamsV220 commonFixpipeParamsV220 {SIZE_128, SIZE_128, SIZE_128, SIZE_128, false};
+    AscendC::FixpipeParamsV220 commonFixpipeParamsV220{SIZE_128, SIZE_128, SIZE_128, SIZE_128, false};
     // l1
     LocalTensor<INPUT_TYPE> l1_query_ping_tensor;
     LocalTensor<INPUT_TYPE> l1_query_pong_tensor;
@@ -70,48 +71,49 @@ private:
     uint32_t qSrcDvalue;
     uint32_t kvSrcDvalue;
     uint32_t sparseMode;
-    int64_t sparseLeftBound{0};              // preToken直线计算公式: s1Idx = s2Idx + sparseLeftBound
-    int64_t sparseRightBound{0};             // nextToken直线计算公式: s1Idx = s2Idx + sparseRightBound
-    __gm__ INPUT_TYPE* queryAddr;
-    __gm__ INPUT_TYPE* keyAddr;
-    __gm__ INPUT_TYPE* dyAddr;
-    __gm__ INPUT_TYPE* valueAddr;
-    __gm__ INPUT_TYPE* pWorkSpaceAddr;
-    __gm__ INPUT_TYPE* dsWorkSpaceAddr;
-    __gm__ float* mm1WorkSpaceAddr;
-    __gm__ float* mm2WorkSpaceAddr;
-    __gm__ float* dqDetWorkSpaceAddr;
-    __gm__ float* dkDetWorkSpaceAddr;
-    __gm__ float* dvDetWorkSpaceAddr;
-    __gm__ float* dqWorkSpaceAddr;
-    __gm__ float* dkWorkSpaceAddr;
-    __gm__ float* dvWorkSpaceAddr;
+    int64_t sparseLeftBound{0};  // preToken直线计算公式: s1Idx = s2Idx + sparseLeftBound
+    int64_t sparseRightBound{0}; // nextToken直线计算公式: s1Idx = s2Idx + sparseRightBound
+    __gm__ INPUT_TYPE *queryAddr;
+    __gm__ INPUT_TYPE *keyAddr;
+    __gm__ INPUT_TYPE *dyAddr;
+    __gm__ INPUT_TYPE *valueAddr;
+    __gm__ INPUT_TYPE *pWorkSpaceAddr;
+    __gm__ INPUT_TYPE *dsWorkSpaceAddr;
+    __gm__ float *mm1WorkSpaceAddr;
+    __gm__ float *mm2WorkSpaceAddr;
+    __gm__ float *dqDetWorkSpaceAddr;
+    __gm__ float *dkDetWorkSpaceAddr;
+    __gm__ float *dvDetWorkSpaceAddr;
+    __gm__ float *dqWorkSpaceAddr;
+    __gm__ float *dkWorkSpaceAddr;
+    __gm__ float *dvWorkSpaceAddr;
 
 public:
     __aicore__ inline CubeOpDet(){};
 
-    __aicore__ inline void Init(TPipe* pipe, const TILING_CLASS* tilingData, __gm__ INPUT_TYPE* queryAddr, __gm__ INPUT_TYPE* keyAddr,
-                                __gm__ INPUT_TYPE* dyAddr, __gm__ INPUT_TYPE* valueAddr, __gm__ float* mm1WorkSpaceAddr,
-                                __gm__ float* mm2WorkSpaceAddr, __gm__ float* dqDetWorkSpaceAddr,
-                                __gm__ float* dkDetWorkSpaceAddr, __gm__ float* dvDetWorkSpaceAddr,
-                                __gm__ float* dqWorkSpaceAddr, __gm__ float* dkWorkSpaceAddr,
-                                __gm__ float* dvWorkSpaceAddr) {
+    __aicore__ inline void Init(TPipe *pipe, const TILING_CLASS *tilingData, __gm__ INPUT_TYPE *queryAddr,
+                                __gm__ INPUT_TYPE *keyAddr, __gm__ INPUT_TYPE *dyAddr, __gm__ INPUT_TYPE *valueAddr,
+                                __gm__ float *mm1WorkSpaceAddr, __gm__ float *mm2WorkSpaceAddr,
+                                __gm__ float *dqDetWorkSpaceAddr, __gm__ float *dkDetWorkSpaceAddr,
+                                __gm__ float *dvDetWorkSpaceAddr, __gm__ float *dqWorkSpaceAddr,
+                                __gm__ float *dkWorkSpaceAddr, __gm__ float *dvWorkSpaceAddr)
+    {
         dimN2 = tilingData->basicDetTensorTilingData.n2;
         dimN1 = dimN2 * tilingData->basicDetTensorTilingData.g;
         dimD = tilingData->basicDetTensorTilingData.d;
         sparseMode = tilingData->basicDetTensorTilingData.sparseMode;
         batch = tilingData->basicDetTensorTilingData.b;
         this->layout = tilingData->basicDetTensorTilingData.layout;
-        if (layout == BNGSD){
+        if (layout == BNGSD) {
             qSrcDvalue = dimD;
             kvSrcDvalue = dimD;
-        } else if (layout == BSNGD){
+        } else if (layout == BSNGD) {
             qSrcDvalue = dimN1 * dimD;
             kvSrcDvalue = dimN2 * dimD;
-        } else if (layout == SBNGD){
+        } else if (layout == SBNGD) {
             qSrcDvalue = batch * dimN1 * dimD;
             kvSrcDvalue = batch * dimN2 * dimD;
-        } else if (layout == TND){
+        } else if (layout == TND) {
             qSrcDvalue = dimN1 * dimD;
             kvSrcDvalue = dimN2 * dimD;
         }
@@ -121,8 +123,8 @@ public:
         this->valueAddr = valueAddr;
         this->mm1WorkSpaceAddr = mm1WorkSpaceAddr;
         this->mm2WorkSpaceAddr = mm2WorkSpaceAddr;
-        this->dsWorkSpaceAddr = (__gm__ INPUT_TYPE*)mm1WorkSpaceAddr;
-        this->pWorkSpaceAddr = (__gm__ INPUT_TYPE*)mm2WorkSpaceAddr;
+        this->dsWorkSpaceAddr = (__gm__ INPUT_TYPE *)mm1WorkSpaceAddr;
+        this->pWorkSpaceAddr = (__gm__ INPUT_TYPE *)mm2WorkSpaceAddr;
         this->dqDetWorkSpaceAddr = dqDetWorkSpaceAddr;
         this->dkDetWorkSpaceAddr = dkDetWorkSpaceAddr;
         this->dvDetWorkSpaceAddr = dvDetWorkSpaceAddr;
@@ -134,11 +136,10 @@ public:
         TBuf<AscendC::TPosition::CO1> L0CBuffer;
         AsdopsBuffer<ArchType::ASCEND_V220> asdopsBuf;
 
-
         pipe->InitBuffer(L1Buffer, HardwareInfo<ArchType::ASCEND_V220>::l1Size);
         pipe->InitBuffer(L0CBuffer, HardwareInfo<ArchType::ASCEND_V220>::l0CSize);
-        tmp_type_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ INPUT_TYPE*>(0));
-        tmp_fp32_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(0));
+        tmp_type_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ INPUT_TYPE *>(0));
+        tmp_fp32_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(0));
         AscendC::SetNdParaImpl(config);
         AscendC::SetLoadDataPaddingValue<uint64_t>(0);
         commonFixpipeParamsV220.quantPre = QuantMode_t::NoQuant;
@@ -150,7 +151,8 @@ public:
 
         // 计算MM345左矩阵时，由于空间不足，需要pingpong
         l1_a_ping_tensor = asdopsBuf.GetBuffer<BufferType::ASCEND_CB, INPUT_TYPE>(SIZE_256 * SIZE_ONE_K);
-        l1_a_pong_tensor = asdopsBuf.GetBuffer<BufferType::ASCEND_CB, INPUT_TYPE>(SIZE_256 * SIZE_ONE_K + SIZE_64 * SIZE_ONE_K);
+        l1_a_pong_tensor =
+            asdopsBuf.GetBuffer<BufferType::ASCEND_CB, INPUT_TYPE>(SIZE_256 * SIZE_ONE_K + SIZE_64 * SIZE_ONE_K);
         // 计算右矩阵空间充足，直接按偏移存储即可
         l1_b_ping_tensor = asdopsBuf.GetBuffer<BufferType::ASCEND_CB, INPUT_TYPE>(SIZE_384 * SIZE_ONE_K);
 
@@ -163,19 +165,21 @@ public:
         l0_c_pong_tensor = asdopsBuf.GetBuffer<BufferType::ASCEND_L0C, float>(SIZE_64 * SIZE_ONE_K);
     }
 
-    __aicore__ inline __attribute__((always_inline)) void SyncFunc() {
+    __aicore__ inline __attribute__((always_inline)) void SyncFunc()
+    {
         SET_FLAG(MTE1, MTE2, EVENT_ID0);
         WAIT_FLAG(MTE1, MTE2, EVENT_ID0);
     }
 
-    __aicore__ inline __attribute__((always_inline)) void Cube12Process(const CubeAddrInfoDet& shapeInfo) {
+    __aicore__ inline __attribute__((always_inline)) void Cube12Process(const CubeAddrInfoDet &shapeInfo)
+    {
         SET_FLAG(M, MTE1, aEventIDPing);
         SET_FLAG(M, MTE1, aEventIDPong);
         SET_FLAG(M, MTE1, bEventIDPing);
         SET_FLAG(M, MTE1, bEventIDPong);
         SET_FLAG(FIX, M, aEventIDPing);
         SET_FLAG(FIX, M, aEventIDPong);
-        if(shapeInfo.taskId == 0){
+        if (shapeInfo.taskId == 0) {
             enableCausalOpt = shapeInfo.enableCausalOpt;
         }
         sparseLeftBound = shapeInfo.sparseLeftBound;
@@ -194,16 +198,17 @@ public:
         WAIT_FLAG(FIX, M, aEventIDPong);
     };
 
-    __aicore__ inline __attribute__((always_inline)) void Cube345Process(const CubeAddrInfoDet& shapeInfo) {
+    __aicore__ inline __attribute__((always_inline)) void Cube345Process(const CubeAddrInfoDet &shapeInfo)
+    {
         SET_FLAG(MTE1, MTE2, aEventIDPing);
         SET_FLAG(MTE1, MTE2, aEventIDPong);
         SET_FLAG(M, MTE1, aEventIDPing);
         SET_FLAG(M, MTE1, aEventIDPong);
         SET_FLAG(FIX, M, bEventIDPing);
         SET_FLAG(FIX, M, bEventIDPong);
-        __gm__ float* dq_out;
-        __gm__ float* dk_out;
-        __gm__ float* dv_out;
+        __gm__ float *dq_out;
+        __gm__ float *dk_out;
+        __gm__ float *dv_out;
         sparseLeftBound = shapeInfo.sparseLeftBound;
         sparseRightBound = shapeInfo.sparseRightBound;
 
@@ -235,8 +240,10 @@ public:
 
 private:
     template <uint32_t CUBE_TYPE>
-    __aicore__ inline __attribute__((always_inline)) void ComputeMM12(const CubeAddrInfoDet& shapeInfo, __gm__ INPUT_TYPE* left,
-                                                                        __gm__ INPUT_TYPE* right, __gm__ float* out) {
+    __aicore__ inline __attribute__((always_inline)) void ComputeMM12(const CubeAddrInfoDet &shapeInfo,
+                                                                      __gm__ INPUT_TYPE *left, __gm__ INPUT_TYPE *right,
+                                                                      __gm__ float *out)
+    {
         /*
         对于Dq，ReDuce轴为headDim方向（对应K轴），具体遍历顺序示意图如下：
                             dimD(K)                          dimD(K)
@@ -252,7 +259,7 @@ private:
         */
         uint32_t taskIdPingPong = shapeInfo.taskId % 2;
         uint64_t globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + taskIdPingPong * BLOCK_WORKSPACE;
-        int32_t cubeBlockIdx = 0;  // 用于计算MM12输出结果的下标，一个cubeBlock的大小是128*128
+        int32_t cubeBlockIdx = 0; // 用于计算MM12输出结果的下标，一个cubeBlock的大小是128*128
         int32_t mSize = shapeInfo.s1Len;
         int32_t nSize = shapeInfo.s2Len;
         int32_t mLoop = CeilDiv(mSize, SIZE_128);
@@ -262,9 +269,9 @@ private:
         auto gm_a = left + shapeInfo.s1GmAddr;
         auto gm_b = right + shapeInfo.s2GmAddr;
         auto gm_c = out + globalBlockOffset;
-        const uint64_t left_offset = gm_a - (__gm__ INPUT_TYPE*)0;
-        const uint64_t right_offset = gm_b - (__gm__ INPUT_TYPE*)0;
-        const uint64_t out_offset = gm_c - (__gm__ float*)0;
+        const uint64_t left_offset = gm_a - (__gm__ INPUT_TYPE *)0;
+        const uint64_t right_offset = gm_b - (__gm__ INPUT_TYPE *)0;
+        const uint64_t out_offset = gm_c - (__gm__ float *)0;
 
         for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
             int32_t s2Idx = shapeInfo.s2Idx + nIdx * SIZE_128;
@@ -279,7 +286,8 @@ private:
             for (int32_t mIdx = 0; mIdx < mLoop; mIdx++) {
                 int32_t s1Idx = shapeInfo.s1Idx + mIdx * SIZE_128;
                 int32_t mProcess = (mIdx == mLoop - 1) ? mTail : SIZE_128;
-                if(enableCausalOpt && IsFullMaskBlock(s1Idx, s2Idx, mProcess, nProcess, sparseLeftBound, sparseRightBound, sparseMode)){
+                if (enableCausalOpt &&
+                    IsFullMaskBlock(s1Idx, s2Idx, mProcess, nProcess, sparseLeftBound, sparseRightBound, sparseMode)) {
                     continue;
                 }
                 LocalTensor<INPUT_TYPE> l1_a_tensor;
@@ -288,21 +296,21 @@ private:
                 uint32_t aEventID = ping_pong_flag_a ? aEventIDPing : aEventIDPong;
                 int32_t mProcessAlign = RoundUp(mProcess, SIZE_16);
                 uint64_t inner_query_offset, inner_key_offset;
-                if (layout == BSNGD || layout == TND){
+                if (layout == BSNGD || layout == TND) {
                     inner_query_offset = mIdx * SIZE_128 * dimN1 * dimD;
                     inner_key_offset = nIdx * SIZE_128 * dimN2 * dimD;
-                } else if (layout == SBNGD){
+                } else if (layout == SBNGD) {
                     inner_query_offset = mIdx * SIZE_128 * batch * dimN1 * dimD;
                     inner_key_offset = nIdx * SIZE_128 * batch * dimN2 * dimD;
-                } else if (layout == BNGSD){
+                } else if (layout == BNGSD) {
                     inner_query_offset = mIdx * SIZE_128 * dimD;
                     inner_key_offset = nIdx * SIZE_128 * dimD;
                 }
 
                 if constexpr (CUBE_TYPE == QK) {
                     // reuse query
-                    l1_a_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * dimD]
-                                                : l1_query_pong_tensor[mIdx * SIZE_128 * dimD];
+                    l1_a_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * dimD] :
+                                                   l1_query_pong_tensor[mIdx * SIZE_128 * dimD];
                 } else {
                     l1_a_tensor = l1_a_ping_tensor[mIdx * SIZE_128 * dimD];
                 }
@@ -313,7 +321,7 @@ private:
                     commonNd2NzParams.srcDValue = qSrcDvalue;
                     commonNd2NzParams.dstNzC0Stride = mProcessAlign;
                     AscendC::DataCopy(l1_a_tensor, tmp_type_gm_tensor[left_offset + inner_query_offset],
-                                        commonNd2NzParams);
+                                      commonNd2NzParams);
 
                     SET_FLAG(MTE2, MTE1, EVENT_ID0);
                     WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
@@ -324,7 +332,7 @@ private:
                 commonLoadData2dParamsNoTranspose.srcStride = mProcessAlign / SIZE_16;
                 for (int32_t i = 0; i < mProcessAlign / SIZE_16; i++) {
                     AscendC::LoadData(l0_a_tensor[i * dimD * SIZE_16], l1_a_tensor[i * SIZE_256],
-                                        commonLoadData2dParamsNoTranspose);
+                                      commonLoadData2dParamsNoTranspose);
                 }
 
                 if (needCopyInBMatrix) {
@@ -333,7 +341,7 @@ private:
                     commonNd2NzParams.srcDValue = kvSrcDvalue;
                     commonNd2NzParams.dstNzC0Stride = nProcessAlign;
                     AscendC::DataCopy(l1_b_tensor, tmp_type_gm_tensor[right_offset + inner_key_offset],
-                                        commonNd2NzParams);
+                                      commonNd2NzParams);
                     SET_FLAG(MTE2, MTE1, EVENT_ID0);
                     WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
                     WAIT_FLAG(M, MTE1, bEventID);
@@ -364,7 +372,9 @@ private:
                 commonFixpipeParamsV220.nSize = nProcess;
                 commonFixpipeParamsV220.srcStride = mProcessAlign;
                 commonFixpipeParamsV220.dstStride = SIZE_128;
-                AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(tmp_fp32_gm_tensor[out_offset + cubeBlockIdx * BASE_BLOCK_SIZE], l0_c_tensor, commonFixpipeParamsV220);
+                AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(
+                    tmp_fp32_gm_tensor[out_offset + cubeBlockIdx * BASE_BLOCK_SIZE], l0_c_tensor,
+                    commonFixpipeParamsV220);
                 SET_FLAG(FIX, M, aEventID);
                 cubeBlockIdx++;
                 ping_pong_flag_a = 1 - ping_pong_flag_a;
@@ -374,8 +384,10 @@ private:
     };
 
     template <uint32_t CUBE_TYPE>
-    __aicore__ inline __attribute__((always_inline)) void ComputeMMDQ(const CubeAddrInfoDet& shapeInfo, __gm__ INPUT_TYPE* left,
-                                                                        __gm__ INPUT_TYPE* right, __gm__ float* out) {
+    __aicore__ inline __attribute__((always_inline)) void ComputeMMDQ(const CubeAddrInfoDet &shapeInfo,
+                                                                      __gm__ INPUT_TYPE *left, __gm__ INPUT_TYPE *right,
+                                                                      __gm__ float *out)
+    {
         /*
         对于Dq，ReDuce轴为S2方向（对应N轴），具体遍历顺序示意图如下：
                             S2(N)                           dimD(K)
@@ -397,11 +409,11 @@ private:
         int32_t nTail = (nSize % SIZE_128) == 0 ? SIZE_128 : (nSize % SIZE_128);
         int32_t mLoop = CeilDiv(mSize, SIZE_128);
         int32_t nLoop = CeilDiv(nSize, SIZE_128);
-        uint64_t left_offset = (__gm__ INPUT_TYPE*)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE*)0;
-        uint64_t right_offset = (__gm__ INPUT_TYPE*)(right + shapeInfo.s2GmAddr) - (__gm__ INPUT_TYPE*)0;
-        uint64_t out_offset = (__gm__ float*)(out) - (__gm__ float*)0;
+        uint64_t left_offset = (__gm__ INPUT_TYPE *)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE *)0;
+        uint64_t right_offset = (__gm__ INPUT_TYPE *)(right + shapeInfo.s2GmAddr) - (__gm__ INPUT_TYPE *)0;
+        uint64_t out_offset = (__gm__ float *)(out) - (__gm__ float *)0;
         bool isCausalBlock = shapeInfo.s1Idx == shapeInfo.s2Idx;
-        bool visitBMatrix[4] = {false, false, false,false};
+        bool visitBMatrix[4] = {false, false, false, false};
 
         for (int32_t mIdx = 0; mIdx < mLoop; mIdx++) {
             int32_t mProcess = (mIdx == mLoop - 1) ? mTail : SIZE_128;
@@ -411,7 +423,7 @@ private:
             uint32_t bEventID = ping_pong_flag_b ? bEventIDPing : bEventIDPong;
             LocalTensor<float> l0_c_buf_tensor = ping_pong_flag_b ? l0_c_ping_tensor : l0_c_pong_tensor;
 
-            for(int32_t nIdx=0; nIdx < nLoop; nIdx++){
+            for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
                 int32_t s2Idx = shapeInfo.s2Idx + nIdx * SIZE_128;
                 int32_t cubeBlockIdx = cubeBlockIdxArry[nIdx][mIdx];
                 int32_t nProcess = (nIdx == nLoop - 1) ? nTail : SIZE_128;
@@ -419,10 +431,10 @@ private:
                 bool needCopyInBMatrix = false;
                 bool needCopyOut = (nIdx == nLoop - 1) ? true : false;
                 uint64_t inner_query_offset, inner_key_offset;
-                if (layout == BSNGD || layout == TND){
+                if (layout == BSNGD || layout == TND) {
                     inner_query_offset = mIdx * SIZE_128 * (dimN1 * dimD);
                     inner_key_offset = nIdx * SIZE_128 * (dimN2 * dimD);
-                } else if (layout == SBNGD){
+                } else if (layout == SBNGD) {
                     inner_query_offset = mIdx * SIZE_128 * batch * dimN1 * dimD;
                     inner_key_offset = nIdx * SIZE_128 * batch * dimN2 * dimD;
                 } else {
@@ -452,11 +464,12 @@ private:
 
                 WAIT_FLAG(MTE1, MTE2, aEventID);
                 WAIT_FLAG(M, MTE1, aEventID);
-                this->template MM345LoadA<CUBE_TYPE>(l1_a_buf_tensor, l0_a_buf_tensor, tmp_type_gm_tensor[real_left_offset],
-                                                    mProcess, nProcess, mProcessAlign, nProcessAlign, true);
+                this->template MM345LoadA<CUBE_TYPE>(l1_a_buf_tensor, l0_a_buf_tensor,
+                                                     tmp_type_gm_tensor[real_left_offset], mProcess, nProcess,
+                                                     mProcessAlign, nProcessAlign, true);
                 SET_FLAG(MTE1, MTE2, aEventID);
-                MM345LoadB(l1_b_buf_tensor, l0_b_buf_tensor, tmp_type_gm_tensor[real_right_offset], nProcess, nProcessAlign,
-                        dimN2, needCopyInBMatrix);
+                MM345LoadB(l1_b_buf_tensor, l0_b_buf_tensor, tmp_type_gm_tensor[real_right_offset], nProcess,
+                           nProcessAlign, dimN2, needCopyInBMatrix);
 
                 SET_FLAG(MTE1, M, EVENT_ID0);
                 WAIT_FLAG(MTE1, M, EVENT_ID0);
@@ -474,25 +487,27 @@ private:
 
                 if (needCopyOut) {
                     if constexpr (DETERMINISTIC_ENABLE) {
-                            MM345CopyOut<false>(l0_c_buf_tensor, out_offset + mIdx * SIZE_128 * dimD, mProcess, dimD, mProcessAlign);
+                        MM345CopyOut<false>(l0_c_buf_tensor, out_offset + mIdx * SIZE_128 * dimD, mProcess, dimD,
+                                            mProcessAlign);
                     } else {
                         MM345CopyOut<true>(l0_c_buf_tensor, out_offset + inner_query_offset, mProcess, dimN1 * dimD,
-                                        mProcessAlign);
+                                           mProcessAlign);
                     }
                 }
                 SET_FLAG(FIX, M, bEventID);
 
                 initL0C = false;
                 ping_pong_flag_a = 1 - ping_pong_flag_a;
-        }
-        ping_pong_flag_b = 1 - ping_pong_flag_b;
+            }
+            ping_pong_flag_b = 1 - ping_pong_flag_b;
         }
     };
 
     template <uint32_t CUBE_TYPE>
-    __aicore__ inline __attribute__((always_inline)) void ComputeMMDKV(const CubeAddrInfoDet& shapeInfo,
-                                                                        __gm__ INPUT_TYPE* left, __gm__ INPUT_TYPE* right,
-                                                                        __gm__ float* out) {
+    __aicore__ inline __attribute__((always_inline)) void ComputeMMDKV(const CubeAddrInfoDet &shapeInfo,
+                                                                       __gm__ INPUT_TYPE *left,
+                                                                       __gm__ INPUT_TYPE *right, __gm__ float *out)
+    {
         /*
         对于Dk，Dv，ReDuce轴为S1方向（对应M轴），具体遍历顺序示意图如下：
                             S2(N)                           dimD(K)
@@ -515,9 +530,9 @@ private:
         int32_t nTail = (nSize % SIZE_128) == 0 ? SIZE_128 : (nSize % SIZE_128);
         int32_t mLoop = CeilDiv(mSize, SIZE_128);
         int32_t nLoop = CeilDiv(nSize, SIZE_128);
-        uint64_t left_offset = (__gm__ INPUT_TYPE*)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE*)0;
-        uint64_t right_offset = (__gm__ INPUT_TYPE*)(right + shapeInfo.s1GmAddr) - (__gm__ INPUT_TYPE*)0;
-        uint64_t out_offset = (__gm__ float*)(out) - (__gm__ float*)0;
+        uint64_t left_offset = (__gm__ INPUT_TYPE *)(left + globalBlockOffset * 2) - (__gm__ INPUT_TYPE *)0;
+        uint64_t right_offset = (__gm__ INPUT_TYPE *)(right + shapeInfo.s1GmAddr) - (__gm__ INPUT_TYPE *)0;
+        uint64_t out_offset = (__gm__ float *)(out) - (__gm__ float *)0;
         for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
             int32_t nProcess = (nIdx == nLoop - 1) ? nTail : SIZE_128;
             int32_t nProcessAlign = RoundUp(nProcess, SIZE_16);
@@ -525,7 +540,7 @@ private:
             bool initL0C = true;
             uint32_t bEventID = ping_pong_flag_b ? bEventIDPing : bEventIDPong;
             LocalTensor<float> l0_c_buf_tensor = ping_pong_flag_b ? l0_c_ping_tensor : l0_c_pong_tensor;
-            for(int32_t mIdx=0; mIdx < mLoop; mIdx++){
+            for (int32_t mIdx = 0; mIdx < mLoop; mIdx++) {
                 int32_t s1Idx = shapeInfo.s1Idx + mIdx * SIZE_128;
                 int32_t mProcess = (mIdx == mLoop - 1) ? mTail : SIZE_128;
                 if (enableCausalOpt &&
@@ -534,11 +549,11 @@ private:
                 }
                 uint64_t inner_query_offset, inner_key_offset;
                 int32_t dstStride;
-                if (layout == BSNGD || layout == TND){
+                if (layout == BSNGD || layout == TND) {
                     inner_query_offset = mIdx * SIZE_128 * (dimN1 * dimD);
                     inner_key_offset = nIdx * SIZE_128 * (dimN2 * dimD);
                     dstStride = dimN2 * dimD;
-                } else if (layout == SBNGD){
+                } else if (layout == SBNGD) {
                     inner_query_offset = mIdx * SIZE_128 * (batch * dimN1 * dimD);
                     inner_key_offset = nIdx * SIZE_128 * (batch * dimN2 * dimD);
                     dstStride = batch * dimN2 * dimD;
@@ -559,8 +574,8 @@ private:
 
                 if constexpr (CUBE_TYPE == DK) {
                     // reuse query
-                    l1_b_buf_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * dimD]
-                                                    : l1_query_pong_tensor[mIdx * SIZE_128 * dimD];
+                    l1_b_buf_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * dimD] :
+                                                       l1_query_pong_tensor[mIdx * SIZE_128 * dimD];
                     needCopyInBMatrix = false;
                 } else {
                     l1_b_buf_tensor = l1_b_ping_tensor[mIdx * SIZE_128 * dimD];
@@ -569,12 +584,13 @@ private:
 
                 WAIT_FLAG(MTE1, MTE2, aEventID);
                 WAIT_FLAG(M, MTE1, aEventID);
-                this->template MM345LoadA<CUBE_TYPE>(l1_a_buf_tensor, l0_a_buf_tensor, tmp_type_gm_tensor[real_left_offset],
-                                                    mProcess, nProcess, mProcessAlign, nProcessAlign, true);
+                this->template MM345LoadA<CUBE_TYPE>(l1_a_buf_tensor, l0_a_buf_tensor,
+                                                     tmp_type_gm_tensor[real_left_offset], mProcess, nProcess,
+                                                     mProcessAlign, nProcessAlign, true);
                 SET_FLAG(MTE1, MTE2, aEventID);
 
-                MM345LoadB(l1_b_buf_tensor, l0_b_buf_tensor, tmp_type_gm_tensor[real_right_offset], mProcess, mProcessAlign,
-                        dimN1, needCopyInBMatrix);
+                MM345LoadB(l1_b_buf_tensor, l0_b_buf_tensor, tmp_type_gm_tensor[real_right_offset], mProcess,
+                           mProcessAlign, dimN1, needCopyInBMatrix);
 
                 SET_FLAG(MTE1, M, EVENT_ID0);
                 WAIT_FLAG(MTE1, M, EVENT_ID0);
@@ -593,18 +609,20 @@ private:
                 if (mIdx == mLoop - 1) {
                     if constexpr (DETERMINISTIC_ENABLE) {
                         if (shapeInfo.atmoicAdd) {
-                            MM345CopyOut<true>(l0_c_buf_tensor, out_offset + inner_key_offset, nProcess, dstStride, nProcessAlign);
+                            MM345CopyOut<true>(l0_c_buf_tensor, out_offset + inner_key_offset, nProcess, dstStride,
+                                               nProcessAlign);
                         } else {
-                            MM345CopyOut<false>(l0_c_buf_tensor, out_offset + nIdx * SIZE_128 * dimD, nProcess, dimD, nProcessAlign);
+                            MM345CopyOut<false>(l0_c_buf_tensor, out_offset + nIdx * SIZE_128 * dimD, nProcess, dimD,
+                                                nProcessAlign);
                         }
                     } else {
                         MM345CopyOut<true>(l0_c_buf_tensor, out_offset + inner_key_offset, nProcess, dimN2 * dimD,
-                                        nProcessAlign);
+                                           nProcessAlign);
                     }
                 }
 
                 SET_FLAG(FIX, M, bEventID);
-                if constexpr (CUBE_TYPE == DK){
+                if constexpr (CUBE_TYPE == DK) {
                     // 记录cubeBlockIdx, 用于dQ的计算
                     cubeBlockIdxArry[nIdx][mIdx] = cubeBlockIdx;
                 }
@@ -618,10 +636,12 @@ private:
 
     template <uint32_t CUBE_TYPE>
     __aicore__ inline __attribute__((always_inline)) void MM345LoadA(LocalTensor<INPUT_TYPE> dstL1Tensor,
-                                                                    LocalTensor<INPUT_TYPE> dstL0Tensor,
-                                                                    GlobalTensor<INPUT_TYPE> srcTensor, const int32_t baseM,
-                                                                    const int32_t baseN, const int32_t baseMAlign,
-                                                                    const int32_t baseNAlign, const bool needCopyIn) {
+                                                                     LocalTensor<INPUT_TYPE> dstL0Tensor,
+                                                                     GlobalTensor<INPUT_TYPE> srcTensor,
+                                                                     const int32_t baseM, const int32_t baseN,
+                                                                     const int32_t baseMAlign, const int32_t baseNAlign,
+                                                                     const bool needCopyIn)
+    {
         if (needCopyIn) {
             uint32_t mUp = (baseM + 1) / 2;
             uint32_t mDown = baseM - mUp;
@@ -643,7 +663,7 @@ private:
             commonLoadData2dParamsNoTranspose.srcStride = baseMAlign / SIZE_16;
             for (int32_t i = 0; i < baseMAlign / SIZE_16; i++) {
                 AscendC::LoadData(dstL0Tensor[i * baseNAlign * SIZE_16], dstL1Tensor[i * SIZE_16 * SIZE_16],
-                                commonLoadData2dParamsNoTranspose);
+                                  commonLoadData2dParamsNoTranspose);
             }
         } else {
             commonLoadData2dParamsTranspose.repeatTimes = (baseMAlign / SIZE_16) * (baseNAlign / SIZE_16);
@@ -654,12 +674,13 @@ private:
 
     __aicore__ inline __attribute__((always_inline)) void MM345LoadB(
         LocalTensor<INPUT_TYPE> dstL1Tensor, LocalTensor<INPUT_TYPE> dstL0Tensor, GlobalTensor<INPUT_TYPE> srcTensor,
-        const int32_t processLen, const int32_t processLenAlign, const int32_t headNum, const bool needCopyIn) {
+        const int32_t processLen, const int32_t processLenAlign, const int32_t headNum, const bool needCopyIn)
+    {
         if (needCopyIn) {
             int32_t _srcDValue{0};
-            if (layout == BNGSD){
+            if (layout == BNGSD) {
                 _srcDValue = dimD;
-            } else if (layout == SBNGD){
+            } else if (layout == SBNGD) {
                 _srcDValue = batch * headNum * dimD;
             } else {
                 _srcDValue = headNum * dimD;
@@ -678,14 +699,15 @@ private:
         commonLoadData2dParamsTranspose.srcStride = processLenAlign / SIZE_16;
         for (int32_t j = 0; j < processLenAlign / SIZE_16; j++) {
             AscendC::LoadData(dstL0Tensor[j * dimD * SIZE_16], dstL1Tensor[j * SIZE_16 * SIZE_16],
-                                commonLoadData2dParamsTranspose);
+                              commonLoadData2dParamsTranspose);
         }
     };
 
     template <bool ATMOIC_ADD>
     __aicore__ inline __attribute__((always_inline)) void MM345CopyOut(LocalTensor<float> srcTensor, uint64_t outOffset,
-                                                                        uint16_t mSize, uint32_t dstStride,
-                                                                        uint16_t srcStride) {
+                                                                       uint16_t mSize, uint32_t dstStride,
+                                                                       uint16_t srcStride)
+    {
         if constexpr (ATMOIC_ADD) {
             AscendC::SetAtomicType<float>();
         }
@@ -694,13 +716,13 @@ private:
         commonFixpipeParamsV220.nSize = dimD;
         commonFixpipeParamsV220.srcStride = srcStride;
         commonFixpipeParamsV220.dstStride = dstStride;
-        AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(tmp_fp32_gm_tensor[outOffset], srcTensor, commonFixpipeParamsV220);
+        AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(tmp_fp32_gm_tensor[outOffset], srcTensor,
+                                                               commonFixpipeParamsV220);
 
         if constexpr (ATMOIC_ADD) {
             AscendC::SetAtomicNone();
         }
     };
-
 };
-}  // namespace FAG_DET
-#endif  // __CUBEFORWARD_H__
+} // namespace FAG_DET
+#endif // __CUBEFORWARD_H__

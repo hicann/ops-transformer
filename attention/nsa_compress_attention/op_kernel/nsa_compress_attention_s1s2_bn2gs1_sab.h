@@ -55,7 +55,7 @@ struct SplitSameABExtraInfo {
     int64_t vecCoreOffset;
 };
 
-enum class MmPolicyType : uint32_t{
+enum class MmPolicyType : uint32_t {
     NORMAL = 0
 };
 
@@ -68,17 +68,16 @@ constexpr AscendC::SoftmaxConfig SOFTMAX_DEFAULT_CFG = {false};
 constexpr AscendC::SoftmaxConfig SOFTMAX_REDUCE_CFG = {false, 0, 0, AscendC::SoftmaxMode::SOFTMAX_OUTPUT_WITHOUT_BRC};
 
 // L1 extension
-template<MmPolicyType mmPolicyType>
+template <MmPolicyType mmPolicyType>
 struct MatmulPolicySelector {
-    template <const auto& MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>
-    struct Result : AscendC::Impl::Detail::MatmulPolicy<MM_CFG, IMPL, A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>{};
+    template <const auto &MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>
+    struct Result : AscendC::Impl::Detail::MatmulPolicy<MM_CFG, IMPL, A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE> {};
 };
 
 // INPUT_T - means data type for input
 // T       - means data type when calc
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T = INPUT_T, CubeFormat bmm1Format = CubeFormat::ND,
-          MmPolicyType mmPolicyType = MmPolicyType::NORMAL>
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T = INPUT_T,
+          CubeFormat bmm1Format = CubeFormat::ND, MmPolicyType mmPolicyType = MmPolicyType::NORMAL>
 class NsaCompressAttentionS1s2Bn2gs1SameAB {
 public:
     __aicore__ inline NsaCompressAttentionS1s2Bn2gs1SameAB(){};
@@ -90,9 +89,9 @@ public:
     using b1Type = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T, true, LayoutMode::NONE, true>;
     using bias1Type = MatmulType<TPosition::GM, CubeFormat::ND, float>;
     using c1Type = MatmulType<TPosition::GM, CubeFormat::ND, T>;
-    matmul::Matmul<a1Type, b1Type, c1Type, bias1Type, CFG_EXCEED,
-                   matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                   MatmulPolicySelector<mmPolicyType>::template Result> bmm1;
+    matmul::Matmul<a1Type, b1Type, c1Type, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                   MatmulPolicySelector<mmPolicyType>::template Result>
+        bmm1;
 
     // define batchmatmul
     using a2Type = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T, false, LayoutMode::NONE, true>;
@@ -101,43 +100,45 @@ public:
     using c2NzType = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T>;
     matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, CFG_EXCEED,
                    matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                   MatmulPolicySelector<mmPolicyType>::template Result> bmm2;
+                   MatmulPolicySelector<mmPolicyType>::template Result>
+        bmm2;
 
 protected:
     __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                     __gm__ uint8_t *attenMask, __gm__ uint8_t *topkMask,
-                                     __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                     __gm__ uint8_t *attentionOut, __gm__ uint8_t *topkIndicesOut,
-                                     __gm__ uint8_t *workspace,
+                                     __gm__ uint8_t *attenMask, __gm__ uint8_t *topkMask, __gm__ uint8_t *softmaxMax,
+                                     __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut,
+                                     __gm__ uint8_t *topkIndicesOut, __gm__ uint8_t *workspace,
                                      const NsaCompressAttentionGeneralTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void WaitBmm1Result(SplitSameABExtraInfo &extraInfo);
     __aicore__ inline void WaitBmm2Result(SplitSameABExtraInfo &extraInfo);
     __aicore__ inline void IterateBmm2(SplitSameABExtraInfo &extraInfo,
                                        matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, CFG_EXCEED,
-                                       matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm2);
+                                                      matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                                                      MatmulPolicySelector<mmPolicyType>::template Result> &bmm2);
     __aicore__ inline void SetTiling(const NsaCompressAttentionGeneralTilingData *__restrict tilingData);
     __aicore__ inline void InitBuffer();
     template <typename T2>
-    __aicore__ inline void IterateBmm1(SplitSameABExtraInfo &extraInfo,
-                                       matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED,
-                                       matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
+    __aicore__ inline void IterateBmm1(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
     template <typename T2>
-    __aicore__ inline void Bmm1SetTensorA(SplitSameABExtraInfo &extraInfo,
-                                          matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED,
-                                          matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                          MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
+    __aicore__ inline void Bmm1SetTensorA(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
     template <typename T2>
-    __aicore__ inline void SetBmm1TensorB(SplitSameABExtraInfo &extraInfo,
-                                          matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED,
-                                          matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                          MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
+    __aicore__ inline void SetBmm1TensorB(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1);
     __aicore__ inline void ComputeBmm1Tail(SplitSameABExtraInfo &extraInfo);
     __aicore__ inline void ProcessVec1(SplitSameABExtraInfo &extraInfo);
     __aicore__ inline void ProcessVec2(SplitSameABExtraInfo &extraInfo);
-    __aicore__ inline void GetBmm1Result(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t s1LoopIdx, int64_t gLoopIdx);
-    __aicore__ inline void CopyInAttenMask(SplitSameABExtraInfo &extraInfo, LocalTensor<uint8_t> &attenMaskUb, int64_t s1LoopIdx);
+    __aicore__ inline void GetBmm1Result(SplitSameABExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t s1LoopIdx,
+                                         int64_t gLoopIdx);
+    __aicore__ inline void CopyInAttenMask(SplitSameABExtraInfo &extraInfo, LocalTensor<uint8_t> &attenMaskUb,
+                                           int64_t s1LoopIdx);
     __aicore__ inline void TopkCompute(SplitSameABExtraInfo &extraInfo);
     __aicore__ inline void TransposeTilingCompute(ConfusionTransposeTiling &tiling, uint64_t row, uint64_t col);
     __aicore__ inline void TopkTilingCompute(TopkTiling &tiling, uint64_t inner, uint64_t outter);
@@ -213,7 +214,7 @@ protected:
     LocalTensor<float> transBack;
     LocalTensor<uint8_t> tmpBuf;
     LocalTensor<uint8_t> sharedBuf;
-    int timesArray[ MAX_TIMES ]; // isInfo.isM + isInfo.isN -1  < 100
+    int timesArray[MAX_TIMES]; // isInfo.isM + isInfo.isN -1  < 100
     int32_t scoreLoop;
     int32_t innerLoop;
     uint64_t s2Loop;
@@ -236,16 +237,15 @@ protected:
     LocalTensor<int32_t> srcLocalIndex;
 };
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                 bmm1Format, mmPolicyType>::InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key,
-                                     __gm__ uint8_t *value, __gm__ uint8_t *attenMask, __gm__ uint8_t *topkMask,
-                                     __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                     __gm__ uint8_t *attentionOut, __gm__ uint8_t *topkIndicesOut,
-                                     __gm__ uint8_t *workspace,
-                                     const NsaCompressAttentionGeneralTilingData *__restrict tiling, TPipe *tPipe)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
+    layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+    mmPolicyType>::InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
+                             __gm__ uint8_t *attenMask, __gm__ uint8_t *topkMask, __gm__ uint8_t *softmaxMax,
+                             __gm__ uint8_t *softmaxSum, __gm__ uint8_t *attentionOut, __gm__ uint8_t *topkIndicesOut,
+                             __gm__ uint8_t *workspace, const NsaCompressAttentionGeneralTilingData *__restrict tiling,
+                             TPipe *tPipe)
 {
     this->vecBlockIdx = GetBlockIdx();
     this->cubeBlockIdx = this->vecBlockIdx / 2;
@@ -267,7 +267,7 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     this->topkIndicesOutGm.SetGlobalBuffer((__gm__ int32_t *)topkIndicesOut);
 
     int64_t mm1BaseCount = NSA_BASE_S1G_SIZE * this->tilingData->inputParams.alignedS2;
-    int64_t mm1BaseSize = mm1BaseCount * sizeof(float); //s2的最大值 //向上16对齐
+    int64_t mm1BaseSize = mm1BaseCount * sizeof(float); // s2的最大值 //向上16对齐
     int64_t mm1BaseSizeHalf = mm1BaseCount * sizeof(INPUT_T);
     int64_t totalOffset = mm1BaseSize * GM_DOUBLE_BUFFER + mm1BaseSizeHalf;
 
@@ -285,21 +285,22 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     uint64_t baseS1G =
         static_cast<uint64_t>(NSA_BASE_S1G_SIZE) / static_cast<uint64_t>(this->tilingData->inputParams.gSize);
     uint64_t alignedS2Div = static_cast<uint64_t>(this->tilingData->inputParams.alignedS2) /
-        static_cast<uint64_t>(this->tilingData->importanceScoreParams.isM);
+                            static_cast<uint64_t>(this->tilingData->importanceScoreParams.isM);
     uint64_t perCoreOffsetU64 = baseS1G * alignedS2Div * sizeof(float) * GM_DOUBLE_BUFFER;
     this->impScoreRes[0].SetGlobalBuffer(
         (__gm__ T *)(workspace + impScoreOffsetU64 + perCoreOffsetU64 * static_cast<uint64_t>(this->cubeBlockIdx)));
-    this->impScoreRes[1].SetGlobalBuffer(
-        (__gm__ T *)(workspace + impScoreOffsetU64 + perCoreOffsetU64 *
-        static_cast<uint64_t>(this->cubeBlockIdx) + perCoreOffsetU64 / 2));
+    this->impScoreRes[1].SetGlobalBuffer((__gm__ T *)(workspace + impScoreOffsetU64 +
+                                                      perCoreOffsetU64 * static_cast<uint64_t>(this->cubeBlockIdx) +
+                                                      perCoreOffsetU64 / 2));
 
     GetExtremeValue(this->negativeFloatScalar, this->positiveFloatScalar);
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                            bmm1Format, mmPolicyType>::SetTiling(const NsaCompressAttentionGeneralTilingData *__restrict tilingData)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
+    layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+    mmPolicyType>::SetTiling(const NsaCompressAttentionGeneralTilingData *__restrict tilingData)
 {
     // copy base params
     this->tilingData = tilingData;
@@ -309,19 +310,17 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     this->d2Size = this->tilingData->coreParams.d2Size;
 };
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                            bmm1Format, mmPolicyType>::InitBuffer()
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                                            mmPolicyType>::InitBuffer()
 {
     int64_t tempBufSize = 32 * 1024;
     int64_t availUbSize = 192 * 1024;
     int64_t attenMaskAlign = CeilDiv(this->tilingData->inputParams.s2Size, 32) * 32;
-    this->vecMaxG = (availUbSize - tempBufSize) /
-                    (2 * sizeof(float) * this->tilingData->inputParams.alignedS2 +
-                    1 * sizeof(INPUT_T) * this->tilingData->inputParams.alignedS2 +
-                    1 * sizeof(uint8_t) * attenMaskAlign +
-                    2 * sizeof(float) * 8);
+    this->vecMaxG = (availUbSize - tempBufSize) / (2 * sizeof(float) * this->tilingData->inputParams.alignedS2 +
+                                                   1 * sizeof(INPUT_T) * this->tilingData->inputParams.alignedS2 +
+                                                   1 * sizeof(uint8_t) * attenMaskAlign + 2 * sizeof(float) * 8);
     this->vecMaxG = Min(this->vecMaxG, this->gSize);
     this->pipe->InitBuffer(this->allUbBuffer, availUbSize);
     allUbLocal = allUbBuffer.Get<uint8_t>();
@@ -382,42 +381,43 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     }
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                bmm1Format, mmPolicyType>::WaitBmm1Result(SplitSameABExtraInfo &extraInfo)
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                     mmPolicyType>::WaitBmm1Result(SplitSameABExtraInfo &extraInfo)
 {
     this->bmm1.WaitIterateAll();
     this->bmm1.End();
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 template <typename T2>
 __aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                 bmm1Format, mmPolicyType>::IterateBmm1(SplitSameABExtraInfo &extraInfo,
-                                                          matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED,
-                                                          matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                                          MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format, mmPolicyType>::
+    IterateBmm1(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
 {
-    bmm1.SetOrgShape(extraInfo.cubeS1gRealSize, extraInfo.s2RealSize, this->dSize, this->tilingData->inputParams.n2Size * this->dSize, extraInfo.s2RealSize); // b,s2,n2,d
+    bmm1.SetOrgShape(extraInfo.cubeS1gRealSize, extraInfo.s2RealSize, this->dSize,
+                     this->tilingData->inputParams.n2Size * this->dSize, extraInfo.s2RealSize); // b,s2,n2,d
 
     this->Bmm1SetTensorA(extraInfo, bmm1);
     this->SetBmm1TensorB(extraInfo, bmm1);
     bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2], false, false, true);
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 template <typename T2>
 __aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                 bmm1Format, mmPolicyType>::Bmm1SetTensorA(SplitSameABExtraInfo &extraInfo,
-                                                             matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED,
-                                                             matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                                             MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format, mmPolicyType>::
+    Bmm1SetTensorA(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -429,8 +429,8 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
         uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) * static_cast<uint64_t>(this->s1TotalSize);
         n2OffsetU64 = n2OffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->dSize);
-        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) *
-            static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->dSize);
+        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) * static_cast<uint64_t>(this->gSize) *
+                              static_cast<uint64_t>(this->dSize);
         uint64_t s1gOffsetU64 =
             static_cast<uint64_t>(extraInfo.s1oIdx) * static_cast<uint64_t>(this->tilingData->coreParams.s1BaseSize);
         s1gOffsetU64 = s1gOffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->dSize);
@@ -443,15 +443,15 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     bmm1.SetTensorA(this->queryGm[extraInfo.qCoreOffset]);
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 template <typename T2>
 __aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                 bmm1Format, mmPolicyType>::SetBmm1TensorB(SplitSameABExtraInfo &extraInfo,
-                                                             matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED,
-                                                             matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                                             MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format, mmPolicyType>::
+    SetBmm1TensorB(
+        SplitSameABExtraInfo &extraInfo,
+        matmul::Matmul<a1Type, b1Type, T2, bias1Type, CFG_EXCEED, matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                       MatmulPolicySelector<mmPolicyType>::template Result> &bmm1)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -466,11 +466,10 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     bmm1.SetTail(extraInfo.cubeS1gRealSize, extraInfo.s2RealSize);
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                bmm1Format, mmPolicyType>::ProcessVec1(SplitSameABExtraInfo &extraInfo)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                                            mmPolicyType>::ProcessVec1(SplitSameABExtraInfo &extraInfo)
 {
     if (extraInfo.s1RealSize == 0) {
         return;
@@ -492,18 +491,18 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
             extraInfo.vec1S1RealSize = extraInfo.vec1MaxG;
             if (gLoopIdx == extraInfo.vec1LoopCountG - 1) {
                 extraInfo.vec1S1RealSize = this->gSize - gLoopIdx * extraInfo.vec1MaxG;
-            }          
+            }
             AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2);
             this->GetBmm1Result(extraInfo, mm1ResultLocal, s1LoopIdx, gLoopIdx);
             this->CopyInAttenMask(extraInfo, attenMaskLocal, s1LoopIdx);
 
-            //正向Wait
+            // 正向Wait
             AscendC::SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
             AscendC::WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
 
             // scale
             Muls(mm1ResultLocal, mm1ResultLocal, static_cast<T>(this->tilingData->inputParams.scaleValue),
-                extraInfo.vec1S1RealSize * extraInfo.s2RealSizeAlign32);
+                 extraInfo.vec1S1RealSize * extraInfo.s2RealSizeAlign32);
             AscendC::PipeBarrier<PIPE_V>();
 
             AscendC::WaitFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
@@ -513,33 +512,51 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
                 selectShapeInfo.firstAxis = (uint32_t)extraInfo.vec1S1RealSize;
                 selectShapeInfo.srcLastAxis = (uint32_t)extraInfo.s2RealSizeAlign32;
                 selectShapeInfo.maskLastAxis = (uint32_t)CeilDiv(extraInfo.s2RealSize, 32) * 32;
-                AscendC::SelectWithBytesMask(mm1ResultLocal, mm1ResultLocal, this->negativeFloatScalar, attenMaskLocal, softmaxTmpLocal, selectShapeInfo);
+                AscendC::SelectWithBytesMask(mm1ResultLocal, mm1ResultLocal, this->negativeFloatScalar, attenMaskLocal,
+                                             softmaxTmpLocal, selectShapeInfo);
                 AscendC::PipeBarrier<PIPE_V>();
             }
 
             AscendC::WaitFlag<HardEvent::MTE3_V>(eventIdMte3ToV1);
-            SoftMaxShapeInfo srcShape = {(uint32_t)extraInfo.vec1S1RealSize, (uint32_t)extraInfo.s2RealSizeAlign32, (uint32_t)extraInfo.vec1S1RealSize, (uint32_t)extraInfo.s2RealSize};
-            AscendC::SoftMax<T>(softMaxResultLocal, softMaxSumLocal, softMaxMaxLocal, mm1ResultLocal, softmaxTmpLocal, this->softmaxtiling, srcShape);
+            SoftMaxShapeInfo srcShape = {(uint32_t)extraInfo.vec1S1RealSize, (uint32_t)extraInfo.s2RealSizeAlign32,
+                                         (uint32_t)extraInfo.vec1S1RealSize, (uint32_t)extraInfo.s2RealSize};
+            AscendC::SoftMax<T>(softMaxResultLocal, softMaxSumLocal, softMaxMaxLocal, mm1ResultLocal, softmaxTmpLocal,
+                                this->softmaxtiling, srcShape);
             AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMte2);
 
-            //正向Wait
+            // 正向Wait
             AscendC::SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
 
             AscendC::PipeBarrier<PIPE_V>();
-            DataCopyPad(this->mm1Res[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize + gLoopIdx * extraInfo.vec1MaxG) * extraInfo.s2RealSize], softMaxResultLocal, {(uint16_t)extraInfo.vec1S1RealSize, (uint32_t)(extraInfo.s2RealSize * sizeof(float)), (uint32_t)(extraInfo.s2RealSizeAlign32 - extraInfo.s2RealSize) / 8, 0, 0});
-            DataCopyPad(softmaxSumGm[extraInfo.softmaxMaxOffset + (gLoopIdx * extraInfo.vec1MaxG * extraInfo.s1Size + s1LoopIdx) * 8], softMaxSumLocal, {(uint16_t)extraInfo.vec1S1RealSize, (uint32_t)(8 * sizeof(float)), 0, (uint32_t)((extraInfo.s1Size - 1) * 8 * sizeof(float)), 0});
-            DataCopyPad(softmaxMaxGm[extraInfo.softmaxMaxOffset + (gLoopIdx * extraInfo.vec1MaxG * extraInfo.s1Size + s1LoopIdx) * 8], softMaxMaxLocal, {(uint16_t)extraInfo.vec1S1RealSize, (uint32_t)(8 * sizeof(float)), 0, (uint32_t)((extraInfo.s1Size - 1) * 8 * sizeof(float)), 0});
+            DataCopyPad(this->mm1Res[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize +
+                                                            gLoopIdx * extraInfo.vec1MaxG) *
+                                                           extraInfo.s2RealSize],
+                        softMaxResultLocal,
+                        {(uint16_t)extraInfo.vec1S1RealSize, (uint32_t)(extraInfo.s2RealSize * sizeof(float)),
+                         (uint32_t)(extraInfo.s2RealSizeAlign32 - extraInfo.s2RealSize) / 8, 0, 0});
+            DataCopyPad(softmaxSumGm[extraInfo.softmaxMaxOffset +
+                                     (gLoopIdx * extraInfo.vec1MaxG * extraInfo.s1Size + s1LoopIdx) * 8],
+                        softMaxSumLocal,
+                        {(uint16_t)extraInfo.vec1S1RealSize, (uint32_t)(8 * sizeof(float)), 0,
+                         (uint32_t)((extraInfo.s1Size - 1) * 8 * sizeof(float)), 0});
+            DataCopyPad(softmaxMaxGm[extraInfo.softmaxMaxOffset +
+                                     (gLoopIdx * extraInfo.vec1MaxG * extraInfo.s1Size + s1LoopIdx) * 8],
+                        softMaxMaxLocal,
+                        {(uint16_t)extraInfo.vec1S1RealSize, (uint32_t)(8 * sizeof(float)), 0,
+                         (uint32_t)((extraInfo.s1Size - 1) * 8 * sizeof(float)), 0});
             AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV1);
 
-            Cast(castTmpLocal, softMaxResultLocal, RoundMode::CAST_RINT, extraInfo.vec1S1RealSize * extraInfo.s2RealSizeAlign32);
+            Cast(castTmpLocal, softMaxResultLocal, RoundMode::CAST_RINT,
+                 extraInfo.vec1S1RealSize * extraInfo.s2RealSizeAlign32);
             AscendC::PipeBarrier<PIPE_V>();
 
             // bf16 datacopy --> GM
             AscendC::SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             DataCopy(
-                this->stage1Res[(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize + gLoopIdx * extraInfo.vec1MaxG) * extraInfo.s2RealSizeAlign32],
+                this->stage1Res[(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize + gLoopIdx * extraInfo.vec1MaxG) *
+                                extraInfo.s2RealSizeAlign32],
                 castTmpLocal, extraInfo.vec1S1RealSize * extraInfo.s2RealSizeAlign32);
             AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
         }
@@ -557,11 +574,10 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     return;
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                bmm1Format, mmPolicyType>::ProcessVec2(SplitSameABExtraInfo &extraInfo)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                                            mmPolicyType>::ProcessVec2(SplitSameABExtraInfo &extraInfo)
 {
     if (extraInfo.s1RealSize == 0) {
         return;
@@ -589,7 +605,7 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMte2);
     AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToVMask);
     AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
-    // [0, s2] loop 
+    // [0, s2] loop
     for (int64_t loopIdx = 0; loopIdx < this->s2Loop; ++loopIdx) {
         // s2 last loop adapt
         if (loopIdx == this->s2Loop - 1) { // lastLoop
@@ -620,17 +636,14 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
             softmaxDstStride = this->s2Length + s2Offset - extraInfo.s2RealSize;
         }
 
-        AscendC::DataCopyExtParams params = {
-            static_cast<uint16_t>(this->vecS1BaseSize * this->gSize),
-            static_cast<uint32_t>(softmaxSrcBlockLen * sizeof(float)),
-            static_cast<uint16_t>(softmaxSrcStride * sizeof(float)),
-            static_cast<uint32_t>(softmaxDstStride * sizeof(float) / 32),
-            0
-        };
-        AscendC::DataCopyPadExtParams<T> extParams = {
-            true, 0, static_cast<uint8_t>(softmaxDstStride % 8), 0.0
-        };
-        AscendC::DataCopyPad(softmaxRes, this->mm1Res[extraInfo.taskIdMod2][extraInfo.vecCoreOffset * extraInfo.s2RealSize + s2Offset], params, extParams);
+        AscendC::DataCopyExtParams params = {static_cast<uint16_t>(this->vecS1BaseSize * this->gSize),
+                                             static_cast<uint32_t>(softmaxSrcBlockLen * sizeof(float)),
+                                             static_cast<uint16_t>(softmaxSrcStride * sizeof(float)),
+                                             static_cast<uint32_t>(softmaxDstStride * sizeof(float) / 32), 0};
+        AscendC::DataCopyPadExtParams<T> extParams = {true, 0, static_cast<uint8_t>(softmaxDstStride % 8), 0.0};
+        AscendC::DataCopyPad(
+            softmaxRes, this->mm1Res[extraInfo.taskIdMod2][extraInfo.vecCoreOffset * extraInfo.s2RealSize + s2Offset],
+            params, extParams);
 
         // CopyInTopKMask
         AscendC::SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
@@ -647,23 +660,19 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
                 maskSrcStride = 0;
             }
             AscendC::DataCopyExtParams params = {
-                static_cast<uint16_t>(this->vecS1BaseSize),
-                static_cast<uint32_t>(this->scoreLoop * sizeof(uint8_t)),
-                static_cast<uint16_t>((CeilDiv(this->tilingData->inputParams.s2Size, isInfo.isM) - this->scoreLoop) * sizeof(uint8_t)),
-                maskSrcStride,
-                0
-            };
-            AscendC::DataCopyPadExtParams<uint8_t> extParams = {
-                true, 0, static_cast<uint8_t>(maskPad), 0
-            };
+                static_cast<uint16_t>(this->vecS1BaseSize), static_cast<uint32_t>(this->scoreLoop * sizeof(uint8_t)),
+                static_cast<uint16_t>((CeilDiv(this->tilingData->inputParams.s2Size, isInfo.isM) - this->scoreLoop) *
+                                      sizeof(uint8_t)),
+                maskSrcStride, 0};
+            AscendC::DataCopyPadExtParams<uint8_t> extParams = {true, 0, static_cast<uint8_t>(maskPad), 0};
             AscendC::DataCopyPad<uint8_t>(maskTensor, topKMaskGmInt[maskGmOffset + maskOffset], params, extParams);
         }
 
         // CalcImportanceScore
         AscendC::SetFlag<HardEvent::MTE2_V>(eventIdMte2ToVMask);
         AscendC::WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
-        AscendC::ConfusionTranspose<float>(trans, softmaxRes, sharedBuf,
-            AscendC::TransposeType::TRANSPOSE_ND2ND_ONLY, transposeInfoForward);
+        AscendC::ConfusionTranspose<float>(trans, softmaxRes, sharedBuf, AscendC::TransposeType::TRANSPOSE_ND2ND_ONLY,
+                                           transposeInfoForward);
         AscendC::PipeBarrier<PIPE_V>();
 
         int64_t lineOffset = innerLoop - isInfo.isM;
@@ -675,8 +684,9 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
         }
         int64_t vS1MulsGsize = this->vecS1BaseSize * this->gSize;
         if (loopIdx == this->s2Loop - 1) {
-            int64_t dstOffset = (scoreLoop * isInfo.isM + lineOffset ) * vS1MulsGsize;
-            uint64_t unalignedLen = (s2Offset + scoreLoop * isInfo.isM + lineOffset - extraInfo.s2RealSize) * vS1MulsGsize;
+            int64_t dstOffset = (scoreLoop * isInfo.isM + lineOffset) * vS1MulsGsize;
+            uint64_t unalignedLen =
+                (s2Offset + scoreLoop * isInfo.isM + lineOffset - extraInfo.s2RealSize) * vS1MulsGsize;
             Duplicate(trans[dstOffset - unalignedLen], (float)0.0, unalignedLen + vS1MulsGsize);
             AscendC::PipeBarrier<PIPE_V>();
         }
@@ -698,25 +708,21 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
             int64_t transOffset = startOffset - (i * vS1MulsGsize);
             if (unlikely(transOffset < 0)) {
                 scoreIdx = 1;
-                startOffset = ((scoreIdx + 1 ) * isInfo.isM + lineOffset) * vS1MulsGsize;
+                startOffset = ((scoreIdx + 1) * isInfo.isM + lineOffset) * vS1MulsGsize;
                 transOffset = startOffset - (i * vS1MulsGsize);
             }
-            Muls(scoreRes[scoreIdx * vS1MulsGsize + ubOffset],
-                trans[transOffset], static_cast<float>(times),
-                static_cast<int32_t>(vS1MulsGsize),
-                scoreLoop - scoreIdx, {1, 1, 8, srcStride});
+            Muls(scoreRes[scoreIdx * vS1MulsGsize + ubOffset], trans[transOffset], static_cast<float>(times),
+                 static_cast<int32_t>(vS1MulsGsize), scoreLoop - scoreIdx, {1, 1, 8, srcStride});
             AscendC::PipeBarrier<PIPE_V>();
-            Add(scoreRes[scoreIdx * vS1MulsGsize], 
-                scoreRes[scoreIdx * vS1MulsGsize + ubOffset], 
-                scoreRes[scoreIdx * vS1MulsGsize], 
-                static_cast<int32_t>(vS1MulsGsize),
-                scoreLoop - scoreIdx, {1, 1, 1, 8, 8, 8});
+            Add(scoreRes[scoreIdx * vS1MulsGsize], scoreRes[scoreIdx * vS1MulsGsize + ubOffset],
+                scoreRes[scoreIdx * vS1MulsGsize], static_cast<int32_t>(vS1MulsGsize), scoreLoop - scoreIdx,
+                {1, 1, 1, 8, 8, 8});
             AscendC::PipeBarrier<PIPE_V>();
         }
 
         AscendC::PipeBarrier<PIPE_V>();
-        AscendC::ConfusionTranspose<float>(transBack, scoreRes, sharedBuf,
-            AscendC::TransposeType::TRANSPOSE_ND2ND_ONLY, transposeInfoBackward);
+        AscendC::ConfusionTranspose<float>(transBack, scoreRes, sharedBuf, AscendC::TransposeType::TRANSPOSE_ND2ND_ONLY,
+                                           transposeInfoBackward);
         AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMte2);
         // reduce g [s1g, outerLoop(s2ScoreLoopLen)]
         if (this->gSize > 1) {
@@ -729,22 +735,19 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
             int addLoopOuter = (s2Aligned64B + MAX_ADD_NUM - 1) / MAX_ADD_NUM;
             for (int addIdex = 0; addIdex < addLoopOuter; addIdex++) {
                 int CalcNum = addIdex == addLoopOuter - 1 ? s2Aligned64B - addIdex * MAX_ADD_NUM : MAX_ADD_NUM;
-                for (int gIdx = 1; gIdx < this->gSize; gIdx *= 2) {  //  this->gSize % 2 == 0
+                for (int gIdx = 1; gIdx < this->gSize; gIdx *= 2) { //  this->gSize % 2 == 0
                     uint16_t sgBlock = static_cast<uint16_t>(s2Aligned64B * gIdx * 2 * sizeof(float) / BLOCK_SIZE);
-                    if (sgBlock < 256){
-                        Add(transBack[addIdex * MAX_ADD_NUM], 
-                            transBack[gIdx * s2Aligned64B + addIdex * MAX_ADD_NUM], 
-                            transBack[addIdex * MAX_ADD_NUM], 
-                            CalcNum,
-                            this->vecS1BaseSize * (this->gSize / (gIdx * 2)), 
-                            {1, 1, 1, static_cast<uint8_t>(sgBlock), static_cast<uint8_t>(sgBlock), static_cast<uint8_t>(sgBlock)});
+                    if (sgBlock < 256) {
+                        Add(transBack[addIdex * MAX_ADD_NUM], transBack[gIdx * s2Aligned64B + addIdex * MAX_ADD_NUM],
+                            transBack[addIdex * MAX_ADD_NUM], CalcNum, this->vecS1BaseSize * (this->gSize / (gIdx * 2)),
+                            {1, 1, 1, static_cast<uint8_t>(sgBlock), static_cast<uint8_t>(sgBlock),
+                             static_cast<uint8_t>(sgBlock)});
                         AscendC::PipeBarrier<PIPE_V>();
                     } else {
                         for (int i = 0; i < this->vecS1BaseSize * (this->gSize / (gIdx * 2)); i++) {
                             Add(transBack[addIdex * MAX_ADD_NUM + i * s2Aligned64B * gIdx * 2],
                                 transBack[gIdx * s2Aligned64B + addIdex * MAX_ADD_NUM + i * s2Aligned64B * gIdx * 2],
-                                transBack[addIdex * MAX_ADD_NUM + i * s2Aligned64B * gIdx * 2],
-                                CalcNum);
+                                transBack[addIdex * MAX_ADD_NUM + i * s2Aligned64B * gIdx * 2], CalcNum);
                             AscendC::PipeBarrier<PIPE_V>();
                         }
                     }
@@ -759,8 +762,8 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
             selectShapeInfo.firstAxis = this->vecS1BaseSize;
             selectShapeInfo.srcLastAxis = s2Aligned64B;
             selectShapeInfo.maskLastAxis = maskLenAligned32B;
-            AscendC::SelectWithBytesMask(transBack, transBack, this->positiveFloatScalar,
-                                        maskTensor, tmpBuf, selectShapeInfo);
+            AscendC::SelectWithBytesMask(transBack, transBack, this->positiveFloatScalar, maskTensor, tmpBuf,
+                                         selectShapeInfo);
         }
         AscendC::SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
         AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
@@ -768,19 +771,19 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
         // CopyOutImportanceScore
         uint64_t s2OutOffset = isInfo.outerLoop * loopIdx;
         uint32_t ImpScoreSrcStride = (this->s2Aligned64B - this->scoreLoop) / 8;
-        uint32_t ImpScoreDstStride = static_cast<uint32_t>((CeilDiv(extraInfo.s2RealSize, isInfo.isM) - isInfo.outerLoop) * sizeof(float));
+        uint32_t ImpScoreDstStride =
+            static_cast<uint32_t>((CeilDiv(extraInfo.s2RealSize, isInfo.isM) - isInfo.outerLoop) * sizeof(float));
         if (loopIdx == this->s2Loop - 1) {
             ImpScoreSrcStride = static_cast<uint32_t>((this->s2Aligned64B - this->scoreLoop) / 8);
-            ImpScoreDstStride = static_cast<uint32_t>(isInfo.outerLoop * (this->s2Loop-1) * sizeof(float));
+            ImpScoreDstStride = static_cast<uint32_t>(isInfo.outerLoop * (this->s2Loop - 1) * sizeof(float));
         }
-        AscendC::DataCopyExtParams copyOutParams = {
-            static_cast<uint16_t>(extraInfo.s1RealSize),
-            static_cast<uint32_t>(this->scoreLoop * sizeof(float)),
-            ImpScoreSrcStride,
-            ImpScoreDstStride,
-            0
-        };
-        DataCopyPad(this->impScoreRes[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset / this->gSize) * CeilDiv(extraInfo.s2RealSize, isInfo.isM) + s2OutOffset], transBack, copyOutParams);
+        AscendC::DataCopyExtParams copyOutParams = {static_cast<uint16_t>(extraInfo.s1RealSize),
+                                                    static_cast<uint32_t>(this->scoreLoop * sizeof(float)),
+                                                    ImpScoreSrcStride, ImpScoreDstStride, 0};
+        DataCopyPad(this->impScoreRes[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset / this->gSize) *
+                                                                CeilDiv(extraInfo.s2RealSize, isInfo.isM) +
+                                                            s2OutOffset],
+                    transBack, copyOutParams);
 
         AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
         AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToVMask);
@@ -799,18 +802,17 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     return;
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                bmm1Format, mmPolicyType>::TopkCompute(SplitSameABExtraInfo &extraInfo)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                                            mmPolicyType>::TopkCompute(SplitSameABExtraInfo &extraInfo)
 {
     AscendC::TopKInfo topKInfoData;
     uint32_t blockLength = 32;
     uint32_t S1Base = extraInfo.s1RealSize;
     uint32_t S2sizeTopK = CeilDiv(extraInfo.s2RealSize, this->tilingData->importanceScoreParams.isM);
     uint32_t k = this->tilingData->inputParams.selectBlockCount;
-    uint32_t k_pad = (k + 8 - 1) / 8 * 8; //float数据类型对齐，暂时不考虑其他
+    uint32_t k_pad = (k + 8 - 1) / 8 * 8; // float数据类型对齐，暂时不考虑其他
     uint32_t S2sizeAlign32 = (S2sizeTopK + blockLength - 1) / blockLength * blockLength;
     uint32_t S2sizeAlign8 = (S2sizeTopK + 8 - 1) / 8 * 8;
     uint32_t tmpUbSize = this->tilingData->importanceScoreParams.tmpUbSize;
@@ -818,13 +820,13 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     maxTopkBase = maxTopkBase > 0 ? maxTopkBase : 1;
     uint32_t topkBase = maxTopkBase > S1Base ? S1Base : maxTopkBase;
     AscendC::DataCopyExtParams copyInParamsV1, copyInParamsPad;
-    AscendC::DataCopyPadExtParams<float> padParamsFloatV1 {false, 0, 0, 0};
-    AscendC::DataCopyPadExtParams<float> padParamsFloat {true, 0, static_cast<uint8_t>(S2sizeAlign8 - S2sizeTopK), 0};
+    AscendC::DataCopyPadExtParams<float> padParamsFloatV1{false, 0, 0, 0};
+    AscendC::DataCopyPadExtParams<float> padParamsFloat{true, 0, static_cast<uint8_t>(S2sizeAlign8 - S2sizeTopK), 0};
 
     topKInfoData.inner = S2sizeAlign32;
     topKInfoData.n = S2sizeTopK;
     uint32_t topkLoopNum = (S1Base + topkBase - 1) / topkBase;
-    uint32_t topkBaseTail = S1Base - (topkLoopNum -1) * topkBase;
+    uint32_t topkBaseTail = S1Base - (topkLoopNum - 1) * topkBase;
 
     int64_t addrOffset = 0;
     sorceResultLocal = allUbBuffer.GetWithOffset<T>(topkBase * S2sizeAlign32, addrOffset);
@@ -841,8 +843,8 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     int64_t s1gOffset = 0;
 
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
-        uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) *
-            static_cast<uint64_t>(this->s1TotalSize) * static_cast<uint64_t>(k);
+        uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) * static_cast<uint64_t>(this->s1TotalSize) *
+                               static_cast<uint64_t>(k);
         uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) * static_cast<uint64_t>(k);
         uint64_t s1Base =
             static_cast<uint64_t>(extraInfo.s1oIdx) * static_cast<uint64_t>(this->tilingData->coreParams.s1BaseSize);
@@ -865,10 +867,11 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
 
     AscendC::PipeBarrier<PIPE_ALL>();
-    for(uint64_t taskLoop = 0; taskLoop < topkLoopNum; taskLoop++) {
+    for (uint64_t taskLoop = 0; taskLoop < topkLoopNum; taskLoop++) {
         uint64_t topkOutNum = taskLoop == topkLoopNum - 1 ? topkBaseTail : topkBase;
         copyInParamsV1 = {1, (uint32_t)(topkOutNum * S2sizeTopK * sizeof(float)), 0, 0, 0};
-        copyInParamsPad = {(uint16_t)topkOutNum, (uint32_t)(S2sizeTopK * sizeof(float)), 0, (S2sizeAlign32 - S2sizeAlign8) / 8, 0};
+        copyInParamsPad = {(uint16_t)topkOutNum, (uint32_t)(S2sizeTopK * sizeof(float)), 0,
+                           (S2sizeAlign32 - S2sizeAlign8) / 8, 0};
 
         topKInfoData.outter = topkOutNum;
         if (taskLoop == 0 || taskLoop == topkLoopNum - 1) {
@@ -887,10 +890,22 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
 
         AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMte2);
         AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2);
-        if (S2sizeTopK % 32 == 0){
-            DataCopyPad(sorceResultLocal, this->impScoreRes[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset / this->gSize) * CeilDiv(extraInfo.s2RealSize, this->tilingData->importanceScoreParams.isM) + taskLoop * topkBase * S2sizeTopK], copyInParamsV1, padParamsFloatV1);
+        if (S2sizeTopK % 32 == 0) {
+            DataCopyPad(
+                sorceResultLocal,
+                this->impScoreRes[extraInfo.taskIdMod2]
+                                 [(extraInfo.vecCoreOffset / this->gSize) *
+                                      CeilDiv(extraInfo.s2RealSize, this->tilingData->importanceScoreParams.isM) +
+                                  taskLoop * topkBase * S2sizeTopK],
+                copyInParamsV1, padParamsFloatV1);
         } else {
-            DataCopyPad(sorceResultLocal, this->impScoreRes[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset / this->gSize) * CeilDiv(extraInfo.s2RealSize, this->tilingData->importanceScoreParams.isM) + taskLoop * topkBase * S2sizeTopK], copyInParamsPad, padParamsFloat);
+            DataCopyPad(
+                sorceResultLocal,
+                this->impScoreRes[extraInfo.taskIdMod2]
+                                 [(extraInfo.vecCoreOffset / this->gSize) *
+                                      CeilDiv(extraInfo.s2RealSize, this->tilingData->importanceScoreParams.isM) +
+                                  taskLoop * topkBase * S2sizeTopK],
+                copyInParamsPad, padParamsFloat);
         }
 
         AscendC::SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
@@ -898,24 +913,18 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
         AscendC::WaitFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
 
         AscendC::TopK<float, false, false, false, AscendC::TopKMode::TOPK_NORMAL>(
-                topKValueLocal, 
-                topKIdexLocal, 
-                sorceResultLocal, 
-                srcLocalIndex, 
-                srcLocalFinish, 
-                topKTmpLocal, 
-                k, 
-                this->topktiling, 
-                topKInfoData, 
-                true);
+            topKValueLocal, topKIdexLocal, sorceResultLocal, srcLocalIndex, srcLocalFinish, topKTmpLocal, k,
+            this->topktiling, topKInfoData, true);
 
         AscendC::SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
         AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
 
-        if(k % 8 == 0) {
-            DataCopyPad(topkIndicesOutGm[TopkOutCoreOffset + taskLoop * topkBase * k], topKIdexLocal, {(uint16_t)1, (uint32_t)(topkOutNum * k * sizeof(int32_t)), 0, 0, 0});
+        if (k % 8 == 0) {
+            DataCopyPad(topkIndicesOutGm[TopkOutCoreOffset + taskLoop * topkBase * k], topKIdexLocal,
+                        {(uint16_t)1, (uint32_t)(topkOutNum * k * sizeof(int32_t)), 0, 0, 0});
         } else {
-            DataCopyPad(topkIndicesOutGm[TopkOutCoreOffset + taskLoop * topkBase * k], topKIdexLocal, {(uint16_t)topkOutNum, (uint32_t)(k * sizeof(int32_t)), 0, 0, 0});
+            DataCopyPad(topkIndicesOutGm[TopkOutCoreOffset + taskLoop * topkBase * k], topKIdexLocal,
+                        {(uint16_t)topkOutNum, (uint32_t)(k * sizeof(int32_t)), 0, 0, 0});
         }
         AscendC::SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
     }
@@ -929,10 +938,12 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
     GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(eventIdVToMte3);
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-        typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-    bmm1Format, mmPolicyType>::TransposeTilingCompute(ConfusionTransposeTiling &tiling, uint64_t row, uint64_t col)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                     mmPolicyType>::TransposeTilingCompute(ConfusionTransposeTiling &tiling,
+                                                                           uint64_t row, uint64_t col)
 {
     uint32_t blockSizeT = 8;
     uint32_t rowBlock = row / 16;
@@ -947,10 +958,12 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     tiling.param5 = repeat;
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-        typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-    bmm1Format, mmPolicyType>::TopkTilingCompute(TopkTiling &tiling, uint64_t inner, uint64_t outter)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                                            mmPolicyType>::TopkTilingCompute(TopkTiling &tiling,
+                                                                                             uint64_t inner,
+                                                                                             uint64_t outter)
 {
     tiling.tmpLocalSize = 4 * inner;
     tiling.innerDataSize = 2 * inner;
@@ -966,17 +979,19 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     tiling.srcIndexOffset = 4 * inner;
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                    bmm1Format, mmPolicyType>::GetBmm1Result(SplitSameABExtraInfo &extraInfo,
-                                               LocalTensor<T> &bmm1ResUb, int64_t s1LoopIdx, int64_t gLoopIdx)
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                     mmPolicyType>::GetBmm1Result(SplitSameABExtraInfo &extraInfo,
+                                                                  LocalTensor<T> &bmm1ResUb, int64_t s1LoopIdx,
+                                                                  int64_t gLoopIdx)
 {
     if (likely(extraInfo.s2RealSizeAlign32 == extraInfo.s2RealSize)) {
         DataCopy2D(bmm1ResUb,
-                   this->mm1Res[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize + gLoopIdx * extraInfo.vec1MaxG) *
-                                                      extraInfo.s2RealSize],
+                   this->mm1Res[extraInfo.taskIdMod2]
+                               [(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize + gLoopIdx * extraInfo.vec1MaxG) *
+                                extraInfo.s2RealSize],
                    extraInfo.vec1S1RealSize, extraInfo.s2RealSize, extraInfo.s2RealSize);
     } else {
         DataCopyParams dataCopyParams;
@@ -1002,54 +1017,65 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
         }
         dataCopyPadParams.paddingValue = 0;
         DataCopyPad(bmm1ResUb,
-                    this->mm1Res[extraInfo.taskIdMod2][(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize + gLoopIdx * extraInfo.vec1MaxG) *
-                                                       extraInfo.s2RealSize], dataCopyParams, dataCopyPadParams);
+                    this->mm1Res[extraInfo.taskIdMod2]
+                                [(extraInfo.vecCoreOffset + s1LoopIdx * this->gSize + gLoopIdx * extraInfo.vec1MaxG) *
+                                 extraInfo.s2RealSize],
+                    dataCopyParams, dataCopyPadParams);
     }
     uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(extraInfo.vec1S1RealSize),
                                  static_cast<uint32_t>(extraInfo.s2RealSizeAlign32)};
     bmm1ResUb.SetShapeInfo(ShapeInfo(2, bmm1ResUbShape, DataFormat::ND));
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
 __aicore__ inline void
-NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                    bmm1Format, mmPolicyType>::CopyInAttenMask(SplitSameABExtraInfo &extraInfo, LocalTensor<uint8_t> &attenMaskUb, int64_t s1LoopIdx)
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                     mmPolicyType>::CopyInAttenMask(SplitSameABExtraInfo &extraInfo,
+                                                                    LocalTensor<uint8_t> &attenMaskUb,
+                                                                    int64_t s1LoopIdx)
 {
     if constexpr (hasAtten == true) {
         auto attenMaskS2Align = CeilDiv(extraInfo.s2RealSize, 32) * 32;
-        int64_t maskOffset = (extraInfo.s1oIdx * this->cubeS1BaseSize + extraInfo.vecCoreOffset / this->gSize + s1LoopIdx) * this->tilingData->inputParams.s2Size; // attenMaskGm offset: [cubeS1Offset + vecS1Offset + s1LoopIdx] * maxS2
+        int64_t maskOffset =
+            (extraInfo.s1oIdx * this->cubeS1BaseSize + extraInfo.vecCoreOffset / this->gSize + s1LoopIdx) *
+            this->tilingData->inputParams
+                .s2Size; // attenMaskGm offset: [cubeS1Offset + vecS1Offset + s1LoopIdx] * maxS2
         if (likely(attenMaskS2Align == extraInfo.s2RealSize)) {
             for (int i = 0; i < extraInfo.vec1S1RealSize; ++i) {
-                DataCopy(attenMaskUb[i * attenMaskS2Align], this->attenMaskGmInt[maskOffset], extraInfo.attenMaskS2Size);
+                DataCopy(attenMaskUb[i * attenMaskS2Align], this->attenMaskGmInt[maskOffset],
+                         extraInfo.attenMaskS2Size);
             }
         } else {
             AscendC::DataCopyExtParams dataCopyParams = {1, (uint32_t)extraInfo.attenMaskS2Size, 0, 0, 0};
-            AscendC::DataCopyPadExtParams<uint8_t> dataCopyPadParams = {true, 0, (uint8_t)(attenMaskS2Align - extraInfo.attenMaskS2Size), 1};
+            AscendC::DataCopyPadExtParams<uint8_t> dataCopyPadParams = {
+                true, 0, (uint8_t)(attenMaskS2Align - extraInfo.attenMaskS2Size), 1};
             for (int i = 0; i < extraInfo.vec1S1RealSize; ++i) {
-                DataCopyPad(attenMaskUb[i * attenMaskS2Align], this->attenMaskGmInt[maskOffset], dataCopyParams, dataCopyPadParams);
+                DataCopyPad(attenMaskUb[i * attenMaskS2Align], this->attenMaskGmInt[maskOffset], dataCopyParams,
+                            dataCopyPadParams);
             }
         }
     }
 }
 
-
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                                    bmm1Format, mmPolicyType>::WaitBmm2Result(SplitSameABExtraInfo &extraInfo)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void
+NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+                                     mmPolicyType>::WaitBmm2Result(SplitSameABExtraInfo &extraInfo)
 {
     this->bmm2.WaitIterateAll();
     this->bmm2.End();
 }
 
-template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T,
-          typename T, CubeFormat bmm1Format, MmPolicyType mmPolicyType>
-__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T, T,
-                                        bmm1Format, mmPolicyType>::IterateBmm2(SplitSameABExtraInfo &extraInfo,
-                                            matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, CFG_EXCEED,
-                                            matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
-                                            MatmulPolicySelector<mmPolicyType>::template Result> &bmm2)
+template <LayOutTypeEnum layOutType, bool hasAtten, bool hasTopkMask, typename INPUT_T, typename T,
+          CubeFormat bmm1Format, MmPolicyType mmPolicyType>
+__aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<
+    layOutType, hasAtten, hasTopkMask, INPUT_T, T, bmm1Format,
+    mmPolicyType>::IterateBmm2(SplitSameABExtraInfo &extraInfo,
+                               matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, CFG_EXCEED,
+                                              matmul::MatmulCallBackFunc<nullptr, nullptr, nullptr>,
+                                              MatmulPolicySelector<mmPolicyType>::template Result> &bmm2)
 {
     int64_t bOffset = 0;
     int64_t n2Offset = 0;
@@ -1059,14 +1085,16 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
         // b,s2,n2,d
         uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s2SizeAcc) *
-            static_cast<uint64_t>(this->tilingData->inputParams.n2Size) * static_cast<uint64_t>(this->d2Size);
+                              static_cast<uint64_t>(this->tilingData->inputParams.n2Size) *
+                              static_cast<uint64_t>(this->d2Size);
         uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) * static_cast<uint64_t>(this->d2Size);
         bOffset = static_cast<int64_t>(bOffsetU64);
         n2Offset = static_cast<int64_t>(n2OffsetU64);
     }
 
     int64_t vCoreOffset = n2Offset + bOffset + s2Offset;
-    bmm2.SetOrgShape(extraInfo.cubeS1gRealSize, this->tilingData->inputParams.n2Size * this->d2Size, extraInfo.s2AlignedSize, extraInfo.s2AlignedSize, this->d2Size); // b,s2,n2,d
+    bmm2.SetOrgShape(extraInfo.cubeS1gRealSize, this->tilingData->inputParams.n2Size * this->d2Size,
+                     extraInfo.s2AlignedSize, extraInfo.s2AlignedSize, this->d2Size); // b,s2,n2,d
 
     bmm2.SetTensorA(this->stage1Res);
     bmm2.SetTensorB(this->valueGm[vCoreOffset]);
@@ -1074,8 +1102,8 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
         uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) * static_cast<uint64_t>(this->s1TotalSize);
         n2OffsetU64 = n2OffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->d2Size);
-        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) *
-            static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->d2Size);
+        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) * static_cast<uint64_t>(this->gSize) *
+                              static_cast<uint64_t>(this->d2Size);
         uint64_t s1gOffsetU64 =
             static_cast<uint64_t>(extraInfo.s1oIdx) * static_cast<uint64_t>(this->tilingData->coreParams.s1BaseSize);
         s1gOffsetU64 = s1gOffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->d2Size);

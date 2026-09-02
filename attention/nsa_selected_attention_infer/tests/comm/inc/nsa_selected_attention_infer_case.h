@@ -24,9 +24,10 @@
 #include "tests/utils/context.h"
 #include "nsa_selected_attention_infer_param.h"
 
-#define NSA_SELECT_ATTENTION_INFER_KERNEL_PARAM                                                                           \
-    (uint8_t *query, uint8_t *key, uint8_t *value, uint8_t *topkIndices, uint8_t *attenMask,             \
-    uint8_t *blockTable, uint8_t *actualQSeqLengths, uint8_t *actualKVSeqLengths, uint8_t *attentionOut, uint8_t *workspace, uint8_t *tiling)
+#define NSA_SELECT_ATTENTION_INFER_KERNEL_PARAM \
+    (uint8_t * query, uint8_t * key, uint8_t * value, uint8_t * topkIndices, uint8_t * attenMask, \
+     uint8_t * blockTable, uint8_t * actualQSeqLengths, uint8_t * actualKVSeqLengths, uint8_t * attentionOut, \
+     uint8_t * workspace, uint8_t * tiling)
 
 namespace ops::adv::tests::NsaSelectedAttentionInfer {
 class NsaSelectAttentionInferCase : public ops::adv::tests::utils::Case {
@@ -66,8 +67,8 @@ public:
 
     NsaSelectAttentionInferCase();
     NsaSelectAttentionInferCase(const char *name, bool enable, const char *dbgInfo, OpInfo incre,
-                             NsaSelectAttentionInferParam param,
-                             int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
+                                NsaSelectAttentionInferParam param,
+                                int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     bool Run() override;
     bool DoOpTiling(DoTilingParam &tilingParam);
 
@@ -84,5 +85,5 @@ protected:
     bool InitCurrentCasePtr() override;
 };
 
-}
+} // namespace ops::adv::tests::NsaSelectedAttentionInfer
 #endif // UTEST_NSA_SELECT_ATTENTION_INFER_CASE_H

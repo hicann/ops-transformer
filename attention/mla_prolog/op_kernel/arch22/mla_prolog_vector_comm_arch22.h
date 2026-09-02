@@ -16,7 +16,6 @@
 #ifndef MLA_PROLOG_VECTOR_COMM_ARCH22_H
 #define MLA_PROLOG_VECTOR_COMM_ARCH22_H
 
-
 #include "mla_prolog_comm_arch22.h"
 namespace MlaProlog {
 
@@ -367,7 +366,6 @@ __aicore__ inline void CastFP32ToINT8(const LocalTensor<O> outLocal, const Local
     PipeBarrier<PIPE_V>();
     Cast(outLocal, tmpHalf, RoundMode::CAST_TRUNC, cnt);
 }
-
 
 /**
  * @brief QuantPerChannel 同时对row行进行FP32到int8的per-channel量化操作。一行中的每一列用不同的量化参数。

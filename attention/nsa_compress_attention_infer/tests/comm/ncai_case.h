@@ -32,10 +32,10 @@ namespace ops::adv::tests::ncaInfer {
  */
 
 class NcaInferCase : public ops::adv::tests::utils::Case {
-using OpInfo = ops::adv::tests::utils::OpInfo;
-using Context = ops::adv::tests::utils::Context;
-using Tensor = ops::adv::tests::utils::Tensor;
-using TensorList = ops::adv::tests::utils::TensorList;
+    using OpInfo = ops::adv::tests::utils::OpInfo;
+    using Context = ops::adv::tests::utils::Context;
+    using Tensor = ops::adv::tests::utils::Tensor;
+    using TensorList = ops::adv::tests::utils::TensorList;
 
 public:
     class ncaInferParam {
@@ -48,7 +48,7 @@ public:
         int64_t G = 0;
         int64_t D = 0;
         int64_t N2 = 0;
-        
+
         // attr
         int64_t numHeads = 1;
         int64_t numKeyValueHeads = 1;
@@ -66,9 +66,9 @@ public:
         std::vector<int64_t> actualSelKvSeqLenOptionalLenList = {};
         ncaInferParam();
         ncaInferParam(int64_t pB, int64_t pS1, int64_t pS2, int64_t pN1, int64_t pG, int64_t pD, int64_t pN2,
-        int64_t pnumHeads, int64_t pnumKeyValueHeads, int64_t pselectBlockSize, 
-        int64_t pselectBlockCount,int64_t pcompressBlockSize,int64_t pcompressStride, float pscaleValue, 
-        std::string pInputLayout, int64_t ppageBlockSize, int64_t pSparseMode);
+                      int64_t pnumHeads, int64_t pnumKeyValueHeads, int64_t pselectBlockSize, int64_t pselectBlockCount,
+                      int64_t pcompressBlockSize, int64_t pcompressStride, float pscaleValue, std::string pInputLayout,
+                      int64_t ppageBlockSize, int64_t pSparseMode);
     };
     class DoTilingParam {
     public:
@@ -79,7 +79,8 @@ public:
         gert::Tensor *actSeqSelKVLenTensor = nullptr;
     };
 
-    Tensor query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional, actualCmpKvSeqLenOptional, actualSelKvSeqLenOptional, topkMaskOptional, output, topkIndicesOut;
+    Tensor query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional,
+        actualCmpKvSeqLenOptional, actualSelKvSeqLenOptional, topkMaskOptional, output, topkIndicesOut;
     OpInfo mOpInfo;
     Context mCtx;
     ncaInferParam mParam;
@@ -90,8 +91,9 @@ public:
     bool InitParam() override;
     bool InitOpInfo() override;
     bool InitCurrentCasePtr() override;
-    bool DoOpTiling(DoTilingParam& tilingParam);
-    template <class T> static bool InitTensor(Tensor &tensor, std::vector<T> &hostData)
+    bool DoOpTiling(DoTilingParam &tilingParam);
+    template <class T>
+    static bool InitTensor(Tensor &tensor, std::vector<T> &hostData)
     {
         if (hostData.empty()) {
             return true;
@@ -105,4 +107,4 @@ public:
     }
 };
 
-}
+} // namespace ops::adv::tests::ncaInfer

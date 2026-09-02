@@ -129,11 +129,11 @@ struct FuzzyBaseInfoParams { // 频繁使用的基础参数
 
 class FusedFloydAttentionGradTilingS1s2Bn2gs1s2 : public TilingBaseClass {
 public:
-    explicit FusedFloydAttentionGradTilingS1s2Bn2gs1s2(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-
-    }
+    explicit FusedFloydAttentionGradTilingS1s2Bn2gs1s2(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
     FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2 tilingData;
+
 protected:
     bool IsCapable() override;
     ge::graphStatus GetPlatformInfo() override;

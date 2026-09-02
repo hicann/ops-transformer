@@ -159,15 +159,16 @@ __aicore__ inline bool IsIncludeInvalidLine(uint16_t softMaxCheckRes, uint32_t b
         uint32_t bitRange = bitIdxB - bitIdxA + 1;
         uint32_t maxBitRange = SOFTMAX_CHECK_RES_BITS - bitIdxA;
         bitRange = Min(bitRange, maxBitRange);
-        uint16_t mask = (bitRange == SOFTMAX_CHECK_RES_BITS)
-                            ? SOFTMAX_CHECK_RES_DEFAULT_VALUE
-                            : static_cast<uint16_t>((static_cast<uint16_t>(1U) << bitRange) - 1);
+        uint16_t mask = (bitRange == SOFTMAX_CHECK_RES_BITS) ?
+                            SOFTMAX_CHECK_RES_DEFAULT_VALUE :
+                            static_cast<uint16_t>((static_cast<uint16_t>(1U) << bitRange) - 1);
         mask = static_cast<uint16_t>(mask << bitIdxA);
         return (softMaxCheckRes & mask);
     }
 }
 
-template <typename T> __aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
+template <typename T>
+__aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
 {
     if constexpr (IsSameType<T, float>::value) {
         uint32_t tmp1 = NEGATIVE_MIN_VAULE_FP32;
@@ -259,8 +260,8 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
         for (int64_t i = 0; i < 2; ++i) {
             for (int64_t j = 0; j < innerLoop; ++j) {
                 Copy(bmmResUb[outerIndex * outerBmmOffset + j * 128 + i * 8],
-                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize,
-                     repeatMaxTimes, repeatParams);
+                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize, repeatMaxTimes,
+                     repeatParams);
             }
             if (likely(innerRemain)) {
                 Copy(bmmResUb[outerIndex * outerBmmOffset + innerLoop * 128 + i * 8],
@@ -278,8 +279,8 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
             }
             if (likely(innerRemain)) {
                 Copy(bmmResUb[outerLoop * outerBmmOffset + innerLoop * 128 + i * 8],
-                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
-                     outerRemain, repeatParams);
+                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8, outerRemain,
+                     repeatParams);
             }
         }
     }

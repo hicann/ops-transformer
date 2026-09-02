@@ -49,10 +49,9 @@ __simd_vf__ void DequantVFImpl(__ubuf__ float *yAddr, __ubuf__ T *xAddr, __ubuf_
             AscendC::MicroAPI::LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
                 vregScalePerToken, scalePerTokenAddr + scaleOffset);
             if constexpr (!std::is_same<T, float>::value) {
-                AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(
-                    vregInput, xAddr + colOffset + rowOffset);
-                AscendC::MicroAPI::Cast<float, T, castTraitInt32ToFp32>(
-                    vregInputFp32, vregInput, fullMask);
+                AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(vregInput,
+                                                                                        xAddr + colOffset + rowOffset);
+                AscendC::MicroAPI::Cast<float, T, castTraitInt32ToFp32>(vregInputFp32, vregInput, fullMask);
             } else {
                 AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(vregInputFp32,
                                                                                         xAddr + colOffset + rowOffset);
@@ -78,8 +77,7 @@ __simd_vf__ void DequantVFImpl(__ubuf__ float *yAddr, __ubuf__ T *xAddr, __ubuf_
             if constexpr (!std::is_same<T, float>::value) {
                 AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(
                     vregInput, xAddr + dLoops * floatRepSize + rowOffset);
-                AscendC::MicroAPI::Cast<float, T, castTraitInt32ToFp32>(
-                    vregInputFp32, vregInput, tailMask);
+                AscendC::MicroAPI::Cast<float, T, castTraitInt32ToFp32>(vregInputFp32, vregInput, tailMask);
             } else {
                 AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(
                     vregInputFp32, xAddr + dLoops * floatRepSize + rowOffset);
@@ -107,8 +105,8 @@ __simd_vf__ void DequantVFImpl(__ubuf__ float *yAddr, __ubuf__ T *xAddr, __ubuf_
 template <typename T>
 __aicore__ inline void DequantVf(const LocalTensor<float> &outputLocal, const LocalTensor<T> &inputLocal,
                                  const LocalTensor<float> &scalePerChannelLocal,
-                                 const LocalTensor<float> &scalePerTokenLocal,
-                                 uint32_t row, uint32_t col, uint32_t stride)
+                                 const LocalTensor<float> &scalePerTokenLocal, uint32_t row, uint32_t col,
+                                 uint32_t stride)
 {
     __ubuf__ float *outputUb = (__ubuf__ float *)outputLocal.GetPhyAddr();
     __ubuf__ T *inputUb = (__ubuf__ T *)inputLocal.GetPhyAddr();

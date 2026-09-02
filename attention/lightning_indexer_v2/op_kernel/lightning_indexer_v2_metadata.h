@@ -9,9 +9,9 @@
  */
 
 /*!
-* \file lightning_indexer_v2_metadata.h
-* \brief
-*/
+ * \file lightning_indexer_v2_metadata.h
+ * \brief
+ */
 
 #ifndef LIGHTNING_INDEXER_V2_METADATA_H
 #define LIGHTNING_INDEXER_V2_METADATA_H
@@ -48,7 +48,7 @@ inline constexpr uint32_t LD_V2_WORKSPACE_NUM_INDEX = 4;
 inline constexpr uint32_t LD_V2_M_START_INDEX = 5;
 inline constexpr uint32_t LD_V2_M_NUM_INDEX = 6;
 
- /**
+/**
  * @brief 获取属性的绝对索引
  * @param coreIdx 核索引
  * @param metaIdx 元数据索引
@@ -67,13 +67,13 @@ __aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, b
 #endif
 
 namespace detail {
-    struct LiV2Metadata {
-        uint32_t liV2Metadata[AIC_CORE_MAX_NUM][LI_V2_METADATA_SIZE];
-        uint32_t ldV2Metadata[AIV_CORE_MAX_NUM][LD_V2_METADATA_SIZE];
-    };
+struct LiV2Metadata {
+    uint32_t liV2Metadata[AIC_CORE_MAX_NUM][LI_V2_METADATA_SIZE];
+    uint32_t ldV2Metadata[AIV_CORE_MAX_NUM][LD_V2_METADATA_SIZE];
 };
+}; // namespace detail
 
 static_assert(LI_V2_METADATA_TOTAL_SIZE * sizeof(LI_V2_METADATA_T) >= sizeof(detail::LiV2Metadata));
-};
+}; // namespace optiling
 
 #endif

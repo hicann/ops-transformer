@@ -60,43 +60,73 @@ public:
     }
 
     CATLASS_HOST_DEVICE
-    LongIndex GetOffset(TensorCoord const &coord) const { return stride_[0] * coord[0]; }
+    LongIndex GetOffset(TensorCoord const &coord) const
+    {
+        return stride_[0] * coord[0];
+    }
 
     /// Returns the layout of a tile.
     CATLASS_HOST_DEVICE
-    VectorLayout GetTileLayout(TensorCoord const &tileShape) const { return VectorLayout(tileShape, stride()); }
+    VectorLayout GetTileLayout(TensorCoord const &tileShape) const
+    {
+        return VectorLayout(tileShape, stride());
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
 private:
     /// Stride data member

@@ -535,5 +535,4 @@ __aicore__ inline void VecOp<NSAGT>::Process(const int64_t dyGmOffset, const int
     }
 }
 
-
 } // namespace NSAG_BASIC

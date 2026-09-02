@@ -62,8 +62,8 @@ __simd_vf__ void Conv1dNeedStateSingleTailConVF(__ubuf__ T *xAddr, __ubuf__ T *w
             MicroAPI::Add(yB32, yB32, mulB32, maskB32);
         }
         for (uint8_t xLoop = 0; xLoop < xSLen; xLoop++) {
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(weightB16, weightAddr + offset +
-                                                                                       (xLoop + stateSLen) * dimLen);
+            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                weightB16, weightAddr + offset + (xLoop + stateSLen) * dimLen);
             MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(xB16, xAddr + offset + xLoop * dimLen);
             MicroAPI::Cast<float, T, castTraitB162B32>(weightB32, weightB16, maskB32);
             MicroAPI::Cast<float, T, castTraitB162B32>(xB32, xB16, maskB32);
@@ -127,8 +127,8 @@ __simd_vf__ void Conv1dNeedStateSingleTailNoConVF(__ubuf__ T *xAddr, __ubuf__ T 
             MicroAPI::Add(yB32, yB32, mulB32, maskB32);
         }
         for (uint8_t xLoop = 0; xLoop < xSLen; xLoop++) {
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(weightB16, weightAddr + offset +
-                                                                                       (xLoop + stateSLen) * dimLen);
+            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                weightB16, weightAddr + offset + (xLoop + stateSLen) * dimLen);
             MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(xB16, xAddr + offset + xLoop * dimLen);
             MicroAPI::Cast<float, T, castTraitB162B32>(weightB32, weightB16, maskB32);
             MicroAPI::Cast<float, T, castTraitB162B32>(xB32, xB16, maskB32);

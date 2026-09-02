@@ -20,7 +20,6 @@
 #define MLA_EXTERN_C
 #endif
 
-namespace optiling {
-} // optiling
+namespace optiling {} // namespace optiling
 
 #endif

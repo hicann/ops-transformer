@@ -19,7 +19,6 @@
 #include "op_host/tiling_base.h"
 #include "op_host/tiling_type.h"
 
-
 namespace optiling {
 
 constexpr uint32_t CORE_LIST_NUM = 50;
@@ -62,7 +61,8 @@ struct TempParamsS1s2Bn2 {
 
 class FlashAttentionScoreGradTilingS1s2Bn2 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit FlashAttentionScoreGradTilingS1s2Bn2(gert::TilingContext *context) : Ops::Transformer::OpTiling::TilingBaseClass(context)
+    explicit FlashAttentionScoreGradTilingS1s2Bn2(gert::TilingContext *context)
+        : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         td_->reset();
     }
@@ -148,8 +148,7 @@ class FlashAttentionScoreGradTilingDeterministic : public FlashAttentionScoreGra
 public:
     explicit FlashAttentionScoreGradTilingDeterministic(gert::TilingContext *context)
         : FlashAttentionScoreGradTilingS1s2Bn2(context)
-    {
-    }
+    {}
 
 protected:
     bool IsCapable() override;

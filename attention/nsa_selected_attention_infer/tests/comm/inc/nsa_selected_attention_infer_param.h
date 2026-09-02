@@ -27,6 +27,7 @@ namespace ops::adv::tests::NsaSelectedAttentionInfer {
 class NsaSelectAttentionInferParam {
 public:
     using Tensor = ops::adv::tests::utils::Tensor;
+
 public:
     enum class LayoutType {
         BSH,
@@ -57,16 +58,19 @@ public:
     int64_t numtokens = 1;
 
     std::vector<int32_t> topkData = {};
-    std::vector<int32_t> blocktableData ={};
+    std::vector<int32_t> blocktableData = {};
 
     /* 输入输出 */
     Tensor query, key, value, blocktable, actualQSeqLengths, actualKvSeqLengths, topkIndices, attentionOut;
 
 public:
     NsaSelectAttentionInferParam() = default;
-    NsaSelectAttentionInferParam(int64_t pBatchSize, int64_t pQSeqSize, int64_t pHeadSize, int64_t pHeadDim, int64_t pMaxBlockNumPerBatch,
-                  int64_t pBlockSize, int64_t pSeqSize, int64_t pHeadDimV, int64_t pHeadSizeV, int64_t pSelectedBlockSize, int64_t pSelectedBlockCount, int64_t pSparseMode,
-                  float pScaleValue, std::string pInputLayout, ge::DataType pOptionalDataType, std::vector<int64_t> pActualSeqQLenList, std::vector<int64_t> pActualSeqKVLenList, int64_t numtokens);
+    NsaSelectAttentionInferParam(int64_t pBatchSize, int64_t pQSeqSize, int64_t pHeadSize, int64_t pHeadDim,
+                                 int64_t pMaxBlockNumPerBatch, int64_t pBlockSize, int64_t pSeqSize, int64_t pHeadDimV,
+                                 int64_t pHeadSizeV, int64_t pSelectedBlockSize, int64_t pSelectedBlockCount,
+                                 int64_t pSparseMode, float pScaleValue, std::string pInputLayout,
+                                 ge::DataType pOptionalDataType, std::vector<int64_t> pActualSeqQLenList,
+                                 std::vector<int64_t> pActualSeqKVLenList, int64_t numtokens);
 
     virtual ~NsaSelectAttentionInferParam() = default;
 
@@ -80,7 +84,8 @@ public:
     void InitTopkDataForSelectedBlockSize();
     void InitTopkDataOtherLayout();
     void InitTopkDataForS1();
-    template <class T> static bool InitTensor(Tensor &tensor, std::vector<T> &hostData)
+    template <class T>
+    static bool InitTensor(Tensor &tensor, std::vector<T> &hostData)
     {
         if (hostData.empty()) {
             return true;
@@ -94,5 +99,5 @@ public:
     }
 };
 
-}
+} // namespace ops::adv::tests::NsaSelectedAttentionInfer
 #endif // UTEST_NSA_SELECT_ATTENTION_INFER_PARAM_H

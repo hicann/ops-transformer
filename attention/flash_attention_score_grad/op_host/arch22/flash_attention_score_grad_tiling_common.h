@@ -236,7 +236,8 @@ inline uint32_t AlignData(const uint32_t a, const uint32_t b)
     return (a + b - 1U) / b * b;
 }
 
-template <class T> inline T AlignTo(const T n, const T alignSize)
+template <class T>
+inline T AlignTo(const T n, const T alignSize)
 {
     if (alignSize == 0) {
         return 0;
@@ -244,7 +245,8 @@ template <class T> inline T AlignTo(const T n, const T alignSize)
     return (n + alignSize - 1) & (~(alignSize - 1));
 }
 
-template <typename T> inline T AlignUp(T num1, T num2)
+template <typename T>
+inline T AlignUp(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -286,7 +288,7 @@ TILING_DATA_FIELD_DEF(uint32_t, kRopePreBlockTotal);
 TILING_DATA_FIELD_DEF(uint32_t, kRopePreBlockTail);
 TILING_DATA_FIELD_DEF(uint32_t, vPreBlockFactor);
 TILING_DATA_FIELD_DEF(uint32_t, vPreBlockTotal);
-TILING_DATA_FIELD_DEF(uint32_t, vPreBlockTail); 
+TILING_DATA_FIELD_DEF(uint32_t, vPreBlockTail);
 TILING_DATA_FIELD_DEF(uint32_t, maskCoreNum);
 TILING_DATA_FIELD_DEF(uint32_t, castBufferLen);
 TILING_DATA_FIELD_DEF(uint32_t, outputBufferLen);
@@ -298,7 +300,7 @@ TILING_DATA_FIELD_DEF(uint32_t, maskTailCoreLoop);
 TILING_DATA_FIELD_DEF(uint32_t, maskTailCoreLastLoopNum);
 TILING_DATA_FIELD_DEF(uint32_t, dropoutIsDivisibleBy8);
 TILING_DATA_FIELD_DEF(uint64_t, dropBeginAddr);
-TILING_DATA_FIELD_DEF(uint32_t, reserved); 
+TILING_DATA_FIELD_DEF(uint32_t, reserved);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PreParamsOp, PreParams)
 

@@ -75,8 +75,7 @@ class IndexerQuantCacheTiling {
 public:
     explicit IndexerQuantCacheTiling(gert::TilingContext *tilingContext)
         : context_(tilingContext)
-    {
-    }
+    {}
     ~IndexerQuantCacheTiling() = default;
 
     ge::graphStatus GetPlatformInfo();

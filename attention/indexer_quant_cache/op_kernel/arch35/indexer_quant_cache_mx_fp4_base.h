@@ -50,7 +50,10 @@ constexpr uint16_t NEW_MANTISSA_MAXFP4 = 0x0008;
 constexpr uint16_t FP8_E8M0_NAN_VAL_MAXFP4 = 0x00ff;
 constexpr uint16_t FP8_E8M0_SPECIAL_MIN_MAXFP4 = 0x0040;
 
-__aicore__ inline uint32_t ScaleRowAlignMxFp4(uint32_t scaleCol) { return ((scaleCol + 63U) / 64U) * 64U; }
+__aicore__ inline uint32_t ScaleRowAlignMxFp4(uint32_t scaleCol)
+{
+    return ((scaleCol + 63U) / 64U) * 64U;
+}
 
 template <typename T, typename U>
 __simd_callee__ inline void FP16ConvertMXFP4(AscendC::Reg::RegTensor<half> &output,

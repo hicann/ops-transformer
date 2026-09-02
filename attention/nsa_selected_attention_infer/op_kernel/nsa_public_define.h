@@ -45,8 +45,8 @@ enum class LAYOUT {
 constexpr SoftmaxConfig IFA_SOFTMAX_FLASHV2_CFG = {false}; // 将isCheckTiling设置为false
 
 template <typename Q_T, typename KV_T, typename OUT_T, typename ORIGIN_T, const bool PAGE_ATTENTION = false,
-        const bool FLASH_DECODE = false, LAYOUT LAYOUT_T = LAYOUT::BSH, const uint8_t ANTIQUANT_MODE = 0,
-        const bool SHARED_PREFIX = false, typename... Args>
+          const bool FLASH_DECODE = false, LAYOUT LAYOUT_T = LAYOUT::BSH, const uint8_t ANTIQUANT_MODE = 0,
+          const bool SHARED_PREFIX = false, typename... Args>
 struct NSAType {
     using queryType = Q_T;
     using kvType = KV_T;
@@ -60,7 +60,7 @@ struct NSAType {
 };
 
 __aicore__ inline void RowMuls(LocalTensor<float> dstUb, LocalTensor<float> src0Ub, LocalTensor<float> src1Ub,
-                            uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
+                               uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // muls by row, 每行的元素乘以相同的元素
     // dstUb[i, (j * 8) : (j * 8 + 7)] = src0Ub[i, (j * 8) : (j * 8 + 7)] * src1Ub[i, 0 : 7]
@@ -106,7 +106,7 @@ __aicore__ inline void RowMuls(LocalTensor<float> dstUb, LocalTensor<float> src0
 }
 
 __aicore__ inline void RowDivs(LocalTensor<float> dstUb, LocalTensor<float> src0Ub, LocalTensor<float> src1Ub,
-                            uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
+                               uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // divs by row, 每行的元素除以相同的元素
     // dstUb[i, (j * 8) : (j * 8 + 7)] = src0Ub[i, (j * 8) : (j * 8 + 7)] / src1Ub[i, 0 : 7]

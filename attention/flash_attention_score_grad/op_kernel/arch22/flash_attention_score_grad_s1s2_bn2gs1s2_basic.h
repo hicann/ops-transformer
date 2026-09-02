@@ -137,8 +137,9 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::CubePro
             if (cube23_mix_flag) {
                 AscendC::WaitEvent(VEC2CUBE);
                 SetFlag();
-                cubeOp.Cube23Process(cubeAddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm1WorkSpaceAddr, (__gm__ TYPE *)key,
-                                    (__gm__ TYPE *)query, (__gm__ float *)dqWorkSpaceAddr, (__gm__ float *)dkWorkSpaceAddr);
+                cubeOp.Cube23Process(cubeAddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm1WorkSpaceAddr,
+                                     (__gm__ TYPE *)key, (__gm__ TYPE *)query, (__gm__ float *)dqWorkSpaceAddr,
+                                     (__gm__ float *)dkWorkSpaceAddr);
                 WaitFlag();
                 SetFlag();
                 cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm2WorkSpaceAddr, (__gm__ TYPE *)dy,
@@ -150,8 +151,8 @@ __aicore__ inline void FlashAttentionScoreGradBasic<TYPE, TILING_CLASS>::CubePro
                                     (__gm__ float *)dqWorkSpaceAddr);
                 WaitFlag();
                 SetFlag();
-                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm1WorkSpaceAddr, (__gm__ TYPE *)query,
-                                (__gm__ float *)dkWorkSpaceAddr);
+                cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm1WorkSpaceAddr,
+                                    (__gm__ TYPE *)query, (__gm__ float *)dkWorkSpaceAddr);
                 cubeOp.Cube3Process(cube3AddrInfo[(taskId - 1) % 2], (__gm__ TYPE *)mm2WorkSpaceAddr, (__gm__ TYPE *)dy,
                                     (__gm__ float *)dvWorkSpaceAddr);
                 WaitFlag();

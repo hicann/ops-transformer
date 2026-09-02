@@ -45,7 +45,7 @@ public:
     static constexpr uint64_t L0_BUF_NUM = 2;
 
     static constexpr uint32_t KEY_MTE1_MTE2_EVENT = EVENT_ID2;
-    static constexpr uint32_t QUERY_MTE1_MTE2_EVENT = EVENT_ID5;         // KEY_MTE1_MTE2_EVENT + KEY_BUF_NUM;
+    static constexpr uint32_t QUERY_MTE1_MTE2_EVENT = EVENT_ID5; // KEY_MTE1_MTE2_EVENT + KEY_BUF_NUM;
     static constexpr uint32_t M_MTE1_EVENT = EVENT_ID3;
 
     static constexpr uint32_t MTE2_MTE1_EVENT = EVENT_ID2;
@@ -128,10 +128,10 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::InitBuffers(TPipe *pipe
 }
 
 template <typename LIT>
-__aicore__ inline void
-LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm,
-                                   const GlobalTensor<K_T> &keyGm,
-                                   const GlobalTensor<Q_T> &queryGm, const GlobalTensor<float> &mm1ResGm)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm,
+                                                                             const GlobalTensor<K_T> &keyGm,
+                                                                             const GlobalTensor<Q_T> &queryGm,
+                                                                             const GlobalTensor<float> &mm1ResGm)
 {
     blkTableGm_ = blkTableGm;
     keyGm_ = keyGm;
@@ -151,7 +151,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
             s2GmOffset + S2_BASIC_BLOCK > s2ProcessSize ? s2ProcessSize - s2GmOffset : S2_BASIC_BLOCK;
         if (PAGE_ATTENTION) {
             KeyNd2NzForPA(s2L1RealSize, s2GmBaseOffset + s2GmOffset, runInfo);
-        }else {
+        } else {
             KeyNd2Nz(s2L1RealSize, s2GmOffset, runInfo);
         }
 
@@ -205,7 +205,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                    const LICommon::RunInfo &runInfo)
+                                                                  const LICommon::RunInfo &runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -242,7 +242,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1R
 // blkNum, blkSize, N2, D
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                    const LICommon::RunInfo &runInfo)
+                                                                       const LICommon::RunInfo &runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -284,7 +284,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t 
 // batch, s1, n2, g, d
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
-                                                 const LICommon::RunInfo &runInfo)
+                                                                    const LICommon::RunInfo &runInfo)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -301,9 +301,9 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1g
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s1gGmOffset,
-                                                     uint64_t s1gL1Offset, uint64_t s1gL1RealSize,
-                                                     uint64_t s1gL0RealSize, const LICommon::RunInfo &runInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s1gGmOffset, uint64_t s1gL1Offset,
+                                                                        uint64_t s1gL1RealSize, uint64_t s1gL0RealSize,
+                                                                        const LICommon::RunInfo &runInfo)
 {
     LoadData3DParamsV2<Q_T> loadData3DParams;
     // SetFmatrixParams
@@ -338,9 +338,9 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s2L1Offset,
-                                                   uint64_t s2L1RealSize, uint64_t s2L0RealSize,
-                                                   const LICommon::RunInfo &runInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s2L1Offset, uint64_t s2L1RealSize,
+                                                                      uint64_t s2L0RealSize,
+                                                                      const LICommon::RunInfo &runInfo)
 {
     uint64_t keyL1Offset = s2L1Offset >= S2_BASIC_BLOCK_L0 ? S2_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 : 0;
     LoadData2DParams loadData2DParams;
@@ -355,7 +355,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::ComuteL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                const LICommon::RunInfo &runInfo)
+                                                                   const LICommon::RunInfo &runInfo)
 {
     MmadParams mmadParams;
     mmadParams.m = CeilAlign(s1gL0RealSize, BLOCK_CUBE);
@@ -372,9 +372,9 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComuteL0c(uint64_t s1gL
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::Fixp(uint64_t s1gGmOffset,
-                                           uint64_t s2GmOffset, uint64_t s1gL0RealSize,
-                                           uint64_t s2L0RealSize, const LICommon::RunInfo &runInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::Fixp(uint64_t s1gGmOffset, uint64_t s2GmOffset,
+                                                              uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
+                                                              const LICommon::RunInfo &runInfo)
 {
     AscendC::DataCopyCO12DstParams intriParams;
     intriParams.mSize = CeilAlign(s1gL0RealSize, BLOCK_CUBE);

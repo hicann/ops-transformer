@@ -16,11 +16,10 @@
  * l0_c： dimG * selectedBlockSize * sizof(T1) (0-4k / 64k-68k)
  */
 
-
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube1Process(const int64_t queryGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset,
-                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube1Process(
+    const int64_t queryGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx)
 {
     LocalTensor<T1> l1_query_tensor = mmPingPongIdx ? l1_query_ping_tensor : l1_query_pong_tensor;
     LocalTensor<T1> l1_key_tensor = mmPingPongIdx ? l1_key_ping_tensor : l1_key_pong_tensor;

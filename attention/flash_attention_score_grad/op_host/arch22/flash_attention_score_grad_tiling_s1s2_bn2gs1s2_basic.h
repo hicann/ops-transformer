@@ -75,10 +75,9 @@ struct MultiHeadLatentAttentionGradCompileInfo {
 
 class FlashAttentionScoreGraTilingMla : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit FlashAttentionScoreGraTilingMla(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-        
-    }
+    explicit FlashAttentionScoreGraTilingMla(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
     FlashAttentionGradMlaTilingData *tilingData = context_->GetTilingData<FlashAttentionGradMlaTilingData>();
 
 protected:

@@ -36,9 +36,7 @@ constexpr uint32_t DIM_ALIGN = 64;
 template <typename T>
 class FusedCausalConv1dCutBSH {
 public:
-    __aicore__ inline FusedCausalConv1dCutBSH()
-    {
-    }
+    __aicore__ inline FusedCausalConv1dCutBSH() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR queryStartLoc,
                                 GM_ADDR cacheIndices, GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
@@ -334,11 +332,12 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::ParseTiling(const FusedCausal
 }
 
 template <typename T>
-__aicore__ inline void
-FusedCausalConv1dCutBSH<T>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates, GM_ADDR queryStartLoc,
-                                 GM_ADDR cacheIndices, GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
-                                 GM_ADDR blockIdxFirst, GM_ADDR blockIdxLast, GM_ADDR initialStateIdx, GM_ADDR y,
-                                 GM_ADDR workspace, const FusedCausalConv1dCutBSHTilingData *tiling)
+__aicore__ inline void FusedCausalConv1dCutBSH<T>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR convStates,
+                                                        GM_ADDR queryStartLoc, GM_ADDR cacheIndices,
+                                                        GM_ADDR numAcceptedToken, GM_ADDR numComputedTokens,
+                                                        GM_ADDR blockIdxFirst, GM_ADDR blockIdxLast,
+                                                        GM_ADDR initialStateIdx, GM_ADDR y, GM_ADDR workspace,
+                                                        const FusedCausalConv1dCutBSHTilingData *tiling)
 {
     (void)y; // y may be unused when inplace_==true; suppress warning
     ParseTiling(tiling);
@@ -1026,11 +1025,10 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::Compute(uint32_t curBsStart, 
 }
 
 template <typename T>
-__aicore__ inline void
-FusedCausalConv1dCutBSH<T>::WriteCacheToStates(LocalTensor<T> &cacheLocal, LocalTensor<T> &xLocal, uint32_t chunkEnd,
-                                               uint32_t curBatchLen, uint32_t cachedStateLen, bool hasCacheLocal,
-                                               int64_t writeCIdx, uint32_t dimStart, uint32_t dimSize,
-                                               uint32_t dimBlocks, uint32_t cacheSkipBlocks, uint64_t batchGmEnd)
+__aicore__ inline void FusedCausalConv1dCutBSH<T>::WriteCacheToStates(
+    LocalTensor<T> &cacheLocal, LocalTensor<T> &xLocal, uint32_t chunkEnd, uint32_t curBatchLen,
+    uint32_t cachedStateLen, bool hasCacheLocal, int64_t writeCIdx, uint32_t dimStart, uint32_t dimSize,
+    uint32_t dimBlocks, uint32_t cacheSkipBlocks, uint64_t batchGmEnd)
 {
     // ---- Decompose: how many rows from cache vs from x ----
     uint32_t cFromCache, cFromX;

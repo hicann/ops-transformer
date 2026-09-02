@@ -22,37 +22,39 @@ using namespace AscendC;
 template <class TILING_TYPE, bool DETERMINISTIC_ENABLE>
 class VectorInitOuputDet {
 public:
-  __aicore__ inline VectorInitOuputDet() {}
-  __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
-                              __gm__ uint8_t *workspace, const TILING_TYPE *orgTilingData);
-  __aicore__ inline void Process();
+    __aicore__ inline VectorInitOuputDet() {}
+    __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
+                                __gm__ uint8_t *workspace, const TILING_TYPE *orgTilingData);
+    __aicore__ inline void Process();
 
-  TPipe *pipe;
-  GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm;
+    TPipe *pipe;
+    GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm;
 
-  const TILING_TYPE *tilingData;
+    const TILING_TYPE *tilingData;
 
-  uint32_t cBlockIdx;
-  // query
-  uint32_t qPreBlockFactor;
-  uint32_t qPreBlockTotal;
-  uint32_t qPreBlockTail;
-  uint32_t kvPreBlockFactor;
-  uint32_t kvPreBlockTotal;
-  uint32_t kvPreBlockTail;
+    uint32_t cBlockIdx;
+    // query
+    uint32_t qPreBlockFactor;
+    uint32_t qPreBlockTotal;
+    uint32_t qPreBlockTail;
+    uint32_t kvPreBlockFactor;
+    uint32_t kvPreBlockTotal;
+    uint32_t kvPreBlockTail;
 
-  int64_t initdqSize;
-  int64_t dqOffset;
-  int64_t initdkSize;
-  int64_t dkvOffset;
-  uint32_t dqPostAbsorb;
+    int64_t initdqSize;
+    int64_t dqOffset;
+    int64_t initdkSize;
+    int64_t dkvOffset;
+    uint32_t dqPostAbsorb;
 };
 
 template <class TILING_TYPE, bool DETERMINISTIC_ENABLE>
 __aicore__ inline void VectorInitOuputDet<TILING_TYPE, DETERMINISTIC_ENABLE>::Init(TPipe *pipe_in, __gm__ uint8_t *dq,
-                                                                                __gm__ uint8_t *dk, __gm__ uint8_t *dv,
-                                                                                __gm__ uint8_t *workspace,
-                                                                                const TILING_TYPE *orgTilingData) {
+                                                                                   __gm__ uint8_t *dk,
+                                                                                   __gm__ uint8_t *dv,
+                                                                                   __gm__ uint8_t *workspace,
+                                                                                   const TILING_TYPE *orgTilingData)
+{
     cBlockIdx = GetBlockIdx();
 
     tilingData = orgTilingData;
@@ -72,12 +74,12 @@ __aicore__ inline void VectorInitOuputDet<TILING_TYPE, DETERMINISTIC_ENABLE>::In
     int64_t kvPreTailNumTmp = tilingData->basicDetTensorTilingData.kvSize % kvPreBlockFactor;
     kvPreBlockTail = kvPreTailNumTmp == 0 ? kvPreBlockFactor : kvPreTailNumTmp;
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + 
-                                    tilingData->basicDetTensorTilingData.dqWorkSpaceOffset / sizeof(float));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + 
-                                    tilingData->basicDetTensorTilingData.dkWorkSpaceOffset / sizeof(float));
-    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + 
-                                    tilingData->basicDetTensorTilingData.dvWorkSpaceOffset / sizeof(float));
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  tilingData->basicDetTensorTilingData.dqWorkSpaceOffset / sizeof(float));
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  tilingData->basicDetTensorTilingData.dkWorkSpaceOffset / sizeof(float));
+    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  tilingData->basicDetTensorTilingData.dvWorkSpaceOffset / sizeof(float));
 
     initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
     dqOffset = ((int64_t)cBlockIdx) * qPreBlockFactor;
@@ -86,8 +88,9 @@ __aicore__ inline void VectorInitOuputDet<TILING_TYPE, DETERMINISTIC_ENABLE>::In
 }
 
 template <class TILING_TYPE, bool DETERMINISTIC_ENABLE>
-__aicore__ inline void VectorInitOuputDet<TILING_TYPE, DETERMINISTIC_ENABLE>::Process() {
-  // process clear dq dk dv workspace
+__aicore__ inline void VectorInitOuputDet<TILING_TYPE, DETERMINISTIC_ENABLE>::Process()
+{
+    // process clear dq dk dv workspace
     if (dqPostAbsorb == 0 && g_coreType == AIV && cBlockIdx < qPreBlockTotal) {
         InitOutput<float>(dqWorkSpaceGm[dqOffset], initdqSize, 0);
     }
@@ -98,4 +101,4 @@ __aicore__ inline void VectorInitOuputDet<TILING_TYPE, DETERMINISTIC_ENABLE>::Pr
     }
 }
 
-#endif  // FLASH_ATTENTION_SCORE_GRAD_BASIC_DET_PRE_KERNEL_H_
+#endif // FLASH_ATTENTION_SCORE_GRAD_BASIC_DET_PRE_KERNEL_H_

@@ -188,7 +188,10 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
         Params() = default;
 
         CATLASS_HOST_DEVICE
-        Params(float scalar) { scale = scalar; }
+        Params(float scalar)
+        {
+            scale = scalar;
+        }
     };
     Params params;
 

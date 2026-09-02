@@ -20,7 +20,7 @@
 
 namespace optiling {
 namespace flash_attn {
-//参考训练算子公共info
+// 参考训练算子公共info
 struct FlashAttnCompileInfo {
     uint32_t aivNum;
     uint32_t aicNum;

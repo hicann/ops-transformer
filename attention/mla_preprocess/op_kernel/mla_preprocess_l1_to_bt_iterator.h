@@ -15,19 +15,13 @@
 // Partial specialization for V220
 template <typename DataType>
 struct l1_to_bt<ArchType::ASCEND_V220, DataType> {
-    __aicore__ l1_to_bt(uint64_t dst,
-                        const AscendC::LocalTensor<DataType> &src,
-                        uint16_t convControl,
-                        uint16_t nBurst,
-                        uint16_t lenBurst,
-                        uint16_t srcGap,
-                        uint16_t dstGap)
+    __aicore__ l1_to_bt(uint64_t dst, const AscendC::LocalTensor<DataType> &src, uint16_t convControl, uint16_t nBurst,
+                        uint16_t lenBurst, uint16_t srcGap, uint16_t dstGap)
     {
         AscendC::LocalTensor<DataType> dstTensor;
         dstTensor.InitBuffer(dst, nBurst * lenBurst);
         dstTensor.address_.logicPos = static_cast<uint8_t>(AscendC::TPosition::C2);
-        AscendC::DataCopy(dstTensor,
-                          src,
+        AscendC::DataCopy(dstTensor, src,
                           AscendC::DataCopyParams(nBurst,   // nBurst
                                                   lenBurst, // lenBurst
                                                   srcGap,   // srcGap

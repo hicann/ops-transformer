@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- #ifndef ARCH35_FLASH_ATTENTION_SCORE_TILING_REGBASE_H_
- #define ARCH35_FLASH_ATTENTION_SCORE_TILING_REGBASE_H_
+#ifndef ARCH35_FLASH_ATTENTION_SCORE_TILING_REGBASE_H_
+#define ARCH35_FLASH_ATTENTION_SCORE_TILING_REGBASE_H_
 
 #include <numeric>
 #include <alog_pub.h>
@@ -145,7 +145,7 @@ enum class ImplMode : uint8_t {
 
 enum class PseType : uint8_t {
     PSE_OUTER_MUL_ADD_TYPE = 0, // v2 default
-    PSE_OUTER_ADD_MUL_TYPE, // v1 current usage
+    PSE_OUTER_ADD_MUL_TYPE,     // v1 current usage
     PSE_INNER_MUL_ADD_TYPE,
     PSE_INNER_MUL_ADD_SQRT_TYPE,
     PSE_INVALID_TYPE,
@@ -215,8 +215,8 @@ struct FACompileInfoCommon {
 };
 
 enum class SplitCoreMode : uint8_t {
-    SQ_SINGLE_CORE_FIRST = 0,   // 传统分核
-    SQ_MULTI_CORE_FIRST = 1,    // 全新分核：对于N和S较大场景，采取顺序分配或者两两配对的分核方式；
+    SQ_SINGLE_CORE_FIRST = 0, // 传统分核
+    SQ_MULTI_CORE_FIRST = 1, // 全新分核：对于N和S较大场景，采取顺序分配或者两两配对的分核方式；
 };
 
 template <typename T>
@@ -270,7 +270,8 @@ static auto CalcTailSize(T num1, T num2) -> T
 
 class FlashAttentionScoreTilingRegbase : public TilingBaseClass {
 public:
-    explicit FlashAttentionScoreTilingRegbase(gert::TilingContext *context) : TilingBaseClass(context)
+    explicit FlashAttentionScoreTilingRegbase(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {
         Reset();
     }
@@ -283,7 +284,8 @@ public:
     }
 
 protected:
-    void Reset() {
+    void Reset()
+    {
         bmmDtype = matmul_tiling::DataType::DT_FLOAT;
         bmm1OutDtype = matmul_tiling::DataType::DT_FLOAT;
         bmm2OutDtype = matmul_tiling::DataType::DT_FLOAT;
@@ -359,7 +361,8 @@ protected:
     uint64_t GetTilingKey() const override = 0;
     // 6、计算Workspace 大小
     ge::graphStatus GetWorkspaceSize() override = 0;
-    // 7、保存Tiling数据，// 由于这个类中不保存TilingData，子类中需要调用这个类的PostTiling并额外设置RawTilingData的DataSize
+    // 7、保存Tiling数据，//
+    // 由于这个类中不保存TilingData，子类中需要调用这个类的PostTiling并额外设置RawTilingData的DataSize
     ge::graphStatus PostTiling() override;
 
     bool GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t> &res, int64_t &actualLen) const;
@@ -383,8 +386,7 @@ protected:
                                        const gert::Shape &attenMaskStorageShape);
     bool Analyze2DimAttenOptionalInput(AttenMaskShapeType &attenMaskShapeType,
                                        const gert::Shape &attenMaskStorageShape);
-    bool AnalyzeAttenOptionalInputDimNumLimit(const gert::Shape &attenMaskStorageShape,
-                                              size_t attenMaskDimNum);
+    bool AnalyzeAttenOptionalInputDimNumLimit(const gert::Shape &attenMaskStorageShape, size_t attenMaskDimNum);
     bool AnalyzeAttenOptionalInput();
     bool AnalyzeDropOptionalInput();
     bool AnalyzeFp8OptionalInput();
@@ -405,8 +407,8 @@ protected:
     virtual void SetSparseParamsRegbase(int64_t maxCoreNum);
     virtual bool SetPseAlibiParamsRegbase();
     virtual bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray, int64_t bIdx);
-    virtual bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, MultiCoreParamsRegbase &multiCoreParamsRegbase,
-                                   int64_t maxCoreNum);
+    virtual bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray,
+                                   MultiCoreParamsRegbase &multiCoreParamsRegbase, int64_t maxCoreNum);
     void SetPrefixSparseStartIdx(const std::vector<std::vector<int64_t>> &sparseValidArray,
                                  MultiCoreParamsRegbase &multiCoreParamsRegbase, int64_t maxCoreNum);
     int64_t PrintSparseMaxMinLoadPerCore(const std::vector<int64_t> &sparseValidArray, int64_t *sparseStartIdx,
@@ -480,7 +482,7 @@ protected:
     int64_t thresholdS2Size = std::numeric_limits<int64_t>::max();
     int64_t firstFullLoadS1OuterIdx = -1;
     SplitCoreMode splitCoreMode = SplitCoreMode::SQ_SINGLE_CORE_FIRST;
-    uint64_t l2CacheSize = 134217728;    // 128M
+    uint64_t l2CacheSize = 134217728; // 128M
 
     const char *templateName = "base";
     const char *opName;
@@ -500,7 +502,8 @@ protected:
 
     DTemplateType dTemplateType = DTemplateType::DTEMPLATEBOTTOM;
     DTemplateType dVTemplateType = DTemplateType::DTEMPLATEBOTTOM;
-    FlashAttentionScoreSimplifiedTilingData *tilingData = context_->GetTilingData<FlashAttentionScoreSimplifiedTilingData>();
+    FlashAttentionScoreSimplifiedTilingData *tilingData =
+        context_->GetTilingData<FlashAttentionScoreSimplifiedTilingData>();
     InputParamsRegbase *inputParamsRegbase_ = &tilingData->inputParamsRegbase;
     MultiCoreParamsRegbase *multiCoreParamsRegbase_ = &tilingData->multiCoreParamsRegbase;
     DropmaskParamsRegbase *dropmaskParamsRegbase_ = &tilingData->dropmaskParamsRegbase;

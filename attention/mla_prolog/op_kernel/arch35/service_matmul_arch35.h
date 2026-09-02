@@ -22,8 +22,7 @@ namespace MlaProlog {
 
 constexpr uint8_t UNIT_FLAG_DISABLE = 0;  // 0: disable: 不配置unitFlag
 constexpr uint8_t UNIT_FLAG_CHECK = 0b10; // 2: enable: 将mmadParams.unitFlag设置为 0b10
-constexpr uint8_t UNIT_FLAG_SET = 0b11;   // 3: enable: 在k的最后一轮循环，会将mmadParams.unitFlag设置为 0b11
-
+constexpr uint8_t UNIT_FLAG_SET = 0b11; // 3: enable: 在k的最后一轮循环，会将mmadParams.unitFlag设置为 0b11
 
 /**
  * @brief Struct to encapsulate all local tensor objects for matrix multiplication
@@ -162,9 +161,9 @@ __aicore__ inline void LoadL1AAndScale(const GlobalTensor<T> &tensorAGm, const G
     dn2Nzparam.nValue = nInput / FP8_TWO; // 单个DN矩阵的列数N, 单位为元素个数
     dn2Nzparam.dValue = mInput;           // 单个DN矩阵的实际行数D, 单位为元素个数
     dn2Nzparam.srcDnMatrixStride = 0;     // 相邻DN矩阵起始地址之间的偏移, 单位为元素个数
-    dn2Nzparam.srcDValue = srcDValue;     // 同一个DN矩阵中相邻行起始地址之间的偏移, 单位为元素个数
+    dn2Nzparam.srcDValue = srcDValue; // 同一个DN矩阵中相邻行起始地址之间的偏移, 单位为元素个数
     dn2Nzparam.dstNzC0Stride =
-        nInput / FP8_TWO;        // 来自DN矩阵中同一列的相邻两个block在NZ矩阵中起始地址间的偏移，单位为block(32B)个数
+        nInput / FP8_TWO; // 来自DN矩阵中同一列的相邻两个block在NZ矩阵中起始地址间的偏移，单位为block(32B)个数
     dn2Nzparam.dstNzNStride = 1; // 转换为NZ矩阵后，DN中相邻两行在NZ矩阵中起始地址之间的偏移，单位为元素个数
     dn2Nzparam.dstNzMatrixStride = dn2Nzparam.nValue; // 两个NZ矩阵，起始地址之间的偏移，单位为block个数
     DataCopy(bL1Tensor[scaleAInL1BOffset / FP8_TWO], tensorScaleGmCast, dn2Nzparam);
@@ -201,12 +200,12 @@ __aicore__ inline void LoadL1BAndScale(const GlobalTensor<T> &tensorBGm, const G
 
     Dn2NzParams dn2Nzparam;
     dn2Nzparam.dnNum = 1;
-    dn2Nzparam.nValue = nInput / FP8_TWO;    // 单个DN矩阵的列数N, 单位为元素个数
-    dn2Nzparam.dValue = nL1Size;             // 单个DN矩阵的实际行数D, 单位为元素个数
-    dn2Nzparam.srcDnMatrixStride = 0;        // 相邻DN矩阵起始地址之间的偏移, 单位为元素个数
+    dn2Nzparam.nValue = nInput / FP8_TWO; // 单个DN矩阵的列数N, 单位为元素个数
+    dn2Nzparam.dValue = nL1Size;          // 单个DN矩阵的实际行数D, 单位为元素个数
+    dn2Nzparam.srcDnMatrixStride = 0;     // 相邻DN矩阵起始地址之间的偏移, 单位为元素个数
     dn2Nzparam.srcDValue = nInput / FP8_TWO; // 同一个DN矩阵中相邻行起始地址之间的偏移, 单位为元素个数
     dn2Nzparam.dstNzC0Stride =
-        dn2Nzparam.srcDValue;    // 来自DN矩阵中同一列的相邻两个block在NZ矩阵中起始地址间的偏移，单位为block(32B)个数
+        dn2Nzparam.srcDValue; // 来自DN矩阵中同一列的相邻两个block在NZ矩阵中起始地址间的偏移，单位为block(32B)个数
     dn2Nzparam.dstNzNStride = 1; // 转换为NZ矩阵后，DN中相邻两行在NZ矩阵中起始地址之间的偏移，单位为元素个数
     dn2Nzparam.dstNzMatrixStride = dn2Nzparam.dstNzC0Stride; // 两个NZ矩阵，起始地址之间的偏移，单位为block个数
     DataCopy(bL1ScaleTensor[scaleBInL1BOffset / FP8_TWO], tensorScaleGmCast, dn2Nzparam);
@@ -596,10 +595,11 @@ __aicore__ inline void MatmulL1(const LocalTensor<O_L0C> &cL0, const LocalTensor
  */
 template <typename T, typename O, typename S, bool hasL1ALoaded = false, bool scaleSrcPadFlag = false,
           bool enUnitFlag = false, DataFormat bLoadFormat = DataFormat::NZ>
-__aicore__ inline void
-MatmulSplitK(const GlobalTensor<O> &tensorCGm, const GlobalTensor<T> &tensorAGm, const GlobalTensor<T> &tensorBGm,
-             const MMParams &para, MMBufParams &bufParam, const uint32_t nL1Offset, const uint32_t nL1Size,
-             const GlobalTensor<S> &tensorAScaleGm = {}, const GlobalTensor<S> &tensorBScaleGm = {})
+__aicore__ inline void MatmulSplitK(const GlobalTensor<O> &tensorCGm, const GlobalTensor<T> &tensorAGm,
+                                    const GlobalTensor<T> &tensorBGm, const MMParams &para, MMBufParams &bufParam,
+                                    const uint32_t nL1Offset, const uint32_t nL1Size,
+                                    const GlobalTensor<S> &tensorAScaleGm = {},
+                                    const GlobalTensor<S> &tensorBScaleGm = {})
 {
     using O_L0C = typename std::conditional<std::is_same<T, int8_t>::value, int32_t, float>::type;
 
@@ -833,7 +833,6 @@ __aicore__ inline void LoadL1BOuter(const GlobalTensor<T> &tensorBGm, const Glob
     SetFlag<HardEvent::MTE2_MTE1>(B_EVENT0 + bEventIdx);
 }
 
-
 /**
  * @brief K-outer: 主Matmul函数。A数据每kL1加载到L1A，A-scale复用原LoadL1AAndScale放L1B一次加载全量。
  *        B每nb双缓冲加载，B-scale紧随B数据之后。FixPipe使用AtomicAdd累加到GM。
@@ -982,6 +981,5 @@ __aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O> &tensorCGm, cons
 }
 
 } // namespace MlaProlog
-
 
 #endif

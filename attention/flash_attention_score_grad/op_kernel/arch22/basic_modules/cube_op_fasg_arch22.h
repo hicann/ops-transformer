@@ -13,7 +13,6 @@
  * \brief
  */
 
-
 #ifndef _CUBE_OP_H__ARCH22
 #define _CUBE_OP_H__ARCH22
 
@@ -28,62 +27,62 @@ class CubeOp {
 public:
     /* clang-format off */
     __aicore__ inline CubeOp(){};
-    __aicore__ inline void Init(TPipe *pipe, 
-                                uint64_t qHeadNumIn, 
-                                uint64_t kvHeadNumIn, 
-                                uint64_t headDimIn, 
+    __aicore__ inline void Init(TPipe *pipe,
+                                uint64_t qHeadNumIn,
+                                uint64_t kvHeadNumIn,
+                                uint64_t headDimIn,
                                 uint64_t sparseMode);
     __aicore__ inline __attribute__((always_inline)) void Cube1Process(const CubeAddrInfo &addrs,
-                                                                        __gm__ TYPE *left, 
-                                                                        __gm__ TYPE *right, 
+                                                                        __gm__ TYPE *left,
+                                                                        __gm__ TYPE *right,
                                                                         __gm__ float *out);
 
     __aicore__ inline __attribute__((always_inline)) void Cube2Process(const CubeAddrInfo &addrs,
-                                                                       __gm__ TYPE *left, 
-                                                                       __gm__ TYPE *right, 
+                                                                       __gm__ TYPE *left,
+                                                                       __gm__ TYPE *right,
                                                                        __gm__ float *out);
 
     __aicore__ inline __attribute__((always_inline)) void Cube3Process(const CubeAddrInfo &addrs,
-                                                                       __gm__ TYPE *left, 
-                                                                       __gm__ TYPE *right, 
+                                                                       __gm__ TYPE *left,
+                                                                       __gm__ TYPE *right,
                                                                        __gm__ float *out);
 
-    __aicore__ inline __attribute__((always_inline)) void Cube23Process(const CubeAddrInfo &addrs, 
-                                                                        __gm__ TYPE *left, 
-                                                                        __gm__ TYPE *right1, 
-                                                                        __gm__ TYPE *right2, 
-                                                                        __gm__ float *out1, 
+    __aicore__ inline __attribute__((always_inline)) void Cube23Process(const CubeAddrInfo &addrs,
+                                                                        __gm__ TYPE *left,
+                                                                        __gm__ TYPE *right1,
+                                                                        __gm__ TYPE *right2,
+                                                                        __gm__ float *out1,
                                                                         __gm__ float *out2);
 
 private:
-    __aicore__ inline __attribute__((always_inline)) void Cube1Compute(const AddrInfo &shapeInfo, 
-                                                                       __gm__ TYPE *left, 
-                                                                       __gm__ TYPE *right, 
+    __aicore__ inline __attribute__((always_inline)) void Cube1Compute(const AddrInfo &shapeInfo,
+                                                                       __gm__ TYPE *left,
+                                                                       __gm__ TYPE *right,
                                                                        __gm__ float *out);
-    __aicore__ inline __attribute__((always_inline)) void Cube2Compute(const AddrInfo &shapeInfo, 
-                                                                       __gm__ TYPE *left, 
-                                                                       __gm__ TYPE *right, 
-                                                                       __gm__ float *out, 
+    __aicore__ inline __attribute__((always_inline)) void Cube2Compute(const AddrInfo &shapeInfo,
+                                                                       __gm__ TYPE *left,
+                                                                       __gm__ TYPE *right,
+                                                                       __gm__ float *out,
                                                                        const bool isFirst);
-    __aicore__ inline __attribute__((always_inline)) void Cube3Compute(const AddrInfo &shapeInfo, 
-                                                                       __gm__ TYPE *left, 
-                                                                       __gm__ TYPE *right, 
+    __aicore__ inline __attribute__((always_inline)) void Cube3Compute(const AddrInfo &shapeInfo,
+                                                                       __gm__ TYPE *left,
+                                                                       __gm__ TYPE *right,
                                                                        __gm__ float *out);
 
-    __aicore__ inline __attribute__((always_inline)) void Cube23Compute(const AddrInfo &shapeInfo, 
-                                                                        __gm__ TYPE *left, 
-                                                                        __gm__ TYPE *right1,  
-                                                                        __gm__ TYPE *right2, 
-                                                                        __gm__ float *out1, 
+    __aicore__ inline __attribute__((always_inline)) void Cube23Compute(const AddrInfo &shapeInfo,
+                                                                        __gm__ TYPE *left,
+                                                                        __gm__ TYPE *right1,
+                                                                        __gm__ TYPE *right2,
+                                                                        __gm__ float *out1,
                                                                         __gm__ float *out2);
-                                                                        
-    __aicore__ inline __attribute__((always_inline)) void LoadDataAToL1(LocalTensor<TYPE> dstTensor, 
-                                                                        GlobalTensor<TYPE> srcTensor, 
-                                                                        const int32_t mSize, 
+
+    __aicore__ inline __attribute__((always_inline)) void LoadDataAToL1(LocalTensor<TYPE> dstTensor,
+                                                                        GlobalTensor<TYPE> srcTensor,
+                                                                        const int32_t mSize,
                                                                         const int32_t kSize);
-    __aicore__ inline __attribute__((always_inline)) void LoadDataBToL1(LocalTensor<TYPE> dstTensor, 
-                                                                        GlobalTensor<TYPE> srcTensor, 
-                                                                        const int32_t nSize, 
+    __aicore__ inline __attribute__((always_inline)) void LoadDataBToL1(LocalTensor<TYPE> dstTensor,
+                                                                        GlobalTensor<TYPE> srcTensor,
+                                                                        const int32_t nSize,
                                                                         const int32_t kSize);
     __aicore__ inline __attribute__((always_inline)) void LoadDataAToL0(LocalTensor<TYPE> dstTensor,
                                                                         LocalTensor<TYPE> srcTensor,
@@ -101,9 +100,9 @@ private:
                                                                     const int32_t m_mad_,
                                                                     const int32_t n_mad_,
                                                                     const bool skip);
-    __aicore__ inline __attribute__((always_inline)) void Cube1CopyOut(GlobalTensor<float> dstTensor, 
-                                                                       LocalTensor<float> srcTensor, 
-                                                                       const int32_t mSize, 
+    __aicore__ inline __attribute__((always_inline)) void Cube1CopyOut(GlobalTensor<float> dstTensor,
+                                                                       LocalTensor<float> srcTensor,
+                                                                       const int32_t mSize,
                                                                        const int32_t nSize);
     AscendC::Nd2NzParams commonNd2NzParamsFp32_ {
         1,
@@ -241,8 +240,8 @@ private:
 };
 
 template <typename TYPE>
-__aicore__ inline void
-CubeOp<TYPE>::Init(TPipe *pipe, uint64_t qHeadNumIn, uint64_t kvHeadNumIn, uint64_t headDimIn, uint64_t sparseMode)
+__aicore__ inline void CubeOp<TYPE>::Init(TPipe *pipe, uint64_t qHeadNumIn, uint64_t kvHeadNumIn, uint64_t headDimIn,
+                                          uint64_t sparseMode)
 {
     pipe->InitBuffer(L1Buffer, HardwareInfo<ArchType::ASCEND_V220>::l1Size);
     pipe->InitBuffer(L0CBuffer, HardwareInfo<ArchType::ASCEND_V220>::l0CSize);
@@ -289,8 +288,9 @@ CubeOp<TYPE>::Init(TPipe *pipe, uint64_t qHeadNumIn, uint64_t kvHeadNumIn, uint6
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<TYPE>::Cube1Process(const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ TYPE *right, __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube1Process(const CubeAddrInfo &addrs,
+                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
+                                                                                 __gm__ float *out)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;
@@ -301,8 +301,9 @@ CubeOp<TYPE>::Cube1Process(const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ 
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<TYPE>::Cube2Process(const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ TYPE *right, __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Process(const CubeAddrInfo &addrs,
+                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
+                                                                                 __gm__ float *out)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;
@@ -313,8 +314,9 @@ CubeOp<TYPE>::Cube2Process(const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ 
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<TYPE>::Cube3Process(const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ TYPE *right, __gm__ float *out)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube3Process(const CubeAddrInfo &addrs,
+                                                                                 __gm__ TYPE *left, __gm__ TYPE *right,
+                                                                                 __gm__ float *out)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;
@@ -325,8 +327,9 @@ CubeOp<TYPE>::Cube3Process(const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ 
 }
 
 template <typename TYPE>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<TYPE>::Cube23Process(const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ TYPE *right1, __gm__ TYPE *right2, __gm__ float *out1, __gm__ float *out2)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube23Process(
+    const CubeAddrInfo &addrs, __gm__ TYPE *left, __gm__ TYPE *right1, __gm__ TYPE *right2, __gm__ float *out1,
+    __gm__ float *out2)
 {
     pingPongIdx = addrs.taskId % 2;
     globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + pingPongIdx * BLOCK_WORKSPACE;

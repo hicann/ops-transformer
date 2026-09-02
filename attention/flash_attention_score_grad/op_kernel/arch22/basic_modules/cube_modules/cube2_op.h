@@ -52,7 +52,6 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute
     int32_t startS1Id = shapeInfo.S1Idx;
     int32_t startS2Id = shapeInfo.S2Idx;
 
-
     int32_t skip_num = 0;
     for (uint32_t n_loop_index = 0; n_loop_index < n_loop; n_loop_index++) {
         int32_t n_remain = (n_loop_index == n_loop - 1) ? l1_n_block_size_tail : 128;
@@ -115,7 +114,6 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute
             ping_pong_flag_l1_a_ = 1 - ping_pong_flag_l1_a_;
         }
 
-
         // load L1B (n, headDim) -> L0B
         AscendC::LocalTensor<TYPE> *l0_b_buf_tensor = ping_pong_flag_l0_b_ ? &l0_b_pong_tensor : &l0_b_ping_tensor;
         commonLoadData2dParamsTranspose.repeatTimes = headDim / 16;
@@ -163,7 +161,6 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<TYPE>::Cube2Compute
             AscendC::WaitFlag<HardEvent::MTE1_M>(static_cast<int32_t>(ping_pong_flag_l0_a_));
             if (!is_skip) {
                 uint16_t m_modify = (m_remain == 1) ? 2 : m_remain;
-
 
                 AscendC::Mmad(*l0_c_buf_tensor, *l0_a_buf_tensor, *l0_b_buf_tensor,
                               AscendC::MmadParams(m_modify, headDim, n_remain, last_k ? 3 : 2,

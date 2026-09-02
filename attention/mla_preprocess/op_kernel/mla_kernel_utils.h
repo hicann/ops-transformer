@@ -121,14 +121,16 @@ __aicore__ inline T ComputeSum(const AscendC::LocalTensor<T> &in, const AscendC:
         int64_t bodyCount = repeatTimes * elementNumPerRep;
         if (repeatTimes > 0) {
             AscendC::AscendCUtils::SetMask<T>(elementNumPerRep);
-            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp.GetPhyAddr(), (__ubuf__ T *)src.GetPhyAddr(), repeatTimes, 1, 1, 8);
+            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp.GetPhyAddr(), (__ubuf__ T *)src.GetPhyAddr(),
+                                                 repeatTimes, 1, 1, 8);
             AscendC::SetFlag<HardEvent::V_S>(EVENT_ID0); // PipeBarrier(PIPE_V)?
             AscendC::WaitFlag<HardEvent::V_S>(EVENT_ID0);
         }
 
         if (tailCount != 0) {
             AscendC::AscendCUtils::SetMask<T>(tailCount);
-            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp[bodyCount].GetPhyAddr(), (__ubuf__ T *)src[bodyCount].GetPhyAddr(), 1, 1, 1, 8);
+            cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp[bodyCount].GetPhyAddr(),
+                                                 (__ubuf__ T *)src[bodyCount].GetPhyAddr(), 1, 1, 1, 8);
             AscendC::SetFlag<HardEvent::V_S>(EVENT_ID0);
             AscendC::WaitFlag<HardEvent::V_S>(EVENT_ID0);
             sum += tmp.GetValue(bodyCount);
@@ -140,7 +142,8 @@ __aicore__ inline T ComputeSum(const AscendC::LocalTensor<T> &in, const AscendC:
 
     if (count > 1) {
         AscendC::AscendCUtils::SetMask<T>(count);
-        cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp.GetPhyAddr(), (__ubuf__ T *)tmp.GetPhyAddr(), 1, 1, 1, 8);
+        cadd_v<ArchType::ASCEND_V200, float>((__ubuf__ T *)tmp.GetPhyAddr(), (__ubuf__ T *)tmp.GetPhyAddr(), 1, 1, 1,
+                                             8);
         AscendC::SetFlag<HardEvent::V_S>(EVENT_ID0);
         AscendC::WaitFlag<HardEvent::V_S>(EVENT_ID0);
     }

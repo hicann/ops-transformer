@@ -58,10 +58,10 @@ __simd_vf__ void ComputeVFImpl(__ubuf__ T *xAddr, __ubuf__ O *yAddr, __ubuf__ fl
         AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
         RoundMode::CAST_ROUND};
     static constexpr AscendC::MicroAPI::DivSpecificMode mode = {AscendC::MicroAPI::MaskMergeMode::ZEROING, true};
-    AscendC::MicroAPI::RegTensor<T> xInput;         // 搬入的x
-    AscendC::MicroAPI::RegTensor<float> xFp32;      // cast成float之后的x
-    AscendC::MicroAPI::RegTensor<float> xFp32Abs;   // x的绝对值absvalue
-    AscendC::MicroAPI::RegTensor<float> xMaxAbs;    // x的abs与-inf比较的结果，可以认为是x的absvalue的一些最大值
+    AscendC::MicroAPI::RegTensor<T> xInput;       // 搬入的x
+    AscendC::MicroAPI::RegTensor<float> xFp32;    // cast成float之后的x
+    AscendC::MicroAPI::RegTensor<float> xFp32Abs; // x的绝对值absvalue
+    AscendC::MicroAPI::RegTensor<float> xMaxAbs; // x的abs与-inf比较的结果，可以认为是x的absvalue的一些最大值
     AscendC::MicroAPI::RegTensor<float> xReduceMax; // reduceMax
     AscendC::MicroAPI::RegTensor<float> xScale;     // scale
     AscendC::MicroAPI::RegTensor<float> xScaleDup;  // Duplicate之后的scale，为了和input一起得到y
@@ -86,8 +86,8 @@ __simd_vf__ void ComputeVFImpl(__ubuf__ T *xAddr, __ubuf__ O *yAddr, __ubuf__ fl
                 xInput, xAddr + rowIndex * rowCount + j * VL);
             AscendC::MicroAPI::Cast<float, T, castTraitB16ToF32>(xFp32, xInput, validMask0);
         } else {
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(xFp32, xAddr + rowIndex * rowCount +
-                                                                                               j * VL);
+            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(
+                xFp32, xAddr + rowIndex * rowCount + j * VL);
         }
         AscendC::MicroAPI::Abs(xFp32Abs, xFp32, validMask0);
         AscendC::MicroAPI::Max(xMaxAbs, xFp32Abs, xMaxAbs, fullMask1);
@@ -114,8 +114,8 @@ __simd_vf__ void ComputeVFImpl(__ubuf__ T *xAddr, __ubuf__ O *yAddr, __ubuf__ fl
                 xInput, xAddr + rowIndex * rowCount + j * VL);
             AscendC::MicroAPI::Cast<float, T, castTraitB16ToF32>(xFp32, xInput, validMask2);
         } else {
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(xFp32, xAddr + rowIndex * rowCount +
-                                                                                               j * VL);
+            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(
+                xFp32, xAddr + rowIndex * rowCount + j * VL);
         }
         AscendC::MicroAPI::Div(xNorm, xFp32, xScaleDup, validMask2);
         if constexpr (std::is_same<O, fp8_e4m3fn_t>::value) {
@@ -199,7 +199,6 @@ __simd_vf__ void ComputeMaxExpVF(__ubuf__ T *srcAddr, __ubuf__ uint16_t *maxExpA
     }
     AscendC::MicroAPI::StoreUnAlignPost(maxExpAddr, u1, 0);
 }
-
 
 template <typename T, typename U>
 __simd_vf__ void ComputeScaleVF(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,

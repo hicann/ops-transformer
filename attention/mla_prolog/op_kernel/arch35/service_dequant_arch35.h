@@ -35,10 +35,11 @@ namespace MlaProlog {
  * @param oriRow 一共有多少行
 */
 template <typename T, typename C, typename O>
-__aicore__ inline void
-DequantPerTokenQc(const GlobalTensor<O> &outputGm, const GlobalTensor<T> &inputGm,
-                  const GlobalTensor<C> &deqScaleQcQrWGm, const LocalTensor<float> deQuantScaleQcQrLocal,
-                  const LocalTensor<uint8_t> &shareTmpUb, Rectangle dequantRowColStrideParams, uint32_t oriRow)
+__aicore__ inline void DequantPerTokenQc(const GlobalTensor<O> &outputGm, const GlobalTensor<T> &inputGm,
+                                         const GlobalTensor<C> &deqScaleQcQrWGm,
+                                         const LocalTensor<float> deQuantScaleQcQrLocal,
+                                         const LocalTensor<uint8_t> &shareTmpUb, Rectangle dequantRowColStrideParams,
+                                         uint32_t oriRow)
 {
     int64_t count = dequantRowColStrideParams.row * dequantRowColStrideParams.col;
 
@@ -143,10 +144,11 @@ __aicore__ inline void CastPerTokenQc(const GlobalTensor<O> &outputGm, const Glo
  */
 // 用于enableGroupComputeOpt场景
 template <typename T, typename C, typename O>
-__aicore__ inline void
-DequantSplitNQc(const GlobalTensor<O> &outputGm, const GlobalTensor<T> &inputGm, const GlobalTensor<C> &deqScaleQcQrWGm,
-                const LocalTensor<C> &deQuantScaleQcQrLocal, const LocalTensor<uint8_t> &shareTmpUb,
-                Rectangle dequantRowColStrideParams, uint32_t oriCol, uint32_t dstStride, uint32_t subBlockIdx_)
+__aicore__ inline void DequantSplitNQc(const GlobalTensor<O> &outputGm, const GlobalTensor<T> &inputGm,
+                                       const GlobalTensor<C> &deqScaleQcQrWGm,
+                                       const LocalTensor<C> &deQuantScaleQcQrLocal,
+                                       const LocalTensor<uint8_t> &shareTmpUb, Rectangle dequantRowColStrideParams,
+                                       uint32_t oriCol, uint32_t dstStride, uint32_t subBlockIdx_)
 {
     int64_t count = dequantRowColStrideParams.col * 1;
     LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>();                         // count * sizeof(T)

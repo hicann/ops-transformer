@@ -203,7 +203,8 @@ inline uint32_t AlignData(const uint32_t a, const uint32_t b)
     return (a + b - 1) / b * b;
 }
 
-template <class T> inline T AlignTo(const T n, const T alignSize)
+template <class T>
+inline T AlignTo(const T n, const T alignSize)
 {
     if (alignSize == 0) {
         return 0;
@@ -211,7 +212,8 @@ template <class T> inline T AlignTo(const T n, const T alignSize)
     return (n + alignSize - 1) & (~(alignSize - 1));
 }
 
-template <typename T> static T AlignUp(T num1, T num2)
+template <typename T>
+static T AlignUp(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -221,10 +223,12 @@ template <typename T> static T AlignUp(T num1, T num2)
     }
     return (num1 + num2 - 1) / num2 * num2;
 }
-ge::graphStatus CheckSoftmaxMaxAndSumShape(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2, uint8_t inputIdx);
+ge::graphStatus CheckSoftmaxMaxAndSumShape(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+                                           uint8_t inputIdx);
 ge::graphStatus CheckAttentionMaskShape(gert::TilingContext *context, int64_t b, int64_t s1, int64_t s3);
 ge::graphStatus CheckSupportShape(gert::TilingContext *context);
-ge::graphStatus CheckInputShapeValid(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2, int64_t s3, int64_t d);
+ge::graphStatus CheckInputShapeValid(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+                                     int64_t s3, int64_t d);
 bool CheckSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape);
 bool isTndSABHit(gert::TilingContext *context);
 

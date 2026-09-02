@@ -73,7 +73,6 @@ enum class KernelInputLayout {
     TND = 3,
 };
 
-
 struct FlashAttentionGradBasicDetCompileInfo {
     uint32_t aivNum;
     uint32_t aicNum;
@@ -88,9 +87,9 @@ struct FlashAttentionGradBasicDetCompileInfo {
 
 class FlashAttentionScoreGraTilingBasicDet : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit FlashAttentionScoreGraTilingBasicDet(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit FlashAttentionScoreGraTilingBasicDet(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
     FlashAttentionGradBasicDetTilingData *tilingData = context_->GetTilingData<FlashAttentionGradBasicDetTilingData>();
 
 protected:

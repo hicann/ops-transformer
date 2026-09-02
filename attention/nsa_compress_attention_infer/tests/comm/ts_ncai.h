@@ -13,7 +13,6 @@
  * \brief nsaGrad UTest 相关基类定义.
  */
 
-
 #include "tests/utest/ts.h"
 #include "ncai_case.h"
 

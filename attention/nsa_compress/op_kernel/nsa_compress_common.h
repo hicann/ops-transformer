@@ -18,7 +18,6 @@
 
 #include "kernel_operator.h"
 
-
 namespace NASCompress {
 
 const int32_t NSASuccess = 0;
@@ -35,7 +34,6 @@ const size_t Two = 2;
 const size_t Four = 4;
 const size_t Eight = 8;
 const size_t SixTeen = 16;
-
 
 enum class CompressState : uint16_t {
     COMPRESS_TOKEN_INITIATED = 1,

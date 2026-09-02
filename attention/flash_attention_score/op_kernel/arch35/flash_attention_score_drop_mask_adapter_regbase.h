@@ -25,11 +25,10 @@
 
 class FlashAttentionScoreDropMaskAdapterRegbase {
 public:
-    __aicore__ inline FlashAttentionScoreDropMaskAdapterRegbase()
-    {
-    }
+    __aicore__ inline FlashAttentionScoreDropMaskAdapterRegbase() {}
     __aicore__ inline void Init(__gm__ uint8_t *dropMask, __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, AscendC::TPipe *tPipe);
+                                const FlashAttentionScoreSimplifiedTilingData *__restrict tiling,
+                                AscendC::TPipe *tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyIn(int64_t offset, int32_t calSize);
     __aicore__ inline void Compute(int32_t calSize, AscendC::LocalTensor<half> &dropMaskSelSrc,
@@ -37,7 +36,8 @@ public:
     __aicore__ inline void CopyOut(int64_t offset, int32_t calSize);
     __aicore__ inline void SyncAllCores();
 
-    template <typename T1, typename T2> __aicore__ inline T1 CeilDiv(T1 a, T2 b)
+    template <typename T1, typename T2>
+    __aicore__ inline T1 CeilDiv(T1 a, T2 b)
     {
         if (b == 0) {
             return 0;
@@ -45,7 +45,8 @@ public:
         return (a + b - 1) / b;
     };
 
-    template <typename T1, typename T2> __aicore__ inline T1 Min(T1 a, T2 b)
+    template <typename T1, typename T2>
+    __aicore__ inline T1 Min(T1 a, T2 b)
     {
         return (a > b) ? (b) : (a);
     };
@@ -68,10 +69,9 @@ public:
     constexpr static int32_t SELECT_MAX_OFFSET = SELECT_MAX_SRC_STRIDE * SELECT_MAX_REPEAT;
 };
 
-__aicore__ inline void
-FlashAttentionScoreDropMaskAdapterRegbase::Init(__gm__ uint8_t *dropMask, __gm__ uint8_t *workspace,
-                                         const FlashAttentionScoreSimplifiedTilingData *__restrict tiling,
-                                         AscendC::TPipe *tPipe)
+__aicore__ inline void FlashAttentionScoreDropMaskAdapterRegbase::Init(
+    __gm__ uint8_t *dropMask, __gm__ uint8_t *workspace,
+    const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, AscendC::TPipe *tPipe)
 {
     pipe = tPipe;
     tilingData = tiling;
@@ -79,7 +79,7 @@ FlashAttentionScoreDropMaskAdapterRegbase::Init(__gm__ uint8_t *dropMask, __gm__
 
     dropMaskGm.SetGlobalBuffer(dropMask);
     outputGm.SetGlobalBuffer(workspace + tiling->dropmaskParamsRegbase.dropMaskAddrOffset,
-        CeilDiv(tiling->dropmaskParamsRegbase.shapeTotalSize, 512) * 512);
+                             CeilDiv(tiling->dropmaskParamsRegbase.shapeTotalSize, 512) * 512);
     pipe->InitBuffer(dropMaskInputQueue, 1, tiling->dropmaskParamsRegbase.baseUbCalSize / AscendC::ONE_BYTE_BIT_SIZE);
     pipe->InitBuffer(dropMaskOutputQueue, 1, tiling->dropmaskParamsRegbase.baseUbCalSize);
     pipe->InitBuffer(dropMaskSelSrcTBuf, tiling->dropmaskParamsRegbase.baseUbCalSize * sizeof(half));
@@ -90,8 +90,10 @@ __aicore__ inline void FlashAttentionScoreDropMaskAdapterRegbase::Process()
 {
     // 输入非对齐时，bit[gm] -> select(fp16)[ub] -> bool[ub] -> bool[gm]
     // 单次ub计算量为x个元素，空间占用：x/8 * 1 [1个 uint8]+ 2x * 2[2个fp16,select的src和res] + x * 1 [1个uint8]
-    int64_t multiCoreFactorSize = tilingData->dropmaskParamsRegbase.multiCoreFactorSize; // BN2GS1S2 / 单次UB计算量 / coreNum
-    int64_t multiCoreTotalSize = tilingData->dropmaskParamsRegbase.multiCoreTotalSize; // 绑多核轴总量，BN2GS1S2 / 单次UB计算量
+    int64_t multiCoreFactorSize =
+        tilingData->dropmaskParamsRegbase.multiCoreFactorSize; // BN2GS1S2 / 单次UB计算量 / coreNum
+    int64_t multiCoreTotalSize =
+        tilingData->dropmaskParamsRegbase.multiCoreTotalSize; // 绑多核轴总量，BN2GS1S2 / 单次UB计算量
     int64_t coreOffset = multiCoreFactorSize * blockIdx;
     int64_t shapeTotalSize = tilingData->dropmaskParamsRegbase.shapeTotalSize; // BN2GS1S2
     int64_t singleCoreCalNum = Min(multiCoreFactorSize, multiCoreTotalSize - coreOffset);
@@ -140,9 +142,8 @@ __aicore__ inline void FlashAttentionScoreDropMaskAdapterRegbase::CopyIn(int64_t
     dropMaskInputQueue.EnQue(dropMaskUb);
 }
 
-__aicore__ inline void
-FlashAttentionScoreDropMaskAdapterRegbase::Compute(int32_t calSize, AscendC::LocalTensor<half> &dropMaskSelSrc,
-                                                   const AscendC::BinaryRepeatParams &binaryRepeatParams)
+__aicore__ inline void FlashAttentionScoreDropMaskAdapterRegbase::Compute(
+    int32_t calSize, AscendC::LocalTensor<half> &dropMaskSelSrc, const AscendC::BinaryRepeatParams &binaryRepeatParams)
 {
     AscendC::LocalTensor<half> dropMaskSelRes = dropMaskSelResTBuf.template Get<half>();
     AscendC::LocalTensor<uint8_t> dropMaskUb = dropMaskInputQueue.template DeQue<uint8_t>();

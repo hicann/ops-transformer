@@ -62,9 +62,12 @@ enum class S2TemplateType {
     NotAligned,
 };
 
-
-constexpr MatmulConfig FAG_CP_CFG_31_41_DEFAULT = {true, false, false, 0, 0, 0, false, false, false, false,
-                                                0, 0, 0, 0, 0, 0, 0, 0, true, false, false, false, false, true,
-                                                BatchMode::BATCH_LESS_THAN_L1, true, true, true, false, true, false};
+constexpr MatmulConfig FAG_CP_CFG_31_41_DEFAULT = {true,  false, false, 0,     0,
+                                                   0,     false, false, false, false,
+                                                   0,     0,     0,     0,     0,
+                                                   0,     0,     0,     true,  false,
+                                                   false, false, false, true,  BatchMode::BATCH_LESS_THAN_L1,
+                                                   true,  true,  true,  false, true,
+                                                   false};
 
 #endif // FLASH_ATTENTION_SCORE_GRAD_CONSTANT_PROPAGATION_H_

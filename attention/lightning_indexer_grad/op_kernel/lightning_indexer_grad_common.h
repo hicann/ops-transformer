@@ -99,7 +99,7 @@ __aicore__ inline T CeilDiv(T num, T rnd)
     return (rnd == 0) ? 0 : (num / rnd + (num % rnd != 0 ? 1 : 0));
 }
 
-template <typename T> 
+template <typename T>
 __aicore__ inline T RoundUp(T val, T align)
 {
     static_assert(std::is_arithmetic<T>::value, "T must be an arithmetic type");

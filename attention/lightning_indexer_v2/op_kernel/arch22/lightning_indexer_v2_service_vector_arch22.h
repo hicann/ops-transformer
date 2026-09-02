@@ -121,12 +121,12 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitBuffers(TPipe *
     uint32_t reduceCacheSize = REDUCE_BANK_CONFLICT_OFFSETS + groupInner_ * s2BaseSize_ * sizeof(float);
     outNeedBufSize = reduceCacheSize > outNeedBufSize ? reduceCacheSize : outNeedBufSize;
     virTopK = constInfo_.isSparseCountOver2K ? constInfo_.sparseCount : BASE_TOPK;
-    pipe->InitBuffer(outQueue_, 1, outNeedBufSize);                                            // 32KB  extract
+    pipe->InitBuffer(outQueue_, 1, outNeedBufSize); // 32KB  extract
     // 68KB: cube结果和weight搬运db(2x34KB), mrgsort临时UB
     pipe->InitBuffer(tmpBuf_, (groupInner_ * s2BaseSize_ + s2BaseSize_) * 2 * sizeof(float));
-    pipe->InitBuffer(sortOutBuf_, CeilDiv(s1BaseSize_, 2) * virTopK * 2 * sizeof(float));    // 64KB
-    pipe->InitBuffer(indexBuf_, s2BaseSize_ * sizeof(int32_t));                                // 2KB
-    pipe->InitBuffer(reduceOutBuf_, s2BaseSize_ * 3 * sizeof(float));                          // 6KB
+    pipe->InitBuffer(sortOutBuf_, CeilDiv(s1BaseSize_, 2) * virTopK * 2 * sizeof(float)); // 64KB
+    pipe->InitBuffer(indexBuf_, s2BaseSize_ * sizeof(int32_t));                           // 2KB
+    pipe->InitBuffer(reduceOutBuf_, s2BaseSize_ * 3 * sizeof(float));                     // 6KB
     pipe->InitBuffer(brcBuf_, groupInner_ * 8 * sizeof(float));
     pipe->InitBuffer(paramBuf_, LD_PARAM_NUM * sizeof(int64_t));
 
@@ -169,7 +169,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitLDBuffers(TPipe
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitParams(const struct LIV2Common::ConstInfo &constInfo,
-                                                 const LIV2TilingData *__restrict tilingData)
+                                                                        const LIV2TilingData *__restrict tilingData)
 {
     this->constInfo_ = constInfo;
     blockS2StartIdx_ = 0;
@@ -187,11 +187,9 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitParams(const st
 }
 
 template <typename LIT>
-__aicore__ inline void
-LightningIndexerV2ServiceVector<LIT>::InitVec1GlobalTensor(
-    GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<float> vec1ResGm,
-    GlobalTensor<int64_t> vec1ParamGm, GlobalTensor<W_T> weightsGm,
-    GlobalTensor<int32_t> indiceOutGm, GlobalTensor<OUT_V_T> valueOutGm)
+__aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitVec1GlobalTensor(
+    GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<float> vec1ResGm, GlobalTensor<int64_t> vec1ParamGm,
+    GlobalTensor<W_T> weightsGm, GlobalTensor<int32_t> indiceOutGm, GlobalTensor<OUT_V_T> valueOutGm)
 {
     this->mm1ResGm = mm1ResGm;
     this->vec1ResGm = vec1ResGm;
@@ -409,15 +407,13 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
 
             if (needCopyOutGm) {
                 int64_t offset = (constInfo_.sparseCount <= SPARSE_COUNT_4K) ? virTopK : constInfo_.sparseCount / 2;
-                int64_t copyLen = (constInfo_.sparseCount <= SPARSE_COUNT_4K) ?
-                                      constInfo_.sparseCount :
-                                      constInfo_.sparseCount / 2;
+                int64_t copyLen =
+                    (constInfo_.sparseCount <= SPARSE_COUNT_4K) ? constInfo_.sparseCount : constInfo_.sparseCount / 2;
                 int64_t copyNum = (constInfo_.sparseCount <= SPARSE_COUNT_4K) ? 1 : 2;
                 for (int64_t i = 0; i < copyNum; i++) {
                     LocalTensor<float> outValueUb = outQueue_.AllocTensor<float>();
                     LocalTensor<uint32_t> outIdxUb = outValueUb[offset].template ReinterpretCast<uint32_t>();
-                    Extract(outValueUb, outIdxUb,
-                            globalTopkUb_[innerS1Idx * virTopK * 2 + 2 * i * offset],
+                    Extract(outValueUb, outIdxUb, globalTopkUb_[innerS1Idx * virTopK * 2 + 2 * i * offset],
                             (offset / 32));
                     PipeBarrier<PIPE_V>();
 
@@ -426,8 +422,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
                     outValueUb = outQueue_.DeQue<float>();
 
                     LIServiceVec::CopyOut(
-                        indiceOutGm[info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount + i * offset],
-                        idxULocal1, copyLen);
+                        indiceOutGm[info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount + i * offset], idxULocal1,
+                        copyLen);
                     if (constInfo_.returnValue) {
                         LIServiceVec::CopyOut(
                             valueOutGm[info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount + i * offset],
@@ -440,10 +436,10 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
                 // vec1Param Gm = [aic, s1BaseSize_, 2, 16] int64
                 //     16 = [needFd, s2AcSeq, s2Start, s2End, isS2End, bn2idx, s1Idx, S1ProcNum, ......]
 
-                int64_t wsOffset = (blockId_ / 2) * s1BaseSize_ * 2 * 2 * BASE_TOPK +       // 2个AIV共同地址偏移
+                int64_t wsOffset = (blockId_ / 2) * s1BaseSize_ * 2 * 2 * BASE_TOPK + // 2个AIV共同地址偏移
                                    (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * 2 * BASE_TOPK + // 每个AIV的地址偏移，S1方向
                                    (ldS1Offset + innerS1Idx) * 2 * 2 * BASE_TOPK;
-                int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +       // 2个AIV共同地址偏移
+                int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ + // 2个AIV共同地址偏移
                                        (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_ + // 每个AIV的地址偏移，S1方向
                                        (ldS1Offset + innerS1Idx) * 2 * paramNum_;
 

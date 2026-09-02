@@ -113,7 +113,10 @@ struct ParamInfo {
         }
         return (isValid == other.isValid && dtype == other.dtype && dimNum == other.dimNum && shape == other.shape);
     }
-    bool operator!=(const ParamInfo &other) const { return !(*this == other); }
+    bool operator!=(const ParamInfo &other) const
+    {
+        return !(*this == other);
+    }
 
     bool isValid{};
     ge::DataType dtype{ge::DT_MAX};

@@ -23,7 +23,6 @@ using AclnnNsaCompressWithCacheParam = ops::adv::tests::NsaCompressWithCache::Ac
 using LayoutType = ops::adv::tests::NsaCompressWithCache::NsaCompressWithCacheParam::LayoutType;
 using AclnnNsaCompressWithCacheCase = ops::adv::tests::NsaCompressWithCache::AclnnNsaCompressWithCacheCase;
 
-
 class Ts_Aclnn_NsaCompressWithCache : public Ts<AclnnNsaCompressWithCacheCase> {};
 class Ts_Aclnn_NsaCompressWithCache_Ascend910B3 : public Ts_Ascend910B3<AclnnNsaCompressWithCacheCase> {};
 

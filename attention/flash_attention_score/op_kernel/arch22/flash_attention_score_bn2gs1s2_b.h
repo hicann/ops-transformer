@@ -15,13 +15,13 @@
 
 #ifndef FLASH_ATTENTION_SCORE_BN2GS1S2_B_H
 #define FLASH_ATTENTION_SCORE_BN2GS1S2_B_H
-#define FA_BN2GS1S2B_FUNCTION_TEMPLATE                                                                                 \
-    template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop,              \
-              typename INPUT_T, typename T, bool isBasicBlock, LayoutMode layout, STemplateType s1TemplateType,        \
+#define FA_BN2GS1S2B_FUNCTION_TEMPLATE \
+    template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, \
+              typename INPUT_T, typename T, bool isBasicBlock, LayoutMode layout, STemplateType s1TemplateType, \
               STemplateType s2TemplateType, DTemplateType dTemplateType>
-#define FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE                                                                          \
+#define FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE \
     implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, layout, s1TemplateType, s2TemplateType, \
-    dTemplateType
+        dTemplateType
 
 #include "util.h"
 #include "dropmask.h"
@@ -98,8 +98,9 @@ public:
     __aicore__ inline FlashAttentionScoreBn2gs1s2B(){};
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse,
                                 __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                                __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
+                                __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
+                                __gm__ uint8_t *workspace,
                                 const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void Process();
 
@@ -111,10 +112,10 @@ public:
     constexpr static MatmulConfig mm1Config = GetBn2gs1s2BMm1Config<s1TemplateType, s2TemplateType, dTemplateType>();
     constexpr static MatmulApiStaticTiling stcMm1Tiling =
         matmul::GetMatmulApiTiling<a1Type, b1Type, c1Type, bias1Type>(mm1Config);
-    using modeTypeMm1 = typename AscendC::Conditional<
-        (s1TemplateType == STemplateType::S_TEMPLATE_UNKNOW),
-        matmul::Matmul<a1Type, b1Type, c1Type, bias1Type>,
-        matmul::Matmul<a1Type, b1Type, c1Type, bias1Type, stcMm1Tiling>>::type;
+    using modeTypeMm1 =
+        typename AscendC::Conditional<(s1TemplateType == STemplateType::S_TEMPLATE_UNKNOW),
+                                      matmul::Matmul<a1Type, b1Type, c1Type, bias1Type>,
+                                      matmul::Matmul<a1Type, b1Type, c1Type, bias1Type, stcMm1Tiling>>::type;
     modeTypeMm1 bmm1;
 
     using a2Type = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T, false, LayoutMode::BNGS1S2>;
@@ -124,24 +125,24 @@ public:
     constexpr static MatmulConfig mm2Config = GetBn2gs1s2BMm2Config<s1TemplateType, s2TemplateType, dTemplateType>();
     constexpr static MatmulApiStaticTiling stcMm2Tiling =
         matmul::GetMatmulApiTiling<a2Type, b2Type, c2Type, bias2Type>(mm2Config);
-    using modeTypeMm2 = typename AscendC::Conditional<
-        (s1TemplateType == STemplateType::S_TEMPLATE_UNKNOW),
-        matmul::Matmul<a2Type, b2Type, c2Type, bias2Type>,
-        matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, stcMm2Tiling>>::type;
+    using modeTypeMm2 =
+        typename AscendC::Conditional<(s1TemplateType == STemplateType::S_TEMPLATE_UNKNOW),
+                                      matmul::Matmul<a2Type, b2Type, c2Type, bias2Type>,
+                                      matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, stcMm2Tiling>>::type;
     modeTypeMm2 bmm2;
 
     using c2NzType = MatmulType<TPosition::GM, CubeFormat::NZ, T, false, LayoutMode::BNGS1S2>;
-    using modeTypeMm2Nz = typename AscendC::Conditional<
-        (s1TemplateType == STemplateType::S_TEMPLATE_UNKNOW),
-        matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type>,
-        matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, stcMm2Tiling>>::type;
+    using modeTypeMm2Nz =
+        typename AscendC::Conditional<(s1TemplateType == STemplateType::S_TEMPLATE_UNKNOW),
+                                      matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type>,
+                                      matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, stcMm2Tiling>>::type;
     modeTypeMm2Nz bmm2Nz;
 
 protected:
     __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                      __gm__ uint8_t *pse, __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask,
-                                     __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
-                                     __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
+                                     __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
+                                     __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
                                      __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
                                      const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void WaitBmm1Result();
@@ -151,8 +152,8 @@ protected:
     template <typename T2, const auto &TILING>
     __aicore__ inline void IterateBmm2(SplitBExtraInfo &extraInfo,
                                        matmul::Matmul<a2Type, b2Type, T2, bias2Type, TILING> &bmm2);
-    __aicore__ inline void NzToNd(SplitBNz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmResGm,
-                                  LocalTensor<T> &tempUb, LocalTensor<T> &bmmResUb);
+    __aicore__ inline void NzToNd(SplitBNz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmResGm, LocalTensor<T> &tempUb,
+                                  LocalTensor<T> &bmmResUb);
     __aicore__ inline void AtenmaskBoolCopyIn(LocalTensor<uint8_t> &dstTensor, GlobalTensor<uint8_t> &srcTensor,
                                               int64_t offset, SplitBExtraInfo &extraInfo, int32_t s2Size,
                                               int64_t totalS2Size);
@@ -298,11 +299,10 @@ protected:
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::Init(
-                                __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                                __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
+    __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
+    __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
+    __gm__ uint8_t *workspace, const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
 {
     this->InitInput(query, key, value, pse, dropMask, paddingMask, prefix, attenMask, sink, softmaxMax, softmaxSum,
                     softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
@@ -327,16 +327,11 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
 };
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::InitInput(
-                                                __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
-                                                __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
-                                                __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
-                                                __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
-                                                __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                                const FlashAttentionScoreGeneralTilingData *__restrict tiling,
-                                                TPipe *tPipe)
+__aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::InitInput(
+    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
+    __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
+    __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
+    __gm__ uint8_t *workspace, const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
 {
     this->blockIdx = GetBlockIdx();
     this->pipe = tPipe;
@@ -363,8 +358,8 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::InitInput(
                             this->tilingData->inputParams.gSize * this->tilingData->inputParams.s1Size *
                             this->tilingData->coreParams.dBaseSize * sizeof(T);
 
-    int64_t pseInnerAlibiSize = this->tilingData->coreParams.pseAlibiBaseS1 *
-                                this->tilingData->coreParams.pseAlibiBaseS2 * sizeof(half);
+    int64_t pseInnerAlibiSize =
+        this->tilingData->coreParams.pseAlibiBaseS1 * this->tilingData->coreParams.pseAlibiBaseS2 * sizeof(half);
     // 512对齐
     int64_t mm1Offset = CeilDiv(mm1ResultSize, 512) * 512 / (sizeof(INPUT_T) / 2); // 与tiling算法保持一致
     int64_t mm2Offset = CeilDiv(mm2ResultSize, 512) * 512;
@@ -375,21 +370,22 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::InitInput(
 
     uint64_t dropmaskWorkSpaceLen = this->tilingData->dropmaskParams.shapeTotalSize;
     dropmaskWorkSpaceLen = CeilDiv(dropmaskWorkSpaceLen, 512) * 512;
-    uint64_t mm1ResPingAddr = (dropmaskWorkSpaceLen +
-                               this->blockIdx * (mm1TotalOffset + mm2TotalOffset + pseAlibiOffset)) / sizeof(T);
-    uint64_t mm1ResPongAddr = mm1ResPingAddr + mm1Offset / sizeof(T);  // 间隔1份bmm1Result空间
-    uint64_t mm2ResPingAddr = mm1ResPongAddr + mm1Offset / sizeof(T);  // 间隔1份bmm1Result空间
-    uint64_t mm2ResPongAddr = mm2ResPingAddr + mm2Offset / sizeof(T);  // 间隔1份bmm2Result空间
-    uint64_t pseAlibiAddr = mm2ResPongAddr + mm2Offset / sizeof(T);    // 间隔1份bmm2Result空间
+    uint64_t mm1ResPingAddr =
+        (dropmaskWorkSpaceLen + this->blockIdx * (mm1TotalOffset + mm2TotalOffset + pseAlibiOffset)) / sizeof(T);
+    uint64_t mm1ResPongAddr = mm1ResPingAddr + mm1Offset / sizeof(T); // 间隔1份bmm1Result空间
+    uint64_t mm2ResPingAddr = mm1ResPongAddr + mm1Offset / sizeof(T); // 间隔1份bmm1Result空间
+    uint64_t mm2ResPongAddr = mm2ResPingAddr + mm2Offset / sizeof(T); // 间隔1份bmm2Result空间
+    uint64_t pseAlibiAddr = mm2ResPongAddr + mm2Offset / sizeof(T);   // 间隔1份bmm2Result空间
 
     // FP32场景，stage1Result不与bmm1Result共用空间，需要占用2倍mm1Offset空间
     if constexpr (IsSameType<INPUT_T, float>::value) {
-        mm1ResPingAddr = (dropmaskWorkSpaceLen +
-                          this->blockIdx * (mm1TotalOffset * 2 + mm2TotalOffset + pseAlibiOffset)) / sizeof(T);
-        mm1ResPongAddr = mm1ResPingAddr + mm1Offset / sizeof(T);      // 间隔1份bmm1Result空间
-        mm2ResPingAddr = mm1ResPongAddr + mm1Offset / sizeof(T) * 3;  // 间隔1份bmm1Result空间和2份stage1Result空间
-        mm2ResPongAddr = mm2ResPingAddr + mm2Offset / sizeof(T);      // 间隔1份bmm2Result空间
-        pseAlibiAddr = mm2ResPongAddr + mm2Offset / sizeof(T);        // 间隔1份bmm2Result空间
+        mm1ResPingAddr =
+            (dropmaskWorkSpaceLen + this->blockIdx * (mm1TotalOffset * 2 + mm2TotalOffset + pseAlibiOffset)) /
+            sizeof(T);
+        mm1ResPongAddr = mm1ResPingAddr + mm1Offset / sizeof(T);     // 间隔1份bmm1Result空间
+        mm2ResPingAddr = mm1ResPongAddr + mm1Offset / sizeof(T) * 3; // 间隔1份bmm1Result空间和2份stage1Result空间
+        mm2ResPongAddr = mm2ResPingAddr + mm2Offset / sizeof(T);     // 间隔1份bmm2Result空间
+        pseAlibiAddr = mm2ResPongAddr + mm2Offset / sizeof(T);       // 间隔1份bmm2Result空间
     }
 
     // bmm1Result，占用2倍mm1Offset空间
@@ -409,7 +405,7 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::InitInput(
     this->mm2ResPing.SetGlobalBuffer((__gm__ T *)workspace + mm2ResPingAddr);
     this->mm2ResPong.SetGlobalBuffer((__gm__ T *)workspace + mm2ResPongAddr);
 
-    this->pseAlibiGm.SetGlobalBuffer((__gm__ half*)workspace + pseAlibiAddr * 2);
+    this->pseAlibiGm.SetGlobalBuffer((__gm__ half *)workspace + pseAlibiAddr * 2);
     // dropout workspace
     dropoutWorkspaceGm.SetGlobalBuffer((__gm__ uint8_t *)workspace);
 
@@ -467,7 +463,9 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
         this->pseInfo.qStartIdx = this->tilingData->inputParams.qStartIdx;
         this->pseInfo.kvStartIdx = this->tilingData->inputParams.kvStartIdx;
         this->pseInfo.pseEndogenous = (this->pseInfo.pseType == (int64_t)PseTypeEnum::PSE_INNER_MUL_ADD_TYPE ||
-            this->pseInfo.pseType == (int64_t)PseTypeEnum::PSE_INNER_MUL_ADD_SQRT_TYPE) ? true : false;
+                                       this->pseInfo.pseType == (int64_t)PseTypeEnum::PSE_INNER_MUL_ADD_SQRT_TYPE) ?
+                                          true :
+                                          false;
     }
     if constexpr (hasDrop == true) {
         this->dropMaskInfo.s1Size = this->s1Size;
@@ -514,17 +512,17 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::CalBatchSize()
 {
-    this->tensorABatchSize = this->bBaseSize * this->tilingData->inputParams.n2Size *
-                             this->tilingData->inputParams.gSize;
+    this->tensorABatchSize =
+        this->bBaseSize * this->tilingData->inputParams.n2Size * this->tilingData->inputParams.gSize;
     this->tensorBBatchSize = this->bBaseSize * this->tilingData->inputParams.n2Size;
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::InitBuffer()
 {
-    this->pipe->InitBuffer(this->maskTBufPing, 11 * 1024);             // 可以给attenmask 11k
-    this->pipe->InitBuffer(this->maskTBufPong, 16 * 1024);             // 可以给dropoutmask和pse 16k
-    this->pipe->InitBuffer(this->pseTBuf, 16384); // pse 16k
+    this->pipe->InitBuffer(this->maskTBufPing, 11 * 1024); // 可以给attenmask 11k
+    this->pipe->InitBuffer(this->maskTBufPong, 16 * 1024); // 可以给dropoutmask和pse 16k
+    this->pipe->InitBuffer(this->pseTBuf, 16384);          // pse 16k
 
     this->pipe->InitBuffer(this->stage1PingBuf, 8 * 1024 * sizeof(T)); // t.a 32k
     this->pipe->InitBuffer(this->stage1PongBuf, 8 * 1024 * sizeof(T)); // i.a 32k
@@ -534,7 +532,7 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
     this->pipe->InitBuffer(this->softmaxSumPongBuf, this->softmaxBufSize * blockBytes); // 8k max
     this->pipe->InitBuffer(this->softmaxMaxPingBuf, this->softmaxBufSize * blockBytes); // 8k max
     this->pipe->InitBuffer(this->softmaxMaxPongBuf, this->softmaxBufSize * blockBytes); // 8k max
-    this->pipe->InitBuffer(this->softmaxExpBuf, blockBytes);      // 当前模版exp未使用，分配32B即可
+    this->pipe->InitBuffer(this->softmaxExpBuf, blockBytes); // 当前模版exp未使用，分配32B即可
 
     // 存放vector的输出，为Cast成fp16之后的结果
     this->pipe->InitBuffer(this->vecOut, 16384); // 16k
@@ -629,8 +627,8 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::IterateBmm1(SplitBExtraInfo &extraInfo)
+__aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::IterateBmm1(
+    SplitBExtraInfo &extraInfo)
 {
     int64_t qCoreOffset = this->ComputeQCoreOffset(extraInfo);
     int64_t kvCoreOffset = this->ComputeKVCoreOffset(extraInfo);
@@ -678,8 +676,8 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline int64_t
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeQCoreOffset(SplitBExtraInfo &extraInfo)
+__aicore__ inline int64_t FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeQCoreOffset(
+    SplitBExtraInfo &extraInfo)
 {
     // 计算gm上的offset
     int64_t qBOffset = 0;
@@ -699,8 +697,8 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeQCor
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline int64_t
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeKVCoreOffset(SplitBExtraInfo &extraInfo)
+__aicore__ inline int64_t FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeKVCoreOffset(
+    SplitBExtraInfo &extraInfo)
 {
     // 计算gm上的offset
     int64_t kvBOffset = 0;
@@ -773,8 +771,8 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ProcessVec1(SplitBExtraInfo &extraInfo)
+__aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ProcessVec1(
+    SplitBExtraInfo &extraInfo)
 {
     LocalTensor<T> stage1PingTensor = this->stage1PingBuf.template Get<T>(); // t.a 32k
     LocalTensor<T> stage1PongTensor = this->stage1PongBuf.template Get<T>(); // i.a 32k
@@ -883,8 +881,7 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ProcessVec1
                     this->ComputeAttenMask(extraInfo, stage1PingTensor, 1);
                 }
                 if (this->attenMaskCompressMode == static_cast<uint8_t>(AttenMaskCompressMode::PREFIX_MODE)) {
-                    event_t eventIdMte3ToMte2 =
-                        static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
+                    event_t eventIdMte3ToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
                     AscendC::SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
                     AscendC::WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
                     this->CopyInAttenMask(extraInfo, this->attenMaskOffsetPre);
@@ -1071,8 +1068,8 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
             }
             if (likely(innerRemain)) {
                 Copy(bmmResUb[outerLoop * outerBmmOffset + innerLoop * 128 + i * 8],
-                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
-                     outerRemain, repeatParams);
+                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8, outerRemain,
+                     repeatParams);
             }
         }
     }
@@ -1082,8 +1079,8 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ProcessVec2(SplitBExtraInfo &extraInfo)
+__aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ProcessVec2(
+    SplitBExtraInfo &extraInfo)
 {
     int64_t dAlign8 = (this->dSize + 7) / 8 * 8;
     event_t eventIdMte3ToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
@@ -1128,8 +1125,8 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ProcessVec2
                     nz2NdInfo.ndFirstAxisRealSize = this->s1Size;
                     nz2NdInfo.ndFirstAxisLoopSize = extraInfo.s1Vec2BaseSize;
                     nz2NdInfo.ndLastAxis = this->dSizeAlign16;
-                    nz2NdInfo.bmmResOffset = extraInfo.biN2GoIdx * this->s1Size * this->dSizeAlign16 +
-                                             s1oIdx * this->s1Vec2BaseSize * 16;
+                    nz2NdInfo.bmmResOffset =
+                        extraInfo.biN2GoIdx * this->s1Size * this->dSizeAlign16 + s1oIdx * this->s1Vec2BaseSize * 16;
                     event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
                     AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
                     AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
@@ -1146,8 +1143,8 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ProcessVec2
                     nz2NdInfo.ndFirstAxisRealSize = this->s1Size;
                     nz2NdInfo.ndFirstAxisLoopSize = extraInfo.s1Vec2BaseSize;
                     nz2NdInfo.ndLastAxis = this->dSizeAlign16;
-                    nz2NdInfo.bmmResOffset = extraInfo.biN2GoIdx * this->s1Size * this->dSizeAlign16 +
-                                             s1oIdx * this->s1Vec2BaseSize * 16;
+                    nz2NdInfo.bmmResOffset =
+                        extraInfo.biN2GoIdx * this->s1Size * this->dSizeAlign16 + s1oIdx * this->s1Vec2BaseSize * 16;
                     event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
                     AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
                     AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
@@ -1322,9 +1319,8 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline void
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::CopyInAttenMask(SplitBExtraInfo &extraInfo,
-                                                                                     int64_t maskOffset)
+__aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::CopyInAttenMask(
+    SplitBExtraInfo &extraInfo, int64_t maskOffset)
 {
     if constexpr (hasAtten == true) {
         LocalTensor<uint8_t> attenMaskUb = this->maskTBufPing.template Get<uint8_t>();
@@ -1373,8 +1369,8 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeOffs
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline int64_t
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeAttenMaskOffset(SplitBExtraInfo &extraInfo)
+__aicore__ inline int64_t FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeAttenMaskOffset(
+    SplitBExtraInfo &extraInfo)
 {
     if constexpr (hasAtten == true) {
         int64_t deltaCausalOrNext = 0;
@@ -1396,10 +1392,10 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeAtte
         } else if (this->attenMaskCompressMode == static_cast<uint8_t>(AttenMaskCompressMode::PREFIX_MODE)) {
             deltaCausalOrNext = s1Offset - s2Offset - deltaN;
             deltaPre = (this->s1Size + ((__gm__ int64_t *)this->prefixNAddr)[extraInfo.boIdx] > this->s2Size) ?
-                           (((__gm__ int64_t *)this->prefixNAddr)[extraInfo.boIdx] - s2Offset) : 0;
-            this->attenMaskOffsetPre =
-                this->ComputeOffsetForPrefixRectangle(deltaPre, this->s2Size,
-                                                      this->tilingData->inputParams.attenMaskS2Size);
+                           (((__gm__ int64_t *)this->prefixNAddr)[extraInfo.boIdx] - s2Offset) :
+                           0;
+            this->attenMaskOffsetPre = this->ComputeOffsetForPrefixRectangle(
+                deltaPre, this->s2Size, this->tilingData->inputParams.attenMaskS2Size);
             if (this->blockIdx + extraInfo.vecS1BaseSize < prefixAttenMaskDownHeight) { // in case of out of bound
                 this->attenMaskOffsetPre += this->tilingData->inputParams.attenMaskS2Size * this->blockIdx;
             }
@@ -1412,9 +1408,8 @@ FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeAtte
 }
 
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
-__aicore__ inline int64_t
-FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeOffsetForNoCompress(
-    SplitBExtraInfo &extraInfo)
+__aicore__ inline int64_t FlashAttentionScoreBn2gs1s2B<
+    FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::ComputeOffsetForNoCompress(SplitBExtraInfo &extraInfo)
 {
     if constexpr (hasAtten == true) {
         int64_t bOffset = 0;
@@ -1491,7 +1486,6 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
     }
 }
 
-
 FA_BN2GS1S2B_FUNCTION_TEMPLATE
 __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS_TEMPLATE>::SoftMaxCompute(
     SplitBExtraInfo &extraInfo, LocalTensor<T> &srcTensor, int64_t loopIdx)
@@ -1536,24 +1530,24 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
     AscendC::PipeBarrier<PIPE_V>();
     SoftMaxTiling softmaxFlashTilingData;
     if (IsBasicBlockInSoftMax(extraInfo.vecS1BaseSize, this->s2Size)) {
-        if (hasSink){
+        if (hasSink) {
             expUb = this->maskTBufPing.template Get<T>()[0];
             expUb.SetShapeInfo(ShapeInfo(2, expShape, DataFormat::ND));
             SoftmaxFlashV2<T, true, true, true>(srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer,
-                                        softmaxFlashTilingData);
-        }else{
+                                                softmaxFlashTilingData);
+        } else {
             SoftmaxFlashV2<T, false, true, true>(srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer,
-                                        softmaxFlashTilingData);
+                                                 softmaxFlashTilingData);
         }
     } else {
-        if (hasSink){
+        if (hasSink) {
             expUb = this->maskTBufPing.template Get<T>()[0];
             expUb.SetShapeInfo(ShapeInfo(2, expShape, DataFormat::ND));
             SoftmaxFlashV2<T, true, true, false>(srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer,
-                                                softmaxFlashTilingData);
-        }else{
+                                                 softmaxFlashTilingData);
+        } else {
             SoftmaxFlashV2<T, false, true, false>(srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer,
-                                                softmaxFlashTilingData);
+                                                  softmaxFlashTilingData);
         }
     }
 

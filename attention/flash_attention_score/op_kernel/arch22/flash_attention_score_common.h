@@ -48,7 +48,8 @@ using AscendC::TPosition;
 using AscendC::TSCM;
 
 constexpr MatmulConfig CFG_EXCEED = GetNormalConfig(true);
-constexpr MatmulConfig CFG_DIS_UNIT_FLAG_EXCEED = GetNormalConfig(true, false, false, BatchMode::BATCH_LESS_THAN_L1, true, IterateOrder::UNDEF, ScheduleType::INNER_PRODUCT, false);
+constexpr MatmulConfig CFG_DIS_UNIT_FLAG_EXCEED = GetNormalConfig(
+    true, false, false, BatchMode::BATCH_LESS_THAN_L1, true, IterateOrder::UNDEF, ScheduleType::INNER_PRODUCT, false);
 constexpr MatmulConfig CFG_IBSHARE_EXCEED = GetIBShareNormConfig(true);
 constexpr MatmulConfig CFG_MDL_EXCEED = GetMDLConfig(true);
 constexpr uint64_t BLOCK_BYTE = 32;
@@ -170,7 +171,8 @@ __aicore__ inline bool IsIncludeInvalidLine(uint16_t softMaxCheckRes, uint32_t b
     }
 }
 
-template <typename T> __aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
+template <typename T>
+__aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
 {
     if constexpr (IsSameType<T, float>::value) {
         uint32_t tmp1 = NEGATIVE_MIN_VAULE_FP32;
@@ -238,8 +240,7 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
     dataCopyParams.blockLen = nz2NdInfo.ndFirstAxisLoopSize * 2;
     dataCopyParams.srcStride = (nz2NdInfo.ndFirstAxisRealSize - nz2NdInfo.ndFirstAxisLoopSize) * 2;
     dataCopyParams.dstStride = 1;
-    int64_t bmmResOffset = nz2NdInfo.vecCoreOffset * 16 +
-                           nz2NdInfo.loopIdx * nz2NdInfo.ndFirstAxisBaseSize * 16;
+    int64_t bmmResOffset = nz2NdInfo.vecCoreOffset * 16 + nz2NdInfo.loopIdx * nz2NdInfo.ndFirstAxisBaseSize * 16;
     int64_t innerLoop = nzFirstAxis / 8L;
     int64_t innerRemain = nzFirstAxis % 8L;
 
@@ -263,8 +264,8 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
         for (int64_t i = 0; i < 2; ++i) {
             for (int64_t j = 0; j < innerLoop; ++j) {
                 Copy(bmmResUb[outerIndex * outerBmmOffset + j * 128 + i * 8],
-                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize,
-                     repeatMaxTimes, repeatParams);
+                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize, repeatMaxTimes,
+                     repeatParams);
             }
             if (likely(innerRemain)) {
                 Copy(bmmResUb[outerIndex * outerBmmOffset + innerLoop * 128 + i * 8],
@@ -282,8 +283,8 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
             }
             if (likely(innerRemain)) {
                 Copy(bmmResUb[outerLoop * outerBmmOffset + innerLoop * 128 + i * 8],
-                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
-                     outerRemain, repeatParams);
+                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8, outerRemain,
+                     repeatParams);
             }
         }
     }

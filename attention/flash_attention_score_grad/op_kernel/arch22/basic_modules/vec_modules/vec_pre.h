@@ -19,11 +19,10 @@
 #include "kernel_operator.h"
 using namespace AscendC;
 
-template <class TILING_TYPE> class VectorInitOuput {
+template <class TILING_TYPE>
+class VectorInitOuput {
 public:
-    __aicore__ inline VectorInitOuput()
-    {
-    }
+    __aicore__ inline VectorInitOuput() {}
     __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
                                 __gm__ uint8_t *workspace, const TILING_TYPE *orgTilingData);
     __aicore__ inline void Process();
@@ -84,7 +83,8 @@ __aicore__ inline void VectorInitOuput<TILING_TYPE>::Init(TPipe *pipe_in, __gm__
     dkvOffset = ((int64_t)cBlockIdx) * kvPreBlockFactor;
 }
 
-template <class TILING_TYPE> __aicore__ inline void VectorInitOuput<TILING_TYPE>::Process()
+template <class TILING_TYPE>
+__aicore__ inline void VectorInitOuput<TILING_TYPE>::Process()
 {
     // process clear dq dk dv workspace
     if (g_coreType == AIV && cBlockIdx < qPreBlockTotal) {

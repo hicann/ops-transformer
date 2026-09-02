@@ -16,11 +16,10 @@
  * l0_c： dimG * selectedBlockSize * sizof(T1) (0-4k / 48k-52k)
  */
 
-
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::LoadBData(const int64_t dsGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset,
-                      const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::LoadBData(
+    const int64_t dsGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx)
 {
     LocalTensor<T1> l1_key_tensor = mmPingPongIdx ? l1_key_ping_tensor : l1_key_pong_tensor;
     LocalTensor<T1> l0_a_tensor = l0_a_cube3_tensor;
@@ -80,9 +79,9 @@ CubeOp<T1>::LoadBData(const int64_t dsGmOffset, const int64_t keyGmOffset, const
 }
 
 template <typename T1>
-__aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube3Process(const int64_t dsGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset,
-                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx)
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube3Process(
+    const int64_t dsGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx)
 {
     commonLoadData2dParamsNoTranspose.repeatTimes = 512 / SIZE_16;
     commonLoadData2dParamsNoTranspose.srcStride = dimGAlign / SIZE_16;

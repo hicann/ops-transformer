@@ -15,7 +15,14 @@
 #include "kernel_tensor.h"
 
 namespace MlaPreprocess {
-enum class BufferType { ASCEND_UB, ASCEND_CB, ASCEND_L0A, ASCEND_L0B, ASCEND_L0C, ASCEND_MAX };
+enum class BufferType {
+    ASCEND_UB,
+    ASCEND_CB,
+    ASCEND_L0A,
+    ASCEND_L0B,
+    ASCEND_L0C,
+    ASCEND_MAX
+};
 
 template <BufferType BufferType_>
 __aicore__ constexpr AscendC::TPosition GetPosition()
@@ -39,11 +46,9 @@ struct AsdopsBuffer {
 public:
     __aicore__ AsdopsBuffer()
     {
-        constexpr uint32_t bufferSize[(uint32_t)BufferType::ASCEND_MAX] = {HardwareInfo<ArchTag>::ubSize,
-                                                                           HardwareInfo<ArchTag>::l1Size,
-                                                                           HardwareInfo<ArchTag>::l0ASize,
-                                                                           HardwareInfo<ArchTag>::l0BSize,
-                                                                           HardwareInfo<ArchTag>::l0CSize};
+        constexpr uint32_t bufferSize[(uint32_t)BufferType::ASCEND_MAX] = {
+            HardwareInfo<ArchTag>::ubSize, HardwareInfo<ArchTag>::l1Size, HardwareInfo<ArchTag>::l0ASize,
+            HardwareInfo<ArchTag>::l0BSize, HardwareInfo<ArchTag>::l0CSize};
 #ifndef __CCE_KT_TEST__
 #ifdef __DAV_C220_VEC__
         tensor[(uint32_t)BufferType::ASCEND_UB].InitBuffer(0, bufferSize[(uint32_t)BufferType::ASCEND_UB]);
@@ -81,5 +86,5 @@ public:
 public:
     AscendC::LocalTensor<uint8_t> tensor[(uint32_t)BufferType::ASCEND_MAX];
 };
-}
+} // namespace MlaPreprocess
 #endif

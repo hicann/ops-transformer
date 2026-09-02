@@ -17,37 +17,21 @@
 namespace MlaPreprocess {
 template <ArchType ArchTag, typename ElementA, typename ElementB, typename AccDTypeC, bool IsTransposeA>
 struct mmad {
-    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor,
-                    AscendC::LocalTensor<ElementA> l0aTensor,
-                    AscendC::LocalTensor<ElementB> l0bTensor,
-                    uint32_t mTileActual,
-                    uint32_t nTileActual,
-                    uint32_t kPartActual,
-                    bool initC,
-                    uint8_t unitFlag = 0) {};
+    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor, AscendC::LocalTensor<ElementA> l0aTensor,
+                    AscendC::LocalTensor<ElementB> l0bTensor, uint32_t mTileActual, uint32_t nTileActual,
+                    uint32_t kPartActual, bool initC, uint8_t unitFlag = 0) {};
 
-    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor,
-                    AscendC::LocalTensor<ElementA> l0aTensor,
-                    AscendC::LocalTensor<ElementB> l0bTensor,
-                    uint64_t biasBt,
-                    uint32_t mTileActual,
-                    uint32_t nTileActual,
-                    uint32_t kPartActual,
-                    bool initC,
-                    uint8_t unitFlag = 0) {};
+    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor, AscendC::LocalTensor<ElementA> l0aTensor,
+                    AscendC::LocalTensor<ElementB> l0bTensor, uint64_t biasBt, uint32_t mTileActual,
+                    uint32_t nTileActual, uint32_t kPartActual, bool initC, uint8_t unitFlag = 0) {};
 };
 
 // Partial specialization for V220, int8_t, not_vector_A, not TransposeA
 template <ArchType ArchTag, typename AccDTypeC, typename ElementA, typename ElementB>
 struct mmad<ArchTag, ElementA, ElementB, AccDTypeC, false> {
-    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor,
-                    AscendC::LocalTensor<ElementA> l0aTensor,
-                    AscendC::LocalTensor<ElementB> l0bTensor,
-                    uint32_t mTileActual,
-                    uint32_t nTileActual,
-                    uint32_t kPartActual,
-                    bool initC,
-                    uint8_t unitFlag = 0)
+    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor, AscendC::LocalTensor<ElementA> l0aTensor,
+                    AscendC::LocalTensor<ElementB> l0bTensor, uint32_t mTileActual, uint32_t nTileActual,
+                    uint32_t kPartActual, bool initC, uint8_t unitFlag = 0)
     {
         AscendC::Mmad(l0cTensor,                       // C
                       l0aTensor,                       // A
@@ -60,15 +44,9 @@ struct mmad<ArchTag, ElementA, ElementB, AccDTypeC, false> {
                                           initC));     // cmatrixInitVal
     };
 
-    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor,
-                    AscendC::LocalTensor<ElementA> l0aTensor,
-                    AscendC::LocalTensor<ElementB> l0bTensor,
-                    uint64_t biasBt,
-                    uint32_t mTileActual,
-                    uint32_t nTileActual,
-                    uint32_t kPartActual,
-                    bool initC,
-                    uint8_t unitFlag = 0)
+    __aicore__ mmad(AscendC::LocalTensor<AccDTypeC> l0cTensor, AscendC::LocalTensor<ElementA> l0aTensor,
+                    AscendC::LocalTensor<ElementB> l0bTensor, uint64_t biasBt, uint32_t mTileActual,
+                    uint32_t nTileActual, uint32_t kPartActual, bool initC, uint8_t unitFlag = 0)
     {
         AscendC::LocalTensor<AccDTypeC> biasTensor;
         biasTensor.InitBuffer(biasBt, nTileActual);
@@ -85,5 +63,5 @@ struct mmad<ArchTag, ElementA, ElementB, AccDTypeC, false> {
                                           false));     // cmatrixInitVal
     };
 };
-}
+} // namespace MlaPreprocess
 #endif

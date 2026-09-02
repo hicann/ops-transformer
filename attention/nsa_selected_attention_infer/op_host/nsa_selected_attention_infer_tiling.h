@@ -160,11 +160,11 @@ enum class TilingInOutMode : uint32_t {
 
 enum class NsaPerfMode : uint32_t {
     NORMAL = 0,
-    BMM_ALL_BY_VEC, // 1
-    C1_V1, // 2
-    CUBE_VIEW_MM, // 3
+    BMM_ALL_BY_VEC,         // 1
+    C1_V1,                  // 2
+    CUBE_VIEW_MM,           // 3
     CUBE_VIEW_MM_FULL_LOAD, // 4
-    CUBE_VIEW_MM_MLA  // 5
+    CUBE_VIEW_MM_MLA        // 5
 };
 
 enum NsaSocVersion : uint32_t {
@@ -202,10 +202,10 @@ public:
     ~NsaSelectTiling() = default;
 
     ge::graphStatus DoTiling(gert::TilingContext &context);
-    ge::graphStatus RunBigKernelTiling(NsaSelectAttentionInferContext &context, NsaSelectAttentionInferTilingDataV2 &tilingData,
-                                    bool isWorkspace = false);
+    ge::graphStatus RunBigKernelTiling(NsaSelectAttentionInferContext &context,
+                                       NsaSelectAttentionInferTilingDataV2 &tilingData, bool isWorkspace = false);
     ge::graphStatus NsaSelectAttentionInferSetTilingData(gert::TilingContext &context,
-                                                    NsaSelectAttentionInferTilingDataV2 &tilingData) const;
+                                                         NsaSelectAttentionInferTilingDataV2 &tilingData) const;
     static ge::graphStatus ConvertContext(gert::TilingContext &context, NsaSelectAttentionInferContext &nsaContext);
 
 private:
@@ -243,11 +243,11 @@ private:
 
     std::vector<int64_t> InitSparseValidArray(const int64_t *actualLens) const;
     bool BalanceLoad(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                    std::vector<int64_t> &localValue, std::vector<int64_t> &sparseStartIdx) const;
+                     std::vector<int64_t> &localValue, std::vector<int64_t> &sparseStartIdx) const;
     void InitLoadValue(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                    const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue) const;
+                       const std::vector<int64_t> &sparseStartIdx, std::vector<int64_t> &localValue) const;
     void SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, int64_t totalSize, int64_t validAivNum,
-                        uint32_t *sparseStartIdx, int64_t splitFactorSize);
+                           uint32_t *sparseStartIdx, int64_t splitFactorSize);
 
     ge::graphStatus SplitBN_V0();
 
@@ -365,11 +365,11 @@ private:
 };
 
 ge::graphStatus TilingPrepareForNsaSelectAttentionInfer(gert::TilingParseContext *context);
-ge::graphStatus TilingNsaSelectAttentionInferAdapter(gert::TilingContext *context, NsaSelectAttentionInferContext &nsaContext,
-                                                NsaSelectAttentionInferTilingDataV2 &nsaTilingData);
+ge::graphStatus TilingNsaSelectAttentionInferAdapter(gert::TilingContext *context,
+                                                     NsaSelectAttentionInferContext &nsaContext,
+                                                     NsaSelectAttentionInferTilingDataV2 &nsaTilingData);
 
 Nsa_EXTERN_C ge::graphStatus TilingNsaSelectAttentionInfer(gert::TilingContext *context);
 
 } // namespace optiling
 #endif // NSA_SELECTED_ATTENTION_INFER_TILING_H_
- 

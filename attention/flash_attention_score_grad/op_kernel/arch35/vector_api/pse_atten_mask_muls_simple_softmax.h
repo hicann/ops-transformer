@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
+
 /*!
  * \file pse_atten_mask_muls_simple_softmax.h
  */
@@ -28,7 +28,7 @@ __aicore__ inline void CopyInPse(FagConstInfo &constInfo, FagRunInfo &runInfo, P
 {
     // 调用公共函数，传入LocalTensor
     if constexpr (IS_PSE) {
-        if (runInfo.commonRunInfo.halfS1RealSize == 0 || pseInfo.pseType == 2 || pseInfo.pseType == 3){
+        if (runInfo.commonRunInfo.halfS1RealSize == 0 || pseInfo.pseType == 2 || pseInfo.pseType == 3) {
             return;
         }
         LocalTensor<T1> pseTensor = pseInQue.AllocTensor<T1>();
@@ -57,10 +57,10 @@ __aicore__ inline void CopyInAttenMask(FagConstInfo &constInfo, FagRunInfo &runI
                                        GlobalTensor<uint8_t> &attenMaskGm)
 {
     if constexpr (IS_ATTEN_MASK) {
-        if (runInfo.commonRunInfo.halfS1RealSize == 0){
+        if (runInfo.commonRunInfo.halfS1RealSize == 0) {
             return;
         }
-        AttenMaskCopyIn<IS_ATTEN_MASK>(attenMaskInQue, attenMaskInQuePre, attenMaskGm, runInfo.commonRunInfo, 
+        AttenMaskCopyIn<IS_ATTEN_MASK>(attenMaskInQue, attenMaskInQuePre, attenMaskGm, runInfo.commonRunInfo,
                                        constInfo.commonConstInfo, attenMaskInfo);
     }
 }
@@ -70,7 +70,9 @@ __aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo
                                     TQue<QuePosition::VECIN, 1> &maxSumInQue, GlobalTensor<T2> &maxGm,
                                     GlobalTensor<T2> &sumGm)
 {
-    if (runInfo.commonRunInfo.halfS1RealSize == 0) { return; }
+    if (runInfo.commonRunInfo.halfS1RealSize == 0) {
+        return;
+    }
     int64_t maxSumGmOffset = 0;
     if (constInfo.tndMaxSumLayout == MAX_SUM_TND) { // TND + TND
         int64_t dSize = constInfo.commonConstInfo.dSize;
@@ -82,8 +84,9 @@ __aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo
              runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx() * constInfo.commonConstInfo.n2G) *
             MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
     } else if (constInfo.commonConstInfo.layoutType == TND) { // TND + BNS8
-        int64_t tndS1PrefixSum =(runInfo.commonRunInfo.boIdx == 0 ? 0 :
-                                ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
+        int64_t tndS1PrefixSum = (runInfo.commonRunInfo.boIdx == 0 ?
+                                      0 :
+                                      ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
         int64_t actualS1Len = 0;
         maxSumGmOffset = tndS1PrefixSum * constInfo.commonConstInfo.n2G * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
         if (unlikely(runInfo.commonRunInfo.boIdx == 0)) {
@@ -94,13 +97,18 @@ __aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo
         }
         maxSumGmOffset +=
             ((runInfo.commonRunInfo.n2oIdx * constInfo.commonConstInfo.gSize + runInfo.commonRunInfo.goIdx) *
-                 actualS1Len + runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
-             runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
+                 actualS1Len +
+             runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
+             runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) *
+            MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
     } else { // BNS8
         maxSumGmOffset = (((runInfo.commonRunInfo.boIdx * constInfo.n2Size + runInfo.commonRunInfo.n2oIdx) *
-                constInfo.commonConstInfo.gSize + runInfo.commonRunInfo.goIdx) * constInfo.commonConstInfo.s1Size +
-                runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
-                runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
+                               constInfo.commonConstInfo.gSize +
+                           runInfo.commonRunInfo.goIdx) *
+                              constInfo.commonConstInfo.s1Size +
+                          runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
+                          runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) *
+                         MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
     }
     LocalTensor<T2> maxSumTensor = maxSumInQue.AllocTensor<T2>();
     if (constInfo.tndMaxSumLayout == MAX_SUM_TND) {
@@ -128,29 +136,33 @@ template <typename T2, const uint32_t VECTOR_BASEM = 64>
 __aicore__ inline int64_t GetBNSOffset(FagConstInfo &constInfo, FagRunInfo &runInfo)
 {
     int64_t offset = 0;
-    int64_t tndS1PrefixSum =(runInfo.commonRunInfo.boIdx == 0 ? 0 :
-                            ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
+    int64_t tndS1PrefixSum =
+        (runInfo.commonRunInfo.boIdx == 0 ? 0 :
+                                            ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1]);
     int64_t actualS1Len = 0;
     offset = tndS1PrefixSum * constInfo.commonConstInfo.n2G * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
     if (unlikely(runInfo.commonRunInfo.boIdx == 0)) {
         actualS1Len = ((__gm__ int64_t *)constInfo.seqS1_addr)[0];
     } else {
         actualS1Len = ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx] -
-                        ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1];
+                      ((__gm__ int64_t *)constInfo.seqS1_addr)[runInfo.commonRunInfo.boIdx - 1];
     }
     offset +=
-        ((runInfo.commonRunInfo.n2oIdx * constInfo.commonConstInfo.gSize + runInfo.commonRunInfo.goIdx) *
-                actualS1Len + runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
-            runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
+        ((runInfo.commonRunInfo.n2oIdx * constInfo.commonConstInfo.gSize + runInfo.commonRunInfo.goIdx) * actualS1Len +
+         runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
+         runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) *
+        MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
     return offset;
 }
- 
+
 template <typename T2, const uint32_t VECTOR_BASEM = 64, const uint32_t IS_ROPE = 0>
 __aicore__ inline void CopyInMaxSumWithSfmg(FagConstInfo &constInfo, FagRunInfo &runInfo,
-                                    TQue<QuePosition::VECIN, 1> &maxSumInQue, GlobalTensor<T2> &maxGm,
-                                    GlobalTensor<T2> &sumGm, GlobalTensor<T2> &sfmgWorkspaceGm)
+                                            TQue<QuePosition::VECIN, 1> &maxSumInQue, GlobalTensor<T2> &maxGm,
+                                            GlobalTensor<T2> &sumGm, GlobalTensor<T2> &sfmgWorkspaceGm)
 {
-    if (runInfo.commonRunInfo.halfS1RealSize == 0) { return; }
+    if (runInfo.commonRunInfo.halfS1RealSize == 0) {
+        return;
+    }
     int64_t maxSumGmOffset = 0;
     int64_t sfmgGmOffset = 0;
     if (constInfo.tndMaxSumLayout == MAX_SUM_TND) { // TND + TND
@@ -168,9 +180,12 @@ __aicore__ inline void CopyInMaxSumWithSfmg(FagConstInfo &constInfo, FagRunInfo 
         sfmgGmOffset = maxSumGmOffset;
     } else { // BNS8
         maxSumGmOffset = (((runInfo.commonRunInfo.boIdx * constInfo.n2Size + runInfo.commonRunInfo.n2oIdx) *
-                constInfo.commonConstInfo.gSize + runInfo.commonRunInfo.goIdx) * constInfo.commonConstInfo.s1Size +
-                runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
-                runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
+                               constInfo.commonConstInfo.gSize +
+                           runInfo.commonRunInfo.goIdx) *
+                              constInfo.commonConstInfo.s1Size +
+                          runInfo.commonRunInfo.s1oIdx * VECTOR_BASEM * CV_CORE_RATIO +
+                          runInfo.commonRunInfo.firstHalfS1RealSize * GetSubBlockIdx()) *
+                         MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2);
         sfmgGmOffset = maxSumGmOffset;
     }
     LocalTensor<T2> maxSumTensor = maxSumInQue.AllocTensor<T2>();
@@ -209,15 +224,18 @@ pseInQue：pse分配Que，入参
 dstTensor：返回计算结果，出参
 srcTensor：VF输入，入参
 *************************/
-template <typename T1, typename T2, const bool IS_FP8_INPUT = false, const uint32_t IS_ATTEN_MASK = 0, const uint32_t IS_PSE = 0, const uint32_t IS_DETER_OLD = 0,
-          const uint32_t VECTOR_BASEM = 64, const uint32_t VECTOR_BASEN = 128>
-__aicore__ inline void
-CalculatePseMulsSelSimpleSoftMax(FagConstInfo &constInfo, FagRunInfo &runInfo, PseInfo& pseInfo, AttenMaskInfo &attenMaskInfo,
-                                 TQue<QuePosition::VECIN, 1> &maxSumInQue, TQue<QuePosition::VECIN, 1> &attenMaskInQue,
-                                 TQue<QuePosition::VECIN, 1> &pseInQue, LocalTensor<T2> &dstTensor, LocalTensor<T2> &srcTensor, 
-                                 __gm__ uint8_t *pseSlope)
+template <typename T1, typename T2, const bool IS_FP8_INPUT = false, const uint32_t IS_ATTEN_MASK = 0,
+          const uint32_t IS_PSE = 0, const uint32_t IS_DETER_OLD = 0, const uint32_t VECTOR_BASEM = 64,
+          const uint32_t VECTOR_BASEN = 128>
+__aicore__ inline void CalculatePseMulsSelSimpleSoftMax(FagConstInfo &constInfo, FagRunInfo &runInfo, PseInfo &pseInfo,
+                                                        AttenMaskInfo &attenMaskInfo,
+                                                        TQue<QuePosition::VECIN, 1> &maxSumInQue,
+                                                        TQue<QuePosition::VECIN, 1> &attenMaskInQue,
+                                                        TQue<QuePosition::VECIN, 1> &pseInQue,
+                                                        LocalTensor<T2> &dstTensor, LocalTensor<T2> &srcTensor,
+                                                        __gm__ uint8_t *pseSlope)
 {
-    if (runInfo.commonRunInfo.halfS1RealSize == 0){
+    if (runInfo.commonRunInfo.halfS1RealSize == 0) {
         return;
     }
     LocalTensor<uint8_t> attenMaskTensor;
@@ -233,45 +251,50 @@ CalculatePseMulsSelSimpleSoftMax(FagConstInfo &constInfo, FagRunInfo &runInfo, P
         float slopes;
         // sparse mode 8非batch = 0下不需要加偏移
         if ((pseInfo.pseType == 2 || pseInfo.pseType == 3) && constInfo.commonConstInfo.layoutType == TND &&
-             attenMaskInfo.compressMode == static_cast<uint8_t>(BAND_LEFT_UP_CASUAL) && runInfo.commonRunInfo.boIdx != 0) {
-                pseInfo.qStartIdx = 0;
-                pseInfo.kvStartIdx = 0;
+            attenMaskInfo.compressMode == static_cast<uint8_t>(BAND_LEFT_UP_CASUAL) &&
+            runInfo.commonRunInfo.boIdx != 0) {
+            pseInfo.qStartIdx = 0;
+            pseInfo.kvStartIdx = 0;
         }
-        ComputeInnerPseOffset<T2, T1, IS_PSE>(slopes, posShift, runInfo.commonRunInfo, constInfo.commonConstInfo, pseInfo, pseSlope);
+        ComputeInnerPseOffset<T2, T1, IS_PSE>(slopes, posShift, runInfo.commonRunInfo, constInfo.commonConstInfo,
+                                              pseInfo, pseSlope);
         pseTensor = (pseInfo.pseType == 0 || pseInfo.pseType == 1) ? pseInQue.DeQue<T1>() : pseInQue.AllocTensor<T1>();
         if (IS_FP8_INPUT) {
             AscendC::MulsSelSimpleSoftMaxAligned256<T1, T2, CONVERT_VECTOR_BASEN, IS_ATTEN_MASK, IS_PSE, IS_DETER_OLD>(
-            dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor, pseTensor,
-            attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue, runInfo.commonRunInfo.halfS1RealSize, 
-            runInfo.commonRunInfo.s2RealSize, pseInfo.pseType, pseInfo.pseLayoutType, posShift, slopes);
+                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor,
+                pseTensor, attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue,
+                runInfo.commonRunInfo.halfS1RealSize, runInfo.commonRunInfo.s2RealSize, pseInfo.pseType,
+                pseInfo.pseLayoutType, posShift, slopes);
         } else if (runInfo.commonRunInfo.s2RealSize > 64) {
             AscendC::MulsSelSimpleSoftMax<T1, T2, 128, IS_ATTEN_MASK, IS_PSE, IS_DETER_OLD>(
-            dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor, pseTensor, 
-            attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue, runInfo.commonRunInfo.halfS1RealSize, 
-            runInfo.commonRunInfo.s2RealSize, pseInfo.pseType, pseInfo.pseLayoutType, posShift, slopes);
+                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor,
+                pseTensor, attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue,
+                runInfo.commonRunInfo.halfS1RealSize, runInfo.commonRunInfo.s2RealSize, pseInfo.pseType,
+                pseInfo.pseLayoutType, posShift, slopes);
         } else {
             AscendC::MulsSelSimpleSoftMax<T1, T2, 64, IS_ATTEN_MASK, IS_PSE, IS_DETER_OLD>(
-            dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor, pseTensor, 
-            attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue, runInfo.commonRunInfo.halfS1RealSize,
-            runInfo.commonRunInfo.s2RealSize, pseInfo.pseType, pseInfo.pseLayoutType, posShift, slopes);
+                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor,
+                pseTensor, attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue,
+                runInfo.commonRunInfo.halfS1RealSize, runInfo.commonRunInfo.s2RealSize, pseInfo.pseType,
+                pseInfo.pseLayoutType, posShift, slopes);
         }
         pseInQue.FreeTensor(pseTensor);
     } else {
         if (IS_FP8_INPUT) {
             AscendC::MulsSelSimpleSoftMaxAligned256<T1, T2, CONVERT_VECTOR_BASEN, IS_ATTEN_MASK, IS_PSE, IS_DETER_OLD>(
-                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor, pseTensor, 
-                attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue, runInfo.commonRunInfo.halfS1RealSize,
-                runInfo.commonRunInfo.s2RealSize);
+                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor,
+                pseTensor, attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue,
+                runInfo.commonRunInfo.halfS1RealSize, runInfo.commonRunInfo.s2RealSize);
         } else if (runInfo.commonRunInfo.s2RealSize > 64) {
             AscendC::MulsSelSimpleSoftMax<T1, T2, 128, IS_ATTEN_MASK, IS_PSE, IS_DETER_OLD>(
-                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor, pseTensor, 
-                attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue, runInfo.commonRunInfo.halfS1RealSize,
-                runInfo.commonRunInfo.s2RealSize);
+                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor,
+                pseTensor, attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue,
+                runInfo.commonRunInfo.halfS1RealSize, runInfo.commonRunInfo.s2RealSize);
         } else {
             AscendC::MulsSelSimpleSoftMax<T1, T2, 64, IS_ATTEN_MASK, IS_PSE, IS_DETER_OLD>(
-                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor, pseTensor, 
-                attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue, runInfo.commonRunInfo.halfS1RealSize,
-                runInfo.commonRunInfo.s2RealSize);
+                dstTensor, maxSumTensor, maxSumTensor[VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE / sizeof(T2)], srcTensor,
+                pseTensor, attenMaskTensor, constInfo.scaleValue, constInfo.attenMaskMinValue,
+                runInfo.commonRunInfo.halfS1RealSize, runInfo.commonRunInfo.s2RealSize);
         }
     }
     // FreeTensor

@@ -25,28 +25,24 @@ using namespace AscendC;
 template <typename T0, typename T1, typename T2>
 class IndexerQuantCacheMultiRowMxFp4 {
 public:
-    __aicore__ inline IndexerQuantCacheMultiRowMxFp4()
-    {}
+    __aicore__ inline IndexerQuantCacheMultiRowMxFp4() {}
 
-    __aicore__ inline void Init(
-        GM_ADDR x, GM_ADDR slotMapping, GM_ADDR cache, GM_ADDR cacheScale,
-        GM_ADDR workspace, const IndexerQuantCacheTilingData* tilingDataPtr, TPipe* pipePtr)
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR slotMapping, GM_ADDR cache, GM_ADDR cacheScale, GM_ADDR workspace,
+                                const IndexerQuantCacheTilingData *tilingDataPtr, TPipe *pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
         cacheCol = (tilingData->d + 1) / 2;
 
-        xGm.SetGlobalBuffer((__gm__ T0*)x);
-        slotMappingGm.SetGlobalBuffer((__gm__ int32_t*)slotMapping);
-        cacheGm.SetGlobalBuffer((__gm__ int8_t*)cache);  // fp4 cache 按字节寻址
-        cacheScaleGm.SetGlobalBuffer((__gm__ T2*)cacheScale);
+        xGm.SetGlobalBuffer((__gm__ T0 *)x);
+        slotMappingGm.SetGlobalBuffer((__gm__ int32_t *)slotMapping);
+        cacheGm.SetGlobalBuffer((__gm__ int8_t *)cache); // fp4 cache 按字节寻址
+        cacheScaleGm.SetGlobalBuffer((__gm__ T2 *)cacheScale);
 
-        pipe->InitBuffer(
-            cacheScaleQue, 2,
-            tilingData->rowFactor * ScaleRowAlignMxFp4(tilingData->scaleCol) * sizeof(T2));
+        pipe->InitBuffer(cacheScaleQue, 2,
+                         tilingData->rowFactor * ScaleRowAlignMxFp4(tilingData->scaleCol) * sizeof(T2));
         pipe->InitBuffer(xQue, 2, tilingData->rowFactor * RoundUp<T0>(tilingData->d) * sizeof(T0));
-        pipe->InitBuffer(
-            cacheQue, 2, tilingData->rowFactor * RoundUp<int8_t>(cacheCol) * sizeof(int8_t));
+        pipe->InitBuffer(cacheQue, 2, tilingData->rowFactor * RoundUp<int8_t>(cacheCol) * sizeof(int8_t));
         pipe->InitBuffer(maxExpBuf, RoundUp<uint16_t>(tilingData->scaleCol) * sizeof(uint16_t));
         pipe->InitBuffer(halfScaleBuf, RoundUp<uint16_t>(tilingData->scaleCol) * sizeof(uint16_t));
         pipe->InitBuffer(indexBuf, RoundUp<int32_t>(tilingData->rowFactor) * sizeof(int32_t));
@@ -67,16 +63,15 @@ public:
             xLocal = xQue.template AllocTensor<T0>();
             validIdx = 0;
             for (int64_t rowInnerIdx = 0; rowInnerIdx < curRowFactor; rowInnerIdx++) {
-                int64_t curSlotIdx = curBlockIdx * tilingData->rowOfFormerBlock +
-                    rowOuterIdx * tilingData->rowFactor + rowInnerIdx;
+                int64_t curSlotIdx =
+                    curBlockIdx * tilingData->rowOfFormerBlock + rowOuterIdx * tilingData->rowFactor + rowInnerIdx;
                 int64_t slot = slotMappingGm.GetValue(curSlotIdx);
                 if (slot == -1) {
                     continue;
                 }
-                CopyIn(
-                    xGm[xGmBaseOffset + rowOuterIdx * tilingData->rowFactor * tilingData->d +
-                        rowInnerIdx * tilingData->d],
-                    xLocal[validIdx * RoundUp<T0>(tilingData->d)], 1, tilingData->d);
+                CopyIn(xGm[xGmBaseOffset + rowOuterIdx * tilingData->rowFactor * tilingData->d +
+                           rowInnerIdx * tilingData->d],
+                       xLocal[validIdx * RoundUp<T0>(tilingData->d)], 1, tilingData->d);
                 indexLocal.SetValue(validIdx, slot);
                 validIdx++;
 
@@ -92,9 +87,8 @@ public:
             LocalTensor<uint16_t> maxExpLocal = maxExpBuf.Get<uint16_t>();
             LocalTensor<uint16_t> halfScaleLocal = halfScaleBuf.Get<uint16_t>();
 
-            VFProcessDynamicMxFp4Quant<T1, T2, T0>(
-                cacheLocal, cacheScaleLocal, xLocal,
-                maxExpLocal, halfScaleLocal, validIdx, tilingData->d);
+            VFProcessDynamicMxFp4Quant<T1, T2, T0>(cacheLocal, cacheScaleLocal, xLocal, maxExpLocal, halfScaleLocal,
+                                                   validIdx, tilingData->d);
 
             xQue.template FreeTensor(xLocal);
             cacheQue.template EnQue(cacheLocal);
@@ -105,15 +99,14 @@ public:
 
             for (int64_t curValidIdx = 0; curValidIdx < validIdx; curValidIdx++) {
                 int64_t curSlotIdx = indexLocal.GetValue(curValidIdx);
-                CopyOut(
-                    cacheLocal[curValidIdx * RoundUp<int8_t>(cacheCol)],
-                    cacheGm[PagedSlotOffset(curSlotIdx, tilingData->blockSize,
-                        tilingData->cacheBlockStride, tilingData->cacheRowStride)], 1, cacheCol);
-                CopyOut(
-                    cacheScaleLocal[curValidIdx * ScaleRowAlignMxFp4(tilingData->scaleCol)],
-                    cacheScaleGm[PagedSlotOffset(curSlotIdx, tilingData->blockSize,
-                        tilingData->scaleBlockStride, tilingData->scaleRowStride)], 1,
-                    tilingData->scaleCol);
+                CopyOut(cacheLocal[curValidIdx * RoundUp<int8_t>(cacheCol)],
+                        cacheGm[PagedSlotOffset(curSlotIdx, tilingData->blockSize, tilingData->cacheBlockStride,
+                                                tilingData->cacheRowStride)],
+                        1, cacheCol);
+                CopyOut(cacheScaleLocal[curValidIdx * ScaleRowAlignMxFp4(tilingData->scaleCol)],
+                        cacheScaleGm[PagedSlotOffset(curSlotIdx, tilingData->blockSize, tilingData->scaleBlockStride,
+                                                     tilingData->scaleRowStride)],
+                        1, tilingData->scaleCol);
             }
             cacheQue.template FreeTensor(cacheLocal);
             cacheScaleQue.template FreeTensor(cacheScaleLocal);
@@ -121,8 +114,8 @@ public:
     }
 
 private:
-    TPipe* pipe;
-    const IndexerQuantCacheTilingData* tilingData;
+    TPipe *pipe;
+    const IndexerQuantCacheTilingData *tilingData;
     GlobalTensor<T0> xGm;
     GlobalTensor<int32_t> slotMappingGm;
     GlobalTensor<int8_t> cacheGm;

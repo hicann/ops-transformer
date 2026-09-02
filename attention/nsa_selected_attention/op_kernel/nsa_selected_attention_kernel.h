@@ -39,12 +39,10 @@ class NsaSelectedAttention {
 public:
     __aicore__ inline NsaSelectedAttention(){};
 
-    __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR value,
-                                    GM_ADDR topkIndices, GM_ADDR attenMask,
-                                    GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen,
-                                    GM_ADDR softmaxMax, GM_ADDR softmaxSum,
-                                    GM_ADDR attentionOut, GM_ADDR workspace,
-                                    const NsaSelectedAttentionTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices, GM_ADDR attenMask,
+                                GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax, GM_ADDR softmaxSum,
+                                GM_ADDR attentionOut, GM_ADDR workspace,
+                                const NsaSelectedAttentionTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void Process();
 
     // define matmul1
@@ -62,9 +60,9 @@ public:
     matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, CFG_EXCEED> bmm2;
 
 protected:
-    __aicore__ inline void InitIOGm(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices,
-                                    GM_ADDR attenMask, GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen,
-                                    GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR attentionOut);
+    __aicore__ inline void InitIOGm(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices, GM_ADDR attenMask,
+                                    GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax,
+                                    GM_ADDR softmaxSum, GM_ADDR attentionOut);
     __aicore__ inline void SetTiling(const NsaSelectedAttentionTilingData *__restrict tiling);
     __aicore__ inline void InitWorkspace(GM_ADDR workspace);
     __aicore__ inline void InitBuffer();
@@ -101,15 +99,15 @@ protected:
     int64_t bN2GD2;
     int64_t gSize;
 
-    int64_t currentCoreS1Len;  // 当前核处理的S1长度
-    int64_t startBS1Offset; // 当前核位于BS1的起始位置，单位：1
-    int64_t endBS1Offset;   // 当前核位于BS1的结束位置，单位：1
+    int64_t currentCoreS1Len;      // 当前核处理的S1长度
+    int64_t startBS1Offset;        // 当前核位于BS1的起始位置，单位：1
+    int64_t endBS1Offset;          // 当前核位于BS1的结束位置，单位：1
     int64_t currentBStartOffset;   // 当前B索引下BS1的初始位置，单位：1
-    int64_t currentBS2StartOffset;   // 当前B索引下S1的长度，单位：1
-    int64_t currentBS1Len;   // 当前B索引下S1的长度，单位：1
-    int64_t currentS1BlockIdx; // 当前S1的块位置，单位：selectedBlockSize
-    int64_t maxBlockNum;  // 当前处理的块数
-    int64_t savedBS1Len; // 记录当前B索引下BS1最大长度
+    int64_t currentBS2StartOffset; // 当前B索引下S1的长度，单位：1
+    int64_t currentBS1Len;         // 当前B索引下S1的长度，单位：1
+    int64_t currentS1BlockIdx;     // 当前S1的块位置，单位：selectedBlockSize
+    int64_t maxBlockNum;           // 当前处理的块数
+    int64_t savedBS1Len;           // 记录当前B索引下BS1最大长度
 
     uint64_t selectedBlockSize;
     uint64_t selectedBlockCount;
@@ -199,24 +197,23 @@ protected:
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
 __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::Init(
-    GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices,
-    GM_ADDR attenMask, GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen,
-    GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR attentionOut, GM_ADDR workspace,
+    GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices, GM_ADDR attenMask, GM_ADDR actualSeqQLen,
+    GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR attentionOut, GM_ADDR workspace,
     const NsaSelectedAttentionTilingData *__restrict tiling, TPipe *tPipe)
 {
     this->blockIdx = GetBlockIdx();
     this->pipe = tPipe;
     this->SetTiling(tiling);
 
-    this->InitIOGm(query, key, value, topkIndices, attenMask, actualSeqQLen,
-    actualSeqKvLen, softmaxMax, softmaxSum, attentionOut);
+    this->InitIOGm(query, key, value, topkIndices, attenMask, actualSeqQLen, actualSeqKvLen, softmaxMax, softmaxSum,
+                   attentionOut);
     this->InitWorkspace(workspace);
     this->InitBuffer();
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
 __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetTiling(
-                                        const NsaSelectedAttentionTilingData *__restrict tiling)
+    const NsaSelectedAttentionTilingData *__restrict tiling)
 {
     // copy base params
     this->tilingData = tiling;
@@ -285,9 +282,11 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SetTiling(
 };
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::InitIOGm(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR topkIndices,
-    GM_ADDR attenMask, GM_ADDR actualSeqQLen, GM_ADDR actualSeqKvLen,
-    GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR attentionOut)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::InitIOGm(GM_ADDR query, GM_ADDR key, GM_ADDR value,
+                                                                             GM_ADDR topkIndices, GM_ADDR attenMask,
+                                                                             GM_ADDR actualSeqQLen,
+                                                                             GM_ADDR actualSeqKvLen, GM_ADDR softmaxMax,
+                                                                             GM_ADDR softmaxSum, GM_ADDR attentionOut)
 {
     this->queryGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
     this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
@@ -312,7 +311,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::InitWorkspac
     uint64_t selectedKCoreOffset = this->dSize * selectedDataSize * this->blockIdx;
     uint64_t selectedVCoreOffset = this->d2Size * selectedDataSize * this->blockIdx;
     uint64_t mm1ResCoreOffset = this->gSize * this->selectedLength * sizeof(float) * this->blockIdx;
-    
+
     this->selectedKRes.SetGlobalBuffer((__gm__ INPUT_T *)(workspace + selectedKCoreOffset));
     this->selectedVRes.SetGlobalBuffer((__gm__ INPUT_T *)(workspace + selectedKSize + selectedVCoreOffset));
     this->mm1Res.SetGlobalBuffer((__gm__ float *)(workspace + selectedKSize + selectedVSize + mm1ResCoreOffset));
@@ -330,13 +329,13 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::InitBuffer()
     ubOffset += alignedBlockCount * sizeof(int32_t);
 
     this->selectVBufferUB = this->selectKBufferUB = vecQue.GetWithOffset<INPUT_T>(SELECTED_KV_MAX_ELE_NUM, ubOffset);
-    ubOffset += SELECTED_KV_MAX_ELE_NUM * sizeof(INPUT_T);  // 24K
+    ubOffset += SELECTED_KV_MAX_ELE_NUM * sizeof(INPUT_T); // 24K
 
     // softmax calc ub
     // softmaxResUb, bmm1ResUb UB复用
     this->softmaxResUb = vecQue.GetWithOffset<INPUT_T>(SOFTMAX_MAX_ELE_NUM, ubOffset);
     this->bmm1ResUb = vecQue.GetWithOffset<float>(SOFTMAX_MAX_ELE_NUM, ubOffset);
-    ubOffset += SOFTMAX_MAX_ELE_NUM * sizeof(float);  // 128K
+    ubOffset += SOFTMAX_MAX_ELE_NUM * sizeof(float); // 128K
 
     this->sumUb = vecQue.GetWithOffset<float>(this->gSize * SOFTMAX_REDUCE_SIZE, ubOffset);
     ubOffset += this->gSize * SOFTMAX_REDUCE_SIZE * sizeof(float);
@@ -426,7 +425,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::CalcRealBS()
             this->currentBS1Len = this->savedBS1Len - this->currentBStartOffset;
             this->currentBS2StartOffset = index == 0 ? 0 : this->actualSeqKvLenUB.GetValue(index - 1);
             this->maxBlockNum = CeilDiv(this->currentS1, this->selectedBlockSize);
-            this->maxBlockNum = this->maxBlockNum < this->selectedBlockCount ? this->maxBlockNum : this->selectedBlockCount;
+            this->maxBlockNum =
+                this->maxBlockNum < this->selectedBlockCount ? this->maxBlockNum : this->selectedBlockCount;
             return;
         }
     }
@@ -435,9 +435,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::CalcRealBS()
 template <typename INPUT_T, bool ATTEN_ENABLE>
 __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetIndices()
 {
-    this->topkIndicesGmOffset = static_cast<uint64_t>(
-        this->currentBS1 * this->n2 * this->selectedBlockCount +
-        this->currentN2 * this->selectedBlockCount);
+    this->topkIndicesGmOffset = static_cast<uint64_t>(this->currentBS1 * this->n2 * this->selectedBlockCount +
+                                                      this->currentN2 * this->selectedBlockCount);
     DataCopy(this->topKIndicesBufferUB, this->topkIndicesGm[this->topkIndicesGmOffset], alignedBlockCount);
     AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID0);
     AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID0);
@@ -458,7 +457,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SelectAndGat
 
     for (size_t index = 0; index < this->selectedBlockCount; ++index) {
         uint64_t topkIndex = static_cast<uint64_t>(this->topKIndicesBufferUB.GetValue(index));
-        selectKTmpOffset = static_cast<uint64_t>(selectKOffset + topkIndex * this->selectedBlockSize * this->n2 * this->dimK + this->currentN2 * this->dimK);
+        selectKTmpOffset = static_cast<uint64_t>(
+            selectKOffset + topkIndex * this->selectedBlockSize * this->n2 * this->dimK + this->currentN2 * this->dimK);
 
         AscendC::SetFlag<AscendC::HardEvent::S_MTE2>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::S_MTE2>(EVENT_ID0);
@@ -495,7 +495,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::SelectAndGat
     copyParams.dstStride = 0;
     for (size_t index = 0; index < this->selectedBlockCount; ++index) {
         uint64_t topkIndex = static_cast<uint64_t>(this->topKIndicesBufferUB.GetValue(index));
-        selectVTmpOffset = static_cast<uint64_t>(selectVOffset + topkIndex * this->selectedBlockSize * this->n2 * this->dimV + this->currentN2 * this->dimV);
+        selectVTmpOffset = static_cast<uint64_t>(
+            selectVOffset + topkIndex * this->selectedBlockSize * this->n2 * this->dimV + this->currentN2 * this->dimV);
 
         AscendC::SetFlag<AscendC::HardEvent::S_MTE2>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::S_MTE2>(EVENT_ID0);
@@ -548,17 +549,10 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::ProcessSoftm
 
         // softmax API
         AscendC::SoftMaxShapeInfo softmaxShapeInfo = {
-            static_cast<uint32_t>(currentProcessSize),
-            static_cast<uint32_t>(this->selectedLength),
-            static_cast<uint32_t>(currentProcessSize),
-            static_cast<uint32_t>(this->selectedLength)};
-        SoftMax(bmm1ResUb,
-                sumUb[reduceOffset],
-                maxUb[reduceOffset],
-                bmm1ResUb,
-                softmaxLocalWorkspace,
-                this->tilingData->softmaxTilingData,
-                softmaxShapeInfo);
+            static_cast<uint32_t>(currentProcessSize), static_cast<uint32_t>(this->selectedLength),
+            static_cast<uint32_t>(currentProcessSize), static_cast<uint32_t>(this->selectedLength)};
+        SoftMax(bmm1ResUb, sumUb[reduceOffset], maxUb[reduceOffset], bmm1ResUb, softmaxLocalWorkspace,
+                this->tilingData->softmaxTilingData, softmaxShapeInfo);
         AscendC::PipeBarrier<PIPE_V>();
         Cast(softmaxResUb, bmm1ResUb, RoundMode::CAST_ROUND, copyLength);
 
@@ -571,8 +565,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::ProcessSoftm
     }
 
     // softmax Max/Sum --> GM
-    uint64_t maxAndSumOutOffset = this->currentBS1 * this->n2G * SOFTMAX_REDUCE_SIZE +
-                                  this->currentN2 * this->maxAndSumOutBlockSize;
+    uint64_t maxAndSumOutOffset =
+        this->currentBS1 * this->n2G * SOFTMAX_REDUCE_SIZE + this->currentN2 * this->maxAndSumOutBlockSize;
     DataCopy(this->softmaxMaxGm[maxAndSumOutOffset], maxUb, this->maxAndSumOutBlockSize);
     DataCopy(this->softmaxSumGm[maxAndSumOutOffset], sumUb, this->maxAndSumOutBlockSize);
 
@@ -582,8 +576,9 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::ProcessSoftm
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetShiftLeftMask(
-    uint32_t totalSize, uint32_t shiftCount, uint64_t &mask)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetShiftLeftMask(uint32_t totalSize,
+                                                                                     uint32_t shiftCount,
+                                                                                     uint64_t &mask)
 {
     mask = (~0ULL) << shiftCount;
     if (totalSize < UL_BIT_COUNT) {
@@ -592,8 +587,10 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetShiftLeft
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::DuplicateWithLoop(
-    size_t selectedBlockIdx, uint32_t saveNum, uint32_t currentProcessSize, uint64_t mask[])
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::DuplicateWithLoop(size_t selectedBlockIdx,
+                                                                                      uint32_t saveNum,
+                                                                                      uint32_t currentProcessSize,
+                                                                                      uint64_t mask[])
 {
     if (saveNum >= UL_BIT_COUNT) {
         GetShiftLeftMask(this->selectedBlockSize - UL_BIT_COUNT, saveNum - UL_BIT_COUNT, mask[0]);
@@ -603,8 +600,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::DuplicateWit
         }
     } else {
         GetShiftLeftMask(this->selectedBlockSize, saveNum, mask[0]);
-        for (uint32_t round = 0, offset = selectedBlockIdx * this->selectedBlockSize;
-             round < currentProcessSize; ++round, offset += this->selectedLength) {
+        for (uint32_t round = 0, offset = selectedBlockIdx * this->selectedBlockSize; round < currentProcessSize;
+             ++round, offset += this->selectedLength) {
             AscendC::Duplicate(this->bmm1ResUb[offset], this->negativeScalar, mask, 1, 1, 0);
         }
         if (selectedBlockSize > UL_BIT_COUNT) {
@@ -635,7 +632,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u
     SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
     WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
     for (size_t selectedBlockIdx = 0; selectedBlockIdx < this->selectedBlockCount; ++selectedBlockIdx) {
-         currentBlockIdx = this->topKIndicesBufferUB.GetValue(selectedBlockIdx);
+        currentBlockIdx = this->topKIndicesBufferUB.GetValue(selectedBlockIdx);
         if (currentBlockIdx == diagBlockIdx) {
             if (saveNum == this->selectedBlockSize) {
                 continue;
@@ -644,8 +641,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u
                 DuplicateWithLoop(selectedBlockIdx, saveNum, currentProcessSize, mask);
             } else {
                 GetShiftLeftMask(this->selectedBlockSize, saveNum, mask[0]);
-                AscendC::Duplicate(this->bmm1ResUb[selectedBlockIdx * this->selectedBlockSize],
-                                   this->negativeScalar, mask, currentProcessSize, 1, static_cast<uint8_t>(dstStride));
+                AscendC::Duplicate(this->bmm1ResUb[selectedBlockIdx * this->selectedBlockSize], this->negativeScalar,
+                                   mask, currentProcessSize, 1, static_cast<uint8_t>(dstStride));
             }
             AscendC::PipeBarrier<PIPE_V>();
         } else if (currentBlockIdx > diagBlockIdx) {
@@ -656,7 +653,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u
                 }
             } else {
                 AscendC::Duplicate(this->bmm1ResUb[selectedBlockIdx * this->selectedBlockSize], this->negativeScalar,
-                    this->selectedBlockSize, currentProcessSize, 1, static_cast<uint8_t>(dstStride));
+                                   this->selectedBlockSize, currentProcessSize, 1, static_cast<uint8_t>(dstStride));
             }
             AscendC::PipeBarrier<PIPE_V>();
         }
@@ -666,11 +663,12 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u
 }
 
 template <typename INPUT_T, bool ATTEN_ENABLE>
-__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetBmm1Result(
-    SplitExtraInfo &extraInfo, uint32_t bmmResOffset, uint32_t currentProcessSize)
+__aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::GetBmm1Result(SplitExtraInfo &extraInfo,
+                                                                                  uint32_t bmmResOffset,
+                                                                                  uint32_t currentProcessSize)
 {
     DataCopy(this->bmm1ResUb, this->mm1Res[bmmResOffset], currentProcessSize * this->selectedLength);
-    // mask 
+    // mask
     if constexpr (ATTEN_ENABLE) {
         HandleMask(currentProcessSize);
     }
@@ -747,4 +745,3 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::WaitBmm2Resu
 }
 
 #endif // NSA_SELECTED_ATTENTION_KERNEL_H
-

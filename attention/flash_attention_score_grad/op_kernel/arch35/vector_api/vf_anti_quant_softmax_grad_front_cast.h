@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
+
 /*!
  * \file vf_anti_quant_softmax_grad_front_cast.h
  */
@@ -15,7 +15,7 @@
 #define MY_ANTI_QUANT_SOFTMAX_GRAD_CAST_INTERFACE_H_
 #include "kernel_tensor.h"
 #include "vf_common_utils.h"
- 
+
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
 using namespace MicroAPI;
@@ -44,10 +44,10 @@ constexpr static AscendC::MicroAPI::CastTrait castTraitB82B32Zero = {
     AscendC::RoundMode::UNKNOWN,
 };
 /* **************************************************************************************************
- 
+
 SoftmaxGradFrontCast *
 ************************************************************************************************* /
- 
+
 @INGROUP SoftmaxGradFrontCast
 brief compute :sum = reducesum(cast(grad) * cast(x))
 param [out] dstTensor output LocalTensor
@@ -55,8 +55,8 @@ param [in] gradTensor input grad LocalTensor
 param [in] srcTensor input src LocalTensor
 */
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN>
-__simd_vf__ inline void AntiQuantSoftmaxGradVF128(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt, 
-                                                    float scaleDx, uint32_t srcM, uint32_t reduceSize)
+__simd_vf__ inline void AntiQuantSoftmaxGradVF128(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt,
+                                                  float scaleDx, uint32_t srcM, uint32_t reduceSize)
 {
     RegTensor<T1> vregSrcFp8;
     RegTensor<OUTDTYPE> vregGradB16;
@@ -78,7 +78,8 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF128(uint64_t dstLocalInt, uint64_t
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), srcN);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt), srcN);
+        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                     srcN);
         Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32Two>(vregSrc2, vregSrcFp8, pregFullExeB8);
@@ -99,8 +100,8 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF128(uint64_t dstLocalInt, uint64_t
 }
 
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN>
-__simd_vf__ inline void AntiQuantSoftmaxGradVF256(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt, 
-                                                    float scaleDx, uint32_t srcM, uint32_t reduceSize)
+__simd_vf__ inline void AntiQuantSoftmaxGradVF256(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt,
+                                                  float scaleDx, uint32_t srcM, uint32_t reduceSize)
 {
     const uint32_t fullExeSize = 128;
     uint64_t gradLocalIntTail = gradLocalInt + fullExeSize * sizeof(OUTDTYPE);
@@ -135,8 +136,10 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF256(uint64_t dstLocalInt, uint64_t
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), srcN);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt), srcN);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16Tail, ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), srcN);
+        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                     srcN);
+        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16Tail,
+                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), srcN);
 
         Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
@@ -166,8 +169,8 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF256(uint64_t dstLocalInt, uint64_t
 }
 
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN>
-__simd_vf__ inline void AntiQuantSoftmaxGradVF384(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt, 
-                                                    float scaleDx, uint32_t srcM, uint32_t reduceSize)
+__simd_vf__ inline void AntiQuantSoftmaxGradVF384(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt,
+                                                  float scaleDx, uint32_t srcM, uint32_t reduceSize)
 {
     const uint32_t fullExeSize = 128;
     uint64_t srcLocalIntTail = srcLocalInt + fullExeSize * 2 * sizeof(T1);
@@ -218,13 +221,13 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF384(uint64_t dstLocalInt, uint64_t
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
-        LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail,
-                                                            ((__ubuf__ T1 *&)srcLocalIntTail), 512);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
+        LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail), 512);
+        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
+                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
         LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                            ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
+                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
         LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                            ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
 
         Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
@@ -271,8 +274,8 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF384(uint64_t dstLocalInt, uint64_t
 }
 
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN, bool OUTDTYPE_IS_B16>
-__simd_vf__ inline void AntiQuantSoftmaxGradVF512(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt, 
-                                                    float scaleDx, uint32_t srcM, uint32_t reduceSize)
+__simd_vf__ inline void AntiQuantSoftmaxGradVF512(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt,
+                                                  float scaleDx, uint32_t srcM, uint32_t reduceSize)
 {
     const uint32_t fullExeSize = 128;
     uint64_t srcLocalIntTail = srcLocalInt + fullExeSize * 2 * sizeof(T1);
@@ -332,15 +335,16 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF512(uint64_t dstLocalInt, uint64_t
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         if constexpr (OUTDTYPE_IS_B16) {
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail,
-                                                                ((__ubuf__ T1 *&)srcLocalIntTail), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                                   512);
+            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
             Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32Two>(vregSrc2, vregSrcFp8, pregFullExeB8);
@@ -369,7 +373,7 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF512(uint64_t dstLocalInt, uint64_t
             Cast<T, OUTDTYPE, castTraitB162B32Odd>(vregGrad5, vregGradDtype2, pregFullExeB16);
             Cast<T, OUTDTYPE, castTraitB162B32Even>(vregGradTail, vregGradDtypeTail, pregFullExeB16);
             Cast<T, OUTDTYPE, castTraitB162B32Odd>(vregGradTail1, vregGradDtypeTail, pregFullExeB16);
-            
+
             Mul(vregMul, vregGrad, vregSrc, pregFullExe);
             Mul(vregMul1, vregGrad1, vregSrc1, pregFullExe);
             Mul(vregMul2, vregGrad2, vregSrc2, pregFullExe);
@@ -395,8 +399,8 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF512(uint64_t dstLocalInt, uint64_t
 }
 
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN, bool OUTDTYPE_IS_B16>
-__simd_vf__ inline void AntiQuantSoftmaxGradVF640(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt, 
-                                                    float scaleDx, uint32_t srcM, uint32_t reduceSize)
+__simd_vf__ inline void AntiQuantSoftmaxGradVF640(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt,
+                                                  float scaleDx, uint32_t srcM, uint32_t reduceSize)
 {
     const uint32_t fullExeSize = 128;
     uint64_t srcLocalInt1 = srcLocalInt + fullExeSize * 2 * sizeof(T1);
@@ -470,17 +474,18 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF640(uint64_t dstLocalInt, uint64_t
         if constexpr (OUTDTYPE_IS_B16) {
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp81, ((__ubuf__ T1 *&)srcLocalInt1), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail,
-                                                                ((__ubuf__ T1 *&)srcLocalIntTail), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                                   512);
+            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype3,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
 
             Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
@@ -523,7 +528,7 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF640(uint64_t dstLocalInt, uint64_t
             Cast<T, OUTDTYPE, castTraitB162B32Odd>(vregGrad7, vregGradDtype3, pregFullExeB16);
             Cast<T, OUTDTYPE, castTraitB162B32Even>(vregGradTail, vregGradDtypeTail, pregFullExeB16);
             Cast<T, OUTDTYPE, castTraitB162B32Odd>(vregGradTail1, vregGradDtypeTail, pregFullExeB16);
-            
+
             Mul(vregMul, vregGrad, vregSrc, pregFullExe);
             Mul(vregMul1, vregGrad1, vregSrc1, pregFullExe);
             Mul(vregMul2, vregGrad2, vregSrc2, pregFullExe);
@@ -540,7 +545,7 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF640(uint64_t dstLocalInt, uint64_t
             Add(vregAdd2, vregMul4, vregMul5, pregFullExe);
             Add(vregAdd3, vregMul6, vregMul7, pregFullExe);
             Add(vregAdd4, vregMul8, vregMul9, pregFullExe);
-            
+
             Add(vregAdd5, vregAdd, vregAdd1, pregFullExe);
             Add(vregAdd6, vregAdd2, vregAdd3, pregFullExe);
             Add(vregAdd, vregAdd4, vregAdd5, pregFullExe);
@@ -553,8 +558,8 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF640(uint64_t dstLocalInt, uint64_t
 }
 
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN, bool OUTDTYPE_IS_B16>
-__simd_vf__ inline void AntiQuantSoftmaxGradVF768(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt, 
-                                                    float scaleDx, uint32_t srcM, uint32_t reduceSize)
+__simd_vf__ inline void AntiQuantSoftmaxGradVF768(uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt,
+                                                  float scaleDx, uint32_t srcM, uint32_t reduceSize)
 {
     const uint32_t fullExeSize = 128;
     uint64_t srcLocalInt1 = srcLocalInt + fullExeSize * 2 * sizeof(T1);
@@ -636,19 +641,20 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF768(uint64_t dstLocalInt, uint64_t
         if constexpr (OUTDTYPE_IS_B16) {
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
             LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp81, ((__ubuf__ T1 *&)srcLocalInt1), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail,
-                                                                ((__ubuf__ T1 *&)srcLocalIntTail), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
+            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                                   512);
+            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype3,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype4,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalInt4), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt4), 512);
             LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                                ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
             Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32Two>(vregSrc2, vregSrcFp8, pregFullExeB8);
@@ -694,7 +700,7 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF768(uint64_t dstLocalInt, uint64_t
             Cast<T, OUTDTYPE, castTraitB162B32Odd>(vregGrad9, vregGradDtype4, pregFullExeB16);
             Cast<T, OUTDTYPE, castTraitB162B32Even>(vregGradTail, vregGradDtypeTail, pregFullExeB16);
             Cast<T, OUTDTYPE, castTraitB162B32Odd>(vregGradTail1, vregGradDtypeTail, pregFullExeB16);
-            
+
             Mul(vregMul, vregGrad, vregSrc, pregFullExe);
             Mul(vregMul1, vregGrad1, vregSrc1, pregFullExe);
             Mul(vregMul2, vregGrad2, vregSrc2, pregFullExe);
@@ -729,18 +735,19 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF768(uint64_t dstLocalInt, uint64_t
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN>
 __aicore__ inline void MyAntiQuantSoftmaxGradFrontCast(const LocalTensor<T> &dstTensor,
                                                        const LocalTensor<OUTDTYPE> &gradTensor,
-                                                       const LocalTensor<T1> &srcTensor, float scaleDx,
-                                                       uint32_t srcM, uint32_t realN = srcN)
+                                                       const LocalTensor<T1> &srcTensor, float scaleDx, uint32_t srcM,
+                                                       uint32_t realN = srcN)
 {
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
     uint64_t gradLocalInt = gradTensor.GetPhyAddr();
     const bool OUTDTYPE_IS_B16 = IsSameType<OUTDTYPE, half>::value || IsSameType<OUTDTYPE, bfloat16_t>::value;
- 
+
     if constexpr (srcN <= 128) {
         const uint32_t fullExeSize = 128;
         uint32_t reduceSize = realN >> 1;
-        AntiQuantSoftmaxGradVF128<T1, T, OUTDTYPE, srcN>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM, reduceSize);
+        AntiQuantSoftmaxGradVF128<T1, T, OUTDTYPE, srcN>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM,
+                                                         reduceSize);
     } else if constexpr (srcN <= 256) {
         const uint32_t fullExeSize = 128;
         uint32_t tailSize = realN > fullExeSize ? (realN % fullExeSize) : 0;
@@ -748,7 +755,8 @@ __aicore__ inline void MyAntiQuantSoftmaxGradFrontCast(const LocalTensor<T> &dst
         if (realN == fullExeSize * 2) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        AntiQuantSoftmaxGradVF256<T1, T, OUTDTYPE, srcN>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM, reduceSize);
+        AntiQuantSoftmaxGradVF256<T1, T, OUTDTYPE, srcN>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM,
+                                                         reduceSize);
     } else if constexpr (srcN <= 384) {
         const uint32_t fullExeSize = 128;
         uint32_t tailSize = realN > fullExeSize * 2 ? (realN % fullExeSize) : 0;
@@ -756,7 +764,8 @@ __aicore__ inline void MyAntiQuantSoftmaxGradFrontCast(const LocalTensor<T> &dst
         if (realN == fullExeSize * 3) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        AntiQuantSoftmaxGradVF384<T1, T, OUTDTYPE, srcN>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM, reduceSize);
+        AntiQuantSoftmaxGradVF384<T1, T, OUTDTYPE, srcN>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM,
+                                                         reduceSize);
     } else if constexpr (srcN <= 512) {
         const uint32_t fullExeSize = 128;
         uint32_t tailSize = realN > fullExeSize * 3 ? (realN % fullExeSize) : 0;
@@ -764,7 +773,8 @@ __aicore__ inline void MyAntiQuantSoftmaxGradFrontCast(const LocalTensor<T> &dst
         if (realN == fullExeSize * 4) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        AntiQuantSoftmaxGradVF512<T1, T, OUTDTYPE, srcN, OUTDTYPE_IS_B16>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM, reduceSize);
+        AntiQuantSoftmaxGradVF512<T1, T, OUTDTYPE, srcN, OUTDTYPE_IS_B16>(dstLocalInt, gradLocalInt, srcLocalInt,
+                                                                          scaleDx, srcM, reduceSize);
     } else if constexpr (srcN <= 640) {
         const uint32_t fullExeSize = 128;
         uint32_t tailSize = realN > fullExeSize * 4 ? (realN % fullExeSize) : 0;
@@ -772,7 +782,8 @@ __aicore__ inline void MyAntiQuantSoftmaxGradFrontCast(const LocalTensor<T> &dst
         if (realN == fullExeSize * 5) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        AntiQuantSoftmaxGradVF640<T1, T, OUTDTYPE, srcN, OUTDTYPE_IS_B16>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM, reduceSize);
+        AntiQuantSoftmaxGradVF640<T1, T, OUTDTYPE, srcN, OUTDTYPE_IS_B16>(dstLocalInt, gradLocalInt, srcLocalInt,
+                                                                          scaleDx, srcM, reduceSize);
     } else if constexpr (srcN <= 768) {
         const uint32_t fullExeSize = 128;
         uint32_t tailSize = realN > fullExeSize * 5 ? (realN % fullExeSize) : 0;
@@ -780,17 +791,17 @@ __aicore__ inline void MyAntiQuantSoftmaxGradFrontCast(const LocalTensor<T> &dst
         if (realN == fullExeSize * 6) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        AntiQuantSoftmaxGradVF768<T1, T, OUTDTYPE, srcN, OUTDTYPE_IS_B16>(dstLocalInt, gradLocalInt, srcLocalInt, scaleDx, srcM, reduceSize);
+        AntiQuantSoftmaxGradVF768<T1, T, OUTDTYPE, srcN, OUTDTYPE_IS_B16>(dstLocalInt, gradLocalInt, srcLocalInt,
+                                                                          scaleDx, srcM, reduceSize);
     }
-}                                         
+}
 #else
 template <typename T1, typename T, typename OUTDTYPE, uint32_t srcN>
 __aicore__ inline void MyAntiQuantSoftmaxGradFrontCast(const LocalTensor<T> &dstTensor,
                                                        const LocalTensor<OUTDTYPE> &gradTensor,
-                                                       const LocalTensor<T1> &srcTensor, float scaleDx,
-                                                       uint32_t srcM, uint32_t realN = srcN)
-{
-}
+                                                       const LocalTensor<T1> &srcTensor, float scaleDx, uint32_t srcM,
+                                                       uint32_t realN = srcN)
+{}
 #endif
 } // namespace AscendC
 

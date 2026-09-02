@@ -47,6 +47,6 @@ private:
     int64_t placeholderAddr_ = 0xff;
 };
 
-}  // namespace MlaPreprocessApi
+} // namespace MlaPreprocessApi
 
-#endif  // OPS_TRANSFORMER_ATTENTION_MLA_PREPROCESS_OP_API_EMPTY_TENSOR_HOLDER_H
+#endif // OPS_TRANSFORMER_ATTENTION_MLA_PREPROCESS_OP_API_EMPTY_TENSOR_HOLDER_H

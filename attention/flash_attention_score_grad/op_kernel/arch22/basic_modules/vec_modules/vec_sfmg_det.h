@@ -18,8 +18,8 @@
 
 #include "kernel_operator.h"
 
-
-template <typename TYPE, class TILING_TYPE> class VectorSoftmaxGradDet {
+template <typename TYPE, class TILING_TYPE>
+class VectorSoftmaxGradDet {
 public:
     __aicore__ inline VectorSoftmaxGradDet(){};
     __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dy, __gm__ uint8_t *attenIn,
@@ -80,10 +80,11 @@ protected:
 };
 
 template <typename TYPE, class TILING_TYPE>
-__aicore__ inline void
-VectorSoftmaxGradDet<TYPE, TILING_TYPE>::Init(TPipe *pipe_in, __gm__ uint8_t *dy, __gm__ uint8_t *attenIn,
-                                           __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *workspace, int32_t batchIn,
-                                           const TILING_TYPE *orgTilingData)
+__aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::Init(TPipe *pipe_in, __gm__ uint8_t *dy,
+                                                                     __gm__ uint8_t *attenIn,
+                                                                     __gm__ uint8_t *actual_seq_qlen,
+                                                                     __gm__ uint8_t *workspace, int32_t batchIn,
+                                                                     const TILING_TYPE *orgTilingData)
 {
     cBlockIdx = GetBlockIdx();
     tilingData = orgTilingData;
@@ -100,11 +101,11 @@ VectorSoftmaxGradDet<TYPE, TILING_TYPE>::Init(TPipe *pipe_in, __gm__ uint8_t *dy
 
     if (layout == TND) {
         n_stride = (n1 * d - d) * sizeof(TYPE);
-    } else if (layout == BNGSD){
+    } else if (layout == BNGSD) {
         n_stride = 0;
-    } else if (layout == BSNGD){
+    } else if (layout == BSNGD) {
         n_stride = (n1 * d - d) * sizeof(TYPE);
-    } else if (layout == SBNGD){
+    } else if (layout == SBNGD) {
         n_stride = (b * n1 * d - d) * sizeof(TYPE);
     }
     uint32_t coreNum = tilingData->basicDetTensorTilingData.coreNum;
@@ -173,20 +174,19 @@ __aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::InitIndex(int64_
 
 template <typename TYPE, class TILING_TYPE>
 __aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::DoCopyIn(int64_t curS, int64_t curNBurst,
-                                                                      int64_t dstOffset, GM_ADDR seqS)
+                                                                         int64_t dstOffset, GM_ADDR seqS)
 {
     int64_t srcOffset = 0;
     if (layout == TND) {
         int64_t bOffset = bIdx == 0 ? 0 : n1 * ((__gm__ int64_t *)seqS)[bIdx - 1] * d;
         srcOffset = bOffset + (sIdx * n1 + nIdx) * d;
     } else if (layout == BNGSD) {
-        srcOffset = bIdx * ( n1 * s1 * d) + nIdx * (s1 * d) + sIdx * d;
-    } else if  (layout == BSNGD) {
+        srcOffset = bIdx * (n1 * s1 * d) + nIdx * (s1 * d) + sIdx * d;
+    } else if (layout == BSNGD) {
         srcOffset = bIdx * (s1 * n1 * d) + sIdx * (n1 * d) + nIdx * d;
     } else if (layout == SBNGD) {
         srcOffset = sIdx * (b * n1 * d) + bIdx * (n1 * d) + nIdx * d;
     }
-    
 
     DataCopyPad(input1Buf[dstOffset], dyGm[srcOffset],
                 {static_cast<uint16_t>(curNBurst), static_cast<uint32_t>(d * sizeof(TYPE)),
@@ -199,7 +199,8 @@ __aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::DoCopyIn(int64_t
 }
 
 template <typename TYPE, class TILING_TYPE>
-__aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::CopyInSfmg(int64_t leftNburst, int64_t &curS, GM_ADDR seqS)
+__aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::CopyInSfmg(int64_t leftNburst, int64_t &curS,
+                                                                           GM_ADDR seqS)
 {
     int64_t dstOffset = 0;
     while (leftNburst > 0) {
@@ -234,7 +235,8 @@ __aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::CopyInSfmg(int64
     }
 }
 
-template <typename TYPE, class TILING_TYPE> __aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::Process()
+template <typename TYPE, class TILING_TYPE>
+__aicore__ inline void VectorSoftmaxGradDet<TYPE, TILING_TYPE>::Process()
 {
     AscendC::PipeBarrier<PIPE_ALL>(); // 去掉pre和sfmg之间的SyncALL，这里需要增加pipeALL
 
@@ -323,4 +325,4 @@ template <typename TYPE, class TILING_TYPE> __aicore__ inline void VectorSoftmax
     }
 }
 
-#endif  // __VECTOR_SFMG_DET_KERNEL_H__
+#endif // __VECTOR_SFMG_DET_KERNEL_H__

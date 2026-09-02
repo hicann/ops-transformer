@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- /*!
+/*!
  * \file fused_floyd_attention_tiling.h
  * \brief
  */
@@ -20,7 +20,6 @@
 #include <tiling/tiling_api.h>
 #include "kernel_tiling/kernel_tiling.h"
 #include "op_host/data_copy_transpose_tiling_def.h"
-
 
 namespace optiling {
 

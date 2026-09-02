@@ -22,7 +22,8 @@
 
 using AscendC::InitOutput;
 
-template <typename T> class FlashAttentionScoreGradEmptyTensor {
+template <typename T>
+class FlashAttentionScoreGradEmptyTensor {
 public:
     __aicore__ inline FlashAttentionScoreGradEmptyTensor(){};
     __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
@@ -36,9 +37,9 @@ protected:
 };
 
 template <typename T>
-__aicore__ inline void
-FlashAttentionScoreGradEmptyTensor<T>::Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
-                                      const FlashAttentionScoreGradTilingData *__restrict tilingData)
+__aicore__ inline void FlashAttentionScoreGradEmptyTensor<T>::Init(
+    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
+    const FlashAttentionScoreGradTilingData *__restrict tilingData)
 {
     m_blockIdx = AscendC::GetBlockIdx();
     m_tilingData = &tilingData->emptyTensorTilingData;
@@ -48,7 +49,8 @@ FlashAttentionScoreGradEmptyTensor<T>::Init(__gm__ uint8_t *dq, __gm__ uint8_t *
     m_dpseGm.SetGlobalBuffer((__gm__ T *)dpse);
 }
 
-template <typename T> __aicore__ inline void FlashAttentionScoreGradEmptyTensor<T>::Process()
+template <typename T>
+__aicore__ inline void FlashAttentionScoreGradEmptyTensor<T>::Process()
 {
     if (m_tilingData->singleCoreDqNum > 0) {
         if (m_blockIdx < m_tilingData->formerDqNum) {

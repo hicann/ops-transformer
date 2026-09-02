@@ -58,12 +58,11 @@ class MutexBuffer {
     using TargetTensorType = LocalTensor<T>;
 
 public:
-    __aicore__ inline MutexBuffer()
-    {
-    }
-    __aicore__ inline MutexBuffer(TensorType tensor, uint32_t size) : tensor_(tensor), size_(size)
-    {
-    }
+    __aicore__ inline MutexBuffer() {}
+    __aicore__ inline MutexBuffer(TensorType tensor, uint32_t size)
+        : tensor_(tensor),
+          size_(size)
+    {}
 
     __aicore__ inline void Init()
     {

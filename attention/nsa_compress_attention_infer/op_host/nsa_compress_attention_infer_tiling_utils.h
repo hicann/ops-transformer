@@ -68,6 +68,6 @@ constexpr uint32_t ALIGNED_32 = 32;
 constexpr int64_t MAX_ACTUALQSEQLEN = 4;
 constexpr int64_t MIN_ACTUALQSEQLEN = 1;
 
-}  // namespace optiling
+} // namespace optiling
 
-#endif  // NSA_COMPRESS_ATTENTION_INFER_TILING_UTILS_H
+#endif // NSA_COMPRESS_ATTENTION_INFER_TILING_UTILS_H

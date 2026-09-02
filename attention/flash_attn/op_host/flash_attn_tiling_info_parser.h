@@ -23,8 +23,7 @@ class FaInfoParser {
 public:
     explicit FaInfoParser(const gert::TilingContext *context)
         : context_(context)
-    {
-    }
+    {}
     ~FaInfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;

@@ -15,16 +15,10 @@
 #include <tuple>
 
 namespace l0op {
-std::tuple<const aclTensor*, const aclTensor*> GatherPaKvCache(
-    const aclTensor *keyCache,
-    const aclTensor *valueCache,
-    const aclTensor *blockTables,
-    const aclTensor *seqLens,
-    aclTensor *keyRef,
-    aclTensor *valueRef,
-    const aclTensor *seqOffsetOptional,
-    char *cacheMode,
-    bool isSeqLensCumsum,
-    aclOpExecutor *executor);
+std::tuple<const aclTensor *, const aclTensor *> GatherPaKvCache(const aclTensor *keyCache, const aclTensor *valueCache,
+                                                                 const aclTensor *blockTables, const aclTensor *seqLens,
+                                                                 aclTensor *keyRef, aclTensor *valueRef,
+                                                                 const aclTensor *seqOffsetOptional, char *cacheMode,
+                                                                 bool isSeqLensCumsum, aclOpExecutor *executor);
 }
 #endif

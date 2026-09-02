@@ -57,16 +57,16 @@ REGISTER_TILING_DATA_CLASS(NsaCoreParamsOp, NsaCoreParams)
 BEGIN_TILING_DATA_DEF(ImportanceScoreParams)
 TILING_DATA_FIELD_DEF(uint64_t, isM);
 TILING_DATA_FIELD_DEF(uint64_t, isN);
-TILING_DATA_FIELD_DEF(uint64_t, outerLoop); // s2方向上一次l'切分循环的次数
-TILING_DATA_FIELD_DEF(uint64_t, lastOuterLoop); // s2方向上一次l'切分循环的次数
-TILING_DATA_FIELD_DEF(uint64_t, innerLoop); // s2方向上一次l 切分循环的次数
+TILING_DATA_FIELD_DEF(uint64_t, outerLoop);      // s2方向上一次l'切分循环的次数
+TILING_DATA_FIELD_DEF(uint64_t, lastOuterLoop);  // s2方向上一次l'切分循环的次数
+TILING_DATA_FIELD_DEF(uint64_t, innerLoop);      // s2方向上一次l 切分循环的次数
 TILING_DATA_FIELD_DEF(uint64_t, s2ScoreLoopLen); // s2方向一次加载的长度
-TILING_DATA_FIELD_DEF(uint64_t, lastLoopLen); // s2方向加载的尾块大小
-TILING_DATA_FIELD_DEF(uint64_t, s2Loop); // s2方向上循环次数
+TILING_DATA_FIELD_DEF(uint64_t, lastLoopLen);    // s2方向加载的尾块大小
+TILING_DATA_FIELD_DEF(uint64_t, s2Loop);         // s2方向上循环次数
 TILING_DATA_FIELD_DEF(uint64_t, tmpUbSize);
-TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingData); // api tiling
-TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingData2); // api tiling
-TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingDataLast); // api tiling
+TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingData);      // api tiling
+TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingData2);     // api tiling
+TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingDataLast);  // api tiling
 TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingDataLast2); // api tiling
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(ImportanceScoreParamsOp, ImportanceScoreParams)
@@ -75,10 +75,10 @@ BEGIN_TILING_DATA_DEF(NsaCompressAttentionGeneralTilingData)
 TILING_DATA_FIELD_DEF_STRUCT(NsaInputParams, inputParams);
 TILING_DATA_FIELD_DEF_STRUCT(NsaMultiCoreParams, multiCoreParams);
 TILING_DATA_FIELD_DEF_STRUCT(NsaCoreParams, coreParams);
-TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, bmm1TilingData); //28 * int
-TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, bmm2TilingData); //28 * int
-TILING_DATA_FIELD_DEF_STRUCT(SoftMaxTiling, softmaxTilingData); //16 * int
-TILING_DATA_FIELD_DEF_STRUCT(TopkTiling, topkTilingData); // 28 * int32
+TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, bmm1TilingData);      // 28 * int
+TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, bmm2TilingData);      // 28 * int
+TILING_DATA_FIELD_DEF_STRUCT(SoftMaxTiling, softmaxTilingData); // 16 * int
+TILING_DATA_FIELD_DEF_STRUCT(TopkTiling, topkTilingData);       // 28 * int32
 TILING_DATA_FIELD_DEF_STRUCT(ImportanceScoreParams, importanceScoreParams);
 END_TILING_DATA_DEF;
 

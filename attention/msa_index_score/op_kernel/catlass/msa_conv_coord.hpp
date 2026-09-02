@@ -90,29 +90,62 @@ public:
 
     // fmapShape
     CATLASS_HOST_DEVICE
-    Index const &batch() const { return fmap6HDShape_[0]; }
+    Index const &batch() const
+    {
+        return fmap6HDShape_[0];
+    }
     CATLASS_HOST_DEVICE
-    Index const &cin1() const { return fmap6HDShape_[CONV_IDX_2]; }
+    Index const &cin1() const
+    {
+        return fmap6HDShape_[CONV_IDX_2];
+    }
     CATLASS_HOST_DEVICE
-    Index const &di() const { return fmap6HDShape_[1]; }
+    Index const &di() const
+    {
+        return fmap6HDShape_[1];
+    }
     CATLASS_HOST_DEVICE
-    Index const &hi() const { return fmap6HDShape_[CONV_IDX_3]; }
+    Index const &hi() const
+    {
+        return fmap6HDShape_[CONV_IDX_3];
+    }
     CATLASS_HOST_DEVICE
-    Index const &wi() const { return fmap6HDShape_[CONV_IDX_4]; }
+    Index const &wi() const
+    {
+        return fmap6HDShape_[CONV_IDX_4];
+    }
     CATLASS_HOST_DEVICE
-    Index const &cin0() const { return fmap6HDShape_[CONV_IDX_5]; }
+    Index const &cin0() const
+    {
+        return fmap6HDShape_[CONV_IDX_5];
+    }
     CATLASS_HOST_DEVICE
-    Index const hiwi() const { return fmap6HDShape_[CONV_IDX_3] * fmap6HDShape_[CONV_IDX_4]; }
+    Index const hiwi() const
+    {
+        return fmap6HDShape_[CONV_IDX_3] * fmap6HDShape_[CONV_IDX_4];
+    }
 
     // filterShape
     CATLASS_HOST_DEVICE
-    Index const &kd() const { return filterFracZ3DShape_[0]; }
+    Index const &kd() const
+    {
+        return filterFracZ3DShape_[0];
+    }
     CATLASS_HOST_DEVICE
-    Index const &kh() const { return filterFracZ3DShape_[CONV_IDX_2]; }
+    Index const &kh() const
+    {
+        return filterFracZ3DShape_[CONV_IDX_2];
+    }
     CATLASS_HOST_DEVICE
-    Index const &kw() const { return filterFracZ3DShape_[CONV_IDX_3]; }
+    Index const &kw() const
+    {
+        return filterFracZ3DShape_[CONV_IDX_3];
+    }
     CATLASS_HOST_DEVICE
-    Index const khkw() const { return filterFracZ3DShape_[CONV_IDX_2] * filterFracZ3DShape_[CONV_IDX_3]; }
+    Index const khkw() const
+    {
+        return filterFracZ3DShape_[CONV_IDX_2] * filterFracZ3DShape_[CONV_IDX_3];
+    }
     CATLASS_HOST_DEVICE
     Index const kdc1khkw() const
     {
@@ -120,67 +153,145 @@ public:
                filterFracZ3DShape_[CONV_IDX_3];
     }
     CATLASS_HOST_DEVICE
-    Index const &n1() const { return filterFracZ3DShape_[CONV_IDX_4]; }
+    Index const &n1() const
+    {
+        return filterFracZ3DShape_[CONV_IDX_4];
+    }
     CATLASS_HOST_DEVICE
-    Index const &n0() const { return filterFracZ3DShape_[CONV_IDX_5]; }
+    Index const &n0() const
+    {
+        return filterFracZ3DShape_[CONV_IDX_5];
+    }
 
     // outShape
     CATLASS_HOST_DEVICE
-    Index const &dout() const { return out6HDShape_[1]; }
+    Index const &dout() const
+    {
+        return out6HDShape_[1];
+    }
     CATLASS_HOST_DEVICE
-    Index const &ho() const { return out6HDShape_[CONV_IDX_3]; }
+    Index const &ho() const
+    {
+        return out6HDShape_[CONV_IDX_3];
+    }
     CATLASS_HOST_DEVICE
-    Index const &wo() const { return out6HDShape_[CONV_IDX_4]; }
+    Index const &wo() const
+    {
+        return out6HDShape_[CONV_IDX_4];
+    }
     CATLASS_HOST_DEVICE
-    Index const &cout1() const { return out6HDShape_[CONV_IDX_2]; }
+    Index const &cout1() const
+    {
+        return out6HDShape_[CONV_IDX_2];
+    }
     CATLASS_HOST_DEVICE
-    Index const &cout0() const { return out6HDShape_[CONV_IDX_5]; }
+    Index const &cout0() const
+    {
+        return out6HDShape_[CONV_IDX_5];
+    }
     CATLASS_HOST_DEVICE
-    Index const &cout() const { return cout_; }
+    Index const &cout() const
+    {
+        return cout_;
+    }
 
     /// paddings
     CATLASS_HOST_DEVICE
-    Index const &padhead() const { return pads_[0]; }
+    Index const &padhead() const
+    {
+        return pads_[0];
+    }
     CATLASS_HOST_DEVICE
-    Index const &padtail() const { return pads_[0]; }
+    Index const &padtail() const
+    {
+        return pads_[0];
+    }
     CATLASS_HOST_DEVICE
-    Index const &padtop() const { return pads_[1]; }
+    Index const &padtop() const
+    {
+        return pads_[1];
+    }
     CATLASS_HOST_DEVICE
-    Index const &padbottom() const { return pads_[1]; }
+    Index const &padbottom() const
+    {
+        return pads_[1];
+    }
     CATLASS_HOST_DEVICE
-    Index const &padleft() const { return pads_[CONV_IDX_2]; }
+    Index const &padleft() const
+    {
+        return pads_[CONV_IDX_2];
+    }
     CATLASS_HOST_DEVICE
-    Index const &padright() const { return pads_[CONV_IDX_2]; }
+    Index const &padright() const
+    {
+        return pads_[CONV_IDX_2];
+    }
 
     /// strideSize
     CATLASS_HOST_DEVICE
-    Index const &sD() const { return strides_[0]; }
+    Index const &sD() const
+    {
+        return strides_[0];
+    }
     CATLASS_HOST_DEVICE
-    Index const &sH() const { return strides_[1]; }
+    Index const &sH() const
+    {
+        return strides_[1];
+    }
     CATLASS_HOST_DEVICE
-    Index const &sW() const { return strides_[CONV_IDX_2]; }
+    Index const &sW() const
+    {
+        return strides_[CONV_IDX_2];
+    }
 
     /// dilationSize
     CATLASS_HOST_DEVICE
-    Index const &dD() const { return dilations_[0]; }
+    Index const &dD() const
+    {
+        return dilations_[0];
+    }
     CATLASS_HOST_DEVICE
-    Index const dilatedKernelD() const { return 1 + (filterFracZ3DShape_[0] - 1) * dilations_[0]; }
+    Index const dilatedKernelD() const
+    {
+        return 1 + (filterFracZ3DShape_[0] - 1) * dilations_[0];
+    }
     CATLASS_HOST_DEVICE
-    Index const &dH() const { return dilations_[1]; }
+    Index const &dH() const
+    {
+        return dilations_[1];
+    }
     CATLASS_HOST_DEVICE
-    Index const dilatedKernelH() const { return 1 + (filterFracZ3DShape_[CONV_IDX_2] - 1) * dilations_[1]; }
+    Index const dilatedKernelH() const
+    {
+        return 1 + (filterFracZ3DShape_[CONV_IDX_2] - 1) * dilations_[1];
+    }
     CATLASS_HOST_DEVICE
-    Index const &dW() const { return dilations_[CONV_IDX_2]; }
+    Index const &dW() const
+    {
+        return dilations_[CONV_IDX_2];
+    }
     CATLASS_HOST_DEVICE
-    Index const dilatedKernelW() const { return 1 + (filterFracZ3DShape_[CONV_IDX_3] - 1) * dilations_[CONV_IDX_2]; }
+    Index const dilatedKernelW() const
+    {
+        return 1 + (filterFracZ3DShape_[CONV_IDX_3] - 1) * dilations_[CONV_IDX_2];
+    }
 
     ///// used in block
     CATLASS_HOST_DEVICE
-    Index const howo() const { return out6HDShape_[CONV_IDX_3] * out6HDShape_[CONV_IDX_4]; }
+    Index const howo() const
+    {
+        return out6HDShape_[CONV_IDX_3] * out6HDShape_[CONV_IDX_4];
+    }
     CATLASS_HOST_DEVICE
-    Index const alignCout() const { return out6HDShape_[CONV_IDX_2] * out6HDShape_[CONV_IDX_5]; }
+    Index const alignCout() const
+    {
+        return out6HDShape_[CONV_IDX_2] * out6HDShape_[CONV_IDX_5];
+    }
     CATLASS_HOST_DEVICE
-    Index const wicin0() const { return fmap6HDShape_[CONV_IDX_4] * fmap6HDShape_[CONV_IDX_5]; }
+    Index const wicin0() const
+    {
+        return fmap6HDShape_[CONV_IDX_4] * fmap6HDShape_[CONV_IDX_5];
+    }
     CATLASS_HOST_DEVICE
     Index const khkwcin0() const
     {
@@ -193,7 +304,10 @@ public:
                filterFracZ3DShape_[CONV_IDX_3] * filterFracZ3DShape_[CONV_IDX_6];
     }
     CATLASS_HOST_DEVICE
-    Index const kdcin1() const { return filterFracZ3DShape_[0] * filterFracZ3DShape_[1]; }
+    Index const kdcin1() const
+    {
+        return filterFracZ3DShape_[0] * filterFracZ3DShape_[1];
+    }
     CATLASS_HOST_DEVICE
     Index const fmapOneBatchSize() const
     {
@@ -217,7 +331,10 @@ struct ConvCoreShape {
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<CONV_RANK_4> ToCoord() { return MakeCoord(noCnt, doCnt, co1Cnt, howoCnt); }
+    static Coord<CONV_RANK_4> ToCoord()
+    {
+        return MakeCoord(noCnt, doCnt, co1Cnt, howoCnt);
+    }
 };
 
 template <uint32_t mAL1_ = 1, uint32_t Kd_ = 1, uint32_t Ci1_ = 1>
@@ -228,7 +345,10 @@ struct ConvFmapL1Shape {
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<CONV_RANK_3> ToCoord() { return MakeCoord(mAL1, Kd, Ci1); }
+    static Coord<CONV_RANK_3> ToCoord()
+    {
+        return MakeCoord(mAL1, Kd, Ci1);
+    }
 };
 
 template <uint32_t Kd_ = 1, uint32_t Ci1_ = 1, uint32_t nBL1_ = 1>
@@ -239,7 +359,10 @@ struct ConvFilterL1Shape {
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<CONV_RANK_3> ToCoord() { return MakeCoord(Kd, Ci1, nBL1); }
+    static Coord<CONV_RANK_3> ToCoord()
+    {
+        return MakeCoord(Kd, Ci1, nBL1);
+    }
 };
 
 template <uint32_t mL0_ = 1, uint32_t kL0_ = 1, uint32_t nL0_ = 1>
@@ -250,7 +373,10 @@ struct ConvL0Shape {
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<CONV_RANK_3> ToCoord() { return MakeCoord(mL0, kL0, nL0); }
+    static Coord<CONV_RANK_3> ToCoord()
+    {
+        return MakeCoord(mL0, kL0, nL0);
+    }
 };
 
 struct Conv3d6HdCoord : public Coord<CONV_RANK_4, uint32_t> {
@@ -278,24 +404,48 @@ struct Conv3d6HdCoord : public Coord<CONV_RANK_4, uint32_t> {
     {}
 
     CATLASS_HOST_DEVICE
-    Index const &n() const { return this->At(N_INDEX); }
+    Index const &n() const
+    {
+        return this->At(N_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &n() { return this->At(N_INDEX); }
+    Index &n()
+    {
+        return this->At(N_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &d() const { return this->At(D_INDEX); }
+    Index const &d() const
+    {
+        return this->At(D_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &d() { return this->At(D_INDEX); }
+    Index &d()
+    {
+        return this->At(D_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &c1() const { return this->At(C1_INDEX); }
+    Index const &c1() const
+    {
+        return this->At(C1_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &c1() { return this->At(C1_INDEX); }
+    Index &c1()
+    {
+        return this->At(C1_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &hw() const { return this->At(HW_INDEX); }
+    Index const &hw() const
+    {
+        return this->At(HW_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &hw() { return this->At(HW_INDEX); }
+    Index &hw()
+    {
+        return this->At(HW_INDEX);
+    }
 };
 
 struct Conv3dFracZ3dCoord : public Coord<CONV_RANK_2, uint32_t> {
@@ -316,14 +466,26 @@ struct Conv3dFracZ3dCoord : public Coord<CONV_RANK_2, uint32_t> {
     {}
 
     CATLASS_HOST_DEVICE
-    Index const &kdc1khkw() const { return this->At(KDC1KHKW_INDEX); }
+    Index const &kdc1khkw() const
+    {
+        return this->At(KDC1KHKW_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &kdc1khkw() { return this->At(KDC1KHKW_INDEX); }
+    Index &kdc1khkw()
+    {
+        return this->At(KDC1KHKW_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &n1() const { return this->At(N1_INDEX); }
+    Index const &n1() const
+    {
+        return this->At(N1_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &n1() { return this->At(N1_INDEX); }
+    Index &n1()
+    {
+        return this->At(N1_INDEX);
+    }
 };
 
 /////////////////// Shapes and Coords for Conv2d ///////////////////
@@ -337,7 +499,10 @@ struct Conv2dFmapL1Shape { // (Ho, Wo, Cin1)
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<CONV_RANK_3> ToCoord() { return MakeCoord(Ho, Wo, Cin1); }
+    static Coord<CONV_RANK_3> ToCoord()
+    {
+        return MakeCoord(Ho, Wo, Cin1);
+    }
 };
 
 template <uint32_t Cout_ = CONV_FRACTAL_C0, uint32_t Cin1_ = 1>
@@ -347,7 +512,10 @@ struct Conv2dFilterL1Shape { // (Cout, Cin1)
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<CONV_RANK_2> ToCoord() { return MakeCoord(Cout, Cin1); }
+    static Coord<CONV_RANK_2> ToCoord()
+    {
+        return MakeCoord(Cout, Cin1);
+    }
 };
 
 template <uint32_t M_ = CONV_FRACTAL_C0, uint32_t N_ = CONV_FRACTAL_C0, uint32_t K_ = CONV_FRACTAL_C0>
@@ -358,7 +526,10 @@ struct Conv2dL0Shape {
 
     /// Returns a Coord object
     CATLASS_HOST_DEVICE
-    static Coord<CONV_RANK_3> ToCoord() { return MakeCoord(M, N, K); }
+    static Coord<CONV_RANK_3> ToCoord()
+    {
+        return MakeCoord(M, N, K);
+    }
 };
 
 struct Conv2dFmapCoord : public Coord<CONV_RANK_5, uint32_t> { // (Batch, C1, H, W, C0)
@@ -401,33 +572,66 @@ public:
     {}
 
     CATLASS_HOST_DEVICE
-    Index const &c1() const { return this->At(C1_INDEX); }
+    Index const &c1() const
+    {
+        return this->At(C1_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &c1() { return this->At(C1_INDEX); }
+    Index &c1()
+    {
+        return this->At(C1_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &batch() const { return this->At(BATCH_INDEX); }
+    Index const &batch() const
+    {
+        return this->At(BATCH_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &batch() { return this->At(BATCH_INDEX); }
+    Index &batch()
+    {
+        return this->At(BATCH_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &h() const { return this->At(H_INDEX); }
+    Index const &h() const
+    {
+        return this->At(H_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &h() { return this->At(H_INDEX); }
+    Index &h()
+    {
+        return this->At(H_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &w() const { return this->At(W_INDEX); }
+    Index const &w() const
+    {
+        return this->At(W_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &w() { return this->At(W_INDEX); }
+    Index &w()
+    {
+        return this->At(W_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &c0() const { return this->At(C0_INDEX); }
+    Index const &c0() const
+    {
+        return this->At(C0_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &c0() { return this->At(C0_INDEX); }
+    Index &c0()
+    {
+        return this->At(C0_INDEX);
+    }
 
     /// Element-wise addition
     CATLASS_HOST_DEVICE
-    Conv2dFmapCoord operator+(Base const &b) const { return Conv2dFmapCoord(Base::operator+(b)); }
+    Conv2dFmapCoord operator+(Base const &b) const
+    {
+        return Conv2dFmapCoord(Base::operator+(b));
+    }
 
     /// In-place addition
     CATLASS_HOST_DEVICE
@@ -478,33 +682,66 @@ public:
     {}
 
     CATLASS_HOST_DEVICE
-    Index const &cin1() const { return this->At(CIN1_INDEX); }
+    Index const &cin1() const
+    {
+        return this->At(CIN1_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &cin1() { return this->At(CIN1_INDEX); }
+    Index &cin1()
+    {
+        return this->At(CIN1_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &kh() const { return this->At(KH_INDEX); }
+    Index const &kh() const
+    {
+        return this->At(KH_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &kh() { return this->At(KH_INDEX); }
+    Index &kh()
+    {
+        return this->At(KH_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &kw() const { return this->At(KW_INDEX); }
+    Index const &kw() const
+    {
+        return this->At(KW_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &kw() { return this->At(KW_INDEX); }
+    Index &kw()
+    {
+        return this->At(KW_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &cout() const { return this->At(COUT_INDEX); }
+    Index const &cout() const
+    {
+        return this->At(COUT_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &cout() { return this->At(COUT_INDEX); }
+    Index &cout()
+    {
+        return this->At(COUT_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &c0() const { return this->At(C0_INDEX); }
+    Index const &c0() const
+    {
+        return this->At(C0_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &c0() { return this->At(C0_INDEX); }
+    Index &c0()
+    {
+        return this->At(C0_INDEX);
+    }
 
     /// Element-wise addition
     CATLASS_HOST_DEVICE
-    Conv2dFilterCoord operator+(Base const &b) const { return Conv2dFilterCoord(Base::operator+(b)); }
+    Conv2dFilterCoord operator+(Base const &b) const
+    {
+        return Conv2dFilterCoord(Base::operator+(b));
+    }
 
     /// In-place addition
     CATLASS_HOST_DEVICE
@@ -553,29 +790,53 @@ public:
     {}
 
     CATLASS_HOST_DEVICE
-    Index const &ho() const { return this->At(HO_INDEX); }
+    Index const &ho() const
+    {
+        return this->At(HO_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index &ho() { return this->At(HO_INDEX); }
+    Index &ho()
+    {
+        return this->At(HO_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &wo() const { return this->At(WO_INDEX); }
+    Index const &wo() const
+    {
+        return this->At(WO_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index &wo() { return this->At(WO_INDEX); }
+    Index &wo()
+    {
+        return this->At(WO_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index howo() const { return this->At(HO_INDEX) * this->At(WO_INDEX); }
+    Index howo() const
+    {
+        return this->At(HO_INDEX) * this->At(WO_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &cout() const { return this->At(COUT_INDEX); }
+    Index const &cout() const
+    {
+        return this->At(COUT_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index &cout() { return this->At(COUT_INDEX); }
+    Index &cout()
+    {
+        return this->At(COUT_INDEX);
+    }
 
     /// Element-wise addition
     CATLASS_HOST_DEVICE
-    Conv2dHoWoCoCoord operator+(Base const &b) const { return Conv2dHoWoCoCoord(Base::operator+(b)); }
+    Conv2dHoWoCoCoord operator+(Base const &b) const
+    {
+        return Conv2dHoWoCoCoord(Base::operator+(b));
+    }
 
     /// In-place addition
     CATLASS_HOST_DEVICE
@@ -626,33 +887,66 @@ public:
     {}
 
     CATLASS_HOST_DEVICE
-    Index const &batch() const { return this->At(BATCH_INDEX); }
+    Index const &batch() const
+    {
+        return this->At(BATCH_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &batch() { return this->At(BATCH_INDEX); }
+    Index &batch()
+    {
+        return this->At(BATCH_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &h() const { return this->At(H_INDEX); }
+    Index const &h() const
+    {
+        return this->At(H_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &h() { return this->At(H_INDEX); }
+    Index &h()
+    {
+        return this->At(H_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &w() const { return this->At(W_INDEX); }
+    Index const &w() const
+    {
+        return this->At(W_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &w() { return this->At(W_INDEX); }
+    Index &w()
+    {
+        return this->At(W_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &cout() const { return this->At(COUT_INDEX); }
+    Index const &cout() const
+    {
+        return this->At(COUT_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &cout() { return this->At(COUT_INDEX); }
+    Index &cout()
+    {
+        return this->At(COUT_INDEX);
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &cin1() const { return this->At(CIN1_INDEX); }
+    Index const &cin1() const
+    {
+        return this->At(CIN1_INDEX);
+    }
     CATLASS_HOST_DEVICE
-    Index &cin1() { return this->At(CIN1_INDEX); }
+    Index &cin1()
+    {
+        return this->At(CIN1_INDEX);
+    }
 
     /// Element-wise addition
     CATLASS_HOST_DEVICE
-    Conv2dCoord operator+(Base const &b) const { return Conv2dCoord(Base::operator+(b)); }
+    Conv2dCoord operator+(Base const &b) const
+    {
+        return Conv2dCoord(Base::operator+(b));
+    }
 
     /// In-place addition
     CATLASS_HOST_DEVICE
@@ -663,7 +957,10 @@ public:
     }
 
     CATLASS_HOST_DEVICE
-    auto GetHoWoCoCoord() const { return this->GetCoordByAxis<H_INDEX, W_INDEX, COUT_INDEX>(); }
+    auto GetHoWoCoCoord() const
+    {
+        return this->GetCoordByAxis<H_INDEX, W_INDEX, COUT_INDEX>();
+    }
 };
 
 class Conv2dFilterParams {
@@ -693,54 +990,114 @@ public:
     {}
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &kh() const { return this->ks[0]; }
+    ShortIndex const &kh() const
+    {
+        return this->ks[0];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex &kh() { return this->ks[0]; }
+    ShortIndex &kh()
+    {
+        return this->ks[0];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &kw() const { return this->ks[1]; }
+    ShortIndex const &kw() const
+    {
+        return this->ks[1];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex &kw() { return this->ks[1]; }
+    ShortIndex &kw()
+    {
+        return this->ks[1];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padLeft() const { return this->pads[0]; }
+    ShortIndex const &padLeft() const
+    {
+        return this->pads[0];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padLeft() { return this->pads[0]; }
+    ShortIndex const &padLeft()
+    {
+        return this->pads[0];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padRight() const { return this->pads[1]; }
+    ShortIndex const &padRight() const
+    {
+        return this->pads[1];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padRight() { return this->pads[1]; }
+    ShortIndex const &padRight()
+    {
+        return this->pads[1];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padTop() const { return this->pads[CONV_IDX_2]; }
+    ShortIndex const &padTop() const
+    {
+        return this->pads[CONV_IDX_2];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padTop() { return this->pads[CONV_IDX_2]; }
+    ShortIndex const &padTop()
+    {
+        return this->pads[CONV_IDX_2];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padBottom() const { return this->pads[CONV_IDX_3]; }
+    ShortIndex const &padBottom() const
+    {
+        return this->pads[CONV_IDX_3];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padBottom() { return this->pads[CONV_IDX_3]; }
+    ShortIndex const &padBottom()
+    {
+        return this->pads[CONV_IDX_3];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideH() const { return this->strides[0]; }
+    ShortIndex const &strideH() const
+    {
+        return this->strides[0];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideH() { return this->strides[0]; }
+    ShortIndex const &strideH()
+    {
+        return this->strides[0];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideW() const { return this->strides[1]; }
+    ShortIndex const &strideW() const
+    {
+        return this->strides[1];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideW() { return this->strides[1]; }
+    ShortIndex const &strideW()
+    {
+        return this->strides[1];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationH() const { return this->dilations[0]; }
+    ShortIndex const &dilationH() const
+    {
+        return this->dilations[0];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationH() { return this->dilations[0]; }
+    ShortIndex const &dilationH()
+    {
+        return this->dilations[0];
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationW() const { return this->dilations[1]; }
+    ShortIndex const &dilationW() const
+    {
+        return this->dilations[1];
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationW() { return this->dilations[1]; }
+    ShortIndex const &dilationW()
+    {
+        return this->dilations[1];
+    }
 };
 
 struct Conv2dParams {
@@ -792,115 +1149,244 @@ public:
     }
 
     CATLASS_HOST_DEVICE
-    Conv2dFilterParams const &getFilterParams() const { return this->configs; }
+    Conv2dFilterParams const &getFilterParams() const
+    {
+        return this->configs;
+    }
 
     CATLASS_HOST_DEVICE
-    Conv2dFmapCoord const &getOutputShape() const { return this->outputShape; }
+    Conv2dFmapCoord const &getOutputShape() const
+    {
+        return this->outputShape;
+    }
 
     CATLASS_HOST_DEVICE
-    Conv2dCoord const &getPostIm2colShape() const { return this->postIm2colShape; }
+    Conv2dCoord const &getPostIm2colShape() const
+    {
+        return this->postIm2colShape;
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &batch() const { return this->fmapShape.batch(); }
+    Index const &batch() const
+    {
+        return this->fmapShape.batch();
+    }
     CATLASS_HOST_DEVICE
-    Index &batch() { return this->fmapShape.batch(); }
+    Index &batch()
+    {
+        return this->fmapShape.batch();
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &hi() const { return this->fmapShape.h(); }
+    Index const &hi() const
+    {
+        return this->fmapShape.h();
+    }
     CATLASS_HOST_DEVICE
-    Index &hi() { return this->fmapShape.h(); }
+    Index &hi()
+    {
+        return this->fmapShape.h();
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &wi() const { return this->fmapShape.w(); }
+    Index const &wi() const
+    {
+        return this->fmapShape.w();
+    }
     CATLASS_HOST_DEVICE
-    Index &wi() { return this->fmapShape.w(); }
+    Index &wi()
+    {
+        return this->fmapShape.w();
+    }
 
     CATLASS_HOST_DEVICE
-    Index cin() const { return this->fmapShape.c1() * C0; }
+    Index cin() const
+    {
+        return this->fmapShape.c1() * C0;
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &cin1() const { return this->fmapShape.c1(); }
+    Index const &cin1() const
+    {
+        return this->fmapShape.c1();
+    }
     CATLASS_HOST_DEVICE
-    Index &cin1() { return this->fmapShape.c1(); }
+    Index &cin1()
+    {
+        return this->fmapShape.c1();
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &cout() const { return this->filterShape.cout(); }
+    Index const &cout() const
+    {
+        return this->filterShape.cout();
+    }
     CATLASS_HOST_DEVICE
-    Index &cout() { return this->filterShape.cout(); }
+    Index &cout()
+    {
+        return this->filterShape.cout();
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &cout1() const { return this->outputShape.c1(); }
+    Index const &cout1() const
+    {
+        return this->outputShape.c1();
+    }
     CATLASS_HOST_DEVICE
-    Index &cout1() { return this->outputShape.c1(); }
+    Index &cout1()
+    {
+        return this->outputShape.c1();
+    }
 
     CATLASS_HOST_DEVICE
-    Index coutRound() const { return (this->filterShape.cout() + C0 - 1) / C0 * C0; }
+    Index coutRound() const
+    {
+        return (this->filterShape.cout() + C0 - 1) / C0 * C0;
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &ho() const { return this->outputShape.h(); }
+    Index const &ho() const
+    {
+        return this->outputShape.h();
+    }
     CATLASS_HOST_DEVICE
-    Index &ho() { return this->outputShape.h(); }
+    Index &ho()
+    {
+        return this->outputShape.h();
+    }
 
     CATLASS_HOST_DEVICE
-    Index const &wo() const { return this->outputShape.w(); }
+    Index const &wo() const
+    {
+        return this->outputShape.w();
+    }
     CATLASS_HOST_DEVICE
-    Index &wo() { return this->outputShape.w(); }
+    Index &wo()
+    {
+        return this->outputShape.w();
+    }
 
     CATLASS_HOST_DEVICE
-    Index howo() const { return this->outputShape.h() * this->outputShape.w(); }
+    Index howo() const
+    {
+        return this->outputShape.h() * this->outputShape.w();
+    }
 
     CATLASS_HOST_DEVICE
-    Index howoRound() const { return (this->howo() + C0 - 1) / C0 * C0; }
+    Index howoRound() const
+    {
+        return (this->howo() + C0 - 1) / C0 * C0;
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &kh() const { return this->configs.kh(); }
+    ShortIndex const &kh() const
+    {
+        return this->configs.kh();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex &kh() { return this->configs.kh(); }
+    ShortIndex &kh()
+    {
+        return this->configs.kh();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &kw() const { return this->configs.kw(); }
+    ShortIndex const &kw() const
+    {
+        return this->configs.kw();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex &kw() { return this->configs.kw(); }
+    ShortIndex &kw()
+    {
+        return this->configs.kw();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padTop() const { return this->configs.padTop(); }
+    ShortIndex const &padTop() const
+    {
+        return this->configs.padTop();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padTop() { return this->configs.padTop(); }
+    ShortIndex const &padTop()
+    {
+        return this->configs.padTop();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padBottom() const { return this->configs.padBottom(); }
+    ShortIndex const &padBottom() const
+    {
+        return this->configs.padBottom();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padBottom() { return this->configs.padBottom(); }
+    ShortIndex const &padBottom()
+    {
+        return this->configs.padBottom();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padLeft() const { return this->configs.padLeft(); }
+    ShortIndex const &padLeft() const
+    {
+        return this->configs.padLeft();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padLeft() { return this->configs.padLeft(); }
+    ShortIndex const &padLeft()
+    {
+        return this->configs.padLeft();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &padRight() const { return this->configs.padRight(); }
+    ShortIndex const &padRight() const
+    {
+        return this->configs.padRight();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &padRight() { return this->configs.padRight(); }
+    ShortIndex const &padRight()
+    {
+        return this->configs.padRight();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideH() const { return this->configs.strideH(); }
+    ShortIndex const &strideH() const
+    {
+        return this->configs.strideH();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideH() { return this->configs.strideH(); }
+    ShortIndex const &strideH()
+    {
+        return this->configs.strideH();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideW() const { return this->configs.strideW(); }
+    ShortIndex const &strideW() const
+    {
+        return this->configs.strideW();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &strideW() { return this->configs.strideW(); }
+    ShortIndex const &strideW()
+    {
+        return this->configs.strideW();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationH() const { return this->configs.dilationH(); }
+    ShortIndex const &dilationH() const
+    {
+        return this->configs.dilationH();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationH() { return this->configs.dilationH(); }
+    ShortIndex const &dilationH()
+    {
+        return this->configs.dilationH();
+    }
 
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationW() const { return this->configs.dilationW(); }
+    ShortIndex const &dilationW() const
+    {
+        return this->configs.dilationW();
+    }
     CATLASS_HOST_DEVICE
-    ShortIndex const &dilationW() { return this->configs.dilationW(); }
+    ShortIndex const &dilationW()
+    {
+        return this->configs.dilationW();
+    }
 };
 
 } // namespace Catlass

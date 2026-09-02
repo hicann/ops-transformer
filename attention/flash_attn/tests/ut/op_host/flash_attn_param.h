@@ -35,7 +35,8 @@ struct FlashAttnHostUtParamBase : public HostUtParamBase {
     std::string layout_out = "BSND";
     int64_t return_softmax_lse = 0;
 
-    FlashAttnHostUtParamBase(const csv_map &csvMap) : HostUtParamBase(csvMap)
+    FlashAttnHostUtParamBase(const csv_map &csvMap)
+        : HostUtParamBase(csvMap)
     {
         softmax_scale = std::stof(ReadMap(csvMap, "softmax_scale", "0.0"));
         mask_mode = std::stoll(ReadMap(csvMap, "mask_mode", "0"));
@@ -75,7 +76,8 @@ struct FlashAttnTilingUtParam : public FlashAttnHostUtParamBase {
     FlashAttnCompileInfo compileInfo = {
         64, 32, 65536, 1048576, 32768, 33554432, platform_ascendc::SocVersion::ASCEND950, NpuArch::DAV_3510};
 
-    FlashAttnTilingUtParam(const csv_map &csvMap) : FlashAttnHostUtParamBase(csvMap)
+    FlashAttnTilingUtParam(const csv_map &csvMap)
+        : FlashAttnHostUtParamBase(csvMap)
     {
         inputInstance.emplace_back(GetTensorGE(csvMap, "q_shape", "q_dtype", "q_format", this->q));
         inputInstance.emplace_back(GetTensorGE(csvMap, "k_shape", "k_dtype", "k_format", this->k));
@@ -118,7 +120,8 @@ struct FlashAttnInferShapeUtParam : public FlashAttnHostUtParamBase {
 
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    FlashAttnInferShapeUtParam(const csv_map &csvMap) : FlashAttnHostUtParamBase(csvMap)
+    FlashAttnInferShapeUtParam(const csv_map &csvMap)
+        : FlashAttnHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "q_shape", "q_dtype", "q_format", this->q));
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "k_shape", "k_dtype", "k_format", this->k));
@@ -162,7 +165,8 @@ struct FlashAttnInferDTypeUtParam : public FlashAttnHostUtParamBase {
     ge::DataType expect_attn_out_dtype = ge::DT_UNDEFINED;
     ge::DataType expect_softmax_lse_dtype = ge::DT_UNDEFINED;
 
-    FlashAttnInferDTypeUtParam(const csv_map &csvMap) : FlashAttnHostUtParamBase(csvMap)
+    FlashAttnInferDTypeUtParam(const csv_map &csvMap)
+        : FlashAttnHostUtParamBase(csvMap)
     {
         GetDataTypeGE(csvMap, "q_dtype", this->q_dtype);
         GetDataTypeGE(csvMap, "k_dtype", this->k_dtype);

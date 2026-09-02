@@ -154,7 +154,6 @@ __aicore__ inline void NsaSelectedAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_
     kSizeAlign = tilingData->postTilingData.kSizeAlign;
     vSizeAlign = tilingData->postTilingData.vSizeAlign;
 
-
     if constexpr (INPUT_FORMAT == NZ) {
         b = tilingData->postTilingData.b;
         n2 = tilingData->postTilingData.n2;
@@ -227,12 +226,12 @@ __aicore__ inline void NsaSelectedAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_
     }
 }
 
-
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
           const uint32_t INPUT_FORMAT>
-__aicore__ inline void
-NsaSelectedAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::ComputeDataCopyOffset(
-    int64_t curG, int64_t &curS, int64_t headDim, int64_t headDimAlign)
+__aicore__ inline void NsaSelectedAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT,
+                                                    INPUT_FORMAT>::ComputeDataCopyOffset(int64_t curG, int64_t &curS,
+                                                                                         int64_t headDim,
+                                                                                         int64_t headDimAlign)
 {
     // src BNSD
     scrOffsetBase = bIdx * n2 * curS * curG * headDimAlign;
@@ -297,7 +296,6 @@ __aicore__ inline void NsaSelectedAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_
         return;
     }
 
-
     event_t mte2WaitVPing = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
     event_t mte2WaitVPong = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
     TQue<QuePosition::VECIN, BUFFER_NUM> inQueueCommon;
@@ -359,7 +357,8 @@ __aicore__ inline void NsaSelectedAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_
                 Muls(tmpTensor[ubOffset], tmpTensor[ubOffset], (float)tilingData->postTilingData.scaleValue,
                      sLen * headDimAlign);
             } else {
-                Muls(vecOut[ubOffset], vecOut[ubOffset], (float)tilingData->postTilingData.scaleValue, sLen * headDimAlign);
+                Muls(vecOut[ubOffset], vecOut[ubOffset], (float)tilingData->postTilingData.scaleValue,
+                     sLen * headDimAlign);
             }
 
             PipeBarrier<PIPE_V>();
@@ -374,15 +373,16 @@ __aicore__ inline void NsaSelectedAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_
         outQueueCommon.template DeQue<OUT_TYPE>();
 
         if constexpr (LAYOUT == TND) {
-            DataCopyPad(dstGm[copyOutDstOffset], vecOut[ubOffset],
-                        {static_cast<uint16_t>(dataLen / headDimAlign), static_cast<uint32_t>(headDim * sizeof(OUT_TYPE)), 0,
-                         static_cast<uint32_t>((n2 * curG * headDim - headDim) * sizeof(OUT_TYPE)), 0});
+            DataCopyPad(
+                dstGm[copyOutDstOffset], vecOut[ubOffset],
+                {static_cast<uint16_t>(dataLen / headDimAlign), static_cast<uint32_t>(headDim * sizeof(OUT_TYPE)), 0,
+                 static_cast<uint32_t>((n2 * curG * headDim - headDim) * sizeof(OUT_TYPE)), 0});
         } else {
-            DataCopyPad(dstGm[copyOutDstOffset], vecOut[ubOffset],
-                        {static_cast<uint16_t>(dataLen / headDimAlign), static_cast<uint32_t>(headDim * sizeof(OUT_TYPE)), 0,
-                         static_cast<uint32_t>(copyOutDstStride * sizeof(OUT_TYPE)), 0});
+            DataCopyPad(
+                dstGm[copyOutDstOffset], vecOut[ubOffset],
+                {static_cast<uint16_t>(dataLen / headDimAlign), static_cast<uint32_t>(headDim * sizeof(OUT_TYPE)), 0,
+                 static_cast<uint32_t>(copyOutDstStride * sizeof(OUT_TYPE)), 0});
         }
-
 
         if (sLen + sIdx < curS) {
             sIdx += sLen;

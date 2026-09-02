@@ -100,10 +100,9 @@ public:
     uint64_t outD = 0; // copy out headDim
 };
 
-TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void
-FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::Init(GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dqRope, GM_ADDR dkRope,
-                                                   GM_ADDR dsink, GM_ADDR actual_seq_qlen, GM_ADDR actual_seq_kvlen,
-                                                   GM_ADDR workspace, FagTilingType ordTilingData, TPipe *pipeIn)
+TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void FlashAttentionScoreGradNzPost<TEMPLATE_ARGS>::Init(
+    GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink, GM_ADDR actual_seq_qlen,
+    GM_ADDR actual_seq_kvlen, GM_ADDR workspace, FagTilingType ordTilingData, TPipe *pipeIn)
 {
     pipe = pipeIn;
     tilingData = ordTilingData;

@@ -100,7 +100,6 @@ constexpr uint32_t SPARSE_MODE_ATTR_INDEX = 7;
 constexpr uint32_t FP32_BYTES = 4;
 constexpr uint32_t MAX_BLOCK_SIZE = 512;
 constexpr uint32_t COPYND2NZ_SRC_STRIDE_LIMITATION = 65535;
-}// namespace optiling
-
+} // namespace optiling
 
 #endif // NSA_SELECTED_ATTENTION_INFER_BASE_DEFINE_H

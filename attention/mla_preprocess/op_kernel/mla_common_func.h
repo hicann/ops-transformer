@@ -19,7 +19,7 @@
 #include "stub_fun.h"
 #else
 #ifndef __aicore__
-#define __aicore__  [aicore]
+#define __aicore__ [aicore]
 #endif
 #endif
 
@@ -77,40 +77,47 @@ __aicore__ inline T Min(const T lhs, const T rhs)
     return lhs < rhs ? lhs : rhs;
 }
 
-template <typename Dtype> __aicore__ __attribute__((always_inline)) inline uint32_t BlockSize()
+template <typename Dtype>
+__aicore__ __attribute__((always_inline)) inline uint32_t BlockSize()
 {
     return 32 / sizeof(Dtype);
 }
 
-template <typename Dtype> __aicore__ __attribute__((always_inline)) inline uint32_t MatrixSize()
+template <typename Dtype>
+__aicore__ __attribute__((always_inline)) inline uint32_t MatrixSize()
 {
     return 512 / sizeof(Dtype);
 }
 
-template <typename Dtype> __aicore__ __attribute__((always_inline)) inline uint64_t BlockSizeRoundUp(uint64_t num)
+template <typename Dtype>
+__aicore__ __attribute__((always_inline)) inline uint64_t BlockSizeRoundUp(uint64_t num)
 {
     return (num + BlockSize<Dtype>() - 1) / BlockSize<Dtype>() * BlockSize<Dtype>();
 }
 
-template <typename Dtype> __aicore__ __attribute__((always_inline)) inline uint64_t NumBlocksRoundUp(uint64_t num)
+template <typename Dtype>
+__aicore__ __attribute__((always_inline)) inline uint64_t NumBlocksRoundUp(uint64_t num)
 {
     return (num + BlockSize<Dtype>() - 1) / BlockSize<Dtype>();
 }
 
-template <typename Dtype> __aicore__ __attribute__((always_inline)) inline uint64_t MatrixSizeRoundUp(uint64_t num)
+template <typename Dtype>
+__aicore__ __attribute__((always_inline)) inline uint64_t MatrixSizeRoundUp(uint64_t num)
 {
     return (num + MatrixSize<Dtype>() - 1) / MatrixSize<Dtype>() * MatrixSize<Dtype>();
 }
 
-template <typename Dtype> __aicore__ __attribute__((always_inline)) inline uint64_t NumMatrixsRoundUp(uint64_t num)
+template <typename Dtype>
+__aicore__ __attribute__((always_inline)) inline uint64_t NumMatrixsRoundUp(uint64_t num)
 {
     return (num + MatrixSize<Dtype>() - 1) / MatrixSize<Dtype>();
 }
 
-template <typename Dtype> __aicore__ __attribute__((always_inline)) inline uint64_t L0HalfSize()
+template <typename Dtype>
+__aicore__ __attribute__((always_inline)) inline uint64_t L0HalfSize()
 {
     return 32 * 1024 / sizeof(Dtype);
 }
 
-}
+} // namespace MlaPreprocess
 #endif

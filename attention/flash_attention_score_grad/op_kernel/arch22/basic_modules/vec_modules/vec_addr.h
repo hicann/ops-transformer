@@ -196,7 +196,8 @@ public:
                                 kx = (VEC_BLOCK_LIMIT + 1 - num) / lens;
                                 int have_ur_block = kx != col;
                                 ur = kx == col;
-                                record(s1Idx, s2Idx, kx, ROW_2, kx * ROW_2 - have_ur_block, ur, lastBatchQSum, lastBatchKSum);
+                                record(s1Idx, s2Idx, kx, ROW_2, kx * ROW_2 - have_ur_block, ur, lastBatchQSum,
+                                       lastBatchKSum);
                                 num += kx * ROW_2 - have_ur_block;
                                 record(s1Idx + ROW_2, s2Idx, kx, ROW_2, kx * ROW_2, true, lastBatchQSum, lastBatchKSum);
                                 num += kx * ROW_2;
@@ -236,10 +237,10 @@ public:
                         lastBatchQSum = getTotalLen(batchIdx, seqLenQ);
                         lastBatchKSum = getTotalLen(batchIdx, seqLenK);
                         batchIdx += 1;
-                        if(batchIdx < batchNum){
+                        if (batchIdx < batchNum) {
                             s1 = getSeqLen(batchIdx, seqLenQ);
                             s2 = getSeqLen(batchIdx, seqLenK);
-                        }else{
+                        } else {
                             s1 = 0;
                             s2 = 0;
                         }

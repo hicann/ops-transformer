@@ -23,13 +23,14 @@ using namespace AscendC;
 
 constexpr uint32_t BLOCK_SIZE = 32;
 constexpr uint32_t DOUBLE_BUFFER = 2;
-constexpr uint64_t MAX_BLOCK_CNT = 4095;  // DataCopyPad blockCount 上限
+constexpr uint64_t MAX_BLOCK_CNT = 4095; // DataCopyPad blockCount 上限
 
 template <typename T, typename T_INDEX, bool isSeqLensCumsum, bool hasSeqOffset>
 class GatherPaKvCacheNd {
 public:
     __aicore__ inline GatherPaKvCacheNd(TPipe *pipe, const GatherPaKvCacheTilingDataV35 *__restrict tiling)
-        : pipe_(pipe), tl_(tiling){};
+        : pipe_(pipe),
+          tl_(tiling){};
     __aicore__ inline void Init(GM_ADDR key_cache, GM_ADDR value_cache, GM_ADDR block_tables, GM_ADDR seq_lens,
                                 GM_ADDR key_in, GM_ADDR value_in, GM_ADDR seq_offset, GM_ADDR key_out,
                                 GM_ADDR value_out);
@@ -39,25 +40,21 @@ public:
     __aicore__ inline void InitParams();
     __aicore__ inline void GatherKvCache(GlobalTensor<T> dstCacheGm, GlobalTensor<T> srcCacheGm, uint64_t curLen,
                                          bool isFilledWithZero);
-    __aicore__ inline void GatherKvCacheNonContiguous(
-        GlobalTensor<T> dstGm, GlobalTensor<T> srcGm,
-        uint64_t curBlockSize, uint64_t hiddenSize,
-        int64_t stride0, int64_t stride1, int64_t stride2,
-        bool isSlotNonContig, bool isHeadNonContig,
-        bool isFilledWithZero, bool isKey);
+    __aicore__ inline void GatherKvCacheNonContiguous(GlobalTensor<T> dstGm, GlobalTensor<T> srcGm,
+                                                      uint64_t curBlockSize, uint64_t hiddenSize, int64_t stride0,
+                                                      int64_t stride1, int64_t stride2, bool isSlotNonContig,
+                                                      bool isHeadNonContig, bool isFilledWithZero, bool isKey);
     // 把一段连续字节经UB搬到目标, 按maxUbHiddenSize_自动切块, 保证UB不越界。
     // 所有偏移/长度均为字节粒度。isFilledWithZero时不读src, 直接填零写出。
-    __aicore__ inline void GatherNcContigRun(GlobalTensor<T> dstGm, GlobalTensor<T> srcGm,
-                                             uint64_t dstByteOff, uint64_t srcByteOff,
-                                             uint64_t totalBytes, bool isFilledWithZero);
+    __aicore__ inline void GatherNcContigRun(GlobalTensor<T> dstGm, GlobalTensor<T> srcGm, uint64_t dstByteOff,
+                                             uint64_t srcByteOff, uint64_t totalBytes, bool isFilledWithZero);
     // slot维批量化(对齐scatter CopyOutKey思路, 但批的是slot而非head): 用一条DataCopyPad
     // blockCount=slot数, 一次跳搬整block多个slot(每slot unitBytes, slot间源跨srcSlotStride/
     // 目标跨dstSlotStride)进UB(紧密), 再批量写出。替代逐slot循环+逐slot同步, 大幅降指令/同步开销。
     // 受UB容量/blockCount(4095)限制时按slot分批; 单slot超UB时退回逐slot调GatherNcContigRun。
     // 所有偏移/长度均为字节粒度。
-    __aicore__ inline void GatherNcSlotBatchRun(GlobalTensor<T> dstGm, GlobalTensor<T> srcGm,
-                                                uint64_t dstBaseOff, uint64_t srcBaseOff,
-                                                uint64_t numSlots, uint64_t unitBytes,
+    __aicore__ inline void GatherNcSlotBatchRun(GlobalTensor<T> dstGm, GlobalTensor<T> srcGm, uint64_t dstBaseOff,
+                                                uint64_t srcBaseOff, uint64_t numSlots, uint64_t unitBytes,
                                                 uint64_t srcSlotStrideBytes, uint64_t dstSlotStrideBytes,
                                                 bool isFilledWithZero);
     __aicore__ inline T_INDEX CalcKvCoreOffset(int64_t reduceLen);
@@ -262,8 +259,7 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
             for (uint32_t fracBlockId = 0; fracBlockId < fracBlockCount; fracBlockId++) {
                 uint64_t curFracBlockLen = maxUbHiddenSizeK_;
                 if (fracBlockId == fracBlockCount - 1) {
-                    curFracBlockLen =
-                        curBlockSize * hiddenSizeK_ - (fracBlockCount - 1) * maxUbHiddenSizeK_;
+                    curFracBlockLen = curBlockSize * hiddenSizeK_ - (fracBlockCount - 1) * maxUbHiddenSizeK_;
                 }
                 uint64_t keyCacheOffset = keyCacheStart + fracBlockId * maxUbHiddenSizeK_;
                 GatherKvCache(outKeyGm_[keyOffset], keyCacheGm_[keyCacheOffset], curFracBlockLen, isFilledWithZero);
@@ -274,8 +270,7 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
             for (uint32_t fracBlockId = 0; fracBlockId < fracBlockCount; fracBlockId++) {
                 uint64_t curFracBlockLen = maxUbHiddenSizeV_;
                 if (fracBlockId == fracBlockCount - 1) {
-                    curFracBlockLen =
-                        curBlockSize * hiddenSizeV_ - (fracBlockCount - 1) * maxUbHiddenSizeV_;
+                    curFracBlockLen = curBlockSize * hiddenSizeV_ - (fracBlockCount - 1) * maxUbHiddenSizeV_;
                 }
                 uint64_t valueCacheOffset = valueCacheStart + fracBlockId * maxUbHiddenSizeV_;
                 GatherKvCache(outValueGm_[valueOffset], valueCacheGm_[valueCacheOffset], curFracBlockLen,
@@ -292,10 +287,10 @@ template <typename T, typename T_INDEX, bool isSeqLensCumsum, bool hasSeqOffset>
 __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffset>::ProcessNonContig()
 {
     const uint64_t coreIdx = GetBlockIdx();
-    const uint64_t coreNum = needCoreNum_;  // ND非连续时tiling已设为满核数
-    uint64_t globalBlk = 0;                 // 全局block计数(跨batch累加), 用于轮询分核
+    const uint64_t coreNum = needCoreNum_; // ND非连续时tiling已设为满核数
+    uint64_t globalBlk = 0;                // 全局block计数(跨batch累加), 用于轮询分核
 
-    int64_t runningOffset = 0;  // 非cumsum模式: 累加各batch的seqLen得到batchOffset
+    int64_t runningOffset = 0; // 非cumsum模式: 累加各batch的seqLen得到batchOffset
     for (uint32_t i = 0; i < batchCount_; i++) {
         T_INDEX seqLen;
         int64_t batchOffset, accumSeqLen;
@@ -354,16 +349,16 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
             bool isKHeadNC = (nonContiguousFlag_ >> 5) & 1;
             bool isVSlotNC = (nonContiguousFlag_ >> 6) & 1;
             bool isVHeadNC = (nonContiguousFlag_ >> 7) & 1;
-            bool isKOutNC  = (nonContiguousFlag_ >> 2) & 1;  // ref key 输出非连续(dim0/dim1)
-            bool isVOutNC  = (nonContiguousFlag_ >> 3) & 1;  // ref value 输出非连续
+            bool isKOutNC = (nonContiguousFlag_ >> 2) & 1; // ref key 输出非连续(dim0/dim1)
+            bool isVOutNC = (nonContiguousFlag_ >> 3) & 1; // ref value 输出非连续
 
             // 输出offset按绝对token位置算(本block首token = batchOffset + blockIdx*cacheBlockSize_)。
             // 输出非连续时按token步长(keyOutStride0)算字节基址, 连续时按hiddenSize稠密排列。
             uint64_t baseToken = batchOffset + blockIdx * cacheBlockSize_;
-            uint64_t keyOffset = isKOutNC ? (baseToken * keyOutStride0_ * sizeof(DTYPE_KEY))
-                                          : (baseToken * hiddenSizeK_);
-            uint64_t valueOffset = isVOutNC ? (baseToken * valueOutStride0_ * sizeof(DTYPE_VALUE))
-                                            : (baseToken * hiddenSizeV_);
+            uint64_t keyOffset =
+                isKOutNC ? (baseToken * keyOutStride0_ * sizeof(DTYPE_KEY)) : (baseToken * hiddenSizeK_);
+            uint64_t valueOffset =
+                isVOutNC ? (baseToken * valueOutStride0_ * sizeof(DTYPE_VALUE)) : (baseToken * hiddenSizeV_);
 
             uint64_t keyCacheStart = blockId * kCacheStride0_ * sizeof(DTYPE_KEY);
             uint64_t valueCacheStart = blockId * vCacheStride0_ * sizeof(DTYPE_VALUE);
@@ -381,11 +376,9 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
                     keyOffset += curFracBlockLen;
                 }
             } else {
-                GatherKvCacheNonContiguous(
-                    outKeyGm_[keyOffset], keyCacheGm_[keyCacheStart],
-                    curBlockSize, hiddenSizeK_,
-                    kCacheStride0_, kCacheStride1_, kCacheStride2_,
-                    isKSlotNC, isKHeadNC, isFilledWithZero, true);
+                GatherKvCacheNonContiguous(outKeyGm_[keyOffset], keyCacheGm_[keyCacheStart], curBlockSize, hiddenSizeK_,
+                                           kCacheStride0_, kCacheStride1_, kCacheStride2_, isKSlotNC, isKHeadNC,
+                                           isFilledWithZero, true);
             }
 
             if (!isVSlotNC && !isVOutNC) {
@@ -401,11 +394,9 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
                     valueOffset += curFracBlockLen;
                 }
             } else {
-                GatherKvCacheNonContiguous(
-                    outValueGm_[valueOffset], valueCacheGm_[valueCacheStart],
-                    curBlockSize, hiddenSizeV_,
-                    vCacheStride0_, vCacheStride1_, vCacheStride2_,
-                    isVSlotNC, isVHeadNC, isFilledWithZero, false);
+                GatherKvCacheNonContiguous(outValueGm_[valueOffset], valueCacheGm_[valueCacheStart], curBlockSize,
+                                           hiddenSizeV_, vCacheStride0_, vCacheStride1_, vCacheStride2_, isVSlotNC,
+                                           isVHeadNC, isFilledWithZero, false);
             }
         }
         globalBlk += blockCount;
@@ -413,8 +404,8 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
 }
 
 template <typename T, typename T_INDEX, bool isSeqLensCumsum, bool hasSeqOffset>
-__aicore__ inline T_INDEX
-GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffset>::CalcKvCoreOffset(int64_t reduceLen)
+__aicore__ inline T_INDEX GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffset>::CalcKvCoreOffset(
+    int64_t reduceLen)
 {
     LocalTensor<T_INDEX> prefixSumLocal = prefixSumBuffer_.Get<T_INDEX>();
     uint64_t loopTimes = CeilDivision(reduceLen, seqLenAccSize_);
@@ -484,57 +475,53 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
 
 template <typename T, typename T_INDEX, bool isSeqLensCumsum, bool hasSeqOffset>
 __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffset>::GatherKvCacheNonContiguous(
-    GlobalTensor<T> dstGm, GlobalTensor<T> srcGm,
-    uint64_t curBlockSize, uint64_t hiddenSize,
-    int64_t stride0, int64_t stride1, int64_t stride2,
-    bool isSlotNonContig, bool isHeadNonContig,
-    bool isFilledWithZero, bool isKey)
+    GlobalTensor<T> dstGm, GlobalTensor<T> srcGm, uint64_t curBlockSize, uint64_t hiddenSize, int64_t stride0,
+    int64_t stride1, int64_t stride2, bool isSlotNonContig, bool isHeadNonContig, bool isFilledWithZero, bool isKey)
 {
     // T恒为uint8_t, sizeof(T)==1; stride为元素粒度, 须乘真实元素字节宽转字节偏移。
     // hiddenSize入参已是字节(InitParams已乘sizeof(DTYPE_*))。
-    (void)stride0;          // block起始地址已在调用侧用stride0计算
-    (void)isSlotNonContig;  // 进入本函数即slot非连续 或 输出非连续, 标志无需再用
+    (void)stride0;         // block起始地址已在调用侧用stride0计算
+    (void)isSlotNonContig; // 进入本函数即slot非连续 或 输出非连续, 标志无需再用
     const uint64_t elemSize = isKey ? sizeof(DTYPE_KEY) : sizeof(DTYPE_VALUE);
-    const uint64_t srcSlotStrideBytes = static_cast<uint64_t>(stride1) * elemSize;  // 源slot(token)间步长
-    const uint64_t srcHeadStrideBytes = static_cast<uint64_t>(stride2) * elemSize;  // 源head间步长
+    const uint64_t srcSlotStrideBytes = static_cast<uint64_t>(stride1) * elemSize; // 源slot(token)间步长
+    const uint64_t srcHeadStrideBytes = static_cast<uint64_t>(stride2) * elemSize; // 源head间步长
 
     // 输出侧: token(dim0)步长用 keyOutStride0, head(dim1)步长用 keyOutStride1。
     // 连续时tiling已填稠密值(stride0=hiddenSize, stride1=head_size), 故下式对连续/非连续统一。
-    bool isOutNonContig   = isKey ? ((nonContiguousFlag_ >> 2) & 1) : ((nonContiguousFlag_ >> 3) & 1);
+    bool isOutNonContig = isKey ? ((nonContiguousFlag_ >> 2) & 1) : ((nonContiguousFlag_ >> 3) & 1);
     bool isOutHeadNonContig = isKey ? ((nonContiguousFlag_ >> 8) & 1) : ((nonContiguousFlag_ >> 9) & 1);
     int64_t outStride0 = isKey ? keyOutStride0_ : valueOutStride0_;
     int64_t outStride1 = isKey ? keyOutStride1_ : valueOutStride1_;
-    const uint64_t dstSlotStrideBytes = isOutNonContig
-                                            ? static_cast<uint64_t>(outStride0) * elemSize  // 输出dim0非连续
-                                            : hiddenSize;                                    // 输出连续: 紧密排列
-    const uint64_t dstHeadStrideBytes = static_cast<uint64_t>(outStride1) * elemSize;        // head间步长
+    const uint64_t dstSlotStrideBytes = isOutNonContig ? static_cast<uint64_t>(outStride0) * elemSize // 输出dim0非连续
+                                                         :
+                                                         hiddenSize;                  // 输出连续: 紧密排列
+    const uint64_t dstHeadStrideBytes = static_cast<uint64_t>(outStride1) * elemSize; // head间步长
 
     uint64_t numHeads = isKey ? numHeadsK_ : numHeadsV_;
-    uint64_t headBytes = (numHeads > 0) ? (hiddenSize / numHeads) : hiddenSize;  // 单head字节数
+    uint64_t headBytes = (numHeads > 0) ? (hiddenSize / numHeads) : hiddenSize; // 单head字节数
 
     // 是否需要按head拆: 源head非连续(cache dim2) 或 目标head非连续(ref dim1)。任一成立则不能整token搬。
     bool needHeadLoop = isHeadNonContig || isOutHeadNonContig;
 
     if (!needHeadLoop) {
         // Case B: token内连续(N*D字节连续)。一次批量化搬整block所有slot:
-        GatherNcSlotBatchRun(dstGm, srcGm, 0, 0, curBlockSize, hiddenSize,
-                             srcSlotStrideBytes, dstSlotStrideBytes, isFilledWithZero);
+        GatherNcSlotBatchRun(dstGm, srcGm, 0, 0, curBlockSize, hiddenSize, srcSlotStrideBytes, dstSlotStrideBytes,
+                             isFilledWithZero);
     } else {
         // Case C: head轴(源或目标)非连续。外层循环head(数量少), 内层一次批量化搬整block该head的所有slot。
         for (uint64_t h = 0; h < numHeads; h++) {
             GatherNcSlotBatchRun(dstGm, srcGm,
-                                 h * dstHeadStrideBytes,   // 目标: ref端head位置
-                                 h * srcHeadStrideBytes,   // 源: cache端head位置
-                                 curBlockSize, headBytes,
-                                 srcSlotStrideBytes, dstSlotStrideBytes, isFilledWithZero);
+                                 h * dstHeadStrideBytes, // 目标: ref端head位置
+                                 h * srcHeadStrideBytes, // 源: cache端head位置
+                                 curBlockSize, headBytes, srcSlotStrideBytes, dstSlotStrideBytes, isFilledWithZero);
         }
     }
 }
 
 template <typename T, typename T_INDEX, bool isSeqLensCumsum, bool hasSeqOffset>
 __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffset>::GatherNcContigRun(
-    GlobalTensor<T> dstGm, GlobalTensor<T> srcGm, uint64_t dstByteOff, uint64_t srcByteOff,
-    uint64_t totalBytes, bool isFilledWithZero)
+    GlobalTensor<T> dstGm, GlobalTensor<T> srcGm, uint64_t dstByteOff, uint64_t srcByteOff, uint64_t totalBytes,
+    bool isFilledWithZero)
 {
     // 按UB容量(maxUbHiddenSize_字节)切块, 逐块搬运, 保证UB不越界。
     uint64_t handled = 0;
@@ -581,11 +568,8 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
 // 读/写stride语义对齐scatter CopyInKey/CopyOutKey(srcStride/dstStride均字节粒度)。
 template <typename T, typename T_INDEX, bool isSeqLensCumsum, bool hasSeqOffset>
 __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffset>::GatherNcSlotBatchRun(
-    GlobalTensor<T> dstGm, GlobalTensor<T> srcGm,
-    uint64_t dstBaseOff, uint64_t srcBaseOff,
-    uint64_t numSlots, uint64_t unitBytes,
-    uint64_t srcSlotStrideBytes, uint64_t dstSlotStrideBytes,
-    bool isFilledWithZero)
+    GlobalTensor<T> dstGm, GlobalTensor<T> srcGm, uint64_t dstBaseOff, uint64_t srcBaseOff, uint64_t numSlots,
+    uint64_t unitBytes, uint64_t srcSlotStrideBytes, uint64_t dstSlotStrideBytes, bool isFilledWithZero)
 {
     // 多block DataCopyPad在UB里每个block按32B对齐占位(硬件语义), 故容量按【对齐后】尺寸估算。
     // 与scatter InitLoopInfo一致(用RoundUp(headSize,32)算可装数, blockLen仍用真实尺寸)。
@@ -595,27 +579,29 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
     // 单slot对齐占位超UB: 批量化会越界, 退回逐slot按字节切块(GatherNcContigRun内部再切)。
     if (unitBytesAligned > maxUbHiddenSize_) {
         for (uint64_t s = 0; s < numSlots; s++) {
-            GatherNcContigRun(dstGm, srcGm,
-                              dstBaseOff + s * dstSlotStrideBytes,
-                              srcBaseOff + s * srcSlotStrideBytes,
+            GatherNcContigRun(dstGm, srcGm, dstBaseOff + s * dstSlotStrideBytes, srcBaseOff + s * srcSlotStrideBytes,
                               unitBytes, isFilledWithZero);
         }
         return;
     }
 
-    const uint64_t srcGapBytes = srcSlotStrideBytes - unitBytes;  // 源相邻slot间隙(字节)
-    const uint64_t dstGapBytes = dstSlotStrideBytes - unitBytes;  // 目标相邻slot间隙(字节)
+    const uint64_t srcGapBytes = srcSlotStrideBytes - unitBytes; // 源相邻slot间隙(字节)
+    const uint64_t dstGapBytes = dstSlotStrideBytes - unitBytes; // 目标相邻slot间隙(字节)
 
     // UB一次能装的slot数: 用对齐占位算容量(防溢出), 且blockCount上限MAX_BLOCK_CNT(4095)。
     uint64_t slotsPerBatch = (unitBytesAligned > 0) ? (maxUbHiddenSize_ / unitBytesAligned) : numSlots;
-    if (slotsPerBatch == 0) slotsPerBatch = 1;
-    if (slotsPerBatch > MAX_BLOCK_CNT) slotsPerBatch = MAX_BLOCK_CNT;
-    if (slotsPerBatch > numSlots) slotsPerBatch = numSlots;
+    if (slotsPerBatch == 0)
+        slotsPerBatch = 1;
+    if (slotsPerBatch > MAX_BLOCK_CNT)
+        slotsPerBatch = MAX_BLOCK_CNT;
+    if (slotsPerBatch > numSlots)
+        slotsPerBatch = numSlots;
 
     uint64_t slotDone = 0;
     while (slotDone < numSlots) {
         uint64_t curSlots = numSlots - slotDone;
-        if (curSlots > slotsPerBatch) curSlots = slotsPerBatch;
+        if (curSlots > slotsPerBatch)
+            curSlots = slotsPerBatch;
 
         LocalTensor<T> cacheLocal = cacheQueue_.AllocTensor<T>();
         if (isFilledWithZero) {
@@ -636,8 +622,8 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
             inParams.blockLen = static_cast<uint32_t>(unitBytes);
             inParams.srcStride = static_cast<uint32_t>(srcGapBytes);
             inParams.dstStride = 0;
-            DataCopyPad<T, PaddingMode::Normal>(
-                cacheLocal, srcGm[srcBaseOff + slotDone * srcSlotStrideBytes], inParams, padExtParams_);
+            DataCopyPad<T, PaddingMode::Normal>(cacheLocal, srcGm[srcBaseOff + slotDone * srcSlotStrideBytes], inParams,
+                                                padExtParams_);
             cacheQueue_.EnQue<T>(cacheLocal);
             cacheLocal = cacheQueue_.DeQue<T>();
         }
@@ -648,8 +634,7 @@ __aicore__ inline void GatherPaKvCacheNd<T, T_INDEX, isSeqLensCumsum, hasSeqOffs
         outParams.blockLen = static_cast<uint32_t>(unitBytes);
         outParams.srcStride = 0;
         outParams.dstStride = static_cast<uint32_t>(dstGapBytes);
-        DataCopyPad<T, PaddingMode::Normal>(
-            dstGm[dstBaseOff + slotDone * dstSlotStrideBytes], cacheLocal, outParams);
+        DataCopyPad<T, PaddingMode::Normal>(dstGm[dstBaseOff + slotDone * dstSlotStrideBytes], cacheLocal, outParams);
         event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
         SetFlag<HardEvent::MTE3_MTE2>(eventId);
         WaitFlag<HardEvent::MTE3_MTE2>(eventId);

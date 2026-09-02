@@ -28,36 +28,35 @@ struct GatherPaKvCacheTilingDataTest {
     int32_t isSeqLensCumsum;
 };
 
-
-#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                            \
-    __ubuf__ tilingStruct *tilingDataPointer =                                                                         \
+#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
+    __ubuf__ tilingStruct *tilingDataPointer = \
         reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
 
-#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer)                                               \
+#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
 
-#define GET_TILING_DATA(tilingData, tilingPointer)                                                                     \
-    GatherPaKvCacheTilingDataTest tilingData;                                                                              \
-    INIT_TILING_DATA(GatherPaKvCacheTilingDataTest, tilingDataPointer, tilingPointer);                                     \
-    (tilingData).blockSize = tilingDataPointer->blockSize;                                                             \
-    (tilingData).numTokens = tilingDataPointer->numTokens;                                                             \
-    (tilingData).numblkTabCol = tilingDataPointer->numblkTabCol;                                                       \
-    (tilingData).tokenSizeK = tilingDataPointer->tokenSizeK;                                                           \
-    (tilingData).tokenSizeV = tilingDataPointer->tokenSizeV;                                                           \
-    (tilingData).typeByte = tilingDataPointer->typeByte;                                                               \
-    (tilingData).hasSeqStarts = tilingDataPointer->hasSeqStarts;                                                       \
+#define GET_TILING_DATA(tilingData, tilingPointer) \
+    GatherPaKvCacheTilingDataTest tilingData; \
+    INIT_TILING_DATA(GatherPaKvCacheTilingDataTest, tilingDataPointer, tilingPointer); \
+    (tilingData).blockSize = tilingDataPointer->blockSize; \
+    (tilingData).numTokens = tilingDataPointer->numTokens; \
+    (tilingData).numblkTabCol = tilingDataPointer->numblkTabCol; \
+    (tilingData).tokenSizeK = tilingDataPointer->tokenSizeK; \
+    (tilingData).tokenSizeV = tilingDataPointer->tokenSizeV; \
+    (tilingData).typeByte = tilingDataPointer->typeByte; \
+    (tilingData).hasSeqStarts = tilingDataPointer->hasSeqStarts; \
     (tilingData).isSeqLensCumsum = tilingDataPointer->isSeqLensCumsum;
 
-#define GET_TILING_DATA_WITH_STRUCT(TilingData, tilingData, tilingPointer)                                             \
-    TilingData tilingData;                                                                                             \
-    INIT_TILING_DATA(TilingData, tilingDataPointer, tilingPointer);                                                    \
-    (tilingData).blockSize = tilingDataPointer->blockSize;                                                             \
-    (tilingData).numTokens = tilingDataPointer->numTokens;                                                             \
-    (tilingData).numblkTabCol = tilingDataPointer->numblkTabCol;                                                       \
-    (tilingData).tokenSizeK = tilingDataPointer->tokenSizeK;                                                           \
-    (tilingData).tokenSizeV = tilingDataPointer->tokenSizeV;                                                           \
-    (tilingData).typeByte = tilingDataPointer->typeByte;                                                               \
-    (tilingData).hasSeqStarts = tilingDataPointer->hasSeqStarts;                                                       \
+#define GET_TILING_DATA_WITH_STRUCT(TilingData, tilingData, tilingPointer) \
+    TilingData tilingData; \
+    INIT_TILING_DATA(TilingData, tilingDataPointer, tilingPointer); \
+    (tilingData).blockSize = tilingDataPointer->blockSize; \
+    (tilingData).numTokens = tilingDataPointer->numTokens; \
+    (tilingData).numblkTabCol = tilingDataPointer->numblkTabCol; \
+    (tilingData).tokenSizeK = tilingDataPointer->tokenSizeK; \
+    (tilingData).tokenSizeV = tilingDataPointer->tokenSizeV; \
+    (tilingData).typeByte = tilingDataPointer->typeByte; \
+    (tilingData).hasSeqStarts = tilingDataPointer->hasSeqStarts; \
     (tilingData).isSeqLensCumsum = tilingDataPointer->isSeqLensCumsum;
 
 #endif

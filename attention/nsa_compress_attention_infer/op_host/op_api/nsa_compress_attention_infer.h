@@ -15,27 +15,13 @@
 
 namespace l0op {
 
-const std::array<const aclTensor *, 2>
-NsaCompressAttentionInfer(const aclTensor *query,
-                    const aclTensor *key,
-                    const aclTensor *value,
-                    const aclTensor *attentionMaskOptional,
-                    const aclTensor *blockTableOptional,
-                    const aclIntArray *actualQSeqLenOptional,
-                    const aclIntArray *actualCmpKvSeqLenOptional,
-                    const aclIntArray *actualSelKvSeqLenOptional,
-                    const aclTensor *topKMaskOptional,
-                    int64_t numHeads,
-                    int64_t numKeyValueHeads,
-                    int64_t selectBlockSize,
-                    int64_t selectBlockCount,
-                    int64_t compressBlockSize,
-                    int64_t compressBlockStride,
-                    double scaleValue,
-                    const char *layoutOptional,
-                    int64_t pageBlockSize,
-                    int64_t sparseMode,
-                    aclOpExecutor *executor);
+const std::array<const aclTensor *, 2> NsaCompressAttentionInfer(
+    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *attentionMaskOptional,
+    const aclTensor *blockTableOptional, const aclIntArray *actualQSeqLenOptional,
+    const aclIntArray *actualCmpKvSeqLenOptional, const aclIntArray *actualSelKvSeqLenOptional,
+    const aclTensor *topKMaskOptional, int64_t numHeads, int64_t numKeyValueHeads, int64_t selectBlockSize,
+    int64_t selectBlockCount, int64_t compressBlockSize, int64_t compressBlockStride, double scaleValue,
+    const char *layoutOptional, int64_t pageBlockSize, int64_t sparseMode, aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_OP_NSA_NSA_COMPRESS_ATTENTION_INFER_OP_H_

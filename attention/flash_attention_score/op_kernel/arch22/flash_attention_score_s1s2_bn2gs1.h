@@ -86,11 +86,12 @@ class FlashAttentionScoreS1s2Bn2gs1 {
 public:
     __aicore__ inline FlashAttentionScoreS1s2Bn2gs1(){};
 
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,  __gm__ uint8_t *keyRope,
-                                __gm__ uint8_t *value, __gm__ uint8_t *pse,
+    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,
+                                __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *pse,
                                 __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                                __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
+                                __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
+                                __gm__ uint8_t *workspace,
                                 const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void Process();
 
@@ -106,23 +107,25 @@ public:
 
     // define batchmatmul
     using a2Type = typename AscendC::Conditional<(IsSameType<T, INPUT_T>::value == true),
-            MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T>, MatmulType<TPosition::GM, bmm1Format, INPUT_T>>::type;
+                                                 MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T>,
+                                                 MatmulType<TPosition::GM, bmm1Format, INPUT_T>>::type;
     using a2TypeNz = MatmulType<TPosition::GM, CubeFormat::NZ, INPUT_T>;
     using b2Type = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T, false, LayoutMode::NONE, enableL1Reuse>;
     using bias2Type = MatmulType<TPosition::GM, CubeFormat::ND, float>;
     using c2Type = MatmulType<TPosition::GM, CubeFormat::ND, T>;
     using c2NzType = MatmulType<TPosition::GM, CubeFormat::NZ, T>;
-    using modeTypemm2 = typename AscendC::Conditional<
-          (IsSameType<T, INPUT_T>::value == false && layOutType == LayOutTypeEnum::LAYOUT_TND),
-          matmul::Matmul<a2TypeNz, b2Type, c2NzType, bias2Type, GetMmCfg(enableL1Reuse)>,
-          matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, GetMmCfg(enableL1Reuse)>>::type;
+    using modeTypemm2 =
+        typename AscendC::Conditional<(IsSameType<T, INPUT_T>::value == false &&
+                                       layOutType == LayOutTypeEnum::LAYOUT_TND),
+                                      matmul::Matmul<a2TypeNz, b2Type, c2NzType, bias2Type, GetMmCfg(enableL1Reuse)>,
+                                      matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, GetMmCfg(enableL1Reuse)>>::type;
     modeTypemm2 bmm2;
 
 protected:
-    __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,  __gm__ uint8_t *keyRope,
-                                     __gm__ uint8_t *value,
-                                     __gm__ uint8_t *pse, __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask,
-                                     __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
+    __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key,
+                                     __gm__ uint8_t *keyRope, __gm__ uint8_t *value, __gm__ uint8_t *pse,
+                                     __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
+                                     __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
                                      __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
                                      __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
                                      const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
@@ -144,13 +147,13 @@ protected:
                                           matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1);
     template <typename T2, const MatmulConfig &MM_CFG>
     __aicore__ inline void Bmm1SetTensorARope(SplitExtraInfo &extraInfo,
-                                          matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1);
+                                              matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1);
     template <typename T2, const MatmulConfig &MM_CFG>
     __aicore__ inline void SetBmm1TensorB(SplitExtraInfo &extraInfo,
                                           matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1);
     template <typename T2, const MatmulConfig &MM_CFG>
     __aicore__ inline void SetBmm1TensorBRope(SplitExtraInfo &extraInfo,
-                                          matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1);
+                                              matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1);
     __aicore__ inline void ComputeBmm1Tail(SplitExtraInfo &extraInfo);
     __aicore__ inline void ProcessVec1(SplitExtraInfo &extraInfo);
     __aicore__ inline void CopyInAttenMask(SplitExtraInfo &extraInfo, int64_t loopIdx, int64_t maskOffset,
@@ -215,7 +218,7 @@ protected:
     TBuf<> softmaxSumBuf[2];
     TBuf<> softmaxExpBuf[2];
     TBuf<> softmaxMaxBuf;
-    TBuf<> commonTBuf; // common的复用空间
+    TBuf<> commonTBuf;     // common的复用空间
     TBuf<> softmaxTempBuf; // softmaxTempBuf m,1 的时候临时空间
 
     LocalTensor<T> softmaxExpUb;
@@ -251,7 +254,7 @@ protected:
     int64_t bN2GDRope = 0;
     int64_t gS2;
 
-    //MLA D不等长，V和OUT为D2
+    // MLA D不等长，V和OUT为D2
     int64_t gD2;
     int64_t n2S2D2;
     int64_t s2D2;
@@ -333,21 +336,17 @@ protected:
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::Init(__gm__ uint8_t *query, __gm__ uint8_t *queryRope,
-                                                   __gm__ uint8_t *key,  __gm__ uint8_t *keyRope,
-                                                   __gm__ uint8_t *value,
-                                                   __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
-                                                   __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix,
-                                                   __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
-                                                   __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
-                                                   __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                                   const FlashAttentionScoreGeneralTilingData *__restrict tiling,
-                                                   TPipe *tPipe)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::Init(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key, __gm__ uint8_t *keyRope,
+                   __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask,
+                   __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax,
+                   __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
+                   __gm__ uint8_t *workspace, const FlashAttentionScoreGeneralTilingData *__restrict tiling,
+                   TPipe *tPipe)
 {
-    this->InitInput(query, queryRope, key, keyRope, value, pse, dropMask, paddingMask, prefix, attenMask, sink, softmaxMax, softmaxSum,
-                    softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
+    this->InitInput(query, queryRope, key, keyRope, value, pse, dropMask, paddingMask, prefix, attenMask, sink,
+                    softmaxMax, softmaxSum, softmaxOut, attentionOut, workspace, tiling, tPipe); // gm设置
 
     this->ComputeConstexpr();
     this->InitBuffer();
@@ -361,22 +360,17 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::InitInput(
-                                                        __gm__ uint8_t *query, __gm__ uint8_t *queryRope,
-                                                        __gm__ uint8_t *key,  __gm__ uint8_t *keyRope,
-                                                        __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                                                        __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask,
-                                                        __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *sink,
-                                                        __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                                        __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut,
-                                                        __gm__ uint8_t *workspace,
-                                                        const FlashAttentionScoreGeneralTilingData *__restrict tiling,
-                                                        TPipe *tPipe)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::InitInput(__gm__ uint8_t *query, __gm__ uint8_t *queryRope, __gm__ uint8_t *key, __gm__ uint8_t *keyRope,
+                        __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
+                        __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask,
+                        __gm__ uint8_t *sink, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
+                        __gm__ uint8_t *softmaxOut, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                        const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe)
 {
     if ASCEND_IS_AIV {
-        this->blockIdx = GetBlockIdx();  
+        this->blockIdx = GetBlockIdx();
     } else {
         this->blockIdx = GetBlockIdx() * 2;
     }
@@ -435,9 +429,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     }
 
     totalOffset = mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset * 2 * GM_DOUBLE_BUFFER;
-    int64_t pseInnerAlibiSize = this->tilingData->coreParams.pseAlibiBaseS1 *
-                                this->tilingData->coreParams.pseAlibiBaseS2 * sizeof(half);
-    int64_t pseAlibiOffset =  CeilDiv(pseInnerAlibiSize, 512) * 512;
+    int64_t pseInnerAlibiSize =
+        this->tilingData->coreParams.pseAlibiBaseS1 * this->tilingData->coreParams.pseAlibiBaseS2 * sizeof(half);
+    int64_t pseAlibiOffset = CeilDiv(pseInnerAlibiSize, 512) * 512;
     totalOffset += pseAlibiOffset;
 
     // bmm1Result，占用2倍mmNRatioOffset空间
@@ -464,7 +458,7 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     this->vec2Res[1].SetGlobalBuffer(
         (__gm__ T *)(workspace + this->blockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + mm2Offset * 3));
     pseAlibiAddr = this->blockIdx * totalOffset + mmNRatioOffset * bmm1AndVec1Ratio + 4 * mm2Offset;
-    this->pseAlibiGm.SetGlobalBuffer((__gm__ half*)(workspace + pseAlibiAddr));
+    this->pseAlibiGm.SetGlobalBuffer((__gm__ half *)(workspace + pseAlibiAddr));
     if constexpr (IsSameType<T, half>::value) {
         this->negativeIntScalar = NEGATIVE_MIN_VAULE_FP16;
     }
@@ -473,10 +467,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::SetTiling(const FlashAttentionScoreGeneralTilingData
-                                                            *__restrict tilingData)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::SetTiling(const FlashAttentionScoreGeneralTilingData *__restrict tilingData)
 {
     // copy base params
     this->tilingData = tilingData;
@@ -503,11 +496,11 @@ __aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPs
     uint64_t maskTBufPongSize = 16 * 1024;
 
     // 可选输入的buffer空间，保持和stage1处理的size一致
-    if constexpr  (hasAtten == true) {
+    if constexpr (hasAtten == true) {
         this->pipe->InitBuffer(this->maskTBufPing, stage1AttenSize); // 可以给attenmask 9k
     }
     this->pipe->InitBuffer(this->maskTBufPong, maskTBufPongSize); // 可以给dropoutmask 16k
-    this->pipe->InitBuffer(this->pseTBuf, 16384); // pse 16k
+    this->pipe->InitBuffer(this->pseTBuf, 16384);                 // pse 16k
 
     this->pipe->InitBuffer(this->stage1PingBuf, stage2Size * sizeof(T)); // t.a 32k
     this->pipe->InitBuffer(this->stage2TBuf, stage2Size * sizeof(T));    // t.c 32k
@@ -530,8 +523,9 @@ __aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPs
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
-__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                     isBasicBlock, bmm1Format, enableL1Reuse, hasRope>::ComputeConstexpr()
+__aicore__ inline void
+FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                              enableL1Reuse, hasRope>::ComputeConstexpr()
 {
     // 计算轴的乘积
     if constexpr (enableL1Reuse) {
@@ -573,7 +567,7 @@ __aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPs
     this->s2BaseN2D = this->s2BaseSize * this->n2D;
     this->s2BaseNratioSize = this->s2BaseSize * this->tilingData->coreParams.nRatio;
     this->s1BaseS2 = this->s1BaseSize * this->tilingData->inputParams.s2Size;
-   
+
     if constexpr (hasRope == true) {
         this->gDRope = this->tilingData->inputParams.gSize * dRopeSize;
         this->n2DRope = this->tilingData->inputParams.n2Size * dRopeSize;
@@ -650,7 +644,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::GetS1LoopRange(int64_t &multiCoreInnerOffset,
-                                                             int64_t &multiCoreInnerLimit)
+                                                                      int64_t &multiCoreInnerLimit)
 {
     // 计算sparse场景下s1的循环范围
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
@@ -729,9 +723,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                              ((__gm__ int64_t *)this->prefixNAddr)[this->boIdx]);
         if constexpr (enableL1Reuse) {
             if (useNext) {
-                this->nextS2EndIdx =
-                    Max(s1BaseSize * (this->s1oIdx + 2) - this->s1Size + this->s2Size,
-                        ((__gm__ int64_t *)this->prefixNAddr)[this->boIdx]);
+                this->nextS2EndIdx = Max(s1BaseSize * (this->s1oIdx + 2) - this->s1Size + this->s2Size,
+                                         ((__gm__ int64_t *)this->prefixNAddr)[this->boIdx]);
             }
         }
     } else { // 其它场景, 如无attention mask
@@ -972,7 +965,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::GetBNIdx(const int64_t &multiCoreInnerOffset,
-                                                       const int64_t &multiCoreInnerLimit)
+                                                                const int64_t &multiCoreInnerLimit)
 {
     bngStartIdx = multiCoreInnerOffset / this->tilingData->coreParams.s1OuterSize;
     bngEndIdx = CeilDiv(multiCoreInnerLimit, this->tilingData->coreParams.s1OuterSize);
@@ -1015,8 +1008,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::SetExtraInfo(SplitExtraInfo &extraInfo, int64_t taskId,
-                                                           int64_t s2LoopCount, int64_t s2LoopLimit,
-                                                           int64_t multiCoreInnerIdx, bool lastNotPair)
+                                                                    int64_t s2LoopCount, int64_t s2LoopLimit,
+                                                                    int64_t multiCoreInnerIdx, bool lastNotPair)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
     extraInfo.s2EndIdx = this->s2EndIdx;
@@ -1080,10 +1073,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 template <typename T2, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::IterateBmm1(SplitExtraInfo &extraInfo,
-                                                          matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::IterateBmm1(SplitExtraInfo &extraInfo, matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1)
 {
     if constexpr (hasRope == true) {
         bmm1.SetOrgShape(extraInfo.s1RealSize, this->mm1Kb, this->mm1Ka2, this->mm1Kb2, extraInfo.s2RealSize);
@@ -1100,7 +1092,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     this->Bmm1SetTensorA(extraInfo, bmm1);
     this->SetBmm1TensorB(extraInfo, bmm1);
     if constexpr (enableL1Reuse) {
-        bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2], hasRope, false, true, extraInfo.lastNotPair);
+        bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2], hasRope, false, true,
+                                        extraInfo.lastNotPair);
     } else {
         bmm1.template IterateAll<false>(this->mm1Res[extraInfo.taskIdMod2], hasRope, false, true);
     }
@@ -1109,11 +1102,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 template <typename T2, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::Bmm1SetTensorA(SplitExtraInfo &extraInfo,
-                                                             matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG>
-                                                                 &bmm1)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::Bmm1SetTensorA(SplitExtraInfo &extraInfo, matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -1154,11 +1145,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 template <typename T2, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::Bmm1SetTensorARope(SplitExtraInfo &extraInfo,
-                                                             matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG>
-                                                                 &bmm1)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::Bmm1SetTensorARope(SplitExtraInfo &extraInfo, matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1)
 {
     int64_t bOffset = 0;
     int64_t s1Offset = 0;
@@ -1183,11 +1172,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 template <typename T2, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::SetBmm1TensorB(SplitExtraInfo &extraInfo,
-                                                             matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG>
-                                                                 &bmm1)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::SetBmm1TensorB(SplitExtraInfo &extraInfo, matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1)
 {
     // 计算gm上的offset
     int64_t bOffset = 0;
@@ -1221,11 +1208,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 template <typename T2, const MatmulConfig &MM_CFG>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::SetBmm1TensorBRope(SplitExtraInfo &extraInfo,
-                                                             matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG>
-                                                                 &bmm1)
+__aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<
+    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
+    hasRope>::SetBmm1TensorBRope(SplitExtraInfo &extraInfo, matmul::Matmul<a1Type, b1Type, T2, bias1Type, MM_CFG> &bmm1)
 {
     int64_t bOffset = 0;
     int64_t n2Offset = 0;
@@ -1329,7 +1314,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
             this->pseInfo.needCast = true;
             bool innerAlibiFlag = false; // alibi核内生成相关配置，仅在LAYOUT=TND，SparseMode=8时生效
             if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
-                if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL) && this->pseInfo.boIdx != 0) {
+                if (this->tilingData->inputParams.sparseType ==
+                        static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL) &&
+                    this->pseInfo.boIdx != 0) {
                     innerAlibiFlag = true;
                 }
             }
@@ -1351,12 +1338,16 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                 }
             }
             AscendC::PipeBarrier<PIPE_V>();
-            PseCompute<T, hasPse>(this->tilingData->inputParams.pseType != (uint32_t)PseTypeEnum::PSE_OUTER_ADD_MUL_TYPE ? stage1PingTensor : actualUseTensor, commonTBuf, this->pseInfo);
+            PseCompute<T, hasPse>(
+                this->tilingData->inputParams.pseType != (uint32_t)PseTypeEnum::PSE_OUTER_ADD_MUL_TYPE ?
+                    stage1PingTensor :
+                    actualUseTensor,
+                commonTBuf, this->pseInfo);
         }
         if (this->tilingData->inputParams.pseType == (uint32_t)PseTypeEnum::PSE_OUTER_ADD_MUL_TYPE) {
             AscendC::PipeBarrier<PIPE_V>();
             Muls(stage1PingTensor, actualUseTensor, static_cast<T>(this->tilingData->inputParams.scaleValue),
-            extraInfo.vec1S1RealSize * extraInfo.s2AlignedSize);
+                 extraInfo.vec1S1RealSize * extraInfo.s2AlignedSize);
         }
         if constexpr (hasAtten) {
             SelectWithBytesMaskShapeInfo shapeInfo;
@@ -1521,7 +1512,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::CopyInAttenMask(SplitExtraInfo &extraInfo, int64_t loopIdx,
-                                                              int64_t maskOffset, bool secondTime)
+                                                                       int64_t maskOffset, bool secondTime)
 {
     if constexpr (hasAtten == true) {
         LocalTensor<uint8_t> attenMaskUb;
@@ -1562,9 +1553,10 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
-__aicore__ inline int64_t FlashAttentionScoreS1s2Bn2gs1<
-    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
-    hasRope>::ComputeAttenMaskOffset(SplitExtraInfo &extraInfo, int64_t loopIdx)
+__aicore__ inline int64_t
+FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                              enableL1Reuse, hasRope>::ComputeAttenMaskOffset(SplitExtraInfo &extraInfo,
+                                                                              int64_t loopIdx)
 {
     if constexpr (hasAtten == true) {
         if (this->tilingData->inputParams.attenMaskCompressMode ==
@@ -1620,7 +1612,8 @@ __aicore__ inline int64_t FlashAttentionScoreS1s2Bn2gs1<
                                extraInfo.s2LoopCount * this->s2BaseNratioSize;
                     this->attenMaskOffsetPre = ComputeOffsetForPrefixRectangle(
                         deltaPre, this->s2BaseNratioSize, this->tilingData->inputParams.attenMaskS2Size);
-                    if (this->blockIdx + extraInfo.vec1S1RealSize < prefixAttenMaskDownHeight) { // in case of out of bound
+                    if (this->blockIdx + extraInfo.vec1S1RealSize <
+                        prefixAttenMaskDownHeight) { // in case of out of bound
                         this->attenMaskOffsetPre += this->tilingData->inputParams.attenMaskS2Size * this->blockIdx;
                     }
                 }
@@ -1676,8 +1669,9 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::GetAttenMaskComputeMode(int64_t deltaCausalOrNext, int64_t deltaPre,
-                                                                      int64_t s1Offset, SplitExtraInfo &extraInfo)
+                              enableL1Reuse, hasRope>::GetAttenMaskComputeMode(int64_t deltaCausalOrNext,
+                                                                               int64_t deltaPre, int64_t s1Offset,
+                                                                               SplitExtraInfo &extraInfo)
 {
     if constexpr (hasAtten == true) {
         int64_t causalOrNextFactor = deltaCausalOrNext - extraInfo.s2AlignedSize;
@@ -1714,8 +1708,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                 // attenmask value is all 0, no need to compute
                 this->attenMaskComputeMode = AttenMaskComputeMode::NO_NEED_COMPUTE_MODE;
             } else {
-                int64_t intersectionX = extraInfo.s1Size - extraInfo.s2Size +
-                    ((__gm__ int64_t *)this->prefixNAddr)[extraInfo.boIdx];
+                int64_t intersectionX =
+                    extraInfo.s1Size - extraInfo.s2Size + ((__gm__ int64_t *)this->prefixNAddr)[extraInfo.boIdx];
                 if (s1Offset >= intersectionX) {
                     this->attenMaskComputeMode = AttenMaskComputeMode::CAUSAL_OR_NEXT_ONLY_MODE;
                 } else if (s1Offset + extraInfo.vec1S1BaseSize <= intersectionX) {
@@ -1731,9 +1725,10 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
-__aicore__ inline int64_t FlashAttentionScoreS1s2Bn2gs1<
-    implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format, enableL1Reuse,
-    hasRope>::ComputeOffsetForNoCompress(SplitExtraInfo &extraInfo, int64_t loopIdx)
+__aicore__ inline int64_t
+FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
+                              enableL1Reuse, hasRope>::ComputeOffsetForNoCompress(SplitExtraInfo &extraInfo,
+                                                                                  int64_t loopIdx)
 {
     if constexpr (hasAtten == true) {
         int64_t bOffset = 0;
@@ -1764,8 +1759,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::GetBmm1Result(SplitExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb,
-                                                            int64_t loopIdx)
+                              enableL1Reuse, hasRope>::GetBmm1Result(SplitExtraInfo &extraInfo,
+                                                                     LocalTensor<T> &bmm1ResUb, int64_t loopIdx)
 {
     if constexpr (bmm1Format == CubeFormat::NZ) {
         if (extraInfo.needNz2Nd == 1) {
@@ -1816,9 +1811,9 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::ComputeAttenMask(SelectWithBytesMaskShapeInfo &shapeInfo,
-                                                               LocalTensor<T> &bmm1ResUb,
-                                                               LocalTensor<uint8_t> &attenMaskUb,
-                                                               const uint8_t maskType, event_t vWaitMte2)
+                                                                        LocalTensor<T> &bmm1ResUb,
+                                                                        LocalTensor<uint8_t> &attenMaskUb,
+                                                                        const uint8_t maskType, event_t vWaitMte2)
 {
     if constexpr (hasAtten == true) {
         LocalTensor<uint8_t> apiTmpBuffer = commonTBuf.template Get<uint8_t>();
@@ -1837,13 +1832,12 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     }
 }
 
-
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::SoftMaxCheckResCompress(SplitExtraInfo &extraInfo,
-                                                                      int64_t vec1S1realSplitN)
+                                                                               int64_t vec1S1realSplitN)
 {
     if (unlikely(extraInfo.realSplitN == 1)) {
         bool res = IsIncludeInvalidLine(this->softMaxCheckRes, vec1S1realSplitN);
@@ -1866,8 +1860,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::InvalidLineSplitS2Process(SplitExtraInfo &extraInfo,
-                                                                        LocalTensor<T> &srcTensor,
-                                                                        LocalTensor<T> &maxUb, int64_t loopIdx)
+                                                                                 LocalTensor<T> &srcTensor,
+                                                                                 LocalTensor<T> &maxUb, int64_t loopIdx)
 {
     if constexpr (implMode == ImplModeEnum::AA_INVALID_LINE_HIGH_PRECISION) {
         if (loopIdx == 0 && extraInfo.s2LoopCount == extraInfo.s2LoopLimit) {
@@ -1884,7 +1878,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                 static_cast<uint32_t>(extraInfo.vec1S1RealSize), static_cast<uint32_t>(extraInfo.s2RealSize)};
             bool res;
             if (this->softmaxReduceSize == 1) {
-                res = AdjustSoftMaxRes<T, T, false, 1>(srcTensor, maxUb, this->negativeIntScalar, 0.0, softmaxShapeInfo);
+                res =
+                    AdjustSoftMaxRes<T, T, false, 1>(srcTensor, maxUb, this->negativeIntScalar, 0.0, softmaxShapeInfo);
             } else {
                 res = AdjustSoftMaxRes<T, T>(srcTensor, maxUb, this->negativeIntScalar, 0.0, softmaxShapeInfo);
             }
@@ -1899,10 +1894,12 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
             if (this->softmaxReduceSize == 1) {
                 int32_t calcCnt = (extraInfo.s1RealSize * 4 - 1 + 256) / 256 * 256 / 4;
                 LocalTensor<uint8_t> maskTensor = this->softmaxTempBuf.template Get<uint8_t>();
-                CompareScalar(maskTensor, maxTensor, static_cast<T>(this->negativeFloatScalar), AscendC::CMPMODE::NE, calcCnt);
-                Select(sumTensor, maskTensor, sumTensor, static_cast<T>(this->positiveFloatScalar), AscendC::SELMODE::VSEL_TENSOR_SCALAR_MODE, calcCnt);
+                CompareScalar(maskTensor, maxTensor, static_cast<T>(this->negativeFloatScalar), AscendC::CMPMODE::NE,
+                              calcCnt);
+                Select(sumTensor, maskTensor, sumTensor, static_cast<T>(this->positiveFloatScalar),
+                       AscendC::SELMODE::VSEL_TENSOR_SCALAR_MODE, calcCnt);
             } else {
-                SoftMaxShapeInfo softmaxShapeInfo {
+                SoftMaxShapeInfo softmaxShapeInfo{
                     static_cast<uint32_t>(extraInfo.s1RealSize), static_cast<uint32_t>(fp32BaseSize),
                     static_cast<uint32_t>(extraInfo.s1RealSize), static_cast<uint32_t>(fp32BaseSize)};
                 AdjustSoftMaxRes<T, T>(sumTensor, maxTensor, this->negativeIntScalar, this->positiveFloatScalar,
@@ -1916,8 +1913,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::SoftMaxCompute(SplitExtraInfo &extraInfo, LocalTensor<T> &srcTensor,
-                                                             int64_t loopIdx)
+                              enableL1Reuse, hasRope>::SoftMaxCompute(SplitExtraInfo &extraInfo,
+                                                                      LocalTensor<T> &srcTensor, int64_t loopIdx)
 {
     uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(extraInfo.vec1S1RealSize),
                                  static_cast<uint32_t>(extraInfo.s2AlignedSize)};
@@ -1925,11 +1922,13 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                                     static_cast<uint32_t>(extraInfo.s2RealSize)};
     srcTensor.SetShapeInfo(ShapeInfo(2, bmm1ResUbShape, 2, bmm1ResUbOrgShape, DataFormat::ND));
 
-    uint32_t maxSumShape[] = {static_cast<uint32_t>(extraInfo.vec1S1RealSize), static_cast<uint32_t>(this->softmaxReduceSize)};
+    uint32_t maxSumShape[] = {static_cast<uint32_t>(extraInfo.vec1S1RealSize),
+                              static_cast<uint32_t>(this->softmaxReduceSize)};
     LocalTensor<T> sumUb;
     sumUb = this->softmaxSumBuf[extraInfo.multiCoreInnerIdxMod2]
                 .template Get<T>()[loopIdx * extraInfo.vec1S1BaseSize * this->softmaxReduceSize];
-    LocalTensor<T> maxUb = this->softmaxMaxBuf.template Get<T>()[loopIdx * extraInfo.vec1S1BaseSize * this->softmaxReduceSize];
+    LocalTensor<T> maxUb =
+        this->softmaxMaxBuf.template Get<T>()[loopIdx * extraInfo.vec1S1BaseSize * this->softmaxReduceSize];
 
     sumUb.SetShapeInfo(ShapeInfo(2, maxSumShape, DataFormat::ND));
     maxUb.SetShapeInfo(ShapeInfo(2, maxSumShape, DataFormat::ND));
@@ -1955,70 +1954,60 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     if (unlikely(extraInfo.s2LoopCount == 0 && !hasSink)) {
         if (IsBasicBlockInSoftMax(extraInfo.vec1S1RealSize, extraInfo.s2RealSize)) {
             if (this->softmaxReduceSize == 1) {
-                SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize,
-                                                                                extraInfo.s2AlignedSize, sizeof(T),
-                                                                                sizeof(T),
-                                                                                apiTmpBuffer.GetSize() / sizeof(T),
-                                                                                false, true, false, true);
-                SoftmaxFlashV2<T, false, true, true, false, SOFTMAX_REDUCE_CFG>(srcTensor, sumUb, maxUb, srcTensor, expUb,
-                                                                                       sumUb, maxUb, apiTmpBuffer, newTiling);
+                SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(
+                    extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T), sizeof(T),
+                    apiTmpBuffer.GetSize() / sizeof(T), false, true, false, true);
+                SoftmaxFlashV2<T, false, true, true, false, SOFTMAX_REDUCE_CFG>(
+                    srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             } else {
-                SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize,
-                                                                                extraInfo.s2AlignedSize, sizeof(T),
-                                                                                sizeof(T),
-                                                                                apiTmpBuffer.GetSize() / sizeof(T),
-                                                                                false, true);
-                SoftmaxFlashV2<T, false, true, true, false, SOFTMAX_DEFAULT_CFG>(srcTensor, sumUb, maxUb, srcTensor, expUb,
-                                                                                 sumUb, maxUb, apiTmpBuffer, newTiling);
+                SoftMaxTiling newTiling =
+                    AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T),
+                                                          sizeof(T), apiTmpBuffer.GetSize() / sizeof(T), false, true);
+                SoftmaxFlashV2<T, false, true, true, false, SOFTMAX_DEFAULT_CFG>(
+                    srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             }
         } else {
             if (this->softmaxReduceSize == 1) {
-            SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize,
-                                                                            extraInfo.s2AlignedSize, sizeof(T),
-                                                                            sizeof(T),
-                                                                            apiTmpBuffer.GetSize() / sizeof(T),
-                                                                            false, false, false, true);
-            SoftmaxFlashV2<T, false, true, false, false, SOFTMAX_REDUCE_CFG>(srcTensor, sumUb, maxUb, srcTensor, expUb,
-                                                                             sumUb, maxUb, apiTmpBuffer, newTiling);
+                SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(
+                    extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T), sizeof(T),
+                    apiTmpBuffer.GetSize() / sizeof(T), false, false, false, true);
+                SoftmaxFlashV2<T, false, true, false, false, SOFTMAX_REDUCE_CFG>(
+                    srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             } else {
-                SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize,
-                                                                                extraInfo.s2AlignedSize, sizeof(T),
-                                                                                sizeof(T),
-                                                                                apiTmpBuffer.GetSize() / sizeof(T),
-                                                                                false, false);
-                SoftmaxFlashV2<T, false, true, false, false, SOFTMAX_DEFAULT_CFG>(srcTensor, sumUb, maxUb, srcTensor, expUb,
-                                                                                  sumUb, maxUb, apiTmpBuffer, newTiling);
+                SoftMaxTiling newTiling =
+                    AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T),
+                                                          sizeof(T), apiTmpBuffer.GetSize() / sizeof(T), false, false);
+                SoftmaxFlashV2<T, false, true, false, false, SOFTMAX_DEFAULT_CFG>(
+                    srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             }
         }
     } else {
         if (IsBasicBlockInSoftMax(extraInfo.vec1S1RealSize, extraInfo.s2RealSize)) {
             if (this->softmaxReduceSize == 1) {
-                SoftMaxTiling newTiling =
-                    AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T),\
-                    sizeof(T), apiTmpBuffer.GetSize() / sizeof(T), true, true, false, true);
+                SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(
+                    extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T), sizeof(T),
+                    apiTmpBuffer.GetSize() / sizeof(T), true, true, false, true);
                 SoftmaxFlashV2<T, true, true, true, false, SOFTMAX_REDUCE_CFG>(
                     srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             } else {
                 SoftMaxTiling newTiling =
-                    AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T),\
-                    sizeof(T), apiTmpBuffer.GetSize() / sizeof(T), true, true);
+                    AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T),
+                                                          sizeof(T), apiTmpBuffer.GetSize() / sizeof(T), true, true);
                 SoftmaxFlashV2<T, true, true, true, false, SOFTMAX_DEFAULT_CFG>(
                     srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             }
 
         } else {
             if (this->softmaxReduceSize == 1) {
-                SoftMaxTiling newTiling =
-                    AscendC::SoftMaxFlashV2TilingFuncImpl(
-                        extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T), sizeof(T),\
-                        apiTmpBuffer.GetSize() / sizeof(T), true, false, false, true);
+                SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(
+                    extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T), sizeof(T),
+                    apiTmpBuffer.GetSize() / sizeof(T), true, false, false, true);
                 SoftmaxFlashV2<T, true, true, false, false, SOFTMAX_REDUCE_CFG>(
                     srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             } else {
                 SoftMaxTiling newTiling =
-                    AscendC::SoftMaxFlashV2TilingFuncImpl(
-                        extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T), sizeof(T),\
-                        apiTmpBuffer.GetSize() / sizeof(T), true, false);
+                    AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vec1S1RealSize, extraInfo.s2AlignedSize, sizeof(T),
+                                                          sizeof(T), apiTmpBuffer.GetSize() / sizeof(T), true, false);
                 SoftmaxFlashV2<T, true, true, false, false, SOFTMAX_DEFAULT_CFG>(
                     srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer, newTiling);
             }
@@ -2045,10 +2034,14 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                     if (this->softmaxReduceSize == 1) {
                         int32_t calcCnt = (extraInfo.s1RealSize * 4 - 1 + 256) / 256 * 256 / 4;
                         LocalTensor<uint8_t> maskTensor = this->softmaxTempBuf.template Get<uint8_t>();
-                        CompareScalar(maskTensor, maxTensor, static_cast<T>(this->negativeFloatScalar), AscendC::CMPMODE::NE, calcCnt);
-                        Select(sumTensor, maskTensor, sumTensor, static_cast<T>(this->positiveFloatScalar), AscendC::SELMODE::VSEL_TENSOR_SCALAR_MODE, calcCnt);
+                        CompareScalar(maskTensor, maxTensor, static_cast<T>(this->negativeFloatScalar),
+                                      AscendC::CMPMODE::NE, calcCnt);
+                        Select(sumTensor, maskTensor, sumTensor, static_cast<T>(this->positiveFloatScalar),
+                               AscendC::SELMODE::VSEL_TENSOR_SCALAR_MODE, calcCnt);
                     } else {
-                        SoftMaxShapeInfo softmaxFullShapeInfo {static_cast<uint32_t>(extraInfo.s1RealSize), static_cast<uint32_t>(fp32BaseSize), static_cast<uint32_t>(extraInfo.s1RealSize), static_cast<uint32_t>(fp32BaseSize)};
+                        SoftMaxShapeInfo softmaxFullShapeInfo{
+                            static_cast<uint32_t>(extraInfo.s1RealSize), static_cast<uint32_t>(fp32BaseSize),
+                            static_cast<uint32_t>(extraInfo.s1RealSize), static_cast<uint32_t>(fp32BaseSize)};
                         AdjustSoftMaxRes<T, T>(sumTensor, maxTensor, this->negativeIntScalar, this->positiveFloatScalar,
                                                softmaxFullShapeInfo);
                     }
@@ -2060,18 +2053,17 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     }
 
     if (loopIdx == extraInfo.realSplitN - 1 && extraInfo.s2LoopCount == extraInfo.s2LoopLimit) {
-        if (this->tilingData->inputParams.tndSoftmaxOut == 1){
+        if (this->tilingData->inputParams.tndSoftmaxOut == 1) {
             // layout of output softmax_max and softmax_out should be TND
             extraInfo.softmaxMaxOffset =
-                (extraInfo.s1SizeAcc * this->n2G +
-                extraInfo.s1oIdx * static_cast<int64_t>(s1BaseSize) * this->n2G +
-                extraInfo.n2oIdx * this->tilingData->inputParams.gSize +
-                extraInfo.goIdx ) * static_cast<int64_t>(fp32BaseSize);
+                (extraInfo.s1SizeAcc * this->n2G + extraInfo.s1oIdx * static_cast<int64_t>(s1BaseSize) * this->n2G +
+                 extraInfo.n2oIdx * this->tilingData->inputParams.gSize + extraInfo.goIdx) *
+                static_cast<int64_t>(fp32BaseSize);
         } else {
             extraInfo.softmaxMaxOffset =
                 (extraInfo.s1SizeAcc * this->n2G +
-                extraInfo.n2oIdx * this->tilingData->inputParams.gSize * extraInfo.s1Size +
-                extraInfo.goIdx * extraInfo.s1Size + extraInfo.s1oIdx * static_cast<int64_t>(s1BaseSize)) *
+                 extraInfo.n2oIdx * this->tilingData->inputParams.gSize * extraInfo.s1Size +
+                 extraInfo.goIdx * extraInfo.s1Size + extraInfo.s1oIdx * static_cast<int64_t>(s1BaseSize)) *
                 static_cast<int64_t>(fp32BaseSize);
         }
         int64_t calculateSize = extraInfo.s1RealSize * fp32BaseSize;
@@ -2084,7 +2076,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
             AscendC::SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             if (this->tilingData->inputParams.tndSoftmaxOut == 1) {
-                DataCopy(this->softmaxMaxGm[extraInfo.softmaxMaxOffset], softmaxTemp, {static_cast<uint16_t>(extraInfo.s1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
+                DataCopy(this->softmaxMaxGm[extraInfo.softmaxMaxOffset], softmaxTemp,
+                         {static_cast<uint16_t>(extraInfo.s1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
             } else {
                 DataCopy(this->softmaxMaxGm[extraInfo.softmaxMaxOffset], softmaxTemp, calculateSize);
             }
@@ -2092,7 +2085,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
             AscendC::SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             if (this->tilingData->inputParams.tndSoftmaxOut == 1) {
-                DataCopy(this->softmaxMaxGm[extraInfo.softmaxMaxOffset], maxTensor, {static_cast<uint16_t>(extraInfo.s1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
+                DataCopy(this->softmaxMaxGm[extraInfo.softmaxMaxOffset], maxTensor,
+                         {static_cast<uint16_t>(extraInfo.s1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
             } else {
                 DataCopy(this->softmaxMaxGm[extraInfo.softmaxMaxOffset], maxTensor, calculateSize);
             }
@@ -2268,8 +2262,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse, hasRope>::Bmm2ResultMul(SplitExtraInfo &extraInfo, LocalTensor<T> &bmm2ResUb,
-                                                            int64_t s1oIdx)
+                              enableL1Reuse, hasRope>::Bmm2ResultMul(SplitExtraInfo &extraInfo,
+                                                                     LocalTensor<T> &bmm2ResUb, int64_t s1oIdx)
 {
     AscendC::PipeBarrier<PIPE_V>();
     LocalTensor<T> expUb;
@@ -2290,14 +2284,17 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
         Brcb(softmaxTemp, expUb, (extraInfo.s1RealSize + 7) / 8, {1, 8});
         AscendC::PipeBarrier<PIPE_V>();
         for (int i = 0; i < loop; i++) {
-            Mul(bmm2ResUb[i * repeatMaxSize], softmaxTemp[s1oIdx * extraInfo.vec2S1BaseSize * 8], bmm2ResUb[i * repeatMaxSize], repeatMaxSize, extraInfo.vec2S1RealSize, repeatParams);
+            Mul(bmm2ResUb[i * repeatMaxSize], softmaxTemp[s1oIdx * extraInfo.vec2S1BaseSize * 8],
+                bmm2ResUb[i * repeatMaxSize], repeatMaxSize, extraInfo.vec2S1RealSize, repeatParams);
         }
         if (likely(remain)) {
-            Mul(bmm2ResUb[loop * repeatMaxSize], softmaxTemp[s1oIdx * extraInfo.vec2S1BaseSize * 8], bmm2ResUb[loop * repeatMaxSize], remain, extraInfo.vec2S1RealSize, repeatParams);
+            Mul(bmm2ResUb[loop * repeatMaxSize], softmaxTemp[s1oIdx * extraInfo.vec2S1BaseSize * 8],
+                bmm2ResUb[loop * repeatMaxSize], remain, extraInfo.vec2S1RealSize, repeatParams);
         }
     } else {
         for (int i = 0; i < loop; i++) {
-            Mul(bmm2ResUb[i * repeatMaxSize], expUb[s1oIdx * extraInfo.vec2S1BaseSize * 8], bmm2ResUb[i * repeatMaxSize], repeatMaxSize, extraInfo.vec2S1RealSize, repeatParams);
+            Mul(bmm2ResUb[i * repeatMaxSize], expUb[s1oIdx * extraInfo.vec2S1BaseSize * 8],
+                bmm2ResUb[i * repeatMaxSize], repeatMaxSize, extraInfo.vec2S1RealSize, repeatParams);
         }
         if (likely(remain)) {
             Mul(bmm2ResUb[loop * repeatMaxSize], expUb[s1oIdx * extraInfo.vec2S1BaseSize * 8],
@@ -2335,7 +2332,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 
         for (int i = 0; i < loop; i++) {
             Div(bmm2ResUb[i * repeatMaxSize], bmm2ResUb[i * repeatMaxSize],
-                softmaxTemp[s1oIdx * extraInfo.vec2S1BaseSize * 8], repeatMaxSize, extraInfo.vec2S1RealSize, repeatParams);
+                softmaxTemp[s1oIdx * extraInfo.vec2S1BaseSize * 8], repeatMaxSize, extraInfo.vec2S1RealSize,
+                repeatParams);
         }
         if (likely(remain)) {
             Div(bmm2ResUb[loop * repeatMaxSize], bmm2ResUb[loop * repeatMaxSize],
@@ -2358,7 +2356,7 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse, hasRope>::Bmm2DataCopyOut(SplitExtraInfo &extraInfo, int64_t s1oIdx,
-                                                              int64_t mm2ResCalcSize)
+                                                                       int64_t mm2ResCalcSize)
 {
     LocalTensor<T> bmm2ResUb = this->stage2TBuf.template Get<T>();
     LocalTensor<INPUT_T> attenOut = this->stage2TBuf.template Get<INPUT_T>();
@@ -2427,15 +2425,15 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     if (likely(dstStride <= 65535)) {
         dataCopyParams.blockCount = extraInfo.vec2S1RealSize;
         dataCopyParams.dstStride = static_cast<uint16_t>(dstStride);
-        DataCopyPad(this->attentionOutGm[outCoreOffset + s1oIdx * extraInfo.vec2S1BaseSize * attenOutOffset],
-                    attenOut, dataCopyParams);
+        DataCopyPad(this->attentionOutGm[outCoreOffset + s1oIdx * extraInfo.vec2S1BaseSize * attenOutOffset], attenOut,
+                    dataCopyParams);
     } else {
         dataCopyParams.blockCount = 1;
         dataCopyParams.dstStride = 0;
 
         for (int32_t i = 0; i < extraInfo.vec2S1RealSize; i++) {
-            DataCopyPad(this->attentionOutGm[outCoreOffset +
-                                             s1oIdx * extraInfo.vec2S1BaseSize * attenOutOffset + i * datacopyOffset],
+            DataCopyPad(this->attentionOutGm[outCoreOffset + s1oIdx * extraInfo.vec2S1BaseSize * attenOutOffset +
+                                             i * datacopyOffset],
                         attenOut[i * this->d2SizeAlign16], dataCopyParams);
         }
     }
@@ -2464,18 +2462,18 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
         AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
         if (this->tilingData->inputParams.tndSoftmaxOut == 1) {
             DataCopy(this->softmaxSumGm[extraInfo.softmaxMaxOffset + vec2GmS1Offset], softmaxTemp,
-                {static_cast<uint16_t>(extraInfo.vec2S1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
+                     {static_cast<uint16_t>(extraInfo.vec2S1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
         } else {
             DataCopy(this->softmaxSumGm[extraInfo.softmaxMaxOffset + vec2GmS1Offset], softmaxTemp,
-                extraInfo.vec2S1RealSize * fp32BaseSize);
+                     extraInfo.vec2S1RealSize * fp32BaseSize);
         }
     } else {
         if (this->tilingData->inputParams.tndSoftmaxOut == 1) {
             DataCopy(this->softmaxSumGm[extraInfo.softmaxMaxOffset + vec2GmS1Offset], sumTensor,
-                {static_cast<uint16_t>(extraInfo.vec2S1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
+                     {static_cast<uint16_t>(extraInfo.vec2S1RealSize), 1, 0, static_cast<uint16_t>(this->n2G - 1)});
         } else {
             DataCopy(this->softmaxSumGm[extraInfo.softmaxMaxOffset + vec2GmS1Offset], sumTensor,
-                extraInfo.vec2S1RealSize * fp32BaseSize);
+                     extraInfo.vec2S1RealSize * fp32BaseSize);
         }
     }
 }
@@ -2484,8 +2482,8 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse, bool hasRope>
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                                enableL1Reuse, hasRope>::NdToNz(SplitExtraInfo &extraInfo, LocalTensor<INPUT_T> &nzResUb,
-                                                    LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx)
+                              enableL1Reuse, hasRope>::NdToNz(SplitExtraInfo &extraInfo, LocalTensor<INPUT_T> &nzResUb,
+                                                              LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx)
 {
     auto nzResUbTmp = nzResUb.template ReinterpretCast<half>();
     auto vec1ResUbTmp = vec1ResUb.template ReinterpretCast<half>();
@@ -2506,29 +2504,27 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     int64_t vecS1BaseSizeTime16 = extraInfo.vec1S1BaseSize * 16;
     int64_t offsetJ = 8 * extraInfo.vec1S1RealSize * 16 + 128;
     AscendC::PipeBarrier<PIPE_V>();
-    for (int64_t outerIndex = 0; outerIndex < s1OuterLoop; ++ outerIndex) {
+    for (int64_t outerIndex = 0; outerIndex < s1OuterLoop; ++outerIndex) {
         for (int64_t j = 0; j < s2InnerLoop; ++j) {
             Copy(nzResUbTmp[outerIndex * s1OuterTempOffset + j * offsetJ],
-                 vec1ResUbTmp[outerIndex * s1OuterBmm1Offset + j * 128],
-                 repeatMaxSize16, repeatMaxTimes, repeatParams);
+                 vec1ResUbTmp[outerIndex * s1OuterBmm1Offset + j * 128], repeatMaxSize16, repeatMaxTimes, repeatParams);
         }
         if (likely(s2InnerRemain)) {
             Copy(nzResUbTmp[outerIndex * s1OuterTempOffset + s2InnerLoop * offsetJ],
-                 vec1ResUbTmp[outerIndex * s1OuterBmm1Offset + s2InnerLoop * 128],
-                 s2InnerRemain * 16, repeatMaxTimes, repeatParams);
+                 vec1ResUbTmp[outerIndex * s1OuterBmm1Offset + s2InnerLoop * 128], s2InnerRemain * 16, repeatMaxTimes,
+                 repeatParams);
         }
     }
 
     if (likely(s1OuterRemain)) {
         for (int64_t j = 0; j < s2InnerLoop; ++j) {
             Copy(nzResUbTmp[s1OuterLoop * s1OuterTempOffset + j * offsetJ],
-                 vec1ResUbTmp[s1OuterLoop * s1OuterBmm1Offset + j * 128],
-                 repeatMaxSize16, s1OuterRemain, repeatParams);
+                 vec1ResUbTmp[s1OuterLoop * s1OuterBmm1Offset + j * 128], repeatMaxSize16, s1OuterRemain, repeatParams);
         }
         if (likely(s2InnerRemain)) {
             Copy(nzResUbTmp[s1OuterLoop * s1OuterTempOffset + s2InnerLoop * offsetJ],
-                 vec1ResUbTmp[s1OuterLoop * s1OuterBmm1Offset + s2InnerLoop * 128],
-                 s2InnerRemain * 16, s1OuterRemain, repeatParams);
+                 vec1ResUbTmp[s1OuterLoop * s1OuterBmm1Offset + s2InnerLoop * 128], s2InnerRemain * 16, s1OuterRemain,
+                 repeatParams);
         }
     }
 

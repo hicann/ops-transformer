@@ -25,7 +25,8 @@
 
 using AscendC::InitOutput;
 
-template <typename T> class FlashAttentionScoreGradEmptyTensorRegbase {
+template <typename T>
+class FlashAttentionScoreGradEmptyTensorRegbase {
 public:
     __aicore__ inline FlashAttentionScoreGradEmptyTensorRegbase(){};
     __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse,
@@ -40,10 +41,9 @@ protected:
 };
 
 template <typename T>
-__aicore__ inline void
-FlashAttentionScoreGradEmptyTensorRegbase<T>::Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
-                                      __gm__ uint8_t *dpse, __gm__ uint8_t *dqRope, __gm__ uint8_t *dkRope,
-                                      const FlashAttentionScoreGradEmptyTensorTilingDataRegbase *__restrict tilingData)
+__aicore__ inline void FlashAttentionScoreGradEmptyTensorRegbase<T>::Init(
+    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse, __gm__ uint8_t *dqRope,
+    __gm__ uint8_t *dkRope, const FlashAttentionScoreGradEmptyTensorTilingDataRegbase *__restrict tilingData)
 {
     m_blockIdx = AscendC::GetBlockIdx();
     m_tilingData = tilingData;
@@ -57,7 +57,8 @@ FlashAttentionScoreGradEmptyTensorRegbase<T>::Init(__gm__ uint8_t *dq, __gm__ ui
     }
 }
 
-template <typename T> __aicore__ inline void FlashAttentionScoreGradEmptyTensorRegbase<T>::Process()
+template <typename T>
+__aicore__ inline void FlashAttentionScoreGradEmptyTensorRegbase<T>::Process()
 {
     if (m_tilingData->singleCoreDqNum > 0) {
         if (m_blockIdx < m_tilingData->formerDqNum) {
@@ -97,19 +98,21 @@ template <typename T> __aicore__ inline void FlashAttentionScoreGradEmptyTensorR
     }
     if (m_tilingData->isRope && m_tilingData->singleCoreDqRopeNum > 0) {
         if (m_blockIdx < m_tilingData->formerDqRopeNum) {
-            InitOutput<T>(m_dqRopeGm[m_blockIdx * m_tilingData->singleCoreDqRopeNum], m_tilingData->singleCoreDqRopeNum, 0);
+            InitOutput<T>(m_dqRopeGm[m_blockIdx * m_tilingData->singleCoreDqRopeNum], m_tilingData->singleCoreDqRopeNum,
+                          0);
         } else {
             InitOutput<T>(m_dqRopeGm[m_tilingData->formerDqRopeNum * m_tilingData->singleCoreDqRopeNum +
-                         (m_blockIdx - m_tilingData->formerDqRopeNum) * m_tilingData->tailCoreDqRopeNum],
+                                     (m_blockIdx - m_tilingData->formerDqRopeNum) * m_tilingData->tailCoreDqRopeNum],
                           m_tilingData->tailCoreDqRopeNum, 0);
         }
     }
     if (m_tilingData->isRope && m_tilingData->singleCoreDkRopeNum > 0) {
         if (m_blockIdx < m_tilingData->formerDkRopeNum) {
-            InitOutput<T>(m_dkRopeGm[m_blockIdx * m_tilingData->singleCoreDkRopeNum], m_tilingData->singleCoreDkRopeNum, 0);
+            InitOutput<T>(m_dkRopeGm[m_blockIdx * m_tilingData->singleCoreDkRopeNum], m_tilingData->singleCoreDkRopeNum,
+                          0);
         } else {
             InitOutput<T>(m_dkRopeGm[m_tilingData->formerDkRopeNum * m_tilingData->singleCoreDkRopeNum +
-                         (m_blockIdx - m_tilingData->formerDkRopeNum) * m_tilingData->tailCoreDkRopeNum],
+                                     (m_blockIdx - m_tilingData->formerDkRopeNum) * m_tilingData->tailCoreDkRopeNum],
                           m_tilingData->tailCoreDkRopeNum, 0);
         }
     }

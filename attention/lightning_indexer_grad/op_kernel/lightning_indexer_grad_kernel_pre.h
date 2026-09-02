@@ -9,9 +9,9 @@
  */
 
 /*!
-* \file lightning_indexer_grad_service_vector_pre.h
-* \brief
-*/
+ * \file lightning_indexer_grad_service_vector_pre.h
+ * \brief
+ */
 #ifndef LIGHTNING_INDEXER_GRAD_SERVICE_VECTOR_PRE_H
 #define LIGHTNING_INDEXER_GRAD_SERVICE_VECTOR_PRE_H
 
@@ -32,16 +32,17 @@ template <typename LIGT>
 class LIGVectorPre {
 public:
     using dataType = typename LIGT::dataType;
-    
+
     __aicore__ inline LIGVectorPre(){};
     __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dweights, __gm__ uint8_t *workspace,
                                 const LIGTilingData *__restrict orgTilingData, __gm__ uint8_t *actualSeqLengthsQ);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
-    __aicore__ inline void DoSplitOnGM(uint32_t coreNum, uint32_t gmSize,
-                                    uint32_t &PreBlockTotal, int64_t &initSize, int64_t &Offset);
-    
+    __aicore__ inline void DoSplitOnGM(uint32_t coreNum, uint32_t gmSize, uint32_t &PreBlockTotal, int64_t &initSize,
+                                       int64_t &Offset);
+
     using D_T = typename LIGT::dataType;
+
 protected:
     TPipe *pipe;
     GlobalTensor<float> dkWorkSpaceGm;
@@ -61,17 +62,16 @@ protected:
     uint32_t wPreBlockTotal = 0;
     int64_t initdwSize = 0;
     int64_t dwOffset = 0;
-    
+
     // Output GlobalTensor
     GlobalTensor<D_T> dqGm;
     GlobalTensor<D_T> dweightsGm;
     GlobalTensor<uint32_t> actualSeqLengthsGmQ;
 };
 
-
 template <typename LIGT>
 __aicore__ inline void LIGVectorPre<LIGT>::DoSplitOnGM(uint32_t coreNum, uint32_t gmSize, uint32_t &PreBlockTotal,
-                                                    int64_t &initSize, int64_t &Offset)
+                                                       int64_t &initSize, int64_t &Offset)
 {
     uint32_t PreBlockFactor = CeilDiv(gmSize, coreNum);
     PreBlockTotal = CeilDiv(gmSize, PreBlockFactor);
@@ -83,8 +83,9 @@ __aicore__ inline void LIGVectorPre<LIGT>::DoSplitOnGM(uint32_t coreNum, uint32_
 
 template <typename LIGT>
 __aicore__ inline void LIGVectorPre<LIGT>::Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dweights,
-                                            __gm__ uint8_t *workspace, const LIGTilingData *__restrict orgTilingData,
-                                            __gm__ uint8_t *actualSeqLengthsQ)
+                                                __gm__ uint8_t *workspace,
+                                                const LIGTilingData *__restrict orgTilingData,
+                                                __gm__ uint8_t *actualSeqLengthsQ)
 {
     cBlockIdx = GetBlockIdx();
     pipe = pipe_in;
@@ -104,9 +105,12 @@ __aicore__ inline void LIGVectorPre<LIGT>::Init(TPipe *pipe_in, __gm__ uint8_t *
             actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsQ, tilingData->batch);
         }
         uint32_t actualSeqTotalLenQ = 0;
-        if (tilingData->batch > 0) {actualSeqTotalLenQ = actualSeqLengthsGmQ.GetValue(tilingData->batch - 1);}
+        if (tilingData->batch > 0) {
+            actualSeqTotalLenQ = actualSeqLengthsGmQ.GetValue(tilingData->batch - 1);
+        }
         if (tilingData->seqlenQ > actualSeqTotalLenQ) {
-            uint32_t dqPaddingSize = (tilingData->seqlenQ - actualSeqTotalLenQ) * tilingData->headNumQ * tilingData->headDim;
+            uint32_t dqPaddingSize =
+                (tilingData->seqlenQ - actualSeqTotalLenQ) * tilingData->headNumQ * tilingData->headDim;
             uint32_t dwPaddingSize = (tilingData->seqlenQ - actualSeqTotalLenQ) * tilingData->headNumQ;
             DoSplitOnGM(tilingData->usedCoreNum, dqPaddingSize, qPreBlockTotal, initdqSize, dqOffset);
             dqOffset += actualSeqTotalLenQ * tilingData->headNumQ * tilingData->headDim;
@@ -116,7 +120,7 @@ __aicore__ inline void LIGVectorPre<LIGT>::Init(TPipe *pipe_in, __gm__ uint8_t *
     }
 }
 
-template <typename LIGT> 
+template <typename LIGT>
 __aicore__ inline void LIGVectorPre<LIGT>::Process()
 {
     // process clear dk workspace
@@ -124,7 +128,7 @@ __aicore__ inline void LIGVectorPre<LIGT>::Process()
         InitOutput<float>(dkWorkSpaceGm[dkOffset], initdkSize, 0);
     }
     // TND layout: process clear dq, dk, dweights's padding
-    
+
     if (g_coreType == AIV && LIGT::layout == LIG_LAYOUT::TND) {
         if (cBlockIdx < qPreBlockTotal) {
             InitOutput<D_T>(dqGm[dqOffset], initdqSize, 0);
@@ -135,7 +139,7 @@ __aicore__ inline void LIGVectorPre<LIGT>::Process()
     }
 }
 
-template <typename LIGT> 
+template <typename LIGT>
 __aicore__ inline void LIGVectorPre<LIGT>::SyncALLCores()
 {
     SyncAll();

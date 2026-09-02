@@ -12,7 +12,11 @@
 #define INCLUDE_HARDWARE_H
 
 namespace MlaPreprocess {
-enum class ArchType { ASCEND_V220, ASCEND_V200, ASCEND_M200 };
+enum class ArchType {
+    ASCEND_V220,
+    ASCEND_V200,
+    ASCEND_M200
+};
 
 template <ArchType ArchTag>
 struct HardwareInfo {
@@ -32,5 +36,5 @@ struct HardwareInfo {
     static uint32_t const btBlockSize = 64;
     static uint32_t const fbBlockSize = 128;
 };
-}
+} // namespace MlaPreprocess
 #endif

@@ -32,7 +32,8 @@ using AscendC::TBuf;
 using AscendC::TPipe;
 using AscendC::TQue;
 
-template <typename OUT_TYPE, class TILING_TYPE> class VectorPost {
+template <typename OUT_TYPE, class TILING_TYPE>
+class VectorPost {
 public:
     __aicore__ inline VectorPost(){};
     __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
@@ -120,7 +121,8 @@ __aicore__ inline void VectorPost<OUT_TYPE, TILING_TYPE>::Init(TPipe *pipe_in, _
     pipe->InitBuffer(outQueue, 1, ubBaseSize);
 }
 
-template <typename OUT_TYPE, class TILING_TYPE> __aicore__ inline void VectorPost<OUT_TYPE, TILING_TYPE>::Process()
+template <typename OUT_TYPE, class TILING_TYPE>
+__aicore__ inline void VectorPost<OUT_TYPE, TILING_TYPE>::Process()
 {
     // init q
     uint64_t qBegin = cBlockIdx * qPostBlockFactor * qPostBaseNum;
