@@ -24,7 +24,7 @@
 ## 功能说明
 
 - 接口功能：训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。对标竞品适配gptoss模型支持sink功能。**该接口query、key、value参数支持多个长度相等或者多个长度不相等的sequence**
-  - **该接口相较于[FlashAttentionScoreV3](./aclnnFlashAttentionScoreV2.md)接口，功能差异如下：**：
+  - **该接口相较于[FlashAttentionScoreV3](./aclnnFlashAttentionScoreV3.md)接口，功能差异如下：**：
     - 调整Dropout功能：在keepProb小于1.0时，若没有外部传入的DropoutMask，则使用新增参数seed和offset生成DropoutMask；若有外部传入的DropoutMask，则使用外部传入的DropoutMask。
     -增加了sinkOptional可选输入，数据类型支持FLOAT32。
   - **该接口相较于[FlashAttentionVarLenScoreV5](./aclnnFlashAttentionVarLenScoreV5.md)接口，功能差异如下**：

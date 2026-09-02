@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。对标竞品适配gptoss模型支持sink功能。**跟[aclnnFlashAttentionScoreV2](./aclnnFlashAttentionVarLenScoreV2.md)接口的区别是：增加`sinkInOptional`可选输入。**
+- 接口功能：训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。对标竞品适配gptoss模型支持sink功能。**跟[aclnnFlashAttentionScoreV2](./aclnnFlashAttentionScoreV2.md)接口的区别是：增加`sinkInOptional`可选输入。**
 
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：暂不支持sinkInOptional参数。

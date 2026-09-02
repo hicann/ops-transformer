@@ -1,6 +1,6 @@
 # aclnnMlaProlog
 
-**须知：该接口后续版本会废弃，请使用最新接口aclnnMlaPrologV3WeightNz。**
+**须知：该接口后续版本会废弃，请使用最新接口[aclnnMlaPrologV3WeightNz](../../mla_prolog_v3/docs/aclnnMlaPrologV3WeightNz.md)。**
 
 ## 产品支持情况
 
@@ -739,9 +739,10 @@ aclnnStatus aclnnMlaProlog(
   </table>
   </details>
 
-  <summary><a id="SupportScenes"></a>不同量化场景参数的dtype与shape约束</summary>
+  <details>
+  <summary><a id="SupportScenes1"></a>不同量化场景参数的dtype与shape约束</summary>
 
-- 在不同量化场景下，参数的dtype和shape组合需要满足如下条件：
+  在不同量化场景下，参数的dtype和shape组合需要满足如下条件：
   <div style="overflow-x: auto; width: 100%;">
   <table style="table-layout: auto;" border="1">
     <tr>
@@ -961,6 +962,7 @@ aclnnStatus aclnnMlaProlog(
     </tr>
   </table>
   </div>
+  </details>
 
   <!-- 参数解释请参见**算子执行接口**。-->
 

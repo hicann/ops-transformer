@@ -259,7 +259,7 @@ aclnnStatus aclnnQuantReduceScatter(
 
 ## 调用示例
 
-示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
+示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 - <term>Atlas A5训练系列产品/Atlas A5推理系列产品</term>：
 

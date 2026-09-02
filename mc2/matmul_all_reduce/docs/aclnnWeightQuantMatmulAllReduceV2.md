@@ -205,7 +205,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
           <td>antiquantGroupSize</td>
           <td>输入</td>
           <td>伪量化pergroup模式下，对x2进行反量化计算的groupSize输入。</td>
-          <td><ul><li>pergroup量化场景下需传入该参数，传入值的范围为[32,min(k-1,INT_MAX)]，且为32的倍数; k取值范围与[mm接口]保持一致，为[1,65535]。</li><li>非pergroup量化场景下仅支持传入0。</li></ul></td>
+          <td><ul><li>pergroup量化场景下需传入该参数，传入值的范围为[32,min(k-1,INT_MAX)]，且为32的倍数; k取值范围与mm接口保持一致，为[1,65535]。</li><li>非pergroup量化场景下仅支持传入0。</li></ul></td>
           <td>INT64</td>
           <td>-</td>
           <td>-</td>

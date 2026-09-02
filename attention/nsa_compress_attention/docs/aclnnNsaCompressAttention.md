@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **算子功能**：NSA中compress attention以及select topk索引计算。论文：<https://arxiv.org/pdf/2502.11089>
+- **算子功能**：NSA中compress attention以及select topk索引计算。论文：[Native Sparse Attention](https://arxiv.org/pdf/2502.11089)。
 
 - **计算公式**：压缩block大小：$l$，select block大小：$l'$，压缩stride大小：$d$
 
@@ -461,7 +461,7 @@ aclnnStatus aclnnNsaCompressAttention(
 - 输入query、key、value的inputLayout必须一致。
 - 输入query的headNum为N1，输入key和value的headNum为N2，则N1 >= N2 && N1 % N2 == 0
 - 设G = N1 / N2，G需要满足以下约束：G < 128 && 128 % G == 0
-- attenMask和topkMask的使用需符合论文描述
+- attenMask和topkMask的使用需符合论文描述。
 
 ## 调用示例
 
