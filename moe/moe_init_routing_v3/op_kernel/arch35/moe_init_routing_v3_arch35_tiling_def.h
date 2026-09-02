@@ -129,10 +129,9 @@ struct MoeInitRoutingV3Arch35TilingData {
     int64_t epFullload{0}; // 未使用
     int64_t activeNum{0};
     int64_t dropPadMode{0};
-    int64_t smoothType{0};                          // 未使用
-    int64_t expertCapacity{0};                      // 新增：DropPad模式下的expert capacity
-    int64_t isInputTopkWeight{0};                   // 新增：topk_weight输入是否提供
-    int64_t topkWeightOutPerCorePerLoopElements{0}; // 新增：TopkWeightOut每轮处理的索引元素数
+    int64_t smoothType{0};        // 未使用
+    int64_t expertCapacity{0};    // 新增：DropPad模式下的expert capacity
+    int64_t isInputTopkWeight{0}; // 新增：topk_weight输入是否提供
     MoeV3Arch35VBSComputeTilingData vbsComputeParamsOp;
     MoeV3Arch35VMSMiddleComputeTilingData vmsMiddleComputeParamsOp;
     MoeV3Arch35SortOutComputeTilingData sortOutComputeParamsOp;

@@ -87,7 +87,7 @@ def _moe_init_routing_v4_numpy(
             expanded_topk_weight = numpy.zeros(
                 (expert_num * expert_capacity, 1), dtype=numpy.float32
             )
-            expanded_topk_weight[valid_capacity_mask] = topk_weight_flat[
+            expanded_topk_weight[valid_capacity_mask, 0] = topk_weight_flat[
                 sort_row_tmp[valid_capacity_mask]
             ]
 
@@ -259,7 +259,12 @@ class MoeInitRoutingV4TestSpec:
         row_idx_type=0,
         **kwargs,
     ):
-        active_num_val = int(active_num) if active_num is not None else -1
+        if active_num is None:
+            active_num_val = -1
+        else:
+            # TTK may provide scalar inputs as a one-element NumPy array.
+            # Normalize that representation before converting to Python int.
+            active_num_val = int(numpy.asarray(active_num).item())
         scale_np = numpy.asarray(scale) if scale is not None else None
         offset_np = numpy.asarray(offset) if offset is not None else None
         topk_weight_np = numpy.asarray(topk_weight) if topk_weight is not None else None

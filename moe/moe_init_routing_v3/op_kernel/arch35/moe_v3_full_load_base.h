@@ -73,6 +73,36 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadCompute
     asc_atomic_add(actualIdxNumAddr, localCount);
 }
 
+__simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadTopkWeightGatherSimt(
+    int64_t elements, int64_t indexBase, int64_t totalLength, int64_t expertStart, int64_t expertEnd,
+    __ubuf__ int32_t *sortedRowIdx, __ubuf__ int32_t *sortedExpertIdx, __gm__ float *topkWeight,
+    __gm__ volatile float *expandedTopkWeight)
+{
+    for (int64_t index = static_cast<int64_t>(threadIdx.x); index < elements;
+         index += static_cast<int64_t>(blockDim.x)) {
+        int64_t dstIndex = indexBase + index;
+        int32_t expertId = sortedExpertIdx[dstIndex];
+        int32_t srcIndex = sortedRowIdx[dstIndex];
+        if (expertId >= expertStart && expertId < expertEnd && srcIndex >= 0 && srcIndex < totalLength) {
+            expandedTopkWeight[dstIndex] = topkWeight[srcIndex];
+        }
+    }
+}
+
+__simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadTopkWeightScatterSimt(
+    int64_t elements, int64_t indexBase, int64_t outputRows, __ubuf__ int32_t *srcToDstRow, __gm__ float *topkWeight,
+    __gm__ volatile float *expandedTopkWeight)
+{
+    for (int64_t index = static_cast<int64_t>(threadIdx.x); index < elements;
+         index += static_cast<int64_t>(blockDim.x)) {
+        int64_t srcIndex = indexBase + index;
+        int32_t dstIndex = srcToDstRow[srcIndex];
+        if (dstIndex >= 0 && dstIndex < outputRows) {
+            expandedTopkWeight[dstIndex] = topkWeight[srcIndex];
+        }
+    }
+}
+
 template <typename T>
 class MoeV3FullLoadBase {
 public:
@@ -156,7 +186,6 @@ protected:
 
     GlobalTensor<float> topkWeightGm_;
     GlobalTensor<float> expandedTopkWeightGm_;
-    TBuf<TPosition::VECCALC> topkWeightBuf_;
 
     TPipe *pipe_;
 };
@@ -253,10 +282,6 @@ __aicore__ inline void MoeV3FullLoadBase<T>::InitQueBuffers()
     pipe_->InitBuffer(tempBuffer_, buffSize * kvFactor_);
     pipe_->InitBuffer(sortedBuffer_, buffSize * kvFactor_);
     pipe_->InitBuffer(expertCountBuf_, AlignBytes(actualExpertNum_, sizeof(int32_t)));
-
-    if (isInputTopkWeight_ == 1) {
-        pipe_->InitBuffer(topkWeightBuf_, AlignBytes(1, sizeof(float)));
-    }
 }
 
 template <typename T>
@@ -579,30 +604,16 @@ __aicore__ inline void MoeV3FullLoadBase<T>::TopkWeightScatterOut()
 {
     LocalTensor<int32_t> sortedRowIdx = sortedRowIdxQueue_.DeQue<int32_t>();
     LocalTensor<int32_t> sortedExpertIdx = sortedExpertIdxQueue_.DeQue<int32_t>();
-    SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
-
-    DataCopyExtParams copyParams{1, static_cast<uint32_t>(sizeof(float)), 0, 0, 0};
-    DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
-    LocalTensor<float> topkWeightLocal = topkWeightBuf_.Get<float>();
 
     int64_t startRowIdx = blockIdx_ * perCoreIndicesElements_;
     int64_t endRowIdx = Min(startRowIdx + coreIndicesElements_, activeNum_);
-
-    for (int64_t i = startRowIdx; i < endRowIdx; i++) {
-        int32_t curExpertId = sortedExpertIdx.GetValue(i);
-        if (curExpertId < expertStart_) {
-            continue;
-        }
-        if (curExpertId >= expertEnd_) {
-            break;
-        }
-        int64_t srcIdx = sortedRowIdx.GetValue(i);
-        if (srcIdx >= 0 && srcIdx < totalLength_) {
-            SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
-            DataCopyPad(topkWeightLocal, topkWeightGm_[srcIdx], copyParams, padParams);
-            SetWaitFlag<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
-            DataCopyPad(expandedTopkWeightGm_[i], topkWeightLocal, copyParams);
-        }
+    int64_t elements = endRowIdx - startRowIdx;
+    if (elements > 0) {
+        uint32_t threadNum = static_cast<uint32_t>(Min(elements, SIMT_THREAD_NUM));
+        asc_vf_call<FullLoadTopkWeightGatherSimt>(
+            dim3{threadNum, 1, 1}, elements, startRowIdx, totalLength_, expertStart_, expertEnd_,
+            (__ubuf__ int32_t *)sortedRowIdx.GetPhyAddr(), (__ubuf__ int32_t *)sortedExpertIdx.GetPhyAddr(),
+            (__gm__ float *)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float *)expandedTopkWeightGm_.GetPhyAddr());
     }
 
     sortedRowIdxQueue_.EnQue<int32_t>(sortedRowIdx);
@@ -613,24 +624,16 @@ template <typename T>
 __aicore__ inline void MoeV3FullLoadBase<T>::TopkWeightGatherOut()
 {
     LocalTensor<int32_t> expandedRowIdx = expandedRowIdxQueue_.DeQue<int32_t>();
-    SetWaitFlag<HardEvent::V_S>(HardEvent::V_S);
-
-    DataCopyExtParams copyParams{1, static_cast<uint32_t>(sizeof(float)), 0, 0, 0};
-    DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
-    LocalTensor<float> topkWeightLocal = topkWeightBuf_.Get<float>();
 
     int64_t startRowIdx = blockIdx_ * perCoreIndicesElements_;
     int64_t endRowIdx = startRowIdx + coreIndicesElements_;
     int64_t outputRows = (dropPadMode_ == DROP_PAD_MODE) ? outputRows_ : Min(actualExpertIdxNum_, activeNum_);
-
-    for (int64_t curIndex = startRowIdx; curIndex < endRowIdx; curIndex++) {
-        int32_t outIndex = expandedRowIdx.GetValue(curIndex);
-        if (outIndex >= 0 && outIndex < outputRows) {
-            SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
-            DataCopyPad(topkWeightLocal, topkWeightGm_[curIndex], copyParams, padParams);
-            SetWaitFlag<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
-            DataCopyPad(expandedTopkWeightGm_[outIndex], topkWeightLocal, copyParams);
-        }
+    int64_t elements = endRowIdx - startRowIdx;
+    if (elements > 0) {
+        uint32_t threadNum = static_cast<uint32_t>(Min(elements, SIMT_THREAD_NUM));
+        asc_vf_call<FullLoadTopkWeightScatterSimt>(
+            dim3{threadNum, 1, 1}, elements, startRowIdx, outputRows, (__ubuf__ int32_t *)expandedRowIdx.GetPhyAddr(),
+            (__gm__ float *)topkWeightGm_.GetPhyAddr(), (__gm__ volatile float *)expandedTopkWeightGm_.GetPhyAddr());
     }
 
     expandedRowIdxQueue_.EnQue<int32_t>(expandedRowIdx);

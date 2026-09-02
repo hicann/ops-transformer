@@ -120,7 +120,7 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::DoOpTiling()
     ComputeCountingSortMode();
 
     ComputeUseGatherCopy();
-    Tiling4TopkWeightOut();
+
     if (quantMode_ == QUANT_MODE_MXFP8_E5M2 || quantMode_ == QUANT_MODE_MXFP8_E4M3FN ||
         quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E5M2 || quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E4M3FN ||
         quantMode_ == QUANT_MODE_MXFP4_E2M1) {
@@ -1223,7 +1223,6 @@ void MoeInitRoutingV3TilingArch35::LogBaseTilingData()
     ss << "dropPadMode = " << tilingDataPtr_->dropPadMode << "\n";
     ss << "smoothType = " << tilingDataPtr_->smoothType << "\n";
     ss << "isInputTopkWeight = " << tilingDataPtr_->isInputTopkWeight << "\n";
-    ss << "topkWeightOutPerCorePerLoopElements = " << tilingDataPtr_->topkWeightOutPerCorePerLoopElements << "\n";
     OP_LOGI(context_, "%s", ss.str().c_str());
 }
 
@@ -2118,26 +2117,6 @@ void MoeInitRoutingV3TilingArch35::ComputeUseGatherCopy()
     } else {
         tilingDataPtr_->useGatherCopy = 0;
     }
-}
-
-void MoeInitRoutingV3TilingArch35::Tiling4TopkWeightOut()
-{
-    if (isInputTopkWeight_ == 0) {
-        tilingDataPtr_->topkWeightOutPerCorePerLoopElements = 0;
-        return;
-    }
-
-    int64_t splitBase = totalLength_;
-    int64_t perCoreElements = Ops::Base::CeilDiv(splitBase, aivCoreNum_);
-
-    // TopkWeightOut使用独立TPipe，UB全部可用。
-    // kernel侧UB占用: topkWeightCopyInQueue_固定32字节 + rowIdxCopyInQueue_双缓冲每元素8字节(2*4)
-    int64_t fixedBuffer = AlignBytes(1, static_cast<int64_t>(sizeof(float)));
-    int64_t perElementSize = DOUBLE_BUFFER * static_cast<int64_t>(sizeof(int32_t));
-    int64_t perLoopMaxElements = (availUbSize_ - fixedBuffer) / perElementSize;
-    int64_t perCorePerLoopElements = std::min(perLoopMaxElements, perCoreElements);
-
-    tilingDataPtr_->topkWeightOutPerCorePerLoopElements = perCorePerLoopElements;
 }
 
 void MoeInitRoutingV3TilingArch35::SetLoopParams4SrcToDstDropPad(int64_t perCoreRows, int64_t lastCoreRows)
