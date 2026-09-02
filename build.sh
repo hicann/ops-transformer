@@ -52,7 +52,7 @@ ASCEND_SOC_UNITS="ascend910b"
 SOC_USER_SPECIFIED=false
 # 支持的 SoC 列表(校验用, 单一数据源): 取自 cmake/scripts/util/const_var.py 的 SOC_MAP_EXT keys(出包遍历的 kernel 编译 soc 集合)
 # + CMakeLists.txt SOC_VERSION_LIST 中的 mc62。不在 CMakeLists.txt SOC_VERSION_LIST 的 soc 会走空包(cpack_empty_package)
-SUPPORT_COMPUTE_UNIT_SHORT=("ascend910b" "ascend910_93" "ascend950" "ascend310p" "ascend310b" "ascend910" "ascend610lite" "kirinx90" "kirin9030" "mc62")
+SUPPORT_COMPUTE_UNIT_SHORT=("ascend910b" "ascend910_93" "ascend950" "ascend350" "ascend310p" "ascend310b" "ascend910" "ascend610lite" "kirinx90" "kirin9030" "mc62")
 CMAKE_BUILD_MODE=""
 BUILD_TYPE=""
 VERSION=""
@@ -2366,7 +2366,7 @@ function build_pr_ut_exclude_mc2()
     fi
     CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST_CI_PR=ON"
     CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST=${TEST_EXCLUDE_MC2}"
-    process_soc_input "ascend310p,ascend910b,ascend950"
+    process_soc_input "ascend310p,ascend910b,ascend950,ascend350"
     set_compute_unit_option_ut
     build_ut ${BUILD}
 }

@@ -61,6 +61,7 @@ enum class SocVersion {
     ASCEND910B,
     ASCEND910_93,
     ASCEND950,
+    ASCEND350,
     ASCEND910E,
     ASCEND310,
     ASCEND310P,
@@ -104,7 +105,8 @@ class PlatformInfo {
 public:
     PlatformInfo() {};
 
-    PlatformInfo(int32_t deviceId) : deviceId_(deviceId) {};
+    PlatformInfo(int32_t deviceId)
+        : deviceId_(deviceId) {};
 
     SocVersion GetSocVersion() const;
 

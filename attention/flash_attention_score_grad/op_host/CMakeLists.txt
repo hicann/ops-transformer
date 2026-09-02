@@ -23,6 +23,13 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
         COMPUTE_UNIT Ascend950PR_9599
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend350")
+    set(flash_attention_score_grad_apt_depends attention/common CACHE INTERNAL "Dependencies for flash_attention_score_grad")
+    add_ops_compile_options(
+        OP_NAME FlashAttentionScoreGrad
+        COMPUTE_UNIT Ascend350_355e
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
 endif()
 
 if (BUILD_OPS_RTY_KERNEL)
@@ -46,7 +53,7 @@ else()
         OP_API_INDEPENDENT ON
         # op_api新的地址
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
-        OPTYPE flash_attention_score_grad 
+        OPTYPE flash_attention_score_grad
         ACLNNTYPE aclnn_inner
     )
 endif()

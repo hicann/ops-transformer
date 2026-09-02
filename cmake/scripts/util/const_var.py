@@ -32,6 +32,7 @@ SOC_MAP_EXT = {
     "ascend950": "Ascend950PR_9599",
     "kirinx90": "KirinX90",
     "kirin9030": "Kirin9030",
+    "ascend350": "Ascend350_355e",
 }
 
 CHECK_ASC_DEVKIT_VERSION = False
