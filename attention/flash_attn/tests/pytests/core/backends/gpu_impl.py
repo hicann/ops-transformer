@@ -14,7 +14,12 @@
 import torch
 
 try:
-    from flash_attn import flash_attn_func, flash_attn_varlen_func, flash_attn_with_kvcache
+    from flash_attn import (
+        flash_attn_func,
+        flash_attn_varlen_func,
+        flash_attn_with_kvcache,
+    )
+
     FLASH_ATTN_AVAILABLE = True
 except ImportError:
     FLASH_ATTN_AVAILABLE = False
@@ -23,7 +28,9 @@ except ImportError:
 def gpu_fixed_attn(q_bshd, k_bshd, v_bshd, softmax_scale, causal):
     """固定长度 attention。输入 [B, S, N, D]。"""
     out_bshd = flash_attn_func(
-        q_bshd, k_bshd, v_bshd,
+        q_bshd,
+        k_bshd,
+        v_bshd,
         dropout_p=0.0,
         softmax_scale=softmax_scale,
         causal=causal,
@@ -32,12 +39,24 @@ def gpu_fixed_attn(q_bshd, k_bshd, v_bshd, softmax_scale, causal):
     return out_bshd
 
 
-def gpu_varlen_attn(q_tnd, k_tnd, v_tnd, cu_q, cu_kv, max_sq, max_skv, softmax_scale, causal, device):
+def gpu_varlen_attn(
+    q_tnd, k_tnd, v_tnd, cu_q, cu_kv, max_sq, max_skv, softmax_scale, causal, device
+):
     """变长 attention。输入 [total_tokens, N, D]。"""
-    cu_q_t = torch.tensor(cu_q, dtype=torch.int32, device=device) if not isinstance(cu_q, torch.Tensor) else cu_q.to(device=device, dtype=torch.int32)
-    cu_kv_t = torch.tensor(cu_kv, dtype=torch.int32, device=device) if not isinstance(cu_kv, torch.Tensor) else cu_kv.to(device=device, dtype=torch.int32)
+    cu_q_t = (
+        torch.tensor(cu_q, dtype=torch.int32, device=device)
+        if not isinstance(cu_q, torch.Tensor)
+        else cu_q.to(device=device, dtype=torch.int32)
+    )
+    cu_kv_t = (
+        torch.tensor(cu_kv, dtype=torch.int32, device=device)
+        if not isinstance(cu_kv, torch.Tensor)
+        else cu_kv.to(device=device, dtype=torch.int32)
+    )
     out_tnd = flash_attn_varlen_func(
-        q_tnd, k_tnd, v_tnd,
+        q_tnd,
+        k_tnd,
+        v_tnd,
         cu_seqlens_q=cu_q_t,
         cu_seqlens_k=cu_kv_t,
         max_seqlen_q=int(max_sq),
@@ -50,7 +69,9 @@ def gpu_varlen_attn(q_tnd, k_tnd, v_tnd, cu_q, cu_kv, max_sq, max_skv, softmax_s
     return out_tnd
 
 
-def gpu_paged_attn(q_bshd, k_cache, v_cache, block_table, cache_seqlens, softmax_scale, causal):
+def gpu_paged_attn(
+    q_bshd, k_cache, v_cache, block_table, cache_seqlens, softmax_scale, causal
+):
     """Paged KV cache attention。
     q: [B, S, N, D], k_cache/v_cache: [num_blocks, block_size, N, D]
     """

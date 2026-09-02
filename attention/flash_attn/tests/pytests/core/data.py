@@ -18,19 +18,21 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # 参数组构造 — 按 flash_attn.md 的 6 组参数规范化
 # ============================================================
 
-def build_flash_attn_params(p: dict, device: torch.device, inputs: dict
-                            ) -> Tuple[dict, dict, dict]:
+
+def build_flash_attn_params(
+    p: dict, device: torch.device, inputs: dict
+) -> Tuple[dict, dict, dict]:
     """从 normalized params 按参数组构造 metadata / kernel kwargs。
 
     Returns: (meta_kwargs, kernel_kwargs, out_layout)
     """
-    layout_q   = p.get("layout_q", p.get("input_layout", "BNSD"))
-    layout_kv  = p.get("layout_kv", layout_q)
+    layout_q = p.get("layout_q", p.get("input_layout", "BNSD"))
+    layout_kv = p.get("layout_kv", layout_q)
     layout_out = p.get("layout_out", layout_q)
     d = p["D"]
 
     # === 公共参数组 ===
-    scale = p.get("scale", 1 / (d ** 0.5))
+    scale = p.get("scale", 1 / (d**0.5))
 
     # === Mask 参数组 ===
     mask_mode = p.get("mask_mode", 0)
@@ -52,14 +54,16 @@ def build_flash_attn_params(p: dict, device: torch.device, inputs: dict
 
     # === SeqLens 参数组 ===
     def _u32(x):
-        if x is None: return None
-        if torch.is_tensor(x): return x.to(torch.int32, device=device).contiguous()
+        if x is None:
+            return None
+        if torch.is_tensor(x):
+            return x.to(torch.int32, device=device).contiguous()
         return torch.tensor(x, dtype=torch.int32, device=device).contiguous()
 
-    cu_q  = _u32(p.get("cu_seqlens_q"))
+    cu_q = _u32(p.get("cu_seqlens_q"))
     cu_kv = _u32(p.get("cu_seqlens_kv"))
-    sq    = _u32(p.get("seqused_q", p.get("actual_seq_qlen")))
-    skv   = _u32(p.get("seqused_kv", p.get("actual_seq_kvlen")))
+    sq = _u32(p.get("seqused_q", p.get("actual_seq_qlen")))
+    skv = _u32(p.get("seqused_kv", p.get("actual_seq_kvlen")))
 
     def _resolve_max_seqlen(explicit, used_seq, cu_seqlens, fallback):
         if explicit is not None:
@@ -71,7 +75,8 @@ def build_flash_attn_params(p: dict, device: torch.device, inputs: dict
         return fallback
 
     # 从 tensor shape 推导 metadata 参数
-    q = inputs["q"]; k = inputs["k"]
+    q = inputs["q"]
+    k = inputs["k"]
     if layout_q == "BNSD":
         bs, nqh, s_q, hd = q.shape[0], q.shape[1], q.shape[2], q.shape[3]
         nkh, s_kv = k.shape[1], k.shape[2]
@@ -85,8 +90,12 @@ def build_flash_attn_params(p: dict, device: torch.device, inputs: dict
         s_q = p.get("S1", 1)
         s_kv = p.get("S2", p.get("S1", 1))
     else:
-        bs = q.shape[0]; nqh = p["N1"]; nkh = p.get("N2", nqh)
-        hd = d; s_q = q.shape[1]; s_kv = k.shape[1]
+        bs = q.shape[0]
+        nqh = p["N1"]
+        nkh = p.get("N2", nqh)
+        hd = d
+        s_q = q.shape[1]
+        s_kv = k.shape[1]
 
     msq = _resolve_max_seqlen(p.get("max_seqlen_q"), sq, cu_q, s_q)
     msk = _resolve_max_seqlen(p.get("max_seqlen_kv"), skv, cu_kv, s_kv)
@@ -103,24 +112,42 @@ def build_flash_attn_params(p: dict, device: torch.device, inputs: dict
 
     # === metadata kwargs ===
     meta_kwargs = dict(
-        cu_seqlens_q=cu_q, cu_seqlens_kv=cu_kv,
-        seqused_q=sq, seqused_kv=skv,
-        num_heads_q=nqh, num_heads_kv=nkh, head_dim=hd,
-        batch_size=bs, max_seqlen_q=msq, max_seqlen_kv=msk,
-        mask_mode=mask_mode, win_left=wl, win_right=wr,
-        layout_q=layout_q, layout_kv=layout_kv, layout_out=layout_out,
+        cu_seqlens_q=cu_q,
+        cu_seqlens_kv=cu_kv,
+        seqused_q=sq,
+        seqused_kv=skv,
+        num_heads_q=nqh,
+        num_heads_kv=nkh,
+        head_dim=hd,
+        batch_size=bs,
+        max_seqlen_q=msq,
+        max_seqlen_kv=msk,
+        mask_mode=mask_mode,
+        win_left=wl,
+        win_right=wr,
+        layout_q=layout_q,
+        layout_kv=layout_kv,
+        layout_out=layout_out,
     )
 
     # === kernel kwargs ===
     kernel_kwargs = dict(
-        softmax_scale=scale, mask_mode=mask_mode,
-        win_left=wl, win_right=wr,
-        block_table=bt, sinks=None, attn_mask=attn_mask,
-        cu_seqlens_q=cu_q, cu_seqlens_kv=cu_kv,
-        seqused_q=sq, seqused_kv=skv,
+        softmax_scale=scale,
+        mask_mode=mask_mode,
+        win_left=wl,
+        win_right=wr,
+        block_table=bt,
+        sinks=None,
+        attn_mask=attn_mask,
+        cu_seqlens_q=cu_q,
+        cu_seqlens_kv=cu_kv,
+        seqused_q=sq,
+        seqused_kv=skv,
         max_seqlen_q=msq,
         max_seqlen_kv=msk,
-        layout_q=layout_q, layout_kv=layout_kv, layout_out=layout_out,
+        layout_q=layout_q,
+        layout_kv=layout_kv,
+        layout_out=layout_out,
         return_softmax_lse=p.get("return_softmax_lse", False),
     )
 
@@ -144,15 +171,19 @@ class InputSpec:
 
     # ── 核心 API ──
 
-    def tensor(self, name: str, *,
-               shape: str = "",
-               layout: dict = None,
-               dtype=None,
-               method: str = "randn",
-               when: Callable = None,
-               layout_override: str = None,  # 覆盖全局 layout，如 k/v 用 layout_kv
-               range_key: str = None,  # 从 params[range_key] 读取 (lo, hi) 覆盖 low/high
-               **kwargs) -> "InputSpec":
+    def tensor(
+        self,
+        name: str,
+        *,
+        shape: str = "",
+        layout: dict = None,
+        dtype=None,
+        method: str = "randn",
+        when: Callable = None,
+        layout_override: str = None,  # 覆盖全局 layout，如 k/v 用 layout_kv
+        range_key: str = None,  # 从 params[range_key] 读取 (lo, hi) 覆盖 low/high
+        **kwargs,
+    ) -> "InputSpec":
         """添加一个张量定义。
 
         Args:
@@ -165,19 +196,31 @@ class InputSpec:
             layout_override: 覆盖全局 layout，如 k/v 应该用 layout_kv
             range_key: params 中的 key 名（如 "q_range"），其值 (lo, hi) 覆盖 low/high
         """
-        self._items.append(dict(
-            name=name, shape=shape, layout=layout or {},
-            dtype=dtype, method=method, when=when,
-            layout_override=layout_override, range_key=range_key,
-            kwargs=kwargs,
-        ))
+        self._items.append(
+            dict(
+                name=name,
+                shape=shape,
+                layout=layout or {},
+                dtype=dtype,
+                method=method,
+                when=when,
+                layout_override=layout_override,
+                range_key=range_key,
+                kwargs=kwargs,
+            )
+        )
         return self
 
     # ── 生成入口 ──
 
-    def generate(self, params: dict, device,
-                 layout: str = "BNSD", layout_kv: str = None, seed: int = 42
-                 ) -> Dict[str, torch.Tensor]:
+    def generate(
+        self,
+        params: dict,
+        device,
+        layout: str = "BNSD",
+        layout_kv: str = None,
+        seed: int = 42,
+    ) -> Dict[str, torch.Tensor]:
         """在指定 device 上生成所有张量。"""
         rng = torch.Generator(device=device)
         rng.manual_seed(seed)
@@ -240,6 +283,7 @@ class InputSpec:
 
 # ── helpers ──
 
+
 def _infer_dtype(ds: str) -> torch.dtype:
     return torch.float16 if ds == "fp16" else torch.bfloat16
 
@@ -265,36 +309,79 @@ def _generate(method, shape, dtype, device, rng, **kw):
 flash_attn_inputs = (
     InputSpec("flash_attn")
     # q — 按 layout_q 生成
-    .tensor("q", layout={"BNSD": "B,N1,S1,D", "BSND": "B,S1,N1,D", "TND": "total_s1,N1,D"},
-            method="uniform", low=-5.0, high=5.0, range_key="q_range",
-            when=lambda p: "q_range" in p)
-    .tensor("q", layout={"BNSD": "B,N1,S1,D", "BSND": "B,S1,N1,D", "TND": "total_s1,N1,D"},
-            when=lambda p: "q_range" not in p)
+    .tensor(
+        "q",
+        layout={"BNSD": "B,N1,S1,D", "BSND": "B,S1,N1,D", "TND": "total_s1,N1,D"},
+        method="uniform",
+        low=-5.0,
+        high=5.0,
+        range_key="q_range",
+        when=lambda p: "q_range" in p,
+    )
+    .tensor(
+        "q",
+        layout={"BNSD": "B,N1,S1,D", "BSND": "B,S1,N1,D", "TND": "total_s1,N1,D"},
+        when=lambda p: "q_range" not in p,
+    )
     # k/v — 按 layout_kv 生成（PA 时生成 page 格式）
-    .tensor("k", layout={
-            "BNSD": "B,N2,S2,D", "BSND": "B,S2,N2,D", "TND": "total_s2,N2,D",
+    .tensor(
+        "k",
+        layout={
+            "BNSD": "B,N2,S2,D",
+            "BSND": "B,S2,N2,D",
+            "TND": "total_s2,N2,D",
             "PA_BBND": "num_blocks,block_size,N2,D",
             "PA_BNBD": "num_blocks,N2,block_size,D",
-            "PA_NZ": "num_blocks,N2,D_nz_sub,block_size,nz_blk_elem"},
-            method="uniform", low=-5.0, high=5.0, range_key="k_range",
-            when=lambda p: "k_range" in p, layout_override="layout_kv")
-    .tensor("k", layout={
-            "BNSD": "B,N2,S2,D", "BSND": "B,S2,N2,D", "TND": "total_s2,N2,D",
+            "PA_NZ": "num_blocks,N2,D_nz_sub,block_size,nz_blk_elem",
+        },
+        method="uniform",
+        low=-5.0,
+        high=5.0,
+        range_key="k_range",
+        when=lambda p: "k_range" in p,
+        layout_override="layout_kv",
+    )
+    .tensor(
+        "k",
+        layout={
+            "BNSD": "B,N2,S2,D",
+            "BSND": "B,S2,N2,D",
+            "TND": "total_s2,N2,D",
             "PA_BBND": "num_blocks,block_size,N2,D",
             "PA_BNBD": "num_blocks,N2,block_size,D",
-            "PA_NZ": "num_blocks,N2,D_nz_sub,block_size,nz_blk_elem"},
-            when=lambda p: "k_range" not in p, layout_override="layout_kv")
-    .tensor("v", layout={
-            "BNSD": "B,N2,S2,_V", "BSND": "B,S2,N2,_V", "TND": "total_s2,N2,_V",
+            "PA_NZ": "num_blocks,N2,D_nz_sub,block_size,nz_blk_elem",
+        },
+        when=lambda p: "k_range" not in p,
+        layout_override="layout_kv",
+    )
+    .tensor(
+        "v",
+        layout={
+            "BNSD": "B,N2,S2,_V",
+            "BSND": "B,S2,N2,_V",
+            "TND": "total_s2,N2,_V",
             "PA_BBND": "num_blocks,block_size,N2,_V",
             "PA_BNBD": "num_blocks,N2,block_size,_V",
-            "PA_NZ": "num_blocks,N2,DV_nz_sub,block_size,nz_blk_elem"},
-            method="uniform", low=-5.0, high=5.0, range_key="v_range",
-            when=lambda p: "v_range" in p, layout_override="layout_kv")
-    .tensor("v", layout={
-            "BNSD": "B,N2,S2,_V", "BSND": "B,S2,N2,_V", "TND": "total_s2,N2,_V",
+            "PA_NZ": "num_blocks,N2,DV_nz_sub,block_size,nz_blk_elem",
+        },
+        method="uniform",
+        low=-5.0,
+        high=5.0,
+        range_key="v_range",
+        when=lambda p: "v_range" in p,
+        layout_override="layout_kv",
+    )
+    .tensor(
+        "v",
+        layout={
+            "BNSD": "B,N2,S2,_V",
+            "BSND": "B,S2,N2,_V",
+            "TND": "total_s2,N2,_V",
             "PA_BBND": "num_blocks,block_size,N2,_V",
             "PA_BNBD": "num_blocks,N2,block_size,_V",
-            "PA_NZ": "num_blocks,N2,DV_nz_sub,block_size,nz_blk_elem"},
-            when=lambda p: "v_range" not in p, layout_override="layout_kv")
+            "PA_NZ": "num_blocks,N2,DV_nz_sub,block_size,nz_blk_elem",
+        },
+        when=lambda p: "v_range" not in p,
+        layout_override="layout_kv",
+    )
 )

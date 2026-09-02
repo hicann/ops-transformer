@@ -41,15 +41,14 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const FaTilingInfo &faInfo)
 
     const gert::CompileTimeTensorDesc *metadataDesc = faInfo.opParamInfo.metadata.desc;
     OP_CHECK_IF(metadataDesc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "metadata",
-            "metadata desc cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "metadata", "metadata desc cannot be empty"),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(metadataDesc->GetDataType() != ge::DT_INT32,
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "metadata",
-            DataTypeToSerialString(metadataDesc->GetDataType()).c_str(),
-            "The dtype of metadata must be INT32"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(faInfo.opName, "metadata",
+                                                      DataTypeToSerialString(metadataDesc->GetDataType()).c_str(),
+                                                      "The dtype of metadata must be INT32"),
+                return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != CheckFormatSupport(metadataDesc, METADATA_NAME)) {
         return ge::GRAPH_FAILED;
@@ -57,16 +56,16 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const FaTilingInfo &faInfo)
 
     uint32_t dimNum = metadataTensor->GetStorageShape().GetDimNum();
     OP_CHECK_IF(dimNum != 1,
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(faInfo.opName, "metadata",
-            std::to_string(dimNum).c_str(), "The shape dim of metadata must be 1"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(faInfo.opName, "metadata", std::to_string(dimNum).c_str(),
+                                                         "The shape dim of metadata must be 1"),
+                return ge::GRAPH_FAILED);
 
     int64_t dim0 = metadataTensor->GetStorageShape().GetDim(0);
     OP_CHECK_IF(dim0 <= 0,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "metadata",
-            GetShapeStr(metadataTensor->GetStorageShape()).c_str(),
-            "The 1st axis of metadata must be greater than 0"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "metadata",
+                                                      GetShapeStr(metadataTensor->GetStorageShape()).c_str(),
+                                                      "The 1st axis of metadata must be greater than 0"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

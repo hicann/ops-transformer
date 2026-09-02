@@ -16,7 +16,13 @@ from typing import Any, Dict
 from .base import Backend
 
 try:
-    from core.backends.gpu_impl import gpu_fixed_attn, gpu_varlen_attn, gpu_paged_attn, FLASH_ATTN_AVAILABLE
+    from core.backends.gpu_impl import (
+        gpu_fixed_attn,
+        gpu_varlen_attn,
+        gpu_paged_attn,
+        FLASH_ATTN_AVAILABLE,
+    )
+
     _HAS_GPU = FLASH_ATTN_AVAILABLE
 except ImportError:
     _HAS_GPU = False
@@ -41,19 +47,25 @@ class GPUBackend(Backend):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    def compute(self, inputs: Dict[str, torch.Tensor],
-                params: Dict[str, Any]) -> Dict[str, torch.Tensor]:
+    def compute(
+        self, inputs: Dict[str, torch.Tensor], params: Dict[str, Any]
+    ) -> Dict[str, torch.Tensor]:
         layout_q = params.get("layout_q", params.get("input_layout", "BNSD"))
         layout_kv = params.get("layout_kv", layout_q)
         block_size = params.get("block_size", 256)
         mask_mode = params.get("mask_mode", 0)
         d = params.get("D", inputs["q"].shape[-1])
         softmax_scale = params.get("scale", d ** (-0.5))
-        causal = (int(mask_mode) == 3)
+        causal = int(mask_mode) == 3
 
-        use_paged = (layout_kv in ("PA_BBND", "PA_BNBD", "PA_NZ") and block_size % 256 == 0)
-        has_seqused = (params.get("seqused_kv") is not None or params.get("seqused_q") is not None
-                       or params.get("cu_seqlens_kv") is not None)
+        use_paged = (
+            layout_kv in ("PA_BBND", "PA_BNBD", "PA_NZ") and block_size % 256 == 0
+        )
+        has_seqused = (
+            params.get("seqused_kv") is not None
+            or params.get("seqused_q") is not None
+            or params.get("cu_seqlens_kv") is not None
+        )
         use_varlen = (layout_q == "TND") or (has_seqused and not use_paged)
 
         if use_paged:
@@ -75,9 +87,13 @@ class GPUBackend(Backend):
 
         if isinstance(block_table, list):
             if isinstance(block_table[0], list):
-                bt_tensor = torch.tensor(block_table, dtype=torch.int32, device=self._device)
+                bt_tensor = torch.tensor(
+                    block_table, dtype=torch.int32, device=self._device
+                )
             else:
-                bt_tensor = torch.tensor([block_table], dtype=torch.int32, device=self._device)
+                bt_tensor = torch.tensor(
+                    [block_table], dtype=torch.int32, device=self._device
+                )
         else:
             bt_tensor = block_table.to(device=self._device, dtype=torch.int32)
 
@@ -111,20 +127,27 @@ class GPUBackend(Backend):
         B = q_bshd.shape[0]
         if seqused_kv is None:
             S_kv = k.shape[2] if layout_kv == "PA_BBND" else k.shape[1]
-            cache_seqlens = torch.full((B,), S_kv, dtype=torch.int32, device=self._device)
+            cache_seqlens = torch.full(
+                (B,), S_kv, dtype=torch.int32, device=self._device
+            )
         elif isinstance(seqused_kv, (list, tuple)):
-            cache_seqlens = torch.tensor(list(seqused_kv), dtype=torch.int32, device=self._device)
+            cache_seqlens = torch.tensor(
+                list(seqused_kv), dtype=torch.int32, device=self._device
+            )
         else:
             cache_seqlens = seqused_kv.to(device=self._device, dtype=torch.int32)
 
-        out_bshd = gpu_paged_attn(q_bshd, k_cache, v_cache, bt_tensor, cache_seqlens,
-                                  softmax_scale, causal)
+        out_bshd = gpu_paged_attn(
+            q_bshd, k_cache, v_cache, bt_tensor, cache_seqlens, softmax_scale, causal
+        )
         layout_out = params.get("layout_out", layout_q)
         if layout_out == "BSND":
             return out_bshd.contiguous()
         elif layout_out == "TND":
             cu_seqlens_q = params.get("cu_seqlens_q")
-            return _pack_bnsd_to_tnd(out_bshd.permute(0, 2, 1, 3), cu_seqlens_q).contiguous()
+            return _pack_bnsd_to_tnd(
+                out_bshd.permute(0, 2, 1, 3), cu_seqlens_q
+            ).contiguous()
         else:
             return out_bshd.permute(0, 2, 1, 3).contiguous()
 
@@ -174,26 +197,48 @@ class GPUBackend(Backend):
         if cu_kv is None:
             raise ValueError("TND layout 需要 cu_seqlens_kv")
 
-        seqlens_q = [int(cu_q[i+1]) - int(cu_q[i]) for i in range(len(cu_q)-1)]
-        seqlens_kv = [int(cu_kv[i+1]) - int(cu_kv[i]) for i in range(len(cu_kv)-1)]
+        seqlens_q = [int(cu_q[i + 1]) - int(cu_q[i]) for i in range(len(cu_q) - 1)]
+        seqlens_kv = [int(cu_kv[i + 1]) - int(cu_kv[i]) for i in range(len(cu_kv) - 1)]
         max_sq = max(seqlens_q) if seqlens_q else 0
         max_skv = max(seqlens_kv) if seqlens_kv else 0
 
-        out_tnd = gpu_varlen_attn(q_tnd, k_tnd, v_tnd, cu_q, cu_kv,
-                                  max_sq, max_skv, softmax_scale, causal, self._device)
+        out_tnd = gpu_varlen_attn(
+            q_tnd,
+            k_tnd,
+            v_tnd,
+            cu_q,
+            cu_kv,
+            max_sq,
+            max_skv,
+            softmax_scale,
+            causal,
+            self._device,
+        )
         layout_out = params.get("layout_out", layout_q)
         if layout_out == "TND" or (layout_q == "TND" and layout_out == "TND"):
             return out_tnd.contiguous()
         elif layout_out in ("BNSD", "BSND"):
-            cu = cu_q if isinstance(cu_q, list) else (cu_q.cpu().tolist() if isinstance(cu_q, torch.Tensor) else list(cu_q))
+            cu = (
+                cu_q
+                if isinstance(cu_q, list)
+                else (
+                    cu_q.cpu().tolist()
+                    if isinstance(cu_q, torch.Tensor)
+                    else list(cu_q)
+                )
+            )
             B = len(cu) - 1
             N = out_tnd.shape[1]
             D = out_tnd.shape[2]
-            max_s = max(int(cu[i+1]) - int(cu[i]) for i in range(B))
-            out_bnsd = torch.zeros(B, N, max_s, D, dtype=out_tnd.dtype, device=out_tnd.device)
+            max_s = max(int(cu[i + 1]) - int(cu[i]) for i in range(B))
+            out_bnsd = torch.zeros(
+                B, N, max_s, D, dtype=out_tnd.dtype, device=out_tnd.device
+            )
             for i in range(B):
-                start, end = int(cu[i]), int(cu[i+1])
-                out_bnsd[i, :, :end-start, :] = out_tnd[start:end, :, :].permute(1, 0, 2)
+                start, end = int(cu[i]), int(cu[i + 1])
+                out_bnsd[i, :, : end - start, :] = out_tnd[start:end, :, :].permute(
+                    1, 0, 2
+                )
             if layout_out == "BSND":
                 return out_bnsd.permute(0, 2, 1, 3).contiguous()
             return out_bnsd.contiguous()
@@ -253,8 +298,17 @@ class GPUBackend(Backend):
 
     def _pa_to_bnsd_pair(self, inputs, layout_kv, params):
         from core.backends.cpu import _pa_to_bnsd
-        k_cpu = inputs["k"].cpu() if inputs["k"].device != torch.device("cpu") else inputs["k"]
-        v_cpu = inputs["v"].cpu() if inputs["v"].device != torch.device("cpu") else inputs["v"]
+
+        k_cpu = (
+            inputs["k"].cpu()
+            if inputs["k"].device != torch.device("cpu")
+            else inputs["k"]
+        )
+        v_cpu = (
+            inputs["v"].cpu()
+            if inputs["v"].device != torch.device("cpu")
+            else inputs["v"]
+        )
         k_bnsd = _pa_to_bnsd(k_cpu, layout_kv, params)
         v_bnsd = _pa_to_bnsd(v_cpu, layout_kv, params)
         return k_bnsd, v_bnsd
@@ -303,14 +357,14 @@ def _unpack_tnd_to_bnsd(q_tnd, cu_seqlens_q):
         out = torch.zeros(B, N, max_sq, D, dtype=q_tnd.dtype, device=q_tnd.device)
         for i in range(B):
             start, end = int(cu[i]), int(cu[i + 1])
-            out[i, :, :end - start, :] = q_tnd[start:end, :, :].permute(1, 0, 2)
+            out[i, :, : end - start, :] = q_tnd[start:end, :, :].permute(1, 0, 2)
     else:
         N, D = q_tnd.shape[1], q_tnd.shape[3]
         max_sq = max(int(cu[i + 1]) - int(cu[i]) for i in range(B))
         out = torch.zeros(B, N, max_sq, D, dtype=q_tnd.dtype, device=q_tnd.device)
         for i in range(B):
             start, end = int(cu[i]), int(cu[i + 1])
-            out[i, :, :end - start, :] = q_tnd[0, :, start:end, :]
+            out[i, :, : end - start, :] = q_tnd[0, :, start:end, :]
     return out
 
 

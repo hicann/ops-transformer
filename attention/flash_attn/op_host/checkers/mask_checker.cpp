@@ -36,7 +36,8 @@ ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FaTilingInfo &faInfo)
     const std::vector<int64_t> maskModeList = {static_cast<int64_t>(MaskMode::NO_MASK),
                                                static_cast<int64_t>(MaskMode::CAUSAL),
                                                static_cast<int64_t>(MaskMode::BAND)};
-    OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckValueSupport(static_cast<int64_t>(faInfo.maskMode), maskModeList),
+    OP_CHECK_IF(
+        ge::GRAPH_SUCCESS != CheckValueSupport(static_cast<int64_t>(faInfo.maskMode), maskModeList),
         OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "mask_mode", std::to_string(faInfo.maskMode).c_str(), "0, 3 or 4"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
@@ -109,48 +110,49 @@ ge::graphStatus MaskChecker::CheckParaExistence(const FaTilingInfo &faInfo)
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "attn_mask", "not empty",
                                                           "When mask_mode=0 (no mask mode), attn_mask must be empty"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(faInfo.winLeft != -1,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_left",
-                                                          std::to_string(faInfo.winLeft).c_str(),
-                                                          "When mask_mode=0 (no mask mode), win_left must be -1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(faInfo.winRight != -1,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_right",
-                                                          std::to_string(faInfo.winRight).c_str(),
-                                                          "When mask_mode=0 (no mask mode), win_right must be -1"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            faInfo.winLeft != -1,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_left", std::to_string(faInfo.winLeft).c_str(),
+                                                  "When mask_mode=0 (no mask mode), win_left must be -1"),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            faInfo.winRight != -1,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_right", std::to_string(faInfo.winRight).c_str(),
+                                                  "When mask_mode=0 (no mask mode), win_right must be -1"),
+            return ge::GRAPH_FAILED);
     }
     if (faInfo.maskMode == static_cast<int64_t>(MaskMode::CAUSAL)) {
         OP_CHECK_IF(attnMaskTensor == nullptr,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "attn_mask", "empty",
                                                           "When mask_mode=3 (causal mode), attn_mask must be provided"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(faInfo.winLeft != -1,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_left",
-                                                          std::to_string(faInfo.winLeft).c_str(),
-                                                          "When mask_mode=3 (causal mode), win_left must be -1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(faInfo.winRight != -1,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_right",
-                                                          std::to_string(faInfo.winRight).c_str(),
-                                                          "When mask_mode=3 (causal mode), win_right must be -1"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            faInfo.winLeft != -1,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_left", std::to_string(faInfo.winLeft).c_str(),
+                                                  "When mask_mode=3 (causal mode), win_left must be -1"),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            faInfo.winRight != -1,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_right", std::to_string(faInfo.winRight).c_str(),
+                                                  "When mask_mode=3 (causal mode), win_right must be -1"),
+            return ge::GRAPH_FAILED);
     }
     if (faInfo.maskMode == static_cast<int64_t>(MaskMode::BAND)) {
         OP_CHECK_IF(attnMaskTensor == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "attn_mask",
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        faInfo.opName, "attn_mask",
                         "The value of attn_mask cannot be nullptr when the mask_mode=4 (band mode)"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(faInfo.winLeft < -1,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_left",
-                        std::to_string(faInfo.winLeft).c_str(),
-                        "The value of win_left must be greater than or equal to -1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(faInfo.winRight < -1,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_right",
-                        std::to_string(faInfo.winRight).c_str(),
-                        "The value of win_right must be greater than or equal to -1"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            faInfo.winLeft < -1,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_left", std::to_string(faInfo.winLeft).c_str(),
+                                                  "The value of win_left must be greater than or equal to -1"),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            faInfo.winRight < -1,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_right", std::to_string(faInfo.winRight).c_str(),
+                                                  "The value of win_right must be greater than or equal to -1"),
+            return ge::GRAPH_FAILED);
     }
 
     return ge::GRAPH_SUCCESS;

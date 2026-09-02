@@ -21,18 +21,16 @@ class Backend(ABC):
     name: str = "base"
 
     @abstractmethod
-    def is_available(self) -> bool:
-        ...
+    def is_available(self) -> bool: ...
 
     @abstractmethod
-    def compute(self, inputs: Dict[str, torch.Tensor],
-                params: Dict[str, Any]) -> Dict[str, torch.Tensor]:
-        ...
+    def compute(
+        self, inputs: Dict[str, torch.Tensor], params: Dict[str, Any]
+    ) -> Dict[str, torch.Tensor]: ...
 
     @property
     @abstractmethod
-    def device(self) -> torch.device:
-        ...
+    def device(self) -> torch.device: ...
 
     def clear_cache(self):
         pass

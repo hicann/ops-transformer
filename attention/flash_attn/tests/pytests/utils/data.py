@@ -13,7 +13,9 @@ import torch
 from einops import rearrange
 
 
-def generate_cpu_mask(b, s1, s2, mask_mode, win_left, win_right, prefix=None, index=None, band_index=None):
+def generate_cpu_mask(
+    b, s1, s2, mask_mode, win_left, win_right, prefix=None, index=None, band_index=None
+):
     if mask_mode is None or mask_mode == 0:
         return None
     elif mask_mode == 3:
@@ -22,18 +24,27 @@ def generate_cpu_mask(b, s1, s2, mask_mode, win_left, win_right, prefix=None, in
         # -1 means infinity (no mask on that side)
         effective_win_right = s2 if win_right == -1 else win_right
         effective_win_left = s1 if win_left == -1 else win_left
-        atten_mask_u = torch.triu(torch.ones(s1, s2), diagonal=effective_win_right + 1 + s2 - s1)
-        atten_mask_l = torch.tril(torch.ones(s1, s2), diagonal=-effective_win_left - 1 + s2 - s1)
+        atten_mask_u = torch.triu(
+            torch.ones(s1, s2), diagonal=effective_win_right + 1 + s2 - s1
+        )
+        atten_mask_l = torch.tril(
+            torch.ones(s1, s2), diagonal=-effective_win_left - 1 + s2 - s1
+        )
         mask = (atten_mask_u + atten_mask_l).bool()
     return mask
 
 
 def page_attn_for_bnsd(bnsd_tensor, b, act_seq_lens_kv, block_table, block_size):
     block_num = int(block_table.max()) + 1
-    kv_cache_bnsd_shape = (block_num, bnsd_tensor.shape[1], block_size, bnsd_tensor.shape[3])
+    kv_cache_bnsd_shape = (
+        block_num,
+        bnsd_tensor.shape[1],
+        block_size,
+        bnsd_tensor.shape[3],
+    )
     page_cache_tensor = torch.zeros(size=kv_cache_bnsd_shape, dtype=bnsd_tensor.dtype)
     actual_b = block_table.shape[0]
-    is_tnd = (b == 1 and actual_b > 1)
+    is_tnd = b == 1 and actual_b > 1
     cum_kv_offset = 0
     for i in range(actual_b):
         b_seq = act_seq_lens_kv[i] if len(act_seq_lens_kv) > i else act_seq_lens_kv[0]
@@ -55,50 +66,64 @@ def page_attn_for_bnsd(bnsd_tensor, b, act_seq_lens_kv, block_table, block_size)
 
 
 def dtype_sizeof(data_type):
-    if data_type == 'fp16' or data_type == 'bf16':
+    if data_type == "fp16" or data_type == "bf16":
         return 2
-    elif data_type == 'int8' or data_type == 'fp8':
+    elif data_type == "int8" or data_type == "fp8":
         return 1
 
 
-def rearrange_by_block_table(bnsd_tensor, block_table, block_size, b, act_seq_lens_kv, kv_storage_mode, kv_dtype):
-    page_cache_tensor = page_attn_for_bnsd(bnsd_tensor, b, act_seq_lens_kv, block_table, block_size)
+def rearrange_by_block_table(
+    bnsd_tensor, block_table, block_size, b, act_seq_lens_kv, kv_storage_mode, kv_dtype
+):
+    page_cache_tensor = page_attn_for_bnsd(
+        bnsd_tensor, b, act_seq_lens_kv, block_table, block_size
+    )
     if kv_storage_mode == "PA_BBND":
         return page_cache_tensor.permute(0, 2, 1, 3)
     elif kv_storage_mode == "PA_BNBD":
         return page_cache_tensor
-    elif kv_storage_mode == "PA_NZ":  # PA_NZ: shape=(NumBlocks, N_kv, BlockSize/16, D, 16)，分页注意力NZ格式
+    elif (
+        kv_storage_mode == "PA_NZ"
+    ):  # PA_NZ: shape=(NumBlocks, N_kv, BlockSize/16, D, 16)，分页注意力NZ格式
         blk_elem = 32 // dtype_sizeof(kv_dtype)
-        page_cache_tensor = page_cache_tensor.reshape(page_cache_tensor.shape[0],
-                                                       page_cache_tensor.shape[1],
-                                                       page_cache_tensor.shape[2],
-                                                       page_cache_tensor.shape[3] // blk_elem,
-                                                       blk_elem).permute(0, 1, 3, 2, 4)
+        page_cache_tensor = page_cache_tensor.reshape(
+            page_cache_tensor.shape[0],
+            page_cache_tensor.shape[1],
+            page_cache_tensor.shape[2],
+            page_cache_tensor.shape[3] // blk_elem,
+            blk_elem,
+        ).permute(0, 1, 3, 2, 4)
         return page_cache_tensor
     else:
         return None
 
 
 def trans_bnsd_to_layout(tensor, layout_type, **kwargs):
-    b               = kwargs.get("B")
-    block_size      = kwargs.get("block_size")
-    block_table     = kwargs.get("block_table")
-    seqused_kv      = kwargs.get("seqused_kv")
-    dtype           = kwargs.get("Dtype", "bf16")
+    b = kwargs.get("B")
+    block_size = kwargs.get("block_size")
+    block_table = kwargs.get("block_table")
+    seqused_kv = kwargs.get("seqused_kv")
+    dtype = kwargs.get("Dtype", "bf16")
 
     if tensor is None:
         return None
     else:
         if layout_type == "BSH":
-            return rearrange(tensor.clone(), 'b n s d -> b s (n d)')
+            return rearrange(tensor.clone(), "b n s d -> b s (n d)")
         elif layout_type == "SBH":
-            return rearrange(tensor.clone(), 'b n s d -> s b (n d)')
+            return rearrange(tensor.clone(), "b n s d -> s b (n d)")
         elif layout_type == "BSND":
-            return rearrange(tensor.clone(), 'b n s d -> b s n d')
+            return rearrange(tensor.clone(), "b n s d -> b s n d")
         elif layout_type == "TND":
-            return rearrange(tensor.clone(), '1 n s d -> s n d')
-        elif layout_type == "PA_BBND" or layout_type == "PA_BNBD" or layout_type == "PA_NZ":
-            return rearrange_by_block_table(tensor, block_table, block_size, b, seqused_kv, layout_type, dtype)
+            return rearrange(tensor.clone(), "1 n s d -> s n d")
+        elif (
+            layout_type == "PA_BBND"
+            or layout_type == "PA_BNBD"
+            or layout_type == "PA_NZ"
+        ):
+            return rearrange_by_block_table(
+                tensor, block_table, block_size, b, seqused_kv, layout_type, dtype
+            )
         return tensor.clone()
 
 

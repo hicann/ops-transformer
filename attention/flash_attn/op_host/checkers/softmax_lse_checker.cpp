@@ -36,11 +36,10 @@ ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const FaTilingInfo &faInfo)
     auto &returnSoftmaxLse = faInfo.opParamInfo.returnSoftMaxLse;
     if (returnSoftmaxLse != nullptr) {
         int64_t returnSoftmaxLseVal = *returnSoftmaxLse;
-        OP_CHECK_IF(
-            returnSoftmaxLseVal != 0 && returnSoftmaxLseVal != 1,
-            OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "return_softmax_lse",
-                std::to_string(returnSoftmaxLseVal).c_str(), "0 or 1"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(returnSoftmaxLseVal != 0 && returnSoftmaxLseVal != 1,
+                    OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "return_softmax_lse",
+                                              std::to_string(returnSoftmaxLseVal).c_str(), "0 or 1"),
+                    return ge::GRAPH_FAILED);
     }
 
     if (!faInfo.softmaxLseFlag) {
@@ -54,7 +53,7 @@ ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const FaTilingInfo &faInfo)
 
     OP_CHECK_IF(lseOutDesc->GetDataType() != ge::DT_FLOAT,
                 OP_LOGE_FOR_INVALID_DTYPE(faInfo.opName, "lse_out",
-                        Ops::Base::ToString(lseOutDesc->GetDataType()).c_str(), "FP32"),
+                                          Ops::Base::ToString(lseOutDesc->GetDataType()).c_str(), "FP32"),
                 return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != CheckFormatSupport(lseOutDesc, SOFTMAX_LSE_NAME)) {
@@ -69,8 +68,8 @@ ge::graphStatus SoftmaxLSEChecker::CheckParaExistence(const FaTilingInfo &faInfo
     if (faInfo.softmaxLseFlag) {
         const gert::StorageShape *lseOutShape = faInfo.opParamInfo.lseOut.shape;
         OP_CHECK_IF(lseOutShape == nullptr,
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "lse_out", "empty",
-                "When softmaxLSE is enabled, lse_out cannot be empty"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "lse_out", "empty",
+                                                          "When softmaxLSE is enabled, lse_out cannot be empty"),
                     return ge::GRAPH_FAILED);
     }
 

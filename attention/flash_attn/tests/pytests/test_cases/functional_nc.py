@@ -14,6 +14,7 @@
 # dim1-only物理上不可行(见data.py注释), 已全部移除
 # 拦截用例(REJ): CheckKVContiguous 会拒绝的场景，预期在 NPU compute 时报错
 
+# fmt: off
 TestCases = {
     # ================================================================
     # 正常通过 — PA_BNBD（dim0 / dim01 基准）
@@ -173,3 +174,4 @@ TestCases = {
                                "q_range": [(-5.0, 5.0)], "k_range": [(-5.0, 5.0)], "v_range": [(-5.0, 5.0)],
                                "nc_kv_dims": [(0, 1)]},
 }
+# fmt: on

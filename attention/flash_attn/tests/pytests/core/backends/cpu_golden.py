@@ -43,12 +43,12 @@ def _attend(q, k, v, atten_mask, scale, need_fix_invalid):
     qk = torch.matmul(q, k.permute(0, 1, 3, 2)).mul(scale)
     if atten_mask is not None:
         qk = qk.masked_fill_(atten_mask.cpu().bool(), value=torch.tensor(-1.7e38))
-    
+
     if qk.shape[-1] == 0:
         b, n, sq, _ = qk.shape
         softmax_res = torch.zeros((b, n, sq, 0), dtype=qk.dtype)
-        x_max       = torch.zeros(b, n, sq, 1)  # torch.finfo(torch.float).min
-        x_sum       = torch.zeros(b, n, sq, 1)  # torch.finfo(torch.float).max
+        x_max = torch.zeros(b, n, sq, 1)  # torch.finfo(torch.float).min
+        x_sum = torch.zeros(b, n, sq, 1)  # torch.finfo(torch.float).max
     else:
         softmax_res, x_max, x_sum = tsoftmax(qk)
 
@@ -80,16 +80,18 @@ def broadcastKV(n1, n2, kv_tensor, dtype):
         factor = n1 // n2
         for i in range(n1):
             j = i // factor
-            kv_res[:, i:i + 1, :, :] = kv_tensor[:, j:j + 1, :, :]
+            kv_res[:, i : i + 1, :, :] = kv_tensor[:, j : j + 1, :, :]
     else:
         factor = n2 // n1
         for i in range(n1):
             j = i * factor
-            kv_res[:, i:i + 1, :, :] = kv_tensor[:, j:j + 1, :, :]
+            kv_res[:, i : i + 1, :, :] = kv_tensor[:, j : j + 1, :, :]
     return kv_res
 
 
-def _should_fix_invalid_rows(mask_mode, win_left, win_right, act_q_len, act_kv_len, prefix):
+def _should_fix_invalid_rows(
+    mask_mode, win_left, win_right, act_q_len, act_kv_len, prefix
+):
     if mask_mode is None or mask_mode == 0:
         return False
     if mask_mode == 3:
@@ -116,11 +118,11 @@ def tforward_tnd(q, k, v, **kwargs):
     cu_kv = kwargs.get("cu_seqlens_kv", None)
 
     mask_mode = kwargs.get("mask_mode", None)
-    win_left  = kwargs.get("win_left", 2147483647)
+    win_left = kwargs.get("win_left", 2147483647)
     win_right = kwargs.get("win_right", 2147483647)
     prefix = kwargs.get("prefix", [])
 
-    scale = kwargs.get("scale", 1 / (d ** 0.5))
+    scale = kwargs.get("scale", 1 / (d**0.5))
 
     band_index = 0
 
@@ -139,9 +141,9 @@ def tforward_tnd(q, k, v, **kwargs):
         q_start = cu_q[i]
         kv_start = cu_kv[i] if cu_kv is not None else sum(seqused_kv[:i])
 
-        qi = q[:, :, q_start:q_start + act_q_len]
-        ki = k[:, :, kv_start:kv_start + act_kv_len]
-        vi = v[:, :, kv_start:kv_start + act_kv_len]
+        qi = q[:, :, q_start : q_start + act_q_len]
+        ki = k[:, :, kv_start : kv_start + act_kv_len]
+        vi = v[:, :, kv_start : kv_start + act_kv_len]
 
         if n1 != n2:
             ki = broadcastKV(n1, n2, ki, ki.dtype)
@@ -150,14 +152,26 @@ def tforward_tnd(q, k, v, **kwargs):
         if mask_mode is None:
             atten_maski = None
         else:
-            atten_maski = generate_cpu_mask(1, act_q_len, act_kv_len, mask_mode, win_left, win_right, prefix, i, band_index)
+            atten_maski = generate_cpu_mask(
+                1,
+                act_q_len,
+                act_kv_len,
+                mask_mode,
+                win_left,
+                win_right,
+                prefix,
+                i,
+                band_index,
+            )
 
-        need_fix = _should_fix_invalid_rows(mask_mode, win_left, win_right, act_q_len, act_kv_len, prefix)
+        need_fix = _should_fix_invalid_rows(
+            mask_mode, win_left, win_right, act_q_len, act_kv_len, prefix
+        )
 
         outi, x_maxi, x_sumi = _attend(qi, ki, vi, atten_maski, scale, need_fix)
-        out_golden[:, :, q_start:q_start + act_q_len] = outi
-        x_max[:, q_start:q_start + act_q_len] = x_maxi.squeeze(0).squeeze(-1)	 
-        x_sum[:, q_start:q_start + act_q_len] = x_sumi.squeeze(0).squeeze(-1)
+        out_golden[:, :, q_start : q_start + act_q_len] = outi
+        x_max[:, q_start : q_start + act_q_len] = x_maxi.squeeze(0).squeeze(-1)
+        x_sum[:, q_start : q_start + act_q_len] = x_sumi.squeeze(0).squeeze(-1)
     return out_golden, x_max, x_sum
 
 
@@ -170,9 +184,21 @@ def tforward(q, k, v, **kwargs):
         s1 = kwargs.get("S1")
         s2 = kwargs.get("S2", s1)
 
-        q = q.reshape(1, b, n1, s1, q.shape[-1]).transpose(1, 2).reshape(1, n1, b * s1, q.shape[-1])
-        k = k.reshape(1, b, n2, s2, k.shape[-1]).transpose(1, 2).reshape(1, n2, b * s2, k.shape[-1])
-        v = v.reshape(1, b, n2, s2, v.shape[-1]).transpose(1, 2).reshape(1, n2, b * s2, v.shape[-1])
+        q = (
+            q.reshape(1, b, n1, s1, q.shape[-1])
+            .transpose(1, 2)
+            .reshape(1, n1, b * s1, q.shape[-1])
+        )
+        k = (
+            k.reshape(1, b, n2, s2, k.shape[-1])
+            .transpose(1, 2)
+            .reshape(1, n2, b * s2, k.shape[-1])
+        )
+        v = (
+            v.reshape(1, b, n2, s2, v.shape[-1])
+            .transpose(1, 2)
+            .reshape(1, n2, b * s2, v.shape[-1])
+        )
 
         cu_q = [i * s1 for i in range(b + 1)]
         cu_kv = [i * s2 for i in range(b + 1)]
@@ -188,7 +214,7 @@ def tforward(q, k, v, **kwargs):
         b = kwargs.get("B")
         s1 = kwargs.get("S1")
         n1 = kwargs.get("N1")
-        # 1 n t d  ->  b n s d 
+        # 1 n t d  ->  b n s d
         out = out.reshape(n1, b, s1, out.shape[-1]).transpose(0, 1)
         x_max = x_max.reshape(n1, b, s1).transpose(1, 0)
         x_sum = x_sum.reshape(n1, b, s1).transpose(1, 0)
