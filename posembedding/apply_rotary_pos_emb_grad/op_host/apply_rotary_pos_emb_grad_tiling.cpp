@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -728,7 +728,7 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetReduceOpCompileInfo(
     uint64_t ubSize = 0;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     OP_CHECK_IF(ubSize <= static_cast<uint64_t>(Ops::Base::CACHE_BUF_SIZE),
-                OP_LOGE(context_->GetNodeName(), "ReduceOp GetHardwareInfo Failed, ubSize:%lu, at least:%lld.",
+                OP_LOGE(context_->GetNodeName(), "ReduceOp GetHardwareInfo Failed, ubSize:%lu, at least:%lu.",
                         compileInfo->ubSize, Ops::Base::CACHE_BUF_SIZE),
                 return ge::GRAPH_FAILED);
     compileInfo->ubSize = ubSize;
@@ -854,8 +854,8 @@ ge::graphStatus TilingPrepareForApplyRotaryPosEmbGrad(gert::TilingParseContext *
     auto platformInfo = context->GetPlatformInfo();
     auto compileInfoPtr = context->GetCompiledInfo<ApplyRotaryPosEmbGradCompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compile info is null"), return ge::GRAPH_FAILED);
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfoPtr->numBlocks = ascendcPlatform.GetCoreNumAiv();
     uint64_t ubSizePlatForm;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);

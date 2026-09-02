@@ -55,19 +55,25 @@ type
  * Defaults to 1.
 
  * @attention Constraints:
-* Let (B, S, N, D) represents the shape of the input "grad_query_embed" and "grad_key_embed" (4D) or (T, N, D) for 3D
-TND layout.
+* Let (B, S, N, D) or (S, B, N, D) represents the shape of the input "grad_query_embed" and "grad_key_embed" (4D) or (T,
+N, D) for 3D TND layout. \n
+* The data type, "layout" and dimension nums of all inputs and outputs must be same. \n
 * Under this representation, the shape constraints of each parameter can be described as follows:
+ * @li All inputs and outputs do not support empty, means each dimension must be greater than zero.
  * @li The D of "grad_query_embed", "grad_key_embed", "cos", "sin", "query", "key", "grad_cos", "grad_sin" must be
 equal.
  * D should be less or equal to 1024. And In half mode, D must be a multiple of 2.
- * @li The shape and of "grad_query_embed", "grad_query" and "query" must be same, the shape of "grad_key_embed",
+ * @li The shape of "grad_query_embed", "grad_query" and "query" must be same, the shape of "grad_key_embed",
 "grad_key" and "key" must be same.
- * @li The data type and dimension nums of all inputs must be same.
- * @li For any "layout", the dimensions of "grad_query_embed" and "grad_query" must be same except for the N dimension.
- * @li The N dimension of "cos" and "sin" must be 1, the B dimension of "cos" and "sin" must be 1 or be same with
-"grad_query_embed",
- * and other dimension of "cos" and "sin" must be same with "grad_query_embed".
+ * In addition, "query" and "key" must be both empty or not empty at the same time.
+ * @li For any "layout", the dimensions of "grad_query_embed" and "grad_key_embed" must be same except for the N
+dimension.
+ * @li The N dimension of "cos" and "sin" must be 1. When "layout" is 1 (BSND) or 2 (SBND),
+ * the B dimension of "cos" and "sin" can be 1 or the same as the B dimension of "grad_query_embed".
+ * When "layout" is 4 (TND), the T dimension of "cos" and "sin" must be the same as the T dimension of
+"grad_query_embed".
+ * Except the N dimension (and the broadcastable B dimension in the BSND and SBND layouts),
+ * all other dimensions must be the same as"grad_query_embed".
  * @li The shapes of "cos", "sin", "grad_cos" and "grad_sin" must be same.
 **/
 
