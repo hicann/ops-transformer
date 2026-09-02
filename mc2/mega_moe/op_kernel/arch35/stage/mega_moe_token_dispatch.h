@@ -81,7 +81,7 @@ __aicore__ inline WaveDispatchCoreRange PlanWaveExpertDispatch(const TokenDispat
     uint64_t expertRowCount = expertGlobalRowEnd > expertGlobalRowBegin ?
                                   static_cast<uint64_t>(expertGlobalRowEnd - expertGlobalRowBegin) :
                                   0U;
-    WaveDispatchCoreRange range{expertRowCount, expertGlobalRowBegin, 0U, 0U};
+    WaveDispatchCoreRange range{0U, expertGlobalRowBegin, 0U, 0U};
 
     uint32_t totalCoreCount = blockJob.totalJobs;
     if (expertRowCount == 0U || totalCoreCount == 0U || expertGlobalRowBegin >= context.maxOutputSize) {
@@ -92,6 +92,7 @@ __aicore__ inline WaveDispatchCoreRange PlanWaveExpertDispatch(const TokenDispat
     uint64_t validGlobalRowEnd =
         expertGlobalRowEnd < context.maxOutputSize ? expertGlobalRowEnd : context.maxOutputSize;
     uint32_t validExpertRowCount = static_cast<uint32_t>(validGlobalRowEnd - expertGlobalRowBegin);
+    range.expertRowCount = validExpertRowCount;
     uint32_t activeCoreCount = validExpertRowCount < totalCoreCount ? validExpertRowCount : totalCoreCount;
 
     // 将当前专家的有效行从滚动首核开始连续均分；冷专家每行恰好交给一个活跃核。
@@ -472,7 +473,7 @@ __aicore__ inline void PrepareMoeExpertTokenCountTable(const MoeStageCommonConfi
     SyncFuncStatic<AscendC::HardEvent::MTE2_S, SYNC_EVENT_ID2>();
 
     ComputeExpertCountTables(scratch.cumsumInfoTensor, scratch.expertTokenNumsOutTensor, common.moeExpertPerRank,
-                             common.worldSize);
+                             common.worldSize, params.tilingData->maxOutputSize);
     SyncFuncStatic<AscendC::HardEvent::V_S, SYNC_EVENT_ID2>();
     uint64_t countOffset = GetExpertCountWorkspaceOffset(countWorkspace, common.moeExpertPerRank, 0U, true);
     SyncFuncStatic<AscendC::HardEvent::V_MTE3, SYNC_EVENT_ID2>();

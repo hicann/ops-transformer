@@ -90,7 +90,8 @@ __simd_callee__ inline void InclusivePrefixSumInt32(__ubuf__ int32_t *values, ui
  * 并作差。相比先调用通用前缀和、再启动第二个 VF，融合实现省去一次 asc_vf_call 和外部流水同步。
  */
 __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t *count, __ubuf__ int32_t *expertCounts,
-                                                   uint32_t elementCount, uint32_t expertCount, uint32_t worldSize)
+                                                   uint32_t elementCount, uint32_t expertCount, uint32_t worldSize,
+                                                   uint32_t maxOutputSize)
 {
     InclusivePrefixSumInt32(count, elementCount);
 
@@ -102,14 +103,17 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t *count, __ub
     AscendC::Reg::RegTensor<int32_t> previousEndPrefixReg;
     AscendC::Reg::RegTensor<int32_t> expertCountReg;
     AscendC::Reg::RegTensor<int32_t> previousVectorEndReg;
+    AscendC::Reg::RegTensor<int32_t> maxOutputSizeReg;
     AscendC::Reg::RegTensor<int32_t> laneIndexReg;
     AscendC::Reg::RegTensor<int32_t> gatherIndexReg;
     AscendC::Reg::RegTensor<int32_t> previousLaneIndexReg;
     AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<int32_t, AscendC::Reg::MaskPattern::ALL>();
     AscendC::Reg::MaskReg firstLaneMask = AscendC::Reg::CreateMask<int32_t, AscendC::Reg::MaskPattern::VL1>();
 
+    int32_t maxOutputSizeInt32 = static_cast<int32_t>(maxOutputSize);
     AscendC::Reg::Arange(laneIndexReg, 0);
     AscendC::Reg::Duplicate(previousVectorEndReg, 0, fullMask);
+    AscendC::Reg::Duplicate(maxOutputSizeReg, maxOutputSizeInt32, fullMask);
     for (uint32_t expertOffset = 0U; expertOffset < expertCount; expertOffset += ELEMENTS_PER_VECTOR) {
         uint32_t validCount = expertCount - expertOffset;
         validCount = validCount < ELEMENTS_PER_VECTOR ? validCount : ELEMENTS_PER_VECTOR;
@@ -127,7 +131,14 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t *count, __ub
         AscendC::Reg::Gather(previousEndPrefixReg, expertEndPrefixReg,
                              reinterpret_cast<AscendC::Reg::RegTensor<uint32_t> &>(previousLaneIndexReg));
         AscendC::Reg::Select(previousEndPrefixReg, previousVectorEndReg, previousEndPrefixReg, firstLaneMask);
-        AscendC::Reg::Sub(expertCountReg, expertEndPrefixReg, previousEndPrefixReg, activeMask);
+        AscendC::Reg::MaskReg overflowMask;
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::GE>(overflowMask, expertEndPrefixReg, maxOutputSizeInt32,
+                                                              activeMask);
+        AscendC::Reg::Select(expertCountReg, maxOutputSizeReg, expertEndPrefixReg, overflowMask);
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::GE>(overflowMask, previousEndPrefixReg, maxOutputSizeInt32,
+                                                              activeMask);
+        AscendC::Reg::Select(previousEndPrefixReg, maxOutputSizeReg, previousEndPrefixReg, overflowMask);
+        AscendC::Reg::Sub(expertCountReg, expertCountReg, previousEndPrefixReg, activeMask);
         AscendC::Reg::StoreAlign(expertCounts + expertOffset, expertCountReg, activeMask);
 
         AscendC::Reg::Duplicate(previousLaneIndexReg, static_cast<int32_t>(validCount - 1U), fullMask);
@@ -138,11 +149,12 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t *count, __ub
 
 __aicore__ inline void ComputeExpertCountTables(LocalTensor<int32_t> countTensor,
                                                 LocalTensor<int32_t> expertCountTensor, uint32_t expertCount,
-                                                uint32_t worldSize)
+                                                uint32_t worldSize, uint32_t maxOutputSize)
 {
     __ubuf__ int32_t *count = reinterpret_cast<__ubuf__ int32_t *>(countTensor.GetPhyAddr());
     __ubuf__ int32_t *expertCounts = reinterpret_cast<__ubuf__ int32_t *>(expertCountTensor.GetPhyAddr());
-    asc_vf_call<ComputeExpertCountTablesVF>(count, expertCounts, expertCount * worldSize, expertCount, worldSize);
+    asc_vf_call<ComputeExpertCountTablesVF>(count, expertCounts, expertCount * worldSize, expertCount, worldSize,
+                                            maxOutputSize);
 }
 
 __aicore__ inline WorkRange TilingByJobContext(uint32_t totalLen, uint32_t jobIndex, uint32_t totalJobs,
