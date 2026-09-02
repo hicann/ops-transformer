@@ -15,4 +15,4 @@
 #include "../../attn_infra/layout/bsag_matrix.hpp"
 #include "../../attn_infra/layout/bsag_vector.hpp"
 
-#endif  // LAYOUT_LAYOUT_HPP
+#endif // LAYOUT_LAYOUT_HPP

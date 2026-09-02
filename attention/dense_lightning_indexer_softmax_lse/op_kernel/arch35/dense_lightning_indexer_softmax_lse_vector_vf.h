@@ -30,10 +30,9 @@ constexpr static CastTrait castTraitB162B32Even = {
 };
 
 template <typename T, bool outerGidxZero>
-__simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float *mmOutUb,
-                                    __ubuf__ float *weightsUb, __ubuf__ T *weightsTUb,
-                                    int64_t groupInner, int64_t s2Inner,
-                                    uint64_t repeatTimes, uint64_t countPerRepeat)
+__simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float *mmOutUb, __ubuf__ float *weightsUb,
+                                  __ubuf__ T *weightsTUb, int64_t groupInner, int64_t s2Inner, uint64_t repeatTimes,
+                                  uint64_t countPerRepeat)
 {
     RegTensor<float> mmReg;
     RegTensor<float> weightReg;
@@ -42,7 +41,7 @@ __simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float
     RegTensor<float> reduceReg;
     RegTensor<half> weightHalfReg;
     RegTensor<bfloat16_t> weightBfReg;
-    
+
     MaskReg pregAllB32 = CreateMask<float, MaskPattern::ALL>();
     MaskReg pregWeightB16 = CreateMask<T, MaskPattern::ALL>();
 
@@ -56,7 +55,7 @@ __simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float
         } else {
             AscendC::MicroAPI::LoadAlign<T, LoadDist::DIST_BRC_B32>(weightReg, weightsUb + i);
         }
-        
+
         for (int32_t j = 0; j < repeatTimes; j++) {
             uint32_t offset = i * s2Inner + j * countPerRepeat;
             LoadAlign(mmReg, mmOutUb + offset);
@@ -75,17 +74,17 @@ __simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float
 }
 
 __simd_vf__ inline void DoReduceSumBlockVF(__ubuf__ float *dstTensor, __ubuf__ float *srcTensor,
-                                            __ubuf__ float *maxValueTensor, __ubuf__ float *prevSumTensor,
-                                            uint32_t count)
+                                           __ubuf__ float *maxValueTensor, __ubuf__ float *prevSumTensor,
+                                           uint32_t count)
 {
     RegTensor<float> srcReg;
     RegTensor<float> dstReg;
     RegTensor<float> maxReg;
     RegTensor<float> expReg;
     RegTensor<float> prevReg;
-    
+
     MaskReg pregTail = UpdateMask<float>(count);
-    
+
     LoadAlign(maxReg, maxValueTensor);
     LoadAlign(prevReg, prevSumTensor);
     LoadAlign(srcReg, srcTensor);

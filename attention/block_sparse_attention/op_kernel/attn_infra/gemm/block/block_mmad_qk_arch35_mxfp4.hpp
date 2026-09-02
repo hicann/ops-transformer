@@ -139,7 +139,10 @@ public:
         return (numerator + denominator - 1) / denominator;
     }
 
-    __aicore__ inline uint32_t MinU32(uint32_t a, uint32_t b) { return (a < b) ? a : b; }
+    __aicore__ inline uint32_t MinU32(uint32_t a, uint32_t b)
+    {
+        return (a < b) ? a : b;
+    }
 
     // Q 稠密 GM → L1（RowMajor → zN）
     template <class TensorQ, class TensorL1Q>

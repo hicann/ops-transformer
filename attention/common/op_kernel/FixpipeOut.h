@@ -38,9 +38,10 @@ __aicore__ inline void FixpipeMmCopyOutToUB(LocalTensor<mmOutputType> &mmResUb, 
     L0C2UbFixpParams.mSize =
         (fixpOutParam.fixpOutMSize + 1) >>
         1 << 1; // 有效数据不足16行，只需输出部分行即可;L0C上的bmm1结果矩阵M方向的size大小必须是偶数
-    L0C2UbFixpParams.srcStride = ((L0C2UbFixpParams.mSize + 15) >> 4)
-                                 << 4; // L0C上matmul结果相邻连续数据片断间隔（前面一个数据块的头与后面数据块的头的间隔），单位为16
-                                       // *sizeof(T) //源NZ矩阵中相邻Z排布的起始地址偏移
+    L0C2UbFixpParams.srcStride =
+        ((L0C2UbFixpParams.mSize + 15) >> 4)
+        << 4; // L0C上matmul结果相邻连续数据片断间隔（前面一个数据块的头与后面数据块的头的间隔），单位为16
+              // *sizeof(T) //源NZ矩阵中相邻Z排布的起始地址偏移
     L0C2UbFixpParams.dstStride =
         (L0C2UbFixpParams.nSize + 15) >> 4 << 4; // mmResUb上两行之间的间隔，单位：element。 //
                                                  // 128：根据比对dump文件得到，ND方案(S1 * S2)时脏数据用mask剔除

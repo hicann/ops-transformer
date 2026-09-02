@@ -144,11 +144,12 @@ __aicore__ inline void DataCopyGmNZToL1(LocalTensor<L1Type> &l1Tensor, GlobalTen
 }
 
 template <typename L1Type>
-__aicore__ inline void
-GmCopyInToL1HasRopePANoContinue(LocalTensor<L1Type> &nopeTensor, LocalTensor<L1Type> &ropeTensor,
-                                GlobalTensor<L1Type> &nopeGmTensor, GlobalTensor<L1Type> &ropeGmTensor,
-                                GlobalTensor<int32_t> &blockTableGm, KVLAYOUT kvLayout, const PAShape &shape,
-                                const PAShape &ropeShape, const Position &startPos)
+__aicore__ inline void GmCopyInToL1HasRopePANoContinue(LocalTensor<L1Type> &nopeTensor, LocalTensor<L1Type> &ropeTensor,
+                                                       GlobalTensor<L1Type> &nopeGmTensor,
+                                                       GlobalTensor<L1Type> &ropeGmTensor,
+                                                       GlobalTensor<int32_t> &blockTableGm, KVLAYOUT kvLayout,
+                                                       const PAShape &shape, const PAShape &ropeShape,
+                                                       const Position &startPos)
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch; // 块表的基偏移量

@@ -13,11 +13,9 @@
 
 #include "../../attn_infra/bsa_base_defs.hpp"
 
-namespace NpuArch::Gemm 
-{
+namespace NpuArch::Gemm {
 template <class Element_, class Layout_, AscendC::TPosition POSITION_ = AscendC::TPosition::GM>
-struct GemmType 
-{
+struct GemmType {
     using Element = Element_;
     using Layout = Layout_;
     static constexpr AscendC::TPosition POSITION = POSITION_;

@@ -77,7 +77,7 @@ struct InnerSplitParams {
 };
 
 enum class SparseMode : uint32_t {
-    RIGHT_DOWN_CAUSAL = 3  // 右下角点划分的下三角部分
+    RIGHT_DOWN_CAUSAL = 3 // 右下角点划分的下三角部分
 };
 
 // -----------算子TilingData定义---------------
@@ -99,52 +99,142 @@ public:
     float scaleValue;
     int64_t maxLoopSize;
 
-    uint8_t layoutType;  // 0: BSND, 1: TND
+    uint8_t layoutType; // 0: BSND, 1: TND
 
-    int32_t get_bSize() const {return bSize;}
-    void set_bSize(int32_t bSizeParam) {this->bSize = bSizeParam;}
+    int32_t get_bSize() const
+    {
+        return bSize;
+    }
+    void set_bSize(int32_t bSizeParam)
+    {
+        this->bSize = bSizeParam;
+    }
 
-    int32_t get_n2Size() const {return n2Size;}
-    void set_n2Size(int32_t n2SizeParam) {this->n2Size = n2SizeParam;}
+    int32_t get_n2Size() const
+    {
+        return n2Size;
+    }
+    void set_n2Size(int32_t n2SizeParam)
+    {
+        this->n2Size = n2SizeParam;
+    }
 
-    int32_t get_n2IndexSize() const {return n2IndexSize;}
-    void set_n2IndexSize(int32_t n2IndexSizeParam) {this->n2IndexSize = n2IndexSizeParam;}
+    int32_t get_n2IndexSize() const
+    {
+        return n2IndexSize;
+    }
+    void set_n2IndexSize(int32_t n2IndexSizeParam)
+    {
+        this->n2IndexSize = n2IndexSizeParam;
+    }
 
-    int32_t get_gSizeQuery() const {return gSizeQuery;}
-    void set_gSizeQuery(int32_t gSizeQueryParam) {this->gSizeQuery = gSizeQueryParam;}
+    int32_t get_gSizeQuery() const
+    {
+        return gSizeQuery;
+    }
+    void set_gSizeQuery(int32_t gSizeQueryParam)
+    {
+        this->gSizeQuery = gSizeQueryParam;
+    }
 
-    int32_t get_gSizeQueryIndex() const {return gSizeQueryIndex;}
-    void set_gSizeQueryIndex(int32_t gSizeQueryIndexParam) {this->gSizeQueryIndex = gSizeQueryIndexParam;}
+    int32_t get_gSizeQueryIndex() const
+    {
+        return gSizeQueryIndex;
+    }
+    void set_gSizeQueryIndex(int32_t gSizeQueryIndexParam)
+    {
+        this->gSizeQueryIndex = gSizeQueryIndexParam;
+    }
 
-    int32_t get_s1Size() const {return s1Size;}
-    void set_s1Size(int32_t s1SizeParam) {this->s1Size = s1SizeParam;}
+    int32_t get_s1Size() const
+    {
+        return s1Size;
+    }
+    void set_s1Size(int32_t s1SizeParam)
+    {
+        this->s1Size = s1SizeParam;
+    }
 
-    int32_t get_s2Size() const {return s2Size;}
-    void set_s2Size(int32_t s2SizeParam) {this->s2Size = s2SizeParam;}
+    int32_t get_s2Size() const
+    {
+        return s2Size;
+    }
+    void set_s2Size(int32_t s2SizeParam)
+    {
+        this->s2Size = s2SizeParam;
+    }
 
-    int32_t get_dSizeQuery() const {return dSizeQuery;}
-    void set_dSizeQuery(int32_t dSizeQueryParam) {this->dSizeQuery = dSizeQueryParam;}
+    int32_t get_dSizeQuery() const
+    {
+        return dSizeQuery;
+    }
+    void set_dSizeQuery(int32_t dSizeQueryParam)
+    {
+        this->dSizeQuery = dSizeQueryParam;
+    }
 
-    int32_t get_dSizeQueryIndex() const {return dSizeQueryIndex;}
-    void set_dSizeQueryIndex(int32_t dSizeQueryIndexParam) {this->dSizeQueryIndex = dSizeQueryIndexParam;}
+    int32_t get_dSizeQueryIndex() const
+    {
+        return dSizeQueryIndex;
+    }
+    void set_dSizeQueryIndex(int32_t dSizeQueryIndexParam)
+    {
+        this->dSizeQueryIndex = dSizeQueryIndexParam;
+    }
 
-    int32_t get_kSize() const {return kSize;}
-    void set_kSize(int32_t kSizeParam) {this->kSize = kSizeParam;}
+    int32_t get_kSize() const
+    {
+        return kSize;
+    }
+    void set_kSize(int32_t kSizeParam)
+    {
+        this->kSize = kSizeParam;
+    }
 
-    int32_t get_sparseMode() const {return sparseMode;}
-    void set_sparseMode(int32_t sparseModeParam) {this->sparseMode = sparseModeParam;}
+    int32_t get_sparseMode() const
+    {
+        return sparseMode;
+    }
+    void set_sparseMode(int32_t sparseModeParam)
+    {
+        this->sparseMode = sparseModeParam;
+    }
 
-    int32_t get_rsvd() const {return rsvd;}
-    void set_rsvd(int32_t rsvdParam) {this->rsvd = rsvdParam;}
+    int32_t get_rsvd() const
+    {
+        return rsvd;
+    }
+    void set_rsvd(int32_t rsvdParam)
+    {
+        this->rsvd = rsvdParam;
+    }
 
-    float get_scaleValue() const {return scaleValue;}
-    void set_scaleValue(float scaleValueParam) {this->scaleValue = scaleValueParam;}
+    float get_scaleValue() const
+    {
+        return scaleValue;
+    }
+    void set_scaleValue(float scaleValueParam)
+    {
+        this->scaleValue = scaleValueParam;
+    }
 
-    uint8_t get_layoutType() const {return layoutType;}
-    void set_layoutType(uint8_t layoutTypeParam) {this->layoutType = layoutTypeParam;}
+    uint8_t get_layoutType() const
+    {
+        return layoutType;
+    }
+    void set_layoutType(uint8_t layoutTypeParam)
+    {
+        this->layoutType = layoutTypeParam;
+    }
 
-    int64_t get_maxLoopSize() const {return maxLoopSize;}
-    void set_maxLoopSize(int32_t maxLoopSizeParam) {this->maxLoopSize = maxLoopSizeParam;}
+    int64_t get_maxLoopSize() const
+    {
+        return maxLoopSize;
+    }
+    void set_maxLoopSize(int32_t maxLoopSizeParam)
+    {
+        this->maxLoopSize = maxLoopSizeParam;
+    }
 };
 
 class DLIGradKLLossMultiCoreParams {
@@ -152,34 +242,61 @@ public:
     uint32_t coreNum;
     uint32_t rsvd;
     int64_t splitFactorSize;
-    int64_t totalSize; // 表明有多少个S1
-    int64_t padTotalSize; // TND场景下的T有可能大于实际长度
+    int64_t totalSize;              // 表明有多少个S1
+    int64_t padTotalSize;           // TND场景下的T有可能大于实际长度
     int64_t bS1Index[MAX_CORE_NUM]; // 每个核B,S1合轴之后的起始和结束位置
 
-    int32_t get_coreNum() const {return coreNum;}
-    void set_coreNum(uint32_t coreNumParam) {this->coreNum = coreNumParam;}
+    int32_t get_coreNum() const
+    {
+        return coreNum;
+    }
+    void set_coreNum(uint32_t coreNumParam)
+    {
+        this->coreNum = coreNumParam;
+    }
 
-    int64_t get_splitFactorSize() const {return splitFactorSize;}
-    void set_splitFactorSize(int64_t splitFactorSizeParam) {this->splitFactorSize = splitFactorSizeParam;}
+    int64_t get_splitFactorSize() const
+    {
+        return splitFactorSize;
+    }
+    void set_splitFactorSize(int64_t splitFactorSizeParam)
+    {
+        this->splitFactorSize = splitFactorSizeParam;
+    }
 
-    int64_t get_totalSize() const {return totalSize;}
-    void set_totalSize(int64_t totalSizeParam) {this->totalSize = totalSizeParam;}
+    int64_t get_totalSize() const
+    {
+        return totalSize;
+    }
+    void set_totalSize(int64_t totalSizeParam)
+    {
+        this->totalSize = totalSizeParam;
+    }
 
-    int64_t get_padTotalSize() const {return padTotalSize;}
-    void set_padTotalSize(int64_t padTotalSizeParam) {this->padTotalSize = padTotalSizeParam;}
+    int64_t get_padTotalSize() const
+    {
+        return padTotalSize;
+    }
+    void set_padTotalSize(int64_t padTotalSizeParam)
+    {
+        this->padTotalSize = padTotalSizeParam;
+    }
 
-    int64_t *get_bS1Ptr() {return bS1Index;}
+    int64_t *get_bS1Ptr()
+    {
+        return bS1Index;
+    }
 };
 
 class DLIGradKLLossInitOutputParams {
 public:
     uint32_t singleCoreSize; // 单核需要初始化的元素个数
     uint32_t rsvd;
-    int64_t totalOutputSize; // 总的需要初始化的元素个数，等于bSize * s2Size * D 或者T2 * D
+    int64_t totalOutputSize;     // 总的需要初始化的元素个数，等于bSize * s2Size * D 或者T2 * D
     int64_t t1PadSingleCoreSize; // q的t维度pad部份进行清零，每个核的任务数
-    int64_t t1PadRemainderSize; // q的t维度pad部份进行清零，每个核处理的余数
+    int64_t t1PadRemainderSize;  // q的t维度pad部份进行清零，每个核处理的余数
     int64_t t2PadSingleCoreSize; // k的t维度pad部份进行清零，每个核的任务数
-    int64_t t2PadRemainderSize; // k的t维度pad部份进行清零，每个核的任务数
+    int64_t t2PadRemainderSize;  // k的t维度pad部份进行清零，每个核的任务数
 
     uint32_t get_singleCoreSize() const
     {
@@ -250,9 +367,10 @@ public:
     DLIGradKLLossVecApiParams vectorParams;
 };
 
-template <typename T> inline T Align(T num, T rnd)
+template <typename T>
+inline T Align(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
 } // namespace optiling

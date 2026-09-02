@@ -335,15 +335,14 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl256VF(
 // update, 128 < originN <= 256
 template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 256,
           bool hasAtten = 0, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool hasSink = false>
-__aicore__ inline void
-ProcessVec1UpdateGeneralImpl256(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &expSumTensor,
-                                const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
-                                const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &inExpSumTensor,
-                                const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &maskTensor,
-                                const LocalTensor<pseShiftType> &pseTensor, const LocalTensor<uint8_t> &dropTensor,
-                                const LocalTensor<uint8_t> &sharedTmpBuffer, const uint16_t m, const uint32_t originN,
-                                const uint32_t pseStride, const float slopes, const float posShift, const T scale,
-                                const T minValue, float keepProb, const float sinkValue = 0.0f)
+__aicore__ inline void ProcessVec1UpdateGeneralImpl256(
+    const LocalTensor<T2> &dstTensor, const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
+    const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &inExpSumTensor,
+    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &maskTensor,
+    const LocalTensor<pseShiftType> &pseTensor, const LocalTensor<uint8_t> &dropTensor,
+    const LocalTensor<uint8_t> &sharedTmpBuffer, const uint16_t m, const uint32_t originN, const uint32_t pseStride,
+    const float slopes, const float posShift, const T scale, const T minValue, float keepProb,
+    const float sinkValue = 0.0f)
 {
     const uint32_t nPadding = (s2BaseSize + blockBytesU8 - 1) / blockBytesU8 * blockBytesU8;
     // 写的时候固定用65或者33的stride去写，因为正向目前使能settail之后mm2的s1方向必须算满128或者64行

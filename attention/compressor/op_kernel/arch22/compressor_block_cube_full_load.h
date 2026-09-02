@@ -125,10 +125,11 @@ __aicore__ inline void CompressorBlockCubeFullLoad<COMP>::InitParams(const Const
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorBlockCubeFullLoad<COMP>::Init(
-    __gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate, __gm__ uint8_t *stateCache, __gm__ uint8_t *ape,
-    __gm__ uint8_t *stateBlockTable, __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed,
-    __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut)
+__aicore__ inline void CompressorBlockCubeFullLoad<COMP>::Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv,
+                                                               __gm__ uint8_t *wGate, __gm__ uint8_t *stateCache,
+                                                               __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable,
+                                                               __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed,
+                                                               __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut)
 {
     xGm_.SetGlobalBuffer((__gm__ X_T *)x);
     wkvGm_.SetGlobalBuffer((__gm__ X_T *)wKv);
@@ -161,9 +162,8 @@ __aicore__ inline void CompressorBlockCubeFullLoad<COMP>::InitBuffers(TPipe *pip
 }
 
 template <typename COMP>
-__aicore__ inline void
-CompressorBlockCubeFullLoad<COMP>::InitGlobalBuffers(const GlobalTensor<MM1_OUT_T> &kvMm1ResGm,
-                                                     const GlobalTensor<MM1_OUT_T> &scoreMm1ResGm)
+__aicore__ inline void CompressorBlockCubeFullLoad<COMP>::InitGlobalBuffers(
+    const GlobalTensor<MM1_OUT_T> &kvMm1ResGm, const GlobalTensor<MM1_OUT_T> &scoreMm1ResGm)
 {
     this->kvMm1ResGm = kvMm1ResGm;
     this->scoreMm1ResGm = scoreMm1ResGm;
@@ -297,10 +297,11 @@ __aicore__ inline void CompressorBlockCubeFullLoad<COMP>::LoadBToL0(LocalTensor<
 }
 
 template <typename COMP>
-__aicore__ inline void
-CompressorBlockCubeFullLoad<COMP>::MatrixMmad(LocalTensor<T> cL0Tensor, LocalTensor<X_T> aL0Tensor,
-                                              LocalTensor<X_T> bL0Tensor, uint32_t mActSize, uint32_t nDealSize,
-                                              uint32_t kActSize, bool isInitL0C)
+__aicore__ inline void CompressorBlockCubeFullLoad<COMP>::MatrixMmad(LocalTensor<T> cL0Tensor,
+                                                                     LocalTensor<X_T> aL0Tensor,
+                                                                     LocalTensor<X_T> bL0Tensor, uint32_t mActSize,
+                                                                     uint32_t nDealSize, uint32_t kActSize,
+                                                                     bool isInitL0C)
 {
     MmadParams mmadParams;
     mmadParams.m = mActSize < 16 ? 16 : mActSize;

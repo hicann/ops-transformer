@@ -40,15 +40,14 @@ public:
     DLIGradKLLossConstInfo constInfo;
     const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData;
 
-    __aicore__ inline DenseLightningIndexerGradKLLossVector2() {};
+    __aicore__ inline DenseLightningIndexerGradKLLossVector2(){};
 
     __aicore__ inline void InitParams(const struct DLIGradKLLossConstInfo &vecConstInfo,
-        const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData);
+                                      const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData);
     __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitVector2GM(const GlobalTensor<MM3_OUT_T>& dKeyIndexGmIn,
-                                         const GlobalTensor<OUT_T>& dKeyIndexGmOut);
-    __aicore__ inline void InitVector2DeterGM(const GlobalTensor<T>& lossGm,
-        const GlobalTensor<T>& lossDeterGmFloat);
+    __aicore__ inline void InitVector2GM(const GlobalTensor<MM3_OUT_T> &dKeyIndexGmIn,
+                                         const GlobalTensor<OUT_T> &dKeyIndexGmOut);
+    __aicore__ inline void InitVector2DeterGM(const GlobalTensor<T> &lossGm, const GlobalTensor<T> &lossDeterGmFloat);
     __aicore__ inline void ProcessVectorDk();
     __aicore__ inline void DeterSumLoss();
 
@@ -84,8 +83,7 @@ __aicore__ inline void DenseLightningIndexerGradKLLossVector2<DLIT>::InitParams(
 
 template <typename DLIT>
 __aicore__ inline void DenseLightningIndexerGradKLLossVector2<DLIT>::InitVector2GM(
-    const GlobalTensor<MM3_OUT_T>& dKeyIndexGmIn,
-                                                                    const GlobalTensor<OUT_T>& dKeyIndexGmOut)
+    const GlobalTensor<MM3_OUT_T> &dKeyIndexGmIn, const GlobalTensor<OUT_T> &dKeyIndexGmOut)
 {
     this->dKeyIndexGmIn = dKeyIndexGmIn;
     this->dKeyIndexGmOut = dKeyIndexGmOut;
@@ -93,7 +91,7 @@ __aicore__ inline void DenseLightningIndexerGradKLLossVector2<DLIT>::InitVector2
 
 template <typename DLIT>
 __aicore__ inline void DenseLightningIndexerGradKLLossVector2<DLIT>::InitVector2DeterGM(
-    const GlobalTensor<T>& lossGm, const GlobalTensor<T>& lossDeterGmFloat)
+    const GlobalTensor<T> &lossGm, const GlobalTensor<T> &lossDeterGmFloat)
 {
     this->lossGm = lossGm;
     this->lossDeterGmFloat = lossDeterGmFloat;
@@ -119,7 +117,7 @@ __aicore__ inline void DenseLightningIndexerGradKLLossVector2<DLIT>::InitBuffers
     // deter 相关
     ubLossIn_ = ubInFloatPing_;
     ubLossOut_ = ubInFloatPong_;
-    tmpUb_ =  ubOutHalfPong_.template ReinterpretCast<uint8_t>();
+    tmpUb_ = ubOutHalfPong_.template ReinterpretCast<uint8_t>();
 }
 
 template <typename DLIT>
@@ -183,15 +181,11 @@ __aicore__ inline void DenseLightningIndexerGradKLLossVector2<DLIT>::DeterSumLos
         dataCopyParams.blockLen = sizeof(T);
         dataCopyPadParams.rightPadding = 0;
         dataCopyPadParams.paddingValue = 0;
-        event_t mte2ToScalar =
-            static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_S>());
+        event_t mte2ToScalar = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_S>());
         float totalLoss = 0.0f;
         for (int64_t i = 0; i < constInfo.aivNum; ++i) {
-            DataCopyPad(
-                ubLossIn_,
-                lossDeterGmFloat[i * optiling::DETER_LOSS_TMP_GM_NUM],
-                dataCopyParams,
-                dataCopyPadParams);
+            DataCopyPad(ubLossIn_, lossDeterGmFloat[i * optiling::DETER_LOSS_TMP_GM_NUM], dataCopyParams,
+                        dataCopyPadParams);
             SetFlag<HardEvent::MTE2_S>(mte2ToScalar);
             WaitFlag<HardEvent::MTE2_S>(mte2ToScalar);
             totalLoss += ubLossIn_.GetValue(0);
@@ -199,16 +193,14 @@ __aicore__ inline void DenseLightningIndexerGradKLLossVector2<DLIT>::DeterSumLos
         GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_S>(mte2ToScalar);
 
         ubLossOut_.SetValue(0, totalLoss);
-        event_t scalarToMte3 =
-            static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::S_MTE3>());
+        event_t scalarToMte3 = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::S_MTE3>());
         SetFlag<HardEvent::S_MTE3>(scalarToMte3);
         WaitFlag<HardEvent::S_MTE3>(scalarToMte3);
         AscendC::DataCopyPad(lossGm, ubLossOut_,
-            {static_cast<uint32_t>(1), static_cast<uint32_t>(sizeof(float)),
-            static_cast<uint32_t>(0), static_cast<uint32_t>(0)});
+                             {static_cast<uint32_t>(1), static_cast<uint32_t>(sizeof(float)), static_cast<uint32_t>(0),
+                              static_cast<uint32_t>(0)});
 
-        event_t mte3ToScalar =
-            static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE3_S>());
+        event_t mte3ToScalar = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE3_S>());
         SetFlag<HardEvent::MTE3_S>(mte3ToScalar);
         WaitFlag<HardEvent::MTE3_S>(mte3ToScalar);
         GetTPipePtr()->ReleaseEventID<HardEvent::S_MTE3>(scalarToMte3);

@@ -37,8 +37,7 @@ __simd_vf__ inline void CastFp32ToOutVF(__ubuf__ OUT_T *dstUb, __ubuf__ float *s
     RegTensor<OUT_T> dstReg;
 
     for (uint32_t offset = 0; offset < count; offset += FP32_REG_ELEMENTS) {
-        uint32_t validCount =
-            count - offset < FP32_REG_ELEMENTS ? count - offset : FP32_REG_ELEMENTS;
+        uint32_t validCount = count - offset < FP32_REG_ELEMENTS ? count - offset : FP32_REG_ELEMENTS;
         MaskReg tailMask = UpdateMask<float>(validCount);
         LoadAlign(srcReg, srcUb + offset);
         if constexpr (IsSameType<OUT_T, float>::value) {
@@ -51,8 +50,8 @@ __simd_vf__ inline void CastFp32ToOutVF(__ubuf__ OUT_T *dstUb, __ubuf__ float *s
 }
 
 template <typename OUT_T>
-__aicore__ inline void CastFp32ToOut(
-    const LocalTensor<OUT_T> &dstTensor, const LocalTensor<float> &srcTensor, uint32_t count)
+__aicore__ inline void CastFp32ToOut(const LocalTensor<OUT_T> &dstTensor, const LocalTensor<float> &srcTensor,
+                                     uint32_t count)
 {
     __ubuf__ OUT_T *dstUb = reinterpret_cast<__ubuf__ OUT_T *>(dstTensor.GetPhyAddr());
     __ubuf__ float *srcUb = reinterpret_cast<__ubuf__ float *>(srcTensor.GetPhyAddr());

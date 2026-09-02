@@ -34,7 +34,6 @@ __simd_vf__ void ProcessVec1NoUpdateImpl64VF(__ubuf__ T2 *expUb, __ubuf__ T *exp
     AscendC::MicroAPI::RegTensor<float> vreg_exp;
     AscendC::MicroAPI::RegTensor<float> vreg_exp_sum;
 
-
     AscendC::MicroAPI::UnalignRegForStore ureg_max;
     AscendC::MicroAPI::UnalignRegForStore ureg_exp_sum;
 

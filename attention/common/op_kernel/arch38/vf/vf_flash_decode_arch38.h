@@ -48,8 +48,8 @@ __aicore__ inline void ReduceFinalRes_VF_0(LocalTensor<T> &dstLocal, LocalTensor
 
         for (k = 0; k < static_cast<uint16_t>(dealRowCount); k++) { // repeat g
 
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BLK>(vregLse, (__ubuf__ float *&)lseUb +
-                                                                             splitKVIndex * dealRowCount * 8 + k * 8);
+            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BLK>(
+                vregLse, (__ubuf__ float *&)lseUb + splitKVIndex * dealRowCount * 8 + k * 8);
             for (z = 0; z < dLoops; z++) {
                 // splitKVIndex=0的场景，vregDst不需要load，直接置0
                 MicroAPI::Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vregDst, FLT_ZERO, pregTailN);
@@ -90,12 +90,12 @@ __aicore__ inline void ReduceFinalRes_VF_rest(LocalTensor<T> &dstLocal, LocalTen
         uint32_t stride = (0x1 << 16) | 0x8;
 
         for (k = 0; k < static_cast<uint16_t>(dealRowCount); k++) { // repeat g
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BLK>(vregLse, (__ubuf__ float *&)lseUb +
-                                                                             splitKVIndex * dealRowCount * 8 + k * 8);
+            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BLK>(
+                vregLse, (__ubuf__ float *&)lseUb + splitKVIndex * dealRowCount * 8 + k * 8);
             for (z = 0; z < dLoops; z++) {
                 // splitKVIndex>0的场景，reg_dst需要先从dstUb中load之前的结果，再进行add
-                MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vregDst, (__ubuf__ float *&)dstUb +
-                                                                                  k * repStride * 8 + z * floatRepSize);
+                MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(
+                    vregDst, (__ubuf__ float *&)dstUb + k * repStride * 8 + z * floatRepSize);
                 MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(
                     vregAccumOut, (__ubuf__ float *&)accumOutUb + k * repStride * 8 + z * floatRepSize);
                 MicroAPI::Mul<T, MicroAPI::MaskMergeMode::ZEROING>(vregAccumOut, vregLse, vregAccumOut, pregTailN);

@@ -352,16 +352,15 @@ template <typename T, typename T2, typename pseShiftType, bool isUpdate = false,
           uint32_t s2BaseSize = 128, OriginNRange oriNRange = GT_64_AND_LTE_128, bool hasAtten = 0,
           PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
           bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
-__aicore__ inline void
-ProcessVec1Vf(const LocalTensor<T2> &dstTensor, TBuf<> *vselrIndexesBuf, const LocalTensor<T> &expSumTensor,
-              const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor,
-              const LocalTensor<T> &inExpSumTensor, const LocalTensor<T> &inMaxTensor,
-              const LocalTensor<uint8_t> &maskTensor, const LocalTensor<pseShiftType> &pseTensor,
-              const LocalTensor<uint8_t> &dropTensor, const LocalTensor<uint8_t> &sharedTmpBuffer,
-              const LocalTensor<T> &pScaleTensor, const uint16_t m, const uint32_t originN, const uint32_t pseStride,
-              const float slopes, const float posShift, const T scale, const float dScaleQK, const T minValue,
-              float keepProb, const LocalTensor<T> &queryScaleUb = LocalTensor<T>(), const float deSCaleKValue = 1.0f,
-              const float pScale = 1.0f, float sinkValue = 0.0f)
+__aicore__ inline void ProcessVec1Vf(
+    const LocalTensor<T2> &dstTensor, TBuf<> *vselrIndexesBuf, const LocalTensor<T> &expSumTensor,
+    const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor,
+    const LocalTensor<T> &inExpSumTensor, const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &maskTensor,
+    const LocalTensor<pseShiftType> &pseTensor, const LocalTensor<uint8_t> &dropTensor,
+    const LocalTensor<uint8_t> &sharedTmpBuffer, const LocalTensor<T> &pScaleTensor, const uint16_t m,
+    const uint32_t originN, const uint32_t pseStride, const float slopes, const float posShift, const T scale,
+    const float dScaleQK, const T minValue, float keepProb, const LocalTensor<T> &queryScaleUb = LocalTensor<T>(),
+    const float deSCaleKValue = 1.0f, const float pScale = 1.0f, float sinkValue = 0.0f)
 {
     if constexpr (useNz) {
         static_assert(IsSameType<T, half>::value, "VF mul_sel_softmaxflashv2_cast_nz, T must be half");
@@ -388,7 +387,6 @@ ProcessVec1Vf(const LocalTensor<T2> &dstTensor, TBuf<> *vselrIndexesBuf, const L
             scale, dScaleQK, minValue, keepProb, queryScaleUb, deSCaleKValue, pScale, sinkValue);
     }
 }
-
 
 template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 128, uint32_t s2BaseSize = 128,
           OriginNRange oriNRange = GT_64_AND_LTE_128, bool hasAtten = 0,
@@ -533,19 +531,18 @@ template <typename T, typename T2, typename pseShiftType, bool isUpdate = false,
           uint32_t s2BaseSize = 128, OriginNRange oriNRange = GT_64_AND_LTE_128, bool hasAtten = 0,
           PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
           bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
-__aicore__ inline void
-ProcessVec1VfMxfp8(const LocalTensor<T2> &dstTensor, TBuf<> *vselrIndexesBuf, const LocalTensor<T> &expSumTensor,
-                   const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor,
-                   const LocalTensor<T> &inExpSumTensor, const LocalTensor<T> &inMaxTensor,
-                   const LocalTensor<uint8_t> &maskTensor, const LocalTensor<pseShiftType> &pseTensor,
-                   const LocalTensor<uint8_t> &dropTensor, const LocalTensor<fp8_e8m0_t> &pScaleSubLoop0Tensor,
-                   const LocalTensor<uint8_t> &sharedTmpBuffer, const LocalTensor<T> &pScaleTensor,
-                   const LocalTensor<float> &preLoopMaxTensor, const LocalTensor<float> &preLoopSumTensor,
-                   const LocalTensor<float> &firstLoopSumTensor, uint32_t subLoop, const uint16_t m,
-                   const uint32_t originN, const uint32_t pseStride, const float slopes, const float posShift,
-                   const T scale, const float dScaleQK, const T minValue, float keepProb,
-                   const LocalTensor<T> &queryScaleUb = LocalTensor<T>(), const float deSCaleKValue = 1.0f,
-                   const float pScale = 1.0f, float sinkValue = 0.0f)
+__aicore__ inline void ProcessVec1VfMxfp8(
+    const LocalTensor<T2> &dstTensor, TBuf<> *vselrIndexesBuf, const LocalTensor<T> &expSumTensor,
+    const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor,
+    const LocalTensor<T> &inExpSumTensor, const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &maskTensor,
+    const LocalTensor<pseShiftType> &pseTensor, const LocalTensor<uint8_t> &dropTensor,
+    const LocalTensor<fp8_e8m0_t> &pScaleSubLoop0Tensor, const LocalTensor<uint8_t> &sharedTmpBuffer,
+    const LocalTensor<T> &pScaleTensor, const LocalTensor<float> &preLoopMaxTensor,
+    const LocalTensor<float> &preLoopSumTensor, const LocalTensor<float> &firstLoopSumTensor, uint32_t subLoop,
+    const uint16_t m, const uint32_t originN, const uint32_t pseStride, const float slopes, const float posShift,
+    const T scale, const float dScaleQK, const T minValue, float keepProb,
+    const LocalTensor<T> &queryScaleUb = LocalTensor<T>(), const float deSCaleKValue = 1.0f, const float pScale = 1.0f,
+    float sinkValue = 0.0f)
 {
     static_assert(IsSameType<T, float>::value, "VF mul_sel_softmaxflashv2_cast_nz, T must be float");
     static_assert(IsSameType<T2, half>::value || IsSameType<T2, bfloat16_t>::value || IsSameType<T2, float>::value ||

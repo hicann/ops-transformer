@@ -56,7 +56,6 @@ TILING_DATA_FIELD_DEF(uint32_t, maskType);
 TILING_DATA_FIELD_DEF(float, scaleValue);
 TILING_DATA_FIELD_DEF(uint32_t, totalQBlocks); // T: 所有batch中Q方向切块的总数
 
-
 // 稀疏分块参数 (blockShapeOptional)
 TILING_DATA_FIELD_DEF(uint64_t, blockShapeX); // block的x维度(Q方向)
 TILING_DATA_FIELD_DEF(uint64_t, blockShapeY); // block的y维度(KV方向)

@@ -25,25 +25,10 @@
 namespace NpuArch::Gemm::Block {
 ////////////////////////////////////////////////////////////////////
 
-template <
-    class L1TileShape_,
-    class L0TileShape_,
-    class AType_,
-    class BType_,
-    class CType_,
-    class BiasType_,
-    class TileCopy_,
-    class TileMmad_>
-struct BlockMmad<
-    MmadAtlasA2SBSAG2,
-    L1TileShape_,
-    L0TileShape_,
-    AType_,
-    BType_,
-    CType_,
-    BiasType_,
-    TileCopy_,
-    TileMmad_> {
+template <class L1TileShape_, class L0TileShape_, class AType_, class BType_, class CType_, class BiasType_,
+          class TileCopy_, class TileMmad_>
+struct BlockMmad<MmadAtlasA2SBSAG2, L1TileShape_, L0TileShape_, AType_, BType_, CType_, BiasType_, TileCopy_,
+                 TileMmad_> {
 public:
     using DispatchPolicy = MmadAtlasA2SBSAG2;
     using ArchTag = typename DispatchPolicy::ArchTag;
@@ -57,17 +42,17 @@ public:
     using LayoutB = typename BType_::Layout;
     using ElementC = typename CType_::Element;
     using LayoutC = typename CType_::Layout;
-    
+
     using TileMmad = TileMmad_;
     using CopyGmToL1A = typename TileCopy_::CopyGmToL1A;
     using CopyGmToL1B = typename TileCopy_::CopyGmToL1B;
     using CopyL1ToL0A = typename TileCopy_::CopyL1ToL0A;
     using CopyL1ToL0B = typename TileCopy_::CopyL1ToL0B;
     using CopyL0CToGm = typename TileCopy_::CopyL0CToGm;
-    
+
     using ElementAccumulator =
         typename Gemm::helper::ElementAccumulatorSelector<ElementA, ElementB>::ElementAccumulator;
-    
+
     using LayoutAInL1 = typename CopyL1ToL0A::LayoutSrc;
     using LayoutBInL1 = typename CopyL1ToL0B::LayoutSrc;
     using LayoutAInL0 = typename CopyL1ToL0A::LayoutDst;
@@ -78,14 +63,14 @@ public:
     using L1BAlignHelper = Gemm::helper::L1AlignHelper<ElementB, LayoutB>;
 
     static constexpr uint32_t STAGES = DispatchPolicy::STAGES;
-    
+
     static constexpr uint32_t L1A_SIZE = L1TileShape::M * L1TileShape::K * sizeof(ElementA);
     static constexpr uint32_t L1B_SIZE = L1TileShape::N * L1TileShape::K * sizeof(ElementB);
 
     static constexpr uint32_t L0A_SIZE = ArchTag::L0A_SIZE;
     static constexpr uint32_t L0B_SIZE = ArchTag::L0B_SIZE;
     static constexpr uint32_t L0C_SIZE = ArchTag::L0C_SIZE;
-    
+
     static constexpr uint32_t L0A_PINGPONG_BUF_SIZE = L0A_SIZE / STAGES;
     static constexpr uint32_t L0B_PINGPONG_BUF_SIZE = L0B_SIZE / STAGES;
     static constexpr uint32_t L0C_PINGPONG_BUF_SIZE = L0C_SIZE / STAGES;
@@ -94,28 +79,26 @@ public:
 
     static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
 
-    __aicore__ inline
-    BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0, uint32_t pingpongFlagOffset = 0, bool isAtomicAdd_ = false)
+    __aicore__ inline BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0,
+                                uint32_t pingpongFlagOffset = 0, bool isAtomicAdd_ = false)
     {
         isAtomicAdd = isAtomicAdd_;
         PINGPONG_FLAG_OFFSET = pingpongFlagOffset;
         for (uint32_t i = 0; i < STAGES; i++) {
             l1ATensor[i] = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart + L1A_SIZE * i);
-            l1BTensor[i] = resource.l1Buf.template GetBufferByByte<ElementB>(l1BufAddrStart + L1A_SIZE * 2 + L1B_SIZE * i);
+            l1BTensor[i] =
+                resource.l1Buf.template GetBufferByByte<ElementB>(l1BufAddrStart + L1A_SIZE * 2 + L1B_SIZE * i);
             l0ATensor[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(L0A_PINGPONG_BUF_SIZE * i);
             l0BTensor[i] = resource.l0BBuf.template GetBufferByByte<ElementB>(L0B_PINGPONG_BUF_SIZE * i);
             l0CTensor[i] = resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(L0C_PINGPONG_BUF_SIZE * i);
         }
     }
 
-    __aicore__ inline
-    ~BlockMmad() {}
+    __aicore__ inline ~BlockMmad() {}
 
-    __aicore__ inline
-    void operator()(AscendC::GlobalTensor<ElementA> gA,
-                    AscendC::GlobalTensor<ElementB> gB,
-                    AscendC::GlobalTensor<ElementC> gC,
-                    LayoutA layoutA, LayoutB layoutB, LayoutC layoutC, GemmCoord actualShape, uint32_t& pingpongFlag)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
+                                      AscendC::GlobalTensor<ElementC> gC, LayoutA layoutA, LayoutB layoutB,
+                                      LayoutC layoutC, GemmCoord actualShape, uint32_t &pingpongFlag)
     {
         LayoutAInL1 layoutAInL1 = LayoutAInL1::template MakeLayout<ElementA>(L1TileShape::M, L1TileShape::K);
         LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(L1TileShape::K, L1TileShape::N);
@@ -146,8 +129,8 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
 
         AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(pingpongFlag);
-        tileMmad(
-            l0CTensor[pingpongFlag], l0ATensor[pingpongFlag], l0BTensor[pingpongFlag], mRound, nRound, actualShape.k());
+        tileMmad(l0CTensor[pingpongFlag], l0ATensor[pingpongFlag], l0BTensor[pingpongFlag], mRound, nRound,
+                 actualShape.k());
         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(pingpongFlag);
 
         AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
@@ -172,7 +155,7 @@ public:
 protected:
     AscendC::LocalTensor<ElementA> l1ATensor[STAGES];
     AscendC::LocalTensor<ElementB> l1BTensor[STAGES];
-    
+
     AscendC::LocalTensor<ElementA> l0ATensor[STAGES];
     AscendC::LocalTensor<ElementB> l0BTensor[STAGES];
     AscendC::LocalTensor<ElementAccumulator> l0CTensor[STAGES];
@@ -190,8 +173,6 @@ protected:
 
 ////////////////////////////////////////////////////////////////////
 
-}  // namespace NpuArch::Gemm::Block
+} // namespace NpuArch::Gemm::Block
 
-
-#endif  // GEMM_BLOCK_MMAD_BSAG_2_HPP
-
+#endif // GEMM_BLOCK_MMAD_BSAG_2_HPP

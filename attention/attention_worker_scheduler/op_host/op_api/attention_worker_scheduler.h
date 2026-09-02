@@ -17,11 +17,10 @@
 
 #include "opdev/op_executor.h"
 
-namespace l0op
-{
+namespace l0op {
 
-const aclTensor* AttentionWorkerScheduler(const aclTensor* scheduleContext, aclTensor* scheduleContextOut,
-                                          aclOpExecutor* executor);
-}  // namespace l0op
+const aclTensor *AttentionWorkerScheduler(const aclTensor *scheduleContext, aclTensor *scheduleContextOut,
+                                          aclOpExecutor *executor);
+} // namespace l0op
 
-#endif  // OP_API_INC_LEVEL0_OP_ATTENTION_WORKER_SCHEDULER_H_
+#endif // OP_API_INC_LEVEL0_OP_ATTENTION_WORKER_SCHEDULER_H_

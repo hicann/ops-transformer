@@ -256,7 +256,10 @@ public:
     }
 
     // buffer id 获取
-    __aicore__ inline uint32_t GetSPBufferIdx(const uint32_t loop) { return loop / 2 % 2; }
+    __aicore__ inline uint32_t GetSPBufferIdx(const uint32_t loop)
+    {
+        return loop / 2 % 2;
+    }
 
     __aicore__ inline uint32_t GetLocalGroupMaxBufIdx(uint32_t loop)
     {

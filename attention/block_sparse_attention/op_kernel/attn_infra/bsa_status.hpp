@@ -11,9 +11,12 @@
 #ifndef BSA_STATUS_HPP
 #define BSA_STATUS_HPP
 
-namespace NpuArch{
+namespace NpuArch {
 
-enum class Status{ kSuccess, kInvalid };
+enum class Status {
+    kSuccess,
+    kInvalid
+};
 
 } // namespace NpuArch
 

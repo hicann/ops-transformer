@@ -38,8 +38,8 @@ __simd_vf__ void ReduceFinalRes_0_VF(__ubuf__ T *dstUb, __ubuf__ T *lseUb, __ubu
 
     for (k = 0; k < static_cast<uint16_t>(dealRowCount); k++) { // repeat g
 
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BLK>(vregLse, (__ubuf__ float *&)lseUb +
-                                                                          splitKVIndex * dealRowCount * 8 + k * 8);
+        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BLK>(
+            vregLse, (__ubuf__ float *&)lseUb + splitKVIndex * dealRowCount * 8 + k * 8);
         for (z = 0; z < dLoops; z++) {
             // splitKVIndex=0的场景，vregDst不需要load，直接置0
             MicroAPI::Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vregDst, FLT_ZERO, pregTailN);
@@ -87,12 +87,12 @@ __simd_vf__ void ReduceFinalRes_Rest_VF(__ubuf__ T *dstUb, __ubuf__ T *lseUb, __
     uint32_t stride = (0x1 << 16) | 0x8;
 
     for (k = 0; k < static_cast<uint16_t>(dealRowCount); k++) { // repeat g
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BLK>(vregLse, (__ubuf__ float *&)lseUb +
-                                                                          splitKVIndex * dealRowCount * 8 + k * 8);
+        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BLK>(
+            vregLse, (__ubuf__ float *&)lseUb + splitKVIndex * dealRowCount * 8 + k * 8);
         for (z = 0; z < dLoops; z++) {
             // splitKVIndex>0的场景，reg_dst需要先从dstUb中load之前的结果，再进行add
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregDst, (__ubuf__ float *&)dstUb +
-                                                                               k * repStride * 8 + z * floatRepSize);
+            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(
+                vregDst, (__ubuf__ float *&)dstUb + k * repStride * 8 + z * floatRepSize);
             MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(
                 vregAccumOut, (__ubuf__ float *&)accumOutUb + k * repStride * 8 + z * floatRepSize);
             MicroAPI::Mul<T, MicroAPI::MaskMergeMode::ZEROING>(vregAccumOut, vregLse, vregAccumOut, pregTailN);

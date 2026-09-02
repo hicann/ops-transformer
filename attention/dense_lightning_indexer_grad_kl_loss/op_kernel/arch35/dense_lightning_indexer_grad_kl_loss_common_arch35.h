@@ -46,11 +46,11 @@ static constexpr uint32_t DOUBLE_BUFFER = 2;
 static constexpr uint32_t AIC_AIV_RATIO = 2;
 static constexpr uint32_t FLOAT_DATA_BLOCK_NUM = 8;
 static constexpr uint32_t FLOAT_REPEAT_NUM = 64;
-static constexpr uint32_t S2_BASE_STEP_MASK_V3V4  = 128;
-static constexpr uint32_t TEMP_VEC_SIZE_V3V4  = 24 * 1024;
+static constexpr uint32_t S2_BASE_STEP_MASK_V3V4 = 128;
+static constexpr uint32_t TEMP_VEC_SIZE_V3V4 = 24 * 1024;
 
 // deter
-static constexpr int64_t DETER_INVALID_RUNINFO_VALUE  = -1;
+static constexpr int64_t DETER_INVALID_RUNINFO_VALUE = -1;
 
 enum class DLILayout {
     BSND = 0,
@@ -69,10 +69,10 @@ struct MMParam {
     uint32_t dstFixStride = 0;
     bool isLeftTranspose = false;
     bool isRightTranspose = false;
-    bool needCopyRight = true;              // 本次是否需要使用L0B
-    bool isRightReuse = false;              // 所有轮次是否涉及复用
-    bool isL0CInit = true;                  // 本次是否需要累加
-    bool needAccumL0C = false;              // 所有轮次是否涉及累加
+    bool needCopyRight = true; // 本次是否需要使用L0B
+    bool isRightReuse = false; // 所有轮次是否涉及复用
+    bool isL0CInit = true;     // 本次是否需要累加
+    bool needAccumL0C = false; // 所有轮次是否涉及累加
     bool isOutKFisrt = true;
     bool isFixOut = false;
     bool isFixRelu = false;
@@ -82,12 +82,9 @@ struct MMParam {
 /** @name 模版类型定义
  *  @{
  */
-template <typename InputQT, typename InputKT, typename InputWT, typename OutT,
-          DLILayout LayoutQT = DLILayout::TND,
-          DLILayout LayoutKT = DLILayout::TND,
-          DLISparseMode SparseMode = DLISparseMode::RightDown,
-          const bool HasRope = false, const bool Deterministic = false,
-          typename... Args>
+template <typename InputQT, typename InputKT, typename InputWT, typename OutT, DLILayout LayoutQT = DLILayout::TND,
+          DLILayout LayoutKT = DLILayout::TND, DLISparseMode SparseMode = DLISparseMode::RightDown,
+          const bool HasRope = false, const bool Deterministic = false, typename... Args>
 struct DLIType {
     using inputQT = InputQT;
     using inputKT = InputKT;
@@ -99,7 +96,6 @@ struct DLIType {
     static constexpr bool deterministic = Deterministic;
 };
 /// @}
-
 
 /** @name 核内数据结构定义
  *  @{
@@ -128,18 +124,18 @@ struct DLIGradKLLossConstInfo {
 
     /** \brief TilingData中的信息 */
     uint32_t bSize;
-    uint32_t n1Size; // 128/64/32
-    uint32_t n2Size; // 目前与n1Size相同
-    uint32_t n1IndexSize; // 64/32
-    uint32_t n2IndexSize; // 目前是1
-    uint32_t gSizeQuery; // 1
-    uint32_t gSizeQueryIndex; // 64/32
-    uint32_t s1Size; // 支持泛化
-    uint32_t s2Size; // 支持泛化
-    uint32_t dSizeQuery; // 默认不带Rope，固定等于128
-    uint32_t dSizeQueryIndex; // 默认不带Rope，固定等于128
+    uint32_t n1Size;              // 128/64/32
+    uint32_t n2Size;              // 目前与n1Size相同
+    uint32_t n1IndexSize;         // 64/32
+    uint32_t n2IndexSize;         // 目前是1
+    uint32_t gSizeQuery;          // 1
+    uint32_t gSizeQueryIndex;     // 64/32
+    uint32_t s1Size;              // 支持泛化
+    uint32_t s2Size;              // 支持泛化
+    uint32_t dSizeQuery;          // 默认不带Rope，固定等于128
+    uint32_t dSizeQueryIndex;     // 默认不带Rope，固定等于128
     uint32_t dSizeQueryRope = 64; // Rope，固定等于64
-    uint32_t kSize; // 现阶段只支持2048
+    uint32_t kSize;               // 现阶段只支持2048
     uint32_t t1Size;
     DLISparseMode sparseMode; // 0或者3
     float scaleValue;
@@ -201,7 +197,7 @@ struct DLIGradKLLossRunInfo {
     uint32_t nRealSizeSY;
     uint32_t nIdxP;
     uint32_t nIdxSY;
-    int32_t sparseMaskStartIdx;  // 可能会出现负数
+    int32_t sparseMaskStartIdx; // 可能会出现负数
 
     // 存放一些offset，减少重复计算
     int32_t s2SparseLen;
@@ -234,24 +230,27 @@ struct DLIGradKLLossRunInfo {
 };
 /// @}
 
-
 // ================================Util functions==================================
-template <typename T> __aicore__ inline T SFAAlign(T num, T rnd)
+template <typename T>
+__aicore__ inline T SFAAlign(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Max(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Max(T1 a, T2 b)
 {
     return (a < b) ? (b) : (a);
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Min(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Min(T1 a, T2 b)
 {
     return (a > b) ? (b) : (a);
 }
 
-template <typename T> __aicore__ inline size_t BlockAlign(size_t s)
+template <typename T>
+__aicore__ inline size_t BlockAlign(size_t s)
 {
     if constexpr (IsSameType<T, int4b_t>::value) {
         return (s + 63) / 64 * 64;

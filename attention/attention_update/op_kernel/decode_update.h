@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- /*!
+/*!
  * \file decode_update.h
  * \brief
  */
@@ -48,7 +48,8 @@ template <typename lseType, typename outType>
 class DecodeUpdate {
 public:
     __aicore__ inline DecodeUpdate() {}
-    __aicore__ inline void Init(GM_ADDR lse, GM_ADDR in, GM_ADDR out, GM_ADDR lesout, const DecodeUpdateTilingData *tdata)
+    __aicore__ inline void Init(GM_ADDR lse, GM_ADDR in, GM_ADDR out, GM_ADDR lesout,
+                                const DecodeUpdateTilingData *tdata)
     {
         this->lsePtr = GetTensorPtr(lse);
         this->inPtr = GetTensorPtr(in);
@@ -97,11 +98,12 @@ public:
     }
 
 private:
-    __aicore__ inline __gm__ uint64_t* GetTensorPtr(GM_ADDR gmAddr) {
-        __gm__ uint64_t* dataAddr = reinterpret_cast<__gm__ uint64_t*>(gmAddr);
+    __aicore__ inline __gm__ uint64_t *GetTensorPtr(GM_ADDR gmAddr)
+    {
+        __gm__ uint64_t *dataAddr = reinterpret_cast<__gm__ uint64_t *>(gmAddr);
         uint64_t tensorPtrOffset = *dataAddr; // The offset of the data address from the first address.
         // Moving 3 bits to the right means dividing by sizeof(uint64 t).
-        __gm__ uint64_t* tensorPtr = dataAddr + (tensorPtrOffset >> 3);
+        __gm__ uint64_t *tensorPtr = dataAddr + (tensorPtrOffset >> 3);
         return tensorPtr;
     }
 
@@ -141,18 +143,14 @@ private:
         uint32_t maxTileLength =
             (MAX_UB_SIZE - NUM8 * sizeof(uint32_t) - (ELEM_PER_256B - 1) * (sizeof(float) + sizeof(uint8_t))) /
             (sizeof(float) * spAligned * BUFFER_NUM * (NUM2 * (NUM1 + hDim) + hDim / spAligned) +
-             hDim * spAligned * sizeof(float) * NUM2 +
-             sizeof(float) * BUFFER_NUM +
-             sizeof(float) * NUM2 +
+             hDim * spAligned * sizeof(float) * NUM2 + sizeof(float) * BUFFER_NUM + sizeof(float) * NUM2 +
              sizeof(uint8_t) * spAligned);
         if constexpr (!std::is_same<outType, float>::value) {
             maxTileLength =
                 (MAX_UB_SIZE - NUM8 * sizeof(uint32_t) - (ELEM_PER_256B - 1) * (sizeof(float) + sizeof(uint8_t))) /
                 (sizeof(float) * spAligned * BUFFER_NUM * (NUM2 * (NUM1 + hDim) + hDim / spAligned) +
-                 hDim * spAligned * sizeof(float) * NUM2 +
-                 sizeof(float) * BUFFER_NUM +
-                 sizeof(float) * NUM2 + (spAlloc + NUM1) * NUM16 * BUFFER_NUM +
-                 sizeof(uint8_t) * spAligned);
+                 hDim * spAligned * sizeof(float) * NUM2 + sizeof(float) * BUFFER_NUM + sizeof(float) * NUM2 +
+                 (spAlloc + NUM1) * NUM16 * BUFFER_NUM + sizeof(uint8_t) * spAligned);
         }
         if (sp >= NUM8) {
             maxTileLength = maxTileLength / SPLIT_TO_2;
@@ -191,8 +189,8 @@ private:
         pipe.InitBuffer(selMaskBuffer, inQueueLseLengthAlign * sizeof(uint8_t));
     }
 
-    __aicore__ inline void CopyInSpAccData(LocalTensor<float>& lseLocal, LocalTensor<float>& inLocal,
-                                           int32_t spLoopIdx, uint32_t curLengthPad)
+    __aicore__ inline void CopyInSpAccData(LocalTensor<float> &lseLocal, LocalTensor<float> &inLocal, int32_t spLoopIdx,
+                                           uint32_t curLengthPad)
     {
         LocalTensor<float> lseAccLocal = lseexpsumBuffer.Get<float>();
         LocalTensor<float> outAccLocal = lseexpBroadcastBuffer.Get<float>();
@@ -202,10 +200,10 @@ private:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void CopyInLsePerSp(LocalTensor<float>& lseLocal, uint32_t posIdx,
-                                          uint32_t gmSpIdx, int32_t progress, uint32_t curLengthPad)
+    __aicore__ inline void CopyInLsePerSp(LocalTensor<float> &lseLocal, uint32_t posIdx, uint32_t gmSpIdx,
+                                          int32_t progress, uint32_t curLengthPad)
     {
-        lseGm.SetGlobalBuffer(reinterpret_cast<__gm__ lseType*>(*(lsePtr + gmSpIdx)), totalLength);
+        lseGm.SetGlobalBuffer(reinterpret_cast<__gm__ lseType *>(*(lsePtr + gmSpIdx)), totalLength);
         if (curLength % ALIGNED_TO_8 == 0) {
             DataCopy(lseLocal[posIdx * curLengthPad],
                      lseGm[static_cast<uint64_t>(progress) * tileLength + gmStartOffset], curLength);
@@ -217,10 +215,10 @@ private:
         }
     }
 
-    __aicore__ inline void CopyInOPerSp(LocalTensor<float>& inLocal, LocalTensor<outType>& inLocalFp16,
-                                         uint32_t posIdx, uint32_t gmSpIdx, int32_t progress)
+    __aicore__ inline void CopyInOPerSp(LocalTensor<float> &inLocal, LocalTensor<outType> &inLocalFp16, uint32_t posIdx,
+                                        uint32_t gmSpIdx, int32_t progress)
     {
-        inGm.SetGlobalBuffer(reinterpret_cast<__gm__ outType*>(*(inPtr + gmSpIdx)),
+        inGm.SetGlobalBuffer(reinterpret_cast<__gm__ outType *>(*(inPtr + gmSpIdx)),
                              static_cast<uint64_t>(totalLength) * hDim);
         uint32_t inOffset = posIdx * curLength * hDim;
         uint64_t gmOffset = static_cast<uint64_t>(progress) * tileLength * hDim + gmStartOffset * hDim;
@@ -234,11 +232,10 @@ private:
                 if (fp16Offset % NUM32 == NUM16) {
                     fp16Offset += NUM16;
                 }
-                DataCopyPad(inLocalFp16[fp16Offset / NUM2], inGm[gmOffset],
-                            {static_cast<uint16_t>(1),
-                             static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0},
-                            {true, 0,
-                             static_cast<uint8_t>((NUM32 - curLength * hDim * sizeof(outType) % NUM32) / NUM2), 0});
+                DataCopyPad(
+                    inLocalFp16[fp16Offset / NUM2], inGm[gmOffset],
+                    {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0},
+                    {true, 0, static_cast<uint8_t>((NUM32 - curLength * hDim * sizeof(outType) % NUM32) / NUM2), 0});
                 PipeBarrier<PIPE_ALL>();
                 Cast(inLocal[inOffset], inLocalFp16[fp16Offset / NUM2], RoundMode::CAST_NONE, curLength * hDim);
             }
@@ -291,7 +288,7 @@ private:
         inQueueIn.EnQue(inLocal);
     }
 
-    __aicore__ inline void SaveAcc(LocalTensor<float>& outAccLocal)
+    __aicore__ inline void SaveAcc(LocalTensor<float> &outAccLocal)
     {
         LocalTensor<float> lseoutLocal = outQueueLse.DeQue<float>();
         LocalTensor<float> outLocal = outQueueOut.DeQue<float>();
@@ -306,7 +303,7 @@ private:
         outQueueOut.FreeTensor(outLocal);
     }
 
-    __aicore__ inline void WriteAcc(LocalTensor<float>& outAccLocal)
+    __aicore__ inline void WriteAcc(LocalTensor<float> &outAccLocal)
     {
         LocalTensor<float> lseAccLocal = lseexpsumBuffer.Get<float>();
         LocalTensor<float> outLocal = outQueueOut.AllocTensor<float>();
@@ -322,7 +319,7 @@ private:
         outQueueLse.EnQue(lseoutLocal);
     }
 
-    __aicore__ inline void ProcessLseInfReplacement(LocalTensor<float>& lseLocal, uint32_t effectiveSp)
+    __aicore__ inline void ProcessLseInfReplacement(LocalTensor<float> &lseLocal, uint32_t effectiveSp)
     {
         LocalTensor<uint8_t> selMask = selMaskBuffer.Get<uint8_t>();
         uint32_t curLengthPad = ((curLength + NUM7) / NUM8) * NUM8;
@@ -335,8 +332,8 @@ private:
         Duplicate<float>(negInfTensor, NEG_INF, static_cast<int32_t>(curLengthPad * effectiveSp));
         PipeBarrier<PIPE_V>();
 
-        Select<float, uint8_t>(lseLocal, selMask, negInfTensor, lseLocal,
-                               SELMODE::VSEL_TENSOR_TENSOR_MODE, static_cast<uint32_t>(curLengthPad * effectiveSp));
+        Select<float, uint8_t>(lseLocal, selMask, negInfTensor, lseLocal, SELMODE::VSEL_TENSOR_TENSOR_MODE,
+                               static_cast<uint32_t>(curLengthPad * effectiveSp));
         PipeBarrier<PIPE_V>();
     }
 
@@ -405,22 +402,21 @@ private:
             int64_t tmpTailStart = hDim - tmpTailLength;
             for (uint32_t i = 0; i < effectiveSp; i++) {
                 for (uint32_t k = 0; k < curLength; k++) {
-                    Mul(inLocal[i * curLength * hDim + k * hDim],
-                        inLocal[i * curLength * hDim + k * hDim],
-                        lseexpBroadcastLocal[i * curLengthPad * NUM64 + k * NUM64],
-                        NUM64, hDim / NUM64, {1, 1, 1, 8, 8, 0});
+                    Mul(inLocal[i * curLength * hDim + k * hDim], inLocal[i * curLength * hDim + k * hDim],
+                        lseexpBroadcastLocal[i * curLengthPad * NUM64 + k * NUM64], NUM64, hDim / NUM64,
+                        {1, 1, 1, 8, 8, 0});
                     if (tmpTailLength > 0) {
                         Mul(inLocal[i * curLength * hDim + k * hDim + tmpTailStart],
                             inLocal[i * curLength * hDim + k * hDim + tmpTailStart],
-                            lseexpBroadcastLocal[i * curLengthPad * NUM64 + k * NUM64],
-                            tmpTailLength, 1, {1, 1, 1, 8, 8, 0});
+                            lseexpBroadcastLocal[i * curLengthPad * NUM64 + k * NUM64], tmpTailLength, 1,
+                            {1, 1, 1, 8, 8, 0});
                     }
                 }
             }
         } else {
             for (uint32_t i = 0; i < effectiveSp; i++) {
-                Mul(inLocal[i * curLength * hDim], inLocal[i * curLength * hDim], lseexpBroadcastLocal[i * curLengthPad * hDim],
-                    curLength * hDim);
+                Mul(inLocal[i * curLength * hDim], inLocal[i * curLength * hDim],
+                    lseexpBroadcastLocal[i * curLengthPad * hDim], curLength * hDim);
             }
         }
         PipeBarrier<PIPE_V>();
@@ -443,8 +439,8 @@ private:
     {
         LocalTensor<float> outLocal = outQueueOut.DeQue<float>();
         if constexpr (std::is_same<outType, float>::value) { // fp32直接搬运
-            DataCopy(outGm[gmStartOffset * hDim + static_cast<uint64_t>(progress) * tileLength * hDim],
-                     outLocal, curLength * hDim);
+            DataCopy(outGm[gmStartOffset * hDim + static_cast<uint64_t>(progress) * tileLength * hDim], outLocal,
+                     curLength * hDim);
         } else if constexpr (std::is_same<outType, bfloat16_t>::value) { // 先转fp32，再搬运
             LocalTensor<outType> outLocal16 = outLocal.template ReinterpretCast<outType>();
             Cast(outLocal16, outLocal, RoundMode::CAST_RINT, curLength * hDim);
@@ -487,8 +483,8 @@ private:
     GlobalTensor<outType> outGm;
     GlobalTensor<lseType> lseoutGm;
 
-    __gm__ uint64_t* lsePtr;
-    __gm__ uint64_t* inPtr;
+    __gm__ uint64_t *lsePtr;
+    __gm__ uint64_t *inPtr;
 
     uint32_t blockLength; //  单核上数据总长度
     uint16_t tileLength;  //  单核循环的非最后一轮数据长度

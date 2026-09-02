@@ -17,26 +17,26 @@
 
 namespace aicpu {
 class AttentionWorkerSchedulerKernel : public CpuKernel {
- public:
- AttentionWorkerSchedulerKernel() = default;
-  ~AttentionWorkerSchedulerKernel() = default;
-  uint32_t Compute(CpuKernelContext &ctx) override;
+public:
+    AttentionWorkerSchedulerKernel() = default;
+    ~AttentionWorkerSchedulerKernel() = default;
+    uint32_t Compute(CpuKernelContext &ctx) override;
 
- private:
-  void WaitForFfnCompletion(AttentionDataDesc *data_desc_ptr, uint64_t flag_num, uint64_t last_ready_cnt);
-  uint32_t InitAndCheck(CpuKernelContext &ctx);
-  uint32_t InitAndCheckScheduleContext();
-  uint32_t InitAndCheckScheduleContextCommon();
-  uint32_t InitAndCheckScheduleContextAttention();
+private:
+    void WaitForFfnCompletion(AttentionDataDesc *data_desc_ptr, uint64_t flag_num, uint64_t last_ready_cnt);
+    uint32_t InitAndCheck(CpuKernelContext &ctx);
+    uint32_t InitAndCheckScheduleContext();
+    uint32_t InitAndCheckScheduleContextCommon();
+    uint32_t InitAndCheckScheduleContextAttention();
 
-  ScheduleContext *schedule_context_ = nullptr;
-  uint32_t micro_batch_num_ = 0;
-  uint32_t micro_batch_size_ = 0;
-  uint32_t selected_expert_num_ = 0;
-  uint64_t per_data_desc_size_ = 0;
-  int8_t *token_info_buf_ = nullptr;
-  uint64_t token_info_buf_size_ = 0;
-  uint32_t micro_batch_id_ = 0;
+    ScheduleContext *schedule_context_ = nullptr;
+    uint32_t micro_batch_num_ = 0;
+    uint32_t micro_batch_size_ = 0;
+    uint32_t selected_expert_num_ = 0;
+    uint64_t per_data_desc_size_ = 0;
+    int8_t *token_info_buf_ = nullptr;
+    uint64_t token_info_buf_size_ = 0;
+    uint32_t micro_batch_id_ = 0;
 };
-}  // namespace aicpu
-#endif  // OP_KERNEL_AICPU_ATTENTION_WORKER_SCHEDULER_H
+} // namespace aicpu
+#endif // OP_KERNEL_AICPU_ATTENTION_WORKER_SCHEDULER_H

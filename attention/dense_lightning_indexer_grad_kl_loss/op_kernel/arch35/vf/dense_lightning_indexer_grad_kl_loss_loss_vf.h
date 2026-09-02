@@ -24,8 +24,8 @@ using namespace AscendC::MicroAPI;
 constexpr uint32_t LOSS_FP32_REG_ELEMENTS = 64;
 constexpr float LOSS_MIN_VALUE = 1e-8f;
 
-__simd_vf__ inline void ComputeLossElementwiseVF(
-    __ubuf__ float *dstUb, __ubuf__ float *pUb, __ubuf__ float *syUb, uint32_t count)
+__simd_vf__ inline void ComputeLossElementwiseVF(__ubuf__ float *dstUb, __ubuf__ float *pUb, __ubuf__ float *syUb,
+                                                 uint32_t count)
 {
     RegTensor<float> pReg;
     RegTensor<float> pClampedReg;
@@ -38,8 +38,7 @@ __simd_vf__ inline void ComputeLossElementwiseVF(
 
     Duplicate(minReg, LOSS_MIN_VALUE);
     for (uint32_t offset = 0; offset < count; offset += LOSS_FP32_REG_ELEMENTS) {
-        uint32_t validCount =
-            count - offset < LOSS_FP32_REG_ELEMENTS ? count - offset : LOSS_FP32_REG_ELEMENTS;
+        uint32_t validCount = count - offset < LOSS_FP32_REG_ELEMENTS ? count - offset : LOSS_FP32_REG_ELEMENTS;
         MaskReg tailMask = UpdateMask<float>(validCount);
         LoadAlign(pReg, pUb + offset);
         LoadAlign(syReg, syUb + offset);
@@ -53,9 +52,8 @@ __simd_vf__ inline void ComputeLossElementwiseVF(
     }
 }
 
-__aicore__ inline void ComputeLossElementwise(
-    const LocalTensor<float> &dstTensor, const LocalTensor<float> &pTensor,
-    const LocalTensor<float> &syTensor, uint32_t count)
+__aicore__ inline void ComputeLossElementwise(const LocalTensor<float> &dstTensor, const LocalTensor<float> &pTensor,
+                                              const LocalTensor<float> &syTensor, uint32_t count)
 {
     __ubuf__ float *dstUb = reinterpret_cast<__ubuf__ float *>(dstTensor.GetPhyAddr());
     __ubuf__ float *pUb = reinterpret_cast<__ubuf__ float *>(pTensor.GetPhyAddr());

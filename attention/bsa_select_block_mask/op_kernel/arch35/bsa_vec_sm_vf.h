@@ -20,9 +20,9 @@ namespace BSASelectBlockMaskVF {
 using namespace AscendC;
 using namespace MicroAPI;
 
-__simd_vf__ inline void DoSoftmaxSecondPassFp32VF(
-    __ubuf__ float *scoreUb, __ubuf__ float *rowMaxUb, __ubuf__ float *rowSumUb,
-    float scaleValue, uint32_t row, uint32_t col)
+__simd_vf__ inline void DoSoftmaxSecondPassFp32VF(__ubuf__ float *scoreUb, __ubuf__ float *rowMaxUb,
+                                                  __ubuf__ float *rowSumUb, float scaleValue, uint32_t row,
+                                                  uint32_t col)
 {
     RegTensor<float> scoreReg;
     RegTensor<float> maxReg;
@@ -48,8 +48,8 @@ __simd_vf__ inline void DoSoftmaxSecondPassFp32VF(
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__simd_vf__ inline void DoSoftmaxFirstPassExpFp32VF(
-    __ubuf__ float *scoreUb, __ubuf__ float *rowMaxUb, uint32_t row, uint32_t col)
+__simd_vf__ inline void DoSoftmaxFirstPassExpFp32VF(__ubuf__ float *scoreUb, __ubuf__ float *rowMaxUb, uint32_t row,
+                                                    uint32_t col)
 {
     RegTensor<float> scoreReg;
     RegTensor<float> maxReg;
@@ -71,9 +71,10 @@ __simd_vf__ inline void DoSoftmaxFirstPassExpFp32VF(
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 }
 
-__aicore__ inline void DoSoftmaxSecondPassFp32VfWrapper(
-    const LocalTensor<float> &scoreUb, const LocalTensor<float> &rowMaxUb,
-    const LocalTensor<float> &rowSumUb, float scaleValue, uint32_t row, uint32_t col)
+__aicore__ inline void DoSoftmaxSecondPassFp32VfWrapper(const LocalTensor<float> &scoreUb,
+                                                        const LocalTensor<float> &rowMaxUb,
+                                                        const LocalTensor<float> &rowSumUb, float scaleValue,
+                                                        uint32_t row, uint32_t col)
 {
     __ubuf__ float *scoreAddr = (__ubuf__ float *)scoreUb.GetPhyAddr();
     __ubuf__ float *rowMaxAddr = (__ubuf__ float *)rowMaxUb.GetPhyAddr();
@@ -81,8 +82,9 @@ __aicore__ inline void DoSoftmaxSecondPassFp32VfWrapper(
     DoSoftmaxSecondPassFp32VF(scoreAddr, rowMaxAddr, rowSumAddr, scaleValue, row, col);
 }
 
-__aicore__ inline void DoSoftmaxFirstPassExpFp32VfWrapper(
-    const LocalTensor<float> &scoreUb, const LocalTensor<float> &rowMaxUb, uint32_t row, uint32_t col)
+__aicore__ inline void DoSoftmaxFirstPassExpFp32VfWrapper(const LocalTensor<float> &scoreUb,
+                                                          const LocalTensor<float> &rowMaxUb, uint32_t row,
+                                                          uint32_t col)
 {
     __ubuf__ float *scoreAddr = (__ubuf__ float *)scoreUb.GetPhyAddr();
     __ubuf__ float *rowMaxAddr = (__ubuf__ float *)rowMaxUb.GetPhyAddr();

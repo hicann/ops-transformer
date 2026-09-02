@@ -30,16 +30,16 @@ constexpr uint32_t baseD256 = 256;
 constexpr uint32_t baseD512 = 512;
 
 template <typename T>
-struct ReduceMulRegList {  
+struct ReduceMulRegList {
     MicroAPI::RegTensor<T> vreg0;
     MicroAPI::RegTensor<T> vreg1;
     MicroAPI::RegTensor<T> vregMul;
     MicroAPI::RegTensor<T> vregSum;
 };
 
-
 template <typename T>
-__simd_callee__ void LoadMulAddVFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, ReduceMulRegList<T> &regList, uint64_t offset, uint32_t maskValue)
+__simd_callee__ void LoadMulAddVFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, ReduceMulRegList<T> &regList,
+                                      uint64_t offset, uint32_t maskValue)
 {
     MicroAPI::MaskReg mask = MicroAPI::UpdateMask<T>(maskValue);
     MicroAPI::LoadAlign(regList.vreg0, kvAddr + offset);
@@ -47,8 +47,6 @@ __simd_callee__ void LoadMulAddVFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr,
     MicroAPI::Mul(regList.vregMul, regList.vreg0, regList.vreg1, mask);
     MicroAPI::Add(regList.vregSum, regList.vregSum, regList.vregMul, mask);
 }
-
-
 
 template <typename T>
 __simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
@@ -233,10 +231,9 @@ __simd_vf__ void MulReduceSumbase512VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
 // 当前仅支持coff * cmpRatio为2的幂的情况
 template <typename T>
 __aicore__ inline void MulReduceSumbaseVF(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
-                                          const LocalTensor<T> &outputLocal, const uint32_t coff, const uint32_t cmpRatio,
-                                          const uint32_t baseD, const uint32_t scLoopCnt)
+                                          const LocalTensor<T> &outputLocal, const uint32_t coff,
+                                          const uint32_t cmpRatio, const uint32_t baseD, const uint32_t scLoopCnt)
 {
-
     __ubuf__ T *kvAddr = (__ubuf__ T *)kvLocal.GetPhyAddr();
     __ubuf__ T *scoreAddr = (__ubuf__ T *)scoreLocal.GetPhyAddr();
     __ubuf__ T *outputAddr = (__ubuf__ T *)outputLocal.GetPhyAddr();
@@ -256,6 +253,5 @@ __aicore__ inline void MulReduceSumbaseVF(const LocalTensor<T> &kvLocal, const L
         MulReduceSumbase512VFImpl(kvAddr, scoreAddr, outputAddr, coff, cmpRatio, scLoopCnt, baseD);
     }
 }
-
 
 #endif

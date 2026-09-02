@@ -102,10 +102,10 @@ private:
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseVector<T>::InitBuffers(TPipe *pipe)
 {
-    pipe->InitBuffer(scaleBuf_, DOUBLE_NUM,
-                     groupInner_ * s2BaseSize_ * sizeof(float) + s2BaseSize_ * sizeof(float) +
-                     groupInner_ * 8 * sizeof(float));
-    
+    pipe->InitBuffer(
+        scaleBuf_, DOUBLE_NUM,
+        groupInner_ * s2BaseSize_ * sizeof(float) + s2BaseSize_ * sizeof(float) + groupInner_ * 8 * sizeof(float));
+
     uint32_t reduceCacheSize = REDUCE_BANK_CONFLICT_OFFSETS + groupInner_ * s2BaseSize_ * sizeof(float);
     pipe->InitBuffer(reduceCacheBuf_, DOUBLE_NUM, reduceCacheSize);
 
@@ -113,7 +113,7 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::InitBuffers(TPipe *pipe)
 
     pipe->InitBuffer(reduceMaxSrc0Queue_, DOUBLE_NUM, 4 * REDUCE_BASE_BLOCK_SIZE * sizeof(float));
     pipe->InitBuffer(reduceSumSrc0Queue_, DOUBLE_NUM, 5 * REDUCE_BASE_BLOCK_SIZE * sizeof(float));
-    
+
     pipe->InitBuffer(resetZeroQueue_, DOUBLE_NUM, REST_ZERO_BASE_BLOCK_SIZE * sizeof(float));
 }
 
@@ -137,10 +137,10 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::InitParams(
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseVector<T>::InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm,
-                                                                     GlobalTensor<float> vec1ResGm,
-                                                                     GlobalTensor<W_T> weightsGm,
-                                                                     GlobalTensor<OUT_T> softmaxMaxGm,
-                                                                     GlobalTensor<OUT_T> softmaxSumGm)
+                                                                        GlobalTensor<float> vec1ResGm,
+                                                                        GlobalTensor<W_T> weightsGm,
+                                                                        GlobalTensor<OUT_T> softmaxMaxGm,
+                                                                        GlobalTensor<OUT_T> softmaxSumGm)
 {
     this->mm1ResGm = mm1ResGm;
     this->vec1ResGm = vec1ResGm;
@@ -151,13 +151,11 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::InitVec1GlobalTensor(GlobalTe
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseVector<T>::AllocEventID()
-{
-}
+{}
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseVector<T>::FreeEventID()
-{
-}
+{}
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessVec(const DenseLISoftmaxLseCommon::RunInfo &info)
@@ -191,7 +189,7 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessVec(const DenseLISoftm
 
             LocalTensor<float> reduceOutUb = reduceOutBuf_.AllocTensor<float>();
             LocalTensor<float> reduceCacheUb = reduceCacheBuf_.AllocTensor<float>();
-            
+
             for (int outerGidx = 0; outerGidx < outerG; outerGidx++) {
                 int32_t procGnum = outerGidx != outerG - 1 ? groupInner_ : gSize_ - outerGidx * groupInner_;
 
@@ -202,29 +200,28 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessVec(const DenseLISoftm
                     weightsInTUb = weightsInTUb[groupInner_];
                 }
 
-                int64_t curMm1ResGmOffset = mmGmOffset +
-                                            innerS1Idx * gSize_ * info.actualSingleProcessSInnerSizeAlign +
+                int64_t curMm1ResGmOffset = mmGmOffset + innerS1Idx * gSize_ * info.actualSingleProcessSInnerSizeAlign +
                                             outerGidx * groupInner_ * info.actualSingleProcessSInnerSizeAlign;
                 int64_t curWeightGmOffset = weightGmOffset + innerS1Idx * gSize_ + outerGidx * groupInner_;
-                DenseLISoftmaxLseServiceVec::CopyIn(mmInUb, weightsInTUb, mm1ResGm, weightsGm,
-                                                 curMm1ResGmOffset, curWeightGmOffset, procGnum,
-                                                 info.actualSingleProcessSInnerSizeAlign, mmUbStride);
+                DenseLISoftmaxLseServiceVec::CopyIn(mmInUb, weightsInTUb, mm1ResGm, weightsGm, curMm1ResGmOffset,
+                                                    curWeightGmOffset, procGnum,
+                                                    info.actualSingleProcessSInnerSizeAlign, mmUbStride);
                 scaleBuf_.EnQue<float>(mmInUb);
                 mmInUb = scaleBuf_.DeQue<float>();
                 weightsInUb = mmInUb[procGnum * s2BaseSize_];
                 DoScaleVfWrapper<W_T>(reduceCacheUb[REDUCE_BANK_CONFLICT_NUM], mmInUb, weightsInUb, weightsInTUb,
-                               procGnum, s2BaseSize_, outerGidx);
+                                      procGnum, s2BaseSize_, outerGidx);
                 scaleBuf_.FreeTensor(mmInUb);
             }
 
             int32_t gRedCnt = groupInner_ > gSize_ ? gSize_ : groupInner_;
-            DenseLISoftmaxLseServiceVec::DoReduce(reduceCacheUb[REDUCE_BANK_CONFLICT_NUM], reduceOutUb,
-                                               gRedCnt, s2BaseSize_);
+            DenseLISoftmaxLseServiceVec::DoReduce(reduceCacheUb[REDUCE_BANK_CONFLICT_NUM], reduceOutUb, gRedCnt,
+                                                  s2BaseSize_);
             reduceOutBuf_.EnQue<float>(reduceOutUb);
             reduceOutUb = reduceOutBuf_.DeQue<float>();
             int64_t curReduceSumGmOffset = reduceSumGmOffset + innerS1Idx * kSeqSizeAlignS2BaseSize_;
-            DenseLISoftmaxLseServiceVec::CopyOut(vec1ResGm[curReduceSumGmOffset],
-                                                 reduceOutUb, info.actualSingleProcessSInnerSize);
+            DenseLISoftmaxLseServiceVec::CopyOut(vec1ResGm[curReduceSumGmOffset], reduceOutUb,
+                                                 info.actualSingleProcessSInnerSize);
             reduceCacheBuf_.FreeTensor(reduceCacheUb);
             reduceOutBuf_.FreeTensor(reduceOutUb);
         }
@@ -235,8 +232,8 @@ template <typename T>
 __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessSoftmax(const DenseLISoftmaxLseCommon::RunInfo &info)
 {
     uint32_t loop = info.s1BlockInnerLoop;
-    uint32_t actDealS1BaseSize = info.gS1Idx * s1BaseSize_ + s1BaseSize_ > info.actS1Size ?
-        info.actS1Size % s1BaseSize_ : s1BaseSize_;
+    uint32_t actDealS1BaseSize =
+        info.gS1Idx * s1BaseSize_ + s1BaseSize_ > info.actS1Size ? info.actS1Size % s1BaseSize_ : s1BaseSize_;
     uint32_t aiv0DealS1Size = DenseLISoftmaxLseCommon::CeilDiv(actDealS1BaseSize, (uint32_t)AIV_RATIO);
     if (blockId_ % AIV_RATIO == 0 && loop >= aiv0DealS1Size) {
         return;
@@ -250,8 +247,8 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessSoftmax(const DenseLIS
     uint32_t actS1Size = info.actS1Size;
     uint32_t actS2Size = info.actS2Size;
 
-    maskedActS2Size_ = (actS2Size - actS1Size + s1Idx + 1) > actS2Size ?
-                       actS2Size : (actS2Size - actS1Size + s1Idx + 1);
+    maskedActS2Size_ =
+        (actS2Size - actS1Size + s1Idx + 1) > actS2Size ? actS2Size : (actS2Size - actS1Size + s1Idx + 1);
     reduceOutGmOffset_ = info.reduceMaxOutGmOffset + s1Idx;
     reduceSrcGmOffset_ = loop * kSeqSizeAlignS2BaseSize_;
 
@@ -271,8 +268,8 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceMax(uint32_t pin
     LocalTensor<float> sharedTmpTensor = reduceMaxSrc0[2 * REDUCE_BASE_BLOCK_SIZE];
     for (uint32_t blockIdx = 0; blockIdx <= blockNum - 1; blockIdx++) {
         WaitFlag<HardEvent::V_S>(EVENT_ID0);
-        uint32_t curBlockSize = blockIdx != blockNum - 1 ? REDUCE_BASE_BLOCK_SIZE :
-            maskedActS2Size_ - REDUCE_BASE_BLOCK_SIZE * blockIdx;
+        uint32_t curBlockSize =
+            blockIdx != blockNum - 1 ? REDUCE_BASE_BLOCK_SIZE : maskedActS2Size_ - REDUCE_BASE_BLOCK_SIZE * blockIdx;
         if (blockIdx > 0) {
             uint64_t mask = 64;
             uint8_t repeatTime = 1;
@@ -284,8 +281,8 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceMax(uint32_t pin
             AscendC::PipeBarrier<PIPE_V>();
         }
         AscendC::DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(curBlockSize * sizeof(float)), 0, 0, 0};
-        AscendC::DataCopyPadExtParams<float> padParams{true, 0,
-            static_cast<uint8_t>(DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)) - curBlockSize),
+        AscendC::DataCopyPadExtParams<float> padParams{
+            true, 0, static_cast<uint8_t>(DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)) - curBlockSize),
             SOFTMAX_MIN_NUM};
         AscendC::DataCopyPad(reduceMaxSrc0, vec1ResGm[reduceSrcGmOffset_ + REDUCE_BASE_BLOCK_SIZE * blockIdx],
                              dataCopyParams, padParams);
@@ -293,8 +290,8 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceMax(uint32_t pin
         reduceMaxSrc0 = reduceMaxSrc0Queue_.DeQue<float>();
 
         if (curBlockSize < REDUCE_BASE_BLOCK_SIZE) {
-            Duplicate(reduceMaxSrc0[DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8))],
-                SOFTMAX_MIN_NUM, REDUCE_BASE_BLOCK_SIZE - DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)));
+            Duplicate(reduceMaxSrc0[DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8))], SOFTMAX_MIN_NUM,
+                      REDUCE_BASE_BLOCK_SIZE - DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)));
             AscendC::PipeBarrier<PIPE_V>();
         }
         AscendC::Max(reduceMaxDstTensor, reduceMaxSrc0, reduceMaxSrc1, REDUCE_BASE_BLOCK_SIZE);
@@ -333,8 +330,8 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceSum(uint32_t pin
     SetFlag<HardEvent::V_S>(EVENT_ID4);
     for (uint32_t blockIdx = 0; blockIdx <= blockNum - 1; blockIdx++) {
         WaitFlag<HardEvent::V_S>(EVENT_ID4);
-        uint32_t curBlockSize = blockIdx != blockNum - 1 ? REDUCE_BASE_BLOCK_SIZE :
-                                maskedActS2Size_ - REDUCE_BASE_BLOCK_SIZE * blockIdx;
+        uint32_t curBlockSize =
+            blockIdx != blockNum - 1 ? REDUCE_BASE_BLOCK_SIZE : maskedActS2Size_ - REDUCE_BASE_BLOCK_SIZE * blockIdx;
         if (blockIdx > 0) {
             uint64_t mask = 64;
             uint8_t repeatTime = 1;
@@ -347,8 +344,8 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceSum(uint32_t pin
         }
 
         AscendC::DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(curBlockSize * sizeof(float)), 0, 0, 0};
-        AscendC::DataCopyPadExtParams<float> padParams{true, 0,
-            static_cast<uint8_t>(DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)) - curBlockSize),
+        AscendC::DataCopyPadExtParams<float> padParams{
+            true, 0, static_cast<uint8_t>(DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)) - curBlockSize),
             SOFTMAX_MIN_NUM};
         AscendC::DataCopyPad(reduceSumSrc0, vec1ResGm[reduceSrcGmOffset_ + REDUCE_BASE_BLOCK_SIZE * blockIdx],
                              dataCopyParams, padParams);
@@ -356,12 +353,12 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceSum(uint32_t pin
         reduceSumSrc0 = reduceSumSrc0Queue_.DeQue<float>();
 
         if (curBlockSize < REDUCE_BASE_BLOCK_SIZE) {
-            Duplicate(reduceSumSrc0[DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8))],
-                SOFTMAX_MIN_NUM, REDUCE_BASE_BLOCK_SIZE - DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)));
+            Duplicate(reduceSumSrc0[DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8))], SOFTMAX_MIN_NUM,
+                      REDUCE_BASE_BLOCK_SIZE - DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)));
             AscendC::PipeBarrier<PIPE_V>();
         }
-        DoReduceSumBlockVfWrapper(reduceSumDstTensor, reduceSumSrc0, subMaxTensor,
-            reduceSumSrc1, REDUCE_BASE_BLOCK_SIZE);
+        DoReduceSumBlockVfWrapper(reduceSumDstTensor, reduceSumSrc0, subMaxTensor, reduceSumSrc1,
+                                  REDUCE_BASE_BLOCK_SIZE);
         SetFlag<HardEvent::V_S>(EVENT_ID4);
     }
     WaitFlag<HardEvent::V_S>(EVENT_ID4);
@@ -396,15 +393,15 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessOutput(uint64_t outOff
     WaitFlag<HardEvent::V_MTE3>(vToMte3);
     for (uint32_t blockIdx = 0; blockIdx <= blockNum - 1; blockIdx++) {
         uint32_t curBlockSize = blockIdx != blockNum - 1 ? REST_ZERO_BASE_BLOCK_SIZE :
-                                aivCoreDealSize - REST_ZERO_BASE_BLOCK_SIZE * blockIdx;
+                                                           aivCoreDealSize - REST_ZERO_BASE_BLOCK_SIZE * blockIdx;
         DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(curBlockSize * sizeof(float)), 0, 0, 0};
-        AscendC::DataCopyPad(softmaxMaxGm[aivOutOffset + REST_ZERO_BASE_BLOCK_SIZE * blockIdx],
-                             resetZeroTensor, copyOutParams);
-        AscendC::DataCopyPad(softmaxSumGm[aivOutOffset + REST_ZERO_BASE_BLOCK_SIZE * blockIdx],
-                             resetZeroTensor, copyOutParams);
+        AscendC::DataCopyPad(softmaxMaxGm[aivOutOffset + REST_ZERO_BASE_BLOCK_SIZE * blockIdx], resetZeroTensor,
+                             copyOutParams);
+        AscendC::DataCopyPad(softmaxSumGm[aivOutOffset + REST_ZERO_BASE_BLOCK_SIZE * blockIdx], resetZeroTensor,
+                             copyOutParams);
     }
     resetZeroQueue_.FreeTensor(resetZeroTensor);
     GetTPipePtr()->ReleaseEventID<AscendC::HardEvent::V_MTE3>(vToMte3);
 }
-}
+} // namespace DenseLISoftmaxLseKernel
 #endif // DENSE_LIGHTNING_INDEXER_SOFTMAX_LSE_SERVICE_VECTOR_H

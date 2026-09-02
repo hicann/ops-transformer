@@ -27,23 +27,23 @@
 
 namespace optiling {
 BEGIN_TILING_DATA_DEF(AttentionWorkerCombineTilingData)
-    TILING_DATA_FIELD_DEF(int64_t, usedCoreNum);       // 使用的核数
-    TILING_DATA_FIELD_DEF(int64_t, BS);                // batchSize
-    TILING_DATA_FIELD_DEF(int64_t, K);                 // TopK 选出的专家数
-    TILING_DATA_FIELD_DEF(int64_t, H);                 // hiddenSize
-    TILING_DATA_FIELD_DEF(int64_t, needSchedule);      // 是否需要扫描 schedule_context
-    TILING_DATA_FIELD_DEF(int64_t, BsSplitFactor);     // bs轴核内切分
-    TILING_DATA_FIELD_DEF(int64_t, BsSplitCoreNum);    // bs轴核间切分
-    TILING_DATA_FIELD_DEF(int64_t, mainCoreBsLoopNum); // 主核 bs 循环次数
-    TILING_DATA_FIELD_DEF(int64_t, tailCoreBsLoopNum); // 尾核 bs 循环次数
-    TILING_DATA_FIELD_DEF(int64_t, HSplitFactor);      // hidden 轴核内切分
-    TILING_DATA_FIELD_DEF(int64_t, HSplitTailFactor);  // hidden 轴核内尾块
-    TILING_DATA_FIELD_DEF(int64_t, HSplitCoreNum);     // hidden 轴核间切分
-    TILING_DATA_FIELD_DEF(int64_t, mainCoreHLoopNum);  // 主核 H 循环次数
-    TILING_DATA_FIELD_DEF(int64_t, tailCoreHLoopNum);  // 尾核 H 循环次数
-    TILING_DATA_FIELD_DEF(int64_t, KSplitFactor);      // k 轴核内切分
-    TILING_DATA_FIELD_DEF(int64_t, KSplitTailFactor);  // k 轴尾块切分
-    TILING_DATA_FIELD_DEF(int64_t, KSplitLoopNum);     // k 轴循环次数
+TILING_DATA_FIELD_DEF(int64_t, usedCoreNum);       // 使用的核数
+TILING_DATA_FIELD_DEF(int64_t, BS);                // batchSize
+TILING_DATA_FIELD_DEF(int64_t, K);                 // TopK 选出的专家数
+TILING_DATA_FIELD_DEF(int64_t, H);                 // hiddenSize
+TILING_DATA_FIELD_DEF(int64_t, needSchedule);      // 是否需要扫描 schedule_context
+TILING_DATA_FIELD_DEF(int64_t, BsSplitFactor);     // bs轴核内切分
+TILING_DATA_FIELD_DEF(int64_t, BsSplitCoreNum);    // bs轴核间切分
+TILING_DATA_FIELD_DEF(int64_t, mainCoreBsLoopNum); // 主核 bs 循环次数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreBsLoopNum); // 尾核 bs 循环次数
+TILING_DATA_FIELD_DEF(int64_t, HSplitFactor);      // hidden 轴核内切分
+TILING_DATA_FIELD_DEF(int64_t, HSplitTailFactor);  // hidden 轴核内尾块
+TILING_DATA_FIELD_DEF(int64_t, HSplitCoreNum);     // hidden 轴核间切分
+TILING_DATA_FIELD_DEF(int64_t, mainCoreHLoopNum);  // 主核 H 循环次数
+TILING_DATA_FIELD_DEF(int64_t, tailCoreHLoopNum);  // 尾核 H 循环次数
+TILING_DATA_FIELD_DEF(int64_t, KSplitFactor);      // k 轴核内切分
+TILING_DATA_FIELD_DEF(int64_t, KSplitTailFactor);  // k 轴尾块切分
+TILING_DATA_FIELD_DEF(int64_t, KSplitLoopNum);     // k 轴循环次数
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(AttentionWorkerCombine, AttentionWorkerCombineTilingData)
@@ -55,8 +55,10 @@ struct AttentionWorkerCombineCompileInfo {
 
 class AttentionWorkerCombineTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit AttentionWorkerCombineTiling(gert::TilingContext *context) : TilingBaseClass(context){}
-    ~AttentionWorkerCombineTiling() override{}
+    explicit AttentionWorkerCombineTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
+    ~AttentionWorkerCombineTiling() override {}
 
     uint64_t coreNum_ = 0;
     uint64_t ubSize_ = 0;

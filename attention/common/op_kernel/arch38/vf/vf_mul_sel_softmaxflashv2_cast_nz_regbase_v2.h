@@ -183,7 +183,6 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
             static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::UNKNOWN,
                                                                MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
-
             MicroAPI::DataCopy<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
                 (__ubuf__ T2 *&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
             MicroAPI::DataCopy<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(

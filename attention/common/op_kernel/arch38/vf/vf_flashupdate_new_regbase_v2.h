@@ -100,10 +100,11 @@ __aicore__ inline void FlashUpdateNoTailV510_VF(const LocalTensor<T> &dstTensor,
  * @param [in] d, input colums, should be 32 bytes aligned
  */
 template <typename T, typename OUTPUT_T, typename MMOUTPUT_T, uint32_t dSize = 0>
-__aicore__ inline void
-FlashUpdateLastNoTailV510_VF(const LocalTensor<T> &dstTensor, const LocalTensor<T> &curTensor,
-                             const LocalTensor<T> &preTensor, const LocalTensor<float> &expMaxTensor,
-                             const LocalTensor<float> &expSumTensor, const uint16_t m, const uint16_t d)
+__aicore__ inline void FlashUpdateLastNoTailV510_VF(const LocalTensor<T> &dstTensor, const LocalTensor<T> &curTensor,
+                                                    const LocalTensor<T> &preTensor,
+                                                    const LocalTensor<float> &expMaxTensor,
+                                                    const LocalTensor<float> &expSumTensor, const uint16_t m,
+                                                    const uint16_t d)
 {
     __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
     __ubuf__ T *curUb = (__ubuf__ T *)curTensor.GetPhyAddr();

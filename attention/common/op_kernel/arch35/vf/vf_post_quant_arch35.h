@@ -90,10 +90,11 @@ __aicore__ inline void PostQuantPerChnlImpl(const LocalTensor<OUTPUT_T> &dstTens
 
 // without offset
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>
-__simd_vf__ void
-PostQuantPerChnlNoOffsetImplVF(__ubuf__ OUTPUT_T *dstUb, __ubuf__ T *srcUb, __ubuf__ POSTQUANT_PARAMS_T *scaleUb,
-                               const uint16_t floatRepSize, uint16_t dLoops, uint16_t dTailLoop, uint32_t pltTailD,
-                               const uint16_t gRowCount, const uint16_t s1RowCount, const uint16_t srcD)
+__simd_vf__ void PostQuantPerChnlNoOffsetImplVF(__ubuf__ OUTPUT_T *dstUb, __ubuf__ T *srcUb,
+                                                __ubuf__ POSTQUANT_PARAMS_T *scaleUb, const uint16_t floatRepSize,
+                                                uint16_t dLoops, uint16_t dTailLoop, uint32_t pltTailD,
+                                                const uint16_t gRowCount, const uint16_t s1RowCount,
+                                                const uint16_t srcD)
 {
     RegTensor<T> vregInput;
     RegTensor<T> vregMul;

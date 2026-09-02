@@ -15,8 +15,7 @@
 
 #ifndef FLASH_ATTENTION_SCORE_KERNEL_INFER_REGBASE_V2_H_
 #define FLASH_ATTENTION_SCORE_KERNEL_INFER_REGBASE_V2_H_
-namespace optiling {
-};
+namespace optiling {};
 #include "flash_attention_score_kernel_base.h"
 #include "vf/vf_flash_decode_arch38.h"
 #include "infer_flash_attention_comm_arch38.h"

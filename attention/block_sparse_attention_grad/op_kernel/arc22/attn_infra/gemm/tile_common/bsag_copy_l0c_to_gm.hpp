@@ -24,109 +24,68 @@ enum class ScaleGranularity {
     PER_GROUP
 };
 
-template <
-    class ArchTag,
-    class ElementSrc,
-    class ElementDst,
-    ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT
->
+template <class ArchTag, class ElementSrc, class ElementDst,
+          ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT>
 struct CopyL0CToGmQuantMode {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, can not find the specialization.");
 };
 
 // CopyL0CToGm cast fp32 to fp16
 template <>
-struct CopyL0CToGmQuantMode<
-    NpuArch::Arch::AtlasA2,
-    float, half,
-    ScaleGranularity::NO_QUANT
-> {
+struct CopyL0CToGmQuantMode<NpuArch::Arch::AtlasA2, float, half, ScaleGranularity::NO_QUANT> {
     static constexpr auto VALUE = QuantMode_t::F322F16;
 };
 
 // CopyL0CToGm cast fp32 to bf16
 template <>
-struct CopyL0CToGmQuantMode<
-    NpuArch::Arch::AtlasA2,
-    float, bfloat16_t,
-    ScaleGranularity::NO_QUANT
-> {
+struct CopyL0CToGmQuantMode<NpuArch::Arch::AtlasA2, float, bfloat16_t, ScaleGranularity::NO_QUANT> {
     static constexpr auto VALUE = QuantMode_t::F322BF16;
 };
 
 // CopyL0CToGm output fp32
 template <>
-struct CopyL0CToGmQuantMode<
-    NpuArch::Arch::AtlasA2,
-    float, float,
-    ScaleGranularity::NO_QUANT
-> {
+struct CopyL0CToGmQuantMode<NpuArch::Arch::AtlasA2, float, float, ScaleGranularity::NO_QUANT> {
     static constexpr auto VALUE = QuantMode_t::NoQuant;
 };
 
 // CopyL0CToGm output int32
 template <>
-struct CopyL0CToGmQuantMode<
-    NpuArch::Arch::AtlasA2,
-    int32_t, int32_t,
-    ScaleGranularity::NO_QUANT
-> {
+struct CopyL0CToGmQuantMode<NpuArch::Arch::AtlasA2, int32_t, int32_t, ScaleGranularity::NO_QUANT> {
     static constexpr auto VALUE = QuantMode_t::NoQuant;
 };
 
 // CopyL0CToGm cast int32_t to fp16
 template <>
-struct CopyL0CToGmQuantMode<
-    NpuArch::Arch::AtlasA2,
-    int32_t, half,
-    ScaleGranularity::PER_TENSOR
-> {
+struct CopyL0CToGmQuantMode<NpuArch::Arch::AtlasA2, int32_t, half, ScaleGranularity::PER_TENSOR> {
     static constexpr auto VALUE = QuantMode_t::DEQF16;
 };
 
 template <>
-struct CopyL0CToGmQuantMode<
-    NpuArch::Arch::AtlasA2,
-    int32_t, half,
-    ScaleGranularity::PER_CHANNEL
-> {
+struct CopyL0CToGmQuantMode<NpuArch::Arch::AtlasA2, int32_t, half, ScaleGranularity::PER_CHANNEL> {
     static constexpr auto VALUE = QuantMode_t::VDEQF16;
 };
 
-template <
-    class ArchTag,
-    class ElementAccumulator,
-    class GmType,
-    ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT,
-    bool ReluEnable = false
->
+template <class ArchTag, class ElementAccumulator, class GmType,
+          ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT, bool ReluEnable = false>
 struct CopyL0CToGm {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, can not find the specialization.");
 };
 
-template <
-    class ElementAccumulator_,
-    class ElementDst_,
-    bool ReluEnable_
->
-struct CopyL0CToGm<NpuArch::Arch::AtlasA2,
-                   ElementAccumulator_,
-                   Gemm::GemmType<ElementDst_, layout::RowMajor>,
-                   ScaleGranularity::NO_QUANT,
-                   ReluEnable_>
-{
+template <class ElementAccumulator_, class ElementDst_, bool ReluEnable_>
+struct CopyL0CToGm<NpuArch::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<ElementDst_, layout::RowMajor>,
+                   ScaleGranularity::NO_QUANT, ReluEnable_> {
     using ArchTag = NpuArch::Arch::AtlasA2;
     using ElementDst = ElementDst_;
     using ElementSrc = ElementAccumulator_;
     using LayoutSrc = NpuArch::layout::zN;
     using LayoutDst = NpuArch::layout::RowMajor;
-    static constexpr auto quantPre = CopyL0CToGmQuantMode<ArchTag, ElementSrc, ElementDst,
-        ScaleGranularity::NO_QUANT>::VALUE;
+    static constexpr auto quantPre =
+        CopyL0CToGmQuantMode<ArchTag, ElementSrc, ElementDst, ScaleGranularity::NO_QUANT>::VALUE;
     static constexpr auto reluEn = ReluEnable_;
 
-    __aicore__ inline
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-        LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<ElementDst> const &dst,
+                                      AscendC::LocalTensor<ElementSrc> const &src, LayoutDst const &dstLayout,
+                                      LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
 
@@ -146,29 +105,21 @@ struct CopyL0CToGm<NpuArch::Arch::AtlasA2,
     }
 };
 
-template <
-    class ElementAccumulator_,
-    class ElementDst_,
-    bool ReluEnable_
->
-struct CopyL0CToGm<NpuArch::Arch::AtlasA2,
-                   ElementAccumulator_,
-                   Gemm::GemmType<ElementDst_, layout::zN>,
-                   ScaleGranularity::NO_QUANT,
-                   ReluEnable_>
-{
+template <class ElementAccumulator_, class ElementDst_, bool ReluEnable_>
+struct CopyL0CToGm<NpuArch::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<ElementDst_, layout::zN>,
+                   ScaleGranularity::NO_QUANT, ReluEnable_> {
     using ArchTag = NpuArch::Arch::AtlasA2;
     using ElementDst = ElementDst_;
     using ElementSrc = ElementAccumulator_;
     using LayoutSrc = NpuArch::layout::zN;
     using LayoutDst = NpuArch::layout::zN;
-    static constexpr auto quantPre = CopyL0CToGmQuantMode<ArchTag, ElementSrc, ElementDst,
-        ScaleGranularity::NO_QUANT>::VALUE;
+    static constexpr auto quantPre =
+        CopyL0CToGmQuantMode<ArchTag, ElementSrc, ElementDst, ScaleGranularity::NO_QUANT>::VALUE;
     static constexpr auto reluEn = ReluEnable_;
 
-    __aicore__ inline
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-        LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<ElementDst> const &dst,
+                                      AscendC::LocalTensor<ElementSrc> const &src, LayoutDst const &dstLayout,
+                                      LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
 
@@ -189,21 +140,15 @@ struct CopyL0CToGm<NpuArch::Arch::AtlasA2,
 };
 
 ///////////////////////////////////////////CopyL0CToGmTla/////////////////////////////////////////////////
-template <
-    class ArchTag,
-    class TensorSrc,
-    class TensorDst,
-    ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT,
-    bool ReluEnable = false,
-    class Enable = void
->
+template <class ArchTag, class TensorSrc, class TensorDst,
+          ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT, bool ReluEnable = false,
+          class Enable = void>
 struct CopyL0CToGmTla {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, can not find the specialization.");
 };
 
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-}  // namespace NpuArch::Gemm::Tile
+} // namespace NpuArch::Gemm::Tile
 
 #endif // GEMM_TILE_COPY_L0C_TO_GM_HPP

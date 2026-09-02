@@ -15,39 +15,33 @@
 #include "../../../attn_infra/detail/bsag_alignment.hpp"
 #include "../../../attn_infra/bsag_matrix_coord.hpp"
 
-namespace NpuArch::Epilogue::Tile 
-{
+namespace NpuArch::Epilogue::Tile {
 
 struct EpilogueIdentityTileSwizzle {
     MatrixCoord blockShape;
     MatrixCoord tileShape;
     MatrixCoord loopsMN;
 
-    __aicore__ inline
-    EpilogueIdentityTileSwizzle() = default;
+    __aicore__ inline EpilogueIdentityTileSwizzle() = default;
 
-    __aicore__ inline
-    EpilogueIdentityTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape) :
-        blockShape(blockShape),
-        tileShape(tileShape)
+    __aicore__ inline EpilogueIdentityTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape)
+        : blockShape(blockShape),
+          tileShape(tileShape)
     {
         loopsMN = CeilDiv(blockShape, tileShape);
     }
 
-    __aicore__ inline
-    uint32_t GetLoops() const
+    __aicore__ inline uint32_t GetLoops() const
     {
         return loopsMN.row() * loopsMN.column();
     }
 
-    __aicore__ inline
-    MatrixCoord GetTileCoord(uint32_t loopIdx) const
+    __aicore__ inline MatrixCoord GetTileCoord(uint32_t loopIdx) const
     {
-        return MatrixCoord{ loopIdx / loopsMN.column(), loopIdx % loopsMN.column() };
+        return MatrixCoord{loopIdx / loopsMN.column(), loopIdx % loopsMN.column()};
     }
 
-    __aicore__ inline
-    MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
+    __aicore__ inline MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
     {
         return MatrixCoord::Min(tileShape, blockShape - tileCoord * tileShape);
     }
@@ -58,36 +52,31 @@ struct EpilogueHorizontalTileSwizzle {
     MatrixCoord tileShape;
     MatrixCoord loopsMN;
 
-    __aicore__ inline
-    EpilogueHorizontalTileSwizzle() = default;
+    __aicore__ inline EpilogueHorizontalTileSwizzle() = default;
 
-    __aicore__ inline
-    EpilogueHorizontalTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape) :
-        blockShape(blockShape),
-        tileShape(tileShape)
+    __aicore__ inline EpilogueHorizontalTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape)
+        : blockShape(blockShape),
+          tileShape(tileShape)
     {
         loopsMN = CeilDiv(blockShape, tileShape);
     }
 
-    __aicore__ inline
-    uint32_t GetLoops() const
+    __aicore__ inline uint32_t GetLoops() const
     {
         return loopsMN.row() * loopsMN.column();
     }
 
-    __aicore__ inline
-    MatrixCoord GetTileCoord(uint32_t loopIdx) const
+    __aicore__ inline MatrixCoord GetTileCoord(uint32_t loopIdx) const
     {
-        return MatrixCoord{ loopIdx % loopsMN.row(), loopIdx / loopsMN.row() };
+        return MatrixCoord{loopIdx % loopsMN.row(), loopIdx / loopsMN.row()};
     }
 
-    __aicore__ inline
-    MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
+    __aicore__ inline MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
     {
         return MatrixCoord::Min(tileShape, blockShape - tileCoord * tileShape);
     }
 };
 
-}
+} // namespace NpuArch::Epilogue::Tile
 
-#endif  // EPILOGUE_TILE_TILE_SWIZZLE_HPP
+#endif // EPILOGUE_TILE_TILE_SWIZZLE_HPP

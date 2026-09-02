@@ -25,40 +25,27 @@
 using namespace AscendC;
 namespace NpuArch::Epilogue::Block {
 
-template <
-    class OutputType_,
-    class UpdateType_,
-    class InputType_>
-class BlockEpilogue<
-    EpilogueAtlasA2FAGPre,
-    OutputType_,
-    UpdateType_,
-    InputType_>
-{
+template <class OutputType_, class UpdateType_, class InputType_>
+class BlockEpilogue<EpilogueAtlasA2FAGPre, OutputType_, UpdateType_, InputType_> {
 public:
     using DispatchPolicy = EpilogueAtlasA2FAGPre;
     using ArchTag = typename DispatchPolicy::ArchTag;
 
     struct Params {
-        GM_ADDR dqWrk; 
+        GM_ADDR dqWrk;
         GM_ADDR dkWrk;
         GM_ADDR dvWrk;
         GM_ADDR tilingData;
 
         // Methods
-        __aicore__ inline
-        Params() {}
+        __aicore__ inline Params() {}
 
-        __aicore__ inline
-        Params(
-            GM_ADDR dqWrk_, GM_ADDR dkWrk_, GM_ADDR dvWrk_,
-            GM_ADDR tilingData_
-        ) : 
-            dqWrk(dqWrk_), dkWrk(dkWrk_), dvWrk(dvWrk_),
-            tilingData(tilingData_)
-        {
-            
-        }    
+        __aicore__ inline Params(GM_ADDR dqWrk_, GM_ADDR dkWrk_, GM_ADDR dvWrk_, GM_ADDR tilingData_)
+            : dqWrk(dqWrk_),
+              dkWrk(dkWrk_),
+              dvWrk(dvWrk_),
+              tilingData(tilingData_)
+        {}
     };
 
     NpuArch::Arch::Resource<ArchTag> resource;
@@ -86,11 +73,11 @@ public:
     uint64_t usedCoreNum = 0;
     uint64_t ubsize = 0;
 
-    __aicore__ inline
-    BlockEpilogue(Params const &params)
+    __aicore__ inline BlockEpilogue(Params const &params)
     {
         cBlockIdx = GetBlockIdx();
-        __gm__ BlockSparseAttentionGradTilingData *tilingData = reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tilingData);
+        __gm__ BlockSparseAttentionGradTilingData *tilingData =
+            reinterpret_cast<__gm__ BlockSparseAttentionGradTilingData *>(params.tilingData);
         usedCoreNum = tilingData->usedVecCoreNum; // 先按这个把，得适配
 
         qSizeAlign = tilingData->dqSize;
@@ -98,7 +85,8 @@ public:
         ubsize = tilingData->ubSize / BLOCK_BYTE * BLOCK_BYTE; // 32字节对齐
 
         qPreBlockFactor = (qSizeAlign + usedCoreNum - 1) / usedCoreNum; // 每个vec 处理的元素数量 向上取整
-        qPreBlockTotal = (qSizeAlign + qPreBlockFactor - 1) / qPreBlockFactor; // 一共需要处理次数 向上取整， 也理解需要的核数
+        qPreBlockTotal =
+            (qSizeAlign + qPreBlockFactor - 1) / qPreBlockFactor; // 一共需要处理次数 向上取整， 也理解需要的核数
         qPreTailNumTmp = qSizeAlign % qPreBlockFactor; // remain量， 尾核数量
         qPreTailNum = qPreTailNumTmp == 0 ? qPreBlockFactor : qPreTailNumTmp;
 
@@ -119,32 +107,24 @@ public:
         zeroTensor = resource.ubBuf.template GetBufferByByte<float>(0);
     }
 
-    __aicore__ inline
-    ~BlockEpilogue()
-    {
-    }
+    __aicore__ inline ~BlockEpilogue() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    __aicore__ inline
-    void operator()();
+    __aicore__ inline void operator()();
 
     template <>
-    __aicore__ inline
-    void operator()<AscendC::AIC>()
-    {
-
-    }
+    __aicore__ inline void operator()<AscendC::AIC>()
+    {}
 
     template <>
-    __aicore__ inline
-    void operator()<AscendC::AIV>()
+    __aicore__ inline void operator()<AscendC::AIV>()
     {
         if (cBlockIdx >= usedCoreNum) {
             return;
         }
 
         uint64_t maxDataCount = (ubsize) / sizeof(float);
-        Duplicate(zeroTensor, (float)0.0,  maxDataCount);
+        Duplicate(zeroTensor, (float)0.0, maxDataCount);
 
         // dq
         uint64_t cOutElement = initdqSize; // currenr out ele
@@ -165,9 +145,7 @@ public:
         }
     }
 
-
-    __aicore__ inline
-    void processZero(GlobalTensor<float> outGm, uint64_t outCount, uint64_t maxDataCount)
+    __aicore__ inline void processZero(GlobalTensor<float> outGm, uint64_t outCount, uint64_t maxDataCount)
     {
         uint64_t cOutElement = outCount; // currenr out ele
         uint64_t totalLoop = cOutElement / maxDataCount;
@@ -188,6 +166,6 @@ public:
     }
 };
 
-}
+} // namespace NpuArch::Epilogue::Block
 
 #endif // CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_FAG_PRE_HPP

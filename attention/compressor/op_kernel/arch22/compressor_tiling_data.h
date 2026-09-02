@@ -21,59 +21,59 @@
 const uint32_t CMP_MAX_AIC_CORE_NUM = 24;
 
 namespace optiling {
-    struct CompressorSplitCoreParams {
-        uint32_t mStart;
-        uint32_t mEnd;
-        uint32_t nStart;
-        uint32_t nEnd;
-        uint32_t kStart;
-        uint32_t kEnd;
-    };
+struct CompressorSplitCoreParams {
+    uint32_t mStart;
+    uint32_t mEnd;
+    uint32_t nStart;
+    uint32_t nEnd;
+    uint32_t kStart;
+    uint32_t kEnd;
+};
 
-    // 1. 基础参数结构体
-    struct CompressorBaseParams {   
-        uint32_t batchSize = 0;             // bastch size（批大小）
-        uint32_t seqSize = 0;               // sequence size（kvs大小）  
-        uint32_t hiddenSize = 0;            // hidden size（隐藏层大小）
-        uint32_t tokenSize = 0;             // token size = batchSize * seqSize(token总数：批大小x序列1长度)
-        uint32_t headDim = 0;               // head size of kv
-        uint32_t csSize = 0;                // Compress sequence len
-        uint32_t cmpRatio = 4;              // Compress ratio
-        uint32_t usedCoreNum = 0;           // 使用核数
-        uint32_t nSize = 0;                 // 控制v2积攒的轮数
-        uint64_t stateCacheStrideDim0 = 0;  // stateCache第0维的stride
-        uint32_t kBaseNum = 0;
-        uint32_t kBaseSize = 0;
-        uint32_t coreGroupNum = 0;
-        uint32_t mLoopNum = 0;
-        CompressorSplitCoreParams splitCoreParam[CMP_MAX_AIC_CORE_NUM];
-    };
+// 1. 基础参数结构体
+struct CompressorBaseParams {
+    uint32_t batchSize = 0;            // bastch size（批大小）
+    uint32_t seqSize = 0;              // sequence size（kvs大小）
+    uint32_t hiddenSize = 0;           // hidden size（隐藏层大小）
+    uint32_t tokenSize = 0;            // token size = batchSize * seqSize(token总数：批大小x序列1长度)
+    uint32_t headDim = 0;              // head size of kv
+    uint32_t csSize = 0;               // Compress sequence len
+    uint32_t cmpRatio = 4;             // Compress ratio
+    uint32_t usedCoreNum = 0;          // 使用核数
+    uint32_t nSize = 0;                // 控制v2积攒的轮数
+    uint64_t stateCacheStrideDim0 = 0; // stateCache第0维的stride
+    uint32_t kBaseNum = 0;
+    uint32_t kBaseSize = 0;
+    uint32_t coreGroupNum = 0;
+    uint32_t mLoopNum = 0;
+    CompressorSplitCoreParams splitCoreParam[CMP_MAX_AIC_CORE_NUM];
+};
 
-    struct CompressorPageAttentionParams {
-        uint32_t blockNum = 0;
-        uint32_t blockSize = 1;
-        uint32_t maxBlockNumPerBatch = 1;
-    };
+struct CompressorPageAttentionParams {
+    uint32_t blockNum = 0;
+    uint32_t blockSize = 1;
+    uint32_t maxBlockNumPerBatch = 1;
+};
 
-    struct CompressorInnerSplitParams {
-        uint32_t mBaseSize;
-        uint32_t dBaseSize;
-    };
+struct CompressorInnerSplitParams {
+    uint32_t mBaseSize;
+    uint32_t dBaseSize;
+};
 
-    struct CompressorWorkspaceParams {
-        uint32_t mm1KvResSize;
-        uint32_t mm1ScoreResSize;
-        uint32_t vec1ResSize;
-        uint32_t vec1TailCacheSize;
-        uint32_t dbWorkspaceRatio = 1;
-    };
+struct CompressorWorkspaceParams {
+    uint32_t mm1KvResSize;
+    uint32_t mm1ScoreResSize;
+    uint32_t vec1ResSize;
+    uint32_t vec1TailCacheSize;
+    uint32_t dbWorkspaceRatio = 1;
+};
 
-    struct CompressorTilingData {
-        CompressorBaseParams baseParams;
-        CompressorPageAttentionParams pageAttentionParams;
-        CompressorInnerSplitParams innerSplitParams;
-        CompressorWorkspaceParams workspaceParams;
-    };
-} // optiling
+struct CompressorTilingData {
+    CompressorBaseParams baseParams;
+    CompressorPageAttentionParams pageAttentionParams;
+    CompressorInnerSplitParams innerSplitParams;
+    CompressorWorkspaceParams workspaceParams;
+};
+} // namespace optiling
 
-#endif  // COMPRESSOR_TILING_DATA_H
+#endif // COMPRESSOR_TILING_DATA_H

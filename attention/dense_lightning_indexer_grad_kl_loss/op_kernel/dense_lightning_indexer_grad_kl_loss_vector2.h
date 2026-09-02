@@ -27,7 +27,7 @@
 using AscendC::CrossCoreSetFlag;
 using AscendC::CrossCoreWaitFlag;
 
-template <typename DLIT> 
+template <typename DLIT>
 class DLIKLLossVector2Service {
 public:
     // 中间计算数据类型为float，高精度模式
@@ -42,11 +42,11 @@ public:
     __aicore__ inline DLIKLLossVector2Service(){};
 
     __aicore__ inline void InitParams(const struct DLIGradKLLossConstInfo &vecConstInfo,
-        const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData);
+                                      const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData);
     __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitVector2GM(const GlobalTensor<MM3_OUT_T>& dKeyIndexGmIn,
-                                         const GlobalTensor<OUT_T>& dKeyIndexGmOut);
-    __aicore__ inline void InitVector2DeterGM(const GlobalTensor<T>& lossGm, const GlobalTensor<T>& lossDeterGmFloat);
+    __aicore__ inline void InitVector2GM(const GlobalTensor<MM3_OUT_T> &dKeyIndexGmIn,
+                                         const GlobalTensor<OUT_T> &dKeyIndexGmOut);
+    __aicore__ inline void InitVector2DeterGM(const GlobalTensor<T> &lossGm, const GlobalTensor<T> &lossDeterGmFloat);
     __aicore__ inline void ProcessVectorDk();
     __aicore__ inline void DeterSumLoss();
 
@@ -72,7 +72,8 @@ private:
 };
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVector2Service<DLIT>::InitParams(const struct DLIGradKLLossConstInfo &vecConstInfo,
+__aicore__ inline void DLIKLLossVector2Service<DLIT>::InitParams(
+    const struct DLIGradKLLossConstInfo &vecConstInfo,
     const optiling::DenseLightningIndexerGradKLLossTilingData *__restrict tilingData)
 {
     this->constInfo = vecConstInfo;
@@ -80,16 +81,16 @@ __aicore__ inline void DLIKLLossVector2Service<DLIT>::InitParams(const struct DL
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVector2Service<DLIT>::InitVector2GM(const GlobalTensor<MM3_OUT_T>& dKeyIndexGmIn,
-                                                                    const GlobalTensor<OUT_T>& dKeyIndexGmOut)
+__aicore__ inline void DLIKLLossVector2Service<DLIT>::InitVector2GM(const GlobalTensor<MM3_OUT_T> &dKeyIndexGmIn,
+                                                                    const GlobalTensor<OUT_T> &dKeyIndexGmOut)
 {
     this->dKeyIndexGmIn = dKeyIndexGmIn;
     this->dKeyIndexGmOut = dKeyIndexGmOut;
 }
 
 template <typename DLIT>
-__aicore__ inline void DLIKLLossVector2Service<DLIT>::InitVector2DeterGM(const GlobalTensor<T>& lossGm,
-                                                                        const GlobalTensor<T>& lossDeterGmFloat)
+__aicore__ inline void DLIKLLossVector2Service<DLIT>::InitVector2DeterGM(const GlobalTensor<T> &lossGm,
+                                                                         const GlobalTensor<T> &lossDeterGmFloat)
 {
     this->lossGm = lossGm;
     this->lossDeterGmFloat = lossDeterGmFloat;
@@ -115,7 +116,7 @@ __aicore__ inline void DLIKLLossVector2Service<DLIT>::InitBuffers(TPipe *pipe)
     // deter 相关
     ubLossIn_ = ubInFloatPing_;
     ubLossOut_ = ubInFloatPong_;
-    tmpUb_ =  ubOutHalfPong_.template ReinterpretCast<uint8_t>();
+    tmpUb_ = ubOutHalfPong_.template ReinterpretCast<uint8_t>();
 }
 
 template <typename DLIT>
@@ -144,7 +145,7 @@ __aicore__ inline void DLIKLLossVector2Service<DLIT>::ProcessVectorDk()
         }
 
         eventId = pingPongFlag ? EVENT_ID1 : EVENT_ID0;
-        
+
         LocalTensor<MM4_OUT_T> dKeyIndexUbIn = pingPongFlag ? ubInFloatPong_ : ubInFloatPing_;
         LocalTensor<OUT_T> dKeyIndexUbOut = pingPongFlag ? ubOutHalfPong_ : ubOutHalfPing_;
 
@@ -160,7 +161,7 @@ __aicore__ inline void DLIKLLossVector2Service<DLIT>::ProcessVectorDk()
         dataCopyOutParams.blockLen = processNum * sizeof(OUT_T);
         DataCopyPad(dKeyIndexGmOut[dKeyGmOffsetCur], dKeyIndexUbOut, dataCopyOutParams);
         SetFlag<HardEvent::MTE3_MTE2>(eventId);
-        
+
         pingPongFlag = 1 - pingPongFlag;
     }
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
@@ -201,12 +202,12 @@ __aicore__ inline void DLIKLLossVector2Service<DLIT>::DeterSumLoss()
         WaitFlag<HardEvent::V_MTE3>(vToMte3);
 
         AscendC::DataCopyPad(lossGm, ubLossOut_,
-            {static_cast<uint32_t>(1), static_cast<uint32_t>(sizeof(float)),
-            static_cast<uint32_t>(0), static_cast<uint32_t>(0)});
+                             {static_cast<uint32_t>(1), static_cast<uint32_t>(sizeof(float)), static_cast<uint32_t>(0),
+                              static_cast<uint32_t>(0)});
 
         SetFlag<HardEvent::MTE3_V>(mte3ToV);
         WaitFlag<HardEvent::MTE3_V>(mte3ToV);
-        
+
         GetTPipePtr()->ReleaseEventID<AscendC::HardEvent::MTE2_V>(mte2ToV);
         GetTPipePtr()->ReleaseEventID<AscendC::HardEvent::V_MTE3>(vToMte3);
         GetTPipePtr()->ReleaseEventID<AscendC::HardEvent::MTE3_V>(mte3ToV);

@@ -132,12 +132,12 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl512GqaFullquantVF(
             // 把前面的两个[64,16]拼起来（横向分形cast成一个），第j个[64, 32]
             LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_1,
                                                            srcUb1 + i * 16 * 16 + j * 64 * 32); // 第一个分形的前8行
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_unroll_1,
-                                                           srcUb1 + i * 16 * 16 + j * 64 * 32 +
-                                                               64 * 16); // 第二个分形的前8行（第二个[64,16]）
+            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
+                vreg_input_x_unroll_1,
+                srcUb1 + i * 16 * 16 + j * 64 * 32 + 64 * 16); // 第二个分形的前8行（第二个[64,16]）
             // 上两个cast成一个分形, 下两个cast一个
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb1 + i * 16 * 16 + j * 64 * 32 +
-                                                                               128); // 第一个分形的后8行
+            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
+                vreg_input_x_2, srcUb1 + i * 16 * 16 + j * 64 * 32 + 128); // 第一个分形的后8行
             LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_unroll_2,
                                                            srcUb1 + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
             // ExpSub
@@ -195,11 +195,11 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl512GqaFullquantVF(
         for (uint16_t j = 0; j < n / 32; ++j) {
             LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_1,
                                                            srcUb2 + i * 16 * 16 + j * 64 * 32); // 第一个分形的前8行
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_unroll_1,
-                                                           srcUb2 + i * 16 * 16 + j * 64 * 32 +
-                                                               64 * 16); // 第二个分形的前8行（第二个 [64,16] ）
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb2 + i * 16 * 16 + j * 64 * 32 +
-                                                                               128); // 第一个分形的后8行
+            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
+                vreg_input_x_unroll_1,
+                srcUb2 + i * 16 * 16 + j * 64 * 32 + 64 * 16); // 第二个分形的前8行（第二个 [64,16] ）
+            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
+                vreg_input_x_2, srcUb2 + i * 16 * 16 + j * 64 * 32 + 128); // 第一个分形的后8行
             LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_unroll_2,
                                                            srcUb2 + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
             // expSub

@@ -23,10 +23,12 @@ using namespace AscendC;
 template <typename T>
 class KernelAttentionWorkerCombineSplitK {
 public:
-    __aicore__ inline KernelAttentionWorkerCombineSplitK(){}
+    __aicore__ inline KernelAttentionWorkerCombineSplitK() {}
 
     __aicore__ inline KernelAttentionWorkerCombineSplitK(TPipe *pipe, const AttentionWorkerCombineTilingData *tiling)
-        : pipe_(pipe), tl_(tiling){}
+        : pipe_(pipe),
+          tl_(tiling)
+    {}
 
     __aicore__ inline void Init(GM_ADDR schedule_context, GM_ADDR expert_scales, GM_ADDR layer_id, GM_ADDR y,
                                 GM_ADDR next_layer_id);
@@ -261,4 +263,4 @@ __aicore__ inline void KernelAttentionWorkerCombineSplitK<T>::CopyOut(int64_t of
     outQue.FreeTensor(dstLocal);
 }
 
-#endif  // OP_KERNEL_ATTENTION_WORKER_COMBINE_SPLIT_K_H_
+#endif // OP_KERNEL_ATTENTION_WORKER_COMBINE_SPLIT_K_H_

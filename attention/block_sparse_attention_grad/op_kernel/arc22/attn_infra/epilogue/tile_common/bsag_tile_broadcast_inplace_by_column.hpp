@@ -13,8 +13,7 @@
 
 #include "../../../attn_infra/bsag_base_defs.hpp"
 
-namespace NpuArch::Epilogue::Tile 
-{
+namespace NpuArch::Epilogue::Tile {
 
 template <
     /// Tag indicating architecture
@@ -22,22 +21,18 @@ template <
     /// Compute data type
     class ComputeType_,
     /// Length of the compute buffer
-    class TileShape_
->
+    class TileShape_>
 struct TileBroadcastInplaceByColumn {
     using ArchTag = ArchTag_;
     using ElementCompute = typename ComputeType_::Element;
     using TileShape = TileShape_;
 
-    __aicore__ inline
-    TileBroadcastInplaceByColumn() {}
+    __aicore__ inline TileBroadcastInplaceByColumn() {}
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<ElementCompute> const &ubInOut
-    )
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubInOut)
     {
-        constexpr uint32_t eleNumPerBlk = static_cast<uint32_t>(BYTE_PER_BLK) / static_cast<uint32_t>(sizeof(ElementCompute));
+        constexpr uint32_t eleNumPerBlk =
+            static_cast<uint32_t>(BYTE_PER_BLK) / static_cast<uint32_t>(sizeof(ElementCompute));
         constexpr uint32_t blkNumPerRow = TileShape::COLUMN / eleNumPerBlk;
 
         constexpr uint64_t defaultMask = BYTE_PER_VECTOR_FRACTAL / sizeof(ElementCompute);
@@ -54,11 +49,8 @@ struct TileBroadcastInplaceByColumn {
         for (uint32_t rowOffset = 0; rowOffset < TileShape::ROW; rowOffset += BLK_NUM_PER_VECTOR_FRACTAL) {
             uint64_t mask = ((TileShape::ROW - rowOffset) >= BLK_NUM_PER_VECTOR_FRACTAL) ? defaultMask : tailMask;
             for (uint32_t colOffset = eleNumPerBlk; colOffset < TileShape::COLUMN; colOffset += eleNumPerBlk) {
-                AscendC::Copy(
-                    ubInOut[rowOffset * TileShape::COLUMN + colOffset],
-                    ubInOut[rowOffset * TileShape::COLUMN],
-                    mask, 1, repeatParams
-                );
+                AscendC::Copy(ubInOut[rowOffset * TileShape::COLUMN + colOffset],
+                              ubInOut[rowOffset * TileShape::COLUMN], mask, 1, repeatParams);
             }
         }
     }

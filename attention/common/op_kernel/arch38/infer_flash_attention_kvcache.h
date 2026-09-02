@@ -422,7 +422,6 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr<isInfer> &runParam,
     }
 }
 
-
 TEMPLATE_INTF
 __aicore__ inline bool ComputeParamS1(RunParamStr<isInfer> &runParam, const ConstInfo<isInfer, hasRope> &constInfo,
                                       uint32_t sOuterLoopIdx, __gm__ int64_t *actualSeqQlenAddr, PseInfo &pseInfo)

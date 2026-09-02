@@ -14,8 +14,7 @@
 #include "../../attn_infra/bsag_base_defs.hpp"
 #include "../../attn_infra/arch/bsag_arch.hpp"
 
-namespace NpuArch::Gemm 
-{
+namespace NpuArch::Gemm {
 
 // Block Mmad Policies
 
@@ -81,6 +80,6 @@ struct MmadAtlasA2SBSAG3 : public MmadAtlasA2 {
     static constexpr uint32_t STAGES = 2;
 };
 
-}  // namespace NpuArch::Gemm
+} // namespace NpuArch::Gemm
 
-#endif  // GEMM_DISPATCH_POLICY_HPP
+#endif // GEMM_DISPATCH_POLICY_HPP

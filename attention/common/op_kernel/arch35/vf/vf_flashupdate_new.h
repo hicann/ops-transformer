@@ -676,7 +676,6 @@ __simd_vf__ inline void RowInvalidUpdateVF(__ubuf__ T *finalUb, __ubuf__ float *
     constexpr uint16_t floatRepSize = 64; // 64: 一个寄存器可以存储64个float类型数据
     const uint16_t dLoops = d / floatRepSize;
 
-
     constexpr uint32_t tmpZero = 0x00000000; // zero value of fp16 and fp32
     const T zeroValue = *((T *)&tmpZero);
     const float minValue = *((float *)&min);

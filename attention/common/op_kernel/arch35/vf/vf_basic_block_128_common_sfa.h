@@ -103,10 +103,11 @@ __simd_callee__ inline void TailScaleStoreMax128(RegTensor<float> &vreg_input_x,
 }
 
 template <typename T>
-__simd_callee__ inline void
-AlignedScaleStoreMax128(RegTensor<float> &vreg_input_x, RegTensor<float> &vreg_input_x_unroll,
-                        RegTensor<float> &vreg_max_tmp, __ubuf__ T *&srcUb, const uint16_t i, const uint32_t s2BaseSize,
-                        const float scale, MaskReg &preg_all)
+__simd_callee__ inline void AlignedScaleStoreMax128(RegTensor<float> &vreg_input_x,
+                                                    RegTensor<float> &vreg_input_x_unroll,
+                                                    RegTensor<float> &vreg_max_tmp, __ubuf__ T *&srcUb,
+                                                    const uint16_t i, const uint32_t s2BaseSize, const float scale,
+                                                    MaskReg &preg_all)
 {
     LoadAlign(vreg_input_x, srcUb + i * s2BaseSize);
     LoadAlign(vreg_input_x_unroll, srcUb + floatRepSize + i * s2BaseSize);

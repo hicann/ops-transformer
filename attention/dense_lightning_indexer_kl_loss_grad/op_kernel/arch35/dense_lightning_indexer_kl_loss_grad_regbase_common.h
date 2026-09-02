@@ -29,9 +29,15 @@ constexpr int8_t TASK_C1 = 1;
 constexpr int8_t TASK_V1 = 2;
 constexpr int8_t TASK_C2 = 3;
 
-enum class DLILayout { BSND = 0, TND = 1 };
+enum class DLILayout {
+    BSND = 0,
+    TND = 1
+};
 
-enum class DLISparseMode { DefaultMask = 0, RightDown = 3 };
+enum class DLISparseMode {
+    DefaultMask = 0,
+    RightDown = 3
+};
 
 constexpr uint32_t L0_MAX_SIZE = 64 * 1024;
 constexpr uint32_t L1_MAX_SIZE = 512 * 1024;

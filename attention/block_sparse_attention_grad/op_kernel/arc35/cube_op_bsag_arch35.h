@@ -382,10 +382,11 @@ private:
     }
 
     template <bool A_MATRIX>
-    __aicore__ inline void
-    load_data_gm_2_l0(const LocalTensor<INPUT_TYPE> &dstL0Tensor, const LocalTensor<INPUT_TYPE> &dstL1Tensor,
-                      const GlobalTensor<INPUT_TYPE> &srcGmTensor, const int32_t mSize, const int32_t kSize,
-                      const int32_t mSizeAlign, const int32_t kSizeAlign, const int32_t srcKStride)
+    __aicore__ inline void load_data_gm_2_l0(const LocalTensor<INPUT_TYPE> &dstL0Tensor,
+                                             const LocalTensor<INPUT_TYPE> &dstL1Tensor,
+                                             const GlobalTensor<INPUT_TYPE> &srcGmTensor, const int32_t mSize,
+                                             const int32_t kSize, const int32_t mSizeAlign, const int32_t kSizeAlign,
+                                             const int32_t srcKStride)
     {
         load_data_gm_2_l1(dstL1Tensor, srcGmTensor, mSize, kSize, mSizeAlign, kSizeAlign, srcKStride);
         SET_FLAG(MTE2, MTE1, EVENT_ID0);
@@ -399,10 +400,11 @@ private:
     }
 
     template <bool A_MATRIX>
-    __aicore__ inline void
-    load_data_gm_2_l0_trans(const LocalTensor<INPUT_TYPE> &dstL0Tensor, const LocalTensor<INPUT_TYPE> &dstL1Tensor,
-                            const GlobalTensor<INPUT_TYPE> &srcGmTensor, const int32_t mSize, const int32_t kSize,
-                            const int32_t mSizeAlign, const int32_t kSizeAlign, const int32_t srcKStride)
+    __aicore__ inline void load_data_gm_2_l0_trans(const LocalTensor<INPUT_TYPE> &dstL0Tensor,
+                                                   const LocalTensor<INPUT_TYPE> &dstL1Tensor,
+                                                   const GlobalTensor<INPUT_TYPE> &srcGmTensor, const int32_t mSize,
+                                                   const int32_t kSize, const int32_t mSizeAlign,
+                                                   const int32_t kSizeAlign, const int32_t srcKStride)
     {
         load_data_gm_2_l1(dstL1Tensor, srcGmTensor, mSize, kSize, mSizeAlign, kSizeAlign, srcKStride);
         SET_FLAG(MTE2, MTE1, EVENT_ID0);

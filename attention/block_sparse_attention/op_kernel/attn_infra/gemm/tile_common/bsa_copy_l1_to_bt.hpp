@@ -16,9 +16,7 @@
 #include "../../../attn_infra/layout/bsa_layout.hpp"
 #include "../../../attn_infra/gemm/bsa_gemm_type.hpp"
 
-
 namespace NpuArch::Gemm::Tile {
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

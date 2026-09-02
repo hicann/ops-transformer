@@ -23,19 +23,20 @@
 #include "kernel_operator.h"
 #endif
 
-
 struct AxisSlices;
 
 struct Axis {
     uint32_t start;
     uint32_t sizeAct;
 
-    __aicore__ inline Axis(uint32_t sizeAct_) : start(0), sizeAct(sizeAct_)
-    {
-    }
-    __aicore__ inline Axis(uint32_t start_, uint32_t sizeAct_) : start(start_), sizeAct(sizeAct_)
-    {
-    }
+    __aicore__ inline Axis(uint32_t sizeAct_)
+        : start(0),
+          sizeAct(sizeAct_)
+    {}
+    __aicore__ inline Axis(uint32_t start_, uint32_t sizeAct_)
+        : start(start_),
+          sizeAct(sizeAct_)
+    {}
 
     __aicore__ inline AxisSlices Split(uint32_t splitSize) const;
 
@@ -61,9 +62,10 @@ struct AxisSlices {
         uint32_t splitSize_;
 
         __aicore__ inline Iterator(const AxisSlices &slices)
-            : cur_(Min(slices.splitSize_, slices.sizeAct_)), tSizeAct_(slices.sizeAct_), splitSize_(slices.splitSize_)
-        {
-        }
+            : cur_(Min(slices.splitSize_, slices.sizeAct_)),
+              tSizeAct_(slices.sizeAct_),
+              splitSize_(slices.splitSize_)
+        {}
 
         __aicore__ inline Axis &operator*()
         {
@@ -86,9 +88,10 @@ struct AxisSlices {
     uint32_t sizeAct_;
     uint32_t splitSize_;
 
-    __aicore__ inline AxisSlices(uint32_t sizeAct, uint32_t splitSize) : sizeAct_(sizeAct), splitSize_(splitSize)
-    {
-    }
+    __aicore__ inline AxisSlices(uint32_t sizeAct, uint32_t splitSize)
+        : sizeAct_(sizeAct),
+          splitSize_(splitSize)
+    {}
 
     __aicore__ inline Iterator begin()
     {

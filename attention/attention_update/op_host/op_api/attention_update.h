@@ -19,8 +19,9 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::tuple<const aclTensor*, const aclTensor*> AttentionUpdate(const aclTensorList *lse, const aclTensorList *go, int64_t updateType,
-                            int64_t sp, aclOpExecutor *executor);
+const std::tuple<const aclTensor *, const aclTensor *> AttentionUpdate(const aclTensorList *lse,
+                                                                       const aclTensorList *go, int64_t updateType,
+                                                                       int64_t sp, aclOpExecutor *executor);
 }
 
 #endif // OP_API_INC_LEVEL0_ATTENTION_UPDATE_H_

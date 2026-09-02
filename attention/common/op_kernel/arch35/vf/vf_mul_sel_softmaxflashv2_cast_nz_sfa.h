@@ -117,10 +117,11 @@ __aicore__ inline void ProcessVec1Update(const LocalTensor<T2> &dstTensor, const
 
 template <typename T, typename T2, bool isUpdate = false, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128,
           OriginNRange oriNRange = OriginNRange::EQ_128_SFA>
-__aicore__ inline void
-ProcessVec1Vf(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &expSumTensor,
-              const LocalTensor<T> &maxTensor, const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
-              TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale, const T minValue)
+__aicore__ inline void ProcessVec1Vf(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,
+                                     const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
+                                     const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
+                                     TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale,
+                                     const T minValue)
 {
     static_assert(IsSameType<T, float>::value, "VF mul_sel_softmaxflashv2_cast_nz, T must be float");
     static_assert(

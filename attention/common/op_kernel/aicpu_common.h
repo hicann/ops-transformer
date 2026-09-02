@@ -103,7 +103,7 @@ inline bool IsTensorExists(const Tensor *tensor)
 
 inline std::vector<int64_t> GetTensorDataAsInt64(const Tensor *tensor)
 {
-    std::vector<int64_t> result {};
+    std::vector<int64_t> result{};
 
     if (!IsTensorExists(tensor)) {
         return result;

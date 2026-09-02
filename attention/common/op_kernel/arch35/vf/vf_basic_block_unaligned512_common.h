@@ -22,52 +22,52 @@ using namespace regbaseutil;
 
 namespace FaVectorApi {
 
-#define VREG_FLOAT_PSE_ALIBI_8_DECL                                                                                    \
-    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3,                             \
-        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6,                         \
-        RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, RegTensor<float> &vreg_alibi1,                       \
-        RegTensor<float> &vreg_alibi2, RegTensor<float> &vreg_alibi3, RegTensor<float> &vreg_alibi4,                   \
-        RegTensor<float> &vreg_alibi5, RegTensor<float> &vreg_alibi6, RegTensor<float> &vreg_alibi7,                   \
+#define VREG_FLOAT_PSE_ALIBI_8_DECL \
+    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3, \
+        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, \
+        RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, RegTensor<float> &vreg_alibi1, \
+        RegTensor<float> &vreg_alibi2, RegTensor<float> &vreg_alibi3, RegTensor<float> &vreg_alibi4, \
+        RegTensor<float> &vreg_alibi5, RegTensor<float> &vreg_alibi6, RegTensor<float> &vreg_alibi7, \
         RegTensor<float> &vreg_alibi8, const float slopes, MaskReg &preg_all
 
-#define ARG_FLOAT_PSE_ALIBI_8                                                                                          \
-    vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_pse7, vreg_pse8, vreg_alibi1, vreg_alibi2,  \
+#define ARG_FLOAT_PSE_ALIBI_8 \
+    vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_pse7, vreg_pse8, vreg_alibi1, vreg_alibi2, \
         vreg_alibi3, vreg_alibi4, vreg_alibi5, vreg_alibi6, vreg_alibi7, vreg_alibi8, slopes, preg_all
 
-#define VREG_FLOAT_PSE_ALIBI_6_DECL                                                                                    \
-    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3,                             \
-        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6,                         \
-        RegTensor<float> &vreg_alibi1, RegTensor<float> &vreg_alibi2, RegTensor<float> &vreg_alibi3,                   \
-        RegTensor<float> &vreg_alibi4, RegTensor<float> &vreg_alibi5, RegTensor<float> &vreg_alibi6,                   \
+#define VREG_FLOAT_PSE_ALIBI_6_DECL \
+    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3, \
+        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, \
+        RegTensor<float> &vreg_alibi1, RegTensor<float> &vreg_alibi2, RegTensor<float> &vreg_alibi3, \
+        RegTensor<float> &vreg_alibi4, RegTensor<float> &vreg_alibi5, RegTensor<float> &vreg_alibi6, \
         const float slopes, MaskReg &preg_all
 
-#define ARG_FLOAT_PSE_ALIBI_6                                                                                          \
-    vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_alibi1, vreg_alibi2, vreg_alibi3,           \
+#define ARG_FLOAT_PSE_ALIBI_6 \
+    vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_alibi1, vreg_alibi2, vreg_alibi3, \
         vreg_alibi4, vreg_alibi5, vreg_alibi6, slopes, preg_all
 
-#define VREG_FLOAT_PSE_8_LOAD_DECL(T)                                                                                  \
-    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3,                             \
-        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6,                         \
-        RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, __ubuf__ T *&pseUb, const uint32_t i,                \
+#define VREG_FLOAT_PSE_8_LOAD_DECL(T) \
+    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3, \
+        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, \
+        RegTensor<float> &vreg_pse7, RegTensor<float> &vreg_pse8, __ubuf__ T *&pseUb, const uint32_t i, \
         const uint32_t pseStride, MaskReg &preg_all_b16
 
-#define ARG_FLOAT_PSE_8_LOAD                                                                                           \
-    vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_pse7, vreg_pse8, pseUb, i, pseStride,       \
+#define ARG_FLOAT_PSE_8_LOAD \
+    vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, vreg_pse7, vreg_pse8, pseUb, i, pseStride, \
         preg_all_b16
 
-#define VREG_FLOAT_PSE_6_LOAD_DECL(T)                                                                                  \
-    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3,                             \
-        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, __ubuf__ T *&pseUb,     \
+#define VREG_FLOAT_PSE_6_LOAD_DECL(T) \
+    RegTensor<float> &vreg_pse1, RegTensor<float> &vreg_pse2, RegTensor<float> &vreg_pse3, \
+        RegTensor<float> &vreg_pse4, RegTensor<float> &vreg_pse5, RegTensor<float> &vreg_pse6, __ubuf__ T *&pseUb, \
         const uint32_t i, const uint32_t pseStride, MaskReg &preg_all_b16
 
-#define ARG_FLOAT_PSE_6_LOAD                                                                                           \
+#define ARG_FLOAT_PSE_6_LOAD \
     vreg_pse1, vreg_pse2, vreg_pse3, vreg_pse4, vreg_pse5, vreg_pse6, pseUb, i, pseStride, preg_all_b16
 
-#define VREG_FLOAT_CAST_STORE_EXP_512_DECL                                                                             \
-    RegTensor<float> &vreg_exp_even1, RegTensor<float> &vreg_exp_odd1, RegTensor<float> &vreg_exp_even2,               \
-        RegTensor<float> &vreg_exp_odd2, RegTensor<float> &vreg_exp_even3, RegTensor<float> &vreg_exp_odd3,            \
+#define VREG_FLOAT_CAST_STORE_EXP_512_DECL \
+    RegTensor<float> &vreg_exp_even1, RegTensor<float> &vreg_exp_odd1, RegTensor<float> &vreg_exp_even2, \
+        RegTensor<float> &vreg_exp_odd2, RegTensor<float> &vreg_exp_even3, RegTensor<float> &vreg_exp_odd3, \
         RegTensor<float> &vreg_exp_even4, RegTensor<float> &vreg_exp_odd4, __ubuf__ T2 *&expUb1, __ubuf__ T2 *&expUb2, \
-        __ubuf__ T2 *&expUb3, __ubuf__ T2 *&expUb4, const uint32_t blockStride, const uint32_t repeatStride,           \
+        __ubuf__ T2 *&expUb3, __ubuf__ T2 *&expUb4, const uint32_t blockStride, const uint32_t repeatStride, \
         MaskReg &preg_all, MaskReg &storeMask
 
 __simd_callee__ inline void ComputePseInnerMulAdd8(VREG_FLOAT_PSE_ALIBI_8_DECL)
@@ -479,11 +479,12 @@ __simd_callee__ inline void ExpSub8(RegTensor<float> &e1, RegTensor<float> &o1, 
 }
 
 template <typename T, typename T2, typename OUTPUT_T, uint32_t s2BaseSize, bool hasAtten, PseTypeEnum pseMode>
-__simd_callee__ static inline void
-ProcessVec1TailLoop512(__ubuf__ T *srcUb, __ubuf__ OUTPUT_T *pseUb, __ubuf__ uint32_t *maskUb7,
-                       __ubuf__ uint32_t *maskUb8, const uint32_t nPadding, uint32_t pltOriTailN3,
-                       uint32_t pltOriTailN4, const uint16_t m, const uint32_t pseStride, const float slopes,
-                       const float posShift, const T scale, const T minValue)
+__simd_callee__ static inline void ProcessVec1TailLoop512(__ubuf__ T *srcUb, __ubuf__ OUTPUT_T *pseUb,
+                                                          __ubuf__ uint32_t *maskUb7, __ubuf__ uint32_t *maskUb8,
+                                                          const uint32_t nPadding, uint32_t pltOriTailN3,
+                                                          uint32_t pltOriTailN4, const uint16_t m,
+                                                          const uint32_t pseStride, const float slopes,
+                                                          const float posShift, const T scale, const T minValue)
 {
     RegTensor<float> vreg_min;
     RegTensor<float> vreg_sel7;

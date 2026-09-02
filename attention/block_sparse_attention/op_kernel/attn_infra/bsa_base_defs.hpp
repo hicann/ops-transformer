@@ -51,7 +51,10 @@ template <>
 struct SizeOfBits<fp4x2_e2m1_t> {
     static constexpr uint32_t value = 4;
 };
-constexpr uint32_t BytesToBits(uint32_t bytes) { return bytes * 8; }
+constexpr uint32_t BytesToBits(uint32_t bytes)
+{
+    return bytes * 8;
+}
 
 constexpr uint32_t BYTE_PER_BLK = 32;
 constexpr uint32_t BLK_NUM_PER_VECTOR_FRACTAL = 8;

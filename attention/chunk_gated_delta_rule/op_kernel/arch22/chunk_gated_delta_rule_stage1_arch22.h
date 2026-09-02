@@ -68,9 +68,9 @@ struct GDRStageOneInitParams {
 
 class Stage1 {
 public:
-    __aicore__ inline Stage1(StageOneMT &mm) : mm(mm)
-    {
-    }
+    __aicore__ inline Stage1(StageOneMT &mm)
+        : mm(mm)
+    {}
     __aicore__ inline void SetGlobalTensors(const GDRStageOneInitParams &initParams)
     {
         queryGm_ = initParams.query;

@@ -24,7 +24,6 @@ using namespace AscendC;
 using namespace AscendC::Impl::Detail;
 using namespace regbaseutil;
 
-
 namespace BaseApi {
 TEMPLATES_DEF
 class FABlockVecInfer : public FABlockVecBase<FABlockVecInfer<TEMPLATE_ARGS>, TEMPLATE_ARGS> {
@@ -83,8 +82,7 @@ public:
                                          __gm__ uint8_t *postQuantOffset);
     __aicore__ inline void GenerateDropoutMask(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
                                                LocalTensor<uint8_t> &dropMaskUb)
-    {
-    }
+    {}
     __aicore__ inline void SoftmaxDataCopyOut(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo,
                                               LocalTensor<float> &sumUb, LocalTensor<float> &maxUb);
     template <typename VEC2_RES_T>
@@ -152,9 +150,8 @@ private:
 };
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void
-FABlockVecInfer<TEMPLATE_ARGS>::InitCubeVecSharedParams(CVSharedParams<isInfer, isPa> &sharedParams, int32_t aicIdx,
-                                                        uint8_t subBlockIdx)
+__aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::InitCubeVecSharedParams(
+    CVSharedParams<isInfer, isPa> &sharedParams, int32_t aicIdx, uint8_t subBlockIdx)
 {
     auto &inputParamsRegbase = this->tilingData->inputParamsRegbase;
     sharedParams.bSize = inputParamsRegbase.bSize;
@@ -688,9 +685,8 @@ __aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::CopyAccumOutIn(ConstInfo<
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void
-FABlockVecInfer<TEMPLATE_ARGS>::ComputeLogSumExpAndCopyToGm(RunInfo<isInfer> &runInfo,
-                                                            ConstInfo<isInfer, hasRope> &constInfo)
+__aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::ComputeLogSumExpAndCopyToGm(
+    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
 {
     if (unlikely(runInfo.halfS1RealSize == 0)) {
         return;
@@ -732,10 +728,11 @@ __aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::ReduceFDDataCopyOut(
 
 TEMPLATES_DEF_NO_DEFAULT
 template <typename VEC2_RES_T>
-__aicore__ inline void
-FABlockVecInfer<TEMPLATE_ARGS>::PostQuant(ConstInfo<isInfer, hasRope> &constInfo, RunInfo<isInfer> &runInfo,
-                                          LocalTensor<OUTPUT_T> &attenOut, LocalTensor<VEC2_RES_T> &vec2ResUb,
-                                          int64_t vec2S1Idx, int64_t dSizeAligned64)
+__aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::PostQuant(ConstInfo<isInfer, hasRope> &constInfo,
+                                                                 RunInfo<isInfer> &runInfo,
+                                                                 LocalTensor<OUTPUT_T> &attenOut,
+                                                                 LocalTensor<VEC2_RES_T> &vec2ResUb, int64_t vec2S1Idx,
+                                                                 int64_t dSizeAligned64)
 {
     AscendQuant(attenOut, vec2ResUb, constInfo.postQuantScaleValue, constInfo.postQuantOffsetValue,
                 runInfo.vec2S1RealSize * dSizeAligned64);

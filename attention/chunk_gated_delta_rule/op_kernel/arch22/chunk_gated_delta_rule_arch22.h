@@ -84,11 +84,11 @@ __aicore__ inline void CopyCast(const GlobalTensor<srcType> &src, const GlobalTe
     }
 }
 
-
 template <typename lowType, typename highType>
 class CGDR {
 public:
-    __aicore__ inline CGDR(TPipe *pipe, const ChunkGatedDeltaRuleTilingData *tilingData) : stageOneOp_(stage1MT_)
+    __aicore__ inline CGDR(TPipe *pipe, const ChunkGatedDeltaRuleTilingData *tilingData)
+        : stageOneOp_(stage1MT_)
     {
         pipe_ = pipe;
         tiling_ = tilingData;

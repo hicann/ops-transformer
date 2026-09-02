@@ -25,8 +25,7 @@ template <
     /// GemmType type for B matrix operand
     class BType_,
     /// GemmType type for Bias operand
-    class BiasType_
->
+    class BiasType_>
 struct TileMmad {
     using ElementA = typename AType_::Element;
     using ElementB = typename BType_::Element;
@@ -35,15 +34,12 @@ struct TileMmad {
 
     // Methods
 
-    __aicore__ inline
-    TileMmad() {}
+    __aicore__ inline TileMmad() {}
 
-    __aicore__ inline
-    void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
-         AscendC::LocalTensor<ElementA> const &l0ATensor,
-         AscendC::LocalTensor<ElementB> const &l0BTensor,
-         uint32_t m, uint32_t n, uint32_t k,
-         bool initC = true, uint8_t unitFlag = 0)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
+                                      AscendC::LocalTensor<ElementA> const &l0ATensor,
+                                      AscendC::LocalTensor<ElementB> const &l0BTensor, uint32_t m, uint32_t n,
+                                      uint32_t k, bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;
         mmadParams.m = m;
@@ -55,10 +51,7 @@ struct TileMmad {
             mmadParams.kDirectionAlign = true;
         }
 
-        AscendC::Mmad(l0CTensor,
-                      l0ATensor,
-                      l0BTensor,
-                      mmadParams);
+        AscendC::Mmad(l0CTensor, l0ATensor, l0BTensor, mmadParams);
 
         const uint32_t PIPE_M_BARRIER_THRESHOLD = 10;
         if ((m / C0_NUM_PER_FRACTAL) * (n / C0_NUM_PER_FRACTAL) < PIPE_M_BARRIER_THRESHOLD) {
@@ -66,13 +59,11 @@ struct TileMmad {
         }
     }
 
-    __aicore__ inline
-    void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
-         AscendC::LocalTensor<ElementA> const &l0ATensor,
-         AscendC::LocalTensor<ElementB> const &l0BTensor,
-         AscendC::LocalTensor<ElementAccumulator> const &l0BiasTensor,
-         uint32_t m, uint32_t n, uint32_t k,
-         bool initC = true, uint8_t unitFlag = 0)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
+                                      AscendC::LocalTensor<ElementA> const &l0ATensor,
+                                      AscendC::LocalTensor<ElementB> const &l0BTensor,
+                                      AscendC::LocalTensor<ElementAccumulator> const &l0BiasTensor, uint32_t m,
+                                      uint32_t n, uint32_t k, bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;
         mmadParams.m = m;
@@ -84,11 +75,7 @@ struct TileMmad {
             mmadParams.kDirectionAlign = true;
         }
 
-        AscendC::Mmad(l0CTensor,
-                      l0ATensor,
-                      l0BTensor,
-                      l0BiasTensor,
-                      mmadParams);
+        AscendC::Mmad(l0CTensor, l0ATensor, l0BTensor, l0BiasTensor, mmadParams);
 
         const uint32_t PIPE_M_BARRIER_THRESHOLD = 10;
         if ((m / C0_NUM_PER_FRACTAL) * (n / C0_NUM_PER_FRACTAL) < PIPE_M_BARRIER_THRESHOLD) {

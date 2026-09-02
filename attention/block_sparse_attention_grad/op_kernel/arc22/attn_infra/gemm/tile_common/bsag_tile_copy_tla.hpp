@@ -13,8 +13,6 @@
 
 #include "../../../attn_infra/bsag_base_defs.hpp"
 
-namespace NpuArch::Gemm::Tile {
-
-} // namespace NpuArch::Gemm::Tile
+namespace NpuArch::Gemm::Tile {} // namespace NpuArch::Gemm::Tile
 
 #endif // GEMM_TILE_TILE_COPY_TLA_HPP

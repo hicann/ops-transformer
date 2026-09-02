@@ -19,7 +19,6 @@
 #include "compressor_comm_arch22.h"
 namespace Compressor {
 
-
 struct MatRpeatParam {
     uint32_t row;
     uint32_t col;
@@ -45,7 +44,7 @@ struct RmsNormParam {
  * @param col 列数
  */
 __aicore__ inline void ColumnSum(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                                     const LocalTensor<float> &shareTmpUb, uint32_t row, uint32_t col)
+                                 const LocalTensor<float> &shareTmpUb, uint32_t row, uint32_t col)
 {
     // 行数为1时，直接将srcLocal复制到dstLocal
     if (unlikely(row == 1)) {
@@ -95,7 +94,7 @@ __aicore__ inline void ColumnSum(const LocalTensor<float> &dstLocal, const Local
  * @param col 列数
  */
 __aicore__ inline void ColumnMax(const LocalTensor<float> &dstLocal, const LocalTensor<float> &srcLocal,
-                                     const LocalTensor<float> &shareTmpUb, uint32_t row, uint32_t col)
+                                 const LocalTensor<float> &shareTmpUb, uint32_t row, uint32_t col)
 {
     // 行数为1时，直接将srcLocal复制到dstLocal
     if (unlikely(row == 1)) {
@@ -135,7 +134,6 @@ __aicore__ inline void ColumnMax(const LocalTensor<float> &dstLocal, const Local
         }
     }
 }
-
 
 /**
  * @brief MatSubVec 矩阵逐行减向量
@@ -254,8 +252,7 @@ __aicore__ inline void RowSum(const LocalTensor<float> &dstLocal, const LocalTen
 {
     uint32_t blockCount = repeatParam.loopTimes;
     if (blockCount > 0 && repeatParam.colRemain > 0) {
-        Add(shareTmpUb, srcLocal, srcLocal[blockCount * repeatParam.dtypeMask], repeatParam.colRemain,
-            repeatParam.row,
+        Add(shareTmpUb, srcLocal, srcLocal[blockCount * repeatParam.dtypeMask], repeatParam.colRemain, repeatParam.row,
             {1, 1, 1, repeatParam.repeatStride, repeatParam.repeatStride, repeatParam.repeatStride});
         AscendC::PipeBarrier<PIPE_V>();
     }
@@ -271,9 +268,8 @@ __aicore__ inline void RowSum(const LocalTensor<float> &dstLocal, const LocalTen
     }
 
     WholeReduceSum(dstLocal, shareTmpUb,
-                   (repeatParam.col < repeatParam.dtypeMask) ? repeatParam.col :
-                                                                             repeatParam.dtypeMask,
-                   repeatParam.row, 1, 1, repeatParam.repeatStride);
+                   (repeatParam.col < repeatParam.dtypeMask) ? repeatParam.col : repeatParam.dtypeMask, repeatParam.row,
+                   1, 1, repeatParam.repeatStride);
 }
 
 /**
@@ -308,7 +304,6 @@ __aicore__ inline void RowDivs(const LocalTensor<float> &dstLocal, const LocalTe
         }
     }
 }
-
 
 /**
  * @brief RowMuls 矩阵每行乘以相同元素

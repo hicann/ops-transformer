@@ -44,12 +44,11 @@ END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(AttentionUpdate_20000, AttentionUpdateTilingData)
 REGISTER_TILING_DATA_CLASS(AttentionUpdate_20001, AttentionUpdateTilingData)
 
-
 class AttentionUpdateTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit AttentionUpdateTiling(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit AttentionUpdateTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
 
 protected:
     bool IsCapable() override;

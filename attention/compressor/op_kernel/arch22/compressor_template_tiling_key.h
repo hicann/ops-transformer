@@ -36,8 +36,7 @@ ASCENDC_TPL_ARGS_DECL(compressor, // 算子唯一标识，与opType保持一致
                       // bit:9-10  template_id 0:empty_tensor 1:normal 2:full load
                       ASCENDC_TPL_UINT_DECL(TEMPLATE_ID, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
                       // bit:11  grad_enabled 0:关闭 1:开启 (arch22仅支持0)
-                      ASCENDC_TPL_BOOL_DECL(GRAD_ENABLED, 0, 1),);
-
+                      ASCENDC_TPL_BOOL_DECL(GRAD_ENABLED, 0, 1), );
 
 ASCENDC_TPL_SEL(
 

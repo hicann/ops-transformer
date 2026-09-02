@@ -22,8 +22,8 @@
 #include "lib/matrix/matmul/tiling.h"
 #include "dense_lightning_indexer_grad_kl_loss_common.h"
 
-
-template <typename DLIT> class DLITMatmulService {
+template <typename DLIT>
+class DLITMatmulService {
 public:
     // 中间计算数据类型为float, 高精度模式
     using T = float;
@@ -34,19 +34,14 @@ public:
 
     __aicore__ inline DLITMatmulService(){};
     __aicore__ inline void InitParams(const DLIGradKLLossConstInfo &constInfo);
-    __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> &queryGm,
-                                               GlobalTensor<KV_T> &keyGm,
-                                               GlobalTensor<Q_T> &qRopeGm,
-                                               GlobalTensor<KV_T> &keyRopeGm,
+    __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> &queryGm, GlobalTensor<KV_T> &keyGm,
+                                               GlobalTensor<Q_T> &qRopeGm, GlobalTensor<KV_T> &keyRopeGm,
                                                GlobalTensor<int64_t> &actualSeqLengthsQueryGm,
                                                GlobalTensor<int64_t> &actualSeqLengthsKeyGm,
-                                               GlobalTensor<MM12_OUT_T> &bmm1Res,
-                                               GM_ADDR mm1Res);
-    __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<Q_T> &queryIndex,
-                                               GlobalTensor<KV_T> &keyIndex,
+                                               GlobalTensor<MM12_OUT_T> &bmm1Res, GM_ADDR mm1Res);
+    __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<Q_T> &queryIndex, GlobalTensor<KV_T> &keyIndex,
                                                GlobalTensor<T> &mm2Res);
-    __aicore__ inline void InitMm5GlobalTensor(GlobalTensor<Q_T> &reluGradRes,
-                                               GlobalTensor<MM12_OUT_T> &bmm5Res);
+    __aicore__ inline void InitMm5GlobalTensor(GlobalTensor<Q_T> &reluGradRes, GlobalTensor<MM12_OUT_T> &bmm5Res);
     __aicore__ inline void InitMm5DeterGlobalTensor(GlobalTensor<MM12_OUT_T> &dKeyIndexDeterGmFloat);
     __aicore__ inline void InitMm6GlobalTensor(GlobalTensor<T> &bmm6Res);
     __aicore__ inline void InitBuffers(TPipe *pipe);
@@ -57,14 +52,15 @@ public:
     __aicore__ inline void ComputeMm34Deter(const DLIGradKLLossRunInfo &info);
     __aicore__ inline void ComputeMm4(const DLIGradKLLossRunInfo &info);
     __aicore__ inline void FreeEventID();
-    
+
 private:
     __aicore__ inline void CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
     __aicore__ inline void CopyInMm1AToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t qHeadIdx);
     __aicore__ inline void CopyInMm1BToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t kvHeadIdx, uint32_t s2InnerIdx,
                                           uint32_t actualS2Len, uint8_t pingpongFlag);
-    __aicore__ inline void CopyInMm2AToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t n1IndexId, uint32_t pingpongFlag);
+    __aicore__ inline void CopyInMm2AToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t n1IndexId,
+                                          uint32_t pingpongFlag);
     __aicore__ inline void CopyInMm2BToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t n2IndexId, uint32_t s2InnerIdx,
                                           uint32_t actualS2Len, uint8_t pingpongFlag);
     __aicore__ inline void CopyInReluGradToL1A(const DLIGradKLLossRunInfo &runInfo, uint32_t n1IndexId);
@@ -73,10 +69,14 @@ private:
     __aicore__ inline void MmadInner(struct MMParam &mmParams, LocalTensor<Q_T> &l1QTensor,
                                      LocalTensor<KV_T> &l1KTensor, LocalTensor<MM12_OUT_T> l0cTensor,
                                      uint8_t l1PingPongFlag, uint8_t l0abPingPongFlag, uint8_t l0cPingPongFlag);
-    __aicore__ inline void LoadDataMmA(LocalTensor<Q_T> &aL0Tensor, LocalTensor<Q_T> &aL1Tensor, struct MMParam &mmParam);
-    __aicore__ inline void LoadDataMmAWithTranspose(LocalTensor<Q_T> &aL0Tensor, LocalTensor<Q_T> &aL1Tensor, struct MMParam &mmParam);
-    __aicore__ inline void LoadDataMmB(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor, struct MMParam &mmParam);
-    __aicore__ inline void LoadDataMmBWithTranspose(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor, struct MMParam &mmParam);
+    __aicore__ inline void LoadDataMmA(LocalTensor<Q_T> &aL0Tensor, LocalTensor<Q_T> &aL1Tensor,
+                                       struct MMParam &mmParam);
+    __aicore__ inline void LoadDataMmAWithTranspose(LocalTensor<Q_T> &aL0Tensor, LocalTensor<Q_T> &aL1Tensor,
+                                                    struct MMParam &mmParam);
+    __aicore__ inline void LoadDataMmB(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor,
+                                       struct MMParam &mmParam);
+    __aicore__ inline void LoadDataMmBWithTranspose(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor,
+                                                    struct MMParam &mmParam);
     __aicore__ inline void FixCopyOut(struct MMParam &mmParams, GlobalTensor<MM12_OUT_T> &resGm,
                                       LocalTensor<MM12_OUT_T> l0cTensor, uint8_t l0cPingPongFlag);
     __aicore__ inline void FixOutAtomicAdd(struct MMParam &mmParams, GlobalTensor<MM12_OUT_T> &resGm,
@@ -84,7 +84,7 @@ private:
 
     static constexpr bool HAS_ROPE = DLIT::hasRope;
     static constexpr DLILayout INPUT_LAYOUT = DLIT::inputQLayout;
-    
+
     // m <> mte1 EventID
     static constexpr uint32_t L0AB_EVENT0 = EVENT_ID3;
     static constexpr uint32_t L0AB_EVENT1 = EVENT_ID4;
@@ -144,21 +144,19 @@ private:
     LocalTensor<KV_T> bL0TensorPingPong[2];
     LocalTensor<MM12_OUT_T> cL0TensorPingPong[2];
     LocalTensor<Q_T> l1ReLuGradTensor;
-
 };
 
-template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::InitParams(const DLIGradKLLossConstInfo &constInfo)
+template <typename DLIT>
+__aicore__ inline void DLITMatmulService<DLIT>::InitParams(const DLIGradKLLossConstInfo &constInfo)
 {
     this->constInfo = constInfo;
 }
 
 template <typename DLIT>
-__aicore__ inline void
-DLITMatmulService<DLIT>::InitMm1GlobalTensor(GlobalTensor<Q_T> &queryGm, GlobalTensor<KV_T> &keyGm,
-                                             GlobalTensor<Q_T> &qRopeGm, GlobalTensor<KV_T> &keyRopeGm,
-                                             GlobalTensor<int64_t> &actualSeqLengthsQueryGm,
-                                             GlobalTensor<int64_t> &actualSeqLengthsKeyGm,
-                                             GlobalTensor<MM12_OUT_T> &bmm1Res, GM_ADDR mm1Res)
+__aicore__ inline void DLITMatmulService<DLIT>::InitMm1GlobalTensor(
+    GlobalTensor<Q_T> &queryGm, GlobalTensor<KV_T> &keyGm, GlobalTensor<Q_T> &qRopeGm, GlobalTensor<KV_T> &keyRopeGm,
+    GlobalTensor<int64_t> &actualSeqLengthsQueryGm, GlobalTensor<int64_t> &actualSeqLengthsKeyGm,
+    GlobalTensor<MM12_OUT_T> &bmm1Res, GM_ADDR mm1Res)
 {
     this->queryGm = queryGm;
     this->qRopeGm = qRopeGm;
@@ -171,8 +169,9 @@ DLITMatmulService<DLIT>::InitMm1GlobalTensor(GlobalTensor<Q_T> &queryGm, GlobalT
 }
 
 template <typename DLIT>
-__aicore__ inline void
-DLITMatmulService<DLIT>::InitMm2GlobalTensor(GlobalTensor<Q_T> &queryIndex, GlobalTensor<KV_T> &keyIndex, GlobalTensor<T> &mm2Res)
+__aicore__ inline void DLITMatmulService<DLIT>::InitMm2GlobalTensor(GlobalTensor<Q_T> &queryIndex,
+                                                                    GlobalTensor<KV_T> &keyIndex,
+                                                                    GlobalTensor<T> &mm2Res)
 {
     queryIndexGm = queryIndex;
     keyIndexGm = keyIndex;
@@ -181,8 +180,8 @@ DLITMatmulService<DLIT>::InitMm2GlobalTensor(GlobalTensor<Q_T> &queryIndex, Glob
 }
 
 template <typename DLIT>
-__aicore__ inline void
-DLITMatmulService<DLIT>::InitMm5GlobalTensor(GlobalTensor<Q_T> &reluGradRes, GlobalTensor<MM12_OUT_T> &bmm5Res)
+__aicore__ inline void DLITMatmulService<DLIT>::InitMm5GlobalTensor(GlobalTensor<Q_T> &reluGradRes,
+                                                                    GlobalTensor<MM12_OUT_T> &bmm5Res)
 {
     this->reluGradRes[0] = reluGradRes;
     this->reluGradRes[1] = reluGradRes[constInfo.n1IndexSize * S1_BASE_STEP * S2_BASE_STEP];
@@ -190,28 +189,27 @@ DLITMatmulService<DLIT>::InitMm5GlobalTensor(GlobalTensor<Q_T> &reluGradRes, Glo
 }
 
 template <typename DLIT>
-__aicore__ inline void 
-DLITMatmulService<DLIT>::InitMm5DeterGlobalTensor(GlobalTensor<T> &dKeyIndexDeterGmFloat)
+__aicore__ inline void DLITMatmulService<DLIT>::InitMm5DeterGlobalTensor(GlobalTensor<T> &dKeyIndexDeterGmFloat)
 {
     this->dKeyIndexDeterGmFloat = dKeyIndexDeterGmFloat;
 }
 
 template <typename DLIT>
-__aicore__ inline void
-DLITMatmulService<DLIT>::InitMm6GlobalTensor(GlobalTensor<T> &bmm6Res)
+__aicore__ inline void DLITMatmulService<DLIT>::InitMm6GlobalTensor(GlobalTensor<T> &bmm6Res)
 {
     this->mm6ResGm = bmm6Res;
 }
 
-template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::InitBuffers(TPipe *pipe)
+template <typename DLIT>
+__aicore__ inline void DLITMatmulService<DLIT>::InitBuffers(TPipe *pipe)
 {
     // L1
-    pipe->InitBuffer(queryBuf, 128 * 192 * sizeof(Q_T));            // 48k
-    pipe->InitBuffer(keyBuf[0], 128 * 192 * sizeof(KV_T));          // 48k
-    pipe->InitBuffer(keyBuf[1], 128 * 192 * sizeof(KV_T));          // 48k
-    pipe->InitBuffer(queryIndexBuf[0], 128 * 128 * sizeof(Q_T));       // 32k
-    pipe->InitBuffer(queryIndexBuf[1], 128 * 128 * sizeof(Q_T));       // 32k
-    pipe->InitBuffer(reluGradOutBuf, 128 * 1024 * sizeof(KV_T));    // 256k
+    pipe->InitBuffer(queryBuf, 128 * 192 * sizeof(Q_T));         // 48k
+    pipe->InitBuffer(keyBuf[0], 128 * 192 * sizeof(KV_T));       // 48k
+    pipe->InitBuffer(keyBuf[1], 128 * 192 * sizeof(KV_T));       // 48k
+    pipe->InitBuffer(queryIndexBuf[0], 128 * 128 * sizeof(Q_T)); // 32k
+    pipe->InitBuffer(queryIndexBuf[1], 128 * 128 * sizeof(Q_T)); // 32k
+    pipe->InitBuffer(reluGradOutBuf, 128 * 1024 * sizeof(KV_T)); // 256k
 
     l1QueryTensor = queryBuf.Get<Q_T>();
     l1QueryRopeTensor = l1QueryTensor[CUBE_BASE_BLOCK * constInfo.dSizeQuery];
@@ -224,7 +222,7 @@ template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::InitBuf
     // l1KeyIndexTensor[0] = keyIndexBuf[0].Get<KV_T>();
     // l1KeyIndexTensor[1] = keyIndexBuf[1].Get<KV_T>();
     l1ReLuGradTensor = reluGradOutBuf.Get<Q_T>();
-    
+
     // L0A/B/C
     pipe->InitBuffer(tmpBufL0A[0], L0A_PP_SIZE); // 32K
     pipe->InitBuffer(tmpBufL0A[1], L0A_PP_SIZE); // 32K
@@ -241,7 +239,8 @@ template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::InitBuf
     cL0TensorPingPong[1] = tmpBufL0C[1].Get<MM12_OUT_T>();
 }
 
-template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::AllocEventID()
+template <typename DLIT>
+__aicore__ inline void DLITMatmulService<DLIT>::AllocEventID()
 {
     SetFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q);
     SetFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_RELU_GRAD);
@@ -251,16 +250,15 @@ template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::AllocEv
     SetFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q_INDEX[1]);
     SetFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY_INDEX[0]);
     SetFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY_INDEX[1]);
-    
 
     SetFlag<AscendC::HardEvent::M_MTE1>(SYNC_MTE1MM_FLAG[0]);
     SetFlag<AscendC::HardEvent::M_MTE1>(SYNC_MTE1MM_FLAG[1]);
     SetFlag<AscendC::HardEvent::FIX_M>(SYNC_MMFIX_FLAG[0]);
     SetFlag<AscendC::HardEvent::FIX_M>(SYNC_MMFIX_FLAG[1]);
-    
 }
 
-template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::FreeEventID()
+template <typename DLIT>
+__aicore__ inline void DLITMatmulService<DLIT>::FreeEventID()
 {
     WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q);
     WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_RELU_GRAD);
@@ -270,20 +268,16 @@ template <typename DLIT> __aicore__ inline void DLITMatmulService<DLIT>::FreeEve
     WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q_INDEX[1]);
     WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY_INDEX[0]);
     WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY_INDEX[1]);
-    
+
     WaitFlag<AscendC::HardEvent::M_MTE1>(SYNC_MTE1MM_FLAG[0]);
     WaitFlag<AscendC::HardEvent::M_MTE1>(SYNC_MTE1MM_FLAG[1]);
     WaitFlag<AscendC::HardEvent::FIX_M>(SYNC_MMFIX_FLAG[0]);
     WaitFlag<AscendC::HardEvent::FIX_M>(SYNC_MMFIX_FLAG[1]);
-    
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::CopyGmToL1(LocalTensor<KV_T> &l1Tensor,
-                                                           GlobalTensor<KV_T> &gmSrcTensor,
-                                                           uint32_t srcN,
-                                                           uint32_t srcD,
-                                                           uint32_t srcDstride)
+__aicore__ inline void DLITMatmulService<DLIT>::CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor,
+                                                           uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -298,15 +292,14 @@ __aicore__ inline void DLITMatmulService<DLIT>::CopyGmToL1(LocalTensor<KV_T> &l1
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm1AToL1(const DLIGradKLLossRunInfo &runInfo,
-                                                               uint32_t n1Idx)
+__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm1AToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t n1Idx)
 {
     uint32_t headOffset = n1Idx * constInfo.dSizeQuery;
     auto querySrcGm = queryGm[runInfo.queryTensorOffset + headOffset];
     CopyGmToL1(l1QueryTensor, querySrcGm, runInfo.curS1Size, constInfo.dSizeQuery,
                constInfo.dSizeQuery * constInfo.n1Size);
 
-    if constexpr(HAS_ROPE) {
+    if constexpr (HAS_ROPE) {
         headOffset = n1Idx * constInfo.dSizeQueryRope;
         auto queryRopeSrcGm = qRopeGm[runInfo.queryRopeTensorOffset + headOffset];
         CopyGmToL1(l1QueryRopeTensor, queryRopeSrcGm, runInfo.curS1Size, constInfo.dSizeQueryRope,
@@ -315,10 +308,8 @@ __aicore__ inline void DLITMatmulService<DLIT>::CopyInMm1AToL1(const DLIGradKLLo
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm1BToL1(const DLIGradKLLossRunInfo &runInfo,
-                                                               uint32_t n2Idx,
-                                                               uint32_t s2InnerIdx,
-                                                               uint32_t actualS2Len,
+__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm1BToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t n2Idx,
+                                                               uint32_t s2InnerIdx, uint32_t actualS2Len,
                                                                uint8_t pingpongFlag)
 {
     uint32_t keyGmOffset = runInfo.keyTensorOffset +
@@ -328,7 +319,7 @@ __aicore__ inline void DLITMatmulService<DLIT>::CopyInMm1BToL1(const DLIGradKLLo
     CopyGmToL1(l1KeyTensor[pingpongFlag], keySrcGm, actualS2Len, constInfo.dSizeQuery,
                constInfo.dSizeQuery * constInfo.n2Size);
 
-    if constexpr(HAS_ROPE) {
+    if constexpr (HAS_ROPE) {
         keyGmOffset = runInfo.keyRopeTensorOffset +
                       s2InnerIdx * constInfo.s2BaseBlk * constInfo.n2Size * constInfo.dSizeQueryRope +
                       n2Idx * constInfo.dSizeQueryRope;
@@ -339,8 +330,7 @@ __aicore__ inline void DLITMatmulService<DLIT>::CopyInMm1BToL1(const DLIGradKLLo
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm2AToL1(const DLIGradKLLossRunInfo &runInfo,
-                                                               uint32_t n1IndexId,
+__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm2AToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t n1IndexId,
                                                                uint32_t pingpongFlag)
 {
     uint32_t headOffset = n1IndexId * constInfo.dSizeQueryIndex;
@@ -350,10 +340,8 @@ __aicore__ inline void DLITMatmulService<DLIT>::CopyInMm2AToL1(const DLIGradKLLo
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm2BToL1(const DLIGradKLLossRunInfo &runInfo,
-                                                               uint32_t n2IndexId,
-                                                               uint32_t s2InnerIdx,
-                                                               uint32_t actualS2Len,
+__aicore__ inline void DLITMatmulService<DLIT>::CopyInMm2BToL1(const DLIGradKLLossRunInfo &runInfo, uint32_t n2IndexId,
+                                                               uint32_t s2InnerIdx, uint32_t actualS2Len,
                                                                uint8_t pingpongFlag)
 {
     uint32_t keyGmOffset = runInfo.keyIndexTensorOffset +
@@ -371,13 +359,11 @@ __aicore__ inline void DLITMatmulService<DLIT>::CopyInReluGradToL1A(const DLIGra
     uint32_t reluGradGmOffset = n1IndexId * runInfo.curS1Size * runInfo.curS2StepSize;
     auto reluGradWs = reluGradRes[runInfo.taskIdMod2][reluGradGmOffset];
 
-    CopyGmToL1(l1ReLuGradTensor, reluGradWs, runInfo.curS1Size, runInfo.curS2StepSize,
-               runInfo.curS2StepSize);
+    CopyGmToL1(l1ReLuGradTensor, reluGradWs, runInfo.curS1Size, runInfo.curS2StepSize, runInfo.curS2StepSize);
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmA(LocalTensor<Q_T> &aL0Tensor,
-                                                            LocalTensor<Q_T> &aL1Tensor,
+__aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmA(LocalTensor<Q_T> &aL0Tensor, LocalTensor<Q_T> &aL1Tensor,
                                                             struct MMParam &mmParam)
 {
     uint32_t alignM = AlignTo(mmParam.singleM, static_cast<uint32_t>(C0_SIZE));
@@ -412,13 +398,12 @@ __aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmAWithTranspose(LocalTe
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmB(LocalTensor<KV_T> &l0Tensor,
-                                                             LocalTensor<KV_T> &l1Tensor,
-                                                             struct MMParam &mmParam)
+__aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmB(LocalTensor<KV_T> &l0Tensor, LocalTensor<KV_T> &l1Tensor,
+                                                            struct MMParam &mmParam)
 {
     uint32_t alignK = AlignTo(mmParam.singleK, static_cast<uint32_t>(C0_SIZE));
     uint32_t alignN = AlignTo(mmParam.singleN, static_cast<uint32_t>(C0_SIZE));
-    
+
     LoadData2DParams loadData2DParams;
     loadData2DParams.startIndex = 0;
     loadData2DParams.repeatTimes = alignK * alignN / CUBE_MATRIX_SIZE;
@@ -427,17 +412,16 @@ __aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmB(LocalTensor<KV_T> &l
     loadData2DParams.ifTranspose = false;
 
     LoadData(l0Tensor, l1Tensor, loadData2DParams);
-    
 }
 
 template <typename DLIT>
 __aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmBWithTranspose(LocalTensor<KV_T> &l0Tensor,
-                                                                          LocalTensor<KV_T> &l1Tensor,
-                                                                          struct MMParam &mmParam)
+                                                                         LocalTensor<KV_T> &l1Tensor,
+                                                                         struct MMParam &mmParam)
 {
     uint32_t alignK = AlignTo(mmParam.singleK, static_cast<uint32_t>(C0_SIZE));
     uint32_t alignN = AlignTo(mmParam.singleN, static_cast<uint32_t>(C0_SIZE));
-    
+
     LoadData2DParams loadData2DParams;
     loadData2DParams.startIndex = 0;
     loadData2DParams.repeatTimes = alignN / C0_SIZE;
@@ -448,18 +432,14 @@ __aicore__ inline void DLITMatmulService<DLIT>::LoadDataMmBWithTranspose(LocalTe
     for (int32_t i = 0; i < alignK / C0_SIZE; i++) {
         LoadData(l0Tensor[i * alignN * C0_SIZE], l1Tensor[i * CUBE_MATRIX_SIZE], loadData2DParams);
     }
-    
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::MmadInner(struct MMParam &mmParams,
-                                                          LocalTensor<Q_T> &l1QTensor,
+__aicore__ inline void DLITMatmulService<DLIT>::MmadInner(struct MMParam &mmParams, LocalTensor<Q_T> &l1QTensor,
                                                           LocalTensor<KV_T> &l1KTensor,
-                                                          LocalTensor<MM12_OUT_T> l0cTensor,
-                                                          uint8_t l1PingPongFlag,
-                                                          uint8_t l0abPingPongFlag,
-                                                          uint8_t l0cPingPongFlag) {
-
+                                                          LocalTensor<MM12_OUT_T> l0cTensor, uint8_t l1PingPongFlag,
+                                                          uint8_t l0abPingPongFlag, uint8_t l0cPingPongFlag)
+{
     MmadParams mmadParams;
     mmadParams.m = mmParams.singleM == 1 ? 16 : mmParams.singleM;
     mmadParams.n = mmParams.singleN;
@@ -472,8 +452,8 @@ __aicore__ inline void DLITMatmulService<DLIT>::MmadInner(struct MMParam &mmPara
     if (mmParams.isRightReuse) {
         l0bTensor = bL0TensorPingPong[l1PingPongFlag & 1];
     }
-    
-    WaitFlag<AscendC::HardEvent::M_MTE1>(SYNC_MTE1MM_FLAG[l0abPingPongFlag & 1]);///mte1等matmul完成后开始下一次搬运
+
+    WaitFlag<AscendC::HardEvent::M_MTE1>(SYNC_MTE1MM_FLAG[l0abPingPongFlag & 1]); /// mte1等matmul完成后开始下一次搬运
     if (mmParams.isLeftTranspose) {
         LoadDataMmAWithTranspose(l0aTensor, l1QTensor, mmParams);
     } else {
@@ -486,10 +466,10 @@ __aicore__ inline void DLITMatmulService<DLIT>::MmadInner(struct MMParam &mmPara
             LoadDataMmB(l0bTensor, l1KTensor, mmParams);
         }
     }
-    SetFlag<AscendC::HardEvent::MTE1_M>(SYNC_MTE1MM_FLAG[l0abPingPongFlag & 1]);//L0A L0B搬完发给matmul可以运算
-    WaitFlag<AscendC::HardEvent::MTE1_M>(SYNC_MTE1MM_FLAG[l0abPingPongFlag & 1]);///matmul等mte1完成
-    WaitFlag<AscendC::HardEvent::FIX_M>(SYNC_MMFIX_FLAG[l0cPingPongFlag & 1]);//mte1等mte2搬完
-    
+    SetFlag<AscendC::HardEvent::MTE1_M>(SYNC_MTE1MM_FLAG[l0abPingPongFlag & 1]); // L0A L0B搬完发给matmul可以运算
+    WaitFlag<AscendC::HardEvent::MTE1_M>(SYNC_MTE1MM_FLAG[l0abPingPongFlag & 1]); /// matmul等mte1完成
+    WaitFlag<AscendC::HardEvent::FIX_M>(SYNC_MMFIX_FLAG[l0cPingPongFlag & 1]);    // mte1等mte2搬完
+
     Mmad(l0cTensor, l0aTensor, l0bTensor, mmadParams);
     if (mmParams.needAccumL0C) {
         PipeBarrier<PIPE_M>();
@@ -498,10 +478,8 @@ __aicore__ inline void DLITMatmulService<DLIT>::MmadInner(struct MMParam &mmPara
 }
 
 template <typename DLIT>
-__aicore__ inline void DLITMatmulService<DLIT>::FixCopyOut(struct MMParam &mmParams,
-                                                           GlobalTensor<MM12_OUT_T> &resGm,
-                                                           LocalTensor<MM12_OUT_T> l0cTensor,
-                                                           uint8_t l0cPingPongFlag)
+__aicore__ inline void DLITMatmulService<DLIT>::FixCopyOut(struct MMParam &mmParams, GlobalTensor<MM12_OUT_T> &resGm,
+                                                           LocalTensor<MM12_OUT_T> l0cTensor, uint8_t l0cPingPongFlag)
 {
     if (mmParams.isFixOut) {
         SetFlag<AscendC::HardEvent::M_FIX>(SYNC_MMFIX_FLAG[l0cPingPongFlag & 1]);
@@ -555,36 +533,39 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm1(const DLIGradKLLossRu
         uint32_t dstHeadOffset = qHeadIdx * info.curS1Size * info.curS2StepSize;
         WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q);
         CopyInMm1AToL1(info, qHeadIdx);
-        
+
         for (uint32_t s2InnerIdx = 0; s2InnerIdx < info.curS2LoopTimes; s2InnerIdx++) {
             mmParams.dstFixOffset = dstHeadOffset + s2InnerIdx * constInfo.s2BaseBlk;
             uint32_t curS2BlkSize = (s2InnerIdx == info.curS2LoopTimes - 1) ?
-                                    (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) : constInfo.s2BaseBlk;
+                                        (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) :
+                                        constInfo.s2BaseBlk;
             mmParams.singleN = curS2BlkSize;
-            
+
             WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY[l1PingPongFlag & 1]);
             CopyInMm1BToL1(info, kvHeadIdx, s2InnerIdx, curS2BlkSize, l1PingPongFlag);
 
             SetFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY[l1PingPongFlag & 1]);
             WaitFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY[l1PingPongFlag & 1]);
-            
+
             for (uint32_t kIdx = 0; kIdx < constInfo.dLoopTimesCube; kIdx++) {
                 mmParams.singleK = (kIdx == constInfo.dLoopTimesCube - 1) ?
-                                   (constInfo.dSizeActual - kIdx * CUBE_BASE_BLOCK) : CUBE_BASE_BLOCK;
+                                       (constInfo.dSizeActual - kIdx * CUBE_BASE_BLOCK) :
+                                       CUBE_BASE_BLOCK;
                 mmParams.isFixOut = (kIdx == constInfo.dLoopTimesCube - 1);
                 mmParams.isL0CInit = (kIdx == 0);
-                
+
                 auto mm1DstGm = mm1ResGm[info.taskIdMod2][mmParams.dstFixOffset];
                 auto l1SrcQTensor = l1QueryTensor[kIdx * CUBE_BASE_BLOCK * CUBE_BASE_BLOCK];
                 auto l1SrcKTensor = l1KeyTensor[l1PingPongFlag & 1][kIdx * CUBE_BASE_BLOCK * CUBE_BASE_BLOCK];
                 LocalTensor<MM12_OUT_T> l0cTensor = cL0TensorPingPong[l0cPingPongFlag & 1];
-                MmadInner(mmParams, l1SrcQTensor, l1SrcKTensor, l0cTensor,
-                          l1PingPongFlag, l0abPingPongFlag, l0cPingPongFlag);
+                MmadInner(mmParams, l1SrcQTensor, l1SrcKTensor, l0cTensor, l1PingPongFlag, l0abPingPongFlag,
+                          l0cPingPongFlag);
                 FixCopyOut(mmParams, mm1DstGm, l0cTensor, l0cPingPongFlag);
                 l0abPingPongFlag = (l0abPingPongFlag + 1) & 1;
             }
 
-            SetFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY[l1PingPongFlag & 1]);   //L0B搬完发给MTE2可以搬到L1 下一轮发射
+            SetFlag<AscendC::HardEvent::MTE1_MTE2>(
+                SYNC_MTE21_FLAG_KEY[l1PingPongFlag & 1]); // L0B搬完发给MTE2可以搬到L1 下一轮发射
             l0cPingPongFlag = (l0cPingPongFlag + 1) & 1;
             l1PingPongFlag = (l1PingPongFlag + 1) & 1;
         }
@@ -605,25 +586,26 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm2(const DLIGradKLLossRu
     mmParams.isFixOut = true;
     mmParams.isFixRelu = true;
     mmParams.isL0CInit = true;
-    
+
     for (uint32_t n1IndexId = 0; n1IndexId < this->constInfo.n1IndexSize; n1IndexId++) {
         uint32_t n2IndexId = n1IndexId / constInfo.gSizeQueryIndex;
         uint32_t dstHeadOffset = n1IndexId * info.curS1Size * info.curS2StepSize;
         WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q_INDEX[l1PingPongFlag & 1]);
         CopyInMm2AToL1(info, n1IndexId, l1PingPongFlag);
-        
+
         for (uint32_t s2InnerIdx = 0; s2InnerIdx < info.curS2LoopTimes; s2InnerIdx++) {
             mmParams.dstFixOffset = dstHeadOffset + s2InnerIdx * constInfo.s2BaseBlk;
             uint32_t curS2BlkSize = (s2InnerIdx == info.curS2LoopTimes - 1) ?
-                                    (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) : constInfo.s2BaseBlk;
+                                        (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) :
+                                        constInfo.s2BaseBlk;
             mmParams.singleN = curS2BlkSize;
-            
+
             WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY[l0PingPongFlag & 1]);
             CopyInMm2BToL1(info, n2IndexId, s2InnerIdx, curS2BlkSize, l0PingPongFlag);
 
             SetFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY_INDEX[l0PingPongFlag & 1]);
             WaitFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY_INDEX[l0PingPongFlag & 1]);
-            
+
             auto mm2DstGm = mm2ResGm[info.taskIdMod2][mmParams.dstFixOffset];
             auto l1SrcQTensor = l1QIndexTensor[l1PingPongFlag & 1];
             auto l1SrcKTensor = l1KeyTensor[l0PingPongFlag & 1];
@@ -652,7 +634,7 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34(const DLIGradKLLossR
     mm3Params.isFixOut = true;
     mm3Params.isL0CInit = true;
     mm3Params.isLeftTranspose = true;
-    mm3Params.isRightTranspose = true;      // NZ -> ZN
+    mm3Params.isRightTranspose = true; // NZ -> ZN
     // mm3Params.isRightReuse = true;
 
     MMParam mm4Params;
@@ -668,7 +650,7 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34(const DLIGradKLLossR
         // 一个head拷贝一次, mm3和mm4复用
         WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_RELU_GRAD);
         CopyInReluGradToL1A(info, n1IndexId);
-        
+
         // matmul 3
         WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q_INDEX[l1PingPongFlag & 1]);
         CopyInMm2AToL1(info, n1IndexId, l1PingPongFlag);
@@ -677,7 +659,8 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34(const DLIGradKLLossR
 
         for (uint32_t s2InnerIdx = 0; s2InnerIdx < info.curS2LoopTimes; s2InnerIdx++) {
             uint32_t curS2BlkSize = (s2InnerIdx == info.curS2LoopTimes - 1) ?
-                                    (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) : constInfo.s2BaseBlk;
+                                        (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) :
+                                        constInfo.s2BaseBlk;
             mm3Params.singleM = curS2BlkSize;
             // mm3Params.needCopyRight = (s2InnerIdx == 0);
 
@@ -686,9 +669,10 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34(const DLIGradKLLossR
             auto l1bTensor = l1QIndexTensor[l1PingPongFlag & 1];
             LocalTensor<MM12_OUT_T> l0cTensor = cL0TensorPingPong[l0abPingPongFlag & 1];
 
-            uint32_t dKeyGmOffset = info.keyIndexTensorOffset
-                                    + s2InnerIdx * constInfo.s2BaseBlk * constInfo.n2IndexSize * constInfo.dSizeQueryIndex
-                                    + n2IndexId * constInfo.dSizeQueryIndex;
+            uint32_t dKeyGmOffset =
+                info.keyIndexTensorOffset +
+                s2InnerIdx * constInfo.s2BaseBlk * constInfo.n2IndexSize * constInfo.dSizeQueryIndex +
+                n2IndexId * constInfo.dSizeQueryIndex;
             auto dstGm = mm5ResGm[dKeyGmOffset];
             MmadInner(mm3Params, l1aTensor, l1bTensor, l0cTensor, l1PingPongFlag, l0abPingPongFlag, l0abPingPongFlag);
             FixOutAtomicAdd(mm3Params, dstGm, l0cTensor, l0abPingPongFlag);
@@ -705,13 +689,14 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34(const DLIGradKLLossR
 
         for (uint32_t s2InnerIdx = 0; s2InnerIdx < info.curS2LoopTimes; s2InnerIdx++) {
             uint32_t curS2BlkSize = (s2InnerIdx == info.curS2LoopTimes - 1) ?
-                                    (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) : constInfo.s2BaseBlk;
+                                        (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) :
+                                        constInfo.s2BaseBlk;
             mm4Params.singleK = curS2BlkSize;
             mm4Params.isFixOut = (s2InnerIdx == info.curS2LoopTimes - 1);
             mm4Params.isL0CInit = (s2InnerIdx == 0);
             WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY[l0abPingPongFlag & 1]);
             CopyInMm2BToL1(info, n2IndexId, s2InnerIdx, curS2BlkSize, l0abPingPongFlag);
-            
+
             SetFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY_INDEX[l0abPingPongFlag & 1]);
             WaitFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY_INDEX[l0abPingPongFlag & 1]);
 
@@ -753,7 +738,7 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34Deter(const DLIGradKL
     mm3Params.isFixOut = true;
     mm3Params.isL0CInit = true;
     mm3Params.isLeftTranspose = true;
-    mm3Params.isRightTranspose = true;      // NZ -> ZN
+    mm3Params.isRightTranspose = true; // NZ -> ZN
 
     MMParam mm4Params;
     mm4Params.singleM = info.curS1Size;
@@ -768,7 +753,7 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34Deter(const DLIGradKL
         // 一个head拷贝一次, mm3和mm4复用
         WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_RELU_GRAD);
         CopyInReluGradToL1A(info, n1IndexId);
-        
+
         // matmul 3
         WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_Q_INDEX[l1PingPongFlag & 1]);
         CopyInMm2AToL1(info, n1IndexId, l1PingPongFlag);
@@ -779,16 +764,18 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34Deter(const DLIGradKL
         mm3Params.atomicFlag = (n1IndexId != 0);
         for (uint32_t s2InnerIdx = 0; s2InnerIdx < info.curS2LoopTimes; s2InnerIdx++) {
             uint32_t curS2BlkSize = (s2InnerIdx == info.curS2LoopTimes - 1) ?
-                                    (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) : constInfo.s2BaseBlk;
+                                        (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) :
+                                        constInfo.s2BaseBlk;
             mm3Params.singleM = curS2BlkSize;
             uint32_t l1ReluGradOffset = s2InnerIdx * constInfo.s2BaseBlk * info.curS1SizeAlign16;
             auto l1aTensor = l1ReLuGradTensor[l1ReluGradOffset];
             auto l1bTensor = l1QIndexTensor[l1PingPongFlag & 1];
             LocalTensor<MM12_OUT_T> l0cTensor = cL0TensorPingPong[l0abPingPongFlag & 1];
 
-            uint32_t dKeyGmOffset = constInfo.dKeyDeterGmOffset +
-                                    s2InnerIdx * constInfo.s2BaseBlk * constInfo.n2IndexSize * constInfo.dSizeQueryIndex +
-                                    n2IndexId * constInfo.dSizeQueryIndex;
+            uint32_t dKeyGmOffset =
+                constInfo.dKeyDeterGmOffset +
+                s2InnerIdx * constInfo.s2BaseBlk * constInfo.n2IndexSize * constInfo.dSizeQueryIndex +
+                n2IndexId * constInfo.dSizeQueryIndex;
             auto dstGm = dKeyIndexDeterGmFloat[dKeyGmOffset];
             MmadInner(mm3Params, l1aTensor, l1bTensor, l0cTensor, l1PingPongFlag, l0abPingPongFlag, l0abPingPongFlag);
             FixOutAtomicAdd(mm3Params, dstGm, l0cTensor, l0abPingPongFlag);
@@ -804,13 +791,14 @@ __aicore__ inline void DLITMatmulService<DLIT>::ComputeMm34Deter(const DLIGradKL
 
         for (uint32_t s2InnerIdx = 0; s2InnerIdx < info.curS2LoopTimes; s2InnerIdx++) {
             uint32_t curS2BlkSize = (s2InnerIdx == info.curS2LoopTimes - 1) ?
-                                    (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) : constInfo.s2BaseBlk;
+                                        (info.curS2StepSize - s2InnerIdx * constInfo.s2BaseBlk) :
+                                        constInfo.s2BaseBlk;
             mm4Params.singleK = curS2BlkSize;
             mm4Params.isFixOut = (s2InnerIdx == info.curS2LoopTimes - 1);
             mm4Params.isL0CInit = (s2InnerIdx == 0);
             WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SYNC_MTE21_FLAG_KEY[l0abPingPongFlag & 1]);
             CopyInMm2BToL1(info, n2IndexId, s2InnerIdx, curS2BlkSize, l0abPingPongFlag);
-            
+
             SetFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY_INDEX[l0abPingPongFlag & 1]);
             WaitFlag<AscendC::HardEvent::MTE2_MTE1>(SYNC_MTE21_FLAG_KEY_INDEX[l0abPingPongFlag & 1]);
 

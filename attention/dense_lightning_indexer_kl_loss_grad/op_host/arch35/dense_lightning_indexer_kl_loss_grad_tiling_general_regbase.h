@@ -70,8 +70,14 @@ protected:
         maxSeqlenK = 0;
     }
 
-    [[nodiscard]] gert::TilingContext *GetContext() { return context_; }
-    bool IsCapable() { return true; }
+    [[nodiscard]] gert::TilingContext *GetContext()
+    {
+        return context_;
+    }
+    bool IsCapable()
+    {
+        return true;
+    }
     // 1、获取平台信息比如CoreNum、UB/L1/L0C资源大小
     ge::graphStatus GetPlatformInfo() override;
     // 2、获取INPUT/OUTPUT/ATTR信息

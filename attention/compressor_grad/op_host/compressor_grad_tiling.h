@@ -91,36 +91,34 @@ static const std::string D_APE_NAME = "d_ape";
 static std::string DataTypeToSerialString(ge::DataType type);
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
-    {X_NAME,                  {ge::DT_BF16, ge::DT_FLOAT16}},
-    {WKV_NAME,                {ge::DT_BF16, ge::DT_FLOAT16}},
-    {WGATE_NAME,              {ge::DT_BF16, ge::DT_FLOAT16}},
-    {D_CMP_KV_NAME,           {ge::DT_BF16, ge::DT_FLOAT16}},
-    {SOFTMAX_SCORE_NAME,      {ge::DT_FLOAT}},
-    {KV_NAME,                 {ge::DT_FLOAT}},
-    {CU_SEQLENS_NAME,         {ge::DT_INT32}},
-    {SEQUSED_NAME,            {ge::DT_INT32}},
-    {START_POS_NAME,          {ge::DT_INT32}},
-    {D_X_NAME,                {ge::DT_BF16, ge::DT_FLOAT16}},
-    {D_WKV_NAME,              {ge::DT_BF16, ge::DT_FLOAT16}},
-    {D_WGATE_NAME,            {ge::DT_BF16, ge::DT_FLOAT16}},
-    {D_APE_NAME,              {ge::DT_FLOAT}}
-};
+    {X_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {WKV_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {WGATE_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {D_CMP_KV_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {SOFTMAX_SCORE_NAME, {ge::DT_FLOAT}},
+    {KV_NAME, {ge::DT_FLOAT}},
+    {CU_SEQLENS_NAME, {ge::DT_INT32}},
+    {SEQUSED_NAME, {ge::DT_INT32}},
+    {START_POS_NAME, {ge::DT_INT32}},
+    {D_X_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {D_WKV_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {D_WGATE_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {D_APE_NAME, {ge::DT_FLOAT}}};
 
 const std::map<std::string, std::vector<uint32_t>> DIM_NUM_MAP = {
-    {X_NAME,                  {COMPRESSOR_GRAD_DIM_NUM_2, COMPRESSOR_GRAD_DIM_NUM_3}},
-    {WKV_NAME,                {COMPRESSOR_GRAD_DIM_NUM_2}},
-    {WGATE_NAME,              {COMPRESSOR_GRAD_DIM_NUM_2}},
-    {D_CMP_KV_NAME,           {COMPRESSOR_GRAD_DIM_NUM_2, COMPRESSOR_GRAD_DIM_NUM_3}},
-    {SOFTMAX_SCORE_NAME,      {COMPRESSOR_GRAD_DIM_NUM_3, COMPRESSOR_GRAD_DIM_NUM_4}},
-    {KV_NAME,                 {COMPRESSOR_GRAD_DIM_NUM_3, COMPRESSOR_GRAD_DIM_NUM_4}},
-    {CU_SEQLENS_NAME,         {COMPRESSOR_GRAD_DIM_NUM_1}},
-    {SEQUSED_NAME,            {COMPRESSOR_GRAD_DIM_NUM_1}},
-    {START_POS_NAME,          {COMPRESSOR_GRAD_DIM_NUM_1}},
-    {D_X_NAME,                {COMPRESSOR_GRAD_DIM_NUM_2, COMPRESSOR_GRAD_DIM_NUM_3}},
-    {D_WKV_NAME,              {COMPRESSOR_GRAD_DIM_NUM_2}},
-    {D_WGATE_NAME,            {COMPRESSOR_GRAD_DIM_NUM_2}},
-    {D_APE_NAME,              {COMPRESSOR_GRAD_DIM_NUM_2}}
-};
+    {X_NAME, {COMPRESSOR_GRAD_DIM_NUM_2, COMPRESSOR_GRAD_DIM_NUM_3}},
+    {WKV_NAME, {COMPRESSOR_GRAD_DIM_NUM_2}},
+    {WGATE_NAME, {COMPRESSOR_GRAD_DIM_NUM_2}},
+    {D_CMP_KV_NAME, {COMPRESSOR_GRAD_DIM_NUM_2, COMPRESSOR_GRAD_DIM_NUM_3}},
+    {SOFTMAX_SCORE_NAME, {COMPRESSOR_GRAD_DIM_NUM_3, COMPRESSOR_GRAD_DIM_NUM_4}},
+    {KV_NAME, {COMPRESSOR_GRAD_DIM_NUM_3, COMPRESSOR_GRAD_DIM_NUM_4}},
+    {CU_SEQLENS_NAME, {COMPRESSOR_GRAD_DIM_NUM_1}},
+    {SEQUSED_NAME, {COMPRESSOR_GRAD_DIM_NUM_1}},
+    {START_POS_NAME, {COMPRESSOR_GRAD_DIM_NUM_1}},
+    {D_X_NAME, {COMPRESSOR_GRAD_DIM_NUM_2, COMPRESSOR_GRAD_DIM_NUM_3}},
+    {D_WKV_NAME, {COMPRESSOR_GRAD_DIM_NUM_2}},
+    {D_WGATE_NAME, {COMPRESSOR_GRAD_DIM_NUM_2}},
+    {D_APE_NAME, {COMPRESSOR_GRAD_DIM_NUM_2}}};
 
 static const std::map<std::string, uint32_t> LAYOUT_DIM_MAP = {
     {"BSH", COMPRESSOR_GRAD_DIM_NUM_3},
@@ -174,15 +172,15 @@ struct OptionalParaInfo {
     const gert::Tensor *tensor;
 };
 
-const std::vector<uint32_t> COFF {1, 2};
-const std::vector<uint32_t> HEAD_DIM {128, 512};
+const std::vector<uint32_t> COFF{1, 2};
+const std::vector<uint32_t> HEAD_DIM{128, 512};
 
 enum class LayoutType {
     LAYOUT_BSH,
     LAYOUT_TH
 };
 
-enum class TemplateId:uint8_t {
+enum class TemplateId : uint8_t {
     NORMAL = 0,
     EMPTY_X = 1,
     FULL_LOAD = 2
@@ -192,7 +190,7 @@ struct CompressorGradContext {
     const char *opName;
     const char *opType;
     fe::PlatFormInfos *platformInfo;
-    
+
     RequiredParaInfo x;
     RequiredParaInfo wkv;
     RequiredParaInfo wgate;
@@ -220,27 +218,27 @@ struct CompressorGradContext {
 };
 
 struct CompressorGradSplitCoreParams {
-        uint32_t mStart;
-        uint32_t mEnd;
-        uint32_t nStart;
-        uint32_t nEnd;
-        uint32_t kStart;
-        uint32_t kEnd;
-    };
+    uint32_t mStart;
+    uint32_t mEnd;
+    uint32_t nStart;
+    uint32_t nEnd;
+    uint32_t kStart;
+    uint32_t kEnd;
+};
 
 // 1. 基础参数结构体
 struct CompressorGradBaseParams {
-    uint32_t batchSize = 0;             // bastch size（批大小）
-    uint32_t seqSize = 0;               // sequence size（kvs大小）
-    uint32_t hiddenSize = 0;            // hidden size（隐藏层大小）
-    uint32_t tokenSize = 0;             // token size = batchSize * seqSize(token总数：批大小x序列1长度)
-    uint32_t headDim = 0;               // head size of kv
-    uint32_t featureDim = 0;               // head size of kv
-    uint32_t csSize = 0;                // Compress sequence len
-    uint32_t cmpRatio = 4;              // Compress ratio
-    uint32_t usedCoreNum = 0;           // 使用核数
-    uint32_t nSize = 0;                 // 预留字段（当前未参与 tiling 决策）
-    uint64_t stateCacheStrideDim0 = 0;  // stateCache第0维的stride
+    uint32_t batchSize = 0;            // bastch size（批大小）
+    uint32_t seqSize = 0;              // sequence size（kvs大小）
+    uint32_t hiddenSize = 0;           // hidden size（隐藏层大小）
+    uint32_t tokenSize = 0;            // token size = batchSize * seqSize(token总数：批大小x序列1长度)
+    uint32_t headDim = 0;              // head size of kv
+    uint32_t featureDim = 0;           // head size of kv
+    uint32_t csSize = 0;               // Compress sequence len
+    uint32_t cmpRatio = 4;             // Compress ratio
+    uint32_t usedCoreNum = 0;          // 使用核数
+    uint32_t nSize = 0;                // 预留字段（当前未参与 tiling 决策）
+    uint64_t stateCacheStrideDim0 = 0; // stateCache第0维的stride
     uint32_t kBaseNum = 0;
     uint32_t kBaseSize = 0;
     uint32_t coreGroupNum = 0;

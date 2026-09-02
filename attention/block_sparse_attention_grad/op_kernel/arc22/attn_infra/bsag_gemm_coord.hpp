@@ -27,8 +27,7 @@ template <
     /// Columns of matrix product
     uint32_t N_ = 1,
     /// Inner dimension of matrix product
-    uint32_t K_ = 1
->
+    uint32_t K_ = 1>
 struct GemmShape {
     static constexpr uint32_t M = M_;
     static constexpr uint32_t N = N_;
@@ -91,11 +90,15 @@ struct GemmCoord : public Coord<3, uint32_t> {
 
     /// Constructs from Coord<3> and a batch
     HOST_DEVICE
-    GemmCoord(Coord<3, Index> const &coord) : Base(coord) {}
+    GemmCoord(Coord<3, Index> const &coord)
+        : Base(coord)
+    {}
 
     /// Helper to construct from a K, N, M, batch variables
     HOST_DEVICE
-    GemmCoord(Index m, Index n, Index k) : Base(MakeCoord(m, n, k)) {}
+    GemmCoord(Index m, Index n, Index k)
+        : Base(MakeCoord(m, n, k))
+    {}
 
     /// Returns the Gemm M coordinate
     HOST_DEVICE
@@ -160,4 +163,4 @@ struct GemmCoord : public Coord<3, uint32_t> {
 
 } // namespace NpuArch
 
-#endif  // GEMM_COORD_HPP
+#endif // GEMM_COORD_HPP

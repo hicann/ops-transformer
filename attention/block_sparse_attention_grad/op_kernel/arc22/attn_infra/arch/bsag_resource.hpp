@@ -14,10 +14,9 @@
 #include "../../attn_infra/bsag_base_defs.hpp"
 #include "../../attn_infra/arch/bsag_local_tensor_buffer.hpp"
 
-namespace NpuArch::Arch
-{
+namespace NpuArch::Arch {
 
-template<class ArchTag>
+template <class ArchTag>
 struct Resource {
 public:
     AscendC::TPipe pipe;
@@ -29,8 +28,7 @@ public:
     LocalTensorBuffer<ArchTag, AscendC::TPosition::CO1> l0CBuf;
     LocalTensorBuffer<ArchTag, AscendC::TPosition::VECCALC> ubBuf;
 
-    __aicore__ inline
-    Resource()
+    __aicore__ inline Resource()
     {
         // The initialization of AscendC::Tpipe will insert some synchronization interfaces,
         // which may conflict with the usage by users. Therefore, the "destroy" interface is used for releasing.

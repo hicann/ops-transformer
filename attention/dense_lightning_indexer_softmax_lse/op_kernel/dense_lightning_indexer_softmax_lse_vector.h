@@ -135,6 +135,6 @@ __aicore__ inline void DoReduce(const LocalTensor<float> &srcTensor, LocalTensor
     AscendC::Add(dstTensor, srcTensor, srcTensor[aNum], aNum);
     AscendC::PipeBarrier<PIPE_V>();
 }
-}
+} // namespace DenseLISoftmaxLseServiceVec
 
 #endif // DENSE_LIGHTNING_INDEXER_SOFTMAX_LSE_VECTOR_H

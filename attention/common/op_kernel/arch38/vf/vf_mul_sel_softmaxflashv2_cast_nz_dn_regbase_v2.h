@@ -24,11 +24,12 @@ using namespace MicroAPI;
 #define DROPOUT false
 
 template <typename T, typename T2, uint16_t ubN = 128>
-__aicore__ inline void
-ProcessVec1DnNoUpdateRegbaseV2(const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor,
-                               const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
-                               const LocalTensor<float> &expMaxTensor, const uint32_t m, const uint32_t originN,
-                               const T scale, const T minValue, float quantScale1)
+__aicore__ inline void ProcessVec1DnNoUpdateRegbaseV2(const LocalTensor<T2> &dstTensor,
+                                                      const LocalTensor<float> &expSumTensor,
+                                                      const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
+                                                      const LocalTensor<float> &expMaxTensor, const uint32_t m,
+                                                      const uint32_t originN, const T scale, const T minValue,
+                                                      float quantScale1)
 {
     constexpr uint32_t stride = (ubN << 15) | (0x1 << 16) | 0x1;
     constexpr uint32_t blockN = 32;  // 一个block包含32个int8数据
@@ -242,11 +243,12 @@ ProcessVec1DnNoUpdateRegbaseV2(const LocalTensor<T2> &dstTensor, const LocalTens
 }
 
 template <typename T, typename T2, uint16_t ubN = 128>
-__aicore__ inline void
-ProcessVec1DnUpdateRegbaseV2(const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor,
-                             const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
-                             const LocalTensor<float> &expMaxTensor, const uint32_t m, const uint32_t originN,
-                             const T scale, const T minValue, float quantScale1)
+__aicore__ inline void ProcessVec1DnUpdateRegbaseV2(const LocalTensor<T2> &dstTensor,
+                                                    const LocalTensor<float> &expSumTensor,
+                                                    const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
+                                                    const LocalTensor<float> &expMaxTensor, const uint32_t m,
+                                                    const uint32_t originN, const T scale, const T minValue,
+                                                    float quantScale1)
 {
     constexpr uint32_t stride = (ubN << 15) | (0x1 << 16) | 0x1;
     constexpr uint32_t blockN = 32;  // 一个block包含32个fp16数据

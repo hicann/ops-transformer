@@ -72,8 +72,8 @@ protected:
                                      const DenseLISoftmaxLseCommon::RunInfo &runInfo);
     __aicore__ inline void LoadKeyToL0b(uint64_t s2L1Offset, uint64_t s2L1RealSize, uint64_t s2L0RealSize,
                                         const DenseLISoftmaxLseCommon::RunInfo &runInfo);
-    __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize,
-                                          uint64_t s1gL0RealSize, const DenseLISoftmaxLseCommon::RunInfo &runInfo);
+    __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize, uint64_t s1gL0RealSize,
+                                          const DenseLISoftmaxLseCommon::RunInfo &runInfo);
     __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gL1Offset,
                                       const DenseLISoftmaxLseCommon::RunInfo &runInfo);
     __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset,
@@ -128,8 +128,8 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::InitBuffers(TPipe *pipe)
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseMatmul<T>::InitMm1GlobalTensor(const GlobalTensor<K_T> &keyGm,
-                                                                    const GlobalTensor<Q_T> &queryGm,
-                                                                    const GlobalTensor<float> &mm1ResGm)
+                                                                       const GlobalTensor<Q_T> &queryGm,
+                                                                       const GlobalTensor<float> &mm1ResGm)
 {
     keyGm_ = keyGm;
     queryGm_ = queryGm;
@@ -194,7 +194,7 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::ComputeMm1(const DenseLISoftm
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseMatmul<T>::KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                         const DenseLISoftmaxLseCommon::RunInfo &runInfo)
+                                                            const DenseLISoftmaxLseCommon::RunInfo &runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -202,7 +202,8 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::KeyNd2Nz(uint64_t s2L1RealSiz
         // 搬运按照S2_BASIC_BLOCK_L0*D_BASIC_BLOCK_L0的方式在l1上排布, 方便后续mte1
         // 根据s2的offset判断当前属于前一个L0分型还是后一个L0分型，暂时只支持两个分型
         uint64_t s2Mte2Size = (s2L1RealSize <= S2_BASIC_BLOCK_L0 || s2L1Offset >= S2_BASIC_BLOCK_L0) ?
-                               s2L1RealSize - s2L1Offset : S2_BASIC_BLOCK_L0 - s2L1Offset;
+                                  s2L1RealSize - s2L1Offset :
+                                  S2_BASIC_BLOCK_L0 - s2L1Offset;
 
         Nd2NzParams nd2nzPara;
         nd2nzPara.ndNum = 1;
@@ -210,16 +211,17 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::KeyNd2Nz(uint64_t s2L1RealSiz
         nd2nzPara.dValue = constInfo_.headDim;
         nd2nzPara.srcDValue = constInfo_.headDim;
         nd2nzPara.dstNzC0Stride = s2L1Offset >= S2_BASIC_BLOCK_L0 ?
-                                  CeilAlign(s2L1RealSize - S2_BASIC_BLOCK_L0, (uint64_t)BLOCK_CUBE) :
-                                  (s2L1RealSize > S2_BASIC_BLOCK_L0 ? S2_BASIC_BLOCK_L0 :
-                                  CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE)); // 对齐到16 单位block
+                                      CeilAlign(s2L1RealSize - S2_BASIC_BLOCK_L0, (uint64_t)BLOCK_CUBE) :
+                                      (s2L1RealSize > S2_BASIC_BLOCK_L0 ?
+                                           S2_BASIC_BLOCK_L0 :
+                                           CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE)); // 对齐到16 单位block
         nd2nzPara.dstNzNStride = 1;
         nd2nzPara.srcNdMatrixStride = 0;
         nd2nzPara.dstNzMatrixStride = 0;
         DataCopy(keyL1_[(keyL1BufIdx_ % KEY_BUF_NUM) * KEY_BUFFER_OFFSET +
                         (s2L1Offset >= S2_BASIC_BLOCK_L0 ?
-                        S2_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 + (s2L1Offset - S2_BASIC_BLOCK_L0) * BLOCK_CUBE :
-                        s2L1Offset * BLOCK_CUBE)],
+                             S2_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 + (s2L1Offset - S2_BASIC_BLOCK_L0) * BLOCK_CUBE :
+                             s2L1Offset * BLOCK_CUBE)],
                  keyGm_[keyGmOffset], nd2nzPara);
         s2L1Offset += s2Mte2Size;
     }
@@ -228,7 +230,7 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::KeyNd2Nz(uint64_t s2L1RealSiz
 // batch, s1, n2, g, d
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseMatmul<T>::QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
-                                                           const DenseLISoftmaxLseCommon::RunInfo &runInfo)
+                                                              const DenseLISoftmaxLseCommon::RunInfo &runInfo)
 {
     uint64_t s1gL1Offset = 0;
     while (s1gL1Offset < s1gL1RealSize) {
@@ -236,7 +238,8 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::QueryNd2Nz(uint64_t s1gL1Real
         // M_BASIC_BLOCK_L0*D_BASIC_BLOCK_L0的方式在l1上排布, 方便后续mte1
         // 根据s2的offset判断当前属于前一个L0分型还是后一个L0分型，暂时只支持两个分型
         uint64_t s1Mte2Size = (s1gL1RealSize <= M_BASIC_BLOCK_L0 || s1gL1Offset >= M_BASIC_BLOCK_L0) ?
-                               s1gL1RealSize - s1gL1Offset : M_BASIC_BLOCK_L0 - s1gL1Offset;
+                                  s1gL1RealSize - s1gL1Offset :
+                                  M_BASIC_BLOCK_L0 - s1gL1Offset;
 
         Nd2NzParams nd2nzPara;
         nd2nzPara.ndNum = 1;
@@ -244,16 +247,17 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::QueryNd2Nz(uint64_t s1gL1Real
         nd2nzPara.dValue = constInfo_.headDim;
         nd2nzPara.srcDValue = constInfo_.headDim;
         nd2nzPara.dstNzC0Stride = s1gL1Offset >= M_BASIC_BLOCK_L0 ?
-                                  CeilAlign(s1gL1RealSize - M_BASIC_BLOCK_L0, (uint64_t)BLOCK_CUBE) :
-                                  (s1gL1RealSize > M_BASIC_BLOCK_L0 ? M_BASIC_BLOCK_L0 :
-                                  CeilAlign(s1gL1RealSize, (uint64_t)BLOCK_CUBE)); // 对齐到16 单位block
+                                      CeilAlign(s1gL1RealSize - M_BASIC_BLOCK_L0, (uint64_t)BLOCK_CUBE) :
+                                      (s1gL1RealSize > M_BASIC_BLOCK_L0 ?
+                                           M_BASIC_BLOCK_L0 :
+                                           CeilAlign(s1gL1RealSize, (uint64_t)BLOCK_CUBE)); // 对齐到16 单位block
         nd2nzPara.dstNzNStride = 1;
         nd2nzPara.srcNdMatrixStride = 0;
         nd2nzPara.dstNzMatrixStride = 0;
         DataCopy(queryL1_[(queryL1Mte2BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET +
-                        (s1gL1Offset >= M_BASIC_BLOCK_L0 ?
-                        M_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 + (s1gL1Offset - M_BASIC_BLOCK_L0) * BLOCK_CUBE :
-                        s1gL1Offset * BLOCK_CUBE)],
+                          (s1gL1Offset >= M_BASIC_BLOCK_L0 ?
+                               M_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 + (s1gL1Offset - M_BASIC_BLOCK_L0) * BLOCK_CUBE :
+                               s1gL1Offset * BLOCK_CUBE)],
                  queryGm_[queryGmOffset], nd2nzPara);
         s1gL1Offset += s1Mte2Size;
     }
@@ -261,8 +265,8 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::QueryNd2Nz(uint64_t s1gL1Real
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseMatmul<T>::LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize,
-                                                               uint64_t s1gL0RealSize,
-                                                               const DenseLISoftmaxLseCommon::RunInfo &runInfo)
+                                                                  uint64_t s1gL0RealSize,
+                                                                  const DenseLISoftmaxLseCommon::RunInfo &runInfo)
 {
     uint64_t keyL1Offset = s1gL1Offset >= M_BASIC_BLOCK_L0 ? M_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 : 0;
     LoadData2DParams loadData2DParams;
@@ -272,14 +276,13 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::LoadQueryToL0a(uint64_t s1gL1
     loadData2DParams.dstGap = 0;
     loadData2DParams.ifTranspose = false;
     LoadData(queryL0_[(l0BufIdx_ % L0_BUF_NUM) * L0AB_BUFFER_OFFSET],
-             queryL1_[(queryL1Mte1BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET + keyL1Offset],
-             loadData2DParams);
+             queryL1_[(queryL1Mte1BufIdx_ % QUERY_BUF_NUM) * QUERY_BUFFER_OFFSET + keyL1Offset], loadData2DParams);
 }
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseMatmul<T>::LoadKeyToL0b(uint64_t s2L1Offset, uint64_t s2L1RealSize,
-                                                             uint64_t s2L0RealSize,
-                                                             const DenseLISoftmaxLseCommon::RunInfo &runInfo)
+                                                                uint64_t s2L0RealSize,
+                                                                const DenseLISoftmaxLseCommon::RunInfo &runInfo)
 {
     uint64_t keyL1Offset = s2L1Offset >= S2_BASIC_BLOCK_L0 ? S2_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 : 0;
     LoadData2DParams loadData2DParams;
@@ -294,7 +297,7 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::LoadKeyToL0b(uint64_t s2L1Off
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseMatmul<T>::ComuteL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                          const DenseLISoftmaxLseCommon::RunInfo &runInfo)
+                                                             const DenseLISoftmaxLseCommon::RunInfo &runInfo)
 {
     MmadParams mmadParams;
     mmadParams.m = CeilAlign(s1gL0RealSize, BLOCK_CUBE);
@@ -312,8 +315,8 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::ComuteL0c(uint64_t s1gL0RealS
 
 template <typename T>
 __aicore__ inline void DenseLISoftmaxLseMatmul<T>::Fixp(uint64_t s1gGmOffset, uint64_t s2GmOffset,
-                                                     uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                     const DenseLISoftmaxLseCommon::RunInfo &runInfo)
+                                                        uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
+                                                        const DenseLISoftmaxLseCommon::RunInfo &runInfo)
 {
     AscendC::DataCopyCO12DstParams intriParams;
     intriParams.mSize = CeilAlign(s1gL0RealSize, BLOCK_CUBE);
@@ -360,5 +363,5 @@ __aicore__ inline void DenseLISoftmaxLseMatmul<T>::FreeEventID()
     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 0);
     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 1);
 }
-}
+} // namespace DenseLISoftmaxLseKernel
 #endif // DENSE_LIGHTNING_INDEXER_SOFTMAX_LSE_SERVICE_CUBE_H

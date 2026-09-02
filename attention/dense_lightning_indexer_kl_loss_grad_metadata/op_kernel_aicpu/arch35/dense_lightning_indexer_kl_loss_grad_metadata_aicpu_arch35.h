@@ -22,7 +22,11 @@ namespace aicpu {
 
 constexpr int64_t FA_TOLERANCE_RATIO = 2;
 
-enum BlockType : uint32_t { NORMAL_BLOCK = 0, TAIL_BLOCK, BLOCK_MAX_TYPE };
+enum BlockType : uint32_t {
+    NORMAL_BLOCK = 0,
+    TAIL_BLOCK,
+    BLOCK_MAX_TYPE
+};
 
 enum class SparseMode : uint8_t {
     DEFAULT_MASK = 0,
@@ -33,7 +37,11 @@ enum class SparseMode : uint8_t {
     SPARSE_BUTT,
 };
 
-enum class ValidSocVersion { ASCEND910 = 0, ASCEND950, RESERVED_VERSION = 99999 };
+enum class ValidSocVersion {
+    ASCEND910 = 0,
+    ASCEND950,
+    RESERVED_VERSION = 99999
+};
 
 template <class T>
 using Range = std::pair<T, T>;

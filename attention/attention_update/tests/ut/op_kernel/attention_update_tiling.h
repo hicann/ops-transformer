@@ -37,11 +37,11 @@ inline void InitAttentionUpdateTilingData(uint8_t *tiling, DecodeUpdateTilingDat
 }
 
 #define GET_TILING_DATA(tiling_data, tiling_arg) \
-    DecodeUpdateTilingData tiling_data;          \
+    DecodeUpdateTilingData tiling_data; \
     InitAttentionUpdateTilingData(tiling_arg, &tiling_data)
 
 #define GET_TILING_DATA_WITH_STRUCT(type, tiling_data, tiling_arg) \
-    type tiling_data;                                              \
+    type tiling_data; \
     InitAttentionUpdateTilingData(tiling_arg, &tiling_data)
 
 #endif // TEST_ATTENTION_UPDATE_TILING_H

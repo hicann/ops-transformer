@@ -335,14 +335,12 @@ __aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t> &maskPre, LocalT
 template <bool hasAtten>
 __aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
                                          int32_t &halfS1RealSize, int64_t s2BaseSize)
-{
-}
+{}
 
 template <bool hasAtten>
 __aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
                                            int32_t &halfS1RealSize, int64_t s2BaseSize)
-{
-}
+{}
 #endif
 
 template <bool hasAtten, bool enableKVPrefix = false, bool isFd = false, bool hasRope = false, bool isInfer = false,

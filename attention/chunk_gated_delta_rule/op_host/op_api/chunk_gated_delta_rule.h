@@ -15,9 +15,11 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const std::array<const aclTensor *, 2>
-ChunkGatedDeltaRule(const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *beta,
-                    const aclTensor *initialState, const aclTensor *actualSeqLengths, const aclTensor *gOptional,
-                    float scaleValue, aclOpExecutor *executor);
+const std::array<const aclTensor *, 2> ChunkGatedDeltaRule(const aclTensor *query, const aclTensor *key,
+                                                           const aclTensor *value, const aclTensor *beta,
+                                                           const aclTensor *initialState,
+                                                           const aclTensor *actualSeqLengths,
+                                                           const aclTensor *gOptional, float scaleValue,
+                                                           aclOpExecutor *executor);
 }
 #endif // PTA_NPU_OP_API_COMMON_INC_LEVEL0_OP_CHUNK_GATED_DELTA_RULE

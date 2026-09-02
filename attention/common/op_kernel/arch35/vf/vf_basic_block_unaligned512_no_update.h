@@ -24,17 +24,17 @@ using namespace regbaseutil;
 namespace FaVectorApi {
 
 template <typename T, typename T2, uint32_t s2BaseSize>
-__simd_callee__ static inline void
-PostReduceStage512(__ubuf__ T *&maxUb, UnalignRegForStore &ureg_max, __ubuf__ T *maxUbStart,
-                   RegTensor<float> &vreg_max_brc, const uint16_t m, __ubuf__ T *srcUb, RegTensor<float> &vreg_input_x1,
-                   RegTensor<float> &vreg_input_x2, RegTensor<float> &vreg_input_x3, RegTensor<float> &vreg_input_x4,
-                   RegTensor<float> &vreg_input_x5, RegTensor<float> &vreg_input_x6, RegTensor<float> &vreg_input_x7,
-                   RegTensor<float> &vreg_input_x8, RegTensor<float> &vreg_exp_even1, RegTensor<float> &vreg_exp_odd1,
-                   RegTensor<float> &vreg_exp_even2, RegTensor<float> &vreg_exp_odd2, RegTensor<float> &vreg_exp_even3,
-                   RegTensor<float> &vreg_exp_odd3, RegTensor<float> &vreg_exp_even4, RegTensor<float> &vreg_exp_odd4,
-                   RegTensor<float> &vreg_exp_sum3, UnalignRegForStore &ureg_exp_sum, __ubuf__ T *&expSumUb,
-                   __ubuf__ T2 *expUb1, __ubuf__ T2 *expUb2, __ubuf__ T2 *expUb3, __ubuf__ T2 *expUb4,
-                   const uint32_t blockStride, const uint32_t repeatStride, MaskReg &preg_all, MaskReg &preg_all_b16)
+__simd_callee__ static inline void PostReduceStage512(
+    __ubuf__ T *&maxUb, UnalignRegForStore &ureg_max, __ubuf__ T *maxUbStart, RegTensor<float> &vreg_max_brc,
+    const uint16_t m, __ubuf__ T *srcUb, RegTensor<float> &vreg_input_x1, RegTensor<float> &vreg_input_x2,
+    RegTensor<float> &vreg_input_x3, RegTensor<float> &vreg_input_x4, RegTensor<float> &vreg_input_x5,
+    RegTensor<float> &vreg_input_x6, RegTensor<float> &vreg_input_x7, RegTensor<float> &vreg_input_x8,
+    RegTensor<float> &vreg_exp_even1, RegTensor<float> &vreg_exp_odd1, RegTensor<float> &vreg_exp_even2,
+    RegTensor<float> &vreg_exp_odd2, RegTensor<float> &vreg_exp_even3, RegTensor<float> &vreg_exp_odd3,
+    RegTensor<float> &vreg_exp_even4, RegTensor<float> &vreg_exp_odd4, RegTensor<float> &vreg_exp_sum3,
+    UnalignRegForStore &ureg_exp_sum, __ubuf__ T *&expSumUb, __ubuf__ T2 *expUb1, __ubuf__ T2 *expUb2,
+    __ubuf__ T2 *expUb3, __ubuf__ T2 *expUb4, const uint32_t blockStride, const uint32_t repeatStride,
+    MaskReg &preg_all, MaskReg &preg_all_b16)
 {
     StoreUnAlignPost<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), ureg_max, 0);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();

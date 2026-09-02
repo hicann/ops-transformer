@@ -86,7 +86,6 @@ __simd_vf__ void ProcessVec1UpdateImpl64VF(__ubuf__ T2 *expUb, __ubuf__ T *srcUb
                                                                                         ureg_exp_sum, 0);
 }
 
-
 // update, originN <= 64
 template <typename T, typename T2, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128>
 __aicore__ inline void ProcessVec1UpdateImpl64(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,

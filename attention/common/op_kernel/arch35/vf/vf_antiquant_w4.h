@@ -33,13 +33,13 @@ static constexpr MicroAPI::CastTrait castTraitW4_2 = {MicroAPI::RegLayout::UNKNO
 static constexpr MicroAPI::CastTrait castTraitFp32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
                                                       MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 
-
 template <typename Q_T, typename KV_T>
-__simd_callee__ inline void
-CastMulStoreW4GroupNz(MicroAPI::RegTensor<KV_T> &vKvData, MicroAPI::RegTensor<half> &vCastFp16Res,
-                      MicroAPI::RegTensor<bfloat16_t> &vRes, MicroAPI::RegTensor<bfloat16_t> &vScale,
-                      __ubuf__ Q_T *ubDstAddr, __ubuf__ uint8_t *ubSrcAddr, MicroAPI::MaskReg &kvTypeMaskAll,
-                      MicroAPI::MaskReg &qTypeMaskAll)
+__simd_callee__ inline void CastMulStoreW4GroupNz(MicroAPI::RegTensor<KV_T> &vKvData,
+                                                  MicroAPI::RegTensor<half> &vCastFp16Res,
+                                                  MicroAPI::RegTensor<bfloat16_t> &vRes,
+                                                  MicroAPI::RegTensor<bfloat16_t> &vScale, __ubuf__ Q_T *ubDstAddr,
+                                                  __ubuf__ uint8_t *ubSrcAddr, MicroAPI::MaskReg &kvTypeMaskAll,
+                                                  MicroAPI::MaskReg &qTypeMaskAll)
 {
     MicroAPI::LoadAlign<uint8_t, MicroAPI::LoadDist::DIST_UNPACK4_B8>((MicroAPI::RegTensor<uint8_t> &)vKvData,
                                                                       ubSrcAddr);
@@ -116,7 +116,6 @@ __aicore__ inline void AntiquantVFImplW4PerTokenGroupNz(LocalTensor<KV_T> &antiq
         }
     }
 }
-
 
 template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSize, bool hasOffset = false>
 __simd_vf__ void AntiquantVFImplW4Nz(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *ubDstAddr, __ubuf__ Q_T *ubOffsetAddr,
@@ -332,7 +331,6 @@ __simd_vf__ void AntiquantVFImplW4D64(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T 
             ubDstAddr_, vRes, blockStride, repeatStride, qTypeMaskHigher64);
     }
 }
-
 
 template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSize, bool hasOffset = false>
 __aicore__ inline void AntiquantVFW4D64(LocalTensor<KV_T> &antiqInUb, LocalTensor<Q_T> &antiqResUb,
@@ -602,11 +600,12 @@ __aicore__ inline void AntiquantVFW4PerTokenD128(LocalTensor<KV_T> &antiqInUb, L
 }
 
 template <typename Q_T, typename KV_T, bool hasOffset>
-__simd_callee__ inline void
-CastAddMulStoreW4(MicroAPI::RegTensor<int4x2_t> &vKvData, MicroAPI::RegTensor<half> &vCastFp16Res,
-                  MicroAPI::RegTensor<Q_T> &vRes, MicroAPI::RegTensor<Q_T> &vOffsetFp16,
-                  MicroAPI::RegTensor<Q_T> &vScaleFp16, __ubuf__ Q_T *&ubDstAddr, uint32_t blockStride,
-                  uint32_t repeatStride, MicroAPI::MaskReg &kvMaskAll, MicroAPI::MaskReg &qMaskAll)
+__simd_callee__ inline void CastAddMulStoreW4(MicroAPI::RegTensor<int4x2_t> &vKvData,
+                                              MicroAPI::RegTensor<half> &vCastFp16Res, MicroAPI::RegTensor<Q_T> &vRes,
+                                              MicroAPI::RegTensor<Q_T> &vOffsetFp16,
+                                              MicroAPI::RegTensor<Q_T> &vScaleFp16, __ubuf__ Q_T *&ubDstAddr,
+                                              uint32_t blockStride, uint32_t repeatStride, MicroAPI::MaskReg &kvMaskAll,
+                                              MicroAPI::MaskReg &qMaskAll)
 {
     if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
         MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
@@ -661,7 +660,6 @@ __simd_vf__ void AntiquantVFImplW4PerTokenD256(__ubuf__ uint8_t *ubSrcAddr, __ub
                                                 blockStride, repeatStride, kvMaskAll, qMaskAll);
     }
 }
-
 
 template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSize, bool hasOffset = false>
 __aicore__ inline void AntiquantVFW4PerTokenD256(LocalTensor<KV_T> &antiqInUb, LocalTensor<Q_T> &antiqResUb,
@@ -900,7 +898,6 @@ __simd_vf__ void AntiquantVFImplFP4_unalign(__ubuf__ uint8_t *ubSrcAddr, __ubuf_
     MicroAPI::Duplicate(mask_tmp, 0x8000);                         // 后续填充MaskReg为c0000000
     MicroAPI::MaskGenWithRegTensor<uint16_t, 0>(preg_1, mask_tmp); // 0为mask_tmp的偏移
     MicroAPI::Unsqueeze(prefixSum, preg_1);
-
 
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 1;

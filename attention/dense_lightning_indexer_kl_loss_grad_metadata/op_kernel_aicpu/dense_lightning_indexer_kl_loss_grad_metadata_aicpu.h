@@ -41,7 +41,10 @@ inline bool IsTensorValid(Tensor *tensor)
     return tensor != nullptr && tensor->GetData() != nullptr && tensor->GetTensorShape() != nullptr;
 }
 
-inline int64_t AbsDiff(int64_t lhs, int64_t rhs) { return lhs > rhs ? lhs - rhs : rhs - lhs; }
+inline int64_t AbsDiff(int64_t lhs, int64_t rhs)
+{
+    return lhs > rhs ? lhs - rhs : rhs - lhs;
+}
 
 } // namespace aicpu
 
