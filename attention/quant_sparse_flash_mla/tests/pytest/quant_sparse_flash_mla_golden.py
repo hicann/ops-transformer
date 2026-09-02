@@ -1644,10 +1644,12 @@ def gen_data(params, generate_golden=True):
     max_seqlen_ori_kv = seqused_ori_kv.max().item()
     max_seqlen_cmp_kv = seqused_cmp_kv.max().item() if seqused_cmp_kv is not None else 0
 
-    # ORI_SPARSE/ORI_CMP_SPARSE: seqused (actualLength) not passed to op, determined by sparse_indices and topkLength
-    # no_actual_length = template_run_mode in ("ORI_SPARSE", "ORI_CMP_SPARSE")
-    # seqused_ori_kv = None if no_actual_length else seqused_ori_kv
-    # seqused_cmp_kv = None if no_actual_length else seqused_cmp_kv
+    # Sparse templates derive KV lengths from sparse indices and top-k lengths.
+    # Keep the derived values for metadata and CPU Golden, but do not expose them
+    # as direct API inputs when their CSV slots are intentionally absent.
+    no_actual_length = template_run_mode in ("ORI_SPARSE", "ORI_CMP_SPARSE")
+    op_seqused_ori_kv = None if no_actual_length else seqused_ori_kv
+    op_seqused_cmp_kv = None if no_actual_length else seqused_cmp_kv
     cu_seqlens_ori_kv = cu_seqlens_ori_kv if layout_kv == "TND" else None
     cu_seqlens_cmp_kv = cu_seqlens_cmp_kv if layout_kv == "TND" else None
 
@@ -1704,8 +1706,8 @@ def gen_data(params, generate_golden=True):
             "seqused_q": seqused_q,
             "cu_seqlens_ori_kv": cu_seqlens_ori_kv,
             "cu_seqlens_cmp_kv": cu_seqlens_cmp_kv,
-            "seqused_ori_kv": seqused_ori_kv,
-            "seqused_cmp_kv": seqused_cmp_kv,
+            "seqused_ori_kv": op_seqused_ori_kv,
+            "seqused_cmp_kv": op_seqused_cmp_kv,
             "cmp_residual_kv": cmp_residual_kv,
             "sinks": sinks,
             "q_descale": q_descale,

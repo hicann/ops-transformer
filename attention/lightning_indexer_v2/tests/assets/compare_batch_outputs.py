@@ -277,9 +277,13 @@ class IndexerBatchDumpComparator:
                 raise ValueError(f"{testcase_name}: result CSV has no matching row")
             if result.get("precision_status") != "PASS":
                 raise ValueError(f"{testcase_name}: precision_status is not PASS")
-            if self.require_intra_case and "batch_intra=PASS" not in (
-                result.get("eager_precision") or ""
-            ):
+            eager_precision = result.get("eager_precision") or ""
+            if "NO_OUTPU" in eager_precision:
+                raise ValueError(
+                    f"{testcase_name}: eager_precision reports no output; "
+                    "raw-byte batch comparison is invalid"
+                )
+            if self.require_intra_case and "batch_intra=PASS" not in eager_precision:
                 raise ValueError(f"{testcase_name}: same-case batch check did not PASS")
 
             geometry = self.geometry(row)

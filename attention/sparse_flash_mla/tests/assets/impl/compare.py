@@ -149,6 +149,37 @@ class SparseFlashMlaBatchComparator:
         }
 
     @staticmethod
+    def relation_slices_overlap(first, second):
+        """Return whether two relation samples select the same q output region."""
+        first_slices = first[0]
+        first_axes = first[2]
+        second_slices = second[0]
+        second_axes = second[2]
+        if first_axes != second_axes:
+            return False
+        first_batch = first_slices[0]
+        second_batch = second_slices[0]
+        if first_batch[1] <= second_batch[0] or second_batch[1] <= first_batch[0]:
+            return False
+        if first_axes == (0,):
+            return True
+        first_sequence = first_slices[1]
+        second_sequence = second_slices[1]
+        return not (
+            first_sequence[1] <= second_sequence[0]
+            or second_sequence[1] <= first_sequence[0]
+        )
+
+    def validate_disjoint_relations(self, relations):
+        """Reject duplicate or overlapping samples that would self-compare."""
+        for index, relation in enumerate(relations):
+            for candidate in relations[index + 1 :]:
+                if self.relation_slices_overlap(relation, candidate):
+                    raise ValueError(
+                        f"{self.OPERATOR_NAME} relation samples must not overlap"
+                    )
+
+    @staticmethod
     def storage_bytes(value):
         if torch.is_tensor(value):
             tensor = value.detach().cpu().contiguous()
@@ -159,6 +190,38 @@ class SparseFlashMlaBatchComparator:
             )
         array = np.ascontiguousarray(np.asarray(value))
         return tuple(array.shape), array.dtype.str, array.view(np.uint8).tobytes()
+
+    def validate_batch_consistency_id(self, batch_consistency_id, axes, axis_seeds):
+        """Validate the stable seed/axis portion of framework relation IDs."""
+        if (
+            not isinstance(batch_consistency_id, (tuple, list))
+            or len(batch_consistency_id) != 1
+        ):
+            raise ValueError("batch_consistency_id must contain one q relation group")
+        id_axes = batch_consistency_id[0]
+        if not isinstance(id_axes, (tuple, list)) or len(id_axes) != len(axes):
+            raise ValueError("batch_consistency_id axis groups do not match q axes")
+        for axis, ids, seeds in zip(axes, id_axes, axis_seeds):
+            if not isinstance(ids, (tuple, list)) or len(ids) != len(seeds):
+                raise ValueError(
+                    "batch_consistency_id sample count does not match q seeds"
+                )
+            for relation_id, seed in zip(ids, seeds):
+                parts = str(relation_id).split("_", 2)
+                if len(parts) < 2:
+                    raise ValueError(
+                        f"invalid batch_consistency_id relation: {relation_id!r}"
+                    )
+                try:
+                    id_seed, id_axis = (int(parts[0]), int(parts[1]))
+                except ValueError as error:
+                    raise ValueError(
+                        f"invalid batch_consistency_id relation: {relation_id!r}"
+                    ) from error
+                if id_seed != int(seed) or id_axis != int(axis):
+                    raise ValueError(
+                        "batch_consistency_id seed/axis does not match q relation"
+                    )
 
     def parse_relations(
         self, batch_consistency_id, batch_axis, batch_slice_info, batch_seed
@@ -206,7 +269,6 @@ class SparseFlashMlaBatchComparator:
                 )
 
             relations = []
-            expected_axes = [[] for _axis in axes]
             for sample_index in range(sample_count):
                 parsed_slices = []
                 seed = None
@@ -237,23 +299,13 @@ class SparseFlashMlaBatchComparator:
                         )
                     seed = seed_value
                     parsed_slices.append((start, stop, step))
-                    # The framework groups matching relations across different
-                    # logical B/S offsets, so only the relation length is stable.
-                    length = len(range(start, stop, step))
-                    expected_axes[axis_group].append(f"{seed}_{axis}_{length}_{step}")
                 if axes == (0, 1) and parsed_slices[0][1] - parsed_slices[0][0] != 1:
                     raise ValueError("logical (B,S) relation requires one B per sample")
                 relations.append((tuple(parsed_slices), seed, axes))
+            self.validate_disjoint_relations(relations)
+            self.validate_batch_consistency_id(batch_consistency_id, axes, axis_seeds)
         except (IndexError, TypeError, ValueError) as error:
             return None, self.config_failure(str(error))
-
-        expected_batch_id = (tuple(tuple(values) for values in expected_axes),)
-        if batch_consistency_id != expected_batch_id:
-            return None, self.config_failure(
-                f"{self.OPERATOR_NAME} batch_consistency_id does not match batch "
-                f"slice metadata: expected={expected_batch_id!r}, "
-                f"actual={batch_consistency_id!r}"
-            )
         return relations, None
 
     def output_selector(self, npu, relation, compare_context):

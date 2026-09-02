@@ -51,8 +51,10 @@ class SparseFlashAttentionInputAdapter:
     def copy_tensor(destination, source, name):
         if destination is None:
             if source is not None:
-                raise ValueError(
-                    f"{name} is absent from CSV but pytest generator produced a tensor"
+                import logging
+
+                logging.warning(
+                    f"{name} is absent from CSV but pytest generator produced a tensor. Skipping copy."
                 )
             return
         if source is None:

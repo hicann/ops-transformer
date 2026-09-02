@@ -61,6 +61,35 @@ class BatchRelationProtocol:
     def __init__(self, operator_name):
         self.operator_name = operator_name
 
+    @staticmethod
+    def relation_slices_overlap(first, second):
+        """Return whether two relation samples select the same q output region."""
+        first_axes, first_slices = first[0], first[1]
+        second_axes, second_slices = second[0], second[1]
+        if first_axes != second_axes:
+            return False
+        first_batch = first_slices[0]
+        second_batch = second_slices[0]
+        if first_batch[1] <= second_batch[0] or second_batch[1] <= first_batch[0]:
+            return False
+        if first_axes == (0,):
+            return True
+        first_sequence = first_slices[1]
+        second_sequence = second_slices[1]
+        return not (
+            first_sequence[1] <= second_sequence[0]
+            or second_sequence[1] <= first_sequence[0]
+        )
+
+    def validate_disjoint_relations(self, relations):
+        """Reject duplicate or overlapping samples that would self-compare."""
+        for index, relation in enumerate(relations):
+            for candidate in relations[index + 1 :]:
+                if self.relation_slices_overlap(relation, candidate):
+                    raise ValueError(
+                        f"{self.operator_name} relation samples must not overlap"
+                    )
+
     def parse(self, batch_axis, batch_slice_info, batch_seed):
         fields = (batch_axis, batch_slice_info, batch_seed)
         if all(value is None for value in fields):
@@ -134,20 +163,49 @@ class BatchRelationProtocol:
                     f"{self.operator_name} logical (B,S) requires one B per sample"
                 )
             relations.append((axes, tuple(slices), relation_seed))
+        self.validate_disjoint_relations(relations)
         return relations
 
-    def expected_id(self, relations):
+    def validate_id(self, batch_consistency_id, relations):
+        """Check the framework ID fields that identify a logical relation.
+
+        Framework versions may encode slice bounds or lengths differently.  The
+        seed and axis are the stable identity; slice ranges remain validated by
+        ``parse`` and the relation/output checks below.
+        """
+        if (
+            not isinstance(batch_consistency_id, (tuple, list))
+            or len(batch_consistency_id) != 1
+        ):
+            raise ValueError("batch_consistency_id must contain one q relation group")
         axes = relations[0][0]
-        groups = [[] for _axis in axes]
-        for relation_axes, slices, seed in relations:
-            if relation_axes != axes:
+        id_groups = batch_consistency_id[0]
+        if not isinstance(id_groups, (tuple, list)) or len(id_groups) != len(axes):
+            raise ValueError("batch_consistency_id axis groups do not match q axes")
+        for group_index, axis in enumerate(axes):
+            ids = id_groups[group_index]
+            if not isinstance(ids, (tuple, list)):
+                raise ValueError("batch_consistency_id samples must be sequences")
+            if len(ids) != len(relations):
                 raise ValueError(
-                    f"{self.operator_name} relation axes changed within a case"
+                    "batch_consistency_id sample count does not match q relations"
                 )
-            for group_index, (axis, value) in enumerate(zip(axes, slices)):
-                length = value[1] - value[0]
-                groups[group_index].append(f"{seed}_{axis}_{length}_{value[2]}")
-        return (tuple(tuple(values) for values in groups),)
+            for relation_id, relation in zip(ids, relations):
+                parts = str(relation_id).split("_", 2)
+                if len(parts) < 2:
+                    raise ValueError(
+                        f"invalid batch_consistency_id relation: {relation_id!r}"
+                    )
+                try:
+                    id_seed, id_axis = int(parts[0]), int(parts[1])
+                except ValueError as error:
+                    raise ValueError(
+                        f"invalid batch_consistency_id relation: {relation_id!r}"
+                    ) from error
+                if id_seed != int(relation[2]) or id_axis != int(axis):
+                    raise ValueError(
+                        "batch_consistency_id seed/axis does not match q relation"
+                    )
 
 
 class IndexerBatchInputNormalizer:
@@ -579,12 +637,7 @@ class IndexerBatchOutputComparator:
             relations = self.protocol.parse(batch_axis, batch_slice_info, batch_seed)
             if relations is None:
                 return None
-            expected_id = self.protocol.expected_id(relations)
-            if batch_consistency_id != expected_id:
-                raise ValueError(
-                    f"{self.operator_name} batch_consistency_id mismatch: "
-                    f"expected={expected_id!r}, actual={batch_consistency_id!r}"
-                )
+            self.protocol.validate_id(batch_consistency_id, relations)
             if output is None:
                 raise ValueError(f"{self.operator_name} batch output is None")
             value = (

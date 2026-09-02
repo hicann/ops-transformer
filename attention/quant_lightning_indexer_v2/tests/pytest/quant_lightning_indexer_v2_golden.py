@@ -2161,7 +2161,7 @@ def qliv2_output_single(
         )
         golden_block_table = block_table
         if torch.is_tensor(golden_block_table):
-            golden_block_table = golden_block_table.detach().cpu().numpy()
+            golden_block_table = golden_block_table.detach().cpu()
         golden_state = {
             "model_args": (
                 batch_size,
@@ -2392,6 +2392,11 @@ def generate_cpu_golden(input_data):
         s1size=state["s1size"],
     )
     values = state["forward_inputs"]
+    block_table = values["block_table"]
+    if torch.is_tensor(block_table):
+        # The CPU reference indexes block tables as an ndarray; keep the saved
+        # tensor intact for PT consumers and convert only this local argument.
+        block_table = block_table.detach().cpu().numpy()
     cpu_result, topk_value, cpu_topk_value = test_qliv2.forward(
         values["query"],
         values["key"],
@@ -2402,7 +2407,7 @@ def generate_cpu_golden(input_data):
         values["cu_seqlens_k"],
         values["seqused_q"],
         values["seqused_k"],
-        values["block_table"],
+        block_table,
         values["output_idx_offset"],
     )
     state["cpu_result"] = cpu_result

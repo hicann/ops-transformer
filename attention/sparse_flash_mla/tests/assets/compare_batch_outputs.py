@@ -286,6 +286,34 @@ class BatchOutputComparator:
             )
         return start, stop, step
 
+    @staticmethod
+    def validate_disjoint_relations(testcase_name, relations):
+        """Reject relation samples that select the same logical q positions."""
+        for index, relation in enumerate(relations):
+            for candidate in relations[index + 1 :]:
+                if relation["axes"] != candidate["axes"]:
+                    continue
+                batch_slice = relation["slices"][0]
+                candidate_batch = candidate["slices"][0]
+                if (
+                    batch_slice[1] <= candidate_batch[0]
+                    or candidate_batch[1] <= batch_slice[0]
+                ):
+                    continue
+                if relation["axes"] == (0,):
+                    raise ValueError(
+                        f"{testcase_name}: relation samples overlap logical B positions"
+                    )
+                sequence_slice = relation["slices"][1]
+                candidate_sequence = candidate["slices"][1]
+                if not (
+                    sequence_slice[1] <= candidate_sequence[0]
+                    or candidate_sequence[1] <= sequence_slice[0]
+                ):
+                    raise ValueError(
+                        f"{testcase_name}: relation samples overlap logical q positions"
+                    )
+
     def parse_relations(self, row):
         batch_axis = self.parse_cell(row, "batch_axis")
         batch_slices = self.parse_cell(row, "batch_slice_info")
@@ -355,6 +383,8 @@ class BatchOutputComparator:
                     f"{row['testcase_name']}: logical (B,S) requires one B per sample"
                 )
             relations.append({"axes": axes, "slices": tuple(slices), "seed": seed})
+
+        self.validate_disjoint_relations(row["testcase_name"], relations)
 
         if axes == (0, 1) and len({item["slices"][1] for item in relations}) > 1:
             attributes = self.parse_cell(row, "attributes", {})
@@ -504,9 +534,13 @@ class BatchOutputComparator:
                     f"{testcase_name}: precision_status is "
                     f"{result.get('precision_status')!r}, expected PASS"
                 )
-            if self.require_intra_case and "batch_intra=PASS" not in (
-                result.get("eager_precision") or ""
-            ):
+            eager_precision = result.get("eager_precision") or ""
+            if "NO_OUTPU" in eager_precision:
+                raise ValueError(
+                    f"{testcase_name}: eager_precision reports no output; "
+                    "raw-byte batch comparison is invalid"
+                )
+            if self.require_intra_case and "batch_intra=PASS" not in eager_precision:
                 raise ValueError(
                     f"{testcase_name}: eager_precision lacks batch_intra=PASS"
                 )

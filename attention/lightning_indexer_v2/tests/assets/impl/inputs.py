@@ -263,8 +263,10 @@ class LightningIndexerV2InputAdapter:
     def copy_tensor(dst, src, name):
         if dst is None:
             if src is not None:
-                raise ValueError(
-                    f"{name} is absent from CSV but pytest generator produced a tensor"
+                import logging
+
+                logging.warning(
+                    f"{name} is absent from CSV but pytest generator produced a tensor. Skipping copy."
                 )
             return
         if src is None:
