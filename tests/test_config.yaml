@@ -293,7 +293,13 @@ attention:
       - attention/flash_attention_score/docs
       - attention/flash_attention_score/README.md
     ut_cov_exclude:
-      - attention/flash_attention_score
+      - attention/flash_attention_score/op_api
+      - attention/flash_attention_score/op_graph
+      - attention/flash_attention_score/op_kernel
+      - attention/flash_attention_score/tests
+      - attention/flash_attention_score/docs
+      - attention/flash_attention_score/examples
+      - attention/flash_attention_score/op_host/arch22
     test:
       ut: True
     options:

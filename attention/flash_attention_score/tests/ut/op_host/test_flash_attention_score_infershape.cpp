@@ -1,102 +1,84 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
 #include <gtest/gtest.h>
-#include <iostream>
-#include "infer_shape_context_faker.h"
-#include "infer_datatype_context_faker.h"
+#include "flash_attention_score_param.h"
 #include "infer_shape_case_executor.h"
+#include "infer_datatype_context_faker.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class FlashAttentionScoreProto : public testing::Test {
+namespace FlashAttentionScoreUT {
+
+class FlashAttentionScoreInferShapeTest : public testing::TestWithParam<FlashAttentionScoreInferShapeUtParam> {
 protected:
     static void SetUpTestCase()
     {
-        // std::cout << "FlashAttentionScoreProto SetUp" << std::endl;
+        std::cout << "FlashAttentionScore InferShapeTest SetUp" << std::endl;
     }
-
     static void TearDownTestCase()
     {
-        // std::cout << "FlashAttentionScoreProto TearDown" << std::endl;
+        std::cout << "FlashAttentionScore InferShapeTest TearDown" << std::endl;
     }
 };
 
-TEST_F(FlashAttentionScoreProto, flash_attention_score_infershape_0)
+TEST_P(FlashAttentionScoreInferShapeTest, param)
 {
-    gert::InfershapeContextPara infershapeContextPara(
-        "FlashAttentionScore",
-        // 输入Tensor
-        {
-            // q
-            {{{256, 1, 128}, {256, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // k: S2=256, B=1, H2=128
-            {{{256, 1, 128}, {256, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // v: S2=256, B=1, H2=128
-            {{{256, 1, 128}, {256, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // real_shift
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // drop_mask
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // padding_mask
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            // atten_mask: S1=256, S2=256
-            {{{256, 256}, {256, 256}}, ge::DT_UINT8, ge::FORMAT_ND},
-            // prefix
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            // actual_seq_qlen
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            // actual_seq_kvlen
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            // q_start_idx
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            // kv_start_idx
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            // dScaleQ
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // dScaleK
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // dScaleV
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // queryRope
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // keyRope
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        },
-        {// 输出Tensor
-         // softmaxMax: B=1, N1=1, S1=256, 8
-         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-         // softmaxSum: B=1, N1=1, S1=256, 8
-         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-         // softmaxOut
-         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-         // attentionOut
-         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
-        {// 属性
-         {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
-         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
-         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
-         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
-         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"softmax_out_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("same_as_input")}});
+    auto param = GetParam();
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {1, 1, 256, 8}, // softmaxMax
-        {1, 1, 256, 8}, // softmaxSum
-        {0, 0, 0, 0},   // softmaxOut
-        {256, 1, 128},  // attentionOut
-    };
-    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+    std::vector<gert::InfershapeContextPara::TensorDescription> inputTensors;
+    std::vector<gert::InfershapeContextPara::TensorDescription> outputTensors;
+
+    gert::InfershapeContextPara::TensorDescription allInputs[] = {
+        param.query,        param.key,          param.value,   param.real_shift,      param.drop_mask,
+        param.padding_mask, param.atten_mask,   param.prefix,  param.actual_seq_qlen, param.actual_seq_kvlen,
+        param.q_start_idx,  param.kv_start_idx, param.dScaleQ, param.dScaleK,         param.dScaleV,
+        param.queryRope,    param.keyRope};
+    for (size_t i = 0; i < param.inputInstance.size() && i < sizeof(allInputs) / sizeof(allInputs[0]); i++) {
+        if (param.inputInstance[i] == 1) {
+            inputTensors.emplace_back(allInputs[i]);
+        }
+    }
+
+    gert::InfershapeContextPara::TensorDescription allOutputs[] = {param.softmaxMax, param.softmaxSum, param.softmaxOut,
+                                                                   param.attentionOut};
+    for (size_t i = 0; i < param.outputInstance.size() && i < sizeof(allOutputs) / sizeof(allOutputs[0]); i++) {
+        if (param.outputInstance[i] == 1) {
+            outputTensors.emplace_back(allOutputs[i]);
+        }
+    }
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "FlashAttentionScore", inputTensors, outputTensors,
+        {
+            {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(param.scale_value)},
+            {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(param.keep_prob)},
+            {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.pre_tockens)},
+            {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.next_tockens)},
+            {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.head_num)},
+            {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.input_layout)},
+            {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.inner_precise)},
+            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.sparse_mode)},
+            {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.pse_type)},
+            {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.seed)},
+            {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.offset)},
+            {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.out_dtype)},
+            {"softmax_out_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.softmax_out_layout)},
+        },
+        param.inputInstance, param.outputInstance);
+
+    ExecuteTestCase(infershapeContextPara, param.expectResult, param.expectOutputShape);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    FlashAttentionScore, FlashAttentionScoreInferShapeTest,
+    testing::ValuesIn(GetCasesFromCsv<FlashAttentionScoreInferShapeUtParam>(ReplaceFileExtension2Csv(__FILE__))),
+    PrintCaseInfoString<FlashAttentionScoreInferShapeUtParam>);
+
+} // namespace FlashAttentionScoreUT

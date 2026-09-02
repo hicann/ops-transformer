@@ -1,0 +1,5 @@
+case_name,expectResult,input_dtype,softmaxMax_dtype,softmaxSum_dtype,softmaxOut_dtype,attentionOut_dtype,scale_value,keep_prob,pre_tockens,next_tockens,head_num,input_layout,inner_precise,sparse_mode,pse_type,seed,offset,out_dtype,softmax_out_layout
+FlashAttentionScore_inferdatatype_0,SUCCESS,FLOAT16,FLOAT,FLOAT,FLOAT16,FLOAT16,0.088388,1.0,65536,65536,1,BSH,0,0,0,0,0,0,same_as_input
+FlashAttentionScore_inferdatatype_1,SUCCESS,FLOAT8_E4M3FN,FLOAT,FLOAT,BF16,BF16,0.088388,1.0,65536,65536,1,BSH,0,0,0,0,0,0,same_as_input
+FlashAttentionScore_inferdatatype_2,SUCCESS,HIFLOAT8,FLOAT,FLOAT,BF16,BF16,0.088388,1.0,65536,65536,1,BSH,0,0,0,0,0,0,same_as_input
+FlashAttentionScore_inferdatatype_3,SUCCESS,FLOAT8_E5M2,FLOAT,FLOAT,BF16,BF16,0.088388,1.0,65536,65536,1,BSH,0,0,0,0,0,0,same_as_input
