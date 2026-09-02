@@ -150,7 +150,7 @@ transformer-2@ops-transformer:
             huawei_style:
                 - ops/ops-transformer/attention/common/op_kernel/vector_common.h
                 - ops/ops-transformer/attention/lightning_indexer/op_host/
-                - ops/ops-transformer/attention/lightning_indexer/op_kernel/
+                - ops/ops-transformer/attention/lightning_indexer/op_kernel/arch35/
                 - ops/ops-transformer/attention/sparse_flash_attention/op_host/
                 - ops/ops-transformer/attention/sparse_flash_attention/op_kernel/
                 - ops/ops-transformer/attention/quant_lightning_indexer/op_host/
@@ -159,8 +159,17 @@ transformer-2@ops-transformer:
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/op_kernel/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/op_host/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/op_kernel/
+                - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/op_api/
                 - ops/ops-transformer/attention/sparse_flash_mla/op_host/
-                - ops/ops-transformer/attention/sparse_flash_mla/op_kernel/
+                - ops/ops-transformer/attention/sparse_flash_mla/op_kernel/arch35/
+                - ops/ops-transformer/attention/quant_sparse_flash_mla/op_host/
+                - ops/ops-transformer/attention/quant_sparse_flash_mla/op_kernel/
+                - ops/ops-transformer/attention/lightning_indexer_v2/op_host/
+                - ops/ops-transformer/attention/lightning_indexer_v2/op_kernel/arch35/
+                - ops/ops-transformer/attention/quant_lightning_indexer_v2/op_host/
+                - ops/ops-transformer/attention/quant_lightning_indexer_v2/op_kernel/
+                - ops/ops-transformer/attention/kv_quant_sparse_flash_attention_v2/op_host/
+                - ops/ops-transformer/attention/kv_quant_sparse_flash_attention_v2/op_kernel/
             opensource_style: null
             kernel_style: null
         unrelease:
@@ -177,7 +186,22 @@ transformer-2@ops-transformer:
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/tests/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/docs/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/examples/
+                - ops/ops-transformer/attention/kv_quant_sparse_flash_attention_v2/tests/
+                - ops/ops-transformer/attention/sparse_flash_mla/tests/
+                - ops/ops-transformer/attention/sparse_flash_mla/docs/
+                - ops/ops-transformer/attention/sparse_flash_mla/examples/
+                - ops/ops-transformer/attention/quant_sparse_flash_mla/tests/
+                - ops/ops-transformer/attention/quant_sparse_flash_mla/docs/
+                - ops/ops-transformer/attention/quant_sparse_flash_mla/examples/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/tests/
+                - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/docs/
+                - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/examples/
+                - ops/ops-transformer/attention/lightning_indexer_v2/tests/
+                - ops/ops-transformer/attention/lightning_indexer_v2/docs/
+                - ops/ops-transformer/attention/lightning_indexer_v2/examples/
+                - ops/ops-transformer/attention/quant_lightning_indexer_v2/tests/
+                - ops/ops-transformer/attention/quant_lightning_indexer_v2/docs/
+                - ops/ops-transformer/attention/quant_lightning_indexer_v2/examples/
             non_delivery: null
             open_source: null
     llt:
