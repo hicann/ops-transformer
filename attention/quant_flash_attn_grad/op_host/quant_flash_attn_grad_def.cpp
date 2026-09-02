@@ -155,7 +155,7 @@ public:
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Attr("quant_mode").AttrType(REQUIRED);
+        this->Attr("quant_mode").AttrType(REQUIRED).Int();
         this->Attr("softmax_scale").AttrType(OPTIONAL).Float(1.0f);
         this->Attr("mask_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("win_left").AttrType(OPTIONAL).Int(-1);

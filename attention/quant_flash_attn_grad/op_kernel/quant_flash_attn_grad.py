@@ -2568,14 +2568,14 @@ def quant_flash_attn_grad(
             shape=[TS, TS], dtype=pl.DT_FP32, target_memory=pl.MemorySpace.Vec
         ),
         addrs=[VA2, VA2 + 256],
-        mutex_ids=[4, 5],
+        mutex_ids=[29, 30],
     )
     dq_vec = pl.make_tile_group(
         type=pl.TileType(
             shape=[TS, TS], dtype=pl.DT_FP32, target_memory=pl.MemorySpace.Vec
         ),
         addrs=VA3,
-        mutex_ids=[6],
+        mutex_ids=[31],
     )
     lse_vec = pl.make_tile_group(
         type=pl.TileType(
@@ -2775,7 +2775,7 @@ def quant_flash_attn_grad(
             compact=1,
         ),
         addrs=CA1,
-        mutex_ids=[1],
+        mutex_ids=[2],
     )
     acc_db = pl.make_tile_group(
         type=pl.TileType(
@@ -2785,7 +2785,7 @@ def quant_flash_attn_grad(
             compact=1,
         ),
         addrs=CA2,
-        mutex_ids=[2, 3],
+        mutex_ids=[4, 6],
     )
     ## post
     post_in = pl.make_tile_group(
