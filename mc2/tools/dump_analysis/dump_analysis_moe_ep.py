@@ -42,15 +42,14 @@ METADATA_FIELD_NAMES = [
     "serverNum",
     "rankNumPerServer",
 ]
-# Metadata 中 7 个固定 Region 的名称
-REGION_COUNT = 7
+# Metadata 中 6 个固定 Region 的名称
+REGION_COUNT = 6
 REGION_NAMES = [
     "PER_CORE_DIAG",
     "COUNT_NOTIFY",
     "EXPERT_COUNT",
     "DISPATCH_SLOT_STATE",
     "COMBINE_TOKEN_STATE",
-    "COMBINE_STATE_TAIL",
     "HYBRID_SCALEOUT_STATUS",
 ]
 # Region 名称到 dump 文件后缀的映射, 每个 Region 单独输出一个 .bin 文件
@@ -61,7 +60,6 @@ REGION_FILE_SUFFIX = {
     "EXPERT_COUNT": "expert_count.bin",
     "DISPATCH_SLOT_STATE": "dispatch_slot_state.bin",
     "COMBINE_TOKEN_STATE": "combine_token_state.bin",
-    "COMBINE_STATE_TAIL": "combine_state_tail.bin",
     "HYBRID_SCALEOUT_STATUS": "hybrid_scaleout_status.bin",
 }
 # Per-core 诊断区: 每个 512B slot 包含 4 个 MoeEpCoreDiagRecord, 每个 record 64B
@@ -431,13 +429,12 @@ def analyze_single_card(
 def write_metadata_sheet(wb, all_metadata: dict, card_count: int):
     ws = wb.active
     ws.title = "metadata"
-    region_offset_names = [r + "_offset" for r in REGION_NAMES]
-    region_size_names = [r + "_size" for r in REGION_NAMES]
+    region_offset_size_names = []
+    for r in REGION_NAMES:
+        region_offset_size_names.append(r + "_offset")
+        region_offset_size_names.append(r + "_size")
     all_field_names = (
-        METADATA_FIELD_NAMES
-        + region_offset_names
-        + region_size_names
-        + ["bs", "使用核数"]
+        METADATA_FIELD_NAMES + region_offset_size_names + ["bs", "使用核数"]
     )
     ws.append(["card_num"] + all_field_names)
     for card_num in range(card_count):
