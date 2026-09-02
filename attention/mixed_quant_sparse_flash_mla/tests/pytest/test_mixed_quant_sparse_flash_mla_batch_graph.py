@@ -19,6 +19,20 @@ import concurrent.futures
 import result_compare_method
 from batch import mixed_quant_sparse_flash_mla_process
 import utils
+import sys
+import torch_npu
+
+SMLA_PYTEST_PATH = Path(__file__).resolve().parents[3] / "sparse_flash_mla/tests/pytest"
+if str(SMLA_PYTEST_PATH) not in sys.path:
+    sys.path.append(str(SMLA_PYTEST_PATH))
+
+from batch_consistency.config import resolve_consistency_config  # noqa: E402
+from batch_consistency.model import RunResult  # noqa: E402
+from batch_consistency.pytest_support import (  # noqa: E402
+    consistency_fulfill_percent,
+    format_consistency_summary,
+    run_configured_consistency,
+)
 
 testcase_path = os.environ.get("MQSMLA_PT_DIR", "mqsmla_testcase")
 batch_test_mode = int(
@@ -70,6 +84,38 @@ else:
 
 def mqsmla_aclgraph(testcase_files):
     test_data = torch.load(testcase_files, map_location="cpu")
+    consistency_config = resolve_consistency_config(
+        test_data, os.environ.get("MQSMLA_BATCH_CONSISTENCY", "auto")
+    )
+    if consistency_config is not None:
+
+        def consistency_executor(data):
+            values = (
+                mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_graph(
+                    data, device_id=device_id
+                )
+            )
+            return RunResult(values[0], values[2])
+
+        report = run_configured_consistency(
+            test_data,
+            consistency_config,
+            consistency_executor,
+            result_compare_method.check_result,
+            lambda: torch_npu.npu.set_device(device_id),
+        )
+        summary = format_consistency_summary(report)
+        print(summary, flush=True)
+        fulfill_percent = consistency_fulfill_percent(report)
+        result = "Pass" if report["pass"] else "Failed"
+        utils.save_result(
+            test_data["params"], result, fulfill_percent, Path(result_path)
+        )
+        if not report["relations"]:
+            pytest.skip(f"batch consistency has no applicable relation: {report}")
+        if not report["pass"]:
+            pytest.fail(summary)
+        return
     npu_error_msg = None
     try:
         npu_result, cpu_quant_result, npu_lse, cpu_lse = (

@@ -18,6 +18,20 @@ import result_compare_method
 from batch import quant_sparse_flash_mla_process
 import utils
 import logging
+import sys
+import torch_npu
+
+SMLA_PYTEST_PATH = Path(__file__).resolve().parents[3] / "sparse_flash_mla/tests/pytest"
+if str(SMLA_PYTEST_PATH) not in sys.path:
+    sys.path.append(str(SMLA_PYTEST_PATH))
+
+from batch_consistency.config import resolve_consistency_config  # noqa: E402
+from batch_consistency.model import RunResult  # noqa: E402
+from batch_consistency.pytest_support import (  # noqa: E402
+    consistency_fulfill_percent,
+    format_consistency_summary,
+    run_configured_consistency,
+)
 
 testcase_path = os.environ.get("QSMLA_PT_DIR", "qsmla_testcase")
 is_run_graph = os.environ.get("RUN_GRAPH", "0") == "1"
@@ -48,6 +62,42 @@ else:
 
 def qsmla(testcase_files):
     test_data = torch.load(testcase_files, map_location="cpu", weights_only=False)
+    consistency_config = resolve_consistency_config(
+        test_data, os.environ.get("QSMLA_BATCH_CONSISTENCY", "auto")
+    )
+    if consistency_config is not None:
+
+        def consistency_executor(data):
+            if is_run_graph:
+                values = quant_sparse_flash_mla_process.test_qsmla_quant_process_graph(
+                    data, device_id=device_id
+                )
+            else:
+                values = quant_sparse_flash_mla_process.test_qsmla_quant_process_ci(
+                    data, device_id=device_id
+                )
+            return RunResult(values[0], values[3])
+
+        report = run_configured_consistency(
+            test_data,
+            consistency_config,
+            consistency_executor,
+            result_compare_method.check_result,
+            lambda: torch_npu.npu.set_device(device_id),
+        )
+        logging.info(f"batch consistency report: {report}")
+        summary = format_consistency_summary(report)
+        print(summary, flush=True)
+        fulfill_percent = consistency_fulfill_percent(report)
+        result = "PASS" if report["pass"] else "FAILED"
+        utils.save_result(
+            test_data["params"], result, fulfill_percent, Path(result_path)
+        )
+        if not report["relations"]:
+            pytest.skip(f"batch consistency has no applicable relation: {report}")
+        if not report["pass"]:
+            pytest.fail(summary)
+        return
     try:
         if is_run_graph:
             npu_result, cpu_quant_result, cpu_lse, npu_lse = (

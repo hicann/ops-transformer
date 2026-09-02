@@ -18,6 +18,8 @@ import pandas as pd
 from pathlib import Path
 import pytest
 import torch
+
+from batch_consistency.config import prepare_consistency_params
 import time
 import random
 
@@ -32,6 +34,15 @@ str_map_dict = {
     "BF16": torch.bfloat16,
     "FP16": torch.float16,
 }
+
+
+def normalize_topk_mode(value):
+    """Accept the case-insensitive ``fullK`` spelling used by Excel cases."""
+    if isinstance(value, list):
+        return [normalize_topk_mode(item) for item in value]
+    if isinstance(value, str) and value.casefold() == "fullk":
+        return "fullK"
+    return value
 
 
 def to_int_or_na(x):
@@ -297,8 +308,12 @@ def generate_param_combinations(ENABLED_PARAMS, is_save_pt=False):
             "cmp_mask_mode": params.get("cmp_mask_mode", [None]),
             "ori_win_left": params.get("ori_win_left", [None]),
             "ori_win_right": params.get("ori_win_right", [None]),
-            "ori_kv_topk_mode": params.get("ori_kv_topk_mode", ori_topk_default),
-            "cmp_kv_topk_mode": params.get("cmp_kv_topk_mode", cmp_topk_default),
+            "ori_kv_topk_mode": normalize_topk_mode(
+                params.get("ori_kv_topk_mode", ori_topk_default)
+            ),
+            "cmp_kv_topk_mode": normalize_topk_mode(
+                params.get("cmp_kv_topk_mode", cmp_topk_default)
+            ),
             "ori_sparse_indices_mode": params.get("ori_sparse_indices_mode", ["full"]),
             "cmp_sparse_indices_mode": params.get("cmp_sparse_indices_mode", ["full"]),
             "actlen_mode": params.get("actlen_mode", ["full"]),
@@ -310,6 +325,21 @@ def generate_param_combinations(ENABLED_PARAMS, is_save_pt=False):
             "return_softmax_lse": params.get("return_softmax_lse", [False]),
             "ori_topk_length": params.get("ori_topk_length", [None]),
             "cmp_topk_length": params.get("cmp_topk_length", [None]),
+            "batch_consistency": params.get("batch_consistency", [None]),
+            "batch_consistency_seed": params.get("batch_consistency_seed", [None]),
+            "batch_consistency_order": params.get("batch_consistency_order", [None]),
+            "batch_consistency_batch_split": params.get(
+                "batch_consistency_batch_split", [None]
+            ),
+            "batch_consistency_mode_batch": params.get(
+                "batch_consistency_mode_batch", [None]
+            ),
+            "batch_consistency_token_split": params.get(
+                "batch_consistency_token_split", [None]
+            ),
+            "batch_consistency_shape_change": params.get(
+                "batch_consistency_shape_change", [None]
+            ),
         }
         param_names = list(param_values.keys())
         for key, value in param_values.items():
@@ -395,8 +425,11 @@ def fill_random_used_len(SMax, B, random_seq=False):
     return used_lens
 
 
-def generate_case_with_default_param(param_combinations):
+def generate_case_with_default_param(
+    param_combinations, batch_consistency_policy="auto"
+):
     case_param = param_combinations.copy()
+    prepare_consistency_params(case_param, batch_consistency_policy)
     case_param.setdefault("testcase_name", "case_" + str(int(time.time() * 1000000)))
     case_param.update(
         {

@@ -862,15 +862,11 @@ class QuantSparseFlashMlaInputAdapter:
             filled["Testcase_Name"] = params.get("testcase_name")
         pytest_check.check_valid_param(filled)
         if batch_random is None:
-            data = pytest_golden.generate_and_save_testdata(
-                filled, save_pt=False, generate_golden=False
-            )
+            data = pytest_golden.gen_data(filled, generate_golden=False)
         else:
             batch_random.validate_params(filled)
             with batch_random:
-                data = pytest_golden.generate_and_save_testdata(
-                    filled, save_pt=False, generate_golden=False
-                )
+                data = pytest_golden.gen_data(filled, generate_golden=False)
             batch_random.normalize_block_tables(data)
         return data
 

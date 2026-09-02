@@ -19,6 +19,7 @@ PT_SAVE_DIR="qsmla_testcase"
 EXCEL_FILE="./excel/example.xlsx"
 SHEET_NAME="decode"
 KEEP_PT=false
+BATCH_CONSISTENCY_POLICY="auto"
 
 # ====================== 执行区 ======================
 
@@ -26,6 +27,7 @@ KEEP_PT=false
 run_single() {
     echo "===== 执行单用例算子调测 ====="
     export RUN_GRAPH="$RUN_GRAPH"
+    export QSMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s $TEST_QSMLA_SINGLE_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning --show-capture=no
 }
 
@@ -38,6 +40,7 @@ run_batch_save() {
     export QSMLA_EXCEL="$EXCEL_FILE"
     export QSMLA_SHEET="$SHEET_NAME"
     export QSMLA_PT_DIR="$PT_SAVE_DIR"
+    export QSMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s $QSMLA_PT_SAVE_SCRIPT -x -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning --show-capture=no
     if [ $? -ne 0 ]; then
         echo "batch_save 执行失败，退出"
@@ -64,6 +67,7 @@ run_batch_exec() {
     echo "找到 $pt_count 个pt文件，开始执行NPU测试"
     export QSMLA_PT_DIR="$PT_SAVE_DIR"
     export RUN_GRAPH="$RUN_GRAPH"
+    export QSMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s $TEST_QSMLA_PT_BATCH_SCRIPT -x -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning --show-capture=no
     if [ $? -ne 0 ]; then
         echo "batch_exec 执行失败"
@@ -118,6 +122,7 @@ show_help() {
     echo "  --pt-dir <目录>   指定pt文件保存/读取目录（默认: qsmla_testcase）"
     echo "  --keep-pt         执行完成后保留pt文件（默认清理，仅batch命令）"
     echo "  --run-graph       执行aclgraph模式（默认不开启）"
+    echo "  --batch-consistency <auto|on|off>  batch一致性策略（默认: auto）"
     echo ""
     echo "示例："
     echo "  $0 single                              # eager模式下执行single模式"
@@ -187,6 +192,14 @@ if [ "$COMMAND" = "batch_save" ] || [ "$COMMAND" = "batch_exec" ] || [ "$COMMAND
                 RUN_GRAPH=1
                 shift
                 ;;
+            --batch-consistency)
+                if [ $# -lt 2 ] || { [ "$2" != "auto" ] && [ "$2" != "on" ] && [ "$2" != "off" ]; }; then
+                    echo "错误：--batch-consistency 需要 auto、on 或 off"
+                    exit 1
+                fi
+                BATCH_CONSISTENCY_POLICY="$2"
+                shift 2
+                ;;
             *)
                 echo "错误：未知选项 '$1'"
                 show_help
@@ -203,6 +216,14 @@ if [ "$COMMAND" = "single" ] ; then
             --run-graph)
                 RUN_GRAPH=1
                 shift
+                ;;
+            --batch-consistency)
+                if [ $# -lt 2 ] || { [ "$2" != "auto" ] && [ "$2" != "on" ] && [ "$2" != "off" ]; }; then
+                    echo "错误：--batch-consistency 需要 auto、on 或 off"
+                    exit 1
+                fi
+                BATCH_CONSISTENCY_POLICY="$2"
+                shift 2
                 ;;
             *)
                 echo "错误：未知选项 '$1'"

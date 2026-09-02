@@ -18,6 +18,8 @@ import pytest
 import sparse_flash_mla_golden
 import traceback
 
+from batch_consistency.config import resolve_consistency_config
+
 excel_path = os.getenv("SMLA_EXCEL_PATH", "./excel/example.xlsx")
 excel_sheet = os.getenv("SMLA_EXCEL_SHEET", "CSA")
 ENABLED_PARAMS_FROM_FILE = utils.load_excel_test_cases(excel_path, excel_sheet)
@@ -59,10 +61,20 @@ def record_failed_case(param_combinations, error_msg):
 def generate_and_save(param_combinations):
     global case_id
     try:
-        test_data = utils.generate_case_with_default_param(param_combinations)
+        batch_consistency_policy = os.getenv("SMLA_BATCH_CONSISTENCY", "auto")
+        test_data = utils.generate_case_with_default_param(
+            param_combinations, batch_consistency_policy
+        )
         print("data parsed.", test_data)
         print("strat to generate data")
         input_data = sparse_flash_mla_golden.gen_data(test_data)
+        config = resolve_consistency_config(
+            input_data,
+            batch_consistency_policy,
+            persist=True,
+        )
+        if config is not None:
+            print("batch consistency config:", config)
         print("strat to save data")
         sparse_flash_mla_golden.save_test_case(input_data, save_path)
     except Exception as e:

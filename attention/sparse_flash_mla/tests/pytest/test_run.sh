@@ -46,8 +46,20 @@ show_help() {
     示例3: bash $0 load_graph -P "./data" -E "./excel/example.xlsx" -S "CSA"
 
 通用选项:
+  --batch-consistency <auto|on|off>
+               batch一致性策略（默认auto：paramset/PT有配置时开启）
   -h, --help   显示此帮助信息
 EOF
+}
+
+BATCH_CONSISTENCY_POLICY="auto"
+
+set_batch_consistency_policy() {
+    if [[ "$1" != "auto" && "$1" != "on" && "$1" != "off" ]]; then
+        echo "错误: --batch-consistency 仅支持 auto、on、off"
+        exit 1
+    fi
+    BATCH_CONSISTENCY_POLICY="$1"
 }
 
 # 检查参数数量
@@ -82,6 +94,14 @@ run_script_single() {
                 R_VALUE="$2"
                 shift 2
                 ;;
+            --batch-consistency)
+                if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                    echo "错误: --batch-consistency 参数需要值"
+                    exit 1
+                fi
+                set_batch_consistency_policy "$2"
+                shift 2
+                ;;
             *)
                 echo "错误: 未知参数 '$1'"
                 echo "test_sparse_flash_mla_single.py 脚本支持的参数: -R"
@@ -104,6 +124,7 @@ run_script_single() {
     echo "==============================="
 
     # 运行 Python 脚本
+    export SMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     if [ "$VERBOSE" = true ]; then
         echo "正在运行 test_sparse_flash_mla_single.py..."
     fi
@@ -148,6 +169,14 @@ run_script_save() {
                 P_VALUE="$2"
                 shift 2
                 ;;
+            --batch-consistency)
+                if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                    echo "错误: --batch-consistency 参数需要值"
+                    exit 1
+                fi
+                set_batch_consistency_policy "$2"
+                shift 2
+                ;;
             *)
                 echo "错误: 未知参数 '$1'"
                 echo "sparse_flash_mla_pt_save.py 脚本支持的参数: -E, -S, -P"
@@ -190,6 +219,7 @@ run_script_save() {
     fi
 
     # 运行脚本，传递环境变量
+    export SMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s batch/sparse_flash_mla_pt_save.py  -v -m ci
 }
 
@@ -232,6 +262,14 @@ run_script_load() {
                 S_VALUE="$2"
                 shift 2
                 ;;
+            --batch-consistency)
+                if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                    echo "错误: --batch-consistency 参数需要值"
+                    exit 1
+                fi
+                set_batch_consistency_policy "$2"
+                shift 2
+                ;;
             *)
                 echo "错误: 未知参数 '$1'"
                 echo "test_sparse_flash_mla_batch.py 脚本支持的参数: -P, -R, -E, -S"
@@ -242,6 +280,7 @@ run_script_load() {
 
     # 打印参数信息
     echo "==============================="
+    export SMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     echo "脚本: test_sparse_flash_mla_batch.py"
     echo "参数配置:"
 
@@ -401,6 +440,14 @@ run_script_load_graph() {
                 S_VALUE="$2"
                 shift 2
                 ;;
+            --batch-consistency)
+                if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                    echo "错误: --batch-consistency 参数需要值"
+                    exit 1
+                fi
+                set_batch_consistency_policy "$2"
+                shift 2
+                ;;
             *)
                 echo "错误: 未知参数 '$1'"
                 echo "test_sparse_flash_mla_batch_graph.py 脚本支持的参数: -P, -R, -E, -S"
@@ -411,6 +458,7 @@ run_script_load_graph() {
 
     # 打印参数信息
     echo "==============================="
+    export SMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     echo "脚本: test_sparse_flash_mla_batch_graph.py (Graph模式)"
     echo "参数配置:"
 

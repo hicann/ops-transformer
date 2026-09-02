@@ -23,11 +23,13 @@ KEEP_PT=false
 BATCH_TEST_MODE=1
 RESULT_PATH="./mqsmla_result.xlsx"
 DEVICE_ID=0
+BATCH_CONSISTENCY_POLICY="auto"
 
 # ====================== 执行区 ======================
 
 run_single() {
     echo "===== 执行单用例算子调测 ====="
+    export MQSMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s $TEST_QSMLA_SINGLE_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
 }
 
@@ -39,6 +41,7 @@ run_batch_save() {
     export MQSMLA_EXCEL="$EXCEL_FILE"
     export MQSMLA_SHEET="$SHEET_NAME"
     export MQSMLA_PT_DIR="$PT_SAVE_DIR"
+    export MQSMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s $QSMLA_PT_SAVE_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
     if [ $? -ne 0 ]; then
         echo "batch_save 执行失败，退出"
@@ -67,6 +70,7 @@ run_batch_exec() {
     export MQSMLA_EXCEL_PATH="$EXCEL_FILE"
     export MQSMLA_RESULT_SAVE_PATH="$RESULT_PATH"
     export MQSMLA_DEVICE_ID="$DEVICE_ID"
+    export MQSMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s $TEST_QSMLA_PT_BATCH_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
     if [ $? -ne 0 ]; then
         echo "batch_exec 执行失败"
@@ -96,6 +100,7 @@ run_batch_exec_graph() {
     export MQSMLA_EXCEL_PATH="$EXCEL_FILE"
     export MQSMLA_RESULT_SAVE_PATH="$RESULT_PATH"
     export MQSMLA_DEVICE_ID="$DEVICE_ID"
+    export MQSMLA_BATCH_CONSISTENCY="$BATCH_CONSISTENCY_POLICY"
     python3 -m pytest -rA -s $TEST_QSMLA_PT_BATCH_GRAPH_SCRIPT -v -m graph -W ignore::UserWarning -W ignore::DeprecationWarning
     if [ $? -ne 0 ]; then
         echo "batch_exec_graph 执行失败"
@@ -150,6 +155,7 @@ show_help() {
     echo "  --device-id <id>    指定NPU设备ID（默认: 0）"
     echo "  --mode <0|1>        批跑模式: 0=全量批跑(默认), 1=按表格中case批跑"
     echo "  --keep-pt           执行完成后保留pt文件（默认清理，仅batch命令）"
+    echo "  --batch-consistency <auto|on|off>  batch一致性策略（默认: auto）"
     echo ""
     echo "环境变量（.py文件读取）："
     echo "  MQSMLA_PT_DIR              pt文件目录（batch_save/batch_exec/batch_exec_graph）"
@@ -241,6 +247,34 @@ if [ "$COMMAND" = "batch_save" ] || [ "$COMMAND" = "batch_exec" ] || [ "$COMMAND
                 fi
                 KEEP_PT=true
                 shift
+                ;;
+            --batch-consistency)
+                if [ $# -lt 2 ] || { [ "$2" != "auto" ] && [ "$2" != "on" ] && [ "$2" != "off" ]; }; then
+                    echo "错误：--batch-consistency 需要 auto、on 或 off"
+                    exit 1
+                fi
+                BATCH_CONSISTENCY_POLICY="$2"
+                shift 2
+                ;;
+            *)
+                echo "错误：未知选项 '$1'"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+fi
+
+if [ "$COMMAND" = "single" ]; then
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --batch-consistency)
+                if [ $# -lt 2 ] || { [ "$2" != "auto" ] && [ "$2" != "on" ] && [ "$2" != "off" ]; }; then
+                    echo "错误：--batch-consistency 需要 auto、on 或 off"
+                    exit 1
+                fi
+                BATCH_CONSISTENCY_POLICY="$2"
+                shift 2
                 ;;
             *)
                 echo "错误：未知选项 '$1'"

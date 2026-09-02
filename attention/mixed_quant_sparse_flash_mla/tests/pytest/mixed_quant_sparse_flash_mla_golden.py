@@ -2192,9 +2192,7 @@ def save_test_case(input_data, output_dir):
     return input_filepath
 
 
-def generate_and_save_testdata(
-    params, save_pt=False, save_path="", generate_golden=True
-):
+def gen_data(params, generate_golden=True):
     """
     生成input param及cpuout
     runNpu: 生成完毕后执行npu计算
@@ -2724,9 +2722,6 @@ def generate_and_save_testdata(
         "cpu_output": cpu_result,
         "cpu_lse": cpu_lse if return_softmax_lse else None,
     }
-
-    if save_pt:
-        save_test_case(input_data, save_path)
 
     return input_data
 

@@ -19,6 +19,15 @@ import concurrent.futures
 import pandas as pd
 from pathlib import Path
 import os
+import torch_npu
+
+from batch_consistency.config import resolve_consistency_config
+from batch_consistency.model import RunResult
+from batch_consistency.pytest_support import (
+    consistency_fulfill_percent,
+    format_consistency_summary,
+    run_configured_consistency,
+)
 
 pt_dir = os.getenv("SMLA_PT_LOAD_PATH", "./data")
 result_path = Path(os.getenv("SMLA_RESULT_SAVE_PATH", "./result/smla_result.xlsx"))
@@ -80,6 +89,29 @@ print("files:", locals()["testcase_files"])
 
 def smla_graph(testcase_files):
     test_data = torch.load(testcase_files, map_location="cpu")
+    consistency_config = resolve_consistency_config(
+        test_data, os.environ.get("SMLA_BATCH_CONSISTENCY", "auto")
+    )
+    if consistency_config is not None:
+        report = run_configured_consistency(
+            test_data,
+            consistency_config,
+            lambda data: RunResult(
+                *sparse_flash_mla_process.call_npu_graph(data, device_id=device_id)
+            ),
+            result_compare_method.check_result,
+            lambda: torch_npu.npu.set_device(device_id),
+        )
+        summary = format_consistency_summary(report)
+        print(summary, flush=True)
+        fulfill_percent = consistency_fulfill_percent(report)
+        result = "Pass" if report["pass"] else "Failed"
+        utils.save_result(result, fulfill_percent, test_data["params"], result_path)
+        if not report["relations"]:
+            pytest.skip(f"batch consistency has no applicable relation: {report}")
+        if not report["pass"]:
+            pytest.fail(summary)
+        return
     npu_error_msg = None
     try:
         npu_result, softmax_lse = sparse_flash_mla_process.call_npu_graph(

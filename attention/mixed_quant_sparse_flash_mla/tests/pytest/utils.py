@@ -13,10 +13,16 @@
 import pytest
 import random
 import pandas as pd
-from pathlib import Path
 import numpy as np
 import os
 import math
+
+
+def normalize_topk_mode(value):
+    """Accept the case-insensitive ``fullK`` spelling used by Excel cases."""
+    if isinstance(value, str) and value.casefold() == "fullk":
+        return "fullK"
+    return value
 
 
 def infer_template_run_mode(
@@ -167,8 +173,7 @@ def gen_cu_seqlens_cmp_kv(
 
     inferred = [math.floor(value / cmp_ratio) for value in cu_seqlens_ori_kv]
     capacities = [
-        inferred[index + 1] - inferred[index]
-        for index in range(len(inferred) - 1)
+        inferred[index + 1] - inferred[index] for index in range(len(inferred) - 1)
     ]
     if all(capacity >= actual for capacity, actual in zip(capacities, seqused_cmp_kv)):
         return inferred
@@ -183,6 +188,7 @@ def gen_cu_seqlens_cmp_kv(
     adjusted = list(seqused_cmp_kv)
     adjusted[-1] += total - required
     return gen_cu_seqlens_from_seqused(adjusted)
+
 
 def calc_block_num(seqused_ori_kv, seqused_cmp_kv, block_size1, block_size2, cmp_ratio):
     """
@@ -414,10 +420,10 @@ def fill_none_params(params_dict):
     T1 = cu_seqlens_q[-1] if layout_q == "TND" else None
 
     ori_mask_mode = params_dict.get("ori_mask_mode")
-    ori_kv_topk_mode = params_dict.get("ori_kv_topk_mode")
+    ori_kv_topk_mode = normalize_topk_mode(params_dict.get("ori_kv_topk_mode"))
     if ori_kv_topk_mode is None:
         ori_kv_topk_mode = "fullK" if ori_mask_mode == 0 else "no"
-    cmp_kv_topk_mode = params_dict.get("cmp_kv_topk_mode")
+    cmp_kv_topk_mode = normalize_topk_mode(params_dict.get("cmp_kv_topk_mode"))
     if cmp_kv_topk_mode is None:
         cmp_kv_topk_mode = "fullK" if cmp_mask_mode == 0 else "no"
 
@@ -472,6 +478,19 @@ def fill_none_params(params_dict):
         "cmp_sparse_indices_mode": params_dict.get("cmp_sparse_indices_mode", "full"),
         "ori_topk_length": params_dict.get("ori_topk_length", None),
         "cmp_topk_length": params_dict.get("cmp_topk_length", None),
+        "batch_consistency": params_dict.get("batch_consistency"),
+        "batch_consistency_seed": params_dict.get("batch_consistency_seed"),
+        "batch_consistency_order": params_dict.get("batch_consistency_order"),
+        "batch_consistency_batch_split": params_dict.get(
+            "batch_consistency_batch_split"
+        ),
+        "batch_consistency_mode_batch": params_dict.get("batch_consistency_mode_batch"),
+        "batch_consistency_token_split": params_dict.get(
+            "batch_consistency_token_split"
+        ),
+        "batch_consistency_shape_change": params_dict.get(
+            "batch_consistency_shape_change"
+        ),
     }
 
     return filled_params

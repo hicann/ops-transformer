@@ -12,7 +12,6 @@
 
 import itertools
 import torch
-from mixed_quant_sparse_flash_mla_paramset import ENABLED_PARAMS
 import result_compare_method
 import check_valid_param
 import mixed_quant_sparse_flash_mla_golden
@@ -25,6 +24,25 @@ import os
 import multiprocessing as mp
 import concurrent.futures
 import utils
+import sys
+import torch_npu
+
+from mixed_quant_sparse_flash_mla_paramset import ENABLED_PARAMS
+
+SMLA_PYTEST_PATH = Path(__file__).resolve().parents[3] / "sparse_flash_mla/tests/pytest"
+if str(SMLA_PYTEST_PATH) not in sys.path:
+    sys.path.append(str(SMLA_PYTEST_PATH))
+
+from batch_consistency.config import (  # noqa: E402
+    prepare_consistency_params,
+    resolve_consistency_config,
+)
+from batch_consistency.model import RunResult  # noqa: E402
+from batch_consistency.pytest_support import (  # noqa: E402
+    consistency_fulfill_percent,
+    format_consistency_summary,
+    run_configured_consistency,
+)
 
 pt_save_path = "mqsmla_testcase"
 device_id = 0
@@ -78,6 +96,21 @@ for params in ENABLED_PARAMS:
         "cmp_sparse_indices_mode": params.get("cmp_sparse_indices_mode", ["full"]),
         "ori_topk_length": params.get("ori_topk_length", [None]),
         "cmp_topk_length": params.get("cmp_topk_length", [None]),
+        "batch_consistency": params.get("batch_consistency", [None]),
+        "batch_consistency_seed": params.get("batch_consistency_seed", [None]),
+        "batch_consistency_order": params.get("batch_consistency_order", [None]),
+        "batch_consistency_batch_split": params.get(
+            "batch_consistency_batch_split", [None]
+        ),
+        "batch_consistency_mode_batch": params.get(
+            "batch_consistency_mode_batch", [None]
+        ),
+        "batch_consistency_token_split": params.get(
+            "batch_consistency_token_split", [None]
+        ),
+        "batch_consistency_shape_change": params.get(
+            "batch_consistency_shape_change", [None]
+        ),
     }
 
     param_names = list(param_values.keys())
@@ -94,6 +127,8 @@ def mqsmla(param_combinations):
 
     # 填充None参数的默认值
     params = utils.fill_none_params(param_combinations)
+    batch_consistency_policy = os.environ.get("MQSMLA_BATCH_CONSISTENCY", "auto")
+    prepare_consistency_params(params, batch_consistency_policy)
 
     # 生成测试用例名称
     Testcase_Name = params["Testcase_Name"]
@@ -118,9 +153,43 @@ def mqsmla(param_combinations):
         pytest.skip(f"输入参数校验失败:{e}")
 
     # 生成测试数据及golden
-    test_data = mixed_quant_sparse_flash_mla_golden.generate_and_save_testdata(
-        params, save_pt=save_pt, save_path=pt_save_path
+    test_data = mixed_quant_sparse_flash_mla_golden.gen_data(params)
+    consistency_config = resolve_consistency_config(
+        test_data,
+        batch_consistency_policy,
+        persist=save_pt,
     )
+    if save_pt:
+        mixed_quant_sparse_flash_mla_golden.save_test_case(test_data, pt_save_path)
+
+    if consistency_config is not None:
+        if params["layout_q"] == "TND" and test_data.get("cpu_lse") is not None:
+            test_data["cpu_lse"] = test_data["cpu_lse"].transpose(0, 1).contiguous()
+
+        def consistency_executor(data):
+            values = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
+                data, device_id=device_id
+            )
+            return RunResult(values[0], values[3])
+
+        report = run_configured_consistency(
+            test_data,
+            consistency_config,
+            consistency_executor,
+            result_compare_method.check_result,
+            lambda: torch_npu.npu.set_device(device_id),
+        )
+        summary = format_consistency_summary(report)
+        print(summary, flush=True)
+        fulfill_percent = consistency_fulfill_percent(report)
+        result = "Pass" if report["pass"] else "Failed"
+        case_id += 1
+        utils.save_result(test_data["params"], result, fulfill_percent, result_path)
+        if not report["relations"]:
+            pytest.skip(f"batch consistency has no applicable relation: {report}")
+        if not report["pass"]:
+            pytest.fail(summary)
+        return
 
     # 获得cpu结果(真值)和算子结果（测试值）
     npu_error_msg = None
