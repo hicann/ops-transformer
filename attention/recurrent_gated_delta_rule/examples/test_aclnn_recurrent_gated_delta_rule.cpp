@@ -15,19 +15,20 @@
 
 #include <iostream>
 #include <vector>
+#include <cstring>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_recurrent_gated_delta_rule.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -39,10 +40,10 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, const char *name)
 {
     auto size = GetShapeSize(shape);
-    std::vector<aclFloat16> resultData(size, 0);
+    std::vector<uint16_t> resultData(size, 0);
     auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
                            size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
@@ -50,7 +51,10 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
         if (i >= 5) { // print the first five data
             break;
         }
-        LOG_PRINT("mean result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+        float result = 0.0f;
+        uint32_t val = static_cast<uint32_t>(resultData[i]) << 16U;
+        std::memcpy(&result, &val, sizeof(result));
+        LOG_PRINT("%s result[%ld] is: %f\n", name, i, result);
     }
 }
 
@@ -103,7 +107,8 @@ int main()
     void *queryDeviceAddr = nullptr;
     void *keyDeviceAddr = nullptr;
     void *valueDeviceAddr = nullptr;
-    void *gamaDeviceAddr = nullptr;
+    void *gDeviceAddr = nullptr;
+    void *gkDeviceAddr = nullptr;
     void *betaDeviceAddr = nullptr;
     void *stateRefDeviceAddr = nullptr;
     void *actSeqLenDeviceAddr = nullptr;
@@ -114,8 +119,8 @@ int main()
     aclTensor *query = nullptr;
     aclTensor *key = nullptr;
     aclTensor *value = nullptr;
-    aclTensor *gama = nullptr;
-    aclTensor *gamak = nullptr;
+    aclTensor *g = nullptr;
+    aclTensor *gk = nullptr;
     aclTensor *beta = nullptr;
     aclTensor *stateRef = nullptr;
     aclTensor *actSeqLen = nullptr;
@@ -131,19 +136,20 @@ int main()
     int32_t dimV = 32;
     int32_t dimK = 32;
 
-
     std::vector<int64_t> stateShape = {batchSize * mtp, headVNum, dimV, dimK};
     std::vector<int64_t> qkShape = {batchSize * mtp, headKNum, dimK};
     std::vector<int64_t> vShape = {batchSize * mtp, headVNum, dimV};
-    std::vector<int64_t> gamaShape = {batchSize * mtp, headVNum};
+    std::vector<int64_t> gShape = {batchSize * mtp, headVNum};
+    std::vector<int64_t> gkShape = {batchSize * mtp, headVNum, dimK};
     std::vector<int64_t> actSeqLenShape = {batchSize};
     std::vector<int64_t> ssmStaIdShape = {batchSize * mtp};
     std::vector<float> stateRefHostData(GetShapeSize(stateShape));
     std::vector<float> queryHostData(GetShapeSize(qkShape));
     std::vector<float> keyHostData(GetShapeSize(qkShape));
     std::vector<float> valueHostData(GetShapeSize(vShape));
-    std::vector<float> gamaHostData(GetShapeSize(gamaShape));
-    std::vector<float> betaHostData(GetShapeSize(gamaShape));
+    std::vector<float> gHostData(GetShapeSize(gShape));
+    std::vector<float> gkHostData(GetShapeSize(gkShape));
+    std::vector<float> betaHostData(GetShapeSize(gShape));
     std::vector<int32_t> actSeqLenHostData(batchSize, mtp);
     std::vector<int32_t> ssmStaIdHostData(batchSize * mtp);
     std::vector<int32_t> numAccTokHostData(batchSize, 1);
@@ -158,6 +164,12 @@ int main()
     }
     for (int i = 0; i < valueHostData.size(); i++) {
         valueHostData[i] = 0.5;
+    }
+    for (int i = 0; i < gHostData.size(); i++) {
+        gHostData[i] = -0.5;
+    }
+    for (int i = 0; i < gkHostData.size(); i++) {
+        gkHostData[i] = -0.5;
     }
     for (int i = 0; i < betaHostData.size(); i++) {
         betaHostData[i] = 0.5;
@@ -176,9 +188,11 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(valueHostData, vShape, &valueDeviceAddr, aclDataType::ACL_BF16, &value);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(gamaHostData, gamaShape, &gamaDeviceAddr, aclDataType::ACL_FLOAT, &gama);
+    ret = CreateAclTensor(gHostData, gShape, &gDeviceAddr, aclDataType::ACL_FLOAT, &g);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(betaHostData, gamaShape, &betaDeviceAddr, aclDataType::ACL_BF16, &beta);
+    ret = CreateAclTensor(gkHostData, gkShape, &gkDeviceAddr, aclDataType::ACL_FLOAT, &gk);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = CreateAclTensor(betaHostData, gShape, &betaDeviceAddr, aclDataType::ACL_BF16, &beta);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(actSeqLenHostData, actSeqLenShape, &actSeqLenDeviceAddr, aclDataType::ACL_INT32, &actSeqLen);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -194,8 +208,8 @@ int main()
     float scale = 1.0;
     aclOpExecutor *executor;
     // 调用aclnnRecurrentGatedDeltaRuleGetWorkspaceSize第一段接口
-    ret = aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(query, key, value, beta, stateRef, actSeqLen, ssmStaId, gama,
-                                                       gamak, numAccTok, scale, attnOut, &workspaceSize, &executor);
+    ret = aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(query, key, value, beta, stateRef, actSeqLen, ssmStaId, g, gk,
+                                                       numAccTok, scale, attnOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnRecurrentGatedDeltaRuleGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
@@ -215,14 +229,15 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
-    PrintOutResult(stateShape, &stateRefDeviceAddr);
-    PrintOutResult(vShape, &attnOutDeviceAddr);
+    PrintOutResult(stateShape, &stateRefDeviceAddr, "finalState");
+    PrintOutResult(vShape, &attnOutDeviceAddr, "out");
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     aclDestroyTensor(query);
     aclDestroyTensor(key);
     aclDestroyTensor(value);
-    aclDestroyTensor(gama);
+    aclDestroyTensor(g);
+    aclDestroyTensor(gk);
     aclDestroyTensor(beta);
     aclDestroyTensor(stateRef);
     aclDestroyTensor(actSeqLen);
@@ -231,16 +246,17 @@ int main()
     aclDestroyTensor(attnOut);
 
     // 7. 释放device资源
-    aclrtFree(query);
-    aclrtFree(key);
-    aclrtFree(value);
-    aclrtFree(gama);
-    aclrtFree(beta);
-    aclrtFree(stateRef);
-    aclrtFree(actSeqLen);
-    aclrtFree(ssmStaId);
-    aclrtFree(numAccTok);
-    aclrtFree(attnOut);
+    aclrtFree(queryDeviceAddr);
+    aclrtFree(keyDeviceAddr);
+    aclrtFree(valueDeviceAddr);
+    aclrtFree(gDeviceAddr);
+    aclrtFree(gkDeviceAddr);
+    aclrtFree(betaDeviceAddr);
+    aclrtFree(stateRefDeviceAddr);
+    aclrtFree(actSeqLenDeviceAddr);
+    aclrtFree(ssmStaIdDeviceAddr);
+    aclrtFree(numAccTokDeviceAddr);
+    aclrtFree(attnOutDeviceAddr);
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }

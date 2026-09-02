@@ -15,19 +15,20 @@
 
 #include <iostream>
 #include <vector>
+#include <cstring>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_chunk_gated_delta_rule.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -42,7 +43,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, const char *name)
 {
     auto size = GetShapeSize(shape);
-    std::vector<aclFloat16> resultData(size, 0);
+    std::vector<uint16_t> resultData(size, 0);
     auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
                            size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
@@ -50,7 +51,10 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, const char *
         if (i >= 5) { // print the first five data
             break;
         }
-        LOG_PRINT("%s result[%ld] is: %f\n", name, i, aclFloat16ToFloat(resultData[i]));
+        float result = 0.0f;
+        uint32_t val = static_cast<uint32_t>(resultData[i]) << 16U;
+        std::memcpy(&result, &val, sizeof(result));
+        LOG_PRINT("%s result[%ld] is: %f\n", name, i, result);
     }
 }
 
@@ -122,12 +126,11 @@ int main()
 
     // 自定义输入与属性
     int32_t batchSize = 2;
-    int32_t seqLength = 200;
+    int32_t seqLength = 32;
     int32_t headKNum = 4;
     int32_t headVNum = 8;
     int32_t dimV = 32;
     int32_t dimK = 32;
-
 
     std::vector<int64_t> stateShape = {batchSize, headVNum, dimV, dimK};
     std::vector<int64_t> qkShape = {batchSize * seqLength, headKNum, dimK};
@@ -141,21 +144,25 @@ int main()
     std::vector<float> gamaHostData(GetShapeSize(gamaShape));
     std::vector<int16_t> betaHostData(GetShapeSize(gamaShape));
     std::vector<int32_t> actSeqLenHostData(batchSize, seqLength);
-    int16_t bfloatOne = 16256; // int16_t的16256的二进制对应bfloat16的1.0
+    int16_t bfloatHalf = 16128;    // int16_t的16128的二进制对应bfloat16的0.5
+    int16_t bfloatQuarter = 15936; // int16_t的15936的二进制对应bfloat16的0.25
     for (int i = 0; i < initStateHostData.size(); i++) {
-        initStateHostData[i] = bfloatOne;
+        initStateHostData[i] = bfloatQuarter;
     }
     for (int i = 0; i < queryHostData.size(); i++) {
-        queryHostData[i] = bfloatOne;
+        queryHostData[i] = bfloatQuarter;
     }
     for (int i = 0; i < keyHostData.size(); i++) {
-        keyHostData[i] = bfloatOne;
+        keyHostData[i] = bfloatQuarter;
     }
     for (int i = 0; i < valueHostData.size(); i++) {
-        valueHostData[i] = bfloatOne;
+        valueHostData[i] = bfloatHalf;
     }
     for (int i = 0; i < betaHostData.size(); i++) {
-        betaHostData[i] = bfloatOne;
+        betaHostData[i] = bfloatHalf;
+    }
+    for (int i = 0; i < gamaHostData.size(); i++) {
+        gamaHostData[i] = -0.5f;
     }
 
     std::vector<int16_t> attnOutHostData(valueHostData);

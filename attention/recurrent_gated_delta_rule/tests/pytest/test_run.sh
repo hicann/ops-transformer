@@ -163,6 +163,30 @@ _run_mss_single_batch() {
     echo "$mss_status"
 }
 
+# mssanitizer 前置校验：跑1条用例确认 mssanitizer 能真正拦截到 kernel
+_mss_preflight() {
+    local mss_tool="$1"
+    local mss_bin="$2"
+    local kernel_opts="$3"
+
+    local preflight_log="${RESULT_DIR}/mss_preflight_${TIMESTAMP}.log"
+    echo "===== mssanitizer preflight check: verify kernel interception =====" | tee "$preflight_log"
+    TEST_MODE=random SKIP_GOLDEN=1 RANDOM_CASE_COUNT=1 RANDOM_SEED=0 \
+        CSV_FILE="/dev/null" MSS_TOOL=$mss_tool \
+        "$mss_bin" --tool=$mss_tool $kernel_opts $MSS_EXTRA_OPTS -- \
+        python3 -m pytest -rA -s $TEST_RECURRENT_GATED_DELTA_RULE_SINGLE_SCRIPT -v -m ci \
+        -W ignore::UserWarning -W ignore::DeprecationWarning \
+        2>&1 | tee -a "$preflight_log"
+    if ! grep -q "\[mssanitizer\] Start.*sanitizer on kernel" "$preflight_log"; then
+        echo "===== ABORT: mssanitizer failed to intercept any kernel, detection is ineffective, stopping =====" | tee -a "$preflight_log"
+        echo "Possible cause: CANN version incompatible with mssanitizer (kernel launch path not hooked)" | tee -a "$preflight_log"
+        echo "Troubleshoot: check if mssanitizer version matches CANN version" | tee -a "$preflight_log"
+        return 1
+    fi
+    echo "===== preflight passed: mssanitizer intercepted kernel successfully =====" | tee -a "$preflight_log"
+    return 0
+}
+
 # mssanitizer 检测（随机用例，仅NPU不跑golden；tool 可选 memcheck/racecheck/initcheck/synccheck）
 # MSS_BATCH 环境变量 > 0 时启用分批模式：每批重启 mssanitizer 避免 host 内存累积
 run_mss() {
@@ -176,6 +200,11 @@ run_mss() {
         kernel_opts="--kernel-name=$mss_kernel"
     fi
     local batch_size="${MSS_BATCH:-0}"
+
+    # 前置校验：确认 mssanitizer 能拦截到 kernel，否则正式检测无意义
+    if ! _mss_preflight "$mss_tool" "$mss_bin" "$kernel_opts"; then
+        exit 1
+    fi
 
     # 分批模式：每批重启 mssanitizer，避免 host 内存累积导致 OOM
     # CSV/log 统一追加到单一文件，不产生每批独立文件
