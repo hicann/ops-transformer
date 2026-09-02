@@ -105,7 +105,7 @@ struct BlockAttnResPrepareOpApiCase {
     std::string expSumShape;
     std::string expSumDtype;
     std::string expSumFormat;
-    float eps = 1.0e-6F;
+    double eps = 1.0e-6;
     aclnnStatus expectRet = ACLNN_SUCCESS;
 };
 
@@ -161,7 +161,7 @@ std::vector<BlockAttnResPrepareOpApiCase> LoadCases()
             testCase.expSumShape = ops::ut::Trim(items[index++]);
             testCase.expSumDtype = ops::ut::Trim(items[index++]);
             testCase.expSumFormat = ops::ut::Trim(items[index++]);
-            testCase.eps = std::stof(ops::ut::Trim(items[index++]));
+            testCase.eps = std::stod(ops::ut::Trim(items[index++]));
             testCase.expectRet = ops::ut::ParseAclnnStatus(items[index++]);
             cases.emplace_back(std::move(testCase));
         } catch (const std::exception &error) {

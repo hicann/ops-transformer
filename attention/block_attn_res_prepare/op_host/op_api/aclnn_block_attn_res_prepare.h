@@ -28,14 +28,14 @@ extern "C" {
  * @param numerator [输出] 形状为[S, T, D]的FP32 ND张量。
  * @param logitMax [输出] 形状为[S, T]的FP32 ND张量。
  * @param expSum [输出] 形状为[S, T]的FP32 ND张量。
- * @param eps [输入] 用于保证数值稳定性的FP32正数。
+ * @param eps [输入] 用于保证数值稳定性的DOUBLE正数。
  * @param workspaceSize [输出] 设备侧所需的工作空间大小，单位为字节。
  * @param executor [输出] 第二段接口使用的执行器。
  * @return 成功时返回ACLNN_SUCCESS。
  */
 ACLNN_API aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor *blockRes, const aclTensor *validBlocks,
                                                                const aclTensor *pseudoQuery, aclTensor *numerator,
-                                                               aclTensor *logitMax, aclTensor *expSum, float eps,
+                                                               aclTensor *logitMax, aclTensor *expSum, double eps,
                                                                uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /**

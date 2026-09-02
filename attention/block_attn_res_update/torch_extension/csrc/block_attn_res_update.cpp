@@ -39,9 +39,6 @@ void CheckTensorContiguous(const at::Tensor &tensor, const char *name)
 void CheckEps(double eps)
 {
     TORCH_CHECK(std::isfinite(eps) && eps > 0.0, "eps must be finite and greater than 0, but got ", eps, ".");
-    const float aclnnEps = static_cast<float>(eps);
-    TORCH_CHECK(std::isfinite(aclnnEps) && aclnnEps > 0.0F,
-                "eps must be representable as a finite positive float32 value, but got ", eps, ".");
 }
 
 void CheckInputs(const at::Tensor &partialBlock, const at::Tensor &delta, const at::Tensor &pseudoQuery,
@@ -113,7 +110,6 @@ at::Tensor block_attn_res_update(at::Tensor &partialBlock, const at::Tensor &del
                                  double eps)
 {
     CheckInputs(partialBlock, delta, pseudoQuery, numerator, logitMax, expSum, eps);
-    const float aclnnEps = static_cast<float>(eps);
 
     at::Tensor h{nullptr};
     {
@@ -123,7 +119,7 @@ at::Tensor block_attn_res_update(at::Tensor &partialBlock, const at::Tensor &del
     }
 
     // aclnnBlockAttnResUpdate updates partial_block in place; the Torch API only returns h.
-    ACLNN_CMD(aclnnBlockAttnResUpdate, partialBlock, delta, pseudoQuery, numerator, logitMax, expSum, aclnnEps, h);
+    ACLNN_CMD(aclnnBlockAttnResUpdate, partialBlock, delta, pseudoQuery, numerator, logitMax, expSum, eps, h);
 
     return h;
 }

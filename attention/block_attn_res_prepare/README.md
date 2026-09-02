@@ -17,62 +17,62 @@
 
 - 计算公式：
 
-$$
-\operatorname{block\_attn\_res\_prepare}
-\left(V,Q,\operatorname{valid\_blocks};\epsilon\right)
-\longrightarrow (O,M,L)
-$$
+    $$
+    \operatorname{block\_attn\_res\_prepare}
+    \left(V,Q,\operatorname{valid\_blocks};\epsilon\right)
+    \longrightarrow (O,M,L)
+    $$
 
-对 token $t$ 的第 $n$ 个有效历史来源计算 RMS 归一化因子：
+    对 token $t$ 的第 $n$ 个有效历史来源计算 RMS 归一化因子：
 
-$$
-R_{t,n}=\sqrt{\frac{1}{D}\sum_{d=0}^{D-1}V_{t,n,d}^{2}+\epsilon}
-$$
+    $$
+    R_{t,n}=\sqrt{\frac{1}{D}\sum_{d=0}^{D-1}V_{t,n,d}^{2}+\epsilon}
+    $$
 
-对每个目标 slot、token 和有效历史来源计算 logit：
+    对每个目标 slot、token 和有效历史来源计算 logit：
 
-$$
-Z_{s,t,n}=R_{t,n}^{-1}\sum_{d=0}^{D-1}Q_{s,d}V_{t,n,d}
-$$
+    $$
+    Z_{s,t,n}=R_{t,n}^{-1}\sum_{d=0}^{D-1}Q_{s,d}V_{t,n,d}
+    $$
 
-设 $N_v$ 为 `valid_blocks` 指定的有效历史来源数，则：
+    设 $N_v$ 为 `valid_blocks` 指定的有效历史来源数，则：
 
-$$
-M_{s,t}=\max_{0\le n<N_v}Z_{s,t,n}
-$$
+    $$
+    M_{s,t}=\max_{0\le n<N_v}Z_{s,t,n}
+    $$
 
-$$
-E_{s,t,n}=\exp\left(Z_{s,t,n}-M_{s,t}\right)
-$$
+    $$
+    E_{s,t,n}=\exp\left(Z_{s,t,n}-M_{s,t}\right)
+    $$
 
-$$
-L_{s,t}=\sum_{n=0}^{N_v-1}E_{s,t,n}
-$$
+    $$
+    L_{s,t}=\sum_{n=0}^{N_v-1}E_{s,t,n}
+    $$
 
-$$
-O_{s,t,d}=\sum_{n=0}^{N_v-1}E_{s,t,n}V_{t,n,d}
-$$
+    $$
+    O_{s,t,d}=\sum_{n=0}^{N_v-1}E_{s,t,n}V_{t,n,d}
+    $$
 
-当 `valid_blocks[0] == 0` 时，不执行上述 softmax 计算，直接返回：
+    当 `valid_blocks[0] == 0` 时，不执行上述 softmax 计算，直接返回：
 
-$$
-O=\mathbf{0}_{S\times T\times D},\qquad
-M=m_{\min}\mathbf{1}_{S\times T},\qquad
-L=\mathbf{0}_{S\times T},\qquad
-m_{\min}=-3.4028234663852886\times10^{38}
-$$
+    $$
+    O=\mathbf{0}_{S\times T\times D},\qquad
+    M=m_{\min}\mathbf{1}_{S\times T},\qquad
+    L=\mathbf{0}_{S\times T},\qquad
+    m_{\min}=-3.4028234663852886\times10^{38}
+    $$
 
-即 `numerator` 为 shape `[S, T, D]` 的全 0 Tensor，`logit_max` 为 shape `[S, T]` 且所有元素均为 FLOAT32 最小有限值 $m_{\min}$ 的 Tensor，`exp_sum` 为 shape `[S, T]` 的全 0 Tensor。该结果表示 online softmax 的空状态。
+    即 `numerator` 为 shape `[S, T, D]` 的全 0 Tensor，`logit_max` 为 shape `[S, T]` 且所有元素均为 FLOAT32 最小有限值 $m_{\min}$ 的 Tensor，`exp_sum` 为 shape `[S, T]` 的全 0 Tensor。该结果表示 online softmax 的空状态。
 
-其中：
+    其中：
 
-- $V\in\mathbb{R}^{T\times N\times D}$ 表示输入 `block_res`；$V_{t,n,d}$ 表示第 $t$ 个 token、第 $n$ 个历史残差块在第 $d$ 个隐藏特征上的值。
-- $Q\in\mathbb{R}^{S\times D}$ 表示输入 `pseudo_query`（伪 Query）；每个目标 slot 对应一个 Query 向量，$Q_{s,d}$ 表示第 $s$ 个目标 slot 在第 $d$ 个隐藏特征上的值。
-- $T$ 表示 token 数，$N$ 表示 `block_res` 第 1 维可容纳的历史残差块数，$S$ 表示目标 slot 数，$D$ 表示HiddenSize。
-- $N_v=\min(\texttt{valid\_blocks[0]},N)$，表示实际参与计算的历史残差块数。
-- $R$ 表示 RMS 归一化因子，$Z$ 表示归一化注意力 logit，$E$ 表示 max-shift 后的指数值。
-- $O$、$M$、$L$ 分别表示 softmax 加权分子、logit 最大值和指数和，对应输出 `numerator`、`logit_max`、`exp_sum`。
-- $\epsilon$ 表示 RMS 归一化的数值稳定项，对应属性 `eps`。
+    - $V\in\mathbb{R}^{T\times N\times D}$ 表示输入 `block_res`；$V_{t,n,d}$ 表示第 $t$ 个 token、第 $n$ 个历史残差块在第 $d$ 个隐藏特征上的值。
+    - $Q\in\mathbb{R}^{S\times D}$ 表示输入 `pseudo_query`（伪 Query）；每个目标 slot 对应一个 Query 向量，$Q_{s,d}$ 表示第 $s$ 个目标 slot 在第 $d$ 个隐藏特征上的值。
+    - $T$ 表示 token 数，$N$ 表示 `block_res` 第 1 维可容纳的历史残差块数，$S$ 表示目标 slot 数，$D$ 表示HiddenSize。
+    - $N_v=\min(\texttt{valid\_blocks[0]},N)$，表示实际参与计算的历史残差块数。
+    - $R$ 表示 RMS 归一化因子，$Z$ 表示归一化注意力 logit，$E$ 表示 max-shift 后的指数值。
+    - $O$、$M$、$L$ 分别表示 softmax 加权分子、logit 最大值和指数和，对应输出 `numerator`、`logit_max`、`exp_sum`。
+    - $\epsilon$ 表示 RMS 归一化的数值稳定项，对应属性 `eps`。
 
 ## 参数说明
 

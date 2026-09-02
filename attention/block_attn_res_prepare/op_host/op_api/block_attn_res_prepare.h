@@ -23,7 +23,7 @@ constexpr std::size_t BLOCK_ATTN_RES_PREPARE_OUTPUT_NUM = 3;
 const std::array<const aclTensor *, BLOCK_ATTN_RES_PREPARE_OUTPUT_NUM> BlockAttnResPrepare(const aclTensor *blockRes,
                                                                                            const aclTensor *validBlocks,
                                                                                            const aclTensor *pseudoQuery,
-                                                                                           float eps,
+                                                                                           double eps,
                                                                                            aclOpExecutor *executor);
 
 } // namespace l0op

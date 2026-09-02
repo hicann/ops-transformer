@@ -49,7 +49,7 @@ struct BlockAttnResUpdateParams {
     const aclTensor *numerator{nullptr};
     const aclTensor *logitMax{nullptr};
     const aclTensor *expSum{nullptr};
-    float eps{0.0F};
+    double eps{1e-6};
     aclTensor *h{nullptr};
 };
 
@@ -335,9 +335,9 @@ static bool CheckContiguous(const BlockAttnResUpdateParams &params)
     return CheckTensorContiguous(params.h, H_NAME);
 }
 
-static bool CheckEps(float eps)
+static bool CheckEps(double eps)
 {
-    OP_CHECK(std::isfinite(eps) && eps > 0.0F,
+    OP_CHECK(std::isfinite(eps) && eps > 0.0,
              OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_API_NAME, "eps", std::to_string(eps),
                                                    "eps must be finite and greater than 0"),
              return false);
@@ -389,7 +389,7 @@ static aclnnStatus PreProcess(BlockAttnResUpdateParams &params)
 extern "C" aclnnStatus aclnnBlockAttnResUpdateGetWorkspaceSize(aclTensor *partialBlockRef, const aclTensor *delta,
                                                                const aclTensor *pseudoQuery, const aclTensor *numerator,
                                                                const aclTensor *logitMax, const aclTensor *expSum,
-                                                               float eps, aclTensor *h, uint64_t *workspaceSize,
+                                                               double eps, aclTensor *h, uint64_t *workspaceSize,
                                                                aclOpExecutor **executor)
 {
     OP_CHECK(workspaceSize != nullptr,

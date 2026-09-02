@@ -187,7 +187,7 @@ int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
     std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> hTensorPtr(h, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    constexpr float eps = 1.0e-6F;
+    constexpr double eps = 1.0e-6;
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     void *workspaceAddr = nullptr;

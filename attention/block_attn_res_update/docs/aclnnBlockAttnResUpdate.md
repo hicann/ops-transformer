@@ -104,7 +104,7 @@ aclnnStatus aclnnBlockAttnResUpdateGetWorkspaceSize(
     const aclTensor *numerator,
     const aclTensor *logitMax,
     const aclTensor *expSum,
-    float            eps,
+    double           eps,
     aclTensor       *h,
     uint64_t        *workspaceSize,
     aclOpExecutor  **executor)
@@ -259,7 +259,7 @@ aclnnStatus aclnnBlockAttnResUpdate(
         <td>×</td>
       </tr>
       <tr>
-        <td>eps(float)</td>
+        <td>eps(double)</td>
         <td>输入</td>
         <td>RMSNorm数值稳定项。</td>
         <td>
@@ -618,7 +618,7 @@ int RunBlockAttnResUpdate(int32_t deviceId, aclrtStream &stream)
     std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> hTensorPtr(h, aclDestroyTensor);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    constexpr float eps = 1.0e-6F;
+    constexpr double eps = 1.0e-6;
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     void *workspaceAddr = nullptr;

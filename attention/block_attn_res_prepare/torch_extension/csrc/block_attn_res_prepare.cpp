@@ -68,9 +68,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> block_attn_res_prepare(const at::
                 "block_res.size(2) must equal pseudo_query.size(1), but got block_res.size(2)=",
                 blockRes.size(D_DIM_INDEX), " and pseudo_query.size(1)=", pseudoQuery.size(PSEUDO_QUERY_D_DIM_INDEX));
 
-    const float epsValue = static_cast<float>(eps);
-    TORCH_CHECK(std::isfinite(epsValue) && epsValue > 0.0F,
-                "eps must be representable as a finite positive float, but got ", eps);
+    TORCH_CHECK(std::isfinite(eps) && eps > 0.0, "eps must be finite and greater than zero, but got ", eps);
 
     const int64_t totalT = blockRes.size(T_DIM_INDEX);
     const int64_t totalS = pseudoQuery.size(S_DIM_INDEX);
@@ -86,7 +84,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> block_attn_res_prepare(const at::
         expSum = at::empty({totalS, totalT}, outputOptions);
     }
 
-    ACLNN_CMD(aclnnBlockAttnResPrepare, blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum, epsValue);
+    ACLNN_CMD(aclnnBlockAttnResPrepare, blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum, eps);
     return {numerator, logitMax, expSum};
 }
 

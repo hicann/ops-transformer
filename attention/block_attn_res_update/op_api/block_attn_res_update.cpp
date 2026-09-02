@@ -57,7 +57,7 @@ static bool IsEmptyWorkload(const aclTensor *partialBlockRef)
 
 const aclTensor *BlockAttnResUpdate(aclTensor *partialBlockRef, const aclTensor *delta, const aclTensor *pseudoQuery,
                                     const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum,
-                                    float eps, aclOpExecutor *executor)
+                                    double eps, aclOpExecutor *executor)
 {
     L0_DFX(BlockAttnResUpdate, partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum, eps);
 
@@ -78,12 +78,12 @@ const aclTensor *BlockAttnResUpdate(aclTensor *partialBlockRef, const aclTensor 
 
     auto ret =
         INFER_SHAPE(BlockAttnResUpdate, OP_INPUT(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum),
-                    OP_OUTPUT(partialBlockRef, h), OP_ATTR(eps));
+                    OP_OUTPUT(partialBlockRef, h), OP_ATTR(static_cast<float>(eps)));
     OP_CHECK_INFERSHAPE(ret != ACLNN_SUCCESS, return nullptr, "BlockAttnResUpdate InferShape failed.");
 
     ret = ADD_TO_LAUNCHER_LIST_AICORE(BlockAttnResUpdate,
                                       OP_INPUT(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum),
-                                      OP_OUTPUT(partialBlockRef, h), OP_ATTR(eps));
+                                      OP_OUTPUT(partialBlockRef, h), OP_ATTR(static_cast<float>(eps)));
     OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return nullptr,
                                          "BlockAttnResUpdate ADD_TO_LAUNCHER_LIST_AICORE failed.");
     return h;

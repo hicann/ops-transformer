@@ -113,18 +113,18 @@ aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(
     aclTensor       *numerator,
     aclTensor       *logitMax,
     aclTensor       *expSum,
-    float            eps,
+    double           eps,
     uint64_t        *workspaceSize,
-    aclOpExecutor  **executor);
+    aclOpExecutor  **executor)
 ```
+
 ```cpp
 aclnnStatus aclnnBlockAttnResPrepare(
     void          *workspace,
     uint64_t       workspaceSize,
     aclOpExecutor *executor,
-    aclrtStream    stream);
+    aclrtStream    stream)
 ```
-
 
 ## aclnnBlockAttnResPrepareGetWorkspaceSize
 
@@ -214,7 +214,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
       <td>×</td>
     </tr>
     <tr>
-      <td>eps（float）</td>
+      <td>eps（double）</td>
       <td>输入</td>
       <td>表示RMS归一化的稳定项，通常为1e-6。</td>
       <td>必须为有限正数。</td>
@@ -245,21 +245,20 @@ aclnnStatus aclnnBlockAttnResPrepare(
     </tr>
   </tbody>
   </table>
-
 - **返回值**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
   第一段接口完成参数校验和执行器创建，可能返回以下状态码：
 
-  | 返回值 | 错误码 | 说明 |
-  | --- | --- | --- |
-  | `ACLNN_SUCCESS` | 0 | 接口调用成功。 |
-  | `ACLNN_ERR_PARAM_NULLPTR` | 161001 | `blockRes`、`validBlocks`、`pseudoQuery`、`numerator`、`logitMax`、`expSum`、`workspaceSize` 或 `executor` 为空指针。 |
-  | `ACLNN_ERR_PARAM_INVALID` | 161002 | 输入或输出的数据类型、维数、shape 或连续性不满足约束，或者 `eps` 不是有限正数。 |
-  | `ACLNN_ERR_RUNTIME_ERROR` | 361001 | 当前运行平台不是 Ascend 950。 |
-  | `ACLNN_ERR_INNER_CREATE_EXECUTOR` | 561101 | 接口内部创建 `aclOpExecutor` 失败。 |
-  | `ACLNN_ERR_INNER_NULLPTR` | 561103 | 接口内部执行连续化处理、创建算子输出或创建输出拷贝节点时返回空指针。 |
+  | 返回值                              | 错误码 | 说明                                                                                                                                  |
+  | ----------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+  | `ACLNN_SUCCESS`                   | 0      | 接口调用成功。                                                                                                                        |
+  | `ACLNN_ERR_PARAM_NULLPTR`         | 161001 | `blockRes`、`validBlocks`、`pseudoQuery`、`numerator`、`logitMax`、`expSum`、`workspaceSize` 或 `executor` 为空指针。 |
+  | `ACLNN_ERR_PARAM_INVALID`         | 161002 | 输入或输出的数据类型、维数、shape 或连续性不满足约束，或者`eps` 不是有限正数。                                                      |
+  | `ACLNN_ERR_RUNTIME_ERROR`         | 361001 | 该接口运行在不支持的产品型号上。                                                                                                      |
+  | `ACLNN_ERR_INNER_CREATE_EXECUTOR` | 561101 | 接口内部创建`aclOpExecutor` 失败。                                                                                                  |
+  | `ACLNN_ERR_INNER_NULLPTR`         | 561103 | 接口内部执行连续化处理、创建算子输出或创建输出拷贝节点时返回空指针。                                                                  |
 
 ## aclnnBlockAttnResPrepare
 
@@ -300,7 +299,6 @@ aclnnStatus aclnnBlockAttnResPrepare(
     </tr>
   </tbody>
   </table>
-
 - **返回值**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。

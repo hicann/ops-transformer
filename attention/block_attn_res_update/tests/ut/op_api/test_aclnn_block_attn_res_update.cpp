@@ -170,7 +170,7 @@ struct BlockAttnResUpdateOpApiCase {
     string expSumSpec;
     string expSumDtype;
     string expSumFormat;
-    float eps = 1.0e-6F;
+    double eps = 1.0e-6;
     string hSpec;
     string hDtype;
     string hFormat;
@@ -229,7 +229,7 @@ vector<BlockAttnResUpdateOpApiCase> LoadCases(const string &csvFilePath)
             c.expSumSpec = test_utils::Trim(cols[i++]);
             c.expSumDtype = test_utils::Trim(cols[i++]);
             c.expSumFormat = test_utils::Trim(cols[i++]);
-            c.eps = stof(test_utils::Trim(cols[i++]));
+            c.eps = stod(test_utils::Trim(cols[i++]));
             c.hSpec = test_utils::Trim(cols[i++]);
             c.hDtype = test_utils::Trim(cols[i++]);
             c.hFormat = test_utils::Trim(cols[i++]);

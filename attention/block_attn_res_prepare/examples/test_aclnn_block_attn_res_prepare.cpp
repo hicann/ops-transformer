@@ -39,7 +39,7 @@
 namespace {
 
 constexpr int64_t ROW_MAJOR_STRIDE_START_OFFSET = 2;
-constexpr float DEFAULT_EPS = 1.0e-6F;
+constexpr double DEFAULT_EPS = 1.0e-6;
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {

@@ -266,13 +266,13 @@ aclnnStatus CheckShape(const aclTensor *blockRes, const aclTensor *validBlocks, 
 }
 
 aclnnStatus CheckParams(const aclTensor *blockRes, const aclTensor *validBlocks, const aclTensor *pseudoQuery,
-                        const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum, float eps,
+                        const aclTensor *numerator, const aclTensor *logitMax, const aclTensor *expSum, double eps,
                         uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     CHECK_RET(CheckNotNull(blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum, workspaceSize, executor) ==
                   ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_NULLPTR);
-    if (!std::isfinite(eps) || eps <= 0.0F) {
+    if (!std::isfinite(eps) || eps <= 0.0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnBlockAttnResPrepareGetWorkspaceSize", "eps",
                                               std::to_string(eps).c_str(), "eps must be finite and greater than zero");
         return ACLNN_ERR_PARAM_INVALID;
@@ -289,7 +289,7 @@ aclnnStatus CheckParams(const aclTensor *blockRes, const aclTensor *validBlocks,
 extern "C" {
 aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor *blockRes, const aclTensor *validBlocks,
                                                      const aclTensor *pseudoQuery, aclTensor *numerator,
-                                                     aclTensor *logitMax, aclTensor *expSum, float eps,
+                                                     aclTensor *logitMax, aclTensor *expSum, double eps,
                                                      uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     L2_DFX_PHASE_1(aclnnBlockAttnResPrepare, DFX_IN(blockRes, validBlocks, pseudoQuery, eps),
