@@ -1061,9 +1061,9 @@ if (NOT ENABLE_AICPU_KERNEL)
     install(DIRECTORY ${TENSOR_API}/include/c_api
             DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common/tensor_api/include
     )
-    # Shared kernel headers for whitelist deps (contents -> ascendc/common).
+    # Shared kernel headers for whitelist deps (contents -> ascendc/common/op_kernel).
     install(DIRECTORY ${OPS_ADV_DIR}/mc2/common/op_kernel/
-            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common
+            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common/op_kernel
     )
 
     file(GLOB _3rd_op_dirs "${OPS_ADV_DIR}/mc2/3rd/*")
@@ -1103,11 +1103,11 @@ endforeach(    )
         file(GLOB KERNEL_SUB_DIRS RELATIVE "${CURRENT_KERNEL_DIR}" "${CURRENT_KERNEL_DIR}/*")
         filter_copy_files(SELECTED_FILES SELECTED_DIRS)
         install(FILES ${SELECTED_FILES}
-            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}
+            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}/op_kernel
             OPTIONAL
         )
         install(DIRECTORY ${SELECTED_DIRS}
-            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}
+            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}/op_kernel
             OPTIONAL
         )
 
@@ -1119,11 +1119,11 @@ endforeach(    )
             filter_copy_files(SELECTED_DEPEND_FILES SELECTED_DEPEND_DIRS)
             if (NOT op_depend_dir IN_LIST OPS_TRANSFORMER_SHARED_KERNEL_INSTALL_DEPS)
                 install(FILES ${SELECTED_DEPEND_FILES}
-                        DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_depened_name}
+                        DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_depened_name}/op_kernel
                         OPTIONAL
                 )
                 install(DIRECTORY ${SELECTED_DEPEND_DIRS}
-                        DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_depened_name}
+                        DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_depened_name}/op_kernel
                         OPTIONAL
                 )
             endif ()

@@ -675,22 +675,22 @@ if (BUILD_OPS_RTY_KERNEL)
         endif()
 
         install(FILES ${KERNEL_FILES}
-                DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}
+                DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}/op_kernel
                 OPTIONAL
         )
 
         install(DIRECTORY ${op_dir}/arch22
-            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}
+            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}/op_kernel
             OPTIONAL
         )
 
         install(DIRECTORY ${op_dir}/arch35
-                DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}
+                DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}/op_kernel
                 OPTIONAL
         )
 
         install(DIRECTORY ${op_dir}/arch38
-                DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}
+                DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}/op_kernel
                 OPTIONAL
         )
 

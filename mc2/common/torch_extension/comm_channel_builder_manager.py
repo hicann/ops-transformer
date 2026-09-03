@@ -41,6 +41,14 @@ class CommChannelBuilderManagerOpBuilder(OpBuilder):
                 self._cann_path,
                 "opp/built-in/op_impl/ai_core/tbe/impl/ops_transformer/ascendc/common",
             ),
+            os.path.join(
+                self._cann_path,
+                "opp/vendors/custom_transformer/op_impl/ai_core/tbe/custom_transformer_impl/ascendc/common/op_kernel",
+            ),
+            os.path.join(
+                self._cann_path,
+                "opp/built-in/op_impl/ai_core/tbe/impl/ops_transformer/ascendc/common/op_kernel",
+            ),
         ]
         for path in candidate_paths:
             if os.path.isdir(path):
