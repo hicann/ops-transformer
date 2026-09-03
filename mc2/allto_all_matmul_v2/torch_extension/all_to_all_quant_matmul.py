@@ -37,7 +37,7 @@ class _AllToAllQuantMatmulOpBuilder(OpBuilder):
             "npu_all_to_all_quant_matmul(Tensor context, Tensor x1, Tensor x2, int hccl_buffer_size, str group_name, int world_size, *, "
             "Tensor? bias=None, Tensor? x1_scale=None, Tensor? x2_scale=None, "
             "int? x1_quant_mode=None, int? x2_quant_mode=None, "
-            "int[] group_sizes=None, "
+            "int[] group_sizes=[], "
             "int? x1_dtype=None, int? x2_dtype=None, "
             "int? x1_scale_dtype=None, int? x2_scale_dtype=None, "
             "int? y_dtype=None, str? comm_mode=None, int? precision_mode=None"
@@ -132,7 +132,7 @@ def _npu_all_to_all_quant_matmul(
         x2_scale,
         x1_quant_mode,
         x2_quant_mode,
-        group_sizes,
+        group_sizes if group_sizes is not None else [],
         x1_dtype,
         x2_dtype,
         x1_scale_dtype,
