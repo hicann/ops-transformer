@@ -1053,3 +1053,51 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_empty_tensor_k
                               {0, EXPERT_NUM}, ROW_IDX_TYPE_SCATTER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT,
                               kExpandedXDtypeAuto, ge::GRAPH_SUCCESS);
 }
+
+// CountingSort 模板1 FullLoad + 非量化 + GATHER（10000010）
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cs_fullload_unquant_gather)
+{
+    RunArch35ExtendedTestcase(15, 40062, 3014, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, ge::DT_INT8,
+                              {0, 10}, ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto,
+                              ge::GRAPH_SUCCESS, 10000010);
+}
+
+// CountingSort 模板1 FullLoad + 非量化 + SCATTER（10001010）
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cs_fullload_unquant_scatter)
+{
+    RunArch35ExtendedTestcase(53, 118, 962, 0, 0, EXPERT_TOKENS_TYPE_KEY_VALUE, true, QUANT_MODE_UNQUANT, ge::DT_FLOAT,
+                              {43, 49}, ROW_IDX_TYPE_SCATTER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto,
+                              ge::GRAPH_SUCCESS, 10001010);
+}
+
+// CountingSort 模板2 CutOrigin + 静态量化 + SCATTER（10011020）
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cs_cutorigin_static_scatter)
+{
+    RunArch35ExtendedTestcase(28672, 2048, 8, 1, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_STATIC, ge::DT_FLOAT16,
+                              {0, 128}, ROW_IDX_TYPE_SCATTER, {1}, ge::DT_FLOAT, {1}, ge::DT_FLOAT, kExpandedXDtypeAuto,
+                              ge::GRAPH_SUCCESS, 10011020);
+}
+
+// CountingSort 模板2 CutOrigin + 非量化 + SCATTER（10001020）
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cs_cutorigin_unquant_scatter)
+{
+    RunArch35ExtendedTestcase(14336, 2048, 8, 1, 0, EXPERT_TOKENS_TYPE_KEY_VALUE, true, QUANT_MODE_UNQUANT, ge::DT_INT8,
+                              {0, 32}, ROW_IDX_TYPE_SCATTER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto,
+                              ge::GRAPH_SUCCESS, 10001020);
+}
+
+// CountingSort 模板2 CutOrigin + 静态量化 + GATHER（10010020）
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cs_cutorigin_static_gather)
+{
+    RunArch35ExtendedTestcase(2501, 2967, 4, 1, 0, EXPERT_TOKENS_TYPE_KEY_VALUE, true, QUANT_MODE_STATIC, ge::DT_BF16,
+                              {0, 16}, ROW_IDX_TYPE_GATHER, {1}, ge::DT_FLOAT, {1}, ge::DT_FLOAT, kExpandedXDtypeAuto,
+                              ge::GRAPH_SUCCESS, 10010020);
+}
+
+// CountingSort 模板2 CutOrigin + 非量化 + GATHER（10000020）
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cs_cutorigin_unquant_gather)
+{
+    RunArch35ExtendedTestcase(7168, 2048, 8, 1, 0, EXPERT_TOKENS_TYPE_KEY_VALUE, true, QUANT_MODE_UNQUANT, ge::DT_INT8,
+                              {0, 32}, ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto,
+                              ge::GRAPH_SUCCESS, 10000020);
+}

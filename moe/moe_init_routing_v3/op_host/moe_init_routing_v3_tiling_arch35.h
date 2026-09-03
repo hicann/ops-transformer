@@ -129,10 +129,8 @@ constexpr int64_t QUANT_MODE_TILINGKEY_BASE = 10000LL;
 constexpr int64_t ROWIDX_TYPE_TILINGKEY_BASE = 1000LL;
 constexpr int64_t DROP_MODE_TILINGKEY_BASE = 100LL;
 constexpr uint64_t EMPTY_TENSOR_TILINGKEY = 3000000ULL;
+constexpr uint64_t COUNT_SORT_BASE = 10LL; // 分阶段：00  计数排序全载：10  计数排序非全载：20
 constexpr int64_t KEY_VALUE_MODE_DIM0_NUM = 2LL;
-
-const static int64_t COUNT_SORT_BASE = 400000LL;
-const static int64_t FULL_LOAD_BASE = 10000;
 
 inline static int64_t CeilLog4(int64_t x)
 {
