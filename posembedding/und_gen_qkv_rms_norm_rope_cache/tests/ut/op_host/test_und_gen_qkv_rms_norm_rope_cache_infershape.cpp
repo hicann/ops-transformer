@@ -39,8 +39,7 @@ protected:
 };
 
 gert::InfershapeContextPara BuildInferShapeContext(int64_t undLen, int64_t genLen, int64_t numHeadQ, int64_t numHeadK,
-                                                   int64_t numHeadV, int64_t headDim = HEAD_DIM,
-                                                   int64_t maxPos = 4096)
+                                                   int64_t numHeadV, int64_t headDim = HEAD_DIM, int64_t maxPos = 4096)
 {
     const int64_t total = undLen + genLen;
     const int64_t numHead = numHeadQ + numHeadK + numHeadV;
@@ -191,29 +190,29 @@ void CheckInferDataType()
     ge::DataType kCacheOutDtype = ge::DT_FLOAT;
     ge::DataType vCacheOutDtype = ge::DT_FLOAT;
 
-    auto contextHolder = gert::InferDataTypeContextFaker()
-                             .IrInputNum(12)
-                             .NodeIoNum(12, 3)
-                             .NodeInputTd(0, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(1, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(2, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(3, floatDtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(4, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(5, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(6, int64Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(7, int64Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(8, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(9, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(10, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeInputTd(11, int64Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                             .InputDataTypes({&bf16Dtype, &bf16Dtype, &bf16Dtype, &floatDtype, &bf16Dtype, &bf16Dtype,
-                                              &int64Dtype, &int64Dtype, &bf16Dtype, &bf16Dtype, &bf16Dtype,
-                                              &int64Dtype})
-                             .OutputDataTypes({&qOutDtype, &kCacheOutDtype, &vCacheOutDtype})
-                             .Build();
+    auto contextHolder =
+        gert::InferDataTypeContextFaker()
+            .IrInputNum(12)
+            .NodeIoNum(12, 3)
+            .NodeInputTd(0, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(1, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(2, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(3, floatDtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(4, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(5, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(6, int64Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(7, int64Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(8, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(9, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(10, bf16Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeInputTd(11, int64Dtype, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&bf16Dtype, &bf16Dtype, &bf16Dtype, &floatDtype, &bf16Dtype, &bf16Dtype, &int64Dtype,
+                             &int64Dtype, &bf16Dtype, &bf16Dtype, &bf16Dtype, &int64Dtype})
+            .OutputDataTypes({&qOutDtype, &kCacheOutDtype, &vCacheOutDtype})
+            .Build();
     auto context = contextHolder.GetContext<gert::InferDataTypeContext>();
     ASSERT_NE(context, nullptr);
     ASSERT_EQ(dataTypeFunc(context), ge::GRAPH_SUCCESS);
@@ -354,7 +353,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_total_falls_back_to_slot_
 TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_unknown_rank_all_inputs)
 {
     auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
-    for (auto& desc : para.inputTensorDesc_) {
+    for (auto &desc : para.inputTensorDesc_) {
         desc.shape_ = {{-2}, {-2}};
     }
     std::vector<std::vector<int64_t>> expectOutputShape = {
@@ -382,7 +381,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_without_optional_inputs)
 TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_without_optional_inputs_all_unknown_rank)
 {
     auto para = BuildInferShapeContextWithoutOptional(5, 8, 1, 1);
-    for (auto& desc : para.inputTensorDesc_) {
+    for (auto &desc : para.inputTensorDesc_) {
         desc.shape_ = {{-2}, {-2}};
     }
     std::vector<std::vector<int64_t>> expectOutputShape = {
@@ -443,6 +442,85 @@ TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_dynamic_dim_gen_len)
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
+// k_cache/v_cache 是原地写入的输入输出，输出 shape 必须原样保留输入的取值，
+// 不能用其他输入推导出的 D 覆盖：aclnn 单算子路径上两者是同一个 tensor，
+// 覆盖会把调用方传错的维抹掉，使 tiling 侧的 KV Cache 校验恒真。
+TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_keeps_k_cache_head_dim_even_if_mismatch)
+{
+    auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[4] = {{{2, 128, 1, 127}, {2, 128, 1, 127}}, ge::DT_BF16, ge::FORMAT_ND};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {8, 8, 128},
+        {2, 128, 1, 127},
+        {2, 128, 1, 128},
+    };
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_keeps_v_cache_head_dim_even_if_mismatch)
+{
+    auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[5] = {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {8, 8, 128},
+        {2, 128, 1, 128},
+        {2, 128, 1, 64},
+    };
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// Bn 只能从 k_cache/v_cache 取，先拿到的是 k_cache 的；v_cache 自己的 Bn 不能被它覆盖
+TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_keeps_v_cache_block_num_even_if_mismatch)
+{
+    auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[5] = {{{0, 128, 1, 128}, {0, 128, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {8, 8, 128},
+        {2, 128, 1, 128},
+        {0, 128, 1, 128},
+    };
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// H 由属性给出，同样不能覆盖 cache 自己的 H
+TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_keeps_cache_head_num_even_if_mismatch_attr)
+{
+    auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[4] = {{{2, 128, 4, 128}, {2, 128, 4, 128}}, ge::DT_BF16, ge::FORMAT_ND};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {8, 8, 128},
+        {2, 128, 4, 128},
+        {2, 128, 1, 128},
+    };
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// 输入里是 -1 的维仍用推导值补齐，图模式的动态 shape 推导能力不受"不覆盖"影响
+TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_fills_only_dynamic_cache_dims)
+{
+    auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[4] = {{{-1, -1, -1, -1}, {-1, -1, -1, -1}}, ge::DT_BF16, ge::FORMAT_ND};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {8, 8, 128},
+        {2, 128, 1, 128}, // Bn/Bs 退到 v_cache，H 取属性，D 取 und_qkv
+        {2, 128, 1, 128},
+    };
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// cache 是未知 rank(-2) 时无输入 shape 可拷，退回按 [Bn, Bs, H, D] 整份推导
+TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_derives_cache_shape_when_unknown_rank)
+{
+    auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[4] = {{{-2}, {-2}}, ge::DT_BF16, ge::FORMAT_ND};
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {8, 8, 128},
+        {2, 128, 1, 128},
+        {2, 128, 1, 128},
+    };
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
 // 来源的 rank 合法、但目标维本身是动态 shape（-1）时也要继续往下找：
 // und_qkv 的 D 维为 -1，D 应退到 cos_sin_cache
 TEST_F(UndGenQkvRmsNormRopeCacheInferShape, infershape_skip_source_whose_dim_is_dynamic)
@@ -461,12 +539,12 @@ namespace {
 struct RankCase {
     size_t inputIdx;
     size_t expectDimNum;
-    const char* name;
+    const char *name;
 };
 
 struct HeadDimSourceCase {
     size_t inputIdx;
-    const char* name;
+    const char *name;
 };
 
 // D 出现在这 9 个输入里，与 infershape 中 HEAD_DIM_SOURCES 一一对应
@@ -481,7 +559,7 @@ class UndGenQkvRmsNormRopeCacheInferShapeRank : public testing::TestWithParam<Ra
 // 这是在钉 INPUT_SPECS 这张表本身的录入正确性，表里任一条 expectDimNum 写错都会被抓到。
 TEST_P(UndGenQkvRmsNormRopeCacheInferShapeRank, infershape_fail_when_rank_mismatch)
 {
-    const auto& param = GetParam();
+    const auto &param = GetParam();
     auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
     auto dtype = para.inputTensorDesc_[param.inputIdx].dtype_;
     // 比预期多一维
@@ -496,7 +574,7 @@ INSTANTIATE_TEST_SUITE_P(AllInputs, UndGenQkvRmsNormRopeCacheInferShapeRank,
                                          RankCase{6, 1, "slot_mapping"}, RankCase{7, 2, "positions"},
                                          RankCase{8, 3, "gen_qkv"}, RankCase{9, 1, "gen_weights_q"},
                                          RankCase{10, 1, "gen_weights_k"}, RankCase{11, 1, "cat_indices"}),
-                         [](const testing::TestParamInfo<RankCase>& info) { return std::string(info.param.name); });
+                         [](const testing::TestParamInfo<RankCase> &info) { return std::string(info.param.name); });
 
 class UndGenQkvRmsNormRopeCacheInferShapeHeadDim : public testing::TestWithParam<HeadDimSourceCase> {};
 
@@ -505,7 +583,7 @@ class UndGenQkvRmsNormRopeCacheInferShapeHeadDim : public testing::TestWithParam
 // 其中 v_cache 那条同时覆盖了 Bn/Bs 在 k_cache 不可用时退到 v_cache 的路径。
 TEST_P(UndGenQkvRmsNormRopeCacheInferShapeHeadDim, infershape_head_dim_from_single_source)
 {
-    const auto& param = GetParam();
+    const auto &param = GetParam();
     auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
     for (size_t idx : HEAD_DIM_INPUT_IDXS) {
         if (idx != param.inputIdx) {
@@ -528,6 +606,6 @@ INSTANTIATE_TEST_SUITE_P(AllHeadDimSources, UndGenQkvRmsNormRopeCacheInferShapeH
                                          HeadDimSourceCase{4, "k_cache"}, HeadDimSourceCase{5, "v_cache"},
                                          HeadDimSourceCase{8, "gen_qkv"}, HeadDimSourceCase{9, "gen_weights_q"},
                                          HeadDimSourceCase{10, "gen_weights_k"}),
-                         [](const testing::TestParamInfo<HeadDimSourceCase>& info) {
+                         [](const testing::TestParamInfo<HeadDimSourceCase> &info) {
                              return std::string(info.param.name);
                          });

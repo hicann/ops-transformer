@@ -41,7 +41,7 @@ protected:
 
 // gert::StorageShape 只有 initializer_list 构造，维数在编译期固定；
 // 输出 shape 用例需要按运行期 vector 造 shape，这里补一个helper
-gert::StorageShape MakeStorageShape(const std::vector<int64_t>& dims)
+gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
 {
     gert::StorageShape shape;
     shape.MutableOriginShape().SetDimNum(dims.size());
@@ -56,12 +56,12 @@ gert::StorageShape MakeStorageShape(const std::vector<int64_t>& dims)
 // 全部可选输入均提供（hasGen = true, hasCatIndices = true）
 // qOut / kCacheOut / vCacheOut 传空表示用推导出的正确 shape，非空则覆盖（用于输出 shape 校验用例）
 gert::TilingContextPara BuildTilingContext(int64_t undLen, int64_t genLen, int64_t numHeadQ, int64_t numHeadK,
-                                           int64_t numHeadV, int64_t headDim = HEAD_DIM,
-                                           int64_t blockSize = BLOCK_SIZE, int64_t maxPos = 4096,
-                                           const std::vector<int64_t>& mropeSection = {16, 16, 16},
-                                           const std::vector<int64_t>& qOutOverride = {},
-                                           const std::vector<int64_t>& kCacheOutOverride = {},
-                                           const std::vector<int64_t>& vCacheOutOverride = {})
+                                           int64_t numHeadV, int64_t headDim = HEAD_DIM, int64_t blockSize = BLOCK_SIZE,
+                                           int64_t maxPos = 4096,
+                                           const std::vector<int64_t> &mropeSection = {16, 16, 16},
+                                           const std::vector<int64_t> &qOutOverride = {},
+                                           const std::vector<int64_t> &kCacheOutOverride = {},
+                                           const std::vector<int64_t> &vCacheOutOverride = {})
 {
     const int64_t total = undLen + genLen;
     const int64_t numHead = numHeadQ + numHeadK + numHeadV;
@@ -69,12 +69,10 @@ gert::TilingContextPara BuildTilingContext(int64_t undLen, int64_t genLen, int64
 
     const std::vector<int64_t> qOut =
         qOutOverride.empty() ? std::vector<int64_t>{total, numHeadQ, headDim} : qOutOverride;
-    const std::vector<int64_t> kCacheOut = kCacheOutOverride.empty()
-                                               ? std::vector<int64_t>{blockNum, blockSize, numHeadK, headDim}
-                                               : kCacheOutOverride;
-    const std::vector<int64_t> vCacheOut = vCacheOutOverride.empty()
-                                               ? std::vector<int64_t>{blockNum, blockSize, numHeadV, headDim}
-                                               : vCacheOutOverride;
+    const std::vector<int64_t> kCacheOut =
+        kCacheOutOverride.empty() ? std::vector<int64_t>{blockNum, blockSize, numHeadK, headDim} : kCacheOutOverride;
+    const std::vector<int64_t> vCacheOut =
+        vCacheOutOverride.empty() ? std::vector<int64_t>{blockNum, blockSize, numHeadV, headDim} : vCacheOutOverride;
 
     static optiling::UndGenQkvRmsNormRopeCacheCompileInfo compileInfo = {};
 
@@ -110,8 +108,7 @@ gert::TilingContextPara BuildTilingContext(int64_t undLen, int64_t genLen, int64
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(NORM_EPS)},
             {"mrope_section", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(mropeSection)},
         },
-        &compileInfo,
-        "Ascend950");
+        &compileInfo, "Ascend950");
 }
 // TilingData 的 POD 镜像，字段顺序必须与 op_host/und_gen_qkv_rms_norm_rope_cache_tiling.h
 // 中的 BEGIN_TILING_DATA_DEF 完全一致。CheckTilingData 会用 tilingDataSize 断言二者未漂移。
@@ -148,11 +145,11 @@ struct TilingDataMirror {
 constexpr int64_t PLATFORM_CORE_NUM = 64;
 constexpr int64_t PLATFORM_UB_BYTES = 256 * 1024;
 
-const TilingDataMirror* AsTilingData(const TilingInfo& tilingInfo)
+const TilingDataMirror *AsTilingData(const TilingInfo &tilingInfo)
 {
     EXPECT_EQ(tilingInfo.tilingDataSize, sizeof(TilingDataMirror))
         << "TilingData 布局已变，同步更新本文件的 TilingDataMirror";
-    return reinterpret_cast<const TilingDataMirror*>(tilingInfo.tilingData.get());
+    return reinterpret_cast<const TilingDataMirror *>(tilingInfo.tilingData.get());
 }
 
 // 按 tiling.h 的 "UB 划分" 注释复算一遍 ubFactor 的期望值
@@ -160,10 +157,10 @@ int64_t ExpectedUbFactor(int64_t numHeadQ, int64_t numHeadK, int64_t numHeadV, i
 {
     const int64_t n = numHeadQ + numHeadK + numHeadV;
     const int64_t d = HEAD_DIM;
-    const int64_t resident = 4 * d * 2 +                       // wBf16Buf
-                             4 * d * 4 +                       // wFp32Buf
-                             (((d / 2) * 4 + 31) / 32) * 32 +  // gatherIdxBuf
-                             5 * 256 * 8;                      // idxBuf（5 区 x IDX_WINDOW_TOKENS 个 int64）
+    const int64_t resident = 4 * d * 2 +                      // wBf16Buf
+                             4 * d * 4 +                      // wFp32Buf
+                             (((d / 2) * 4 + 31) / 32) * 32 + // gatherIdxBuf
+                             5 * 256 * 8;                     // idxBuf（5 区 x IDX_WINDOW_TOKENS 个 int64）
     // gamma 是 TBuf 常驻、不随 token 数伸缩（VF 按 undMask 算基址直接取 wFp32Buf），
     // 所以 perToken 只有三个队列
     const int64_t perToken = 2 * n * d * 2 + 2 * MROPE_AXIS_NUM * d * 4 + 2 * n * d * 2;
@@ -172,7 +169,7 @@ int64_t ExpectedUbFactor(int64_t numHeadQ, int64_t numHeadK, int64_t numHeadV, i
 }
 
 // 校验多核切分：核数拉满、总量守恒、核间负载差 ≤ 1
-void CheckBlockTiling(const TilingDataMirror* td, int64_t total)
+void CheckBlockTiling(const TilingDataMirror *td, int64_t total)
 {
     const int64_t expectUsedCore = std::min(PLATFORM_CORE_NUM, total);
     EXPECT_EQ(td->usedCoreNum, expectUsedCore);
@@ -180,8 +177,7 @@ void CheckBlockTiling(const TilingDataMirror* td, int64_t total)
     EXPECT_EQ(td->tailBlockFactor, total / expectUsedCore);
     EXPECT_EQ(td->blockFactor, td->formerCoreNum > 0 ? td->tailBlockFactor + 1 : td->tailBlockFactor);
     // 总量守恒
-    EXPECT_EQ(td->formerCoreNum * td->blockFactor + (td->usedCoreNum - td->formerCoreNum) * td->tailBlockFactor,
-              total);
+    EXPECT_EQ(td->formerCoreNum * td->blockFactor + (td->usedCoreNum - td->formerCoreNum) * td->tailBlockFactor, total);
     // 核间负载差恒 ≤ 1
     EXPECT_LE(td->blockFactor - td->tailBlockFactor, 1);
 }
@@ -200,7 +196,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_h8_1_1)
     ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1U);
     EXPECT_EQ(tilingInfo.workspaceSizes[0], 0U);
 
-    const auto* td = AsTilingData(tilingInfo);
+    const auto *td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     // total=8 < 64 核：每核 1 个 token，blockDim 只开 8 个
     CheckBlockTiling(td, undLen + genLen);
@@ -220,7 +216,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_h16_2_2)
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 0);
 
-    const auto* td = AsTilingData(tilingInfo);
+    const auto *td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     CheckBlockTiling(td, undLen + genLen);
     EXPECT_EQ(td->usedCoreNum, PLATFORM_CORE_NUM);
@@ -241,7 +237,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_when_total_tokens_far_exc
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
 
-    const auto* td = AsTilingData(tilingInfo);
+    const auto *td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     EXPECT_EQ(td->totalTokens, undLen + genLen);
     CheckBlockTiling(td, undLen + genLen);
@@ -256,15 +252,14 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_when_total_tokens_far_exc
 TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_ub_factor_never_exceeds_und_mask_width)
 {
     const std::vector<std::vector<int64_t>> headCombos{{8, 1, 1}, {16, 2, 2}};
-    for (const auto& heads : headCombos) {
+    for (const auto &heads : headCombos) {
         auto para = BuildTilingContext(30000, 30000, heads[0], heads[1], heads[2]);
         TilingInfo tilingInfo;
         ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
-        const auto* td = AsTilingData(tilingInfo);
+        const auto *td = AsTilingData(tilingInfo);
         ASSERT_NE(td, nullptr);
         EXPECT_GT(td->ubFactor, 0);
-        EXPECT_LE(td->ubFactor, optiling::MAX_UB_FACTOR)
-            << "ubFactor 超过 kernel 侧 undMask 的位宽，会导致 gamma 选错";
+        EXPECT_LE(td->ubFactor, optiling::MAX_UB_FACTOR) << "ubFactor 超过 kernel 侧 undMask 的位宽，会导致 gamma 选错";
     }
 }
 
@@ -277,7 +272,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_block_split_uses_all_cores_when_t
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
 
-    const auto* td = AsTilingData(tilingInfo);
+    const auto *td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     CheckBlockTiling(td, undLen + genLen);
     EXPECT_EQ(td->usedCoreNum, PLATFORM_CORE_NUM); // 64 个核全用上
@@ -292,13 +287,13 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_ub_factor_differs_between_head_co
     TilingInfo infoSmall;
     auto paraSmall = BuildTilingContext(30000, 30000, 8, 1, 1);
     ASSERT_TRUE(ExecuteTiling(paraSmall, infoSmall));
-    const auto* tdSmall = AsTilingData(infoSmall);
+    const auto *tdSmall = AsTilingData(infoSmall);
     ASSERT_NE(tdSmall, nullptr);
 
     TilingInfo infoLarge;
     auto paraLarge = BuildTilingContext(30000, 30000, 16, 2, 2);
     ASSERT_TRUE(ExecuteTiling(paraLarge, infoLarge));
-    const auto* tdLarge = AsTilingData(infoLarge);
+    const auto *tdLarge = AsTilingData(infoLarge);
     ASSERT_NE(tdLarge, nullptr);
 
     EXPECT_EQ(tdSmall->ubFactor, ExpectedUbFactor(8, 1, 1, tdSmall->blockFactor));
@@ -320,7 +315,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_plain_rope_empty_mrope_se
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 0);
 
-    const auto* td = AsTilingData(tilingInfo);
+    const auto *td = AsTilingData(tilingInfo);
     ASSERT_NE(td, nullptr);
     EXPECT_EQ(td->mropeSectionT, HEAD_DIM / 2);
     EXPECT_EQ(td->mropeSectionH, 0);
@@ -407,8 +402,8 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_cos_sin_cache_dtype_inv
 TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_kv_cache_dtype_invalid)
 {
     auto para = BuildTilingContext(7, 1, 8, 1, 1);
-    para.inputTensorDesc_[4] = {{{2, BLOCK_SIZE, 1, HEAD_DIM}, {2, BLOCK_SIZE, 1, HEAD_DIM}},
-                                ge::DT_FLOAT16, ge::FORMAT_ND};
+    para.inputTensorDesc_[4] = {
+        {{2, BLOCK_SIZE, 1, HEAD_DIM}, {2, BLOCK_SIZE, 1, HEAD_DIM}}, ge::DT_FLOAT16, ge::FORMAT_ND};
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
@@ -445,7 +440,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_with_various_block_size)
         auto para = BuildTilingContext(7, 1, 8, 1, 1, HEAD_DIM, bs);
         TilingInfo tilingInfo;
         ASSERT_TRUE(ExecuteTiling(para, tilingInfo)) << "block_size=" << bs << " 应当支持";
-        const auto* td = AsTilingData(tilingInfo);
+        const auto *td = AsTilingData(tilingInfo);
         ASSERT_NE(td, nullptr);
         EXPECT_EQ(td->blockSize, bs);
         // 切分只看 total 与 UB，与 Bs 无关
@@ -469,8 +464,8 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_kv_cache_head_num_misma
 {
     // k_cache 的 Hk 与 num_heads_k 不一致
     auto para = BuildTilingContext(7, 1, 8, 1, 1);
-    para.inputTensorDesc_[4] = {{{2, BLOCK_SIZE, 2, HEAD_DIM}, {2, BLOCK_SIZE, 2, HEAD_DIM}},
-                                ge::DT_BF16, ge::FORMAT_ND};
+    para.inputTensorDesc_[4] = {
+        {{2, BLOCK_SIZE, 2, HEAD_DIM}, {2, BLOCK_SIZE, 2, HEAD_DIM}}, ge::DT_BF16, ge::FORMAT_ND};
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
@@ -543,8 +538,7 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_all_optional_inputs_abs
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(NORM_EPS)},
             {"mrope_section", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({16, 16, 16})},
         },
-        &compileInfo,
-        "Ascend950");
+        &compileInfo, "Ascend950");
     para.inputInstanceNum_ = {1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0};
     para.outputInstanceNum_ = {1, 1, 1};
 
@@ -605,8 +599,8 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_q_out_not_3d)
 TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_k_cache_out_shape_mismatch_input)
 {
     // k_cache 是原地写入，输出 shape 必须与输入逐维一致；这里 Bn 少一个 block
-    auto para = BuildTilingContext(5, 3, 8, 1, 1, HEAD_DIM, BLOCK_SIZE, 4096, {16, 16, 16}, {},
-                                   {1, BLOCK_SIZE, 1, HEAD_DIM});
+    auto para =
+        BuildTilingContext(5, 3, 8, 1, 1, HEAD_DIM, BLOCK_SIZE, 4096, {16, 16, 16}, {}, {1, BLOCK_SIZE, 1, HEAD_DIM});
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
@@ -614,5 +608,71 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_v_cache_out_dim_num_mis
 {
     auto para = BuildTilingContext(5, 3, 8, 1, 1, HEAD_DIM, BLOCK_SIZE, 4096, {16, 16, 16}, {}, {},
                                    {2 * BLOCK_SIZE, 1, HEAD_DIM});
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+// k_cache 的 D 与其他输入不一致：aclnn 单算子路径上这一维曾被 InferShape 的推导值覆盖，
+// 使本校验恒真（infershape 侧的 infershape_keeps_* 用例锁住不覆盖的行为）
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_k_cache_head_dim_mismatch)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[4] = {{{2, BLOCK_SIZE, 1, 127}, {2, BLOCK_SIZE, 1, 127}}, ge::DT_BF16, ge::FORMAT_ND};
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_v_cache_head_dim_mismatch)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[5] = {{{2, BLOCK_SIZE, 1, 64}, {2, BLOCK_SIZE, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND};
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+// v_cache 的 Bn 与 k_cache 不一致（这里取 0，即空 cache）
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_v_cache_block_num_mismatch)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[5] = {
+        {{0, BLOCK_SIZE, 1, HEAD_DIM}, {0, BLOCK_SIZE, 1, HEAD_DIM}}, ge::DT_BF16, ge::FORMAT_ND};
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_v_cache_not_4d)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[5] = {
+        {{2 * BLOCK_SIZE, 1, HEAD_DIM}, {2 * BLOCK_SIZE, 1, HEAD_DIM}}, ge::DT_BF16, ge::FORMAT_ND};
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+// format 不被 InferShape 改写，两条通路统一在 tiling 拦；q 的输出 format 在 aclnn 路径上
+// 由 l0 内部张量决定，调用方那侧另由 L2 的 CheckQOutFormat 兜住
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_input_format_not_nd)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[4].format_ = ge::FORMAT_FRACTAL_NZ;
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_optional_input_format_not_nd)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[8].format_ = ge::FORMAT_FRACTAL_NZ;
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+// NCL/NCHW/NCDHW 与 ND 排布一致，框架按 rank 打这些标签，必须放行
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_when_format_is_nd_compatible)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.inputTensorDesc_[0].format_ = ge::FORMAT_NCL;
+    para.inputTensorDesc_[4].format_ = ge::FORMAT_NCHW; // 4 维 KV Cache 在框架侧就是这个标签
+    para.outputTensorDesc_[0].format_ = ge::FORMAT_NCL;
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS);
+}
+
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_output_format_not_nd)
+{
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.outputTensorDesc_[0].format_ = ge::FORMAT_FRACTAL_NZ;
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

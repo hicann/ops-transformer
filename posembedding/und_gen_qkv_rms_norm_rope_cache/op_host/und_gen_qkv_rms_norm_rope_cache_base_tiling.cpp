@@ -53,7 +53,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
 
     auto undQkvShapePtr = context_->GetInputShape(UND_QKV_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, undQkvShapePtr);
-    auto& undQkvShape = undQkvShapePtr->GetStorageShape();
+    auto &undQkvShape = undQkvShapePtr->GetStorageShape();
     OP_CHECK_IF(undQkvShape.GetDimNum() != DIM_NUM_THREE,
                 OP_LOGE(context_->GetNodeName(), "und_qkv must be 3D tensor [und_len, N, D]."),
                 return ge::GRAPH_FAILED);
@@ -64,7 +64,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     // gen_qkv 为可选输入：不传时退化为纯 prefill（gen_len = 0）
     auto genQkvShapePtr = context_->GetOptionalInputShape(GEN_QKV_INDEX);
     if (genQkvShapePtr != nullptr) {
-        auto& genQkvShape = genQkvShapePtr->GetStorageShape();
+        auto &genQkvShape = genQkvShapePtr->GetStorageShape();
         OP_CHECK_IF(genQkvShape.GetDimNum() != DIM_NUM_THREE,
                     OP_LOGE(context_->GetNodeName(), "gen_qkv must be 3D tensor [gen_len, N, D]."),
                     return ge::GRAPH_FAILED);
@@ -78,7 +78,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
 
     auto kCacheShapePtr = context_->GetInputShape(K_CACHE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kCacheShapePtr);
-    auto& kCacheShape = kCacheShapePtr->GetStorageShape();
+    auto &kCacheShape = kCacheShapePtr->GetStorageShape();
     OP_CHECK_IF(kCacheShape.GetDimNum() != DIM_NUM_FOUR,
                 OP_LOGE(context_->GetNodeName(), "k_cache must be 4D tensor [Bn, Bs, Hk, D]."),
                 return ge::GRAPH_FAILED);
@@ -89,18 +89,20 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, cosSinShapePtr);
     maxPos_ = cosSinShapePtr->GetStorageShape().GetDim(DIM_ZERO);
 
-    OP_CHECK_IF(CheckDtypeValid() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "CheckDtypeValid failed."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckAttrsValid() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "CheckAttrsValid failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtypeValid() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckDtypeValid failed."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckFormatValid() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckFormatValid failed."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckAttrsValid() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckAttrsValid failed."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckUndGenQkvValid() != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_->GetNodeName(), "CheckUndGenQkvValid failed."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckWeightsValid() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "CheckWeightsValid failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckWeightsValid() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckWeightsValid failed."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckCosSinCacheValid() != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_->GetNodeName(), "CheckCosSinCacheValid failed."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckKvCacheValid() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "CheckKvCacheValid failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckKvCacheValid() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckKvCacheValid failed."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckSlotMappingValid() != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_->GetNodeName(), "CheckSlotMappingValid failed."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckPositionsValid() != ge::GRAPH_SUCCESS,
@@ -109,8 +111,8 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
                 OP_LOGE(context_->GetNodeName(), "CheckCatIndicesValid failed."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckOutputShapeValid() != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_->GetNodeName(), "CheckOutputShapeValid failed."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckSupportRange() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "CheckSupportRange failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckSupportRange() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckSupportRange failed."),
+                return ge::GRAPH_FAILED);
 
     reciprocal_ = 1.0f / static_cast<float>(headDim_);
     return ge::GRAPH_SUCCESS;
@@ -120,7 +122,7 @@ namespace {
 struct DtypeSpec {
     int64_t index;
     ge::DataType expect;
-    const char* name;
+    const char *name;
     bool optional;
 };
 
@@ -148,7 +150,7 @@ constexpr DtypeSpec OUTPUT_DTYPE_SPECS[] = {
 
 ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckDtypeValid()
 {
-    for (const auto& spec : INPUT_DTYPE_SPECS) {
+    for (const auto &spec : INPUT_DTYPE_SPECS) {
         // 可选输入必须按 IR 下标取：它未实例化时后面输入的实例化下标会整体前移，
         // 用 GetInputDesc 会取到隔壁输入的 desc
         auto desc = spec.optional ? context_->GetOptionalInputDesc(spec.index) : context_->GetInputDesc(spec.index);
@@ -165,7 +167,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckDtypeValid()
                             ge::TypeUtils::DataTypeToSerialString(dtype).c_str()),
                     return ge::GRAPH_FAILED);
     }
-    for (const auto& spec : OUTPUT_DTYPE_SPECS) {
+    for (const auto &spec : OUTPUT_DTYPE_SPECS) {
         auto desc = context_->GetOutputDesc(spec.index);
         OP_CHECK_NULL_WITH_CONTEXT(context_, desc);
         auto dtype = desc->GetDataType();
@@ -180,43 +182,41 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckDtypeValid()
 
 ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckOutputShapeValid()
 {
-    // 输出 buffer 由调用方分配（aclnn 单算子路径上 InferShape 不会替调用方重新开），
-    // 这里不校验的话，q 开小一行 kernel 就会按 TilingData 里的 T 写满而静默越界。
+    // q 的 shape 由 InferShape 按同一批输入推出，两条通路上这里都恒成立；
+    // 调用方传进来的 q 由 aclnn L2 的 CheckQOutShape 拦。留此校验兜住直接构造
+    // tiling context 的调用方。
     auto qShapePtr = context_->GetOutputShape(Q_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, qShapePtr);
-    auto& qShape = qShapePtr->GetStorageShape();
-    OP_CHECK_IF(qShape.GetDimNum() != DIM_NUM_THREE,
-                OP_LOGE(context_->GetNodeName(), "output q must be 3D tensor [T, Hq, D], got %zu dims.",
-                        qShape.GetDimNum()),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(qShape.GetDim(DIM_ZERO) != totalTokens_ || qShape.GetDim(DIM_ONE) != numHeadQ_ ||
-                    qShape.GetDim(DIM_TWO) != headDim_,
-                OP_LOGE(context_->GetNodeName(), "output q shape must be [%ld, %ld, %ld], got [%ld, %ld, %ld].",
-                        totalTokens_, numHeadQ_, headDim_, qShape.GetDim(DIM_ZERO), qShape.GetDim(DIM_ONE),
-                        qShape.GetDim(DIM_TWO)),
-                return ge::GRAPH_FAILED);
+    auto &qShape = qShapePtr->GetStorageShape();
+    OP_CHECK_IF(
+        qShape.GetDimNum() != DIM_NUM_THREE,
+        OP_LOGE(context_->GetNodeName(), "output q must be 3D tensor [T, Hq, D], got %zu dims.", qShape.GetDimNum()),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        qShape.GetDim(DIM_ZERO) != totalTokens_ || qShape.GetDim(DIM_ONE) != numHeadQ_ ||
+            qShape.GetDim(DIM_TWO) != headDim_,
+        OP_LOGE(context_->GetNodeName(), "output q shape must be [%ld, %ld, %ld], got [%ld, %ld, %ld].", totalTokens_,
+                numHeadQ_, headDim_, qShape.GetDim(DIM_ZERO), qShape.GetDim(DIM_ONE), qShape.GetDim(DIM_TWO)),
+        return ge::GRAPH_FAILED);
 
     // k_cache/v_cache 是原地写入的输入输出，输出 shape 必须与对应输入逐维一致
-    const int64_t cachePairs[][DIM_NUM_TWO] = {{K_CACHE_INDEX, K_CACHE_OUT_INDEX},
-                                               {V_CACHE_INDEX, V_CACHE_OUT_INDEX}};
-    const char* cacheNames[] = {"k_cache", "v_cache"};
+    const int64_t cachePairs[][DIM_NUM_TWO] = {{K_CACHE_INDEX, K_CACHE_OUT_INDEX}, {V_CACHE_INDEX, V_CACHE_OUT_INDEX}};
+    const char *cacheNames[] = {"k_cache", "v_cache"};
     for (size_t i = 0; i < sizeof(cacheNames) / sizeof(cacheNames[0]); ++i) {
         auto inShapePtr = context_->GetInputShape(cachePairs[i][DIM_ZERO]);
         OP_CHECK_NULL_WITH_CONTEXT(context_, inShapePtr);
         auto outShapePtr = context_->GetOutputShape(cachePairs[i][DIM_ONE]);
         OP_CHECK_NULL_WITH_CONTEXT(context_, outShapePtr);
-        auto& inShape = inShapePtr->GetStorageShape();
-        auto& outShape = outShapePtr->GetStorageShape();
+        auto &inShape = inShapePtr->GetStorageShape();
+        auto &outShape = outShapePtr->GetStorageShape();
         OP_CHECK_IF(outShape.GetDimNum() != inShape.GetDimNum(),
-                    OP_LOGE(context_->GetNodeName(),
-                            "output %s dim num must match input (%zu), got %zu.", cacheNames[i], inShape.GetDimNum(),
-                            outShape.GetDimNum()),
+                    OP_LOGE(context_->GetNodeName(), "output %s dim num must match input (%zu), got %zu.",
+                            cacheNames[i], inShape.GetDimNum(), outShape.GetDimNum()),
                     return ge::GRAPH_FAILED);
         for (size_t dim = 0; dim < inShape.GetDimNum(); ++dim) {
             OP_CHECK_IF(outShape.GetDim(dim) != inShape.GetDim(dim),
-                        OP_LOGE(context_->GetNodeName(),
-                                "output %s dim %zu must match input (%ld), got %ld.", cacheNames[i], dim,
-                                inShape.GetDim(dim), outShape.GetDim(dim)),
+                        OP_LOGE(context_->GetNodeName(), "output %s dim %zu must match input (%ld), got %ld.",
+                                cacheNames[i], dim, inShape.GetDim(dim), outShape.GetDim(dim)),
                         return ge::GRAPH_FAILED);
         }
     }
@@ -244,17 +244,16 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckSupportRange()
     OP_CHECK_IF(!hasGen_,
                 OP_LOGE(context_->GetNodeName(),
                         "gen_qkv is currently required and gen_len must be positive "
-                        "(prefill-only path is not supported yet), got gen_len=%ld.", genLen_),
+                        "(prefill-only path is not supported yet), got gen_len=%ld.",
+                        genLen_),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->GetOptionalInputShape(GEN_WEIGHTS_Q_INDEX) == nullptr ||
                     context_->GetOptionalInputShape(GEN_WEIGHTS_K_INDEX) == nullptr,
-                OP_LOGE(context_->GetNodeName(),
-                        "gen_weights_q/gen_weights_k are currently required."),
+                OP_LOGE(context_->GetNodeName(), "gen_weights_q/gen_weights_k are currently required."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(!hasCatIndices_,
-                OP_LOGE(context_->GetNodeName(),
-                        "cat_indices is currently required "
-                        "(identity-mapping path is not supported yet)."),
+                OP_LOGE(context_->GetNodeName(), "cat_indices is currently required "
+                                                 "(identity-mapping path is not supported yet)."),
                 return ge::GRAPH_FAILED);
 
     bool comboValid = false;
@@ -273,16 +272,47 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckSupportRange()
     return ge::GRAPH_SUCCESS;
 }
 
+static inline bool IsNdCompatibleFormat(ge::Format format)
+{
+    return format == ge::FORMAT_ND || format == ge::FORMAT_NCL || format == ge::FORMAT_NCHW;
+}
+
+ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckFormatValid()
+{
+    // format 不会被 InferShape 改写，aclnn 单算子与图模式两条通路在这里统一拦
+    for (const auto &spec : INPUT_DTYPE_SPECS) {
+        auto desc = spec.optional ? context_->GetOptionalInputDesc(spec.index) : context_->GetInputDesc(spec.index);
+        if (desc == nullptr) {
+            continue; // 必选输入的空 desc 已由 CheckDtypeValid 拦下
+        }
+        auto format = static_cast<ge::Format>(ge::GetPrimaryFormat(desc->GetStorageFormat()));
+        OP_CHECK_IF(!IsNdCompatibleFormat(format),
+                    OP_LOGE(context_->GetNodeName(), "input %s only supports ND format, got %s.", spec.name,
+                            ge::TypeUtils::FormatToSerialString(format).c_str()),
+                    return ge::GRAPH_FAILED);
+    }
+    for (const auto &spec : OUTPUT_DTYPE_SPECS) {
+        auto desc = context_->GetOutputDesc(spec.index);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, desc);
+        auto format = static_cast<ge::Format>(ge::GetPrimaryFormat(desc->GetStorageFormat()));
+        OP_CHECK_IF(!IsNdCompatibleFormat(format),
+                    OP_LOGE(context_->GetNodeName(), "output %s only supports ND format, got %s.", spec.name,
+                            ge::TypeUtils::FormatToSerialString(format).c_str()),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckAttrsValid()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
-    const int64_t* numHeadsQ = attrs->GetInt(NUM_HEADS_Q_ATTR_IDX);
+    const int64_t *numHeadsQ = attrs->GetInt(NUM_HEADS_Q_ATTR_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, numHeadsQ);
-    const int64_t* numHeadsK = attrs->GetInt(NUM_HEADS_K_ATTR_IDX);
+    const int64_t *numHeadsK = attrs->GetInt(NUM_HEADS_K_ATTR_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, numHeadsK);
-    const int64_t* numHeadsV = attrs->GetInt(NUM_HEADS_V_ATTR_IDX);
+    const int64_t *numHeadsV = attrs->GetInt(NUM_HEADS_V_ATTR_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, numHeadsV);
     numHeadQ_ = *numHeadsQ;
     numHeadK_ = *numHeadsK;
@@ -297,7 +327,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckAttrsValid()
                         numHeadQ_ + numHeadK_ + numHeadV_, numHead_),
                 return ge::GRAPH_FAILED);
 
-    const float* normEps = attrs->GetFloat(NORM_EPS_ATTR_IDX);
+    const float *normEps = attrs->GetFloat(NORM_EPS_ATTR_IDX);
     epsilon_ = (normEps == nullptr) ? 1e-6f : *normEps;
     OP_CHECK_IF(epsilon_ <= 0.0f, OP_LOGE(context_->GetNodeName(), "norm_eps must be positive, got %f.", epsilon_),
                 return ge::GRAPH_FAILED);
@@ -313,13 +343,13 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckAttrsValid()
     mropeSection_[DIM_ZERO] = half;
     mropeSection_[DIM_ONE] = 0;
     mropeSection_[DIM_TWO] = 0;
-    const gert::ContinuousVector* mropeSection = attrs->GetAttrPointer<gert::ContinuousVector>(MROPE_SECTION_ATTR_IDX);
+    const gert::ContinuousVector *mropeSection = attrs->GetAttrPointer<gert::ContinuousVector>(MROPE_SECTION_ATTR_IDX);
     if (mropeSection != nullptr && mropeSection->GetSize() > 0) {
         OP_CHECK_IF(mropeSection->GetSize() != static_cast<size_t>(MROPE_AXIS_NUM),
                     OP_LOGE(context_->GetNodeName(), "mrope_section must be empty or have exactly 3 elements, got %zu.",
                             mropeSection->GetSize()),
                     return ge::GRAPH_FAILED);
-        const int64_t* sectionData = reinterpret_cast<const int64_t*>(mropeSection->GetData());
+        const int64_t *sectionData = reinterpret_cast<const int64_t *>(mropeSection->GetData());
         OP_CHECK_NULL_WITH_CONTEXT(context_, sectionData);
         int64_t sectionSum = 0;
         for (int64_t i = 0; i < MROPE_AXIS_NUM; ++i) {
@@ -348,12 +378,12 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckUndGenQkvValid()
 
     auto genQkvShapePtr = context_->GetOptionalInputShape(GEN_QKV_INDEX);
     if (genQkvShapePtr != nullptr) {
-        auto& genQkvShape = genQkvShapePtr->GetStorageShape();
-        OP_CHECK_IF(genQkvShape.GetDim(DIM_ONE) != numHead_ || genQkvShape.GetDim(DIM_TWO) != headDim_,
-                    OP_LOGE(context_->GetNodeName(),
-                            "gen_qkv N/D dims must match und_qkv, got (%ld, %ld) vs (%ld, %ld).",
-                            genQkvShape.GetDim(DIM_ONE), genQkvShape.GetDim(DIM_TWO), numHead_, headDim_),
-                    return ge::GRAPH_FAILED);
+        auto &genQkvShape = genQkvShapePtr->GetStorageShape();
+        OP_CHECK_IF(
+            genQkvShape.GetDim(DIM_ONE) != numHead_ || genQkvShape.GetDim(DIM_TWO) != headDim_,
+            OP_LOGE(context_->GetNodeName(), "gen_qkv N/D dims must match und_qkv, got (%ld, %ld) vs (%ld, %ld).",
+                    genQkvShape.GetDim(DIM_ONE), genQkvShape.GetDim(DIM_TWO), numHead_, headDim_),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(genQkvShape.GetDim(DIM_ZERO) < 0,
                     OP_LOGE(context_->GetNodeName(), "gen_qkv gen_len must be non-negative."), return ge::GRAPH_FAILED);
     }
@@ -366,7 +396,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckWeightsValid()
     for (int64_t idx : requiredWeightIdx) {
         auto shapePtr = context_->GetInputShape(idx);
         OP_CHECK_NULL_WITH_CONTEXT(context_, shapePtr);
-        auto& shape = shapePtr->GetStorageShape();
+        auto &shape = shapePtr->GetStorageShape();
         OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_ONE || shape.GetDim(DIM_ZERO) != headDim_,
                     OP_LOGE(context_->GetNodeName(), "weights(input %ld) must be 1D tensor [D=%ld].", idx, headDim_),
                     return ge::GRAPH_FAILED);
@@ -377,17 +407,17 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckWeightsValid()
     for (int64_t idx : genWeightIdx) {
         auto shapePtr = context_->GetOptionalInputShape(idx);
         if (shapePtr == nullptr) {
-            OP_CHECK_IF(hasGen_,
-                        OP_LOGE(context_->GetNodeName(),
-                                "gen_weights_q/gen_weights_k are required when gen_qkv is provided."),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                hasGen_,
+                OP_LOGE(context_->GetNodeName(), "gen_weights_q/gen_weights_k are required when gen_qkv is provided."),
+                return ge::GRAPH_FAILED);
             continue;
         }
-        auto& shape = shapePtr->GetStorageShape();
-        OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_ONE || shape.GetDim(DIM_ZERO) != headDim_,
-                    OP_LOGE(context_->GetNodeName(), "gen weights(input %ld) must be 1D tensor [D=%ld].", idx,
-                            headDim_),
-                    return ge::GRAPH_FAILED);
+        auto &shape = shapePtr->GetStorageShape();
+        OP_CHECK_IF(
+            shape.GetDimNum() != DIM_NUM_ONE || shape.GetDim(DIM_ZERO) != headDim_,
+            OP_LOGE(context_->GetNodeName(), "gen weights(input %ld) must be 1D tensor [D=%ld].", idx, headDim_),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -396,7 +426,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckCosSinCacheValid()
 {
     auto shapePtr = context_->GetInputShape(COS_SIN_CACHE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapePtr);
-    auto& shape = shapePtr->GetStorageShape();
+    auto &shape = shapePtr->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_TWO,
                 OP_LOGE(context_->GetNodeName(), "cos_sin_cache must be 2D tensor [max_pos, D]."),
                 return ge::GRAPH_FAILED);
@@ -414,18 +444,18 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckKvCacheValid()
     // k_cache/v_cache 固定为连续 BBND：[Bn, Bs, Hk/Hv, D]
     auto kCacheShapePtr = context_->GetInputShape(K_CACHE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kCacheShapePtr);
-    auto& kCacheShape = kCacheShapePtr->GetStorageShape();
+    auto &kCacheShape = kCacheShapePtr->GetStorageShape();
     auto vCacheShapePtr = context_->GetInputShape(V_CACHE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, vCacheShapePtr);
-    auto& vCacheShape = vCacheShapePtr->GetStorageShape();
+    auto &vCacheShape = vCacheShapePtr->GetStorageShape();
 
     OP_CHECK_IF(vCacheShape.GetDimNum() != DIM_NUM_FOUR,
                 OP_LOGE(context_->GetNodeName(), "v_cache must be 4D tensor [Bn, Bs, Hv, D]."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(blockNum_ <= 0 || blockSize_ <= 0,
-                OP_LOGE(context_->GetNodeName(), "k_cache Bn(%ld) and Bs(%ld) must be positive.", blockNum_,
-                        blockSize_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        blockNum_ <= 0 || blockSize_ <= 0,
+        OP_LOGE(context_->GetNodeName(), "k_cache Bn(%ld) and Bs(%ld) must be positive.", blockNum_, blockSize_),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(kCacheShape.GetDim(DIM_TWO) != numHeadK_,
                 OP_LOGE(context_->GetNodeName(), "k_cache Hk dimension must be num_heads_k(%ld), got %ld.", numHeadK_,
                         kCacheShape.GetDim(DIM_TWO)),
@@ -456,7 +486,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckSlotMappingValid()
 {
     auto shapePtr = context_->GetInputShape(SLOT_MAPPING_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapePtr);
-    auto& shape = shapePtr->GetStorageShape();
+    auto &shape = shapePtr->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_ONE,
                 OP_LOGE(context_->GetNodeName(), "slot_mapping must be 1D tensor [T]."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(shape.GetDim(DIM_ZERO) != totalTokens_,
@@ -470,7 +500,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckPositionsValid()
 {
     auto shapePtr = context_->GetInputShape(POSITIONS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapePtr);
-    auto& shape = shapePtr->GetStorageShape();
+    auto &shape = shapePtr->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_TWO,
                 OP_LOGE(context_->GetNodeName(), "positions must be 2D tensor [3, T]."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(shape.GetDim(DIM_ZERO) != MROPE_AXIS_NUM,
@@ -490,7 +520,7 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::CheckCatIndicesValid()
     if (shapePtr == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
-    auto& shape = shapePtr->GetStorageShape();
+    auto &shape = shapePtr->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_ONE,
                 OP_LOGE(context_->GetNodeName(), "cat_indices must be 1D tensor [T]."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(shape.GetDim(DIM_ZERO) != totalTokens_,
@@ -505,13 +535,13 @@ uint64_t UndGenQkvRmsNormRopeCacheTilingBase::GetTilingKey() const
     return tilingKey_;
 }
 
-ge::graphStatus Tiling4UndGenQkvRmsNormRopeCache(gert::TilingContext* context)
+ge::graphStatus Tiling4UndGenQkvRmsNormRopeCache(gert::TilingContext *context)
 {
     OP_LOGD(context, "Tiling4UndGenQkvRmsNormRopeCache running.");
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepare4UndGenQkvRmsNormRopeCache(gert::TilingParseContext* context)
+ge::graphStatus TilingPrepare4UndGenQkvRmsNormRopeCache(gert::TilingParseContext *context)
 {
     OP_LOGD(context, "TilingPrepare4UndGenQkvRmsNormRopeCache running.");
     auto compileInfo = context->GetCompiledInfo<UndGenQkvRmsNormRopeCacheCompileInfo>();

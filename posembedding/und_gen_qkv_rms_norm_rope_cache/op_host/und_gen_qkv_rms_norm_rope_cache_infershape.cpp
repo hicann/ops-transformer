@@ -54,7 +54,7 @@ constexpr int64_t UNKNOWN_DIM_VALUE = -1LL;
 // 维度取值、跨输入一致性与支持范围的校验仍统一在 tiling 侧。
 struct InputSpec {
     size_t idx;
-    const char* name;
+    const char *name;
     size_t expectDimNum;
     bool optional;
 };
@@ -125,16 +125,16 @@ constexpr DimSource BLOCK_SIZE_SOURCES[] = {
 };
 
 // 可选输入按 IR 下标取（未实例化时返回 nullptr），必选输入按实例化下标取
-inline const gert::Shape* GetShapeByIrIndex(gert::InferShapeContext* context, size_t irIdx)
+inline const gert::Shape *GetShapeByIrIndex(gert::InferShapeContext *context, size_t irIdx)
 {
     return INPUT_SPECS[irIdx].optional ? context->GetOptionalInputShape(irIdx) : context->GetInputShape(irIdx);
 }
 
 // rank 校验：输入没传或是未知 rank(-2) 时跳过，否则 rank 必须与 IR 定义一致
-inline ge::graphStatus CheckInputRanks(gert::InferShapeContext* context)
+inline ge::graphStatus CheckInputRanks(gert::InferShapeContext *context)
 {
-    for (const auto& spec : INPUT_SPECS) {
-        const gert::Shape* shape = GetShapeByIrIndex(context, spec.idx);
+    for (const auto &spec : INPUT_SPECS) {
+        const gert::Shape *shape = GetShapeByIrIndex(context, spec.idx);
         if (shape == nullptr || Ops::Base::IsUnknownRank(*shape)) {
             continue;
         }
@@ -148,9 +148,9 @@ inline ge::graphStatus CheckInputRanks(gert::InferShapeContext* context)
 
 // 取某个输入的指定维；输入没传、是未知 rank 或该维本身是 -1 时返回 -1。
 // 前置条件：CheckInputRanks 已通过，因此非未知 rank 的输入 rank 必定合法，dimIdx 不会越界
-inline int64_t TryGetDim(gert::InferShapeContext* context, const DimSource& src)
+inline int64_t TryGetDim(gert::InferShapeContext *context, const DimSource &src)
 {
-    const gert::Shape* shape = GetShapeByIrIndex(context, src.inputIdx);
+    const gert::Shape *shape = GetShapeByIrIndex(context, src.inputIdx);
     if (shape == nullptr || Ops::Base::IsUnknownRank(*shape)) {
         return UNKNOWN_DIM_VALUE;
     }
@@ -159,9 +159,9 @@ inline int64_t TryGetDim(gert::InferShapeContext* context, const DimSource& src)
 
 // 按给定顺序逐个来源尝试，先拿到具体值就返回；全都拿不到才返回 -1
 template <size_t N>
-inline int64_t InferDimFromSources(gert::InferShapeContext* context, const DimSource (&sources)[N])
+inline int64_t InferDimFromSources(gert::InferShapeContext *context, const DimSource (&sources)[N])
 {
-    for (const auto& src : sources) {
+    for (const auto &src : sources) {
         const int64_t dim = TryGetDim(context, src);
         if (dim != UNKNOWN_DIM_VALUE) {
             return dim;
@@ -171,7 +171,7 @@ inline int64_t InferDimFromSources(gert::InferShapeContext* context, const DimSo
 }
 
 // T = und_len + gen_len；任一段拿不到具体值时返回 -1，交由调用方回退到其他来源
-inline int64_t InferTotalTokensByAdd(const gert::Shape* undQkvShape, const gert::Shape* genQkvShape)
+inline int64_t InferTotalTokensByAdd(const gert::Shape *undQkvShape, const gert::Shape *genQkvShape)
 {
     if (Ops::Base::IsUnknownRank(*undQkvShape)) {
         return UNKNOWN_DIM_VALUE;
@@ -190,34 +190,46 @@ inline int64_t InferTotalTokensByAdd(const gert::Shape* undQkvShape, const gert:
     return genLen == UNKNOWN_DIM_VALUE ? UNKNOWN_DIM_VALUE : undLen + genLen;
 }
 
-// KV Cache 输出与输入同址，shape 为 [Bn, Bs, H, D]：H 由属性给出恒可知，Bn/Bs/D 能推则推
-inline void SetCacheShape(gert::Shape* cacheShape, int64_t blockNum, int64_t blockSize, int64_t numHeads,
-                          int64_t headDim)
+// KV Cache 输出与输入同址，shape 恒等于输入，[Bn, Bs, H, D] 的推导值只用来填输入里未知的维。
+// 不能整份改写：aclnn 单算子路径上输出与输入是同一个 tensor，推导值会盖掉调用方传错的维，
+// 使 tiling 侧的 KV Cache 校验恒真。
+inline void SetCacheShape(gert::Shape *cacheOutShape, const gert::Shape *cacheInShape, int64_t blockNum,
+                          int64_t blockSize, int64_t numHeads, int64_t headDim)
 {
-    cacheShape->SetDimNum(DIM_NUM_FOUR);
-    cacheShape->SetDim(DIM_ZERO, blockNum);
-    cacheShape->SetDim(DIM_ONE, blockSize);
-    cacheShape->SetDim(DIM_TWO, numHeads);
-    cacheShape->SetDim(DIM_THREE, headDim);
+    const int64_t inferred[DIM_NUM_FOUR] = {blockNum, blockSize, numHeads, headDim};
+    if (Ops::Base::IsUnknownRank(*cacheInShape)) {
+        cacheOutShape->SetDimNum(DIM_NUM_FOUR);
+        for (size_t i = 0; i < DIM_NUM_FOUR; ++i) {
+            cacheOutShape->SetDim(i, inferred[i]);
+        }
+        return;
+    }
+    // 前置条件：CheckInputRanks 已通过，非未知 rank 的 cache 必为 4 维
+    *cacheOutShape = *cacheInShape;
+    for (size_t i = 0; i < DIM_NUM_FOUR; ++i) {
+        if (cacheOutShape->GetDim(i) == UNKNOWN_DIM_VALUE) {
+            cacheOutShape->SetDim(i, inferred[i]);
+        }
+    }
 }
 
-graphStatus InferShape4UndGenQkvRmsNormRopeCache(gert::InferShapeContext* context)
+graphStatus InferShape4UndGenQkvRmsNormRopeCache(gert::InferShapeContext *context)
 {
     OP_LOGD(context, "Begin to do InferShape4UndGenQkvRmsNormRopeCache.");
 
-    const gert::Shape* undQkvShape = context->GetInputShape(IN_UND_QKV);
+    const gert::Shape *undQkvShape = context->GetInputShape(IN_UND_QKV);
     OP_CHECK_NULL_WITH_CONTEXT(context, undQkvShape);
-    const gert::Shape* kCacheShape = context->GetInputShape(IN_K_CACHE);
+    const gert::Shape *kCacheShape = context->GetInputShape(IN_K_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, kCacheShape);
-    const gert::Shape* vCacheShape = context->GetInputShape(IN_V_CACHE);
+    const gert::Shape *vCacheShape = context->GetInputShape(IN_V_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, vCacheShape);
-    const gert::Shape* genQkvShape = context->GetOptionalInputShape(IN_GEN_QKV);
+    const gert::Shape *genQkvShape = context->GetOptionalInputShape(IN_GEN_QKV);
 
-    gert::Shape* qOutShape = context->GetOutputShape(OUT_Q);
+    gert::Shape *qOutShape = context->GetOutputShape(OUT_Q);
     OP_CHECK_NULL_WITH_CONTEXT(context, qOutShape);
-    gert::Shape* kCacheOutShape = context->GetOutputShape(OUT_K_CACHE);
+    gert::Shape *kCacheOutShape = context->GetOutputShape(OUT_K_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, kCacheOutShape);
-    gert::Shape* vCacheOutShape = context->GetOutputShape(OUT_V_CACHE);
+    gert::Shape *vCacheOutShape = context->GetOutputShape(OUT_V_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, vCacheOutShape);
 
     // 非未知 rank 的输入，rank 必须与 IR 定义一致，不一致直接判失败，不能当成"这个来源用不了"跳过
@@ -226,11 +238,11 @@ graphStatus InferShape4UndGenQkvRmsNormRopeCache(gert::InferShapeContext* contex
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t* numHeadsQ = attrs->GetInt(ATTR_NUM_HEADS_Q);
+    const int64_t *numHeadsQ = attrs->GetInt(ATTR_NUM_HEADS_Q);
     OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsQ);
-    const int64_t* numHeadsK = attrs->GetInt(ATTR_NUM_HEADS_K);
+    const int64_t *numHeadsK = attrs->GetInt(ATTR_NUM_HEADS_K);
     OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsK);
-    const int64_t* numHeadsV = attrs->GetInt(ATTR_NUM_HEADS_V);
+    const int64_t *numHeadsV = attrs->GetInt(ATTR_NUM_HEADS_V);
     OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsV);
 
     // 三个输出的 rank 恒定、头数恒由属性给出，其余维度能推则推、推不出才置 -1
@@ -252,14 +264,14 @@ graphStatus InferShape4UndGenQkvRmsNormRopeCache(gert::InferShapeContext* contex
     // k_cache/v_cache 原地写入，输出与输入同址：[Bn, Bs, Hk/Hv, D]
     const int64_t blockNum = InferDimFromSources(context, BLOCK_NUM_SOURCES);
     const int64_t blockSize = InferDimFromSources(context, BLOCK_SIZE_SOURCES);
-    SetCacheShape(kCacheOutShape, blockNum, blockSize, *numHeadsK, headDim);
-    SetCacheShape(vCacheOutShape, blockNum, blockSize, *numHeadsV, headDim);
+    SetCacheShape(kCacheOutShape, kCacheShape, blockNum, blockSize, *numHeadsK, headDim);
+    SetCacheShape(vCacheOutShape, vCacheShape, blockNum, blockSize, *numHeadsV, headDim);
 
     OP_LOGD(context, "End to do InferShape4UndGenQkvRmsNormRopeCache.");
     return GRAPH_SUCCESS;
 }
 
-graphStatus InferDtype4UndGenQkvRmsNormRopeCache(gert::InferDataTypeContext* context)
+graphStatus InferDtype4UndGenQkvRmsNormRopeCache(gert::InferDataTypeContext *context)
 {
     OP_LOGD(context, "InferDtype4UndGenQkvRmsNormRopeCache enter");
 

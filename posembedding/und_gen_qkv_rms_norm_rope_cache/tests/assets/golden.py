@@ -46,7 +46,6 @@
 纯 CPU torch 实现，不依赖 NPU。
 """
 
-import logging
 import zlib
 
 import torch
@@ -441,17 +440,96 @@ def _gen_index_values(arrays, kwargs):
 
 
 # --------------------------------------------------------------------------- #
-# 精度判据：cross_check / L1，标杆用 golden 自身
+# 精度判据
 # --------------------------------------------------------------------------- #
-try:
-    from ttk.core_modules.comparison.cross_check import CrossCheckComparison
-    from ttk.core_modules.comparison.resolve import resolve_tolerance
+# 实际判定走下面的 compare（逐元素 isclose + 超差占比），内置的纯相对判据判不住
+# RoPE 抵消点：x_lo*cos - x_hi*sin 近乎完全抵消时 golden 可能恰为 0，相对误差无界。
+# TOLERANCE 仅为占位以通过 Spec 校验——Spec.tolerance 只收 2.1 的四个标准名。
+TOLERANCE = {"bfloat16": {"standard": "stat_rel_err"}}
 
-    _TTK_CROSS_CHECK_AVAILABLE = True
-except ImportError:  # 不在 ops-test-kit 环境里（如直接跑本文件自检）
-    _TTK_CROSS_CHECK_AVAILABLE = False
+# 逐 dtype 的 (rtol, atol)。bf16 尾数 7 位，1 ulp 的相对量级即 2^-8，rtol 取 2^-7 留一倍裕量。
+_TOL_BY_DTYPE = {
+    "bfloat16": (2.0**-7, 1e-4),
+    "float16": (2.0**-10, 2.5e-5),
+    "float32": (2.0**-13, 2.5e-5),
+}
+_DEFAULT_TOL = (2.0**-7, 1e-4)
+# 允许超差的元素占比（比例不是百分数），取 TTK 内置 close 判据 bf16 的 ptol 默认值
+_MISMATCH_RATIO = 0.001
 
-TOLERANCE = {"bfloat16": {"standard": "cross_check", "level": "L1"}}
+
+def _dtype_name(value):
+    """numpy（bf16 由 ml_dtypes 承载）或 torch 张量 -> dtype 名。"""
+    import numpy as np
+
+    if isinstance(value, torch.Tensor):
+        return str(value.dtype).rsplit(".", 1)[-1]
+    return np.dtype(value.dtype).name
+
+
+def _to_f32_flat(value):
+    import numpy as np
+
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu().float().numpy().reshape(-1)
+    return np.asarray(value).astype(np.float32).reshape(-1)
+
+
+def _isclose_ratio(*outputs):
+    """outputs = (NPU_0..n-1, golden_0..n-1)，逐输出返回 compare 契约的 dict。"""
+    import numpy as np
+
+    half = len(outputs) // 2
+    results = []
+    for idx, (npu, gold) in enumerate(zip(outputs[:half], outputs[half:])):
+        rtol, atol = _TOL_BY_DTYPE.get(_dtype_name(npu), _DEFAULT_TOL)
+        actual = _to_f32_flat(npu)
+        golden = _to_f32_flat(gold)
+        if actual.shape != golden.shape:
+            results.append(
+                {
+                    "pass": False,
+                    "precision": "shape_mismatch",
+                    "error_info": "output %d: npu %s vs golden %s"
+                    % (idx, actual.shape, golden.shape),
+                }
+            )
+            continue
+        total = int(actual.size)
+        close = np.isclose(actual, golden, rtol=rtol, atol=atol, equal_nan=True)
+        bad = total - int(close.sum())
+        ratio = (bad / total) if total else 0.0
+        passed = ratio <= _MISMATCH_RATIO
+        metrics = {
+            "standard": "isclose_ratio",
+            "rtol": rtol,
+            "atol": atol,
+            "mismatch_ratio_limit": _MISMATCH_RATIO,
+            "result": {"total": total, "mismatch": bad, "mismatch_ratio": ratio},
+            "pass": passed,
+        }
+        error_info = None
+        if not passed:
+            worst = np.argsort(-np.abs(actual - golden))[: min(bad, 8)]
+            metrics["reason"] = "mismatch_ratio %.3g > %g" % (ratio, _MISMATCH_RATIO)
+            error_info = "output %d: %d/%d (%.3g) 超出 rtol=%g atol=%g; worst: %s" % (
+                idx,
+                bad,
+                total,
+                ratio,
+                rtol,
+                atol,
+                ", ".join("npu=%g golden=%g" % (actual[i], golden[i]) for i in worst),
+            )
+        results.append(
+            {
+                "pass": passed,
+                "precision": "%s%%" % ((1.0 - ratio) * 100.0),
+                "metrics": metrics,
+                "error_info": error_info,
+            }
+        )
+    return results
 
 
 class _SpecBase:
@@ -460,47 +538,7 @@ class _SpecBase:
     tolerance = TOLERANCE
 
     def compare(*outputs, **kwargs):
-        return _cross_check(*outputs)
-
-
-def _dtype_name(array):
-    """numpy（bf16 由 ml_dtypes 承载）或 torch 张量 -> resolve_tolerance 认的 dtype 名。"""
-    import numpy as np
-
-    if isinstance(array, torch.Tensor):
-        return str(array.dtype).rsplit(".", 1)[-1]
-    return np.dtype(array.dtype).name
-
-
-def _cross_check(*outputs):
-    """outputs = (NPU_0..n-1, golden_0..n-1)，逐输出返回 compare 契约的 dict。
-
-    dtype 取 NPU 输出：golden 在 cross_check 下会被 Promote 抬成 fp32。
-    """
-    if not _TTK_CROSS_CHECK_AVAILABLE:
-        raise RuntimeError(
-            "ttk.core_modules.comparison 不可用：请在 ops-test-kit checkout 下运行"
-        )
-    half = len(outputs) // 2
-    results = []
-    for idx, (npu, gold) in enumerate(zip(outputs[:half], outputs[half:])):
-        dtype_str = _dtype_name(npu)
-        params = resolve_tolerance(TOLERANCE, None, None, [dtype_str], None)[0].params
-        precision, log, is_pass, metrics = CrossCheckComparison(
-            npu, gold, idx, dtype_str, params, third_party=gold
-        ).compare()
-        logging.info(
-            "[cross_check] output %d %s %s", idx, precision, metrics.get("result")
-        )
-        results.append(
-            {
-                "pass": is_pass,
-                "precision": precision,
-                "metrics": metrics,
-                "error_info": None if is_pass else log,
-            }
-        )
-    return results
+        return _isclose_ratio(*outputs)
 
 
 class UndGenQkvRmsNormRopeCacheTestSpec(_SpecBase):
@@ -509,7 +547,7 @@ class UndGenQkvRmsNormRopeCacheTestSpec(_SpecBase):
     参数序与 op_host/und_gen_qkv_rms_norm_rope_cache_def.cpp 的输入一致（不含输出），
     张量为 numpy.ndarray，bf16 由 ml_dtypes.bfloat16 承载，属性走 kwargs。
 
-    判据见上方 TOLERANCE：cross_check / L1，标杆即 golden 自身。
+    判据见下方 _SpecBase.compare。
     """
 
     def customize_inputs(
@@ -635,6 +673,10 @@ def _as_torch(x):
 def _write_back(dst, values):
     """把 numpy 取值原地写回 dst（numpy 或 torch 均可）。"""
     if isinstance(dst, torch.Tensor):
+        if 0 in dst.stride():
+            # 广播视图多个元素共址，装不下互异索引；CSV 声明的取值范围已保证合法。
+            # slot_mapping 走到这里必然重复槽位，由 golden 的重复槽位守卫拦下。
+            return
         dst.copy_(torch.from_numpy(values.astype("int64")).to(dst.dtype))
     else:
         dst[...] = values.astype(dst.dtype)
