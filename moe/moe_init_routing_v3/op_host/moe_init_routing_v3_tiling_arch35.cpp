@@ -102,7 +102,7 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::DoOpTiling()
     MIRV3_CHECK_GE_RET(CheckOutputs());
     MIRV3_CHECK_GE_RET(CheckTopkWeightConsistency());
 
-    // 空tensor快速返回，跳过后续tiling计算
+    // n/k 为 0 时没有路由元素，直接走空 Tensor 路径。
     if (isEmptyTensor_) {
         return ge::GRAPH_SUCCESS;
     }
@@ -119,8 +119,19 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::DoOpTiling()
     isFullload_ = IsFullLoad();
     ComputeCountingSortMode();
 
-    ComputeUseGatherCopy();
+    if (dropPadMode_ == DROP_PAD_MODE_DROPPAD) {
+        Tiling4SrcToDstDropPadCompute();
+    }
+    if (cols_ == 0) {
+        auto *gatherOutTiling = &tilingDataPtr_->gatherOutComputeParamsOp;
+        const auto *tokensCountTiling = &tilingDataPtr_->expertTokensCountTilingDataOp;
+        gatherOutTiling->needCoreNum = tokensCountTiling->needCoreNum;
+        gatherOutTiling->perCoreIndicesElements = tokensCountTiling->perCoreElements;
+        gatherOutTiling->lastCoreIndicesElements = tokensCountTiling->lastCoreElements;
+        return ge::GRAPH_SUCCESS;
+    }
 
+    ComputeUseGatherCopy();
     if (quantMode_ == QUANT_MODE_MXFP8_E5M2 || quantMode_ == QUANT_MODE_MXFP8_E4M3FN ||
         quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E5M2 || quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E4M3FN ||
         quantMode_ == QUANT_MODE_MXFP4_E2M1) {
@@ -130,7 +141,6 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::DoOpTiling()
                quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E4M3FN) {
         Tiling4GatherOutFP8Quant();
     } else if (dropPadMode_ == DROP_PAD_MODE_DROPPAD && !isFullload_) {
-        Tiling4SrcToDstDropPadCompute();
         Tiling4GatherOutDropPadCompute();
     } else if (IsMXFP8NoQuantCase(quantMode_, xDtype_)) {
         Tiling4GatherOutMxFP8NoQuantCompute();
@@ -853,25 +863,19 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::CheckSetEmptyTensor()
 {
     OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::CheckSetEmptyTensor()");
 
-    // 空tensor场景：n_==0、k_==0、cols_==0
-    if (n_ == 0 || k_ == 0 || cols_ == 0) {
+    // n/k 为 0 时没有路由元素；cols 为 0 时仍有 n*k 个路由元素，继续走正常 tiling key。
+    if (n_ == 0 || k_ == 0) {
         isEmptyTensor_ = true;
     }
 
-    // 空tensor场景下activeNum无实际意义（如cols_==0但n_*k_>0时，调用方可能传入0），跳过校验并
-    // 归一化为totalLength_，与非arch35版本保持一致，避免语义上合法的空输入误失败。
-    if (isEmptyTensor_) {
-        tilingDataPtr_->activeNum = totalLength_;
-    } else if (activeNum_ != ACTIVE_NUM_MIN_VALUE) {
+    if (activeNum_ != 0 && activeNum_ != ACTIVE_NUM_MIN_VALUE) {
         //! 出于历史调用的兼容性，保留校验activeNum=n*k，但实际上不使用该属性
         OP_CHECK_IF(activeNum_ != totalLength_,
                     OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "active_num", std::to_string(activeNum_),
                                               ("bs*k(" + std::to_string(totalLength_) + ")")),
                     return ge::GRAPH_FAILED);
-        tilingDataPtr_->activeNum = totalLength_;
-    } else {
-        tilingDataPtr_->activeNum = totalLength_;
     }
+    tilingDataPtr_->activeNum = totalLength_;
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1931,7 +1935,9 @@ bool MoeInitRoutingV3TilingArch35::IsFullLoad()
 
 bool MoeInitRoutingV3TilingArch35::IsCountingSortApplicable()
 {
-    if (expertNum_ > MAX_EXPERT_NUM) {
+    // Counting-sort kernel requires a non-empty feature dimension. Zero-width inputs keep using the normal routing
+    // templates, which still produce row indices and expert counts.
+    if (cols_ == 0 || expertNum_ > MAX_EXPERT_NUM) {
         return false;
     }
     // 量化模式白名单：CS kernel 仅有非量化/静态量化两套模板，其余量化模式无对应 CS 模板

@@ -79,6 +79,10 @@ __aicore__ inline void MoeV3FullLoadDynamicQuant<T, QuantT>::Init(
     MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, topkWeight, expandedTopkWeight,
                                workspace, tilingData, tPipe);
 
+    if (this->cols_ == 0) {
+        return;
+    }
+
     colsAlign_ = Align(this->cols_, sizeof(T));
     if constexpr (IsSameType<QuantT, int4b_t>::value) {
         colsAsInt8_ = Ceil(this->cols_, static_cast<int64_t>(2)) * sizeof(int8_t);
@@ -427,6 +431,11 @@ __aicore__ inline void MoeV3FullLoadDynamicQuant<T, QuantT>::Process()
         if (this->blockIdx_ == this->needCoreNum_ - 1 && this->expertTokensNumFlag_ == 1) {
             this->ComputeExpertTokenCount();
             this->CopyExpertCountToOutput();
+        }
+
+        if (this->cols_ == 0) {
+            this->FreeLocalTensor();
+            return;
         }
 
         if (this->epFullload_ || this->isInputScale_) {

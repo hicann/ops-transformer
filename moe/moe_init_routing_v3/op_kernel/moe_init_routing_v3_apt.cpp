@@ -199,43 +199,9 @@ extern "C" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp
     auto t = &tilingData;
     const bool isInt8DynamicQuant = t->quantMode == MOE_INIT_ROUTING_V3_QUANT_MODE_DYNAMIC;
     const bool isInt4DynamicQuant = t->quantMode == MOE_INIT_ROUTING_V3_QUANT_MODE_INT4_DYNAMIC;
-
     if (TILING_KEY_IS(EMPTY_TENSOR)) {
         if (GetBlockIdx() != 0) {
             return;
-        }
-        // EMPTY_TENSOR分支主要适用于n==0或k==0的空tensor场景，此时expandedRowIdx/expandedScale为0元素。
-        // 当cols==0但n*k>0时（n>0且k>0），expandedRowIdx和expandedScale仍有n*k个元素，需初始化后再返回。
-        if (t->n > 0 && t->k > 0) {
-            int64_t rowIdxElements = t->n * t->k;
-            GlobalTensor<int32_t> expandedRowIdxGm;
-            expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, rowIdxElements);
-            InitGlobalMemory(expandedRowIdxGm, rowIdxElements, static_cast<int32_t>(0));
-
-            constexpr bool isMXFPXNoQuant = IsSameType<DTYPE_X, fp8_e4m3fn_t>::value ||
-                                            IsSameType<DTYPE_X, fp8_e5m2_t>::value ||
-                                            IsSameType<DTYPE_X, fp4x2_e2m1_t>::value;
-            const int64_t quantModeUnquant = -1;
-            const int64_t quantModeDynamic = 1;
-            const int64_t quantModeHif8Pertoken = 8;
-            const int64_t quantModeInt4Dynamic = 13;
-            // expandedScale为1D float [n*k]（或droppad时[expertNum*expertCapacity]）的量化模式，
-            // 无论isInputScale是否为1，输出均有元素需初始化。MXFP8/MXFP4/FP8_PERBLOCK在cols==0时
-            // expandedScale含ceilDiv(0,blockSize)=0的维度，总元素为0，无需init。
-            bool needScaleInit =
-                !isMXFPXNoQuant && (t->quantMode == quantModeUnquant || t->quantMode == quantModeDynamic ||
-                                    t->quantMode == quantModeInt4Dynamic || t->quantMode == quantModeHif8Pertoken);
-            if (needScaleInit) {
-                int64_t scaleElements = rowIdxElements;
-                if (t->dropPadMode == DROP_PAD_MODE && t->quantMode != quantModeHif8Pertoken) {
-                    scaleElements = t->expertNum * t->expertCapacity;
-                }
-                if (scaleElements > 0) {
-                    GlobalTensor<float> expandedScaleGm;
-                    expandedScaleGm.SetGlobalBuffer((__gm__ float *)expandedScale, scaleElements);
-                    InitGlobalMemory(expandedScaleGm, scaleElements, 0.0f);
-                }
-            }
         }
         if (t->expertTokensNumFlag) {
             GlobalTensor<int64_t> expertTokensCountGm;
@@ -470,6 +436,13 @@ extern "C" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp
             rowIdxGatherDropPadOp.Process();
             rowIdxGatherDropPadPipe.Destroy();
         }
+    }
+
+    if (t->cols == 0) {
+#if (__NPU_ARCH__ == 3510)
+        SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(oriOverflowMode);
+#endif
+        return;
     }
 
     // 4.TopkWeightOut（仅非FullLoad路径）
