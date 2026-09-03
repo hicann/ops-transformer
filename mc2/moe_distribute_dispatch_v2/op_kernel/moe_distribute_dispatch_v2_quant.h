@@ -32,8 +32,7 @@ namespace Mc2Kernel {
 using namespace AscendC;
 using namespace MoeDistributeV2Base;
 
-template <typename XInType, typename ExpandXOutType, typename XOutType, int32_t QuantMode, bool IsSmoothScaleExist,
-          bool EnableBatchGroupScale = false>
+template <typename XInType, typename ExpandXOutType, typename XOutType, int32_t QuantMode, bool IsSmoothScaleExist>
 class MoeDistributeDispatchV2Quant {
 public:
     uint32_t axisH_{0};
@@ -242,17 +241,11 @@ public:
             __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
             __ubuf__ float *scaleOutLocalAddr = (__ubuf__ float *)outLocal[Align128<uint32_t>(axisH_)].GetPhyAddr();
 
-            if constexpr (EnableBatchGroupScale) {
-                // per-group路径不使用floatLocalTemp_，复用这块UB暂存各group的最大值和量化系数。
-                __ubuf__ float *groupScaleLocalAddr = (__ubuf__ float *)floatLocalTemp_.GetPhyAddr();
-                Quant::ComputePerTileDynamicBatchScale<XInType, ExpandXOutType, AscendC::RoundMode::CAST_RINT,
-                                                       IsSmoothScaleExist>(
-                    srcAddr, smoothLocalAddr, groupScaleLocalAddr, scaleOutLocalAddr, outLocalAddr, axisH_);
-            } else {
-                Quant::ComputePerTileDynamic<XInType, ExpandXOutType, AscendC::RoundMode::CAST_RINT,
-                                             IsSmoothScaleExist>(srcAddr, smoothLocalAddr, scaleOutLocalAddr,
-                                                                 outLocalAddr, axisH_);
-            }
+            // per-group路径不使用floatLocalTemp_，复用这块UB暂存各group的最大值和量化系数。
+            __ubuf__ float *groupScaleLocalAddr = (__ubuf__ float *)floatLocalTemp_.GetPhyAddr();
+            Quant::ComputePerTileDynamicBatchScale<XInType, ExpandXOutType, AscendC::RoundMode::CAST_RINT,
+                                                   IsSmoothScaleExist>(srcAddr, smoothLocalAddr, groupScaleLocalAddr,
+                                                                       scaleOutLocalAddr, outLocalAddr, axisH_);
         }
     }
 

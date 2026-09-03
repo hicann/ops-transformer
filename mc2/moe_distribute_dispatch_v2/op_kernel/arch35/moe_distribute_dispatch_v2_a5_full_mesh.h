@@ -293,9 +293,7 @@ private:
     DataCopyParams hCopyParams_;
     DataCopyParams dataStateParams_{1U, sizeof(uint32_t), 0U, 0U};
 
-    MoeDistributeDispatchV2Quant<XInType, ExpandXOutType, XOutType, QuantMode, IsSmoothScaleExist,
-                                 QuantMode == PERGROUP_DYNAMIC_QUANT>
-        quantInst_;
+    MoeDistributeDispatchV2Quant<XInType, ExpandXOutType, XOutType, QuantMode, IsSmoothScaleExist> quantInst_;
 };
 
 template <TemplateMC2A5FullMeshTypeClass>
