@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <string>
 
+#include "graph/utils/type_utils.h"
 #include "quant_block_sparse_attn_check.h"
 #include "quant_block_sparse_attn_tiling.h"
 #include "log/log.h"
@@ -94,7 +95,7 @@ ge::graphStatus CheckInputDtype(const QBSARequiredParaInfo &input, const char *i
     }
     const ge::DataType actualType = input.desc->GetDataType();
     if (actualType != expectedType) {
-        OP_LOGE_FOR_INVALID_DTYPE(kOpName, inputName, std::to_string(static_cast<int32_t>(actualType)),
+        OP_LOGE_FOR_INVALID_DTYPE(kOpName, inputName, ge::TypeUtils::DataTypeToSerialString(actualType),
                                   expectedTypeName);
         return ge::GRAPH_FAILED;
     }
@@ -122,7 +123,7 @@ ge::graphStatus CheckKVDtypeConsistency(const QuantBlockSparseAttnParaInfo &opPa
     if (keyType != valueType) {
         OP_LOGE_FOR_INVALID_DTYPE(
             kOpName, "key/value",
-            std::to_string(static_cast<int32_t>(keyType)) + "/" + std::to_string(static_cast<int32_t>(valueType)),
+            ge::TypeUtils::DataTypeToSerialString(keyType) + "/" + ge::TypeUtils::DataTypeToSerialString(valueType),
             "key and value must have the same dtype");
         return ge::GRAPH_FAILED;
     }
@@ -212,29 +213,30 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckDtype() const
         return ge::GRAPH_FAILED;
     }
     if (tilingInfo_.qDtype != ge::DT_FLOAT8_E4M3FN) {
-        OP_LOGE_FOR_INVALID_DTYPE(kOpName, "query", std::to_string(static_cast<int>(tilingInfo_.qDtype)),
+        OP_LOGE_FOR_INVALID_DTYPE(kOpName, "query", ge::TypeUtils::DataTypeToSerialString(tilingInfo_.qDtype),
                                   "FLOAT8_E4M3FN");
         return ge::GRAPH_FAILED;
     }
     if (tilingInfo_.kvDtype != ge::DT_FLOAT8_E4M3FN) {
-        OP_LOGE_FOR_INVALID_DTYPE(kOpName, "key/value", std::to_string(static_cast<int>(tilingInfo_.kvDtype)),
+        OP_LOGE_FOR_INVALID_DTYPE(kOpName, "key/value", ge::TypeUtils::DataTypeToSerialString(tilingInfo_.kvDtype),
                                   "FLOAT8_E4M3FN");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.value.desc != nullptr && opParamInfo.value.desc->GetDataType() != ge::DT_FLOAT8_E4M3FN) {
-        OP_LOGE_FOR_INVALID_DTYPE(
-            kOpName, "value", std::to_string(static_cast<int>(opParamInfo.value.desc->GetDataType())), "FLOAT8_E4M3FN");
+        OP_LOGE_FOR_INVALID_DTYPE(kOpName, "value",
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.value.desc->GetDataType()),
+                                  "FLOAT8_E4M3FN");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.sparseIndices.desc != nullptr && opParamInfo.sparseIndices.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "sparse_indices",
-                                  std::to_string(static_cast<int>(opParamInfo.sparseIndices.desc->GetDataType())),
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.sparseIndices.desc->GetDataType()),
                                   "INT32");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.sparseSeqLen.desc != nullptr && opParamInfo.sparseSeqLen.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "sparse_seq_len",
-                                  std::to_string(static_cast<int>(opParamInfo.sparseSeqLen.desc->GetDataType())),
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.sparseSeqLen.desc->GetDataType()),
                                   "INT32");
         return ge::GRAPH_FAILED;
     }
@@ -242,42 +244,46 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckDtype() const
         opParamInfo.attenMask.shape->GetStorageShape().GetShapeSize() > 0 &&
         opParamInfo.attenMask.desc->GetDataType() != ge::DT_UINT8) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "atten_mask",
-                                  std::to_string(static_cast<int>(opParamInfo.attenMask.desc->GetDataType())), "UINT8");
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.attenMask.desc->GetDataType()),
+                                  "UINT8");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.metadata.desc != nullptr && opParamInfo.metadata.tensor != nullptr &&
         opParamInfo.metadata.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "metadata",
-                                  std::to_string(static_cast<int>(opParamInfo.metadata.desc->GetDataType())), "INT32");
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.metadata.desc->GetDataType()),
+                                  "INT32");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.seqUsedKV.desc != nullptr && opParamInfo.seqUsedKV.tensor != nullptr &&
         opParamInfo.seqUsedKV.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "seqused_kv",
-                                  std::to_string(static_cast<int>(opParamInfo.seqUsedKV.desc->GetDataType())), "INT32");
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.seqUsedKV.desc->GetDataType()),
+                                  "INT32");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.blockTable.desc != nullptr && opParamInfo.blockTable.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "block_table",
-                                  std::to_string(static_cast<int>(opParamInfo.blockTable.desc->GetDataType())),
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.blockTable.desc->GetDataType()),
                                   "INT32");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.cuSeqlensQ.desc != nullptr && opParamInfo.cuSeqlensQ.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "cu_seqlens_q",
-                                  std::to_string(static_cast<int>(opParamInfo.cuSeqlensQ.desc->GetDataType())),
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.cuSeqlensQ.desc->GetDataType()),
                                   "INT32");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.attnOut.desc != nullptr && opParamInfo.attnOut.desc->GetDataType() != ge::DT_BF16) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "attention_out",
-                                  std::to_string(static_cast<int>(opParamInfo.attnOut.desc->GetDataType())),
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.attnOut.desc->GetDataType()),
                                   "BFLOAT16");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo.lseOut.desc != nullptr && opParamInfo.lseOut.desc->GetDataType() != ge::DT_FLOAT) {
         OP_LOGE_FOR_INVALID_DTYPE(kOpName, "softmax_lse",
-                                  std::to_string(static_cast<int>(opParamInfo.lseOut.desc->GetDataType())), "FLOAT");
+                                  ge::TypeUtils::DataTypeToSerialString(opParamInfo.lseOut.desc->GetDataType()),
+                                  "FLOAT");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
