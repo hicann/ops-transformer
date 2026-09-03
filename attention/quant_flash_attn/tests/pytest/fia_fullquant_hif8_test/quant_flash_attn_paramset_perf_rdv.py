@@ -27,11 +27,11 @@ TEST_PARAMS = {
         "p_scale": [1.0],
         "enable_lse": [False],
     },
-    "TND_B1_QS512_KVS5120_Nq80_Nkv2_D64_SP3": {
+    "TND_B1_QS512_KVS5120_Nq80_Nkv2_D128_SP3": {
         "B": [1],
         "N_q": [80],
         "N_kv": [2],
-        "D": [64],
+        "D": [128],
         "cu_seqlens_q": [[0, 512]],
         "cu_seqlens_kv": [[0, 5120]],
         "seqused_q": [[512]],
@@ -43,11 +43,11 @@ TEST_PARAMS = {
         "p_scale": [1.0],
         "enable_lse": [False],
     },
-    "TND_B1_QS3000_KVS6000_Nq16_Nkv8_D64_SP3": {
+    "TND_B1_QS3000_KVS6000_Nq16_Nkv8_D128_SP3": {
         "B": [1],
         "N_q": [16],
         "N_kv": [8],
-        "D": [64],
+        "D": [128],
         "cu_seqlens_q": [[0, 3000]],
         "cu_seqlens_kv": [[0, 6000]],
         "seqused_q": [[3000]],

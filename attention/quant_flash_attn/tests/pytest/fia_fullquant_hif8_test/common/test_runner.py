@@ -36,6 +36,7 @@ PARAM_MAP = {
     "data_range_k": "DATA_RANGE_K",
     "data_range_v": "DATA_RANGE_V",
     "enable_lse": "ENABLE_LSE",
+    "input_layout": "INPUT_LAYOUT",
     "quant_mode": None,
     "device_id": "DEVICE_ID",
     "is_contiguous": "IS_CONTIGUOUS",
@@ -179,9 +180,13 @@ def execute_test(params, mode, cdir=None):
             # CPU golden 经 convert 后是 [T, N, 1] (T-major), 需转成 [N, T] 对齐
             lse_cmp = lse_cmp.squeeze(-1).permute(1, 0).contiguous()
         else:
-            lse_cmp = golden.convert_q_bnsd_to_layout(
-                cpu_lse, act_seqused_q, compare_layout
-            )
+            # NPU LSE 非 TND 时固定为 (B,N,S) 3D (与 layout_out 无关),
+            # BSND 也按 BNSD 对齐, 不随 compare_layout 转置
+            lse_cmp = golden.convert_q_bnsd_to_layout(cpu_lse, act_seqused_q, "BNSD")
+            # golden LSE 带附加尾维 1 ((B,N,S,1)), 剥掉附加维;
+            # S=1 时保留 (B,N,1) 与 NPU infershape 一致
+            if lse_cmp.ndim > 1 and lse_cmp.shape[-1] == 1:
+                lse_cmp = lse_cmp.squeeze(-1).contiguous()
         lse_result = result_compare_method.check_result(lse_cmp, lse_out)
 
     return atten_result, lse_result

@@ -1137,10 +1137,18 @@ def cpu_qfa_hif8(
                 list(lse_cu_q),
                 fill_value=float("inf"),
             )
-        while cpu_lse_aligned.ndim > 1 and cpu_lse_aligned.shape[-1] == 1:
-            cpu_lse_aligned = cpu_lse_aligned.squeeze(-1).contiguous()
-        if compare_layout == "TND" and cpu_lse_aligned.ndim == 2:
-            cpu_lse_aligned = cpu_lse_aligned.permute(1, 0).contiguous()
+        if compare_layout == "TND":
+            # TND: golden LSE 转 TND 后为 (T,N,1), 剥附加尾维得 (T,N),
+            # 再翻转成 NPU 的 N-major (N,T); 只剥一次, 避免 N=1 时误剥 N 维
+            if cpu_lse_aligned.ndim > 1 and cpu_lse_aligned.shape[-1] == 1:
+                cpu_lse_aligned = cpu_lse_aligned.squeeze(-1).contiguous()
+            if cpu_lse_aligned.ndim == 2:
+                cpu_lse_aligned = cpu_lse_aligned.permute(1, 0).contiguous()
+        else:
+            # BNSD/BSND: 只剥 golden 附加的尾维 1 ((B,N,S,1)->(B,N,S)),
+            # S=1 时保留 (B,N,1) 与 NPU infershape 输出一致
+            if cpu_lse_aligned.ndim > 1 and cpu_lse_aligned.shape[-1] == 1:
+                cpu_lse_aligned = cpu_lse_aligned.squeeze(-1).contiguous()
         result = [cpu_out_aligned, cpu_lse_aligned]
     else:
         result = [cpu_out_aligned, None]

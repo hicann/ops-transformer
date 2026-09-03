@@ -32,6 +32,7 @@ PARAM_NAMES = [
     "data_range_k",
     "data_range_v",
     "enable_lse",
+    "input_layout",
     "quant_mode",
     "device_id",
     "is_contiguous",
@@ -50,6 +51,7 @@ TEST_PARAMS_DEFAULTS = {
     "enable_pa": [False],
     "kv_cache_layout": ["TND"],
     "block_size": [0],
+    "input_layout": ["TND"],
 }
 
 
