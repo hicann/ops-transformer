@@ -35,6 +35,11 @@ constexpr Reg::CastTrait castTraitB162B32 = {
     RoundMode::UNKNOWN,
 };
 
+constexpr Reg::DivSpecificMode div0UlpMode = {
+    Reg::MaskMergeMode::ZEROING,
+    true,
+};
+
 __simd_vf__ void SigmoidGradFP32VF(__ubuf__ float *xNormAddr, __ubuf__ float *gradNormXAddr, __ubuf__ float *gradXAddr,
                                    uint32_t totalElements, uint32_t oneRepeatSize, uint16_t repeatTimes)
 {
@@ -135,9 +140,9 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
         __ubuf__ float *gradYRow = gradYBase + row * kAlign;
         __ubuf__ float *gradNormXRow = gradNormXBase + row * n;
 
-        // ---- Phase 1a: accumulate global D across all chunks. ----
+        // ---- Phase 1a: accumulate global D across all chunks, add eps last. ----
         Reg::RegTensor<float> globalD;
-        Reg::Duplicate(globalD, eps, maskLane0);
+        Reg::Duplicate(globalD, 0.0f, maskLane0);
 
         uint32_t remainingK1 = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
@@ -155,6 +160,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
             Reg::ReduceSum(chunkSum, wPrimeReg, chunkMask);
             Reg::Add(globalD, globalD, chunkSum, maskLane0);
         }
+        Reg::Adds(globalD, globalD, eps, maskLane0);
 
         // ---- Phase 1b: re-gather w', compute w'/D, multiply by gradY, accumulate betaNum. ----
         Reg::RegTensor<float> globalBetaNum;
@@ -177,7 +183,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
             Reg::RegTensor<float> bcastDReg1b;
             Reg::Duplicate<float, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(bcastDReg1b, globalD,
                                                                                          chunkMask);
-            Reg::Div(wNormReg, wPrimeReg, bcastDReg1b, chunkMask);
+            Reg::Div<float, &div0UlpMode>(wNormReg, wPrimeReg, bcastDReg1b, chunkMask);
 
             Reg::LoadAlign(gradYReg, gradYRow + chunkOffset);
             Reg::Mul(tmpReg, gradYReg, wNormReg, chunkMask);
@@ -207,7 +213,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
             Reg::Duplicate<float, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(gradWPrimeReg, globalBetaNum,
                                                                                          chunkMask);
             Reg::Sub(gradWPrimeReg, gradYReg, gradWPrimeReg, chunkMask);
-            Reg::Div(gradWPrimeReg, gradWPrimeReg, bcastDReg, chunkMask);
+            Reg::Div<float, &div0UlpMode>(gradWPrimeReg, gradWPrimeReg, bcastDReg, chunkMask);
 
             Reg::DataCopyScatter(gradNormXRow, gradWPrimeReg, idxU32Reg, chunkMask);
         }
