@@ -69,7 +69,10 @@ public:
     {}
     ~MoeFinalizeRoutingV2Membase() override = default;
 
-    void Reset(gert::TilingContext *context) override { MoeFinalizeRoutingTilingV2::Reset(context); }
+    void Reset(gert::TilingContext *context) override
+    {
+        MoeFinalizeRoutingTilingV2::Reset(context);
+    }
 
 protected:
     ge::graphStatus DoGetPlatformInfo() override;
@@ -1034,6 +1037,7 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::Check310pParams()
     auto expandedXInputDesc = context_->GetInputDesc(INDEX_IN_EXPAND_PERMUTED_ROWS_V2);
     auto expandedXDtype = expandedXInputDesc->GetDataType();
     auto scaleInputDesc = context_->GetOptionalInputDesc(INDEX_IN_SCALES_V2);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, scaleInputDesc);
     auto scaleDtype = scaleInputDesc->GetDataType();
     OP_CHECK_IF(
         scaleDtype != expandedXDtype,
