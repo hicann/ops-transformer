@@ -179,8 +179,8 @@ int main()
     groupListHostData[0] = m;
 
     std::vector<uint16_t> sharedInputHostData(GetShapeSize(sharedInputShape));
-    std::vector<int64_t> logitHostData(GetShapeSize(logitShape));
-    std::vector<float> rowIndexHostData(GetShapeSize(rowIndexShape));
+    std::vector<float> logitHostData(GetShapeSize(logitShape));
+    std::vector<int64_t> rowIndexHostData(GetShapeSize(rowIndexShape));
     std::vector<float> outHostData(GetShapeSize(outShape)); // 实际上是float16半精度方式
 
     // 创建x aclTensor

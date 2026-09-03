@@ -454,7 +454,6 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     | x1    | x2    | scale   | bias    | offsetOptional  | antiquantScaleOptional | antiquantOffsetOptional | pertokenScaleOptional | groupList | sharedInput | logit   |   rowIndex | out   | tuningConfigOptional |
     |------|------|---------|---------|---------|----------------|-----------------|---------------|-----------|-------------|---------|----------|-------| ----------------------|
     | INT8 | INT8 | FLOAT | null    | null    | null           | null            | FLOAT       | INT64     | BFLOAT16    | FLOAT | INT64    | FLOAT |   IntArray             |
-    | INT8 | INT8 | FLOAT | null    | null    | null           | null            | FLOAT       | INT64     | BFLOAT16    | FLOAT | INT64    | FLOAT |   IntArray             |
     | INT8 | INT4 | INT64   | FLOAT | FLOAT | null           | null            | FLOAT       | INT64     | BFLOAT16    | FLOAT | INT64    | FLOAT |   IntArray             |
     | INT8 | INT4 | INT64   | FLOAT | null    | null           | null            | FLOAT       | INT64     | BFLOAT16    | FLOAT | INT64    | FLOAT |   IntArray             |
 
@@ -655,7 +654,6 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
         void *logitDeviceAddr = nullptr;
         void *rowIndexDeviceAddr = nullptr;
         void *outDeviceAddr = nullptr;
-        void *tuningConfigDeviceAddr = nullptr;
 
         aclTensor* x = nullptr;
         aclTensor* w = nullptr;
@@ -679,8 +677,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
         groupListHostData[3] = 64;
 
         std::vector<uint16_t> sharedInputHostData(GetShapeSize(sharedInputShape));
-        std::vector<int64_t> logitHostData(GetShapeSize(logitShape));
-        std::vector<float> rowIndexHostData(GetShapeSize(rowIndexShape));
+        std::vector<float> logitHostData(GetShapeSize(logitShape));
+        std::vector<int64_t> rowIndexHostData(GetShapeSize(rowIndexShape));
         std::vector<float> outHostData(GetShapeSize(outShape));
 
         // 创建x aclTensor
@@ -731,13 +729,13 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
         // 创建tuningConfig aclIntArray
         aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
         std::unique_ptr<aclIntArray, aclnnStatus (*)(const aclIntArray *)> tuningConfigIntArrayPtr(tuningConfig, aclDestroyIntArray);
-        std::unique_ptr<void, aclError (*)(void *)> tuningConfigDeviceAddrPtr(tuningConfigDeviceAddr, aclrtFree);
-        CHECK_RET(tuningConfig != nullptr, -1);
+        CHECK_RET(tuningConfig != nullptr, return -1);
         // 3. 调用CANN算子库API，需要修改为具体的Api名称
         uint64_t workspaceSize = 0;
         aclOpExecutor *executor;
         void *workspaceAddr = nullptr;
 
+        // x2需从ND格式转换为算子要求的NZ格式，因此先调用aclnnTransMatmulWeight完成权重格式转换。
         // 调用aclnnTransMatmulWeight第一段接口
         ret = aclnnTransMatmulWeightGetWorkspaceSize(w, &workspaceSize, &executor);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnTransMatmulWeightGetWorkspaceSize failed. ERROR: %d\n", ret);
@@ -757,6 +755,11 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize failed. ERROR: %d\n", ret);
                   return ret);
+        // 释放权重格式转换阶段申请的workspace，避免第二次分配覆盖指针造成内存泄漏。
+        if (workspaceAddr != nullptr) {
+            aclrtFree(workspaceAddr);
+            workspaceAddr = nullptr;
+        }
         // 根据第一段接口计算出的workspaceSize申请device内存
 
         if (workspaceSize > 0) {
@@ -993,8 +996,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       groupListHostData[0] = 64;
 
       std::vector<uint16_t> sharedInputHostData(GetShapeSize(sharedInputShape));
-      std::vector<int64_t> logitHostData(GetShapeSize(logitShape));
-      std::vector<float> rowIndexHostData(GetShapeSize(rowIndexShape));
+      std::vector<float> logitHostData(GetShapeSize(logitShape));
+      std::vector<int64_t> rowIndexHostData(GetShapeSize(rowIndexShape));
       std::vector<float> outHostData(GetShapeSize(outShape));
 
       // 创建x aclTensor
@@ -1101,7 +1104,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
   - MxA8W4数据流示例：
 
-  ``` Cpp
+  ```cpp
   #include <iostream>
   #include <memory>
   #include <vector>
@@ -1232,8 +1235,10 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       int64_t *dstShape = nullptr;
       uint64_t dstShapeSize = 0;
       int actualFormat;
-      ret = aclnnNpuFormatCastCalculateSizeAndFormat(srcTensor, 29, aclFormat::ACL_FORMAT_ND, &dstShape, &dstShapeSize,
-                                                     &actualFormat);
+      // aclnnNpuFormatCast的私有格式码：29表示FRACTAL_NZ。
+      constexpr int64_t kNpuFormatFractalNz = 29;
+      ret = aclnnNpuFormatCastCalculateSizeAndFormat(srcTensor, kNpuFormatFractalNz, aclFormat::ACL_FORMAT_ND,
+                                                     &dstShape, &dstShapeSize, &actualFormat);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNpuFormatCastCalculateSizeAndFormat failed. ERROR: %d\n", ret);
                 return ret);
 
@@ -1340,7 +1345,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
       std::vector<uint16_t> sharedInputHostData(GetShapeSize(sharedInputShape));
       std::vector<float> logitHostData(GetShapeSize(logitShape));
-      std::vector<float> rowIndexHostData(GetShapeSize(rowIndexShape));
+      std::vector<int64_t> rowIndexHostData(GetShapeSize(rowIndexShape));
       std::vector<float> outHostData(GetShapeSize(outShape));
 
       ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN, &x);
