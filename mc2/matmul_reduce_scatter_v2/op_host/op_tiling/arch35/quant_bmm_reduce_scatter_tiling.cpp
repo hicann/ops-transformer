@@ -336,9 +336,36 @@ bool QuantBmmReduceScatterTiling::MxfpSceneParamCheck(const gert::StorageShape *
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "kValue", std::to_string(args_.kValue).c_str(),
                                                               "In MXFP4 quant mode, kValue must be even"),
                         return false);
+        if (!args_.isBTrans) {
+            OP_TILING_CHECK(args_.nValue % EVEN_ALIGN != 0,
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                opName_, "nValue", std::to_string(args_.nValue).c_str(),
+                                "In MXFP4 quant mode with non-transposed x2, nValue must be even"),
+                            return false);
+        }
     }
     OP_TILING_CHECK(CheckMxScaleDim(x1ScaleShape, x2ScaleShape) == ge::GRAPH_FAILED,
                     OP_LOGE(opName_, "CheckMxScaleDim failed!"), return false);
+    auto biasShape = context_->GetInputShape(static_cast<size_t>(BIAS_INDEX));
+    auto biasDesc = context_->GetOptionalInputDesc(static_cast<size_t>(BIAS_INDEX));
+    if ((biasShape != nullptr) && (biasDesc != nullptr)) {
+        OP_TILING_CHECK(
+            biasDesc->GetDataType() != ge::DataType::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "bias", Ops::Base::ToString(biasDesc->GetDataType()).c_str(),
+                                                  "In MX quant mode, the dtype of bias must be DT_FLOAT"),
+            return false);
+        OP_TILING_CHECK(biasShape->GetStorageShape().GetDimNum() != 1,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            opName_, "bias", std::to_string(biasShape->GetStorageShape().GetDimNum()).c_str(),
+                            "In MX quant mode, the shape of bias must be 1D"),
+                        return false);
+        uint64_t biasLen = static_cast<uint64_t>(biasShape->GetStorageShape().GetDim(0));
+        OP_TILING_CHECK(
+            biasLen != args_.nValue,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "bias", std::to_string(biasLen).c_str(),
+                                                  "In MX quant mode, the length of bias must be equal to n"),
+            return false);
+    }
     return true;
 }
 
@@ -498,7 +525,10 @@ void QuantBmmReduceScatterTiling::SetScene()
     return;
 }
 
-bool QuantBmmReduceScatterTiling::CheckPerblockM() { return args_.orgMValue % (PERBLOCK_SIZE * args_.rankDim) == 0; }
+bool QuantBmmReduceScatterTiling::CheckPerblockM()
+{
+    return args_.orgMValue % (PERBLOCK_SIZE * args_.rankDim) == 0;
+}
 
 ge::graphStatus QuantBmmReduceScatterTiling::DoOpTiling()
 {

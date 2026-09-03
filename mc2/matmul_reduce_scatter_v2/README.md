@@ -39,7 +39,7 @@
         output=ReduceScatter(\sum_{0}^{\left \lfloor \frac{k}{blockSize=128} \right \rfloor} (x1_{pr}@x2_{rq}*(x1Scale_{pr}*x2Scale_{rq})))
         $$
 
-    - 情形4：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/FLOAT4_E2M1的mx量化场景，且不输出amaxOut，当x1的shape为(m, k)、x2的shape为(n, k)时， x1Scale的shape为(m, ceildiv(k, 64), 2)、x2Scale的shape为(n, ceildiv(k, 64), 2)时，入参x1、x2进行matmul计算和dequant计算后，再进行ReduceScatter通信。mx量化仅支持x2、x2Scale转置场景。
+    - 情形4：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/FLOAT4_E2M1的mx量化场景，且不输出amaxOut，当x1的shape为(m, k)、x1Scale的shape为(m, ceildiv(k, 64), 2)时，入参x1、x2进行matmul计算和dequant计算后，再进行ReduceScatter通信。x2支持转置/不转置场景：当x2转置时，x2的shape为(n, k)、x2Scale的shape为(n, ceildiv(k, 64), 2)；当x2不转置时，x2的shape为(k, n)、x2Scale的shape为(ceildiv(k, 64), n, 2)。
 
         $$
         output=ReduceScatter(\sum_{0}^{\left \lfloor \frac{k}{blockSize=32} \right \rfloor} (x1_{pr}@x2_{rq}*(x1Scale_{pr}*x2Scale_{rq})))
@@ -117,7 +117,8 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>x2</td>
         <td>输入</td>
         <td>MM右矩阵，即计算公式中的x2。</td>
-        <td><ul><li>当前版本仅支持二维输入， shape为[m, k]，支持转置/不转置场景。</li><li>仅支持两根轴转置情况下的非连续Tensor，其他场景的<a href="../../docs/zh/context/non_contiguous_tensor.md">非连续的Tensor</a>不支持。MX量化场景下x2仅支持转置输入，且k必须为偶数。</li></ul></td>
+        <td><ul><li>当前版本仅支持二维输入，支持转置/不转置场景，转置时shape为[n, k]，不转置时shape为[k, n]。</li><li>仅支持两根轴转置情况下的
+        非连续Tensor，其他场景的<a href="../../docs/zh/context/non_contiguous_tensor.md">[非连续的Tensor]</a>不支持。</li></ul></td>
         <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT8</td>
         <td>ND、FRACTAL_NZ</td>
         <td>2</td>
@@ -147,7 +148,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>x2Scale</td>
         <td>输入</td>
         <td>mm右矩阵反量化参数。</td>
-        <td>支持传入空指针场景。MX量化场景下x2Scale仅支持转置输入。</td>
+        <td>支持传入空指针场景。MX量化场景下x2Scale支持转置/不转置输入。</td>
         <td>FLOAT16、BFLOAT16、FLOAT、INT64、FLOAT8_E8M0</td>
         <td>ND</td>
         <td>1-3</td>
@@ -287,7 +288,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         - x1、x2：数据类型支持FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1，数据格式仅支持ND。
         - bias：如果x1的数据类型是FLOAT16、BFLOAT16，则bias的数据类型必须为FLOAT16、BFLOAT16。如果x1的数据类型是FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1时，在pertensor和mx量化场景下，bias的数据类型必须为FLOAT。在perblock场景下，仅支持输入为nullptr。
         - x1Scale：当x1和x2数据类型为FLOAT16、BFLOAT16时，仅支持输入为nullptr。在pertensor场景下，shape为[1]。在perblock场景下，shape为[ceildiv(m, 128), ceildiv(k, 128)]。在pertensor和perblock场景下，数据类型支持FLOAT。在mx量化场景下，数据类型为FLOAT8_E8M0，shape为(m, ceilDiv(k, 64), 2)。
-        - x2Scale：当x1和x2数据类型为FLOAT16、BFLOAT16时，仅支持输入为nullptr。在pertensor场景下，shape为[1]。在perblock场景下，shape为[ceildiv(k, 128), ceildiv(n, 128)]。在pertensor和perblock场景下，数据类型支持FLOAT。在mx场景下，数据类型为FLOAT8_E8M0，shape为(n, ceilDiv(k, 64), 2)，仅支持转置输入。
+        - x2Scale：当x1和x2数据类型为FLOAT16、BFLOAT16时，仅支持输入为nullptr。在pertensor场景下，shape为[1]。在perblock场景下，shape为[ceildiv(k, 128), ceildiv(n, 128)]。在pertensor和perblock场景下，数据类型支持FLOAT。在mx场景下，数据类型为FLOAT8_E8M0，当x2转置时shape为(n, ceilDiv(k, 64), 2)，当x2不转置时shape为(ceilDiv(k, 64), n, 2)。
         - groupSize:
             - 仅当x1Scale和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
             - groupSize值支持公式推导：传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1Scale/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。设置原理：如果groupSizeM=0，表示m方向量化分组值由接口推导，推导公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1Scale shape中的m一致；如果groupSizeK=0，表示k方向量化分组值由接口推导，推导公式为groupSizeK = k / scaleK（需保证k能被scaleK整除），其中k与x1 shape中的k一致，scaleK与x1Scale shape中的k一致；如果groupSizeN=0，表示n方向量化分组值由接口推导，推导公式为groupSizeN = n / scaleN（需保证n能被scaleN整除），其中n与x2 shape中的n一致，scaleN与x2Scale shape中的n一致。
@@ -387,7 +388,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 - <term>Ascend 950PR/Ascend 950DT</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
     - 输入x1为2维，其shape为\(m, k\)，m须为卡数rank\_size的整数倍。
-    - 输入x2必须是2维，其shape为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
+    - 输入x2为2维，其viewshape必须为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
     - bias为1维，shape为\(n,\)。
     - 输出为2维，其shape为\(m/rank\_size, n\), rank\_size为卡数。
     - 当x1、x2的数据类型为FLOAT16/BFLOAT16时，x1/x2支持的空tensor场景，m和n可以为空，k不可为空，且需满足以下条件：
@@ -397,8 +398,8 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1时，不支持空tensor。
     - 当x1、x2的数据类型为FLOAT16/BFLOAT16/HIFLOAT8/FLOAT4_E2M1时，x1和x2的数据类型需要保持一致。
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2时，x1和x2的数据类型可以为其中任意一种。
-    - mx量化场景下，x2/x2Scale仅支持转置输入。
-    - mx量化场景下，且x1和x2输入为FLOAT4_E2M1（MXFP4量化）时，k必须是偶数。
+    - mx量化场景下，x2/x2Scale支持转置/不转置输入。
+    - mx量化场景下，且x1和x2输入为FLOAT4_E2M1（MXFP4量化）时，k必须是偶数，当x2不转置输入时，n必须也是偶数。
     - 支持2、4、8、16、32、64卡；支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
     - ReduceScatter集合通信数据总量不能超过16 * 256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
