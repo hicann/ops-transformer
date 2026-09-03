@@ -61,21 +61,17 @@ constexpr uint32_t M_IDX = 0;
 constexpr uint32_t N_IDX = 1;
 } // namespace
 
-constexpr AscendC::MicroAPI::CastTrait ctInt322Fp32 = {
-    AscendC::MicroAPI::RegLayout::UNKNOWN, AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
+constexpr AscendC::Reg::CastTrait ctInt322Fp32 = {AscendC::Reg::RegLayout::UNKNOWN, AscendC::Reg::SatMode::UNKNOWN,
+                                                  AscendC::Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
 
-constexpr AscendC::MicroAPI::CastTrait ctFp322Half = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::NO_SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT};
+constexpr AscendC::Reg::CastTrait ctFp322Half = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT,
+                                                 AscendC::Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
 
-constexpr AscendC::MicroAPI::CastTrait ctHalf2Fp32Zero = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::UNKNOWN};
+constexpr AscendC::Reg::CastTrait ctHalf2Fp32Zero = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN,
+                                                     AscendC::Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
 
-constexpr AscendC::MicroAPI::CastTrait ctHalf2Fp32One = {
-    AscendC::MicroAPI::RegLayout::ONE, AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::UNKNOWN};
+constexpr AscendC::Reg::CastTrait ctHalf2Fp32One = {AscendC::Reg::RegLayout::ONE, AscendC::Reg::SatMode::UNKNOWN,
+                                                    AscendC::Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
 
 #define QMM_BLOCK_EPILOGUE_DEQUANT_CLASS_LOCAL_PARAMS \
     template <typename L0TileShape_, typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, \
@@ -551,81 +547,80 @@ __aicore__ inline void BlockEpilogueDequant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCA
     uint16_t nLoopCnt = (nSize + eleNumPerVf - 1) / eleNumPerVf;
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::MaskReg maskN4B16 =
-            AscendC::MicroAPI::CreateMask<bfloat16_t, AscendC::MicroAPI::MaskPattern::ALL>();
+        AscendC::Reg::MaskReg maskN4B16 = AscendC::Reg::CreateMask<bfloat16_t, AscendC::Reg::MaskPattern::ALL>();
         for (uint16_t mIdx = 0; mIdx < mSize; mIdx++) {
             uint32_t elementNum = nSize;
             for (uint16_t vfBlockIdx = 0; vfBlockIdx < nLoopCnt; vfBlockIdx++) {
-                AscendC::MicroAPI::RegTensor<DataTypeIn> l0cOutReg;
-                AscendC::MicroAPI::RegTensor<DataTypeX2Scale> scaleReg;
-                AscendC::MicroAPI::RegTensor<DataTypeX1Scale> perTokenScaleReg;
-                AscendC::MicroAPI::RegTensor<BiasDtype> biasReg;
-                AscendC::MicroAPI::RegTensor<float> castSrcOutReg, castScaleReg, castScaleOneReg, mulScaleOutReg,
+                AscendC::Reg::RegTensor<DataTypeIn> l0cOutReg;
+                AscendC::Reg::RegTensor<DataTypeX2Scale> scaleReg;
+                AscendC::Reg::RegTensor<DataTypeX1Scale> perTokenScaleReg;
+                AscendC::Reg::RegTensor<BiasDtype> biasReg;
+                AscendC::Reg::RegTensor<float> castSrcOutReg, castScaleReg, castScaleOneReg, mulScaleOutReg,
                     mulPtScaleOutReg, castBiasReg, castBiasOneReg, addBiasOutReg;
-                AscendC::MicroAPI::RegTensor<DataTypeOut> castResultOutReg;
-                AscendC::MicroAPI::MaskReg maskN = AscendC::MicroAPI::UpdateMask<DataTypeIn>(elementNum);
+                AscendC::Reg::RegTensor<DataTypeOut> castResultOutReg;
+                AscendC::Reg::MaskReg maskN = AscendC::Reg::UpdateMask<DataTypeIn>(elementNum);
                 // copy input from ub to register, addr of ub should align to 32B
                 uint32_t l0cOutOffset = mIdx * nSrcUbAligned + vfBlockIdx * eleNumPerVf;
-                AscendC::MicroAPI::DataCopy(l0cOutReg, l0cOut + l0cOutOffset);
+                AscendC::Reg::DataCopy(l0cOutReg, l0cOut + l0cOutOffset);
                 // cast l0cOut from int32 to float
                 if constexpr (IsSameType<DataTypeIn, int32_t>::value) {
-                    AscendC::MicroAPI::Cast<float, DataTypeIn, ctInt322Fp32>(castSrcOutReg, l0cOutReg, maskN);
+                    AscendC::Reg::Cast<float, DataTypeIn, ctInt322Fp32>(castSrcOutReg, l0cOutReg, maskN);
                 } else {
                     castSrcOutReg = l0cOutReg;
                 }
                 // l0c_out * scale2
                 if constexpr (isPertensor) {
-                    AscendC::MicroAPI::Muls(mulScaleOutReg, castSrcOutReg, x2ScaleScalar_, maskN);
+                    AscendC::Reg::Muls(mulScaleOutReg, castSrcOutReg, x2ScaleScalar_, maskN);
                 } else {
-                    AscendC::MicroAPI::DataCopy(scaleReg, scale2 + vfBlockIdx * eleNumPerVf);
+                    AscendC::Reg::DataCopy(scaleReg, scale2 + vfBlockIdx * eleNumPerVf);
                     if constexpr (!IsSameType<DataTypeX2Scale, float>::value) { // cast scale2 from bf16 to float
-                        AscendC::MicroAPI::Cast<float, DataTypeX2Scale, ctHalf2Fp32Zero>(castScaleReg, scaleReg, maskN);
-                        AscendC::MicroAPI::Cast<float, DataTypeX2Scale, ctHalf2Fp32One>(castScaleOneReg, scaleReg,
-                                                                                        maskN4B16);
-                        AscendC::MicroAPI::Interleave(castScaleReg, castScaleOneReg, castScaleReg, castScaleOneReg);
+                        AscendC::Reg::Cast<float, DataTypeX2Scale, ctHalf2Fp32Zero>(castScaleReg, scaleReg, maskN);
+                        AscendC::Reg::Cast<float, DataTypeX2Scale, ctHalf2Fp32One>(castScaleOneReg, scaleReg,
+                                                                                   maskN4B16);
+                        AscendC::Reg::Interleave(castScaleReg, castScaleOneReg, castScaleReg, castScaleOneReg);
                     } else {
                         castScaleReg = scaleReg;
                     }
-                    AscendC::MicroAPI::Mul(mulScaleOutReg, castSrcOutReg, castScaleReg, maskN);
+                    AscendC::Reg::Mul(mulScaleOutReg, castSrcOutReg, castScaleReg, maskN);
                 }
                 // out * x1Scale
                 if constexpr (x1QuantMode == Qmm::QuantMode::PERTENSOR_MODE) {
-                    AscendC::MicroAPI::Muls(mulPtScaleOutReg, mulScaleOutReg, x1ScaleScalar_, maskN);
+                    AscendC::Reg::Muls(mulPtScaleOutReg, mulScaleOutReg, x1ScaleScalar_, maskN);
                 } else if constexpr (x1QuantMode == Qmm::QuantMode::PERTOKEN_MODE) {
-                    AscendC::MicroAPI::DataCopy<DataTypeX1Scale, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                        perTokenScaleReg, x1Scale + mIdx);
-                    AscendC::MicroAPI::Mul(mulPtScaleOutReg, mulScaleOutReg, perTokenScaleReg, maskN);
+                    AscendC::Reg::DataCopy<DataTypeX1Scale, AscendC::Reg::LoadDist::DIST_BRC_B32>(perTokenScaleReg,
+                                                                                                  x1Scale + mIdx);
+                    AscendC::Reg::Mul(mulPtScaleOutReg, mulScaleOutReg, perTokenScaleReg, maskN);
                 } else {
                     mulPtScaleOutReg = mulScaleOutReg;
                 }
                 // out + bias
                 if constexpr (isBiasEpilogue) {
-                    AscendC::MicroAPI::DataCopy(biasReg, bias + vfBlockIdx * eleNumPerVf);
+                    AscendC::Reg::DataCopy(biasReg, bias + vfBlockIdx * eleNumPerVf);
                     // cast bias from bf16/fp16 to float
                     if constexpr (IsSameType<BiasDtype, bfloat16_t>::value || IsSameType<BiasDtype, half>::value) {
-                        AscendC::MicroAPI::Cast<float, BiasDtype, ctHalf2Fp32Zero>(castBiasReg, biasReg, maskN);
-                        AscendC::MicroAPI::Cast<float, BiasDtype, ctHalf2Fp32One>(castBiasOneReg, biasReg, maskN4B16);
-                        AscendC::MicroAPI::Interleave(castBiasReg, castBiasOneReg, castBiasReg, castBiasOneReg);
+                        AscendC::Reg::Cast<float, BiasDtype, ctHalf2Fp32Zero>(castBiasReg, biasReg, maskN);
+                        AscendC::Reg::Cast<float, BiasDtype, ctHalf2Fp32One>(castBiasOneReg, biasReg, maskN4B16);
+                        AscendC::Reg::Interleave(castBiasReg, castBiasOneReg, castBiasReg, castBiasOneReg);
                     } else {
                         castBiasReg = biasReg;
                     }
-                    AscendC::MicroAPI::Add(addBiasOutReg, mulPtScaleOutReg, castBiasReg, maskN);
+                    AscendC::Reg::Add(addBiasOutReg, mulPtScaleOutReg, castBiasReg, maskN);
                 } else {
                     addBiasOutReg = mulPtScaleOutReg;
                 }
                 // cast dequant result from float to fp16/bf16
                 if constexpr (!IsSameType<DataTypeOut, float>::value) {
-                    AscendC::MicroAPI::Cast<DataTypeOut, float, ctFp322Half>(castResultOutReg, addBiasOutReg, maskN);
+                    AscendC::Reg::Cast<DataTypeOut, float, ctFp322Half>(castResultOutReg, addBiasOutReg, maskN);
                 } else {
                     castResultOutReg = addBiasOutReg;
                 }
                 // copy out from register to ub
                 uint32_t dstUbOffset = mIdx * nDstUbAligned + vfBlockIdx * eleNumPerVf;
                 if constexpr (IsSameType<DataTypeOut, float>::value) {
-                    AscendC::MicroAPI::DataCopy<DataTypeOut, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(
+                    AscendC::Reg::DataCopy<DataTypeOut, AscendC::Reg::StoreDist::DIST_NORM_B32>(
                         dst + dstUbOffset, castResultOutReg, maskN);
                 } else {
-                    AscendC::MicroAPI::DataCopy<DataTypeOut, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
+                    AscendC::Reg::DataCopy<DataTypeOut, AscendC::Reg::StoreDist::DIST_PACK_B32>(
                         dst + dstUbOffset, castResultOutReg, maskN);
                 }
             }

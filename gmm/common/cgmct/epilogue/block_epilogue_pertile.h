@@ -541,60 +541,58 @@ __aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
     __VEC_SCOPE__
     {
         for (uint16_t mIdx = 0; mIdx < mSize; mIdx++) {
-            AscendC::MicroAPI::RegTensor<X1ScaleType> x1ScaleReg, muledScaleReg;
+            AscendC::Reg::RegTensor<X1ScaleType> x1ScaleReg, muledScaleReg;
             if constexpr (transA) {
-                AscendC::MicroAPI::DataCopy<X1ScaleType, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                AscendC::Reg::DataCopy<X1ScaleType, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                     x1ScaleReg, x1Scale + x1ScaleKIdxInCache * alignM + mIdx);
             } else {
-                AscendC::MicroAPI::DataCopy<X1ScaleType, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                AscendC::Reg::DataCopy<X1ScaleType, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                     x1ScaleReg, x1Scale + mIdx * alignK + x1ScaleKIdxInCache);
             }
             // 1 ND
             uint32_t elementNum = nSize0;
-            AscendC::MicroAPI::MaskReg maskN = AscendC::MicroAPI::UpdateMask<CType>(elementNum);
-            AscendC::MicroAPI::RegTensor<CType> l0cOutReg;
-            AscendC::MicroAPI::RegTensor<CType> addReg;
-            AscendC::MicroAPI::RegTensor<CType> ResReg, mulScaleOutReg;
+            AscendC::Reg::MaskReg maskN = AscendC::Reg::UpdateMask<CType>(elementNum);
+            AscendC::Reg::RegTensor<CType> l0cOutReg;
+            AscendC::Reg::RegTensor<CType> addReg;
+            AscendC::Reg::RegTensor<CType> ResReg, mulScaleOutReg;
             // copy input from ub to register, addr of ub should align to 32B
             uint32_t offset = mIdx * UB_TWO_BANK_ELEMS_B32;
             uint32_t l0cOutOffset = offset;
-            AscendC::MicroAPI::DataCopy(l0cOutReg, l0cOut + offset);
+            AscendC::Reg::DataCopy(l0cOutReg, l0cOut + offset);
             // l0c_out * scale
-            AscendC::MicroAPI::Muls(muledScaleReg, x1ScaleReg, x2Scale0, maskN);
-            AscendC::MicroAPI::Mul(mulScaleOutReg, l0cOutReg, muledScaleReg, maskN);
+            AscendC::Reg::Muls(muledScaleReg, x1ScaleReg, x2Scale0, maskN);
+            AscendC::Reg::Mul(mulScaleOutReg, l0cOutReg, muledScaleReg, maskN);
             uint32_t dstUbOffset = offset;
             if constexpr (isFirstKLoop) {
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                mulScaleOutReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, mulScaleOutReg,
+                                                                                      maskN);
             } else {
-                AscendC::MicroAPI::DataCopy(addReg, dst + dstUbOffset);
-                AscendC::MicroAPI::Add(ResReg, mulScaleOutReg, addReg, maskN);
+                AscendC::Reg::DataCopy(addReg, dst + dstUbOffset);
+                AscendC::Reg::Add(ResReg, mulScaleOutReg, addReg, maskN);
                 // copy out from register to ub
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                ResReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, ResReg, maskN);
             }
             // 2 ND
             if constexpr (ndNum == 1) {
                 continue;
             }
             elementNum = nSize1;
-            maskN = AscendC::MicroAPI::UpdateMask<CType>(elementNum);
+            maskN = AscendC::Reg::UpdateMask<CType>(elementNum);
             // copy input from ub to register, addr of ub should align to 32B
             l0cOutOffset = offset + UB_TWO_BANK_ELEMS_B32 * PER_BLOCK_SIZE; // + distance of 2 NDs
-            AscendC::MicroAPI::DataCopy(l0cOutReg, l0cOut + l0cOutOffset);
+            AscendC::Reg::DataCopy(l0cOutReg, l0cOut + l0cOutOffset);
             // l0c_out * scale
-            AscendC::MicroAPI::Muls(muledScaleReg, x1ScaleReg, x2Scale1, maskN);
-            AscendC::MicroAPI::Mul(mulScaleOutReg, l0cOutReg, muledScaleReg, maskN);
+            AscendC::Reg::Muls(muledScaleReg, x1ScaleReg, x2Scale1, maskN);
+            AscendC::Reg::Mul(mulScaleOutReg, l0cOutReg, muledScaleReg, maskN);
             dstUbOffset = offset + nSize0;
             if constexpr (isFirstKLoop) {
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                mulScaleOutReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, mulScaleOutReg,
+                                                                                      maskN);
             } else {
-                AscendC::MicroAPI::DataCopy(addReg, dst + dstUbOffset);
-                AscendC::MicroAPI::Add(ResReg, mulScaleOutReg, addReg, maskN);
+                AscendC::Reg::DataCopy(addReg, dst + dstUbOffset);
+                AscendC::Reg::Add(ResReg, mulScaleOutReg, addReg, maskN);
                 // copy out from register to ub
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                ResReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, ResReg, maskN);
             }
         }
     }
@@ -612,26 +610,25 @@ __aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
             // 1 ND
             X2ScaleType scaleMul = x1Scale * x2Scale0;
             uint32_t elementNum = nSize0;
-            AscendC::MicroAPI::MaskReg maskN = AscendC::MicroAPI::UpdateMask<CType>(elementNum);
-            AscendC::MicroAPI::RegTensor<CType> l0cOutReg;
-            AscendC::MicroAPI::RegTensor<CType> addReg;
-            AscendC::MicroAPI::RegTensor<CType> ResReg, mulScaleOutReg;
+            AscendC::Reg::MaskReg maskN = AscendC::Reg::UpdateMask<CType>(elementNum);
+            AscendC::Reg::RegTensor<CType> l0cOutReg;
+            AscendC::Reg::RegTensor<CType> addReg;
+            AscendC::Reg::RegTensor<CType> ResReg, mulScaleOutReg;
             // copy input from ub to register, addr of ub should align to 32B
             uint32_t offset = mIdx * UB_TWO_BANK_ELEMS_B32;
             uint32_t l0cOutOffset = offset;
-            AscendC::MicroAPI::DataCopy(l0cOutReg, l0cOut + offset);
+            AscendC::Reg::DataCopy(l0cOutReg, l0cOut + offset);
             // l0c_out * scale
-            AscendC::MicroAPI::Muls(mulScaleOutReg, l0cOutReg, scaleMul, maskN);
+            AscendC::Reg::Muls(mulScaleOutReg, l0cOutReg, scaleMul, maskN);
             uint32_t dstUbOffset = offset;
             if constexpr (isFirstKLoop) {
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                mulScaleOutReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, mulScaleOutReg,
+                                                                                      maskN);
             } else {
-                AscendC::MicroAPI::DataCopy(addReg, dst + dstUbOffset);
-                AscendC::MicroAPI::Add(ResReg, mulScaleOutReg, addReg, maskN);
+                AscendC::Reg::DataCopy(addReg, dst + dstUbOffset);
+                AscendC::Reg::Add(ResReg, mulScaleOutReg, addReg, maskN);
                 // copy out from register to ub
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                ResReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, ResReg, maskN);
             }
             // 2 ND
             if constexpr (ndNum == 1) {
@@ -639,22 +636,21 @@ __aicore__ inline void BlockEpiloguePerTile<QGMM_BLOCK_EPILOGUE_FUNC_LOCAL_PARAM
             }
             scaleMul = x1Scale * x2Scale1;
             elementNum = nSize1;
-            maskN = AscendC::MicroAPI::UpdateMask<CType>(elementNum);
+            maskN = AscendC::Reg::UpdateMask<CType>(elementNum);
             // copy input from ub to register, addr of ub should align to 32B
             l0cOutOffset = offset + UB_TWO_BANK_ELEMS_B32 * PER_BLOCK_SIZE; // + distance of 2 NDs
-            AscendC::MicroAPI::DataCopy(l0cOutReg, l0cOut + l0cOutOffset);
+            AscendC::Reg::DataCopy(l0cOutReg, l0cOut + l0cOutOffset);
             // l0c_out * scale
-            AscendC::MicroAPI::Muls(mulScaleOutReg, l0cOutReg, scaleMul, maskN);
+            AscendC::Reg::Muls(mulScaleOutReg, l0cOutReg, scaleMul, maskN);
             dstUbOffset = offset + nSize0;
             if constexpr (isFirstKLoop) {
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                mulScaleOutReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, mulScaleOutReg,
+                                                                                      maskN);
             } else {
-                AscendC::MicroAPI::DataCopy(addReg, dst + dstUbOffset);
-                AscendC::MicroAPI::Add(ResReg, mulScaleOutReg, addReg, maskN);
+                AscendC::Reg::DataCopy(addReg, dst + dstUbOffset);
+                AscendC::Reg::Add(ResReg, mulScaleOutReg, addReg, maskN);
                 // copy out from register to ub
-                AscendC::MicroAPI::DataCopy<CType, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>(dst + dstUbOffset,
-                                                                                                ResReg, maskN);
+                AscendC::Reg::DataCopy<CType, AscendC::Reg::StoreDist::DIST_NORM_B32>(dst + dstUbOffset, ResReg, maskN);
             }
         }
     }

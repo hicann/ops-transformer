@@ -192,17 +192,17 @@ BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_ROUTING_FUNC_LOCAL_PARA
     logitUbAddr += offsetLogit;
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<float> vregLogit;
-        AscendC::MicroAPI::RegTensor<DataTypeOut> vregRe, vDstReg;
-        AscendC::MicroAPI::MaskReg mask;
+        AscendC::Reg::RegTensor<float> vregLogit;
+        AscendC::Reg::RegTensor<DataTypeOut> vregRe, vDstReg;
+        AscendC::Reg::MaskReg mask;
         for (uint16_t i = 0; i < repeatTimesLogit; ++i) {
-            DataCopy<DataTypeOut, MicroAPI::LoadDist::DIST_BRC_B32>(vregLogit, logitUbAddr + i);
+            DataCopy<DataTypeOut, Reg::LoadDist::DIST_BRC_B32>(vregLogit, logitUbAddr + i);
             uint32_t elementNum = singleN_;
             for (uint16_t j = 0; j < repeatTimesRe; ++j) {
-                mask = AscendC::MicroAPI::UpdateMask<DataTypeOut>(elementNum);
-                AscendC::MicroAPI::DataCopy(vregRe, l0cOutUbAddr + i * alignN_ + j * vlForFloatNumber_);
-                AscendC::MicroAPI::Mul(vDstReg, vregLogit, vregRe, mask);
-                AscendC::MicroAPI::DataCopy(outUbAddr + i * alignN_ + j * vlForFloatNumber_, vDstReg, mask);
+                mask = AscendC::Reg::UpdateMask<DataTypeOut>(elementNum);
+                AscendC::Reg::DataCopy(vregRe, l0cOutUbAddr + i * alignN_ + j * vlForFloatNumber_);
+                AscendC::Reg::Mul(vDstReg, vregLogit, vregRe, mask);
+                AscendC::Reg::DataCopy(outUbAddr + i * alignN_ + j * vlForFloatNumber_, vDstReg, mask);
             }
         }
     }

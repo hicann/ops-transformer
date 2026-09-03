@@ -39,12 +39,12 @@ using AscendC::TBuf;
 using AscendC::TEventID;
 using AscendC::VECTOR_REG_WIDTH;
 using AscendC::WaitFlag;
-namespace MicroAPI = AscendC::MicroAPI;
-using AscendC::MicroAPI::AddrReg;
-using AscendC::MicroAPI::GetRound;
-using AscendC::MicroAPI::MaskReg;
-using AscendC::MicroAPI::RegTensor;
-using AscendC::MicroAPI::TypeGet;
+namespace Reg = AscendC::Reg;
+using AscendC::Reg::AddrReg;
+using AscendC::Reg::GetRound;
+using AscendC::Reg::MaskReg;
+using AscendC::Reg::RegTensor;
+using AscendC::Reg::TypeGet;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
 struct GmmFrUbBufferInfo {

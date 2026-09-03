@@ -24,8 +24,8 @@
 #endif
 #include "weight_quant_tool.h"
 
-namespace MicroAPI = AscendC::MicroAPI;
-using AscendC::MicroAPI::RegTensor;
+namespace Reg = AscendC::Reg;
+using AscendC::Reg::RegTensor;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
 
@@ -38,12 +38,11 @@ struct LocalAddressYParam {
     __local_mem__ yType *yPhyAddr;
 };
 
-static constexpr MicroAPI::CastTrait C32_TO_FP32_TRAIT = {MicroAPI::RegLayout::UNKNOWN, MicroAPI::SatMode::UNKNOWN,
-                                                          MicroAPI::MaskMergeMode::ZEROING,
-                                                          AscendC::RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait C32_TO_FP32_TRAIT = {Reg::RegLayout::UNKNOWN, Reg::SatMode::UNKNOWN,
+                                                     Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
 
-static constexpr MicroAPI::CastTrait FP32_TO_F16 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                    MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait FP32_TO_F16 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT, Reg::MaskMergeMode::ZEROING,
+                                               AscendC::RoundMode::CAST_RINT};
 
 template <typename yType, bool hasBias>
 __aicore__ inline void AntiQuantYB32(LocalAddressYParam<yType> &localAddressParam, uint64_t nRealL0Size,
@@ -57,37 +56,37 @@ __aicore__ inline void AntiQuantYB32(LocalAddressYParam<yType> &localAddressPara
         RegTensor<float> antiQuantKScaleVreg;
         RegTensor<float> biasVreg;
         RegTensor<yType> yF16Vreg;
-        MicroAPI::MaskReg maskAll = MicroAPI::CreateMask<uint8_t, AscendC::MicroAPI::MaskPattern::ALL>();
+        Reg::MaskReg maskAll = Reg::CreateMask<uint8_t, AscendC::Reg::MaskPattern::ALL>();
 
         uint32_t nRealL0Temp = nRealL0Size;
         for (uint16_t nId = 0; nId < ubLoopN; nId++) {
             if constexpr (hasBias) {
-                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_NORM>(
-                    biasVreg, localAddressParam.biasPhyAddr + nId * nRealVRegSize);
+                Reg::DataCopy<float, Reg::LoadDist::DIST_NORM>(biasVreg,
+                                                               localAddressParam.biasPhyAddr + nId * nRealVRegSize);
             }
-            MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_NORM>(
-                antiQuantCScaleVreg, localAddressParam.cScalePhyAddr + nId * nRealVRegSize);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_NORM>(antiQuantCScaleVreg,
+                                                           localAddressParam.cScalePhyAddr + nId * nRealVRegSize);
 
-            MicroAPI::MaskReg yResultMask = MicroAPI::UpdateMask<float>(nRealL0Temp);
+            Reg::MaskReg yResultMask = Reg::UpdateMask<float>(nRealL0Temp);
             for (uint16_t mId = 0; mId < ubLoopM; mId++) {
                 uint64_t yOffset = nId * nRealVRegSize + mId * nRealL0Size;
                 uint64_t ubYOffset = (nId * nRealVRegSize >> 1) + mId * nRealL0Size;
-                MicroAPI::DataCopy<int32_t, MicroAPI::LoadDist::DIST_NORM>(yOriginVreg,
-                                                                           localAddressParam.yOriginPhyAddr + yOffset);
-                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_BRC_B32>(antiQuantKScaleVreg,
-                                                                            localAddressParam.kScalePhyAddr + mId);
+                Reg::DataCopy<int32_t, Reg::LoadDist::DIST_NORM>(yOriginVreg,
+                                                                 localAddressParam.yOriginPhyAddr + yOffset);
+                Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(antiQuantKScaleVreg,
+                                                                  localAddressParam.kScalePhyAddr + mId);
 
-                MicroAPI::Cast<float, int32_t, C32_TO_FP32_TRAIT>(yVreg, yOriginVreg, maskAll);
-                MicroAPI::Mul(yVreg, yVreg, antiQuantCScaleVreg, maskAll);
-                MicroAPI::Mul(yVreg, yVreg, antiQuantKScaleVreg, maskAll);
+                Reg::Cast<float, int32_t, C32_TO_FP32_TRAIT>(yVreg, yOriginVreg, maskAll);
+                Reg::Mul(yVreg, yVreg, antiQuantCScaleVreg, maskAll);
+                Reg::Mul(yVreg, yVreg, antiQuantKScaleVreg, maskAll);
                 if constexpr (hasBias) {
-                    MicroAPI::Add(yVreg, yVreg, biasVreg, maskAll);
+                    Reg::Add(yVreg, yVreg, biasVreg, maskAll);
                 }
 
-                MicroAPI::Cast<yType, float, FP32_TO_F16>(yF16Vreg, yVreg, maskAll);
+                Reg::Cast<yType, float, FP32_TO_F16>(yF16Vreg, yVreg, maskAll);
 
-                MicroAPI::DataCopy<yType, MicroAPI::StoreDist::DIST_PACK_B32>(
-                    localAddressParam.yPhyAddr + ubYOffset * 2, yF16Vreg, yResultMask);
+                Reg::DataCopy<yType, Reg::StoreDist::DIST_PACK_B32>(localAddressParam.yPhyAddr + ubYOffset * 2,
+                                                                    yF16Vreg, yResultMask);
             }
         }
     }

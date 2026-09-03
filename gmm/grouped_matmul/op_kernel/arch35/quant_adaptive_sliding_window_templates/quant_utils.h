@@ -52,7 +52,7 @@ constexpr uint32_t WEIGHTNZ_N0_K0 = 512;
 
 constexpr float NEG_SQRT_EIGHT_OVER_PI = -1.595769121 * 0.044715;
 constexpr float TANH_APPROX_FACTOR = 1 / 0.044715;
-constexpr AscendC::MicroAPI::DivSpecificMode mode = {AscendC::MicroAPI::MaskMergeMode::ZEROING, true};
+constexpr AscendC::Reg::DivSpecificMode mode = {AscendC::Reg::MaskMergeMode::ZEROING, true};
 
 constexpr uint8_t SYNC_AIC_AIV_MODE = 4;
 constexpr uint16_t FLAG_ID_MAX = 16;

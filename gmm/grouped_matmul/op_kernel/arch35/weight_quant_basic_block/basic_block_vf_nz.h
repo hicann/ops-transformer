@@ -24,12 +24,12 @@
 #endif
 #include "weight_quant_tool.h"
 
-namespace MicroAPI = AscendC::MicroAPI;
+namespace Reg = AscendC::Reg;
 using AscendC::BLOCK_CUBE;
 using AscendC::VECTOR_REG_WIDTH;
-using AscendC::MicroAPI::AddrReg;
-using AscendC::MicroAPI::MaskReg;
-using AscendC::MicroAPI::RegTensor;
+using AscendC::Reg::AddrReg;
+using AscendC::Reg::MaskReg;
+using AscendC::Reg::RegTensor;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
 
@@ -49,13 +49,11 @@ struct Int4NzParams {
     __local_mem__ uint8_t *antiQuantScaleMaskPhyAddr;
 };
 
-static constexpr MicroAPI::CastTrait CAST_S4_TO_F16_TRAIT = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                             MicroAPI::MaskMergeMode::ZEROING,
-                                                             AscendC::RoundMode::UNKNOWN};
+static constexpr Reg::CastTrait CAST_S4_TO_F16_TRAIT = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                        Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
 
-static constexpr MicroAPI::CastTrait CAST_F16_TO_S8_TRAIT = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                             MicroAPI::MaskMergeMode::ZEROING,
-                                                             AscendC::RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait CAST_F16_TO_S8_TRAIT = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                        Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
 
 static constexpr int64_t ONE_BLK_ELEM_B16 = ONE_BLK_SIZE / sizeof(half);
 
@@ -67,14 +65,14 @@ __aicore__ inline void AntiQuantInt4NzKnVf(Int4NzParams<xType, wType, antiQuantS
     RegTensor<xType> antiQuantOffsetVreg;
     RegTensor<int4x2_t> weightS4Vreg;
     RegTensor<xType> weightF16Vreg;
-    MicroAPI::MaskReg maskAll = MicroAPI::CreateMask<uint8_t, AscendC::MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg maskAll = Reg::CreateMask<uint8_t, AscendC::Reg::MaskPattern::ALL>();
 
     for (uint16_t LoopN1Idx = 0; LoopN1Idx < int4NzParams.loopN1; LoopN1Idx++) {
         // DIST_BLK 的含义为读取一个32B(即16个数)的数据，广播到256B(即128个数)
-        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_BLK>(
-            antiQuantScaleVreg, int4NzParams.antiQuantScaleBasePhyAddr + LoopN1Idx * BLOCK_CUBE);
+        Reg::DataCopy<xType, Reg::LoadDist::DIST_BLK>(antiQuantScaleVreg,
+                                                      int4NzParams.antiQuantScaleBasePhyAddr + LoopN1Idx * BLOCK_CUBE);
         if constexpr (hasAntiQuantOffset) {
-            MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_BLK>(
+            Reg::DataCopy<xType, Reg::LoadDist::DIST_BLK>(
                 antiQuantOffsetVreg, int4NzParams.antiQuantOffsetBasePhyAddr + LoopN1Idx * BLOCK_CUBE);
         }
 
@@ -82,29 +80,29 @@ __aicore__ inline void AntiQuantInt4NzKnVf(Int4NzParams<xType, wType, antiQuantS
             // DIST_UNPACK4_B8 表示搬运模式如下，Vn中一个数字4bit(0.5Byte)：
             // Vn 0 1 2 3 4 5 6 7 8 9 a b c d e f
             // Vd 0 1 x x x x x x 2 3 x x x x x x
-            MicroAPI::DataCopy<int4x2_t, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
+            Reg::DataCopy<int4x2_t, Reg::LoadDist::DIST_UNPACK4_B8>(
                 weightS4Vreg, (__local_mem__ int4x2_t *)(int4NzParams.weightLowBitPhyAddr +
                                                          LoopN1Idx * (BLOCK_CUBE >> 1) * ubMte2InnerSize +
                                                          LoopInnerNumIdx * (VECTOR_REG_WIDTH >> 2)));
             // PART_P0 表示按照如下形式处理做cast：
             // Vn 0 1 x x x x x x 2 3 x x x x x x
             // Vd 0 0 0 0 1 1 1 1 2 2 2 2 3 3 3 3
-            MicroAPI::Cast<xType, int4x2_t, CAST_S4_TO_F16_TRAIT>(weightF16Vreg, weightS4Vreg, maskAll);
+            Reg::Cast<xType, int4x2_t, CAST_S4_TO_F16_TRAIT>(weightF16Vreg, weightS4Vreg, maskAll);
             if constexpr (hasAntiQuantOffset) {
-                MicroAPI::Add(weightF16Vreg, weightF16Vreg, antiQuantOffsetVreg, maskAll);
+                Reg::Add(weightF16Vreg, weightF16Vreg, antiQuantOffsetVreg, maskAll);
             }
-            MicroAPI::Mul(weightF16Vreg, weightF16Vreg, antiQuantScaleVreg, maskAll);
+            Reg::Mul(weightF16Vreg, weightF16Vreg, antiQuantScaleVreg, maskAll);
 
             if constexpr (useVag) {
-                AddrReg weightF16PhyAddrReg = MicroAPI::CreateAddrReg<xType>(
-                    LoopN1Idx, int4NzParams.loopN1DstStride, LoopInnerNumIdx, int4NzParams.innerDstStride);
-                MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
-                    int4NzParams.weightHighBitPhyAddr, weightF16Vreg, weightF16PhyAddrReg, maskAll);
+                AddrReg weightF16PhyAddrReg = Reg::CreateAddrReg<xType>(LoopN1Idx, int4NzParams.loopN1DstStride,
+                                                                        LoopInnerNumIdx, int4NzParams.innerDstStride);
+                Reg::DataCopy<xType, Reg::StoreDist::DIST_NORM_B16>(int4NzParams.weightHighBitPhyAddr, weightF16Vreg,
+                                                                    weightF16PhyAddrReg, maskAll);
             } else {
-                MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
-                    int4NzParams.weightHighBitPhyAddr + LoopN1Idx * int4NzParams.loopN1DstStride +
-                        LoopInnerNumIdx * int4NzParams.innerDstStride,
-                    weightF16Vreg, maskAll);
+                Reg::DataCopy<xType, Reg::StoreDist::DIST_NORM_B16>(int4NzParams.weightHighBitPhyAddr +
+                                                                        LoopN1Idx * int4NzParams.loopN1DstStride +
+                                                                        LoopInnerNumIdx * int4NzParams.innerDstStride,
+                                                                    weightF16Vreg, maskAll);
             }
         }
     }
@@ -119,9 +117,9 @@ __aicore__ inline void AntiQuantS8S4NzKnGroupVf(Int4NzParams<xType, wType, antiQ
     RegTensor<int4x2_t> weightS4Vreg;
     RegTensor<half> weightF16Vreg;
     RegTensor<xType> weightS8Vreg;
-    MicroAPI::MaskReg maskAll = MicroAPI::CreateMask<uint8_t, AscendC::MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskSelect = MicroAPI::CreateMask<uint8_t>();
-    MicroAPI::DataCopy(maskSelect, int4NzParams.antiQuantScaleMaskPhyAddr);
+    Reg::MaskReg maskAll = Reg::CreateMask<uint8_t, AscendC::Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskSelect = Reg::CreateMask<uint8_t>();
+    Reg::DataCopy(maskSelect, int4NzParams.antiQuantScaleMaskPhyAddr);
     __local_mem__ antiQuantScaleType *antiQuantScaleBasePhyAddr;
 
     for (uint16_t loopN1Idx = 0; loopN1Idx < int4NzParams.loopN1; loopN1Idx++) {
@@ -129,17 +127,16 @@ __aicore__ inline void AntiQuantS8S4NzKnGroupVf(Int4NzParams<xType, wType, antiQ
             // DIST_BLK 的含义为读取一个32B(即16个数)的数据，广播到256B(即128个数)
             antiQuantScaleBasePhyAddr =
                 int4NzParams.antiQuantScaleBasePhyAddr + loopN1Idx * C0_SIZE_B8 + loopGroupIdx * VEC_MAX_ELEM_B16;
-            MicroAPI::DataCopy<antiQuantScaleType, MicroAPI::LoadDist::DIST_BLK>(antiQuantScaleVreg,
-                                                                                 antiQuantScaleBasePhyAddr);
-            MicroAPI::DataCopy<antiQuantScaleType, MicroAPI::LoadDist::DIST_BLK>(
-                antiQuantScaleVreg1, antiQuantScaleBasePhyAddr + ONE_BLK_ELEM_B16);
-            MicroAPI::Select(antiQuantScaleVreg, antiQuantScaleVreg, antiQuantScaleVreg1, maskSelect);
+            Reg::DataCopy<antiQuantScaleType, Reg::LoadDist::DIST_BLK>(antiQuantScaleVreg, antiQuantScaleBasePhyAddr);
+            Reg::DataCopy<antiQuantScaleType, Reg::LoadDist::DIST_BLK>(antiQuantScaleVreg1,
+                                                                       antiQuantScaleBasePhyAddr + ONE_BLK_ELEM_B16);
+            Reg::Select(antiQuantScaleVreg, antiQuantScaleVreg, antiQuantScaleVreg1, maskSelect);
             for (uint16_t loopGroupInnerIdx = 0; loopGroupInnerIdx < int4NzParams.loopInnerNum; loopGroupInnerIdx++) {
                 // DIST_UNPACK4_B8 表示搬运模式如下，Vn中一个数字4bit(0.5Byte)：
                 // Vn 0 1 2 3 4 5 6 7 8 9 a b c d e f
                 // Vd 0 1 x x x x x x 2 3 x x x x x x
                 // 地址偏移以B记，对C0_SIZE_B8和VEC_MAX_ELEM_B16除以2实现正确偏移
-                MicroAPI::DataCopy<int4x2_t, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
+                Reg::DataCopy<int4x2_t, Reg::LoadDist::DIST_UNPACK4_B8>(
                     weightS4Vreg,
                     (__local_mem__ int4x2_t *)(int4NzParams.weightLowBitPhyAddr +
                                                loopN1Idx * (C0_SIZE_B8 >> 1) * ubMte2InnerSize +
@@ -148,18 +145,18 @@ __aicore__ inline void AntiQuantS8S4NzKnGroupVf(Int4NzParams<xType, wType, antiQ
                 // S4_TO_F16按如下模式cast
                 // Vn 00000012 00000034
                 // Vd 3c004000 42004400
-                MicroAPI::Cast<half, int4x2_t, CAST_S4_TO_F16_TRAIT>(weightF16Vreg, weightS4Vreg, maskAll);
-                MicroAPI::Mul(weightF16Vreg, weightF16Vreg, antiQuantScaleVreg, maskAll);
+                Reg::Cast<half, int4x2_t, CAST_S4_TO_F16_TRAIT>(weightF16Vreg, weightS4Vreg, maskAll);
+                Reg::Mul(weightF16Vreg, weightF16Vreg, antiQuantScaleVreg, maskAll);
                 // F16_TO_S8按如下模式cast
                 // Vn 3c004000 42004400
                 // Vd 00010002 00030004
-                MicroAPI::Cast<xType, half, CAST_F16_TO_S8_TRAIT>(weightS8Vreg, weightF16Vreg, maskAll);
+                Reg::Cast<xType, half, CAST_F16_TO_S8_TRAIT>(weightS8Vreg, weightF16Vreg, maskAll);
 
-                AddrReg weightHighBitPhyAddrReg = MicroAPI::CreateAddrReg<xType>(
+                AddrReg weightHighBitPhyAddrReg = Reg::CreateAddrReg<xType>(
                     loopN1Idx, int4NzParams.loopN1DstStride, loopGroupIdx, int4NzParams.groupDstStride,
                     loopGroupInnerIdx, int4NzParams.innerDstStride);
-                MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_PACK_B16>(
-                    int4NzParams.weightHighBitPhyAddr, weightS8Vreg, weightHighBitPhyAddrReg, maskAll);
+                Reg::DataCopy<xType, Reg::StoreDist::DIST_PACK_B16>(int4NzParams.weightHighBitPhyAddr, weightS8Vreg,
+                                                                    weightHighBitPhyAddrReg, maskAll);
             }
         }
     }

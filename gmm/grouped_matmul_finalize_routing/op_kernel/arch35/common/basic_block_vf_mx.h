@@ -23,7 +23,7 @@
 #include "kernel_operator_intf.h"
 #endif
 
-namespace MicroAPI = AscendC::MicroAPI;
+namespace Reg = AscendC::Reg;
 using AscendC::VECTOR_REG_WIDTH;
 
 namespace WeightQuantBatchMatmulV2::Arch35 {
