@@ -62,6 +62,11 @@ TILING_DATA_FIELD_DEF(uint32_t, pL1BufNum);
 // PA_BBND page base stride in elements (dim0). Allows first-axis non-contiguous KV cache.
 TILING_DATA_FIELD_DEF(uint64_t, kStride0);
 TILING_DATA_FIELD_DEF(uint64_t, vStride0);
+TILING_DATA_FIELD_DEF(uint32_t, fdStaticEnabled);
+TILING_DATA_FIELD_DEF(uint32_t, fdLseSubStride);
+TILING_DATA_FIELD_DEF(uint32_t, fdPartialCapacity);
+TILING_DATA_FIELD_DEF(uint64_t, fdPartialLseOffset);
+TILING_DATA_FIELD_DEF(uint64_t, fdPartialOOffset);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttention, GenericBlockSparseAttentionTilingData)
 
@@ -119,6 +124,7 @@ private:
     uint32_t topK_ = 16;
     uint32_t qBlockNum_ = 0;
     uint32_t maxBlocksPerBatch_ = 0;
+    uint32_t groupSize_ = 0;
     float scaleValue_ = 0.0f;
     uint32_t softmaxPrecision_ = 0;
     int64_t isPackedGQA_ = 1;
@@ -148,6 +154,12 @@ private:
     // Default = contiguous PA_BBND page size; overwritten when KV is a dim0-strided view.
     uint64_t kStride0_ = 0;
     uint64_t vStride0_ = 0;
+
+    bool fdStaticEnabled_ = false;
+    uint32_t fdLseSubStride_ = 0;
+    uint32_t fdPartialCapacity_ = 0;
+    uint64_t fdPartialLseOffset_ = 0;
+    uint64_t fdPartialOOffset_ = 0;
 
     GenericBlockSparseAttentionTilingData *tilingData_ = nullptr;
 };

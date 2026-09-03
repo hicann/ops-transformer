@@ -117,10 +117,13 @@ public:
         AscendC::DataCopyPad(gLseTensorTlaTile.data()[dstOffset], ubLseTensorTla.data()[srcOffset], repeatParams);
     }
 
-    template <class TensorO, class TensorLse>
+    template <bool IS_FD, class TensorO, class TensorLse>
     __aicore__ inline void SubCoreCompute(TensorO &gOTensorTlaTile, TensorLse &gLseTensorTlaTile, uint32_t curTileMod,
                                           uint32_t ubOTmpBufId, bool isFirstKvSTile, bool isLastKvSTile,
-                                          uint32_t colStrideCurSubCore, Arch::CrossCoreFlag mm2ToReFlag)
+                                          uint32_t colStrideCurSubCore, Arch::CrossCoreFlag mm2ToReFlag,
+                                          AscendC::GlobalTensor<float> &gPartialO,
+                                          AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+                                          uint32_t groupRowOffset, uint32_t groupSize, uint32_t fdLseSubStride)
     {
         uint32_t rowNumCurSubCore = tla::get<0>(gOTensorTlaTile.shape());
         uint32_t colNumCurSubCore = tla::get<1>(gOTensorTlaTile.shape());
@@ -173,6 +176,27 @@ public:
         // release lo buf
         SetCrossCoreSync<4, PIPE_V>(mm2ToReFlag);
         if (isLastKvSTile) {
+            if constexpr (IS_FD) {
+                const uint32_t rowCountAlign = RoundUp(rowNumCurSubCore, 8);
+                AscendC::Ln(lseUbTensor32, glUbTensor32, rowCountAlign);
+                AscendC::PipeBarrier<PIPE_V>();
+                AscendC::Add(lseUbTensor32, lseUbTensor32, gmUbTensor32, rowCountAlign);
+                AscendC::PipeBarrier<PIPE_V>();
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+                const uint64_t oOffset = static_cast<uint64_t>(fdTaskId) * groupSize * colStrideCurSubCore +
+                                         static_cast<uint64_t>(groupRowOffset) * colStrideCurSubCore;
+                AscendC::DataCopy(gPartialO[oOffset], goUbTensor32, rowNumCurSubCore * colStrideCurSubCore);
+                const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
+                const uint64_t lseOffset =
+                    static_cast<uint64_t>(fdTaskId) * 2 * fdLseSubStride + subBlockIdx * fdLseSubStride;
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
+                AscendC::DataCopyPad(gPartialLse[lseOffset], lseUbTensor32,
+                                     AscendC::DataCopyExtParams(1, rowNumCurSubCore * sizeof(float), 0, 0, 0));
+                AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
+                return;
+            }
             if constexpr (DispatchPolicy::LSE_MODE == LseMode::OUT_ONLY) {
                 uint32_t colNumLseUb = 0;
                 uint32_t colStrideLseUb = 0;
@@ -492,14 +516,114 @@ public:
         auto gLseTensorTlaTile =
             GetTile(gLseTensor, tla::MakeCoord(rowOffsetCurSubCore, 0), tla::MakeShape(rowNumCurSubCore, 1));
         uint32_t ubOTmpBufId = gatheredKvSTileIdx % UB_OTMP_BUF_STAGES;
+        AscendC::GlobalTensor<float> dummyPartialO;
+        AscendC::GlobalTensor<float> dummyPartialLse;
 
         if (rowNumCurSubCore > 0) {
-            SubCoreCompute(gOTensorTlaTile, gLseTensorTlaTile, curTileMod, ubOTmpBufId, isFirstKvSTile, isLastKvSTile,
-                           colStrideCurSubCore, mm2ToReFlag);
+            SubCoreCompute<false>(gOTensorTlaTile, gLseTensorTlaTile, curTileMod, ubOTmpBufId, isFirstKvSTile,
+                                  isLastKvSTile, colStrideCurSubCore, mm2ToReFlag, dummyPartialO, dummyPartialLse, 0U,
+                                  rowOffsetCurSubCore, rowNumOri, 0U);
         } else {
             Arch::CrossCoreWaitFlag<4, PIPE_V>(mm2ToReFlag);
             Arch::CrossCoreSetFlag<4, PIPE_V>(mm2ToReFlag);
         }
+    }
+
+    template <class TensorO, class TensorLse>
+    __aicore__ inline void ProcessPartial(TensorO &gOTensor, TensorLse &gLseTensor, GemmCoord actualOriShape,
+                                          uint32_t curTileMod, uint32_t gatheredKvSTileIdx, bool isFirstKvSTile,
+                                          bool isLastKvSTile, Arch::CrossCoreFlag mm2ToReFlag,
+                                          AscendC::GlobalTensor<float> &gPartialO,
+                                          AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+                                          uint32_t fdLseSubStride)
+    {
+        const uint32_t rowNumOri = actualOriShape[0];
+        const uint32_t colNumOri = actualOriShape[1];
+        const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
+        uint32_t rowNumSplit = RoundUp(rowNumOri, 8) / AscendC::GetSubBlockNum();
+        rowNumSplit = (rowNumOri < rowNumSplit) ? rowNumOri : rowNumSplit;
+        const uint32_t rowNumCurSubCore = subBlockIdx == 0 ? rowNumSplit : rowNumOri - rowNumSplit;
+        const uint32_t rowOffsetCurSubCore = rowNumSplit * subBlockIdx;
+        const uint32_t colStrideCurSubCore = RoundUp(colNumOri, 8);
+        auto gOTensorTlaTile =
+            GetTile(gOTensor, tla::MakeCoord(rowOffsetCurSubCore, 0), tla::MakeShape(rowNumCurSubCore, colNumOri));
+        auto gLseTensorTlaTile =
+            GetTile(gLseTensor, tla::MakeCoord(rowOffsetCurSubCore, 0), tla::MakeShape(rowNumCurSubCore, 1));
+        const uint32_t ubOTmpBufId = gatheredKvSTileIdx % UB_OTMP_BUF_STAGES;
+        if (rowNumCurSubCore > 0) {
+            SubCoreCompute<true>(gOTensorTlaTile, gLseTensorTlaTile, curTileMod, ubOTmpBufId, isFirstKvSTile,
+                                 isLastKvSTile, colStrideCurSubCore, mm2ToReFlag, gPartialO, gPartialLse, fdTaskId,
+                                 rowOffsetCurSubCore, rowNumOri, fdLseSubStride);
+        } else {
+            Arch::CrossCoreWaitFlag<4, PIPE_V>(mm2ToReFlag);
+            Arch::CrossCoreSetFlag<4, PIPE_V>(mm2ToReFlag);
+        }
+    }
+
+    __aicore__ inline void WriteNeutralPartial(AscendC::GlobalTensor<float> &gPartialO,
+                                               AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+                                               uint32_t groupSize, uint32_t colNum, uint32_t fdLseSubStride)
+    {
+        const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
+        uint32_t rowNumSplit = RoundUp(groupSize, 8) / AscendC::GetSubBlockNum();
+        rowNumSplit = groupSize < rowNumSplit ? groupSize : rowNumSplit;
+        const uint32_t rowNum = subBlockIdx == 0 ? rowNumSplit : groupSize - rowNumSplit;
+        const uint32_t rowOffset = rowNumSplit * subBlockIdx;
+        if (rowNum == 0) {
+            return;
+        }
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
+        AscendC::Duplicate(goUbTensor32, 0.0f, rowNum * colNum);
+        AscendC::Duplicate(lseUbTensor32, -3.402823466e+38F, RoundUp(rowNum, 8));
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+        const uint64_t oOffset =
+            static_cast<uint64_t>(fdTaskId) * groupSize * colNum + static_cast<uint64_t>(rowOffset) * colNum;
+        AscendC::DataCopy(gPartialO[oOffset], goUbTensor32, rowNum * colNum);
+        const uint64_t lseOffset = static_cast<uint64_t>(fdTaskId) * 2 * fdLseSubStride + subBlockIdx * fdLseSubStride;
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
+        AscendC::DataCopyPad(gPartialLse[lseOffset], lseUbTensor32,
+                             AscendC::DataCopyExtParams(1, rowNum * sizeof(float), 0, 0, 0));
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
+    }
+
+    template <class TensorO, class TensorLse>
+    __aicore__ inline void WriteEmptyOutput(TensorO &gOTensor, TensorLse &gLseTensor, GemmCoord actualOriShape)
+    {
+        const uint32_t rowNumOri = actualOriShape[0];
+        const uint32_t colNumOri = actualOriShape[1];
+        const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
+        uint32_t rowNumSplit = RoundUp(rowNumOri, 8) / AscendC::GetSubBlockNum();
+        rowNumSplit = rowNumOri < rowNumSplit ? rowNumOri : rowNumSplit;
+        const uint32_t rowNum = subBlockIdx == 0 ? rowNumSplit : rowNumOri - rowNumSplit;
+        const uint32_t rowOffset = rowNumSplit * subBlockIdx;
+        if (rowNum == 0) {
+            return;
+        }
+        const uint32_t colStride = RoundUp(colNumOri, 8);
+        auto gOTile = GetTile(gOTensor, tla::MakeCoord(rowOffset, 0), tla::MakeShape(rowNum, colNumOri));
+        auto gLseTile = GetTile(gLseTensor, tla::MakeCoord(rowOffset, 0), tla::MakeShape(rowNum, 1));
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
+        AscendC::Duplicate(goUbTensor16, static_cast<ElementO>(0), rowNum * colStride);
+        if constexpr (DispatchPolicy::LSE_MODE == LseMode::OUT_ONLY) {
+            AscendC::Duplicate(lseUbTensor32, -3.402823466e+38F, rowNum * 8U);
+        }
+        AscendC::PipeBarrier<PIPE_V>();
+        if constexpr (DispatchPolicy::LSE_MODE == LseMode::OUT_ONLY) {
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
+            auto ubLseLayout = tla::MakeLayout(tla::MakeShape(rowNum, 8U), tla::MakeStride(8U, tla::Int<1>{}));
+            auto ubLseTensor = tla::MakeTensor(lseUbTensor32, ubLseLayout, Arch::PositionUB{});
+            CopyUbToGmLse(gLseTile, ubLseTensor);
+        }
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+        auto ubOLayout = tla::MakeLayout(tla::MakeShape(rowNum, colNumOri), tla::MakeStride(colStride, tla::Int<1>{}));
+        auto ubOTensor = tla::MakeTensor(goUbTensor16, ubOLayout, Arch::PositionUB{});
+        copyUbToGmO(gOTile, ubOTensor);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
     }
 
 private:

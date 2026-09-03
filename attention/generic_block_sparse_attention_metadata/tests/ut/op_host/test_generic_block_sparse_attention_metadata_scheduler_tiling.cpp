@@ -61,7 +61,7 @@ constexpr int64_t DECODE_FOURTH_CORE_FIRST_BLOCK = 9;
 constexpr int64_t DECODE_COMBINE_PARTIAL_COUNT = 4;
 
 constexpr int64_t UNSUPPORTED_DIM = 64;
-constexpr int64_t UNSUPPORTED_BLOCK_CAPACITY = 17;
+constexpr int64_t MAX_BLOCK_CAPACITY = 256;
 constexpr int64_t ACTIVE_BASE_TASK_NUM = 8;
 constexpr int64_t ACTIVE_AIC_CORE_NUM = 28;
 constexpr int64_t ACTIVE_VALID_BLOCK_NUM = 16;
@@ -219,18 +219,19 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ZeroCountsAndRepeatedPr
     ASSERT_EQ(result.decodeSchedules[0].baseTaskStart, 1);
 }
 
-TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, SparseBlockCapacityGate)
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, SparseBlockCapacityUpTo256)
 {
     ScheduleInput lhs = MakeDecodeInput();
     lhs.blockIndexStride = DECODE_FIRST_BLOCK_NUM;
     ScheduleInput rhs = lhs;
-    rhs.blockIndexStride = UNSUPPORTED_BLOCK_CAPACITY;
+    rhs.blockIndexStride = MAX_BLOCK_CAPACITY;
     ScheduleResult lhsResult;
     ScheduleResult rhsResult;
     ASSERT_EQ(BuildSchedule(lhs, lhsResult), ScheduleStatus::SUCCESS);
     ASSERT_EQ(BuildSchedule(rhs, rhsResult), ScheduleStatus::SUCCESS);
     ASSERT_TRUE(lhsResult.fdActiveCoreNum > 0);
-    ASSERT_EQ(rhsResult.fdActiveCoreNum, 0);
+    ASSERT_EQ(rhsResult.fdActiveCoreNum, lhsResult.fdActiveCoreNum);
+    ASSERT_EQ(rhsResult.decodePerCoreTaskNum, lhsResult.decodePerCoreTaskNum);
 }
 
 TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ActiveCoreCapacityAcrossBaseTasks)

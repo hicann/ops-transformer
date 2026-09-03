@@ -308,7 +308,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, scale_value_zero_defaults_to_rs
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, static_cast<int64_t>(kFp16Tiling910B));
     ASSERT_NE(tilingInfo.tilingData, nullptr);
-    // scaleValue is the 11th field (10 uint32 ahead) in the POD tiling layout.
+    // scaleValue follows the 10 uint32 fields in the POD tiling layout.
     constexpr size_t kScaleValueOffset = 10U * sizeof(uint32_t);
     ASSERT_GT(tilingInfo.tilingDataSize, kScaleValueOffset + sizeof(float));
     float scaleValue = 0.0f;

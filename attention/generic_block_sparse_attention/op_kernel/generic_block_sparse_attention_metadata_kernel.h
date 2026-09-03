@@ -23,8 +23,16 @@ constexpr uint32_t METADATA_TOTAL_SIZE = 1024U;
 constexpr uint32_t MAX_AIC_CORE_NUM = 36U;
 constexpr uint32_t MAX_DECODE_CORE_NUM = 32U;
 constexpr uint32_t MAX_COMBINE_TASK_NUM = 32U;
+constexpr uint32_t MAX_FD_ACTIVE_CORE_NUM = MAX_DECODE_CORE_NUM;
+constexpr uint32_t MAX_FD_PARTIAL_PER_BASE_TASK = MAX_DECODE_CORE_NUM;
+constexpr uint32_t MAX_SPARSE_BLOCK_CAPACITY = 256U;
 constexpr MetadataType METADATA_MAGIC = 0x5341534D;
-constexpr MetadataType METADATA_VERSION = 6;
+constexpr MetadataType METADATA_VERSION = 8;
+
+enum FdScheduleFlag : uint32_t {
+    FD_SCHEDULE_ENABLED = 1U << 0,
+    FD_ACTUAL_BLOCK_PREFIX = 1U << 1,
+};
 
 enum HeaderIndex : uint32_t {
     MAGIC_INDEX = 0U,
@@ -32,9 +40,13 @@ enum HeaderIndex : uint32_t {
     METADATA_USED_SIZE_INDEX = 2U,
     SA_USED_CORE_NUM_INDEX = 3U,
     SA_TOTAL_TASK_NUM_INDEX = 4U,
-    DECODE_LAUNCH_CORE_NUM_INDEX = 5U,
+    FD_ACTIVE_CORE_NUM_INDEX = 5U,
     DECODE_PER_CORE_TASK_NUM_INDEX = 6U,
     COMBINE_TASK_NUM_INDEX = 7U,
+    FD_SCHEDULE_FLAGS_INDEX = 8U,
+    FD_TOTAL_FLAT_TASK_NUM_INDEX = 9U,
+    FD_PARTIAL_TASK_NUM_INDEX = 10U,
+    CONFIG_SIGNATURE_INDEX = 11U,
     HEADER_SIZE = 16U,
 };
 
@@ -89,10 +101,14 @@ struct Metadata {
     MetadataType metadataUsedSize;
     MetadataType saUsedCoreNum;
     MetadataType saTotalTaskNum;
-    MetadataType decodeLaunchCoreNum;
+    MetadataType fdActiveCoreNum;
     MetadataType decodePerCoreTaskNum;
     MetadataType combineTaskNum;
-    MetadataType headerReserved[HEADER_SIZE - 8U];
+    MetadataType fdScheduleFlags;
+    MetadataType fdTotalFlatTaskNum;
+    MetadataType fdPartialTaskNum;
+    MetadataType configSignature;
+    MetadataType headerReserved[HEADER_SIZE - 12U];
     DecodeSchedule decodeSchedules[MAX_DECODE_CORE_NUM];
     CombineSchedule combineSchedules[MAX_COMBINE_TASK_NUM];
     MetadataType padding[METADATA_TOTAL_SIZE - METADATA_USED_SIZE];

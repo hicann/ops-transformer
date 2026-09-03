@@ -25,7 +25,7 @@ constexpr uint32_t MAX_COMBINE_TASK_NUM = 32U;
 // FD scheduling capacity is independent from sparseBlockIdx.shape[-1].
 constexpr uint32_t MAX_FD_ACTIVE_CORE_NUM = MAX_DECODE_CORE_NUM;
 constexpr uint32_t MAX_FD_PARTIAL_PER_BASE_TASK = MAX_DECODE_CORE_NUM;
-constexpr uint32_t MAX_SPARSE_BLOCK_CAPACITY = 16U;
+constexpr uint32_t MAX_SPARSE_BLOCK_CAPACITY = 256U;
 constexpr MetadataType METADATA_MAGIC = 0x5341534D;
 constexpr MetadataType METADATA_VERSION = 8;
 
