@@ -21,24 +21,24 @@
 #include "aclnnop/aclnn_grouped_matmul_weight_nz.h"
 #include "aclnnop/aclnn_trans_matmul_weight.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define CHECK_FREE_RET(cond, return_expr)                                                                              \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            Finalize(deviceId, stream);                                                                                \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_FREE_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            Finalize(deviceId, stream); \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -196,7 +196,7 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
     int64_t groupType = 0L;
     int64_t groupListType = 0L;
     int64_t actType = 0L;
-    std::vector<int8_t> xHostData(m * k, 10);
+    std::vector<int16_t> xHostData(m * k, 10);
     std::vector<int8_t> weightHostData(groupnum * k * n / 2, 17);           // 0001 0001
     std::vector<int8_t> weightTransposedHostData(groupnum * k * n / 2, 17); // 0001 0001
     std::vector<int16_t> biasHostData(groupnum * n, 10);
