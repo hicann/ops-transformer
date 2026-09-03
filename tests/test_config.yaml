@@ -301,6 +301,7 @@ attention:
       - attention/flash_attention_score/examples
       - attention/flash_attention_score/op_host/arch22
     test:
+      examples: True
       ut: True
     options:
       - flash_attention_score
