@@ -215,7 +215,7 @@ const gert::Shape &KcQuantMatmulAlltoAllHelper::GetScaleShape(const size_t index
 const gert::StorageShape *KcQuantMatmulAlltoAllHelper::GetOffsetShape(const size_t index)
 {
     (void)index;
-    return (gert::StorageShape *)nullptr;
+    return nullptr;
 }
 
 const gert::StorageShape *KcQuantMatmulAlltoAllHelper::GetPertokenShape(const size_t index)
@@ -305,8 +305,8 @@ ge::graphStatus KcQuantMatmulAlltoAllHelper::PostTiling()
  */
 KcQuantMatmulAlltoAllHelper::KcQuantMatmulAlltoAllHelper(
     KcQuantMatmulAllToAllTilingBase &kcQuantMatmulAllToAllTilingBase,
-    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &data, uint64_t &mmMvalueLen)
-    : Mc2AdaptiveSlidingWindowTiling(kcQuantMatmulAllToAllTilingBase.context_, &data),
+    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &out, uint64_t &mmMvalueLen)
+    : Mc2AdaptiveSlidingWindowTiling(kcQuantMatmulAllToAllTilingBase.context_, &out),
       tilingProcesser_(kcQuantMatmulAllToAllTilingBase),
       mmLen(mmMvalueLen)
 {}

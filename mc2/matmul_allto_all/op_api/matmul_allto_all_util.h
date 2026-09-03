@@ -12,7 +12,6 @@
 #define CHECKER_H
 
 #include "aclnn/aclnn_base.h"
-#include "aclnn_util.h"
 #include "hccl/hccl_types.h"
 #include "mc2_log_compat.h"
 

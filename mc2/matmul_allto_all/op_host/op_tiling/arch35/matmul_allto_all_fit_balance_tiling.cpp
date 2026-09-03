@@ -13,7 +13,6 @@
  * \brief arch35 架构的 AllToAll Fit Balance Tiling 实现
  */
 #include <iostream>
-#include "mc2_log.h"
 #include "matmul_allto_all_fit_balance_tiling.h"
 
 namespace MC2Tiling {

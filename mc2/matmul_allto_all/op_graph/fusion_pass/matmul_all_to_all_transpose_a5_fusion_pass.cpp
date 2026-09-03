@@ -49,7 +49,7 @@ struct ReplaceGraphInputs {
 
 // 加载 EsTranspose 符号
 namespace {
-typedef EsCTensorHolder *(*EsTransposeFunc)(EsCTensorHolder *, EsCTensorHolder *);
+using EsTransposeFunc = EsCTensorHolder *(*)(EsCTensorHolder *, EsCTensorHolder *);
 
 EsTransposeFunc GetEsTransposeFunc()
 {

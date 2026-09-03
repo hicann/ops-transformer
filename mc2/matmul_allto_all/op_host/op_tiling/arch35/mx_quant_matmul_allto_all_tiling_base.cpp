@@ -701,7 +701,7 @@ const gert::Shape &MxQuantMatmulAlltoAllHelper::GetScaleShape(const size_t index
 const gert::StorageShape *MxQuantMatmulAlltoAllHelper::GetOffsetShape(const size_t index)
 {
     (void)index;
-    return (gert::StorageShape *)nullptr;
+    return nullptr;
 }
 
 const gert::StorageShape *MxQuantMatmulAlltoAllHelper::GetPertokenShape(const size_t index)
@@ -793,8 +793,8 @@ ge::graphStatus MxQuantMatmulAlltoAllHelper::PostTiling()
  */
 MxQuantMatmulAlltoAllHelper::MxQuantMatmulAlltoAllHelper(
     MxQuantMatmulAllToAllTilingBase &mxQuantMatmulAllToAllTilingBase,
-    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &data, uint64_t &mmMvalueLen)
-    : Mc2AdaptiveSlidingWindowTiling(mxQuantMatmulAllToAllTilingBase.context_, &data),
+    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &out, uint64_t &mmMvalueLen)
+    : Mc2AdaptiveSlidingWindowTiling(mxQuantMatmulAllToAllTilingBase.context_, &out),
       tilingProcesser_(mxQuantMatmulAllToAllTilingBase),
       mmLen_(mmMvalueLen)
 {}

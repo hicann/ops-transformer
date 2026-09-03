@@ -153,7 +153,8 @@ static ge::graphStatus GetMatmulAxisInfoForMatmulAlltoAll(const gert::InferShape
  * @param context
  * @param shape
  */
-static ge::graphStatus CheckRankDimForMatmulAlltoAll(gert::InferShapeContext *context, MatmulAlltoAllShapeInfo &shape)
+static ge::graphStatus CheckRankDimForMatmulAlltoAll(const gert::InferShapeContext *context,
+                                                     MatmulAlltoAllShapeInfo &shape)
 {
     const gert::RuntimeAttrs *attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);

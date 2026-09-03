@@ -230,6 +230,7 @@ aclnnStatus CheckX2Valid(const char *opName, const aclTensor *x2)
 aclnnStatus CheckAndHandleCommMode(const char *opName, const char *group, const char *commModeStr,
                                    uint8_t &commModeEnum)
 {
+    (void)group;
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
