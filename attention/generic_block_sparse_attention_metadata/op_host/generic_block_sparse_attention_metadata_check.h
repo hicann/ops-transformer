@@ -190,8 +190,8 @@ aclnnStatus CheckGbsaLayouts(const char *qInputLayout, const char *kvInputLayout
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qInputLayout currently only supports TND.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (!GbsaIsLayout(kvInputLayout, "PAGED_BBND")) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "kvInputLayout currently only supports PAGED_BBND.");
+    if (!GbsaIsLayout(kvInputLayout, "PA_BBND")) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "kvInputLayout currently only supports PA_BBND.");
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -287,8 +287,8 @@ aclnnStatus CheckGbsaSeqLengthInputs(const aclTensor *cuSeqLengthsOptional, cons
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cuSeqLengths is required for TND query.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    const bool kvSeqLengthsRequired = GbsaIsLayout(kvInputLayout, "TND") || GbsaIsLayout(kvInputLayout, "PAGED_BBND") ||
-                                      GbsaIsLayout(kvInputLayout, "PAGED_BNBD");
+    const bool kvSeqLengthsRequired = GbsaIsLayout(kvInputLayout, "TND") || GbsaIsLayout(kvInputLayout, "PA_BBND") ||
+                                      GbsaIsLayout(kvInputLayout, "PA_BNBD");
     if (kvSeqLengthsRequired && !GbsaTensorValid(cuSeqLengthsKvOptional)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cuSeqLengthsKv is required for TND or paged KV.");
         return ACLNN_ERR_PARAM_INVALID;

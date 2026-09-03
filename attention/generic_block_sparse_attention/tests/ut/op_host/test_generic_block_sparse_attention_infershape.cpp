@@ -71,7 +71,7 @@ std::vector<gert::InfershapeContextPara::TensorDescription> MakeInputs()
 }
 
 std::vector<gert::InfershapeContextPara::OpAttr> MakeAttrs(int64_t returnLse, const std::string &layoutQ = "TND",
-                                                           const std::string &layoutKv = "PAGED_BBND")
+                                                           const std::string &layoutKv = "PA_BBND")
 {
     return {
         {"block_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(kBlockShape)},

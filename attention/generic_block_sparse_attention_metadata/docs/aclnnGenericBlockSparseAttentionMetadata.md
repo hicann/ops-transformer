@@ -140,7 +140,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>
         可选输入，用于变长序列场景。
         <ul>
-          <li>layoutKv为TND/PAGED_BBND/PAGED_BNBD时必须传入。当前仅支持PAGED_BBND。</li>
+          <li>layoutKv为TND/PA_BBND/PA_BNBD时必须传入。当前仅支持PA_BBND。</li>
           <li>layoutKv为BNSD/BSND时：如传入，算子内按该输入指定的实际序列长度处理；如传入nullptr，按key/value的shape中的S处理（当前不支持）。</li>
           <li>元素为前缀和：第0个元素为0，最后一个元素等于各batch KV存储长度之和，后一个元素须≥前一个元素。</li>
         </ul>
@@ -264,7 +264,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>layoutKv</td>
       <td>输入</td>
       <td>代表输入key、value的数据排布格式。</td>
-      <td>目标支持"TND""BNSD""BSND""PAGED_BBND""PAGED_BNBD"，详见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。当前仅支持"PAGED_BBND"。</td>
+      <td>目标支持"TND""BNSD""BSND""PA_BBND""PA_BNBD"，详见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。当前仅支持"PA_BBND"。</td>
       <td>String</td>
       <td>-</td>
       <td>-</td>
@@ -497,7 +497,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 ### 其他约束
 
 - 本接口必须与`aclnnGenericBlockSparseAttention`配套使用。共同Tensor和属性须与随后调用的主算子完全一致，每次调用主算子前均须重新生成`metadataOptional`。主算子的完整约束见[aclnnGenericBlockSparseAttention](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#约束说明)。
-- 当前仅支持`layoutQ="TND"`、`layoutKv="PAGED_BBND"`、`isPackedGQA=1`、`headDim=128`、`blockShape=[1, 128]`、`maskType=1`以及`winLeft=winRight=-1`。
+- 当前仅支持`layoutQ="TND"`、`layoutKv="PA_BBND"`、`isPackedGQA=1`、`headDim=128`、`blockShape=[1, 128]`、`maskType=1`以及`winLeft=winRight=-1`。
 - `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0、不超过256，且须不小于`sparseBlockCount`中所有元素的最大值。
 - `cuSeqLengthsQOptional`和`cuSeqLengthsKvOptional`当前必须传入；`sequsedQOptional`和`sequsedKvOptional`可传入nullptr。传入seqused时，每个元素须位于`[0, 对应Batch存储长度]`范围内。分核按实际长度累加，稀疏块分块仍按cu前缀和描述的存储长度计算。
 - `numQHeads >= numKvHeads`且`numQHeads % numKvHeads == 0`，`groupSize = numQHeads / numKvHeads`不超过128。
@@ -524,7 +524,7 @@ aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparse
     aclOpExecutor *executor = nullptr;
     aclnnStatus ret = aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
         sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, nullptr, nullptr, 16, 2048,
-        32, 8, 128, blockShape, 1, "TND", "PAGED_BBND", 1, 0, 0, -1, -1, metadataOptional, &workspaceSize,
+        32, 8, 128, blockShape, 1, "TND", "PA_BBND", 1, 0, 0, -1, -1, metadataOptional, &workspaceSize,
         &executor);
     aclDestroyIntArray(blockShape);
     if (ret != ACL_SUCCESS) {

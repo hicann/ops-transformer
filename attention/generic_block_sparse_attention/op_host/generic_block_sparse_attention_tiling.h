@@ -59,7 +59,7 @@ TILING_DATA_FIELD_DEF(uint32_t, qL1BufNum);
 TILING_DATA_FIELD_DEF(uint32_t, kL1BufNum);
 TILING_DATA_FIELD_DEF(uint32_t, vL1BufNum);
 TILING_DATA_FIELD_DEF(uint32_t, pL1BufNum);
-// PAGED_BBND page base stride in elements (dim0). Allows first-axis non-contiguous KV cache.
+// PA_BBND page base stride in elements (dim0). Allows first-axis non-contiguous KV cache.
 TILING_DATA_FIELD_DEF(uint64_t, kStride0);
 TILING_DATA_FIELD_DEF(uint64_t, vStride0);
 END_TILING_DATA_DEF;
@@ -145,7 +145,7 @@ private:
     int64_t maskType_ = 0;
     int64_t quantType_ = 0;
 
-    // Default = contiguous PAGED_BBND page size; overwritten when KV is a dim0-strided view.
+    // Default = contiguous PA_BBND page size; overwritten when KV is a dim0-strided view.
     uint64_t kStride0_ = 0;
     uint64_t vStride0_ = 0;
 

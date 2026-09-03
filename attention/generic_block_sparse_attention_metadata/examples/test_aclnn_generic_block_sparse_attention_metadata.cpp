@@ -203,7 +203,7 @@ aclnnStatus CreateTndDecodeCase(CaseContext &context)
     context.numKvHeads = numKvHeads;
     context.headDim = GBSA_HEAD_DIM;
     context.qInputLayout = "TND";
-    context.kvInputLayout = "PAGED_BBND";
+    context.kvInputLayout = "PA_BBND";
     context.expectedSaTotalTaskNum = static_cast<int32_t>(qStorageLength * numKvHeads);
     context.expectDecodeSchedule = true;
 
@@ -247,7 +247,7 @@ aclnnStatus CreateTndSeqUsedCase(CaseContext &context)
     context.numKvHeads = numKvHeads;
     context.headDim = GBSA_HEAD_DIM;
     context.qInputLayout = "TND";
-    context.kvInputLayout = "PAGED_BBND";
+    context.kvInputLayout = "PA_BBND";
     context.expectedSaTotalTaskNum = (firstBatchUsedQ + secondBatchUsedQ) * static_cast<int32_t>(numKvHeads);
 
     // The two batches occupy physical Q ranges [0, 4) and [4, 8). seqUsedQ selects [0, 2) and [4, 7).

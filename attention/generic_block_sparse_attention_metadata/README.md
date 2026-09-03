@@ -146,7 +146,7 @@
     <tr>
       <td>layoutKv</td>
       <td>属性</td>
-      <td>主算子Key/Value的数据排布格式，当前仅支持"PAGED_BBND"。</td>
+      <td>主算子Key/Value的数据排布格式，当前仅支持"PA_BBND"。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
@@ -198,7 +198,7 @@
 ## 约束说明
 
 - 本算子必须与`GenericBlockSparseAttention`配套使用。所有对应输入和属性须与随后调用的主算子一致，每次调用主算子前均须重新生成`metadataOptional`。
-- 当前仅支持`layoutQ="TND"`、`layoutKv="PAGED_BBND"`、`isPackedGQA=1`、`blockShape=[1, 128]`和`headDim=128`。
+- 当前仅支持`layoutQ="TND"`、`layoutKv="PA_BBND"`、`isPackedGQA=1`、`blockShape=[1, 128]`和`headDim=128`。
 - `numQHeads >= numKvHeads`且`numQHeads % numKvHeads == 0`，`numQHeads / numKvHeads`不超过128。
 - `sparseBlockIdx`最后一维须不小于`sparseBlockCount`中所有元素的最大值，且当前不超过256。
 - 输出`metadataOptional`是固定为INT32、shape为(1024,)的不透明数据，不得解析、修改或跨不同输入和属性复用。

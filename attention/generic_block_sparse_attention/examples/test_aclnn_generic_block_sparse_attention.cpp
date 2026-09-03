@@ -12,7 +12,7 @@
  * \file test_aclnn_generic_block_sparse_attention.cpp
  * \brief GenericBlockSparseAttention + Metadata 算子调用示例
  *
- * Regular path: layoutQ=TND, layoutKv=PAGED_BBND, maskType=1, blockShape=[1,128], D=128.
+ * Regular path: layoutQ=TND, layoutKv=PA_BBND, maskType=1, blockShape=[1,128], D=128.
  */
 
 #include <algorithm>
@@ -152,7 +152,7 @@ int main()
     auto ret = Init(deviceId, &context, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    // Regular path smoke case: TND query + PAGED_BBND KV
+    // Regular path smoke case: TND query + PA_BBND KV
     int64_t B = 1;
     int64_t S1 = 4;
     int64_t S2 = 256;
@@ -261,7 +261,7 @@ int main()
     CHECK_RET(blockShape != nullptr, LOG_PRINT("aclCreateIntArray failed\n"); return -1);
 
     char layoutQ[] = "TND";
-    char layoutKv[] = "PAGED_BBND";
+    char layoutKv[] = "PA_BBND";
 
     // 3. 先调用 Metadata，再调用主算子
     uint64_t metadataWorkspaceSize = 0;

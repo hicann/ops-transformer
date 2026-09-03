@@ -37,7 +37,7 @@
 
 > **说明：**<br>
 > 参数维度含义：B表示Batch Size，T表示Total tokens，N表示Head Num，D表示Head Dim，topK表示`sparseBlockIdx`最后一维`maxSparseBlockCount`。<br>
-> TND中的N为query的headNum（记为N1），PAGED_BBND中的N为key/value的headNum（记为N2）。GQA下N1与N2可以不同，约束见下文。
+> TND中的N为query的headNum（记为N1），PA_BBND中的N为key/value的headNum（记为N2）。GQA下N1与N2可以不同，约束见下文。
 
 <table style="undefined;table-layout: fixed; width: 1200px"><colgroup>
   <col style="width: 220px">
@@ -66,7 +66,7 @@
     <tr>
       <td>key</td>
       <td>输入</td>
-      <td>公式中的key。layoutKv为"PAGED_BBND"时，shape为[numBlocks, blockSize, N, D]，N为kv的headNum（N2）。</td>
+      <td>公式中的key。layoutKv为"PA_BBND"时，shape为[numBlocks, blockSize, N, D]，N为kv的headNum（N2）。</td>
       <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN</td>
       <td>ND</td>
     </tr>
@@ -101,7 +101,7 @@
     <tr>
       <td>cuSeqLengthsKvOptional</td>
       <td>输入</td>
-      <td>各batch中key/value序列长度前缀和，layoutKv为"PAGED_BBND"时必传，shape为[B+1,]。</td>
+      <td>各batch中key/value序列长度前缀和，layoutKv为"PA_BBND"时必传，shape为[B+1,]。</td>
       <td>INT64</td>
       <td>ND</td>
     </tr>
@@ -150,7 +150,7 @@
     <tr>
       <td>layoutKv</td>
       <td>属性</td>
-      <td>key/value数据排布格式，当前仅支持"PAGED_BBND"。</td>
+      <td>key/value数据排布格式，当前仅支持"PA_BBND"。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
@@ -214,7 +214,7 @@
 - sequsedQOptional/sequsedKvOptional与cu前缀和同时传入时：分核/任务空间按各batch实际有效长度（seqused）累加；各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
 - 输入query、key、value的数据类型必须一致。
 - 输入query的headNum为N1，输入key和value的headNum为N2，则N1 >= N2且N1 % N2 == 0；groupSize=N1/N2当前须≤128。
-- PAGED_BBND下key/value仅dim0（物理页轴）可非连续；页内blockSize×N2×D须连续。
+- PA_BBND下key/value仅dim0（物理页轴）可非连续；页内blockSize×N2×D须连续。
 
 ## 调用说明
 

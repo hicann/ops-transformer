@@ -119,8 +119,8 @@ static aclnnStatus ValidateParams(const aclTensor *query, const aclTensor *key, 
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layoutQ only supports TND, got %s.", layoutQStr.c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (layoutKvStr != "PAGED_BBND") {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layoutKv only supports PAGED_BBND, got %s.", layoutKvStr.c_str());
+    if (layoutKvStr != "PA_BBND") {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layoutKv only supports PA_BBND, got %s.", layoutKvStr.c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -218,7 +218,7 @@ static aclnnStatus MakeContiguous(const aclTensor *&query, const aclTensor *&spa
     return ACLNN_SUCCESS;
 }
 
-// Only dim0 may be non-contiguous for PAGED_BBND KV.
+// Only dim0 may be non-contiguous for PA_BBND KV.
 static bool IsFirstAxisOnlyNonContiguous(const aclTensor *tensor, const char *name)
 {
     if (tensor == nullptr || IsContiguous(tensor)) {
@@ -268,7 +268,7 @@ static const aclTensor *CreateStrideAwareView(const aclTensor *tensor, const cha
 }
 
 // Contiguous KV: Contiguous (normalize descriptor). Dim0-only holes: stride-aware view.
-// Other non-contig: Contiguous fallback (tiling rejects non-dim0 holes for PAGED_BBND).
+// Other non-contig: Contiguous fallback (tiling rejects non-dim0 holes for PA_BBND).
 static const aclTensor *NormalizeDim0KvTensor(const aclTensor *tensor, const char *name, aclOpExecutor *executor)
 {
     if (tensor == nullptr) {

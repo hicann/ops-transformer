@@ -275,8 +275,8 @@ ge::graphStatus GBSATiling::GetInputLayout(gert::TilingContext *context)
         OP_LOGE(context->GetNodeName(), "layoutQ only supports TND, got %s.", layoutQ_.c_str());
         return ge::GRAPH_FAILED;
     }
-    if (layoutKv_ != "PAGED_BBND") {
-        OP_LOGE(context->GetNodeName(), "layoutKv only supports PAGED_BBND, got %s.", layoutKv_.c_str());
+    if (layoutKv_ != "PA_BBND") {
+        OP_LOGE(context->GetNodeName(), "layoutKv only supports PA_BBND, got %s.", layoutKv_.c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -303,7 +303,7 @@ ge::graphStatus GBSATiling::CheckAttentionOutDtype(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-// Validate PAGED_BBND key/value: only dim0 may be non-contiguous.
+// Validate PA_BBND key/value: only dim0 may be non-contiguous.
 static ge::graphStatus ValidatePagedBbndDim0OnlyNonContig(gert::TilingContext *context, uint64_t inputIndex,
                                                           const gert::Shape &shape, const char *tensorName)
 {
@@ -318,7 +318,7 @@ static ge::graphStatus ValidatePagedBbndDim0OnlyNonContig(gert::TilingContext *c
         if (actualStride != expectedStride) {
             OP_LOGE(context->GetNodeName(),
                     "Tensor %s dim%zu is non-contiguous: actual stride=%llu, expected=%llu. "
-                    "Only the first axis (dim0) may be non-contiguous for PAGED_BBND.",
+                    "Only the first axis (dim0) may be non-contiguous for PA_BBND.",
                     tensorName, i, static_cast<unsigned long long>(actualStride),
                     static_cast<unsigned long long>(expectedStride));
             return ge::GRAPH_FAILED;
@@ -364,7 +364,7 @@ ge::graphStatus GBSATiling::ParseKvCacheStride0(gert::TilingContext *context)
     const uint64_t rowElems = static_cast<uint64_t>(kvHeads_) * static_cast<uint64_t>(embeddingSize_);
     if (kStride0_ < pageElems || (rowElems > 0 && (kStride0_ % rowElems) != 0)) {
         OP_LOGE(context->GetNodeName(),
-                "key dim0 stride (%llu) invalid for PAGED_BBND: expect >= pageElems=%llu and "
+                "key dim0 stride (%llu) invalid for PA_BBND: expect >= pageElems=%llu and "
                 "aligned to Nkv*D=%llu.",
                 static_cast<unsigned long long>(kStride0_), static_cast<unsigned long long>(pageElems),
                 static_cast<unsigned long long>(rowElems));
@@ -372,7 +372,7 @@ ge::graphStatus GBSATiling::ParseKvCacheStride0(gert::TilingContext *context)
     }
     if (vStride0_ < pageElems || (rowElems > 0 && (vStride0_ % rowElems) != 0)) {
         OP_LOGE(context->GetNodeName(),
-                "value dim0 stride (%llu) invalid for PAGED_BBND: expect >= pageElems=%llu and "
+                "value dim0 stride (%llu) invalid for PA_BBND: expect >= pageElems=%llu and "
                 "aligned to Nkv*D=%llu.",
                 static_cast<unsigned long long>(vStride0_), static_cast<unsigned long long>(pageElems),
                 static_cast<unsigned long long>(rowElems));
@@ -487,7 +487,7 @@ ge::graphStatus GBSATiling::ParseBlockTable(gert::TilingContext *context)
     if (blockTableShape == nullptr) {
         blockTablePresent_ = false;
         OP_LOGE(context->GetNodeName(),
-                "Stage 1 requires blockTable for PAGED_BBND layout, but blockTableOptional is nullptr.");
+                "Stage 1 requires blockTable for PA_BBND layout, but blockTableOptional is nullptr.");
         return ge::GRAPH_FAILED;
     }
     blockTablePresent_ = true;
@@ -622,14 +622,14 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext *con
 
 ge::graphStatus GBSATiling::CheckCuSeqLengths(gert::TilingContext *context)
 {
-    // layoutQ is fixed to TND and layoutKv is fixed to PAGED_BBND (validated in GetInputLayout),
+    // layoutQ is fixed to TND and layoutKv is fixed to PA_BBND (validated in GetInputLayout),
     // so cuSeqLengthsQ/Kv are required to locate per-batch token ranges on device.
     if (context->GetOptionalInputTensor(CU_SEQ_LENGTHS_Q_INDEX) == nullptr) {
         OP_LOGE(context->GetNodeName(), "cuSeqLengthsQ cannot be empty when layoutQ is TND.");
         return ge::GRAPH_FAILED;
     }
     if (context->GetOptionalInputTensor(CU_SEQ_LENGTHS_KV_INDEX) == nullptr) {
-        OP_LOGE(context->GetNodeName(), "cuSeqLengthsKv cannot be empty when layoutKv is PAGED_BBND.");
+        OP_LOGE(context->GetNodeName(), "cuSeqLengthsKv cannot be empty when layoutKv is PA_BBND.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -684,7 +684,7 @@ uint64_t GBSATiling::GenerateTilingKey()
      * - [2-4]   Mask Type          maskType_ * 1000 (current path: 1)
      * - [5-7]   Softmax Precision  0=Float, 1=Half (*100000); arch35 keys keep 0
      * - [8-10]  PagedCache         1=WithCache (*1000000)
-     * - [11-13] KV Layout          70=PAGED_BBND (*1000000 → 70000000)
+     * - [11-13] KV Layout          70=PA_BBND (*1000000 → 70000000)
      * - dtype                    FP16=+0, BF16=+22220, FP8 out FP16=+10 / BF16=+20
      * - LSE                      +100000000
      * - op+arch                  920=aicore220, 925=aicore310
@@ -705,7 +705,7 @@ uint64_t GBSATiling::GenerateTilingKey()
         }
     }
 
-    // KV layout: PAGED_BBND = 70
+    // KV layout: PA_BBND = 70
     tilingKey += 70000000ULL;
     // Paged cache required on current path
     tilingKey += 1000000ULL;

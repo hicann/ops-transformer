@@ -248,7 +248,8 @@ public:
             uint32_t actualLoopNum = 0;
             for (uint32_t i = 0; i < kvSLoopNum && i < topK_; i++) {
                 int32_t logicalId = gSparseBlockIdx.GetValue(sparseIdxBase + i);
-                if (logicalId < 0 || static_cast<uint32_t>(logicalId) >= maxBlocksPerBatch_)
+                if (logicalId < 0 || static_cast<uint32_t>(logicalId) >= maxBlocksPerBatch_ ||
+                    static_cast<uint32_t>(logicalId) > lastLogicalBlockId)
                     continue;
                 int64_t btOffset = static_cast<int64_t>(batchIdx) * maxBlocksPerBatch_ + logicalId;
                 int32_t physicalId = gBlockTable.GetValue(btOffset);
@@ -457,7 +458,7 @@ private:
     uint32_t totalTaskNum_;
     float scaleValue_;
     uint32_t groupSize_;
-    // PAGED_BBND page base strides (elements); may exceed blockSize*Nkv*D when dim0 is strided.
+    // PA_BBND page base strides (elements); may exceed blockSize*Nkv*D when dim0 is strided.
     uint64_t kStride0_;
     uint64_t vStride0_;
     // base tile info
