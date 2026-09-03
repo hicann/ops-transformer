@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <cstdint>
 #include "op_api_ut_common/inner/file_io.h"
 
 using namespace std;
