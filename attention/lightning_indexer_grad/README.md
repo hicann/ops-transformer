@@ -4,7 +4,7 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      x     |
+|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
 |<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
@@ -175,7 +175,7 @@
 
 - inputLayout支持TND/BSND。
 - 关于数据shape的约束，以Layout的BSND举例。其中：
-  
+
   - B（Batchsize）：取值范围为1\~1024。
   - N（Head-Num）：取值为1\~64。
   - G（Group）：取值为N。
