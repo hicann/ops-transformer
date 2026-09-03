@@ -79,8 +79,8 @@ struct MaskInfo {
 };
 
 template <typename T, uint32_t s2BaseSize>
-__simd_vf__ void MaskUbCopyS1GVF(__ubuf__ T * maskUb, uint16_t headGLoop, uint16_t midGLoop,
-    uint16_t tailGLoop, uint16_t midS1Count)
+__simd_vf__ void MaskUbCopyS1GVF(__ubuf__ T *maskUb, uint16_t headGLoop, uint16_t midGLoop, uint16_t tailGLoop,
+                                 uint16_t midS1Count)
 {
     constexpr uint32_t repeatStride = s2BaseSize >> 5;
 
@@ -91,50 +91,50 @@ __simd_vf__ void MaskUbCopyS1GVF(__ubuf__ T * maskUb, uint16_t headGLoop, uint16
     MaskReg preg_all;
     if constexpr (s2BaseSize == 128) {
         preg_all = CreateMask<bool, MaskPattern::VL128>();
-    } else {    // s2BaseSize = 256
+    } else { // s2BaseSize = 256
         preg_all = CreateMask<bool, MaskPattern::ALL>();
     }
 
-    for (uint16_t x = headGLoop; x > 0; x = 0) {     // if (headGLoop > 0) {}
-        LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            vreg_g_head, maskUb, 1, repeatStride, preg_all);
+    for (uint16_t x = headGLoop; x > 0; x = 0) { // if (headGLoop > 0) {}
+        LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(vreg_g_head, maskUb, 1,
+                                                                                        repeatStride, preg_all);
         for (uint16_t i = 1; i < headGLoop; ++i) {
-            StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                maskUb, vreg_g_head, 1, repeatStride, preg_all);
+            StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(maskUb, vreg_g_head, 1,
+                                                                                             repeatStride, preg_all);
         }
     }
 
-    for (uint16_t x = midGLoop; x > 0; x = 0) {     // if (midGLoop > 0) {}
+    for (uint16_t x = midGLoop; x > 0; x = 0) { // if (midGLoop > 0) {}
         for (uint16_t i = 0; i < midS1Count; ++i) {
-            LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                vreg_g_mid, maskUb, 1, repeatStride, preg_all);
+            LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(vreg_g_mid, maskUb, 1,
+                                                                                            repeatStride, preg_all);
             for (uint16_t j = 1; j < midGLoop; ++j) {
-                StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+                StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                     maskUb, vreg_g_mid, 1, repeatStride, preg_all);
             }
             LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
         }
     }
 
-    for (uint16_t x = tailGLoop; x > 1; x = 0) {     // if (tailGLoop > 1) {}
-        LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            vreg_g_tail, maskUb, 1, repeatStride, preg_all);
+    for (uint16_t x = tailGLoop; x > 1; x = 0) { // if (tailGLoop > 1) {}
+        LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(vreg_g_tail, maskUb, 1,
+                                                                                        repeatStride, preg_all);
         for (uint16_t i = 1; i < tailGLoop; ++i) {
-            StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                maskUb, vreg_g_tail, 1, repeatStride, preg_all);
+            StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(maskUb, vreg_g_tail, 1,
+                                                                                             repeatStride, preg_all);
         }
     }
 }
 
 template <typename T, uint32_t s2BaseSize>
-__aicore__ inline void MaskUbCopyS1G(const LocalTensor<T>& maskTensor, int32_t headGSize, int32_t gSize,
-    int32_t tailGSize, int32_t midS1Count)
+__aicore__ inline void MaskUbCopyS1G(const LocalTensor<T> &maskTensor, int32_t headGSize, int32_t gSize,
+                                     int32_t tailGSize, int32_t midS1Count)
 {
     if (gSize <= 1) {
         return;
     }
 
-    __ubuf__ T * maskUb = (__ubuf__ T*)maskTensor.GetPhyAddr();
+    __ubuf__ T *maskUb = (__ubuf__ T *)maskTensor.GetPhyAddr();
     MaskUbCopyS1GVF<T, s2BaseSize>(maskUb, headGSize, gSize, tailGSize, midS1Count);
 }
 
