@@ -51,6 +51,14 @@ struct GmmRuntimeState {
 struct ExpertTokenPosition {
     uint32_t expertIdx = 0U;
     uint32_t tokenIndexInExpert = 0U;
+    // 从全部本卡 MoE 专家起点累计的全局连续 row，避免末波 Combine 重新标量扫描 count 表。
+    uint64_t globalTokenIndex = 0U;
+};
+
+// 标识 MoE 专家紧凑 token 序列中的左闭右开区间 [begin, end)。
+struct ExpertTokenRange {
+    ExpertTokenPosition begin{};
+    ExpertTokenPosition end{};
 };
 
 using Mc2MoeContext = Mc2Aclnn::Mc2MoeContext;
@@ -158,7 +166,6 @@ struct MoeSyncWorkspaceLayout {
     int32_t dispatchFlagSlotCountPerExpert;
     int32_t activationFlagSlotCountPerExpert;
     uint32_t gmm1TileStatusCountPerExpert;
-    uint64_t combineSyncSlotCountPerExpert;
 };
 
 struct GroupSyncSlotLayout {

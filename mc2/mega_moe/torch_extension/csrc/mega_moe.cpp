@@ -223,11 +223,9 @@ int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_
 {
     int64_t expertPerRank = moeExpertNum / epWorldSize;
 
-    // mask_recv_size
-    int64_t compareCount = CeilAlign(numMaxTokensPerRank * numTopk * 4, 256) / 4;
-    int64_t maskAlignSize = CeilAlign(compareCount / 8, 32);
-    int64_t maskSlotSize = maskAlignSize + 32;
-    int64_t maskRecvSize = CeilAlign(expertPerRank * epWorldSize * maskSlotSize, 512);
+    // Compact route-index receive area.
+    int64_t routeIndexAlignSize = CeilAlign(numMaxTokensPerRank * static_cast<int64_t>(sizeof(int32_t)), 32);
+    int64_t routeRecvSize = CeilAlign(expertPerRank * epWorldSize * routeIndexAlignSize, 512);
 
     // Expert-major raw count table: [localExpert][sourceRank].
     int64_t expertCountRecvSize = CeilAlign(expertPerRank * epWorldSize * static_cast<int64_t>(sizeof(int32_t)), 512);
@@ -245,7 +243,7 @@ int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_
     // combine_send_size
     int64_t combineOut = CeilAlign(numMaxTokensPerRank * hidden * numTopk * 2, 512);
 
-    int64_t totalBytes = EXCEPTION_DUMP_REGION_SIZE + PEERMEM_DATA_OFFSET + maskRecvSize + expertCountRecvSize +
+    int64_t totalBytes = EXCEPTION_DUMP_REGION_SIZE + PEERMEM_DATA_OFFSET + routeRecvSize + expertCountRecvSize +
                          quantTokenScaleSize + combineOut;
 
     return totalBytes;

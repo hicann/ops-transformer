@@ -60,16 +60,16 @@ __aicore__ inline __gm__ GmmLoopCount *RegisterMegaMoeExceptionDump(ExceptionDum
                                                                     GM_ADDR tilingGM,
                                                                     const MegaMoeTilingData *tilingData,
                                                                     const MegaMoeImpl::PeermemInfo &peermemInfo,
-                                                                    uint32_t maskAlignSize, GM_ADDR epRankIdAddr)
+                                                                    GM_ADDR epRankIdAddr)
 {
     engine.Init(dumpBase, tilingGM);
     engine.UpdateStage(Stage::INIT);
     engine.Dump(epRankIdAddr, sizeof(uint32_t));
-    const size_t maskRecvSize = static_cast<size_t>(CalcMaskRecvSize(static_cast<int64_t>(maskAlignSize),
-                                                                     static_cast<int64_t>(tilingData->moeExpertPerRank),
-                                                                     static_cast<int64_t>(tilingData->epWorldSize)));
+    size_t routeRecvSize = static_cast<size_t>(CalcRouteIndexRecvSize(
+        CalcDispatchRouteIndexAlignSize(tilingData), static_cast<int64_t>(tilingData->moeExpertPerRank),
+        static_cast<int64_t>(tilingData->epWorldSize)));
     engine.Dump(peermemInfo.rankSyncInWorldPtr, static_cast<size_t>(MegaMoeImpl::PEERMEM_DATA_OFFSET));
-    engine.Dump(peermemInfo.maskRecvPtr, maskRecvSize);
+    engine.Dump(peermemInfo.maskRecvPtr, routeRecvSize);
     GM_ADDR loopCountBase = dumpBase + GMM_LOOP_COUNT_REGION_OFFSET;
     engine.Dump(loopCountBase, tilingData->blockAivNum, GMM_LOOP_COUNT_DATA_SIZE, sizeof(GmmLoopCount));
 

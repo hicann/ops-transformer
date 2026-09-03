@@ -195,30 +195,6 @@ __aicore__ inline void GetGroupSyncSlotRange(uint32_t groupIndex, const GroupSyn
     firstSyncSlot = groupIndex * slotLayout.baseSlotCountPerGroup + precedingExtraSlotCount;
 }
 
-__aicore__ inline void ComputeCombineGroupsForCore(uint32_t logicalCoreId, uint32_t groupCount,
-                                                   uint32_t logicalCoreCount, uint32_t &firstGroupIndex,
-                                                   uint32_t &groupStride, uint32_t &coreIndexWithinGroup,
-                                                   uint32_t &coresAssignedToGroup)
-{
-    uint32_t totalSyncSlotCount = groupCount > logicalCoreCount ? groupCount : logicalCoreCount;
-    uint32_t baseSlotCountPerGroup = totalSyncSlotCount / groupCount;
-    uint32_t extraSlotGroupCount = totalSyncSlotCount % groupCount;
-    uint32_t slotBoundaryAfterExtraSlotGroups = extraSlotGroupCount * (baseSlotCountPerGroup + 1U);
-
-    if (logicalCoreId < slotBoundaryAfterExtraSlotGroups) {
-        coresAssignedToGroup = baseSlotCountPerGroup + 1U;
-        firstGroupIndex = logicalCoreId / coresAssignedToGroup;
-        coreIndexWithinGroup = logicalCoreId % coresAssignedToGroup;
-    } else {
-        uint32_t slotOffsetAfterExtraSlotGroups = logicalCoreId - slotBoundaryAfterExtraSlotGroups;
-        coresAssignedToGroup = baseSlotCountPerGroup;
-        firstGroupIndex = extraSlotGroupCount + slotOffsetAfterExtraSlotGroups / coresAssignedToGroup;
-        coreIndexWithinGroup = slotOffsetAfterExtraSlotGroups % coresAssignedToGroup;
-    }
-
-    groupStride = groupCount < logicalCoreCount ? groupCount : logicalCoreCount;
-}
-
 /*
  * 计算单个专家贡献的独立 M 分组数。不同专家使用不同权重，因此各专家不足
  * rowsPerMGroup 的尾块也必须分别占用一个分组。
@@ -271,6 +247,18 @@ __aicore__ inline WorkRange GetBalancedTokenRange(uint32_t totalTokens, uint32_t
     uint32_t remainder = totalTokens % workerCount;
     uint32_t extraBefore = workerIdx < remainder ? workerIdx : remainder;
     return {workerIdx * base + extraBefore, base + static_cast<uint32_t>(workerIdx < remainder)};
+}
+
+// 以全局 row 前缀轮转“多一个 token”的首 owner；Dispatch/Combine 共用这一公式。
+__aicore__ inline WorkRange GetRotatedBalancedTokenRange(uint32_t totalTokens, uint32_t workerIdx, uint32_t workerCount,
+                                                         uint64_t globalRowPrefix)
+{
+    if (workerCount == 0U || workerIdx >= workerCount) {
+        return {};
+    }
+    uint32_t firstOwner = static_cast<uint32_t>(globalRowPrefix % workerCount);
+    uint32_t logicalWorkerIdx = workerIdx >= firstOwner ? workerIdx - firstOwner : workerIdx + workerCount - firstOwner;
+    return GetBalancedTokenRange(totalTokens, logicalWorkerIdx, workerCount);
 }
 
 #if defined(__DAV_C310_CUBE__) || defined(__DAV_C310_VEC__)
@@ -331,21 +319,6 @@ __aicore__ inline void EndSync(int32_t vecSetSyncCom, uint16_t pingpongIdx = 0)
         } else {
             WaitForVector();
         }
-    }
-}
-
-__aicore__ inline void EndGMM2Sync(int32_t &vecSetSyncCom, uint16_t gmm2PingPongIdx)
-{
-    if constexpr (g_coreType == AIV) {
-        return;
-    }
-    if (vecSetSyncCom <= 0) {
-        return;
-    } else if (vecSetSyncCom == 1) {
-        WaitForVector();
-    } else {
-        WaitForVector(gmm2PingPongIdx);
-        WaitForVector(1U - gmm2PingPongIdx);
     }
 }
 
@@ -461,6 +434,7 @@ __aicore__ inline uint32_t AdvanceExpertTokenPositionInWave(uint32_t expertToken
         expertRemainingTokenCount < waveRemainingTokenCapacity ? expertRemainingTokenCount : waveRemainingTokenCapacity;
     waveMGroupCount += Ops::Base::CeilDiv(sliceTokenCount, TileM);
     position.tokenIndexInExpert += sliceTokenCount;
+    position.globalTokenIndex += sliceTokenCount;
     if (position.tokenIndexInExpert >= expertTokenCount) {
         ++position.expertIdx;
         position.tokenIndexInExpert = 0U;
@@ -500,6 +474,37 @@ __aicore__ inline uint32_t GetExpertTokenCountFromWorkspace(GM_ADDR expertTokenC
     __gm__ int32_t *expertTokenCountAddr =
         reinterpret_cast<__gm__ int32_t *>(expertTokenCountWorkspace) + countSlotIndex;
     return static_cast<uint32_t>(AscendC::ReadGmByPassDCache(expertTokenCountAddr));
+}
+
+/*
+ * 在当前 WAVE 的剩余容量内规划下一个非空专家 slice。
+ * 单次调用最多返回一个非空专家范围；空专家会被跳过。函数只更新当前 WAVE 的 M-group 计数，
+ * 不修改调用方持有的 Dispatch 位置；调用方在 Dispatch 完成后使用返回范围的 end 提交进度。
+ */
+template <uint32_t TileM>
+__aicore__ inline ExpertTokenRange PlanNextExpertTokenRangeInWave(GM_ADDR expertTokenCountWorkspace,
+                                                                  const BlockWorkspaceContext &countWorkspace,
+                                                                  uint32_t expertCount, uint32_t waveMGroupTarget,
+                                                                  uint32_t &waveMGroupCount,
+                                                                  const ExpertTokenPosition &position)
+{
+    ExpertTokenPosition plannedPosition = position;
+    while (plannedPosition.expertIdx < expertCount && waveMGroupCount < waveMGroupTarget) {
+        uint32_t expertTokenCount = GetExpertTokenCountFromWorkspace(expertTokenCountWorkspace, countWorkspace,
+                                                                     expertCount, plannedPosition.expertIdx);
+        // 空专家或已完成专家不占用 WAVE 容量，继续寻找下一个非空专家。
+        if (expertTokenCount == 0U || plannedPosition.tokenIndexInExpert >= expertTokenCount) {
+            ++plannedPosition.expertIdx;
+            plannedPosition.tokenIndexInExpert = 0U;
+            continue;
+        }
+
+        ExpertTokenRange range{plannedPosition, plannedPosition};
+        AdvanceExpertTokenPositionInWave<TileM>(expertTokenCount, waveMGroupTarget, waveMGroupCount, plannedPosition);
+        range.end = plannedPosition;
+        return range;
+    }
+    return {plannedPosition, plannedPosition};
 }
 
 // 轮询 GM 中的 int32 flag 直至等于期望值，并在两次读取之间加入短暂退避。
