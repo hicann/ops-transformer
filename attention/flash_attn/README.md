@@ -199,7 +199,7 @@ cd build && ctest -R flash_attn_tiling --output-on-failure
 - **概念**：当某一行（一个 Q head 的一行 Q token）的所有 token 均被掩码排除（如 window 窗口外、seqused 截断、mask 全 1），该行没有任何有效参与计算的元素时，称为**无效行**。kernel 以该行 softmax max 是否仍为 `-inf`（softmaxMax == -inf，即没有任何有效 s 值）作为判定依据。
 - **行无效时输出**：
   - **attn_out**：无效行输出**清零**（写 0）。`RowInvalidUpdateVF` 用 `Select` 将 max == -inf 的行整体写 0（`vf_flashupdate_new.h`），FD 阶段由 `InvalidRows`/`InvalidMaskRows` 清零后写出。
-  - **softmax_lse**：无效行输出 **+inf**（3e+99）。代码不依赖数学推导（log(sum) + max 会得 -inf），而是显式处理：`ComputeLseOutputVF` 先算 `lse = log(sum) + max`，再用 `Select` 将 max == -inf 的行置为 `infValue = 3e+99`（`vf_flashupdate_new.h:522-523`）；FD 阶段 `ComputeScaleValue` 同样处理（`vf_flash_decode_arch35.h:310-311`）。
+  - **softmax_lse**：无效行输出 **+inf**（3e+99）。代码不依赖数学推导（log(sum) + max 会得 -inf），而是显式处理：`ComputeLseOutputVF` 先算 `lse = log(sum) + max`，再用 `Select` 将 max == -inf 的行置为 `infValue = 3e+99`（`vf_flashupdate_new.h:522-523`）；FD 阶段 `ComputeScaleValue` 同样处理（`vf_flash_decode_arch35.h:312-313`）。
 
 #### 1.8 Sink（learnable sink）
 
@@ -351,7 +351,8 @@ FA 计算的核心是把注意力矩阵按块切分、逐块 online 计算。基
 | 1 | 32 | 256 | 64 | 64 |
 | 2 | 64 | 128 | 128 | 128 |
 | 3 | 32 | 256 | 128 | 128 |
-| 4 | 32 | 256 | 256 | 256 |
+| 4 | 64 | 128 | 256 | 256 |
+| 5 | 32 | 256 | 256 | 256 |
 
 - **sOuter**：M 方向（Q 序列）每核每次迭代的块行数。
 - **sInner**：N 方向（KV 序列）的块大小，即 s2BaseSize。
@@ -360,14 +361,14 @@ FA 计算的核心是把注意力矩阵按块切分、逐块 online 计算。基
 
 - **mBaseSize = sOuter × CV_RATIO**（CV_RATIO=2，AIC:AIV=1:2）：一个 AIC 核承担 mBaseSize 行 Q，对应 2 个 AIV 核各处理 mBaseSize/2 行。
 - **s2BaseSize = sInner**：KV 序列方向的块大小。
-- host 侧 `AdjustSinnerAndSouter` 按 D（及 maxSeq/window 条件）选择 sOuter/sInner，再映射到 config（D=64→config0/1，D=128→config2/3，D=256→config4）。
+- host 侧 `AdjustSinnerAndSouter` 按 D（及 gSize/maxSeq/window 条件）选择 sOuter/sInner，再映射到 config（D=64→config0/1，D=128→config2/3，D=256→config4/5：`gSize × maxSeqQ ≥ 64` 时取 sOuter=64/sInner=128→config4，否则取 sOuter=32/sInner=256→config5）。
 
 **gS1 合轴**：
 
-- **含义**：GQA 下 g = Q_N / KV_N 个 Q head 共享同一份 KV。为避免任务循环中分别遍历 g 与 S1 两个维度，将两轴合并为一个 **gS1 轴**：`gS1Size = actSeqLensQ × gSize`（`flash_attn_kernel_dn.h:290`）。
+- **含义**：GQA 下 g = Q_N / KV_N 个 Q head 共享同一份 KV。为避免任务循环中分别遍历 g 与 S1 两个维度，将两轴合并为一个 **gS1 轴**：`gS1Size = actSeqLensQ × gSize`（`flash_attn_kernel_dn.h:288`）。
 - **排布差异**（合轴内部 g 与 S1 的先后，影响 mask/RowInvalid 的行换算）：
-  - **S1G 排布**（BSND/TND 布局）：S1 在外、g 在内，`s1Idx = gS1Idx / gSize`（`flash_attn_kernel_dn.h:473`）。
-  - **GS1 排布**（BNSD 布局）：g 在外、S1 在内，`s1Idx = gS1Idx % actSeqLensQ`（`flash_attn_kernel_dn.h:476`）。
+  - **S1G 排布**（BSND/TND 布局）：S1 在外、g 在内，`s1Idx = gS1Idx / gSize`（`flash_attn_kernel_dn.h:483`）。
+  - **GS1 排布**（BNSD 布局）：g 在外、S1 在内，`s1Idx = gS1Idx % actSeqLensQ`（`flash_attn_kernel_dn.h:486`）。
 - **合轴收益**：bN2 × gS1 二维任务空间按 mBaseSize 统一分块（`gS1LoopTimes = ceil(gS1Size / mBaseSize)`）；共享同一份 KV 的 g 个 Q head 落在相邻行，便于 KV 复用与负载均衡切分。
 
 **任务循环结构**（kernel 内三重循环，详见 §7）：
@@ -424,9 +425,9 @@ FD 段  [section][aivIdx(72)][16 字段]：bN2Idx, mIdx(gS1Idx), workspaceIdx, s
 | 0-7 | InOutLayoutType | 0=BSND, 1=BNSD, 2=TND, 3=BNSD_BSND |
 | 8-15 | KvLayoutType | 0=连续, 1=PA_BBND, 2=PA_BNBD, 3=PA_NZ |
 | 16 | HasAttenMask | false/true |
-| 17-19 | Config | 0~4（sOuter×sInner×D×DV 组合，见 §3 基本块） |
+| 17-19 | Config | 0~5（sOuter×sInner×D×DV 组合，见 §3 基本块） |
 
-**生成**：host tiling 的 `GenTilingKey` 一步 —— `UpdateTilingKeyInfo`（按布局/mask/config 填 tilingKeyInfo）→ `GET_TPL_TILING_KEY`（`arch35/flash_attn_tiling.cpp:193-203`）。
+**生成**：host tiling 的 `GenTilingKey` 一步 —— `UpdateTilingKeyInfo`（按布局/mask/config 填 tilingKeyInfo）→ `GET_TPL_TILING_KEY`（`arch35/flash_attn_tiling.cpp:194-204`）。
 
 **下发与选择**：tiling 期 `SetTilingKey` 写入 TilingContext；运行时 kernel 按 key 选择变体执行。编译期可用 `--tiling_key` 指定只生成部分变体（见 Quick Start 编译）。
 
@@ -447,7 +448,7 @@ useDn = !hasAttenMask && (config == 0 || config == 2)
 | 路径 | 条件 | 调度框架 | softmax VF | 适用 |
 |---|---|---|---|---|
 | Dn | 无mask 且 config∈{0,2} | flash_attn_kernel_dn.h | ProcessVec1VfDn（无mask专用优化） | 无mask、D≤128 |
-| Nd | 其余（有mask 或 config∈{1,3,4}） | flash_attn_kernel_nd.h | ProcessVec1Vf（按 actS2 四档通用） | 有mask或 D=256 |
+| Nd | 其余（有mask 或 config∈{1,3,4,5}） | flash_attn_kernel_nd.h | ProcessVec1Vf（按 actS2 四档通用） | 有mask或 D=256 |
 
 加新模板组合（如新 config、新布局）的改动点：`flash_attn_template_tiling_key.h`（参数声明）→ host `UpdateTilingKeyConfig`（映射）→ `flash_attn.cpp` 的路由与 kernel 模板实例化处。
 
@@ -464,9 +465,9 @@ Process():
   FreeEventID + UnInitCrossCoreSync
 ```
 
-**① InitOutput**（`flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h` 的 `ClearOutput`，`needInitOutput=true` 时执行）：计算 attn_out 与 softmax_lse 的总大小（TND 取 T×g×N×DV），由 `2×coreNum` 个 AIV 按 32KB POP buffer 并行写 GM：attn_out 清零（0），LSE 预置 `3e+99`；写完后 `SyncAll` 保证后续计算可见（`flash_attn_block_vec_dn.h:269-294`）。
+**① InitOutput**（`flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h` 的 `ClearOutput`，`needInitOutput=true` 时执行）：计算 attn_out 与 softmax_lse 的总大小（TND 取 T×g×N×DV），由 `2×coreNum` 个 AIV 按 32KB POP buffer 并行写 GM：attn_out 清零（0），LSE 预置 `3e+99`；写完后 `SyncAll` 保证后续计算可见（`flash_attn_block_vec_dn.h:263-291`）。
 
-**② FlashAttention（FA）——核心 while 循环**（`flash_attn_kernel_dn.h:215-268`）：
+**② FlashAttention（FA）——核心 while 循环**（`flash_attn_kernel_dn.h:213-265`）：
 
 ```text
 bN2Cur, gS1Cur, s2Cur ← metadata 段起点；createdTaskCount / executedTaskCount = 0
@@ -485,7 +486,7 @@ while (shouldDispatchTask || validTaskCount):
 - `GetTaskDealMode`：按 seqused/cu_seqlens 算 `actSeqLensQ/Kv`，行长为 0 时整行跳过（DEAL_ZERO），窗口模式下 s2 游标未到 `curS2Start` 时快进（NOT_START），mask 有效时 `CalcCurS2StartEndWithSparse` 决定跳过无效 tile。
 - **while 循环的本质**：创建任务（游标推进）与执行任务（流水消费）分离，`validTaskCount` 追踪未执行任务数，保证创建慢于执行 2 轮（PRELOAD_N）以形成流水。
 
-**③ 核间 PRELOAD 流水（ExecuteTask）**（`flash_attn_kernel_dn.h:424-446`）：
+**③ 核间 PRELOAD 流水（ExecuteTask）**（`flash_attn_kernel_dn.h:422-444`）：
 
 ```text
 ExecuteTask(loop, taskRunInfo):
@@ -499,28 +500,31 @@ ExecuteTask(loop, taskRunInfo):
 
 即同一时刻 AIC 上 BMM1(本轮) 与 BMM2(2 轮前) 并行，AIV 上 Vec1(本轮) 与 Vec2(2 轮前) 并行；数据经核间 flag 接力（BMM1 结果 UB → Vec1 → L1 → BMM2），`PRELOAD_TASK_CACHE_SIZE=4` 用 `loop & 3` 代替取模。
 
-**④ FlashDecode（FD 调度）**（`flash_attn_kernel_dn.h:557-568`）：读 FD 段 metadata（bN2Idx/mIdx/workspaceIdx/s2SplitNum/mStart）→ `vecFdBlock_.InitBuffers()` → `ICachePreLoad` → `SyncAll()`（等 FA 全部完成）→ `vecFdBlock_.FlashDecode()` → `SyncAll()`（等 FD 完成再进下一 section）。
+**④ FlashDecode（FD 调度）**（`flash_attn_kernel_dn.h:567-578`）：读 FD 段 metadata（bN2Idx/mIdx/workspaceIdx/s2SplitNum/mStart）→ `vecFdBlock_.InitBuffers()` → `ICachePreLoad` → `SyncAll()`（等 FA 全部完成）→ `vecFdBlock_.FlashDecode()` → `SyncAll()`（等 FD 完成再进下一 section）。
 
-**⑤ FA 的 CV 计算流程（CV 配比 1:2 的数据流向）**：`KERNEL_TYPE_MIX_AIC_1_2` 下 1 个 AIC 配 2 个 AIV，AIC 承担两个 BMM，AIV 承担 softmax/output——双 AIV 通过 flag + `AIV0_AIV1_OFFSET=16` 各自独立同步，行方向各处理 `mBaseSize/2` 行（`actVecMSize`）：
+**⑤ FA 的 CV 计算流程（CV 配比 1:2 的数据流向）**：`KERNEL_TYPE_MIX_AIC_1_2` 下 1 个 AIC 配 2 个 AIV，AIC 承担两个 BMM，AIV 承担 softmax/output——双 AIV 通过 flag + `AIV0_AIV1_OFFSET=16` 各自独立同步，行方向各处理 `mBaseSize/2` 行（`actVecMSize`）。BMM1/BMM2 的 fixpipe 结果写入**共享的 UB mmRes buffer**（见 §8/§9），同一 buffer 的 flag 在写端（BMM1/BMM2）与读端（Vec1/Vec2）间接力：
 
 ```text
             AIC（Cube）                              AIV0（前半 mBaseSize/2 行）      AIV1（后半 mBaseSize/2 行）
-──────────────────────────────────────────────────────────────────────────────────────────────────────
-BMM1:      Q×K^T → L0C → Fixpipe → UB[bufId]
-           CrossCoreSetFlag(CC_BMM1_0+bufId) ──────────────► CrossCoreWaitFlag 读 UB 前半
-           CrossCoreSetFlag(CC_BMM1_0+bufId+16) ─────────────────────────────► CrossCoreWaitFlag 读 UB 后半
-           CrossCoreWaitFlag(同 flag×2，等两 AIV 读完) ◄─ CrossCoreSetFlag ×2
-                                                     Vec1 softmax → cast → L1(P) ──► AIV 各自
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+BMM1:      Q×K^T → L0C → Fixpipe → mmRes[bufId]
+           （先 WaitFlag 同 flag×2：等该 buffer 上一个读端读完释放）
+           CrossCoreSetFlag(mmSyncIdx) ────────────────────► CrossCoreWaitFlag 读 UB 前半
+           CrossCoreSetFlag(mmSyncIdx+16) ──────────────────────────────► CrossCoreWaitFlag 读 UB 后半
+                                                      Vec1 softmax → cast → L1(P) ──► AIV 各自
            AIC CrossCoreWaitFlag 等 L1(P) 就绪（CC_L1P，双路）◄─ CrossCoreSetFlag ×2
+           Vec1 读毕 SetFlag(mmSyncIdx) ──► 释放该 buffer，供下一个写端覆写
 
-BMM2:      P×V → L0C → Fixpipe → UB[bufId]
-           CrossCoreSetFlag(CC_BMM2_0+bufId) ──────────────► Vec2 前半行累加 → 写 GM
-           CrossCoreSetFlag(CC_BMM2_0+bufId+16) ────────────────────────────► Vec2 后半行累加 → 写 GM
+BMM2:      P×V → L0C → Fixpipe → mmRes[bufId']（bufId' 由 mmResBufId_ 计数器推进，≠bufId）
+           （先 WaitFlag 同 flag×2：等该 buffer 上一个读端读完释放）
+           CrossCoreSetFlag(mmSyncIdx') ──────────────────► Vec2 前半行累加 → 写 GM
+           CrossCoreSetFlag(mmSyncIdx'+16) ───────────────────────────► Vec2 后半行累加 → 写 GM
+           Vec2 读毕 SetFlag(mmSyncIdx') ──► 释放该 buffer，供下一个写端覆写
 ```
 
-- **flag 分工**：BMM1/BMM2 各用一对 flag（`CC_BMM1_0/1`、`CC_BMM2_0/1`，UB 双 buffer 轮转），`+16` 偏移让同一 AIC 的两个 AIV 使用独立 flag 位，互不串扰。
+- **flag 分工（一 buffer 一 flag 的读写接力）**：**flag 的 ID 标识 mmRes buffer（资源），不标识操作**。BMM1/BMM2 结果共用同一组 `ubMmResBuffers_`，每个 buffer 对应一个核间同步 ID——AIV 侧（block_vec）为 `CC_MM_0~3`、AIC 侧（block_cube）为 `CROSSCORE_MM_0~3`（两侧各声明一份、数值一致），代码中经 `mmSyncIdx = CC_MM_0 + mmResUbBufId` 换算后传给 `CrossCoreSetFlag/WaitFlag`（D≤128 用 4 个、D=256 用 2 个）：写端（BMM1/BMM2）fixpipe 完成后 Set（结果就绪），读端（Vec1/Vec2）Wait 后读取、读毕再 Set（buffer 释放）——同一 flag 沿「就绪 → 释放 → 就绪」交替接力，取代早期 BMM1/BMM2 各持一对独立 flag（`CC_BMM1_0/1`/`CC_BMM2_0/1`）的方案；`+16`（`AIV0_AIV1_OFFSET`）偏移让同一 AIC 的两个 AIV 使用独立 flag 位，互不串扰。buffer 由 `mmResBufId_` 单调递增计数器分配（取代 `loop%N` 索引——后者会使 BMM1(L) 与 BMM2(L-2) 映射到同一 buffer），保证同一 ExecuteTask 内先后执行的 BMM1(L) 与 BMM2(L-2) 落在不同 buffer，避免写写冲突与环形等待。
 - **L1(P) 交接**：Vec1 结果由两个 AIV 各自写 L1(P) 后 CrossCoreSetFlag(CC_L1P)（3 buffer 对应三路 flag），AIC 在 BMM2 前等待两路都就绪。
-- **行分担**：两个 AIV 各算 `mBaseSize/2` 行（Dn 按 `align32(actM)>>1`、Nd 按 `(actM+1)>>1` 切分），与 BMM1 fixpipe 的 `dualDstCtl=2` 双目标写、BMM2 fixpipe 的 `dualDstCtl=1` 配合，保证每 AIV 恰好拿到自己那半。
+- **行分担**：两个 AIV 各算 `mBaseSize/2` 行（Dn 按 `align32(actM)>>1`、Nd 按 `(actM+1)>>1` 切分），与 BMM1/BMM2 fixpipe 的双目标写（`dualDstCtl=1`，按 M 维对半拆分写入两个 AIV 的 UB）配合，保证每 AIV 恰好拿到自己那半。
 
 
 ### 8. block cube 层
@@ -532,37 +536,35 @@ AIC 侧按存储层级分配 buffer，覆盖 BMM1（Q×K^T）与 BMM2（P×V）�
 |---|---|---|---|
 | L1 | `l1PBuffers_` | 3×（mBaseSize×s2BaseSize×sizeof(INPUT_T)） | softmax 结果（P 矩阵），供 BMM2 读 |
 | L1 | `l1QBuffers_` | 2×（mBaseSize×dBaseSize×sizeof(Q_T)） | Q 矩阵（BMM1 输入），gS1 行内复用 |
-| L1 | `l1KvBuffers_` | 4×64KB（Nd D=256：2×128KB 大缓冲） | K/V 矩阵，BMM1 用 K、BMM2 用 V，共享 |
+| L1 | `l1KvBuffers_` | 4×64KB（s2BaseSize=256 且 D>128，即 config=5：2×128KB 大缓冲） | K/V 矩阵，BMM1 用 K、BMM2 用 V，共享 |
 | L0A | `l0aBufferManager_` | 2×32KB（BufferManager 初始 64KB） | BMM1 的 K / BMM2 的 P |
 | L0B | `l0bBufferManager_` | 2×32KB（BufferManager 初始 64KB） | BMM1 的 Q / BMM2 的 V |
-| L0C | `l0CBuffers_` | 4×64KB | 两个 MM 的 Matmul 结果 |
-| UB | `ubMm1ResBuffers_` | 2×（mBaseSize/2×s2BaseSize×sizeof(MM_T)） | BMM1 fixpipe 结果 → AIV softmax |
-| UB | `ubMm2ResBuffers_` | 2×（mBaseSize/2×dVBaseSize×sizeof(MM_T)） | BMM2 fixpipe 结果 → AIV output 累加 |
+| L0C | `l0CBuffers_` | 4×64KB | 两个 MM 的 Matmul 结果（共享轮转） |
+| UB | `ubMmResBuffers_` | （D≤128：4；D=256：2）×（mBaseSize/2×max(s2BaseSize, dVBaseSize)×sizeof(MM_T)） | BMM1/BMM2 fixpipe 结果分时复用 → AIV softmax / output 累加 |
 
 **L1 buffer 分配策略解释**：
 
 - **P 3 个**：P 由 AIV 写（softmax 结果）、AIC 读（BMM2 输入），读写分属不同核。PRELOAD_N=2 下 AIV 写第 N 轮 P 与 AIC 读第 N-2 轮 P 并行，3 buffer 轮转恰好容纳「写入中/待读取/已释放」三个状态，避免核间 flag 等待阻塞流水。
 - **Q 2 个**：同一 gS1 行内多个 s2 循环复用同一份 Q，仅在 `isFirstS2Loop` 加载、`isLastS2Loop` 释放；2 buffer 用于前后 gS1 行切换时新旧 Q 交替，MTE2 加载与计算重叠。
-- **KV 4×64KB**：K 与 V 分别被 BMM1/BMM2 消费，二者在 PRELOAD_N=2 流水下时间错开——加载 K 的同时可加载下一轮的 V。4 buffer 让 K/V 交替加载保持 MTE2 连续工作；64KB 容量覆盖 mBaseSize×s2BaseSize×2B 单矩阵。Nd D=256 时 s2BaseSize=256，单矩阵超过 64KB，改用 2×128KB 大缓冲。
+- **KV 4×64KB**：K 与 V 分别被 BMM1/BMM2 消费，二者在 PRELOAD_N=2 流水下时间错开——加载 K 的同时可加载下一轮的 V。4 buffer 让 K/V 交替加载保持 MTE2 连续工作；64KB 容量覆盖 mBaseSize×s2BaseSize×2B 单矩阵。s2BaseSize=256 且 D>128（config=5）时单矩阵（s2×d×2B=128KB）超过 64KB，改用 2×128KB 大缓冲；config=4（s2BaseSize=128）仍为 4×64KB。
 
 **L0A/L0B 分配策略解释**：L0A/L0B 是 Matmul 的 A/B 操作数缓存，2×32KB 双 buffer 让 MTE1 搬运（L1→L0）与 PIPE_M 计算重叠——搬运第 i+1 轮数据时第 i 轮正在计算；由 `BuffersPolicyDB`（LOCK_UNLOCK + 外部 eventID）管理锁依赖。
 
-**L0C 分配策略解释**：L0C 是 Matmul 结果的累加器，4×64KB 双倍覆盖「上一轮 Fixpipe 读 + 本轮 Matmul 写」的重叠窗口。两个 MM 共用同一组 L0C（时间错开复用），4 buffer 使 MTE1→M→FIX 三级流水连续推进。
+**L0C 分配策略解释**：L0C 是 Matmul 结果的累加器，4×64KB 双倍覆盖「上一轮 Fixpipe 读 + 本轮 Matmul 写」的重叠窗口。两个 MM 共用同一组 L0C（时间错开复用），4 buffer 使 MTE1→M→FIX 三级流水连续推进。D=256（dVBaseSize>128）时 BMM2 以 128 列为 tile 做外层循环（`IterateBmm2l0Split` 的 `nLoops` 循环，splitN），逐 tile 占用轮转的 64KB buffer 并独立 Fixpipe——单个 buffer 无需容纳 128×256×4B 整块结果，L0C 布局对 D=128/D=256 保持统一。
 
-**UB 分配策略解释**：`ubMm1Res/ubMm2ResBuffers_` 是 AIC→AIV 的 CV 通信 buffer（fixpipe 写、AIV 读）。2 buffer 轮转配合核间 flag（`CC_BMM1_0/1`、`CC_BMM2_0/1`）实现双缓冲：AIC fixpipe 写 buf A 时 AIV 正在读 buf B，flag 置位/等待交替，隐藏 CV 传输延迟。大小为 `mBaseSize/2` 行切片（双 AIV 各处理一半，`CV_RATIO=2`）。需要与block_vec上对应UB buffer的地址和大小完全对齐。
+**UB 分配策略解释**：`ubMmResBuffers_` 是 AIC→AIV 的 CV 通信 buffer（fixpipe 写、AIV 读），BMM1/BMM2 的结果复用同一组 buffer：buffer 大小取 `s2BaseSize` 与 `dVBaseSize` 的较大值（`mBaseSize/2` 行切片，双 AIV 各处理一半，`CV_RATIO=2`）；buffer 数按 D 分档——D≤128 用 4 个、D=256 用 2 个（`UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2 : 4`）。多 buffer 轮转配合核间同步 ID（AIC 侧 `CROSSCORE_MM_0~3`，一 flag 一 buffer）实现流水：AIC fixpipe 写某个 buffer 时 AIV 正在读更早的 buffer，flag 置位/等待交替，隐藏 CV 传输延迟；buffer 由 `mmResBufId_` 单调递增计数器分配。需要与block_vec上对应UB buffer的地址和大小完全对齐。
 
 ### 9. block vector 层
 
 #### 9.1 buffer 分配
-**UB buffer 分配（以 Nd 为例，`UbLayout` 结构体定义，`flash_attn_block_vec_nd.h:205-220`）**：Nd 是功能最全的路径（含 mask），其布局覆盖 Dn 全部 buffer 并多出 mask/tmp 两项；按地址从低到高排布，`static_assert(sizeof(UbLayout) <= 248KB)` 限制总占用；UB总size为256KB，但是由于需要为AscendC和VF预留8K，所以业务只能使用248K。
+**UB buffer 分配（以 Nd 为例，`UbLayout` 结构体定义，`flash_attn_block_vec_nd.h:203-216`）**：Nd 是功能最全的路径（含 mask），其布局覆盖 Dn 全部 buffer 并多出 mask/tmp 两项；按地址从低到高排布，`static_assert(sizeof(UbLayout) <= 248KB)` 限制总占用；UB总size为256KB，但是由于需要为AscendC和VF预留8K，所以业务只能使用248K。
 
 | Buffer | 数量×大小 | 用途 | 分配策略 |
 |---|---|---|---|
-| `ubMm2ResBuffers_` | 2 × (mBaseSize/2 × dVBaseSize × sizeof(FP32)) ≈ 2×32KB | CV 通信 BUF：AIC BMM2 fixpipe 结果（Vec2 输入） | **双 buffer**：AIC fixpipe 写与 AIV Vec2 读并行，配合 `CC_BMM2_0/1` flag 轮转 |
-| `ubMm1ResBuffers_` | 2 × (mBaseSize/2 × s2BaseSize × sizeof(FP32)) ≈ 2×32KB | CV 通信 BUF：AIC BMM1 fixpipe 结果（Vec1 输入） | **双 buffer**：同上，`CC_BMM1_0/1` flag 轮转；大小为 mBaseSize/2 行切片（双 AIV 各处理一半） |
+| `ubMmResBuffers_` | （D≤128：4；D=256：2）× (mBaseSize/2 × max(s2BaseSize, dVBaseSize) × sizeof(FP32))，D=128 时 ≈ 4×32KB | CV 通信 BUF：AIC BMM1/BMM2 fixpipe 结果分时复用（Vec1 softmax 输入 / Vec2 累加输入） | **多 buffer 轮转**：AIC fixpipe 写与 AIV 读并行，一 flag 一 buffer（AIV 侧 `CC_MM_0~3` / AIC 侧 `CROSSCORE_MM_0~3`）读写接力（见 §7⑤）；buffer 大小取 s2 与 dV 较大值，BMM1/BMM2 结果分时复用；`mmResBufId_` 单调递增计数器分配 buffer（取代 `loop%N`） |
 | `ubMaskBuffers_` | 2 × (mBaseSize/2 × s2BaseSize × sizeof(uint8)) | mask 从 GM 拷入的输入 BUF（仅 Nd） | **双 buffer 预取**：当前轮 `AttenMaskCopyIn` 计算的同时 MTE3 预取下一轮 mask，规避 GM 访存延迟。真实需求 = 每个 AIV 的 mBaseSize/2 行 × s2BaseSize 个 INT8（1B），即 2×(mBaseSize/2 × s2BaseSize × 1B)（当前代码写死 2×8KB，仅等于 s2BaseSize=128 时的需求） |
-| `ubVec2Res_` | 1 × (mBaseSize/2 × dVBaseSize × sizeof(FP32)) | Vec2 中间结果 + attn_out 输出 buffer | **单 buffer**：与 PRELOAD_N=2 流水配合（Vec2 与 2 轮前 Vec1 同时执行），首次 tile 用 `DataCopy` 分支跳过脏值（见 §7），无需双缓冲。真实需求 = 每个 AIV 的 mBaseSize/2 行 × dVBaseSize × FP32(4B)（当前代码写死 32KB，仅等于 dVBaseSize=128 时的需求） |
-| `ubVec1ResBuffers_` | 2 × ((mBaseSize/2 + 1) × dVBaseSize × sizeof(BF16/FP16)) | softmax 结果 cast 后拷至 L1(P) 的过渡 BUF | **双 buffer**：V pipe 写与 MTE3 拷 L1 并行，2 buffer 使两段传输交替。**行大小取 (mBaseSize/2 + 1) 而非 mBaseSize/2**：每行多留 1 个元素作为地址偏移，使相邻行的起始地址错开（不再同余于 UB bank 数），避免多行并发访问命中同一 bank 造成 bank 冲突；×2B 为 cast 回 FP16 的元素大小 |
+| `ubVec2Res_` | 1 × (mBaseSize/2 × Align64(dVBaseSize) × sizeof(FP32)) | Vec2 中间结果 + attn_out 输出 buffer | **单 buffer**：与 PRELOAD_N=2 流水配合（Vec2 与 2 轮前 Vec1 同时执行），首次 tile 用 `DataCopy` 分支跳过脏值（见 §7），无需双缓冲。大小按模板参数动态计算（`UB_VEC2_RES_BUF_BYTES = mBaseSize/CV_RATIO × Align64(dVBaseSize) × sizeof(T)`，原为写死 32768U） |
+| `ubVec1ResBuffers_` | 2 × ((mBaseSize/2 + 1) × s2BaseSize × sizeof(BF16/FP16)) | softmax 结果 cast 后拷至 L1(P) 的过渡 BUF | **双 buffer**：V pipe 写与 MTE3 拷 L1 并行，2 buffer 使两段传输交替。大小按模板参数动态计算（`UB_VEC1_RES_BUF_BYTES = (mBaseSize/CV_RATIO+1) × s2BaseSize × sizeof(INPUT_T)`，原为写死 33024U）。**行大小取 (mBaseSize/2 + 1) 而非 mBaseSize/2**：每行多留 1 个元素作为地址偏移，使相邻行的起始地址错开（不再同余于 UB bank 数），避免多行并发访问命中同一 bank 造成 bank 冲突；×2B 为 cast 回 FP16 的元素大小 |
 | `softmaxSumBuf_` / `softmaxMaxBuf_` | 各 3 × (mBaseSize/2 × sizeof(FP32)) | online softmax 的 sum/max 累加状态 | **3 buffer，`mloop % 3`**：每个 gS1 行（mloop）独立一组状态，3 轮转容纳 PRELOAD_N=2 下同时活跃的 mloop（当前行 + 2 行在途），需要注意的是由于VF的处理约束，单个buffer的大小需要256B对齐 |
 | `softmaxExpBuf_` | 3 × (mBaseSize/2 × sizeof(FP32)) | exp 中间结果 | **3 buffer，`loop % 3`**：与 sum/max 配合同步轮转，需要注意的是由于VF的处理约束，单个buffer的大小需要256B对齐 |
 | `ubLseOutBuffers_` | 2 × (mBaseSize/2 × 32B) | FD 中间结果（sum/max）拷出 GM，或 LSE 结果拷出 | **双 buffer**：MTE3 拷出与 V pipe 计算重叠，`UB_OUT_LSE_OUT_EVENT0/1` 轮转，32B是因为输出时单行的max和sum需要扩展为32B后输出 |
@@ -582,7 +584,7 @@ m_{global} = \max_i m_i, \qquad
 o_{final} = \frac{\sum_i o_i \cdot e^{m_i - m_{global}}}{\ell_{global}}
 $$
 
-- `ComputeScaleValue`：先 Max 归约得全局 max；再对每份做 `Sub(m_i, m_global) → Exp → Mul(l_i, ·) → Add 累加` 得全局 sum；LSE 输出 `log(sum) + max`，max==-inf（无效行）时置 +inf（`vf_flash_decode_arch35.h:299-315`）。
+- `ComputeScaleValue`：先 Max 归约得全局 max；再对每份做 `Sub(m_i, m_global) → Exp → Mul(l_i, ·) → Add 累加` 得全局 sum；LSE 输出 `log(sum) + max`，max==-inf（无效行）时置 +inf（`vf_flash_decode_arch35.h:299-317`）。
 - `ReduceFinalRes`：用 scale $e^{m_i - m_{global}}$ 重算每份 accumOut 权重，加权累加后再除 $\ell_{global}$（`ReduceFinalRes_VF`）。
 
 **计算流程**：
@@ -597,17 +599,18 @@ FlashDecode(fdParams)：
   └─ DealInvalidRows / DealInvalidMaskRows（清零无效行）→ Cast → Bmm2DataCopyOutTrans 写 GM
 ```
 
-**UB 分配**（`InitBuffers`，`flash_attn_block_vec_flashdecode.h:175-233`；与 FA block **共享同一块 UB 布局**，按绝对字节偏移手动管理）：
+**UB 分配**（`InitBuffers`，`flash_attn_block_vec_flashdecode.h:172-230`；与 FA block **共享同一块 UB 布局**，按绝对字节偏移手动管理）：
 
-**BASE 定义**（`flash_attn_block_vec_flashdecode.h:179-183`）：
+**BASE 定义**（`flash_attn_block_vec_flashdecode.h:178-182`）：
 
 ```cpp
-constexpr uint32_t mm1Sz = mBaseSize / 2U * s2BaseSize * sizeof(T);   // FA ubMm1Res 单 buffer 大小
-constexpr uint32_t mm2Sz = mBaseSize / 2U * dVBaseSize * sizeof(T);   // FA ubMm2Res 单 buffer 大小
-constexpr uint32_t BASE  = mm1Sz * 2U + mm2Sz * 2U;                   // FD 业务区起始字节偏移
+// bmm1和bmm2复用buffer
+constexpr uint32_t mmSz = mBaseSize / 2U * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T); // FA ubMmRes 单 buffer 大小
+// FD 业务区起始字节偏移（跳过 bmm1/bmm2/mm2In 区域）
+constexpr uint32_t BASE = mmSz * ((dVBaseSize > 128) ? 2U : 4U);
 ```
 
-FD 复用 FA 的 UB 布局（同一 AIV），因此必须从 FA block 已占用的 buffer **之后**起址。`BASE = ubMm1Res×2 + ubMm2Res×2` 正是跳过 FA 的 **CV 通信双 buffer 区**（BMM1/BMM2 fixpipe 结果区），FD 业务区从此偏移开始；其后的 `SharedBuffer1/2/3` 区在 FA 阶段由 `attenMaskBuf`/`stage1OutBuf`/`stage2OutBuf` 使用，FA 结束、FD 开始时前者已不再需要，故可分时复用（详见下方并行性说明）。
+FD 复用 FA 的 UB 布局（同一 AIV），因此必须从 FA block 已占用的 buffer **之后**起址。`BASE = mmSz × buffer 数`（D≤128 为 4、D=256 为 2，与 FA 的 `UB_MM_RES_BUFCNT` 口径一致）正是跳过 FA 的 **CV 通信 mmRes 区**（BMM1/BMM2 fixpipe 共享结果区），FD 业务区从此偏移开始；其后的 `SharedBuffer1/2/3` 区在 FA 阶段由 `attenMaskBuf`/`stage1OutBuf`/`stage2OutBuf` 使用，FA 结束、FD 开始时前者已不再需要，故可分时复用（详见下方并行性说明）。
 
 | Buffer | 数量×大小 | 用途 |
 |---|---|---|
@@ -622,7 +625,7 @@ FD 复用 FA 的 UB 布局（同一 AIV），因此必须从 FA block 已占用�
 
 > 注：FD 各 buffer 与 FA 的 `attenMaskBuf`/`stage1OutBuf`/`stage2OutBuf` **复用同一物理 UB 区**（`InitBuffers` 注释：SharedBuffer1/2/3 区 FA 与 FD 分时复用），因此不增加额外 UB 总量。
 
-**FD 与 block_cube 的并行性**（`flash_attn_kernel_dn.h:603-621`）：
+**FD 与 block_cube 的并行性**（`flash_attn_kernel_dn.h:613-637`）：
 
 ```text
 Process():       AIC（block_cube）                     AIV（block_vec / FD）
