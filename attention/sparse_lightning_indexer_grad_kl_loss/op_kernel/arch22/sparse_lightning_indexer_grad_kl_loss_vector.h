@@ -895,7 +895,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::Vector2ScatterAdd(int32_t v
                 ScatterAddCopyOutSingle(scatterAddTmpUb[ub1Offset], keyOffset1, scatterAddGm);
                 ScatterAddCopyOutSingle(scatterAddTmpUb[ub2Offset], keyOffset2, scatterAddGm);
             } else {
-                DataCopyExtParams dataCopyParams(keyOffset1Pass + keyOffset1Pass, constInfo.dSizeQueryIndex * sizeof(T),
+                DataCopyExtParams dataCopyParams(keyOffset1Pass + keyOffset2Pass, constInfo.dSizeQueryIndex * sizeof(T),
                                                  0, keySrcStride, 0);
                 int64_t keyStartOffset = (keyOffset1Pass) ? keyOffset1 : keyOffset2;
                 int64_t ubStartOffset = (keyOffset1Pass) ? ub1Offset : ub2Offset;
