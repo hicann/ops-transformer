@@ -78,7 +78,7 @@ public:
 
 private:
     // 取负 + 判定有效位。取负让降序排序等价于 expert_id 升序;判定阈值同样取负后比较,
-    // 于是"有效"= 键 > -expertStart。这一段是纯规则的逐元素向量运算,用 MicroAPI 写。
+    // 于是"有效"= 键 > -expertStart。这一段是纯规则的逐元素向量运算,用 Reg 写。
     __aicore__ inline void PrepareKeys(const LocalTensor<float> &keys, const LocalTensor<uint32_t> &maskBits,
                                        int64_t count)
     {
@@ -89,13 +89,13 @@ private:
 
         __VEC_SCOPE__
         {
-            MicroAPI::MaskReg loopMask;
-            MicroAPI::RegTensor<float> keyReg;
+            Reg::MaskReg loopMask;
+            Reg::RegTensor<float> keyReg;
             for (uint16_t i = 0; i < repeatTimes; i++) {
-                loopMask = MicroAPI::UpdateMask<float>(remain);
-                MicroAPI::DataCopy(keyReg, keyAddr + i * FLOAT_REG_ELEMENTS);
-                MicroAPI::Muls(keyReg, keyReg, negOne, loopMask);
-                MicroAPI::DataCopy(keyAddr + i * FLOAT_REG_ELEMENTS, keyReg, loopMask);
+                loopMask = Reg::UpdateMask<float>(remain);
+                Reg::DataCopy(keyReg, keyAddr + i * FLOAT_REG_ELEMENTS);
+                Reg::Muls(keyReg, keyReg, negOne, loopMask);
+                Reg::DataCopy(keyAddr + i * FLOAT_REG_ELEMENTS, keyReg, loopMask);
             }
         }
         PipeBarrier<PIPE_V>();
