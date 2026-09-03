@@ -303,43 +303,32 @@ Metadata字段布局：
     import torch_npu
     import torchair
     import cann_ops_transformer
-
+    from torchair.configs.compiler_config import CompilerConfig
 
     class SparseFlashMlaSoftmaxL1NormModel(torch.nn.Module):
         def __init__(self):
-            super().__init__()
+            super(SparseFlashMlaSoftmaxL1NormModel, self).__init__()
 
-        def forward(self, q, k, softmax_lse, cu_seq_qlen_tensor, cu_seq_klen_tensor,
-                    cmp_residual_k, max_seqlen_k, cmp_ratio, mask_mode, layout_q, layout_k):
+        def forward(self, m_inputs, npu_inputs):
             # 调用sparse_flash_mla_softmax_l1_norm_metadata完成负载均衡计算
-            metadata = cann_ops_transformer.sparse_flash_mla_softmax_l1_norm_metadata(
-                N1, N2, D,
-                cu_seqlens_q=cu_seq_qlen_tensor,
-                cu_seqlens_k=cu_seq_klen_tensor,
-                cmp_residual_k=cmp_residual_k,
-                max_seqlen_q=S1,
-                max_seqlen_k=max_seqlen_k,
-                topk=0,
-                cmp_ratio=cmp_ratio,
-                mask_mode=mask_mode,
-                layout_q=layout_q,
-                layout_k=layout_k,
+            metadata = torch.ops.cann_ops_transformer.sparse_flash_mla_softmax_l1_norm_metadata(
+                **m_inputs
             )
+            # metadata输出Tensor显式迁移到NPU后作为主算子入参
+            npu_inputs["metadata"] = metadata.npu()
             # 调用sparse_flash_mla_softmax_l1_norm执行算子计算
-            return cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
-                q, k, softmax_lse,
-                cu_seqlens_q=cu_seq_qlen_tensor,
-                cu_seqlens_k=cu_seq_klen_tensor,
-                cmp_residual_k=cmp_residual_k,
-                metadata=metadata,
-                softmax_scale=scale_value,
-                max_seqlen_k=max_seqlen_k,
-                cmp_ratio=cmp_ratio,
-                mask_mode=mask_mode,
-                layout_q=layout_q,
-                layout_k=layout_k,
+            return torch.ops.cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
+                **npu_inputs
             )
 
+    def sparse_flash_mla_softmax_l1_norm_acl_graph(m_inputs, npu_inputs):
+        npu_mode = SparseFlashMlaSoftmaxL1NormModel().npu()
+        config = CompilerConfig()
+        config.mode = "reduce-overhead"
+        npu_backend = torchair.get_npu_backend(compiler_config=config)
+        torch._dynamo.reset()
+        npu_mode = torch.compile(npu_mode, fullgraph=True, backend=npu_backend, dynamic=True)
+        return npu_mode(m_inputs, npu_inputs)
 
     torch_npu.npu.set_device(0)
 
@@ -376,11 +365,43 @@ Metadata字段布局：
 
     cmp_residual_k = torch.zeros(B, dtype=torch.int32, device="npu")
 
-    model = SparseFlashMlaSoftmaxL1NormModel()
-    config = torchair.CompilerConfig()
-    # 获取图模式后端
-    npu_backend = torchair.get_npu_backend(compiler_config=config)
-    model = torch.compile(model, backend=npu_backend, dynamic=True)
-    softmax_l1_norm = model(q, k, softmax_lse, cu_seq_qlen_tensor, cu_seq_klen_tensor,
-                            cmp_residual_k, S2, cmp_ratio, 3, input_layout, input_layout)
+    # metadata前置接口的入参
+    m_inputs = {
+        "num_heads_q": N1,
+        "num_heads_k": N2,
+        "head_dim": D,
+        "cu_seqlens_q": cu_seq_qlen_tensor,
+        "cu_seqlens_k": cu_seq_klen_tensor,
+        "cmp_residual_k": cmp_residual_k,
+        "max_seqlen_q": S1,
+        "max_seqlen_k": S2,
+        "topk": 0,
+        "cmp_ratio": cmp_ratio,
+        "mask_mode": 3,
+        "layout_q": input_layout,
+        "layout_k": input_layout,
+    }
+
+    # 主算子入参，metadata由图内生成
+    npu_inputs = {
+        "q": q.npu(),
+        "k": k.npu(),
+        "softmax_lse": softmax_lse.npu(),
+        "cu_seqlens_q": cu_seq_qlen_tensor,
+        "cu_seqlens_k": cu_seq_klen_tensor,
+        "cmp_residual_k": cmp_residual_k,
+        "softmax_scale": scale_value,
+        "max_seqlen_k": S2,
+        "cmp_ratio": cmp_ratio,
+        "mask_mode": 3,
+        "layout_q": input_layout,
+        "layout_k": input_layout,
+    }
+
+    softmax_l1_norm = sparse_flash_mla_softmax_l1_norm_acl_graph(m_inputs, npu_inputs)
+
+    torch_npu.npu.synchronize()
+    assert softmax_l1_norm.shape == (T1, N2, T2)
+    assert softmax_l1_norm.dtype == torch.float32
+    assert torch.isfinite(softmax_l1_norm.float()).all().item()
     ```

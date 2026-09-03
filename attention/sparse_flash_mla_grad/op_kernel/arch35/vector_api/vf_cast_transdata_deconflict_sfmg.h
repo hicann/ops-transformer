@@ -35,13 +35,13 @@ constexpr AscendC::Reg::CastTrait castTraitFp322Fp16Odd = {
     AscendC::Reg::RegLayout::ONE,
     AscendC::Reg::SatMode::SAT,
     AscendC::Reg::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT,
+    AscendC::RoundMode::CAST_ROUND,
 };
 constexpr AscendC::Reg::CastTrait castTraitFp322Fp16Even = {
     AscendC::Reg::RegLayout::ZERO,
     AscendC::Reg::SatMode::SAT,
     AscendC::Reg::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT,
+    AscendC::RoundMode::CAST_ROUND,
 };
 /* **************************************************************************************************
  * cast + ND_2_NZ                                             *

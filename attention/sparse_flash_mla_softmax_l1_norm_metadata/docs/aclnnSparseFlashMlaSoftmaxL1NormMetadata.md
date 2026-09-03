@@ -186,7 +186,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>numHeadsQ</td>
       <td>输入</td>
       <td>表示query的head个数。</td>
-      <td>必须为正数，并且能被numHeadsK整除。</td>
+      <td>取值范围[1, 128]，并且能被numHeadsK整除。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -196,7 +196,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>numHeadsK</td>
       <td>输入</td>
       <td>表示key的head个数。</td>
-      <td>必须为正数。</td>
+      <td>当前仅支持1。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -206,7 +206,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>headDim</td>
       <td>输入</td>
       <td>表示q/k的head dimension。</td>
-      <td>必须为正数。</td>
+      <td>当前仅支持512。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -422,7 +422,9 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
     - layoutQ必须为BSND或TND。
     - layoutK支持BSND和TND，建议与layoutQ保持一致。
   - head约束
-    - numHeadsQ、numHeadsK和headDim必须为正数。
+    - numHeadsQ取值范围为[1, 128]。
+    - numHeadsK当前仅支持1。
+    - headDim当前仅支持512。
     - numHeadsQ必须能被numHeadsK整除。
   - 负载均衡约束
     - topk支持非负数，0表示无稀疏。

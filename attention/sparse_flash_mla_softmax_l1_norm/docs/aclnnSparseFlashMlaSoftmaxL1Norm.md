@@ -618,7 +618,7 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(kHostData, kShape, &kDeviceAddr, aclDataType::ACL_FLOAT16, &k);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  ret = CreateAclTensor(softmaxLseHostData, softmaxLseShape, &softmaxLseDeviceAddr, aclDataType::ACL_FLOAT, &lse);
+  ret = CreateAclTensor(softmaxLseHostData, softmaxLseShape, &softmaxLseDeviceAddr, aclDataType::ACL_FLOAT, &softmaxLse);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(cuSeqQLenHostData, cuSeqQLenshape, &cuSeqQLenDeviceAddr, aclDataType::ACL_INT32, &cuSeqQLen);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
