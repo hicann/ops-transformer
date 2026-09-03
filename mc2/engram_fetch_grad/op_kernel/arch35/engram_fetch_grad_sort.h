@@ -64,17 +64,17 @@ constexpr uint32_t SIMT_STAGING_PAD_BYTES = HISTOGRAM_BINS * (SIMT_SLOT_ALIGN - 
 
 constexpr uint32_t UB_BLOCK_BYTES = Ops::Base::GetUbBlockSize();
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitU162U32Even = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::NO_SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitU162U32Even = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::NO_SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitU162U32Odd = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::NO_SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitU162U32Odd = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::NO_SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
 

@@ -31,14 +31,14 @@ namespace Activation {
 constexpr uint32_t VECTOR_LENGTH_FP32 = AscendC::VECTOR_REG_WIDTH / sizeof(float);
 
 // 输入统一转换为 FP32，供各激活的寄存器计算流程使用。
-constexpr AscendC::MicroAPI::CastTrait CAST_INPUT_TO_FP32 = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::UNKNOWN};
+constexpr AscendC::Reg::CastTrait CAST_INPUT_TO_FP32 = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN,
+                                                        AscendC::Reg::MaskMergeMode::ZEROING,
+                                                        AscendC::RoundMode::UNKNOWN};
 
 // 当前激活结果统一写入 BF16 UB；量化流程在激活之后独立执行。
-constexpr AscendC::MicroAPI::CastTrait CAST_FP32_TO_BF16 = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::NO_SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT};
+constexpr AscendC::Reg::CastTrait CAST_FP32_TO_BF16 = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT,
+                                                       AscendC::Reg::MaskMergeMode::ZEROING,
+                                                       AscendC::RoundMode::CAST_RINT};
 
 /*
  * 单个门控激活 tile 的完整执行上下文。

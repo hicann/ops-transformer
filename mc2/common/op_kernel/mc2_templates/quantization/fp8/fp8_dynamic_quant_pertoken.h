@@ -52,24 +52,24 @@ protected:
     static constexpr float FP8_E5M2_MAX_VALUE = 57344.0f;
     static constexpr float FP8_E4M3FN_MAX_VALUE = 448.0f;
 
-    constexpr static AscendC::MicroAPI::CastTrait castTraitB16ToB32 = {
-        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN,
-        AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
-    constexpr static AscendC::MicroAPI::CastTrait castTraitF32ToI16 = {
-        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::NO_SAT,
-        AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
-    constexpr static AscendC::MicroAPI::CastTrait castTraitI16ToF16 = {
-        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN,
-        AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_ROUND};
-    constexpr static AscendC::MicroAPI::CastTrait castTraitF16ToI8 = {
-        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::NO_SAT,
-        AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_TRUNC};
-    constexpr static AscendC::MicroAPI::CastTrait castTraitF32tofp8 = {
-        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::NO_SAT,
-        AscendC::MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-    constexpr static AscendC::MicroAPI::CastTrait castTraitF32toh8 = {
-        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::NO_SAT,
-        AscendC::MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+    constexpr static AscendC::Reg::CastTrait castTraitB16ToB32 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
+        AscendC::RoundMode::UNKNOWN};
+    constexpr static AscendC::Reg::CastTrait castTraitF32ToI16 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT, AscendC::Reg::MaskMergeMode::ZEROING,
+        AscendC::RoundMode::CAST_RINT};
+    constexpr static AscendC::Reg::CastTrait castTraitI16ToF16 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
+        AscendC::RoundMode::CAST_ROUND};
+    constexpr static AscendC::Reg::CastTrait castTraitF16ToI8 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT, AscendC::Reg::MaskMergeMode::ZEROING,
+        AscendC::RoundMode::CAST_TRUNC};
+    constexpr static AscendC::Reg::CastTrait castTraitF32tofp8 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT, AscendC::Reg::MaskMergeMode::ZEROING,
+        RoundMode::CAST_RINT};
+    constexpr static AscendC::Reg::CastTrait castTraitF32toh8 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT, AscendC::Reg::MaskMergeMode::ZEROING,
+        RoundMode::CAST_ROUND};
 
     template <typename T>
     __aicore__ static inline T Max(T a, T b)
@@ -484,17 +484,17 @@ __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDa
 {
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<quantInputDataType> vregX;
-        AscendC::MicroAPI::RegTensor<float> vregFloatX;
-        AscendC::MicroAPI::RegTensor<float> vregAbsX;
-        AscendC::MicroAPI::RegTensor<float> vregMaxAbsX;
-        AscendC::MicroAPI::RegTensor<float> vregReduceMax;
+        AscendC::Reg::RegTensor<quantInputDataType> vregX;
+        AscendC::Reg::RegTensor<float> vregFloatX;
+        AscendC::Reg::RegTensor<float> vregAbsX;
+        AscendC::Reg::RegTensor<float> vregMaxAbsX;
+        AscendC::Reg::RegTensor<float> vregReduceMax;
 
-        AscendC::MicroAPI::MaskReg preg0;
-        AscendC::MicroAPI::MaskReg preg1 = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
-        AscendC::MicroAPI::UnalignReg ureg0;
+        AscendC::Reg::MaskReg preg0;
+        AscendC::Reg::MaskReg preg1 = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+        AscendC::Reg::UnalignReg ureg0;
 
-        AscendC::MicroAPI::Duplicate(vregMaxAbsX, 0.0f, preg1);
+        AscendC::Reg::Duplicate(vregMaxAbsX, 0.0f, preg1);
         uint32_t dtypeSize = sizeof(float);
         uint16_t VL = AscendC::VECTOR_REG_WIDTH / dtypeSize;
         // kAxisSize aligned to 16 for vector processing
@@ -503,17 +503,16 @@ __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDa
         uint32_t sreg0 = colNum;
 
         for (uint16_t j = 0; j < vfLoop; j++) {
-            preg0 = AscendC::MicroAPI::UpdateMask<float>(sreg0);
-            AscendC::MicroAPI::DataCopy<quantInputDataType, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                vregX, xAddr + j * VL);
-            AscendC::MicroAPI::Cast<float, quantInputDataType, castTraitB16ToB32>(vregFloatX, vregX, preg0);
-            AscendC::MicroAPI::Abs(vregAbsX, vregFloatX, preg0);
-            AscendC::MicroAPI::Max(vregMaxAbsX, vregAbsX, vregMaxAbsX, preg1);
+            preg0 = AscendC::Reg::UpdateMask<float>(sreg0);
+            AscendC::Reg::DataCopy<quantInputDataType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(vregX, xAddr + j * VL);
+            AscendC::Reg::Cast<float, quantInputDataType, castTraitB16ToB32>(vregFloatX, vregX, preg0);
+            AscendC::Reg::Abs(vregAbsX, vregFloatX, preg0);
+            AscendC::Reg::Max(vregMaxAbsX, vregAbsX, vregMaxAbsX, preg1);
         }
-        AscendC::MicroAPI::ReduceMax(vregReduceMax, vregMaxAbsX, preg1);
-        AscendC::MicroAPI::DataCopyUnAlign<float, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            maxAddr, vregReduceMax, ureg0, 1);
-        AscendC::MicroAPI::DataCopyUnAlignPost(maxAddr, ureg0, 0);
+        AscendC::Reg::ReduceMax(vregReduceMax, vregMaxAbsX, preg1);
+        AscendC::Reg::DataCopyUnAlign<float, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(maxAddr, vregReduceMax, ureg0,
+                                                                                          1);
+        AscendC::Reg::DataCopyUnAlignPost(maxAddr, ureg0, 0);
     }
 }
 
@@ -523,19 +522,19 @@ __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDa
 {
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<quantInputDataType> vregX;
-        AscendC::MicroAPI::RegTensor<float> vregFloatX;
-        AscendC::MicroAPI::RegTensor<float> vregScale;
-        AscendC::MicroAPI::RegTensor<float> vregScaledX;
-        AscendC::MicroAPI::RegTensor<int16_t> vregYInt16;
-        AscendC::MicroAPI::RegTensor<half> vregYFp16;
-        AscendC::MicroAPI::RegTensor<quantOutputDataType> vregY;
+        AscendC::Reg::RegTensor<quantInputDataType> vregX;
+        AscendC::Reg::RegTensor<float> vregFloatX;
+        AscendC::Reg::RegTensor<float> vregScale;
+        AscendC::Reg::RegTensor<float> vregScaledX;
+        AscendC::Reg::RegTensor<int16_t> vregYInt16;
+        AscendC::Reg::RegTensor<half> vregYFp16;
+        AscendC::Reg::RegTensor<quantOutputDataType> vregY;
 
-        AscendC::MicroAPI::MaskReg preg1 = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
-        AscendC::MicroAPI::MaskReg preg2;
-        AscendC::MicroAPI::MaskReg preg3 = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::H>();
+        AscendC::Reg::MaskReg preg1 = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+        AscendC::Reg::MaskReg preg2;
+        AscendC::Reg::MaskReg preg3 = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::H>();
 
-        AscendC::MicroAPI::Duplicate(vregScale, scale, preg1);
+        AscendC::Reg::Duplicate(vregScale, scale, preg1);
 
         uint32_t dtypeSize = sizeof(float);
         uint16_t VL = AscendC::VECTOR_REG_WIDTH / dtypeSize; // 每个向量寄存器能存的元素数
@@ -545,41 +544,39 @@ __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDa
         uint32_t sreg1 = colNum;
         for (uint16_t j = 0; j < vfLoop; j++) {
             auto addr = yAddr + j * VL;
-            preg2 = AscendC::MicroAPI::UpdateMask<float>(sreg1);
+            preg2 = AscendC::Reg::UpdateMask<float>(sreg1);
             // 1. 重新加载数据（或可以重用之前加载的）
-            AscendC::MicroAPI::DataCopy<quantInputDataType, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                vregX, xAddr + j * VL);
+            AscendC::Reg::DataCopy<quantInputDataType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(vregX, xAddr + j * VL);
             // 2. 转换为float并应用平滑缩放
-            AscendC::MicroAPI::Cast<float, quantInputDataType, castTraitB16ToB32>(vregFloatX, vregX, preg2);
+            AscendC::Reg::Cast<float, quantInputDataType, castTraitB16ToB32>(vregFloatX, vregX, preg2);
             // 3. 除以scale进行缩放
-            AscendC::MicroAPI::Div(vregScaledX, vregFloatX, vregScale, preg2);
+            AscendC::Reg::Div(vregScaledX, vregFloatX, vregScale, preg2);
             // 4. 根据目标类型进行量化
             if constexpr (IsSameType<quantOutputDataType, int8_t>::value) {
-                AscendC::MicroAPI::Cast<int16_t, float, castTraitF32ToI16>(vregYInt16, vregScaledX, preg2);
-                AscendC::MicroAPI::Cast<half, int16_t, castTraitI16ToF16>(vregYFp16, vregYInt16, preg2);
-                AscendC::MicroAPI::Cast<quantOutputDataType, half, castTraitF16ToI8>(vregY, vregYFp16, preg2);
+                AscendC::Reg::Cast<int16_t, float, castTraitF32ToI16>(vregYInt16, vregScaledX, preg2);
+                AscendC::Reg::Cast<half, int16_t, castTraitI16ToF16>(vregYFp16, vregYInt16, preg2);
+                AscendC::Reg::Cast<quantOutputDataType, half, castTraitF16ToI8>(vregY, vregYFp16, preg2);
             } else if constexpr (IsSameType<quantOutputDataType, hifloat8_t>::value) {
-                AscendC::MicroAPI::Cast<quantOutputDataType, float, castTraitF32toh8>(vregY, vregScaledX, preg2);
+                AscendC::Reg::Cast<quantOutputDataType, float, castTraitF32toh8>(vregY, vregScaledX, preg2);
             } else if constexpr (IsSameType<quantOutputDataType, fp8_e4m3fn_t>::value ||
                                  IsSameType<quantOutputDataType, fp8_e5m2_t>::value) {
-                AscendC::MicroAPI::Cast<quantOutputDataType, float, castTraitF32tofp8>(vregY, vregScaledX, preg2);
+                AscendC::Reg::Cast<quantOutputDataType, float, castTraitF32tofp8>(vregY, vregScaledX, preg2);
             } else if constexpr (IsSameType<quantOutputDataType, int4b_t>::value) {
-                AscendC::MicroAPI::RegTensor<uint16_t> vregPackedHalf;
-                AscendC::MicroAPI::Cast<int16_t, float, castTraitF32ToI16>(vregYInt16, vregScaledX, preg2);
-                AscendC::MicroAPI::Cast<half, int16_t, castTraitI16ToF16>(vregYFp16, vregYInt16, preg2);
-                AscendC::MicroAPI::Pack(vregPackedHalf, (AscendC::MicroAPI::RegTensor<uint32_t> &)vregYFp16);
-                AscendC::MicroAPI::Cast<int4x2_t, half, castTraitF16ToI8>(
-                    (AscendC::MicroAPI::RegTensor<int4x2_t> &)vregY,
-                    (AscendC::MicroAPI::RegTensor<half> &)vregPackedHalf, preg2);
+                AscendC::Reg::RegTensor<uint16_t> vregPackedHalf;
+                AscendC::Reg::Cast<int16_t, float, castTraitF32ToI16>(vregYInt16, vregScaledX, preg2);
+                AscendC::Reg::Cast<half, int16_t, castTraitI16ToF16>(vregYFp16, vregYInt16, preg2);
+                AscendC::Reg::Pack(vregPackedHalf, (AscendC::Reg::RegTensor<uint32_t> &)vregYFp16);
+                AscendC::Reg::Cast<int4x2_t, half, castTraitF16ToI8>(
+                    (AscendC::Reg::RegTensor<int4x2_t> &)vregY, (AscendC::Reg::RegTensor<half> &)vregPackedHalf, preg2);
                 addr = yAddr + (j * VL) / 2;
             }
             // 5. 存储量化结果
             if constexpr (IsSameType<quantOutputDataType, int4b_t>::value) {
-                AscendC::MicroAPI::DataCopy<quantOutputDataType, AscendC::MicroAPI::StoreDist::DIST_PACK4_B32>(
-                    addr, vregY, preg3);
+                AscendC::Reg::DataCopy<quantOutputDataType, AscendC::Reg::StoreDist::DIST_PACK4_B32>(addr, vregY,
+                                                                                                     preg3);
             } else {
-                AscendC::MicroAPI::DataCopy<quantOutputDataType, AscendC::MicroAPI::StoreDist::DIST_PACK4_B32>(
-                    addr, vregY, preg2);
+                AscendC::Reg::DataCopy<quantOutputDataType, AscendC::Reg::StoreDist::DIST_PACK4_B32>(addr, vregY,
+                                                                                                     preg2);
             }
         }
     }

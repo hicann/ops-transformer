@@ -72,24 +72,24 @@ __aicore__ inline uint64_t FracDiv(uint64_t total, uint64_t base, uint32_t num, 
     return total * num / (base * num + den);
 }
 
-static constexpr AscendC::MicroAPI::CastTrait castTrait = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::NO_SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_NONE};
+static constexpr AscendC::Reg::CastTrait castTrait = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT,
+                                                      AscendC::Reg::MaskMergeMode::ZEROING,
+                                                      AscendC::RoundMode::CAST_NONE};
 
 // fp8_e8m0_t数据类型到bf16_t数据类型转换
 static __aicore__ inline void CastVf(__local_mem__ bfloat16_t *dstPtr, __local_mem__ fp8_e8m0_t *srcPtr, uint32_t count)
 {
-    AscendC::MicroAPI::RegTensor<fp8_e8m0_t> srcReg;
-    AscendC::MicroAPI::RegTensor<fp8_e8m0_t> srcZeroReg;
-    AscendC::MicroAPI::RegTensor<fp8_e8m0_t> dstReg0;
-    AscendC::MicroAPI::RegTensor<fp8_e8m0_t> dstReg1;
-    AscendC::MicroAPI::RegTensor<bfloat16_t> bf16DstReg;
-    AscendC::MicroAPI::MaskReg maskReg;
-    maskReg = AscendC::MicroAPI::UpdateMask<bfloat16_t>(count);
-    AscendC::MicroAPI::DataCopy(srcReg, srcPtr);
-    AscendC::MicroAPI::Interleave(dstReg0, dstReg1, srcReg, srcZeroReg);
-    AscendC::MicroAPI::Cast<bfloat16_t, fp8_e8m0_t, castTrait>(bf16DstReg, dstReg0, maskReg);
-    AscendC::MicroAPI::DataCopy(dstPtr, bf16DstReg, maskReg);
+    AscendC::Reg::RegTensor<fp8_e8m0_t> srcReg;
+    AscendC::Reg::RegTensor<fp8_e8m0_t> srcZeroReg;
+    AscendC::Reg::RegTensor<fp8_e8m0_t> dstReg0;
+    AscendC::Reg::RegTensor<fp8_e8m0_t> dstReg1;
+    AscendC::Reg::RegTensor<bfloat16_t> bf16DstReg;
+    AscendC::Reg::MaskReg maskReg;
+    maskReg = AscendC::Reg::UpdateMask<bfloat16_t>(count);
+    AscendC::Reg::DataCopy(srcReg, srcPtr);
+    AscendC::Reg::Interleave(dstReg0, dstReg1, srcReg, srcZeroReg);
+    AscendC::Reg::Cast<bfloat16_t, fp8_e8m0_t, castTrait>(bf16DstReg, dstReg0, maskReg);
+    AscendC::Reg::DataCopy(dstPtr, bf16DstReg, maskReg);
 }
 
 } // namespace AscendC

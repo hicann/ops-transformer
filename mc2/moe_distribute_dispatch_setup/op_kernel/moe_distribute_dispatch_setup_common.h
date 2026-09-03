@@ -98,24 +98,24 @@ __aicore__ inline T Align512(T x)
     return (x + Mc2Kernel::ALIGN_UP_TO_512_MASK) & (~Mc2Kernel::ALIGN_UP_TO_512_MASK);
 }
 
-template <MicroAPI::HistogramsType htype, typename T, typename U>
+template <Reg::HistogramsType htype, typename T, typename U>
 static __aicore__ inline void HistogramsVf(__local_mem__ U *dst, __local_mem__ T *src, uint16_t repeatElm,
                                            uint16_t halfRepeat, uint32_t totalElm, uint16_t repeatTimes)
 {
-    AscendC::MicroAPI::RegTensor<T> srcReg;
-    AscendC::MicroAPI::RegTensor<U> dst0Reg;
-    AscendC::MicroAPI::RegTensor<U> dst1Reg;
-    AscendC::MicroAPI::MaskReg pregOut = AscendC::MicroAPI::CreateMask<T>();
-    MicroAPI::Duplicate(dst0Reg, 0);
-    MicroAPI::Duplicate(dst1Reg, 0);
+    AscendC::Reg::RegTensor<T> srcReg;
+    AscendC::Reg::RegTensor<U> dst0Reg;
+    AscendC::Reg::RegTensor<U> dst1Reg;
+    AscendC::Reg::MaskReg pregOut = AscendC::Reg::CreateMask<T>();
+    Reg::Duplicate(dst0Reg, 0);
+    Reg::Duplicate(dst1Reg, 0);
     for (uint16_t i = 0; i < repeatTimes; ++i) {
-        MicroAPI::MaskReg preg = MicroAPI::UpdateMask<T>(totalElm);
-        MicroAPI::DataCopy(srcReg, src + repeatElm * i);
-        MicroAPI::Histograms<T, U, MicroAPI::HistogramsBinType::BIN0, htype>(dst0Reg, srcReg, preg);
-        MicroAPI::Histograms<T, U, MicroAPI::HistogramsBinType::BIN1, htype>(dst1Reg, srcReg, preg);
+        Reg::MaskReg preg = Reg::UpdateMask<T>(totalElm);
+        Reg::DataCopy(srcReg, src + repeatElm * i);
+        Reg::Histograms<T, U, Reg::HistogramsBinType::BIN0, htype>(dst0Reg, srcReg, preg);
+        Reg::Histograms<T, U, Reg::HistogramsBinType::BIN1, htype>(dst1Reg, srcReg, preg);
     }
-    MicroAPI::DataCopy(dst, dst0Reg, pregOut);
-    MicroAPI::DataCopy(dst + halfRepeat, dst1Reg, pregOut);
+    Reg::DataCopy(dst, dst0Reg, pregOut);
+    Reg::DataCopy(dst + halfRepeat, dst1Reg, pregOut);
 }
 
 __aicore__ inline void GetExpertFreq(LocalTensor<uint16_t> &dstLocal, LocalTensor<uint8_t> &srcLocal, uint32_t totalElm)
@@ -124,8 +124,8 @@ __aicore__ inline void GetExpertFreq(LocalTensor<uint16_t> &dstLocal, LocalTenso
     uint16_t repeatTimes = Ceil<uint32_t, uint16_t>(totalElm, repeatElm);
     __local_mem__ uint8_t *src = (__local_mem__ uint8_t *)srcLocal.GetPhyAddr();
     __local_mem__ uint16_t *dst = (__local_mem__ uint16_t *)dstLocal.GetPhyAddr();
-    VF_CALL<HistogramsVf<MicroAPI::HistogramsType::FREQUENCY, uint8_t, uint16_t>>(dst, src, repeatElm, repeatElm >> 1,
-                                                                                  totalElm, repeatTimes);
+    VF_CALL<HistogramsVf<Reg::HistogramsType::FREQUENCY, uint8_t, uint16_t>>(dst, src, repeatElm, repeatElm >> 1,
+                                                                             totalElm, repeatTimes);
     PipeBarrier<PIPE_V>();
 }
 
@@ -136,8 +136,8 @@ __aicore__ inline void GetExpertCumSum(LocalTensor<uint16_t> &dstLocal, LocalTen
     uint16_t repeatTimes = Ceil<uint32_t, uint16_t>(totalElm, repeatElm);
     __local_mem__ uint8_t *src = (__local_mem__ uint8_t *)srcLocal.GetPhyAddr();
     __local_mem__ uint16_t *dst = (__local_mem__ uint16_t *)dstLocal.GetPhyAddr();
-    VF_CALL<HistogramsVf<MicroAPI::HistogramsType::ACCUMULATE, uint8_t, uint16_t>>(dst, src, repeatElm, repeatElm >> 1,
-                                                                                   totalElm, repeatTimes);
+    VF_CALL<HistogramsVf<Reg::HistogramsType::ACCUMULATE, uint8_t, uint16_t>>(dst, src, repeatElm, repeatElm >> 1,
+                                                                              totalElm, repeatTimes);
     PipeBarrier<PIPE_V>();
 }
 
@@ -145,21 +145,20 @@ static __aicore__ inline void ReduceLoop(__local_mem__ int32_t *dst, __local_mem
                                          uint32_t repeat0SrcStride, uint16_t repeat1Times, uint32_t repeat1Stride,
                                          uint32_t repeat1Element, uint32_t repeat0DstStride)
 {
-    MicroAPI::MaskReg maskFirst = MicroAPI::CreateMask<int32_t, MicroAPI::MaskPattern::VL1>();
+    Reg::MaskReg maskFirst = Reg::CreateMask<int32_t, Reg::MaskPattern::VL1>();
     for (uint16_t i0 = 0; i0 < repeat0Times; ++i0) {
-        MicroAPI::RegTensor<int32_t> sumReg;
+        Reg::RegTensor<int32_t> sumReg;
         uint32_t elements = repeat1Element;
-        MicroAPI::Duplicate(sumReg, 0);
+        Reg::Duplicate(sumReg, 0);
         for (uint16_t i1 = 0; i1 < repeat1Times; ++i1) {
-            MicroAPI::RegTensor<int32_t> srcReg;
-            MicroAPI::RegTensor<int32_t> dstReg;
-            MicroAPI::MaskReg mask = MicroAPI::UpdateMask<int32_t>(elements);
-            MicroAPI::DataCopy(srcReg, src + i0 * repeat0SrcStride + i1 * repeat1Stride);
-            MicroAPI::ReduceSum(dstReg, srcReg, mask);
-            MicroAPI::Add(sumReg, sumReg, dstReg, maskFirst);
+            Reg::RegTensor<int32_t> srcReg;
+            Reg::RegTensor<int32_t> dstReg;
+            Reg::MaskReg mask = Reg::UpdateMask<int32_t>(elements);
+            Reg::DataCopy(srcReg, src + i0 * repeat0SrcStride + i1 * repeat1Stride);
+            Reg::ReduceSum(dstReg, srcReg, mask);
+            Reg::Add(sumReg, sumReg, dstReg, maskFirst);
         }
-        MicroAPI::DataCopy<int32_t, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(dst + i0 * repeat0DstStride, sumReg,
-                                                                                 maskFirst);
+        Reg::DataCopy<int32_t, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(dst + i0 * repeat0DstStride, sumReg, maskFirst);
     }
 }
 

@@ -31,31 +31,31 @@ __aicore__ inline void QuantizeMxFp4Data(__ubuf__ bfloat16_t *input, __ubuf__ ui
     int64_t outputElementCountPerStore = FP4_OUTPUT_ELEMENT_COUNT_PER_STORE;
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::MaskReg dataMask;
-        AscendC::MicroAPI::RegTensor<uint16_t> reciprocalScaleReg;
-        AscendC::MicroAPI::RegTensor<bfloat16_t> inputReg0, inputReg1;
-        AscendC::MicroAPI::RegTensor<OutputType> outputReg0, outputReg1;
+        AscendC::Reg::MaskReg dataMask;
+        AscendC::Reg::RegTensor<uint16_t> reciprocalScaleReg;
+        AscendC::Reg::RegTensor<bfloat16_t> inputReg0, inputReg1;
+        AscendC::Reg::RegTensor<OutputType> outputReg0, outputReg1;
         for (uint16_t loopIndex = 0; loopIndex < dataLoopCount; loopIndex++) {
-            dataMask = AscendC::MicroAPI::UpdateMask<bfloat16_t>(dataCount);
-            AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE,
-                                        AscendC::MicroAPI::LoadDist::DIST_DINTLV_B16>(inputReg0, inputReg1, input,
-                                                                                      inputElementCountPerLoop);
-            AscendC::MicroAPI::DataCopy<uint16_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE,
-                                        AscendC::MicroAPI::LoadDist::DIST_E2B_B16>(reciprocalScaleReg, reciprocalScale,
-                                                                                   scaleElementCountPerLoop);
-            AscendC::MicroAPI::Mul(inputReg0, inputReg0, (AscendC::MicroAPI::RegTensor<bfloat16_t> &)reciprocalScaleReg,
-                                   dataMask);
-            AscendC::MicroAPI::Mul(inputReg1, inputReg1, (AscendC::MicroAPI::RegTensor<bfloat16_t> &)reciprocalScaleReg,
-                                   dataMask);
-            AscendC::MicroAPI::Interleave(inputReg0, inputReg1, inputReg0, inputReg1);
-            AscendC::MicroAPI::Cast<OutputType, bfloat16_t, CAST_BF16_TO_FP4>(outputReg0, inputReg0, dataMask);
-            AscendC::MicroAPI::Cast<OutputType, bfloat16_t, CAST_BF16_TO_FP4>(outputReg1, inputReg1, dataMask);
-            AscendC::MicroAPI::DataCopy<int8_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE,
-                                        AscendC::MicroAPI::StoreDist::DIST_PACK4_B32>(
-                output, (AscendC::MicroAPI::RegTensor<int8_t> &)outputReg0, outputElementCountPerStore, dataMask);
-            AscendC::MicroAPI::DataCopy<int8_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE,
-                                        AscendC::MicroAPI::StoreDist::DIST_PACK4_B32>(
-                output, (AscendC::MicroAPI::RegTensor<int8_t> &)outputReg1, outputElementCountPerStore, dataMask);
+            dataMask = AscendC::Reg::UpdateMask<bfloat16_t>(dataCount);
+            AscendC::Reg::DataCopy<bfloat16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
+                                   AscendC::Reg::LoadDist::DIST_DINTLV_B16>(inputReg0, inputReg1, input,
+                                                                            inputElementCountPerLoop);
+            AscendC::Reg::DataCopy<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
+                                   AscendC::Reg::LoadDist::DIST_E2B_B16>(reciprocalScaleReg, reciprocalScale,
+                                                                         scaleElementCountPerLoop);
+            AscendC::Reg::Mul(inputReg0, inputReg0, (AscendC::Reg::RegTensor<bfloat16_t> &)reciprocalScaleReg,
+                              dataMask);
+            AscendC::Reg::Mul(inputReg1, inputReg1, (AscendC::Reg::RegTensor<bfloat16_t> &)reciprocalScaleReg,
+                              dataMask);
+            AscendC::Reg::Interleave(inputReg0, inputReg1, inputReg0, inputReg1);
+            AscendC::Reg::Cast<OutputType, bfloat16_t, CAST_BF16_TO_FP4>(outputReg0, inputReg0, dataMask);
+            AscendC::Reg::Cast<OutputType, bfloat16_t, CAST_BF16_TO_FP4>(outputReg1, inputReg1, dataMask);
+            AscendC::Reg::DataCopy<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
+                                   AscendC::Reg::StoreDist::DIST_PACK4_B32>(
+                output, (AscendC::Reg::RegTensor<int8_t> &)outputReg0, outputElementCountPerStore, dataMask);
+            AscendC::Reg::DataCopy<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
+                                   AscendC::Reg::StoreDist::DIST_PACK4_B32>(
+                output, (AscendC::Reg::RegTensor<int8_t> &)outputReg1, outputElementCountPerStore, dataMask);
         }
     }
 }

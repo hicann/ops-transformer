@@ -44,27 +44,27 @@ constexpr int64_t SCALE_ELEMENT_COUNT_PER_VECTOR = 128;
 constexpr int64_t SCALE_PACK_ELEMENT_COUNT = 64;
 constexpr int64_t FP4_OUTPUT_ELEMENT_COUNT_PER_STORE = 64;
 
-constexpr AscendC::MicroAPI::CastTrait CAST_BF16_TO_FP32_ZERO_LAYOUT = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait CAST_BF16_TO_FP32_ZERO_LAYOUT = {
+    AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN};
-constexpr AscendC::MicroAPI::CastTrait CAST_BF16_TO_FP32_ONE_LAYOUT = {
-    AscendC::MicroAPI::RegLayout::ONE, AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait CAST_BF16_TO_FP32_ONE_LAYOUT = {
+    AscendC::Reg::RegLayout::ONE, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN};
-constexpr AscendC::MicroAPI::CastTrait CAST_FP32_TO_FP8_LAYOUT_ZERO = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait CAST_FP32_TO_FP8_LAYOUT_ZERO = {
+    AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT};
-constexpr AscendC::MicroAPI::CastTrait CAST_FP32_TO_FP8_LAYOUT_ONE = {
-    AscendC::MicroAPI::RegLayout::ONE, AscendC::MicroAPI::SatMode::SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait CAST_FP32_TO_FP8_LAYOUT_ONE = {
+    AscendC::Reg::RegLayout::ONE, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT};
-constexpr AscendC::MicroAPI::CastTrait CAST_FP32_TO_FP8_LAYOUT_TWO = {
-    AscendC::MicroAPI::RegLayout::TWO, AscendC::MicroAPI::SatMode::SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait CAST_FP32_TO_FP8_LAYOUT_TWO = {
+    AscendC::Reg::RegLayout::TWO, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT};
-constexpr AscendC::MicroAPI::CastTrait CAST_FP32_TO_FP8_LAYOUT_THREE = {
-    AscendC::MicroAPI::RegLayout::THREE, AscendC::MicroAPI::SatMode::SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait CAST_FP32_TO_FP8_LAYOUT_THREE = {
+    AscendC::Reg::RegLayout::THREE, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT};
-constexpr AscendC::MicroAPI::CastTrait CAST_BF16_TO_FP4 = {
-    AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN, AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT};
+constexpr AscendC::Reg::CastTrait CAST_BF16_TO_FP4 = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN,
+                                                      AscendC::Reg::MaskMergeMode::ZEROING,
+                                                      AscendC::RoundMode::CAST_RINT};
 
 template <typename OutputType>
 __aicore__ inline uint16_t GetOutputMaxExponent()

@@ -82,47 +82,47 @@ __aicore__ inline void DeQuantMxFp8(LocalTensor<XType> &inLocal, LocalTensor<flo
     uint32_t quantCount2 = scaleLen * 2;
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<fp8_e8m0_t> vSrcReg;
-        AscendC::MicroAPI::RegTensor<T> tokenSrcReg;
-        AscendC::MicroAPI::RegTensor<float> tokenFp32SrcReg;
-        AscendC::MicroAPI::RegTensor<bfloat16_t> vDstReg;
-        AscendC::MicroAPI::RegTensor<bfloat16_t> dyScaleBf16Reg;
-        AscendC::MicroAPI::RegTensor<float> dyScaleFp32Reg;
-        AscendC::MicroAPI::RegTensor<float> sumDstReg;
-        AscendC::MicroAPI::RegTensor<float> sumLocalDstReg;
-        static constexpr AscendC::MicroAPI::CastTrait FP82BF16CastTraitZero = {
-            AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN,
-            AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
-        static constexpr AscendC::MicroAPI::CastTrait FP162FP32CastTraitZero = {
-            AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN,
-            AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
-        AscendC::MicroAPI::MaskReg maskReg;
-        AscendC::MicroAPI::MaskReg maskReg1;
-        AscendC::MicroAPI::MaskReg maskReg2;
+        AscendC::Reg::RegTensor<fp8_e8m0_t> vSrcReg;
+        AscendC::Reg::RegTensor<T> tokenSrcReg;
+        AscendC::Reg::RegTensor<float> tokenFp32SrcReg;
+        AscendC::Reg::RegTensor<bfloat16_t> vDstReg;
+        AscendC::Reg::RegTensor<bfloat16_t> dyScaleBf16Reg;
+        AscendC::Reg::RegTensor<float> dyScaleFp32Reg;
+        AscendC::Reg::RegTensor<float> sumDstReg;
+        AscendC::Reg::RegTensor<float> sumLocalDstReg;
+        static constexpr AscendC::Reg::CastTrait FP82BF16CastTraitZero = {
+            AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
+            AscendC::RoundMode::UNKNOWN};
+        static constexpr AscendC::Reg::CastTrait FP162FP32CastTraitZero = {
+            AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
+            AscendC::RoundMode::UNKNOWN};
+        AscendC::Reg::MaskReg maskReg;
+        AscendC::Reg::MaskReg maskReg1;
+        AscendC::Reg::MaskReg maskReg2;
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskReg = AscendC::MicroAPI::UpdateMask<bfloat16_t>(scaleLen);
-            MicroAPI::DataCopy<fp8_e8m0_t, MicroAPI::LoadDist::DIST_UNPACK_B8>(vSrcReg, srcPtr0 + i * bf16RepeatSize);
-            MicroAPI::Cast<bfloat16_t, fp8_e8m0_t, FP82BF16CastTraitZero>(vDstReg, vSrcReg, maskReg);
-            MicroAPI::DataCopy<bfloat16_t, MicroAPI::StoreDist::DIST_INTLV_B16>(dyScaleBf16Ptr + i * bf16RepeatSize * 2,
-                                                                                vDstReg, vDstReg, maskReg);
+            maskReg = AscendC::Reg::UpdateMask<bfloat16_t>(scaleLen);
+            Reg::DataCopy<fp8_e8m0_t, Reg::LoadDist::DIST_UNPACK_B8>(vSrcReg, srcPtr0 + i * bf16RepeatSize);
+            Reg::Cast<bfloat16_t, fp8_e8m0_t, FP82BF16CastTraitZero>(vDstReg, vSrcReg, maskReg);
+            Reg::DataCopy<bfloat16_t, Reg::StoreDist::DIST_INTLV_B16>(dyScaleBf16Ptr + i * bf16RepeatSize * 2, vDstReg,
+                                                                      vDstReg, maskReg);
         }
-        MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+        Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
         for (uint16_t i = 0; i < repeatTimes2; i++) {
-            maskReg1 = AscendC::MicroAPI::UpdateMask<float>(quantCount2);
-            MicroAPI::DataCopy<bfloat16_t, MicroAPI::LoadDist::DIST_UNPACK_B16>(dyScaleBf16Reg,
-                                                                                dyScaleBf16Ptr + i * fp32RepeatSize);
-            MicroAPI::Cast<float, bfloat16_t, FP162FP32CastTraitZero>(dyScaleFp32Reg, dyScaleBf16Reg, maskReg1);
-            MicroAPI::DataCopy<float, MicroAPI::StoreDist::DIST_INTLV_B32>(dyScaleFp32Ptr + i * fp32RepeatSize * 2,
-                                                                           dyScaleFp32Reg, dyScaleFp32Reg, maskReg1);
+            maskReg1 = AscendC::Reg::UpdateMask<float>(quantCount2);
+            Reg::DataCopy<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(dyScaleBf16Reg,
+                                                                      dyScaleBf16Ptr + i * fp32RepeatSize);
+            Reg::Cast<float, bfloat16_t, FP162FP32CastTraitZero>(dyScaleFp32Reg, dyScaleBf16Reg, maskReg1);
+            Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(dyScaleFp32Ptr + i * fp32RepeatSize * 2,
+                                                                 dyScaleFp32Reg, dyScaleFp32Reg, maskReg1);
         }
-        MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+        Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
         for (uint16_t i = 0; i < fp32RepeatTimes; i++) {
-            maskReg2 = AscendC::MicroAPI::UpdateMask<float>(tokenLen);
-            MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_E2B_B32>(dyScaleFp32Reg, dyScaleFp32Ptr + i * 8);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_UNPACK4_B8>(tokenSrcReg, tokenPtr0 + i * fp32RepeatSize);
-            MicroAPI::Cast<float, T, FP82BF16CastTraitZero>(tokenFp32SrcReg, tokenSrcReg, maskReg2);
-            MicroAPI::Mul(sumLocalDstReg, dyScaleFp32Reg, tokenFp32SrcReg, maskReg2);
-            MicroAPI::DataCopy(sumDstPtr + i * fp32RepeatSize, sumLocalDstReg, maskReg2);
+            maskReg2 = AscendC::Reg::UpdateMask<float>(tokenLen);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_E2B_B32>(dyScaleFp32Reg, dyScaleFp32Ptr + i * 8);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_UNPACK4_B8>(tokenSrcReg, tokenPtr0 + i * fp32RepeatSize);
+            Reg::Cast<float, T, FP82BF16CastTraitZero>(tokenFp32SrcReg, tokenSrcReg, maskReg2);
+            Reg::Mul(sumLocalDstReg, dyScaleFp32Reg, tokenFp32SrcReg, maskReg2);
+            Reg::DataCopy(sumDstPtr + i * fp32RepeatSize, sumLocalDstReg, maskReg2);
         }
     }
 }

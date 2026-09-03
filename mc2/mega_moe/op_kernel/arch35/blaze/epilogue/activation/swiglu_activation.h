@@ -43,105 +43,103 @@ __aicore__ inline void RunSwiGLU(const GatedActivationTileContext<InputType> &co
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<InputType> gateReg;
-        AscendC::MicroAPI::RegTensor<InputType> upReg;
-        AscendC::MicroAPI::RegTensor<float> gateFp32Reg;
-        AscendC::MicroAPI::RegTensor<float> upFp32Reg;
-        AscendC::MicroAPI::RegTensor<float> negReg;
-        AscendC::MicroAPI::RegTensor<float> expReg;
-        AscendC::MicroAPI::RegTensor<float> denominatorReg;
-        AscendC::MicroAPI::RegTensor<float> sigmoidReg;
-        AscendC::MicroAPI::RegTensor<float> outputFp32Reg;
-        AscendC::MicroAPI::RegTensor<float> weightReg;
-        AscendC::MicroAPI::RegTensor<bfloat16_t> outputReg;
-        AscendC::MicroAPI::RegTensor<bfloat16_t> zeroReg;
-        AscendC::MicroAPI::MaskReg fullMask =
-            AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
-        AscendC::MicroAPI::MaskReg tailComputeMask = AscendC::MicroAPI::UpdateMask<float>(tailComputeMaskElementCount);
-        AscendC::MicroAPI::MaskReg tailStoreMask = AscendC::MicroAPI::UpdateMask<float>(tailStoreMaskElementCount);
-        AscendC::MicroAPI::MaskReg additionalPaddingStoreMask =
-            AscendC::MicroAPI::UpdateMask<bfloat16_t>(additionalPaddingStoreMaskElementCount);
+        AscendC::Reg::RegTensor<InputType> gateReg;
+        AscendC::Reg::RegTensor<InputType> upReg;
+        AscendC::Reg::RegTensor<float> gateFp32Reg;
+        AscendC::Reg::RegTensor<float> upFp32Reg;
+        AscendC::Reg::RegTensor<float> negReg;
+        AscendC::Reg::RegTensor<float> expReg;
+        AscendC::Reg::RegTensor<float> denominatorReg;
+        AscendC::Reg::RegTensor<float> sigmoidReg;
+        AscendC::Reg::RegTensor<float> outputFp32Reg;
+        AscendC::Reg::RegTensor<float> weightReg;
+        AscendC::Reg::RegTensor<bfloat16_t> outputReg;
+        AscendC::Reg::RegTensor<bfloat16_t> zeroReg;
+        AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+        AscendC::Reg::MaskReg tailComputeMask = AscendC::Reg::UpdateMask<float>(tailComputeMaskElementCount);
+        AscendC::Reg::MaskReg tailStoreMask = AscendC::Reg::UpdateMask<float>(tailStoreMaskElementCount);
+        AscendC::Reg::MaskReg additionalPaddingStoreMask =
+            AscendC::Reg::UpdateMask<bfloat16_t>(additionalPaddingStoreMaskElementCount);
 
         for (uint16_t rowIndex = 0; rowIndex < rowLoopCount; rowIndex++) {
             if constexpr (FuseTopkWeight) {
-                AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                     weightReg, context.topkWeights + rowIndex * INT32_PER_256B + WEIGHT_INDEX);
             }
             for (uint16_t vectorIndex = 0; vectorIndex < fullVectorLoopCount; vectorIndex++) {
-                AscendC::MicroAPI::AddrReg inputOffset = AscendC::MicroAPI::CreateAddrReg<InputType>(
+                AscendC::Reg::AddrReg inputOffset = AscendC::Reg::CreateAddrReg<InputType>(
                     rowIndex, context.inputRowStrideElements, vectorIndex, VECTOR_LENGTH_FP32);
-                AscendC::MicroAPI::DataCopy<InputType, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    gateReg, context.gate, inputOffset);
-                AscendC::MicroAPI::DataCopy<InputType, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(upReg, context.up,
-                                                                                                     inputOffset);
-                AscendC::MicroAPI::Cast<float, InputType, CAST_INPUT_TO_FP32>(gateFp32Reg, gateReg, fullMask);
-                AscendC::MicroAPI::Cast<float, InputType, CAST_INPUT_TO_FP32>(upFp32Reg, upReg, fullMask);
+                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(gateReg, context.gate,
+                                                                                           inputOffset);
+                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(upReg, context.up,
+                                                                                           inputOffset);
+                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(gateFp32Reg, gateReg, fullMask);
+                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(upFp32Reg, upReg, fullMask);
 
                 if constexpr (!IsStep) {
-                    AscendC::MicroAPI::Mins(gateFp32Reg, gateFp32Reg, params.clampLimit, fullMask);
+                    AscendC::Reg::Mins(gateFp32Reg, gateFp32Reg, params.clampLimit, fullMask);
                 }
-                AscendC::MicroAPI::Mins(upFp32Reg, upFp32Reg, params.clampLimit, fullMask);
-                AscendC::MicroAPI::Maxs(upFp32Reg, upFp32Reg, -params.clampLimit, fullMask);
+                AscendC::Reg::Mins(upFp32Reg, upFp32Reg, params.clampLimit, fullMask);
+                AscendC::Reg::Maxs(upFp32Reg, upFp32Reg, -params.clampLimit, fullMask);
 
-                AscendC::MicroAPI::Muls(negReg, gateFp32Reg, negScalarOne, fullMask);
-                AscendC::MicroAPI::Exp(expReg, negReg, fullMask);
-                AscendC::MicroAPI::Adds(denominatorReg, expReg, scalarOne, fullMask);
-                AscendC::MicroAPI::Div(sigmoidReg, gateFp32Reg, denominatorReg, fullMask);
+                AscendC::Reg::Muls(negReg, gateFp32Reg, negScalarOne, fullMask);
+                AscendC::Reg::Exp(expReg, negReg, fullMask);
+                AscendC::Reg::Adds(denominatorReg, expReg, scalarOne, fullMask);
+                AscendC::Reg::Div(sigmoidReg, gateFp32Reg, denominatorReg, fullMask);
                 if constexpr (IsStep) {
-                    AscendC::MicroAPI::Mins(sigmoidReg, sigmoidReg, params.clampLimit, fullMask);
+                    AscendC::Reg::Mins(sigmoidReg, sigmoidReg, params.clampLimit, fullMask);
                 }
-                AscendC::MicroAPI::Mul(outputFp32Reg, sigmoidReg, upFp32Reg, fullMask);
+                AscendC::Reg::Mul(outputFp32Reg, sigmoidReg, upFp32Reg, fullMask);
                 if constexpr (FuseTopkWeight) {
-                    AscendC::MicroAPI::Mul(outputFp32Reg, outputFp32Reg, weightReg, fullMask);
+                    AscendC::Reg::Mul(outputFp32Reg, outputFp32Reg, weightReg, fullMask);
                 }
 
-                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, outputFp32Reg, fullMask);
-                AscendC::MicroAPI::AddrReg outputOffset = AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(
+                AscendC::Reg::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, outputFp32Reg, fullMask);
+                AscendC::Reg::AddrReg outputOffset = AscendC::Reg::CreateAddrReg<bfloat16_t>(
                     rowIndex, context.outputRowStrideElements, vectorIndex, VECTOR_LENGTH_FP32);
-                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
-                    context.output, outputReg, outputOffset, fullMask);
+                AscendC::Reg::DataCopy<bfloat16_t, AscendC::Reg::StoreDist::DIST_PACK_B32>(context.output, outputReg,
+                                                                                           outputOffset, fullMask);
             }
 
-            AscendC::MicroAPI::AddrReg tailInputOffset =
-                AscendC::MicroAPI::CreateAddrReg<InputType>(rowIndex, context.inputRowStrideElements);
-            AscendC::MicroAPI::AddrReg tailOutputOffset =
-                AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(rowIndex, context.outputRowStrideElements);
+            AscendC::Reg::AddrReg tailInputOffset =
+                AscendC::Reg::CreateAddrReg<InputType>(rowIndex, context.inputRowStrideElements);
+            AscendC::Reg::AddrReg tailOutputOffset =
+                AscendC::Reg::CreateAddrReg<bfloat16_t>(rowIndex, context.outputRowStrideElements);
             for (uint16_t tailIndex = 0; tailIndex < needTailVectorCompute; tailIndex++) {
-                AscendC::MicroAPI::DataCopy<InputType, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    gateReg, context.gateTail, tailInputOffset);
-                AscendC::MicroAPI::DataCopy<InputType, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    upReg, context.upTail, tailInputOffset);
-                AscendC::MicroAPI::Cast<float, InputType, CAST_INPUT_TO_FP32>(gateFp32Reg, gateReg, tailComputeMask);
-                AscendC::MicroAPI::Cast<float, InputType, CAST_INPUT_TO_FP32>(upFp32Reg, upReg, tailComputeMask);
+                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(gateReg, context.gateTail,
+                                                                                           tailInputOffset);
+                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(upReg, context.upTail,
+                                                                                           tailInputOffset);
+                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(gateFp32Reg, gateReg, tailComputeMask);
+                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(upFp32Reg, upReg, tailComputeMask);
 
                 if constexpr (!IsStep) {
-                    AscendC::MicroAPI::Mins(gateFp32Reg, gateFp32Reg, params.clampLimit, tailComputeMask);
+                    AscendC::Reg::Mins(gateFp32Reg, gateFp32Reg, params.clampLimit, tailComputeMask);
                 }
-                AscendC::MicroAPI::Mins(upFp32Reg, upFp32Reg, params.clampLimit, tailComputeMask);
-                AscendC::MicroAPI::Maxs(upFp32Reg, upFp32Reg, -params.clampLimit, tailComputeMask);
+                AscendC::Reg::Mins(upFp32Reg, upFp32Reg, params.clampLimit, tailComputeMask);
+                AscendC::Reg::Maxs(upFp32Reg, upFp32Reg, -params.clampLimit, tailComputeMask);
 
-                AscendC::MicroAPI::Muls(negReg, gateFp32Reg, negScalarOne, tailComputeMask);
-                AscendC::MicroAPI::Exp(expReg, negReg, tailComputeMask);
-                AscendC::MicroAPI::Adds(denominatorReg, expReg, scalarOne, tailComputeMask);
-                AscendC::MicroAPI::Div(sigmoidReg, gateFp32Reg, denominatorReg, tailComputeMask);
+                AscendC::Reg::Muls(negReg, gateFp32Reg, negScalarOne, tailComputeMask);
+                AscendC::Reg::Exp(expReg, negReg, tailComputeMask);
+                AscendC::Reg::Adds(denominatorReg, expReg, scalarOne, tailComputeMask);
+                AscendC::Reg::Div(sigmoidReg, gateFp32Reg, denominatorReg, tailComputeMask);
                 if constexpr (IsStep) {
-                    AscendC::MicroAPI::Mins(sigmoidReg, sigmoidReg, params.clampLimit, tailComputeMask);
+                    AscendC::Reg::Mins(sigmoidReg, sigmoidReg, params.clampLimit, tailComputeMask);
                 }
-                AscendC::MicroAPI::Mul(outputFp32Reg, sigmoidReg, upFp32Reg, tailComputeMask);
+                AscendC::Reg::Mul(outputFp32Reg, sigmoidReg, upFp32Reg, tailComputeMask);
                 if constexpr (FuseTopkWeight) {
-                    AscendC::MicroAPI::Mul(outputFp32Reg, outputFp32Reg, weightReg, tailComputeMask);
+                    AscendC::Reg::Mul(outputFp32Reg, outputFp32Reg, weightReg, tailComputeMask);
                 }
 
-                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, outputFp32Reg,
-                                                                              tailComputeMask);
-                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
+                AscendC::Reg::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, outputFp32Reg, tailComputeMask);
+                AscendC::Reg::DataCopy<bfloat16_t, AscendC::Reg::StoreDist::DIST_PACK_B32>(
                     context.outputTail, outputReg, tailOutputOffset, tailStoreMask);
             }
             for (uint16_t additionalPaddingIndex = 0; additionalPaddingIndex < needAdditionalPaddingStore;
                  additionalPaddingIndex++) {
-                AscendC::MicroAPI::Duplicate(zeroReg, zeroValue);
-                AscendC::MicroAPI::DataCopy<bfloat16_t>(context.additionalPaddingOutput, zeroReg, tailOutputOffset,
-                                                        additionalPaddingStoreMask);
+                AscendC::Reg::Duplicate(zeroReg, zeroValue);
+                AscendC::Reg::DataCopy<bfloat16_t>(context.additionalPaddingOutput, zeroReg, tailOutputOffset,
+                                                   additionalPaddingStoreMask);
             }
         }
     }

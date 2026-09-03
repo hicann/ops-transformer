@@ -29,29 +29,27 @@ __aicore__ inline void ComputeGroupMaxExp(__ubuf__ bfloat16_t *input, __ubuf__ u
     int64_t scaleElementCountPerLoop = SCALE_ELEMENT_COUNT_PER_DATA_LOOP;
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<bfloat16_t> inputReg0, inputReg1;
-        AscendC::MicroAPI::RegTensor<uint16_t> exponentReg0, exponentReg1;
-        AscendC::MicroAPI::RegTensor<uint16_t> exponentMaskReg, maxExponentReg;
-        AscendC::MicroAPI::Duplicate(exponentMaskReg, BF16_EXPONENT_MASK);
-        AscendC::MicroAPI::MaskReg dataMask0, dataMask1;
-        AscendC::MicroAPI::UnalignReg unalignReg;
+        AscendC::Reg::RegTensor<bfloat16_t> inputReg0, inputReg1;
+        AscendC::Reg::RegTensor<uint16_t> exponentReg0, exponentReg1;
+        AscendC::Reg::RegTensor<uint16_t> exponentMaskReg, maxExponentReg;
+        AscendC::Reg::Duplicate(exponentMaskReg, BF16_EXPONENT_MASK);
+        AscendC::Reg::MaskReg dataMask0, dataMask1;
+        AscendC::Reg::UnalignReg unalignReg;
         for (uint16_t loopIndex = 0; loopIndex < dataLoopCount; loopIndex++) {
-            dataMask0 = AscendC::MicroAPI::UpdateMask<bfloat16_t>(dataCount);
+            dataMask0 = AscendC::Reg::UpdateMask<bfloat16_t>(dataCount);
             // DINTLV_B16 每轮消费两个 BF16 寄存器，第二次调用必须保留以推进剩余计数。
-            dataMask1 = AscendC::MicroAPI::UpdateMask<bfloat16_t>(dataCount);
-            AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE,
-                                        AscendC::MicroAPI::LoadDist::DIST_DINTLV_B16>(inputReg0, inputReg1, input,
-                                                                                      inputElementCountPerLoop);
-            AscendC::MicroAPI::And(exponentReg0, (AscendC::MicroAPI::RegTensor<uint16_t> &)inputReg0, exponentMaskReg,
-                                   dataMask0);
-            AscendC::MicroAPI::And(exponentReg1, (AscendC::MicroAPI::RegTensor<uint16_t> &)inputReg1, exponentMaskReg,
-                                   dataMask0);
-            AscendC::MicroAPI::Max(maxExponentReg, exponentReg0, exponentReg1, dataMask0);
-            AscendC::MicroAPI::ReduceMaxWithDataBlock(maxExponentReg, maxExponentReg, dataMask0);
-            AscendC::MicroAPI::DataCopyUnAlign<uint16_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            dataMask1 = AscendC::Reg::UpdateMask<bfloat16_t>(dataCount);
+            AscendC::Reg::DataCopy<bfloat16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
+                                   AscendC::Reg::LoadDist::DIST_DINTLV_B16>(inputReg0, inputReg1, input,
+                                                                            inputElementCountPerLoop);
+            AscendC::Reg::And(exponentReg0, (AscendC::Reg::RegTensor<uint16_t> &)inputReg0, exponentMaskReg, dataMask0);
+            AscendC::Reg::And(exponentReg1, (AscendC::Reg::RegTensor<uint16_t> &)inputReg1, exponentMaskReg, dataMask0);
+            AscendC::Reg::Max(maxExponentReg, exponentReg0, exponentReg1, dataMask0);
+            AscendC::Reg::ReduceMaxWithDataBlock(maxExponentReg, maxExponentReg, dataMask0);
+            AscendC::Reg::DataCopyUnAlign<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
                 maxExp, maxExponentReg, unalignReg, scaleElementCountPerLoop);
         }
-        AscendC::MicroAPI::DataCopyUnAlignPost(maxExp, unalignReg, 0);
+        AscendC::Reg::DataCopyUnAlignPost(maxExp, unalignReg, 0);
     }
 }
 
@@ -62,46 +60,45 @@ __aicore__ inline void ComputeMxScale(__ubuf__ uint16_t *maxExp, __ubuf__ uint16
     const uint16_t outputMaxExponent = GetOutputMaxExponent<OutputType>();
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<uint16_t> exponentMaskReg, maxExponentReg;
-        AscendC::MicroAPI::Duplicate(exponentMaskReg, BF16_EXPONENT_MASK);
-        AscendC::MicroAPI::MaskReg validExponentMask, nonzeroMask, scaleMask;
-        AscendC::MicroAPI::RegTensor<uint16_t> outputMaxExponentReg, sharedExponentReg, outputScaleReg;
-        AscendC::MicroAPI::RegTensor<uint16_t> exponentBiasReg, reciprocalScaleReg;
-        AscendC::MicroAPI::Duplicate(outputMaxExponentReg, outputMaxExponent);
-        AscendC::MicroAPI::Duplicate(exponentBiasReg, BF16_EXPONENT_BIAS);
-        AscendC::MicroAPI::RegTensor<uint16_t> fp8NanReg, zeroReg, bf16NanReg;
-        AscendC::MicroAPI::Duplicate(fp8NanReg, FP8_NAN_EXPONENT);
-        AscendC::MicroAPI::Duplicate(zeroReg, 0);
-        AscendC::MicroAPI::Duplicate(bf16NanReg, BF16_NAN_VALUE);
-        AscendC::MicroAPI::MaskReg belowMaxExponentMask, specialExponentMask;
-        AscendC::MicroAPI::RegTensor<uint16_t> specialExponentReg;
-        AscendC::MicroAPI::Duplicate(specialExponentReg, SPECIAL_EXPONENT_THRESHOLD);
+        AscendC::Reg::RegTensor<uint16_t> exponentMaskReg, maxExponentReg;
+        AscendC::Reg::Duplicate(exponentMaskReg, BF16_EXPONENT_MASK);
+        AscendC::Reg::MaskReg validExponentMask, nonzeroMask, scaleMask;
+        AscendC::Reg::RegTensor<uint16_t> outputMaxExponentReg, sharedExponentReg, outputScaleReg;
+        AscendC::Reg::RegTensor<uint16_t> exponentBiasReg, reciprocalScaleReg;
+        AscendC::Reg::Duplicate(outputMaxExponentReg, outputMaxExponent);
+        AscendC::Reg::Duplicate(exponentBiasReg, BF16_EXPONENT_BIAS);
+        AscendC::Reg::RegTensor<uint16_t> fp8NanReg, zeroReg, bf16NanReg;
+        AscendC::Reg::Duplicate(fp8NanReg, FP8_NAN_EXPONENT);
+        AscendC::Reg::Duplicate(zeroReg, 0);
+        AscendC::Reg::Duplicate(bf16NanReg, BF16_NAN_VALUE);
+        AscendC::Reg::MaskReg belowMaxExponentMask, specialExponentMask;
+        AscendC::Reg::RegTensor<uint16_t> specialExponentReg;
+        AscendC::Reg::Duplicate(specialExponentReg, SPECIAL_EXPONENT_THRESHOLD);
         for (uint16_t loopIndex = 0; loopIndex < scaleLoopCount; loopIndex++) {
-            scaleMask = AscendC::MicroAPI::UpdateMask<uint16_t>(scaleCount);
-            AscendC::MicroAPI::DataCopy<uint16_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            scaleMask = AscendC::Reg::UpdateMask<uint16_t>(scaleCount);
+            AscendC::Reg::DataCopy<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
                 maxExponentReg, maxExp, SCALE_ELEMENT_COUNT_PER_VECTOR);
-            AscendC::MicroAPI::Compare<uint16_t, AscendC::CMPMODE::NE>(validExponentMask, maxExponentReg,
-                                                                       exponentMaskReg, scaleMask);
-            AscendC::MicroAPI::Compare<uint16_t, AscendC::CMPMODE::NE>(nonzeroMask, maxExponentReg, zeroReg, scaleMask);
-            AscendC::MicroAPI::Compare<uint16_t, AscendC::CMPMODE::LE>(belowMaxExponentMask, maxExponentReg,
-                                                                       outputMaxExponentReg, scaleMask);
-            AscendC::MicroAPI::Select<uint16_t>(maxExponentReg, outputMaxExponentReg, maxExponentReg,
-                                                belowMaxExponentMask);
-            AscendC::MicroAPI::Sub(sharedExponentReg, maxExponentReg, outputMaxExponentReg, scaleMask);
-            AscendC::MicroAPI::ShiftRights(outputScaleReg, sharedExponentReg, BF16_EXPONENT_SHIFT, scaleMask);
-            AscendC::MicroAPI::Select<uint16_t>(outputScaleReg, outputScaleReg, fp8NanReg, validExponentMask);
-            AscendC::MicroAPI::Select<uint16_t>(outputScaleReg, outputScaleReg, zeroReg, nonzeroMask);
-            AscendC::MicroAPI::DataCopy<uint16_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE,
-                                        AscendC::MicroAPI::StoreDist::DIST_PACK_B16>(
-                outputScale, outputScaleReg, SCALE_PACK_ELEMENT_COUNT, scaleMask);
-            AscendC::MicroAPI::Compare<uint16_t, AscendC::CMPMODE::EQ>(specialExponentMask, sharedExponentReg,
-                                                                       exponentBiasReg, scaleMask);
-            AscendC::MicroAPI::Sub(reciprocalScaleReg, exponentBiasReg, sharedExponentReg, scaleMask);
-            AscendC::MicroAPI::Select<uint16_t>(reciprocalScaleReg, reciprocalScaleReg, bf16NanReg, validExponentMask);
-            AscendC::MicroAPI::Select<uint16_t>(reciprocalScaleReg, reciprocalScaleReg, zeroReg, nonzeroMask);
-            AscendC::MicroAPI::Select<uint16_t>(reciprocalScaleReg, specialExponentReg, reciprocalScaleReg,
-                                                specialExponentMask);
-            AscendC::MicroAPI::DataCopy<uint16_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            AscendC::Reg::Compare<uint16_t, AscendC::CMPMODE::NE>(validExponentMask, maxExponentReg, exponentMaskReg,
+                                                                  scaleMask);
+            AscendC::Reg::Compare<uint16_t, AscendC::CMPMODE::NE>(nonzeroMask, maxExponentReg, zeroReg, scaleMask);
+            AscendC::Reg::Compare<uint16_t, AscendC::CMPMODE::LE>(belowMaxExponentMask, maxExponentReg,
+                                                                  outputMaxExponentReg, scaleMask);
+            AscendC::Reg::Select<uint16_t>(maxExponentReg, outputMaxExponentReg, maxExponentReg, belowMaxExponentMask);
+            AscendC::Reg::Sub(sharedExponentReg, maxExponentReg, outputMaxExponentReg, scaleMask);
+            AscendC::Reg::ShiftRights(outputScaleReg, sharedExponentReg, BF16_EXPONENT_SHIFT, scaleMask);
+            AscendC::Reg::Select<uint16_t>(outputScaleReg, outputScaleReg, fp8NanReg, validExponentMask);
+            AscendC::Reg::Select<uint16_t>(outputScaleReg, outputScaleReg, zeroReg, nonzeroMask);
+            AscendC::Reg::DataCopy<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
+                                   AscendC::Reg::StoreDist::DIST_PACK_B16>(outputScale, outputScaleReg,
+                                                                           SCALE_PACK_ELEMENT_COUNT, scaleMask);
+            AscendC::Reg::Compare<uint16_t, AscendC::CMPMODE::EQ>(specialExponentMask, sharedExponentReg,
+                                                                  exponentBiasReg, scaleMask);
+            AscendC::Reg::Sub(reciprocalScaleReg, exponentBiasReg, sharedExponentReg, scaleMask);
+            AscendC::Reg::Select<uint16_t>(reciprocalScaleReg, reciprocalScaleReg, bf16NanReg, validExponentMask);
+            AscendC::Reg::Select<uint16_t>(reciprocalScaleReg, reciprocalScaleReg, zeroReg, nonzeroMask);
+            AscendC::Reg::Select<uint16_t>(reciprocalScaleReg, specialExponentReg, reciprocalScaleReg,
+                                           specialExponentMask);
+            AscendC::Reg::DataCopy<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
                 reciprocalScale, reciprocalScaleReg, SCALE_ELEMENT_COUNT_PER_VECTOR, scaleMask);
         }
     }
