@@ -16,16 +16,16 @@
 #include "hccl/hccl.h"
 #include "aclnnop/aclnn_allto_allv_quant_grouped_mat_mul.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -78,7 +78,7 @@ int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args &args)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
     char hcomName[128] = {0};
     ret = HcclGetCommName(args.hcclComm, hcomName);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetEpCommName failed. ret: %d\n", ret); return -1);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret: %d\n", ret); return -1);
 
     std::vector<int64_t> gmmXShape = {BS * K, H};
     std::vector<int64_t> gmmWShape = {e, H, N1};

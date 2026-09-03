@@ -25,7 +25,7 @@
 
 ## 功能说明
 
-- 接口功能：完成路由专家GroupedMatMul、Unpermute、AlltoAllv融合并实现与共享专家MatMul并行融合，**先计算后通信**。
+- 接口功能：完成路由专家 GroupedMatMul、Unpermute、AlltoAllv 融合并实现与共享专家 MatMul 并行融合，**先计算后通信**。
 
 - 计算公式：
 
@@ -114,7 +114,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>gmmX(aclTensor*)</td>
     <td>输入</td>
-    <td>该输入进行AlltoAllv通信。</td>
+    <td>GroupedMatMul 计算的左矩阵。</td>
     <td><ul><li>数据类型与gmmWeight保持一致。</li><li>支持2维，shape为(A, H1)。</li></ul></td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
@@ -124,7 +124,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>gmmWeight(aclTensor*)</td>
     <td>输入</td>
-    <td>GroupedMatMul计算的右矩阵。</td>
+    <td>GroupedMatMul 计算的右矩阵。</td>
     <td><ul><li>数据类型与gmmX保持一致。</li><li>支持3维，shape为(e, H1, N1)。</li></ul></td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
@@ -205,7 +205,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <td>sendCounts(aclIntArray*)</td>
     <td>输入</td>
     <td>表示发送给其他卡的token数。</td>
-    <td><ul><li>输入类型需为aclIntArray*，元素类型为INT64。</li><li>list大小为e * epWorldSize，最大为256。输入类型需为list。</li></ul></td>
+    <td><ul><li>输入类型需为aclIntArray*，元素类型为INT64。</li><li>list大小为e * epWorldSize，最大为256。</li></ul></td>
     <td>aclIntArray*（元素类型INT64）</td>
     <td>-</td>
     <td>-</td>
@@ -304,12 +304,12 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>ACLNN_ERR_PARAM_NULLPTR</td>
     <td>161001</td>
-    <td>1. 传入参数要求是必选输入、输出或者必选属性，但实际传入了空指针。</td>
+    <td>传入参数要求是必选输入、输出或者必选属性，但实际传入了空指针。</td>
     </tr>
     <tr>
     <td>ACLNN_ERR_PARAM_INVALID</td>
     <td>161002</td>
-    <td>1. gmmX、gmmWeight、sendCountsTensorOptional、recvCountsTensorOptional、mmXOptional、mmWeightOptional、group、epWorldSize、sendCounts、recvCounts的数据类型、数据格式或者维度不在支持的范围内。</td>
+    <td>gmmX、gmmWeight、sendCountsTensorOptional、recvCountsTensorOptional、mmXOptional、mmWeightOptional、group、epWorldSize、sendCounts、recvCounts的数据类型、数据格式或者维度不在支持的范围内。</td>
     </tr>
     </tbody></table>
 
@@ -365,7 +365,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
   - Atlas A3 训练系列产品/Atlas A3 推理系列产品：支持AI_CPU通信。
   <!-- end id8 -->
   <!-- npu="950" id9 -->
-  - Ascend 950DT：支持CCU通信和AI_CPU通信，CCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
+  - Ascend 950DT：支持 CCU 通信和 AI_CPU 通信，CCU 仅支持单机 UB 域内互联，AI_CPU 可支持跨机 UB 域内互联。
 
   <!-- end id9 -->
 
@@ -382,7 +382,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
 
 <!-- npu="A3" id10 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  : 单卡通信量在2MB以下可能存在性能劣化。
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：单卡通信量在2MB以下可能存在性能劣化。
 
 <!-- end id10 -->
 
@@ -390,7 +390,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分 HCCL 集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,A3" id11 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Ascend 950DT</term>：
@@ -461,7 +461,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     constexpr int64_t N2 = 4096;
     constexpr int64_t A = BS * K;
 
-    std::vector<int16_t> pGmmyData(BS *K *N1, 0);
+    std::vector<int16_t> pGmmYData(BS *K *N1, 0);
     std::vector<int16_t> pmmYData(BS *N2, 0);
 
     int LaunchOneThreadAlltoAllvGmm(Args &args)
@@ -470,7 +470,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
         char hcomName[128] = {0};
         ret = HcclGetCommName(args.hcclComm, hcomName);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetEpCommName failed. ret: %d\n", ret); return -1);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret: %d\n", ret); return -1);
 
         std::vector<int64_t> gmmXShape = {A, H};
         std::vector<int64_t> gmmWShape = {e, H, N1};
@@ -565,7 +565,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
         // 释放device资源，需要根据具体API的接口定义修改
         if (args.rankId == 0) {
             size_t size = A * N1 * sizeof(int16_t);
-            aclrtMemcpy(pGmmyData.data(), size, gmmYDeviceAddr, size, ACL_MEMCPY_DEVICE_TO_HOST);
+            aclrtMemcpy(pGmmYData.data(), size, gmmYDeviceAddr, size, ACL_MEMCPY_DEVICE_TO_HOST);
         }
         if (gmmX != nullptr) {
             aclDestroyTensor(gmmX);

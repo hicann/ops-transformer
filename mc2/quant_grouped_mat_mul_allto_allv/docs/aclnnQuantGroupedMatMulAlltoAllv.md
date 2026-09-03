@@ -26,7 +26,7 @@
 ## 功能说明
 
 - 接口功能：
-    - 完成量化的路由专家GroupedMatMul、Unpermute、AlltoAllv融合并实现与共享专家MatMul并行融合，先计算后通信，支持Pertensor-Pertensor、Mx[量化模式](../../../docs/zh/context/quant_mode_introduction.md)。
+    - 完成量化的路由专家 GroupedMatMul、Unpermute、AlltoAllv 融合并实现与共享专家 MatMul 并行融合，先计算后通信，支持pertensor-pertensor、mx[量化模式](../../../docs/zh/context/quant_mode_introduction.md)。
 
 - 计算公式：
     - 路由专家：
@@ -39,7 +39,7 @@
     - 共享专家：
 
         $$
-        mmY = (mmX @  mmWeight) * mmXScaleOptional * mmWeightScaleOptional
+        mmY = (mmX @ mmWeight) * mmXScaleOptional * mmWeightScaleOptional
         $$
 
 ## 函数原型
@@ -185,7 +185,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
                 <td>mmXOptional</td>
                 <td>输入</td>
                 <td>公式中的输入mmX。</td>
-                <td>shape (bs, H2)。bs为每卡部署的专家个数，H2为hidden size。</td>
+                <td>shape (BS, H2)。BS为batch sequence size，H2为hidden size。</td>
                 <td>HIFLOAT8、FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1</td>
                 <td>ND</td>
                 <td>2</td>
@@ -240,7 +240,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
                 <td>gmmXQuantMode</td>
                 <td>输入</td>
                 <td>gmmX的量化模式。</td>
-                <td>必须传入量化模式，当前支持1 （pertensor量化）和6（mx量化）。</td>
+                <td>必须传入量化模式，当前支持1（pertensor量化）和6（mx量化）。</td>
                 <td>INT64</td>
                 <td>-</td>
                 <td>1</td>
@@ -251,7 +251,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
                 <td>gmmWeightQuantMode</td>
                 <td>输入</td>
                 <td>gmmWeight的量化模式。</td>
-                <td>必须传入量化模式，当前支持1 （pertensor量化）和6（mx量化）。</td>
+                <td>必须传入量化模式，当前支持1（pertensor量化）和6（mx量化）。</td>
                 <td>INT64</td>
                 <td>-</td>
                 <td>1</td>
@@ -262,7 +262,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
                 <td>mmXQuantMode</td>
                 <td>输入</td>
                 <td>mmX的量化模式。</td>
-                <td>mmX非空，则必须传入量化模式，当前支持1 （pertensor量化）和6（mx量化）。</td>
+                <td>mmX非空，则必须传入量化模式，当前支持1（pertensor量化）和6（mx量化）。</td>
                 <td>INT64</td>
                 <td>-</td>
                 <td>1</td>
@@ -273,7 +273,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
                 <td>mmWeightQuantMode</td>
                 <td>输入</td>
                 <td>mmWeight的量化模式。</td>
-                <td>mmWeight不为空，则必须传入量化模式，当前支持1 （pertensor量化）和6（mx量化）。</td>
+                <td>mmWeight不为空，则必须传入量化模式，当前支持1（pertensor量化）和6（mx量化）。</td>
                 <td>INT64</td>
                 <td>-</td>
                 <td>1</td>
@@ -306,7 +306,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
                 <td>groupSize</td>
                 <td>输入</td>
                 <td>PerGroup量化分组大小。</td>
-                <td>用于Matmul计算三个方向上的量化分组大小，预留参数，仅支持配置为0，取值不生效。groupSize输入由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（高16位无效），计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</td>
+                <td>用于Matmul计算三个方向上的量化分组大小。预留参数，仅当量化Scale输入为2维及以上数据时取值有效，其他场景需传入0。groupSize输入由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（高16位无效），计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</td>
                 <td>INT64</td>
                 <td>-</td>
                 <td>-</td>
@@ -382,7 +382,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
             <tr>
                 <td>y</td>
                 <td>输出</td>
-                <td>grouped matmul计算输出。</td>
+                <td>GroupedMatMul计算输出。</td>
                 <td>不支持空Tensor。shape (BSK, N1)。</td>
                 <td>FLOAT16、BFLOAT16</td>
                 <td>ND</td>
@@ -394,7 +394,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
                 <td>mmYOptional</td>
                 <td>输出</td>
                 <td>matmul计算输出。</td>
-                <td>shape (bs, N1)。</td>
+                <td>shape (bs, N2)。</td>
                 <td>FLOAT16、BFLOAT16</td>
                 <td>ND</td>
                 <td>2</td>
@@ -514,17 +514,17 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
 - 通信引擎约束：
 
   <!-- npu="950" id7 -->
-  - Ascend 950DT：支持AI_CPU通信。
+  - Ascend 950DT：支持 AI_CPU 通信。
   <!-- end id7 -->
 
-- e * epWorldSize最大支持256，e表示单卡上的专家数量，最大支持到32，epWorldSize支持2/4/8/16/32/64/128/256;
+- e * epWorldSize 乘积最大支持 256，其中 e（单卡专家数），最大支持 32，epWorldSize 支持 2/4/8/16/32/64/128/256;
 - gmmX的shape(A, H1)，A为sendCounts之和，H1取值范围(0, 65536);
 - gmmWeight的shape(e, H1, N1)，N1取值范围(0, 65536);
 - y的shape为(BSK, N1)，第一维其中K的范围[2, 8]，BSK为recvCounts之和;
 - mmX是共享专家的左矩阵，shape为(BS, H2)，H2的取值范围(0, 12288]；
-- mmWeight是共享专家的右矩阵，shape为(H2， N2)，N2的取值范围(0, 65536)；
+- mmWeight是共享专家的右矩阵，shape为(H2, N2)，N2的取值范围(0, 65536)；
 - sendCounts为发送到其他卡的token数，数组大小为e * epWorldSize;
-- recvCounts从其他卡的token数，数组大小为e * epWorldSize;
+- recvCounts为从其他卡的token数，数组大小为e * epWorldSize;
 - 路由专家和共享专家量化Scale、Mode等均为必选；
 - 低比特通信Mode为必选参数，DType和Scale为可选，当Mode为非0时需要提供DType和Scale；
 - 参数说明里shape使用的变量：
@@ -546,7 +546,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
     $$
     groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
     $$
-    - 如果满足重新设置条件，当gmmXScale/gmmWeightScale/mmXScale/mmWeightScale输入是2维及以上时，且数据类型都为FLOAT8_E8M0时，[groupSizeM，groupSizeN，groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
+    - 如果满足重新设置条件，当gmmXScale/gmmWeightScale/mmXScale/mmWeightScale输入是2维及以上时，且数据类型都为FLOAT8_E8M0时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
 
 - 量化参数约束：
   - 当前版本支持pertensor量化、mx量化。
@@ -580,7 +580,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
 
 <!-- end id8 -->
 
-```Cpp
+```cpp
 #include <thread>
 #include <iostream>
 #include <string>
@@ -652,7 +652,7 @@ constexpr int64_t N1 = 4096;
 constexpr int64_t N2 = 4096;
 constexpr int64_t A = BS * K;
 
-std::vector<int16_t> pGmmyData(BS *K *N1, 0);
+std::vector<int16_t> pGmmYData(BS *K *N1, 0);
 std::vector<int16_t> pmmYData(BS *N2, 0);
 
 int LaunchOneThreadAlltoAllvGmm(Args &args)
@@ -661,7 +661,7 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
     char hcomName[128] = {0};
     ret = HcclGetCommName(args.hcclComm, hcomName);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetEpCommName failed. ret: %d\n", ret); return -1);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret: %d\n", ret); return -1);
 
     std::vector<int64_t> gmmXShape = {A, H};
     std::vector<int64_t> gmmWShape = {e, H, N1};
@@ -817,7 +817,7 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     // 释放device资源，需要根据具体API的接口定义修改
     if (args.rankId == 0) {
         size_t size = A * N1 * sizeof(int16_t);
-        aclrtMemcpy(pGmmyData.data(), size, yDeviceAddr, size, ACL_MEMCPY_DEVICE_TO_HOST);
+        aclrtMemcpy(pGmmYData.data(), size, yDeviceAddr, size, ACL_MEMCPY_DEVICE_TO_HOST);
     }
     if (gmmX != nullptr) {
         aclDestroyTensor(gmmX);
