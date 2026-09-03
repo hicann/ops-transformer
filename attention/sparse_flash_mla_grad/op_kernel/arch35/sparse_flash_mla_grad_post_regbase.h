@@ -20,7 +20,8 @@
 using namespace AscendC;
 
 template <typename T1, typename T2, typename OUTDTYPE = T1, const bool IS_TND = 0, const bool isOriKVExist = 0,
-          const bool isCmpKVExist = 0>
+          const bool isCmpKVExist = 0, const bool IsOriKVSparse = 0, const bool IsCmpKVSparse = 0,
+          const bool IsDETER = 0>
 class SparseFlashMlaGradPostRegbase {
 public:
     __aicore__ inline SparseFlashMlaGradPostRegbase(){};
@@ -45,6 +46,7 @@ public:
     TBuf<> dsinkResBuf;
     GlobalTensor<OUTDTYPE> dqkv[3];
     GlobalTensor<float> dqkvWorkspace[3];
+    GlobalTensor<float> dqkvVWorkspace[3];
     GlobalTensor<float> dsinkWorkspace;
     GlobalTensor<float> dsinkGm;
     uint32_t vBlockIdx;
@@ -54,11 +56,12 @@ public:
 };
 
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist>
-__aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dori_kv, __gm__ uint8_t *dcmp_kv, __gm__ uint8_t *dsinks,
-    __gm__ uint8_t *workspace, const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict ordTilingData,
-    TPipe *pipe_in)
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+__aicore__ inline void SparseFlashMlaGradPostRegbase<
+    T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse, IsCmpKVSparse,
+    IsDETER>::Init(__gm__ uint8_t *dq, __gm__ uint8_t *dori_kv, __gm__ uint8_t *dcmp_kv, __gm__ uint8_t *dsinks,
+                   __gm__ uint8_t *workspace,
+                   const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict ordTilingData, TPipe *pipe_in)
 {
     vBlockIdx = GetBlockIdx();
     tilingData = ordTilingData;
@@ -71,11 +74,19 @@ __aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, i
         dqkv[1].SetGlobalBuffer((__gm__ OUTDTYPE *)dori_kv);
         dqkvWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace +
                                          tilingData->postTilingData.dOriKVWorkSpaceOffset / sizeof(T2));
+        if constexpr (!IsOriKVSparse && !IsDETER) {
+            dqkvVWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace +
+                                              tilingData->postTilingData.dOriVWorkSpaceOffset / sizeof(T2));
+        }
     }
     if constexpr (isCmpKVExist) {
         dqkv[2].SetGlobalBuffer((__gm__ OUTDTYPE *)dcmp_kv);
         dqkvWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace +
                                          tilingData->postTilingData.dCmpKVWorkSpaceOffset / sizeof(T2));
+        if constexpr (!IsCmpKVSparse && !IsDETER) {
+            dqkvVWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace +
+                                              tilingData->postTilingData.dCmpVWorkSpaceOffset / sizeof(T2));
+        }
     }
 
     loop = tilingData->postTilingData.qPostBlockFactor;
@@ -96,9 +107,9 @@ __aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, i
 }
 
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist>
-__aicore__ inline void
-SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::ProcessSink()
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+__aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist,
+                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER>::ProcessSink()
 {
     if (vBlockIdx != 0) {
         return;
@@ -141,9 +152,9 @@ SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExi
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(eventIDMte3ToMte2);
 }
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist>
-__aicore__ inline void
-SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::ProcessDqkv()
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+__aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist,
+                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER>::ProcessDqkv()
 {
     for (int qkvIdx = 0; qkvIdx < 3; qkvIdx++) {
         if constexpr (!isOriKVExist) {
@@ -173,6 +184,34 @@ SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExi
 
         if (end > inputTotalSize) {
             end = inputTotalSize;
+        }
+
+        if (qkvIdx >= 1) {
+            bool denseKvUnDeter = (qkvIdx == 1) ? (!IsOriKVSparse && !IsDETER) : (!IsCmpKVSparse && !IsDETER);
+            if (denseKvUnDeter) {
+                for (uint64_t idx = begin; idx < end; idx += REGBASE_POST_BASE) {
+                    uint32_t size = idx + REGBASE_POST_BASE < inputTotalSize ? REGBASE_POST_BASE : qPostTailNum;
+                    LocalTensor<float> dkIn = inQueuePing.AllocTensor<float>();
+                    LocalTensor<float> dvIn = inQueuePong.AllocTensor<float>();
+                    DataCopy(dkIn, dqkvWorkspace[qkvIdx][idx], (size + 7) >> 3 << 3);
+                    inQueuePing.EnQue(dkIn);
+                    inQueuePing.DeQue<float>();
+                    DataCopy(dvIn, dqkvVWorkspace[qkvIdx][idx], (size + 7) >> 3 << 3);
+                    inQueuePong.EnQue(dvIn);
+                    inQueuePong.DeQue<float>();
+                    Muls(dkIn, dkIn, (float)tilingData->baseParams.scaleValue, size);
+                    Add(dkIn, dkIn, dvIn, size);
+                    LocalTensor<OUTDTYPE> vecOut = outQueuePing.AllocTensor<OUTDTYPE>();
+                    Cast(vecOut, dkIn, RoundMode::CAST_ROUND, size);
+                    outQueuePing.EnQue(vecOut);
+                    outQueuePing.DeQue<OUTDTYPE>();
+                    DataCopy(dqkv[qkvIdx][idx], vecOut, (size + 15) >> 4 << 4);
+                    outQueuePing.FreeTensor(vecOut);
+                    inQueuePing.FreeTensor(dkIn);
+                    inQueuePong.FreeTensor(dvIn);
+                }
+                continue;
+            }
         }
 
         for (uint64_t pingIdx = begin; pingIdx < end; pingIdx = pingIdx + (REGBASE_POST_BASE << 1)) {
@@ -221,8 +260,9 @@ SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExi
     }
 }
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist>
-__aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist>::Process()
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+__aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist,
+                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER>::Process()
 {
     if (g_coreType != AIV) {
         return;

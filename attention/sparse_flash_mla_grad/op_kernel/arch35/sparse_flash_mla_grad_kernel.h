@@ -153,7 +153,13 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
     }
 
     // compute dk
-    this->cubeBlock.template IterateMmDsQ<CALC_TYPE, BaseClass::IS_DK_WRITE_UB>(this->mm4ResWorkSpaceGm, this->dSL1Buf,
+    GlobalTensor<CALC_TYPE> dkOutTensor = this->mm4ResWorkSpaceGm;
+    if constexpr (!IsDETER) {
+        if (!runInfo.isSparse) {
+            dkOutTensor = runInfo.isOriKV ? this->dOriKVWorkSpaceGm : this->dCmpKVWorkSpaceGm;
+        }
+    }
+    this->cubeBlock.template IterateMmDsQ<CALC_TYPE, BaseClass::IS_DK_WRITE_UB>(dkOutTensor, this->dSL1Buf,
                                                                                 this->constInfo, runInfo); // c4
     if ASCEND_IS_AIC {
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SYNC_C4_TO_V3_FLAG);
@@ -166,7 +172,13 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
         CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(16 + SYNC_V4_TO_C5_FLAG);
     }
     // compute dv
-    this->cubeBlock.template IterateMmPDy<CALC_TYPE, BaseClass::IS_DV_WRITE_UB>(this->mm5ResWorkSpaceGm, this->pL1Buf,
+    GlobalTensor<CALC_TYPE> dvOutTensor = this->mm5ResWorkSpaceGm;
+    if constexpr (!IsDETER) {
+        if (!runInfo.isSparse) {
+            dvOutTensor = runInfo.isOriKV ? this->dOriVWorkSpaceGm : this->dCmpVWorkSpaceGm;
+        }
+    }
+    this->cubeBlock.template IterateMmPDy<CALC_TYPE, BaseClass::IS_DV_WRITE_UB>(dvOutTensor, this->pL1Buf,
                                                                                 this->constInfo, runInfo); // c5
     if ASCEND_IS_AIC {
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SYNC_C5_TO_V4_FLAG);

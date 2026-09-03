@@ -228,7 +228,6 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-
 bool SparseFlashMlaGradTilingBs1Regbase::IsCapable()
 {
     OP_LOGI(context_, "SparseFlashMlaGrad basic template hit.");
@@ -298,12 +297,15 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetWorkspaceSize()
     int64_t dqWorkspaceLen = tmpData.dqWorkspaceLen;
     int64_t doriKVWorkspaceLen = tmpData.doriKVWorkspaceLen;
     int64_t dcmpKVWorkspaceLen = tmpData.dcmpKVWorkspaceLen;
+    int64_t doriVWorkspaceLen = tmpData.doriVWorkspaceLen;
+    int64_t dcmpVWorkspaceLen = tmpData.dcmpVWorkspaceLen;
 
     size_t *workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = sysLen;
     workspaces[0] += selectedKWorkspaceLen * coreNum;
     workspaces[0] += (mm4WorkspaceLen + mm5WorkspaceLen + dSinkWorkspaceLen) * coreNum;
     workspaces[0] += dqWorkspaceLen + doriKVWorkspaceLen + dcmpKVWorkspaceLen;
+    workspaces[0] += doriVWorkspaceLen + dcmpVWorkspaceLen;
 
     baseParams_->set_selectedKWorkSpaceOffset(0);
     int64_t workspaceOffsets = selectedKWorkspaceLen * coreNum;
@@ -319,6 +321,10 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetWorkspaceSize()
     workspaceOffsets = workspaceOffsets + doriKVWorkspaceLen;
     postTilingData_->set_dCmpKVWorkSpaceOffset(workspaceOffsets);
     workspaceOffsets = workspaceOffsets + dcmpKVWorkspaceLen;
+    postTilingData_->set_dOriVWorkSpaceOffset(workspaceOffsets);
+    workspaceOffsets = workspaceOffsets + doriVWorkspaceLen;
+    postTilingData_->set_dCmpVWorkSpaceOffset(workspaceOffsets);
+    workspaceOffsets = workspaceOffsets + dcmpVWorkspaceLen;
 
     return ge::GRAPH_SUCCESS;
 }
@@ -336,18 +342,17 @@ uint64_t SparseFlashMlaGradTilingBs1Regbase::GetTilingKey() const
     baseParams_->set_hasCmpTopK(tmpData.cmpTopK);
     baseParams_->set_isSink(tmpData.sinks);
 
-    OP_LOGI(
-        context_,
-        "SparseFlashMlaGrad get tilingkey, InputDType[%ld], IsTnd[%ld], GTemplateNum[%ld], S2TemplateNum[%ld], \
+    OP_LOGI(context_,
+            "SparseFlashMlaGrad get tilingkey, InputDType[%ld], IsTnd[%ld], GTemplateNum[%ld], S2TemplateNum[%ld], \
         DTemplateNum[%ld], IsOriKVExist[%d], IsCmpKVExist[%d], IsOriKVSparse[%d], IsCmpKVSparse[%d], \
         HasUsedSeqQ[%d], HasUsedSeqOriKV[%d], HasUsedSeqCmpKV[%d], HasOriTopK[%d], HasCmpTopK[%d], IsSink[%d], \
         Deterministic[%d]",
-        inputDtypeSize, isTnd, tmpData.singleM, tmpData.singleN, tmpData.d, static_cast<uint8_t>(tmpData.oriKV),
-        static_cast<uint8_t>(tmpData.cmpKV), static_cast<uint8_t>(tmpData.oriKVSparse),
-        static_cast<uint8_t>(tmpData.cmpKVSparse), static_cast<uint8_t>(tmpData.usedSeqQ),
-        static_cast<uint8_t>(tmpData.usedSeqOriKV), static_cast<uint8_t>(tmpData.usedSeqCmpKV),
-        static_cast<uint8_t>(tmpData.oriTopK), static_cast<uint8_t>(tmpData.cmpTopK),
-        static_cast<uint8_t>(tmpData.sinks), static_cast<uint8_t>(tmpData.deterministic));
+            inputDtypeSize, isTnd, tmpData.singleM, tmpData.singleN, tmpData.d, static_cast<uint8_t>(tmpData.oriKV),
+            static_cast<uint8_t>(tmpData.cmpKV), static_cast<uint8_t>(tmpData.oriKVSparse),
+            static_cast<uint8_t>(tmpData.cmpKVSparse), static_cast<uint8_t>(tmpData.usedSeqQ),
+            static_cast<uint8_t>(tmpData.usedSeqOriKV), static_cast<uint8_t>(tmpData.usedSeqCmpKV),
+            static_cast<uint8_t>(tmpData.oriTopK), static_cast<uint8_t>(tmpData.cmpTopK),
+            static_cast<uint8_t>(tmpData.sinks), static_cast<uint8_t>(tmpData.deterministic));
     // tmpData.singleM 为G方向上固定切分大小 tmpData.singleN为S2方向上固定切分大小
     tilingKey = GET_TPL_TILING_KEY(
         static_cast<uint8_t>(inputDtypeSize), static_cast<uint8_t>(isTnd), static_cast<uint16_t>(tmpData.singleM),
@@ -638,6 +643,12 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::DoCastTiling()
     tmpData.dqWorkspaceLen = (allNumQuery * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
     tmpData.doriKVWorkspaceLen = (allNumOriKV * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
     tmpData.dcmpKVWorkspaceLen = (allNumCmpKV * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
+    if (!tmpData.oriKVSparse && !tmpData.deterministic) {
+        tmpData.doriVWorkspaceLen = (allNumOriKV * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
+    }
+    if (!tmpData.cmpKVSparse && !tmpData.deterministic) {
+        tmpData.dcmpVWorkspaceLen = (allNumCmpKV * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
+    }
     return ge::GRAPH_SUCCESS;
 }
 

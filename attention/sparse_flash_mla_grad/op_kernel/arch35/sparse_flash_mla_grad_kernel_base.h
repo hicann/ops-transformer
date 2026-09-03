@@ -102,7 +102,8 @@ protected:
     TPipe *pipe;
 
     // output global mmemory
-    GlobalTensor<float> dqWorkSpaceGm, dOriKVWorkSpaceGm, dCmpKVWorkSpaceGm, mm4ResWorkSpaceGm, mm5ResWorkSpaceGm;
+    GlobalTensor<float> dqWorkSpaceGm, dOriKVWorkSpaceGm, dCmpKVWorkSpaceGm, dOriVWorkSpaceGm, dCmpVWorkSpaceGm;
+    GlobalTensor<float> mm4ResWorkSpaceGm, mm5ResWorkSpaceGm;
     GlobalTensor<INPUT_TYPE> selectedKWorkSpaceGm;
     // CV核间共享Buffer
     TBuf<> mm1ResBuf[2];
@@ -297,6 +298,10 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
                                       tilingData->postTilingData.dOriKVWorkSpaceOffset / sizeof(float));
     dCmpKVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
                                       tilingData->postTilingData.dCmpKVWorkSpaceOffset / sizeof(float));
+    dOriVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                     tilingData->postTilingData.dOriVWorkSpaceOffset / sizeof(float));
+    dCmpVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                     tilingData->postTilingData.dCmpVWorkSpaceOffset / sizeof(float));
 
     int64_t selectedKWorkSpaceOffset = tilingData->baseParams.selectedKWorkSpaceOffset / sizeof(INPUT_TYPE) +
                                        cBlockIdx * CUBE_BASEN * constInfo.commonConstInfo.dSize * 3;
@@ -538,8 +543,10 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
         runInfo.mm4ResWsAddr = runInfo.deterTaskIdMod2 * PROCESS_KV_SIZE * constInfo.dTotalSize * coreNum +
                                cBlockIdx * PROCESS_KV_SIZE * constInfo.dTotalSize +
                                (runInfo.blkCntOffset - kvOffset) * constInfo.dTotalSize;
-    } else {
+    } else if (runInfo.isSparse) {
         runInfo.mm4ResWsAddr = (taskId % 2) * CUBE_BASEN * constInfo.dTotalSize;
+    } else {
+        runInfo.mm4ResWsAddr = runInfo.kSelectedWsAddr;
     }
     runInfo.mm5ResWsAddr = runInfo.mm4ResWsAddr;
 }

@@ -505,6 +505,8 @@ public:
     int64_t dqWorkSpaceOffset;
     int64_t dOriKVWorkSpaceOffset;
     int64_t dCmpKVWorkSpaceOffset;
+    int64_t dOriVWorkSpaceOffset;
+    int64_t dCmpVWorkSpaceOffset;
     int64_t sinkReduceAxis;
     int64_t sinkPostBlockTotal;
     int64_t sinkPostBlockFactor;
@@ -573,6 +575,14 @@ public:
     int64_t get_dCmpKVWorkSpaceOffset() const
     {
         return dCmpKVWorkSpaceOffset;
+    }
+    int64_t get_dOriVWorkSpaceOffset() const
+    {
+        return dOriVWorkSpaceOffset;
+    }
+    int64_t get_dCmpVWorkSpaceOffset() const
+    {
+        return dCmpVWorkSpaceOffset;
     }
     int64_t get_sinkReduceAxis() const
     {
@@ -654,6 +664,14 @@ public:
     void set_dCmpKVWorkSpaceOffset(int64_t value)
     {
         this->dCmpKVWorkSpaceOffset = value;
+    }
+    void set_dOriVWorkSpaceOffset(int64_t value)
+    {
+        this->dOriVWorkSpaceOffset = value;
+    }
+    void set_dCmpVWorkSpaceOffset(int64_t value)
+    {
+        this->dCmpVWorkSpaceOffset = value;
     }
     void set_sinkReduceAxis(int64_t value)
     {

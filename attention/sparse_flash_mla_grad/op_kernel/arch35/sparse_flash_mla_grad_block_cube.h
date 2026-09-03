@@ -549,8 +549,18 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQNormal(
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
         constexpr static FixpipeConfig DK_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, IS_WRITE_UB};
+        if constexpr (!IsDETER) {
+            if (!runInfo.isSparse) {
+                SetAtomicAdd<CALC_TYPE>();
+            }
+        }
         Fixpipe<T, CALC_TYPE, DK_FIXPIPE_CONFIG>(outTensor[runInfo.mm4ResWsAddr + n * CUBE_BASEN],
                                                  dkL0CBuffer.GetTensor<CALC_TYPE>(), fixpipeParams);
+        if constexpr (!IsDETER) {
+            if (!runInfo.isSparse) {
+                SetAtomicNone();
+            }
+        }
 
         dkL0CBuffer.Set<HardEvent::FIX_M>();
         SetFlag<HardEvent::FIX_M>(eventIDFIXToM);
@@ -631,8 +641,18 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDyNormal(
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
         constexpr static FixpipeConfig DV_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, IS_WRITE_UB};
+        if constexpr (!IsDETER) {
+            if (!runInfo.isSparse) {
+                SetAtomicAdd<CALC_TYPE>();
+            }
+        }
         Fixpipe<T, CALC_TYPE, DV_FIXPIPE_CONFIG>(outTensor[runInfo.mm5ResWsAddr + n * CUBE_BASEN],
                                                  dvL0CBuffer.GetTensor<CALC_TYPE>(), fixpipeParams);
+        if constexpr (!IsDETER) {
+            if (!runInfo.isSparse) {
+                SetAtomicNone();
+            }
+        }
         dvL0CBuffer.Set<HardEvent::FIX_M>();
     }
 }
