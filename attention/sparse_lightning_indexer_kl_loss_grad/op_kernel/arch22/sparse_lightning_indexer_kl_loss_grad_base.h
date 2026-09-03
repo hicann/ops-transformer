@@ -104,6 +104,8 @@ private:
     // 确定性：按有效 S1 压缩调度（不改 tiling totalSize）
     __aicore__ inline int64_t CalcValidTotalSize();
     __aicore__ inline void ResetValidIdxMap();
+    __aicore__ inline void LoadAllocatedAndUsedSeqLens(int64_t bIdx, int64_t &accumS1, int64_t &accumS2, int32_t &usedQ,
+                                                       int32_t &usedK);
     __aicore__ inline bool LoadValidBatchAt(int64_t curB);
     __aicore__ inline bool MapValidIdxToBS1(int64_t validIdx, int64_t &bIdx, int64_t &s1Idx, int64_t &accumS1Len,
                                             int64_t &accumS2Len, int32_t &actualSeqLensQ, int32_t &actualSeqLensK);
@@ -441,33 +443,40 @@ __aicore__ inline int64_t SparseLightningIndexerKLLossGradBase<SLIT>::GetInvalid
 }
 
 template <typename SLIT>
+__aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::LoadAllocatedAndUsedSeqLens(
+    int64_t bIdx, int64_t &accumS1, int64_t &accumS2, int32_t &usedQ, int32_t &usedK)
+{
+    int32_t allocatedQ = constInfo.s1Size;
+    int32_t allocatedK = constInfo.s2Size;
+    accumS1 = 0;
+    accumS2 = 0;
+    if constexpr (LAYOUT_T == SLILayout::TND) {
+        allocatedQ = GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1);
+        if constexpr (KV_LAYOUT_T == SLILayout::TND) {
+            allocatedK = GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2);
+        } else {
+            accumS2 = bIdx * constInfo.s2Size;
+        }
+    }
+    usedQ = hasSequsedQ ? GetUsedSeqLens(bIdx, allocatedQ, seqUsedQueryGm) : allocatedQ;
+    usedK = hasSequsedK ? GetUsedSeqLens(bIdx, allocatedK, seqUsedKeyGm) : allocatedK;
+}
+
+template <typename SLIT>
 __aicore__ inline int64_t SparseLightningIndexerKLLossGradBase<SLIT>::CalcValidTotalSize()
 {
     if (cachedValidTotalSize_ >= 0) {
         return cachedValidTotalSize_;
     }
     int64_t validTotalSize = 0;
-    if constexpr (LAYOUT_T == SLILayout::TND) {
-        for (int64_t bIdx = 0; bIdx < constInfo.bSize; ++bIdx) {
-            int64_t accumS1Len = 0;
-            int64_t accumS2Len = 0;
-            int32_t actualSeqLensQ =
-                GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1Len);
-            int32_t actualSeqLensK = 0;
-            if constexpr (KV_LAYOUT_T == SLILayout::TND) {
-                actualSeqLensK =
-                    GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2Len);
-            } else {
-                actualSeqLensK = constInfo.s2Size;
-            }
-            int64_t invalidS1Size = GetInvalidS1Size(bIdx, actualSeqLensQ, actualSeqLensK);
-            validTotalSize += Max(static_cast<int64_t>(actualSeqLensQ) - invalidS1Size, static_cast<int64_t>(0));
-        }
-    } else {
-        for (int64_t bIdx = 0; bIdx < constInfo.bSize; ++bIdx) {
-            int64_t invalidS1Size = GetInvalidS1Size(bIdx, constInfo.s1Size, constInfo.s2Size);
-            validTotalSize += Max(constInfo.s1Size - invalidS1Size, static_cast<int64_t>(0));
-        }
+    for (int64_t bIdx = 0; bIdx < constInfo.bSize; ++bIdx) {
+        int64_t accumS1Len = 0;
+        int64_t accumS2Len = 0;
+        int32_t actualSeqLensQ = 0;
+        int32_t actualSeqLensK = 0;
+        LoadAllocatedAndUsedSeqLens(bIdx, accumS1Len, accumS2Len, actualSeqLensQ, actualSeqLensK);
+        int64_t invalidS1Size = GetInvalidS1Size(bIdx, actualSeqLensQ, actualSeqLensK);
+        validTotalSize += Max(static_cast<int64_t>(actualSeqLensQ) - invalidS1Size, static_cast<int64_t>(0));
     }
     cachedValidTotalSize_ = validTotalSize;
     return validTotalSize;
@@ -494,31 +503,17 @@ __aicore__ inline bool SparseLightningIndexerKLLossGradBase<SLIT>::LoadValidBatc
         mapBatchReady_ = false;
         return false;
     }
-    if constexpr (LAYOUT_T == SLILayout::TND) {
-        int64_t curAccumS1 = 0;
-        int64_t curAccumS2 = 0;
-        int32_t seqQ = GetActualSeqLens(curB, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, curAccumS1);
-        int32_t seqK = 0;
-        if constexpr (KV_LAYOUT_T == SLILayout::TND) {
-            seqK = GetActualSeqLens(curB, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, curAccumS2);
-        } else {
-            seqK = constInfo.s2Size;
-            curAccumS2 = curB * constInfo.s2Size;
-        }
-        mapInvalidS1CurB_ = GetInvalidS1Size(curB, seqQ, seqK);
-        mapValidCntCurB_ = Max(static_cast<int64_t>(seqQ) - mapInvalidS1CurB_, static_cast<int64_t>(0));
-        mapAccumS1CurB_ = curAccumS1;
-        mapAccumS2CurB_ = curAccumS2;
-        mapSeqQCurB_ = seqQ;
-        mapSeqKCurB_ = seqK;
-    } else {
-        mapInvalidS1CurB_ = GetInvalidS1Size(curB, constInfo.s1Size, constInfo.s2Size);
-        mapValidCntCurB_ = Max(constInfo.s1Size - mapInvalidS1CurB_, static_cast<int64_t>(0));
-        mapAccumS1CurB_ = 0;
-        mapAccumS2CurB_ = 0;
-        mapSeqQCurB_ = constInfo.s1Size;
-        mapSeqKCurB_ = constInfo.s2Size;
-    }
+    int64_t curAccumS1 = 0;
+    int64_t curAccumS2 = 0;
+    int32_t seqQ = 0;
+    int32_t seqK = 0;
+    LoadAllocatedAndUsedSeqLens(curB, curAccumS1, curAccumS2, seqQ, seqK);
+    mapInvalidS1CurB_ = GetInvalidS1Size(curB, seqQ, seqK);
+    mapValidCntCurB_ = Max(static_cast<int64_t>(seqQ) - mapInvalidS1CurB_, static_cast<int64_t>(0));
+    mapAccumS1CurB_ = curAccumS1;
+    mapAccumS2CurB_ = curAccumS2;
+    mapSeqQCurB_ = seqQ;
+    mapSeqKCurB_ = seqK;
     mapCurB_ = curB;
     mapBatchReady_ = true;
     return true;
@@ -614,65 +609,36 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::InitInvalidS1
     if constexpr (deterministic) {
         int64_t totalCoreNum = GetBlockNum() * GetTaskRation();
         int64_t qRowSize = constInfo.gSizeQuery * constInfo.dSizeQuery;
-        int64_t dwRowSize = constInfo.gSizeQueryIndex;
+        int64_t dwRowSize = static_cast<int64_t>(constInfo.n2Size) * constInfo.gSizeQueryIndex;
         int64_t softmaxRowSize = constInfo.n2Size * topKSize;
         int64_t validTotalSize = 0;
 
-        if constexpr (LAYOUT_T == SLILayout::TND) {
-            for (int64_t bIdx = 0; bIdx < constInfo.bSize; ++bIdx) {
-                int64_t accumS1Len = 0;
-                int64_t accumS2Len = 0;
-                int64_t actualSeqLensQ =
-                    GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1Len);
-                int64_t actualSeqLensK = 0;
-                if constexpr (KV_LAYOUT_T == SLILayout::TND) {
-                    actualSeqLensK =
-                        GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2Len);
-                } else {
-                    actualSeqLensK = constInfo.s2Size;
+        for (int64_t bIdx = 0; bIdx < constInfo.bSize; ++bIdx) {
+            int64_t accumS1Len = 0;
+            int64_t accumS2Len = 0;
+            int32_t actualSeqLensQ = 0;
+            int32_t actualSeqLensK = 0;
+            LoadAllocatedAndUsedSeqLens(bIdx, accumS1Len, accumS2Len, actualSeqLensQ, actualSeqLensK);
+            int64_t invalidS1Size = GetInvalidS1Size(bIdx, actualSeqLensQ, actualSeqLensK);
+            validTotalSize += Max(static_cast<int64_t>(actualSeqLensQ) - invalidS1Size, static_cast<int64_t>(0));
+            if ASCEND_IS_AIV {
+                int64_t gmS1Base = accumS1Len;
+                if constexpr (LAYOUT_T != SLILayout::TND) {
+                    gmS1Base = bIdx * constInfo.s1Size;
                 }
-                int64_t invalidS1Size = GetInvalidS1Size(bIdx, actualSeqLensQ, actualSeqLensK);
-                validTotalSize += Max(actualSeqLensQ - invalidS1Size, static_cast<int64_t>(0));
-                if ASCEND_IS_AIV {
-                    int64_t dqClearStart = 0;
-                    int64_t dqClearEnd = 0;
-                    int64_t dwClearStart = 0;
-                    int64_t dwClearEnd = 0;
-                    int64_t softmaxClearStart = 0;
-                    int64_t softmaxClearEnd = 0;
-                    CalcCoreClearRange(invalidS1Size * qRowSize, totalCoreNum, dqClearStart, dqClearEnd);
-                    CalcCoreClearRange(invalidS1Size * dwRowSize, totalCoreNum, dwClearStart, dwClearEnd);
-                    CalcCoreClearRange(invalidS1Size * softmaxRowSize, totalCoreNum, softmaxClearStart,
-                                       softmaxClearEnd);
-                    ClearInvalidS1Output(dQueryIndexGm, dqClearStart, dqClearEnd, 0, invalidS1Size, accumS1Len,
-                                         qRowSize);
-                    ClearInvalidS1Output(dWeightGm, dwClearStart, dwClearEnd, 0, invalidS1Size, accumS1Len, dwRowSize);
-                    ClearInvalidS1Output(softmaxOutGm, softmaxClearStart, softmaxClearEnd, 0, invalidS1Size, accumS1Len,
-                                         softmaxRowSize);
-                }
-            }
-        } else {
-            for (int64_t bIdx = 0; bIdx < constInfo.bSize; ++bIdx) {
-                int64_t invalidS1Size = GetInvalidS1Size(bIdx, constInfo.s1Size, constInfo.s2Size);
-                validTotalSize += Max(constInfo.s1Size - invalidS1Size, static_cast<int64_t>(0));
-                if ASCEND_IS_AIV {
-                    int64_t batchS1Base = bIdx * constInfo.s1Size;
-                    int64_t dqClearStart = 0;
-                    int64_t dqClearEnd = 0;
-                    int64_t dwClearStart = 0;
-                    int64_t dwClearEnd = 0;
-                    int64_t softmaxClearStart = 0;
-                    int64_t softmaxClearEnd = 0;
-                    CalcCoreClearRange(invalidS1Size * qRowSize, totalCoreNum, dqClearStart, dqClearEnd);
-                    CalcCoreClearRange(invalidS1Size * dwRowSize, totalCoreNum, dwClearStart, dwClearEnd);
-                    CalcCoreClearRange(invalidS1Size * softmaxRowSize, totalCoreNum, softmaxClearStart,
-                                       softmaxClearEnd);
-                    ClearInvalidS1Output(dQueryIndexGm, dqClearStart, dqClearEnd, 0, invalidS1Size, batchS1Base,
-                                         qRowSize);
-                    ClearInvalidS1Output(dWeightGm, dwClearStart, dwClearEnd, 0, invalidS1Size, batchS1Base, dwRowSize);
-                    ClearInvalidS1Output(softmaxOutGm, softmaxClearStart, softmaxClearEnd, 0, invalidS1Size,
-                                         batchS1Base, softmaxRowSize);
-                }
+                int64_t dqClearStart = 0;
+                int64_t dqClearEnd = 0;
+                int64_t dwClearStart = 0;
+                int64_t dwClearEnd = 0;
+                int64_t softmaxClearStart = 0;
+                int64_t softmaxClearEnd = 0;
+                CalcCoreClearRange(invalidS1Size * qRowSize, totalCoreNum, dqClearStart, dqClearEnd);
+                CalcCoreClearRange(invalidS1Size * dwRowSize, totalCoreNum, dwClearStart, dwClearEnd);
+                CalcCoreClearRange(invalidS1Size * softmaxRowSize, totalCoreNum, softmaxClearStart, softmaxClearEnd);
+                ClearInvalidS1Output(dQueryIndexGm, dqClearStart, dqClearEnd, 0, invalidS1Size, gmS1Base, qRowSize);
+                ClearInvalidS1Output(dWeightGm, dwClearStart, dwClearEnd, 0, invalidS1Size, gmS1Base, dwRowSize);
+                ClearInvalidS1Output(softmaxOutGm, softmaxClearStart, softmaxClearEnd, 0, invalidS1Size, gmS1Base,
+                                     softmaxRowSize);
             }
         }
         cachedValidTotalSize_ = validTotalSize;

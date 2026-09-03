@@ -152,6 +152,8 @@ private:
                                              int32_t actualSeqLensK, int64_t cmpRatio, SLISparseMode sparseMode);
     __aicore__ inline int64_t GetInvalidS1Size(int64_t bIdx, int64_t actualSeqLensQ, int64_t actualSeqLensK);
     __aicore__ inline void ResetValidIdxMap();
+    __aicore__ inline void LoadAllocatedAndUsedSeqLens(int64_t bIdx, int64_t &accumS1, int64_t &accumS2, int32_t &usedQ,
+                                                       int32_t &usedK);
     __aicore__ inline bool LoadValidBatchAt(int64_t curB);
     __aicore__ inline bool MapValidIdxToBS1(int64_t validIdx, int64_t &bIdx, int64_t &s1Idx, int64_t &accumS1Len,
                                             int64_t &accumS2Len, int32_t &actualSeqLensQ, int32_t &actualSeqLensK);
@@ -919,37 +921,44 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ResetValidIdxMap()
 }
 
 template <typename SLIT>
+__aicore__ inline void SLIKLLossVectorService<SLIT>::LoadAllocatedAndUsedSeqLens(int64_t bIdx, int64_t &accumS1,
+                                                                                 int64_t &accumS2, int32_t &usedQ,
+                                                                                 int32_t &usedK)
+{
+    int32_t allocatedQ = constInfo.s1Size;
+    int32_t allocatedK = constInfo.s2Size;
+    accumS1 = 0;
+    accumS2 = 0;
+    if constexpr (LAYOUT_T == SLILayout::TND) {
+        allocatedQ = GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1);
+        if constexpr (KV_LAYOUT_T == SLILayout::TND) {
+            allocatedK = GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2);
+        } else {
+            accumS2 = bIdx * constInfo.s2Size;
+        }
+    }
+    usedQ = hasSequsedQ ? GetUsedSeqLens(bIdx, allocatedQ, seqUsedQueryGm) : allocatedQ;
+    usedK = hasSequsedK ? GetUsedSeqLens(bIdx, allocatedK, seqUsedKeyGm) : allocatedK;
+}
+
+template <typename SLIT>
 __aicore__ inline bool SLIKLLossVectorService<SLIT>::LoadValidBatchAt(int64_t curB)
 {
     if (curB < 0 || curB >= constInfo.bSize) {
         mapBatchReady_ = false;
         return false;
     }
-    if constexpr (LAYOUT_T == SLILayout::TND) {
-        int64_t curAccumS1 = 0;
-        int64_t curAccumS2 = 0;
-        int32_t seqQ = GetActualSeqLens(curB, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, curAccumS1);
-        int32_t seqK = 0;
-        if constexpr (KV_LAYOUT_T == SLILayout::TND) {
-            seqK = GetActualSeqLens(curB, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, curAccumS2);
-        } else {
-            seqK = constInfo.s2Size;
-            curAccumS2 = curB * constInfo.s2Size;
-        }
-        mapInvalidS1CurB_ = GetInvalidS1Size(curB, seqQ, seqK);
-        mapValidCntCurB_ = Max(static_cast<int64_t>(seqQ) - mapInvalidS1CurB_, static_cast<int64_t>(0));
-        mapAccumS1CurB_ = curAccumS1;
-        mapAccumS2CurB_ = curAccumS2;
-        mapSeqQCurB_ = seqQ;
-        mapSeqKCurB_ = seqK;
-    } else {
-        mapInvalidS1CurB_ = GetInvalidS1Size(curB, constInfo.s1Size, constInfo.s2Size);
-        mapValidCntCurB_ = Max(constInfo.s1Size - mapInvalidS1CurB_, static_cast<int64_t>(0));
-        mapAccumS1CurB_ = 0;
-        mapAccumS2CurB_ = 0;
-        mapSeqQCurB_ = constInfo.s1Size;
-        mapSeqKCurB_ = constInfo.s2Size;
-    }
+    int64_t curAccumS1 = 0;
+    int64_t curAccumS2 = 0;
+    int32_t seqQ = 0;
+    int32_t seqK = 0;
+    LoadAllocatedAndUsedSeqLens(curB, curAccumS1, curAccumS2, seqQ, seqK);
+    mapInvalidS1CurB_ = GetInvalidS1Size(curB, seqQ, seqK);
+    mapValidCntCurB_ = Max(static_cast<int64_t>(seqQ) - mapInvalidS1CurB_, static_cast<int64_t>(0));
+    mapAccumS1CurB_ = curAccumS1;
+    mapAccumS2CurB_ = curAccumS2;
+    mapSeqQCurB_ = seqQ;
+    mapSeqKCurB_ = seqK;
     mapCurB_ = curB;
     mapBatchReady_ = true;
     return true;
@@ -1024,10 +1033,8 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::GetRunInfo(int64_t taskId, 
         runInfo.accumS1Idx = accumS1Len + s1Idx;
         runInfo.accumS2Idx = accumS2Len;
     } else if constexpr (LAYOUT_T == SLILayout::BSND) {
-        runInfo.actS1Size =
-            hasSequsedQ ? GetUsedSeqLens(runInfo.bIdx, constInfo.s1Size, seqUsedQueryGm) : constInfo.s1Size;
-        runInfo.actS2Size =
-            hasSequsedK ? GetUsedSeqLens(runInfo.bIdx, constInfo.s2Size, seqUsedKeyGm) : constInfo.s2Size;
+        runInfo.actS1Size = actualSeqLensQ;
+        runInfo.actS2Size = actualSeqLensK;
         runInfo.accumS1Idx = bIdx * constInfo.s1Size + s1Idx;
         runInfo.accumS2Idx = bIdx * constInfo.s2Size;
     }
