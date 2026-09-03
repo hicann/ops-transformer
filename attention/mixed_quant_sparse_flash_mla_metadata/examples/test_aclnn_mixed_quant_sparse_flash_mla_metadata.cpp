@@ -352,7 +352,7 @@ int main()
         printf("    End BN2     : %u\n", result.faMetadata[i][FA_BN2_END_INDEX]);
         printf("    End M       : %u\n", result.faMetadata[i][FA_M_END_INDEX]);
         printf("    End S2      : %u\n", result.faMetadata[i][FA_S2_END_INDEX]);
-        printf("    First Worksapce Index : %u\n", result.faMetadata[i][FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX]);
+        printf("    First Workspace Index : %u\n", result.faMetadata[i][FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX]);
         printf("    Max S2 Block Num : %u\n", result.faMetadata[i][FA_S2_MAX_NUM]);
     }
     for (uint32_t i = 0; i < AIV_CORE_MAX_NUM; ++i) {
@@ -360,7 +360,7 @@ int main()
         printf("    Core Enable             : %u\n", result.fdMetadata[i][FD_CORE_ENABLE_INDEX]);
         printf("    FD Task BN2 Idx         : %u\n", result.fdMetadata[i][FD_BN2_IDX_INDEX]);
         printf("    FD Task M Idx           : %u\n", result.fdMetadata[i][FD_M_IDX_INDEX]);
-        printf("    FD Task S2 Idx          : %u\n", result.fdMetadata[i][FD_WORKSPACE_IDX_INDEX]);
+        printf("    FD Task Workspace Idx   : %u\n", result.fdMetadata[i][FD_WORKSPACE_IDX_INDEX]);
         printf("    FD Task Workspace Num   : %u\n", result.fdMetadata[i][FD_WORKSPACE_NUM_INDEX]);
         printf("    FD Subtask M Start      : %u\n", result.fdMetadata[i][FD_M_START_INDEX]);
         printf("    FD Subtask M Num        : %u\n", result.fdMetadata[i][FD_M_NUM_INDEX]);

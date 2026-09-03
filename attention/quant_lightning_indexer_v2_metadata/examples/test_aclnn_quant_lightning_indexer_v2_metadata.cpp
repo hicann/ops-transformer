@@ -21,12 +21,12 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_quant_lightning_indexer_v2_metadata.h"
 
-#define CHECK_LOG_RET(cond, ret_val, fmt, ...)      \
-    do {                                            \
-        if (!(cond)) {                              \
-            printf(fmt "\n", ##__VA_ARGS__);        \
-            return (ret_val);                       \
-        }                                           \
+#define CHECK_LOG_RET(cond, ret_val, fmt, ...) \
+    do { \
+        if (!(cond)) { \
+            printf(fmt "\n", ##__VA_ARGS__); \
+            return (ret_val); \
+        } \
     } while (0)
 
 // 参考 quant_lightning_indexer_v2_metadata.h
@@ -60,13 +60,14 @@ struct QliV2Metadata {
     uint32_t fdData[AIV_CORE_MAX_NUM][QLD_V2_METADATA_SIZE];
 };
 
-struct ScopeGuard
-{
-    explicit ScopeGuard(std::function<void()> onExitScope) : m_exitFunc(std::move(onExitScope)),
-        m_isDismissed(false) {}
+struct ScopeGuard {
+    explicit ScopeGuard(std::function<void()> onExitScope)
+        : m_exitFunc(std::move(onExitScope)),
+          m_isDismissed(false)
+    {}
     // 禁止拷贝
-    ScopeGuard(const ScopeGuard&) = delete;
-    ScopeGuard& operator=(const ScopeGuard&) = delete;
+    ScopeGuard(const ScopeGuard &) = delete;
+    ScopeGuard &operator=(const ScopeGuard &) = delete;
 
     ~ScopeGuard()
     {
@@ -85,41 +86,41 @@ struct ScopeGuard
 };
 
 struct Tensor {
-    void *hostAddr { nullptr };
-    void *deviceAddr { nullptr };
-    aclTensor *data { nullptr };
+    void *hostAddr{nullptr};
+    void *deviceAddr{nullptr};
+    aclTensor *data{nullptr};
 };
 
 struct ArgScenario {
-    bool hasCuSeq { false };
-    bool hasSeqused { false };
+    bool hasCuSeq{false};
+    bool hasSeqused{false};
 };
 
 struct ArgContext {
     // required input
-    int64_t numHeadsQ { 0 };
-    int64_t numHeadsK { 0 };
-    int64_t headDim { 0 };
-    int64_t topk { 0 };
-    int64_t quantMode { 2 };
+    int64_t numHeadsQ{0};
+    int64_t numHeadsK{0};
+    int64_t headDim{0};
+    int64_t topk{0};
+    int64_t quantMode{2};
     // optional input
-    Tensor cuSeqlensQOptional {};
-    Tensor cuSeqlensKOptional {};
-    Tensor sequsedQOptional {};
-    Tensor sequsedKOptional {};
-    Tensor cmpResidualKOptional {};
-    int64_t batchSize { 0 };
-    int64_t maxSeqlenQ { 0 };
-    int64_t maxSeqlenK { 0 };
-    char *layoutQOptional { nullptr };
-    char *layoutKOptional { nullptr };
-    int64_t maskMode { 0 };
-    int64_t cmpRatio { 0 };
+    Tensor cuSeqlensQOptional{};
+    Tensor cuSeqlensKOptional{};
+    Tensor sequsedQOptional{};
+    Tensor sequsedKOptional{};
+    Tensor cmpResidualKOptional{};
+    int64_t batchSize{0};
+    int64_t maxSeqlenQ{0};
+    int64_t maxSeqlenK{0};
+    char *layoutQOptional{nullptr};
+    char *layoutKOptional{nullptr};
+    int64_t maskMode{0};
+    int64_t cmpRatio{0};
     // output
-    Tensor metadata {};
+    Tensor metadata{};
 };
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) 
+int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -128,7 +129,7 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape)
     return shapeSize;
 }
 
-aclnnStatus Init(int32_t deviceId, aclrtStream* stream) 
+aclnnStatus Init(int32_t deviceId, aclrtStream *stream)
 {
     // 固定写法，初始化
     auto ret = aclInit(nullptr);
@@ -140,7 +141,7 @@ aclnnStatus Init(int32_t deviceId, aclrtStream* stream)
     return ACL_SUCCESS;
 }
 
-void Finalize(int32_t deviceId, aclrtStream stream) 
+void Finalize(int32_t deviceId, aclrtStream stream)
 {
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);
@@ -159,7 +160,7 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMalloc failed. ERROR: %d", ret);
     // 调用aclCreateTensor接口创建aclTensor
     tensor.data = aclCreateTensor(shape.data(), shape.size(), dataType, nullptr, 0, aclFormat::ACL_FORMAT_ND,
-        shape.data(), shape.size(), tensor.deviceAddr);
+                                  shape.data(), shape.size(), tensor.deviceAddr);
 
     // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
     ret = aclrtMemcpy(tensor.deviceAddr, size, tensor.hostAddr, size, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -213,15 +214,15 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.headDim = 128;
     context.topk = 0;
     context.quantMode = 2; // 2: per-token-head / 3: group-scaling
-    ret = CreateTensor(aclDataType::ACL_INT32, { QLI_V2_METADATA_TOTAL_SIZE }, context.metadata);     // 1024: Fix size
+    ret = CreateTensor(aclDataType::ACL_INT32, {QLI_V2_METADATA_TOTAL_SIZE}, context.metadata); // 1024: Fix size
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create meta failed. Error: %d", ret);
 
-    context.maskMode = 0;                   // 0: no mask, 3: causal
-    context.cmpRatio = 1;                   // [1, 128], 1: no compress
+    context.maskMode = 0; // 0: no mask, 3: causal
+    context.cmpRatio = 1; // [1, 128], 1: no compress
     context.layoutQOptional = (char *)malloc(sizeof(char) * 16);
     context.layoutKOptional = (char *)malloc(sizeof(char) * 16);
-    strcpy(context.layoutQOptional, "BSND");                // BSND,TND
-    strcpy(context.layoutKOptional, "BSND");                // BSND,TND,PA_BBND
+    strcpy(context.layoutQOptional, "BSND"); // BSND,TND
+    strcpy(context.layoutKOptional, "BSND"); // BSND,TND,PA_BBND
 
     if (!scenario.hasCuSeq && !scenario.hasSeqused) {
         context.batchSize = batchSize;
@@ -233,17 +234,17 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
 
     if (scenario.hasCuSeq) {
         // (B+1,), first element is always 0
-        ret = CreateTensor(aclDataType::ACL_INT32, { batchSize + 1 }, context.cuSeqlensQOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {batchSize + 1}, context.cuSeqlensQOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqlensQOptional failed. Error: %d", ret);
-        ret = CreateTensor(aclDataType::ACL_INT32, { batchSize + 1 }, context.cuSeqlensKOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {batchSize + 1}, context.cuSeqlensKOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqlensKOptional failed. Error: %d", ret);
     }
 
     if (scenario.hasSeqused) {
         // (B,)
-        ret = CreateTensor(aclDataType::ACL_INT32, { batchSize }, context.sequsedQOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {batchSize}, context.sequsedQOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create sequsedQOptional failed. Error: %d", ret);
-        ret = CreateTensor(aclDataType::ACL_INT32, { batchSize }, context.sequsedKOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {batchSize}, context.sequsedKOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create sequsedKOptional failed. Error: %d", ret);
     }
 
@@ -251,7 +252,8 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     return ACL_SUCCESS;
 }
 
-int main() {
+int main()
+{
     // 1. （固定写法）device/stream初始化，参考对外接口列表
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -261,10 +263,10 @@ int main() {
     ScopeGuard sysGuard([&] { Finalize(deviceId, stream); });
 
     // 2. 构造输入与输出，需要根据API的接口定义构造
-    ArgScenario scenario {};
+    ArgScenario scenario{};
     scenario.hasCuSeq = true;
     scenario.hasSeqused = true;
-    ArgContext context {};
+    ArgContext context{};
     ret = CreateArgs(scenario, context);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create input arguments failed. ERROR: %d", ret);
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
@@ -276,13 +278,12 @@ int main() {
     void *workspaceAddr = nullptr;
     ret = aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
         context.cuSeqlensQOptional.data, context.cuSeqlensKOptional.data, context.sequsedQOptional.data,
-        context.sequsedKOptional.data, context.cmpResidualKOptional.data,
-        context.numHeadsQ, context.numHeadsK, context.headDim, context.topk, context.quantMode,
-        context.batchSize, context.maxSeqlenQ, context.maxSeqlenK, context.layoutQOptional,
-        context.layoutKOptional, context.maskMode, context.cmpRatio,
-        context.metadata.data, &workspaceSize, &executor);
-    CHECK_LOG_RET(ret == ACL_SUCCESS, ret,
-        "aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
+        context.sequsedKOptional.data, context.cmpResidualKOptional.data, context.numHeadsQ, context.numHeadsK,
+        context.headDim, context.topk, context.quantMode, context.batchSize, context.maxSeqlenQ, context.maxSeqlenK,
+        context.layoutQOptional, context.layoutKOptional, context.maskMode, context.cmpRatio, context.metadata.data,
+        &workspaceSize, &executor);
+    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize failed. ERROR: %d\n",
+                  ret);
 
     if (workspaceSize > static_cast<uint64_t>(0)) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -294,7 +295,7 @@ int main() {
             workspaceAddr = nullptr;
         }
     });
-    
+
     // 调用aclnnLightningIndexerV2Metadata第二段接口
     ret = aclnnQuantLightningIndexerV2Metadata(workspaceAddr, workspaceSize, executor, stream);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclnnQuantLightningIndexerV2Metadata failed. ERROR: %d\n", ret);
@@ -304,7 +305,7 @@ int main() {
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtSynchronizeStream failed. ERROR: %d\n", ret);
 
     // 5. 打印输出
-    QliV2Metadata result {};
+    QliV2Metadata result{};
     ret = aclrtMemcpy(&result, sizeof(result), context.metadata.deviceAddr, sizeof(result), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d\n", ret);
 
@@ -317,14 +318,14 @@ int main() {
         printf("    End BN2     : %u\n", result.faData[i][QLI_V2_BN2_END_INDEX]);
         printf("    End M       : %u\n", result.faData[i][QLI_V2_M_END_INDEX]);
         printf("    End S2      : %u\n", result.faData[i][QLI_V2_S2_END_INDEX]);
-        printf("    First Worksapce Index : %u\n", result.faData[i][QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX]);
+        printf("    First Workspace Index : %u\n", result.faData[i][QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX]);
     }
     for (uint32_t i = 0; i < AIV_CORE_MAX_NUM; ++i) {
         printf("AIV Core%u\n", i);
         printf("    Core Enable             : %u\n", result.fdData[i][QLD_V2_CORE_ENABLE_INDEX]);
         printf("    FD Task BN2 Idx         : %u\n", result.fdData[i][QLD_V2_BN2_IDX_INDEX]);
         printf("    FD Task M Idx           : %u\n", result.fdData[i][QLD_V2_M_IDX_INDEX]);
-        printf("    FD Task S2 Idx          : %u\n", result.fdData[i][QLD_V2_WORKSPACE_IDX_INDEX]);
+        printf("    FD Task Workspace Idx   : %u\n", result.fdData[i][QLD_V2_WORKSPACE_IDX_INDEX]);
         printf("    FD Task Workspace Num   : %u\n", result.fdData[i][QLD_V2_WORKSPACE_NUM_INDEX]);
         printf("    FD Subtask M Start      : %u\n", result.fdData[i][QLD_V2_M_START_INDEX]);
         printf("    FD Subtask M Num        : %u\n", result.fdData[i][QLD_V2_M_NUM_INDEX]);
