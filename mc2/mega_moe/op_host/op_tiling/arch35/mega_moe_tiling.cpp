@@ -79,6 +79,7 @@ constexpr float DEFAULT_SWIGLU_OAI_BETA = 1.0f;
 
 constexpr uint32_t GMM_TILE_N = 256U;
 constexpr uint32_t GMM1_MIN_LOGICAL_TILES_PER_CORE = 4U;
+constexpr int64_t GMM_TILE_STATUS_COUNT_ALIGN = 16LL;
 
 uint32_t CalcMGroupsPerWave(const MegaMoeTilingData *tilingData, uint32_t aicNum)
 {
@@ -886,7 +887,7 @@ static void SetPrefetchAndWaveParams(MegaMoeTilingData *tilingData, const uint32
         int64_t maxTilesM = ops::CeilDiv(static_cast<int64_t>(tilingData->maxOutputSize), static_cast<int64_t>(256));
         int64_t maxTilesN = ops::CeilDiv(maxSchedulerN, static_cast<int64_t>(256));
         tilingData->maxTilesPerExpert =
-            static_cast<uint32_t>(ops::CeilAlign(maxTilesM * maxTilesN, static_cast<int64_t>(16)));
+            static_cast<uint32_t>(ops::CeilAlign(maxTilesM * maxTilesN, GMM_TILE_STATUS_COUNT_ALIGN));
     }
 
     tilingData->mGroupsPerWave = CalcMGroupsPerWave(tilingData, aicNum);
@@ -2371,7 +2372,8 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
 
     // WorkspaceSize
     // 以地址 0 作为虚拟基址，使构造出的指针值等于各 workspace 分区偏移。
-    WorkspaceInfo workspaceInfo(reinterpret_cast<uint8_t *>(0U), tilingData);
+    GM_ADDR workspaceBase = 0U;
+    WorkspaceInfo workspaceInfo(workspaceBase, tilingData);
     OP_TILING_CHECK(SetWorkspace(context, workspaceInfo, nodeName) == ge::GRAPH_FAILED,
                     OP_LOGE(nodeName, "Tiling set workspace Failed"), return ge::GRAPH_FAILED);
 

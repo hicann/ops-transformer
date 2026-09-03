@@ -68,9 +68,14 @@ struct WorkspaceInfo {
     HOST_DEVICE WorkspaceInfo() = default;
     HOST_DEVICE WorkspaceInfo(GM_ADDR base, const MegaMoeTilingData *tilingData, uint32_t serverNum = 1)
     {
+        InitializeWorkspaceLayout(base, tilingData, serverNum);
+    }
+
+private:
+    HOST_DEVICE void InitializeWorkspaceLayout(GM_ADDR base, const MegaMoeTilingData *tilingData, uint32_t serverNum)
+    {
         workspaceSize = 0;
         dispatchRevDataPtr = base;
-
         workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * tilingData->h, ALIGN_512);
         dispatchRevScalePtr = base + workspaceSize;
 

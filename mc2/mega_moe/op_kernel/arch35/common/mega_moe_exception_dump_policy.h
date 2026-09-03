@@ -36,7 +36,9 @@ enum class LoopCountIndex : uint32_t {
     GMM2 = 1
 };
 
-struct alignas(64) GmmLoopCount {
+constexpr size_t GMM_LOOP_COUNT_ALIGNMENT = 64U;
+
+struct alignas(GMM_LOOP_COUNT_ALIGNMENT) GmmLoopCount {
     uint64_t gmm1Count;
     uint64_t gmm2Count;
 };

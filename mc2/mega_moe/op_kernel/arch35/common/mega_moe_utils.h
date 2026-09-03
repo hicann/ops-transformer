@@ -30,6 +30,7 @@ using namespace AscendC;
 constexpr uint8_t SYNC_AIC_AIV_MODE = 4;
 constexpr uint16_t AIC_SYNC_AIV_FLAG = 4;
 constexpr uint16_t AIV_SYNC_AIC_FLAG = 6;
+constexpr uint32_t UINT64_BYTE_OFFSET_SHIFT = 3U;
 
 struct WorkRange {
     uint32_t start = 0;
@@ -377,7 +378,7 @@ __aicore__ inline GM_ADDR GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
 {
     __gm__ uint64_t *dataAddr = reinterpret_cast<__gm__ uint64_t *>(tensorPtr);
     uint64_t tensorPtrOffset = *dataAddr;
-    __gm__ uint64_t *retPtr = dataAddr + (tensorPtrOffset >> 3);
+    __gm__ uint64_t *retPtr = dataAddr + (tensorPtrOffset >> UINT64_BYTE_OFFSET_SHIFT);
     return reinterpret_cast<GM_ADDR>(*(retPtr + index));
 }
 
