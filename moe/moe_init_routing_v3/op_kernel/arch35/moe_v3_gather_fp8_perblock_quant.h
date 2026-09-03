@@ -34,7 +34,7 @@ template <typename T, typename U>
 __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, __ubuf__ U *yAddr,
                                   uint32_t totalElemNum, uint16_t blockNum, float fp8MaxValue)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
 
     uint16_t vfNum = AscendC::VECTOR_REG_WIDTH / sizeof(float);
 

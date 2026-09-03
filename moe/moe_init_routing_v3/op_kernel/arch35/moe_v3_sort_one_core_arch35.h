@@ -64,19 +64,19 @@ __aicore__ inline void MoeSortOneCore::SortCompute()
 
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg maskRegLoop, cmpMaskReg;
-        MicroAPI::MaskReg pregMain = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
+        Reg::MaskReg maskRegLoop, cmpMaskReg;
+        Reg::MaskReg pregMain = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
 
-        MicroAPI::RegTensor<float> inRegToFloat, infFloat, vDstReg0;
+        Reg::RegTensor<float> inRegToFloat, infFloat, vDstReg0;
         Duplicate(infFloat, static_cast<float>(MIN_FP32), pregMain);
 
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegLoop = MicroAPI::UpdateMask<float>(sreg);
-            MicroAPI::LoadAlign(inRegToFloat, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
-            MicroAPI::Compares<float, CMPMODE::LT>(cmpMaskReg, inRegToFloat, cmpScalar, maskRegLoop);
-            MicroAPI::Muls(inRegToFloat, inRegToFloat, negone, maskRegLoop);
-            MicroAPI::Select(vDstReg0, infFloat, inRegToFloat, cmpMaskReg);
-            MicroAPI::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, vDstReg0, maskRegLoop);
+            maskRegLoop = Reg::UpdateMask<float>(sreg);
+            Reg::LoadAlign(inRegToFloat, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
+            Reg::Compares<float, CMPMODE::LT>(cmpMaskReg, inRegToFloat, cmpScalar, maskRegLoop);
+            Reg::Muls(inRegToFloat, inRegToFloat, negone, maskRegLoop);
+            Reg::Select(vDstReg0, infFloat, inRegToFloat, cmpMaskReg);
+            Reg::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, vDstReg0, maskRegLoop);
         }
     }
 

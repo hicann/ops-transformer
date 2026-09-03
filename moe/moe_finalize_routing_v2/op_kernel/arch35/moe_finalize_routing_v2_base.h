@@ -21,11 +21,11 @@
 
 namespace MoeFinalizeRoutingV2Regbase {
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
-using AscendC::MicroAPI::MaskReg;
-using AscendC::MicroAPI::RegTensor;
-using AscendC::MicroAPI::UnalignRegForLoad;
-using AscendC::MicroAPI::UnalignRegForStore;
+using namespace AscendC::Reg;
+using AscendC::Reg::MaskReg;
+using AscendC::Reg::RegTensor;
+using AscendC::Reg::UnalignRegForLoad;
+using AscendC::Reg::UnalignRegForStore;
 
 constexpr int32_t DROPLESS_COLUMN = 0; // 按列读取
 constexpr int32_t DROP_PAD_COLUMN = 1; // 按列读取
@@ -35,17 +35,17 @@ constexpr int32_t INVALID_IDX = -1;
 constexpr int32_t DOUBLE_BUFFER = 2;
 constexpr int32_t VL_FP32 = Ops::Base::GetVRegSize() / sizeof(float);
 
-constexpr AscendC::MicroAPI::CastTrait castTraitB162B32Even = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait castTraitB162B32Even = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
 
-constexpr AscendC::MicroAPI::CastTrait castTraitB322B16Even = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::NO_SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait castTraitB322B16Even = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::NO_SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
@@ -63,7 +63,7 @@ __aicore__ inline void LoadInputData(RegTensor<float> &dst, __ubuf__ T *src, Mas
         LoadAlign(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
@@ -88,10 +88,10 @@ __aicore__ inline void LoadInputDataWithBrc(RegTensor<float> &dst, __ubuf__ T *s
                                             uint32_t srcOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
+        LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::Reg::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
@@ -174,7 +174,7 @@ __aicore__ inline void VFProcessExpandXBiasScale(const LocalTensor<float> yLocal
         RegTensor<float> scaleReg;
         RegTensor<S> tmp;
         MaskReg pregLoop;
-        MaskReg pregMain = CreateMask<S, AscendC::MicroAPI::MaskPattern::ALL>();
+        MaskReg pregMain = CreateMask<S, AscendC::Reg::MaskPattern::ALL>();
         UnalignRegForLoad uSrc;
         UnalignRegForLoad uExpandedX;
         UnalignRegForLoad uBias;
@@ -268,7 +268,7 @@ __aicore__ inline void VFProcessExpandXBiasScaleOptimized(const LocalTensor<floa
         RegTensor<float> scaleReg;
         RegTensor<T> tmp;
         MaskReg pregLoop;
-        MaskReg pregMain = CreateMask<T, AscendC::MicroAPI::MaskPattern::ALL>();
+        MaskReg pregMain = CreateMask<T, AscendC::Reg::MaskPattern::ALL>();
         UnalignRegForLoad uSrc;
         UnalignRegForLoad uExpandedX;
         UnalignRegForLoad uBias;
@@ -310,7 +310,7 @@ __aicore__ inline void VFProcessExpandXBiasScaleOptimized(const LocalTensor<floa
                 StoreOuputDataUnalign<float>(y, yLocalAddr, uDst, pregLoop, tailNum);
             }
             StoreUnAlignPost(yLocalAddr, uDst, 0);
-            LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+            LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
         }
     }
 }

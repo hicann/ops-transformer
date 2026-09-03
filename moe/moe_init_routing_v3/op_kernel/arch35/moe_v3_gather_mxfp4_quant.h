@@ -26,7 +26,7 @@ template <typename T, typename U>
 __simd_vf__ inline void vfMxfp4ComputeMaxExp(__ubuf__ T *xAddr, __ubuf__ uint16_t *maxExpOutAddr, uint32_t xElemNum,
                                              uint16_t vfLoopNum, uint32_t vlForT, uint32_t numVRegBlocks)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
 
     // 用于把float16转为bfloat16，不涉及宽度变化
     static constexpr CastTrait traitFP16ToBF16 = {RegLayout::UNKNOWN, SatMode::UNKNOWN, MaskMergeMode::ZEROING,
@@ -96,7 +96,7 @@ __simd_vf__ inline void vfMxfp4ComputeScale(__ubuf__ uint16_t *maxExpInAddr, __u
                                             uint32_t validScaleElemNum, uint16_t vfLoopNum, uint32_t vlForT,
                                             uint16_t expLowerBoundValue)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
 
     RegTensor<uint16_t> maxExp, sharedExp, mxScale, invScale;
     // infBF16存放bf16指数的inf值
@@ -178,7 +178,7 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
                                            __ubuf__ int8_t *xQuantOutAddr, uint32_t xElemNum, uint16_t vfLoopNum,
                                            uint32_t vlForT, uint32_t numVRegBlocks)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     // fp16转fp32
     static constexpr CastTrait castTraitF16toFp32Zero = {RegLayout::ZERO, SatMode::UNKNOWN, MaskMergeMode::ZEROING,
                                                          RoundMode::UNKNOWN};

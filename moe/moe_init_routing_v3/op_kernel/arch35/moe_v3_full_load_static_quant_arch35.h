@@ -55,10 +55,10 @@ private:
     float scale_;
     float offset_;
 
-    constexpr static MicroAPI::CastTrait castTraitF32ToF16 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                              MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
-    constexpr static MicroAPI::CastTrait castTraitF16ToI8 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                             MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+    constexpr static Reg::CastTrait castTraitF32ToF16 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                         Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+    constexpr static Reg::CastTrait castTraitF16ToI8 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                        Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
 };
 
 template <typename T>
@@ -109,25 +109,25 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Compute(int64_t rowLength)
     uint32_t sreg = static_cast<uint32_t>(this->cols_ * rowLength);
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> inReg;
-        MicroAPI::RegTensor<half> outRegF16;
-        MicroAPI::RegTensor<int8_t> outRegI8;
+        Reg::RegTensor<float> inReg;
+        Reg::RegTensor<half> outRegF16;
+        Reg::RegTensor<int8_t> outRegI8;
 
-        MicroAPI::MaskReg maskRegInLoop;
+        Reg::MaskReg maskRegInLoop;
 
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegInLoop = MicroAPI::UpdateMask<float>(sreg);
+            maskRegInLoop = Reg::UpdateMask<float>(sreg);
             if constexpr (!IsSameType<T, float>::value) {
                 ops::LoadOneTensorForDtypeT<T>(inUbAddrCastT, inReg, maskRegInLoop, i * FLOAT_REG_TENSOR_LENGTH);
             } else {
-                MicroAPI::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
+                Reg::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
             }
-            MicroAPI::Cast<half, float, castTraitF32ToF16>(outRegF16, inReg, maskRegInLoop);
-            MicroAPI::Muls(outRegF16, outRegF16, static_cast<half>(scale_), maskRegInLoop);
-            MicroAPI::Adds(outRegF16, outRegF16, static_cast<half>(offset_), maskRegInLoop);
-            MicroAPI::Cast<int8_t, half, castTraitF16ToI8>(outRegI8, outRegF16, maskRegInLoop);
-            MicroAPI::StoreAlign<int8_t, MicroAPI::StoreDist::DIST_PACK4_B32>(outUbAddr + i * FLOAT_REG_TENSOR_LENGTH,
-                                                                              outRegI8, maskRegInLoop);
+            Reg::Cast<half, float, castTraitF32ToF16>(outRegF16, inReg, maskRegInLoop);
+            Reg::Muls(outRegF16, outRegF16, static_cast<half>(scale_), maskRegInLoop);
+            Reg::Adds(outRegF16, outRegF16, static_cast<half>(offset_), maskRegInLoop);
+            Reg::Cast<int8_t, half, castTraitF16ToI8>(outRegI8, outRegF16, maskRegInLoop);
+            Reg::StoreAlign<int8_t, Reg::StoreDist::DIST_PACK4_B32>(outUbAddr + i * FLOAT_REG_TENSOR_LENGTH, outRegI8,
+                                                                    maskRegInLoop);
         }
     }
 

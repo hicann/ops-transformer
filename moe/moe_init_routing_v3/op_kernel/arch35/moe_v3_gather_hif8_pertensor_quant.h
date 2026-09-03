@@ -85,8 +85,8 @@ private:
     int64_t lastLoopRows_;
     int64_t rowLoops_;
 
-    constexpr static MicroAPI::CastTrait castTraitF32toh8 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::SAT,
-                                                             MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+    constexpr static Reg::CastTrait castTraitF32toh8 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
+                                                        Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
 };
 
 template <typename T>
@@ -120,21 +120,21 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::Compute()
     uint32_t sreg;
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> inReg;
-        MicroAPI::RegTensor<hifloat8_t> outRegH8;
-        MicroAPI::MaskReg maskRegInLoop;
+        Reg::RegTensor<float> inReg;
+        Reg::RegTensor<hifloat8_t> outRegH8;
+        Reg::MaskReg maskRegInLoop;
 
         sreg = static_cast<uint32_t>(cols_);
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegInLoop = MicroAPI::UpdateMask<float>(sreg);
+            maskRegInLoop = Reg::UpdateMask<float>(sreg);
             ops::LoadOneTensorForDtypeT<T>(inUbAddrCastT, inReg, maskRegInLoop,
                                            i * FLOAT_REG_TENSOR_LENGTH); // 将fp16、bf16转为fp32
-            MicroAPI::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg,
-                                 maskRegInLoop);                   // fp16/bf16转float后写回UB
-            MicroAPI::Muls(inReg, inReg, scaleNum, maskRegInLoop); // quantx = x * scale
-            MicroAPI::Cast<hifloat8_t, float, castTraitF32toh8>(outRegH8, inReg, maskRegInLoop);
-            MicroAPI::StoreAlign<hifloat8_t, MicroAPI::StoreDist::DIST_PACK4_B32>(
-                outUbAddr + i * FLOAT_REG_TENSOR_LENGTH, outRegH8, maskRegInLoop);
+            Reg::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg,
+                            maskRegInLoop);                   // fp16/bf16转float后写回UB
+            Reg::Muls(inReg, inReg, scaleNum, maskRegInLoop); // quantx = x * scale
+            Reg::Cast<hifloat8_t, float, castTraitF32toh8>(outRegH8, inReg, maskRegInLoop);
+            Reg::StoreAlign<hifloat8_t, Reg::StoreDist::DIST_PACK4_B32>(outUbAddr + i * FLOAT_REG_TENSOR_LENGTH,
+                                                                        outRegH8, maskRegInLoop);
         }
     }
     inputXOutQueue_.EnQue(outLocal);
@@ -192,20 +192,20 @@ __aicore__ inline void MoeGatherOutHif8PertensorQuant<T>::ComputePartial(LocalTe
     uint32_t sreg;
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> inReg;
-        MicroAPI::RegTensor<hifloat8_t> outRegH8;
-        MicroAPI::MaskReg maskRegLoop;
+        Reg::RegTensor<float> inReg;
+        Reg::RegTensor<hifloat8_t> outRegH8;
+        Reg::MaskReg maskRegLoop;
 
         sreg = static_cast<uint32_t>(colsTileLength_);
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegLoop = MicroAPI::UpdateMask<float>(sreg);
+            maskRegLoop = Reg::UpdateMask<float>(sreg);
             ops::LoadOneTensorForDtypeT<T>(inUbAddrCastT, inReg, maskRegLoop, i * FLOAT_REG_TENSOR_LENGTH);
-            MicroAPI::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg, maskRegLoop);
-            MicroAPI::Muls(inReg, inReg, scaleNum, maskRegLoop); // 将token值按照行乘以scale进行hif8 pertensor量化
-            MicroAPI::Cast<hifloat8_t, float, castTraitF32toh8>(
+            Reg::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg, maskRegLoop);
+            Reg::Muls(inReg, inReg, scaleNum, maskRegLoop); // 将token值按照行乘以scale进行hif8 pertensor量化
+            Reg::Cast<hifloat8_t, float, castTraitF32toh8>(
                 outRegH8, inReg, maskRegLoop); // 将量化后的float32类型按照截断的方式cast到hifloat8
-            MicroAPI::StoreAlign<hifloat8_t, MicroAPI::StoreDist::DIST_PACK4_B32>(
-                outUbAddr + i * FLOAT_REG_TENSOR_LENGTH, outRegH8, maskRegLoop);
+            Reg::StoreAlign<hifloat8_t, Reg::StoreDist::DIST_PACK4_B32>(outUbAddr + i * FLOAT_REG_TENSOR_LENGTH,
+                                                                        outRegH8, maskRegLoop);
         }
     }
     inputXOutQueue_.EnQue(outLocal);

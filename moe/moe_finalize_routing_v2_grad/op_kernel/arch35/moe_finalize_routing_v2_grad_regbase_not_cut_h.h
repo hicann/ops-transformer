@@ -20,7 +20,7 @@
 
 namespace MoeFinalizeRoutingV2Grad {
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 
 template <typename T1, typename T2, typename T3, bool IsBiasExist = true>
 class MoeFinalizeRoutingV2GradRegbaseNotCutH : MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist> {

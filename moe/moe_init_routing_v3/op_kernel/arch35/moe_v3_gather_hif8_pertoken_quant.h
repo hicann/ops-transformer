@@ -89,8 +89,8 @@ private:
     int64_t colLoops_;
     int64_t expertStart_;
 
-    constexpr static MicroAPI::CastTrait castTraitF32toh8 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::SAT,
-                                                             MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+    constexpr static Reg::CastTrait castTraitF32toh8 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
+                                                        Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
 };
 
 template <typename T>
@@ -124,40 +124,40 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::Compute()
     uint32_t sreg;
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> inReg, scaleValueReg;
-        MicroAPI::Duplicate(scaleValueReg, 0.0f);
-        MicroAPI::RegTensor<hifloat8_t> outRegH8;
+        Reg::RegTensor<float> inReg, scaleValueReg;
+        Reg::Duplicate(scaleValueReg, 0.0f);
+        Reg::RegTensor<hifloat8_t> outRegH8;
 
-        MicroAPI::MaskReg maskRegInLoop;
-        MicroAPI::MaskReg maskRegAll = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg maskRegVL1 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
-        MicroAPI::MaskReg maskRegVL8 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL8>();
+        Reg::MaskReg maskRegInLoop;
+        Reg::MaskReg maskRegAll = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg maskRegVL1 = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
+        Reg::MaskReg maskRegVL8 = Reg::CreateMask<float, Reg::MaskPattern::VL8>();
 
         sreg = static_cast<uint32_t>(cols_);
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegInLoop = MicroAPI::UpdateMask<float>(sreg);
+            maskRegInLoop = Reg::UpdateMask<float>(sreg);
             ops::LoadOneTensorForDtypeT<T>(inUbAddrCastT, inReg, maskRegInLoop,
-                                           i * FLOAT_REG_TENSOR_LENGTH); // 将fp16、bf16转为fp32
-            MicroAPI::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg, maskRegInLoop); // 将转换后的fp32写回ub
-            MicroAPI::Abs(inReg, inReg, maskRegInLoop);
-            MicroAPI::Max(scaleValueReg, scaleValueReg, inReg, maskRegAll); // 求当前块中x的最大值
+                                           i * FLOAT_REG_TENSOR_LENGTH);                   // 将fp16、bf16转为fp32
+            Reg::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg, maskRegInLoop); // 将转换后的fp32写回ub
+            Reg::Abs(inReg, inReg, maskRegInLoop);
+            Reg::Max(scaleValueReg, scaleValueReg, inReg, maskRegAll); // 求当前块中x的最大值
         }
-        Reg::Reduce<Reg::ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll); // 求所有块中的最大值
-        MicroAPI::Muls(scaleValueReg, scaleValueReg, 1.0f / HIFLOAT8_MAX_VALUE, maskRegVL1); // hifloat8最大值 计算scale
-        MicroAPI::Duplicate(scaleValueReg, scaleValueReg, maskRegAll); // 将scalevalue按照最低位元素进行进行广播
-        MicroAPI::StoreAlign(scaleUbAddr, scaleValueReg, maskRegVL8); // 将scale写回，按照块大小32字节对齐
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);    // 求所有块中的最大值
+        Reg::Muls(scaleValueReg, scaleValueReg, 1.0f / HIFLOAT8_MAX_VALUE, maskRegVL1); // hifloat8最大值 计算scale
+        Reg::Duplicate(scaleValueReg, scaleValueReg, maskRegAll); // 将scalevalue按照最低位元素进行进行广播
+        Reg::StoreAlign(scaleUbAddr, scaleValueReg, maskRegVL8);  // 将scale写回，按照块大小32字节对齐
 
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE,
-                              MicroAPI::MemType::VEC_LOAD>(); // 确保scale写回ub完成后，在执行量化计算
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE,
+                         Reg::MemType::VEC_LOAD>(); // 确保scale写回ub完成后，在执行量化计算
 
         sreg = static_cast<uint32_t>(cols_);
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegInLoop = MicroAPI::UpdateMask<float>(sreg);
-            MicroAPI::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
-            MicroAPI::Div(inReg, inReg, scaleValueReg, maskRegInLoop);
-            MicroAPI::Cast<hifloat8_t, float, castTraitF32toh8>(outRegH8, inReg, maskRegInLoop);
-            MicroAPI::StoreAlign<hifloat8_t, MicroAPI::StoreDist::DIST_PACK4_B32>(
-                outUbAddr + i * FLOAT_REG_TENSOR_LENGTH, outRegH8, maskRegInLoop);
+            maskRegInLoop = Reg::UpdateMask<float>(sreg);
+            Reg::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
+            Reg::Div(inReg, inReg, scaleValueReg, maskRegInLoop);
+            Reg::Cast<hifloat8_t, float, castTraitF32toh8>(outRegH8, inReg, maskRegInLoop);
+            Reg::StoreAlign<hifloat8_t, Reg::StoreDist::DIST_PACK4_B32>(outUbAddr + i * FLOAT_REG_TENSOR_LENGTH,
+                                                                        outRegH8, maskRegInLoop);
         }
     }
 
@@ -220,23 +220,23 @@ __aicore__ inline float MoeGatherOutHif8PertokenQuant<T>::ComputeMax(LocalTensor
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> inReg, scaleReg;
-        MicroAPI::Duplicate(scaleReg, 0.0f);
+        Reg::RegTensor<float> inReg, scaleReg;
+        Reg::Duplicate(scaleReg, 0.0f);
 
-        MicroAPI::MaskReg maskRegLoop;
-        MicroAPI::MaskReg maskRegAll = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg maskRegVL2 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL2>();
+        Reg::MaskReg maskRegLoop;
+        Reg::MaskReg maskRegAll = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg maskRegVL2 = Reg::CreateMask<float, Reg::MaskPattern::VL2>();
 
         sreg = static_cast<uint32_t>(colsTileLength_);
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegLoop = MicroAPI::UpdateMask<float>(sreg);
+            maskRegLoop = Reg::UpdateMask<float>(sreg);
             ops::LoadOneTensorForDtypeT<T>(inUbAddrCastT, inReg, maskRegLoop, i * FLOAT_REG_TENSOR_LENGTH);
-            MicroAPI::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg, maskRegLoop);
-            MicroAPI::Abs(inReg, inReg, maskRegLoop);
-            MicroAPI::Max(scaleReg, scaleReg, inReg, maskRegAll);
+            Reg::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, inReg, maskRegLoop);
+            Reg::Abs(inReg, inReg, maskRegLoop);
+            Reg::Max(scaleReg, scaleReg, inReg, maskRegAll);
         }
         Reg::Reduce<Reg::ReduceType::MAX>(scaleReg, scaleReg, maskRegAll);
-        MicroAPI::StoreAlign(scaleUbAddr + 8, scaleReg, maskRegVL2);
+        Reg::StoreAlign(scaleUbAddr + 8, scaleReg, maskRegVL2);
     }
 
     SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
@@ -267,19 +267,19 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::ComputeQuant(LocalTenso
     uint32_t sreg;
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> inReg, tempReg;
-        MicroAPI::RegTensor<hifloat8_t> outRegH8;
-        MicroAPI::MaskReg maskRegLoop;
+        Reg::RegTensor<float> inReg, tempReg;
+        Reg::RegTensor<hifloat8_t> outRegH8;
+        Reg::MaskReg maskRegLoop;
 
         sreg = static_cast<uint32_t>(colsTileLength_);
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            maskRegLoop = MicroAPI::UpdateMask<float>(sreg);
-            MicroAPI::Duplicate(tempReg, scaleTemp, maskRegLoop);
-            MicroAPI::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
-            MicroAPI::Div(tempReg, inReg, tempReg, maskRegLoop);
-            MicroAPI::Cast<hifloat8_t, float, castTraitF32toh8>(outRegH8, tempReg, maskRegLoop);
-            MicroAPI::StoreAlign<hifloat8_t, MicroAPI::StoreDist::DIST_PACK4_B32>(
-                outUbAddr + i * FLOAT_REG_TENSOR_LENGTH, outRegH8, maskRegLoop);
+            maskRegLoop = Reg::UpdateMask<float>(sreg);
+            Reg::Duplicate(tempReg, scaleTemp, maskRegLoop);
+            Reg::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
+            Reg::Div(tempReg, inReg, tempReg, maskRegLoop);
+            Reg::Cast<hifloat8_t, float, castTraitF32toh8>(outRegH8, tempReg, maskRegLoop);
+            Reg::StoreAlign<hifloat8_t, Reg::StoreDist::DIST_PACK4_B32>(outUbAddr + i * FLOAT_REG_TENSOR_LENGTH,
+                                                                        outRegH8, maskRegLoop);
         }
     }
     xOutQueue_.EnQue(outLocal);

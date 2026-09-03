@@ -23,8 +23,8 @@
 #define FNV_OFFSET_BIASIS_B64 0xCBF29CE484222325UL
 
 using namespace AscendC;
-static constexpr MicroAPI::CastTrait castTraitInt16ToFp32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                             MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+static constexpr Reg::CastTrait castTraitInt16ToFp32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                        Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 /*
  * 用于计算
  */
@@ -49,7 +49,7 @@ __aicore__ void inline IndexStatisticInt32(LocalTensor<INDICE_TYPE> &srcLocal, L
     uint16_t tailLoop = Ops::Base::CeilDiv(tailNum, static_cast<uint32_t>(64));
     __VEC_SCOPE__
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         MaskReg patAllB32 = CreateMask<uint32_t, MaskPattern::ALL>();
         MaskReg patAllB16 = CreateMask<uint16_t, MaskPattern::ALL>();
         MaskReg patAllB8 = CreateMask<uint8_t, MaskPattern::ALL>();
@@ -151,7 +151,7 @@ __aicore__ void inline IndexStatisticInt64(LocalTensor<INDICE_TYPE> &srcLocal, L
     uint16_t loopSize = Ops::Base::CeilDiv(rowLen, 32L);
     __VEC_SCOPE__
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         MaskReg patAllB32 = CreateMask<uint32_t, MaskPattern::ALL>();
         MaskReg patAllB16 = CreateMask<uint16_t, MaskPattern::ALL>();
 

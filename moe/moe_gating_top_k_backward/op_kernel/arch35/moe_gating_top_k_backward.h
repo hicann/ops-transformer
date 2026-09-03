@@ -24,7 +24,7 @@
 
 namespace MoeGatingTopKBackwardNs {
 using namespace AscendC;
-using MicroAPI::RegTensor;
+using Reg::RegTensor;
 
 template <typename T>
 class MoeGatingTopKBackward {

@@ -23,13 +23,13 @@
 
 namespace MoeGatingTopK {
 using namespace AscendC;
-using MicroAPI::RegTensor;
+using Reg::RegTensor;
 
 constexpr int32_t CONSTANT_TWO = 2;
 constexpr int32_t CONSTANT_THREE = 3;
 constexpr int32_t CONSTANT_FOUR = 4;
 constexpr int32_t CONSTANT_EIGHT = 8;
-constexpr MicroAPI::DivSpecificMode mode = {MicroAPI::MaskMergeMode::ZEROING, true};
+constexpr Reg::DivSpecificMode mode = {Reg::MaskMergeMode::ZEROING, true};
 
 template <typename T, typename U1 = int32_t, typename U2 = int32_t>
 class MoeGatingTopKRegbase {
@@ -243,12 +243,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::PadWithMinFp32(__ubuf__ 
                                                                        uint32_t perGroupExpertCountAlign0)
 {
     RegTensor<float> vregPad;
-    MicroAPI::UnalignRegForStore u0;
-    MicroAPI::Duplicate(vregPad, *((float *)&MIN_FP32));
+    Reg::UnalignRegForStore u0;
+    Reg::Duplicate(vregPad, *((float *)&MIN_FP32));
     for (uint16_t i = 0; i < groupCount0; i++) {
         auto padUbAddr = addBiasOutAddr + perGroupExpertCount0 + i * perGroupExpertCountAlign0;
-        MicroAPI::StoreUnAlign(padUbAddr, vregPad, u0, perGroupExpertCountAlign0 - perGroupExpertCount0);
-        MicroAPI::StoreUnAlignPost(padUbAddr, u0, 0);
+        Reg::StoreUnAlign(padUbAddr, vregPad, u0, perGroupExpertCountAlign0 - perGroupExpertCount0);
+        Reg::StoreUnAlignPost(padUbAddr, u0, 0);
     }
 }
 
@@ -260,14 +260,14 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::GenerateIndexAndCopy(__u
 {
     RegTensor<int32_t> vregIndex;
     RegTensor<float> vregSoftmaxResult;
-    MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
+    Reg::MaskReg preg0 = Reg::CreateMask<float>();
 
     for (uint16_t i = 0; i < vfLoopNum; i++) {
-        preg0 = MicroAPI::UpdateMask<float>(size);
+        preg0 = Reg::UpdateMask<float>(size);
         ops::LoadOneTensorForDtypeT<float>(sigmoidOutAddr, vregSoftmaxResult, preg0, i * VL_FLOAT_SIZE);
-        MicroAPI::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
-        MicroAPI::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSoftmaxResult, preg0);
-        MicroAPI::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
+        Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
+        Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSoftmaxResult, preg0);
+        Reg::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
     }
 }
 
@@ -291,18 +291,18 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftMaxWithBias(LocalTen
         RegTensor<int32_t> vregIndex;
         RegTensor<float> vregSoftmaxResult;
         RegTensor<float> vregBiasResult;
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
+        Reg::MaskReg preg0 = Reg::CreateMask<float>();
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(size);
             ops::LoadOneTensorForDtypeT<float>(sigmoidOutAddr, vregSoftmaxResult, preg0, i * VL_FLOAT_SIZE);
             ops::LoadOneTensorForDtypeT<T>(biasAddr, vregBiasFp32, preg0, i * VL_FLOAT_SIZE);
-            MicroAPI::Add(vregBiasResult, vregSoftmaxResult, vregBiasFp32, preg0);
-            MicroAPI::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
-            MicroAPI::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
-            MicroAPI::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregBiasResult, preg0);
+            Reg::Add(vregBiasResult, vregSoftmaxResult, vregBiasFp32, preg0);
+            Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
+            Reg::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
+            Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregBiasResult, preg0);
         }
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_STORE>();
         PadWithMinFp32(addBiasOutAddr, groupCount_, perGroupExpertCount_, perGroupExpertCountAlign_);
     }
 }
@@ -321,7 +321,7 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftMaxWithoutBias(Local
     __VEC_SCOPE__
     {
         GenerateIndexAndCopy(sigmoidOutAddr, addBiasOutAddr, indexOutAddr, size, CeilDiv(size, VL_FLOAT_SIZE));
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_STORE>();
         PadWithMinFp32(addBiasOutAddr, groupCount_, perGroupExpertCount_, perGroupExpertCountAlign_);
     }
 }
@@ -389,24 +389,24 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithBias(LocalTen
         RegTensor<float> vreg1;
         RegTensor<float> vreg2;
         RegTensor<float> vreg3;
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate<float, MicroAPI::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
+        Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(size);
             ops::LoadTwoTensorForDtypeT<T>(inputAddr, biasAddr, vregInFp32, vregBiasFp32, preg0, preg0,
                                            i * VL_FLOAT_SIZE, i * VL_FLOAT_SIZE);
-            MicroAPI::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
-            MicroAPI::Exp(vreg2, vreg1, preg0);
-            MicroAPI::Adds(vreg3, vreg2, static_cast<float>(1), preg0);
-            MicroAPI::Div<float, &mode>(vregSigmoidResult, vregOne, vreg3, preg0);
-            MicroAPI::Add(vregBiasResult, vregSigmoidResult, vregBiasFp32, preg0);
-            MicroAPI::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
-            MicroAPI::StoreAlign(sigmoidOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
-            MicroAPI::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
-            MicroAPI::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregBiasResult, preg0);
+            Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
+            Reg::Exp(vreg2, vreg1, preg0);
+            Reg::Adds(vreg3, vreg2, static_cast<float>(1), preg0);
+            Reg::Div<float, &mode>(vregSigmoidResult, vregOne, vreg3, preg0);
+            Reg::Add(vregBiasResult, vregSigmoidResult, vregBiasFp32, preg0);
+            Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
+            Reg::StoreAlign(sigmoidOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
+            Reg::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
+            Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregBiasResult, preg0);
         }
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_STORE>();
         PadWithMinFp32(addBiasOutAddr, groupCount_, perGroupExpertCount_, perGroupExpertCountAlign_);
     }
 }
@@ -434,22 +434,22 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithoutBias(Local
         RegTensor<float> vreg1;
         RegTensor<float> vreg2;
         RegTensor<float> vreg3;
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate<float, MicroAPI::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
+        Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(size);
             ops::LoadOneTensorForDtypeT<T>(inputAddr, vregInFp32, preg0, i * VL_FLOAT_SIZE);
-            MicroAPI::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
-            MicroAPI::Exp(vreg2, vreg1, preg0);
-            MicroAPI::Adds(vreg3, vreg2, static_cast<float>(1), preg0);
-            MicroAPI::Div<float, &mode>(vregSigmoidResult, vregOne, vreg3, preg0);
-            MicroAPI::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
-            MicroAPI::StoreAlign(sigmoidOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
-            MicroAPI::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
-            MicroAPI::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
+            Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
+            Reg::Exp(vreg2, vreg1, preg0);
+            Reg::Adds(vreg3, vreg2, static_cast<float>(1), preg0);
+            Reg::Div<float, &mode>(vregSigmoidResult, vregOne, vreg3, preg0);
+            Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
+            Reg::StoreAlign(sigmoidOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
+            Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
+            Reg::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
         }
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_STORE>();
         PadWithMinFp32(addBiasOutAddr, groupCount_, perGroupExpertCount_, perGroupExpertCountAlign_);
     }
 }
@@ -494,24 +494,24 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithBias(LocalTe
         RegTensor<float> vreg1;
         RegTensor<float> vreg2;
         RegTensor<float> vreg3;
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate<float, MicroAPI::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
+        Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(size);
             ops::LoadTwoTensorForDtypeT<T>(inputAddr, biasAddr, vregInFp32, vregBiasFp32, preg0, preg0,
                                            i * VL_FLOAT_SIZE, i * VL_FLOAT_SIZE);
-            MicroAPI::Exp(vreg1, vregInFp32, preg0);
-            MicroAPI::Adds(vreg2, vreg1, static_cast<float>(1), preg0);
-            MicroAPI::Ln(vreg3, vreg2, preg0);
-            MicroAPI::Sqrt(vregSoftplusResult, vreg3, preg0);
-            MicroAPI::Add(vregBiasResult, vregSoftplusResult, vregBiasFp32, preg0);
-            MicroAPI::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
-            MicroAPI::StoreAlign(softplusOutAddr + i * VL_FLOAT_SIZE, vregSoftplusResult, preg0);
-            MicroAPI::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
-            MicroAPI::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregBiasResult, preg0);
+            Reg::Exp(vreg1, vregInFp32, preg0);
+            Reg::Adds(vreg2, vreg1, static_cast<float>(1), preg0);
+            Reg::Ln(vreg3, vreg2, preg0);
+            Reg::Sqrt(vregSoftplusResult, vreg3, preg0);
+            Reg::Add(vregBiasResult, vregSoftplusResult, vregBiasFp32, preg0);
+            Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
+            Reg::StoreAlign(softplusOutAddr + i * VL_FLOAT_SIZE, vregSoftplusResult, preg0);
+            Reg::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
+            Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregBiasResult, preg0);
         }
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_STORE>();
         PadWithMinFp32(addBiasOutAddr, groupCount_, perGroupExpertCount_, perGroupExpertCountAlign_);
     }
 }
@@ -539,22 +539,22 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithoutBias(Loca
         RegTensor<float> vreg1;
         RegTensor<float> vreg2;
         RegTensor<float> vreg3;
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate<float, MicroAPI::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
+        Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(size);
             ops::LoadOneTensorForDtypeT<T>(inputAddr, vregInFp32, preg0, i * VL_FLOAT_SIZE);
-            MicroAPI::Exp(vreg1, vregInFp32, preg0);
-            MicroAPI::Adds(vreg2, vreg1, static_cast<float>(1), preg0);
-            MicroAPI::Ln(vreg3, vreg2, preg0);
-            MicroAPI::Sqrt(vregSoftplusResult, vreg3, preg0);
-            MicroAPI::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
-            MicroAPI::StoreAlign(softplusOutAddr + i * VL_FLOAT_SIZE, vregSoftplusResult, preg0);
-            MicroAPI::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSoftplusResult, preg0);
-            MicroAPI::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
+            Reg::Exp(vreg1, vregInFp32, preg0);
+            Reg::Adds(vreg2, vreg1, static_cast<float>(1), preg0);
+            Reg::Ln(vreg3, vreg2, preg0);
+            Reg::Sqrt(vregSoftplusResult, vreg3, preg0);
+            Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
+            Reg::StoreAlign(softplusOutAddr + i * VL_FLOAT_SIZE, vregSoftplusResult, preg0);
+            Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSoftplusResult, preg0);
+            Reg::StoreAlign(indexOutAddr + i * VL_FLOAT_SIZE, vregIndex, preg0);
         }
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_STORE>();
         PadWithMinFp32(addBiasOutAddr, groupCount_, perGroupExpertCount_, perGroupExpertCountAlign_);
     }
 }
@@ -646,10 +646,10 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashGatherWithSmallKAlig
             RegTensor<uint32_t> vreg1;
             RegTensor<float> vreg2;
 
-            MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<uint32_t>(k);
-            MicroAPI::LoadAlign(vreg1, expertIdxAddr);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-            MicroAPI::Muls(vreg2, vreg2, routedScalingFactor, preg0);
+            Reg::MaskReg preg0 = Reg::UpdateMask<uint32_t>(k);
+            Reg::LoadAlign(vreg1, expertIdxAddr);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
+            Reg::Muls(vreg2, vreg2, routedScalingFactor, preg0);
             ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg0, 0);
         }
     } else {
@@ -660,14 +660,14 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashGatherWithSmallKAlig
             RegTensor<float> vreg3;
             RegTensor<float> vreg4;
 
-            MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<uint32_t>(k);
-            MicroAPI::LoadAlign(vreg1, expertIdxAddr);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
+            Reg::MaskReg preg0 = Reg::UpdateMask<uint32_t>(k);
+            Reg::LoadAlign(vreg1, expertIdxAddr);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
             Reg::Reduce<Reg::ReduceType::SUM>(vreg3, vreg2, preg0);
-            MicroAPI::Adds(vreg3, vreg3, eps, preg0);
-            MicroAPI::Duplicate(vreg4, vreg3, preg0);
-            MicroAPI::Div(vreg4, vreg2, vreg4, preg0);
-            MicroAPI::Muls(vreg4, vreg4, routedScalingFactor, preg0);
+            Reg::Adds(vreg3, vreg3, eps, preg0);
+            Reg::Duplicate(vreg4, vreg3, preg0);
+            Reg::Div(vreg4, vreg2, vreg4, preg0);
+            Reg::Muls(vreg4, vreg4, routedScalingFactor, preg0);
             ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg4, preg0, 0);
         }
     }
@@ -689,16 +689,16 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashGatherWithSmallKNotA
             RegTensor<float> vreg2;
             RegTensor<uint32_t> vregAlign;
 
-            MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<float>(k);
-            MicroAPI::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
+            Reg::MaskReg preg0 = Reg::UpdateMask<float>(k);
+            Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
 
-            MicroAPI::LoadAlign(vreg1, expertIdxAddr);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-            MicroAPI::Muls(vreg2, vreg2, routedScalingFactor, preg0);
+            Reg::LoadAlign(vreg1, expertIdxAddr);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
+            Reg::Muls(vreg2, vreg2, routedScalingFactor, preg0);
 
-            MicroAPI::Div(vregAlign, vreg1, vregAlign, preg0);
-            MicroAPI::Muls(vregAlign, vregAlign, expertIdxPad, preg0);
-            MicroAPI::Sub(vreg1, vreg1, vregAlign, preg0);
+            Reg::Div(vregAlign, vreg1, vregAlign, preg0);
+            Reg::Muls(vregAlign, vregAlign, expertIdxPad, preg0);
+            Reg::Sub(vreg1, vreg1, vregAlign, preg0);
 
             ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg0, 0);
         }
@@ -711,20 +711,20 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashGatherWithSmallKNotA
             RegTensor<float> vreg4;
             RegTensor<uint32_t> vregAlign;
 
-            MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<float>(k);
-            MicroAPI::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
+            Reg::MaskReg preg0 = Reg::UpdateMask<float>(k);
+            Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
 
-            MicroAPI::LoadAlign(vreg1, expertIdxAddr);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
+            Reg::LoadAlign(vreg1, expertIdxAddr);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
             Reg::Reduce<Reg::ReduceType::SUM>(vreg3, vreg2, preg0);
-            MicroAPI::Adds(vreg3, vreg3, eps, preg0);
-            MicroAPI::Duplicate(vreg4, vreg3, preg0);
-            MicroAPI::Div(vreg4, vreg2, vreg4, preg0);
-            MicroAPI::Muls(vreg4, vreg4, routedScalingFactor, preg0);
+            Reg::Adds(vreg3, vreg3, eps, preg0);
+            Reg::Duplicate(vreg4, vreg3, preg0);
+            Reg::Div(vreg4, vreg2, vreg4, preg0);
+            Reg::Muls(vreg4, vreg4, routedScalingFactor, preg0);
 
-            MicroAPI::Div(vregAlign, vreg1, vregAlign, preg0);
-            MicroAPI::Muls(vregAlign, vregAlign, expertIdxPad, preg0);
-            MicroAPI::Sub(vreg1, vreg1, vregAlign, preg0);
+            Reg::Div(vregAlign, vreg1, vregAlign, preg0);
+            Reg::Muls(vregAlign, vregAlign, expertIdxPad, preg0);
+            Reg::Sub(vreg1, vreg1, vregAlign, preg0);
 
             ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg4, preg0, 0);
         }
@@ -819,20 +819,19 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKInGroup(LocalT
             RegTensor<float> vreg1;
             RegTensor<float> vreg2;
             RegTensor<float> vregPad;
-            MicroAPI::UnalignRegForStore u0;
-            MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
+            Reg::UnalignRegForStore u0;
+            Reg::MaskReg preg0 = Reg::CreateMask<float>();
             __ubuf__ float *inputAddr = (__ubuf__ float *)sortedInGroupTensor.GetPhyAddr();
             __ubuf__ float *outputAddr = (__ubuf__ float *)top2InGroupTensor.GetPhyAddr();
-            MicroAPI::Duplicate(vregPad, *((float *)&MIN_FP32));
+            Reg::Duplicate(vregPad, *((float *)&MIN_FP32));
             for (uint16_t i = 0; i < groupCount0; i++) {
-                MicroAPI::LoadAlign<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(
-                    vreg0, vreg1, inputAddr + i * perGroupExpertCountAlign0 * 2);
+                Reg::LoadAlign<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
+                                                                      inputAddr + i * perGroupExpertCountAlign0 * 2);
                 Reg::PairReduceElem<Reg::PairReduce::SUM>(vreg2, vreg0, preg0);
-                MicroAPI::StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputAddr, vreg2, u0, 1);
+                Reg::StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(outputAddr, vreg2, u0, 1);
             }
-            MicroAPI::StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputAddr, vregPad, u0,
-                                                                                   padNegInfNum);
-            MicroAPI::StoreUnAlignPost(outputAddr, u0, 0);
+            Reg::StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(outputAddr, vregPad, u0, padNegInfNum);
+            Reg::StoreUnAlignPost(outputAddr, u0, 0);
         }
     } else {
         __VEC_SCOPE__
@@ -840,18 +839,17 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKInGroup(LocalT
             RegTensor<float> vreg0;
             RegTensor<float> vreg1;
             RegTensor<float> vregPad;
-            MicroAPI::UnalignRegForStore u0;
+            Reg::UnalignRegForStore u0;
             __ubuf__ float *inputAddr = (__ubuf__ float *)sortedInGroupTensor.GetPhyAddr();
             __ubuf__ float *outputAddr = (__ubuf__ float *)top2InGroupTensor.GetPhyAddr();
-            MicroAPI::Duplicate(vregPad, *((float *)&MIN_FP32));
+            Reg::Duplicate(vregPad, *((float *)&MIN_FP32));
             for (uint16_t i = 0; i < groupCount0; i++) {
-                MicroAPI::LoadAlign<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(
-                    vreg0, vreg1, inputAddr + i * perGroupExpertCountAlign0 * 2);
-                MicroAPI::StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputAddr, vreg0, u0, 1);
+                Reg::LoadAlign<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
+                                                                      inputAddr + i * perGroupExpertCountAlign0 * 2);
+                Reg::StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(outputAddr, vreg0, u0, 1);
             }
-            MicroAPI::StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(outputAddr, vregPad, u0,
-                                                                                   padNegInfNum);
-            MicroAPI::StoreUnAlignPost(outputAddr, u0, 0);
+            Reg::StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(outputAddr, vregPad, u0, padNegInfNum);
+            Reg::StoreUnAlignPost(outputAddr, u0, 0);
         }
     }
 }
@@ -869,24 +867,23 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKAfterSort(Loca
         RegTensor<int32_t> vreg0;
         RegTensor<int32_t> vreg1;
         RegTensor<float> vregPad;
-        MicroAPI::UnalignRegForStore u0;
+        Reg::UnalignRegForStore u0;
 
         __ubuf__ int32_t *inputAddr = (__ubuf__ int32_t *)sortedGroupTensor.GetPhyAddr();
         __ubuf__ int32_t *outputAddr = (__ubuf__ int32_t *)top2InGroupTensor.GetPhyAddr();
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<int32_t>();
+        Reg::MaskReg preg0 = Reg::CreateMask<int32_t>();
         uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(size, VL_FLOAT_SIZE));
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<int32_t>(size);
-            MicroAPI::LoadAlign<int32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                              inputAddr + i * 2 * VL_FLOAT_SIZE);
-            MicroAPI::StoreAlign(outputAddr + i * VL_FLOAT_SIZE, vreg1, preg0);
+            preg0 = Reg::UpdateMask<int32_t>(size);
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, inputAddr + i * 2 * VL_FLOAT_SIZE);
+            Reg::StoreAlign(outputAddr + i * VL_FLOAT_SIZE, vreg1, preg0);
         }
-        AscendC::MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_STORE>();
-        MicroAPI::Duplicate(vregPad, *((float *)&MIN_FP32));
+        AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_STORE>();
+        Reg::Duplicate(vregPad, *((float *)&MIN_FP32));
         outputAddr = outputAddr + kGroup0;
-        MicroAPI::StoreUnAlign(outputAddr, (RegTensor<int32_t> &)vregPad, u0, padkGroupNum);
-        MicroAPI::StoreUnAlignPost(outputAddr, u0, 0);
+        Reg::StoreUnAlign(outputAddr, (RegTensor<int32_t> &)vregPad, u0, padkGroupNum);
+        Reg::StoreUnAlignPost(outputAddr, u0, 0);
     }
     Sort<float, true>(sortedGroupTensor, top2InGroupTensor, indexTensor, tmpLocal,
                       kGroupNumAlign / ONE_REPEAT_SORT_NUM);
@@ -1160,16 +1157,16 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFNoNorm(
         RegTensor<uint32_t> vregAlign;
         RegTensor<uint32_t> vregExpertIdxTmp;
 
-        MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<float>(k);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr);
-        MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-        MicroAPI::Muls(vreg2, vreg2, routedScalingFactor, preg0);
-        MicroAPI::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
-        MicroAPI::Div(vregExpertIdxTmp, vreg1, vregAlign, preg0);
-        MicroAPI::Muls(vregExpertIdxTmp, vregExpertIdxTmp, expertIdxPad, preg0);
-        MicroAPI::Sub(vreg1, vreg1, vregExpertIdxTmp, preg0);
+        Reg::MaskReg preg0 = Reg::UpdateMask<float>(k);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr);
+        Reg::Gather(vreg2, inputAddr, vreg1, preg0);
+        Reg::Muls(vreg2, vreg2, routedScalingFactor, preg0);
+        Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
+        Reg::Div(vregExpertIdxTmp, vreg1, vregAlign, preg0);
+        Reg::Muls(vregExpertIdxTmp, vregExpertIdxTmp, expertIdxPad, preg0);
+        Reg::Sub(vreg1, vreg1, vregExpertIdxTmp, preg0);
         ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg0, 0);
-        MicroAPI::StoreAlign(expertIdxAddr, vreg1, preg0);
+        Reg::StoreAlign(expertIdxAddr, vreg1, preg0);
     }
 }
 
@@ -1194,20 +1191,20 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFWithNor
         RegTensor<uint32_t> vregAlign;
         RegTensor<uint32_t> vregExpertIdxTmp;
 
-        MicroAPI::MaskReg preg0 = MicroAPI::UpdateMask<float>(k);
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr);
-        MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
+        Reg::MaskReg preg0 = Reg::UpdateMask<float>(k);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr);
+        Reg::Gather(vreg2, inputAddr, vreg1, preg0);
         Reg::Reduce<Reg::ReduceType::SUM>(vreg3, vreg2, preg0);
-        MicroAPI::Adds(vreg3, vreg3, eps, preg0);
-        MicroAPI::Duplicate(vreg4, vreg3, preg0);
-        MicroAPI::Div(vreg4, vreg2, vreg4, preg0);
-        MicroAPI::Muls(vreg4, vreg4, routedScalingFactor, preg0);
-        MicroAPI::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
-        MicroAPI::Div(vregExpertIdxTmp, vreg1, vregAlign, preg0);
-        MicroAPI::Muls(vregExpertIdxTmp, vregExpertIdxTmp, expertIdxPad, preg0);
-        MicroAPI::Sub(vreg1, vreg1, vregExpertIdxTmp, preg0);
+        Reg::Adds(vreg3, vreg3, eps, preg0);
+        Reg::Duplicate(vreg4, vreg3, preg0);
+        Reg::Div(vreg4, vreg2, vreg4, preg0);
+        Reg::Muls(vreg4, vreg4, routedScalingFactor, preg0);
+        Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
+        Reg::Div(vregExpertIdxTmp, vreg1, vregAlign, preg0);
+        Reg::Muls(vregExpertIdxTmp, vregExpertIdxTmp, expertIdxPad, preg0);
+        Reg::Sub(vreg1, vreg1, vregExpertIdxTmp, preg0);
         ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg4, preg0, 0);
-        MicroAPI::StoreAlign(expertIdxAddr, vreg1, preg0);
+        Reg::StoreAlign(expertIdxAddr, vreg1, preg0);
     }
 }
 
@@ -1232,34 +1229,32 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKNotAlignEVFNoNorm(
         RegTensor<float> vregSum;
         RegTensor<uint32_t> vregAlign;
 
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::MaskReg preg1 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate(vregSum, static_cast<float>(0), preg0);
-        MicroAPI::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
+        Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::MaskReg preg1 = Reg::CreateMask<float>();
+        Reg::Duplicate(vregSum, static_cast<float>(0), preg0);
+        Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
         uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(k, VL_FLOAT_SIZE));
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<uint32_t>(k);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               mrgSortAddr + 2 * i * VL_FLOAT_SIZE);
-            MicroAPI::Duplicate(vreg2, static_cast<float>(0), preg1);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-            MicroAPI::Add(vregSum, vregSum, vreg2, preg1);
+            preg0 = Reg::UpdateMask<uint32_t>(k);
+            Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr + 2 * i * VL_FLOAT_SIZE);
+            Reg::Duplicate(vreg2, static_cast<float>(0), preg1);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
+            Reg::Add(vregSum, vregSum, vreg2, preg1);
         }
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg1 = MicroAPI::UpdateMask<uint32_t>(k1);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               mrgSortAddr + VL_FLOAT_SIZE * i * 2);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg1);
-            MicroAPI::Muls(vreg2, vreg2, routedScalingFactor, preg1);
+            preg1 = Reg::UpdateMask<uint32_t>(k1);
+            Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr + VL_FLOAT_SIZE * i * 2);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg1);
+            Reg::Muls(vreg2, vreg2, routedScalingFactor, preg1);
 
             // compute expertIdx: id = id - floor_div(id, perGroupExpertCountAlign) * pad
-            MicroAPI::Div(vreg3, vreg1, vregAlign, preg1);
-            MicroAPI::Muls(vreg3, vreg3, expertIdxPad, preg1);
-            MicroAPI::Sub(vreg1, vreg1, vreg3, preg1);
+            Reg::Div(vreg3, vreg1, vregAlign, preg1);
+            Reg::Muls(vreg3, vreg3, expertIdxPad, preg1);
+            Reg::Sub(vreg1, vreg1, vreg3, preg1);
             ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg1, i * VL_FLOAT_SIZE);
-            MicroAPI::StoreAlign(expertIdxAddr + i * VL_FLOAT_SIZE, vreg1, preg1);
+            Reg::StoreAlign(expertIdxAddr + i * VL_FLOAT_SIZE, vreg1, preg1);
         }
     }
 }
@@ -1286,35 +1281,33 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKNotAlignEVFWithNor
         RegTensor<uint32_t> vregAlign;
         RegTensor<uint32_t> vregExpertIdxTmp;
 
-        MicroAPI::MaskReg preg0 = MicroAPI::CreateMask<float>();
-        MicroAPI::MaskReg preg1 = MicroAPI::CreateMask<float>();
-        MicroAPI::Duplicate(vregSum, static_cast<float>(0), preg0);
-        MicroAPI::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
+        Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::MaskReg preg1 = Reg::CreateMask<float>();
+        Reg::Duplicate(vregSum, static_cast<float>(0), preg0);
+        Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
         uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(k, VL_FLOAT_SIZE));
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = MicroAPI::UpdateMask<uint32_t>(k);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               2 * i * VL_FLOAT_SIZE + mrgSortAddr);
-            MicroAPI::Duplicate(vreg2, static_cast<float>(0), preg1);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg0);
-            MicroAPI::Add(vregSum, vregSum, vreg2, preg1);
+            preg0 = Reg::UpdateMask<uint32_t>(k);
+            Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, 2 * i * VL_FLOAT_SIZE + mrgSortAddr);
+            Reg::Duplicate(vreg2, static_cast<float>(0), preg1);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
+            Reg::Add(vregSum, vregSum, vreg2, preg1);
         }
         Reg::Reduce<Reg::ReduceType::SUM>(vregSum, vregSum, preg1);
-        MicroAPI::Adds(vregSum, vregSum, eps, preg1);
-        MicroAPI::Duplicate(vreg4, vregSum, preg1);
+        Reg::Adds(vregSum, vregSum, eps, preg1);
+        Reg::Duplicate(vreg4, vregSum, preg1);
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg1 = MicroAPI::UpdateMask<uint32_t>(k1);
-            MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1,
-                                                                               mrgSortAddr + i * 2 * VL_FLOAT_SIZE);
-            MicroAPI::Gather(vreg2, inputAddr, vreg1, preg1);
-            MicroAPI::Div(vregOutput, vreg2, vreg4, preg1);
-            MicroAPI::Muls(vregOutput, vregOutput, routedScalingFactor, preg1);
-            MicroAPI::Div(vregExpertIdxTmp, vreg1, vregAlign, preg1);
-            MicroAPI::Muls(vregExpertIdxTmp, vregExpertIdxTmp, expertIdxPad, preg1);
-            MicroAPI::Sub(vreg1, vreg1, vregExpertIdxTmp, preg1);
+            preg1 = Reg::UpdateMask<uint32_t>(k1);
+            Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr + i * 2 * VL_FLOAT_SIZE);
+            Reg::Gather(vreg2, inputAddr, vreg1, preg1);
+            Reg::Div(vregOutput, vreg2, vreg4, preg1);
+            Reg::Muls(vregOutput, vregOutput, routedScalingFactor, preg1);
+            Reg::Div(vregExpertIdxTmp, vreg1, vregAlign, preg1);
+            Reg::Muls(vregExpertIdxTmp, vregExpertIdxTmp, expertIdxPad, preg1);
+            Reg::Sub(vreg1, vreg1, vregExpertIdxTmp, preg1);
             ops::StoreOneTensorForDtypeT<T>(outputAddr, vregOutput, preg1, i * VL_FLOAT_SIZE);
-            MicroAPI::StoreAlign(expertIdxAddr + i * VL_FLOAT_SIZE, vreg1, preg1);
+            Reg::StoreAlign(expertIdxAddr + i * VL_FLOAT_SIZE, vreg1, preg1);
         }
     }
 }

@@ -100,15 +100,15 @@ __aicore__ inline void MoeInplaceIndexAddDeterminsticNotQuant<VAR_T, IDX_T>::Cop
     uint16_t size = (totalBytes + stride - 1) / stride;
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<int8_t> inputRegTensor;
+        AscendC::Reg::RegTensor<int8_t> inputRegTensor;
         uint32_t sreg = totalBytes;
-        AscendC::MicroAPI::MaskReg preg;
+        AscendC::Reg::MaskReg preg;
 
         for (uint16_t i = 0; i < size; i++) {
-            preg = AscendC::MicroAPI::UpdateMask<int8_t>(sreg);
-            AscendC::MicroAPI::AddrReg offset = AscendC::MicroAPI::CreateAddrReg<int8_t>(i, stride);
-            AscendC::MicroAPI::DataCopy(inputRegTensor, inAddr, offset);
-            AscendC::MicroAPI::DataCopy(outAddr, inputRegTensor, offset, preg);
+            preg = AscendC::Reg::UpdateMask<int8_t>(sreg);
+            AscendC::Reg::AddrReg offset = AscendC::Reg::CreateAddrReg<int8_t>(i, stride);
+            AscendC::Reg::DataCopy(inputRegTensor, inAddr, offset);
+            AscendC::Reg::DataCopy(outAddr, inputRegTensor, offset, preg);
         }
     }
     return;

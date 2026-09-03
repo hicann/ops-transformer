@@ -179,13 +179,13 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegBaseCutH<T1, T2, T3, IsBiasExi
             __ubuf__ float *srcAddr = (__ubuf__ float *)level1Temp.GetPhyAddr();
             __VEC_SCOPE__
             {
-                MicroAPI::RegTensor<float> vregLevel1;
-                MicroAPI::RegTensor<float> vregLevel0;
-                MicroAPI::MaskReg preg = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
+                Reg::RegTensor<float> vregLevel1;
+                Reg::RegTensor<float> vregLevel0;
+                Reg::MaskReg preg = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
                 LoadAlign(vregLevel1, srcAddr);
                 LoadAlign(vregLevel0, dstAddr);
                 Add(vregLevel0, vregLevel0, vregLevel1, preg);
-                StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(dstAddr, vregLevel0, preg);
+                StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(dstAddr, vregLevel0, preg);
             }
         } else {
             int64_t level2Count = level1Count / CACHE_BUFF_SIZE;
@@ -199,16 +199,16 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegBaseCutH<T1, T2, T3, IsBiasExi
             __ubuf__ float *level2Addr = (__ubuf__ float *)level2Temp.GetPhyAddr();
             __VEC_SCOPE__
             {
-                MicroAPI::RegTensor<float> vregLevel2;
-                MicroAPI::RegTensor<float> vregLevel1;
-                MicroAPI::RegTensor<float> vregLevel0;
-                MicroAPI::MaskReg preg = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
+                Reg::RegTensor<float> vregLevel2;
+                Reg::RegTensor<float> vregLevel1;
+                Reg::RegTensor<float> vregLevel0;
+                Reg::MaskReg preg = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
                 LoadAlign(vregLevel2, level2Addr);
                 LoadAlign(vregLevel1, level1Addr);
                 LoadAlign(vregLevel0, dstAddr);
                 Add(vregLevel0, vregLevel0, vregLevel2, preg);
                 Add(vregLevel0, vregLevel0, vregLevel1, preg);
-                StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(dstAddr, vregLevel0, preg);
+                StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(dstAddr, vregLevel0, preg);
             }
         }
 
@@ -533,10 +533,10 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegBaseCutH<T1, T2, T3, IsBiasExi
     uint16_t loopCount = (count + VL_FLOAT32_SIZE - 1) / VL_FLOAT32_SIZE;
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> gradYReg;
-        MicroAPI::MaskReg pregLoop;
+        Reg::RegTensor<float> gradYReg;
+        Reg::MaskReg pregLoop;
         for (uint16_t i = 0; i < loopCount; i++) {
-            pregLoop = MicroAPI::UpdateMask<float>(count);
+            pregLoop = Reg::UpdateMask<float>(count);
             // 拷贝到RegBase内
             ops::LoadOneTensorForDtypeT<T1>(gradYMem, gradYReg, pregLoop, i * VL_FLOAT32_SIZE);
             // 计算
@@ -601,16 +601,16 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegBaseCutH<T1, T2, T3, IsBiasExi
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> x1;
-        MicroAPI::RegTensor<float> x2;
-        MicroAPI::RegTensor<float> x3;
-        MicroAPI::RegTensor<float> x4;
-        MicroAPI::RegTensor<float> sum1;
-        MicroAPI::RegTensor<float> sum2;
-        MicroAPI::RegTensor<float> sum12;
-        MicroAPI::RegTensor<float> vlSum;
+        Reg::RegTensor<float> x1;
+        Reg::RegTensor<float> x2;
+        Reg::RegTensor<float> x3;
+        Reg::RegTensor<float> x4;
+        Reg::RegTensor<float> sum1;
+        Reg::RegTensor<float> sum2;
+        Reg::RegTensor<float> sum12;
+        Reg::RegTensor<float> vlSum;
 
-        MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
+        Reg::MaskReg pregAll = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
         LoadAlign(x1, src + 0 * VL_FLOAT32_SIZE);
         LoadAlign(x2, src + 1 * VL_FLOAT32_SIZE);
         LoadAlign(x3, src + 2 * VL_FLOAT32_SIZE);
@@ -619,8 +619,8 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegBaseCutH<T1, T2, T3, IsBiasExi
         Add(sum2, x2, x4, pregAll);
         Add(sum12, sum1, sum2, pregAll);
         Reg::Reduce<Reg::ReduceType::SUM>(vlSum, sum12, pregAll);
-        MicroAPI::MaskReg pregMerge = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
-        StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(dst + idx, vlSum, pregMerge);
+        Reg::MaskReg pregMerge = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
+        StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(dst + idx, vlSum, pregMerge);
     }
 }
 
@@ -635,14 +635,14 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegBaseCutH<T1, T2, T3, IsBiasExi
     __VEC_SCOPE__
     {
         uint32_t sregMask = (uint32_t)1;
-        MicroAPI::MaskReg preg = MicroAPI::UpdateMask<float>(sregMask);
+        Reg::MaskReg preg = Reg::UpdateMask<float>(sregMask);
         ;
         if constexpr (!IsSameType<T3, float>::value) {
-            MicroAPI::RegTensor<T3> vregB16;
-            MicroAPI::RegTensor<float> vregF32;
+            Reg::RegTensor<T3> vregB16;
+            Reg::RegTensor<float> vregF32;
             LoadAlign(vregF32, srcAddr);
             Cast<T3, float, castTraitB322B16>(vregB16, vregF32, preg);
-            StoreAlign<T3, MicroAPI::StoreDist::DIST_PACK_B32>(dstAddr, vregB16, preg);
+            StoreAlign<T3, Reg::StoreDist::DIST_PACK_B32>(dstAddr, vregB16, preg);
         }
     }
     DataCopyExtParams copyExtParams{1, 1, 0, 0, 0};

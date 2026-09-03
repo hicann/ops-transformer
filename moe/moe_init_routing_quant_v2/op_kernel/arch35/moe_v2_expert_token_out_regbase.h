@@ -25,24 +25,24 @@ constexpr static uint32_t VL_INT32 = static_cast<uint32_t>(Ops::Base::GetVRegSiz
 constexpr static int64_t EXPERT_NUM = 256;
 constexpr static uint32_t FOUR = 4;
 
-constexpr static MicroAPI::CastTrait castTraitS322U8 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::NO_SAT,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr static Reg::CastTrait castTraitS322U8 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::NO_SAT,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::UNKNOWN,
 };
 
-constexpr static MicroAPI::CastTrait castTraitU162U32Even = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::NO_SAT,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr static Reg::CastTrait castTraitU162U32Even = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::NO_SAT,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::UNKNOWN,
 };
 
-constexpr static MicroAPI::CastTrait castTraitU162U32Odd = {
-    MicroAPI::RegLayout::ONE,
-    MicroAPI::SatMode::NO_SAT,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr static Reg::CastTrait castTraitU162U32Odd = {
+    Reg::RegLayout::ONE,
+    Reg::SatMode::NO_SAT,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::UNKNOWN,
 };
 
@@ -115,15 +115,15 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::CopyIn(int64_t progress)
     copyInQueue.EnQue<int32_t>(inLocal);
 }
 
-__aicore__ inline void DHist(MicroAPI::RegTensor<uint16_t> &dst0, MicroAPI::RegTensor<uint16_t> &dst1,
-                             MicroAPI::RegTensor<uint8_t> &src, MicroAPI::MaskReg &mask)
+__aicore__ inline void DHist(Reg::RegTensor<uint16_t> &dst0, Reg::RegTensor<uint16_t> &dst1,
+                             Reg::RegTensor<uint8_t> &src, Reg::MaskReg &mask)
 {
     dhistv2(dst0, src, mask, Bin_N0);
     dhistv2(dst1, src, mask, Bin_N1);
 }
 
-__aicore__ inline void CHist(MicroAPI::RegTensor<uint16_t> &dst0, MicroAPI::RegTensor<uint16_t> &dst1,
-                             MicroAPI::RegTensor<uint8_t> &src, MicroAPI::MaskReg &mask)
+__aicore__ inline void CHist(Reg::RegTensor<uint16_t> &dst0, Reg::RegTensor<uint16_t> &dst1,
+                             Reg::RegTensor<uint8_t> &src, Reg::MaskReg &mask)
 {
     chistv2(dst0, src, mask, Bin_N0);
     chistv2(dst1, src, mask, Bin_N1);
@@ -137,23 +137,23 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::CalcHistVF(__ubuf__ int32_t *
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<int32_t> expertIdxS32;
-        MicroAPI::RegTensor<uint8_t> expertIdxU8;
-        MicroAPI::RegTensor<uint16_t> histLowU16;
-        MicroAPI::RegTensor<uint16_t> histHighU16;
-        MicroAPI::RegTensor<uint32_t> histLowU32Even;
-        MicroAPI::RegTensor<uint32_t> histLowU32Odd;
-        MicroAPI::RegTensor<uint32_t> histHighU32Even;
-        MicroAPI::RegTensor<uint32_t> histHighU32Odd;
-        MicroAPI::RegTensor<uint32_t> hist[FOUR];
-        MicroAPI::RegTensor<uint32_t> src[FOUR];
-        MicroAPI::MaskReg pregLoop;
-        MicroAPI::MaskReg histMask = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::M4>();
-        MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<int32_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::Duplicate(histLowU16, 0, pregAll);
-        MicroAPI::Duplicate(histHighU16, 0, pregAll);
+        Reg::RegTensor<int32_t> expertIdxS32;
+        Reg::RegTensor<uint8_t> expertIdxU8;
+        Reg::RegTensor<uint16_t> histLowU16;
+        Reg::RegTensor<uint16_t> histHighU16;
+        Reg::RegTensor<uint32_t> histLowU32Even;
+        Reg::RegTensor<uint32_t> histLowU32Odd;
+        Reg::RegTensor<uint32_t> histHighU32Even;
+        Reg::RegTensor<uint32_t> histHighU32Odd;
+        Reg::RegTensor<uint32_t> hist[FOUR];
+        Reg::RegTensor<uint32_t> src[FOUR];
+        Reg::MaskReg pregLoop;
+        Reg::MaskReg histMask = Reg::CreateMask<int8_t, Reg::MaskPattern::M4>();
+        Reg::MaskReg pregAll = Reg::CreateMask<int32_t, Reg::MaskPattern::ALL>();
+        Reg::Duplicate(histLowU16, 0, pregAll);
+        Reg::Duplicate(histHighU16, 0, pregAll);
         for (uint16_t i = 0; i < (uint16_t)(loopCount - 1); i++) {
-            pregLoop = MicroAPI::UpdateMask<int32_t>(count);
+            pregLoop = Reg::UpdateMask<int32_t>(count);
             LoadAlign(expertIdxS32, expertSeqs + i * VL_INT32);
             Cast<uint8_t, int32_t, castTraitS322U8>(expertIdxU8, expertIdxS32, pregLoop);
             if constexpr (cumsum) {
@@ -164,25 +164,25 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::CalcHistVF(__ubuf__ int32_t *
         }
 
         uint32_t count4 = count * FOUR;
-        MicroAPI::MaskReg tempMask = MicroAPI::UpdateMask<int8_t>(count4);
+        Reg::MaskReg tempMask = Reg::UpdateMask<int8_t>(count4);
         for (uint16_t i = (uint16_t)(loopCount - 1); i < loopCount; i++) {
-            pregLoop = MicroAPI::UpdateMask<int32_t>(count);
+            pregLoop = Reg::UpdateMask<int32_t>(count);
             LoadAlign(expertIdxS32, expertSeqs + i * VL_INT32);
             Cast<uint8_t, int32_t, castTraitS322U8>(expertIdxU8, expertIdxS32, pregLoop);
-            MicroAPI::And(histMask, histMask, tempMask, pregAll);
+            Reg::And(histMask, histMask, tempMask, pregAll);
             if constexpr (cumsum) {
                 CHist(histLowU16, histHighU16, expertIdxU8, histMask);
             } else {
                 DHist(histLowU16, histHighU16, expertIdxU8, histMask);
             }
         }
-        MicroAPI::MaskReg pregAllU16 = MicroAPI::CreateMask<int16_t, MicroAPI::MaskPattern::ALL>();
+        Reg::MaskReg pregAllU16 = Reg::CreateMask<int16_t, Reg::MaskPattern::ALL>();
         Cast<uint32_t, uint16_t, castTraitU162U32Even>(histLowU32Even, histLowU16, pregAllU16);
         Cast<uint32_t, uint16_t, castTraitU162U32Odd>(histLowU32Odd, histLowU16, pregAllU16);
-        MicroAPI::Interleave<uint32_t>(hist[0], hist[1], histLowU32Even, histLowU32Odd);
+        Reg::Interleave<uint32_t>(hist[0], hist[1], histLowU32Even, histLowU32Odd);
         Cast<uint32_t, uint16_t, castTraitU162U32Even>(histHighU32Even, histHighU16, pregAllU16);
         Cast<uint32_t, uint16_t, castTraitU162U32Odd>(histHighU32Odd, histHighU16, pregAllU16);
-        MicroAPI::Interleave<uint32_t>(hist[2], hist[3], histHighU32Even, histHighU32Odd);
+        Reg::Interleave<uint32_t>(hist[2], hist[3], histHighU32Even, histHighU32Odd);
         LoadAlign(src[0], (__ubuf__ uint32_t *)tokenIdxOut);
         Add<uint32_t>(hist[0], hist[0], src[0], pregAll);
         StoreAlign((__ubuf__ uint32_t *)tokenIdxOut, hist[0], pregAll);

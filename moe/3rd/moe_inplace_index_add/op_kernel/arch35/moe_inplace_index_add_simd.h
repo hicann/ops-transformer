@@ -94,17 +94,17 @@ __aicore__ inline void MoeInplaceIndexAddSimd<VAR_T, IDX_T, CAST_T, IS_CONTIGUOU
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<int16_t> sumReg;
-        AscendC::MicroAPI::RegTensor<int16_t> castReg;
-        AscendC::MicroAPI::RegTensor<int16_t> alphaReg;
-        AscendC::MicroAPI::MaskReg maskReg;
+        AscendC::Reg::RegTensor<int16_t> sumReg;
+        AscendC::Reg::RegTensor<int16_t> castReg;
+        AscendC::Reg::RegTensor<int16_t> alphaReg;
+        AscendC::Reg::MaskReg maskReg;
         uint32_t maskLen = static_cast<uint32_t>(colLen);
         for (uint16_t j = 0; j < static_cast<uint16_t>(loopSize); j++) {
-            maskReg = AscendC::MicroAPI::UpdateMask<int16_t>(maskLen);
-            AscendC::MicroAPI::Duplicate(alphaReg, alphaValue, maskReg);
+            maskReg = AscendC::Reg::UpdateMask<int16_t>(maskLen);
+            AscendC::Reg::Duplicate(alphaReg, alphaValue, maskReg);
             auto updatesOffet = j * vfLen;
             LoadOneTensorForDtypeInt<VAR_T>(updatesAddr, castReg, maskReg, updatesOffet);
-            AscendC::MicroAPI::Mul(sumReg, castReg, alphaReg, maskReg);
+            AscendC::Reg::Mul(sumReg, castReg, alphaReg, maskReg);
             StoreOneTensorForDtypeInt<VAR_T>(updateMulAddr, sumReg, maskReg, updatesOffet);
         }
     }

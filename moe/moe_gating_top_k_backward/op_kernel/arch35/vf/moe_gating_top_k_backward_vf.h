@@ -21,37 +21,37 @@
 namespace MoeGatingTopKBackwardNs {
 using namespace AscendC;
 
-constexpr MicroAPI::CastTrait castTraitB322B16 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::NO_SAT,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr Reg::CastTrait castTraitB322B16 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::NO_SAT,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::CAST_RINT,
 };
 
-constexpr MicroAPI::CastTrait castTraitB162B32 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::UNKNOWN,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr Reg::CastTrait castTraitB162B32 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::UNKNOWN,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::UNKNOWN,
 };
 
 __simd_vf__ void SigmoidGradFP32VF(__ubuf__ float *xNormAddr, __ubuf__ float *gradNormXAddr, __ubuf__ float *gradXAddr,
                                    uint32_t totalElements, uint32_t oneRepeatSize, uint16_t repeatTimes)
 {
-    MicroAPI::RegTensor<float> xReg, gNormReg, tmpReg, dstReg;
-    MicroAPI::MaskReg preg = MicroAPI::CreateMask<float>();
+    Reg::RegTensor<float> xReg, gNormReg, tmpReg, dstReg;
+    Reg::MaskReg preg = Reg::CreateMask<float>();
 
     for (uint16_t i = 0; i < repeatTimes; i++) {
         uint32_t remaining = totalElements - i * oneRepeatSize;
         uint32_t chunkElems = (remaining > oneRepeatSize) ? oneRepeatSize : remaining;
-        preg = MicroAPI::UpdateMask<float>(chunkElems);
-        MicroAPI::LoadAlign(xReg, xNormAddr + i * oneRepeatSize);
-        MicroAPI::LoadAlign(gNormReg, gradNormXAddr + i * oneRepeatSize);
-        MicroAPI::Muls(tmpReg, xReg, static_cast<float>(-1), preg);
-        MicroAPI::Adds(tmpReg, tmpReg, static_cast<float>(1), preg);
-        MicroAPI::Mul(tmpReg, tmpReg, xReg, preg);
-        MicroAPI::Mul(dstReg, tmpReg, gNormReg, preg);
-        MicroAPI::StoreAlign(gradXAddr + i * oneRepeatSize, dstReg, preg);
+        preg = Reg::UpdateMask<float>(chunkElems);
+        Reg::LoadAlign(xReg, xNormAddr + i * oneRepeatSize);
+        Reg::LoadAlign(gNormReg, gradNormXAddr + i * oneRepeatSize);
+        Reg::Muls(tmpReg, xReg, static_cast<float>(-1), preg);
+        Reg::Adds(tmpReg, tmpReg, static_cast<float>(1), preg);
+        Reg::Mul(tmpReg, tmpReg, xReg, preg);
+        Reg::Mul(dstReg, tmpReg, gNormReg, preg);
+        Reg::StoreAlign(gradXAddr + i * oneRepeatSize, dstReg, preg);
     }
 }
 
@@ -59,23 +59,23 @@ template <typename T>
 __simd_vf__ void SigmoidGradHalfVF(__ubuf__ float *xNormAddr, __ubuf__ float *gradNormXAddr, __ubuf__ T *gradXAddr,
                                    uint32_t totalElements, uint32_t oneRepeatSize, uint16_t repeatTimes)
 {
-    MicroAPI::RegTensor<float> xReg, gNormReg, tmpReg, dstReg;
-    MicroAPI::RegTensor<T> outReg;
-    MicroAPI::MaskReg pregFp = MicroAPI::CreateMask<float>();
+    Reg::RegTensor<float> xReg, gNormReg, tmpReg, dstReg;
+    Reg::RegTensor<T> outReg;
+    Reg::MaskReg pregFp = Reg::CreateMask<float>();
 
     for (uint16_t i = 0; i < repeatTimes; i++) {
         uint32_t remaining = totalElements - i * oneRepeatSize;
         uint32_t chunkElems = (remaining > oneRepeatSize) ? oneRepeatSize : remaining;
-        pregFp = MicroAPI::UpdateMask<float>(chunkElems);
-        MicroAPI::LoadAlign(xReg, xNormAddr + i * oneRepeatSize);
-        MicroAPI::LoadAlign(gNormReg, gradNormXAddr + i * oneRepeatSize);
-        MicroAPI::Muls(tmpReg, xReg, static_cast<float>(-1), pregFp);
-        MicroAPI::Adds(tmpReg, tmpReg, static_cast<float>(1), pregFp);
-        MicroAPI::Mul(tmpReg, tmpReg, xReg, pregFp);
-        MicroAPI::Mul(dstReg, tmpReg, gNormReg, pregFp);
+        pregFp = Reg::UpdateMask<float>(chunkElems);
+        Reg::LoadAlign(xReg, xNormAddr + i * oneRepeatSize);
+        Reg::LoadAlign(gNormReg, gradNormXAddr + i * oneRepeatSize);
+        Reg::Muls(tmpReg, xReg, static_cast<float>(-1), pregFp);
+        Reg::Adds(tmpReg, tmpReg, static_cast<float>(1), pregFp);
+        Reg::Mul(tmpReg, tmpReg, xReg, pregFp);
+        Reg::Mul(dstReg, tmpReg, gNormReg, pregFp);
 
-        MicroAPI::Cast<T, float, castTraitB322B16>(outReg, dstReg, pregFp);
-        MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(gradXAddr + i * oneRepeatSize, outReg, pregFp);
+        Reg::Cast<T, float, castTraitB322B16>(outReg, dstReg, pregFp);
+        Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(gradXAddr + i * oneRepeatSize, outReg, pregFp);
     }
 }
 
@@ -83,16 +83,16 @@ template <typename T>
 __simd_vf__ void CastGradYFlatVF(__ubuf__ T *srcAddr, __ubuf__ float *dstAddr, uint32_t totalElements,
                                  uint32_t oneRepeatSize, uint16_t repeatTimes)
 {
-    MicroAPI::MaskReg preg = MicroAPI::CreateMask<float>();
+    Reg::MaskReg preg = Reg::CreateMask<float>();
     for (uint16_t i = 0; i < repeatTimes; i++) {
         uint32_t remaining = totalElements - i * oneRepeatSize;
         uint32_t chunkElems = (remaining > oneRepeatSize) ? oneRepeatSize : remaining;
-        preg = MicroAPI::UpdateMask<float>(chunkElems);
-        MicroAPI::RegTensor<T> srcB16;
-        MicroAPI::RegTensor<float> dstF32;
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(srcB16, srcAddr + i * oneRepeatSize);
-        MicroAPI::Cast<float, T, castTraitB162B32>(dstF32, srcB16, preg);
-        MicroAPI::StoreAlign(dstAddr + i * oneRepeatSize, dstF32, preg);
+        preg = Reg::UpdateMask<float>(chunkElems);
+        Reg::RegTensor<T> srcB16;
+        Reg::RegTensor<float> dstF32;
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(srcB16, srcAddr + i * oneRepeatSize);
+        Reg::Cast<float, T, castTraitB162B32>(dstF32, srcB16, preg);
+        Reg::StoreAlign(dstAddr + i * oneRepeatSize, dstF32, preg);
     }
 }
 
@@ -110,13 +110,13 @@ __simd_vf__ void CastGradYRowsVF(__ubuf__ T *srcAddr, __ubuf__ float *dstAddr, u
         uint32_t remainingK = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
             uint16_t chunkOffset = c * chunkSize;
-            MicroAPI::MaskReg preg = MicroAPI::UpdateMask<float>(remainingK);
+            Reg::MaskReg preg = Reg::UpdateMask<float>(remainingK);
 
-            MicroAPI::RegTensor<T> srcB16;
-            MicroAPI::RegTensor<float> dstF32;
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(srcB16, srcRow + chunkOffset);
-            MicroAPI::Cast<float, T, castTraitB162B32>(dstF32, srcB16, preg);
-            MicroAPI::StoreAlign(dstRow + chunkOffset, dstF32, preg);
+            Reg::RegTensor<T> srcB16;
+            Reg::RegTensor<float> dstF32;
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(srcB16, srcRow + chunkOffset);
+            Reg::Cast<float, T, castTraitB162B32>(dstF32, srcB16, preg);
+            Reg::StoreAlign(dstRow + chunkOffset, dstF32, preg);
         }
     }
 }
@@ -127,7 +127,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
 {
     constexpr uint16_t chunkSize = VECTOR_REG_WIDTH / sizeof(int32_t); // 64 for int32_t/float
     uint16_t repeatTimes = static_cast<uint16_t>((k + chunkSize - 1) / chunkSize);
-    MicroAPI::MaskReg maskLane0 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
+    Reg::MaskReg maskLane0 = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
 
     for (uint16_t row = 0; row < curRows; row++) {
         __ubuf__ int32_t *idxRow = expertIdxBase + row * kAlign;
@@ -136,81 +136,80 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
         __ubuf__ float *gradNormXRow = gradNormXBase + row * n;
 
         // ---- Phase 1a: accumulate global D across all chunks. ----
-        MicroAPI::RegTensor<float> globalD;
-        MicroAPI::Duplicate(globalD, eps, maskLane0);
+        Reg::RegTensor<float> globalD;
+        Reg::Duplicate(globalD, eps, maskLane0);
 
         uint32_t remainingK1 = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
             uint16_t chunkOffset = c * chunkSize;
-            MicroAPI::MaskReg chunkMask = MicroAPI::UpdateMask<int32_t>(remainingK1);
+            Reg::MaskReg chunkMask = Reg::UpdateMask<int32_t>(remainingK1);
 
-            MicroAPI::RegTensor<int32_t> idxReg;
-            MicroAPI::RegTensor<uint32_t> idxU32Reg;
-            MicroAPI::RegTensor<float> wPrimeReg, chunkSum;
+            Reg::RegTensor<int32_t> idxReg;
+            Reg::RegTensor<uint32_t> idxU32Reg;
+            Reg::RegTensor<float> wPrimeReg, chunkSum;
 
-            MicroAPI::LoadAlign(idxReg, idxRow + chunkOffset);
-            idxU32Reg = (MicroAPI::RegTensor<uint32_t> &)idxReg;
-            MicroAPI::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
+            Reg::LoadAlign(idxReg, idxRow + chunkOffset);
+            idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
+            Reg::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
 
-            MicroAPI::ReduceSum(chunkSum, wPrimeReg, chunkMask);
-            MicroAPI::Add(globalD, globalD, chunkSum, maskLane0);
+            Reg::ReduceSum(chunkSum, wPrimeReg, chunkMask);
+            Reg::Add(globalD, globalD, chunkSum, maskLane0);
         }
 
         // ---- Phase 1b: re-gather w', compute w'/D, multiply by gradY, accumulate betaNum. ----
-        MicroAPI::RegTensor<float> globalBetaNum;
-        MicroAPI::Duplicate(globalBetaNum, 0.0f, maskLane0);
+        Reg::RegTensor<float> globalBetaNum;
+        Reg::Duplicate(globalBetaNum, 0.0f, maskLane0);
 
         uint32_t remainingK1b = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
             uint16_t chunkOffset = c * chunkSize;
-            MicroAPI::MaskReg chunkMask = MicroAPI::UpdateMask<int32_t>(remainingK1b);
+            Reg::MaskReg chunkMask = Reg::UpdateMask<int32_t>(remainingK1b);
 
-            MicroAPI::RegTensor<int32_t> idxReg;
-            MicroAPI::RegTensor<uint32_t> idxU32Reg;
-            MicroAPI::RegTensor<float> wPrimeReg, gradYReg, wNormReg, tmpReg, chunkSum;
+            Reg::RegTensor<int32_t> idxReg;
+            Reg::RegTensor<uint32_t> idxU32Reg;
+            Reg::RegTensor<float> wPrimeReg, gradYReg, wNormReg, tmpReg, chunkSum;
 
-            MicroAPI::LoadAlign(idxReg, idxRow + chunkOffset);
-            idxU32Reg = (MicroAPI::RegTensor<uint32_t> &)idxReg;
-            MicroAPI::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
+            Reg::LoadAlign(idxReg, idxRow + chunkOffset);
+            idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
+            Reg::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
 
             // Broadcast D (lane0) to every lane for this chunk's w'/D.
-            MicroAPI::RegTensor<float> bcastDReg1b;
-            MicroAPI::Duplicate<float, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-                bcastDReg1b, globalD, chunkMask);
-            MicroAPI::Div(wNormReg, wPrimeReg, bcastDReg1b, chunkMask);
+            Reg::RegTensor<float> bcastDReg1b;
+            Reg::Duplicate<float, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(bcastDReg1b, globalD,
+                                                                                         chunkMask);
+            Reg::Div(wNormReg, wPrimeReg, bcastDReg1b, chunkMask);
 
-            MicroAPI::LoadAlign(gradYReg, gradYRow + chunkOffset);
-            MicroAPI::Mul(tmpReg, gradYReg, wNormReg, chunkMask);
-            MicroAPI::ReduceSum(chunkSum, tmpReg, chunkMask);
-            MicroAPI::Add(globalBetaNum, globalBetaNum, chunkSum, maskLane0);
+            Reg::LoadAlign(gradYReg, gradYRow + chunkOffset);
+            Reg::Mul(tmpReg, gradYReg, wNormReg, chunkMask);
+            Reg::ReduceSum(chunkSum, tmpReg, chunkMask);
+            Reg::Add(globalBetaNum, globalBetaNum, chunkSum, maskLane0);
         }
 
         // ---- Phase 2: recompute gradWPrime per chunk, scatter. ----
         uint32_t remainingK2 = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
             uint16_t chunkOffset = c * chunkSize;
-            MicroAPI::MaskReg chunkMask = MicroAPI::UpdateMask<int32_t>(remainingK2);
+            Reg::MaskReg chunkMask = Reg::UpdateMask<int32_t>(remainingK2);
 
-            MicroAPI::RegTensor<int32_t> idxReg;
-            MicroAPI::RegTensor<uint32_t> idxU32Reg;
-            MicroAPI::RegTensor<float> gradYReg;
+            Reg::RegTensor<int32_t> idxReg;
+            Reg::RegTensor<uint32_t> idxU32Reg;
+            Reg::RegTensor<float> gradYReg;
 
-            MicroAPI::LoadAlign(idxReg, idxRow + chunkOffset);
-            idxU32Reg = (MicroAPI::RegTensor<uint32_t> &)idxReg;
-            MicroAPI::LoadAlign(gradYReg, gradYRow + chunkOffset);
+            Reg::LoadAlign(idxReg, idxRow + chunkOffset);
+            idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
+            Reg::LoadAlign(gradYReg, gradYRow + chunkOffset);
 
             // Broadcast the row-global D/betaNum (lane0) to every lane of this chunk.
             // betaNum already includes /D from Phase 1b.
-            MicroAPI::RegTensor<float> bcastDReg;
-            MicroAPI::Duplicate<float, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-                bcastDReg, globalD, chunkMask);
-            MicroAPI::RegTensor<float> gradWPrimeReg;
-            MicroAPI::Duplicate<float, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-                gradWPrimeReg, globalBetaNum, chunkMask);
-            MicroAPI::Sub(gradWPrimeReg, gradYReg, gradWPrimeReg, chunkMask);
-            MicroAPI::Div(gradWPrimeReg, gradWPrimeReg, bcastDReg, chunkMask);
+            Reg::RegTensor<float> bcastDReg;
+            Reg::Duplicate<float, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(bcastDReg, globalD, chunkMask);
+            Reg::RegTensor<float> gradWPrimeReg;
+            Reg::Duplicate<float, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(gradWPrimeReg, globalBetaNum,
+                                                                                         chunkMask);
+            Reg::Sub(gradWPrimeReg, gradYReg, gradWPrimeReg, chunkMask);
+            Reg::Div(gradWPrimeReg, gradWPrimeReg, bcastDReg, chunkMask);
 
-            MicroAPI::DataCopyScatter(gradNormXRow, gradWPrimeReg, idxU32Reg, chunkMask);
+            Reg::DataCopyScatter(gradNormXRow, gradWPrimeReg, idxU32Reg, chunkMask);
         }
     }
 }
