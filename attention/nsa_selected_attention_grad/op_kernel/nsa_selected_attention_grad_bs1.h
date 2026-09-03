@@ -277,6 +277,7 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::Init(
     InitParams(ordTilingData, actual_seq_qlen, actual_seq_kvlen);
     InitWorkspace(workspace);
     AtomicClean();
+    SyncAll();
     InitUB(pipe);
 }
 
