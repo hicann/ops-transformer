@@ -27,6 +27,9 @@ import const_var
 PYF_PATH = os.path.dirname(os.path.realpath(__file__))
 COMPUTE_UNIT = None
 ENABLE_EXPERIMENTAL = "OFF"
+PYPTO_ARCH_MAP = {
+    "ascend950": "a5",
+}
 
 if const_var.CHECK_ASC_DEVKIT_VERSION:
     IMPORT_HEADER = """
@@ -339,7 +342,7 @@ PYPTO_COMPILE_OP_API = """
         attrs = __attrs__ {}, origin_inputs=[{}], origin_outputs = [{}],\\
                 param_type_dynamic = {}, mc2_ctx = {}, param_type_list = {}, init_value_list = {},\\
                 output_shape_depend_on_compute = {})
-    pypto_compile_op(src, origin_func_name, op_info, options, code_channel, '{}', {})
+    pypto_compile_op(src, origin_func_name, op_info, options, code_channel, '{}', {}, arch='{}')
 """
 
 # Extra import appended to the wrapper head for pypto ops (kept out of the default head so non-pypto
@@ -425,8 +428,10 @@ class AdpBuilder(opdesc_parser.OpDesc):
         self.argsdefv = []
         self.op_compile_option: str = "{}"
         # pypto-pro binary-delivery op: emit a wrapper that calls pypto_compile_op (src = the DSL .py
-        # co-located at op_kernel/<op_file>.py) instead of the template compile_op. Set from --pypto-ops.
+        # co-located at op_kernel/<op_file>.py) instead of the template compile_op. Set from --pypto-ops
+        # and the per-SOC ops-info generated for the compute units originating from build.sh --soc.
         self.is_pypto = False
+        self.pypto_arch = None
         super().__init__(op_type)
 
     def write_adapt(
@@ -833,6 +838,7 @@ class AdpBuilder(opdesc_parser.OpDesc):
                     self.output_shape_depend_on_compute,
                     self.op_compile_option,
                     repr(extend_opt),
+                    self.pypto_arch,
                 )
             )
         else:
@@ -956,6 +962,18 @@ def write_scripts(
         # pypto-pro binary-delivery ops (from --pypto-ops, matched by op_file): emit the pypto wrapper
         # variant (calls pypto_compile_op). Non-pypto ops keep the template compile_op wrapper.
         op_desc.is_pypto = op_desc.op_file in pypto_ops
+        if op_desc.is_pypto:
+            if not ini_soc:
+                raise RuntimeError(
+                    "PyPTO binary compilation requires a SOC-specific ops-info file"
+                )
+            if _compute_unit and ini_soc not in _compute_unit:
+                continue
+            op_desc.pypto_arch = PYPTO_ARCH_MAP.get(ini_soc)
+            if op_desc.pypto_arch is None:
+                raise RuntimeError(
+                    f"PyPTO binary compilation does not support compute unit '{ini_soc}'"
+                )
         op_desc.write_adapt(
             dirs.get(const_var.CFG_IMPL_DIR),
             dirs.get(const_var.CFG_OUT_DIR),

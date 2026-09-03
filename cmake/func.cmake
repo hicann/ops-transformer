@@ -693,7 +693,7 @@ function(enable_pypto_kernel op_file)
     execute_process(
         COMMAND ${HI_PYTHON} ${OPS_ADV_DIR}/cmake/scripts/pypto_codegen.py
                 --py-file "${_py}" --out-dir "${_gen}"
-                --op-file "${op_file}" --soc "${_soc_unit}"
+                --op-file "${op_file}"
         RESULT_VARIABLE _rc
     )
     if (NOT _rc EQUAL 0)
