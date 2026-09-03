@@ -78,172 +78,171 @@ constexpr uint32_t MROPE_MX_FP32_NEG_EXP_UNIT = 0xff800000U;
 constexpr uint32_t MROPE_MX_FP32_NAN_BITS = 0x7f810000U;
 constexpr uint32_t MROPE_MX_E8M0_NAN = 0x000000ffU;
 constexpr int16_t MROPE_MX_FP32_EXP_SHIFT = 23;
-constexpr MicroAPI::CastTrait MROPE_MX_CAST_FP32_TO_FP8 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::SAT,
-                                                           MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-constexpr MicroAPI::CastTrait MROPE_MX_CAST_FP32_TO_FP8_ONE = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-constexpr MicroAPI::CastTrait MROPE_MX_CAST_FP32_TO_FP8_TWO = {MicroAPI::RegLayout::TWO, MicroAPI::SatMode::SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-constexpr MicroAPI::CastTrait MROPE_MX_CAST_FP32_TO_FP8_THREE = {
-    MicroAPI::RegLayout::THREE, MicroAPI::SatMode::SAT, MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+constexpr Reg::CastTrait MROPE_MX_CAST_FP32_TO_FP8 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
+                                                      Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+constexpr Reg::CastTrait MROPE_MX_CAST_FP32_TO_FP8_ONE = {Reg::RegLayout::ONE, Reg::SatMode::SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+constexpr Reg::CastTrait MROPE_MX_CAST_FP32_TO_FP8_TWO = {Reg::RegLayout::TWO, Reg::SatMode::SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+constexpr Reg::CastTrait MROPE_MX_CAST_FP32_TO_FP8_THREE = {Reg::RegLayout::THREE, Reg::SatMode::SAT,
+                                                            Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 
 __simd_callee__ inline void RmsNormMropeFp32D128(
-    MicroAPI::RegTensor<float> &outLow, MicroAPI::RegTensor<float> &outHigh, MicroAPI::RegTensor<bfloat16_t> &inLowBf16,
-    MicroAPI::RegTensor<bfloat16_t> &inHighBf16, MicroAPI::RegTensor<float> &gammaCosLow,
-    MicroAPI::RegTensor<float> &gammaCosHigh, MicroAPI::RegTensor<float> &gammaSinLow,
-    MicroAPI::RegTensor<float> &gammaSinHigh, float epsilon, MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst)
+    Reg::RegTensor<float> &outLow, Reg::RegTensor<float> &outHigh, Reg::RegTensor<bfloat16_t> &inLowBf16,
+    Reg::RegTensor<bfloat16_t> &inHighBf16, Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh,
+    Reg::RegTensor<float> &gammaSinLow, Reg::RegTensor<float> &gammaSinHigh, float epsilon, Reg::MaskReg mask64,
+    Reg::MaskReg maskFirst)
 {
     // 逐行参考通路：先得到 norm=x/rms，再完成 gamma 和旋转；输出仍为两个连续 D64。
-    MicroAPI::RegTensor<float> normLow;
-    MicroAPI::RegTensor<float> normHigh;
-    MicroAPI::RegTensor<float> rotateTmp;
+    Reg::RegTensor<float> normLow;
+    Reg::RegTensor<float> normHigh;
+    Reg::RegTensor<float> rotateTmp;
     RmsNormBf16ToFp32D128<false>(normLow, normHigh, inLowBf16, inHighBf16, gammaCosLow, gammaCosHigh, epsilon, mask64,
                                  maskFirst);
-    MicroAPI::Mul(outLow, normLow, gammaCosLow, mask64);
-    MicroAPI::Mul(rotateTmp, normHigh, gammaSinHigh, mask64);
-    MicroAPI::Sub(outLow, outLow, rotateTmp, mask64);
-    MicroAPI::Mul(outHigh, normHigh, gammaCosHigh, mask64);
-    MicroAPI::Mul(rotateTmp, normLow, gammaSinLow, mask64);
-    MicroAPI::Add(outHigh, outHigh, rotateTmp, mask64);
+    Reg::Mul(outLow, normLow, gammaCosLow, mask64);
+    Reg::Mul(rotateTmp, normHigh, gammaSinHigh, mask64);
+    Reg::Sub(outLow, outLow, rotateTmp, mask64);
+    Reg::Mul(outHigh, normHigh, gammaCosHigh, mask64);
+    Reg::Mul(rotateTmp, normLow, gammaSinLow, mask64);
+    Reg::Add(outHigh, outHigh, rotateTmp, mask64);
 }
 
-__simd_callee__ inline void MxReduceMaxD32x2(MicroAPI::RegTensor<uint32_t> &maxValue, MicroAPI::RegTensor<float> &input,
-                                             MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskLow32,
-                                             MicroAPI::MaskReg maskHigh32)
+__simd_callee__ inline void MxReduceMaxD32x2(Reg::RegTensor<uint32_t> &maxValue, Reg::RegTensor<float> &input,
+                                             Reg::MaskReg mask64, Reg::MaskReg maskLow32, Reg::MaskReg maskHigh32)
 {
     // 一个 D64 寄存器包含两个 D32 block。本函数输出这两个 block 的绝对值最大值。
-    MicroAPI::RegTensor<uint32_t> absMask;
-    MicroAPI::RegTensor<uint32_t> absValue;
-    MicroAPI::RegTensor<uint32_t> lowMax;
-    MicroAPI::RegTensor<uint32_t> highMax;
-    MicroAPI::RegTensor<uint32_t> interleaveScratch;
+    Reg::RegTensor<uint32_t> absMask;
+    Reg::RegTensor<uint32_t> absValue;
+    Reg::RegTensor<uint32_t> lowMax;
+    Reg::RegTensor<uint32_t> highMax;
+    Reg::RegTensor<uint32_t> interleaveScratch;
 
     // Step 1: 清除 FP32 符号位得到 abs(input)，整数比较保持非负 FP32 的大小顺序。
-    MicroAPI::Duplicate(absMask, MROPE_MX_FP32_ABS_MASK);
-    MicroAPI::And(absValue, (MicroAPI::RegTensor<uint32_t> &)input, absMask, mask64);
+    Reg::Duplicate(absMask, MROPE_MX_FP32_ABS_MASK);
+    Reg::And(absValue, (Reg::RegTensor<uint32_t> &)input, absMask, mask64);
     // Step 2: 分别归约低/高 32 lanes；Interleave 把两个标量结果放入后续可拼接布局。
-    MicroAPI::ReduceMax(lowMax, absValue, maskLow32);
-    MicroAPI::ReduceMax(highMax, absValue, maskHigh32);
-    MicroAPI::Interleave(maxValue, interleaveScratch, lowMax, highMax);
+    Reg::ReduceMax(lowMax, absValue, maskLow32);
+    Reg::ReduceMax(highMax, absValue, maskHigh32);
+    Reg::Interleave(maxValue, interleaveScratch, lowMax, highMax);
 }
 
-__simd_callee__ inline void MxQuantCublasScaleD32x4(MicroAPI::RegTensor<float> &reciprocal,
-                                                    MicroAPI::RegTensor<uint32_t> &scaleExp,
-                                                    MicroAPI::RegTensor<uint32_t> &maxValue, MicroAPI::MaskReg mask4)
+__simd_callee__ inline void MxQuantCublasScaleD32x4(Reg::RegTensor<float> &reciprocal,
+                                                    Reg::RegTensor<uint32_t> &scaleExp,
+                                                    Reg::RegTensor<uint32_t> &maxValue, Reg::MaskReg mask4)
 {
     // 输入是四个 D32 amax 的原始 FP32 bit；输出是四个 E8M0 byte（暂存为 uint32）
     // 和对应的 FP32 倒数=1/scale。整个转换使用整数指数域，保持既定 MX 合同。
-    MicroAPI::MaskReg normalPredicate;
-    MicroAPI::MaskReg invalidPredicate;
-    MicroAPI::RegTensor<uint32_t> adjustedBits;
+    Reg::MaskReg normalPredicate;
+    Reg::MaskReg invalidPredicate;
+    Reg::RegTensor<uint32_t> adjustedBits;
 
     // For max > 0x04600001:
     //   ((max + 0x001fffff) >> 23) - 8
     // == ((max + 0xfc1fffff) mod 2^32) >> 23.
     // ZEROING keeps every lower value, including the locked edge, at scale 0.
-    MicroAPI::CompareScalar<uint32_t, AscendC::CMPMODE::GT>(normalPredicate, maxValue,
-                                                            MROPE_MX_FP32_CUBLAS_SUBNORMAL_EDGE, mask4);
-    MicroAPI::CompareScalar<uint32_t, AscendC::CMPMODE::GE>(invalidPredicate, maxValue, MROPE_MX_FP32_INF_BITS, mask4);
-    MicroAPI::Adds(adjustedBits, maxValue, MROPE_MX_FP32_CUBLAS_FOLDED_ROUND_OFFSET, mask4);
-    MicroAPI::ShiftRights<uint32_t, int16_t, MicroAPI::MaskMergeMode::ZEROING>(
-        scaleExp, adjustedBits, MROPE_MX_FP32_EXP_SHIFT, normalPredicate);
+    Reg::CompareScalar<uint32_t, AscendC::CMPMODE::GT>(normalPredicate, maxValue, MROPE_MX_FP32_CUBLAS_SUBNORMAL_EDGE,
+                                                       mask4);
+    Reg::CompareScalar<uint32_t, AscendC::CMPMODE::GE>(invalidPredicate, maxValue, MROPE_MX_FP32_INF_BITS, mask4);
+    Reg::Adds(adjustedBits, maxValue, MROPE_MX_FP32_CUBLAS_FOLDED_ROUND_OFFSET, mask4);
+    Reg::ShiftRights<uint32_t, int16_t, Reg::MaskMergeMode::ZEROING>(scaleExp, adjustedBits, MROPE_MX_FP32_EXP_SHIFT,
+                                                                     normalPredicate);
 
     // E8M0 指数 e 直接映射为 FP32 2^(-e) 的指数位，因此无需逐 lane 浮点除法。
-    MicroAPI::Muls<uint32_t>((MicroAPI::RegTensor<uint32_t> &)reciprocal, scaleExp, MROPE_MX_FP32_NEG_EXP_UNIT, mask4);
-    MicroAPI::Adds<uint32_t>((MicroAPI::RegTensor<uint32_t> &)reciprocal, (MicroAPI::RegTensor<uint32_t> &)reciprocal,
-                             MROPE_MX_FP32_EXP_BIAS_CUBLAS, mask4);
+    Reg::Muls<uint32_t>((Reg::RegTensor<uint32_t> &)reciprocal, scaleExp, MROPE_MX_FP32_NEG_EXP_UNIT, mask4);
+    Reg::Adds<uint32_t>((Reg::RegTensor<uint32_t> &)reciprocal, (Reg::RegTensor<uint32_t> &)reciprocal,
+                        MROPE_MX_FP32_EXP_BIAS_CUBLAS, mask4);
     // Inf/NaN 走固定编码；MERGING 只覆盖 invalid lanes，不改变正常结果。
-    MicroAPI::Duplicate<uint32_t, MicroAPI::MaskMergeMode::MERGING>(scaleExp, MROPE_MX_E8M0_NAN, invalidPredicate);
-    MicroAPI::Duplicate<uint32_t, MicroAPI::MaskMergeMode::MERGING>((MicroAPI::RegTensor<uint32_t> &)reciprocal,
-                                                                    MROPE_MX_FP32_NAN_BITS, invalidPredicate);
+    Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(scaleExp, MROPE_MX_E8M0_NAN, invalidPredicate);
+    Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>((Reg::RegTensor<uint32_t> &)reciprocal,
+                                                          MROPE_MX_FP32_NAN_BITS, invalidPredicate);
 }
 
-__simd_callee__ inline void MxQuantCublasD128(__ubuf__ uint8_t *outBytes, MicroAPI::AddrReg outAddr,
-                                              __ubuf__ uint8_t *scaleBytes, MicroAPI::RegTensor<float> &inLow,
-                                              MicroAPI::RegTensor<float> &inHigh,
-                                              MicroAPI::RegTensor<uint32_t> &scaleGatherLowIndex,
-                                              MicroAPI::RegTensor<uint32_t> &scaleGatherHighIndex,
-                                              MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskLow32,
-                                              MicroAPI::MaskReg maskHigh32, MicroAPI::MaskReg mask4)
+__simd_callee__ inline void MxQuantCublasD128(__ubuf__ uint8_t *outBytes, Reg::AddrReg outAddr,
+                                              __ubuf__ uint8_t *scaleBytes, Reg::RegTensor<float> &inLow,
+                                              Reg::RegTensor<float> &inHigh,
+                                              Reg::RegTensor<uint32_t> &scaleGatherLowIndex,
+                                              Reg::RegTensor<uint32_t> &scaleGatherHighIndex, Reg::MaskReg mask64,
+                                              Reg::MaskReg maskLow32, Reg::MaskReg maskHigh32, Reg::MaskReg mask4)
 {
     // 单行直接量化通路：D128 -> 4×D32 amax -> 4 scales -> 128 E4M3 bytes。
     // 它用于不能组成完整 RowBatch16 的尾行，也定义了批量通路必须保持的输出顺序。
-    MicroAPI::RegTensor<uint32_t> maxLow;
-    MicroAPI::RegTensor<uint32_t> maxHigh;
-    MicroAPI::RegTensor<uint32_t> maxCombined;
-    MicroAPI::RegTensor<uint32_t> interleaveScratch;
+    Reg::RegTensor<uint32_t> maxLow;
+    Reg::RegTensor<uint32_t> maxHigh;
+    Reg::RegTensor<uint32_t> maxCombined;
+    Reg::RegTensor<uint32_t> interleaveScratch;
     // Step 1: low/high 各产生两个 D32 amax，再拼成行内四个 amax。
     MxReduceMaxD32x2(maxLow, inLow, mask64, maskLow32, maskHigh32);
     MxReduceMaxD32x2(maxHigh, inHigh, mask64, maskLow32, maskHigh32);
-    MicroAPI::Interleave(maxCombined, interleaveScratch, maxLow, maxHigh);
+    Reg::Interleave(maxCombined, interleaveScratch, maxLow, maxHigh);
 
-    MicroAPI::RegTensor<float> reciprocalCombined;
-    MicroAPI::RegTensor<uint32_t> scaleExpCombined;
+    Reg::RegTensor<float> reciprocalCombined;
+    Reg::RegTensor<uint32_t> scaleExpCombined;
     // Step 2: 一次生成四个 E8M0 scale 和四个 FP32 倒数。
     MxQuantCublasScaleD32x4(reciprocalCombined, scaleExpCombined, maxCombined, mask4);
 
-    MicroAPI::RegTensor<uint32_t> scaleExpLow;
-    MicroAPI::RegTensor<uint32_t> scaleExpHigh;
-    MicroAPI::DeInterleave(scaleExpLow, scaleExpHigh, scaleExpCombined, scaleExpCombined);
+    Reg::RegTensor<uint32_t> scaleExpLow;
+    Reg::RegTensor<uint32_t> scaleExpHigh;
+    Reg::DeInterleave(scaleExpLow, scaleExpHigh, scaleExpCombined, scaleExpCombined);
 
-    MicroAPI::RegTensor<fp8_e4m3fn_t> output;
-    MicroAPI::RegTensor<uint16_t> scaleB16;
-    MicroAPI::RegTensor<uint8_t> scale;
-    MicroAPI::RegTensor<float> expandedScale;
-    MicroAPI::UnalignReg scaleStore;
+    Reg::RegTensor<fp8_e4m3fn_t> output;
+    Reg::RegTensor<uint16_t> scaleB16;
+    Reg::RegTensor<uint8_t> scale;
+    Reg::RegTensor<float> expandedScale;
+    Reg::UnalignReg scaleStore;
 
     // Step 3: Gather 将每个 D32 倒数广播到对应 32 lanes；乘、Cast、Store 完成量化。
     // scale 分两次各写 2 B，最终仍形成连续的四字节 [s0,s1,s2,s3]。
-    MicroAPI::Pack<uint16_t, uint32_t, MicroAPI::HighLowPart::LOWEST>(scaleB16, scaleExpLow);
-    MicroAPI::Pack<uint8_t, uint16_t, MicroAPI::HighLowPart::LOWEST>(scale, scaleB16);
-    MicroAPI::Gather(expandedScale, reciprocalCombined, scaleGatherLowIndex);
-    MicroAPI::Mul(inLow, inLow, expandedScale, mask64);
-    MicroAPI::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(output, inLow, mask64);
-    MicroAPI::StoreAlign<uint8_t, MicroAPI::StoreDist::DIST_PACK4_B32>(outBytes, (MicroAPI::RegTensor<uint8_t> &)output,
-                                                                       outAddr, mask64);
-    MicroAPI::StoreUnAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(scaleBytes, scale, scaleStore, 2U);
+    Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleB16, scaleExpLow);
+    Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>(scale, scaleB16);
+    Reg::Gather(expandedScale, reciprocalCombined, scaleGatherLowIndex);
+    Reg::Mul(inLow, inLow, expandedScale, mask64);
+    Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(output, inLow, mask64);
+    Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_PACK4_B32>(outBytes, (Reg::RegTensor<uint8_t> &)output, outAddr,
+                                                             mask64);
+    Reg::StoreUnAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE>(scaleBytes, scale, scaleStore, 2U);
 
-    MicroAPI::Pack<uint16_t, uint32_t, MicroAPI::HighLowPart::LOWEST>(scaleB16, scaleExpHigh);
-    MicroAPI::Pack<uint8_t, uint16_t, MicroAPI::HighLowPart::LOWEST>(scale, scaleB16);
-    MicroAPI::Gather(expandedScale, reciprocalCombined, scaleGatherHighIndex);
-    MicroAPI::Mul(inHigh, inHigh, expandedScale, mask64);
-    MicroAPI::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(output, inHigh, mask64);
-    MicroAPI::StoreAlign<uint8_t, MicroAPI::StoreDist::DIST_PACK4_B32>(
-        outBytes + QKV_K_SCALE_D128_HALF_SIZE, (MicroAPI::RegTensor<uint8_t> &)output, outAddr, mask64);
-    MicroAPI::StoreUnAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(scaleBytes, scale, scaleStore, 2U);
-    MicroAPI::StoreUnAlignPost(scaleBytes, scaleStore, 0U);
+    Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleB16, scaleExpHigh);
+    Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>(scale, scaleB16);
+    Reg::Gather(expandedScale, reciprocalCombined, scaleGatherHighIndex);
+    Reg::Mul(inHigh, inHigh, expandedScale, mask64);
+    Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(output, inHigh, mask64);
+    Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_PACK4_B32>(outBytes + QKV_K_SCALE_D128_HALF_SIZE,
+                                                             (Reg::RegTensor<uint8_t> &)output, outAddr, mask64);
+    Reg::StoreUnAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE>(scaleBytes, scale, scaleStore, 2U);
+    Reg::StoreUnAlignPost(scaleBytes, scaleStore, 0U);
 }
 
 __simd_callee__ inline void PrepareMropeGammaD128(
-    MicroAPI::RegTensor<float> &gammaCosLow, MicroAPI::RegTensor<float> &gammaCosHigh,
-    MicroAPI::RegTensor<float> &gammaSinLow, MicroAPI::RegTensor<float> &gammaSinHigh,
-    MicroAPI::RegTensor<float> &gammaLow, MicroAPI::RegTensor<float> &gammaHigh,
-    MicroAPI::RegTensor<uint32_t> &mropeIndex, __ubuf__ float *rawToken, MicroAPI::MaskReg mask64)
+    Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow,
+    Reg::RegTensor<float> &gammaSinHigh, Reg::RegTensor<float> &gammaLow, Reg::RegTensor<float> &gammaHigh,
+    Reg::RegTensor<uint32_t> &mropeIndex, __ubuf__ float *rawToken, Reg::MaskReg mask64)
 {
     // 同一 token 的所有 heads 共用 cos/sin。先按 M-RoPE index Gather，再预乘 gamma，
     // 后续每行旋转只需四次 Mul 和一次 Add/Sub，不重复计算 gamma*cos/sin。
-    MicroAPI::RegTensor<float> cosValue;
-    MicroAPI::RegTensor<float> sinValue;
-    MicroAPI::Gather(cosValue, rawToken, mropeIndex, mask64);
-    MicroAPI::Gather(sinValue, rawToken + QKV_K_SCALE_D128_HALF_SIZE, mropeIndex, mask64);
-    MicroAPI::Mul(gammaSinLow, gammaLow, sinValue, mask64);
-    MicroAPI::Mul(gammaSinHigh, gammaHigh, sinValue, mask64);
-    MicroAPI::Mul(gammaCosLow, gammaLow, cosValue, mask64);
-    MicroAPI::Mul(gammaCosHigh, gammaHigh, cosValue, mask64);
+    Reg::RegTensor<float> cosValue;
+    Reg::RegTensor<float> sinValue;
+    Reg::Gather(cosValue, rawToken, mropeIndex, mask64);
+    Reg::Gather(sinValue, rawToken + QKV_K_SCALE_D128_HALF_SIZE, mropeIndex, mask64);
+    Reg::Mul(gammaSinLow, gammaLow, sinValue, mask64);
+    Reg::Mul(gammaSinHigh, gammaHigh, sinValue, mask64);
+    Reg::Mul(gammaCosLow, gammaLow, cosValue, mask64);
+    Reg::Mul(gammaCosHigh, gammaHigh, cosValue, mask64);
 }
 
-__simd_callee__ inline void LoadRmsNormMropeFp32D128(
-    MicroAPI::RegTensor<float> &outLow, MicroAPI::RegTensor<float> &outHigh, __ubuf__ bfloat16_t *inputBf16,
-    MicroAPI::AddrReg inputAddr, MicroAPI::RegTensor<float> &gammaCosLow, MicroAPI::RegTensor<float> &gammaCosHigh,
-    MicroAPI::RegTensor<float> &gammaSinLow, MicroAPI::RegTensor<float> &gammaSinHigh, float epsilon,
-    MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst)
+__simd_callee__ inline void LoadRmsNormMropeFp32D128(Reg::RegTensor<float> &outLow, Reg::RegTensor<float> &outHigh,
+                                                     __ubuf__ bfloat16_t *inputBf16, Reg::AddrReg inputAddr,
+                                                     Reg::RegTensor<float> &gammaCosLow,
+                                                     Reg::RegTensor<float> &gammaCosHigh,
+                                                     Reg::RegTensor<float> &gammaSinLow,
+                                                     Reg::RegTensor<float> &gammaSinHigh, float epsilon,
+                                                     Reg::MaskReg mask64, Reg::MaskReg maskFirst)
 {
     // 从自然 D128 BF16 行加载两个 D64，并进入“先归一化、后旋转”的逐行通路。
-    MicroAPI::RegTensor<bfloat16_t> inLowBf16;
-    MicroAPI::RegTensor<bfloat16_t> inHighBf16;
-    MicroAPI::LoadAlign<bfloat16_t, MicroAPI::LoadDist::DIST_UNPACK_B16>(inLowBf16, inputBf16, inputAddr);
-    MicroAPI::LoadAlign<bfloat16_t, MicroAPI::LoadDist::DIST_UNPACK_B16>(
-        inHighBf16, inputBf16 + QKV_K_SCALE_D128_HALF_SIZE, inputAddr);
+    Reg::RegTensor<bfloat16_t> inLowBf16;
+    Reg::RegTensor<bfloat16_t> inHighBf16;
+    Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(inLowBf16, inputBf16, inputAddr);
+    Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(inHighBf16, inputBf16 + QKV_K_SCALE_D128_HALF_SIZE,
+                                                               inputAddr);
     RmsNormMropeFp32D128(outLow, outHigh, inLowBf16, inHighBf16, gammaCosLow, gammaCosHigh, gammaSinLow, gammaSinHigh,
                          epsilon, mask64, maskFirst);
 }
@@ -252,83 +251,75 @@ __simd_callee__ inline void LoadRmsNormMropeFp32D128(
 // MX scale 只依赖 max(abs(y))，因此 Scale 阶段可以用 max(abs(z))/rms 得到相同输入；
 // Quant 阶段再用 z/(rms*scale) 一次完成原来的归一化与量化缩放。
 __simd_callee__ inline void LoadRmsSquaredMropeUnnormalizedFp32D128(
-    MicroAPI::RegTensor<float> &outLow, MicroAPI::RegTensor<float> &outHigh, MicroAPI::RegTensor<float> &rmsSquared,
-    __ubuf__ bfloat16_t *inputBf16, MicroAPI::AddrReg inputAddr, MicroAPI::RegTensor<float> &gammaCosLow,
-    MicroAPI::RegTensor<float> &gammaCosHigh, MicroAPI::RegTensor<float> &gammaSinLow,
-    MicroAPI::RegTensor<float> &gammaSinHigh, float epsilon, MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst)
+    Reg::RegTensor<float> &outLow, Reg::RegTensor<float> &outHigh, Reg::RegTensor<float> &rmsSquared,
+    __ubuf__ bfloat16_t *inputBf16, Reg::AddrReg inputAddr, Reg::RegTensor<float> &gammaCosLow,
+    Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow, Reg::RegTensor<float> &gammaSinHigh,
+    float epsilon, Reg::MaskReg mask64, Reg::MaskReg maskFirst)
 {
-    MicroAPI::RegTensor<bfloat16_t> inLowBf16;
-    MicroAPI::RegTensor<bfloat16_t> inHighBf16;
-    MicroAPI::RegTensor<float> inLow;
-    MicroAPI::RegTensor<float> inHigh;
-    MicroAPI::RegTensor<float> squareLow;
-    MicroAPI::RegTensor<float> squareHigh;
-    MicroAPI::RegTensor<float> squareSum;
-    MicroAPI::RegTensor<float> rotateTmp;
+    Reg::RegTensor<bfloat16_t> inLowBf16;
+    Reg::RegTensor<bfloat16_t> inHighBf16;
+    Reg::RegTensor<float> inLow;
+    Reg::RegTensor<float> inHigh;
+    Reg::RegTensor<float> squareLow;
+    Reg::RegTensor<float> squareHigh;
+    Reg::RegTensor<float> squareSum;
+    Reg::RegTensor<float> rotateTmp;
 
     // Step 1: BF16 D128 -> 两个 FP32 D64；BF16 值可精确扩展到 FP32。
-    MicroAPI::LoadAlign<bfloat16_t, MicroAPI::LoadDist::DIST_UNPACK_B16>(inLowBf16, inputBf16, inputAddr);
-    MicroAPI::LoadAlign<bfloat16_t, MicroAPI::LoadDist::DIST_UNPACK_B16>(
-        inHighBf16, inputBf16 + QKV_K_SCALE_D128_HALF_SIZE, inputAddr);
-    MicroAPI::Cast<float, bfloat16_t, QKV_K_SCALE_CAST_BF16_TO_F32>(inLow, inLowBf16, mask64);
-    MicroAPI::Cast<float, bfloat16_t, QKV_K_SCALE_CAST_BF16_TO_F32>(inHigh, inHighBf16, mask64);
+    Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(inLowBf16, inputBf16, inputAddr);
+    Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(inHighBf16, inputBf16 + QKV_K_SCALE_D128_HALF_SIZE,
+                                                               inputAddr);
+    Reg::Cast<float, bfloat16_t, QKV_K_SCALE_CAST_BF16_TO_F32>(inLow, inLowBf16, mask64);
+    Reg::Cast<float, bfloat16_t, QKV_K_SCALE_CAST_BF16_TO_F32>(inHigh, inHighBf16, mask64);
     // Step 2: sum(low^2 + high^2)/128 + epsilon。Add 后 Reduce 覆盖全部 128 个元素。
-    MicroAPI::Mul(squareLow, inLow, inLow, mask64);
-    MicroAPI::Mul(squareHigh, inHigh, inHigh, mask64);
-    MicroAPI::Add(squareSum, squareLow, squareHigh, mask64);
-    MicroAPI::Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(rmsSquared, squareSum,
-                                                                                                mask64);
-    MicroAPI::Muls<float, float, MicroAPI::MaskMergeMode::ZEROING>(rmsSquared, rmsSquared, QKV_K_SCALE_D128_RECIP,
-                                                                   maskFirst);
-    MicroAPI::Adds<float, float, MicroAPI::MaskMergeMode::ZEROING>(rmsSquared, rmsSquared, epsilon, maskFirst);
+    Reg::Mul(squareLow, inLow, inLow, mask64);
+    Reg::Mul(squareHigh, inHigh, inHigh, mask64);
+    Reg::Add(squareSum, squareLow, squareHigh, mask64);
+    Reg::Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(rmsSquared, squareSum, mask64);
+    Reg::Muls<float, float, Reg::MaskMergeMode::ZEROING>(rmsSquared, rmsSquared, QKV_K_SCALE_D128_RECIP, maskFirst);
+    Reg::Adds<float, float, Reg::MaskMergeMode::ZEROING>(rmsSquared, rmsSquared, epsilon, maskFirst);
 
     // Step 3: 不除 rms，直接生成 z。Scale 阶段稍后把 rms 合入倒数。
-    MicroAPI::Mul(outLow, inLow, gammaCosLow, mask64);
-    MicroAPI::Mul(rotateTmp, inHigh, gammaSinHigh, mask64);
-    MicroAPI::Sub(outLow, outLow, rotateTmp, mask64);
-    MicroAPI::Mul(outHigh, inHigh, gammaCosHigh, mask64);
-    MicroAPI::Mul(rotateTmp, inLow, gammaSinLow, mask64);
-    MicroAPI::Add(outHigh, outHigh, rotateTmp, mask64);
+    Reg::Mul(outLow, inLow, gammaCosLow, mask64);
+    Reg::Mul(rotateTmp, inHigh, gammaSinHigh, mask64);
+    Reg::Sub(outLow, outLow, rotateTmp, mask64);
+    Reg::Mul(outHigh, inHigh, gammaCosHigh, mask64);
+    Reg::Mul(rotateTmp, inLow, gammaSinLow, mask64);
+    Reg::Add(outHigh, outHigh, rotateTmp, mask64);
 }
 
 template <bool REDUCE_MAX = true>
 __simd_callee__ inline void StoreAndReduceMropeMxD128x2(
     __ubuf__ float *row0LowScratch, __ubuf__ float *row0HighScratch, __ubuf__ float *row1LowScratch,
-    __ubuf__ float *row1HighScratch, __ubuf__ uint32_t *maxScratch, MicroAPI::AddrReg dataAddr,
-    MicroAPI::AddrReg maxAddr, MicroAPI::RegTensor<float> &row0Low, MicroAPI::RegTensor<float> &row0High,
-    MicroAPI::RegTensor<float> &row1Low, MicroAPI::RegTensor<float> &row1High, MicroAPI::RegTensor<uint32_t> &absMask,
-    MicroAPI::MaskReg mask64, MicroAPI::MaskReg mask8)
+    __ubuf__ float *row1HighScratch, __ubuf__ uint32_t *maxScratch, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr,
+    Reg::RegTensor<float> &row0Low, Reg::RegTensor<float> &row0High, Reg::RegTensor<float> &row1Low,
+    Reg::RegTensor<float> &row1High, Reg::RegTensor<uint32_t> &absMask, Reg::MaskReg mask64, Reg::MaskReg mask8)
 {
     // 两行是 RowBatch16 的最小 producer 单元。
     // Step 1: 先把 row0/row1 的 z 按自然行序写入 data scratch，供 Quant 阶段重读。
-    MicroAPI::StoreAlign<float>(row0LowScratch, row0Low, dataAddr, mask64);
-    MicroAPI::StoreAlign<float>(row0HighScratch, row0High, dataAddr, mask64);
-    MicroAPI::StoreAlign<float>(row1LowScratch, row1Low, dataAddr, mask64);
-    MicroAPI::StoreAlign<float>(row1HighScratch, row1High, dataAddr, mask64);
+    Reg::StoreAlign<float>(row0LowScratch, row0Low, dataAddr, mask64);
+    Reg::StoreAlign<float>(row0HighScratch, row0High, dataAddr, mask64);
+    Reg::StoreAlign<float>(row1LowScratch, row1Low, dataAddr, mask64);
+    Reg::StoreAlign<float>(row1HighScratch, row1High, dataAddr, mask64);
     if constexpr (REDUCE_MAX) {
         // Step 2: 将两行、两个 D64 重排成 D32 流；清符号位后逐级 Max。
         // 最终一次 ReduceMaxWithDataBlock 同时得到 2 rows × 4 D32 的八个 amax。
-        MicroAPI::DeInterleave(row0Low, row0High, row0Low, row0High);
-        MicroAPI::DeInterleave(row1Low, row1High, row1Low, row1High);
-        MicroAPI::DeInterleave(row0Low, row1Low, row0Low, row1Low);
-        MicroAPI::DeInterleave(row0High, row1High, row0High, row1High);
-        MicroAPI::And((MicroAPI::RegTensor<uint32_t> &)row0Low, (MicroAPI::RegTensor<uint32_t> &)row0Low, absMask,
-                      mask64);
-        MicroAPI::And((MicroAPI::RegTensor<uint32_t> &)row0High, (MicroAPI::RegTensor<uint32_t> &)row0High, absMask,
-                      mask64);
-        MicroAPI::And((MicroAPI::RegTensor<uint32_t> &)row1Low, (MicroAPI::RegTensor<uint32_t> &)row1Low, absMask,
-                      mask64);
-        MicroAPI::And((MicroAPI::RegTensor<uint32_t> &)row1High, (MicroAPI::RegTensor<uint32_t> &)row1High, absMask,
-                      mask64);
-        MicroAPI::Max((MicroAPI::RegTensor<uint32_t> &)row0Low, (MicroAPI::RegTensor<uint32_t> &)row0Low,
-                      (MicroAPI::RegTensor<uint32_t> &)row1Low, mask64);
-        MicroAPI::Max((MicroAPI::RegTensor<uint32_t> &)row0High, (MicroAPI::RegTensor<uint32_t> &)row0High,
-                      (MicroAPI::RegTensor<uint32_t> &)row1High, mask64);
-        MicroAPI::Max((MicroAPI::RegTensor<uint32_t> &)row0Low, (MicroAPI::RegTensor<uint32_t> &)row0Low,
-                      (MicroAPI::RegTensor<uint32_t> &)row0High, mask64);
-        MicroAPI::ReduceMaxWithDataBlock((MicroAPI::RegTensor<uint32_t> &)row0Low,
-                                         (MicroAPI::RegTensor<uint32_t> &)row0Low, mask64);
-        MicroAPI::StoreAlign<uint32_t>(maxScratch, (MicroAPI::RegTensor<uint32_t> &)row0Low, maxAddr, mask8);
+        Reg::DeInterleave(row0Low, row0High, row0Low, row0High);
+        Reg::DeInterleave(row1Low, row1High, row1Low, row1High);
+        Reg::DeInterleave(row0Low, row1Low, row0Low, row1Low);
+        Reg::DeInterleave(row0High, row1High, row0High, row1High);
+        Reg::And((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low, absMask, mask64);
+        Reg::And((Reg::RegTensor<uint32_t> &)row0High, (Reg::RegTensor<uint32_t> &)row0High, absMask, mask64);
+        Reg::And((Reg::RegTensor<uint32_t> &)row1Low, (Reg::RegTensor<uint32_t> &)row1Low, absMask, mask64);
+        Reg::And((Reg::RegTensor<uint32_t> &)row1High, (Reg::RegTensor<uint32_t> &)row1High, absMask, mask64);
+        Reg::Max((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low,
+                 (Reg::RegTensor<uint32_t> &)row1Low, mask64);
+        Reg::Max((Reg::RegTensor<uint32_t> &)row0High, (Reg::RegTensor<uint32_t> &)row0High,
+                 (Reg::RegTensor<uint32_t> &)row1High, mask64);
+        Reg::Max((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low,
+                 (Reg::RegTensor<uint32_t> &)row0High, mask64);
+        Reg::ReduceMaxWithDataBlock((Reg::RegTensor<uint32_t> &)row0Low, (Reg::RegTensor<uint32_t> &)row0Low, mask64);
+        Reg::StoreAlign<uint32_t>(maxScratch, (Reg::RegTensor<uint32_t> &)row0Low, maxAddr, mask8);
     }
 }
 
@@ -336,18 +327,17 @@ template <bool REDUCE_MAX = true>
 __simd_callee__ inline void StageMropeMxHeadPairD128(
     __ubuf__ bfloat16_t *inputBf16, __ubuf__ float *row0LowScratch, __ubuf__ float *row0HighScratch,
     __ubuf__ float *row1LowScratch, __ubuf__ float *row1HighScratch, __ubuf__ uint32_t *maxScratch,
-    MicroAPI::AddrReg inputAddr, MicroAPI::AddrReg dataAddr, MicroAPI::AddrReg maxAddr, uint32_t inputHeadStride,
-    MicroAPI::RegTensor<float> &gammaCosLow, MicroAPI::RegTensor<float> &gammaCosHigh,
-    MicroAPI::RegTensor<float> &gammaSinLow, MicroAPI::RegTensor<float> &gammaSinHigh,
-    MicroAPI::RegTensor<uint32_t> &absMask, float epsilon, MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst,
-    MicroAPI::MaskReg mask8)
+    Reg::AddrReg inputAddr, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr, uint32_t inputHeadStride,
+    Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow,
+    Reg::RegTensor<float> &gammaSinHigh, Reg::RegTensor<uint32_t> &absMask, float epsilon, Reg::MaskReg mask64,
+    Reg::MaskReg maskFirst, Reg::MaskReg mask8)
 {
     // 已归一化 producer：两行各自完整执行 RMSNorm+M-RoPE，再共同写 data/max scratch。
     // REDUCE_MAX=false 只用于最终奇 token 的 8-row tail；它稍后走单行直接量化并自行算 amax。
-    MicroAPI::RegTensor<float> row0Low;
-    MicroAPI::RegTensor<float> row0High;
-    MicroAPI::RegTensor<float> row1Low;
-    MicroAPI::RegTensor<float> row1High;
+    Reg::RegTensor<float> row0Low;
+    Reg::RegTensor<float> row0High;
+    Reg::RegTensor<float> row1Low;
+    Reg::RegTensor<float> row1High;
     LoadRmsNormMropeFp32D128(row0Low, row0High, inputBf16, inputAddr, gammaCosLow, gammaCosHigh, gammaSinLow,
                              gammaSinHigh, epsilon, mask64, maskFirst);
     LoadRmsNormMropeFp32D128(row1Low, row1High, inputBf16 + inputHeadStride, inputAddr, gammaCosLow, gammaCosHigh,
@@ -360,26 +350,24 @@ __simd_callee__ inline void StageMropeMxHeadPairD128(
 __simd_callee__ inline void StageMropeMxHeadPairDeferredRmsD128(
     __ubuf__ bfloat16_t *inputBf16, __ubuf__ float *row0LowScratch, __ubuf__ float *row0HighScratch,
     __ubuf__ float *row1LowScratch, __ubuf__ float *row1HighScratch, __ubuf__ uint32_t *maxScratch,
-    __ubuf__ float *rmsSquaredScratch, MicroAPI::AddrReg inputAddr, MicroAPI::AddrReg dataAddr,
-    MicroAPI::AddrReg maxAddr, MicroAPI::AddrReg rmsAddr, uint32_t inputHeadStride,
-    MicroAPI::RegTensor<float> &gammaCosLow, MicroAPI::RegTensor<float> &gammaCosHigh,
-    MicroAPI::RegTensor<float> &gammaSinLow, MicroAPI::RegTensor<float> &gammaSinHigh,
-    MicroAPI::RegTensor<uint32_t> &absMask, float epsilon, MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst,
-    MicroAPI::MaskReg mask8)
+    __ubuf__ float *rmsSquaredScratch, Reg::AddrReg inputAddr, Reg::AddrReg dataAddr, Reg::AddrReg maxAddr,
+    Reg::AddrReg rmsAddr, uint32_t inputHeadStride, Reg::RegTensor<float> &gammaCosLow,
+    Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow, Reg::RegTensor<float> &gammaSinHigh,
+    Reg::RegTensor<uint32_t> &absMask, float epsilon, Reg::MaskReg mask64, Reg::MaskReg maskFirst, Reg::MaskReg mask8)
 {
     // 延迟归一化 producer：每对 head 同时产生
     //   dataScratch : 两行未归一化 z
     //   maxScratch  : 两行各四个 max(abs(z))
     //   rmsScratch  : 两行 rms^2，按 [row0,row1,0,0,0,0,0,0] 稀疏存放
     // 稀疏布局让每个 pair 只需一次对齐 Store；Scale 阶段用 rmsGatherIndex 恢复并广播。
-    MicroAPI::RegTensor<float> row0Low;
-    MicroAPI::RegTensor<float> row0High;
-    MicroAPI::RegTensor<float> row1Low;
-    MicroAPI::RegTensor<float> row1High;
-    MicroAPI::RegTensor<float> row0RmsSquared;
-    MicroAPI::RegTensor<float> row1RmsSquared;
-    MicroAPI::RegTensor<float> rmsPair;
-    MicroAPI::RegTensor<float> rmsPairScratch;
+    Reg::RegTensor<float> row0Low;
+    Reg::RegTensor<float> row0High;
+    Reg::RegTensor<float> row1Low;
+    Reg::RegTensor<float> row1High;
+    Reg::RegTensor<float> row0RmsSquared;
+    Reg::RegTensor<float> row1RmsSquared;
+    Reg::RegTensor<float> rmsPair;
+    Reg::RegTensor<float> rmsPairScratch;
     // Step 1: 两行独立计算 rms^2 和 z。
     LoadRmsSquaredMropeUnnormalizedFp32D128(row0Low, row0High, row0RmsSquared, inputBf16, inputAddr, gammaCosLow,
                                             gammaCosHigh, gammaSinLow, gammaSinHigh, epsilon, mask64, maskFirst);
@@ -390,73 +378,75 @@ __simd_callee__ inline void StageMropeMxHeadPairDeferredRmsD128(
     StoreAndReduceMropeMxD128x2(row0LowScratch, row0HighScratch, row1LowScratch, row1HighScratch, maxScratch, dataAddr,
                                 maxAddr, row0Low, row0High, row1Low, row1High, absMask, mask64, mask8);
     // Step 3: 合成稀疏 rms^2 记录：[rms²_row0, rms²_row1, 0,0,0,0,0,0]。
-    MicroAPI::Interleave(rmsPair, rmsPairScratch, row0RmsSquared, row1RmsSquared);
-    MicroAPI::StoreAlign<float>(rmsSquaredScratch, rmsPair, rmsAddr, mask8);
+    Reg::Interleave(rmsPair, rmsPairScratch, row0RmsSquared, row1RmsSquared);
+    Reg::StoreAlign<float>(rmsSquaredScratch, rmsPair, rmsAddr, mask8);
 }
 
-__simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRms(
-    __ubuf__ uint32_t *maxScratch, __ubuf__ float *rmsSquaredScratch, __ubuf__ float *reciprocalScratch,
-    __ubuf__ uint8_t *scaleBytes, MicroAPI::RegTensor<uint32_t> &rmsGatherIndex, MicroAPI::MaskReg maskScale,
-    MicroAPI::MaskReg maskScaleB16)
+__simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRms(__ubuf__ uint32_t *maxScratch,
+                                                                    __ubuf__ float *rmsSquaredScratch,
+                                                                    __ubuf__ float *reciprocalScratch,
+                                                                    __ubuf__ uint8_t *scaleBytes,
+                                                                    Reg::RegTensor<uint32_t> &rmsGatherIndex,
+                                                                    Reg::MaskReg maskScale, Reg::MaskReg maskScaleB16)
 {
     // 一次处理 16 rows × 4 D32 = 64 个 scale lane。
     // 输入 max(abs(z)) 与 rms^2，输出 E8M0 scale 和 FP32 合并倒数。
-    MicroAPI::RegTensor<uint32_t> maxValue;
-    MicroAPI::RegTensor<float> rmsSquaredSparse;
-    MicroAPI::RegTensor<float> rmsSquared;
-    MicroAPI::RegTensor<float> rms;
-    MicroAPI::RegTensor<float> normalizedMax;
-    MicroAPI::RegTensor<float> reciprocal;
-    MicroAPI::RegTensor<uint32_t> scaleExp;
-    MicroAPI::RegTensor<uint16_t> scaleB16;
+    Reg::RegTensor<uint32_t> maxValue;
+    Reg::RegTensor<float> rmsSquaredSparse;
+    Reg::RegTensor<float> rmsSquared;
+    Reg::RegTensor<float> rms;
+    Reg::RegTensor<float> normalizedMax;
+    Reg::RegTensor<float> reciprocal;
+    Reg::RegTensor<uint32_t> scaleExp;
+    Reg::RegTensor<uint16_t> scaleB16;
 
     // Step 1: 读取 64 个 D32 amax；把 16 个稀疏 rms^2 广播成每行四份。
-    MicroAPI::LoadAlign<uint32_t>(maxValue, maxScratch);
+    Reg::LoadAlign<uint32_t>(maxValue, maxScratch);
     // rmsSquaredSparse: [row0,row1,空×6, row2,row3,空×6, ...]
-    MicroAPI::LoadAlign<float>(rmsSquaredSparse, rmsSquaredScratch);
-    MicroAPI::Gather(rmsSquared, rmsSquaredSparse, rmsGatherIndex);
+    Reg::LoadAlign<float>(rmsSquaredSparse, rmsSquaredScratch);
+    Reg::Gather(rmsSquared, rmsSquaredSparse, rmsGatherIndex);
     // Step 2: rms=sqrt(rms^2)，normalizedMax=max(abs(z))/rms。
-    MicroAPI::Sqrt(rms, rmsSquared, maskScale);
-    MicroAPI::Div(normalizedMax, (MicroAPI::RegTensor<float> &)maxValue, rms, maskScale);
+    Reg::Sqrt(rms, rmsSquared, maskScale);
+    Reg::Div(normalizedMax, (Reg::RegTensor<float> &)maxValue, rms, maskScale);
     // Step 3: 由 normalizedMax 生成 E8M0 scale；再把 1/scale 合并成 1/(rms*scale)。
-    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (MicroAPI::RegTensor<uint32_t> &)normalizedMax, maskScale);
-    MicroAPI::Div(reciprocal, reciprocal, rms, maskScale);
+    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (Reg::RegTensor<uint32_t> &)normalizedMax, maskScale);
+    Reg::Div(reciprocal, reciprocal, rms, maskScale);
 
     // Step 4: 64×uint32 exponent 压成连续 64×E8M0 byte；倒数保留 FP32 写入 scratch。
-    MicroAPI::Pack<uint16_t, uint32_t, MicroAPI::HighLowPart::LOWEST>(scaleB16, scaleExp);
-    MicroAPI::StoreAlign<uint16_t, MicroAPI::StoreDist::DIST_PACK_B16>(
-        reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes), scaleB16, maskScaleB16);
-    MicroAPI::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
+    Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleB16, scaleExp);
+    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes),
+                                                             scaleB16, maskScaleB16);
+    Reg::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
 }
 
 // Q 的 8-head tail 把两个 token 拼成一个 RowBatch16。两半数据已经完成逐行 RMSNorm，
 // 因此直接对 16 行统一算 scale，再将低/高 32 个 scale byte 分别写回 token0/token1。
 __simd_callee__ inline void MxQuantCublasScaleRowBatch16Split(
     __ubuf__ uint32_t *maxScratch, __ubuf__ float *reciprocalScratch, __ubuf__ uint8_t *scaleBytes0,
-    __ubuf__ uint8_t *scaleBytes1, MicroAPI::RegTensor<uint32_t> &scaleHighGatherIndex, MicroAPI::MaskReg maskScale,
-    MicroAPI::MaskReg maskScaleB16, MicroAPI::MaskReg maskScaleHalfB16)
+    __ubuf__ uint8_t *scaleBytes1, Reg::RegTensor<uint32_t> &scaleHighGatherIndex, Reg::MaskReg maskScale,
+    Reg::MaskReg maskScaleB16, Reg::MaskReg maskScaleHalfB16)
 {
     // Step 1: 对两 token 的 16 行统一生成 64 个 scale/倒数。
-    MicroAPI::RegTensor<uint32_t> maxValue;
-    MicroAPI::RegTensor<float> reciprocal;
-    MicroAPI::RegTensor<uint32_t> scaleExp;
-    MicroAPI::RegTensor<uint32_t> scaleExpHigh;
-    MicroAPI::RegTensor<uint16_t> scaleB16;
-    MicroAPI::RegTensor<uint16_t> scaleHighB16;
+    Reg::RegTensor<uint32_t> maxValue;
+    Reg::RegTensor<float> reciprocal;
+    Reg::RegTensor<uint32_t> scaleExp;
+    Reg::RegTensor<uint32_t> scaleExpHigh;
+    Reg::RegTensor<uint16_t> scaleB16;
+    Reg::RegTensor<uint16_t> scaleHighB16;
 
-    MicroAPI::LoadAlign<uint32_t>(maxValue, maxScratch);
+    Reg::LoadAlign<uint32_t>(maxValue, maxScratch);
     MxQuantCublasScaleD32x4(reciprocal, scaleExp, maxValue, maskScale);
 
     // Step 2: 低 8 行直接写 token0；Gather 高 8 行后写 token1。
-    MicroAPI::Pack<uint16_t, uint32_t, MicroAPI::HighLowPart::LOWEST>(scaleB16, scaleExp);
-    MicroAPI::StoreAlign<uint16_t, MicroAPI::StoreDist::DIST_PACK_B16>(
-        reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes0), scaleB16, maskScaleHalfB16);
-    MicroAPI::Gather(scaleExpHigh, scaleExp, scaleHighGatherIndex);
-    MicroAPI::Pack<uint16_t, uint32_t, MicroAPI::HighLowPart::LOWEST>(scaleHighB16, scaleExpHigh);
-    MicroAPI::StoreAlign<uint16_t, MicroAPI::StoreDist::DIST_PACK_B16>(
-        reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes1), scaleHighB16, maskScaleHalfB16);
+    Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleB16, scaleExp);
+    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes0),
+                                                             scaleB16, maskScaleHalfB16);
+    Reg::Gather(scaleExpHigh, scaleExp, scaleHighGatherIndex);
+    Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(scaleHighB16, scaleExpHigh);
+    Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(reinterpret_cast<__ubuf__ uint16_t *>(scaleBytes1),
+                                                             scaleHighB16, maskScaleHalfB16);
 
-    MicroAPI::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
+    Reg::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
 }
 
 template <uint32_t TOKEN_SCALE_COUNT>
@@ -465,16 +455,16 @@ __simd_callee__ inline void StoreMropeMxScaleRowBatch16ToPadded(__ubuf__ uint32_
 {
     // K 的一个 RowBatch16 可能由多个 token 组成。scratch 中 scale 按 16 行紧凑排列，
     // 公共输出却按 token 使用固定 32 B pitch；本函数逐 token 重排到该 padded 布局。
-    MicroAPI::RegTensor<uint32_t> tokenScaleExp;
-    MicroAPI::RegTensor<uint16_t> tokenScaleB16;
+    Reg::RegTensor<uint32_t> tokenScaleExp;
+    Reg::RegTensor<uint16_t> tokenScaleB16;
     uint32_t tokenScaleCount = TOKEN_SCALE_COUNT;
-    MicroAPI::MaskReg tokenScaleMaskB16 = MicroAPI::UpdateMask<uint16_t>(tokenScaleCount);
+    Reg::MaskReg tokenScaleMaskB16 = Reg::UpdateMask<uint16_t>(tokenScaleCount);
     for (uint16_t localToken = 0U; localToken < tokenCount; ++localToken) {
-        MicroAPI::AddrReg scaleLoadAddr = MicroAPI::CreateAddrReg<uint32_t>(localToken, TOKEN_SCALE_COUNT);
-        MicroAPI::LoadAlign<uint32_t>(tokenScaleExp, scaleScratch, scaleLoadAddr);
-        MicroAPI::Pack<uint16_t, uint32_t, MicroAPI::HighLowPart::LOWEST>(tokenScaleB16, tokenScaleExp);
-        MicroAPI::AddrReg scaleStoreAddr = MicroAPI::CreateAddrReg<uint16_t>(localToken, 16U);
-        MicroAPI::StoreAlign<uint16_t, MicroAPI::StoreDist::DIST_PACK_B16>(
+        Reg::AddrReg scaleLoadAddr = Reg::CreateAddrReg<uint32_t>(localToken, TOKEN_SCALE_COUNT);
+        Reg::LoadAlign<uint32_t>(tokenScaleExp, scaleScratch, scaleLoadAddr);
+        Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>(tokenScaleB16, tokenScaleExp);
+        Reg::AddrReg scaleStoreAddr = Reg::CreateAddrReg<uint16_t>(localToken, 16U);
+        Reg::StoreAlign<uint16_t, Reg::StoreDist::DIST_PACK_B16>(
             reinterpret_cast<__ubuf__ uint16_t *>(paddedScaleBytes), tokenScaleB16, scaleStoreAddr, tokenScaleMaskB16);
     }
 }
@@ -482,110 +472,110 @@ __simd_callee__ inline void StoreMropeMxScaleRowBatch16ToPadded(__ubuf__ uint32_
 __simd_callee__ inline void MxQuantCublasScaleRowBatch16DeferredRmsToPadded(
     __ubuf__ uint32_t *maxScratch, __ubuf__ float *rmsSquaredScratch, __ubuf__ float *reciprocalScratch,
     __ubuf__ uint8_t *paddedScaleBytes, uint16_t tokenCount, uint16_t headSize,
-    MicroAPI::RegTensor<uint32_t> &rmsGatherIndex, MicroAPI::MaskReg maskScale, MicroAPI::MaskReg maskScaleB16)
+    Reg::RegTensor<uint32_t> &rmsGatherIndex, Reg::MaskReg maskScale, Reg::MaskReg maskScaleB16)
 {
     // Nk=2/4：先按完整 RowBatch16 算 scale，再借用 maxScratch 暂存 uint32 exponent，
     // 将紧凑的 token×head×4 结果散到每 token 固定 pitch。倒数仍保持连续 64×FP32。
-    MicroAPI::RegTensor<uint32_t> maxValue;
-    MicroAPI::RegTensor<float> rmsSquaredSparse;
-    MicroAPI::RegTensor<float> rmsSquared;
-    MicroAPI::RegTensor<float> rms;
-    MicroAPI::RegTensor<float> normalizedMax;
-    MicroAPI::RegTensor<float> reciprocal;
-    MicroAPI::RegTensor<uint32_t> scaleExp;
+    Reg::RegTensor<uint32_t> maxValue;
+    Reg::RegTensor<float> rmsSquaredSparse;
+    Reg::RegTensor<float> rmsSquared;
+    Reg::RegTensor<float> rms;
+    Reg::RegTensor<float> normalizedMax;
+    Reg::RegTensor<float> reciprocal;
+    Reg::RegTensor<uint32_t> scaleExp;
 
-    MicroAPI::LoadAlign<uint32_t>(maxValue, maxScratch);
-    MicroAPI::LoadAlign<float>(rmsSquaredSparse, rmsSquaredScratch);
-    MicroAPI::Gather(rmsSquared, rmsSquaredSparse, rmsGatherIndex);
-    MicroAPI::Sqrt(rms, rmsSquared, maskScale);
-    MicroAPI::Div(normalizedMax, (MicroAPI::RegTensor<float> &)maxValue, rms, maskScale);
-    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (MicroAPI::RegTensor<uint32_t> &)normalizedMax, maskScale);
-    MicroAPI::Div(reciprocal, reciprocal, rms, maskScale);
+    Reg::LoadAlign<uint32_t>(maxValue, maxScratch);
+    Reg::LoadAlign<float>(rmsSquaredSparse, rmsSquaredScratch);
+    Reg::Gather(rmsSquared, rmsSquaredSparse, rmsGatherIndex);
+    Reg::Sqrt(rms, rmsSquared, maskScale);
+    Reg::Div(normalizedMax, (Reg::RegTensor<float> &)maxValue, rms, maskScale);
+    MxQuantCublasScaleD32x4(reciprocal, scaleExp, (Reg::RegTensor<uint32_t> &)normalizedMax, maskScale);
+    Reg::Div(reciprocal, reciprocal, rms, maskScale);
 
     // exponent 的 producer Store 必须完成，后面的逐 token Load 才能安全重排。
-    MicroAPI::StoreAlign<uint32_t>(maxScratch, scaleExp, maskScale);
-    MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_LOAD>();
+    Reg::StoreAlign<uint32_t>(maxScratch, scaleExp, maskScale);
+    Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     if (headSize == 2U) {
         StoreMropeMxScaleRowBatch16ToPadded<8U>(maxScratch, paddedScaleBytes, tokenCount);
     } else {
         StoreMropeMxScaleRowBatch16ToPadded<16U>(maxScratch, paddedScaleBytes, tokenCount);
     }
 
-    MicroAPI::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
+    Reg::StoreAlign<float>(reciprocalScratch, reciprocal, maskScale);
 }
 
 __simd_callee__ inline void MxQuantCublasDataRowBatch16(__ubuf__ float *dataScratch, __ubuf__ float *reciprocalScratch,
                                                         __ubuf__ uint8_t *outBytes, uint16_t pairCount,
-                                                        MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFp8)
+                                                        Reg::MaskReg mask64, Reg::MaskReg maskFp8)
 {
     // Quant consumer 每次处理两行。dataScratch 是自然 row-major FP32 z；
     // 倒数 scratch 是每行四个 FP32 1/(rms*scale)。最终一次写出连续 2×128 B。
     for (uint16_t pairIdx = 0U; pairIdx < pairCount; ++pairIdx) {
-        MicroAPI::RegTensor<float> reciprocalFp32;
-        MicroAPI::RegTensor<float> x0Zero;
-        MicroAPI::RegTensor<float> x1Zero;
-        MicroAPI::RegTensor<float> x0One;
-        MicroAPI::RegTensor<float> x1One;
-        MicroAPI::RegTensor<fp8_e4m3fn_t> x0ZeroFp8;
-        MicroAPI::RegTensor<fp8_e4m3fn_t> x1ZeroFp8;
-        MicroAPI::RegTensor<fp8_e4m3fn_t> x0OneFp8;
-        MicroAPI::RegTensor<fp8_e4m3fn_t> x1OneFp8;
+        Reg::RegTensor<float> reciprocalFp32;
+        Reg::RegTensor<float> x0Zero;
+        Reg::RegTensor<float> x1Zero;
+        Reg::RegTensor<float> x0One;
+        Reg::RegTensor<float> x1One;
+        Reg::RegTensor<fp8_e4m3fn_t> x0ZeroFp8;
+        Reg::RegTensor<fp8_e4m3fn_t> x1ZeroFp8;
+        Reg::RegTensor<fp8_e4m3fn_t> x0OneFp8;
+        Reg::RegTensor<fp8_e4m3fn_t> x1OneFp8;
         // Step 1: E2B_B32 将两行的 8 个 D32 倒数广播到对应数据 lanes。
-        MicroAPI::AddrReg reciprocalAddr = MicroAPI::CreateAddrReg<float>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
-        MicroAPI::LoadAlign<float, MicroAPI::LoadDist::DIST_E2B_B32>(reciprocalFp32, reciprocalScratch, reciprocalAddr);
-        MicroAPI::AddrReg dataAddr = MicroAPI::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
+        Reg::AddrReg reciprocalAddr = Reg::CreateAddrReg<float>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_E2B_B32>(reciprocalFp32, reciprocalScratch, reciprocalAddr);
+        Reg::AddrReg dataAddr = Reg::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
         // Step 2: 两次双路 Load 取回两行 D128；DeInterleave 得到四个独立 lane stream。
-        MicroAPI::LoadAlign<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(x0Zero, x1Zero, dataScratch, dataAddr);
-        MicroAPI::LoadAlign<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(
-            x0One, x1One, dataScratch + QKV_K_SCALE_D128_FULL_SIZE, dataAddr);
-        MicroAPI::DeInterleave(x0Zero, x0One, x0Zero, x0One);
-        MicroAPI::DeInterleave(x1Zero, x1One, x1Zero, x1One);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_DINTLV_B32>(x0Zero, x1Zero, dataScratch, dataAddr);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_DINTLV_B32>(x0One, x1One, dataScratch + QKV_K_SCALE_D128_FULL_SIZE,
+                                                              dataAddr);
+        Reg::DeInterleave(x0Zero, x0One, x0Zero, x0One);
+        Reg::DeInterleave(x1Zero, x1One, x1Zero, x1One);
         // Step 3: z/(rms*scale)，随后四种 Cast layout 把四个 stream 放到互不重叠的 byte lanes。
-        MicroAPI::Mul(x0Zero, x0Zero, reciprocalFp32, mask64);
-        MicroAPI::Mul(x1Zero, x1Zero, reciprocalFp32, mask64);
-        MicroAPI::Mul(x0One, x0One, reciprocalFp32, mask64);
-        MicroAPI::Mul(x1One, x1One, reciprocalFp32, mask64);
-        MicroAPI::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(x0ZeroFp8, x0Zero, mask64);
-        MicroAPI::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8_ONE>(x1ZeroFp8, x1Zero, mask64);
-        MicroAPI::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8_TWO>(x0OneFp8, x0One, mask64);
-        MicroAPI::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8_THREE>(x1OneFp8, x1One, mask64);
+        Reg::Mul(x0Zero, x0Zero, reciprocalFp32, mask64);
+        Reg::Mul(x1Zero, x1Zero, reciprocalFp32, mask64);
+        Reg::Mul(x0One, x0One, reciprocalFp32, mask64);
+        Reg::Mul(x1One, x1One, reciprocalFp32, mask64);
+        Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8>(x0ZeroFp8, x0Zero, mask64);
+        Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8_ONE>(x1ZeroFp8, x1Zero, mask64);
+        Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8_TWO>(x0OneFp8, x0One, mask64);
+        Reg::Cast<fp8_e4m3fn_t, float, MROPE_MX_CAST_FP32_TO_FP8_THREE>(x1OneFp8, x1One, mask64);
         // Step 4: 这里的 byte Add 是合并互斥 lanes，不是对 E4M3 数值求和；三次合并后恢复
         // row0[128 B] + row1[128 B] 的自然顺序，再由一次 Store 写出 256 B。
-        MicroAPI::Add((MicroAPI::RegTensor<uint8_t> &)x0ZeroFp8, (MicroAPI::RegTensor<uint8_t> &)x0ZeroFp8,
-                      (MicroAPI::RegTensor<uint8_t> &)x0OneFp8, maskFp8);
-        MicroAPI::Add((MicroAPI::RegTensor<uint8_t> &)x1ZeroFp8, (MicroAPI::RegTensor<uint8_t> &)x1ZeroFp8,
-                      (MicroAPI::RegTensor<uint8_t> &)x1OneFp8, maskFp8);
-        MicroAPI::Add((MicroAPI::RegTensor<uint8_t> &)x0ZeroFp8, (MicroAPI::RegTensor<uint8_t> &)x0ZeroFp8,
-                      (MicroAPI::RegTensor<uint8_t> &)x1ZeroFp8, maskFp8);
-        MicroAPI::AddrReg outAddr = MicroAPI::CreateAddrReg<uint8_t>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
-        MicroAPI::StoreAlign<uint8_t, MicroAPI::StoreDist::DIST_NORM_B8>(
-            outBytes, (MicroAPI::RegTensor<uint8_t> &)x0ZeroFp8, outAddr, maskFp8);
+        Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFp8, (Reg::RegTensor<uint8_t> &)x0ZeroFp8,
+                 (Reg::RegTensor<uint8_t> &)x0OneFp8, maskFp8);
+        Reg::Add((Reg::RegTensor<uint8_t> &)x1ZeroFp8, (Reg::RegTensor<uint8_t> &)x1ZeroFp8,
+                 (Reg::RegTensor<uint8_t> &)x1OneFp8, maskFp8);
+        Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFp8, (Reg::RegTensor<uint8_t> &)x0ZeroFp8,
+                 (Reg::RegTensor<uint8_t> &)x1ZeroFp8, maskFp8);
+        Reg::AddrReg outAddr = Reg::CreateAddrReg<uint8_t>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
+        Reg::StoreAlign<uint8_t, Reg::StoreDist::DIST_NORM_B8>(outBytes, (Reg::RegTensor<uint8_t> &)x0ZeroFp8, outAddr,
+                                                               maskFp8);
     }
 }
 
 __simd_callee__ inline void QuantizeMropeMxRowBatch8AfterReady(__ubuf__ float *dataScratch, __ubuf__ uint8_t *outBytes,
-                                                               __ubuf__ uint8_t *scaleBytes, MicroAPI::MaskReg mask64)
+                                                               __ubuf__ uint8_t *scaleBytes, Reg::MaskReg mask64)
 {
     // 奇数个 token 留下的最后 8 行无法与下一 token 拼成 RowBatch16。
     // Stage 已经生成归一化后的 y，因此逐行复用 MxQuantCublasD128，避免为半批构造额外布局。
-    MicroAPI::RegTensor<uint32_t> scaleGatherLowIndex;
-    MicroAPI::RegTensor<uint32_t> scaleGatherHighIndex;
-    MicroAPI::MaskReg maskLow32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::H>();
-    MicroAPI::MaskReg maskHigh32;
-    MicroAPI::Not(maskHigh32, maskLow32, mask64);
+    Reg::RegTensor<uint32_t> scaleGatherLowIndex;
+    Reg::RegTensor<uint32_t> scaleGatherHighIndex;
+    Reg::MaskReg maskLow32 = Reg::CreateMask<float, Reg::MaskPattern::H>();
+    Reg::MaskReg maskHigh32;
+    Reg::Not(maskHigh32, maskLow32, mask64);
     uint32_t scaleCount = MROPE_MX_SCALE_COUNT_D128;
-    MicroAPI::MaskReg mask4 = MicroAPI::UpdateMask<float>(scaleCount);
-    MicroAPI::Arange((MicroAPI::RegTensor<int32_t> &)scaleGatherLowIndex, 0);
-    MicroAPI::ShiftRights(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(5), mask64);
-    MicroAPI::ShiftLefts(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(1), mask64);
-    MicroAPI::Adds(scaleGatherHighIndex, scaleGatherLowIndex, 1U, mask64);
+    Reg::MaskReg mask4 = Reg::UpdateMask<float>(scaleCount);
+    Reg::Arange((Reg::RegTensor<int32_t> &)scaleGatherLowIndex, 0);
+    Reg::ShiftRights(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(5), mask64);
+    Reg::ShiftLefts(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(1), mask64);
+    Reg::Adds(scaleGatherHighIndex, scaleGatherLowIndex, 1U, mask64);
     for (uint16_t row = 0U; row < 8U; ++row) {
-        MicroAPI::RegTensor<float> rowLow;
-        MicroAPI::RegTensor<float> rowHigh;
-        MicroAPI::AddrReg dataAddr = MicroAPI::CreateAddrReg<float>(row, QKV_K_SCALE_D128_FULL_SIZE);
-        MicroAPI::AddrReg outAddr = MicroAPI::CreateAddrReg<uint8_t>(row, QKV_K_SCALE_D128_FULL_SIZE);
-        MicroAPI::LoadAlign<float>(rowLow, dataScratch, dataAddr);
-        MicroAPI::LoadAlign<float>(rowHigh, dataScratch + QKV_K_SCALE_D128_HALF_SIZE, dataAddr);
+        Reg::RegTensor<float> rowLow;
+        Reg::RegTensor<float> rowHigh;
+        Reg::AddrReg dataAddr = Reg::CreateAddrReg<float>(row, QKV_K_SCALE_D128_FULL_SIZE);
+        Reg::AddrReg outAddr = Reg::CreateAddrReg<uint8_t>(row, QKV_K_SCALE_D128_FULL_SIZE);
+        Reg::LoadAlign<float>(rowLow, dataScratch, dataAddr);
+        Reg::LoadAlign<float>(rowHigh, dataScratch + QKV_K_SCALE_D128_HALF_SIZE, dataAddr);
         MxQuantCublasD128(outBytes, outAddr, scaleBytes + static_cast<uint32_t>(row) * MROPE_MX_SCALE_COUNT_D128,
                           rowLow, rowHigh, scaleGatherLowIndex, scaleGatherHighIndex, mask64, maskLow32, maskHigh32,
                           mask4);
@@ -595,10 +585,9 @@ __simd_callee__ inline void QuantizeMropeMxRowBatch8AfterReady(__ubuf__ float *d
 template <bool REDUCE_MAX>
 __simd_callee__ inline void StageQTailToken8D128(
     __ubuf__ bfloat16_t *inputBf16, __ubuf__ uint8_t *waveScratch, uint16_t rowOffset, uint32_t inputHeadStride,
-    MicroAPI::RegTensor<float> &gammaCosLow, MicroAPI::RegTensor<float> &gammaCosHigh,
-    MicroAPI::RegTensor<float> &gammaSinLow, MicroAPI::RegTensor<float> &gammaSinHigh,
-    MicroAPI::RegTensor<uint32_t> &absMask, float epsilon, MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst,
-    MicroAPI::MaskReg mask8)
+    Reg::RegTensor<float> &gammaCosLow, Reg::RegTensor<float> &gammaCosHigh, Reg::RegTensor<float> &gammaSinLow,
+    Reg::RegTensor<float> &gammaSinHigh, Reg::RegTensor<uint32_t> &absMask, float epsilon, Reg::MaskReg mask64,
+    Reg::MaskReg maskFirst, Reg::MaskReg mask8)
 {
     // 把一个 token 的 8 个 Q tail heads 写入 RowBatch16 scratch 的低半或高半。
     // rowOffset=0/8 决定所属半区；四个 pair 恰好覆盖八行。
@@ -611,9 +600,9 @@ __simd_callee__ inline void StageQTailToken8D128(
     __ubuf__ uint32_t *maxScratch = reinterpret_cast<__ubuf__ uint32_t *>(waveScratch + MROPE_MX_ROW_BATCH_DATA_BYTES) +
                                     static_cast<uint32_t>(rowOffset) * MROPE_MX_SCALE_COUNT_D128;
     for (uint16_t pairIdx = 0U; pairIdx < 4U; ++pairIdx) {
-        MicroAPI::AddrReg inputAddr = MicroAPI::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
-        MicroAPI::AddrReg dataAddr = MicroAPI::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
-        MicroAPI::AddrReg maxAddr = MicroAPI::CreateAddrReg<uint32_t>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
+        Reg::AddrReg inputAddr = Reg::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
+        Reg::AddrReg dataAddr = Reg::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
+        Reg::AddrReg maxAddr = Reg::CreateAddrReg<uint32_t>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
         StageMropeMxHeadPairD128<REDUCE_MAX>(inputBf16, row0LowScratch, row0HighScratch, row1LowScratch,
                                              row1HighScratch, maxScratch, inputAddr, dataAddr, maxAddr, inputHeadStride,
                                              gammaCosLow, gammaCosHigh, gammaSinLow, gammaSinHigh, absMask, epsilon,
@@ -673,44 +662,44 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     float epsilon)
 {
     // 固定寄存器准备：gamma、M-RoPE Gather index、abs mask，以及两个批量 Gather index。
-    MicroAPI::RegTensor<uint32_t> mropeIndex;
-    MicroAPI::RegTensor<uint32_t> absMask;
-    MicroAPI::RegTensor<float> gammaLow;
-    MicroAPI::RegTensor<float> gammaHigh;
-    MicroAPI::MaskReg mask64 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskFirst = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
+    Reg::RegTensor<uint32_t> mropeIndex;
+    Reg::RegTensor<uint32_t> absMask;
+    Reg::RegTensor<float> gammaLow;
+    Reg::RegTensor<float> gammaHigh;
+    Reg::MaskReg mask64 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskFirst = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
     uint32_t mask8Count = 8U;
-    MicroAPI::MaskReg mask8 = MicroAPI::UpdateMask<uint32_t>(mask8Count);
-    MicroAPI::MaskReg maskFp8 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskScale = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg mask8 = Reg::UpdateMask<uint32_t>(mask8Count);
+    Reg::MaskReg maskFp8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskScale = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
     uint32_t scaleB16Count = MROPE_MX_ROW_BATCH_ROWS * MROPE_MX_SCALE_COUNT_D128;
-    MicroAPI::MaskReg maskScaleB16 = MicroAPI::UpdateMask<uint16_t>(scaleB16Count);
+    Reg::MaskReg maskScaleB16 = Reg::UpdateMask<uint16_t>(scaleB16Count);
     uint32_t scaleHalfB16Count = 8U * MROPE_MX_SCALE_COUNT_D128;
-    MicroAPI::MaskReg maskScaleHalfB16 = MicroAPI::UpdateMask<uint16_t>(scaleHalfB16Count);
-    MicroAPI::LoadAlign<uint32_t>(mropeIndex, gatherIndex);
-    MicroAPI::LoadAlign<float>(gammaLow, gamma);
-    MicroAPI::LoadAlign<float>(gammaHigh, gamma + QKV_K_SCALE_D128_HALF_SIZE);
-    MicroAPI::Duplicate(absMask, MROPE_MX_FP32_ABS_MASK);
+    Reg::MaskReg maskScaleHalfB16 = Reg::UpdateMask<uint16_t>(scaleHalfB16Count);
+    Reg::LoadAlign<uint32_t>(mropeIndex, gatherIndex);
+    Reg::LoadAlign<float>(gammaLow, gamma);
+    Reg::LoadAlign<float>(gammaHigh, gamma + QKV_K_SCALE_D128_HALF_SIZE);
+    Reg::Duplicate(absMask, MROPE_MX_FP32_ABS_MASK);
 
     // rmsGatherIndex 将稀疏 rms^2 布局
     // [r0,r1,0×6,r2,r3,0×6,...] 展开为 [r0×4,r1×4,...,r15×4]。
-    MicroAPI::RegTensor<uint32_t> rmsGatherIndex;
-    MicroAPI::RegTensor<uint32_t> rmsGatherBase;
-    MicroAPI::RegTensor<uint32_t> rmsGatherOne;
-    MicroAPI::Arange((MicroAPI::RegTensor<int32_t> &)rmsGatherIndex, 0);
-    MicroAPI::ShiftRights(rmsGatherBase, rmsGatherIndex, static_cast<int16_t>(3), maskScale);
-    MicroAPI::ShiftLefts(rmsGatherBase, rmsGatherBase, static_cast<int16_t>(3), maskScale);
-    MicroAPI::ShiftRights(rmsGatherIndex, rmsGatherIndex, static_cast<int16_t>(2), maskScale);
-    MicroAPI::Duplicate(rmsGatherOne, 1U);
-    MicroAPI::And(rmsGatherIndex, rmsGatherIndex, rmsGatherOne, maskScale);
-    MicroAPI::Add(rmsGatherIndex, rmsGatherBase, rmsGatherIndex, maskScale);
+    Reg::RegTensor<uint32_t> rmsGatherIndex;
+    Reg::RegTensor<uint32_t> rmsGatherBase;
+    Reg::RegTensor<uint32_t> rmsGatherOne;
+    Reg::Arange((Reg::RegTensor<int32_t> &)rmsGatherIndex, 0);
+    Reg::ShiftRights(rmsGatherBase, rmsGatherIndex, static_cast<int16_t>(3), maskScale);
+    Reg::ShiftLefts(rmsGatherBase, rmsGatherBase, static_cast<int16_t>(3), maskScale);
+    Reg::ShiftRights(rmsGatherIndex, rmsGatherIndex, static_cast<int16_t>(2), maskScale);
+    Reg::Duplicate(rmsGatherOne, 1U);
+    Reg::And(rmsGatherIndex, rmsGatherIndex, rmsGatherOne, maskScale);
+    Reg::Add(rmsGatherIndex, rmsGatherBase, rmsGatherIndex, maskScale);
 
     // scaleHighGatherIndex 选出 RowBatch16 的高 8 行，供跨 token tail 分别写 scale。
-    MicroAPI::RegTensor<uint32_t> scaleHighGatherIndex;
-    MicroAPI::Arange((MicroAPI::RegTensor<int32_t> &)scaleHighGatherIndex, 0);
-    MicroAPI::ShiftLefts(scaleHighGatherIndex, scaleHighGatherIndex, static_cast<int16_t>(27), maskScale);
-    MicroAPI::ShiftRights(scaleHighGatherIndex, scaleHighGatherIndex, static_cast<int16_t>(27), maskScale);
-    MicroAPI::Adds(scaleHighGatherIndex, scaleHighGatherIndex, 32U, maskScale);
+    Reg::RegTensor<uint32_t> scaleHighGatherIndex;
+    Reg::Arange((Reg::RegTensor<int32_t> &)scaleHighGatherIndex, 0);
+    Reg::ShiftLefts(scaleHighGatherIndex, scaleHighGatherIndex, static_cast<int16_t>(27), maskScale);
+    Reg::ShiftRights(scaleHighGatherIndex, scaleHighGatherIndex, static_cast<int16_t>(27), maskScale);
+    Reg::Adds(scaleHighGatherIndex, scaleHighGatherIndex, 32U, maskScale);
 
     // scratch 索引：先排 token-major 的完整 batch，再排每两个 token 共用的 tail record。
     const uint16_t fullBatchCount = static_cast<uint16_t>(headSize / MROPE_MX_ROW_BATCH_ROWS);
@@ -722,10 +711,10 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
 
     // Phase 1 - Stage：先生产整 tile 的 data/max/rms^2 scratch，不在 token 内关闭流水窗口。
     for (uint16_t tokenIdx = 0U; tokenIdx < tokenSize; ++tokenIdx) {
-        MicroAPI::RegTensor<float> gammaCosLow;
-        MicroAPI::RegTensor<float> gammaCosHigh;
-        MicroAPI::RegTensor<float> gammaSinLow;
-        MicroAPI::RegTensor<float> gammaSinHigh;
+        Reg::RegTensor<float> gammaCosLow;
+        Reg::RegTensor<float> gammaCosHigh;
+        Reg::RegTensor<float> gammaSinLow;
+        Reg::RegTensor<float> gammaSinHigh;
         PrepareMropeGammaD128(gammaCosLow, gammaCosHigh, gammaSinLow, gammaSinHigh, gammaLow, gammaHigh, mropeIndex,
                               rawCosSin + static_cast<uint32_t>(tokenIdx) * 3U * QKV_K_SCALE_D128_FULL_SIZE, mask64);
         __ubuf__ bfloat16_t *tokenInput = inputBf16 + static_cast<uint32_t>(tokenIdx) * inputTokenStride;
@@ -748,10 +737,10 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
             __ubuf__ bfloat16_t *batchInput =
                 tokenInput + static_cast<uint32_t>(batchIdx) * MROPE_MX_ROW_BATCH_ROWS * inputHeadStride;
             for (uint16_t pairIdx = 0U; pairIdx < 8U; ++pairIdx) {
-                MicroAPI::AddrReg inputAddr = MicroAPI::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
-                MicroAPI::AddrReg dataAddr = MicroAPI::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
-                MicroAPI::AddrReg maxAddr = MicroAPI::CreateAddrReg<uint32_t>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
-                MicroAPI::AddrReg rmsAddr = MicroAPI::CreateAddrReg<float>(pairIdx, 8U);
+                Reg::AddrReg inputAddr = Reg::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
+                Reg::AddrReg dataAddr = Reg::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
+                Reg::AddrReg maxAddr = Reg::CreateAddrReg<uint32_t>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
+                Reg::AddrReg rmsAddr = Reg::CreateAddrReg<float>(pairIdx, 8U);
                 StageMropeMxHeadPairDeferredRmsD128(
                     batchInput, row0LowScratch, row0HighScratch, row1LowScratch, row1HighScratch, maxScratch,
                     rmsSquaredScratch, inputAddr, dataAddr, maxAddr, rmsAddr, inputHeadStride, gammaCosLow,
@@ -781,7 +770,7 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
     }
 
     // Stage 的 scratch Store 全部完成后，Scale 才能开始 Load。
-    MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_LOAD>();
+    Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     // Phase 2a - Scale 完整前缀：64 lanes 同时完成 16 rows 的 rms/scale/倒数。
     for (uint16_t tokenIdx = 0U; tokenIdx < tokenSize; ++tokenIdx) {
         __ubuf__ uint8_t *tokenScaleBytes = reinterpret_cast<__ubuf__ uint8_t *>(outScale) +
@@ -825,7 +814,7 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
 
     // 只有批量 Scale 写过倒数时才需要这条 producer -> consumer 屏障。
     if (prefixScratchBatchCount != 0U || tailPairCount != 0U) {
-        MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_LOAD>();
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     }
     // Phase 3a - Quant 完整前缀：每次处理一对 head，按自然 row-major 写 E4M3。
     for (uint16_t tokenIdx = 0U; tokenIdx < tokenSize; ++tokenIdx) {
@@ -878,7 +867,7 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
                                            mask64);
     }
     // Quant 对 scratch 的 Load 完成后，上层才能让下一 tile 覆盖同一 UB 区域。
-    MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_LOAD, MicroAPI::MemType::VEC_STORE>();
+    Reg::LocalMemBar<Reg::MemType::VEC_LOAD, Reg::MemType::VEC_STORE>();
 }
 
 // K RowBatch16 的单-token Stage。headSize 必须为偶数；每次处理两个 heads，
@@ -886,24 +875,24 @@ __simd_vf__ inline void QRmsNormMropeMxD128GlobalTileWaveVfImpl(
 __simd_callee__ inline void StageKMropeMxEvenTokenD128(
     __ubuf__ bfloat16_t *tokenInputBf16, __ubuf__ float *rawToken, __ubuf__ float *tokenDataScratch,
     __ubuf__ uint32_t *tokenMaxScratch, __ubuf__ float *tokenRmsSquaredScratch, uint16_t headSize,
-    uint32_t inputHeadStride, float epsilon, MicroAPI::RegTensor<uint32_t> &mropeIndex,
-    MicroAPI::RegTensor<uint32_t> &absMask, MicroAPI::RegTensor<float> &gammaLow, MicroAPI::RegTensor<float> &gammaHigh,
-    MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst, MicroAPI::MaskReg mask8)
+    uint32_t inputHeadStride, float epsilon, Reg::RegTensor<uint32_t> &mropeIndex, Reg::RegTensor<uint32_t> &absMask,
+    Reg::RegTensor<float> &gammaLow, Reg::RegTensor<float> &gammaHigh, Reg::MaskReg mask64, Reg::MaskReg maskFirst,
+    Reg::MaskReg mask8)
 {
     // cos/sin 只按 token 准备一次，随后被该 token 的所有 K heads 复用。
-    MicroAPI::RegTensor<float> gammaCosLow;
-    MicroAPI::RegTensor<float> gammaCosHigh;
-    MicroAPI::RegTensor<float> gammaSinLow;
-    MicroAPI::RegTensor<float> gammaSinHigh;
+    Reg::RegTensor<float> gammaCosLow;
+    Reg::RegTensor<float> gammaCosHigh;
+    Reg::RegTensor<float> gammaSinLow;
+    Reg::RegTensor<float> gammaSinHigh;
     PrepareMropeGammaD128(gammaCosLow, gammaCosHigh, gammaSinLow, gammaSinHigh, gammaLow, gammaHigh, mropeIndex,
                           rawToken, mask64);
 
     const uint16_t pairCount = static_cast<uint16_t>(headSize / 2U);
     for (uint16_t pairIdx = 0U; pairIdx < pairCount; ++pairIdx) {
-        MicroAPI::AddrReg inputAddr = MicroAPI::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
-        MicroAPI::AddrReg dataAddr = MicroAPI::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
-        MicroAPI::AddrReg maxAddr = MicroAPI::CreateAddrReg<uint32_t>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
-        MicroAPI::AddrReg rmsAddr = MicroAPI::CreateAddrReg<float>(pairIdx, 8U);
+        Reg::AddrReg inputAddr = Reg::CreateAddrReg<bfloat16_t>(pairIdx, 2U * inputHeadStride);
+        Reg::AddrReg dataAddr = Reg::CreateAddrReg<float>(pairIdx, 2U * QKV_K_SCALE_D128_FULL_SIZE);
+        Reg::AddrReg maxAddr = Reg::CreateAddrReg<uint32_t>(pairIdx, 2U * MROPE_MX_SCALE_COUNT_D128);
+        Reg::AddrReg rmsAddr = Reg::CreateAddrReg<float>(pairIdx, 8U);
         StageMropeMxHeadPairDeferredRmsD128(
             tokenInputBf16, tokenDataScratch, tokenDataScratch + QKV_K_SCALE_D128_HALF_SIZE,
             tokenDataScratch + QKV_K_SCALE_D128_FULL_SIZE,
@@ -918,14 +907,14 @@ __simd_callee__ inline void FinishKMropeMxD128EvenRows(__ubuf__ float *dataScrat
                                                        __ubuf__ float *reciprocalScratch,
                                                        __ubuf__ uint8_t *batchOutBytes,
                                                        __ubuf__ uint8_t *batchPaddedScaleBytes, uint16_t tokenCount,
-                                                       uint16_t headSize, MicroAPI::RegTensor<uint32_t> &rmsGatherIndex,
-                                                       MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFp8)
+                                                       uint16_t headSize, Reg::RegTensor<uint32_t> &rmsGatherIndex,
+                                                       Reg::MaskReg mask64, Reg::MaskReg maskFp8)
 {
     // Stage-ready 后完成一个 K RowBatch16：先生成 scale/倒数，再量化 16 行。
     // Nk=8 时两个 token 恰好形成连续 64B scale；Nk=2/4 需写入每 token 的 padded pitch。
-    MicroAPI::MaskReg maskScale = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg maskScale = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
     uint32_t batchScaleCount = MROPE_MX_ROW_BATCH_ROWS * MROPE_MX_SCALE_COUNT_D128;
-    MicroAPI::MaskReg maskScaleB16 = MicroAPI::UpdateMask<uint16_t>(batchScaleCount);
+    Reg::MaskReg maskScaleB16 = Reg::UpdateMask<uint16_t>(batchScaleCount);
     if (headSize == 8U) {
         MxQuantCublasScaleRowBatch16DeferredRms(maxScratch, rmsSquaredScratch, reciprocalScratch, batchPaddedScaleBytes,
                                                 rmsGatherIndex, maskScale, maskScaleB16);
@@ -935,7 +924,7 @@ __simd_callee__ inline void FinishKMropeMxD128EvenRows(__ubuf__ float *dataScrat
                                                         maskScale, maskScaleB16);
     }
     // Scale 写倒数完成后，Quant 才能加载；这是 record 内第二个依赖边。
-    MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_LOAD>();
+    Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     MxQuantCublasDataRowBatch16(dataScratch, reciprocalScratch, batchOutBytes, 8U, mask64, maskFp8);
 }
 
@@ -944,10 +933,9 @@ __simd_callee__ inline void ProcessKMropeMxD128RowBatch16(
     __ubuf__ uint8_t *batchPaddedScaleBytes, __ubuf__ float *dataScratch, __ubuf__ uint32_t *maxScratch,
     __ubuf__ float *reciprocalScratch, __ubuf__ float *rmsSquaredScratch, uint16_t batchTokenCount, uint16_t headSize,
     uint32_t inputTokenStride, uint32_t inputHeadStride, uint32_t scaleTokenStrideWords, float epsilon,
-    MicroAPI::RegTensor<uint32_t> &mropeIndex, MicroAPI::RegTensor<uint32_t> &absMask,
-    MicroAPI::RegTensor<float> &gammaLow, MicroAPI::RegTensor<float> &gammaHigh,
-    MicroAPI::RegTensor<uint32_t> &rmsGatherIndex, MicroAPI::MaskReg mask64, MicroAPI::MaskReg maskFirst,
-    MicroAPI::MaskReg mask8, MicroAPI::MaskReg maskFp8)
+    Reg::RegTensor<uint32_t> &mropeIndex, Reg::RegTensor<uint32_t> &absMask, Reg::RegTensor<float> &gammaLow,
+    Reg::RegTensor<float> &gammaHigh, Reg::RegTensor<uint32_t> &rmsGatherIndex, Reg::MaskReg mask64,
+    Reg::MaskReg maskFirst, Reg::MaskReg mask8, Reg::MaskReg maskFp8)
 {
     // 一个 K batch 始终填满 16 rows：batchTokenCount * headSize == 16。
     // 例如 Nk=8/4/2 分别合并 2/4/8 个 token。tokenRowBegin 保持最终 row-major 顺序。
@@ -967,11 +955,11 @@ __simd_callee__ inline void ProcessKMropeMxD128RowBatch16(
     }
 
     // Phase 2/3 - 等待全部 Stage Store，随后一次 Scale + Quant 完成整个 RowBatch16。
-    MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_LOAD>();
+    Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     FinishKMropeMxD128EvenRows(dataScratch, maxScratch, rmsSquaredScratch, reciprocalScratch, batchOutBytes,
                                batchPaddedScaleBytes, batchTokenCount, headSize, rmsGatherIndex, mask64, maskFp8);
     // Quant 已读完 scratch，下一组 token 才能覆盖该 record。
-    MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_LOAD, MicroAPI::MemType::VEC_STORE>();
+    Reg::LocalMemBar<Reg::MemType::VEC_LOAD, Reg::MemType::VEC_STORE>();
 }
 
 __simd_vf__ inline void KRmsNormMropeMxD128RowBatch16EvenVfImpl(
@@ -981,30 +969,30 @@ __simd_vf__ inline void KRmsNormMropeMxD128RowBatch16EvenVfImpl(
     float epsilon)
 {
     // 偶数 Nk 且 16%Nk==0 的批量入口。它只保留一个 RowBatch16 scratch，并按 token 组循环复用。
-    MicroAPI::RegTensor<uint32_t> mropeIndex;
-    MicroAPI::RegTensor<uint32_t> absMask;
-    MicroAPI::RegTensor<float> gammaLow;
-    MicroAPI::RegTensor<float> gammaHigh;
-    MicroAPI::MaskReg mask64 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskFirst = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
+    Reg::RegTensor<uint32_t> mropeIndex;
+    Reg::RegTensor<uint32_t> absMask;
+    Reg::RegTensor<float> gammaLow;
+    Reg::RegTensor<float> gammaHigh;
+    Reg::MaskReg mask64 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskFirst = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
     uint32_t mask8Count = 8U;
-    MicroAPI::MaskReg mask8 = MicroAPI::UpdateMask<uint32_t>(mask8Count);
-    MicroAPI::MaskReg maskFp8 = MicroAPI::CreateMask<uint8_t, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::LoadAlign<uint32_t>(mropeIndex, gatherIndex);
-    MicroAPI::LoadAlign<float>(gammaLow, gamma);
-    MicroAPI::LoadAlign<float>(gammaHigh, gamma + QKV_K_SCALE_D128_HALF_SIZE);
-    MicroAPI::Duplicate(absMask, MROPE_MX_FP32_ABS_MASK);
-    MicroAPI::RegTensor<uint32_t> rmsGatherIndex;
-    MicroAPI::RegTensor<uint32_t> rmsGatherBase;
-    MicroAPI::RegTensor<uint32_t> rmsGatherOne;
-    MicroAPI::MaskReg maskScale = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::Arange((MicroAPI::RegTensor<int32_t> &)rmsGatherIndex, 0);
-    MicroAPI::ShiftRights(rmsGatherBase, rmsGatherIndex, static_cast<int16_t>(3), maskScale);
-    MicroAPI::ShiftLefts(rmsGatherBase, rmsGatherBase, static_cast<int16_t>(3), maskScale);
-    MicroAPI::ShiftRights(rmsGatherIndex, rmsGatherIndex, static_cast<int16_t>(2), maskScale);
-    MicroAPI::Duplicate(rmsGatherOne, 1U);
-    MicroAPI::And(rmsGatherIndex, rmsGatherIndex, rmsGatherOne, maskScale);
-    MicroAPI::Add(rmsGatherIndex, rmsGatherBase, rmsGatherIndex, maskScale);
+    Reg::MaskReg mask8 = Reg::UpdateMask<uint32_t>(mask8Count);
+    Reg::MaskReg maskFp8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
+    Reg::LoadAlign<uint32_t>(mropeIndex, gatherIndex);
+    Reg::LoadAlign<float>(gammaLow, gamma);
+    Reg::LoadAlign<float>(gammaHigh, gamma + QKV_K_SCALE_D128_HALF_SIZE);
+    Reg::Duplicate(absMask, MROPE_MX_FP32_ABS_MASK);
+    Reg::RegTensor<uint32_t> rmsGatherIndex;
+    Reg::RegTensor<uint32_t> rmsGatherBase;
+    Reg::RegTensor<uint32_t> rmsGatherOne;
+    Reg::MaskReg maskScale = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::Arange((Reg::RegTensor<int32_t> &)rmsGatherIndex, 0);
+    Reg::ShiftRights(rmsGatherBase, rmsGatherIndex, static_cast<int16_t>(3), maskScale);
+    Reg::ShiftLefts(rmsGatherBase, rmsGatherBase, static_cast<int16_t>(3), maskScale);
+    Reg::ShiftRights(rmsGatherIndex, rmsGatherIndex, static_cast<int16_t>(2), maskScale);
+    Reg::Duplicate(rmsGatherOne, 1U);
+    Reg::And(rmsGatherIndex, rmsGatherIndex, rmsGatherOne, maskScale);
+    Reg::Add(rmsGatherIndex, rmsGatherBase, rmsGatherIndex, maskScale);
 
     __ubuf__ float *dataScratch = reinterpret_cast<__ubuf__ float *>(scratch);
     __ubuf__ uint32_t *maxScratch =
@@ -1045,47 +1033,47 @@ __simd_vf__ inline void KRmsNormMropeMxD128VfImpl(__ubuf__ bfloat16_t *inputBf16
 {
     // 通用逐 head 回退：不使用 RowBatch16 scratch。每行先完整 RMSNorm+M-RoPE，
     // 再立即算四个 scale 并量化。它覆盖不能安全拼成 16-row batch 的 K shape。
-    MicroAPI::RegTensor<uint32_t> mropeIndex;
-    MicroAPI::RegTensor<float> gammaLow;
-    MicroAPI::RegTensor<float> gammaHigh;
-    MicroAPI::MaskReg mask64 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskFirst = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
-    MicroAPI::LoadAlign<uint32_t>(mropeIndex, gatherIndex);
-    MicroAPI::LoadAlign<float>(gammaLow, gamma);
-    MicroAPI::LoadAlign<float>(gammaHigh, gamma + QKV_K_SCALE_D128_HALF_SIZE);
+    Reg::RegTensor<uint32_t> mropeIndex;
+    Reg::RegTensor<float> gammaLow;
+    Reg::RegTensor<float> gammaHigh;
+    Reg::MaskReg mask64 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskFirst = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
+    Reg::LoadAlign<uint32_t>(mropeIndex, gatherIndex);
+    Reg::LoadAlign<float>(gammaLow, gamma);
+    Reg::LoadAlign<float>(gammaHigh, gamma + QKV_K_SCALE_D128_HALF_SIZE);
 
     (void)scratch;
 
-    MicroAPI::RegTensor<uint32_t> scaleGatherLowIndex;
-    MicroAPI::RegTensor<uint32_t> scaleGatherHighIndex;
-    MicroAPI::MaskReg maskLow32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::H>();
-    MicroAPI::MaskReg maskHigh32;
-    MicroAPI::Not(maskHigh32, maskLow32, mask64);
+    Reg::RegTensor<uint32_t> scaleGatherLowIndex;
+    Reg::RegTensor<uint32_t> scaleGatherHighIndex;
+    Reg::MaskReg maskLow32 = Reg::CreateMask<float, Reg::MaskPattern::H>();
+    Reg::MaskReg maskHigh32;
+    Reg::Not(maskHigh32, maskLow32, mask64);
     uint32_t scaleCountPerHead = 4U;
-    MicroAPI::MaskReg mask4 = MicroAPI::UpdateMask<float>(scaleCountPerHead);
-    MicroAPI::Arange((MicroAPI::RegTensor<int32_t> &)scaleGatherLowIndex, 0);
-    MicroAPI::ShiftRights(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(5), mask64);
-    MicroAPI::ShiftLefts(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(1), mask64);
-    MicroAPI::Adds(scaleGatherHighIndex, scaleGatherLowIndex, 1U, mask64);
+    Reg::MaskReg mask4 = Reg::UpdateMask<float>(scaleCountPerHead);
+    Reg::Arange((Reg::RegTensor<int32_t> &)scaleGatherLowIndex, 0);
+    Reg::ShiftRights(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(5), mask64);
+    Reg::ShiftLefts(scaleGatherLowIndex, scaleGatherLowIndex, static_cast<int16_t>(1), mask64);
+    Reg::Adds(scaleGatherHighIndex, scaleGatherLowIndex, 1U, mask64);
     // token 外层保证 gamma*cos/sin 只准备一次；head 内层保持输入/输出自然布局。
     for (uint16_t tokenIdx = 0U; tokenIdx < tokenSize; ++tokenIdx) {
-        MicroAPI::RegTensor<float> gammaCosLow;
-        MicroAPI::RegTensor<float> gammaCosHigh;
-        MicroAPI::RegTensor<float> gammaSinLow;
-        MicroAPI::RegTensor<float> gammaSinHigh;
+        Reg::RegTensor<float> gammaCosLow;
+        Reg::RegTensor<float> gammaCosHigh;
+        Reg::RegTensor<float> gammaSinLow;
+        Reg::RegTensor<float> gammaSinHigh;
         __ubuf__ float *rawToken = rawCosSin + static_cast<uint32_t>(tokenIdx) * 3U * QKV_K_SCALE_D128_FULL_SIZE;
         PrepareMropeGammaD128(gammaCosLow, gammaCosHigh, gammaSinLow, gammaSinHigh, gammaLow, gammaHigh, mropeIndex,
                               rawToken, mask64);
         for (uint16_t headIdx = 0U; headIdx < headSize; ++headIdx) {
-            MicroAPI::RegTensor<float> outLowFp32;
-            MicroAPI::RegTensor<float> outHighFp32;
-            MicroAPI::AddrReg inputAddr =
-                MicroAPI::CreateAddrReg<bfloat16_t>(tokenIdx, inputTokenStride, headIdx, inputHeadStride);
+            Reg::RegTensor<float> outLowFp32;
+            Reg::RegTensor<float> outHighFp32;
+            Reg::AddrReg inputAddr =
+                Reg::CreateAddrReg<bfloat16_t>(tokenIdx, inputTokenStride, headIdx, inputHeadStride);
             LoadRmsNormMropeFp32D128(outLowFp32, outHighFp32, inputBf16, inputAddr, gammaCosLow, gammaCosHigh,
                                      gammaSinLow, gammaSinHigh, epsilon, mask64, maskFirst);
-            MicroAPI::AddrReg outAddr =
-                MicroAPI::CreateAddrReg<uint8_t>(tokenIdx, static_cast<uint32_t>(headSize) * QKV_K_SCALE_D128_FULL_SIZE,
-                                                 headIdx, QKV_K_SCALE_D128_FULL_SIZE);
+            Reg::AddrReg outAddr =
+                Reg::CreateAddrReg<uint8_t>(tokenIdx, static_cast<uint32_t>(headSize) * QKV_K_SCALE_D128_FULL_SIZE,
+                                            headIdx, QKV_K_SCALE_D128_FULL_SIZE);
             __ubuf__ uint8_t *scaleBytes =
                 reinterpret_cast<__ubuf__ uint8_t *>(outScale) +
                 (static_cast<uint32_t>(tokenIdx) * scaleTokenStrideWords + headIdx) * sizeof(uint32_t);

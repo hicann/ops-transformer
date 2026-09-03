@@ -42,14 +42,13 @@
 #include "op_kernel/platform_util.h"
 
 namespace UndGenQkvRmsNormRopeCache {
-namespace MicroAPI = AscendC::MicroAPI;
+namespace Reg = AscendC::Reg;
 
-constexpr static MicroAPI::CastTrait CAST_B16_TO_B32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                        MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
+constexpr static Reg::CastTrait CAST_B16_TO_B32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                   Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
 
-constexpr static MicroAPI::CastTrait CAST_FP32_TO_B16 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                         MicroAPI::MaskMergeMode::ZEROING,
-                                                         AscendC::RoundMode::CAST_RINT};
+constexpr static Reg::CastTrait CAST_FP32_TO_B16 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                    Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::CAST_RINT};
 
 /**
  * @brief 本次调用的 UB 起址，逐 tile 变化
@@ -95,13 +94,13 @@ struct QkvMropeTileShape {
  * 全程复用，所以打包成一束按引用传给 per-head 函数，避免参数列表铺开。
  */
 struct MropeTokenRegs {
-    MicroAPI::RegTensor<float> cosValue;
-    MicroAPI::RegTensor<float> sinValue;
-    MicroAPI::RegTensor<float> sinNeg; // -sin，用于把低半 RoPE 的减法折进乘加
-    MicroAPI::RegTensor<float> qGammaLow;
-    MicroAPI::RegTensor<float> qGammaHigh;
-    MicroAPI::RegTensor<float> kGammaLow;
-    MicroAPI::RegTensor<float> kGammaHigh;
+    Reg::RegTensor<float> cosValue;
+    Reg::RegTensor<float> sinValue;
+    Reg::RegTensor<float> sinNeg; // -sin，用于把低半 RoPE 的减法折进乘加
+    Reg::RegTensor<float> qGammaLow;
+    Reg::RegTensor<float> qGammaHigh;
+    Reg::RegTensor<float> kGammaLow;
+    Reg::RegTensor<float> kGammaHigh;
 };
 
 /**
@@ -120,54 +119,54 @@ struct MropeTokenRegs {
  *       所以调用方的 head 循环不需要再算 h * headStride，直接反复调用即可。
  */
 __aicore__ inline void RmsNormRopeOneHead(__ubuf__ bfloat16_t *&inHead, __ubuf__ bfloat16_t *&outHead,
-                                          MicroAPI::RegTensor<float> &gammaLow, MicroAPI::RegTensor<float> &gammaHigh,
-                                          MropeTokenRegs &regs, const QkvMropeTileShape &shape, MicroAPI::MaskReg pFull)
+                                          Reg::RegTensor<float> &gammaLow, Reg::RegTensor<float> &gammaHigh,
+                                          MropeTokenRegs &regs, const QkvMropeTileShape &shape, Reg::MaskReg pFull)
 {
     const int32_t halfStep = static_cast<int32_t>(shape.halfDim);
-    MicroAPI::RegTensor<bfloat16_t> xLowB16;
-    MicroAPI::RegTensor<bfloat16_t> xHighB16;
-    MicroAPI::RegTensor<float> xLow;
-    MicroAPI::RegTensor<float> xHigh;
-    MicroAPI::LoadAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK_B16>(
-        xLowB16, inHead, halfStep);
-    MicroAPI::LoadAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK_B16>(
+    Reg::RegTensor<bfloat16_t> xLowB16;
+    Reg::RegTensor<bfloat16_t> xHighB16;
+    Reg::RegTensor<float> xLow;
+    Reg::RegTensor<float> xHigh;
+    Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK_B16>(xLowB16, inHead,
+                                                                                                   halfStep);
+    Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK_B16>(
         xHighB16, inHead, halfStep); // 两次之后 inHead 已落到下一个 head
-    MicroAPI::Cast<float, bfloat16_t, CAST_B16_TO_B32>(xLow, xLowB16, pFull);
-    MicroAPI::Cast<float, bfloat16_t, CAST_B16_TO_B32>(xHigh, xHighB16, pFull);
+    Reg::Cast<float, bfloat16_t, CAST_B16_TO_B32>(xLow, xLowB16, pFull);
+    Reg::Cast<float, bfloat16_t, CAST_B16_TO_B32>(xHigh, xHighB16, pFull);
 
     // ---- RMSNorm：x / sqrt(mean(x^2) + eps) * gamma，中间量全在 vreg ----
-    MicroAPI::RegTensor<float> squareLow;
-    MicroAPI::RegTensor<float> rms;
-    MicroAPI::Mul(squareLow, xLow, xLow, pFull);
-    MicroAPI::MulAddDst(squareLow, xHigh, xHigh, pFull); // squareLow += x_hi^2
+    Reg::RegTensor<float> squareLow;
+    Reg::RegTensor<float> rms;
+    Reg::Mul(squareLow, xLow, xLow, pFull);
+    Reg::MulAddDst(squareLow, xHigh, xHigh, pFull); // squareLow += x_hi^2
     // 两个半宽相加后再归约，一次 Reduce 覆盖整个 D
-    MicroAPI::ReduceSum(squareLow, squareLow, pFull);
-    MicroAPI::Muls(squareLow, squareLow, shape.reciprocal, pFull);
-    MicroAPI::Adds(squareLow, squareLow, shape.epsilon, pFull);
-    MicroAPI::Sqrt(rms, squareLow, pFull);
-    MicroAPI::Duplicate(rms, rms, pFull); // 广播 lane0
-    MicroAPI::Div(xLow, xLow, rms, pFull);
-    MicroAPI::Div(xHigh, xHigh, rms, pFull);
-    MicroAPI::Mul(xLow, xLow, gammaLow, pFull);
-    MicroAPI::Mul(xHigh, xHigh, gammaHigh, pFull);
+    Reg::ReduceSum(squareLow, squareLow, pFull);
+    Reg::Muls(squareLow, squareLow, shape.reciprocal, pFull);
+    Reg::Adds(squareLow, squareLow, shape.epsilon, pFull);
+    Reg::Sqrt(rms, squareLow, pFull);
+    Reg::Duplicate(rms, rms, pFull); // 广播 lane0
+    Reg::Div(xLow, xLow, rms, pFull);
+    Reg::Div(xHigh, xHigh, rms, pFull);
+    Reg::Mul(xLow, xLow, gammaLow, pFull);
+    Reg::Mul(xHigh, xHigh, gammaHigh, pFull);
 
     // ---- MRoPE 旋转（half-split，cos/sin 已由 Gather 合并）----
     //   out_lo = x_lo * cos - x_hi * sin  ->  用 sinNeg 把减法折成乘加
     //   out_hi = x_hi * cos + x_lo * sin
-    MicroAPI::RegTensor<float> outLow;
-    MicroAPI::RegTensor<float> outHigh;
-    MicroAPI::Mul(outLow, xLow, regs.cosValue, pFull);
-    MicroAPI::MulAddDst(outLow, xHigh, regs.sinNeg, pFull); // outLow += x_hi * (-sin)
-    MicroAPI::Mul(outHigh, xHigh, regs.cosValue, pFull);
-    MicroAPI::MulAddDst(outHigh, xLow, regs.sinValue, pFull); // outHigh += x_lo * sin
+    Reg::RegTensor<float> outLow;
+    Reg::RegTensor<float> outHigh;
+    Reg::Mul(outLow, xLow, regs.cosValue, pFull);
+    Reg::MulAddDst(outLow, xHigh, regs.sinNeg, pFull); // outLow += x_hi * (-sin)
+    Reg::Mul(outHigh, xHigh, regs.cosValue, pFull);
+    Reg::MulAddDst(outHigh, xLow, regs.sinValue, pFull); // outHigh += x_lo * sin
 
-    MicroAPI::RegTensor<bfloat16_t> outLowB16;
-    MicroAPI::RegTensor<bfloat16_t> outHighB16;
-    MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_B16>(outLowB16, outLow, pFull);
-    MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_B16>(outHighB16, outHigh, pFull);
-    MicroAPI::StoreAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_PACK_B32>(
-        outHead, outLowB16, halfStep, pFull);
-    MicroAPI::StoreAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_PACK_B32>(
+    Reg::RegTensor<bfloat16_t> outLowB16;
+    Reg::RegTensor<bfloat16_t> outHighB16;
+    Reg::Cast<bfloat16_t, float, CAST_FP32_TO_B16>(outLowB16, outLow, pFull);
+    Reg::Cast<bfloat16_t, float, CAST_FP32_TO_B16>(outHighB16, outHigh, pFull);
+    Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_PACK_B32>(outHead, outLowB16,
+                                                                                                   halfStep, pFull);
+    Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_PACK_B32>(
         outHead, outHighB16, halfStep, pFull); // 两次之后 outHead 已落到下一个 head
 }
 
@@ -207,13 +206,13 @@ __aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr &addr, const 
 
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg pFull = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
+        Reg::MaskReg pFull = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
         // V 段按 bf16 原宽处理：一个 head = D 个 bf16 = 一个满 VL，掩码 lane 数是 pFull 的两倍
-        MicroAPI::MaskReg pFullB16 = MicroAPI::CreateMask<bfloat16_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::RegTensor<uint32_t> mropeIndex;
+        Reg::MaskReg pFullB16 = Reg::CreateMask<bfloat16_t, Reg::MaskPattern::ALL>();
+        Reg::RegTensor<uint32_t> mropeIndex;
 
         // gather 索引与 token 无关，整个 tile 只加载一次
-        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_NORM>(mropeIndex, addr.gatherIndex);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(mropeIndex, addr.gatherIndex);
 
         // 地址一律用 post-update 自走，循环体内没有任何 t*stride / h*stride 计算：
         //   inPtr    每 head 推 headStride，一个 token 走完 Q/K/V 三段正好是 (Hq+Hk+Hv)*D
@@ -236,27 +235,27 @@ __aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr &addr, const 
 
             // 三轴合并：一条 Gather 从 [3, D] 窗口里按 axisLut 挑出 D/2 个 lane。
             // 本 token 的 Q、K 所有 head 共用这一份 cos/sin
-            MicroAPI::Gather(regs.cosValue, cosSinPtr, mropeIndex, pFull);
-            MicroAPI::Gather(regs.sinValue, cosSinPtr + shape.halfDim, mropeIndex, pFull);
+            Reg::Gather(regs.cosValue, cosSinPtr, mropeIndex, pFull);
+            Reg::Gather(regs.sinValue, cosSinPtr + shape.halfDim, mropeIndex, pFull);
             cosSinPtr += shape.cosSinTokenStride;
             // 低半 RoPE 是 out_lo = x_lo*cos - x_hi*sin，而乘加原语只有加法版；
             // 这里取一次负，让 head 内可以用 MulAddDst 把减法折进乘加。
             // 每 token 一条，摊到 Hq+Hk 个 head 上可忽略
-            MicroAPI::Muls(regs.sinNeg, regs.sinValue, -1.0f, pFull);
+            Reg::Muls(regs.sinNeg, regs.sinValue, -1.0f, pFull);
 
             // 选 gamma：und 组在 gammaAll 开头，gen 组在 +2*D 处，用位图算偏移即可，无需分支。
             // 组内四份（q低|q高|k低|k高）在 UB 上连续，同一个指针连推 4 次 halfDim 取完；
             // 最后一次自增走出组尾，下个 token 会重新定基址，丢掉即可
             const uint32_t undBit = static_cast<uint32_t>((undMask >> t) & 1ULL);
             __ubuf__ float *gammaPtr = addr.gammaAll + (1U - undBit) * genGammaOffset;
-            MicroAPI::LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
-                regs.qGammaLow, gammaPtr, halfStep);
-            MicroAPI::LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
-                regs.qGammaHigh, gammaPtr, halfStep);
-            MicroAPI::LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
-                regs.kGammaLow, gammaPtr, halfStep);
-            MicroAPI::LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
-                regs.kGammaHigh, gammaPtr, halfStep);
+            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.qGammaLow,
+                                                                                                gammaPtr, halfStep);
+            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.qGammaHigh,
+                                                                                                gammaPtr, halfStep);
+            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.kGammaLow,
+                                                                                                gammaPtr, halfStep);
+            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.kGammaHigh,
+                                                                                                gammaPtr, halfStep);
 
             for (uint16_t h = 0; h < shape.qHeadNum; ++h) {
                 RmsNormRopeOneHead(inPtr, qOutPtr, regs.qGammaLow, regs.qGammaHigh, regs, shape, pFull);
@@ -269,11 +268,11 @@ __aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr &addr, const 
 
             // V 头紧跟 K 头之后，不参与 norm/rope：一个 head 恰好一个满 bf16 VL，直接搬
             for (uint16_t h = 0; h < shape.vHeadNum; ++h) {
-                MicroAPI::RegTensor<bfloat16_t> vValue;
-                MicroAPI::LoadAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
-                    vValue, inPtr, headStep);
-                MicroAPI::StoreAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE,
-                                     MicroAPI::StoreDist::DIST_NORM_B16>(vOutPtr, vValue, headStep, pFullB16);
+                Reg::RegTensor<bfloat16_t> vValue;
+                Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(vValue, inPtr,
+                                                                                                         headStep);
+                Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B16>(
+                    vOutPtr, vValue, headStep, pFullB16);
             }
         }
     }

@@ -51,27 +51,27 @@ __aicore__ inline void HalfRotaryVF(const LocalTensor<T> &inTensor, const LocalT
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vregIn;
-        MicroAPI::RegTensor<T> vregHalfIn;
-        MicroAPI::RegTensor<T> vregOut;
-        MicroAPI::RegTensor<T> vregHalfOut;
-        MicroAPI::RegTensor<T> vregNeg;
-        MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg;
+        Reg::RegTensor<T> vregIn;
+        Reg::RegTensor<T> vregHalfIn;
+        Reg::RegTensor<T> vregOut;
+        Reg::RegTensor<T> vregHalfOut;
+        Reg::RegTensor<T> vregNeg;
+        Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg;
         Duplicate(vregNeg, static_cast<T>(-1.0), pregAll);
         for (uint16_t idxD = 0; idxD < currDNum; idxD++) {
             currInUb = inUb + idxD * dAlign;
             currOutUb = outUb + idxD * dAlign;
             uint32_t updateCnt = halfD;
             for (uint16_t i = 0; i < repeatTimes; i++) {
-                preg = MicroAPI::UpdateMask<T>(updateCnt);
+                preg = Reg::UpdateMask<T>(updateCnt);
                 int32_t offset = i * vecLen;
                 int32_t halfOffset = offset + halfDAlign;
-                MicroAPI::LoadAlign(vregIn, currInUb + offset);
-                MicroAPI::LoadAlign(vregHalfIn, currInUb + halfOffset);
-                MicroAPI::Mul(vregHalfIn, vregHalfIn, vregNeg, preg);
-                MicroAPI::StoreAlign(currOutUb + offset, vregHalfIn, preg);
-                MicroAPI::StoreAlign(currOutUb + halfOffset, vregIn, preg);
+                Reg::LoadAlign(vregIn, currInUb + offset);
+                Reg::LoadAlign(vregHalfIn, currInUb + halfOffset);
+                Reg::Mul(vregHalfIn, vregHalfIn, vregNeg, preg);
+                Reg::StoreAlign(currOutUb + offset, vregHalfIn, preg);
+                Reg::StoreAlign(currOutUb + halfOffset, vregIn, preg);
             }
         }
     }
@@ -95,38 +95,38 @@ __aicore__ inline void QuarterRotaryVF(const LocalTensor<T> &inTensor, const Loc
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vregIn;
-        MicroAPI::RegTensor<T> vregQ1In;
-        MicroAPI::RegTensor<T> vregQ2In;
-        MicroAPI::RegTensor<T> vregQ3In;
-        MicroAPI::RegTensor<T> vregOut;
-        MicroAPI::RegTensor<T> vregQ1Out;
-        MicroAPI::RegTensor<T> vregQ2Out;
-        MicroAPI::RegTensor<T> vregQ3Out;
-        MicroAPI::RegTensor<T> vregNeg;
-        MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg;
+        Reg::RegTensor<T> vregIn;
+        Reg::RegTensor<T> vregQ1In;
+        Reg::RegTensor<T> vregQ2In;
+        Reg::RegTensor<T> vregQ3In;
+        Reg::RegTensor<T> vregOut;
+        Reg::RegTensor<T> vregQ1Out;
+        Reg::RegTensor<T> vregQ2Out;
+        Reg::RegTensor<T> vregQ3Out;
+        Reg::RegTensor<T> vregNeg;
+        Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg;
         Duplicate(vregNeg, static_cast<T>(-1.0), pregAll);
         for (uint16_t idxD = 0; idxD < currDNum; idxD++) {
             currInUb = inUb + idxD * dAlign;
             currOutUb = outUb + idxD * dAlign;
             uint32_t updateCnt = quarterD;
             for (uint16_t i = 0; i < repeatTimes; i++) {
-                preg = MicroAPI::UpdateMask<T>(updateCnt);
+                preg = Reg::UpdateMask<T>(updateCnt);
                 int32_t offset = i * vecLen;
                 int32_t q1Offset = offset + quarterDAlign;
                 int32_t q2Offset = q1Offset + quarterDAlign;
                 int32_t q3Offset = q2Offset + quarterDAlign;
-                MicroAPI::LoadAlign(vregIn, currInUb + offset);
-                MicroAPI::LoadAlign(vregQ1In, currInUb + q1Offset);
-                MicroAPI::LoadAlign(vregQ2In, currInUb + q2Offset);
-                MicroAPI::LoadAlign(vregQ3In, currInUb + q3Offset);
-                MicroAPI::Mul(vregQ1In, vregQ1In, vregNeg, preg);
-                MicroAPI::Mul(vregQ3In, vregQ3In, vregNeg, preg);
-                MicroAPI::StoreAlign(currOutUb + offset, vregQ1In, preg);
-                MicroAPI::StoreAlign(currOutUb + q1Offset, vregIn, preg);
-                MicroAPI::StoreAlign(currOutUb + q2Offset, vregQ3In, preg);
-                MicroAPI::StoreAlign(currOutUb + q3Offset, vregQ2In, preg);
+                Reg::LoadAlign(vregIn, currInUb + offset);
+                Reg::LoadAlign(vregQ1In, currInUb + q1Offset);
+                Reg::LoadAlign(vregQ2In, currInUb + q2Offset);
+                Reg::LoadAlign(vregQ3In, currInUb + q3Offset);
+                Reg::Mul(vregQ1In, vregQ1In, vregNeg, preg);
+                Reg::Mul(vregQ3In, vregQ3In, vregNeg, preg);
+                Reg::StoreAlign(currOutUb + offset, vregQ1In, preg);
+                Reg::StoreAlign(currOutUb + q1Offset, vregIn, preg);
+                Reg::StoreAlign(currOutUb + q2Offset, vregQ3In, preg);
+                Reg::StoreAlign(currOutUb + q3Offset, vregQ2In, preg);
             }
         }
     }
@@ -163,14 +163,14 @@ __aicore__ inline void InterleaveRotaryVF(const LocalTensor<T> &inTensor, const 
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vregFormerIn;
-        MicroAPI::RegTensor<T> vregLatterIn;
-        MicroAPI::RegTensor<T> vregOdd;
-        MicroAPI::RegTensor<T> vregEven;
-        MicroAPI::RegTensor<T> vregNeg;
-        MicroAPI::MaskReg pregLoop = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg pregPart1;
-        MicroAPI::MaskReg pregPart2;
+        Reg::RegTensor<T> vregFormerIn;
+        Reg::RegTensor<T> vregLatterIn;
+        Reg::RegTensor<T> vregOdd;
+        Reg::RegTensor<T> vregEven;
+        Reg::RegTensor<T> vregNeg;
+        Reg::MaskReg pregLoop = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregPart1;
+        Reg::MaskReg pregPart2;
         Duplicate(vregNeg, static_cast<T>(-1.0), pregLoop);
         for (uint16_t idxD = 0; idxD < currDNum; idxD++) {
             int32_t dOffset = idxD * dAlignLen;
@@ -180,15 +180,15 @@ __aicore__ inline void InterleaveRotaryVF(const LocalTensor<T> &inTensor, const 
             uint32_t part2Cnt = part2Num;
             for (uint16_t i = 0; i < dLoopCnt; i++) {
                 int32_t offset = i * loopSize;
-                pregPart1 = MicroAPI::UpdateMask<T>(part1Cnt);
-                pregPart2 = MicroAPI::UpdateMask<T>(part2Cnt);
-                MicroAPI::LoadAlign(vregFormerIn, currInUb + offset);
-                MicroAPI::LoadAlign(vregLatterIn, currInUb + offset + vecLen);
-                MicroAPI::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
-                MicroAPI::Mul(vregOdd, vregOdd, vregNeg, pregLoop);
-                MicroAPI::Interleave<T>(vregFormerIn, vregLatterIn, vregOdd, vregEven);
-                MicroAPI::StoreAlign(currOutUb + offset, vregFormerIn, pregPart1);
-                MicroAPI::StoreAlign(currOutUb + offset + vecLen, vregLatterIn, pregPart2);
+                pregPart1 = Reg::UpdateMask<T>(part1Cnt);
+                pregPart2 = Reg::UpdateMask<T>(part2Cnt);
+                Reg::LoadAlign(vregFormerIn, currInUb + offset);
+                Reg::LoadAlign(vregLatterIn, currInUb + offset + vecLen);
+                Reg::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
+                Reg::Mul(vregOdd, vregOdd, vregNeg, pregLoop);
+                Reg::Interleave<T>(vregFormerIn, vregLatterIn, vregOdd, vregEven);
+                Reg::StoreAlign(currOutUb + offset, vregFormerIn, pregPart1);
+                Reg::StoreAlign(currOutUb + offset + vecLen, vregLatterIn, pregPart2);
             }
         }
     }
@@ -219,14 +219,14 @@ __aicore__ inline void DSDSinInterleaveHalfVF(const LocalTensor<T> &inTensor, co
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vregFormerIn;
-        MicroAPI::RegTensor<T> vregLatterIn;
-        MicroAPI::RegTensor<T> vregOdd;
-        MicroAPI::RegTensor<T> vregEven;
-        MicroAPI::RegTensor<T> vregNeg;
-        MicroAPI::MaskReg pregLoop = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg pregPart1;
-        MicroAPI::MaskReg pregPart2;
+        Reg::RegTensor<T> vregFormerIn;
+        Reg::RegTensor<T> vregLatterIn;
+        Reg::RegTensor<T> vregOdd;
+        Reg::RegTensor<T> vregEven;
+        Reg::RegTensor<T> vregNeg;
+        Reg::MaskReg pregLoop = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregPart1;
+        Reg::MaskReg pregPart2;
         Duplicate(vregNeg, static_cast<T>(-1.0), pregLoop);
         for (uint16_t idxD = 0; idxD < currDNum; idxD++) {
             currInUb = inUb + idxD * dAlignLen;
@@ -236,14 +236,14 @@ __aicore__ inline void DSDSinInterleaveHalfVF(const LocalTensor<T> &inTensor, co
             for (uint16_t i = 0; i < dLoopCnt; i++) {
                 int32_t inOffset = i * loopSize;
                 int32_t outOffset = i * vecLen;
-                pregPart1 = MicroAPI::UpdateMask<T>(part1Cnt);
-                pregPart2 = MicroAPI::UpdateMask<T>(part2Cnt);
-                MicroAPI::LoadAlign(vregFormerIn, currInUb + inOffset);
-                MicroAPI::LoadAlign(vregLatterIn, currInUb + inOffset + vecLen);
-                MicroAPI::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
-                MicroAPI::Mul(vregOdd, vregOdd, vregNeg, pregLoop);
-                MicroAPI::StoreAlign(currOutUb + outOffset, vregOdd, pregPart1);
-                MicroAPI::StoreAlign(currOutUb + outOffset + halfDAlign, vregEven, pregPart2);
+                pregPart1 = Reg::UpdateMask<T>(part1Cnt);
+                pregPart2 = Reg::UpdateMask<T>(part2Cnt);
+                Reg::LoadAlign(vregFormerIn, currInUb + inOffset);
+                Reg::LoadAlign(vregLatterIn, currInUb + inOffset + vecLen);
+                Reg::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
+                Reg::Mul(vregOdd, vregOdd, vregNeg, pregLoop);
+                Reg::StoreAlign(currOutUb + outOffset, vregOdd, pregPart1);
+                Reg::StoreAlign(currOutUb + outOffset + halfDAlign, vregEven, pregPart2);
             }
         }
     }
@@ -274,12 +274,12 @@ __aicore__ inline void DSCosInterleaveHalfVF(const LocalTensor<T> &inTensor, con
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vregFormerIn;
-        MicroAPI::RegTensor<T> vregLatterIn;
-        MicroAPI::RegTensor<T> vregOdd;
-        MicroAPI::RegTensor<T> vregEven;
-        MicroAPI::MaskReg pregPart1;
-        MicroAPI::MaskReg pregPart2;
+        Reg::RegTensor<T> vregFormerIn;
+        Reg::RegTensor<T> vregLatterIn;
+        Reg::RegTensor<T> vregOdd;
+        Reg::RegTensor<T> vregEven;
+        Reg::MaskReg pregPart1;
+        Reg::MaskReg pregPart2;
 
         for (uint16_t idxD = 0; idxD < currDNum; idxD++) {
             currInUb = inUb + idxD * dAlignLen;
@@ -289,13 +289,13 @@ __aicore__ inline void DSCosInterleaveHalfVF(const LocalTensor<T> &inTensor, con
             for (uint16_t i = 0; i < dLoopCnt; i++) {
                 int32_t inOffset = i * loopSize;
                 int32_t outOffset = i * vecLen;
-                pregPart1 = MicroAPI::UpdateMask<T>(part1Cnt);
-                pregPart2 = MicroAPI::UpdateMask<T>(part2Cnt);
-                MicroAPI::LoadAlign(vregFormerIn, currInUb + inOffset);
-                MicroAPI::LoadAlign(vregLatterIn, currInUb + inOffset + vecLen);
-                MicroAPI::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
-                MicroAPI::StoreAlign(currOutUb + outOffset, vregEven, pregPart1);
-                MicroAPI::StoreAlign(currOutUb + outOffset + halfDAlign, vregOdd, pregPart2);
+                pregPart1 = Reg::UpdateMask<T>(part1Cnt);
+                pregPart2 = Reg::UpdateMask<T>(part2Cnt);
+                Reg::LoadAlign(vregFormerIn, currInUb + inOffset);
+                Reg::LoadAlign(vregLatterIn, currInUb + inOffset + vecLen);
+                Reg::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
+                Reg::StoreAlign(currOutUb + outOffset, vregEven, pregPart1);
+                Reg::StoreAlign(currOutUb + outOffset + halfDAlign, vregOdd, pregPart2);
             }
         }
     }
