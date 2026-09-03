@@ -66,7 +66,7 @@ constexpr uint32_t SCALE_PAD_SIZE = 8;
 __simd_callee__ inline void MulsOnAllRows(__ubuf__ float *qFP32Ptr, __ubuf__ float *scalePtr, uint16_t R, uint16_t S,
                                           uint16_t D, uint16_t scaleStride)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
 
     constexpr uint16_t VL_F = VECTOR_REG_WIDTH / sizeof(float);
     uint16_t vlIter = (D + VL_F - 1) / VL_F;
@@ -95,7 +95,7 @@ __simd_vf__ inline void WeightedBinaryReduceFull(__ubuf__ float *qFP32Ptr, __ubu
 {
     MulsOnAllRows(qFP32Ptr, scalePtr, R, S, D, scaleStride);
 
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
 
     constexpr uint16_t VL_F = VECTOR_REG_WIDTH / sizeof(float);
     uint16_t vlIter = (D + VL_F - 1) / VL_F;

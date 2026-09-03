@@ -138,7 +138,7 @@ static __simd_vf__ inline void AccumulateRawSafeGateChunk128Regbase(__ubuf__ flo
                                                                     __ubuf__ float *acc, uint16_t rows, float expA,
                                                                     float lowerBound)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t FLOAT_ELEMENTS_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     constexpr uint16_t ROW_ELEMENTS = 2 * FLOAT_ELEMENTS_PER_REG;
 
@@ -191,11 +191,11 @@ static __simd_vf__ inline void AccumulateRawSafeGateChunk128Regbase(__ubuf__ flo
 }
 
 template <typename InputT>
-__simd_callee__ inline void LoadKdaGateRegbasePair(AscendC::MicroAPI::RegTensor<float> &zeroReg,
-                                                   AscendC::MicroAPI::RegTensor<float> &oneReg, __ubuf__ InputT *src,
-                                                   AscendC::MicroAPI::MaskReg &inputMask)
+__simd_callee__ inline void LoadKdaGateRegbasePair(AscendC::Reg::RegTensor<float> &zeroReg,
+                                                   AscendC::Reg::RegTensor<float> &oneReg, __ubuf__ InputT *src,
+                                                   AscendC::Reg::MaskReg &inputMask)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     if constexpr (std::is_same<InputT, float>()) {
         LoadAlign<float, LoadDist::DIST_DINTLV_B32>(zeroReg, oneReg, src);
     } else {
@@ -206,11 +206,11 @@ __simd_callee__ inline void LoadKdaGateRegbasePair(AscendC::MicroAPI::RegTensor<
 }
 
 template <typename OutputT>
-__simd_callee__ inline void ClampKdaGateRegbaseOutput(AscendC::MicroAPI::RegTensor<float> &zeroReg,
-                                                      AscendC::MicroAPI::RegTensor<float> &oneReg,
-                                                      AscendC::MicroAPI::MaskReg &floatMask)
+__simd_callee__ inline void ClampKdaGateRegbaseOutput(AscendC::Reg::RegTensor<float> &zeroReg,
+                                                      AscendC::Reg::RegTensor<float> &oneReg,
+                                                      AscendC::Reg::MaskReg &floatMask)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     if constexpr (std::is_same<OutputT, half>()) {
         Mins(zeroReg, zeroReg, KDA_FP16_MAX, floatMask);
         Mins(oneReg, oneReg, KDA_FP16_MAX, floatMask);
@@ -220,13 +220,13 @@ __simd_callee__ inline void ClampKdaGateRegbaseOutput(AscendC::MicroAPI::RegTens
 }
 
 template <typename OutputT, bool USE_REF, bool NEGATIVE>
-__simd_callee__ inline void BuildKdaGateRegbaseExp(AscendC::MicroAPI::RegTensor<float> &expZeroReg,
-                                                   AscendC::MicroAPI::RegTensor<float> &expOneReg,
-                                                   AscendC::MicroAPI::RegTensor<float> &gateZeroReg,
-                                                   AscendC::MicroAPI::RegTensor<float> &gateOneReg, __ubuf__ float *ref,
-                                                   AscendC::MicroAPI::MaskReg &floatMask)
+__simd_callee__ inline void BuildKdaGateRegbaseExp(AscendC::Reg::RegTensor<float> &expZeroReg,
+                                                   AscendC::Reg::RegTensor<float> &expOneReg,
+                                                   AscendC::Reg::RegTensor<float> &gateZeroReg,
+                                                   AscendC::Reg::RegTensor<float> &gateOneReg, __ubuf__ float *ref,
+                                                   AscendC::Reg::MaskReg &floatMask)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr float expInputMax = std::is_same<OutputT, bfloat16_t>() ? KDA_SCORE_EXP_INPUT_MAX : KDA_EXP_INPUT_MAX;
     constexpr float expInputMin = std::is_same<OutputT, bfloat16_t>() ? KDA_SCORE_EXP_INPUT_MIN : KDA_EXP_INPUT_MIN;
     if constexpr (USE_REF) {
@@ -254,12 +254,11 @@ __simd_callee__ inline void BuildKdaGateRegbaseExp(AscendC::MicroAPI::RegTensor<
 }
 
 template <typename OutputT>
-__simd_callee__ inline void StoreKdaGateRegbasePair(__ubuf__ OutputT *dst, AscendC::MicroAPI::RegTensor<float> &zeroReg,
-                                                    AscendC::MicroAPI::RegTensor<float> &oneReg,
-                                                    AscendC::MicroAPI::MaskReg &inputMask,
-                                                    AscendC::MicroAPI::MaskReg &floatMask)
+__simd_callee__ inline void StoreKdaGateRegbasePair(__ubuf__ OutputT *dst, AscendC::Reg::RegTensor<float> &zeroReg,
+                                                    AscendC::Reg::RegTensor<float> &oneReg,
+                                                    AscendC::Reg::MaskReg &inputMask, AscendC::Reg::MaskReg &floatMask)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     RegTensor<OutputT> outputReg;
     ClampKdaGateRegbaseOutput<OutputT>(zeroReg, oneReg, floatMask);
     CastFloat2Half<OutputT>(outputReg, zeroReg, oneReg, floatMask);
@@ -272,7 +271,7 @@ static __simd_vf__ inline void PrepareKdaGateQwRegbase(__ubuf__ InputT *q, __ubu
                                                        __ubuf__ InputT *kDirect, __ubuf__ GK_T *gate,
                                                        __ubuf__ float *ref, uint16_t rows, uint16_t cols)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t ELEMENTS_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(InputT);
 
     MaskReg floatMask = CreateMask<float, MaskPattern::ALL>();
@@ -322,7 +321,7 @@ static __simd_vf__ inline void PrepareKdaGateKgRegbase(__ubuf__ OutputT *kg, __u
                                                        __ubuf__ float *ref, uint16_t rows, uint16_t cols,
                                                        uint16_t validRows)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t ELEMENTS_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(InputT);
 
     MaskReg floatMask = CreateMask<float, MaskPattern::ALL>();
@@ -366,7 +365,7 @@ static __simd_vf__ inline void PrepareKdaGateQwKgRegbase(
     __ubuf__ InputT *finalKgOut, __ubuf__ float *beta, __ubuf__ GK_T *gate, __ubuf__ float *ref,
     __ubuf__ float *finalRef, uint16_t rows, uint16_t cols, uint16_t validRows)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t ELEMENTS_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(InputT);
     constexpr float scoreExpInputMax =
         std::is_same<OutputT, bfloat16_t>() ? KDA_SCORE_EXP_INPUT_MAX : KDA_EXP_INPUT_MAX;
@@ -502,7 +501,7 @@ static __simd_vf__ inline void PrepareKdaGateQwKgRegbase(
 
 static __simd_vf__ inline void ForwardSubDiag16Regbase(__ubuf__ float *diag, uint16_t valid)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t DIAG_SIZE = KDA_SOLVE_DIAG_BT;
     uint32_t activeCount = DIAG_SIZE;
     MaskReg rowMask = UpdateMask<float>(activeCount);
@@ -532,7 +531,7 @@ static __simd_vf__ inline void ForwardSubDiag16Regbase(__ubuf__ float *diag, uin
 static __simd_vf__ inline void SelectCausalRows64Regbase(__ubuf__ float *aqk, __ubuf__ float *akk, uint16_t rowBegin,
                                                          uint16_t rowCount)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t ROW_ELEMENTS = 64;
 
     MaskReg fullMask = CreateMask<float, MaskPattern::ALL>();
@@ -561,7 +560,7 @@ static __simd_vf__ inline void SelectCausalRows64Regbase(__ubuf__ float *aqk, __
 static __simd_vf__ inline void ForwardSubDiag16StridedRegbase(__ubuf__ float *matrix, uint16_t rowStride,
                                                               uint16_t rowBegin, uint16_t colBegin, uint16_t valid)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t DIAG_SIZE = KDA_SOLVE_DIAG_BT;
     uint32_t activeCount = DIAG_SIZE;
     MaskReg rowMask = UpdateMask<float>(activeCount);
@@ -593,7 +592,7 @@ static __simd_vf__ inline void ForwardSubDiag16PairStridedRegbase(__ubuf__ float
                                                                   uint16_t colBegin, uint16_t firstValid,
                                                                   uint16_t secondValid)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t DIAG_SIZE = KDA_SOLVE_DIAG_BT;
     constexpr uint16_t SECOND_LOCAL_ROW = DIAG_SIZE;
     uint32_t activeCount = DIAG_SIZE;
@@ -664,7 +663,7 @@ static __simd_vf__ inline void ForwardSubDiag16PairStridedRegbase(__ubuf__ float
 static __simd_vf__ inline void ApplyKdaRowScaleRegbase(__ubuf__ float *matrix, __ubuf__ float *rowScale, uint16_t rows,
                                                        uint16_t cols)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t FP32_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     RegTensor<float> matrixReg0;
     RegTensor<float> matrixReg1;

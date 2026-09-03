@@ -22,44 +22,44 @@ template <typename T, typename U>
 __simd_vf__ void QuantPerTensorVFImpl(__ubuf__ T *inputBuf, __ubuf__ T *quantScaleBuf, __ubuf__ U *outputBuf,
                                       uint32_t cnt, const uint16_t floatRepSize, uint16_t repeatTimes)
 {
-    MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
 
     // float -> fp8e4m3 类型转换模式结构体
-    static constexpr MicroAPI::CastTrait CAST_TRAITF322FP8E4M3 = {
-        MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::SAT, MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-    static constexpr MicroAPI::CastTrait CAST_TRAIT = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::SAT,
-                                                       MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-    static constexpr MicroAPI::CastTrait CAST_TRAITB162F32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                              MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-    static constexpr MicroAPI::CastTrait CAST_TRAITF322HIF8 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
-    static constexpr MicroAPI::CastTrait castTraitF32ToHalf = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ODD};
-    MicroAPI::RegTensor<T> vregSrc;
-    MicroAPI::RegTensor<float> vregQuantScale;
-    MicroAPI::RegTensor<float> vregFloat;
-    MicroAPI::RegTensor<U> vregRes;
-    MicroAPI::RegTensor<half> yHalf;
+    static constexpr Reg::CastTrait CAST_TRAITF322FP8E4M3 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
+                                                             Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+    static constexpr Reg::CastTrait CAST_TRAIT = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                                  RoundMode::CAST_RINT};
+    static constexpr Reg::CastTrait CAST_TRAITB162F32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                         Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+    static constexpr Reg::CastTrait CAST_TRAITF322HIF8 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+    static constexpr Reg::CastTrait castTraitF32ToHalf = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ODD};
+    Reg::RegTensor<T> vregSrc;
+    Reg::RegTensor<float> vregQuantScale;
+    Reg::RegTensor<float> vregFloat;
+    Reg::RegTensor<U> vregRes;
+    Reg::RegTensor<half> yHalf;
     // 量化系数broadcast到寄存器所有位置
-    MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vregQuantScale, quantScaleBuf);
+    Reg::LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vregQuantScale, quantScaleBuf);
     for (uint16_t i = 0; i < uint16_t(repeatTimes); i++) {
         uint16_t loopOffset = i * floatRepSize;
         if constexpr (std::is_same<T, float>::value) {
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregFloat, inputBuf + loopOffset);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_NORM>(vregFloat, inputBuf + loopOffset);
         } else if constexpr (std::is_same<T, bfloat16_t>::value) {
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(vregSrc, inputBuf + loopOffset);
-            MicroAPI::Cast<float, T, CAST_TRAITB162F32>(vregFloat, vregSrc, pregAll);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(vregSrc, inputBuf + loopOffset);
+            Reg::Cast<float, T, CAST_TRAITB162F32>(vregFloat, vregSrc, pregAll);
         }
-        MicroAPI::Mul<T, MicroAPI::MaskMergeMode::ZEROING>(vregFloat, vregFloat, vregQuantScale, pregAll);
+        Reg::Mul<T, Reg::MaskMergeMode::ZEROING>(vregFloat, vregFloat, vregQuantScale, pregAll);
         if constexpr (std::is_same<U, hifloat8_t>::value) {
-            MicroAPI::Cast<U, float, CAST_TRAITF322HIF8>(vregRes, vregFloat, pregAll);
+            Reg::Cast<U, float, CAST_TRAITF322HIF8>(vregRes, vregFloat, pregAll);
         } else if constexpr (std::is_same<U, int8_t>::value) {
-            MicroAPI::Cast<half, float, castTraitF32ToHalf>(yHalf, vregFloat, pregAll);
-            MicroAPI::Cast<U, half, CAST_TRAIT>(vregRes, yHalf, pregAll);
+            Reg::Cast<half, float, castTraitF32ToHalf>(yHalf, vregFloat, pregAll);
+            Reg::Cast<U, half, CAST_TRAIT>(vregRes, yHalf, pregAll);
         } else {
-            MicroAPI::Cast<U, float, CAST_TRAITF322FP8E4M3>(vregRes, vregFloat, pregAll);
+            Reg::Cast<U, float, CAST_TRAITF322FP8E4M3>(vregRes, vregFloat, pregAll);
         }
-        MicroAPI::StoreAlign<U, MicroAPI::StoreDist::DIST_PACK4_B32>(outputBuf + loopOffset, vregRes, pregAll);
+        Reg::StoreAlign<U, Reg::StoreDist::DIST_PACK4_B32>(outputBuf + loopOffset, vregRes, pregAll);
     }
 }
 

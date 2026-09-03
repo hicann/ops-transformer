@@ -21,7 +21,7 @@
 using namespace commondef;
 using namespace optiling::fag;
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 #include "flash_attention_score_grad_s1s2_bn2gs1s2_post_regbase.h"
 #include "flash_attention_score_grad_s1s2_bn2gs1s2_pre_regbase.h"
 #include "flash_attention_score_grad_presfmg_regbase.h"

@@ -25,41 +25,37 @@ __simd_vf__ void OuterAddVFImpl(__ubuf__ T *outputBuf, __ubuf__ T *deltaBuf, __u
                                 __ubuf__ T *stateInBuf, const uint32_t floatRepSize, uint16_t dLoops, uint32_t dTail,
                                 const uint16_t row, const uint32_t col)
 {
-    AscendC::MicroAPI::RegTensor<T> vregKInput;
-    AscendC::MicroAPI::RegTensor<T> vregDelta;
-    AscendC::MicroAPI::RegTensor<T> vregStateIn;
-    AscendC::MicroAPI::MaskReg pregAll = AscendC::MicroAPI::CreateMask<T, AscendC::MicroAPI::MaskPattern::ALL>();
+    AscendC::Reg::RegTensor<T> vregKInput;
+    AscendC::Reg::RegTensor<T> vregDelta;
+    AscendC::Reg::RegTensor<T> vregStateIn;
+    AscendC::Reg::MaskReg pregAll = AscendC::Reg::CreateMask<T, AscendC::Reg::MaskPattern::ALL>();
 
     for (uint16_t j = 0; j < dLoops; j++) {
-        AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(vregKInput,
-                                                                                kInputBuf + j * floatRepSize);
+        AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(vregKInput, kInputBuf + j * floatRepSize);
         for (uint16_t i = 0; i < row; i++) {
             uint16_t loopOffset = i * col + j * floatRepSize;
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                 vregDelta, deltaBuf + i); // 使用DIST_BRC_B32模式搬运将首元素broadcast到整个寄存器
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(vregStateIn,
-                                                                                    stateInBuf + loopOffset);
-            AscendC::MicroAPI::MulAddDst<T, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregStateIn, vregKInput,
-                                                                                       vregDelta, pregAll);
-            AscendC::MicroAPI::StoreAlign<T, AscendC::MicroAPI::StoreDist::DIST_NORM>(outputBuf + loopOffset,
-                                                                                      vregStateIn, pregAll);
+            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(vregStateIn, stateInBuf + loopOffset);
+            AscendC::Reg::MulAddDst<T, AscendC::Reg::MaskMergeMode::ZEROING>(vregStateIn, vregKInput, vregDelta,
+                                                                             pregAll);
+            AscendC::Reg::StoreAlign<T, AscendC::Reg::StoreDist::DIST_NORM>(outputBuf + loopOffset, vregStateIn,
+                                                                            pregAll);
         }
     }
 
     if (dTail > 0) {
-        AscendC::MicroAPI::MaskReg tailMask = AscendC::MicroAPI::UpdateMask<T>(dTail);
-        AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(vregKInput,
-                                                                                kInputBuf + dLoops * floatRepSize);
+        AscendC::Reg::MaskReg tailMask = AscendC::Reg::UpdateMask<T>(dTail);
+        AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(vregKInput, kInputBuf + dLoops * floatRepSize);
         for (uint16_t i = 0; i < row; i++) {
             uint16_t loopOffset = i * col + dLoops * floatRepSize;
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                 vregDelta, deltaBuf + i); // 使用DIST_BRC_B32模式搬运将首元素broadcast到整个寄存器
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_NORM>(vregStateIn,
-                                                                                    stateInBuf + loopOffset);
-            AscendC::MicroAPI::MulAddDst<T, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregStateIn, vregKInput,
-                                                                                       vregDelta, tailMask);
-            AscendC::MicroAPI::StoreAlign<T, AscendC::MicroAPI::StoreDist::DIST_NORM>(outputBuf + loopOffset,
-                                                                                      vregStateIn, tailMask);
+            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(vregStateIn, stateInBuf + loopOffset);
+            AscendC::Reg::MulAddDst<T, AscendC::Reg::MaskMergeMode::ZEROING>(vregStateIn, vregKInput, vregDelta,
+                                                                             tailMask);
+            AscendC::Reg::StoreAlign<T, AscendC::Reg::StoreDist::DIST_NORM>(outputBuf + loopOffset, vregStateIn,
+                                                                            tailMask);
         }
     }
 }

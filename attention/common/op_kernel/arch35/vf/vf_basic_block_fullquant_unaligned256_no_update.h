@@ -79,8 +79,8 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl256GqaFullquantVF(
     Duplicate(vreg_p_scale, static_cast<half>(pScale));
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_all);
     for (uint16_t i = 0; i < m / 8; ++i) {
-        StoreAlign<half, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ half *&)srcUb + tailNOffset + i * 128, vreg_min,
-                                                             preg_all);
+        StoreAlign<half, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ half *&)srcUb + tailNOffset + i * 128, vreg_min,
+                                                        preg_all);
     }
     // LS同步
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
@@ -99,35 +99,34 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl256GqaFullquantVF(
                 preg_all); // 读入第j个[64, 16]，和已经读入的 [64, 16]的max再取max
             Max(vreg_max_tmp_unroll, vreg_max_tmp_unroll, vreg_input_x_unroll_1, preg_all);
         }
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::MAX>(vreg_max_tmp, vreg_max_tmp, preg_all);
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::MAX>(vreg_max_tmp_unroll, vreg_max_tmp_unroll, preg_all);
+        ReduceDataBlock<AscendC::Reg::ReduceType::MAX>(vreg_max_tmp, vreg_max_tmp, preg_all);
+        ReduceDataBlock<AscendC::Reg::ReduceType::MAX>(vreg_max_tmp_unroll, vreg_max_tmp_unroll, preg_all);
         Sub(vreg_max_tmp, vreg_max_tmp, vreg_ln_p_scale, preg_all);
         Sub(vreg_max_tmp_unroll, vreg_max_tmp_unroll, vreg_ln_p_scale, preg_all);
-        StoreUnAlign<half, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp,
-                                                                    ureg_max, 8);
-        StoreUnAlign<half, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp_unroll,
-                                                                    ureg_max, 8);
+        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp, ureg_max, 8);
+        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp_unroll,
+                                                               ureg_max, 8);
     }
-    StoreUnAlignPost<half, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), ureg_max, 0);
+    StoreUnAlignPost<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), ureg_max, 0);
 
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
     for (uint16_t i = 0; i < 4; ++i) {
-        LoadAlign<half, MicroAPI::LoadDist::DIST_E2B_B16>(vreg_max, tmpMaxUb2 + i * 16);
-        LoadAlign<half, MicroAPI::LoadDist::DIST_E2B_B16>(vreg_max_2, tmpMaxUb2 + i * 16 + 8);
+        LoadAlign<half, Reg::LoadDist::DIST_E2B_B16>(vreg_max, tmpMaxUb2 + i * 16);
+        LoadAlign<half, Reg::LoadDist::DIST_E2B_B16>(vreg_max_2, tmpMaxUb2 + i * 16 + 8);
         // sum 清零
         Duplicate(vreg_exp_sum_1, 0, preg_all);
         Duplicate(vreg_exp_sum_2, 0, preg_all);
 
         for (uint16_t j = 0; j < n / 32; ++j) {
             // n / 32 ，两个fp16的分形（一行16个元素）合一个fp8的分形（一行32个元素），第j个[64, 32]
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * 16 * 16 + j * 64 * 32);
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_unroll_1,
-                                                           srcUb + i * 16 * 16 + j * 64 * 32 + 64 * 16);
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * 16 * 16 + j * 64 * 32);
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_input_x_unroll_1,
+                                                      srcUb + i * 16 * 16 + j * 64 * 32 + 64 * 16);
 
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * 16 * 16 + j * 64 * 32 + 128);
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_unroll_2,
-                                                           srcUb + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * 16 * 16 + j * 64 * 32 + 128);
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_input_x_unroll_2,
+                                                      srcUb + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
             ExpSub<float, half, RegLayout::ZERO>(vreg_exp_0_1, vreg_input_x_1, vreg_max, preg_all);
             ExpSub<float, half, RegLayout::ONE>(vreg_exp_2_1, vreg_input_x_1, vreg_max, preg_all);
             ExpSub<float, half, RegLayout::ZERO>(vreg_exp_1_1, vreg_input_x_unroll_1, vreg_max, preg_all);
@@ -176,14 +175,14 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl256GqaFullquantVF(
             Gather(vreg_exp_merge_f8_2, vreg_exp_merge_f8_2, vreg_exp_merge_f8_indexes);
             StoreAlign(expUb + i * 16 * 32 + j * 64 * 32 + 256, vreg_exp_merge_f8_2, preg_all_b8);
         }
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::SUM>(vreg_exp_sum_1, vreg_exp_sum_1, preg_all);
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::SUM>(vreg_exp_sum_2, vreg_exp_sum_2, preg_all);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_1,
-                                                                     ureg_exp_sum, 8);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_2,
-                                                                     ureg_exp_sum, 8);
+        ReduceDataBlock<AscendC::Reg::ReduceType::SUM>(vreg_exp_sum_1, vreg_exp_sum_1, preg_all);
+        ReduceDataBlock<AscendC::Reg::ReduceType::SUM>(vreg_exp_sum_2, vreg_exp_sum_2, preg_all);
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_1,
+                                                                ureg_exp_sum, 8);
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_2,
+                                                                ureg_exp_sum, 8);
     }
-    StoreUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), ureg_max, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), ureg_max, 0);
 }
 
 template <typename T, typename T2, typename OUTPUT_T, uint32_t s1BaseSize = 16, uint32_t s2BaseSize = 512,

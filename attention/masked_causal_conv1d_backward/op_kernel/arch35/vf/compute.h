@@ -10,7 +10,7 @@
 
 /*!
  * \file compute.h
- * \brief MicroAPI VF helpers for masked_causal_conv1d_backward
+ * \brief Reg VF helpers for masked_causal_conv1d_backward
  */
 
 #ifndef MASKED_CAUSAL_CONV1D_BACKWARD_VF_COMPUTE_H
@@ -22,17 +22,17 @@ using namespace AscendC;
 
 namespace MaskedCausalConv1dBackwardVF {
 
-constexpr MicroAPI::CastTrait castTraitB162B32 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::UNKNOWN,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr Reg::CastTrait castTraitB162B32 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::UNKNOWN,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::UNKNOWN,
 };
 
-constexpr MicroAPI::CastTrait castTraitB322B16 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::NO_SAT,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr Reg::CastTrait castTraitB322B16 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::NO_SAT,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::CAST_RINT,
 };
 
@@ -44,89 +44,83 @@ __simd_vf__ void GradXAndWeightNoTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __u
                                       __ubuf__ float *p0Addr, __ubuf__ float *p1Addr, __ubuf__ float *p2Addr,
                                       uint32_t sMain, uint32_t dimLen)
 {
-    MicroAPI::MaskReg fullMask = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg fullMask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
     uint32_t dimLoopNum = dimLen / B32_REP_SIZE;
     uint32_t dimOff = 0;
 
     for (uint32_t dl = 0; dl < dimLoopNum; ++dl) {
-        MicroAPI::RegTensor<T> w0B16, w1B16, w2B16;
-        MicroAPI::RegTensor<float> w0B32, w1B32, w2B32;
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(w0B16, wAddr + 0 * dimLen + dimOff);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(w1B16, wAddr + 1 * dimLen + dimOff);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(w2B16, wAddr + 2 * dimLen + dimOff);
-        MicroAPI::Cast<float, T, castTraitB162B32>(w0B32, w0B16, fullMask);
-        MicroAPI::Cast<float, T, castTraitB162B32>(w1B32, w1B16, fullMask);
-        MicroAPI::Cast<float, T, castTraitB162B32>(w2B32, w2B16, fullMask);
+        Reg::RegTensor<T> w0B16, w1B16, w2B16;
+        Reg::RegTensor<float> w0B32, w1B32, w2B32;
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(w0B16, wAddr + 0 * dimLen + dimOff);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(w1B16, wAddr + 1 * dimLen + dimOff);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(w2B16, wAddr + 2 * dimLen + dimOff);
+        Reg::Cast<float, T, castTraitB162B32>(w0B32, w0B16, fullMask);
+        Reg::Cast<float, T, castTraitB162B32>(w1B32, w1B16, fullMask);
+        Reg::Cast<float, T, castTraitB162B32>(w2B32, w2B16, fullMask);
 
         for (uint32_t si = 0; si < sMain; ++si) {
             uint32_t r0 = (si << 1); // base row
             uint32_t r1 = r0 + 1U;   // next row
 
             // Six independent loads for two consecutive output rows
-            MicroAPI::RegTensor<T> go0B16, go1B16, go2B16;
-            MicroAPI::RegTensor<float> go0B32, go1B32, go2B32;
-            MicroAPI::RegTensor<T> go3B16, go4B16, go5B16;
-            MicroAPI::RegTensor<float> go3B32, go4B32, go5B32;
-            MicroAPI::RegTensor<T> in0B16, in1B16;
-            MicroAPI::RegTensor<float> in0B32, in1B32;
+            Reg::RegTensor<T> go0B16, go1B16, go2B16;
+            Reg::RegTensor<float> go0B32, go1B32, go2B32;
+            Reg::RegTensor<T> go3B16, go4B16, go5B16;
+            Reg::RegTensor<float> go3B32, go4B32, go5B32;
+            Reg::RegTensor<T> in0B16, in1B16;
+            Reg::RegTensor<float> in0B32, in1B32;
 
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go0B16, goAddr + r0 * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go1B16, goAddr + (r0 + 1) * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go2B16, goAddr + (r0 + 2) * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go3B16, goAddr + r1 * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go4B16, goAddr + (r1 + 1) * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go5B16, goAddr + (r1 + 2) * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go0B16, goAddr + r0 * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go1B16, goAddr + (r0 + 1) * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go2B16, goAddr + (r0 + 2) * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go3B16, goAddr + r1 * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go4B16, goAddr + (r1 + 1) * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go5B16, goAddr + (r1 + 2) * dimLen + dimOff);
 
-            MicroAPI::Cast<float, T, castTraitB162B32>(go0B32, go0B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go1B32, go1B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go2B32, go2B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go3B32, go3B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go4B32, go4B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go5B32, go5B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go0B32, go0B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go1B32, go1B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go2B32, go2B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go3B32, go3B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go4B32, go4B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go5B32, go5B16, fullMask);
 
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(in0B16, inAddr + r0 * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(in1B16, inAddr + r1 * dimLen + dimOff);
-            MicroAPI::Cast<float, T, castTraitB162B32>(in0B32, in0B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(in1B32, in1B16, fullMask);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(in0B16, inAddr + r0 * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(in1B16, inAddr + r1 * dimLen + dimOff);
+            Reg::Cast<float, T, castTraitB162B32>(in0B32, in0B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(in1B32, in1B16, fullMask);
 
             // y0 = go0*w2 + go1*w1 + go2*w0
-            MicroAPI::RegTensor<float> y0B32, y1B32, tmp0B32, tmp1B32, tmp2B32;
-            MicroAPI::Mul(y0B32, go0B32, w2B32, fullMask);
-            MicroAPI::MulAddDst(y0B32, go1B32, w1B32, fullMask);
-            MicroAPI::MulAddDst(y0B32, go2B32, w0B32, fullMask);
+            Reg::RegTensor<float> y0B32, y1B32, tmp0B32, tmp1B32, tmp2B32;
+            Reg::Mul(y0B32, go0B32, w2B32, fullMask);
+            Reg::MulAddDst(y0B32, go1B32, w1B32, fullMask);
+            Reg::MulAddDst(y0B32, go2B32, w0B32, fullMask);
             // y1 = go3*w2 + go4*w1 + go5*w0
-            MicroAPI::Mul(y1B32, go3B32, w2B32, fullMask);
-            MicroAPI::MulAddDst(y1B32, go4B32, w1B32, fullMask);
-            MicroAPI::MulAddDst(y1B32, go5B32, w0B32, fullMask);
+            Reg::Mul(y1B32, go3B32, w2B32, fullMask);
+            Reg::MulAddDst(y1B32, go4B32, w1B32, fullMask);
+            Reg::MulAddDst(y1B32, go5B32, w0B32, fullMask);
 
             // store gi rows
-            MicroAPI::RegTensor<T> y0B16, y1B16;
-            MicroAPI::Cast<T, float, castTraitB322B16>(y0B16, y0B32, fullMask);
-            MicroAPI::Cast<T, float, castTraitB322B16>(y1B16, y1B32, fullMask);
-            MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(giAddr + r0 * dimLen + dimOff, y0B16, fullMask);
-            MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(giAddr + r1 * dimLen + dimOff, y1B16, fullMask);
+            Reg::RegTensor<T> y0B16, y1B16;
+            Reg::Cast<T, float, castTraitB322B16>(y0B16, y0B32, fullMask);
+            Reg::Cast<T, float, castTraitB322B16>(y1B16, y1B32, fullMask);
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(giAddr + r0 * dimLen + dimOff, y0B16, fullMask);
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(giAddr + r1 * dimLen + dimOff, y1B16, fullMask);
 
             // products for row r0
-            MicroAPI::Mul(tmp0B32, go0B32, in0B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p2Addr + r0 * dimLen + dimOff, tmp0B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp1B32, go1B32, in0B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p1Addr + r0 * dimLen + dimOff, tmp1B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp2B32, go2B32, in0B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p0Addr + r0 * dimLen + dimOff, tmp2B32,
-                                                                            fullMask);
+            Reg::Mul(tmp0B32, go0B32, in0B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p2Addr + r0 * dimLen + dimOff, tmp0B32, fullMask);
+            Reg::Mul(tmp1B32, go1B32, in0B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p1Addr + r0 * dimLen + dimOff, tmp1B32, fullMask);
+            Reg::Mul(tmp2B32, go2B32, in0B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p0Addr + r0 * dimLen + dimOff, tmp2B32, fullMask);
 
             // products for row r1
-            MicroAPI::Mul(tmp0B32, go3B32, in1B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p2Addr + r1 * dimLen + dimOff, tmp0B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp1B32, go4B32, in1B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p1Addr + r1 * dimLen + dimOff, tmp1B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp2B32, go5B32, in1B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p0Addr + r1 * dimLen + dimOff, tmp2B32,
-                                                                            fullMask);
+            Reg::Mul(tmp0B32, go3B32, in1B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p2Addr + r1 * dimLen + dimOff, tmp0B32, fullMask);
+            Reg::Mul(tmp1B32, go4B32, in1B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p1Addr + r1 * dimLen + dimOff, tmp1B32, fullMask);
+            Reg::Mul(tmp2B32, go5B32, in1B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p0Addr + r1 * dimLen + dimOff, tmp2B32, fullMask);
         }
         dimOff += B32_REP_SIZE;
     }
@@ -137,115 +131,106 @@ __simd_vf__ void GradXAndWeightWithTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, _
                                         __ubuf__ float *p0Addr, __ubuf__ float *p1Addr, __ubuf__ float *p2Addr,
                                         uint32_t sMain, uint32_t dimLen)
 {
-    MicroAPI::MaskReg fullMask = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg fullMask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
     uint32_t dimLoopNum = dimLen / B32_REP_SIZE;
     uint32_t dimOff = 0;
 
     for (uint32_t dl = 0; dl < dimLoopNum; ++dl) {
-        MicroAPI::RegTensor<T> w0B16, w1B16, w2B16;
-        MicroAPI::RegTensor<float> w0B32, w1B32, w2B32;
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(w0B16, wAddr + 0 * dimLen + dimOff);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(w1B16, wAddr + 1 * dimLen + dimOff);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(w2B16, wAddr + 2 * dimLen + dimOff);
-        MicroAPI::Cast<float, T, castTraitB162B32>(w0B32, w0B16, fullMask);
-        MicroAPI::Cast<float, T, castTraitB162B32>(w1B32, w1B16, fullMask);
-        MicroAPI::Cast<float, T, castTraitB162B32>(w2B32, w2B16, fullMask);
+        Reg::RegTensor<T> w0B16, w1B16, w2B16;
+        Reg::RegTensor<float> w0B32, w1B32, w2B32;
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(w0B16, wAddr + 0 * dimLen + dimOff);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(w1B16, wAddr + 1 * dimLen + dimOff);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(w2B16, wAddr + 2 * dimLen + dimOff);
+        Reg::Cast<float, T, castTraitB162B32>(w0B32, w0B16, fullMask);
+        Reg::Cast<float, T, castTraitB162B32>(w1B32, w1B16, fullMask);
+        Reg::Cast<float, T, castTraitB162B32>(w2B32, w2B16, fullMask);
 
         for (uint32_t si = 0; si < sMain; ++si) {
             uint32_t r0 = (si << 1);
             uint32_t r1 = r0 + 1U;
 
-            MicroAPI::RegTensor<T> go0B16, go1B16, go2B16, go3B16, go4B16, go5B16;
-            MicroAPI::RegTensor<float> go0B32, go1B32, go2B32, go3B32, go4B32, go5B32;
-            MicroAPI::RegTensor<T> in0B16, in1B16;
-            MicroAPI::RegTensor<float> in0B32, in1B32;
+            Reg::RegTensor<T> go0B16, go1B16, go2B16, go3B16, go4B16, go5B16;
+            Reg::RegTensor<float> go0B32, go1B32, go2B32, go3B32, go4B32, go5B32;
+            Reg::RegTensor<T> in0B16, in1B16;
+            Reg::RegTensor<float> in0B32, in1B32;
 
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go0B16, goAddr + r0 * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go1B16, goAddr + (r0 + 1) * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go2B16, goAddr + (r0 + 2) * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go3B16, goAddr + r1 * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go4B16, goAddr + (r1 + 1) * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go5B16, goAddr + (r1 + 2) * dimLen + dimOff);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go0B32, go0B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go1B32, go1B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go2B32, go2B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go3B32, go3B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go4B32, go4B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(go5B32, go5B16, fullMask);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go0B16, goAddr + r0 * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go1B16, goAddr + (r0 + 1) * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go2B16, goAddr + (r0 + 2) * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go3B16, goAddr + r1 * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go4B16, goAddr + (r1 + 1) * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go5B16, goAddr + (r1 + 2) * dimLen + dimOff);
+            Reg::Cast<float, T, castTraitB162B32>(go0B32, go0B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go1B32, go1B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go2B32, go2B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go3B32, go3B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go4B32, go4B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(go5B32, go5B16, fullMask);
 
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(in0B16, inAddr + r0 * dimLen + dimOff);
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(in1B16, inAddr + r1 * dimLen + dimOff);
-            MicroAPI::Cast<float, T, castTraitB162B32>(in0B32, in0B16, fullMask);
-            MicroAPI::Cast<float, T, castTraitB162B32>(in1B32, in1B16, fullMask);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(in0B16, inAddr + r0 * dimLen + dimOff);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(in1B16, inAddr + r1 * dimLen + dimOff);
+            Reg::Cast<float, T, castTraitB162B32>(in0B32, in0B16, fullMask);
+            Reg::Cast<float, T, castTraitB162B32>(in1B32, in1B16, fullMask);
 
-            MicroAPI::RegTensor<float> y0B32, y1B32, tmp0B32, tmp1B32, tmp2B32;
+            Reg::RegTensor<float> y0B32, y1B32, tmp0B32, tmp1B32, tmp2B32;
             // y0
-            MicroAPI::Mul(y0B32, go0B32, w2B32, fullMask);
-            MicroAPI::MulAddDst(y0B32, go1B32, w1B32, fullMask);
-            MicroAPI::MulAddDst(y0B32, go2B32, w0B32, fullMask);
+            Reg::Mul(y0B32, go0B32, w2B32, fullMask);
+            Reg::MulAddDst(y0B32, go1B32, w1B32, fullMask);
+            Reg::MulAddDst(y0B32, go2B32, w0B32, fullMask);
             // y1
-            MicroAPI::Mul(y1B32, go3B32, w2B32, fullMask);
-            MicroAPI::MulAddDst(y1B32, go4B32, w1B32, fullMask);
-            MicroAPI::MulAddDst(y1B32, go5B32, w0B32, fullMask);
+            Reg::Mul(y1B32, go3B32, w2B32, fullMask);
+            Reg::MulAddDst(y1B32, go4B32, w1B32, fullMask);
+            Reg::MulAddDst(y1B32, go5B32, w0B32, fullMask);
 
-            MicroAPI::RegTensor<T> y0B16, y1B16;
-            MicroAPI::Cast<T, float, castTraitB322B16>(y0B16, y0B32, fullMask);
-            MicroAPI::Cast<T, float, castTraitB322B16>(y1B16, y1B32, fullMask);
-            MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(giAddr + r0 * dimLen + dimOff, y0B16, fullMask);
-            MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(giAddr + r1 * dimLen + dimOff, y1B16, fullMask);
+            Reg::RegTensor<T> y0B16, y1B16;
+            Reg::Cast<T, float, castTraitB322B16>(y0B16, y0B32, fullMask);
+            Reg::Cast<T, float, castTraitB322B16>(y1B16, y1B32, fullMask);
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(giAddr + r0 * dimLen + dimOff, y0B16, fullMask);
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(giAddr + r1 * dimLen + dimOff, y1B16, fullMask);
 
             // products
-            MicroAPI::Mul(tmp0B32, go0B32, in0B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p2Addr + r0 * dimLen + dimOff, tmp0B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp1B32, go1B32, in0B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p1Addr + r0 * dimLen + dimOff, tmp1B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp2B32, go2B32, in0B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p0Addr + r0 * dimLen + dimOff, tmp2B32,
-                                                                            fullMask);
+            Reg::Mul(tmp0B32, go0B32, in0B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p2Addr + r0 * dimLen + dimOff, tmp0B32, fullMask);
+            Reg::Mul(tmp1B32, go1B32, in0B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p1Addr + r0 * dimLen + dimOff, tmp1B32, fullMask);
+            Reg::Mul(tmp2B32, go2B32, in0B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p0Addr + r0 * dimLen + dimOff, tmp2B32, fullMask);
 
-            MicroAPI::Mul(tmp0B32, go3B32, in1B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p2Addr + r1 * dimLen + dimOff, tmp0B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp1B32, go4B32, in1B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p1Addr + r1 * dimLen + dimOff, tmp1B32,
-                                                                            fullMask);
-            MicroAPI::Mul(tmp2B32, go5B32, in1B32, fullMask);
-            MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p0Addr + r1 * dimLen + dimOff, tmp2B32,
-                                                                            fullMask);
+            Reg::Mul(tmp0B32, go3B32, in1B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p2Addr + r1 * dimLen + dimOff, tmp0B32, fullMask);
+            Reg::Mul(tmp1B32, go4B32, in1B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p1Addr + r1 * dimLen + dimOff, tmp1B32, fullMask);
+            Reg::Mul(tmp2B32, go5B32, in1B32, fullMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p0Addr + r1 * dimLen + dimOff, tmp2B32, fullMask);
         }
 
         // Tail row
         uint32_t r = (sMain << 1); // last row index
-        MicroAPI::RegTensor<T> go0B16, go1B16, go2B16, inB16;
-        MicroAPI::RegTensor<float> go0B32, go1B32, go2B32, inB32, yB32, tmp0B32, tmp1B32, tmp2B32;
-        MicroAPI::RegTensor<T> yB16;
+        Reg::RegTensor<T> go0B16, go1B16, go2B16, inB16;
+        Reg::RegTensor<float> go0B32, go1B32, go2B32, inB32, yB32, tmp0B32, tmp1B32, tmp2B32;
+        Reg::RegTensor<T> yB16;
 
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go0B16, goAddr + r * dimLen + dimOff);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go1B16, goAddr + (r + 1) * dimLen + dimOff);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(go2B16, goAddr + (r + 2) * dimLen + dimOff);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(inB16, inAddr + r * dimLen + dimOff);
-        MicroAPI::Cast<float, T, castTraitB162B32>(go0B32, go0B16, fullMask);
-        MicroAPI::Cast<float, T, castTraitB162B32>(go1B32, go1B16, fullMask);
-        MicroAPI::Cast<float, T, castTraitB162B32>(go2B32, go2B16, fullMask);
-        MicroAPI::Cast<float, T, castTraitB162B32>(inB32, inB16, fullMask);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go0B16, goAddr + r * dimLen + dimOff);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go1B16, goAddr + (r + 1) * dimLen + dimOff);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(go2B16, goAddr + (r + 2) * dimLen + dimOff);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(inB16, inAddr + r * dimLen + dimOff);
+        Reg::Cast<float, T, castTraitB162B32>(go0B32, go0B16, fullMask);
+        Reg::Cast<float, T, castTraitB162B32>(go1B32, go1B16, fullMask);
+        Reg::Cast<float, T, castTraitB162B32>(go2B32, go2B16, fullMask);
+        Reg::Cast<float, T, castTraitB162B32>(inB32, inB16, fullMask);
 
-        MicroAPI::Mul(yB32, go0B32, w2B32, fullMask);
-        MicroAPI::MulAddDst(yB32, go1B32, w1B32, fullMask);
-        MicroAPI::MulAddDst(yB32, go2B32, w0B32, fullMask);
-        MicroAPI::Cast<T, float, castTraitB322B16>(yB16, yB32, fullMask);
-        MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(giAddr + r * dimLen + dimOff, yB16, fullMask);
+        Reg::Mul(yB32, go0B32, w2B32, fullMask);
+        Reg::MulAddDst(yB32, go1B32, w1B32, fullMask);
+        Reg::MulAddDst(yB32, go2B32, w0B32, fullMask);
+        Reg::Cast<T, float, castTraitB322B16>(yB16, yB32, fullMask);
+        Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(giAddr + r * dimLen + dimOff, yB16, fullMask);
 
-        MicroAPI::Mul(tmp0B32, go0B32, inB32, fullMask);
-        MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p2Addr + r * dimLen + dimOff, tmp0B32,
-                                                                        fullMask);
-        MicroAPI::Mul(tmp1B32, go1B32, inB32, fullMask);
-        MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p1Addr + r * dimLen + dimOff, tmp1B32,
-                                                                        fullMask);
-        MicroAPI::Mul(tmp2B32, go2B32, inB32, fullMask);
-        MicroAPI::StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>(p0Addr + r * dimLen + dimOff, tmp2B32,
-                                                                        fullMask);
+        Reg::Mul(tmp0B32, go0B32, inB32, fullMask);
+        Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p2Addr + r * dimLen + dimOff, tmp0B32, fullMask);
+        Reg::Mul(tmp1B32, go1B32, inB32, fullMask);
+        Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p1Addr + r * dimLen + dimOff, tmp1B32, fullMask);
+        Reg::Mul(tmp2B32, go2B32, inB32, fullMask);
+        Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(p0Addr + r * dimLen + dimOff, tmp2B32, fullMask);
 
         dimOff += B32_REP_SIZE;
     }
@@ -254,15 +239,15 @@ __simd_vf__ void GradXAndWeightWithTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, _
 template <typename T>
 __simd_vf__ void CastRowB32ToDT(__ubuf__ float *srcAddr, __ubuf__ T *dstAddr, uint32_t dimLen)
 {
-    MicroAPI::MaskReg fullMask = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg fullMask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
     uint32_t dimLoopNum = dimLen / B32_REP_SIZE;
     uint32_t dimOff = 0;
     for (uint32_t dl = 0; dl < dimLoopNum; ++dl) {
-        MicroAPI::RegTensor<float> s;
-        MicroAPI::RegTensor<T> dB16;
-        MicroAPI::LoadAlign<float, MicroAPI::LoadDist::DIST_NORM>(s, srcAddr + dimOff);
-        MicroAPI::Cast<T, float, castTraitB322B16>(dB16, s, fullMask);
-        MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(dstAddr + dimOff, dB16, fullMask);
+        Reg::RegTensor<float> s;
+        Reg::RegTensor<T> dB16;
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(s, srcAddr + dimOff);
+        Reg::Cast<T, float, castTraitB322B16>(dB16, s, fullMask);
+        Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(dstAddr + dimOff, dB16, fullMask);
         dimOff += B32_REP_SIZE;
     }
 }

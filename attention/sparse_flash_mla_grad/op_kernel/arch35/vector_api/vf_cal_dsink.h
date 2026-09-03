@@ -17,7 +17,7 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-using namespace MicroAPI;
+using namespace Reg;
 /* **************************************************************************************************
 
 SUB *
@@ -59,7 +59,7 @@ __simd_vf__ inline void CalculateDsinkVF(uint64_t dstLocalInt, uint64_t pLocalIn
     int32_t srcN = 128;
     for (uint16_t m = 0; m < static_cast<uint16_t>(realM); m++) {
         Duplicate(vregRes, 0);
-        LoadAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_BRC_B32>(
+        LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_BRC_B32>(
             vregSoftmaxSink, ((__ubuf__ T *&)softmaxSinkLocalInt), 1);
         for (uint16_t n = 0; n < loopTimes; n++) {
             LoadAlign(vregP, ((__ubuf__ T *&)pLocalInt + m * srcN + n * fullExeSize)); ////todo srcN
@@ -67,7 +67,7 @@ __simd_vf__ inline void CalculateDsinkVF(uint64_t dstLocalInt, uint64_t pLocalIn
             Mul(vregMul, vregP, vregDp, pregFullExe);
             Mul(vregMul1, vregMul, vregSoftmaxSink, pregFullExe);
             Muls(vregMul1, vregMul1, -1, pregFullExe);
-            Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregMul1, pregFullExe);
+            Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregMul1, pregFullExe);
             Add(vregRes, vregRes, vregReduceSum, pregAccu);
         }
 
@@ -77,7 +77,7 @@ __simd_vf__ inline void CalculateDsinkVF(uint64_t dstLocalInt, uint64_t pLocalIn
         Mul(vregMulTail, vregPTail, vregDpTail, pregTailExe);
         Mul(vregMulTail1, vregMulTail, vregSoftmaxSink, pregTailExe);
         Muls(vregMulTail1, vregMulTail1, -1, pregFullExe);
-        Reduce<MicroAPI::ReduceType::SUM>(vregReduceSumTail, vregMulTail1, pregTailExe);
+        Reduce<Reg::ReduceType::SUM>(vregReduceSumTail, vregMulTail1, pregTailExe);
         Add(vregRes, vregRes, vregReduceSumTail, pregAccu);
         uint64_t dstOffset = dstLocalInt + 4 * m;
         StoreUnAlign<T>(((__ubuf__ T *&)dstOffset), vregRes, uregRes, 1);

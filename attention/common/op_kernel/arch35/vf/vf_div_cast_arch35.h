@@ -39,21 +39,21 @@ __simd_vf__ inline void DivCastImpl64VF(__ubuf__ OUTPUT_T *dstUb, __ubuf__ float
     MaskReg preg_all_b16 = CreateMask<uint16_t, MaskPattern::ALL>();
 
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i);
         LoadAlign(vreg_src, srcUb + i * srcD);
         Div(vreg_div, vreg_src, vreg_exp_sum, preg_all);
 
         if constexpr (IsSameType<OUTPUT_T, float>::value) {
-            StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD, vreg_div,
-                                                                     preg_all);
+            StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD, vreg_div,
+                                                                preg_all);
         } else if constexpr (IsSameType<OUTPUT_T, bfloat16_t>::value) {
             Cast<OUTPUT_T, T, castTraitZero>(vreg_div_bf16, vreg_div, preg_all_b16);
-            StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_PACK_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD,
-                                                                     vreg_div_bf16, preg_all);
+            StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_PACK_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD, vreg_div_bf16,
+                                                                preg_all);
         } else {
             Cast<OUTPUT_T, T, castTraitZero>(vreg_div_f16, vreg_div, preg_all_b16);
-            StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_PACK_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD,
-                                                                     vreg_div_f16, preg_all);
+            StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_PACK_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD, vreg_div_f16,
+                                                                preg_all);
         }
     }
 }
@@ -89,35 +89,35 @@ __simd_vf__ inline void DivCastImpl128VF(__ubuf__ OUTPUT_T *dstUb, __ubuf__ floa
     MaskReg preg_all_b16 = CreateMask<uint16_t, MaskPattern::ALL>();
 
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i);
         if constexpr (IsSameType<OUTPUT_T, float>::value) {
             LoadAlign(vreg_src_even, srcUb + i * srcD);
             LoadAlign(vreg_src_odd, srcUb + i * srcD + (srcD >> 1));
         } else {
-            LoadAlign<T, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg_src_even, vreg_src_odd, srcUb + i * srcD);
+            LoadAlign<T, Reg::LoadDist::DIST_DINTLV_B32>(vreg_src_even, vreg_src_odd, srcUb + i * srcD);
         }
         Div(vreg_div_even, vreg_src_even, vreg_exp_sum, preg_all);
         Div(vreg_div_odd, vreg_src_odd, vreg_exp_sum, preg_all);
 
         if constexpr (IsSameType<OUTPUT_T, float>::value) {
-            StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD,
-                                                                     vreg_div_even, preg_all);
-            StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B32>(
-                (__ubuf__ OUTPUT_T *&)dstUb + i * srcD + (srcD >> 1), vreg_div_odd, preg_all);
+            StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD, vreg_div_even,
+                                                                preg_all);
+            StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD + (srcD >> 1),
+                                                                vreg_div_odd, preg_all);
         } else if constexpr (IsSameType<OUTPUT_T, bfloat16_t>::value) {
             Cast<OUTPUT_T, T, castTraitZero>(vreg_div_even_bf16, vreg_div_even, preg_all);
             Cast<OUTPUT_T, T, castTraitOne>(vreg_div_odd_bf16, vreg_div_odd, preg_all);
             Or((RegTensor<uint16_t> &)vreg_cast_bf16, (RegTensor<uint16_t> &)vreg_div_even_bf16,
                (RegTensor<uint16_t> &)vreg_div_odd_bf16, preg_all_b16);
-            StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD,
-                                                                     vreg_cast_bf16, preg_all_b16);
+            StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD, vreg_cast_bf16,
+                                                                preg_all_b16);
         } else {
             Cast<OUTPUT_T, T, castTraitZero>(vreg_div_even_f16, vreg_div_even, preg_all);
             Cast<OUTPUT_T, T, castTraitOne>(vreg_div_odd_f16, vreg_div_odd, preg_all);
             Or((RegTensor<uint16_t> &)vreg_cast_f16, (RegTensor<uint16_t> &)vreg_div_even_f16,
                (RegTensor<uint16_t> &)vreg_div_odd_f16, preg_all_b16);
-            StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD,
-                                                                     vreg_cast_f16, preg_all_b16);
+            StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ OUTPUT_T *&)dstUb + i * srcD, vreg_cast_f16,
+                                                                preg_all_b16);
         }
     }
 }
@@ -155,21 +155,21 @@ __simd_vf__ inline void DivCastImplGeneralVF(__ubuf__ OUTPUT_T *dstUb, __ubuf__ 
     constexpr uint16_t floatRepSize = 64;
 
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i);
         for (uint16_t j = 0; j < dLoops; ++j) {
             LoadAlign(vreg_src, srcUb + i * srcD + j * floatRepSize);
             Div(vreg_div, vreg_src, vreg_exp_sum, preg_all);
 
             if constexpr (IsSameType<OUTPUT_T, float>::value) {
-                StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B32>(
+                StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_NORM_B32>(
                     (__ubuf__ OUTPUT_T *&)dstUb + i * srcD + j * floatRepSize, vreg_div, preg_all);
             } else if constexpr (IsSameType<OUTPUT_T, bfloat16_t>::value) {
                 Cast<OUTPUT_T, T, castTraitZero>(vreg_div_bf16, vreg_div, preg_all_b16);
-                StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_PACK_B32>(
+                StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_PACK_B32>(
                     (__ubuf__ OUTPUT_T *&)dstUb + i * srcD + j * floatRepSize, vreg_div_bf16, preg_all);
             } else {
                 Cast<OUTPUT_T, T, castTraitZero>(vreg_div_f16, vreg_div, preg_all_b16);
-                StoreAlign<OUTPUT_T, MicroAPI::StoreDist::DIST_PACK_B32>(
+                StoreAlign<OUTPUT_T, Reg::StoreDist::DIST_PACK_B32>(
                     (__ubuf__ OUTPUT_T *&)dstUb + i * srcD + j * floatRepSize, vreg_div_f16, preg_all);
             }
         }

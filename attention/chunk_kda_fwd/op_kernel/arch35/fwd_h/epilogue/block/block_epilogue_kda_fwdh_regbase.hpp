@@ -19,7 +19,7 @@
 
 namespace Catlass::Epilogue::Block::detail {
 
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 
 constexpr CastTrait KDA_B16_TO_F32_ZERO = {
     RegLayout::ZERO,
@@ -313,7 +313,7 @@ static __simd_vf__ inline void ComputeKdaTailVWorkspaceRegbaseDualIssue(__ubuf__
 static __simd_vf__ inline void ApplyRowScaleDualIssue(__ubuf__ float *matrix, __ubuf__ float *rowScale,
                                                       uint32_t rowScaleOffset, uint16_t rows, uint16_t cols)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t FP32_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(float);
 
     RegTensor<float> matrixReg0;

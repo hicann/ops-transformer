@@ -23,7 +23,7 @@
 namespace NpuArch::Epilogue::Block::Mxfp4VF {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, typename T2,
           uint16_t KvsBase = 256, uint16_t QsBase = 128>
@@ -90,7 +90,7 @@ __simd_vf__ inline void softmax_with_group_max_qs64_kvs256_vf(__ubuf__ T2 *p_des
     }
 
     Max(group_gmax, group_gmax, curr_group_max, preg_VL64_16bit);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max, curr_group_max, preg_VL64_16bit);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max, curr_group_max, preg_VL64_16bit);
 
     if constexpr (MX_QUANT_MODE == MXQuantMode::OCP) {
         Adds(curr_group_max, curr_group_max, NEG_TWO_VALE, preg_VL64_16bit);
@@ -217,7 +217,7 @@ __simd_vf__ inline void softmax_with_group_max_qs64_kvs256_vf(__ubuf__ T2 *p_des
         }
 
         // ====================== 全局/局部最大值更新 ======================
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_invalid_max);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_invalid_max);
 
         // 下一块最大值归一化
         Muls(next_group_max, next_group_max, INV_LN2, preg_valid_max);
@@ -231,8 +231,8 @@ __simd_vf__ inline void softmax_with_group_max_qs64_kvs256_vf(__ubuf__ T2 *p_des
         Max(group_gmax, group_gmax, next_group_max, preg_valid_max);
 
         // 存储下一块最大值到 ulmax (i+1)*128 偏移
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max + ((i + 1) * QsBase), next_group_max,
-                                                          preg_valid_max);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max + ((i + 1) * QsBase), next_group_max,
+                                                     preg_valid_max);
 
         // 更新当前块最大值，用于下一次循环
         if constexpr (MX_QUANT_MODE == MXQuantMode::OCP) {

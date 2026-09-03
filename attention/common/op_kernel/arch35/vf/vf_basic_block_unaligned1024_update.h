@@ -97,17 +97,17 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl1024VF(
         maskUb11, maskUb12, maskUb13, maskUb14, maskUb15, maskUb16, minValue, m, slopes, scale, posShift, pseStride,
         nPadding, ureg_max);
 
-    StoreUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), ureg_max, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), ureg_max, 0);
     LoadAlign(vreg_in_max, inMaxUb);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     LoadAlign(vreg_input_max, tmpMaxUb2);
 
     Max(vreg_max_new, vreg_input_max, vreg_in_max, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)tmpMaxUb2, vreg_max_new, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)tmpMaxUb2, vreg_max_new, preg_all);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_max, tmpMaxUb2 + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max, tmpMaxUb2 + i);
 
         LoadInputDinterleave8<T>(ARG_FLOAT_INPUT_X_16);
 
@@ -129,7 +129,7 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl1024VF(
             CastStoreExpF16_1024<T2>(ARG_FLOAT_CAST_STORE_EXP_1024);
         }
     }
-    StoreUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpExpSumUb), ureg_exp_sum, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpExpSumUb), ureg_exp_sum, 0);
 }
 
 // noupdate, 512 < originN <= 1024

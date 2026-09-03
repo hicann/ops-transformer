@@ -36,12 +36,12 @@ __simd_vf__ inline void ReduceSumBasicVF(uint64_t dstLocalInt, uint64_t srcLocal
     // Duplicate(vregDst, 0.0f);
     LoadAlign(vregDst, ((__ubuf__ float *&)dstLocalInt));
     for (uint16_t k = 0; k < static_cast<uint16_t>(loopTimes); k++) {
-        LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrc, ((__ubuf__ float *&)srcLocalInt), 64);
-        Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregSrc, pregFullExe);
+        LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrc, ((__ubuf__ float *&)srcLocalInt), 64);
+        Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregSrc, pregFullExe);
         Add(vregDst, vregDst, vregReduceSum, pregAccu);
     }
-    LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcTail, ((__ubuf__ float *&)srcLocalIntTail), 64);
-    Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregSrcTail, pregTailExe);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcTail, ((__ubuf__ float *&)srcLocalIntTail), 64);
+    Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregSrcTail, pregTailExe);
     Add(vregDst, vregDst, vregReduceSum, pregAccu);
     StoreUnAlign<T>(((__ubuf__ T *&)dstLocalInt), vregDst, uregRes, 1);
     StoreUnAlignPost<T>(((__ubuf__ T *&)dstLocalInt), uregRes, 0);

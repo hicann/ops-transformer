@@ -49,65 +49,62 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl128(
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vreg_input_x;
-        MicroAPI::RegTensor<T> vreg_input_max;
-        MicroAPI::RegTensor<T> vreg_max_brc;
-        MicroAPI::RegTensor<float> vreg_exp_sum;
-        MicroAPI::RegTensor<float> vreg_exp_even;
-        MicroAPI::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vreg_input_x;
+        Reg::RegTensor<T> vreg_input_max;
+        Reg::RegTensor<T> vreg_max_brc;
+        Reg::RegTensor<float> vreg_exp_sum;
+        Reg::RegTensor<float> vreg_exp_even;
+        Reg::RegTensor<float> vreg_exp_odd;
 
-        MicroAPI::UnalignReg ureg_max;
-        MicroAPI::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg ureg_max;
+        Reg::UnalignReg ureg_exp_sum;
 
-        MicroAPI::MaskReg preg_all_b32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b16 = MicroAPI::CreateMask<half, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_s8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::VL128>();
+        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
 
-        MicroAPI::RegTensor<half> vreg_exp_res;
-        MicroAPI::RegTensor<half> vreg_muls_res;
-        MicroAPI::RegTensor<T2> vreg_cast;
-        MicroAPI::RegTensor<T2> vreg_res;
+        Reg::RegTensor<half> vreg_exp_res;
+        Reg::RegTensor<half> vreg_muls_res;
+        Reg::RegTensor<T2> vreg_cast;
+        Reg::RegTensor<T2> vreg_res;
 
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x,
-                                                                 srcUb + i * sInner); // fp16 data 256B one row
-            MicroAPI::Muls<T, T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale,
-                                                                   preg_all_b16); // Muls(scale)
-            MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_all_b16);
-            MicroAPI::ReduceMax<T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
-            MicroAPI::DataCopyUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x,
+                                                       srcUb + i * sInner); // fp16 data 256B one row
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale,
+                                                         preg_all_b16); // Muls(scale)
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_all_b16);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(maxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, ureg_max, 0);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BRC_B16>(vreg_max_brc, maxUbStart + i);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
-            MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-                vreg_exp_res, vreg_input_x, vreg_max_brc, preg_all_b16);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max_brc, maxUbStart + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_input_x,
+                                                                                     vreg_max_brc, preg_all_b16);
 
-            static constexpr MicroAPI::CastTrait castTrait = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                              MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-            static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::UNKNOWN,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-            MicroAPI::DataCopy<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                         Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+            Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 (__ubuf__ T2 *&)expUb, vreg_exp_res, blockStride, repeatStride, preg_all_b16);
 
             // x_sum = sum(x_exp, axis=-1, keepdims=True)
-            MicroAPI::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            MicroAPI::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd,
-                                                                   preg_all_b32);
-            MicroAPI::ReduceSum<float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum,
-                                                                                preg_all_b32);
-            MicroAPI::DataCopyUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(expSumUb, vreg_exp_sum,
-                                                                                      ureg_exp_sum, 1);
+            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
+            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, vreg_exp_sum, ureg_exp_sum, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(expSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, ureg_exp_sum, 0);
     }
 }
 
@@ -131,76 +128,72 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vreg_input_x_1;
-        MicroAPI::RegTensor<T> vreg_input_x_2;
-        MicroAPI::RegTensor<T> vreg_input_max_tmp;
-        MicroAPI::RegTensor<T> vreg_input_max;
-        MicroAPI::RegTensor<T> vreg_max_brc;
-        MicroAPI::RegTensor<float> vreg_exp_sum;
-        MicroAPI::RegTensor<float> vreg_exp_even;
-        MicroAPI::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vreg_input_x_1;
+        Reg::RegTensor<T> vreg_input_x_2;
+        Reg::RegTensor<T> vreg_input_max_tmp;
+        Reg::RegTensor<T> vreg_input_max;
+        Reg::RegTensor<T> vreg_max_brc;
+        Reg::RegTensor<float> vreg_exp_sum;
+        Reg::RegTensor<float> vreg_exp_even;
+        Reg::RegTensor<float> vreg_exp_odd;
 
-        MicroAPI::UnalignReg ureg_max;
-        MicroAPI::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg ureg_max;
+        Reg::UnalignReg ureg_exp_sum;
 
-        MicroAPI::MaskReg preg_all_b32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b16 = MicroAPI::CreateMask<half, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_s8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::VL128>();
+        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
 
-        MicroAPI::RegTensor<T> vreg_exp_res;
-        MicroAPI::RegTensor<T> vreg_exp_res_1;
-        MicroAPI::RegTensor<T> vreg_exp_res_2;
+        Reg::RegTensor<T> vreg_exp_res;
+        Reg::RegTensor<T> vreg_exp_res_1;
+        Reg::RegTensor<T> vreg_exp_res_2;
 
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            MicroAPI::Muls<T, T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
-            MicroAPI::Muls<T, T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
-            MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_all_b16);
-            MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
-                                                                      preg_all_b16);
-            MicroAPI::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
-            MicroAPI::ReduceMax<T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
-            MicroAPI::DataCopyUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
+                                                            preg_all_b16);
+            Reg::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(maxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, ureg_max, 0);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BRC_B16>(vreg_max_brc, maxUbStart + i);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-                vreg_exp_res_1, vreg_input_x_1, vreg_max_brc, preg_all_b16);
-            MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-                vreg_exp_res_2, vreg_input_x_2, vreg_max_brc, preg_all_b16);
-            static constexpr MicroAPI::CastTrait castTrait = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                              MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-            static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::UNKNOWN,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max_brc, maxUbStart + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_1, vreg_input_x_1,
+                                                                                     vreg_max_brc, preg_all_b16);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_2, vreg_input_x_2,
+                                                                                     vreg_max_brc, preg_all_b16);
+            static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                         Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
-            MicroAPI::DataCopy<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 (__ubuf__ T2 *&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
-            MicroAPI::DataCopy<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 (__ubuf__ T2 *&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
 
             // x_sum = sum(x_exp, axis=-1, keepdims=True)
-            MicroAPI::Add<half, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2,
-                                                                  preg_all_b16);
-            MicroAPI::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            MicroAPI::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd,
-                                                                   preg_all_b32);
-            MicroAPI::ReduceSum<float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum,
-                                                                                preg_all_b32);
-            MicroAPI::DataCopyUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(expSumUb, vreg_exp_sum,
-                                                                                      ureg_exp_sum, 1);
+            Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2, preg_all_b16);
+            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
+            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, vreg_exp_sum, ureg_exp_sum, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(expSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, ureg_exp_sum, 0);
     }
 }
 
@@ -251,129 +244,123 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl128(
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vreg_input_x;
-        MicroAPI::RegTensor<T> vreg_input_max;
-        MicroAPI::RegTensor<float> vreg_exp_sum;
-        MicroAPI::RegTensor<float> vreg_exp_sum_brc_even;
-        MicroAPI::RegTensor<float> vreg_exp_sum_brc_odd;
-        MicroAPI::RegTensor<T> vreg_in_max;
-        MicroAPI::RegTensor<T> vreg_max;
-        MicroAPI::RegTensor<T> vreg_exp_max;
-        MicroAPI::RegTensor<float> vreg_exp_max_even;
-        MicroAPI::RegTensor<float> vreg_exp_max_odd;
-        MicroAPI::RegTensor<float> vreg_in_exp_sum_even;
-        MicroAPI::RegTensor<float> vreg_in_exp_sum_odd;
-        MicroAPI::RegTensor<float> vreg_exp_sum_update_even;
-        MicroAPI::RegTensor<float> vreg_exp_sum_update_odd;
-        MicroAPI::RegTensor<T> vreg_exp_res;
-        MicroAPI::RegTensor<float> vreg_exp_even;
-        MicroAPI::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vreg_input_x;
+        Reg::RegTensor<T> vreg_input_max;
+        Reg::RegTensor<float> vreg_exp_sum;
+        Reg::RegTensor<float> vreg_exp_sum_brc_even;
+        Reg::RegTensor<float> vreg_exp_sum_brc_odd;
+        Reg::RegTensor<T> vreg_in_max;
+        Reg::RegTensor<T> vreg_max;
+        Reg::RegTensor<T> vreg_exp_max;
+        Reg::RegTensor<float> vreg_exp_max_even;
+        Reg::RegTensor<float> vreg_exp_max_odd;
+        Reg::RegTensor<float> vreg_in_exp_sum_even;
+        Reg::RegTensor<float> vreg_in_exp_sum_odd;
+        Reg::RegTensor<float> vreg_exp_sum_update_even;
+        Reg::RegTensor<float> vreg_exp_sum_update_odd;
+        Reg::RegTensor<T> vreg_exp_res;
+        Reg::RegTensor<float> vreg_exp_even;
+        Reg::RegTensor<float> vreg_exp_odd;
 
-        MicroAPI::UnalignReg ureg_max;
-        MicroAPI::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg ureg_max;
+        Reg::UnalignReg ureg_exp_sum;
 
-        MicroAPI::MaskReg preg_all_b32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b16 = MicroAPI::CreateMask<half, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_s8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::VL128>();
+        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
 
-        MicroAPI::RegTensor<half> vreg_cast_b16;
-        MicroAPI::RegTensor<half> vreg_cast_b16_unroll;
-        MicroAPI::RegTensor<half> vreg_cast_res;
-        MicroAPI::RegTensor<half> vreg_muls_res;
-        // MicroAPI::RegTensor<half> vregAddsRes;
-        MicroAPI::RegTensor<int8_t> vreg_cast;
-        MicroAPI::RegTensor<int8_t> vreg_res;
+        Reg::RegTensor<half> vreg_cast_b16;
+        Reg::RegTensor<half> vreg_cast_b16_unroll;
+        Reg::RegTensor<half> vreg_cast_res;
+        Reg::RegTensor<half> vreg_muls_res;
+        // Reg::RegTensor<half> vregAddsRes;
+        Reg::RegTensor<int8_t> vreg_cast;
+        Reg::RegTensor<int8_t> vreg_res;
 
-        static constexpr MicroAPI::CastTrait castTrait = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                          MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-        static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                           MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-        static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::UNKNOWN,
-                                                           MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+        static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                     Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+        static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+        static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
+                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
         // x_max = max(src, axis=-1, keepdims=True); x_max = Max(x_max, inMax)
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
-            MicroAPI::Muls<T, T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale, preg_all_b16);
-            MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B32>(srcUb + i * sInner, vreg_input_x, preg_all_b16);
-            MicroAPI::ReduceMax<T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
-            MicroAPI::DataCopyUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max,
-                                                                                  1);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B32>(srcUb + i * sInner, vreg_input_x, preg_all_b16);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, ureg_max, 0);
         // load history max
-        MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_in_max, inMaxUb);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_in_max, inMaxUb);
         mem_bar(VST_VLD);
         // load current max
-        MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_max, tmpMaxUbStart);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_max, tmpMaxUbStart);
         // max(history max, current max)
-        MicroAPI::Max<T, MicroAPI::MaskMergeMode::ZEROING>(vreg_max, vreg_input_max, vreg_in_max, preg_all_b16);
+        Reg::Max<T, Reg::MaskMergeMode::ZEROING>(vreg_max, vreg_input_max, vreg_in_max, preg_all_b16);
         // exp_max = exp(inmax - x_max)
-        MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-            vreg_exp_max, vreg_in_max, vreg_max, preg_all_b16);
-        MicroAPI::Cast<float, half, castTrait0>(vreg_exp_max_even, vreg_exp_max, preg_all_b16);
-        MicroAPI::Cast<float, half, castTrait1>(vreg_exp_max_odd, vreg_exp_max, preg_all_b16);
+        Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_max, vreg_in_max, vreg_max,
+                                                                                 preg_all_b16);
+        Reg::Cast<float, half, castTrait0>(vreg_exp_max_even, vreg_exp_max, preg_all_b16);
+        Reg::Cast<float, half, castTrait1>(vreg_exp_max_odd, vreg_exp_max, preg_all_b16);
         // store exp_max
-        MicroAPI::DataCopy<float, MicroAPI::StoreDist::DIST_INTLV_B32>(expMaxUb, vreg_exp_max_even, vreg_exp_max_odd,
-                                                                       preg_all_b32);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expMaxUb, vreg_exp_max_even, vreg_exp_max_odd,
+                                                             preg_all_b32);
         // store max
-        MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B16>(maxUb, vreg_max, preg_all_b16);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(maxUb, vreg_max, preg_all_b16);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BRC_B16>(vreg_max, maxUb + i);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
-            MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-                vreg_exp_res, vreg_input_x, vreg_max, preg_all_b16);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max, maxUb + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_input_x,
+                                                                                     vreg_max, preg_all_b16);
 
-            static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 
-            MicroAPI::Muls<half, half, MicroAPI::MaskMergeMode::ZEROING>(vreg_muls_res, vreg_exp_res, (half)quantScaleP,
-                                                                         preg_all_b16);
-            // MicroAPI::Adds<half, half, MicroAPI::MaskMergeMode::ZEROING>(vregAddsRes, vreg_muls_res, (half)offset,
+            Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res, vreg_exp_res, (half)quantScaleP,
+                                                               preg_all_b16);
+            // Reg::Adds<half, half, Reg::MaskMergeMode::ZEROING>(vregAddsRes, vreg_muls_res, (half)offset,
             // preg_all_b16);
 
-            MicroAPI::Cast<int8_t, half, castTrait0>(vreg_cast, vreg_muls_res, preg_all_b16);
-            MicroAPI::Pack<uint8_t, uint16_t, MicroAPI::HighLowPart::LOWEST>(
-                (MicroAPI::RegTensor<uint8_t> &)vreg_res, (MicroAPI::RegTensor<uint16_t> &)vreg_cast);
+            Reg::Cast<int8_t, half, castTrait0>(vreg_cast, vreg_muls_res, preg_all_b16);
+            Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t> &)vreg_res,
+                                                                   (Reg::RegTensor<uint16_t> &)vreg_cast);
 
-            MicroAPI::DataCopy<int8_t, MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                               MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ int8_t *&)expUb), vreg_res,
-                                                                        blockStride, repeatStride, preg_s8);
+            Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                ((__ubuf__ int8_t *&)expUb), vreg_res, blockStride, repeatStride, preg_s8);
 
             // x_sum = sum(x_exp, axis=-1, keepdims=True)
-            MicroAPI::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            MicroAPI::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd,
-                                                                   preg_all_b32);
-            MicroAPI::ReduceSum<float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum,
-                                                                                preg_all_b32);
-            MicroAPI::DataCopyUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vreg_exp_sum,
-                                                                                      ureg_exp_sum, 1);
+            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
+            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vreg_exp_sum, ureg_exp_sum, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, ureg_exp_sum, 0);
         mem_bar(VST_VLD);
 
         // x_sum = sum(exp_max * in_sum + x_sum)
-        MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg_in_exp_sum_even, vreg_in_exp_sum_odd,
-                                                                       inExpSumUb);
-        MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg_exp_sum_brc_even, vreg_exp_sum_brc_odd,
-                                                                       tmpExpSumUbStart);
-        MicroAPI::Mul<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_max_even,
-                                                               vreg_in_exp_sum_even, preg_all_b32);
-        MicroAPI::Mul<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_max_odd,
-                                                               vreg_in_exp_sum_odd, preg_all_b32);
-        MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_sum_update_even,
-                                                               vreg_exp_sum_brc_even, preg_all_b32);
-        MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_sum_update_odd,
-                                                               vreg_exp_sum_brc_odd, preg_all_b32);
-        MicroAPI::DataCopy<float, MicroAPI::StoreDist::DIST_INTLV_B32>(expSumUb, vreg_exp_sum_update_even,
-                                                                       vreg_exp_sum_update_odd, preg_all_b32);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_in_exp_sum_even, vreg_in_exp_sum_odd, inExpSumUb);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_exp_sum_brc_even, vreg_exp_sum_brc_odd,
+                                                             tmpExpSumUbStart);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_max_even, vreg_in_exp_sum_even,
+                                                     preg_all_b32);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_max_odd, vreg_in_exp_sum_odd,
+                                                     preg_all_b32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_sum_update_even,
+                                                     vreg_exp_sum_brc_even, preg_all_b32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_sum_update_odd,
+                                                     vreg_exp_sum_brc_odd, preg_all_b32);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expSumUb, vreg_exp_sum_update_even,
+                                                             vreg_exp_sum_update_odd, preg_all_b32);
     }
 }
 
@@ -404,129 +391,123 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> vreg_input_x_1;
-        MicroAPI::RegTensor<T> vreg_input_x_2;
-        MicroAPI::RegTensor<T> vreg_input_max;
-        MicroAPI::RegTensor<T> vreg_input_max_tmp;
-        MicroAPI::RegTensor<float> vreg_exp_sum;
-        MicroAPI::RegTensor<float> vreg_exp_sum_brc_even;
-        MicroAPI::RegTensor<float> vreg_exp_sum_brc_odd;
-        MicroAPI::RegTensor<T> vreg_in_max;
-        MicroAPI::RegTensor<T> vreg_max;
-        MicroAPI::RegTensor<T> vreg_exp_max;
-        MicroAPI::RegTensor<float> vreg_exp_max_even;
-        MicroAPI::RegTensor<float> vreg_exp_max_odd;
-        MicroAPI::RegTensor<float> vreg_in_exp_sum_even;
-        MicroAPI::RegTensor<float> vreg_in_exp_sum_odd;
-        MicroAPI::RegTensor<float> vreg_exp_sum_update_even;
-        MicroAPI::RegTensor<float> vreg_exp_sum_update_odd;
-        MicroAPI::RegTensor<T> vreg_exp_res;
-        MicroAPI::RegTensor<T> vreg_exp_res_1;
-        MicroAPI::RegTensor<T> vreg_exp_res_2;
-        MicroAPI::RegTensor<float> vreg_exp_even;
-        MicroAPI::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vreg_input_x_1;
+        Reg::RegTensor<T> vreg_input_x_2;
+        Reg::RegTensor<T> vreg_input_max;
+        Reg::RegTensor<T> vreg_input_max_tmp;
+        Reg::RegTensor<float> vreg_exp_sum;
+        Reg::RegTensor<float> vreg_exp_sum_brc_even;
+        Reg::RegTensor<float> vreg_exp_sum_brc_odd;
+        Reg::RegTensor<T> vreg_in_max;
+        Reg::RegTensor<T> vreg_max;
+        Reg::RegTensor<T> vreg_exp_max;
+        Reg::RegTensor<float> vreg_exp_max_even;
+        Reg::RegTensor<float> vreg_exp_max_odd;
+        Reg::RegTensor<float> vreg_in_exp_sum_even;
+        Reg::RegTensor<float> vreg_in_exp_sum_odd;
+        Reg::RegTensor<float> vreg_exp_sum_update_even;
+        Reg::RegTensor<float> vreg_exp_sum_update_odd;
+        Reg::RegTensor<T> vreg_exp_res;
+        Reg::RegTensor<T> vreg_exp_res_1;
+        Reg::RegTensor<T> vreg_exp_res_2;
+        Reg::RegTensor<float> vreg_exp_even;
+        Reg::RegTensor<float> vreg_exp_odd;
 
-        MicroAPI::UnalignReg ureg_max;
-        MicroAPI::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg ureg_max;
+        Reg::UnalignReg ureg_exp_sum;
 
-        MicroAPI::MaskReg preg_all_b32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b16 = MicroAPI::CreateMask<half, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_all_b8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg preg_s8 = MicroAPI::CreateMask<int8_t, MicroAPI::MaskPattern::VL128>();
+        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
 
-        MicroAPI::RegTensor<T> vreg_cast_b16;
-        MicroAPI::RegTensor<T> vreg_cast_b16_unroll;
-        MicroAPI::RegTensor<T> vreg_cast_res;
-        MicroAPI::RegTensor<T> vreg_muls_res;
-        MicroAPI::RegTensor<int8_t> vreg_cast;
-        MicroAPI::RegTensor<int8_t> vreg_res;
+        Reg::RegTensor<T> vreg_cast_b16;
+        Reg::RegTensor<T> vreg_cast_b16_unroll;
+        Reg::RegTensor<T> vreg_cast_res;
+        Reg::RegTensor<T> vreg_muls_res;
+        Reg::RegTensor<int8_t> vreg_cast;
+        Reg::RegTensor<int8_t> vreg_res;
 
-        static constexpr MicroAPI::CastTrait castTrait = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                          MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-        static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                           MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-        static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::UNKNOWN,
-                                                           MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+        static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                     Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+        static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+        static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
+                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
         // x_max = max(src, axis=-1, keepdims=True); x_max = Max(x_max, inMax)
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            MicroAPI::Muls<T, T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
-            MicroAPI::Muls<T, T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
-            MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_all_b16);
-            MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
-                                                                      preg_all_b16);
-            MicroAPI::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
-            MicroAPI::ReduceMax<T, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
-            MicroAPI::DataCopyUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max,
-                                                                                  1);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
+                                                            preg_all_b16);
+            Reg::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, ureg_max, 0);
         // load history max
-        MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_in_max, inMaxUb);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_in_max, inMaxUb);
         mem_bar(VST_VLD);
         // load current max
-        MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_max, tmpMaxUbStart);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_max, tmpMaxUbStart);
         // max(history max, current max)
-        MicroAPI::Max<T, MicroAPI::MaskMergeMode::ZEROING>(vreg_max, vreg_input_max, vreg_in_max, preg_all_b16);
+        Reg::Max<T, Reg::MaskMergeMode::ZEROING>(vreg_max, vreg_input_max, vreg_in_max, preg_all_b16);
         // exp_max = exp(inmax - x_max)
-        MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-            vreg_exp_max, vreg_in_max, vreg_max, preg_all_b16);
-        MicroAPI::Cast<float, half, castTrait0>(vreg_exp_max_even, vreg_exp_max, preg_all_b16);
-        MicroAPI::Cast<float, half, castTrait1>(vreg_exp_max_odd, vreg_exp_max, preg_all_b16);
+        Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_max, vreg_in_max, vreg_max,
+                                                                                 preg_all_b16);
+        Reg::Cast<float, half, castTrait0>(vreg_exp_max_even, vreg_exp_max, preg_all_b16);
+        Reg::Cast<float, half, castTrait1>(vreg_exp_max_odd, vreg_exp_max, preg_all_b16);
         // store exp_max
-        MicroAPI::DataCopy<float, MicroAPI::StoreDist::DIST_INTLV_B32>(expMaxUb, vreg_exp_max_even, vreg_exp_max_odd,
-                                                                       preg_all_b32);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expMaxUb, vreg_exp_max_even, vreg_exp_max_odd,
+                                                             preg_all_b32);
         // store max
-        MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B16>(maxUb, vreg_max, preg_all_b16);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(maxUb, vreg_max, preg_all_b16);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BRC_B16>(vreg_max, maxUb + i);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-                vreg_exp_res_1, vreg_input_x_1, vreg_max, preg_all_b16);
-            MicroAPI::FusedExpSub<T, T, MicroAPI::RegLayout::ONE, MicroAPI::MaskMergeMode::ZEROING>(
-                vreg_exp_res_2, vreg_input_x_2, vreg_max, preg_all_b16);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max, maxUb + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_1, vreg_input_x_1,
+                                                                                     vreg_max, preg_all_b16);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_2, vreg_input_x_2,
+                                                                                     vreg_max, preg_all_b16);
 
-            MicroAPI::DataCopy<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 (__ubuf__ T2 *&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
-            MicroAPI::DataCopy<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 (__ubuf__ T2 *&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
 
             // x_sum = sum(x_exp, axis=-1, keepdims=True)
-            MicroAPI::Add<half, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2,
-                                                                  preg_all_b16);
-            MicroAPI::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            MicroAPI::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd,
-                                                                   preg_all_b32);
-            MicroAPI::ReduceSum<float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum,
-                                                                                preg_all_b32);
-            MicroAPI::DataCopyUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vreg_exp_sum,
-                                                                                      ureg_exp_sum, 1);
+            Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2, preg_all_b16);
+            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
+            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vreg_exp_sum, ureg_exp_sum, 1);
         }
-        MicroAPI::DataCopyUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, ureg_exp_sum, 0);
         mem_bar(VST_VLD);
 
         // x_sum = sum(exp_max * in_sum + x_sum)
-        MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg_in_exp_sum_even, vreg_in_exp_sum_odd,
-                                                                       inExpSumUb);
-        MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_DINTLV_B32>(vreg_exp_sum_brc_even, vreg_exp_sum_brc_odd,
-                                                                       tmpExpSumUbStart);
-        MicroAPI::Mul<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_max_even,
-                                                               vreg_in_exp_sum_even, preg_all_b32);
-        MicroAPI::Mul<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_max_odd,
-                                                               vreg_in_exp_sum_odd, preg_all_b32);
-        MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_sum_update_even,
-                                                               vreg_exp_sum_brc_even, preg_all_b32);
-        MicroAPI::Add<float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_sum_update_odd,
-                                                               vreg_exp_sum_brc_odd, preg_all_b32);
-        MicroAPI::DataCopy<float, MicroAPI::StoreDist::DIST_INTLV_B32>(expSumUb, vreg_exp_sum_update_even,
-                                                                       vreg_exp_sum_update_odd, preg_all_b32);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_in_exp_sum_even, vreg_in_exp_sum_odd, inExpSumUb);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_exp_sum_brc_even, vreg_exp_sum_brc_odd,
+                                                             tmpExpSumUbStart);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_max_even, vreg_in_exp_sum_even,
+                                                     preg_all_b32);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_max_odd, vreg_in_exp_sum_odd,
+                                                     preg_all_b32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_sum_update_even,
+                                                     vreg_exp_sum_brc_even, preg_all_b32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_sum_update_odd,
+                                                     vreg_exp_sum_brc_odd, preg_all_b32);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expSumUb, vreg_exp_sum_update_even,
+                                                             vreg_exp_sum_update_odd, preg_all_b32);
     }
 }
 

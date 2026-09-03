@@ -20,17 +20,17 @@
 namespace AscendC {
 constexpr uint16_t REDUCE_SIZE = 1;
 constexpr uint32_t floatRepSize = 64;
-using namespace MicroAPI;
-constexpr static AscendC::MicroAPI::CastTrait castTraitB162B32Odd = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+using namespace Reg;
+constexpr static AscendC::Reg::CastTrait castTraitB162B32Odd = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
-constexpr static AscendC::MicroAPI::CastTrait castTraitB162B32Even = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitB162B32Even = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
 
@@ -66,13 +66,13 @@ __simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
     Duplicate(vreg_zero, 0.0f);
     for (uint16_t i = 0; i < m; ++i) {
         if constexpr (IsSameType<INPUT_T, half>::value) {
-            LoadAlign<INPUT_T, MicroAPI::LoadDist::DIST_BRC_B16>(vreg_weight_half, weightUb + i);
+            LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B16>(vreg_weight_half, weightUb + i);
             Cast<float, INPUT_T, castTraitB162B32Even>(vreg_weight, vreg_weight_half, pregFullExeB16);
         } else if constexpr (IsSameType<INPUT_T, bfloat16_t>::value) {
-            LoadAlign<INPUT_T, MicroAPI::LoadDist::DIST_BRC_B16>(vreg_weight_bf, weightUb + i);
+            LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B16>(vreg_weight_bf, weightUb + i);
             Cast<float, INPUT_T, castTraitB162B32Even>(vreg_weight, vreg_weight_bf, pregFullExeB16);
         } else if constexpr (IsSameType<INPUT_T, float>::value) {
-            LoadAlign<INPUT_T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_weight, weightUb + i);
+            LoadAlign<INPUT_T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight, weightUb + i);
         }
 
         LoadAlign(vreg_input_x1, srcUb + i * nBaseSize);

@@ -18,11 +18,11 @@
 #include "kernel_tensor.h"
 
 namespace AscendC {
-using namespace MicroAPI;
-constexpr static AscendC::MicroAPI::CastTrait castTraitZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+using namespace Reg;
+constexpr static AscendC::Reg::CastTrait castTraitZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 template <typename T, typename INPUT_T, bool isAlign>
@@ -64,7 +64,7 @@ __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T *dstUb, __ubuf__ T *
     MaskReg preg_bf16 = UpdateMask<uint16_t>(repeatSize);
 
     Duplicate(vreg_zero, 0.0f);
-    LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_softmax_reduce, softmaxReduceSumUb);
+    LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_softmax_reduce, softmaxReduceSumUb);
     if constexpr (!isAlign) {
         LoadAlign(vreg_input_x1, srcUb + regCnt * floatRepSize);
         LoadAlign(vreg_input_x2, reduceSumUb + regCnt * floatRepSize);
@@ -83,7 +83,7 @@ __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T *dstUb, __ubuf__ T *
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     for (uint16_t i = 0; i < nIndexSize; ++i) {
         Duplicate(vreg_output_dw, 0.0f);
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_weight, weightUb + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight, weightUb + i);
         if constexpr (!isAlign) {
             LoadAlign(vreg_input_sub_new, reduceSumUb + regCnt * floatRepSize);
             LoadAlign(vreg_input_x1, reluUb + i * nBaseSize + regCnt * floatRepSize);
@@ -96,12 +96,12 @@ __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T *dstUb, __ubuf__ T *
             if constexpr (IsSameType<INPUT_T, half>::value) {
                 Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_half, vreg_tmp2, pregFullExeB16);
                 DeInterleave(vreg_relugrad_half_even, vreg_relugrad_half_odd, vreg_relugrad_half, vreg_relugrad_half);
-                StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+                StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                     ((__ubuf__ INPUT_T *&)dstUb), vreg_relugrad_half_even, blockStride, 1, preg_bf16);
             } else if constexpr (IsSameType<INPUT_T, bfloat16_t>::value) {
                 Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_bf, vreg_tmp2, pregFullExeB16);
                 DeInterleave(vreg_relugrad_bf_even, vreg_relugrad_bf_odd, vreg_relugrad_bf, vreg_relugrad_bf);
-                StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+                StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                     ((__ubuf__ INPUT_T *&)dstUb), vreg_relugrad_bf_even, blockStride, 1, preg_bf16);
             }
         } else {
@@ -115,22 +115,22 @@ __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T *dstUb, __ubuf__ T *
             if constexpr (IsSameType<INPUT_T, half>::value) {
                 Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_half, vreg_tmp2, pregFullExeB16);
                 DeInterleave(vreg_relugrad_half_even, vreg_relugrad_half_odd, vreg_relugrad_half, vreg_relugrad_half);
-                StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+                StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                     ((__ubuf__ INPUT_T *&)dstUb), vreg_relugrad_half_even, blockStride, 1, preg_bf16);
             } else if constexpr (IsSameType<INPUT_T, bfloat16_t>::value) {
                 Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_bf, vreg_tmp2, pregFullExeB16);
                 DeInterleave(vreg_relugrad_bf_even, vreg_relugrad_bf_odd, vreg_relugrad_bf, vreg_relugrad_bf);
-                StoreAlign<INPUT_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+                StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                     ((__ubuf__ INPUT_T *&)dstUb), vreg_relugrad_bf_even, blockStride, 1, preg_bf16);
             }
         }
-        Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_out_dw, vreg_output_dw,
-                                                                                          preg_all_b32);
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_dst, (__ubuf__ T *&)dwUb);
+        Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_out_dw, vreg_output_dw,
+                                                                                preg_all_b32);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_dst, (__ubuf__ T *&)dwUb);
         Add(vreg_dst, vreg_out_dw, vreg_dst, preg_all_b32);
-        StoreUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)dwUb), vreg_dst, ureg_dst, 1);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)dwUb), vreg_dst, ureg_dst, 1);
     }
-    StoreUnAlignPost<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)dwUb), ureg_dst, 0);
+    StoreUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)dwUb), ureg_dst, 0);
 }
 
 template <typename T, typename INPUT_T, bool isAlign>

@@ -19,7 +19,7 @@
 
 namespace DenseDliGradKLLossArch35 {
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 
 constexpr static CastTrait CAST_GRAD_FP32_TO_B16 = {
     RegLayout::ZERO,

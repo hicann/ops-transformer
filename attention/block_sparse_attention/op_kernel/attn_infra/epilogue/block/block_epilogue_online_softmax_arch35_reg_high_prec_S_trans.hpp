@@ -212,7 +212,7 @@ private:
                                                    uint16_t s2BaseSize, uint32_t blockStride, uint32_t repeatStride,
                                                    __ubuf__ float *expMaxUb, __ubuf__ ElementS *lastExpSumUb)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> src0Vreg;
         RegTensor<float> src1Vreg;
         RegTensor<float> src2Vreg;
@@ -299,12 +299,12 @@ private:
             StoreAlign<float, StoreDist::DIST_NORM_B32>(LastMaxUbStart, max0Vreg, pregTailN);
         }
 
-        StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)newMaxUb, max0Vreg, pregFull);
+        StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)newMaxUb, max0Vreg, pregFull);
 
-        Duplicate<float, AscendC::MicroAPI::MaskMergeMode::ZEROING, float>(sum0Vreg, 0, pregFull);
-        Duplicate<float, AscendC::MicroAPI::MaskMergeMode::ZEROING, float>(sum1Vreg, 0, pregFull);
-        Duplicate<float, AscendC::MicroAPI::MaskMergeMode::ZEROING, float>(sum2Vreg, 0, pregFull);
-        Duplicate<float, AscendC::MicroAPI::MaskMergeMode::ZEROING, float>(sum3Vreg, 0, pregFull);
+        Duplicate<float, AscendC::Reg::MaskMergeMode::ZEROING, float>(sum0Vreg, 0, pregFull);
+        Duplicate<float, AscendC::Reg::MaskMergeMode::ZEROING, float>(sum1Vreg, 0, pregFull);
+        Duplicate<float, AscendC::Reg::MaskMergeMode::ZEROING, float>(sum2Vreg, 0, pregFull);
+        Duplicate<float, AscendC::Reg::MaskMergeMode::ZEROING, float>(sum3Vreg, 0, pregFull);
 
         for (int32_t i = 0; i < mFirstTile; i++) {
             LoadAlign(src0Vreg, srcUb + i * s2BaseSize);
@@ -328,9 +328,9 @@ private:
             Cast<ElementP, float, castTraitZeroROUND>(exp1Vreg16, exp1Vreg32, pregFull);
             Cast<ElementP, float, castTraitZeroROUND>(exp3Vreg16, exp3Vreg32, pregFull);
             DeInterleave(deInterleave2Vreg, deInterleave3Vreg, exp1Vreg16, exp3Vreg16);
-            StoreAlign<ElementP, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                       AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ ElementP *&)exp0Ub), deInterleave0Vreg, blockStride, 1, pregFp16VL128);
+            StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
+                       AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ ElementP *&)exp0Ub), deInterleave0Vreg,
+                                                                    blockStride, 1, pregFp16VL128);
 
             if constexpr (mTileNum >= MAlignedTileNum::Zero) {
                 Add(sum0Vreg, exp0Vreg32, sum0Vreg, pregTailN);
@@ -338,9 +338,9 @@ private:
             if constexpr (mTileNum >= MAlignedTileNum::Two) {
                 Add(sum2Vreg, exp2Vreg32, sum2Vreg, pregTailN);
             }
-            StoreAlign<ElementP, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                       AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ ElementP *&)exp1Ub), deInterleave2Vreg, blockStride, 1, pregFp16VL128);
+            StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
+                       AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ ElementP *&)exp1Ub), deInterleave2Vreg,
+                                                                    blockStride, 1, pregFp16VL128);
             if constexpr (mTileNum >= MAlignedTileNum::One) {
                 Add(sum1Vreg, exp1Vreg32, sum1Vreg, pregTailN);
             }
@@ -371,8 +371,8 @@ private:
                 Cast<ElementP, float, castTraitZeroROUND>(exp1Vreg16, exp1Vreg32, pregFull);
                 Cast<ElementP, float, castTraitZeroROUND>(exp3Vreg16, exp3Vreg32, pregFull);
                 DeInterleave(deInterleave2Vreg, deInterleave3Vreg, exp1Vreg16, exp3Vreg16);
-                StoreAlign<ElementP, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                           AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+                StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
+                           AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
                     ((__ubuf__ ElementP *&)exp0Ub), deInterleave0Vreg, blockStride, 1, pregFp16VL128);
 
                 if constexpr (mTileNum > MAlignedTileNum::Zero) {
@@ -381,8 +381,8 @@ private:
                 if constexpr (mTileNum > MAlignedTileNum::Two) {
                     Add(sum2Vreg, exp2Vreg32, sum2Vreg, pregTailN);
                 }
-                StoreAlign<ElementP, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                           AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+                StoreAlign<ElementP, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY,
+                           AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
                     ((__ubuf__ ElementP *&)exp1Ub), deInterleave2Vreg, blockStride, 1, pregFp16VL128);
                 if constexpr (mTileNum > MAlignedTileNum::One) {
                     Add(sum1Vreg, exp1Vreg32, sum1Vreg, pregTailN);
@@ -396,7 +396,7 @@ private:
             Add(updateExpSumVreg, updateExpSumVreg, sum0Vreg, pregFull);
             StoreAlign<float, StoreDist::DIST_NORM_B32>(lastExpSumUb, updateExpSumVreg, pregFull);
         }
-        StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)expSumUb, sum0Vreg, pregFull);
+        StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)expSumUb, sum0Vreg, pregFull);
     }
 };
 } // namespace NpuArch::Epilogue::Block

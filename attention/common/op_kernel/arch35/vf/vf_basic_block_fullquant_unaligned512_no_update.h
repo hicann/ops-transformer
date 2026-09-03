@@ -104,21 +104,21 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl512GqaFullquantVF(
             Max(vreg_max_tmp_unroll, vreg_max_tmp_unroll, vreg_src_x_unroll_1, preg_all_float);
             Max(vreg_max_tmp_unroll, vreg_max_tmp_unroll, vreg_src_x_unroll_2, preg_all_float);
         }
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::MAX>(vreg_max_tmp, vreg_max_tmp,
-                                                            preg_all_float); // 只剩8行的8个max值
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::MAX>(vreg_max_tmp_unroll, vreg_max_tmp_unroll, preg_all_float);
+        ReduceDataBlock<AscendC::Reg::ReduceType::MAX>(vreg_max_tmp, vreg_max_tmp,
+                                                       preg_all_float); // 只剩8行的8个max值
+        ReduceDataBlock<AscendC::Reg::ReduceType::MAX>(vreg_max_tmp_unroll, vreg_max_tmp_unroll, preg_all_float);
         Sub(vreg_max_tmp, vreg_max_tmp, vreg_ln_p_scale, preg_all_float);
         Sub(vreg_max_tmp_unroll, vreg_max_tmp_unroll, vreg_ln_p_scale, preg_all_float);
-        StoreUnAlign<half, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp,
-                                                                    ureg_max, 8); // 存入16行的max到ub
-        StoreUnAlign<half, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp_unroll,
-                                                                    ureg_max, 8);
+        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp, ureg_max,
+                                                               8); // 存入16行的max到ub
+        StoreUnAlign<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), vreg_max_tmp_unroll,
+                                                               ureg_max, 8);
     }
-    StoreUnAlignPost<half, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), ureg_max, 0);
+    StoreUnAlignPost<half, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ half *&)tmpMaxUb), ureg_max, 0);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     for (uint16_t i = 0; i < 4; ++i) {
-        LoadAlign<half, MicroAPI::LoadDist::DIST_E2B_B16>(vreg_max, tmpMaxUb2 + i * 16); // 读入8行的Max, 并广播
-        LoadAlign<half, MicroAPI::LoadDist::DIST_E2B_B16>(vreg_max_2, tmpMaxUb2 + i * 16 + 8);
+        LoadAlign<half, Reg::LoadDist::DIST_E2B_B16>(vreg_max, tmpMaxUb2 + i * 16); // 读入8行的Max, 并广播
+        LoadAlign<half, Reg::LoadDist::DIST_E2B_B16>(vreg_max_2, tmpMaxUb2 + i * 16 + 8);
 
         Duplicate(vreg_exp_sum_1, 0, preg_all_float); // sum清零
         Duplicate(vreg_exp_sum_2, 0, preg_all_float);
@@ -126,16 +126,16 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl512GqaFullquantVF(
         for (uint16_t j = 0; j < n / 32; ++j) {
             // n / 32 是啥？两个fp16的分形（一行16个元素）合一个fp8的分形（一行32个元素），第j个[64, 32]
             // 把前面的两个[64,16]拼起来（横向分形cast成一个），第j个[64, 32]
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_src_x_1,
-                                                           srcUb1 + i * 16 * 16 + j * 64 * 32); // 第一个分形的前8行
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_src_x_1,
+                                                      srcUb1 + i * 16 * 16 + j * 64 * 32); // 第一个分形的前8行
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(
                 vreg_src_x_unroll_1,
                 srcUb1 + i * 16 * 16 + j * 64 * 32 + 64 * 16); // 第二个分形的前8行（第二个[64,16]）
             // 上两个cast成一个分形，下两个cast一个
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
-                vreg_src_x_2, srcUb1 + i * 16 * 16 + j * 64 * 32 + 128); // 第一个分形的后8行
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_src_x_unroll_2,
-                                                           srcUb1 + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_src_x_2,
+                                                      srcUb1 + i * 16 * 16 + j * 64 * 32 + 128); // 第一个分形的后8行
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_src_x_unroll_2,
+                                                      srcUb1 + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
 
             ExpSub<float, half, RegLayout::ZERO>(vreg_exp_0_1, vreg_src_x_1, vreg_max, preg_all_float);
             ExpSub<float, half, RegLayout::ONE>(vreg_exp_2_1, vreg_src_x_1, vreg_max, preg_all_float);
@@ -189,15 +189,15 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl512GqaFullquantVF(
         }
         // 第二个 256
         for (uint16_t j = 0; j < n / 32; ++j) {
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_src_x_1,
-                                                           srcUb2 + i * 16 * 16 + j * 64 * 32); // 第一个分形的前8行
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_src_x_1,
+                                                      srcUb2 + i * 16 * 16 + j * 64 * 32); // 第一个分形的前8行
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(
                 vreg_src_x_unroll_1,
                 srcUb2 + i * 16 * 16 + j * 64 * 32 + 64 * 16); // 第二个分形的前8行（第二个[64,16]）
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(
-                vreg_src_x_2, srcUb2 + i * 16 * 16 + j * 64 * 32 + 128); // 第一个分形的后8行
-            LoadAlign<half, MicroAPI::LoadDist::DIST_NORM>(vreg_src_x_unroll_2,
-                                                           srcUb2 + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_src_x_2,
+                                                      srcUb2 + i * 16 * 16 + j * 64 * 32 + 128); // 第一个分形的后8行
+            LoadAlign<half, Reg::LoadDist::DIST_NORM>(vreg_src_x_unroll_2,
+                                                      srcUb2 + i * 16 * 16 + j * 64 * 32 + 128 + 64 * 16);
 
             ExpSub<float, half, RegLayout::ZERO>(vreg_exp_0_1, vreg_src_x_1, vreg_max, preg_all_float);
             ExpSub<float, half, RegLayout::ONE>(vreg_exp_2_1, vreg_src_x_1, vreg_max, preg_all_float);
@@ -249,14 +249,14 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl512GqaFullquantVF(
             Gather(vreg_exp_merge_f8_2, vreg_exp_merge_f8_2, vreg_exp_merge_f8_indexes);
             StoreAlign(expUb2 + i * 16 * 32 + j * 64 * 32 + 256, vreg_exp_merge_f8_2, preg_all_b8);
         }
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::SUM>(vreg_exp_sum_1, vreg_exp_sum_1, preg_all_float);
-        ReduceDataBlock<AscendC::MicroAPI::ReduceType::SUM>(vreg_exp_sum_2, vreg_exp_sum_2, preg_all_float);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_1,
-                                                                     ureg_exp_sum, 8);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_2,
-                                                                     ureg_exp_sum, 8);
+        ReduceDataBlock<AscendC::Reg::ReduceType::SUM>(vreg_exp_sum_1, vreg_exp_sum_1, preg_all_float);
+        ReduceDataBlock<AscendC::Reg::ReduceType::SUM>(vreg_exp_sum_2, vreg_exp_sum_2, preg_all_float);
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_1,
+                                                                ureg_exp_sum, 8);
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), vreg_exp_sum_2,
+                                                                ureg_exp_sum, 8);
     }
-    StoreUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), ureg_max, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)tmpExpSumUb), ureg_max, 0);
 }
 
 // update, 256 < Orignin N <=512

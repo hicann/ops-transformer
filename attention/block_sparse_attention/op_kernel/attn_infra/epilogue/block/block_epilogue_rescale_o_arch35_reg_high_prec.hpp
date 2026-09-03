@@ -229,7 +229,7 @@ public:
                                                               __ubuf__ ElementOTmp *dmUb, uint32_t row,
                                                               uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> dmVreg;
         RegTensor<float> goPreVreg;
         RegTensor<float> loVreg;
@@ -251,7 +251,7 @@ public:
                                                               __ubuf__ ElementOTmp *dmUb, uint32_t row,
                                                               uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> dmVreg;
         RegTensor<float> goPreVreg0;
         RegTensor<float> goPreVreg1;
@@ -290,7 +290,7 @@ public:
         __ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb, __ubuf__ ElementOTmp *dmUb, __ubuf__ ElementOTmp *glUb,
         uint32_t row, uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> dmVreg;
         RegTensor<float> goPreVreg;
         RegTensor<float> loVreg;
@@ -319,7 +319,7 @@ public:
         __ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb, __ubuf__ ElementOTmp *dmUb, __ubuf__ ElementOTmp *glUb,
         uint32_t row, uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> dmVreg;
         RegTensor<float> goPreVreg0;
         RegTensor<float> goPreVreg1;
@@ -369,7 +369,7 @@ public:
                                                                       uint32_t colStride, uint32_t colTail,
                                                                       uint32_t vlElemNum)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> goCurVreg;
         RegTensor<float> glVreg;
         RegTensor<float> divVreg;
@@ -392,7 +392,7 @@ public:
                                                                       uint32_t colStride, uint32_t colTail,
                                                                       uint32_t vlElemNum)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> goCurVreg0;
         RegTensor<float> goCurVreg1;
         RegTensor<float> glVreg;
@@ -421,7 +421,7 @@ public:
                                                           __ubuf__ float *lseUb, uint32_t row)
     {
         // This vf works only when the rowNum in each AIV does not exceed 64
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> gmVreg;
         RegTensor<float> glVreg;
         RegTensor<float> logGlVreg;
@@ -442,7 +442,7 @@ public:
     __simd_vf__ inline void LogSumExpFuncQSAxisIncontinuous(__ubuf__ float *gmUb, __ubuf__ float *glUb,
                                                             __ubuf__ float *lseUb, uint32_t row)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> gmRowwiseVreg0;
         RegTensor<float> gmRowwiseVreg1;
         RegTensor<float> glRowwiseVreg0;

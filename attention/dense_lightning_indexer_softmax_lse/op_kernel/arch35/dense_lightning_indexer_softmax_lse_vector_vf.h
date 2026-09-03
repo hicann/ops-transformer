@@ -20,7 +20,7 @@
 
 namespace DenseLISoftmaxLseVF {
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 constexpr static CastTrait castTraitB162B32Even = {
     RegLayout::ZERO,
@@ -47,13 +47,13 @@ __simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float
 
     for (int32_t i = 0; i < groupInner; i++) {
         if constexpr (IsSameType<T, half>::value) {
-            AscendC::MicroAPI::LoadAlign<T, LoadDist::DIST_BRC_B16>(weightHalfReg, weightsTUb + i);
-            AscendC::MicroAPI::Cast<float, T, castTraitB162B32Even>(weightReg, weightHalfReg, pregWeightB16);
+            AscendC::Reg::LoadAlign<T, LoadDist::DIST_BRC_B16>(weightHalfReg, weightsTUb + i);
+            AscendC::Reg::Cast<float, T, castTraitB162B32Even>(weightReg, weightHalfReg, pregWeightB16);
         } else if constexpr (IsSameType<T, bfloat16_t>::value) {
-            AscendC::MicroAPI::LoadAlign<T, LoadDist::DIST_BRC_B16>(weightBfReg, weightsTUb + i);
-            AscendC::MicroAPI::Cast<float, T, castTraitB162B32Even>(weightReg, weightBfReg, pregWeightB16);
+            AscendC::Reg::LoadAlign<T, LoadDist::DIST_BRC_B16>(weightBfReg, weightsTUb + i);
+            AscendC::Reg::Cast<float, T, castTraitB162B32Even>(weightReg, weightBfReg, pregWeightB16);
         } else {
-            AscendC::MicroAPI::LoadAlign<T, LoadDist::DIST_BRC_B32>(weightReg, weightsUb + i);
+            AscendC::Reg::LoadAlign<T, LoadDist::DIST_BRC_B32>(weightReg, weightsUb + i);
         }
 
         for (int32_t j = 0; j < repeatTimes; j++) {
@@ -62,9 +62,9 @@ __simd_vf__ inline void DoScaleVF(__ubuf__ float *reduceCacheBuf, __ubuf__ float
             Mul(tmpReg, mmReg, weightReg, pregAllB32);
 
             if constexpr (outerGidxZero) {
-                AscendC::MicroAPI::Duplicate(reduceReg, 0.0f);
+                AscendC::Reg::Duplicate(reduceReg, 0.0f);
             } else {
-                AscendC::MicroAPI::LoadAlign(reduceReg, reduceCacheBuf + offset);
+                AscendC::Reg::LoadAlign(reduceReg, reduceCacheBuf + offset);
             }
             Add(reduceReg, reduceReg, tmpReg, pregAllB32);
             StoreAlign(reduceCacheBuf + offset, reduceReg, pregAllB32);

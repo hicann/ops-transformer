@@ -18,7 +18,7 @@
 #include "kernel_tensor.h"
 
 namespace AscendC {
-using namespace MicroAPI;
+using namespace Reg;
 
 template <typename T, bool isAlign>
 __simd_vf__ inline void ProcessVec2BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ T *srcOtherUb,
@@ -60,8 +60,7 @@ __simd_vf__ inline void ProcessVec2BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
-    Reduce<MicroAPI::ReduceType::MAX, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_max, vreg_tmp,
-                                                                                      preg_all_b32);
+    Reduce<Reg::ReduceType::MAX, float, float, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_tmp, preg_all_b32);
     Duplicate(vreg_max, vreg_input_max, preg_all_b32);
     for (uint16_t i = 0; i < alignCnt; ++i) {
         LoadAlign(vreg_input_x, srcUb + i * floatRepSize);
@@ -75,8 +74,7 @@ __simd_vf__ inline void ProcessVec2BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
         StoreAlign(((__ubuf__ T *&)dstUb + alignCnt * floatRepSize), vreg_tmp, preg_all_b32);
         Add(vreg_tmp_sum, vreg_tmp, vreg_tmp_sum, preg_all_b32);
     }
-    Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_input_sum, vreg_tmp_sum,
-                                                                                      preg_all_b32);
+    Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_input_sum, vreg_tmp_sum, preg_all_b32);
     Duplicate(vreg_sum, vreg_input_sum, preg_all_b32);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     for (uint16_t i = 0; i < alignCnt; ++i) {

@@ -158,15 +158,15 @@ __simd_vf__ inline void UpdateExpSumAndExpMaxVF(__ubuf__ T *maxUb, __ubuf__ T *i
     LoadAlign(vreg_max, tmpMaxUb);
     LoadAlign(vreg_in_max, inMaxUb);
     FusedExpSub(vreg_exp_max, vreg_in_max, vreg_max, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expMaxUb, vreg_exp_max, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)maxUb, vreg_max, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expMaxUb, vreg_exp_max, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)maxUb, vreg_max, preg_all);
     LoadAlign(vreg_in_exp_sum, inExpSumUb);
 
     // x_sum = exp_max * insum + x_sum
     LoadAlign(vreg_exp_sum_brc, tmpExpSumUb);
     Mul(vreg_exp_sum_update, vreg_exp_max, vreg_in_exp_sum, preg_all);
     Add(vreg_exp_sum_update, vreg_exp_sum_update, vreg_exp_sum_brc, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expSumUb, vreg_exp_sum_update, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expSumUb, vreg_exp_sum_update, preg_all);
 }
 
 template <typename T>
@@ -192,16 +192,16 @@ template <typename T>
 __simd_vf__ inline void InitSoftmaxFromSinksVF(__ubuf__ T *sumUb, __ubuf__ T *maxUb, __ubuf__ T *sinksUb,
                                                uint32_t sinksOffset, const T R0, uint32_t m)
 {
-    AscendC::MicroAPI::RegTensor<T> vreg_sinks;
-    AscendC::MicroAPI::RegTensor<T> vreg_sum;
-    AscendC::MicroAPI::MaskReg preg_m = AscendC::MicroAPI::UpdateMask<T>(m);
-    AscendC::MicroAPI::UnalignRegForLoad ureg;
+    AscendC::Reg::RegTensor<T> vreg_sinks;
+    AscendC::Reg::RegTensor<T> vreg_sum;
+    AscendC::Reg::MaskReg preg_m = AscendC::Reg::UpdateMask<T>(m);
+    AscendC::Reg::UnalignRegForLoad ureg;
     auto srcUbT = sinksUb + sinksOffset;
-    AscendC::MicroAPI::LoadUnAlignPre(ureg, srcUbT);
-    AscendC::MicroAPI::LoadUnAlign(vreg_sinks, ureg, srcUbT);
-    AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(maxUb, vreg_sinks, preg_m);
-    AscendC::MicroAPI::Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_sum, R0, preg_m);
-    AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(sumUb, vreg_sum, preg_m);
+    AscendC::Reg::LoadUnAlignPre(ureg, srcUbT);
+    AscendC::Reg::LoadUnAlign(vreg_sinks, ureg, srcUbT);
+    AscendC::Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(maxUb, vreg_sinks, preg_m);
+    AscendC::Reg::Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_sum, R0, preg_m);
+    AscendC::Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(sumUb, vreg_sum, preg_m);
 }
 
 template <typename T>
@@ -218,17 +218,17 @@ __aicore__ inline void InitSoftmaxFromSinks(const LocalTensor<T> &sumTensor, con
 template <typename T>
 __simd_vf__ inline void ComputeLseVF(__ubuf__ T *outLseUb, __ubuf__ T *sumUb, __ubuf__ T *maxUb, uint32_t m)
 {
-    AscendC::MicroAPI::RegTensor<T> vreg_outLse;
-    AscendC::MicroAPI::RegTensor<T> vreg_sum;
-    AscendC::MicroAPI::RegTensor<T> vreg_max;
-    AscendC::MicroAPI::RegTensor<T> vreg_tmp;
-    AscendC::MicroAPI::MaskReg preg_m = AscendC::MicroAPI::UpdateMask<T>(m);
-    AscendC::MicroAPI::LoadAlign(vreg_sum, sumUb);
-    AscendC::MicroAPI::LoadAlign(vreg_max, maxUb);
-    AscendC::MicroAPI::UnalignRegForStore ureg;
-    AscendC::MicroAPI::Log<T, MaskMergeMode::ZEROING>(vreg_tmp, vreg_sum, preg_m);
-    AscendC::MicroAPI::Add(vreg_outLse, vreg_tmp, vreg_max, preg_m);
-    AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM>(outLseUb, vreg_outLse, preg_m);
+    AscendC::Reg::RegTensor<T> vreg_outLse;
+    AscendC::Reg::RegTensor<T> vreg_sum;
+    AscendC::Reg::RegTensor<T> vreg_max;
+    AscendC::Reg::RegTensor<T> vreg_tmp;
+    AscendC::Reg::MaskReg preg_m = AscendC::Reg::UpdateMask<T>(m);
+    AscendC::Reg::LoadAlign(vreg_sum, sumUb);
+    AscendC::Reg::LoadAlign(vreg_max, maxUb);
+    AscendC::Reg::UnalignRegForStore ureg;
+    AscendC::Reg::Log<T, MaskMergeMode::ZEROING>(vreg_tmp, vreg_sum, preg_m);
+    AscendC::Reg::Add(vreg_outLse, vreg_tmp, vreg_max, preg_m);
+    AscendC::Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM>(outLseUb, vreg_outLse, preg_m);
 }
 
 template <typename T>

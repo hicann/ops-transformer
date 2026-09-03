@@ -18,38 +18,35 @@
 
 namespace FaVectorApi {
 // w4转Q_T
-static constexpr MicroAPI::CastTrait castTraitW4 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                    MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+static constexpr Reg::CastTrait castTraitW4 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
+                                               RoundMode::UNKNOWN};
 // fp32转Q_T
-static constexpr MicroAPI::CastTrait castTraitW4_0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                      MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitW4_0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                 Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 // bf16转fp16
-static constexpr MicroAPI::CastTrait castTraitW4_1 = {MicroAPI::RegLayout::UNKNOWN, MicroAPI::SatMode::SAT,
-                                                      MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+static constexpr Reg::CastTrait castTraitW4_1 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::SAT,
+                                                 Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
 // fp16转bf16
-static constexpr MicroAPI::CastTrait castTraitW4_2 = {MicroAPI::RegLayout::UNKNOWN, MicroAPI::SatMode::UNKNOWN,
-                                                      MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitW4_2 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::UNKNOWN,
+                                                 Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 // fp32转fp16
-static constexpr MicroAPI::CastTrait castTraitFp32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                      MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitFp32 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                 Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 
 template <typename Q_T, typename KV_T>
-__simd_callee__ inline void CastMulStoreW4GroupNz(MicroAPI::RegTensor<KV_T> &vKvData,
-                                                  MicroAPI::RegTensor<half> &vCastFp16Res,
-                                                  MicroAPI::RegTensor<bfloat16_t> &vRes,
-                                                  MicroAPI::RegTensor<bfloat16_t> &vScale, __ubuf__ Q_T *ubDstAddr,
-                                                  __ubuf__ uint8_t *ubSrcAddr, MicroAPI::MaskReg &kvTypeMaskAll,
-                                                  MicroAPI::MaskReg &qTypeMaskAll)
+__simd_callee__ inline void CastMulStoreW4GroupNz(Reg::RegTensor<KV_T> &vKvData, Reg::RegTensor<half> &vCastFp16Res,
+                                                  Reg::RegTensor<bfloat16_t> &vRes, Reg::RegTensor<bfloat16_t> &vScale,
+                                                  __ubuf__ Q_T *ubDstAddr, __ubuf__ uint8_t *ubSrcAddr,
+                                                  Reg::MaskReg &kvTypeMaskAll, Reg::MaskReg &qTypeMaskAll)
 {
-    MicroAPI::LoadAlign<uint8_t, MicroAPI::LoadDist::DIST_UNPACK4_B8>((MicroAPI::RegTensor<uint8_t> &)vKvData,
-                                                                      ubSrcAddr);
-    MicroAPI::Cast<bfloat16_t, KV_T, castTraitW4>(vRes, vKvData, kvTypeMaskAll);
-    MicroAPI::Mul<bfloat16_t, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
+    Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK4_B8>((Reg::RegTensor<uint8_t> &)vKvData, ubSrcAddr);
+    Reg::Cast<bfloat16_t, KV_T, castTraitW4>(vRes, vKvData, kvTypeMaskAll);
+    Reg::Mul<bfloat16_t, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
     if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-        MicroAPI::StoreAlign<Q_T, MicroAPI::StoreDist::DIST_NORM_B16>(ubDstAddr, vRes, qTypeMaskAll);
+        Reg::StoreAlign<Q_T, Reg::StoreDist::DIST_NORM_B16>(ubDstAddr, vRes, qTypeMaskAll);
     } else {
-        MicroAPI::Cast<half, bfloat16_t, castTraitW4_1>(vCastFp16Res, vRes, qTypeMaskAll);
-        MicroAPI::StoreAlign<Q_T, MicroAPI::StoreDist::DIST_NORM_B16>(ubDstAddr, vCastFp16Res, qTypeMaskAll);
+        Reg::Cast<half, bfloat16_t, castTraitW4_1>(vCastFp16Res, vRes, qTypeMaskAll);
+        Reg::StoreAlign<Q_T, Reg::StoreDist::DIST_NORM_B16>(ubDstAddr, vCastFp16Res, qTypeMaskAll);
     }
 }
 
@@ -65,13 +62,12 @@ __aicore__ inline void AntiquantVFImplW4PerTokenGroupNz(LocalTensor<KV_T> &antiq
         __ubuf__ bfloat16_t *ubOffsetAddr = (__ubuf__ bfloat16_t *)antiqOffsetUb.GetPhyAddr();
         __ubuf__ bfloat16_t *ubScaleAddr = (__ubuf__ bfloat16_t *)antiqScaleUb.GetPhyAddr();
 
-        MicroAPI::RegTensor<KV_T> vKvData;
-        MicroAPI::RegTensor<bfloat16_t> vScaleFirst, vScaleBack, vRes;
-        MicroAPI::RegTensor<half> vCastFp16Res;
+        Reg::RegTensor<KV_T> vKvData;
+        Reg::RegTensor<bfloat16_t> vScaleFirst, vScaleBack, vRes;
+        Reg::RegTensor<half> vCastFp16Res;
 
-        MicroAPI::MaskReg kvTypeMaskAll = MicroAPI::CreateMask<KV_T, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg qTypeMaskAll =
-            MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>(); // Q_T 所有元素（共128个）
+        Reg::MaskReg kvTypeMaskAll = Reg::CreateMask<KV_T, Reg::MaskPattern::ALL>();
+        Reg::MaskReg qTypeMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>(); // Q_T 所有元素（共128个）
 
         // UB总共dealRowCount行 * baseSize列，每次处理8行 * 16列 = 128个元素
         const uint32_t rowBaseSize = 8;   // 8行
@@ -95,9 +91,8 @@ __aicore__ inline void AntiquantVFImplW4PerTokenGroupNz(LocalTensor<KV_T> &antiq
             for (uint16_t colLoopIdx = 0; colLoopIdx < colLoopCnt; colLoopIdx++) {
                 __ubuf__ bfloat16_t *ubScaleAddrTmp =
                     ubScaleAddr + rowScaleStride * rowLoopIdx + colLoopIdx * colScaleStride;
-                MicroAPI::LoadAlign<bfloat16_t, MicroAPI::LoadDist::DIST_E2B_B16>(vScaleFirst, ubScaleAddrTmp);
-                MicroAPI::LoadAlign<bfloat16_t, MicroAPI::LoadDist::DIST_E2B_B16>(vScaleBack,
-                                                                                  ubScaleAddrTmp + rowBaseSize);
+                Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_E2B_B16>(vScaleFirst, ubScaleAddrTmp);
+                Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_E2B_B16>(vScaleBack, ubScaleAddrTmp + rowBaseSize);
                 for (uint16_t innerLoopIdx = 0; innerLoopIdx < innerLoopCnt; innerLoopIdx++) {
                     __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + rowSrcStride * rowLoopIdx +
                                                   colLoopIdx * innerLoopCnt * colSrcStride +
@@ -121,14 +116,14 @@ template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSiz
 __simd_vf__ void AntiquantVFImplW4Nz(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *ubDstAddr, __ubuf__ Q_T *ubOffsetAddr,
                                      __ubuf__ Q_T *ubScaleAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData;
-    MicroAPI::RegTensor<Q_T> vOffset;
-    MicroAPI::RegTensor<Q_T> vScale;
-    MicroAPI::RegTensor<Q_T> vRes;
-    MicroAPI::RegTensor<half> vCastFp16Res;
+    Reg::RegTensor<int4x2_t> vKvData;
+    Reg::RegTensor<Q_T> vOffset;
+    Reg::RegTensor<Q_T> vScale;
+    Reg::RegTensor<Q_T> vRes;
+    Reg::RegTensor<half> vCastFp16Res;
 
-    MicroAPI::MaskReg kvMaskAll = MicroAPI::CreateMask<KV_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qTypeMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg kvMaskAll = Reg::CreateMask<KV_T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qTypeMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
     // UB总共dealRowCount行 * baseSize列，每次处理8行 * 16列 = 128个元素
     uint32_t rowBaseSize = 8;   // 8行
@@ -142,9 +137,9 @@ __simd_vf__ void AntiquantVFImplW4Nz(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *
 
     for (uint16_t colLoopIdx = 0; colLoopIdx < colLoopCnt; colLoopIdx++) {
         if constexpr (hasOffset) {
-            MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_BLK>(vOffset, ubOffsetAddr + colLoopIdx * colBaseSize);
+            Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_BLK>(vOffset, ubOffsetAddr + colLoopIdx * colBaseSize);
         }
-        MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_BLK>(vScale, ubScaleAddr + colLoopIdx * colBaseSize);
+        Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_BLK>(vScale, ubScaleAddr + colLoopIdx * colBaseSize);
 
         // #pragma unroll(4)
         for (uint16_t rowLoop = 0; rowLoop < rowLoopCnt; rowLoop++) {
@@ -152,45 +147,43 @@ __simd_vf__ void AntiquantVFImplW4Nz(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *
             __ubuf__ Q_T *ubDstAddrTmp = ubDstAddr + colDstStride * colLoopIdx + dealBaseNum * rowLoopIdx;
             __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + colSrcStride * colLoopIdx + dealBaseSize * rowLoopIdx;
             ;
-            MicroAPI::LoadAlign<uint8_t, MicroAPI::LoadDist::DIST_UNPACK4_B8>((MicroAPI::RegTensor<uint8_t> &)vKvData,
-                                                                              ubSrcTemp);
+            Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK4_B8>((Reg::RegTensor<uint8_t> &)vKvData, ubSrcTemp);
 
             if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-                MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
-                MicroAPI::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
+                Reg::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
+                Reg::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
             } else {
-                MicroAPI::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
+                Reg::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
             }
 
             if constexpr (hasOffset) {
-                MicroAPI::Add<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vOffset, qTypeMaskAll);
+                Reg::Add<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vOffset, qTypeMaskAll);
             }
-            MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
-            MicroAPI::StoreAlign<Q_T, MicroAPI::StoreDist::DIST_NORM_B16>(ubDstAddrTmp, vRes, qTypeMaskAll);
+            Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
+            Reg::StoreAlign<Q_T, Reg::StoreDist::DIST_NORM_B16>(ubDstAddrTmp, vRes, qTypeMaskAll);
         }
     }
 }
 
 template <typename Q_T, typename KV_T, bool hasOffset>
-__simd_callee__ inline void CastAddMulStoreW4Nz(MicroAPI::RegTensor<int4x2_t> &vKvData,
-                                                MicroAPI::RegTensor<half> &vCastFp16Res, MicroAPI::RegTensor<Q_T> &vRes,
-                                                MicroAPI::RegTensor<Q_T> &vOffset, MicroAPI::RegTensor<Q_T> &vScale,
-                                                __ubuf__ Q_T *ubDstAddr, __ubuf__ uint8_t *ubSrcAddr,
-                                                MicroAPI::MaskReg &kvMaskAll, MicroAPI::MaskReg &qTypeMaskAll)
+__simd_callee__ inline void CastAddMulStoreW4Nz(Reg::RegTensor<int4x2_t> &vKvData, Reg::RegTensor<half> &vCastFp16Res,
+                                                Reg::RegTensor<Q_T> &vRes, Reg::RegTensor<Q_T> &vOffset,
+                                                Reg::RegTensor<Q_T> &vScale, __ubuf__ Q_T *ubDstAddr,
+                                                __ubuf__ uint8_t *ubSrcAddr, Reg::MaskReg &kvMaskAll,
+                                                Reg::MaskReg &qTypeMaskAll)
 {
-    MicroAPI::LoadAlign<uint8_t, MicroAPI::LoadDist::DIST_UNPACK4_B8>((MicroAPI::RegTensor<uint8_t> &)vKvData,
-                                                                      ubSrcAddr);
+    Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK4_B8>((Reg::RegTensor<uint8_t> &)vKvData, ubSrcAddr);
     if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-        MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
-        MicroAPI::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
+        Reg::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
+        Reg::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
     } else {
-        MicroAPI::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
+        Reg::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
     }
     if constexpr (hasOffset) {
-        MicroAPI::Add<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vOffset, qTypeMaskAll);
+        Reg::Add<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vOffset, qTypeMaskAll);
     }
-    MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vScale, vRes, qTypeMaskAll);
-    MicroAPI::StoreAlign<Q_T, MicroAPI::StoreDist::DIST_NORM_B16>(ubDstAddr, vRes, qTypeMaskAll);
+    Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vScale, vRes, qTypeMaskAll);
+    Reg::StoreAlign<Q_T, Reg::StoreDist::DIST_NORM_B16>(ubDstAddr, vRes, qTypeMaskAll);
 }
 
 template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSize, bool hasOffset = false>
@@ -198,16 +191,16 @@ __simd_vf__ void AntiquantVFImplW4PerTokenNz(__ubuf__ uint8_t *ubSrcAddr, __ubuf
                                              __ubuf__ Q_T *ubOffsetAddr, __ubuf__ Q_T *ubScaleAddr,
                                              uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData;
-    MicroAPI::RegTensor<Q_T> vOffsetFirst;
-    MicroAPI::RegTensor<Q_T> vOffsetBack;
-    MicroAPI::RegTensor<Q_T> vScaleFirst;
-    MicroAPI::RegTensor<Q_T> vScaleBack;
-    MicroAPI::RegTensor<Q_T> vRes;
-    MicroAPI::RegTensor<half> vCastFp16Res;
+    Reg::RegTensor<int4x2_t> vKvData;
+    Reg::RegTensor<Q_T> vOffsetFirst;
+    Reg::RegTensor<Q_T> vOffsetBack;
+    Reg::RegTensor<Q_T> vScaleFirst;
+    Reg::RegTensor<Q_T> vScaleBack;
+    Reg::RegTensor<Q_T> vRes;
+    Reg::RegTensor<half> vCastFp16Res;
 
-    MicroAPI::MaskReg kvTypeMaskAll = MicroAPI::CreateMask<int4x2_t, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qTypeMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>(); // Q_T 所有元素（共128个）
+    Reg::MaskReg kvTypeMaskAll = Reg::CreateMask<int4x2_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qTypeMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>(); // Q_T 所有元素（共128个）
 
     // UB总共dealRowCount行 * baseSize列，每次处理8行 * 16列 = 128个元素
     const uint32_t rowBaseSize = 8;        // 8行
@@ -229,11 +222,11 @@ __simd_vf__ void AntiquantVFImplW4PerTokenNz(__ubuf__ uint8_t *ubSrcAddr, __ubuf
         __ubuf__ Q_T *ubScaleAddrTmp = ubScaleAddr + doubleRowBaseSize * rowLoopIdx;
 
         if constexpr (hasOffset) {
-            MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_E2B_B16>(vOffsetFirst, ubOffsetAddrTmp);
-            MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_E2B_B16>(vOffsetBack, ubOffsetAddrTmp + rowBaseSize);
+            Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_E2B_B16>(vOffsetFirst, ubOffsetAddrTmp);
+            Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_E2B_B16>(vOffsetBack, ubOffsetAddrTmp + rowBaseSize);
         }
-        MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_E2B_B16>(vScaleFirst, ubScaleAddrTmp);
-        MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_E2B_B16>(vScaleBack, ubScaleAddrTmp + rowBaseSize);
+        Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_E2B_B16>(vScaleFirst, ubScaleAddrTmp);
+        Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_E2B_B16>(vScaleBack, ubScaleAddrTmp + rowBaseSize);
 
         for (uint16_t colLoopIdx = 0; colLoopIdx < colLoopCnt; colLoopIdx++) {
             __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + rowSrcStride * rowLoopIdx + colSrcStride * colLoopIdx;
@@ -284,17 +277,17 @@ template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSiz
 __simd_vf__ void AntiquantVFImplW4D64(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *ubDstAddr, __ubuf__ Q_T *ubDstAddr_,
                                       __ubuf__ Q_T *ubOffsetAddr, __ubuf__ Q_T *ubScaleAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData;
-    MicroAPI::RegTensor<Q_T> vOffset;
-    MicroAPI::RegTensor<Q_T> vScale;
-    MicroAPI::RegTensor<Q_T> vRes;
-    MicroAPI::RegTensor<half> vCastFp16Res;
+    Reg::RegTensor<int4x2_t> vKvData;
+    Reg::RegTensor<Q_T> vOffset;
+    Reg::RegTensor<Q_T> vScale;
+    Reg::RegTensor<Q_T> vRes;
+    Reg::RegTensor<half> vCastFp16Res;
 
-    MicroAPI::MaskReg qTypeMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qTypeMaskLower64 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::VL64>();
-    MicroAPI::MaskReg qTypeMaskHigher64;
-    MicroAPI::Xor(qTypeMaskHigher64, qTypeMaskLower64, qTypeMaskAll,
-                  qTypeMaskAll); // qTypeMaskAll与qTypeMaskLower64异或得到qTypeMaskHigher64
+    Reg::MaskReg qTypeMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qTypeMaskLower64 = Reg::CreateMask<Q_T, Reg::MaskPattern::VL64>();
+    Reg::MaskReg qTypeMaskHigher64;
+    Reg::Xor(qTypeMaskHigher64, qTypeMaskLower64, qTypeMaskAll,
+             qTypeMaskAll); // qTypeMaskAll与qTypeMaskLower64异或得到qTypeMaskHigher64
 
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 2;
@@ -302,32 +295,32 @@ __simd_vf__ void AntiquantVFImplW4D64(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T 
 
     __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr;
     if constexpr (hasOffset) {
-        MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_NORM>(vOffset, ubOffsetAddr);
+        Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_NORM>(vOffset, ubOffsetAddr);
     }
-    MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_NORM>(vScale, ubScaleAddr);
+    Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_NORM>(vScale, ubScaleAddr);
 
     // #pragma unroll(4)
     for (uint16_t dealRowIdx = 0; dealRowIdx < loopCnt; dealRowIdx++) {
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData, ubSrcTemp, baseSize);
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData, ubSrcTemp, baseSize);
         if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-            MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, qTypeMaskAll);
-            MicroAPI::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, qTypeMaskAll);
+            Reg::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, qTypeMaskAll);
+            Reg::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, qTypeMaskAll);
         } else {
-            MicroAPI::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, qTypeMaskAll);
+            Reg::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, qTypeMaskAll);
         }
 
         if constexpr (hasOffset) {
-            MicroAPI::Add<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vOffset, qTypeMaskAll);
+            Reg::Add<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vOffset, qTypeMaskAll);
         }
 
-        MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
+        Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
 
         // vRes fp16 128个元素
-        MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ubDstAddr, vRes, blockStride, repeatStride, qTypeMaskLower64);
 
-        MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ubDstAddr_, vRes, blockStride, repeatStride, qTypeMaskHigher64);
     }
 }
@@ -353,86 +346,83 @@ __simd_vf__ void AntiquantVFImplW4PerTokenD64(__ubuf__ uint8_t *ubSrcAddr, __ubu
                                               __ubuf__ Q_T *ubDstAddr_, __ubuf__ ANTIQ_PARAMS_T *ubOffsetAddr,
                                               __ubuf__ ANTIQ_PARAMS_T *ubScaleAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData;
-    MicroAPI::RegTensor<ANTIQ_PARAMS_T> vOffset;
-    MicroAPI::RegTensor<ANTIQ_PARAMS_T> vScale;
-    MicroAPI::RegTensor<Q_T> vOffsetFp16;
-    MicroAPI::RegTensor<Q_T> vOffsetFp16High;
-    MicroAPI::RegTensor<Q_T> vOffsetFp16Low;
-    MicroAPI::RegTensor<Q_T> vScaleFp16;
-    MicroAPI::RegTensor<Q_T> vScaleFp16High;
-    MicroAPI::RegTensor<Q_T> vScaleFp16Low;
-    MicroAPI::RegTensor<Q_T> vRes;
-    MicroAPI::RegTensor<half> vCastFp16Res;
+    Reg::RegTensor<int4x2_t> vKvData;
+    Reg::RegTensor<ANTIQ_PARAMS_T> vOffset;
+    Reg::RegTensor<ANTIQ_PARAMS_T> vScale;
+    Reg::RegTensor<Q_T> vOffsetFp16;
+    Reg::RegTensor<Q_T> vOffsetFp16High;
+    Reg::RegTensor<Q_T> vOffsetFp16Low;
+    Reg::RegTensor<Q_T> vScaleFp16;
+    Reg::RegTensor<Q_T> vScaleFp16High;
+    Reg::RegTensor<Q_T> vScaleFp16Low;
+    Reg::RegTensor<Q_T> vRes;
+    Reg::RegTensor<half> vCastFp16Res;
 
-    MicroAPI::MaskReg maskOne = MicroAPI::CreateMask<ANTIQ_PARAMS_T, MicroAPI::MaskPattern::VL1>();
-    MicroAPI::MaskReg kvMaskAll = MicroAPI::CreateMask<KV_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qTypeMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg maskOne = Reg::CreateMask<ANTIQ_PARAMS_T, Reg::MaskPattern::VL1>();
+    Reg::MaskReg kvMaskAll = Reg::CreateMask<KV_T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qTypeMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
-    MicroAPI::UnalignRegForLoad u0;
-    MicroAPI::UnalignRegForLoad u1;
+    Reg::UnalignRegForLoad u0;
+    Reg::UnalignRegForLoad u1;
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 2;
     uint16_t loopCnt = static_cast<uint16_t>((dealRowCount + 1) / 2); // +1是为了兼容处理奇数行
 
-    MicroAPI::MaskReg qTypeMaskLower64 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::VL64>();
-    MicroAPI::MaskReg qTypeMaskHigher64;
-    MicroAPI::Xor(qTypeMaskHigher64, qTypeMaskLower64, qTypeMaskAll,
-                  qTypeMaskAll); // qTypeMaskAll与qTypeMaskLower64异或得到qTypeMaskHigher64
+    Reg::MaskReg qTypeMaskLower64 = Reg::CreateMask<Q_T, Reg::MaskPattern::VL64>();
+    Reg::MaskReg qTypeMaskHigher64;
+    Reg::Xor(qTypeMaskHigher64, qTypeMaskLower64, qTypeMaskAll,
+             qTypeMaskAll); // qTypeMaskAll与qTypeMaskLower64异或得到qTypeMaskHigher64
 
-    MicroAPI::LoadUnAlignPre(u0, ubScaleAddr);
+    Reg::LoadUnAlignPre(u0, ubScaleAddr);
     if constexpr (hasOffset) {
-        MicroAPI::LoadUnAlignPre(u1, ubOffsetAddr);
+        Reg::LoadUnAlignPre(u1, ubOffsetAddr);
     }
     for (uint16_t dealRowIdx = 0; dealRowIdx < loopCnt; dealRowIdx++) {
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData, ubSrcAddr, baseSize);
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData, ubSrcAddr, baseSize);
         if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-            MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
-            MicroAPI::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
+            Reg::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
+            Reg::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
         } else {
-            MicroAPI::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
+            Reg::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
         }
 
-        MicroAPI::LoadUnAlign<ANTIQ_PARAMS_T>(vScale, u0, ubScaleAddr, 1); // 1表示ub自动往后偏移1个float
-        MicroAPI::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vScaleFp16, vScale, maskOne);
-        MicroAPI::Duplicate<uint16_t, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-            (MicroAPI::RegTensor<uint16_t> &)vScaleFp16Low, (MicroAPI::RegTensor<uint16_t> &)vScaleFp16,
-            qTypeMaskLower64);
+        Reg::LoadUnAlign<ANTIQ_PARAMS_T>(vScale, u0, ubScaleAddr, 1); // 1表示ub自动往后偏移1个float
+        Reg::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vScaleFp16, vScale, maskOne);
+        Reg::Duplicate<uint16_t, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(
+            (Reg::RegTensor<uint16_t> &)vScaleFp16Low, (Reg::RegTensor<uint16_t> &)vScaleFp16, qTypeMaskLower64);
 
-        MicroAPI::LoadUnAlign<ANTIQ_PARAMS_T>(vScale, u0, ubScaleAddr, 1); // 1表示ub自动往后偏移1个float
-        MicroAPI::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vScaleFp16, vScale, maskOne);
-        MicroAPI::Duplicate<uint16_t, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-            (MicroAPI::RegTensor<uint16_t> &)vScaleFp16High, (MicroAPI::RegTensor<uint16_t> &)vScaleFp16,
-            qTypeMaskHigher64);
-        MicroAPI::Or<uint16_t, MicroAPI::MaskMergeMode::ZEROING>(
-            (MicroAPI::RegTensor<uint16_t> &)vScaleFp16, (MicroAPI::RegTensor<uint16_t> &)vScaleFp16Low,
-            (MicroAPI::RegTensor<uint16_t> &)vScaleFp16High, kvMaskAll);
+        Reg::LoadUnAlign<ANTIQ_PARAMS_T>(vScale, u0, ubScaleAddr, 1); // 1表示ub自动往后偏移1个float
+        Reg::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vScaleFp16, vScale, maskOne);
+        Reg::Duplicate<uint16_t, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(
+            (Reg::RegTensor<uint16_t> &)vScaleFp16High, (Reg::RegTensor<uint16_t> &)vScaleFp16, qTypeMaskHigher64);
+        Reg::Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t> &)vScaleFp16,
+                                                       (Reg::RegTensor<uint16_t> &)vScaleFp16Low,
+                                                       (Reg::RegTensor<uint16_t> &)vScaleFp16High, kvMaskAll);
         if constexpr (hasOffset) {
-            MicroAPI::LoadUnAlign<ANTIQ_PARAMS_T>(vOffset, u1, ubOffsetAddr, 1); // 1表示ub自动往后偏移1个float
-            MicroAPI::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vOffsetFp16, vOffset, maskOne);
-            MicroAPI::Duplicate<uint16_t, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-                (MicroAPI::RegTensor<uint16_t> &)vOffsetFp16Low, (MicroAPI::RegTensor<uint16_t> &)vOffsetFp16,
-                qTypeMaskLower64);
+            Reg::LoadUnAlign<ANTIQ_PARAMS_T>(vOffset, u1, ubOffsetAddr, 1); // 1表示ub自动往后偏移1个float
+            Reg::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vOffsetFp16, vOffset, maskOne);
+            Reg::Duplicate<uint16_t, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(
+                (Reg::RegTensor<uint16_t> &)vOffsetFp16Low, (Reg::RegTensor<uint16_t> &)vOffsetFp16, qTypeMaskLower64);
 
-            MicroAPI::LoadUnAlign<ANTIQ_PARAMS_T>(vOffset, u1, ubOffsetAddr, 1); // 1表示ub自动往后偏移1个float
-            MicroAPI::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vOffsetFp16, vOffset, maskOne);
-            MicroAPI::Duplicate<uint16_t, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-                (MicroAPI::RegTensor<uint16_t> &)vOffsetFp16High, (MicroAPI::RegTensor<uint16_t> &)vOffsetFp16,
+            Reg::LoadUnAlign<ANTIQ_PARAMS_T>(vOffset, u1, ubOffsetAddr, 1); // 1表示ub自动往后偏移1个float
+            Reg::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vOffsetFp16, vOffset, maskOne);
+            Reg::Duplicate<uint16_t, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(
+                (Reg::RegTensor<uint16_t> &)vOffsetFp16High, (Reg::RegTensor<uint16_t> &)vOffsetFp16,
                 qTypeMaskHigher64);
-            MicroAPI::Or<uint16_t, MicroAPI::MaskMergeMode::ZEROING>(
-                (MicroAPI::RegTensor<uint16_t> &)vOffsetFp16, (MicroAPI::RegTensor<uint16_t> &)vOffsetFp16Low,
-                (MicroAPI::RegTensor<uint16_t> &)vOffsetFp16High, kvMaskAll);
-            MicroAPI::Add<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vOffsetFp16, kvMaskAll);
+            Reg::Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t> &)vOffsetFp16,
+                                                           (Reg::RegTensor<uint16_t> &)vOffsetFp16Low,
+                                                           (Reg::RegTensor<uint16_t> &)vOffsetFp16High, kvMaskAll);
+            Reg::Add<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vOffsetFp16, kvMaskAll);
         }
 
-        MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vScaleFp16, kvMaskAll);
+        Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vScaleFp16, kvMaskAll);
 
         // vRes fp16 128个元素
-        MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ubDstAddr, vRes, blockStride, repeatStride, qTypeMaskLower64);
 
-        MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ubDstAddr_, vRes, blockStride, repeatStride, qTypeMaskHigher64);
     }
 }
@@ -457,14 +447,14 @@ template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSiz
 __simd_vf__ void AntiquantVFImplW4Norm(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *ubDstAddr, __ubuf__ Q_T *ubOffsetAddr,
                                        __ubuf__ Q_T *ubScaleAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData;
-    MicroAPI::RegTensor<Q_T> vOffset;
-    MicroAPI::RegTensor<Q_T> vScale;
-    MicroAPI::RegTensor<Q_T> vRes;
-    MicroAPI::RegTensor<half> vCastFp16Res;
+    Reg::RegTensor<int4x2_t> vKvData;
+    Reg::RegTensor<Q_T> vOffset;
+    Reg::RegTensor<Q_T> vScale;
+    Reg::RegTensor<Q_T> vRes;
+    Reg::RegTensor<half> vCastFp16Res;
 
-    MicroAPI::MaskReg kvMaskAll = MicroAPI::CreateMask<KV_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qTypeMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg kvMaskAll = Reg::CreateMask<KV_T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qTypeMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 1;
@@ -474,28 +464,28 @@ __simd_vf__ void AntiquantVFImplW4Norm(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T
         __ubuf__ Q_T *ubDstAddrTmp = ubDstAddr + blockStride * 128 * colLoopIdx;
         __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + colLoopIdx * 64;
         if constexpr (hasOffset) {
-            MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_NORM>(vOffset, ubOffsetAddr + colLoopIdx * 128);
+            Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_NORM>(vOffset, ubOffsetAddr + colLoopIdx * 128);
         }
-        MicroAPI::LoadAlign<Q_T, MicroAPI::LoadDist::DIST_NORM>(vScale, ubScaleAddr + colLoopIdx * 128);
+        Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_NORM>(vScale, ubScaleAddr + colLoopIdx * 128);
 
         // #pragma unroll(4)
         for (uint16_t dealRowIdx = 0; dealRowIdx < static_cast<uint16_t>(dealRowCount); dealRowIdx++) {
-            MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-                (MicroAPI::RegTensor<uint8_t> &)vKvData, ubSrcTemp, baseSize / 2);
+            Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+                (Reg::RegTensor<uint8_t> &)vKvData, ubSrcTemp, baseSize / 2);
             if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-                MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
-                MicroAPI::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
+                Reg::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
+                Reg::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
             } else {
-                MicroAPI::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
+                Reg::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
             }
 
             if constexpr (hasOffset) {
-                MicroAPI::Add<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vOffset, vRes, qTypeMaskAll);
+                Reg::Add<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vOffset, vRes, qTypeMaskAll);
             }
 
-            MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
+            Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vScale, qTypeMaskAll);
 
-            MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 ubDstAddrTmp, vRes, blockStride, repeatStride, qTypeMaskAll);
         }
     }
@@ -517,15 +507,15 @@ __aicore__ inline void AntiquantVFW4Norm(LocalTensor<KV_T> &antiqInUb, LocalTens
 }
 
 template <typename Q_T, typename ANTIQ_PARAMS_T>
-__simd_callee__ inline void LoadParamAndBroadcast(MicroAPI::RegTensor<ANTIQ_PARAMS_T> &vParam,
-                                                  MicroAPI::RegTensor<Q_T> &vParamFp16, MicroAPI::UnalignRegForLoad &u,
-                                                  __ubuf__ ANTIQ_PARAMS_T *&ubAddr, MicroAPI::MaskReg &maskOne,
-                                                  MicroAPI::MaskReg &qTypeMaskAll)
+__simd_callee__ inline void LoadParamAndBroadcast(Reg::RegTensor<ANTIQ_PARAMS_T> &vParam,
+                                                  Reg::RegTensor<Q_T> &vParamFp16, Reg::UnalignRegForLoad &u,
+                                                  __ubuf__ ANTIQ_PARAMS_T *&ubAddr, Reg::MaskReg &maskOne,
+                                                  Reg::MaskReg &qTypeMaskAll)
 {
-    MicroAPI::LoadUnAlign<ANTIQ_PARAMS_T>(vParam, u, ubAddr, 1); // 1表示ub自动往后偏移1个float
-    MicroAPI::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vParamFp16, vParam, maskOne);
-    MicroAPI::Duplicate<uint16_t, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(
-        (MicroAPI::RegTensor<uint16_t> &)vParamFp16, (MicroAPI::RegTensor<uint16_t> &)vParamFp16, qTypeMaskAll);
+    Reg::LoadUnAlign<ANTIQ_PARAMS_T>(vParam, u, ubAddr, 1); // 1表示ub自动往后偏移1个float
+    Reg::Cast<Q_T, ANTIQ_PARAMS_T, castTraitW4_0>(vParamFp16, vParam, maskOne);
+    Reg::Duplicate<uint16_t, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(
+        (Reg::RegTensor<uint16_t> &)vParamFp16, (Reg::RegTensor<uint16_t> &)vParamFp16, qTypeMaskAll);
 }
 
 template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSize, bool hasOffset = false>
@@ -533,51 +523,51 @@ __simd_vf__ void AntiquantVFImplW4PerTokenD128(__ubuf__ uint8_t *ubSrcAddr, __ub
                                                __ubuf__ ANTIQ_PARAMS_T *ubOffsetAddr,
                                                __ubuf__ ANTIQ_PARAMS_T *ubScaleAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData;
-    MicroAPI::RegTensor<ANTIQ_PARAMS_T> vOffset;
-    MicroAPI::RegTensor<ANTIQ_PARAMS_T> vScale;
-    MicroAPI::RegTensor<Q_T> vOffsetFp16;
-    MicroAPI::RegTensor<Q_T> vScaleFp16;
-    MicroAPI::RegTensor<Q_T> vRes;
-    MicroAPI::RegTensor<half> vCastFp16Res;
-    MicroAPI::MaskReg maskOne = MicroAPI::CreateMask<ANTIQ_PARAMS_T, MicroAPI::MaskPattern::VL1>();
-    MicroAPI::MaskReg kvMaskAll = MicroAPI::CreateMask<KV_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qTypeMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::RegTensor<int4x2_t> vKvData;
+    Reg::RegTensor<ANTIQ_PARAMS_T> vOffset;
+    Reg::RegTensor<ANTIQ_PARAMS_T> vScale;
+    Reg::RegTensor<Q_T> vOffsetFp16;
+    Reg::RegTensor<Q_T> vScaleFp16;
+    Reg::RegTensor<Q_T> vRes;
+    Reg::RegTensor<half> vCastFp16Res;
+    Reg::MaskReg maskOne = Reg::CreateMask<ANTIQ_PARAMS_T, Reg::MaskPattern::VL1>();
+    Reg::MaskReg kvMaskAll = Reg::CreateMask<KV_T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qTypeMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 1;
     const uint16_t colLoopCnt = static_cast<uint16_t>(baseSize / 128);
-    MicroAPI::UnalignRegForLoad u0;
-    MicroAPI::UnalignRegForLoad u1;
+    Reg::UnalignRegForLoad u0;
+    Reg::UnalignRegForLoad u1;
     for (uint16_t colLoopIdx = 0; colLoopIdx < colLoopCnt; colLoopIdx++) {
         __ubuf__ Q_T *ubDstAddrTmp = ubDstAddr + blockStride * 128 * colLoopIdx;
         __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + colLoopIdx * 64;
         __ubuf__ ANTIQ_PARAMS_T *ubScaleAddrTemp = ubScaleAddr;
         __ubuf__ ANTIQ_PARAMS_T *ubOffsetAddrTemp = ubOffsetAddr;
 
-        MicroAPI::LoadUnAlignPre(u0, ubScaleAddrTemp);
+        Reg::LoadUnAlignPre(u0, ubScaleAddrTemp);
         if constexpr (hasOffset) {
-            MicroAPI::LoadUnAlignPre(u1, ubOffsetAddrTemp);
+            Reg::LoadUnAlignPre(u1, ubOffsetAddrTemp);
         }
         for (uint16_t dealRowIdx = 0; dealRowIdx < static_cast<uint16_t>(dealRowCount); dealRowIdx++) {
-            MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-                (MicroAPI::RegTensor<uint8_t> &)vKvData, ubSrcTemp, baseSize / 2);
+            Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+                (Reg::RegTensor<uint8_t> &)vKvData, ubSrcTemp, baseSize / 2);
             if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-                MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
-                MicroAPI::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
+                Reg::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
+                Reg::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
             } else {
-                MicroAPI::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
+                Reg::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
             }
             LoadParamAndBroadcast<Q_T, ANTIQ_PARAMS_T>(vScale, vScaleFp16, u0, ubScaleAddrTemp, maskOne, qTypeMaskAll);
             if constexpr (hasOffset) {
                 LoadParamAndBroadcast<Q_T, ANTIQ_PARAMS_T>(vOffset, vOffsetFp16, u1, ubOffsetAddrTemp, maskOne,
                                                            qTypeMaskAll);
-                MicroAPI::Add<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vOffsetFp16, qTypeMaskAll);
+                Reg::Add<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vOffsetFp16, qTypeMaskAll);
             }
 
-            MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vScaleFp16, qTypeMaskAll);
+            Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vScaleFp16, qTypeMaskAll);
 
-            MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 ubDstAddrTmp, vRes, blockStride, repeatStride, qTypeMaskAll);
         }
     }
@@ -600,24 +590,23 @@ __aicore__ inline void AntiquantVFW4PerTokenD128(LocalTensor<KV_T> &antiqInUb, L
 }
 
 template <typename Q_T, typename KV_T, bool hasOffset>
-__simd_callee__ inline void CastAddMulStoreW4(MicroAPI::RegTensor<int4x2_t> &vKvData,
-                                              MicroAPI::RegTensor<half> &vCastFp16Res, MicroAPI::RegTensor<Q_T> &vRes,
-                                              MicroAPI::RegTensor<Q_T> &vOffsetFp16,
-                                              MicroAPI::RegTensor<Q_T> &vScaleFp16, __ubuf__ Q_T *&ubDstAddr,
-                                              uint32_t blockStride, uint32_t repeatStride, MicroAPI::MaskReg &kvMaskAll,
-                                              MicroAPI::MaskReg &qMaskAll)
+__simd_callee__ inline void CastAddMulStoreW4(Reg::RegTensor<int4x2_t> &vKvData, Reg::RegTensor<half> &vCastFp16Res,
+                                              Reg::RegTensor<Q_T> &vRes, Reg::RegTensor<Q_T> &vOffsetFp16,
+                                              Reg::RegTensor<Q_T> &vScaleFp16, __ubuf__ Q_T *&ubDstAddr,
+                                              uint32_t blockStride, uint32_t repeatStride, Reg::MaskReg &kvMaskAll,
+                                              Reg::MaskReg &qMaskAll)
 {
     if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
-        MicroAPI::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
-        MicroAPI::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
+        Reg::Cast<half, int4x2_t, castTraitW4>(vCastFp16Res, vKvData, kvMaskAll);
+        Reg::Cast<Q_T, half, castTraitW4_2>(vRes, vCastFp16Res, kvMaskAll);
     } else {
-        MicroAPI::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
+        Reg::Cast<Q_T, int4x2_t, castTraitW4>(vRes, vKvData, kvMaskAll);
     }
     if constexpr (hasOffset) {
-        MicroAPI::Add<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vOffsetFp16, qMaskAll);
+        Reg::Add<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vOffsetFp16, qMaskAll);
     }
-    MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vRes, vRes, vScaleFp16, qMaskAll);
-    MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+    Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vRes, vScaleFp16, qMaskAll);
+    Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
         ubDstAddr, vRes, blockStride, repeatStride, qMaskAll);
 }
 
@@ -626,21 +615,21 @@ __simd_vf__ void AntiquantVFImplW4PerTokenD256(__ubuf__ uint8_t *ubSrcAddr, __ub
                                                __ubuf__ Q_T *ubDstAddr, __ubuf__ ANTIQ_PARAMS_T *ubOffsetAddr,
                                                __ubuf__ ANTIQ_PARAMS_T *ubScaleAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData, vKvData1;
-    MicroAPI::RegTensor<ANTIQ_PARAMS_T> vOffset, vScale;
-    MicroAPI::RegTensor<Q_T> vOffsetFp16, vScaleFp16, vRes, vRes1;
-    MicroAPI::RegTensor<half> vCastFp16Res, vCastFp16Res1;
-    MicroAPI::MaskReg maskOne = MicroAPI::CreateMask<ANTIQ_PARAMS_T, MicroAPI::MaskPattern::VL1>();
-    MicroAPI::MaskReg kvMaskAll = MicroAPI::CreateMask<KV_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::RegTensor<int4x2_t> vKvData, vKvData1;
+    Reg::RegTensor<ANTIQ_PARAMS_T> vOffset, vScale;
+    Reg::RegTensor<Q_T> vOffsetFp16, vScaleFp16, vRes, vRes1;
+    Reg::RegTensor<half> vCastFp16Res, vCastFp16Res1;
+    Reg::MaskReg maskOne = Reg::CreateMask<ANTIQ_PARAMS_T, Reg::MaskPattern::VL1>();
+    Reg::MaskReg kvMaskAll = Reg::CreateMask<KV_T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
     uint32_t blockStride = 1 + dealRowCount;
     uint32_t repeatStride = 1;
-    MicroAPI::UnalignRegForLoad u0;
-    MicroAPI::UnalignRegForLoad u1;
-    MicroAPI::LoadUnAlignPre(u0, ubScaleAddr);
+    Reg::UnalignRegForLoad u0;
+    Reg::UnalignRegForLoad u1;
+    Reg::LoadUnAlignPre(u0, ubScaleAddr);
     if constexpr (hasOffset) {
-        MicroAPI::LoadUnAlignPre(u1, ubOffsetAddr);
+        Reg::LoadUnAlignPre(u1, ubOffsetAddr);
     }
     __ubuf__ Q_T *ubDstAddr1 = ubDstAddr + blockStride * 128;
     for (uint16_t j = 0; j < static_cast<uint16_t>(dealRowCount); j++) {
@@ -650,10 +639,10 @@ __simd_vf__ void AntiquantVFImplW4PerTokenD256(__ubuf__ uint8_t *ubSrcAddr, __ub
             LoadParamAndBroadcast<Q_T, ANTIQ_PARAMS_T>(vOffset, vOffsetFp16, u1, ubOffsetAddr, maskOne, qMaskAll);
         }
 
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData, ubSrcAddr, 128); // d=256，ub是uint8_t的，偏移128
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData1, ubSrcAddr1, 128); // d=256，ub是uint8_t的，偏移128
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData, ubSrcAddr, 128); // d=256，ub是uint8_t的，偏移128
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData1, ubSrcAddr1, 128); // d=256，ub是uint8_t的，偏移128
         CastAddMulStoreW4<Q_T, KV_T, hasOffset>(vKvData, vCastFp16Res, vRes, vOffsetFp16, vScaleFp16, ubDstAddr,
                                                 blockStride, repeatStride, kvMaskAll, qMaskAll);
         CastAddMulStoreW4<Q_T, KV_T, hasOffset>(vKvData1, vCastFp16Res1, vRes1, vOffsetFp16, vScaleFp16, ubDstAddr1,
@@ -684,21 +673,21 @@ __simd_vf__ void AntiquantVFImplW4PerTokenD512(__ubuf__ uint8_t *ubSrcAddr, __ub
                                                __ubuf__ Q_T *ubDstAddr, __ubuf__ ANTIQ_PARAMS_T *ubOffsetAddr,
                                                __ubuf__ ANTIQ_PARAMS_T *ubScaleAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<int4x2_t> vKvData, vKvData1, vKvData2, vKvData3;
-    MicroAPI::RegTensor<ANTIQ_PARAMS_T> vOffset, vScale;
-    MicroAPI::RegTensor<Q_T> vOffsetFp16, vScaleFp16, vRes, vRes1, vRes2, vRes3;
-    MicroAPI::RegTensor<half> vCastFp16Res, vCastFp16Res1, vCastFp16Res2, vCastFp16Res3;
-    MicroAPI::MaskReg maskOne = MicroAPI::CreateMask<ANTIQ_PARAMS_T, MicroAPI::MaskPattern::VL1>();
-    MicroAPI::MaskReg kvMaskAll = MicroAPI::CreateMask<KV_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg qMaskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::RegTensor<int4x2_t> vKvData, vKvData1, vKvData2, vKvData3;
+    Reg::RegTensor<ANTIQ_PARAMS_T> vOffset, vScale;
+    Reg::RegTensor<Q_T> vOffsetFp16, vScaleFp16, vRes, vRes1, vRes2, vRes3;
+    Reg::RegTensor<half> vCastFp16Res, vCastFp16Res1, vCastFp16Res2, vCastFp16Res3;
+    Reg::MaskReg maskOne = Reg::CreateMask<ANTIQ_PARAMS_T, Reg::MaskPattern::VL1>();
+    Reg::MaskReg kvMaskAll = Reg::CreateMask<KV_T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qMaskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 1;
-    MicroAPI::UnalignRegForLoad u1;
-    MicroAPI::UnalignRegForLoad u0;
-    MicroAPI::LoadUnAlignPre(u0, ubScaleAddr);
+    Reg::UnalignRegForLoad u1;
+    Reg::UnalignRegForLoad u0;
+    Reg::LoadUnAlignPre(u0, ubScaleAddr);
     if constexpr (hasOffset) {
-        MicroAPI::LoadUnAlignPre(u1, ubOffsetAddr);
+        Reg::LoadUnAlignPre(u1, ubOffsetAddr);
     }
     __ubuf__ Q_T *ubDstAddr1 = ubDstAddr + blockStride * 128;
     __ubuf__ Q_T *ubDstAddr2 = ubDstAddr + blockStride * 128 * 2;
@@ -710,14 +699,14 @@ __simd_vf__ void AntiquantVFImplW4PerTokenD512(__ubuf__ uint8_t *ubSrcAddr, __ub
             LoadParamAndBroadcast<Q_T, ANTIQ_PARAMS_T>(vOffset, vOffsetFp16, u1, ubOffsetAddr, maskOne, qMaskAll);
         }
 
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData, ubSrcAddr, 256); // d=512，ub是uint8_t的，ub往后偏移256
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData1, ubSrcAddr1, 256); // d=512，ub是uint8_t的，偏移256
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData2, ubSrcAddr2, 256); // d=512，ub是uint8_t的，偏移256
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)vKvData3, ubSrcAddr3, 256); // d=512，ub是uint8_t的，偏移256
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData, ubSrcAddr, 256); // d=512，ub是uint8_t的，ub往后偏移256
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData1, ubSrcAddr1, 256); // d=512，ub是uint8_t的，偏移256
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData2, ubSrcAddr2, 256); // d=512，ub是uint8_t的，偏移256
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)vKvData3, ubSrcAddr3, 256); // d=512，ub是uint8_t的，偏移256
         CastAddMulStoreW4<Q_T, KV_T, hasOffset>(vKvData, vCastFp16Res, vRes, vOffsetFp16, vScaleFp16, ubDstAddr,
                                                 blockStride, repeatStride, kvMaskAll, qMaskAll);
         CastAddMulStoreW4<Q_T, KV_T, hasOffset>(vKvData1, vCastFp16Res1, vRes1, vOffsetFp16, vScaleFp16, ubDstAddr1,
@@ -752,53 +741,51 @@ template <typename Q_T, typename KV_T, uint32_t baseSize, bool hasOffset = false
 __simd_vf__ void AntiquantVFImplFP4_d64(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *ubDstAddr, __ubuf__ Q_T *ubDstAddr_,
                                         __ubuf__ Q_T *ubScalerSrcAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<fp4x2_e2m1_t> w_nd_f4;
-    MicroAPI::RegTensor<bfloat16_t> w_nd_bf16;
-    MicroAPI::RegTensor<half> w_nd_f16;
-    MicroAPI::RegTensor<half> w_nd_f16_1;
-    MicroAPI::RegTensor<bfloat16_t> v_mul_res;
-    MicroAPI::RegTensor<bfloat16_t> scale;
-    MicroAPI::RegTensor<half> offset;
+    Reg::RegTensor<fp4x2_e2m1_t> w_nd_f4;
+    Reg::RegTensor<bfloat16_t> w_nd_bf16;
+    Reg::RegTensor<half> w_nd_f16;
+    Reg::RegTensor<half> w_nd_f16_1;
+    Reg::RegTensor<bfloat16_t> v_mul_res;
+    Reg::RegTensor<bfloat16_t> scale;
+    Reg::RegTensor<half> offset;
 
-    MicroAPI::MaskReg preg_0;
-    MicroAPI::MaskReg preg_tmp;
-    MicroAPI::MaskReg preg_prev_64;
-    MicroAPI::MaskReg preg_next_64;
-    preg_0 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
-    preg_prev_64 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::VL64>();
-    preg_tmp = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg preg_0;
+    Reg::MaskReg preg_tmp;
+    Reg::MaskReg preg_prev_64;
+    Reg::MaskReg preg_next_64;
+    preg_0 = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
+    preg_prev_64 = Reg::CreateMask<Q_T, Reg::MaskPattern::VL64>();
+    preg_tmp = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
-    MicroAPI::Xor(preg_next_64, preg_prev_64, preg_tmp, preg_0);
+    Reg::Xor(preg_next_64, preg_prev_64, preg_tmp, preg_0);
     uint32_t dealElementSize = 128; // 一次寄存器能处理的元素个数
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 2;
     uint16_t loopCnt = static_cast<uint16_t>((dealRowCount + 1) / 2); // 加1是为了处理奇数行
     for (uint16_t i = 0; i < loopCnt; i++) {
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)w_nd_f4, ubSrcAddr, 64); // 从UB中读取输入数据
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+            (Reg::RegTensor<uint8_t> &)w_nd_f4, ubSrcAddr, 64); // 从UB中读取输入数据
 
-        MicroAPI::Cast<bfloat16_t, KV_T, castTraitW4>(w_nd_bf16, (MicroAPI::RegTensor<KV_T> &)w_nd_f4, preg_0);
+        Reg::Cast<bfloat16_t, KV_T, castTraitW4>(w_nd_bf16, (Reg::RegTensor<KV_T> &)w_nd_f4, preg_0);
 
         // 加载 scale
-        MicroAPI::LoadAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_E2B_B16>(
+        Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_E2B_B16>(
             scale, (__ubuf__ bfloat16_t *&)ubScalerSrcAddr, 8);
         // mul操作
-        MicroAPI::Mul<bfloat16_t, MicroAPI::MaskMergeMode::ZEROING>(v_mul_res, w_nd_bf16, scale, preg_0);
+        Reg::Mul<bfloat16_t, Reg::MaskMergeMode::ZEROING>(v_mul_res, w_nd_bf16, scale, preg_0);
         if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
             // 将输出结果copy到UB
-            MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 ubDstAddr, v_mul_res, blockStride, repeatStride, preg_prev_64);
-            MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 ubDstAddr_, v_mul_res, blockStride, repeatStride, preg_next_64);
         } else {
-            MicroAPI::Cast<half, bfloat16_t, castTraitW4_1>(w_nd_f16, v_mul_res, preg_0);
+            Reg::Cast<half, bfloat16_t, castTraitW4_1>(w_nd_f16, v_mul_res, preg_0);
             // 将输出结果copy到UB
-            MicroAPI::StoreAlign<half, MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                                 MicroAPI::PostLiteral::POST_MODE_UPDATE>(ubDstAddr, w_nd_f16, blockStride,
-                                                                          repeatStride, preg_prev_64);
-            MicroAPI::StoreAlign<half, MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                                 MicroAPI::PostLiteral::POST_MODE_UPDATE>(ubDstAddr_, w_nd_f16, blockStride,
-                                                                          repeatStride, preg_next_64);
+            Reg::StoreAlign<half, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                ubDstAddr, w_nd_f16, blockStride, repeatStride, preg_prev_64);
+            Reg::StoreAlign<half, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                ubDstAddr_, w_nd_f16, blockStride, repeatStride, preg_next_64);
         }
     }
 }
@@ -822,14 +809,14 @@ template <typename Q_T, typename KV_T, uint32_t baseSize, bool hasOffset = false
 __simd_vf__ void AntiquantVFImplFP4_norm(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *ubDstAddr,
                                          __ubuf__ Q_T *ubScalerSrcAddr, uint32_t dealRowCount)
 {
-    MicroAPI::RegTensor<fp4x2_e2m1_t> w_nd_f4;
-    MicroAPI::RegTensor<bfloat16_t> w_nd_bf16;
-    MicroAPI::RegTensor<half> w_nd_f16;
-    MicroAPI::RegTensor<bfloat16_t> v_mul_res;
-    MicroAPI::RegTensor<bfloat16_t> scale;
+    Reg::RegTensor<fp4x2_e2m1_t> w_nd_f4;
+    Reg::RegTensor<bfloat16_t> w_nd_bf16;
+    Reg::RegTensor<half> w_nd_f16;
+    Reg::RegTensor<bfloat16_t> v_mul_res;
+    Reg::RegTensor<bfloat16_t> scale;
 
-    MicroAPI::MaskReg preg_0;
-    preg_0 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg preg_0;
+    preg_0 = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
 
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 1;
@@ -840,28 +827,26 @@ __simd_vf__ void AntiquantVFImplFP4_norm(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q
         __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + colLoopIdx * 64;
         __ubuf__ Q_T *ubScalerSrcAddrTemp = ubScalerSrcAddr + colLoopIdx * 8; // 每次内层循环开始的ub
         for (uint16_t i = 0; i < static_cast<uint16_t>(dealRowCount); i++) {
-            MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-                (MicroAPI::RegTensor<uint8_t> &)w_nd_f4, ubSrcTemp, baseSize / 2); // 每次ub往后偏移baseSize / 2
+            Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+                (Reg::RegTensor<uint8_t> &)w_nd_f4, ubSrcTemp, baseSize / 2); // 每次ub往后偏移baseSize / 2
 
             // cast操作
-            MicroAPI::Cast<bfloat16_t, KV_T, castTraitW4>(w_nd_bf16, (MicroAPI::RegTensor<KV_T> &)w_nd_f4, preg_0);
+            Reg::Cast<bfloat16_t, KV_T, castTraitW4>(w_nd_bf16, (Reg::RegTensor<KV_T> &)w_nd_f4, preg_0);
             // 加载 scale
-            MicroAPI::LoadAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_E2B_B16>(
+            Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_E2B_B16>(
                 scale, (__ubuf__ bfloat16_t *&)ubScalerSrcAddrTemp, 8 * colLoopCnt);
             // mul操作
-            MicroAPI::Mul<bfloat16_t, MicroAPI::MaskMergeMode::ZEROING>(v_mul_res, w_nd_bf16, scale, preg_0);
+            Reg::Mul<bfloat16_t, Reg::MaskMergeMode::ZEROING>(v_mul_res, w_nd_bf16, scale, preg_0);
 
             if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
                 // 将输出结果copy到UB
-                MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                                     MicroAPI::PostLiteral::POST_MODE_UPDATE>(ubDstAddrTmp, v_mul_res, blockStride,
-                                                                              repeatStride, preg_0);
+                Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                    ubDstAddrTmp, v_mul_res, blockStride, repeatStride, preg_0);
             } else {
-                MicroAPI::Cast<half, bfloat16_t, castTraitW4_1>(w_nd_f16, v_mul_res, preg_0);
+                Reg::Cast<half, bfloat16_t, castTraitW4_1>(w_nd_f16, v_mul_res, preg_0);
                 // 将输出结果copy到UB
-                MicroAPI::StoreAlign<half, MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                                     MicroAPI::PostLiteral::POST_MODE_UPDATE>(ubDstAddrTmp, w_nd_f16, blockStride,
-                                                                              repeatStride, preg_0);
+                Reg::StoreAlign<half, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                    ubDstAddrTmp, w_nd_f16, blockStride, repeatStride, preg_0);
             }
         }
     }
@@ -883,21 +868,21 @@ template <typename Q_T, typename KV_T, uint32_t baseSize, bool hasOffset = false
 __simd_vf__ void AntiquantVFImplFP4_unalign(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T *ubDstAddr,
                                             __ubuf__ Q_T *ubScalerSrcAddr, uint32_t dealRowCount, uint32_t headDim)
 {
-    MicroAPI::RegTensor<fp4x2_e2m1_t> w_nd_f4;
-    MicroAPI::RegTensor<bfloat16_t> w_nd_bf16;
-    MicroAPI::RegTensor<half> w_nd_f16;
-    MicroAPI::RegTensor<bfloat16_t> v_mul_res;
-    MicroAPI::RegTensor<bfloat16_t> scale;
-    MicroAPI::RegTensor<uint16_t> mask_tmp;
-    MicroAPI::RegTensor<uint16_t> prefixSum;
-    MicroAPI::UnalignRegForLoad u0;
+    Reg::RegTensor<fp4x2_e2m1_t> w_nd_f4;
+    Reg::RegTensor<bfloat16_t> w_nd_bf16;
+    Reg::RegTensor<half> w_nd_f16;
+    Reg::RegTensor<bfloat16_t> v_mul_res;
+    Reg::RegTensor<bfloat16_t> scale;
+    Reg::RegTensor<uint16_t> mask_tmp;
+    Reg::RegTensor<uint16_t> prefixSum;
+    Reg::UnalignRegForLoad u0;
 
-    MicroAPI::MaskReg preg_0;
-    MicroAPI::MaskReg preg_1;
-    preg_0 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::Duplicate(mask_tmp, 0x8000);                         // 后续填充MaskReg为c0000000
-    MicroAPI::MaskGenWithRegTensor<uint16_t, 0>(preg_1, mask_tmp); // 0为mask_tmp的偏移
-    MicroAPI::Unsqueeze(prefixSum, preg_1);
+    Reg::MaskReg preg_0;
+    Reg::MaskReg preg_1;
+    preg_0 = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
+    Reg::Duplicate(mask_tmp, 0x8000);                         // 后续填充MaskReg为c0000000
+    Reg::MaskGenWithRegTensor<uint16_t, 0>(preg_1, mask_tmp); // 0为mask_tmp的偏移
+    Reg::Unsqueeze(prefixSum, preg_1);
 
     uint32_t blockStride = dealRowCount + 1;
     uint32_t repeatStride = 1;
@@ -909,30 +894,28 @@ __simd_vf__ void AntiquantVFImplFP4_unalign(__ubuf__ uint8_t *ubSrcAddr, __ubuf_
         __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + colLoopIdx * 64;
         __ubuf__ Q_T *ubScalerSrcAddrTemp = ubScalerSrcAddr + colLoopIdx * 8; // 每次内层循环开始的ub
         for (uint16_t i = 0; i < static_cast<uint16_t>(dealRowCount); i++) {
-            MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK4_B8>(
-                (MicroAPI::RegTensor<uint8_t> &)w_nd_f4, ubSrcTemp, baseSize / 2); // 每次ub往后偏移baseSize / 2
+            Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK4_B8>(
+                (Reg::RegTensor<uint8_t> &)w_nd_f4, ubSrcTemp, baseSize / 2); // 每次ub往后偏移baseSize / 2
 
             // cast操作
-            MicroAPI::Cast<bfloat16_t, KV_T, castTraitW4>(w_nd_bf16, (MicroAPI::RegTensor<KV_T> &)w_nd_f4, preg_0);
+            Reg::Cast<bfloat16_t, KV_T, castTraitW4>(w_nd_bf16, (Reg::RegTensor<KV_T> &)w_nd_f4, preg_0);
             // 加载 scale
-            MicroAPI::LoadUnAlignPre(u0, (__ubuf__ bfloat16_t *&)ubScalerSrcAddrTemp);
-            MicroAPI::LoadUnAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            Reg::LoadUnAlignPre(u0, (__ubuf__ bfloat16_t *&)ubScalerSrcAddrTemp);
+            Reg::LoadUnAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE>(
                 scale, u0, (__ubuf__ bfloat16_t *&)ubScalerSrcAddrTemp, scaleStride);
-            MicroAPI::Gather(scale, scale, prefixSum);
+            Reg::Gather(scale, scale, prefixSum);
             // mul操作
-            MicroAPI::Mul<bfloat16_t, MicroAPI::MaskMergeMode::ZEROING>(v_mul_res, scale, w_nd_bf16, preg_0);
+            Reg::Mul<bfloat16_t, Reg::MaskMergeMode::ZEROING>(v_mul_res, scale, w_nd_bf16, preg_0);
 
             if constexpr (std::is_same<Q_T, bfloat16_t>::value) {
                 // 将输出结果copy到UB
-                MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                                     MicroAPI::PostLiteral::POST_MODE_UPDATE>(ubDstAddrTmp, v_mul_res, blockStride,
-                                                                              repeatStride, preg_0);
+                Reg::StoreAlign<Q_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                    ubDstAddrTmp, v_mul_res, blockStride, repeatStride, preg_0);
             } else {
-                MicroAPI::Cast<half, bfloat16_t, castTraitW4_1>(w_nd_f16, v_mul_res, preg_0);
+                Reg::Cast<half, bfloat16_t, castTraitW4_1>(w_nd_f16, v_mul_res, preg_0);
                 // 将输出结果copy到UB
-                MicroAPI::StoreAlign<half, MicroAPI::DataCopyMode::DATA_BLOCK_COPY,
-                                     MicroAPI::PostLiteral::POST_MODE_UPDATE>(ubDstAddrTmp, w_nd_f16, blockStride,
-                                                                              repeatStride, preg_0);
+                Reg::StoreAlign<half, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                    ubDstAddrTmp, w_nd_f16, blockStride, repeatStride, preg_0);
             }
         }
     }
@@ -1047,42 +1030,42 @@ template <typename Q_T, typename ANTIQ_PARAMS_T>
 __simd_vf__ void AntiqScaleByVFImpl(__ubuf__ uint8_t *ub_src_addr, __ubuf__ half *ub_dst_addr,
                                     __ubuf__ half *ub_dst_addr_, uint16_t loop_cnt, uint32_t tailSize)
 {
-    MicroAPI::RegTensor<uint8_t> w_nd_s8;
-    MicroAPI::RegTensor<bfloat16_t> w_nd_bf16;
-    MicroAPI::RegTensor<bfloat16_t> w_nd_bf16_1;
-    MicroAPI::RegTensor<half> w_nd_f16;
-    MicroAPI::RegTensor<half> w_nd_f16_1;
-    MicroAPI::RegTensor<half> e8m0_zero, e8m0_nan;
-    MicroAPI::RegTensor<int16_t> b16_zero, b16_nan;
-    MicroAPI::MaskReg preg_135;
-    MicroAPI::MaskReg p_e8m0_zero, p_e8m0_nan;
-    preg_135 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::RegTensor<uint8_t> w_nd_s8;
+    Reg::RegTensor<bfloat16_t> w_nd_bf16;
+    Reg::RegTensor<bfloat16_t> w_nd_bf16_1;
+    Reg::RegTensor<half> w_nd_f16;
+    Reg::RegTensor<half> w_nd_f16_1;
+    Reg::RegTensor<half> e8m0_zero, e8m0_nan;
+    Reg::RegTensor<int16_t> b16_zero, b16_nan;
+    Reg::MaskReg preg_135;
+    Reg::MaskReg p_e8m0_zero, p_e8m0_nan;
+    preg_135 = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
     int16_t shift_4bit_0 = 7;
 
-    MicroAPI::Duplicate(e8m0_zero, 0x0);
-    MicroAPI::Duplicate(e8m0_nan, 0x7f80); // 0xff << 7
-    MicroAPI::Duplicate(b16_zero, 0x40);
-    MicroAPI::Duplicate(b16_nan, 0x7fff);
+    Reg::Duplicate(e8m0_zero, 0x0);
+    Reg::Duplicate(e8m0_nan, 0x7f80); // 0xff << 7
+    Reg::Duplicate(b16_zero, 0x40);
+    Reg::Duplicate(b16_nan, 0x7fff);
     for (uint16_t i = 0; i < static_cast<uint16_t>(loop_cnt); i++) {
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)w_nd_s8, ub_src_addr, 128);
-        MicroAPI::ShiftLefts((MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_s8,
-                             shift_4bit_0, preg_135);
-        MicroAPI::Compare<uint16_t, CMPMODE::NE>(p_e8m0_zero, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                                                 (MicroAPI::RegTensor<uint16_t> &)e8m0_zero,
-                                                 preg_135); // 等于0布尔值设置为0
-        MicroAPI::Select((MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                         (MicroAPI::RegTensor<uint16_t> &)b16_zero, p_e8m0_zero); // 布尔值为0的时候，取b16_zero
-        MicroAPI::Compare<uint16_t, CMPMODE::NE>(p_e8m0_nan, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                                                 (MicroAPI::RegTensor<uint16_t> &)e8m0_nan, preg_135);
-        MicroAPI::Select((MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                         (MicroAPI::RegTensor<uint16_t> &)b16_nan, p_e8m0_nan);
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK_B8>(
+            (Reg::RegTensor<uint8_t> &)w_nd_s8, ub_src_addr, 128);
+        Reg::ShiftLefts((Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_s8, shift_4bit_0,
+                        preg_135);
+        Reg::Compare<uint16_t, CMPMODE::NE>(p_e8m0_zero, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                                            (Reg::RegTensor<uint16_t> &)e8m0_zero,
+                                            preg_135); // 等于0布尔值设置为0
+        Reg::Select((Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                    (Reg::RegTensor<uint16_t> &)b16_zero, p_e8m0_zero); // 布尔值为0的时候，取b16_zero
+        Reg::Compare<uint16_t, CMPMODE::NE>(p_e8m0_nan, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                                            (Reg::RegTensor<uint16_t> &)e8m0_nan, preg_135);
+        Reg::Select((Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                    (Reg::RegTensor<uint16_t> &)b16_nan, p_e8m0_nan);
 
-        MicroAPI::Interleave((MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16_1,
-                             (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16);
-        MicroAPI::StoreAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_NORM_B16>(
+        Reg::Interleave((Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_bf16_1,
+                        (Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_bf16);
+        Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B16>(
             (__ubuf__ bfloat16_t *&)ub_dst_addr, w_nd_bf16, 256, preg_135);
-        MicroAPI::StoreAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_NORM_B16>(
+        Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B16>(
             (__ubuf__ bfloat16_t *&)ub_dst_addr_, w_nd_bf16_1, 256, preg_135);
     }
 }
@@ -1091,16 +1074,16 @@ template <typename Q_T, typename ANTIQ_PARAMS_T>
 __simd_vf__ void AntiqScaleByPertokenVFImpl(__ubuf__ ANTIQ_PARAMS_T *ubSrcAddr, __ubuf__ Q_T *ubDstAddr,
                                             uint32_t copyTotalS)
 {
-    MicroAPI::RegTensor<ANTIQ_PARAMS_T> vAntiqParam;
-    MicroAPI::RegTensor<Q_T> vAntiqParamFp16;
-    MicroAPI::MaskReg maskAll = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::RegTensor<ANTIQ_PARAMS_T> vAntiqParam;
+    Reg::RegTensor<Q_T> vAntiqParamFp16;
+    Reg::MaskReg maskAll = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
     uint32_t splitS = 256 / sizeof(ANTIQ_PARAMS_T);
     uint16_t loopCnt = (copyTotalS + splitS - 1) / splitS;
     for (uint16_t i = 0; i < loopCnt; i++) {
-        MicroAPI::LoadAlign<ANTIQ_PARAMS_T, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
-            vAntiqParam, ubSrcAddr, splitS);
-        MicroAPI::Cast<Q_T, ANTIQ_PARAMS_T, castTraitFp32>(vAntiqParamFp16, vAntiqParam, maskAll);
-        MicroAPI::StoreAlign<Q_T, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_PACK_B32>(
+        Reg::LoadAlign<ANTIQ_PARAMS_T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(vAntiqParam,
+                                                                                                     ubSrcAddr, splitS);
+        Reg::Cast<Q_T, ANTIQ_PARAMS_T, castTraitFp32>(vAntiqParamFp16, vAntiqParam, maskAll);
+        Reg::StoreAlign<Q_T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_PACK_B32>(
             ubDstAddr, vAntiqParamFp16, splitS, maskAll);
     }
 }
@@ -1133,38 +1116,38 @@ template <typename Q_T, typename ANTIQ_PARAMS_T>
 __simd_vf__ void AntiqScalePerTokenGroupByVFImpl(__ubuf__ uint8_t *ub_src_addr, __ubuf__ half *ub_dst_addr,
                                                  __ubuf__ half *ub_dst_addr_, uint16_t loop_cnt, uint32_t tailSize)
 {
-    MicroAPI::RegTensor<uint8_t> w_nd_s8;
-    MicroAPI::RegTensor<bfloat16_t> w_nd_bf16;
-    MicroAPI::RegTensor<bfloat16_t> w_nd_bf16_1;
-    MicroAPI::RegTensor<half> w_nd_f16;
-    MicroAPI::RegTensor<half> w_nd_f16_1;
-    MicroAPI::RegTensor<int16_t> b16_zero, b16_nan;
-    MicroAPI::RegTensor<half> e8m0_zero, e8m0_nan;
-    MicroAPI::MaskReg preg_135;
-    MicroAPI::MaskReg p_e8m0_zero, p_e8m0_nan;
-    preg_135 = MicroAPI::CreateMask<Q_T, MicroAPI::MaskPattern::ALL>();
+    Reg::RegTensor<uint8_t> w_nd_s8;
+    Reg::RegTensor<bfloat16_t> w_nd_bf16;
+    Reg::RegTensor<bfloat16_t> w_nd_bf16_1;
+    Reg::RegTensor<half> w_nd_f16;
+    Reg::RegTensor<half> w_nd_f16_1;
+    Reg::RegTensor<int16_t> b16_zero, b16_nan;
+    Reg::RegTensor<half> e8m0_zero, e8m0_nan;
+    Reg::MaskReg preg_135;
+    Reg::MaskReg p_e8m0_zero, p_e8m0_nan;
+    preg_135 = Reg::CreateMask<Q_T, Reg::MaskPattern::ALL>();
     int16_t shift_4bit_0 = 7;
 
-    MicroAPI::Duplicate(b16_zero, 0x40);
-    MicroAPI::Duplicate(b16_nan, 0x7fff);
-    MicroAPI::Duplicate(e8m0_zero, 0x0);
-    MicroAPI::Duplicate(e8m0_nan, 0x7f80); // 0xff << 7
+    Reg::Duplicate(b16_zero, 0x40);
+    Reg::Duplicate(b16_nan, 0x7fff);
+    Reg::Duplicate(e8m0_zero, 0x0);
+    Reg::Duplicate(e8m0_nan, 0x7f80); // 0xff << 7
     for (uint16_t i = 0; i < static_cast<uint16_t>(loop_cnt); i++) {
-        MicroAPI::LoadAlign<uint8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_UNPACK_B8>(
-            (MicroAPI::RegTensor<uint8_t> &)w_nd_s8, ub_src_addr, 128);
-        MicroAPI::ShiftLefts((MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_s8,
-                             shift_4bit_0, preg_135);
-        MicroAPI::Compare<uint16_t, CMPMODE::NE>(p_e8m0_zero, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                                                 (MicroAPI::RegTensor<uint16_t> &)e8m0_zero,
-                                                 preg_135); // 等于0布尔值设置为0
-        MicroAPI::Select((MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                         (MicroAPI::RegTensor<uint16_t> &)b16_zero, p_e8m0_zero); // 布尔值为0的时候，取b16_zero
-        MicroAPI::Compare<uint16_t, CMPMODE::NE>(p_e8m0_nan, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                                                 (MicroAPI::RegTensor<uint16_t> &)e8m0_nan, preg_135);
-        MicroAPI::Select((MicroAPI::RegTensor<uint16_t> &)w_nd_bf16, (MicroAPI::RegTensor<uint16_t> &)w_nd_bf16,
-                         (MicroAPI::RegTensor<uint16_t> &)b16_nan, p_e8m0_nan);
+        Reg::LoadAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK_B8>(
+            (Reg::RegTensor<uint8_t> &)w_nd_s8, ub_src_addr, 128);
+        Reg::ShiftLefts((Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_s8, shift_4bit_0,
+                        preg_135);
+        Reg::Compare<uint16_t, CMPMODE::NE>(p_e8m0_zero, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                                            (Reg::RegTensor<uint16_t> &)e8m0_zero,
+                                            preg_135); // 等于0布尔值设置为0
+        Reg::Select((Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                    (Reg::RegTensor<uint16_t> &)b16_zero, p_e8m0_zero); // 布尔值为0的时候，取b16_zero
+        Reg::Compare<uint16_t, CMPMODE::NE>(p_e8m0_nan, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                                            (Reg::RegTensor<uint16_t> &)e8m0_nan, preg_135);
+        Reg::Select((Reg::RegTensor<uint16_t> &)w_nd_bf16, (Reg::RegTensor<uint16_t> &)w_nd_bf16,
+                    (Reg::RegTensor<uint16_t> &)b16_nan, p_e8m0_nan);
 
-        MicroAPI::StoreAlign<bfloat16_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_NORM_B16>(
+        Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B16>(
             (__ubuf__ bfloat16_t *&)ub_dst_addr, w_nd_bf16, 128, preg_135);
     }
 }

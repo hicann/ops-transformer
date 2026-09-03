@@ -20,7 +20,7 @@
 #include "util_regbase.h"
 
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 using AscendC::DropOutShapeInfo;
 
 namespace regbaseutil {
@@ -76,7 +76,7 @@ __simd_vf__ inline void GenIndexAlign(const uint64_t indexVecDstLocalInt, const 
 
     Arange(inc_idx, 0);
     for (uint16_t s1Idx = 0; s1Idx < static_cast<uint16_t>(rowNums); s1Idx++) {
-        StoreAlign<int32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_NORM_B32>(
+        StoreAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>(
             (__ubuf__ int32_t *&)indexVecDstLocalInt, inc_idx, eachRowIndexNum, preg);
         Adds(inc_idx, inc_idx, eachRowOffset, preg);
     }
@@ -93,12 +93,11 @@ __simd_vf__ inline void GenIndexUnAling(const uint64_t indexVecDstLocalInt, cons
 
     Arange(inc_idx, 0);
     for (uint16_t s1Idx = 0; s1Idx < static_cast<uint16_t>(rowNums); s1Idx++) {
-        StoreUnAlign<int32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t *&)indexVecDstLocalInt,
-                                                                       inc_idx, ureg, eachRowIndexNum);
+        StoreUnAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t *&)indexVecDstLocalInt, inc_idx,
+                                                                  ureg, eachRowIndexNum);
         Adds(inc_idx, inc_idx, eachRowOffset, preg);
     }
-    StoreUnAlignPost<int32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t *&)indexVecDstLocalInt, ureg,
-                                                                       0);
+    StoreUnAlignPost<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ int32_t *&)indexVecDstLocalInt, ureg, 0);
 }
 
 /*
@@ -147,8 +146,8 @@ __simd_vf__ inline void GenMaskVF(__ubuf__ uint32_t *mask, const uint64_t indexV
     Duplicate(v_const_mul_1, (uint32_t)PHILOX_CONST_MUL_1);
 
     for (uint16_t i = 0; i < mainLoop; i++) {
-        LoadAlign<int32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(inc_idx, ((__ubuf__ int32_t *&)indexVecLocalInt),
-                                                                    ELE_CNT_B32);
+        LoadAlign<int32_t, Reg::PostLiteral::POST_MODE_UPDATE>(inc_idx, ((__ubuf__ int32_t *&)indexVecLocalInt),
+                                                               ELE_CNT_B32);
 
         RegTensor<uint32_t> tmp_ctr_0 = ctr_0;
         RegTensor<uint32_t> tmp_ctr_1 = ctr_1;
@@ -190,10 +189,10 @@ __simd_vf__ inline void GenMaskVF(__ubuf__ uint32_t *mask, const uint64_t indexV
         CompareScalar<uint8_t, CMPMODE::LE>(pm_2, tmp_ctr_2_u8, probValueUint8Scalar, preg);
         CompareScalar<uint8_t, CMPMODE::LE>(pm_3, tmp_ctr_3_u8, probValueUint8Scalar, preg);
         // pm是256bit，32Byte，偏移是按照Byte来的
-        StoreAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_0, 32);
-        StoreAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_1, 32);
-        StoreAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_2, 32);
-        StoreAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_3, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_0, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_1, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_2, 32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)mask, pm_3, 32);
     }
 }
 
@@ -345,10 +344,10 @@ __simd_vf__ inline void DropMaskBool2BitVF(const uint64_t srcUb, const uint64_t 
     MaskReg preg_all = CreateMask<uint8_t, MaskPattern::ALL>();
 
     for (uint16_t i = 0; i < loopCount; ++i) {
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vreg_drop, (__ubuf__ uint32_t *&)srcUb, OFFSET_64);
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(vreg_drop, (__ubuf__ uint32_t *&)srcUb, OFFSET_64);
         RegTensor<uint8_t> vreg_tmp = (RegTensor<uint8_t> &)vreg_drop;
         CompareScalar<uint8_t, CMPMODE::EQ>(vreg_cmp, vreg_tmp, 1, preg_all);
-        StoreAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)dstUb, vreg_cmp, OFFSET_32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)dstUb, vreg_cmp, OFFSET_32);
     }
 }
 
@@ -374,13 +373,13 @@ __simd_vf__ inline void DropMaskPadDelVF(const uint64_t srcUb, const uint64_t ds
     for (uint16_t i = 0; i < loopCount; ++i) {
         // srcUb: 12340000 srcUb: 56780000
         // preg1: 11223344 preg2: 55667788
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_US>(
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_US>(
             preg1, (__ubuf__ uint32_t *&)srcUb, OFFSET_32);
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_US>(
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_US>(
             preg2, (__ubuf__ uint32_t *&)srcUb, OFFSET_32);
         // preg3: 12345678
         MaskDeInterleave<uint8_t>(preg3, preg4, preg1, preg2);
-        StoreAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)dstUb, preg3, OFFSET_32);
+        StoreAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>((__ubuf__ uint32_t *&)dstUb, preg3, OFFSET_32);
     }
 }
 

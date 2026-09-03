@@ -15,7 +15,7 @@
 
 namespace ChunkGatedDeltaRule {
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 /*
  * FP32 状态缩放：scale = exp(gCumLast)，state = state * scale。

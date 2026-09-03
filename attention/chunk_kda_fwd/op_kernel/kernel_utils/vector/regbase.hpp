@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 
 #pragma once
 

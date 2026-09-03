@@ -18,7 +18,7 @@
 #include "kernel_tensor.h"
 
 namespace AscendC {
-using namespace MicroAPI;
+using namespace Reg;
 
 template <typename T>
 __simd_vf__ inline void ComputePsinkPartialVF(uint64_t dstLocalInt, uint64_t sinkLocalInt, uint64_t maxLocalInt,
@@ -44,20 +44,20 @@ __simd_vf__ inline void ComputePsinkPartialVF(uint64_t dstLocalInt, uint64_t sin
 
     Duplicate(vregDst, 0.0f);
     for (uint16_t k = 0; k < static_cast<uint16_t>(loopTimes); k++) {
-        LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSink, ((__ubuf__ float *&)sinkLocalInt), 64);
-        LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregMax, ((__ubuf__ float *&)maxLocalInt), 64);
-        LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSum, ((__ubuf__ float *&)sumLocalInt), 64);
+        LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSink, ((__ubuf__ float *&)sinkLocalInt), 64);
+        LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregMax, ((__ubuf__ float *&)maxLocalInt), 64);
+        LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSum, ((__ubuf__ float *&)sumLocalInt), 64);
         ExpSub(vregExp, vregSink, vregMax, pregFullExe);
         Div(vregDiv, vregExp, vregSum, pregFullExe);
-        Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregDiv, pregFullExe);
+        Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregDiv, pregFullExe);
         Add(vregDst, vregDst, vregReduceSum, pregAccu);
     }
-    LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSinkTail, ((__ubuf__ float *&)sinkLocalIntTail), 64);
-    LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregMaxTail, ((__ubuf__ float *&)maxLocalIntTail), 64);
-    LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSumTail, ((__ubuf__ float *&)sumLocalIntTail), 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSinkTail, ((__ubuf__ float *&)sinkLocalIntTail), 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregMaxTail, ((__ubuf__ float *&)maxLocalIntTail), 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSumTail, ((__ubuf__ float *&)sumLocalIntTail), 64);
     ExpSub(vregExp, vregSinkTail, vregMaxTail, pregTailExe);
     Div(vregDiv, vregExp, vregSumTail, pregTailExe);
-    Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregDiv, pregTailExe);
+    Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregDiv, pregTailExe);
     Add(vregDst, vregDst, vregReduceSum, pregAccu);
     StoreUnAlign<T>(((__ubuf__ T *&)dstLocalInt), vregDst, uregRes, 1);
     StoreUnAlignPost<T>(((__ubuf__ T *&)dstLocalInt), uregRes, 0);

@@ -43,53 +43,52 @@ template <typename FloatT>
 struct UIntSortConstCtx {
     using Traits = UIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
-    AscendC::MicroAPI::RegTensor<UInt> zeros;
-    AscendC::MicroAPI::RegTensor<UInt> allOne;
-    AscendC::MicroAPI::RegTensor<UInt> signMask;
-    AscendC::MicroAPI::RegTensor<UInt> nan;
+    AscendC::Reg::RegTensor<UInt> zeros;
+    AscendC::Reg::RegTensor<UInt> allOne;
+    AscendC::Reg::RegTensor<UInt> signMask;
+    AscendC::Reg::RegTensor<UInt> nan;
 };
 
 template <typename FloatT>
-__simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, AscendC::MicroAPI::MaskReg &maskAll)
+__simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
 {
     using Traits = UIntSortTraits<FloatT>;
-    AscendC::MicroAPI::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
-    AscendC::MicroAPI::Duplicate(ctx.allOne, Traits::ALL_ONE, maskAll);
-    AscendC::MicroAPI::Duplicate(ctx.signMask, Traits::SIGN_MASK, maskAll);
-    AscendC::MicroAPI::Duplicate(ctx.nan, Traits::NAN_MASK, maskAll);
+    AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
+    AscendC::Reg::Duplicate(ctx.allOne, Traits::ALL_ONE, maskAll);
+    AscendC::Reg::Duplicate(ctx.signMask, Traits::SIGN_MASK, maskAll);
+    AscendC::Reg::Duplicate(ctx.nan, Traits::NAN_MASK, maskAll);
 }
 
 template <typename FloatT>
-__simd_callee__ inline void UIntToSortableKey(
-    AscendC::MicroAPI::RegTensor<FloatT> &outKey,
-    AscendC::MicroAPI::RegTensor<typename UIntSortConstCtx<FloatT>::UInt> &inVal, UIntSortConstCtx<FloatT> &ctx,
-    AscendC::MicroAPI::MaskReg &maskAll)
+__simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT> &outKey,
+                                              AscendC::Reg::RegTensor<typename UIntSortConstCtx<FloatT>::UInt> &inVal,
+                                              UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
 {
     using Traits = UIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
 
-    AscendC::MicroAPI::RegTensor<UInt> regTemp;
-    AscendC::MicroAPI::RegTensor<UInt> regMask;
-    AscendC::MicroAPI::MaskReg regSelectZero;
-    AscendC::MicroAPI::MaskReg regSelectSign;
+    AscendC::Reg::RegTensor<UInt> regTemp;
+    AscendC::Reg::RegTensor<UInt> regMask;
+    AscendC::Reg::MaskReg regSelectZero;
+    AscendC::Reg::MaskReg regSelectSign;
 
     auto &inBits = inVal;
 
     // 1. 0 check
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::EQ>(regSelectZero, inBits, ctx.zeros, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectZero, inBits, ctx.zeros, maskAll);
 
     // 2. 0 -> -NAN
-    AscendC::MicroAPI::Select((AscendC::MicroAPI::RegTensor<UInt> &)outKey, ctx.nan, inBits, regSelectZero);
+    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt> &)outKey, ctx.nan, inBits, regSelectZero);
 
     // 3. sign bit
-    AscendC::MicroAPI::And(regTemp, (AscendC::MicroAPI::RegTensor<UInt> &)outKey, ctx.signMask, maskAll);
+    AscendC::Reg::And(regTemp, (AscendC::Reg::RegTensor<UInt> &)outKey, ctx.signMask, maskAll);
 
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::GT>(regSelectSign, regTemp, ctx.zeros, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::GT>(regSelectSign, regTemp, ctx.zeros, maskAll);
 
     // 4. xor mask
-    AscendC::MicroAPI::Select(regMask, ctx.signMask, ctx.allOne, regSelectSign);
-    AscendC::MicroAPI::Xor((AscendC::MicroAPI::RegTensor<UInt> &)outKey, (AscendC::MicroAPI::RegTensor<UInt> &)outKey,
-                           regMask, maskAll);
+    AscendC::Reg::Select(regMask, ctx.signMask, ctx.allOne, regSelectSign);
+    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt> &)outKey, (AscendC::Reg::RegTensor<UInt> &)outKey, regMask,
+                      maskAll);
 }
 
 template <typename T>
@@ -119,157 +118,154 @@ template <typename FloatT>
 struct FloatSortConstCtx {
     using Traits = FloatSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
-    AscendC::MicroAPI::RegTensor<UInt> zeros;
-    AscendC::MicroAPI::RegTensor<UInt> allOne;
-    AscendC::MicroAPI::RegTensor<UInt> signMask;
-    AscendC::MicroAPI::RegTensor<UInt> nan;
+    AscendC::Reg::RegTensor<UInt> zeros;
+    AscendC::Reg::RegTensor<UInt> allOne;
+    AscendC::Reg::RegTensor<UInt> signMask;
+    AscendC::Reg::RegTensor<UInt> nan;
 };
 
 template <typename FloatT>
-__simd_callee__ inline void InitFloatSortConstCtx(FloatSortConstCtx<FloatT> &ctx, AscendC::MicroAPI::MaskReg &maskAll)
+__simd_callee__ inline void InitFloatSortConstCtx(FloatSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
 {
     using Traits = FloatSortTraits<FloatT>;
-    AscendC::MicroAPI::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
-    AscendC::MicroAPI::Duplicate(ctx.allOne, Traits::ALL_ONE, maskAll);
-    AscendC::MicroAPI::Duplicate(ctx.signMask, Traits::SIGN_MASK, maskAll);
-    AscendC::MicroAPI::Duplicate(ctx.nan, Traits::NAN_MASK, maskAll);
+    AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
+    AscendC::Reg::Duplicate(ctx.allOne, Traits::ALL_ONE, maskAll);
+    AscendC::Reg::Duplicate(ctx.signMask, Traits::SIGN_MASK, maskAll);
+    AscendC::Reg::Duplicate(ctx.nan, Traits::NAN_MASK, maskAll);
 }
 
 template <typename FloatT>
-__simd_callee__ inline void FloatToSortableKey(MicroAPI::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey,
-                                               MicroAPI::RegTensor<FloatT> &inVal, FloatSortConstCtx<FloatT> &ctx,
-                                               MicroAPI::MaskReg &maskAll)
+__simd_callee__ inline void FloatToSortableKey(Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey,
+                                               Reg::RegTensor<FloatT> &inVal, FloatSortConstCtx<FloatT> &ctx,
+                                               Reg::MaskReg &maskAll)
 {
     using Traits = FloatSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
 
-    AscendC::MicroAPI::RegTensor<UInt> regTemp;
-    AscendC::MicroAPI::RegTensor<UInt> regMask;
-    AscendC::MicroAPI::MaskReg regSelectNan;
-    AscendC::MicroAPI::MaskReg regSelectSign;
+    AscendC::Reg::RegTensor<UInt> regTemp;
+    AscendC::Reg::RegTensor<UInt> regMask;
+    AscendC::Reg::MaskReg regSelectNan;
+    AscendC::Reg::MaskReg regSelectSign;
 
-    auto &inBits = (AscendC::MicroAPI::RegTensor<UInt> &)inVal;
+    auto &inBits = (AscendC::Reg::RegTensor<UInt> &)inVal;
 
     // 1. NaN check
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::EQ>(regSelectNan, inBits, ctx.nan, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectNan, inBits, ctx.nan, maskAll);
 
     // 2. NaN -> ALL_ONE
-    AscendC::MicroAPI::Select(outKey, ctx.allOne, inBits, regSelectNan);
+    AscendC::Reg::Select(outKey, ctx.allOne, inBits, regSelectNan);
 
     // 3. sign bit
-    AscendC::MicroAPI::And(regTemp, outKey, ctx.signMask, maskAll);
+    AscendC::Reg::And(regTemp, outKey, ctx.signMask, maskAll);
 
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::GT>(regSelectSign, regTemp, ctx.zeros, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::GT>(regSelectSign, regTemp, ctx.zeros, maskAll);
 
     // 4. xor mask
-    AscendC::MicroAPI::Select(regMask, ctx.allOne, ctx.signMask, regSelectSign);
-    AscendC::MicroAPI::Xor(outKey, outKey, regMask, maskAll);
+    AscendC::Reg::Select(regMask, ctx.allOne, ctx.signMask, regSelectSign);
+    AscendC::Reg::Xor(outKey, outKey, regMask, maskAll);
 }
 
 template <typename FloatT>
-__simd_callee__ inline void FloatX2ToSortableKey(MicroAPI::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey0,
-                                                 MicroAPI::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey1,
-                                                 MicroAPI::RegTensor<FloatT> &inVal0,
-                                                 MicroAPI::RegTensor<FloatT> &inVal1, FloatSortConstCtx<FloatT> &ctx,
-                                                 MicroAPI::MaskReg &maskAll)
+__simd_callee__ inline void FloatX2ToSortableKey(Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey0,
+                                                 Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey1,
+                                                 Reg::RegTensor<FloatT> &inVal0, Reg::RegTensor<FloatT> &inVal1,
+                                                 FloatSortConstCtx<FloatT> &ctx, Reg::MaskReg &maskAll)
 {
     using Traits = FloatSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
 
-    AscendC::MicroAPI::RegTensor<UInt> regTemp[2];
-    AscendC::MicroAPI::RegTensor<UInt> regMask[2];
-    AscendC::MicroAPI::MaskReg regSelectNan[2];
-    AscendC::MicroAPI::MaskReg regSelectSign[2];
+    AscendC::Reg::RegTensor<UInt> regTemp[2];
+    AscendC::Reg::RegTensor<UInt> regMask[2];
+    AscendC::Reg::MaskReg regSelectNan[2];
+    AscendC::Reg::MaskReg regSelectSign[2];
 
-    auto &inBits0 = (AscendC::MicroAPI::RegTensor<UInt> &)inVal0;
-    auto &inBits1 = (AscendC::MicroAPI::RegTensor<UInt> &)inVal1;
+    auto &inBits0 = (AscendC::Reg::RegTensor<UInt> &)inVal0;
+    auto &inBits1 = (AscendC::Reg::RegTensor<UInt> &)inVal1;
 
     // 1. NaN check
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::EQ>(regSelectNan[0], inBits0, ctx.nan, maskAll);
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::EQ>(regSelectNan[1], inBits1, ctx.nan, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectNan[0], inBits0, ctx.nan, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectNan[1], inBits1, ctx.nan, maskAll);
 
     // 2. NaN -> ALL_ONE
-    AscendC::MicroAPI::Select(outKey0, ctx.allOne, inBits0, regSelectNan[0]);
-    AscendC::MicroAPI::Select(outKey1, ctx.allOne, inBits1, regSelectNan[1]);
+    AscendC::Reg::Select(outKey0, ctx.allOne, inBits0, regSelectNan[0]);
+    AscendC::Reg::Select(outKey1, ctx.allOne, inBits1, regSelectNan[1]);
 
     // 3. sign bit
-    AscendC::MicroAPI::And(regTemp[0], outKey0, ctx.signMask, maskAll);
-    AscendC::MicroAPI::And(regTemp[1], outKey1, ctx.signMask, maskAll);
+    AscendC::Reg::And(regTemp[0], outKey0, ctx.signMask, maskAll);
+    AscendC::Reg::And(regTemp[1], outKey1, ctx.signMask, maskAll);
 
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::GT>(regSelectSign[0], regTemp[0], ctx.zeros, maskAll);
-    AscendC::MicroAPI::Compare<UInt, CMPMODE::GT>(regSelectSign[1], regTemp[1], ctx.zeros, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::GT>(regSelectSign[0], regTemp[0], ctx.zeros, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::GT>(regSelectSign[1], regTemp[1], ctx.zeros, maskAll);
 
     // 4. xor mask
-    AscendC::MicroAPI::Select(regMask[0], ctx.allOne, ctx.signMask, regSelectSign[0]);
-    AscendC::MicroAPI::Select(regMask[1], ctx.allOne, ctx.signMask, regSelectSign[1]);
-    AscendC::MicroAPI::Xor(outKey0, outKey0, regMask[0], maskAll);
-    AscendC::MicroAPI::Xor(outKey1, outKey1, regMask[1], maskAll);
+    AscendC::Reg::Select(regMask[0], ctx.allOne, ctx.signMask, regSelectSign[0]);
+    AscendC::Reg::Select(regMask[1], ctx.allOne, ctx.signMask, regSelectSign[1]);
+    AscendC::Reg::Xor(outKey0, outKey0, regMask[0], maskAll);
+    AscendC::Reg::Xor(outKey1, outKey1, regMask[1], maskAll);
 }
 
 template <typename T, size_t N>
-__simd_callee__ inline void DuplicateZero(AscendC::MicroAPI::RegTensor<T> (&regArray)[N],
-                                          AscendC::MicroAPI::MaskReg &mask)
+__simd_callee__ inline void DuplicateZero(AscendC::Reg::RegTensor<T> (&regArray)[N], AscendC::Reg::MaskReg &mask)
 {
     static_assert(N <= 4, "N must be <= 4");
     // 不能用循环, 会导致fatal error: error in backend: Unsupported Inst must be hoisted.
     if constexpr (N >= 1) {
-        AscendC::MicroAPI::Duplicate(regArray[0], static_cast<T>(0), mask);
+        AscendC::Reg::Duplicate(regArray[0], static_cast<T>(0), mask);
     }
     if constexpr (N >= 2) {
-        AscendC::MicroAPI::Duplicate(regArray[1], static_cast<T>(0), mask);
+        AscendC::Reg::Duplicate(regArray[1], static_cast<T>(0), mask);
     }
     if constexpr (N >= 3) {
-        AscendC::MicroAPI::Duplicate(regArray[2], static_cast<T>(0), mask);
+        AscendC::Reg::Duplicate(regArray[2], static_cast<T>(0), mask);
     }
     if constexpr (N >= 4) {
-        AscendC::MicroAPI::Duplicate(regArray[3], static_cast<T>(0), mask);
+        AscendC::Reg::Duplicate(regArray[3], static_cast<T>(0), mask);
     }
 }
 
 template <typename T, size_t N, bool ApplyRelu = true>
-__simd_callee__ inline void WeightedAccum(AscendC::MicroAPI::RegTensor<T> (&accum)[N],
-                                          AscendC::MicroAPI::RegTensor<T> (&input)[N],
-                                          AscendC::MicroAPI::RegTensor<T> &weight, AscendC::MicroAPI::MaskReg &mask)
+__simd_callee__ inline void WeightedAccum(AscendC::Reg::RegTensor<T> (&accum)[N],
+                                          AscendC::Reg::RegTensor<T> (&input)[N], AscendC::Reg::RegTensor<T> &weight,
+                                          AscendC::Reg::MaskReg &mask)
 {
     static_assert(N <= 2, "N must be <= 2");
     // ---- Relu block ----
     if constexpr (ApplyRelu) {
         if constexpr (N >= 1) {
-            AscendC::MicroAPI::Relu(input[0], input[0], mask);
+            AscendC::Reg::Relu(input[0], input[0], mask);
         }
         if constexpr (N >= 2) {
-            AscendC::MicroAPI::Relu(input[1], input[1], mask);
+            AscendC::Reg::Relu(input[1], input[1], mask);
         }
     }
     // ---- MulAdd block ----
     if constexpr (N >= 1) {
-        AscendC::MicroAPI::MulAddDst(accum[0], input[0], weight, mask);
+        AscendC::Reg::MulAddDst(accum[0], input[0], weight, mask);
     }
     if constexpr (N >= 2) {
-        AscendC::MicroAPI::MulAddDst(accum[1], input[1], weight, mask);
+        AscendC::Reg::MulAddDst(accum[1], input[1], weight, mask);
     }
 }
 
-__simd_callee__ inline void BroadcastLane(AscendC::MicroAPI::RegTensor<float> &dst,
-                                          AscendC::MicroAPI::RegTensor<float> &src, uint16_t laneIdx)
-{
-    AscendC::MicroAPI::RegTensor<uint32_t> brcGatherIndex;
-    AscendC::MicroAPI::Duplicate(brcGatherIndex, laneIdx);
-    AscendC::MicroAPI::Gather(dst, src, brcGatherIndex);
-}
-
-__simd_callee__ inline void BroadcastLane(AscendC::MicroAPI::RegTensor<bfloat16_t> &dst,
-                                          AscendC::MicroAPI::RegTensor<bfloat16_t> &src, uint16_t laneIdx)
-{
-    AscendC::MicroAPI::RegTensor<uint16_t> brcGatherIndex;
-    AscendC::MicroAPI::Duplicate(brcGatherIndex, laneIdx);
-    AscendC::MicroAPI::Gather(dst, src, brcGatherIndex);
-}
-
-__simd_callee__ inline void BroadcastLane(AscendC::MicroAPI::RegTensor<float> &dst, __ubuf__ float *src,
+__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float> &dst, AscendC::Reg::RegTensor<float> &src,
                                           uint16_t laneIdx)
 {
-    AscendC::MicroAPI::LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + laneIdx);
+    AscendC::Reg::RegTensor<uint32_t> brcGatherIndex;
+    AscendC::Reg::Duplicate(brcGatherIndex, laneIdx);
+    AscendC::Reg::Gather(dst, src, brcGatherIndex);
+}
+
+__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<bfloat16_t> &dst,
+                                          AscendC::Reg::RegTensor<bfloat16_t> &src, uint16_t laneIdx)
+{
+    AscendC::Reg::RegTensor<uint16_t> brcGatherIndex;
+    AscendC::Reg::Duplicate(brcGatherIndex, laneIdx);
+    AscendC::Reg::Gather(dst, src, brcGatherIndex);
+}
+
+__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float> &dst, __ubuf__ float *src, uint16_t laneIdx)
+{
+    AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + laneIdx);
 }
 
 } // namespace liV2Vector1

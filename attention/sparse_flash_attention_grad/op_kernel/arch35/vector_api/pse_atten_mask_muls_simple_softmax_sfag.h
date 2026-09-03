@@ -153,14 +153,14 @@ __simd_vf__ inline void SinkSoftMaxVF(uint64_t sinkAddr, uint64_t maxAddr, uint6
     RegTensor<float> vregSink, vregMax, vregSum, vregSub, vregExp, vregDiv;
     MaskReg pregTail = UpdateMask<float>(tailSize); // mask 控制处理的元素数（仅 [0:halfG) lane 有效）
     // 单次加载 64 元素（halfG ≤ 64）；[halfG:64] lane 读到的是 TQue UB 后续内容，pregTail 会屏蔽掉
-    LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSink, (__ubuf__ float *&)sinkAddr, 64);
-    LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregMax, (__ubuf__ float *&)maxAddr, 64);
-    LoadAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSum, (__ubuf__ float *&)sumAddr, 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSink, (__ubuf__ float *&)sinkAddr, 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregMax, (__ubuf__ float *&)maxAddr, 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSum, (__ubuf__ float *&)sumAddr, 64);
     Sub(vregSub, vregSink, vregMax, pregTail); // sink - max
     Exp(vregExp, vregSub, pregTail);           // exp(sink-max)
     Div(vregDiv, vregExp, vregSum, pregTail);  // exp / sum
-    StoreAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_NORM_B32>(
-        (__ubuf__ float *&)dstAddr, vregDiv, 64, pregTail);
+    StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstAddr,
+                                                                                         vregDiv, 64, pregTail);
 }
 
 // CalculateSinkSimpleSoftMax：P_sink = exp(sink-max)/sum，微指令直接读 sink 专用 TQue
@@ -225,7 +225,7 @@ __simd_vf__ inline void SinkNegRowSumVF(uint64_t dstAddr, uint64_t pAddr, uint64
         ReduceSum(vregReduceSum, vregMul, pregTailExe);
         Sub(vregRes, vregRes, vregReduceSum, pregAccu);
         // 每 head 标量写 dst[m]，POST_MODE_UPDATE 自动推进 dstAddr 一个元素
-        StoreUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)dstAddr), vregRes, uregRes, 1);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)dstAddr), vregRes, uregRes, 1);
     }
     vstas(uregRes, ((__ubuf__ T *&)dstAddr), 0, POST_UPDATE);
 }

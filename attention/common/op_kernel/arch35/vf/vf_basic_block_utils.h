@@ -36,68 +36,68 @@ constexpr float INV_LN2 = static_cast<float>(1.4426950409F);
 /* **************************************************************************************************
  * Muls + Select(optional) + SoftmaxFlashV2 + Cast(fp32->fp16/bf16) + ND2NZ
  * ************************************************************************************************* */
-using namespace MicroAPI;
+using namespace Reg;
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitNoneZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitNoneZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_NONE,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitOne = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitOne = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitTwo = {
-    AscendC::MicroAPI::RegLayout::TWO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitTwo = {
+    AscendC::Reg::RegLayout::TWO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitThree = {
-    AscendC::MicroAPI::RegLayout::THREE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitThree = {
+    AscendC::Reg::RegLayout::THREE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintOne = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintOne = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintTwo = {
-    AscendC::MicroAPI::RegLayout::TWO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintTwo = {
+    AscendC::Reg::RegLayout::TWO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintThree = {
-    AscendC::MicroAPI::RegLayout::THREE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintThree = {
+    AscendC::Reg::RegLayout::THREE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
@@ -609,48 +609,32 @@ constexpr static AscendC::MicroAPI::CastTrait castTraitRintThree = {
  * ************************************************************************************************* */
 #define DO_LOADALIGN_MASK_6(cmp, mub, pad) \
     do { \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##1, mub##1, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##2, mub##2, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##3, mub##3, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##4, mub##4, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##5, mub##5, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##6, mub##6, \
-                                                                                                  pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##1, mub##1, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##2, mub##2, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##3, mub##3, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##4, mub##4, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##5, mub##5, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##6, mub##6, pad); \
     } while (0)
 
 #define DO_LOADALIGN_MASK_8(cmp, mub, pad) \
     do { \
         DO_LOADALIGN_MASK_6(cmp, mub, pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##7, mub##7, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##8, mub##8, \
-                                                                                                  pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##7, mub##7, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##8, mub##8, pad); \
     } while (0)
 
 #define DO_LOADALIGN_MASK_16(cmp, mub, pad) \
     do { \
         DO_LOADALIGN_MASK_8(cmp, mub, pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##9, mub##9, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##10, mub##10, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##11, mub##11, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##12, mub##12, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##13, mub##13, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##14, mub##14, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##15, mub##15, \
-                                                                                                  pad); \
-        LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(cmp##16, mub##16, \
-                                                                                                  pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##9, mub##9, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##10, mub##10, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##11, mub##11, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##12, mub##12, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##13, mub##13, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##14, mub##14, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##15, mub##15, pad); \
+        LoadAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::MaskDist::DIST_DS>(cmp##16, mub##16, pad); \
     } while (0)
 
 /* **************************************************************************************************
@@ -658,48 +642,48 @@ constexpr static AscendC::MicroAPI::CastTrait castTraitRintThree = {
  * ************************************************************************************************* */
 #define DO_STOREALIGN_6(T, buf, val, stride, idx, mask) \
     do { \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 0 + idx * stride, \
-                                                          val##1, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 1 + idx * stride, \
-                                                          val##2, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 2 + idx * stride, \
-                                                          val##3, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 3 + idx * stride, \
-                                                          val##4, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 4 + idx * stride, \
-                                                          val##5, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 5 + idx * stride, \
-                                                          val##6, mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 0 + idx * stride, val##1, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 1 + idx * stride, val##2, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 2 + idx * stride, val##3, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 3 + idx * stride, val##4, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 4 + idx * stride, val##5, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 5 + idx * stride, val##6, \
+                                                     mask); \
     } while (0)
 
 #define DO_STOREALIGN_8(T, buf, val, stride, idx, mask) \
     do { \
         DO_STOREALIGN_6(T, buf, val, stride, idx, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 6 + idx * stride, \
-                                                          val##7, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 7 + idx * stride, \
-                                                          val##8, mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 6 + idx * stride, val##7, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 7 + idx * stride, val##8, \
+                                                     mask); \
     } while (0)
 
 #define DO_STOREALIGN_16(T, buf, val, stride, idx, mask) \
     do { \
         DO_STOREALIGN_8(T, buf, val, stride, idx, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 8 + idx * stride, \
-                                                          val##9, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 9 + idx * stride, \
-                                                          val##10, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 10 + idx * stride, \
-                                                          val##11, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 11 + idx * stride, \
-                                                          val##12, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 12 + idx * stride, \
-                                                          val##13, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 13 + idx * stride, \
-                                                          val##14, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 14 + idx * stride, \
-                                                          val##15, mask); \
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 15 + idx * stride, \
-                                                          val##16, mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 8 + idx * stride, val##9, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 9 + idx * stride, val##10, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 10 + idx * stride, val##11, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 11 + idx * stride, val##12, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 12 + idx * stride, val##13, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 13 + idx * stride, val##14, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 14 + idx * stride, val##15, \
+                                                     mask); \
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)buf + floatRepSize * 15 + idx * stride, val##16, \
+                                                     mask); \
     } while (0)
 /* **************************************************************************************************
  * maskUb reference-pointer declarations: __ubuf__ uint32_t *&maskUbN

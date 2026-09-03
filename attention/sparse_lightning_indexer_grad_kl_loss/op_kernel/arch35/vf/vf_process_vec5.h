@@ -18,7 +18,7 @@
 #include "kernel_tensor.h"
 
 namespace AscendC {
-using namespace MicroAPI;
+using namespace Reg;
 
 template <typename T, bool isAlign>
 __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ T *srcOtherUb,
@@ -47,7 +47,7 @@ __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
     Duplicate(vreg_max, maxValue);
     Duplicate(vreg_zero, 0.0f);
     Duplicate(vreg_output_x, 0.0f);
-    LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_dst, dstUb);
+    LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_dst, dstUb);
     for (uint16_t i = 0; i < alignCnt; ++i) {
         LoadAlign(vreg_input_x1, srcUb + i * floatRepSize);
         LoadAlign(vreg_input_other1, srcOtherUb + i * floatRepSize);
@@ -87,8 +87,7 @@ __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
         Mul(vreg_output_x_new, vreg_tmp2, vreg_input_x2_new, preg_all_b32);
         Add(vreg_output_x, vreg_output_x_new, vreg_output_x, preg_all_b32);
     }
-    Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_output, vreg_output_x,
-                                                                                      preg_all_b32);
+    Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_output, vreg_output_x, preg_all_b32);
     Add(vreg_dst, vreg_output, vreg_dst, preg_all_b32);
     StoreAlign(((__ubuf__ T *&)dstUb), vreg_dst, preg_loss);
 }

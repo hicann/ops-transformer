@@ -17,7 +17,7 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-using namespace MicroAPI;
+using namespace Reg;
 /* **************************************************************************************************
 
 SUB *
@@ -48,12 +48,12 @@ __simd_vf__ inline void ReduceSinkVF(uint64_t dstLocalInt, uint64_t srcLocalInt,
     Duplicate(vregRes, 0);
     for (uint16_t n = 0; n < loopTimes; n++) {
         LoadAlign(vregSrc, ((__ubuf__ T *&)srcLocalInt + n * fullExeSize));
-        Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregSrc, pregFullExe);
+        Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregSrc, pregFullExe);
         Add(vregRes, vregRes, vregReduceSum, pregAccu);
     }
     // 尾块
     LoadAlign(vregSrcTail, ((__ubuf__ T *&)srcLocalIntTail));
-    Reduce<MicroAPI::ReduceType::SUM>(vregReduceSumTail, vregSrcTail, pregTailExe);
+    Reduce<Reg::ReduceType::SUM>(vregReduceSumTail, vregSrcTail, pregTailExe);
     Add(vregRes, vregRes, vregReduceSumTail, pregAccu);
     StoreUnAlign<T>(((__ubuf__ T *&)dstLocalInt), vregRes, uregRes, 1);
     StoreUnAlignPost<T>(((__ubuf__ T *&)dstLocalInt), uregRes, 0);

@@ -22,28 +22,27 @@ __simd_vf__ void MulQrVFImpl(__ubuf__ T *inputBuf, __ubuf__ T *outputBuf, __ubuf
                              const uint16_t floatRepSize, uint16_t repeatTimes, float quantScaleCkvRope,
                              uint64_t computeBlockAlign)
 {
-    MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
 
     for (uint16_t i = 0; i < repeatTimes; i++) {
-        MicroAPI::RegTensor<T> vregSrc;
-        MicroAPI::RegTensor<T> vregQuantScale;
-        MicroAPI::RegTensor<T> vregDequantScaleVrcb;
-        MicroAPI::RegTensor<T> vregMulScale;
-        MicroAPI::RegTensor<T> vregRes;
+        Reg::RegTensor<T> vregSrc;
+        Reg::RegTensor<T> vregQuantScale;
+        Reg::RegTensor<T> vregDequantScaleVrcb;
+        Reg::RegTensor<T> vregMulScale;
+        Reg::RegTensor<T> vregRes;
         uint16_t loopOffset = i * floatRepSize;             // 计算数据偏移
         uint16_t dequantLoopOffset = i * computeBlockAlign; // 动态量化参数偏移
 
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregSrc, inputBuf + loopOffset);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_NORM>(vregSrc, inputBuf + loopOffset);
         // broadcast量化系数
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vregDequantScaleVrcb,
-                                                                 dequantScaleBrcbBuf + dequantLoopOffset);
-        MicroAPI::Duplicate(vregQuantScale, quantScaleCkvRope);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vregDequantScaleVrcb, dequantScaleBrcbBuf + dequantLoopOffset);
+        Reg::Duplicate(vregQuantScale, quantScaleCkvRope);
 
-        MicroAPI::Div(vregMulScale, vregQuantScale, vregDequantScaleVrcb, pregAll);
+        Reg::Div(vregMulScale, vregQuantScale, vregDequantScaleVrcb, pregAll);
 
-        MicroAPI::Mul<T, MicroAPI::MaskMergeMode::ZEROING>(vregRes, vregSrc, vregMulScale, pregAll);
+        Reg::Mul<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregSrc, vregMulScale, pregAll);
 
-        MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM>(outputBuf + loopOffset, vregRes, pregAll);
+        Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM>(outputBuf + loopOffset, vregRes, pregAll);
     }
 }
 

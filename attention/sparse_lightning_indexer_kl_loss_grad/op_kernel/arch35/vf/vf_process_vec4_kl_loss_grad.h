@@ -18,7 +18,7 @@
 #include "kernel_tensor.h"
 
 namespace AscendC {
-using namespace MicroAPI;
+using namespace Reg;
 
 template <typename T>
 __simd_vf__ inline void ProcessVec4BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ T *maxUb, __ubuf__ T *sumUb,
@@ -42,8 +42,8 @@ __simd_vf__ inline void ProcessVec4BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
         LoadAlign(vreg_input_x2, srcUb + i * nBaseSize + floatRepSize);
         Muls(vreg_input_x1, vreg_input_x1, scaleValue, preg_all_b32);
         Muls(vreg_input_x2, vreg_input_x2, scaleValue, preg_all_b32);
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_max, maxUb + i);
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_sum, sumUb + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max, maxUb + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_sum, sumUb + i);
         ExpSub(vreg_tmp1, vreg_input_x1, vreg_max, preg_all_b32);
         ExpSub(vreg_tmp2, vreg_input_x2, vreg_max, preg_all_b32);
         Div(vreg_input_x1, vreg_tmp1, vreg_sum, preg_all_b32);

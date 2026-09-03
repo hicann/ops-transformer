@@ -36,11 +36,11 @@ __simd_callee__ static inline void PostReduceStage512(
     __ubuf__ T2 *expUb3, __ubuf__ T2 *expUb4, const uint32_t blockStride, const uint32_t repeatStride,
     MaskReg &preg_all, MaskReg &preg_all_b16)
 {
-    StoreUnAlignPost<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), ureg_max, 0);
+    StoreUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), ureg_max, 0);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_max_brc, maxUbStart + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max_brc, maxUbStart + i);
 
         LoadInputDinterleave4<T>(vreg_input_x1, vreg_input_x2, vreg_input_x3, vreg_input_x4, vreg_input_x5,
                                  vreg_input_x6, vreg_input_x7, vreg_input_x8, srcUb, i, s2BaseSize);
@@ -63,7 +63,7 @@ __simd_callee__ static inline void PostReduceStage512(
                                     blockStride, repeatStride, preg_all, preg_all_b16);
         }
     }
-    StoreUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)expSumUb), ureg_exp_sum, 0);
+    StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)expSumUb), ureg_exp_sum, 0);
 }
 
 template <typename T, typename T2, typename OUTPUT_T, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 256,
@@ -194,7 +194,7 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl512VF(
                        vreg_src_x6_new, vreg_src_x7_new, vreg_src_x8_new, preg_all);
         }
 
-        StoreUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), vreg_input_max, ureg_max, 1);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), vreg_input_max, ureg_max, 1);
     }
     PostReduceStage512<T, T2, s2BaseSize>(
         maxUb, ureg_max, maxUbStart, vreg_max_brc, m, srcUb, vreg_src_x1, vreg_src_x2, vreg_src_x3, vreg_src_x4,
@@ -332,7 +332,7 @@ __simd_vf__ __no_simd_vf_fusion__ void ProcessVec1NoUpdateGeneralImpl512VFStage2
             MaxReduce4(vreg_input_max, vreg_x_src1, vreg_x_src2, vreg_x_src3, vreg_x_src4, vreg_x_src5_new,
                        vreg_x_src6_new, vreg_x_src7_new, vreg_x_src8_new, preg_all);
         }
-        StoreUnAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), vreg_input_max, ureg_max, 1);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), vreg_input_max, ureg_max, 1);
     }
     PostReduceStage512<T, T2, s2BaseSize>(
         maxUb, ureg_max, maxUbStart, vreg_max_brc, m, srcUb, vreg_x_src1, vreg_x_src2, vreg_x_src3, vreg_x_src4,

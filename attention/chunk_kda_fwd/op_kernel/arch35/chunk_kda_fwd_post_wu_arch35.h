@@ -112,7 +112,7 @@ static __simd_vf__ inline void ComputeKdaTailWuRegbase(__ubuf__ float *wOut, __u
                                                        __ubuf__ bfloat16_t *akk, __ubuf__ bfloat16_t *wSeed,
                                                        __ubuf__ bfloat16_t *uSeed, uint16_t rows, uint16_t curT)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t DIM = 128;
     constexpr uint16_t FP32_REG_ELEMENTS = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     constexpr uint16_t AKK_ROW_ELEMENTS = 64;
@@ -172,11 +172,11 @@ static __simd_vf__ inline void ComputeKdaTailWuRegbase(__ubuf__ float *wOut, __u
 }
 
 template <typename InputT>
-__simd_callee__ inline void LoadPostKdaGateRegbasePair(AscendC::MicroAPI::RegTensor<float> &zeroReg,
-                                                       AscendC::MicroAPI::RegTensor<float> &oneReg,
-                                                       __ubuf__ InputT *src, AscendC::MicroAPI::MaskReg &inputMask)
+__simd_callee__ inline void LoadPostKdaGateRegbasePair(AscendC::Reg::RegTensor<float> &zeroReg,
+                                                       AscendC::Reg::RegTensor<float> &oneReg, __ubuf__ InputT *src,
+                                                       AscendC::Reg::MaskReg &inputMask)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     if constexpr (std::is_same<InputT, float>()) {
         LoadAlign<float, LoadDist::DIST_DINTLV_B32>(zeroReg, oneReg, src);
     } else {
@@ -187,13 +187,12 @@ __simd_callee__ inline void LoadPostKdaGateRegbasePair(AscendC::MicroAPI::RegTen
 }
 
 template <typename OutputT>
-__simd_callee__ inline void StorePostKdaGateRegbasePair(__ubuf__ OutputT *dst,
-                                                        AscendC::MicroAPI::RegTensor<float> &zeroReg,
-                                                        AscendC::MicroAPI::RegTensor<float> &oneReg,
-                                                        AscendC::MicroAPI::MaskReg &inputMask,
-                                                        AscendC::MicroAPI::MaskReg &floatMask)
+__simd_callee__ inline void StorePostKdaGateRegbasePair(__ubuf__ OutputT *dst, AscendC::Reg::RegTensor<float> &zeroReg,
+                                                        AscendC::Reg::RegTensor<float> &oneReg,
+                                                        AscendC::Reg::MaskReg &inputMask,
+                                                        AscendC::Reg::MaskReg &floatMask)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     if constexpr (std::is_same<OutputT, half>()) {
         Mins(zeroReg, zeroReg, KDA_FP16_MAX, floatMask);
         Mins(oneReg, oneReg, KDA_FP16_MAX, floatMask);
@@ -209,7 +208,7 @@ template <typename T, typename GK_T>
 static __simd_vf__ inline void ComputePostKdaKgRegbase(__ubuf__ T *kAndKg, __ubuf__ GK_T *gate, __ubuf__ float *ref,
                                                        uint16_t rows, uint16_t cols)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t ELEMENTS_PER_REG = AscendC::VECTOR_REG_WIDTH / sizeof(T);
     MaskReg floatMask = CreateMask<float, MaskPattern::ALL>();
     for (uint16_t row = 0; row < rows; ++row) {

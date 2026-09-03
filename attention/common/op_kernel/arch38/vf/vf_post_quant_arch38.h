@@ -19,11 +19,11 @@
 namespace FaVectorApi {
 
 // fp32/fp16->int8/fp8
-static constexpr MicroAPI::CastTrait castTraitP0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                    MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitP0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT, Reg::MaskMergeMode::ZEROING,
+                                               RoundMode::CAST_RINT};
 // fp32->hifp8
-static constexpr MicroAPI::CastTrait castTraitP1 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                    MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_HYBRID};
+static constexpr Reg::CastTrait castTraitP1 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT, Reg::MaskMergeMode::ZEROING,
+                                               RoundMode::CAST_HYBRID};
 
 // with offset
 template <typename T, typename OUTPUT_T, typename POSTQUANT_PARAMS_T>

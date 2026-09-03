@@ -20,7 +20,7 @@
 #include "flash_attention_score_common_regbase_arch38.h"
 
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 namespace regbaseutil {
 enum class AttenMaskCompressMode {
     NO_COMPRESS_MODE = 0,

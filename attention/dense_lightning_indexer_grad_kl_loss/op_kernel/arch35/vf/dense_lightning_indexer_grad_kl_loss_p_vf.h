@@ -19,7 +19,7 @@
 
 namespace DenseDliGradKLLossArch35 {
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 
 constexpr uint32_t P_FP32_REG_ELEMENTS = 64;
 

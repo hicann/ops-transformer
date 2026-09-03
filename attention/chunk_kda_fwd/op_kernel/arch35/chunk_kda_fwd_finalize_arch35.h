@@ -83,10 +83,10 @@ constexpr uint32_t KDA_GATE_TILE_ROWS = 32;
 constexpr uint32_t KDA_CUBE_MIN_REDUCTION = 16;
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
-constexpr AscendC::MicroAPI::CastTrait KDA_TAIL_BF16_TO_FP32 = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait KDA_TAIL_BF16_TO_FP32 = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_NONE,
 };
 
@@ -95,7 +95,7 @@ static __simd_vf__ inline void ComputeKdaTailOutputRegbase(__ubuf__ float *dst, 
                                                            __ubuf__ bfloat16_t *aqk, uint16_t rows, uint16_t curT,
                                                            float scale)
 {
-    using namespace AscendC::MicroAPI;
+    using namespace AscendC::Reg;
     constexpr uint16_t DIM = 128;
     constexpr uint16_t FP32_REG_ELEMENTS = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     constexpr uint16_t AQK_ROW_ELEMENTS = 16;

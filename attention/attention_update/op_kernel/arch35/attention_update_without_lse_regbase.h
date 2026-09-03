@@ -174,60 +174,57 @@ __aicore__ inline void AttentionUpdateWithoutLse<goType>::ComputeLseMVF(uint32_t
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<float> vregLse; // 处理INF后的lse
-        AscendC::MicroAPI::RegTensor<float> vregMax; // reduce max
-        AscendC::MicroAPI::RegTensor<float> vregSubRes;
-        AscendC::MicroAPI::RegTensor<float> vregExpRes;
-        AscendC::MicroAPI::RegTensor<float> vregSum; // 累加 reduce sum
-        AscendC::MicroAPI::RegTensor<float> vregLogRes;
-        AscendC::MicroAPI::RegTensor<float> vregLseM; // 可选输出 lse_max
-        AscendC::MicroAPI::RegTensor<float> vregSubLseMRes;
-        AscendC::MicroAPI::RegTensor<float> vregLseExpFinal;
-        AscendC::MicroAPI::RegTensor<float> vregNegInf;      // 待替换的-INF
-        AscendC::MicroAPI::RegTensor<float> vregOriginalMax; // 搬入的初始Max
-        AscendC::MicroAPI::RegTensor<float> vregOriginalLse; // 搬入的初始lse
+        AscendC::Reg::RegTensor<float> vregLse; // 处理INF后的lse
+        AscendC::Reg::RegTensor<float> vregMax; // reduce max
+        AscendC::Reg::RegTensor<float> vregSubRes;
+        AscendC::Reg::RegTensor<float> vregExpRes;
+        AscendC::Reg::RegTensor<float> vregSum; // 累加 reduce sum
+        AscendC::Reg::RegTensor<float> vregLogRes;
+        AscendC::Reg::RegTensor<float> vregLseM; // 可选输出 lse_max
+        AscendC::Reg::RegTensor<float> vregSubLseMRes;
+        AscendC::Reg::RegTensor<float> vregLseExpFinal;
+        AscendC::Reg::RegTensor<float> vregNegInf;      // 待替换的-INF
+        AscendC::Reg::RegTensor<float> vregOriginalMax; // 搬入的初始Max
+        AscendC::Reg::RegTensor<float> vregOriginalLse; // 搬入的初始lse
 
-        AscendC::MicroAPI::MaskReg preg1;
-        AscendC::MicroAPI::MaskReg pregAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
-        AscendC::MicroAPI::MaskReg pregCompare;
+        AscendC::Reg::MaskReg preg1;
+        AscendC::Reg::MaskReg pregAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+        AscendC::Reg::MaskReg pregCompare;
         uint32_t sreg = curBlockNum;
-        static constexpr AscendC::MicroAPI::ExpSpecificMode mode = {AscendC::MicroAPI::MaskMergeMode::ZEROING,
-                                                                    AscendC::ExpAlgo::PRECISION_1ULP_FTZ_FALSE};
-        MicroAPI::Duplicate(vregNegInf, NEG_INF);
+        static constexpr AscendC::Reg::ExpSpecificMode mode = {AscendC::Reg::MaskMergeMode::ZEROING,
+                                                               AscendC::ExpAlgo::PRECISION_1ULP_FTZ_FALSE};
+        Reg::Duplicate(vregNegInf, NEG_INF);
         for (uint16_t i = 0; i < vfLoop; i++) {
-            preg1 = AscendC::MicroAPI::UpdateMask<float, MicroAPI::RegTraitNumOne>(sreg);
-            AscendC::MicroAPI::LoadAlign<float>(vregOriginalMax, lseUbAddr + i * VL);
-            MicroAPI::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalMax, POS_INF, pregAll);
-            MicroAPI::Select<float>(vregMax, vregNegInf, vregOriginalMax, pregCompare);
+            preg1 = AscendC::Reg::UpdateMask<float, Reg::RegTraitNumOne>(sreg);
+            AscendC::Reg::LoadAlign<float>(vregOriginalMax, lseUbAddr + i * VL);
+            Reg::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalMax, POS_INF, pregAll);
+            Reg::Select<float>(vregMax, vregNegInf, vregOriginalMax, pregCompare);
             for (uint16_t j = 1; j < spSize; j++) {
-                AscendC::MicroAPI::LoadAlign<float>(vregOriginalLse, lseUbAddr + i * VL + j * blockStride);
-                MicroAPI::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalLse, POS_INF, pregAll);
-                MicroAPI::Select<float>(vregLse, vregNegInf, vregOriginalLse, pregCompare);
-                AscendC::MicroAPI::Max<float>(vregMax, vregMax, vregLse, preg1);
+                AscendC::Reg::LoadAlign<float>(vregOriginalLse, lseUbAddr + i * VL + j * blockStride);
+                Reg::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalLse, POS_INF, pregAll);
+                Reg::Select<float>(vregLse, vregNegInf, vregOriginalLse, pregCompare);
+                AscendC::Reg::Max<float>(vregMax, vregMax, vregLse, preg1);
             }
 
-            AscendC::MicroAPI::Duplicate(vregSum, static_cast<float>(0), preg1);
+            AscendC::Reg::Duplicate(vregSum, static_cast<float>(0), preg1);
             for (uint16_t j = 0; j < spSize; j++) {
-                AscendC::MicroAPI::LoadAlign<float>(vregOriginalLse, lseUbAddr + i * VL + j * blockStride);
-                MicroAPI::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalLse, POS_INF, pregAll);
-                MicroAPI::Select<float>(vregLse, vregNegInf, vregOriginalLse, pregCompare);
-                AscendC::MicroAPI::Sub<float, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregSubRes, vregLse, vregMax,
-                                                                                         preg1);
-                AscendC::MicroAPI::Exp<float, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregExpRes, vregSubRes, preg1);
-                AscendC::MicroAPI::Add<float, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregSum, vregExpRes, vregSum,
-                                                                                         preg1);
+                AscendC::Reg::LoadAlign<float>(vregOriginalLse, lseUbAddr + i * VL + j * blockStride);
+                Reg::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalLse, POS_INF, pregAll);
+                Reg::Select<float>(vregLse, vregNegInf, vregOriginalLse, pregCompare);
+                AscendC::Reg::Sub<float, AscendC::Reg::MaskMergeMode::ZEROING>(vregSubRes, vregLse, vregMax, preg1);
+                AscendC::Reg::Exp<float, AscendC::Reg::MaskMergeMode::ZEROING>(vregExpRes, vregSubRes, preg1);
+                AscendC::Reg::Add<float, AscendC::Reg::MaskMergeMode::ZEROING>(vregSum, vregExpRes, vregSum, preg1);
             }
-            AscendC::MicroAPI::Log<float, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregLogRes, vregSum, preg1);
-            AscendC::MicroAPI::Add<float, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregLseM, vregLogRes, vregMax,
-                                                                                     preg1);
+            AscendC::Reg::Log<float, AscendC::Reg::MaskMergeMode::ZEROING>(vregLogRes, vregSum, preg1);
+            AscendC::Reg::Add<float, AscendC::Reg::MaskMergeMode::ZEROING>(vregLseM, vregLogRes, vregMax, preg1);
             for (uint16_t j = 0; j < spSize; j++) {
-                AscendC::MicroAPI::LoadAlign<float>(vregOriginalLse, lseUbAddr + i * VL + j * blockStride);
-                MicroAPI::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalLse, POS_INF, pregAll);
-                MicroAPI::Select<float>(vregLse, vregNegInf, vregOriginalLse, pregCompare);
-                AscendC::MicroAPI::Sub<float, AscendC::MicroAPI::MaskMergeMode::ZEROING>(vregSubLseMRes, vregLse,
-                                                                                         vregLseM, preg1);
-                AscendC::MicroAPI::Exp<float, &mode>(vregLseExpFinal, vregSubLseMRes, preg1);
-                AscendC::MicroAPI::StoreAlign<float>(expUbAddr + i * VL + j * blockStride, vregLseExpFinal, preg1);
+                AscendC::Reg::LoadAlign<float>(vregOriginalLse, lseUbAddr + i * VL + j * blockStride);
+                Reg::Compares<float, CMPMODE::EQ>(pregCompare, vregOriginalLse, POS_INF, pregAll);
+                Reg::Select<float>(vregLse, vregNegInf, vregOriginalLse, pregCompare);
+                AscendC::Reg::Sub<float, AscendC::Reg::MaskMergeMode::ZEROING>(vregSubLseMRes, vregLse, vregLseM,
+                                                                               preg1);
+                AscendC::Reg::Exp<float, &mode>(vregLseExpFinal, vregSubLseMRes, preg1);
+                AscendC::Reg::StoreAlign<float>(expUbAddr + i * VL + j * blockStride, vregLseExpFinal, preg1);
             }
         }
     }
@@ -274,35 +271,35 @@ __aicore__ inline void AttentionUpdateWithoutLse<goType>::ComputeOutputVF(uint32
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<float> vregLse0, vregLse1; // 搬入的lse
-        AscendC::MicroAPI::RegTensor<float> vregGo0, vregGo1;   // 搬入的go
-        AscendC::MicroAPI::RegTensor<float> vregSumRes;         // 求和的结果
+        AscendC::Reg::RegTensor<float> vregLse0, vregLse1; // 搬入的lse
+        AscendC::Reg::RegTensor<float> vregGo0, vregGo1;   // 搬入的go
+        AscendC::Reg::RegTensor<float> vregSumRes;         // 求和的结果
 
-        AscendC::MicroAPI::MaskReg preg1;
+        AscendC::Reg::MaskReg preg1;
         for (uint16_t i = 0; i < bshInLoopNum; i++) {
             uint32_t sreg = dRealNum;
             for (uint16_t j = 0; j < vfLoop; j++) {
-                preg1 = AscendC::MicroAPI::UpdateMask<float, MicroAPI::RegTraitNumOne>(sreg);
-                AscendC::MicroAPI::Duplicate(vregSumRes, 0, preg1);
+                preg1 = AscendC::Reg::UpdateMask<float, Reg::RegTraitNumOne>(sreg);
+                AscendC::Reg::Duplicate(vregSumRes, 0, preg1);
                 for (uint16_t k = 0; k < unrollLoops; k++) {
-                    AscendC::MicroAPI::LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                    AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                         vregLse0, expUbAddr + (k * unrollTimes * bshNum + lseUbOffset + i));
                     ops::LoadOneTensorForDtypeT<goType>(goUbAddr, vregGo0, preg1,
                                                         k * unrollTimes * goAlign + i * dAlign + j * VL);
-                    AscendC::MicroAPI::MulAddDst(vregSumRes, vregLse0, vregGo0, preg1);
+                    AscendC::Reg::MulAddDst(vregSumRes, vregLse0, vregGo0, preg1);
 
-                    AscendC::MicroAPI::LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                    AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                         vregLse1, expUbAddr + ((k * unrollTimes + 1) * bshNum + lseUbOffset + i));
                     ops::LoadOneTensorForDtypeT<goType>(goUbAddr, vregGo1, preg1,
                                                         (k * unrollTimes + 1) * goAlign + i * dAlign + j * VL);
-                    AscendC::MicroAPI::MulAddDst(vregSumRes, vregLse1, vregGo1, preg1);
+                    AscendC::Reg::MulAddDst(vregSumRes, vregLse1, vregGo1, preg1);
                 }
                 if constexpr (hasTailRoll) {
-                    AscendC::MicroAPI::LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                    AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                         vregLse0, expUbAddr + ((spSize - 1) * bshNum + lseUbOffset + i));
                     ops::LoadOneTensorForDtypeT<goType>(goUbAddr, vregGo0, preg1,
                                                         (spSize - 1) * goAlign + i * dAlign + j * VL);
-                    AscendC::MicroAPI::MulAddDst(vregSumRes, vregLse0, vregGo0, preg1);
+                    AscendC::Reg::MulAddDst(vregSumRes, vregLse0, vregGo0, preg1);
                 }
                 ops::StoreOneTensorForDtypeT<goType>(sumUbAddr, vregSumRes, preg1, i * dAlign + j * VL);
             }

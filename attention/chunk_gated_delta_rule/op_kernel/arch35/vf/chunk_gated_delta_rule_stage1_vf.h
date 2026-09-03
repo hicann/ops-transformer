@@ -15,7 +15,7 @@
 
 namespace ChunkGatedDeltaRule {
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 /*
  * 按传入的 chunkSize 计算 FP32 inclusive cumsum、exp 和 Gamma：

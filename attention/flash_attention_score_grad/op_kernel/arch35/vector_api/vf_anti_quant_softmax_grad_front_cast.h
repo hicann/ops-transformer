@@ -18,29 +18,29 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-using namespace MicroAPI;
-constexpr static AscendC::MicroAPI::CastTrait castTraitB82B32Three = {
-    AscendC::MicroAPI::RegLayout::THREE,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+using namespace Reg;
+constexpr static AscendC::Reg::CastTrait castTraitB82B32Three = {
+    AscendC::Reg::RegLayout::THREE,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
-constexpr static AscendC::MicroAPI::CastTrait castTraitB82B32Two = {
-    AscendC::MicroAPI::RegLayout::TWO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitB82B32Two = {
+    AscendC::Reg::RegLayout::TWO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
-constexpr static AscendC::MicroAPI::CastTrait castTraitB82B32One = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitB82B32One = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
-constexpr static AscendC::MicroAPI::CastTrait castTraitB82B32Zero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitB82B32Zero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
 /* **************************************************************************************************
@@ -77,9 +77,9 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF128(uint64_t dstLocalInt, uint64_t
     MaskReg pregTailExe = UpdateMask<T>(reduceSize);
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
-        LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), srcN);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
-                                                                     srcN);
+        LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), srcN);
+        LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                srcN);
         Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32Two>(vregSrc2, vregSrcFp8, pregFullExeB8);
@@ -135,11 +135,11 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF256(uint64_t dstLocalInt, uint64_t
     MaskReg pregTailExe = UpdateMask<float>(reduceSize);
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
-        LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), srcN);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
-                                                                     srcN);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradB16Tail,
-                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), srcN);
+        LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), srcN);
+        LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradB16, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                srcN);
+        LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradB16Tail,
+                                                                ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), srcN);
 
         Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
@@ -220,14 +220,14 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF384(uint64_t dstLocalInt, uint64_t
     MaskReg pregTailExe = UpdateMask<T>(reduceSize);
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
-        LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
-        LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail), 512);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
-                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
-        LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                                     ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+        LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
+        LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail), 512);
+        LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                512);
+        LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1, ((__ubuf__ OUTDTYPE *&)gradLocalInt1),
+                                                                512);
+        LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
+                                                                ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
 
         Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
         Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
@@ -334,17 +334,16 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF512(uint64_t dstLocalInt, uint64_t
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         if constexpr (OUTDTYPE_IS_B16) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail),
-                                                                   512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                    512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
             Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32Two>(vregSrc2, vregSrcFp8, pregFullExeB8);
@@ -472,20 +471,19 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF640(uint64_t dstLocalInt, uint64_t
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         if constexpr (OUTDTYPE_IS_B16) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp81, ((__ubuf__ T1 *&)srcLocalInt1), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail),
-                                                                   512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype3,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp81, ((__ubuf__ T1 *&)srcLocalInt1), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                    512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype3,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
 
             Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
@@ -639,22 +637,21 @@ __simd_vf__ inline void AntiQuantSoftmaxGradVF768(uint64_t dstLocalInt, uint64_t
 
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         if constexpr (OUTDTYPE_IS_B16) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp81, ((__ubuf__ T1 *&)srcLocalInt1), 512);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail),
-                                                                   512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype3,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtype4,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalInt4), 512);
-            LoadAlign<OUTDTYPE, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
-                                                                         ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8, ((__ubuf__ T1 *&)srcLocalInt), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp81, ((__ubuf__ T1 *&)srcLocalInt1), 512);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcFp8Tail, ((__ubuf__ T1 *&)srcLocalIntTail), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype, ((__ubuf__ OUTDTYPE *&)gradLocalInt),
+                                                                    512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype1,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt1), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype2,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt2), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype3,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt3), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtype4,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalInt4), 512);
+            LoadAlign<OUTDTYPE, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradDtypeTail,
+                                                                    ((__ubuf__ OUTDTYPE *&)gradLocalIntTail), 512);
             Cast<T, T1, castTraitB82B32Zero>(vregSrc, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32One>(vregSrc1, vregSrcFp8, pregFullExeB8);
             Cast<T, T1, castTraitB82B32Two>(vregSrc2, vregSrcFp8, pregFullExeB8);

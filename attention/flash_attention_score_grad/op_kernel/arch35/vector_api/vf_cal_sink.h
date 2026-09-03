@@ -17,7 +17,7 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-using namespace MicroAPI;
+using namespace Reg;
 /* **************************************************************************************************
 
 SUB *
@@ -64,10 +64,10 @@ __simd_vf__ inline void CalculateSinkVF(T sinkScale, uint64_t dstLocalInt, uint6
     Duplicate(vregSink, sinkScale);
     Duplicate(vregRes, 0);
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
-        LoadAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_BRC_B32>(
-            vregMax, ((__ubuf__ T *&)maxLocalInt), 8);
-        LoadAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_BRC_B32>(
-            vregSum, ((__ubuf__ T *&)sumLocalInt), 8);
+        LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_BRC_B32>(vregMax,
+                                                                                      ((__ubuf__ T *&)maxLocalInt), 8);
+        LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_BRC_B32>(vregSum,
+                                                                                      ((__ubuf__ T *&)sumLocalInt), 8);
         for (uint16_t n = 0; n < loopTimes; n++) {
             LoadAlign(vregP, ((__ubuf__ T *&)pLocalInt + m * srcN + n * fullExeSize));
             LoadAlign(vregDp, ((__ubuf__ T *&)dpLocalInt + m * srcN + n * fullExeSize));
@@ -75,7 +75,7 @@ __simd_vf__ inline void CalculateSinkVF(T sinkScale, uint64_t dstLocalInt, uint6
             ExpSub(vregSub, vregSink, vregMax, pregFullExe);
             Div(vregDiv, vregSub, vregSum, pregFullExe);
             Mul(vregMul, vregMul, vregDiv, pregFullExe);
-            Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregMul, pregFullExe);
+            Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregMul, pregFullExe);
             Add(vregRes, vregRes, vregReduceSum, pregAccu);
         }
         // 尾块
@@ -85,7 +85,7 @@ __simd_vf__ inline void CalculateSinkVF(T sinkScale, uint64_t dstLocalInt, uint6
         ExpSub(vregSubTail, vregSink, vregMax, pregFullExe);
         Div(vregDivTail, vregSubTail, vregSum, pregFullExe);
         Mul(vregMulTail, vregMulTail, vregDivTail, pregTailExe);
-        Reduce<MicroAPI::ReduceType::SUM>(vregReduceSumTail, vregMulTail, pregTailExe);
+        Reduce<Reg::ReduceType::SUM>(vregReduceSumTail, vregMulTail, pregTailExe);
         Add(vregRes, vregRes, vregReduceSumTail, pregAccu);
     }
     StoreUnAlign<T>(((__ubuf__ T *&)dstLocalInt), vregRes, uregRes, 1);

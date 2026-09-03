@@ -43,14 +43,14 @@ __simd_callee__ inline void CastStoreExp128(RegTensor<float> &vreg_exp_even, Reg
         Cast<T2, T, castTraitOne>(vreg_exp_odd_bf16, vreg_exp_odd, preg_all);
         Or((RegTensor<uint16_t> &)vreg_exp_bf16, (RegTensor<uint16_t> &)vreg_exp_even_bf16,
            (RegTensor<uint16_t> &)vreg_exp_odd_bf16, storeMask);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)expUb), vreg_exp_bf16, blockStride, repeatStride, storeMask);
     } else if constexpr (IsSameType<T2, half>::value) {
         Cast<T2, T, castTraitZero>(vreg_exp_even_fp16, vreg_exp_even, preg_all);
         Cast<T2, T, castTraitOne>(vreg_exp_odd_fp16, vreg_exp_odd, preg_all);
         Or((RegTensor<uint16_t> &)vreg_exp_fp16, (RegTensor<uint16_t> &)vreg_exp_even_fp16,
            (RegTensor<uint16_t> &)vreg_exp_odd_fp16, storeMask);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)expUb), vreg_exp_fp16, blockStride, repeatStride, storeMask);
     } else if constexpr (IsSameType<T2, hifloat8_t>::value) {
         RegTensor<hifloat8_t> vreg_exp_even_hifp8;
@@ -78,10 +78,8 @@ __simd_callee__ inline void ExpSumReduceStore128(RegTensor<float> &vreg_exp_sum,
                                                  __ubuf__ T *&expSumUb, MaskReg &preg_all)
 {
     Add(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all);
-    Reduce<MicroAPI::ReduceType::SUM, float, float, MicroAPI::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum,
-                                                                                      preg_all);
-    StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)expSumUb), vreg_exp_sum, ureg_exp_sum,
-                                                                 1);
+    Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all);
+    StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)expSumUb), vreg_exp_sum, ureg_exp_sum, 1);
 }
 
 template <typename T>
@@ -96,9 +94,9 @@ __simd_callee__ inline void TailScaleStoreMax128(RegTensor<float> &vreg_input_x,
     Muls(vreg_input_x, vreg_input_x, scale, preg_all);
     Muls(vreg_input_x_unroll, vreg_input_x_unroll, scale, preg_ori_tail_n);
     Select(vreg_input_x_unroll_new, vreg_input_x_unroll, vreg_min, preg_ori_tail_n);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + i * s2BaseSize, vreg_input_x, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + floatRepSize + i * s2BaseSize,
-                                                      vreg_input_x_unroll_new, preg_tail_n);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + i * s2BaseSize, vreg_input_x, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + floatRepSize + i * s2BaseSize,
+                                                 vreg_input_x_unroll_new, preg_tail_n);
     Max(vreg_max_tmp, vreg_input_x, vreg_input_x_unroll_new, preg_all);
 }
 
@@ -113,9 +111,9 @@ __simd_callee__ inline void AlignedScaleStoreMax128(RegTensor<float> &vreg_input
     LoadAlign(vreg_input_x_unroll, srcUb + floatRepSize + i * s2BaseSize);
     Muls(vreg_input_x, vreg_input_x, scale, preg_all);
     Muls(vreg_input_x_unroll, vreg_input_x_unroll, scale, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + i * s2BaseSize, vreg_input_x, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + floatRepSize + i * s2BaseSize,
-                                                      vreg_input_x_unroll, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + i * s2BaseSize, vreg_input_x, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + floatRepSize + i * s2BaseSize,
+                                                 vreg_input_x_unroll, preg_all);
     Max(vreg_max_tmp, vreg_input_x, vreg_input_x_unroll, preg_all);
 }
 

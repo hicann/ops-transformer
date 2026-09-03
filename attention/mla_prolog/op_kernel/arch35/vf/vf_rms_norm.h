@@ -24,53 +24,49 @@ template <typename InType, typename GammaType, typename C, typename OutType>
 __simd_vf__ void RmsNormVFImpl(__ubuf__ InType *inputBuf, __ubuf__ GammaType *gammaBuf, __ubuf__ OutType *outputBuf,
                                uint32_t cnt, uint32_t repeatTimes, const RmsNormParam rmsNormParams)
 {
-    MicroAPI::RegTensor<C> vregSum;
-    MicroAPI::RegTensor<C> vregSumReduce;
-    MicroAPI::RegTensor<C> vregDiv;
-    MicroAPI::RegTensor<C> vregSquareRoot;
+    Reg::RegTensor<C> vregSum;
+    Reg::RegTensor<C> vregSumReduce;
+    Reg::RegTensor<C> vregDiv;
+    Reg::RegTensor<C> vregSquareRoot;
 
-    MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<C, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg pregFirst = MicroAPI::CreateMask<C, MicroAPI::MaskPattern::VL1>();
+    Reg::MaskReg pregAll = Reg::CreateMask<C, Reg::MaskPattern::ALL>();
+    Reg::MaskReg pregFirst = Reg::CreateMask<C, Reg::MaskPattern::VL1>();
 
-    static constexpr MicroAPI::CastTrait castTraitB162B32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                             MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+    static constexpr Reg::CastTrait castTraitB162B32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                        Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
-    MicroAPI::Duplicate<C, C>(vregSum, 0.0);
+    Reg::Duplicate<C, C>(vregSum, 0.0);
 
     for (uint16_t i = 0; i < uint16_t(repeatTimes); ++i) {
-        MicroAPI::RegTensor<C> vregXCast;
-        MicroAPI::RegTensor<C> vregXSquare;
+        Reg::RegTensor<C> vregXCast;
+        Reg::RegTensor<C> vregXSquare;
         uint64_t loopOffset = i * FLOAT_REP_SIZE;
 
-        MicroAPI::LoadAlign<C, MicroAPI::LoadDist::DIST_NORM>(vregXCast, inputBuf + loopOffset);
-        MicroAPI::Mul<C, MicroAPI::MaskMergeMode::ZEROING>(vregXSquare, vregXCast, vregXCast, pregAll);
-        MicroAPI::Add<C, MicroAPI::MaskMergeMode::ZEROING>(vregSum, vregXSquare, vregSum, pregAll);
+        Reg::LoadAlign<C, Reg::LoadDist::DIST_NORM>(vregXCast, inputBuf + loopOffset);
+        Reg::Mul<C, Reg::MaskMergeMode::ZEROING>(vregXSquare, vregXCast, vregXCast, pregAll);
+        Reg::Add<C, Reg::MaskMergeMode::ZEROING>(vregSum, vregXSquare, vregSum, pregAll);
     }
 
-    MicroAPI::Reduce<MicroAPI::ReduceType::SUM, C, C, MicroAPI::MaskMergeMode::ZEROING>(vregSumReduce, vregSum,
-                                                                                        pregAll);
-    MicroAPI::Muls<C, C, MicroAPI::MaskMergeMode::ZEROING>(vregSumReduce, vregSumReduce, rmsNormParams.reciprocal,
-                                                           pregFirst);
-    MicroAPI::Adds<C, C, MicroAPI::MaskMergeMode::ZEROING>(vregSumReduce, vregSumReduce, rmsNormParams.epsilon,
-                                                           pregFirst);
-    MicroAPI::Sqrt<C, MicroAPI::MaskMergeMode::ZEROING>(vregSquareRoot, vregSumReduce, pregFirst);
-    MicroAPI::Duplicate<C, MicroAPI::HighLowPart::LOWEST, MicroAPI::MaskMergeMode::ZEROING>(vregDiv, vregSquareRoot,
-                                                                                            pregAll);
+    Reg::Reduce<Reg::ReduceType::SUM, C, C, Reg::MaskMergeMode::ZEROING>(vregSumReduce, vregSum, pregAll);
+    Reg::Muls<C, C, Reg::MaskMergeMode::ZEROING>(vregSumReduce, vregSumReduce, rmsNormParams.reciprocal, pregFirst);
+    Reg::Adds<C, C, Reg::MaskMergeMode::ZEROING>(vregSumReduce, vregSumReduce, rmsNormParams.epsilon, pregFirst);
+    Reg::Sqrt<C, Reg::MaskMergeMode::ZEROING>(vregSquareRoot, vregSumReduce, pregFirst);
+    Reg::Duplicate<C, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(vregDiv, vregSquareRoot, pregAll);
 
     for (uint16_t i = 0; i < uint16_t(repeatTimes); ++i) {
-        MicroAPI::RegTensor<C> vregXCast;
-        MicroAPI::RegTensor<GammaType> vregGamma;
-        MicroAPI::RegTensor<C> vregGammaCast;
+        Reg::RegTensor<C> vregXCast;
+        Reg::RegTensor<GammaType> vregGamma;
+        Reg::RegTensor<C> vregGammaCast;
         uint16_t loopOffset = i * FLOAT_REP_SIZE;
 
-        MicroAPI::LoadAlign<C, MicroAPI::LoadDist::DIST_NORM>(vregXCast, inputBuf + loopOffset);
-        MicroAPI::LoadAlign<GammaType, MicroAPI::LoadDist::DIST_UNPACK_B16>(vregGamma, gammaBuf + loopOffset);
-        MicroAPI::Cast<C, GammaType, castTraitB162B32>(vregGammaCast, vregGamma, pregAll);
+        Reg::LoadAlign<C, Reg::LoadDist::DIST_NORM>(vregXCast, inputBuf + loopOffset);
+        Reg::LoadAlign<GammaType, Reg::LoadDist::DIST_UNPACK_B16>(vregGamma, gammaBuf + loopOffset);
+        Reg::Cast<C, GammaType, castTraitB162B32>(vregGammaCast, vregGamma, pregAll);
 
-        MicroAPI::Div<C, MicroAPI::MaskMergeMode::ZEROING>(vregXCast, vregXCast, vregDiv, pregAll);
-        MicroAPI::Mul<C, MicroAPI::MaskMergeMode::ZEROING>(vregXCast, vregXCast, vregGammaCast, pregAll);
+        Reg::Div<C, Reg::MaskMergeMode::ZEROING>(vregXCast, vregXCast, vregDiv, pregAll);
+        Reg::Mul<C, Reg::MaskMergeMode::ZEROING>(vregXCast, vregXCast, vregGammaCast, pregAll);
 
-        MicroAPI::StoreAlign<OutType, MicroAPI::StoreDist::DIST_NORM>(outputBuf + loopOffset, vregXCast, pregAll);
+        Reg::StoreAlign<OutType, Reg::StoreDist::DIST_NORM>(outputBuf + loopOffset, vregXCast, pregAll);
     }
 }
 

@@ -15,7 +15,7 @@
 
 namespace ChunkGatedDeltaRule {
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 /*
  * gated 路径一次完成 masked_qkt：

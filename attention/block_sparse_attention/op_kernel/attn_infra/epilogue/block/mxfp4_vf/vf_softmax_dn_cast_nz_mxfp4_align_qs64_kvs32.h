@@ -23,7 +23,7 @@
 namespace NpuArch::Epilogue::Block::Mxfp4VF {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, typename T2,
           uint16_t KvsBaseAlign = 32, uint16_t QsBase = 128>
@@ -87,7 +87,7 @@ __simd_vf__ inline void softmax_with_group_max_align_qs64_kvs32_vf(__ubuf__ T2 *
         Truncate<T, RoundMode::CAST_CEIL>(curr_group_max, curr_group_max, preg_VL64_16bit);
     }
     Max(group_gmax, group_gmax, curr_group_max, preg_VL64_16bit);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max, curr_group_max, preg_VL64_16bit);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max, curr_group_max, preg_VL64_16bit);
     if constexpr (MX_QUANT_MODE == MXQuantMode::OCP) {
         Adds(curr_group_max, curr_group_max, NEG_TWO_VALE, preg_VL64_16bit);
     }
@@ -185,13 +185,12 @@ __simd_vf__ inline void softmax_with_group_max_align_qs64_kvs32_vf(__ubuf__ T2 *
         }
 
         // ====================== 全局/局部最大值更新 ======================
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_all_16bit);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_all_16bit);
     }
 
     // GroupMaxpadding到64, 使得对应的pscale=0
     Duplicate(min_val_reg, MIN_VALUE);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max + GROUP_COUNT * QsBase, min_val_reg,
-                                                      preg_all_16bit);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max + GROUP_COUNT * QsBase, min_val_reg, preg_all_16bit);
 }
 
 template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, typename T2,

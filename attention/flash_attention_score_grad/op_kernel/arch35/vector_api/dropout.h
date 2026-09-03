@@ -19,7 +19,7 @@
 #include "../../../../common/op_kernel/arch35/dropmask.h"
 
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 using namespace commondef;
 
 #ifndef __CCE_KT_TEST__
@@ -44,20 +44,20 @@ __simd_vf__ inline void CalculateDropoutVF(uint64_t srcLocalInt, uint64_t dstLoc
     uint16_t repeatTimes = CeilDivision(dataSize, repeatElm);
 
     for (uint16_t i = 0; i < (uint16_t)(repeatTimes / UNROLL_FACTOR); ++i) {
-        LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_US>(preg1, (__ubuf__ uint32_t *&)maskLocalInt + i * 4);
+        LoadAlign<uint32_t, Reg::MaskDist::DIST_US>(preg1, (__ubuf__ uint32_t *&)maskLocalInt + i * 4);
         MaskInterleave<half>(preg3, preg4, preg1, preg2);
         preg0 = UpdateMask<float>(sreg);
         LoadAlign(vreg0, (__ubuf__ float *&)srcLocalInt + i * 2 * repeatElm);
         Select(vreg2, vreg0, vreg1, preg3);
         Muls(vreg5, vreg2, divValue, preg0);
-        StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstLocalInt + i * 2 * repeatElm, vreg5,
-                                                              preg0);
+        StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstLocalInt + i * 2 * repeatElm, vreg5,
+                                                         preg0);
         preg0 = UpdateMask<float>(sreg);
         LoadAlign(vreg3, (__ubuf__ float *&)srcLocalInt + (i * 2 + 1) * repeatElm);
         Select(vreg4, vreg3, vreg1, preg4);
         Muls(vreg6, vreg4, divValue, preg0);
-        StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstLocalInt + (i * 2 + 1) * repeatElm,
-                                                              vreg6, preg0);
+        StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstLocalInt + (i * 2 + 1) * repeatElm,
+                                                         vreg6, preg0);
     }
 
     RegTensor<float> vreg7;
@@ -70,12 +70,12 @@ __simd_vf__ inline void CalculateDropoutVF(uint64_t srcLocalInt, uint64_t dstLoc
     uint32_t selOffset = (repeatTimes / UNROLL_FACTOR) * 4;
     for (uint16_t i = 0; i < (uint16_t)(repeatTimes % UNROLL_FACTOR); ++i) {
         preg0 = UpdateMask<float>(sreg);
-        LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_US>(preg7, (__ubuf__ uint32_t *&)maskLocalInt + selOffset);
-        UnPack<AscendC::MicroAPI::HighLowPart::LOWEST>(preg8, preg7);
+        LoadAlign<uint32_t, Reg::MaskDist::DIST_US>(preg7, (__ubuf__ uint32_t *&)maskLocalInt + selOffset);
+        UnPack<AscendC::Reg::HighLowPart::LOWEST>(preg8, preg7);
         LoadAlign(vreg7, (__ubuf__ float *&)srcLocalInt + offset0);
         Select(vreg8, vreg7, vreg1, preg8);
         Muls(vreg9, vreg8, divValue, preg0);
-        StoreAlign<float, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstLocalInt + offset2, vreg9, preg0);
+        StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstLocalInt + offset2, vreg9, preg0);
     }
 }
 

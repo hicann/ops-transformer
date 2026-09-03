@@ -19,7 +19,7 @@
 
 namespace DenseDliGradKLLossArch35 {
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 
 constexpr uint32_t LOSS_FP32_REG_ELEMENTS = 64;
 constexpr float LOSS_MIN_VALUE = 1e-8f;

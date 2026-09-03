@@ -47,43 +47,43 @@ __aicore__ inline void FlashUpdateNoTailV510_VF(const LocalTensor<T> &dstTensor,
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> vSrcRegMax;
-        MicroAPI::RegTensor<T> vSrcRegMaxB16;
-        MicroAPI::RegTensor<T> vSrcRegMaxB16Even;
-        MicroAPI::RegTensor<T> vSrcRegMaxB16Odd;
-        MicroAPI::RegTensor<T> vSrcRegPre;
-        MicroAPI::RegTensor<T> vSrcRegCur;
-        MicroAPI::RegTensor<T> vSrcRegMul;
-        MicroAPI::RegTensor<T> vDstRegAdd;
+        Reg::RegTensor<float> vSrcRegMax;
+        Reg::RegTensor<T> vSrcRegMaxB16;
+        Reg::RegTensor<T> vSrcRegMaxB16Even;
+        Reg::RegTensor<T> vSrcRegMaxB16Odd;
+        Reg::RegTensor<T> vSrcRegPre;
+        Reg::RegTensor<T> vSrcRegCur;
+        Reg::RegTensor<T> vSrcRegMul;
+        Reg::RegTensor<T> vDstRegAdd;
 
-        MicroAPI::RegTensor<MMOUTPUT_T> vregSrc;
+        Reg::RegTensor<MMOUTPUT_T> vregSrc;
 
-        MicroAPI::MaskReg maskRegAllB32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg maskRegAllB16 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+        Reg::MaskReg maskRegAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg maskRegAllB16 = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
 
-        MicroAPI::MaskReg preg_d;
+        Reg::MaskReg preg_d;
         uint32_t sreg_d = dSize;
-        preg_d = MicroAPI::UpdateMask<T>(sreg_d);
+        preg_d = Reg::UpdateMask<T>(sreg_d);
 
         for (uint16_t i = 0; i < m; ++i) {
-            static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_BRC_B32>(vSrcRegMax, expMaxUb + i * reduceSize);
-            MicroAPI::Cast<T, float, castTrait0>(vSrcRegMaxB16Even, vSrcRegMax, maskRegAllB32);
-            MicroAPI::Cast<T, float, castTrait1>(vSrcRegMaxB16Odd, vSrcRegMax, maskRegAllB32);
-            MicroAPI::Or<uint16_t, MicroAPI::MaskMergeMode::ZEROING>(
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegMaxB16, (MicroAPI::RegTensor<uint16_t> &)vSrcRegMaxB16Even,
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegMaxB16Odd, preg_d);
+            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(vSrcRegMax, expMaxUb + i * reduceSize);
+            Reg::Cast<T, float, castTrait0>(vSrcRegMaxB16Even, vSrcRegMax, maskRegAllB32);
+            Reg::Cast<T, float, castTrait1>(vSrcRegMaxB16Odd, vSrcRegMax, maskRegAllB32);
+            Reg::Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t> &)vSrcRegMaxB16,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegMaxB16Even,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegMaxB16Odd, preg_d);
 
             // high performance only support d=128
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vSrcRegPre, preUb + i * dSize);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vSrcRegCur, curUb + i * dSize);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vSrcRegPre, preUb + i * dSize);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vSrcRegCur, curUb + i * dSize);
 
-            MicroAPI::Mul<T, MicroAPI::MaskMergeMode::ZEROING>(vSrcRegMul, vSrcRegMaxB16, vSrcRegPre, preg_d);
-            MicroAPI::Add<T, MicroAPI::MaskMergeMode::ZEROING>(vDstRegAdd, vSrcRegMul, vSrcRegCur, preg_d);
-            MicroAPI::DataCopy<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B16>(dstUb + i * dSize, vDstRegAdd, preg_d);
+            Reg::Mul<T, Reg::MaskMergeMode::ZEROING>(vSrcRegMul, vSrcRegMaxB16, vSrcRegPre, preg_d);
+            Reg::Add<T, Reg::MaskMergeMode::ZEROING>(vDstRegAdd, vSrcRegMul, vSrcRegCur, preg_d);
+            Reg::DataCopy<OUTPUT_T, Reg::StoreDist::DIST_NORM_B16>(dstUb + i * dSize, vDstRegAdd, preg_d);
         }
     }
 }
@@ -116,57 +116,57 @@ __aicore__ inline void FlashUpdateLastNoTailV510_VF(const LocalTensor<T> &dstTen
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> vSrcRegSum;
-        MicroAPI::RegTensor<float> vSrcRegMax;
-        MicroAPI::RegTensor<T> vSrcRegSumB16;
-        MicroAPI::RegTensor<T> vSrcRegSumB16Even;
-        MicroAPI::RegTensor<T> vSrcRegSumB16Odd;
-        MicroAPI::RegTensor<T> vSrcRegMaxB16;
-        MicroAPI::RegTensor<T> vSrcRegMaxB16Even;
-        MicroAPI::RegTensor<T> vSrcRegMaxB16Odd;
-        MicroAPI::RegTensor<T> vSrcRegPre;
-        MicroAPI::RegTensor<T> vSrcRegCur;
-        MicroAPI::RegTensor<T> vSrcRegMul;
-        MicroAPI::RegTensor<T> vSrcRegAdd;
-        MicroAPI::RegTensor<T> vDstRegDiv;
+        Reg::RegTensor<float> vSrcRegSum;
+        Reg::RegTensor<float> vSrcRegMax;
+        Reg::RegTensor<T> vSrcRegSumB16;
+        Reg::RegTensor<T> vSrcRegSumB16Even;
+        Reg::RegTensor<T> vSrcRegSumB16Odd;
+        Reg::RegTensor<T> vSrcRegMaxB16;
+        Reg::RegTensor<T> vSrcRegMaxB16Even;
+        Reg::RegTensor<T> vSrcRegMaxB16Odd;
+        Reg::RegTensor<T> vSrcRegPre;
+        Reg::RegTensor<T> vSrcRegCur;
+        Reg::RegTensor<T> vSrcRegMul;
+        Reg::RegTensor<T> vSrcRegAdd;
+        Reg::RegTensor<T> vDstRegDiv;
 
-        MicroAPI::RegTensor<MMOUTPUT_T> vregSrc;
+        Reg::RegTensor<MMOUTPUT_T> vregSrc;
 
         // false: normal mode; true: higher precision mode
-        MicroAPI::MaskReg preg_d;
+        Reg::MaskReg preg_d;
         uint32_t sreg_d = dSize;
-        preg_d = MicroAPI::UpdateMask<T>(sreg_d);
+        preg_d = Reg::UpdateMask<T>(sreg_d);
 
-        static constexpr MicroAPI::DivSpecificMode mode = {MicroAPI::MaskMergeMode::ZEROING, false};
-        MicroAPI::MaskReg maskRegAllB32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg maskRegAllB16 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+        static constexpr Reg::DivSpecificMode mode = {Reg::MaskMergeMode::ZEROING, false};
+        Reg::MaskReg maskRegAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg maskRegAllB16 = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
 
         for (uint16_t i = 0; i < m; ++i) {
-            static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_BRC_B32>(vSrcRegMax, expMaxUb + i * reduceSize);
-            MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_BRC_B32>(vSrcRegSum, expSumUb + i * reduceSize);
-            MicroAPI::Cast<T, float, castTrait0>(vSrcRegMaxB16Even, vSrcRegMax, maskRegAllB32);
-            MicroAPI::Cast<T, float, castTrait1>(vSrcRegMaxB16Odd, vSrcRegMax, maskRegAllB32);
-            MicroAPI::Cast<T, float, castTrait0>(vSrcRegSumB16Even, vSrcRegSum, maskRegAllB32);
-            MicroAPI::Cast<T, float, castTrait1>(vSrcRegSumB16Odd, vSrcRegSum, maskRegAllB32);
-            MicroAPI::Or<uint16_t, MicroAPI::MaskMergeMode::ZEROING>(
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegMaxB16, (MicroAPI::RegTensor<uint16_t> &)vSrcRegMaxB16Even,
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegMaxB16Odd, preg_d);
-            MicroAPI::Or<uint16_t, MicroAPI::MaskMergeMode::ZEROING>(
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegSumB16, (MicroAPI::RegTensor<uint16_t> &)vSrcRegSumB16Even,
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegSumB16Odd, preg_d);
+            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(vSrcRegMax, expMaxUb + i * reduceSize);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(vSrcRegSum, expSumUb + i * reduceSize);
+            Reg::Cast<T, float, castTrait0>(vSrcRegMaxB16Even, vSrcRegMax, maskRegAllB32);
+            Reg::Cast<T, float, castTrait1>(vSrcRegMaxB16Odd, vSrcRegMax, maskRegAllB32);
+            Reg::Cast<T, float, castTrait0>(vSrcRegSumB16Even, vSrcRegSum, maskRegAllB32);
+            Reg::Cast<T, float, castTrait1>(vSrcRegSumB16Odd, vSrcRegSum, maskRegAllB32);
+            Reg::Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t> &)vSrcRegMaxB16,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegMaxB16Even,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegMaxB16Odd, preg_d);
+            Reg::Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t> &)vSrcRegSumB16,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegSumB16Even,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegSumB16Odd, preg_d);
 
             // high performance only support d=128
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vSrcRegPre, preUb + i * dSize);
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vSrcRegCur, curUb + i * dSize);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vSrcRegPre, preUb + i * dSize);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vSrcRegCur, curUb + i * dSize);
 
-            MicroAPI::Mul<T, MicroAPI::MaskMergeMode::ZEROING>(vSrcRegMul, vSrcRegMaxB16, vSrcRegPre, preg_d);
-            MicroAPI::Add<T, MicroAPI::MaskMergeMode::ZEROING>(vSrcRegAdd, vSrcRegMul, vSrcRegCur, preg_d);
-            MicroAPI::Div<T, &mode>(vDstRegDiv, vSrcRegAdd, vSrcRegSumB16, preg_d);
-            MicroAPI::DataCopy<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B16>(dstUb + i * dSize, vDstRegDiv, preg_d);
+            Reg::Mul<T, Reg::MaskMergeMode::ZEROING>(vSrcRegMul, vSrcRegMaxB16, vSrcRegPre, preg_d);
+            Reg::Add<T, Reg::MaskMergeMode::ZEROING>(vSrcRegAdd, vSrcRegMul, vSrcRegCur, preg_d);
+            Reg::Div<T, &mode>(vDstRegDiv, vSrcRegAdd, vSrcRegSumB16, preg_d);
+            Reg::DataCopy<OUTPUT_T, Reg::StoreDist::DIST_NORM_B16>(dstUb + i * dSize, vDstRegDiv, preg_d);
         }
     }
 }
@@ -193,39 +193,39 @@ __aicore__ inline void FlashUpdateDivNoTailV510_VF(const LocalTensor<T> &dstTens
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> vSrcRegSum;
-        MicroAPI::RegTensor<T> vSrcRegSumB16Even;
-        MicroAPI::RegTensor<T> vSrcRegSumB16Odd;
-        MicroAPI::RegTensor<T> vSrcRegSumB16;
-        MicroAPI::RegTensor<T> vSrcRegPre;
-        MicroAPI::RegTensor<T> vDstRegDiv;
+        Reg::RegTensor<float> vSrcRegSum;
+        Reg::RegTensor<T> vSrcRegSumB16Even;
+        Reg::RegTensor<T> vSrcRegSumB16Odd;
+        Reg::RegTensor<T> vSrcRegSumB16;
+        Reg::RegTensor<T> vSrcRegPre;
+        Reg::RegTensor<T> vDstRegDiv;
 
-        MicroAPI::RegTensor<MMOUTPUT_T> vregSrc;
+        Reg::RegTensor<MMOUTPUT_T> vregSrc;
 
-        MicroAPI::MaskReg preg_d;
+        Reg::MaskReg preg_d;
         uint32_t sreg_d = dSize;
-        preg_d = MicroAPI::UpdateMask<T>(sreg_d);
+        preg_d = Reg::UpdateMask<T>(sreg_d);
 
         // false: normal mode; true: higher precision mode
-        static constexpr MicroAPI::DivSpecificMode mode = {MicroAPI::MaskMergeMode::ZEROING, false};
-        MicroAPI::MaskReg maskRegAllB32 = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg maskRegAllB16 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+        static constexpr Reg::DivSpecificMode mode = {Reg::MaskMergeMode::ZEROING, false};
+        Reg::MaskReg maskRegAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg maskRegAllB16 = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
 
         for (uint16_t i = 0; i < m; ++i) {
-            static constexpr MicroAPI::CastTrait castTrait0 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ONE, MicroAPI::SatMode::NO_SAT,
-                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_BRC_B32>(vSrcRegSum, expSumUb + i * reduceSize);
-            MicroAPI::Cast<T, float, castTrait0>(vSrcRegSumB16Even, vSrcRegSum, maskRegAllB32);
-            MicroAPI::Cast<T, float, castTrait1>(vSrcRegSumB16Odd, vSrcRegSum, maskRegAllB32);
-            MicroAPI::Or<uint16_t, MicroAPI::MaskMergeMode::ZEROING>(
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegSumB16, (MicroAPI::RegTensor<uint16_t> &)vSrcRegSumB16Even,
-                (MicroAPI::RegTensor<uint16_t> &)vSrcRegSumB16Odd, preg_d);
+            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
+                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(vSrcRegSum, expSumUb + i * reduceSize);
+            Reg::Cast<T, float, castTrait0>(vSrcRegSumB16Even, vSrcRegSum, maskRegAllB32);
+            Reg::Cast<T, float, castTrait1>(vSrcRegSumB16Odd, vSrcRegSum, maskRegAllB32);
+            Reg::Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t> &)vSrcRegSumB16,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegSumB16Even,
+                                                           (Reg::RegTensor<uint16_t> &)vSrcRegSumB16Odd, preg_d);
             // high performance only support d=128
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vSrcRegPre, preUb + i * dSize);
-            MicroAPI::Div<T, &mode>(vDstRegDiv, vSrcRegPre, vSrcRegSumB16, preg_d);
-            MicroAPI::DataCopy<OUTPUT_T, MicroAPI::StoreDist::DIST_NORM_B16>(dstUb + i * dSize, vDstRegDiv, preg_d);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vSrcRegPre, preUb + i * dSize);
+            Reg::Div<T, &mode>(vDstRegDiv, vSrcRegPre, vSrcRegSumB16, preg_d);
+            Reg::DataCopy<OUTPUT_T, Reg::StoreDist::DIST_NORM_B16>(dstUb + i * dSize, vDstRegDiv, preg_d);
         }
     }
 }
@@ -284,13 +284,13 @@ __aicore__ inline void InvalidLineUpdate(const LocalTensor<T> &dstTensor, const 
 
         Duplicate(vreg_invalid_value, invalidValue);
         for (uint16_t i = 0; i < m; ++i) {
-            DataCopy<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_max, maxUb + i);
+            DataCopy<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max, maxUb + i);
             CompareScalar<T, CMPMODE::EQ>(preg_compare, vreg_max, minValue, preg_all);
             for (uint16_t j = 0; j < dLoops; ++j) {
                 DataCopy(vreg_input, srcUb + i * d + j * floatRepSize);
                 Select(vreg_input_brc, vreg_invalid_value, vreg_input, preg_compare);
-                DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize,
-                                                                vreg_input_brc, preg_all);
+                DataCopy<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize,
+                                                           vreg_input_brc, preg_all);
             }
         }
     }
@@ -319,33 +319,32 @@ __aicore__ inline void RowInvalidUpdateVF(const LocalTensor<T> &finalTensor, con
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> vregMinValue;
-        MicroAPI::RegTensor<T> vregZeroValue;
-        MicroAPI::RegTensor<float> vregMax;
-        MicroAPI::RegTensor<T> vregFinal;
-        MicroAPI::RegTensor<T> vregFinalNew;
+        Reg::RegTensor<float> vregMinValue;
+        Reg::RegTensor<T> vregZeroValue;
+        Reg::RegTensor<float> vregMax;
+        Reg::RegTensor<T> vregFinal;
+        Reg::RegTensor<T> vregFinalNew;
 
-        MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::MaskReg pregTailD = MicroAPI::UpdateMask<T>(pltTailD);
-        MicroAPI::MaskReg pregCompare;
+        Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregTailD = Reg::UpdateMask<T>(pltTailD);
+        Reg::MaskReg pregCompare;
 
-        MicroAPI::Duplicate<float, float>(vregMinValue, minValue);
-        MicroAPI::Duplicate<T, T>(vregZeroValue, zeroValue);
+        Reg::Duplicate<float, float>(vregMinValue, minValue);
+        Reg::Duplicate<T, T>(vregZeroValue, zeroValue);
         for (uint16_t i = 0; i < m; ++i) {
-            MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_BRC_B32>(vregMax, maxUb + i);
-            MicroAPI::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregAll);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(vregMax, maxUb + i);
+            Reg::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregAll);
             for (uint16_t j = 0; j < dLoops; ++j) {
-                MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vregFinal, finalUb + i * dSize + j * floatRepSize);
-                MicroAPI::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
-                MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + j * floatRepSize,
-                                                                          vregFinalNew, pregAll);
+                Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregFinal, finalUb + i * dSize + j * floatRepSize);
+                Reg::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
+                Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + j * floatRepSize, vregFinalNew,
+                                                                pregAll);
             }
             for (uint16_t t = 0; t < hasTail; ++t) {
-                MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_NORM>(vregFinal,
-                                                                     finalUb + i * dSize + dLoops * floatRepSize);
-                MicroAPI::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
-                MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + dLoops * floatRepSize,
-                                                                          vregFinalNew, pregTailD);
+                Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregFinal, finalUb + i * dSize + dLoops * floatRepSize);
+                Reg::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
+                Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + dLoops * floatRepSize,
+                                                                vregFinalNew, pregTailD);
             }
         }
     }
