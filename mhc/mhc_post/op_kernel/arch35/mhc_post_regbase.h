@@ -80,9 +80,9 @@ private:
 
     int64_t curBS_;
     uint32_t blockIdx_;
-    constexpr static AscendC::MicroAPI::CastTrait castB16ToB32 = {
-        AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN,
-        AscendC::MicroAPI::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
+    constexpr static AscendC::Reg::CastTrait castB16ToB32 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
+        AscendC::RoundMode::UNKNOWN};
 };
 
 REGBASE_TEMPLATE_DECLARE
@@ -149,32 +149,31 @@ __aicore__ inline void MhcPostRegbase<REGBASE_TEMPLATE_ARGS>::DoMulAndAdd(LocalT
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<T> xReg;
-        AscendC::MicroAPI::RegTensor<T> hOutReg;
-        AscendC::MicroAPI::RegTensor<float> xRegFloat;
-        AscendC::MicroAPI::RegTensor<float> hOutRegFloat;
-        AscendC::MicroAPI::RegTensor<float> hResReg;
-        AscendC::MicroAPI::RegTensor<float> hPostReg;
-        AscendC::MicroAPI::RegTensor<float> outRegFloat;
-        AscendC::MicroAPI::MaskReg pMask;
+        AscendC::Reg::RegTensor<T> xReg;
+        AscendC::Reg::RegTensor<T> hOutReg;
+        AscendC::Reg::RegTensor<float> xRegFloat;
+        AscendC::Reg::RegTensor<float> hOutRegFloat;
+        AscendC::Reg::RegTensor<float> hResReg;
+        AscendC::Reg::RegTensor<float> hPostReg;
+        AscendC::Reg::RegTensor<float> outRegFloat;
+        AscendC::Reg::MaskReg pMask;
         for (uint16_t nIndex = 0; nIndex < nTimes; nIndex++) {
             uint32_t dNumU32 = static_cast<uint32_t>(dAlign);
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(hPostReg, hPostAddr + nIndex);
+            AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(hPostReg, hPostAddr + nIndex);
             for (uint16_t j = 0; j < dRepeatTimes; j++) {
-                pMask = AscendC::MicroAPI::UpdateMask<float>(dNumU32);
-                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(hOutReg,
-                                                                                             hOutAddr + j * VL_FP32);
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(hOutRegFloat, hOutReg, pMask);
-                AscendC::MicroAPI::Mul(outRegFloat, hOutRegFloat, hPostReg, pMask);
+                pMask = AscendC::Reg::UpdateMask<float>(dNumU32);
+                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(hOutReg, hOutAddr + j * VL_FP32);
+                AscendC::Reg::Cast<float, T, castB16ToB32>(hOutRegFloat, hOutReg, pMask);
+                AscendC::Reg::Mul(outRegFloat, hOutRegFloat, hPostReg, pMask);
                 for (uint16_t i = 0; i < nTotal; i++) {
-                    AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(
                         xReg, xAddr + i * dAlign + j * VL_FP32);
-                    AscendC::MicroAPI::Cast<float, T, castB16ToB32>(xRegFloat, xReg, pMask);
-                    AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                        hResReg, hResAddr + i * nAlign + nIndex);
-                    AscendC::MicroAPI::MulAddDst(outRegFloat, xRegFloat, hResReg, pMask);
+                    AscendC::Reg::Cast<float, T, castB16ToB32>(xRegFloat, xReg, pMask);
+                    AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(hResReg,
+                                                                                        hResAddr + i * nAlign + nIndex);
+                    AscendC::Reg::MulAddDst(outRegFloat, xRegFloat, hResReg, pMask);
                 }
-                AscendC::MicroAPI::DataCopy(yAddr + nIndex * dAlign + j * VL_FP32, outRegFloat, pMask);
+                AscendC::Reg::DataCopy(yAddr + nIndex * dAlign + j * VL_FP32, outRegFloat, pMask);
             }
         }
     }
@@ -208,56 +207,55 @@ __aicore__ inline void MhcPostRegbase<REGBASE_TEMPLATE_ARGS>::DoMulAndAdd_N4(Loc
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<T> xReg0, xReg1, xReg2, xReg3;
-        AscendC::MicroAPI::RegTensor<float> xRegFloat0, xRegFloat1, xRegFloat2, xRegFloat3;
-        AscendC::MicroAPI::RegTensor<float> hResReg0, hResReg1, hResReg2, hResReg3;
-        AscendC::MicroAPI::RegTensor<T> hOutReg;
-        AscendC::MicroAPI::RegTensor<float> hOutRegFloat;
-        AscendC::MicroAPI::RegTensor<float> hPostReg;
-        AscendC::MicroAPI::RegTensor<float> outRegFloat;
-        AscendC::MicroAPI::MaskReg pMask;
+        AscendC::Reg::RegTensor<T> xReg0, xReg1, xReg2, xReg3;
+        AscendC::Reg::RegTensor<float> xRegFloat0, xRegFloat1, xRegFloat2, xRegFloat3;
+        AscendC::Reg::RegTensor<float> hResReg0, hResReg1, hResReg2, hResReg3;
+        AscendC::Reg::RegTensor<T> hOutReg;
+        AscendC::Reg::RegTensor<float> hOutRegFloat;
+        AscendC::Reg::RegTensor<float> hPostReg;
+        AscendC::Reg::RegTensor<float> outRegFloat;
+        AscendC::Reg::MaskReg pMask;
 
         for (uint16_t nIndex = 0; nIndex < nTimes; nIndex++) {
             uint32_t dNumU32 = static_cast<uint32_t>(dAlign);
 
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                hResReg0, hResAddr + 0 * nAlign + nIndex);
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                hResReg1, hResAddr + 1 * nAlign + nIndex);
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                hResReg2, hResAddr + 2 * nAlign + nIndex);
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                hResReg3, hResAddr + 3 * nAlign + nIndex);
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(hPostReg, hPostAddr + nIndex);
+            AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(hResReg0,
+                                                                                hResAddr + 0 * nAlign + nIndex);
+            AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(hResReg1,
+                                                                                hResAddr + 1 * nAlign + nIndex);
+            AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(hResReg2,
+                                                                                hResAddr + 2 * nAlign + nIndex);
+            AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(hResReg3,
+                                                                                hResAddr + 3 * nAlign + nIndex);
+            AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(hPostReg, hPostAddr + nIndex);
 
             for (uint16_t j = 0; j < repeatTimes; j++) {
-                pMask = AscendC::MicroAPI::UpdateMask<float>(dNumU32);
+                pMask = AscendC::Reg::UpdateMask<float>(dNumU32);
 
-                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(hOutReg,
-                                                                                             hOutAddr + j * VL_FP32);
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(hOutRegFloat, hOutReg, pMask);
+                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(hOutReg, hOutAddr + j * VL_FP32);
+                AscendC::Reg::Cast<float, T, castB16ToB32>(hOutRegFloat, hOutReg, pMask);
 
-                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    xReg0, xAddr + 0 * dAlign + j * VL_FP32);
-                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    xReg1, xAddr + 1 * dAlign + j * VL_FP32);
-                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    xReg2, xAddr + 2 * dAlign + j * VL_FP32);
-                AscendC::MicroAPI::DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    xReg3, xAddr + 3 * dAlign + j * VL_FP32);
+                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xReg0,
+                                                                                   xAddr + 0 * dAlign + j * VL_FP32);
+                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xReg1,
+                                                                                   xAddr + 1 * dAlign + j * VL_FP32);
+                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xReg2,
+                                                                                   xAddr + 2 * dAlign + j * VL_FP32);
+                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xReg3,
+                                                                                   xAddr + 3 * dAlign + j * VL_FP32);
 
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(xRegFloat0, xReg0, pMask);
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(xRegFloat1, xReg1, pMask);
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(xRegFloat2, xReg2, pMask);
-                AscendC::MicroAPI::Cast<float, T, castB16ToB32>(xRegFloat3, xReg3, pMask);
+                AscendC::Reg::Cast<float, T, castB16ToB32>(xRegFloat0, xReg0, pMask);
+                AscendC::Reg::Cast<float, T, castB16ToB32>(xRegFloat1, xReg1, pMask);
+                AscendC::Reg::Cast<float, T, castB16ToB32>(xRegFloat2, xReg2, pMask);
+                AscendC::Reg::Cast<float, T, castB16ToB32>(xRegFloat3, xReg3, pMask);
 
-                AscendC::MicroAPI::Mul(outRegFloat, hOutRegFloat, hPostReg, pMask);
-                AscendC::MicroAPI::MulAddDst(outRegFloat, xRegFloat0, hResReg0, pMask);
-                AscendC::MicroAPI::MulAddDst(outRegFloat, xRegFloat1, hResReg1, pMask);
-                AscendC::MicroAPI::MulAddDst(outRegFloat, xRegFloat2, hResReg2, pMask);
-                AscendC::MicroAPI::MulAddDst(outRegFloat, xRegFloat3, hResReg3, pMask);
+                AscendC::Reg::Mul(outRegFloat, hOutRegFloat, hPostReg, pMask);
+                AscendC::Reg::MulAddDst(outRegFloat, xRegFloat0, hResReg0, pMask);
+                AscendC::Reg::MulAddDst(outRegFloat, xRegFloat1, hResReg1, pMask);
+                AscendC::Reg::MulAddDst(outRegFloat, xRegFloat2, hResReg2, pMask);
+                AscendC::Reg::MulAddDst(outRegFloat, xRegFloat3, hResReg3, pMask);
 
-                AscendC::MicroAPI::DataCopy(yAddr + nIndex * dAlign + j * VL_FP32, outRegFloat, pMask);
+                AscendC::Reg::DataCopy(yAddr + nIndex * dAlign + j * VL_FP32, outRegFloat, pMask);
             }
         }
     }

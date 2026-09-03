@@ -91,8 +91,8 @@ constexpr uint32_t CROSS_CORE_WAIT_FLAG_C0 = 0x9;
 constexpr uint32_t CROSS_CORE_WAIT_FLAG_C1 = 0x8;
 constexpr uint32_t VEC_DEAL_VECIDX_DIV = 2;
 
-constexpr MicroAPI::CastTrait ctHalf2Fp32Zero = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                 MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+constexpr Reg::CastTrait ctHalf2Fp32Zero = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
+                                            RoundMode::UNKNOWN};
 
 struct InitParams {
     GM_ADDR x;

@@ -22,7 +22,7 @@
 #include "mhc_pre_sinkhorn_backward_data_arch35.h"
 
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 namespace {
 constexpr int32_t DOUBLE_BUF = 2;

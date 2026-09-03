@@ -157,46 +157,46 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcRowBackward(
     __local_mem__ int32_t *broadcastAddr = (__local_mem__ int32_t *)broadcastLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg maskReg = MicroAPI::CreateMask<uint32_t>();
-        MicroAPI::MaskReg allMask = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::LoadAlign(maskReg, maskAddr); // VL
+        Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
+        Reg::MaskReg allMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+        Reg::LoadAlign(maskReg, maskAddr); // VL
 
-        MicroAPI::RegTensor<float> gradYReg;
-        MicroAPI::RegTensor<float> normReg;
-        MicroAPI::RegTensor<float> sumReg;
-        MicroAPI::RegTensor<float> dotProdReg;
-        MicroAPI::RegTensor<float> sumGradYReg;
-        MicroAPI::RegTensor<float> sumBrcbReg;
-        MicroAPI::RegTensor<int32_t> indexReg;
-        MicroAPI::RegTensor<int32_t> broadcastReg;
+        Reg::RegTensor<float> gradYReg;
+        Reg::RegTensor<float> normReg;
+        Reg::RegTensor<float> sumReg;
+        Reg::RegTensor<float> dotProdReg;
+        Reg::RegTensor<float> sumGradYReg;
+        Reg::RegTensor<float> sumBrcbReg;
+        Reg::RegTensor<int32_t> indexReg;
+        Reg::RegTensor<int32_t> broadcastReg;
 
-        MicroAPI::LoadAlign(indexReg, indexAddr);         // VL
-        MicroAPI::LoadAlign(broadcastReg, broadcastAddr); // VL
+        Reg::LoadAlign(indexReg, indexAddr);         // VL
+        Reg::LoadAlign(broadcastReg, broadcastAddr); // VL
         for (uint16_t j = 0; j < repeatTimes; j++) {
             uint32_t perT = min(repeatSize, perloopSize - (repeatSize * j));
             uint32_t dataLen = perT * static_cast<uint32_t>(nAlignSize_);
-            MicroAPI::MaskReg CalcMaskReg = MicroAPI::UpdateMask<uint32_t>(dataLen); // dataLen
-            MicroAPI::And(CalcMaskReg, CalcMaskReg, maskReg, allMask);
-            MicroAPI::MaskReg dataCopyMaskReg = MicroAPI::UpdateMask<uint32_t>(perT);
+            Reg::MaskReg CalcMaskReg = Reg::UpdateMask<uint32_t>(dataLen); // dataLen
+            Reg::And(CalcMaskReg, CalcMaskReg, maskReg, allMask);
+            Reg::MaskReg dataCopyMaskReg = Reg::UpdateMask<uint32_t>(perT);
             for (uint16_t k = 0; k < static_cast<uint16_t>(nSize_); k++) {
                 // 根据索引位置将输入gradYAddr对应元素搬入gradYReg
-                MicroAPI::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_,
-                                         (MicroAPI::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
-                MicroAPI::DataCopy(normReg, normAddr + k * perloopSize * nAlignSize_ + j * repeatSize * nAlignSize_);
-                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_E2B_B32>(
-                    sumReg, sumAddr + k * perloopSizePad + j * repeatSize);
+                Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_,
+                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                Reg::DataCopy(normReg, normAddr + k * perloopSize * nAlignSize_ + j * repeatSize * nAlignSize_);
+                Reg::DataCopy<float, Reg::LoadDist::DIST_E2B_B32>(sumReg,
+                                                                  sumAddr + k * perloopSizePad + j * repeatSize);
 
-                MicroAPI::Mul(dotProdReg, gradYReg, normReg, CalcMaskReg);
-                MicroAPI::ReduceSumWithDataBlock(sumGradYReg, dotProdReg, CalcMaskReg);
-                MicroAPI::Gather(sumBrcbReg, sumGradYReg, (MicroAPI::RegTensor<uint32_t> &)(broadcastReg));
-                MicroAPI::Sub(dotProdReg, gradYReg, sumBrcbReg, CalcMaskReg);
-                MicroAPI::Div(dotProdReg, dotProdReg, sumReg, CalcMaskReg);
+                Reg::Mul(dotProdReg, gradYReg, normReg, CalcMaskReg);
+                Reg::ReduceSumWithDataBlock(sumGradYReg, dotProdReg, CalcMaskReg);
+                Reg::Gather(sumBrcbReg, sumGradYReg, (Reg::RegTensor<uint32_t> &)(broadcastReg));
+                Reg::Sub(dotProdReg, gradYReg, sumBrcbReg, CalcMaskReg);
+                Reg::Div(dotProdReg, dotProdReg, sumReg, CalcMaskReg);
 
-                MicroAPI::DataCopyScatter(gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_, dotProdReg,
-                                          (MicroAPI::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                Reg::DataCopyScatter(gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_, dotProdReg,
+                                     (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
             }
         }
-        MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+        Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
     }
 }
 
@@ -209,45 +209,45 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcColBackward(
     __local_mem__ int32_t *indexAddr = (__local_mem__ int32_t *)indexLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg maskReg = MicroAPI::CreateMask<uint32_t>();
-        MicroAPI::MaskReg allMask = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::LoadAlign(maskReg, maskAddr); // VL
+        Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
+        Reg::MaskReg allMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+        Reg::LoadAlign(maskReg, maskAddr); // VL
 
-        MicroAPI::RegTensor<float> gradYReg;
-        MicroAPI::RegTensor<float> gradInputReg;
-        MicroAPI::RegTensor<float> normReg;
-        MicroAPI::RegTensor<float> sumReg;
-        MicroAPI::RegTensor<float> mulResultReg;
-        MicroAPI::RegTensor<float> sumColReg;
-        MicroAPI::RegTensor<int32_t> indexReg;
+        Reg::RegTensor<float> gradYReg;
+        Reg::RegTensor<float> gradInputReg;
+        Reg::RegTensor<float> normReg;
+        Reg::RegTensor<float> sumReg;
+        Reg::RegTensor<float> mulResultReg;
+        Reg::RegTensor<float> sumColReg;
+        Reg::RegTensor<int32_t> indexReg;
 
-        MicroAPI::LoadAlign(indexReg, indexAddr); // VL
+        Reg::LoadAlign(indexReg, indexAddr); // VL
 
         for (uint16_t j = 0; j < repeatTimes; j++) {
             uint32_t perT = min(repeatSize, perloopSize - (repeatSize * j));
             uint32_t dataLen = perT * static_cast<uint32_t>(nAlignSize_);
 
-            MicroAPI::MaskReg CalcMaskReg = MicroAPI::UpdateMask<uint32_t>(dataLen); // dataLen
-            MicroAPI::And(CalcMaskReg, CalcMaskReg, maskReg, allMask);
-            MicroAPI::Duplicate(sumColReg, static_cast<float>(0));
-            MicroAPI::DataCopy(sumReg, sumAddr + j * repeatSize * nAlignSize_);
+            Reg::MaskReg CalcMaskReg = Reg::UpdateMask<uint32_t>(dataLen); // dataLen
+            Reg::And(CalcMaskReg, CalcMaskReg, maskReg, allMask);
+            Reg::Duplicate(sumColReg, static_cast<float>(0));
+            Reg::DataCopy(sumReg, sumAddr + j * repeatSize * nAlignSize_);
             for (uint16_t i = 0; i < static_cast<uint16_t>(n); i++) {
-                MicroAPI::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n,
-                                         (MicroAPI::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
-                MicroAPI::DataCopy(normReg, normAddr + j * repeatSize * nAlignSize_ + i * nAlignSize_ * perloopSize);
-                MicroAPI::Mul(mulResultReg, gradYReg, normReg, CalcMaskReg);
-                MicroAPI::Add(sumColReg, sumColReg, mulResultReg, CalcMaskReg);
+                Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n,
+                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                Reg::DataCopy(normReg, normAddr + j * repeatSize * nAlignSize_ + i * nAlignSize_ * perloopSize);
+                Reg::Mul(mulResultReg, gradYReg, normReg, CalcMaskReg);
+                Reg::Add(sumColReg, sumColReg, mulResultReg, CalcMaskReg);
             }
             for (uint16_t i = 0; i < static_cast<uint16_t>(n); i++) {
-                MicroAPI::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n,
-                                         (MicroAPI::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
-                MicroAPI::Sub(gradInputReg, gradYReg, sumColReg, CalcMaskReg);
-                MicroAPI::Div(gradInputReg, gradInputReg, sumReg, CalcMaskReg);
-                MicroAPI::DataCopyScatter(gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n, gradInputReg,
-                                          (MicroAPI::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n,
+                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                Reg::Sub(gradInputReg, gradYReg, sumColReg, CalcMaskReg);
+                Reg::Div(gradInputReg, gradInputReg, sumReg, CalcMaskReg);
+                Reg::DataCopyScatter(gradYAddr + j * repeatSize * nSize_ * nSize_ + i * n, gradInputReg,
+                                     (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
             }
         }
-        MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+        Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
     }
 }
 
@@ -262,49 +262,49 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CalcSoftmaxBackward(
     __local_mem__ int32_t *broadcastAddr = (__local_mem__ int32_t *)broadcastLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg maskReg = MicroAPI::CreateMask<uint32_t>();
-        MicroAPI::MaskReg allMask = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::LoadAlign(maskReg, maskAddr); // VL
+        Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
+        Reg::MaskReg allMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+        Reg::LoadAlign(maskReg, maskAddr); // VL
 
-        MicroAPI::RegTensor<float> gradYReg;
-        MicroAPI::RegTensor<float> normReg;
-        MicroAPI::RegTensor<float> mulResultReg;
-        MicroAPI::RegTensor<float> dotProdReg;
-        MicroAPI::RegTensor<float> dotProdBrcbReg;
-        MicroAPI::RegTensor<float> gradInputReg;
-        MicroAPI::RegTensor<int32_t> broadcastReg;
+        Reg::RegTensor<float> gradYReg;
+        Reg::RegTensor<float> normReg;
+        Reg::RegTensor<float> mulResultReg;
+        Reg::RegTensor<float> dotProdReg;
+        Reg::RegTensor<float> dotProdBrcbReg;
+        Reg::RegTensor<float> gradInputReg;
+        Reg::RegTensor<int32_t> broadcastReg;
 
-        MicroAPI::RegTensor<int32_t> indexReg;
+        Reg::RegTensor<int32_t> indexReg;
 
-        MicroAPI::LoadAlign(indexReg, indexAddr);         // VL
-        MicroAPI::LoadAlign(broadcastReg, broadcastAddr); // VL
+        Reg::LoadAlign(indexReg, indexAddr);         // VL
+        Reg::LoadAlign(broadcastReg, broadcastAddr); // VL
 
         for (uint16_t k = 0; k < static_cast<uint16_t>(nSize_); k++) {
             for (uint16_t j = 0; j < repeatTimes; j++) {
                 uint32_t perT = min(repeatSize, perloopSize - (repeatSize * j));
                 uint32_t dataLen = perT * static_cast<uint32_t>(nAlignSize_);
 
-                MicroAPI::MaskReg CalcMaskReg = MicroAPI::UpdateMask<uint32_t>(dataLen); // dataLen
-                MicroAPI::And(CalcMaskReg, CalcMaskReg, maskReg, allMask);
-                MicroAPI::MaskReg dataCopyMaskReg = MicroAPI::UpdateMask<uint32_t>(perT);
+                Reg::MaskReg CalcMaskReg = Reg::UpdateMask<uint32_t>(dataLen); // dataLen
+                Reg::And(CalcMaskReg, CalcMaskReg, maskReg, allMask);
+                Reg::MaskReg dataCopyMaskReg = Reg::UpdateMask<uint32_t>(perT);
 
                 // 按照indeReg中存储索引的顺序将数据搬到gradYReg,此时gradYReg [n, t, align_n]
-                MicroAPI::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_,
-                                         (MicroAPI::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                Reg::DataCopyGather(gradYReg, gradYAddr + j * repeatSize * nSize_ * nSize_ + k * nSize_,
+                                    (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
 
-                MicroAPI::DataCopy(normReg, normAddr + k * perloopSize * nAlignSize_ + j * repeatSize * nAlignSize_);
+                Reg::DataCopy(normReg, normAddr + k * perloopSize * nAlignSize_ + j * repeatSize * nAlignSize_);
 
-                MicroAPI::Mul(mulResultReg, gradYReg, normReg, CalcMaskReg);
-                MicroAPI::ReduceSumWithDataBlock(dotProdReg, mulResultReg, CalcMaskReg);
-                MicroAPI::Gather(dotProdBrcbReg, dotProdReg, (MicroAPI::RegTensor<uint32_t> &)(broadcastReg));
-                MicroAPI::Sub(gradInputReg, gradYReg, dotProdBrcbReg, CalcMaskReg);
-                MicroAPI::Mul(gradInputReg, gradInputReg, normReg, CalcMaskReg);
+                Reg::Mul(mulResultReg, gradYReg, normReg, CalcMaskReg);
+                Reg::ReduceSumWithDataBlock(dotProdReg, mulResultReg, CalcMaskReg);
+                Reg::Gather(dotProdBrcbReg, dotProdReg, (Reg::RegTensor<uint32_t> &)(broadcastReg));
+                Reg::Sub(gradInputReg, gradYReg, dotProdBrcbReg, CalcMaskReg);
+                Reg::Mul(gradInputReg, gradInputReg, normReg, CalcMaskReg);
 
-                MicroAPI::DataCopyScatter(gradInputAddr + +j * repeatSize * nSize_ * nSize_ + k * nSize_, gradInputReg,
-                                          (MicroAPI::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
+                Reg::DataCopyScatter(gradInputAddr + +j * repeatSize * nSize_ * nSize_ + k * nSize_, gradInputReg,
+                                     (Reg::RegTensor<uint32_t> &)(indexReg), CalcMaskReg);
             }
         }
-        MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+        Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
     }
 }
 
@@ -484,39 +484,39 @@ __aicore__ inline void MhcSinkhornBackwardSimd::CreateGatherIndex(uint32_t n)
 
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg maskReg = MicroAPI::CreateMask<uint32_t>();
-        MicroAPI::MaskReg allMask = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::LoadAlign(maskReg, maskAddr); // VL
+        Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
+        Reg::MaskReg allMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+        Reg::LoadAlign(maskReg, maskAddr); // VL
 
-        MicroAPI::RegTensor<int32_t> indexReg;
-        MicroAPI::RegTensor<int32_t> orderReg;
-        MicroAPI::RegTensor<int32_t> duplicateReg1;
-        MicroAPI::RegTensor<int32_t> duplicateReg2;
-        MicroAPI::RegTensor<int32_t> tmpReg1;
-        MicroAPI::RegTensor<int32_t> tmpReg2;
-        MicroAPI::RegTensor<int32_t> tmpReg3;
+        Reg::RegTensor<int32_t> indexReg;
+        Reg::RegTensor<int32_t> orderReg;
+        Reg::RegTensor<int32_t> duplicateReg1;
+        Reg::RegTensor<int32_t> duplicateReg2;
+        Reg::RegTensor<int32_t> tmpReg1;
+        Reg::RegTensor<int32_t> tmpReg2;
+        Reg::RegTensor<int32_t> tmpReg3;
 
-        MicroAPI::RegTensor<int32_t> duplicateBrcbReg;
-        MicroAPI::RegTensor<int32_t> orderBrcbReg;
-        MicroAPI::RegTensor<int32_t> tmpBrcbReg;
+        Reg::RegTensor<int32_t> duplicateBrcbReg;
+        Reg::RegTensor<int32_t> orderBrcbReg;
+        Reg::RegTensor<int32_t> tmpBrcbReg;
 
         // indexReg：使用DataCopyGather生成索引
-        MicroAPI::Duplicate(duplicateReg1, static_cast<int32_t>(INDEX_BLOCK_LEN)); // [8,8,8,...,8]
-        MicroAPI::Duplicate(duplicateReg2, static_cast<int32_t>(n * n));           // 填充n*n
-        MicroAPI::Arange(orderReg, static_cast<int32_t>(0));                       // [0,1,2,...,63]
-        MicroAPI::Div(tmpReg1, orderReg, duplicateReg1, maskReg); // [0,0,...,0,1,1,...,1,...,7,7,...,7]
-        MicroAPI::Mul(tmpReg2, tmpReg1, duplicateReg1, maskReg);  // [0,0,...,0,8,8,...,8,...,63,63,...,63]
-        MicroAPI::Sub(tmpReg2, orderReg, tmpReg2, maskReg);       // [0,1,2,...,7,0,1,2,...,7,...,0,1,2,...,7]
-        MicroAPI::Mul(tmpReg3, tmpReg1, duplicateReg2, maskReg);  // [0,0,...,0,16,16,...,16,...,112,112,...,112]
-        MicroAPI::Add(indexReg, tmpReg2, tmpReg3, maskReg); // [0,1,2,...,7,16,17,18,...,23,...,112,113,114,...,119]
-        MicroAPI::DataCopy<int32_t, MicroAPI::StoreDist::DIST_NORM>(indexAddr, indexReg, allMask);
+        Reg::Duplicate(duplicateReg1, static_cast<int32_t>(INDEX_BLOCK_LEN)); // [8,8,8,...,8]
+        Reg::Duplicate(duplicateReg2, static_cast<int32_t>(n * n));           // 填充n*n
+        Reg::Arange(orderReg, static_cast<int32_t>(0));                       // [0,1,2,...,63]
+        Reg::Div(tmpReg1, orderReg, duplicateReg1, maskReg);                  // [0,0,...,0,1,1,...,1,...,7,7,...,7]
+        Reg::Mul(tmpReg2, tmpReg1, duplicateReg1, maskReg);                   // [0,0,...,0,8,8,...,8,...,63,63,...,63]
+        Reg::Sub(tmpReg2, orderReg, tmpReg2, maskReg);      // [0,1,2,...,7,0,1,2,...,7,...,0,1,2,...,7]
+        Reg::Mul(tmpReg3, tmpReg1, duplicateReg2, maskReg); // [0,0,...,0,16,16,...,16,...,112,112,...,112]
+        Reg::Add(indexReg, tmpReg2, tmpReg3, maskReg);      // [0,1,2,...,7,16,17,18,...,23,...,112,113,114,...,119]
+        Reg::DataCopy<int32_t, Reg::StoreDist::DIST_NORM>(indexAddr, indexReg, allMask);
 
-        MicroAPI::Duplicate(duplicateBrcbReg, static_cast<int32_t>(INDEX_BLOCK_LEN));
-        MicroAPI::Arange(orderBrcbReg, static_cast<int32_t>(0));
-        MicroAPI::Div(tmpBrcbReg, orderBrcbReg, duplicateBrcbReg, allMask);
-        MicroAPI::DataCopy<int32_t, MicroAPI::StoreDist::DIST_NORM>(broadcastAddr, tmpBrcbReg, allMask);
+        Reg::Duplicate(duplicateBrcbReg, static_cast<int32_t>(INDEX_BLOCK_LEN));
+        Reg::Arange(orderBrcbReg, static_cast<int32_t>(0));
+        Reg::Div(tmpBrcbReg, orderBrcbReg, duplicateBrcbReg, allMask);
+        Reg::DataCopy<int32_t, Reg::StoreDist::DIST_NORM>(broadcastAddr, tmpBrcbReg, allMask);
 
-        MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+        Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
     }
 }
 

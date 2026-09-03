@@ -16,10 +16,10 @@
 
 namespace MhcPreSinkhornNs {
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
-using AscendC::MicroAPI::MaskReg;
-using AscendC::MicroAPI::RegTensor;
-using AscendC::MicroAPI::UnalignRegForLoad;
+using namespace AscendC::Reg;
+using AscendC::Reg::MaskReg;
+using AscendC::Reg::RegTensor;
+using AscendC::Reg::UnalignRegForLoad;
 constexpr int32_t BLOCK_SIZE = 32;
 constexpr int32_t VL_FP32 = 64;
 constexpr int32_t C0_SIZE = 8;
@@ -55,17 +55,17 @@ __aicore__ inline int32_t RoundUp(int32_t num)
     return CeilAlign(num, elemNum);
 }
 
-constexpr AscendC::MicroAPI::CastTrait castTraitB162B32Even = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait castTraitB162B32Even = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
 
-constexpr AscendC::MicroAPI::CastTrait castTraitB322B16Even = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::NO_SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait castTraitB322B16Even = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::NO_SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
@@ -84,7 +84,7 @@ __aicore__ inline void LoadInputData(RegTensor<float> &dst, __ubuf__ T *src, Mas
         LoadAlign(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
@@ -97,7 +97,7 @@ __aicore__ inline void StoreOutputData(__ubuf__ T *dst, RegTensor<float> &src, M
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
         Cast<T, float, castTraitB322B16Even>(tmp, src, pregLoop);
-        StoreAlign<T, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(dst + dstOffset, tmp, pregLoop);
+        StoreAlign<T, AscendC::Reg::StoreDist::DIST_PACK_B32>(dst + dstOffset, tmp, pregLoop);
     }
 }
 
@@ -106,10 +106,10 @@ __aicore__ inline void LoadInputDataWithBrc(RegTensor<float> &dst, __ubuf__ T *s
                                             uint32_t srcOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
+        LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::Reg::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
@@ -159,7 +159,7 @@ __aicore__ inline void VFTransND2NZ(const LocalTensor<float> &yLocal, const Loca
             MaskReg pregMain = CreateMask<float>();
             for (uint16_t i = 0; i < curRowMainCount; i++) {
                 for (uint16_t j = 0; j < loopCount; j++) {
-                    LoadAlign<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+                    LoadAlign<float, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY>(
                         x, xLocalAddr + i * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float)) + j * c1Size,
                         dataBlockStride, pregMain);
                     StoreAlign(yLocalAddr + i * C0_SIZE * c1Size + j * curRowNumAlign * c1Size, x, pregMain);
@@ -176,7 +176,7 @@ __aicore__ inline void VFTransND2NZ(const LocalTensor<float> &yLocal, const Loca
             MaskReg pregLoop = UpdateMask<float>(sreg);
             for (uint16_t i = 0; i < curRowMainCount; i++) {
                 for (uint16_t j = 0; j < loopCount; j++) {
-                    LoadAlign<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+                    LoadAlign<float, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY>(
                         x, xLocalAddr + i * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float)) + j * c1Size,
                         dataBlockStride, pregMain);
                     StoreAlign(yLocalAddr + i * C0_SIZE * c1Size + j * curRowNumAlign * c1Size, x, pregMain);
@@ -185,8 +185,8 @@ __aicore__ inline void VFTransND2NZ(const LocalTensor<float> &yLocal, const Loca
             xLocalAddr = xLocalAddr + curRowMainCount * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float));
             yLocalAddr = yLocalAddr + curRowMainCount * C0_SIZE * c1Size;
             for (uint16_t i = 0; i < loopCount; i++) {
-                LoadAlign<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(x, xLocalAddr + i * c1Size,
-                                                                                   dataBlockStride, pregLoop);
+                LoadAlign<float, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY>(x, xLocalAddr + i * c1Size,
+                                                                              dataBlockStride, pregLoop);
                 StoreAlign(yLocalAddr + i * curRowNumAlign * c1Size, x, pregLoop);
             }
         }
@@ -253,7 +253,7 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float> &rms
             RegTensor<float> y;
             MaskReg pregLoop;
             MaskReg pregMain = CreateMask<float>();
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             uint32_t sreg;
             for (uint16_t i = 0; i < curRowNum; i++) {
                 Duplicate(sum, 0.0f);
@@ -272,11 +272,11 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float> &rms
                 Reduce<ReduceType::SUM>(sum, sum, pregMain);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, y,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, y,
+                                                                                       pregMerge);
                 } else {
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, sum,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, sum,
+                                                                                       pregMerge);
                 }
             }
         }
@@ -289,7 +289,7 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float> &rms
             RegTensor<float> one;
             RegTensor<float> y;
             MaskReg pregMain = CreateMask<float>();
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             uint32_t sreg = curColNum;
             MaskReg pregLoop = UpdateMask<float>(sreg);
             for (uint16_t i = 0; i < curRowNum; i++) {
@@ -305,11 +305,11 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float> &rms
                 Reduce<ReduceType::SUM>(sum, sum, pregLoop);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, y,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, y,
+                                                                                       pregMerge);
                 } else {
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, sum,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, sum,
+                                                                                       pregMerge);
                 }
             }
         }
@@ -334,7 +334,7 @@ __aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float> &yLocal, co
             RegTensor<float> y;
             MaskReg pregLoop;
             MaskReg pregMain = CreateMask<float>();
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             uint32_t sreg;
             for (uint16_t i = 0; i < curRowNum; i++) {
                 Duplicate(sum, 0.0f);
@@ -352,11 +352,9 @@ __aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float> &yLocal, co
                 Reduce<ReduceType::SUM>(sum, sum, pregMain);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y, pregMerge);
                 } else {
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, sum,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, sum, pregMerge);
                 }
             }
         }
@@ -368,7 +366,7 @@ __aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float> &yLocal, co
             RegTensor<float> one;
             RegTensor<float> y;
             MaskReg pregMain = CreateMask<float>();
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             uint32_t sreg = curColNum;
             MaskReg pregLoop = UpdateMask<float>(sreg);
             for (uint16_t i = 0; i < curRowNum; i++) {
@@ -383,11 +381,9 @@ __aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float> &yLocal, co
                 Reduce<ReduceType::SUM>(sum, sum, pregLoop);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y, pregMerge);
                 } else {
-                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, sum,
-                                                                                            pregMerge);
+                    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, sum, pregMerge);
                 }
             }
         }
@@ -410,7 +406,7 @@ __aicore__ inline void VFProcessInvRmsPart2(const LocalTensor<float> &yLocal, co
         RegTensor<float> y;
         uint32_t sreg = curColNum;
         MaskReg pregLoop = UpdateMask<float>(sreg);
-        MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+        MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
         Duplicate(one, static_cast<float>(1.0), pregMerge);
         for (uint16_t i = 0; i < curRowNum; i++) {
             LoadInputData(x, xLocalAddr, pregLoop, i * curColNumAlign);
@@ -418,7 +414,7 @@ __aicore__ inline void VFProcessInvRmsPart2(const LocalTensor<float> &yLocal, co
             Adds(sum, sum, eps, pregMerge);
             Sqrt(sum, sum, pregMerge);
             Div(y, one, sum, pregMerge);
-            StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y, pregMerge);
+            StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y, pregMerge);
         }
     }
 }
@@ -456,7 +452,7 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduce(const LocalTensor<flo
             RegTensor<float> mm;
             uint32_t sreg = hcMix;
             MaskReg pregLoop = UpdateMask<float>(sreg);
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             Duplicate(one, static_cast<float>(1.0), pregMerge);
             for (uint16_t i = 0; i < bs; i++) {
                 Duplicate(sum1, static_cast<float>(0.0f), pregMerge);
@@ -499,7 +495,7 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduce(const LocalTensor<flo
             RegTensor<float> y;
             uint32_t sreg = hcMix;
             MaskReg pregLoop = UpdateMask<float>(sreg);
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             Duplicate(one, static_cast<float>(1.0), pregMerge);
             for (uint16_t i = 0; i < bs; i++) {
                 Duplicate(sumX1, static_cast<float>(0.0f), pregMerge);
@@ -585,7 +581,7 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
             RegTensor<float> mm;
             uint32_t sreg = hcMix;
             MaskReg pregLoop = UpdateMask<float>(sreg);
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             Duplicate(one, static_cast<float>(1.0), pregMerge);
             for (uint16_t i = 0; i < bs; i++) {
                 Duplicate(sum1, static_cast<float>(0.0f), pregMerge);
@@ -600,8 +596,8 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
                 Sqrt(sum1, sum1, pregMerge);
                 Div(rsqrt, one, sum1, pregMerge);
                 // store invRmsOut
-                StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
-                                                                                        pregMerge);
+                StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
+                                                                                   pregMerge);
                 Duplicate(rsqrt, rsqrt, pregLoop);
                 Mul(y, sum2, rsqrt, pregLoop);
                 // store hcBeforeNorm
@@ -633,7 +629,7 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
             RegTensor<float> y;
             uint32_t sreg = hcMix;
             MaskReg pregLoop = UpdateMask<float>(sreg);
-            MaskReg pregMerge = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+            MaskReg pregMerge = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
             Duplicate(one, static_cast<float>(1.0), pregMerge);
             for (uint16_t i = 0; i < bs; i++) {
                 Duplicate(sumX1, static_cast<float>(0.0f), pregMerge);
@@ -684,8 +680,8 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
                 Sqrt(sumX1, sumX1, pregMerge);
                 Div(rsqrt, one, sumX1, pregMerge);
                 // store invRmsOut
-                StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
-                                                                                        pregMerge);
+                StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
+                                                                                   pregMerge);
                 Duplicate(rsqrt, rsqrt, pregLoop);
                 Mul(y, sumM1, rsqrt, pregLoop);
                 // store hcBeforeNorm
@@ -751,15 +747,14 @@ __aicore__ inline void VFProcessInvRmsPart3Gradout(const LocalTensor<float> &inv
         uint32_t sreg = hcMix;
         MaskReg pregLoop = UpdateMask<float>(sreg);
         Duplicate(one, static_cast<float>(1.0), pregLoop);
-        MaskReg pregOne = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+        MaskReg pregOne = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
         for (uint16_t i = 0; i < bs; i++) {
             LoadInputDataWithBrc<float>(x, xLocalAddr, pregLoop, i);
             LoadInputData<float>(mm, mmLocalAddr, pregLoop, i * hcMixAlign);
             Adds(x, x, eps, pregLoop);
             Sqrt(x, x, pregLoop);
             Div(rsqrt, one, x, pregLoop);
-            StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
-                                                                                    pregOne);
+            StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt, pregOne);
             Mul(y, mm, rsqrt, pregLoop);
             StoreOutputData(yLocalAddr, y, pregLoop, i * hcMixAlign);
         }
@@ -1060,7 +1055,7 @@ __aicore__ inline void VFProcessIterationGradout(RegTensor<float> &sum, RegTenso
     Duplicate(sum1, sum1, pregLoop);
     Adds(sum1, sum1, eps, pregLoop);
     // store sumOut[2j][dim1] dim1:0,1,2,3
-    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
+    StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(
         sumOutLocalAddr + 2 * j * dim0 * dim2Align + i * dim2Align + curDim1, sum1, pregOne);
     Div(mix1, mix1, sum1, pregLoop);
     // store normOut[2j][dim1] dim1:0,1,2,3
@@ -1105,7 +1100,7 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalT
         uint32_t sreg = dim2;
         MaskReg pregLoop = UpdateMask<float>(sreg);
         LoadUnAlignPre<float>(uMix, mixLocalAddr);
-        MaskReg pregOne = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
+        MaskReg pregOne = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
         for (uint16_t i = 0; i < dim0; i++) {
             Duplicate(sum1, static_cast<float>(0), pregLoop);
             for (uint16_t j = 0; j < dim1; j++) {
@@ -1121,8 +1116,8 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalT
                 Reduce<ReduceType::SUM>(sum, mix, pregLoop);
                 // store sumOut[0][j] j -> 1~dim1
                 Adds(sumOut, sum, eps, pregOne);
-                StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                    sumOutLocalAddr + i * dim2Align + j, sumOut, pregOne);
+                StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(sumOutLocalAddr + i * dim2Align + j,
+                                                                                   sumOut, pregOne);
                 Duplicate(sum, sum, pregLoop);
                 Div(mix, mix, sum, pregLoop);
                 Adds(mix, mix, eps, pregLoop);

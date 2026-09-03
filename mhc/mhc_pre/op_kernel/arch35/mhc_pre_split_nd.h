@@ -316,42 +316,42 @@ __aicore__ inline void MhcPreSplitND<T, P, RESI_MODE>::VFDoV0ProcessXInSingleRed
     uint16_t nLoopCnt = MhcPreCeilDiv(nSize, vector_.eleNumPerVf_);
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg fullMask = MicroAPI::CreateMask<P>();
+        Reg::MaskReg fullMask = Reg::CreateMask<P>();
         for (uint16_t mIdx = 0; mIdx < mSize; ++mIdx) {
             uint32_t elementNum = nSize;
             // Keep the whole D-slice sum in one register and reduce once per row instead of once per vector block.
-            MicroAPI::RegTensor<P> squareSumReg;
-            MicroAPI::Duplicate(squareSumReg, 0.0f);
+            Reg::RegTensor<P> squareSumReg;
+            Reg::Duplicate(squareSumReg, 0.0f);
             for (uint16_t vfBlockIdx = 0; vfBlockIdx < nLoopCnt; ++vfBlockIdx) {
-                MicroAPI::RegTensor<T> xInReg;
-                MicroAPI::RegTensor<P> gammaReg;
-                MicroAPI::RegTensor<P> xFp32Reg;
-                MicroAPI::RegTensor<P> xMulReg;
-                MicroAPI::RegTensor<P> squareReg;
+                Reg::RegTensor<T> xInReg;
+                Reg::RegTensor<P> gammaReg;
+                Reg::RegTensor<P> xFp32Reg;
+                Reg::RegTensor<P> xMulReg;
+                Reg::RegTensor<P> squareReg;
                 uint32_t xInOffset = mIdx * nSrcUbAligned + vfBlockIdx * vector_.eleNumPerVf_;
-                MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + xInOffset);
-                MicroAPI::MaskReg blockMask = MicroAPI::UpdateMask<P>(elementNum);
-                MicroAPI::Cast<P, T, MHC_PRE_CAST_B16_TO_FP32>(xFp32Reg, xInReg, blockMask);
+                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + xInOffset);
+                Reg::MaskReg blockMask = Reg::UpdateMask<P>(elementNum);
+                Reg::Cast<P, T, MHC_PRE_CAST_B16_TO_FP32>(xFp32Reg, xInReg, blockMask);
                 if constexpr (hasGamma) {
-                    MicroAPI::LoadAlign(gammaReg, gamma + vfBlockIdx * vector_.eleNumPerVf_);
-                    MicroAPI::Mul(xMulReg, gammaReg, xFp32Reg, blockMask);
+                    Reg::LoadAlign(gammaReg, gamma + vfBlockIdx * vector_.eleNumPerVf_);
+                    Reg::Mul(xMulReg, gammaReg, xFp32Reg, blockMask);
                 } else {
                     xMulReg = xFp32Reg;
                 }
                 uint32_t dstUbOffset = mIdx * nDstUbAligned + vfBlockIdx * vector_.eleNumPerVf_;
-                MicroAPI::StoreAlign(xDst + dstUbOffset, xMulReg, blockMask);
-                MicroAPI::Mul(squareReg, xFp32Reg, xFp32Reg, blockMask);
-                MicroAPI::Add<P, MicroAPI::MaskMergeMode::MERGING>(squareSumReg, squareSumReg, squareReg, blockMask);
+                Reg::StoreAlign(xDst + dstUbOffset, xMulReg, blockMask);
+                Reg::Mul(squareReg, xFp32Reg, xFp32Reg, blockMask);
+                Reg::Add<P, Reg::MaskMergeMode::MERGING>(squareSumReg, squareSumReg, squareReg, blockMask);
             }
-            MicroAPI::RegTensor<P> partialReg;
-            MicroAPI::Reduce<MicroAPI::ReduceType::SUM>(partialReg, squareSumReg, fullMask);
+            Reg::RegTensor<P> partialReg;
+            Reg::Reduce<Reg::ReduceType::SUM>(partialReg, squareSumReg, fullMask);
             if constexpr (isFirstND) {
-                MicroAPI::Store(invRmsDst + mIdx, partialReg, 1U);
+                Reg::Store(invRmsDst + mIdx, partialReg, 1U);
             } else {
-                MicroAPI::RegTensor<P> sumReg;
-                MicroAPI::Load(sumReg, invRmsDst + mIdx);
-                MicroAPI::Add(sumReg, sumReg, partialReg, fullMask);
-                MicroAPI::Store(invRmsDst + mIdx, sumReg, 1U);
+                Reg::RegTensor<P> sumReg;
+                Reg::Load(sumReg, invRmsDst + mIdx);
+                Reg::Add(sumReg, sumReg, partialReg, fullMask);
+                Reg::Store(invRmsDst + mIdx, sumReg, 1U);
             }
         }
     }

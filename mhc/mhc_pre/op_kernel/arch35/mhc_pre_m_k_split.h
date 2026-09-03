@@ -47,17 +47,17 @@ __aicore__ inline void MhcPreMkVFTransND2NZ(const LocalTensor<float> &dstLocal, 
     if (tailRows == 0) {
         __VEC_SCOPE__
         {
-            AscendC::MicroAPI::RegTensor<float> data;
-            AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::CreateMask<float>();
+            AscendC::Reg::RegTensor<float> data;
+            AscendC::Reg::MaskReg mask = AscendC::Reg::CreateMask<float>();
             for (uint16_t rowBlock = 0; rowBlock < mainRowBlocks; ++rowBlock) {
                 for (uint16_t columnBlock = 0; columnBlock < columnLoops; ++columnBlock) {
-                    AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+                    AscendC::Reg::DataCopy<float, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY>(
                         data,
                         src + rowBlock * MHC_PRE_BASIC_API_C0_SIZE * columnAlign + columnBlock * dataBlockElements,
                         srcBlockStride, mask);
-                    AscendC::MicroAPI::DataCopy(dst + rowBlock * MHC_PRE_BASIC_API_C0_SIZE * dataBlockElements +
-                                                    columnBlock * rowAlign * dataBlockElements,
-                                                data, mask);
+                    AscendC::Reg::DataCopy(dst + rowBlock * MHC_PRE_BASIC_API_C0_SIZE * dataBlockElements +
+                                               columnBlock * rowAlign * dataBlockElements,
+                                           data, mask);
                 }
             }
         }
@@ -66,26 +66,26 @@ __aicore__ inline void MhcPreMkVFTransND2NZ(const LocalTensor<float> &dstLocal, 
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<float> data;
-        AscendC::MicroAPI::MaskReg fullMask = AscendC::MicroAPI::CreateMask<float>();
+        AscendC::Reg::RegTensor<float> data;
+        AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<float>();
         uint32_t tailElements = tailRows * MHC_PRE_BASIC_API_C0_SIZE;
-        AscendC::MicroAPI::MaskReg tailMask = AscendC::MicroAPI::UpdateMask<float>(tailElements);
+        AscendC::Reg::MaskReg tailMask = AscendC::Reg::UpdateMask<float>(tailElements);
         for (uint16_t rowBlock = 0; rowBlock < mainRowBlocks; ++rowBlock) {
             for (uint16_t columnBlock = 0; columnBlock < columnLoops; ++columnBlock) {
-                AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+                AscendC::Reg::DataCopy<float, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY>(
                     data, src + rowBlock * MHC_PRE_BASIC_API_C0_SIZE * columnAlign + columnBlock * dataBlockElements,
                     srcBlockStride, fullMask);
-                AscendC::MicroAPI::DataCopy(dst + rowBlock * MHC_PRE_BASIC_API_C0_SIZE * dataBlockElements +
-                                                columnBlock * rowAlign * dataBlockElements,
-                                            data, fullMask);
+                AscendC::Reg::DataCopy(dst + rowBlock * MHC_PRE_BASIC_API_C0_SIZE * dataBlockElements +
+                                           columnBlock * rowAlign * dataBlockElements,
+                                       data, fullMask);
             }
         }
         src += mainRowBlocks * MHC_PRE_BASIC_API_C0_SIZE * columnAlign;
         dst += mainRowBlocks * MHC_PRE_BASIC_API_C0_SIZE * dataBlockElements;
         for (uint16_t columnBlock = 0; columnBlock < columnLoops; ++columnBlock) {
-            AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+            AscendC::Reg::DataCopy<float, AscendC::Reg::DataCopyMode::DATA_BLOCK_COPY>(
                 data, src + columnBlock * dataBlockElements, srcBlockStride, tailMask);
-            AscendC::MicroAPI::DataCopy(dst + columnBlock * rowAlign * dataBlockElements, data, tailMask);
+            AscendC::Reg::DataCopy(dst + columnBlock * rowAlign * dataBlockElements, data, tailMask);
         }
     }
 }
@@ -107,34 +107,34 @@ __aicore__ inline void MhcPreMkVFProcessXInGammaLoops(const LocalTensor<float> &
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<T> xInReg;
-        AscendC::MicroAPI::RegTensor<float> gammaReg;
-        AscendC::MicroAPI::RegTensor<float> xReg;
-        AscendC::MicroAPI::RegTensor<float> xGammaReg;
-        AscendC::MicroAPI::RegTensor<float> squareReg;
-        AscendC::MicroAPI::RegTensor<float> partialReg;
-        AscendC::MicroAPI::RegTensor<float> sumReg;
+        AscendC::Reg::RegTensor<T> xInReg;
+        AscendC::Reg::RegTensor<float> gammaReg;
+        AscendC::Reg::RegTensor<float> xReg;
+        AscendC::Reg::RegTensor<float> xGammaReg;
+        AscendC::Reg::RegTensor<float> squareReg;
+        AscendC::Reg::RegTensor<float> partialReg;
+        AscendC::Reg::RegTensor<float> sumReg;
         uint32_t remaining = columnCount - static_cast<uint32_t>(loopStart) * MHC_PRE_BASIC_API_VL_FP32;
         for (uint16_t loop = loopStart; loop < loopEnd; ++loop) {
-            AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::UpdateMask<float>(remaining);
+            AscendC::Reg::MaskReg mask = AscendC::Reg::UpdateMask<float>(remaining);
             uint32_t vectorOffset = static_cast<uint32_t>(loop) * MHC_PRE_BASIC_API_VL_FP32;
-            AscendC::MicroAPI::LoadAlign(gammaReg, gamma + vectorOffset);
+            AscendC::Reg::LoadAlign(gammaReg, gamma + vectorOffset);
             for (uint16_t row = 0; row < rowCount; ++row) {
                 uint32_t srcOffset = static_cast<uint32_t>(row) * srcStride + vectorOffset;
-                AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + srcOffset);
-                AscendC::MicroAPI::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
-                AscendC::MicroAPI::Mul(xGammaReg, gammaReg, xReg, mask);
+                AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + srcOffset);
+                AscendC::Reg::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
+                AscendC::Reg::Mul(xGammaReg, gammaReg, xReg, mask);
                 uint32_t dstOffset = static_cast<uint32_t>(row) * dstStride + vectorOffset;
-                AscendC::MicroAPI::StoreAlign(xOut + dstOffset, xGammaReg, mask);
-                AscendC::MicroAPI::Mul(squareReg, xReg, xReg, mask);
-                AscendC::MicroAPI::Reduce<AscendC::MicroAPI::ReduceType::SUM>(partialReg, squareReg, mask);
+                AscendC::Reg::StoreAlign(xOut + dstOffset, xGammaReg, mask);
+                AscendC::Reg::Mul(squareReg, xReg, xReg, mask);
+                AscendC::Reg::Reduce<AscendC::Reg::ReduceType::SUM>(partialReg, squareReg, mask);
                 if constexpr (INIT_RMS) {
-                    AscendC::MicroAPI::Duplicate(sumReg, 0.0f);
+                    AscendC::Reg::Duplicate(sumReg, 0.0f);
                 } else {
-                    AscendC::MicroAPI::Load(sumReg, rms + row);
+                    AscendC::Reg::Load(sumReg, rms + row);
                 }
-                AscendC::MicroAPI::Add(sumReg, sumReg, partialReg, mask);
-                AscendC::MicroAPI::Store(rms + row, sumReg, 1U);
+                AscendC::Reg::Add(sumReg, sumReg, partialReg, mask);
+                AscendC::Reg::Store(rms + row, sumReg, 1U);
             }
         }
     }
@@ -156,35 +156,35 @@ __aicore__ inline void MhcPreMkVFProcessXInGammaSmallRows(const LocalTensor<floa
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<T> xInReg;
-        AscendC::MicroAPI::RegTensor<float> gammaReg;
-        AscendC::MicroAPI::RegTensor<float> xReg;
-        AscendC::MicroAPI::RegTensor<float> xGammaReg;
-        AscendC::MicroAPI::RegTensor<float> squareReg;
-        AscendC::MicroAPI::RegTensor<float> partialReg;
-        AscendC::MicroAPI::RegTensor<float> sumReg;
+        AscendC::Reg::RegTensor<T> xInReg;
+        AscendC::Reg::RegTensor<float> gammaReg;
+        AscendC::Reg::RegTensor<float> xReg;
+        AscendC::Reg::RegTensor<float> xGammaReg;
+        AscendC::Reg::RegTensor<float> squareReg;
+        AscendC::Reg::RegTensor<float> partialReg;
+        AscendC::Reg::RegTensor<float> sumReg;
         for (uint16_t row = 0; row < rowCount; ++row) {
             if constexpr (IS_FIRST_K) {
-                AscendC::MicroAPI::Duplicate(sumReg, 0.0f);
+                AscendC::Reg::Duplicate(sumReg, 0.0f);
             } else {
-                AscendC::MicroAPI::Load(sumReg, rms + row);
+                AscendC::Reg::Load(sumReg, rms + row);
             }
             uint32_t remaining = columnCount;
             for (uint16_t loop = 0; loop < loopCount; ++loop) {
-                AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::UpdateMask<float>(remaining);
+                AscendC::Reg::MaskReg mask = AscendC::Reg::UpdateMask<float>(remaining);
                 uint32_t vectorOffset = static_cast<uint32_t>(loop) * MHC_PRE_BASIC_API_VL_FP32;
-                AscendC::MicroAPI::LoadAlign(gammaReg, gamma + vectorOffset);
+                AscendC::Reg::LoadAlign(gammaReg, gamma + vectorOffset);
                 uint32_t srcOffset = static_cast<uint32_t>(row) * srcStride + vectorOffset;
-                AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + srcOffset);
-                AscendC::MicroAPI::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
-                AscendC::MicroAPI::Mul(xGammaReg, gammaReg, xReg, mask);
+                AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + srcOffset);
+                AscendC::Reg::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
+                AscendC::Reg::Mul(xGammaReg, gammaReg, xReg, mask);
                 uint32_t dstOffset = static_cast<uint32_t>(row) * dstStride + vectorOffset;
-                AscendC::MicroAPI::StoreAlign(xOut + dstOffset, xGammaReg, mask);
-                AscendC::MicroAPI::Mul(squareReg, xReg, xReg, mask);
-                AscendC::MicroAPI::Reduce<AscendC::MicroAPI::ReduceType::SUM>(partialReg, squareReg, mask);
-                AscendC::MicroAPI::Add(sumReg, sumReg, partialReg, mask);
+                AscendC::Reg::StoreAlign(xOut + dstOffset, xGammaReg, mask);
+                AscendC::Reg::Mul(squareReg, xReg, xReg, mask);
+                AscendC::Reg::Reduce<AscendC::Reg::ReduceType::SUM>(partialReg, squareReg, mask);
+                AscendC::Reg::Add(sumReg, sumReg, partialReg, mask);
             }
-            AscendC::MicroAPI::Store(rms + row, sumReg, 1U);
+            AscendC::Reg::Store(rms + row, sumReg, 1U);
         }
     }
 }
@@ -206,46 +206,46 @@ __aicore__ inline void MhcPreMkVFProcessXInGammaFull128(const LocalTensor<float>
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<T> xInReg;
-        AscendC::MicroAPI::RegTensor<float> gamma0Reg;
-        AscendC::MicroAPI::RegTensor<float> gamma1Reg;
-        AscendC::MicroAPI::RegTensor<float> xReg;
-        AscendC::MicroAPI::RegTensor<float> xGammaReg;
-        AscendC::MicroAPI::RegTensor<float> squareReg;
-        AscendC::MicroAPI::RegTensor<float> squareSumReg;
-        AscendC::MicroAPI::RegTensor<float> partialReg;
-        AscendC::MicroAPI::RegTensor<float> sumReg;
-        AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::CreateMask<float>();
+        AscendC::Reg::RegTensor<T> xInReg;
+        AscendC::Reg::RegTensor<float> gamma0Reg;
+        AscendC::Reg::RegTensor<float> gamma1Reg;
+        AscendC::Reg::RegTensor<float> xReg;
+        AscendC::Reg::RegTensor<float> xGammaReg;
+        AscendC::Reg::RegTensor<float> squareReg;
+        AscendC::Reg::RegTensor<float> squareSumReg;
+        AscendC::Reg::RegTensor<float> partialReg;
+        AscendC::Reg::RegTensor<float> sumReg;
+        AscendC::Reg::MaskReg mask = AscendC::Reg::CreateMask<float>();
 
-        AscendC::MicroAPI::LoadAlign(gamma0Reg, gamma);
-        AscendC::MicroAPI::LoadAlign(gamma1Reg, gamma + vectorOffset);
+        AscendC::Reg::LoadAlign(gamma0Reg, gamma);
+        AscendC::Reg::LoadAlign(gamma1Reg, gamma + vectorOffset);
         for (uint16_t row = 0; row < rowCount; ++row) {
             uint32_t rowSrcOffset = static_cast<uint32_t>(row) * srcStride;
             uint32_t rowDstOffset = static_cast<uint32_t>(row) * dstStride;
-            AscendC::MicroAPI::Duplicate(squareSumReg, 0.0f);
+            AscendC::Reg::Duplicate(squareSumReg, 0.0f);
 
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + rowSrcOffset);
-            AscendC::MicroAPI::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
-            AscendC::MicroAPI::Mul(xGammaReg, gamma0Reg, xReg, mask);
-            AscendC::MicroAPI::StoreAlign(xOut + rowDstOffset, xGammaReg, mask);
-            AscendC::MicroAPI::Mul(squareReg, xReg, xReg, mask);
-            AscendC::MicroAPI::Add(squareSumReg, squareSumReg, squareReg, mask);
+            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + rowSrcOffset);
+            AscendC::Reg::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
+            AscendC::Reg::Mul(xGammaReg, gamma0Reg, xReg, mask);
+            AscendC::Reg::StoreAlign(xOut + rowDstOffset, xGammaReg, mask);
+            AscendC::Reg::Mul(squareReg, xReg, xReg, mask);
+            AscendC::Reg::Add(squareSumReg, squareSumReg, squareReg, mask);
 
-            AscendC::MicroAPI::LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                xInReg, xIn + rowSrcOffset + vectorOffset);
-            AscendC::MicroAPI::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
-            AscendC::MicroAPI::Mul(xGammaReg, gamma1Reg, xReg, mask);
-            AscendC::MicroAPI::StoreAlign(xOut + rowDstOffset + vectorOffset, xGammaReg, mask);
-            AscendC::MicroAPI::Mul(squareReg, xReg, xReg, mask);
-            AscendC::MicroAPI::Add(squareSumReg, squareSumReg, squareReg, mask);
+            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xInReg,
+                                                                                xIn + rowSrcOffset + vectorOffset);
+            AscendC::Reg::Cast<float, T, MHC_PRE_BASIC_API_CAST_B16_TO_B32>(xReg, xInReg, mask);
+            AscendC::Reg::Mul(xGammaReg, gamma1Reg, xReg, mask);
+            AscendC::Reg::StoreAlign(xOut + rowDstOffset + vectorOffset, xGammaReg, mask);
+            AscendC::Reg::Mul(squareReg, xReg, xReg, mask);
+            AscendC::Reg::Add(squareSumReg, squareSumReg, squareReg, mask);
 
-            AscendC::MicroAPI::Reduce<AscendC::MicroAPI::ReduceType::SUM>(partialReg, squareSumReg, mask);
+            AscendC::Reg::Reduce<AscendC::Reg::ReduceType::SUM>(partialReg, squareSumReg, mask);
             if constexpr (IS_FIRST_K) {
-                AscendC::MicroAPI::Store(rms + row, partialReg, 1U);
+                AscendC::Reg::Store(rms + row, partialReg, 1U);
             } else {
-                AscendC::MicroAPI::Load(sumReg, rms + row);
-                AscendC::MicroAPI::Add(sumReg, sumReg, partialReg, mask);
-                AscendC::MicroAPI::Store(rms + row, sumReg, 1U);
+                AscendC::Reg::Load(sumReg, rms + row);
+                AscendC::Reg::Add(sumReg, sumReg, partialReg, mask);
+                AscendC::Reg::Store(rms + row, sumReg, 1U);
             }
         }
     }
@@ -299,38 +299,38 @@ __aicore__ inline void MhcPreMkVFReducePartials(const LocalTensor<float> &mmOutL
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<float> rms0;
-        AscendC::MicroAPI::RegTensor<float> rms1;
-        AscendC::MicroAPI::RegTensor<float> rms2;
-        AscendC::MicroAPI::RegTensor<float> rms3;
-        AscendC::MicroAPI::RegTensor<float> mm0;
-        AscendC::MicroAPI::RegTensor<float> mm1;
-        AscendC::MicroAPI::RegTensor<float> mm2;
-        AscendC::MicroAPI::RegTensor<float> mm3;
-        AscendC::MicroAPI::RegTensor<float> sumRms0;
-        AscendC::MicroAPI::RegTensor<float> sumRms1;
-        AscendC::MicroAPI::RegTensor<float> sumRms2;
-        AscendC::MicroAPI::RegTensor<float> sumRms3;
-        AscendC::MicroAPI::RegTensor<float> sumMm0;
-        AscendC::MicroAPI::RegTensor<float> sumMm1;
-        AscendC::MicroAPI::RegTensor<float> sumMm2;
-        AscendC::MicroAPI::RegTensor<float> sumMm3;
-        AscendC::MicroAPI::RegTensor<float> one;
+        AscendC::Reg::RegTensor<float> rms0;
+        AscendC::Reg::RegTensor<float> rms1;
+        AscendC::Reg::RegTensor<float> rms2;
+        AscendC::Reg::RegTensor<float> rms3;
+        AscendC::Reg::RegTensor<float> mm0;
+        AscendC::Reg::RegTensor<float> mm1;
+        AscendC::Reg::RegTensor<float> mm2;
+        AscendC::Reg::RegTensor<float> mm3;
+        AscendC::Reg::RegTensor<float> sumRms0;
+        AscendC::Reg::RegTensor<float> sumRms1;
+        AscendC::Reg::RegTensor<float> sumRms2;
+        AscendC::Reg::RegTensor<float> sumRms3;
+        AscendC::Reg::RegTensor<float> sumMm0;
+        AscendC::Reg::RegTensor<float> sumMm1;
+        AscendC::Reg::RegTensor<float> sumMm2;
+        AscendC::Reg::RegTensor<float> sumMm3;
+        AscendC::Reg::RegTensor<float> one;
         uint32_t rmsMaskSize = 1U;
         uint32_t mmMaskSize = mmSegmentSize;
-        AscendC::MicroAPI::MaskReg rmsMask = AscendC::MicroAPI::UpdateMask<float>(rmsMaskSize);
-        AscendC::MicroAPI::MaskReg mmMask = AscendC::MicroAPI::UpdateMask<float>(mmMaskSize);
-        AscendC::MicroAPI::Duplicate(one, 1.0f, rmsMask);
+        AscendC::Reg::MaskReg rmsMask = AscendC::Reg::UpdateMask<float>(rmsMaskSize);
+        AscendC::Reg::MaskReg mmMask = AscendC::Reg::UpdateMask<float>(mmMaskSize);
+        AscendC::Reg::Duplicate(one, 1.0f, rmsMask);
 
         for (uint16_t row = 0; row < rowCount; ++row) {
-            AscendC::MicroAPI::Duplicate(sumRms0, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms1, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms2, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms3, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumMm0, 0.0f, mmMask);
-            AscendC::MicroAPI::Duplicate(sumMm1, 0.0f, mmMask);
-            AscendC::MicroAPI::Duplicate(sumMm2, 0.0f, mmMask);
-            AscendC::MicroAPI::Duplicate(sumMm3, 0.0f, mmMask);
+            AscendC::Reg::Duplicate(sumRms0, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms1, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms2, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms3, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumMm0, 0.0f, mmMask);
+            AscendC::Reg::Duplicate(sumMm1, 0.0f, mmMask);
+            AscendC::Reg::Duplicate(sumMm2, 0.0f, mmMask);
+            AscendC::Reg::Duplicate(sumMm3, 0.0f, mmMask);
 
             for (uint16_t loop = 0; loop < fourLoopCount; ++loop) {
                 uint16_t kBase = loop * 4U;
@@ -341,47 +341,47 @@ __aicore__ inline void MhcPreMkVFReducePartials(const LocalTensor<float> &mmOutL
                                             static_cast<uint32_t>(kBase + 2U) * rmsStride + row);
                 MhcPreBasicApiLoadBroadcast(rms3, rmsPartial, rmsMask,
                                             static_cast<uint32_t>(kBase + 3U) * rmsStride + row);
-                AscendC::MicroAPI::Add(sumRms0, sumRms0, rms0, rmsMask);
-                AscendC::MicroAPI::Add(sumRms1, sumRms1, rms1, rmsMask);
-                AscendC::MicroAPI::Add(sumRms2, sumRms2, rms2, rmsMask);
-                AscendC::MicroAPI::Add(sumRms3, sumRms3, rms3, rmsMask);
+                AscendC::Reg::Add(sumRms0, sumRms0, rms0, rmsMask);
+                AscendC::Reg::Add(sumRms1, sumRms1, rms1, rmsMask);
+                AscendC::Reg::Add(sumRms2, sumRms2, rms2, rmsMask);
+                AscendC::Reg::Add(sumRms3, sumRms3, rms3, rmsMask);
 
-                AscendC::MicroAPI::Load<float>(
+                AscendC::Reg::Load<float>(
                     mm0, mmPartial + static_cast<uint32_t>(kBase) * mmGroupStride + row * fusionSize + mmSegmentOffset);
-                AscendC::MicroAPI::Load<float>(mm1, mmPartial + static_cast<uint32_t>(kBase + 1U) * mmGroupStride +
-                                                        row * fusionSize + mmSegmentOffset);
-                AscendC::MicroAPI::Load<float>(mm2, mmPartial + static_cast<uint32_t>(kBase + 2U) * mmGroupStride +
-                                                        row * fusionSize + mmSegmentOffset);
-                AscendC::MicroAPI::Load<float>(mm3, mmPartial + static_cast<uint32_t>(kBase + 3U) * mmGroupStride +
-                                                        row * fusionSize + mmSegmentOffset);
-                AscendC::MicroAPI::Add(sumMm0, sumMm0, mm0, mmMask);
-                AscendC::MicroAPI::Add(sumMm1, sumMm1, mm1, mmMask);
-                AscendC::MicroAPI::Add(sumMm2, sumMm2, mm2, mmMask);
-                AscendC::MicroAPI::Add(sumMm3, sumMm3, mm3, mmMask);
+                AscendC::Reg::Load<float>(mm1, mmPartial + static_cast<uint32_t>(kBase + 1U) * mmGroupStride +
+                                                   row * fusionSize + mmSegmentOffset);
+                AscendC::Reg::Load<float>(mm2, mmPartial + static_cast<uint32_t>(kBase + 2U) * mmGroupStride +
+                                                   row * fusionSize + mmSegmentOffset);
+                AscendC::Reg::Load<float>(mm3, mmPartial + static_cast<uint32_t>(kBase + 3U) * mmGroupStride +
+                                                   row * fusionSize + mmSegmentOffset);
+                AscendC::Reg::Add(sumMm0, sumMm0, mm0, mmMask);
+                AscendC::Reg::Add(sumMm1, sumMm1, mm1, mmMask);
+                AscendC::Reg::Add(sumMm2, sumMm2, mm2, mmMask);
+                AscendC::Reg::Add(sumMm3, sumMm3, mm3, mmMask);
             }
 
             for (uint16_t tail = 0; tail < tailLoopCount; ++tail) {
                 uint16_t kIndex = fourLoopCount * 4U + tail;
                 MhcPreBasicApiLoadBroadcast(rms0, rmsPartial, rmsMask, static_cast<uint32_t>(kIndex) * rmsStride + row);
-                AscendC::MicroAPI::Add(sumRms0, sumRms0, rms0, rmsMask);
-                AscendC::MicroAPI::Load<float>(mm0, mmPartial + static_cast<uint32_t>(kIndex) * mmGroupStride +
-                                                        row * fusionSize + mmSegmentOffset);
-                AscendC::MicroAPI::Add(sumMm0, sumMm0, mm0, mmMask);
+                AscendC::Reg::Add(sumRms0, sumRms0, rms0, rmsMask);
+                AscendC::Reg::Load<float>(mm0, mmPartial + static_cast<uint32_t>(kIndex) * mmGroupStride +
+                                                   row * fusionSize + mmSegmentOffset);
+                AscendC::Reg::Add(sumMm0, sumMm0, mm0, mmMask);
             }
 
-            AscendC::MicroAPI::Add(sumRms0, sumRms0, sumRms3, rmsMask);
-            AscendC::MicroAPI::Add(sumRms1, sumRms1, sumRms2, rmsMask);
-            AscendC::MicroAPI::Add(sumRms0, sumRms0, sumRms1, rmsMask);
-            AscendC::MicroAPI::Muls(sumRms0, sumRms0, scaleMean, rmsMask);
-            AscendC::MicroAPI::Adds(sumRms0, sumRms0, normEps, rmsMask);
-            AscendC::MicroAPI::Sqrt(sumRms0, sumRms0, rmsMask);
-            AscendC::MicroAPI::Div(sumRms0, one, sumRms0, rmsMask);
+            AscendC::Reg::Add(sumRms0, sumRms0, sumRms3, rmsMask);
+            AscendC::Reg::Add(sumRms1, sumRms1, sumRms2, rmsMask);
+            AscendC::Reg::Add(sumRms0, sumRms0, sumRms1, rmsMask);
+            AscendC::Reg::Muls(sumRms0, sumRms0, scaleMean, rmsMask);
+            AscendC::Reg::Adds(sumRms0, sumRms0, normEps, rmsMask);
+            AscendC::Reg::Sqrt(sumRms0, sumRms0, rmsMask);
+            AscendC::Reg::Div(sumRms0, one, sumRms0, rmsMask);
 
-            AscendC::MicroAPI::Add(sumMm0, sumMm0, sumMm3, mmMask);
-            AscendC::MicroAPI::Add(sumMm1, sumMm1, sumMm2, mmMask);
-            AscendC::MicroAPI::Add(sumMm0, sumMm0, sumMm1, mmMask);
-            AscendC::MicroAPI::Store<float>(invRmsOut + row, sumRms0, 1U);
-            AscendC::MicroAPI::Store<float>(mmOut + row * fusionSize + mmSegmentOffset, sumMm0, mmSegmentSize);
+            AscendC::Reg::Add(sumMm0, sumMm0, sumMm3, mmMask);
+            AscendC::Reg::Add(sumMm1, sumMm1, sumMm2, mmMask);
+            AscendC::Reg::Add(sumMm0, sumMm0, sumMm1, mmMask);
+            AscendC::Reg::Store<float>(invRmsOut + row, sumRms0, 1U);
+            AscendC::Reg::Store<float>(mmOut + row * fusionSize + mmSegmentOffset, sumMm0, mmSegmentSize);
         }
     }
 }
@@ -402,28 +402,28 @@ __aicore__ inline void MhcPreMkVFReducePartialsSequentialGeneral(
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<float> rms0;
-        AscendC::MicroAPI::RegTensor<float> rms1;
-        AscendC::MicroAPI::RegTensor<float> rms2;
-        AscendC::MicroAPI::RegTensor<float> rms3;
-        AscendC::MicroAPI::RegTensor<float> sumRms0;
-        AscendC::MicroAPI::RegTensor<float> sumRms1;
-        AscendC::MicroAPI::RegTensor<float> sumRms2;
-        AscendC::MicroAPI::RegTensor<float> sumRms3;
-        AscendC::MicroAPI::RegTensor<float> mm;
-        AscendC::MicroAPI::RegTensor<float> sumMm;
-        AscendC::MicroAPI::RegTensor<float> one;
+        AscendC::Reg::RegTensor<float> rms0;
+        AscendC::Reg::RegTensor<float> rms1;
+        AscendC::Reg::RegTensor<float> rms2;
+        AscendC::Reg::RegTensor<float> rms3;
+        AscendC::Reg::RegTensor<float> sumRms0;
+        AscendC::Reg::RegTensor<float> sumRms1;
+        AscendC::Reg::RegTensor<float> sumRms2;
+        AscendC::Reg::RegTensor<float> sumRms3;
+        AscendC::Reg::RegTensor<float> mm;
+        AscendC::Reg::RegTensor<float> sumMm;
+        AscendC::Reg::RegTensor<float> one;
         uint32_t rmsMaskSize = 1U;
         uint32_t mmMaskSize = mmSegmentSize;
-        AscendC::MicroAPI::MaskReg rmsMask = AscendC::MicroAPI::UpdateMask<float>(rmsMaskSize);
-        AscendC::MicroAPI::MaskReg mmMask = AscendC::MicroAPI::UpdateMask<float>(mmMaskSize);
-        AscendC::MicroAPI::Duplicate(one, 1.0f, rmsMask);
+        AscendC::Reg::MaskReg rmsMask = AscendC::Reg::UpdateMask<float>(rmsMaskSize);
+        AscendC::Reg::MaskReg mmMask = AscendC::Reg::UpdateMask<float>(mmMaskSize);
+        AscendC::Reg::Duplicate(one, 1.0f, rmsMask);
 
         for (uint16_t row = 0; row < rowCount; ++row) {
-            AscendC::MicroAPI::Duplicate(sumRms0, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms1, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms2, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms3, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms0, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms1, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms2, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms3, 0.0f, rmsMask);
             for (uint16_t loop = 0; loop < fourLoopCount; ++loop) {
                 uint16_t kBase = loop * 4U;
                 MhcPreBasicApiLoadBroadcast(rms0, rmsPartial, rmsMask, static_cast<uint32_t>(kBase) * rmsStride + row);
@@ -433,32 +433,32 @@ __aicore__ inline void MhcPreMkVFReducePartialsSequentialGeneral(
                                             static_cast<uint32_t>(kBase + 2U) * rmsStride + row);
                 MhcPreBasicApiLoadBroadcast(rms3, rmsPartial, rmsMask,
                                             static_cast<uint32_t>(kBase + 3U) * rmsStride + row);
-                AscendC::MicroAPI::Add(sumRms0, sumRms0, rms0, rmsMask);
-                AscendC::MicroAPI::Add(sumRms1, sumRms1, rms1, rmsMask);
-                AscendC::MicroAPI::Add(sumRms2, sumRms2, rms2, rmsMask);
-                AscendC::MicroAPI::Add(sumRms3, sumRms3, rms3, rmsMask);
+                AscendC::Reg::Add(sumRms0, sumRms0, rms0, rmsMask);
+                AscendC::Reg::Add(sumRms1, sumRms1, rms1, rmsMask);
+                AscendC::Reg::Add(sumRms2, sumRms2, rms2, rmsMask);
+                AscendC::Reg::Add(sumRms3, sumRms3, rms3, rmsMask);
             }
             for (uint16_t tail = 0; tail < tailLoopCount; ++tail) {
                 uint16_t kIndex = fourLoopCount * 4U + tail;
                 MhcPreBasicApiLoadBroadcast(rms0, rmsPartial, rmsMask, static_cast<uint32_t>(kIndex) * rmsStride + row);
-                AscendC::MicroAPI::Add(sumRms0, sumRms0, rms0, rmsMask);
+                AscendC::Reg::Add(sumRms0, sumRms0, rms0, rmsMask);
             }
-            AscendC::MicroAPI::Add(sumRms0, sumRms0, sumRms3, rmsMask);
-            AscendC::MicroAPI::Add(sumRms1, sumRms1, sumRms2, rmsMask);
-            AscendC::MicroAPI::Add(sumRms0, sumRms0, sumRms1, rmsMask);
-            AscendC::MicroAPI::Muls(sumRms0, sumRms0, scaleMean, rmsMask);
-            AscendC::MicroAPI::Adds(sumRms0, sumRms0, normEps, rmsMask);
-            AscendC::MicroAPI::Sqrt(sumRms0, sumRms0, rmsMask);
-            AscendC::MicroAPI::Div(sumRms0, one, sumRms0, rmsMask);
+            AscendC::Reg::Add(sumRms0, sumRms0, sumRms3, rmsMask);
+            AscendC::Reg::Add(sumRms1, sumRms1, sumRms2, rmsMask);
+            AscendC::Reg::Add(sumRms0, sumRms0, sumRms1, rmsMask);
+            AscendC::Reg::Muls(sumRms0, sumRms0, scaleMean, rmsMask);
+            AscendC::Reg::Adds(sumRms0, sumRms0, normEps, rmsMask);
+            AscendC::Reg::Sqrt(sumRms0, sumRms0, rmsMask);
+            AscendC::Reg::Div(sumRms0, one, sumRms0, rmsMask);
 
-            AscendC::MicroAPI::Duplicate(sumMm, 0.0f, mmMask);
+            AscendC::Reg::Duplicate(sumMm, 0.0f, mmMask);
             for (uint16_t kIndex = 0; kIndex < mmGroupK; ++kIndex) {
-                AscendC::MicroAPI::Load<float>(
+                AscendC::Reg::Load<float>(
                     mm, mmPartial + static_cast<uint32_t>(kIndex) * mmGroupStride + row * fusionSize + mmSegmentOffset);
-                AscendC::MicroAPI::Add(sumMm, sumMm, mm, mmMask);
+                AscendC::Reg::Add(sumMm, sumMm, mm, mmMask);
             }
-            AscendC::MicroAPI::Store<float>(invRmsOut + row, sumRms0, 1U);
-            AscendC::MicroAPI::Store<float>(mmOut + row * fusionSize + mmSegmentOffset, sumMm, mmSegmentSize);
+            AscendC::Reg::Store<float>(invRmsOut + row, sumRms0, 1U);
+            AscendC::Reg::Store<float>(mmOut + row * fusionSize + mmSegmentOffset, sumMm, mmSegmentSize);
         }
     }
 }
@@ -480,26 +480,26 @@ __aicore__ inline void MhcPreMkVFReducePartialsSequentialFlat(
 
     __VEC_SCOPE__
     {
-        AscendC::MicroAPI::RegTensor<float> rms0;
-        AscendC::MicroAPI::RegTensor<float> rms1;
-        AscendC::MicroAPI::RegTensor<float> rms2;
-        AscendC::MicroAPI::RegTensor<float> rms3;
-        AscendC::MicroAPI::RegTensor<float> sumRms0;
-        AscendC::MicroAPI::RegTensor<float> sumRms1;
-        AscendC::MicroAPI::RegTensor<float> sumRms2;
-        AscendC::MicroAPI::RegTensor<float> sumRms3;
-        AscendC::MicroAPI::RegTensor<float> mm;
-        AscendC::MicroAPI::RegTensor<float> sumMm;
-        AscendC::MicroAPI::RegTensor<float> one;
+        AscendC::Reg::RegTensor<float> rms0;
+        AscendC::Reg::RegTensor<float> rms1;
+        AscendC::Reg::RegTensor<float> rms2;
+        AscendC::Reg::RegTensor<float> rms3;
+        AscendC::Reg::RegTensor<float> sumRms0;
+        AscendC::Reg::RegTensor<float> sumRms1;
+        AscendC::Reg::RegTensor<float> sumRms2;
+        AscendC::Reg::RegTensor<float> sumRms3;
+        AscendC::Reg::RegTensor<float> mm;
+        AscendC::Reg::RegTensor<float> sumMm;
+        AscendC::Reg::RegTensor<float> one;
         uint32_t rmsMaskSize = 1U;
-        AscendC::MicroAPI::MaskReg rmsMask = AscendC::MicroAPI::UpdateMask<float>(rmsMaskSize);
-        AscendC::MicroAPI::Duplicate(one, 1.0f, rmsMask);
+        AscendC::Reg::MaskReg rmsMask = AscendC::Reg::UpdateMask<float>(rmsMaskSize);
+        AscendC::Reg::Duplicate(one, 1.0f, rmsMask);
 
         for (uint16_t row = 0; row < rowCount; ++row) {
-            AscendC::MicroAPI::Duplicate(sumRms0, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms1, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms2, 0.0f, rmsMask);
-            AscendC::MicroAPI::Duplicate(sumRms3, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms0, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms1, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms2, 0.0f, rmsMask);
+            AscendC::Reg::Duplicate(sumRms3, 0.0f, rmsMask);
             for (uint16_t loop = 0; loop < fourLoopCount; ++loop) {
                 uint16_t kBase = loop * 4U;
                 MhcPreBasicApiLoadBroadcast(rms0, rmsPartial, rmsMask, static_cast<uint32_t>(kBase) * rmsStride + row);
@@ -509,38 +509,37 @@ __aicore__ inline void MhcPreMkVFReducePartialsSequentialFlat(
                                             static_cast<uint32_t>(kBase + 2U) * rmsStride + row);
                 MhcPreBasicApiLoadBroadcast(rms3, rmsPartial, rmsMask,
                                             static_cast<uint32_t>(kBase + 3U) * rmsStride + row);
-                AscendC::MicroAPI::Add(sumRms0, sumRms0, rms0, rmsMask);
-                AscendC::MicroAPI::Add(sumRms1, sumRms1, rms1, rmsMask);
-                AscendC::MicroAPI::Add(sumRms2, sumRms2, rms2, rmsMask);
-                AscendC::MicroAPI::Add(sumRms3, sumRms3, rms3, rmsMask);
+                AscendC::Reg::Add(sumRms0, sumRms0, rms0, rmsMask);
+                AscendC::Reg::Add(sumRms1, sumRms1, rms1, rmsMask);
+                AscendC::Reg::Add(sumRms2, sumRms2, rms2, rmsMask);
+                AscendC::Reg::Add(sumRms3, sumRms3, rms3, rmsMask);
             }
             for (uint16_t tail = 0; tail < tailLoopCount; ++tail) {
                 uint16_t kIndex = fourLoopCount * 4U + tail;
                 MhcPreBasicApiLoadBroadcast(rms0, rmsPartial, rmsMask, static_cast<uint32_t>(kIndex) * rmsStride + row);
-                AscendC::MicroAPI::Add(sumRms0, sumRms0, rms0, rmsMask);
+                AscendC::Reg::Add(sumRms0, sumRms0, rms0, rmsMask);
             }
-            AscendC::MicroAPI::Add(sumRms0, sumRms0, sumRms3, rmsMask);
-            AscendC::MicroAPI::Add(sumRms1, sumRms1, sumRms2, rmsMask);
-            AscendC::MicroAPI::Add(sumRms0, sumRms0, sumRms1, rmsMask);
-            AscendC::MicroAPI::Muls(sumRms0, sumRms0, scaleMean, rmsMask);
-            AscendC::MicroAPI::Adds(sumRms0, sumRms0, normEps, rmsMask);
-            AscendC::MicroAPI::Sqrt(sumRms0, sumRms0, rmsMask);
-            AscendC::MicroAPI::Div(sumRms0, one, sumRms0, rmsMask);
-            AscendC::MicroAPI::Store<float>(invRmsOut + row, sumRms0, 1U);
+            AscendC::Reg::Add(sumRms0, sumRms0, sumRms3, rmsMask);
+            AscendC::Reg::Add(sumRms1, sumRms1, sumRms2, rmsMask);
+            AscendC::Reg::Add(sumRms0, sumRms0, sumRms1, rmsMask);
+            AscendC::Reg::Muls(sumRms0, sumRms0, scaleMean, rmsMask);
+            AscendC::Reg::Adds(sumRms0, sumRms0, normEps, rmsMask);
+            AscendC::Reg::Sqrt(sumRms0, sumRms0, rmsMask);
+            AscendC::Reg::Div(sumRms0, one, sumRms0, rmsMask);
+            AscendC::Reg::Store<float>(invRmsOut + row, sumRms0, 1U);
         }
 
         uint32_t remaining = mmElements;
         for (uint16_t loop = 0; loop < mmLoopCount; ++loop) {
             uint32_t currentCount = AscendC::Std::min(remaining, MHC_PRE_BASIC_API_VL_FP32);
-            AscendC::MicroAPI::MaskReg mmMask = AscendC::MicroAPI::UpdateMask<float>(remaining);
+            AscendC::Reg::MaskReg mmMask = AscendC::Reg::UpdateMask<float>(remaining);
             uint32_t vectorOffset = static_cast<uint32_t>(loop) * MHC_PRE_BASIC_API_VL_FP32;
-            AscendC::MicroAPI::Duplicate(sumMm, 0.0f, mmMask);
+            AscendC::Reg::Duplicate(sumMm, 0.0f, mmMask);
             for (uint16_t kIndex = 0; kIndex < mmGroupK; ++kIndex) {
-                AscendC::MicroAPI::Load<float>(
-                    mm, mmPartial + static_cast<uint32_t>(kIndex) * mmGroupStride + vectorOffset);
-                AscendC::MicroAPI::Add(sumMm, sumMm, mm, mmMask);
+                AscendC::Reg::Load<float>(mm, mmPartial + static_cast<uint32_t>(kIndex) * mmGroupStride + vectorOffset);
+                AscendC::Reg::Add(sumMm, sumMm, mm, mmMask);
             }
-            AscendC::MicroAPI::Store<float>(mmOut + vectorOffset, sumMm, currentCount);
+            AscendC::Reg::Store<float>(mmOut + vectorOffset, sumMm, currentCount);
         }
     }
 }

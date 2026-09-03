@@ -172,71 +172,70 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcSoftmax(int32_t handleN
     uint16_t loopSize = Ops::Base::CeilDiv(static_cast<uint16_t>(handleNum), blockCnt);
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> inputReg;
-        MicroAPI::RegTensor<float> midReg;
-        MicroAPI::RegTensor<float> sumReg;
-        MicroAPI::RegTensor<float> sumoutReg;
+        Reg::RegTensor<float> inputReg;
+        Reg::RegTensor<float> midReg;
+        Reg::RegTensor<float> sumReg;
+        Reg::RegTensor<float> sumoutReg;
 
-        MicroAPI::RegTensor<int32_t> orderReg;
-        MicroAPI::RegTensor<int32_t> tmpReg1;
-        MicroAPI::RegTensor<int32_t> tmpReg2;
-        MicroAPI::RegTensor<int32_t> tmpReg3;
-        MicroAPI::RegTensor<int32_t> dupReg1;
-        MicroAPI::RegTensor<int32_t> dupReg2;
-        MicroAPI::RegTensor<int32_t> rowIndexReg;
+        Reg::RegTensor<int32_t> orderReg;
+        Reg::RegTensor<int32_t> tmpReg1;
+        Reg::RegTensor<int32_t> tmpReg2;
+        Reg::RegTensor<int32_t> tmpReg3;
+        Reg::RegTensor<int32_t> dupReg1;
+        Reg::RegTensor<int32_t> dupReg2;
+        Reg::RegTensor<int32_t> rowIndexReg;
 
-        MicroAPI::AddrReg normAddrReg;
-        MicroAPI::AddrReg sumAddrReg;
-        MicroAPI::MaskReg maskRegCalc;
-        MicroAPI::MaskReg maskRegCopy;
-        MicroAPI::MaskReg maskRegFresh;
+        Reg::AddrReg normAddrReg;
+        Reg::AddrReg sumAddrReg;
+        Reg::MaskReg maskRegCalc;
+        Reg::MaskReg maskRegCopy;
+        Reg::MaskReg maskRegFresh;
 
-        MicroAPI::MaskReg maskReg = MicroAPI::CreateMask<uint32_t>();
-        MicroAPI::Duplicate(dupReg1, static_cast<int32_t>(INDEX_BLOCK_LEN));
-        MicroAPI::Duplicate(dupReg2, static_cast<int32_t>(nnSize_));
-        MicroAPI::Arange(orderReg, static_cast<int32_t>(0));
-        MicroAPI::Div(tmpReg1, orderReg, dupReg1, maskReg);
-        MicroAPI::Mul(tmpReg2, tmpReg1, dupReg1, maskReg);
-        MicroAPI::Sub(tmpReg2, orderReg, tmpReg2, maskReg);
-        MicroAPI::Mul(tmpReg3, tmpReg1, dupReg2, maskReg);
-        MicroAPI::Add(rowIndexReg, tmpReg2, tmpReg3, maskReg);
+        Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
+        Reg::Duplicate(dupReg1, static_cast<int32_t>(INDEX_BLOCK_LEN));
+        Reg::Duplicate(dupReg2, static_cast<int32_t>(nnSize_));
+        Reg::Arange(orderReg, static_cast<int32_t>(0));
+        Reg::Div(tmpReg1, orderReg, dupReg1, maskReg);
+        Reg::Mul(tmpReg2, tmpReg1, dupReg1, maskReg);
+        Reg::Sub(tmpReg2, orderReg, tmpReg2, maskReg);
+        Reg::Mul(tmpReg3, tmpReg1, dupReg2, maskReg);
+        Reg::Add(rowIndexReg, tmpReg2, tmpReg3, maskReg);
 
         for (uint16_t i = 0; i < loopSize; i++) {
             /* 32B按mask处理 */
-            maskRegFresh = MicroAPI::UpdateMask<uint32_t>(handleSize);
-            MicroAPI::LoadAlign(maskRegCalc, maskAddr);
-            MicroAPI::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
+            maskRegFresh = Reg::UpdateMask<uint32_t>(handleSize);
+            Reg::LoadAlign(maskRegCalc, maskAddr);
+            Reg::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
             /* 32B全部处理 */
-            maskRegCopy = MicroAPI::UpdateMask<uint32_t>(copyLen);
+            maskRegCopy = Reg::UpdateMask<uint32_t>(copyLen);
 
-            MicroAPI::Duplicate(sumoutReg, static_cast<float>(0));
+            Reg::Duplicate(sumoutReg, static_cast<float>(0));
             for (uint16_t nIdx = 0; nIdx < static_cast<uint16_t>(tilingData_.n); nIdx++) {
                 auto inputOfset = inputAddr + (i * blockCnt * nnSize_) + nIdx * tilingData_.n;
-                MicroAPI::DataCopyGather(inputReg, inputOfset, (MicroAPI::RegTensor<uint32_t> &)(rowIndexReg),
-                                         maskRegCalc);
-                MicroAPI::ReduceMaxWithDataBlock(midReg, inputReg, maskRegCalc);
-                MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_LOAD, AscendC::MicroAPI::MemType::VEC_STORE>();
-                MicroAPI::DataCopy(midResAddr, midReg, maskReg);
-                MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
-                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_E2B_B32>(midReg, midResAddr);
-                MicroAPI::Sub(inputReg, inputReg, midReg, maskRegCalc);
-                MicroAPI::Exp(inputReg, inputReg, maskRegCalc);
+                Reg::DataCopyGather(inputReg, inputOfset, (Reg::RegTensor<uint32_t> &)(rowIndexReg), maskRegCalc);
+                Reg::ReduceMaxWithDataBlock(midReg, inputReg, maskRegCalc);
+                Reg::LocalMemBar<AscendC::Reg::MemType::VEC_LOAD, AscendC::Reg::MemType::VEC_STORE>();
+                Reg::DataCopy(midResAddr, midReg, maskReg);
+                Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+                Reg::DataCopy<float, Reg::LoadDist::DIST_E2B_B32>(midReg, midResAddr);
+                Reg::Sub(inputReg, inputReg, midReg, maskRegCalc);
+                Reg::Exp(inputReg, inputReg, maskRegCalc);
 
-                MicroAPI::ReduceSumWithDataBlock(sumReg, inputReg, maskRegCalc);
-                MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_LOAD, AscendC::MicroAPI::MemType::VEC_STORE>();
-                MicroAPI::DataCopy(sumResAddr, sumReg, maskReg);
-                MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
-                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_E2B_B32>(sumReg, sumResAddr);
-                MicroAPI::Div(inputReg, inputReg, sumReg, maskRegCalc);
+                Reg::ReduceSumWithDataBlock(sumReg, inputReg, maskRegCalc);
+                Reg::LocalMemBar<AscendC::Reg::MemType::VEC_LOAD, AscendC::Reg::MemType::VEC_STORE>();
+                Reg::DataCopy(sumResAddr, sumReg, maskReg);
+                Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+                Reg::DataCopy<float, Reg::LoadDist::DIST_E2B_B32>(sumReg, sumResAddr);
+                Reg::Div(inputReg, inputReg, sumReg, maskRegCalc);
                 /* 搬出normout[0] */
-                normAddrReg = MicroAPI::CreateAddrReg<float>(i, vflen, nIdx, handleLen);
-                MicroAPI::DataCopy(normOutAddr, inputReg, normAddrReg, maskRegCopy);
-                MicroAPI::Adds(inputReg, inputReg, tilingData_.eps, maskRegCalc);
-                MicroAPI::Add(sumoutReg, sumoutReg, inputReg, maskRegCalc);
+                normAddrReg = Reg::CreateAddrReg<float>(i, vflen, nIdx, handleLen);
+                Reg::DataCopy(normOutAddr, inputReg, normAddrReg, maskRegCopy);
+                Reg::Adds(inputReg, inputReg, tilingData_.eps, maskRegCalc);
+                Reg::Add(sumoutReg, sumoutReg, inputReg, maskRegCalc);
             }
             /* 搬出sumout[1] */
-            sumAddrReg = MicroAPI::CreateAddrReg<float>(i, vflen);
-            MicroAPI::DataCopy(sumOutAddr, sumoutReg, sumAddrReg, maskRegCopy);
+            sumAddrReg = Reg::CreateAddrReg<float>(i, vflen);
+            Reg::DataCopy(sumOutAddr, sumoutReg, sumAddrReg, maskRegCopy);
         }
     }
 
@@ -267,38 +266,38 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcColNorm(int32_t handleN
     uint16_t loopSize = Ops::Base::CeilDiv(static_cast<uint16_t>(handleNum), blockCnt);
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> normReg;
-        MicroAPI::RegTensor<float> sumOutReg;
-        MicroAPI::RegTensor<float> midReg;
+        Reg::RegTensor<float> normReg;
+        Reg::RegTensor<float> sumOutReg;
+        Reg::RegTensor<float> midReg;
 
-        MicroAPI::AddrReg normAddrReg;
-        MicroAPI::AddrReg sumAddrReg;
-        MicroAPI::MaskReg maskRegCalc;
-        MicroAPI::MaskReg maskRegCopy;
-        MicroAPI::MaskReg maskRegFresh;
+        Reg::AddrReg normAddrReg;
+        Reg::AddrReg sumAddrReg;
+        Reg::MaskReg maskRegCalc;
+        Reg::MaskReg maskRegCopy;
+        Reg::MaskReg maskRegFresh;
 
-        MicroAPI::MaskReg maskReg = MicroAPI::CreateMask<uint32_t>();
+        Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
         for (uint16_t i = 0; i < loopSize; i++) {
-            maskRegFresh = MicroAPI::UpdateMask<uint32_t>(handleSize);
-            MicroAPI::LoadAlign(maskRegCalc, maskAddr);
-            MicroAPI::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
-            maskRegCopy = MicroAPI::UpdateMask<uint32_t>(copyLen);
+            maskRegFresh = Reg::UpdateMask<uint32_t>(handleSize);
+            Reg::LoadAlign(maskRegCalc, maskAddr);
+            Reg::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
+            maskRegCopy = Reg::UpdateMask<uint32_t>(copyLen);
 
-            sumAddrReg = MicroAPI::CreateAddrReg<uint32_t>(i, vflen);
-            MicroAPI::DataCopy(sumOutReg, sumOutAddr, sumAddrReg);
-            MicroAPI::Adds(sumOutReg, sumOutReg, tilingData_.eps, maskRegCalc);
+            sumAddrReg = Reg::CreateAddrReg<uint32_t>(i, vflen);
+            Reg::DataCopy(sumOutReg, sumOutAddr, sumAddrReg);
+            Reg::Adds(sumOutReg, sumOutReg, tilingData_.eps, maskRegCalc);
             if constexpr (OUT_FLAG) {
-                MicroAPI::DataCopy(sumOutAddr, sumOutReg, sumAddrReg, maskRegCopy);
+                Reg::DataCopy(sumOutAddr, sumOutReg, sumAddrReg, maskRegCopy);
             }
 
             for (uint16_t nIdx = 0; nIdx < static_cast<uint16_t>(tilingData_.n); nIdx++) {
-                normAddrReg = MicroAPI::CreateAddrReg<uint32_t>(i, vflen, nIdx, handleLen);
-                MicroAPI::DataCopy(normReg, normOutAddr, normAddrReg);
+                normAddrReg = Reg::CreateAddrReg<uint32_t>(i, vflen, nIdx, handleLen);
+                Reg::DataCopy(normReg, normOutAddr, normAddrReg);
                 if constexpr (ADDS_EPS) {
-                    MicroAPI::Adds(normReg, normReg, tilingData_.eps, maskRegCalc); // 这里有区别
+                    Reg::Adds(normReg, normReg, tilingData_.eps, maskRegCalc); // 这里有区别
                 }
-                MicroAPI::Div(normReg, normReg, sumOutReg, maskRegCalc);
-                MicroAPI::DataCopy(normOutAddr, normReg, normAddrReg, maskRegCopy);
+                Reg::Div(normReg, normReg, sumOutReg, maskRegCalc);
+                Reg::DataCopy(normOutAddr, normReg, normAddrReg, maskRegCopy);
             }
         }
     }
@@ -331,52 +330,52 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcRowNorm(int32_t handleN
     auto tailLoopHandleNum = handleNum - (loopSize - 1) * blockCnt;
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> normReg;
-        MicroAPI::RegTensor<float> midReg;
-        MicroAPI::RegTensor<float> sumReg;
-        MicroAPI::RegTensor<float> sumoutReg;
-        MicroAPI::UnalignRegForStore uReg;
+        Reg::RegTensor<float> normReg;
+        Reg::RegTensor<float> midReg;
+        Reg::RegTensor<float> sumReg;
+        Reg::RegTensor<float> sumoutReg;
+        Reg::UnalignRegForStore uReg;
 
-        MicroAPI::AddrReg sumAddrReg;
-        MicroAPI::AddrReg normAddrReg;
-        MicroAPI::MaskReg maskRegCalc;
-        MicroAPI::MaskReg maskRegCopy;
-        MicroAPI::MaskReg maskRegFresh;
-        MicroAPI::MaskReg maskReg;
+        Reg::AddrReg sumAddrReg;
+        Reg::AddrReg normAddrReg;
+        Reg::MaskReg maskRegCalc;
+        Reg::MaskReg maskRegCopy;
+        Reg::MaskReg maskRegFresh;
+        Reg::MaskReg maskReg;
 
-        maskReg = MicroAPI::CreateMask<uint32_t>();
+        maskReg = Reg::CreateMask<uint32_t>();
         for (uint16_t i = 0; i < loopSize; i++) {
             auto postUpdateStride = (i == loopSize - 1) ? tailLoopHandleNum : blockCnt;
-            maskRegFresh = MicroAPI::UpdateMask<uint32_t>(handleSize);
-            MicroAPI::LoadAlign(maskRegCalc, maskAddr);
-            MicroAPI::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
-            maskRegCopy = MicroAPI::UpdateMask<uint32_t>(copyLen);
+            maskRegFresh = Reg::UpdateMask<uint32_t>(handleSize);
+            Reg::LoadAlign(maskRegCalc, maskAddr);
+            Reg::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
+            maskRegCopy = Reg::UpdateMask<uint32_t>(copyLen);
 
-            MicroAPI::Duplicate(sumoutReg, static_cast<float>(0));
+            Reg::Duplicate(sumoutReg, static_cast<float>(0));
             for (uint16_t nIdx = 0; nIdx < static_cast<uint16_t>(tilingData_.n); nIdx++) {
-                normAddrReg = MicroAPI::CreateAddrReg<uint32_t>(i, vflen, nIdx, handleLen);
-                MicroAPI::DataCopy(normReg, normOutAddr, normAddrReg);
-                MicroAPI::ReduceSumWithDataBlock(sumReg, normReg, maskRegCalc);
-                MicroAPI::DataCopy(midResAddr, sumReg, maskRegCopy);
+                normAddrReg = Reg::CreateAddrReg<uint32_t>(i, vflen, nIdx, handleLen);
+                Reg::DataCopy(normReg, normOutAddr, normAddrReg);
+                Reg::ReduceSumWithDataBlock(sumReg, normReg, maskRegCalc);
+                Reg::DataCopy(midResAddr, sumReg, maskRegCopy);
                 if constexpr (OUT_FLAG) {
                     /* 搬出sumout[2*i] */
                     auto sumOfset = sumRowOutAddr + i * blockCnt + nIdx * handleNum;
-                    MicroAPI::Adds(sumReg, sumReg, tilingData_.eps, maskReg);
+                    Reg::Adds(sumReg, sumReg, tilingData_.eps, maskReg);
                     /* 非对齐搬运，偏移为handleNum */
-                    MicroAPI::StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(sumOfset, sumReg, uReg,
-                                                                                           postUpdateStride);
-                    MicroAPI::StoreUnAlignPost<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(sumOfset, uReg, 0);
+                    Reg::StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(sumOfset, sumReg, uReg,
+                                                                                 postUpdateStride);
+                    Reg::StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(sumOfset, uReg, 0);
                 }
-                MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
-                MicroAPI::DataCopy<float, MicroAPI::LoadDist::DIST_E2B_B32>(sumReg, midResAddr);
-                MicroAPI::Adds(sumReg, sumReg, tilingData_.eps, maskRegCalc);
-                MicroAPI::Div(normReg, normReg, sumReg, maskRegCalc);
-                MicroAPI::DataCopy(normOutAddr, normReg, normAddrReg, maskRegCopy);
-                MicroAPI::Add(sumoutReg, sumoutReg, normReg, maskRegCalc);
+                Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+                Reg::DataCopy<float, Reg::LoadDist::DIST_E2B_B32>(sumReg, midResAddr);
+                Reg::Adds(sumReg, sumReg, tilingData_.eps, maskRegCalc);
+                Reg::Div(normReg, normReg, sumReg, maskRegCalc);
+                Reg::DataCopy(normOutAddr, normReg, normAddrReg, maskRegCopy);
+                Reg::Add(sumoutReg, sumoutReg, normReg, maskRegCalc);
             }
             /* 搬出sumout[2*i+1] */
-            sumAddrReg = MicroAPI::CreateAddrReg<uint32_t>(i, vflen);
-            MicroAPI::DataCopy(sumColOutAddr, sumoutReg, sumAddrReg, maskRegCopy);
+            sumAddrReg = Reg::CreateAddrReg<uint32_t>(i, vflen);
+            Reg::DataCopy(sumColOutAddr, sumoutReg, sumAddrReg, maskRegCopy);
         }
     }
     normOutQue_.EnQue(normOutLocal);
@@ -402,37 +401,37 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::ScatterOutFromNorm(int32_t 
     uint16_t loopSize = Ops::Base::CeilDiv(static_cast<uint16_t>(handleNum), blockCnt);
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<float> normReg;
-        MicroAPI::RegTensor<int32_t> orderReg;
-        MicroAPI::RegTensor<int32_t> tmpReg1;
-        MicroAPI::RegTensor<int32_t> tmpReg2;
-        MicroAPI::RegTensor<int32_t> tmpReg3;
-        MicroAPI::RegTensor<int32_t> dupReg1;
-        MicroAPI::RegTensor<int32_t> dupReg2;
-        MicroAPI::RegTensor<int32_t> indexReg;
+        Reg::RegTensor<float> normReg;
+        Reg::RegTensor<int32_t> orderReg;
+        Reg::RegTensor<int32_t> tmpReg1;
+        Reg::RegTensor<int32_t> tmpReg2;
+        Reg::RegTensor<int32_t> tmpReg3;
+        Reg::RegTensor<int32_t> dupReg1;
+        Reg::RegTensor<int32_t> dupReg2;
+        Reg::RegTensor<int32_t> indexReg;
 
-        MicroAPI::AddrReg normAddrReg;
-        MicroAPI::MaskReg maskRegCalc;
-        MicroAPI::MaskReg maskRegFresh;
+        Reg::AddrReg normAddrReg;
+        Reg::MaskReg maskRegCalc;
+        Reg::MaskReg maskRegFresh;
 
-        MicroAPI::MaskReg maskReg = MicroAPI::CreateMask<uint32_t>();
-        MicroAPI::Duplicate(dupReg1, INDEX_BLOCK_LEN);
-        MicroAPI::Duplicate(dupReg2, static_cast<int32_t>(nnSize_));
-        MicroAPI::Arange(orderReg, static_cast<int32_t>(0));
-        MicroAPI::Div(tmpReg1, orderReg, dupReg1, maskReg);
-        MicroAPI::Mul(tmpReg2, tmpReg1, dupReg1, maskReg);
-        MicroAPI::Sub(tmpReg2, orderReg, tmpReg2, maskReg);
-        MicroAPI::Mul(tmpReg3, tmpReg1, dupReg2, maskReg);
-        MicroAPI::Add(indexReg, tmpReg2, tmpReg3, maskReg);
+        Reg::MaskReg maskReg = Reg::CreateMask<uint32_t>();
+        Reg::Duplicate(dupReg1, INDEX_BLOCK_LEN);
+        Reg::Duplicate(dupReg2, static_cast<int32_t>(nnSize_));
+        Reg::Arange(orderReg, static_cast<int32_t>(0));
+        Reg::Div(tmpReg1, orderReg, dupReg1, maskReg);
+        Reg::Mul(tmpReg2, tmpReg1, dupReg1, maskReg);
+        Reg::Sub(tmpReg2, orderReg, tmpReg2, maskReg);
+        Reg::Mul(tmpReg3, tmpReg1, dupReg2, maskReg);
+        Reg::Add(indexReg, tmpReg2, tmpReg3, maskReg);
         for (uint16_t i = 0; i < loopSize; i++) {
-            maskRegFresh = MicroAPI::UpdateMask<uint32_t>(handleSize);
-            MicroAPI::LoadAlign(maskRegCalc, maskAddr);
-            MicroAPI::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
+            maskRegFresh = Reg::UpdateMask<uint32_t>(handleSize);
+            Reg::LoadAlign(maskRegCalc, maskAddr);
+            Reg::MaskAnd(maskRegCalc, maskRegCalc, maskRegFresh, maskReg);
             for (uint16_t nIdx = 0; nIdx < static_cast<uint16_t>(tilingData_.n); nIdx++) {
                 auto outOfset = outputAddr + (i * blockCnt * nnSize_) + nIdx * tilingData_.n;
-                normAddrReg = MicroAPI::CreateAddrReg<uint32_t>(i, vflen, nIdx, handleLen);
-                MicroAPI::DataCopy(normReg, normOutAddr, normAddrReg);
-                MicroAPI::DataCopyScatter(outOfset, normReg, (MicroAPI::RegTensor<uint32_t> &)(indexReg), maskRegCalc);
+                normAddrReg = Reg::CreateAddrReg<uint32_t>(i, vflen, nIdx, handleLen);
+                Reg::DataCopy(normReg, normOutAddr, normAddrReg);
+                Reg::DataCopyScatter(outOfset, normReg, (Reg::RegTensor<uint32_t> &)(indexReg), maskRegCalc);
             }
         }
     }

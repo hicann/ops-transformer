@@ -33,27 +33,26 @@ template <class T, class P, int8_t RESI_MODE>
 class MhcPreSplitND;
 
 // Vector cast and division traits shared by all templates.
-constexpr MicroAPI::CastTrait MHC_PRE_CAST_FP32_TO_B16 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                          MicroAPI::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-constexpr MicroAPI::CastTrait MHC_PRE_CAST_B16_TO_FP32 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                          MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-constexpr MicroAPI::DivSpecificMode MHC_PRE_DIV_ZEROING_MODE = {MicroAPI::MaskMergeMode::ZEROING, true};
+constexpr Reg::CastTrait MHC_PRE_CAST_FP32_TO_B16 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                     Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+constexpr Reg::CastTrait MHC_PRE_CAST_B16_TO_FP32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                     Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+constexpr Reg::DivSpecificMode MHC_PRE_DIV_ZEROING_MODE = {Reg::MaskMergeMode::ZEROING, true};
 
 template <class P>
-__aicore__ inline void MhcPreLoadHInValue(MicroAPI::RegTensor<P> &dst, __ubuf__ P *src, uint32_t offset)
+__aicore__ inline void MhcPreLoadHInValue(Reg::RegTensor<P> &dst, __ubuf__ P *src, uint32_t offset)
 {
-    MicroAPI::DataCopy<P, MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + offset);
+    Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(dst, src + offset);
 }
 
 template <class T, class P>
-__aicore__ inline void MhcPreAccumulateHIn(MicroAPI::RegTensor<P> &acc, MicroAPI::RegTensor<P> &xFp32,
-                                           MicroAPI::RegTensor<T> &xIn, MicroAPI::RegTensor<P> &hPre, __ubuf__ T *x,
-                                           uint32_t offset, MicroAPI::MaskReg mask)
+__aicore__ inline void MhcPreAccumulateHIn(Reg::RegTensor<P> &acc, Reg::RegTensor<P> &xFp32, Reg::RegTensor<T> &xIn,
+                                           Reg::RegTensor<P> &hPre, __ubuf__ T *x, uint32_t offset, Reg::MaskReg mask)
 {
-    MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(xIn, x + offset);
-    MicroAPI::Cast<P, T, MHC_PRE_CAST_B16_TO_FP32>(xFp32, xIn, mask);
-    MicroAPI::Mul(xFp32, xFp32, hPre, mask);
-    MicroAPI::Add(acc, acc, xFp32, mask);
+    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(xIn, x + offset);
+    Reg::Cast<P, T, MHC_PRE_CAST_B16_TO_FP32>(xFp32, xIn, mask);
+    Reg::Mul(xFp32, xFp32, hPre, mask);
+    Reg::Add(acc, acc, xFp32, mask);
 }
 
 template <class P, uint32_t HEAD_NUM, bool HAS_RESI_VALUE>
@@ -76,54 +75,54 @@ __aicore__ inline void MhcPreVFPostSegments(const LocalTensor<P> &hPreLocal, con
 
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<P> dataReg;
-        MicroAPI::RegTensor<P> invRmsReg;
-        MicroAPI::RegTensor<P> invRmsBroadReg;
-        MicroAPI::RegTensor<P> alphaPreReg;
-        MicroAPI::RegTensor<P> alphaPostReg;
-        MicroAPI::RegTensor<P> alphaResReg;
-        MicroAPI::RegTensor<P> biasPreReg;
-        MicroAPI::RegTensor<P> biasPostReg;
-        MicroAPI::RegTensor<P> biasResReg;
+        Reg::RegTensor<P> dataReg;
+        Reg::RegTensor<P> invRmsReg;
+        Reg::RegTensor<P> invRmsBroadReg;
+        Reg::RegTensor<P> alphaPreReg;
+        Reg::RegTensor<P> alphaPostReg;
+        Reg::RegTensor<P> alphaResReg;
+        Reg::RegTensor<P> biasPreReg;
+        Reg::RegTensor<P> biasPostReg;
+        Reg::RegTensor<P> biasResReg;
         uint32_t nMaskSize = HEAD_NUM;
         uint32_t resMaskSize = HEAD_NUM * HEAD_NUM;
-        MicroAPI::MaskReg nMask = MicroAPI::UpdateMask<P>(nMaskSize);
-        MicroAPI::MaskReg resMask = MicroAPI::UpdateMask<P>(resMaskSize);
+        Reg::MaskReg nMask = Reg::UpdateMask<P>(nMaskSize);
+        Reg::MaskReg resMask = Reg::UpdateMask<P>(resMaskSize);
 
-        MicroAPI::Load<P>(alphaPreReg, alpha);
-        MicroAPI::Load<P>(alphaPostReg, alpha + HEAD_NUM);
-        MicroAPI::Load<P>(biasPreReg, bias);
-        MicroAPI::Load<P>(biasPostReg, bias + HEAD_NUM);
+        Reg::Load<P>(alphaPreReg, alpha);
+        Reg::Load<P>(alphaPostReg, alpha + HEAD_NUM);
+        Reg::Load<P>(biasPreReg, bias);
+        Reg::Load<P>(biasPostReg, bias + HEAD_NUM);
         if constexpr (HAS_RESI_VALUE) {
-            MicroAPI::Load<P>(alphaResReg, alpha + 2U * HEAD_NUM);
-            MicroAPI::Load<P>(biasResReg, bias + 2U * HEAD_NUM);
+            Reg::Load<P>(alphaResReg, alpha + 2U * HEAD_NUM);
+            Reg::Load<P>(biasResReg, bias + 2U * HEAD_NUM);
         }
 
         // Consume pre/post/res by fixed UB offsets in one VF loop. This replaces Gather and stages
         // every output at a 32-byte-aligned local-buffer base before DMA.
         for (uint16_t row = 0; row < rowCount; ++row) {
-            MicroAPI::Load<P>(invRmsReg, invRms + invRmsOffset + row);
-            MicroAPI::Duplicate(invRmsBroadReg, invRmsReg, nMask);
+            Reg::Load<P>(invRmsReg, invRms + invRmsOffset + row);
+            Reg::Duplicate(invRmsBroadReg, invRmsReg, nMask);
             uint32_t mmOffset = static_cast<uint32_t>(row) * mmRowStride;
-            MicroAPI::Load<P>(dataReg, mm + mmOffset);
-            MicroAPI::Mul(dataReg, dataReg, invRmsBroadReg, nMask);
-            MicroAPI::Mul(dataReg, dataReg, alphaPreReg, nMask);
-            MicroAPI::Add(dataReg, dataReg, biasPreReg, nMask);
-            MicroAPI::Store<P>(hPre + row * HEAD_NUM, dataReg, HEAD_NUM);
+            Reg::Load<P>(dataReg, mm + mmOffset);
+            Reg::Mul(dataReg, dataReg, invRmsBroadReg, nMask);
+            Reg::Mul(dataReg, dataReg, alphaPreReg, nMask);
+            Reg::Add(dataReg, dataReg, biasPreReg, nMask);
+            Reg::Store<P>(hPre + row * HEAD_NUM, dataReg, HEAD_NUM);
 
-            MicroAPI::Load<P>(dataReg, mm + mmOffset + HEAD_NUM);
-            MicroAPI::Mul(dataReg, dataReg, invRmsBroadReg, nMask);
-            MicroAPI::Mul(dataReg, dataReg, alphaPostReg, nMask);
-            MicroAPI::Add(dataReg, dataReg, biasPostReg, nMask);
-            MicroAPI::Store<P>(hPost + row * HEAD_NUM, dataReg, HEAD_NUM);
+            Reg::Load<P>(dataReg, mm + mmOffset + HEAD_NUM);
+            Reg::Mul(dataReg, dataReg, invRmsBroadReg, nMask);
+            Reg::Mul(dataReg, dataReg, alphaPostReg, nMask);
+            Reg::Add(dataReg, dataReg, biasPostReg, nMask);
+            Reg::Store<P>(hPost + row * HEAD_NUM, dataReg, HEAD_NUM);
 
             if constexpr (HAS_RESI_VALUE) {
-                MicroAPI::Duplicate(invRmsBroadReg, invRmsReg, resMask);
-                MicroAPI::Load<P>(dataReg, mm + mmOffset + 2U * HEAD_NUM);
-                MicroAPI::Mul(dataReg, dataReg, invRmsBroadReg, resMask);
-                MicroAPI::Mul(dataReg, dataReg, alphaResReg, resMask);
-                MicroAPI::Add(dataReg, dataReg, biasResReg, resMask);
-                MicroAPI::Store<P>(hRes + row * HEAD_NUM * HEAD_NUM, dataReg, HEAD_NUM * HEAD_NUM);
+                Reg::Duplicate(invRmsBroadReg, invRmsReg, resMask);
+                Reg::Load<P>(dataReg, mm + mmOffset + 2U * HEAD_NUM);
+                Reg::Mul(dataReg, dataReg, invRmsBroadReg, resMask);
+                Reg::Mul(dataReg, dataReg, alphaResReg, resMask);
+                Reg::Add(dataReg, dataReg, biasResReg, resMask);
+                Reg::Store<P>(hRes + row * HEAD_NUM * HEAD_NUM, dataReg, HEAD_NUM * HEAD_NUM);
             }
         }
     }
@@ -134,18 +133,18 @@ __aicore__ inline void MhcPreVFExpandAlpha(const LocalTensor<P> &alphaLocal)
     __ubuf__ P *alpha = (__ubuf__ P *)alphaLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<P> alphaPreReg;
-        MicroAPI::RegTensor<P> alphaPostReg;
-        MicroAPI::RegTensor<P> alphaResReg;
-        MicroAPI::DataCopy<P, MicroAPI::LoadDist::DIST_BRC_B32>(alphaPreReg, alpha);
-        MicroAPI::DataCopy<P, MicroAPI::LoadDist::DIST_BRC_B32>(alphaPostReg, alpha + 1U);
+        Reg::RegTensor<P> alphaPreReg;
+        Reg::RegTensor<P> alphaPostReg;
+        Reg::RegTensor<P> alphaResReg;
+        Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(alphaPreReg, alpha);
+        Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(alphaPostReg, alpha + 1U);
         if constexpr (HAS_RESI_VALUE) {
-            MicroAPI::DataCopy<P, MicroAPI::LoadDist::DIST_BRC_B32>(alphaResReg, alpha + 2U);
+            Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(alphaResReg, alpha + 2U);
         }
-        MicroAPI::Store<P>(alpha, alphaPreReg, HEAD_NUM);
-        MicroAPI::Store<P>(alpha + HEAD_NUM, alphaPostReg, HEAD_NUM);
+        Reg::Store<P>(alpha, alphaPreReg, HEAD_NUM);
+        Reg::Store<P>(alpha + HEAD_NUM, alphaPostReg, HEAD_NUM);
         if constexpr (HAS_RESI_VALUE) {
-            MicroAPI::Store<P>(alpha + 2U * HEAD_NUM, alphaResReg, HEAD_NUM * HEAD_NUM);
+            Reg::Store<P>(alpha + 2U * HEAD_NUM, alphaResReg, HEAD_NUM * HEAD_NUM);
         }
     }
 }
@@ -376,40 +375,40 @@ public:
         uint16_t nLoopCnt = MhcPreCeilDiv(nSize, eleNumPerVf_);
         __VEC_SCOPE__
         {
-            MicroAPI::MaskReg mask = MicroAPI::CreateMask<P>();
+            Reg::MaskReg mask = Reg::CreateMask<P>();
             for (uint16_t mIdx = 0; mIdx < mSize; mIdx++) {
                 uint32_t elementNum = nSize;
-                MicroAPI::RegTensor<P> sumReg;
+                Reg::RegTensor<P> sumReg;
                 if constexpr (isFirstND) {
-                    MicroAPI::Duplicate(sumReg, 0);
+                    Reg::Duplicate(sumReg, 0);
                 } else {
-                    MicroAPI::Load(sumReg, invRmsDst + mIdx);
+                    Reg::Load(sumReg, invRmsDst + mIdx);
                 }
                 for (uint16_t vfBlockIdx = 0; vfBlockIdx < nLoopCnt; vfBlockIdx++) {
-                    MicroAPI::RegTensor<T> xInReg;
-                    MicroAPI::RegTensor<P> gammaReg;
-                    MicroAPI::RegTensor<P> xFp32Reg, xMulReg, xSquaReg;
-                    MicroAPI::RegTensor<P> tmpSumReg;
+                    Reg::RegTensor<T> xInReg;
+                    Reg::RegTensor<P> gammaReg;
+                    Reg::RegTensor<P> xFp32Reg, xMulReg, xSquaReg;
+                    Reg::RegTensor<P> tmpSumReg;
 
                     uint32_t xInOffset = mIdx * nSrcUbAligned + vfBlockIdx * eleNumPerVf_;
-                    MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + xInOffset);
-                    MicroAPI::MaskReg maskN4B32 = MicroAPI::UpdateMask<P>(elementNum);
-                    MicroAPI::Cast<float, T, MHC_PRE_CAST_B16_TO_FP32>(xFp32Reg, xInReg, maskN4B32);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(xInReg, xIn + xInOffset);
+                    Reg::MaskReg maskN4B32 = Reg::UpdateMask<P>(elementNum);
+                    Reg::Cast<float, T, MHC_PRE_CAST_B16_TO_FP32>(xFp32Reg, xInReg, maskN4B32);
                     if constexpr (hasGamma) {
-                        MicroAPI::LoadAlign(gammaReg, gamma + vfBlockIdx * eleNumPerVf_);
-                        MicroAPI::Mul(xMulReg, gammaReg, xFp32Reg, maskN4B32);
+                        Reg::LoadAlign(gammaReg, gamma + vfBlockIdx * eleNumPerVf_);
+                        Reg::Mul(xMulReg, gammaReg, xFp32Reg, maskN4B32);
                     } else {
                         xMulReg = xFp32Reg;
                     }
                     uint32_t dstUbOffset = mIdx * nDstUbAligned + vfBlockIdx * eleNumPerVf_;
-                    MicroAPI::StoreAlign(xDst + dstUbOffset, xMulReg, maskN4B32);
+                    Reg::StoreAlign(xDst + dstUbOffset, xMulReg, maskN4B32);
 
-                    MicroAPI::Mul(xSquaReg, xFp32Reg, xFp32Reg, maskN4B32);
-                    MicroAPI::Reduce<MicroAPI::ReduceType::SUM>(tmpSumReg, xSquaReg, maskN4B32);
-                    MicroAPI::Add(sumReg, sumReg, tmpSumReg, maskN4B32);
+                    Reg::Mul(xSquaReg, xFp32Reg, xFp32Reg, maskN4B32);
+                    Reg::Reduce<Reg::ReduceType::SUM>(tmpSumReg, xSquaReg, maskN4B32);
+                    Reg::Add(sumReg, sumReg, tmpSumReg, maskN4B32);
                 }
 
-                MicroAPI::Store(invRmsDst + mIdx, sumReg, 1);
+                Reg::Store(invRmsDst + mIdx, sumReg, 1);
             }
         }
     }
@@ -421,18 +420,18 @@ public:
         __VEC_SCOPE__
         {
             uint32_t elementNum = nSize;
-            MicroAPI::MaskReg mask = MicroAPI::CreateMask<P>();
+            Reg::MaskReg mask = Reg::CreateMask<P>();
             for (uint16_t vfBlockIdx = 0; vfBlockIdx < nLoopCnt; vfBlockIdx++) {
-                MicroAPI::MaskReg maskN4B32 = MicroAPI::UpdateMask<P>(elementNum);
-                MicroAPI::RegTensor<P> invrmsReg, onesReg;
+                Reg::MaskReg maskN4B32 = Reg::UpdateMask<P>(elementNum);
+                Reg::RegTensor<P> invrmsReg, onesReg;
 
-                MicroAPI::LoadAlign(invrmsReg, invRms + vfBlockIdx * eleNumPerVf_);
-                MicroAPI::Muls(invrmsReg, invrmsReg, scaleMean, maskN4B32);
-                MicroAPI::Adds(invrmsReg, invrmsReg, normEps, maskN4B32);
-                MicroAPI::Sqrt(invrmsReg, invrmsReg, maskN4B32);
-                MicroAPI::Duplicate(onesReg, 1);
-                MicroAPI::Div(invrmsReg, onesReg, invrmsReg, maskN4B32);
-                MicroAPI::StoreAlign(invRms + vfBlockIdx * eleNumPerVf_, invrmsReg, maskN4B32);
+                Reg::LoadAlign(invrmsReg, invRms + vfBlockIdx * eleNumPerVf_);
+                Reg::Muls(invrmsReg, invrmsReg, scaleMean, maskN4B32);
+                Reg::Adds(invrmsReg, invrmsReg, normEps, maskN4B32);
+                Reg::Sqrt(invrmsReg, invrmsReg, maskN4B32);
+                Reg::Duplicate(onesReg, 1);
+                Reg::Div(invrmsReg, onesReg, invrmsReg, maskN4B32);
+                Reg::StoreAlign(invRms + vfBlockIdx * eleNumPerVf_, invrmsReg, maskN4B32);
             }
         }
     }
@@ -588,20 +587,20 @@ public:
         uint32_t curElemCnt = totalElem;
         __VEC_SCOPE__
         {
-            MicroAPI::RegTensor<P> hPreReg;
-            MicroAPI::RegTensor<P> negReg, expReg, addOneReg, sigmoidReg, resultReg, oneReg;
+            Reg::RegTensor<P> hPreReg;
+            Reg::RegTensor<P> negReg, expReg, addOneReg, sigmoidReg, resultReg, oneReg;
 
             for (uint16_t vfBlockIdx = 0; vfBlockIdx < nLoopCnt; vfBlockIdx++) {
-                MicroAPI::MaskReg mask = MicroAPI::UpdateMask<P>(curElemCnt);
-                MicroAPI::LoadAlign(hPreReg, hPreBuffAddr + vfBlockIdx * eleNumPerVf_);
-                MicroAPI::Neg(negReg, hPreReg, mask);
-                MicroAPI::Exp(expReg, negReg, mask);
-                MicroAPI::Adds(addOneReg, expReg, static_cast<P>(kOneValue), mask);
-                MicroAPI::Duplicate(oneReg, static_cast<P>(kOneValue), mask);
-                MicroAPI::Div<P, &MHC_PRE_DIV_ZEROING_MODE>(sigmoidReg, oneReg, addOneReg, mask);
+                Reg::MaskReg mask = Reg::UpdateMask<P>(curElemCnt);
+                Reg::LoadAlign(hPreReg, hPreBuffAddr + vfBlockIdx * eleNumPerVf_);
+                Reg::Neg(negReg, hPreReg, mask);
+                Reg::Exp(expReg, negReg, mask);
+                Reg::Adds(addOneReg, expReg, static_cast<P>(kOneValue), mask);
+                Reg::Duplicate(oneReg, static_cast<P>(kOneValue), mask);
+                Reg::Div<P, &MHC_PRE_DIV_ZEROING_MODE>(sigmoidReg, oneReg, addOneReg, mask);
 
-                MicroAPI::Adds(resultReg, sigmoidReg, matrixInfo_.hcEps, mask);
-                MicroAPI::StoreAlign(hPreBuffAddr + vfBlockIdx * eleNumPerVf_, resultReg, mask);
+                Reg::Adds(resultReg, sigmoidReg, matrixInfo_.hcEps, mask);
+                Reg::StoreAlign(hPreBuffAddr + vfBlockIdx * eleNumPerVf_, resultReg, mask);
             }
         }
 
@@ -627,22 +626,22 @@ public:
         {
             for (uint16_t vfBlockIdx = 0; vfBlockIdx < nLoopCnt; ++vfBlockIdx) {
                 uint32_t elemOffset = vfBlockIdx * regCapacityFp32;
-                MicroAPI::MaskReg mask = MicroAPI::UpdateMask<P>(curElemCnt);
-                MicroAPI::RegTensor<P> hPostReg;
-                MicroAPI::RegTensor<P> negReg, expReg, addOneReg, sigmoidReg, resultReg, oneReg;
+                Reg::MaskReg mask = Reg::UpdateMask<P>(curElemCnt);
+                Reg::RegTensor<P> hPostReg;
+                Reg::RegTensor<P> negReg, expReg, addOneReg, sigmoidReg, resultReg, oneReg;
 
-                MicroAPI::LoadAlign(hPostReg, hPostBuffAddr + elemOffset);
-                MicroAPI::Neg(negReg, hPostReg, mask);
-                MicroAPI::Exp(expReg, negReg, mask);
-                MicroAPI::Adds(addOneReg, expReg, kOneValue, mask);
-                MicroAPI::Duplicate(oneReg, kOneValue, mask);
-                MicroAPI::Div<P, &MHC_PRE_DIV_ZEROING_MODE>(sigmoidReg, oneReg, addOneReg, mask);
+                Reg::LoadAlign(hPostReg, hPostBuffAddr + elemOffset);
+                Reg::Neg(negReg, hPostReg, mask);
+                Reg::Exp(expReg, negReg, mask);
+                Reg::Adds(addOneReg, expReg, kOneValue, mask);
+                Reg::Duplicate(oneReg, kOneValue, mask);
+                Reg::Div<P, &MHC_PRE_DIV_ZEROING_MODE>(sigmoidReg, oneReg, addOneReg, mask);
 
-                MicroAPI::Muls(resultReg, sigmoidReg, scalarValue, mask);
+                Reg::Muls(resultReg, sigmoidReg, scalarValue, mask);
                 if constexpr (RESI_MODE == MHC_PRE_NO_RESI) {
-                    MicroAPI::Adds(resultReg, resultReg, matrixInfo_.hcEps, mask);
+                    Reg::Adds(resultReg, resultReg, matrixInfo_.hcEps, mask);
                 }
-                MicroAPI::StoreAlign(hPostOutAddr + elemOffset, resultReg, mask);
+                Reg::StoreAlign(hPostOutAddr + elemOffset, resultReg, mask);
             }
         }
         outQueue_.EnQue(hPostOutLocal);
@@ -663,18 +662,18 @@ public:
         uint16_t dLoopCnt = (lenD + eleNumPerVf_ - 1) / eleNumPerVf_;
         __VEC_SCOPE__
         {
-            MicroAPI::RegTensor<P> xFp32Reg;
-            MicroAPI::RegTensor<T> xInReg;
-            MicroAPI::RegTensor<P> accFp32Reg;
-            MicroAPI::RegTensor<T> outB16Reg;
-            MicroAPI::RegTensor<P> hPreReg0;
-            MicroAPI::RegTensor<P> hPreReg1;
-            MicroAPI::RegTensor<P> hPreReg2;
-            MicroAPI::RegTensor<P> hPreReg3;
-            MicroAPI::RegTensor<P> hPreReg4;
-            MicroAPI::RegTensor<P> hPreReg5;
-            MicroAPI::RegTensor<P> hPreReg6;
-            MicroAPI::RegTensor<P> hPreReg7;
+            Reg::RegTensor<P> xFp32Reg;
+            Reg::RegTensor<T> xInReg;
+            Reg::RegTensor<P> accFp32Reg;
+            Reg::RegTensor<T> outB16Reg;
+            Reg::RegTensor<P> hPreReg0;
+            Reg::RegTensor<P> hPreReg1;
+            Reg::RegTensor<P> hPreReg2;
+            Reg::RegTensor<P> hPreReg3;
+            Reg::RegTensor<P> hPreReg4;
+            Reg::RegTensor<P> hPreReg5;
+            Reg::RegTensor<P> hPreReg6;
+            Reg::RegTensor<P> hPreReg7;
 
             for (uint16_t row = 0; row < rowCount; ++row) {
                 uint32_t hPreOffset = static_cast<uint32_t>(row) * HEAD_NUM;
@@ -695,9 +694,9 @@ public:
                 uint32_t xRowOffset = static_cast<uint32_t>(row) * HEAD_NUM * localStride;
                 uint32_t outRowOffset = static_cast<uint32_t>(row) * localStride;
                 for (uint16_t dIdx = 0; dIdx < dLoopCnt; ++dIdx) {
-                    MicroAPI::MaskReg mask = MicroAPI::UpdateMask<P>(remaining);
+                    Reg::MaskReg mask = Reg::UpdateMask<P>(remaining);
                     uint32_t dOffset = static_cast<uint32_t>(dIdx) * eleNumPerVf_;
-                    MicroAPI::Duplicate<P>(accFp32Reg, static_cast<P>(0.0f), mask);
+                    Reg::Duplicate<P>(accFp32Reg, static_cast<P>(0.0f), mask);
                     MhcPreAccumulateHIn<T, P>(accFp32Reg, xFp32Reg, xInReg, hPreReg0, xInAddr, xRowOffset + dOffset,
                                               mask);
                     MhcPreAccumulateHIn<T, P>(accFp32Reg, xFp32Reg, xInReg, hPreReg1, xInAddr,
@@ -718,9 +717,9 @@ public:
                         MhcPreAccumulateHIn<T, P>(accFp32Reg, xFp32Reg, xInReg, hPreReg7, xInAddr,
                                                   xRowOffset + 7U * localStride + dOffset, mask);
                     }
-                    MicroAPI::Cast<T, P, MHC_PRE_CAST_FP32_TO_B16>(outB16Reg, accFp32Reg, mask);
-                    MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_PACK_B32>(hinOutAddr + outRowOffset + dOffset,
-                                                                                outB16Reg, mask);
+                    Reg::Cast<T, P, MHC_PRE_CAST_FP32_TO_B16>(outB16Reg, accFp32Reg, mask);
+                    Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(hinOutAddr + outRowOffset + dOffset, outB16Reg,
+                                                                      mask);
                 }
             }
         }

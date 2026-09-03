@@ -15,7 +15,7 @@
 #include "kernel_operator.h"
 
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 namespace {
 constexpr int32_t FP32_BYTE_SIZE = 4;
@@ -52,48 +52,48 @@ __aicore__ inline void ComputeGradSigmoidVf(LocalTensor<T> gradSigmoidLocal1, Lo
         RegTensor<T> onesReg;
         RegTensor<T> h2ValNormedReg;
 
-        MaskReg mask = MicroAPI::CreateMask<T, MaskPattern::ALL>();
+        MaskReg mask = Reg::CreateMask<T, MaskPattern::ALL>();
 
-        MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BLK>(alphaReg, alphaPtr);
-        MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BLK>(biasReg, biasPtr);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_BLK>(alphaReg, alphaPtr);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_BLK>(biasReg, biasPtr);
 
         // 初始化 mulMaskReg 为 [1,1,1,1, 2,2,2,2, 1,1,1,1, 2,2,2,2, ...]
-        MicroAPI::Arange(mulMaskReg, 0.f);
-        MicroAPI::Muls(mulMaskReg, mulMaskReg, 0.25f, mask);
-        MicroAPI::Truncate<T, RoundMode::CAST_FLOOR, MicroAPI::MaskMergeMode::ZEROING>(mulMaskReg, mulMaskReg, mask);
+        Reg::Arange(mulMaskReg, 0.f);
+        Reg::Muls(mulMaskReg, mulMaskReg, 0.25f, mask);
+        Reg::Truncate<T, RoundMode::CAST_FLOOR, Reg::MaskMergeMode::ZEROING>(mulMaskReg, mulMaskReg, mask);
 
-        MicroAPI::Muls(tmpReg, mulMaskReg, 0.5f, mask);
-        MicroAPI::Truncate<T, RoundMode::CAST_FLOOR, MicroAPI::MaskMergeMode::ZEROING>(tmpReg, tmpReg, mask);
-        MicroAPI::Muls(tmpReg, tmpReg, 2.0f, mask);
+        Reg::Muls(tmpReg, mulMaskReg, 0.5f, mask);
+        Reg::Truncate<T, RoundMode::CAST_FLOOR, Reg::MaskMergeMode::ZEROING>(tmpReg, tmpReg, mask);
+        Reg::Muls(tmpReg, tmpReg, 2.0f, mask);
 
-        MicroAPI::Sub(mulMaskReg, mulMaskReg, tmpReg, mask);
-        MicroAPI::Adds(mulMaskReg, mulMaskReg, 1.0f, mask);
+        Reg::Sub(mulMaskReg, mulMaskReg, tmpReg, mask);
+        Reg::Adds(mulMaskReg, mulMaskReg, 1.0f, mask);
 
         // 初始化 onesReg 为 [1,1,1,1, ...]
-        MicroAPI::Duplicate(onesReg, 1.0f, mask);
+        Reg::Duplicate(onesReg, 1.0f, mask);
 
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            MicroAPI::MaskReg mask1 = MicroAPI::UpdateMask<T>(totalElements);
+            Reg::MaskReg mask1 = Reg::UpdateMask<T>(totalElements);
 
-            MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_E2B_B32>(invRmsBrcbReg, invRmsPtr + i * BLOCKNUM_PER_VL);
-            MicroAPI::DataCopy(fusedHPre2AndHPost2Reg, fusedHPre2AndHPost2Ptr + i * FP32_PER_VL);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_E2B_B32>(invRmsBrcbReg, invRmsPtr + i * BLOCKNUM_PER_VL);
+            Reg::DataCopy(fusedHPre2AndHPost2Reg, fusedHPre2AndHPost2Ptr + i * FP32_PER_VL);
 
-            MicroAPI::Mul(h2ValNormedReg, fusedHPre2AndHPost2Reg, invRmsBrcbReg, mask);
-            MicroAPI::Mul(gradSigmoidReg1, h2ValNormedReg, alphaReg, mask);
-            MicroAPI::Add(gradSigmoidReg1, gradSigmoidReg1, biasReg, mask);
+            Reg::Mul(h2ValNormedReg, fusedHPre2AndHPost2Reg, invRmsBrcbReg, mask);
+            Reg::Mul(gradSigmoidReg1, h2ValNormedReg, alphaReg, mask);
+            Reg::Add(gradSigmoidReg1, gradSigmoidReg1, biasReg, mask);
 
-            MicroAPI::Neg(gradSigmoidReg1, gradSigmoidReg1, mask);
-            MicroAPI::Exp(gradSigmoidReg1, gradSigmoidReg1, mask);
-            MicroAPI::Adds(gradSigmoidReg1, gradSigmoidReg1, 1.0f, mask);
-            MicroAPI::Div(gradSigmoidReg1, onesReg, gradSigmoidReg1, mask);
-            MicroAPI::Mul(tmpReg, gradSigmoidReg1, gradSigmoidReg1, mask);
-            MicroAPI::Sub(gradSigmoidReg1, gradSigmoidReg1, tmpReg, mask);
-            MicroAPI::Mul(gradSigmoidReg1, gradSigmoidReg1, mulMaskReg, mask);
+            Reg::Neg(gradSigmoidReg1, gradSigmoidReg1, mask);
+            Reg::Exp(gradSigmoidReg1, gradSigmoidReg1, mask);
+            Reg::Adds(gradSigmoidReg1, gradSigmoidReg1, 1.0f, mask);
+            Reg::Div(gradSigmoidReg1, onesReg, gradSigmoidReg1, mask);
+            Reg::Mul(tmpReg, gradSigmoidReg1, gradSigmoidReg1, mask);
+            Reg::Sub(gradSigmoidReg1, gradSigmoidReg1, tmpReg, mask);
+            Reg::Mul(gradSigmoidReg1, gradSigmoidReg1, mulMaskReg, mask);
 
-            MicroAPI::Mul(gradSigmoidReg2, gradSigmoidReg1, h2ValNormedReg, mask);
+            Reg::Mul(gradSigmoidReg2, gradSigmoidReg1, h2ValNormedReg, mask);
 
-            MicroAPI::DataCopy(gradSigmoidPtr1 + i * FP32_PER_VL, gradSigmoidReg1, mask1);
-            MicroAPI::DataCopy(gradSigmoidPtr2 + i * FP32_PER_VL, gradSigmoidReg2, mask1);
+            Reg::DataCopy(gradSigmoidPtr1 + i * FP32_PER_VL, gradSigmoidReg1, mask1);
+            Reg::DataCopy(gradSigmoidPtr2 + i * FP32_PER_VL, gradSigmoidReg2, mask1);
         }
     }
 }
@@ -116,54 +116,54 @@ __aicore__ inline void ComputeGradPreVf(LocalTensor<T> gradHPreLocal, LocalTenso
 
         RegTensor<T> gradHPreReg0, gradHPreReg1, gradHPreReg2, gradHPreReg3;
 
-        static constexpr MicroAPI::CastTrait castTrait = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                          MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
-        MaskReg mask = MicroAPI::CreateMask<T, MaskPattern::ALL>();
+        static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                     Reg::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
+        MaskReg mask = Reg::CreateMask<T, MaskPattern::ALL>();
 
-        MicroAPI::Duplicate(gradHPreReg0, 0);
-        MicroAPI::Duplicate(gradHPreReg1, 0);
-        MicroAPI::Duplicate(gradHPreReg2, 0);
-        MicroAPI::Duplicate(gradHPreReg3, 0);
+        Reg::Duplicate(gradHPreReg0, 0);
+        Reg::Duplicate(gradHPreReg1, 0);
+        Reg::Duplicate(gradHPreReg2, 0);
+        Reg::Duplicate(gradHPreReg3, 0);
 
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            MicroAPI::DataCopy(xReg0, xPtr + i * FP32_PER_VL);
-            MicroAPI::DataCopy(xReg1, xPtr + (i + 1 * repeatTimes) * FP32_PER_VL);
-            MicroAPI::DataCopy(xReg2, xPtr + (i + 2 * repeatTimes) * FP32_PER_VL);
-            MicroAPI::DataCopy(xReg3, xPtr + (i + 3 * repeatTimes) * FP32_PER_VL);
-            MicroAPI::DataCopy(gradHinReg, hinGradPtr + i * FP32_PER_VL);
+            Reg::DataCopy(xReg0, xPtr + i * FP32_PER_VL);
+            Reg::DataCopy(xReg1, xPtr + (i + 1 * repeatTimes) * FP32_PER_VL);
+            Reg::DataCopy(xReg2, xPtr + (i + 2 * repeatTimes) * FP32_PER_VL);
+            Reg::DataCopy(xReg3, xPtr + (i + 3 * repeatTimes) * FP32_PER_VL);
+            Reg::DataCopy(gradHinReg, hinGradPtr + i * FP32_PER_VL);
 
-            MicroAPI::Interleave(xReg0, tmpReg, xReg0, tmpReg);
-            MicroAPI::Interleave(xReg1, tmpReg, xReg1, tmpReg);
-            MicroAPI::Interleave(xReg2, tmpReg, xReg2, tmpReg);
-            MicroAPI::Interleave(xReg3, tmpReg, xReg3, tmpReg);
-            MicroAPI::Interleave(gradHinReg, tmpReg, gradHinReg, tmpReg);
+            Reg::Interleave(xReg0, tmpReg, xReg0, tmpReg);
+            Reg::Interleave(xReg1, tmpReg, xReg1, tmpReg);
+            Reg::Interleave(xReg2, tmpReg, xReg2, tmpReg);
+            Reg::Interleave(xReg3, tmpReg, xReg3, tmpReg);
+            Reg::Interleave(gradHinReg, tmpReg, gradHinReg, tmpReg);
 
-            MicroAPI::Cast<T, U, castTrait>(xFp32Reg0, xReg0, mask);
-            MicroAPI::Cast<T, U, castTrait>(xFp32Reg1, xReg1, mask);
-            MicroAPI::Cast<T, U, castTrait>(xFp32Reg2, xReg2, mask);
-            MicroAPI::Cast<T, U, castTrait>(xFp32Reg3, xReg3, mask);
-            MicroAPI::Cast<T, U, castTrait>(gradHinCastReg, gradHinReg, mask);
+            Reg::Cast<T, U, castTrait>(xFp32Reg0, xReg0, mask);
+            Reg::Cast<T, U, castTrait>(xFp32Reg1, xReg1, mask);
+            Reg::Cast<T, U, castTrait>(xFp32Reg2, xReg2, mask);
+            Reg::Cast<T, U, castTrait>(xFp32Reg3, xReg3, mask);
+            Reg::Cast<T, U, castTrait>(gradHinCastReg, gradHinReg, mask);
 
-            MicroAPI::Mul(xFp32Reg0, xFp32Reg0, gradHinCastReg, mask);
-            MicroAPI::Mul(xFp32Reg1, xFp32Reg1, gradHinCastReg, mask);
-            MicroAPI::Mul(xFp32Reg2, xFp32Reg2, gradHinCastReg, mask);
-            MicroAPI::Mul(xFp32Reg3, xFp32Reg3, gradHinCastReg, mask);
+            Reg::Mul(xFp32Reg0, xFp32Reg0, gradHinCastReg, mask);
+            Reg::Mul(xFp32Reg1, xFp32Reg1, gradHinCastReg, mask);
+            Reg::Mul(xFp32Reg2, xFp32Reg2, gradHinCastReg, mask);
+            Reg::Mul(xFp32Reg3, xFp32Reg3, gradHinCastReg, mask);
 
-            MicroAPI::Add(gradHPreReg0, gradHPreReg0, xFp32Reg0, mask);
-            MicroAPI::Add(gradHPreReg1, gradHPreReg1, xFp32Reg1, mask);
-            MicroAPI::Add(gradHPreReg2, gradHPreReg2, xFp32Reg2, mask);
-            MicroAPI::Add(gradHPreReg3, gradHPreReg3, xFp32Reg3, mask);
+            Reg::Add(gradHPreReg0, gradHPreReg0, xFp32Reg0, mask);
+            Reg::Add(gradHPreReg1, gradHPreReg1, xFp32Reg1, mask);
+            Reg::Add(gradHPreReg2, gradHPreReg2, xFp32Reg2, mask);
+            Reg::Add(gradHPreReg3, gradHPreReg3, xFp32Reg3, mask);
         }
 
-        MicroAPI::Reduce<MicroAPI::ReduceType::SUM>(gradHPreReg0, gradHPreReg0, mask);
-        MicroAPI::Reduce<MicroAPI::ReduceType::SUM>(gradHPreReg1, gradHPreReg1, mask);
-        MicroAPI::Reduce<MicroAPI::ReduceType::SUM>(gradHPreReg2, gradHPreReg2, mask);
-        MicroAPI::Reduce<MicroAPI::ReduceType::SUM>(gradHPreReg3, gradHPreReg3, mask);
+        Reg::Reduce<Reg::ReduceType::SUM>(gradHPreReg0, gradHPreReg0, mask);
+        Reg::Reduce<Reg::ReduceType::SUM>(gradHPreReg1, gradHPreReg1, mask);
+        Reg::Reduce<Reg::ReduceType::SUM>(gradHPreReg2, gradHPreReg2, mask);
+        Reg::Reduce<Reg::ReduceType::SUM>(gradHPreReg3, gradHPreReg3, mask);
 
-        MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr, gradHPreReg0, mask);
-        MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr + 1, gradHPreReg1, mask);
-        MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr + 2, gradHPreReg2, mask);
-        MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr + 3, gradHPreReg3, mask);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr, gradHPreReg0, mask);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr + 1, gradHPreReg1, mask);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr + 2, gradHPreReg2, mask);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(gradHPrePtr + 3, gradHPreReg3, mask);
     }
 }
 
@@ -188,31 +188,31 @@ __aicore__ inline void ComputeGradXVf(LocalTensor<U> gradXLocal, LocalTensor<U> 
         RegTensor<U> gradXCastReg, tmpTReg;
         RegTensor<T> tmpReg;
 
-        MaskReg mask = MicroAPI::CreateMask<T, MaskPattern::ALL>();
-        MaskReg maskCast = MicroAPI::CreateMask<U, MaskPattern::VL64>();
+        MaskReg mask = Reg::CreateMask<T, MaskPattern::ALL>();
+        MaskReg maskCast = Reg::CreateMask<U, MaskPattern::VL64>();
 
-        static constexpr MicroAPI::CastTrait castTrait1 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                           MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
-        static constexpr MicroAPI::CastTrait castTrait2 = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::NO_SAT,
-                                                           MicroAPI::MaskMergeMode::MERGING, RoundMode::CAST_RINT};
+        static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                      Reg::MaskMergeMode::MERGING, RoundMode::CAST_NONE};
+        static constexpr Reg::CastTrait castTrait2 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                      Reg::MaskMergeMode::MERGING, RoundMode::CAST_RINT};
 
-        MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_BRC_B32>(preReg, hPrePtr);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B32>(preReg, hPrePtr);
 
         for (uint16_t i = 0; i < repeatTimes; i++) {
-            MicroAPI::DataCopy(xReg, xPtr + i * FP32_PER_VL);
-            MicroAPI::DataCopy(gradHinReg, gradHinPtr + i * FP32_PER_VL);
+            Reg::DataCopy(xReg, xPtr + i * FP32_PER_VL);
+            Reg::DataCopy(gradHinReg, gradHinPtr + i * FP32_PER_VL);
 
-            MicroAPI::Interleave(gradHinReg, tmpUReg, gradHinReg, tmpUReg);
-            MicroAPI::Interleave(xReg, tmpUReg, xReg, tmpUReg);
-            MicroAPI::Cast<T, U, castTrait1>(gradHinCastReg, gradHinReg, mask);
-            MicroAPI::Cast<T, U, castTrait1>(xFp32Reg, xReg, mask);
+            Reg::Interleave(gradHinReg, tmpUReg, gradHinReg, tmpUReg);
+            Reg::Interleave(xReg, tmpUReg, xReg, tmpUReg);
+            Reg::Cast<T, U, castTrait1>(gradHinCastReg, gradHinReg, mask);
+            Reg::Cast<T, U, castTrait1>(xFp32Reg, xReg, mask);
 
-            MicroAPI::Muls(gradXReg, xFp32Reg, gradInvRmsVal * gradRMSNormVal, mask);
-            MicroAPI::Mul(tmpReg, gradHinCastReg, preReg, mask);
-            MicroAPI::Add(gradXReg, tmpReg, gradXReg, mask);
-            MicroAPI::Cast<U, T, castTrait2>(gradXCastReg, gradXReg, mask);
-            MicroAPI::DeInterleave(gradXCastReg, tmpTReg, gradXCastReg, tmpTReg);
-            MicroAPI::DataCopy(gradXPtr + i * FP32_PER_VL, gradXCastReg, maskCast);
+            Reg::Muls(gradXReg, xFp32Reg, gradInvRmsVal * gradRMSNormVal, mask);
+            Reg::Mul(tmpReg, gradHinCastReg, preReg, mask);
+            Reg::Add(gradXReg, tmpReg, gradXReg, mask);
+            Reg::Cast<U, T, castTrait2>(gradXCastReg, gradXReg, mask);
+            Reg::DeInterleave(gradXCastReg, tmpTReg, gradXCastReg, tmpTReg);
+            Reg::DataCopy(gradXPtr + i * FP32_PER_VL, gradXCastReg, maskCast);
         }
     }
 }

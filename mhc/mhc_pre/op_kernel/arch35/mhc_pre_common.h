@@ -83,10 +83,10 @@ constexpr uint64_t MHC_PRE_BASIC_API_L1_BUF_NUM = 2U;
 constexpr uint64_t MHC_PRE_BASIC_API_L1_BUF_OFFSET = 128U * 256U;
 
 // Basic API vector cast traits.
-constexpr AscendC::MicroAPI::CastTrait MHC_PRE_BASIC_API_CAST_B16_TO_B32 = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait MHC_PRE_BASIC_API_CAST_B16_TO_B32 = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::UNKNOWN,
 };
 
@@ -141,10 +141,10 @@ __aicore__ inline uint32_t BasicApiRoundUp(uint32_t value)
 }
 
 // Register and tensor data-movement helpers.
-__aicore__ inline void MhcPreBasicApiLoadBroadcast(AscendC::MicroAPI::RegTensor<float> &dst, __local_mem__ float *src,
-                                                   AscendC::MicroAPI::MaskReg mask, uint32_t offset)
+__aicore__ inline void MhcPreBasicApiLoadBroadcast(AscendC::Reg::RegTensor<float> &dst, __local_mem__ float *src,
+                                                   AscendC::Reg::MaskReg mask, uint32_t offset)
 {
-    AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + offset);
+    AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + offset);
 }
 
 template <typename T>
@@ -162,10 +162,10 @@ __aicore__ inline void MhcPreVFCompactRows(const LocalTensor<T> &dstLocal, const
     __ubuf__ T *src = (__ubuf__ T *)srcLocal.GetPhyAddr();
     __VEC_SCOPE__
     {
-        MicroAPI::RegTensor<T> data;
+        Reg::RegTensor<T> data;
         for (uint16_t row = 0; row < rowCount; ++row) {
-            MicroAPI::Load<T>(data, src + static_cast<uint32_t>(row) * srcRowStride);
-            MicroAPI::Store<T>(dst + static_cast<uint32_t>(row) * rowWidth, data, rowWidth);
+            Reg::Load<T>(data, src + static_cast<uint32_t>(row) * srcRowStride);
+            Reg::Store<T>(dst + static_cast<uint32_t>(row) * rowWidth, data, rowWidth);
         }
     }
 }

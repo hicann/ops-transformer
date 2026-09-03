@@ -21,15 +21,15 @@
 #include "arch35/mhc_pre_sinkhorn_backward_deterministic.h"
 
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
-template<bool DETERMINISTIC>
-__global__ __aicore__ void mhc_pre_sinkhorn_backward(
-    GM_ADDR grad_hin, GM_ADDR grad_h_post, GM_ADDR grad_h_res, GM_ADDR x,
-    GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias, GM_ADDR h_pre,
-    GM_ADDR hc_before_norm, GM_ADDR inv_rms, GM_ADDR sum_out,
-    GM_ADDR norm_out, GM_ADDR grad_x, GM_ADDR grad_phi,
-    GM_ADDR grad_alpha, GM_ADDR grad_bias, GM_ADDR workspace, GM_ADDR tiling)
+template <bool DETERMINISTIC>
+__global__ __aicore__ void mhc_pre_sinkhorn_backward(GM_ADDR grad_hin, GM_ADDR grad_h_post, GM_ADDR grad_h_res,
+                                                     GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias, GM_ADDR h_pre,
+                                                     GM_ADDR hc_before_norm, GM_ADDR inv_rms, GM_ADDR sum_out,
+                                                     GM_ADDR norm_out, GM_ADDR grad_x, GM_ADDR grad_phi,
+                                                     GM_ADDR grad_alpha, GM_ADDR grad_bias, GM_ADDR workspace,
+                                                     GM_ADDR tiling)
 {
     if (workspace == nullptr) {
         return;
@@ -50,9 +50,8 @@ __global__ __aicore__ void mhc_pre_sinkhorn_backward(
         op.mm1_.Init(&tilingData.mm1TilingData, &pipe);
         op.mm2_.SetSubBlockIdx(0);
         op.mm2_.Init(&tilingData.mm2TilingData, &pipe);
-        op.Init(x, phi, h_pre, grad_hin, grad_h_post, grad_h_res, alpha, bias,
-            hc_before_norm, inv_rms, sum_out, norm_out, grad_x, grad_phi,
-            grad_alpha, grad_bias, usrWorkspace, &tilingData, &pipe);
+        op.Init(x, phi, h_pre, grad_hin, grad_h_post, grad_h_res, alpha, bias, hc_before_norm, inv_rms, sum_out,
+                norm_out, grad_x, grad_phi, grad_alpha, grad_bias, usrWorkspace, &tilingData, &pipe);
         op.Process();
     } else {
         REGISTER_TILING_FOR_TILINGKEY("DETERMINISTIC == false", MhcPreSinkhornBackwardArch35TilingData);
@@ -62,9 +61,8 @@ __global__ __aicore__ void mhc_pre_sinkhorn_backward(
         op.mm1_.Init(&tilingData.mm1TilingData, &pipe);
         op.mm2_.SetSubBlockIdx(0);
         op.mm2_.Init(&tilingData.mm2TilingData, &pipe);
-        op.Init(x, phi, h_pre, grad_hin, grad_h_post, grad_h_res, alpha, bias,
-            hc_before_norm, inv_rms, sum_out, norm_out, grad_x, grad_phi,
-            grad_alpha, grad_bias, usrWorkspace, &tilingData, &pipe);
+        op.Init(x, phi, h_pre, grad_hin, grad_h_post, grad_h_res, alpha, bias, hc_before_norm, inv_rms, sum_out,
+                norm_out, grad_x, grad_phi, grad_alpha, grad_bias, usrWorkspace, &tilingData, &pipe);
         op.Process();
     }
 }
