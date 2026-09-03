@@ -10,42 +10,29 @@
 
 /*!
  * \file quant_all_reduce_gen_task.cpp
- * \brief 静态shape图下沉实现
+ * \brief 静态shape图下沉占位注册
  */
-#include <vector>
-#include <platform/platform_info.h>
-#include "common/utils/op_mc2.h"
 
+#include <vector>
+#include <cstdint>
 #include "register/op_impl_registry.h"
-#include "op_graph/mc2_gen_task_ops_utils.h"
-#include "op_graph/mc2_gen_task_ops_utils_arch35.h"
-#include "op_graph/mc2_moe_gen_task_ops_utils.h"
-#include "mc2_log.h"
-#include "mc2_platform_info.h"
 
 namespace ops {
 
-
 static ge::Status QuantAllReduceCalcOpParam(gert::ExeResGenerationContext *context)
 {
-    if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
-        OPS_LOG_D(context->GetNodeName(), "Do A5 MTE CalcParam in QuantAllReduce BUILD_OPEN_PROJECT");
-        return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "mte server", "mte_stream");
-    }
-    OPS_LOG_D(context->GetNodeName(), "Do general CalcParam in QuantAllReduce BUILD_OPEN_PROJECT");
-    return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "aicpu kfc server", "kfc_stream");
+    // 不设置 attached stream infos，避免框架生成 hcom wait/record 任务与 kHcom 隐藏输入
+    (void)context;
+    return ge::GRAPH_SUCCESS;
 }
 
 static ge::Status QuantAllReduceGenTask(const gert::ExeResGenerationContext *context,
                                         std::vector<std::vector<uint8_t>> &tasks)
 {
-    if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
-        OPS_LOG_D(context->GetNodeName(), "Do MTE general GenTask in QuantAllReduce BUILD_OPEN_PROJECT");
-        // 这里调用moe的接口
-        return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallbackV2(context, tasks);
-    }
-    OPS_LOG_D(context->GetNodeName(), "Do A5 CCU GenTask in QuantAllReduce BUILD_OPEN_PROJECT");
-    return Mc2Arch35GenTaskOpsUtils::Mc2Arch35GenTaskCallBack(context, tasks);
+    // 保留框架默认生成的 aicore taks，不做任何注入/改写
+    (void)context;
+    (void)tasks;
+    return ge::GRAPH_SUCCESS;
 }
 
 IMPL_OP(QuantAllReduce).CalcOpParam(QuantAllReduceCalcOpParam).GenerateTask(QuantAllReduceGenTask);

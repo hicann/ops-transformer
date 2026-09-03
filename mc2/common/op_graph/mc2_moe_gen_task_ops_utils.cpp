@@ -46,15 +46,11 @@ const std::string ALL_TO_ALLV_QUANT_GROUPED_MM_OP_TYPE = "AlltoAllvQuantGroupedM
 const std::string QUANT_GROUPED_MM_ALL_TO_ALLV_OP_TYPE = "QuantGroupedMatMulAlltoAllv";
 const std::string ATTENTION_TO_FFN_OP_TYPE = "AttentionToFFN";
 const std::string FFN_TO_ATTENTION_OP_TYPE = "FFNToAttention";
-const std::string QUANT_ALL_REDUCE_OP_TYPE = "QuantAllReduce";
-const std::string QUANT_REDUCE_SCATTER_OP_TYPE = "QuantReduceScatter";
 const int32_t GROUP_CNT_OF_DS_TRAINING = 1;
 const int32_t GROUP_CNT_OF_MOE_DISTRIBUTE = 2;
 const int32_t ONE_GROUP_CNT_OF_MOE_DISTRIBUTE = 1;
 const int32_t GROUP_CNT_OF_DISTRIBUTE_BARRIER = 1;
 const int32_t GROUP_CNT_OF_ATTENTION_FFN = 1;
-const int32_t GROUP_CNT_OF_QUANT_ALL_REDUCE = 1;
-const int32_t GROUP_CNT_OF_QUANT_REDUCE_SCATTER = 1;
 const int32_t GROUP_CNT = 2;
 const int32_t MAX_GROUP_CNT = 16;
 const std::string SO_NAME_LEGACY = "libccl_kernel.so";
@@ -82,9 +78,7 @@ static const std::map<const std::string, int32_t> GROUP_CNT_MAP{
     {ALL_TO_ALLV_QUANT_GROUPED_MM_OP_TYPE, GROUP_CNT_OF_DS_TRAINING},
     {QUANT_GROUPED_MM_ALL_TO_ALLV_OP_TYPE, GROUP_CNT_OF_DS_TRAINING},
     {ATTENTION_TO_FFN_OP_TYPE, GROUP_CNT_OF_ATTENTION_FFN},
-    {FFN_TO_ATTENTION_OP_TYPE, GROUP_CNT_OF_ATTENTION_FFN},
-    {QUANT_ALL_REDUCE_OP_TYPE, GROUP_CNT_OF_QUANT_ALL_REDUCE},
-    {QUANT_REDUCE_SCATTER_OP_TYPE, GROUP_CNT_OF_QUANT_REDUCE_SCATTER}};
+    {FFN_TO_ATTENTION_OP_TYPE, GROUP_CNT_OF_ATTENTION_FFN}};
 
 static const std::unordered_set<std::string> NO_AI_CPU_SET{MOE_DISTRIBUTE_DISPATCH_OP_TYPE,
                                                            MOE_DISTRIBUTE_COMBINE_OP_TYPE,
@@ -103,11 +97,11 @@ static const std::unordered_set<std::string> NEED_SET_BLOCK_SET{
 
 // 对已有结构的重复定义，只在本文件插入 aicpu desc 的时候使用
 struct HcclCommParamDescTmp {
-    uint64_t version   : 4;
-    uint64_t groupNum  : 4;
-    uint64_t hasFfts   : 1;
+    uint64_t version : 4;
+    uint64_t groupNum : 4;
+    uint64_t hasFfts : 1;
     uint64_t tilingOff : 7;
-    uint64_t isDyn     : 48;
+    uint64_t isDyn : 48;
 };
 
 static bool IsPlatform910B(const char *nodeName)
@@ -349,8 +343,7 @@ ge::Status Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallbackV2(const gert::ExeResGene
         ((opTypeStr != MOE_DISTRIBUTE_DISPATCH_V2_OP_TYPE) && (opTypeStr != MOE_DISTRIBUTE_COMBINE_V2_OP_TYPE) &&
          (opTypeStr != DISTRIBUTE_BARRIER_OP_TYPE) && (opTypeStr != MOE_DISTRIBUTE_DISPATCH_OP_TYPE) &&
          (opTypeStr != MOE_DISTRIBUTE_COMBINE_OP_TYPE) && (opTypeStr != ATTENTION_TO_FFN_OP_TYPE) &&
-         (opTypeStr != FFN_TO_ATTENTION_OP_TYPE) && (opTypeStr != QUANT_ALL_REDUCE_OP_TYPE) &&
-         (opTypeStr != QUANT_REDUCE_SCATTER_OP_TYPE) && (opTypeStr != MOE_DISTRIBUTE_COMBINE_ADD_RMS_NORM_OP_TYPE));
+         (opTypeStr != FFN_TO_ATTENTION_OP_TYPE) && (opTypeStr != MOE_DISTRIBUTE_COMBINE_ADD_RMS_NORM_OP_TYPE));
     return useAiCpu ? Mc2MoeInsertTask(context, tasks, groupCnt) : ge::GRAPH_SUCCESS;
 }
 } // namespace ops

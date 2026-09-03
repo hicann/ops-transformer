@@ -39,8 +39,6 @@ const std::string QUANT_GROUPED_MM_ALL_TO_ALLV_OP_TYPE = "QuantGroupedMatMulAllt
 const std::string ALL_GATHER_MM_V2_OP_TYPE = "AllGatherMatmulV2";
 const std::string MM_REDUCE_SCATTER_V2_OP_TYPE = "MatmulReduceScatterV2";
 const std::string MM_ALL_REDUCE_OP_TYPE = "MatmulAllReduce";
-const std::string QUANT_ALL_REDUCE_OP_TYPE = "QuantAllReduce";
-const std::string QUANT_REDUCE_SCATTER_OP_TYPE = "QuantReduceScatter";
 const std::string MM_ALLTO_ALL_OP_TYPE = "MatmulAlltoAll";
 const std::string ALLTO_ALL_MATMUL_OP_TYPE = "AlltoAllMatmul";
 const std::string ATTR_NAME_GROUP = "group";
@@ -57,8 +55,6 @@ static const std::map<const std::string, const GroupInfo> GROUP_INFO_MAP_ARCH35{
     {ALL_GATHER_MM_V2_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
     {MM_REDUCE_SCATTER_V2_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
     {MM_ALL_REDUCE_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
-    {QUANT_ALL_REDUCE_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
-    {QUANT_REDUCE_SCATTER_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
     {MM_ALLTO_ALL_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
     {ALLTO_ALL_MATMUL_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
     {ALL_TO_ALLV_GROUPED_MM_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
