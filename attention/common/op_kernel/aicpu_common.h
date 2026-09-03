@@ -16,6 +16,7 @@
 #ifndef AICPU_COMMON_H
 #define AICPU_COMMON_H
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 #include "log.h"
