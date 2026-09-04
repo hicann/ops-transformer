@@ -10,7 +10,7 @@
 
 #ifndef VF_MASK_INVALID_ROWS_MXFP4_H
 #define VF_MASK_INVALID_ROWS_MXFP4_H
-#include "vf_common_def.h"
+#include "../mxfp4_vf/vf_common_def.h"
 
 namespace NpuArch::Epilogue::Block::Mxfp4VF {
 using AscendC::LocalTensor;

@@ -166,7 +166,7 @@ public:
         half NEG_LOG2_CX = static_cast<half>(-log2Cx_);
         half LOG2_CX_CEIL = static_cast<half>(log2CxCeil_);
 
-        EpilogueOnlineSoftmax epilogueOnlineSoftmax(resource, NEG_LOG2_CX);
+        EpilogueOnlineSoftmax epilogueOnlineSoftmax(resource, NEG_LOG2_CX, maxBlockNumEff_ > 0);
         EpilogueCopyGlobalMaxUbToL1 epilogueCopyGlobalMaxUbToL1(resource);
         EpilogueComputePScale epilogueComputePScale(resource, LOG2_CX_CEIL);
         EpilogueRescaleO epilogueRescaleO(resource);

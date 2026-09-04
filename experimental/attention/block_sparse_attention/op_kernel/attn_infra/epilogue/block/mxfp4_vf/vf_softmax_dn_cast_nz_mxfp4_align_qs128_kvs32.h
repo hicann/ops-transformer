@@ -23,14 +23,13 @@
 namespace NpuArch::Epilogue::Block::Mxfp4VF {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, typename T2,
           uint16_t KvsBaseAlign = 32, uint16_t QsBase = 128>
 __simd_vf__ inline void softmax_with_group_max_align_qs128_kvs32_vf(__ubuf__ T2 *p_dest, __ubuf__ T *s,
                                                                     __ubuf__ T *local_group_max, __ubuf__ T *global_max,
-                                                                    __ubuf__ uint8_t *indexes_ub, const T NEG_LOG2_CX,
-                                                                    const uint16_t effY)
+                                                                    __ubuf__ uint8_t *indexes_ub, const T NEG_LOG2_CX)
 {
     // ====================== 寄存器定义 ======================
     RegTensor<half> src_c0, src_c1, src_c2, src_c3;
@@ -49,8 +48,6 @@ __simd_vf__ inline void softmax_with_group_max_align_qs128_kvs32_vf(__ubuf__ T2 
     const uint16_t GROUP_COUNT = KvsBaseAlign / ROWS_PER_GROUP;
     const uint16_t ROW_SUB_LOOP = 4;
     const uint16_t ITER_PER_GROUP = ROWS_PER_GROUP / ROW_SUB_LOOP;
-    const uint16_t effYClamped = effY < KvsBaseAlign ? effY : KvsBaseAlign;
-    const uint16_t validGroups = (effYClamped + ROWS_PER_GROUP - 1) / ROWS_PER_GROUP; // 有效组数向上取整
 
     // ====================== 掩码定义 ======================
     MaskReg preg_all_16bit = CreateMask<uint16_t, MaskPattern::ALL>();
@@ -65,10 +62,6 @@ __simd_vf__ inline void softmax_with_group_max_align_qs128_kvs32_vf(__ubuf__ T2 
     LoadAlign(group_gmax, global_max);
 
     LoadAlign(idx_nd2nz, indexes_ub);
-
-    Duplicate(min_val_reg, MIN_VALUE);
-    RegTensor<uint8_t> zero8;
-    Duplicate(zero8, static_cast<uint8_t>(0));
 
     // ====================== 预计算：第一个分组的最大值 ======================
     Duplicate(curr_group_max, MIN_VALUE);
@@ -93,14 +86,14 @@ __simd_vf__ inline void softmax_with_group_max_align_qs128_kvs32_vf(__ubuf__ T2 
         Truncate<T, RoundMode::CAST_CEIL>(curr_group_max, curr_group_max, preg_all_16bit);
     }
     Max(group_gmax, group_gmax, curr_group_max, preg_all_16bit);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max, curr_group_max, preg_all_16bit);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max, curr_group_max, preg_all_16bit);
     if constexpr (MX_QUANT_MODE == MXQuantMode::OCP) {
         Adds(curr_group_max, curr_group_max, NEG_TWO_VALE, preg_all_16bit);
     }
     Muls(curr_group_max, curr_group_max, LN2, preg_all_16bit);
 
     // ====================== 核心：双块流水分组循环 ======================
-    for (uint16_t i = 0; i < validGroups; i++) {
+    for (uint16_t i = 0; i < GROUP_COUNT; i++) {
         // ========== 第一个内循环：处理偶数子块 j = 0,2,4,6 ==========
         for (uint16_t j = 0; j < ITER_PER_GROUP; j += 2) {
             // 当前块计算：Sub + Exp
@@ -199,19 +192,19 @@ __simd_vf__ inline void softmax_with_group_max_align_qs128_kvs32_vf(__ubuf__ T2 
         }
 
         // ====================== 全局/局部最大值更新 ======================
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_all_16bit);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_all_16bit);
     }
 
     // GroupMaxpadding到64, 使得对应的pscale=0
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max + GROUP_COUNT * QsBase, min_val_reg,
-                                                      preg_all_16bit);
+    Duplicate(min_val_reg, MIN_VALUE);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max + GROUP_COUNT * QsBase, min_val_reg, preg_all_16bit);
 }
 
 template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, typename T2,
           uint16_t KvsBaseAlign = 32, uint16_t QsBase = 128>
 __aicore__ inline void SoftmaxWithGroupMaxAlignQs128Kvs32CallVF(
     const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &localGroupMax,
-    const LocalTensor<T> &globalMax, const LocalTensor<uint8_t> &indexesBuf, const T NEG_LOG2_CX, const uint16_t effY)
+    const LocalTensor<T> &globalMax, const LocalTensor<uint8_t> &indexesBuf, const T NEG_LOG2_CX)
 {
     __ubuf__ T2 *p_dest = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
     __ubuf__ T *s_ub = (__ubuf__ T *)srcTensor.GetPhyAddr();
@@ -220,7 +213,7 @@ __aicore__ inline void SoftmaxWithGroupMaxAlignQs128Kvs32CallVF(
     __ubuf__ uint8_t *indexes_ub = (__ubuf__ uint8_t *)indexesBuf.GetPhyAddr();
 
     softmax_with_group_max_align_qs128_kvs32_vf<MX_QUANT_MODE, clear_gmax, T, T2, KvsBaseAlign, QsBase>(
-        p_dest, s_ub, local_group_max, global_max, indexes_ub, NEG_LOG2_CX, effY);
+        p_dest, s_ub, local_group_max, global_max, indexes_ub, NEG_LOG2_CX);
 }
 
 } // namespace NpuArch::Epilogue::Block::Mxfp4VF
