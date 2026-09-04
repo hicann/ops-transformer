@@ -29,16 +29,15 @@ using namespace AscendC;
 #if __CCE_AICORE__ == 310
 template <uint8_t inputDType, bool isTnd, uint16_t gTemplateType, uint16_t s2TemplateType, uint16_t dTemplateType,
           bool isOriKVExist, bool isCmpKVExist, bool isOriKVSparse, bool isCmpKVSparse, bool deterministic>
-__global__ __aicore__ void
-sparse_flash_mla_grad(__gm__ uint8_t *query, __gm__ uint8_t *d_out, __gm__ uint8_t *out, __gm__ uint8_t *lse,
-                      __gm__ uint8_t *ori_kv, __gm__ uint8_t *cmp_kv, __gm__ uint8_t *ori_sparse_indices,
-                      __gm__ uint8_t *cmp_sparse_indices, __gm__ uint8_t *cu_seqlens_q,
-                      __gm__ uint8_t *cu_seqlens_ori_kv, __gm__ uint8_t *cu_seqlens_cmp_kv, __gm__ uint8_t *seqused_q,
-                      __gm__ uint8_t *seqused_ori_kv, __gm__ uint8_t *seqused_cmp_kv, __gm__ uint8_t *cmp_residual_kv,
-                      __gm__ uint8_t *ori_topk_length, __gm__ uint8_t *cmp_topk_length, __gm__ uint8_t *sinks,
-                      __gm__ uint8_t *metadata, __gm__ uint8_t *d_query, __gm__ uint8_t *d_ori_kv,
-                      __gm__ uint8_t *d_cmp_kv, __gm__ uint8_t *d_sinks, __gm__ uint8_t *ori_softmax_l1_norm,
-                      __gm__ uint8_t *cmp_softmax_l1_norm, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling_data)
+__global__ __aicore__ void sparse_flash_mla_grad(
+    __gm__ uint8_t *query, __gm__ uint8_t *d_out, __gm__ uint8_t *out, __gm__ uint8_t *lse, __gm__ uint8_t *ori_kv,
+    __gm__ uint8_t *cmp_kv, __gm__ uint8_t *ori_sparse_indices, __gm__ uint8_t *cmp_sparse_indices,
+    __gm__ uint8_t *cu_seqlens_q, __gm__ uint8_t *cu_seqlens_ori_kv, __gm__ uint8_t *cu_seqlens_cmp_kv,
+    __gm__ uint8_t *seqused_q, __gm__ uint8_t *seqused_ori_kv, __gm__ uint8_t *seqused_cmp_kv,
+    __gm__ uint8_t *cmp_residual_kv, __gm__ uint8_t *ori_topk_length, __gm__ uint8_t *cmp_topk_length,
+    __gm__ uint8_t *sinks, __gm__ uint8_t *metadata, __gm__ uint8_t *d_query, __gm__ uint8_t *d_ori_kv,
+    __gm__ uint8_t *d_cmp_kv, __gm__ uint8_t *d_sinks, __gm__ uint8_t *ori_softmax_l1_norm,
+    __gm__ uint8_t *cmp_softmax_l1_norm, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling_data)
 {
     REGISTER_TILING_DEFAULT(optiling::smlag::SparseFlashMlaGradTilingDataRegbase);
     RegbaseSFAG<inputDType, isTnd, gTemplateType, s2TemplateType, dTemplateType, isOriKVExist, isCmpKVExist,
@@ -50,62 +49,63 @@ sparse_flash_mla_grad(__gm__ uint8_t *query, __gm__ uint8_t *d_out, __gm__ uint8
 }
 
 #else
-#define INVOKE_SMLAG_BASIC_IMPL(templateClass, ...)                                                  \
-    do {                                                                                            \
-        __gm__ uint8_t *user = GetUserWorkspace(workspace);                                         \
+#define INVOKE_SMLAG_BASIC_IMPL(templateClass, ...) \
+    do { \
+        __gm__ uint8_t *user = GetUserWorkspace(workspace); \
         GET_TILING_DATA_WITH_STRUCT(SparseFlashMlaGradTilingData, tiling_data_in, tiling_data); \
-        const SparseFlashMlaGradTilingData *__restrict tilingData = &tiling_data_in;            \
-        templateClass<SMLAG_BASIC::SMLAG_TYPE<SparseFlashMlaGradTilingData, __VA_ARGS__>> op;     \
-        op.Process(query, ori_kv, cmp_kv, out, d_out, lse, cmp_sparse_indices,                      \
-                   cu_seqlens_q, cu_seqlens_ori_kv, cu_seqlens_cmp_kv, cmp_residual_kv,             \
-                   sinks, d_query, d_ori_kv, d_cmp_kv, d_sinks, cmp_softmax_l1_norm, user, tilingData);\
+        const SparseFlashMlaGradTilingData *__restrict tilingData = &tiling_data_in; \
+        templateClass<SMLAG_BASIC::SMLAG_TYPE<SparseFlashMlaGradTilingData, __VA_ARGS__>> op; \
+        op.Process(query, ori_kv, cmp_kv, out, d_out, lse, cmp_sparse_indices, cu_seqlens_q, cu_seqlens_ori_kv, \
+                   cu_seqlens_cmp_kv, seqused_q, seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, sinks, d_query, \
+                   d_ori_kv, d_cmp_kv, d_sinks, cmp_softmax_l1_norm, user, tilingData); \
     } while (0)
 
-template<int LAYOUT, int MODE>
-__global__ __aicore__ void
-sparse_flash_mla_grad(__gm__ uint8_t *query, __gm__ uint8_t *d_out, __gm__ uint8_t *out, __gm__ uint8_t *lse, 
-                            __gm__ uint8_t *ori_kv, __gm__ uint8_t *cmp_kv,
-                            __gm__ uint8_t *ori_sparse_indices, __gm__ uint8_t *cmp_sparse_indices, 
-                            __gm__ uint8_t *cu_seqlens_q, __gm__ uint8_t *cu_seqlens_ori_kv, __gm__ uint8_t *cu_seqlens_cmp_kv, 
-                            __gm__ uint8_t *seqused_q, __gm__ uint8_t *seqused_ori_kv, __gm__ uint8_t *seqused_cmp_kv,
-                            __gm__ uint8_t *cmp_residual_kv, __gm__ uint8_t *ori_topk_length, __gm__ uint8_t *cmp_topk_length,
-                            __gm__ uint8_t *sinks, __gm__ uint8_t *metadata, 
-                            __gm__ uint8_t *d_query, __gm__ uint8_t *d_ori_kv, __gm__ uint8_t *d_cmp_kv,
-                            __gm__ uint8_t *d_sinks, __gm__ uint8_t *ori_softmax_l1_norm, __gm__ uint8_t *cmp_softmax_l1_norm,
-                            __gm__ uint8_t *workspace, __gm__ uint8_t *tiling_data)
+template <int LAYOUT, int MODE, bool HAS_SEQUSED>
+__global__ __aicore__ void sparse_flash_mla_grad(
+    __gm__ uint8_t *query, __gm__ uint8_t *d_out, __gm__ uint8_t *out, __gm__ uint8_t *lse, __gm__ uint8_t *ori_kv,
+    __gm__ uint8_t *cmp_kv, __gm__ uint8_t *ori_sparse_indices, __gm__ uint8_t *cmp_sparse_indices,
+    __gm__ uint8_t *cu_seqlens_q, __gm__ uint8_t *cu_seqlens_ori_kv, __gm__ uint8_t *cu_seqlens_cmp_kv,
+    __gm__ uint8_t *seqused_q, __gm__ uint8_t *seqused_ori_kv, __gm__ uint8_t *seqused_cmp_kv,
+    __gm__ uint8_t *cmp_residual_kv, __gm__ uint8_t *ori_topk_length, __gm__ uint8_t *cmp_topk_length,
+    __gm__ uint8_t *sinks, __gm__ uint8_t *metadata, __gm__ uint8_t *d_query, __gm__ uint8_t *d_ori_kv,
+    __gm__ uint8_t *d_cmp_kv, __gm__ uint8_t *d_sinks, __gm__ uint8_t *ori_softmax_l1_norm,
+    __gm__ uint8_t *cmp_softmax_l1_norm, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling_data)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
     if constexpr (ORIG_DTYPE_QUERY == DT_FLOAT16) {
         if (MODE == SMLAG_SCFA_MODE) {
             if (LAYOUT == SMLAG_LAYOUT_BSND) {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, half, true);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, half, true, SMLAG_SCFA_MODE,
+                                        HAS_SEQUSED);
             } else {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, half, false);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, half, false, SMLAG_SCFA_MODE,
+                                        HAS_SEQUSED);
             }
         } else {
             if (LAYOUT == SMLAG_LAYOUT_BSND) {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, half, true, MODE);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, half, true, MODE, HAS_SEQUSED);
             } else {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, half, false, MODE);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, half, false, MODE, HAS_SEQUSED);
             }
         }
     }
     if constexpr (ORIG_DTYPE_QUERY == DT_BF16) {
         if (MODE == SMLAG_SCFA_MODE) {
             if (LAYOUT == SMLAG_LAYOUT_BSND) {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, bfloat16_t, true);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, bfloat16_t, true, SMLAG_SCFA_MODE,
+                                        HAS_SEQUSED);
             } else {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, bfloat16_t, false);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, bfloat16_t, false, SMLAG_SCFA_MODE,
+                                        HAS_SEQUSED);
             }
         } else {
             if (LAYOUT == SMLAG_LAYOUT_BSND) {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, bfloat16_t, true, MODE);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, bfloat16_t, true, MODE, HAS_SEQUSED);
             } else {
-                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, bfloat16_t, false, MODE);
+                INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SparseFlashMlaGrad, bfloat16_t, false, MODE, HAS_SEQUSED);
             }
         }
     }
 }
 #endif
-

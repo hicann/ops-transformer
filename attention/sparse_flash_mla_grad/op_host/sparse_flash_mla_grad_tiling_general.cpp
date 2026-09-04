@@ -222,7 +222,8 @@ uint64_t SparseFlashMlaGradBasicTiling::GetTilingKey() const
     // LAYOUT: 0(BSND); 1(TND)
     // CMP_MODE: 0(SWA); 1(CFA); 2(SCFA)
     uint32_t layout = tmpData.layout == static_cast<uint32_t>(InputLayout::TND) ? 1U : 0U;
-    return GET_TPL_TILING_KEY(layout, tmpData.mode);
+    bool hasSeqused = tmpData.usedSeqQ || tmpData.usedSeqOriKV || tmpData.usedSeqCmpKV;
+    return GET_TPL_TILING_KEY(layout, tmpData.mode, static_cast<uint8_t>(hasSeqused));
 }
 
 ge::graphStatus SparseFlashMlaGradBasicTiling::DoBlockTiling()
@@ -394,24 +395,28 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
 
     // -------------- 当前不支持参数必须传空校验 --------------
     auto oriSparseIndicesTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ORI_SPARSE_INDICES));
-    auto seqUsedQTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::SEQUSED_Q));
-    auto seqUsedOriKvTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::SEQUSED_ORI_KV));
-    auto seqUsedCmpKvTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::SEQUSED_CMP_KV));
     auto oriTopkLenTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ORI_TOPK_LENGTH));
     auto cmpTopkLenTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CMP_TOPK_LENGTH));
     auto metadataTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::METADATA));
     OP_CHECK_IF(oriSparseIndicesTensor != nullptr,
                 OP_LOGE("SparseFlashMlaGrad", "oriSparseIndices should be nullptr now."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(seqUsedQTensor != nullptr, OP_LOGE("SparseFlashMlaGrad", "seqUsedQ should be nullptr now."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(seqUsedOriKvTensor != nullptr, OP_LOGE("SparseFlashMlaGrad", "seqUsedOriKv should be nullptr now."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(seqUsedCmpKvTensor != nullptr, OP_LOGE("SparseFlashMlaGrad", "seqUsedCmpKv should be nullptr now."),
-                return ge::GRAPH_FAILED);
     OP_CHECK_IF(oriTopkLenTensor != nullptr, OP_LOGE("SparseFlashMlaGrad", "oriTopkLength should be nullptr now."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(cmpTopkLenTensor != nullptr, OP_LOGE("SparseFlashMlaGrad", "cmpTopkLength should be nullptr now."),
                 return ge::GRAPH_FAILED);
+
+    auto usedSeqQ = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_Q));
+    if (usedSeqQ != nullptr) {
+        tmpData.usedSeqQ = true;
+    }
+    auto usedSeqOriKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_ORI_KV));
+    if (usedSeqOriKV != nullptr) {
+        tmpData.usedSeqOriKV = true;
+    }
+    auto usedSeqCmpKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_CMP_KV));
+    if (usedSeqCmpKV != nullptr) {
+        tmpData.usedSeqCmpKV = true;
+    }
 
     // -------------- attrs ----------------
     const char *inputLayoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
@@ -616,6 +621,10 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
                         return ge::GRAPH_FAILED);
         }
     }
+
+    tilingData.opInfo.set_hasUsedSeqQ(tmpData.usedSeqQ);
+    tilingData.opInfo.set_hasUsedSeqOriKV(tmpData.usedSeqOriKV);
+    tilingData.opInfo.set_hasUsedSeqCmpKV(tmpData.usedSeqCmpKV);
     tilingData.opInfo.set_selectedBlockSize(1);
 
     return ge::GRAPH_SUCCESS;

@@ -45,6 +45,9 @@ struct TempParams {
     uint32_t s1BasicSize;
     uint32_t selected_block_count;
     uint32_t mode;
+    bool usedSeqQ = false;
+    bool usedSeqOriKV = false;
+    bool usedSeqCmpKV = false;
 };
 
 struct AiCoreParams {
