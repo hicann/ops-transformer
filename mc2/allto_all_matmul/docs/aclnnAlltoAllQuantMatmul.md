@@ -117,7 +117,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
 
 - ​**参数说明**​：
 
-    <table style="undefined;table-layout: fixed; width: 1556px"> <colgroup>
+    <table style="table-layout: fixed; width: 1556px"> <colgroup>
     <col style="width: 154px">
     <col style="width: 123px">
     <col style="width: 270px">
@@ -377,7 +377,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
 
   第一段接口完成入参校验，出现以下场景时报错：
 
-  <table style="undefined;table-layout: fixed; width: 1030px"><colgroup>
+  <table style="table-layout: fixed; width: 1030px"><colgroup>
     <col style="width:250px">
     <col style="width:130px">
     <col style="width:650px">
@@ -425,7 +425,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
 
 * **参数说明：**
 
-    <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
+    <table style="table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 168px">
     <col style="width: 128px">
     <col style="width: 854px">
@@ -779,7 +779,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
         //（固定写法）同步等待任务执行结束
         ret = aclrtSynchronizeStreamWithTimeout(args.stream, 10000);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
-        LOG_PRINT("device%d aclnnMatmulAlltoAll execute success \n", args.rankId);
+        LOG_PRINT("device%d aclnnAlltoAllQuantMatmul execute success \n", args.rankId);
         // 释放device资源，需要根据具体API的接口定义修改
         if (x1 != nullptr) {
             aclDestroyTensor(x1);
@@ -878,6 +878,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
     #include <vector>
     #include <acl/acl.h>
     #include <hccl/hccl.h>
+    #include "aclnn/opdev/fp16_t.h"
     #include "aclnnop/aclnn_allto_all_quant_matmul.h"
 
     int ndev = 2;
@@ -982,12 +983,12 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
         long long x2ScaleShapeSize = GetShapeSize(x2ScaleShape);
         long long outShapeSize = GetShapeSize(outShape);
         long long allToAllOutShapeSize = GetShapeSize(allToAllOutShape);
-        std::vector<int16_t> x1HostData(x1ShapeSize, 1);
-        std::vector<int16_t> x2HostData(x2ShapeSize, 1);
-        std::vector<int16_t> biasHostData(biasShapeSize, 1);
-        std::vector<int16_t> x2ScaleHostData(x2ScaleShapeSize, 1);
-        std::vector<int16_t> outHostData(outShapeSize, 0);
-        std::vector<int16_t> allToAllOutHostData(allToAllOutShapeSize, 0);
+        std::vector<op::fp16_t> x1HostData(x1ShapeSize, 1);
+        std::vector<int8_t> x2HostData(x2ShapeSize, 1);
+        std::vector<float> biasHostData(biasShapeSize, 1);
+        std::vector<float> x2ScaleHostData(x2ScaleShapeSize, 1);
+        std::vector<float> outHostData(outShapeSize, 0);
+        std::vector<op::fp16_t> allToAllOutHostData(allToAllOutShapeSize, 0);
         // 创建tensor
         ret = CreateAclTensor(x1HostData, x1Shape, &x1DeviceAddr, aclDataType::ACL_FLOAT16, &x1);
         CHECK_RET(ret == ACL_SUCCESS, return ret);

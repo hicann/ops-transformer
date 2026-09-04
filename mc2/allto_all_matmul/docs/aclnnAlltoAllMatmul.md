@@ -305,7 +305,7 @@ aclnnStatus aclnnAlltoAllMatmul(
   - <term>Ascend 950PR/Ascend 950DT</term>：支持2、4、8、16卡。
   <!-- end id9 -->
 
-* 参数说明中shape使用的变量BS必须整除NPU卡数。
+* 参数说明中shape使用的变量BS必须能被NPU卡数（rankSize）整除。
 * BS和N的值不得超过2147483647（INT32_MAX），BS的值不得小于0，N的值不得小于1。
 * H*rankSize范围，根据设备型号有不同限制：
 

@@ -531,7 +531,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
         ret = aclnnAlltoAllMatmulV2GetWorkspaceSize(x1, x2, bias, alltoAllAxesOptional, hcom_name, "aiv", false, false,
                                                 out, alltoallout, &workspaceSize, &executor);
         CHECK_RET(ret == ACL_SUCCESS,
-                LOG_PRINT(" failed. ERROR: %d\n", ret); return ret);
+                LOG_PRINT("aclnnAlltoAllMatmulV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
         // 根据第一段接口计算出的workspaceSize申请device内存
         if (workspaceSize > 0) {
             ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -753,7 +753,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
         ret = aclnnAlltoAllMatmulV2GetWorkspaceSize(x1, x2, bias, alltoAllAxesOptional, hcom_name, "ai_cpu", false, false,
                                                 out, alltoallout, &workspaceSize, &executor);
         CHECK_RET(ret == ACL_SUCCESS,
-                LOG_PRINT(" failed. ERROR: %d\n", ret); return ret);
+                LOG_PRINT("aclnnAlltoAllMatmulV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
         // 根据第一段接口计算出的workspaceSize申请device内存
         if (workspaceSize > 0) {
             ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
