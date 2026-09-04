@@ -41,6 +41,7 @@ constexpr int64_t GBSA_SOFTMAX_PRECISION_HIGH = 0;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_MIXED = 1;
 constexpr int64_t GBSA_CURRENT_MASK_TYPE = 1;
 constexpr int64_t GBSA_CURRENT_WINDOW_SIZE = -1;
+constexpr int64_t GBSA_DEFAULT_MAX_SEQ_LEN = -1;
 
 bool GbsaTensorValid(const aclTensor *tensor)
 {
@@ -158,14 +159,14 @@ aclnnStatus CheckGbsaBlockAttrs(int64_t blockShapeX, int64_t blockShapeY, int64_
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaScalarAttrs(int64_t maxQSeqLen, int64_t maxKvSeqLen, int64_t numQHeads, int64_t numKvHeads,
-                                 int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, int64_t isPackedGQA)
+aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t headDim, int64_t blockShapeX,
+                                 int64_t blockShapeY, int64_t isPackedGQA)
 {
     const struct {
         int64_t value;
         const char *name;
-    } positiveAttrs[] = {{maxQSeqLen, "maxQSeqLen"}, {maxKvSeqLen, "maxKvSeqLen"}, {numQHeads, "numQHeads"},
-                         {numKvHeads, "numKvHeads"}, {headDim, "headDim"},         {blockShapeY, "blockShapeY"}};
+    } positiveAttrs[] = {
+        {numQHeads, "numQHeads"}, {numKvHeads, "numKvHeads"}, {headDim, "headDim"}, {blockShapeY, "blockShapeY"}};
     for (const auto &attr : positiveAttrs) {
         const aclnnStatus status = CheckGbsaPositiveScalarAttr(attr.value, attr.name);
         if (status != ACLNN_SUCCESS) {
@@ -182,6 +183,25 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t maxQSeqLen, int64_t maxKvSeqLen, int64_
         return ACLNN_ERR_PARAM_INVALID;
     }
     return CheckGbsaBlockAttrs(blockShapeX, blockShapeY, isPackedGQA);
+}
+
+aclnnStatus CheckGbsaMaxSeqLenAttr(int64_t maxSeqLen, const char *attrName)
+{
+    if (maxSeqLen < GBSA_DEFAULT_MAX_SEQ_LEN) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be -1 or greater than or equal to 0, but got %lld.", attrName,
+                maxSeqLen);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckGbsaMaxSeqLenAttrs(int64_t maxQSeqLen, int64_t maxKvSeqLen)
+{
+    aclnnStatus status = CheckGbsaMaxSeqLenAttr(maxQSeqLen, "maxQSeqLen");
+    if (status != ACLNN_SUCCESS) {
+        return status;
+    }
+    return CheckGbsaMaxSeqLenAttr(maxKvSeqLen, "maxKvSeqLen");
 }
 
 aclnnStatus CheckGbsaLayouts(const char *qInputLayout, const char *kvInputLayout)
@@ -388,12 +408,15 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor *sparseBlockIdx, const aclTe
     if (status != ACLNN_SUCCESS) {
         return status;
     }
-    status = CheckGbsaScalarAttrs(maxQSeqLen, maxKvSeqLen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY,
-                                  isPackedGQA);
+    status = CheckGbsaLayouts(qInputLayout, kvInputLayout);
     if (status != ACLNN_SUCCESS) {
         return status;
     }
-    status = CheckGbsaLayouts(qInputLayout, kvInputLayout);
+    status = CheckGbsaMaxSeqLenAttrs(maxQSeqLen, maxKvSeqLen);
+    if (status != ACLNN_SUCCESS) {
+        return status;
+    }
+    status = CheckGbsaScalarAttrs(numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGQA);
     if (status != ACLNN_SUCCESS) {
         return status;
     }

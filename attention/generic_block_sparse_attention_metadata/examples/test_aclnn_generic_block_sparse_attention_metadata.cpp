@@ -48,6 +48,7 @@ constexpr int64_t GBSA_MASK_TYPE = 1;
 constexpr int64_t GBSA_QUANT_TYPE = 0;
 constexpr int64_t GBSA_SOFTMAX_PRECISION = 0;
 constexpr int64_t GBSA_WINDOW_SIZE = -1;
+constexpr int64_t GBSA_DEFAULT_MAX_SEQ_LEN = -1;
 
 struct ScopeGuard {
     explicit ScopeGuard(std::function<void()> callback)
@@ -81,8 +82,8 @@ struct CaseContext {
     Tensor seqUsedKv;
     Tensor metadata;
     aclIntArray *blockShape = nullptr;
-    int64_t maxQSeqLen = 0;
-    int64_t maxKvSeqLen = 0;
+    int64_t maxQSeqLen = GBSA_DEFAULT_MAX_SEQ_LEN;
+    int64_t maxKvSeqLen = GBSA_DEFAULT_MAX_SEQ_LEN;
     int64_t numQHeads = 0;
     int64_t numKvHeads = 0;
     int64_t headDim = 0;
@@ -197,8 +198,8 @@ aclnnStatus CreateTndDecodeCase(CaseContext &context)
     constexpr int32_t secondQBlockCount = 3;
 
     context.name = "TND decode schedule";
-    context.maxQSeqLen = qStorageLength;
-    context.maxKvSeqLen = kvStorageLength;
+    context.maxQSeqLen = GBSA_DEFAULT_MAX_SEQ_LEN;
+    context.maxKvSeqLen = GBSA_DEFAULT_MAX_SEQ_LEN;
     context.numQHeads = numQHeads;
     context.numKvHeads = numKvHeads;
     context.headDim = GBSA_HEAD_DIM;
@@ -241,8 +242,8 @@ aclnnStatus CreateTndSeqUsedCase(CaseContext &context)
     constexpr int32_t firstBlockCount = 1;
 
     context.name = "TND cuSeqLengths and seqUsedQ";
-    context.maxQSeqLen = qStorageLengthPerBatch;
-    context.maxKvSeqLen = kvStorageLengthPerBatch;
+    context.maxQSeqLen = GBSA_DEFAULT_MAX_SEQ_LEN;
+    context.maxKvSeqLen = GBSA_DEFAULT_MAX_SEQ_LEN;
     context.numQHeads = numQHeads;
     context.numKvHeads = numKvHeads;
     context.headDim = GBSA_HEAD_DIM;

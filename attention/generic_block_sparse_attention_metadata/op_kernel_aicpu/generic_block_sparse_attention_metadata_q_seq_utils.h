@@ -25,11 +25,10 @@ inline int64_t CeilDivQSeq(int64_t value, int64_t divisor)
 }
 
 inline bool BuildTndQSeqLayout(const std::vector<int64_t> &cuSeqLengths, const std::vector<int64_t> &seqUsedQ,
-                               bool hasSeqUsedQ, int64_t maxQSeqLen, int64_t blockShapeX, int64_t qBlockStorageNum,
+                               bool hasSeqUsedQ, int64_t blockShapeX, int64_t qBlockStorageNum,
                                std::vector<int64_t> &actualQSeqLens, std::vector<int64_t> &qStorageBlockStarts)
 {
-    if (cuSeqLengths.empty() || cuSeqLengths.front() != 0 || maxQSeqLen <= 0 || blockShapeX <= 0 ||
-        qBlockStorageNum < 0) {
+    if (cuSeqLengths.empty() || cuSeqLengths.front() != 0 || blockShapeX <= 0 || qBlockStorageNum < 0) {
         return false;
     }
     const std::size_t batchSize = cuSeqLengths.size() - 1U;
@@ -46,9 +45,6 @@ inline bool BuildTndQSeqLayout(const std::vector<int64_t> &cuSeqLengths, const s
             return false;
         }
         const int64_t storageQSeqLen = cuSeqLengths[batchIdx + 1U] - cuSeqLengths[batchIdx];
-        if (storageQSeqLen > maxQSeqLen) {
-            return false;
-        }
         const int64_t actualQSeqLen = hasSeqUsedQ ? seqUsedQ[batchIdx] : storageQSeqLen;
         if (actualQSeqLen < 0 || actualQSeqLen > storageQSeqLen) {
             return false;

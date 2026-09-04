@@ -34,6 +34,7 @@ constexpr int64_t DEFAULT_BATCH_SIZE = 2;
 constexpr int64_t DEFAULT_NUM_Q_HEADS = 8;
 constexpr int64_t DEFAULT_NUM_KV_HEADS = 2;
 constexpr int64_t DEFAULT_MAX_Q_SEQ_LEN = 3;
+constexpr int64_t UNSPECIFIED_MAX_Q_SEQ_LEN = -1;
 constexpr int64_t DEFAULT_Q_BLOCK_STORAGE_NUM = 6;
 constexpr int64_t DEFAULT_AIC_CORE_NUM = 8;
 constexpr int64_t DEFAULT_FIRST_Q_SEQ_LEN = 2;
@@ -138,7 +139,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, PrefillSchedule)
 {
     ScheduleInput input = MakeInput();
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(result.totalQTokenNum, DEFAULT_TOTAL_Q_TOKEN_NUM);
     ASSERT_EQ(result.saTotalTaskNum, DEFAULT_SA_TASK_NUM);
     ASSERT_EQ(result.saUsedCoreNum, DEFAULT_SA_TASK_NUM);
@@ -147,7 +148,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, PrefillSchedule)
     ASSERT_EQ(result.fdActiveCoreNum, 0);
 
     TaskInfo task;
-    ASSERT_EQ(DecodeTask(input, result, DEFAULT_DECODE_TASK_INDEX, task), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(DecodeTask(input, result, DEFAULT_DECODE_TASK_INDEX, task), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(task.qUnit, DEFAULT_FIRST_Q_SEQ_LEN);
     ASSERT_EQ(task.batchIdx, 1);
     ASSERT_EQ(task.qTokenInBatch, 0);
@@ -160,7 +161,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ActualBlockPrefixDecode
 {
     ScheduleInput input = MakeDecodeInput();
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(result.blockPrefix[0], 0);
     ASSERT_EQ(result.blockPrefix[1], DECODE_FIRST_BLOCK_NUM);
     ASSERT_EQ(result.blockPrefix[DECODE_Q_BLOCK_STORAGE_NUM], DECODE_TOTAL_VALID_BLOCK_NUM);
@@ -191,12 +192,12 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, DecodeShapeConstraints)
     ScheduleInput input = MakeDecodeInput();
     ScheduleResult result;
     input.blockShapeY = UNSUPPORTED_DIM;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(result.fdActiveCoreNum, 0);
 
     input.blockShapeY = SUPPORTED_BLOCK_SHAPE_Y;
     input.headDim = UNSUPPORTED_DIM;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(result.fdActiveCoreNum, 0);
 }
 
@@ -211,7 +212,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ZeroCountsAndRepeatedPr
     input.qSeqLens = {DEFAULT_MAX_Q_SEQ_LEN};
     input.validBlockNums = {0, DECODE_FIRST_BLOCK_NUM, DECODE_SECOND_BLOCK_NUM};
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(result.blockPrefix[0], 0);
     ASSERT_EQ(result.blockPrefix[1], 0);
     ASSERT_EQ(result.blockPrefix[DECODE_Q_BLOCK_STORAGE_NUM], DECODE_FIRST_BLOCK_NUM);
@@ -227,8 +228,8 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, SparseBlockCapacityUpTo
     rhs.blockIndexStride = MAX_BLOCK_CAPACITY;
     ScheduleResult lhsResult;
     ScheduleResult rhsResult;
-    ASSERT_EQ(BuildSchedule(lhs, lhsResult), ScheduleStatus::SUCCESS);
-    ASSERT_EQ(BuildSchedule(rhs, rhsResult), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(lhs, lhsResult), BSAScheduleStatus::BSA_SUCCESS);
+    ASSERT_EQ(BuildSchedule(rhs, rhsResult), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_TRUE(lhsResult.fdActiveCoreNum > 0);
     ASSERT_EQ(rhsResult.fdActiveCoreNum, lhsResult.fdActiveCoreNum);
     ASSERT_EQ(rhsResult.decodePerCoreTaskNum, lhsResult.decodePerCoreTaskNum);
@@ -244,7 +245,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ActiveCoreCapacityAcros
     input.validBlockNums.assign(ACTIVE_BASE_TASK_NUM, ACTIVE_VALID_BLOCK_NUM);
 
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_TRUE(result.fdActiveCoreNum > ACTIVE_VALID_BLOCK_NUM);
     ASSERT_TRUE(result.fdActiveCoreNum <= input.aicCoreNum);
     ASSERT_EQ(result.combineTaskNum, ACTIVE_BASE_TASK_NUM);
@@ -266,7 +267,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, PartialTaskNumCanExceed
     input.validBlockNums.assign(DECODE_Q_BLOCK_STORAGE_NUM, PARTIAL_VALID_BLOCK_NUM);
 
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(result.fdActiveCoreNum, PARTIAL_ACTIVE_CORE_NUM);
     ASSERT_EQ(result.combineTaskNum, PARTIAL_COMBINE_TASK_NUM);
     ASSERT_EQ(result.fdPartialTaskNum, PARTIAL_TASK_NUM);
@@ -293,7 +294,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, PartialWorkspaceUpperBo
                 input.validBlockNums.assign(baseTaskNum, validBlockNum);
 
                 ScheduleResult result;
-                ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+                ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
                 if ((static_cast<uint32_t>(result.fdScheduleFlags) & FD_SCHEDULE_ENABLED) == 0U) {
                     continue;
                 }
@@ -320,12 +321,12 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnpackedInternalTaskMod
     input.isPackedGQA = UNPACKED_GQA;
     input.validBlockNums.assign(DEFAULT_NUM_Q_HEADS, 0);
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(result.sparseHeadNum, DEFAULT_NUM_Q_HEADS);
     ASSERT_EQ(result.saTotalTaskNum, DEFAULT_NUM_Q_HEADS);
 
     TaskInfo task;
-    ASSERT_EQ(DecodeTask(input, result, UNPACKED_TASK_INDEX, task), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(DecodeTask(input, result, UNPACKED_TASK_INDEX, task), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(task.sparseHeadIdx, UNPACKED_TASK_INDEX);
     ASSERT_EQ(task.qHeadStart, UNPACKED_TASK_INDEX);
     ASSERT_EQ(task.qHeadCount, 1);
@@ -337,7 +338,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, InvalidBlockCount)
     ScheduleInput input = MakeInput();
     input.validBlockNums[0] = input.blockIndexStride + 1;
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::INVALID_PARAM);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_INVALID_PARAM);
 }
 
 TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, TndSeqUsedUsesStorageOffsets)
@@ -345,9 +346,8 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, TndSeqUsedUsesStorageOf
     std::vector<int64_t> actualQSeqLens;
     std::vector<int64_t> qStorageBlockStarts;
     ASSERT_TRUE(BuildTndQSeqLayout({0, TND_Q_STORAGE_LEN_PER_BATCH, TND_TOTAL_Q_STORAGE_LEN},
-                                   {TND_FIRST_BATCH_USED_Q, TND_SECOND_BATCH_USED_Q}, true, TND_Q_STORAGE_LEN_PER_BATCH,
-                                   SUPPORTED_BLOCK_SHAPE_X, TND_TOTAL_Q_STORAGE_LEN, actualQSeqLens,
-                                   qStorageBlockStarts));
+                                   {TND_FIRST_BATCH_USED_Q, TND_SECOND_BATCH_USED_Q}, true, SUPPORTED_BLOCK_SHAPE_X,
+                                   TND_TOTAL_Q_STORAGE_LEN, actualQSeqLens, qStorageBlockStarts));
     ASSERT_EQ(actualQSeqLens[0], TND_FIRST_BATCH_USED_Q);
     ASSERT_EQ(actualQSeqLens[1], TND_SECOND_BATCH_USED_Q);
     ASSERT_EQ(qStorageBlockStarts[0], 0);
@@ -367,32 +367,53 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, TndSeqUsedUsesStorageOf
               counts[TND_Q_STORAGE_LEN_PER_BATCH + TND_SECOND_BATCH_USED_Q - 1]);
 }
 
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, SchedulerAllowsUnspecifiedMaxQSeqLen)
+{
+    ScheduleInput input = MakeInput();
+    input.maxQSeqLen = UNSPECIFIED_MAX_Q_SEQ_LEN;
+    ScheduleResult result;
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+    ASSERT_EQ(result.totalQTokenNum, DEFAULT_TOTAL_Q_TOKEN_NUM);
+    ASSERT_EQ(result.saTotalTaskNum, DEFAULT_SA_TASK_NUM);
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, TndQSeqWithoutSeqUsedUsesStorageLengths)
+{
+    std::vector<int64_t> actualQSeqLens;
+    std::vector<int64_t> qStorageBlockStarts;
+    ASSERT_TRUE(BuildTndQSeqLayout({0, TND_Q_STORAGE_LEN_PER_BATCH, TND_TOTAL_Q_STORAGE_LEN}, {}, false,
+                                   SUPPORTED_BLOCK_SHAPE_X, TND_TOTAL_Q_STORAGE_LEN, actualQSeqLens,
+                                   qStorageBlockStarts));
+    ASSERT_EQ(actualQSeqLens[0], TND_Q_STORAGE_LEN_PER_BATCH);
+    ASSERT_EQ(actualQSeqLens[1], TND_Q_STORAGE_LEN_PER_BATCH);
+}
+
 TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, TndQSeqValidation)
 {
     std::vector<int64_t> actualQSeqLens;
     std::vector<int64_t> qStorageBlockStarts;
     ASSERT_TRUE(!BuildTndQSeqLayout({0, TND_Q_STORAGE_LEN_PER_BATCH, TND_TOTAL_Q_STORAGE_LEN},
                                     {TND_INVALID_FIRST_BATCH_USED_Q, TND_SECOND_BATCH_USED_Q}, true,
-                                    TND_Q_STORAGE_LEN_PER_BATCH, SUPPORTED_BLOCK_SHAPE_X, TND_TOTAL_Q_STORAGE_LEN,
-                                    actualQSeqLens, qStorageBlockStarts));
+                                    SUPPORTED_BLOCK_SHAPE_X, TND_TOTAL_Q_STORAGE_LEN, actualQSeqLens,
+                                    qStorageBlockStarts));
     ASSERT_TRUE(!BuildTndQSeqLayout({0, TND_Q_STORAGE_LEN_PER_BATCH, TND_SECOND_BATCH_USED_Q}, {}, false,
-                                    TND_Q_STORAGE_LEN_PER_BATCH, SUPPORTED_BLOCK_SHAPE_X, TND_Q_STORAGE_LEN_PER_BATCH,
-                                    actualQSeqLens, qStorageBlockStarts));
+                                    SUPPORTED_BLOCK_SHAPE_X, TND_Q_STORAGE_LEN_PER_BATCH, actualQSeqLens,
+                                    qStorageBlockStarts));
     ASSERT_TRUE(!BuildTndQSeqLayout({1, TND_Q_STORAGE_LEN_PER_BATCH, TND_TOTAL_Q_STORAGE_LEN}, {}, false,
-                                    TND_Q_STORAGE_LEN_PER_BATCH, SUPPORTED_BLOCK_SHAPE_X, TND_TOTAL_Q_STORAGE_LEN,
-                                    actualQSeqLens, qStorageBlockStarts));
+                                    SUPPORTED_BLOCK_SHAPE_X, TND_TOTAL_Q_STORAGE_LEN, actualQSeqLens,
+                                    qStorageBlockStarts));
     ASSERT_TRUE(!BuildTndQSeqLayout({0, TND_Q_STORAGE_LEN_PER_BATCH, TND_TOTAL_Q_STORAGE_LEN}, {}, false,
-                                    TND_Q_STORAGE_LEN_PER_BATCH, SUPPORTED_BLOCK_SHAPE_X,
-                                    TND_INVALID_TOTAL_Q_STORAGE_LEN, actualQSeqLens, qStorageBlockStarts));
+                                    SUPPORTED_BLOCK_SHAPE_X, TND_INVALID_TOTAL_Q_STORAGE_LEN, actualQSeqLens,
+                                    qStorageBlockStarts));
 }
 
 TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, MetadataEncoding)
 {
     ScheduleInput input = MakeDecodeInput();
     ScheduleResult result;
-    ASSERT_EQ(BuildSchedule(input, result), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
     std::array<MetadataType, METADATA_TOTAL_SIZE> metadata{};
-    ASSERT_EQ(EncodeMetadata(result, metadata.data(), metadata.size()), ScheduleStatus::SUCCESS);
+    ASSERT_EQ(EncodeMetadata(result, metadata.data(), metadata.size()), BSAScheduleStatus::BSA_SUCCESS);
     ASSERT_EQ(metadata[MAGIC_INDEX], METADATA_MAGIC);
     ASSERT_EQ(metadata[VERSION_INDEX], METADATA_VERSION);
     ASSERT_EQ(metadata[METADATA_USED_SIZE_INDEX], static_cast<int32_t>(METADATA_USED_SIZE));

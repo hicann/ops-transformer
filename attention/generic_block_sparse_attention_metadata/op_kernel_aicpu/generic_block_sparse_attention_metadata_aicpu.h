@@ -36,7 +36,7 @@ private:
     bool ParseQSeqLens(std::vector<int64_t> &qSeqLens, std::vector<int64_t> &qStorageBlockStarts) const;
     bool ParseValidBlockNums(const std::vector<int64_t> &qSeqLens, const std::vector<int64_t> &qStorageBlockStarts,
                              std::vector<int64_t> &validBlockNums) const;
-    bool GenerateMetadata(const std::vector<int64_t> &qSeqLens, const std::vector<int64_t> &validBlockNums);
+    bool GenerateMetadata(const std::vector<int64_t> &qSeqLens, const std::vector<int64_t> &validBlockNums) const;
     bool CheckOptionalTensor(const Tensor *tensor, DataType dataType, int64_t elementNum, const char *tensorName) const;
 
     Tensor *sparseBlockIdx_ = nullptr;
