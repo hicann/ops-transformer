@@ -143,7 +143,7 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     ctxPtr_ = (__gm__ EngramCommContext *)commContext;
     rankId_ = ctxPtr_->rankId;
     numRanks_ = ctxPtr_->rankSize;
-    channelsPerRank_ = (HANDLE_ARRAY_SIZE + numRanks_ - 1U) / numRanks_;
+    channelsPerRank_ = ctxPtr_->channelsPerRank;
     if (channelsPerRank_ == 0U) {
         channelsPerRank_ = 1U;
     }

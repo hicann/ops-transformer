@@ -71,7 +71,7 @@ using namespace AscendC;
 #define HCOMM_INIT_SIZE 512UL
 
 static constexpr uint32_t WIN_ADDR_ALIGN = 512;
-static constexpr uint32_t COMBINE_CHANNEL_COUNT = 6U;
+static constexpr uint32_t COMBINE_CHANNEL_COUNT = 1U;
 static constexpr uint32_t RECV_META_FIELDS = 4;
 // Keep one SQ entry unused. A token that would make the following token cross this limit requests a CQE and drains.
 static constexpr uint32_t HCOMM_SQ_MAX_PENDING = 32767U;
@@ -251,9 +251,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
         channelsPerRank_ = 1;
     }
 
-    uint32_t minTopKLocalExperts = (topK_ < localmoeNum_) ? topK_ : localmoeNum_;
-    combineChannelCount_ = Ceil(numMaxTokensPerRank_ * minTopKLocalExperts, HCOMM_SQ_MAX_PENDING + 1);
-    combineChannelCount_ = combineChannelCount_ < COMBINE_CHANNEL_COUNT ? combineChannelCount_ : COMBINE_CHANNEL_COUNT;
+    combineChannelCount_ = COMBINE_CHANNEL_COUNT;
 
     for (uint32_t i = 0; i < epWorldSize_; ++i) {
         winRankAddr_[i] = (GM_ADDR)mc2Context_->epHcclBuffer[i];

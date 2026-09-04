@@ -21,7 +21,6 @@ namespace Mc2Tiling {
 constexpr uint64_t MOE_EP_UB_ALIGN = 32UL;
 constexpr uint64_t MOE_EP_WIN_ALIGN = 512UL;
 constexpr uint64_t MOE_EP_NOTIFY_TOKEN_LIMIT = 15000UL;
-constexpr uint64_t MOE_EP_COMBINE_CHANNEL_COUNT = 6UL;
 constexpr uint64_t MOE_EP_MAX_OUT_DTYPE_SIZE = 2UL;
 constexpr uint64_t MOE_EP_METADATA_DTYPE_SIZE = 4UL;
 constexpr uint32_t MOE_EP_NETWORK_DIRECT = 0U;

@@ -36,8 +36,6 @@ constexpr int32_t BITS_PER_BYTE = 8;
 constexpr uint32_t ALIGNED_LEN_256 = 256U;
 
 constexpr uint32_t NUM_SLOTS = 8U;
-constexpr uint32_t SENDER_CHANNEL_IDX = 0U;
-constexpr uint32_t RECEIVER_CHANNEL_IDX = 1U;
 
 constexpr int32_t ENGRAM_DT_BFLOAT16 = 27;
 constexpr int32_t ENGRAM_DT_FLOAT16 = 1;

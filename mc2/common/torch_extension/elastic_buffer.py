@@ -251,7 +251,6 @@ def _get_moe_ep_window_layout(
     win_addr_align = 512
     ub_align = 32
     notify_cnt_align = 15000
-    combine_channel_count = 6
     max_out_dtype_size = 2
     metadata_dtype_size = 4
     state_dtype_size = 4
@@ -270,8 +269,7 @@ def _get_moe_ep_window_layout(
         + world_size * dispatch_notify_count * win_addr_align
     )
     combine_state_size = (
-        num_max_tokens_per_rank * topk * win_addr_align
-        + world_size * combine_channel_count * win_addr_align
+        num_max_tokens_per_rank * topk * win_addr_align + world_size * win_addr_align
     )
     state_buffer_size = (
         dump_metadata_bytes

@@ -594,7 +594,7 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
         int64_t wsPermOutTemp = aivNum * perCoreTempSize;
         int64_t wsLocalData = totalRecv * hiddenBytes;
         int64_t wsRecvData = numTokens * hiddenBytes;
-        int64_t wsCounterScratch = aivNum * UB_ALIGN;
+        int64_t wsCounterScratch = 2 * aivNum * UB_ALIGN;
         int64_t wsPartialCounts = aivNum * numRanks * static_cast<int64_t>(sizeof(int32_t));
         int64_t wsFlagScratch = aivNum * UB_ALIGN;
         int64_t wsIndicesReadyFlag = numRanks * static_cast<int64_t>(sizeof(int32_t));
