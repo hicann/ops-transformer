@@ -130,11 +130,11 @@ __aicore__ inline void MoeGatingTopKWithoutGroup<T, U1, U2>::ComputeX()
         PipeBarrier<PIPE_V>();
     }
 
-    if (normType_ == 1) { // sigmoid
+    if (normType_ == NORM_TYPE_SIGMOID) { // sigmoid
         LocalTensor<uint8_t> calcNormTmpTensor = calcTmpBuf_.Get<uint8_t>();
         Sigmoid(xNormTensor, xInLocalTensor, calcNormTmpTensor, expertCount_);
         PipeBarrier<PIPE_V>();
-    } else if (normType_ == 0) { // softmax
+    } else if (normType_ == NORM_TYPE_SOFTMAX) { // softmax
         LocalTensor<float> reduceValueTensor = calcTmpBuf_.Get<float>();
         LocalTensor<float> calcTmp = calcTmpBuf_.Get<float>()[8];
         ReduceMax(reduceValueTensor, xInLocalTensor, calcTmp, expertCount_);
@@ -160,6 +160,16 @@ __aicore__ inline void MoeGatingTopKWithoutGroup<T, U1, U2>::ComputeX()
         Duplicate(xInLocalTensor, sumValue, expertCount_);
         PipeBarrier<PIPE_V>();
         Div(xNormTensor, xNormTensor, xInLocalTensor, expertCount_);
+        PipeBarrier<PIPE_V>();
+    } else { // sqrt softplus: sqrt(ln(exp(x) + 1))
+        LocalTensor<float> calcNormTmpTensor = calcTmpBuf_.Get<float>();
+        Exp(calcNormTmpTensor, xInLocalTensor, expertCount_);
+        PipeBarrier<PIPE_V>();
+        Adds(calcNormTmpTensor, calcNormTmpTensor, float(1.0), expertCount_);
+        PipeBarrier<PIPE_V>();
+        Ln(calcNormTmpTensor, calcNormTmpTensor, expertCount_);
+        PipeBarrier<PIPE_V>();
+        Sqrt(xNormTensor, calcNormTmpTensor, expertCount_);
         PipeBarrier<PIPE_V>();
     }
     if (addBias_) {
@@ -235,8 +245,9 @@ __aicore__ inline void MoeGatingTopKWithoutGroup<T, U1, U2>::SelectTopKExpertSco
     PipeBarrier<PIPE_V>();
     Gather(yOutTensor, xNormTensor, topKExpertIdWithByte.template ReinterpretCast<uint32_t>(), static_cast<uint32_t>(0),
            k_);
-    bool needRenorm = (normType_ == 1) ||               // 情况1：sigmoid + renorm
-                      (normType_ == 0 && renorm_ == 1); // 情况3：softmax + renorm
+    bool needRenorm =
+        (normType_ == NORM_TYPE_SIGMOID || normType_ == NORM_TYPE_SOFTPLUS) || // sigmoid/softplus恒做归一化
+        (normType_ == NORM_TYPE_SOFTMAX && renorm_ == 1);                      // softmax + renorm
     if (needRenorm == 1) {
         LocalTensor<float> maxValueTensor = calcTmpBuf_.Get<float>();
         LocalTensor<float> tmpTensor = calcTmpBuf_.Get<float>()[BLOCK_BYTES];

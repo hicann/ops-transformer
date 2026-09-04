@@ -176,6 +176,72 @@ TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_succ_04)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
+TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_succ_05_norm_type_softplus)
+{
+    optiling::MoeGatingTopKCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopK",
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{16, 8}, {16, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 8}, {16, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"k_group", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"group_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"group_select_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"out_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo);
+    uint64_t expectTilingKey = 1;
+    string expectTilingData = "16 16 1 1 256 1 8 1 1 256 256 1 0 2 0 0 2178868143328329728 1024 0 ";
+    std::vector<size_t> expectWorkspaces = {16777216};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_succ_06_hash_norm_type_softplus)
+{
+    optiling::MoeGatingTopKCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopK",
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{32, 8}, {32, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{16, 8}, {16, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 8}, {16, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+            {"k_group", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"group_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"group_select_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"out_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo);
+    uint64_t expectTilingKey = 4;
+    string expectTilingData = "16 16 1 1 256 1 8 1 1 256 256 1 0 2 0 0 2178868143328329728 1024 1 ";
+    std::vector<size_t> expectWorkspaces = {16777216};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
 TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_fail_01)
 {
     optiling::MoeGatingTopKCompileInfo compileInfo = {};

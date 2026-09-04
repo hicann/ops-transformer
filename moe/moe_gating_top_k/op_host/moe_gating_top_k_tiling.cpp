@@ -27,6 +27,7 @@ const static int64_t RENORM_NO = 0;
 const static int64_t RENORM_L1 = 1;
 const static int64_t NORM_TYPE_SOFTMAX = 0;
 const static int64_t NORM_TYPE_SIGMOID = 1;
+const static int64_t NORM_TYPE_SOFTPLUS = 2;
 const static int64_t OUT_FLAG_FALSE = 0;
 const static int64_t OUT_FLAG_TRUE = 1;
 const static size_t X_INPUT_DIMS = 2;
@@ -236,9 +237,15 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckAttr()
                                           "greater than 0"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(normType_ != NORM_TYPE_SOFTMAX && normType_ != NORM_TYPE_SIGMOID,
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "norm_type", std::to_string(normType_), "0 or 1"),
+    OP_CHECK_IF(normType_ != NORM_TYPE_SOFTMAX && normType_ != NORM_TYPE_SIGMOID && normType_ != NORM_TYPE_SOFTPLUS,
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "norm_type", std::to_string(normType_), "0, 1 or 2"),
                 return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        normType_ == NORM_TYPE_SOFTPLUS && groupCount_ != 1,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "group_count", std::to_string(groupCount_),
+                                              "The attr group_count must be 1 when the attr norm_type is 2 (softplus)"),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(groupSelectMode_ != GROUP_SELECT_MODE_SUM && groupSelectMode_ != GROUP_SELECT_MODE_MAX,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "group_select_mode",

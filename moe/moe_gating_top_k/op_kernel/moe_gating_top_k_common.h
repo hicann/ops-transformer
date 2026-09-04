@@ -40,6 +40,7 @@ constexpr int64_t MERGE_LIST_IDX_THREE = 3;
 
 constexpr int64_t NORM_TYPE_SOFTMAX = 0;
 constexpr int64_t NORM_TYPE_SIGMOID = 1;
+constexpr int64_t NORM_TYPE_SOFTPLUS = 2;
 
 __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 {
