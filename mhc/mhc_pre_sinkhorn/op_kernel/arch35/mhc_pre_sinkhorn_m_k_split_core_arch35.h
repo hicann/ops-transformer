@@ -234,6 +234,11 @@ public:
                 WaitFlag<HardEvent::MTE3_V>(static_cast<event_t>(1));
             }
         }
+        if ASCEND_IS_AIV {
+            // Drain the two double-buffer credits seeded by the paired AIC.
+            CrossCoreWaitFlag<SYNC_MODE4, PIPE_MTE3>(SYNC_AIC_AIV_FLAG);
+            CrossCoreWaitFlag<SYNC_MODE4, PIPE_MTE3>(SYNC_AIC_AIV_FLAG);
+        }
         if ASCEND_IS_AIC {
             mmService_.End();
         }
