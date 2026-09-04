@@ -57,6 +57,9 @@ constexpr CubeFormat weightFormat = CubeFormat::ND;
 constexpr bool isMxFp4Input =
     (AscendC::IsSameType<DTYPE_X, fp4x2_e2m1_t>::value || AscendC::IsSameType<DTYPE_X, fp4x2_e1m2_t>::value) &&
     (AscendC::IsSameType<DTYPE_WEIGHT, fp4x2_e2m1_t>::value || AscendC::IsSameType<DTYPE_WEIGHT, fp4x2_e1m2_t>::value);
+constexpr bool isMxFp8Input =
+    (AscendC::IsSameType<DTYPE_X, fp8_e4m3fn_t>::value || AscendC::IsSameType<DTYPE_X, fp8_e5m2_t>::value) &&
+    (AscendC::IsSameType<DTYPE_WEIGHT, fp8_e4m3fn_t>::value || AscendC::IsSameType<DTYPE_WEIGHT, fp8_e5m2_t>::value);
 #endif
 } // namespace
 
@@ -117,22 +120,22 @@ __global__ __aicore__ void grouped_matmul_swiglu_quant_v2(GM_ADDR x, GM_ADDR xSc
         }
     } else {
         if (QUANT_B_TRANS == GMM_SWIGLU_QUANT_NO_TRANS && QUANT_A_TRANS == GMM_SWIGLU_QUANT_NO_TRANS) {
-            if constexpr (KERNEL_TYPE == GMM_SWIGLU_QUANT_ORIGINAL_KERNEL_TYPE) {
-                GmmSwigluAswt<Cgmct::Gemm::layout::RowMajor, Cgmct::Gemm::layout::RowMajor>(
+            if constexpr (KERNEL_TYPE == GMM_SWIGLU_QUANT_TENSOR_LEVEL_KERNEL_TYPE && isMxFp8Input) {
+                GmmTensorApiSwigluQuantMxFp8Kernel<AscendC::Te::NDExtLayoutPtn, AscendC::Te::NDExtLayoutPtn>(
                     x, weight, weightScale, xScale, weightAssistanceMatrix, smoothScale, groupList, y, yScale,
                     workspace, tiling);
             } else {
-                GmmTensorApiSwigluQuantMxFp8Kernel<AscendC::Te::NDExtLayoutPtn, AscendC::Te::NDExtLayoutPtn>(
+                GmmSwigluAswt<Cgmct::Gemm::layout::RowMajor, Cgmct::Gemm::layout::RowMajor>(
                     x, weight, weightScale, xScale, weightAssistanceMatrix, smoothScale, groupList, y, yScale,
                     workspace, tiling);
             }
         } else if (QUANT_B_TRANS == GMM_SWIGLU_QUANT_TRANS && QUANT_A_TRANS == GMM_SWIGLU_QUANT_NO_TRANS) {
-            if constexpr (KERNEL_TYPE == GMM_SWIGLU_QUANT_ORIGINAL_KERNEL_TYPE) {
-                GmmSwigluAswt<Cgmct::Gemm::layout::RowMajor, Cgmct::Gemm::layout::ColumnMajor>(
+            if constexpr (KERNEL_TYPE == GMM_SWIGLU_QUANT_TENSOR_LEVEL_KERNEL_TYPE && isMxFp8Input) {
+                GmmTensorApiSwigluQuantMxFp8Kernel<AscendC::Te::NDExtLayoutPtn, AscendC::Te::DNExtLayoutPtn>(
                     x, weight, weightScale, xScale, weightAssistanceMatrix, smoothScale, groupList, y, yScale,
                     workspace, tiling);
             } else {
-                GmmTensorApiSwigluQuantMxFp8Kernel<AscendC::Te::NDExtLayoutPtn, AscendC::Te::DNExtLayoutPtn>(
+                GmmSwigluAswt<Cgmct::Gemm::layout::RowMajor, Cgmct::Gemm::layout::ColumnMajor>(
                     x, weight, weightScale, xScale, weightAssistanceMatrix, smoothScale, groupList, y, yScale,
                     workspace, tiling);
             }
