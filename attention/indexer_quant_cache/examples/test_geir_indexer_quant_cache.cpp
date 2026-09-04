@@ -42,6 +42,7 @@ using std::map;
 using std::string;
 using std::vector;
 
+// clang-format off
 #define ADD_INPUT(intputIndex, intputName, intputDtype, inputShape)                                                    \
     vector<int64_t> placeholder##intputIndex##_shape = inputShape;                                                     \
     auto placeholder##intputIndex = op::Data("placeholder" + intputIndex).set_attr_index(0);                           \
@@ -72,6 +73,7 @@ using std::vector;
     do {                                                                                                               \
         printf(message, ##__VA_ARGS__);                                                                                \
     } while (0)
+// clang-format on
 
 string GetTime()
 {
@@ -182,7 +184,7 @@ int CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor> &input, std::vect
     const int64_t tokenNum = 1024;
     const int64_t d = 128;
     const int64_t blockNum = 128;
-    const int64_t blockSizeDim = 16;   // num_slots = 128*16 = 2048
+    const int64_t blockSizeDim = 16; // num_slots = 128*16 = 2048
     std::vector<int64_t> cacheShape = {blockNum, blockSizeDim, 1, d};
     std::vector<int64_t> cacheScaleShape = {blockNum, blockSizeDim, 1, 1};
     std::vector<int64_t> xShape = {tokenNum, d};
@@ -304,6 +306,7 @@ int main(int argc, char *argv[])
     std::string warning_str(warning_msg.GetString());
     std::cout << "Warning message: " << warning_str << std::endl;
     printf("%s - INFO - [XIR]: Start to finalize ir graph session\n", GetTime().c_str());
+    delete session;
     ret = ge::GEFinalize();
     if (ret != SUCCESS) {
         printf("%s - INFO - [XIR]: Finalize ir graph session failed\n", GetTime().c_str());
