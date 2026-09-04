@@ -14,13 +14,12 @@
  */
 
 #include "arch35/quant_compressor_kernel.h"
-#include "arch35/quant_compressor_kernel_full_load.h"
 
 using namespace QuantCompressor;
 
-#define INVOKE_QUANT_COMPRESSOR_GENERAL_OP_IMPL(templateClass, ...) \
+#define INVOKE_QUANT_COMPRESSOR_GENERAL_OP_IMPL(templateClass, isFullLoad, ...) \
     do { \
-        templateClass<COMPType<__VA_ARGS__>> op(&pipe, tilingData); \
+        templateClass<COMPType<__VA_ARGS__>, isFullLoad> op(&pipe, tilingData); \
         op.Init(x, wKv, wGate, stateCache, ape, xDescale, wKvDescale, wGateDescale, stateBlockTable, cuSeqlens, \
                 seqUsed, startPos, cmpKvOut, workspace); \
         op.Process(); \
@@ -49,9 +48,10 @@ __global__ __aicore__ void quant_compressor(__gm__ uint8_t *x, __gm__ uint8_t *w
     constexpr auto cacheMode = static_cast<CACHE_MODE>(CacheMode);
     constexpr auto quantMode = static_cast<QUANT_MODE>(QuantMode);
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::FULL_LOAD) {
-        INVOKE_QUANT_COMPRESSOR_GENERAL_OP_IMPL(QuantCompressorKernelFullLoad, xLayout, xDtype, coff, cacheMode,
+        INVOKE_QUANT_COMPRESSOR_GENERAL_OP_IMPL(QuantCompressorKernel, true, xLayout, xDtype, coff, cacheMode,
                                                 quantMode);
     } else {
-        INVOKE_QUANT_COMPRESSOR_GENERAL_OP_IMPL(QuantCompressorKernel, xLayout, xDtype, coff, cacheMode, quantMode);
+        INVOKE_QUANT_COMPRESSOR_GENERAL_OP_IMPL(QuantCompressorKernel, false, xLayout, xDtype, coff, cacheMode,
+                                                quantMode);
     }
 }

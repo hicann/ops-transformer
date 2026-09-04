@@ -31,7 +31,12 @@ __aicore__ inline T CeilDivT(T num1, T num2)
     if (num2 == 0) {
         return static_cast<T>(0);
     }
-    return (num1 + num2 - 1) / num2;
+    T quotient = num1 / num2;
+    T remainder = num1 % num2;
+    if (remainder != 0 && ((num1 > 0 && num2 > 0) || (num1 < 0 && num2 < 0))) {
+        return quotient + 1;
+    }
+    return quotient;
 }
 
 template <typename T>
@@ -202,15 +207,16 @@ struct ConstInfo {
 
     // workSpace
     uint32_t dbWorkspaceRatio = 1;
-    uint32_t mm1KvResSize = 0;
-    uint32_t mm1ScoreResSize = 0;
+    uint64_t mm1KvResSize = 0;
+    uint64_t mm1ScoreResSize = 0;
+    uint64_t vec1ResSize = 0;
     uint32_t vec1TailCacheSize = 0;
-    uint32_t mm1ResSize = 0; // 所有cube输出kv/score结果的总大小
+    uint64_t mm1ResSize = 0; // 所有cube输出kv/score结果的总大小
 
     uint32_t aiCoreIdx = 0;
     uint32_t nSize = 0;
 
-    uint32_t dbSize = 0;
+    uint64_t dbSize = 0;
 };
 
 struct RunInfo {
@@ -366,6 +372,11 @@ inline constexpr uint32_t REPEAT_STRIDE_NUM = REPEAT_BLOCK_BYTE / BYTE_BLOCK;   
 inline constexpr uint32_t REPEAT_MAX_NUM = 255;
 inline constexpr uint32_t BRCB_NUM = 8;
 inline constexpr uint32_t MAX_R = 256;
+
+inline constexpr uint32_t NZ_FRACTAL_DIM = 16;
+inline constexpr uint32_t WEIGHT_MATRIX_NUM = 2;
+inline constexpr uint32_t STATE_INTERLEAVE_FACTOR = 2;
+inline constexpr float SOFTMAX_MIN_VALUE = -2e38f;
 
 template <typename T>
 __aicore__ inline void CopySingleMatrixNDToNZ(LocalTensor<T> l1Tensor, const GlobalTensor<T> gmTensor, uint32_t nValue,

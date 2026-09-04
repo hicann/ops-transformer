@@ -35,9 +35,9 @@ public:
     __aicore__ inline void Init(__gm__ uint8_t *startPos, __gm__ uint8_t *seqUsed, __gm__ uint8_t *cuSeqlens);
 
     __aicore__ inline uint32_t GetSeqUsed(uint32_t bIdx);
-    __aicore__ inline uint64_t GetStartPos(uint32_t bIdx);
+    __aicore__ inline uint32_t GetStartPos(uint32_t bIdx);
     __aicore__ inline uint32_t GetSeqLength(uint32_t bIdx);
-    __aicore__ inline uint64_t GetTIdxByBatch(uint32_t bIdx);
+    __aicore__ inline uint32_t GetTIdxByBatch(uint32_t bIdx);
 
 public:
     ToolsParams toolParams_{};
@@ -84,10 +84,10 @@ __aicore__ inline uint32_t CompressorTools<COMP>::GetSeqUsed(uint32_t bIdx)
 }
 
 template <typename COMP>
-__aicore__ inline uint64_t CompressorTools<COMP>::GetStartPos(uint32_t bIdx)
+__aicore__ inline uint32_t CompressorTools<COMP>::GetStartPos(uint32_t bIdx)
 {
     if (isExistStartPos_) {
-        return (uint64_t)startPosGm_.GetValue(bIdx);
+        return (uint32_t)startPosGm_.GetValue(bIdx);
     } else {
         return 0;
     }
@@ -104,12 +104,12 @@ __aicore__ inline uint32_t CompressorTools<COMP>::GetSeqLength(uint32_t bIdx)
 }
 
 template <typename COMP>
-__aicore__ inline uint64_t CompressorTools<COMP>::GetTIdxByBatch(uint32_t bIdx)
+__aicore__ inline uint32_t CompressorTools<COMP>::GetTIdxByBatch(uint32_t bIdx)
 {
     if constexpr (COMP::xLayout == X_LAYOUT::TH) {
-        return (uint64_t)(cuSeqlensGm_.GetValue(bIdx));
+        return (uint32_t)(cuSeqlensGm_.GetValue(bIdx));
     } else {
-        return (uint64_t)toolParams_.seqSize * bIdx;
+        return (uint32_t)toolParams_.seqSize * bIdx;
     }
 }
 

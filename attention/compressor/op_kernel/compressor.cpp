@@ -19,47 +19,35 @@
 #include "arch22/compressor_kernel_full_load.h"
 #else
 #include "arch35/compressor_kernel.h"
-#include "arch35/compressor_kernel_full_load.h"
 #endif
- 
+
 using namespace Compressor;
 
 #if (__CCE_AICORE__ == 220)
-#define INVOKE_COMPRESSOR_GENERAL_OP_IMPL(templateClass, ...)                                                          \
-    do {                                                                                                               \
-        templateClass<COMPType<__VA_ARGS__>> op(&pipe, tilingData);                                                    \
-        op.Init(x, wKv, wGate, stateCache, ape, stateBlockTable,  \
-                cuSeqlens, seqUsed, startPos, cmpKvOut, workspace);                                                    \
-        op.Process();                                                                                                  \
+#define INVOKE_COMPRESSOR_GENERAL_OP_IMPL(templateClass, ...) \
+    do { \
+        templateClass<COMPType<__VA_ARGS__>> op(&pipe, tilingData); \
+        op.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut, workspace); \
+        op.Process(); \
     } while (0)
 #else
-#define INVOKE_COMPRESSOR_GENERAL_OP_IMPL(templateClass, ...)                                                          \
-    do {                                                                                                               \
-        templateClass<COMPType<__VA_ARGS__>> op(&pipe, tilingData);                                                    \
-        op.Init(x, wKv, wGate, stateCache, ape, stateBlockTable,  \
-                cuSeqlens, seqUsed, startPos, cmpKvOut, \
-                softmaxScoreOut, kvOut, workspace);                                                    \
-        op.Process();                                                                                                  \
+#define INVOKE_COMPRESSOR_GENERAL_OP_IMPL(templateClass, isFullLoad, ...) \
+    do { \
+        templateClass<COMPType<__VA_ARGS__>, isFullLoad> op(&pipe, tilingData); \
+        op.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut, \
+                softmaxScoreOut, kvOut, workspace); \
+        op.Process(); \
     } while (0)
 #endif
 
-template<uint8_t XLayout, uint8_t XDType, uint8_t Coff, uint8_t CacheMode, uint8_t TemplateId, uint8_t GradEnabled>
-__global__ __aicore__ void compressor(
-    __gm__ uint8_t *x,
-    __gm__ uint8_t *wKv,
-    __gm__ uint8_t *wGate,
-    __gm__ uint8_t *stateCache,
-    __gm__ uint8_t *ape,
-    __gm__ uint8_t *stateBlockTable,
-    __gm__ uint8_t *cuSeqlens,
-    __gm__ uint8_t *seqUsed,
-    __gm__ uint8_t *startPos,
-    __gm__ uint8_t *cmpKvOut,
-    __gm__ uint8_t *stateCacheOut,
-    __gm__ uint8_t *softmaxScoreOut,
-    __gm__ uint8_t *kvOut,
-    __gm__ uint8_t *workspace,
-    __gm__ uint8_t *tiling) {
+template <uint8_t XLayout, uint8_t XDType, uint8_t Coff, uint8_t CacheMode, uint8_t TemplateId, uint8_t GradEnabled>
+__global__ __aicore__ void compressor(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
+                                      __gm__ uint8_t *stateCache, __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable,
+                                      __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
+                                      __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *stateCacheOut,
+                                      __gm__ uint8_t *softmaxScoreOut, __gm__ uint8_t *kvOut, __gm__ uint8_t *workspace,
+                                      __gm__ uint8_t *tiling)
+{
     REGISTER_TILING_DEFAULT(optiling::CompressorTilingData);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     GET_TILING_DATA_WITH_STRUCT(optiling::CompressorTilingData, tilingDataIn, tiling);
@@ -72,18 +60,18 @@ __global__ __aicore__ void compressor(
     constexpr auto xDtype = static_cast<X_DTYPE>(XDType);
     constexpr auto coff = static_cast<COFF>(Coff);
     constexpr auto cacheMode = static_cast<CACHE_MODE>(CacheMode);
-    #if (__CCE_AICORE__ == 220)
-        if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::FULL_LOAD) {
-            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelFullLoad, xLayout, xDtype, coff);
-        } else {
-            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelPerf, xLayout, xDtype, coff);
-        }
-    #else
-        constexpr auto gradEnabled = static_cast<GRAD_ENABLED>(GradEnabled);
-        if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::FULL_LOAD) {
-            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelFullLoad, xLayout, xDtype, coff, cacheMode, gradEnabled);
-        } else {
-            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernel, xLayout, xDtype, coff, cacheMode, gradEnabled);
-        }
-    #endif
+#if (__CCE_AICORE__ == 220)
+    if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::FULL_LOAD) {
+        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelFullLoad, xLayout, xDtype, coff);
+    } else {
+        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelPerf, xLayout, xDtype, coff);
+    }
+#else
+    constexpr auto gradEnabled = static_cast<GRAD_ENABLED>(GradEnabled);
+    if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::FULL_LOAD) {
+        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernel, true, xLayout, xDtype, coff, cacheMode, gradEnabled);
+    } else {
+        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernel, false, xLayout, xDtype, coff, cacheMode, gradEnabled);
+    }
+#endif
 }

@@ -124,7 +124,7 @@ struct CmpBlockInfo {
     uint32_t bIdx = 0U;
     uint32_t sIdx = 0U;
     uint32_t bSeqUsed = 0U;
-    uint64_t bStartPos = 0U;
+    uint32_t bStartPos = 0U;
     bool needReset = false;
     bool isFirst = true;
 
@@ -149,7 +149,7 @@ struct BatchInfo {
     uint32_t seqCnt = 0;
     uint32_t seqUsedCnt = 0;
     uint32_t headHolderSeq = 0;
-    uint64_t bStartPos = 0;
+    uint32_t bStartPos = 0;
     uint32_t bIdx = 0;
     uint32_t sIdx = 0;
 };
@@ -256,7 +256,6 @@ struct RunInfo {
 struct Vec1RunInfo {
     // vec相关信息，一次syncAll需处理数据的起始索引
     uint32_t c1v1DbIdx = 0; // vec1 doubleBuffer索引
-    uint32_t v1v2DbIdx = 0; // v1v2 doubleBuffer索引
     uint32_t bStart = 0;
     uint32_t sStart = 0;
     uint32_t dealTcNum = 0;
@@ -285,7 +284,7 @@ struct BlockInfo {
 
     uint32_t isFirst = true;
     uint32_t bSeqUsed = 0U;
-    uint64_t bStartPos = 0U;
+    uint32_t bStartPos = 0U;
     uint32_t headHolderSeqCnt = 0U;
     uint32_t validSeqCnt = 0U;
     uint32_t tailHolderSeqCnt = 0U;

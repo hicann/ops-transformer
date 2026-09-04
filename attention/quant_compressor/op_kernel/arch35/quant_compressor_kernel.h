@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file quant_compressor_kernel.h
@@ -22,12 +22,14 @@
 #include "quant_compressor_tools.h"
 #include "quant_compressor_block_cube.h"
 #include "quant_compressor_block_vec.h"
+#include "quant_compressor_block_vec_normal.h"
+#include "quant_compressor_block_vec_full_load.h"
 
 using namespace AscendC;
 
 namespace QuantCompressor {
 
-template <typename COMP>
+template <typename COMP, bool IS_FULL_LOAD = false>
 class QuantCompressorKernel {
 public:
     __aicore__ inline QuantCompressorKernel(TPipe *pipe,
@@ -48,23 +50,34 @@ private:
     __aicore__ inline void InitWorkspace(__gm__ uint8_t *workspace);
     // ================================Process functions================================
     __aicore__ inline void InitTilingData();
+    // 运行时K轴切分（NORMAL独有）
     __aicore__ inline void SplitK();
-    // 获取基本块数量
+    // 获取基本块数量（NORMAL独有）
     __aicore__ inline uint32_t GetLoopTimes();
     __aicore__ inline void SkipInvalidBatch(BatchInfo &batchInfo);
+    // 更新当前组信息（NORMAL独有）
     __aicore__ inline void UpdateCurGroup(BasicBlockInfo &basicBlockInfo, BatchInfo batchInfo, uint32_t &curGroupQuota,
                                           uint32_t curDealSeq);
+    // 单次循环的batch切分（NORMAL独有）
     __aicore__ inline BasicBlockInfo SkipOneLoop(BatchInfo &batchInfo);
     // 计算分核基本信息
     __aicore__ inline void CalcSplitCoreInfo();
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const RunInfo &info, bool isNeedExcute);
+    __aicore__ inline void ComputeMm1(const RunInfo &info, bool isNeedExcute = true);
     __aicore__ inline void ComputeVec1(const Vec1RunInfo &info);
 
     __aicore__ inline bool IsNeedExcuteC1(RunInfo info);
+    // 计算Cube/Vec1参数（NORMAL独有）
     __aicore__ inline void CalcC1V1Params(RunInfo &info, Vec1RunInfo &vec1Info, BatchInfo &batchInfo, uint32_t loopIdx);
+    // 从constInfo直接读取mStart/mEnd（FULL_LOAD独有）
+    __aicore__ inline void CalcCubeParams(RunInfo &info);
+    // 计算vec1所需的压缩TC数量（FULL_LOAD独有）
+
+    // NORMAL/FULL_LOAD主循环体分离
+    __aicore__ inline void ProcessNormalLoop();
+    __aicore__ inline void ProcessFullLoadLoop();
 
     using X_T = uint8_t;
     using T = float;
@@ -93,13 +106,13 @@ private:
     // ================================Task Info====================================
     QuantCompressorTools<COMP> tools_;
     ConstInfo constInfo{};
-    uint32_t aiCoreIdx = 0;
 
     // ==============================Service Define==============================
-    QuantCompressorBlockCube<COMP> blockCube_;
-    QuantCompressorBlockVector<COMP> blockVec_;
+    QuantCompressorBlockCube<COMP, IS_FULL_LOAD> blockCube_;
+    using VecType = typename AscendC::Conditional<IS_FULL_LOAD, QuantCompressorBlockVectorFullLoad<COMP>,
+                                                  QuantCompressorBlockVectorNormal<COMP>>::type;
+    VecType blockVec_;
 
-    uint32_t accDealSize = 0;
     uint32_t loopTimes = 0;
     uint32_t cubeLoop = 0;
     uint32_t vec1Loop = 0;
@@ -109,14 +122,12 @@ private:
     bool isFirstUpdateCurGroup = true;
 };
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
-                                                         __gm__ uint8_t *stateCache, __gm__ uint8_t *ape,
-                                                         __gm__ uint8_t *xDescale, __gm__ uint8_t *wKvDescale,
-                                                         __gm__ uint8_t *wGateDescale, __gm__ uint8_t *stateBlockTable,
-                                                         __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed,
-                                                         __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut,
-                                                         __gm__ uint8_t *workspace)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::Init(
+    __gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate, __gm__ uint8_t *stateCache, __gm__ uint8_t *ape,
+    __gm__ uint8_t *xDescale, __gm__ uint8_t *wKvDescale, __gm__ uint8_t *wGateDescale, __gm__ uint8_t *stateBlockTable,
+    __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut,
+    __gm__ uint8_t *workspace)
 {
     if ASCEND_IS_AIV {
         constInfo.aiCoreIdx = GetBlockIdx() / 2;
@@ -147,12 +158,18 @@ __aicore__ inline void QuantCompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm
     constInfo.bIdxOfLastTc = constInfo.batchSize - 1;
     // 1. 计算head_dim的切分大小, 构建ConstInfo的其他信息
     CalcSplitCoreInfo();
-    SplitK(); // K轴切分
-    // 2. 计算循环次数
-    loopTimes = GetLoopTimes();
-    // 3. 初始化workspace
+    if constexpr (!IS_FULL_LOAD) {
+        // 2. 运行时K轴切分
+        SplitK();
+        // 3. 计算循环次数
+        loopTimes = GetLoopTimes();
+    } else {
+        // 2. FULL_LOAD整块加载, 主循环只跑一次
+        loopTimes = 1;
+    }
+    // 4. 初始化workspace
     InitWorkspace(workspace);
-    // 4. 初始化block层
+    // 5. 初始化block层
     if ASCEND_IS_AIC {
         blockCube_.InitParams(constInfo, tools_);
         blockCube_.Init(x, wKv, wGate, stateCache, ape, xDescale, wKvDescale, wGateDescale, stateBlockTable, cuSeqlens,
@@ -168,15 +185,13 @@ __aicore__ inline void QuantCompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm
     }
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::InitTilingData()
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::InitTilingData()
 {
     constInfo.cmpRatio = tilingData_->baseParams.cmpRatio;
     constInfo.batchSize = tilingData_->baseParams.batchSize;
     constInfo.mBaseSize = tilingData_->innerSplitParams.mBaseSize;
     constInfo.dBaseSize = tilingData_->innerSplitParams.dBaseSize;
-    constInfo.kBaseSize = tilingData_->baseParams.hiddenSize;
-    constInfo.kBaseNum = 1;
     constInfo.headDim = tilingData_->baseParams.headDim;
     constInfo.hSize = tilingData_->baseParams.hiddenSize;
     constInfo.sSize = tilingData_->baseParams.seqSize;
@@ -191,10 +206,25 @@ __aicore__ inline void QuantCompressorKernel<COMP>::InitTilingData()
     constInfo.vec1TailCacheSize = tilingData_->workspaceParams.vec1TailCacheSize;
     constInfo.dbWorkspaceRatio = tilingData_->workspaceParams.dbWorkspaceRatio;
     constInfo.batchConsistency = tilingData_->baseParams.batchConsistency;
+
+    if constexpr (IS_FULL_LOAD) {
+        constInfo.mStart = tilingData_->baseParams.splitCoreParam[constInfo.aiCoreIdx].mStart;
+        constInfo.mEnd = tilingData_->baseParams.splitCoreParam[constInfo.aiCoreIdx].mEnd;
+        constInfo.nStart = tilingData_->baseParams.splitCoreParam[constInfo.aiCoreIdx].nStart;
+        constInfo.nEnd = tilingData_->baseParams.splitCoreParam[constInfo.aiCoreIdx].nEnd;
+        constInfo.kStart = tilingData_->baseParams.splitCoreParam[constInfo.aiCoreIdx].kStart;
+        constInfo.kEnd = tilingData_->baseParams.splitCoreParam[constInfo.aiCoreIdx].kEnd;
+        constInfo.mLoopNum = tilingData_->baseParams.mLoopNum;
+        constInfo.kBaseNum = tilingData_->baseParams.kBaseNum;
+        constInfo.kBaseSize = tilingData_->baseParams.kBaseSize;
+    } else {
+        constInfo.kBaseSize = tilingData_->baseParams.hiddenSize;
+        constInfo.kBaseNum = 1;
+    }
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::SplitK()
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::SplitK()
 {
     uint32_t mSize = 0;
     for (uint32_t i = 0; i < constInfo.batchSize; i++) {
@@ -230,8 +260,8 @@ __aicore__ inline void QuantCompressorKernel<COMP>::SplitK()
     }
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::SkipInvalidBatch(BatchInfo &batchInfo)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::SkipInvalidBatch(BatchInfo &batchInfo)
 {
     for (; batchInfo.bIdx < constInfo.batchSize; ++batchInfo.bIdx) {
         batchInfo.seqCnt = tools_.GetSeqLength(batchInfo.bIdx);
@@ -256,9 +286,11 @@ __aicore__ inline void QuantCompressorKernel<COMP>::SkipInvalidBatch(BatchInfo &
     }
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::UpdateCurGroup(BasicBlockInfo &basicBlockInfo, BatchInfo batchInfo,
-                                                                   uint32_t &curGroupQuota, uint32_t curDealSeq)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::UpdateCurGroup(BasicBlockInfo &basicBlockInfo,
+                                                                                 BatchInfo batchInfo,
+                                                                                 uint32_t &curGroupQuota,
+                                                                                 uint32_t curDealSeq)
 {
     // 更新当前组的信息
     if (curGroupQuota == 0 && !isFirstUpdateCurGroup) {
@@ -283,8 +315,8 @@ __aicore__ inline void QuantCompressorKernel<COMP>::UpdateCurGroup(BasicBlockInf
     }
 }
 
-template <typename COMP>
-__aicore__ inline BasicBlockInfo QuantCompressorKernel<COMP>::SkipOneLoop(BatchInfo &batchInfo)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline BasicBlockInfo QuantCompressorKernel<COMP, IS_FULL_LOAD>::SkipOneLoop(BatchInfo &batchInfo)
 {
     BasicBlockInfo basicBlockInfo{};
     isFirstUpdateCurGroup = true;
@@ -352,8 +384,8 @@ __aicore__ inline BasicBlockInfo QuantCompressorKernel<COMP>::SkipOneLoop(BatchI
     return basicBlockInfo;
 }
 
-template <typename COMP>
-__aicore__ inline uint32_t QuantCompressorKernel<COMP>::GetLoopTimes()
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline uint32_t QuantCompressorKernel<COMP, IS_FULL_LOAD>::GetLoopTimes()
 {
     // 计算主循环次数
     uint32_t loopTimes = 0;
@@ -365,8 +397,8 @@ __aicore__ inline uint32_t QuantCompressorKernel<COMP>::GetLoopTimes()
     return loopTimes;
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::CalcSplitCoreInfo()
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::CalcSplitCoreInfo()
 {
     // D方向的基本块数量
     constInfo.dBasicBlockNum = constInfo.headDim / constInfo.dBaseSize;
@@ -388,8 +420,8 @@ __aicore__ inline void QuantCompressorKernel<COMP>::CalcSplitCoreInfo()
     constInfo.dbSize = constInfo.coreGroupNum * constInfo.mm1KvResSize;
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::InitWorkspace(__gm__ uint8_t *workspace)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::InitWorkspace(__gm__ uint8_t *workspace)
 {
     uint64_t offset = 0;
     uint64_t mm1KvResStartOffset = offset;
@@ -416,8 +448,8 @@ __aicore__ inline void QuantCompressorKernel<COMP>::InitWorkspace(__gm__ uint8_t
     offset += constInfo.dbWorkspaceRatio * constInfo.vec1TailCacheSize * sizeof(MM1_OUT_T);
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::ComputeMm1(const RunInfo &info, bool isNeedExcute)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::ComputeMm1(const RunInfo &info, bool isNeedExcute)
 {
     CrossCoreWaitFlag<SYNC_MODE2, PIPE_FIX>(SYNC_V1_C1_FLAG + info.cubeDbIdx);
     if (isNeedExcute) {
@@ -428,20 +460,24 @@ __aicore__ inline void QuantCompressorKernel<COMP>::ComputeMm1(const RunInfo &in
     CrossCoreSetFlag<SYNC_MODE2, PIPE_FIX>(SYNC_C1_V1_FLAG + info.cubeDbIdx);
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::ComputeVec1(const Vec1RunInfo &info)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::ComputeVec1(const Vec1RunInfo &info)
 {
     CrossCoreWaitFlag<SYNC_MODE2, PIPE_MTE2>(SYNC_C1_V1_FLAG + info.c1v1DbIdx);
     CrossCoreWaitFlag<SYNC_MODE0, PIPE_MTE2>(SYNC_V1_FLAG2 + info.c1v1DbIdx);
-    blockVec_.ComputeVec1(info);
+    if constexpr (IS_FULL_LOAD) {
+        blockVec_.ComputeVec1();
+    } else {
+        blockVec_.ComputeVec1(info);
+    }
     CrossCoreSetFlag<SYNC_MODE0, PIPE_MTE2>(SYNC_V1_FLAG);
     CrossCoreWaitFlag<SYNC_MODE0, PIPE_MTE2>(SYNC_V1_FLAG);
     CrossCoreSetFlag<SYNC_MODE2, PIPE_MTE2>(SYNC_V1_C1_FLAG + info.c1v1DbIdx);
     CrossCoreSetFlag<SYNC_MODE0, PIPE_MTE3>(SYNC_V1_FLAG2 + (info.c1v1DbIdx + 1) % constInfo.dbWorkspaceRatio);
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::AllocEventID()
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::AllocEventID()
 {
     if ASCEND_IS_AIC {
         blockCube_.AllocEventID(pipe_);
@@ -454,8 +490,8 @@ __aicore__ inline void QuantCompressorKernel<COMP>::AllocEventID()
     }
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::FreeEventID()
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::FreeEventID()
 {
     if ASCEND_IS_AIC {
         for (int i = 0; i < constInfo.dbWorkspaceRatio; ++i) {
@@ -468,16 +504,16 @@ __aicore__ inline void QuantCompressorKernel<COMP>::FreeEventID()
     }
 }
 
-template <typename COMP>
-__aicore__ inline bool QuantCompressorKernel<COMP>::IsNeedExcuteC1(RunInfo info)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline bool QuantCompressorKernel<COMP, IS_FULL_LOAD>::IsNeedExcuteC1(RunInfo info)
 {
     // B超出范围则cube不执行
     return info.bStart < constInfo.batchSize;
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::CalcC1V1Params(RunInfo &info, Vec1RunInfo &vec1Info,
-                                                                   BatchInfo &batchInfo, uint32_t loopIdx)
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::CalcC1V1Params(RunInfo &info, Vec1RunInfo &vec1Info,
+                                                                                 BatchInfo &batchInfo, uint32_t loopIdx)
 {
     vec1Info.bStart = batchInfo.bIdx;
     vec1Info.sStart = batchInfo.sIdx;
@@ -495,15 +531,16 @@ __aicore__ inline void QuantCompressorKernel<COMP>::CalcC1V1Params(RunInfo &info
     vec1Info.dealScSize = basicBlockInfo.compressedTcNum;
 }
 
-template <typename COMP>
-__aicore__ inline void QuantCompressorKernel<COMP>::Process()
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::CalcCubeParams(RunInfo &info)
 {
-    // 所有batch的有效序列都为0时, 直接退出
-    if (constInfo.batchSize == 0) {
-        return;
-    }
-    AllocEventID();
+    info.cubeDbIdx = (cubeLoop++ & (constInfo.dbWorkspaceRatio - 1));
+    info.dealSeqCnt = constInfo.mEnd - constInfo.mStart;
+}
 
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::ProcessNormalLoop()
+{
     BatchInfo batchInfo{};
 
     RunInfo extraInfo[1];
@@ -519,6 +556,36 @@ __aicore__ inline void QuantCompressorKernel<COMP>::Process()
         } else {
             ComputeVec1(vec1Info);
         }
+    }
+}
+
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::ProcessFullLoadLoop()
+{
+    RunInfo extraInfo[1];
+    for (uint32_t i = 0; i < loopTimes; ++i) {
+        RunInfo &extraInfo0 = extraInfo[0];
+        if ASCEND_IS_AIC {
+            CalcCubeParams(extraInfo0);
+            ComputeMm1(extraInfo0);
+        } else {
+            ComputeVec1(Vec1RunInfo{});
+        }
+    }
+}
+
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::Process()
+{
+    // 所有batch的有效序列都为0时, 直接退出
+    if (constInfo.batchSize == 0) {
+        return;
+    }
+    AllocEventID();
+    if constexpr (IS_FULL_LOAD) {
+        ProcessFullLoadLoop();
+    } else {
+        ProcessNormalLoop();
     }
     FreeEventID();
 }
