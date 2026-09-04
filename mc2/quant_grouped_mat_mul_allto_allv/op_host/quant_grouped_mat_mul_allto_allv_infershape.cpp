@@ -44,7 +44,7 @@ static constexpr size_t DIM_NUM_3 = 3;
 static constexpr int64_t FIRST_ELE_SIZE = -1;
 
 static graphStatus CheckDims(const gert::InferShapeContext *context, const gert::Shape *gmmXShape,
-                             const gert::Shape *gmmWeightShape, bool transGmmWeight)
+                             const gert::Shape *gmmWeightShape)
 {
     auto result = ge::GRAPH_SUCCESS;
 
@@ -62,7 +62,7 @@ static graphStatus CheckDims(const gert::InferShapeContext *context, const gert:
 }
 
 static graphStatus CheckDimsOptional(const gert::InferShapeContext *context, const gert::Shape *mmXShape,
-                                     const gert::Shape *mmWeightShape, bool transMmWeight)
+                                     const gert::Shape *mmWeightShape)
 {
     auto result = ge::GRAPH_SUCCESS;
 
@@ -118,7 +118,7 @@ static ge::graphStatus InferMMOutputShape(const gert::InferShapeContext *context
                return ge::GRAPH_FAILED);
     mmYShape->SetDimNum(DIM_NUM_0);
     if ((mmWeightShape != nullptr) && (mmXShape != nullptr) && (mmYShape != nullptr) && (transMmWeightPtr != nullptr)) {
-        OPS_ERR_IF(CheckDimsOptional(context, mmXShape, mmWeightShape, *transMmWeightPtr) != ge::GRAPH_SUCCESS,
+        OPS_ERR_IF(CheckDimsOptional(context, mmXShape, mmWeightShape) != ge::GRAPH_SUCCESS,
                    VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "CheckDimsOptional failed."),
                    return ge::GRAPH_FAILED);
         int64_t bs = mmXShape->GetDim(DIM_0);
@@ -157,7 +157,7 @@ static ge::graphStatus InferShapeGroupedMatMulAlltoAllv(gert::InferShapeContext 
     OPS_CHECK_NULL_WITH_CONTEXT(context, recvCountsPtr);
     OPS_CHECK_NULL_WITH_CONTEXT(context, sendCountsPtr);
     OPS_CHECK_NULL_WITH_CONTEXT(context, transGmmWeightPtr);
-    OPS_ERR_IF(CheckDims(context, gmmXShape, gmmWeightShape, *transGmmWeightPtr) != ge::GRAPH_SUCCESS,
+    OPS_ERR_IF(CheckDims(context, gmmXShape, gmmWeightShape) != ge::GRAPH_SUCCESS,
                VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "CheckDims failed."),
                return ge::GRAPH_FAILED);
 

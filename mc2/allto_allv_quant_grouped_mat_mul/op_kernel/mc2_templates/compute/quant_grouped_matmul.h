@@ -34,7 +34,7 @@ public:
     __aicore__ inline QuantGroupedMatmul() {}
     __aicore__ inline void Init(GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR xScaleGM, GM_ADDR weightScaleGM, GM_ADDR yGM,
                                 GM_ADDR workspaceGM, const TilingDataType *tilingData,
-                                const GmmTilingDataType *gmmTilingData, TILING_TYPE *gmmArrayAddrIn, TPipe *tPipe,
+                                const GmmTilingDataType *gmmTilingData, MC2_TILING_TYPE *gmmArrayAddrIn, TPipe *tPipe,
                                 bool isA2avGmmFlag = false);
     __aicore__ inline void Process(uint32_t startExpertIdx, uint32_t expertNum);
     __aicore__ inline void Process(uint32_t expertIdx);
@@ -75,7 +75,7 @@ private:
     uint64_t bs_ = 0;
     uint64_t a_ = 0;
     const GmmTilingDataType *gmmTilingData_;
-    TILING_TYPE *gmmArrayAddrIn_;
+    MC2_TILING_TYPE *gmmArrayAddrIn_;
     GM_ADDR ttXScaleRepeatGm_ = nullptr;
     GM_ADDR ttWeightScaleRepeatGm_ = nullptr;
 };
@@ -86,8 +86,8 @@ __aicore__ inline void
 QuantGroupedMatmul<TilingDataType, GmmTilingDataType, xType, wType, scaleType, yType, wFormat, aTrans, bTrans, isLocal,
                    isA2avGmm>::Init(GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR xScaleGM, GM_ADDR weightScaleGM, GM_ADDR yGM,
                                     GM_ADDR workspaceGM, const TilingDataType *tilingData,
-                                    const GmmTilingDataType *gmmTilingData, TILING_TYPE *gmmArrayAddrIn, TPipe *tPipe,
-                                    bool isA2avGmmFlag)
+                                    const GmmTilingDataType *gmmTilingData, MC2_TILING_TYPE *gmmArrayAddrIn,
+                                    TPipe *tPipe, bool isA2avGmmFlag)
 {
     if ASCEND_IS_AIV {
         return;

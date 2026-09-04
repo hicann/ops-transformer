@@ -34,7 +34,7 @@ extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, 
 extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
 extern "C" void *NnopbaseGetUserHandle(void *executor);
 
-static aclnnStatus CheckAndHandleCommMode(const char *group, const char *commModeStr, uint8_t &commModeEnum)
+static aclnnStatus CheckAndHandleCommMode(const char *commModeStr, uint8_t &commModeEnum)
 {
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
@@ -63,10 +63,8 @@ static aclnnStatus CheckAndHandleCommMode(const char *group, const char *commMod
 static bool CheckNullStatus(const aclTensor *gmmX, const aclTensor *gmmWeight,
                             const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional,
                             const aclTensor *mmXOptional, const aclTensor *mmWeightOptional, const char *group,
-                            bool transGmmWeight, bool transMmWeight, aclTensor *y, const aclTensor *mmYOptional)
+                            aclTensor *y, const aclTensor *mmYOptional)
 {
-    (void)transGmmWeight;
-    (void)transMmWeight;
     // 检查必选入参出参为非空
     OP_CHECK_NULL(gmmX, return false);
     OP_CHECK_NULL(gmmWeight, return false);
@@ -122,14 +120,10 @@ static aclnnStatus CheckSendAndRecv(const aclIntArray *sendCounts, const aclIntA
 static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight,
                                const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional,
                                const aclTensor *mmXOptional, const aclTensor *mmWeightOptional, const char *group,
-                               int64_t epWorldSize, const aclIntArray *sendCounts, const aclIntArray *recvCounts,
-                               bool transGmmWeight, bool transMmWeight, aclTensor *y, aclTensor *mmYOptional)
+                               aclTensor *y, aclTensor *mmYOptional)
 {
-    (void)epWorldSize;
-    (void)sendCounts;
-    (void)recvCounts;
     CHECK_RET(CheckNullStatus(gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional,
-                              mmWeightOptional, group, transGmmWeight, transMmWeight, y, mmYOptional),
+                              mmWeightOptional, group, y, mmYOptional),
               ACLNN_ERR_PARAM_NULLPTR);
 
     if (strnlen(group, HCCL_GROUP_NAME_MAX) >= HCCL_GROUP_NAME_MAX) {
@@ -147,9 +141,8 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2GetWorkspaceSize(
     const aclIntArray *recvCounts, bool transGmmWeight, bool transMmWeight, aclTensor *y, aclTensor *mmYOptional,
     uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    auto ret_param =
-        CheckParams(gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional, mmWeightOptional,
-                    group, epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight, y, mmYOptional);
+    auto ret_param = CheckParams(gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional,
+                                 mmWeightOptional, group, y, mmYOptional);
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
     auto ret_send_and_recv = CheckSendAndRecv(sendCounts, recvCounts);
     CHECK_RET(ret_send_and_recv == ACLNN_SUCCESS, ret_send_and_recv);
@@ -159,7 +152,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2GetWorkspaceSize(
     }
     char *str_commMode = const_cast<char *>(commMode);
     uint8_t commModeEnum = 0;
-    aclnnStatus checkCommModeRet = CheckAndHandleCommMode(group, commMode, commModeEnum);
+    aclnnStatus checkCommModeRet = CheckAndHandleCommMode(commMode, commModeEnum);
     CHECK_RET(checkCommModeRet == ACLNN_SUCCESS, checkCommModeRet);
     aclnnStatus ret = aclnnInnerGroupedMatMulAlltoAllvGetWorkspaceSize(
         gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional, mmWeightOptional,

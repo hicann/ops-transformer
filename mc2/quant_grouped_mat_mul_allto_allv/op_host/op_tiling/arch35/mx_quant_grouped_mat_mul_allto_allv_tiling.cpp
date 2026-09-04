@@ -85,11 +85,11 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsGmm()
                     OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmX", Ops::Base::ToString(localParams_.gmmXDtype).c_str(),
                                               "(DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1)"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_WEIGHT_DTYPE_LIST, localParams_.gmmWeightDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmWeight",
-                                              Ops::Base::ToString(localParams_.gmmWeightDtype).c_str(),
-                                              "(DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1)"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(MX_QUANT_GMM_WEIGHT_DTYPE_LIST, localParams_.gmmWeightDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmWeight", Ops::Base::ToString(localParams_.gmmWeightDtype).c_str(),
+                                  "(DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1)"),
+        return ge::GRAPH_FAILED);
     localParams_.yDtype = context_->GetOutputDesc(OUTPUT_Y_INDEX)->GetDataType();
     OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_Y_DTYPE_LIST, localParams_.yDtype),
                     OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(localParams_.yDtype).c_str(),
@@ -146,11 +146,11 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsMm()
                     OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmX", Ops::Base::ToString(localParams_.mmXDtype).c_str(),
                                               "(DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1)"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_WEIGHT_DTYPE_LIST, localParams_.mmWeightDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmWeight",
-                                              Ops::Base::ToString(localParams_.mmWeightDtype).c_str(),
-                                              "(DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1)"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(MX_QUANT_GMM_WEIGHT_DTYPE_LIST, localParams_.mmWeightDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmWeight", Ops::Base::ToString(localParams_.mmWeightDtype).c_str(),
+                                  "(DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1)"),
+        return ge::GRAPH_FAILED);
     localParams_.mmYDtype = context_->GetOutputDesc(OUTPUT_MM_Y_OPTIONAL_INDEX)->GetDataType();
     OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_Y_DTYPE_LIST, localParams_.mmYDtype),
                     OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmY", Ops::Base::ToString(localParams_.mmYDtype).c_str(),
@@ -210,16 +210,16 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckParamsRelationGmm()
 
     localParams_.gmmXScaleDtype = gmmXScaleDesc->GetDataType();
     localParams_.gmmWeightScaleDtype = gmmWeightScaleDesc->GetDataType();
-    OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_X_SCALE_DTYPE_LIST, localParams_.gmmXScaleDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmXScale",
-                                              Ops::Base::ToString(localParams_.gmmXScaleDtype).c_str(),
-                                              "(DT_FLOAT8_E8M0)"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_WEIGHT_SCALE_DTYPE_LIST, localParams_.gmmWeightScaleDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmWeightScale",
-                                              Ops::Base::ToString(localParams_.gmmWeightScaleDtype).c_str(),
-                                              "(DT_FLOAT8_E8M0)"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(MX_QUANT_GMM_X_SCALE_DTYPE_LIST, localParams_.gmmXScaleDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmXScale", Ops::Base::ToString(localParams_.gmmXScaleDtype).c_str(),
+                                  "(DT_FLOAT8_E8M0)"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(MX_QUANT_GMM_WEIGHT_SCALE_DTYPE_LIST, localParams_.gmmWeightScaleDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmWeightScale",
+                                  Ops::Base::ToString(localParams_.gmmWeightScaleDtype).c_str(), "(DT_FLOAT8_E8M0)"),
+        return ge::GRAPH_FAILED);
 
     const gert::StorageShape *gmmXScaleStorageShape = context_->GetRequiredInputShape(GMM_X_SCALE_INDEX);
     const gert::StorageShape *gmmWeightScaleStorageShape = context_->GetRequiredInputShape(GMM_WEIGHT_SCALE_INDEX);
@@ -232,11 +232,11 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckParamsRelationGmm()
                     OP_LOGE_WITH_INVALID_ATTR(opName_, "gmmXQuantMode", std::to_string(localParams_.gmmXQuantMode),
                                               std::to_string(QUANT_MX)),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(localParams_.gmmWeightQuantMode != QUANT_MX,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "gmmWeightQuantMode",
-                                              std::to_string(localParams_.gmmWeightQuantMode),
-                                              std::to_string(QUANT_MX)),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        localParams_.gmmWeightQuantMode != QUANT_MX,
+        OP_LOGE_WITH_INVALID_ATTR(opName_, "gmmWeightQuantMode", std::to_string(localParams_.gmmWeightQuantMode),
+                                  std::to_string(QUANT_MX)),
+        return ge::GRAPH_FAILED);
     ge::graphStatus status = MxCheckShapeDimensions(gmmXScaleStorageShape, DIM_THREE, "gmmXScaleShape");
     OP_TILING_CHECK(status != ge::GRAPH_SUCCESS, "", return ge::GRAPH_FAILED);
     status = MxCheckShapeDimensions(gmmWeightScaleStorageShape, DIM_FOUR, "gmmWeightScaleShape");
@@ -291,16 +291,16 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckParamsRelationMm()
 
     localParams_.mmXScaleDtype = mmXScaleDesc->GetDataType();
     localParams_.mmWeightScaleDtype = mmWeightScaleDesc->GetDataType();
-    OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_X_SCALE_DTYPE_LIST, localParams_.mmXScaleDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmXScale",
-                                              Ops::Base::ToString(localParams_.mmXScaleDtype).c_str(),
-                                              "(DT_FLOAT8_E8M0)"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!IsContains(MX_QUANT_GMM_WEIGHT_SCALE_DTYPE_LIST, localParams_.mmWeightScaleDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmWeightScale",
-                                              Ops::Base::ToString(localParams_.mmWeightScaleDtype).c_str(),
-                                              "(DT_FLOAT8_E8M0)"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(MX_QUANT_GMM_X_SCALE_DTYPE_LIST, localParams_.mmXScaleDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmXScale", Ops::Base::ToString(localParams_.mmXScaleDtype).c_str(),
+                                  "(DT_FLOAT8_E8M0)"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(MX_QUANT_GMM_WEIGHT_SCALE_DTYPE_LIST, localParams_.mmWeightScaleDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmWeightScale",
+                                  Ops::Base::ToString(localParams_.mmWeightScaleDtype).c_str(), "(DT_FLOAT8_E8M0)"),
+        return ge::GRAPH_FAILED);
 
     const gert::StorageShape *mmXScaleStorageShape = context_->GetOptionalInputShape(MM_X_SCALE_OPTIONAL_INDEX);
     const gert::StorageShape *mmWeightScaleStorageShape =
@@ -415,12 +415,12 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckParamsAttrEpAndSetLoca
     OP_TILING_CHECK(((groupSizeM != MX_GROUP_SIZE_M) && (groupSizeM != 0)) ||
                         ((groupSizeN != MX_GROUP_SIZE_N) && (groupSizeN != 0)) ||
                         ((groupSizeK != MX_GROUP_SIZE_K) && (groupSizeK != 0)),
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "groupSize",
-                                              (std::string("groupSizeM=") + std::to_string(groupSizeM) +
-                                               ", groupSizeN=" + std::to_string(groupSizeN) +
-                                               ", groupSizeK=" + std::to_string(groupSizeK))
-                                                  .c_str(),
-                                              "groupSizeM=0/1, groupSizeN=0/1, groupSizeK=0/32"),
+                    OP_LOGE_WITH_INVALID_ATTR(
+                        opName_, "groupSize",
+                        (std::string("groupSizeM=") + std::to_string(groupSizeM) +
+                         ", groupSizeN=" + std::to_string(groupSizeN) + ", groupSizeK=" + std::to_string(groupSizeK))
+                            .c_str(),
+                        "groupSizeM=0/1, groupSizeN=0/1, groupSizeK=0/32"),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -431,11 +431,11 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckMxQuantDtypeConstraint
     if (!localParams_.hasSharedMm) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_TILING_CHECK(localParams_.gmmXDtype != localParams_.mmXDtype,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "mmX",
-                                                          Ops::Base::ToString(localParams_.mmXDtype).c_str(),
-                                                          "The dtype of mmX must be the same as that of gmmX"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        localParams_.gmmXDtype != localParams_.mmXDtype,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "mmX", Ops::Base::ToString(localParams_.mmXDtype).c_str(),
+                                              "The dtype of mmX must be the same as that of gmmX"),
+        return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(localParams_.gmmWeightDtype != localParams_.mmWeightDtype,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -443,11 +443,11 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckMxQuantDtypeConstraint
                         "The dtype of mmWeight must be the same as that of gmmWeight"),
                     return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(localParams_.yDtype != localParams_.mmYDtype,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "mmY",
-                                                          Ops::Base::ToString(localParams_.mmYDtype).c_str(),
-                                                          "The dtype of mmY must be the same as that of y"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        localParams_.yDtype != localParams_.mmYDtype,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "mmY", Ops::Base::ToString(localParams_.mmYDtype).c_str(),
+                                              "The dtype of mmY must be the same as that of y"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -558,14 +558,14 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::CheckMxQuantMmScaleShapes()
     if (localParams_.isMmWeightTrans) { // Transposed Scenario
         OP_TILING_CHECK((mmWeightScaleDim0 != localParams_.N2) || (mmWeightScaleDim1 != mmxDivH2) ||
                             (mmWeightScaleDim2 != EVEN_ALIGN),
-                        OP_LOGE_FOR_INVALID_SHAPE(opName_, "mmWeightScale",
-                                                  (std::string("[") + std::to_string(mmWeightScaleDim0) + "," +
-                                                   std::to_string(mmWeightScaleDim1) + "," +
-                                                   std::to_string(mmWeightScaleDim2) + "]")
-                                                      .c_str(),
-                                                  (std::string("[") + std::to_string(localParams_.N2) + "," +
-                                                   std::to_string(mmxDivH2) + "," + std::to_string(EVEN_ALIGN) + "]")
-                                                      .c_str()),
+                        OP_LOGE_FOR_INVALID_SHAPE(
+                            opName_, "mmWeightScale",
+                            (std::string("[") + std::to_string(mmWeightScaleDim0) + "," +
+                             std::to_string(mmWeightScaleDim1) + "," + std::to_string(mmWeightScaleDim2) + "]")
+                                .c_str(),
+                            (std::string("[") + std::to_string(localParams_.N2) + "," + std::to_string(mmxDivH2) + "," +
+                             std::to_string(EVEN_ALIGN) + "]")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
     } else {
         OP_TILING_CHECK((mmWeightScaleDim0 != mmxDivH2) || (mmWeightScaleDim1 != localParams_.N2) ||

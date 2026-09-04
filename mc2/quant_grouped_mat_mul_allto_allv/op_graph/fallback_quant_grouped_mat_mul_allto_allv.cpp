@@ -82,7 +82,7 @@ struct QuantGroupedMatMulAlltoAllvAttrs {
     const char *commMode;
 };
 
-static ge::graphStatus GetInputs(gert::OpExecuteContext *host_api_ctx, QuantGroupedMatMulAlltoAllvInputs &inputs)
+static ge::graphStatus GetInputs(const gert::OpExecuteContext *host_api_ctx, QuantGroupedMatMulAlltoAllvInputs &inputs)
 {
     inputs.gmmX = host_api_ctx->GetInputTensor(INPUT_K_GMM_X);
     inputs.gmmWeight = host_api_ctx->GetInputTensor(INPUT_K_GMM_WEIGHT);

@@ -19,10 +19,6 @@
 
 #pragma once
 
-// 使用公共命名空间中的类型
-using MC2KernelTemplate::GMMQuantTilingData;
-using MC2KernelTemplate::TaskTilingInfo;
-
 /**
  * GMM A2AV Workspace 信息 (后通信模式: GMM计算 → AlltoAllv发送)
  *
@@ -64,13 +60,13 @@ struct QuantGmmA2avTilingData {
     GmmA2avWorkspaceInfo workspaceInfo;
 
     // ============ 核心配置信息 (Task/Loop/Comm) ============
-    TaskTilingInfo taskTilingInfo;
+    MC2KernelTemplate::TaskTilingInfo taskTilingInfo;
 
     // ============ 共享专家 GMM Tiling（放在前面）============
-    GMMQuantTilingData sharedGmmTiling; // 共享专家 GMM Tiling 数据
+    MC2KernelTemplate::GMMQuantTilingData sharedGmmTiling; // 共享专家 GMM Tiling 数据
 
     // ============ 普通专家 GMM Tiling ============
-    GMMQuantTilingData gmmBaseTiling; // 共享专家 GMM Tiling 数据，后续还会在kernel中根据任务刷新
+    MC2KernelTemplate::GMMQuantTilingData gmmBaseTiling; // 共享专家 GMM Tiling 数据，后续还会在kernel中根据任务刷新
 
     // ============ isPermuteOut ============
     bool isPermuteOut = false;

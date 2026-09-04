@@ -93,12 +93,12 @@ uint64_t QuantGroupedMatmulAllToAllvTilingBase::GetTilingKey() const
 }
 
 QuantModePair QuantGroupedMatmulAllToAllvTilingBase::GetQuantMode(const gert::TilingContext *context,
-                                                                  const char *opName)
+                                                                  const char *opName) const
 {
     const gert::RuntimeAttrs *attrs = context->GetAttrs();
     if (attrs == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "attrs");
-        return QUANT_PAIR_ERROR;
+        return QuantModePair::QUANT_PAIR_ERROR;
     }
     // 获取量化模式属性（默认为0，表示非量化）
     int64_t gmmXQuantMode = 0;

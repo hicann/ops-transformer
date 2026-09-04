@@ -36,7 +36,7 @@ extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, 
 extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
 extern "C" void *NnopbaseGetUserHandle(void *executor);
 
-static aclnnStatus CheckAndHandleCommMode(const char *group, const char *commModeStr, uint8_t &commModeEnum)
+static aclnnStatus CheckAndHandleCommMode(const char *commModeStr, uint8_t &commModeEnum)
 {
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
@@ -102,10 +102,9 @@ static bool CheckNullStatus(const aclTensor *gmmX, const aclTensor *gmmWeight,
 static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight,
                                const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional,
                                const aclTensor *mmXOptional, const aclTensor *mmWeightOptional, const char *group,
-                               int64_t epWorldSize, bool permuteOutFlag, aclTensor *gmmY, aclTensor *mmYOptional,
+                               bool permuteOutFlag, aclTensor *gmmY, aclTensor *mmYOptional,
                                aclTensor *permuteOutOptional)
 {
-    (void)epWorldSize; // Unused
     CHECK_RET(CheckNullStatus(gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional,
                               mmWeightOptional, group, permuteOutFlag, gmmY, mmYOptional, permuteOutOptional),
               ACLNN_ERR_PARAM_NULLPTR);
@@ -150,9 +149,8 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2GetWorkspaceSize(
     const aclIntArray *recvCounts, bool transGmmWeight, bool transMmWeight, bool permuteOutFlag, aclTensor *gmmY,
     aclTensor *mmYOptional, aclTensor *permuteOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    auto ret_param =
-        CheckParams(gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional, mmWeightOptional,
-                    group, epWorldSize, permuteOutFlag, gmmY, mmYOptional, permuteOutOptional);
+    auto ret_param = CheckParams(gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional,
+                                 mmWeightOptional, group, permuteOutFlag, gmmY, mmYOptional, permuteOutOptional);
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
     auto ret_send_and_recv = CheckSendAndRecv(sendCounts, recvCounts);
     CHECK_RET(ret_send_and_recv == ACLNN_SUCCESS, ret_send_and_recv);
@@ -162,7 +160,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2GetWorkspaceSize(
     }
     char *str_commMode = const_cast<char *>(commMode);
     uint8_t commModeEnum = 0;
-    aclnnStatus checkCommModeRet = CheckAndHandleCommMode(group, commMode, commModeEnum);
+    aclnnStatus checkCommModeRet = CheckAndHandleCommMode(commMode, commModeEnum);
     CHECK_RET(checkCommModeRet == ACLNN_SUCCESS, checkCommModeRet);
     aclnnStatus ret = aclnnInnerAlltoAllvGroupedMatMulGetWorkspaceSize(
         gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional, mmWeightOptional,
