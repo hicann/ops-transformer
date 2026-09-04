@@ -62,6 +62,20 @@ cd build_out
 
   各 tiling key 的编码含义见[开发者指南 §5](#5-tilingkey)。
 
+  **如何从运行日志中查找 tiling key**：在跑用例时打开 ASCEND DEBUG 日志（`export ASCEND_SLOG_PRINT_TO_STDOUT=1` 和 `export ASCEND_GLOBAL_LOG_LEVEL=0`），日志中搜索**最后一次**出现的 `kernel_name=FlashAttn_`，格式为 `FlashAttn_<hash>_<tiling_key>`，末尾的数字即为本次用例的 tiling key。例如日志中出现：
+
+  ```
+  StreamLaunchKernelV2: ... kernel_name=FlashAttn_7a9b290f0be5028cb35fc6d409953d1d_262144 ...
+  ```
+
+  则该用例的 tiling key 为 `262144`，将其填入 `--tiling_key` 即可只编译该变体。
+
+  也可通过 tiling 日志辅助确认：搜索 `GenTilingKey`，日志会直接打印 tiling key 值，例如：
+
+  ```
+  [flash_attn_tiling.cpp:198] ... GenTilingKey ... The tilingkey is 262144.
+  ```
+
 ### 2. torch 扩展包构建与安装
 
 使用 torch 接口前必做。在仓根目录构建 torch 扩展 whl 并安装：
