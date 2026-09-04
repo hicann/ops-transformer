@@ -120,6 +120,9 @@ static ge::graphStatus InferGMMOutputShape(const gert::InferShapeContext *contex
                    VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(),
                                                        "sendCounts size should not be smaller than e * epWorldSize."),
                    return ge::GRAPH_FAILED);
+        OPS_ERR_IF(recvCountsPtr->GetData() == nullptr,
+                   VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "recvCounts GetData is nullptr."),
+                   return ge::GRAPH_FAILED);
         for (int64_t i = 0; i < arraySize; i++) {
             a += static_cast<const int64_t *>(recvCountsPtr->GetData())[i];
         }

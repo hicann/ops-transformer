@@ -576,7 +576,10 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
     auto isTransA = context->GetAttrs()->GetAttrPointer<bool>(index++);
     auto isTransB = context->GetAttrs()->GetAttrPointer<bool>(index++);
     auto gatherIndex = context->GetAttrs()->GetAttrPointer<int64_t>(index++);
-    auto commTurn = *context->GetAttrs()->GetAttrPointer<int64_t>(index++);
+    auto commTurnPtr = context->GetAttrs()->GetAttrPointer<int64_t>(index++);
+    OP_TILING_CHECK(commTurnPtr == nullptr, OP_LOGE(context->GetNodeName(), "commTurn is nullptr"),
+                    return ge::GRAPH_FAILED);
+    auto commTurn = *commTurnPtr;
 
     auto rankSize = mc2tiling::MatmulFormulaicTiling::GetRankSize(group);
     OP_TILING_CHECK(
@@ -586,8 +589,9 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
 
     OP_LOGD("AllGatherMatmul",
             " group is %s, rankSize is %u, isTransA is %d, isTransB is %d, gatherIndex is %d,"
-            "commTurn is %d.",
-            group, rankSize, *isTransA, *isTransB, *gatherIndex, commTurn);
+            "commTurn is %ld.",
+            group, rankSize, isTransA ? *isTransA : 0, isTransB ? *isTransB : 0, gatherIndex ? *gatherIndex : 0,
+            commTurn);
     tilingData->param.rankDim = rankSize;
     tilingData->param.isTransposeA = isTransA ? *isTransA : 0;
     tilingData->param.isTransposeB = isTransB ? *isTransB : 0;
