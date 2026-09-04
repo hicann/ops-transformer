@@ -10,7 +10,7 @@
 
 /*!
  * \file swiglu_activation.h
- * \brief SwiGLU 和 SwiGLU-Step 门控激活实现。
+ * \brief SwiGLU 和 SwiGLU-Step 门控激活 Reg VF 实现。
  */
 
 #ifndef MEGA_MOE_ARCH35_SWIGLU_ACTIVATION_H
@@ -18,21 +18,66 @@
 
 #if defined(__DAV_C310__)
 #include "activation_common.h"
+#include "basic_api/reg_compute/kernel_reg_compute_intf.h"
 
 namespace MegaMoeImpl {
 namespace Activation {
 
-// SwiGLU 直接调用接口使用的最小参数集。
-struct SwiGluParams {
-    float clampLimit = 0.0F;
-};
-
-template <typename InputType, bool FuseTopkWeight, bool IsStep>
-__aicore__ inline void RunSwiGLU(const GatedActivationTileContext<InputType> &context, const SwiGluParams &params)
+template <typename InputType>
+__simd_callee__ inline void LoadSwiGluInputAsFp32(AscendC::Reg::RegTensor<float> &dstReg,
+                                                  AscendC::Reg::RegTensor<InputType> &inputReg, __ubuf__ InputType *src,
+                                                  AscendC::Reg::MaskReg computeMask)
 {
-    const float scalarOne = 1.0F;
-    const float negScalarOne = -1.0F;
-    bfloat16_t zeroValue = 0;
+    AscendC::Reg::LoadAlign<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(inputReg, src);
+    AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(dstReg, inputReg, computeMask);
+}
+
+__simd_callee__ inline void StoreSwiGluFp32AsBf16(__ubuf__ bfloat16_t *dst,
+                                                  AscendC::Reg::RegTensor<bfloat16_t> &outputReg,
+                                                  AscendC::Reg::RegTensor<float> &srcReg,
+                                                  AscendC::Reg::MaskReg computeMask, AscendC::Reg::MaskReg storeMask)
+{
+    AscendC::Reg::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, srcReg, computeMask);
+    AscendC::Reg::StoreAlign<bfloat16_t, AscendC::Reg::StoreDist::DIST_PACK_B32>(dst, outputReg, storeMask);
+}
+
+template <bool IsStep>
+__simd_callee__ inline void ComputeSwiGluRegFlow(
+    AscendC::Reg::RegTensor<float> &outputFp32Reg, AscendC::Reg::RegTensor<float> &gateFp32Reg,
+    AscendC::Reg::RegTensor<float> &upFp32Reg, AscendC::Reg::RegTensor<float> &negReg,
+    AscendC::Reg::RegTensor<float> &expReg, AscendC::Reg::RegTensor<float> &denominatorReg,
+    AscendC::Reg::RegTensor<float> &sigmoidReg, AscendC::Reg::MaskReg computeMask, float clampLimit)
+{
+    if constexpr (!IsStep) {
+        AscendC::Reg::Mins(gateFp32Reg, gateFp32Reg, clampLimit, computeMask);
+    }
+    AscendC::Reg::Mins(upFp32Reg, upFp32Reg, clampLimit, computeMask);
+    AscendC::Reg::Maxs(upFp32Reg, upFp32Reg, -clampLimit, computeMask);
+
+    AscendC::Reg::Muls(negReg, gateFp32Reg, -1.0F, computeMask);
+    AscendC::Reg::Exp(expReg, negReg, computeMask);
+    AscendC::Reg::Adds(denominatorReg, expReg, 1.0F, computeMask);
+    AscendC::Reg::Div(sigmoidReg, gateFp32Reg, denominatorReg, computeMask);
+    if constexpr (IsStep) {
+        AscendC::Reg::Mins(sigmoidReg, sigmoidReg, clampLimit, computeMask);
+    }
+    AscendC::Reg::Mul(outputFp32Reg, sigmoidReg, upFp32Reg, computeMask);
+}
+
+template <typename InputType, bool TopkWeightsPrefetch, bool IsStep>
+__simd_vf__ inline void RunSwiGLU(GatedActivationTileContext<InputType> context, float clampLimit)
+{
+    __ubuf__ InputType *gate = context.gate;
+    __ubuf__ InputType *up = context.up;
+    __ubuf__ bfloat16_t *output = context.output;
+    __ubuf__ float *topkWeights = context.topkWeights;
+    __ubuf__ InputType *gateTail = context.gateTail;
+    __ubuf__ InputType *upTail = context.upTail;
+    __ubuf__ bfloat16_t *outputTail = context.outputTail;
+    __ubuf__ bfloat16_t *additionalPaddingOutput = context.additionalPaddingOutput;
+
+    const uint32_t inputRowStrideElements = context.inputRowStrideElements;
+    const uint32_t outputRowStrideElements = context.outputRowStrideElements;
     const uint16_t rowLoopCount = context.rowLoopCount;
     const uint16_t fullVectorLoopCount = context.fullVectorLoopCount;
     const uint16_t needTailVectorCompute = context.needTailVectorCompute;
@@ -41,106 +86,63 @@ __aicore__ inline void RunSwiGLU(const GatedActivationTileContext<InputType> &co
     uint32_t tailStoreMaskElementCount = context.tailStoreMaskElementCount;
     uint32_t additionalPaddingStoreMaskElementCount = context.additionalPaddingStoreMaskElementCount;
 
-    __VEC_SCOPE__
-    {
-        AscendC::Reg::RegTensor<InputType> gateReg;
-        AscendC::Reg::RegTensor<InputType> upReg;
-        AscendC::Reg::RegTensor<float> gateFp32Reg;
-        AscendC::Reg::RegTensor<float> upFp32Reg;
-        AscendC::Reg::RegTensor<float> negReg;
-        AscendC::Reg::RegTensor<float> expReg;
-        AscendC::Reg::RegTensor<float> denominatorReg;
-        AscendC::Reg::RegTensor<float> sigmoidReg;
-        AscendC::Reg::RegTensor<float> outputFp32Reg;
-        AscendC::Reg::RegTensor<float> weightReg;
-        AscendC::Reg::RegTensor<bfloat16_t> outputReg;
-        AscendC::Reg::RegTensor<bfloat16_t> zeroReg;
-        AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
-        AscendC::Reg::MaskReg tailComputeMask = AscendC::Reg::UpdateMask<float>(tailComputeMaskElementCount);
-        AscendC::Reg::MaskReg tailStoreMask = AscendC::Reg::UpdateMask<float>(tailStoreMaskElementCount);
-        AscendC::Reg::MaskReg additionalPaddingStoreMask =
-            AscendC::Reg::UpdateMask<bfloat16_t>(additionalPaddingStoreMaskElementCount);
+    AscendC::Reg::RegTensor<InputType> gateReg;
+    AscendC::Reg::RegTensor<InputType> upReg;
+    AscendC::Reg::RegTensor<float> gateFp32Reg;
+    AscendC::Reg::RegTensor<float> upFp32Reg;
+    AscendC::Reg::RegTensor<float> negReg;
+    AscendC::Reg::RegTensor<float> expReg;
+    AscendC::Reg::RegTensor<float> denominatorReg;
+    AscendC::Reg::RegTensor<float> sigmoidReg;
+    AscendC::Reg::RegTensor<float> outputFp32Reg;
+    AscendC::Reg::RegTensor<float> weightReg;
+    AscendC::Reg::RegTensor<bfloat16_t> outputReg;
+    AscendC::Reg::RegTensor<bfloat16_t> zeroReg;
 
-        for (uint16_t rowIndex = 0; rowIndex < rowLoopCount; rowIndex++) {
-            if constexpr (FuseTopkWeight) {
-                AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(
-                    weightReg, context.topkWeights + rowIndex * INT32_PER_256B + WEIGHT_INDEX);
+    AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+    AscendC::Reg::MaskReg tailComputeMask = AscendC::Reg::UpdateMask<float>(tailComputeMaskElementCount);
+    AscendC::Reg::MaskReg tailStoreMask = AscendC::Reg::UpdateMask<float>(tailStoreMaskElementCount);
+    AscendC::Reg::MaskReg additionalPaddingStoreMask =
+        AscendC::Reg::UpdateMask<bfloat16_t>(additionalPaddingStoreMaskElementCount);
+
+    for (uint16_t rowIndex = 0; rowIndex < rowLoopCount; ++rowIndex) {
+        if constexpr (TopkWeightsPrefetch) {
+            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(
+                weightReg, topkWeights + rowIndex * INT32_PER_256B + WEIGHT_INDEX);
+        }
+
+        const uint32_t inputRowOffset = static_cast<uint32_t>(rowIndex) * inputRowStrideElements;
+        const uint32_t outputRowOffset = static_cast<uint32_t>(rowIndex) * outputRowStrideElements;
+        for (uint16_t vectorIndex = 0; vectorIndex < fullVectorLoopCount; ++vectorIndex) {
+            const uint32_t vectorOffset = static_cast<uint32_t>(vectorIndex) * VECTOR_LENGTH_FP32;
+            LoadSwiGluInputAsFp32<InputType>(gateFp32Reg, gateReg, gate + inputRowOffset + vectorOffset, fullMask);
+            LoadSwiGluInputAsFp32<InputType>(upFp32Reg, upReg, up + inputRowOffset + vectorOffset, fullMask);
+            ComputeSwiGluRegFlow<IsStep>(outputFp32Reg, gateFp32Reg, upFp32Reg, negReg, expReg, denominatorReg,
+                                         sigmoidReg, fullMask, clampLimit);
+            if constexpr (TopkWeightsPrefetch) {
+                AscendC::Reg::Mul(outputFp32Reg, outputFp32Reg, weightReg, fullMask);
             }
-            for (uint16_t vectorIndex = 0; vectorIndex < fullVectorLoopCount; vectorIndex++) {
-                AscendC::Reg::AddrReg inputOffset = AscendC::Reg::CreateAddrReg<InputType>(
-                    rowIndex, context.inputRowStrideElements, vectorIndex, VECTOR_LENGTH_FP32);
-                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(gateReg, context.gate,
-                                                                                           inputOffset);
-                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(upReg, context.up,
-                                                                                           inputOffset);
-                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(gateFp32Reg, gateReg, fullMask);
-                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(upFp32Reg, upReg, fullMask);
+            StoreSwiGluFp32AsBf16(output + outputRowOffset + vectorOffset, outputReg, outputFp32Reg, fullMask,
+                                  fullMask);
+        }
 
-                if constexpr (!IsStep) {
-                    AscendC::Reg::Mins(gateFp32Reg, gateFp32Reg, params.clampLimit, fullMask);
-                }
-                AscendC::Reg::Mins(upFp32Reg, upFp32Reg, params.clampLimit, fullMask);
-                AscendC::Reg::Maxs(upFp32Reg, upFp32Reg, -params.clampLimit, fullMask);
-
-                AscendC::Reg::Muls(negReg, gateFp32Reg, negScalarOne, fullMask);
-                AscendC::Reg::Exp(expReg, negReg, fullMask);
-                AscendC::Reg::Adds(denominatorReg, expReg, scalarOne, fullMask);
-                AscendC::Reg::Div(sigmoidReg, gateFp32Reg, denominatorReg, fullMask);
-                if constexpr (IsStep) {
-                    AscendC::Reg::Mins(sigmoidReg, sigmoidReg, params.clampLimit, fullMask);
-                }
-                AscendC::Reg::Mul(outputFp32Reg, sigmoidReg, upFp32Reg, fullMask);
-                if constexpr (FuseTopkWeight) {
-                    AscendC::Reg::Mul(outputFp32Reg, outputFp32Reg, weightReg, fullMask);
-                }
-
-                AscendC::Reg::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, outputFp32Reg, fullMask);
-                AscendC::Reg::AddrReg outputOffset = AscendC::Reg::CreateAddrReg<bfloat16_t>(
-                    rowIndex, context.outputRowStrideElements, vectorIndex, VECTOR_LENGTH_FP32);
-                AscendC::Reg::DataCopy<bfloat16_t, AscendC::Reg::StoreDist::DIST_PACK_B32>(context.output, outputReg,
-                                                                                           outputOffset, fullMask);
+        for (uint16_t tailIndex = 0; tailIndex < needTailVectorCompute; ++tailIndex) {
+            LoadSwiGluInputAsFp32<InputType>(gateFp32Reg, gateReg, gateTail + inputRowOffset, tailComputeMask);
+            LoadSwiGluInputAsFp32<InputType>(upFp32Reg, upReg, upTail + inputRowOffset, tailComputeMask);
+            ComputeSwiGluRegFlow<IsStep>(outputFp32Reg, gateFp32Reg, upFp32Reg, negReg, expReg, denominatorReg,
+                                         sigmoidReg, tailComputeMask, clampLimit);
+            if constexpr (TopkWeightsPrefetch) {
+                AscendC::Reg::Mul(outputFp32Reg, outputFp32Reg, weightReg, tailComputeMask);
             }
+            StoreSwiGluFp32AsBf16(outputTail + outputRowOffset, outputReg, outputFp32Reg, tailComputeMask,
+                                  tailStoreMask);
+        }
 
-            AscendC::Reg::AddrReg tailInputOffset =
-                AscendC::Reg::CreateAddrReg<InputType>(rowIndex, context.inputRowStrideElements);
-            AscendC::Reg::AddrReg tailOutputOffset =
-                AscendC::Reg::CreateAddrReg<bfloat16_t>(rowIndex, context.outputRowStrideElements);
-            for (uint16_t tailIndex = 0; tailIndex < needTailVectorCompute; tailIndex++) {
-                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(gateReg, context.gateTail,
-                                                                                           tailInputOffset);
-                AscendC::Reg::DataCopy<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(upReg, context.upTail,
-                                                                                           tailInputOffset);
-                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(gateFp32Reg, gateReg, tailComputeMask);
-                AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(upFp32Reg, upReg, tailComputeMask);
-
-                if constexpr (!IsStep) {
-                    AscendC::Reg::Mins(gateFp32Reg, gateFp32Reg, params.clampLimit, tailComputeMask);
-                }
-                AscendC::Reg::Mins(upFp32Reg, upFp32Reg, params.clampLimit, tailComputeMask);
-                AscendC::Reg::Maxs(upFp32Reg, upFp32Reg, -params.clampLimit, tailComputeMask);
-
-                AscendC::Reg::Muls(negReg, gateFp32Reg, negScalarOne, tailComputeMask);
-                AscendC::Reg::Exp(expReg, negReg, tailComputeMask);
-                AscendC::Reg::Adds(denominatorReg, expReg, scalarOne, tailComputeMask);
-                AscendC::Reg::Div(sigmoidReg, gateFp32Reg, denominatorReg, tailComputeMask);
-                if constexpr (IsStep) {
-                    AscendC::Reg::Mins(sigmoidReg, sigmoidReg, params.clampLimit, tailComputeMask);
-                }
-                AscendC::Reg::Mul(outputFp32Reg, sigmoidReg, upFp32Reg, tailComputeMask);
-                if constexpr (FuseTopkWeight) {
-                    AscendC::Reg::Mul(outputFp32Reg, outputFp32Reg, weightReg, tailComputeMask);
-                }
-
-                AscendC::Reg::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, outputFp32Reg, tailComputeMask);
-                AscendC::Reg::DataCopy<bfloat16_t, AscendC::Reg::StoreDist::DIST_PACK_B32>(
-                    context.outputTail, outputReg, tailOutputOffset, tailStoreMask);
-            }
-            for (uint16_t additionalPaddingIndex = 0; additionalPaddingIndex < needAdditionalPaddingStore;
-                 additionalPaddingIndex++) {
-                AscendC::Reg::Duplicate(zeroReg, zeroValue);
-                AscendC::Reg::DataCopy<bfloat16_t>(context.additionalPaddingOutput, zeroReg, tailOutputOffset,
-                                                   additionalPaddingStoreMask);
-            }
+        for (uint16_t additionalPaddingIndex = 0; additionalPaddingIndex < needAdditionalPaddingStore;
+             ++additionalPaddingIndex) {
+            AscendC::Reg::Duplicate(zeroReg, static_cast<bfloat16_t>(0));
+            AscendC::Reg::StoreAlign<bfloat16_t>(additionalPaddingOutput + outputRowOffset, zeroReg,
+                                                 additionalPaddingStoreMask);
         }
     }
 }

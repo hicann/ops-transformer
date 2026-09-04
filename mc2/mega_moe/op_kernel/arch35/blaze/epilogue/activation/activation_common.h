@@ -19,6 +19,7 @@
 #if defined(__DAV_C310__)
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
+#include "basic_api/reg_compute/kernel_reg_compute_intf.h"
 #else
 #include "kernel_operator.h"
 #endif
@@ -44,7 +45,7 @@ constexpr AscendC::Reg::CastTrait CAST_FP32_TO_BF16 = {AscendC::Reg::RegLayout::
  * 单个门控激活 tile 的完整执行上下文。
  *
  * Block Epilogue 在分派激活前直接计算地址、物理行距、循环次数和尾部 Mask，具体激活仅消费这些
- * 已物化的数据。此结构不保存 RegTensor、MaskReg、AddrReg 等 VecScope 内对象。
+ * 已物化的数据。此结构不保存 RegTensor、MaskReg 等 VF 内对象。
  */
 template <typename InputType>
 struct GatedActivationTileContext {
@@ -62,9 +63,9 @@ struct GatedActivationTileContext {
     uint32_t outputRowStrideElements;
     uint16_t rowLoopCount;
     uint16_t fullVectorLoopCount;
-    // 0/1 标志：为保持原 VecScope for-loop 形态，直接作为尾 Vector 计算循环上界。
+    // 0/1 标志：直接作为尾 Vector 计算的 VF 循环上界。
     uint16_t needTailVectorCompute;
-    // 0/1 标志：为保持原 VecScope for-loop 形态，直接作为额外补零写回循环上界。
+    // 0/1 标志：直接作为额外补零写回的 VF 循环上界。
     uint16_t needAdditionalPaddingStore;
 
     // UpdateMask 接收可写引用，具体激活需将以下计数复制到局部变量后再调用。

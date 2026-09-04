@@ -25,7 +25,6 @@
 #include "../../common/mega_moe_constants.h"
 
 namespace MegaMoeImpl {
-namespace Detail {
 
 struct ActivationMxQuantUbOffsets {
     uint32_t firstInputOffsetBytes;
@@ -36,7 +35,7 @@ struct ActivationMxQuantUbOffsets {
     uint32_t quantOutputOffsetBytes;
     uint32_t quantScaleOffsetBytes;
     uint32_t maxExpOffsetBytes;
-    uint32_t reciprocalScaleOffsetBytes;
+    uint32_t inverseMxScaleOffsetBytes;
     uint32_t scaleElementCapacity;
     uint32_t topkWeightOffsetBytes;
     uint32_t topkWeightElementCapacity;
@@ -54,7 +53,7 @@ __aicore__ constexpr inline ActivationMxQuantUbOffsets BuildActivationMxQuantUbO
     constexpr uint32_t quantScaleOffsetBytes = quantOutputOffsetBytes + activationQuantElementCapacity * sizeof(int8_t);
     constexpr uint32_t scaleElementCapacity = activationQuantElementCapacity / AscendC::ONE_BLK_SIZE;
     constexpr uint32_t maxExpOffsetBytes = quantScaleOffsetBytes + scaleElementCapacity * sizeof(int8_t);
-    constexpr uint32_t reciprocalScaleOffsetBytes = maxExpOffsetBytes + scaleElementCapacity * sizeof(uint16_t);
+    constexpr uint32_t inverseMxScaleOffsetBytes = maxExpOffsetBytes + scaleElementCapacity * sizeof(uint16_t);
     constexpr uint32_t vecInEndBytes = maxSingleElementCount * sizeof(InputType) * 2U;
     constexpr uint32_t secondInputOffsetBytes =
         (vecInEndBytes <= 256U * 1024U) ? (maxSingleElementCount * sizeof(InputType)) : 0U;
@@ -67,7 +66,7 @@ __aicore__ constexpr inline ActivationMxQuantUbOffsets BuildActivationMxQuantUbO
             quantOutputOffsetBytes,
             quantScaleOffsetBytes,
             maxExpOffsetBytes,
-            reciprocalScaleOffsetBytes,
+            inverseMxScaleOffsetBytes,
             scaleElementCapacity,
             vecInEndBytes,
             TileM * INT32_PER_256B};
@@ -81,7 +80,7 @@ struct ActivationMxQuantUbPointers {
     __ubuf__ int8_t *quantOutput;
     __ubuf__ uint16_t *quantScale;
     __ubuf__ uint16_t *maxExp;
-    __ubuf__ uint16_t *reciprocalScale;
+    __ubuf__ uint16_t *inverseMxScale;
     uint32_t selectedInt8BufferOffsetElements;
 };
 
@@ -89,7 +88,7 @@ template <typename InputType, uint32_t MaxSingleElementCount, bool IsInterleaved
 __aicore__ inline ActivationMxQuantUbPointers<InputType> ResolveActivationMxQuantUbPointers(
     __ubuf__ InputType *firstInputBase, __ubuf__ InputType *secondInputBase, __ubuf__ bfloat16_t *activationOutputBase,
     __ubuf__ int8_t *quantOutputBase, __ubuf__ uint16_t *quantScaleBase, __ubuf__ uint16_t *maxExpBase,
-    __ubuf__ uint16_t *reciprocalScaleBase, uint32_t validColumnCount, uint16_t pingpongIdx)
+    __ubuf__ uint16_t *inverseMxScaleBase, uint32_t validColumnCount, uint16_t pingpongIdx)
 {
     constexpr uint32_t pongElementOfInput = MaxSingleElementCount;
     constexpr uint32_t pongElementOfBfloat16 = MaxSingleElementCount * sizeof(InputType) / sizeof(bfloat16_t);
@@ -108,12 +107,11 @@ __aicore__ inline ActivationMxQuantUbPointers<InputType> ResolveActivationMxQuan
     pointers.quantOutput = quantOutputBase + pongMultiplier * pongElementOfInt8;
     pointers.quantScale = quantScaleBase + pongMultiplier * pongElementOfUint16;
     pointers.maxExp = maxExpBase + pongMultiplier * pongElementOfUint16;
-    pointers.reciprocalScale = reciprocalScaleBase + pongMultiplier * pongElementOfUint16;
+    pointers.inverseMxScale = inverseMxScaleBase + pongMultiplier * pongElementOfUint16;
     pointers.selectedInt8BufferOffsetElements = pongMultiplier * pongElementOfInt8;
     return pointers;
 }
 
-} // namespace Detail
 } // namespace MegaMoeImpl
 
 #endif // defined(__DAV_C310__)
