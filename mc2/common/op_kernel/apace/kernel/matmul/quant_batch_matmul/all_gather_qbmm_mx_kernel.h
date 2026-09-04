@@ -67,6 +67,7 @@ public:
     static constexpr int64_t kC0Size = 32;               // C0_SIZE_B8 for non-fp4
     static constexpr int64_t kCacheLineAlignMask = 0x7f; // 128B cache line alignment for fp8
     static constexpr int32_t kScaleC0 = 2;
+    static constexpr uint32_t DIMS_NUM = 2UL;
 
     // ---- Layout factories ----
     using MakeLayoutA = AscendC::Te::FrameLayoutFormat<LayoutA, AscendC::Std::Int<kC0Size>>;
@@ -85,10 +86,10 @@ public:
     using FragBlockShape = typename BlockMmadFragC::BlockShape;
 
     // ---- FragmentTensor types ----
-    using FragTensorA = Apace::Basic::FragmentTensor<2, Apace::Basic::MAX_FRAGMENT_COUNT, MakeLayoutA, AType>;
+    using FragTensorA = Apace::Basic::FragmentTensor<DIMS_NUM, Apace::Basic::MAX_FRAGMENT_COUNT, MakeLayoutA, AType>;
     using FragScaleA =
-        Apace::Basic::FragmentTensor<2, Apace::Basic::MAX_FRAGMENT_COUNT, MakeLayoutScaleA, AscendC::fp8_e8m0_t>;
-    using FragTensorC = Apace::Basic::FragmentTensor<2, Apace::Basic::MAX_FRAGMENT_COUNT, MakeLayoutC, CType>;
+        Apace::Basic::FragmentTensor<DIMS_NUM, Apace::Basic::MAX_FRAGMENT_COUNT, MakeLayoutScaleA, AscendC::fp8_e8m0_t>;
+    using FragTensorC = Apace::Basic::FragmentTensor<DIMS_NUM, Apace::Basic::MAX_FRAGMENT_COUNT, MakeLayoutC, CType>;
 
     /**
      * @brief Tiling 配置（对标 blaze QBMMTiling）
@@ -168,8 +169,8 @@ private:
     __aicore__ inline void BuildMainFragment(const Params &params, uint32_t roundIdx);
     __aicore__ inline void BuildTailFragment(const Params &params);
     __aicore__ inline void UpdateMainRoundAddrs(const Params &params, uint32_t roundIdx);
-    __aicore__ inline Apace::Basic::FragmentParam<2> MakeFragParam(uint64_t fragSize, uint64_t realFragSize,
-                                                                   uint32_t fragCnt, uint64_t shape1) const;
+    __aicore__ inline Apace::Basic::FragmentParam<DIMS_NUM> MakeFragParam(uint64_t fragSize, uint64_t realFragSize,
+                                                                          uint32_t fragCnt, uint64_t shape1) const;
 
     // ---- Tile context resolution ----
     struct TileCtx {
@@ -414,10 +415,11 @@ __aicore__ inline void AllGatherQbmmMxKernel<AType, BType, CType>::Process(const
 }
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline Apace::Basic::FragmentParam<2> AllGatherQbmmMxKernel<AType, BType, CType>::MakeFragParam(
-    uint64_t fragSize, uint64_t realFragSize, uint32_t fragCnt, uint64_t shape1) const
+__aicore__ inline Apace::Basic::FragmentParam<AllGatherQbmmMxKernel<AType, BType, CType>::DIMS_NUM>
+AllGatherQbmmMxKernel<AType, BType, CType>::MakeFragParam(uint64_t fragSize, uint64_t realFragSize, uint32_t fragCnt,
+                                                          uint64_t shape1) const
 {
-    Apace::Basic::FragmentParam<2> param{};
+    Apace::Basic::FragmentParam<DIMS_NUM> param{};
     param.assembleAxis = 0;
     param.assembledShape[0] = fragSize * fragCnt;
     param.assembledShape[1] = shape1;
@@ -444,11 +446,11 @@ __aicore__ inline void AllGatherQbmmMxKernel<AType, BType, CType>::BuildFragment
     headAddrListA_[0] = params.aGM;
     headAddrListScale_[0] = params.aScaleGM;
     headAddrListC_[0] = cFragAddrs_[fp.rankId];
-    headFragA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutA, AType>(
+    headFragA_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutA, AType>(
         MakeFragParam(fp.headRows, fp.headRows, 1, fp.k), headAddrListA_);
-    headFragScaleA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(
+    headFragScaleA_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(
         MakeFragParam(fp.headRows, fp.headRows, 1, fp.scaleKLen), headAddrListScale_);
-    headFragC_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutC, CType>(
+    headFragC_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutC, CType>(
         MakeFragParam(fp.headRows, fp.headRows, 1, fp.n), headAddrListC_);
     // main / tail 的 fragment tensor 延迟到首次使用时构建，构建开销被 comm wait 掩盖。
 }
@@ -488,11 +490,11 @@ __aicore__ inline void AllGatherQbmmMxKernel<AType, BType, CType>::BuildMainFrag
         mainAddrListC_[fragIdx] = cFragAddrs_[r] + curRoundCOff_;
         fragIdx++;
     }
-    curMainA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutA, AType>(
+    curMainA_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutA, AType>(
         MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.k), mainAddrListA_);
-    curMainScaleA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(
+    curMainScaleA_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(
         MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.scaleKLen), mainAddrListScale_);
-    curMainC_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutC, CType>(
+    curMainC_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutC, CType>(
         MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.n), mainAddrListC_);
     curMainRoundIdx_ = roundIdx;
 }
@@ -518,11 +520,11 @@ __aicore__ inline void AllGatherQbmmMxKernel<AType, BType, CType>::BuildTailFrag
         }
         tailAddrListC_[r] = cFragAddrs_[r] + tailCOff;
     }
-    tailFragA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutA, AType>(
+    tailFragA_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutA, AType>(
         MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.k), tailAddrListA_);
-    tailFragScaleA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(
+    tailFragScaleA_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(
         MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.scaleKLen), tailAddrListScale_);
-    tailFragC_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutC, CType>(
+    tailFragC_ = Apace::Basic::MakeFragmentTensor<DIMS_NUM, MAX_FRAG, MakeLayoutC, CType>(
         MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.n), tailAddrListC_);
 }
 

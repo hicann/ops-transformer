@@ -30,9 +30,8 @@ struct CommContext {
 } // namespace AivComm
 } // namespace Apace
 
-using Apace::AivComm::CommContext;
-
 #pragma pack(push, 8)
+// 8 means 8 bytes aligned
 struct alignas(8) AllGatherMxMatmulUrmaTilingData {
     QuantMatmulTilingData mmTile;
     CommTilingData commTile;

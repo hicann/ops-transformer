@@ -384,7 +384,7 @@ private:
         }
     }
 
-    uint64_t CalUsedCoreNum(const QuantMatmulRunInfo &runInfo, uint64_t mTile, uint64_t nTile)
+    uint64_t CalUsedCoreNum(const QuantMatmulRunInfo &runInfo, uint64_t mTile, uint64_t nTile) const
     {
         return mTile * nTile * runInfo.tailBlockCnt;
     }
@@ -409,7 +409,7 @@ private:
     }
 
     uint64_t GetDepthA1B1(const QuantMatmulRunInfo &runInfo, uint64_t leftSize, uint64_t perDepthSize,
-                          uint64_t depthInit)
+                          uint64_t depthInit) const
     {
         // The first pass grows by powers of two to find a feasible region; the
         // second pass snaps the result to a DMA-friendly K granularity.
@@ -439,7 +439,7 @@ private:
         return depthInit * depthScale;
     }
 
-    void CalStepKs(const QuantMatmulArgs &args, QuantMatmulRunInfo &runInfo)
+    void CalStepKs(const QuantMatmulArgs &args, QuantMatmulRunInfo &runInfo) const
     {
         // Convert L1 depth to step-K counts and keep A/B synchronized so both
         // sides advance through K with the same outer scheduling cadence.
@@ -470,7 +470,7 @@ private:
 
     void CalScaleFactors(const QuantMatmulArgs &args, const QuantMatmulPlatformInfo &platformInfo,
                          QuantMatmulRunInfo &runInfo, uint64_t baseASize, uint64_t baseBSize, uint64_t baseScaleASize,
-                         uint64_t baseScaleBSize)
+                         uint64_t baseScaleBSize) const
     {
         // Scale reuse is solved after A/B depth is fixed. The search keeps the
         // two scale paths balanced while staying inside the leftover L1 budget.

@@ -31,7 +31,6 @@
 #include <cstdlib>
 #include "apace_st_utils.h"
 #include "apace/utils/apace_constant.h"
-#include "apace/utils/apace_common_utils.h"
 #include "apace/tiling/quant_matmul_tiling_swat.h"
 #include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_tiling_data.h"
 #include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_impl.h"

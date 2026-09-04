@@ -24,6 +24,7 @@
 // The field order is part of the host-device contract, so layout stability is
 // more important here than convenience of reordering members.
 #pragma pack(push, 8)
+// 8 means 8 bytes aligned
 struct alignas(8) QuantMatmulTilingData {
     // Original problem shape.
     uint32_t m{0};
