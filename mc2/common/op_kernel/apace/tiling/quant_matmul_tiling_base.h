@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <optional>
 
 #include "../utils/apace_common_utils.h"
@@ -97,8 +98,13 @@ protected:
     virtual void DoOpTiling(QuantMatmulTilingData &tilingData) = 0;
 
 private:
+    // 仅当全局日志级别为 DEBUG(ASCEND_GLOBAL_LOG_LEVEL=0) 时打印 tiling 调试信息，默认级别下不打印。
     void PrintTilingData(const QuantMatmulTilingData &tilingData) const
     {
+        const char *level = std::getenv("ASCEND_GLOBAL_LOG_LEVEL");
+        if (level == nullptr || level[0] != '0') {
+            return;
+        }
         printf("[QuantMatmul Strategy]\n");
         printf("  strategy           : %s\n", TilingName());
         printf("[QuantMatmul Tiling Data]\n");
