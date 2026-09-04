@@ -120,6 +120,71 @@ public:
         IterateBmm1Impl<1U, false, true>(outputBuf1, runInfo, constInfo);
     }
 
+    __aicore__ inline void IterateBmm2(MxBmm2Buf &outputBuf,
+                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
+                                       MxRunInfo &runInfo, const MxConstInfo &constInfo)
+    {
+        // C2: P[128,512] x V[512,DV]，P/V 均携带 e8m0 scale。
+        Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> pBuf = inputBuf.GetCube();
+        pBuf.WaitCrossCore();
+        constexpr uint64_t pScaleOffset = static_cast<uint64_t>(M_BASE) * S2_BASE;
+        if (runInfo.actSingleLoopS2Size > S2_SPLIT) {
+            // tail PScale 填 e8m0(1.0)。
+            constexpr uint32_t int16Bytes = 2U;
+            LocalTensor<int16_t> pScalePadTensor =
+                pBuf.GetTensor<int16_t>(pScaleOffset / int16Bytes + M_BASE * S2_SPLIT / MX_SCALE_GROUP / int16Bytes);
+            InitConstValue(pScalePadTensor, {1, M_BASE * S2_SPLIT / MX_SCALE_GROUP * sizeof(SCALE_T) / 32U, 0, 0x7f7f});
+        }
+        LocalTensor<SCALE_T> pScaleTensor = pBuf.GetTensor<SCALE_T>(pScaleOffset);
+
+        Buffer<BufferType::L0C> mm2ResL0C = mmL0CBuffers_.Get();
+        mm2ResL0C.Wait<HardEvent::FIX_M>();
+        constexpr uint32_t baseK = S2_SPLIT;
+        constexpr uint64_t l1BaseKOffset = static_cast<uint64_t>(baseK) * M_BASE;
+        constexpr uint64_t l1ScaleOffset = l1BaseKOffset / MX_SCALE_GROUP;
+        const uint32_t kLoops = (runInfo.actSingleLoopS2Size + baseK - 1U) / baseK;
+        for (uint32_t kIdx = 0U; kIdx < kLoops; ++kIdx) {
+            const uint32_t realK = (kIdx == kLoops - 1U) ? runInfo.actSingleLoopS2Size - kIdx * baseK : baseK;
+            Buffer<BufferType::L1> vBuf = l1VBuffers_.Get();
+            vBuf.Wait<HardEvent::MTE1_MTE2>();
+            LocalTensor<INPUT_T> vTensor = vBuf.GetTensor<INPUT_T>();
+            // V 使用 ND2NZ，tail 补零到 64-token 对齐。
+            InitValuePadding(vTensor, realK, constInfo.dSizeV);
+            CopyValueToL1(vTensor, runInfo, constInfo, realK, kIdx);
+
+            const uint64_t vScaleOffset = static_cast<uint64_t>(AlignUp64(realK)) * constInfo.dSizeV;
+            LocalTensor<SCALE_T> vScaleTensor = vBuf.GetTensor<SCALE_T>(vScaleOffset);
+            // VScale 按 64-token group 寻址。
+            CopyValueScaleToL1(vScaleTensor, runInfo, constInfo, realK, kIdx);
+            vBuf.Set<HardEvent::MTE2_MTE1>();
+            vBuf.Wait<HardEvent::MTE2_MTE1>();
+
+            // C2: P[M,K] * V[K,DV] -> C2[M,DV]。
+            const bool isFirstKLoop = kIdx == 0U;
+            MMParam param = MxMakeMMParam(M_BASE,           // singleM：固定的 Q block 行数。
+                                          constInfo.dSizeV, // singleN：V 的 head dimension。
+                                          AlignUp64(realK), // singleK：当前 K 分块按 64 对齐后的长度。
+                                          true,             // isLeftTranspose：P 按 [M,K] 转置视图加载。
+                                          false,            // isRightTranspose：V 按 [K,DV] 加载，不转置。
+                                          isFirstKLoop,     // cmatrixInitVal：首个 K 分块初始化 C 矩阵。
+                                          isFirstKLoop);    // isOutKFisrt：标记当前是外层 K 循环首块。
+            // P 转置，V 保持 KN。
+            MxMatmulFull<INPUT_T, INPUT_T, MM_T, M_BASE, DV_BASE, baseK, ABLayout::MK, ABLayout::KN,
+                         BuffersPolicyDB<BufferType::L0A>, BuffersPolicyDB<BufferType::L0B>, SCALE_T, SCALE_T,
+                         mx_fp8_e4m3_t, mx_fp8_e4m3_t>(pBuf.GetTensor<INPUT_T>()[kIdx * l1BaseKOffset], vTensor,
+                                                       mmL0ABuffers_, mmL0BBuffers_, mm2ResL0C.GetTensor<MM_T>(), param,
+                                                       pScaleTensor[kIdx * l1ScaleOffset], vScaleTensor);
+            vBuf.Set<HardEvent::MTE1_MTE2>();
+        }
+
+        mm2ResL0C.Set<HardEvent::M_FIX>();
+        mm2ResL0C.Wait<HardEvent::M_FIX>();
+        outputBuf.WaitCrossCore();
+        FixpipeMm2(outputBuf.GetTensor<MM_T>(), mm2ResL0C.GetTensor<MM_T>(), runInfo, constInfo);
+        mm2ResL0C.Set<HardEvent::FIX_M>();
+        outputBuf.SetCrossCore();
+    }
+
 private:
     template <uint32_t SUB_LOOP, bool LOAD_Q_TO_L0B, bool RELEASE_Q_L0B>
     __aicore__ inline void IterateBmm1Impl(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
@@ -172,7 +237,12 @@ private:
         Buffer<BufferType::L0C> mm1ResL0C = mmL0CBuffers_.Get();
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         // MxMatmulFull 同时消费 fp8 data 与 e8m0 scale。
-        MMParam param = MxMakeMMParam(s2CalcSize, runInfo.actMSize, constInfo.dSize, false, true);
+        // C1: K[S2,D] * Q^T[D,M] -> C1[S2,M]。
+        MMParam param = MxMakeMMParam(s2CalcSize,       // singleM：当前 subLoop 的实际 S2 长度。
+                                      runInfo.actMSize, // singleN：当前 Q block 的实际 M 长度。
+                                      constInfo.dSize,  // singleK：Q/K head dimension。
+                                      false,            // isLeftTranspose：K 按 [S2,D] 加载，不转置。
+                                      true);            // isRightTranspose：Q 按 [D,M] 转置视图加载。
         if constexpr (LOAD_Q_TO_L0B && RELEASE_Q_L0B) {
             MxMatmulFull<INPUT_T, INPUT_T, MM_T, S2_SPLIT, M_BASE, D_BASE, ABLayout::MK, ABLayout::KN,
                          BuffersPolicyDB<BufferType::L0A>, BuffersPolicyDB<BufferType::L0B>, SCALE_T, SCALE_T,
@@ -202,66 +272,6 @@ private:
         outputBuf.SetCrossCore();
     }
 
-public:
-    __aicore__ inline void IterateBmm2(MxBmm2Buf &outputBuf,
-                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
-                                       MxRunInfo &runInfo, const MxConstInfo &constInfo)
-    {
-        // C2: P[128,512] x V[512,DV]，P/V 均携带 e8m0 scale。
-        Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> pBuf = inputBuf.GetCube();
-        pBuf.WaitCrossCore();
-        constexpr uint64_t pScaleOffset = static_cast<uint64_t>(M_BASE) * S2_BASE;
-        if (runInfo.actSingleLoopS2Size > S2_SPLIT) {
-            // tail PScale 填 e8m0(1.0)。
-            constexpr uint32_t int16Bytes = 2U;
-            LocalTensor<int16_t> pScalePadTensor =
-                pBuf.GetTensor<int16_t>(pScaleOffset / int16Bytes + M_BASE * S2_SPLIT / MX_SCALE_GROUP / int16Bytes);
-            InitConstValue(pScalePadTensor, {1, M_BASE * S2_SPLIT / MX_SCALE_GROUP * sizeof(SCALE_T) / 32U, 0, 0x7f7f});
-        }
-        LocalTensor<SCALE_T> pScaleTensor = pBuf.GetTensor<SCALE_T>(pScaleOffset);
-
-        Buffer<BufferType::L0C> mm2ResL0C = mmL0CBuffers_.Get();
-        mm2ResL0C.Wait<HardEvent::FIX_M>();
-        constexpr uint32_t baseK = S2_SPLIT;
-        constexpr uint64_t l1BaseKOffset = static_cast<uint64_t>(baseK) * M_BASE;
-        constexpr uint64_t l1ScaleOffset = l1BaseKOffset / MX_SCALE_GROUP;
-        const uint32_t kLoops = (runInfo.actSingleLoopS2Size + baseK - 1U) / baseK;
-        for (uint32_t kIdx = 0U; kIdx < kLoops; ++kIdx) {
-            const uint32_t realK = (kIdx == kLoops - 1U) ? runInfo.actSingleLoopS2Size - kIdx * baseK : baseK;
-            Buffer<BufferType::L1> vBuf = l1VBuffers_.Get();
-            vBuf.Wait<HardEvent::MTE1_MTE2>();
-            LocalTensor<INPUT_T> vTensor = vBuf.GetTensor<INPUT_T>();
-            // V 使用 ND2NZ，tail 补零到 64-token 对齐。
-            InitValuePadding(vTensor, realK, constInfo.dSizeV);
-            CopyValueToL1(vTensor, runInfo, constInfo, realK, kIdx);
-
-            const uint64_t vScaleOffset = static_cast<uint64_t>(AlignUp64(realK)) * constInfo.dSizeV;
-            LocalTensor<SCALE_T> vScaleTensor = vBuf.GetTensor<SCALE_T>(vScaleOffset);
-            // VScale 按 64-token group 寻址。
-            CopyValueScaleToL1(vScaleTensor, runInfo, constInfo, realK, kIdx);
-            vBuf.Set<HardEvent::MTE2_MTE1>();
-            vBuf.Wait<HardEvent::MTE2_MTE1>();
-
-            MMParam param =
-                MxMakeMMParam(M_BASE, constInfo.dSizeV, AlignUp64(realK), true, false, kIdx == 0U, kIdx == 0U);
-            // P 转置，V 保持 KN。
-            MxMatmulFull<INPUT_T, INPUT_T, MM_T, M_BASE, DV_BASE, baseK, ABLayout::MK, ABLayout::KN,
-                         BuffersPolicyDB<BufferType::L0A>, BuffersPolicyDB<BufferType::L0B>, SCALE_T, SCALE_T,
-                         mx_fp8_e4m3_t, mx_fp8_e4m3_t>(pBuf.GetTensor<INPUT_T>()[kIdx * l1BaseKOffset], vTensor,
-                                                       mmL0ABuffers_, mmL0BBuffers_, mm2ResL0C.GetTensor<MM_T>(), param,
-                                                       pScaleTensor[kIdx * l1ScaleOffset], vScaleTensor);
-            vBuf.Set<HardEvent::MTE1_MTE2>();
-        }
-
-        mm2ResL0C.Set<HardEvent::M_FIX>();
-        mm2ResL0C.Wait<HardEvent::M_FIX>();
-        outputBuf.WaitCrossCore();
-        FixpipeMm2(outputBuf.GetTensor<MM_T>(), mm2ResL0C.GetTensor<MM_T>(), runInfo, constInfo);
-        mm2ResL0C.Set<HardEvent::FIX_M>();
-        outputBuf.SetCrossCore();
-    }
-
-private:
     __aicore__ inline uint32_t AlignUp32(uint32_t value) const
     {
         return (value + 31U) >> 5 << 5;

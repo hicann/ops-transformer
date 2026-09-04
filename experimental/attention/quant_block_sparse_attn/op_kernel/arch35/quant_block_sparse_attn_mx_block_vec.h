@@ -275,7 +275,7 @@ public:
         pScaleSubLoop0Que_.template FreeTensor(pScaleSubLoopTensor);
 
         stage1OutQue_[stage1Offset].template EnQue(stage1CastTensor);
-        stage1OutQue_[stage1Offset].template DeQue<INPUT_T>();
+        stage1CastTensor = stage1OutQue_[stage1Offset].template DeQue<INPUT_T>();
         CopyPToL1<SUB_LOOP>(outputBuf, stage1CastTensor, constInfo);
         stage1OutQue_[stage1Offset].template FreeTensor(stage1CastTensor);
 
@@ -497,7 +497,7 @@ private:
         constexpr uint64_t pScaleL1Offset = static_cast<uint64_t>(M_BASE) * S2_BASE;
         LocalTensor<SCALE_T> pScaleL1Tensor = outputBuf.GetTensor<SCALE_T>(pScaleL1Offset);
         pScaleSubLoop0Que_.template EnQue(pScaleSubLoopTensor);
-        pScaleSubLoop0Que_.template DeQue<SCALE_T>();
+        pScaleSubLoopTensor = pScaleSubLoop0Que_.template DeQue<SCALE_T>();
         // 两个 AIV 各处理 VEC_M_BASE 行；PScale 每 MX_SCALE_GROUP 个 P 元素生成一个 scale，
         // 因此一个 subBlock 的 PScale 长度为 VEC_M_BASE * S2_SPLIT / MX_SCALE_GROUP。
         constexpr uint64_t pScaleDataLen = VEC_M_BASE * S2_SPLIT / MX_SCALE_GROUP;
@@ -569,7 +569,7 @@ private:
         LocalTensor<float> lseUb = softmaxLseQueue_.template AllocTensor<float>();
         ComputeLseOutputVF(lseUb, sumUb, maxUb, runInfo.actVecMSize);
         softmaxLseQueue_.template EnQue(lseUb);
-        softmaxLseQueue_.template DeQue<float>();
+        lseUb = softmaxLseQueue_.template DeQue<float>();
         DataCopyExtParams dataCopyParams;
         dataCopyParams.blockLen = sizeof(float);
         dataCopyParams.blockCount = runInfo.actVecMSize;
