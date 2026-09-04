@@ -754,7 +754,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
             return ge::GRAPH_FAILED;
         }
         if (dimDq < dimDorikv) {
-            OP_LOGE(context_, "head_dim of Query[%ld] can not less than head_dim of ori_kv[%ld].", dimDq, dimDorikv);
+            OP_LOGE(context_, "head_dim of Query[%ld] cannot be less than head_dim of ori_kv[%ld].", dimDq, dimDorikv);
             return ge::GRAPH_FAILED;
         }
         if (strcmp(layoutQ, TND_STR) == 0) {
@@ -783,7 +783,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
             return ge::GRAPH_FAILED;
         }
         if (dimDq < dimDcmpkv) {
-            OP_LOGE(context_, "head_dim of Query[%ld] can not less than head_dim of cmp_kv[%ld].", dimDq, dimDcmpkv);
+            OP_LOGE(context_, "head_dim of Query[%ld] cannot be less than head_dim of cmp_kv[%ld].", dimDq, dimDcmpkv);
             return ge::GRAPH_FAILED;
         }
         if (strcmp(layoutQ, TND_STR) == 0) {
@@ -849,7 +849,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
 
     auto cmpRatio = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::CMP_RATIO));
     if (cmpRatio < 1 || cmpRatio > 128) {
-        OP_LOGE(context_, "cmp_ratio must be range [1,128], but now get input cmp_ratio [%ld]!", cmpRatio);
+        OP_LOGE(context_, "cmp_ratio must be in the range [1, 128], but got [%ld].", cmpRatio);
         return ge::GRAPH_FAILED;
     }
     auto usedSeqCmpKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_CMP_KV));
@@ -986,7 +986,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     }
 
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context_, "SparseFlashMlaGrad the input shpae of TND Layout is invalid.");
+        OP_LOGE(context_, "SparseFlashMlaGrad the input shape of TND Layout is invalid.");
         return ge::GRAPH_FAILED;
     }
     if (tmpData.layout == static_cast<uint32_t>(InputLayout::TND)) {
@@ -994,7 +994,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     }
 
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context_, "SparseFlashMlaGrad the input shpae of TND Layout is invalid.");
+        OP_LOGE(context_, "SparseFlashMlaGrad the input shape of TND Layout is invalid.");
         return ge::GRAPH_FAILED;
     }
     int32_t nNums = tmpData.layout == static_cast<uint32_t>(InputLayout::TND) ? tmpData.t1 : tmpData.b * tmpData.s1;

@@ -9,7 +9,6 @@
  */
 
 #include <gtest/gtest.h>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -155,12 +154,12 @@ class SparseLightningIndexerGradKLLossTilingRegbase : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        std::cout << "SparseLightningIndexerGradKLLossTilingRegbase SetUp" << std::endl;
+        GTEST_LOG_(INFO) << "SparseLightningIndexerGradKLLossTilingRegbase SetUp";
     }
 
     static void TearDownTestCase()
     {
-        std::cout << "SparseLightningIndexerGradKLLossTilingRegbase TearDown" << std::endl;
+        GTEST_LOG_(INFO) << "SparseLightningIndexerGradKLLossTilingRegbase TearDown";
     }
 };
 

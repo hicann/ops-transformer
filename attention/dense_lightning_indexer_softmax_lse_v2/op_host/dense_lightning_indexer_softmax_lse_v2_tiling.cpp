@@ -235,7 +235,7 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
 
     auto socVersion = ascendcPlatform.GetSocVersion();
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context)) {
-        OP_LOGE(context->GetNodeName(), "SOC Version[%d] is not support.", static_cast<int32_t>(socVersion));
+        OP_LOGE(context->GetNodeName(), "SOC Version[%d] is not supported.", static_cast<int32_t>(socVersion));
         return ge::GRAPH_PARAM_INVALID;
     }
 
@@ -307,11 +307,11 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
                 OP_LOGE(context->GetNodeName(), "query_index and key_index dtype must be the same, but got %d and %d.",
                         static_cast<int32_t>(queryDType), static_cast<int32_t>(keyDType)),
                 return ge::GRAPH_PARAM_INVALID);
-    OP_CHECK_IF(queryDType != ge::DT_FLOAT16 && queryDType != ge::DT_BF16,
-                OP_LOGE(context->GetNodeName(),
-                        "query_index and key_index dtype must be float16 or bfloat16, but got %d.",
-                        static_cast<int32_t>(queryDType)),
-                return ge::GRAPH_PARAM_INVALID);
+    OP_CHECK_IF(
+        queryDType != ge::DT_FLOAT16 && queryDType != ge::DT_BF16,
+        OP_LOGE(context->GetNodeName(), "query_index and key_index dtype must be float16 or bfloat16, but got %d.",
+                static_cast<int32_t>(queryDType)),
+        return ge::GRAPH_PARAM_INVALID);
     OP_CHECK_IF(weightDesc->GetDataType() != ge::DT_FLOAT,
                 OP_LOGE(context->GetNodeName(), "weight dtype must be float32, but got %d.",
                         static_cast<int32_t>(weightDesc->GetDataType())),
@@ -319,19 +319,17 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
 
     // metadata (optional input index 8) is a mandatory input, must be provided
     OP_CHECK_IF(context->GetOptionalInputShape(8) == nullptr,
-                OP_LOGE(context->GetNodeName(), "metadata must be provided."),
-                return ge::GRAPH_PARAM_INVALID);
+                OP_LOGE(context->GetNodeName(), "metadata must be provided."), return ge::GRAPH_PARAM_INVALID);
 
-    const char *optInputNames[] = {"cu_seq_lens_q", "cu_seq_lens_k", "seq_used_q", "seq_used_k", "cmp_residual_k",
-                                   "metadata"};
+    const char *optInputNames[] = {"cu_seq_lens_q", "cu_seq_lens_k",  "seq_used_q",
+                                   "seq_used_k",    "cmp_residual_k", "metadata"};
     for (int32_t i = 3; i <= 8; i++) {
         auto optShape = context->GetOptionalInputShape(i);
         if (optShape == nullptr) {
             continue;
         }
         auto optDesc = context->GetOptionalInputDesc(i);
-        OP_CHECK_IF(optDesc == nullptr,
-                    OP_LOGE(context->GetNodeName(), "%s desc is null.", optInputNames[i - 3]),
+        OP_CHECK_IF(optDesc == nullptr, OP_LOGE(context->GetNodeName(), "%s desc is null.", optInputNames[i - 3]),
                     return ge::GRAPH_PARAM_INVALID);
         OP_CHECK_IF(optDesc->GetDataType() != ge::DT_INT32,
                     OP_LOGE(context->GetNodeName(), "%s dtype must be int32, but got %d.", optInputNames[i - 3],

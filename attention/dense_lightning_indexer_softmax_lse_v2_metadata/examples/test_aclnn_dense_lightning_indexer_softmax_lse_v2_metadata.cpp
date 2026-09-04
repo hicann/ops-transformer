@@ -24,10 +24,12 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_dense_lightning_indexer_softmax_lse_v2_metadata.h"
 
+#define LOG_PRINT(message, ...) printf(message, ##__VA_ARGS__)
+
 #define CHECK_LOG_RET(cond, ret_val, fmt, ...) \
     do { \
         if (!(cond)) { \
-            printf(fmt "\n", ##__VA_ARGS__); \
+            LOG_PRINT(fmt "\n", ##__VA_ARGS__); \
             return (ret_val); \
         } \
     } while (0)
@@ -42,7 +44,10 @@ struct DenseLISoftmaxLseV2MetaData {
 };
 
 struct ScopeGuard {
-    explicit ScopeGuard(std::function<void()> onExitScope) : m_exitFunc(std::move(onExitScope)), m_isDismissed(false) {}
+    explicit ScopeGuard(std::function<void()> onExitScope)
+        : m_exitFunc(std::move(onExitScope)),
+          m_isDismissed(false)
+    {}
     ScopeGuard(const ScopeGuard &) = delete;
     ScopeGuard &operator=(const ScopeGuard &) = delete;
 
@@ -53,7 +58,10 @@ struct ScopeGuard {
         }
     }
 
-    void Dismiss() { m_isDismissed = true; }
+    void Dismiss()
+    {
+        m_isDismissed = true;
+    }
 
     std::function<void()> m_exitFunc;
     bool m_isDismissed;
@@ -215,10 +223,10 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
 
 void PrintMetadata(const DenseLISoftmaxLseV2MetaData &metadata)
 {
-    printf("forecore_num      : %d\n", metadata.forecore_num);
-    printf("tail_core_num     : %d\n", metadata.tail_core_num);
-    printf("b_s1_per_core     : %d\n", metadata.b_s1_per_core);
-    printf("b_s1_per_tail_core: %d\n", metadata.b_s1_per_tail_core);
+    LOG_PRINT("forecore_num      : %d\n", metadata.forecore_num);
+    LOG_PRINT("tail_core_num     : %d\n", metadata.tail_core_num);
+    LOG_PRINT("b_s1_per_core     : %d\n", metadata.b_s1_per_core);
+    LOG_PRINT("b_s1_per_tail_core: %d\n", metadata.b_s1_per_tail_core);
 }
 
 int main()
@@ -268,7 +276,7 @@ int main()
     ret = aclrtMemcpy(&result, sizeof(result), context.metadata.deviceAddr, sizeof(result), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d", ret);
     PrintMetadata(result);
-    printf("pass\n");
+    LOG_PRINT("pass\n");
 
     return 0;
 }

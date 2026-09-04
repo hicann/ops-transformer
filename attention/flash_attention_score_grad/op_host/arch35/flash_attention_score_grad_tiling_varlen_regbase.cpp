@@ -1350,7 +1350,7 @@ protected:
                 totalBlockInfo[i][1] = fBaseParams.n2 * fBaseParams.g * totalBlockInfo[i][0] + totalBlockInfo[i - 1][1];
             }
             acturalBlockInfo[i][fBaseParams.s2Outer] = batchTotalValidBlk;
-            OP_LOGD("FillBlockInfoLoadBalanceForBn2", " batchid = %ld: acturalBlock = %f", i,
+            OP_LOGD("FillBlockInfoLoadBalanceForBn2", " batchid = %ld: actualBlock = %f", i,
                     acturalBlockInfo[i][fBaseParams.s2Outer]);
             acturalBlockInfo[fBaseParams.b + 1][0] =
                 acturalBlockInfo[fBaseParams.b + 1][0] < batchTotalValidBlk ?
@@ -1376,7 +1376,7 @@ protected:
                 OP_LOGD("CaclePerCoreBlockInfoBn2", " Not support BN2_MULTIBLK.");
                 return false;
             } else if (currentSum + num > maxBlockNumPerCore) {
-                OP_LOGD("CaclePerCoreBlockInfoBn2", " blockIdx = %ld: acturalBlock = %f", coreIdx, currentSum);
+                OP_LOGD("CaclePerCoreBlockInfoBn2", " blockIdx = %ld: actualBlock = %f", coreIdx, currentSum);
                 int64_t preBatchBlockNum = b == 0 ? 0 : totalBlockInfo[b - 1][1];
                 int64_t preNGBlockNum = n * totalBlockInfo[b][0];
 
@@ -1388,7 +1388,7 @@ protected:
                 currentSum += num;
             }
         }
-        OP_LOGD("CaclePerCoreBlockInfoBn2", " blockIdx = %ld: acturalBlock = %f", coreIdx, currentSum);
+        OP_LOGD("CaclePerCoreBlockInfoBn2", " blockIdx = %ld: actualBlock = %f", coreIdx, currentSum);
 
         blockStarts[0] = 0;
         blockEnds[coreIdx] = totalBlockInfo[fBaseParams.b - 1][1];
@@ -1728,7 +1728,7 @@ protected:
                         OP_LOGD("GetBlockInfoOfBNS4TND", " Not support BN2S2.");
                         return false;
                     } else if (currentSum + num > maxBlockNumPerCore) {
-                        OP_LOGD("GetBlockInfoOfBNS4TND", " blockIdx = %ld: acturalBlock = %f", coreIdx, currentSum);
+                        OP_LOGD("GetBlockInfoOfBNS4TND", " blockIdx = %ld: actualBlock = %f", coreIdx, currentSum);
                         int64_t preBatchBlockNum = b == 0 ? 0 : totalBlockInfo[b - 1][1];
                         int64_t preNGBlockNum = n * totalBlockInfo[b][0];
                         int64_t preS2BlockNum = j * actualS1Outer;

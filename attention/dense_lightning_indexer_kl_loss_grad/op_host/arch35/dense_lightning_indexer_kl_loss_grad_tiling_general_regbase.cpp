@@ -308,14 +308,13 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeAttrs()
         OP_LOGE(opName, "Layout of Query and Key need to be consistent, but now layoutQuery is %s and layoutKey is %s.",
                 layoutQuery, layoutKey),
         return false);
-    OP_CHECK_IF(
-        (sparseMode != SPARSE_MODE_SIZE_3 && sparseMode != SPARSE_MODE_SIZE_0),
-        OP_LOGE(opName, " The value of mask_mode is [%d], but currently only supports mode [0,3].", sparseMode),
-        return false);
-    OP_CHECK_IF((cmpRatio < CMP_RATIO_1 || cmpRatio > CMP_RATIO_128),
-                OP_LOGE(opName, " The value of cmpRatio is [%d], but currently only supports ranging from 1 to 128.",
-                        cmpRatio),
+    OP_CHECK_IF((sparseMode != SPARSE_MODE_SIZE_3 && sparseMode != SPARSE_MODE_SIZE_0),
+                OP_LOGE(opName, " The value of mask_mode is [%d], but currently only supports mode [0,3].", sparseMode),
                 return false);
+    OP_CHECK_IF(
+        (cmpRatio < CMP_RATIO_1 || cmpRatio > CMP_RATIO_128),
+        OP_LOGE(opName, " The value of cmpRatio is [%d], but currently only supports ranging from 1 to 128.", cmpRatio),
+        return false);
     OP_CHECK_IF((sparseMode == SPARSE_MODE_SIZE_3 && cmpRatio != 1 && cmpResidualK == nullptr),
                 OP_LOGE(opName, " cmp_residual_k is required when mask_mode is 3 with cmp_ratio not equal to 1!"),
                 return false);
@@ -356,8 +355,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDimLayout(const
             gSizeQueryIndex = queryIndexShape.GetDim(1) / n2Size;
             dSizeQueryIndex = queryIndexShape.GetDim(2);
             OP_CHECK_IF(dSizeQueryIndex != 128,
-                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %d.", dSizeQueryIndex),
-                        return false);
+                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %d.", dSizeQueryIndex), return false);
             maxSeqlenK = attnSoftmaxL1Shape.GetDim(2);
             tilingData->baseParams.set_maxSeqlenK(static_cast<uint32_t>(maxSeqlenK));
             topKRange = TopKRangeRegbase::RANGE_0_2K;
@@ -386,8 +384,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDimLayout(const
             gSizeQueryIndex = queryIndexShape.GetDim(2) / n2Size;
             dSizeQueryIndex = queryIndexShape.GetDim(3);
             OP_CHECK_IF(dSizeQueryIndex != 128,
-                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %d.", dSizeQueryIndex),
-                        return false);
+                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %d.", dSizeQueryIndex), return false);
             maxSeqlenK = attnSoftmaxL1Shape.GetDim(3);
             tilingData->baseParams.set_maxSeqlenK(static_cast<uint32_t>(maxSeqlenK));
             topKRange = TopKRangeRegbase::RANGE_0_2K;
@@ -442,8 +439,8 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDtype()
         same32 = true;
     } else {
         OP_LOGE(context_,
-                "InputDtype is fault: weightsDtype must be float32, but[%s]; softmaxLseDtype must be float32, but[%s]; "
-                "attnSoftmaxL1Dtype must be float32, but[%s].",
+                "Input dtype is invalid: weightsDtype must be float32, but got [%s]; softmaxLseDtype must be float32, "
+                "but got [%s]; attnSoftmaxL1Dtype must be float32, but got [%s].",
                 ge::TypeUtils::DataTypeToSerialString(weightsDtype).c_str(),
                 ge::TypeUtils::DataTypeToSerialString(softmaxLseDtype).c_str(),
                 ge::TypeUtils::DataTypeToSerialString(attnSoftmaxL1Dtype).c_str());
@@ -658,7 +655,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeLayout()
                 OP_LOGE(opName, "Layout %s data analyze failed.", layoutQuery), return false);
     OP_CHECK_IF(gSizeQueryIndex == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "gSizeQueryIndex is zero"), return false);
     OP_CHECK_IF(n2Size == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "n2Size is zero"), return false);
-    OP_CHECK_IF(dSizeQueryIndex <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "dSizeQueryIndex is not support <= 0"),
+    OP_CHECK_IF(dSizeQueryIndex <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "dSizeQueryIndex must be greater than 0"),
                 return false);
     return true;
 }
@@ -893,9 +890,15 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::DoOpTiling(
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::PostTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::PostTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 uint64_t DenseLightningIndexerKLLossGradTilingGeneralRegbase::GetTilingKey() const
 {

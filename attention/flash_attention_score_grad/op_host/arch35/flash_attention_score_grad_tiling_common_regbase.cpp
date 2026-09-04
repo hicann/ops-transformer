@@ -207,7 +207,7 @@ ge::graphStatus CheckShapeValid(const gert::TilingContext *context, int64_t b, i
         std::to_string(b) + ", " + std::to_string(n1) + ", " + std::to_string(s1) + ", " + std::to_string(d);
     OP_CHECK_IF(isShapeInValid,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "query", shapeMsg.c_str(),
-                                                      "All axes of query must be postitive numbers"),
+                                                      "All axes of query must be positive numbers"),
                 return ge::GRAPH_FAILED);
 
     auto queryType = context->GetInputDesc(0)->GetDataType();
@@ -239,7 +239,7 @@ ge::graphStatus CheckTndShapeValid(const gert::TilingContext *context, int64_t t
     std::string shapeMsg = std::to_string(t1) + ", " + std::to_string(n1) + ", " + std::to_string(d);
     OP_CHECK_IF(isShapeInValid,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "query", shapeMsg.c_str(),
-                                                      "All axes of query must be postitive numbers"),
+                                                      "All axes of query must be positive numbers"),
                 return ge::GRAPH_FAILED);
 
     auto ret = CheckAttentionInShape(context);
@@ -1363,11 +1363,11 @@ ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams)
          (fBaseParams.s1Token + fBaseParams.s2Token) < 0)) {
         std::string valueMsg = "{" + std::to_string(fBaseParams.s1Token) + ", " + std::to_string(fBaseParams.s2Token) +
                                ", " + std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
-        std::string reasonMsg = "When inputLayout is TND, the valud of nextTokens, preTokens, nextToKens + preTokens "
+        std::string reasonMsg = "When inputLayout is TND, the value of nextTokens, preTokens, nextTokens + preTokens "
                                 "cannot be less than {" +
                                 std::to_string(int64_t(-fBaseParams.s2)) + ", " +
                                 std::to_string(int64_t(-fBaseParams.s1)) + ", 0}";
-        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "nextTokens, preTokens, nextToKens",
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "nextTokens, preTokens, nextTokens",
                                                valueMsg.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
@@ -1582,7 +1582,7 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
         } else {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                 "FlashAttentionScoreGrad", "pseShifOptional", Ops::Base::ToString(pseShape->GetStorageShape()).c_str(),
-                "When pseType is 0 or 1 and inputLayout is TND, the shape of pseShifOptional is unspported");
+                "When pseType is 0 or 1 and inputLayout is TND, the shape of pseShifOptional is unsupported");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -1840,7 +1840,7 @@ ge::graphStatus ProcessPseSparseMode8(FuzzyBaseInfoParamsRegbase &fBaseParams)
                     "FlashAttentionScoreGrad",
                     "actualSeqQLenOptional, actualSeqKLenOptional, qStartIdxOptional, kvStartIdxOptional",
                     valuesMsg.c_str(),
-                    "When pseTye is 2 or 3 and sparseMode is 8, the value of "
+                    "When pseType is 2 or 3 and sparseMode is 8, the value of "
                     "actualSeqQLenOptional - actualSeqKLenOptional + qStartIdxOptional - kvStartIdxOptional must be 0");
                 return ge::GRAPH_FAILED;
             }

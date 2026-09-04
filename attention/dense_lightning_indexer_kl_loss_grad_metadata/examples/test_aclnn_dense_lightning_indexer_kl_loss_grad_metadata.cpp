@@ -23,10 +23,12 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_dense_lightning_indexer_kl_loss_grad_metadata.h"
 
+#define LOG_PRINT(message, ...) printf(message, ##__VA_ARGS__)
+
 #define CHECK_LOG_RET(cond, ret_val, fmt, ...) \
     do { \
         if (!(cond)) { \
-            printf(fmt "\n", ##__VA_ARGS__); \
+            LOG_PRINT(fmt "\n", ##__VA_ARGS__); \
             return (ret_val); \
         } \
     } while (0)
@@ -65,7 +67,10 @@ struct ScopeGuard {
         }
     }
 
-    void Dismiss() { m_isDismissed = true; }
+    void Dismiss()
+    {
+        m_isDismissed = true;
+    }
 
     std::function<void()> m_exitFunc;
     bool m_isDismissed;
@@ -221,11 +226,11 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
 void PrintMetadata(const SliGradKLLossMetaData &metadata)
 {
     const int32_t *data = reinterpret_cast<const int32_t *>(&metadata);
-    printf("TOTAL_NUM               : %d\n", data[TOTAL_NUM]);
-    printf("FORMER_CORE_PROCESS_NUM : %d\n", data[FORMER_CORE_PROCESS_NUM]);
-    printf("REMAIN_CORE_PROCESS_NUM : %d\n", data[REMAIN_CORE_PROCESS_NUM]);
-    printf("REMAIN_CORE_NUM         : %d\n", data[REMAIN_CORE_NUM]);
-    printf("USED_CORE_NUM           : %d\n", data[USED_CORE_NUM]);
+    LOG_PRINT("TOTAL_NUM               : %d\n", data[TOTAL_NUM]);
+    LOG_PRINT("FORMER_CORE_PROCESS_NUM : %d\n", data[FORMER_CORE_PROCESS_NUM]);
+    LOG_PRINT("REMAIN_CORE_PROCESS_NUM : %d\n", data[REMAIN_CORE_PROCESS_NUM]);
+    LOG_PRINT("REMAIN_CORE_NUM         : %d\n", data[REMAIN_CORE_NUM]);
+    LOG_PRINT("USED_CORE_NUM           : %d\n", data[USED_CORE_NUM]);
     return;
 }
 

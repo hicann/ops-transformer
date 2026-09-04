@@ -8,10 +8,15 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+import logging
+
 import torch
 import torch_npu
 from cann_ops_transformer.ops import dense_lightning_indexer_kl_loss_grad
 from cann_ops_transformer.ops import dense_lightning_indexer_kl_loss_grad_metadata
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 torch_npu.npu.set_device(0)
 device = torch.device("npu:0")
@@ -73,4 +78,10 @@ dq, dk, dw, softmax_out = dense_lightning_indexer_kl_loss_grad(
 )
 
 torch.npu.synchronize()
-print(dq.shape, dk.shape, dw.shape, softmax_out.shape)
+logger.info(
+    "Output shapes: dq=%s, dk=%s, dw=%s, softmax_out=%s",
+    dq.shape,
+    dk.shape,
+    dw.shape,
+    softmax_out.shape,
+)
