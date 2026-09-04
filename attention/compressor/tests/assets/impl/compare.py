@@ -348,36 +348,14 @@ def compare(*outputs, **kwargs):
         }
 
     GOLDEN_OUTPUT_COUNT = 2
-    golden_outputs = list(outputs[-GOLDEN_OUTPUT_COUNT:])
-    npu_outputs = list(outputs[:-GOLDEN_OUTPUT_COUNT])
+    npu_outputs = list(outputs[:GOLDEN_OUTPUT_COUNT])
+    golden_outputs = list(outputs[GOLDEN_OUTPUT_COUNT:])
     cmp_kv_mask = kwargs.get("cmp_kv_mask", None)
 
-    # Fallback: single NPU output (cmp_kv only) — compare cmp_kv, skip state_cache
-    if len(npu_outputs) == 1:
-        results = [
-            _tensor_compare(
-                npu_outputs[0][cmp_kv_mask], golden_outputs[0][cmp_kv_mask], "cmp_kv"
-            )
-        ]
-        gc.collect()
-        for i in range(1, len(golden_outputs)):
-            name = _OUTPUT_NAMES[i] if i < len(_OUTPUT_NAMES) else f"output_{i}"
-            results.append(
-                {
-                    "pass": True,
-                    "precision": "N/A",
-                    "error_info": f"{name}: NPU state_cache not captured",
-                }
-            )
-        result_consistency = _batch_consistency_check(npu_outputs[0], kwargs)
-        if result_consistency is not None:
-            results.append(result_consistency)
-        return results
-
     npu_cmp_kv = npu_outputs[0]
-    npu_state_cache = npu_outputs[1]
+    npu_state_cache = npu_outputs[-1]
     cpu_cmp_kv = golden_outputs[0]
-    cpu_state_cache = golden_outputs[1]
+    cpu_state_cache = golden_outputs[-1]
 
     update_kv = kwargs.get("update_kv", None)
     update_score = kwargs.get("update_score", None)
@@ -460,41 +438,16 @@ def compare_aclnn(*outputs, **kwargs):
         }
 
     GOLDEN_OUTPUT_COUNT = 4
-    golden_outputs = [_to_torch(g) for g in outputs[-GOLDEN_OUTPUT_COUNT:]]
-    npu_outputs = [_to_torch(o) for o in outputs[:-GOLDEN_OUTPUT_COUNT]]
+    golden_outputs = [_to_torch(g) for g in outputs[GOLDEN_OUTPUT_COUNT:]]
+    npu_outputs = [_to_torch(o) for o in outputs[:GOLDEN_OUTPUT_COUNT]]
     cmp_kv_mask = kwargs.get("cmp_kv_mask", None)
     mid_result_mask = kwargs.get("mid_result_mask", None)
     gradEnabled = kwargs.get("gradEnabled", None)
-    # Fallback: single NPU output (cmp_kv only) — compare cmp_kv, skip state_cache
-    if len(npu_outputs) == 1:
-        results = [
-            _tensor_compare(
-                npu_outputs[0][cmp_kv_mask].to(torch.float32),
-                golden_outputs[0][cmp_kv_mask].to(torch.float32),
-                "cmp_kv",
-            )
-        ]
-        gc.collect()
-        for i in range(1, len(golden_outputs)):
-            name = _OUTPUT_NAMES[i] if i < len(_OUTPUT_NAMES) else f"output_{i}"
-            results.append(
-                {
-                    "pass": True,
-                    "precision": "N/A",
-                    "error_info": f"{name}: NPU state_cache not captured",
-                }
-            )
-        result_consistency = _batch_consistency_check(
-            npu_outputs[0].to(torch.float32), kwargs
-        )
-        if result_consistency is not None:
-            results.append(result_consistency)
-        return results
 
     npu_cmp_kv = npu_outputs[0].to(torch.float32)
-    npu_state_cache = npu_outputs[3].to(torch.float32)
+    npu_state_cache = npu_outputs[-1].to(torch.float32)
     cpu_cmp_kv = golden_outputs[0].to(torch.float32)
-    cpu_state_cache = golden_outputs[3].to(torch.float32)
+    cpu_state_cache = golden_outputs[-1].to(torch.float32)
 
     update_kv = kwargs.get("update_kv", None)
     update_score = kwargs.get("update_score", None)
