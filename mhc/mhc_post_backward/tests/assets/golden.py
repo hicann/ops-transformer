@@ -179,15 +179,15 @@ class TorchMhcPostBackwardTestSpec:
     Tensor hPost) -> (Tensor, Tensor, Tensor, Tensor).
     """
 
-    def golden(grad_output, x, h_res, h_out, h_post, **kwargs):
+    def golden(gradOutput, x, hRes, hOut, hPost, **kwargs):
         grad_x, grad_h_res, grad_h_out, grad_h_post = _mhc_post_backward_compute(
-            grad_output.float(),
+            gradOutput.float(),
             x.float(),
-            None if h_res is None else h_res.float(),
-            h_out.float(),
-            h_post.float(),
+            None if hRes is None else hRes.float(),
+            hOut.float(),
+            hPost.float(),
         )
-        dt_x, dt_hres, dt_hout, dt_hpost = _backward_dtypes_torch(grad_output)
+        dt_x, dt_hres, dt_hout, dt_hpost = _backward_dtypes_torch(gradOutput)
         return [
             grad_x.to(dt_x),
             grad_h_res.to(dt_hres),
@@ -196,18 +196,18 @@ class TorchMhcPostBackwardTestSpec:
         ]
 
     class ThirdPartyImpl:
-        def __init__(self, grad_output, **kwargs):
-            self.out_dtype = grad_output.dtype
+        def __init__(self, gradOutput, **kwargs):
+            self.out_dtype = gradOutput.dtype
 
-        def __call__(self, grad_output, x, h_res, h_out, h_post, **kwargs):
+        def __call__(self, gradOutput, x, hRes, hOut, hPost, **kwargs):
             grad_x, grad_h_res, grad_h_out, grad_h_post = _mhc_post_backward_compute(
-                grad_output.float(),
+                gradOutput.float(),
                 x.float(),
-                None if h_res is None else h_res.float(),
-                h_out.float(),
-                h_post.float(),
+                None if hRes is None else hRes.float(),
+                hOut.float(),
+                hPost.float(),
             )
-            dt_x, dt_hres, dt_hout, dt_hpost = _backward_dtypes_torch(grad_output)
+            dt_x, dt_hres, dt_hout, dt_hpost = _backward_dtypes_torch(gradOutput)
             return [
                 grad_x.to(dt_x),
                 grad_h_res.to(dt_hres),
