@@ -48,7 +48,7 @@ PACKAGE_TYPE="run"
 PACKAGE_TYPE_SET=FALSE
 KERNEL_TEMPLATE_INPUT=""
 ASCEND_SOC_UNITS="ascend910b"
-# 标记用户是否显式指定了 --soc; 未指定时由 detect_soc_from_npu_smi 自动探测 NPU 芯片型号
+# 标记用户是否显式指定了 --soc; 未指定时由 detect_soc_from_lspci 自动探测 NPU 芯片型号
 SOC_USER_SPECIFIED=false
 # 支持的 SoC 列表(校验用, 单一数据源): 取自 cmake/scripts/util/const_var.py 的 SOC_MAP_EXT keys(出包遍历的 kernel 编译 soc 集合)
 # + CMakeLists.txt SOC_VERSION_LIST 中的 mc62。不在 CMakeLists.txt SOC_VERSION_LIST 的 soc 会走空包(cpack_empty_package)
@@ -1052,54 +1052,53 @@ function process_soc_input(){
         echo "Warning: Hardware type '$ASCEND_SOC_UNITS' detected. Please ensure you are using compatible hardware."
     fi
 
-    # 标记用户已显式指定 --soc, 后续 detect_soc_from_npu_smi 据此跳过自动探测
+    # 标记用户已显式指定 --soc, 后续 detect_soc_from_lspci 据此跳过自动探测
     SOC_USER_SPECIFIED=true
 }
 
-# detect_soc_from_npu_smi - 在用户未显式指定 --soc 时, 通过 npu-smi info 自动探测 NPU 芯片型号,
+# detect_soc_from_lspci - 在用户未显式指定 --soc 时, 通过 lspci 查询 NPU PCI 设备 ID 自动探测芯片型号,
 # 映射为编译用 soc_version 并赋值给 ASCEND_SOC_UNITS; 探测失败则保持默认值(ascend910b)。
 # 映射依据: cmake/scripts/util/const_var.py 的 SOC_MAP_EXT 与 opdesc_parser.py 的 SOC_TO_SHORT_SOC_MAP。
-function detect_soc_from_npu_smi() {
+function detect_soc_from_lspci() {
     # 用户已显式指定 --soc, 跳过自动探测
     if [[ "$SOC_USER_SPECIFIED" == "true" ]]; then
         return 0
     fi
 
-    # npu-smi 不可用时, 保持默认 soc
-    if ! command -v npu-smi &>/dev/null; then
-        echo "[INFO] npu-smi not found, using default soc: $ASCEND_SOC_UNITS"
+    # lspci 不可用时, 保持默认 soc
+    if ! command -v lspci &>/dev/null; then
+        echo "[INFO] lspci not found, using default soc: $ASCEND_SOC_UNITS"
         return 0
     fi
 
-    # 从 npu-smi info 输出提取首个 NPU 的芯片名(第三字段)
-    # 输出行格式: "| 0     910B3               | OK  | ..." -> $3 为芯片名
-    local chip_name
-    chip_name=$(npu-smi info 2>/dev/null | grep -E '^\| [0-9]+\s+[0-9A-Za-z]+\s+\|' | head -1 | awk '{print $3}')
+    # 从 lspci 输出提取首个 NPU 的设备 ID: 厂商号固定为 19e5, 设备 ID 形如 "d801"/"d803" 等
+    local device_id
+    device_id=$(lspci -n -D 2>/dev/null | grep -o '19e5:d[0-9a-f]\{3\}' | head -n1 | cut -d: -f2) || true
 
-    if [[ -z "$chip_name" ]]; then
-        echo "[INFO] No NPU detected by npu-smi, using default soc: $ASCEND_SOC_UNITS"
+    if [[ -z "$device_id" ]]; then
+        echo "[INFO] No NPU detected by lspci, using default soc: $ASCEND_SOC_UNITS"
         return 0
     fi
 
-    # 芯片名 -> soc_version 映射(大小写不敏感: ${chip_name^^} 转大写后匹配; * 通配匹配同系列变体)
+    # 设备 ID -> soc_version 映射
     local detected_soc="unknown"
-    case "${chip_name^^}" in
-        910A|910)
+    case "$device_id" in
+        d801)
             detected_soc="ascend910"
             ;;
-        910B*)
-            detected_soc="ascend910b"
-            ;;
-        910_93*)
-            detected_soc="ascend910_93"
-            ;;
-        310P*)
+        d500)
             detected_soc="ascend310p"
             ;;
-        310B*)
+        d105|d107)
             detected_soc="ascend310b"
             ;;
-        950*)
+        d802)
+            detected_soc="ascend910b"
+            ;;
+        d803)
+            detected_soc="ascend910_93"
+            ;;
+        d806)
             detected_soc="ascend950"
             ;;
         *)
@@ -1109,9 +1108,9 @@ function detect_soc_from_npu_smi() {
 
     if [[ "$detected_soc" != "unknown" ]]; then
         ASCEND_SOC_UNITS="$detected_soc"
-        echo "[INFO] Auto-detected NPU chip: $chip_name -> soc_version: $detected_soc"
+        echo "[INFO] Auto-detected NPU device id: $device_id -> soc_version: $detected_soc"
     else
-        echo "[INFO] Unrecognized NPU chip name '$chip_name', using default soc: $ASCEND_SOC_UNITS"
+        echo "[INFO] Unrecognized NPU device id '$device_id', using default soc: $ASCEND_SOC_UNITS"
     fi
 }
 
@@ -2299,8 +2298,8 @@ function process_ci_smoke_with_changed_list()
     done
 }
 
-# 参数解析完成后, 若用户未显式指定 --soc, 则通过 npu-smi info 自动探测 NPU 芯片型号
-detect_soc_from_npu_smi
+# 参数解析完成后, 若用户未显式指定 --soc, 则通过 lspci 设备 ID 自动探测 NPU 芯片型号
+detect_soc_from_lspci
 
 if [[ "$ENABLE_SMOKE" == "TRUE" ]]; then
     process_ci_smoke_with_changed_list
