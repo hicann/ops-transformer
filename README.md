@@ -2,6 +2,7 @@
 
 ## 🔥Latest News
 
+- [2026/08] 仓内集成[pre-commit代码检查框架](docs/zh/develop/pre-commit_guide.md)，配置后`git commit`时自动检查并修复格式问题，将规范问题拦截在提交阶段、提升代码合入效率，详见[pre-commit配置指导书](docs/zh/develop/pre-commit_guide.md)。
 - [2026/07] A5上新支持算子[quant_flash_attn](attention/quant_flash_attn)，Dense Attention全量化场景专用，以及experimental目录新增[同名算子](experimental/attention/quant_flash_attn)支持A5的MxFP4全量化；[chunk_gated_delta_rule](attention/chunk_gated_delta_rule)算子支持A5；A5新增DSV4 dense训练阶段TopK筛选反向算子[dense_lightning_indexer_grad_kl_loss](attention/dense_lightning_indexer_grad_kl_loss)、[dense_lightning_indexer_softmax_lse](attention/dense_lightning_indexer_softmax_lse)；mc2新支持算子[engram_fetch_grad](mc2/engram_fetch_grad)。
 - [2026/06] A5上新增支持[sparse_flash_mla](attention/sparse_flash_mla)、[mixed_quant_sparse_flash_mla](attention/mixed_quant_sparse_flash_mla)以及对应的metadata算子，用于DSV4场景稀疏Attention计算。新增[lightning_indexer_v2](attention/lightning_indexer_v2)、[quant_lightning_indexer_v2](attention/quant_lightning_indexer_v2)以及对应的metadata算子，用于DSV4场景TopK筛选。A5新增DSV4 sparse训练阶段Attention反向算子[sparse_flash_mla_grad](attention/sparse_flash_mla_grad)、[sparse_lightning_indexer_kl_loss_grad](attention/sparse_lightning_indexer_kl_loss_grad)；mc2新支持算子[engram_fetch](mc2/engram_fetch)、[engram_fetch_wait](mc2/engram_fetch_wait)。
 - [2026/05] [fused_infer_attention_score](attention/fused_infer_attention_score)算子A5上支持MxFP8全量化；A5上新支持算子[flash_attn](attention/flash_attn)，Dense Attention非量化场景专用。
