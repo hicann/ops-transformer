@@ -206,7 +206,7 @@ template <typename T, CubeFormat format>
 using FormatToLayoutT = typename FormatToLayout<T, format>::type;
 
 template <typename T, CubeFormat format>
-__aicore__ constexpr inline decltype(auto) MakeLayoutByFormat(int row, int col)
+__aicore__ inline decltype(auto) MakeLayoutByFormat(int row, int col)
 {
     static_assert(format == CubeFormat::ND || format == CubeFormat::ND_ALIGN || format == CubeFormat::NZ ||
                       format == CubeFormat::ZN || format == CubeFormat::ZZ,
