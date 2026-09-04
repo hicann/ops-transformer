@@ -203,22 +203,22 @@ void PrintMegaMoeTilingData(const MegaMoeTilingData *tilingData, const char *nod
     OP_LOGD(nodeName, "mGroupsPerWave is %u", tilingData->mGroupsPerWave);
 }
 
-void PrintWorkspaceInfo(const struct WorkspaceInfo *info, const char *nodeName)
+void PrintWorkspaceLayout(const struct WorkspaceLayout *layout, const char *nodeName)
 {
-    OP_LOGD(nodeName, "dispatchRevDataPtr:         %ld\n", info->dispatchRevDataPtr);
-    OP_LOGD(nodeName, "dispatchRevScalePtr:        %ld\n", info->dispatchRevScalePtr);
-    OP_LOGD(nodeName, "activationQuantDataPtr:         %ld\n", info->activationQuantDataPtr);
-    OP_LOGD(nodeName, "activationQuantScalePtr:        %ld\n", info->activationQuantScalePtr);
-    OP_LOGD(nodeName, "expertRevTokenNumsPtr:      %ld\n", info->expertRevTokenNumsPtr);
-    OP_LOGD(nodeName, "metaInfoPtr:                %ld\n", info->metaInfoPtr);
-    OP_LOGD(nodeName, "flagActivationToGmm2Ptr:        %ld\n", info->flagActivationToGmm2Ptr);
-    OP_LOGD(nodeName, "flagDispatchToGmm1Ptr:      %ld\n", info->flagDispatchToGmm1Ptr);
-    OP_LOGD(nodeName, "flagSendCntCalToUpdParamsPtr:      %ld\n", info->flagSendCntCalToUpdParamsPtr);
-    OP_LOGD(nodeName, "flagGmmToEpiloguePtr: %ld\n", info->flagGmmToEpiloguePtr);
-    OP_LOGD(nodeName, "gmm2ReadyPtr:               %ld\n", info->gmm2ReadyPtr);
-    OP_LOGD(nodeName, "gmm2CombineSyncCounterPtr:  %ld\n", info->gmm2CombineSyncCounterPtr);
-    OP_LOGD(nodeName, "gmm2MmadResPtr:             %ld\n", info->gmm2MmadResPtr);
-    OP_LOGD(nodeName, "workspaceSize:              %ld\n", info->workspaceSize);
+    OP_LOGD(nodeName, "dispatchRevDataOffset:         %ld\n", layout->dispatchRevDataOffset);
+    OP_LOGD(nodeName, "dispatchRevScaleOffset:        %ld\n", layout->dispatchRevScaleOffset);
+    OP_LOGD(nodeName, "activationQuantDataOffset:     %ld\n", layout->activationQuantDataOffset);
+    OP_LOGD(nodeName, "activationQuantScaleOffset:    %ld\n", layout->activationQuantScaleOffset);
+    OP_LOGD(nodeName, "expertRevTokenNumsOffset:      %ld\n", layout->expertRevTokenNumsOffset);
+    OP_LOGD(nodeName, "metaInfoOffset:                %ld\n", layout->metaInfoOffset);
+    OP_LOGD(nodeName, "flagActivationToGmm2Offset:    %ld\n", layout->flagActivationToGmm2Offset);
+    OP_LOGD(nodeName, "flagDispatchToGmm1Offset:      %ld\n", layout->flagDispatchToGmm1Offset);
+    OP_LOGD(nodeName, "flagSendCntCalToUpdParamsOffset: %ld\n", layout->flagSendCntCalToUpdParamsOffset);
+    OP_LOGD(nodeName, "flagGmmToEpilogueOffset:       %ld\n", layout->flagGmmToEpilogueOffset);
+    OP_LOGD(nodeName, "gmm2ReadyOffset:               %ld\n", layout->gmm2ReadyOffset);
+    OP_LOGD(nodeName, "gmm2CombineSyncCounterOffset:  %ld\n", layout->gmm2CombineSyncCounterOffset);
+    OP_LOGD(nodeName, "gmm2MmadResOffset:             %ld\n", layout->gmm2MmadResOffset);
+    OP_LOGD(nodeName, "workspaceSize:                 %ld\n", layout->workspaceSize);
 }
 
 void PrintPeermemInfo(const MegaMoeTilingData *tilingData, const char *nodeName)
@@ -1370,7 +1370,8 @@ static ge::graphStatus CheckAttrAndSetTilingData(const gert::TilingContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetWorkspace(gert::TilingContext *context, WorkspaceInfo &workspaceInfo, const char *nodeName)
+static ge::graphStatus SetWorkspace(gert::TilingContext *context, const WorkspaceLayout &workspaceLayout,
+                                    const char *nodeName)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     int64_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
@@ -1378,12 +1379,12 @@ static ge::graphStatus SetWorkspace(gert::TilingContext *context, WorkspaceInfo 
     size_t *workspace = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspace == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "workspace"), return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(workspaceInfo.workspaceSize == 0LL,
+    OP_TILING_CHECK(workspaceLayout.workspaceSize == 0LL,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "workspaceSize",
-                                              std::to_string(workspaceInfo.workspaceSize).c_str(), "non-zero"),
+                                              std::to_string(workspaceLayout.workspaceSize).c_str(), "non-zero"),
                     return ge::GRAPH_FAILED);
 
-    int64_t workspaceSize = sysWorkspaceSize + workspaceInfo.workspaceSize + RESERVED_WORKSPACE_SIZE;
+    int64_t workspaceSize = sysWorkspaceSize + workspaceLayout.workspaceSize + RESERVED_WORKSPACE_SIZE;
     workspace[0] = workspaceSize;
 
     OP_LOGD(nodeName, "sysWorkspaceSize: %ld \n", sysWorkspaceSize);
@@ -2371,15 +2372,13 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
     context->SetTilingKey(tilingKey);
 
     // WorkspaceSize
-    // 以地址 0 作为虚拟基址，使构造出的指针值等于各 workspace 分区偏移。
-    GM_ADDR workspaceBase = 0U;
-    WorkspaceInfo workspaceInfo(workspaceBase, tilingData);
-    OP_TILING_CHECK(SetWorkspace(context, workspaceInfo, nodeName) == ge::GRAPH_FAILED,
+    WorkspaceLayout workspaceLayout(tilingData);
+    OP_TILING_CHECK(SetWorkspace(context, workspaceLayout, nodeName) == ge::GRAPH_FAILED,
                     OP_LOGE(nodeName, "Tiling set workspace Failed"), return ge::GRAPH_FAILED);
 
     // Print Info
     PrintMegaMoeTilingData(tilingData, nodeName);
-    PrintWorkspaceInfo(&workspaceInfo, nodeName);
+    PrintWorkspaceLayout(&workspaceLayout, nodeName);
     PrintPeermemInfo(tilingData, nodeName);
 
     return ge::GRAPH_SUCCESS;

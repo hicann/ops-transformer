@@ -50,7 +50,7 @@ HOST_DEVICE int64_t CalcDispatchMaskAlignSizeBy(int64_t numMaxTokensPerRank, int
     int64_t sendTotalNum = numMaxTokensPerRank * topK;
     int64_t alignedRouteCount = Ops::Base::CeilAlign(sendTotalNum * static_cast<int64_t>(sizeof(int32_t)), ALIGN_256) /
                                 static_cast<int64_t>(sizeof(int32_t));
-    return Ops::Base::CeilAlign(alignedRouteCount / 8, ALIGN_32);
+    return Ops::Base::CeilAlign(alignedRouteCount / static_cast<int64_t>(BITS_PER_BYTE), ALIGN_32);
 }
 
 HOST_DEVICE int64_t CalcDispatchMaskAlignSize(const MegaMoeTilingData *tilingData)

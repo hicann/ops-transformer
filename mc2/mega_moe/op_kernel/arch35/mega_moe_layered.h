@@ -363,7 +363,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Init(
     params_.y2GmAddr = yOut;
     params_.expertTokenNumsOutGmAddr = expertTokenNumsOut;
     params_.probsGmAddr = topkWeights;
-    params_.workspaceInfo = WorkspaceInfo(workspaceGM, tilingData, serverNum_);
+    {
+        WorkspaceLayout workspaceLayout(tilingData, serverNum_);
+        params_.workspaceInfo.Bind(workspaceGM, workspaceLayout);
+    }
     params_.peermemInfo = PeermemInfo(g_winRankAddr_[rankId_], tilingData, A_ELEMS_PER_BYTE, serverNum_);
     params_.tilingData = tilingData;
     if constexpr (ENABLE_A8W4 || ENABLE_A4W4) {

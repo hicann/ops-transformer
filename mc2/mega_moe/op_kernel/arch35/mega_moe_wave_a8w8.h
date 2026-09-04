@@ -262,7 +262,10 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Init(
     params_.y2GmAddr = yOut;
     params_.expertTokenNumsOutGmAddr = expertTokenNumsOut;
     params_.probsGmAddr = topkWeights;
-    params_.workspaceInfo = WorkspaceInfo(workspaceGM, tilingData);
+    {
+        WorkspaceLayout workspaceLayout(tilingData);
+        params_.workspaceInfo.Bind(workspaceGM, workspaceLayout);
+    }
     params_.peermemInfo = PeermemInfo(g_winRankAddr_[rankId_], tilingData, 1U);
     params_.tilingData = tilingData;
     epilogueOp_.Init({.yGmAddr = params_.workspaceInfo.activationQuantDataPtr,

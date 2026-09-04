@@ -42,13 +42,14 @@ aclTensorList *ConvertTensorListToInt4(const aclTensorList *input, aclOpExecutor
     }
     constexpr int64_t INT4_NUMS_IN_INT32 = 8; // 每个int32包含8个int4
     std::vector<aclTensor *> tensors;
-    for (uint64_t i = 0; i < input->Size(); i++) {
+    const int tensorCount = input->Size();
+    for (int i = 0; i < tensorCount; ++i) {
         auto tensor = (*input)[i];
         auto viewShape = tensor->GetViewShape();
         viewShape[viewShape.GetDimNum() - 1] = viewShape[viewShape.GetDimNum() - 1] * INT4_NUMS_IN_INT32;
         auto inputTemp = executor->CreateView(tensor, viewShape, tensor->GetViewOffset());
         if (inputTemp == nullptr) {
-            OP_LOGE(ACLNN_ERR_INNER, "ConvertTensorListToInt4: CreateView failed at index %lu.", i);
+            OP_LOGE(ACLNN_ERR_INNER, "ConvertTensorListToInt4: CreateView failed at index %d.", i);
             return nullptr;
         }
         inputTemp->SetDataType(DataType::DT_INT4);
