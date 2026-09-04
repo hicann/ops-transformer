@@ -19,6 +19,7 @@
 #include <graph/utils/type_utils.h>
 #include <tiling/platform/platform_ascendc.h>
 #include <exe_graph/runtime/tiling_context.h>
+#include <exe_graph/runtime/tiling_parse_context.h>
 #include "register/tilingdata_base.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "platform/soc_spec.h"
@@ -34,8 +35,11 @@ constexpr uint32_t VALUE_DEQUANT_SCALE_INPUT_INDEX = 5;
 constexpr uint32_t BLOCK_TABLE_INPUT_INDEX = 6;
 constexpr uint32_t ACT_SEQ_LEN_Q_INPUT_INDEX = 7;
 constexpr uint32_t ACT_SEQ_LEN_KV_INPUT_INDEX = 8;
+constexpr uint32_t SINKS_INPUT_INDEX = 9;
 // Outputs Index
 constexpr uint32_t OUTPUT_INDEX = 0;
+constexpr uint32_t SOFTMAX_MAX_INDEX = 1;
+constexpr uint32_t SOFTMAX_SUM_INDEX = 2;
 // Attributes Index
 constexpr uint32_t SCALE_VALUE_ATTR_INDEX = 0;
 constexpr uint32_t KEY_QUANT_MODE_ATTR_INDEX = 1;
@@ -50,11 +54,14 @@ constexpr uint32_t ATTENTION_MODE_ATTR_INDEX = 9;
 constexpr uint32_t QUANT_SCALE_REPO_MODE_ATTR_INDEX = 10;
 constexpr uint32_t TILE_SIZE_ATTR_INDEX = 11;
 constexpr uint32_t ROPE_HEAD_DIM_ATTR_INDEX = 12;
+constexpr uint32_t RETURN_SOFTMAX_LSE_ATTR_INDEX = 13;
 // Dim Index
 constexpr uint32_t DIM_IDX_ONE = 1;
 constexpr uint32_t DIM_IDX_TWO = 2;
 constexpr uint32_t DIM_IDX_THREE = 3;
+
 // Dim Num
+constexpr size_t DIM_NUM_ONE = 1;
 constexpr size_t DIM_NUM_TWO = 2;
 constexpr size_t DIM_NUM_THREE = 3;
 constexpr size_t DIM_NUM_FOUR = 4;
@@ -129,7 +136,10 @@ struct QSFAParaInfo {
     QSFAOptionalParaInfo keyRope = {nullptr, nullptr};
     QSFAOptionalParaInfo keyDequantScale = {nullptr, nullptr};
     QSFAOptionalParaInfo valueDequantScale = {nullptr, nullptr};
+    QSFAOptionalParaInfo sinks = {nullptr, nullptr};
     QSFARequiredParaInfo attenOut = {nullptr, nullptr};
+    QSFARequiredParaInfo softmaxMax = {nullptr, nullptr};
+    QSFARequiredParaInfo softmaxSum = {nullptr, nullptr};
 
     const char *layoutQuery = nullptr;
     const char *layoutKV = nullptr;
@@ -146,6 +156,7 @@ struct QSFAParaInfo {
     const int64_t *ropeHeadDim = nullptr;
     const int64_t *preTokens = nullptr;
     const int64_t *nextTokens = nullptr;
+    const bool *returnSoftmaxLse = nullptr;
 };
 
 struct InnerSplitParams {
@@ -172,36 +183,29 @@ TILING_DATA_FIELD_DEF(int64_t, dSizeVInput)
 TILING_DATA_FIELD_DEF(uint32_t, isActualLenDimsNull)
 TILING_DATA_FIELD_DEF(uint32_t, isActualLenDimsKVNull)
 TILING_DATA_FIELD_DEF(uint32_t, keyStride0) // PA mode non-contiguous stride
+TILING_DATA_FIELD_DEF(uint32_t, returnSoftmaxLse)
 END_TILING_DATA_DEF
-
-REGISTER_TILING_DATA_CLASS(KvQuantSparseFlashAttentionBaseParamsMlaOp, KvQuantSparseFlashAttentionBaseParamsMla)
 
 BEGIN_TILING_DATA_DEF(KvQuantSparseFlashAttentionSingleCoreParamsMla)
 TILING_DATA_FIELD_DEF(uint32_t, usedCoreNum);
 END_TILING_DATA_DEF
-REGISTER_TILING_DATA_CLASS(KvQuantSparseFlashAttentionSingleCoreParamsMlaOp,
-                           KvQuantSparseFlashAttentionSingleCoreParamsMla)
 
 BEGIN_TILING_DATA_DEF(KvQuantSparseFlashAttentionSingleCoreTensorSizeMla)
 TILING_DATA_FIELD_DEF(uint32_t, mmResUbSize);
 TILING_DATA_FIELD_DEF(uint32_t, bmm2ResUbSize);
 END_TILING_DATA_DEF
-REGISTER_TILING_DATA_CLASS(KvQuantSparseFlashAttentionSingleCoreTensorSizeMlaOp,
-                           KvQuantSparseFlashAttentionSingleCoreTensorSizeMla)
 
 BEGIN_TILING_DATA_DEF(KvQuantSparseFlashAttentionSplitKVParamsMla)
 TILING_DATA_FIELD_DEF(uint32_t, s2)            // S2切分份数
 TILING_DATA_FIELD_DEF(uint32_t, accumOutSize)  // FD workspace
 TILING_DATA_FIELD_DEF(uint32_t, logSumExpSize) // FD workspace
 END_TILING_DATA_DEF
-REGISTER_TILING_DATA_CLASS(KvQuantSparseFlashAttentionSplitKVParamsMlaOp, KvQuantSparseFlashAttentionSplitKVParamsMla)
 
 // 内切基本块参数
 BEGIN_TILING_DATA_DEF(KvQuantSparseFlashAttentionInnerSplitParams)
 TILING_DATA_FIELD_DEF(uint32_t, mBaseSize)
 TILING_DATA_FIELD_DEF(uint32_t, s2BaseSize)
 END_TILING_DATA_DEF
-REGISTER_TILING_DATA_CLASS(KvQuantSparseFlashAttentionInnerSplitParamsOp, KvQuantSparseFlashAttentionInnerSplitParams)
 
 BEGIN_TILING_DATA_DEF(KvQuantSparseFlashAttentionTilingDataMla)
 TILING_DATA_FIELD_DEF_STRUCT(KvQuantSparseFlashAttentionBaseParamsMla, baseParams);
@@ -210,7 +214,6 @@ TILING_DATA_FIELD_DEF_STRUCT(KvQuantSparseFlashAttentionSingleCoreParamsMla, sin
 TILING_DATA_FIELD_DEF_STRUCT(KvQuantSparseFlashAttentionSingleCoreTensorSizeMla, singleCoreTensorSize);
 TILING_DATA_FIELD_DEF_STRUCT(KvQuantSparseFlashAttentionInnerSplitParams, innerSplitParams);
 END_TILING_DATA_DEF
-REGISTER_TILING_DATA_CLASS(KvQuantSparseFlashAttention, KvQuantSparseFlashAttentionTilingDataMla)
 
 template <typename T>
 inline T Align(T num, T rnd)
@@ -228,6 +231,7 @@ struct QSFATilingInfo {
     const char *opName = nullptr;
     fe::PlatFormInfos *platformInfo = nullptr;
     QSFAParaInfo opParamInfo;
+    bool isV2Op = false;
 
     // Base Param
     NpuArch npuArch = NpuArch::DAV_2201;
@@ -292,6 +296,8 @@ struct QSFATilingInfo {
 
     uint64_t l2CacheSize = 0;
     int64_t dSizeVInput = 0;
+
+    bool returnSoftmaxLse = false;
 
     uint32_t keyStride0 = 0; // PA mode non-contiguous stride on 0-axis
 };
@@ -419,9 +425,12 @@ private:
     ge::graphStatus CheckSingleParaSparseMode() const;
     ge::graphStatus CheckSingleParaSparseBlockSize() const;
     ge::graphStatus CheckSingleParaSparseIndices() const;
+    ge::graphStatus CheckSingleParaSinks() const;
     ge::graphStatus CheckSingleParaDequantScale() const;
+    ge::graphStatus CheckSingleParaSoftmaxOutputs() const;
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus CheckMultiParaConsistency() const;
+    ge::graphStatus CheckDequantScaleNotExistence();
     template <typename T>
     ge::graphStatus CheckAttrValueByMap(std::map<std::string, std::pair<const T *, T>> &attrMap) const;
     ge::graphStatus CheckParaExistenceMlaAntiquant() const;
@@ -572,6 +581,7 @@ public:
     const gert::TilingContext *context_ = nullptr;
 
     const char *opName_;
+    bool isV2Op_ = false;
     fe::PlatFormInfos *platformInfo_;
     QSFAParaInfo opParamInfo_;
 
@@ -623,5 +633,12 @@ public:
     uint32_t keyStride0_ = 0;
     uint32_t keyStride1_ = 0;
 };
+
+struct KvQuantSparseFlashAttentionCompileInfo {
+    int64_t coreNum;
+};
+
+ge::graphStatus TilingPrepareForKvQuantSparseFlashAttention(gert::TilingParseContext *context);
+ge::graphStatus TilingKvQuantSparseFlashAttention(gert::TilingContext *context);
 } // namespace optiling
 #endif // KV_QUANT_SPARSE_FLASH_ATTENTION_TILING_H

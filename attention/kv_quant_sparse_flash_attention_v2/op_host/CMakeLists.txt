@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------------------------------------
-# Copyright (c) 2025 Huawei Technologies Co., Ltd.
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -10,7 +10,7 @@
 add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
-    set(kv_quant_sparse_flash_attention_v2_depends attention/common attention/sparse_flash_attention CACHE INTERNAL "Dependencies for kv_quant_sparse_flash_attention_v2")
+    set(kv_quant_sparse_flash_attention_v2_depends attention/common attention/sparse_flash_attention attention/kv_quant_sparse_flash_attention CACHE INTERNAL "Dependencies for kv_quant_sparse_flash_attention_v2")
     target_sources(op_host_aclnn PRIVATE
     kv_quant_sparse_flash_attention_v2_def.cpp
     )

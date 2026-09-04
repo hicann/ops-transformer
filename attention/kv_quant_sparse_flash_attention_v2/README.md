@@ -225,3 +225,9 @@
   - 参数sparse\_block\_size仅支持1。
   - 仅在layout_key为PA_BSND时，key支持0轴非连续。
   - 支持可选入参sinks。
+
+## 调用说明
+
+| 调用方式  | 样例代码                                                     | 说明                                                         |
+| -------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| PyTorch API | [kv_quant_sparse_flash_attention](../../torch_extension/cann_ops_transformer/docs/zh/kv_quant_sparse_flash_attention.md) | 通过`cann_ops_transformer.kv_quant_sparse_flash_attention`调用KvQuantSparseFlashAttentionV2算子 |

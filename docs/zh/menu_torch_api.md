@@ -18,6 +18,7 @@
 - [inplace_partial_rotary_mul](../../torch_extension/cann_ops_transformer/docs/zh/inplace_partial_rotary_mul.md)
 - [inplace_partial_rotary_mul_backward](../../torch_extension/cann_ops_transformer/docs/zh/inplace_partial_rotary_mul_backward.md)
 - [kv_compress_epilog](../../torch_extension/cann_ops_transformer/docs/zh/kv_compress_epilog.md)
+- [kv_quant_sparse_flash_attention](../../torch_extension/cann_ops_transformer/docs/zh/kv_quant_sparse_flash_attention.md)
 - [lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/lightning_indexer.md)
 - [lightning_indexer_kl_loss](../../torch_extension/cann_ops_transformer/docs/zh/lightning_indexer_kl_loss.md)
 - [low_latency_combine](../../torch_extension/cann_ops_transformer/docs/zh/low_latency_combine.md)

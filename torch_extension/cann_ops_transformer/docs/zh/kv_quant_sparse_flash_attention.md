@@ -24,7 +24,7 @@
 ## 功能说明
 
 - 接口功能：
-  `kv_quant_sparse_flash_attention`是`cann_ops_transformer`的扩展`torch`接口，用于调用`KvQuantSparseFlashAttentionV2`算子完成量化和稀疏场景下的注意力计算。该算子仅支持Ascend 950系列产品（A5架构）。
+  `kv_quant_sparse_flash_attention`是`cann_ops_transformer`的扩展`torch`接口，用于调用`KvQuantSparseFlashAttentionV2`算子完成量化和稀疏场景下的注意力计算。
 
   随着大模型上下文长度的增加，Sparse Attention的重要性与日俱增。该技术通过“只计算关键部分”大幅减少计算量，然而会引入大量的离散访存，造成数据搬运时间增加，进而影响整体性能。`kv_quant_sparse_flash_attention`在`sparse_flash_attention`的基础上支持了Per-Token-Head-Tile-128量化输入，并针对离散访存进行了指令缩减及搬运聚合的细致优化。
 
@@ -132,7 +132,7 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 
 ## 约束说明
 
-- 该接口支持单算子模式和TorchAir图模式调用。
+- 该接口支持单算子模式调用。
 - 非PageAttention场景`layout_query`和`layout_kv`取值需要保持一致。
 - `return_softmax_lse=False`时返回空shape为`[0]`的float32占位Tensor；`return_softmax_lse=True`时返回float32的softmax_max与softmax_sum结果。
 - <term>Ascend 950PR/Ascend 950DT</term>：
@@ -141,6 +141,11 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
   - 仅在`layout_kv`为`PA_BSND`时，key支持0轴非连续。
   - 支持可选入参sinks。
   - 当key/value为hifloat8时，`sparse_size`（sparse_indices最后一维）仅支持2048。
+
+## 确定性计算
+
+- 默认支持确定性计算。
+- batch一致性：可以满足计算结果和所在批次大小和所在批次位置无关。
 
 ## 调用示例
 

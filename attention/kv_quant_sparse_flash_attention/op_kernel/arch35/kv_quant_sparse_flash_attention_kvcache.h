@@ -174,6 +174,24 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstIn
         if (constInfo.subBlockIdx == 1) {
             runParam.attentionOutOffset += runParam.firstHalfMRealSize * constInfo.dSizeV;
         }
+        if (constInfo.returnSoftmaxLse) {
+            if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
+                // [N2, T, G] (TND)
+                runParam.softmaxLseOffset = runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
+                                            (qsfaSeqOffset + runParam.sOuterOffset) * constInfo.gSize;
+            } else {
+                // [B, N2, S1, G] (BSND)
+                runParam.softmaxLseOffset = sIdx * constInfo.n2Size * constInfo.s1Size * constInfo.gSize +
+                                            runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
+                                            runParam.sOuterOffset * constInfo.gSize;
+            }
+            if (IS_SPLIT_G && constInfo.aicIdx % 2U != 0) {                // splitG时, 累加第一个核的偏移
+                runParam.softmaxLseOffset += (constInfo.gSize + 1U) >> 1U; // splitG时，需要偏移前一半G
+            }
+            if (constInfo.subBlockIdx == 1) {
+                runParam.softmaxLseOffset += runParam.firstHalfMRealSize;
+            }
+        }
     }
 }
 

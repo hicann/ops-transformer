@@ -9,17 +9,16 @@
  */
 
 /*!
- * \file kv_quant_sparse_flash_attention_v2_tiling.h
- * \brief 复用 kv_quant_sparse_flash_attention 的 tiling 定义, 仅注册 v2 算子名到共享 TilingData
+ * \file kv_quant_sparse_flash_attention_v2_tiling_register.cpp
+ * \brief KvQuantSparseFlashAttentionV2 tiling 入口注册, 复用 kv_quant_sparse_flash_attention 的 tiling 实现
  */
-#ifndef KV_QUANT_SPARSE_FLASH_ATTENTION_V2_TILING_H
-#define KV_QUANT_SPARSE_FLASH_ATTENTION_V2_TILING_H
 
-#include "register/tilingdata_base.h"
-#include "../../kv_quant_sparse_flash_attention/op_host/kv_quant_sparse_flash_attention_tiling.h"
+#include "kv_quant_sparse_flash_attention_v2_tiling.h"
+#include "register/op_def_registry.h"
 
+using namespace ge;
 namespace optiling {
-REGISTER_TILING_DATA_CLASS(KvQuantSparseFlashAttentionV2, KvQuantSparseFlashAttentionTilingDataMla)
+IMPL_OP_OPTILING(KvQuantSparseFlashAttentionV2)
+    .Tiling(TilingKvQuantSparseFlashAttention)
+    .TilingParse<KvQuantSparseFlashAttentionCompileInfo>(TilingPrepareForKvQuantSparseFlashAttention);
 } // namespace optiling
-
-#endif // KV_QUANT_SPARSE_FLASH_ATTENTION_V2_TILING_H

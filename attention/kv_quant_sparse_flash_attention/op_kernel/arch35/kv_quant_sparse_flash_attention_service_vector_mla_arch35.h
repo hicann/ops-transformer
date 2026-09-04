@@ -15,6 +15,8 @@
 #ifndef KV_QUANT_SPARSE_FLASH_ATTENTION_SERVICE_VECTOR_MLA_ARCH35_H
 #define KV_QUANT_SPARSE_FLASH_ATTENTION_SERVICE_VECTOR_MLA_ARCH35_H
 
+#include <limits>
+#include "adv_api/utils/init_global_memory.h"
 #include "kv_quant_sparse_flash_attention_common_arch35.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "lib/matrix/matmul/tiling.h"
@@ -51,6 +53,9 @@ public:
     static constexpr uint32_t qsfaDTemplateAlign64 = Align64Func(dVTemplateType);
     static constexpr uint32_t dVTemplateTypeInput = 672;
     static constexpr float R0 = 1.0f;
+#if KVQSFA_VERSION >= 2
+    static constexpr uint64_t SYNC_SINKS_BUF_FLAG = 6;
+#endif
 
     // ==================== Functions ======================
     __aicore__ inline QSFAVectorService(){};
@@ -76,9 +81,16 @@ public:
     // 初始化LocalTensor
     __aicore__ inline void InitLocalBuffer(TPipe *pipe, ConstInfo &constInfo);
     // 初始化attentionOutGM
+#if KVQSFA_VERSION >= 2
+    __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxMax,
+                                       __gm__ uint8_t *softmaxSum, ConstInfo &constInfo);
+    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *sparseIndices,
+                                            __gm__ uint8_t *blockTable, __gm__ uint8_t *sinks);
+#else
     __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, ConstInfo &constInfo);
     __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *sparseIndices,
                                             __gm__ uint8_t *blockTable);
+#endif
     __aicore__ inline void InitOutputSingleCore(ConstInfo &constInfo);
     __aicore__ inline void ProcessVec0(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputL1,
                                        Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
@@ -142,6 +154,10 @@ private:
                                                LocalTensor<VEC2_RES_T> &vec2ResUb, int64_t vec2S1Idx,
                                                int64_t qsfaVec2CalcSize);
     __aicore__ inline void SoftmaxInitBuffer();
+#if KVQSFA_VERSION >= 2
+    __aicore__ inline void InitSinksBuffer(ConstInfo &constInfo);
+    __aicore__ inline void CopyFALseToGm(RunInfo &runInfo, ConstInfo &constInfo);
+#endif
     __aicore__ inline void InitCubeVecSharedParams(CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx);
     __aicore__ inline void ComputeNeedInitQSFA(CVSharedParams &sharedParams) const;
     __aicore__ inline void GetExtremeValue(T &negativeScalar);
@@ -150,14 +166,24 @@ private:
     const KvQuantSparseFlashAttentionTilingDataMla *__restrict tilingData;
 
     GlobalTensor<OUTPUT_T> attentionOutGm;
+#if KVQSFA_VERSION >= 2
+    GlobalTensor<float> softmaxMaxGm;
+    GlobalTensor<float> softmaxSumGm;
+#endif
     GlobalTensor<KV_T> keyGm;
     GlobalTensor<int32_t> SparseIndicesGm;
     GlobalTensor<int32_t> blockTableGm;
     GlobalTensor<int32_t> cuSeqlensQGm;
     GlobalTensor<int32_t> actualSeqLengthsKVGm;
+#if KVQSFA_VERSION >= 2
+    GlobalTensor<T> sinksGm;
+#endif
     GlobalTensor<uint32_t> kvPhyAddrGm;
 
-    TBuf<> commonTBuf;                            // common的复用空间
+    TBuf<> commonTBuf; // common的复用空间
+#if KVQSFA_VERSION >= 2
+    TBuf<> sinksBuf;
+#endif
     TQue<QuePosition::VECOUT, 1> stage1OutQue[2]; // 2份表示可能存在pingpong
     TQue<QuePosition::VECIN, 2> stage0InQue;      // for v0 input, 2份表示可能存在pingpong
     TQue<QuePosition::VECOUT, 2> stage0OutQue;    // for v0 output, 2份表示可能存在pingpong
@@ -168,6 +194,12 @@ private:
     TBuf<> softmaxSumBuf[2];
     TBuf<> softmaxExpBuf[2];
     TBuf<> vselrIndexesBuf[2];
+#if KVQSFA_VERSION >= 2
+    TBuf<> lseBuf;
+    LocalTensor<float> lseUb;
+    TEventID mte3ToVLseOutId;
+    TEventID vToMte3LseOutId;
+#endif
 
     T negativeFloatScalar;
     uint32_t maxBlockNumPerBatch;
@@ -175,6 +207,7 @@ private:
     int64_t qsfaSparseCalSize;
     int64_t sparseS2Start;
     int64_t sparseS2End;
+    bool isSinks = false;
 };
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetRealCmpS2Idx(
@@ -634,9 +667,14 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::ProcessVec1(
     this->stage1OutQue[stage1Offset].template FreeTensor(stage1CastTensor);
 
     outputBuf.SetCrossCore();
-    if (runInfo.s2LoopCount != 0) {
+    if (runInfo.s2LoopCount != 0 || isSinks) {
         SFAUpdateExpSumAndExpMax<T>(sumUb, maxUb, qsfaExpUb, sumUb, maxUb, apiTmpBuffer, runInfo.halfMRealSize);
     }
+#if KVQSFA_VERSION >= 2
+    if (constInfo.returnSoftmaxLse && runInfo.s2LoopCount == runInfo.s2LoopLimit) {
+        CopyFALseToGm(runInfo, constInfo);
+    }
+#endif
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -644,7 +682,7 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::ProcessVec1SoftmaxDispa
     LocalTensor<Q_T> &stage1CastTensor, LocalTensor<T> &mmRes, LocalTensor<float> &sumUb, LocalTensor<float> &maxUb,
     LocalTensor<T> &apiTmpBuffer, RunInfo &runInfo, ConstInfo &constInfo)
 {
-    if (runInfo.s2LoopCount == 0) {
+    if (runInfo.s2LoopCount == 0 && !isSinks) {
         if (likely(runInfo.s2RealSize == 128)) { // s2RealSize等于128分档, VF内常量化减少if判断
             ProcessVec1Vf<T, Q_T, false, s1BaseSize, s2BaseSize, FaVectorApi::OriginNRange::EQ_128_SFA>(
                 stage1CastTensor, mmRes, sumUb, maxUb, maxUb, apiTmpBuffer, vselrIndexesBuf, runInfo.halfMRealSize,
@@ -659,6 +697,17 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::ProcessVec1SoftmaxDispa
                 runInfo.s2RealSize, static_cast<T>(constInfo.softmaxScale), negativeFloatScalar);
         }
     } else {
+#if KVQSFA_VERSION >= 2
+        if (runInfo.s2LoopCount == 0 && isSinks) {
+            // vec0: 0 ~ halfMRealSize - 1, vec1: firstHalfMRealSize ~ gSize
+            int64_t sinksOffset = runInfo.goIdx;
+            if (constInfo.subBlockIdx == 1) {
+                sinksOffset += runInfo.firstHalfMRealSize;
+            }
+            LocalTensor<T> sinksUb = this->sinksBuf.template Get<T>();
+            InitSoftmaxFromSinks<T>(sumUb, maxUb, sinksUb, sinksOffset, R0, runInfo.halfMRealSize);
+        }
+#endif
         if (likely(runInfo.s2RealSize == 128)) { // s2RealSize等于128分档, VF内常量化减少if判断
             ProcessVec1Vf<T, Q_T, true, s1BaseSize, s2BaseSize, FaVectorApi::OriginNRange::EQ_128_SFA>(
                 stage1CastTensor, mmRes, sumUb, maxUb, maxUb, apiTmpBuffer, vselrIndexesBuf, runInfo.halfMRealSize,
@@ -772,14 +821,101 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitOutputSingleCore(Co
         uint64_t singleCoreSize = (totalOutputSize + (CV_RATIO * coreNum) - 1) / (CV_RATIO * coreNum);
         uint64_t tailSize = totalOutputSize - constInfo.aivIdx * singleCoreSize;
         uint64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
-        if (singleInitOutputSize > 0) {
-            matmul::InitOutput<OUTPUT_T>(this->attentionOutGm[constInfo.aivIdx * singleCoreSize], singleInitOutputSize,
-                                         0);
+        if (constInfo.aivIdx * singleCoreSize < totalOutputSize && singleInitOutputSize > 0) {
+            GlobalTensor<OUTPUT_T> attentionOutEodGm = this->attentionOutGm[constInfo.aivIdx * singleCoreSize];
+            AscendC::Fill<OUTPUT_T>(attentionOutEodGm, singleInitOutputSize, static_cast<OUTPUT_T>(0));
         }
     }
+#if KVQSFA_VERSION >= 2
+    if (constInfo.returnSoftmaxLse) {
+        uint64_t totalLseSize = 0;
+        if constexpr (LAYOUT_T == QSFA_LAYOUT::BSND) {
+            totalLseSize = constInfo.bSize * constInfo.n2Size * constInfo.s1Size * constInfo.gSize;
+        } else if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
+            totalLseSize = constInfo.n2Size * constInfo.s1Size * constInfo.gSize;
+        }
+        if (coreNum != 0 && totalLseSize > 0) {
+            uint64_t singleCoreLseSize = (totalLseSize + (CV_RATIO * coreNum) - 1) / (CV_RATIO * coreNum);
+            uint64_t tailLseSize = totalLseSize - constInfo.aivIdx * singleCoreLseSize;
+            uint64_t singleInitLseSize = tailLseSize < singleCoreLseSize ? tailLseSize : singleCoreLseSize;
+            if (constInfo.aivIdx * singleCoreLseSize < totalLseSize && singleInitLseSize > 0) {
+                GlobalTensor<float> softmaxSumEodGm = this->softmaxSumGm[constInfo.aivIdx * singleCoreLseSize];
+                GlobalTensor<float> softmaxMaxEodGm = this->softmaxMaxGm[constInfo.aivIdx * singleCoreLseSize];
+                AscendC::Fill<float>(softmaxSumEodGm, singleInitLseSize, static_cast<float>(0.0));
+                AscendC::Fill<float>(softmaxMaxEodGm, singleInitLseSize,
+                                     static_cast<float>(-std::numeric_limits<float>::infinity()));
+            }
+        }
+    }
+#endif
     SyncAll();
 }
 
+#if KVQSFA_VERSION >= 2
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CopyFALseToGm(RunInfo &runInfo, ConstInfo &constInfo)
+{
+    LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.multiCoreIdxMod2].template Get<float>();
+    LocalTensor<float> maxUb = this->softmaxMaxBuf[runInfo.multiCoreIdxMod2].template Get<float>();
+
+    size_t alignedSize = (sizeof(float) * runInfo.halfMRealSize + 31) / 32 * 32 / sizeof(float);
+
+    int64_t lseOffset = runInfo.softmaxLseOffset;
+    DataCopyExtParams dataCopyParams;
+    dataCopyParams.blockCount = 1;
+    dataCopyParams.blockLen = sizeof(float) * runInfo.halfMRealSize;
+    dataCopyParams.srcStride = 0;
+    dataCopyParams.dstStride = 0;
+
+    // 拷贝 softmaxMaxUb -> GM
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+    DataCopy(lseUb, maxUb, alignedSize);
+    SetFlag<HardEvent::V_MTE3>(vToMte3LseOutId);
+    WaitFlag<HardEvent::V_MTE3>(vToMte3LseOutId);
+    DataCopyPad(this->softmaxMaxGm[lseOffset], lseUb, dataCopyParams);
+    SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+
+    // 拷贝 softmaxSumUb -> GM
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+    DataCopy(lseUb, sumUb, alignedSize);
+    SetFlag<HardEvent::V_MTE3>(vToMte3LseOutId);
+    WaitFlag<HardEvent::V_MTE3>(vToMte3LseOutId);
+    DataCopyPad(this->softmaxSumGm[lseOffset], lseUb, dataCopyParams);
+    SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+}
+
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CleanOutput(__gm__ uint8_t *attentionOut,
+                                                                     __gm__ uint8_t *softmaxMax,
+                                                                     __gm__ uint8_t *softmaxSum, ConstInfo &constInfo)
+{
+    if ASCEND_IS_AIV {
+        this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
+        this->softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
+        this->softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
+        if (constInfo.needInit == 1) {
+            InitOutputSingleCore(constInfo);
+        }
+    }
+}
+
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitGlobalBuffer(__gm__ uint8_t *key, __gm__ uint8_t *value,
+                                                                          __gm__ uint8_t *sparseIndices,
+                                                                          __gm__ uint8_t *blockTable,
+                                                                          __gm__ uint8_t *sinks)
+{
+    keyGm.SetGlobalBuffer((__gm__ KV_T *)(key));
+    SparseIndicesGm.SetGlobalBuffer((__gm__ int32_t *)sparseIndices);
+    if constexpr (isPa) {
+        blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+    }
+    if (sinks != nullptr) {
+        sinksGm.SetGlobalBuffer((__gm__ T *)sinks);
+        this->isSinks = true;
+    }
+}
+#else
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CleanOutput(__gm__ uint8_t *attentionOut, ConstInfo &constInfo)
 {
@@ -802,6 +938,7 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitGlobalBuffer(__gm__
         blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
     }
 }
+#endif
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::SoftmaxInitBuffer()
@@ -813,7 +950,32 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::SoftmaxInitBuffer()
     tPipe->InitBuffer(softmaxMaxBuf[1], softmaxBufSize);
     tPipe->InitBuffer(softmaxExpBuf[0], softmaxBufSize);
     tPipe->InitBuffer(softmaxExpBuf[1], softmaxBufSize);
+#if KVQSFA_VERSION >= 2
+    tPipe->InitBuffer(lseBuf, 512); // lse的最大容量
+    lseUb = this->lseBuf.template Get<float>();
+    mte3ToVLseOutId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
+    SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+    vToMte3LseOutId = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
+#endif
 }
+
+#if KVQSFA_VERSION >= 2
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitSinksBuffer(ConstInfo &constInfo)
+{
+    LocalTensor<T> sinksUb = this->sinksBuf.template Get<T>();
+    const uint32_t maxN = constInfo.gSize; // N最大支持128, sink shape是[N]
+    DataCopyExtParams dataCopyParams;
+    dataCopyParams.blockCount = 1U;
+    dataCopyParams.blockLen = maxN * sizeof(T);
+    dataCopyParams.srcStride = 0U;
+    dataCopyParams.dstStride = 0U;
+    DataCopyPadExtParams<T> padParams;
+    DataCopyPad(sinksUb, this->sinksGm, dataCopyParams, padParams);
+    SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_SINKS_BUF_FLAG);
+    WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_SINKS_BUF_FLAG);
+}
+#endif
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, ConstInfo &constInfo)
@@ -837,6 +999,12 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *
     vToMte3Id[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
     SetFlag<HardEvent::MTE3_V>(mte3ToVId[0]);
     SetFlag<HardEvent::MTE3_V>(mte3ToVId[1]);
+#if KVQSFA_VERSION >= 2
+    tPipe->InitBuffer(sinksBuf, 512); // sinksBuf内存申请512B
+    if (this->isSinks) {
+        InitSinksBuffer(constInfo);
+    }
+#endif
 }
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitCubeVecSharedParams(
@@ -864,6 +1032,7 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>
 
     sharedParams.isActualSeqLengthsNull = sparseAttnSharedkvBaseParams.isActualLenDimsNull;
     sharedParams.isActualSeqLengthsKVNull = sparseAttnSharedkvBaseParams.isActualLenDimsKVNull;
+    sharedParams.returnSoftmaxLse = (sparseAttnSharedkvBaseParams.returnSoftmaxLse != 0);
 
     ComputeNeedInitQSFA(sharedParams);
 
@@ -1341,10 +1510,19 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetKVPhyAddr(uint32_t h
 TEMPLATES_DEF class QSFAVectorServiceDummy {
 public:
     __aicore__ inline QSFAVectorServiceDummy(){};
+#if KVQSFA_VERSION >= 2
+    __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxMax,
+                                       __gm__ uint8_t *softmaxSum, ConstInfo &constInfo)
+    {}
+    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *sparseIndices,
+                                            __gm__ uint8_t *blockTable, __gm__ uint8_t *sinks)
+    {}
+#else
     __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, ConstInfo &constInfo) {}
     __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *sparseIndices,
                                             __gm__ uint8_t *blockTable)
     {}
+#endif
     __aicore__ inline void InitVecBlock(TPipe *pipe, const KvQuantSparseFlashAttentionTilingDataMla *__restrict tiling,
                                         CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx,
                                         __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths) {};

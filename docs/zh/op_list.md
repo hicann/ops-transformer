@@ -278,6 +278,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/kv_quant_sparse_flash_attention_v2/README.md">kv_quant_sparse_flash_attention_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>在Kv Quant Sparse Flash Attention的基础上支持了sinks特性以及支持输出softmax_max和softmax_sum。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/lightning_indexer/README.md">lightning_indexer</a></td>
     <td>✓</td>
     <td>✓</td>

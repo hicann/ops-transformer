@@ -18,6 +18,10 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
+#ifndef KVQSFA_VERSION
+#define KVQSFA_VERSION (-1)
+#endif
+
 #define QSFA_LAYOUT_BSND 0
 #define QSFA_LAYOUT_TND 1
 #define QSFA_LAYOUT_PA_BSND 2
