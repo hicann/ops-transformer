@@ -56,7 +56,12 @@ constexpr uint32_t ENGRAM_CYCLES_PER_US = 1000U;
 constexpr uint32_t HCOMM_BATCH_CAPACITY = 128U;
 constexpr uint32_t HCOMM_PLAIN_WRITE_WQE_BYTES = 64U;
 constexpr uint32_t HCOMM_BATCH_BUFFER_BYTES = HCOMM_BATCH_CAPACITY * HCOMM_PLAIN_WRITE_WQE_BYTES;
-
+constexpr int STATUS_FLAGS_TIME_CHECK = 1;
+constexpr int SEND_INDICES_REMOTE_TIME_CHECK = 2;
+constexpr int RECV_INDICES_FROM_PEER_TIME_CHECK = 3;
+constexpr int RECV_TOKEN_CHUNK_TIME_CHECK = 4;
+constexpr int WAIT_INDICES_READY_FLAG_TIME_CHECK = 5;
+constexpr int LOCAL_READ_TABLE_SEND_REMOTE_TIME_CHECK = 6;
 constexpr AscendC::UrmaWqeEntry URMA_NO_CQE_CFG = {
     .odr = 5,
     .fence = 1,
@@ -658,7 +663,7 @@ __aicore__ inline void EngramFetchTrainArch35::WaitAllStatusFlags(GM_ADDR status
         for (uint32_t i = 0; i < numRanks_; i++) {
             sumOfFlag += flagLocal.GetValue(i * STATE_OFFSET / sizeof(int32_t));
         }
-        TimeoutCheck(startTime, 1);
+        TimeoutCheck(startTime, STATUS_FLAGS_TIME_CHECK);
     }
 }
 
@@ -916,7 +921,7 @@ __aicore__ inline void EngramFetchTrainArch35::SendIndicesRemote(uint32_t dstRan
             while (localWriteCnt >= static_cast<uint32_t>(remoteReadCnt) &&
                    localWriteCnt - static_cast<uint32_t>(remoteReadCnt) >= NUM_SLOTS) {
                 remoteReadCnt = ReadLocalCounter(localWinBase, indicesReadOffset_, dstRank, 0U, false);
-                TimeoutCheck(startTime, 2);
+                TimeoutCheck(startTime, SEND_INDICES_REMOTE_TIME_CHECK);
             }
         }
 
@@ -951,7 +956,7 @@ __aicore__ inline void EngramFetchTrainArch35::RecvIndicesFromPeer(GM_ADDR local
         int32_t remoteWriteCnt = ReadLocalCounter(localWinBase, indicesWriteOffset_, srcRank, 0U, false);
         while (remoteWriteCnt <= 0 || static_cast<uint32_t>(remoteWriteCnt) <= localReadCnt) {
             remoteWriteCnt = ReadLocalCounter(localWinBase, indicesWriteOffset_, srcRank, 0U, false);
-            TimeoutCheck(startTime, 3);
+            TimeoutCheck(startTime, RECV_INDICES_FROM_PEER_TIME_CHECK);
         }
         uint32_t availableSlots = static_cast<uint32_t>(remoteWriteCnt) - localReadCnt;
         if (availableSlots > NUM_SLOTS) {
@@ -1033,7 +1038,7 @@ __aicore__ inline uint32_t EngramFetchTrainArch35::RecvTokenChunk(GM_ADDR localW
         int32_t remoteWriteCnt = ReadLocalCounter(localWinBase, tokenWriteOffset_, srcRank, subIdx);
         while (remoteWriteCnt <= 0 || static_cast<uint32_t>(remoteWriteCnt) <= totalReceived) {
             remoteWriteCnt = ReadLocalCounter(localWinBase, tokenWriteOffset_, srcRank, subIdx);
-            TimeoutCheck(startTime, 4);
+            TimeoutCheck(startTime, RECV_TOKEN_CHUNK_TIME_CHECK);
         }
         uint32_t available = static_cast<uint32_t>(remoteWriteCnt) - totalReceived;
         uint32_t remaining = myCount - totalReceived;
@@ -1325,7 +1330,7 @@ __aicore__ inline void EngramFetchTrainArch35::WaitIndicesReadyFlag(uint32_t dst
         DataCopyPad(flagLocal, flagGM, cpParams, cpPad);
         EngramFetchTrainSyncFunc<HardEvent::MTE2_S>();
         flagVal = flagLocal.GetValue(0);
-        TimeoutCheck(startTime, 5);
+        TimeoutCheck(startTime, WAIT_INDICES_READY_FLAG_TIME_CHECK);
     }
 }
 
@@ -1435,7 +1440,7 @@ __aicore__ inline void EngramFetchTrainArch35::LocalReadTableAndSendRemote(uint3
             int32_t remoteReadCnt = ReadLocalCounter(localWinBase, tokenReadOffset_, dstRank, subIdx);
             while (totalSent >= static_cast<uint32_t>(remoteReadCnt) + maxTokensPerSlot_) {
                 remoteReadCnt = ReadLocalCounter(localWinBase, tokenReadOffset_, dstRank, subIdx);
-                TimeoutCheck(startTime, 6);
+                TimeoutCheck(startTime, LOCAL_READ_TABLE_SEND_REMOTE_TIME_CHECK);
             }
         }
         uint32_t remaining = myCount - totalSent;

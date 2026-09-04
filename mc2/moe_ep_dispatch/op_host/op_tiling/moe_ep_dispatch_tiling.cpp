@@ -86,6 +86,8 @@ constexpr uint64_t UB_ALIGN = 32UL;
 constexpr uint32_t NETWORK_DIRECT = 0U;
 constexpr uint32_t NETWORK_HYBRID = 1U;
 
+constexpr uint32_t TOPK_AND_TOPK_WEIGHT_NUMBER = 2U;
+
 static void PrintTilingDataInfo(const char *nodeName, const MoeEpDispatchInfo &info)
 {
     OP_LOGD(nodeName, "epWorldSize is %u.", info.cfg.epWorldSize);
@@ -569,7 +571,8 @@ static ge::graphStatus CheckInputTensor(const gert::TilingContext *context, cons
     uint32_t kAlign32 = ((info.cfg.topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
     uint32_t scalesSizeAlign32 = isXFp8 ? ((info.scalesBytes + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN : 0;
     info.perSlotBytes =
-        ((hAlign32 + scalesSizeAlign32 + kAlign32 * 2 + UB_ALIGN + WIN_ADDR_ALIGN - 1) / WIN_ADDR_ALIGN) *
+        ((hAlign32 + scalesSizeAlign32 + kAlign32 * TOPK_AND_TOPK_WEIGHT_NUMBER + UB_ALIGN + WIN_ADDR_ALIGN - 1) /
+         WIN_ADDR_ALIGN) *
         WIN_ADDR_ALIGN;
     info.isTopkWeights = (context->GetOptionalInputShape(TOPK_WEIGHTS_INDEX) != nullptr) ? 1 : 0;
     OP_LOGD(nodeName, "perSlotBytes = %u (hidden=%u)", info.perSlotBytes, info.cfg.hidden);

@@ -19,6 +19,9 @@ constexpr uint32_t SIMT_THREAD_NUM = 1024;
 constexpr bool kUseSimtScatter = true;
 constexpr uint32_t SIMT_SLOT_ALIGN = 32U;
 constexpr uint32_t SIMT_SLOT_ALIGN_ELEMS = SIMT_SLOT_ALIGN / sizeof(int32_t);
+constexpr uint32_t EVEN_NUMBER = 2U;
+constexpr uint32_t SORT_POOL_NUMBER = 16U;
+constexpr uint32_t INDICE_AND_INDEX_NUMBER = 2U;
 
 __simt_vf__ LAUNCH_BOUND(SIMT_THREAD_NUM)
 __aicore__ inline void GatherGroupsSimt(uint32_t tileLen, __ubuf__ uint8_t *sortedKey, __ubuf__ uint32_t *sortedIndex,
@@ -136,7 +139,7 @@ public:
 
     __aicore__ inline void Init(uint32_t totalElements, uint32_t numCores, GM_ADDR valueGm, GM_ADDR indexGm,
                                 GM_ADDR workspaceGm, AscendC::TPipe &pipe,
-                                AscendC::TBufPool<AscendC::TPosition::VECCALC, 16> &pool);
+                                AscendC::TBufPool<AscendC::TPosition::VECCALC, SORT_POOL_NUMBER> &pool);
 
     __aicore__ inline void SetMaxValue(uint32_t maxVal);
 
@@ -376,7 +379,8 @@ __aicore__ inline uint64_t EngramFetchGradSort::GetWorkspaceSize(uint32_t totalE
     uint64_t sortTempBytes = static_cast<uint64_t>(totalElements) * sizeof(int32_t);
     uint64_t sortTempSize = (sortTempBytes + UB_BLOCK_BYTES - 1U) / UB_BLOCK_BYTES * UB_BLOCK_BYTES;
     uint64_t simtStagingBytes = static_cast<uint64_t>(numCores) * SimtStagingPerCore(MAX_SINGLE_CORE_ELEMENTS);
-    return 2 * sortTempSize + 2 * static_cast<uint64_t>(sortTileCount) * HISTOGRAM_BINS * sizeof(int32_t) +
+    return INDICE_AND_INDEX_NUMBER * sortTempSize +
+           INDICE_AND_INDEX_NUMBER * static_cast<uint64_t>(sortTileCount) * HISTOGRAM_BINS * sizeof(int32_t) +
            HISTOGRAM_BINS * sizeof(int32_t) + static_cast<uint64_t>(numCores) * HISTOGRAM_BINS * sizeof(int32_t) +
            simtStagingBytes;
 }
@@ -419,7 +423,7 @@ __aicore__ inline uint32_t EngramFetchGradSort::SmallBufsBytes()
 
 __aicore__ inline void EngramFetchGradSort::Init(uint32_t totalElements, uint32_t numCores, GM_ADDR valueGm,
                                                  GM_ADDR indexGm, GM_ADDR workspaceGm, AscendC::TPipe &pipe,
-                                                 AscendC::TBufPool<AscendC::TPosition::VECCALC, 16> &pool)
+                                                 AscendC::TBufPool<AscendC::TPosition::VECCALC, SORT_POOL_NUMBER> &pool)
 {
     elementCount_ = totalElements;
     coreCount_ = numCores;
@@ -620,7 +624,7 @@ __aicore__ inline AscendC::GlobalTensor<int32_t> *EngramFetchGradSort::GetSrcVal
     if (byteRound == 0) {
         return &valueGm;
     }
-    if (byteRound % 2 == 1) {
+    if (byteRound % EVEN_NUMBER == 1) {
         return &tempValueGm;
     }
     return &outputValueGm;
@@ -636,7 +640,7 @@ __aicore__ inline void EngramFetchGradSort::GetDstBuffers(
         srcIdx = &indexGm;
         dstValue = &tempValueGm;
         dstIndex = &tempIndexGm;
-    } else if (byteRound % 2 == 1) {
+    } else if (byteRound % EVEN_NUMBER == 1) {
         srcIdx = &tempIndexGm;
         dstValue = &outputValueGm;
         dstIndex = &outputIndexGm;
@@ -1040,7 +1044,7 @@ __aicore__ inline void EngramFetchGradSort::Process(uint32_t actualCount, Ascend
                             prefixGm_, tileOffsetsGm_, pipe);
     }
 
-    if (byteRounds_ % 2 == 1) {
+    if (byteRounds_ % EVEN_NUMBER == 1) {
         CopyTempToOutput(tempValueGm_, tempIndexGm_, valueGm_, indexGm_, pipe);
     }
 }

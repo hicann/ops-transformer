@@ -80,6 +80,7 @@ constexpr int64_t SCALES_GROUP_SIZE_PERGROUP = 128;
 constexpr int64_t SCALES_ALIGN_EVEN = 2; // fp8 align 2
 constexpr uint32_t NETWORK_DIRECT = 0U;
 constexpr uint32_t NETWORK_HYBRID = 1U;
+constexpr uint32_t TOPK_AND_TOPK_WEIGHT_NUMBER = 2U;
 
 static void PrintTilingDataInfo(const char *nodeName, const MoeEpDispatchEpilogueInfo &info)
 {
@@ -503,7 +504,8 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext *cont
     uint32_t kAlign32 = ((info.cfg.topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
     uint32_t scalesSizeAlign32 = isFp8 ? ((info.cfg.scalesBytes + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN : 0;
     info.cfg.perSlotBytes =
-        ((hAlign32 + scalesSizeAlign32 + kAlign32 * 2 + UB_ALIGN + WIN_ADDR_ALIGN - 1) / WIN_ADDR_ALIGN) *
+        ((hAlign32 + scalesSizeAlign32 + kAlign32 * TOPK_AND_TOPK_WEIGHT_NUMBER + UB_ALIGN + WIN_ADDR_ALIGN - 1) /
+         WIN_ADDR_ALIGN) *
         WIN_ADDR_ALIGN;
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());

@@ -171,7 +171,7 @@ private:
     uint32_t indicesBufElements_{0};
     TBuf<> castFp32Buf_;
     TBuf<> accumBuf_;
-    TBufPool<TPosition::VECCALC, 16> sortPool_;
+    TBufPool<TPosition::VECCALC, SORT_POOL_NUMBER> sortPool_;
 
     AscendC::Hcomm<COMM_PROTOCOL_UBC_CTP> hcomm_;
     EngramFetchGradSort::EngramFetchGradSort sorter_;
