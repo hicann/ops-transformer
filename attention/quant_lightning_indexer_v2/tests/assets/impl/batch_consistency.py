@@ -20,6 +20,31 @@ import numpy as np
 import torch
 
 
+HIFLOAT8_QUANT_MODE = 4
+SUPPORTED_QUANT_MODES = (1, 2, 3, 4, 5)
+MXFP4_DECODE_VALUES = torch.tensor(
+    (
+        0.0,
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        3.0,
+        4.0,
+        6.0,
+        -0.0,
+        -0.5,
+        -1.0,
+        -1.5,
+        -2.0,
+        -3.0,
+        -4.0,
+        -6.0,
+    ),
+    dtype=torch.float32,
+)
+
+
 class CaseRandomContext:
     """Give batch cases distinct backgrounds without changing normal cases."""
 
@@ -216,6 +241,7 @@ class IndexerBatchInputNormalizer:
         self.attributes = attributes
         self.operator_name = operator_name
         self.quantized = quantized
+        self.quant_mode = int(attributes.get("quant_mode", 1)) if quantized else None
         self.layout_q = attributes.get(
             "layout_q", attributes.get("layout_query", "BSND")
         )
@@ -324,6 +350,10 @@ class IndexerBatchInputNormalizer:
         dtype = template.dtype
         if dtype == torch.bool:
             value = torch.randint(0, 2, shape, generator=generator, dtype=torch.int64)
+        elif "float4" in str(dtype):
+            # CPU cannot cast into Float4, but its packed byte view is writable.
+            packed = torch.randint(0, 16, shape, generator=generator, dtype=torch.uint8)
+            return packed.view(dtype)
         elif dtype.is_floating_point:
             value = torch.rand(shape, generator=generator, dtype=torch.float32)
             value = value * 0.75 + 0.25 if positive else value - 0.5
@@ -337,7 +367,22 @@ class IndexerBatchInputNormalizer:
     def copy_selection(tensor, selector, value):
         if tensor is None:
             return
-        tensor[selector].copy_(value.to(dtype=tensor.dtype, device=tensor.device))
+        source = value
+        if (
+            torch.is_tensor(source)
+            and "float4" in str(source.dtype)
+            and "float4" not in str(tensor.dtype)
+        ):
+            # PyTorch has no Float4 CPU cast kernel.  The pytest CPU golden
+            # stores unpacked values, while the device input uses packed bytes.
+            packed = source.view(torch.uint8)
+            decode_values = MXFP4_DECODE_VALUES.to(device=source.device)
+            low = decode_values[(packed & 0x0F).to(torch.long)]
+            high = decode_values[(packed >> 4).to(torch.long)]
+            source = torch.stack((low, high), dim=-1).reshape(
+                *source.shape[:-1], source.shape[-1] * 2
+            )
+        tensor[selector].copy_(source.to(dtype=tensor.dtype, device=tensor.device))
 
     def query_selector(self, batch_index, sequence_slice):
         if self.layout_q == "BSND":
@@ -351,6 +396,18 @@ class IndexerBatchInputNormalizer:
             token_start += sequence_slice[0]
             token_stop = self.q_prefix[batch_index] + sequence_slice[1]
         return (slice(token_start, token_stop, 1),), token_stop - token_start
+
+    def query_capacity(self, batch_index):
+        """Return the physical q span used by the raw-byte output comparator."""
+        if self.layout_q == "BSND":
+            return int(self.query.shape[1])
+        return self.q_prefix[batch_index + 1] - self.q_prefix[batch_index]
+
+    def query_comparison_length(self, batch_index):
+        """Match the q span that the output comparator will actually select."""
+        if self.layout_q == "TND":
+            return self.query_capacity(batch_index)
+        return self.q_lengths[batch_index]
 
     def validate_relations(self, relations):
         mask_mode = int(
@@ -371,10 +428,16 @@ class IndexerBatchInputNormalizer:
                 )
             if (
                 sequence_slice is None
-                and len(set(self.q_lengths[batch_start:batch_stop])) != 1
+                and len(
+                    {
+                        self.query_capacity(batch_index)
+                        for batch_index in range(batch_start, batch_stop)
+                    }
+                )
+                != 1
             ):
                 raise ValueError(
-                    f"{self.operator_name} one B-only relation requires equal q lengths"
+                    f"{self.operator_name} one B-only relation requires equal q output spans"
                 )
             signature = []
             for batch_index in range(batch_start, batch_stop):
@@ -391,7 +454,7 @@ class IndexerBatchInputNormalizer:
                     (
                         q_count
                         if sequence_slice is not None
-                        else self.q_lengths[batch_index],
+                        else self.query_comparison_length(batch_index),
                         self.k_lengths[batch_index],
                         self.residual[batch_index],
                     )
@@ -402,7 +465,8 @@ class IndexerBatchInputNormalizer:
             previous = grouped_signatures.setdefault(key, value)
             if previous != value:
                 raise ValueError(
-                    f"{self.operator_name} relation requires equal q/K lengths and residuals"
+                    f"{self.operator_name} relation requires equal q output spans, "
+                    "K lengths and residuals"
                 )
 
         for index, (left, left_seed) in enumerate(occupied):
@@ -436,9 +500,10 @@ class IndexerBatchInputNormalizer:
         targets = (
             (self.query_references("query"), 0, False),
             (self.query_references("weights"), 1, False),
-            (self.query_references("query_dequant_scale"), 2, True),
             (self.query_references("output_idx_offset"), 3, True),
         )
+        if self.quant_mode != HIFLOAT8_QUANT_MODE:
+            targets += ((self.query_references("query_dequant_scale"), 2, True),)
         for references, slot, positive in targets:
             if not references:
                 continue
@@ -460,6 +525,23 @@ class IndexerBatchInputNormalizer:
         state = self.data.get("golden_state", {}).get("forward_inputs", {})
         references.append(state.get(name))
         return [value for value in references if value is not None]
+
+    def input_references(self, name):
+        state = self.data.get("golden_state", {}).get("forward_inputs", {})
+        return [
+            value
+            for value in (self.data.get(name), state.get(name))
+            if value is not None
+        ]
+
+    def fill_hifloat8_scales(self):
+        """Use one stable global scale because mode 4 scales have shape ``(1,)``."""
+        for name in ("query_dequant_scale", "key_dequant_scale"):
+            for tensor in self.input_references(name):
+                if torch.is_tensor(tensor):
+                    tensor.fill_(1)
+                else:
+                    np.asarray(tensor).fill(1)
 
     def scatter_paged(self, tensor, batch_index, value, seed, relative_batch):
         table = self.tensor_values(self.block_table[batch_index])
@@ -525,9 +607,9 @@ class IndexerBatchInputNormalizer:
 
     def apply(self, relations):
         self.validate_relations(relations)
-        if self.quantized and int(self.attributes.get("quant_mode", 1)) not in (1, 2):
+        if self.quantized and self.quant_mode not in SUPPORTED_QUANT_MODES:
             raise ValueError(
-                f"{self.operator_name} batch consistency supports quant_mode 1 or 2"
+                f"{self.operator_name} batch consistency supports quant_mode 1 through 5"
             )
         for axes, slices, seed in relations:
             batch_start, batch_stop, _ = slices[0]
@@ -541,9 +623,17 @@ class IndexerBatchInputNormalizer:
                 self.fill_key_tensor(
                     "key", batch_index, seed, relative_batch, 10, False
                 )
-                self.fill_key_tensor(
-                    "key_dequant_scale", batch_index, seed, relative_batch, 11, True
-                )
+                if self.quant_mode != HIFLOAT8_QUANT_MODE:
+                    self.fill_key_tensor(
+                        "key_dequant_scale",
+                        batch_index,
+                        seed,
+                        relative_batch,
+                        11,
+                        True,
+                    )
+        if self.quant_mode == HIFLOAT8_QUANT_MODE:
+            self.fill_hifloat8_scales()
 
 
 class IndexerBatchOutputComparator:
