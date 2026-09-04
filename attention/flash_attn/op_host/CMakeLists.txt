@@ -9,9 +9,6 @@
 # -----------------------------------------------------------------------------------------------------------
 add_op_to_compiled_list()
 
-set(FLASH_ATTN_SKIP_HEADER TRUE CACHE INTERNAL "Skip packaging header for this operator")
-set(FLASH_ATTN_INNER_SKIP_HEADER TRUE CACHE INTERNAL "Skip packaging inner header for this operator")
-
 if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnInner PRIVATE
         flash_attn_def.cpp

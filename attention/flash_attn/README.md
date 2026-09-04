@@ -242,9 +242,7 @@ AICPU 侧与 Host 侧 tiling 共享 `fa_adjust_sinner_souter.h` 的档位选择�
 
 | 文件 | 重点内容 |
 |---|---|
-| `op_api/aclnn_flash_attn.h` / `op_api/aclnn_flash_attn.cpp` | 对外 `aclnnFlashAttn` 两段式接口（GetWorkspaceSize + 执行），薄壳转发 |
-| `op_api/aclnn_flash_attn_inner.h` / `op_api/aclnn_flash_attn_inner.cpp` | inner 实现：对可选输入（sinks/softmax_lse）造占位 tensor |
-| `op_api/flash_attn.h` / `op_api/flash_attn.cpp` | L0 API 层（`namespace l0op`）：注册 launcher-list，由框架据此自动生成 inner workspace 计算 |
+| `op_api/aclnn_flash_attn.cpp` | 对外 `aclnnFlashAttn` 两段式接口（GetWorkspaceSize + 执行），薄壳转发；内含 sinks/softmax_lse 占位 tensor 处理与 inner 接口 extern 声明 |
 
 **② 算子定义与 shape 推导**
 

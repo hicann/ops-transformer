@@ -8,8 +8,6 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-set(FLASH_ATTN_METADATA_SKIP_HEADER TRUE CACHE INTERNAL "Skip packaging header for flash_attn_metadata")
-
 get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
 get_filename_component(OP_NAME ${PARENT_DIR} NAME)
 
