@@ -154,7 +154,7 @@ ElasticBuffer.engram_write(storage) -> None
 
 **输入参数**：
 
-- **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。要求2维、连续、`hidden`必须128对齐，数据类型支持 `bfloat16`、`float16`、`float32`。
+- **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。要求2维、连续、`hidden`必须大于0，数据类型支持 `bfloat16`、`float16`、`float32`。
 
 **输出说明**：无返回值，数据写入host pinned内存。
 
@@ -314,7 +314,7 @@ ElasticBuffer.get_engram_storage_size_hint(
 **输入参数**：
 
 - **num_entries** (`int`)：必选参数，Engram storage的条目数，必须非负。
-- **hidden** (`int`)：必选参数，每个条目的隐藏层维度，必须128 数量对齐且大于0。
+- **hidden** (`int`)：必选参数，每个条目的隐藏层维度，必须大于0。
 - **dtype** (`torch.dtype`)：可选参数，数据类型，默认为 `torch.bfloat16`。仅在此处用于按dtype计算字节数。
 
 **输出说明**：
@@ -502,7 +502,7 @@ ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
 
 - **参数对齐约束**：
   - `num_cpu_bytes` 必须为2MB对齐（即能被 `2 × 1024 × 1024` 整除）。
-  - `hidden` 必须为128 数量对齐。
+  - `hidden` 必须大于0。
   - [get_engram_storage_size_hint](#get_engram_storage_size_hint静态方法) 返回值自动满足2MB对齐。
 
 - **Engram维度约束**：

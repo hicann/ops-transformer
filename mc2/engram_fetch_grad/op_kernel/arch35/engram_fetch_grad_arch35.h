@@ -364,9 +364,14 @@ __aicore__ inline void EngramFetchGradArch35::LocalCopySlice(GM_ADDR dst, GM_ADD
 }
 
 // Rows of one grad ping-pong half buffer: bounded by the half size and gradSubBatch.
+__aicore__ inline static uint32_t AlignRowStride(uint32_t hiddenBytes)
+{
+    return (hiddenBytes + Mc2Kernel::UB_ALIGN - 1U) / Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
+}
+
 __aicore__ inline static uint32_t MaxGradRowsPerPing(uint32_t hiddenBytes, uint32_t gradSubBatch)
 {
-    uint32_t maxByPong = Mc2Kernel::GRAD_PING_BYTES / hiddenBytes;
+    uint32_t maxByPong = Mc2Kernel::GRAD_PING_BYTES / AlignRowStride(hiddenBytes);
     if (maxByPong < 1U) {
         maxByPong = 1U;
     }
@@ -378,7 +383,9 @@ __aicore__ inline static uint32_t MaxGradRowsPerPing(uint32_t hiddenBytes, uint3
 
 __aicore__ inline static uint32_t CastBufBytes(uint32_t hiddenDim, uint32_t maxByPong)
 {
-    return Ceil(hiddenDim * sizeof(float) * maxByPong * 2U, UB_ALIGN) * UB_ALIGN;
+    uint32_t fp32RowStride =
+        (hiddenDim * sizeof(float) + Mc2Kernel::UB_ALIGN - 1U) / Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
+    return Ceil(fp32RowStride * maxByPong * 2U, UB_ALIGN) * UB_ALIGN;
 }
 
 __aicore__ inline static uint32_t AccumBufBytes(uint32_t hiddenDim)
@@ -431,10 +438,11 @@ __aicore__ inline void EngramFetchGradArch35::Init(GM_ADDR commContext, GM_ADDR 
     ubSize_ = tilingData->ubSize;
     gradSubBatch_ = tilingData->gradSubBatch;
     if (gradSubBatch_ == 0U) {
-        // 旧 tiling 兼容回落：回落值必须同时受半缓冲容量约束，否则 subLen*hiddenBytes 越过 32KB 半缓冲
+        // 旧 tiling 兼容回落：回落值必须同时受半缓冲容量约束（按 32B 对齐行 stride），
+        // 否则 subLen*rowStride 越过 32KB 半缓冲
         uint32_t rowsPerPing = 1U;
         if (hiddenBytes_ > 0 && hiddenBytes_ <= static_cast<int64_t>(Mc2Kernel::GRAD_PING_BYTES)) {
-            rowsPerPing = Mc2Kernel::GRAD_PING_BYTES / static_cast<uint32_t>(hiddenBytes_);
+            rowsPerPing = Mc2Kernel::GRAD_PING_BYTES / AlignRowStride(static_cast<uint32_t>(hiddenBytes_));
         }
         gradSubBatch_ = (rowsPerPing < Mc2Kernel::GRAD_SUB_BATCH) ? rowsPerPing : Mc2Kernel::GRAD_SUB_BATCH;
     }
@@ -677,7 +685,8 @@ __aicore__ inline void EngramFetchGradArch35::UnsortGrad()
     GlobalTensor<int32_t> permGM;
     permGM.SetGlobalBuffer((__gm__ int32_t *)permOutGM_);
 
-    if (static_cast<uint64_t>(hiddenBytes_) > tileBytes_) {
+    if ((static_cast<uint64_t>(hiddenBytes_) % Mc2Kernel::UB_ALIGN != 0U) ||
+        (static_cast<uint64_t>(hiddenBytes_) > tileBytes_)) {
         LocalTensor<int32_t> idxUb = indicesBuf_.Get<int32_t>();
         int64_t pos = start;
         while (pos < end) {

@@ -430,7 +430,7 @@ class ElasticBuffer:
 
         Arguments:
             num_entries: the number of entries in the Engram storage (must be non-negative).
-            hidden: the hidden dimension of each entry (must be 128-aligned and positive).
+            hidden: the hidden dimension of each entry (must be positive).
             dtype: the data type, defaults to `torch.bfloat16`.
 
         Returns:
@@ -443,10 +443,6 @@ class ElasticBuffer:
         torch._check(
             hidden > 0,
             lambda: f"hidden must be positive, got {hidden}",
-        )
-        torch._check(
-            hidden % 128 == 0,
-            lambda: f"hidden must be 128-aligned, got {hidden}",
         )
         torch._check(
             dtype in (torch.bfloat16, torch.float16, torch.float32),
@@ -611,10 +607,6 @@ class ElasticBuffer:
             storage.size(1) > 0,
             lambda: f"storage second dimension must be positive, got: {storage.size(1)}",
         )
-        torch._check(
-            storage.size(1) % 128 == 0,
-            lambda: f"storage second dimension must be 128-aligned, got: {storage.size(1)}",
-        )
         self._runtime.engram_write(storage)
         self._engram_context_tensor = self._runtime.get_context_tensor()
         self._engram_hidden_size = storage.size(1)
@@ -755,12 +747,6 @@ class ElasticBuffer:
             lambda: (
                 f"grad_fetched hidden size ({grad_fetched.size(1)}) must match storage hidden size "
                 f"({self._engram_hidden_size})"
-            ),
-        )
-        _torch_check(
-            grad_fetched.size(1) % 128 == 0,
-            lambda: (
-                f"grad_fetched hidden size must be 128-aligned, got {grad_fetched.size(1)}"
             ),
         )
         for _name, _tensor in (

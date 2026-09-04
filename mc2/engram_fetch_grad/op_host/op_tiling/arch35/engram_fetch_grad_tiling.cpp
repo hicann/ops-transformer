@@ -52,7 +52,6 @@ constexpr uint32_t DIM_TWO = 2U;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024 * 1024;
 constexpr int64_t SIMT_DCACHE_SIZE = 64 * 1024LL;
 
-constexpr int32_t HIDDEN_SIZE_ALIGN = 128;
 constexpr int64_t BUFFER_ALIGNMENT = 2 * 1024 * 1024;
 
 static const std::vector<ge::DataType> GRAD_DTYPE_LIST = {ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT};
@@ -233,11 +232,6 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "gradFetched",
                                               (std::string("dim1=") + std::to_string(hiddenDim)).c_str(), "> 0"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        hiddenDim % HIDDEN_SIZE_ALIGN != 0,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "gradFetched", (std::string("dim1=") + std::to_string(hiddenDim)).c_str(),
-                                  (std::string("must be ") + std::to_string(HIDDEN_SIZE_ALIGN) + "-aligned").c_str()),
-        return ge::GRAPH_FAILED);
 
     // perm: 1D (T,), dim0 == numTokens
     const gert::StorageShape *permShape = context->GetInputShape(IN_PERM);
@@ -613,7 +607,10 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, EngramFetchGr
     OP_TILING_CHECK(permanentUb >= static_cast<uint64_t>(tilingData.ubSize),
                     OP_LOGE(nodeName, "permanent UB (%llu) exceeds availUbSize (%llu)", permanentUb, tilingData.ubSize),
                     return ge::GRAPH_FAILED);
-    uint32_t maxByPong = Mc2Kernel::GRAD_PING_BYTES / static_cast<uint32_t>(tilingData.hiddenBytes);
+    // UB 侧按 32B 对齐行 stride 排布 gradRaw/cast 行，容量计算必须与 kernel 侧一致（含非对齐 hiddenBytes）
+    uint32_t inRowStride = static_cast<uint32_t>(
+        AlignTo(static_cast<int64_t>(tilingData.hiddenBytes), static_cast<int64_t>(Mc2Kernel::UB_ALIGN)));
+    uint32_t maxByPong = Mc2Kernel::GRAD_PING_BYTES / inRowStride;
     if (maxByPong < 1U) {
         maxByPong = 1U;
     }
@@ -625,9 +622,10 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, EngramFetchGr
     uint32_t availableForCast = (availableForPool > Mc2Kernel::COMM_BUF_BYTES + accumNeed) ?
                                     (availableForPool - Mc2Kernel::COMM_BUF_BYTES - accumNeed) :
                                     0U;
-    uint32_t maxByCast = needCast ? (availableForCast / (static_cast<uint32_t>(tilingData.hiddenDim) * sizeof(float) *
-                                                         Mc2Kernel::ACCUM_BUF_COPIES)) :
-                                    maxByPong;
+    // cast 缓冲行 stride 同样 32B 对齐（fp32 行）
+    uint32_t fp32RowStride = static_cast<uint32_t>(
+        AlignTo(static_cast<int64_t>(tilingData.hiddenDim) * sizeof(float), static_cast<int64_t>(Mc2Kernel::UB_ALIGN)));
+    uint32_t maxByCast = needCast ? (availableForCast / (fp32RowStride * Mc2Kernel::ACCUM_BUF_COPIES)) : maxByPong;
     uint32_t gradSubBatch = maxByPong;
     if (maxByCast < gradSubBatch) {
         gradSubBatch = maxByCast;

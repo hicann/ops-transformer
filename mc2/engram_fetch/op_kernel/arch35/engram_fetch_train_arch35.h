@@ -1248,6 +1248,10 @@ __aicore__ inline uint32_t EngramFetchTrainArch35::CalcTokensPerTile() const
     if (hiddenBytesU32 == 0U) {
         return 0U;
     }
+
+    if (hiddenBytesU32 % UB_ALIGN != 0U) {
+        return 0U;
+    }
     return tileBytes_ / hiddenBytesU32;
 }
 
@@ -1296,13 +1300,16 @@ __aicore__ inline void EngramFetchTrainArch35::LocalReadTablePerToken(int64_t cu
 
         GlobalTensor<uint8_t> srcGm;
         srcGm.SetGlobalBuffer((__gm__ uint8_t *)src);
-        DataCopy(tmp, srcGm, hiddenBytesU32);
+        DataCopyExtParams cpParams{1U, hiddenBytesU32, 0U, 0U, 0U};
+        DataCopyPadExtParams<uint8_t> cpPad{false, 0, 0, 0};
+        DataCopyPad(tmp, srcGm, cpParams, cpPad);
         AscendC::SetFlag<HardEvent::MTE2_MTE3>(ppEvtMte2ToMte3_[bufIdx]);
 
         GlobalTensor<uint8_t> dstGm;
         dstGm.SetGlobalBuffer((__gm__ uint8_t *)dst);
         AscendC::WaitFlag<HardEvent::MTE2_MTE3>(ppEvtMte2ToMte3_[bufIdx]);
-        DataCopy(dstGm, tmp, hiddenBytesU32);
+        DataCopyParams gmParams = {1U, static_cast<uint16_t>(hiddenBytesU32), 0U, 0U};
+        DataCopyPad(dstGm, tmp, gmParams);
         AscendC::SetFlag<HardEvent::MTE3_MTE2>(ppEvtMte3ToMte2_[bufIdx]);
 
         tileIdx++;

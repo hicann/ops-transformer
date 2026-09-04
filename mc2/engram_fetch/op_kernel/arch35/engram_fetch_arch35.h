@@ -445,10 +445,13 @@ __aicore__ inline void EngramFetchArch35::LocalCopySlice(GM_ADDR dst, GM_ADDR sr
         uint64_t thisLen = (len - off > TILE_BYTES) ? tileLen : (len - off);
 
         AscendC::LocalTensor<uint8_t> tmp = relayQue_.AllocTensor<uint8_t>();
-        AscendC::DataCopy(tmp, srcGm[off], thisLen);
+        AscendC::DataCopyExtParams mte2Params{1U, static_cast<uint32_t>(thisLen), 0U, 0U, 0U};
+        AscendC::DataCopyPadExtParams<uint8_t> mte2Pad{false, 0, 0, 0};
+        AscendC::DataCopyPad(tmp, srcGm[off], mte2Params, mte2Pad);
         relayQue_.EnQue<uint8_t>(tmp);
         tmp = relayQue_.DeQue<uint8_t>();
-        AscendC::DataCopy(dstGm[off], tmp, thisLen);
+        AscendC::DataCopyParams mte3Params{1U, static_cast<uint16_t>(thisLen), 0U, 0U};
+        AscendC::DataCopyPad(dstGm[off], tmp, mte3Params);
         relayQue_.FreeTensor<uint8_t>(tmp);
 
         off += thisLen;
