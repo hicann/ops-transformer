@@ -60,12 +60,6 @@ enum class SMLATemplateMode : uint32_t {
     ORI_CMP_SPARSE_TEMPLATE_MODE = 4
 };
 
-enum class KvStorageMode : uint32_t {
-    BATCH_CONTINUOUS = 0,
-    TENSOR_LIST = 1,
-    PAGE_ATTENTION = 2
-};
-
 // ------------------算子原型索引常量定义----------------
 // Inputs Index (0-10, common)
 constexpr uint32_t Q_INDEX = 0;
@@ -115,20 +109,11 @@ constexpr uint32_t DIM_NUM_THREE = 3;
 constexpr uint32_t DIM_NUM_FOUR = 4;
 
 // 常量
-constexpr uint32_t MAX_BLOCK_SIZE = 1024;
-constexpr uint32_t COPYND2NZ_SRC_STRIDE_LIMITATION = 65535;
-constexpr uint32_t NUM_BYTES_FLOAT = 4;
-constexpr uint32_t NUM_BYTES_FLOAT16 = 2;
-constexpr uint32_t NUM_BYTES_BF16 = 2;
 constexpr uint32_t BYTE_BLOCK = 32;
 
 // 入参限制常量
-constexpr uint32_t HEAD_DIM_LIMIT = 128;
-constexpr uint32_t SPARSE_LIMIT = 2048;
-constexpr uint32_t SPARSE_MODE_LOWER = 3;
 constexpr uint32_t METADATA_LIMIT = 1024;
 constexpr uint32_t DIM_LIMIT = 512;
-constexpr uint32_t TOPK_LIMIT = 1024;
 constexpr uint32_t BLOCK_SIZE_LIMIT = 1024;
 
 // -----------算子TilingData定义（A2/A3字段顺序 + A5追加字段）---------------
@@ -250,10 +235,6 @@ public:
     uint32_t qTSize = 0; // 仅TND时生效
 
     uint32_t actualLenDimsQ = 0;
-    uint32_t maxActualseq = 0;
-    bool actualSeqLenFlag = false;
-    bool isSameSeqAllKVTensor = true;
-    bool isSameActualseq = true;
     uint32_t actualLenDimsKV = 0;
 
     uint32_t actualLenDimsOriKV = 0;
@@ -279,21 +260,16 @@ public:
     uint32_t oriSparseIndexWidth = 0;
 
     int64_t topkValueMode = 0;
-    // Mask
-    int32_t sparseMode = 0;
     // Others Flag
-    uint32_t sparseCount = 0;
     bool returnSoftmaxLse = false;
     bool batchConsistency = false;
 
     // PageAttention
-    uint32_t blockTypeSize = 0;
     uint32_t oriMaxBlockNumPerBatch = 0;
     int32_t blockSize = 0;
     int32_t oriBlockSize = 0;
     int32_t cmpBlockSize = 0;
     uint32_t cmpMaxBlockNumPerBatch = 0;
-    uint32_t totalBlockNum = 0;
 
     // DType
     ge::DataType qType = ge::DT_FLOAT16;
@@ -379,21 +355,12 @@ private:
     ge::graphStatus CheckFeaturePa() const;
 
     ge::graphStatus CheckMultiParaConsistency();
-    void SetSMLAShapeCompare();
     ge::graphStatus CheckDTypeConsistency(const ge::DataType &actualDtype, const ge::DataType &expectDtype,
                                           const std::string &name) const;
     ge::graphStatus CheckOriAndCmpKv() const;
     ge::graphStatus CheckAttenOut() const;
     ge::graphStatus CheckActualSeqLensQ() const;
     ge::graphStatus CheckActualSeqLens() const;
-    ge::graphStatus CheckBlockTable() const;
-
-    gert::Shape queryShapeCmp_{};
-    gert::Shape oriKvShapeCmp_{};
-    gert::Shape cmpKvShapeCmp_{};
-    gert::Shape oriKvSparseIndicesCmp_{};
-    gert::Shape cmpKvSparseIndicesCmp_{};
-    gert::Shape attenOutShapeCmp_{};
 
     const char *opName_;
     fe::PlatFormInfos *platformInfo_;
@@ -411,13 +378,8 @@ private:
     uint32_t oriKvHeadDim_ = 0;
     uint32_t cmpKvHeadDim_ = 0;
 
-    uint32_t qTSize_ = 0;  // 仅TND时生效
-    uint32_t kvTSize_ = 0; // 仅TND时生效
+    uint32_t qTSize_ = 0; // 仅TND时生效
     int64_t cmpRatio_ = 1;
-    KvStorageMode kvStorageMode_ = KvStorageMode::BATCH_CONTINUOUS;
-    uint32_t oriSparseBlockCount_ = 0; // A5
-    uint32_t cmpSparseBlockCount_ = 0; // A5
-    uint32_t sparseBlockCount_ = 0;    // A2/A3
     int64_t oriWinLeft_ = 0;
     int64_t oriWinRight_ = 0;
     bool hasOriSparseIndices_ = false;
@@ -431,20 +393,10 @@ private:
     SMLALayout outLayout_ = SMLALayout::TND;
     SMLALayout kvLayout_ = SMLALayout::PA_BBND;
 
-    uint32_t oriMaxBlockNumPerBatch_ = 0;
-    uint32_t cmpMaxBlockNumPerBatch_ = 0;
-    int64_t blockSize_ = 0;
     int32_t oriBlockSize_ = 0;
     int32_t cmpBlockSize_ = 0;
 
-    uint32_t aicNum_ = 0;
-    uint32_t aivNum_ = 0;
     NpuArch npuArch_ = NpuArch::DAV_2201;
-    uint64_t l2CacheSize_ = 0;
-
-    bool isSameSeqAllKVTensor_ = true;
-    bool isSameActualseq_ = true;
-    uint32_t maxActualseq_ = 0;
 
     ge::DataType qType_ = ge::DT_FLOAT16;
     ge::DataType oriKvType_ = ge::DT_FLOAT16;
@@ -479,7 +431,6 @@ public:
     void GetInputParaInfo();
     void GetOutputParaInfo();
     ge::graphStatus GetAttrParaInfo();
-    ge::graphStatus GetKvCache();
     ge::graphStatus GetOpParaInfo();
 
     ge::graphStatus GetInOutDataType();
@@ -492,7 +443,6 @@ public:
     ge::graphStatus GetGSize();
     ge::graphStatus GetBatchSize();
     ge::graphStatus GetQTSize();
-    ge::graphStatus GetKVTSize(); // A2/A3
     ge::graphStatus GetS1Size();
     ge::graphStatus GetS2SizeForPageAttention();
     ge::graphStatus GetS2SizeForTND(); // A2/A3
@@ -528,24 +478,18 @@ public:
     uint32_t s1Size_ = 0;
     int64_t s2Size_ = 0;
     int64_t cmpS2Size_ = 0; // A5
-    uint32_t headDim_ = 0;
     uint32_t qTSize_ = 0;
-    uint32_t orikvTSize_ = 0; // A2/A3
-    uint32_t cmpkvTSize_ = 0; // A2/A3
     uint32_t qHeadDim_ = 0;
     uint32_t oriKvHeadDim_ = 0;
     uint32_t cmpKvHeadDim_ = 0;
     int64_t sparseBlockSize_ = 0;
     int64_t oriSparseBlockCount_ = 0; // A5
     int64_t cmpSparseBlockCount_ = 0; // A5
-    int64_t sparseBlockCount_ = 0;    // A2/A3
     int64_t oriWinLeft_ = 0;
     int64_t oriWinRight_ = 0;
     bool hasOriSparseIndices_ = false;
     uint32_t oriSparseIndexWidth_ = 0;
     int64_t topkValueMode_ = 0;
-    uint32_t maxActualseq_ = 0;
-    bool isSameSeqAllKVTensor_ = true;
     uint32_t actualLenDimsKV_ = 0;
     uint32_t actualLenDimsQ_ = 0;
     bool batchConsistency_ = false;
