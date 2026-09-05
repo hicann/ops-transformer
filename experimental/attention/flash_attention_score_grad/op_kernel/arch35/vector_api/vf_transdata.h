@@ -18,7 +18,7 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-using namespace MicroAPI;
+using namespace Reg;
 /* **************************************************************************************************
  * nz2nd                                             *
  * ************************************************************************************************* */
@@ -80,8 +80,7 @@ __aicore__ inline void Transdata(const LocalTensor<T> &dstTensor, const LocalTen
 template <typename T>
 __aicore__ inline void Transdata(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint32_t srcM,
                                  uint32_t srcN)
-{
-}
+{}
 #endif
 } // namespace AscendC
 

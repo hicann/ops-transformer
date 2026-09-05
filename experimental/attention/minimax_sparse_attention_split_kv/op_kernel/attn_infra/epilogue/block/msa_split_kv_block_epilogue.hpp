@@ -35,7 +35,7 @@ using namespace AscendC::Reg;
 // embedded (this operator's Phase1 leaves accumOut unnormalized). FP32-only path
 // (<T, Tacc> with Tacc=float; the bf16 O_partial path uses the separate header
 // below, do NOT add bf16 branches here — keeps the verified fp32 binary identical).
-// Must follow the vf_flash_decode.h include above (relies on FLT_ZERO / MicroAPI).
+// Must follow the vf_flash_decode.h include above (relies on FLT_ZERO / Reg).
 #include "../../../arch35/vector_api/vf_flash_decode_msa.h"
 
 #include "../../../attn_infra/epilogue/block/msa_split_kv_block_epilogue_online_softmax_arch35_reg_low_prec_bf16.hpp"

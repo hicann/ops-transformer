@@ -18,7 +18,7 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-using namespace MicroAPI;
+using namespace Reg;
 /* **************************************************************************************************
 
 SoftmaxGradFrontCast *
@@ -31,8 +31,9 @@ param [in] gradTensor input grad LocalTensor
 param [in] srcTensor input src LocalTensor
 */
 template <typename T1, uint32_t HEAD_DIM_ALIGN>
-__simd_vf__ inline void CastAligned512F16VF384(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt1, 
-                                                uint64_t gradLocalInt1, uint64_t srcLocalIntTail, uint64_t gradLocalIntTail, uint32_t reduceSize, uint32_t srcM)
+__simd_vf__ inline void CastAligned512F16VF384(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt,
+                                               uint64_t srcLocalInt1, uint64_t gradLocalInt1, uint64_t srcLocalIntTail,
+                                               uint64_t gradLocalIntTail, uint32_t reduceSize, uint32_t srcM)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregGrad;
@@ -82,12 +83,18 @@ __simd_vf__ inline void CastAligned512F16VF384(uint64_t srcLocalInt, uint64_t ds
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         // 手动unroll 128个数分64个数做mul和add
         if constexpr (IsSameType<T1, half>::value) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf, ((__ubuf__ T1 *&)srcLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf, ((__ubuf__ T1 *&)gradLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf1, ((__ubuf__ T1 *&)srcLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf1, ((__ubuf__ T1 *&)gradLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalfTail, ((__ubuf__ T1 *&)srcLocalIntTail), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalfTail, ((__ubuf__ T1 *&)gradLocalIntTail), HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf, ((__ubuf__ T1 *&)srcLocalInt),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradHalf, ((__ubuf__ T1 *&)gradLocalInt),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf1, ((__ubuf__ T1 *&)srcLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradHalf1, ((__ubuf__ T1 *&)gradLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcHalfTail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradHalfTail, ((__ubuf__ T1 *&)gradLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradHalf, pregFullExeB16);
@@ -101,12 +108,17 @@ __simd_vf__ inline void CastAligned512F16VF384(uint64_t srcLocalInt, uint64_t ds
             Cast<float, T1, castTraitB162B32Even>(vregGradTail, vregGradHalfTail, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregGrad1Tail, vregGradHalfTail, pregFullExeB16);
         } else if constexpr (IsSameType<T1, bfloat16_t>::value) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf, ((__ubuf__ T1 *&)srcLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf, ((__ubuf__ T1 *&)gradLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf1, ((__ubuf__ T1 *&)srcLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf1, ((__ubuf__ T1 *&)gradLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBfTail, ((__ubuf__ T1 *&)srcLocalIntTail), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBfTail, ((__ubuf__ T1 *&)gradLocalIntTail), HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcBf, ((__ubuf__ T1 *&)srcLocalInt), HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradBf, ((__ubuf__ T1 *&)gradLocalInt),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcBf1, ((__ubuf__ T1 *&)srcLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradBf1, ((__ubuf__ T1 *&)gradLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcBfTail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradBfTail, ((__ubuf__ T1 *&)gradLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcBf, pregFullExeB16);
@@ -133,15 +145,17 @@ __simd_vf__ inline void CastAligned512F16VF384(uint64_t srcLocalInt, uint64_t ds
         Add(vregAdd, vregAddLast, vregAddTail, pregFullExe);
 
         ReduceSum(vregReduceSum, vregAdd, pregFullExe);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ float *&)dstLocalInt), vregReduceSum, uregReduceSum, 1);
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalInt), vregReduceSum,
+                                                                uregReduceSum, 1);
     }
     vstas(uregReduceSum, ((__ubuf__ float *&)dstLocalInt), 0, POST_UPDATE);
 }
 
 template <typename T1, uint32_t HEAD_DIM_ALIGN>
-__simd_vf__ inline void CastAligned512F16VF512(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt, uint64_t srcLocalInt1, uint64_t gradLocalInt1, 
-                                                uint64_t srcLocalInt2, uint64_t gradLocalInt2, uint64_t srcLocalIntTail, uint64_t gradLocalIntTail, uint32_t reduceSize, uint32_t srcM)
+__simd_vf__ inline void CastAligned512F16VF512(uint64_t srcLocalInt, uint64_t dstLocalInt, uint64_t gradLocalInt,
+                                               uint64_t srcLocalInt1, uint64_t gradLocalInt1, uint64_t srcLocalInt2,
+                                               uint64_t gradLocalInt2, uint64_t srcLocalIntTail,
+                                               uint64_t gradLocalIntTail, uint32_t reduceSize, uint32_t srcM)
 {
     RegTensor<float> vregSrc;
     RegTensor<float> vregGrad;
@@ -203,14 +217,22 @@ __simd_vf__ inline void CastAligned512F16VF512(uint64_t srcLocalInt, uint64_t ds
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         // 手动unroll 128个数分64个数做mul和add
         if constexpr (IsSameType<T1, half>::value) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf, ((__ubuf__ T1 *&)srcLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf, ((__ubuf__ T1 *&)gradLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf1, ((__ubuf__ T1 *&)srcLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf1, ((__ubuf__ T1 *&)gradLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf2, ((__ubuf__ T1 *&)srcLocalInt2), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalf2, ((__ubuf__ T1 *&)gradLocalInt2), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcHalfTail, ((__ubuf__ T1 *&)srcLocalIntTail), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradHalfTail, ((__ubuf__ T1 *&)gradLocalIntTail), HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf, ((__ubuf__ T1 *&)srcLocalInt),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradHalf, ((__ubuf__ T1 *&)gradLocalInt),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf1, ((__ubuf__ T1 *&)srcLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradHalf1, ((__ubuf__ T1 *&)gradLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcHalf2, ((__ubuf__ T1 *&)srcLocalInt2),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradHalf2, ((__ubuf__ T1 *&)gradLocalInt2),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcHalfTail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradHalfTail, ((__ubuf__ T1 *&)gradLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcHalf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradHalf, pregFullExeB16);
@@ -228,14 +250,21 @@ __simd_vf__ inline void CastAligned512F16VF512(uint64_t srcLocalInt, uint64_t ds
             Cast<float, T1, castTraitB162B32Even>(vregGradTail, vregGradHalfTail, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregGrad1Tail, vregGradHalfTail, pregFullExeB16);
         } else if constexpr (IsSameType<T1, bfloat16_t>::value) {
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf, ((__ubuf__ T1 *&)srcLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf, ((__ubuf__ T1 *&)gradLocalInt), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf1, ((__ubuf__ T1 *&)srcLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf1, ((__ubuf__ T1 *&)gradLocalInt1), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBf2, ((__ubuf__ T1 *&)srcLocalInt2), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBf2, ((__ubuf__ T1 *&)gradLocalInt2), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregSrcBfTail, ((__ubuf__ T1 *&)srcLocalIntTail), HEAD_DIM_ALIGN);
-            LoadAlign<T1, MicroAPI::PostLiteral::POST_MODE_UPDATE>(vregGradBfTail, ((__ubuf__ T1 *&)gradLocalIntTail), HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcBf, ((__ubuf__ T1 *&)srcLocalInt), HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradBf, ((__ubuf__ T1 *&)gradLocalInt),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcBf1, ((__ubuf__ T1 *&)srcLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradBf1, ((__ubuf__ T1 *&)gradLocalInt1),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcBf2, ((__ubuf__ T1 *&)srcLocalInt2),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradBf2, ((__ubuf__ T1 *&)gradLocalInt2),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcBfTail, ((__ubuf__ T1 *&)srcLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
+            LoadAlign<T1, Reg::PostLiteral::POST_MODE_UPDATE>(vregGradBfTail, ((__ubuf__ T1 *&)gradLocalIntTail),
+                                                              HEAD_DIM_ALIGN);
             Cast<float, T1, castTraitB162B32Even>(vregSrc, vregSrcBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Even>(vregGrad, vregGradBf, pregFullExeB16);
             Cast<float, T1, castTraitB162B32Odd>(vregSrc1, vregSrcBf, pregFullExeB16);
@@ -270,15 +299,17 @@ __simd_vf__ inline void CastAligned512F16VF512(uint64_t srcLocalInt, uint64_t ds
         Add(vregAddLast, vregAddTemp, vregAdd, pregFullExe);
 
         ReduceSum(vregReduceSum, vregAddLast, pregFullExe);
-        StoreUnAlign<float, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ float *&)dstLocalInt), vregReduceSum, uregReduceSum, 1);
+        StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ float *&)dstLocalInt), vregReduceSum,
+                                                                uregReduceSum, 1);
     }
     vstas(uregReduceSum, ((__ubuf__ float *&)dstLocalInt), 0, POST_UPDATE);
 }
 
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                                    const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
+__aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor,
+                                                           const LocalTensor<T1> &gradTensor,
+                                                           const LocalTensor<T1> &srcTensor, uint32_t srcM,
+                                                           uint32_t realN = srcN)
 {
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
@@ -296,7 +327,8 @@ __aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> 
         if (realN == fullExeSize * 3) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        CastAligned512F16VF384<T1, HEAD_DIM_ALIGN>(srcLocalInt, dstLocalInt, gradLocalInt, srcLocalInt1, gradLocalInt1, srcLocalIntTail, gradLocalIntTail, reduceSize, srcM);
+        CastAligned512F16VF384<T1, HEAD_DIM_ALIGN>(srcLocalInt, dstLocalInt, gradLocalInt, srcLocalInt1, gradLocalInt1,
+                                                   srcLocalIntTail, gradLocalIntTail, reduceSize, srcM);
     } else if constexpr (srcN == 512) {
         const uint32_t fullExeSize = 128;
         uint64_t srcLocalInt1 = srcTensor.GetPhyAddr() + fullExeSize * sizeof(T1);
@@ -311,15 +343,18 @@ __aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> 
         if (realN == fullExeSize * 4) {
             reduceSize = (fullExeSize + 1) >> 1;
         }
-        CastAligned512F16VF512<T1, HEAD_DIM_ALIGN>(srcLocalInt, dstLocalInt, gradLocalInt, srcLocalInt1, gradLocalInt1, srcLocalInt2, gradLocalInt2, srcLocalIntTail, gradLocalIntTail, reduceSize, srcM);
+        CastAligned512F16VF512<T1, HEAD_DIM_ALIGN>(srcLocalInt, dstLocalInt, gradLocalInt, srcLocalInt1, gradLocalInt1,
+                                                   srcLocalInt2, gradLocalInt2, srcLocalIntTail, gradLocalIntTail,
+                                                   reduceSize, srcM);
     }
 }
 #else
 template <typename T1, typename T, uint32_t srcN, uint32_t HEAD_DIM_ALIGN>
-__aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor, const LocalTensor<T1> &gradTensor,
-                                                const LocalTensor<T1> &srcTensor, uint32_t srcM, uint32_t realN = srcN)
-{
-}
+__aicore__ inline void MySoftmaxGradFrontCastAligned512F16(const LocalTensor<T> &dstTensor,
+                                                           const LocalTensor<T1> &gradTensor,
+                                                           const LocalTensor<T1> &srcTensor, uint32_t srcM,
+                                                           uint32_t realN = srcN)
+{}
 #endif
 } // namespace AscendC
 

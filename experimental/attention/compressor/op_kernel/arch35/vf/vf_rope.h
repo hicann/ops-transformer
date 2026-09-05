@@ -21,42 +21,40 @@
 
 using namespace AscendC;
 
-constexpr MicroAPI::CastTrait castTraitB162B32 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::UNKNOWN,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr Reg::CastTrait castTraitB162B32 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::UNKNOWN,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::UNKNOWN,
 };
 
-constexpr MicroAPI::CastTrait castTraitB322B16 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::NO_SAT,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr Reg::CastTrait castTraitB322B16 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::NO_SAT,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::CAST_RINT,
 };
-
 
 template <typename T, typename ROPET>
 __simd_vf__ void HalfModeRopeVF(__ubuf__ T *sinUb, __ubuf__ T *cosUb, __ubuf__ T *inUb, __ubuf__ ROPET *outUb,
                                 uint32_t row, uint32_t col, uint32_t actualCol, uint64_t baseAddr)
 {
-    MicroAPI::RegTensor<T> vregCos;
-    MicroAPI::RegTensor<T> vregHalfCos;
-    MicroAPI::RegTensor<T> vregSin;
-    MicroAPI::RegTensor<T> vregHalfSin;
-    MicroAPI::RegTensor<T> vregIn;
-    MicroAPI::RegTensor<T> vregHalfIn;
-    MicroAPI::RegTensor<T> vregOut;
-    MicroAPI::RegTensor<T> vregHalfOut;
-    MicroAPI::RegTensor<T> vregTemp;
-    MicroAPI::RegTensor<T> vregCastIn;
-    MicroAPI::RegTensor<ROPET> vregOutBf16;
-    MicroAPI::RegTensor<ROPET> vregOutHalfBf16;
-    MicroAPI::RegTensor<ROPET> vregCastOut;
+    Reg::RegTensor<T> vregCos;
+    Reg::RegTensor<T> vregHalfCos;
+    Reg::RegTensor<T> vregSin;
+    Reg::RegTensor<T> vregHalfSin;
+    Reg::RegTensor<T> vregIn;
+    Reg::RegTensor<T> vregHalfIn;
+    Reg::RegTensor<T> vregOut;
+    Reg::RegTensor<T> vregHalfOut;
+    Reg::RegTensor<T> vregTemp;
+    Reg::RegTensor<T> vregCastIn;
+    Reg::RegTensor<ROPET> vregOutBf16;
+    Reg::RegTensor<ROPET> vregOutHalfBf16;
+    Reg::RegTensor<ROPET> vregCastOut;
     uint32_t maskValue = col / 2;
-    MicroAPI::MaskReg mask = MicroAPI::UpdateMask<T>(maskValue);
+    Reg::MaskReg mask = Reg::UpdateMask<T>(maskValue);
     uint32_t halfCol = col / 2;
-
 
     for (uint32_t rIdx = 0; rIdx < row; rIdx++) {
         __ubuf__ T *curSinUb = sinUb + rIdx * col;
@@ -64,52 +62,49 @@ __simd_vf__ void HalfModeRopeVF(__ubuf__ T *sinUb, __ubuf__ T *cosUb, __ubuf__ T
         __ubuf__ T *curInUb = inUb + rIdx * actualCol;
         __ubuf__ ROPET *curOutUb = outUb + rIdx * actualCol;
 
-        MicroAPI::DataCopy(vregIn, curInUb + baseAddr);
-        MicroAPI::DataCopy(vregHalfIn, curInUb + baseAddr + halfCol);
-        MicroAPI::DataCopy(vregCos, curCosUb);
-        MicroAPI::DataCopy(vregHalfCos, curCosUb + halfCol);
-        MicroAPI::DataCopy(vregSin, curSinUb);
-        MicroAPI::DataCopy(vregHalfSin, curSinUb + halfCol);
-        MicroAPI::Mul(vregSin, vregSin, vregHalfIn, mask);
-        MicroAPI::Mul(vregHalfSin, vregHalfSin, vregIn, mask);
-        MicroAPI::Mul(vregCos, vregCos, vregIn, mask);
-        MicroAPI::Sub(vregOut, vregCos, vregSin, mask);
-        MicroAPI::Mul(vregHalfCos, vregHalfCos, vregHalfIn, mask);
-        MicroAPI::Add(vregHalfOut, vregHalfSin, vregHalfCos, mask);
-        MicroAPI::Cast<ROPET, T, castTraitB322B16>(vregOutBf16, vregOut, mask);
-        MicroAPI::DataCopy<ROPET, MicroAPI::StoreDist::DIST_PACK_B32>(curOutUb + baseAddr, vregOutBf16, mask);
-        MicroAPI::Cast<ROPET, T, castTraitB322B16>(vregOutHalfBf16, vregHalfOut, mask);
-        MicroAPI::DataCopy<ROPET, MicroAPI::StoreDist::DIST_PACK_B32>(curOutUb + baseAddr + halfCol, vregOutHalfBf16,
-                                                                      mask);
+        Reg::DataCopy(vregIn, curInUb + baseAddr);
+        Reg::DataCopy(vregHalfIn, curInUb + baseAddr + halfCol);
+        Reg::DataCopy(vregCos, curCosUb);
+        Reg::DataCopy(vregHalfCos, curCosUb + halfCol);
+        Reg::DataCopy(vregSin, curSinUb);
+        Reg::DataCopy(vregHalfSin, curSinUb + halfCol);
+        Reg::Mul(vregSin, vregSin, vregHalfIn, mask);
+        Reg::Mul(vregHalfSin, vregHalfSin, vregIn, mask);
+        Reg::Mul(vregCos, vregCos, vregIn, mask);
+        Reg::Sub(vregOut, vregCos, vregSin, mask);
+        Reg::Mul(vregHalfCos, vregHalfCos, vregHalfIn, mask);
+        Reg::Add(vregHalfOut, vregHalfSin, vregHalfCos, mask);
+        Reg::Cast<ROPET, T, castTraitB322B16>(vregOutBf16, vregOut, mask);
+        Reg::DataCopy<ROPET, Reg::StoreDist::DIST_PACK_B32>(curOutUb + baseAddr, vregOutBf16, mask);
+        Reg::Cast<ROPET, T, castTraitB322B16>(vregOutHalfBf16, vregHalfOut, mask);
+        Reg::DataCopy<ROPET, Reg::StoreDist::DIST_PACK_B32>(curOutUb + baseAddr + halfCol, vregOutHalfBf16, mask);
 
         for (uint64_t dOffset = 0; dOffset < baseAddr; dOffset += 64) {
             uint32_t castMaskValue = min(baseAddr - dOffset, static_cast<uint64_t>(64));
-            MicroAPI::MaskReg castMask = MicroAPI::UpdateMask<T>(castMaskValue);
-            MicroAPI::DataCopy(vregCastIn, curInUb + dOffset);
-            MicroAPI::Cast<ROPET, T, castTraitB322B16>(vregCastOut, vregCastIn, castMask);
-            MicroAPI::DataCopy<ROPET, MicroAPI::StoreDist::DIST_PACK_B32>(curOutUb + dOffset, vregCastOut, castMask);
+            Reg::MaskReg castMask = Reg::UpdateMask<T>(castMaskValue);
+            Reg::DataCopy(vregCastIn, curInUb + dOffset);
+            Reg::Cast<ROPET, T, castTraitB322B16>(vregCastOut, vregCastIn, castMask);
+            Reg::DataCopy<ROPET, Reg::StoreDist::DIST_PACK_B32>(curOutUb + dOffset, vregCastOut, castMask);
         }
     }
 }
-
 
 template <typename T, typename ROPET>
 __simd_vf__ void InterleaveModeRopeVF(__ubuf__ T *sinUb, __ubuf__ T *cosUb, __ubuf__ T *inUb, __ubuf__ ROPET *outUb,
                                       uint32_t row, uint32_t col, uint32_t actualCol, uint64_t baseAddr)
 {
-    MicroAPI::RegTensor<T> vregCos;
-    MicroAPI::RegTensor<T> vregSin;
-    MicroAPI::RegTensor<T> vregIn;
-    MicroAPI::RegTensor<T> vregOdd;
-    MicroAPI::RegTensor<T> vregEven;
-    MicroAPI::RegTensor<T> vregOut;
-    MicroAPI::RegTensor<T> vregTemp;
-    MicroAPI::RegTensor<T> vregCastIn;
-    MicroAPI::RegTensor<ROPET> vregOutBf16;
-    MicroAPI::RegTensor<ROPET> vregCastOut;
+    Reg::RegTensor<T> vregCos;
+    Reg::RegTensor<T> vregSin;
+    Reg::RegTensor<T> vregIn;
+    Reg::RegTensor<T> vregOdd;
+    Reg::RegTensor<T> vregEven;
+    Reg::RegTensor<T> vregOut;
+    Reg::RegTensor<T> vregTemp;
+    Reg::RegTensor<T> vregCastIn;
+    Reg::RegTensor<ROPET> vregOutBf16;
+    Reg::RegTensor<ROPET> vregCastOut;
     uint32_t maskValue = col;
-    MicroAPI::MaskReg mask = MicroAPI::UpdateMask<T>(maskValue);
-
+    Reg::MaskReg mask = Reg::UpdateMask<T>(maskValue);
 
     for (uint32_t rIdx = 0; rIdx < row; rIdx++) {
         __ubuf__ T *curSinUb = sinUb + rIdx * col;
@@ -117,27 +112,26 @@ __simd_vf__ void InterleaveModeRopeVF(__ubuf__ T *sinUb, __ubuf__ T *cosUb, __ub
         __ubuf__ T *curInUb = inUb + rIdx * actualCol;
         __ubuf__ ROPET *curOutUb = outUb + rIdx * actualCol;
 
-        MicroAPI::DataCopy(vregIn, curInUb + baseAddr);
-        MicroAPI::DataCopy(vregCos, curCosUb);
-        MicroAPI::DataCopy(vregSin, curSinUb);
-        MicroAPI::Mul(vregCos, vregCos, vregIn, mask);
-        MicroAPI::DeInterleave<T>(vregEven, vregOdd, vregIn, vregTemp);
-        MicroAPI::Muls(vregOdd, vregOdd, static_cast<T>(-1.0), mask);
-        MicroAPI::Interleave<T>(vregIn, vregTemp, vregOdd, vregEven);
-        MicroAPI::Mul(vregSin, vregSin, vregIn, mask);
-        MicroAPI::Add(vregOut, vregCos, vregSin, mask);
-        MicroAPI::Cast<ROPET, T, castTraitB322B16>(vregOutBf16, vregOut, mask);
-        MicroAPI::DataCopy<ROPET, MicroAPI::StoreDist::DIST_PACK_B32>(curOutUb + baseAddr, vregOutBf16, mask);
+        Reg::DataCopy(vregIn, curInUb + baseAddr);
+        Reg::DataCopy(vregCos, curCosUb);
+        Reg::DataCopy(vregSin, curSinUb);
+        Reg::Mul(vregCos, vregCos, vregIn, mask);
+        Reg::DeInterleave<T>(vregEven, vregOdd, vregIn, vregTemp);
+        Reg::Muls(vregOdd, vregOdd, static_cast<T>(-1.0), mask);
+        Reg::Interleave<T>(vregIn, vregTemp, vregOdd, vregEven);
+        Reg::Mul(vregSin, vregSin, vregIn, mask);
+        Reg::Add(vregOut, vregCos, vregSin, mask);
+        Reg::Cast<ROPET, T, castTraitB322B16>(vregOutBf16, vregOut, mask);
+        Reg::DataCopy<ROPET, Reg::StoreDist::DIST_PACK_B32>(curOutUb + baseAddr, vregOutBf16, mask);
         for (uint64_t dOffset = 0; dOffset < baseAddr; dOffset += 64) {
             uint32_t castMaskValue = min(baseAddr - dOffset, static_cast<uint64_t>(64));
-            MicroAPI::MaskReg castMask = MicroAPI::UpdateMask<T>(castMaskValue);
-            MicroAPI::DataCopy(vregCastIn, curInUb + dOffset);
-            MicroAPI::Cast<ROPET, T, castTraitB322B16>(vregCastOut, vregCastIn, castMask);
-            MicroAPI::DataCopy<ROPET, MicroAPI::StoreDist::DIST_PACK_B32>(curOutUb + dOffset, vregCastOut, castMask);
+            Reg::MaskReg castMask = Reg::UpdateMask<T>(castMaskValue);
+            Reg::DataCopy(vregCastIn, curInUb + dOffset);
+            Reg::Cast<ROPET, T, castTraitB322B16>(vregCastOut, vregCastIn, castMask);
+            Reg::DataCopy<ROPET, Reg::StoreDist::DIST_PACK_B32>(curOutUb + dOffset, vregCastOut, castMask);
         }
     }
 }
-
 
 template <Compressor::ROTARY_MODE MODE, typename T, typename ROPET>
 __aicore__ inline void RopeVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,

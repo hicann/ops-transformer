@@ -17,7 +17,7 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-using namespace MicroAPI;
+using namespace Reg;
 /* **************************************************************************************************
 
 SUB *
@@ -32,7 +32,7 @@ param [in] dpTensor input dp LocalTensor
 
 template <typename T>
 __simd_vf__ inline void ReduceSinkVF(uint64_t dstLocalInt, uint64_t srcLocalInt, uint64_t srcLocalIntTail,
-    uint16_t loopTimes, uint16_t fullExeSize, uint32_t realTailSize)
+                                     uint16_t loopTimes, uint16_t fullExeSize, uint32_t realTailSize)
 {
     RegTensor<T> vregSrc;
     RegTensor<T> vregSrcTail;
@@ -48,22 +48,19 @@ __simd_vf__ inline void ReduceSinkVF(uint64_t dstLocalInt, uint64_t srcLocalInt,
     Duplicate(vregRes, 0);
     for (uint16_t n = 0; n < loopTimes; n++) {
         LoadAlign(vregSrc, ((__ubuf__ T *&)srcLocalInt + n * fullExeSize));
-        Reduce<MicroAPI::ReduceType::SUM>(vregReduceSum, vregSrc, pregFullExe);
+        Reduce<Reg::ReduceType::SUM>(vregReduceSum, vregSrc, pregFullExe);
         Add(vregRes, vregRes, vregReduceSum, pregAccu);
     }
     // 尾块
     LoadAlign(vregSrcTail, ((__ubuf__ T *&)srcLocalIntTail));
-    Reduce<MicroAPI::ReduceType::SUM>(vregReduceSumTail, vregSrcTail, pregTailExe);
+    Reduce<Reg::ReduceType::SUM>(vregReduceSumTail, vregSrcTail, pregTailExe);
     Add(vregRes, vregRes, vregReduceSumTail, pregAccu);
-    StoreUnAlign<T>(
-            ((__ubuf__ T *&)dstLocalInt), vregRes, uregRes, 1);
-    StoreUnAlignPost<T>(
-            ((__ubuf__ T *&)dstLocalInt), uregRes, 0);
+    StoreUnAlign<T>(((__ubuf__ T *&)dstLocalInt), vregRes, uregRes, 1);
+    StoreUnAlignPost<T>(((__ubuf__ T *&)dstLocalInt), uregRes, 0);
 }
 
 template <typename T>
-__aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-    uint64_t pingSize)
+__aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint64_t pingSize)
 {
     const uint16_t fullExeSize = 64;
     uint16_t loopTimes = static_cast<uint16_t>(((pingSize + fullExeSize - 1) / fullExeSize) - 1);
@@ -77,10 +74,8 @@ __aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTe
 }
 #else
 template <typename T>
-__aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-    uint64_t pingSize)
-{
-}
+__aicore__ inline void ReduceSink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor, uint64_t pingSize)
+{}
 #endif
 } // namespace AscendC
 

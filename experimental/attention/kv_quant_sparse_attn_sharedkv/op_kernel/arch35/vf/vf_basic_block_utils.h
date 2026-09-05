@@ -25,62 +25,62 @@ constexpr float floatEps = 2.220446049250313e-16;
 /* **************************************************************************************************
  * Muls + Select(optional) + SoftmaxFlashV2 + Cast(fp32->fp16/bf16) + ND2NZ
  * ************************************************************************************************* */
-using namespace MicroAPI;
+using namespace Reg;
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitOne = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitOne = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitTwo = {
-    AscendC::MicroAPI::RegLayout::TWO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitTwo = {
+    AscendC::Reg::RegLayout::TWO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitThree = {
-    AscendC::MicroAPI::RegLayout::THREE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitThree = {
+    AscendC::Reg::RegLayout::THREE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
- 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+
+constexpr static AscendC::Reg::CastTrait castTraitRintZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintOne = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT,
-};
- 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintTwo = {
-    AscendC::MicroAPI::RegLayout::TWO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintOne = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintThree = {
-    AscendC::MicroAPI::RegLayout::THREE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintTwo = {
+    AscendC::Reg::RegLayout::TWO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
-}
+
+constexpr static AscendC::Reg::CastTrait castTraitRintThree = {
+    AscendC::Reg::RegLayout::THREE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::CAST_RINT,
+};
+} // namespace SCFaVectorApi
 #endif // VF_BASIC_BLOCK_UTILS_H
