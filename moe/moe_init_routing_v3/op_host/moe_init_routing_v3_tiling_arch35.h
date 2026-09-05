@@ -129,8 +129,13 @@ constexpr int64_t QUANT_MODE_TILINGKEY_BASE = 10000LL;
 constexpr int64_t ROWIDX_TYPE_TILINGKEY_BASE = 1000LL;
 constexpr int64_t DROP_MODE_TILINGKEY_BASE = 100LL;
 constexpr uint64_t EMPTY_TENSOR_TILINGKEY = 3000000ULL;
-constexpr uint64_t COUNT_SORT_BASE = 10LL; // 分阶段：00  计数排序全载：10  计数排序非全载：20
+constexpr uint64_t COUNT_SORT_BASE = 10LL; // 分阶段:00  计数排序全载:10  计数排序非全载:20
+
+constexpr int64_t COUNT_SORT_MODE_NONE = 0LL;      // 未启用计数排序（走普通流程）
+constexpr int64_t COUNT_SORT_MODE_FULLLOAD = 1LL;  // 计数排序 FullLoad（核内全载）
+constexpr int64_t COUNT_SORT_MODE_CUTORIGIN = 2LL; // 计数排序 CutOrigin（核内 chunk 切分）
 constexpr int64_t KEY_VALUE_MODE_DIM0_NUM = 2LL;
+constexpr int64_t MASK_STRIDE = 64;
 
 inline static int64_t CeilLog4(int64_t x)
 {
@@ -300,7 +305,8 @@ protected:
     bool isEmptyTensor_ = false;
     int64_t ep_ = 0LL;
 
-    // CountingSort 性能模板标志：0=未启用, 1=FullLoad, 2=CutOrigin
+    // CountingSort 性能模板标志：COUNT_SORT_MODE_NONE=未启用, COUNT_SORT_MODE_FULLLOAD=FullLoad,
+    // COUNT_SORT_MODE_CUTORIGIN=CutOrigin
     int64_t countingSortMode_ = 0LL;
 
     // input attrs

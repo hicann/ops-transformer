@@ -191,7 +191,9 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::GetWorkspaceSize()
         return GetEmptyTensorWorkspaceSize();
     }
 
-    if (countingSortMode_ == 1 || countingSortMode_ == 2) {
+    bool isCountingSortMode =
+        (countingSortMode_ == COUNT_SORT_MODE_FULLLOAD || countingSortMode_ == COUNT_SORT_MODE_CUTORIGIN);
+    if (isCountingSortMode) {
         return GetCountingSortWorkspaceSize();
     }
     return GetNormalWorkspaceSize();
@@ -211,10 +213,10 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::GetCountingSortWorkspaceSize()
     int64_t pairsPerCore = Ops::Base::CeilAlign(maxCoreEntries, CS_ONE_BLOCK_ELEMENT) * NUM_TWO;
 
     int64_t csWorkspace = 0;
-    if (countingSortMode_ == 1) {
+    if (countingSortMode_ == COUNT_SORT_MODE_FULLLOAD) {
         csWorkspace = filterNeedCoreNum * expertCountStride * static_cast<int64_t>(sizeof(int32_t));
         csWorkspace += filterNeedCoreNum * pairsPerCore * static_cast<int64_t>(sizeof(int32_t));
-    } else if (countingSortMode_ == 2) {
+    } else if (countingSortMode_ == COUNT_SORT_MODE_CUTORIGIN) {
         int64_t pairsBase = tilingDataPtr_->countingSortParamsOp.pairsWsOffset;
         csWorkspace = (pairsBase + filterNeedCoreNum * pairsPerCore + filterNeedCoreNum * expertCountStride) *
                       static_cast<int64_t>(sizeof(int32_t));
@@ -1958,8 +1960,8 @@ bool MoeInitRoutingV3TilingArch35::IsCountingSortApplicable()
 
 void MoeInitRoutingV3TilingArch35::ComputeCountingSortMode()
 {
-    countingSortMode_ = 0;
-    tilingDataPtr_->countingSortParamsOp.countingSortMode = 0;
+    countingSortMode_ = COUNT_SORT_MODE_NONE;
+    tilingDataPtr_->countingSortParamsOp.countingSortMode = COUNT_SORT_MODE_NONE;
 
     if (isFullload_ || !IsCountingSortApplicable()) {
         return;
@@ -1982,9 +1984,7 @@ void MoeInitRoutingV3TilingArch35::ComputeCountingSortMode()
         }
     }
     countingSortMode_ = tilingDataPtr_->countingSortParamsOp.countingSortMode;
-    // 计数排序模板沿用主 tilingkey 公式：固定 sortMode_=0，计数排序 tilingkey 仅落在单核前缀，
-    // 与 kernel 侧 apt 的 CS_* 常量（全载 10000010/10001010，非全载 10000020/10010020 等）一一对应。
-    if (countingSortMode_ != 0) {
+    if (countingSortMode_ != COUNT_SORT_MODE_NONE) {
         sortMode_ = 0;
     }
 }
@@ -1996,9 +1996,8 @@ int64_t MoeInitRoutingV3TilingArch35::EstimateArch35CountingSortFullLoadUB(int64
         return -1;
     }
     int64_t coreEntries = perCoreTokens * k_;
-    int64_t entriesAligned = Ops::Base::CeilDiv(coreEntries, static_cast<int64_t>(64)) * 64;
-    int64_t maskBytes =
-        Ops::Base::CeilAlign(Ops::Base::CeilDiv(entriesAligned, static_cast<int64_t>(8)), UB_BLOCK_SIZE);
+    int64_t entriesAligned = Ops::Base::CeilDiv(coreEntries, static_cast<int64_t>(MASK_STRIDE)) * MASK_STRIDE;
+    int64_t maskBytes = Ops::Base::CeilAlign(Ops::Base::CeilDiv(entriesAligned, CS_ONE_BLOCK_ELEMENT), UB_BLOCK_SIZE);
     int64_t expertCountStride = Ops::Base::CeilAlign(expertEnd_ - expertStart_, CS_ONE_BLOCK_ELEMENT);
     int64_t colsAligned = Ops::Base::CeilAlign(cols_ * inputXDtypeSize_, UB_BLOCK_SIZE) / inputXDtypeSize_;
 
@@ -2057,7 +2056,7 @@ int64_t MoeInitRoutingV3TilingArch35::EstimateArch35CountingSortFullLoadUB(int64
 void MoeInitRoutingV3TilingArch35::ComputeArch35CountingSortFullLoadTiling()
 {
     auto *cs = &tilingDataPtr_->countingSortParamsOp;
-    cs->countingSortMode = 1;
+    cs->countingSortMode = COUNT_SORT_MODE_FULLLOAD;
 
     int64_t perCoreTokens = Ops::Base::CeilDiv(n_, aivCoreNum_);
     int64_t needCoreNum = Ops::Base::CeilDiv(n_, perCoreTokens);
@@ -2124,7 +2123,7 @@ void MoeInitRoutingV3TilingArch35::ComputeUseGatherCopy()
 void MoeInitRoutingV3TilingArch35::ComputeArch35CountingSortCutOriginTiling()
 {
     auto *cs = &tilingDataPtr_->countingSortParamsOp;
-    cs->countingSortMode = 2;
+    cs->countingSortMode = COUNT_SORT_MODE_CUTORIGIN;
 
     int64_t perCoreTokens = Ops::Base::CeilDiv(n_, aivCoreNum_);
     int64_t needCoreNum = Ops::Base::CeilDiv(n_, perCoreTokens);
@@ -2166,7 +2165,7 @@ void MoeInitRoutingV3TilingArch35::ComputeArch35CountingSortCutOriginTiling()
     // 装得下。
     int64_t totalUB = persistentSize + std::max(phaseASize, phaseBSize);
     if (totalUB > availUbSize_) {
-        cs->countingSortMode = 0;
+        cs->countingSortMode = COUNT_SORT_MODE_NONE;
         return;
     }
 
