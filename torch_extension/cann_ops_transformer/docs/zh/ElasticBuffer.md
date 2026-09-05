@@ -27,7 +27,7 @@ ElasticBuffer类提供统一的分布式通信buffer管理能力：
 
 - Engram存储接口用于分布式Engram存储管理，支持将本rank的表写入host pinned共享段，以及通过RDMA从远端rank抓取Engram数据。需与 [get_engram_storage_size_hint](#get_engram_storage_size_hint静态方法) 配套使用。
 - Engram训练接口在推理接口的基础上，通过 `with_grad=True` 开启训练模式。前向 [engram_fetch](#engram_fetch) 在抓取数据的同时保存反向所需的通信元数据（封装为 [EngramFetchCtx](#engramfetchctx)），反向 [engram_fetch_grad](#engram_fetch_grad) 根据这些元数据将梯度沿前向路径反向交换并按local entry稀疏累加，产出稀疏梯度用于优化器更新。
-- Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。需与[get_moe_ep_ccl_buffer_size](#get_moe_ep_ccl_buffer_size静态方法)配套使用。
+- Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。所需的CCL通信buffer由ElasticBuffer内部按算子参数自动计算并申请，无需手动配置。
 
 ## 函数原型
 
@@ -417,7 +417,7 @@ ElasticBuffer.combine(x, handle, *, topk_weights=None, bias=None) -> (Tensor, Te
 
 ### get_moe_ep_ccl_buffer_size（静态方法）
 
-**功能**：需与 [dispatch](#dispatch) 和 [combine](#combine) 配套使用，用于计算dispatch和combine算子所需的HCCL通信 `buffer_size` 大小（单位：MB）。该接口为静态方法，可在初始化ElasticBuffer前调用。
+**功能**：返回默认的CCL通信buffer大小（单位：MB）。当前dispatch和combine所需的通信buffer无需再通过 `HCCL_BUFFSIZE` 环境变量手动配置，无需调用该接口。
 
 **函数原型**：
 
@@ -435,60 +435,7 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 
 **输出说明**：
 
-- **ccl_buffer_size** (`int`)：计算得到的 `ccl_buffer_size` 大小，单位为MB。将该值设置为 `HCCL_BUFFSIZE` 环境变量即可满足通信域的内存需求。
-
-**计算公式**：
-
-```text
-local_experts_num = num_experts // world_size
-
-dispatch_count_size = world_size * Align512(local_experts_num * 4)
-dispatch_notify_count = Align15000(num_max_tokens_per_rank) // 15000
-dispatch_notify_size = world_size * 512 * (1 + dispatch_notify_count)
-combine_state_size = num_max_tokens_per_rank * topk * 512 + world_size * 512
-state_buffer_size = dispatch_count_size + dispatch_notify_size + combine_state_size
-
-metadata_bytes = Align32(topk * 4)
-hidden_align = Align32(hidden * 2)
-dispatch_per_slot_bytes = Align512(hidden_align + metadata_bytes * 2 + 32)
-combine_per_slot_bytes = Align512(hidden_align + 32)
-
-dispatch_recv_buffer_size = world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
-combine_recv_buffer_size = num_max_tokens_per_rank * topk * combine_per_slot_bytes
-dispatch_send_buffer_size = dispatch_recv_buffer_size
-direct_minimum_buffer_size =
-    state_buffer_size
-    + dispatch_recv_buffer_size
-    + combine_recv_buffer_size
-    + dispatch_send_buffer_size
-
-combine_buffer_size = num_max_tokens_per_rank * topk * combine_per_slot_bytes
-对 world_size 的每个因子 rnps（1 ≤ rnps ≤ world_size 且 world_size % rnps == 0）：
-    scaleout_rank_count = world_size // rnps
-    scaleout_per_slot_bytes = Align512(dispatch_per_slot_bytes + topk * 4)
-    scaleout_recv_data_size = scaleout_rank_count * num_max_tokens_per_rank * scaleout_per_slot_bytes
-    scaleout_recv_status_size = scaleout_rank_count * num_max_tokens_per_rank * 512
-    payload_stash_size = num_max_tokens_per_rank * scaleout_per_slot_bytes
-    dispatch_buffer_size(rnps) =
-        scaleout_recv_data_size
-        + dispatch_recv_buffer_size
-        + scaleout_recv_status_size
-        + payload_stash_size
-hybrid_minimum_buffer_size =
-    state_buffer_size
-    + max(dispatch_buffer_size(rnps))
-    + combine_buffer_size
-
-minimum_buffer_size = max(direct_minimum_buffer_size, hybrid_minimum_buffer_size)
-
-ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
-```
-
-其中 `AlignX(value) = ((value + X - 1) / X) * X`，公式中的 `/` 表示整除。
-
-由于运行时无法获知实际 scaleout 拓扑，hybrid 路径对 `world_size` 的所有合法因子 `rnps`（即 `rank_num_per_server`）枚举取最大值，按最大合法布局预留内存。通信窗口在 direct 拓扑下依次存放状态区、Dispatch接收区、Combine接收区和Dispatch发送区；hybrid 拓扑下布局为状态区、Scaleout Dispatch区、Combine区。Dispatch发送区与接收区均按
-`dispatch_per_slot_bytes` 的最大2字节hidden规格预留；kernel实际读写和通信仍使用当前数据类型对应的
-`per_slot_bytes`。Combine发送数据在Combine算子的workspace中暂存，不计入HCCL通信窗口大小。
+- **ccl_buffer_size** (`int`)：默认的CCL通信buffer大小，固定返回200，单位为MB。当前通信buffer已由ElasticBuffer内部按算子参数自动计算并申请，该值目前无参考意义。
 
 ### destroy
 
@@ -549,9 +496,8 @@ ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
   - `num_local_experts`：表示本卡专家数量，`num_local_experts = num_experts / ep_world_size`，其中 `num_experts` 取值范围为 `[2, 2048]` 且须被 `ep_world_size` 整除，即满足 `0 < num_local_experts * ep_world_size ≤ 2048`。
 
 - **HCCL通信域缓存区大小**：
-  - 调用 [dispatch](#dispatch) 或 [combine](#combine) 前需检查 `HCCL_BUFFSIZE` 环境变量取值是否合理，该环境变量配置单个通信域的 buffer 大小（单位MB，实际物理分配为 2 倍），不配置时默认为200MB。
-  - 通信域缓存区大小可通过调用 [get_moe_ep_ccl_buffer_size](#get_moe_ep_ccl_buffer_size静态方法) 计算。
-  - 计算得到的 `ccl_buffer_size` 需通过环境变量 `HCCL_BUFFSIZE` 设置，每个通信域独占一组 `2 * HCCL_BUFFSIZE` 大小的内存。
+  - [dispatch](#dispatch) 和 [combine](#combine) 所需的CCL通信buffer由ElasticBuffer内部自动计算并按需申请，无需配置 `HCCL_BUFFSIZE` 环境变量。
+  - Engram训练模式（`with_grad=True`）的a2a收发仍使用HCCL默认通信buffer，`HCCL_BUFFSIZE` 环境变量仅对该路径生效（不配置时默认200MB）。
 
 - **通信域约束**：
   - Engram通信域 `world_size` 范围 `[2, 1024]`，支持多卡分布式场景。
@@ -848,15 +794,6 @@ def run_dispatch_combine(rank):
 
 if __name__ == "__main__":
     os.environ["HCCL_WHITELIST_DISABLE"] = "1"
-    os.environ["HCCL_BUFFSIZE"] = str(
-        ElasticBuffer.get_moe_ep_ccl_buffer_size(
-            world_size,
-            num_max_tokens_per_rank,
-            hidden,
-            num_experts,
-            top_k,
-        )
-    )
 
     processes = []
     for rank in range(world_size):
