@@ -72,6 +72,47 @@ __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
     }
 }
 
+constexpr static AscendC::MicroAPI::CastTrait castTraitRintZero = {
+    AscendC::MicroAPI::RegLayout::ZERO,
+    AscendC::MicroAPI::SatMode::SAT,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::CAST_RINT,
+};
+
+constexpr static AscendC::MicroAPI::CastTrait castTraitRintOne = {
+    AscendC::MicroAPI::RegLayout::ONE,
+    AscendC::MicroAPI::SatMode::SAT,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::CAST_RINT,
+};
+
+constexpr static AscendC::MicroAPI::CastTrait castTraitRintTwo = {
+    AscendC::MicroAPI::RegLayout::TWO,
+    AscendC::MicroAPI::SatMode::SAT,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::CAST_RINT,
+};
+
+constexpr static AscendC::MicroAPI::CastTrait castTraitRintThree = {
+    AscendC::MicroAPI::RegLayout::THREE,
+    AscendC::MicroAPI::SatMode::SAT,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::CAST_RINT,
+};
+
+constexpr static AscendC::MicroAPI::CastTrait castTraitZero = {
+    AscendC::MicroAPI::RegLayout::ZERO,
+    AscendC::MicroAPI::SatMode::UNKNOWN,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::UNKNOWN,
+};
+constexpr static AscendC::MicroAPI::CastTrait castTraitOne = {
+    AscendC::MicroAPI::RegLayout::ONE,
+    AscendC::MicroAPI::SatMode::UNKNOWN,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::UNKNOWN,
+};
+
 namespace MXFP4 {
 static constexpr uint32_t KB_BYTE = 1024;
 static constexpr uint32_t QS_BASE_SIZE = 128;

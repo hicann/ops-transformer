@@ -37,11 +37,11 @@ namespace NpuArch::Gemm::Block {
 ////////////////////////////////////////////////////////////////////
 
 template <class L1TileShape_, class L0TileShape_, class ElementA_, class ElementB_, class ElementC_, class ElementBias_,
-          class TileCopy_, class TileMmad_>
-struct BlockMmadTla<MmadAtlasA5BsaQK<false>, L1TileShape_, L0TileShape_, ElementA_, ElementB_, ElementC_, ElementBias_,
-                    TileCopy_, TileMmad_> {
+          class TileCopy_, class TileMmad_, bool zNOnlineSoftmax_>
+struct BlockMmadTla<MmadAtlasA5BsaQK<false, zNOnlineSoftmax_>, L1TileShape_, L0TileShape_, ElementA_, ElementB_,
+                    ElementC_, ElementBias_, TileCopy_, TileMmad_> {
 public:
-    using DispatchPolicy = MmadAtlasA5BsaQK<false>;
+    using DispatchPolicy = MmadAtlasA5BsaQK<false, zNOnlineSoftmax_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
     using TileCopy = TileCopy_;
     using ElementQ = ElementA_;
@@ -281,7 +281,7 @@ public:
                     }
                 }
                 // fixpipe
-                if (nL0Itr == 0) {
+                if ((nL1Itr == 0) && (nL0Itr == 0)) {
                     // reverse crossCoreSync, do fixPipe only after ubCTensor is fully released
                     WaitCrossCoreSync<4, PIPE_FIX>(mm1ToSmFlag);
                 }
@@ -294,7 +294,7 @@ public:
                 uint32_t mFixPAligned8 = RoundUp(qSTile, 8);
                 uint32_t mPerSubCore = mFixPAligned8 / 2;
                 uint32_t nFixPAligned16 = RoundUp(l0TileNAct, 16);
-                auto ubCTensorTlaTile = GetTile(ubCTensor, tla::MakeCoord(0, nL0Itr * L0_TILE_N),
+                auto ubCTensorTlaTile = GetTile(ubCTensor, tla::MakeCoord(0, nL1Itr * l1BTileN + nL0Itr * L0_TILE_N),
                                                 tla::MakeShape(mPerSubCore, nFixPAligned16));
                 auto l0CTensorTlaTileSub0 =
                     GetTile(l0CTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(mPerSubCore, l0TileNAct));

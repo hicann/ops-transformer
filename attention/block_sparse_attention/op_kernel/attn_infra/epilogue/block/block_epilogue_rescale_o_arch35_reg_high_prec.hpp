@@ -30,11 +30,11 @@ enum class DRegSplitStages {
 
 template <class ElementO_, class ElementOTmp_, class ElementS_, class ElementKV_, class TileCopy_,
           class OTmpSrcPos_, // the src TPosition of pv res, viable configurations: GM/L0C
-          LseMode LSE_MODE_, LseFormat LSE_FORMAT_, bool transposedMm1>
-class BlockEpilogue<EpilogueAtlasA5BsaRescaleO<LSE_MODE_, LSE_FORMAT_, transposedMm1>, ElementO_, ElementOTmp_,
-                    ElementS_, ElementKV_, TileCopy_, OTmpSrcPos_> {
+          LseMode LSE_MODE_, LseFormat LSE_FORMAT_, bool transposedMm1_, bool zNOnlineSoftmax_>
+class BlockEpilogue<EpilogueAtlasA5BsaRescaleO<LSE_MODE_, LSE_FORMAT_, transposedMm1_, zNOnlineSoftmax_>, ElementO_,
+                    ElementOTmp_, ElementS_, ElementKV_, TileCopy_, OTmpSrcPos_> {
 public:
-    using DispatchPolicy = EpilogueAtlasA5BsaRescaleO<LSE_MODE_, LSE_FORMAT_, transposedMm1>;
+    using DispatchPolicy = EpilogueAtlasA5BsaRescaleO<LSE_MODE_, LSE_FORMAT_, transposedMm1_, zNOnlineSoftmax_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
     using ElementO = ElementO_;
     using ElementOTmp = ElementOTmp_;
@@ -47,41 +47,14 @@ public:
     using CopyUbToGmO = typename TileCopy::CopyUbToGmO;
 
     static constexpr uint32_t UB_OTMP_BUF_STAGES = 2;
+    static constexpr uint32_t UB_DM_BUF_MAX_STAGES = 3;
     static constexpr uint32_t UB_UINT8_BLOCK_SIZE = 32768;
-    static constexpr uint32_t MAX_UB_OTMP_ELEM_NUM = 8192;
     static constexpr uint32_t DM_UB_GLOBAL_ELEM_NUM = 64;
     static constexpr uint32_t RESCALE_ROW_MAX_ELEM_NUM = 64;
     static constexpr uint32_t RESCALE_COL_MAX_ELEM_NUM = 128;
     static constexpr uint32_t RESCALE_VREG_SIZE = 256 / sizeof(ElementOTmp);
     static constexpr float MAX_VALUE_RECIPROCAL_FP8 = 1.0f / 448.0f;
     static constexpr bool FULL_QUANT_FP8 = AscendC::IsSameType<ElementKV, fp8_e4m3fn_t>::value;
-    static constexpr uint32_t UB_DM_BUF_MAX_STAGES = 3;
-
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
-    {
-        constexpr uint32_t LO_UB_TENSOR_OFFSET = 4 * UB_UINT8_BLOCK_SIZE;
-        constexpr uint32_t GO_UB_TENSOR_OFFSET = 6 * UB_UINT8_BLOCK_SIZE;
-        constexpr uint32_t LM_UB_TENSOR_OFFSET = 7 * UB_UINT8_BLOCK_SIZE;
-        constexpr uint32_t GM_UB_TENSOR_OFFSET = LM_UB_TENSOR_OFFSET + 64 * sizeof(float);
-        constexpr uint32_t DM_UB_TENSOR_OFFSET = GM_UB_TENSOR_OFFSET + 64 * sizeof(float);
-        constexpr uint32_t LL_UB_TENSOR_OFFSET = DM_UB_TENSOR_OFFSET + 3 * 64 * sizeof(float);
-        constexpr uint32_t GL_UB_TENSOR_OFFSET = LL_UB_TENSOR_OFFSET + 64 * sizeof(float);
-        constexpr uint32_t LSE_UB_TENSOR_OFFSET = GL_UB_TENSOR_OFFSET + 64 * sizeof(float);
-
-        for (uint32_t i = 0; i < UB_OTMP_BUF_STAGES; i++) {
-            loUbTensor[i] =
-                resource.ubBuf.template GetBufferByByte<ElementOTmp>(LO_UB_TENSOR_OFFSET + i * UB_UINT8_BLOCK_SIZE);
-        }
-        for (uint32_t i = 0; i < UB_DM_BUF_MAX_STAGES; i++) {
-            dmUbTensor32[i] = resource.ubBuf.template GetBufferByByte<ElementOTmp>(
-                DM_UB_TENSOR_OFFSET + i * DM_UB_GLOBAL_ELEM_NUM * sizeof(float));
-        }
-        goUbTensor32 = resource.ubBuf.template GetBufferByByte<ElementOTmp>(GO_UB_TENSOR_OFFSET);
-        goUbTensor16 = resource.ubBuf.template GetBufferByByte<ElementO>(GO_UB_TENSOR_OFFSET);
-        glUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(GL_UB_TENSOR_OFFSET);
-        gmUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(GM_UB_TENSOR_OFFSET);
-        lseUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(LSE_UB_TENSOR_OFFSET);
-    }
 
     __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, UBufTileHelper &uBufTileHelper)
     {
@@ -200,7 +173,6 @@ public:
                 CopyUbToGmLse(gLseTensorTlaTile, ubLseTensorTla);
             }
             AscendC::PipeBarrier<PIPE_V>();
-
             if (std::is_same<ElementO, bfloat16_t>::value) {
                 AscendC::Cast(goUbTensor16, goUbTensor32, AscendC::RoundMode::CAST_RINT,
                               rowNumCurSubCore * colStrideCurSubCore);
@@ -307,7 +279,7 @@ public:
             Mul(mulVreg, goPreVreg, dmVreg, pregTail);
             Add(goCurVreg, mulVreg, loVreg, pregTail);
             Div(divVreg, goCurVreg, glVreg, pregTail);
-            if constexpr (FULL_QUANT_FP8) {
+            if constexpr (FULL_QUANT_FP8 && !zNOnlineSoftmax_) {
                 Muls(divVreg, divVreg, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride, divVreg, pregTail);
@@ -347,7 +319,7 @@ public:
             Add(goCurVreg1, mulVreg1, loVreg1, pregTail);
             Div(divVreg0, goCurVreg0, glVreg, pregFull);
             Div(divVreg1, goCurVreg1, glVreg, pregTail);
-            if constexpr (FULL_QUANT_FP8) {
+            if constexpr (FULL_QUANT_FP8 && !zNOnlineSoftmax_) {
                 Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
                 Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
@@ -378,7 +350,7 @@ public:
             LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glVreg, glUb + i);
             LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goCurVreg, loUb + i * colStride);
             Div(divVreg, goCurVreg, glVreg, pregTail);
-            if constexpr (FULL_QUANT_FP8) {
+            if constexpr (FULL_QUANT_FP8 && !zNOnlineSoftmax_) {
                 Muls(divVreg, divVreg, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride, divVreg, pregTail);
@@ -406,7 +378,7 @@ public:
             LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goCurVreg1, loUb + i * colStride + vlElemNum);
             Div(divVreg0, goCurVreg0, glVreg, pregFull);
             Div(divVreg1, goCurVreg1, glVreg, pregTail);
-            if constexpr (FULL_QUANT_FP8) {
+            if constexpr (FULL_QUANT_FP8 && !zNOnlineSoftmax_) {
                 Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
                 Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
@@ -484,19 +456,19 @@ public:
         uint32_t subBlockNum = AscendC::GetSubBlockNum();
 
         uint32_t rowNumOriAligned = 0;
-        if (DispatchPolicy::transposedMm1) {
+        if (transposedMm1_) {
             rowNumOriAligned = RoundUp(rowNumOri, 32);
         } else {
             rowNumOriAligned = RoundUp(rowNumOri, 8);
         }
-        uint32_t colNumOriAligned = RoundUp(colNumOri, 8);
+        uint32_t colNumOriAligned8 = RoundUp(colNumOri, 8);
 
         uint32_t rowNumSplit = rowNumOriAligned / subBlockNum;
         rowNumSplit = (rowNumOri < rowNumSplit) ? rowNumOri : rowNumSplit;
         uint32_t rowNumCurSubCore = (subBlockIdx == 0) ? rowNumSplit : (rowNumOri - rowNumSplit);
         uint32_t rowOffsetCurSubCore = rowNumSplit * subBlockIdx;
         uint32_t colNumCurSubCore = colNumOri;
-        uint32_t colStrideCurSubCore = colNumOriAligned;
+        uint32_t colStrideCurSubCore = colNumOriAligned8;
 
         auto gOTensorTlaTile = GetTile(gOTensor, tla::MakeCoord(rowOffsetCurSubCore, 0),
                                        tla::MakeShape(rowNumCurSubCore, colNumCurSubCore));
@@ -515,8 +487,6 @@ public:
 
 private:
     AscendC::LocalTensor<ElementOTmp> loUbTensor[UB_OTMP_BUF_STAGES];
-    AscendC::LocalTensor<SMDtype> dmUbTensor16;
-    AscendC::LocalTensor<SMDtype> glUbTensor16;
     AscendC::LocalTensor<float> gmUbTensor32;
     AscendC::LocalTensor<float> dmUbTensor32[UB_DM_BUF_MAX_STAGES];
     AscendC::LocalTensor<float> glUbTensor32;

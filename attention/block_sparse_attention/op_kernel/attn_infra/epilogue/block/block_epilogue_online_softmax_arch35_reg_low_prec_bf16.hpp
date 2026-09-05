@@ -76,40 +76,6 @@ public:
 
     static constexpr bool FULL_QUANT_FP8 = AscendC::IsSameType<ElementOutput, fp8_e4m3fn_t>::value;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, float scaleValue_)
-    {
-        // Allocate UB space
-        constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
-        constexpr uint32_t LP_UB_TENSOR_OFFSET = 2 * UB_UINT8_BLOCK_SIZE;
-
-        constexpr uint32_t LM_UB_TENSOR_OFFSET = 7 * UB_UINT8_BLOCK_SIZE;
-        constexpr uint32_t GM_UB_TENSOR_OFFSET = LM_UB_TENSOR_OFFSET + 64 * sizeof(float);
-        constexpr uint32_t DM_UB_TENSOR_OFFSET = GM_UB_TENSOR_OFFSET + 64 * sizeof(float);
-        constexpr uint32_t LL_UB_TENSOR_OFFSET = DM_UB_TENSOR_OFFSET + 3 * 64 * sizeof(float);
-        constexpr uint32_t GL_UB_TENSOR_OFFSET = LL_UB_TENSOR_OFFSET + 64 * sizeof(float);
-
-        subBlockIdx_ = AscendC::GetSubBlockIdx();
-        scaleValue = AscendC::ToBfloat16(scaleValue_);
-        MIN_VALUE = AscendC::ToBfloat16(-3.389531390315715675e+38);
-
-        for (uint32_t i = 0; i < UB_S_P_BUF_STAGES; i++) {
-            lsUbTensor[i] = resource.ubBuf.template GetBufferByByte<ElementInput>(
-                LS_UB_TENSOR_OFFSET + MAX_UB_S_ELEM_NUM * sizeof(ElementInput) * i);
-            lpUbTensor[i] = resource.ubBuf.template GetBufferByByte<ElementOutput>(
-                LP_UB_TENSOR_OFFSET + MAX_UB_S_ELEM_NUM * sizeof(ElementOutput) * i);
-        }
-        for (uint32_t i = 0; i < UB_DM_BUF_MAX_STAGES; i++) {
-            dmUbTensor[i] = resource.ubBuf.template GetBufferByByte<float>(DM_UB_TENSOR_OFFSET +
-                                                                           DM_UB_GLOBAL_ELEM_NUM * sizeof(float) * i);
-        }
-        gmUbTensor = resource.ubBuf.template GetBufferByByte<float>(GM_UB_TENSOR_OFFSET);
-        glUbTensor = resource.ubBuf.template GetBufferByByte<float>(GL_UB_TENSOR_OFFSET);
-        lmUbTensor = resource.ubBuf.template GetBufferByByte<ElementInput>(LM_UB_TENSOR_OFFSET);
-        llUbTensor = resource.ubBuf.template GetBufferByByte<ElementInput>(LL_UB_TENSOR_OFFSET);
-        lmUbFloatTensor = resource.ubBuf.template GetBufferByByte<float>(LM_UB_TENSOR_OFFSET);
-        llUbFloatTensor = resource.ubBuf.template GetBufferByByte<float>(LL_UB_TENSOR_OFFSET);
-    }
-
     __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, float scaleValue_,
                                     UBufTileHelper &uBufTileHelper)
     {
@@ -327,7 +293,6 @@ private:
 
         RegTensor<ElementInput> minVreg;
         RegTensor<ElementInput> srcVreg;
-        // RegTensor<ElementInput> maxSrcVreg;
         RegTensor<ElementInput> maxTmpVreg;
         RegTensor<ElementInput> scaleVreg;
         RegTensor<float> maxFloatVreg0;
@@ -383,7 +348,6 @@ private:
         RegTensor<ElementInput> minVreg;
         RegTensor<ElementInput> srcVreg0;
         RegTensor<ElementInput> srcVreg1;
-        // RegTensor<ElementInput> maxSrcVreg;
         RegTensor<ElementInput> maxTmpVreg;
         RegTensor<ElementInput> scaleVreg;
         RegTensor<float> maxFloatVreg0;

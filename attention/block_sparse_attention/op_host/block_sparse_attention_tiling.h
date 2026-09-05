@@ -199,6 +199,8 @@ private:
     void CalcSplitCoreTilingParams950();
     void CalcWorkspaceTilingParams950(gert::TilingContext *bsaContext);
     void CalcMatmulPhaseL1TileInfo950();
+    void B8FullQuantKVPL1TileInfo950(uint32_t qBaseTileAligned128, uint32_t embeddingSizeAligned128,
+                                     uint32_t kvBaseTileAligned128);
     void TransposedMatmulConfig950();
     // 910 exclusive
     ge::graphStatus CalculateTaskSplit(gert::TilingContext *bsaContext);

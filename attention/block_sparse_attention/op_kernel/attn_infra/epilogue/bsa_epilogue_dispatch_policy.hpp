@@ -58,6 +58,13 @@ struct EpilogueOnlineSoftmaxBsa {
     static constexpr bool transposedMm1 = transposedMm1_;
 };
 
+template <bool transposedMm1_ = false, bool zNOnlineSoftmax_ = false>
+struct EpilogueB8FullQuantOnlineSoftmaxBsa {
+    using ArchTag = Arch::AtlasA5;
+    static constexpr bool transposedMm1 = transposedMm1_;
+    static constexpr bool zNOnlineSoftmax = zNOnlineSoftmax_;
+};
+
 template <bool transposedMm1_ = false, MXQuantMode MX_QUANT_MODE_ = MXQuantMode::NONE>
 struct EpilogueOnlineSoftmaxBsaMX {
     using ArchTag = Arch::AtlasA5;
@@ -76,12 +83,14 @@ struct EpilogueCopyGlobalMaxUbToL1BsaMX {
     using ArchTag = Arch::AtlasA5;
 };
 
-template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::BNS1, bool transposedMm1_ = false>
+template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::BNS1, bool transposedMm1_ = false,
+          bool zNOnlineSoftmax_ = false>
 struct EpilogueAtlasA5BsaRescaleO {
     using ArchTag = Arch::AtlasA5;
     static constexpr LseMode LSE_MODE = LSE_MODE_;
     static constexpr LseFormat LSE_FORMAT = LSE_FORMAT_;
     static constexpr bool transposedMm1 = transposedMm1_;
+    static constexpr bool zNOnlineSoftmax = zNOnlineSoftmax_;
 };
 
 template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::BNS1, bool transposedMm1_ = false>
