@@ -228,6 +228,26 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/generic_block_sparse_attention_grad/README.md">generic_block_sparse_attention_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>通用块稀疏注意力反向算子，依据rsvdBlockIdx/rsvdBlockCount在被选中的Q块上计算并传播梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/generic_block_sparse_attention_grad_metadata/README.md">generic_block_sparse_attention_grad_metadata</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI CPU</td>
+    <td>generic_block_sparse_attention_grad算子的前置算子，用于计算generic_block_sparse_attention_grad的负载均衡。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/incre_flash_attention/README.md">incre_flash_attention</a></td>
     <td>✓</td>
     <td>✓</td>

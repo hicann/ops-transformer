@@ -69,6 +69,7 @@ operator_group_6:
   - quant_lightning_indexer
   - block_sparse_attention
   - generic_block_sparse_attention
+  - generic_block_sparse_attention_grad
 operator_group_7:
   - attention_pioneer
   - fused_infer_attention_score,10-0
