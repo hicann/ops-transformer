@@ -74,6 +74,7 @@ public:
     static constexpr uint32_t STAGE1_OUT_UB_SIZE = VEC_M_BASE * STAGE1_CAST_ROW_STRIDE * sizeof(INPUT_T);
     static constexpr uint32_t PSCALE_SUB_LOOP_UB_SIZE = VEC_M_BASE * S2_SPLIT / MX_SCALE_GROUP * sizeof(SCALE_T);
     static constexpr uint32_t SOFTMAX_STATE_UB_SIZE = VEC_M_BASE * sizeof(float);
+    static constexpr float MX_EMPTY_LSE_VALUE = -3e+99; // 与 CUDA 空 softmax 行的 LSE=-Inf 语义一致。
 
     __aicore__ inline void Init(TPipe *pipe, __gm__ uint8_t *pScale, __gm__ uint8_t *softmaxLse,
                                 __gm__ uint8_t *attentionOut, __gm__ uint8_t *attenMask, uint32_t attenMaskS2Size,
@@ -203,7 +204,7 @@ public:
                 LocalTensor<float> emptyLse = softmaxLseQueue_.template AllocTensor<float>();
                 // UB->GM 以 4B block 搬运时，每行源数据占一个 32B data block。
                 // 与 ComputeLseOutputVF 的 E2B 布局保持一致，避免第 2 行起读取未初始化的 32B 槽位。
-                Duplicate<float>(emptyLse, QBSA_EMPTY_LSE_VALUE, actVecMSize * 8U);
+                Duplicate<float>(emptyLse, MX_EMPTY_LSE_VALUE, actVecMSize * 8U);
                 softmaxLseQueue_.template EnQue(emptyLse);
                 emptyLse = softmaxLseQueue_.template DeQue<float>();
                 DataCopyPad(softmaxLseGm_[lseOffset], emptyLse, lseCopyParams);
@@ -567,7 +568,7 @@ private:
                                              LocalTensor<float> &sumUb, LocalTensor<float> &maxUb)
     {
         LocalTensor<float> lseUb = softmaxLseQueue_.template AllocTensor<float>();
-        ComputeLseOutputVF(lseUb, sumUb, maxUb, runInfo.actVecMSize);
+        ComputeLseOutputVF<float, true>(lseUb, sumUb, maxUb, runInfo.actVecMSize);
         softmaxLseQueue_.template EnQue(lseUb);
         lseUb = softmaxLseQueue_.template DeQue<float>();
         DataCopyExtParams dataCopyParams;

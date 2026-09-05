@@ -483,7 +483,7 @@ __aicore__ inline void InvalidLineUpdate(const LocalTensor<T> &dstTensor, const 
     InvalidLineUpdateVF<T, srcD>(dstUb, srcUb, maxUb, m, d, minValue, invalidValue);
 }
 
-template <typename T>
+template <typename T, bool negativeInfWhenEmpty = false>
 __simd_vf__ inline void ComputeLseOutputVF(__ubuf__ T *srcSumUb, __ubuf__ T *srcMaxUb, __ubuf__ T *dstUb,
                                            const uint32_t dealCount)
 {
@@ -499,6 +499,7 @@ __simd_vf__ inline void ComputeLseOutputVF(__ubuf__ T *srcSumUb, __ubuf__ T *src
     constexpr uint32_t dealRows = 8;
     constexpr uint32_t floatRepSize = 64; // 64: 一个寄存器存64个float
     constexpr float infValue = 3e+99;     // 3e+99 for float inf
+    constexpr float negInfValue = -3e+99; // -3e+99 for float -inf
     constexpr uint32_t tmpMin = 0xFF7FFFFF;
     float minValue = *((float *)&tmpMin);
     uint16_t updateLoops = dealCount / dealRows;
@@ -508,7 +509,12 @@ __simd_vf__ inline void ComputeLseOutputVF(__ubuf__ T *srcSumUb, __ubuf__ T *src
     Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
     Reg::MaskReg pregTail = Reg::UpdateMask<T>(pltTail);
     Reg::Duplicate<float, float>(vregMinValue, minValue);
-    Reg::Duplicate<float, float>(vregInfValue, infValue);
+    if constexpr (negativeInfWhenEmpty) {
+        Reg::Duplicate<float, float>(vregInfValue, negInfValue);
+    } else {
+        // 保持原 FP8 实例化的寄存器初始化与指令路径不变。
+        Reg::Duplicate<float, float>(vregInfValue, infValue);
+    }
     Reg::Duplicate<float, float>(vregZero, 0.0f);
 
     for (uint16_t i = 0; i < updateLoops; ++i) {
@@ -519,11 +525,19 @@ __simd_vf__ inline void ComputeLseOutputVF(__ubuf__ T *srcSumUb, __ubuf__ T *src
         Reg::Add<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregRes, vregMax, pregAll);
 
         Reg::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregAll);
-        Reg::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
+        if constexpr (negativeInfWhenEmpty) {
+            Reg::Select<T>(vregResFinal, vregInfValue, vregRes, pregCompare);
+        } else {
+            Reg::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
+        }
 
-        // sum == 0 保护：ln(0) + max = -inf, 需替换为 vregMinValue
+        // sum == 0 表示空 softmax 行：MX 输出 -Inf，其他路径保留 -FLT_MAX。
         Reg::Compare<float, CMPMODE::EQ>(pregZeroSum, vregSum, vregZero, pregAll);
-        Reg::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
+        if constexpr (negativeInfWhenEmpty) {
+            Reg::Select<T>(vregResFinal, vregInfValue, vregResFinal, pregZeroSum);
+        } else {
+            Reg::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
+        }
 
         Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(dstUb + (i * floatRepSize), vregResFinal, pregAll);
     }
@@ -536,17 +550,25 @@ __simd_vf__ inline void ComputeLseOutputVF(__ubuf__ T *srcSumUb, __ubuf__ T *src
         Reg::Add<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregRes, vregMax, pregTail);
 
         Reg::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregTail);
-        Reg::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
+        if constexpr (negativeInfWhenEmpty) {
+            Reg::Select<T>(vregResFinal, vregInfValue, vregRes, pregCompare);
+        } else {
+            Reg::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
+        }
 
-        // sum == 0 保护：ln(0) + max = -inf, 需替换为 vregMinValue
+        // sum == 0 表示空 softmax 行：MX 输出 -Inf，其他路径保留 -FLT_MAX。
         Reg::Compare<float, CMPMODE::EQ>(pregZeroSum, vregSum, vregZero, pregTail);
-        Reg::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
+        if constexpr (negativeInfWhenEmpty) {
+            Reg::Select<T>(vregResFinal, vregInfValue, vregResFinal, pregZeroSum);
+        } else {
+            Reg::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
+        }
 
         Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(dstUb + floatRepSize * updateLoops, vregResFinal, pregTail);
     }
 }
 
-template <typename T>
+template <typename T, bool negativeInfWhenEmpty = false>
 __aicore__ inline void ComputeLseOutputVF(const LocalTensor<T> &dstTensor, const LocalTensor<T> &softmaxSumTensor,
                                           const LocalTensor<T> &softmaxMaxTensor, uint32_t dealCount)
 {
@@ -554,7 +576,7 @@ __aicore__ inline void ComputeLseOutputVF(const LocalTensor<T> &dstTensor, const
     __ubuf__ T *srcMaxUb = (__ubuf__ T *)softmaxMaxTensor.GetPhyAddr();
     __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
 
-    ComputeLseOutputVF<T>(srcSumUb, srcMaxUb, dstUb, dealCount);
+    ComputeLseOutputVF<T, negativeInfWhenEmpty>(srcSumUb, srcMaxUb, dstUb, dealCount);
 }
 
 template <typename T>

@@ -29,7 +29,11 @@ DATA_RANGE_LEFT = -1000
 DATA_RANGE_RIGHT = 1000
 FP8_E4M3_MAX = 448.0
 SCALE_EPSILON = 1e-8
-EMPTY_LSE = -3.4028234663852886e38
+# CUDA SDPA 空 softmax 行的 LSE 语义是 -Inf；kernel 侧 FP8_EMPTY_LSE_VALUE(-3e+99)
+# 经 FP32 溢出后同样是 -Inf。SOFTMAX_MAX_SENTINEL 与之共用：kernel V1 在线 max
+# 空态哨兵仍是有限 -FLT_MAX，但 -Inf 哨兵在比较/合并语义上与 -FLT_MAX 等价
+# （-Inf score 与空态判空一致、NaN 仍传播），仅 LSE 输出值随本常量变为 -Inf。
+EMPTY_LSE = float("-inf")
 SOFTMAX_MAX_SENTINEL = EMPTY_LSE
 MASK_VALUE = -10000.0
 

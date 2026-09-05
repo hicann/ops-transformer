@@ -50,7 +50,7 @@ bash build_and_install.sh
 
 `quant_block_sparse_attn_golden.py` 在 CPU 上生成参考结果。Q、K、V 均以 FP8 数据构造；Q/K 反量化尺度在 `QK^T` 之后以行、列尺度作用于分数。参考实现对稳定式 Softmax 的指数权重，对指数权重量化为 FP8，用于 BMM2 累加；最终以同样含该因子的累积和归一化输出，因此该尺度在分子、分母中相消。V 的反量化尺度在累加过程中参与缩放。
 
-`sparse_indices` 保存逻辑 KV block 编号，`block_table` 将逻辑 block 映射到 PA KV Cache 中的物理 block。K、V 与 K 反量化尺度被打包在同一段 `uint8` 存储内，并分别以视图访问。若某个查询行没有有效的稀疏 KV 位置，Golden 保持 `attention_out` 为零，并将该行的 LSE 设为 `EMPTY_LSE`。当 `return_softmax_lse=True` 时，比较同时包含 LSE。
+`sparse_indices` 保存逻辑 KV block 编号，`block_table` 将逻辑 block 映射到 PA KV Cache 中的物理 block。K、V 与 K 反量化尺度被打包在同一段 `uint8` 存储内，并分别以视图访问。若某个查询行没有有效的稀疏 KV 位置，Golden 保持 `attention_out` 为零，并将该行的 LSE 设为 `EMPTY_LSE`（`-Inf`，与 CUDA SDPA 空 softmax 行语义及 kernel 侧 `FP8_EMPTY_LSE_VALUE(-3e+99)` 一致）。当 `return_softmax_lse=True` 时，比较同时包含 LSE。
 
 ## 扩展加载
 

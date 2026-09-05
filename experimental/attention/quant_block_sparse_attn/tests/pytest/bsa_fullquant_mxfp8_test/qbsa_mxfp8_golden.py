@@ -1498,7 +1498,9 @@ def generate_data():
 #   - 输出 OUT 固定 TND，MXFP8 TND LSE 固定 TN
 # ==============================================================================
 
-EMPTY_LSE = -3.4028234663852886e38
+# CUDA SDPA 空 softmax 行的 LSE 语义是 -Inf；kernel 侧 MX_EMPTY_LSE_VALUE(-3e+99)
+# 经 FP32 溢出后同样是 -Inf。仅变更空行 LSE 哨兵，attention_out=0 语义不变。
+EMPTY_LSE = float("-inf")
 MASK_VALUE = -10000.0
 # Keep the exact FP32 constants and operation order used by the VF.  For
 # large-magnitude negative scores, ``x / log(2)`` and ``x * INV_LN2`` can
@@ -1720,11 +1722,15 @@ def _exp_sub(lhs, rhs, use_quant_matmul):
 
 
 def _softmax_row_is_active(local_max):
-    """Match the VF's finite-sentinel softmax state transition.
+    """Match the kernel's empty-row softmax state transition.
 
-    The VF reduces each row from the finite ``-FLT_MAX`` sentinel.  Therefore
-    that exact max value means the row has never started. NaN is deliberately
-    active because ``NaN != -FLT_MAX`` in the kernel and must keep propagating.
+    The kernel VF reduces each row from the finite ``-FLT_MAX`` sentinel, so a
+    ``-Inf`` score never starts a row; the golden here starts from ``-Inf``,
+    which reaches the same inactive verdict because ``-Inf != -Inf`` is false.
+    NaN is deliberately active because ``NaN != -Inf`` and must keep
+    propagating.  A score that is exactly ``-FLT_MAX`` is inactive in the
+    kernel (it equals the VF sentinel) but active here; the value is
+    measure-zero for the MX quantized score grid and accepted.
     """
     return local_max != EMPTY_LSE
 
@@ -2155,7 +2161,9 @@ def cpu_mxfp8_golden(
                     head_idx,
                 )
 
-                # Use the same finite sentinel as the kernel's online max state.
+                # Online max starts from the empty-row sentinel.  The kernel
+                # VF starts from -FLT_MAX; -Inf here yields the same inactive
+                # verdict for -Inf scores (see _softmax_row_is_active).
                 m_run = torch.full((nq,), EMPTY_LSE, dtype=torch.float32)
                 l_run = torch.zeros((nq,), dtype=torch.float32)
                 acc = torch.zeros((nq, head_dim), dtype=torch.float32)
