@@ -136,6 +136,35 @@ REG_OP(Data)
                              DT_UINT16, DT_COMPLEX128, DT_FLOAT16, DT_BF16,   DT_UINT32, DT_UINT64, DT_STRING}))
     .OP_END_FACTORY_REG(Fill)
 
+    /**
+    * @brief swin_transformer model specific structure.Operator only supports swin_transformer.
+
+    * @par Inputs:
+    * Three inputs, including:
+    * @li x: An ND Tensor. Must be one of the following types: float16, float, bfloat16,
+            the shape should be (B*W, N, S1, S2) or (B, W, N, S1, S2).
+    * @li atten_mask: An ND Tensor. Must be one of the following types: float16, float, bfloat16,
+                    the shape should be (W, S1, S2) or (W, 1, S1, S2) or (1, W, 1, S1, S2)
+    * @li relative_pos_bias: An ND Tensor. Must be one of the following types: float16, float, bfloat16.
+                            the shape sholud be (N, S1, S2) or (1, N, S1, S2) or (1, 1, N, S1, S2)
+
+    * @par Attributes:
+    * @li scale_value: A optional attribute, the type is float. Defaults to 1.0.
+    * @li inner_precision_mode: A optional attribute, the type is int. Defaults to 0, reserved field.
+
+    * @par Outputs:
+    * One output, including:
+    * @li y: An ND Tensor. Must be one of the following types: float16, float, bfloat16,
+            the shape should be same with x.
+    */
+    REG_OP(MaskedSoftmaxWithRelPosBias)
+    .INPUT(x, TensorType({DT_FLOAT16, DT_BFLOAT16, DT_FLOAT}))
+    .OPTIONAL_INPUT(atten_mask, TensorType({DT_FLOAT16, DT_BFLOAT16, DT_FLOAT}))
+    .INPUT(relative_pos_bias, TensorType({DT_FLOAT16, DT_BFLOAT16, DT_FLOAT}))
+    .OUTPUT(y, TensorType({DT_FLOAT16, DT_BFLOAT16, DT_FLOAT}))
+    .ATTR(scale_value, Float, 1.0)
+    .ATTR(inner_precision_mode, Int, 0)
+    .OP_END_FACTORY_REG(MaskedSoftmaxWithRelPosBias)
 } // namespace ge
 
 #endif // MATH_COMMON_STUB_OPS_H
