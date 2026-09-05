@@ -202,6 +202,30 @@ void FusedInferAttentionScoreProcessSoftmaxLse(bool softmaxLseFlag, const aclTen
 #endif
 
 namespace {
+// 场景模式枚举值，与 op_host 侧定义保持一致
+constexpr int64_t SPARSE_MODE_NO_MASK = 0;
+constexpr int64_t SPARSE_MODE_RIGHT_DOWN = 3;
+constexpr int64_t SPARSE_MODE_BAND = 4;
+constexpr int64_t SPARSE_MODE_TREE = 9;
+constexpr int64_t INNER_PRECISE_HIGH_PRECISION = 0;
+constexpr int64_t INNER_PRECISE_HIGH_PERFORMANCE = 1;
+// head dim 数值常量
+constexpr int64_t DIM_64 = 64;
+constexpr int64_t DIM_128 = 128;
+constexpr int64_t DIM_512 = 512;
+// 维度数
+constexpr int64_t DIM_NUM_1 = 1;
+constexpr int64_t DIM_NUM_2 = 2;
+constexpr int64_t DIM_NUM_3 = 3;
+constexpr int64_t DIM_NUM_4 = 4;
+constexpr int64_t DIM_NUM_5 = 5;
+// 维度索引
+constexpr int64_t DIM_0 = 0;
+constexpr int64_t DIM_1 = 1;
+constexpr int64_t DIM_2 = 2;
+constexpr int64_t DIM_3 = 3;
+constexpr int64_t DIM_4 = 4;
+
 enum class CacheStridePolicy {
     MAKE_CONTIGUOUS,
     KEEP_FAI_KV_DIM0,
@@ -227,7 +251,7 @@ bool HasQueryHeadDim(const aclTensor *tensor, int64_t numHeads, int64_t expected
     }
     const auto shape = tensor->GetViewShape();
     const auto dimNum = shape.GetDimNum();
-    if (dimNum < 3) {
+    if (dimNum < DIM_NUM_3) {
         return false;
     }
     const int64_t lastDim = shape.GetDim(dimNum - 1);
@@ -241,15 +265,15 @@ int64_t GetPageAttentionCacheHeadDim(const aclTensor *tensor, int64_t numKeyValu
     }
     const auto shape = tensor->GetViewShape();
     const auto dimNum = shape.GetDimNum();
-    if (dimNum == 3) { // BnBsH
-        const int64_t hiddenSize = shape.GetDim(2);
+    if (dimNum == DIM_NUM_3) { // BnBsH
+        const int64_t hiddenSize = shape.GetDim(DIM_2);
         return hiddenSize % numKeyValueHeads == 0 ? hiddenSize / numKeyValueHeads : -1;
     }
-    if (dimNum == 4) { // BnNBsD
-        return shape.GetDim(3);
+    if (dimNum == DIM_NUM_4) { // BnNBsD
+        return shape.GetDim(DIM_3);
     }
-    if (dimNum == 5) { // NZ: Bn, N, D/16, Bs, 16
-        return shape.GetDim(2) * shape.GetDim(4);
+    if (dimNum == DIM_NUM_5) { // NZ: Bn, N, D/16, Bs, 16
+        return shape.GetDim(DIM_2) * shape.GetDim(DIM_4);
     }
     return -1;
 }
@@ -269,7 +293,8 @@ bool IsArch22MlaD512RoutingCandidate(const aclTensor *query, const aclTensorList
 
     const std::string inputLayoutStr(inputLayout);
     if (!IsSupportedArch22MlaLayout(inputLayoutStr) ||
-        (sparseMode != 0 && sparseMode != 3 && sparseMode != 4 && sparseMode != 9)) {
+        (sparseMode != SPARSE_MODE_NO_MASK && sparseMode != SPARSE_MODE_RIGHT_DOWN && sparseMode != SPARSE_MODE_BAND &&
+         sparseMode != SPARSE_MODE_TREE)) {
         return false;
     }
     const bool hiddenLayout = inputLayoutStr == "BSH" || inputLayoutStr == "BSH_NBSD";
@@ -283,11 +308,12 @@ bool IsArch22MlaD512RoutingCandidate(const aclTensor *query, const aclTensorList
 
     return query->GetViewShape().GetShapeSize() > 0 && (*key)[0]->GetViewShape().GetShapeSize() > 0 &&
            (*value)[0]->GetViewShape().GetShapeSize() > 0 && queryRopeOptional->GetViewShape().GetShapeSize() > 0 &&
-           keyRopeOptional->GetViewShape().GetShapeSize() > 0 && HasQueryHeadDim(query, numHeads, 512, hiddenLayout) &&
-           HasQueryHeadDim(queryRopeOptional, numHeads, 64, hiddenLayout) &&
-           GetPageAttentionCacheHeadDim((*key)[0], numKeyValueHeads) == 512 &&
-           GetPageAttentionCacheHeadDim((*value)[0], numKeyValueHeads) == 512 &&
-           GetPageAttentionCacheHeadDim(keyRopeOptional, numKeyValueHeads) == 64;
+           keyRopeOptional->GetViewShape().GetShapeSize() > 0 &&
+           HasQueryHeadDim(query, numHeads, DIM_512, hiddenLayout) &&
+           HasQueryHeadDim(queryRopeOptional, numHeads, DIM_64, hiddenLayout) &&
+           GetPageAttentionCacheHeadDim((*key)[0], numKeyValueHeads) == DIM_512 &&
+           GetPageAttentionCacheHeadDim((*value)[0], numKeyValueHeads) == DIM_512 &&
+           GetPageAttentionCacheHeadDim(keyRopeOptional, numKeyValueHeads) == DIM_64;
 }
 
 bool IsFAIRoutingCandidate(const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
@@ -305,64 +331,65 @@ bool IsFAIRoutingCandidate(const aclTensor *query, const aclTensorList *key, con
     constexpr int64_t MAX_BLOCK_SIZE = 512;
     constexpr int64_t BLOCK_SIZE_ALIGNMENT = 16;
     constexpr int64_t NZ_INNER_BLOCK = 16;
-    constexpr int64_t UNSUPPORTED_SINK_HEAD_DIM = 64;
 
     const std::string inputLayoutStr(inputLayout);
     const auto queryDtype = query->GetDataType();
     const auto queryShape = query->GetViewShape();
     const auto keyShape = (*key)[0]->GetViewShape();
     const auto valueShape = (*value)[0]->GetViewShape();
-    if (queryShape.GetDimNum() <= 2) {
+    if (queryShape.GetDimNum() <= DIM_NUM_2) {
         return false;
     }
-    const int64_t queryHeadDim = queryShape.GetDim(2);
+    const int64_t queryHeadDim = queryShape.GetDim(DIM_2);
 
     bool learnableSinkSupported = true;
-    if (learnableSinkOptional != nullptr && inputLayoutStr == "TND" && queryHeadDim == UNSUPPORTED_SINK_HEAD_DIM &&
+    if (learnableSinkOptional != nullptr && inputLayoutStr == "TND" && queryHeadDim == DIM_64 &&
         learnableSinkOptional->GetDataType() == DataType::DT_BF16) {
         learnableSinkSupported = false;
     }
     const bool isRopeSplitMla = queryRopeOptional != nullptr && keyRopeOptional != nullptr;
-    const bool sparseModeSupported = sparseMode == 0 || sparseMode == 3 || sparseMode == 4;
+    const bool sparseModeSupported =
+        sparseMode == SPARSE_MODE_NO_MASK || sparseMode == SPARSE_MODE_RIGHT_DOWN || sparseMode == SPARSE_MODE_BAND;
     const bool isMha = numKeyValueHeads == 0 || numHeads == numKeyValueHeads;
-    const bool mhaConditions = isMha && !(queryDtype == DataType::DT_BF16 && innerPrecise == 1) &&
-                               !(sparseMode == 0 && attenMaskOptional != nullptr);
-    const bool nonMhaConditions = !isMha && innerPrecise == 0;
+    const bool mhaConditions = isMha &&
+                               !(queryDtype == DataType::DT_BF16 && innerPrecise == INNER_PRECISE_HIGH_PERFORMANCE) &&
+                               !(sparseMode == SPARSE_MODE_NO_MASK && attenMaskOptional != nullptr);
+    const bool nonMhaConditions = !isMha && innerPrecise == INNER_PRECISE_HIGH_PRECISION;
     if (inputLayoutStr != "TND" || !learnableSinkSupported || isRopeSplitMla || !sparseModeSupported ||
         (!mhaConditions && !nonMhaConditions)) {
         return false;
     }
 
     if (blockTableOptional == nullptr) {
-        if (keyShape.GetDimNum() <= 2 || valueShape.GetDimNum() <= 2) {
+        if (keyShape.GetDimNum() <= DIM_NUM_2 || valueShape.GetDimNum() <= DIM_NUM_2) {
             return false;
         }
-        const int64_t keyHeadDim = keyShape.GetDim(2);
-        const int64_t valueHeadDim = valueShape.GetDim(2);
+        const int64_t keyHeadDim = keyShape.GetDim(DIM_2);
+        const int64_t valueHeadDim = valueShape.GetDim(DIM_2);
         return queryHeadDim <= MAX_HEAD_DIM && keyHeadDim <= MAX_HEAD_DIM && valueHeadDim <= MAX_HEAD_DIM &&
                queryHeadDim == keyHeadDim && queryHeadDim == valueHeadDim;
     }
-    if (keyShape.GetDimNum() == 3) {
-        if (valueShape.GetDimNum() <= 2 || numKeyValueHeads == 0) {
+    if (keyShape.GetDimNum() == DIM_NUM_3) {
+        if (valueShape.GetDimNum() <= DIM_NUM_2 || numKeyValueHeads == 0) {
             return false;
         }
-        const int64_t blockSize = keyShape.GetDim(1);
-        const int64_t keyHeadDim = keyShape.GetDim(2) / numKeyValueHeads;
-        const int64_t valueHeadDim = valueShape.GetDim(2) / numKeyValueHeads;
+        const int64_t blockSize = keyShape.GetDim(DIM_1);
+        const int64_t keyHeadDim = keyShape.GetDim(DIM_2) / numKeyValueHeads;
+        const int64_t valueHeadDim = valueShape.GetDim(DIM_2) / numKeyValueHeads;
         return queryHeadDim <= MAX_HEAD_DIM && keyHeadDim <= MAX_HEAD_DIM && valueHeadDim <= MAX_HEAD_DIM &&
                queryHeadDim == keyHeadDim && queryHeadDim == valueHeadDim && blockSize % BLOCK_SIZE_ALIGNMENT == 0 &&
                blockSize <= MAX_BLOCK_SIZE;
     }
-    if (keyShape.GetDimNum() == 5) {
-        if (valueShape.GetDimNum() <= 3) {
+    if (keyShape.GetDimNum() == DIM_NUM_5) {
+        if (valueShape.GetDimNum() <= DIM_NUM_3) {
             return false;
         }
-        const int64_t blockSize = keyShape.GetDim(3);
-        const int64_t keyHeadDim = keyShape.GetDim(2) * NZ_INNER_BLOCK;
-        const int64_t valueHeadDim = valueShape.GetDim(2) * NZ_INNER_BLOCK;
+        const int64_t blockSize = keyShape.GetDim(DIM_3);
+        const int64_t keyHeadDim = keyShape.GetDim(DIM_2) * NZ_INNER_BLOCK;
+        const int64_t valueHeadDim = valueShape.GetDim(DIM_2) * NZ_INNER_BLOCK;
         const bool headDimSupported = queryHeadDim <= MAX_HEAD_DIM && keyHeadDim <= MAX_HEAD_DIM &&
                                       valueHeadDim <= MAX_HEAD_DIM && queryHeadDim == keyHeadDim &&
-                                      queryHeadDim == valueHeadDim && queryHeadDim != 64 && queryHeadDim != 128;
+                                      queryHeadDim == valueHeadDim && queryHeadDim != DIM_64 && queryHeadDim != DIM_128;
         return headDimSupported && blockSize % BLOCK_SIZE_ALIGNMENT == 0 && blockSize <= MAX_BLOCK_SIZE;
     }
     return false;
@@ -394,7 +421,7 @@ bool IsFirstAxisOnlyNonContiguous(const aclTensor *tensor, const char *name)
 
     auto viewShape = tensor->GetViewShape();
     int64_t dimNum = viewShape.GetDimNum();
-    if (dimNum <= 1) {
+    if (dimNum <= DIM_NUM_1) {
         OP_LOGW("%s is non-contiguous with dim num[%ld] <= 1, it will be forced to be contiguous.", name, dimNum);
         return false;
     }
@@ -411,16 +438,16 @@ bool IsFirstAxisOnlyNonContiguous(const aclTensor *tensor, const char *name)
         delete[] viewStrides;
         return false;
     }
-    if (viewShape.GetDim(0) > 1 && viewStrides[0] <= 0) {
+    if (viewShape.GetDim(DIM_0) > 1 && viewStrides[DIM_0] <= 0) {
         OP_LOGW("%s has invalid dim0 stride[%ld] for dim0 size[%ld], it will be forced to be contiguous.", name,
-                viewStrides[0], viewShape.GetDim(0));
+                viewStrides[DIM_0], viewShape.GetDim(DIM_0));
         delete[] viewStrides;
         return false;
     }
 
     bool isFirstAxisOnlyNonContiguous = true;
     int64_t expectedStride = 1;
-    for (int64_t dim = dimNum - 1; dim >= 1; --dim) {
+    for (int64_t dim = dimNum - 1; dim >= DIM_1; --dim) {
         if (viewShape.GetDim(dim) != 1 && viewStrides[dim] != expectedStride) {
             OP_LOGW("%s is non-contiguous at axis[%ld] (0-based): actual stride[%ld], expected stride[%ld], "
                     "shape[%s]. It will be forced to be contiguous.",

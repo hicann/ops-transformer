@@ -54,11 +54,6 @@ constexpr uint32_t BLOCK_SIZE_ALIGN_SIZE_16 = 16;
 constexpr uint32_t BLOCK_SIZE_ALIGN_SIZE_128 = 128;
 
 // sparse mode
-// constexpr uint32_t SPARSE_MODE_NO_MASK = 0;
-// constexpr uint32_t SPARSE_MODE_ALL_MASK = 1;
-// constexpr uint32_t SPARSE_MODE_LEFT_UP = 2;
-// constexpr uint32_t SPARSE_MODE_RIGHT_DOWN = 3;
-// constexpr uint32_t SPARSE_MODE_BAND = 4;
 constexpr uint32_t SPARSE_OPTIMIZE_ATTENTION_SIZE = 2048;
 
 // mask
@@ -116,7 +111,7 @@ constexpr uint32_t DSIZE_512 = 512;
 constexpr uint32_t DSIZE_576 = 576;
 constexpr uint32_t CV_RATIO = 2;
 
-constexpr uint32_t DOUBLE_BUFFER_NUM=2;
+constexpr uint32_t DOUBLE_BUFFER_NUM = 2;
 
 // num
 constexpr uint32_t NUM1 = 1;
@@ -168,38 +163,41 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_HIFLOAT8, "DT_HIFLOAT8"},
     {ge::DT_FLOAT8_E4M3FN, "DT_FLOAT8_E4M3FN"},
     {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"},
-    {ge::DT_FLOAT8_E8M0, "DT_FLOAT8_E8M0"}
-};
+    {ge::DT_FLOAT8_E8M0, "DT_FLOAT8_E8M0"}};
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
-    {QUERY_NAME,                  {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
-    {KEY_NAME,                    {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT4, ge::DT_HIFLOAT8, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1}},
-    {VALUE_NAME,                  {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT4, ge::DT_HIFLOAT8, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1}},
-    {PSE_SHIFT_NAME,              {ge::DT_FLOAT16, ge::DT_BF16}},
-    {ATTEN_MASK_NAME,             {ge::DT_BOOL, ge::DT_INT8, ge::DT_UINT8}},
-    {DEQUANT_SCALE1_NAME,         {ge::DT_UINT64, ge::DT_FLOAT}},
-    {QUANT_SCALE1_NAME,           {ge::DT_FLOAT}},
-    {DEQUANT_SCALE2_NAME,         {ge::DT_UINT64, ge::DT_FLOAT}},
-    {QUANT_SCALE2_NAME,           {ge::DT_FLOAT, ge::DT_BF16}},
-    {QUANT_OFFSET2_NAME,          {ge::DT_FLOAT, ge::DT_BF16}},
-    {ANTIQUANT_SCALE_NAME,        {ge::DT_FLOAT16, ge::DT_BF16}},
-    {ANTIQUANT_OFFSET_NAME,       {ge::DT_FLOAT16, ge::DT_BF16}},
-    {BLOCK_TABLE_NAME,            {ge::DT_INT32}},
-    {KEY_ANTIQUANT_SCALE_NAME,    {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT}},
-    {KEY_ANTIQUANT_OFFSET_NAME,   {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT}},
-    {VALUE_ANTIQUANT_SCALE_NAME,  {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT}},
+    {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
+    {KEY_NAME,
+     {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT4, ge::DT_HIFLOAT8, ge::DT_FLOAT8_E4M3FN,
+      ge::DT_FLOAT4_E2M1}},
+    {VALUE_NAME,
+     {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT4, ge::DT_HIFLOAT8, ge::DT_FLOAT8_E4M3FN,
+      ge::DT_FLOAT4_E2M1}},
+    {PSE_SHIFT_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {ATTEN_MASK_NAME, {ge::DT_BOOL, ge::DT_INT8, ge::DT_UINT8}},
+    {DEQUANT_SCALE1_NAME, {ge::DT_UINT64, ge::DT_FLOAT}},
+    {QUANT_SCALE1_NAME, {ge::DT_FLOAT}},
+    {DEQUANT_SCALE2_NAME, {ge::DT_UINT64, ge::DT_FLOAT}},
+    {QUANT_SCALE2_NAME, {ge::DT_FLOAT, ge::DT_BF16}},
+    {QUANT_OFFSET2_NAME, {ge::DT_FLOAT, ge::DT_BF16}},
+    {ANTIQUANT_SCALE_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {ANTIQUANT_OFFSET_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {BLOCK_TABLE_NAME, {ge::DT_INT32}},
+    {KEY_ANTIQUANT_SCALE_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT}},
+    {KEY_ANTIQUANT_OFFSET_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT}},
+    {VALUE_ANTIQUANT_SCALE_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT}},
     {VALUE_ANTIQUANT_OFFSET_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT}},
-    {KEY_SHARED_PREFIX_NAME,      {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
-    {VALUE_SHARED_PREFIX_NAME,    {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
-    {QUERY_ROPE_NAME,             {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
-    {KEY_ROPE_NAME,               {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
-    {DEQUANT_SCALE_QUERY_NAME,    {ge::DT_FLOAT}},
-    {ATTEN_OUT_NAME,              {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
-    {SOFTMAX_LSE_NAME,            {ge::DT_FLOAT}},
+    {KEY_SHARED_PREFIX_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
+    {VALUE_SHARED_PREFIX_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
+    {QUERY_ROPE_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
+    {KEY_ROPE_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
+    {DEQUANT_SCALE_QUERY_NAME, {ge::DT_FLOAT}},
+    {ATTEN_OUT_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8}},
+    {SOFTMAX_LSE_NAME, {ge::DT_FLOAT}},
 };
 
 const std::set<ge::Format> FORMAT_SUPPORT_SET = {ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC, ge::FORMAT_NCDHW};
-}
+} // namespace arch35FIA
 } // namespace optiling
 
 #endif // FUSED_INFER_ATTENTION_SCORE_TILING_CONSTANTS_H

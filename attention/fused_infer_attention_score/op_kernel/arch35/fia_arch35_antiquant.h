@@ -20,16 +20,13 @@
 #include "fia_arch35_template_tiling_key_enum.h"
 #include "flash_attention_score_antiquant_kernel.h"
 
-#define REGBASE_COPY_TILING_DATA_ASCEND950_ANTIQUANT_BASEAPI(tiling) \
-    GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = &tilingDataIn;
-
 #define INVOKE_FA_OP_IMPL_ASCEND950_ANTIQUANT_BASEAPI(templateClass, ...) \
     do { \
         if (query == nullptr) { \
             return; \
         } \
-        REGBASE_COPY_TILING_DATA_ASCEND950_ANTIQUANT_BASEAPI(tiling); \
+        GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
+        const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = &tilingDataIn; \
         TPipe tPipe; \
         __gm__ uint8_t *user = GetUserWorkspace(workspace); \
         using CubeBlockType = \

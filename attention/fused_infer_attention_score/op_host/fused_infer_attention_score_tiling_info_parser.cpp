@@ -1720,21 +1720,25 @@ ge::graphStatus FiaInfoParser::GetPostQuantInfo()
 ge::graphStatus FiaInfoParser::GetFullQuantMode()
 {
     if (quantMode_ == FiaQuantMode::FULL_QUANT) {
-        if (*opParamInfo_.queryQuantMode == 7 && *opParamInfo_.keyAntiquantMode == 7 &&
-            *opParamInfo_.valueAntiquantMode == 7) {
+        if (*opParamInfo_.queryQuantMode == arch35FIA::PER_BLOCK_MODE &&
+            *opParamInfo_.keyAntiquantMode == arch35FIA::PER_BLOCK_MODE &&
+            *opParamInfo_.valueAntiquantMode == arch35FIA::PER_BLOCK_MODE) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 opName_, "QuantMode", std::to_string(*opParamInfo_.queryQuantMode).c_str(),
-                "In the fullquant scenario, per-block(QuantMode == 7) is not supported");
+                "In the fullquant scenario, per-block(PER_BLOCK_MODE) is not supported");
             return ge::GRAPH_FAILED;
-        } else if (*opParamInfo_.queryQuantMode == 6 && *opParamInfo_.keyAntiquantMode == 6 &&
-                   *opParamInfo_.valueAntiquantMode == 8) {
+        } else if (*opParamInfo_.queryQuantMode == arch35FIA::PER_TOKEN_GROUP_MODE &&
+                   *opParamInfo_.keyAntiquantMode == arch35FIA::PER_TOKEN_GROUP_MODE &&
+                   *opParamInfo_.valueAntiquantMode == arch35FIA::PER_CHANNEL_GROUP_MODE) {
             fullQuantMode_ = FiaFullQuantMode::QKV_MXFP8_FULL_QUANT;
-        } else if (*opParamInfo_.queryQuantMode == 3 && *opParamInfo_.keyAntiquantMode == 3 &&
-                   *opParamInfo_.valueAntiquantMode == 2) {
+        } else if (*opParamInfo_.queryQuantMode == arch35FIA::PER_TOKEN_HEAD_MODE &&
+                   *opParamInfo_.keyAntiquantMode == arch35FIA::PER_TOKEN_HEAD_MODE &&
+                   *opParamInfo_.valueAntiquantMode == arch35FIA::PER_TENSOR_HEAD_MODE) {
             fullQuantMode_ = FiaFullQuantMode::QK_PER_TOKEN_HEAD_V_PER_HEAD;
         } else if (ropeMode_ == RopeMode::ROPE_SPLIT &&
-                   (*opParamInfo_.queryQuantMode == 3 && *opParamInfo_.keyAntiquantMode == 0 &&
-                    *opParamInfo_.valueAntiquantMode == 0)) {
+                   (*opParamInfo_.queryQuantMode == arch35FIA::PER_TOKEN_HEAD_MODE &&
+                    *opParamInfo_.keyAntiquantMode == arch35FIA::PER_CHANNEL_MODE &&
+                    *opParamInfo_.valueAntiquantMode == arch35FIA::PER_CHANNEL_MODE)) {
             fullQuantMode_ = FiaFullQuantMode::Q_PER_TOKEN_HEAD_KV_PER_TENSOR_FULL_QUANT;
         } else {
             fullQuantMode_ = FiaFullQuantMode::QKV_PER_TENSOR_FULL_QUANT;

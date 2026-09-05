@@ -97,6 +97,8 @@ END_TILING_DATA_DEF
 const uint32_t SIZE_OF_16BIT = 2;
 const uint32_t SIZE_OF_32BIT = 4;
 const uint32_t N_SPLIT_HELPER = 2;
+// sink 场景下实际序列长度不可知，split lse/o 工作区按上界 2 倍预留
+const uint32_t SPLIT_WORKSPACE_FACTOR = 2;
 const uint32_t MAX_KV_STACK_LEN = 512;
 const uint32_t Q_TILE_CEIL = 128;
 const uint32_t WORKSPACE_BLOCK_SIZE_DB = Q_TILE_CEIL * MAX_KV_STACK_LEN;
@@ -350,10 +352,11 @@ void FAInferTiling::FillWorkSpaceTilingData(FAInferTilingData &faTilingData)
     uint64_t splitLseTotalSize = 0;
     uint64_t splitOTotalSize = 0;
     if (faInfo_.isTilingSink) {
-        splitLseTotalSize = 2 * static_cast<uint64_t>(blockNum_) * Q_TILE_CEIL * SIZE_OF_32BIT * faInfo_.numHeads;
+        splitLseTotalSize =
+            SPLIT_WORKSPACE_FACTOR * static_cast<uint64_t>(blockNum_) * Q_TILE_CEIL * SIZE_OF_32BIT * faInfo_.numHeads;
         uint32_t embeddingSizeV = static_cast<uint32_t>(faInfo_.embeddingSizeV);
-        splitOTotalSize =
-            2 * static_cast<uint64_t>(blockNum_) * Q_TILE_CEIL * embeddingSizeV * SIZE_OF_32BIT * faInfo_.numHeads;
+        splitOTotalSize = SPLIT_WORKSPACE_FACTOR * static_cast<uint64_t>(blockNum_) * Q_TILE_CEIL * embeddingSizeV *
+                          SIZE_OF_32BIT * faInfo_.numHeads;
         faTilingData.set_splitLseTotalSize(splitLseTotalSize);
         faTilingData.set_splitOTotalSize(splitOTotalSize);
         faTilingData.set_needCoreNum(blockNum_);

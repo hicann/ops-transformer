@@ -79,7 +79,7 @@ struct RunInfoX {
 
     uint32_t actSingleLoopS2Size = 0; // S2方向长度
     uint32_t actSingleLoopS2SizeAlign;
-    // uint32_t curS2LoopTimes = 0;
+
     bool isS2SplitCore = false;
     uint32_t faTmpOutWsPos = 0; // FA阶段，S2外切，需要写到workspace时，写出到第几块M*D的GM块
 
