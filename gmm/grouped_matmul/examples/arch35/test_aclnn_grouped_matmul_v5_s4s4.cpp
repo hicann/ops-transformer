@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -20,22 +20,22 @@
 #include "aclnnop/aclnn_grouped_matmul_v5.h"
 
 #define CHECK_RET(cond, return_expr) \
-    do {                             \
-        if (!(cond)) {               \
-            return_expr;             \
-        }                            \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
 #define CHECK_FREE_RET(cond, return_expr) \
-    do {                                  \
-        if (!(cond)) {                    \
-            Finalize(deviceId, stream);   \
-            return_expr;                  \
-        }                                 \
+    do { \
+        if (!(cond)) { \
+            Finalize(deviceId, stream); \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)         \
-    do {                                \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
@@ -114,9 +114,9 @@ int aclnnGroupedMatmulTest(int32_t deviceId, aclrtStream &stream)
     constexpr int64_t kVal = 256L;
     constexpr int64_t nVal = 256L;
     constexpr int64_t eVal = 2L;
-    constexpr int64_t int4PackRatio = 2L;              // INT4 数据打包：2 个 INT4 元素占 1 个 int8_t 字节
-    constexpr int8_t int4FillValue = 0x11;             // INT4 填充值，高低 4bit 均为 1
-    constexpr int64_t printCount = 10L;                // 打印结果前 N 个元素
+    constexpr int64_t int4PackRatio = 2L;  // INT4 数据打包：2 个 INT4 元素占 1 个 int8_t 字节
+    constexpr int8_t int4FillValue = 0x11; // INT4 填充值，高低 4bit 均为 1
+    constexpr int64_t printCount = 10L;    // 打印结果前 N 个元素
     int64_t m = mVal;
     int64_t k = kVal;
     int64_t n = nVal;
@@ -124,7 +124,7 @@ int aclnnGroupedMatmulTest(int32_t deviceId, aclrtStream &stream)
 
     std::vector<std::vector<int64_t>> xShape = {{m, k}};
     std::vector<std::vector<int64_t>> weightShape = {{e, k, n}};
-    std::vector<std::vector<int64_t>> scaleShape = {{e, n}};          // perchannel: (E, N)
+    std::vector<std::vector<int64_t>> scaleShape = {{e, n}}; // perchannel: (E, N)
     std::vector<std::vector<int64_t>> yShape = {{m, n}};
     std::vector<int64_t> groupListShape = {{e}};
 
@@ -159,7 +159,7 @@ int aclnnGroupedMatmulTest(int32_t deviceId, aclrtStream &stream)
     // INT4 数据存储：每 2 个 INT4 元素占用 1 个 int8_t 字节
     std::vector<int8_t> xHostData(m * k / int4PackRatio, int4FillValue);
     std::vector<int8_t> weightHostData(e * k * n / int4PackRatio, int4FillValue);
-    std::vector<uint64_t> scaleHostData(e * n, 1);                    // UINT64 perchannel scale
+    std::vector<uint64_t> scaleHostData(e * n, 1); // UINT64 perchannel scale
     std::vector<uint16_t> yHostData(m * n, 0);
     std::vector<int64_t> groupListData = {mVal / eVal, mVal};
 
@@ -201,8 +201,8 @@ int aclnnGroupedMatmulTest(int32_t deviceId, aclrtStream &stream)
     std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(workspaceAddr, aclrtFree);
 
     // 调用 aclnnGroupedMatmulV5 第一段接口
-    // S4S4 场景：bias/offset/antiquantScale/antiquantOffset/activationInput/activationQuantScale/activationQuantOffset 均传空
-    // perTokenScale 传空（不使用 pertoken 量化时）
+    // S4S4 场景：bias/offset/antiquantScale/antiquantOffset/activationInput/activationQuantScale/activationQuantOffset
+    // 均传空 perTokenScale 传空（不使用 pertoken 量化时）
     ret = aclnnGroupedMatmulV5GetWorkspaceSize(
         x, weight, bias, scale, offset, antiquantScale, antiquantOffset, perTokenScale, groupedList, activationInput,
         activationQuantScale, activationQuantOffset, splitItem, groupType, groupListType, actType, nullptr, out,
@@ -227,8 +227,8 @@ int aclnnGroupedMatmulTest(int32_t deviceId, aclrtStream &stream)
     // 将结果从 Device 拷贝到 Host
     auto size = GetShapeSize(yShape[0]);
     std::vector<uint16_t> resultData(size, 0);
-    ret = aclrtMemcpy(resultData.data(), size * sizeof(resultData[0]), yDeviceAddr,
-                      size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(resultData.data(), size * sizeof(resultData[0]), yDeviceAddr, size * sizeof(resultData[0]),
+                      ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t j = 0; j < size && j < printCount; j++) {
         LOG_PRINT("result[%ld] is: %d\n", j, resultData[j]);

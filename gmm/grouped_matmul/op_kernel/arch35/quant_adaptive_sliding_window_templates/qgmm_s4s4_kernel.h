@@ -19,7 +19,7 @@
 #include "../grouped_matmul_tiling_data_apt.h"
 #include "tensor_api/tensor.h"
 
-#include "blaze/gemm/kernel/kernel_gmm_fixpipe_quant.h"
+#include "blaze/gemm/kernel/kernel_qgmm_mix_fixpipe_quant.h"
 #include "../int4_tensor_to_int8_preprocess.h"
 #include "../int4_weight_to_int8_preprocess.h"
 #include "../../grouped_matmul_utils.h"

@@ -3,8 +3,8 @@
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS FILE IS PROVIDED ON AN "AS IS" BASIS, WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -37,7 +37,7 @@
 #include <vector>
 
 #include "../../../op_host/op_tiling/arch35/grouped_quant_basic_api_matmul_tiling.h"
-#include "../../../op_host/op_tiling/arch35/grouped_weight_quant_batch_matmul_tiling.h"  // AIC_AIV_CORE_RATIO
+#include "../../../op_host/op_tiling/arch35/grouped_weight_quant_batch_matmul_tiling.h" // AIC_AIV_CORE_RATIO
 #include "../../../op_kernel/arch35/grouped_matmul_tiling_data_apt.h"
 #include "tiling_case_executor.h"
 #include "gmm_csv_ge_parse_utils.h"
@@ -52,15 +52,15 @@ constexpr uint32_t DEFAULT_AIC_NUM = 32;
 optiling::GMMCompileInfo MakeAscend950CompileInfo()
 {
     return {
-        DEFAULT_AIC_NUM,                                      // aicNum
-        DEFAULT_AIC_NUM * optiling::AIC_AIV_CORE_RATIO,       // aivNum = 2*aic
-        262144,                                               // ubSize
-        524288,                                               // l1Size
-        134217728,                                            // l2Size
-        262144,                                               // l0CSize
-        65536,                                                // l0ASize
-        65536,                                                // l0BSize
-        platform_ascendc::SocVersion::ASCEND950,              // socVersion
+        DEFAULT_AIC_NUM,                                // aicNum
+        DEFAULT_AIC_NUM * optiling::AIC_AIV_CORE_RATIO, // aivNum = 2*aic
+        262144,                                         // ubSize
+        524288,                                         // l1Size
+        134217728,                                      // l2Size
+        262144,                                         // l0CSize
+        65536,                                          // l0ASize
+        65536,                                          // l0BSize
+        platform_ascendc::SocVersion::ASCEND950,        // socVersion
         NpuArch::DAV_3510,
     };
 }
@@ -103,9 +103,8 @@ bool RunS4S4Tiling(int64_t m, int64_t k, int64_t n, int64_t e, int64_t groupSize
     }
     groupList[static_cast<size_t>(e - 1)] = m;
 
-    gert::StorageShape scaleShape = isPergroup
-        ? ops::ut::MakeGertStorageShape({e, G, n}, {e, G, n})
-        : ops::ut::MakeGertStorageShape({e, n}, {e, n});
+    gert::StorageShape scaleShape = isPergroup ? ops::ut::MakeGertStorageShape({e, G, n}, {e, G, n}) :
+                                                 ops::ut::MakeGertStorageShape({e, n}, {e, n});
 
     vector<gert::TilingContextPara::TensorDescription> inputDescs = {
         MakeTensorDesc({m, k}, ge::DT_INT4),
@@ -122,9 +121,8 @@ bool RunS4S4Tiling(int64_t m, int64_t k, int64_t n, int64_t e, int64_t groupSize
         MakeTensorDesc({m, n}, ge::DT_FLOAT16),
     };
 
-    gert::TilingContextPara ctx(
-        "GroupedMatmul", inputDescs, outputDescs, GetS4S4Attrs(false),
-        &compileInfo, "3510", compileInfo.aicNum, compileInfo.ubSize);
+    gert::TilingContextPara ctx("GroupedMatmul", inputDescs, outputDescs, GetS4S4Attrs(false), &compileInfo, "3510",
+                                compileInfo.aicNum, compileInfo.ubSize);
     return ExecuteTiling(ctx, tilingInfo);
 }
 
@@ -187,7 +185,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize64EvenAccepted
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, /*k=*/512, 256, 2, /*groupSize=*/64, true, info));
     const auto *p = GetS4S4Params(info);
-    EXPECT_EQ(p->quantGroupNum, 8U);   // G = 512/64
+    EXPECT_EQ(p->quantGroupNum, 8U); // G = 512/64
     EXPECT_EQ(p->baseK, 128U);
 }
 
@@ -196,7 +194,7 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, pergroupGroupSize2MinEvenAccept
     TilingInfo info;
     ASSERT_TRUE(RunS4S4Tiling(128, /*k=*/1024, 256, 2, /*groupSize=*/2, true, info));
     const auto *p = GetS4S4Params(info);
-    EXPECT_EQ(p->quantGroupNum, 512U);   // G = 1024/2
+    EXPECT_EQ(p->quantGroupNum, 512U); // G = 1024/2
     EXPECT_EQ(p->baseK, 128U);
 }
 
@@ -218,8 +216,8 @@ TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, perchannelScale2DQuantGroupNumO
     ASSERT_TRUE(RunS4S4Tiling(128, 1024, 256, 2, /*groupSize=*/0, /*isPergroup=*/false, info));
     ASSERT_EQ(info.tilingDataSize, sizeof(GroupedMatmulTilingData::GMMS4S4IntQuantTilingData));
     const auto *p = GetS4S4Params(info);
-    EXPECT_EQ(p->quantGroupNum, 1U);   // perchannel
-    EXPECT_EQ(p->baseK, 128U);         // min(1024,128)
+    EXPECT_EQ(p->quantGroupNum, 1U); // perchannel
+    EXPECT_EQ(p->baseK, 128U);       // min(1024,128)
 }
 
 TEST_F(TestGroupedS4S4QuantPergroupArch35Tiling, perchannelKZeroRejected)
