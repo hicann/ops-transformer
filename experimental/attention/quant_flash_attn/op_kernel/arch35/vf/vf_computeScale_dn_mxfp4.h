@@ -22,11 +22,10 @@
 namespace Mxfp4Api {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 #define VMULSCVT false
 #define DROPOUT false
-
 
 // T: half
 template <bool clear_gmax, typename T, uint16_t m = 128>

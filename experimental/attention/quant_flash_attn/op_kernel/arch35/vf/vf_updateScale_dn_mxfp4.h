@@ -22,7 +22,7 @@
 namespace Mxfp4Api {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 #define VMULSCVT false
 #define DROPOUT false

@@ -22,7 +22,7 @@
 namespace Mxfp4Api {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 template <typename T>
 __simd_vf__ void inline vf_init_indexs_and_duplicate(__ubuf__ uint8_t *index_nd2xz, __ubuf__ T *dupDest)
@@ -46,7 +46,7 @@ __simd_vf__ void inline vf_init_indexs_and_duplicate(__ubuf__ uint8_t *index_nd2
     MaskReg preg_all_16bit = CreateMask<uint16_t, MaskPattern::ALL>();
     Duplicate(src, MIN_VALUE);
     for (uint16_t i = 0; i < 4; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(dupDest + i * 128, src, preg_all_16bit);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(dupDest + i * 128, src, preg_all_16bit);
     }
 }
 

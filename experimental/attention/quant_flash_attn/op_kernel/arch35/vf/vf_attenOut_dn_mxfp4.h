@@ -22,7 +22,7 @@
 namespace Mxfp4Api {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 #define VMULSCVT false
 #define DROPOUT false
@@ -131,30 +131,30 @@ __simd_vf__ void processOutVF(__ubuf__ float *attenOutMD, __ubuf__ float *attenO
         Interleave(vreg_src5, vreg_src6, vreg_src5, vreg_src6);
         Interleave(vreg_src7, vreg_src8, vreg_src7, vreg_src8);
 
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 0,
-                                                                   (RegTensor<float> &)vreg_src1, 8 + 1, preg_all32);
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 1,
-                                                                   (RegTensor<float> &)vreg_src2, 8 + 1, preg_all32);
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 2,
-                                                                   (RegTensor<float> &)vreg_src3, 8 + 1, preg_all32);
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 3,
-                                                                   (RegTensor<float> &)vreg_src4, 8 + 1, preg_all32);
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 4,
-                                                                   (RegTensor<float> &)vreg_src5, 8 + 1, preg_all32);
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 5,
-                                                                   (RegTensor<float> &)vreg_src6, 8 + 1, preg_all32);
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 6,
-                                                                   (RegTensor<float> &)vreg_src7, 8 + 1, preg_all32);
-        StoreAlign<float, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>((__ubuf__ float *)attenOutMD + 8 * i +
-                                                                       (8 + 1) * 8 * 8 * 7,
-                                                                   (RegTensor<float> &)vreg_src8, 8 + 1, preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 0, (RegTensor<float> &)vreg_src1, 8 + 1,
+            preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 1, (RegTensor<float> &)vreg_src2, 8 + 1,
+            preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 2, (RegTensor<float> &)vreg_src3, 8 + 1,
+            preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 3, (RegTensor<float> &)vreg_src4, 8 + 1,
+            preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 4, (RegTensor<float> &)vreg_src5, 8 + 1,
+            preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 5, (RegTensor<float> &)vreg_src6, 8 + 1,
+            preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 6, (RegTensor<float> &)vreg_src7, 8 + 1,
+            preg_all32);
+        StoreAlign<float, Reg::DataCopyMode::DATA_BLOCK_COPY>(
+            (__ubuf__ float *)attenOutMD + 8 * i + (8 + 1) * 8 * 8 * 7, (RegTensor<float> &)vreg_src8, 8 + 1,
+            preg_all32);
     }
 }
 
