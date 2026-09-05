@@ -129,7 +129,7 @@
       <tr>
         <td>expertCapacity</td>
         <td>属性</td>
-        <td>表示每个专家能够处理的tokens数，取值范围大于等于0。</td>
+        <td>表示每个专家能够处理的tokens数。在Dropless场景下不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。</td>
         <td>INT</td>
         <td>-</td>
       </tr>
@@ -143,7 +143,7 @@
       <tr>
         <td>dropPadMode</td>
         <td>属性</td>
-        <td>表示是否为DropPad场景，取值为0 和1。<br>• 0：表示Dropless场景，该场景下不校验expertCapacity。<br>• 1：表示DropPad场景。</td>
+        <td>表示是否为DropPad场景，取值为0 和1。<br>• 0：表示Dropless场景。<br>• 1：表示DropPad场景。</td>
         <td>INT</td>
         <td>-</td>
       </tr>
@@ -218,7 +218,7 @@
 
 - 输入值域限制：
   - activeNum当前未使用，校验需等于NUM_ROWS*K。
-  - expertCapacity在Dropless场景下仅校验其值，不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。
+  - expertCapacity在Dropless场景下不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。
   - dropPadMode支持取值为0和1，分别代表Dropless场景和DropPad场景。
   - expertTokensNumType当前只支持0、1 和2，分别代表cumsum模式、count模式和key\_value模式。
   - expertTokensNumFlag只支持true，代表输出expertTokensCountOrCumsumOut。

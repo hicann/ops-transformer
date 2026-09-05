@@ -9,12 +9,16 @@
  */
 
 #include <iostream>
+#include <array>
+#include <cstddef>
 #include <fstream>
 #include <string.h>
 #include <stdint.h>
 #include <vector>
 #include <string>
 #include <map>
+#include <cstring>
+#include "acl/acl.h"
 #include "assert.h"
 #include "graph.h"
 #include "types.h"
@@ -25,7 +29,6 @@
 #include "array_ops.h"
 #include "ge_ir_build.h"
 
-#include "experiment_ops.h"
 #include "nn_other.h"
 #include "../op_graph/ffn_worker_batching_proto.h"
 
@@ -37,41 +40,11 @@ using std::map;
 using std::string;
 using std::vector;
 
-#define ADD_INPUT(intputIndex, intputName, intputDtype, inputShape)                          \
-    vector<int64_t> placeholder##intputIndex##_shape = inputShape;                           \
-    auto placeholder##intputIndex = op::Data("placeholder" + intputIndex).set_attr_index(0); \
-    TensorDesc placeholder##intputIndex##_desc =                                             \
-        TensorDesc(ge::Shape(placeholder##intputIndex##_shape), FORMAT_ND, intputDtype);     \
-    placeholder##intputIndex##_desc.SetPlacement(ge::kPlacementHost);                        \
-    placeholder##intputIndex##_desc.SetFormat(FORMAT_ND);                                    \
-    Tensor tensor_placeholder##intputIndex;                                                  \
-    ret = GenOnesData(placeholder##intputIndex##_shape,                                      \
-        tensor_placeholder##intputIndex,                                                     \
-        placeholder##intputIndex##_desc,                                                     \
-        intputDtype,                                                                         \
-        2);                                                                                  \
-    if (ret != SUCCESS) {                                                                    \
-        printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str());       \
-        return FAILED;                                                                       \
-    }                                                                                        \
-    placeholder##intputIndex.update_input_desc_x(placeholder##intputIndex##_desc);           \
-    input.push_back(tensor_placeholder##intputIndex);                                        \
-    graph.AddOp(placeholder##intputIndex);                                                   \
-    ffn_worker_batching_op.set_input_##intputName(placeholder##intputIndex);                       \
-    inputs.push_back(placeholder##intputIndex);
-
-#define ADD_OUTPUT(outputIndex, outputName, outputDtype, outputShape)                        \
-    TensorDesc outputName##outputIndex##_desc =                                              \
-        TensorDesc(ge::Shape(outputShape), FORMAT_ND, outputDtype);                          \
+#define ADD_OUTPUT(outputIndex, outputName, outputDtype, outputShape) \
+    TensorDesc outputName##outputIndex##_desc = TensorDesc(ge::Shape(outputShape), FORMAT_ND, outputDtype); \
     ffn_worker_batching_op.update_output_desc_##outputName(outputName##outputIndex##_desc);
 
-#define ADD_INPUT_ATTR(attrName, attrValue)                                                  \
-    attention_worker_combine_op.set_attr_##attrName(attrValue);
-
-#define LOG_PRINT(message, ...)     \
-  do {                              \
-    printf(message, ##__VA_ARGS__); \
-  } while (0)
+#define ADD_INPUT_ATTR(attrName, attrValue) ffn_worker_batching_op.set_attr_##attrName(attrValue);
 
 string GetTime()
 {
@@ -114,21 +87,90 @@ uint32_t GetDataTypeSize(DataType dt)
     return dilation;
 }
 
-int32_t GenOnesData(
-    vector<int64_t> shapes, Tensor &input_tensor, TensorDesc &input_tensor_desc, DataType data_type, int value)
+#pragma pack(push, 1)
+struct ScheduleContext {
+    struct CommonArea {
+        uint32_t session_num;
+        uint32_t micro_batch_num;
+        uint32_t micro_batch_size;
+        uint32_t selected_expert_num;
+        uint32_t expert_num;
+        uint32_t attn_to_ffn_token_size;
+        uint32_t ffn_to_attn_token_size;
+        int32_t schedule_mode;
+        int8_t reserve0[96];
+    };
+    struct ControlArea {
+        int32_t run_flag;
+        int8_t reserve2[124];
+    };
+    struct FfnArea {
+        uint64_t token_info_buf;
+        uint64_t token_info_buf_size;
+        uint64_t token_data_buf;
+        uint64_t token_data_buf_size;
+        uint64_t polling_index;
+        int8_t reserve3[88];
+        uint64_t layer_ids_buf;
+        uint64_t layer_ids_buf_size;
+        uint64_t session_ids_buf;
+        uint64_t session_ids_buf_size;
+        uint64_t micro_batch_ids_buf;
+        uint64_t micro_batch_ids_buf_size;
+        uint64_t expert_ids_buf;
+        uint64_t expert_ids_buf_size;
+        uint32_t out_num;
+        int8_t reserve4[60];
+    };
+    struct AttentionArea {
+        uint64_t token_info_buf;
+        uint64_t token_info_buf_size;
+        uint64_t token_data_buf;
+        uint64_t token_data_buf_size;
+        uint32_t micro_batch_id;
+        int8_t reserve5[92];
+    };
+    CommonArea common;
+    ControlArea control;
+    AttentionArea attention;
+    FfnArea ffn;
+    int8_t reserve6[384];
+};
+static_assert(sizeof(ScheduleContext) == 1024, "ScheduleContext must occupy 1024 bytes");
+static_assert(offsetof(ScheduleContext, ffn) == 384, "FfnArea must use the schedule-context offset");
+#pragma pack(pop)
+
+struct ExampleResources {
+    std::array<uint8_t, sizeof(ScheduleContext)> schedule_context{};
+    std::vector<void *> device_buffers;
+};
+
+int32_t CopyToDevice(const void *host_data, size_t data_size, void **device_data, ExampleResources &resources)
 {
-    input_tensor_desc.SetRealDimCnt(shapes.size());
-    size_t size = 1;
-    for (uint32_t i = 0; i < shapes.size(); i++) {
-        size *= shapes[i];
+    aclError acl_ret = aclrtMalloc(device_data, data_size, ACL_MEM_MALLOC_HUGE_FIRST);
+    if (acl_ret != ACL_SUCCESS) {
+        printf("aclrtMalloc failed. ERROR: %d\n", acl_ret);
+        return FAILED;
     }
-    uint32_t data_len = size * GetDataTypeSize(data_type);
-    int32_t *pData = new (std::nothrow) int32_t[data_len];
-    for (uint32_t i = 0; i < size; ++i) {
-        *(pData + i) = value;
+    acl_ret = aclrtMemcpy(*device_data, data_size, host_data, data_size, ACL_MEMCPY_HOST_TO_DEVICE);
+    if (acl_ret != ACL_SUCCESS) {
+        printf("aclrtMemcpy failed. ERROR: %d\n", acl_ret);
+        aclrtFree(*device_data);
+        *device_data = nullptr;
+        return FAILED;
     }
-    input_tensor = Tensor(input_tensor_desc, reinterpret_cast<uint8_t *>(pData), data_len);
+    resources.device_buffers.push_back(*device_data);
     return SUCCESS;
+}
+
+void ReleaseDeviceBuffers(ExampleResources &resources)
+{
+    for (void *device_buffer : resources.device_buffers) {
+        if (device_buffer != nullptr) {
+            aclrtFree(device_buffer);
+        }
+    }
+    resources.device_buffers.clear();
 }
 
 int32_t WriteDataToFile(string bin_file, uint64_t data_size, uint8_t *inputData)
@@ -140,54 +182,110 @@ int32_t WriteDataToFile(string bin_file, uint64_t data_size, uint8_t *inputData)
     return SUCCESS;
 }
 
-int CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor> &input, std::vector<Operator> &inputs,
-    std::vector<Operator> &outputs, Graph &graph)
+int CreateOppInGraph(std::vector<ge::Tensor> &input, std::vector<Operator> &inputs, std::vector<Operator> &outputs,
+                     Graph &graph, ExampleResources &resources)
 {
-    Status ret = SUCCESS;
-    // 自定义代码：添加单算子定义到图中
     auto ffn_worker_batching_op = op::FfnWorkerBatching("ffn_worker_batching");
 
-    // shape定义
+    constexpr int64_t session_num = 1;
+    constexpr int64_t micro_batch_num = 1;
+    constexpr int64_t micro_batch_size = 8;
+    constexpr int64_t selected_expert_num = 9;
+    constexpr int64_t expert_num = 8;
+    constexpr int64_t hidden_size = 4096;
+    constexpr int64_t token_num = session_num * micro_batch_size * selected_expert_num;
+
     std::vector<int64_t> schedule_context_shape = {1024};
-    
-    std::vector<int64_t> y_shape = {1152,4096};
-    std::vector<int64_t> group_list_shape = {8,2};
-    std::vector<int64_t> session_ids_shape = {1152};
-    std::vector<int64_t> micro_batch_ids_shape = {1152};
-    std::vector<int64_t> token_ids_shape = {1152};
-    std::vector<int64_t> expert_offsets_shape = {1152};
-    std::vector<int64_t> dynamic_scale_shape = {1152};
+    std::vector<int64_t> y_shape = {token_num, hidden_size};
+    std::vector<int64_t> group_list_shape = {expert_num, 2};
+    std::vector<int64_t> session_ids_shape = {token_num};
+    std::vector<int64_t> micro_batch_ids_shape = {token_num};
+    std::vector<int64_t> token_ids_shape = {token_num};
+    std::vector<int64_t> expert_offsets_shape = {token_num};
+    std::vector<int64_t> dynamic_scale_shape = {token_num};
     std::vector<int64_t> actual_token_num_shape = {1};
-    
-    // 添加输入（顺序严格匹配 proto.h）
-    ADD_INPUT(1, schedule_context, inDtype, schedule_context_shape);
-    
-    // 添加输出（顺序严格匹配 proto.h）
-    ADD_OUTPUT(1, y, DT_INT8, y_shape);
+
+    std::vector<uint16_t> token_data(token_num * hidden_size, 0x3c00);
+    std::vector<int32_t> expert_ids(token_num);
+    for (int64_t i = 0; i < token_num; ++i) {
+        expert_ids[i] = static_cast<int32_t>(i % expert_num);
+    }
+    std::vector<int32_t> session_ids(session_num, 0);
+    std::vector<int32_t> micro_batch_ids(session_num, 0);
+
+    void *token_data_device = nullptr;
+    void *expert_ids_device = nullptr;
+    void *session_ids_device = nullptr;
+    void *micro_batch_ids_device = nullptr;
+    if (CopyToDevice(token_data.data(), token_data.size() * sizeof(uint16_t), &token_data_device, resources) !=
+            SUCCESS ||
+        CopyToDevice(expert_ids.data(), expert_ids.size() * sizeof(int32_t), &expert_ids_device, resources) !=
+            SUCCESS ||
+        CopyToDevice(session_ids.data(), session_ids.size() * sizeof(int32_t), &session_ids_device, resources) !=
+            SUCCESS ||
+        CopyToDevice(micro_batch_ids.data(), micro_batch_ids.size() * sizeof(int32_t), &micro_batch_ids_device,
+                     resources) != SUCCESS) {
+        ReleaseDeviceBuffers(resources);
+        return FAILED;
+    }
+
+    ScheduleContext schedule_context = {};
+    schedule_context.common.session_num = session_num;
+    schedule_context.common.micro_batch_num = micro_batch_num;
+    schedule_context.common.micro_batch_size = micro_batch_size;
+    schedule_context.common.selected_expert_num = selected_expert_num;
+    schedule_context.common.expert_num = expert_num;
+    schedule_context.common.attn_to_ffn_token_size = hidden_size * sizeof(uint16_t);
+    schedule_context.common.ffn_to_attn_token_size = hidden_size * sizeof(uint16_t);
+    schedule_context.common.schedule_mode = 0;
+    schedule_context.control.run_flag = 1;
+    schedule_context.ffn.token_data_buf = reinterpret_cast<uint64_t>(token_data_device);
+    schedule_context.ffn.token_data_buf_size = token_data.size() * sizeof(uint16_t);
+    schedule_context.ffn.session_ids_buf = reinterpret_cast<uint64_t>(session_ids_device);
+    schedule_context.ffn.session_ids_buf_size = session_ids.size() * sizeof(int32_t);
+    schedule_context.ffn.micro_batch_ids_buf = reinterpret_cast<uint64_t>(micro_batch_ids_device);
+    schedule_context.ffn.micro_batch_ids_buf_size = micro_batch_ids.size() * sizeof(int32_t);
+    schedule_context.ffn.expert_ids_buf = reinterpret_cast<uint64_t>(expert_ids_device);
+    schedule_context.ffn.expert_ids_buf_size = expert_ids.size() * sizeof(int32_t);
+    schedule_context.ffn.out_num = session_num;
+    std::memcpy(resources.schedule_context.data(), &schedule_context, sizeof(schedule_context));
+
+    auto schedule_context_data = op::Data("schedule_context").set_attr_index(0);
+    TensorDesc schedule_context_desc(ge::Shape(schedule_context_shape), FORMAT_ND, DT_INT8);
+    schedule_context_desc.SetPlacement(ge::kPlacementHost);
+    schedule_context_desc.SetFormat(FORMAT_ND);
+    schedule_context_desc.SetRealDimCnt(schedule_context_shape.size());
+    schedule_context_data.update_input_desc_x(schedule_context_desc);
+    Tensor schedule_context_tensor(schedule_context_desc, resources.schedule_context.data(),
+                                   resources.schedule_context.size());
+    input.push_back(schedule_context_tensor);
+    graph.AddOp(schedule_context_data);
+    ffn_worker_batching_op.set_input_schedule_context(schedule_context_data);
+    inputs.push_back(schedule_context_data);
+
+    ADD_OUTPUT(1, y, DT_FLOAT16, y_shape);
     ADD_OUTPUT(2, group_list, DT_INT64, group_list_shape);
     ADD_OUTPUT(3, session_ids, DT_INT32, session_ids_shape);
     ADD_OUTPUT(4, micro_batch_ids, DT_INT32, micro_batch_ids_shape);
     ADD_OUTPUT(5, token_ids, DT_INT32, token_ids_shape);
     ADD_OUTPUT(6, expert_offsets, DT_INT32, expert_offsets_shape);
-    ADD_OUTPUT(7, dynamic_scale, DT_FLOAT32, dynamic_scale_shape);
+    ADD_OUTPUT(7, dynamic_scale, DT_FLOAT, dynamic_scale_shape);
     ADD_OUTPUT(8, actual_token_num, DT_INT64, actual_token_num_shape);
 
-    std::vector<int> max_out_shape_value = {16, 8, 9, 4096};
+    std::vector<int64_t> max_out_shape_value = {session_num, micro_batch_size, selected_expert_num, hidden_size};
 
-    //添加属性
-    ADD_INPUT_ATTR(expert_num, 8);
+    ADD_INPUT_ATTR(expert_num, expert_num);
     ADD_INPUT_ATTR(max_out_shape, max_out_shape_value);
-    ADD_INPUT_ATTR(token_dtype, 8);
-    ADD_INPUT_ATTR(need_schedule, 1);
+    ADD_INPUT_ATTR(token_dtype, 0);
+    ADD_INPUT_ATTR(need_schedule, 0);
     ADD_INPUT_ATTR(layer_num, 1);
-
 
     outputs.push_back(ffn_worker_batching_op);
     // 添加完毕
     return SUCCESS;
 }
 
-int main(int argc, char *argv[])
+int main()
 {
     const char *graph_name = "tc_ge_irrun_test";
     Graph graph(graph_name);
@@ -204,16 +302,13 @@ int main(int argc, char *argv[])
 
     std::vector<Operator> inputs{};
     std::vector<Operator> outputs{};
+    ExampleResources resources{};
 
-    std::cout << argv[1] << std::endl;
-    char *endptr;
-
-    DataType inDtype = DT_INT32;
-    std::cout << inDtype << std::endl;
-
-    ret = CreateOppInGraph(inDtype, input, inputs, outputs, graph);
+    ret = CreateOppInGraph(input, inputs, outputs, graph, resources);
     if (ret != SUCCESS) {
         printf("%s - ERROR - [XIR]: Create ir session using build options failed\n", GetTime().c_str());
+        ReleaseDeviceBuffers(resources);
+        GEFinalize();
         return FAILED;
     }
 
@@ -229,6 +324,8 @@ int main(int argc, char *argv[])
 
     if (session == nullptr) {
         printf("%s - ERROR - [XIR]: Create ir session using build options failed\n", GetTime().c_str());
+        ReleaseDeviceBuffers(resources);
+        GEFinalize();
         return FAILED;
     }
     printf("%s - INFO - [XIR]: Create ir session using build options success\n", GetTime().c_str());
@@ -239,6 +336,13 @@ int main(int argc, char *argv[])
     };
     uint32_t graph_id = 0;
     ret = session->AddGraph(graph_id, graph, graph_options);
+    if (ret != SUCCESS) {
+        printf("%s - ERROR - [XIR]: Add compute graph to ir session failed\n", GetTime().c_str());
+        delete session;
+        ReleaseDeviceBuffers(resources);
+        GEFinalize();
+        return FAILED;
+    }
 
     printf("%s - INFO - [XIR]: Session add ir compute graph to ir session success\n", GetTime().c_str());
     printf("%s - INFO - [XIR]: dump graph to txt\n", GetTime().c_str());
@@ -249,7 +353,10 @@ int main(int argc, char *argv[])
     ret = session->RunGraph(graph_id, input, output);
     if (ret != SUCCESS) {
         printf("%s - INFO - [XIR]: Run graph failed\n", GetTime().c_str());
+        ge::AscendString error_msg = ge::GEGetErrorMsgV2();
+        std::cout << "Error message: " << error_msg.GetString() << std::endl;
         delete session;
+        ReleaseDeviceBuffers(resources);
         GEFinalize();
         return FAILED;
     }
@@ -275,10 +382,6 @@ int main(int argc, char *argv[])
         std::cout << "this is " << i << "th output, output shape size =" << output_shape << std::endl;
         uint32_t data_size = output_shape * GetDataTypeSize(output[i].GetTensorDesc().GetDataType());
         WriteDataToFile((const char *)output_file.c_str(), data_size, output_data_i);
-        int32_t *result = (int32_t*)output_data_i;
-        for (int64_t j = 0; j < output_shape; j++) {
-            LOG_PRINT("result[%ld] is: %d\n", j, result[j]);
-        }
     }
 
     ge::AscendString error_msg = ge::GEGetErrorMsgV2();
@@ -288,6 +391,8 @@ int main(int argc, char *argv[])
     std::string warning_str(warning_msg.GetString());
     std::cout << "Warning message: " << warning_str << std::endl;
     printf("%s - INFO - [XIR]: Start to finalize ir graph session\n", GetTime().c_str());
+    delete session;
+    ReleaseDeviceBuffers(resources);
     ret = ge::GEFinalize();
     if (ret != SUCCESS) {
         printf("%s - INFO - [XIR]: Finalize ir graph session failed\n", GetTime().c_str());

@@ -220,7 +220,7 @@ int CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor> &input, std::vect
     return SUCCESS;
 }
 
-int main(int argc, char *argv[])
+int main()
 {
     const char *graph_name = "tc_geir_test_moe_re_routing_v2";
     Graph graph(graph_name);
@@ -238,7 +238,6 @@ int main(int argc, char *argv[])
     std::vector<Operator> inputs{};
     std::vector<Operator> outputs{};
 
-    std::cout << argv[1] << std::endl;
     char *endptr;
 
     DataType inDtype = DT_INT32;

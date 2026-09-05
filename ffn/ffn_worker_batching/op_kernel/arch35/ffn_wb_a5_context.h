@@ -54,6 +54,11 @@ constexpr int64_t ONE_REPEAT_SORT_NUM = 32;
 constexpr int64_t MRG_LIST_NUM = 4;
 
 // schedule_context 内存放的是设备地址(二级指针),真数据需二次解引用后使用。
+// 测试模式下(TEST_MAGIC),存放的是相对 schedule_context 起始的偏移量,
+// kernel 通过 scBase + offset 还原真实地址,与 A2 路径 ffn_wb_get_schedule_context.h 同源。
+constexpr int32_t TEST_MAGIC_OFFSET = 640;
+constexpr int32_t TEST_MAGIC = 0x54455354;
+
 struct BufferInfo {
     uint64_t tokenInfoBuf = 0;
     uint64_t tokenDataBuf = 0;
@@ -162,12 +167,18 @@ __aicore__ inline void ScheduleContextParse(GM_ADDR schedule_context, const Tili
     ctx.coreNum = tilingData->coreNum;
     ctx.ubSize = tilingData->ubSize;
 
+    // 测试模式判定:magic 字段 == TEST_MAGIC 时,各 buffer 字段存放的是相对偏移,
+    // 需加上 schedule_context 基址还原真实地址;否则为绝对设备地址(scBase=0)。
+    LocalTensor<uint32_t> magicField = val[TEST_MAGIC_OFFSET].template ReinterpretCast<uint32_t>();
+    uint32_t magicValue = magicField.GetValue(0);
+    uint64_t scBase = (magicValue == TEST_MAGIC) ? reinterpret_cast<uint64_t>(schedule_context) : 0;
+
     ctx.bufferPtr.tokenDataBuf =
-        val[FFN_WB_CTX_OFFSET(ffn.token_data_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
+        scBase + val[FFN_WB_CTX_OFFSET(ffn.token_data_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
 
     if constexpr (isRecv) {
         ctx.bufferPtr.tokenInfoBuf =
-            val[FFN_WB_CTX_OFFSET(ffn.token_info_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
+            scBase + val[FFN_WB_CTX_OFFSET(ffn.token_info_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
         ctx.curMicroBatchID =
             val[FFN_WB_CTX_OFFSET(ffn.polling_index)].template ReinterpretCast<uint64_t>().GetValue(0);
         ASSERT_MSG(ctx.curMicroBatchID < ctx.M, "curMicroBatchID:%lu should be less than micro_batch_num:%u",
@@ -176,11 +187,11 @@ __aicore__ inline void ScheduleContextParse(GM_ADDR schedule_context, const Tili
         ctx.BsKPaddingCount = Align(bsk, sizeof(int32_t)) - bsk;
     } else {
         ctx.bufferPtr.sessionIdsBuf =
-            val[FFN_WB_CTX_OFFSET(ffn.session_ids_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
+            scBase + val[FFN_WB_CTX_OFFSET(ffn.session_ids_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
         ctx.bufferPtr.microBatchIdsBuf =
-            val[FFN_WB_CTX_OFFSET(ffn.micro_batch_ids_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
+            scBase + val[FFN_WB_CTX_OFFSET(ffn.micro_batch_ids_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
         ctx.bufferPtr.expertIdsBuf =
-            val[FFN_WB_CTX_OFFSET(ffn.expert_ids_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
+            scBase + val[FFN_WB_CTX_OFFSET(ffn.expert_ids_buf)].template ReinterpretCast<uint64_t>().GetValue(0);
         ctx.outNum = val[FFN_WB_CTX_OFFSET(ffn.out_num)].template ReinterpretCast<uint32_t>().GetValue(0);
     }
 }

@@ -731,7 +731,7 @@ function build_example()
                 found_specific_example=true
             fi
             echo "Start compile and run example file: $file"
-            g++ ${verbose_option} ${file} -I ${GRAPH_INCLUDE_PATH} -I ${GE_INCLUDE_PATH} -I ${LINUX_INCLUDE_PATH} -I ${INC_INCLUDE_PATH} -L ${GRAPH_LIBRARY_STUB_PATH} -L ${GRAPH_LIBRARY_PATH} -lgraph -lge_runner -lgraph_base -lge_compiler -o test_geir_${EXAMPLE_NAME}
+            g++ ${verbose_option} ${file} -I ${GRAPH_INCLUDE_PATH} -I ${GE_INCLUDE_PATH} -I ${LINUX_INCLUDE_PATH} -I ${INC_INCLUDE_PATH} -L ${GRAPH_LIBRARY_STUB_PATH} -L ${GRAPH_LIBRARY_PATH} -lgraph -lge_runner -lgraph_base -lge_compiler -lacl_rt -o test_geir_${EXAMPLE_NAME}
             ./test_geir_${EXAMPLE_NAME}
             run_result=$?
             if [ $run_result -ne 0 ]; then
