@@ -23,10 +23,8 @@
 #include "gmmsq_weight_quant_cube_compute_tools.h"
 
 using AscendC::Dn2NzParams;
-using AscendC::GetBlockIdx;
 using AscendC::GlobalTensor;
 using AscendC::HardEvent;
-using AscendC::IsSameType;
 using AscendC::LocalTensor;
 using AscendC::SetFlag;
 using AscendC::TPosition;
@@ -45,7 +43,7 @@ GMMSQ_WQ_CUBE_COMPUTE_TEMPLATE_PARAM
 class GMMSQWeightQuantCubeCompute {
 public:
     __aicore__ inline GMMSQWeightQuantCubeCompute(){};
-    __aicore__ inline void UpdateGlobalAddr(__gm__ xType *x, __gm__ yType *y, __gm__ weightScaleType *weightScale,
+    __aicore__ inline void UpdateGlobalAddr(__gm__ xType *x, __gm__ weightScaleType *weightScale,
                                             __gm__ xScaleType *xScale);
     __aicore__ inline void MxA8W4Init(uint64_t l1RemainSize, uint64_t l1StartSize);
     __aicore__ inline void LaunchMatmul(const LocalTensor<xType> &weightL1, int64_t kbOffset, uint64_t kbL1RealSize,
@@ -54,7 +52,6 @@ public:
                                           uint64_t kbL1RealSize = 0);
     __aicore__ inline void SetMTE1ToMTE2(uint64_t kaGmOffset, const BasicBlockOffsetParam &offsetParam,
                                          uint64_t kbL1RealSize = 0);
-    __aicore__ inline void SetMTE1ToMTE2(const BasicBlockOffsetParam &offsetParam);
     __aicore__ inline void SetWeightMTE1ToMTE2(const BasicBlockOffsetParam &offsetParam);
     __aicore__ inline void WaitScaleMTE1ToMTE2(uint64_t kbGmOffset);
     __aicore__ inline void SetScaleMTE1ToMTE2(uint64_t kbGmOffset, const BasicBlockOffsetParam &offsetParam);
@@ -86,17 +83,12 @@ private:
     static constexpr uint32_t EVENT_ID_M_TO_MTE1 = 3;
     static constexpr uint32_t EVENT_ID_MTE1_TO_M = 3;
     static constexpr uint32_t EVENT_ID_MTE2_TO_MTE1 = 3;
-    uint64_t aL1Count_ = 0;
-    uint64_t aL1MaxHalfCount_ = 0;
     uint64_t scaleBufIdx_ = 0;
     uint64_t aL1BufIdx_ = 0;
 
-    AscendC::TEventID cubeEventIdsMxScaleMte1ToMte2_[DOUBLE_BUFFER_NUM];
-    AscendC::TEventID cubeEventIdsMte1ToMte2_[DOUBLE_BUFFER_NUM];
     GlobalTensor<xType> xGlobal_;
     GlobalTensor<fp8_e8m0_t> xScaleGlobal_;
     GlobalTensor<fp8_e8m0_t> weightScaleGlobal_;
-    GlobalTensor<yType> yGlobal_;
 
     uint64_t l0LoopIdx_ = 0;
 
@@ -119,8 +111,6 @@ private:
 GMMSQ_WQ_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void GMMSQ_WQ_CUBE_COMPUTE_CLASS::MxA8W4Init(uint64_t l1RemainSize, uint64_t l1StartSize)
 {
-    aL1Count_ = 0;
-    aL1MaxHalfCount_ = 0;
     aL1DbNum_ = DOUBLE_BUFFER_NUM;
 
     xScaleAL1_ = LocalTensor<fp8_e8m0_t>(TPosition::TSCM, l1StartSize, l1RemainSize / sizeof(fp8_e8m0_t));
@@ -144,12 +134,11 @@ __aicore__ inline void GMMSQ_WQ_CUBE_COMPUTE_CLASS::MxA8W4Init(uint64_t l1Remain
 }
 
 GMMSQ_WQ_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void GMMSQ_WQ_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(__gm__ xType *x, __gm__ yType *y,
+__aicore__ inline void GMMSQ_WQ_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(__gm__ xType *x,
                                                                      __gm__ weightScaleType *weightScale,
                                                                      __gm__ xScaleType *xScale)
 {
     xGlobal_.SetGlobalBuffer(x);
-    yGlobal_.SetGlobalBuffer(y);
     xScaleGlobal_.SetGlobalBuffer(xScale);
     weightScaleGlobal_.SetGlobalBuffer(weightScale);
 }

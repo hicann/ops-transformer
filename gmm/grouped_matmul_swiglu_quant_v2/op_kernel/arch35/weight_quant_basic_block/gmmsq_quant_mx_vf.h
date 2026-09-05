@@ -28,7 +28,6 @@
 namespace GMMSQWeightQuant {
 
 namespace Reg = AscendC::Reg;
-using AscendC::BLOCK_CUBE;
 using AscendC::VECTOR_REG_WIDTH;
 using AscendC::Reg::AddrReg;
 using AscendC::Reg::MaskReg;

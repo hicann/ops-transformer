@@ -26,8 +26,6 @@
 
 using AscendC::GetSubBlockIdx;
 using AscendC::LocalTensor;
-using AscendC::TBuf;
-using AscendC::TPipe;
 using AscendC::TPosition;
 using namespace WeightQuantBatchMatmulV2::Arch35;
 
@@ -44,10 +42,9 @@ GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
 class GMMSQWeightQuantVcvBasicBlock {
 public:
     __aicore__ inline GMMSQWeightQuantVcvBasicBlock() = default;
-    __aicore__ inline void Init(uint64_t antiQuantGroupSize, __gm__ yType *y, __gm__ yScaleType *yScale);
+    __aicore__ inline void Init();
     __aicore__ inline void UpdateGlobalAddr(__gm__ xType *x, __gm__ wType *weight, __gm__ weightScaleType *weightScale,
-                                            __gm__ xScaleType *xScale, __gm__ yType *y, __gm__ yScaleType *yScale,
-                                            const bool weightL2Cacheable);
+                                            __gm__ xScaleType *xScale, const bool weightL2Cacheable);
     __aicore__ inline void ComputeBasicBlock(const BasicBlockOffsetParam &curOffsetParam,
                                              const BasicBlockOffsetParam &previousOffsetParam);
     __aicore__ inline void End(const BasicBlockOffsetParam &curOffsetParam);
@@ -105,8 +102,7 @@ protected:
 };
 
 GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::Init(uint64_t antiQuantGroupSize, __gm__ yType *y,
-                                                            __gm__ yScaleType *yScale)
+__aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::Init()
 {
     weightL1_ = LocalTensor<xType>(TPosition::TSCM, 0, L1_SIZE_BYTE / sizeof(xType));
 
@@ -125,7 +121,7 @@ __aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::Init(uint64_t antiQuantGr
         SetAicToAiv<PIPE_MTE1>(SYNC_AIC_AIV_FLAG);
         SetAicToAiv<PIPE_MTE1>(SYNC_AIC_AIV_FLAG);
     } else {
-        vecCompute_.Init(y, yScale);
+        vecCompute_.Init();
     }
     cvLoopIdx_ = 0;
 }
@@ -133,12 +129,11 @@ __aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::Init(uint64_t antiQuantGr
 GMMSQ_WQ_VCV_BASIC_BLOCK_TEMPLATE_PARAM
 __aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::UpdateGlobalAddr(__gm__ xType *x, __gm__ wType *weight,
                                                                         __gm__ weightScaleType *weightScale,
-                                                                        __gm__ xScaleType *xScale, __gm__ yType *y,
-                                                                        __gm__ yScaleType *yScale,
+                                                                        __gm__ xScaleType *xScale,
                                                                         const bool weightL2Cacheable)
 {
     if ASCEND_IS_AIC {
-        cubeCompute_.UpdateGlobalAddr(x, reinterpret_cast<__gm__ float *>(y), weightScale, xScale);
+        cubeCompute_.UpdateGlobalAddr(x, weightScale, xScale);
     } else {
         vecCompute_.UpdateGlobalAddr(weight, weightL2Cacheable);
     }
@@ -203,8 +198,7 @@ __aicore__ inline void GMMSQ_WQ_VCV_BASIC_BLOCK_CLASS::VecComputeNzNkWithStartLi
         WaitAicToAiv<PIPE_MTE3>(SYNC_AIC_AIV_FLAG);
 
         vecCompute_.WeightAntiQuantComputeNzNk(
-            mte2RealK, kMte2Offset, weightL1_[(cvLoopIdx_ & 1) * weightL1DbOffset_ + nL1AlignSize * kL1Offset],
-            curOffsetParam);
+            mte2RealK, weightL1_[(cvLoopIdx_ & 1) * weightL1DbOffset_ + nL1AlignSize * kL1Offset], curOffsetParam);
         SetAivToAic<PIPE_MTE3>(SYNC_AIV_AIC_FLAG);
         vecCompute_.SetVToMTE2();
     }

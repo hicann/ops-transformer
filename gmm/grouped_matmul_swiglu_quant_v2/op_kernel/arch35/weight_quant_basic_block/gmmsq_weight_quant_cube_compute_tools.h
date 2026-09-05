@@ -20,7 +20,6 @@
 #include "op_kernel/math_util.h"
 
 using AscendC::BLOCK_CUBE;
-using AscendC::GlobalTensor;
 using AscendC::int4b_t;
 using AscendC::IsSameType;
 using AscendC::LocalTensor;
@@ -31,7 +30,6 @@ namespace GMMSQWeightQuant {
 static constexpr uint64_t L0AB_OPERATE_UNIT = 512L; // L0上搬运单位512Byte
 static constexpr int32_t UNIT_FLAG_UPDATE = 3;      // 检查并更新标记位
 static constexpr int32_t UNIT_FLAG_CHECK_ONLY = 2;  // 只检查标记位
-static constexpr uint64_t FIXP_DST_STRIDE = 256L;   // fixp搬出N方向stride固定256元素
 static constexpr AscendC::FixpipeConfig CFG_ROW_MAJOR_UB = {AscendC::CO2Layout::ROW_MAJOR, true};
 
 static constexpr uint64_t K_ALIGNMENT64 = 64UL; // 处理K轴非64对齐的场景
@@ -55,12 +53,6 @@ struct FixL0CToDstParams {
     uint64_t outNSize;        // 输出N方向的总大小，用于dstStride
     uint64_t splitNSize = 0;  // fixp输出多个矩阵时，N方向切分的大小
     uint64_t dstNdStride = 0; // fixp输出多个矩阵时，目的相邻DN矩阵起始地址间的偏移
-};
-
-enum QuantPreMode {
-    NO_QUANT = 0,
-    VEC_QUANT = 1,
-    SCALAR_QUANT = 2
 };
 
 template <typename T>
@@ -184,10 +176,9 @@ __aicore__ inline void MmadCompute(const LocalTensor<DstType> &cL0Tensor, const 
  * @param fixL0CToDstParams 搬运参数
  * @tparam DstType UB数据类型
  * @tparam SrcType L0C数据类型
- * @tparam outSplitN 是否要在N方向切分，搬运成多个ND矩阵
  */
 
-template <typename DstType, typename SrcType, bool outSplitN = false>
+template <typename DstType, typename SrcType>
 __aicore__ inline void FixL0CToDst(const LocalTensor<DstType> &outTensor, const LocalTensor<SrcType> &cL0Tensor,
                                    const FixL0CToDstParams &fixL0CToDstParams)
 {

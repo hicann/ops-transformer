@@ -57,7 +57,7 @@ constexpr T GetOrDefault(const T *ptr, T defaultValue)
     return ptr == nullptr ? defaultValue : *ptr;
 }
 
-bool CheckCoreNum(gert::TilingContext *context, uint32_t aicNum, uint32_t aivNum)
+bool CheckCoreNum(uint32_t aicNum, uint32_t aivNum)
 {
     if (unlikely(aicNum <= 0)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "aicNum", std::to_string(aicNum),
@@ -193,7 +193,7 @@ bool CheckTilingDataCapacity(gert::TilingContext &context, uint64_t tilingDataSi
                 return false);
     OP_CHECK_IF(rawTiling->GetCapacity() < tilingDataSize,
                 OP_LOGE(OP_NAME, "context tiling data capacity %zu < actual tiling data size %zu.",
-                        rawTiling->GetCapacity(), tilingDataSize),
+                        static_cast<size_t>(rawTiling->GetCapacity()), static_cast<size_t>(tilingDataSize)),
                 return false);
     return true;
 }
@@ -305,7 +305,7 @@ bool CheckAttrs([[maybe_unused]] const gert::TilingContext &context, const GMMSQ
     return true;
 }
 
-bool CheckDtypes(const gert::TilingContext &context, const GMMSQWeightQuantInputParams &params)
+bool CheckDtypes(const gert::TilingContext &context)
 {
     const auto *xDesc = context.GetInputDesc(X_INDEX);
     const auto *wDesc = context.GetDynamicInputDesc(WEIGHT_INDEX, 0);
@@ -384,9 +384,9 @@ bool GetInputs(GMMSQWeightQuantInputParams &params, const gert::TilingContext &c
     }
     uint64_t expectedWeightDim = params.isSingleMultiSingle ? DIM_NUM_WEIGHT_ND - 1 : DIM_NUM_WEIGHT_ND;
     if (unlikely(wShapeLen != expectedWeightDim)) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(OP_NAME, "weight", std::to_string(wShapeLen),
-                                                 "The shape dim of weight must be " +
-                                                     std::to_string(expectedWeightDim));
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            OP_NAME, "weight", std::to_string(wShapeLen),
+            "The shape dim of weight must be " + std::to_string(expectedWeightDim));
         return false;
     }
 
@@ -448,22 +448,21 @@ std::string ToShapeString(const std::vector<int64_t> &shape)
     return shapeStr;
 }
 
-bool CheckInputShape(gert::TilingContext *context, const char *variableName, const gert::Shape &shape,
-                     const std::vector<int64_t> &expectedShape)
+bool CheckInputShape(const char *variableName, const gert::Shape &shape, const std::vector<int64_t> &expectedShape)
 {
     auto shapeLen = shape.GetDimNum();
     if (unlikely(shapeLen != expectedShape.size())) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(OP_NAME, variableName, std::to_string(shapeLen),
-                                                 "The shape dim of " + std::string(variableName) + " must be " +
-                                                     std::to_string(expectedShape.size()));
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            OP_NAME, variableName, std::to_string(shapeLen),
+            "The shape dim of " + std::string(variableName) + " must be " + std::to_string(expectedShape.size()));
         return false;
     }
     size_t i = 0;
     for (auto dim : expectedShape) {
         if (unlikely(dim != shape.GetDim(i++))) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(OP_NAME, variableName, Ops::Base::ToString(shape),
-                                                  "Shape does not match the expected value " +
-                                                      ToShapeString(expectedShape));
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                OP_NAME, variableName, Ops::Base::ToString(shape),
+                "Shape does not match the expected value " + ToShapeString(expectedShape));
             return false;
         }
     }
@@ -498,9 +497,9 @@ bool IsInputShapeValid([[maybe_unused]] gert::TilingContext &context, const GMMS
         return false;
     }
     if (unlikely(params.groupNum < 1 || params.groupNum > MAX_GROUP_NUM)) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(OP_NAME, "weight", "groupNum=" + std::to_string(params.groupNum),
-                                              "groupNum of weight must be in range [1, " +
-                                                  std::to_string(MAX_GROUP_NUM) + "]");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            OP_NAME, "weight", "groupNum=" + std::to_string(params.groupNum),
+            "groupNum of weight must be in range [1, " + std::to_string(MAX_GROUP_NUM) + "]");
         return false;
     }
     return true;
@@ -531,11 +530,10 @@ bool CheckSingleMultiSingleInputs(gert::TilingContext &context, const GMMSQWeigh
                     OP_LOGE(params.opName, "Check weight[%ld] format failed.", i), return false);
         OP_CHECK_IF(!CheckWeightScaleFormat(context, tensorIndex, params.opName.c_str()),
                     OP_LOGE(params.opName, "Check weightScale[%ld] format failed.", i), return false);
-        if (!CheckInputShape(&context, "weight", curWeightShapePtr->GetStorageShape(), expectedWeightShape)) {
+        if (!CheckInputShape("weight", curWeightShapePtr->GetStorageShape(), expectedWeightShape)) {
             return false;
         }
-        if (!CheckInputShape(&context, "weightScale", curWeightScaleShapePtr->GetOriginShape(),
-                             expectedWeightScaleShape)) {
+        if (!CheckInputShape("weightScale", curWeightScaleShapePtr->GetOriginShape(), expectedWeightScaleShape)) {
             return false;
         }
     }
@@ -549,14 +547,14 @@ static bool CheckScaleAndGroupListShapes(gert::TilingContext &context, const GMM
 {
     int64_t scaleKSize = GroupedMatmul::CeilDiv<int64_t>(params.kSize, MX_SCALE_BLOCK_SIZE);
     const std::vector<int64_t> expectedXScaleShape = {static_cast<int64_t>(params.mSize), scaleKSize, MX_INNER_DIM};
-    if (!CheckInputShape(&context, "xScale", xScaleShape, expectedXScaleShape)) {
+    if (!CheckInputShape("xScale", xScaleShape, expectedXScaleShape)) {
         return false;
     }
-    if (!CheckInputShape(&context, "groupList", groupListShape, {params.groupNum})) {
+    if (!CheckInputShape("groupList", groupListShape, {params.groupNum})) {
         return false;
     }
     const std::vector<int64_t> expectedWeightScaleShape = {params.groupNum, params.nSize, scaleKSize, MX_INNER_DIM};
-    if (!CheckInputShape(&context, "weightScale", weightScaleShape, expectedWeightScaleShape)) {
+    if (!CheckInputShape("weightScale", weightScaleShape, expectedWeightScaleShape)) {
         return false;
     }
     return true;
@@ -591,10 +589,10 @@ bool CheckInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams
 
     int64_t scaleKSize = GroupedMatmul::CeilDiv<int64_t>(params.kSize, MX_SCALE_BLOCK_SIZE);
     const std::vector<int64_t> expectedXScaleShape = {static_cast<int64_t>(params.mSize), scaleKSize, MX_INNER_DIM};
-    if (!CheckInputShape(&context, "xScale", xScaleShape, expectedXScaleShape)) {
+    if (!CheckInputShape("xScale", xScaleShape, expectedXScaleShape)) {
         return false;
     }
-    if (!CheckInputShape(&context, "groupList", groupListShape, {params.groupNum})) {
+    if (!CheckInputShape("groupList", groupListShape, {params.groupNum})) {
         return false;
     }
 
@@ -607,7 +605,7 @@ bool CheckInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams
         const std::vector<int64_t> expectedWeightShape = {
             static_cast<int64_t>(params.groupNum), GroupedMatmul::CeilDiv<int64_t>(params.kSize, C0_SIZE),
             GroupedMatmul::CeilDiv<int64_t>(params.nSize, CUBE_BLOCK), CUBE_BLOCK, C0_SIZE};
-        if (!CheckInputShape(&context, "weight", wStorageShape, expectedWeightShape)) {
+        if (!CheckInputShape("weight", wStorageShape, expectedWeightShape)) {
             return false;
         }
     }
@@ -619,10 +617,11 @@ bool CheckInputs(gert::TilingContext &context, const GMMSQWeightQuantInputParams
 void PrintInputParams(gert::TilingContext &context, const GMMSQWeightQuantInputParams &params)
 {
     OP_LOGD(context.GetNodeName(),
-            "Input params: mSize=%ld, kSize=%ld, nSize=%ld, groupNum=%ld, "
-            "wTrans=%s, groupListType=%ld",
-            params.mSize, params.kSize, params.nSize, params.groupNum, params.wTrans ? "true" : "false",
-            params.groupListType);
+            "Input params: mSize=%lld, kSize=%lld, nSize=%lld, groupNum=%lld, "
+            "wTrans=%s, groupListType=%lld",
+            static_cast<long long>(params.mSize), static_cast<long long>(params.kSize),
+            static_cast<long long>(params.nSize), static_cast<long long>(params.groupNum),
+            params.wTrans ? "true" : "false", static_cast<long long>(params.groupListType));
 }
 
 bool GroupedMatmulSwigluQuantV2WeightQuantTiling::IsCapable()
@@ -635,11 +634,11 @@ ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::GetPlatformInfo()
     const auto *compileInfoPtr = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(OP_NAME, "CompileInfo is null"), return ge::GRAPH_FAILED);
     compileInfoPtr_ = compileInfoPtr;
-    OP_LOGI(context_, "Compile info: aicNum(%u) aivNum(%lu) ubSize(%lu) baseM(%lu) baseN(%lu) supportL12BtBf16(%lu).",
+    OP_LOGI(context_, "Compile info: aicNum(%u) aivNum(%u) ubSize(%llu) baseM(%u) baseN(%u) supportL12BtBf16(%s).",
             compileInfoPtr_->aicNum_, compileInfoPtr_->aivNum_, compileInfoPtr_->ubSize_, compileInfoPtr_->baseM_,
-            compileInfoPtr_->baseN_, compileInfoPtr_->supportL12BtBf16);
+            compileInfoPtr_->baseN_, compileInfoPtr_->supportL12BtBf16 ? "true" : "false");
 
-    if (!CheckCoreNum(context_, compileInfoPtr_->aicNum_, compileInfoPtr_->aivNum_)) {
+    if (!CheckCoreNum(compileInfoPtr_->aicNum_, compileInfoPtr_->aivNum_)) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -659,7 +658,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::GetShapeAttrsInfo()
     if (!CheckAttrs(*context_, inputParams_)) {
         return ge::GRAPH_FAILED;
     }
-    if (!CheckDtypes(*context_, inputParams_)) {
+    if (!CheckDtypes(*context_)) {
         return ge::GRAPH_FAILED;
     }
     if (!GetInputs(inputParams_, *context_)) {
@@ -685,9 +684,10 @@ ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::DoOpTiling()
     tilingData_.nSize = inputParams_.nSize;
 
     OP_LOGD(context_->GetNodeName(),
-            "Tiling data set: coreNum=%u, groupNum=%ld, "
-            "kSize=%ld, nSize=%ld, groupListType=%u.",
-            tilingData_.coreNum, tilingData_.groupNum, tilingData_.kSize, tilingData_.nSize, tilingData_.groupListType);
+            "Tiling data set: coreNum=%u, groupNum=%u, "
+            "kSize=%llu, nSize=%llu, groupListType=%u.",
+            tilingData_.coreNum, tilingData_.groupNum, static_cast<unsigned long long>(tilingData_.kSize),
+            static_cast<unsigned long long>(tilingData_.nSize), static_cast<uint32_t>(tilingData_.groupListType));
 
     return ge::GRAPH_SUCCESS;
 }
@@ -699,7 +699,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::DoLibApiTiling()
 
 uint64_t GroupedMatmulSwigluQuantV2WeightQuantTiling::GetTilingKey() const
 {
-    return GET_TPL_TILING_KEY(static_cast<int64_t>(inputParams_.wTrans), 0L,
+    return GET_TPL_TILING_KEY(static_cast<uint64_t>(inputParams_.wTrans), 0UL,
                               static_cast<uint64_t>(inputParams_.isSingleMultiSingle));
 }
 
@@ -722,7 +722,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2WeightQuantTiling::PostTiling()
     errno_t ret = memcpy_s(rawTiling->GetData(), rawTiling->GetCapacity(), static_cast<void *>(&tilingData_),
                            sizeof(tilingData_));
     if (ret != EOK) {
-        OP_LOGE(OP_NAME, "memcpy_s failed, ret = %d", ret);
+        OP_LOGE(OP_NAME, "memcpy_s failed, ret = %d", static_cast<int>(ret));
         return ge::GRAPH_FAILED;
     }
     context_->GetRawTilingData()->SetDataSize(sizeof(tilingData_));

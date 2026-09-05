@@ -28,7 +28,6 @@ using AscendC::BLOCK_CUBE;
 using AscendC::GlobalTensor;
 using AscendC::IsSameType;
 using AscendC::ListTensorDesc;
-using AscendC::SyncAll;
 using GMMSQArch35Tiling::GMMSQWeightQuantTilingData;
 using namespace WeightQuantBatchMatmulV2::Arch35;
 
@@ -109,13 +108,13 @@ __aicore__ inline void GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::Init(GM_ADDR x, GM_ADD
     yGm_ = reinterpret_cast<__gm__ yType *>(y);
     yScaleGm_ = reinterpret_cast<__gm__ yScaleType *>(yScale);
     groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(groupList));
-    basicBlock_.Init(tiling_->groupSize, yGm_, yScaleGm_);
+    basicBlock_.Init();
 }
 
 GMMSQ_WQ_RESPLIT_CONTROLLER_TEMPLATE_PARAM
 __aicore__ inline void GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::Process()
 {
-    uint32_t cubeBlockIdx = GetBlockIdx();
+    uint32_t cubeBlockIdx = AscendC::GetBlockIdx();
     if ASCEND_IS_AIV {
         cubeBlockIdx = cubeBlockIdx >> 1;
     }
@@ -138,7 +137,7 @@ __aicore__ inline void GMMSQ_WQ_RESPLIT_CONTROLLER_CLASS::Process()
         if (ctrlParam.mSize > 0 && offsetParam[ctrlParam.processId].nSize > 0) {
             uint64_t mBlkNum = CeilDivide(ctrlParam.mSize, M_L1);
             ctrlParam.mL1Size = CeilDivide(ctrlParam.mSize, mBlkNum);
-            basicBlock_.UpdateGlobalAddr(xGm_, weightGm_, weightScaleGm_, xScaleGm_, yGm_, yScaleGm_,
+            basicBlock_.UpdateGlobalAddr(xGm_, weightGm_, weightScaleGm_, xScaleGm_,
                                          ctrlParam.mL1Size < ctrlParam.mSize || isCacheLineUnaligned);
             ctrlParam.curBasicBlockId =
                 cubeBlockIdx >= startBasicBlockId ? cubeBlockIdx : cubeBlockIdx + tiling_->coreNum;
