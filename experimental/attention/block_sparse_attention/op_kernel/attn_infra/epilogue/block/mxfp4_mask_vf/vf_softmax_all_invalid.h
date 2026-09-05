@@ -15,7 +15,7 @@
 namespace NpuArch::Epilogue::Block::Mxfp4VF {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 // 通用 chunk 全0 模板：pDest 清 0 + local_group_max 填 MIN_VALUE + global_max 置极负
 template <typename T, bool HAS_HIGH_OFF = true, uint16_t GROUPS = 4, uint16_t CHUNKS = 2, uint16_t LGM_GROUPS = 0,
@@ -62,7 +62,7 @@ __simd_vf__ inline void softmax_all_invalid_chunk_vf(__ubuf__ uint8_t *p_dest, _
     constexpr uint16_t lgmGroups = (LGM_GROUPS == 0) ? CHUNKS * GROUPS : LGM_GROUPS;
     constexpr uint16_t lgmBase = CHUNK_START * GROUPS * LGM_GROUP;
     for (uint16_t i = lgmBase; i < lgmBase + lgmGroups * LGM_GROUP; i += 128) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max + i, min_reg, preg_all_16);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max + i, min_reg, preg_all_16);
     }
     // 注意: 这里**不写** global_max —— 见本函数上方注释
 }
@@ -81,7 +81,7 @@ __simd_vf__ inline void init_global_max_vf(__ubuf__ T *global_max)
     MaskReg preg_all_16 = CreateMask<uint16_t, MaskPattern::ALL>();
     RegTensor<T> neg_reg;
     Duplicate(neg_reg, static_cast<T>(MIN_VALUE));
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(global_max, neg_reg, preg_all_16);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(global_max, neg_reg, preg_all_16);
 }
 
 template <typename T>

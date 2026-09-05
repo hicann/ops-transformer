@@ -19,7 +19,7 @@
 namespace FaVectorApi {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 #define VMULSCVT false
 #define DROPOUT false
@@ -30,14 +30,14 @@ constexpr float VF_QBSA_EMPTY_LSE_VALUE = -3.4028234663852886e38F;
 // Layout selectors for unpacking the four FP8 lanes produced by a B32 -> B8
 // cast.  The unpacked values are accumulated into the softmax denominator so
 // C2's numerator and denominator use exactly the same quantized P.
-constexpr static AscendC::MicroAPI::CastTrait QBSA_CAST_B8_TO_B32_ZERO = {RegLayout::ZERO, SatMode::UNKNOWN,
-                                                                          MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-constexpr static AscendC::MicroAPI::CastTrait QBSA_CAST_B8_TO_B32_ONE = {RegLayout::ONE, SatMode::UNKNOWN,
-                                                                         MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-constexpr static AscendC::MicroAPI::CastTrait QBSA_CAST_B8_TO_B32_TWO = {RegLayout::TWO, SatMode::UNKNOWN,
-                                                                         MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-constexpr static AscendC::MicroAPI::CastTrait QBSA_CAST_B8_TO_B32_THREE = {RegLayout::THREE, SatMode::UNKNOWN,
-                                                                           MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+constexpr static AscendC::Reg::CastTrait QBSA_CAST_B8_TO_B32_ZERO = {RegLayout::ZERO, SatMode::UNKNOWN,
+                                                                     MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+constexpr static AscendC::Reg::CastTrait QBSA_CAST_B8_TO_B32_ONE = {RegLayout::ONE, SatMode::UNKNOWN,
+                                                                    MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+constexpr static AscendC::Reg::CastTrait QBSA_CAST_B8_TO_B32_TWO = {RegLayout::TWO, SatMode::UNKNOWN,
+                                                                    MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+constexpr static AscendC::Reg::CastTrait QBSA_CAST_B8_TO_B32_THREE = {RegLayout::THREE, SatMode::UNKNOWN,
+                                                                      MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
 // Safe pre-pad value for AttenTail variants. Must be a large negative finite float
 // so that (pad_value * qScale * kScale) does NOT overflow to -inf/NaN before the
@@ -160,30 +160,30 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
 
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -198,18 +198,18 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateVF(
     Sub(max0, max0, vreg_ln_p_scale, preg_108);
     Select(max0, max0, vreg_empty_lse, preg_invalid_cur);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
     uint16_t loopNum;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
     loopNum = ubN_div_8;
 
@@ -266,9 +266,9 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -280,7 +280,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, bool needAtten = false, uint32_t ubN = 128>
@@ -371,8 +371,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -400,30 +399,30 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
 
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -433,7 +432,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
     // Tail columns may have zero scale when the second sparse block is absent.
     // Re-apply minValue after q/k scale so invalid columns cannot enter softmax.
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -445,18 +444,18 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
     Sub(max0, max0, vreg_ln_p_scale, preg_108);
     Select(max0, max0, vreg_empty_lse, preg_invalid_cur);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
     uint16_t loopNum;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
     loopNum = ubN_div_8;
 
@@ -514,9 +513,9 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -528,7 +527,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, uint32_t ubN = 128>
@@ -695,30 +694,30 @@ __simd_vf__ inline void ProcessVec1DnUpdateVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
 
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -736,19 +735,19 @@ __simd_vf__ inline void ProcessVec1DnUpdateVF(
     Max(max0, max0, vreg_x_max_f32_b, preg_108);
 
     FusedExpSub(vreg_x_max_f32_b, vreg_x_max_f32_b, max0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
     uint16_t loopNum;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
     loopNum = ubN_div_8;
 
@@ -806,9 +805,9 @@ __simd_vf__ inline void ProcessVec1DnUpdateVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -825,7 +824,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateVF(
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
     Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, bool needAtten = true, uint32_t ubN = 128>
@@ -917,8 +916,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -946,30 +944,30 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
 
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * m);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * m);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m * 4, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m * 4, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m * 4, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m * 4, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -979,7 +977,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     // Tail columns may have zero scale when the second sparse block is absent.
     // Re-apply minValue after q/k scale so invalid columns cannot enter softmax.
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -994,19 +992,19 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     Max(max0, max0, vreg_x_max_f32_b, preg_108);
 
     FusedExpSub(vreg_x_max_f32_b, vreg_x_max_f32_b, max0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
     uint16_t loopNum;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
     loopNum = ubN_div_8;
 
@@ -1064,9 +1062,9 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -1083,7 +1081,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
     Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, uint32_t ubN = 128>
@@ -1292,29 +1290,29 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -1329,17 +1327,17 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadVF(
     Sub(max0, max0, vreg_ln_p_scale, preg_108);
     Select(max0, max0, vreg_empty_lse, preg_invalid_cur);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
 
     for (uint16_t i0 = 0; i0 < loopNum; ++i0) {
@@ -1396,9 +1394,9 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -1410,7 +1408,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, bool needAtten = false, uint32_t ubN = 128>
@@ -1509,8 +1507,8 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_safe_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_safe_min,
+                                                     preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -1527,30 +1525,30 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
 
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -1560,8 +1558,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
     // 第二个 sparse block 不存在时，尾部列可能对应零 scale。
     // q/k scale 处理后重新写入 minValue，避免无效列进入 softmax。
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -1573,17 +1570,17 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
     Sub(max0, max0, vreg_ln_p_scale, preg_108);
     Select(max0, max0, vreg_empty_lse, preg_invalid_cur);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
 
     for (uint16_t i0 = 0; i0 < loopNum; ++i0) {
@@ -1640,9 +1637,9 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -1654,7 +1651,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, uint32_t ubN = 128>
@@ -1808,30 +1805,30 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
 
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -1849,18 +1846,18 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadVF(
     Max(max0, max0, vreg_x_max_f32_b, preg_108);
 
     FusedExpSub(vreg_x_max_f32_b, vreg_x_max_f32_b, max0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
 
     for (uint16_t i0 = 0; i0 < loopNum; ++i0) {
@@ -1917,9 +1914,9 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -1936,7 +1933,7 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadVF(
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
     Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, bool needAtten = false, uint32_t ubN = 128>
@@ -2036,8 +2033,8 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_safe_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_safe_min,
+                                                     preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -2054,30 +2051,30 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_qscale_vec, preg_135);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_qscale_vec, preg_135);
 
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4);
         Mul(vreg_data_tmp0, vreg_data_tmp0, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 1);
         Mul(vreg_data_tmp1, vreg_data_tmp1, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 2);
         Mul(vreg_data_tmp2, vreg_data_tmp2, vreg_kscale_val, preg_135);
-        LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
+        LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vreg_kscale_val, kScaleUb + iter_m * 4 + 3);
         Mul(vreg_data_tmp3, vreg_data_tmp3, vreg_kscale_val, preg_135);
 
         if constexpr (needAtten) {
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
             Select(vreg_data_tmp0, vreg_data_tmp0, vreg_min, preg_compare0);
             Select(vreg_data_tmp1, vreg_data_tmp1, vreg_min, preg_compare1);
             Select(vreg_data_tmp2, vreg_data_tmp2, vreg_min, preg_compare2);
             Select(vreg_data_tmp3, vreg_data_tmp3, vreg_min, preg_compare3);
         }
 
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, vreg_data_tmp0, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, vreg_data_tmp1, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, vreg_data_tmp2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, vreg_data_tmp3, preg_135);
         Max(max0, max0, vreg_data_tmp0, preg_135);
         Max(max1, max1, vreg_data_tmp1, preg_135);
         Max(max2, max2, vreg_data_tmp2, preg_135);
@@ -2087,8 +2084,7 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     // Tail columns may have zero scale when the second sparse block is absent.
     // Re-apply minValue after q/k scale so invalid columns cannot enter softmax.
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -2103,18 +2099,18 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     Max(max0, max0, vreg_x_max_f32_b, preg_108);
 
     FusedExpSub(vreg_x_max_f32_b, vreg_x_max_f32_b, max0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
 
     for (uint16_t i0 = 0; i0 < loopNum; ++i0) {
@@ -2171,9 +2167,9 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
            (RegTensor<uint8_t> &)vreg_x_exp_6, preg_134);
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -2190,7 +2186,7 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
     Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }
 
 template <typename T, typename T2, bool hasAtten = false, uint32_t ubN = 128>
@@ -2320,7 +2316,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf_
     RegTensor<float> src0, src1, src2, src3;
     RegTensor<float> max0, max1, max2, max3;
     MaskReg preg_compare0, preg_compare1, preg_compare2, preg_compare3;
-    MaskReg preg = AscendC::MicroAPI::CreateMask<T, AscendC::MicroAPI::MaskPattern::ALL>();
+    MaskReg preg = AscendC::Reg::CreateMask<T, AscendC::Reg::MaskPattern::ALL>();
     RegTensor<float> vreg_min;
     RegTensor<float> vreg_zero;
     MaskReg preg_invalid_cur;
@@ -2353,8 +2349,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf_
     Duplicate(vreg_p_scale, static_cast<float>(pScale));
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_108);
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min, preg_135);
     }
     mem_bar(VST_VLD);
 
@@ -2364,18 +2359,18 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf_
             LoadAlign(src1, src_ub1 + iter_m * m4Const);
             LoadAlign(src2, src_ub2 + iter_m * m4Const);
             LoadAlign(src3, src_ub3 + iter_m * m4Const);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
             Select(src0, src0, vreg_min, preg_compare0);
             Select(src1, src1, vreg_min, preg_compare1);
             Select(src2, src2, vreg_min, preg_compare2);
             Select(src3, src3, vreg_min, preg_compare3);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, src0, preg_108);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, src1, preg_108);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, src2, preg_108);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, src3, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, src0, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, src1, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, src2, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, src3, preg_108);
             Max(max0, max0, src0, preg_108);
             Max(max1, max1, src1, preg_108);
             Max(max2, max2, src2, preg_108);
@@ -2410,18 +2405,18 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf_
         FusedExpSub(vreg_x_max_f32_b, vreg_x_max_f32_b, max0, preg_134);
     }
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
     Sub(max0, max0, vreg_ln_p_scale, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
 
     if constexpr (hasAtten) {
@@ -2499,9 +2494,9 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf_
 
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -2513,18 +2508,18 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf_
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
 
     if constexpr (SUB_LOOP == 0U) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
         // pscale update
         RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0;
         Duplicate(vreg_p_scale_f8e8m0, 0x7f, preg_134);
-        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
-                                                                  vreg_p_scale_f8e8m0, preg_134);
+        StoreAlign<fp8_e8m0_t, Reg::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
+                                                             vreg_p_scale_f8e8m0, preg_134);
     } else {
         RegTensor<float> first_loop_sum;
         LoadAlign(first_loop_sum, new_global_sum);
         Mul(first_loop_sum, vreg_x_max_f32_b, first_loop_sum, preg_134);
         Add(vreg_x_sum0, first_loop_sum, vreg_x_sum0, preg_134);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_x_sum0, preg_134);
         // pscale update
         RegTensor<bfloat16_t> vreg_p_scale_bf16_0;
         RegTensor<bfloat16_t> vreg_p_scale_bf16_1;
@@ -2539,8 +2534,8 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf_
         Or((RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0, (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0,
            (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_1, preg_134);
         DeInterleave(vreg_p_scale_f8e8m0_dst0, vreg_p_scale_f8e8m0_dst1, vreg_p_scale_f8e8m0_0, vreg_p_scale_f8e8m0_0);
-        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
-                                                                  vreg_p_scale_f8e8m0_dst0, preg_134);
+        StoreAlign<fp8_e8m0_t, Reg::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
+                                                             vreg_p_scale_f8e8m0_dst0, preg_134);
     }
 }
 
@@ -2626,7 +2621,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
     RegTensor<float> src0, src1, src2, src3;
     RegTensor<float> max0, max1, max2, max3;
     MaskReg preg_compare0, preg_compare1, preg_compare2, preg_compare3;
-    MaskReg preg = AscendC::MicroAPI::CreateMask<T, AscendC::MicroAPI::MaskPattern::ALL>();
+    MaskReg preg = AscendC::Reg::CreateMask<T, AscendC::Reg::MaskPattern::ALL>();
     RegTensor<float> vreg_min;
     RegTensor<float> vreg_zero;
     MaskReg preg_invalid_cur;
@@ -2656,8 +2651,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
     Duplicate(vreg_p_scale, static_cast<float>(pScale));
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_108);
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min,
-                                                          preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * mConst, vreg_min, preg_135);
     }
     mem_bar(VST_VLD);
 
@@ -2667,18 +2661,18 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
             LoadAlign(src1, src_ub1 + iter_m * m4Const);
             LoadAlign(src2, src_ub2 + iter_m * m4Const);
             LoadAlign(src3, src_ub3 + iter_m * m4Const);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
-            LoadAlign<uint32_t, MicroAPI::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare0, mask_ub0 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare1, mask_ub1 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare2, mask_ub2 + iter_m * mConst);
+            LoadAlign<uint32_t, Reg::MaskDist::DIST_DS>(preg_compare3, mask_ub3 + iter_m * mConst);
             Select(src0, src0, vreg_min, preg_compare0);
             Select(src1, src1, vreg_min, preg_compare1);
             Select(src2, src2, vreg_min, preg_compare2);
             Select(src3, src3, vreg_min, preg_compare3);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, src0, preg_108);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, src1, preg_108);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, src2, preg_108);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, src3, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub0 + iter_m * m4Const, src0, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub1 + iter_m * m4Const, src1, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub2 + iter_m * m4Const, src2, preg_108);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub3 + iter_m * m4Const, src3, preg_108);
             Max(max0, max0, src0, preg_108);
             Max(max1, max1, src1, preg_108);
             Max(max2, max2, src2, preg_108);
@@ -2710,7 +2704,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
     Max(max0, max0, vreg_x_max_f32_b, preg_108);
 
     if constexpr (SUB_LOOP == 0U) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)pre_loop_max, vreg_x_max_f32_b, preg_108);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)pre_loop_max, vreg_x_max_f32_b, preg_108);
         FusedExpSub(vreg_x_max_f32_b, vreg_x_max_f32_b, max0, preg_134);
     } else {
         FusedExpSub(vreg_subloop_update, vreg_x_max_f32_b, max0, preg_134);
@@ -2718,21 +2712,21 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
         FusedExpSub(vreg_x_max_f32_b, vreg_x_max_f32_b, max0, preg_134);
     }
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)new_global_max, max0, preg_108);
     Sub(max0, max0, vreg_ln_p_scale, preg_108);
 
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T *&)exp_max_fp32, vreg_x_max_f32_b, preg_108);
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_0, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_1, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_2, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_3, 0, preg_134);
     RegTensor<uint8_t> idx_nd2nz;
 
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
-    Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_4, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_5, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_6, 0, preg_134);
+    Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_x_sum_7, 0, preg_134);
     LoadAlign(idx_nd2nz, indexesUb);
 
     if constexpr (hasAtten) {
@@ -2811,9 +2805,9 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
 
         Gather(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, idx_nd2nz);
         Gather(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1, idx_nd2nz);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-        StoreAlign<T2, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2 *&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
     }
     Add(vreg_x_sum0, vreg_x_sum_2, vreg_x_sum_0, preg_134);
@@ -2830,16 +2824,16 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
     RegTensor<float> vreg_l0;
     if constexpr (SUB_LOOP == 0U) {
         LoadAlign(vreg_l0, new_global_sum);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)pre_loop_sum, vreg_l0, preg_134);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)pre_loop_sum, vreg_l0, preg_134);
         Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
         Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)first_loop_sum, vreg_x_sum0, preg_134);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)first_loop_sum, vreg_x_sum0, preg_134);
         // pscale update
         RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0;
         Duplicate(vreg_p_scale_f8e8m0, 0x7f, preg_134);
-        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
-                                                                  vreg_p_scale_f8e8m0, preg_134);
+        StoreAlign<fp8_e8m0_t, Reg::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
+                                                             vreg_p_scale_f8e8m0, preg_134);
     } else {
         RegTensor<float> vreg_l1;
         LoadAlign(vreg_l0, first_loop_sum);
@@ -2848,7 +2842,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
         Add(vreg_x_sum0, vreg_l0, vreg_x_sum0, preg_134);
         Mul(vreg_l1, vreg_x_max_f32_b, vreg_l1, preg_134);
         Add(vreg_l0, vreg_x_sum0, vreg_l1, preg_134);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
         // pscale update
         RegTensor<bfloat16_t> vreg_p_scale_bf16_0;
         RegTensor<bfloat16_t> vreg_p_scale_bf16_1;
@@ -2863,8 +2857,8 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
         Or((RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0, (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0,
            (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_1, preg_134);
         DeInterleave(vreg_p_scale_f8e8m0_dst0, vreg_p_scale_f8e8m0_dst1, vreg_p_scale_f8e8m0_0, vreg_p_scale_f8e8m0_0);
-        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
-                                                                  vreg_p_scale_f8e8m0_dst0, preg_134);
+        StoreAlign<fp8_e8m0_t, Reg::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
+                                                             vreg_p_scale_f8e8m0_dst0, preg_134);
     }
 }
 
@@ -2938,8 +2932,8 @@ __simd_vf__ inline void BroadCastMaxSumVF(__ubuf__ float *out_ub, __ubuf__ float
     RegTensor<float> broadcast_reg;
     MaskReg preg_all = CreateMask<T, MaskPattern::ALL>();
     for (uint16_t i = 0; i < loopM; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_E2B_B32>(broadcast_reg, ori_ub + i * 8);
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)out_ub + i * 64, broadcast_reg, preg_all);
+        LoadAlign<T, Reg::LoadDist::DIST_E2B_B32>(broadcast_reg, ori_ub + i * 8);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)out_ub + i * 64, broadcast_reg, preg_all);
     }
 }
 

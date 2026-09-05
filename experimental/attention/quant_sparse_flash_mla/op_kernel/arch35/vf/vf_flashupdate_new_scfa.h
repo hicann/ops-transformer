@@ -25,28 +25,28 @@ constexpr uint16_t REDUCE_SIZE = 1;
  * FlashUpdate, fp32
  * ************************************************************************************************* */
 template <typename T, typename INPUT_T, typename OUTPUT_T, uint16_t srcD, uint16_t reduceSize>
-__simd_vf__ inline void FlashUpdateBasicVF(__ubuf__ float * dstUb, __ubuf__ float * curUb, __ubuf__ float * preUb,
-    __ubuf__ float * expMaxUb, const uint16_t m, const float vDescale)
+__simd_vf__ inline void FlashUpdateBasicVF(__ubuf__ float *dstUb, __ubuf__ float *curUb, __ubuf__ float *preUb,
+                                           __ubuf__ float *expMaxUb, const uint16_t m, const float vDescale)
 {
     constexpr uint16_t dLoops = srcD / floatRepSize;
-    AscendC::MicroAPI::RegTensor<float> vreg_exp_max;
-    AscendC::MicroAPI::RegTensor<float> vreg_input_pre;
-    AscendC::MicroAPI::RegTensor<float> vreg_input_cur;
-    AscendC::MicroAPI::RegTensor<float> vreg_mul;
-    AscendC::MicroAPI::RegTensor<float> vreg_add;
+    AscendC::Reg::RegTensor<float> vreg_exp_max;
+    AscendC::Reg::RegTensor<float> vreg_input_pre;
+    AscendC::Reg::RegTensor<float> vreg_input_cur;
+    AscendC::Reg::RegTensor<float> vreg_mul;
+    AscendC::Reg::RegTensor<float> vreg_add;
 
-    AscendC::MicroAPI::MaskReg preg_all = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
+    AscendC::Reg::MaskReg preg_all = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
 
     // dstTensor = preTensor * expMaxTensor + curTensor
     for (uint16_t i = 0; i < m; ++i) {
-        AscendC::MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize);  // [m,8]
+        AscendC::Reg::LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize); // [m,8]
 
         for (uint16_t j = 0; j < dLoops; ++j) {
-            AscendC::MicroAPI::LoadAlign(vreg_input_pre, preUb + i * srcD + j * floatRepSize);
-            AscendC::MicroAPI::LoadAlign(vreg_input_cur, curUb + i * srcD + j * floatRepSize);
+            AscendC::Reg::LoadAlign(vreg_input_pre, preUb + i * srcD + j * floatRepSize);
+            AscendC::Reg::LoadAlign(vreg_input_cur, curUb + i * srcD + j * floatRepSize);
 
-            AscendC::MicroAPI::MulDstAdd(vreg_input_pre, vreg_exp_max, vreg_input_cur, preg_all);
-            AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
+            AscendC::Reg::MulDstAdd(vreg_input_pre, vreg_exp_max, vreg_input_cur, preg_all);
+            AscendC::Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(
                 (__ubuf__ T *&)dstUb + i * srcD + j * floatRepSize, vreg_input_pre, preg_all);
         }
     }
@@ -64,46 +64,48 @@ __simd_vf__ inline void FlashUpdateBasicVF(__ubuf__ float * dstUb, __ubuf__ floa
  */
 template <typename T, typename INPUT_T, typename OUTPUT_T, uint16_t srcD>
 __aicore__ inline void FlashUpdateNew(const LocalTensor<T> &dstTensor, const LocalTensor<T> &curTensor,
-    const LocalTensor<T> &preTensor, const LocalTensor<T> &expMaxTensor, const uint16_t m, const float vDescale)
+                                      const LocalTensor<T> &preTensor, const LocalTensor<T> &expMaxTensor,
+                                      const uint16_t m, const float vDescale)
 {
     static_assert(IsSameType<T, float>::value, "VF FlashUpdate, T must be float");
 
-    __ubuf__ float * dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
-    __ubuf__ float * curUb = (__ubuf__ T*)curTensor.GetPhyAddr();
-    __ubuf__ float * preUb = (__ubuf__ T*)preTensor.GetPhyAddr();
-    __ubuf__ float * expMaxUb = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
+    __ubuf__ float *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
+    __ubuf__ float *curUb = (__ubuf__ T *)curTensor.GetPhyAddr();
+    __ubuf__ float *preUb = (__ubuf__ T *)preTensor.GetPhyAddr();
+    __ubuf__ float *expMaxUb = (__ubuf__ T *)expMaxTensor.GetPhyAddr();
     FlashUpdateBasicVF<T, INPUT_T, OUTPUT_T, srcD, REDUCE_SIZE>(dstUb, curUb, preUb, expMaxUb, m, vDescale);
 }
 
 template <typename T, typename INPUT_T, typename OUTPUT_T, uint16_t srcD, uint16_t reduceSize>
-__simd_vf__ inline void FlashUpdateLastBasicVF(__ubuf__ float * dstUb, __ubuf__ float * curUb, __ubuf__ float * preUb,
-    __ubuf__ float * expMaxUb, __ubuf__ float * expSumUb, const uint16_t m, const float vDescale)
+__simd_vf__ inline void FlashUpdateLastBasicVF(__ubuf__ float *dstUb, __ubuf__ float *curUb, __ubuf__ float *preUb,
+                                               __ubuf__ float *expMaxUb, __ubuf__ float *expSumUb, const uint16_t m,
+                                               const float vDescale)
 {
     constexpr uint16_t dLoops = srcD / floatRepSize;
-    AscendC::MicroAPI::RegTensor<float> vreg_exp_max;
-    AscendC::MicroAPI::RegTensor<float> vreg_input_pre;
-    AscendC::MicroAPI::RegTensor<float> vreg_input_cur;
-    AscendC::MicroAPI::RegTensor<float> vreg_mul;
-    AscendC::MicroAPI::RegTensor<float> vreg_add;
-    AscendC::MicroAPI::RegTensor<float> vreg_div;
-    AscendC::MicroAPI::RegTensor<float> vreg_exp_sum;
+    AscendC::Reg::RegTensor<float> vreg_exp_max;
+    AscendC::Reg::RegTensor<float> vreg_input_pre;
+    AscendC::Reg::RegTensor<float> vreg_input_cur;
+    AscendC::Reg::RegTensor<float> vreg_mul;
+    AscendC::Reg::RegTensor<float> vreg_add;
+    AscendC::Reg::RegTensor<float> vreg_div;
+    AscendC::Reg::RegTensor<float> vreg_exp_sum;
 
-    AscendC::MicroAPI::MaskReg preg_all = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
+    AscendC::Reg::MaskReg preg_all = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
 
     for (uint16_t i = 0; i < m; ++i) {
-        AscendC::MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize);
-        AscendC::MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * reduceSize);
+        AscendC::Reg::LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize);
+        AscendC::Reg::LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * reduceSize);
 
         for (uint16_t j = 0; j < dLoops; ++j) {
-            AscendC::MicroAPI::LoadAlign(vreg_input_pre, preUb + i * srcD + j * floatRepSize);
-            AscendC::MicroAPI::LoadAlign(vreg_input_cur, curUb + i * srcD + j * floatRepSize);
+            AscendC::Reg::LoadAlign(vreg_input_pre, preUb + i * srcD + j * floatRepSize);
+            AscendC::Reg::LoadAlign(vreg_input_cur, curUb + i * srcD + j * floatRepSize);
 
-            AscendC::MicroAPI::MulDstAdd(vreg_input_pre, vreg_exp_max, vreg_input_cur, preg_all);
-            AscendC::MicroAPI::Div(vreg_div, vreg_input_pre, vreg_exp_sum, preg_all);
+            AscendC::Reg::MulDstAdd(vreg_input_pre, vreg_exp_max, vreg_input_cur, preg_all);
+            AscendC::Reg::Div(vreg_div, vreg_input_pre, vreg_exp_sum, preg_all);
             if constexpr (IsSameType<INPUT_T, hifloat8_t>::value) {
-                AscendC::MicroAPI::Muls(vreg_div, vreg_div, vDescale, preg_all);  // Muls(scale)
+                AscendC::Reg::Muls(vreg_div, vreg_div, vDescale, preg_all); // Muls(scale)
             }
-            AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
+            AscendC::Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(
                 (__ubuf__ T *&)dstUb + i * srcD + j * floatRepSize, vreg_div, preg_all);
         }
     }
@@ -122,41 +124,41 @@ __simd_vf__ inline void FlashUpdateLastBasicVF(__ubuf__ float * dstUb, __ubuf__ 
  */
 template <typename T, typename INPUT_T, typename OUTPUT_T, uint16_t srcD>
 __aicore__ inline void FlashUpdateLastNew(const LocalTensor<T> &dstTensor, const LocalTensor<T> &curTensor,
-    const LocalTensor<T> &preTensor, const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &expSumTensor,
-    uint16_t m, float vDescale)
+                                          const LocalTensor<T> &preTensor, const LocalTensor<T> &expMaxTensor,
+                                          const LocalTensor<T> &expSumTensor, uint16_t m, float vDescale)
 {
     static_assert(IsSameType<T, float>::value, "VF FlashUpdateLast, T must be float");
-    __ubuf__ float * dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
-    __ubuf__ float * curUb = (__ubuf__ T*)curTensor.GetPhyAddr();
-    __ubuf__ float * preUb = (__ubuf__ T*)preTensor.GetPhyAddr();
-    __ubuf__ float * expMaxUb = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
-    __ubuf__ float * expSumUb = (__ubuf__ T*)expSumTensor.GetPhyAddr();
+    __ubuf__ float *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
+    __ubuf__ float *curUb = (__ubuf__ T *)curTensor.GetPhyAddr();
+    __ubuf__ float *preUb = (__ubuf__ T *)preTensor.GetPhyAddr();
+    __ubuf__ float *expMaxUb = (__ubuf__ T *)expMaxTensor.GetPhyAddr();
+    __ubuf__ float *expSumUb = (__ubuf__ T *)expSumTensor.GetPhyAddr();
 
     FlashUpdateLastBasicVF<T, INPUT_T, OUTPUT_T, srcD, REDUCE_SIZE>(dstUb, curUb, preUb, expMaxUb, expSumUb, m,
-        vDescale);
+                                                                    vDescale);
 }
 
 template <typename T, typename INPUT_T, typename OUTPUT_T, uint32_t srcD>
-__simd_vf__ inline void LastDivNewVF(__ubuf__ float * dstUb, __ubuf__ float * curUb, __ubuf__ float * expSumUb,
-    const uint16_t m, const float vDescale)
+__simd_vf__ inline void LastDivNewVF(__ubuf__ float *dstUb, __ubuf__ float *curUb, __ubuf__ float *expSumUb,
+                                     const uint16_t m, const float vDescale)
 {
     const uint16_t dLoops = srcD >> 6;
-    AscendC::MicroAPI::RegTensor<float> vreg_input_cur;
-    AscendC::MicroAPI::RegTensor<float> vreg_div;
-    AscendC::MicroAPI::RegTensor<float> vreg_exp_sum;
-    AscendC::MicroAPI::MaskReg preg_all = CreateMask<float, MaskPattern::ALL>();
+    AscendC::Reg::RegTensor<float> vreg_input_cur;
+    AscendC::Reg::RegTensor<float> vreg_div;
+    AscendC::Reg::RegTensor<float> vreg_exp_sum;
+    AscendC::Reg::MaskReg preg_all = CreateMask<float, MaskPattern::ALL>();
     uint32_t sreg_init = srcD;
-    AscendC::MicroAPI::MaskReg preg_update = UpdateMask<float>(sreg_init);
+    AscendC::Reg::MaskReg preg_update = UpdateMask<float>(sreg_init);
 
     for (uint16_t i = 0; i < m; ++i) {
-        AscendC::MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * REDUCE_SIZE);
+        AscendC::Reg::LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * REDUCE_SIZE);
         for (uint16_t j = 0; j < dLoops; ++j) {
-            AscendC::MicroAPI::LoadAlign(vreg_input_cur, curUb + i * srcD + j * floatRepSize);
-            AscendC::MicroAPI::Div(vreg_div, vreg_input_cur, vreg_exp_sum, preg_all);
+            AscendC::Reg::LoadAlign(vreg_input_cur, curUb + i * srcD + j * floatRepSize);
+            AscendC::Reg::Div(vreg_div, vreg_input_cur, vreg_exp_sum, preg_all);
             if constexpr (IsSameType<INPUT_T, hifloat8_t>::value) {
-                AscendC::MicroAPI::Muls(vreg_div, vreg_div, vDescale, preg_all);  // Muls(scale)
+                AscendC::Reg::Muls(vreg_div, vreg_div, vDescale, preg_all); // Muls(scale)
             }
-            AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
+            AscendC::Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(
                 (__ubuf__ T *&)dstUb + i * srcD + j * floatRepSize, vreg_div, preg_update);
         }
     }
@@ -164,15 +166,15 @@ __simd_vf__ inline void LastDivNewVF(__ubuf__ float * dstUb, __ubuf__ float * cu
 
 // dstTensor = curTensor / expSumTensor, curTensor: [64,128], expSumTensor: [64,8]
 template <typename T, typename INPUT_T, typename OUTPUT_T, uint32_t srcD>
-__aicore__ inline void LastDivNew(const LocalTensor<T>& dstTensor, const LocalTensor<T>& curTensor,
-    const LocalTensor<T>& expSumTensor, const uint16_t m, const float vDeScale)
+__aicore__ inline void LastDivNew(const LocalTensor<T> &dstTensor, const LocalTensor<T> &curTensor,
+                                  const LocalTensor<T> &expSumTensor, const uint16_t m, const float vDeScale)
 {
-    __ubuf__ float * dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
-    __ubuf__ float * curUb = (__ubuf__ T*)curTensor.GetPhyAddr();
-    __ubuf__ float * expSumUb = (__ubuf__ T*)expSumTensor.GetPhyAddr();
+    __ubuf__ float *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
+    __ubuf__ float *curUb = (__ubuf__ T *)curTensor.GetPhyAddr();
+    __ubuf__ float *expSumUb = (__ubuf__ T *)expSumTensor.GetPhyAddr();
 
     LastDivNewVF<T, INPUT_T, OUTPUT_T, srcD>(dstUb, curUb, expSumUb, m, vDeScale);
 }
-} // namespace
+} // namespace SCFaVectorApi
 
 #endif // FLASH_UPDATE_NEW_INTERFACE_SCFA_H

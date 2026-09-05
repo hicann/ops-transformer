@@ -34,88 +34,88 @@ constexpr float INV_LN2 = static_cast<float>(1.4426950409F);
 /* **************************************************************************************************
  * Muls + Select(optional) + SoftmaxFlashV2 + Cast(fp32->fp16/bf16) + ND2NZ
  * ************************************************************************************************* */
-using namespace MicroAPI;
+using namespace Reg;
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitNoneZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::UNKNOWN,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitNoneZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::UNKNOWN,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_NONE,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitOne = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitOne = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitTwo = {
-    AscendC::MicroAPI::RegLayout::TWO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitTwo = {
+    AscendC::Reg::RegLayout::TWO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitThree = {
-    AscendC::MicroAPI::RegLayout::THREE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitThree = {
+    AscendC::Reg::RegLayout::THREE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_ROUND,
 };
- 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintZero = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+
+constexpr static AscendC::Reg::CastTrait castTraitRintZero = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintOne = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
-    AscendC::RoundMode::CAST_RINT,
-};
- 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintTwo = {
-    AscendC::MicroAPI::RegLayout::TWO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintOne = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-constexpr static AscendC::MicroAPI::CastTrait castTraitRintThree = {
-    AscendC::MicroAPI::RegLayout::THREE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr static AscendC::Reg::CastTrait castTraitRintTwo = {
+    AscendC::Reg::RegLayout::TWO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
-#define USE_MLA_FULLQUANT_V1_P(vreg_exp, vreg_rowmax_p, MaskReg)    \
-    do {                                                            \
-        Muls(vreg_exp, vreg_exp, fp8e4m3MaxValue, MaskReg);         \
-        Div(vreg_exp, vreg_exp, vreg_rowmax_p, MaskReg);            \
+constexpr static AscendC::Reg::CastTrait castTraitRintThree = {
+    AscendC::Reg::RegLayout::THREE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::CAST_RINT,
+};
+
+#define USE_MLA_FULLQUANT_V1_P(vreg_exp, vreg_rowmax_p, MaskReg) \
+    do { \
+        Muls(vreg_exp, vreg_exp, fp8e4m3MaxValue, MaskReg); \
+        Div(vreg_exp, vreg_exp, vreg_rowmax_p, MaskReg); \
     } while (0)
-    
+
 #define USE_MLA_FULLQUANT_V1_P_INT8(vreg_exp, vreg_rowmax_p, MaskReg) \
-    do {                                                              \
-        Muls(vreg_exp, vreg_exp, int8MaxValue, MaskReg);              \
-        Div(vreg_exp, vreg_exp, vreg_rowmax_p, MaskReg);              \
+    do { \
+        Muls(vreg_exp, vreg_exp, int8MaxValue, MaskReg); \
+        Div(vreg_exp, vreg_exp, vreg_rowmax_p, MaskReg); \
     } while (0)
 
-#define USE_MLA_FULLQUANT_V1_P_HIFP8(vreg_exp, vreg_rowmax_p, MaskReg)    \
-    do {                                                            \
-        Muls(vreg_exp, vreg_exp, hifp8MaxValue, MaskReg);         \
-        Div(vreg_exp, vreg_exp, vreg_rowmax_p, MaskReg);            \
+#define USE_MLA_FULLQUANT_V1_P_HIFP8(vreg_exp, vreg_rowmax_p, MaskReg) \
+    do { \
+        Muls(vreg_exp, vreg_exp, hifp8MaxValue, MaskReg); \
+        Div(vreg_exp, vreg_exp, vreg_rowmax_p, MaskReg); \
     } while (0)
-} // namespace
+} // namespace FaVectorApi
 
 #endif // VF_BASIC_BLOCK_UTILS_H

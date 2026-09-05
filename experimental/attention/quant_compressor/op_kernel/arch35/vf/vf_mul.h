@@ -29,7 +29,6 @@ constexpr uint32_t baseD128 = 128;
 constexpr uint32_t baseD256 = 256;
 constexpr uint32_t baseD512 = 512;
 
-
 template <typename T>
 __simd_callee__ inline T SimdCeilDivT(T num1, T num2)
 {
@@ -41,24 +40,22 @@ __simd_callee__ inline T SimdCeilDivT(T num1, T num2)
 
 template <typename T>
 struct ReduceMulRegList {
-    MicroAPI::RegTensor<T> vreg0;
-    MicroAPI::RegTensor<T> vreg1;
-    MicroAPI::RegTensor<T> vregMul;
-    MicroAPI::RegTensor<T> vregSum;
+    Reg::RegTensor<T> vreg0;
+    Reg::RegTensor<T> vreg1;
+    Reg::RegTensor<T> vregMul;
+    Reg::RegTensor<T> vregSum;
 };
-
 
 template <typename T>
 __simd_callee__ void LoadMulAddVFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, ReduceMulRegList<T> &regList,
                                       uint64_t offset, uint32_t maskValue)
 {
-    MicroAPI::MaskReg mask = MicroAPI::UpdateMask<T>(maskValue);
-    MicroAPI::LoadAlign(regList.vreg0, kvAddr + offset);
-    MicroAPI::LoadAlign(regList.vreg1, scoreAddr + offset);
-    MicroAPI::Mul(regList.vregMul, regList.vreg0, regList.vreg1, mask);
-    MicroAPI::Add(regList.vregSum, regList.vregSum, regList.vregMul, mask);
+    Reg::MaskReg mask = Reg::UpdateMask<T>(maskValue);
+    Reg::LoadAlign(regList.vreg0, kvAddr + offset);
+    Reg::LoadAlign(regList.vreg1, scoreAddr + offset);
+    Reg::Mul(regList.vregMul, regList.vreg0, regList.vreg1, mask);
+    Reg::Add(regList.vregSum, regList.vregSum, regList.vregMul, mask);
 }
-
 
 template <typename T>
 __simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
@@ -66,21 +63,21 @@ __simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAd
                                          const uint32_t baseD)
 {
     ReduceMulRegList<T> regList;
-    MicroAPI::RegTensor<T> vregSum0;
-    MicroAPI::MaskReg mask = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskL32 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::VL32>();
-    MicroAPI::MaskReg maskL16 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::VL16>();
-    MicroAPI::MaskReg maskL8 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::VL8>();
-    MicroAPI::MaskReg maskH32;
-    MicroAPI::MaskReg maskH48;
-    MicroAPI::MaskReg maskH56;
-    MicroAPI::Not(maskH48, maskL16, mask);
-    MicroAPI::Not(maskH32, maskL32, mask);
-    MicroAPI::Not(maskH56, maskL8, mask);
+    Reg::RegTensor<T> vregSum0;
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskL32 = Reg::CreateMask<T, Reg::MaskPattern::VL32>();
+    Reg::MaskReg maskL16 = Reg::CreateMask<T, Reg::MaskPattern::VL16>();
+    Reg::MaskReg maskL8 = Reg::CreateMask<T, Reg::MaskPattern::VL8>();
+    Reg::MaskReg maskH32;
+    Reg::MaskReg maskH48;
+    Reg::MaskReg maskH56;
+    Reg::Not(maskH48, maskL16, mask);
+    Reg::Not(maskH32, maskL32, mask);
+    Reg::Not(maskH56, maskL8, mask);
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
-        MicroAPI::Duplicate(regList.vregSum, 0, mask);
+        Reg::Duplicate(regList.vregSum, 0, mask);
         // 当前仅支持coff * cmpRatio为2的幂的情况
         for (uint32_t rLoop = 0; rLoop < SimdCeilDivT(rCnt, 8U); rLoop++) {
             uint32_t dealLen = min((rCnt - rLoop * 8) * baseD, baseD64);
@@ -88,18 +85,18 @@ __simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAd
             offset += dealLen;
         }
         // 64 -> 32
-        MicroAPI::Squeeze<T, AscendC::MicroAPI::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
-        MicroAPI::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
+        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
+        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
 
         // 32 -> 16
-        MicroAPI::Squeeze<T, AscendC::MicroAPI::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH48);
-        MicroAPI::Add(regList.vregSum, regList.vregSum, vregSum0, maskL16);
+        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH48);
+        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL16);
 
         // 16 -> 8
-        MicroAPI::Squeeze<T, AscendC::MicroAPI::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH56);
-        MicroAPI::Add(regList.vregSum, regList.vregSum, vregSum0, maskL8);
+        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH56);
+        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL8);
 
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL8);
+        Reg::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL8);
     }
 }
 
@@ -109,18 +106,18 @@ __simd_vf__ void MulReduceSumbase16VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
                                           const uint32_t baseD)
 {
     ReduceMulRegList<T> regList;
-    MicroAPI::RegTensor<T> vregSum0;
-    MicroAPI::MaskReg mask = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskL32 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::VL32>();
-    MicroAPI::MaskReg maskL16 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::VL16>();
-    MicroAPI::MaskReg maskH32;
-    MicroAPI::MaskReg maskH48;
-    MicroAPI::Not(maskH48, maskL16, mask);
-    MicroAPI::Not(maskH32, maskL32, mask);
+    Reg::RegTensor<T> vregSum0;
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskL32 = Reg::CreateMask<T, Reg::MaskPattern::VL32>();
+    Reg::MaskReg maskL16 = Reg::CreateMask<T, Reg::MaskPattern::VL16>();
+    Reg::MaskReg maskH32;
+    Reg::MaskReg maskH48;
+    Reg::Not(maskH48, maskL16, mask);
+    Reg::Not(maskH32, maskL32, mask);
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
-        MicroAPI::Duplicate(regList.vregSum, 0, mask);
+        Reg::Duplicate(regList.vregSum, 0, mask);
         // 当前仅支持coff * cmpRatio为2的幂的情况
         for (uint32_t rLoop = 0; rLoop < SimdCeilDivT(rCnt, 4U); rLoop++) {
             uint32_t dealLen = min((rCnt - rLoop * 4) * baseD, baseD64);
@@ -128,14 +125,14 @@ __simd_vf__ void MulReduceSumbase16VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
             offset += dealLen;
         }
         // 64 -> 32
-        MicroAPI::Squeeze<T, AscendC::MicroAPI::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
-        MicroAPI::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
+        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
+        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
 
         // 32 -> 16
-        MicroAPI::Squeeze<T, AscendC::MicroAPI::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH48);
-        MicroAPI::Add(regList.vregSum, regList.vregSum, vregSum0, maskL16);
+        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH48);
+        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL16);
 
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL16);
+        Reg::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL16);
     }
 }
 
@@ -145,16 +142,16 @@ __simd_vf__ void MulReduceSumbase32VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
                                           const uint32_t baseD)
 {
     ReduceMulRegList<T> regList;
-    MicroAPI::RegTensor<T> vregSum0;
-    MicroAPI::RegTensor<T> vregSum1;
-    MicroAPI::MaskReg mask = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg maskL32 = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::VL32>();
-    MicroAPI::MaskReg maskH32;
-    MicroAPI::Not(maskH32, maskL32, mask);
+    Reg::RegTensor<T> vregSum0;
+    Reg::RegTensor<T> vregSum1;
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg maskL32 = Reg::CreateMask<T, Reg::MaskPattern::VL32>();
+    Reg::MaskReg maskH32;
+    Reg::Not(maskH32, maskL32, mask);
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
-        MicroAPI::Duplicate(regList.vregSum, 0, mask);
+        Reg::Duplicate(regList.vregSum, 0, mask);
         // 当前仅支持coff * cmpRatio为2的幂的情况
         for (uint32_t rLoop = 0; rLoop < SimdCeilDivT(rCnt, 2U); rLoop++) {
             uint32_t dealLen = min((rCnt - rLoop * 2) * baseD, baseD64);
@@ -162,10 +159,10 @@ __simd_vf__ void MulReduceSumbase32VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
             offset += dealLen;
         }
         // 64 -> 32
-        MicroAPI::Squeeze<T, AscendC::MicroAPI::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
-        MicroAPI::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
+        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
+        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
 
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL32);
+        Reg::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL32);
     }
 }
 
@@ -175,16 +172,16 @@ __simd_vf__ void MulReduceSumbase64VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
                                           const uint32_t baseD)
 {
     ReduceMulRegList<T> regList;
-    MicroAPI::MaskReg mask = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
-        MicroAPI::Duplicate(regList.vregSum, 0, mask);
+        Reg::Duplicate(regList.vregSum, 0, mask);
         for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, baseD64);
             offset += baseD;
         }
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, mask);
     }
 }
 
@@ -194,19 +191,19 @@ __simd_vf__ void MulReduceSumbase128VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
                                            const uint32_t baseD)
 {
     ReduceMulRegList<T> regList[2];
-    MicroAPI::MaskReg mask = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
-        MicroAPI::Duplicate(regList[0].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[1].vregSum, 0, mask);
+        Reg::Duplicate(regList[0].vregSum, 0, mask);
+        Reg::Duplicate(regList[1].vregSum, 0, mask);
         for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[0], offset, baseD64);
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[1], offset + baseD64, baseD64);
             offset += baseD;
         }
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD, regList[0].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + baseD64, regList[1].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD, regList[0].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + baseD64, regList[1].vregSum, mask);
     }
 }
 
@@ -216,14 +213,14 @@ __simd_vf__ void MulReduceSumbase256VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
                                            const uint32_t baseD)
 {
     ReduceMulRegList<T> regList[4];
-    MicroAPI::MaskReg mask = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
-        MicroAPI::Duplicate(regList[0].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[1].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[2].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[3].vregSum, 0, mask);
+        Reg::Duplicate(regList[0].vregSum, 0, mask);
+        Reg::Duplicate(regList[1].vregSum, 0, mask);
+        Reg::Duplicate(regList[2].vregSum, 0, mask);
+        Reg::Duplicate(regList[3].vregSum, 0, mask);
         for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[0], offset, baseD64);
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[1], offset + baseD64, baseD64);
@@ -231,10 +228,10 @@ __simd_vf__ void MulReduceSumbase256VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[3], offset + 3 * baseD64, baseD64);
             offset += baseD;
         }
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD, regList[0].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + baseD64, regList[1].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 2 * baseD64, regList[2].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 3 * baseD64, regList[3].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD, regList[0].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + baseD64, regList[1].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 2 * baseD64, regList[2].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 3 * baseD64, regList[3].vregSum, mask);
     }
 }
 
@@ -244,18 +241,18 @@ __simd_vf__ void MulReduceSumbase512VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
                                            const uint32_t baseD)
 {
     ReduceMulRegList<T> regList[8];
-    MicroAPI::MaskReg mask = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
-        MicroAPI::Duplicate(regList[0].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[1].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[2].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[3].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[4].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[5].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[6].vregSum, 0, mask);
-        MicroAPI::Duplicate(regList[7].vregSum, 0, mask);
+        Reg::Duplicate(regList[0].vregSum, 0, mask);
+        Reg::Duplicate(regList[1].vregSum, 0, mask);
+        Reg::Duplicate(regList[2].vregSum, 0, mask);
+        Reg::Duplicate(regList[3].vregSum, 0, mask);
+        Reg::Duplicate(regList[4].vregSum, 0, mask);
+        Reg::Duplicate(regList[5].vregSum, 0, mask);
+        Reg::Duplicate(regList[6].vregSum, 0, mask);
+        Reg::Duplicate(regList[7].vregSum, 0, mask);
         for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[0], offset, baseD64);
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[1], offset + baseD64, baseD64);
@@ -267,14 +264,14 @@ __simd_vf__ void MulReduceSumbase512VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList[7], offset + 7 * baseD64, baseD64);
             offset += baseD;
         }
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD, regList[0].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + baseD64, regList[1].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 2 * baseD64, regList[2].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 3 * baseD64, regList[3].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 4 * baseD64, regList[4].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 5 * baseD64, regList[5].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 6 * baseD64, regList[6].vregSum, mask);
-        MicroAPI::StoreAlign(outputAddr + scLoop * baseD + 7 * baseD64, regList[7].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD, regList[0].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + baseD64, regList[1].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 2 * baseD64, regList[2].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 3 * baseD64, regList[3].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 4 * baseD64, regList[4].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 5 * baseD64, regList[5].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 6 * baseD64, regList[6].vregSum, mask);
+        Reg::StoreAlign(outputAddr + scLoop * baseD + 7 * baseD64, regList[7].vregSum, mask);
     }
 }
 
@@ -313,19 +310,18 @@ __aicore__ inline void MulReduceSumbaseVF(const LocalTensor<T> &kvLocal, const L
     }
 }
 
-
 template <typename T>
 __simd_vf__ void MulsVFImpl(__ubuf__ T *dstAddr, __ubuf__ T *srcAddr, float scalarValue, uint32_t cnt,
                             uint16_t repeatTimes)
 {
-    MicroAPI::RegTensor<T> srcReg;
-    MicroAPI::RegTensor<T> dstReg;
-    MicroAPI::MaskReg mask;
+    Reg::RegTensor<T> srcReg;
+    Reg::RegTensor<T> dstReg;
+    Reg::MaskReg mask;
     for (uint16_t i = 0; i < repeatTimes; i++) {
-        mask = MicroAPI::UpdateMask<T>(cnt);
-        MicroAPI::LoadAlign(srcReg, srcAddr + i * baseD64);
-        MicroAPI::Muls(dstReg, srcReg, scalarValue, mask);
-        MicroAPI::StoreAlign(dstAddr + i * baseD64, dstReg, mask);
+        mask = Reg::UpdateMask<T>(cnt);
+        Reg::LoadAlign(srcReg, srcAddr + i * baseD64);
+        Reg::Muls(dstReg, srcReg, scalarValue, mask);
+        Reg::StoreAlign(dstAddr + i * baseD64, dstReg, mask);
     }
 }
 

@@ -19,8 +19,8 @@
 
 namespace FaVectorApi {
 // bf16->fp32
-static constexpr MicroAPI::CastTrait castTraitFp16_32_update = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
-                                                                MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+static constexpr Reg::CastTrait castTraitFp16_32_update = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
+                                                           Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 constexpr uint16_t REDUCE_SIZE = 1;
 template <typename T, typename INPUT_T, typename OUTPUT_T, uint16_t srcD, uint16_t reduceSize, bool isUpdatePre>
 __simd_vf__ inline void FlashUpdateBasicVF(__ubuf__ float *dstUb, __ubuf__ float *curUb, __ubuf__ float *preUb,
@@ -39,7 +39,7 @@ __simd_vf__ inline void FlashUpdateBasicVF(__ubuf__ float *dstUb, __ubuf__ float
 
     // dstTensor = preTensor * expMaxTensor + curTensor
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize); // [m,8]
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize); // [m,8]
 
         for (uint16_t j = 0; j < dLoops; ++j) {
             LoadAlign(vreg_input_pre, preUb + i * d + j * floatRepSize);
@@ -53,8 +53,8 @@ __simd_vf__ inline void FlashUpdateBasicVF(__ubuf__ float *dstUb, __ubuf__ float
                 }
             }
             Add(vreg_add, vreg_mul, vreg_input_cur, preg_all);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_add,
-                                                              preg_all);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_add,
+                                                         preg_all);
         }
     }
 }
@@ -96,7 +96,7 @@ __simd_vf__ inline void FlashUpdateGeneralVF(__ubuf__ float *dstUb, __ubuf__ flo
 
     // dstTensor = preTensor * expMaxTensor + curTensor
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize); // [m,8]
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize); // [m,8]
 
         for (uint16_t j = 0; j < dLoops; ++j) {
             LoadAlign(vreg_input_pre, preUb + i * d + j * floatRepSize);
@@ -111,8 +111,8 @@ __simd_vf__ inline void FlashUpdateGeneralVF(__ubuf__ float *dstUb, __ubuf__ flo
                 }
             }
             Add(vreg_add, vreg_mul, vreg_input_cur, preg_all);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_add,
-                                                              preg_all);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_add,
+                                                         preg_all);
         }
         for (uint16_t t = 0; t < hasTail; ++t) {
             LoadAlign(vreg_input_pre, preUb + i * d + dLoops * floatRepSize);
@@ -128,8 +128,8 @@ __simd_vf__ inline void FlashUpdateGeneralVF(__ubuf__ float *dstUb, __ubuf__ flo
             }
             Add(vreg_add, vreg_mul, vreg_input_cur, preg_tail_d);
 
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + dLoops * floatRepSize,
-                                                              vreg_add, preg_tail_d);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + dLoops * floatRepSize, vreg_add,
+                                                         preg_tail_d);
         }
     }
 }
@@ -210,14 +210,14 @@ __simd_vf__ inline void FlashUpdateLastBasicVF(__ubuf__ float *dstUb, __ubuf__ f
     constexpr float hifp8MaxValueRec = 1 / 32768.0f;
 
     if constexpr (zeroWhenSumZero) {
-        MicroAPI::Duplicate<float, float>(vreg_zero, 0.0f);
+        Reg::Duplicate<float, float>(vreg_zero, 0.0f);
     }
 
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize);
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * reduceSize);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * reduceSize);
         if constexpr (zeroWhenSumZero) {
-            MicroAPI::Compare<float, CMPMODE::EQ>(preg_zero_sum, vreg_exp_sum, vreg_zero, preg_all);
+            Reg::Compare<float, CMPMODE::EQ>(preg_zero_sum, vreg_exp_sum, vreg_zero, preg_all);
         }
         for (uint16_t j = 0; j < dLoops; ++j) {
             LoadAlign(vreg_input_pre, preUb + i * d + j * floatRepSize);
@@ -235,8 +235,8 @@ __simd_vf__ inline void FlashUpdateLastBasicVF(__ubuf__ float *dstUb, __ubuf__ f
             if constexpr (zeroWhenSumZero) {
                 Select(vreg_div, vreg_zero, vreg_div, preg_zero_sum);
             }
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_div,
-                                                              preg_all);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_div,
+                                                         preg_all);
         }
     }
 }
@@ -282,14 +282,14 @@ __simd_vf__ inline void FlashUpdateLastGeneralVF(__ubuf__ float *dstUb, __ubuf__
     uint16_t dLoops = d / floatRepSize;
 
     if constexpr (zeroWhenSumZero) {
-        MicroAPI::Duplicate<float, float>(vreg_zero, 0.0f);
+        Reg::Duplicate<float, float>(vreg_zero, 0.0f);
     }
 
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize);
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * reduceSize);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_max, expMaxUb + i * reduceSize);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * reduceSize);
         if constexpr (zeroWhenSumZero) {
-            MicroAPI::Compare<float, CMPMODE::EQ>(preg_zero_sum, vreg_exp_sum, vreg_zero, preg_all);
+            Reg::Compare<float, CMPMODE::EQ>(preg_zero_sum, vreg_exp_sum, vreg_zero, preg_all);
         }
         for (uint16_t j = 0; j < dLoops; ++j) {
             LoadAlign(vreg_input_pre, preUb + i * d + j * floatRepSize);
@@ -309,8 +309,8 @@ __simd_vf__ inline void FlashUpdateLastGeneralVF(__ubuf__ float *dstUb, __ubuf__
                 Select(vreg_div, vreg_zero, vreg_div, preg_zero_sum);
             }
 
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_div,
-                                                              preg_all);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_div,
+                                                         preg_all);
         }
 
         for (uint16_t t = 0; t < hasTail; ++t) {
@@ -330,8 +330,8 @@ __simd_vf__ inline void FlashUpdateLastGeneralVF(__ubuf__ float *dstUb, __ubuf__
                 Select(vreg_div, vreg_zero, vreg_div, preg_zero_sum);
             }
 
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + dLoops * floatRepSize,
-                                                              vreg_div, preg_tail_d);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + dLoops * floatRepSize, vreg_div,
+                                                         preg_tail_d);
         }
     }
 }
@@ -407,12 +407,12 @@ __simd_vf__ inline void LastDivNewVF(__ubuf__ float *dstUb, __ubuf__ float *curU
     constexpr float int8MaxValueRec = 1 / 127.0f;
     constexpr float hifp8MaxValueRec = 1 / 32768.0f;
 
-    MicroAPI::Duplicate<float, float>(vreg_zero, 0.0f);
+    Reg::Duplicate<float, float>(vreg_zero, 0.0f);
 
     for (uint16_t i = 0; i < m; ++i) {
         uint32_t sreg_init = d;
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * REDUCE_SIZE);
-        MicroAPI::Compare<float, CMPMODE::EQ>(preg_zero_sum, vreg_exp_sum, vreg_zero, preg_all);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * REDUCE_SIZE);
+        Reg::Compare<float, CMPMODE::EQ>(preg_zero_sum, vreg_exp_sum, vreg_zero, preg_all);
         for (uint16_t j = 0; j < dLoops; ++j) {
             MaskReg preg_update = UpdateMask<float>(sreg_init);
 
@@ -423,8 +423,8 @@ __simd_vf__ inline void LastDivNewVF(__ubuf__ float *dstUb, __ubuf__ float *curU
             }
             Div(vreg_div, vreg_input_cur, vreg_exp_sum, preg_update);
             Select(vreg_div, vreg_zero, vreg_div, preg_zero_sum);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_div,
-                                                              preg_update);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize, vreg_div,
+                                                         preg_update);
         }
     }
 }
@@ -457,13 +457,13 @@ __simd_vf__ inline void InvalidLineUpdateVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb
 
     Duplicate(vreg_invalid_value, invalidValue);
     for (uint16_t i = 0; i < m; ++i) {
-        LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_max, maxUb + i);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max, maxUb + i);
         Compares<T, CMPMODE::EQ>(preg_compare, vreg_max, minValue, preg_all);
         for (uint16_t j = 0; j < dLoops; ++j) {
             LoadAlign(vreg_input, srcUb + i * d + j * floatRepSize);
             Select(vreg_input_brc, vreg_invalid_value, vreg_input, preg_compare);
-            StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize,
-                                                              vreg_input_brc, preg_all);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)dstUb + i * d + j * floatRepSize,
+                                                         vreg_input_brc, preg_all);
         }
     }
 }
@@ -487,15 +487,15 @@ template <typename T>
 __simd_vf__ inline void ComputeLseOutputVF(__ubuf__ T *srcSumUb, __ubuf__ T *srcMaxUb, __ubuf__ T *dstUb,
                                            const uint32_t dealCount)
 {
-    MicroAPI::RegTensor<T> vregSum;
-    MicroAPI::RegTensor<T> vregMax;
-    MicroAPI::RegTensor<T> vregRes;
-    MicroAPI::RegTensor<T> vregResFinal;
-    MicroAPI::RegTensor<float> vregMinValue;
-    MicroAPI::RegTensor<float> vregInfValue;
-    MicroAPI::RegTensor<float> vregZero;
-    MicroAPI::MaskReg pregCompare;
-    MicroAPI::MaskReg pregZeroSum;
+    Reg::RegTensor<T> vregSum;
+    Reg::RegTensor<T> vregMax;
+    Reg::RegTensor<T> vregRes;
+    Reg::RegTensor<T> vregResFinal;
+    Reg::RegTensor<float> vregMinValue;
+    Reg::RegTensor<float> vregInfValue;
+    Reg::RegTensor<float> vregZero;
+    Reg::MaskReg pregCompare;
+    Reg::MaskReg pregZeroSum;
     constexpr uint32_t dealRows = 8;
     constexpr uint32_t floatRepSize = 64; // 64: 一个寄存器存64个float
     constexpr float infValue = 3e+99;     // 3e+99 for float inf
@@ -505,45 +505,44 @@ __simd_vf__ inline void ComputeLseOutputVF(__ubuf__ T *srcSumUb, __ubuf__ T *src
     uint16_t tailLSize = (dealCount % dealRows) << 3;
     uint32_t pltTail = static_cast<uint32_t>(tailLSize);
 
-    MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-    MicroAPI::MaskReg pregTail = MicroAPI::UpdateMask<T>(pltTail);
-    MicroAPI::Duplicate<float, float>(vregMinValue, minValue);
-    MicroAPI::Duplicate<float, float>(vregInfValue, infValue);
-    MicroAPI::Duplicate<float, float>(vregZero, 0.0f);
+    Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg pregTail = Reg::UpdateMask<T>(pltTail);
+    Reg::Duplicate<float, float>(vregMinValue, minValue);
+    Reg::Duplicate<float, float>(vregInfValue, infValue);
+    Reg::Duplicate<float, float>(vregZero, 0.0f);
 
     for (uint16_t i = 0; i < updateLoops; ++i) {
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_E2B_B32>(vregSum, srcSumUb + (i * dealRows));
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_E2B_B32>(vregMax, srcMaxUb + (i * dealRows));
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_E2B_B32>(vregSum, srcSumUb + (i * dealRows));
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_E2B_B32>(vregMax, srcMaxUb + (i * dealRows));
 
-        MicroAPI::Log<T, MicroAPI::MaskMergeMode::ZEROING>(vregRes, vregSum, pregAll);
-        MicroAPI::Add<T, MicroAPI::MaskMergeMode::ZEROING>(vregRes, vregRes, vregMax, pregAll);
+        Reg::Log<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregSum, pregAll);
+        Reg::Add<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregRes, vregMax, pregAll);
 
-        MicroAPI::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregAll);
-        MicroAPI::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
+        Reg::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregAll);
+        Reg::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
 
         // sum == 0 保护：ln(0) + max = -inf, 需替换为 vregMinValue
-        MicroAPI::Compare<float, CMPMODE::EQ>(pregZeroSum, vregSum, vregZero, pregAll);
-        MicroAPI::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
+        Reg::Compare<float, CMPMODE::EQ>(pregZeroSum, vregSum, vregZero, pregAll);
+        Reg::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
 
-        MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(dstUb + (i * floatRepSize), vregResFinal, pregAll);
+        Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(dstUb + (i * floatRepSize), vregResFinal, pregAll);
     }
 
     if (tailLSize != 0) {
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_E2B_B32>(vregSum, srcSumUb + dealRows * updateLoops);
-        MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_E2B_B32>(vregMax, srcMaxUb + dealRows * updateLoops);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_E2B_B32>(vregSum, srcSumUb + dealRows * updateLoops);
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_E2B_B32>(vregMax, srcMaxUb + dealRows * updateLoops);
 
-        MicroAPI::Log<T, MicroAPI::MaskMergeMode::ZEROING>(vregRes, vregSum, pregTail);
-        MicroAPI::Add<T, MicroAPI::MaskMergeMode::ZEROING>(vregRes, vregRes, vregMax, pregTail);
+        Reg::Log<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregSum, pregTail);
+        Reg::Add<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregRes, vregMax, pregTail);
 
-        MicroAPI::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregTail);
-        MicroAPI::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
+        Reg::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregTail);
+        Reg::Select<T>(vregResFinal, vregMinValue, vregRes, pregCompare);
 
         // sum == 0 保护：ln(0) + max = -inf, 需替换为 vregMinValue
-        MicroAPI::Compare<float, CMPMODE::EQ>(pregZeroSum, vregSum, vregZero, pregTail);
-        MicroAPI::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
+        Reg::Compare<float, CMPMODE::EQ>(pregZeroSum, vregSum, vregZero, pregTail);
+        Reg::Select<T>(vregResFinal, vregMinValue, vregResFinal, pregZeroSum);
 
-        MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(dstUb + floatRepSize * updateLoops, vregResFinal,
-                                                                    pregTail);
+        Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(dstUb + floatRepSize * updateLoops, vregResFinal, pregTail);
     }
 }
 
@@ -570,35 +569,34 @@ __simd_vf__ inline void RowInvalidUpdateVF(__ubuf__ T *finalUb, __ubuf__ float *
     const T zeroValue = *((T *)&tmpZero);
     constexpr uint32_t tmpMin = 0xFF7FFFFF; // min value of float
     const float minValue = *((float *)&tmpMin);
-    MicroAPI::RegTensor<float> vregMinValue;
-    MicroAPI::RegTensor<T> vregZeroValue;
-    MicroAPI::RegTensor<float> vregMax;
-    MicroAPI::RegTensor<T> vregFinal;
-    MicroAPI::RegTensor<T> vregFinalNew;
+    Reg::RegTensor<float> vregMinValue;
+    Reg::RegTensor<T> vregZeroValue;
+    Reg::RegTensor<float> vregMax;
+    Reg::RegTensor<T> vregFinal;
+    Reg::RegTensor<T> vregFinalNew;
 
-    MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
+    Reg::MaskReg pregAll = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
     uint32_t tmpTailD = pltTailD;
-    MicroAPI::MaskReg pregTailD = MicroAPI::UpdateMask<T>(tmpTailD);
-    MicroAPI::MaskReg pregCompare;
-    MicroAPI::MaskReg pregZeroSum;
+    Reg::MaskReg pregTailD = Reg::UpdateMask<T>(tmpTailD);
+    Reg::MaskReg pregCompare;
+    Reg::MaskReg pregZeroSum;
 
-    MicroAPI::Duplicate<float, float>(vregMinValue, minValue);
-    MicroAPI::Duplicate<T, T>(vregZeroValue, zeroValue);
+    Reg::Duplicate<float, float>(vregMinValue, minValue);
+    Reg::Duplicate<T, T>(vregZeroValue, zeroValue);
     for (uint16_t i = 0; i < m; ++i) {
-        MicroAPI::LoadAlign<float, MicroAPI::LoadDist::DIST_BRC_B32>(vregMax, maxUb + i);
-        MicroAPI::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregAll);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(vregMax, maxUb + i);
+        Reg::Compare<float, CMPMODE::EQ>(pregCompare, vregMax, vregMinValue, pregAll);
         for (uint16_t j = 0; j < dLoops; ++j) {
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregFinal, finalUb + i * dSize + j * floatRepSize);
-            MicroAPI::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
-            MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + j * floatRepSize,
-                                                                        vregFinalNew, pregAll);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_NORM>(vregFinal, finalUb + i * dSize + j * floatRepSize);
+            Reg::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + j * floatRepSize, vregFinalNew,
+                                                              pregAll);
         }
         for (uint16_t t = 0; t < hasTail; ++t) {
-            MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregFinal,
-                                                                  finalUb + i * dSize + dLoops * floatRepSize);
-            MicroAPI::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
-            MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + dLoops * floatRepSize,
-                                                                        vregFinalNew, pregTailD);
+            Reg::LoadAlign<T, Reg::LoadDist::DIST_NORM>(vregFinal, finalUb + i * dSize + dLoops * floatRepSize);
+            Reg::Select<T>(vregFinalNew, vregZeroValue, vregFinal, pregCompare);
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(finalUb + i * dSize + dLoops * floatRepSize, vregFinalNew,
+                                                              pregTailD);
         }
     }
 }

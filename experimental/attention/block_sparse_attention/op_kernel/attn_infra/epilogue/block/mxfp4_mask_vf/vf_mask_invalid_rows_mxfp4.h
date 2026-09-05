@@ -15,7 +15,7 @@
 namespace NpuArch::Epilogue::Block::Mxfp4VF {
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 // 将validRows所在的32行以及下一个32行无效部分置为-inf，softmax无效行得到0。
 template <typename T, bool QS64 = false>
@@ -34,7 +34,7 @@ __simd_vf__ inline void mask_invalid_rows_to_min_value_vf(__ubuf__ T *s, uint16_
     Duplicate(min_val_reg, MIN_VALUE, mask);
 
     for (uint16_t r = effClamped; validGroups > 0 && r < writeEnd; ++r) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(s + ((chunkRowBase + r) * QsBase) * 2, min_val_reg, mask);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(s + ((chunkRowBase + r) * QsBase) * 2, min_val_reg, mask);
     }
 }
 

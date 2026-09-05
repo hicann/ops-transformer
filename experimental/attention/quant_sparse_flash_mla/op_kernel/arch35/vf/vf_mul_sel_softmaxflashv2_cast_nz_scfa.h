@@ -33,16 +33,18 @@ namespace SCFaVectorApi {
 using AscendC::LocalTensor;
 
 enum class OriginNRange {
-    EQ_128_SCFA = 0,         // originN == 128, better performance than GT_64_AND_LTE_128 (s2BaseSize=128)
-    GT_0_AND_LTE_64_SCFA,    // 0 < originN <= 64 (s2BaseSize <= 64 or tail s2)
-    GT_64_AND_LTE_128_SCFA,  // 64 < originN <= 128, support for non-alignment (s2BaseSize=128)
+    EQ_128_SCFA = 0,        // originN == 128, better performance than GT_64_AND_LTE_128 (s2BaseSize=128)
+    GT_0_AND_LTE_64_SCFA,   // 0 < originN <= 64 (s2BaseSize <= 64 or tail s2)
+    GT_64_AND_LTE_128_SCFA, // 64 < originN <= 128, support for non-alignment (s2BaseSize=128)
     N_INVALID_SCFA
 };
-template <typename T, typename T2, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128, OriginNRange oriNRange = OriginNRange::EQ_128_SCFA>
-__aicore__ inline void ProcessVec1NoUpdate(
-    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expSumTensor,
-    const LocalTensor<T>& maxTensor, const LocalTensor<T>& inMaxTensor, const LocalTensor<T>& sharedTmpBuffer,
-    TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale, const T minValue)
+template <typename T, typename T2, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128,
+          OriginNRange oriNRange = OriginNRange::EQ_128_SCFA>
+__aicore__ inline void ProcessVec1NoUpdate(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,
+                                           const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
+                                           const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
+                                           TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN,
+                                           const T scale, const T minValue)
 {
     if constexpr (oriNRange == OriginNRange::EQ_128_SCFA) {
         LocalTensor<uint8_t> indexesTensor;
@@ -53,20 +55,20 @@ __aicore__ inline void ProcessVec1NoUpdate(
         ProcessVec1NoUpdateImpl128<T, T2, s1BaseSize, s2BaseSize>(dstTensor, srcTensor, expSumTensor, maxTensor,
                                                                   inMaxTensor, sharedTmpBuffer, indexesTensor, m,
                                                                   originN, scale, minValue);
-    } else if constexpr (oriNRange == OriginNRange::GT_0_AND_LTE_64_SCFA){
+    } else if constexpr (oriNRange == OriginNRange::GT_0_AND_LTE_64_SCFA) {
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
-            IsSameType<T2, hifloat8_t>::value) {
+                      IsSameType<T2, hifloat8_t>::value) {
             indexesTensor =
                 vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)].template Get<uint8_t>();
         }
         ProcessVec1NoUpdateImpl64<T, T2, s1BaseSize, s2BaseSize>(dstTensor, srcTensor, expSumTensor, maxTensor,
                                                                  inMaxTensor, sharedTmpBuffer, indexesTensor, m,
                                                                  originN, scale, minValue);
-    } else if constexpr (oriNRange == OriginNRange::GT_64_AND_LTE_128_SCFA){
+    } else if constexpr (oriNRange == OriginNRange::GT_64_AND_LTE_128_SCFA) {
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
-            IsSameType<T2, hifloat8_t>::value) {
+                      IsSameType<T2, hifloat8_t>::value) {
             indexesTensor =
                 vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
         }
@@ -76,11 +78,13 @@ __aicore__ inline void ProcessVec1NoUpdate(
     }
 }
 
-template <typename T, typename T2, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128, OriginNRange oriNRange = OriginNRange::EQ_128_SCFA>
-__aicore__ inline void ProcessVec1Update(
-    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expSumTensor,
-    const LocalTensor<T>& maxTensor, const LocalTensor<T>& inMaxTensor, const LocalTensor<T>& sharedTmpBuffer,
-    TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale, const T minValue)
+template <typename T, typename T2, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128,
+          OriginNRange oriNRange = OriginNRange::EQ_128_SCFA>
+__aicore__ inline void ProcessVec1Update(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,
+                                         const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
+                                         const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
+                                         TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN,
+                                         const T scale, const T minValue)
 {
     if constexpr (oriNRange == OriginNRange::EQ_128_SCFA) {
         LocalTensor<uint8_t> indexesTensor;
@@ -88,16 +92,16 @@ __aicore__ inline void ProcessVec1Update(
             indexesTensor =
                 vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
         }
-        ProcessVec1UpdateImpl128<T, T2, s1BaseSize, s2BaseSize>(
-            dstTensor, srcTensor, inMaxTensor, sharedTmpBuffer, indexesTensor, m, originN, scale, minValue);
+        ProcessVec1UpdateImpl128<T, T2, s1BaseSize, s2BaseSize>(dstTensor, srcTensor, inMaxTensor, sharedTmpBuffer,
+                                                                indexesTensor, m, originN, scale, minValue);
     } else if constexpr (oriNRange == OriginNRange::GT_0_AND_LTE_64_SCFA) {
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, hifloat8_t>::value) {
             indexesTensor =
                 vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)].template Get<uint8_t>();
         }
-        ProcessVec1UpdateImpl64<T, T2, s1BaseSize, s2BaseSize>(
-            dstTensor, srcTensor, inMaxTensor, sharedTmpBuffer, indexesTensor, m, originN, scale, minValue);
+        ProcessVec1UpdateImpl64<T, T2, s1BaseSize, s2BaseSize>(dstTensor, srcTensor, inMaxTensor, sharedTmpBuffer,
+                                                               indexesTensor, m, originN, scale, minValue);
     } else if constexpr (oriNRange == OriginNRange::GT_64_AND_LTE_128_SCFA) {
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, hifloat8_t>::value) {
@@ -109,29 +113,32 @@ __aicore__ inline void ProcessVec1Update(
     }
 }
 
-template <typename T, typename T2, bool isUpdate = false, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128, OriginNRange oriNRange = OriginNRange::EQ_128_SCFA>
-__aicore__ inline void ProcessVec1Vf(
-    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expSumTensor,
-    const LocalTensor<T>& maxTensor, const LocalTensor<T>& inMaxTensor, const LocalTensor<T>& sharedTmpBuffer,
-    TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale, const T minValue)
+template <typename T, typename T2, bool isUpdate = false, uint32_t s1BaseSize = 64, uint32_t s2BaseSize = 128,
+          OriginNRange oriNRange = OriginNRange::EQ_128_SCFA>
+__aicore__ inline void ProcessVec1Vf(const LocalTensor<T2> &dstTensor, const LocalTensor<T> &srcTensor,
+                                     const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
+                                     const LocalTensor<T> &inMaxTensor, const LocalTensor<T> &sharedTmpBuffer,
+                                     TBuf<> *vselrIndexesBuf, const uint16_t m, const uint32_t originN, const T scale,
+                                     const T minValue)
 {
     static_assert(IsSameType<T, float>::value, "VF mul_sel_softmaxflashv2_cast_nz, T must be float");
     // static_assert(IsSameType<T2, bfloat16_t>::value, "VF mul_sel_softmaxflashv2_cast_nz, T2 must be bfloat16");
 
     if constexpr (!isUpdate) {
-        ProcessVec1NoUpdate<T, T2, s1BaseSize, s2BaseSize, oriNRange>(
-            dstTensor, srcTensor, expSumTensor, maxTensor, inMaxTensor, sharedTmpBuffer, vselrIndexesBuf, m, originN,
-            scale, minValue);
+        ProcessVec1NoUpdate<T, T2, s1BaseSize, s2BaseSize, oriNRange>(dstTensor, srcTensor, expSumTensor, maxTensor,
+                                                                      inMaxTensor, sharedTmpBuffer, vselrIndexesBuf, m,
+                                                                      originN, scale, minValue);
     } else {
-        ProcessVec1Update<T, T2, s1BaseSize, s2BaseSize, oriNRange>(
-            dstTensor, srcTensor, expSumTensor, maxTensor, inMaxTensor, sharedTmpBuffer, vselrIndexesBuf, m, originN,
-            scale, minValue);
+        ProcessVec1Update<T, T2, s1BaseSize, s2BaseSize, oriNRange>(dstTensor, srcTensor, expSumTensor, maxTensor,
+                                                                    inMaxTensor, sharedTmpBuffer, vselrIndexesBuf, m,
+                                                                    originN, scale, minValue);
     }
 }
 
 template <typename T>
-__simd_vf__ inline void UpdateExpSumAndExpMaxVF(__ubuf__ T * maxUb, __ubuf__ T * inMaxUb, __ubuf__ T * expMaxUb,
-    __ubuf__ T * expSumUb, __ubuf__ T * inExpSumUb, __ubuf__ T * tmpExpSumUb, __ubuf__ T * tmpMaxUb, const uint32_t m)
+__simd_vf__ inline void UpdateExpSumAndExpMaxVF(__ubuf__ T *maxUb, __ubuf__ T *inMaxUb, __ubuf__ T *expMaxUb,
+                                                __ubuf__ T *expSumUb, __ubuf__ T *inExpSumUb, __ubuf__ T *tmpExpSumUb,
+                                                __ubuf__ T *tmpMaxUb, const uint32_t m)
 {
     RegTensor<float> vreg_input_x;
     RegTensor<float> vreg_input_x_unroll;
@@ -147,53 +154,52 @@ __simd_vf__ inline void UpdateExpSumAndExpMaxVF(__ubuf__ T * maxUb, __ubuf__ T *
     LoadAlign(vreg_max, tmpMaxUb);
     LoadAlign(vreg_in_max, inMaxUb);
     FusedExpSub(vreg_exp_max, vreg_in_max, vreg_max, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
-        (__ubuf__ T *&)expMaxUb, vreg_exp_max, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
-        (__ubuf__ T *&)maxUb, vreg_max, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expMaxUb, vreg_exp_max, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)maxUb, vreg_max, preg_all);
     LoadAlign(vreg_in_exp_sum, inExpSumUb);
 
     // x_sum = exp_max * insum + x_sum
     LoadAlign(vreg_exp_sum_brc, tmpExpSumUb);
     Mul(vreg_exp_sum_update, vreg_exp_max, vreg_in_exp_sum, preg_all);
     Add(vreg_exp_sum_update, vreg_exp_sum_update, vreg_exp_sum_brc, preg_all);
-    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
-        (__ubuf__ T *&)expSumUb, vreg_exp_sum_update, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expSumUb, vreg_exp_sum_update, preg_all);
 }
 
 template <typename T>
-__aicore__ inline void SCFAUpdateExpSumAndExpMax(
-    const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
-    const LocalTensor<T>& expMaxTensor, const LocalTensor<T>& inExpSumTensor,
-    const LocalTensor<T>& inMaxTensor,  const LocalTensor<T>& sharedTmpBuffer, const uint32_t m)
+__aicore__ inline void SCFAUpdateExpSumAndExpMax(const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor,
+                                                 const LocalTensor<T> &expMaxTensor,
+                                                 const LocalTensor<T> &inExpSumTensor,
+                                                 const LocalTensor<T> &inMaxTensor,
+                                                 const LocalTensor<T> &sharedTmpBuffer, const uint32_t m)
 {
-    __ubuf__ T * maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
-    __ubuf__ T * inMaxUb = (__ubuf__ T*)inMaxTensor.GetPhyAddr();
+    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
+    __ubuf__ T *inMaxUb = (__ubuf__ T *)inMaxTensor.GetPhyAddr();
 
-    __ubuf__ T * expMaxUb = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
-    __ubuf__ T * expSumUb = (__ubuf__ T*)expSumTensor.GetPhyAddr();
-    __ubuf__ T * inExpSumUb = (__ubuf__ T*)inExpSumTensor.GetPhyAddr();
+    __ubuf__ T *expMaxUb = (__ubuf__ T *)expMaxTensor.GetPhyAddr();
+    __ubuf__ T *expSumUb = (__ubuf__ T *)expSumTensor.GetPhyAddr();
+    __ubuf__ T *inExpSumUb = (__ubuf__ T *)inExpSumTensor.GetPhyAddr();
 
-    __ubuf__ T * tmpExpSumUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ T * tmpMaxUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + 64;
-    
+    __ubuf__ T *tmpExpSumUb = (__ubuf__ T *)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ T *tmpMaxUb = (__ubuf__ T *)sharedTmpBuffer.GetPhyAddr() + 64;
+
     UpdateExpSumAndExpMaxVF<T>(maxUb, inMaxUb, expMaxUb, expSumUb, inExpSumUb, tmpExpSumUb, tmpMaxUb, m);
 }
 
 template <typename T>
-__simd_vf__ inline void DuplicateSumWithR0VF(__ubuf__ T * sumUb, const T R0, uint32_t m) {
-    AscendC::MicroAPI::RegTensor<T> vreg_sum;
-    AscendC::MicroAPI::MaskReg preg_m = AscendC::MicroAPI::UpdateMask<T>(m);
-    AscendC::MicroAPI::UnalignRegForStore ureg;
-    AscendC::MicroAPI::Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, T>(vreg_sum, R0, preg_m);
-    AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(sumUb, vreg_sum, preg_m);
+__simd_vf__ inline void DuplicateSumWithR0VF(__ubuf__ T *sumUb, const T R0, uint32_t m)
+{
+    AscendC::Reg::RegTensor<T> vreg_sum;
+    AscendC::Reg::MaskReg preg_m = AscendC::Reg::UpdateMask<T>(m);
+    AscendC::Reg::UnalignRegForStore ureg;
+    AscendC::Reg::Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(vreg_sum, R0, preg_m);
+    AscendC::Reg::StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(sumUb, vreg_sum, preg_m);
 }
 
 template <typename T>
-__aicore__ inline void DuplicateSumWithR0(const LocalTensor<T>& sumTensor, const T R0, uint32_t m)
+__aicore__ inline void DuplicateSumWithR0(const LocalTensor<T> &sumTensor, const T R0, uint32_t m)
 {
-    __ubuf__ T * sumUb = (__ubuf__ T*)sumTensor.GetPhyAddr();
+    __ubuf__ T *sumUb = (__ubuf__ T *)sumTensor.GetPhyAddr();
     DuplicateSumWithR0VF<T>(sumUb, R0, m);
 }
-} // namespace
+} // namespace SCFaVectorApi
 #endif // MUL_SEL_SOFTMAX_FLASH_V2_CAST_NZ_SCFA_INTERFACE_H

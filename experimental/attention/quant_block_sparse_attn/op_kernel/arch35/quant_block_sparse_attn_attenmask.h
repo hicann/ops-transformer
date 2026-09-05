@@ -20,7 +20,7 @@
 #include "quant_block_sparse_attn_common_arch35.h"
 
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 namespace regbaseutil {
 enum class AttenMaskCompressMode {
     NO_COMPRESS_MODE = 0,
@@ -155,7 +155,6 @@ __aicore__ inline int64_t ComputeOffsetForCausal(const int64_t &delta, const uin
     }
     return (Min(delta, s2BaseSize) + vecCoreOffset) * attenMaskS2Size;
 }
-
 
 #ifndef __CCE_KT_TEST__
 // 128bit 寄存器每次加载 4 个 uint32_t，偏移量 = 128bit/8 = 16 字节，即 64 个字节时为 4 个 128bit 元素
