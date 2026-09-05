@@ -71,8 +71,9 @@ using namespace AscendC;
 #define HCOMM_INIT_SIZE 512UL
 
 static constexpr uint32_t WIN_ADDR_ALIGN = 512;
-static constexpr uint32_t COMBINE_CHANNEL_COUNT = 1U;
+static constexpr uint32_t COMBINE_CHANNEL_COUNT = 7U;
 static constexpr uint32_t RECV_META_FIELDS = 4;
+static constexpr uint32_t HCOMM_CHANNEL_TOKEN_CAPACITY = 32368U;
 // Keep one SQ entry unused. A token that would make the following token cross this limit requests a CQE and drains.
 static constexpr uint32_t HCOMM_SQ_MAX_PENDING = 32767U;
 // PR 111 requires each committed batch to contain fewer WQEBBs than the SQ depth.
@@ -247,11 +248,16 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
     MoeEpExceptionDump::WriteMetadata(context, tilingGM + metadataOffset);
     diagWriter_.Init(context, MOE_EP_CORE_DIAG_COMBINE, tpipe_);
     channelsPerRank_ = mc2Context_->channelsPerRank;
-    if (channelsPerRank_ == 0 || (epWorldSize_ > 0 && channelsPerRank_ > Mc2Aclnn::HCCL_MAX_RANK_SIZE / epWorldSize_)) {
-        channelsPerRank_ = 1;
+    if (channelsPerRank_ == 0U) {
+        channelsPerRank_ = 1U;
     }
 
-    combineChannelCount_ = COMBINE_CHANNEL_COUNT;
+    const uint64_t tokenSlotCount = static_cast<uint64_t>(numMaxTokensPerRank_) * topK_;
+    combineChannelCount_ =
+        static_cast<uint32_t>(Ceil(tokenSlotCount, static_cast<uint64_t>(HCOMM_CHANNEL_TOKEN_CAPACITY)));
+    combineChannelCount_ = combineChannelCount_ == 0U ? 1U : combineChannelCount_;
+    combineChannelCount_ = combineChannelCount_ < channelsPerRank_ ? combineChannelCount_ : channelsPerRank_;
+    combineChannelCount_ = combineChannelCount_ < COMBINE_CHANNEL_COUNT ? combineChannelCount_ : COMBINE_CHANNEL_COUNT;
 
     for (uint32_t i = 0; i < epWorldSize_; ++i) {
         winRankAddr_[i] = (GM_ADDR)mc2Context_->epHcclBuffer[i];
@@ -653,7 +659,7 @@ template <TemplateMoeEpCombineTypeClass>
 __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendChannelFlag(uint32_t dstRank,
                                                                                    uint32_t channelIndex)
 {
-    uint64_t flagIndex = static_cast<uint64_t>(rankId_) * COMBINE_CHANNEL_COUNT + channelIndex;
+    uint64_t flagIndex = static_cast<uint64_t>(rankId_) * combineChannelCount_ + channelIndex;
     uint64_t flagOffset =
         static_cast<uint64_t>(numMaxTokensPerRank_) * topK_ * WIN_ADDR_ALIGN + flagIndex * WIN_ADDR_ALIGN;
     GM_ADDR flagAddr = GetUrmaStateAddrByRankId(dstRank, combineStateWinOffset_) + flagOffset;
