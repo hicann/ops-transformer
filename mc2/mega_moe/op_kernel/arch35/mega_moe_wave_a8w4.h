@@ -71,6 +71,12 @@ private:
                                                       uint32_t &startBlockIdx, int32_t &gmm1TileReadySequence,
                                                       uint32_t tokenStartIndexInExpert, uint32_t sliceTokenCount,
                                                       uint32_t gmm1TilesPerMGroup);
+    __aicore__ inline void RunGmm2CombineForWaveRange(const ExpertTokenPosition &waveBeginPosition,
+                                                      const ExpertTokenPosition &waveEndPosition,
+                                                      uint32_t waveLastActiveExpertIdx, ExpertLoopState &gmm2State,
+                                                      GMMAddrInfo &gmm2AddrInfo, uint32_t &startBlockIdx,
+                                                      WaveCombineBufferConfig &combineBufferConfig,
+                                                      uint32_t &combineRowSequence, int32_t &gmm1TileReadySequence);
     __aicore__ inline void ProcessMoeExpertStages(int32_t &gmm1TileReadySequence);
 };
 
@@ -97,11 +103,50 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::RunGmm1
         state.expertIdx);
 }
 
+// 消费一个已完成 Wave 的 GMM2/Combine（内联循环的逐字提取；调度本体在基类 RunGmm2CombineForExpert）。
+// Wave 在专家内结束时需包含该专家；在专家边界结束时，waveEndPosition 已指向下一专家。
+template <TemplateMegaMoeA8W4WaveTypeClass>
+__aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::RunGmm2CombineForWaveRange(
+    const ExpertTokenPosition &waveBeginPosition, const ExpertTokenPosition &waveEndPosition,
+    uint32_t waveLastActiveExpertIdx, ExpertLoopState &gmm2State, GMMAddrInfo &gmm2AddrInfo, uint32_t &startBlockIdx,
+    WaveCombineBufferConfig &combineBufferConfig, uint32_t &combineRowSequence, int32_t &gmm1TileReadySequence)
+{
+    uint32_t waveGmm2ExpertEndExclusive =
+        waveEndPosition.expertIdx + (waveEndPosition.tokenIndexInExpert == 0U ? 0U : 1U);
+    for (uint32_t expertIdx = waveBeginPosition.expertIdx; expertIdx < waveGmm2ExpertEndExclusive; ++expertIdx) {
+        uint32_t sliceTokenStartIndexInExpert =
+            expertIdx == waveBeginPosition.expertIdx ? waveBeginPosition.tokenIndexInExpert : 0U;
+        // WAVE 从专家起点开始时，准备该专家的 GMM2 状态；跨 WAVE slice 沿用已有状态。
+        if (sliceTokenStartIndexInExpert == 0U) {
+            this->template PrepareGmmExpertState<false>(gmm2State, expertIdx);
+        }
+        uint32_t expertTokenCount = static_cast<uint32_t>(Get<M_VALUE>(gmm2State.problemShape));
+        uint32_t sliceTokenEndIndexInExpert =
+            expertIdx == waveEndPosition.expertIdx ? waveEndPosition.tokenIndexInExpert : expertTokenCount;
+        uint32_t sliceTokenCount = sliceTokenEndIndexInExpert - sliceTokenStartIndexInExpert;
+        if (sliceTokenCount != 0U) {
+            bool isFinalCombine = waveEndPosition.expertIdx >= commonConfig_.moeExpertPerRank &&
+                                  expertIdx == waveLastActiveExpertIdx &&
+                                  sliceTokenEndIndexInExpert >= expertTokenCount;
+            // W4 的 GMM2/Combine 调度集中在基类，派生模板只负责提供当前专家 slice。
+            RunGmm2CombineForExpert(gmm2State, gmm2AddrInfo, startBlockIdx, sliceTokenStartIndexInExpert,
+                                    sliceTokenCount, combineBufferConfig, combineRowSequence, gmm1TileReadySequence,
+                                    isFinalCombine);
+        }
+    }
+    if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+        DrainCombineRowBuffers(combineRowSequence, combineBufferConfig.rowBufferCount);
+    }
+}
+
 /*
  * 按 GMM1 调度负载将专家划分为动态 Wave。启动阶段先 Dispatch 第一个完整 Wave；稳态阶段由 AIV1
  * 按专家 slice 交替执行下一 Wave 的 Dispatch 和当前 Wave 的 Activation，同时 AIC/AIV0 执行当前 Wave 的 GMM1。
  * 整 Wave 与专家 slice 都向 DispatchTokenRange 传入显式 [begin, end) 范围。当前 Wave 完成后立即启动
  * GMM2/Combine，无需等待所有专家的 GMM1。
+ * 大 bs 下 GMM2 滞后一拍：wave w 的 GMM2/Combine 延至 GMM1(w+1) 之后，用下一 Wave 的 GMM1
+ * 覆盖 AIC 等激活的自旋（对齐 A8W8 的 gmm2LaggedTarget 设计；A8W4 的 AIV0 prologue 与
+ * AIV1 combine 在 GMM2 调用内均有实活，故三角色整调用同序滞后）。
  */
 template <TemplateMegaMoeA8W4WaveTypeClass>
 __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::ProcessMoeExpertStages(
@@ -131,6 +176,14 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::Process
         Ops::Base::CeilDiv(commonConfig_.gmm1OutputDim / ACTIVATION_N_HALF, static_cast<uint32_t>(L1_TILE_N));
 
     ExpertTokenPosition dispatchPosition{};
+
+    // GMM2 滞后一拍门控：与 A8W8 的 GMM2_LAG_MIN_TOKEN_NUM(4096) 同门槛；
+    // 关闭态与现役"当前 Wave 完成后立即消费"逐字等价。
+    const bool gmm2LagActive = commonConfig_.tokenNum >= 4096U;
+    ExpertTokenPosition prevWaveBeginPosition{};
+    ExpertTokenPosition prevWaveEndPosition{};
+    uint32_t prevWaveLastActiveExpertIdx = commonConfig_.moeExpertPerRank;
+    bool hasPendingGmm2Wave = false;
 
     // 启动阶段：GMM1 开始消费输入前，由 AIV1 先 Dispatch 第一个完整 Wave。
     if constexpr (g_coreType == AIV) {
@@ -211,34 +264,31 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::Process
             }
         }
         UpdateGmmLoopCount(gmmLoopCount_, LoopCountIndex::GMM1, ++gmm1Count);
-        // 当前 Wave 完成后立即消费，使其 GMM2/Combine 与下一 Wave 的输入预取重叠。
-        // GMM2 调度与 Combine 量化模式无关：统一按当前 WAVE 覆盖的专家 slice 顺序推进。
-        uint32_t waveGmm2ExpertEndExclusive =
-            waveEndPosition.expertIdx + (waveEndPosition.tokenIndexInExpert == 0U ? 0U : 1U);
-        for (uint32_t expertIdx = waveBeginPosition.expertIdx; expertIdx < waveGmm2ExpertEndExclusive; ++expertIdx) {
-            uint32_t sliceTokenStartIndexInExpert =
-                expertIdx == waveBeginPosition.expertIdx ? waveBeginPosition.tokenIndexInExpert : 0U;
-            // WAVE 从专家起点开始时，准备该专家的 GMM2 状态；跨 WAVE slice 沿用已有状态。
-            if (sliceTokenStartIndexInExpert == 0U) {
-                this->template PrepareGmmExpertState<false>(gmm2State, expertIdx);
+        if (gmm2LagActive) {
+            // 滞后一拍：本轮消费上一 Wave 的 GMM2/Combine；当前 Wave 边界缓存到下一轮。
+            if (hasPendingGmm2Wave) {
+                RunGmm2CombineForWaveRange(prevWaveBeginPosition, prevWaveEndPosition, prevWaveLastActiveExpertIdx,
+                                           gmm2State, gmm2AddrInfo, startBlockIdx, combineBufferConfig,
+                                           combineRowSequence, gmm1TileReadySequence);
+                UpdateGmmLoopCount(gmmLoopCount_, LoopCountIndex::GMM2, ++gmm2Count);
             }
-            uint32_t expertTokenCount = static_cast<uint32_t>(Get<M_VALUE>(gmm2State.problemShape));
-            uint32_t sliceTokenEndIndexInExpert =
-                expertIdx == waveEndPosition.expertIdx ? waveEndPosition.tokenIndexInExpert : expertTokenCount;
-            uint32_t sliceTokenCount = sliceTokenEndIndexInExpert - sliceTokenStartIndexInExpert;
-            if (sliceTokenCount != 0U) {
-                bool isFinalCombine = waveEndPosition.expertIdx >= commonConfig_.moeExpertPerRank &&
-                                      expertIdx == waveLastActiveExpertIdx &&
-                                      sliceTokenEndIndexInExpert >= expertTokenCount;
-                // W4 的 GMM2/Combine 调度集中在基类，派生模板只负责提供当前专家 slice。
-                RunGmm2CombineForExpert(gmm2State, gmm2AddrInfo, startBlockIdx, sliceTokenStartIndexInExpert,
-                                        sliceTokenCount, combineBufferConfig, combineRowSequence, gmm1TileReadySequence,
-                                        isFinalCombine);
-            }
+            prevWaveBeginPosition = waveBeginPosition;
+            prevWaveEndPosition = waveEndPosition;
+            prevWaveLastActiveExpertIdx = waveLastActiveExpertIdx;
+            hasPendingGmm2Wave = true;
+        } else {
+            // 当前 Wave 完成后立即消费，使其 GMM2/Combine 与下一 Wave 的输入预取重叠。
+            RunGmm2CombineForWaveRange(waveBeginPosition, waveEndPosition, waveLastActiveExpertIdx, gmm2State,
+                                       gmm2AddrInfo, startBlockIdx, combineBufferConfig, combineRowSequence,
+                                       gmm1TileReadySequence);
+            UpdateGmmLoopCount(gmmLoopCount_, LoopCountIndex::GMM2, ++gmm2Count);
         }
-        if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
-            DrainCombineRowBuffers(combineRowSequence, combineBufferConfig.rowBufferCount);
-        }
+    }
+    // 滞后流水收尾：三角色共同补跑最后一个 Wave 的 GMM2/Combine。
+    if (hasPendingGmm2Wave) {
+        RunGmm2CombineForWaveRange(prevWaveBeginPosition, prevWaveEndPosition, prevWaveLastActiveExpertIdx, gmm2State,
+                                   gmm2AddrInfo, startBlockIdx, combineBufferConfig, combineRowSequence,
+                                   gmm1TileReadySequence);
         UpdateGmmLoopCount(gmmLoopCount_, LoopCountIndex::GMM2, ++gmm2Count);
     }
 }
