@@ -18,6 +18,7 @@ operator_group_1:
   - nsa_selected_attention_infer
   - mla_preprocess_v2
   - mla_preprocess
+  - block_attention_residuals_grad
 operator_group_2:
   - incre_flash_attention
   - prompt_flash_attention

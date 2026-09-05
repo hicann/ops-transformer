@@ -22,6 +22,7 @@ operator_group_1:
   - mhc_pre
   - mhc_pre_backward
   - mhc_sinkhorn_backward
+  - block_attention_residuals_grad
 operator_group_2:
   - grouped_matmul
   - grouped_matmul_add
