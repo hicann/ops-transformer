@@ -43,7 +43,7 @@ uint64_t CalcMaxTileMFromHcclLimit(const CutResult &cutRes, const CommSizeInfo &
 uint64_t SelectOptimalCandidateTileM(uint64_t maxTileM);
 
 uint64_t DetermineFinalTileMWithLimit(uint64_t mValue, uint64_t candidateTileM, uint64_t maxTileM,
-                                      const CommSizeInfo &commSize, const std::string &opName);
+                                      const std::string &opName);
 
 void ApplyTileSplit(CutResult &cutRes, uint64_t mValue, uint64_t tileM, const CommSizeInfo &commSize,
                     const std::string &opName);

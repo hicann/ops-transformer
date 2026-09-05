@@ -63,6 +63,8 @@ protected:
     void SetTilingKeyParams();
     ge::graphStatus CheckGroupSize();
     ge::graphStatus CheckPerBlockScaleInput();
+    ge::graphStatus CheckScaleShapeValid(const char *scaleName, uint64_t firstDim, uint64_t secondDim,
+                                         uint64_t expectFirstDim, uint64_t expectSecondDim);
     ge::graphStatus CheckMXFPScaleInput();
     ge::graphStatus CheckMXFP4Input();
     ge::graphStatus CheckPerTensorScaleInput();

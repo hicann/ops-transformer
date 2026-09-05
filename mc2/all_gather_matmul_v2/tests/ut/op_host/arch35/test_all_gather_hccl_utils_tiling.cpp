@@ -70,27 +70,23 @@ TEST(AllGatherHcclUtilsTest, SelectOptimalCandidateTileM)
 
 TEST(AllGatherHcclUtilsTest, DetermineFinalTileMWithin63Tiles)
 {
-    CommSizeInfo commSize{8192, 2, 8};
-    EXPECT_EQ(DetermineFinalTileMWithLimit(1200, 256, 2048, commSize, "ut"), 256U);
+    EXPECT_EQ(DetermineFinalTileMWithLimit(1200, 256, 2048, "ut"), 256U);
 }
 
 TEST(AllGatherHcclUtilsTest, DetermineFinalTileMRecalcWhenTooManyTiles)
 {
     // 候选列表从大到小取第一个 >= minTileM_align，故返回 2048 而非 512。
-    CommSizeInfo commSize{8192, 2, 8};
-    EXPECT_EQ(DetermineFinalTileMWithLimit(16384, 256, 2048, commSize, "ut"), 2048U);
+    EXPECT_EQ(DetermineFinalTileMWithLimit(16384, 256, 2048, "ut"), 2048U);
 }
 
 TEST(AllGatherHcclUtilsTest, DetermineFinalTileMUsesAlignedFallback)
 {
-    CommSizeInfo commSize{256, 2, 8};
-    EXPECT_EQ(DetermineFinalTileMWithLimit(137088, 2048, 65536, commSize, "ut"), 2304U);
+    EXPECT_EQ(DetermineFinalTileMWithLimit(137088, 2048, 65536, "ut"), 2304U);
 }
 
 TEST(AllGatherHcclUtilsTest, DetermineFinalTileMUnsupportedWhenExceedsMax)
 {
-    CommSizeInfo commSize{65535, 2, 8};
-    EXPECT_EQ(DetermineFinalTileMWithLimit(200000, 256, 256, commSize, "ut"), HCCL_UNSUPPORTED);
+    EXPECT_EQ(DetermineFinalTileMWithLimit(200000, 256, 256, "ut"), HCCL_UNSUPPORTED);
 }
 
 TEST(AllGatherHcclUtilsTest, ApplyTileSplitWithTail)
