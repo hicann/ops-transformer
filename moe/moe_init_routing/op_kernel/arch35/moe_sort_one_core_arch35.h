@@ -51,8 +51,7 @@ __aicore__ inline void MoeSortOneCore::SortCompute()
 {
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.DeQue<int32_t>();
     LocalTensor<int32_t> expertForSourceRowLocal = inLocal[0];
-    LocalTensor<float> expertForSourceRowLocalFp32;
-    expertForSourceRowLocalFp32 = expertForSourceRowLocal.ReinterpretCast<float>();
+    LocalTensor<float> expertForSourceRowLocalFp32 = expertForSourceRowLocal.ReinterpretCast<float>();
     Cast(expertForSourceRowLocalFp32, expertForSourceRowLocal, RoundMode::CAST_ROUND, this->tileLength);
     Muls(expertForSourceRowLocalFp32, expertForSourceRowLocalFp32, (float)-1, this->tileLength);
 

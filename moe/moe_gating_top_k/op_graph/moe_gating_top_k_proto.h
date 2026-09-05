@@ -20,30 +20,53 @@
 namespace ge {
 
 /**
-   * @brief Compute renorm(sigmoid) and topk for moe input.
-   *
-   * @par Inputs:
-   * @li x: A 2D tensor which moe gating topk is applied, The shape is: (B*S, E), format supports ND, and data type must be float16, float or bfloat16. E(Expert num) can not be greater than 2048. E(Expert num) should be divisible by group_count.
-   * @li bias: A 1D tensor which is "bias" in moe gating topk. The shape is: (E), format supports ND, and data type must be the same as that of x.
-   *
-   * @par Outputs:
-   * @li y: A 2D tensor which is the topk value result of moe gating topk, format supports ND, and data type must be the same as that of x.
-         The size of the non-1 axis must be the same as that of the corresponding axis of x.
-         The size of the -1 axis must be the same as that of k.
-   * @li expert_idx: A 2D tensor which is the topk index result of moe gating topk, format supports ND, and data type must be int. The shape must be the same as that of y.
-   * @li out: A 2D tensor which is the renorm result of moe gating topk, format supports ND, and data type must be float. The shape must be the same as that of x.
-   *
-   * @par Attributes:
-   * @li k: A required attribute of type int. The value must greater than 0 and less than or equal to expert_num / group_count * k_group, idicating the topk value.
-   * @li k_group: An optional attribute of type int. It can not be less than 1, and can not be greater than group_count, indicating the topk group value. The default value is 1.
-   * @li group_count: An optional attribute of type int. It can not be less than 1, indicating the group count. x_shpe[-1] must be divisible by groupCount, and the result after division must be greater than groupSelectMode. The group_count * align_32(expert_num / group_count) can not be greater than 2048. The default value is 1.
-   * @li group_select_mode: An optional attribute of type int. 0 indicating that sort group by max values, 1 indicating that sort group by sum of top-2 values. The default value is 0.
-   * @li renorm: An optional attribute of type int. It can only be 0 now, indicating that norm firstly and then topk. The default value is 0.
-   * @li norm_type: An optional attribute of type int. 0 indicating that the softmax function is used, 1 indicating that the sigmoid function is used. The default value is 0.
-   * @li out_flag: An optional attribute of type bool. true indicating that has renorm output, false indicating that does not have renorm output. The default value is false.
-   * @li routed_scaling_factor: An optional attribute of type float, indicating the routed_scaling_factor coefficient in use. The default value is 1.0.
-   * @li eps: An optional attribute of type float, indicating the eps coefficient in use. The default value is 1e-20.
-   */
+ * @brief Compute renorm(sigmoid) and topk for moe input.
+ *
+ * @par Inputs:
+ * @li x: A 2D tensor which moe gating topk is applied, The shape is: (B*S, E), format supports ND, and data type
+ *  must be float16, float or bfloat16. E(Expert num) can not be greater than 2048. E(Expert num) should be divisible
+ *  by group_count.
+ * @li bias: A 1D tensor which is "bias" in moe gating topk. The shape is: (E), format supports ND, and data type
+ *  must be the same as that of x.
+ * @li input_ids: An optional 1D tensor which is the input index of hash mode, used to look up expert indices from
+ *  tid2eid. The shape is: (B*S), which must be the same as the 0th axis of x, format supports ND, and data type
+ *  must be int32 or int64. It is only required when hash mode is enabled, that is, both input_ids and tid2eid are
+ *  provided.
+ * @li tid2eid: An optional 2D tensor which is the hash mapping table, storing the precomputed expert indices. The
+ *  shape is: (numKeys, k), where numKeys is the number of rows in the mapping table and k must be equal to the value
+ *  of attribute k, format supports ND, and data type must be int32 or int64. It is only required when hash mode is
+ *  enabled, that is, both input_ids and tid2eid are provided.
+ *
+ * @par Outputs:
+ * @li y: A 2D tensor which is the topk value result of moe gating topk, format supports ND, and data type must be
+ *  the same as that of x.
+ *  The size of the non-1 axis must be the same as that of the corresponding axis of x.
+ *  The size of the -1 axis must be the same as that of k.
+ * @li expert_idx: A 2D tensor which is the topk index result of moe gating topk, format supports ND,
+ *  and data type must be int. The shape must be the same as that of y.
+ * @li out: A 2D tensor which is the renorm result of moe gating topk, format supports ND,
+ *  and data type must be float. The shape must be the same as that of x.
+ *
+ * @par Attributes:
+ * @li k: A required attribute of type int. The value must greater than 0 and less than or equal to
+ *  expert_num / group_count * k_group, idicating the topk value.
+ * @li k_group: An optional attribute of type int. It can not be less than 1, and can not be greater than group_count,
+ *  indicating the topk group value. The default value is 1.
+ * @li group_count: An optional attribute of type int. It can not be less than 1, indicating the group count.
+ *  x_shpe[-1] must be divisible by groupCount, and the result after division must be greater than groupSelectMode.
+ *  The group_count * align_32(expert_num / group_count) can not be greater than 2048. The default value is 1.
+ * @li group_select_mode: An optional attribute of type int. 0 indicating that sort group by max values,
+ *  1 indicating that sort group by sum of top-2 values. The default value is 0.
+ * @li renorm: An optional attribute of type int. It can only be 0 now, indicating that norm firstly and then topk.
+ *  The default value is 0.
+ * @li norm_type: An optional attribute of type int. 0 indicating that the softmax function is used,
+ *  1 indicating that the sigmoid function is used. The default value is 0.
+ * @li out_flag: An optional attribute of type bool. true indicating that has renorm output,
+ *  false indicating that does not have renorm output. The default value is false.
+ * @li routed_scaling_factor: An optional attribute of type float, indicating the routed_scaling_factor coefficient
+ *  in use. The default value is 1.0.
+ * @li eps: An optional attribute of type float, indicating the eps coefficient in use. The default value is 1e-20.
+ */
 REG_OP(MoeGatingTopK)
     .INPUT(x, TensorType({DT_FLOAT, DT_FLOAT16, DT_BF16}))
     .OPTIONAL_INPUT(bias, TensorType({DT_FLOAT, DT_FLOAT16, DT_BF16}))

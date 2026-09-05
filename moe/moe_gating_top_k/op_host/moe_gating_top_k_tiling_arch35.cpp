@@ -75,6 +75,7 @@ const static int64_t DEFAULT_WORKSPACE_SIZE = static_cast<int64_t>(16 * 1024 * 1
 const static int64_t DEFAULT_BATCH_ROWS = 4;
 const static int64_t MAX_BATCH_ROWS = 128;
 const static int64_t MAX_SINGLE_EXPERT_BATCH_ROWS = 4096;
+const static int64_t USABLE_UB_PERCENT = 80; // reserve 20% UB for pipe/event overhead
 
 class MoeGatingTopKTilingRegbase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
@@ -664,8 +665,7 @@ void MoeGatingTopKTilingRegbase::SplitRows()
         // all queues use double buffer
         int64_t perRowUbSize = (inputDtypeSize_ + inputDtypeSize_ + sizeof(int32_t) + sizeof(float)) * 2;
         int64_t maxBatchByUb = static_cast<int64_t>(aicoreParams_.ubSize) / perRowUbSize;
-        // reserve 20% UB for pipe/event overhead
-        maxBatchByUb = maxBatchByUb * 4 / 5;
+        maxBatchByUb = maxBatchByUb * USABLE_UB_PERCENT / 100;
         batchRows = std::min(std::max(maxBatchByUb, static_cast<int64_t>(1)), MAX_SINGLE_EXPERT_BATCH_ROWS);
     } else {
         bool isSimplifiedPath = (kGroup_ == groupCount_ || groupCount_ == expertCount_);
