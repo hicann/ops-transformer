@@ -64,6 +64,7 @@ public:
     static constexpr uint32_t vec1ResOffsetDn = s2BaseSize * 32 + 64;
     static constexpr uint32_t vec1Srcstride = (s1BaseSize >> 1) + 1;
     static constexpr uint32_t dTemplateAlign64 = Align64Func((uint16_t)dVTemplateType);
+    static constexpr uint32_t NEGATIVE_INF_VALUE_FP32 = 0xFF800000U;
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
     static constexpr bool isBf16Fp16 = IsSameType<INPUT_T, bfloat16_t>::value || IsSameType<INPUT_T, half>::value;
@@ -682,12 +683,23 @@ __aicore__ inline void FANoQuantBlockVecBase<TEMPLATE_BASE_ARGS>::InvalidLinePro
     if (constInfo.softMaxCheckRes) {
         SoftMaxShapeInfo softmaxShapeInfo{static_cast<uint32_t>(runInfo.halfS1RealSize), static_cast<uint32_t>(1),
                                           static_cast<uint32_t>(runInfo.halfS1RealSize), static_cast<uint32_t>(1)};
-        bool res = SoftmaxInvalidLineCheck(maxUb, NEGATIVE_MIN_VALUE_FP32, softmaxShapeInfo);
+        // A real mask marks invalid rows with -FLT_MAX, while the all-zero virtual mask leaves data-originated
+        // -inf unchanged. Select one sentinel per path so the sum and output repair each need only one pass.
+        const bool enableDataNegativeInfRepair = this->tilingData->inputParamsRegbase.attenMaskS2Size == 0;
+        uint32_t negativeInvalidLineBits = NEGATIVE_MIN_VALUE_FP32;
+        T negativeInvalidLineScalar = this->negativeFloatScalar;
+        if constexpr (IsSameType<T, float>::value) {
+            if (unlikely(enableDataNegativeInfRepair)) {
+                negativeInvalidLineBits = NEGATIVE_INF_VALUE_FP32;
+                negativeInvalidLineScalar = *((float *)&negativeInvalidLineBits);
+            }
+        }
+        bool res = SoftmaxInvalidLineCheck(maxUb, negativeInvalidLineBits, softmaxShapeInfo);
         if (!res) {
             constInfo.softMaxCheckRes = false;
         } else {
             if (unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {
-                SoftmaxSumUpdate<T>(sumUb, maxUb, runInfo.halfS1RealSize, this->negativeFloatScalar,
+                SoftmaxSumUpdate<T>(sumUb, maxUb, runInfo.halfS1RealSize, negativeInvalidLineScalar,
                                     this->positiveFloatScalar);
             }
         }
@@ -953,7 +965,14 @@ __aicore__ inline void FANoQuantBlockVecBase<TEMPLATE_BASE_ARGS>::ProcessVec1Nd(
 
     LocalTensor<uint8_t> attenMaskUb;
     if constexpr (hasAtten == true) {
-        if constexpr (isMlaFullQuant || isMlaNoQuant) {
+        const bool useVirtualAttenMask = implMode == ImplModeEnum::AA_INVALID_LINE_HIGH_PRECISION &&
+                                         this->tilingData->inputParamsRegbase.attenMaskS2Size == 0;
+        if (unlikely(useVirtualAttenMask)) {
+            // A zero mask is equivalent to no mask. It lets a mode-2 no-mask call reuse the existing HasAtten
+            // kernel, whose vector path preserves invalid-line information for the subsequent repair step.
+            attenMaskUb = this->attenMaskInQue[runInfo.taskIdMod2].template AllocTensor<uint8_t>();
+            Duplicate(attenMaskUb, static_cast<uint8_t>(0U), runInfo.halfS1RealSize * s2BaseSize);
+        } else if constexpr (isMlaFullQuant || isMlaNoQuant) {
             this->MlaAttenMaskCopyIn(this->attenMaskInQue[runInfo.taskIdMod2],
                                      this->attenMaskInQue[1 - runInfo.taskIdMod2], this->attenMaskGmInt, runInfo,
                                      constInfo, *attenMaskInfoPtr);
@@ -2034,8 +2053,15 @@ __aicore__ inline void FANoQuantBlockVecBase<TEMPLATE_BASE_ARGS>::Bmm2DataCopyOu
                 int64_t vec2MaxBufOffset = ComputeOffsetForSoftmax(runInfo, vec2S1Idx);
                 LocalTensor<float> maxTensor =
                     softmaxMaxBuf[runInfo.multiCoreIdxMod3].template Get<float>()[vec2MaxBufOffset];
+                T negativeInvalidLineScalar = this->negativeFloatScalar;
+                if constexpr (IsSameType<T, float>::value) {
+                    if (unlikely(this->tilingData->inputParamsRegbase.attenMaskS2Size == 0)) {
+                        uint32_t negativeInvalidLineBits = NEGATIVE_INF_VALUE_FP32;
+                        negativeInvalidLineScalar = *((float *)&negativeInvalidLineBits);
+                    }
+                }
                 InvalidLineUpdate<T, dTemplateAlign64>(vec2ResUb, vec2ResUb, maxTensor, runInfo.vec2S1RealSize,
-                                                       dSizeAligned64, this->negativeFloatScalar, 0.0);
+                                                       dSizeAligned64, negativeInvalidLineScalar, 0.0);
             }
         }
         if constexpr (!POST_QUANT) {

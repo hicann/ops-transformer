@@ -15,8 +15,8 @@ namespace optiling {
 namespace FA {
 class FlashAttentionScoreTilingBasic : public FlashAttentionScoreTilingRegbase {
 public:
-    explicit FlashAttentionScoreTilingBasic(gert::TilingContext *context) :
-        FlashAttentionScoreTilingRegbase(context)
+    explicit FlashAttentionScoreTilingBasic(gert::TilingContext *context)
+        : FlashAttentionScoreTilingRegbase(context)
     {
         this->templateName = "S1S2Const";
         this->regbase = true;
@@ -27,12 +27,14 @@ protected:
     STemplateType s1TemplateType = STemplateType::STEMPLATEBOTTOM;
     STemplateType s2TemplateType = STemplateType::STEMPLATEBOTTOM;
 
-    ge::graphStatus CheckContext() override {
+    ge::graphStatus CheckContext() override
+    {
         FlashAttentionScoreTilingRegbase::CheckContext();
         return ge::GRAPH_SUCCESS;
     }
 
-    int64_t CalcTotalSize() override {
+    int64_t CalcTotalSize() override
+    {
         int64_t totalSize = bSize * n2Size * gSize * multiCoreParamsRegbase_->get_s1OuterSize();
         if (totalSize < aicNum && implMode != ImplMode::AA_INVALID_LINE_HIGH_PRECISION && !hasRope &&
             inputDtypeBytes != DATA_TYPE_FP32 && inputDtypeBytes != DATA_TYPE_FP8 && dBasicBlock <= NUM_256) {
@@ -48,13 +50,14 @@ protected:
         return totalSize;
     }
 
-    void CalcDBasicBlock() override {
+    void CalcDBasicBlock() override
+    {
         /* 先确定D的基本块，确定的逻辑是按照64来分档 */
         dBasicBlock = AlignUp(dSize + dSizeRope, D_TEMPLATE_SPLIT_SIZE);
         /* dBasicBlock > 256 直接令D轴大小为768 */
         if (dBasicBlock > NUM_256) {
             dTemplateType = DTemplateType::ALIGNED_768;
-            return ; // 直接返回不往下走
+            return; // 直接返回不往下走
         }
         /* dBasicBlock <= 256, 根据对齐大小选择*/
         switch (dBasicBlock) {
@@ -72,28 +75,26 @@ protected:
                 break;
             default:
                 dTemplateType = DTemplateType::DTEMPLATEBOTTOM;
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "query and key",
-                    std::to_string(dBasicBlock).c_str(),
-                    "The value of dBasicBlock must be in range (0, 768]");
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "query and key", std::to_string(dBasicBlock).c_str(),
+                                                      "The value of dBasicBlock must be in range (0, 768]");
         }
     }
 
     void CalcS1S2BasicBlock() override
     {
         /* s2 = 64 && d == 64使能dn优化 */
-        
+
         if ((inputDtype == ge::DT_HIFLOAT8) && !hasAttenMask && !hasPse && !hasDropOut && !hasRope) {
             s1TemplateType = STemplateType::ALIGNED_128;
             s2TemplateType = STemplateType::ALIGNED_512;
             s1BasicBlock = NUM_128;
             s2BasicBlock = NUM_512;
-        } else if ((dSize == DN_D_64 && dSizeV == DN_D_64 &&
-            (s1Size % DN_S1_128 == 0) &&
-            (s2Size % MIN_DN_S2 == 0) &&
-            !hasAttenMask && !hasPse && !hasDropOut && (inputDtypeBytes != DATA_TYPE_FP32) && 
-            (inputDtypeBytes != DATA_TYPE_FP8) && !hasRope) ||
-            ((inputDtype == ge::DT_FLOAT8_E5M2 || inputDtype == ge::DT_FLOAT8_E4M3FN) &&
-              !hasAttenMask && !hasPse && !hasDropOut && !hasRope)) {
+        } else if ((dSize == DN_D_64 && dSizeV == DN_D_64 && (s1Size % DN_S1_128 == 0) && (s2Size % MIN_DN_S2 == 0) &&
+                    !hasAttenMask && !hasPse && !hasDropOut && (inputDtypeBytes != DATA_TYPE_FP32) &&
+                    (inputDtypeBytes != DATA_TYPE_FP8) && !hasRope &&
+                    implMode != ImplMode::AA_INVALID_LINE_HIGH_PRECISION) ||
+                   ((inputDtype == ge::DT_FLOAT8_E5M2 || inputDtype == ge::DT_FLOAT8_E4M3FN) && !hasAttenMask &&
+                    !hasPse && !hasDropOut && !hasRope)) {
             s1TemplateType = STemplateType::ALIGNED_128;
             s2TemplateType = STemplateType::ALIGNED_256;
             s1BasicBlock = NUM_128;
@@ -134,7 +135,8 @@ protected:
         if (pseS1Size == PSE_ALIBI_S_SIZE && s1Size > PSE_ALIBI_S_SIZE) {
             if (s1Size == s2Size) {
                 if (inputParamsRegbase_->get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL)) {
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparse_type",
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "sparse_type",
                         std::to_string(static_cast<int64_t>(inputParamsRegbase_->get_sparseType())).c_str(),
                         "The value of sparse_type must be CAUSAL when pse alibi is used with "
                         "s1Size > 1024 and s1Size == s2Size");
@@ -142,8 +144,8 @@ protected:
                 }
                 pseEncodeType = PseEncodeType::PSE_ENCODE_ALIBI_S2_FULL;
             } else {
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName,
-                    "s1Size and s2Size", (std::to_string(s1Size) + " and " + std::to_string(s2Size)).c_str(),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName, "s1Size and s2Size", (std::to_string(s1Size) + " and " + std::to_string(s2Size)).c_str(),
                     "The values of s1Size and s2Size must be the same "
                     "when pse alibi is used with s1Size > 1024");
                 return false;
@@ -158,40 +160,48 @@ protected:
     uint64_t GetTilingKey() const override
     {
         uint8_t pseMode = hasPse ? static_cast<uint8_t>(pseType) : static_cast<uint8_t>(PseType::PSE_NONE_TYPE);
-        OP_LOGD(opName, "TilingKey info is implMode:%d, s1TemplateType:%d, s2TemplateType:%d, dTemplateType:%d,"
-            "dVTemplateType:%d, pseMode:%d, hasAttenMask:%d, hasDropOut:%d, hasRope:%d, outDtype:%d, regbase:%d,"
-            "optionalDn:%d", static_cast<uint8_t>(implMode), static_cast<uint16_t>(s1TemplateType),
-            static_cast<uint16_t>(s2TemplateType), static_cast<uint16_t>(dTemplateType),
-            static_cast<uint16_t>(dVTemplateType), pseMode, hasAttenMask, hasDropOut, hasRope,
-            static_cast<uint8_t>(outDtype), static_cast<uint8_t>(regbase), optionalDn);
+        // Mode 2 reuses the existing attention-mask kernel to enable invalid-line processing. The kernel uses
+        // attenMaskS2Size to distinguish a real mask from the virtual all-zero mask used by the no-mask case.
+        const bool enableAttenPipeline = hasAttenMask || implMode == ImplMode::AA_INVALID_LINE_HIGH_PRECISION;
+        OP_LOGD(opName,
+                "TilingKey info is implMode:%d, s1TemplateType:%d, s2TemplateType:%d, dTemplateType:%d,"
+                "dVTemplateType:%d, pseMode:%d, hasAttenMask:%d, enableAttenPipeline:%d, hasDropOut:%d, hasRope:%d, "
+                "outDtype:%d, regbase:%d, optionalDn:%d",
+                static_cast<uint8_t>(implMode), static_cast<uint16_t>(s1TemplateType),
+                static_cast<uint16_t>(s2TemplateType), static_cast<uint16_t>(dTemplateType),
+                static_cast<uint16_t>(dVTemplateType), pseMode, hasAttenMask, enableAttenPipeline, hasDropOut, hasRope,
+                static_cast<uint8_t>(outDtype), static_cast<uint8_t>(regbase), optionalDn);
 
         // Const 128
         if (dTemplateType == dVTemplateType) {
             return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyLayout),
-                static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
-                static_cast<uint16_t>(dTemplateType), static_cast<uint16_t>(DTemplateType::NONALIGNED),
-                pseMode, hasAttenMask, hasDropOut, hasRope, static_cast<uint8_t>(outDtype),
-                static_cast<uint8_t>(regbase), optionalDn);
+                                      static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
+                                      static_cast<uint16_t>(dTemplateType),
+                                      static_cast<uint16_t>(DTemplateType::NONALIGNED), pseMode, enableAttenPipeline,
+                                      hasDropOut, hasRope, static_cast<uint8_t>(outDtype),
+                                      static_cast<uint8_t>(regbase), optionalDn);
         }
         return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyLayout),
-            static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
-            static_cast<uint16_t>(dTemplateType), static_cast<uint16_t>(dVTemplateType), pseMode, hasAttenMask,
-            hasDropOut, hasRope, static_cast<uint8_t>(outDtype), static_cast<uint8_t>(regbase), optionalDn);
+                                  static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
+                                  static_cast<uint16_t>(dTemplateType), static_cast<uint16_t>(dVTemplateType), pseMode,
+                                  enableAttenPipeline, hasDropOut, hasRope, static_cast<uint8_t>(outDtype),
+                                  static_cast<uint8_t>(regbase), optionalDn);
     }
 
     void AnalyzeOptionalDn() override
     {
-        if ((hasAttenMask && attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::LEFT_UP_CAUSAL_MODE)
-            && attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE)) ||
+        if ((hasAttenMask &&
+             attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::LEFT_UP_CAUSAL_MODE) &&
+             attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE)) ||
             !hasAttenMask || hasPse || hasRope || hasDropOut || inputDtypeBytes == DATA_TYPE_FP32 ||
             inputDtypeBytes == DATA_TYPE_FP8 || dTemplateType > DTemplateType::ALIGNED_256 ||
-            dTemplateType != dVTemplateType || s1TemplateType == STemplateType::ALIGNED_64 ||
-            s1Size < NUM_1536 || s2Size < NUM_1536) {
+            dTemplateType != dVTemplateType || s1TemplateType == STemplateType::ALIGNED_64 || s1Size < NUM_1536 ||
+            s2Size < NUM_1536) {
             return;
         }
         optionalDn = true;
     }
-    
+
     bool IsCapable() override
     {
         if (npuArch != NpuArch::DAV_3510) {
@@ -212,10 +222,9 @@ protected:
         if (dTemplateType > DTemplateType::ALIGNED_256) {
             bmm2ResBlockSize = static_cast<int64_t>(dVTemplateType);
         }
-        bool useDn = (!hasPse && !hasAttenMask && !hasDropOut && s1BasicBlock != NUM_64
-                      && dVBasicBlock <= NUM_256 && !hasRope);
-        if ((!useDn && dSize > MIN_D_TO_USE_WORKSPACE) ||
-            (useDn && dSize > DN_MIN_D_TO_USE_WORKSPACE)) {
+        bool useDn =
+            (!hasPse && !hasAttenMask && !hasDropOut && s1BasicBlock != NUM_64 && dVBasicBlock <= NUM_256 && !hasRope);
+        if ((!useDn && dSize > MIN_D_TO_USE_WORKSPACE) || (useDn && dSize > DN_MIN_D_TO_USE_WORKSPACE)) {
             bmm2Bytes = s1BasicBlock * bmm2ResBlockSize * calcTypeSize;
             if (dTemplateType > DTemplateType::ALIGNED_256) {
                 vec2Bytes = s1BasicBlock * dVBasicBlock * calcTypeSize;
@@ -223,8 +232,8 @@ protected:
         }
         bmm2Bytes = AlignUp(bmm2Bytes, GM_ALIGN);
         vec2Bytes = AlignUp(vec2Bytes, GM_ALIGN);
-        workspaces[0] = static_cast<size_t>((bmm2Bytes + vec2Bytes) * PING_PONG_VALUE *
-            multiCoreParamsRegbase_->get_coreNum());
+        workspaces[0] =
+            static_cast<size_t>((bmm2Bytes + vec2Bytes) * PING_PONG_VALUE * multiCoreParamsRegbase_->get_coreNum());
         return ge::GRAPH_SUCCESS;
     }
 
@@ -235,6 +244,7 @@ protected:
     }
 };
 
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingBasic, static_cast<int32_t>(NpuArch::DAV_3510), 83);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingBasic,
+                                   static_cast<int32_t>(NpuArch::DAV_3510), 83);
 } // namespace FA
 } // namespace optiling
