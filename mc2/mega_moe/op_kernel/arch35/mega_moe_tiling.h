@@ -158,6 +158,7 @@ struct MegaMoeSendMaskBufferConfig {
     int32_t bufferCount;
     uint32_t bufferBytes;
 };
+
 struct MegaMoeTilingData {
     uint32_t moeExpertPerRank; // 本卡参与 topK 路由的 MoE 专家数，与 weight1 表达的专家数一致
     uint32_t bs;
@@ -200,8 +201,11 @@ struct MegaMoeTilingData {
     uint32_t mGroupsPerWave;    // 每个 routed expert Wave 消费的 256-row M 分组数
     // MoE 和共享专家使用相同布局：true 表示每个专家一个二维 tensor，false 表示单个三维堆叠 tensor。
     bool isPerExpertWeightTensor;
-    // 全卡一致的单卡 token 数上界（attr num_max_tokens_per_rank；attr=0 时 host 置为 bs）。
-    // 跨卡窗口布局、mask 槽几何与收发批网格一律用该上界，bs 仅描述本卡真实 token 数。
+    // 全卡一致的单卡 token 数上界（attr num_max_tokens_per_rank）。
+    // MTE 保留 attr=0 时回退到 bs 的兼容语义；URMA 必须显式传入非 0 上界。
+    // 跨卡窗口和 mask 槽几何使用该上界，bs 仅描述本卡真实 token 数。
     uint32_t numMaxTokensPerRank;
+    // URMA 分层拓扑；Host workspace 计算与 Device 通道映射必须使用同一个值。
+    uint32_t rankNumPerServer;
 };
 #endif

@@ -7,6 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import torch
@@ -227,6 +228,38 @@ def _npu_mega_moe(
     )
 
 
+@dataclass(frozen=True)
+class _MegaMoeCclBufferSizeParams:
+    ep_world_size: int
+    moe_expert_num: int
+    num_max_tokens_per_rank: int
+    num_topk: int
+    hidden: int
+    max_recv_token_num: int
+    dispatch_quant_mode: int
+    dispatch_quant_out_dtype: Optional[torch.dtype]
+    combine_quant_mode: int
+    comm_alg: str
+    topk_weights_type: int
+
+    def __call__(self, server_num: int = 0) -> int:
+        # Context passes a positive server count only after cross-super topology is confirmed.
+        return _get_mega_moe_ccl_buffer_size(
+            self.ep_world_size,
+            self.moe_expert_num,
+            self.num_max_tokens_per_rank,
+            self.num_topk,
+            self.hidden,
+            self.max_recv_token_num,
+            self.dispatch_quant_mode,
+            self.dispatch_quant_out_dtype,
+            self.combine_quant_mode,
+            self.comm_alg,
+            self.topk_weights_type,
+            server_num,
+        )
+
+
 class SymmBuffer:
     def __init__(
         self,
@@ -250,19 +283,21 @@ class SymmBuffer:
             self.rank_id, init_comm=False
         )
         self.ep_world_size = torch.distributed.get_world_size(group)
-        required_ccl_buffer_size = _get_mega_moe_ccl_buffer_size(
-            self.ep_world_size,
-            num_experts,
-            num_max_tokens_per_rank,
-            num_topk,
-            hidden,
-            max_recv_token_num,
-            dispatch_quant_mode,
-            dispatch_quant_out_dtype,
-            combine_quant_mode,
-            comm_alg,
-            topk_weights_type,
+        ccl_buffer_size_params = _MegaMoeCclBufferSizeParams(
+            ep_world_size=self.ep_world_size,
+            moe_expert_num=num_experts,
+            num_max_tokens_per_rank=num_max_tokens_per_rank,
+            num_topk=num_topk,
+            hidden=hidden,
+            max_recv_token_num=max_recv_token_num,
+            dispatch_quant_mode=dispatch_quant_mode,
+            dispatch_quant_out_dtype=dispatch_quant_out_dtype,
+            combine_quant_mode=combine_quant_mode,
+            comm_alg=comm_alg,
+            topk_weights_type=topk_weights_type,
         )
+        # Use the exact MTE size initially; cross-super context replaces it with the URMA size before malloc.
+        required_ccl_buffer_size = ccl_buffer_size_params()
         self._ctx_manager = CommContextManager(
             self.group_name,
             self.ep_world_size,
@@ -272,6 +307,7 @@ class SymmBuffer:
                 "Ascend950": "channel",
             },
             customCclBufferSize=required_ccl_buffer_size,
+            customCclBufferSizeResolver=ccl_buffer_size_params,
         )
         self.context = self._ctx_manager.create_context()
         self.ccl_buffer_size = self._ctx_manager.ccl_buffer_size
@@ -383,19 +419,20 @@ class SymmBuffer:
             rank_id, init_comm=True
         )
         ep_world_size = torch.distributed.get_world_size(group)
-        required_ccl_buffer_size = _get_mega_moe_ccl_buffer_size(
-            ep_world_size,
-            self.num_experts,
-            self.num_max_tokens_per_rank,
-            self.num_topk,
-            self.hidden,
-            self.max_recv_token_num,
-            self.dispatch_quant_mode,
-            self.dispatch_quant_out_dtype,
-            self.combine_quant_mode,
-            self.comm_alg,
-            self.topk_weights_type,
+        ccl_buffer_size_params = _MegaMoeCclBufferSizeParams(
+            ep_world_size=ep_world_size,
+            moe_expert_num=self.num_experts,
+            num_max_tokens_per_rank=self.num_max_tokens_per_rank,
+            num_topk=self.num_topk,
+            hidden=self.hidden,
+            max_recv_token_num=self.max_recv_token_num,
+            dispatch_quant_mode=self.dispatch_quant_mode,
+            dispatch_quant_out_dtype=self.dispatch_quant_out_dtype,
+            combine_quant_mode=self.combine_quant_mode,
+            comm_alg=self.comm_alg,
+            topk_weights_type=self.topk_weights_type,
         )
+        required_ccl_buffer_size = ccl_buffer_size_params()
         new_manager = CommContextManager(
             group_name,
             ep_world_size,
@@ -405,6 +442,7 @@ class SymmBuffer:
                 "Ascend950": "channel",
             },
             customCclBufferSize=required_ccl_buffer_size,
+            customCclBufferSizeResolver=ccl_buffer_size_params,
         )
         try:
             new_context = new_manager.create_context()
@@ -458,6 +496,7 @@ def _get_mega_moe_ccl_buffer_size(
     combine_quant_mode: int = 0,
     comm_alg: str = "",
     topk_weights_type: int = 0,
+    server_num: int = 0,
 ) -> int:
     _op_module = _mega_moe_op_builder.load()
     quant_dtype_int = _dtype_to_int(dispatch_quant_out_dtype)  # 将torch.dtype转换为int
@@ -473,6 +512,7 @@ def _get_mega_moe_ccl_buffer_size(
         combine_quant_mode,
         comm_alg,
         topk_weights_type,
+        server_num,
     )
 
 

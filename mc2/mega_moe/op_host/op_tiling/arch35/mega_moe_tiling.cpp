@@ -62,14 +62,15 @@ const static int64_t MIN_H = 1024LL;
 const static int64_t MAX_H = 8LL * 1024LL; // 8K
 const static int64_t H_ALIGN = 32LL;
 const static int64_t W4_K_ALIGN = 64LL;
-const static int64_t HIDDEN_DIM_BASE = 1024LL;
+const static int64_t URMA_H_ALIGN = 1024LL;
 const static int64_t MAX_HIDDEN_DIM = 8LL * 1024LL; // 8K
-// MTE 路径 N 泛化：hiddenDim(=GMM1 输出维，含 gate/up 两半) 按 GMM_TILE_N(256) 粒度放宽，
-// 下限 512 保证非交织模式 gate/up 半宽至少覆盖 1 个完整 256 tile；URMA 路径维持 1K 约束不变。
-const static int64_t MTE_MIN_HIDDEN_DIM = 512LL;
-const static int64_t MTE_HIDDEN_DIM_ALIGN = 256LL;
+// hiddenDim 是 GMM1 含 gate/up 两路的完整输出宽度；MTE 与 URMA 共用支持尾 tile 的激活 epilogue。
+// 256 对齐保证 gate/up 半宽按 128 对齐，下限 512 保证半宽至少覆盖一个完整 tile。
+const static int64_t MIN_HIDDEN_DIM = 512LL;
+const static int64_t HIDDEN_DIM_ALIGN = 256LL;
 const static int64_t MIN_EP_WORLD_SIZE = 2LL;
-const static int64_t MAX_EP_WORLD_SIZE = 1024LL;
+const static int64_t MAX_MTE_EP_WORLD_SIZE = 1024LL;
+const static int64_t MAX_URMA_EP_WORLD_SIZE = 1024LL;
 const static int64_t MAX_MOE_EXPERT_NUM = 2048LL;
 const static int64_t INPUT_WEIGHT_SCALES_CEIL_ALIGN = 64LL;
 const static int64_t RESERVED_WORKSPACE_SIZE = 1024 * 1024 * 50LL;
@@ -90,7 +91,7 @@ uint32_t CalcMGroupsPerWave(const MegaMoeTilingData *tilingData, uint32_t aicNum
     /*
      * hiddenDim 包含 gate/up 两部分。交织模式每核至少调度 4 个独立 N tile；非交织模式
      * 每个物理任务成对处理 gate/up，原先每核 2 个物理任务同样等价于 4 个逻辑 N tile。
-     * hiddenDim 已校验为 GMM_TILE_N(256) 的倍数（MTE；URMA 仍为 1024），CeilDiv 对
+     * hiddenDim 已校验为 GMM_TILE_N(256) 的倍数，CeilDiv 对
      * 非交织半宽产生的尾 tile 只影响 wave 粒度估算，不影响正确性，两种编译模式共用本公式。
      */
     uint64_t gmm1LogicalTilesPerMGroup = ops::CeilDiv<uint64_t>(tilingData->hiddenDim, GMM_TILE_N);
@@ -160,9 +161,9 @@ void PrintMegaMoeTilingData(const MegaMoeTilingData *tilingData, const char *nod
             tilingData->maxOutputSize, tilingData->isPerExpertWeightTensor);
     OP_LOGD(nodeName,
             "topology: moeExpertPerRank=%u, sharedExpertNum=%u, epWorldSize=%u, aicNum=%u, blockAivNum=%u, "
-            "blockNumPerEP=%u, topoType=%ld",
+            "blockNumPerEP=%u, topoType=%ld, rankNumPerServer=%u",
             tilingData->moeExpertPerRank, tilingData->sharedExpertNum, tilingData->epWorldSize, tilingData->aicNum,
-            tilingData->blockAivNum, tilingData->blockNumPerEP, tilingData->topoType);
+            tilingData->blockAivNum, tilingData->blockNumPerEP, tilingData->topoType, tilingData->rankNumPerServer);
     OP_LOGD(nodeName, "mode: groupedMatmulMode=%u, combineQuantMode=%ld, clampLimit=%f",
             static_cast<uint32_t>(tilingData->groupedMatmulMode), tilingData->combineQuantMode, tilingData->clampLimit);
     OP_LOGD(nodeName, "combineSync: slotCountPerExpert=%lu", tilingData->combineSyncSlotCountPerExpert);
@@ -226,37 +227,30 @@ void PrintPeermemInfo(const MegaMoeTilingData *tilingData, const char *nodeName)
     OP_LOGD(nodeName, "========== PeermemInfo ==========");
     int64_t exceptionDumpRegionSize = tilingData->topoType == TOPO_TYPE_MTE ? EXCEPTION_DUMP_REGION_SIZE : 0;
     OP_LOGD(nodeName, "exceptionDumpRegionSize: {%ld}\n", exceptionDumpRegionSize);
-    // 各区尺寸取自 kernel 侧同一份布局公式（common/mega_moe_peermem.h）。
-    int64_t routeRecvSize = 0;
-    if (tilingData->topoType == TOPO_TYPE_MTE) {
-        routeRecvSize = CalcRouteIndexRecvSize(CalcDispatchRouteIndexAlignSize(tilingData),
-                                               static_cast<int64_t>(tilingData->moeExpertPerRank),
-                                               static_cast<int64_t>(tilingData->epWorldSize));
-    } else {
-        routeRecvSize =
-            CalcMaskRecvSize(CalcDispatchMaskAlignSize(tilingData), static_cast<int64_t>(tilingData->moeExpertPerRank),
-                             static_cast<int64_t>(tilingData->epWorldSize));
+    bool isA4Activation = tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||
+                          tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ;
+    PeermemSizeParams params{};
+    params.numMaxTokensPerRank = static_cast<int64_t>(tilingData->numMaxTokensPerRank);
+    params.topK = static_cast<int64_t>(tilingData->topK);
+    params.h = static_cast<int64_t>(tilingData->h);
+    params.moeExpertPerRank = static_cast<int64_t>(tilingData->moeExpertPerRank);
+    params.epWorldSize = static_cast<int64_t>(tilingData->epWorldSize);
+    params.yDtypeSize = SIZE_BF_16;
+    params.elemsPerByte = isA4Activation ? 2U : 1U;
+    params.topkWeightsPrefetch = tilingData->topkWeightsPrefetch == 1;
+    params.isQuantCombine = tilingData->combineQuantMode != COMBINE_NO_QUANT;
+    params.topoType = tilingData->topoType;
+    params.serverNum = 1;
+    if (tilingData->topoType == TOPO_TYPE_URMA) {
+        params.serverNum = tilingData->epWorldSize / tilingData->rankNumPerServer;
     }
-    int64_t expertCountRecvSize = CalcExpertCountRecvSize(static_cast<int64_t>(tilingData->moeExpertPerRank),
-                                                          static_cast<int64_t>(tilingData->epWorldSize));
-    int64_t tokenScaleBytes =
-        CalcQuantTokenScaleBytes(static_cast<int64_t>(tilingData->h), 1U, static_cast<int64_t>(tilingData->topK),
-                                 tilingData->topkWeightsPrefetch == 1);
-    int64_t quantTokenScaleSize = ops::CeilAlign(
-        static_cast<int64_t>(tilingData->numMaxTokensPerRank) * tokenScaleBytes, static_cast<int64_t>(ALIGN_512));
-    // 非量化 combine 每个 hidden 元素存一个 BF16（2 字节）。
-    int64_t combineTokenBytes =
-        CalcCombineTokenBytes(static_cast<int64_t>(tilingData->h), 2, tilingData->combineQuantMode != COMBINE_NO_QUANT);
-    int64_t sendTotalNum = static_cast<int64_t>(tilingData->numMaxTokensPerRank) * tilingData->topK;
-    int64_t combineSendSize = ops::CeilAlign(sendTotalNum * combineTokenBytes, static_cast<int64_t>(ALIGN_512));
-    OP_LOGD(nodeName, "rankSyncInWorldSize: {%ld}\n", PEERMEM_DATA_OFFSET);
-    OP_LOGD(nodeName, "routeRecvSize: {%ld}\n", routeRecvSize);
-    OP_LOGD(nodeName, "expertCountRecvSize: {%ld}\n", expertCountRecvSize);
-    OP_LOGD(nodeName, "quantTokenScaleSize: {%ld}\n", quantTokenScaleSize);
-    OP_LOGD(nodeName, "combineSendSize: {%ld}\n", combineSendSize);
-    OP_LOGD(nodeName, "total PeermemInfo Size: {%ld}\n",
-            exceptionDumpRegionSize + PEERMEM_DATA_OFFSET + routeRecvSize + expertCountRecvSize + quantTokenScaleSize +
-                combineSendSize);
+    PeermemLayoutSizes sizes = CalcPeermemLayoutSizes(params);
+    OP_LOGD(nodeName, "peermemDataOffset: {%ld}\n", sizes.dataOffset);
+    OP_LOGD(nodeName, "maskRecvSize: {%ld}\n", sizes.maskRecvSize);
+    OP_LOGD(nodeName, "expertCountRecvSize: {%ld}\n", sizes.expertCountRecvSize);
+    OP_LOGD(nodeName, "dispatchRecordAreaSize: {%ld}\n", sizes.dispatchRecordAreaSize);
+    OP_LOGD(nodeName, "combineSendSize: {%ld}\n", sizes.combineSendSize);
+    OP_LOGD(nodeName, "total PeermemInfo Size: {%ld}\n", exceptionDumpRegionSize + CalcPeermemLeastSize(params));
 }
 
 static ge::DataType GetDataTypeByOpQuantMode(const int64_t opQuantMode)
@@ -312,8 +306,10 @@ static uint64_t CalTilingKey(const gert::TilingContext *context, MegaMoeConfig &
     int64_t opQuantMode = GetOpQuantModeByAttrDispatchOutType(context, config);
     int64_t combineQuantMode = GetCombineQuantModeByAttr(context, config);
     int64_t topoType = TILINGKEY_TPL_MTE;
+    if (tilingData->topoType == TOPO_TYPE_URMA) {
+        topoType = TILINGKEY_TPL_URMA;
+    }
     int64_t topkWeightsType = *attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex));
-
     return GET_TPL_TILING_KEY(static_cast<int64_t>(*dispatchQuantModePtr), opQuantMode, combineQuantMode, topoType,
                               topkWeightsType);
 }
@@ -335,6 +331,9 @@ static ge::graphStatus CheckAttrPtrNullptr(const gert::TilingContext *context, M
     auto numMaxTokensPerRankPtr = attrs->GetAttrPointer<int64_t>((config.attrNumMaxTokensPerRankIndex));
     auto activationPtr = attrs->GetAttrPointer<char>(static_cast<int>(config.attrActivationIndex));
     auto activationParamsPtr = attrs->GetListFloat(config.attrActivationParamsIndex);
+    auto rankNumPerServerPtr = attrs->GetAttrPointer<int64_t>(config.attrRankNumPerServerIndex);
+    auto topoTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
+    auto topkWeightsTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopkWeightsTypeIndex);
 
     OP_TILING_CHECK(moeExpertNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "moeExpertNum"),
                     return ge::GRAPH_FAILED);
@@ -356,6 +355,11 @@ static ge::graphStatus CheckAttrPtrNullptr(const gert::TilingContext *context, M
     OP_TILING_CHECK(activationPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "activation"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(activationParamsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "activationParams"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(rankNumPerServerPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "rankNumPerServer"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topoTypePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "topoType"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topkWeightsTypePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "topkWeightsType"),
                     return ge::GRAPH_FAILED);
     const size_t paramCount = activationParamsPtr->GetSize();
     const float *activationParams = paramCount == 0U ? nullptr : activationParamsPtr->GetData();
@@ -444,8 +448,7 @@ static ge::graphStatus CheckSituGluActivationParams(const float *activationParam
 }
 
 /*
- * URMA 路径的 kernel 目前只实现了 swiglu，别的激活还没接上。
- * 在 host 就拦掉，免得跑到板上才发现这条路走不通。
+ * URMA Layered 已接入 situglu 分派；其余扩展激活仍保持原约束。
  */
 static ge::graphStatus CheckActivationTopoConstraint(const gert::TilingContext *context, MegaMoeConfig &config,
                                                      const char *activationPtr, const char *nodeName)
@@ -453,8 +456,9 @@ static ge::graphStatus CheckActivationTopoConstraint(const gert::TilingContext *
     auto attrs = context->GetAttrs();
     auto topoTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
     OP_TILING_CHECK(
-        topoTypePtr != nullptr && *topoTypePtr == TOPO_TYPE_URMA && std::strcmp(activationPtr, "swiglu") != 0,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation", activationPtr, "'swiglu' for URMA topology"),
+        topoTypePtr != nullptr && *topoTypePtr == TOPO_TYPE_URMA && std::strcmp(activationPtr, "swiglu") != 0 &&
+            std::strcmp(activationPtr, "situglu") != 0,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation", activationPtr, "'swiglu' or 'situglu' for URMA topology"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -477,7 +481,7 @@ static ge::graphStatus CheckActivationParams(const gert::TilingContext *context,
                                               "one of 'swiglu', 'swiglustep', 'swigluoai' or 'situglu'"),
                     return ge::GRAPH_FAILED);
 
-    // 拓扑约束先判：URMA 只认 swiglu，激活类型不对就没必要再往下校验它的参数了。
+    // 拓扑约束先判：URMA 支持 swiglu/situglu，其他激活保持拦截。
     ge::graphStatus topoStatus = CheckActivationTopoConstraint(context, config, activationPtr, nodeName);
     if (topoStatus != ge::GRAPH_SUCCESS) {
         return topoStatus;
@@ -525,10 +529,20 @@ static ge::graphStatus CheckCommDomainAttrs(const gert::TilingContext *context, 
 
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>((config.attrEpWorldSizeIndex));
     epWorldSize = static_cast<int64_t>(*epWorldSizePtr);
-    OP_TILING_CHECK(epWorldSize < MIN_EP_WORLD_SIZE || epWorldSize > MAX_EP_WORLD_SIZE,
+
+    int64_t topoType = *attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
+    OP_TILING_CHECK(topoType != TOPO_TYPE_MTE && topoType != TOPO_TYPE_URMA,
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topoType", std::to_string(topoType).c_str(),
+                                              "only support MTE(0) or URMA(1)"),
+                    return ge::GRAPH_FAILED);
+    int64_t maxEpWorldSize = MAX_MTE_EP_WORLD_SIZE;
+    if (topoType == TOPO_TYPE_URMA) {
+        maxEpWorldSize = MAX_URMA_EP_WORLD_SIZE;
+    }
+    OP_TILING_CHECK(epWorldSize < MIN_EP_WORLD_SIZE || epWorldSize > maxEpWorldSize,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "epWorldSize", std::to_string(epWorldSize).c_str(),
                                               (std::string("should in [") + std::to_string(MIN_EP_WORLD_SIZE) + ", " +
-                                               std::to_string(MAX_EP_WORLD_SIZE) + "]")
+                                               std::to_string(maxEpWorldSize) + "] for the selected topology")
                                                   .c_str()),
                     return ge::GRAPH_FAILED);
 
@@ -536,6 +550,16 @@ static ge::graphStatus CheckCommDomainAttrs(const gert::TilingContext *context, 
     auto commAlgPtr = attrs->GetAttrPointer<char>(static_cast<int>(config.attrCommAlgIndex));
     OP_TILING_CHECK(std::strcmp(commAlgPtr, "") != 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "commAlg", commAlgPtr, "not support, need empty string"),
+                    return ge::GRAPH_FAILED);
+
+    auto rankNumPerServerPtr = attrs->GetAttrPointer<int64_t>(config.attrRankNumPerServerIndex);
+    int64_t rankNumPerServer = *rankNumPerServerPtr;
+    OP_TILING_CHECK(topoType == TOPO_TYPE_URMA && (rankNumPerServer <= 0 || rankNumPerServer > epWorldSize ||
+                                                   epWorldSize % rankNumPerServer != 0),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "rankNumPerServer", std::to_string(rankNumPerServer).c_str(),
+                                              (std::string("should be in [1, epWorldSize] and divide epWorldSize(") +
+                                               std::to_string(epWorldSize) + ") for URMA")
+                                                  .c_str()),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -647,23 +671,29 @@ static ge::graphStatus CheckQuantAttrs(const gert::TilingContext *context, MegaM
  * 计算通信窗口的最小容量。各分区尺寸复用 common/mega_moe_peermem.h 中的 Host/Device 公共公式，
  * 保证 Host 侧容量校验与 Kernel 侧地址布局一致。
  * 当前校验阶段尚未确定激活数据的实际压缩比例，因此 elemsPerByte 取 1，按最大存储需求预留空间。
- * PeermemSizeParams 使用聚合初始化，末尾同类型字段必须严格保持与结构体定义一致的顺序。
+ * 逐字段赋值避免同类型字段因聚合初始化顺序变化而静默错位。
  */
 static int64_t CalcLeastCclBufferSize(const gert::TilingContext *context, MegaMoeConfig &config,
                                       const MegaMoeAttrShapeContext &shape, int64_t numMaxTokensPerRank,
                                       int64_t epWorldSize, int64_t moeExpertPerRank, bool topkWeightsPrefetch)
 {
     auto topoTypePtr = context->GetAttrs()->GetAttrPointer<int64_t>((config.attrTopoTypeIndex));
-    PeermemSizeParams peermemSizeParams{static_cast<int64_t>(numMaxTokensPerRank),
-                                        static_cast<int64_t>(shape.topK),
-                                        static_cast<int64_t>(shape.h),
-                                        static_cast<int64_t>(moeExpertPerRank),
-                                        static_cast<int64_t>(epWorldSize),
-                                        static_cast<int64_t>(shape.yDtypeSize),
-                                        1U,
-                                        topkWeightsPrefetch,
-                                        GetCombineQuantModeByAttr(context, config) != COMBINE_NO_QUANT,
-                                        *topoTypePtr};
+    PeermemSizeParams peermemSizeParams{};
+    peermemSizeParams.numMaxTokensPerRank = numMaxTokensPerRank;
+    peermemSizeParams.topK = shape.topK;
+    peermemSizeParams.h = shape.h;
+    peermemSizeParams.moeExpertPerRank = moeExpertPerRank;
+    peermemSizeParams.epWorldSize = epWorldSize;
+    peermemSizeParams.yDtypeSize = shape.yDtypeSize;
+    peermemSizeParams.elemsPerByte = 1U;
+    peermemSizeParams.topkWeightsPrefetch = topkWeightsPrefetch;
+    peermemSizeParams.isQuantCombine = GetCombineQuantModeByAttr(context, config) != COMBINE_NO_QUANT;
+    peermemSizeParams.topoType = *topoTypePtr;
+    peermemSizeParams.serverNum = 1;
+    auto rankNumPerServerPtr = context->GetAttrs()->GetAttrPointer<int64_t>(config.attrRankNumPerServerIndex);
+    if (peermemSizeParams.topoType == TOPO_TYPE_URMA) {
+        peermemSizeParams.serverNum = epWorldSize / *rankNumPerServerPtr;
+    }
     int64_t leastCclBufferSize = CalcPeermemLeastSize(peermemSizeParams);
     // MTE 路径会在 peermem 头部单独留一段异常 dump 区，窗口下限要把这段一起算进去。
     if (*topoTypePtr == TOPO_TYPE_MTE) {
@@ -676,8 +706,8 @@ static int64_t CalcLeastCclBufferSize(const gert::TilingContext *context, MegaMo
  * 容量这一组：单卡 token 数上界、topk 权重预取开关、peermem 窗口大小、能收多少 token。
  * topkWeightsType 归在这里，是因为开了预取之后 peermem 里每个 token 要多存一份 topk 权重，
  * 它直接决定窗口要开多大，所以先把它校验掉，再拿去算下面的容量。
- * numMaxTokensPerRank 传 0 表示"就按本卡 bs 算"，替换成 bs 之后的值才是后面公式该用的，
- * 所以默认化就在这个函数里做完，别的地方不要再去读一次 attr——那样会拿回 0 把容量算塌。
+ * MTE 下 numMaxTokensPerRank 传 0 表示按本卡 bs 计算。URMA 使用跨卡对称窗口，host 无法从
+ * 本卡 bs 推导全卡一致的容量上界，因此必须显式传入非 0 值。
  */
 static ge::graphStatus CheckCapacityAttrs(const gert::TilingContext *context, MegaMoeConfig &config,
                                           const char *nodeName, const MegaMoeAttrShapeContext &shape,
@@ -689,16 +719,40 @@ static ge::graphStatus CheckCapacityAttrs(const gert::TilingContext *context, Me
     OP_TILING_CHECK(numMaxTokensPerRankPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "numMaxTokensPerRank"),
                     return ge::GRAPH_FAILED);
     int64_t numMaxTokensPerRank = static_cast<int64_t>(*numMaxTokensPerRankPtr);
-    // 这个上界最后按 uint32 落库，越界值不拦会被截断成一个错误的上界，所以连 UINT32_MAX 一起卡。
+    const int64_t topoType = *attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
+    OP_TILING_CHECK(topoType == TOPO_TYPE_URMA && shape.bs <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "bs", std::to_string(shape.bs).c_str(),
+                                              "should be greater than 0 for URMA"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topoType == TOPO_TYPE_URMA && numMaxTokensPerRank == 0,
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "numMaxTokensPerRank", "0",
+                                              "should be >= bs and identical on all ranks for URMA"),
+                    return ge::GRAPH_FAILED);
+    // 这个上界最后按 uint32 落库，越界值不拦会被截断成错误值。
     OP_TILING_CHECK(
         numMaxTokensPerRank < 0 || numMaxTokensPerRank > 0xFFFFFFFFLL ||
             (numMaxTokensPerRank != 0 && shape.bs > numMaxTokensPerRank),
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "numMaxTokensPerRank", std::to_string(numMaxTokensPerRank).c_str(),
-                                  (std::string("0 or in [bs, UINT32_MAX], bs is ") + std::to_string(shape.bs).c_str())),
+                                  (std::string("0 for MTE, or in [bs, UINT32_MAX] (URMA requires nonzero), bs is ") +
+                                   std::to_string(shape.bs))
+                                      .c_str()),
         return ge::GRAPH_FAILED);
     if (numMaxTokensPerRank == 0) {
         numMaxTokensPerRank = shape.bs;
     }
+    const int64_t routeCapacity = numMaxTokensPerRank * shape.topK;
+    OP_TILING_CHECK(
+        topoType == TOPO_TYPE_URMA && routeCapacity > std::numeric_limits<int32_t>::max(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "numMaxTokensPerRank * topK", std::to_string(routeCapacity).c_str(),
+                                  "should be <= INT32_MAX for URMA route indexes"),
+        return ge::GRAPH_FAILED);
+
+    const int64_t maxOutputCapacity = numMaxTokensPerRank * epWorldSize * std::min(shape.topK, moeExpertPerRank);
+    OP_TILING_CHECK(
+        topoType == TOPO_TYPE_URMA && maxOutputCapacity > std::numeric_limits<int32_t>::max(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "maximum receive token capacity", std::to_string(maxOutputCapacity).c_str(),
+                                  "should be <= INT32_MAX for URMA prefix sums"),
+        return ge::GRAPH_FAILED);
 
     int64_t topkWeightsType = *attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex));
     OP_TILING_CHECK(topkWeightsType != 0 && topkWeightsType != 1,
@@ -715,11 +769,17 @@ static ge::graphStatus CheckCapacityAttrs(const gert::TilingContext *context, Me
                     return ge::GRAPH_FAILED);
     OP_LOGD(nodeName, "cclBufferSize is %ld, leastCclBufferSize is %ld", cclBufferSize, leastCclBufferSize);
 
-    int64_t maxRecvTokenNum = static_cast<int64_t>(*attrs->GetAttrPointer<int64_t>((config.attrMaxRecvTokenNumIndex)));
+    const int64_t maxRecvTokenNum =
+        static_cast<int64_t>(*attrs->GetAttrPointer<int64_t>((config.attrMaxRecvTokenNumIndex)));
     OP_TILING_CHECK(
         maxRecvTokenNum < 0,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(), " >= 0"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(), ">= 0"),
         return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topoType == TOPO_TYPE_URMA && maxRecvTokenNum > maxOutputCapacity,
+                    OP_LOGE_FOR_INVALID_VALUE(
+                        nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(),
+                        (std::string("should be in [0, ") + std::to_string(maxOutputCapacity) + "] for URMA").c_str()),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -768,8 +828,7 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, MegaM
  * 把校验过的属性落进 tilingData：通信域大小、单卡 token 上界、本卡专家数、输出上界、
  * 每个 EP 分几个 block、combine 量化模式。
  * maxOutputSize 在 maxRecvTokenNum 没填时兜底 = numMaxTokensPerRank × epWorldSize × min(topK, 本卡专家数)。
- * 三个乘数都是 uint32，乘法在 32 位里做完才赋值，极端大的配置会回绕——这是现在的既有取值口径，
- * 改成 64 位算会让这些配置下的落值变大，进而改掉 flag 区和 route 接收区尺寸，动之前先确认影响面。
+ * URMA 的容量乘积已在 CheckCapacityAttrs 中限制到 INT32_MAX；MTE 保留原有的 uint32 取值口径。
  */
 static ge::graphStatus SetBasicAttrParams(const gert::TilingContext *context, MegaMoeConfig &config,
                                           MegaMoeTilingData *tilingData, const char *nodeName, const uint32_t aicNum)
@@ -777,15 +836,22 @@ static ge::graphStatus SetBasicAttrParams(const gert::TilingContext *context, Me
     auto attrs = context->GetAttrs();
 
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>((config.attrEpWorldSizeIndex));
+    auto rankNumPerServerPtr = attrs->GetAttrPointer<int64_t>(config.attrRankNumPerServerIndex);
+    auto topoTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
+    auto topkWeightsTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopkWeightsTypeIndex);
     auto maxRecvTokenNumPtr = attrs->GetAttrPointer<int64_t>((config.attrMaxRecvTokenNumIndex));
 
     tilingData->epWorldSize = *epWorldSizePtr;
-    // attr 为 0 时上界取本卡 bs, 与原逻辑取值一致
+    tilingData->topoType = *topoTypePtr;
+    tilingData->topkWeightsPrefetch = static_cast<int32_t>(*topkWeightsTypePtr);
+    // MTE 下 attr 为 0 时上界取本卡 bs；URMA 已在参数校验阶段拒绝 0。
     auto numMaxTokensPerRankPtr = attrs->GetAttrPointer<int64_t>((config.attrNumMaxTokensPerRankIndex));
     OP_TILING_CHECK(numMaxTokensPerRankPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "numMaxTokensPerRank"),
                     return ge::GRAPH_FAILED);
     tilingData->numMaxTokensPerRank =
         *numMaxTokensPerRankPtr != 0 ? static_cast<uint32_t>(*numMaxTokensPerRankPtr) : tilingData->bs;
+    tilingData->rankNumPerServer = *topoTypePtr == TOPO_TYPE_URMA ? static_cast<uint32_t>(*rankNumPerServerPtr) :
+                                                                    static_cast<uint32_t>(*epWorldSizePtr);
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>((config.attrMoeExpertNumIndex));
     int64_t moeExpertNum = static_cast<int64_t>(*moeExpertNumPtr);
     int64_t moeExpertPerRank = moeExpertNum / static_cast<int64_t>(tilingData->epWorldSize);
@@ -879,8 +945,8 @@ static void SetGroupedMatmulMode(const gert::TilingContext *context, MegaMoeConf
 static void SetPrefetchAndWaveParams(MegaMoeTilingData *tilingData, const uint32_t aicNum)
 {
     // GMM1 tile 状态位区每 expert 的 tile 上限（仅 prefetch 软同步路径使用）。
-    // 非交织调度只遍历 hiddenDim / 2，交织调度会遍历完整 hiddenDim；host 无法感知 kernel
-    // 编译期开关，因此按完整 hiddenDim 预留，避免交织模式覆盖下一 expert 的状态槽。
+    // 非交织调度只遍历 hiddenDim / 2，交织调度会遍历完整 hiddenDim；统一按完整 hiddenDim
+    // 预留，使两个 clencode 共用同一 workspace 布局并避免交织模式覆盖下一 expert 的状态槽。
     tilingData->maxTilesPerExpert = 0;
     if (tilingData->topkWeightsPrefetch == 1) {
         int64_t maxSchedulerN = static_cast<int64_t>(tilingData->hiddenDim);
@@ -1189,25 +1255,20 @@ static MegaMoeUnpermuteBufferConfig CalcUnpermuteBufferConfig(const MegaMoeTilin
 
 static uint64_t CalcCombineSyncSlotCountPerExpert(const MegaMoeTilingData *tilingData)
 {
-    // URMA group counter 仅服务 layered 量化 Combine。
-    if (tilingData->topoType != TOPO_TYPE_URMA || tilingData->combineQuantMode == COMBINE_NO_QUANT ||
-        tilingData->moeExpertPerRank == 0U) {
+    // MTE 统一使用 per-expert AIC ready 表；group counter 服务 URMA layered Combine，量化与非量化均需要。
+    if (tilingData->topoType != TOPO_TYPE_URMA || tilingData->moeExpertPerRank == 0U) {
         return 0U;
     }
 
-    uint64_t logicalCoreCount = tilingData->blockAivNum;
-    if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 ||
-        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||
-        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ) {
-        logicalCoreCount /= 2U;
-    }
+    // 上述 guard 保证这里只剩 URMA；layered Combine 仅由 subBlockIdx=1 的半数 AIV 执行。
+    uint64_t combineCoreCount = tilingData->blockAivNum / 2U;
     // 同一 token 的 topK expert id 不重复，因此单 expert 从每张卡最多接收 bs 个 token。
     uint64_t maxTokenCountForOneExpert =
         static_cast<uint64_t>(tilingData->numMaxTokensPerRank) * tilingData->epWorldSize;
     uint64_t maxTokenGroupCountForOneExpert =
         ops::CeilDiv(maxTokenCountForOneExpert, static_cast<uint64_t>(COMBINE_TOKEN_GROUP_SIZE));
     // Workspace 在路由结果产生前分配，因此每个本卡 MoE expert 都按独立最坏情况预留 slot。
-    return std::max(maxTokenGroupCountForOneExpert, logicalCoreCount);
+    return std::max(maxTokenGroupCountForOneExpert, combineCoreCount);
 }
 
 static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData *tilingData)
@@ -1232,7 +1293,7 @@ static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData *tilingData)
     if (tilingData->topoType == TOPO_TYPE_URMA) {
         flagElementCount += tilingData->combineSyncSlotCountPerExpert * moeExpertCount * INT_CACHELINE;
     }
-    if (tilingData->sharedExpertNum > 0) {
+    if (tilingData->sharedExpertNum > 0 && tilingData->topoType == TOPO_TYPE_MTE) {
         uint64_t tokenGroupCount = ops::CeilDiv<uint64_t>(tilingData->bs, L1_TILE_M_256);
         flagElementCount += tokenGroupCount * tilingData->sharedExpertNum * INT_CACHELINE;
     }
@@ -1354,9 +1415,6 @@ static ge::graphStatus CheckAttrAndSetTilingData(const gert::TilingContext *cont
                                                  MegaMoeTilingData *tilingData, const uint32_t aicNum)
 {
     const char *nodeName = context->GetNodeName();
-
-    OP_TILING_CHECK(CheckAttrPtrNullptr(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check attr pointers failed."), return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckActivationParams(context, config, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "check activation params failed."), return ge::GRAPH_FAILED);
@@ -1650,7 +1708,8 @@ static ge::graphStatus CheckWeightTensorDim(const gert::TilingContext *context, 
 static ge::graphStatus CheckSharedTensorMatchesMoeTensor(const gert::TilingContext *context,
                                                          const NamedIndex &sharedInput, const NamedIndex &moeInput,
                                                          bool isPerExpertWeightTensor, const NamedIndex *dimensions,
-                                                         uint32_t dimensionCount, const char *nodeName)
+                                                         uint32_t dimensionCount, bool checkStorageFormat,
+                                                         const char *nodeName)
 {
     auto sharedDesc = context->GetDynamicInputDesc(sharedInput.index, 0);
     auto sharedShape = context->GetDynamicInputShape(sharedInput.index, 0);
@@ -1666,6 +1725,12 @@ static ge::graphStatus CheckSharedTensorMatchesMoeTensor(const gert::TilingConte
                                               std::to_string(sharedDesc->GetDataType()).c_str(),
                                               (std::string("must be same as ") + moeInput.name).c_str()),
                     return ge::GRAPH_FAILED);
+    if (checkStorageFormat) {
+        OP_TILING_CHECK(
+            sharedDesc->GetStorageFormat() != moeDesc->GetStorageFormat(),
+            OP_LOGE(nodeName, "%s and %s must use the same storage format.", sharedInput.name, moeInput.name),
+            return ge::GRAPH_FAILED);
+    }
 
     for (uint32_t dimensionIdx = 0; dimensionIdx < dimensionCount; ++dimensionIdx) {
         const auto &dimension = dimensions[dimensionIdx];
@@ -1709,11 +1774,11 @@ static ge::graphStatus CheckSharedExpertInputs(const gert::TilingContext *contex
     };
     OP_TILING_CHECK(
         CheckSharedTensorMatchesMoeTensor(context, sharedWeightOneInput, moeWeightOneInput, isPerExpertWeightTensor,
-                                          weightDimensions, TWO_DIMS, nodeName) != ge::GRAPH_SUCCESS,
+                                          weightDimensions, TWO_DIMS, true, nodeName) != ge::GRAPH_SUCCESS,
         OP_LOGE(nodeName, "check shared_weight1 failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         CheckSharedTensorMatchesMoeTensor(context, sharedWeightTwoInput, moeWeightTwoInput, isPerExpertWeightTensor,
-                                          weightDimensions, TWO_DIMS, nodeName) != ge::GRAPH_SUCCESS,
+                                          weightDimensions, TWO_DIMS, true, nodeName) != ge::GRAPH_SUCCESS,
         OP_LOGE(nodeName, "check shared_weight2 failed."), return ge::GRAPH_FAILED);
 
     const NamedIndex scaleDimensions[] = {
@@ -1723,11 +1788,11 @@ static ge::graphStatus CheckSharedExpertInputs(const gert::TilingContext *contex
     };
     OP_TILING_CHECK(
         CheckSharedTensorMatchesMoeTensor(context, sharedScaleOneInput, moeScaleOneInput, isPerExpertWeightTensor,
-                                          scaleDimensions, THREE_DIMS, nodeName) != ge::GRAPH_SUCCESS,
+                                          scaleDimensions, THREE_DIMS, false, nodeName) != ge::GRAPH_SUCCESS,
         OP_LOGE(nodeName, "check shared_weight_scales1 failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         CheckSharedTensorMatchesMoeTensor(context, sharedScaleTwoInput, moeScaleTwoInput, isPerExpertWeightTensor,
-                                          scaleDimensions, THREE_DIMS, nodeName) != ge::GRAPH_SUCCESS,
+                                          scaleDimensions, THREE_DIMS, false, nodeName) != ge::GRAPH_SUCCESS,
         OP_LOGE(nodeName, "check shared_weight_scales2 failed."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1935,7 +2000,7 @@ static ge::graphStatus CheckBasicInputTensorDim(const gert::TilingContext *conte
     OP_LOGD(nodeName, "topkWeights dim0 = %ld", topkWeightsDim0);
     OP_LOGD(nodeName, "topkWeights dim1 = %ld", topkWeightsDim1);
 
-    OP_TILING_CHECK(xDim0 != topkIdsDim0 && xDim0 != topkWeightsDim0 && topkIdsDim0 != topkWeightsDim0,
+    OP_TILING_CHECK(xDim0 != topkIdsDim0 || xDim0 != topkWeightsDim0,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         nodeName, "x, topkIds, topkWeights",
                         (std::string("[") + std::to_string(xDim0) + ", " + std::to_string(topkIdsDim0) + ", " +
@@ -2147,12 +2212,34 @@ static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context, Meg
         static_cast<ge::Format>(ge::GetPrimaryFormat(topkWeightsDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
         OP_LOGE(nodeName, "topkWeights format is invalid."), return ge::GRAPH_FAILED);
 
-    // A8W4 path: weight1 must use NZ_C0_32 format now.
-    if (weightOneDesc->GetDataType() == ge::DT_FLOAT4_E2M1 &&
-        GetOpQuantModeByAttrDispatchOutType(context, config) == DISPATCH_QUANT_OUT_DTYPE_E4M3FN) {
+    bool isW4 = weightOneDesc->GetDataType() == ge::DT_FLOAT4_E2M1;
+    int64_t dispatchOutType = GetOpQuantModeByAttrDispatchOutType(context, config);
+    ge::Format weightOnePrimaryFormat =
+        static_cast<ge::Format>(ge::GetPrimaryFormat(weightOneDesc->GetStorageFormat()));
+    ge::Format weightTwoPrimaryFormat =
+        static_cast<ge::Format>(ge::GetPrimaryFormat(weightTwoDesc->GetStorageFormat()));
+    OP_TILING_CHECK(!isW4 && weightOnePrimaryFormat != weightTwoPrimaryFormat,
+                    OP_LOGE(nodeName, "weight1 and weight2 must use the same ND/NZ path."), return ge::GRAPH_FAILED);
+    if (isW4 && dispatchOutType == DISPATCH_QUANT_OUT_DTYPE_E4M3FN) {
         OP_TILING_CHECK(weightOneDesc->GetStorageFormat() != ge::FORMAT_FRACTAL_NZ_C0_32,
                         OP_LOGE_FOR_INVALID_FORMAT(nodeName, "weight1",
                                                    Ops::Base::ToString(weightOneDesc->GetStorageFormat()).c_str(),
+                                                   "FORMAT_FRACTAL_NZ_C0_32"),
+                        return ge::GRAPH_FAILED);
+    }
+    if (isW4 && dispatchOutType == DISPATCH_QUANT_OUT_DTYPE_E2M1) {
+        OP_TILING_CHECK(weightOneDesc->GetStorageFormat() != ge::FORMAT_ND &&
+                            weightOneDesc->GetStorageFormat() != ge::FORMAT_FRACTAL_NZ,
+                        OP_LOGE_FOR_INVALID_FORMAT(nodeName, "weight1",
+                                                   Ops::Base::ToString(weightOneDesc->GetStorageFormat()).c_str(),
+                                                   "FORMAT_ND or FORMAT_FRACTAL_NZ"),
+                        return ge::GRAPH_FAILED);
+    }
+    // W4 GMM2 固定使用 ZN/C0=32 prologue；weight2 不能再以逻辑 ND 描述交给 kernel 猜测物理布局。
+    if (isW4) {
+        OP_TILING_CHECK(weightTwoDesc->GetStorageFormat() != ge::FORMAT_FRACTAL_NZ_C0_32,
+                        OP_LOGE_FOR_INVALID_FORMAT(nodeName, "weight2",
+                                                   Ops::Base::ToString(weightTwoDesc->GetStorageFormat()).c_str(),
                                                    "FORMAT_FRACTAL_NZ_C0_32"),
                         return ge::GRAPH_FAILED);
     }
@@ -2222,11 +2309,11 @@ static ge::graphStatus CheckTopKAndHParam(const gert::TilingContext *context, Me
     auto topoTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
     auto weightOneDesc = context->GetDynamicInputDesc(config.weight1Index, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightOneDesc);
-    bool isW4NzC0_32 = weightOneDesc->GetDataType() == ge::DT_FLOAT4_E2M1 &&
-                       weightOneDesc->GetStorageFormat() == ge::FORMAT_FRACTAL_NZ_C0_32;
+    bool isW4Nz =
+        weightOneDesc->GetDataType() == ge::DT_FLOAT4_E2M1 &&
+        static_cast<ge::Format>(ge::GetPrimaryFormat(weightOneDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ;
     // URMA/Layered 保持 1K 对齐；W4 的 NZ_C0_32 分形要求 GMM K 按 64 对齐；其余 MTE 路径按 32 对齐。
-    int64_t requiredHAlignment =
-        *topoTypePtr == TOPO_TYPE_URMA ? HIDDEN_DIM_BASE : (isW4NzC0_32 ? W4_K_ALIGN : H_ALIGN);
+    int64_t requiredHAlignment = *topoTypePtr == TOPO_TYPE_URMA ? URMA_H_ALIGN : (isW4Nz ? W4_K_ALIGN : H_ALIGN);
     OP_TILING_CHECK(
         xDim1 % requiredHAlignment != 0,
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "H", std::to_string(xDim1).c_str(),
@@ -2237,14 +2324,11 @@ static ge::graphStatus CheckTopKAndHParam(const gert::TilingContext *context, Me
 }
 
 /*
- * 校验本卡 MoE 专家数与 GMM1 输出维 hiddenDim：取值范围与按拓扑确定的对齐要求。
+ * 校验本卡 MoE 专家数与 GMM1 输出维 hiddenDim：取值范围与统一对齐要求。
  */
 static ge::graphStatus CheckExpertAndHiddenDimParam(const gert::TilingContext *context, MegaMoeConfig &config,
                                                     const char *nodeName)
 {
-    auto attrs = context->GetAttrs();
-    auto topoTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
-
     auto weightOneStorageShape = context->GetDynamicInputShape(config.weight1Index, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightOneStorageShape);
     bool isPerExpertWeightTensor = weightOneStorageShape->GetStorageShape().GetDimNum() == TWO_DIMS;
@@ -2258,18 +2342,15 @@ static ge::graphStatus CheckExpertAndHiddenDimParam(const gert::TilingContext *c
 
     int64_t hiddenDim =
         GetSingleExpertTensorDimSize(weightOneStorageShape, WEIGHT_MATRIX_ROW_DIM_INDEX, isPerExpertWeightTensor);
-    // URMA 保持 1K 下限/1K 对齐；MTE 泛化到 [512, 8K] 且 256 对齐（gate/up 半宽按 128 对齐）。
-    const int64_t minHiddenDim = *topoTypePtr == TOPO_TYPE_URMA ? HIDDEN_DIM_BASE : MTE_MIN_HIDDEN_DIM;
-    const int64_t hiddenDimAlign = *topoTypePtr == TOPO_TYPE_URMA ? HIDDEN_DIM_BASE : MTE_HIDDEN_DIM_ALIGN;
-    OP_TILING_CHECK(hiddenDim < minHiddenDim || hiddenDim > MAX_HIDDEN_DIM,
+    OP_TILING_CHECK(hiddenDim < MIN_HIDDEN_DIM || hiddenDim > MAX_HIDDEN_DIM,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "hiddenDim", std::to_string(hiddenDim).c_str(),
-                                              (std::string("should in [") + std::to_string(minHiddenDim) + ", " +
+                                              (std::string("should in [") + std::to_string(MIN_HIDDEN_DIM) + ", " +
                                                std::to_string(MAX_HIDDEN_DIM) + "]")
                                                   .c_str()),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(hiddenDim % hiddenDimAlign != 0,
+    OP_TILING_CHECK(hiddenDim % HIDDEN_DIM_ALIGN != 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "hiddenDim", std::to_string(hiddenDim).c_str(),
-                                              (std::string("multiple of ") + std::to_string(hiddenDimAlign)).c_str()),
+                                              (std::string("multiple of ") + std::to_string(HIDDEN_DIM_ALIGN)).c_str()),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -2333,6 +2414,9 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
     MegaMoeTilingData *tilingData = context->GetTilingData<MegaMoeTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
 
+    OP_TILING_CHECK(CheckAttrPtrNullptr(context, config, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "check attr pointers failed."), return ge::GRAPH_FAILED);
+
     // Input check & set
     OP_TILING_CHECK(CheckAndSetInput(context, tilingData, config, nodeName) == ge::GRAPH_FAILED,
                     OP_LOGE(nodeName, "Check and set input failed."), return ge::GRAPH_FAILED);
@@ -2343,10 +2427,6 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     tilingData->aicNum = aicNum;
     tilingData->blockAivNum = aivNum;
-    auto attrs = context->GetAttrs();
-    tilingData->topoType = *attrs->GetAttrPointer<int64_t>((config.attrTopoTypeIndex));
-    tilingData->topkWeightsPrefetch =
-        static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex)));
     OP_TILING_CHECK(aivNum <= 0 || aicNum <= 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "aivNum/aicNum",
                                               (std::to_string(aivNum) + ", " + std::to_string(aicNum)).c_str(),

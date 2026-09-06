@@ -9,7 +9,10 @@
 // -----------------------------------------------------------------------------------------------------------
 
 #include <torch/extension.h>
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
+#include <limits>
 #include "aclnn_common.h"
 
 namespace op_api {
@@ -143,12 +146,21 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
 }
 
 namespace {
+constexpr int64_t ALIGN_32 = 32LL;
 constexpr int64_t ALIGN_128 = 128LL;
+constexpr int64_t ALIGN_256 = 256LL;
 constexpr int64_t ALIGN_512 = 512LL;
 constexpr int64_t MB_SIZE = 1024LL * 1024LL;
 constexpr int64_t RESERVED_SPACE_SIZE = 10LL * 1024 * 1024;
 constexpr int64_t MAX_EXPERTS_PER_RANK_A2A3 = 128LL;
 constexpr int64_t SYNC_STATE_RESERVED_SIZE = 512LL * 1024;
+constexpr int64_t PEERMEM_MIN_RANK_SYNC_SIZE = 48LL * 1024LL;
+constexpr int64_t PEERMEM_SYNC_COUNT_REGION_SIZE = 12LL * 1024LL;
+constexpr int64_t PEERMEM_SYNC_SLOT_SIZE = 64LL;
+constexpr int64_t MXFP_SCALE_GROUP_NUM = 32LL;
+constexpr int64_t MXFP_MULTI_BASE_SIZE = 2LL;
+constexpr int64_t Y_DTYPE_SIZE = 2LL;
+constexpr int64_t URMA_H_ALIGN = 1024LL;
 // 异常 Dump 区
 constexpr int64_t EXCEPTION_DUMP_REGION_SIZE = 60LL * 1024LL;
 // rankSyncInWorld 同步区
@@ -217,48 +229,98 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
     return (offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE + MB_SIZE) / MB_SIZE;
 }
 
-// A5 half-buffer minimum size (MB). Ported 1:1 from the original Python implementation.
-int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
+// The Torch JIT wheel does not package op_kernel headers. Keep this pure sizing mirror synchronized with
+// mc2/mega_moe/op_kernel/arch35/common/mega_moe_peermem.h, which remains the host/device layout source of truth.
+int64_t CalcTokenScaleBytesA5(int64_t hidden, int64_t numTopk, int64_t topkWeightsType)
+{
+    int64_t mxScaleNum = (hidden + ALIGN_32 - 1) / ALIGN_32;
+    int64_t dataBytes = CeilAlign(hidden, ALIGN_256);
+    int64_t tokenBytes = CeilAlign(dataBytes + mxScaleNum, ALIGN_32);
+    if (topkWeightsType == 1) {
+        int64_t weightBytes = CeilAlign(numTopk * static_cast<int64_t>(sizeof(float)), ALIGN_32);
+        tokenBytes = CeilAlign(tokenBytes + weightBytes, ALIGN_32);
+    }
+    return tokenBytes;
+}
+
+int64_t CalcCombineTokenBytesA5(int64_t hidden, int64_t combineQuantMode)
+{
+    if (combineQuantMode == 0) {
+        return hidden * Y_DTYPE_SIZE;
+    }
+    int64_t tokenStorageBytes = CeilAlign(hidden, ALIGN_256);
+    int64_t scaleCount = (hidden + MXFP_SCALE_GROUP_NUM - 1) / MXFP_SCALE_GROUP_NUM;
+    int64_t storedScaleBytes = CeilAlign(scaleCount, MXFP_MULTI_BASE_SIZE);
+    return CeilAlign(tokenStorageBytes + storedScaleBytes, ALIGN_32);
+}
+
+// Preserve the A5 MTE sizing baseline, including its non-quant combine width and exception-dump prefix.
+int64_t CalcMteCclBufferSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
                                int64_t hidden, int64_t topkWeightsType)
 {
     int64_t expertPerRank = moeExpertNum / epWorldSize;
 
     // Compact route-index receive area.
-    int64_t routeIndexAlignSize = CeilAlign(numMaxTokensPerRank * static_cast<int64_t>(sizeof(int32_t)), 32);
-    int64_t routeRecvSize = CeilAlign(expertPerRank * epWorldSize * routeIndexAlignSize, 512);
+    int64_t routeIndexAlignSize = CeilAlign(numMaxTokensPerRank * static_cast<int64_t>(sizeof(int32_t)), ALIGN_32);
+    int64_t routeRecvSize = CeilAlign(expertPerRank * epWorldSize * routeIndexAlignSize, ALIGN_512);
 
     // Expert-major raw count table: [localExpert][sourceRank].
-    int64_t expertCountRecvSize = CeilAlign(expertPerRank * epWorldSize * static_cast<int64_t>(sizeof(int32_t)), 512);
+    int64_t expertCountRecvSize =
+        CeilAlign(expertPerRank * epWorldSize * static_cast<int64_t>(sizeof(int32_t)), ALIGN_512);
 
-    // quant_token_scale_size
-    int64_t mxScaleNum = (hidden + 31) / 32;
-    int64_t dataBytes = CeilAlign(hidden, 256);
-    int64_t tokenBytes = CeilAlign(dataBytes + mxScaleNum, 32);
-    if (topkWeightsType == 1) {
-        int64_t weightBytes = CeilAlign(numTopk * static_cast<int64_t>(sizeof(float)), 32);
-        tokenBytes = CeilAlign(tokenBytes + weightBytes, 32);
-    }
-    int64_t quantTokenScaleSize = CeilAlign(numMaxTokensPerRank * tokenBytes, 512);
+    int64_t tokenBytes = CalcTokenScaleBytesA5(hidden, numTopk, topkWeightsType);
+    int64_t dispatchRecordAreaSize = CeilAlign(numMaxTokensPerRank * tokenBytes, ALIGN_512);
 
-    // combine_send_size
-    int64_t combineOut = CeilAlign(numMaxTokensPerRank * hidden * numTopk * 2, 512);
+    int64_t combineSendSize = CeilAlign(numMaxTokensPerRank * numTopk * hidden * Y_DTYPE_SIZE, ALIGN_512);
 
     int64_t totalBytes = EXCEPTION_DUMP_REGION_SIZE + PEERMEM_DATA_OFFSET + routeRecvSize + expertCountRecvSize +
-                         quantTokenScaleSize + combineOut;
+                         dispatchRecordAreaSize + combineSendSize;
 
     return totalBytes;
+}
+
+// A5 URMA peermem minimum size in bytes. The symmetric layout uses capacity, never the current-rank BS.
+int64_t CalcUrmaCclBufferSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
+                                int64_t hidden, int64_t combineQuantMode, int64_t topkWeightsType, int64_t serverNum)
+{
+    int64_t expertPerRank = moeExpertNum / epWorldSize;
+    int64_t rankSyncSize = epWorldSize * PEERMEM_SYNC_SLOT_SIZE;
+    int64_t dataOffset =
+        CeilAlign(std::max(rankSyncSize, PEERMEM_MIN_RANK_SYNC_SIZE) + PEERMEM_SYNC_COUNT_REGION_SIZE, ALIGN_512);
+
+    int64_t routeCapacity = numMaxTokensPerRank * numTopk;
+    int64_t alignedRouteCount = CeilAlign(routeCapacity * static_cast<int64_t>(sizeof(int32_t)), ALIGN_256) /
+                                static_cast<int64_t>(sizeof(int32_t));
+    int64_t maskAlignSize = CeilAlign(alignedRouteCount / 8, ALIGN_32);
+    int64_t maskRecvSize = CeilAlign(expertPerRank * epWorldSize * (maskAlignSize + ALIGN_32), ALIGN_512);
+    int64_t expertCountRecvSize =
+        CeilAlign(expertPerRank * epWorldSize * static_cast<int64_t>(sizeof(int32_t)), ALIGN_512);
+
+    int64_t tokenBytes = CalcTokenScaleBytesA5(hidden, numTopk, topkWeightsType);
+    int64_t relayRecordBytes = CeilAlign(tokenBytes, ALIGN_512);
+    int64_t relayDataSize = CeilAlign(numMaxTokensPerRank * relayRecordBytes * serverNum, ALIGN_512);
+    int64_t relayFlagSize =
+        CeilAlign(serverNum * numMaxTokensPerRank * static_cast<int64_t>(sizeof(uint64_t)), ALIGN_512);
+
+    int64_t combineTokenBytes = CalcCombineTokenBytesA5(hidden, combineQuantMode);
+    int64_t combineSendSize = CeilAlign(numMaxTokensPerRank * numTopk * combineTokenBytes, ALIGN_512);
+
+    return dataOffset + maskRecvSize + expertCountRecvSize + relayDataSize + relayFlagSize + combineSendSize;
 }
 } // namespace
 
 int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
                                 int64_t hidden, int64_t maxRecvTokenNum, int64_t dispatchQuantMode,
                                 c10::optional<int64_t> dispatchQuantOutDtype, int64_t combineQuantMode,
-                                std::string commAlg, int64_t topkWeightsType)
+                                std::string commAlg, int64_t topkWeightsType, int64_t serverNum)
 {
+    // Zero selects the initial MTE layout; a confirmed cross-server context supplies the actual count (> 1).
+    TORCH_CHECK(serverNum >= 0, "server_num must be non-negative, but got ", serverNum);
     const char *socName = aclrtGetSocName();
     bool isA2 = (socName != nullptr && std::strstr(socName, "Ascend910B") != nullptr);
     bool isA3 = (socName != nullptr && std::strstr(socName, "Ascend910_93") != nullptr);
     if (isA2 || isA3) {
+        TORCH_CHECK(serverNum == 0, "server_num is only supported by the Ascend950 channel backend");
         TORCH_CHECK(epWorldSize == 2 || epWorldSize == 4 || epWorldSize == 8 || epWorldSize == 16 ||
                         epWorldSize == 32 || epWorldSize == 64 || epWorldSize == 128,
                     "ep_world_size only support {2, 4, 8, 16, 32, 64, 128} on A2/A3, but got ", epWorldSize);
@@ -285,22 +347,54 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                                         numTopk);
     }
 
-    // A5 / 950 — 校验与原 Python get_mega_moe_ccl_buffer_size 对齐
+    // A5 / 950 checks are aligned with the arch35 host tiling contract.
     TORCH_CHECK(epWorldSize >= 2 && epWorldSize <= 1024, "ep_world_size only support in [2, 1024], but got ",
                 epWorldSize);
     TORCH_CHECK(hidden >= 1024 && hidden <= 8192, "hidden only support in [1024, 8192], but got ", hidden);
-    TORCH_CHECK(numMaxTokensPerRank >= 1, "num_max_tokens_per_rank should be >= 1, but got ", numMaxTokensPerRank);
-    TORCH_CHECK(moeExpertNum >= 1 && moeExpertNum <= 2048, "moe_expert_num only support in [1, 2048], but got ",
-                moeExpertNum);
+    int64_t hiddenAlignment = serverNum > 0 ? URMA_H_ALIGN : ALIGN_32;
+    TORCH_CHECK(hidden % hiddenAlignment == 0, "hidden must be a multiple of ", hiddenAlignment,
+                " for the selected communication topology, but got ", hidden);
+    TORCH_CHECK(
+        numMaxTokensPerRank >= 1 && static_cast<uint64_t>(numMaxTokensPerRank) <= std::numeric_limits<uint32_t>::max(),
+        "num_max_tokens_per_rank should be in [1, UINT32_MAX], but got ", numMaxTokensPerRank);
+    TORCH_CHECK(maxRecvTokenNum >= 0, "max_recv_token_num should be non-negative, but got ", maxRecvTokenNum);
+    TORCH_CHECK(moeExpertNum >= epWorldSize && moeExpertNum <= 2048 && moeExpertNum % epWorldSize == 0,
+                "moe_expert_num should be in [ep_world_size, 2048] and divisible by ep_world_size, but got ",
+                moeExpertNum, " and ep_world_size ", epWorldSize);
     TORCH_CHECK(numTopk >= 1 && numTopk <= 32, "num_topk only support in [1, 32], but got ", numTopk);
+    TORCH_CHECK(topkWeightsType == 0 || topkWeightsType == 1, "topk_weights_type only support 0 or 1, but got ",
+                topkWeightsType);
+    TORCH_CHECK(combineQuantMode == 0 || combineQuantMode == 3 || combineQuantMode == 4,
+                "combine_quant_mode only support 0, 3 or 4 on Ascend950, but got ", combineQuantMode);
 
-    return CalcHalfBufferSizeMBA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, topkWeightsType);
+    if (serverNum > 0) {
+        TORCH_CHECK(serverNum > 1 && serverNum <= epWorldSize && epWorldSize % serverNum == 0,
+                    "server_num should be in [2, ep_world_size] and divide ep_world_size, but got ", serverNum,
+                    " and ep_world_size ", epWorldSize);
+        int64_t routeCapacity = numMaxTokensPerRank * numTopk;
+        TORCH_CHECK(routeCapacity <= std::numeric_limits<int32_t>::max(),
+                    "num_max_tokens_per_rank * num_topk should be <= INT32_MAX for URMA, but got ", routeCapacity);
+        int64_t expertPerRank = moeExpertNum / epWorldSize;
+        int64_t maxOutputCapacity = numMaxTokensPerRank * epWorldSize * std::min(numTopk, expertPerRank);
+        TORCH_CHECK(maxOutputCapacity <= std::numeric_limits<int32_t>::max(),
+                    "maximum receive token capacity should be <= INT32_MAX for URMA, but got ", maxOutputCapacity);
+        TORCH_CHECK(maxRecvTokenNum <= maxOutputCapacity,
+                    "max_recv_token_num should not exceed the URMA maximum receive token capacity ", maxOutputCapacity,
+                    ", but got ", maxRecvTokenNum);
+        return CalcUrmaCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden,
+                                       combineQuantMode, topkWeightsType, serverNum);
+    }
+    return CalcMteCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, topkWeightsType);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("npu_mega_moe", &NpuMegaMoe, "npu_mega_moe");
-    m.def("get_mega_moe_ccl_buffer_size", &GetMegaMoeCclBufferSize, "get_mega_moe_ccl_buffer_size");
+    m.def("get_mega_moe_ccl_buffer_size", &GetMegaMoeCclBufferSize, "get_mega_moe_ccl_buffer_size",
+          py::arg("ep_world_size"), py::arg("moe_expert_num"), py::arg("num_max_tokens_per_rank"), py::arg("num_topk"),
+          py::arg("hidden"), py::arg("max_recv_token_num"), py::arg("dispatch_quant_mode"),
+          py::arg("dispatch_quant_out_dtype"), py::arg("combine_quant_mode"), py::arg("comm_alg"),
+          py::arg("topk_weights_type"), py::arg("server_num") = 0);
 }
 
 } // namespace op_api
