@@ -239,6 +239,7 @@ public:
     uint64_t s1SinkOuter;
     uint64_t s2SinkOuter;
     uint8_t deterBandScheduleMode;
+    uint8_t reservedPad[7]; // tilingData需要8字节对齐，对应编译器尾部padding
 
     int64_t get_coreNum() const
     {
@@ -516,6 +517,12 @@ public:
     void set_deterBandScheduleMode(uint8_t deterBandScheduleModeParam)
     {
         this->deterBandScheduleMode = deterBandScheduleModeParam;
+    }
+    void set_reservedPad(uint8_t reservedPadVal = 0)
+    {
+        for (uint32_t i = 0; i < sizeof(reservedPad); ++i) {
+            reservedPad[i] = reservedPadVal;
+        }
     }
 };
 
@@ -960,6 +967,11 @@ public:
     {
         hasInvalidCol = val;
     }
+    void set_reserved(uint8_t reserved2Val = 0, uint8_t reserved3Val = 0)
+    {
+        reserved2 = reserved2Val;
+        reserved3 = reserved3Val;
+    }
     void set_sfmgUsedCoreNum(uint32_t val)
     {
         sfmgUsedCoreNum = val;
@@ -1261,6 +1273,10 @@ public:
     {
         noNeedDeter = val;
     }
+    void set_reserved1(uint32_t val)
+    {
+        reserved1 = val;
+    }
     void set_deterMaxRound(int64_t value)
     {
         deterMaxRound = value;
@@ -1370,6 +1386,12 @@ public:
     void set_tndLineDeter(uint8_t value)
     {
         tndLineDeter = value;
+    }
+    void set_reserved(uint8_t reserved2Val = 0, uint8_t reserved3Val = 0, uint32_t reserved4Val = 0)
+    {
+        reserved2 = reserved2Val;
+        reserved3 = reserved3Val;
+        reserved4 = reserved4Val;
     }
     void set_deterPrefixStep(int64_t value)
     {

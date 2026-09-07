@@ -1558,6 +1558,9 @@ uint64_t FlashAttentionScoreGradTilingNormalRegbase::DoPreSfmgTiling()
 
 void FlashAttentionScoreGradTilingNormalRegbase::DoPreTiling()
 {
+    // reserved2/3 仅为 8 字节对齐占位，后面没有任何 set；不写则 tiling blob 里是未初始化字节
+    preTilingData_->set_reserved();
+
     uint64_t inputBufferLen = PRE_BUFFER_SIZE; // x / 8 + 2 * x + 32 = fBaseParams.ubSize
     uint64_t singleUBProcessNum = static_cast<uint64_t>(CAST_BUFFER_LEN) / 2;
 
@@ -2304,6 +2307,8 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
 
     s1s2BNGS1S2BaseParams_->set_isSplitByBlockIdx(static_cast<uint8_t>(fBaseParams.isSplitByBlockIdx));
     s1s2BNGS1S2BaseParams_->set_deterBandScheduleMode(static_cast<uint8_t>(fBaseParams.deterBandScheduleMode));
+    s1s2BNGS1S2BaseParams_->set_reservedPad();
+    s1s2BNGS1S2BaseParams_->set_totalPerBatchNum(0);
     if (fBaseParams.isSplitByBlockIdx) {
         s1s2BNGS1S2BaseParams_->set_totalPerBatchNum(GetTotalPerBatchNum(fBaseParams, fBaseParams.sparseType));
     }
@@ -2325,6 +2330,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
     s1s2BNGS1S2SplitCoreParams_->set_maxValidBBLen(fBaseParams.maxValidBBLen);
     if (fBaseParams.isDeterministic) {
         baseDeterParam_->set_noNeedDeter(fBaseParams.noNeedDeter);
+        baseDeterParam_->set_reserved1(0);
         baseDeterParam_->set_deterMaxRound(fBaseParams.deterMaxRound);
         if ((fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::DETER_BAND) ||
              fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::DETER_DENSE)) &&
@@ -2339,6 +2345,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
     if (IsNewDeter(fBaseParams) && deterParam != nullptr) {
         deterParam->set_coreDivide(fBaseParams.coreDivide);
         deterParam->set_tndLineDeter(fBaseParams.tndLineDeter);
+        deterParam->set_reserved();
         deterParam->set_deterPrefixStep(fBaseParams.deterPrefixStep);
         deterParam->set_deterPrefix(fBaseParams.deterPrefix);
         deterParam->set_deterPrefixAlign(fBaseParams.deterPrefixAlign);
