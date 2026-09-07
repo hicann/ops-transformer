@@ -111,7 +111,7 @@ constexpr int64_t HIDDEN_SIZE_ALIGN = 512;
 // 属性范围限制
 constexpr int64_t MIN_MOE_EXPERT_NUM = 1;
 constexpr int64_t MAX_MOE_EXPERT_NUM = 1024;
-constexpr int64_t VALID_EP_WORLD_SIZE[] = {2, 4, 8, 16, 32, 64, 128};
+constexpr int64_t VALID_EP_WORLD_SIZE[] = {2, 4, 8, 16, 32, 48, 64, 96, 128};
 
 constexpr uint32_t TWO_DIMS = 2U;
 constexpr uint32_t ONE_DIM = 1U;
@@ -190,7 +190,7 @@ static ge::graphStatus CheckEpWorldSizeAttr(const int64_t *ptr)
                               std::end(VALID_EP_WORLD_SIZE);
     OP_TILING_CHECK(!isValidEpWorldSize,
                     OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "ep_world_size", std::to_string(*ptr).c_str(),
-                                              "one of {2, 4, 8, 16, 32, 64, 128}"),
+                                              "one of {2, 4, 8, 16, 32, 48, 64, 96, 128}"),
                     return GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
