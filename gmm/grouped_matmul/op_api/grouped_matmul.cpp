@@ -9,6 +9,7 @@
  */
 
 #include "grouped_matmul.h"
+#include "log/log.h"
 #include "opdev/op_log.h"
 #include "opdev/op_dfx.h"
 #include "opdev/shape_utils.h"
@@ -19,40 +20,32 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(GroupedMatmul);
 
-const aclTensorList *GroupedMatmul(const aclTensorList *x,
-                                   const aclTensorList *weight,
-                                   const aclTensorList *biasOptional,
-                                   const aclTensorList *scaleOptional,
-                                   const aclTensorList *offsetOptional,
-                                   const aclTensorList *antiquantScaleOptional,
-                                   const aclTensorList *antiquantOffsetOptional,
-                                   const aclTensor *groupListOptional,
-                                   const aclTensor *perTokenScaleOptional,
-                                   int64_t splitItem,
-                                   op::DataType yDtype,
-                                   bool transposeWeight,
-                                   bool transposeX,
-                                   int64_t groupType,
-                                   int64_t groupListType,
-                                   int64_t actType,
-                                   const aclIntArray *tuningConfig,
-                                   size_t outLength,
-                                   aclOpExecutor *executor) {
+const aclTensorList *GroupedMatmul(const aclTensorList *x, const aclTensorList *weight,
+                                   const aclTensorList *biasOptional, const aclTensorList *scaleOptional,
+                                   const aclTensorList *offsetOptional, const aclTensorList *antiquantScaleOptional,
+                                   const aclTensorList *antiquantOffsetOptional, const aclTensor *groupListOptional,
+                                   const aclTensor *perTokenScaleOptional, int64_t splitItem, op::DataType yDtype,
+                                   bool transposeWeight, bool transposeX, int64_t groupType, int64_t groupListType,
+                                   int64_t actType, const aclIntArray *tuningConfig, size_t outLength,
+                                   aclOpExecutor *executor)
+{
     L0_DFX(GroupedMatmul, x, weight, biasOptional, scaleOptional, offsetOptional, antiquantScaleOptional,
-           antiquantOffsetOptional, groupListOptional, perTokenScaleOptional, splitItem, yDtype,
-           transposeWeight, transposeX, groupType, groupListType, actType, tuningConfig, outLength);
+           antiquantOffsetOptional, groupListOptional, perTokenScaleOptional, splitItem, yDtype, transposeWeight,
+           transposeX, groupType, groupListType, actType, tuningConfig, outLength);
 
-    std::vector<const aclTensor*> tensorsVec;
+    std::vector<const aclTensor *> tensorsVec;
     const aclTensor *x0 = x->Size() > 0 ? (*x)[0] : nullptr;
     if (x0 == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "(*x)[0] is nullptr.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("GroupedMatmul", "x[0]", "nullptr",
+                                              "x must contain a non-null first tensor");
         return nullptr;
     }
 
     for (size_t i(0); i < outLength; ++i) {
         auto outTensor = executor->AllocTensor(yDtype, x0->GetStorageFormat(), x0->GetOriginalFormat());
         if (outTensor == nullptr) {
-            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "AllocTensor for GroupedMatmul output failed.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("GroupedMatmul", "output",
+                                                     "AllocTensor for GroupedMatmul output failed");
             return nullptr;
         }
         tensorsVec.emplace_back(outTensor);
@@ -61,32 +54,36 @@ const aclTensorList *GroupedMatmul(const aclTensorList *x,
     int64_t outputDtype = yDtype == DataType::DT_INT32 ? 2 : -1;
     auto out = executor->AllocTensorList(tensorsVec.data(), outLength);
     if (out == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "AllocTensorList for GroupedMatmul output failed.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("GroupedMatmul", "output list",
+                                                 "AllocTensorList for GroupedMatmul output failed");
         return nullptr;
     }
 
-    auto ret = INFER_SHAPE(GroupedMatmul,
-                           OP_INPUT(x, weight, biasOptional, scaleOptional, offsetOptional, antiquantScaleOptional,
-                                    antiquantOffsetOptional, groupListOptional, perTokenScaleOptional),
-                           OP_OUTPUT(out),
-                           OP_ATTR(splitItem, outputDtype, transposeWeight, transposeX, groupType, groupListType, actType, tuningConfig));
+    auto ret = INFER_SHAPE(
+        GroupedMatmul,
+        OP_INPUT(x, weight, biasOptional, scaleOptional, offsetOptional, antiquantScaleOptional,
+                 antiquantOffsetOptional, groupListOptional, perTokenScaleOptional),
+        OP_OUTPUT(out),
+        OP_ATTR(splitItem, outputDtype, transposeWeight, transposeX, groupType, groupListType, actType, tuningConfig));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "InferShape failed.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            "GroupedMatmul", "input", "InferShape failed, ret = " + std::to_string(static_cast<int64_t>(ret)));
         return nullptr;
     }
-    ret = ADD_TO_LAUNCHER_LIST_AICORE(GroupedMatmul,
-                                      OP_INPUT(x, weight, biasOptional, scaleOptional, offsetOptional,
-                                               antiquantScaleOptional, antiquantOffsetOptional, groupListOptional,
-                                               perTokenScaleOptional),
-                                      OP_OUTPUT(out),
-                                      OP_ATTR(splitItem, outputDtype, transposeWeight, transposeX, groupType, groupListType,
-                                              actType, tuningConfig));
+    ret = ADD_TO_LAUNCHER_LIST_AICORE(
+        GroupedMatmul,
+        OP_INPUT(x, weight, biasOptional, scaleOptional, offsetOptional, antiquantScaleOptional,
+                 antiquantOffsetOptional, groupListOptional, perTokenScaleOptional),
+        OP_OUTPUT(out),
+        OP_ATTR(splitItem, outputDtype, transposeWeight, transposeX, groupType, groupListType, actType, tuningConfig));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "ADD_TO_LAUNCHER_LIST_AICORE failed.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            "GroupedMatmul", "input",
+            "ADD_TO_LAUNCHER_LIST_AICORE failed, ret = " + std::to_string(static_cast<int64_t>(ret)));
         return nullptr;
     }
 
     return out;
 }
 
-}  // namespace l0op
+} // namespace l0op
