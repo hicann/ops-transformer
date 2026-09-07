@@ -16,6 +16,9 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 from torch.library import impl
 
 QFA_METADATA_OP_NAME = "quant_flash_attn_metadata"
+METADATA_STRIDE = (
+    16  # 每核 metadata 字段数, 与 AICPU/kernel 侧 METADATA_STRIDE 同名同值
+)
 
 
 class QuantMode(IntEnum):
@@ -79,8 +82,32 @@ def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
     return 0
 
 
-def _calculate_max_schedule_size():
-    return 4096
+def _calculate_max_schedule_size(batch_size, num_heads_kv):
+    """dim0 按 sectionNum 最坏值(batch*num_heads_kv)动态计算, 开启 section 后
+    FA/FD 调度区需求随 section 数线性增长, 固定值无法覆盖; 对齐 4096 便于对拍。
+    (2, dim0) 布局中第二行即反向 FAG 区, grad 按 shape.GetDim(1)=dim0 推导其偏移。"""
+    align_size = 4096
+    head_size = METADATA_STRIDE  # head 区占 1 个 stride
+    # batch_size 为 -1/None/0(未知, 由 AICPU 从 varlen tensor 推断)时无法预估 section 数,
+    # 按 1 兜底: sn 恒为 1 时需求为 16+(aic+aiv)*16, 4096 预算已覆盖
+    batch_size = batch_size if batch_size and batch_size > 0 else 1
+    aic_num, aiv_num = _get_core_nums()
+    fa_size = aic_num * METADATA_STRIDE * batch_size * num_heads_kv
+    fd_size = aiv_num * METADATA_STRIDE * batch_size * num_heads_kv
+
+    schedule_size = head_size + fa_size + fd_size
+    return ((schedule_size + align_size - 1) // align_size) * align_size
+
+
+def _get_core_nums():
+    """惰性获取设备核数(理论上限, 与 AICPU 调度/kernel grid 口径一致);
+    仅无 NPU 环境(meta/fallback)返回默认值。真机上查询失败时向上抛出,
+    避免静默用默认核数导致 metadata 欠分配越界。"""
+    npu = getattr(torch, "npu", None)
+    if npu is None or not npu.is_available():
+        return 36, 72
+    props = npu.get_device_properties()
+    return props.cube_core_num, props.vector_core_num
 
 
 # 各 layout 期望的 Q/K/V tensor 维度数 (N2TGD 是 descale 专用 layout, 不在此表)
@@ -157,7 +184,8 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             layout_out: Optional[str] = "BSND",
             is_grad_enabled: Optional[bool] = False,
         ):
-            max_schedule_size = _calculate_max_schedule_size()
+            b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
+            max_schedule_size = _calculate_max_schedule_size(b_size, num_heads_kv)
             return torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
 
         @impl(get_as_library(), self.name, "Meta")
@@ -320,7 +348,7 @@ def quant_flash_attn_metadata(
     layout_out = "BSND" if layout_out is None else layout_out
     head_dim_v = head_dim if head_dim_v is None else head_dim_v
 
-    max_schedule_size = _calculate_max_schedule_size()
+    max_schedule_size = _calculate_max_schedule_size(batch_size, num_heads_kv)
     output = torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
 
     op_module = quant_flash_attn_op_builder.load()

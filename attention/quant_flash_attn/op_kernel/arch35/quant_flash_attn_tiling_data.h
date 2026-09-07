@@ -17,11 +17,14 @@
 #define QUANT_FLASH_ATTN_TILING_DATA_H_
 
 namespace optiling {
-constexpr uint32_t QFA_AIC_CORE_NUM = 36;
-constexpr uint32_t QFA_AIV_CORE_NUM = 72;
+// AICPU metadata format: 16 fields per core (FA and FD both)
+constexpr uint32_t METADATA_STRIDE = 16U;
+static constexpr uint32_t METADATA_HEADER_OFFSET = METADATA_STRIDE * sizeof(uint32_t);
 
-constexpr uint32_t QFA_METADATA_SIZE = 16;
-constexpr uint32_t QFA_FD_METADATA_SIZE = 16;
+// Metadata Head Index Definitions (0-based, matching AICPU quant_flash_attn_metadata.h)
+constexpr uint32_t METADATA_HEADER_SECTION_NUM_INDEX = 0;
+constexpr uint32_t METADATA_HEADER_AIC_NUM_INDEX = 4;
+constexpr uint32_t METADATA_HEADER_AIV_NUM_INDEX = 5;
 
 constexpr uint32_t QFA_BN2_START_INDEX = 0;
 constexpr uint32_t QFA_M_START_INDEX = 1;

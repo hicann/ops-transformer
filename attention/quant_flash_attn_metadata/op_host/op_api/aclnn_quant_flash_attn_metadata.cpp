@@ -60,11 +60,28 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
     uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
     const char *socVersion = npuInfo.GetSocLongVersion().c_str();
 
-    auto output = l0op::QuantFlashAttnMetadata(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional,
-                                               sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ,
-                                               numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft, winRight,
-                                               layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled, socVersion,
-                                               aicCoreNum, aivCoreNum, metaData, uniqueExecutor.get());
+    // 宿主侧读取输出 tensor 的 shape 并经 attr 下发: AICPU 侧输出 TensorShape 可能未填充,
+    // FAG 偏移与容量校验依赖该值, 必须使用宿主侧可靠 shape。
+    // 必须取 ViewShape: torch extension 链路下 aclTensor 的 StorageShape 是一维展平的
+    // 总元素数(aclnn_common.h ConvertType: storage.nbytes()/itemsize), 二维行距只有
+    // ViewShape(DimNum=2, Dim(1)=行长度) 才是正确语义
+    constexpr int64_t DIM_ONE = 1;
+    constexpr int64_t DIM_TWO = 2;
+    constexpr int64_t DIM_IDX_0 = 0;
+    constexpr int64_t DIM_IDX_1 = 1;
+    int64_t metadataDimNum = metaData->GetViewShape().GetDimNum();
+    int64_t metadataRowSize = 0;
+    if (metadataDimNum >= DIM_TWO) {
+        metadataRowSize = metaData->GetViewShape().GetDim(DIM_IDX_1);
+    } else if (metadataDimNum == DIM_ONE) {
+        metadataRowSize = metaData->GetViewShape().GetDim(DIM_IDX_0);
+    }
+
+    auto output = l0op::QuantFlashAttnMetadata(
+        cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ,
+        maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft, winRight, layoutQ,
+        layoutQDescale, layoutKv, layoutOut, isGradEnabled, socVersion, aicCoreNum, aivCoreNum, metadataDimNum,
+        metadataRowSize, metaData, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();

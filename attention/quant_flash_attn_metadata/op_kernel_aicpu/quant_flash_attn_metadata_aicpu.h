@@ -53,6 +53,9 @@ private:
     bool Prepare(CpuKernelContext &ctx);
     bool BalanceSchedule(SectionStreamKResult &splitRes);
     bool GenMetaData(SectionStreamKResult &splitRes);
+    void SetMetadataHead(const SectionStreamKResult &splitRes, optiling::detail::FaMetaData &faMetadata);
+    void SetMetadataFa(const SectionStreamKResult &splitRes, optiling::detail::FaMetaData &faMetadata);
+    void SetMetadataFd(const SectionStreamKResult &splitRes, optiling::detail::FaMetaData &faMetadata);
     bool ParamsInit();
     bool CheckNeedInitOutput();
     std::vector<int64_t> GetTensorDataAsInt64(Tensor *tensor, size_t size);
@@ -89,6 +92,9 @@ private:
     uint32_t s1Size_ = 0;
     uint32_t s2Size_ = 0;
     bool isGradEnabled_ = false;
+    int64_t fagDeterMaxRound_ = 0; // 延迟到 GenMetaData 中 Clear 之后写入
+    int64_t metadataDimNum_ = 0;   // 输出 tensor 维度数(宿主侧经 attr 下发, AICPU 侧 shape 可能未填充)
+    int64_t metadataRowSize_ = -1; // 输出 tensor 单行长度(2D 为 dim1, 1D 为 dim0), 同上
 
     uint32_t groupSize_ = 0;
     uint32_t mBaseSize_ = NUM_64;
