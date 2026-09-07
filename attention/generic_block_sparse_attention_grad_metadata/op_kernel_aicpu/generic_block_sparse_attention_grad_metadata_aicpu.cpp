@@ -319,19 +319,19 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::ExpandTaskList()
 // 生成元数据，将任务列表、块成本、核心数量等信息写入到 metadata 中
 bool GenericBlockSparseAttentionGradMetadataCpuKernel::GenMetadata()
 {
-    int64_t *metadataPtr = static_cast<int64_t *>(metadata_->GetData());
+    int32_t *metadataPtr = static_cast<int32_t *>(metadata_->GetData());
     for (uint32_t i = 0U; i < metadataCapacity_; ++i) {
         metadataPtr[i] = 0;
     }
 
-    metadataPtr[TOTAL_NUM] = static_cast<int64_t>(totalNum_);
-    metadataPtr[TOTAL_BLOCK_COST] = static_cast<int64_t>(totalBlockCost_);
-    metadataPtr[MAX_CORE_BLOCK_COST] = static_cast<int64_t>(maxCoreBlockCost_);
-    metadataPtr[BASE_M] = static_cast<int64_t>(baseM_);
-    metadataPtr[BASE_N] = static_cast<int64_t>(baseN_);
-    metadataPtr[USED_CORE_NUM] = static_cast<int64_t>(usedCoreNum_);
-    metadataPtr[GROUP_SIZE] = static_cast<int64_t>(groupSize_);
-    metadataPtr[MAX_TASK_COUNT] = static_cast<int64_t>(maxTaskCount_);
+    metadataPtr[TOTAL_NUM] = static_cast<int32_t>(totalNum_);
+    metadataPtr[TOTAL_BLOCK_COST] = static_cast<int32_t>(totalBlockCost_);
+    metadataPtr[MAX_CORE_BLOCK_COST] = static_cast<int32_t>(maxCoreBlockCost_);
+    metadataPtr[BASE_M] = static_cast<int32_t>(baseM_);
+    metadataPtr[BASE_N] = static_cast<int32_t>(baseN_);
+    metadataPtr[USED_CORE_NUM] = static_cast<int32_t>(usedCoreNum_);
+    metadataPtr[GROUP_SIZE] = static_cast<int32_t>(groupSize_);
+    metadataPtr[MAX_TASK_COUNT] = static_cast<int32_t>(maxTaskCount_);
 
     for (uint32_t coreIdx = 0U; coreIdx < aicCoreNum_; ++coreIdx) {
         metadataPtr[CORE_TASK_START_OFFSET + coreIdx] = 0;
@@ -343,17 +343,17 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::GenMetadata()
         const uint32_t groupEnd = coreGroupEnd_[coreIdx];
         const uint32_t taskStart = groupStart * groupSize_;
         const uint32_t taskEnd = groupEnd * groupSize_;
-        metadataPtr[CORE_TASK_START_OFFSET + coreIdx] = static_cast<int64_t>(taskStart);
-        metadataPtr[CORE_TASK_END_OFFSET + coreIdx] = static_cast<int64_t>(taskEnd);
+        metadataPtr[CORE_TASK_START_OFFSET + coreIdx] = static_cast<int32_t>(taskStart);
+        metadataPtr[CORE_TASK_END_OFFSET + coreIdx] = static_cast<int32_t>(taskEnd);
     }
 
     for (uint32_t i = 0U; i < totalNum_; ++i) {
         const GsagTask &task = taskList_[i];
         const uint32_t base = TASK_LIST_OFFSET + i * TASK_ENTRY_SIZE;
-        metadataPtr[base + TASK_B] = static_cast<int64_t>(task.b);
-        metadataPtr[base + TASK_N2] = static_cast<int64_t>(task.n2);
-        metadataPtr[base + TASK_J] = static_cast<int64_t>(task.j);
-        metadataPtr[base + TASK_G] = static_cast<int64_t>(task.g);
+        metadataPtr[base + TASK_B] = static_cast<int32_t>(task.b);
+        metadataPtr[base + TASK_N2] = static_cast<int32_t>(task.n2);
+        metadataPtr[base + TASK_J] = static_cast<int32_t>(task.j);
+        metadataPtr[base + TASK_G] = static_cast<int32_t>(task.g);
     }
 
     (void)blockShapeX_;

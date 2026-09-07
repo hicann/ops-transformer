@@ -54,8 +54,8 @@ public:
             .DataType({ge::DT_INT32, ge::DT_INT32})
             .FormatList({ge::FORMAT_ND});
         this->Input("metadata")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_INT64, ge::DT_INT64})
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_INT32, ge::DT_INT32})
             .FormatList({ge::FORMAT_ND});
         this->Input("atten_mask")
             .ParamType(OPTIONAL)

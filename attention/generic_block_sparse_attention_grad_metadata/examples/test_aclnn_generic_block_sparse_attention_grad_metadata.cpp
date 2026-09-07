@@ -83,14 +83,14 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 
 void PrintMetadataHeader(void **deviceAddr)
 {
-    std::vector<int64_t> header(8, 0);
-    auto ret = aclrtMemcpy(header.data(), header.size() * sizeof(int64_t), *deviceAddr, header.size() * sizeof(int64_t),
+    std::vector<int32_t> header(8, 0);
+    auto ret = aclrtMemcpy(header.data(), header.size() * sizeof(int32_t), *deviceAddr, header.size() * sizeof(int32_t),
                            ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy metadata header failed. ERROR: %d\n", ret); return);
-    LOG_PRINT("metadata[0] total_num=%ld\n", header[0]);
-    LOG_PRINT("metadata[1] total_block_cost=%ld\n", header[1]);
-    LOG_PRINT("metadata[5] used_core_num=%ld\n", header[5]);
-    LOG_PRINT("metadata[6] group_size=%ld\n", header[6]);
+    LOG_PRINT("metadata[0] total_num=%d\n", header[0]);
+    LOG_PRINT("metadata[1] total_block_cost=%d\n", header[1]);
+    LOG_PRINT("metadata[5] used_core_num=%d\n", header[5]);
+    LOG_PRINT("metadata[6] group_size=%d\n", header[6]);
 }
 
 } // namespace
@@ -125,7 +125,7 @@ int main()
 
     std::vector<int32_t> idxHost(static_cast<size_t>(GetShapeSize(idxShape)), -1);
     std::vector<int32_t> cntHost(static_cast<size_t>(GetShapeSize(cntShape)), 0);
-    std::vector<int64_t> metaHost(static_cast<size_t>(metaSize), 0);
+    std::vector<int32_t> metaHost(static_cast<size_t>(metaSize), 0);
 
     for (int64_t q = 0; q < S1; ++q) {
         idxHost[static_cast<size_t>(q)] = static_cast<int32_t>(q);
@@ -143,7 +143,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(cntHost, cntShape, &cntAddr, aclDataType::ACL_INT32, &cnt);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT64, &metadata);
+    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT32, &metadata);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     const int64_t blockShapeData[] = {blockX, blockY};

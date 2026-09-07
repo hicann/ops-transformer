@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：aclnnGenericBlockSparseAttentionGrad是通用块稀疏注意力的反向计算算子。依据`sparseBlockIdx`/`sparseBlockCount`（稀疏块索引表）定义的索引，仅在被选中的KV块上计算和传播梯度，支持动态、可变长的分块稀疏模式。调用前须先通过`aclnnGenericBlockSparseAttentionGradMetadata`生成分核`metadata`。
+- 接口功能：aclnnGenericBlockSparseAttentionGrad是通用块稀疏注意力的反向计算算子。依据`sparseBlockIdx`/`sparseBlockCount`（稀疏块索引表）定义的索引，仅在被选中的KV块上计算和传播梯度，支持动态、可变长的分块稀疏模式。调用前须先通过`aclnnGenericBlockSparseAttentionGradMetadata`生成分核`metadataOptional`。
 - 计算公式：
 
 $$
@@ -64,7 +64,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
     const aclTensor *lse,
     const aclTensor *sparseBlockIdx,
     const aclTensor *sparseBlockCount,
-    const aclTensor *metadata,
+    const aclTensor *metadataOptional,
     const aclTensor *attenMaskOptional,
     const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional,
@@ -239,16 +239,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>√</td>
               </tr>
               <tr>
-                  <td>metadata</td>
-                  <td>输入</td>
+                  <td>metadataOptional</td>
+                  <td>可选输入</td>
                   <td>由aclnnGenericBlockSparseAttentionGradMetadata生成的分核信息。</td>
                   <td>
                       <ul>
                           <li>必须传入。</li>
-                          <li>长度≥80+B×N1×J×4（int64元素个数）。</li>
+                          <li>长度≥80+B×N1×J×4（int32元素个数）。</li>
                       </ul>
                   </td>
-                  <td>INT64</td>
+                  <td>INT32</td>
                   <td>ND</td>
                   <td>(x,)</td>
                   <td>√</td>
@@ -375,10 +375,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>Softmax计算采取的精度级别。</td>
                   <td>
                       <ul>
-                          <li>仅支持0或1。</li>
+                          <li>当前仅支持0。</li>
                           <li>0：online softmax和rescale均使用fp32。</li>
-                          <li>1：online softmax使用fp16/bf16，rescale使用fp32，可能发生数值溢出。</li>
-                          <li>当前实现传0。</li>
                       </ul>
                   </td>
                   <td>INT64</td>
@@ -483,7 +481,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
         <tr>
           <td>ACLNN_ERR_PARAM_NULLPTR</td>
           <td>161001</td>
-          <td>必选参数或输出为空指针；layoutQ为"TND"时未提供cuSeqLengthsQOptional；layoutKv为"TND"时未提供cuSeqLengthsKvOptional。</td>
+          <td>必选参数或输出为空指针；metadataOptional未传入；layoutQ为"TND"时未提供cuSeqLengthsQOptional；layoutKv为"TND"时未提供cuSeqLengthsKvOptional。</td>
         </tr>
         <tr>
           <td class="merged-cell" rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
@@ -544,16 +542,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 
 - 确定性计算：
   - aclnnGenericBlockSparseAttentionGrad默认为非确定性实现，暂不支持确定性实现，确定性计算配置后不会生效。
-- 须先调用[aclnnGenericBlockSparseAttentionGradMetadata](../../generic_block_sparse_attention_grad_metadata/docs/aclnnGenericBlockSparseAttentionGradMetadata.md)生成`metadata`，再调用本接口。
+- 须先调用[aclnnGenericBlockSparseAttentionGradMetadata](../../generic_block_sparse_attention_grad_metadata/docs/aclnnGenericBlockSparseAttentionGradMetadata.md)生成`metadataOptional`，再调用本接口。
 - 参数query、key、value、dout、out、dQuery、dKey、dValue的数据类型应保持一致，支持FLOAT16和BFLOAT16。
 - 参数lse的数据类型应为FLOAT32。
 - 参数sparseBlockIdx、sparseBlockCount、sequsedQOptional、sequsedKvOptional的数据类型应为INT32。
-- 参数cuSeqLengthsQOptional、cuSeqLengthsKvOptional、metadata的数据类型应为INT64。
+- 参数cuSeqLengthsQOptional、cuSeqLengthsKvOptional的数据类型应为INT64；参数metadataOptional的数据类型应为INT32。
 - layoutQ和layoutKv当前支持TND、BNSD、BSND，且必须保持一致。
 - 当layoutQ为TND时，需要传入cuSeqLengthsQOptional；当layoutKv为TND时，需要传入cuSeqLengthsKvOptional。
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自Q/K的S维。
 - HeadDim固定为128；N1/N2取值范围[1, 128]，且N1 > N2，N1 % N2 == 0。
-- blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数（Cube按baseN=128对每个稀疏块做S2切分）；isPackedGQA当前仅支持1；maskType当前仅支持1。
+- blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数（Cube按baseN=128对每个稀疏块做S2切分）；isPackedGQA当前仅支持1；maskType当前仅支持1；softmaxPrecision当前仅支持0。
 - winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
 - Softmax LSE的head/seq轴语义须与query布局一致。
 - `sparseBlockIdx`第4维maxS1应≥`sparseBlockCount`中所有元素的最大值。
@@ -664,7 +662,7 @@ int main()
     std::vector<float> lseHost(GetShapeSize(lseShape), 5.0f);
     std::vector<int32_t> idxHost(GetShapeSize(idxShape), -1);
     std::vector<int32_t> cntHost(GetShapeSize(cntShape), 0);
-    std::vector<int64_t> metaHost(metaSize, 0);
+    std::vector<int32_t> metaHost(metaSize, 0);
     std::vector<uint16_t> dqHost(GetShapeSize(qShape), 0);
     std::vector<uint16_t> dkHost(GetShapeSize(kvShape), 0);
     std::vector<uint16_t> dvHost(GetShapeSize(kvShape), 0);
@@ -701,7 +699,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(cntHost, cntShape, &cntAddr, aclDataType::ACL_INT32, &cnt);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT64, &metadata);
+    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT32, &metadata);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(dqHost, qShape, &dqAddr, aclDataType::ACL_FLOAT16, &dq);
     CHECK_RET(ret == ACL_SUCCESS, return ret);

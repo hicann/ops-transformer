@@ -39,6 +39,7 @@ static constexpr int64_t GSAG_SUPPORTED_HEAD_DIM = 128;
 static constexpr int64_t GSAG_BLOCK_SHAPE_Y_MIN = 128;
 static constexpr int64_t GSAG_BLOCK_SHAPE_Y_ALIGN = 64;
 static constexpr int64_t GSAG_SUPPORTED_MASK_TYPE = 1;
+static constexpr int64_t GSAG_SUPPORTED_SOFTMAX_PRECISION = 0;
 // sparse_block_idx: [B, N2, J, maxS1]; sparse_block_count: [B, N2, J]
 static constexpr size_t SPARSE_BLOCK_IDX_DIM_NUM = 4;
 static constexpr size_t SPARSE_BLOCK_COUNT_DIM_NUM = 3;
@@ -49,8 +50,8 @@ static constexpr size_t DIM_MAX_S1 = 3;
 
 aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads,
                              int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, int64_t isPackedGQA,
-                             const char *layoutQ, const char *layoutKv, int64_t maskType, int64_t winLeft,
-                             int64_t winRight, uint32_t aicCoreNum, uint32_t aivCoreNum)
+                             const char *layoutQ, const char *layoutKv, int64_t maskType, int64_t softmaxPrecision,
+                             int64_t winLeft, int64_t winRight, uint32_t aicCoreNum, uint32_t aivCoreNum)
 {
     if (maxQSeqlen < 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GSAG_ACLNN_OP_NAME, "max_q_seqlen", std::to_string(maxQSeqlen),
@@ -80,6 +81,10 @@ aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t nu
     }
     if (maskType != GSAG_SUPPORTED_MASK_TYPE) {
         OP_LOGE_FOR_INVALID_VALUE(GSAG_ACLNN_OP_NAME, "mask_type", std::to_string(maskType), "1");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (softmaxPrecision != GSAG_SUPPORTED_SOFTMAX_PRECISION) {
+        OP_LOGE_FOR_INVALID_VALUE(GSAG_ACLNN_OP_NAME, "softmax_precision", std::to_string(softmaxPrecision), "0");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (headDim != GSAG_SUPPORTED_HEAD_DIM) {
@@ -249,9 +254,9 @@ aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *s
         return ACLNN_ERR_PARAM_INVALID;
     }
     aclGetDataType(metadata, &dataType);
-    if (dataType != aclDataType::ACL_INT64) {
+    if (dataType != aclDataType::ACL_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GSAG_ACLNN_OP_NAME, "metadata", ToString(dataType).GetString(),
-                                              "dtype of metadata must be int64");
+                                              "dtype of metadata must be int32");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -270,11 +275,11 @@ static aclnnStatus ParamsCheck(const aclTensor *sparseBlockIdx, const aclTensor 
 {
     (void)sequsedQOptional;
     (void)sequsedKvOptional;
-    (void)softmaxPrecision;
     (void)socVersion;
 
     if (CheckSingleParam(maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGQA,
-                         layoutQ, layoutKv, maskType, winLeft, winRight, aicCoreNum, aivCoreNum) != ACLNN_SUCCESS) {
+                         layoutQ, layoutKv, maskType, softmaxPrecision, winLeft, winRight, aicCoreNum,
+                         aivCoreNum) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (CheckExistence(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, layoutQ,

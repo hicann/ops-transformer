@@ -42,7 +42,7 @@ public:
         sequsedKv_ = sequsedKv;
         sparseBlockIdx_ = sparseBlockIdx;
         sparseBlockCount_ = sparseBlockCount;
-        metadata_ = reinterpret_cast<__gm__ int64_t *>(metadata);
+        metadata_ = reinterpret_cast<__gm__ int32_t *>(metadata);
 
         cubeCoreIdx_ = GetBlockIdx();
         if ASCEND_IS_AIV {
@@ -222,7 +222,7 @@ private:
     __gm__ uint8_t *sequsedKv_{nullptr};
     __gm__ uint8_t *sparseBlockIdx_{nullptr};
     __gm__ uint8_t *sparseBlockCount_{nullptr};
-    __gm__ int64_t *metadata_{nullptr};
+    __gm__ int32_t *metadata_{nullptr};
     ConstInfo constInfo_{};
     int32_t cubeCoreIdx_{0};
     int32_t taskStart_{0};

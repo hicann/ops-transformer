@@ -144,7 +144,7 @@ int main()
     std::vector<float> lseHost(static_cast<size_t>(GetShapeSize(lseShape)), 5.0f);
     std::vector<int32_t> idxHost(static_cast<size_t>(GetShapeSize(idxShape)), -1);
     std::vector<int32_t> cntHost(static_cast<size_t>(GetShapeSize(cntShape)), 0);
-    std::vector<int64_t> metaHost(static_cast<size_t>(metaSize), 0);
+    std::vector<int32_t> metaHost(static_cast<size_t>(metaSize), 0);
     std::vector<uint16_t> dqHost(static_cast<size_t>(GetShapeSize(qShape)), 0);
     std::vector<uint16_t> dkHost(static_cast<size_t>(GetShapeSize(kvShape)), 0);
     std::vector<uint16_t> dvHost(static_cast<size_t>(GetShapeSize(kvShape)), 0);
@@ -196,7 +196,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(cntHost, cntShape, &cntAddr, aclDataType::ACL_INT32, &cnt);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT64, &metadata);
+    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT32, &metadata);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(dqHost, qShape, &dqAddr, aclDataType::ACL_FLOAT16, &dq);
     CHECK_RET(ret == ACL_SUCCESS, return ret);

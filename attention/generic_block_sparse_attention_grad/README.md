@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-+ 算子功能：GenericBlockSparseAttentionGrad是通用块稀疏注意力的反向计算算子。依据`sparseBlockIdx`/`sparseBlockCount`（稀疏块索引表）定义的索引，仅在被选中的KV块上计算和传播梯度，支持动态、可变长的分块稀疏模式。调用前须先通过`aclnnGenericBlockSparseAttentionGradMetadata`生成分核`metadata`。
++ 算子功能：GenericBlockSparseAttentionGrad是通用块稀疏注意力的反向计算算子。依据`sparseBlockIdx`/`sparseBlockCount`（稀疏块索引表）定义的索引，仅在被选中的KV块上计算和传播梯度，支持动态、可变长的分块稀疏模式。调用前须先通过`aclnnGenericBlockSparseAttentionGradMetadata`生成分核`metadataOptional`。
 + 计算公式：
 
 $$
@@ -108,10 +108,10 @@ $$
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
-    <td class="tg-0pky">metadata</td>
-    <td class="tg-0pky">输入</td>
-    <td class="tg-0pky">由GenericBlockSparseAttentionGradMetadata生成的分核信息。</td>
-    <td class="tg-0pky">INT64</td>
+    <td class="tg-0pky">metadataOptional</td>
+    <td class="tg-0pky">可选输入</td>
+    <td class="tg-0pky">由GenericBlockSparseAttentionGradMetadata生成的分核信息，必须传入。</td>
+    <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
@@ -194,7 +194,7 @@ $$
   <tr>
     <td class="tg-0pky">softmaxPrecision</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">Softmax精度级别，取值0或1，当前实现传0。</td>
+    <td class="tg-0pky">Softmax精度级别，当前仅支持0。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>

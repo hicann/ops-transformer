@@ -148,7 +148,7 @@ $$
   <tr>
     <td class="tg-0pky">softmaxPrecision</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">Softmax精度级别，取值0或1，当前实现传0。</td>
+    <td class="tg-0pky">Softmax精度级别，当前仅支持0。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
@@ -170,7 +170,7 @@ $$
     <td class="tg-0pky">metadata</td>
     <td class="tg-0pky">输出</td>
     <td class="tg-0pky">分核信息，长度≥80+B×N1×J×4。</td>
-    <td class="tg-0pky">INT64</td>
+    <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
 </tbody></table>

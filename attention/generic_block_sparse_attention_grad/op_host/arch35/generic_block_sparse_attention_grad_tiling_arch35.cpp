@@ -59,7 +59,8 @@ protected:
             return false;
         }
         if (blockShapeY_ < 128 || blockShapeY_ % 64 != 0) {
-            OP_LOGE(context_->GetNodeName(), "block_shape[1] must be >= 128 and 64-aligned.");
+            OP_LOGE(context_->GetNodeName(), "block_shape[1] must be >= 128 and 64-aligned, got blockShapeY=%ld.",
+                    static_cast<int64_t>(blockShapeY_));
             return false;
         }
         // BlockY is sparse-block width only. Cube/Softmax tile is fixed baseN=128;
@@ -85,27 +86,29 @@ protected:
 
     ge::graphStatus GetShapeAttrsInfo() override
     {
-        // Inputs: query=0, key=1, value=2, ..., sparse_block_idx=6, sparse_block_count=7, metadata=8
-        // Optional: atten_mask=9, cu_seq_lengths_q=10, cu_seq_lengths_kv=11, seqused_q=12, seqused_kv=13.
+        // Inputs: query=0, key=1, value=2, ..., sparse_block_idx=6, sparse_block_count=7
+        // Optional: metadata=8, atten_mask=9, cu_seq_lengths_q=10, cu_seq_lengths_kv=11, seqused_q=12, seqused_kv=13.
         auto qInputDesc = context_->GetInputDesc(0);
         const gert::StorageShape *queryShape = context_->GetInputShape(0);
         const gert::StorageShape *keyShape = context_->GetInputShape(1);
         const gert::StorageShape *valueShape = context_->GetInputShape(2);
         const gert::StorageShape *idxShape = context_->GetInputShape(6);
         const gert::StorageShape *cntShape = context_->GetInputShape(7);
-        const gert::StorageShape *metaShape = context_->GetInputShape(8);
+        const gert::StorageShape *metaShape = context_->GetOptionalInputShape(8);
 
         const auto *attrs = context_->GetAttrs();
         if (attrs == nullptr || qInputDesc == nullptr || queryShape == nullptr || keyShape == nullptr ||
-            valueShape == nullptr || idxShape == nullptr || cntShape == nullptr || metaShape == nullptr) {
+            valueShape == nullptr || idxShape == nullptr || cntShape == nullptr) {
             OP_LOGE(context_->GetNodeName(), "required inputs/attrs are null.");
+            return ge::GRAPH_FAILED;
+        }
+        if (metaShape == nullptr) {
+            OP_LOGE(context_->GetNodeName(), "metadata must be provided.");
             return ge::GRAPH_FAILED;
         }
 
         dataType_ = qInputDesc->GetDataType();
 
-        // Attrs: block_shape, is_packed_gqa, layout_q, layout_kv, scale_value,
-        //        mask_type, softmax_precision, win_left, win_right
         const auto *blockShapeList = attrs->GetListInt(0);
         isPackedGQA_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(1));
         qLayout_ = attrs->GetAttrPointer<char>(2);

@@ -31,6 +31,7 @@ namespace {
 
 static constexpr int64_t GSAG_MAX_HEAD_NUM = 128;
 static constexpr int64_t GSAG_SUPPORTED_MASK_TYPE = 1;
+static constexpr int64_t GSAG_SUPPORTED_SOFTMAX_PRECISION = 0;
 
 inline bool TensorOk(const aclTensor *t)
 {
@@ -69,21 +70,22 @@ int64_t GetHeadNumFromKey(const aclTensor *key, const char *layout)
 
 aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dout,
                      const aclTensor *out, const aclTensor *lse, const aclTensor *sparseBlockIdx,
-                     const aclTensor *sparseBlockCount, const aclTensor *metadata, const aclTensor *attenMaskOptional,
-                     const aclIntArray *blockShape, int64_t isPackedGQA, char *layoutQ, char *layoutKv,
-                     int64_t maskType, int64_t winLeft, int64_t winRight, const aclTensor *dQuery,
-                     const aclTensor *dKey, const aclTensor *dValue)
+                     const aclTensor *sparseBlockCount, const aclTensor *metadataOptional,
+                     const aclTensor *attenMaskOptional, const aclIntArray *blockShape, int64_t isPackedGQA,
+                     char *layoutQ, char *layoutKv, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft,
+                     int64_t winRight, const aclTensor *dQuery, const aclTensor *dKey, const aclTensor *dValue)
 {
     CHECK_RET(TensorOk(query) && TensorOk(key) && TensorOk(value) && TensorOk(dout) && TensorOk(out) && TensorOk(lse),
               ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(TensorOk(sparseBlockIdx) && TensorOk(sparseBlockCount) && TensorOk(metadata), ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(TensorOk(sparseBlockIdx) && TensorOk(sparseBlockCount), ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(TensorOk(metadataOptional), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(TensorOk(dQuery) && TensorOk(dKey) && TensorOk(dValue), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(layoutQ != nullptr && layoutKv != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(strcmp(layoutQ, layoutKv) == 0, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(isPackedGQA == 1, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(maskType == GSAG_SUPPORTED_MASK_TYPE, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(softmaxPrecision == GSAG_SUPPORTED_SOFTMAX_PRECISION, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(winLeft == -1 && winRight == -1, ACLNN_ERR_PARAM_INVALID);
-    // atten_mask is not supported yet; must be nullptr (causal uses maskType only).
     CHECK_RET(attenMaskOptional == nullptr, ACLNN_ERR_PARAM_INVALID);
     if (blockShape != nullptr) {
         CHECK_RET(blockShape->Size() >= 2, ACLNN_ERR_PARAM_INVALID);
@@ -103,7 +105,7 @@ aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTens
     CHECK_RET(lse->GetDataType() == ACL_FLOAT, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(sparseBlockIdx->GetDataType() == ACL_INT32 && sparseBlockCount->GetDataType() == ACL_INT32,
               ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(metadata->GetDataType() == ACL_INT64, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(metadataOptional->GetDataType() == ACL_INT32, ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
 
@@ -111,17 +113,17 @@ aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTens
 
 aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
     const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dout, const aclTensor *out,
-    const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *metadata,
-    const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional,
-    const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional, const aclIntArray *blockShape,
-    int64_t isPackedGQA, char *layoutQ, char *layoutKv, double scaleValue, int64_t maskType, int64_t softmaxPrecision,
-    int64_t winLeft, int64_t winRight, aclTensor *dQuery, aclTensor *dKey, aclTensor *dValue, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
+    const aclTensor *metadataOptional, const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
+    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+    const aclIntArray *blockShape, int64_t isPackedGQA, char *layoutQ, char *layoutKv, double scaleValue,
+    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, aclTensor *dQuery, aclTensor *dKey,
+    aclTensor *dValue, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     CHECK_RET(workspaceSize != nullptr && executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     L2_DFX_PHASE_1(
         aclnnGenericBlockSparseAttentionGrad,
-        DFX_IN(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadata, attenMaskOptional,
+        DFX_IN(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataOptional, attenMaskOptional,
                cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional, sequsedKvOptional, blockShape,
                isPackedGQA, layoutQ, layoutKv, scaleValue, maskType, softmaxPrecision, winLeft, winRight),
         DFX_OUT(dQuery, dKey, dValue));
@@ -129,9 +131,9 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    auto ret =
-        Validate(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadata, attenMaskOptional,
-                 blockShape, isPackedGQA, layoutQ, layoutKv, maskType, winLeft, winRight, dQuery, dKey, dValue);
+    auto ret = Validate(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataOptional,
+                        attenMaskOptional, blockShape, isPackedGQA, layoutQ, layoutKv, maskType, softmaxPrecision,
+                        winLeft, winRight, dQuery, dKey, dValue);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     auto queryC = l0op::Contiguous(query, uniqueExecutor.get());
@@ -142,7 +144,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
     auto lseC = l0op::Contiguous(lse, uniqueExecutor.get());
     auto idxC = l0op::Contiguous(sparseBlockIdx, uniqueExecutor.get());
     auto cntC = l0op::Contiguous(sparseBlockCount, uniqueExecutor.get());
-    auto metaC = l0op::Contiguous(metadata, uniqueExecutor.get());
+    auto metaC = l0op::Contiguous(metadataOptional, uniqueExecutor.get());
     CHECK_RET(queryC && keyC && valueC && doutC && outC && lseC && idxC && cntC && metaC, ACLNN_ERR_INNER_NULLPTR);
 
     // attenMaskOptional already required nullptr in Validate; keep placeholder for OP_INPUT slot.

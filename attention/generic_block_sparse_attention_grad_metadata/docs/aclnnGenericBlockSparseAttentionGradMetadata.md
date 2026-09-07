@@ -262,7 +262,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>softmaxPrecision</td>
         <td>输入</td>
         <td>Softmax计算采取的精度级别。</td>
-        <td>仅支持0或1，当前实现传0。</td>
+        <td>当前仅支持0。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -293,7 +293,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>输出</td>
         <td>稀疏attention的分核信息。</td>
         <td>不支持空Tensor。metaSize ≥ 80 + B×N1×J×4。</td>
-        <td>INT64</td>
+        <td>INT32</td>
         <td>ND</td>
         <td>[metaSize]</td>
         <td>×</td>
@@ -505,7 +505,7 @@ int main()
 
     std::vector<int32_t> idxHost(static_cast<size_t>(GetShapeSize(idxShape)), -1);
     std::vector<int32_t> cntHost(static_cast<size_t>(GetShapeSize(cntShape)), 0);
-    std::vector<int64_t> metaHost(static_cast<size_t>(metaSize), 0);
+    std::vector<int32_t> metaHost(static_cast<size_t>(metaSize), 0);
     for (int64_t q = 0; q < S1; ++q) {
         idxHost[static_cast<size_t>(q)] = static_cast<int32_t>(q);
     }
@@ -517,7 +517,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, Finalize(deviceId, stream); return ret);
     ret = CreateAclTensor(cntHost, cntShape, &cntAddr, aclDataType::ACL_INT32, &cnt);
     CHECK_RET(ret == ACL_SUCCESS, Finalize(deviceId, stream); return ret);
-    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT64, &metadata);
+    ret = CreateAclTensor(metaHost, metaShape, &metaAddr, aclDataType::ACL_INT32, &metadata);
     CHECK_RET(ret == ACL_SUCCESS, Finalize(deviceId, stream); return ret);
 
     const int64_t blockShapeData[] = {1, blockY};
