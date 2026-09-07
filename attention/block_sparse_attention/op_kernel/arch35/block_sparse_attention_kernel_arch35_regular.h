@@ -481,14 +481,14 @@ public:
         mm2L1AddrStart_ = mm1L1TileM_ * mm1L1TileKLeft_ * qL1BufNum_ * sizeof(ElementQ) +
                           mm1L1TileKRight_ * mm1L1TileN_ * kL1BufNum_ * sizeof(ElementK);
         if constexpr (transposedMm1) {
-            mm1L0ATotalStages_ = CeilDiv(kvBaseTile_, BlockMmadQK::L0_TILE_M) * CeilDiv(embed_, BlockMmadQK::L0_TILE_K);
-            mm1L0BTotalStages_ = CeilDiv(qBaseTile_, BlockMmadQK::L0_TILE_N) * CeilDiv(embed_, BlockMmadQK::L0_TILE_K);
+            mm1L0ATotalStages_ = (kvBaseTile_ / BlockMmadQK::L0_TILE_M) * (embed_ / BlockMmadQK::L0_TILE_K);
+            mm1L0BTotalStages_ = (qBaseTile_ / BlockMmadQK::L0_TILE_N) * (embed_ / BlockMmadQK::L0_TILE_K);
         } else {
-            mm1L0ATotalStages_ = CeilDiv(qBaseTile_, BlockMmadQK::L0_TILE_M) * CeilDiv(embed_, BlockMmadQK::L0_TILE_K);
-            mm1L0BTotalStages_ = CeilDiv(kvBaseTile_, BlockMmadQK::L0_TILE_N) * CeilDiv(embed_, BlockMmadQK::L0_TILE_K);
+            mm1L0ATotalStages_ = (qBaseTile_ / BlockMmadQK::L0_TILE_M) * (embed_ / BlockMmadQK::L0_TILE_K);
+            mm1L0BTotalStages_ = (kvBaseTile_ / BlockMmadQK::L0_TILE_N) * (embed_ / BlockMmadQK::L0_TILE_K);
         }
-        mm2L0ATotalStages_ = CeilDiv(qBaseTile_, BlockMmadPV::L0_TILE_M) * CeilDiv(kvBaseTile_, BlockMmadPV::L0_TILE_K);
-        mm2L0BTotalStages_ = CeilDiv(kvBaseTile_, BlockMmadPV::L0_TILE_K) * CeilDiv(embed_, BlockMmadPV::L0_TILE_N);
+        mm2L0ATotalStages_ = (qBaseTile_ / BlockMmadPV::L0_TILE_M) * (kvBaseTile_ / BlockMmadPV::L0_TILE_K);
+        mm2L0BTotalStages_ = (kvBaseTile_ / BlockMmadPV::L0_TILE_K) * (embed_ / BlockMmadPV::L0_TILE_N);
     }
 
     __aicore__ inline void CalcUBufTileInfo()
@@ -500,10 +500,6 @@ public:
         uint32_t pExtraElemNum = 0;
         if constexpr (transposedMm1) {
             pExtraElemNum = Max(qBaseTilePerSubCore, kvBaseTilePerSubCore);
-        } else {
-            constexpr uint32_t ELE_NUM_PER_DATABLOCK = 32 / sizeof(ElementP);
-            uint32_t pNFractalNum = kvBaseTilePerSubCore / ELE_NUM_PER_DATABLOCK;
-            pExtraElemNum = (pNFractalNum - 1) * ELE_NUM_PER_DATABLOCK;
         }
         uint32_t sStartOffset = 0;
         uint32_t pStartOffset =
