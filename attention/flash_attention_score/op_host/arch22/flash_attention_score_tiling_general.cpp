@@ -99,9 +99,8 @@ static const int64_t UB_BASIC_LIMIT_SIZE = static_cast<int64_t>(8) * 1024;
 static const int64_t SLOPE_BN_DIM_NUM = 2L;
 static const int64_t SLOPE_N_DIM_NUM = 1L;
 static const int64_t L1REUSE_D_LIMIT = 128L;
-static const int64_t L1REUSE_D_LIMIT_MIN = 192L;
 static const int64_t L1REUSE_D_REGULAR_MIN = 256L;
-static const int64_t L1REUSE_D_LIMIT_MAX = 512L;
+static const int64_t L1REUSE_D_LIMIT_MAX = 384L;
 static const int64_t L1REUSE_D_ALIGN = 128L;
 static const int64_t L1REUSE_LARGE_D_HEAD_NUM = 16L;
 static const int64_t L1REUSE_B_SIZE = 1L;
@@ -411,8 +410,7 @@ protected:
         bool isUngroupedHead = gSize == L1REUSE_G_SIZE;
         bool isSupportedSeqLen = s1Size == s2Size && s1Size >= L1REUSE_S_SIZE_MIN && s1Size <= L1REUSE_S_SIZE_MAX;
         bool isSupportedD =
-            dSize == L1REUSE_D_LIMIT_MIN ||
-            (dSize >= L1REUSE_D_REGULAR_MIN && dSize <= L1REUSE_D_LIMIT_MAX && dSize % L1REUSE_D_ALIGN == 0L);
+            dSize >= L1REUSE_D_REGULAR_MIN && dSize <= L1REUSE_D_LIMIT_MAX && dSize % L1REUSE_D_ALIGN == 0L;
         bool isSupportedHead = n1Size > 0L && (dSize <= L1REUSE_D_REGULAR_MIN || n1Size == L1REUSE_LARGE_D_HEAD_NUM);
         bool isSupportedDtype = inputDtype == ge::DT_FLOAT16 || inputDtype == ge::DT_BF16;
         bool isNoMask = sparseMode == static_cast<int64_t>(NO_MASK) && attenMaskExistFlag == 0U;
