@@ -606,7 +606,7 @@ int ExecuteLightningIndexer(TensorResources& resources, aclrtStream stream,
     aclOpExecutor* executor;
 
     int ret = aclnnLightningIndexerGetWorkspaceSize(resources.queryTensor, resources.keyTensor, resources.weightsTensor, nullptr, nullptr, nullptr,
-                                                    layoutQuery, layoutKey, sparseCount, sparseMode, preTokens, nextTokens,returnValue,
+                                                    layoutQuery, layoutKey, sparseCount, sparseMode, preTokens, nextTokens, returnValue,
                                                     resources.sparseIndicesTensor, resources.sparseValuesTensor, workspaceSize, &executor);
 
     if (!CHECK_RET(ret == ACL_SUCCESS)) {

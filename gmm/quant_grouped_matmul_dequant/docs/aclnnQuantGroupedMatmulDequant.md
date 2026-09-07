@@ -480,9 +480,9 @@ int main() {
   std::vector<float> weightScaleHostData(GetShapeSize(weightScaleShape));
   std::vector<int64_t> groupListHostData(GetShapeSize(groupListShape));
   groupListHostData[0] = 7;
-  groupListHostData[0] = 32;
-  groupListHostData[0] = 40;
-  groupListHostData[0] = 64;
+  groupListHostData[1] = 32;
+  groupListHostData[2] = 40;
+  groupListHostData[3] = 64;
   std::vector<float> xScaleHostData(GetShapeSize(xScaleShape));
   std::vector<uint16_t> smoothScaleHostData(GetShapeSize(smoothScaleShape));
   std::vector<uint16_t> outHostData(GetShapeSize(outShape));
