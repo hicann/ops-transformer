@@ -800,8 +800,9 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
     }
 
     if (preTokens < 0 && nextTokens < 0) {
-        OP_LOGE(context_, "PreTokens[%ld] and nextTokens[%ld] config error, there is no valid data block.",
-                oriPreTokens, oriNextTokens);
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "preTokens and nextTokens",
+                                               std::to_string(oriPreTokens) + ", " + std::to_string(oriNextTokens),
+                                               "config error, there is no valid data block");
         return false;
     }
 
@@ -816,9 +817,9 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
             sparseType = SparseEnum::BAND;
             return true;
         } else {
-            OP_LOGE(context_,
-                    "PreTokens[%ld] and nextTokens[%ld] config error with S1[%ld], there is no valid data block.",
-                    oriPreTokens, oriNextTokens, minS1Value);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                opName, "preTokens and nextTokens", std::to_string(oriPreTokens) + ", " + std::to_string(oriNextTokens),
+                "config error with S1[" + std::to_string(minS1Value) + "], there is no valid data block");
             return false;
         }
     }
@@ -834,9 +835,9 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
             sparseType = SparseEnum::BAND;
             return true;
         } else {
-            OP_LOGE(context_,
-                    "PreTokens[%ld] and nextTokens[%ld] config error with S2[%ld], there is no valid data block.",
-                    oriPreTokens, oriNextTokens, minS2Value);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                opName, "preTokens and nextTokens", std::to_string(oriPreTokens) + ", " + std::to_string(oriNextTokens),
+                "config error with S2 " + std::to_string(minS2Value) + ", there is no valid data block");
             return false;
         }
     }
@@ -846,7 +847,8 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
 bool FlashAttentionScoreTilingBase::SparseModeProcess(SparseEnum &sparseType)
 {
     if (sparseMode > static_cast<int64_t>(PREFIX_COMPRESS)) {
-        OP_LOGE(context_, "Not support sparse mode of %ld.", sparseMode);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparseMode", std::to_string(sparseMode),
+                                              "not support this sparse mode");
         return false;
     }
 
@@ -865,7 +867,9 @@ bool FlashAttentionScoreTilingBase::SparseModeProcess(SparseEnum &sparseType)
         if (sparseType == SparseEnum::PREFIX && sparseMode == static_cast<int64_t>(PREFIX) &&
             tilingData->inputParams.get_attenMaskShapeType() != ATTEN_B_N2_G_S1_S2 &&
             tilingData->inputParams.get_attenMaskShapeType() != ATTEN_B_1_1_S1_S2 && bSize != 1) {
-            OP_LOGE(context_, "Prefix mode get invalid atten_mask shape, should be [BNSS] or [B1SS].");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "atten_mask shape",
+                                                  std::to_string(tilingData->inputParams.get_attenMaskShapeType()),
+                                                  "prefix mode only support shape [BNSS] or [B1SS]");
             return false;
         }
     }
@@ -915,20 +919,25 @@ bool FlashAttentionScoreTilingBase::SetPseAlibiParams()
     if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
         pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
         if (s1Size != s2Size) {
-            OP_LOGE(context_, "INNER Pse alibi is supported only when s1Size and s2Size are equal.");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "s1Size and s2Size",
+                                                  std::to_string(s1Size) + ", " + std::to_string(s2Size),
+                                                  "INNER Pse alibi is supported only when s1Size and s2Size are equal");
             return false;
         }
         return true;
     }
     if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
-        OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(), pseType);
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "pse", std::to_string(pseShape->GetStorageShape().GetDimNum()),
+                                                 "pse shape dim num should be at least 1");
         return false;
     } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
         auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
         auto pseS2Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 1);
         if (pseS1Size == PSE_ALIBI_S_SIZE && s1Size > PSE_ALIBI_S_SIZE && pseS2Size == s2Size) {
             if (s1Size != s2Size) {
-                OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 larger than 1024");
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "s1Size and s2Size",
+                                                      std::to_string(s1Size) + ", " + std::to_string(s2Size),
+                                                      "Pse alibi only support same S1 S2 when S1 is larger than 1024");
                 return false;
             }
         }
@@ -974,9 +983,18 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetShapeAttrsInfo()
     alignedD2 = AlignUp(d2Size, FRACTAL_NUM);
 
     if (!isMaxWorkspace) {
-        OP_CHECK_IF(alignedS1 <= 0, OP_LOGE(opName, "invalid alignedS1 %ld.", alignedS1), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(alignedS2 <= 0, OP_LOGE(opName, "invalid alignedS2 %ld.", alignedS2), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(alignedD <= 0, OP_LOGE(opName, "invalid alignedD %ld.", alignedD), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(alignedS1 <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "alignedS1", std::to_string(alignedS1),
+                                                          "should be larger than 0"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(alignedS2 <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "alignedS2", std::to_string(alignedS2),
+                                                          "should be larger than 0"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(alignedD <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "alignedD", std::to_string(alignedD),
+                                                          "should be larger than 0"),
+                    return ge::GRAPH_FAILED);
     }
 
     auto &inputParams = tilingData->inputParams;
@@ -1104,8 +1122,9 @@ bool FlashAttentionScoreTilingBase::AnalyzeDtype()
             isHighPercision = false;
             break;
         default:
-            OP_LOGE(opName, "not support input dtype: %s for now",
-                    ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str());
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "input",
+                                                  ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str(),
+                                                  "not support input dtype for now");
             return false;
     }
 
@@ -1130,8 +1149,13 @@ bool FlashAttentionScoreTilingBase::AnalyzeAttrs()
     keepProb = *keepProbPtr;
     scaleValue = *scaleValuePtr;
     n1Size = *n1SizePtr;
-    OP_CHECK_IF(n1Size == 0, OP_LOGE(opName, "Head num is zero."), return false);
-    OP_CHECK_IF(keepProb <= 0.0 || keepProb > 1.0, OP_LOGE(opName, "keepProb value must be in range of (0, 1]."),
+    OP_CHECK_IF(
+        n1Size == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "n1Size", std::to_string(n1Size), "head num should not be zero"),
+        return false);
+    OP_CHECK_IF(keepProb <= 0.0 || keepProb > 1.0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "keepProb", std::to_string(keepProb),
+                                                      "should be in range of (0, 1]"),
                 return false);
 
     implMode = ImplMode::AA_HIGH_PRECISION;
@@ -1164,8 +1188,10 @@ bool FlashAttentionScoreTilingBase::AnalyzeAttrs()
     if (attrs->GetAttrNum() > idx) {
         auto pseTypePtr = attrs->GetAttrPointer<int64_t>(idx++);
         pseType = *pseTypePtr;
-        OP_CHECK_IF(pseType < 0 || pseType >= PSE_INVALID_TYPE, OP_LOGE(opName, "pseType value is out of range"),
-                    return false);
+        OP_CHECK_IF(
+            pseType < 0 || pseType >= PSE_INVALID_TYPE,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "pseType", std::to_string(pseType), "value is out of range"),
+            return false);
     }
     if (attrs->GetAttrNum() > static_cast<size_t>(SOFTMAX_OUT_LAYOUT_INDEX)) {
         // read 13th attr softmax_out_layout
@@ -1193,16 +1219,28 @@ bool FlashAttentionScoreTilingBase::AnalyzeLayout()
     size_t layoutLen = strlen(inputLayout);
     OP_LOGD(context_, "Get input_layout [%s].", inputLayout);
     OP_CHECK_IF(queryShape.GetDimNum() != layoutLen || keyShape.GetDimNum() != layoutLen,
-                OP_LOGE(opName, "Invalid layout[%s].", inputLayout), return false);
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName, "input_layout", inputLayout,
+                                                       "shape dim num does not match input_layout"),
+                return false);
     OP_CHECK_IF(!Analyze3DimLayout(queryShape, queryRopeShape, keyShape, valueShape, layoutLen) ||
                     !Analyze4DimLayout(queryShape, keyShape, valueShape, layoutLen),
-                OP_LOGE(opName, "Get unsupported layout: %s", inputLayout), return false);
-    OP_CHECK_IF(gSize == 0, OP_LOGE(opName, "gSize is zero."), return false);
-    OP_CHECK_IF(n2Size == 0, OP_LOGE(opName, "n2Size is zero."), return false);
-    OP_CHECK_IF(dSize > HEAD_DIM_MAX_VALUE || dSize <= 0L, OP_LOGE(opName, "dSize is not in range:(0, 512]."),
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName, "input_layout", inputLayout, "unsupported layout"),
                 return false);
-    OP_CHECK_IF(n1Size % n2Size != 0,
-                OP_LOGE(opName, "n1Size [%ld] should be a multiple of n2Size [%ld].", n1Size, n2Size), return false);
+    OP_CHECK_IF(gSize == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "gSize", std::to_string(gSize), "should not be zero"),
+                return false);
+    OP_CHECK_IF(n2Size == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "n2Size", std::to_string(n2Size), "should not be zero"),
+                return false);
+    OP_CHECK_IF(
+        dSize > HEAD_DIM_MAX_VALUE || dSize <= 0L,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "dSize", std::to_string(dSize), "should be in range of (0, 512]"),
+        return false);
+    OP_CHECK_IF(
+        n1Size % n2Size != 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "n1Size", std::to_string(n1Size),
+                                              std::string("should be a multiple of n2Size ") + std::to_string(n2Size)),
+        return false);
     return true;
 }
 
@@ -1336,23 +1374,26 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
             GetActualSeqLenData(ACTUAL_SEQ_LENGTH_KV_INPUT_INDEX, actualSeqLenKvData, actualSeqKVLen, actualKVBatch,
                                 endKvLen);
             OP_CHECK_IF(actualSeqQLen != actualSeqKVLen && (!isMaxWorkspace),
-                        OP_LOGE(opName, "VarLen scene, q is not equal kv."), return false);
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName, "actualSeqQLen and actualSeqKVLen",
+                            std::to_string(actualSeqQLen) + ", " + std::to_string(actualSeqKVLen),
+                            "VarLen scene, q is not equal kv"),
+                        return false);
             bSize = actualSeqQLen;
             accumS1 = std::accumulate(actualSeqLenData.begin(), actualSeqLenData.end(), 0LL);
             accumS2 = std::accumulate(actualSeqLenKvData.begin(), actualSeqLenKvData.end(), 0LL);
             OP_CHECK_IF((t1Size < accumS1 || t2Size < accumS2) && (!isMaxWorkspace),
-                        OP_LOGE(opName,
-                                "Query T(%ld) and key T(%ld) need to be larger than the sum of seqLen(%ld) and "
-                                "seqlenKv(%ld) respectively.",
-                                t1Size, t2Size, accumS1, accumS2),
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            opName, "t1Size and t2Size", std::to_string(t1Size) + ", " + std::to_string(t2Size),
+                            "need larger than respectively sum of seqLen(" + std::to_string(accumS1) +
+                                ") and seqKVLen(" + std::to_string(accumS2) + ")"),
                         return false);
             // 校验EOD场景尾部是否补0
             if (t1Size > accumS1 && t2Size > accumS2) {
                 if ((endQLen != 0 || endKvLen != 0) && (!isMaxWorkspace)) {
-                    OP_LOGE(
-                        opName,
-                        "The end of actualSeqQLen & actualSeqKvLen should be 0 in EOD scenario, but got (%d) and (%d).",
-                        endQLen, endKvLen);
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "endQLen and endKvLen",
+                                                           std::to_string(endQLen) + ", " + std::to_string(endKvLen),
+                                                           "should be 0 in EOD scenario");
                     return false;
                 }
             }
@@ -1406,10 +1447,14 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
                 s2Size = maxS2Val;
                 OP_CHECK_IF(
                     n1Size != queryShape.GetDim(1) && (!isMaxWorkspace),
-                    OP_LOGE(opName, "head_num is [%ld], but got query dim1 [%ld].", n1Size, queryShape.GetDim(1)),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "query dim1", std::to_string(queryShape.GetDim(1)),
+                                                          "should equal head_num " + std::to_string(n1Size)),
                     return false);
                 n2Size = keyShape.GetDim(1);
-                OP_CHECK_IF(n2Size == 0 && (!isMaxWorkspace), OP_LOGE(opName, "N2 is zero."), return false);
+                OP_CHECK_IF(n2Size == 0 && (!isMaxWorkspace),
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "n2Size", std::to_string(n2Size),
+                                                                  "should not be zero"),
+                            return false);
                 gSize = queryShape.GetDim(1) / n2Size;
                 dSize = queryShape.GetDim(2);
                 dRopeSize = queryRopeShape ? queryRopeShape->GetDim(2) : 0;
@@ -1444,8 +1489,13 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
         } else {
             return false;
         }
-        OP_CHECK_IF(h1 == 0 || h2 == 0, OP_LOGE(opName, "H is zero."), return false);
-        OP_CHECK_IF(h1 % n1Size != 0, OP_LOGE(opName, "h1 [%ld] should be a multiple of n1Size [%ld].", h1, n1Size),
+        OP_CHECK_IF(h1 == 0 || h2 == 0,
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        opName, "h1 and h2", std::to_string(h1) + ", " + std::to_string(h2), "should not be zero"),
+                    return false);
+        OP_CHECK_IF(h1 % n1Size != 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "h1", std::to_string(h1),
+                                                          "should be a multiple of n1Size " + std::to_string(n1Size)),
                     return false);
         dSize = h1 / n1Size;
         gSize = h1 / h2;
@@ -1466,10 +1516,15 @@ bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &querySh
             s1Size = queryShape.GetDim(1);
             s2Size = keyShape.GetDim(1);
             n2Size = keyShape.GetDim(2); // 2: N idx
-            OP_CHECK_IF(n2Size == 0, OP_LOGE(opName, "N2 is zero."), return false);
-            OP_CHECK_IF(n1Size != queryShape.GetDim(2),
-                        OP_LOGE(opName, "head_num is [%ld], but got query dim2 [%ld].", n1Size, queryShape.GetDim(2)),
-                        return false);
+            OP_CHECK_IF(
+                n2Size == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "n2Size", std::to_string(n2Size), "should not be zero"),
+                return false);
+            OP_CHECK_IF(
+                n1Size != queryShape.GetDim(2),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "query dim2", std::to_string(queryShape.GetDim(2)),
+                                                      "should equal head_num " + std::to_string(n1Size)),
+                return false);
             gSize = queryShape.GetDim(2) / n2Size; // 2: N idx
             dSize = queryShape.GetDim(3);          // 3: D1 idx
             d2Size = valueShape.GetDim(3);         // 3: D2 idx
@@ -1483,10 +1538,15 @@ bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &querySh
                    inputLayout[2] == 'S' && inputLayout[3] == 'D') {
             bSize = queryShape.GetDim(0);
             n2Size = keyShape.GetDim(1); // 1: N idx
-            OP_CHECK_IF(n2Size == 0, OP_LOGE(opName, "N2 is zero."), return false);
-            OP_CHECK_IF(n1Size != queryShape.GetDim(1),
-                        OP_LOGE(opName, "head_num is [%ld], but got query dim1 [%ld].", n1Size, queryShape.GetDim(1)),
-                        return false);
+            OP_CHECK_IF(
+                n2Size == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "n2Size", std::to_string(n2Size), "should not be zero"),
+                return false);
+            OP_CHECK_IF(
+                n1Size != queryShape.GetDim(1),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "query dim1", std::to_string(queryShape.GetDim(1)),
+                                                      "should equal head_num " + std::to_string(n1Size)),
+                return false);
             gSize = queryShape.GetDim(1) / n2Size;
             s1Size = queryShape.GetDim(2); // 2: S idx
             s2Size = keyShape.GetDim(2);   // 2: S idx
@@ -1615,8 +1675,9 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
              * FA正向对这种情况进行了兼容，能够得到正确的计算结果。
              * FA反向未兼容，因此统一拦截异常输入。
              */
-            OP_LOGE(context_, "Get PseInput is nullptr, but pseType is not default=%u, now pseType=%ld.",
-                    PSE_OUTER_ADD_MUL_TYPE, pseType);
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName, "pse",
+                "PseInput is nullptr while pseType is not default, now pseType=" + std::to_string(pseType));
             return false;
         }
     }
@@ -1628,7 +1689,8 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
             pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
             if (pseDimNum != SLOPE_BN_DIM_NUM && pseDimNum != SLOPE_N_DIM_NUM) {
-                OP_LOGE(context_, "pse inner mode, unsupported pse shape");
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "pse", std::to_string(pseDimNum),
+                                                         "pse inner mode only support slope shape");
                 return false;
             }
             pseShapeType = PSE_B_N2_G_SLOPE;
@@ -1650,16 +1712,18 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
                        pseShapeDims.GetDim(3) == s2Size) {
                 pseShapeType = PSE_B_N2_G_S1_S2;
             } else {
-                OP_LOGE(context_, "get unsupported pse shape");
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "pse shape", std::to_string(pseBSize),
+                                                      "unsupported pse shape");
                 return false;
             }
         } else {
             if (pseDimNum != PSE_DIM_NUM) {
-                OP_LOGE(context_, "pse dim should be 4, but got %zu", pseDimNum);
+                OP_LOGE_FOR_INVALID_SHAPEDIM(opName, "pse", std::to_string(pseDimNum), "4");
                 return false;
             }
             if (pseBSize != bSize && pseBSize != 1) {
-                OP_LOGE(context_, "pse batchsize should be 1 or %ld, but got %ld", bSize, pseBSize);
+                OP_LOGE_FOR_INVALID_VALUE(opName, "pse batchsize", std::to_string(pseBSize),
+                                          "1 or " + std::to_string(bSize));
                 return false;
             }
 
@@ -1673,14 +1737,20 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
             } else if (pseDim1Size == n1Size && pseDim2Size == static_cast<int64_t>(PSE_ALIBI_S_SIZE) &&
                        pseDim3Size == s2Size) {
                 if (s1Size < pseDim2Size) {
-                    OP_LOGE(opName, "get unsupported pse shape, the shape is [%ld, %ld, %ld, %ld]", pseBSize,
-                            pseDim1Size, pseDim2Size, pseDim3Size);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, "pse",
+                        "[" + std::to_string(pseBSize) + ", " + std::to_string(pseDim1Size) + ", " +
+                            std::to_string(pseDim2Size) + ", " + std::to_string(pseDim3Size) + "]",
+                        "unsupported pse shape");
                     return false;
                 }
                 pseShapeType = PSE_B_N2_G_S1_S2;
             } else {
-                OP_LOGE(opName, "get unsupported pse shape, the shape is [%ld, %ld, %ld, %ld]", pseBSize, pseDim1Size,
-                        pseDim2Size, pseDim3Size);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName, "pse",
+                    "[" + std::to_string(pseBSize) + ", " + std::to_string(pseDim1Size) + ", " +
+                        std::to_string(pseDim2Size) + ", " + std::to_string(pseDim3Size) + "]",
+                    "unsupported pse shape");
                 return false;
             }
         }
@@ -1696,8 +1766,9 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         attenMaskExistFlag = static_cast<uint8_t>(1);
         auto attenMaskType = attenMaskInput->GetDataType();
         OP_CHECK_IF(attenMaskType != ge::DT_BOOL && attenMaskType != ge::DT_UINT8,
-                    OP_LOGE(opName, "invalid attenMask dtype[%s], only support bool or uint8.",
-                            ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "attenMask",
+                                                          ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str(),
+                                                          "only support bool or uint8"),
                     return false);
 
         tilingData->inputParams.set_attenMaskDataType(1);
@@ -1720,12 +1791,14 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
                        attenMaskDim3Size == s2Size) {
                 attenMaskShapeType = ATTEN_B_N2_G_S1_S2;
             } else {
-                OP_LOGE(context_,
-                        "get unsupported atten_mask shape, the shape is [%ld, %ld, %ld, %ld]. B=[%ld], N=[%ld], "
-                        "Sq=[%ld], Skv=[%ld], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], "
-                        "[1, 1, Sq, Skv] and [Sq, Skv].",
-                        attenMaskDim0Size, attenMaskDim1Size, attenMaskDim2Size, attenMaskDim3Size, bSize, n1Size,
-                        s1Size, s2Size);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName, "atten_mask",
+                    "[" + std::to_string(attenMaskDim0Size) + ", " + std::to_string(attenMaskDim1Size) + ", " +
+                        std::to_string(attenMaskDim2Size) + ", " + std::to_string(attenMaskDim3Size) + "]",
+                    "B=[" + std::to_string(bSize) + "], N=[" + std::to_string(n1Size) + "], Sq=[" +
+                        std::to_string(s1Size) + "], Skv=[" + std::to_string(s2Size) +
+                        "], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], "
+                        "[1, 1, Sq, Skv] and [Sq, Skv]");
                 return false;
             }
         } else if (attenMaskDimNum == ATTENTION_MASK_DIM_NUM_2) {
@@ -1738,21 +1811,24 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
                 attenMaskShapeType = ATTEN_1_1_1_T_T;
             } else {
                 if (tilingData->inputParams.get_layoutType() == LAYOUT_TND) {
-                    OP_LOGE(context_,
-                            "get unsupported atten_mask shape, the shape is [%ld, %ld]. MaxSq=[%ld],  MaxSkv=[%ld], "
-                            "when input_layout is TND, the supported atten_mask shape is [MaxSq, MaxSkv].",
-                            attenMaskDim0Size, attenMaskDim1Size, s1Size, s2Size);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, "atten_mask",
+                        "[" + std::to_string(attenMaskDim0Size) + ", " + std::to_string(attenMaskDim1Size) + "]",
+                        "when input_layout is TND, the supported atten_mask shape is [MaxSq, MaxSkv], MaxSq=" +
+                            std::to_string(s1Size) + ", MaxSkv=" + std::to_string(s2Size));
                 } else {
-                    OP_LOGE(context_,
-                            "get unsupported atten_mask shape, the shape is [%ld, %ld]. B=[%ld], N=[%ld], Sq=[%ld], "
-                            "Skv=[%ld], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], [1, 1, Sq, "
-                            "Skv] and [Sq, Skv].",
-                            attenMaskDim0Size, attenMaskDim1Size, bSize, n1Size, s1Size, s2Size);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, "atten_mask",
+                        "[" + std::to_string(attenMaskDim0Size) + ", " + std::to_string(attenMaskDim1Size) + "]",
+                        "B=[" + std::to_string(bSize) + "], N=[" + std::to_string(n1Size) + "], Sq=[" +
+                            std::to_string(s1Size) + "], Skv=[" + std::to_string(s2Size) +
+                            "], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], "
+                            "[1, 1, Sq, Skv] and [Sq, Skv]");
                 }
                 return false;
             }
         } else {
-            OP_LOGE(context_, "atten mask dim should be 2 or 4, but got %zu", attenMaskDimNum);
+            OP_LOGE_FOR_INVALID_SHAPEDIM(opName, "atten_mask", std::to_string(attenMaskDimNum), "2 or 4");
             return false;
         }
 
@@ -1761,14 +1837,18 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         if ((attenMaskCompressMode != NO_COMPRESS_MODE && attenMaskCompressMode != PREFIX_MODE) &&
             ((attenMaskStorageShape.GetDim(attenMaskDimNum - ATTEN_MASK_S1_REV_INDEX) != ATTEN_MASK_COMPRESS_LIMIT) ||
              (attenMaskStorageShape.GetDim(attenMaskDimNum - 1) != ATTEN_MASK_COMPRESS_LIMIT))) {
-            OP_LOGE(context_, "In the attenmask compression, please set the atten_mask_shape to [2048,2048].");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName, "atten_mask_shape", "current",
+                "In the attenmask compression, please set the atten_mask_shape to [2048,2048]");
             return false;
         }
         if (attenMaskCompressMode == PREFIX_MODE &&
             ((attenMaskStorageShape.GetDim(attenMaskStorageShape.GetDimNum() - ATTEN_MASK_S1_REV_INDEX) !=
               ATTEN_MASK_COMPRESS_PREFIX_LIMIT) ||
              (attenMaskStorageShape.GetDim(attenMaskStorageShape.GetDimNum() - 1) != ATTEN_MASK_COMPRESS_LIMIT))) {
-            OP_LOGE(context_, "In the prefix attenmask compression, please set the atten_mask_shape to [3072,2048].");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName, "atten_mask_shape", "current",
+                "In the prefix attenmask compression, please set the atten_mask_shape to [3072,2048]");
             return false;
         }
         tilingData->inputParams.set_attenMaskS2Size(attenMaskStorageShape.GetDim(attenMaskDimNum - 1));
@@ -1778,10 +1858,11 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
     auto dropMaskInput = context_->GetOptionalInputDesc(DROP_MASK_INPUT_INDEX);
     if (dropMaskInput != nullptr && dropMaskShape != nullptr && dropMaskShape->GetStorageShape().GetDimNum() != 0) {
         auto dropMaskDtype = dropMaskInput->GetDataType();
-        OP_CHECK_IF(dropMaskDtype != ge::DT_UINT8,
-                    OP_LOGE(opName, "invalid dropMask dtype[%s], only support uint8.",
-                            ge::TypeUtils::DataTypeToSerialString(dropMaskDtype).c_str()),
-                    return false);
+        OP_CHECK_IF(
+            dropMaskDtype != ge::DT_UINT8,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                opName, "dropMask", ge::TypeUtils::DataTypeToSerialString(dropMaskDtype).c_str(), "only support uint8"),
+            return false);
         int64_t dimNum = dropMaskShape->GetStorageShape().GetDimNum();
         int64_t dropMaskShapeSize = 1;
         int64_t shapeSize = 0;
@@ -1800,8 +1881,8 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         }
         shapeSize = AlignUp(shapeSize, BYTE_BIT_NUM) / BYTE_BIT_NUM;
         if (dropMaskShapeSize < shapeSize) {
-            OP_LOGE(context_, "Input dropMask shapeSize is invalid, it should not be less than %ld, but got %ld",
-                    shapeSize, dropMaskShapeSize);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName, "dropMask", std::to_string(dropMaskShapeSize),
+                                                      "should not be less than " + std::to_string(shapeSize));
             return false;
         }
         dropMaskExistFlag = static_cast<uint8_t>(1);
@@ -1821,8 +1902,8 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         int64_t dimNum = shape.GetDimNum();
         auto sinkDtype = sinkInputPtr->GetDataType();
         OP_CHECK_IF(sinkDtype != ge::DT_FLOAT,
-                    OP_LOGE(opName, "invalid sink dtype[%s], only support float.",
-                            ge::TypeUtils::DataTypeToSerialString(sinkDtype).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        opName, "sink", ge::TypeUtils::DataTypeToSerialString(sinkDtype).c_str(), "only support float"),
                     return false);
 
         std::string sinkShape = "";
@@ -1833,15 +1914,15 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
             }
         }
         OP_CHECK_IF(dimNum != 1,
-                    OP_LOGE(opName, "invalid sink shape [%s], sink shape only support [n,].", sinkShape.c_str()),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, "sink", sinkShape.c_str(), "only support shape [n,]"),
                     return false);
 
         int64_t expectShapeSize = n1Size;
         auto actualSinkShapeSize = shape.GetShapeSize();
 
         if (actualSinkShapeSize != expectShapeSize) {
-            OP_LOGE(context_, "Input sink shapeSize is invalid, it should be %ld, but got %ld", expectShapeSize,
-                    actualSinkShapeSize);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName, "sink", std::to_string(actualSinkShapeSize),
+                                                      "should be " + std::to_string(expectShapeSize));
             return false;
         }
         sinkExistFlag = static_cast<uint8_t>(1);
@@ -2305,7 +2386,9 @@ void FlashAttentionScoreTilingBase::SetTensorSizeParams()
 
 bool FlashAttentionScoreTilingBase::InitSparseValidArray(std::vector<int64_t> &sparseValidArray, int64_t bIdx)
 {
-    OP_CHECK_IF(sparseValidArray.size() == 0, OP_LOGE(opName, "Sparse valid array size should be larger than 0."),
+    OP_CHECK_IF(sparseValidArray.size() == 0,
+                OP_LOGE_FOR_INVALID_VALUE(opName, "sparseValidArray size", std::to_string(sparseValidArray.size()),
+                                          "larger than 0"),
                 return false);
     uint8_t sparseType = tilingData->inputParams.get_sparseType();
     if (sparseType == static_cast<uint8_t>(SparseEnum::PREFIX)) {
@@ -2351,10 +2434,14 @@ bool FlashAttentionScoreTilingBase::PartitionSparseData(const std::vector<int64_
                                                         int64_t sparseRollingArraySum, int64_t sparseArraySize,
                                                         int64_t loadMaxEachCore, std::vector<int64_t> &partitionResult)
 {
-    OP_CHECK_IF(partitionResult.size() == 0, OP_LOGE(opName, "partitionResult size should be larger than 0."),
+    OP_CHECK_IF(partitionResult.size() == 0,
+                OP_LOGE_FOR_INVALID_VALUE(opName, "partitionResult size", std::to_string(partitionResult.size()),
+                                          "larger than 0"),
                 return false);
 
-    OP_CHECK_IF(sparseRollingArraySum <= 0, OP_LOGE(opName, "sparseRollingArraySum should be larger than 0."),
+    OP_CHECK_IF(sparseRollingArraySum <= 0,
+                OP_LOGE_FOR_INVALID_VALUE(opName, "sparseRollingArraySum", std::to_string(sparseRollingArraySum),
+                                          "larger than 0"),
                 return false);
     int64_t s1OuterCutEachCore = loadMaxEachCore / sparseRollingArraySum;
     int64_t s1OuterLoadEachCore = s1OuterCutEachCore * sparseRollingArraySum;
@@ -2492,7 +2579,9 @@ bool FlashAttentionScoreTilingBase::SetSparseStartIdx(const std::vector<int64_t>
     std::vector<int64_t> lastValidPartitionResult(validCoreNum, totalSize);
     int64_t sparseArraySum = std::accumulate(sparseValidArray.begin(), sparseValidArray.end(), 0LL);
     int64_t loadTotal = sparseArraySum * (totalSize / sparseValidArray.size());
-    OP_CHECK_IF(validCoreNum <= 0, OP_LOGE(opName, "validCoreNum should be larger than 0."), return false);
+    OP_CHECK_IF(validCoreNum <= 0,
+                OP_LOGE_FOR_INVALID_VALUE(opName, "validCoreNum", std::to_string(validCoreNum), "larger than 0"),
+                return false);
     int64_t loadEachCoreLowerBound = loadTotal / validCoreNum - 1;
     int64_t loadEachCoreUpperBound =
         CeilDivision(loadTotal, validCoreNum) + (*std::max_element(sparseValidArray.begin(), sparseValidArray.end()));
@@ -3615,15 +3704,18 @@ protected:
         if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
             pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
             if (s1Size != s2Size) {
-                OP_LOGE(context_, "INNER Pse alibi is supported only when s1Size and s2Size are equal.");
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName, "s1Size and s2Size", std::to_string(s1Size) + ", " + std::to_string(s2Size),
+                    "INNER Pse alibi is supported only when s1Size and s2Size are equal");
                 return false;
             }
             return true;
         }
         // 2: pre last axiss
         if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
-            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(),
-                    pseType);
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                opName, "pse shape", std::to_string(pseShape->GetStorageShape().GetDimNum()),
+                "pseType " + std::to_string(pseType) + " requires pse shape dim num to be at least 1");
             return false;
         } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
             auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
@@ -3633,10 +3725,16 @@ protected:
             if (pseS1Size == PSE_ALIBI_S_SIZE && s1Size > PSE_ALIBI_S_SIZE) {
                 if (s1Size == s2Size) {
                     OP_CHECK_IF(tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL),
-                                OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
+                                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                    opName, "sparseType",
+                                    std::to_string(static_cast<int64_t>(tilingData->inputParams.get_sparseType())),
+                                    "Pse alibi only support causal sparse type"),
+                                return false);
                     pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 } else {
-                    OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 larger than 1024");
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "s1Size and s2Size", std::to_string(s1Size) + ", " + std::to_string(s2Size),
+                        "Pse alibi only support same S1 S2 when S1 is larger than 1024");
                     return false;
                 }
             }
@@ -3906,15 +4004,18 @@ protected:
         if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
             pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
             if (s1Size != s2Size) {
-                OP_LOGE(context_, "INNER Pse alibi is supported only when s1Size and s2Size are equal.");
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName, "s1Size and s2Size", std::to_string(s1Size) + ", " + std::to_string(s2Size),
+                    "INNER Pse alibi is supported only when s1Size and s2Size are equal");
                 return false;
             }
             return true;
         }
         // 1: pre last axiss
         if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
-            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(),
-                    pseType);
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                opName, "pse shape", std::to_string(pseShape->GetStorageShape().GetDimNum()),
+                "pseType " + std::to_string(pseType) + " requires pse shape dim num to be at least 1");
             return false;
         } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
             auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
@@ -3923,10 +4024,16 @@ protected:
             if (pseS1Size == PSE_ALIBI_S_SIZE && s1Size > PSE_ALIBI_S_SIZE) {
                 if (s1Size == s2Size) {
                     OP_CHECK_IF(tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL),
-                                OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
+                                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                    opName, "sparseType",
+                                    std::to_string(static_cast<int64_t>(tilingData->inputParams.get_sparseType())),
+                                    "Pse alibi only support causal sparse type"),
+                                return false);
                     pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 } else {
-                    OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 larger than 1024");
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "s1Size and s2Size", std::to_string(s1Size) + ", " + std::to_string(s2Size),
+                        "Pse alibi only support same S1 S2 when S1 is larger than 1024");
                     return false;
                 }
             }
@@ -4077,25 +4184,33 @@ protected:
             pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
             OP_CHECK_IF(
                 tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL_BAND),
-                OP_LOGE(opName, "INNER Pse does not support sparse mode 7."), return false);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName, "sparseType",
+                    std::to_string(static_cast<int64_t>(tilingData->inputParams.get_sparseType())),
+                    "INNER Pse does not support sparse mode 7"),
+                return false);
             if (tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::BAND_LEFT_UP_CAUSAL)) {
                 for (int64_t i = 0L; i < bSize; ++i) {
                     if (i == 0) {
                         if (actualSeqLenData[0] - actualSeqLenKvData[0] + qStartIdx - kvStartIdx == 0) {
                             continue;
                         } else {
-                            OP_LOGE(context_,
-                                    "INNER Pse sparse mode 8 is only supported when actualSeqLenData[0] %ld + "
-                                    "qStartIdx %ld - actualSeqLenKvData[0] %ld - kvStartIdx %ld == 0.",
-                                    actualSeqLenData[0], qStartIdx, actualSeqLenKvData[0], kvStartIdx);
+                            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                                opName, "actualSeqLenData[0], qStartIdx, actualSeqLenKvData[0], kvStartIdx",
+                                std::to_string(actualSeqLenData[0]) + ", " + std::to_string(qStartIdx) + ", " +
+                                    std::to_string(actualSeqLenKvData[0]) + ", " + std::to_string(kvStartIdx),
+                                "INNER Pse sparse mode 8 requires actualSeqLenData[0] + qStartIdx - "
+                                "actualSeqLenKvData[0] - kvStartIdx == 0");
                             return false;
                         }
                     }
                     if (actualSeqLenData[i] != actualSeqLenKvData[i]) {
-                        OP_LOGE(context_,
-                                "INNER Pse sparse mode 8 is only supported when actualSeqQLen[%ld] %ld and "
-                                "actualSeqKvLen[%ld] %ld are equal.",
-                                i, actualSeqLenData[i], i, actualSeqLenKvData[i]);
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            opName, "actualSeqQLen and actualSeqKvLen",
+                            std::to_string(actualSeqLenData[i]) + ", " + std::to_string(actualSeqLenKvData[i]),
+                            "INNER Pse sparse mode 8 requires actualSeqQLen and actualSeqKvLen to be equal in "
+                            "batch " +
+                                std::to_string(i));
                         return false;
                     }
                 }
@@ -4104,8 +4219,9 @@ protected:
         }
         // 2: pre last axiss
         if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
-            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(),
-                    pseType);
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                opName, "pse shape", std::to_string(pseShape->GetStorageShape().GetDimNum()),
+                "pseType " + std::to_string(pseType) + " requires pse shape dim num to be at least 1");
             return false;
         } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
             auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
@@ -4116,14 +4232,22 @@ protected:
             if (pseS1Size == PSE_ALIBI_S_SIZE) {
                 for (int64_t i = 0L; i < bSize; ++i) {
                     if (actualSeqLenData[i] != actualSeqLenKvData[i]) {
-                        OP_LOGE(context_, "Pse alibi only support when actualSeqQLen and actualSeqKvLen are equal.");
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            opName, "actualSeqQLen and actualSeqKvLen",
+                            std::to_string(actualSeqLenData[i]) + ", " + std::to_string(actualSeqLenKvData[i]),
+                            "Pse alibi only supports when actualSeqQLen and actualSeqKvLen are equal in batch " +
+                                std::to_string(i));
                         return false;
                     }
                 }
                 OP_CHECK_IF(
                     tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL) &&
                         tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL),
-                    OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "sparseType",
+                        std::to_string(static_cast<int64_t>(tilingData->inputParams.get_sparseType())),
+                        "Pse alibi only support causal sparse type"),
+                    return false);
                 pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 OP_LOGD(context_, "[%s] PSE_ENCODE_ALIBI_S2_FULL.", templateName);
             }
@@ -4271,8 +4395,10 @@ protected:
         } else if (sparseMode == static_cast<int64_t>(RIGHT_DOWN_CAUSAL)) {
             for (int64_t i = 0L; i < bSize; ++i) {
                 if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
-                    OP_LOGE(context_, "Batch[%ld] s1[%ld] is larger than s2[%ld], exist invalid row.", i,
-                            actualSeqLenData[i], actualSeqLenKvData[i]);
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        opName, "actualSeqLenData and actualSeqLenKvData",
+                        std::to_string(actualSeqLenData[i]) + ", " + std::to_string(actualSeqLenKvData[i]),
+                        "batch " + std::to_string(i) + ": s1 is larger than s2, exist invalid row");
                     return false;
                 }
             }
@@ -4281,11 +4407,14 @@ protected:
             sparseType = SparseEnum::RIGHT_DOWN_CAUSAL;
         } else if (sparseMode == static_cast<int64_t>(BAND)) {
             if (preTokens < 0) {
-                OP_LOGE(context_, "pre_tokens[%ld] config error, has invalid data block.", preTokens);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "pre_tokens", std::to_string(preTokens),
+                                                      "config error, has invalid data block");
                 return false;
             }
             if (nextTokens < 0 && preTokens + nextTokens < 0) {
-                OP_LOGE(context_, "pre_tokens[%ld], next_tokens[%ld], invalid config.", preTokens, nextTokens);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
+                                                       std::to_string(preTokens) + ", " + std::to_string(nextTokens),
+                                                       "invalid config");
                 return false;
             }
             for (int64_t i = 0L; i < bSize; ++i) {
@@ -4293,8 +4422,11 @@ protected:
                     continue;
                 }
                 if (actualSeqLenData[i] - nextTokens > actualSeqLenKvData[i]) {
-                    OP_LOGE(context_, "Batch[%ld], s1[%ld], s2[%ld], next_tokens[%ld], has invalid row.", i,
-                            actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "s1, s2 and next_tokens",
+                                                           std::to_string(actualSeqLenData[i]) + ", " +
+                                                               std::to_string(actualSeqLenKvData[i]) + ", " +
+                                                               std::to_string(nextTokens),
+                                                           "batch " + std::to_string(i) + " has invalid row");
                     return false;
                 }
             }
@@ -4308,10 +4440,10 @@ protected:
         } else if (sparseMode == static_cast<int64_t>(RIGHT_DOWN_CAUSAL_BAND)) {
             int64_t lastS2 = actualSeqLenKvData[bandIndex];
             if (preTokens < lastS2 || nextTokens > 0) {
-                OP_LOGE(context_,
-                        "RightDownCausal_Band mode: pre_tokens[%ld] is smaller than last valid s2[%ld] "
-                        "or next_tokens[%ld] is larger than 0, wrong config.",
-                        preTokens, lastS2, nextTokens);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName, "pre_tokens, last valid s2 and next_tokens",
+                    std::to_string(preTokens) + ", " + std::to_string(lastS2) + ", " + std::to_string(nextTokens),
+                    "RightDownCausal_Band mode wrong config");
                 return false;
             }
             for (int64_t i = 0L; i < bSize; ++i) {
@@ -4319,27 +4451,36 @@ protected:
                     continue;
                 }
                 if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
-                    OP_LOGE(context_, "Batch[%ld] s1[%ld] is larger than s2[%ld].", i, actualSeqLenData[i],
-                            actualSeqLenKvData[i]);
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        opName, "actualSeqLenData and actualSeqLenKvData",
+                        std::to_string(actualSeqLenData[i]) + ", " + std::to_string(actualSeqLenKvData[i]),
+                        "batch " + std::to_string(i) + ": s1 is larger than s2");
                     return false;
                 }
                 if ((i == bandIndex) && (actualSeqLenData[i] - nextTokens > actualSeqLenKvData[i])) {
-                    OP_LOGE(context_, "Batch[%ld], s1[%ld], s2[%ld], next_tokens[%ld], has invalid row.", i,
-                            actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "s1, s2 and next_tokens",
+                                                           std::to_string(actualSeqLenData[i]) + ", " +
+                                                               std::to_string(actualSeqLenKvData[i]) + ", " +
+                                                               std::to_string(nextTokens),
+                                                           "batch " + std::to_string(i) + " has invalid row");
                     return false;
                 }
             }
             sparseType = SparseEnum::RIGHT_DOWN_CAUSAL_BAND;
         } else if (sparseMode == static_cast<int64_t>(BAND_LEFT_UP_CAUSAL)) {
             if (actualSeqLenData[bandIndex] - nextTokens > actualSeqLenKvData[bandIndex]) {
-                OP_LOGE(context_, "Batch[%ld], s1[%ld], s2[%ld], next_tokens[%ld], has invalid row.", bandIndex,
-                        actualSeqLenData[0], actualSeqLenKvData[0], nextTokens);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "s1, s2 and next_tokens",
+                                                       std::to_string(actualSeqLenData[bandIndex]) + ", " +
+                                                           std::to_string(actualSeqLenKvData[bandIndex]) + ", " +
+                                                           std::to_string(nextTokens),
+                                                       "batch " + std::to_string(bandIndex) + " has invalid row");
                 return false;
             }
             int64_t firstS2 = actualSeqLenKvData[bandIndex];
             if (preTokens < firstS2) {
-                OP_LOGE(context_, "Band_LeftUpCausal mode: pre_tokens[%ld] is smaller than first valid s2[%ld].",
-                        preTokens, firstS2);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName, "pre_tokens and first valid s2", std::to_string(preTokens) + ", " + std::to_string(firstS2),
+                    "Band_LeftUpCausal mode: pre_tokens is smaller than first valid s2");
                 return false;
             }
             sparseType = SparseEnum::BAND_LEFT_UP_CAUSAL;
@@ -4350,7 +4491,8 @@ protected:
     bool SparseNoMaskModeCheck(int64_t maxS1Value, int64_t maxS2Value, int64_t minS2Value, SparseEnum &sparseType)
     {
         if (nextTokens < 0) {
-            OP_LOGE(context_, "nextTokens[%ld] config error, there is no valid data block.", nextTokens);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "nextTokens", std::to_string(nextTokens),
+                                                  "config error, there is no valid data block");
             return false;
         }
         if (preTokens >= maxS1Value && nextTokens >= maxS2Value) {
@@ -4361,8 +4503,10 @@ protected:
                 continue;
             }
             if (actualSeqLenKvData[i] + preTokens < actualSeqLenData[i]) {
-                OP_LOGE(context_, "Batch[%ld] s1[%ld] s2[%ld] has invalid row, check pre_tokens and next_tokens.", i,
-                        actualSeqLenData[i], actualSeqLenKvData[i]);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName, "s1 and s2",
+                    std::to_string(actualSeqLenData[i]) + ", " + std::to_string(actualSeqLenKvData[i]),
+                    "batch " + std::to_string(i) + " has invalid row, check pre_tokens and next_tokens");
                 return false;
             }
         }
@@ -4383,9 +4527,10 @@ protected:
                 isSparseValidSizeAligned = true;
                 return true;
             } else {
-                OP_LOGE(context_,
-                        "preTokens[%ld] and nextTokens[%ld] config error with S[%ld], has invalid data block.",
-                        preTokens, nextTokens, minS2Value);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName, "preTokens, nextTokens and minS2Value",
+                    std::to_string(preTokens) + ", " + std::to_string(nextTokens) + ", " + std::to_string(minS2Value),
+                    "config error, has invalid data block");
                 return false;
             }
         }
@@ -4396,36 +4541,35 @@ protected:
     {
         auto prefixN = context_->GetOptionalInputTensor(PREFIX_INPUT_INDEX);
         if (prefixN == nullptr) {
-            OP_LOGE(context_, "[%s] prefixN is null pointer while sparse mode is prefix compress", templateName);
+            OP_LOGE_WITH_INVALID_INPUT(opName, "prefixN");
             return false;
         }
 
         auto &prefixShape = prefixN->GetShape().GetStorageShape();
         if (prefixShape.GetDimNum() != 1) {
-            OP_LOGE(context_, "[%s] prefixN shape is invalid, DimNum should be 1, but it is %zu.", templateName,
-                    prefixShape.GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM(opName, "prefixN shape", std::to_string(prefixShape.GetDimNum()), "1");
             return false;
         }
         if (prefixShape.GetDim(0) != bSize) {
-            OP_LOGE(context_,
-                    "[%s] prefixN is invalid, it should be the same size as bSize[%ld], but it "
-                    "is %ld.",
-                    templateName, bSize, prefixShape.GetDim(0));
+            OP_LOGE_FOR_INVALID_SHAPESIZE(opName, "prefixN size", std::to_string(prefixShape.GetDim(0)),
+                                          std::to_string(bSize));
             return false;
         }
 
         /* Get Data from tensor. */
         prefixNData = prefixN->GetData<int64_t>();
         if (prefixNData == nullptr) {
-            OP_LOGE(context_, "[%s] prefixN data is null pointer", templateName);
+            OP_LOGE_WITH_INVALID_INPUT(opName, "prefixN data");
             return false;
         }
 
         for (int64_t i = 0; i < bSize; ++i) {
             if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
                 if (prefixNData[i] < 0 || prefixNData[i] > actualSeqLenKvData[i]) {
-                    OP_LOGE(context_, "[%s] batch[%ld] prefixN=%ld is invalid, should be in range of [0, %ld]",
-                            templateName, i, prefixNData[i], actualSeqLenKvData[i]);
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "prefixN", std::to_string(prefixNData[i]),
+                                                          "batch " + std::to_string(i) +
+                                                              ": should be in range of [0, " +
+                                                              std::to_string(actualSeqLenKvData[i]) + "]");
                     return false;
                 }
                 if (prefixNData[i] == 0) {
@@ -4435,9 +4579,11 @@ protected:
             } else {
                 if (prefixNData[i] < actualSeqLenKvData[i] - actualSeqLenData[i] ||
                     prefixNData[i] > actualSeqLenKvData[i]) {
-                    OP_LOGE(context_, "[%s] batch[%ld] prefixN=%ld is invalid, should be in range of [%ld, %ld]",
-                            templateName, i, prefixNData[i], actualSeqLenKvData[i] - actualSeqLenData[i],
-                            actualSeqLenKvData[i]);
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "prefixN", std::to_string(prefixNData[i]),
+                        "batch " + std::to_string(i) + ": should be in range of [" +
+                            std::to_string(actualSeqLenKvData[i] - actualSeqLenData[i]) + ", " +
+                            std::to_string(actualSeqLenKvData[i]) + "]");
                     return false;
                 }
             }
@@ -4450,12 +4596,15 @@ protected:
     bool VarLenSparseModeProcess(SparseEnum &sparseType)
     {
         if (sparseMode == static_cast<int64_t>(PREFIX) || sparseMode > static_cast<int64_t>(BAND_LEFT_UP_CAUSAL)) {
-            OP_LOGE(context_, "Var len not support sparse mode %ld.", sparseMode);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparseMode", std::to_string(sparseMode),
+                                                  "Var len not support this sparse mode");
             return false;
         }
 
         if (!CheckPretokenAndNexttoken(sparseType)) {
-            OP_LOGE(context_, "Check pre_tokens and next_tokens failed.");
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
+                                                   std::to_string(preTokens) + ", " + std::to_string(nextTokens),
+                                                   "check failed");
             return false;
         }
 
@@ -4626,7 +4775,8 @@ protected:
         int64_t totalSize = multiCoreParams.get_totalSize(); // BN2GS1.o
         int64_t *sparseStartIdx = multiCoreParams.get_sparseStartIdx();
         int64_t maxAiCoreNum = isSameAB ? MAX_AIC_NUM : MAX_AIV_NUM;
-        OP_CHECK_IF(totalSize <= 0 && !isMaxWorkspace, OP_LOGE(opName, "totalSize should be larger than 0."),
+        OP_CHECK_IF(totalSize <= 0 && !isMaxWorkspace,
+                    OP_LOGE_FOR_INVALID_VALUE(opName, "totalSize", std::to_string(totalSize), "larger than 0"),
                     return false);
 
         // initLoad: 使用均分策略, 保证后续不会比均分差

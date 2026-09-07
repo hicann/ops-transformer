@@ -26,7 +26,6 @@
 #include "../op_kernel/arch22/flash_attention_score_tiling.h"
 #include "../op_kernel/arch35/flash_attention_score_template_tiling_key.h"
 
-
 using namespace ge;
 using namespace AscendC;
 using namespace Ops::Transformer::OpTiling;
@@ -45,8 +44,7 @@ constexpr size_t VALUE_1024 = 1024;
 constexpr uint32_t TILING_KEY_1 = 1U;
 constexpr uint32_t FA_EMPTY_TILING_KEY = 1;
 
-struct EmptyArgs
-{
+struct EmptyArgs {
     uint32_t coreNum;
     uint32_t attentionOutFormerNum;          // attentionOut的主核
     uint32_t attentionOutTailNum;            // attentionOut的尾核
@@ -84,21 +82,20 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
             if (inputLayout[0] == 'B') {
                 // layout is BSH
                 if (queryShape.GetDim(0) != keyShape.GetDim(0)) {
-                    std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " +
-                        Ops::Base::ToString(keyShape);
+                    std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " + Ops::Base::ToString(keyShape);
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query and key", shapeMsg.c_str(),
-                        "The B dim of input query must be the same as the B dim "
-                        "of input key when the attr input_layout is BSH");
+                                                           "The B dim of input query must be the same as the B dim "
+                                                           "of input key when the attr input_layout is BSH");
                     return ge::GRAPH_FAILED;
                 }
             } else {
                 if (inputLayout[0] == 'T') { // TND  N1 != N2
                     // q_D != k_D
                     if (queryShape.GetDim(2) != keyShape.GetDim(2)) {
-                        std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " +
-                            Ops::Base::ToString(keyShape);
-                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(),
-                            "query and key", shapeMsg.c_str(),
+                        std::string shapeMsg =
+                            Ops::Base::ToString(queryShape) + " and " + Ops::Base::ToString(keyShape);
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            context->GetNodeName(), "query and key", shapeMsg.c_str(),
                             "The D dim of input query must be the same as the D dim of "
                             "input key when the attr input_layout is TND");
                         return ge::GRAPH_FAILED;
@@ -107,43 +104,41 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
                 }
                 // layout is SBH
                 if (queryShape.GetDim(1) != keyShape.GetDim(1)) {
-                    std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " +
-                        Ops::Base::ToString(keyShape);
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(),
-                        "query and key", shapeMsg.c_str(),
-                        "The B dim of input query must be the same as the B dim of "
-                        "input key when the attr input_layout is SBH");
+                    std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " + Ops::Base::ToString(keyShape);
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query and key", shapeMsg.c_str(),
+                                                           "The B dim of input query must be the same as the B dim of "
+                                                           "input key when the attr input_layout is SBH");
                     return ge::GRAPH_FAILED;
                 }
             }
             // kD < vD
             if (keyShape.GetDim(2) < valueShape.GetDim(2)) {
-                std::string dMsg = std::to_string(keyShape.GetDim(2)) + " and " +
-                    std::to_string(valueShape.GetDim(2));
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "key and value",
-                    dMsg.c_str(), "The value of D dim of input key must be greater than or "
-                    "equal to the value of D dim of input value");
+                std::string dMsg = std::to_string(keyShape.GetDim(2)) + " and " + std::to_string(valueShape.GetDim(2));
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "key and value", dMsg.c_str(),
+                                                       "The value of D dim of input key must be greater than or "
+                                                       "equal to the value of D dim of input value");
                 return ge::GRAPH_FAILED;
             }
         } else if (strlen(inputLayout) == 4) { // 4: layout is BNSD or BSND
             if (queryShape.GetDim(0) != keyShape.GetDim(0)) {
-                std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " +
-                    Ops::Base::ToString(keyShape);
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query and key",
-                    shapeMsg.c_str(), "The B dim of input query must be the same as the B dim of input key");
+                std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " + Ops::Base::ToString(keyShape);
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context->GetNodeName(), "query and key", shapeMsg.c_str(),
+                    "The B dim of input query must be the same as the B dim of input key");
                 return ge::GRAPH_FAILED;
             }
             if (queryShape.GetDim(3) != keyShape.GetDim(3)) {
-                std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " +
-                    Ops::Base::ToString(keyShape);
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query and key",
-                    shapeMsg.c_str(), "The D dim of input query must be the same as the D dim of input key");
+                std::string shapeMsg = Ops::Base::ToString(queryShape) + " and " + Ops::Base::ToString(keyShape);
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context->GetNodeName(), "query and key", shapeMsg.c_str(),
+                    "The D dim of input query must be the same as the D dim of input key");
                 return ge::GRAPH_FAILED;
             }
             if (keyShape.GetDim(3) < valueShape.GetDim(3)) {
                 std::string dMsg = std::to_string(keyShape.GetDim(3)) + " and " + std::to_string(valueShape.GetDim(3));
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "key and value",
-                    dMsg.c_str(), "The D dim of input key must be greater than or equal to the D dim of input value");
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    context->GetNodeName(), "key and value", dMsg.c_str(),
+                    "The D dim of input key must be greater than or equal to the D dim of input value");
                 return ge::GRAPH_FAILED;
             }
         } else {
@@ -157,55 +152,63 @@ static ge::graphStatus CheckParams(const gert::TilingContext *context)
 }
 
 static bool GetEmptyArgs(EmptyArgs &emptyArgs, gert::TilingContext *context, const uint32_t &coreNum,
-                  const uint64_t &attentionOutShapeSize, const int64_t &softmaxSumShapeSize)
+                         const uint64_t &attentionOutShapeSize, const int64_t &softmaxSumShapeSize)
 {
     emptyArgs.coreNum = coreNum;
     OP_CHECK_IF((coreNum <= 0),
-                 OP_LOGE(context, "platform info is invalid, coreNum=%u.", coreNum), return false);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "coreNum", std::to_string(coreNum),
+                                                      "platform info is invalid"),
+                return false);
     auto kernelType = context->GetInputDesc(KEY_INPUT_INDEX)->GetDataType();
     OP_CHECK_IF((kernelType != ge::DT_FLOAT16 && kernelType != ge::DT_FLOAT && kernelType != ge::DT_BF16),
-                OP_LOGE(context, "kernelType is invalid, kernelType is %d.", kernelType),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "kernelType",
+                                                      std::to_string(static_cast<int>(kernelType)),
+                                                      "should be one of FP16, FP32 or BF16"),
                 return false);
     uint32_t kernelTypeSize = ge::GetSizeByDataType(kernelType);
     OP_CHECK_IF((kernelTypeSize <= 0),
-               OP_LOGE(context, "kernelType size is invalid, kernelType size is %u.",
-               kernelTypeSize), return false);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "kernelType size",
+                                                      std::to_string(kernelTypeSize), "should be larger than 0"),
+                return false);
     // 计算 MIN_COPY_UINT_SIZE 块数
-    emptyArgs.attentionOutBlockSize = Ceil(static_cast<uint32_t>(attentionOutShapeSize) * kernelTypeSize,
-                                           MIN_COPY_UINT_SIZE);
+    emptyArgs.attentionOutBlockSize =
+        Ceil(static_cast<uint32_t>(attentionOutShapeSize) * kernelTypeSize, MIN_COPY_UINT_SIZE);
     if (attentionOutShapeSize != 0ULL) {
         if (static_cast<uint64_t>(emptyArgs.attentionOutBlockSize % coreNum) == 0ULL) {
             emptyArgs.attentionOutTailCoreDataSize = 0ULL;
             emptyArgs.attentionOutFormerNum = coreNum;
             emptyArgs.attentionOutTailNum = 0U;
-            emptyArgs.attentionOutSingleCoreDataSize = emptyArgs.attentionOutBlockSize / coreNum * MIN_COPY_UINT_SIZE /
-                                                       kernelTypeSize;
-            emptyArgs.attentionOutLastCoreDataSize = emptyArgs.attentionOutSingleCoreDataSize -
+            emptyArgs.attentionOutSingleCoreDataSize =
+                emptyArgs.attentionOutBlockSize / coreNum * MIN_COPY_UINT_SIZE / kernelTypeSize;
+            emptyArgs.attentionOutLastCoreDataSize =
+                emptyArgs.attentionOutSingleCoreDataSize -
                 (emptyArgs.attentionOutBlockSize * MIN_COPY_UINT_SIZE / kernelTypeSize - attentionOutShapeSize);
-            emptyArgs.attentionOutLastCoreIndex = static_cast<uint64_t>(emptyArgs.attentionOutFormerNum - 1U) *
-                                                  emptyArgs.attentionOutSingleCoreDataSize;
+            emptyArgs.attentionOutLastCoreIndex =
+                static_cast<uint64_t>(emptyArgs.attentionOutFormerNum - 1U) * emptyArgs.attentionOutSingleCoreDataSize;
         } else {
-            emptyArgs.attentionOutTailCoreDataSize = emptyArgs.attentionOutBlockSize / coreNum * MIN_COPY_UINT_SIZE /
-                                                     kernelTypeSize;
-            emptyArgs.attentionOutSingleCoreDataSize = emptyArgs.attentionOutTailCoreDataSize + MIN_COPY_UINT_SIZE /
-                                                       kernelTypeSize;
+            emptyArgs.attentionOutTailCoreDataSize =
+                emptyArgs.attentionOutBlockSize / coreNum * MIN_COPY_UINT_SIZE / kernelTypeSize;
+            emptyArgs.attentionOutSingleCoreDataSize =
+                emptyArgs.attentionOutTailCoreDataSize + MIN_COPY_UINT_SIZE / kernelTypeSize;
             if (emptyArgs.attentionOutBlockSize > coreNum) {
                 emptyArgs.attentionOutFormerNum = static_cast<uint32_t>(emptyArgs.attentionOutBlockSize % coreNum);
                 emptyArgs.attentionOutTailNum = coreNum - emptyArgs.attentionOutFormerNum;
-                emptyArgs.attentionOutLastCoreIndex = 
+                emptyArgs.attentionOutLastCoreIndex =
                     static_cast<uint64_t>(emptyArgs.attentionOutFormerNum) * emptyArgs.attentionOutSingleCoreDataSize +
                     static_cast<uint64_t>(emptyArgs.attentionOutTailNum - 1U) * emptyArgs.attentionOutTailCoreDataSize;
                 emptyArgs.attentionOutLastCoreDataSize =
-                    emptyArgs.attentionOutTailCoreDataSize - (emptyArgs.attentionOutSingleCoreDataSize *
-                    emptyArgs.attentionOutFormerNum + emptyArgs.attentionOutTailCoreDataSize *
-                    emptyArgs.attentionOutTailNum - attentionOutShapeSize);
+                    emptyArgs.attentionOutTailCoreDataSize -
+                    (emptyArgs.attentionOutSingleCoreDataSize * emptyArgs.attentionOutFormerNum +
+                     emptyArgs.attentionOutTailCoreDataSize * emptyArgs.attentionOutTailNum - attentionOutShapeSize);
             } else {
                 emptyArgs.attentionOutFormerNum = emptyArgs.attentionOutBlockSize;
                 emptyArgs.attentionOutTailNum = 0U;
                 emptyArgs.attentionOutLastCoreIndex = static_cast<uint64_t>(emptyArgs.attentionOutFormerNum - 1U) *
-                    emptyArgs.attentionOutSingleCoreDataSize;
-                emptyArgs.attentionOutLastCoreDataSize = emptyArgs.attentionOutSingleCoreDataSize -
-                    (emptyArgs.attentionOutFormerNum * emptyArgs.attentionOutSingleCoreDataSize - attentionOutShapeSize);
+                                                      emptyArgs.attentionOutSingleCoreDataSize;
+                emptyArgs.attentionOutLastCoreDataSize =
+                    emptyArgs.attentionOutSingleCoreDataSize -
+                    (emptyArgs.attentionOutFormerNum * emptyArgs.attentionOutSingleCoreDataSize -
+                     attentionOutShapeSize);
             }
         }
     } else {
@@ -217,15 +220,17 @@ static bool GetEmptyArgs(EmptyArgs &emptyArgs, gert::TilingContext *context, con
         emptyArgs.attentionOutLastCoreIndex = 0ULL;
     }
 
-    uint32_t floatDataSize =  ge::GetSizeByDataType(ge::DT_FLOAT);
+    uint32_t floatDataSize = ge::GetSizeByDataType(ge::DT_FLOAT);
     OP_CHECK_IF((floatDataSize <= 0),
-               OP_LOGE(context, "float data size is invalid, size is %u.", floatDataSize),
-               return false);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "float data size",
+                                                      std::to_string(floatDataSize), "should be larger than 0"),
+                return false);
     // softmaxSum 和 softmaxMax 输出为 fp32
-    emptyArgs.softmaxSumBlockSize = Ceil(static_cast<uint32_t>(softmaxSumShapeSize) * floatDataSize, MIN_COPY_UINT_SIZE);
+    emptyArgs.softmaxSumBlockSize =
+        Ceil(static_cast<uint32_t>(softmaxSumShapeSize) * floatDataSize, MIN_COPY_UINT_SIZE);
     if (static_cast<uint64_t>(emptyArgs.softmaxSumBlockSize % coreNum) == 0ULL) {
-        emptyArgs.softmaxMaxSingleCoreDataSize = emptyArgs.softmaxSumBlockSize / coreNum * MIN_COPY_UINT_SIZE /
-                                                 floatDataSize;
+        emptyArgs.softmaxMaxSingleCoreDataSize =
+            emptyArgs.softmaxSumBlockSize / coreNum * MIN_COPY_UINT_SIZE / floatDataSize;
         emptyArgs.softmaxMaxTailCoreDataSize = 0U;
         emptyArgs.softmaxMaxFormerNum = coreNum;
         emptyArgs.softmaxMaxTailNum = 0U;
@@ -282,14 +287,13 @@ static bool IsEmptyInputRegbase(gert::TilingContext *context)
         |                                   |                             |       |
         |--------n*(blocks/coreNum+1)-------|-----m*(blocks/coreNum)------|<32Byte|
         */
-        FlashAttentionScoreEmptyInputTilingDataRegbase* regbaseEmptyInputTiling =
+        FlashAttentionScoreEmptyInputTilingDataRegbase *regbaseEmptyInputTiling =
             context->GetTilingData<FlashAttentionScoreEmptyInputTilingDataRegbase>();
         auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo *>(context->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"),
-                   return false);
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return false);
 
         EmptyArgs emptyArgs;
-        if (!GetEmptyArgs(emptyArgs, context, compileInfoPtr->aivNum, attentionOutShapeSize, softmaxSumShapeSize)){
+        if (!GetEmptyArgs(emptyArgs, context, compileInfoPtr->aivNum, attentionOutShapeSize, softmaxSumShapeSize)) {
             return false;
         }
         regbaseEmptyInputTiling->set_coreNum(emptyArgs.coreNum);
@@ -347,13 +351,12 @@ static bool IsEmptyInput(gert::TilingContext *context)
         |                                   |                             |       |
         |--------n*(blocks/coreNum+1)-------|-----m*(blocks/coreNum)------|<32Byte|
         */
-        FlashAttentionScoreTilingData* emptyInputTiling = context->GetTilingData<FlashAttentionScoreTilingData>();
+        FlashAttentionScoreTilingData *emptyInputTiling = context->GetTilingData<FlashAttentionScoreTilingData>();
         emptyInputTiling->reset();
         auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo *>(context->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"),
-                   return false);
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return false);
         EmptyArgs emptyArgs;
-        if (!GetEmptyArgs(emptyArgs, context, compileInfoPtr->aivNum, attentionOutShapeSize, softmaxSumShapeSize)){
+        if (!GetEmptyArgs(emptyArgs, context, compileInfoPtr->aivNum, attentionOutShapeSize, softmaxSumShapeSize)) {
             return false;
         }
         emptyInputTiling->emptyInputTilingData.set_coreNum(emptyArgs.coreNum);
@@ -361,7 +364,8 @@ static bool IsEmptyInput(gert::TilingContext *context)
         emptyInputTiling->emptyInputTilingData.set_attentionOutTailNum(emptyArgs.attentionOutTailNum);
         emptyInputTiling->emptyInputTilingData.set_softmaxMaxFormerNum(emptyArgs.softmaxMaxFormerNum);
         emptyInputTiling->emptyInputTilingData.set_softmaxMaxTailNum(emptyArgs.softmaxMaxTailNum);
-        emptyInputTiling->emptyInputTilingData.set_attentionOutSingleCoreDataSize(emptyArgs.attentionOutSingleCoreDataSize);
+        emptyInputTiling->emptyInputTilingData.set_attentionOutSingleCoreDataSize(
+            emptyArgs.attentionOutSingleCoreDataSize);
         emptyInputTiling->emptyInputTilingData.set_attentionOutTailCoreDataSize(emptyArgs.attentionOutTailCoreDataSize);
         emptyInputTiling->emptyInputTilingData.set_softmaxMaxSingleCoreDataSize(emptyArgs.softmaxMaxSingleCoreDataSize);
         emptyInputTiling->emptyInputTilingData.set_softmaxMaxTailCoreDataSize(emptyArgs.softmaxMaxTailCoreDataSize);
@@ -386,12 +390,10 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionScore(gert::TilingContext *
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
- 
+
     auto platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-        OP_LOGE(context, "platformInfoPtr is null"),
-        return ge::GRAPH_FAILED);
- 
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);
+
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
         OP_LOGW(context, "Current npu arch is dav-3510.");
@@ -412,13 +414,9 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionScore(gert::TilingContext *
 ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScore(gert::TilingParseContext *context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-        OP_LOGE(context, "platformInfoPtr is null"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);
     auto compileInfoPtr = context->GetCompiledInfo<FlashAttentionScoreCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-        OP_LOGE(context, "compileInfoPtr is null"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -436,6 +434,6 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScore(gert::Tilin
 IMPL_OP_OPTILING(FlashAttentionScore)
     .Tiling(TilingFlashAttentionScore)
     .TilingInputsDataDependency({7, 8, 9, 10, 11})
-    .TilingParse<FlashAttentionScoreCompileInfo>(TilingPrepareForFlashAttentionScore);  // 向框架注册入口函数
+    .TilingParse<FlashAttentionScoreCompileInfo>(TilingPrepareForFlashAttentionScore); // 向框架注册入口函数
 
 } // namespace optiling
