@@ -28,10 +28,11 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube1Process(
 
     MMParam mmParam;
     mmParam.singleM = runInfo.curS1g;
-    mmParam.singleN = MODE == SMLAG_SCFA_MODE ? selectedBlockSize * blockOffset : selectedCntOffset;
     mmParam.dstStride = singleN;
 
     for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
+        int64_t remainN = static_cast<int64_t>(selectedCntOffset) - (nIdx - blkCntOffset);
+        mmParam.singleN = MODE == SMLAG_SCFA_MODE ? min(selectedBlockSize * blockOffset, remainN) : selectedCntOffset;
         LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_ & 1];
         mmParam.isFixOut = false;
         mmParam.singleK = perLoopDSize;

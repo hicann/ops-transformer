@@ -28,7 +28,6 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2Process(
 
     MMParam mmParam;
     mmParam.singleM = runInfo.curS1g;
-    mmParam.singleN = MODE == SMLAG_SCFA_MODE ? selectedBlockSize * blockOffset : selectedCntOffset;
     mmParam.singleK = perLoopDSize;
     mmParam.isFixOut = false;
     mmParam.dstStride = singleN;
@@ -37,6 +36,8 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2Process(
     CopyGmToL1(l1_dy_tensor, attentionGradGm[dyGmOffset], mmParam.singleM, dimDv,
                dimDv); // [Align(s1g, 16) * (dimDv, 16), 16]
     for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
+        int64_t remainN = static_cast<int64_t>(selectedCntOffset) - (nIdx - blkCntOffset);
+        mmParam.singleN = MODE == SMLAG_SCFA_MODE ? min(selectedBlockSize * blockOffset, remainN) : selectedCntOffset;
         LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_ & 1];
         int64_t mm2WorkspaceGmOffset = outGmOffset + (nIdx - blkCntOffset) * selectedBlockSize;
 
