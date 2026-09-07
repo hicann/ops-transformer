@@ -13,7 +13,6 @@
  * \brief
  */
 
-
 #include <iostream>
 #include <cstdio>
 #include <string>
@@ -25,16 +24,16 @@
 #include "aclnn/opdev/fp16_t.h"
 #include "aclnnop/aclnn_nsa_selected_attention_infer.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -46,26 +45,28 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
+void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+{
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
-    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]),
-                            *deviceAddr, size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
+                           size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < size; i++) {
         LOG_PRINT("mean result[%ld] is: %f\n", i, resultData[i]);
     }
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
-  // 固定写法，资源初始化
-  auto ret = aclInit(nullptr);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
-  ret = aclrtSetDevice(deviceId);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
-  ret = aclrtCreateStream(stream);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
-  return 0;
+int Init(int32_t deviceId, aclrtStream *stream)
+{
+    // 固定写法，资源初始化
+    auto ret = aclInit(nullptr);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
+    ret = aclrtSetDevice(deviceId);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
+    ret = aclrtCreateStream(stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
+    return 0;
 }
 
 template <typename T>
@@ -108,8 +109,8 @@ int main(int argc, char **argv)
 
     int64_t batch = 1;
     int sequenceLengthK = 48;
-    aclIntArray * actualCmpKvSeqLen = nullptr;
-    aclIntArray * actualCmpQSeqLen = nullptr;
+    aclIntArray *actualCmpKvSeqLen = nullptr;
+    aclIntArray *actualCmpQSeqLen = nullptr;
     // 创建actualCmpKvSeqLen aclIntArray
     std::vector<int64_t> actualCmpKvSeqLenVector(batch, sequenceLengthK);
     actualCmpKvSeqLen = aclCreateIntArray(actualCmpKvSeqLenVector.data(), actualCmpKvSeqLenVector.size());
@@ -117,10 +118,20 @@ int main(int argc, char **argv)
     int64_t s1 = 1;
     std::vector<int64_t> actualCmpQSeqLenVector(batch, s1);
     actualCmpQSeqLen = aclCreateIntArray(actualCmpQSeqLenVector.data(), actualCmpQSeqLenVector.size());
+    auto destroyIntArrays = [&]() {
+        if (actualCmpKvSeqLen != nullptr) {
+            aclDestroyIntArray(actualCmpKvSeqLen);
+            actualCmpKvSeqLen = nullptr;
+        }
+        if (actualCmpQSeqLen != nullptr) {
+            aclDestroyIntArray(actualCmpQSeqLen);
+            actualCmpQSeqLen = nullptr;
+        }
+    };
     int64_t d1 = 192;
     int64_t d2 = 128;
     int64_t g = 1;
-    
+
     int64_t n2 = 1;
     int64_t blockSize = 64;
     int64_t selectBlockSize = 64;
@@ -128,8 +139,8 @@ int main(int argc, char **argv)
     int64_t blockTableLength = 1;
     int64_t numBlocks = batch * blockTableLength;
     std::vector<int64_t> queryShape = {batch, s1, n2 * g, d1};
-    std::vector<int64_t> keyShape = {numBlocks, blockSize, n2,d1};
-    std::vector<int64_t> valueShape = {numBlocks, blockSize, n2,d2};
+    std::vector<int64_t> keyShape = {numBlocks, blockSize, n2, d1};
+    std::vector<int64_t> valueShape = {numBlocks, blockSize, n2, d2};
     std::vector<int64_t> topkIndicesShape = {batch, s1, n2, selectBlockCount};
     std::vector<int64_t> blockTableOptionalShape = {batch, blockTableLength};
     std::vector<int64_t> outputShape = {batch, s1, n2 * g, d2};
@@ -146,27 +157,27 @@ int main(int argc, char **argv)
     std::vector<op::fp16_t> valueHostData(valueShapeSize, 1);
     std::vector<int32_t> blockTableOptionalHostData(blockTableOptionalShapeSize, 0);
     std::vector<op::fp16_t> outputHostData(outputShapeSize, 1);
-    
+
     std::vector<int32_t> topkIndicesHostData;
     for (int b = 0; b < batch; ++b) {
-       for (int s = 0; s < s1; ++s) {
-        for (int h = 0; h < n2; ++h) {
-            for (int k = 0; k < selectBlockCount; ++k) {
-                if (k == 0) {
-                    topkIndicesHostData.push_back(k);
-                } else {
-                    topkIndicesHostData.push_back(-1);
+        for (int s = 0; s < s1; ++s) {
+            for (int h = 0; h < n2; ++h) {
+                for (int k = 0; k < selectBlockCount; ++k) {
+                    if (k == 0) {
+                        topkIndicesHostData.push_back(k);
+                    } else {
+                        topkIndicesHostData.push_back(-1);
+                    }
                 }
             }
         }
-       }
     }
     // attr
     double scaleValue = 1.0;
     int64_t sparseMod = 0;
-    int64_t numHeads= static_cast<int64_t>(n2 * g);
+    int64_t numHeads = static_cast<int64_t>(n2 * g);
     std::string sLayerOut = "BSND";
-    char layOut[sLayerOut.length()+1];
+    char layOut[sLayerOut.length() + 1];
     std::strcpy(layOut, sLayerOut.c_str());
 
     void *queryDeviceAddr = nullptr;
@@ -181,65 +192,73 @@ int main(int argc, char **argv)
     aclTensor *blockTableOptionalTensor = nullptr;
     aclTensor *outputTensor = nullptr;
     aclTensor *topkIndicesTensor = nullptr;
-    
+
     uint64_t workspaceSize = 0;
     void *workspaceAddr = nullptr;
 
     if (argv == nullptr || argv[0] == nullptr) {
         LOG_PRINT("Environment error, Argv=%p, Argv[0]=%p", argv, argv == nullptr ? nullptr : argv[0]);
+        destroyIntArrays();
         return 0;
     }
     // 创建query aclTensor
     ret = CreateAclTensor(queryHostData, queryShape, &queryDeviceAddr, aclDataType::ACL_FLOAT16, &queryTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
     // 创建key aclTensor
     ret = CreateAclTensor(keyHostData, keyShape, &keyDeviceAddr, aclDataType::ACL_FLOAT16, &keyTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
     // 创建value aclTensor
     ret = CreateAclTensor(valueHostData, valueShape, &valueDeviceAddr, aclDataType::ACL_FLOAT16, &valueTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
     // 创建blockTableOptional aclTensor
-    ret = CreateAclTensor(blockTableOptionalHostData, blockTableOptionalShape, &blockTableOptionalDeviceAddr, aclDataType::ACL_INT32, &blockTableOptionalTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); return ret);
+    ret = CreateAclTensor(blockTableOptionalHostData, blockTableOptionalShape, &blockTableOptionalDeviceAddr,
+                          aclDataType::ACL_INT32, &blockTableOptionalTensor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
     // 创建output aclTensor
     ret = CreateAclTensor(outputHostData, outputShape, &outputDeviceAddr, aclDataType::ACL_FLOAT16, &outputTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
     // 创建topkIndices aclTensor
-    ret = CreateAclTensor(topkIndicesHostData, topkIndicesShape, &topkIndicesDeviceAddr, aclDataType::ACL_INT32, &topkIndicesTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); return ret);
+    ret = CreateAclTensor(topkIndicesHostData, topkIndicesShape, &topkIndicesDeviceAddr, aclDataType::ACL_INT32,
+                          &topkIndicesTensor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     aclOpExecutor *executor;
 
     // 调用aclnnNsaSelectedAttention第一段接口
-    ret = aclnnNsaSelectedAttentionInferGetWorkspaceSize(queryTensor, keyTensor, valueTensor, topkIndicesTensor, nullptr,
-                blockTableOptionalTensor, actualCmpQSeqLen, actualCmpKvSeqLen, layOut,
-                numHeads, n2, selectBlockSize, selectBlockCount, blockSize,
-                scaleValue, sparseMod, outputTensor,
-                &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
+    ret = aclnnNsaSelectedAttentionInferGetWorkspaceSize(
+        queryTensor, keyTensor, valueTensor, topkIndicesTensor, nullptr, blockTableOptionalTensor, actualCmpQSeqLen,
+        actualCmpKvSeqLen, layOut, numHeads, n2, selectBlockSize, selectBlockCount, blockSize, scaleValue, sparseMod,
+        outputTensor, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); destroyIntArrays(); return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaSelectedAttentionInfer allocate workspace failed. ERROR: %d\n", ret); return ret);
+        CHECK_RET(ret == ACL_SUCCESS,
+                  LOG_PRINT("aclnnNsaSelectedAttentionInfer allocate workspace failed. ERROR: %d\n", ret);
+                  destroyIntArrays(); return ret);
     }
 
     // 调用aclnnNsaSelectedAttention第二段接口
     ret = aclnnNsaSelectedAttentionInfer(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaSelectedAttentionInfer failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaSelectedAttentionInfer failed. ERROR: %d\n", ret);
+              destroyIntArrays(); return ret);
 
     // 4. （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaSelectedAttentionInfer aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS,
+              LOG_PRINT("aclnnNsaSelectedAttentionInfer aclrtSynchronizeStream failed. ERROR: %d\n", ret);
+              destroyIntArrays(); return ret);
     LOG_PRINT("aclnn execute success : %d\n", ret);
-    
+
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     auto size = GetShapeSize(outputShape);
     std::vector<op::fp16_t> resultData(size, 0);
     ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), outputDeviceAddr,
-                size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy [attn] result from device to host failed. ERROR: %d\n", ret); return ret);
+                      size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy [attn] result from device to host failed. ERROR: %d\n", ret);
+              destroyIntArrays(); return ret);
     uint64_t printNum = 10;
     for (int64_t i = 0; i < printNum; i++) {
         std::cout << "index: " << i << ": " << static_cast<float>(resultData[i]) << std::endl;
@@ -252,6 +271,7 @@ int main(int argc, char **argv)
     aclDestroyTensor(outputTensor);
     aclDestroyTensor(topkIndicesTensor);
     aclDestroyTensor(blockTableOptionalTensor);
+    destroyIntArrays();
     aclrtFree(queryDeviceAddr);
     aclrtFree(keyDeviceAddr);
     aclrtFree(valueDeviceAddr);
