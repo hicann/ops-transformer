@@ -302,7 +302,7 @@ bool GroupedMatmulSwigluQuantV2BaseTiling::TryFullLoadA(int32_t baseM, int64_t b
     return false;
 }
 
-ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::DynamicTilingSingleN(gert::TilingContext *context,
+ge::graphStatus GroupedMatmulSwigluQuantV2BaseTiling::DynamicTilingSingleN(const gert::TilingContext *context,
                                                                            const uint32_t &aicNum, int64_t baseM,
                                                                            int64_t baseN, int64_t baseK)
 {
