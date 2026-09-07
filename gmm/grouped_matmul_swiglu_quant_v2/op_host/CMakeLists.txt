@@ -8,22 +8,24 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
 if (BUILD_OPEN_PROJECT)
     set(grouped_matmul_swiglu_quant_v2_depends gmm/common gmm/grouped_matmul CACHE INTERNAL "Dependencies for grouped_matmul_swiglu_quant_v2")
     set(grouped_matmul_swiglu_quant_v2_apt_depends gmm/common gmm/grouped_matmul CACHE INTERNAL "Dependencies for grouped_matmul_swiglu_quant_v2_apt")
     target_sources(op_host_aclnnExc PRIVATE
-    grouped_matmul_swiglu_quant_v2_def.cpp
+        grouped_matmul_swiglu_quant_v2_def.cpp
     )
+    if(NOT CONDITION_UNIT STREQUAL "ascend950")
+        add_ops_compile_options(
+            OP_NAME GroupedMatmulSwigluQuantV2
+            OPTIONS --cce-auto-sync=off
+                    -Wno-deprecated-declarations
+                    -Werror
+        )
+    endif()
 endif()
 
-if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
-    add_ops_compile_options(
-        OP_NAME GroupedMatmulSwigluQuantV2
-        OPTIONS --cce-auto-sync=off
-                -Wno-deprecated-declarations
-                -Werror
-    )
-else()
+if(NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources(
         OP_API_INDEPENDENT ON
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api

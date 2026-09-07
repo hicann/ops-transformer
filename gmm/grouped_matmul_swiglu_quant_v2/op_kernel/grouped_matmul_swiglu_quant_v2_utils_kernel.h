@@ -65,6 +65,14 @@ constexpr MatmulConfig matmulCFGUnitFlag{false, false, true, 0, 0, 0, false, fal
 constexpr MatmulConfig NZ_CFG_MDL = GetMDLConfig(false, false, 0, true, false, false, false);
 constexpr MatmulConfig CUSTOM_CFG_MDL = GetMDLConfig(false, false, 0, true, false, false, true);
 
+template <HardEvent event>
+__aicore__ inline void GmmsqSetWaitFlag()
+{
+    event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(event));
+    SetFlag<event>(eventId);
+    WaitFlag<event>(eventId);
+}
+
 template <class AT_, class BT_, class CT_, class BiasT_, const MatmulConfig &MMCFG_>
 struct MMImplType {
     using AT = AT_;
