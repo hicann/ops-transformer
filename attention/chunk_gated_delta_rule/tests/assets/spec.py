@@ -34,6 +34,31 @@ inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
 
 
+def _patch_aclgraph_clone_input():
+    """Patch TTK 的 aclgraph backend，设置 clone_input=False。
+
+    npugraph_ex 默认 clone_input=True，会将非连续 tensor clone 为连续，
+    导致 stride 信息丢失。这里替换为显式配置的 torchair backend。
+    """
+    try:
+        import torchair
+        from torchair.configs.compiler_config import CompilerConfig
+        from ttk.core_modules.framework_api import graph_execution
+
+        def _get_npu_backend_aclgraph():
+            config = CompilerConfig()
+            config.mode = "npugraph_ex"
+            config.debug.aclgraph.clone_input = False
+            return torchair.get_npu_backend(compiler_config=config)
+
+        graph_execution._get_npu_backend_aclgraph = _get_npu_backend_aclgraph
+    except Exception:
+        pass
+
+
+_patch_aclgraph_clone_input()
+
+
 class ChunkGatedDeltaRuleSpec:
     golden = golden_module.cpu_chunk_gated_delta_rule
     customize_inputs = inputs_module.generate_cgdr_inputs

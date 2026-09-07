@@ -41,6 +41,7 @@ if _USE_GRAPH:
     # 配置图模式 aclgraph config
     config = torchair.CompilerConfig()
     config.mode = "reduce-overhead"
+    config.debug.aclgraph.clone_input = False
     npu_backend = torchair.get_npu_backend(compiler_config=config)
 
 
