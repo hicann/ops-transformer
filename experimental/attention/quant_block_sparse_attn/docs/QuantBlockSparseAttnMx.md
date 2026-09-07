@@ -203,7 +203,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>mask_mode=0 时不使用；mask_mode=3 时为 causal mask。</td>
       <td>UINT8</td>
       <td>ND</td>
-      <td>mask_mode=0 时可不传或传空指针；mask_mode=3:(2048,2048)</td>
+      <td>mask_mode=0 时可不传或传空指针，传入非空则报错；mask_mode=3:(2048,2048)</td>
     </tr>
     <tr>
       <td>cu_seqlens_q</td>
@@ -597,7 +597,7 @@ QuantBlockSparseAttnMx 算子约束分为 4 个档位，按约束复杂程度递
 
 - 存在性约束
 
-  - `query`、`key`、`value`、`q_descale`、`k_descale`、`v_descale`、`sparse_indices`、`sparse_seq_len` 必须传入；`p_scale` 允许传空，传空时使用默认值 1.0 进行量化计算；`atten_mask` 在 `mask_mode=3` 时必须传入，在 `mask_mode=0` 时可不传或传空指针。
+  - `query`、`key`、`value`、`q_descale`、`k_descale`、`v_descale`、`sparse_indices`、`sparse_seq_len` 必须传入；`p_scale` 允许传空，传空时使用默认值 1.0 进行量化计算；`atten_mask` 在 `mask_mode=3` 时必须传入，在 `mask_mode=0` 时可不传或传空指针；若在 `mask_mode=0` 时传入非空掩码，Tiling 阶段将上报错误。
   - `metadata` 在 MXFP8 路径下为必选输入，不允许传空（None）。
   - 当前算子仅支持 4D PA_BNBD KV Cache 输入和 BF16 attention_out 输出 以及FP32 softmax_lse。
 
@@ -730,7 +730,7 @@ QuantBlockSparseAttnMx 算子约束分为 4 个档位，按约束复杂程度递
 
 - 存在性约束
 
-  - `mask_mode=0` 时，`atten_mask` 为可选输入，可以不传或传入空指针。
+  - `mask_mode=0` 时，`atten_mask` 为可选输入，可以不传或传入空指针；若传入非空 `atten_mask`，Tiling 阶段会拦截并报错。
   - `mask_mode=3` 时，`atten_mask` 为必选输入。
 
 - 一致性约束
