@@ -79,7 +79,6 @@ __aicore__ inline void PrepareSharedExpertInput(const AivJobContext &job, const 
     }
     WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
     WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
-    PipeBarrier<PIPE_ALL>();
 }
 
 } // namespace MegaMoeImpl
