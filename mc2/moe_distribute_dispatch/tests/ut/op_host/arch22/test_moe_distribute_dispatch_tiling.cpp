@@ -613,7 +613,6 @@ TEST_F(MoeDistributeDispatchArch22TilingTest, A2ShapeAndEpRankId)
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
 }
 
-
 // 背景：4机 每机器8卡  每卡8个专家  由于deepseek 总共256 专家
 // 可选传入默认值   除了ep_rank_id = 33  quant_mode = 2 同时x的shape{16,7160} 异常
 TEST_F(MoeDistributeDispatchArch22TilingTest, A2MoeExpertNum)
@@ -693,7 +692,6 @@ TEST_F(MoeDistributeDispatchArch22TilingTest, EpWorldSize384)
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
 }
-
 
 TEST_F(MoeDistributeDispatchArch22TilingTest, EpWorldSize72)
 {

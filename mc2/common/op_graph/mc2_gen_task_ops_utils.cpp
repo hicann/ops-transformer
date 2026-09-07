@@ -28,11 +28,11 @@ const std::string KERNEL_NAME_MC2_SERVER = "Mc2ServerKernel";
 
 // 对已有结构的重复定义，只在本文件插入 aicpu desc 的时候使用
 struct HcclCommParamDescTemp {
-    uint64_t version   : 4;
-    uint64_t groupNum  : 4;
-    uint64_t hasFfts   : 1;
+    uint64_t version : 4;
+    uint64_t groupNum : 4;
+    uint64_t hasFfts : 1;
     uint64_t tilingOff : 7;
-    uint64_t isDyn     : 48;
+    uint64_t isDyn : 48;
 };
 
 } // namespace

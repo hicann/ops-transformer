@@ -22,16 +22,16 @@
 #include "hccl/hccl.h"
 #include "aclnnop/aclnn_ffn_to_attention.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 struct Args {
@@ -112,7 +112,6 @@ int LaunchOneProcessFFN2Attention(Args &args)
     aclIntArray *tokenInfoTableShape = aclCreateIntArray(Token_info_shape, 3);
     aclIntArray *tokenDataShape = aclCreateIntArray(Token_data_shape, 4);
 
-
     // 定义当前场景下各变量维度
     std::vector<int64_t> xShape{Y, H};
     std::vector<int64_t> sessionIdsShape{Y};
@@ -122,7 +121,6 @@ int LaunchOneProcessFFN2Attention(Args &args)
     std::vector<int64_t> actualTokenNumShape{1};
     std::vector<int64_t> attnRankTableShape{attention_worker_num};
 
-
     int64_t xShapeSize = GetShapeSize(xShape);
     int64_t sessionIdsShapeSize = GetShapeSize(sessionIdsShape);
     int64_t microBatchIdsShapeSize = GetShapeSize(microBatchIdsShape);
@@ -130,7 +128,6 @@ int LaunchOneProcessFFN2Attention(Args &args)
     int64_t expertOffsetsShapeSize = GetShapeSize(expertOffsetsShape);
     int64_t actualTokenNumShapeSize = GetShapeSize(actualTokenNumShape);
     int64_t attnRankTableShapeSize = GetShapeSize(attnRankTableShape);
-
 
     std::vector<int16_t> xHostData(xShapeSize, 1);
     std::vector<int32_t> sessionIdsHostData(sessionIdsShapeSize, 0);
@@ -147,7 +144,6 @@ int LaunchOneProcessFFN2Attention(Args &args)
     for (int32_t i = 0; i < attention_worker_num; i++) {
         attnRankTableHostData[i] = static_cast<int32_t>(i);
     }
-
 
     ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_BF16, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -168,7 +164,6 @@ int LaunchOneProcessFFN2Attention(Args &args)
     ret = CreateAclTensor(attnRankTableHostData, attnRankTableShape, &attnRankTableDeviceAddr, aclDataType::ACL_INT32,
                           &attnRankTable);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-
 
     uint64_t FFN2AttentionWorkspaceSize = 0;
     aclOpExecutor *FFN2AttentionExecutor = nullptr;
@@ -200,7 +195,6 @@ int LaunchOneProcessFFN2Attention(Args &args)
         std::this_thread::sleep_for(std::chrono::seconds(10));
         LOG_PRINT("[INFO] device_%d is AttentionWorker, sleeping 10 seconds...\n", args.rankId);
     }
-
 
     // 释放device资源
     if (FFN2AttentionWorkspaceSize > 0) {
@@ -234,7 +228,6 @@ int LaunchOneProcessFFN2Attention(Args &args)
     if (tokenDataShape != nullptr) {
         aclDestroyIntArray(tokenDataShape);
     }
-
 
     if (xDeviceAddr != nullptr) {
         aclrtFree(xDeviceAddr);
@@ -290,7 +283,6 @@ int main(int argc, char *argv[])
     HcclComm comms[WORLD_SIZE];
     ret = HcclCommInitAll(WORLD_SIZE, devices, comms);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclCommInitAll failed, ret %d\n", ret); return ret);
-
 
     Args args[DEV_NUM];
     std::vector<std::unique_ptr<std::thread>> threads(DEV_NUM);

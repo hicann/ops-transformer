@@ -26,8 +26,8 @@
 #include "mc2_exception_dump.h"
 
 namespace optiling {
-ge::graphStatus
-MoeDistributeCombineAddRmsNormTilingFuncA2A3::MoeDistributeCombineV2TilingFunc(gert::TilingContext *context)
+ge::graphStatus MoeDistributeCombineAddRmsNormTilingFuncA2A3::MoeDistributeCombineV2TilingFunc(
+    gert::TilingContext *context)
 {
     MoeDistributeCombineV2TilingFuncA2A3 funcA2A3;
     return funcA2A3.MoeDistributeCombineV2TilingFunc(context);

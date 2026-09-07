@@ -50,8 +50,8 @@ __global__ __aicore__ void engram_fetch_grad(GM_ADDR commContext, GM_ADDR gradFe
 #if defined(ENABLE_ENGRAM_FETCH_GRAD_KERNEL)
     TPipe pipe;
     EngramFetchGradArch35 op;
-    op.Init(commContext, gradFetched, perm, sendCounts, recvCounts, recvLocalEntry, numRecv,
-            gradUniqueOut, uniqueLocalEntryOut, numUniqueOut, workspaceGM, &pipe, &tilingData);
+    op.Init(commContext, gradFetched, perm, sendCounts, recvCounts, recvLocalEntry, numRecv, gradUniqueOut,
+            uniqueLocalEntryOut, numUniqueOut, workspaceGM, &pipe, &tilingData);
     op.Process();
 #endif
 }

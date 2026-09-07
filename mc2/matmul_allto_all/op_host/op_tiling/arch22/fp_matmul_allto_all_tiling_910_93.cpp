@@ -96,11 +96,11 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckA3NonQuantTensorDataType(cons
     if (biasTensorDesc != nullptr) {
         ge::DataType biasDtype = biasTensorDesc->GetDataType();
         if (x1Dtype == ge::DT_BF16) {
-            OP_TILING_CHECK((biasDtype != ge::DT_FLOAT),
-                            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "bias",
-                                                                  Ops::Base::ToString(biasDtype).c_str(),
-                                                                  "The dtype of bias must be FLOAT32 when x1 is BF16"),
-                            return ge::GRAPH_FAILED);
+            OP_TILING_CHECK(
+                (biasDtype != ge::DT_FLOAT),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "bias", Ops::Base::ToString(biasDtype).c_str(),
+                                                      "The dtype of bias must be FLOAT32 when x1 is BF16"),
+                return ge::GRAPH_FAILED);
         } else if (x1Dtype == ge::DT_FLOAT16) {
             OP_TILING_CHECK((x1Dtype != biasDtype),
                             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -139,16 +139,16 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckA3NonQuantTensorDataType(cons
  */
 ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckOpInputInfo()
 {
-    OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckAttrsInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check Attrs failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        MatmulAlltoAllTilingUtil::CheckAttrsInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
+        OP_LOGE(opName_, "Tiling check Attrs failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckTensorFormat(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check format failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckA3NonQuantTensorDataType(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check Dtype failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckShapeInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check shape failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        MatmulAlltoAllTilingUtil::CheckShapeInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
+        OP_LOGE(opName_, "Tiling check shape failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(Check2DMatrixMulShapes(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check shape failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckBsRankSizeRange() != ge::GRAPH_SUCCESS,
@@ -464,8 +464,7 @@ void FpMatmulAllToAllTilingBaseA3::SetTilingInfo(MatmulAlltoAllTilingInfoA3 &til
  */
 FpMatmulAllToAllTilingBaseA3::FpMatmulAllToAllTilingBaseA3(gert::TilingContext *context)
     : MatmulAllToAllTilingBase(context)
-{
-}
+{}
 
 ge::graphStatus FpMatmulAllToAllHelper::GetShapeAttrsInfo()
 {
@@ -492,9 +491,9 @@ ge::graphStatus FpMatmulAllToAllHelper::GetShapeAttrsInfo()
 
 FpMatmulAllToAllHelper::FpMatmulAllToAllHelper(FpMatmulAllToAllTilingBaseA3 &matmulAlltoAllTilingA3,
                                                Mc2MatmulV3TilingData &data)
-    : Mc2MatmulV3BaseTiling(matmulAlltoAllTilingA3.context_, &data), tilingProcesser_(matmulAlltoAllTilingA3)
-{
-}
+    : Mc2MatmulV3BaseTiling(matmulAlltoAllTilingA3.context_, &data),
+      tilingProcesser_(matmulAlltoAllTilingA3)
+{}
 
 // 注册tiling类
 REGISTER_TILING_TEMPLATE_WITH_SOCVERSION(MatmulAlltoAll, FpMatmulAllToAllTilingBaseA3,

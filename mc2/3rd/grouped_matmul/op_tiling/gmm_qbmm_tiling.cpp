@@ -97,17 +97,17 @@ bool Mc2GroupedQbmmTiling::AnalyzeAttrs()
         inputParams_.actType = actTypePtr != nullptr ? *actTypePtr : inputParams_.actType;
         inputParams_.groupListType = groupListTypePtr != nullptr ? *groupListTypePtr : inputParams_.groupListType;
     }
-    OP_CHECK_IF(inputParams_.groupType != SPLIT_M && inputParams_.groupType != SPLIT_K,
-                OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "groupType",
-                                          std::to_string(inputParams_.groupType).c_str(),
-                                          "only support 0 (SPLIT_M) or 2 (SPLIT_K)"),
-                return false);
-    OP_CHECK_IF((inputParams_.aDtype == ge::DT_FLOAT4_E2M1 || inputParams_.aDtype == ge::DT_FLOAT4_E1M2) &&
-                    inputParams_.groupType != SPLIT_M,
-                OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "groupType",
-                                          std::to_string(inputParams_.groupType).c_str(),
-                                          "only support 0 (SPLIT_M) for FLOAT4"),
-                return false);
+    OP_CHECK_IF(
+        inputParams_.groupType != SPLIT_M && inputParams_.groupType != SPLIT_K,
+        OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "groupType", std::to_string(inputParams_.groupType).c_str(),
+                                  "only support 0 (SPLIT_M) or 2 (SPLIT_K)"),
+        return false);
+    OP_CHECK_IF(
+        (inputParams_.aDtype == ge::DT_FLOAT4_E2M1 || inputParams_.aDtype == ge::DT_FLOAT4_E1M2) &&
+            inputParams_.groupType != SPLIT_M,
+        OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "groupType", std::to_string(inputParams_.groupType).c_str(),
+                                  "only support 0 (SPLIT_M) for FLOAT4"),
+        return false);
     if (inputParams_.groupType == SPLIT_M) {
         OP_CHECK_IF(inputParams_.transA,
                     OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "transA", "true", "false when groupType == SPLIT_M"),
@@ -139,21 +139,21 @@ bool Mc2GroupedQbmmTiling::CheckBiasDtype() const
             return false);
     } else if (inputParams_.aDtype == ge::DT_INT8) {
         if (inputParams_.cDtype == ge::DT_BF16) {
-            OP_CHECK_IF(inputParams_.biasDtype != ge::DT_INT32 && inputParams_.biasDtype != ge::DT_BF16 &&
-                            inputParams_.biasDtype != ge::DT_FLOAT,
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            inputParams_.opName, "bias",
-                            ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
-                            "If x is INT8 and output is BF16, the dtype of bias must be INT32, BF16 or FLOAT."),
-                        return false);
+            OP_CHECK_IF(
+                inputParams_.biasDtype != ge::DT_INT32 && inputParams_.biasDtype != ge::DT_BF16 &&
+                    inputParams_.biasDtype != ge::DT_FLOAT,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    inputParams_.opName, "bias", ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
+                    "If x is INT8 and output is BF16, the dtype of bias must be INT32, BF16 or FLOAT."),
+                return false);
         } else if (inputParams_.cDtype == ge::DT_FLOAT16) {
-            OP_CHECK_IF(inputParams_.biasDtype != ge::DT_INT32 && inputParams_.biasDtype != ge::DT_FLOAT16 &&
-                            inputParams_.biasDtype != ge::DT_FLOAT,
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            inputParams_.opName, "bias",
-                            ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
-                            "If x is INT8 and output is FLOAT16, the dtype of bias must be INT32, FLOAT16 or FLOAT."),
-                        return false);
+            OP_CHECK_IF(
+                inputParams_.biasDtype != ge::DT_INT32 && inputParams_.biasDtype != ge::DT_FLOAT16 &&
+                    inputParams_.biasDtype != ge::DT_FLOAT,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    inputParams_.opName, "bias", ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
+                    "If x is INT8 and output is FLOAT16, the dtype of bias must be INT32, FLOAT16 or FLOAT."),
+                return false);
         } else {
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(inputParams_.opName, "output",
                                                   ge::TypeUtils::DataTypeToSerialString(inputParams_.cDtype).c_str(),
@@ -295,17 +295,17 @@ bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeM(const gert::Shape &xScaleS
                      ", 2] in mx quant split m mode.")
                         .c_str()),
                 return false);
-    OP_CHECK_IF(xScaleMDim != inputParams_.mSize || xScaleKDim != expectedKDimValue ||
-                    xScaleLastDim != MXFP_MULTI_BASE_SIZE,
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                    inputParams_.opName, "pertokenScale",
-                    (std::string("[") + std::to_string(xScaleMDim) + ", " + std::to_string(xScaleKDim) + ", " +
-                     std::to_string(xScaleLastDim) + "]")
-                        .c_str(),
-                    (std::string("The shape of pertokenScale must be [") + std::to_string(inputParams_.mSize) + ", " +
-                     std::to_string(expectedKDimValue) + ", 2] in mx quant split m mode.")
-                        .c_str()),
-                return false);
+    OP_CHECK_IF(
+        xScaleMDim != inputParams_.mSize || xScaleKDim != expectedKDimValue || xScaleLastDim != MXFP_MULTI_BASE_SIZE,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            inputParams_.opName, "pertokenScale",
+            (std::string("[") + std::to_string(xScaleMDim) + ", " + std::to_string(xScaleKDim) + ", " +
+             std::to_string(xScaleLastDim) + "]")
+                .c_str(),
+            (std::string("The shape of pertokenScale must be [") + std::to_string(inputParams_.mSize) + ", " +
+             std::to_string(expectedKDimValue) + ", 2] in mx quant split m mode.")
+                .c_str()),
+        return false);
     return true;
 }
 
@@ -343,28 +343,28 @@ bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeK(const gert::Shape &xScaleS
                         .c_str(),
                     "The values of transA, transB must be within the range {true, false} for split k mx quant mode."),
                 return false);
-    OP_CHECK_IF(xScaleLastDim != MXFP_MULTI_BASE_SIZE || xScaleKDim != expectedKDimValue ||
-                    xScaleMDim != inputParams_.mSize,
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                    inputParams_.opName, "pertokenScale",
-                    (std::string("[") + std::to_string(xScaleKDim) + ", " + std::to_string(xScaleMDim) + ", " +
-                     std::to_string(xScaleLastDim) + "]")
-                        .c_str(),
-                    (std::string("The shape of pertokenScale must be [") + std::to_string(expectedKDimValue) + ", " +
-                     std::to_string(inputParams_.mSize) + ", 2] for split k mx quant mode.")
-                        .c_str()),
-                return false);
-    OP_CHECK_IF(wScaleLastDim != MXFP_MULTI_BASE_SIZE || wScaleKDim != expectedKDimValue ||
-                    wScaleNDim != inputParams_.nSize,
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                    inputParams_.opName, "scale",
-                    (std::string("[") + std::to_string(wScaleKDim) + ", " + std::to_string(wScaleNDim) + ", " +
-                     std::to_string(wScaleLastDim) + "]")
-                        .c_str(),
-                    (std::string("The shape of scale must be [") + std::to_string(expectedKDimValue) + ", " +
-                     std::to_string(inputParams_.nSize) + ", 2] for split k mx quant mode.")
-                        .c_str()),
-                return false);
+    OP_CHECK_IF(
+        xScaleLastDim != MXFP_MULTI_BASE_SIZE || xScaleKDim != expectedKDimValue || xScaleMDim != inputParams_.mSize,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            inputParams_.opName, "pertokenScale",
+            (std::string("[") + std::to_string(xScaleKDim) + ", " + std::to_string(xScaleMDim) + ", " +
+             std::to_string(xScaleLastDim) + "]")
+                .c_str(),
+            (std::string("The shape of pertokenScale must be [") + std::to_string(expectedKDimValue) + ", " +
+             std::to_string(inputParams_.mSize) + ", 2] for split k mx quant mode.")
+                .c_str()),
+        return false);
+    OP_CHECK_IF(
+        wScaleLastDim != MXFP_MULTI_BASE_SIZE || wScaleKDim != expectedKDimValue || wScaleNDim != inputParams_.nSize,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            inputParams_.opName, "scale",
+            (std::string("[") + std::to_string(wScaleKDim) + ", " + std::to_string(wScaleNDim) + ", " +
+             std::to_string(wScaleLastDim) + "]")
+                .c_str(),
+            (std::string("The shape of scale must be [") + std::to_string(expectedKDimValue) + ", " +
+             std::to_string(inputParams_.nSize) + ", 2] for split k mx quant mode.")
+                .c_str()),
+        return false);
     return true;
 }
 
@@ -384,7 +384,6 @@ bool Mc2GroupedQbmmTiling::CheckQuantParamsForMxQuantMode(const gert::StorageSha
     }
     return true;
 }
-
 
 bool Mc2GroupedQbmmTiling::CheckQuantParamsForNonKGroupQuantMode(const gert::Shape &wScaleShape) const
 {
@@ -480,39 +479,39 @@ bool Mc2GroupedQbmmTiling::CheckShapeForWeightNz(const gert::Shape &wShape) cons
     auto wShapeDimThird = static_cast<uint64_t>(wShape[WEIGHTNZ_THIRD_DIM]);
     auto wShapeDimSecond = static_cast<uint64_t>(wShape[WEIGHTNZ_SECOND_DIM]);
     if (!inputParams_.transB) {
-        OP_CHECK_IF(wShapeDimThird != CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_16),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        context_->GetNodeName(), "weight",
-                        (std::string("dim2=") + std::to_string(wShapeDimThird)).c_str(),
-                        (std::string("The shape [dim2] of weight must be equal to ceil(kSize/16) = ") +
-                         std::to_string(CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_16)))
-                            .c_str()),
-                    return false);
-        OP_CHECK_IF(wShapeDimSecond != CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_32),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        context_->GetNodeName(), "weight",
-                        (std::string("dim1=") + std::to_string(wShapeDimSecond)).c_str(),
-                        (std::string("The shape [dim1] of weight must be equal to ceil(nSize/32) = ") +
-                         std::to_string(CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_32)))
-                            .c_str()),
-                    return false);
+        OP_CHECK_IF(
+            wShapeDimThird != CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_16),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "weight", (std::string("dim2=") + std::to_string(wShapeDimThird)).c_str(),
+                (std::string("The shape [dim2] of weight must be equal to ceil(kSize/16) = ") +
+                 std::to_string(CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_16)))
+                    .c_str()),
+            return false);
+        OP_CHECK_IF(
+            wShapeDimSecond != CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_32),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "weight", (std::string("dim1=") + std::to_string(wShapeDimSecond)).c_str(),
+                (std::string("The shape [dim1] of weight must be equal to ceil(nSize/32) = ") +
+                 std::to_string(CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_32)))
+                    .c_str()),
+            return false);
     } else {
-        OP_CHECK_IF(wShapeDimThird != CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_16),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        context_->GetNodeName(), "weight",
-                        (std::string("dim2=") + std::to_string(wShapeDimThird)).c_str(),
-                        (std::string("The shape [dim2] of weight must be equal to ceil(nSize/16) = ") +
-                         std::to_string(CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_16)))
-                            .c_str()),
-                    return false);
-        OP_CHECK_IF(wShapeDimSecond != CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_32),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        context_->GetNodeName(), "weight",
-                        (std::string("dim1=") + std::to_string(wShapeDimSecond)).c_str(),
-                        (std::string("The shape [dim1] of weight must be equal to ceil(kSize/32) = ") +
-                         std::to_string(CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_32)))
-                            .c_str()),
-                    return false);
+        OP_CHECK_IF(
+            wShapeDimThird != CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_16),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "weight", (std::string("dim2=") + std::to_string(wShapeDimThird)).c_str(),
+                (std::string("The shape [dim2] of weight must be equal to ceil(nSize/16) = ") +
+                 std::to_string(CeilDiv(inputParams_.nSize, WEIGHTNZ_N0_16)))
+                    .c_str()),
+            return false);
+        OP_CHECK_IF(
+            wShapeDimSecond != CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_32),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "weight", (std::string("dim1=") + std::to_string(wShapeDimSecond)).c_str(),
+                (std::string("The shape [dim1] of weight must be equal to ceil(kSize/32) = ") +
+                 std::to_string(CeilDiv(inputParams_.kSize, WEIGHTNZ_K0_32)))
+                    .c_str()),
+            return false);
     }
     OP_CHECK_IF(1 == inputParams_.kSize || 1 == inputParams_.nSize,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "nSize/kSize",
@@ -535,12 +534,12 @@ bool Mc2GroupedQbmmTiling::CheckActiveModeDtype(const gert::StorageShape *xScale
                     "If activation function is enabled, the dtypes of x, weight must be DT_INT8."),
                 return false);
     if (inputParams_.cDtype == ge::DT_BF16) {
-        OP_CHECK_IF(inputParams_.scaleDtype != ge::DT_BF16 && inputParams_.scaleDtype != ge::DT_FLOAT,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "scale",
-                        ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
-                        "If output is DT_BF16, the dtype of scale must be DT_BF16 or DT_FLOAT."),
-                    return false);
+        OP_CHECK_IF(
+            inputParams_.scaleDtype != ge::DT_BF16 && inputParams_.scaleDtype != ge::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                inputParams_.opName, "scale", ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
+                "If output is DT_BF16, the dtype of scale must be DT_BF16 or DT_FLOAT."),
+            return false);
         OP_CHECK_IF(inputParams_.perTokenScaleDtype != ge::DT_FLOAT && xScaleStorageShape != nullptr,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                         inputParams_.opName, "perTokenScale",
@@ -548,12 +547,12 @@ bool Mc2GroupedQbmmTiling::CheckActiveModeDtype(const gert::StorageShape *xScale
                         "If output is DT_BF16, the dtype of perTokenScale must be DT_FLOAT."),
                     return false);
     } else if (inputParams_.cDtype == ge::DT_FLOAT16) {
-        OP_CHECK_IF(inputParams_.scaleDtype != ge::DT_FLOAT,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "scale",
-                        ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
-                        "If output is DT_FLOAT16, the dtype of scale must be DT_FLOAT."),
-                    return false);
+        OP_CHECK_IF(
+            inputParams_.scaleDtype != ge::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                inputParams_.opName, "scale", ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
+                "If output is DT_FLOAT16, the dtype of scale must be DT_FLOAT."),
+            return false);
         OP_CHECK_IF(inputParams_.perTokenScaleDtype != ge::DT_FLOAT && xScaleStorageShape != nullptr,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                         inputParams_.opName, "perTokenScale",
@@ -782,17 +781,17 @@ bool Mc2GroupedQbmmTiling::SetGroupNum(uint32_t groupListIndex)
 bool Mc2GroupedQbmmTiling::SetMKN(const gert::Shape &xShape, const gert::Shape &wShape)
 {
     uint32_t wDimNum = static_cast<uint32_t>(wShape.GetDimNum());
-    OP_CHECK_IF(wDimNum < MIN_ND_DIM,
-                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "weight",
-                                                         (std::to_string(wDimNum) + "D").c_str(),
-                                                         "The shape dim of weight must be at least 2D."),
-                return false);
+    OP_CHECK_IF(
+        wDimNum < MIN_ND_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "weight", (std::to_string(wDimNum) + "D").c_str(),
+                                                 "The shape dim of weight must be at least 2D."),
+        return false);
     uint32_t xDimNum = static_cast<uint32_t>(xShape.GetDimNum());
-    OP_CHECK_IF(xDimNum < MIN_ND_DIM,
-                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "x",
-                                                         (std::to_string(xDimNum) + "D").c_str(),
-                                                         "The shape dim of x must be at least 2D."),
-                return false);
+    OP_CHECK_IF(
+        xDimNum < MIN_ND_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "x", (std::to_string(xDimNum) + "D").c_str(),
+                                                 "The shape dim of x must be at least 2D."),
+        return false);
     auto mSize = inputParams_.transA ? xShape.GetDim(xDimNum - LAST_FIRST_DIM_INDEX) :
                                        xShape.GetDim(xDimNum - LAST_SECOND_DIM_INDEX);
     auto kSize = inputParams_.transA ? xShape.GetDim(xDimNum - LAST_SECOND_DIM_INDEX) :

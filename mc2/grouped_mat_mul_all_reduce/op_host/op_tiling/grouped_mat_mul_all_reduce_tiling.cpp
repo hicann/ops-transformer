@@ -101,8 +101,7 @@ struct PlatFormMemSize {
           l0CSize(GMMGetSizePlatForm(platform_ascendc::CoreMemType::L0_C, ascendcPlatform)),
           l0ASize(GMMGetSizePlatForm(platform_ascendc::CoreMemType::L0_A, ascendcPlatform)),
           l0BSize(GMMGetSizePlatForm(platform_ascendc::CoreMemType::L0_B, ascendcPlatform))
-    {
-    }
+    {}
 };
 
 static void PrintTilingData(optiling::Mc2Msg &msg)
@@ -502,9 +501,9 @@ ge::graphStatus GMMAllReduceTiling::DoAiCoreTiling(const gert::TilingContext *co
     OP_TILING_CHECK(CalMMTiling(context) != ge::GRAPH_SUCCESS, OP_LOGE(opName, "GMM_All_Reduce CalMMTiling failed."),
                     return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(GMMAllReduceSetMMTiling(context, static_cast<matmul_tiling::DataType>(mmDType)) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName, "GMM_All_Reduce GMMAllReduceSetMMTiling failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        GMMAllReduceSetMMTiling(context, static_cast<matmul_tiling::DataType>(mmDType)) != ge::GRAPH_SUCCESS,
+        OP_LOGE(opName, "GMM_All_Reduce GMMAllReduceSetMMTiling failed."), return ge::GRAPH_FAILED);
 
     tilingData.aicoreTiling.set_notifyOff(sizeof(KFCMsgBody)); // used in kernel function
     uint32_t debugMode = mc2tiling::Mc2TilingUtils::GetDebugMode();

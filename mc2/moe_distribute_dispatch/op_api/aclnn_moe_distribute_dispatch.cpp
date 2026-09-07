@@ -59,9 +59,9 @@ static inline bool SafeCopyGroupBuf(char *dst, size_t dstSize, const char *src, 
     if (src != nullptr) {
         error_t ret = strncpy_s(dst, dstSize, src, maxCopyLen);
         if (ret != EOK) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                "aclnnMoeDistributeDispatch", "group strncpy_s return value",
-                std::to_string(static_cast<int32_t>(ret)).c_str(), "strncpy_s failed");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMoeDistributeDispatch", "group strncpy_s return value",
+                                                  std::to_string(static_cast<int32_t>(ret)).c_str(),
+                                                  "strncpy_s failed");
             return false;
         }
     }
@@ -125,10 +125,10 @@ aclnnStatus MoeDistributeDispatchGetWorkspaceSize(
     CHECK_RET(SafeCopyGroupBuf(groupTpBuf, HCCL_GROUP_NAME_MAX, groupTp, HCCL_GROUP_NAME_MAX - 1), ACLNN_ERR_INNER);
 
     aclnnStatus ret = aclnnInnerMoeDistributeDispatchGetWorkspaceSize(
-        x, expertIds, scales, xActiveMask, expertScales, groupEpBuf, epWorldSize, epRankId,
-        moeExpertNum, groupTpBuf, tpWorldSize, tpRankId, expertShardType, sharedExpertNum,
-        shareExpertRankNum, quantMode, globalBs, expertTokenNumsType, expandX, dynamicScales, expandIdx,
-        expertTokensNums, epRecvCounts, tpRecvCounts, expandScales, workspaceSize, executor);
+        x, expertIds, scales, xActiveMask, expertScales, groupEpBuf, epWorldSize, epRankId, moeExpertNum, groupTpBuf,
+        tpWorldSize, tpRankId, expertShardType, sharedExpertNum, shareExpertRankNum, quantMode, globalBs,
+        expertTokenNumsType, expandX, dynamicScales, expandIdx, expertTokensNums, epRecvCounts, tpRecvCounts,
+        expandScales, workspaceSize, executor);
     return ret;
 }
 

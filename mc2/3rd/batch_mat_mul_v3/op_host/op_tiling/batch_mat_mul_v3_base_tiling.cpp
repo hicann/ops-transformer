@@ -766,7 +766,6 @@ void Mc2BatchMatmulV3BaseTiling::DoMultiBatchL1FullLoadTiling()
     return;
 }
 
-
 void Mc2BatchMatmulV3BaseTiling::UpdateMultiBatchNd2nz()
 {
     uint64_t innerSizeA = args_.isATrans ? args_.mValue : args_.kValue;

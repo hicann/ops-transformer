@@ -26,7 +26,6 @@ void AllGatherPlusMM::PrintEstimateKernelTimeResult(double totalMatmulTime, doub
               rankTileNum_);
 }
 
-
 void AllGatherPlusMM::EstimateKernelTime()
 {
     SetCommTimeFactor();

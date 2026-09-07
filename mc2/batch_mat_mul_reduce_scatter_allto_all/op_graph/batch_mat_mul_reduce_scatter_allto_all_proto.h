@@ -82,5 +82,4 @@ REG_OP(BatchMatMulReduceScatterAlltoAll)
 
 } // namespace ge
 
-
 #endif // BATCH_MAT_MUL_REDUCE_SCATTER_ALLTO_ALL_PROTO_H_

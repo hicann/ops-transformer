@@ -37,16 +37,14 @@ using DTYPE_Y = DTYPE_RESIDUAL;
 #include "../../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_910_general.h"
 #endif
 
-namespace MatmulAllReduceAddRmsNormImpl {
-}
+namespace MatmulAllReduceAddRmsNormImpl {}
 
 using namespace AscendC;
 using namespace MatmulAllReduceAddRmsNormImpl;
 
-extern "C" __global__ __aicore__ void
-inplace_matmul_all_reduce_add_rms_norm(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR residualGM, GM_ADDR gammaGM,
-                                       GM_ADDR antiquantScaleGM, GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM,
-                                       GM_ADDR yGM, GM_ADDR normOutGM, GM_ADDR workspaceGM, GM_ADDR tilingGM)
+extern "C" __global__ __aicore__ void inplace_matmul_all_reduce_add_rms_norm(
+    GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR residualGM, GM_ADDR gammaGM, GM_ADDR antiquantScaleGM,
+    GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM, GM_ADDR yGM, GM_ADDR normOutGM, GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
 #ifdef __CCE_KT_TEST__
     REGISTER_TILING_DEFAULT(Mc2Tiling::MatmulAllReduceAddRmsNormTilingData);

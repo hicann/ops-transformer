@@ -770,7 +770,10 @@ ge::graphStatus MoeDistributeDispatchTilingBase::MoeDistributeDispatchA3A5Tiling
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingBase::DoOpTiling() { return MoeDistributeDispatchTilingFunc(context_); }
+ge::graphStatus MoeDistributeDispatchTilingBase::DoOpTiling()
+{
+    return MoeDistributeDispatchTilingFunc(context_);
+}
 
 uint64_t MoeDistributeDispatchTilingBase::GetTilingKey() const
 {
@@ -781,7 +784,10 @@ uint64_t MoeDistributeDispatchTilingBase::GetTilingKey() const
     return tilingKey;
 }
 
-bool MoeDistributeDispatchTilingBase::IsCapable() { return true; }
+bool MoeDistributeDispatchTilingBase::IsCapable()
+{
+    return true;
+}
 
 struct MoeDistributeDispatchCompileInfo {};
 ge::graphStatus TilingParseForMoeDistributeDispatch(gert::TilingParseContext *context)

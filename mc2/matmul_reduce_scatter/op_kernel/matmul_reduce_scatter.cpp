@@ -26,13 +26,13 @@
 #include "matmul_reduce_scatter_full_mesh.h"
 #endif
 
-#define INVOKE_MATMUL_REDUCE_SCATTER_OP_IMPL(templateClass, ...)                                                       \
-    do {                                                                                                               \
-        using aType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, A_DTYPE, true>;                               \
-        using cType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, C_DTYPE>;                                     \
-        templateClass<aType, bType, cType, biasType, __VA_ARGS__> op;                                                  \
-        op.Init(aGM, bGM, biasGM, cGM, workspaceGM, contextGM, &tilingData, &pipe, mc2InitTiling, mc2CcTiling);        \
-        op.Process();                                                                                                  \
+#define INVOKE_MATMUL_REDUCE_SCATTER_OP_IMPL(templateClass, ...) \
+    do { \
+        using aType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, A_DTYPE, true>; \
+        using cType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, C_DTYPE>; \
+        templateClass<aType, bType, cType, biasType, __VA_ARGS__> op; \
+        op.Init(aGM, bGM, biasGM, cGM, workspaceGM, contextGM, &tilingData, &pipe, mc2InitTiling, mc2CcTiling); \
+        op.Process(); \
     } while (0)
 using namespace AscendC;
 

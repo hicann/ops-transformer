@@ -207,7 +207,6 @@ TEST_P(AlltoAllvGroupedMatMulInfershape, infershapeTest)
     Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
-
 static TestParams testParams[] = {{"Test_sample", {{"permuteOutFlag", "true"}}, {}, {}, {}, ge::GRAPH_SUCCESS}};
 
 INSTANTIATE_TEST_SUITE_P(AlltoAllvGroupedMatMul, AlltoAllvGroupedMatMulInfershape, testing::ValuesIn(testParams),

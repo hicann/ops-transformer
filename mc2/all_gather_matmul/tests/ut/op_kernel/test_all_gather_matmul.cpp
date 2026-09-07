@@ -167,7 +167,6 @@ TEST_F(AllGatherMatmulTest, AllGatherMatmulTestNoBiasL2cache)
     tilingData->tileTiling.stepN = 1;
     tilingData->tileTiling.usedCoreNum = 20;
 
-
     uint8_t *aGM = (uint8_t *)AscendC::GmAlloc(512 * 1024 * sizeof(uint16_t));
     uint8_t *bGM = (uint8_t *)AscendC::GmAlloc(8192 * 1024 * sizeof(uint16_t));
     uint8_t *biasGM = nullptr;

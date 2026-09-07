@@ -17,9 +17,8 @@
 #include "../../../../moe_distribute_dispatch_v2/op_host/op_tiling/arch22/moe_distribute_dispatch_v2_tiling_arch22.h"
 
 namespace optiling {
-ge::graphStatus
-MoeDistributeDispatchV3TilingFuncA2A3::MoeDistributeDispatchA3TilingFuncImplPublic(gert::TilingContext *context,
-                                                                                   DispatchV2Config &config)
+ge::graphStatus MoeDistributeDispatchV3TilingFuncA2A3::MoeDistributeDispatchA3TilingFuncImplPublic(
+    gert::TilingContext *context, DispatchV2Config &config)
 {
     MoeDistributeDispatchV2TilingFuncA2A3 impl;
     return impl.MoeDistributeDispatchA3TilingFuncImplPublic(context, config);

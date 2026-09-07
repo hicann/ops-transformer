@@ -307,7 +307,10 @@ bool Mc2QuantBatchMatmulV3TilingBase::CheckShapeInRangeForMandtoryInputs(size_t 
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::IsMicroScaling() const { return inputParams_.scaleDtype == ge::DT_FLOAT8_E8M0; }
+bool Mc2QuantBatchMatmulV3TilingBase::IsMicroScaling() const
+{
+    return inputParams_.scaleDtype == ge::DT_FLOAT8_E8M0;
+}
 
 std::string Mc2QuantBatchMatmulV3TilingBase::QuantModeToString(BasicQuantMode quantMode) const
 {
@@ -667,7 +670,10 @@ void Mc2QuantBatchMatmulV3TilingBase::SetTransAttr(Mc2QuantBatchMatmulV3Trans &t
     }
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::IsCapable() { return true; }
+bool Mc2QuantBatchMatmulV3TilingBase::IsCapable()
+{
+    return true;
+}
 
 void Mc2QuantBatchMatmulV3TilingBase::InitCompileInfo()
 {
@@ -722,7 +728,10 @@ bool Mc2QuantBatchMatmulV3TilingBase::SetPlatformInfoForTiling()
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::GetUbDequantExtreSpace() { return false; }
+bool Mc2QuantBatchMatmulV3TilingBase::GetUbDequantExtreSpace()
+{
+    return false;
+}
 
 bool Mc2QuantBatchMatmulV3TilingBase::CheckShape(const std::vector<gert::Shape *> &mandtoryShape,
                                                  const gert::StorageShape *biasShape,
@@ -736,11 +745,20 @@ bool Mc2QuantBatchMatmulV3TilingBase::CheckShape(const std::vector<gert::Shape *
     return false;
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::CheckDtype() const { return false; }
+bool Mc2QuantBatchMatmulV3TilingBase::CheckDtype() const
+{
+    return false;
+}
 
-ge::graphStatus Mc2QuantBatchMatmulV3TilingBase::CalcUbTiling() { return ge::GRAPH_FAILED; }
+ge::graphStatus Mc2QuantBatchMatmulV3TilingBase::CalcUbTiling()
+{
+    return ge::GRAPH_FAILED;
+}
 
-uint64_t Mc2QuantBatchMatmulInfo::GetMatmulApiMSize() const { return mSizePerNpu > 0U ? mSizePerNpu : mSize; }
+uint64_t Mc2QuantBatchMatmulInfo::GetMatmulApiMSize() const
+{
+    return mSizePerNpu > 0U ? mSizePerNpu : mSize;
+}
 
 uint64_t Mc2QuantBatchMatmulInfo::GetTotalMatmulApiMSize(uint64_t baseM) const
 {

@@ -34,23 +34,23 @@ inline bool MoeDistributeCombineTilingHelper::CheckInputTensorDim(const gert::Ti
 
     const gert::StorageShape *expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdsStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertIds"), return false);
-    OP_TILING_CHECK(expertIdsStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "expertIds",
-                        std::to_string(expertIdsStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of expertIds must be 2D."),
-                    return false);
+    OP_TILING_CHECK(
+        expertIdsStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "expertIds", std::to_string(expertIdsStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of expertIds must be 2D."),
+        return false);
     OP_LOGD(nodeName, "expertIds dim0 = %ld", expertIdsStorageShape->GetStorageShape().GetDim(0));
     OP_LOGD(nodeName, "expertIds dim1 = %ld", expertIdsStorageShape->GetStorageShape().GetDim(1));
 
     const gert::StorageShape *expandIdxStorageShape = context->GetInputShape(EXPAND_IDX_INDEX);
     OP_TILING_CHECK(expandIdxStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandIdx"), return false);
-    OP_TILING_CHECK(expandIdxStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "expandIdx",
-                        std::to_string(expandIdxStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of expandIdx must be 1D."),
-                    return false);
+    OP_TILING_CHECK(
+        expandIdxStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "expandIdx", std::to_string(expandIdxStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of expandIdx must be 1D."),
+        return false);
     OP_LOGD(nodeName, "expandIdx dim0 = %ld", expandIdxStorageShape->GetStorageShape().GetDim(0));
 
     const gert::StorageShape *sharedExpertX = context->GetOptionalInputShape(SHARED_EXPERT_X_INDEX);
@@ -61,13 +61,13 @@ inline bool MoeDistributeCombineTilingHelper::CheckInputTensorDim(const gert::Ti
                         OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertX", "present",
                                                   "should be None when sharedExpertRankNum is non-zero"),
                         return false);
-        OP_TILING_CHECK(((sharedExpertX->GetStorageShape().GetDimNum() != TWO_DIMS) &&
-                         (sharedExpertX->GetStorageShape().GetDimNum() != THREE_DIMS)),
-                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                            nodeName, "sharedExpertX",
-                            std::to_string(sharedExpertX->GetStorageShape().GetDimNum()).c_str(),
-                            "The shape dim of sharedExpertX must be within the range {2D, 3D}"),
-                        return false);
+        OP_TILING_CHECK(
+            ((sharedExpertX->GetStorageShape().GetDimNum() != TWO_DIMS) &&
+             (sharedExpertX->GetStorageShape().GetDimNum() != THREE_DIMS)),
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                nodeName, "sharedExpertX", std::to_string(sharedExpertX->GetStorageShape().GetDimNum()).c_str(),
+                "The shape dim of sharedExpertX must be within the range {2D, 3D}"),
+            return false);
     }
     return true;
 }
@@ -78,12 +78,12 @@ inline bool MoeDistributeCombineTilingHelper::CheckInputSendCountsTensorDim(cons
     const gert::StorageShape *epSendCountsStorageShape = context->GetInputShape(EP_SEND_COUNTS_INDEX);
     OP_TILING_CHECK(epSendCountsStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "epSendCounts"),
                     return false);
-    OP_TILING_CHECK(epSendCountsStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "epSendCounts",
-                        std::to_string(epSendCountsStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of epSendCounts must be 1D."),
-                    return false);
+    OP_TILING_CHECK(
+        epSendCountsStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "epSendCounts", std::to_string(epSendCountsStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of epSendCounts must be 1D."),
+        return false);
     OP_LOGD(nodeName, "epSendCounts dim0 = %ld", epSendCountsStorageShape->GetStorageShape().GetDim(0));
 
     return true;
@@ -95,12 +95,12 @@ inline bool MoeDistributeCombineTilingHelper::CheckInputExpertScalesTensorDim(co
     const gert::StorageShape *expertScalesStorageShape = context->GetInputShape(EXPERT_SCALES_INDEX);
     OP_TILING_CHECK(expertScalesStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertScales"),
                     return false);
-    OP_TILING_CHECK(expertScalesStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "expertScale",
-                        std::to_string(expertScalesStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of expertScales must be 2D."),
-                    return false);
+    OP_TILING_CHECK(
+        expertScalesStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "expertScale", std::to_string(expertScalesStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of expertScales must be 2D."),
+        return false);
     OP_LOGD(nodeName, "expertScales dim0 = %ld", expertScalesStorageShape->GetStorageShape().GetDim(0));
     OP_LOGD(nodeName, "expertScales dim1 = %ld", expertScalesStorageShape->GetStorageShape().GetDim(1));
     return true;
@@ -152,11 +152,11 @@ inline bool MoeDistributeCombineTilingHelper::CheckActiveMask(const gert::Tiling
     OP_TILING_CHECK(xActiveMaskStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xActiveMaskStorageShape"),
                     return false);
     const int64_t xActiveMaskDimNums = xActiveMaskStorageShape->GetStorageShape().GetDimNum();
-    OP_TILING_CHECK(xActiveMaskDimNums != ONE_DIM,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "xActiveMask",
-                                                             std::to_string(xActiveMaskDimNums).c_str(),
-                                                             "The shape dim of xActiveMask must be 1D."),
-                    return false);
+    OP_TILING_CHECK(
+        xActiveMaskDimNums != ONE_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "xActiveMask", std::to_string(xActiveMaskDimNums).c_str(),
+                                                 "The shape dim of xActiveMask must be 1D."),
+        return false);
     auto xActiveMaskDesc = context->GetOptionalInputDesc(X_ACTIVE_MASK_INDEX);
     OP_TILING_CHECK(xActiveMaskDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xActiveMaskDesc"), return false);
     OP_TILING_CHECK(xActiveMaskDesc->GetDataType() != ge::DT_BOOL,
@@ -223,11 +223,11 @@ bool MoeDistributeCombineTilingHelper::CheckTensorDataType(const gert::TilingCon
     }
     auto xDesc = context->GetOutputDesc(OUTPUT_X_INDEX);
     OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return false);
-    OP_TILING_CHECK((xDesc->GetDataType() != expandXDesc->GetDataType()),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x",
-                                                          Ops::Base::ToString(xDesc->GetDataType()).c_str(),
-                                                          "The dtype of x must be the same as that of expandX."),
-                    return false);
+    OP_TILING_CHECK(
+        (xDesc->GetDataType() != expandXDesc->GetDataType()),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(),
+                                              "The dtype of x must be the same as that of expandX."),
+        return false);
     return true;
 }
 

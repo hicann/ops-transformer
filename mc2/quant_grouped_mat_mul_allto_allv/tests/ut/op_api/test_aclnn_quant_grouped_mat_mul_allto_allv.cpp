@@ -30,7 +30,6 @@ protected:
         cout << "test_aclnn_quant_grouped_mat_mul_allto_all SetUp" << endl;
     }
 
-
     static void TearDownTestCase()
     {
         cout << "test_aclnn_quant_grouped_mat_mul_allto_all TearDown" << endl;
@@ -63,15 +62,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmX_quantmode0_with_sca
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, gmmXScale_, nullptr, // gmmXScale 非空, gmmWeightScale 空
-                              nullptr, nullptr,                       // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,      // mm scale
-                              nullptr,                                // commQuantScale
-                              0, 0, 0, 0, 0,                          // gmmXQM=0, 其余=0
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, gmmXScale_, nullptr, // gmmXScale 非空, gmmWeightScale 空
+              nullptr, nullptr,                       // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,      // mm scale
+              nullptr,                                // commQuantScale
+              0, 0, 0, 0, 0,                          // gmmXQM=0, 其余=0
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -97,15 +96,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmX_quantmode1_without_
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmmXScale=nullptr
-                              nullptr, nullptr,                    // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,   // mm scale
-                              nullptr,                             // commQuantScale
-                              1, 0, 0, 0, 0,                       // gmmXQM=1, 其余=0
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmmXScale=nullptr
+              nullptr, nullptr,                    // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,   // mm scale
+              nullptr,                             // commQuantScale
+              1, 0, 0, 0, 0,                       // gmmXQM=1, 其余=0
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -132,15 +131,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmWeight_quantmode0_wit
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, gmmWeightScale_, // gmmWeightScale 非空
-                              nullptr, nullptr,                            // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,           // mm scale
-                              nullptr,                                     // commQuantScale
-                              0, 0, 0, 0, 0,                               // gmmWQM=0
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, gmmWeightScale_, // gmmWeightScale 非空
+              nullptr, nullptr,                            // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,           // mm scale
+              nullptr,                                     // commQuantScale
+              0, 0, 0, 0, 0,                               // gmmWQM=0
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -166,15 +165,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmWeight_quantmode1_wit
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmmWeightScale=nullptr
-                              nullptr, nullptr,                    // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,   // mm scale
-                              nullptr,                             // commQuantScale
-                              0, 1, 0, 0, 0,                       // gmmWQM=1
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmmWeightScale=nullptr
+              nullptr, nullptr,                    // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,   // mm scale
+              nullptr,                             // commQuantScale
+              0, 1, 0, 0, 0,                       // gmmWQM=1
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -201,15 +200,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmX_quantmode0_with_scal
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
-                              nullptr, nullptr,                    // counts tensor
-                              mmX_, mmWeight_, mmXScale_, nullptr, // mmXScale 非空
-                              nullptr,                             // commQuantScale
-                              0, 0, 0, 0, 0,                       // mmXQM=0
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
+              nullptr, nullptr,                    // counts tensor
+              mmX_, mmWeight_, mmXScale_, nullptr, // mmXScale 非空
+              nullptr,                             // commQuantScale
+              0, 0, 0, 0, 0,                       // mmXQM=0
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -235,15 +234,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmX_quantmode1_without_s
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
-                              nullptr, nullptr,                    // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,   // mmXScale=nullptr
-                              nullptr,                             // commQuantScale
-                              0, 0, 1, 0, 0,                       // mmXQM=1
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
+              nullptr, nullptr,                    // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,   // mmXScale=nullptr
+              nullptr,                             // commQuantScale
+              0, 0, 1, 0, 0,                       // mmXQM=1
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -270,15 +269,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmWeight_quantmode0_with
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr,      // gmm scale
-                              nullptr, nullptr,                         // counts tensor
-                              mmX_, mmWeight_, nullptr, mmWeightScale_, // mmWeightScale 非空
-                              nullptr,                                  // commQuantScale
-                              0, 0, 0, 0, 0,                            // mmWQM=0
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr,      // gmm scale
+              nullptr, nullptr,                         // counts tensor
+              mmX_, mmWeight_, nullptr, mmWeightScale_, // mmWeightScale 非空
+              nullptr,                                  // commQuantScale
+              0, 0, 0, 0, 0,                            // mmWQM=0
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -304,15 +303,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmWeight_quantmode1_with
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
-                              nullptr, nullptr,                    // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,   // mmWeightScale=nullptr
-                              nullptr,                             // commQuantScale
-                              0, 0, 0, 1, 0,                       // mmWQM=1
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
+              nullptr, nullptr,                    // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,   // mmWeightScale=nullptr
+              nullptr,                             // commQuantScale
+              0, 0, 0, 1, 0,                       // mmWQM=1
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -519,15 +518,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_commQuantMode_nonzero)
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
-                              nullptr, nullptr,                    // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,   // mm scale
-                              nullptr,                             // commQuantScale
-                              0, 0, 0, 0, 1,                       // commQuantMode=1
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
+              nullptr, nullptr,                    // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,   // mm scale
+              nullptr,                             // commQuantScale
+              0, 0, 0, 0, 1,                       // commQuantMode=1
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -555,15 +554,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_tt_quant_normal)
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, // TT: 双 scale 非空
-                              nullptr, nullptr,                               // counts tensor
-                              mmX_, mmWeight_, nullptr, nullptr,              // mm scale
-                              nullptr,                                        // commQuantScale
-                              1, 1, 0, 0, 0,                                  // gmmXQM=1, gmmWQM=1
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, // TT: 双 scale 非空
+              nullptr, nullptr,                               // counts tensor
+              mmX_, mmWeight_, nullptr, nullptr,              // mm scale
+              nullptr,                                        // commQuantScale
+              1, 1, 0, 0, 0,                                  // gmmXQM=1, gmmWQM=1
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -589,12 +588,12 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_commQuantMode_reject)
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
 
-    auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
-                        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr,
-                              nullptr, 0, 0, 0, 0, 1, // commQuantMode=1
-                              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              false, false),
-                        OUTPUT(y_, mmY_));
+    auto ut = OP_API_UT(
+        aclnnQuantGroupedMatMulAlltoAllv,
+        INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr, nullptr, 0, 0,
+              0, 0, 1, // commQuantMode=1
+              -1, 0, "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts, false, false),
+        OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -969,7 +968,6 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mmWeightScale_null)
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
-
 namespace {
 constexpr size_t kHcclGroupNameMax = 128U;
 }
@@ -1216,7 +1214,6 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmm_weight_scale_rank
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
-
 
 TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmm_weight_scale_last_dim_invalid)
 {

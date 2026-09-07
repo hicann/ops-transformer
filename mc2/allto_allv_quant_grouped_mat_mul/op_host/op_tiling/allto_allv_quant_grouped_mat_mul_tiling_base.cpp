@@ -186,11 +186,11 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckEpWorldSizeValue()
         }
         epWorldSizeValueStr += std::to_string(epWorldSizeValueList[i]);
     }
-    OP_TILING_CHECK(std::find(epWorldSizeValueList.begin(), epWorldSizeValueList.end(), epWorldSize_) ==
-                        epWorldSizeValueList.end(),
-                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "epWorldSize", std::to_string(epWorldSize_),
-                                              "[" + epWorldSizeValueStr + "]"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        std::find(epWorldSizeValueList.begin(), epWorldSizeValueList.end(), epWorldSize_) == epWorldSizeValueList.end(),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "epWorldSize", std::to_string(epWorldSize_),
+                                  "[" + epWorldSizeValueStr + "]"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -206,17 +206,17 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckCommCountsRange()
                             (std::to_string(sendCountsSize) + " and " + std::to_string(recvCountsSize)).c_str(),
                             "sendCounts size should equal recvCounts size"),
                         return ge::GRAPH_FAILED);
-        OP_TILING_CHECK(e_ * epWorldSize_ != sendCountsSize,
-                        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "sendCounts",
-                                                  std::to_string(sendCountsSize).c_str(),
-                                                  "sendCounts size should equal e * epWorldSize"),
-                        return ge::GRAPH_FAILED);
-        OP_TILING_CHECK((e_ * epWorldSize_ <= EXPERT_MIN_VALUE) || (e_ * epWorldSize_ > EXPERT_MAX_VALUE),
-                        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "e * epWorldSize",
-                                                  std::to_string(e_ * epWorldSize_).c_str(),
-                                                  "should be in (" + std::to_string(EXPERT_MIN_VALUE) + ", " +
-                                                      std::to_string(EXPERT_MAX_VALUE) + "]"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            e_ * epWorldSize_ != sendCountsSize,
+            OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "sendCounts", std::to_string(sendCountsSize).c_str(),
+                                      "sendCounts size should equal e * epWorldSize"),
+            return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            (e_ * epWorldSize_ <= EXPERT_MIN_VALUE) || (e_ * epWorldSize_ > EXPERT_MAX_VALUE),
+            OP_LOGE_FOR_INVALID_VALUE(
+                context_->GetNodeName(), "e * epWorldSize", std::to_string(e_ * epWorldSize_).c_str(),
+                "should be in (" + std::to_string(EXPERT_MIN_VALUE) + ", " + std::to_string(EXPERT_MAX_VALUE) + "]"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

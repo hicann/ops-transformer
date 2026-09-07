@@ -1,7 +1,7 @@
 /**
  * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -5613,11 +5613,11 @@ static void TestQuantV2OneParamCase(const AlltoAllQuantMatmulV2AclnnTestParam &p
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet;
-    auto ut = OP_API_UT(aclnnAlltoAllQuantMatmulV2,
-                        INPUT(x1, x2, bias, x1scales, x2scales, nullptr, nullptr, nullptr, group, commMode,
-                              alltoAllAxesOptional, x1quantmode, x2quantmode, 0, -1, x1quantdtype, groupSize,
-                              transposeX1, transposeX2),
-                        OUTPUT(output, alltoallout));
+    auto ut = OP_API_UT(
+        aclnnAlltoAllQuantMatmulV2,
+        INPUT(x1, x2, bias, x1scales, x2scales, nullptr, nullptr, nullptr, group, commMode, alltoAllAxesOptional,
+              x1quantmode, x2quantmode, 0, -1, x1quantdtype, groupSize, transposeX1, transposeX2),
+        OUTPUT(output, alltoallout));
     aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (retStatus == ACLNN_SUCCESS) {
         EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);

@@ -20,7 +20,6 @@
 #include "op_api_ut_common/op_api_ut.h"
 #include "opdev/platform.h"
 
-
 using namespace op;
 using namespace std;
 

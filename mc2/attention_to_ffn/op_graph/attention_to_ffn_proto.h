@@ -59,8 +59,6 @@ REG_OP(AttentionToFFN)
     .ATTR(ffn_start_rank_id, Int, 0)
     .OP_END_FACTORY_REG(AttentionToFFN)
 
-
 } // namespace ge
-
 
 #endif // ATTENTION_TO_FFN_H_

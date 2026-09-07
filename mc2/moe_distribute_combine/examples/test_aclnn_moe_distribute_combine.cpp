@@ -25,16 +25,16 @@
 #include "aclnnop/aclnn_moe_distribute_dispatch.h"
 #include "aclnnop/aclnn_moe_distribute_combine.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 struct Args {
@@ -457,7 +457,6 @@ int run_example_on_A3A5()
     LOG_PRINT("[INFO] aclFinalize success\n");
     return 0;
 }
-
 
 int main(int argc, char *argv[])
 {

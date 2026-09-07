@@ -261,11 +261,11 @@ bool CheckInputShape(Mc2WeightQuantBatchMatmulInfo *inputParams, const gert::Sto
     size_t xOriDimNum = xShape->GetOriginShape().GetDimNum();
     size_t weigthDimNum = weightShape->GetStorageShape().GetDimNum();
     size_t weightOriDimNum = weightShape->GetOriginShape().GetDimNum();
-    OP_TILING_CHECK(xOriDimNum != MM_SHAPE_LEN_ND,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams->opName, "x",
-                                                             (std::to_string(xOriDimNum) + "D").c_str(),
-                                                             "The shape dim of x must be 2D."),
-                    return false);
+    OP_TILING_CHECK(
+        xOriDimNum != MM_SHAPE_LEN_ND,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams->opName, "x", (std::to_string(xOriDimNum) + "D").c_str(),
+                                                 "The shape dim of x must be 2D."),
+        return false);
     OP_TILING_CHECK(xDimNum != MM_SHAPE_LEN_ND,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams->opName, "x storage",
                                                              (std::to_string(xDimNum) + "D").c_str(),
@@ -503,13 +503,13 @@ bool CheckBiasShape(Mc2WeightQuantBatchMatmulInfo *inputParams, const gert::Stor
 
 bool CheckShapeDims(Mc2WeightQuantBatchMatmulInfo *inputParams, NpuArch npuArch)
 {
-    OP_TILING_CHECK((npuArch != NpuArch::DAV_3510) &&
-                        (inputParams->kSize > MAX_SHAPE_DIM || inputParams->nSize > MAX_SHAPE_DIM),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        inputParams->opName, "k/n dims",
-                        (std::to_string(inputParams->kSize) + ", " + std::to_string(inputParams->nSize)).c_str(),
-                        "The value of k/n dims must not be more than 65535."),
-                    return false);
+    OP_TILING_CHECK(
+        (npuArch != NpuArch::DAV_3510) && (inputParams->kSize > MAX_SHAPE_DIM || inputParams->nSize > MAX_SHAPE_DIM),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            inputParams->opName, "k/n dims",
+            (std::to_string(inputParams->kSize) + ", " + std::to_string(inputParams->nSize)).c_str(),
+            "The value of k/n dims must not be more than 65535."),
+        return false);
     uint64_t batchMax = inputParams->transA ? MAX_SHAPE_DIM : MAX_INT32;
     OP_TILING_CHECK((npuArch != NpuArch::DAV_3510) && (inputParams->mSize > batchMax),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -630,11 +630,11 @@ bool CheckInputDtype(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo
         auto biasDtype = biasDesc->GetDataType();
         if (inputParams->aDtype == ge::DT_BF16) {
             if (socVersion == platform_ascendc::SocVersion::ASCEND910B) {
-                OP_TILING_CHECK(biasDtype != ge::DT_FLOAT,
-                                OP_LOGE_FOR_INVALID_DTYPE(inputParams->opName, "bias",
-                                                          ge::TypeUtils::DataTypeToAscendString(biasDtype).GetString(),
-                                                          "DT_FLOAT"),
-                                return false);
+                OP_TILING_CHECK(
+                    biasDtype != ge::DT_FLOAT,
+                    OP_LOGE_FOR_INVALID_DTYPE(inputParams->opName, "bias",
+                                              ge::TypeUtils::DataTypeToAscendString(biasDtype).GetString(), "DT_FLOAT"),
+                    return false);
             } else {
                 OP_TILING_CHECK(biasDtype != ge::DT_FLOAT && biasDtype != ge::DT_BF16,
                                 OP_LOGE_FOR_INVALID_DTYPE(inputParams->opName, "bias",
@@ -643,11 +643,11 @@ bool CheckInputDtype(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo
                                 return false);
             }
         } else {
-            OP_TILING_CHECK(biasDtype != inputParams->aDtype,
-                            OP_LOGE_FOR_INVALID_DTYPE(inputParams->opName, "bias",
-                                                      ge::TypeUtils::DataTypeToAscendString(biasDtype).GetString(),
-                                                      "DT_FLOAT16"),
-                            return false);
+            OP_TILING_CHECK(
+                biasDtype != inputParams->aDtype,
+                OP_LOGE_FOR_INVALID_DTYPE(inputParams->opName, "bias",
+                                          ge::TypeUtils::DataTypeToAscendString(biasDtype).GetString(), "DT_FLOAT16"),
+                return false);
         }
     }
     return true;
@@ -719,20 +719,20 @@ bool CheckQuantDtype(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo
     auto quantScaleDesc = context->GetOptionalInputDesc(4);
     if (quantScaleDesc != nullptr) {
         auto quantScaleDtype = quantScaleDesc->GetDataType();
-        OP_TILING_CHECK(quantScaleDtype != ge::DT_UINT64,
-                        OP_LOGE_FOR_INVALID_DTYPE(inputParams->opName, "quant scale",
-                                                  ge::TypeUtils::DataTypeToAscendString(quantScaleDtype).GetString(),
-                                                  "DT_UINT64"),
-                        return false);
+        OP_TILING_CHECK(
+            quantScaleDtype != ge::DT_UINT64,
+            OP_LOGE_FOR_INVALID_DTYPE(inputParams->opName, "quant scale",
+                                      ge::TypeUtils::DataTypeToAscendString(quantScaleDtype).GetString(), "DT_UINT64"),
+            return false);
     } else {
-        OP_TILING_CHECK(inputParams->cDtype != inputParams->aDtype,
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            inputParams->opName, "output y",
-                            ge::TypeUtils::DataTypeToAscendString(inputParams->cDtype).GetString(),
-                            (std::string("The dtype of output y must be the same as x dtype ") +
-                             ge::TypeUtils::DataTypeToAscendString(inputParams->aDtype).GetString() + " without quant.")
-                                .c_str()),
-                        return false);
+        OP_TILING_CHECK(
+            inputParams->cDtype != inputParams->aDtype,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                inputParams->opName, "output y", ge::TypeUtils::DataTypeToAscendString(inputParams->cDtype).GetString(),
+                (std::string("The dtype of output y must be the same as x dtype ") +
+                 ge::TypeUtils::DataTypeToAscendString(inputParams->aDtype).GetString() + " without quant.")
+                    .c_str()),
+            return false);
     }
     return true;
 }
@@ -864,12 +864,12 @@ bool CheckTempLimit(Mc2WeightQuantBatchMatmulInfo *inputParams)
     if (inputParams->antiQuantType == Mc2QuantType::PER_GROUP &&
         (inputParams->bDtype == ge::DT_FLOAT4_E2M1 || inputParams->bDtype == ge::DT_FLOAT4_E1M2 ||
          inputParams->bDtype == ge::DT_FLOAT)) {
-        OP_TILING_CHECK(std::find(GROUP_SIZE_LIST.begin(), GROUP_SIZE_LIST.end(), inputParams->groupSize) ==
-                            GROUP_SIZE_LIST.end(),
-                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                            inputParams->opName, "groupSize", std::to_string(inputParams->groupSize).c_str(),
-                            "The value of groupSize must be 32, 64, 128, or 256 in A16Fp4 pergroup scenario."),
-                        return false);
+        OP_TILING_CHECK(
+            std::find(GROUP_SIZE_LIST.begin(), GROUP_SIZE_LIST.end(), inputParams->groupSize) == GROUP_SIZE_LIST.end(),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                inputParams->opName, "groupSize", std::to_string(inputParams->groupSize).c_str(),
+                "The value of groupSize must be 32, 64, 128, or 256 in A16Fp4 pergroup scenario."),
+            return false);
     }
 
     return true;
@@ -949,12 +949,12 @@ ge::graphStatus Mc2CheckPara(gert::TilingContext *context, platform_ascendc::Soc
                                                           "The value of attr must be within the supported range."),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckShape(context, &inputParams, socVersion),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams.opName, "shape",
-                                                          (std::to_string(inputParams.mSize) + "x" +
-                                                           std::to_string(inputParams.kSize) + "x" +
-                                                           std::to_string(inputParams.nSize))
-                                                              .c_str(),
-                                                          "The shape must be within the supported range."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        inputParams.opName, "shape",
+                        (std::to_string(inputParams.mSize) + "x" + std::to_string(inputParams.kSize) + "x" +
+                         std::to_string(inputParams.nSize))
+                            .c_str(),
+                        "The shape must be within the supported range."),
                     return ge::GRAPH_FAILED);
     if (inputParams.bFormat == ge::FORMAT_FRACTAL_NZ) {
         OP_TILING_CHECK(!CheckNzSupportedScenarios(&inputParams, npuArch),

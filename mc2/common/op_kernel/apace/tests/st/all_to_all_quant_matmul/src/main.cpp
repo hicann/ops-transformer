@@ -111,8 +111,8 @@ void parseArguments(int argc, char *argv[], int &m, int &k, int &n, int &rankNum
 int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::string &mode, int headMSizeArg)
 {
     const char *ipport = "tcp://127.0.0.1:8998";
-    INFO_LOG("rankNum=%d, rankId=%d, ipport=%s, mode=%s, headMSize=%d",
-             rankNum, rankId, ipport, mode.c_str(), headMSizeArg);
+    INFO_LOG("rankNum=%d, rankId=%d, ipport=%s, mode=%s, headMSize=%d", rankNum, rankId, ipport, mode.c_str(),
+             headMSizeArg);
 
     uint32_t ka = k / rankNum;
 
@@ -139,8 +139,8 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
     tilingData.scaleCommTilingData = tilingData.commTilingData;
     tilingData.scaleCommTilingData.nonSplitAxisSize = ka / 32;
 
-    INFO_LOG("TileCnt=%u, HeadTileCnt=%u, HeadMSize=%u, TailTileCnt=%u, TailMSize=%u",
-             tileCnt, headTileCnt, headMSize, tailTileCnt, tailMSize);
+    INFO_LOG("TileCnt=%u, HeadTileCnt=%u, HeadMSize=%u, TailTileCnt=%u, TailMSize=%u", tileCnt, headTileCnt, headMSize,
+             tailTileCnt, tailMSize);
 
     ACL_CHECK(aclInit(nullptr));
     int32_t deviceId = rankId;
@@ -159,8 +159,8 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
     HcclCommConfigInit(&config);
     config.hcclWorldRankID = static_cast<uint32_t>(rankId);
     HcclComm comm = nullptr;
-    HCCL_CHECK(HcclCommInitRootInfoConfig(static_cast<uint32_t>(rankNum), &rootInfo,
-                                          static_cast<uint32_t>(rankId), &config, &comm));
+    HCCL_CHECK(HcclCommInitRootInfoConfig(static_cast<uint32_t>(rankNum), &rootInfo, static_cast<uint32_t>(rankId),
+                                          &config, &comm));
     if (comm == nullptr) {
         ERROR_LOG("rank %d HcclCommInitRootInfoConfig failed", rankId);
         return -1;
@@ -171,8 +171,7 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
     const char *ctxTag = "all_to_all_quant_matmul";
 
     CommContext *devContext = reinterpret_cast<CommContext *>(
-        builder.CreateDeviceContext(&hostCtx, sizeof(CommContext), ctxTag,
-                                    &hostCtx.udmaCtx, &hostCtx.ubmemCtx));
+        builder.CreateDeviceContext(&hostCtx, sizeof(CommContext), ctxTag, &hostCtx.udmaCtx, &hostCtx.ubmemCtx));
     if (devContext == nullptr) {
         ERROR_LOG("rank %d CreateDeviceContext failed", rankId);
         return -1;
@@ -184,8 +183,7 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
     std::vector<uint8_t> hostA(m * k, 0);
     std::vector<uint8_t> hostB(k * n, 0);
     std::vector<uint8_t> hostScaleA(m * CeilDiv(k, 64) * 2, 0);
-    std::vector<uint8_t> hostScaleB(
-        CeilDiv(k, 64) * 2 * n, 0);
+    std::vector<uint8_t> hostScaleB(CeilDiv(k, 64) * 2 * n, 0);
     std::vector<uint16_t> hostOutput(m * n, 0);
 
     auto sizeA = static_cast<size_t>(1) * hostA.size() * sizeof(uint8_t);
@@ -230,8 +228,7 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
     ACL_CHECK(aclrtMemcpy(deviceScaleB, sizeScaleB, hostScaleB.data(), sizeScaleB, ACL_MEMCPY_HOST_TO_DEVICE));
 
     if (mode == "precision") {
-        AllToAllQuantMatmulKernelE4M3E4M3_Udma<<<
-            tilingData.tileQbmmTilingData.usedCoreNum, nullptr, stream>>>(
+        AllToAllQuantMatmulKernelE4M3E4M3_Udma<<<tilingData.tileQbmmTilingData.usedCoreNum, nullptr, stream>>>(
             devContext, deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
 
         ACL_CHECK(aclrtSynchronizeStream(stream));
@@ -255,15 +252,14 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
         GM_ADDR cacheFlush = nullptr;
         ACL_CHECK(aclrtMalloc((void **)&cacheFlush, cacheFlushSize, ACL_MEM_MALLOC_HUGE_ONLY));
         std::vector<uint16_t> cacheFlushHost(CACHE_FLUSH_ELEM_COUNT, 0x0000);
-        ACL_CHECK(aclrtMemcpy(
-            cacheFlush, cacheFlushSize, cacheFlushHost.data(), cacheFlushSize, ACL_MEMCPY_HOST_TO_DEVICE));
+        ACL_CHECK(
+            aclrtMemcpy(cacheFlush, cacheFlushSize, cacheFlushHost.data(), cacheFlushSize, ACL_MEMCPY_HOST_TO_DEVICE));
 
         constexpr int PERF_LOOP_COUNT = 10;
         std::vector<double> durations(PERF_LOOP_COUNT);
         for (int i = 0; i < PERF_LOOP_COUNT; ++i) {
             auto t0 = std::chrono::steady_clock::now();
-            AllToAllQuantMatmulKernelE4M3E4M3_Udma<<<
-                tilingData.tileQbmmTilingData.usedCoreNum, nullptr, stream>>>(
+            AllToAllQuantMatmulKernelE4M3E4M3_Udma<<<tilingData.tileQbmmTilingData.usedCoreNum, nullptr, stream>>>(
                 devContext, deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
             auto t1 = std::chrono::steady_clock::now();
             durations[i] = std::chrono::duration<double, std::milli>(t1 - t0).count();
@@ -276,8 +272,8 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
             maxv = std::max(maxv, durations[i]);
         }
         double avg = sum / (PERF_LOOP_COUNT - 1);
-        INFO_LOG("[Rank %d] headMSize=%u tileCnt=%u | per-iter ms: avg=%.3f min=%.3f max=%.3f (excl warmup)",
-                 rankId, headMSize, tileCnt, avg, minv, maxv);
+        INFO_LOG("[Rank %d] headMSize=%u tileCnt=%u | per-iter ms: avg=%.3f min=%.3f max=%.3f (excl warmup)", rankId,
+                 headMSize, tileCnt, avg, minv, maxv);
 
         ACL_CHECK(aclrtSynchronizeStream(stream));
         ACL_CHECK(aclrtMemcpy(hostOutput.data(), sizeOutput, deviceOutput, sizeOutput, ACL_MEMCPY_DEVICE_TO_HOST));
@@ -315,7 +311,8 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    INFO_LOG("Master (PID=%d) will fork %d processes (mode=%s, headMSize=%d)", getpid(), rankNum, mode.c_str(), headMSize);
+    INFO_LOG("Master (PID=%d) will fork %d processes (mode=%s, headMSize=%d)", getpid(), rankNum, mode.c_str(),
+             headMSize);
 
     std::vector<pid_t> pids(rankNum);
     for (int rankId = 0; rankId < rankNum; ++rankId) {

@@ -81,7 +81,6 @@ __attribute__((visibility("default"))) aclnnStatus aclnnQuantMatmulAlltoAll(void
                                                                             aclOpExecutor *executor,
                                                                             aclrtStream stream);
 
-
 #ifdef __cplusplus
 }
 #endif

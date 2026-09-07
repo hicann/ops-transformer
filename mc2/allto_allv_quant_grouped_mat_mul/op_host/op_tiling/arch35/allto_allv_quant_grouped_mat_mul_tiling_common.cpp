@@ -106,8 +106,8 @@ ge::graphStatus AlltoAllvQuantGmmTilingCommon::GetWorkspaceSize()
     uint64_t aGroupOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
     uint64_t xScaleOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
     uint64_t ttScaleRepeatSize = sizeof(float) * e_ * 2;
-    workspaces[0] = libApiWorkSpaceSize_ + permuteOutSize_ + permuteScaleOutSize_ +
-        groupListSize + aGroupOffsetTableSize + xScaleOffsetTableSize + tensorListSize + ttScaleRepeatSize;
+    workspaces[0] = libApiWorkSpaceSize_ + permuteOutSize_ + permuteScaleOutSize_ + groupListSize +
+                    aGroupOffsetTableSize + xScaleOffsetTableSize + tensorListSize + ttScaleRepeatSize;
     OP_LOGD(context_->GetNodeName(), "end GetWorkspaceSize.");
     return ge::GRAPH_SUCCESS;
 }
@@ -165,10 +165,8 @@ ge::graphStatus AlltoAllvQuantGmmTilingCommon::PostTiling()
     uint32_t expertNum = CalcExpertNum(e_, epWorldSize_, bsk_, n1_, packFactor);
     tilingData->taskTilingInfo.expertNum = expertNum;
     tilingData->taskTilingInfo.mainLoopExpertNum = expertNum;
-    tilingData->taskTilingInfo.tailLoopExpertNum =
-        (e_ % expertNum == 0) ? 0 : static_cast<uint32_t>(e_ % expertNum);
-    tilingData->taskTilingInfo.totalLoopCount =
-        static_cast<uint32_t>((e_ + expertNum - 1) / expertNum);
+    tilingData->taskTilingInfo.tailLoopExpertNum = (e_ % expertNum == 0) ? 0 : static_cast<uint32_t>(e_ % expertNum);
+    tilingData->taskTilingInfo.totalLoopCount = static_cast<uint32_t>((e_ + expertNum - 1) / expertNum);
     tilingData->isNeedMM = hasSharedExpertFlag_;
     for (uint32_t i = 0; i < e_ * epWorldSize_; i++) {
         tilingData->taskTilingInfo.sendCnt[i] = sendCounts[i];

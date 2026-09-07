@@ -49,14 +49,14 @@ ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingCheckA
     commQuantMode = 0U;
 
     // 获取入参属性
-    OP_TILING_CHECK(GetAttrAndSetTilingData(context, *tilingData, nodeName, groupEp, groupTp, commQuantMode) ==
-                        ge::GRAPH_FAILED,
-                    OP_LOGE(nodeName, "Getting attr failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        GetAttrAndSetTilingData(context, *tilingData, nodeName, groupEp, groupTp, commQuantMode) == ge::GRAPH_FAILED,
+        OP_LOGE(nodeName, "Getting attr failed."), return ge::GRAPH_FAILED);
 
     // 检查输入输出的dim、format、dataType
-    OP_TILING_CHECK(MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombine(context, nodeName) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Tiling check params failed"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombine(context, nodeName) != ge::GRAPH_SUCCESS,
+        OP_LOGE(nodeName, "Tiling check params failed"), return ge::GRAPH_FAILED);
 
     // 检查属性的取值是否合法
     OP_TILING_CHECK(!CheckAttrs(context, *tilingData, nodeName, localMoeExpertNum),

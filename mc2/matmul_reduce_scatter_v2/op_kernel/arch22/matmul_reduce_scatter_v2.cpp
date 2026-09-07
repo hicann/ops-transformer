@@ -35,12 +35,12 @@ __global__ __aicore__ void matmul_reduce_scatter_v2(GM_ADDR aGM, GM_ADDR bGM, GM
                                                     GM_ADDR amaxOutGM, GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     // aiv算子模板
-#define INVOKE_MMREDUCESCATTER_AIV_MODE_OP_IMPL(templateClass, ...)                                                    \
-    do {                                                                                                               \
-        GET_TILING_DATA_WITH_STRUCT(MatmulReduceScatterV2AivModeTilingData, tilingData, tilingGM);                     \
-        templateClass<DTYPE_X1, DTYPE_X2, DTYPEBIAS, DTYPE_X2_SCALE, DTYPE_Y, __VA_ARGS__> op;                         \
-        op.Init(aGM, bGM, biasGM, x1ScaleGM, x2ScaleGM, cGM, workspaceGM, tilingGM);                                   \
-        op.Process();                                                                                                  \
+#define INVOKE_MMREDUCESCATTER_AIV_MODE_OP_IMPL(templateClass, ...) \
+    do { \
+        GET_TILING_DATA_WITH_STRUCT(MatmulReduceScatterV2AivModeTilingData, tilingData, tilingGM); \
+        templateClass<DTYPE_X1, DTYPE_X2, DTYPEBIAS, DTYPE_X2_SCALE, DTYPE_Y, __VA_ARGS__> op; \
+        op.Init(aGM, bGM, biasGM, x1ScaleGM, x2ScaleGM, cGM, workspaceGM, tilingGM); \
+        op.Process(); \
     } while (0)
 
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);

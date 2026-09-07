@@ -81,7 +81,6 @@ TEST_F(MoeDistributeCombineAddRmsNormTest, MoeDistributeCombineAddRmsNormTest110
     uint8_t *constExpertAlpha2 = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
     uint8_t *constExpertV = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
 
-
     ICPU_SET_TILING_KEY(11000);
     auto moeDistributeCombineAddRmsNormWrapper =
         [](GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine, GM_ADDR epSendCount, GM_ADDR scales,
@@ -178,7 +177,6 @@ TEST_F(MoeDistributeCombineAddRmsNormTest, MoeDistributeCombineAddRmsNormTest101
     uint8_t *constExpertAlpha1 = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
     uint8_t *constExpertAlpha2 = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
     uint8_t *constExpertV = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
-
 
     ICPU_SET_TILING_KEY(10100);
     auto moeDistributeCombineAddRmsNormWrapper =
@@ -373,7 +371,6 @@ TEST_F(MoeDistributeCombineAddRmsNormTest, MoeDistributeCombineAddRmsNormTest111
     uint8_t *constExpertAlpha1 = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
     uint8_t *constExpertAlpha2 = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
     uint8_t *constExpertV = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
-
 
     ICPU_SET_TILING_KEY(11100);
     auto moeDistributeCombineAddRmsNormWrapper =

@@ -97,12 +97,12 @@ static bool QuantAllReduceCheckAllDtypesValid(const aclTensor *x, const aclTenso
     isAllDtypesValid = (QuantAllReduceCheckKGAllDtypesValid(x, scales, output) ||
                         QuantAllReduceCheckMXAllDtypesValid(x, scales, output));
     if (!isAllDtypesValid) {
-        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("aclnnQuantAllReduceGetWorkspaceSize", "x/scales/output",
-                                               (std::string(op::ToString(x->GetDataType()).GetString()) + "/" +
-                                                op::ToString(scales->GetDataType()).GetString() + "/" +
-                                                op::ToString(output->GetDataType()).GetString())
-                                                   .c_str(),
-                                               "The dtypes of x, scales and output must be the same.");
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            "aclnnQuantAllReduceGetWorkspaceSize", "x/scales/output",
+            (std::string(op::ToString(x->GetDataType()).GetString()) + "/" +
+             op::ToString(scales->GetDataType()).GetString() + "/" + op::ToString(output->GetDataType()).GetString())
+                .c_str(),
+            "The dtypes of x, scales and output must be the same.");
     }
     return isAllDtypesValid;
 }

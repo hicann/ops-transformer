@@ -454,11 +454,11 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2HcommTwoShot(const cha
 
 ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2Hcomm()
 {
-    OP_TILING_CHECK(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) ==
-                        mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(args_.geCType).c_str(),
-                                              "FLOAT16, BF16, FLOAT or INT8"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) == mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(args_.geCType).c_str(),
+                                  "FLOAT16, BF16, FLOAT or INT8"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(context_->GetAttrs() == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"),
                     return ge::GRAPH_FAILED);
     const uint32_t reduceType = HcclReduceOp::HCCL_REDUCE_SUM;
@@ -527,18 +527,18 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::CheckAxisSize()
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x2", std::to_string(n).c_str(),
                                                           "The size of n-axis exceeds the upper limit UINT16_MAX"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(isA16W8_ && (antiQuantType_ == AntiQuantType::PER_GROUP) &&
-                        ((n % alignDim != 0) || (k % alignDim != 0)),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        context_->GetNodeName(), "x2", ("k=" + std::to_string(k) + ", n=" + std::to_string(n)).c_str(),
-                        "When the quantization mode is A16W8 or F8 pergroup, K and N of x2 must align to 32"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(isA16W4_ && (antiQuantType_ == AntiQuantType::PER_GROUP) &&
-                        ((n % alignDim != 0) || (k % alignDim != 0)),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        context_->GetNodeName(), "x2", ("k=" + std::to_string(k) + ", n=" + std::to_string(n)).c_str(),
-                        "When the quantization mode is A16W4 pergroup, K and N of x2 must align to 64"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        isA16W8_ && (antiQuantType_ == AntiQuantType::PER_GROUP) && ((n % alignDim != 0) || (k % alignDim != 0)),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "x2", ("k=" + std::to_string(k) + ", n=" + std::to_string(n)).c_str(),
+            "When the quantization mode is A16W8 or F8 pergroup, K and N of x2 must align to 32"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        isA16W4_ && (antiQuantType_ == AntiQuantType::PER_GROUP) && ((n % alignDim != 0) || (k % alignDim != 0)),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "x2", ("k=" + std::to_string(k) + ", n=" + std::to_string(n)).c_str(),
+            "When the quantization mode is A16W4 pergroup, K and N of x2 must align to 64"),
+        return ge::GRAPH_FAILED);
     return CheckWeightQuantEmptyTensor();
 }
 
@@ -637,20 +637,20 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::CheckInput()
                         return ge::GRAPH_FAILED);
     }
     // pergroup场景下不支持fp8和hif8,增加校验
-    OP_TILING_CHECK((antiQuantType_ == AntiQuantType::PER_GROUP) &&
-                        ((x2Type == ge::DT_FLOAT8_E4M3FN) || (x2Type == ge::DT_HIFLOAT8)),
-                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "x2",
-                                              ge::TypeUtils::DataTypeToSerialString(x2Type).c_str(),
-                                              "DT_FLOAT8_E4M3FN and DT_HIFLOAT8 not supported in per-group"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (antiQuantType_ == AntiQuantType::PER_GROUP) &&
+            ((x2Type == ge::DT_FLOAT8_E4M3FN) || (x2Type == ge::DT_HIFLOAT8)),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "x2", ge::TypeUtils::DataTypeToSerialString(x2Type).c_str(),
+                                  "DT_FLOAT8_E4M3FN and DT_HIFLOAT8 not supported in per-group"),
+        return ge::GRAPH_FAILED);
 
     // pertensor场景下不支持fp8和hif8,增加校验
-    OP_TILING_CHECK((antiQuantType_ == AntiQuantType::PER_TENSOR) &&
-                        ((x2Type == ge::DT_FLOAT8_E4M3FN) || (x2Type == ge::DT_HIFLOAT8)),
-                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "x2",
-                                              ge::TypeUtils::DataTypeToSerialString(x2Type).c_str(),
-                                              "DT_FLOAT8_E4M3FN and DT_HIFLOAT8 not supported in per-tensor"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (antiQuantType_ == AntiQuantType::PER_TENSOR) &&
+            ((x2Type == ge::DT_FLOAT8_E4M3FN) || (x2Type == ge::DT_HIFLOAT8)),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "x2", ge::TypeUtils::DataTypeToSerialString(x2Type).c_str(),
+                                  "DT_FLOAT8_E4M3FN and DT_HIFLOAT8 not supported in per-tensor"),
+        return ge::GRAPH_FAILED);
 
     return CheckAxisSize();
 }
@@ -658,8 +658,7 @@ WeightQuantMatmulAllReduceTilingA5::WeightQuantMatmulAllReduceTilingA5(gert::Til
     : MatmulAllReduceTilingBase(context),
       weightQuantMatmulAllReduceA5TilingData_(weightQuantMatmulAllReduceA5TilingDataSelf_),
       weightQuantMatmulAllReduceA5Fp8TilingData_(weightQuantMatmulAllReduceA5Fp8TilingDataSelf_)
-{
-}
+{}
 
 CutResult WeightQuantMatmulAllReduceTilingA5::GetTilingResult()
 {

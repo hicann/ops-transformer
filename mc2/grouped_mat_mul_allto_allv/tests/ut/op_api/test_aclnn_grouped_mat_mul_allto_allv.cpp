@@ -145,11 +145,11 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestSendCountsTensorOptional)
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnGroupedMatMulAlltoAllv,
-                        INPUT(gmmX, gmmWeight, sendCountsTensor, nullptr, nullptr, nullptr,
-                              "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              transGmmWeight, transMmWeight),
-                        OUTPUT(yDesc, nullptr));
+    auto ut = OP_API_UT(
+        aclnnGroupedMatMulAlltoAllv,
+        INPUT(gmmX, gmmWeight, sendCountsTensor, nullptr, nullptr, nullptr, "test_grouped_mat_mul_allto_allv_ep_group",
+              epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
+        OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
@@ -170,11 +170,11 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestRecvCountsTensorOptional)
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnGroupedMatMulAlltoAllv,
-                        INPUT(gmmX, gmmWeight, nullptr, recvCountsTensor, nullptr, nullptr,
-                              "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              transGmmWeight, transMmWeight),
-                        OUTPUT(yDesc, nullptr));
+    auto ut = OP_API_UT(
+        aclnnGroupedMatMulAlltoAllv,
+        INPUT(gmmX, gmmWeight, nullptr, recvCountsTensor, nullptr, nullptr, "test_grouped_mat_mul_allto_allv_ep_group",
+              epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
+        OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
@@ -315,11 +315,11 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestGmmxNull)
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnGroupedMatMulAlltoAllv,
-                        INPUT(nullptr, gmmWeight, nullptr, nullptr, nullptr, nullptr,
-                              "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              transGmmWeight, transMmWeight),
-                        OUTPUT(yDesc, nullptr));
+    auto ut = OP_API_UT(
+        aclnnGroupedMatMulAlltoAllv,
+        INPUT(nullptr, gmmWeight, nullptr, nullptr, nullptr, nullptr, "test_grouped_mat_mul_allto_allv_ep_group",
+              epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
+        OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
@@ -386,11 +386,11 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestMmWeightInvalid)
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnGroupedMatMulAlltoAllv,
-                        INPUT(gmmX, gmmWeight, nullptr, nullptr, nullptr, mmWeight,
-                              "test_grouped_mat_mul_allto_allv_ep_group", epWorldSize, sendCounts, recvCounts,
-                              transGmmWeight, transMmWeight),
-                        OUTPUT(yDesc, nullptr));
+    auto ut = OP_API_UT(
+        aclnnGroupedMatMulAlltoAllv,
+        INPUT(gmmX, gmmWeight, nullptr, nullptr, nullptr, mmWeight, "test_grouped_mat_mul_allto_allv_ep_group",
+              epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
+        OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);

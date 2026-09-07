@@ -272,8 +272,8 @@ void Mc2WeightQuantBatchMatmulV2TilingAS::ComputeCubeSplit(bool highPerfFlag)
             // 分核只够剩下可用核数量一半，尝试切分粒度缩减后再重新切分
             tilingData_->cubeBlockDimM = ops::CeilDiv(matmulInfoPtr_->mSize, static_cast<uint64_t>(M_MAX_SIZE >> 1));
         } else {
-            tilingData_->cubeBlockDimM = (std::min(cubeBlockDimMMax, static_cast<uint32_t>(compileInfoPtr_->aicNum) /
-                                                                         tilingData_->cubeBlockDimN));
+            tilingData_->cubeBlockDimM = (std::min(
+                cubeBlockDimMMax, static_cast<uint32_t>(compileInfoPtr_->aicNum) / tilingData_->cubeBlockDimN));
         }
     } else {
         tilingData_->cubeBlockDimN = std::min(compileInfoPtr_->aicNum, mainBlockCountDefault);

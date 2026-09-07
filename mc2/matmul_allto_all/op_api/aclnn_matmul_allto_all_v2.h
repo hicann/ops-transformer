@@ -55,7 +55,6 @@ __attribute__((visibility("default"))) aclnnStatus aclnnMatmulAlltoAllV2GetWorks
 __attribute__((visibility("default"))) aclnnStatus aclnnMatmulAlltoAllV2(void *workspace, uint64_t workspaceSize,
                                                                          aclOpExecutor *executor, aclrtStream stream);
 
-
 #ifdef __cplusplus
 }
 #endif

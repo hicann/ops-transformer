@@ -54,11 +54,11 @@ bool Mc2WeightQuantBatchMatmulV2TilingCustom::IsCapable()
                      (matmulInfoPtr_->antiQuantScaleDtype == ge::DT_INT64)),
                     OP_LOGI(opName_, "Custom do not support antiquant scale dtype is uint64 and int64"), return false);
     if (matmulInfoPtr_->bFormat == ge::FORMAT_FRACTAL_NZ && matmulInfoPtr_->antiQuantType == Mc2QuantType::PER_GROUP) {
-        OP_TILING_CHECK(matmulInfoPtr_->groupSize != 64 && matmulInfoPtr_->groupSize != 128,
-                        OP_LOGI(opName_,
-                                "Custom Nz only support group_size = 64 or 128 for per-group scene, but is [%lu]",
-                                matmulInfoPtr_->groupSize),
-                        return false);
+        OP_TILING_CHECK(
+            matmulInfoPtr_->groupSize != 64 && matmulInfoPtr_->groupSize != 128,
+            OP_LOGI(opName_, "Custom Nz only support group_size = 64 or 128 for per-group scene, but is [%lu]",
+                    matmulInfoPtr_->groupSize),
+            return false);
         OP_TILING_CHECK(matmulInfoPtr_->kSize % matmulInfoPtr_->groupSize != 0,
                         OP_LOGI(opName_,
                                 "Custom Nz only support kSize align to group_size for per-group scene, "

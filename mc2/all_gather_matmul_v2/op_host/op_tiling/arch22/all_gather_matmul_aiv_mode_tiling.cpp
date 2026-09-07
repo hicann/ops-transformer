@@ -43,7 +43,7 @@ constexpr uint32_t X1_SCALE_INDEX = 3;
 constexpr uint32_t X2_SCALE_INDEX = 4;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16 * 1024 * 1024;
 constexpr uint32_t USER_WORKSPACE_A2 = 1 * 1024 * 1024; // moeExpertNum_ * sizeof(uint32_t) + epWorldSize_ * 2 * 32
-constexpr uint64_t CCL_BUFFER_MIN_BYTES = 200ULL * 1024 * 1024;                 // 校验HCCL BUFF空间大小
+constexpr uint64_t CCL_BUFFER_MIN_BYTES = 200ULL * 1024 * 1024; // 校验HCCL BUFF空间大小
 constexpr uint64_t MB_BYTES = 1024ULL * 1024;
 } // namespace
 
@@ -320,11 +320,11 @@ static ge::graphStatus AllGatherMatmulAIVModeCheckShapeAndSetTiling(gert::Tiling
 
     const auto aType = context->GetInputTensor(A_INDEX)->GetDataType();
     const auto bType = context->GetInputTensor(B_INDEX)->GetDataType();
-    OP_TILING_CHECK(aType != bType,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "x1/x2",
-                                                          Ops::Base::ToString(aType).c_str(),
-                                                          "The dtypes of x1 and x2 must be the same"),
-                    return GRAPH_FAILED);
+    OP_TILING_CHECK(
+        aType != bType,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "x1/x2", Ops::Base::ToString(aType).c_str(),
+                                              "The dtypes of x1 and x2 must be the same"),
+        return GRAPH_FAILED);
 
     if (aType == ge::DT_INT4 && bType == ge::DT_INT4) {
         OP_TILING_CHECK(K % 2 != 0 || N % 2 != 0,
@@ -576,9 +576,9 @@ ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext *context)
     auto cclRet = mc2tiling::GetCclBufferSize(group, &hcclBuffSize, opName);
     if (cclRet == ge::GRAPH_SUCCESS) {
         OP_TILING_CHECK(hcclBuffSize < CCL_BUFFER_MIN_BYTES,
-            OP_LOGE(opName, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
-                hcclBuffSize, CCL_BUFFER_MIN_BYTES, CCL_BUFFER_MIN_BYTES / MB_BYTES),
-            return ge::GRAPH_FAILED);
+                        OP_LOGE(opName, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
+                                hcclBuffSize, CCL_BUFFER_MIN_BYTES, CCL_BUFFER_MIN_BYTES / MB_BYTES),
+                        return ge::GRAPH_FAILED);
     } else {
         OP_LOGW(opName, "Can't get HCCL_BUFFSIZE, skip CCL buffer size validation.");
     }

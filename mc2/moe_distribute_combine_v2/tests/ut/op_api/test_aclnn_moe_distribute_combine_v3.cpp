@@ -65,14 +65,14 @@ TEST_F(L2MoeDistributeCombineV3Test, TestMoeDistributeCombineV3FirstApi)
     TensorDesc constExpertV = TensorDesc({1, 7168}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x = TensorDesc({32, 7168}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnMoeDistributeCombineV3,
-                        INPUT(expandX, expertIds, assistInfo, epSendCounts, expertScales, nullptr, nullptr, nullptr,
-                              nullptr, nullptr, nullptr, nullptr, elasticInfo, oriX, constExpertAlpha1,
-                              constExpertAlpha2, constExpertV, "test_moe_distribute_combine_ep", EP_WORLD_SIZE,
-                              EP_RANK_ID, MOE_EXPERT_NUM, "test_moe_distribute_combine_tp", TP_WORLD_SIZE, TP_RANK_ID,
-                              EXPERT_SHARD_TYPE, SHARED_EXPERT_NUM, SHARED_EXPERT_RANK_NUM, GLOBAL_BS, OUT_DTYPE,
-                              COMM_QUANT_MODE, GROUP_LIST_TYPE, "test", 1, 1, 1),
-                        OUTPUT(x));
+    auto ut = OP_API_UT(
+        aclnnMoeDistributeCombineV3,
+        INPUT(expandX, expertIds, assistInfo, epSendCounts, expertScales, nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
+              "test_moe_distribute_combine_ep", EP_WORLD_SIZE, EP_RANK_ID, MOE_EXPERT_NUM,
+              "test_moe_distribute_combine_tp", TP_WORLD_SIZE, TP_RANK_ID, EXPERT_SHARD_TYPE, SHARED_EXPERT_NUM,
+              SHARED_EXPERT_RANK_NUM, GLOBAL_BS, OUT_DTYPE, COMM_QUANT_MODE, GROUP_LIST_TYPE, "test", 1, 1, 1),
+        OUTPUT(x));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);

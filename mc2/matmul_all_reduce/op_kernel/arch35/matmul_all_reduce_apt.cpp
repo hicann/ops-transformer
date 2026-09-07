@@ -46,10 +46,10 @@ static constexpr Mc2WeightQuantBatchMatmulV2::Arch35::VecAntiQuantConfig VEC_ANT
 } // namespace
 #endif
 
-#if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_INT8)) ||                                                \
-    (((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_HIFLOAT8)) ||                                           \
-     (((ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2)) &&                                    \
-      ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2)))) ||                                  \
+#if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_INT8)) || \
+    (((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_HIFLOAT8)) || \
+     (((ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2)) && \
+      ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2)))) || \
     ((ORIG_DTYPE_X1 == DT_FLOAT4_E2M1) && (ORIG_DTYPE_X2 == DT_FLOAT4_E2M1))
 #include "matmul_all_reduce_quant_pertoken.h"
 #include "matmul_all_reduce_quant_pertoken_comm_int8_arch35.h"
@@ -59,8 +59,7 @@ static constexpr Mc2WeightQuantBatchMatmulV2::Arch35::VecAntiQuantConfig VEC_ANT
 #include "matmul_all_reduce_quant_commfp8_mixed_calc.h"
 #endif
 
-namespace MatmulAllReduceImpl {
-}
+namespace MatmulAllReduceImpl {}
 
 using namespace AscendC;
 using namespace MatmulAllReduceImpl;
@@ -140,8 +139,8 @@ __global__ __aicore__ void quant_matmul_all_reduce(GM_ADDR aGM, GM_ADDR bGM, GM_
         INVOKE_MC2_QUANT_MXFP_910_OP_IMPL(AscendC::MatMulASWKernel, Mc2CoreType::ON_CUBE_AND_VECTOR, APT_A2A_RS_AG,
                                           APT_COMM_MODE, false, true);
     }
-#elif (((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_HIFLOAT8)) ||                                         \
-       (((ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2)) &&                                  \
+#elif (((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_HIFLOAT8)) || \
+       (((ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2)) && \
         ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2))))
 // fp8,hif8和mixfp的场景，bias都是float
 #undef DTYPE_BIAS
@@ -171,11 +170,12 @@ __global__ __aicore__ void quant_matmul_all_reduce(GM_ADDR aGM, GM_ADDR bGM, GM_
 }
 
 template <TPL_APT_PARAMS_COMM, TPL_APT_PARAMS_WEIGHT_QUANT_MM, TPL_APT_A2A_RS_AG, TPL_APT_COMM_MODE>
-__global__ __aicore__ void
-weight_quant_matmul_allreduce(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR addGM, GM_ADDR antiquantScaleGM,
-                              GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM, GM_ADDR pertokenGM,
-                              GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM, GM_ADDR cGM, GM_ADDR workspaceGM,
-                              GM_ADDR tilingGM, TPipe &tPipe, GM_ADDR userWS)
+__global__ __aicore__ void weight_quant_matmul_allreduce(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR addGM,
+                                                         GM_ADDR antiquantScaleGM, GM_ADDR antiquantOffsetGM,
+                                                         GM_ADDR dequantGM, GM_ADDR pertokenGM,
+                                                         GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM,
+                                                         GM_ADDR cGM, GM_ADDR workspaceGM, GM_ADDR tilingGM,
+                                                         TPipe &tPipe, GM_ADDR userWS)
 {
 #if defined(WEIGHT_W4_W8) || defined(WEIGHT_F8)
 #if defined(WEIGHT_W4_W8)

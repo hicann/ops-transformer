@@ -26,7 +26,6 @@ void AllGatherPlusMMV2::PrintEstimateKernelTimeResult(double totalMatmulTime, do
               rankTileNum_);
 }
 
-
 void AllGatherPlusMMV2::EstimateKernelTime()
 {
     SetCommTimeFactor();

@@ -43,60 +43,59 @@
 #endif // ORIG_DTYPE_X1 == DT_INT8 && ORIG_DTYPE_X2 == DT_INT8
 
 #if ((ORIG_DTYPE_X1 == DT_INT8) && (ORIG_DTYPE_Y == DT_BF16))
-#define INVOKE_QUANT_BATCH_MATMUL_DEQUANT_BF16_IMPL_COMM_INT8(templateClass, opTile, opTail, ...)                      \
-    do {                                                                                                               \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::QuantMatmulAllReduceTilingData, msg, msg, tilingGM);                         \
-        if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) {                                  \
-            GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM);         \
-            templateClass<DTYPE_X1, DTYPE_X2, FORMAT_X1, FORMAT_X2, DTYPE_Y, DTYPE_Y, int8_t, __VA_ARGS__> matmulOp;   \
-            const Mc2Tiling::QuantMatmulAllReduceTilingData *quantMmrTilingPtr = &tilingDataLocal;                     \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling);           \
-            const AscendC::tiling::TCubeTiling *mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling);                    \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling);       \
-            const AscendC::tiling::TCubeTiling *mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling);                \
-            REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTilePtr, opTail.mm, mmTilingTailPtr);   \
-            matmulOp.Init(aGM, bGM, biasGM, addGM, dequantGM, commQuantScale1GM, commQuantScale2GM, cGM, userWS,       \
-                          &tilingDataLocal, &tPipe);                                                                   \
-            matmulOp.Process(opTile, opTail);                                                                          \
-            tPipe.Destroy();                                                                                           \
-        }                                                                                                              \
+#define INVOKE_QUANT_BATCH_MATMUL_DEQUANT_BF16_IMPL_COMM_INT8(templateClass, opTile, opTail, ...) \
+    do { \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::QuantMatmulAllReduceTilingData, msg, msg, tilingGM); \
+        if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
+            GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM); \
+            templateClass<DTYPE_X1, DTYPE_X2, FORMAT_X1, FORMAT_X2, DTYPE_Y, DTYPE_Y, int8_t, __VA_ARGS__> matmulOp; \
+            const Mc2Tiling::QuantMatmulAllReduceTilingData *quantMmrTilingPtr = &tilingDataLocal; \
+            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling); \
+            const AscendC::tiling::TCubeTiling *mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling); \
+            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling); \
+            const AscendC::tiling::TCubeTiling *mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling); \
+            REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTilePtr, opTail.mm, mmTilingTailPtr); \
+            matmulOp.Init(aGM, bGM, biasGM, addGM, dequantGM, commQuantScale1GM, commQuantScale2GM, cGM, userWS, \
+                          &tilingDataLocal, &tPipe); \
+            matmulOp.Process(opTile, opTail); \
+            tPipe.Destroy(); \
+        } \
     } while (0)
 #endif // (ORIG_DTYPE_X1 == DT_INT8) && (ORIG_DTYPE_Y == DT_BF16)
 
 #if ((ORIG_DTYPE_X1 == DT_INT8) && (ORIG_DTYPE_Y == DT_FLOAT16))
-#define INVOKE_QUANT_BMM_DEQUANT_FP16_IMPL_COMM_INT8(templateClass, ...)                                               \
-    do {                                                                                                               \
-        GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM);             \
-        templateClass<DTYPE_X1, DTYPE_X2, int32_t, DTYPE_Y, int8_t, __VA_ARGS__> op;                                   \
-        op.Init(aGM, bGM, dequantGM, biasGM, addGM, cGM, workspaceGM, &tilingDataLocal, &tPipe);                       \
-        op.InitScale(commQuantScale1GM, commQuantScale2GM);                                                            \
-        op.Process();                                                                                                  \
+#define INVOKE_QUANT_BMM_DEQUANT_FP16_IMPL_COMM_INT8(templateClass, ...) \
+    do { \
+        GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM); \
+        templateClass<DTYPE_X1, DTYPE_X2, int32_t, DTYPE_Y, int8_t, __VA_ARGS__> op; \
+        op.Init(aGM, bGM, dequantGM, biasGM, addGM, cGM, workspaceGM, &tilingDataLocal, &tPipe); \
+        op.InitScale(commQuantScale1GM, commQuantScale2GM); \
+        op.Process(); \
     } while (0)
 #endif
 
 #if ((ORIG_DTYPE_X1 == DT_INT8) && (ORIG_DTYPE_X2 == DT_INT8))
-#define INVOKE_QUANT_BATCH_MATMUL_DEQUANT_PERTOKEN_COMM_INT8_IMPL(templateClass, scaleType, opTile, opTail, ...)       \
-    do {                                                                                                               \
-        GET_TILING_DATA_MEMBER(Mc2Tiling::QuantMatmulAllReduceTilingData, msg, msg, tilingGM);                         \
-        if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) {                                  \
-            GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM);         \
+#define INVOKE_QUANT_BATCH_MATMUL_DEQUANT_PERTOKEN_COMM_INT8_IMPL(templateClass, scaleType, opTile, opTail, ...) \
+    do { \
+        GET_TILING_DATA_MEMBER(Mc2Tiling::QuantMatmulAllReduceTilingData, msg, msg, tilingGM); \
+        if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
+            GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM); \
             templateClass<DTYPE_X1, DTYPE_X2, FORMAT_X1, FORMAT_X2, scaleType, DTYPE_Y, int8_t, __VA_ARGS__> matmulOp; \
-            const Mc2Tiling::QuantMatmulAllReduceTilingData *quantMmrTilingPtr = &tilingDataLocal;                     \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling);           \
-            const AscendC::tiling::TCubeTiling *mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling);                    \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling);       \
-            const AscendC::tiling::TCubeTiling *mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling);                \
-            REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTilePtr, opTail.mm, mmTilingTailPtr);   \
-            matmulOp.Init(aGM, bGM, biasGM, addGM, dequantGM, pertokenGM, commQuantScale1GM, commQuantScale2GM, cGM,   \
-                          userWS, &tilingDataLocal, &tPipe);                                                           \
-            matmulOp.Process(opTile, opTail);                                                                          \
-            tPipe.Destroy();                                                                                           \
-        }                                                                                                              \
+            const Mc2Tiling::QuantMatmulAllReduceTilingData *quantMmrTilingPtr = &tilingDataLocal; \
+            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling); \
+            const AscendC::tiling::TCubeTiling *mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling); \
+            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling); \
+            const AscendC::tiling::TCubeTiling *mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling); \
+            REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTilePtr, opTail.mm, mmTilingTailPtr); \
+            matmulOp.Init(aGM, bGM, biasGM, addGM, dequantGM, pertokenGM, commQuantScale1GM, commQuantScale2GM, cGM, \
+                          userWS, &tilingDataLocal, &tPipe); \
+            matmulOp.Process(opTile, opTail); \
+            tPipe.Destroy(); \
+        } \
     } while (0)
 #endif
 
-namespace MatmulAllReduceImpl {
-}
+namespace MatmulAllReduceImpl {}
 
 using namespace AscendC;
 using namespace Mc2Tiling;

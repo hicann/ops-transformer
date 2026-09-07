@@ -138,11 +138,11 @@ TEST_F(L2AlltoAllvGroupedMatMulTest, TestGmmxNull)
     bool transMmWeight = false;
     bool permuteOutFlag = false;
     TensorDesc gmmY_desc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnAlltoAllvGroupedMatMul,
-                        INPUT(nullptr, gmmWeight, nullptr, nullptr, nullptr, nullptr,
-                              "test_allto_allv_grouped_mat_mul_ep_group", epWorldSize, sendCounts, recvCounts,
-                              transGmmWeight, transMmWeight, permuteOutFlag),
-                        OUTPUT(gmmY_desc, nullptr, nullptr));
+    auto ut = OP_API_UT(
+        aclnnAlltoAllvGroupedMatMul,
+        INPUT(nullptr, gmmWeight, nullptr, nullptr, nullptr, nullptr, "test_allto_allv_grouped_mat_mul_ep_group",
+              epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight, permuteOutFlag),
+        OUTPUT(gmmY_desc, nullptr, nullptr));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);

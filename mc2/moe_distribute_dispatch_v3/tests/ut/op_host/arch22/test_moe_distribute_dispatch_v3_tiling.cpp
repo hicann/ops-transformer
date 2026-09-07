@@ -270,7 +270,6 @@ TEST_F(MoeDistributeDispatchV3Arch22TilingTest, Test4)
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
 }
 
-
 // normal: share rank
 TEST_F(MoeDistributeDispatchV3Arch22TilingTest, Test5)
 {
@@ -553,7 +552,6 @@ TEST_F(MoeDistributeDispatchV3Arch22TilingTest, Test10)
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
 }
 
-
 // normal: share rank
 TEST_F(MoeDistributeDispatchV3Arch22TilingTest, EpWorldSize384)
 {
@@ -647,7 +645,6 @@ TEST_F(MoeDistributeDispatchV3Arch22TilingTest, EpWorldSize72)
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
 }
-
 
 // normal: share rank
 TEST_F(MoeDistributeDispatchV3Arch22TilingTest, XActiveMask2dims)

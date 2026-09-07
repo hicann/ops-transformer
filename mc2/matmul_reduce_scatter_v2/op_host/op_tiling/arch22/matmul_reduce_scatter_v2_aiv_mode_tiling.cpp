@@ -39,7 +39,7 @@ constexpr uint32_t X1_SCALE_INDEX = 3;
 constexpr uint32_t X2_SCALE_INDEX = 4;
 constexpr uint32_t C_INDEX = 0;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16 * 1024 * 1024;
-constexpr uint32_t USER_WORKSPACE_A2 = 1 * 1024 * 1024;         // moeExpertNum_ * sizeof(uint32_t) + epWorldSize_ * 2 * 32
+constexpr uint32_t USER_WORKSPACE_A2 = 1 * 1024 * 1024; // moeExpertNum_ * sizeof(uint32_t) + epWorldSize_ * 2 * 32
 constexpr uint64_t CCL_BUFFER_MIN_BYTES = 200ULL * 1024 * 1024; // 校验HCCL BUFF空间大小
 constexpr uint32_t MB_BYTES = 1024 * 1024;
 constexpr uint64_t TILINGKEY_BIAS = 1U;
@@ -1051,8 +1051,7 @@ void GetUsrWorkSpaceSize(uint32_t elementSize, uint32_t numBlocks, uint64_t &use
     userWorkSpaceSize += info.dequantSize;
     if (needCastBias) {
         const uint64_t biasBytes = static_cast<uint64_t>(info.N) * sizeof(float);
-        info.biasCastSize =
-            (biasBytes + HALF_KBYTE - 1) & ~(static_cast<uint64_t>(HALF_KBYTE) - 1);
+        info.biasCastSize = (biasBytes + HALF_KBYTE - 1) & ~(static_cast<uint64_t>(HALF_KBYTE) - 1);
         userWorkSpaceSize += info.biasCastSize;
     }
 }
@@ -1180,8 +1179,8 @@ ge::graphStatus MatmulReduceScatterTilingV2AivModeFunc(gert::TilingContext *cont
     info.quantFlag =
         (aType == ge::DT_INT8) && (bType == ge::DT_INT8) && (cType == ge::DT_BF16 || cType == ge::DT_FLOAT16);
     const auto biasDesc = context->GetOptionalInputDesc(BIAS_INDEX);
-    const bool needCastBias = !info.quantFlag && aType == ge::DT_BF16 && bType == ge::DT_BF16 &&
-                              biasDesc != nullptr && biasDesc->GetDataType() == ge::DT_BF16;
+    const bool needCastBias = !info.quantFlag && aType == ge::DT_BF16 && bType == ge::DT_BF16 && biasDesc != nullptr &&
+                              biasDesc->GetDataType() == ge::DT_BF16;
 
     // 3. 配置平台信息，GetTilingKey
     info.is910C = false;

@@ -610,7 +610,10 @@ ge::graphStatus TilingParseForMoeDistributeCombine(gert::TilingParseContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeCombineTilingBase::DoOpTiling() { return MoeDistributeCombineTilingFunc(context_); }
+ge::graphStatus MoeDistributeCombineTilingBase::DoOpTiling()
+{
+    return MoeDistributeCombineTilingFunc(context_);
+}
 
 ge::graphStatus MoeDistributeCombineTiling(gert::TilingContext *context)
 {
@@ -626,7 +629,10 @@ uint64_t MoeDistributeCombineTilingBase::GetTilingKey() const
     return tilingKey;
 }
 
-bool MoeDistributeCombineTilingBase::IsCapable() { return true; }
+bool MoeDistributeCombineTilingBase::IsCapable()
+{
+    return true;
+}
 
 IMPL_OP_OPTILING(MoeDistributeCombine)
     .Tiling(MoeDistributeCombineTiling)

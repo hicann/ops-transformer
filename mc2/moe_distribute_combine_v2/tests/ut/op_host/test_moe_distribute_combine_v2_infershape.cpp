@@ -62,7 +62,6 @@ TEST_F(MoeDistributeCombineV2Infershape, InferShape0)
     Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expertOutputShape);
 }
 
-
 TEST_F(MoeDistributeCombineV2Infershape, InferDtype0)
 {
     ge::DataType expandXType = ge::DT_FLOAT16;

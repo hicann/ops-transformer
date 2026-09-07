@@ -37,19 +37,18 @@ CutResult MatmulReduceScatterTilingFuncA2A3::GetCutResult(MatmulReduceScatterTil
     return scatterTilingHccl.tilingM_.cutRes;
 }
 
-ge::graphStatus
-MatmulReduceScatterTilingFuncA2A3::CheckValidRank(const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK,
-                                                  MatmulReduceScatterTilingData *tilingData,
-                                                  gert::TilingContext *context, uint32_t rankSize)
+ge::graphStatus MatmulReduceScatterTilingFuncA2A3::CheckValidRank(
+    const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK, MatmulReduceScatterTilingData *tilingData,
+    gert::TilingContext *context, uint32_t rankSize)
 {
     // distinguish between 910A2 and 910A3
     auto it = std::find(VALID_RANK.at(tilingData->socParam.isA3).begin(),
                         VALID_RANK.at(tilingData->socParam.isA3).end(), rankSize);
-    OP_TILING_CHECK(it == VALID_RANK.at(tilingData->socParam.isA3).end(),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "world_size",
-                                                          std::to_string(rankSize).c_str(),
-                                                          "The value of world_size is illegal"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        it == VALID_RANK.at(tilingData->socParam.isA3).end(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "world_size", std::to_string(rankSize).c_str(),
+                                              "The value of world_size is illegal"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

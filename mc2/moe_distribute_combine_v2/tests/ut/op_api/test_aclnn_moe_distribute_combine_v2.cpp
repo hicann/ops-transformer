@@ -24,7 +24,6 @@
 #include "op_api_ut_common/op_api_ut.h"
 #include "opdev/platform.h"
 
-
 using namespace op;
 using namespace std;
 
@@ -137,13 +136,13 @@ TEST_F(L2MoeDistributeCombineV2Test, TestMoeDistributeCombineFirstApi)
 
     TensorDesc x = TensorDesc({32, 7168}, ACL_FLOAT16, ACL_FORMAT_ND);
 
-    auto ut = OP_API_UT(aclnnMoeDistributeCombineV2,
-                        INPUT(expandX, expertIds, expandIdx, epSendCounts, expertScales, tpSendCounts, xActiveMask,
-                              activationScale, weightScale, groupList, expandScales, sharedExpertX,
-                              "test_moe_distribute_combine_ep", epWorldSize, epRankId, moeExpertNum,
-                              "test_moe_distribute_combine_tp", tpWorldSize, tpRankId, expertShardType, sharedExpertNum,
-                              sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType, "test"),
-                        OUTPUT(x));
+    auto ut = OP_API_UT(
+        aclnnMoeDistributeCombineV2,
+        INPUT(expandX, expertIds, expandIdx, epSendCounts, expertScales, tpSendCounts, xActiveMask, activationScale,
+              weightScale, groupList, expandScales, sharedExpertX, "test_moe_distribute_combine_ep", epWorldSize,
+              epRankId, moeExpertNum, "test_moe_distribute_combine_tp", tpWorldSize, tpRankId, expertShardType,
+              sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType, "test"),
+        OUTPUT(x));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);

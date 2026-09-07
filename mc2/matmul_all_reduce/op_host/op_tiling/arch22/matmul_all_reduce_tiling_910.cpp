@@ -183,11 +183,11 @@ ge::graphStatus MatmulAllReduceTiling910::CheckInputDtype()
 {
     // x2 shape 为 2 维
     size_t x2DimNum = mmrCtxInfo_.x2_shape->GetStorageShape().GetDimNum();
-    OP_TILING_CHECK(x2DimNum != DIM_NUM_TWO,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x2",
-                                                             (std::to_string(x2DimNum) + "D").c_str(),
-                                                             "The shape dim of x2 must be 2"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        x2DimNum != DIM_NUM_TWO,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context_->GetNodeName(), "x2", (std::to_string(x2DimNum) + "D").c_str(), "The shape dim of x2 must be 2"),
+        return ge::GRAPH_FAILED);
     auto x1Type = mmrCtxInfo_.x1->GetDataType();
     //  x1 为fp16 或者bf16
     OP_TILING_CHECK(!((x1Type == ge::DT_FLOAT16) || (x1Type == ge::DT_BF16)),
@@ -270,15 +270,15 @@ ge::graphStatus MatmulAllReduceTiling910::CheckInput()
 }
 
 MatmulAllReduceTiling910::MatmulAllReduceTiling910(gert::TilingContext *context)
-    : MatmulAllReduceTilingBase(context), matmulAllReduce910TilingData_(matmulAllReduce910TilingDataSelf_)
-{
-}
+    : MatmulAllReduceTilingBase(context),
+      matmulAllReduce910TilingData_(matmulAllReduce910TilingDataSelf_)
+{}
 
 MatmulAllReduceTiling910::MatmulAllReduceTiling910(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
                                                    MatmulAllReduce910TilingData *out)
-    : MatmulAllReduceTilingBase(context, mmrCtxInfo), matmulAllReduce910TilingData_(*out)
-{
-}
+    : MatmulAllReduceTilingBase(context, mmrCtxInfo),
+      matmulAllReduce910TilingData_(*out)
+{}
 
 ge::graphStatus TilingTransferHelper::GetShapeAttrsInfo()
 {
@@ -320,9 +320,9 @@ MatmulTPLParam TilingTransferHelper::GetMatmulTPLParam()
 
 TilingTransferHelper::TilingTransferHelper(MatmulAllReduceTiling910 &matmulAllReduceTiling910,
                                            Mc2MatmulV3TilingData &data)
-    : Mc2MatmulV3BaseTiling(matmulAllReduceTiling910.context_, &data), tilingProcesser_(matmulAllReduceTiling910)
-{
-}
+    : Mc2MatmulV3BaseTiling(matmulAllReduceTiling910.context_, &data),
+      tilingProcesser_(matmulAllReduceTiling910)
+{}
 
 CutResult MatmulAllReduceTiling910::GetTilingResult()
 {
@@ -343,7 +343,6 @@ CutResult MatmulAllReduceTiling910::GetTilingResult()
     }
     return mCutAllreduce;
 }
-
 
 // 注册Tiling类
 REGISTER_TILING_TEMPLATE_WITH_SOCVERSION(MatmulAllReduce, MatmulAllReduceTiling910,

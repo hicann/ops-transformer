@@ -351,25 +351,25 @@ bool Mc2WeightQuantBatchMatmulV2WeightNz::AnalyzeDtype()
     auto antiQuantScaleDtype = context_->GetInputDesc(idx++)->GetDataType();
     auto antiQuantOffsetDesc = context_->GetOptionalInputDesc(idx++);
     auto biasDesc = context_->GetOptionalInputDesc(BIAS_INDEX);
-    OP_TILING_CHECK((inputParams_.aDtype != ge::DT_FLOAT16),
-                    OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "x",
-                                              ge::TypeUtils::DataTypeToAscendString(inputParams_.aDtype).GetString(),
-                                              "DT_FLOAT16"),
-                    return false);
+    OP_TILING_CHECK(
+        (inputParams_.aDtype != ge::DT_FLOAT16),
+        OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "x",
+                                  ge::TypeUtils::DataTypeToAscendString(inputParams_.aDtype).GetString(), "DT_FLOAT16"),
+        return false);
 
     inputParams_.cDtype = context_->GetOutputDesc(0)->GetDataType();
-    OP_TILING_CHECK((inputParams_.bDtype != ge::DT_INT8),
-                    OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "weight",
-                                              ge::TypeUtils::DataTypeToAscendString(inputParams_.bDtype).GetString(),
-                                              "DT_INT8"),
-                    return false);
+    OP_TILING_CHECK(
+        (inputParams_.bDtype != ge::DT_INT8),
+        OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "weight",
+                                  ge::TypeUtils::DataTypeToAscendString(inputParams_.bDtype).GetString(), "DT_INT8"),
+        return false);
 
-    OP_TILING_CHECK((inputParams_.cDtype != inputParams_.aDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "y",
-                        ge::TypeUtils::DataTypeToAscendString(inputParams_.cDtype).GetString(),
-                        "The dtype of y must be the same as x or DT_INT8 if quant param is provided."),
-                    return false);
+    OP_TILING_CHECK(
+        (inputParams_.cDtype != inputParams_.aDtype),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            inputParams_.opName, "y", ge::TypeUtils::DataTypeToAscendString(inputParams_.cDtype).GetString(),
+            "The dtype of y must be the same as x or DT_INT8 if quant param is provided."),
+        return false);
     return AnalyzeBiasDtype(biasDesc) && AnalyzeAntiQuantDtype(antiQuantScaleDtype, antiQuantOffsetDesc);
 }
 
@@ -461,11 +461,11 @@ bool Mc2WeightQuantBatchMatmulV2WeightNz::AnalyzeBiasShape(const gert::StorageSh
                     inputParams_.opName, "bias", Ops::Base::ToString(biasShape->GetStorageShape()).c_str(),
                     (std::string("size should be ") + std::to_string(inputParams_.nSize) + " or zero").c_str()),
                 return false);
-            OP_TILING_CHECK(biasShape->GetStorageShape().GetDimNum() > 1 && biasShape->GetStorageShape().GetDim(0) != 1,
-                            OP_LOGE_FOR_INVALID_SHAPE(inputParams_.opName, "bias",
-                                                      Ops::Base::ToString(biasShape->GetStorageShape()).c_str(),
-                                                      "[1, n] or [n,]"),
-                            return false);
+            OP_TILING_CHECK(
+                biasShape->GetStorageShape().GetDimNum() > 1 && biasShape->GetStorageShape().GetDim(0) != 1,
+                OP_LOGE_FOR_INVALID_SHAPE(inputParams_.opName, "bias",
+                                          Ops::Base::ToString(biasShape->GetStorageShape()).c_str(), "[1, n] or [n,]"),
+                return false);
         } else {
             inputParams_.biasWithBatch = true;
             auto outDims = outShape->GetStorageShape().GetDimNum();
@@ -544,11 +544,11 @@ bool Mc2WeightQuantBatchMatmulV2WeightNz::AnalyzeInputShape(const gert::StorageS
     auto weightDims = weightStorageShape.GetDimNum();
     auto outDims = outStorageShape.GetDimNum();
 
-    OP_TILING_CHECK((xDims < MM_SHAPE_LEN_ND_MIN || xDims > MM_SHAPE_LEN_ND_MAX),
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "x",
-                                                             (std::to_string(xDims) + "D").c_str(),
-                                                             "The shape dim of x must be >=2 and <=6."),
-                    return false);
+    OP_TILING_CHECK(
+        (xDims < MM_SHAPE_LEN_ND_MIN || xDims > MM_SHAPE_LEN_ND_MAX),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "x", (std::to_string(xDims) + "D").c_str(),
+                                                 "The shape dim of x must be >=2 and <=6."),
+        return false);
     inputParams_.mSize =
         static_cast<uint64_t>(inputParams_.transA ? xShape->GetStorageShape().GetDim(xDims - 1) :
                                                     xShape->GetStorageShape().GetDim(xDims - MM_SHAPE_LEN_ND));

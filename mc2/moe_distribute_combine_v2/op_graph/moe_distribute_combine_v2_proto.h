@@ -19,7 +19,6 @@
 
 namespace ge {
 
-
 /**
 * @brief MoeDistributeCombineV2 operator interface implementation.
 
@@ -103,8 +102,6 @@ REG_OP(MoeDistributeCombineV2)
     .ATTR(const_expert_num, Int, 0)
     .OP_END_FACTORY_REG(MoeDistributeCombineV2)
 
-
 } // namespace ge
-
 
 #endif // MOE_DISTRIBUTE_COMBINE_V2_PROTO_H_

@@ -188,7 +188,6 @@ protected:
 //     EXPECT_EQ(contextHolder.GetContext<gert::InferDataTypeContext>()->GetOutputDataType(0), x1Type);
 // }
 
-
 // TEST_F(MatmulReduceScatterV2InferDTypeTest, y_dtype_equal_x1_dtype_bf16)
 // {
 //     ge::DataType x1Type = ge::DT_BF16;

@@ -69,8 +69,8 @@ ge::graphStatus AlltoAllvTTQuantGmmTiling::DoGmmTiling(uint64_t gmmxMSzie)
     return ge::GRAPH_SUCCESS;
 }
 
-void AlltoAllvTTQuantGmmTiling::SetGMMQuantParams(
-    Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData, uint32_t groupNum) const
+void AlltoAllvTTQuantGmmTiling::SetGMMQuantParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
+                                                  uint32_t groupNum) const
 {
     gmmQuantTilingData.gmmQuantParams.groupNum = groupNum;
     gmmQuantTilingData.gmmQuantParams.activeType = GMM_ACT_TYPE_NONE;
@@ -85,16 +85,14 @@ void AlltoAllvTTQuantGmmTiling::SetGMMQuantParams(
     gmmQuantTilingData.gmmQuantParams.reserved = 0;
 }
 
-void AlltoAllvTTQuantGmmTiling::SetTilingArray(
-    Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
-    uint64_t M, uint64_t N, uint64_t K, uint32_t groupNum) const
+void AlltoAllvTTQuantGmmTiling::SetTilingArray(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
+                                               uint64_t M, uint64_t N, uint64_t K, uint32_t groupNum) const
 {
     constexpr uint32_t MAX_TENSOR_CONT = 128U;
     OP_TILING_CHECK(groupNum > MAX_TENSOR_CONT,
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "groupNum",
-            std::to_string(groupNum).c_str(),
-            (std::string("<=") + std::to_string(MAX_TENSOR_CONT)).c_str()),
-        return);
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "groupNum", std::to_string(groupNum).c_str(),
+                                              (std::string("<=") + std::to_string(MAX_TENSOR_CONT)).c_str()),
+                    return);
     for (uint32_t i = 0; i < groupNum; i++) {
         gmmQuantTilingData.gmmArray.mList[i] = static_cast<int32_t>(M);
     }
@@ -305,18 +303,18 @@ ge::graphStatus AlltoAllvTTQuantGmmTiling::CheckInputDtype() const
                     return ge::GRAPH_FAILED);
     // check gmmWeight datatype
     ge::DataType gmmWeightDataType = context_->GetInputDesc(GMM_WEIGHT_INDEX)->GetDataType();
-    OP_TILING_CHECK(gmmWeightDataType != ge::DT_HIFLOAT8,
-                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "gmmWeight",
-                                              ge::TypeUtils::DataTypeToSerialString(gmmWeightDataType).c_str(),
-                                              "hifloat8"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        gmmWeightDataType != ge::DT_HIFLOAT8,
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "gmmWeight",
+                                  ge::TypeUtils::DataTypeToSerialString(gmmWeightDataType).c_str(), "hifloat8"),
+        return ge::GRAPH_FAILED);
     // check gmmY dataType
     ge::DataType gmmYDataType = context_->GetOutputDesc(OUTPUT_GMM_Y_INDEX)->GetDataType();
-    OP_TILING_CHECK(gmmYDataType != ge::DT_FLOAT16 && gmmYDataType != ge::DT_BF16,
-                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "gmmY",
-                                              ge::TypeUtils::DataTypeToSerialString(gmmYDataType).c_str(),
-                                              "float16 or bfloat16"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        gmmYDataType != ge::DT_FLOAT16 && gmmYDataType != ge::DT_BF16,
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "gmmY",
+                                  ge::TypeUtils::DataTypeToSerialString(gmmYDataType).c_str(), "float16 or bfloat16"),
+        return ge::GRAPH_FAILED);
     if (permuteOutFlag_) {
         // check permuteOut dtype
         ge::DataType permuteOutDataType = context_->GetOutputDesc(OUTPUT_PERMUTE_OUT_INDEX)->GetDataType();

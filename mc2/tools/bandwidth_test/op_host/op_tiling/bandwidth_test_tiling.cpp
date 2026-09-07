@@ -202,11 +202,11 @@ static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const
                     return ge::GRAPH_FAILED);
 
     const int64_t dstRankIdDim0 = dstRankIdStorageShape->GetStorageShape().GetDim(0);
-    OP_TILING_CHECK(dstRankIdDim0 != xDim0,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "dst_rank_id",
-                                                          std::to_string(dstRankIdDim0).c_str(),
-                                                          "The dim0 of dst_rank_id must be the same as that of x"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        dstRankIdDim0 != xDim0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "dst_rank_id", std::to_string(dstRankIdDim0).c_str(),
+                                              "The dim0 of dst_rank_id must be the same as that of x"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -251,11 +251,11 @@ static ge::graphStatus CheckOutputTensorShape(gert::TilingContext *context, cons
                     return ge::GRAPH_FAILED);
 
     const int64_t receiveCntDim0 = receiveCntStorageShape->GetStorageShape().GetDim(0);
-    OP_TILING_CHECK(receiveCntDim0 != worldSize,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "receive_cnt",
-                                                          std::to_string(receiveCntDim0).c_str(),
-                                                          "The dim0 of receive_cnt must be the same as worldSize"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        receiveCntDim0 != worldSize,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "receive_cnt", std::to_string(receiveCntDim0).c_str(),
+                                              "The dim0 of receive_cnt must be the same as worldSize"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

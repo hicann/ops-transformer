@@ -178,12 +178,12 @@ void Mc2WeightQuantBatchMatmulV2BasicBlockTiling::SetQuantType(Mc2QuantType anti
 bool Mc2WeightQuantBatchMatmulV2BasicBlockTiling::ValidateInputParam() const
 {
     OP_TILING_CHECK(basicBlockParam_.mSize <= 0 || basicBlockParam_.nSize <= 0 || basicBlockParam_.kSize <= 0,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "shape size",
-                                                          (std::to_string(basicBlockParam_.mSize) + ", " +
-                                                           std::to_string(basicBlockParam_.nSize) + ", " +
-                                                           std::to_string(basicBlockParam_.kSize))
-                                                              .c_str(),
-                                                          "The value of shape size must be greater than 0."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "shape size",
+                        (std::to_string(basicBlockParam_.mSize) + ", " + std::to_string(basicBlockParam_.nSize) + ", " +
+                         std::to_string(basicBlockParam_.kSize))
+                            .c_str(),
+                        "The value of shape size must be greater than 0."),
                     return false);
 
     OP_TILING_CHECK(basicBlockParam_.aDtypeBits <= 0 || basicBlockParam_.bDtypeBits <= 0 ||
@@ -197,13 +197,13 @@ bool Mc2WeightQuantBatchMatmulV2BasicBlockTiling::ValidateInputParam() const
                                                           "The value of dtypeBits must be greater than 0."),
                     return false);
 
-    OP_TILING_CHECK(basicBlockParam_.groupSize < 0 || basicBlockParam_.groupSize >= basicBlockParam_.kSize,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "groupSize",
-                                                          std::to_string(basicBlockParam_.groupSize).c_str(),
-                                                          (std::string("The value of groupSize must be >= 0 and < K(") +
-                                                           std::to_string(basicBlockParam_.kSize) + ").")
-                                                              .c_str()),
-                    return false);
+    OP_TILING_CHECK(
+        basicBlockParam_.groupSize < 0 || basicBlockParam_.groupSize >= basicBlockParam_.kSize,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "groupSize", std::to_string(basicBlockParam_.groupSize).c_str(),
+                                              (std::string("The value of groupSize must be >= 0 and < K(") +
+                                               std::to_string(basicBlockParam_.kSize) + ").")
+                                                  .c_str()),
+        return false);
 
     return true;
 }
@@ -509,17 +509,17 @@ void Mc2WeightQuantBatchMatmulV2BasicBlockTiling::GetL1Param(bool isCubeBoundSol
     if (basicBlockParam_.groupSize > 0) {
         int64_t a1BufferNumMax =
             (basicBlockParam_.bDtypeBits == BITS_4 && basicBlockParam_.weightNzFlag) ? BUFF_NUM_4 : BUFF_NUM_2;
-        a1BufferNum = std::min(CeilDiv(stepKMax, stepKaTmp) *
-                                   CeilDiv(basicBlockParam_.singleM, basicBlockParam_.basicBlock.baseM),
-                               a1BufferNumMax);
+        a1BufferNum = std::min(
+            CeilDiv(stepKMax, stepKaTmp) * CeilDiv(basicBlockParam_.singleM, basicBlockParam_.basicBlock.baseM),
+            a1BufferNumMax);
         if (CeilDiv(basicBlockParam_.singleM, basicBlockParam_.basicBlock.baseM) == 1 &&
             CeilDiv(stepKMax, stepKaTmp) <= a1BufferNumMax) {
             a1BufferNum = 1;
             stepKaTmp = stepKMax;
         }
-        b1BufferNum = std::min(CeilDiv(stepKMax, stepKbTmp) *
-                                   CeilDiv(basicBlockParam_.singleN, basicBlockParam_.basicBlock.baseN),
-                               BUFF_NUM_4);
+        b1BufferNum = std::min(
+            CeilDiv(stepKMax, stepKbTmp) * CeilDiv(basicBlockParam_.singleN, basicBlockParam_.basicBlock.baseN),
+            BUFF_NUM_4);
         // 在NK-per-group且K较小场景（K<1024），将cube
         // bound解改为kBL1全载解，以保证scale/offset内轴全载，避免其MTE2性能劣化
         if (isCubeBoundSolution && !basicBlockParam_.weightNzFlag && basicBlockParam_.groupSize > 0 &&
@@ -806,17 +806,17 @@ void Mc2WeightQuantBatchMatmulV2BasicBlockTiling::PrintFinalResult(const BasicBl
 
 bool Mc2WeightQuantBatchMatmulV2BasicBlockTiling::ValidateTilingResult() const
 {
-    OP_TILING_CHECK(basicBlockParam_.mDim * basicBlockParam_.nDim * basicBlockParam_.kDim > platformParam_.blockNum,
-                    OP_LOGE(opName_, "Invalid block dim, mDim: %ld, nDim: %ld, kDim: %ld, maxDimNum: %ld",
-                            basicBlockParam_.mDim, basicBlockParam_.nDim, basicBlockParam_.kDim,
-                            platformParam_.blockNum),
-                    return false);
+    OP_TILING_CHECK(
+        basicBlockParam_.mDim * basicBlockParam_.nDim * basicBlockParam_.kDim > platformParam_.blockNum,
+        OP_LOGE(opName_, "Invalid block dim, mDim: %ld, nDim: %ld, kDim: %ld, maxDimNum: %ld", basicBlockParam_.mDim,
+                basicBlockParam_.nDim, basicBlockParam_.kDim, platformParam_.blockNum),
+        return false);
 
-    OP_TILING_CHECK(GetL1LoadSize(basicBlockParam_.basicBlock, basicBlockParam_.l1Param) > platformParam_.l1Size,
-                    OP_LOGE(opName_, "The load size exceeds L1 buffer limit, load size: %ld, L1 buffer size: %ld",
-                            GetL1LoadSize(basicBlockParam_.basicBlock, basicBlockParam_.l1Param),
-                            platformParam_.l1Size),
-                    return false);
+    OP_TILING_CHECK(
+        GetL1LoadSize(basicBlockParam_.basicBlock, basicBlockParam_.l1Param) > platformParam_.l1Size,
+        OP_LOGE(opName_, "The load size exceeds L1 buffer limit, load size: %ld, L1 buffer size: %ld",
+                GetL1LoadSize(basicBlockParam_.basicBlock, basicBlockParam_.l1Param), platformParam_.l1Size),
+        return false);
 
     int64_t a2Size = static_cast<int64_t>(basicBlockParam_.basicBlock.baseM * basicBlockParam_.basicBlock.baseK *
                                           aByteSize_ * BUFF_NUM_2);
@@ -919,12 +919,12 @@ bool Mc2WeightQuantBatchMatmulV2BasicBlockTiling::GetDefaultBasicBlockTiling()
 bool Mc2WeightQuantBatchMatmulV2BasicBlockTiling::GetBasicBlockTiling()
 {
     OP_TILING_CHECK(!ValidateInputParam(),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "input param",
-                                                          (std::to_string(basicBlockParam_.mSize) + ", " +
-                                                           std::to_string(basicBlockParam_.nSize) + ", " +
-                                                           std::to_string(basicBlockParam_.kSize))
-                                                              .c_str(),
-                                                          "The value of input param must be valid."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input param",
+                        (std::to_string(basicBlockParam_.mSize) + ", " + std::to_string(basicBlockParam_.nSize) + ", " +
+                         std::to_string(basicBlockParam_.kSize))
+                            .c_str(),
+                        "The value of input param must be valid."),
                     return false);
 
     Reset();

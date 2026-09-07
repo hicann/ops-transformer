@@ -64,5 +64,4 @@ REG_OP(GroupedMatMulAllReduce)
 
 } // namespace ge
 
-
 #endif // GROUPED_MAT_MUL_ALL_REDUCE_PROTO_H_

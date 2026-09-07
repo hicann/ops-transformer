@@ -390,9 +390,8 @@ void Mc2QuantBatchMatmulV3BasicTiling::DivisibleCoreLayout(uint64_t mCnt, uint64
     return;
 }
 
-std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>
-Mc2QuantBatchMatmulV3BasicTiling::CalcCoreDistribution(uint64_t mCnt, uint64_t nCnt, uint64_t calcOrder, uint64_t round,
-                                                       uint64_t usedCoreNum) const
+std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> Mc2QuantBatchMatmulV3BasicTiling::CalcCoreDistribution(
+    uint64_t mCnt, uint64_t nCnt, uint64_t calcOrder, uint64_t round, uint64_t usedCoreNum) const
 {
     uint64_t allCnt = mCnt * nCnt;
     std::vector<uint64_t> mCoreDist(mCnt, 0);

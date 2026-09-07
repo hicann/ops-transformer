@@ -181,8 +181,8 @@ TEST_F(MegaMoeArch22TilingTest, ActivationParamValidationWithLargeIntermediateHi
              {"transpose_weight1", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
              {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
              {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
-            {1, 1, 1, 1, kExpertPerRank, kExpertPerRank, 0, 0, 0, 0, 0, 0}, {1, 1}, &compileInfo, "Ascend910B",
-            coreNum, ubSize);
+            {1, 1, 1, 1, kExpertPerRank, kExpertPerRank, 0, 0, 0, 0, 0, 0}, {1, 1}, &compileInfo, "Ascend910B", coreNum,
+            ubSize);
 
         Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
         Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, activationCase.expectedStatus, UINT64_MAX);

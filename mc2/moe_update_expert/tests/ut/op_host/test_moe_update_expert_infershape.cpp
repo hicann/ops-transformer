@@ -109,7 +109,6 @@ TEST_F(MoeUpdateExpertInfershape, MoeUpdateExpertTestEnhancedShape)
     Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expertOutputShape);
 }
 
-
 TEST_F(MoeUpdateExpertInfershape, MoeUpdateExpertTestType)
 {
     ge::DataType expertIdsType = ge::DT_INT64;

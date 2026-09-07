@@ -21,8 +21,8 @@
 #include "matmul_allto_all_tiling_key.h"
 #include "matmul_allto_all_tiling.h"
 #include "matmul_allto_all.h"
-#include "../matmul_allto_all_pipeline.h" // A3调用kernel模板库
-#include "../matmul_allto_all_kernel_base.h"   // A3非量化与A5共用流水
+#include "../matmul_allto_all_pipeline.h"    // A3调用kernel模板库
+#include "../matmul_allto_all_kernel_base.h" // A3非量化与A5共用流水
 
 using namespace AscendC;
 using namespace matmul_allto_all_910b_tiling_key;
@@ -31,24 +31,24 @@ using MC2KernelTemplate::MC2AlltoAllContext;
 using MC2KernelTemplate::MC2AlltoAllPrimitives;
 
 #ifndef MATMUL_ALLTO_ALL_A3_FP_IMPL
-#define MATMUL_ALLTO_ALL_A3_FP_IMPL(tilingData, pipe)                                                                  \
-    do {                                                                                                               \
-        DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_A3_FP(ComputationContextType);                                \
-        DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_A3_FP(false, MM_ALLTO_ALL_TRANS_X2, ComputationType);                 \
-        ComputationType matmulImplName(&pipe);                                                                         \
-        DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION(DTYPE_Y, TransposeType);                                             \
-        TransposeType transposeImplName(&pipe);                                                                        \
-        DEFINE_MC2_HCCL_FOR_COMMUNICATION(false, HcclServerType::HCCL_SERVER_TYPE_AICPU, MC2AlltoAllContext,           \
+#define MATMUL_ALLTO_ALL_A3_FP_IMPL(tilingData, pipe) \
+    do { \
+        DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_A3_FP(ComputationContextType); \
+        DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_A3_FP(false, MM_ALLTO_ALL_TRANS_X2, ComputationType); \
+        ComputationType matmulImplName(&pipe); \
+        DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION(DTYPE_Y, TransposeType); \
+        TransposeType transposeImplName(&pipe); \
+        DEFINE_MC2_HCCL_FOR_COMMUNICATION(false, HcclServerType::HCCL_SERVER_TYPE_AICPU, MC2AlltoAllContext, \
                                           MatmulAlltoAllTilingDataA3, MC2AlltoAllPrimitives, 1, 0, CommunicationType); \
-        CommunicationType commImplName(&tilingData);                                                                   \
-        using SchedulerContextType = MatmulAlltoAllPipelineContext<ComputationContextType>;                            \
-        using SchedulerType =                                                                                          \
-            MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, SchedulerContextType>;           \
-        SchedulerType SchedulerImpl(&matmulImplName, &transposeImplName, &commImplName);                               \
-        Mc2Kernel::MatmulAlltoAllKernelBase<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataA3> op(       \
-            &SchedulerImpl);                                                                                           \
-        op.Init(x1, x2, bias, y, workspaceGM, &tilingData, &pipe);                                                     \
-        op.Process();                                                                                                  \
+        CommunicationType commImplName(&tilingData); \
+        using SchedulerContextType = MatmulAlltoAllPipelineContext<ComputationContextType>; \
+        using SchedulerType = \
+            MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, SchedulerContextType>; \
+        SchedulerType SchedulerImpl(&matmulImplName, &transposeImplName, &commImplName); \
+        Mc2Kernel::MatmulAlltoAllKernelBase<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataA3> op( \
+            &SchedulerImpl); \
+        op.Init(x1, x2, bias, y, workspaceGM, &tilingData, &pipe); \
+        op.Process(); \
     } while (0)
 #endif
 

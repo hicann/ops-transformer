@@ -32,7 +32,6 @@ using namespace Mc2Tiling;
 using namespace AscendC;
 using namespace ge;
 
-
 namespace optiling {
 ge::graphStatus MoeDistributeDispatchV3TilingFuncBase::MoeDistributeDispatchV3TilingFunc(gert::TilingContext *context)
 {

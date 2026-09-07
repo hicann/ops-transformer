@@ -24,7 +24,6 @@
 #include "op_api_ut_common/op_api_ut.h"
 #include "opdev/platform.h"
 
-
 using namespace std;
 namespace {
 class L2GroupedMatMulAllReduceTest : public testing::Test {

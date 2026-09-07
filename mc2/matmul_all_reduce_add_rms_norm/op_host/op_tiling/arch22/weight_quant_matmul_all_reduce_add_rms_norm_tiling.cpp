@@ -33,7 +33,10 @@ ge::graphStatus WeightQuantMMNTilingTransferHelper::GetShapeAttrsInfo()
     return MatmulAllReduceTilingBase::AnalyzeShapeAttr();
 }
 
-bool WeightQuantMatmulAllReduceAddRmsNormTiling::HasTail() const { return hasTail_; }
+bool WeightQuantMatmulAllReduceAddRmsNormTiling::HasTail() const
+{
+    return hasTail_;
+}
 ge::graphStatus WeightQuantMatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo &mrnCtxInfo)
 {
     // x1和residual数据类型是否相同
@@ -101,9 +104,18 @@ ge::graphStatus WeightQuantMatmulAllReduceAddRmsNormTiling::GetShapeAttrsInfo()
     MC2_CHECK_NOTNULL_RET(context_->GetNodeName(), helper_);
     return helper_->GetShapeAttrsInfo();
 }
-ge::graphStatus WeightQuantMatmulAllReduceAddRmsNormTiling::GetPlatformInfo() { return helper_->GetPlatformInfo(); }
-ge::graphStatus WeightQuantMatmulAllReduceAddRmsNormTiling::DoLibApiTiling() { return helper_->DoLibApiTiling(); }
-bool WeightQuantMatmulAllReduceAddRmsNormTiling::IsCapable() { return helper_->IsCapable(); }
+ge::graphStatus WeightQuantMatmulAllReduceAddRmsNormTiling::GetPlatformInfo()
+{
+    return helper_->GetPlatformInfo();
+}
+ge::graphStatus WeightQuantMatmulAllReduceAddRmsNormTiling::DoLibApiTiling()
+{
+    return helper_->DoLibApiTiling();
+}
+bool WeightQuantMatmulAllReduceAddRmsNormTiling::IsCapable()
+{
+    return helper_->IsCapable();
+}
 WeightQuantMatmulAllReduceAddRmsNormTiling::WeightQuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext *context)
     : TilingBaseClass(context)
 {

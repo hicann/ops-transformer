@@ -28,7 +28,7 @@ using namespace Mc2Kernel;
 
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_FLOAT16 || ORIG_DTYPE_X1 == DT_BF16))
 #define QUANT_TYPE MC2_NON_QUANT
-#elif ((ORIG_DTYPE_X1 == DT_FLOAT16 || ORIG_DTYPE_X1 == DT_BF16) &&                                                    \
+#elif ((ORIG_DTYPE_X1 == DT_FLOAT16 || ORIG_DTYPE_X1 == DT_BF16) && \
        (ORIG_DTYPE_X2 == DT_INT8 || ORIG_DTYPE_X2 == DT_INT4))
 #define QUANT_TYPE MC2_DYNAMIC_QUANT
 #else
@@ -36,24 +36,24 @@ using namespace Mc2Kernel;
 #endif
 
 #ifndef ALLTO_ALL_MATMUL_A3_FP_IMPL
-#define ALLTO_ALL_MATMUL_A3_FP_IMPL(tilingData, pipe)                                                                  \
-    do {                                                                                                               \
-        DEFINE_MC2_HCCL_FOR_COMMUNICATION(false, HcclServerType::HCCL_SERVER_TYPE_AICPU,                               \
-                                          MC2KernelTemplate::MC2AlltoAllContext, AlltoAllMatmulTilingDataA3,           \
-                                          MC2KernelTemplate::MC2AlltoAllPrimitives, 0, 1, CommunicationType);          \
-        CommunicationType commImplName(&tilingData);                                                                   \
-        DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION(DTYPE_X1, TransposeType);                                            \
-        TransposeType transposeImplName(&pipe);                                                                        \
-        DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_A3_FP(ComputationContextType);                                \
-        DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_A3_FP(false, ALLTO_ALL_MM_TRANSPOSE_X2, ComputationType);             \
-        ComputationType matmulImplName(&pipe);                                                                         \
-        using SchedulerContextType = AlltoAllMmPipelineContext<ComputationContextType>;                                \
-        using SchedulerType =                                                                                          \
-            AlltoAllMatmulPipeLine<CommunicationType, TransposeType, ComputationType, SchedulerContextType>;           \
-        SchedulerType SchedulerImpl(&commImplName, &transposeImplName, &matmulImplName);                               \
-        AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataA3> op(&SchedulerImpl);  \
-        op.Init(x1, x2, bias, y, all2all_out, workspaceGM, &tilingData, &pipe);                                        \
-        op.Process();                                                                                                  \
+#define ALLTO_ALL_MATMUL_A3_FP_IMPL(tilingData, pipe) \
+    do { \
+        DEFINE_MC2_HCCL_FOR_COMMUNICATION(false, HcclServerType::HCCL_SERVER_TYPE_AICPU, \
+                                          MC2KernelTemplate::MC2AlltoAllContext, AlltoAllMatmulTilingDataA3, \
+                                          MC2KernelTemplate::MC2AlltoAllPrimitives, 0, 1, CommunicationType); \
+        CommunicationType commImplName(&tilingData); \
+        DEFINE_MC2_TRANSPOSE_FOR_MATH_COMPUTATION(DTYPE_X1, TransposeType); \
+        TransposeType transposeImplName(&pipe); \
+        DEFINE_MC2_MATMUL_CONTEXT_FOR_MATMUL_COMPUTATION_A3_FP(ComputationContextType); \
+        DEFINE_MC2_MATMUL_FOR_MATMUL_COMPUTATION_A3_FP(false, ALLTO_ALL_MM_TRANSPOSE_X2, ComputationType); \
+        ComputationType matmulImplName(&pipe); \
+        using SchedulerContextType = AlltoAllMmPipelineContext<ComputationContextType>; \
+        using SchedulerType = \
+            AlltoAllMatmulPipeLine<CommunicationType, TransposeType, ComputationType, SchedulerContextType>; \
+        SchedulerType SchedulerImpl(&commImplName, &transposeImplName, &matmulImplName); \
+        AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataA3> op(&SchedulerImpl); \
+        op.Init(x1, x2, bias, y, all2all_out, workspaceGM, &tilingData, &pipe); \
+        op.Process(); \
     } while (0)
 #endif
 

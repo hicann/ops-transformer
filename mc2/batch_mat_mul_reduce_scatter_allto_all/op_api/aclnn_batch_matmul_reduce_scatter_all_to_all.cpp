@@ -360,7 +360,6 @@ static const aclTensor *TransTensor(const aclTensor *x2)
                            storageDims.data(), storageDimsNum, x2->GetTensor()->GetAddr());
 }
 
-
 aclnnStatus aclnnBatchMatMulReduceScatterAlltoAllGetWorkspaceSize(const aclTensor *x, const aclTensor *weight,
                                                                   const aclTensor *biasOptional, const char *groupEp,
                                                                   const char *groupTp, int64_t epWorldSize,

@@ -19,7 +19,6 @@
 
 namespace ge {
 
-
 /**
 * @brief Fusion of alltoallv and grouped matmul.
 * @par Inputs:
@@ -105,6 +104,5 @@ REG_OP(AlltoAllvQuantGroupedMatMul)
     .OP_END_FACTORY_REG(AlltoAllvQuantGroupedMatMul)
 
 } // namespace ge
-
 
 #endif // allto_allv_quant_grouped_mat_mul_PROTO_H_

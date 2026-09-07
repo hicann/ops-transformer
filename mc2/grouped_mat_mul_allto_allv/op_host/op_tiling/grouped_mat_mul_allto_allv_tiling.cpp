@@ -80,11 +80,11 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckOpInputSingleParamsTensorMM()
     }
     bool allNull = isMmXNull && isMmWeightNull && isMmYNull;
     bool allNotNull = !isMmXNull && !isMmWeightNull && !isMmYNull;
-    OP_TILING_CHECK(!allNull && !allNotNull,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "mmXTensor/mmWeightTensor/mmYTensor",
-                                                          "inconsistent state",
-                                                          "all must exist or not exist at same time"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !allNull && !allNotNull,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "mmXTensor/mmWeightTensor/mmYTensor", "inconsistent state",
+                                              "all must exist or not exist at same time"),
+        return ge::GRAPH_FAILED);
     if (!isMmXNull) {
         localParams_.hasSharedMm = true;
     }
@@ -108,16 +108,16 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsGmm()
     OP_TILING_CHECK(gmmWeightDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmWeight"),
                     return ge::GRAPH_FAILED);
     localParams_.gmmWeightDtype = gmmWeightDesc->GetDataType();
-    OP_TILING_CHECK(!IsContains(GMM_WEIGHT_DTYPE_LIST, localParams_.gmmWeightDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmWeight",
-                                              Ops::Base::ToString(localParams_.gmmWeightDtype).c_str(),
-                                              "DT_FLOAT16 or DT_BF16"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(localParams_.gmmXDtype != localParams_.gmmWeightDtype,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "gmmX",
-                                                          Ops::Base::ToString(localParams_.gmmXDtype).c_str(),
-                                                          "The dtype of gmmX must be the same as that of gmmWeight"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(GMM_WEIGHT_DTYPE_LIST, localParams_.gmmWeightDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "gmmWeight", Ops::Base::ToString(localParams_.gmmWeightDtype).c_str(),
+                                  "DT_FLOAT16 or DT_BF16"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        localParams_.gmmXDtype != localParams_.gmmWeightDtype,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "gmmX", Ops::Base::ToString(localParams_.gmmXDtype).c_str(),
+                                              "The dtype of gmmX must be the same as that of gmmWeight"),
+        return ge::GRAPH_FAILED);
 
     auto yDesc = context_->GetOutputDesc(OUTPUT_Y_INDEX);
     OP_TILING_CHECK(yDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
@@ -126,11 +126,11 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsGmm()
                     OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(localParams_.yDtype).c_str(),
                                               "DT_FLOAT16 or DT_BF16"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(localParams_.gmmXDtype != localParams_.yDtype,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "gmmX",
-                                                          Ops::Base::ToString(localParams_.gmmXDtype).c_str(),
-                                                          "The dtype of gmmX must be the same as that of y"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        localParams_.gmmXDtype != localParams_.yDtype,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "gmmX", Ops::Base::ToString(localParams_.gmmXDtype).c_str(),
+                                              "The dtype of gmmX must be the same as that of y"),
+        return ge::GRAPH_FAILED);
     localParams_.gmmYDtype = localParams_.yDtype;
 
     const gert::StorageShape *gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
@@ -171,16 +171,16 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsMm()
                     OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmX", Ops::Base::ToString(localParams_.mmXDtype).c_str(),
                                               "DT_FLOAT16 or DT_BF16"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!IsContains(GMM_WEIGHT_DTYPE_LIST, localParams_.mmWeightDtype),
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmWeight",
-                                              Ops::Base::ToString(localParams_.mmWeightDtype).c_str(),
-                                              "DT_FLOAT16 or DT_BF16"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(localParams_.gmmXDtype != localParams_.mmXDtype,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "mmX",
-                                                          Ops::Base::ToString(localParams_.mmXDtype).c_str(),
-                                                          "The dtype of mmX must be the same as that of gmmX"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsContains(GMM_WEIGHT_DTYPE_LIST, localParams_.mmWeightDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "mmWeight", Ops::Base::ToString(localParams_.mmWeightDtype).c_str(),
+                                  "DT_FLOAT16 or DT_BF16"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        localParams_.gmmXDtype != localParams_.mmXDtype,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "mmX", Ops::Base::ToString(localParams_.mmXDtype).c_str(),
+                                              "The dtype of mmX must be the same as that of gmmX"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(localParams_.gmmXDtype != localParams_.mmWeightDtype,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "mmWeight",
                                                           Ops::Base::ToString(localParams_.mmWeightDtype).c_str(),
@@ -210,11 +210,11 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsMm()
     localParams_.mmWeightDim0 = mmWeightStorageShape->GetStorageShape().GetDim(DIM_ZERO);
     localParams_.mmWeightDim1 = mmWeightStorageShape->GetStorageShape().GetDim(DIM_ONE);
     uint64_t mmYDim0 = mmYStorageShape->GetStorageShape().GetDim(DIM_ZERO);
-    OP_TILING_CHECK(localParams_.Bs != mmYDim0,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "mmX/mmY",
-                                                             std::to_string(localParams_.Bs).c_str(),
-                                                             "Shape dim 0 of mmX must be equal to shape dim 0 of mmY."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        localParams_.Bs != mmYDim0,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "mmX/mmY", std::to_string(localParams_.Bs).c_str(),
+                                                 "Shape dim 0 of mmX must be equal to shape dim 0 of mmY."),
+        return ge::GRAPH_FAILED);
     localParams_.N2 = mmYStorageShape->GetStorageShape().GetDim(DIM_ONE);
 
     return ge::GRAPH_SUCCESS;
@@ -233,11 +233,11 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsAttr()
     auto transMmWeightPtr = attrs->GetAttrPointer<bool>(ATTR_TRANS_MM_WEIGHT_INDEX);
     OP_TILING_CHECK(transMmWeightPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "transMmWeight"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(*transMmWeightPtr == true && !localParams_.hasSharedMm,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "transMmWeight",
-                                                          std::to_string(*transMmWeightPtr).c_str(),
-                                                          "should not be true when mmX is null"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        *transMmWeightPtr == true && !localParams_.hasSharedMm,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "transMmWeight", std::to_string(*transMmWeightPtr).c_str(),
+                                              "should not be true when mmX is null"),
+        return ge::GRAPH_FAILED);
     localParams_.isMmWeightTrans = *transMmWeightPtr;
 
     localParams_.gmmXScaleDtype = localParams_.gmmXDtype;

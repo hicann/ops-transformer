@@ -33,7 +33,10 @@ ge::graphStatus QuantMMNTilingTransferHelper::GetShapeAttrsInfo()
     return MatmulAllReduceTilingBase::AnalyzeShapeAttr();
 }
 
-bool QuantMatmulAllReduceAddRmsNormTiling::HasTail() const { return hasTail_; }
+bool QuantMatmulAllReduceAddRmsNormTiling::HasTail() const
+{
+    return hasTail_;
+}
 ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo &mrnCtxInfo)
 {
     // dequantScale数据类型为bf16时, residual为bf16;其他时,residual为fp16
@@ -106,9 +109,18 @@ ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetShapeAttrsInfo()
     MC2_CHECK_NOTNULL_RET(context_->GetNodeName(), helper_);
     return helper_->GetShapeAttrsInfo();
 }
-ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetPlatformInfo() { return helper_->GetPlatformInfo(); }
-ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::DoLibApiTiling() { return helper_->DoLibApiTiling(); }
-bool QuantMatmulAllReduceAddRmsNormTiling::IsCapable() { return helper_->IsCapable(); }
+ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetPlatformInfo()
+{
+    return helper_->GetPlatformInfo();
+}
+ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::DoLibApiTiling()
+{
+    return helper_->DoLibApiTiling();
+}
+bool QuantMatmulAllReduceAddRmsNormTiling::IsCapable()
+{
+    return helper_->IsCapable();
+}
 QuantMatmulAllReduceAddRmsNormTiling::QuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext *context)
     : TilingBaseClass(context)
 {

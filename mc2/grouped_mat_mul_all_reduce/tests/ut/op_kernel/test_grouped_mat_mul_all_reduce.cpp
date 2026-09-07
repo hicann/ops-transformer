@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /*!
  * \file test_grouped_mat_mul_all_reduce.h
  * \brief
@@ -28,7 +27,6 @@
 #include "grouped_mat_mul_all_reduce_tiling_def.h"
 #include "grouped_matmul_tensorlist.h"
 using namespace std;
-
 
 extern "C" __global__ __aicore__ void grouped_mat_mul_all_reduce(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM,
                                                                  GM_ADDR groupListGM, GM_ADDR cGM, GM_ADDR workspaceGM,

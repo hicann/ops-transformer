@@ -98,5 +98,4 @@ REG_OP(AlltoAllAllGatherBatchMatMul)
     .OP_END_FACTORY_REG(AlltoAllAllGatherBatchMatMul)
 } // namespace ge
 
-
 #endif // ALLTO_ALL_ALL_GATHER_BATCH_MAT_MUL_PROTO_H_

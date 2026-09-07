@@ -65,14 +65,16 @@ constexpr uint32_t VEC_CORE_GROUP_NUM = 2;
 namespace optiling {
 
 Mc2AdaptiveSlidingWindowTiling::Mc2AdaptiveSlidingWindowTiling(gert::TilingContext *context)
-    : Mc2QuantBatchMatmulV3TilingBase(context, false), tilingData_(tilingDataSelf_)
+    : Mc2QuantBatchMatmulV3TilingBase(context, false),
+      tilingData_(tilingDataSelf_)
 {
     Reset();
 }
 
 Mc2AdaptiveSlidingWindowTiling::Mc2AdaptiveSlidingWindowTiling(gert::TilingContext *context,
                                                                DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *out)
-    : Mc2QuantBatchMatmulV3TilingBase(context, true), tilingData_(*out)
+    : Mc2QuantBatchMatmulV3TilingBase(context, true),
+      tilingData_(*out)
 {
     Reset();
     InitCompileInfo();
@@ -127,7 +129,6 @@ ge::graphStatus Mc2AdaptiveSlidingWindowTiling::GetShapeAttrsInfo()
     tilingDataSize_ = sizeof(DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams);
     return Mc2QuantBatchMatmulV3TilingBase::GetShapeAttrsInfo();
 }
-
 
 ge::graphStatus Mc2AdaptiveSlidingWindowTiling::DoOpTiling()
 {

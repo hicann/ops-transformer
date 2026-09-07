@@ -79,7 +79,7 @@ REG_OP(AllGatherMatmulV2)
     .OPTIONAL_INPUT(quant_scale, TensorType({DT_FLOAT}))
     .OUTPUT(y, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
     .OUTPUT(gather_out,
-    TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8, DT_FLOAT4_E2M1}))
+            TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8, DT_FLOAT4_E2M1}))
     .OUTPUT(amax_out, TensorType({DT_FLOAT}))
     .REQUIRED_ATTR(group, String)
     .ATTR(is_trans_a, Bool, false)
@@ -95,6 +95,5 @@ REG_OP(AllGatherMatmulV2)
     .ATTR(comm_mode, String, "ai_cpu")
     .OP_END_FACTORY_REG(AllGatherMatmulV2)
 } // namespace ge
-
 
 #endif // ALL_GATHER_MATMUL_V2_PROTO_H_

@@ -480,7 +480,6 @@ aclnnStatus Mc2Context::ValidateContextTag(const std::string &mc2ContextTag)
     return ACLNN_SUCCESS;
 }
 
-
 aclnnStatus Mc2Context::CheckContextCache(const HcclComm &hcclHandle, const std::string &mc2ContextTag,
                                           const CommEngine &engine, void *&ctx, uint64_t &hcclBuffSize)
 {

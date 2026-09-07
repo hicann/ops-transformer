@@ -1023,7 +1023,6 @@ TEST_F(AlltoAllAllGatherBmmInfershape, InferDtype0)
     EXPECT_EQ(contextHolder.GetContext<gert::InferDataTypeContext>()->GetOutputDataType(2), ge::DT_FLOAT16);
 }
 
-
 // fp16 infer dtype with bias
 TEST_F(AlltoAllAllGatherBmmInfershape, InferDtype1)
 {

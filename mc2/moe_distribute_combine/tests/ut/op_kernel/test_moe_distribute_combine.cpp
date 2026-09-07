@@ -18,7 +18,6 @@
 #include "../../../op_kernel/moe_distribute_combine.cpp"
 #include "../../../op_kernel/moe_distribute_combine_tiling_key.h"
 
-
 class MoeDistributeCombineTest : public testing::Test {
 protected:
     static void SetUpTestCase()

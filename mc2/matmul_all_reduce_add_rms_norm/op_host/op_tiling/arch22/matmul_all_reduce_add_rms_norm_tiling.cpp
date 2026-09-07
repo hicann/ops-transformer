@@ -31,9 +31,15 @@ MMNTilingTransferHelper::MMNTilingTransferHelper(MatmulAllReduceAddRmsNormTiling
                                &MatmulAllReduceAddRmsNormTiling.mrnCtxInfo_.mmrCtxInfo, &data),
       tilingProcesser_(MatmulAllReduceAddRmsNormTiling)
 {}
-ge::graphStatus MMNTilingTransferHelper::GetShapeAttrsInfo() { return MatmulAllReduceTilingBase::AnalyzeShapeAttr(); }
+ge::graphStatus MMNTilingTransferHelper::GetShapeAttrsInfo()
+{
+    return MatmulAllReduceTilingBase::AnalyzeShapeAttr();
+}
 
-bool MatmulAllReduceAddRmsNormTiling::HasTail() const { return hasTail_; }
+bool MatmulAllReduceAddRmsNormTiling::HasTail() const
+{
+    return hasTail_;
+}
 ge::graphStatus MatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo &mrnCtxInfo)
 {
     // x1和residual数据类型是否相同
@@ -101,9 +107,18 @@ ge::graphStatus MatmulAllReduceAddRmsNormTiling::GetShapeAttrsInfo()
     MC2_CHECK_NOTNULL_RET(context_->GetNodeName(), helper_);
     return helper_->GetShapeAttrsInfo();
 }
-ge::graphStatus MatmulAllReduceAddRmsNormTiling::GetPlatformInfo() { return helper_->GetPlatformInfo(); }
-ge::graphStatus MatmulAllReduceAddRmsNormTiling::DoLibApiTiling() { return helper_->DoLibApiTiling(); }
-bool MatmulAllReduceAddRmsNormTiling::IsCapable() { return helper_->IsCapable(); }
+ge::graphStatus MatmulAllReduceAddRmsNormTiling::GetPlatformInfo()
+{
+    return helper_->GetPlatformInfo();
+}
+ge::graphStatus MatmulAllReduceAddRmsNormTiling::DoLibApiTiling()
+{
+    return helper_->DoLibApiTiling();
+}
+bool MatmulAllReduceAddRmsNormTiling::IsCapable()
+{
+    return helper_->IsCapable();
+}
 MatmulAllReduceAddRmsNormTiling::MatmulAllReduceAddRmsNormTiling(gert::TilingContext *context)
     : TilingBaseClass(context)
 {

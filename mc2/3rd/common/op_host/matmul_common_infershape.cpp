@@ -35,9 +35,12 @@ class InferShapeBatchMatMul {
 public:
     InferShapeBatchMatMul(gert::InferShapeContext *context, const InferShapeBatchTensor &inferShapeTensor,
                           size_t batch_matmul_bias_index = BATCH_MATMUL_BIAS_IDX)
-        : op_name(context->GetNodeName()), shape_a(inferShapeTensor.input_shape_a),
-          shape_b(inferShapeTensor.input_shape_b), trans_a(inferShapeTensor.input_trans_a),
-          trans_b(inferShapeTensor.input_trans_b), shape_out(*(context->GetOutputShape(0))),
+        : op_name(context->GetNodeName()),
+          shape_a(inferShapeTensor.input_shape_a),
+          shape_b(inferShapeTensor.input_shape_b),
+          trans_a(inferShapeTensor.input_trans_a),
+          trans_b(inferShapeTensor.input_trans_b),
+          shape_out(*(context->GetOutputShape(0))),
           shape_bias(context->GetOptionalInputShape(batch_matmul_bias_index))
     {
         num_dima = shape_a.GetDimNum();
@@ -52,7 +55,9 @@ public:
     };
 
     InferShapeBatchMatMul(gert::InferShapeContext *context, const Shape &input_shape_a, const Shape &input_shape_b)
-        : op_name(context->GetNodeName()), shape_a(input_shape_a), shape_b(input_shape_b),
+        : op_name(context->GetNodeName()),
+          shape_a(input_shape_a),
+          shape_b(input_shape_b),
           shape_out(*(context->GetOutputShape(0)))
     {
         shape_bias = context->GetOptionalInputShape(BATCH_MATMUL_FIXPIPE_BIAS_IDX);
@@ -617,8 +622,11 @@ class InferShapeRangeBatchMatMul {
 public:
     InferShapeRangeBatchMatMul(gert::InferShapeRangeContext *in_context, int32_t in_attr_adj_idx,
                                size_t input_bias_index)
-        : context(in_context), op_name(in_context->GetNodeName()), attr_adj_idx(in_attr_adj_idx),
-          x1_shape_range(in_context->GetInputShapeRange(0)), x2_shape_range(in_context->GetInputShapeRange(1)),
+        : context(in_context),
+          op_name(in_context->GetNodeName()),
+          attr_adj_idx(in_attr_adj_idx),
+          x1_shape_range(in_context->GetInputShapeRange(0)),
+          x2_shape_range(in_context->GetInputShapeRange(1)),
           bias_shape_range(in_context->GetOptionalInputShapeRange(input_bias_index)),
           out_shape_range(in_context->GetOutputShapeRange(0)) {};
     bool Init();
@@ -667,9 +675,9 @@ bool InferShapeRangeBatchMatMul::Init()
     x1_max_shape = x1_shape_range->GetMax();
     x2_min_shape = x2_shape_range->GetMin();
     x2_max_shape = x2_shape_range->GetMax();
-    OP_CHECK_IF(x1_min_shape == nullptr || x1_max_shape == nullptr || x2_min_shape == nullptr ||
-                    x2_max_shape == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(op_name, "x1/x2 min/max shape"), return false);
+    OP_CHECK_IF(
+        x1_min_shape == nullptr || x1_max_shape == nullptr || x2_min_shape == nullptr || x2_max_shape == nullptr,
+        OP_LOGE_WITH_INVALID_INPUT(op_name, "x1/x2 min/max shape"), return false);
     num_dim_x1 = x1_min_shape->GetDimNum();
     num_dim_x2 = x2_min_shape->GetDimNum();
     // 初始化x1和x2，转为vector的形式

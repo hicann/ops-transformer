@@ -304,9 +304,8 @@ static void GetBatchMatMulReduceScatterAlltoAllFormulateTileCnt(mc2tiling::Tilin
     return;
 }
 
-static void
-GetBatchMatMulReduceScatterAlltoAllFormulateTileCntShard(mc2tiling::TilingArgs &formulaicArgs,
-                                                         BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+static void GetBatchMatMulReduceScatterAlltoAllFormulateTileCntShard(
+    mc2tiling::TilingArgs &formulaicArgs, BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
 {
     ReduceScatterAll2AllBMM formulaicTiling(formulaicArgs, tilingData->commonTiling.epGroupSize,
                                             tilingData->commonTiling.tpGroupSize, tilingData->commonTiling.EOverEp);
@@ -897,9 +896,9 @@ static ge::graphStatus ComputeCoreTiling(gert::TilingContext *context,
     bool biasCastFlag = tensorInfo.biasDatatype == ge::DT_BF16;
     BmmTilingConfig config{context, *tilingData, tensorInfo.bmmv3BatchInfo, tensorInfo.mmv3ArgsInfo};
     // 待修改，等BMM tiling提供接口和修改方案
-    OP_TILING_CHECK(SetMatmulTilingBatchMatMulReduceScatterAlltoAll(config, formulaicArgs, tensorInfo.isLite) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(context->GetNodeName(), "Set Matmul tiling Failed!"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        SetMatmulTilingBatchMatMulReduceScatterAlltoAll(config, formulaicArgs, tensorInfo.isLite) != ge::GRAPH_SUCCESS,
+        OP_LOGE(context->GetNodeName(), "Set Matmul tiling Failed!"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CalculateMaxSplitUB(tensorInfo.ubSize, tilingData->commonTiling.isBias, xCastFlag, biasCastFlag,
                                         tilingData) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context->GetNodeName(), "Calculate max split UB Failed!"), return ge::GRAPH_FAILED);

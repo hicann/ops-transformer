@@ -71,7 +71,10 @@ static int gBarrierCount = 0;
         } \
     } while (0)
 
-inline uint64_t CeilDivHost(uint64_t a, uint32_t b) { return (a + b - 1) / b; }
+inline uint64_t CeilDivHost(uint64_t a, uint32_t b)
+{
+    return (a + b - 1) / b;
+}
 
 void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum, std::string &mode)
 {

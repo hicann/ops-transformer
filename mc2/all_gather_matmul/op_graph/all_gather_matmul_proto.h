@@ -67,5 +67,4 @@ REG_OP(AllGatherMatmul)
     .OP_END_FACTORY_REG(AllGatherMatmul)
 } // namespace ge
 
-
 #endif // ALL_GATHER_MATMUL_PROTO_H_

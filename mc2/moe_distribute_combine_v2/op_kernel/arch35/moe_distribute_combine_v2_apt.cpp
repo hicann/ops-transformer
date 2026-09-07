@@ -24,13 +24,14 @@ using namespace Mc2Tiling;
 using namespace AscendC;
 
 template <uint8_t QuantMode, uint8_t LayeredMode, uint8_t ArchTag>
-__global__ __aicore__ void
-moe_distribute_combine_v2(GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine, GM_ADDR epSendCount,
-                          GM_ADDR scales, GM_ADDR tpSendCounts, GM_ADDR xActiveMask, GM_ADDR activationScale,
-                          GM_ADDR weightScale, GM_ADDR groupList, GM_ADDR expandScales, GM_ADDR sharedExpertX,
-                          GM_ADDR elasticInfo, GM_ADDR oriX, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2,
-                          GM_ADDR constExpertV, GM_ADDR performanceInfo, GM_ADDR XOut, GM_ADDR workspaceGM,
-                          GM_ADDR tilingGM)
+__global__ __aicore__ void moe_distribute_combine_v2(GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine,
+                                                     GM_ADDR epSendCount, GM_ADDR scales, GM_ADDR tpSendCounts,
+                                                     GM_ADDR xActiveMask, GM_ADDR activationScale, GM_ADDR weightScale,
+                                                     GM_ADDR groupList, GM_ADDR expandScales, GM_ADDR sharedExpertX,
+                                                     GM_ADDR elasticInfo, GM_ADDR oriX, GM_ADDR constExpertAlpha1,
+                                                     GM_ADDR constExpertAlpha2, GM_ADDR constExpertV,
+                                                     GM_ADDR performanceInfo, GM_ADDR XOut, GM_ADDR workspaceGM,
+                                                     GM_ADDR tilingGM)
 
 {
     REGISTER_TILING_DEFAULT(MoeDistributeCombineV2TilingData);

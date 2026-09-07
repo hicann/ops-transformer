@@ -25,7 +25,6 @@ static constexpr uint32_t IDX_FIVE = 5;
 static constexpr uint32_t IDX_EIGHT = 8;
 static constexpr uint32_t IDX_THIRTEEN = 13;
 
-
 static ge::graphStatus InferShapeCheck(gert::InferShapeContext *context)
 {
     if (context == nullptr) {

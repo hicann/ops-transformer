@@ -574,11 +574,11 @@ static void TestOneParamCase(const MoeDistributeCombineSetupAclnnTestParam &para
         CreateAclTensorOrNull(quantExpandXOutShape, quantExpandXOutDtype, quantExpandXOutFormat);
     aclTensor *commCmdInfoOut = CreateAclTensorOrNull(commCmdInfoOutShape, commCmdInfoOutDtype, commCmdInfoOutFormat);
 
-    auto ut = OP_API_UT(aclnnMoeDistributeCombineSetup,
-                        INPUT(expandX, expertIds, assistInfoForCombine, groupEp, epWorldSize, epRankId, moeExpertNum,
-                              expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, commQuantMode, commType,
-                              commAlg),
-                        OUTPUT(quantExpandXOut, commCmdInfoOut));
+    auto ut = OP_API_UT(
+        aclnnMoeDistributeCombineSetup,
+        INPUT(expandX, expertIds, assistInfoForCombine, groupEp, epWorldSize, epRankId, moeExpertNum, expertShardType,
+              sharedExpertNum, sharedExpertRankNum, globalBs, commQuantMode, commType, commAlg),
+        OUTPUT(quantExpandXOut, commCmdInfoOut));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);

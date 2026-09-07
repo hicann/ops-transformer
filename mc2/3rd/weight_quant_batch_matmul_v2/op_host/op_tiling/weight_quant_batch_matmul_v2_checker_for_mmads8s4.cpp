@@ -56,17 +56,17 @@ bool Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4::CheckDtype()
     inputParams_.bDtype = context_->GetInputDesc(idx++)->GetDataType();
     inputParams_.antiQuantScaleDtype = context_->GetInputDesc(idx++)->GetDataType();
     inputParams_.cDtype = context_->GetOutputDesc(0)->GetDataType();
-    OP_TILING_CHECK(inputParams_.aDtype != ge::DT_FLOAT16,
-                    OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "x",
-                                              ge::TypeUtils::DataTypeToAscendString(inputParams_.aDtype).GetString(),
-                                              "DT_FLOAT16"),
-                    return false);
+    OP_TILING_CHECK(
+        inputParams_.aDtype != ge::DT_FLOAT16,
+        OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "x",
+                                  ge::TypeUtils::DataTypeToAscendString(inputParams_.aDtype).GetString(), "DT_FLOAT16"),
+        return false);
 
-    OP_TILING_CHECK(inputParams_.bDtype != ge::DT_INT8,
-                    OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "weight",
-                                              ge::TypeUtils::DataTypeToAscendString(inputParams_.bDtype).GetString(),
-                                              "DT_INT8"),
-                    return false);
+    OP_TILING_CHECK(
+        inputParams_.bDtype != ge::DT_INT8,
+        OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "weight",
+                                  ge::TypeUtils::DataTypeToAscendString(inputParams_.bDtype).GetString(), "DT_INT8"),
+        return false);
 
     OP_TILING_CHECK(
         inputParams_.antiQuantScaleDtype != ge::DT_UINT64 && inputParams_.antiQuantScaleDtype != ge::DT_INT64,
@@ -75,11 +75,11 @@ bool Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4::CheckDtype()
                                   "DT_UINT64 or DT_INT64"),
         return false);
 
-    OP_TILING_CHECK(inputParams_.cDtype != ge::DT_FLOAT16,
-                    OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "y",
-                                              ge::TypeUtils::DataTypeToAscendString(inputParams_.cDtype).GetString(),
-                                              "DT_FLOAT16"),
-                    return false);
+    OP_TILING_CHECK(
+        inputParams_.cDtype != ge::DT_FLOAT16,
+        OP_LOGE_FOR_INVALID_DTYPE(inputParams_.opName, "y",
+                                  ge::TypeUtils::DataTypeToAscendString(inputParams_.cDtype).GetString(), "DT_FLOAT16"),
+        return false);
 
     return true;
 }

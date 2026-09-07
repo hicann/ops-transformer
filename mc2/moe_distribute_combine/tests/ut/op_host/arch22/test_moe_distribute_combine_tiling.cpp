@@ -640,7 +640,6 @@ TEST_F(MoeDistributeCombineArch22TilingTest, EpWorldSize72)
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
 }
 
-
 TEST_F(MoeDistributeCombineArch22TilingTest, A2Int8Quant)
 {
     struct MoeDistributeCombineCompileInfo {};

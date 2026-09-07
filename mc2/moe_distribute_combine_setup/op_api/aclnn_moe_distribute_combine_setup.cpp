@@ -46,9 +46,9 @@ static inline bool CheckEmptyTensor(const aclTensor *tensor, const char *name)
     return true;
 }
 
-#define OP_CHECK_EMPTY_TENSOR(tensor, retExpr)                                                                         \
-    if (!CheckEmptyTensor(tensor, #tensor)) {                                                                          \
-        retExpr;                                                                                                       \
+#define OP_CHECK_EMPTY_TENSOR(tensor, retExpr) \
+    if (!CheckEmptyTensor(tensor, #tensor)) { \
+        retExpr; \
     }
 
 static constexpr size_t TWO_DIM = 2;

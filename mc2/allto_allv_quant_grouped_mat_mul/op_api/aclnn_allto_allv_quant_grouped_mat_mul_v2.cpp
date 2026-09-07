@@ -377,7 +377,6 @@ static aclnnStatus CheckWeightScaleTransposeConsistency(const aclTensor *gmmWeig
     return ACLNN_SUCCESS;
 }
 
-
 static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *gmmXScale,
                                const aclTensor *gmmWeightScale, const aclTensor *sendCountsTensorOptional,
                                const aclTensor *recvCountsTensorOptional, const aclTensor *mmXOptional,

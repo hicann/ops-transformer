@@ -39,7 +39,7 @@ extern "C" __global__ __aicore__ void moe_distribute_dispatch_setup(GM_ADDR x, G
         op.Init(x, expertIds, scales, xActiveMask, YOut, expandIdxOut, commCmdInfoOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     }
-#elif ((ORIG_DTYPE_Y == DT_INT8) || (ORIG_DTYPE_Y == DT_FLOAT8_E5M2) || (ORIG_DTYPE_Y == DT_FLOAT8_E4M3FN) ||          \
+#elif ((ORIG_DTYPE_Y == DT_INT8) || (ORIG_DTYPE_Y == DT_FLOAT8_E5M2) || (ORIG_DTYPE_Y == DT_FLOAT8_E4M3FN) || \
        (ORIG_DTYPE_Y == DT_HIFLOAT8))
     if (TILING_KEY_IS(1011)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchSetupTilingData, tilingData, tilingGM);

@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /* !
  * \file matmul_v3_asw_basic_tiling.cc
  * \brief
@@ -47,7 +46,6 @@ bool Mc2MatMulV3AswBasicApiTiling::IsCapable()
     OP_LOGI(args_.opName, "Mc2MatMulV3 tiling enable state basic api");
     return true;
 }
-
 
 uint64_t Mc2MatMulV3AswBasicApiTiling::GetTilingKey() const
 {

@@ -132,14 +132,14 @@ bool Mc2QuantBatchMatmulV3Checker::CheckScaleDtypeWithPertoken() const
                                               "If the dtype of input is INT8 and that of output is FLOAT16 with "
                                               "pertokenScale, the dtype of scale must be FLOAT, actual dtype is %s."),
         return false);
-    OP_TILING_CHECK(inputParams_.aDtype == ge::DT_INT8 && inputParams_.cDtype == ge::DT_BF16 &&
-                        !(inputParams_.scaleDtype == ge::DT_FLOAT || inputParams_.scaleDtype == ge::DT_BF16),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "scale",
-                        ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
-                        "If the dtype of input is INT8 and that of output is BFLOAT16 with pertokenScale, the dtype of "
-                        "scale must be FLOAT or BFLOAT16, actual dtype is %s."),
-                    return false);
+    OP_TILING_CHECK(
+        inputParams_.aDtype == ge::DT_INT8 && inputParams_.cDtype == ge::DT_BF16 &&
+            !(inputParams_.scaleDtype == ge::DT_FLOAT || inputParams_.scaleDtype == ge::DT_BF16),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            inputParams_.opName, "scale", ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
+            "If the dtype of input is INT8 and that of output is BFLOAT16 with pertokenScale, the dtype of "
+            "scale must be FLOAT or BFLOAT16, actual dtype is %s."),
+        return false);
     return true;
 }
 
@@ -156,32 +156,32 @@ bool Mc2QuantBatchMatmulV3Checker::CheckScalesDtype() const
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "pertokenScale", "nullptr",
                                                   "If the dtype of input is FLOAT4, pertokenScale cannot be nullptr"),
             return false);
-        OP_TILING_CHECK(inputParams_.aDtype != ge::DT_INT8 &&
-                            !(inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_INT64),
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            inputParams_.opName, "scale",
-                            ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
-                            "If the dtype of input is not INT8 without pertokenScale, the dtype of scale must be "
-                            "UINT64 or INT64, actual dtype is %s."),
-                        return false);
-        OP_TILING_CHECK(inputParams_.aDtype == ge::DT_INT8 &&
-                            (inputParams_.cDtype == ge::DT_INT8 || inputParams_.cDtype == ge::DT_FLOAT16) &&
-                            !(inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_INT64),
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            inputParams_.opName, "scale",
-                            ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
-                            "If the dtype of input is INT8 and that of output is INT8 or FLOAT16 without "
-                            "pertokenScale, the dtype of scale must be UINT64 or INT64, actual dtype is %s."),
-                        return false);
-        OP_TILING_CHECK(inputParams_.aDtype == ge::DT_INT8 && inputParams_.cDtype == ge::DT_BF16 &&
-                            !(inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_FLOAT ||
-                              inputParams_.scaleDtype == ge::DT_BF16 || inputParams_.scaleDtype == ge::DT_INT64),
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            inputParams_.opName, "scale",
-                            ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
-                            "If the dtype of input is INT8 and that of output is BFLOAT16 without pertokenScale, the "
-                            "dtype of scale must be UINT64, FLOAT, BFLOAT16 or INT64, actual dtype is %s."),
-                        return false);
+        OP_TILING_CHECK(
+            inputParams_.aDtype != ge::DT_INT8 &&
+                !(inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_INT64),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                inputParams_.opName, "scale", ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
+                "If the dtype of input is not INT8 without pertokenScale, the dtype of scale must be "
+                "UINT64 or INT64, actual dtype is %s."),
+            return false);
+        OP_TILING_CHECK(
+            inputParams_.aDtype == ge::DT_INT8 &&
+                (inputParams_.cDtype == ge::DT_INT8 || inputParams_.cDtype == ge::DT_FLOAT16) &&
+                !(inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_INT64),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                inputParams_.opName, "scale", ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
+                "If the dtype of input is INT8 and that of output is INT8 or FLOAT16 without "
+                "pertokenScale, the dtype of scale must be UINT64 or INT64, actual dtype is %s."),
+            return false);
+        OP_TILING_CHECK(
+            inputParams_.aDtype == ge::DT_INT8 && inputParams_.cDtype == ge::DT_BF16 &&
+                !(inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_FLOAT ||
+                  inputParams_.scaleDtype == ge::DT_BF16 || inputParams_.scaleDtype == ge::DT_INT64),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                inputParams_.opName, "scale", ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
+                "If the dtype of input is INT8 and that of output is BFLOAT16 without pertokenScale, the "
+                "dtype of scale must be UINT64, FLOAT, BFLOAT16 or INT64, actual dtype is %s."),
+            return false);
     }
     return true;
 }
@@ -189,46 +189,46 @@ bool Mc2QuantBatchMatmulV3Checker::CheckScalesDtype() const
 bool Mc2QuantBatchMatmulV3Checker::CheckBiasDtype() const
 {
     auto biasDesc = context_->GetOptionalInputDesc(BIAS_INDEX);
-    OP_TILING_CHECK(biasDesc != nullptr && inputParams_.biasDtype != ge::DT_FLOAT && inputParams_.aDtype != ge::DT_INT8,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "bias",
-                        ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
-                        "If the dtype of input is not INT8, the dtype of bias must be FLOAT, actual dtype is %s."),
-                    return false);
+    OP_TILING_CHECK(
+        biasDesc != nullptr && inputParams_.biasDtype != ge::DT_FLOAT && inputParams_.aDtype != ge::DT_INT8,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            inputParams_.opName, "bias", ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
+            "If the dtype of input is not INT8, the dtype of bias must be FLOAT, actual dtype is %s."),
+        return false);
 
-    OP_TILING_CHECK(biasDesc != nullptr && inputParams_.aDtype == ge::DT_INT8 &&
-                        (inputParams_.cDtype == ge::DT_INT8 || inputParams_.cDtype == ge::DT_FLOAT16 ||
-                         inputParams_.cDtype == ge::DT_BF16) &&
-                        (inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_INT64) &&
-                        inputParams_.biasDtype != ge::DT_INT32,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "bias",
-                        ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
-                        "If the dtype of input is INT8, that of output is INT8, FLOAT16 or BFLOAT16, and that of scale "
-                        "is UINT64 or INT64, the dtype of bias must be INT32, actual dtype is %s."),
-                    return false);
+    OP_TILING_CHECK(
+        biasDesc != nullptr && inputParams_.aDtype == ge::DT_INT8 &&
+            (inputParams_.cDtype == ge::DT_INT8 || inputParams_.cDtype == ge::DT_FLOAT16 ||
+             inputParams_.cDtype == ge::DT_BF16) &&
+            (inputParams_.scaleDtype == ge::DT_UINT64 || inputParams_.scaleDtype == ge::DT_INT64) &&
+            inputParams_.biasDtype != ge::DT_INT32,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            inputParams_.opName, "bias", ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
+            "If the dtype of input is INT8, that of output is INT8, FLOAT16 or BFLOAT16, and that of scale "
+            "is UINT64 or INT64, the dtype of bias must be INT32, actual dtype is %s."),
+        return false);
 
-    OP_TILING_CHECK(biasDesc != nullptr && inputParams_.aDtype == ge::DT_INT8 &&
-                        inputParams_.cDtype == ge::DT_FLOAT16 && inputParams_.scaleDtype == ge::DT_FLOAT &&
-                        !(inputParams_.biasDtype == ge::DT_INT32 || inputParams_.biasDtype == ge::DT_FLOAT ||
-                          inputParams_.biasDtype == ge::DT_FLOAT16),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "bias",
-                        ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
-                        "If the dtype of input is INT8, that of output is FLOAT16, and that of scale is FLOAT, the "
-                        "dtype of bias must be INT32, FLOAT or FLOAT16, actual dtype is %s."),
-                    return false);
+    OP_TILING_CHECK(
+        biasDesc != nullptr && inputParams_.aDtype == ge::DT_INT8 && inputParams_.cDtype == ge::DT_FLOAT16 &&
+            inputParams_.scaleDtype == ge::DT_FLOAT &&
+            !(inputParams_.biasDtype == ge::DT_INT32 || inputParams_.biasDtype == ge::DT_FLOAT ||
+              inputParams_.biasDtype == ge::DT_FLOAT16),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            inputParams_.opName, "bias", ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
+            "If the dtype of input is INT8, that of output is FLOAT16, and that of scale is FLOAT, the "
+            "dtype of bias must be INT32, FLOAT or FLOAT16, actual dtype is %s."),
+        return false);
 
-    OP_TILING_CHECK(biasDesc != nullptr && inputParams_.aDtype == ge::DT_INT8 && inputParams_.cDtype == ge::DT_BF16 &&
-                        (inputParams_.scaleDtype == ge::DT_FLOAT || inputParams_.scaleDtype == ge::DT_BF16) &&
-                        !(inputParams_.biasDtype == ge::DT_INT32 || inputParams_.biasDtype == ge::DT_FLOAT ||
-                          inputParams_.biasDtype == ge::DT_BF16),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        inputParams_.opName, "bias",
-                        ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
-                        "If the dtype of input is INT8, that of output is BFLOAT16, and that of scale is FLOAT or "
-                        "BFLOAT16, the dtype of bias must be INT32, FLOAT or BFLOAT16, actual dtype is %s."),
-                    return false);
+    OP_TILING_CHECK(
+        biasDesc != nullptr && inputParams_.aDtype == ge::DT_INT8 && inputParams_.cDtype == ge::DT_BF16 &&
+            (inputParams_.scaleDtype == ge::DT_FLOAT || inputParams_.scaleDtype == ge::DT_BF16) &&
+            !(inputParams_.biasDtype == ge::DT_INT32 || inputParams_.biasDtype == ge::DT_FLOAT ||
+              inputParams_.biasDtype == ge::DT_BF16),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            inputParams_.opName, "bias", ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype).c_str(),
+            "If the dtype of input is INT8, that of output is BFLOAT16, and that of scale is FLOAT or "
+            "BFLOAT16, the dtype of bias must be INT32, FLOAT or BFLOAT16, actual dtype is %s."),
+        return false);
 
     return true;
 }
@@ -273,13 +273,13 @@ bool Mc2QuantBatchMatmulV3Checker::CheckOutputDtype() const
                                                   "If the dtype of input is INT8 with pertokenScale, the dtype of "
                                                   "output must be FLOAT16 or BFLOAT16, actual is %s."),
             return false);
-        OP_TILING_CHECK(!(inputParams_.cDtype == ge::DT_FLOAT || inputParams_.cDtype == ge::DT_FLOAT16 ||
-                          inputParams_.cDtype == ge::DT_BF16),
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                            inputParams_.opName, "output",
-                            ge::TypeUtils::DataTypeToSerialString(inputParams_.cDtype).c_str(),
-                            "The dtype of output must be FLOAT, FLOAT16 or BFLOAT16 with pertokenScale, actual is %s."),
-                        return false);
+        OP_TILING_CHECK(
+            !(inputParams_.cDtype == ge::DT_FLOAT || inputParams_.cDtype == ge::DT_FLOAT16 ||
+              inputParams_.cDtype == ge::DT_BF16),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                inputParams_.opName, "output", ge::TypeUtils::DataTypeToSerialString(inputParams_.cDtype).c_str(),
+                "The dtype of output must be FLOAT, FLOAT16 or BFLOAT16 with pertokenScale, actual is %s."),
+            return false);
     }
     return true;
 }
@@ -501,12 +501,12 @@ bool Mc2QuantBatchMatmulV3Checker::MxPertokenScaleShapeCheck(const gert::Storage
                                                           "When the quantization mode is mx, the m dimension of "
                                                           "pertokenScale must be equal to the m dimension of x1."),
                     return false);
-    OP_TILING_CHECK(static_cast<uint64_t>(pertoken.GetDim(pertokenShapeLen - 1)) != MXFP_MULTI_BASE_SIZE,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        inputParams_.opName, "pertokenScale",
-                        std::to_string(pertoken.GetDim(pertokenShapeLen - 1)).c_str(),
-                        "When the quantization mode is mx, the last dimension of pertokenScale must be 2."),
-                    return false);
+    OP_TILING_CHECK(
+        static_cast<uint64_t>(pertoken.GetDim(pertokenShapeLen - 1)) != MXFP_MULTI_BASE_SIZE,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            inputParams_.opName, "pertokenScale", std::to_string(pertoken.GetDim(pertokenShapeLen - 1)).c_str(),
+            "When the quantization mode is mx, the last dimension of pertokenScale must be 2."),
+        return false);
     return true;
 }
 
@@ -520,13 +520,13 @@ bool Mc2QuantBatchMatmulV3Checker::MxScaleShapeCheck(const gert::Shape &scaleSha
         return false);
     auto kDimIdx = inputParams_.transB ? 1 : 0;
     auto nDimIdx = inputParams_.transB ? 0 : 1;
-    OP_TILING_CHECK(static_cast<uint64_t>(scaleShape.GetDim(kDimIdx)) !=
-                        ops::CeilDiv(inputParams_.kSize, MXFP_DIVISOR_SIZE),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "scale",
-                                                          std::to_string(scaleShape.GetDim(kDimIdx)).c_str(),
-                                                          "When the quantization mode is mx, the k dimension of scale "
-                                                          "must be equal to the k dimension of x2 ceildivided by 64."),
-                    return false);
+    OP_TILING_CHECK(
+        static_cast<uint64_t>(scaleShape.GetDim(kDimIdx)) != ops::CeilDiv(inputParams_.kSize, MXFP_DIVISOR_SIZE),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "scale",
+                                              std::to_string(scaleShape.GetDim(kDimIdx)).c_str(),
+                                              "When the quantization mode is mx, the k dimension of scale "
+                                              "must be equal to the k dimension of x2 ceildivided by 64."),
+        return false);
     OP_TILING_CHECK(
         static_cast<uint64_t>(scaleShape.GetDim(nDimIdx)) != inputParams_.nSize,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -548,13 +548,13 @@ bool Mc2QuantBatchMatmulV3Checker::CheckInputValidInMxPerGroupMode(const gert::S
     if (!inputParams_.isMxPerGroup) {
         return true;
     }
-    OP_TILING_CHECK(inputParams_.groupSizeM != 1ULL || inputParams_.groupSizeN != 1ULL ||
-                        inputParams_.groupSizeK != 32ULL,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "groupSize",
-                                                          std::to_string(inputParams_.groupSizeM).c_str(),
-                                                          "If the dtype of scale is FLOAT8_E8M0, the value of "
-                                                          "[groupSizeM, groupSizeN, groupSizeK] must be [1, 1, 32]."),
-                    return false);
+    OP_TILING_CHECK(
+        inputParams_.groupSizeM != 1ULL || inputParams_.groupSizeN != 1ULL || inputParams_.groupSizeK != 32ULL,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "groupSize",
+                                              std::to_string(inputParams_.groupSizeM).c_str(),
+                                              "If the dtype of scale is FLOAT8_E8M0, the value of "
+                                              "[groupSizeM, groupSizeN, groupSizeK] must be [1, 1, 32]."),
+        return false);
     if (pertokenShape == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(inputParams_.opName, "pertokenScale");
         return false;
@@ -588,11 +588,11 @@ bool Mc2QuantBatchMatmulV3Checker::CheckShapeInRangeForOptionalInputs(const gert
 {
     if (biasShape != nullptr) {
         auto biasDimNum = biasShape->GetStorageShape().GetDimNum();
-        OP_TILING_CHECK(!(biasDimNum == 1 || biasDimNum == BIAS_THREE_DIM),
-                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "bias",
-                                                                 std::to_string(biasDimNum).c_str(),
-                                                                 "The shape dim of bias must be 1 or 3."),
-                        return false);
+        OP_TILING_CHECK(
+            !(biasDimNum == 1 || biasDimNum == BIAS_THREE_DIM),
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "bias", std::to_string(biasDimNum).c_str(),
+                                                     "The shape dim of bias must be 1 or 3."),
+            return false);
         OP_TILING_CHECK(biasDimNum == BIAS_THREE_DIM && outDimNum != biasDimNum,
                         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                             inputParams_.opName, "output", std::to_string(outDimNum).c_str(),
@@ -644,11 +644,11 @@ bool Mc2QuantBatchMatmulV3Checker::CheckShapeInBoundary(const gert::Shape &shape
                                                   "The last dimension of input must not be larger than 65535."),
             return false);
 
-        OP_TILING_CHECK(curDim <= 0 || curDim > static_cast<int64_t>(INT32_MAX),
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, dimName,
-                                                              std::to_string(curDim).c_str(),
-                                                              "The shape of input must be within the range [1, %d]."),
-                        return false);
+        OP_TILING_CHECK(
+            curDim <= 0 || curDim > static_cast<int64_t>(INT32_MAX),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, dimName, std::to_string(curDim).c_str(),
+                                                  "The shape of input must be within the range [1, %d]."),
+            return false);
 
         mulBound = curDim * mul;
         OP_TILING_CHECK(mulBound / curDim != mul,
@@ -670,21 +670,21 @@ bool Mc2QuantBatchMatmulV3Checker::BiasShapeCheck(const gert::Shape &biasShape, 
         auto biasFirstDim = static_cast<uint64_t>(biasShape.GetDim(0));  // using index 0 to get bias first dim value
         auto biasSecondDim = static_cast<uint64_t>(biasShape.GetDim(1)); // using index 1 to get bias second dim value
         auto biasThirdDim = static_cast<uint64_t>(biasShape.GetDim(2));  // using index 2 to get bias third dim value
-        OP_TILING_CHECK(biasFirstDim != inputParams_.batchC,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "bias",
-                                                              std::to_string(biasFirstDim).c_str(),
-                                                              "The 1st dimension of bias must be equal to batchC."),
-                        return false);
-        OP_TILING_CHECK(biasSecondDim != 1,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "bias",
-                                                              std::to_string(biasSecondDim).c_str(),
-                                                              "The 2nd dimension of bias must be 1."),
-                        return false);
-        OP_TILING_CHECK(biasThirdDim != inputParams_.nSize,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "bias",
-                                                              std::to_string(biasThirdDim).c_str(),
-                                                              "The 3rd dimension of bias must be equal to nSize."),
-                        return false);
+        OP_TILING_CHECK(
+            biasFirstDim != inputParams_.batchC,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "bias", std::to_string(biasFirstDim).c_str(),
+                                                  "The 1st dimension of bias must be equal to batchC."),
+            return false);
+        OP_TILING_CHECK(
+            biasSecondDim != 1,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "bias", std::to_string(biasSecondDim).c_str(),
+                                                  "The 2nd dimension of bias must be 1."),
+            return false);
+        OP_TILING_CHECK(
+            biasThirdDim != inputParams_.nSize,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "bias", std::to_string(biasThirdDim).c_str(),
+                                                  "The 3rd dimension of bias must be equal to nSize."),
+            return false);
     }
     if (biasDimNum == 1) {
         OP_TILING_CHECK(static_cast<uint64_t>(biasShape.GetDim(0)) != inputParams_.nSize,

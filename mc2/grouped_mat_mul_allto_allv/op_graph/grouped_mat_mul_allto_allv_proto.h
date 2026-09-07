@@ -19,7 +19,6 @@
 
 namespace ge {
 
-
 /**
 * @brief Fusion of grouped matmul and alltoallv.
 
@@ -71,8 +70,6 @@ REG_OP(GroupedMatMulAlltoAllv)
     .ATTR(comm_mode, String, "ai_cpu")
     .OP_END_FACTORY_REG(GroupedMatMulAlltoAllv)
 
-
 } // namespace ge
-
 
 #endif // GROUPED_MAT_MUL_ALLTO_ALLV_PROTO_H_

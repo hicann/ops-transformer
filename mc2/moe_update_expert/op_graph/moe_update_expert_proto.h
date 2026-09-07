@@ -58,5 +58,4 @@ REG_OP(MoeUpdateExpert)
 
 } // namespace ge
 
-
 #endif // MOE_UPDATE_EXPERT_PROTO_H_

@@ -25,7 +25,6 @@ using namespace op;
 extern "C" {
 #endif
 
-
 // check nullptr
 static bool CheckNotNull(const aclTensor *x, const aclTensor *weight, const char *groupEp, const char *groupTp,
                          aclTensor *y1Out)
@@ -91,10 +90,10 @@ static bool CheckIfTensorThreeDim(const aclTensor *x, const aclTensor *weight, c
         return false;
     }
     if (weight->GetViewShape().GetDimNum() != SUPPORTED_DIMENSIONAL) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("AlltoAllAllGatherBatchMatMul", "weight",
-                                                 (std::to_string(weight->GetViewShape().GetDimNum()) + "D").c_str(),
-                                                 "The shape of weight must be " +
-                                                     std::to_string(SUPPORTED_DIMENSIONAL) + "D.");
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            "AlltoAllAllGatherBatchMatMul", "weight",
+            (std::to_string(weight->GetViewShape().GetDimNum()) + "D").c_str(),
+            "The shape of weight must be " + std::to_string(SUPPORTED_DIMENSIONAL) + "D.");
         return false;
     }
     if (y1Out->GetViewShape().GetDimNum() != SUPPORTED_DIMENSIONAL) {

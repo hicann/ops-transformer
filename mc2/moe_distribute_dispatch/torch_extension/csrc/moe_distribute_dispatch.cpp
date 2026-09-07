@@ -28,7 +28,10 @@ const int64_t RANK_NUM_PER_NODE = 8;
 const int64_t SEND_COUNT_MEMORY_SIZE = 2;
 const int64_t PACKED_FLOAT4_ELEMENTS_PER_BYTE = 2;
 
-bool HasTensor(const c10::optional<at::Tensor> &tensor) { return tensor.has_value() && tensor.value().defined(); }
+bool HasTensor(const c10::optional<at::Tensor> &tensor)
+{
+    return tensor.has_value() && tensor.value().defined();
+}
 
 aclDataType GetDynamicScalesDtype(const at::Tensor &x, const c10::optional<at::Tensor> &scales,
                                   c10::optional<int64_t> scales_dtype, int64_t quant_mode)
@@ -103,7 +106,10 @@ at::ScalarType GetStorageScalarType(aclDataType dtype)
     return at::kByte;
 }
 
-bool IsPackedFloat4(aclDataType dtype) { return dtype == ACL_FLOAT4_E2M1 || dtype == ACL_FLOAT4_E1M2; }
+bool IsPackedFloat4(aclDataType dtype)
+{
+    return dtype == ACL_FLOAT4_E2M1 || dtype == ACL_FLOAT4_E1M2;
+}
 
 bool IsAscend950()
 {

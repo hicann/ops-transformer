@@ -543,11 +543,11 @@ static ge::graphStatus HandleNoneLocalBmmTilingData(gert::TilingContext *context
                                tilingData->commonTiling.MOverTp, tilingData->commonTiling.H,
                                tilingData->commonTiling.domesticTileE.tileLen);
         } else {
-            CompleteBmmStructs(bmmV3BatchInfo, mmV3ArgsInfo,
-                               (tilingData->commonTiling.epGroupSize - 1) *
-                                   tilingData->commonTiling.domesticTileC.tailLen,
-                               tilingData->commonTiling.MOverTp, tilingData->commonTiling.H,
-                               tilingData->commonTiling.domesticTileE.tileLen);
+            CompleteBmmStructs(
+                bmmV3BatchInfo, mmV3ArgsInfo,
+                (tilingData->commonTiling.epGroupSize - 1) * tilingData->commonTiling.domesticTileC.tailLen,
+                tilingData->commonTiling.MOverTp, tilingData->commonTiling.H,
+                tilingData->commonTiling.domesticTileE.tileLen);
         }
         AlltoAllAllGatherBatchMatMulTiling bmmTilingDomesticTail(context, tilingData->domesticTailTiling.bmmTilingData,
                                                                  bmmV3BatchInfo, mmV3ArgsInfo);

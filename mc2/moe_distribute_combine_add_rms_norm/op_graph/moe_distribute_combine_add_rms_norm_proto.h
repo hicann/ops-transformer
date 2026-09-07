@@ -128,5 +128,4 @@ REG_OP(MoeDistributeCombineAddRmsNorm)
 
 } // namespace ge
 
-
 #endif // MOE_DISTRIBUTE_COMBINE_ADD_RMS_NORM_PROTO_H_

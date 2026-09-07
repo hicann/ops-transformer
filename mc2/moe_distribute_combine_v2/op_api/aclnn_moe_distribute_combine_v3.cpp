@@ -24,7 +24,6 @@ using namespace op;
 extern "C" {
 #endif
 
-
 // check nullptr
 aclnnStatus aclnnMoeDistributeCombineV3GetWorkspaceSize(
     const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine,

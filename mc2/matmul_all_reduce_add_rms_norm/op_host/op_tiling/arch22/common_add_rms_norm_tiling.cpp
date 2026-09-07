@@ -123,11 +123,11 @@ ge::graphStatus CheckAddRmsNormInputShape(const gert::TilingContext *context, co
                                           const gert::StorageShape *xShape)
 {
     // residual shape
-    OP_TILING_CHECK(x2Shape->GetStorageShape().GetDimNum() != DIM_THREE,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "residual",
-                                                 (std::to_string(x2Shape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                                                 "3D"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        x2Shape->GetStorageShape().GetDimNum() != DIM_THREE,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "residual",
+                                     (std::to_string(x2Shape->GetStorageShape().GetDimNum()) + "D").c_str(), "3D"),
+        return ge::GRAPH_FAILED);
     // gamma shape
     OP_TILING_CHECK(
         gammaShape->GetStorageShape().GetDimNum() != DIM_ONE,
@@ -135,17 +135,17 @@ ge::graphStatus CheckAddRmsNormInputShape(const gert::TilingContext *context, co
                                      (std::to_string(gammaShape->GetStorageShape().GetDimNum()) + "D").c_str(), "1D"),
         return ge::GRAPH_FAILED);
     // normOut shape
-    OP_TILING_CHECK(yShape->GetStorageShape().GetDimNum() != DIM_THREE,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "normOut",
-                                                 (std::to_string(yShape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                                                 "3D"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        yShape->GetStorageShape().GetDimNum() != DIM_THREE,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "normOut",
+                                     (std::to_string(yShape->GetStorageShape().GetDimNum()) + "D").c_str(), "3D"),
+        return ge::GRAPH_FAILED);
     // y shape
-    OP_TILING_CHECK(xShape->GetStorageShape().GetDimNum() != DIM_THREE,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "y",
-                                                 (std::to_string(xShape->GetStorageShape().GetDimNum()) + "D").c_str(),
-                                                 "3D"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        xShape->GetStorageShape().GetDimNum() != DIM_THREE,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "y",
+                                     (std::to_string(xShape->GetStorageShape().GetDimNum()) + "D").c_str(), "3D"),
+        return ge::GRAPH_FAILED);
     // residual和gamma的n值
     OP_TILING_CHECK(x2Shape->GetStorageShape().GetDim(2) != gammaShape->GetStorageShape().GetDim(0),
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(

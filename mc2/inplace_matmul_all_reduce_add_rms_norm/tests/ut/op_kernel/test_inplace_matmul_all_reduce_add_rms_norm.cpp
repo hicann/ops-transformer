@@ -38,10 +38,10 @@ using namespace std;
 using namespace std;
 using namespace Mc2Tiling;
 
-extern "C" __global__ __aicore__ void
-inplace_matmul_all_reduce_add_rms_norm(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR residualGM, GM_ADDR gammaGM,
-                                       GM_ADDR antiquantScaleGM, GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM,
-                                       GM_ADDR yGM, GM_ADDR normOutGM, GM_ADDR workspaceGM, GM_ADDR tilingGM);
+extern "C" __global__ __aicore__ void inplace_matmul_all_reduce_add_rms_norm(
+    GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR residualGM, GM_ADDR gammaGM, GM_ADDR antiquantScaleGM,
+    GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM, GM_ADDR yGM, GM_ADDR normOutGM, GM_ADDR workspaceGM,
+    GM_ADDR tilingGM);
 extern uint8_t *g_hcclContextReserved[2];
 struct HcclSignalInfo {
     uint64_t resId; // 在代表event时为eventid，notify时为notifyid

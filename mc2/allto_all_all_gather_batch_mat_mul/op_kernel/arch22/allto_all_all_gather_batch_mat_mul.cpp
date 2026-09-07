@@ -41,22 +41,22 @@ using DT_BIAS = half;
 using DT_BIAS = float;
 #endif
 
-#define AlltoAllAllGatherBatchMatMul_IMPL_CLASS(...)                                                                   \
-    do {                                                                                                               \
-        TPipe pipe;                                                                                                    \
-        AlltoAllAllGatherBatchMatMul<DT_X, DT_BIAS, __VA_ARGS__> op;                                                   \
-        op.Init(xGM, weightGM, biasGM, y1GM, y2GM, y3GM, workspaceGM, &pipe, &tilingData, hcclInitTiling,              \
-                allGatherCcTiling, alltoAllCcTiling);                                                                  \
-        op.Process();                                                                                                  \
+#define AlltoAllAllGatherBatchMatMul_IMPL_CLASS(...) \
+    do { \
+        TPipe pipe; \
+        AlltoAllAllGatherBatchMatMul<DT_X, DT_BIAS, __VA_ARGS__> op; \
+        op.Init(xGM, weightGM, biasGM, y1GM, y2GM, y3GM, workspaceGM, &pipe, &tilingData, hcclInitTiling, \
+                allGatherCcTiling, alltoAllCcTiling); \
+        op.Process(); \
     } while (0)
 
-#define AlltoAllAllGatherBatchMatMul_SHARD_H_IMPL_CLASS(...)                                                           \
-    do {                                                                                                               \
-        TPipe pipe;                                                                                                    \
-        AlltoAllAllGatherBatchMatMulShardH<DT_X, DT_BIAS, __VA_ARGS__> op;                                             \
-        op.Init(xGM, weightGM, biasGM, y1GM, y2GM, y3GM, workspaceGM, &pipe, &tilingData, hcclInitTiling,              \
-                allGatherCcTiling, alltoAllCcTiling);                                                                  \
-        op.Process();                                                                                                  \
+#define AlltoAllAllGatherBatchMatMul_SHARD_H_IMPL_CLASS(...) \
+    do { \
+        TPipe pipe; \
+        AlltoAllAllGatherBatchMatMulShardH<DT_X, DT_BIAS, __VA_ARGS__> op; \
+        op.Init(xGM, weightGM, biasGM, y1GM, y2GM, y3GM, workspaceGM, &pipe, &tilingData, hcclInitTiling, \
+                allGatherCcTiling, alltoAllCcTiling); \
+        op.Process(); \
     } while (0)
 
 template <int XShard, bool WeightTransPose, bool IsBias, bool Y2Need, bool Y3Need>

@@ -54,5 +54,4 @@ REG_OP(DistributeBarrierExtend)
 
 } // namespace ge
 
-
 #endif // DISTRIBUTE_BARRIER_EXTEND_PROTO_H_

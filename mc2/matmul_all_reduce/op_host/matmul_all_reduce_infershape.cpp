@@ -18,7 +18,6 @@
 #include "util/math_util.h"
 #include "register/op_impl_registry.h"
 
-
 using Ops::Base::CeilDiv;
 
 namespace ops {
@@ -79,9 +78,9 @@ static ge::graphStatus CheckMatmulKAndScale(const gert::InferShapeContext *conte
     const auto attrs = context->GetAttrs();
     const int64_t *p = attrs->GetInt(static_cast<size_t>(MmAllReduceAttrIdx::K_ANTIQUANT_GROUP_SIZE));
     const int64_t group_size = (p != nullptr ? *p : 0);
-    OPS_CHECK(CheckScaleShape(context->GetOptionalInputShape(scale_idx), group_size, shape, is_trans_b) !=
-                  ge::GRAPH_SUCCESS,
-              OP_LOGE(context->GetNodeName(), "Failed to check antiquant scale shape."), return ge::GRAPH_FAILED);
+    OPS_CHECK(
+        CheckScaleShape(context->GetOptionalInputShape(scale_idx), group_size, shape, is_trans_b) != ge::GRAPH_SUCCESS,
+        OP_LOGE(context->GetNodeName(), "Failed to check antiquant scale shape."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

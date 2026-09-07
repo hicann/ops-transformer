@@ -21,7 +21,6 @@
 #include "mc2_log.h"
 #include "mc2_tiling_utils.h"
 
-
 namespace mc2tiling {
 
 uint64_t NewGetDataTypeSize(const std::string &opName, ge::DataType type)

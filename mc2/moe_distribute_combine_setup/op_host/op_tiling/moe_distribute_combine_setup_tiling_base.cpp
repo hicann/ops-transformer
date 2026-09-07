@@ -366,11 +366,11 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckInputTensorDim()
 
 ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckOutputTensorDim()
 {
-    OP_TILING_CHECK(CheckOneTensorDim("quantExpandXOut", OUTPUT, QUANT_EXPAND_X_OUT_INDEX, TWO_DIMS) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName_, "quantExpandXOut", "checkdim failed",
-                                                             "quantExpandXOut must be 2D"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckOneTensorDim("quantExpandXOut", OUTPUT, QUANT_EXPAND_X_OUT_INDEX, TWO_DIMS) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName_, "quantExpandXOut", "checkdim failed",
+                                                 "quantExpandXOut must be 2D"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOneTensorDim("commCmdInfoOut", OUTPUT, COMM_CMD_INFO_OUT_INDEX, ONE_DIM) != ge::GRAPH_SUCCESS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName_, "commCmdInfoOut", "checkdim failed",
                                                              "commCmdInfoOut must be 1D"),
@@ -596,20 +596,20 @@ bool MoeDistributeCombineSetupTilingBase::CheckTensorDataType()
     auto quantExpandXOutDesc = context_->GetOutputDesc(QUANT_EXPAND_X_OUT_INDEX);
     auto commCmdInfoOutDesc = context_->GetOutputDesc(COMM_CMD_INFO_OUT_INDEX);
 
-    OP_TILING_CHECK((expandXDesc->GetDataType() != ge::DT_BF16) && (expandXDesc->GetDataType() != ge::DT_FLOAT16),
-                    OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "expandX",
-                                              Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
-                                              "bfloat16 or float16"),
-                    return false);
+    OP_TILING_CHECK(
+        (expandXDesc->GetDataType() != ge::DT_BF16) && (expandXDesc->GetDataType() != ge::DT_FLOAT16),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "expandX", Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
+                                  "bfloat16 or float16"),
+        return false);
     OP_TILING_CHECK((expertIdsDesc->GetDataType() != ge::DT_INT32),
                     OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "expertIds",
                                               Ops::Base::ToString(expertIdsDesc->GetDataType()).c_str(), "int32"),
                     return false);
-    OP_TILING_CHECK((assistInfoForCombineDesc->GetDataType() != ge::DT_INT32),
-                    OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "assistInfoForCombine",
-                                              Ops::Base::ToString(assistInfoForCombineDesc->GetDataType()).c_str(),
-                                              "int32"),
-                    return false);
+    OP_TILING_CHECK(
+        (assistInfoForCombineDesc->GetDataType() != ge::DT_INT32),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "assistInfoForCombine",
+                                  Ops::Base::ToString(assistInfoForCombineDesc->GetDataType()).c_str(), "int32"),
+        return false);
     OP_TILING_CHECK((quantExpandXOutDesc->GetDataType() != ge::DT_INT8),
                     OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "quantExpandXOut",
                                               Ops::Base::ToString(quantExpandXOutDesc->GetDataType()).c_str(), "int8"),

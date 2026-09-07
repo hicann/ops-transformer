@@ -24,11 +24,11 @@ using namespace AscendC;
 using namespace MoeUpdateExpertNamespace;
 using namespace Mc2Tiling;
 
-#define INVOKE_MOE_UPDATE_EXPERT_OP_IMPL()                                                                             \
-    do {                                                                                                               \
-        op.Init(expertIdsGM, eplbTableGM, expertScalesGM, pruningThresholdGM, activeMaskGM, balancedExpertIdsOutGM,    \
-                balancedActiveMaskOutGM, workspaceGM, &tilingData, &pipe);                                             \
-        op.Process();                                                                                                  \
+#define INVOKE_MOE_UPDATE_EXPERT_OP_IMPL() \
+    do { \
+        op.Init(expertIdsGM, eplbTableGM, expertScalesGM, pruningThresholdGM, activeMaskGM, balancedExpertIdsOutGM, \
+                balancedActiveMaskOutGM, workspaceGM, &tilingData, &pipe); \
+        op.Process(); \
     } while (0)
 
 template <int BalanceMode, int ExpertScalesDataType>

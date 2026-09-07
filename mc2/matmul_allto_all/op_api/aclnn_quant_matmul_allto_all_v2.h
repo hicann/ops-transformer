@@ -83,7 +83,6 @@ __attribute__((visibility("default"))) aclnnStatus aclnnQuantMatmulAlltoAllV2(vo
                                                                               aclOpExecutor *executor,
                                                                               aclrtStream stream);
 
-
 #ifdef __cplusplus
 }
 #endif

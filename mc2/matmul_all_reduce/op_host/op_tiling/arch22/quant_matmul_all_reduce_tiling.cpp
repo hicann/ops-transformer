@@ -254,9 +254,9 @@ ge::graphStatus QuantMatmulAllReduceTiling::CheckInput()
     return CheckAxisSize();
 }
 QuantMatmulAllReduceTiling::QuantMatmulAllReduceTiling(gert::TilingContext *context)
-    : MatmulAllReduceTilingBase(context), quantMatmulAllReduceTilingData_(quantMatmulAllReduceTilingDataSelf_)
-{
-}
+    : MatmulAllReduceTilingBase(context),
+      quantMatmulAllReduceTilingData_(quantMatmulAllReduceTilingDataSelf_)
+{}
 const gert::Shape QuantTilingTransferHelper::GetX1Shape(const size_t index)
 {
     (void)index;
@@ -280,9 +280,9 @@ const gert::Shape QuantTilingTransferHelper::GetX2Shape(const size_t index)
 // 使用外部传入的tilingdata和ctxinfo
 QuantMatmulAllReduceTiling::QuantMatmulAllReduceTiling(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
                                                        QuantMatmulAllReduceTilingData *out)
-    : MatmulAllReduceTilingBase(context, mmrCtxInfo), quantMatmulAllReduceTilingData_(*out)
-{
-}
+    : MatmulAllReduceTilingBase(context, mmrCtxInfo),
+      quantMatmulAllReduceTilingData_(*out)
+{}
 const gert::Shape &QuantTilingTransferHelper::GetScaleShape(const size_t index)
 {
     (void)index;
@@ -370,8 +370,7 @@ QuantTilingTransferHelper::QuantTilingTransferHelper(QuantMatmulAllReduceTiling 
                                                      Mc2QuantBatchMatmulV3TilingData &data)
     : Mc2QuantBatchMatmulV3Tiling(quantMatmulAllReduceTiling.context_, &data),
       tilingProcesser_(quantMatmulAllReduceTiling)
-{
-}
+{}
 
 CutResult QuantMatmulAllReduceTiling::GetTilingResult()
 {
@@ -392,7 +391,6 @@ CutResult QuantMatmulAllReduceTiling::GetTilingResult()
     }
     return mCutAllreduceRes;
 }
-
 
 // 注册带SOC版本Tiling的类
 REGISTER_TILING_TEMPLATE_WITH_SOCVERSION(MatmulAllReduce, QuantMatmulAllReduceTiling,

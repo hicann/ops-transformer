@@ -63,5 +63,4 @@ REG_OP(MatmulReduceScatter)
 
 } // namespace ge
 
-
 #endif // MATMUL_REDUCE_SCATTER_PROTO_H_

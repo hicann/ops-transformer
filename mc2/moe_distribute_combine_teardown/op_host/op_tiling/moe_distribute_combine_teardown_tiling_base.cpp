@@ -150,9 +150,15 @@ void MoeDistributeCombineTeardownTilingBase::SetDimsToTilingData()
     tilingData_->moeDistributeCombineTeardownInfo.k = static_cast<uint32_t>(K);
 }
 
-ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckAttrsWithoutRelation() { return ge::GRAPH_FAILED; }
+ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckAttrsWithoutRelation()
+{
+    return ge::GRAPH_FAILED;
+}
 
-ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckAttrsComplex() { return ge::GRAPH_FAILED; }
+ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckAttrsComplex()
+{
+    return ge::GRAPH_FAILED;
+}
 
 ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckAttrs()
 {
@@ -809,7 +815,10 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::SetWorkspace()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeCombineTeardownTilingBase::SetHcommCfg() { return ge::GRAPH_FAILED; }
+ge::graphStatus MoeDistributeCombineTeardownTilingBase::SetHcommCfg()
+{
+    return ge::GRAPH_FAILED;
+}
 
 ge::graphStatus MoeDistributeCombineTeardownTilingBase::MoeDistributeCombineTeardownTilingFuncImpl()
 {
@@ -847,7 +856,10 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::MoeDistributeCombineTear
     return ge::GRAPH_SUCCESS;
 }
 
-bool MoeDistributeCombineTeardownTilingBase::IsCapable() { return false; }
+bool MoeDistributeCombineTeardownTilingBase::IsCapable()
+{
+    return false;
+}
 
 ge::graphStatus MoeDistributeCombineTeardownTilingBase::DoOpTiling()
 {

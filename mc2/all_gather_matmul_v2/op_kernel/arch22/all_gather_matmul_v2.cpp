@@ -33,12 +33,12 @@ __global__ __aicore__ void all_gather_matmul_v2(GM_ADDR aGM, GM_ADDR bGM, GM_ADD
 {
     // aiv算子模板
 
-#define INVOKE_ALLGATHERMATMUL_AIV_MODE_OP_IMPL(templateClass, ...)                                                    \
-    do {                                                                                                               \
-        GET_TILING_DATA_WITH_STRUCT(AllGatherMatmulAIVModeTilingData, tilingData, tilingGM);                           \
-        templateClass<DTYPE_X1, DTYPE_X2, DTYPE_BIAS, DTYPE_X2_SCALE, DTYPE_Y, __VA_ARGS__> op;                        \
-        op.Init(aGM, bGM, biasGM, scaleInv1, scaleInv2, cGM, gatherOut, workspaceGM, tilingGM);                        \
-        op.Process();                                                                                                  \
+#define INVOKE_ALLGATHERMATMUL_AIV_MODE_OP_IMPL(templateClass, ...) \
+    do { \
+        GET_TILING_DATA_WITH_STRUCT(AllGatherMatmulAIVModeTilingData, tilingData, tilingGM); \
+        templateClass<DTYPE_X1, DTYPE_X2, DTYPE_BIAS, DTYPE_X2_SCALE, DTYPE_Y, __VA_ARGS__> op; \
+        op.Init(aGM, bGM, biasGM, scaleInv1, scaleInv2, cGM, gatherOut, workspaceGM, tilingGM); \
+        op.Process(); \
     } while (0)
 
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);

@@ -23,16 +23,16 @@
 #include "aclnnop/aclnn_moe_distribute_combine_setup.h"
 #include "aclnnop/aclnn_moe_distribute_combine_teardown.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 constexpr int DEV_NUM = 2;
@@ -40,9 +40,9 @@ constexpr int DEV_NUM = 2;
 template <typename Func>
 class Guard {
 public:
-    explicit Guard(Func &func) : func_(func)
-    {
-    }
+    explicit Guard(Func &func)
+        : func_(func)
+    {}
     ~Guard()
     {
         func_();

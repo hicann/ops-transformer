@@ -50,7 +50,10 @@ typedef struct {
 extern "C" uint64_t NnopbaseMsprofSysTime();
 extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
 
-static inline bool IsAscend910A5(void) { return op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510; }
+static inline bool IsAscend910A5(void)
+{
+    return op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+}
 
 static uint8_t GetDebugMode()
 {

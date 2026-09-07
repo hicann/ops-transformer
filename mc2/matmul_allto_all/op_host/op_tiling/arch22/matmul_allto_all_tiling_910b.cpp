@@ -852,7 +852,10 @@ void MatmulAlltoAllTiling910B::SetTilingKey()
  *
  * @return uint64_t tilingKey结果
  */
-uint64_t MatmulAlltoAllTiling910B::GetTilingKey() const { return tilingKey_; }
+uint64_t MatmulAlltoAllTiling910B::GetTilingKey() const
+{
+    return tilingKey_;
+}
 
 /**
  * @brief 设置hccl的config,进行hccl对应的通信任务设置

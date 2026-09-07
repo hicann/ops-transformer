@@ -41,12 +41,12 @@ struct BMMRSATAType { // Batch_Mat_Mul_Reduce_Scatter_All_to_All_Type
     static constexpr bool isLite = IS_LITE;
 };
 
-#define INVOKE_BMMRSATA_OP_IMPL(templateClass, ...)                                                                    \
-    do {                                                                                                               \
-        templateClass<BMMRSATAType<__VA_ARGS__>> op;                                                                   \
-        op.Init(xGM, weightGM, biasGM, yGM, userWorkspace, &tilingData, &pipe, hcclInitTiling, reduceScatterCcTiling,  \
-                alltoAllCcTiling);                                                                                     \
-        op.Process();                                                                                                  \
+#define INVOKE_BMMRSATA_OP_IMPL(templateClass, ...) \
+    do { \
+        templateClass<BMMRSATAType<__VA_ARGS__>> op; \
+        op.Init(xGM, weightGM, biasGM, yGM, userWorkspace, &tilingData, &pipe, hcclInitTiling, reduceScatterCcTiling, \
+                alltoAllCcTiling); \
+        op.Process(); \
     } while (0)
 
 template <int YShard, bool WeightTranspose, bool IsBias, bool LiteMode>

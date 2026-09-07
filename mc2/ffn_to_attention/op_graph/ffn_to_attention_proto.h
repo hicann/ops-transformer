@@ -51,8 +51,6 @@ REG_OP(FFNToAttention)
     .REQUIRED_ATTR(token_data_shape, ListInt)
     .OP_END_FACTORY_REG(FFNToAttention)
 
-
 } // namespace ge
-
 
 #endif // FFN_TO_ATTENTION_PROTO_H_
