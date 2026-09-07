@@ -29,23 +29,23 @@
 
   1. Top-k value的计算公式：
 
-    $$
-    I_{t,:}=W_{t,:}@ReLU(\tilde{q}_{t,:}@\tilde{K}_{:t,:}^\top)
-    $$
+     $$
+     I_{t,:}=W_{t,:}@ReLU(\tilde{q}_{t,:}@\tilde{K}_{:t,:}^\top)
+     $$
 
-      - $W_{t,:}$是第$t$个token对应的$weights$；
-      - $\tilde{q}_{t,:}$是$\tilde{q}$矩阵第$t$个token对应的$G$个query头合轴后的结果；
-      - $\tilde{K}_{:t,:}$为$t$行$\tilde{K}$矩阵。
+     - $W_{t,:}$是第$t$个token对应的$weights$；
+     - $\tilde{q}_{t,:}$是$\tilde{q}$矩阵第$t$个token对应的$G$个query头合轴后的结果；
+     - $\tilde{K}_{:t,:}$为$t$行$\tilde{K}$矩阵。
 
   2. 正向的Softmax对应公式：
 
-    $$
-    p_{t,:} = \text{Softmax}(q_{t,:} @ K_{:t,:}^\top/\sqrt{d})
-    $$
+     $$
+     p_{t,:} = \text{Softmax}(q_{t,:} @ K_{:t,:}^\top/\sqrt{d})
+     $$
 
-      - $p_{t,:}$是第$t$个token对应的Softmax结果；
-      - $q_{t,:}$是$q$矩阵第$t$个token对应的$G$个query头合轴后的结果；
-      - ${K}_{:t,:}$为$t$行$K$矩阵。
+     - $p_{t,:}$是第$t$个token对应的Softmax结果；
+     - $q_{t,:}$是$q$矩阵第$t$个token对应的$G$个query头合轴后的结果；
+     - ${K}_{:t,:}$为$t$行$K$矩阵。
 
   3. npu_lightning_indexer会单独训练，对应的loss function为：
 
