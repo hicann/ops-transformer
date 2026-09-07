@@ -104,6 +104,126 @@ class GeneralizedSFA:
         self.ori_topk_length = ori_topk_length
         self.cmp_topk_length = cmp_topk_length
 
+    @staticmethod
+    def _get_batch_consistency_reduce_size(ori_s2_size, cmp_s2_size):
+        """Return the S2 reduction-block size used by batch-consistency metadata."""
+        total_s2_size = ori_s2_size + cmp_s2_size
+        # The kernel computes this quotient with integer division before
+        # rounding the result up to an S2 base block.  Keeping the floor here
+        # is observable at 4096-token boundaries (e.g. 4097..4127 tokens).
+        raw_reduce_size = total_s2_size // 32
+        return max(((raw_reduce_size + 127) // 128) * 128, 128)
+
+    @staticmethod
+    def _update_s2_tile(
+        q_fp32,
+        k_tile,
+        softmax_scale,
+        softmax_dtype,
+        score_max,
+        sumexp,
+        acc_o,
+    ):
+        """Use one 128-token S2 tile to update the online-softmax state."""
+        mm1_res = torch.matmul(q_fp32, k_tile.T)
+        scale_res = mm1_res * softmax_scale
+
+        score_max_pre = score_max.clone()
+        cur_score_max = scale_res.max(dim=-1)[0]
+        score_max = torch.max(score_max, cur_score_max)
+        score_max_pre = torch.exp(score_max_pre - score_max)
+
+        acc_s = torch.exp(scale_res - score_max.unsqueeze(1))
+        sumexp = sumexp * score_max_pre + acc_s.sum(dim=-1)
+        acc_s_cast = acc_s.to(dtype=softmax_dtype).to(dtype=torch.float32)
+        mm2_res = torch.matmul(acc_s_cast, k_tile)
+        acc_o = acc_o * score_max_pre.unsqueeze(1) + mm2_res
+        return score_max, sumexp, acc_o
+
+    def _calculate_local_s2_block(
+        self,
+        q_fp32,
+        k_block_fp32,
+        initial_score_max,
+        s2_base_size=128,
+    ):
+        """Calculate one NPU reduction block and retain its local softmax state."""
+        score_max = initial_score_max.clone()
+        sumexp = torch.ones_like(score_max, dtype=torch.float32)
+        acc_o = torch.zeros(
+            (q_fp32.shape[0], k_block_fp32.shape[-1]), dtype=torch.float32
+        )
+
+        for s2_start in range(0, k_block_fp32.shape[0], s2_base_size):
+            k_tile = k_block_fp32[s2_start : s2_start + s2_base_size]
+            score_max, sumexp, acc_o = self._update_s2_tile(
+                q_fp32,
+                k_tile,
+                self.softmax_scale,
+                self.q_type,
+                score_max,
+                sumexp,
+                acc_o,
+            )
+
+        return score_max, sumexp, acc_o / sumexp.unsqueeze(1)
+
+    def _calculate_batch_consistency(
+        self,
+        q_fp32,
+        ori_k_fp32,
+        cmp_k_fp32,
+        sinks,
+    ):
+        """Follow the NPU S2 split and fixed FD reduction order."""
+        ori_s2_size = 0 if ori_k_fp32 is None else ori_k_fp32.shape[0]
+        cmp_s2_size = 0 if cmp_k_fp32 is None else cmp_k_fp32.shape[0]
+        reduce_size = self._get_batch_consistency_reduce_size(ori_s2_size, cmp_s2_size)
+
+        # Metadata splits ORI and CMP independently, so a reduction block never
+        # crosses the boundary between the two KV regions.
+        blocks = []
+        for k_tensor in (ori_k_fp32, cmp_k_fp32):
+            if k_tensor is None:
+                continue
+            for start in range(0, k_tensor.shape[0], reduce_size):
+                blocks.append(k_tensor[start : start + reduce_size])
+
+        merged_lse = None
+        merged_sum = None
+        merged_o = None
+        for block_id, k_block in enumerate(blocks):
+            initial_max = (
+                sinks.clone()
+                if block_id == 0 and sinks is not None
+                else torch.full((q_fp32.shape[0],), -torch.inf, dtype=torch.float32)
+            )
+            local_max, local_sum, local_o = self._calculate_local_s2_block(
+                q_fp32, k_block, initial_max
+            )
+            if merged_lse is None:
+                merged_lse = local_max
+                merged_sum = local_sum
+                merged_o = local_o
+                continue
+
+            global_max = torch.max(merged_lse, local_max)
+            prev_weight = torch.exp(merged_lse - global_max) * merged_sum
+            cur_weight = torch.exp(local_max - global_max) * local_sum
+            global_sum = prev_weight + cur_weight
+            merged_o = (
+                merged_o * prev_weight.unsqueeze(1) + local_o * cur_weight.unsqueeze(1)
+            ) / global_sum.unsqueeze(1)
+
+            # FD persists the merged state as (LSE, 1, normalized O), then
+            # consumes it in the next step of the deterministic left fold.
+            merged_lse = global_max + torch.log(global_sum)
+            merged_sum = torch.ones_like(global_sum)
+
+        if merged_lse is None:
+            raise ValueError("batch-consistency calculation requires non-empty KV")
+        return merged_o, merged_lse + torch.log(merged_sum)
+
     def calculate_by_bnsd(
         self,
         q_bnsd,
@@ -123,6 +243,7 @@ class GeneralizedSFA:
         ori_topk_length_bnsd=None,
         cmp_topk_length_bnsd=None,
         return_softmax_lse=False,
+        batch_consistency=False,
     ):
         attn_out = torch.zeros(q_bnsd.shape, dtype=q_bnsd.dtype)
         softmax_lse = None
@@ -292,6 +413,30 @@ class GeneralizedSFA:
                         continue
 
                     cur_attn_out = attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]
+                    if batch_consistency:
+                        ori_k_for_reduce = (
+                            None
+                            if is_empty(cur_ori_k_bnsd)
+                            else cur_ori_k_bnsd.to(dtype=torch.float32)
+                        )
+                        cmp_k_for_reduce = (
+                            None
+                            if is_empty(cur_cmp_k)
+                            else cur_cmp_k.to(dtype=torch.float32)
+                        )
+                        acc_o, final_lse = self._calculate_batch_consistency(
+                            q_curr_fp32,
+                            ori_k_for_reduce,
+                            cmp_k_for_reduce,
+                            cur_sinks,
+                        )
+                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = acc_o.to(
+                            dtype=q_bnsd.dtype
+                        )
+                        if return_softmax_lse:
+                            softmax_lse[i_B, i_N2, i_S1, :] = final_lse
+                        continue
+
                     if RUN_MODE == 0:
                         if empty_flag:
                             k_concat = (
@@ -784,6 +929,7 @@ class GeneralizedSFA:
         ori_topk_length=None,
         cmp_topk_length=None,
         return_softmax_lse=False,
+        batch_consistency=False,
     ):
         q_bnsd, q_bnsd_shape = self.trans_shape_to_bnsd(
             q, q.shape, self.layout_q, cu_seqlens_q, seqused_q
@@ -852,6 +998,7 @@ class GeneralizedSFA:
             ori_topk_length_bnsd,
             cmp_topk_length_bnsd,
             return_softmax_lse,
+            batch_consistency,
         )
         attn_out = self.trans_bnsd_to_target_layout(
             attn_out, self.layout_q, cu_seqlens_q
@@ -1545,6 +1692,7 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
     ori_sparse_indices_mode = params.get("ori_sparse_indices_mode")
     cmp_sparse_indices_mode = params.get("cmp_sparse_indices_mode")
     return_softmax_lse = params.get("return_softmax_lse")
+    batch_consistency = params.get("batch_consistency", False)
     template_mode = params.get("template_mode")
 
     # 支持外部指定topk_length
@@ -1880,6 +2028,7 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
         "sinks": sinks,
         "template_idx": template_idx,
         "return_softmax_lse": return_softmax_lse,
+        "batch_consistency": batch_consistency,
     }
     if generate_golden:
         generate_cpu_golden({"golden_state": golden_state})
@@ -2047,6 +2196,7 @@ def generate_cpu_golden(input_data):
         state["ori_topk_length"],
         state["cmp_topk_length"],
         state["return_softmax_lse"],
+        state.get("batch_consistency", False),
     )
     state["cpu_output"] = cpu_output
     state["softmax_lse"] = softmax_lse
