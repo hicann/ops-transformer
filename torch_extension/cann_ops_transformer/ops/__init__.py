@@ -149,6 +149,7 @@ _legacy_map = {
     "sparse_flash_mla_grad": "attention.sparse_flash_mla_grad",
     "sparse_flash_mla_softmax_l1_norm": "attention.sparse_flash_mla_softmax_l1_norm",
     "sparse_lightning_indexer_kl_loss_grad": "attention.sparse_lightning_indexer_kl_loss_grad",
+    "generic_block_sparse_attention_grad": "attention.generic_block_sparse_attention_grad",
     "stem_oam_prep_paged_kv": "attention.stem_oam_prep_paged_kv",
     "stem_oam_prep_varlen_q": "attention.stem_oam_prep_varlen_q",
     "und_gen_qkv_rms_norm_rope_cache": "posembedding.und_gen_qkv_rms_norm_rope_cache",
