@@ -317,8 +317,10 @@ public:
         {
             Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
+            // Mmad K=D 精确累加; LoadData 搬运宽度按分形粒度对齐(对齐D=原值, D=72→80与Nd2Nz写入组数一致)
+            uint32_t ldK = ((constInfo_.dSize + 15) >> 4) << 4;
             MMParam param = MakeMMParam((uint32_t)runInfo.actSingleLoopS2Size, (uint32_t)runInfo.actMSize,
-                                        (uint32_t)(constInfo_.dSize), false, true);
+                                        constInfo_.dSize, false, true, true, true, 0, 0, ldK, 0);
             if constexpr (dBaseSize > 128) {
                 MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(kL1Tensor, qL1Tensor, mmL0APolicy_,
                                                                                     mmL0BPolicy_, l0CSubTensor, param);
@@ -390,12 +392,27 @@ public:
         Mutex::Lock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         {
             uint32_t nLoops = (constInfo_.dSizeV + 128 - 1) / 128;
+            // Mmad N=真实尾块宽度精确计算; LoadData 搬运宽度按分形粒度对齐(D=72→80, 与Nd2Nz写入组数一致);
+            // Fixpipe nSize=真实列 + dstStride=128(UB行距) → vec2 128宽读, 尾列脏但 D 轴逐元素隔离无害
+            uint32_t lastTileN = constInfo_.dSizeV - (nLoops - 1) * 128;
+            uint32_t ldN = ((lastTileN + 15) >> 4) << 4;
             for (uint32_t n = 0; n < nLoops; n++) {
-                uint32_t tileN = (n == nLoops - 1) ? (constInfo_.dSizeV - n * 128) : 128;
+                uint32_t tileN = (n == nLoops - 1) ? lastTileN : 128;
+                uint32_t tileLdN = (n == nLoops - 1) ? ldN : 128;
                 Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
                 LocalTensor<MM_T> l0CSubTensor =
                     l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
-                MMParam param = {(uint32_t)mBaseSize, tileN, (uint32_t)runInfo.actSingleLoopS2Size, true, false};
+                MMParam param = {(uint32_t)mBaseSize,
+                                 tileN,
+                                 (uint32_t)runInfo.actSingleLoopS2Size,
+                                 true,
+                                 false,
+                                 true,
+                                 true,
+                                 0,
+                                 0,
+                                 0,
+                                 tileLdN};
 
                 uint32_t s2Aligned = AttentionCommon::Align(runInfo.actSingleLoopS2Size, 16U);
                 uint64_t vL1Offset = n * 128U / 16U * s2Aligned * 16U;

@@ -179,7 +179,7 @@ cd build && ctest -R flash_attn_tiling --output-on-failure
 | BSND / BNSD / TND | (B, S, N, D) / (B, N, S, D) / (T, N, D) | 连续 KV，非分页 |
 | PA_BBND | (num_blocks, block_size, KV_N, D) | block 内按 BSND 排布 |
 | PA_BNBD | (num_blocks, KV_N, block_size, D) | block 内按 BNSD 排布 |
-| PA_NZ | (num_blocks, KV_N, D/16, block_size, 16) | NZ 分块格式 |
+| PA_NZ | (num_blocks, KV_N, D/16, block_size, 16) | NZ 分块格式，要求 head_dim 为 16 的倍数（D 轴分形粒度为 16 元素） |
 
 - PA 场景约束：PA 时 `seqused_kv` 必填；非 PA 场景传入 `block_table` 会直接报错。`layout_kv` 为 PA 时，`layout_q`/`layout_out` 维持 BSND/BNSD/TND 不变。
 
@@ -361,8 +361,8 @@ FA 计算的核心是把注意力矩阵按块切分、逐块 online 计算。基
 |---|---|---|---|---|
 | 0 | 64 | 128 | 64 | 64 |
 | 1 | 32 | 256 | 64 | 64 |
-| 2 | 64 | 128 | 128 | 128 |
-| 3 | 32 | 256 | 128 | 128 |
+| 2 | 64 | 128 | 128（D=72 复用） | 128（DV=72 复用） |
+| 3 | 32 | 256 | 128（D=72 复用） | 128（DV=72 复用） |
 | 4 | 64 | 128 | 256 | 256 |
 | 5 | 32 | 256 | 256 | 256 |
 
@@ -373,7 +373,7 @@ FA 计算的核心是把注意力矩阵按块切分、逐块 online 计算。基
 
 - **mBaseSize = sOuter × CV_RATIO**（CV_RATIO=2，AIC:AIV=1:2）：一个 AIC 核承担 mBaseSize 行 Q，对应 2 个 AIV 核各处理 mBaseSize/2 行。
 - **s2BaseSize = sInner**：KV 序列方向的块大小。
-- host 侧 `AdjustSinnerAndSouter` 按 D（及 gSize/maxSeq/window 条件）选择 sOuter/sInner，再映射到 config（D=64→config0/1，D=128→config2/3，D=256→config4/5：`gSize × maxSeqQ ≥ 64` 时取 sOuter=64/sInner=128→config4，否则取 sOuter=32/sInner=256→config5）。
+- host 侧 `AdjustSinnerAndSouter` 按 D（及 gSize/maxSeq/window 条件）选择 sOuter/sInner，再映射到 config（D=64→config0/1，D=72 与 D=128→config2/3，D=256→config4/5：`gSize × maxSeqQ ≥ 64` 时取 sOuter=64/sInner=128→config4，否则取 sOuter=32/sInner=256→config5）。D=72 与 D=128 共享 kernel 变体（零新增 tiling key），kernel 内 L1→L0 搬运宽度按 16 元素分形对齐（72→80，`MMParam.loadK/loadN`），Mmad 按真实 D 精确累加，无需 L1 清零。
 
 **gS1 合轴**：
 

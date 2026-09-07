@@ -140,20 +140,20 @@ void FlashAttnTilingImpl::UpdateTilingKeyConfig()
     // config:
     //   config=0: D=64,  sOuter=64,  sInner=128
     //   config=1: D=64,  sOuter=32,  sInner=256
-    //   config=2: D=128, sOuter=64,  sInner=128
-    //   config=3: D=128, sOuter=32,  sInner=256
+    //   config=2: D=128, sOuter=64,  sInner=128 (D=72 复用, kernel 内 pad 到 128)
+    //   config=3: D=128, sOuter=32,  sInner=256 (D=72 复用, kernel 内 pad 到 128)
     //   config=4: D=256, sOuter=64, sInner=128
     //   config=5: D=256, sOuter=32, sInner=256
     if (faInfo_->qkHeadDim == 64) {
         tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 0 : 1;
-    } else if (faInfo_->qkHeadDim == 128) {
+    } else if (faInfo_->qkHeadDim == 72 || faInfo_->qkHeadDim == 128) {
         tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 2 : 3;
     } else if (faInfo_->qkHeadDim == 256) {
         tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 4 : 5;
     } else {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(faInfo_->opName, "qkHeadDim(Head num of Q/K)",
                                                std::to_string(faInfo_->qkHeadDim).c_str(),
-                                               "The value of qkHeadDim(Head num of Q/K) can only be 64/128/256");
+                                               "The value of qkHeadDim(Head num of Q/K) can only be 64/72/128/256");
     }
 }
 
