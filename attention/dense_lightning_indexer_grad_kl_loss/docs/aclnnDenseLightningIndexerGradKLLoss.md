@@ -571,7 +571,7 @@ aclnnStatus aclnnDenseLightningIndexerGradKLLoss(
       </tr>
       <tr>
        <td>S1、S2</td>
-       <td>1~128k</td>
+       <td>1~1M</td>
        <td>S1、S2支持不等长</td>
       </tr>
       <tr>
