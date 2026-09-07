@@ -11,7 +11,7 @@
 #ifndef GMM_GEMM_BLOCK_BLOCK_MMAD_HPP
 #define GMM_GEMM_BLOCK_BLOCK_MMAD_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_gemm_tile_copy.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_tile_mmad.hpp"
 

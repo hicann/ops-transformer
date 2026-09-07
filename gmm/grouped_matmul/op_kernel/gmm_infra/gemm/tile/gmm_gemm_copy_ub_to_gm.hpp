@@ -11,7 +11,7 @@
 #ifndef GMM_COPY_UB_TO_GM_HPP
 #define GMM_COPY_UB_TO_GM_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/arch/gmm_arch.hpp"
 #include "../../../gmm_infra/gemm/gmm_gemm_type.hpp"
 

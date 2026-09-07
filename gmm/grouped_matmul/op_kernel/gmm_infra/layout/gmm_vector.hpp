@@ -11,7 +11,7 @@
 #ifndef GMM_LAYOUT_VECTOR_HPP
 #define GMM_LAYOUT_VECTOR_HPP
 
-#include "../../gmm_infra/base_defs.hpp"
+#include "../../gmm_infra/gmm_base_defs.hpp"
 #include "../../gmm_infra/gmm_coord.hpp"
 #include "../../gmm_infra/gmm_numeric_size.hpp"
 

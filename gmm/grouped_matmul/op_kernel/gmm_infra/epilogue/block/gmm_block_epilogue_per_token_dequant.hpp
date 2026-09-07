@@ -11,7 +11,7 @@
 #ifndef GMM_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_DEQUANT_HPP
 #define GMM_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_DEQUANT_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/arch/gmm_resource.hpp"
 #include "../../../gmm_infra/epilogue/gmm_epilogue_dispatch_policy.hpp"
 #include "../../../gmm_infra/gmm_gemm_coord.hpp"

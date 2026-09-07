@@ -11,7 +11,7 @@
 #ifndef GMM_EPILOGUE_TILE_TILE_ELEMWISE_ADD_HPP
 #define GMM_EPILOGUE_TILE_TILE_ELEMWISE_ADD_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 
 namespace Catlass::Epilogue::Tile {
 

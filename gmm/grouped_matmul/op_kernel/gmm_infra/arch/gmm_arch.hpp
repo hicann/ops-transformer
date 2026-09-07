@@ -11,7 +11,7 @@
 #ifndef GMM_ARCH_ARCH_HPP
 #define GMM_ARCH_ARCH_HPP
 
-#include "../../gmm_infra/base_defs.hpp"
+#include "../../gmm_infra/gmm_base_defs.hpp"
 
 namespace Catlass::Arch {
 

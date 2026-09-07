@@ -24,7 +24,7 @@
 #include "aclnnop/aclnn_generic_block_sparse_attention_metadata.h"
 #include "securec.h"
 
-#include "../generic_block_sparse_attention_metadata.h"
+#include "../generic_block_sparse_attention_metadata_tiling.h"
 
 #define CHECK_LOG_RET(condition, returnValue, format, ...) \
     do { \

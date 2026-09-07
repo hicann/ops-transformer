@@ -16,7 +16,7 @@
 
 #include "opdev/data_type_utils.h"
 #include "opdev/op_log.h"
-#include "../generic_block_sparse_attention_metadata.h"
+#include "../generic_block_sparse_attention_metadata_tiling.h"
 
 namespace {
 constexpr int64_t GBSA_METADATA_DIM_NUM = 1;

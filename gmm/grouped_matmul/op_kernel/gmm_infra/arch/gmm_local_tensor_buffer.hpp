@@ -11,7 +11,7 @@
 #ifndef INCLUDE_CATLASS_ARCH_MEMORY_H
 #define INCLUDE_CATLASS_ARCH_MEMORY_H
 
-#include "../../gmm_infra/base_defs.hpp"
+#include "../../gmm_infra/gmm_base_defs.hpp"
 #include "../../gmm_infra/arch/gmm_arch.hpp"
 
 namespace Catlass::Arch {

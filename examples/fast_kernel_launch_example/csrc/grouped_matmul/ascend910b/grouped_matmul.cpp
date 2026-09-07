@@ -21,7 +21,7 @@
 #include "platform/platform_ascendc.h"
 #include <type_traits>
 
-#include "op_kernel/grouped_matmul_kernel.h"
+#include "op_kernel/fkl_grouped_matmul_kernel.h"
 
 namespace ascend_ops {
 namespace GroupedMatmul {

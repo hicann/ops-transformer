@@ -11,7 +11,7 @@
 #ifndef GMM_GEMM_BLOCK_BLOCK_MMAD_PRELOAD_ASYNC_FIXAXISMOVE_WITH_CALLBACK_HPP
 #define GMM_GEMM_BLOCK_BLOCK_MMAD_PRELOAD_ASYNC_FIXAXISMOVE_WITH_CALLBACK_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/arch/gmm_resource.hpp"
 #include "../../../gmm_infra/gmm_coord.hpp"
 #include "../../../gmm_infra/detail/gmm_callback.hpp"

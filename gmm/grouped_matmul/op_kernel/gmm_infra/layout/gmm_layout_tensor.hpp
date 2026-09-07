@@ -11,7 +11,7 @@
 #ifndef CATLASS_LAYOUT_TENSOR_HPP
 #define CATLASS_LAYOUT_TENSOR_HPP
 
-#include "../../gmm_infra/base_defs.hpp"
+#include "../../gmm_infra/gmm_base_defs.hpp"
 #include "../../gmm_infra/detail/gmm_alignment.hpp"
 #include "../../gmm_infra/gmm_conv_coord.hpp"
 

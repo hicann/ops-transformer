@@ -11,7 +11,7 @@
 #ifndef GMM_GEMM_TILE_COPY_L1_TO_FP_HPP
 #define GMM_GEMM_TILE_COPY_L1_TO_FP_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/arch/gmm_arch.hpp"
 #include "../../../gmm_infra/layout/gmm_layout.hpp"
 #include "../../../gmm_infra/gemm/gmm_gemm_type.hpp"

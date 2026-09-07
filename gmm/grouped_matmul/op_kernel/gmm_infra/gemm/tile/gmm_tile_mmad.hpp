@@ -11,7 +11,7 @@
 #ifndef GMM_GEMM_TILE_TILE_MMAD_HPP
 #define GMM_GEMM_TILE_TILE_MMAD_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/gemm/gmm_helper.hpp"
 namespace Catlass::Gemm::Tile {
 

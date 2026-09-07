@@ -11,7 +11,7 @@
 #ifndef GMM_EPILOGUE_TILE_TILE_SWIZZLE_HPP
 #define GMM_EPILOGUE_TILE_TILE_SWIZZLE_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/detail/gmm_alignment.hpp"
 #include "../../../gmm_infra/gmm_matrix_coord.hpp"
 

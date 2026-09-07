@@ -10,7 +10,7 @@
 #ifndef GMM_NUMERIC_SIZE_HPP
 #define GMM_NUMERIC_SIZE_HPP
 
-#include "../gmm_infra/base_defs.hpp"
+#include "../gmm_infra/gmm_base_defs.hpp"
 
 namespace Catlass {
 

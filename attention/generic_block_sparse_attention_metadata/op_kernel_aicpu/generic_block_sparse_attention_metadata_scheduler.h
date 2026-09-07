@@ -19,7 +19,7 @@
 #include <limits>
 #include <vector>
 
-#include "../generic_block_sparse_attention_metadata.h"
+#include "../generic_block_sparse_attention_metadata_tiling.h"
 
 namespace aicpu {
 namespace generic_block_sparse_attention_metadata {

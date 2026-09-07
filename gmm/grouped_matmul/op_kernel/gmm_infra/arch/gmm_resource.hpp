@@ -11,7 +11,7 @@
 #ifndef INCLUDE_CATLASS_ARCH_RESOURCE_HPP
 #define INCLUDE_CATLASS_ARCH_RESOURCE_HPP
 
-#include "../../gmm_infra/base_defs.hpp"
+#include "../../gmm_infra/gmm_base_defs.hpp"
 #include "../../gmm_infra/arch/gmm_local_tensor_buffer.hpp"
 
 namespace Catlass::Arch {

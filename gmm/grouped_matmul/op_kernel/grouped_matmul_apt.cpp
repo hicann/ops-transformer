@@ -87,7 +87,7 @@ static constexpr VecAntiQuantConfig VEC_ANTIQUANT_CONFIG_DYNAMIC = {4, 0};
 #define ORIG_DTYPE_WEIGHT DT_INT4
 #endif
 #else
-#include "arch35/non_quant/grouped_matmul_kernel.h"
+#include "arch35/non_quant/grouped_matmul_kernel_arch35.h"
 #include "arch35/non_quant/grouped_matmul_tiling_key.h"
 #endif
 

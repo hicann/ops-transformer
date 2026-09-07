@@ -11,7 +11,7 @@
 #ifndef GMM_TILE_BROADCAST_ADD_HPP
 #define GMM_TILE_BROADCAST_ADD_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/gmm_matrix_coord.hpp"
 
 namespace Catlass::Epilogue::Tile {

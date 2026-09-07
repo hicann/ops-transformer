@@ -15,7 +15,7 @@
 #ifndef GROUPED_MATMUL_FIXAXISMOVE_REGULAR_H
 #define GROUPED_MATMUL_FIXAXISMOVE_REGULAR_H
 
-#include "gmm_infra/base_defs.hpp"
+#include "gmm_infra/gmm_base_defs.hpp"
 #include "gmm_infra/gmm_coord.hpp"
 #include "gmm_infra/gmm_matrix_coord.hpp"
 #include "gmm_infra/gmm_gemm_coord.hpp"

@@ -12,7 +12,7 @@
  * \file recurrent_kda_apt.cpp
  * \brief
  */
-#include "arch35/recurrent_kda.h"
+#include "arch35/recurrent_kda_arch35.h"
 #include "recurrent_kda_tiling_data.h"
 
 using namespace AscendC;

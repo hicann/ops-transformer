@@ -10,18 +10,18 @@
 #ifndef GBSA_ARCH22_KERNEL_UTILS
 #define GBSA_ARCH22_KERNEL_UTILS
 
-#include "../attn_infra/base_defs.hpp"
-#include "../attn_infra/arch/arch.hpp"
-#include "../attn_infra/layout/layout.hpp"
+#include "../attn_infra/gbsa_base_defs.hpp"
+#include "../attn_infra/arch/gbsa_arch.hpp"
+#include "../attn_infra/layout/gbsa_layout.hpp"
 
-#include "../attn_infra/gemm/block/block_mmad.hpp"
-#include "../attn_infra/gemm/dispatch_policy.hpp"
-#include "../attn_infra/gemm/gemm_type.hpp"
+#include "../attn_infra/gemm/block/gbsa_block_mmad.hpp"
+#include "../attn_infra/gemm/gbsa_gemm_dispatch_policy.hpp"
+#include "../attn_infra/gemm/gbsa_gemm_type.hpp"
 
-#include "../attn_infra/arch/cross_core_sync.hpp"
-#include "../attn_infra/arch/resource.hpp"
-#include "../attn_infra/epilogue/block/block_epilogue.hpp"
-#include "../attn_infra/epilogue/dispatch_policy.hpp"
+#include "../attn_infra/arch/gbsa_cross_core_sync.hpp"
+#include "../attn_infra/arch/gbsa_resource.hpp"
+#include "../attn_infra/epilogue/block/gbsa_block_epilogue.hpp"
+#include "../attn_infra/epilogue/gbsa_epilogue_dispatch_policy.hpp"
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "kernel_tiling/kernel_tiling.h"

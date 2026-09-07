@@ -11,7 +11,7 @@
 #ifndef GMM_GEMM_TILE_CAST_INT8_TO_FP16_HPP
 #define GMM_GEMM_TILE_CAST_INT8_TO_FP16_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/arch/gmm_resource.hpp"
 #include "../../../gmm_infra/gmm_coord.hpp"
 #include "../../../gmm_infra/gmm_gemm_coord.hpp"

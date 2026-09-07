@@ -24,9 +24,9 @@ set -euo pipefail
 WHITELIST_PATH_PREFIXES=(
   "build/"
   "build_out/"
+  "experimental/"
   # "third_party/"
   # "3rdparty/"
-  # "experimental/"
 )
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"

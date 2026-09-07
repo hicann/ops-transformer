@@ -11,7 +11,7 @@
 #ifndef GMM_GEMM_TILE_TILE_COPY_TLA_HPP
 #define GMM_GEMM_TILE_TILE_COPY_TLA_HPP
 
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 
 namespace Catlass::Gemm::Tile {
 

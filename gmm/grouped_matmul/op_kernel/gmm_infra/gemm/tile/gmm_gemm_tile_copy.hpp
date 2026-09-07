@@ -12,7 +12,7 @@
 #define GMM_GEMM_TILE_TILE_COPY_HPP
 
 #include <type_traits>
-#include "../../../gmm_infra/base_defs.hpp"
+#include "../../../gmm_infra/gmm_base_defs.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_copy_gm_to_l1.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_gemm_copy_l1_to_fp.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_copy_l0c_to_gm.hpp"
