@@ -2182,7 +2182,7 @@ void MoeInitRoutingV3TilingArch35::ComputeArch35CountingSortCutOriginTiling()
     int64_t metaBase = Align(n_ * k_, static_cast<int64_t>(sizeof(int32_t))) * NUM_TWO +
                        Align(actualExpertNum, static_cast<int64_t>(sizeof(int32_t)));
     cs->pairsWsOffset =
-        metaBase + Align(NUM_TWO * std::max(aivCoreNum_, static_cast<int64_t>(1)), static_cast<int64_t>(8));
+        metaBase + Align(NUM_TWO * std::max(aivCoreNum_, static_cast<int64_t>(1)), CS_ONE_BLOCK_ELEMENT);
 
     OP_LOGD(context_,
             "CountingSort CutOrigin: needCoreNum=%ld, perCoreTokens=%ld, coreEntries=%ld, chunkSize=%ld, "
