@@ -32,21 +32,6 @@ extern "C" {
 
 namespace {
 
-static bool CheckQkvDataType(const aclTensor *query, const aclTensor *key, const aclTensor *value)
-{
-    const DataType qDtype = query->GetDataType();
-    const bool supported = qDtype == DataType::DT_FLOAT16 || qDtype == DataType::DT_BF16;
-    if (!supported) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "query dtype must be FLOAT16 or BF16, got %d.", static_cast<int>(qDtype));
-        return false;
-    }
-    if (key->GetDataType() != qDtype || value->GetDataType() != qDtype) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "query, key, and value must use the same dtype.");
-        return false;
-    }
-    return true;
-}
-
 // 检测当前 NPU 是否为 A2 (ascend910b / ascend910_93)。
 // A5 (ascend950) 返回 false。
 // 用于区分 A2 专用的 aclnn 逻辑（CreateView stride 保留、连续 KV dummy blockTable）。
@@ -113,9 +98,6 @@ __attribute__((visibility("default"))) aclnnStatus aclnnMinimaxSparseAttentionSp
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(key != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(value != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    if (!CheckQkvDataType(query, key, value)) {
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     CHECK_RET(k2qRowPtr != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(k2qQIndices != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(k2qSlotIndices != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -135,17 +117,24 @@ __attribute__((visibility("default"))) aclnnStatus aclnnMinimaxSparseAttentionSp
     DataType qDtype = query->GetDataType();
     DataType kDtype = key->GetDataType();
     DataType vDtype = value->GetDataType();
-    auto isQkvOk = [](DataType d) { return d == DataType::DT_BF16 || d == DataType::DT_FLOAT8_E4M3FN; };
+    const bool isA2 = IsA2Platform();
+    auto isQkvOk = [&](DataType d) {
+        return isA2 ? (d == DataType::DT_BF16 || d == DataType::DT_FLOAT16) :
+                      (d == DataType::DT_BF16 || d == DataType::DT_FLOAT8_E4M3FN);
+    };
     if (!isQkvOk(qDtype) || !isQkvOk(kDtype) || !isQkvOk(vDtype)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv Q/K/V only support BF16 or FLOAT8_E4M3FN.");
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv Q/K/V only support %s.",
+                isA2 ? "BF16 or FLOAT16" : "BF16 or FLOAT8_E4M3FN");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (qDtype != kDtype || qDtype != vDtype) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv Q/K/V dtype must be consistent.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (attentionOut->GetDataType() != DataType::DT_BF16) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv attentionOut must be BF16.");
+    // Output dtype follows query dtype (BF16/FP16 in => same out); FP8 input outputs BF16.
+    const DataType expectedOut = (qDtype == DataType::DT_FLOAT8_E4M3FN) ? DataType::DT_BF16 : qDtype;
+    if (attentionOut->GetDataType() != expectedOut) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MinimaxSparseAttentionSplitKv attentionOut dtype must match query dtype.");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (qDtype == DataType::DT_FLOAT8_E4M3FN && innerPrecise != 4) {
@@ -182,7 +171,6 @@ __attribute__((visibility("default"))) aclnnStatus aclnnMinimaxSparseAttentionSp
     // queryTokenStride / keyBlockStride 等。CreateView 以零拷贝方式重建
     // 逻辑视图, 保留 ViewShape + ViewStrides。
     // A5 不读取 stride, 直接使用原 tensor 即可 (GetOriginShape 返回正确逻辑形状)。
-    const bool isA2 = IsA2Platform();
     const aclTensor *queryArg = query;
     const aclTensor *keyArg = key;
     const aclTensor *valueArg = value;
