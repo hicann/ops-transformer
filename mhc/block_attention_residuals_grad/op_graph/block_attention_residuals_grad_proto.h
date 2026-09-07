@@ -20,6 +20,40 @@
 
 namespace ge {
 
+/**
+ * @brief Computes gradients for the BlockAttentionResiduals forward operator.
+ * The operator fuses the backward of softmax, RMS normalization and attention
+ * weighted-sum to produce gradients of partial_block, block_res, proj_weight
+ * and norm_weight.
+ *
+ * @par Inputs:
+ * @li partial_block: A 2D tensor of shape [B, H]. Type supports FLOAT16,
+ *     BFLOAT16 and FLOAT32. Dataformat: ND.
+ * @li block_res: A 3D tensor of shape [B, N, H]. Type supports FLOAT16,
+ *     BFLOAT16 and FLOAT32. Dataformat: ND.
+ * @li proj_weight: A 2D tensor of shape [1, H]. Type supports FLOAT16,
+ *     BFLOAT16 and FLOAT32. Dataformat: ND.
+ * @li norm_weight: A 1D tensor of shape [H]. Type supports FLOAT16,
+ *     BFLOAT16 and FLOAT32. Dataformat: ND.
+ * @li grad_hidden_states: A 2D tensor of shape [B, H]. Type supports FLOAT16,
+ *     BFLOAT16 and FLOAT32. Dataformat: ND.
+ * @li inv_norm: A 2D tensor of shape [B, N + 1]. Type supports FLOAT32.
+ *     Dataformat: ND.
+ * @li probs: A 2D tensor of shape [B, N + 1]. Type supports FLOAT32.
+ *     Dataformat: ND.
+ *
+ * @par Outputs:
+ * @li grad_partial_block: A 2D tensor of shape [B, H], gradient of
+ *     partial_block.
+ * @li grad_block_res: A 3D tensor of shape [B, N, H], gradient of block_res.
+ * @li grad_proj_weight: A 2D tensor of shape [1, H], gradient of proj_weight.
+ * @li grad_norm_weight: A 1D tensor of shape [H], gradient of norm_weight.
+ *     Output dtype is the same as the corresponding input.
+ *
+ * @par Attributes:
+ * @li valid_block_num: An optional int attribute. Defaults to 0. Reserved and
+ *     not used by the current kernel.
+ */
 REG_OP(BlockAttentionResidualsGrad)
     .INPUT(partial_block, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
     .INPUT(block_res, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))

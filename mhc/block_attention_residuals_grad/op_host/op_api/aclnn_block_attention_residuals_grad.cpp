@@ -10,16 +10,272 @@
 
 #include "aclnn_block_attention_residuals_grad.h"
 #include "block_attention_residuals_grad.h"
+#include "log/log.h"
 #include "aclnn_kernels/common/op_error_check.h"
 #include "opdev/make_op_executor.h"
 #include "opdev/op_executor.h"
 #include "aclnn/aclnn_base.h"
 #include "opdev/op_log.h"
 #include "opdev/op_dfx.h"
+#include "opdev/tensor_view_utils.h"
 
 #include "aclnn_kernels/contiguous.h"
 
+#include <string>
+
 using namespace op;
+
+namespace {
+constexpr const char *API_NAME = "aclnnBlockAttentionResidualsGradGetWorkspaceSize";
+constexpr size_t DIM_NUM_1D = 1;
+constexpr size_t DIM_NUM_2D = 2;
+constexpr size_t DIM_NUM_3D = 3;
+constexpr size_t DIM_INDEX_0 = 0;
+constexpr size_t DIM_INDEX_1 = 1;
+constexpr size_t DIM_INDEX_2 = 2;
+constexpr int64_t MIN_TOKEN_NUM = 1;
+constexpr int64_t MIN_BLOCK_NUM = 0;
+constexpr int64_t MAX_BLOCK_NUM = 128;
+constexpr int64_t MIN_HIDDEN_SIZE = 1;
+constexpr int64_t PROJ_WEIGHT_ROW_NUM = 1;
+
+aclnnStatus CheckRequiredParameter(const void *parameter, const char *parameterName)
+{
+    if (parameter == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, parameterName, "nullptr",
+                                              "required parameter must not be nullptr");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckNotNull(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
+                         const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
+                         const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
+                         const aclTensor *gradProjWeight, const aclTensor *gradNormWeight, uint64_t *workspaceSize,
+                         aclOpExecutor **executor)
+{
+    if (CheckRequiredParameter(partialBlock, "partialBlock") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(blockRes, "blockRes") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(projWeight, "projWeight") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(normWeight, "normWeight") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(gradHiddenStates, "gradHiddenStates") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(invNorm, "invNorm") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(probs, "probs") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(gradPartialBlock, "gradPartialBlock") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(gradBlockRes, "gradBlockRes") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(gradProjWeight, "gradProjWeight") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(gradNormWeight, "gradNormWeight") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(workspaceSize, "workspaceSize") != ACLNN_SUCCESS ||
+        CheckRequiredParameter(executor, "executor") != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckSupportedMainDtype(const aclTensor *tensor, const char *tensorName)
+{
+    const DataType actualDtype = tensor->GetDataType();
+    if (actualDtype != DataType::DT_FLOAT16 && actualDtype != DataType::DT_BF16 && actualDtype != DataType::DT_FLOAT) {
+        OP_LOGE_FOR_INVALID_DTYPE(API_NAME, tensorName, op::ToString(actualDtype).GetString(),
+                                  "FLOAT16, BFLOAT16 or FLOAT32");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckDtypeMatches(const aclTensor *tensor, const char *tensorName, DataType expectedDtype)
+{
+    const DataType actualDtype = tensor->GetDataType();
+    if (actualDtype != expectedDtype) {
+        OP_LOGE_FOR_INVALID_DTYPE(API_NAME, tensorName, op::ToString(actualDtype).GetString(),
+                                  op::ToString(expectedDtype).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckDtype(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
+                       const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
+                       const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
+                       const aclTensor *gradProjWeight, const aclTensor *gradNormWeight)
+{
+    if (CheckSupportedMainDtype(partialBlock, "partialBlock") != ACLNN_SUCCESS ||
+        CheckSupportedMainDtype(blockRes, "blockRes") != ACLNN_SUCCESS ||
+        CheckSupportedMainDtype(projWeight, "projWeight") != ACLNN_SUCCESS ||
+        CheckSupportedMainDtype(normWeight, "normWeight") != ACLNN_SUCCESS ||
+        CheckSupportedMainDtype(gradHiddenStates, "gradHiddenStates") != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    const DataType mainDtype = partialBlock->GetDataType();
+    if (CheckDtypeMatches(blockRes, "blockRes", mainDtype) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(projWeight, "projWeight", mainDtype) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(normWeight, "normWeight", mainDtype) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(gradHiddenStates, "gradHiddenStates", mainDtype) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(invNorm, "invNorm", DataType::DT_FLOAT) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(probs, "probs", DataType::DT_FLOAT) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(gradPartialBlock, "gradPartialBlock", mainDtype) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(gradBlockRes, "gradBlockRes", mainDtype) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(gradProjWeight, "gradProjWeight", mainDtype) != ACLNN_SUCCESS ||
+        CheckDtypeMatches(gradNormWeight, "gradNormWeight", mainDtype) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckTensorDimension(const aclTensor *tensor, const char *tensorName, size_t expectedDimension)
+{
+    const size_t actualDimension = tensor->GetViewShape().GetDimNum();
+    if (actualDimension != expectedDimension) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM(API_NAME, tensorName, std::to_string(actualDimension).c_str(),
+                                     std::to_string(expectedDimension).c_str());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckDimensions(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
+                            const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
+                            const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
+                            const aclTensor *gradProjWeight, const aclTensor *gradNormWeight)
+{
+    if (CheckTensorDimension(partialBlock, "partialBlock", DIM_NUM_2D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(blockRes, "blockRes", DIM_NUM_3D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(projWeight, "projWeight", DIM_NUM_2D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(normWeight, "normWeight", DIM_NUM_1D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(gradHiddenStates, "gradHiddenStates", DIM_NUM_2D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(invNorm, "invNorm", DIM_NUM_2D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(probs, "probs", DIM_NUM_2D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(gradPartialBlock, "gradPartialBlock", DIM_NUM_2D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(gradBlockRes, "gradBlockRes", DIM_NUM_3D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(gradProjWeight, "gradProjWeight", DIM_NUM_2D) != ACLNN_SUCCESS ||
+        CheckTensorDimension(gradNormWeight, "gradNormWeight", DIM_NUM_1D) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckInputShapes(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
+                             const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
+                             const aclTensor *probs)
+{
+    const auto &partialBlockShape = partialBlock->GetViewShape();
+    const auto &blockResShape = blockRes->GetViewShape();
+    const auto &projWeightShape = projWeight->GetViewShape();
+    const auto &normWeightShape = normWeight->GetViewShape();
+    const auto &gradHiddenStatesShape = gradHiddenStates->GetViewShape();
+    const auto &invNormShape = invNorm->GetViewShape();
+    const auto &probsShape = probs->GetViewShape();
+    const int64_t tokenNum = partialBlockShape.GetDim(DIM_INDEX_0);
+    const int64_t hiddenSize = partialBlockShape.GetDim(DIM_INDEX_1);
+    const int64_t blockNum = blockResShape.GetDim(DIM_INDEX_1);
+    if (tokenNum < MIN_TOKEN_NUM) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[0]", std::to_string(tokenNum).c_str(),
+                                              "partialBlock.shape[0] must be greater than or equal to 1");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (blockNum < MIN_BLOCK_NUM || blockNum > MAX_BLOCK_NUM) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "blockRes.shape[1]", std::to_string(blockNum).c_str(),
+                                              "blockRes.shape[1] must be in [0, 128]");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (hiddenSize < MIN_HIDDEN_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[1]", std::to_string(hiddenSize).c_str(),
+                                              "partialBlock.shape[1] must be greater than or equal to 1");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (blockResShape.GetDim(DIM_INDEX_0) != tokenNum || blockResShape.GetDim(DIM_INDEX_2) != hiddenSize) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s blockRes shape must be [%ld, %ld, %ld], got [%ld, %ld, %ld]", API_NAME,
+                tokenNum, blockNum, hiddenSize, blockResShape.GetDim(DIM_INDEX_0), blockResShape.GetDim(DIM_INDEX_1),
+                blockResShape.GetDim(DIM_INDEX_2));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (projWeightShape.GetDim(DIM_INDEX_0) != PROJ_WEIGHT_ROW_NUM ||
+        projWeightShape.GetDim(DIM_INDEX_1) != hiddenSize) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s projWeight shape must be [1, %ld], got [%ld, %ld]", API_NAME, hiddenSize,
+                projWeightShape.GetDim(DIM_INDEX_0), projWeightShape.GetDim(DIM_INDEX_1));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (normWeightShape.GetDim(DIM_INDEX_0) != hiddenSize) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s normWeight shape must be [%ld], got [%ld]", API_NAME, hiddenSize,
+                normWeightShape.GetDim(DIM_INDEX_0));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (gradHiddenStatesShape.GetDim(DIM_INDEX_0) != tokenNum ||
+        gradHiddenStatesShape.GetDim(DIM_INDEX_1) != hiddenSize) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s gradHiddenStates shape must be [%ld, %ld], got [%ld, %ld]", API_NAME,
+                tokenNum, hiddenSize, gradHiddenStatesShape.GetDim(DIM_INDEX_0),
+                gradHiddenStatesShape.GetDim(DIM_INDEX_1));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (invNormShape.GetDim(DIM_INDEX_0) != tokenNum || invNormShape.GetDim(DIM_INDEX_1) != blockNum + 1) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s invNorm shape must be [%ld, %ld], got [%ld, %ld]", API_NAME, tokenNum,
+                blockNum + 1, invNormShape.GetDim(DIM_INDEX_0), invNormShape.GetDim(DIM_INDEX_1));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (probsShape.GetDim(DIM_INDEX_0) != tokenNum || probsShape.GetDim(DIM_INDEX_1) != blockNum + 1) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s probs shape must be [%ld, %ld], got [%ld, %ld]", API_NAME, tokenNum,
+                blockNum + 1, probsShape.GetDim(DIM_INDEX_0), probsShape.GetDim(DIM_INDEX_1));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckOutputShapes(const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
+                              const aclTensor *gradProjWeight, const aclTensor *gradNormWeight,
+                              const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
+                              const aclTensor *normWeight)
+{
+    if (gradPartialBlock->GetViewShape() != partialBlock->GetViewShape()) {
+        OP_LOGE_FOR_INVALID_SHAPE(API_NAME, "gradPartialBlock",
+                                  op::ToString(gradPartialBlock->GetViewShape()).GetString(),
+                                  op::ToString(partialBlock->GetViewShape()).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (gradBlockRes->GetViewShape() != blockRes->GetViewShape()) {
+        OP_LOGE_FOR_INVALID_SHAPE(API_NAME, "gradBlockRes", op::ToString(gradBlockRes->GetViewShape()).GetString(),
+                                  op::ToString(blockRes->GetViewShape()).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (gradProjWeight->GetViewShape() != projWeight->GetViewShape()) {
+        OP_LOGE_FOR_INVALID_SHAPE(API_NAME, "gradProjWeight", op::ToString(gradProjWeight->GetViewShape()).GetString(),
+                                  op::ToString(projWeight->GetViewShape()).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (gradNormWeight->GetViewShape() != normWeight->GetViewShape()) {
+        OP_LOGE_FOR_INVALID_SHAPE(API_NAME, "gradNormWeight", op::ToString(gradNormWeight->GetViewShape()).GetString(),
+                                  op::ToString(normWeight->GetViewShape()).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckParams(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
+                        const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
+                        const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
+                        const aclTensor *gradProjWeight, const aclTensor *gradNormWeight, uint64_t *workspaceSize,
+                        aclOpExecutor **executor)
+{
+    if (CheckNotNull(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, gradPartialBlock,
+                     gradBlockRes, gradProjWeight, gradNormWeight, workspaceSize, executor) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    if (CheckDtype(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, gradPartialBlock,
+                   gradBlockRes, gradProjWeight, gradNormWeight) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckDimensions(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs,
+                        gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckInputShapes(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs) !=
+        ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return CheckOutputShapes(gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight, partialBlock, blockRes,
+                             projWeight, normWeight);
+}
+} // namespace
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +293,11 @@ aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
         DFX_OUT(gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight));
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
+    const aclnnStatus checkRet =
+        CheckParams(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, gradPartialBlock,
+                    gradBlockRes, gradProjWeight, gradNormWeight, workspaceSize, executor);
+    CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
 
     // 与正向算子对齐：输入统一转 Contiguous 后再下发
     auto partialBlock_ = l0op::Contiguous(partialBlock, uniqueExecutor.get());

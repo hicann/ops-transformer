@@ -172,7 +172,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>validBlockNum（int64_t）</td>
               <td>属性</td>
               <td>预留属性，当前版本不参与计算。</td>
-              <td><li>建议传入默认值0。</li><li>其他取值当前也不会改变输出。</li></td>
+              <td><li>预留属性，当前版本不参与计算。</li></td>
               <td>INT64</td>
               <td>-</td>
               <td>标量</td>

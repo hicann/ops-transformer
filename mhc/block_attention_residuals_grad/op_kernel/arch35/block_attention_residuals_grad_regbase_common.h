@@ -21,7 +21,7 @@ namespace NsBlockAttentionResidualsGrad {
 namespace RegBase {
 
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 
 constexpr uint32_t GRAD_ELEM_PER_BLK_FP32 = 8;
 constexpr uint32_t GRAD_SCALAR_LOCAL_ELEMS = GRAD_ELEM_PER_BLK_FP32;
