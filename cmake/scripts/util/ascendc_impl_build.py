@@ -342,12 +342,16 @@ PYPTO_COMPILE_OP_API = """
         attrs = __attrs__ {}, origin_inputs=[{}], origin_outputs = [{}],\\
                 param_type_dynamic = {}, mc2_ctx = {}, param_type_list = {}, init_value_list = {},\\
                 output_shape_depend_on_compute = {})
-    pypto_compile_op(src, origin_func_name, op_info, options, code_channel, '{}', {}, arch='{}')
+    pypto_compile_kwargs = {{}}
+    if "arch" in inspect.signature(pypto_compile_op).parameters:
+        pypto_compile_kwargs["arch"] = '{pypto_arch}'
+    pypto_compile_op(src, origin_func_name, op_info, options, code_channel, '{}', {}, **pypto_compile_kwargs)
 """
 
 # Extra import appended to the wrapper head for pypto ops (kept out of the default head so non-pypto
 # builds / environments without pypto_pro are unaffected).
 PYPTO_IMPORT_HEADER = """
+import inspect
 from unittest.mock import MagicMock as _PyptoMagicMock
 sys.modules["torch"] = _PyptoMagicMock(name="torch")
 sys.modules["torch_npu"] = _PyptoMagicMock(name="torch_npu")
@@ -838,7 +842,7 @@ class AdpBuilder(opdesc_parser.OpDesc):
                     self.output_shape_depend_on_compute,
                     self.op_compile_option,
                     repr(extend_opt),
-                    self.pypto_arch,
+                    pypto_arch=self.pypto_arch,
                 )
             )
         else:
