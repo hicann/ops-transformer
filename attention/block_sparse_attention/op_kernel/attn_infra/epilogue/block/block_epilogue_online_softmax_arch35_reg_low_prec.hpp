@@ -40,37 +40,16 @@ public:
     using LayoutInput = LayoutS_;
 
     static constexpr uint32_t BLOCK_SIZE_IN_BYTE = 32;
-    static constexpr uint32_t REPEAT_SIZE_IN_BYTE = 256;
-    static constexpr uint32_t FLOAT_BLOCK_SIZE = 8;
-    static constexpr uint32_t FLOAT_VECTOR_SIZE = 64;
     static constexpr uint32_t HALF_VECTOR_SIZE = 128;
-    static constexpr uint32_t BLOCK_SIZE = 16;
-    static constexpr uint32_t UB_UINT8_VECTOR_SIZE = 1024;
-    static constexpr uint32_t UB_UINT8_BLOCK_SIZE = 32768;
-    static constexpr uint32_t VECTOR_SIZE = 128;
-    static constexpr uint32_t MAX_UB_S_ELEM_NUM = 16384;
-    static constexpr uint32_t DM_UB_GLOBAL_ELEM_NUM = 64;
     static constexpr uint32_t ELE_NUM_PER_C0 = 16;
     static constexpr uint32_t ELE_NUM_PER_C0_FP8 = 32;
+    static constexpr uint32_t ELE_NUM_PER_DATABLOCK = BLOCK_SIZE_IN_BYTE / sizeof(ElementOutput);
 
-    static constexpr uint32_t REDUCE_UB_SIZE = 1024;
-    static constexpr uint32_t ROW_OPS_SPEC_MASK_32 = 32;
-    static constexpr uint32_t ROW_OPS_SPEC_MASK_8 = 8;
-    static constexpr uint32_t ROW_OPS_SPEC_MASK_4 = 4;
-    static constexpr uint32_t ROW_OPS_SPEC_MASK_2 = 2;
-    static constexpr uint32_t MAX_ROW_NUM_SUB_CORE = 256;
-    static constexpr int64_t UB_FLOAT_LINE_SIZE = 64;
-
-    static constexpr uint32_t SPLIT_COL_IDX_2 = 2;
-    static constexpr uint32_t SPLIT_COL_IDX_3 = 3;
     static constexpr ElementInput MIN_VALUE = -65504.0f;
     static constexpr uint32_t HALF_REP_SIZE = 128;
     static constexpr uint32_t FLOAT_REP_SIZE = 64;
     static constexpr uint32_t BLOCK_REP_SIZE = 8;
-    static constexpr uint32_t REPEAT_STRIDE = 1;
     static constexpr uint32_t C0_NUM_PER_FRACTAL = 16;
-    static constexpr uint32_t SM_ROW_MAX_ELEM_NUM = 64;
-    static constexpr uint32_t SM_COL_MAX_ELEM_NUM = 256;
     static constexpr uint32_t SM_VREG_SIZE = 256 / sizeof(ElementInput);
 
     static constexpr uint32_t UB_S_P_BUF_STAGES = 2;
@@ -83,13 +62,15 @@ public:
     {
         subBlockIdx_ = AscendC::GetSubBlockIdx();
         scaleValue = static_cast<ElementInput>(scaleValue_);
+        uint32_t pNFractalNum = uBufTileHelper.kvBaseTilePerSubCore / ELE_NUM_PER_DATABLOCK;
+        uint32_t pStageElemNum = uBufTileHelper.qBaseTilePerSubCore * uBufTileHelper.kvBaseTilePerSubCore +
+                                 (pNFractalNum - 1) * ELE_NUM_PER_DATABLOCK;
         for (uint32_t i = 0; i < UB_S_P_BUF_STAGES; i++) {
             lsUbTensor[i] = resource.ubBuf.template GetBufferByByte<ElementInput>(
                 uBufTileHelper.sStartOffset +
                 uBufTileHelper.qBaseTilePerSubCore * uBufTileHelper.kvBaseTilePerSubCore * sizeof(ElementInput) * i);
             lpUbTensor[i] = resource.ubBuf.template GetBufferByByte<ElementOutput>(
-                uBufTileHelper.pStartOffset +
-                uBufTileHelper.qBaseTilePerSubCore * uBufTileHelper.kvBaseTilePerSubCore * sizeof(ElementOutput) * i);
+                uBufTileHelper.pStartOffset + pStageElemNum * sizeof(ElementOutput) * i);
         }
         for (uint32_t i = 0; i < UB_DM_BUF_MAX_STAGES; i++) {
             dmUbTensor[i] = resource.ubBuf.template GetBufferByByte<float>(
@@ -106,10 +87,6 @@ public:
     template <class TensorDst, class TensorSrc>
     __aicore__ inline void CopyPUbToPL1(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t m)
     {
-        const uint32_t blockCount = tla::get<1, 1>(srcTensor.shape());
-        const uint32_t blockLen = tla::get<0, 0>(srcTensor.shape()) * tla::get<0, 1>(srcTensor.shape());
-        const uint32_t dstOuterStrideCol = tla::get<1, 1>(dstTensor.stride());
-
         AscendC::DataCopyParams repeatParams;
 
         uint32_t elementNumPerC0;
@@ -118,9 +95,9 @@ public:
         } else {
             elementNumPerC0 = ELE_NUM_PER_C0;
         }
-        repeatParams.blockCount = blockCount;
+        repeatParams.blockCount = tla::get<1, 1>(srcTensor.shape());
         repeatParams.blockLen = m;
-        repeatParams.srcStride = tla::get<1, 1>(srcTensor.stride()) / elementNumPerC0 - m;
+        repeatParams.srcStride = tla::get<1, 1>(srcTensor.stride()) / elementNumPerC0 - m + 1;
         repeatParams.dstStride = tla::get<1, 1>(dstTensor.stride()) / elementNumPerC0 - m;
 
         auto dstOffset = dstTensor.layout()(dstTensor.coord());
@@ -147,7 +124,7 @@ public:
         uint32_t n = actualBlockShape.n();
         uint16_t mRound = RoundUp(m, C0_NUM_PER_FRACTAL);
         uint16_t nRound = RoundUp(n, ELE_NUM_PER_C0);
-        uint32_t blockStride = mRound;
+        uint32_t blockStride = mRound + 1;
         constexpr int16_t vlSize = static_cast<int16_t>(AscendC::GetVecLen() / sizeof(ElementInput));
         int16_t nLoops = AscendC::CeilDivision(n, vlSize) - 1;
         uint32_t tailN = (n - 1) % vlSize + 1;
@@ -257,7 +234,6 @@ private:
         RegTensor<ElementInput> srcVreg;
         RegTensor<ElementInput> maxTmpVreg;
         UnalignReg maxUreg;
-        MaskReg pregCompare;
         MaskReg pregFull = CreateMask<ElementInput, MaskPattern::ALL>();
         MaskReg pregTailN = UpdateMask<ElementInput>(tailN);
 
@@ -281,16 +257,13 @@ private:
                                                                               uint16_t S2BaseSize)
     {
         using namespace AscendC::Reg;
-        RegTensor<ElementInput> minVreg;
         RegTensor<ElementInput> srcVreg0;
         RegTensor<ElementInput> srcVreg1;
         RegTensor<ElementInput> maxTmpVreg;
         UnalignReg maxUreg;
-        MaskReg pregCompare;
         MaskReg pregFull = CreateMask<ElementInput, MaskPattern::ALL>();
         MaskReg pregTailN = UpdateMask<ElementInput>(tailN);
 
-        Duplicate(minVreg, MIN_VALUE);
         for (uint16_t i = 0; i < m; ++i) {
             LoadAlign(srcVreg0, srcUb + i * S2BaseSize);
             LoadAlign(srcVreg1, srcUb + i * S2BaseSize + HALF_REP_SIZE);
