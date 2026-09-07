@@ -15,6 +15,7 @@
 
 #include "lightning_indexer_v2_tiling.h"
 #include "../op_kernel/lightning_indexer_v2_template_tiling_key.h"
+#include "lightning_indexer_v2_tiling_info_parser.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -1272,8 +1273,14 @@ ge::graphStatus TilingForLightningIndexerV2(gert::TilingContext *context)
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("LightningIndexerV2", "Tiling context is null."),
                 return ge::GRAPH_FAILED);
     LIV2TilingInfo liV2Info;
-    LIV2InfoParser LIV2InfoParser(context);
-    if (LIV2InfoParser.ParseAndCheck(liV2Info) != ge::GRAPH_SUCCESS) {
+    auto platformInfoPtr = context->GetPlatformInfo();
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    const bool useArch35Checker = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510;
+    LIV2InfoParser liV2InfoParser(context);
+    const ge::graphStatus parseStatus =
+        useArch35Checker ? ParseAndCheckLIV2Arch35(context, liV2Info) : liV2InfoParser.ParseAndCheck(liV2Info);
+    if (parseStatus != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     LightningIndexerV2Tiling liTiling(context);

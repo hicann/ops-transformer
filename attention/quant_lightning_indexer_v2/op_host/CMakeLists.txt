@@ -27,4 +27,10 @@ add_ops_compile_options(
 
 if (NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources(OPTYPE quant_lightning_indexer_v2 ACLNNTYPE aclnn)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../../lightning_indexer_v2/op_host/checkers/checker_sources.cmake)
+    add_lightning_indexer_v2_common_checker_sources(${OPHOST_NAME}_tiling_obj)
+    target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/checkers/qliv2_checker.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/checkers/qliv2_variant_checker.cpp
+    )
 endif()
