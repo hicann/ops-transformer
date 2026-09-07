@@ -57,8 +57,7 @@ uint64_t GetTilingKey(uint32_t sp, ge::DataType goType_)
 
 ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE("AttentionUpdate", "context is null"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OP_LOGE("AttentionUpdate", "context is null"), return ge::GRAPH_FAILED);
     auto compileInfo = reinterpret_cast<const DecodeUpdateCompileInfo *>(context->GetCompileInfo());
     if (compileInfo->is_ascendc) {
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
@@ -85,20 +84,21 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
     const uint32_t totalLength = lseShape.GetDim(LSE_TOTAL_LENGTH_DIM);
     const uint32_t hd = inShape.GetDim(IN_HD_DIM);
 
-    OP_LOGD(nodeName, "TotalLength of b*s*hc is %u, sp is %ld, hd is %u",
-            totalLength, sp, hd);
+    OP_LOGD(nodeName, "TotalLength of b*s*hc is %u, sp is %ld, hd is %u", totalLength, sp, hd);
 
     uint32_t blockDims = 0;
     uint32_t coreNum = compileInfo->coreNum;
     blockDims = std::min<uint32_t>((totalLength + MIN_BLOCK_LENGTH - 1UL) / MIN_BLOCK_LENGTH, coreNum);
 
     DecodeUpdateTilingData tilingData;
-    tilingData.set_formerNum(static_cast<uint32_t>(totalLength % blockDims));
-    tilingData.set_tailNum(static_cast<uint32_t>(blockDims - tilingData.get_formerNum()));
-    tilingData.set_tailLength(static_cast<uint32_t>(totalLength / blockDims));
-    tilingData.set_formerLength(static_cast<uint32_t>(tilingData.get_formerNum() == 0 ?
-                                                          0 :
-                                                          tilingData.get_tailLength() + 1));
+    if (blockDims > 0) {
+        tilingData.set_formerNum(static_cast<uint32_t>(totalLength % blockDims));
+        tilingData.set_tailNum(static_cast<uint32_t>(blockDims - tilingData.get_formerNum()));
+        tilingData.set_tailLength(static_cast<uint32_t>(totalLength / blockDims));
+        tilingData.set_formerLength(
+            static_cast<uint32_t>(tilingData.get_formerNum() == 0 ? 0 : tilingData.get_tailLength() + 1));
+    }
+
     tilingData.set_hDim(static_cast<uint32_t>(hd));
     tilingData.set_sp(static_cast<uint32_t>(sp));
     tilingData.set_updateType(static_cast<uint32_t>(updateType));
@@ -117,8 +117,7 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
     workspaces[0] = SYS_WORKSPACE_SIZE;
 
     context->SetBlockDim(blockDims);
-    tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(),
-                            context->GetRawTilingData()->GetCapacity());
+    tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
 
     return ge::GRAPH_SUCCESS;
@@ -127,9 +126,7 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
 static ge::graphStatus TilingPrepare4DecodeUpdate(gert::TilingParseContext *context)
 {
     auto compileInfo = context->GetCompiledInfo<DecodeUpdateCompileInfo>();
-    OP_CHECK_IF(compileInfo == nullptr,
-                OP_LOGE(context, "compileInfoPtr is null"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return ge::GRAPH_FAILED);
     auto platformInfo = context->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint64_t ubSize;
@@ -139,15 +136,13 @@ static ge::graphStatus TilingPrepare4DecodeUpdate(gert::TilingParseContext *cont
     compileInfo->is_ascendc = Ops::Transformer::OpTiling::IsRegbaseSocVersion(context);
 
     OP_CHECK_IF(compileInfo->coreNum <= 0,
-                OP_LOGE(context->GetNodeName(),
-                        "AttentionUpdate GetHardwareInfo Failed, vectorCoreNum: %u",
+                OP_LOGE(context->GetNodeName(), "AttentionUpdate GetHardwareInfo Failed, vectorCoreNum: %u",
                         compileInfo->coreNum),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(compileInfo->ubSize <= 0,
-                OP_LOGE(context->GetNodeName(),
-                        "AttentionUpdate GetHardwareInfo Failed, ubSize: %lu",
-                        compileInfo->ubSize),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        compileInfo->ubSize <= 0,
+        OP_LOGE(context->GetNodeName(), "AttentionUpdate GetHardwareInfo Failed, ubSize: %lu", compileInfo->ubSize),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
