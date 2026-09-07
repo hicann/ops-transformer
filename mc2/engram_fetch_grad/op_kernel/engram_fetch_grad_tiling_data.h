@@ -16,7 +16,7 @@
 #ifndef ASCENDC_ENGRAM_FETCH_GRAD_TILING_H
 #define ASCENDC_ENGRAM_FETCH_GRAD_TILING_H
 
-#include "kernel_tiling/kernel_tiling.h"
+#include <cstdint>
 
 // Host/Kernel 共享布局常量（单一权威定义）。
 // Host 侧 op_tiling 与 Kernel 侧 utils/arch35/unique 均从此处引用，禁止在其它文件重复定义；

@@ -482,8 +482,8 @@ static ge::graphStatus SetPlatformInfo(gert::TilingContext *context, EngramFetch
 /**
  * @brief 设置tiling数据
  */
-static ge::graphStatus SetTilingData(gert::TilingContext *context, EngramFetchTilingData &tilingData, int64_t numTokens,
-                                     bool isTraining)
+static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramFetchTilingData &tilingData,
+                                     int64_t numTokens, bool isTraining)
 {
     const char *nodeName = context->GetNodeName();
     auto attrs = context->GetAttrs();

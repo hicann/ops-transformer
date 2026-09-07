@@ -23,9 +23,9 @@ constexpr int64_t NETWORK_HYBRID = 1;
 } // namespace
 
 static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx,
-                                aclTensor *numRecvTokensPerRank, aclTensor *numRecvTokensPerExpert,
-                                aclTensor *dstBufferSlotIdx, aclTensor *routeCount, aclTensor *routeDstScaleout,
-                                aclTensor *routeScaleoutSlot)
+                                const aclTensor *numRecvTokensPerRank, const aclTensor *numRecvTokensPerExpert,
+                                const aclTensor *dstBufferSlotIdx, const aclTensor *routeCount,
+                                const aclTensor *routeDstScaleout, const aclTensor *routeScaleoutSlot)
 {
     CHECK_RET(context != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(x != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -40,10 +40,9 @@ static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *x, co
 }
 
 static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank,
-                               int64_t cclBufferSize, int64_t expertAlignment, bool doCpuSync, int64_t topoType,
-                               int64_t rankNumPerServer, const aclTensor *cachedDstSlotIdx,
-                               const aclTensor *cachedRouteCount, const aclTensor *cachedRouteDstScaleout,
-                               const aclTensor *cachedRouteScaleoutSlot)
+                               int64_t cclBufferSize, bool doCpuSync, int64_t topoType, int64_t rankNumPerServer,
+                               const aclTensor *cachedDstSlotIdx, const aclTensor *cachedRouteCount,
+                               const aclTensor *cachedRouteDstScaleout, const aclTensor *cachedRouteScaleoutSlot)
 {
     CHECK_RET(epWorldSize > 1, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(epRankId >= 0 && epRankId < epWorldSize, ACLNN_ERR_PARAM_INVALID);
@@ -57,9 +56,9 @@ static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t nu
     bool cachedMode = (cachedDstSlotIdx != nullptr);
     CHECK_RET(!(cachedMode && doCpuSync), ACLNN_ERR_PARAM_INVALID);
     bool anyCachedRoute =
-        cachedRouteCount != nullptr || cachedRouteDstScaleout != nullptr || cachedRouteScaleoutSlot != nullptr;
+        (cachedRouteCount != nullptr) || (cachedRouteDstScaleout != nullptr) || (cachedRouteScaleoutSlot != nullptr);
     bool allCachedRoute =
-        cachedRouteCount != nullptr && cachedRouteDstScaleout != nullptr && cachedRouteScaleoutSlot != nullptr;
+        (cachedRouteCount != nullptr) && (cachedRouteDstScaleout != nullptr) && (cachedRouteScaleoutSlot != nullptr);
     CHECK_RET(!anyCachedRoute || allCachedRoute, ACLNN_ERR_PARAM_INVALID);
     bool hybridCachedMode = cachedMode && topoType == NETWORK_HYBRID && epWorldSize / rankNumPerServer > 1;
     CHECK_RET(!hybridCachedMode || allCachedRoute, ACLNN_ERR_PARAM_INVALID);
@@ -96,9 +95,9 @@ aclnnStatus aclnnMoeEpDispatchGetWorkspaceSize(
                                    routeCount, routeDstScaleout, routeScaleoutSlot);
     CHECK_RET(retNotNull == ACLNN_SUCCESS, retNotNull);
 
-    auto retParams = CheckParams(epWorldSize, epRankId, numExperts, numMaxTokensPerRank, cclBufferSize, expertAlignment,
-                                 doCpuSync, topoType, rankNumPerServer, cachedDstSlotIdx, cachedRouteCount,
-                                 cachedRouteDstScaleout, cachedRouteScaleoutSlot);
+    auto retParams = CheckParams(epWorldSize, epRankId, numExperts, numMaxTokensPerRank, cclBufferSize, doCpuSync,
+                                 topoType, rankNumPerServer, cachedDstSlotIdx, cachedRouteCount, cachedRouteDstScaleout,
+                                 cachedRouteScaleoutSlot);
     CHECK_RET(retParams == ACLNN_SUCCESS, retParams);
 
     aclnnStatus getWorkspaceSizesRes = aclnnInnerMoeEpDispatchGetWorkspaceSize(

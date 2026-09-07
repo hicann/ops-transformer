@@ -521,7 +521,7 @@ static ge::graphStatus SetPlatformInfo(gert::TilingContext *context, EngramFetch
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetTilingData(gert::TilingContext *context, EngramFetchGradTilingData &tilingData,
+static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramFetchGradTilingData &tilingData,
                                      int64_t numTokens, uint32_t rankSize, int64_t totalRecv, int64_t hiddenDim)
 {
     const char *nodeName = context->GetNodeName();

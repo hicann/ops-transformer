@@ -88,6 +88,8 @@ aclnnStatus DispatchCheckParams(const aclTensor *x, const aclTensor *expertIds, 
                                 aclTensor *dynamicScales, aclTensor *assistInfoForCombine, aclTensor *expertTokensNums,
                                 aclTensor *epRecvCounts, aclTensor *tpRecvCounts)
 {
+    // 对外接口，参数暂使用 void 修改
+    (void)tpRecvCounts;
     CHECK_RET(DispatchCheckNotNull(x, expertIds, groupEp, groupTp, expandX, dynamicScales, assistInfoForCombine,
                                    expertTokensNums, epRecvCounts),
               ACLNN_ERR_PARAM_NULLPTR);
@@ -100,7 +102,7 @@ aclnnStatus DispatchCheckParams(const aclTensor *x, const aclTensor *expertIds, 
         OP_LOGD("quantMode = 2, dynamicScales can't be null");
         CHECK_RET(dynamicScales != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     }
-    if (x->GetDataType() == ACL_INT32) {
+    if (static_cast<int32_t>(x->GetDataType()) == static_cast<int32_t>(ACL_INT32)) {
         OP_LOGD("x dtype is INT32, scales and dynamicScales can't be null");
         CHECK_RET(scalesOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         CHECK_RET(dynamicScales != nullptr, ACLNN_ERR_PARAM_NULLPTR);

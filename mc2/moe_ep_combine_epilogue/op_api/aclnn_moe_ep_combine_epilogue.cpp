@@ -22,7 +22,7 @@ constexpr int64_t NETWORK_DIRECT = 0;
 constexpr int64_t NETWORK_HYBRID = 1;
 } // namespace
 
-static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *topkIdx, aclTensor *combinedX)
+static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *topkIdx, const aclTensor *combinedX)
 {
     CHECK_RET(context != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(topkIdx != nullptr, ACLNN_ERR_PARAM_NULLPTR);

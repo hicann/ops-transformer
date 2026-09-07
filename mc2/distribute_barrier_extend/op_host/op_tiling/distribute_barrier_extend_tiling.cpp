@@ -13,24 +13,7 @@
  * \brief
  */
 
-#include <dlfcn.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <queue>
-#include <string>
-#include <vector>
-
-#include "../../../distribute_barrier/op_kernel/distribute_barrier_tiling.h"
 #include "../../../distribute_barrier/op_host/op_tiling/distribute_barrier_tiling_helper.h"
-// #include "graph/utils/op_desc_utils.h"   // 依赖 ge
-#include "graph/utils/type_utils.h"
-#include "mc2_hcom_topo_info.h"
 #include "mc2_log.h"
 #include "register/op_def_registry.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"

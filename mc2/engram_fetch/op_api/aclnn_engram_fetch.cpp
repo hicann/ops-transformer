@@ -24,9 +24,7 @@
 
 using namespace op;
 
-static bool CheckNotNull(const aclTensor *commContext, const aclTensor *indices, const aclTensor *localStorageAddr,
-                         aclTensor *fetched, aclTensor *permOut, aclTensor *sendCountsOut, aclTensor *recvCountsOut,
-                         aclTensor *recvLocalEntryOut, aclTensor *numRecvOut)
+static bool CheckNotNull(const aclTensor *commContext, const aclTensor *indices, const aclTensor *fetched)
 {
     OP_CHECK_NULL(commContext, return false);
     OP_CHECK_NULL(indices, return false);
@@ -34,14 +32,9 @@ static bool CheckNotNull(const aclTensor *commContext, const aclTensor *indices,
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *commContext, const aclTensor *indices,
-                               const aclTensor *localStorageAddr, aclTensor *fetched, aclTensor *permOut,
-                               aclTensor *sendCountsOut, aclTensor *recvCountsOut, aclTensor *recvLocalEntryOut,
-                               aclTensor *numRecvOut)
+static aclnnStatus CheckParams(const aclTensor *commContext, const aclTensor *indices, const aclTensor *fetched)
 {
-    CHECK_RET(CheckNotNull(commContext, indices, localStorageAddr, fetched, permOut, sendCountsOut, recvCountsOut,
-                           recvLocalEntryOut, numRecvOut),
-              ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(CheckNotNull(commContext, indices, fetched), ACLNN_ERR_PARAM_NULLPTR);
     return ACLNN_SUCCESS;
 }
 
@@ -57,8 +50,7 @@ aclnnStatus aclnnEngramFetchGetWorkspaceSize(const aclTensor *commContext, const
                                              int64_t commBufferSize, int64_t withGrad, uint64_t *workspaceSize,
                                              aclOpExecutor **executor)
 {
-    auto retParam = CheckParams(commContext, indices, localStorageAddr, fetched, permOut, sendCountsOut, recvCountsOut,
-                                recvLocalEntryOut, numRecvOut);
+    auto retParam = CheckParams(commContext, indices, fetched);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     aclnnStatus ret = aclnnInnerEngramFetchGetWorkspaceSize(commContext, indices, localStorageAddr, hiddenSize,
                                                             numEntriesPerRank, numMaxTokensPerRank, commBufferSize,

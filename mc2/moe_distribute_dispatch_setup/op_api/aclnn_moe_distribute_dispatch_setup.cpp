@@ -65,11 +65,8 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *expertIds, const c
 }
 
 // 入参校验
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *expertIds, const aclTensor *scalesOptional,
-                               const char *groupEp, int64_t epWorldSize, int64_t epRankId, int64_t expertShardType,
-                               int64_t shareExpertRankNum, int64_t moeExpertNum, int64_t quantMode, int64_t globalBs,
-                               int64_t commType, const char *commAlg, aclTensor *yOut, aclTensor *expandIdxOut,
-                               aclTensor *commCmdInfoOut)
+static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *expertIds, const char *groupEp, aclTensor *yOut,
+                               aclTensor *expandIdxOut, aclTensor *commCmdInfoOut)
 {
     CHECK_RET(CheckNotNull(x, expertIds, groupEp, yOut, expandIdxOut, commCmdInfoOut), ACLNN_ERR_PARAM_NULLPTR);
     if (strnlen(groupEp, HCCL_GROUP_NAME_MAX) >= HCCL_GROUP_NAME_MAX) {
@@ -89,9 +86,7 @@ aclnnStatus aclnnMoeDistributeDispatchSetupGetWorkspaceSize(
     aclTensor *expandIdxOut, aclTensor *commCmdInfoOut, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_LOGD("aclnnMoeDistributeDispatchSetupGetWorkspaceSize start");
-    auto ret_param =
-        CheckParams(x, expertIds, scalesOptional, groupEp, epWorldSize, epRankId, expertShardType, shareExpertRankNum,
-                    moeExpertNum, quantMode, globalBs, commType, commAlg, yOut, expandIdxOut, commCmdInfoOut);
+    auto ret_param = CheckParams(x, expertIds, groupEp, yOut, expandIdxOut, commCmdInfoOut);
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
 
     aclnnStatus ret = aclnnInnerMoeDistributeDispatchSetupGetWorkspaceSize(
@@ -101,13 +96,7 @@ aclnnStatus aclnnMoeDistributeDispatchSetupGetWorkspaceSize(
     return ret;
 }
 
-aclnnStatus aclnnMoeDistributeDispatchSetupTeardownCalcOutputSize(
-    const aclTensor *x, const aclTensor *expertIds, const aclTensor *scalesOptional,
-    const aclTensor *xActiveMaskOptional, const char *groupEp, int64_t epWorldSize, int64_t epRankId,
-    int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum,
-    int64_t quantMode, int64_t globalBs, int64_t expertTokenNumsType, int64_t commType, const char *commAlg,
-    uint64_t &tokenMsgSize, uint64_t &expandIdxOutSize, uint64_t &assistInfoForCombineOutSize,
-    uint64_t &commCmdInfoOutSize)
+static aclnnStatus CheckCalcOutputShape(const aclTensor *x, const aclTensor *expertIds)
 {
     OP_CHECK_NULL(x, return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK_NULL(expertIds, return ACLNN_ERR_PARAM_NULLPTR);
@@ -123,6 +112,27 @@ aclnnStatus aclnnMoeDistributeDispatchSetupTeardownCalcOutputSize(
                                                  "The shape dim of expertIds must be 2D.");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus aclnnMoeDistributeDispatchSetupTeardownCalcOutputSize(
+    const aclTensor *x, const aclTensor *expertIds, const aclTensor *scalesOptional,
+    const aclTensor *xActiveMaskOptional, const char *groupEp, int64_t epWorldSize, int64_t epRankId,
+    int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum,
+    int64_t quantMode, int64_t globalBs, int64_t expertTokenNumsType, int64_t commType, const char *commAlg,
+    uint64_t &tokenMsgSize, uint64_t &expandIdxOutSize, uint64_t &assistInfoForCombineOutSize,
+    uint64_t &commCmdInfoOutSize)
+{
+    // 对外接口，参数暂使用 void 修改
+    (void)scalesOptional;
+    (void)xActiveMaskOptional;
+    (void)groupEp;
+    (void)expertShardType;
+    (void)expertTokenNumsType;
+    (void)commType;
+    (void)commAlg;
+    aclnnStatus retCheckShape = CheckCalcOutputShape(x, expertIds);
+    CHECK_RET(retCheckShape == ACLNN_SUCCESS, retCheckShape);
     int64_t bs = x->GetViewShape().GetDim(0);
     int64_t h = x->GetViewShape().GetDim(1);
     int64_t k = expertIds->GetViewShape().GetDim(1);

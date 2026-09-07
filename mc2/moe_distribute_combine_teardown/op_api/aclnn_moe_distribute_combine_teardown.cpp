@@ -36,7 +36,6 @@ enum class NnopbaseHcclServerType : uint32_t {
 
 static bool CheckNotNull(const aclTensor *expandX, const aclTensor *quantExpandX, const aclTensor *expertIds,
                          const aclTensor *expandIdx, const aclTensor *expertScales, const aclTensor *commCmdInfo,
-                         const aclTensor *xActiveMaskOptional, const aclTensor *sharedExpertXOptional,
                          const char *groupEp, aclTensor *xOut)
 {
     OP_LOGD("aclnn_moe_distribute_combine_teardown CheckNotNull start");
@@ -57,15 +56,10 @@ static bool CheckNotNull(const aclTensor *expandX, const aclTensor *quantExpandX
 
 static aclnnStatus CheckParams(const aclTensor *expandX, const aclTensor *quantExpandX, const aclTensor *expertIds,
                                const aclTensor *expandIdx, const aclTensor *expertScales, const aclTensor *commCmdInfo,
-                               const aclTensor *xActiveMaskOptional, const aclTensor *sharedExpertXOptional,
-                               const char *groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
-                               int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum,
-                               int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg,
-                               aclTensor *xOut)
+                               const char *groupEp, aclTensor *xOut)
 {
     OP_LOGD("aclnn_moe_distribute_combine_teardown checkparams start");
-    CHECK_RET(CheckNotNull(expandX, quantExpandX, expertIds, expandIdx, expertScales, commCmdInfo, xActiveMaskOptional,
-                           sharedExpertXOptional, groupEp, xOut),
+    CHECK_RET(CheckNotNull(expandX, quantExpandX, expertIds, expandIdx, expertScales, commCmdInfo, groupEp, xOut),
               ACLNN_ERR_PARAM_NULLPTR);
     if (strnlen(groupEp, HCCL_GROUP_NAME_MAX) >= HCCL_GROUP_NAME_MAX) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -105,10 +99,7 @@ extern "C" aclnnStatus aclnnMoeDistributeCombineTeardownGetWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    auto ret_param =
-        CheckParams(expandX, quantExpandX, expertIds, expandIdx, expertScales, commCmdInfo, xActiveMaskOptional,
-                    sharedExpertXOptional, groupEp, epWorldSize, epRankId, moeExpertNum, expertShardType,
-                    sharedExpertNum, sharedExpertRankNum, globalBs, commQuantMode, commType, commAlg, xOut);
+    auto ret_param = CheckParams(expandX, quantExpandX, expertIds, expandIdx, expertScales, commCmdInfo, groupEp, xOut);
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
 
     aclnnStatus ret = aclnnInnerMoeDistributeCombineTeardownGetWorkspaceSize(
