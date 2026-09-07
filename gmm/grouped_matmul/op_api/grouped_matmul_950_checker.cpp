@@ -126,6 +126,9 @@ typename AclnnGroupedMatmulDAV3510Checker<T>::TensorIndexInfo AclnnGroupedMatmul
 template <typename T>
 const char *AclnnGroupedMatmulDAV3510Checker<T>::GetAclnnOpName() const
 {
+    if (!aclnnOpName_.empty()) {
+        return aclnnOpName_.c_str();
+    }
     switch (gmmParams_.apiVersion) {
         case gmm::GMMApiVersion::V1:
             return "aclnnGroupedMatmulGetWorkspaceSize";
@@ -142,6 +145,12 @@ const char *AclnnGroupedMatmulDAV3510Checker<T>::GetAclnnOpName() const
         default:
             return "aclnnGroupedMatmulGetWorkspaceSize";
     }
+}
+
+template <typename T>
+void AclnnGroupedMatmulDAV3510Checker<T>::SetAclnnOpName(const std::string &opName)
+{
+    this->aclnnOpName_ = opName;
 }
 
 template <typename T>

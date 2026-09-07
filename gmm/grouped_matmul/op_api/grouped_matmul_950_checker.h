@@ -25,6 +25,7 @@ public:
     bool IsPerTileQuantMode() const;
     void SetInputName(const std::string &xName, const std::string &weightName, const std::string &perTokenScaleName,
                       const std::string &scaleName, const std::string &groupTensorName);
+    void SetAclnnOpName(const std::string &opName);
 
 private:
     struct TensorDimInfo {
@@ -100,6 +101,7 @@ private:
     std::string groupTensorName_ = "groupTensor";
     std::string biasName_ = "bias";
     std::string yName_ = "y";
+    std::string aclnnOpName_;
     const std::vector<op::DataType> SPECIAL_QUANT_DTYPES = {DataType::DT_FLOAT4_E2M1, DataType::DT_INT4};
 };
 } // namespace gmm

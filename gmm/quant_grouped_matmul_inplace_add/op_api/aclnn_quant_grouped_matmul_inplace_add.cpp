@@ -278,6 +278,7 @@ static aclnnStatus CheckParams(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParam
     } else {
         auto checker = gmm::AclnnGroupedMatmulDAV3510Checker<aclTensor>(gmmParams);
         checker.SetInputName("x1", "x2", "scale1Optional", "scale2", "groupList");
+        checker.SetAclnnOpName(QGMM_INPLACE_ADD_ACLNN_OP_NAME);
         CHECK_RET(checker.CheckGroupedMatmulDAV3510() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     }
     return ACLNN_SUCCESS;
