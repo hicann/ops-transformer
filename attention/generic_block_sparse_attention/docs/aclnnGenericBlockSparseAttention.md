@@ -250,7 +250,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>
         可选输入，用于变长序列场景。
         <ul>
-          <li>layoutKv为TND/PA_BBND/PA_BNBD时必须传入。当前仅支持PA_BBND。</li>
+          <li>layoutKv为TND时必须传入。</li>
+          <li>layoutKv非TND时不传（须为nullptr）。当前仅支持PA_BBND。</li>
           <li>layoutKv为BNSD/BSND时：如传入，算子内按该输入指定的实际序列长度处理；如传入nullptr，按key/value的shape中的S处理（当前不支持）。</li>
           <li>元素为前缀和：第0个元素为0，最后一个元素等于各batch KV存储长度之和，后一个元素须≥前一个元素。</li>
         </ul>
@@ -281,8 +282,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>各batch中kv的实际序列长度。</td>
       <td>
         <ul>
-          <li>不指定实际长度可传入nullptr，表示与cuSeqLengthsKvOptional差分得到的存储长度相同。</li>
-          <li>传入时shape为(B,)，每个元素须≥0且≤对应batch的cu存储长度。与cu并存时的双长度语义见<a href="#其他约束">其他约束</a>。</li>
+          <li>layoutKv为PA_BBND时必须传入，shape为(B,)，每个元素须≥0。</li>
+          <li>layoutKv为TND时：不指定实际长度可传入nullptr，表示与cuSeqLengthsKvOptional差分得到的存储长度相同；传入时shape为(B,)，每个元素须≥0且≤对应batch的cu存储长度。与cu并存时的双长度语义见<a href="#其他约束">其他约束</a>。</li>
         </ul>
       </td>
       <td>INT32</td>
@@ -962,7 +963,8 @@ key、value的shape由layoutKv及是否使能Paged Cache决定，见<a href="#pa
 - 调用前须先执行aclnnGenericBlockSparseAttentionMetadata生成metadataOptional，再调用本接口；metadata须与当前输入/属性配套，每次调用须重新生成。
 - query/key/value的headDim(D)当前仅支持128；KV页blockSize当前仅支持128，且须等于blockShapeY。
 - TND + isPackedGQA=1时：totalQBlocks按cuSeqLengthsQ差分得到的存储长度分块，即$\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$；sparse分块与QKV寻址均按该存储长度，不以seqused重切分。
-- sequsedQOptional/sequsedKvOptional与cu前缀和同时传入时：分核/任务空间按各batch实际有效长度（seqused）累加；各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
+- layoutKv为PA_BBND时须传sequsedKvOptional，不传cuSeqLengthsKvOptional。
+- seqused与对应cu前缀和同时传入时（Q侧，及layoutKv为TND时的KV侧）：分核/任务空间按各batch实际有效长度（seqused）累加；各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
 - 输入query、key、value的数据类型必须一致。
 - PA_BBND下key/value仅dim0（物理页轴）可非连续；页内blockSize×numKeyValueHeads×headDim须连续；stride0 ≥ blockSize×numKeyValueHeads×headDim且按numKeyValueHeads×headDim对齐。
 
@@ -1131,7 +1133,7 @@ int main()
   std::vector<int64_t> sparseCountShape = {N2, totalQBlocks};
   std::vector<int64_t> blockTableShape = {B, maxBlocks};
   std::vector<int64_t> cuSeqQShape = {B + 1};
-  std::vector<int64_t> cuSeqKvShape = {B + 1};
+  std::vector<int64_t> sequsedKvShape = {B};
   std::vector<int64_t> metadataShape = {1024};
   std::vector<int64_t> attnOutShape = {T, N1, D};
 
@@ -1142,7 +1144,7 @@ int main()
   void* sparseCountDeviceAddr = nullptr;
   void* metadataDeviceAddr = nullptr;
   void* cuSeqQDeviceAddr = nullptr;
-  void* cuSeqKvDeviceAddr = nullptr;
+  void* sequsedKvDeviceAddr = nullptr;
   void* blockTableDeviceAddr = nullptr;
   void* attnOutDeviceAddr = nullptr;
 
@@ -1153,7 +1155,7 @@ int main()
   aclTensor* sparseCount = nullptr;
   aclTensor* metadata = nullptr;
   aclTensor* cuSeqQ = nullptr;
-  aclTensor* cuSeqKv = nullptr;
+  aclTensor* sequsedKv = nullptr;
   aclTensor* blockTable = nullptr;
   aclTensor* attnOut = nullptr;
 
@@ -1172,7 +1174,7 @@ int main()
   std::vector<int32_t> blockTableHostData(blockTableSize);
   std::iota(blockTableHostData.begin(), blockTableHostData.end(), 0);
   std::vector<int64_t> cuSeqQHostData = {0, S1};
-  std::vector<int64_t> cuSeqKvHostData = {0, S2};
+  std::vector<int32_t> sequsedKvHostData = {static_cast<int32_t>(S2)};
   std::vector<int32_t> metadataHostData(1024, 0);
   std::vector<uint16_t> attnOutHostData = MakeFp16Data(attnOutSize, 0.0f);
 
@@ -1204,7 +1206,7 @@ int main()
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(cuSeqQHostData, cuSeqQShape, &cuSeqQDeviceAddr, aclDataType::ACL_INT64, &cuSeqQ);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  ret = CreateAclTensor(cuSeqKvHostData, cuSeqKvShape, &cuSeqKvDeviceAddr, aclDataType::ACL_INT64, &cuSeqKv);
+  ret = CreateAclTensor(sequsedKvHostData, sequsedKvShape, &sequsedKvDeviceAddr, aclDataType::ACL_INT32, &sequsedKv);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(blockTableHostData, blockTableShape, &blockTableDeviceAddr, aclDataType::ACL_INT32,
                         &blockTable);
@@ -1223,7 +1225,7 @@ int main()
   uint64_t metadataWorkspaceSize = 0;
   aclOpExecutor* metadataExecutor = nullptr;
   ret = aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-      sparseIdx, sparseCount, cuSeqQ, cuSeqKv, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, 1, layoutQ, layoutKv, 1,
+      sparseIdx, sparseCount, cuSeqQ, nullptr, nullptr, sequsedKv, S1, S2, N1, N2, D, blockShape, 1, layoutQ, layoutKv, 1,
       0, 1, -1, -1, metadata, &metadataWorkspaceSize, &metadataExecutor);
   CHECK_RET(ret == ACL_SUCCESS,
             LOG_PRINT("aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
@@ -1248,8 +1250,8 @@ int main()
   uint64_t workspaceSize = 0;
   aclOpExecutor* executor = nullptr;
   ret = aclnnGenericBlockSparseAttentionGetWorkspaceSize(
-      q, k, v, sparseIdx, sparseCount, metadata, nullptr, nullptr, nullptr, nullptr, nullptr, cuSeqQ, cuSeqKv, nullptr,
-      nullptr, blockTable, blockShape, 1, layoutQ, layoutKv, scaleValue, 1, 0, 0.0, 1, -1, -1, 0, attnOut, nullptr,
+      q, k, v, sparseIdx, sparseCount, metadata, nullptr, nullptr, nullptr, nullptr, nullptr, cuSeqQ, nullptr, nullptr,
+      sequsedKv, blockTable, blockShape, 1, layoutQ, layoutKv, scaleValue, 1, 0, 0.0, 1, -1, -1, 0, attnOut, nullptr,
       &workspaceSize, &executor);
   CHECK_RET(ret == ACL_SUCCESS,
             LOG_PRINT("aclnnGenericBlockSparseAttentionGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
@@ -1278,7 +1280,7 @@ int main()
   aclDestroyTensor(sparseCount);
   aclDestroyTensor(metadata);
   aclDestroyTensor(cuSeqQ);
-  aclDestroyTensor(cuSeqKv);
+  aclDestroyTensor(sequsedKv);
   aclDestroyTensor(blockTable);
   aclDestroyTensor(attnOut);
 
@@ -1290,7 +1292,7 @@ int main()
   aclrtFree(sparseCountDeviceAddr);
   aclrtFree(metadataDeviceAddr);
   aclrtFree(cuSeqQDeviceAddr);
-  aclrtFree(cuSeqKvDeviceAddr);
+  aclrtFree(sequsedKvDeviceAddr);
   aclrtFree(blockTableDeviceAddr);
   aclrtFree(attnOutDeviceAddr);
   if (metadataWorkspaceSize > 0) {

@@ -69,7 +69,7 @@
     <tr>
       <td>cuSeqLengthsKvOptional</td>
       <td>输入</td>
-      <td>各Batch中Key/Value序列存储长度的前缀和，当前必须传入，shape为(B+1,)。</td>
+      <td>各Batch中Key/Value序列存储长度的前缀和，layoutKv为"TND"时必传，非TND时不传，shape为(B+1,)。</td>
       <td>INT64</td>
       <td>ND</td>
     </tr>
@@ -82,8 +82,8 @@
     </tr>
     <tr>
       <td>sequsedKvOptional</td>
-      <td>可选输入</td>
-      <td>各Batch中Key/Value的实际序列长度，shape为(B,)；不传时使用Key/Value存储长度。</td>
+      <td>输入</td>
+      <td>各Batch中Key/Value的实际序列长度，layoutKv为"PA_BBND"时必传，shape为(B,)。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>

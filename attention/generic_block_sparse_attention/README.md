@@ -19,7 +19,7 @@
 
   典型调用流程如下：
 
-  1. 准备`query`、`key`、`value`、`sparseBlockIdx`、`sparseBlockCount`、`cuSeqLengthsQOptional`、`cuSeqLengthsKvOptional`、`blockTableOptional`等输入。
+  1. 准备`query`、`key`、`value`、`sparseBlockIdx`、`sparseBlockCount`等输入。
   2. 调用`aclnnGenericBlockSparseAttentionMetadata`生成`metadataOptional`。
   3. 调用`aclnnGenericBlockSparseAttention`，将上一步得到的`metadataOptional`传入主算子。
 
@@ -101,7 +101,7 @@
     <tr>
       <td>cuSeqLengthsKvOptional</td>
       <td>输入</td>
-      <td>各batch中key/value序列长度前缀和，layoutKv为"PA_BBND"时必传，shape为[B+1,]。</td>
+      <td>各batch中key/value序列长度前缀和，layoutKv为"TND"时必传，非TND时不传，shape为[B+1,]。</td>
       <td>INT64</td>
       <td>ND</td>
     </tr>
@@ -114,8 +114,8 @@
     </tr>
     <tr>
       <td>sequsedKvOptional</td>
-      <td>可选输入</td>
-      <td>各batch中kv实际有效长度；不传时按cu前缀和差分得到的存储长度处理。</td>
+      <td>输入</td>
+      <td>各batch中kv实际有效长度，layoutKv为"PA_BBND"时必传，shape为[B,]。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -211,7 +211,8 @@
 - 调用前须先执行`aclnnGenericBlockSparseAttentionMetadata`生成`metadataOptional`，再调用本接口；metadata须与当前输入/属性配套，每次调用须重新生成。
 - query/key/value的headDim(D)当前仅支持128；KV页blockSize当前仅支持128，且须等于blockShapeY。
 - TND + isPackedGQA=1时：totalQBlocks按cuSeqLengthsQ差分得到的存储长度分块；sparse分块与QKV寻址均按该存储长度，不以seqused重切分；topK须≥`sparseBlockCount`中所有元素的最大值，当前上限为256。
-- sequsedQOptional/sequsedKvOptional与cu前缀和同时传入时：分核/任务空间按各batch实际有效长度（seqused）累加；各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
+- seqused与对应cu前缀和同时传入时（Q侧，及layoutKv为TND时的KV侧）：分核/任务空间按各batch实际有效长度（seqused）累加；各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
+- layoutKv为"PA_BBND"时须传`sequsedKvOptional`，不传`cuSeqLengthsKvOptional`。
 - 输入query、key、value的数据类型必须一致。
 - 输入query的headNum为N1，输入key和value的headNum为N2，则N1 >= N2且N1 % N2 == 0；groupSize=N1/N2当前须≤128。
 - PA_BBND下key/value仅dim0（物理页轴）可非连续；页内blockSize×N2×D须连续。

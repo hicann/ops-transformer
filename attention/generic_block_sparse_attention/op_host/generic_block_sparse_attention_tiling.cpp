@@ -34,6 +34,7 @@ constexpr int V_DEQUANT_SCALE_INDEX = 9;
 constexpr int P_QUANT_SCALE_INDEX = 10;
 constexpr int CU_SEQ_LENGTHS_Q_INDEX = 11;
 constexpr int CU_SEQ_LENGTHS_KV_INDEX = 12;
+constexpr int SEQUSED_KV_INDEX = 14;
 constexpr int BLOCK_TABLE_INDEX = 15;
 
 // Must match METADATA_TOTAL_SIZE in the AICPU / kernel metadata protocol.
@@ -670,14 +671,19 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext *con
 
 ge::graphStatus GBSATiling::CheckCuSeqLengths(gert::TilingContext *context)
 {
-    // layoutQ is fixed to TND and layoutKv is fixed to PA_BBND (validated in GetInputLayout),
-    // so cuSeqLengthsQ/Kv are required to locate per-batch token ranges on device.
+    // layoutQ is fixed to TND and layoutKv is fixed to PA_BBND (validated in GetInputLayout).
+    // Q uses cuSeqLengthsQ; PA KV uses sequsedKv (FA-style: cuSeqLengthsKv only for TND).
     if (context->GetOptionalInputTensor(CU_SEQ_LENGTHS_Q_INDEX) == nullptr) {
         OP_LOGE(context->GetNodeName(), "cuSeqLengthsQ cannot be empty when layoutQ is TND.");
         return ge::GRAPH_FAILED;
     }
-    if (context->GetOptionalInputTensor(CU_SEQ_LENGTHS_KV_INDEX) == nullptr) {
-        OP_LOGE(context->GetNodeName(), "cuSeqLengthsKv cannot be empty when layoutKv is PA_BBND.");
+    if (context->GetOptionalInputTensor(SEQUSED_KV_INDEX) == nullptr) {
+        OP_LOGE(context->GetNodeName(), "sequsedKv cannot be empty when layoutKv is PA_BBND.");
+        return ge::GRAPH_FAILED;
+    }
+    if (context->GetOptionalInputTensor(CU_SEQ_LENGTHS_KV_INDEX) != nullptr) {
+        OP_LOGE(context->GetNodeName(),
+                "cuSeqLengthsKv must be empty when layoutKv is PA_BBND, only supported in TND layout.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

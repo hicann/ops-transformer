@@ -140,7 +140,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>
         可选输入，用于变长序列场景。
         <ul>
-          <li>layoutKv为TND/PA_BBND/PA_BNBD时必须传入。当前仅支持PA_BBND。</li>
+          <li>layoutKv为TND时必须传入。</li>
+          <li>layoutKv非TND时不传（须为nullptr）。当前仅支持PA_BBND。</li>
           <li>layoutKv为BNSD/BSND时：如传入，算子内按该输入指定的实际序列长度处理；如传入nullptr，按key/value的shape中的S处理（当前不支持）。</li>
           <li>元素为前缀和：第0个元素为0，最后一个元素等于各batch KV存储长度之和，后一个元素须≥前一个元素。</li>
         </ul>
@@ -171,8 +172,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>各batch中kv的实际序列长度。</td>
       <td>
         <ul>
-          <li>不指定实际长度可传入nullptr，表示与cuSeqLengthsKvOptional差分得到的存储长度相同。</li>
-          <li>传入时shape为(B,)，每个元素须≥0且≤对应batch的cu存储长度。与cu并存时的双长度语义见<a href="#其他约束">其他约束</a>。</li>
+          <li>layoutKv为PA_BBND时必须传入，shape为(B,)，每个元素须≥0。</li>
+          <li>layoutKv为TND时：不指定实际长度可传入nullptr，表示与cuSeqLengthsKvOptional差分得到的存储长度相同；传入时shape为(B,)，每个元素须≥0且≤对应batch的cu存储长度。与cu并存时的双长度语义见<a href="#其他约束">其他约束</a>。</li>
         </ul>
       </td>
       <td>INT32</td>
@@ -499,7 +500,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 - 本接口必须与`aclnnGenericBlockSparseAttention`配套使用。共同Tensor和属性须与随后调用的主算子完全一致，每次调用主算子前均须重新生成`metadataOptional`。主算子的完整约束见[aclnnGenericBlockSparseAttention](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#约束说明)。
 - 当前仅支持`layoutQ="TND"`、`layoutKv="PA_BBND"`、`isPackedGQA=1`、`headDim=128`、`blockShape=[1, 128]`、`maskType=1`以及`winLeft=winRight=-1`。
 - `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0、不超过256，且须不小于`sparseBlockCount`中所有元素的最大值。
-- `cuSeqLengthsQOptional`和`cuSeqLengthsKvOptional`当前必须传入；`sequsedQOptional`和`sequsedKvOptional`可传入nullptr。传入seqused时，每个元素须位于`[0, 对应Batch存储长度]`范围内。分核按实际长度累加，稀疏块分块仍按cu前缀和描述的存储长度计算。
+- `cuSeqLengthsQOptional`当前必须传入；`sequsedQOptional`可传入nullptr。传入sequsedQ时，每个元素须位于`[0, 对应Batch存储长度]`范围内。分核按实际长度累加，稀疏块分块仍按cu前缀和描述的存储长度计算。
+- layoutKv为PA_BBND时须传`sequsedKvOptional`，不传`cuSeqLengthsKvOptional`。layoutKv为TND时，`sequsedKvOptional`可与`cuSeqLengthsKvOptional`并存，双长度语义同Q侧。
 - `numQHeads >= numKvHeads`且`numQHeads % numKvHeads == 0`，`groupSize = numQHeads / numKvHeads`不超过128。
 - 输出`metadataOptional`固定为INT32、shape为`(1024,)`，不得解析、修改或跨不同输入和属性复用。
 
@@ -512,7 +514,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 #include "aclnnop/aclnn_generic_block_sparse_attention_metadata.h"
 
 aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-                        const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional,
+                        const aclTensor *cuSeqLengthsQOptional, const aclTensor *sequsedKvOptional,
                         aclTensor *metadataOptional, aclrtStream stream)
 {
     const int64_t blockShapeData[] = {1, 128};
@@ -523,7 +525,7 @@ aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparse
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus ret = aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-        sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, nullptr, nullptr, 16, 2048,
+        sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, nullptr, nullptr, sequsedKvOptional, 16, 2048,
         32, 8, 128, blockShape, 1, "TND", "PA_BBND", 1, 0, 0, -1, -1, metadataOptional, &workspaceSize,
         &executor);
     aclDestroyIntArray(blockShape);

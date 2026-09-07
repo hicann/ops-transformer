@@ -218,10 +218,9 @@ aclnnStatus CreateTndDecodeCase(CaseContext &context)
     const std::vector<int64_t> cuSeqLengths = {0, qStorageLength};
     ret = CreateTensor(ACL_INT64, {static_cast<int64_t>(cuSeqLengths.size())}, cuSeqLengths, context.cuSeqLengths);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create TND cuSeqLengths failed, error: %d", ret);
-    const std::vector<int64_t> cuSeqLengthsKv = {0, kvStorageLength};
-    ret =
-        CreateTensor(ACL_INT64, {static_cast<int64_t>(cuSeqLengthsKv.size())}, cuSeqLengthsKv, context.cuSeqLengthsKv);
-    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create TND cuSeqLengthsKv failed, error: %d", ret);
+    const std::vector<int32_t> seqUsedKv = {static_cast<int32_t>(kvStorageLength)};
+    ret = CreateTensor(ACL_INT32, {batchSize}, seqUsedKv, context.seqUsedKv);
+    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create PA seqUsedKv failed, error: %d", ret);
     const std::vector<int32_t> seqUsedQ = {static_cast<int32_t>(qStorageLength)};
     ret = CreateTensor(ACL_INT32, {batchSize}, seqUsedQ, context.seqUsedQ);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create TND seqUsedQ failed, error: %d", ret);
@@ -266,10 +265,10 @@ aclnnStatus CreateTndSeqUsedCase(CaseContext &context)
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create TND sparseBlockCount failed, error: %d", ret);
     ret = CreateTensor(ACL_INT64, {static_cast<int64_t>(cuSeqLengths.size())}, cuSeqLengths, context.cuSeqLengths);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create TND cuSeqLengths failed, error: %d", ret);
-    const std::vector<int64_t> cuSeqLengthsKv = {0, kvStorageLengthPerBatch, batchSize * kvStorageLengthPerBatch};
-    ret =
-        CreateTensor(ACL_INT64, {static_cast<int64_t>(cuSeqLengthsKv.size())}, cuSeqLengthsKv, context.cuSeqLengthsKv);
-    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create TND cuSeqLengthsKv failed, error: %d", ret);
+    const std::vector<int32_t> seqUsedKv = {static_cast<int32_t>(kvStorageLengthPerBatch),
+                                            static_cast<int32_t>(kvStorageLengthPerBatch)};
+    ret = CreateTensor(ACL_INT32, {batchSize}, seqUsedKv, context.seqUsedKv);
+    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create PA seqUsedKv failed, error: %d", ret);
     ret = CreateTensor(ACL_INT32, {batchSize}, seqUsedQ, context.seqUsedQ);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "create TND seqUsedQ failed, error: %d", ret);
     return CreateCommonArgs(context);

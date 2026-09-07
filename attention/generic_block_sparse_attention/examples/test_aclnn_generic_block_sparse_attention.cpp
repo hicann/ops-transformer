@@ -175,7 +175,7 @@ int main()
     std::vector<int64_t> sparseCountShape = {N2, totalQBlocks};
     std::vector<int64_t> blockTableShape = {B, maxBlocks};
     std::vector<int64_t> cuSeqQShape = {B + 1};
-    std::vector<int64_t> cuSeqKvShape = {B + 1};
+    std::vector<int64_t> sequsedKvShape = {B};
     std::vector<int64_t> metadataShape = {1024};
     std::vector<int64_t> attnOutShape = {T, N1, D};
 
@@ -186,7 +186,7 @@ int main()
     void *sparseCountDeviceAddr = nullptr;
     void *metadataDeviceAddr = nullptr;
     void *cuSeqQDeviceAddr = nullptr;
-    void *cuSeqKvDeviceAddr = nullptr;
+    void *sequsedKvDeviceAddr = nullptr;
     void *blockTableDeviceAddr = nullptr;
     void *attnOutDeviceAddr = nullptr;
 
@@ -197,7 +197,7 @@ int main()
     aclTensor *sparseCount = nullptr;
     aclTensor *metadata = nullptr;
     aclTensor *cuSeqQ = nullptr;
-    aclTensor *cuSeqKv = nullptr;
+    aclTensor *sequsedKv = nullptr;
     aclTensor *blockTable = nullptr;
     aclTensor *attnOut = nullptr;
 
@@ -216,7 +216,7 @@ int main()
     std::vector<int32_t> blockTableHostData(blockTableSize);
     std::iota(blockTableHostData.begin(), blockTableHostData.end(), 0);
     std::vector<int64_t> cuSeqQHostData = {0, S1};
-    std::vector<int64_t> cuSeqKvHostData = {0, S2};
+    std::vector<int32_t> sequsedKvHostData = {static_cast<int32_t>(S2)};
     std::vector<int32_t> metadataHostData(1024, 0);
     std::vector<uint16_t> attnOutHostData = MakeFp16Data(attnOutSize, 0.0f);
 
@@ -248,7 +248,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(cuSeqQHostData, cuSeqQShape, &cuSeqQDeviceAddr, aclDataType::ACL_INT64, &cuSeqQ);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(cuSeqKvHostData, cuSeqKvShape, &cuSeqKvDeviceAddr, aclDataType::ACL_INT64, &cuSeqKv);
+    ret = CreateAclTensor(sequsedKvHostData, sequsedKvShape, &sequsedKvDeviceAddr, aclDataType::ACL_INT32, &sequsedKv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(blockTableHostData, blockTableShape, &blockTableDeviceAddr, aclDataType::ACL_INT32,
                           &blockTable);
@@ -267,8 +267,8 @@ int main()
     uint64_t metadataWorkspaceSize = 0;
     aclOpExecutor *metadataExecutor = nullptr;
     ret = aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-        sparseIdx, sparseCount, cuSeqQ, cuSeqKv, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, 1, layoutQ, layoutKv,
-        1, 0, 1, -1, -1, metadata, &metadataWorkspaceSize, &metadataExecutor);
+        sparseIdx, sparseCount, cuSeqQ, nullptr, nullptr, sequsedKv, S1, S2, N1, N2, D, blockShape, 1, layoutQ,
+        layoutKv, 1, 0, 1, -1, -1, metadata, &metadataWorkspaceSize, &metadataExecutor);
     CHECK_RET(ret == ACL_SUCCESS,
               LOG_PRINT("aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
@@ -292,8 +292,8 @@ int main()
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     ret = aclnnGenericBlockSparseAttentionGetWorkspaceSize(
-        q, k, v, sparseIdx, sparseCount, metadata, nullptr, nullptr, nullptr, nullptr, nullptr, cuSeqQ, cuSeqKv,
-        nullptr, nullptr, blockTable, blockShape, 1, layoutQ, layoutKv, scaleValue, 1, 0, 0.0, 1, -1, -1, 0, attnOut,
+        q, k, v, sparseIdx, sparseCount, metadata, nullptr, nullptr, nullptr, nullptr, nullptr, cuSeqQ, nullptr,
+        nullptr, sequsedKv, blockTable, blockShape, 1, layoutQ, layoutKv, scaleValue, 1, 0, 0.0, 1, -1, -1, 0, attnOut,
         nullptr, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS,
               LOG_PRINT("aclnnGenericBlockSparseAttentionGetWorkspaceSize failed. ERROR: %d\n", ret);
@@ -323,7 +323,7 @@ int main()
     aclDestroyTensor(sparseCount);
     aclDestroyTensor(metadata);
     aclDestroyTensor(cuSeqQ);
-    aclDestroyTensor(cuSeqKv);
+    aclDestroyTensor(sequsedKv);
     aclDestroyTensor(blockTable);
     aclDestroyTensor(attnOut);
 
@@ -335,7 +335,7 @@ int main()
     aclrtFree(sparseCountDeviceAddr);
     aclrtFree(metadataDeviceAddr);
     aclrtFree(cuSeqQDeviceAddr);
-    aclrtFree(cuSeqKvDeviceAddr);
+    aclrtFree(sequsedKvDeviceAddr);
     aclrtFree(blockTableDeviceAddr);
     aclrtFree(attnOutDeviceAddr);
     if (metadataWorkspaceSize > 0) {
