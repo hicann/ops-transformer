@@ -304,6 +304,7 @@ $$
   * 其他限制：
       * groupSelectMode取值0和1，0表示使用最大值对group进行排序，1表示使用topk2的sum值对group进行排序。
       * normType取值0、1和2，0表示使用Softmax函数，1表示使用Sigmoid函数，2表示使用SqrtSoftplus函数。
+      * 在Atlas A2/A3系列产品上，normType取值为2时要求groupCount为1（Ascend 950PR/Ascend 950DT无此限制）。
       * normType取值为1或2时，renorm参数无效；normType取值为0时，renorm参数生效，renorm取值为0和1，0表示不做renorm，1表示做renorm。
       * outFlag取值true和false，true表示输出，false表示不输出。
   * **Hash模式限制**：
