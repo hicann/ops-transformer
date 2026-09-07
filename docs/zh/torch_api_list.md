@@ -36,6 +36,7 @@
 | ----------- | ------------------- | ------------------- | ------------------- |
 |[block_attn_res_prepare](../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_prepare.md)|完成 Attention Residuals 历史残差注意力两阶段计算的第一阶段，返回 softmax 加权分子及统计量。|-|默认支持确定性计算|
 |[block_attn_res_update](../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_update.md)|将`delta`原地累加到`partial_block`，计算更新后`partial_block`的RMSNorm score，并与历史online softmax中间状态合并，返回当前层结果`h`。|-|默认确定性实现|
+|[block_attention_residuals](../../torch_extension/cann_ops_transformer/docs/zh/block_attention_residuals.md)|将 `partial_block` 与 `block_res` 拼接后完成 RMS、投影打分与 Softmax 加权融合，输出 `hidden_states`。|默认支持确定性计算|默认支持确定性计算|
 |[apply_rotary_pos_emb](../../torch_extension/cann_ops_transformer/docs/zh/apply_rotary_pos_emb.md)|融合query和key两路旋转位置编码计算，返回旋转位置编码后的query和key输出张量。|默认支持确定性计算|默认支持确定性计算|
 |[apply_rotary_pos_emb_grad](../../torch_extension/cann_ops_transformer/docs/zh/apply_rotary_pos_emb_grad.md)|执行双路旋转位置编码的反向计算，将query和key两路梯度计算融合为一次kernel调用。|-|默认支持确定性计算|
 |[attention_to_ffn](../../torch_extension/cann_ops_transformer/docs/zh/attention_to_ffn.md)|将Attention节点上数据发往FFN节点。|-|默认支持确定性计算|

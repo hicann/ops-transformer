@@ -1588,6 +1588,16 @@
   </tr>
   <tr>
     <td>mhc</td>
+    <td><a href="../../mhc/block_attention_residuals/README.md">block_attention_residuals</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>将 partialBlock 与 blockRes 拼接后完成 RMS、投影打分与 Softmax 加权融合，输出 hiddenStates。</td>
+  </tr>
+  <tr>
+    <td>mhc</td>
     <td><a href="../../mhc/block_attention_residuals_grad/README.md">block_attention_residuals_grad</a></td>
     <td>✓</td>
     <td>✓</td>

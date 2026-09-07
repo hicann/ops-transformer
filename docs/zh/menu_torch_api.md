@@ -3,6 +3,7 @@
 - [Transformer类torch接口列表](torch_api_list.md)
 - [block_attn_res_prepare](../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_prepare.md)
 - [block_attn_res_update](../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_update.md)
+- [block_attention_residuals](../../torch_extension/cann_ops_transformer/docs/zh/block_attention_residuals.md)
 - [apply_rotary_pos_emb](../../torch_extension/cann_ops_transformer/docs/zh/apply_rotary_pos_emb.md)
 - [apply_rotary_pos_emb_grad](../../torch_extension/cann_ops_transformer/docs/zh/apply_rotary_pos_emb_grad.md)
 - [causal_conv1d_fn](../../torch_extension/cann_ops_transformer/docs/zh/causal_conv1d_fn.md)

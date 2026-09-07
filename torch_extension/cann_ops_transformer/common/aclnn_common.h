@@ -16,6 +16,10 @@
 #ifndef CANN_OPS_TRANSFORMER_ACLNN_COMMON_H
 #define CANN_OPS_TRANSFORMER_ACLNN_COMMON_H
 
+// 必须先于任何 torch_npu 头文件引入 acl 基础头文件：torch_npu 自带 third_party/acl 版本较旧，
+// 缺少 ACL_FLOAT8_E5M2/ACL_FLOAT4_E2M1 等新 dtype 常量。若在其之后 include，旧头文件已设置
+// 同名 include guard（INC_EXTERNAL_ACL_ACL_BASE_H_），新版 CANN 头文件会被跳过导致编译失败。
+#include <acl/acl_base.h>
 #include <torch_npu/csrc/framework/utils/OpAdapter.h>
 #include <dlfcn.h>
 #include <vector>
