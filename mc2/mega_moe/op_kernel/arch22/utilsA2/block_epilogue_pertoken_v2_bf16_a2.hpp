@@ -58,6 +58,14 @@ public:
         int64_t offsetWinOutD;
         int32_t serverId;
         Layout3D tokenPerExpertLayout;
+        // 路由表 UB 缓存（chunk 模式下由调用侧每 chunk 刷新后置位）：
+        //   ubTokenPerExpert     = tokenPerExpertLayout(srcRank, rank, g) 的紧凑化 [srcRank*expertPerRank+g]
+        //   ubPreSumBeforeRank   = preSumBeforeRank[dstEpIdx*expertPerRank+g]（combine 用）
+        // 三字段须成组赋值：useUbRouteCache=true 时 ubTokenPerExpert / ubPreSumBeforeRank
+        // 必须已由调用方完成 SetGlobalBuffer/SetSize，否则回落 GM 直接读
+        bool useUbRouteCache{false};
+        AscendC::LocalTensor<int32_t> ubTokenPerExpert;
+        AscendC::LocalTensor<int32_t> ubPreSumBeforeRank;
 
         CATLASS_DEVICE
         Params() {};
@@ -149,8 +157,14 @@ public:
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(event_id);
         for (int32_t dstEpIdx = 0; dstEpIdx < params.EP; dstEpIdx++) {
-            int32_t lenRankInExpert = tokenPerExpert(tokenPerExpertLayout(dstEpIdx, params.rank, groupIdx));
-            int32_t dstExpertOffset = preSumBeforeRank(dstEpIdx * params.expertPerRank + groupIdx);
+            // chunk 模式：路由表读走本核 UB 缓存（MTE 搬入），规避跨 chunk GM 标量读 D-Cache 陈旧
+            int32_t lenRankInExpert = params.useUbRouteCache ?
+                                          params.ubTokenPerExpert.GetValue(dstEpIdx * params.expertPerRank + groupIdx) :
+                                          tokenPerExpert(tokenPerExpertLayout(dstEpIdx, params.rank, groupIdx));
+            int32_t dstExpertOffset =
+                params.useUbRouteCache ?
+                    params.ubPreSumBeforeRank.GetValue(dstEpIdx * params.expertPerRank + groupIdx) :
+                    preSumBeforeRank(dstEpIdx * params.expertPerRank + groupIdx);
             int32_t stRankInExpert = preSumRankInExpert;
             int32_t edRankInExpert = stRankInExpert + lenRankInExpert;
             preSumRankInExpert += lenRankInExpert;

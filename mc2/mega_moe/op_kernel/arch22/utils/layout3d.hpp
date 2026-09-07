@@ -32,7 +32,7 @@ public:
     }
 
     CATLASS_DEVICE
-    int64_t operator()(int64_t dim0, int64_t dim1, int64_t dim2)
+    int64_t operator()(int64_t dim0, int64_t dim1, int64_t dim2) const
     {
         return dim0 * strides[0] + dim1 * strides[1] + dim2;
     }

@@ -47,8 +47,8 @@ enum class Stage : uint32_t {
 template <bool kIsQuantRouting, typename ArchTag = void>
 struct MegaMoeExceptionDumpPolicy {
     // 根据是否为 quant routing 选择完整 tiling 结构体
-    // quant: MegaMoeTilingDataQuant（含 MoeInitRoutingQuantV2TilingData）
-    // non-quant: MegaMoeTilingDataNonQuant（含 MoeInitRoutingV2TilingData）
+    // quant: MegaMoeTilingDataQuant
+    // non-quant: MegaMoeTilingDataNonQuant
     using TilingDataT = std::conditional_t<kIsQuantRouting, MegaMoeTilingDataQuant, MegaMoeTilingDataNonQuant>;
     using StageEnumT = Stage;
     static constexpr MC2ExceptionDump::OpType OP_TYPE = MC2ExceptionDump::OpType::OP_TYPE_MEGA_MOE;

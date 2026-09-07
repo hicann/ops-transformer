@@ -22,6 +22,7 @@ constexpr static int32_t RESET_VAL = 0xffff;
 constexpr static int32_t FLAGSTRIDE = 16;
 constexpr static int32_t UB_ALIGN = 32;
 constexpr static int32_t ALIGN_128 = 128;
+constexpr static int32_t ALIGN_512 = 512;
 constexpr uint16_t CROSS_CORE_FLAG_MAX_SET_COUNT = 15;
 constexpr uint32_t MAX_EXPERTS_PER_RANK = 128;
 constexpr uint32_t MAX_RANK_PER_CORE = 32;
@@ -30,6 +31,10 @@ constexpr static uint16_t SYNCFLAGV2C = 10;
 constexpr static uint32_t SERVER_RANK_SIZE_A2 = 8;
 constexpr static uint32_t kMaxDequantSyncGroups = 16;
 constexpr static uint64_t RESERVED_SPACE_SIZE = 10 * 1024 * 1024;
+// 发送侧逐 chunk 的 token 数（A2/A3 发送侧 prologue chunk 语义；A3 kernel 内另有同名 namespace 级定义）
+constexpr static int64_t PERMUTE_CHUNK = 1024;
+// prologue 每核计数区核数上限（host 侧 workspace 须按实际 aivNum 分配且 <= 此值）
+constexpr static int64_t PERMUTE_MAX_CORES = 128;
 // Flag 同步 magic 值（精确匹配，避免上一轮残留误判）
 // 三处同步（SendTokensV3 / RecvTokensV3 / V2 allgather）统一使用该值，需配合
 // ResetTokenPerExpert 每轮清零 flag 区，确保上一轮残留不会撞上本值

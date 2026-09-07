@@ -75,6 +75,13 @@ public:
         int64_t offsetD;
         int64_t offsetWinOutD;
         Layout3D tokenPerExpertLayout;
+        // 路由表 UB 缓存（可选）：置 true 时 tokenPerExpert / preSumBeforeRank 标量读取
+        // 走调用方刷新好的 UB 副本，索引为 [dstEpIdx * expertPerRank + groupIdx]，不再直接读 GM
+        // 三字段须成组赋值：useUbRouteCache=true 时 ubTokenPerExpert / ubPreSumBeforeRank
+        // 必须已由调用方完成 SetGlobalBuffer/SetSize，否则回落 GM 直接读
+        bool useUbRouteCache{false};
+        AscendC::LocalTensor<int32_t> ubTokenPerExpert;
+        AscendC::LocalTensor<int32_t> ubPreSumBeforeRank;
 
         CATLASS_DEVICE
         Params() {};
@@ -158,6 +165,24 @@ public:
     }
     CATLASS_DEVICE
     ~BlockEpilogue() {}
+
+    // 路由表标量读取：优先走 UB 缓存（紧凑索引），否则回落 GM（保持既有直接读路径）
+    CATLASS_DEVICE int32_t GetLenRankInExpert(int32_t dstEpIdx, int32_t groupIdx) const
+    {
+        if (params.useUbRouteCache) {
+            return params.ubTokenPerExpert.GetValue(dstEpIdx * params.expertPerRank + groupIdx);
+        }
+        return tokenPerExpert(tokenPerExpertLayout(dstEpIdx, params.rank, groupIdx));
+    }
+
+    CATLASS_DEVICE int32_t GetDstExpertOffset(int32_t dstEpIdx, int32_t groupIdx,
+                                              AscendC::GlobalTensor<int32_t> const &preSumBeforeRank) const
+    {
+        if (params.useUbRouteCache) {
+            return params.ubPreSumBeforeRank.GetValue(dstEpIdx * params.expertPerRank + groupIdx);
+        }
+        return preSumBeforeRank(dstEpIdx * params.expertPerRank + groupIdx);
+    }
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementC> const &gmC,
@@ -248,8 +273,8 @@ public:
         int32_t tileOffset = 0;
 
         for (int32_t dstEpIdx = 0; dstEpIdx < params.EP; dstEpIdx++) {
-            int32_t lenRankInExpert = tokenPerExpert(tokenPerExpertLayout(dstEpIdx, params.rank, groupIdx));
-            int32_t dstExpertOffset = preSumBeforeRank(dstEpIdx * params.expertPerRank + groupIdx);
+            int32_t lenRankInExpert = GetLenRankInExpert(dstEpIdx, groupIdx);
+            int32_t dstExpertOffset = GetDstExpertOffset(dstEpIdx, groupIdx, preSumBeforeRank);
             int32_t stRankInExpert = preSumRankInExpert;
             int32_t edRankInExpert = stRankInExpert + lenRankInExpert;
             preSumRankInExpert += lenRankInExpert;

@@ -29,7 +29,6 @@ using namespace AscendC;
 #endif
 
 #include "mega_moe_tiling_a2a3.h"
-#include "moe_init_routing_v2/mc2_mega_moe_moe_init_routing_v2_tiling.h"
 
 #include "template_linear_algebra_v2/mega_moe_catlass.hpp"
 #include "template_linear_algebra_v2/arch/mega_moe_arch.hpp"
@@ -62,7 +61,6 @@ using namespace AscendC;
 #include "mega_moe_kernel_a2_int8.hpp"
 #include "mega_moe_kernel_a2_bf16.hpp"
 #include "mega_moe_kernel_a2_bf16_w4a8.hpp"
-#include "moe_init_routing_quant_v2/moe_init_routing_quant_v2_tiling.h"
 
 namespace MegaMoeA2Impl {
 
@@ -133,10 +131,6 @@ private:
     float activationClamp_;
     float activationParams1_;
     float activationParams2_;
-
-    MoeInitRoutingQuantV2TilingData moeInitRoutingQuantV2TilingData;
-    MoeInitRoutingV2TilingData moeInitRoutingV2TilingData;
-    uint64_t initRoutingQuantTilingKey;
 };
 
 template <MegaMoeClassA2>
@@ -177,16 +171,15 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Init(GM_ADDR contextGM, GM_ADDR
         epWorldSize_ = tilingData.common.worldSize;
         topK_ = tilingData.common.topK;
         expertPerRank_ = tilingData.common.expertPerRank;
-        maxOutputSize_ = tilingData.common.maxRecvTokenNum;
+        // maxOutputSize 语义 = 发送侧单 chunk 接收预算 B（recvRoundBudget，host 已算好）；
+        // 接收行按 chunk 分段（numChunks * B <= maxRecvTokenNum），kernel 内逐 chunk 复用
+        maxOutputSize_ = tilingData.common.recvRoundBudget;
         listLen_ = tilingData.common.listLen;
 
         activationCode_ = tilingData.common.activationCode;
         activationClamp_ = tilingData.common.activationClamp;
         activationParams1_ = tilingData.common.activationParams1;
         activationParams2_ = tilingData.common.activationParams2;
-
-        moeInitRoutingQuantV2TilingData = tilingData.moeInitRoutingQuantV2TilingData;
-        initRoutingQuantTilingKey = tilingData.common.initRoutingQuantTilingKey;
     } else {
         auto tiling = (__gm__ MegaMoeTilingDataNonQuant *)tilingGM;
         GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataNonQuant, tilingData, tilingGM);
@@ -198,16 +191,14 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Init(GM_ADDR contextGM, GM_ADDR
         epWorldSize_ = tilingData.common.worldSize;
         topK_ = tilingData.common.topK;
         expertPerRank_ = tilingData.common.expertPerRank;
-        maxOutputSize_ = tilingData.common.maxRecvTokenNum;
+        // maxOutputSize 语义 = 发送侧单 chunk 接收预算 B（recvRoundBudget，host 已算好）
+        maxOutputSize_ = tilingData.common.recvRoundBudget;
         listLen_ = tilingData.common.listLen;
 
         activationCode_ = tilingData.common.activationCode;
         activationClamp_ = tilingData.common.activationClamp;
         activationParams1_ = tilingData.common.activationParams1;
         activationParams2_ = tilingData.common.activationParams2;
-
-        moeInitRoutingV2TilingData = tilingData.moeInitRoutingV2TilingData;
-        initRoutingQuantTilingKey = tilingData.common.initRoutingQuantTilingKey;
     }
 }
 
@@ -332,7 +323,6 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Process()
                                                                              static_cast<uint32_t>(expertPerRank_),
                                                                              static_cast<uint64_t>(maxOutputSize_),
                                                                              static_cast<uint32_t>(topK_),
-                                                                             initRoutingQuantTilingKey,
                                                                              epilogueCoreNum,
                                                                              contextGM_,
                                                                              xGM_,
@@ -360,7 +350,6 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Process()
                                                                              gmExpertTokenNums_,
                                                                              xActiveMaskGM_,
                                                                              scalesGM_,
-                                                                             moeInitRoutingQuantV2TilingData,
                                                                              epilogueGranularity,
                                                                              activationClamp_,
                                                                              activationCode_,
@@ -381,7 +370,6 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Process()
                                              static_cast<uint32_t>(expertPerRank_),
                                              static_cast<uint64_t>(maxOutputSize_),
                                              static_cast<uint32_t>(topK_),
-                                             initRoutingQuantTilingKey,
                                              epilogueCoreNum,
                                              contextGM_,
                                              xGM_,
@@ -409,7 +397,6 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Process()
                                              gmExpertTokenNums_,
                                              xActiveMaskGM_,
                                              scalesGM_,
-                                             moeInitRoutingQuantV2TilingData,
                                              epilogueGranularity,
                                              activationClamp_,
                                              activationCode_,
@@ -430,7 +417,6 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Process()
                                              static_cast<uint32_t>(expertPerRank_),
                                              static_cast<uint64_t>(maxOutputSize_),
                                              static_cast<uint32_t>(topK_),
-                                             initRoutingQuantTilingKey,
                                              epilogueCoreNum,
                                              contextGM_,
                                              xGM_,
@@ -458,7 +444,6 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Process()
                                              gmExpertTokenNums_,
                                              xActiveMaskGM_,
                                              scalesGM_,
-                                             moeInitRoutingV2TilingData,
                                              epilogueGranularity,
                                              activationClamp_,
                                              activationCode_,

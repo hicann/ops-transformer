@@ -161,6 +161,7 @@ constexpr int64_t MXFP_SCALE_GROUP_NUM = 32LL;
 constexpr int64_t MXFP_MULTI_BASE_SIZE = 2LL;
 constexpr int64_t Y_DTYPE_SIZE = 2LL;
 constexpr int64_t URMA_H_ALIGN = 1024LL;
+constexpr int64_t MOE_PERMUTE_CHUNK = 1024LL;
 // 异常 Dump 区
 constexpr int64_t EXCEPTION_DUMP_REGION_SIZE = 60LL * 1024LL;
 // rankSyncInWorld 同步区
@@ -189,7 +190,11 @@ int64_t CalcLeastCclBufferSizeA2(int64_t maxRecvTokenNum, int64_t h, int64_t epW
     int64_t winInTensorSize = offsetAAfterDispatch + offsetD;
 
     // ===== winOut =====
-    int64_t offsetA = bs * topK * (!isQuantRouting ? h * static_cast<int64_t>(sizeof(int16_t)) : (h + ALIGN_512));
+    // winOut A 区按单 chunk（不超过 bs）的 permute 输出分配，逐 chunk 复用，
+    // 与 tiling_arch22.cpp CalcLeastCclBufferSize 的 A2 分支一致
+    const int64_t chunkTokensA2 = std::min(bs, MOE_PERMUTE_CHUNK);
+    int64_t offsetA =
+        chunkTokensA2 * topK * (!isQuantRouting ? h * static_cast<int64_t>(sizeof(int16_t)) : (h + ALIGN_512));
     int64_t offsetC = maxRecvTokenNum * h * static_cast<int64_t>(sizeof(int16_t));
     int64_t winOutTensorSize = offsetA + offsetC;
     int64_t offsetTensor = std::max(winInTensorSize, winOutTensorSize);
@@ -215,12 +220,14 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
                                    static_cast<int64_t>(sizeof(int32_t));
 
     // Data block 2: tensors (winIn only, no winOut)
+    // Window layout is consistent with kernel PeermemInfo: number of rows per chunk (not exceeding bs)
+    const int64_t chunkTokens = std::min(bs, MOE_PERMUTE_CHUNK);
     int64_t offsetAAfterDispatch =
-        bs * topK * (isQuantRouting ? (h + ALIGN_512) : h * static_cast<int64_t>(sizeof(int16_t)));
-    int64_t offsetD = bs * topK * h * static_cast<int64_t>(sizeof(int16_t));
+        chunkTokens * topK * (isQuantRouting ? (h + ALIGN_512) : h * static_cast<int64_t>(sizeof(int16_t)));
+    int64_t offsetD = chunkTokens * topK * h * static_cast<int64_t>(sizeof(int16_t));
     int64_t offsetTensor = offsetAAfterDispatch + offsetD;
     if (isQuantRouting) {
-        offsetTensor += bs * topK * static_cast<int64_t>(sizeof(float));
+        offsetTensor += chunkTokens * topK * static_cast<int64_t>(sizeof(float));
     }
 
     // Data block 3: sync flags
@@ -327,8 +334,8 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                     "ep_world_size only support {2, 4, 8, 16, 32, 48, 64, 96, 128} on A2/A3, but got ", epWorldSize);
         TORCH_CHECK(hidden >= 1024 && hidden <= 8192 && hidden % 512 == 0,
                     "hidden only support [1024, 8192] and hidden % 512 == 0 on A2/A3, but got ", hidden);
-        TORCH_CHECK(numMaxTokensPerRank >= 1 && numMaxTokensPerRank <= 4096,
-                    "num_max_tokens_per_rank only support [1, 4096] on A2/A3, but got ", numMaxTokensPerRank);
+        TORCH_CHECK(numMaxTokensPerRank >= 1, "num_max_tokens_per_rank should be >= 1 on A2/A3, but got ",
+                    numMaxTokensPerRank);
         TORCH_CHECK(moeExpertNum >= 1 && moeExpertNum <= 2048,
                     "moe_expert_num only support [1, 2048] on A2/A3, but got ", moeExpertNum);
         TORCH_CHECK(numTopk >= 1 && numTopk <= 16, "num_topk only support [1, 16] on A2/A3, but got ", numTopk);

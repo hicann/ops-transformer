@@ -36,6 +36,7 @@ public:
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
     static constexpr uint32_t TILE_LENGTH = DispatchPolicy::TILE_LENGTH;
     static constexpr uint32_t SCALE_BUFFER_COUNT = 2;
+    // 输出侧 scale 缓冲批量：结果 scale 在 UB 中按批累积后写回 GM
     static constexpr uint32_t SCALE_BATCH_COUNT = 256;
     static constexpr uint32_t SCALE_BUFFER_BYTES = (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
     static constexpr uint32_t ROW_MAX_BYTES = BYTE_PER_BLK;
@@ -47,10 +48,15 @@ public:
     using ElementD = typename DType_::Element;
     using LayoutD = typename DType_::Layout;
 
+    // 输入侧 per-token scale 批量预读：批量加载到 UB，避免逐个标量读 GM（读旧值 + 性能差）
+    static constexpr uint32_t SCALE_INPUT_COUNT = 256;
+    static_assert(SCALE_INPUT_COUNT % (BYTE_PER_BLK / sizeof(ElementPerTokenScale)) == 0,
+                  "The scale input batch must be block aligned");
+    static constexpr uint32_t SCALE_INPUT_BYTES = SCALE_INPUT_COUNT * sizeof(float);
     static constexpr size_t BUFFER_SIZE =
         UB_STAGES * (4 * TILE_LENGTH * sizeof(ElementC) + 2 * TILE_LENGTH * sizeof(float) + TILE_LENGTH) +
         3 * TILE_LENGTH * sizeof(float) + TILE_LENGTH * sizeof(ElementD) + 128 * sizeof(int16_t) +
-        SCALE_BUFFER_COUNT * SCALE_BUFFER_BYTES + ROW_MAX_BYTES;
+        SCALE_BUFFER_COUNT * SCALE_BUFFER_BYTES + ROW_MAX_BYTES + SCALE_INPUT_BYTES;
     static_assert(TILE_LENGTH % 256 == 0, "The W4A8 activation tile must be aligned to 256 elements");
     static_assert(UB_STAGES >= 2, "The pipelined W4A8 activation epilogue requires double buffering");
     static_assert(SCALE_BATCH_COUNT % (BYTE_PER_BLK / sizeof(ElementPerTokenScale)) == 0,
@@ -141,6 +147,8 @@ public:
         }
         ubRowAbsMax = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
         ubOffset += ROW_MAX_BYTES;
+        ubPerTokenScaleInput = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+        ubOffset += SCALE_INPUT_BYTES;
         sharedTmpBuffer = resource.ubBuf.template GetBufferByByte<uint8_t>(ubOffset);
     }
 
@@ -205,8 +213,19 @@ public:
                 GetTensorAddr<float>(arrayGroupIdx, reinterpret_cast<GM_ADDR>(gmWeightAux))));
             uint32_t weightAuxOffset = listLen == 1 ? groupIdx * shapeC.column() : 0;
 
-            dcci(gmPerTokenScale1.GetPhyAddr(loopIdx), 0);
-            ElementPerTokenScale perTokenScale = gmPerTokenScale1(loopIdx);
+            uint32_t scaleOffsetInBatch = (loopIdx - loopStartIdx) % SCALE_INPUT_COUNT;
+            if (scaleOffsetInBatch == 0) {
+                uint32_t remain = tasksForIdx - (loopIdx - loopStartIdx);
+                uint32_t copyCount = remain >= SCALE_INPUT_COUNT ?
+                                         SCALE_INPUT_COUNT :
+                                         (remain + BYTE_PER_BLK / sizeof(ElementPerTokenScale) - 1) /
+                                             (BYTE_PER_BLK / sizeof(ElementPerTokenScale)) *
+                                             (BYTE_PER_BLK / sizeof(ElementPerTokenScale));
+                AscendC::DataCopy(ubPerTokenScaleInput, gmPerTokenScale1[loopIdx], copyCount);
+                AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(0);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(0);
+            }
+            ElementPerTokenScale perTokenScale = ubPerTokenScaleInput.GetValue(scaleOffsetInBatch);
             uint32_t tileCount = TileCount(branchLength);
             uint32_t currentStage = 0;
             LoadTile(gmTileC, weightAux[weightAuxOffset], branchLength, 0, TileLength(branchLength, 0),
@@ -511,6 +530,7 @@ private:
     AscendC::LocalTensor<int16_t> xLowI16Tensor;
     AscendC::LocalTensor<float> ubPerTokenScaleOutputList[SCALE_BUFFER_COUNT];
     AscendC::LocalTensor<float> ubRowAbsMax;
+    AscendC::LocalTensor<float> ubPerTokenScaleInput;
     AscendC::LocalTensor<uint8_t> sharedTmpBuffer;
 
     int32_t eventUbCVMTE2List[UB_STAGES];

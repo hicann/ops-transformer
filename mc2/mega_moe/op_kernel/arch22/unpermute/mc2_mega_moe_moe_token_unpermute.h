@@ -245,7 +245,10 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalPartOutTok
     T2 cal_token_idx = this->indicesLocal.GetValue(start_token);
 
     // Handle the first token
-    if (cal_token_idx < this->num_out_tokens) {
+    // 无效索引哨兵（< 0 或 >= num_out_tokens）跳过累加：permute 侧对 masked token /
+    // 非法 topk_ids 条目写 -1，必须补下界，否则 -1 < num_out_tokens 误判有效，
+    // CopyTokenIn 负偏移越界读且垃圾值污染输出行
+    if (cal_token_idx >= 0 && cal_token_idx < this->num_out_tokens) {
         float probsValue = 0;
         if constexpr (PROBS) {
             probsValue = this->probs_tensor.GetValue(start_token);
@@ -262,7 +265,8 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS>::CalPartOutTok
     // Handle the remaining tokens
     for (int64_t token_index = start_token + 1; token_index < end_token; ++token_index) {
         cal_token_idx = this->indicesLocal.GetValue(token_index);
-        if (cal_token_idx < this->num_out_tokens) {
+        // 与首 token 一致：-1 等无效哨兵必须跳过，否则负偏移越界读
+        if (cal_token_idx >= 0 && cal_token_idx < this->num_out_tokens) {
             float probsValue = 0;
             if constexpr (PROBS) {
                 probsValue = this->probs_tensor.GetValue(token_index);

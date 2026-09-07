@@ -42,6 +42,10 @@ public:
     using ElementD = typename DType_::Element;
     using LayoutD = typename DType_::Layout;
 
+    // 批量加载 per-token scale 到 UB，避免逐个标量读 GM（读旧值 + 性能差）
+    static constexpr uint32_t SCALE_INPUT_COUNT = 256;
+    static constexpr uint32_t SCALE_INPUT_BYTES = SCALE_INPUT_COUNT * sizeof(float);
+
     static_assert((std::is_same_v<ElementC, half> || std::is_same_v<ElementC, bfloat16_t>) &&
                       (std::is_same_v<ElementD, half> || std::is_same_v<ElementD, bfloat16_t>),
                   "The element type template parameters of BlockEpilogue are wrong");
@@ -95,6 +99,10 @@ public:
             ubCFp32List[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
             ubOffset += blockN * sizeof(float);
         }
+        ubPerTokenScaleInput = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+        ubOffset += SCALE_INPUT_BYTES;
+        // UB 容量说明：本缓冲自 UB 低地址向上分配，其顶部与 kernel 侧路由缓存（自顶向下分配）共享剩余空间，
+        // 具体可用容量由 kernel 侧分配点保证，两段方向相反、不会重叠。
     }
     CATLASS_DEVICE
     void SetFlag()
@@ -141,6 +149,19 @@ public:
             auto gmTileD = gmD[loopIdx * blockN];
             LayoutC layoutUbC{1, blockN};
 
+            uint32_t scaleOffsetInBatch = loopIdx % SCALE_INPUT_COUNT;
+            if (scaleOffsetInBatch == 0) {
+                uint32_t remain = tileLoops - loopIdx;
+                constexpr uint32_t ELE_PER_BLK = BYTE_PER_BLK / sizeof(ElementPerTokenScale);
+                uint32_t copyCount = remain >= SCALE_INPUT_COUNT ?
+                                         SCALE_INPUT_COUNT :
+                                         (remain + ELE_PER_BLK - 1) / ELE_PER_BLK * ELE_PER_BLK;
+                AscendC::DataCopy(ubPerTokenScaleInput, gmPerTokenScale[loopIdx], copyCount);
+                AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(0);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(0);
+            }
+            ElementPerTokenScale perTokenScale = ubPerTokenScaleInput.GetValue(scaleOffsetInBatch);
+
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
             copyGmToUbC(ubC, gmTileC, layoutUbC, layoutUbC);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[ubListId]);
@@ -148,8 +169,6 @@ public:
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[ubListId]);
             AscendC::Cast(ubCFp32, ubC, AscendC::RoundMode::CAST_NONE, blockN);
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
-
-            ElementPerTokenScale perTokenScale = gmPerTokenScale(loopIdx);
 
             AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
             AscendC::WaitFlag<AscendC::HardEvent::S_V>(0);
@@ -186,6 +205,7 @@ private:
 
     AscendC::LocalTensor<float> ubCFp32List[UB_STAGES];
     AscendC::LocalTensor<float> ubMulList[UB_STAGES];
+    AscendC::LocalTensor<float> ubPerTokenScaleInput;
 
     CopyGmToUbC copyGmToUbC;
     CopyUbToGmD copyUbToGmD;
