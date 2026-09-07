@@ -66,6 +66,7 @@
 
 - test_quant_lightning_indexer_v2_single.py    # pytest测试单用例运行主程序
 - test_quant_lightning_indexer_v2_paramset.py  # 单用例入参配置，按芯片型号自动选择用例
+- test_quant_lightning_indexer_v2_stc.py       # STC白盒用例配置
 
 批量测试：
 
@@ -91,14 +92,37 @@
 
 #### 单用例调测
 
-1、手动配置test_quant_lightning_indexer_v2_paramset.py的ENABLED_PARAMS参数
-
-2、执行指令：
+默认参数集适合临时调试。先配置 `test_quant_lightning_indexer_v2_paramset.py`，再执行：
 
 ``` bash
 bash test_run.sh single
 bash test_run.sh single --save-pt ./single_pt -O ./result/single.xlsx
 bash test_run.sh single -M graph --save-pt ./single_pt
+```
+
+STC 参数集位于 `test_quant_lightning_indexer_v2_stc.py`，用于按代码路径执行白盒用例：
+
+``` bash
+bash test_run.sh single --paramset stc
+```
+
+可以通过 `-C` 或 `--cases` 指定一个或多个用例，多个名称使用逗号分隔：
+
+``` bash
+# 指定单组合 case
+bash test_run.sh single --paramset stc -C MXFP8_S1_21
+
+# 指定多组合 case，运行其展开的全部节点
+bash test_run.sh single --paramset stc -C MXFP8_META_70
+
+# 指定其中一个展开节点；_002 对应 return_value=1
+bash test_run.sh single --paramset stc -C MXFP8_META_70_002
+
+# 一次运行多个指定用例
+bash test_run.sh single --paramset stc -C MXFP8_S1_21,MXFP8_META_73
+
+# 指定 graph 模式；默认使用 eager 模式
+bash test_run.sh single --paramset stc -C MXFP4_META_70_002 -M graph
 ```
 
 #### 用例的批量生成与测试

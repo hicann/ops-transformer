@@ -25,8 +25,13 @@ TEST_LIV2_SINGLE_SCRIPT="test_lightning_indexer_v2_single.py"
 
 # 单用例算子调测
 run_single() {
+    local paramset="${1:-default}"
+    local case_names="$2"
+    local run_mode="${3:-both}"
     echo "===== 执行单用例算子调测 ====="
-    python3 -m pytest -rA -s $TEST_LIV2_SINGLE_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
+    LIV2_PARAMSET="${paramset}" LIV2_CASE_NAMES="${case_names}" \
+    LIV2_RUN_MODE="${run_mode}" \
+        python3 -m pytest -rA -s $TEST_LIV2_SINGLE_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
 }
 
 # 用例批量生成调试
@@ -65,15 +70,18 @@ run_batch() {
 
 # 显示帮助信息
 show_help() {
-    echo "用法: $0 <command> [run_mode]"
+    echo "用法: $0 <command> [options]"
     echo "命令说明："
-    echo "  single              执行单算子用例调测"
+    echo "  single [default|stc] [eager|graph|both]"
+    echo "  single [--paramset default|stc] [-C CASE[,CASE...]] [-M eager|graph|both]"
     echo "  batch [eager|graph] 执行用例批量生成调试"
     echo "                        eager - 直接调用算子（默认）"
     echo "                        graph - torch.compile + torchair 后端"
     echo "  help                显示本帮助信息"
     echo "示例："
     echo "  $0 single        # 执行single模式"
+    echo "  $0 single stc eager # 以eager模式执行STC白盒参数集"
+    echo "  $0 single --paramset stc -C S2_16_003 -M graph"
     echo "  $0 batch         # 执行batch模式（默认eager）"
     echo "  $0 batch eager   # 显式指定eager模式"
     echo "  $0 batch graph   # 使用graph模式"
@@ -93,7 +101,56 @@ RUN_MODE="${2:-eager}"
 # 根据参数执行对应函数
 case "$COMMAND" in
     single)
-        run_single
+        shift
+        paramset="default"
+        case_names=""
+        run_mode="both"
+        if [ $# -gt 0 ] && [[ "$1" != -* ]]; then
+            paramset="$1"
+            shift
+            if [ $# -gt 0 ] && [[ "$1" != -* ]]; then
+                run_mode="$1"
+                shift
+            fi
+        fi
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --paramset)
+                    if [ $# -lt 2 ]; then
+                        echo "错误：--paramset 缺少参数值"
+                        exit 1
+                    fi
+                    paramset="$2"
+                    shift 2
+                    ;;
+                -C|--cases)
+                    if [ $# -lt 2 ]; then
+                        echo "错误：$1 缺少参数值"
+                        exit 1
+                    fi
+                    case_names="$2"
+                    shift 2
+                    ;;
+                -M|--run-mode)
+                    if [ $# -lt 2 ]; then
+                        echo "错误：$1 缺少参数值"
+                        exit 1
+                    fi
+                    run_mode="$2"
+                    shift 2
+                    ;;
+                *)
+                    echo "错误：未知 single 参数 '$1'"
+                    show_help
+                    exit 1
+                    ;;
+            esac
+        done
+        if [[ "$run_mode" != "eager" && "$run_mode" != "graph" && "$run_mode" != "both" ]]; then
+            echo "错误：single 模式仅支持 eager/graph/both，当前值: $run_mode"
+            exit 1
+        fi
+        run_single "$paramset" "$case_names" "$run_mode"
         ;;
     batch)
         if [[ "$RUN_MODE" != "eager" && "$RUN_MODE" != "graph" ]]; then

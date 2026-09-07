@@ -1263,10 +1263,7 @@ def liv2_output_single(
     elif layout_key == "PA_BBND":
         max_seqlen_k = max(seqused_k).item()
     else:
-        if seqused_k is not None:
-            max_seqlen_k = max(seqused_k).item()
-        else:
-            max_seqlen_k = k_seq
+        max_seqlen_k = k_seq
 
     if is_batch:
         query = query.to(qk_dtype)

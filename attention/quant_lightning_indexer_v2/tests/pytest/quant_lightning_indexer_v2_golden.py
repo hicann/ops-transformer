@@ -2144,9 +2144,13 @@ def qliv2_output_single(
             cpu_result, topk_value, cpu_topk_value = None, None, None
         block_table = torch.from_numpy(block_table).to(dtype=torch.int32)
     # ======================== metadata 构造 ========================
-    # max_seqlen 从个体长度中取
-    max_seqlen_q_meta = actual_seq_lengths_query.max().item()
-    max_seqlen_k_meta = actual_seq_lengths_key.max().item()
+    # BSND 的 max_seqlen 对应物理 S 轴；TND/PA 从各 batch 的实际长度中取。
+    max_seqlen_q_meta = (
+        q_seq if layout_query == "BSND" else actual_seq_lengths_query.max().item()
+    )
+    max_seqlen_k_meta = (
+        k_seq if layout_key == "BSND" else actual_seq_lengths_key.max().item()
+    )
 
     if is_batch:
         if qk_dtype == torch.float8_e4m3fn:

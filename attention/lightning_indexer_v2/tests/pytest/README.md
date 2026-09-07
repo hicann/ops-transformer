@@ -19,7 +19,7 @@
 
 - **数据格式**:
   - **query_layout**：BSND、TND
-  - **key_layout**: PA_BBND
+  - **key_layout**：BSND、TND、PA_BBND
 
 - **运行模式**:
    - **eager**：直接调用 `torch.ops.cann_ops_transformer.lightning_indexer`
@@ -29,7 +29,7 @@
 
 #### 前置要求
 
-1、 确认TorchNPU为最新版本  
+1、 确认TorchNPU为最新版本
 2、 参考Attention融合算子Experimental使用说明激活CANN包和自定义算子包
 
 #### custom包调用
@@ -50,8 +50,9 @@
 
 单用例测试：
 
-- test_lightning_indexer_v2_single.py       # pytest测试单用例运行主程序 
+- test_lightning_indexer_v2_single.py       # pytest测试单用例运行主程序
 - test_lightning_indexer_v2_paramset.py     # 单用例入参配置
+- test_lightning_indexer_v2_stc.py          # STC白盒用例配置
 
 批量测试：
 
@@ -60,7 +61,7 @@
 - ./batch/lightning_indexer_v2_pt_save.py           # 读取excel表格批量生成用例pt文件
 - ./batch/list_pt_from_excel.py                     # 从Excel提取Testcase_Name并按名匹配pt文件（batch_exec模式用）
 - ./batch/replace_path.py                           # test_lightning_indexer_v2_batch.py占位符替换
- 
+
 ## 架构说明
 
 - **single 模式**：`liv2_output_acl_graph` 调用 `liv2_output_single(is_batch=True)` 即时生成数据 → `torch.compile` + `torchair` 执行
@@ -76,12 +77,35 @@
 
 #### 单用例调测
 
-1、手动配置test_lightning_indexer_v2_paramset.py的参数
-
-2、执行指令：
+默认参数集适合临时调试。先手动配置 `test_lightning_indexer_v2_paramset.py`，再执行：
 
 ``` bash
 bash test_run.sh single
+```
+
+STC 参数集位于 `test_lightning_indexer_v2_stc.py`，用于按代码路径执行白盒用例：
+
+``` bash
+bash test_run.sh single --paramset stc
+```
+
+可以通过 `-C` 或 `--cases` 指定一个或多个用例，多个名称使用逗号分隔：
+
+``` bash
+# 指定单组合 case
+bash test_run.sh single --paramset stc -C META_TRAILING_K_ZERO_41
+
+# 指定多组合 case，运行其展开的全部节点
+bash test_run.sh single --paramset stc -C S2_16
+
+# 指定其中一个展开节点；_003 对应 k_seq=128
+bash test_run.sh single --paramset stc -C S2_16_003
+
+# 一次运行多个指定用例
+bash test_run.sh single --paramset stc -C S1_TOPK_14,META_TRAILING_Q_ZERO_42
+
+# 指定 graph 模式；默认使用 eager 模式
+bash test_run.sh single --paramset stc -C META_BSND_53_002 -M graph
 ```
 
 #### 用例的批量生成与测试
@@ -219,7 +243,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # graph模式 + 性能采集
 **注意事项**：
 
 - `cmp_ratio > 1`且`sparse_mode != 0`时，`cmp_residual_k`必填（长度=batch_size的列表）
-   
+
 ## 输出文件
 
 | 文件 | 说明 |

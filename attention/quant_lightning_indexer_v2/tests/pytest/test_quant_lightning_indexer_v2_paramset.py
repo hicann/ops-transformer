@@ -922,12 +922,6 @@ elif "Ascend950" in properties.name:
             "quant_li_default_a5_v6",
             "quant_li_default_a5_v7",
             "quant_li_default_a5_v8",
-            "quant_li_default_a5_mxfp8",
-            "quant_li_default_a5_mxfp4",
-            "quant_li_default_a5_mxfp8_bsnd",
-            "quant_li_default_a5_mxfp4_bsnd",
-            "quant_li_default_a5_mxfp8_tnd",
-            "quant_li_default_a5_mxfp4_tnd",
             # 白盒测试用例
             "wb_ld_rv0_bsnd_pa",
             "wb_nold_rv1_bsnd_pa",
