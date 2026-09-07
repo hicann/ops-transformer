@@ -718,6 +718,16 @@ Ascend 950支持的算子分类和算子列表如下：
   </tr>
   <tr>
     <td>mhc</td>
+    <td><a href="../../mhc/mhc_pre_sinkhorn/README.md">mhc_pre_sinkhorn</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>mhc_pre_sinkhorn算子，支持MHC架构中Hin、Hpre、Hres和Hpost矩阵输出。</td>
+  </tr>
+  <tr>
+    <td>mhc</td>
     <td><a href="../../mhc/mhc_sinkhorn/README.md">mhc_sinkhorn</a></td>
     <td>✓</td>
     <td>✓</td>
