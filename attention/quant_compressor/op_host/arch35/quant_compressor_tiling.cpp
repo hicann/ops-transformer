@@ -33,10 +33,10 @@ ge::graphStatus QuantCompressorTiling::ConvertRequiredParams(gert::TilingContext
     quantCompressorContext.x.desc = context.GetRequiredInputDesc(TOKEN_X_INPUT_INDEX);
     quantCompressorContext.x.shape = context.GetRequiredInputShape(TOKEN_X_INPUT_INDEX);
     OP_CHECK_IF(quantCompressorContext.x.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(quantCompressorContext.opName, X_NAME, "shape is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(quantCompressorContext.opName, X_NAME, "x shape is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(quantCompressorContext.x.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(quantCompressorContext.opName, X_NAME, "desc is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(quantCompressorContext.opName, X_NAME, "x desc is nullptr"),
                 return ge::GRAPH_FAILED);
     quantCompressorContext.wkv.desc = context.GetRequiredInputDesc(WEIGHT_KV_INPUT_INDEX);
     quantCompressorContext.wkv.shape = context.GetRequiredInputShape(WEIGHT_KV_INPUT_INDEX);
@@ -101,7 +101,8 @@ ge::graphStatus QuantCompressorTiling::ConvertContext(gert::TilingContext &conte
 
     auto attrs = context.GetAttrs();
     OP_CHECK_IF(attrs == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context.GetNodeName(), "attrs", "got from ge is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context.GetNodeName(), "attrs",
+                                                         "attrs got from TilingContext is nullptr"),
                 return ge::GRAPH_FAILED);
     quantCompressorContext.quantMode = attrs->GetAttrPointer<int>(QUANT_MODE_ATTR_INDEX);
     quantCompressorContext.coff = attrs->GetAttrPointer<int>(COFF_ATTR_INDEX);
@@ -110,10 +111,10 @@ ge::graphStatus QuantCompressorTiling::ConvertContext(gert::TilingContext &conte
     quantCompressorContext.stateCacheStrideDim0 = attrs->GetAttrPointer<int>(STATE_CACHE_STRIDE_DIM0_ATTR_INDEX);
     quantCompressorContext.batchConsistency = context.GetDeterministicLevel();
     OP_LOGD(context.GetNodeName(), "deterministic_level=%d", context.GetDeterministicLevel());
-    OP_CHECK_IF(
-        context.GetWorkspaceSizes(1) == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context.GetNodeName(), "workSpaceSize", "got from ge is nullptr"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context.GetWorkspaceSizes(1) == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context.GetNodeName(), "workSpaceSize",
+                                                         "workSpaceSize got from TilingContext is nullptr"),
+                return ge::GRAPH_FAILED);
     quantCompressorContext.workSpaces = context.GetWorkspaceSizes(1);
     return ge::GRAPH_SUCCESS;
 }
@@ -304,8 +305,21 @@ ge::graphStatus QuantCompressorTiling::CheckEmptyTensor() const
             context_->stateCache.shape->GetStorageShape().GetShapeSize() == 0 ||
             context_->ape.shape->GetStorageShape().GetShapeSize() == 0 ||
             context_->stateBlockTable.shape->GetStorageShape().GetShapeSize() == 0) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->opName, "x", "0",
-                                                  "Only input tensor x dim B or S or T supports to be 0");
+            std::string emptyParaName = X_NAME;
+            if (context_->wkv.shape->GetStorageShape().GetShapeSize() == 0) {
+                emptyParaName = WKV_NAME;
+            } else if (context_->wgate.shape->GetStorageShape().GetShapeSize() == 0) {
+                emptyParaName = WGATE_NAME;
+            } else if (context_->stateCache.shape->GetStorageShape().GetShapeSize() == 0) {
+                emptyParaName = STATE_CACHE_NAME;
+            } else if (context_->ape.shape->GetStorageShape().GetShapeSize() == 0) {
+                emptyParaName = APE_NAME;
+            } else if (context_->stateBlockTable.shape->GetStorageShape().GetShapeSize() == 0) {
+                emptyParaName = STATE_BLOCK_TABLE_NAME;
+            }
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->opName, emptyParaName, "0",
+                emptyParaName + " shape size is 0, only x dim B or S (BSH) / T (TH) supports to be 0");
             return ge::GRAPH_FAILED;
         }
         context_->templateId = TemplateId::NORMAL;
@@ -428,7 +442,7 @@ ge::graphStatus QuantCompressorTiling::CheckAttrValueSupport(const T *attrValue,
     }
 
     if (std::find(expectAttrValList.begin(), expectAttrValList.end(), *attrValue) == expectAttrValList.end()) {
-        LogErrorNumberSupport(expectAttrValList, *attrValue, name, "attr value");
+        LogErrorNumberSupport(expectAttrValList, *attrValue, name, name);
         return ge::GRAPH_FAILED;
     }
 
@@ -452,8 +466,10 @@ void QuantCompressorTiling::LogErrorNumberSupport(const std::vector<T> &expectNu
     std::ostringstream oss;
     for (size_t i = 0; i < expectNumberList.size(); ++i) {
         oss << to_string(expectNumberList[i]);
-        if (i < expectNumberList.size() - 1) {
+        if (i + 2 < expectNumberList.size()) {
             oss << ", ";
+        } else if (i + 1 < expectNumberList.size()) {
+            oss << " or ";
         }
     }
 
@@ -808,46 +824,50 @@ ge::graphStatus QuantCompressorTiling::CheckRequiredParaExistence() const
 ge::graphStatus QuantCompressorTiling::CheckRequiredInOutExistence() const
 {
     OP_CHECK_IF(context_->x.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x", "shape is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x", "x shape is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->x.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x", "desc is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x", "x desc is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->wkv.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv", "shape is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv", "wkv shape is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->wkv.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv", "desc is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv", "wkv desc is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->wgate.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate", "shape is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate", "wgate shape is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->wgate.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate", "desc is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate", "wgate desc is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->stateCache.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_cache", "shape is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->stateCache.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_cache", "desc is nullptr"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->stateCache.shape == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_cache", "state_cache shape is nullptr"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->stateCache.desc == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_cache", "state_cache desc is nullptr"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->ape.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "shape is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "ape shape is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->ape.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "desc is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "ape desc is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->stateBlockTable.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_block_table", "shape is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_block_table",
+                                                         "state_block_table shape is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->stateBlockTable.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_block_table", "desc is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_block_table",
+                                                         "state_block_table desc is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->cmpKv.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_kv", "shape is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_kv", "cmp_kv shape is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->cmpKv.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_kv", "desc is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_kv", "cmp_kv desc is nullptr"),
                 return ge::GRAPH_FAILED);
     if (static_cast<uint8_t>(*context_->quantMode) ==
         static_cast<uint8_t>(QUANT_MODE::A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL)) {
@@ -901,10 +921,10 @@ ge::graphStatus QuantCompressorTiling::CheckRequiredInOutExistence() const
 ge::graphStatus QuantCompressorTiling::CheckRequiredAttrExistence() const
 {
     OP_CHECK_IF(context_->quantMode == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "quant_mode", "attr is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "quant_mode", "quant_mode attr is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->cmpRatio == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_ratio", "attr is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_ratio", "cmp_ratio attr is nullptr"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -925,9 +945,10 @@ ge::graphStatus QuantCompressorTiling::LogErrorShapeConsistency(const std::strin
 
     const uint32_t actualNum = shape->GetStorageShape().GetDim(dimNum);
     OP_CHECK_IF(actualNum != expectNum,
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    context_->opName, name, "dim " + std::to_string(dimNum) + "=" + std::to_string(actualNum),
-                    name + " should be equal to " + subName + ": " + std::to_string(expectNum)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->opName, name,
+                                                      "dim " + std::to_string(dimNum) + "=" + std::to_string(actualNum),
+                                                      name + " dim " + std::to_string(dimNum) + " should be equal to " +
+                                                          subName + ": " + std::to_string(expectNum)),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -953,10 +974,10 @@ ge::graphStatus QuantCompressorTiling::CheckShapeConsistency() const
         ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WGATE_DESCALE_NAME, context_->wgateDescale.shape,
                                                       COMPRESSOR_DIM_INDEX_0, "coff*headDim",
                                                       static_cast<uint32_t>(coffD)) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WKV_NAME, context_->wkv.shape, COMPRESSOR_DIM_INDEX_1, "x",
-                                                      baseParams_->hiddenSize) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WGATE_NAME, context_->wgate.shape, COMPRESSOR_DIM_INDEX_1, "x",
-                                                      baseParams_->hiddenSize) ||
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WKV_NAME, context_->wkv.shape, COMPRESSOR_DIM_INDEX_1,
+                                                      "x hiddenSize", baseParams_->hiddenSize) ||
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WGATE_NAME, context_->wgate.shape, COMPRESSOR_DIM_INDEX_1,
+                                                      "x hiddenSize", baseParams_->hiddenSize) ||
         ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WKV_NAME, context_->wkv.shape, COMPRESSOR_DIM_INDEX_0,
                                                       "coff*headDim", static_cast<uint32_t>(coffD)) ||
         ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WGATE_NAME, context_->wgate.shape, COMPRESSOR_DIM_INDEX_0,

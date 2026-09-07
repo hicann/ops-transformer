@@ -29,7 +29,7 @@ def _get_compressor_op():
             super().__init__("compressor")
 
         def sources(self):
-            return ["ops/csrc/compressor.cpp"]
+            return ["csrc/attention/compressor.cpp"]
 
         def schema(self):
             pass

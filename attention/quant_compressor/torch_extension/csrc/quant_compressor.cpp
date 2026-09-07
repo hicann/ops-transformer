@@ -87,6 +87,11 @@ at::Tensor QuantCompressor(const at::Tensor &x, const at::Tensor &wkv, const at:
                            int64_t coff, int64_t cacheMode)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
+    TORCH_CHECK(x.scalar_type() == at::kByte, "x dtype should be uint8 (carrier for hifloat8), got ", x.scalar_type());
+    TORCH_CHECK(wkv.scalar_type() == at::kByte, "wkv dtype should be uint8 (carrier for hifloat8), got ",
+                wkv.scalar_type());
+    TORCH_CHECK(wgate.scalar_type() == at::kByte, "wgate dtype should be uint8 (carrier for hifloat8), got ",
+                wgate.scalar_type());
     auto xDim = x.dim();
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
@@ -124,6 +129,11 @@ at::Tensor QuantCompressorMeta(const at::Tensor &x, const at::Tensor &wkv, const
                                const c10::optional<at::Tensor> &startPos, int64_t coff, int64_t cacheMode)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
+    TORCH_CHECK(x.scalar_type() == at::kByte, "x dtype should be uint8 (carrier for hifloat8), got ", x.scalar_type());
+    TORCH_CHECK(wkv.scalar_type() == at::kByte, "wkv dtype should be uint8 (carrier for hifloat8), got ",
+                wkv.scalar_type());
+    TORCH_CHECK(wgate.scalar_type() == at::kByte, "wgate dtype should be uint8 (carrier for hifloat8), got ",
+                wgate.scalar_type());
     auto xDim = x.dim();
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
@@ -133,5 +143,8 @@ at::Tensor QuantCompressorMeta(const at::Tensor &x, const at::Tensor &wkv, const
     return ConstructQuantCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("quant_compressor", &QuantCompressor, "quant_compressor"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("quant_compressor", &QuantCompressor, "quant_compressor");
+}
 } // namespace op_api
