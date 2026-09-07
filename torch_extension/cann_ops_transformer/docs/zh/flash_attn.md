@@ -680,12 +680,13 @@ mask_mode参数解释
             <td>sinks</td>
             <td>
                 <ul>
-                    <li>暂不支持</li>
+                    <li>data_type仅支持float32（与q的数据类型无关）</li>
+                    <li>shape必须为1D，且长度等于Q_N（q的头数，GQA分组前的头数）</li>
                 </ul>
             </td>
             <td> 可选参数 </td>
             <td> 无 </td>
-            <td> 暂不支持 </td>
+            <td> 无 </td>
         </tr>
     </tbody>
 </table>

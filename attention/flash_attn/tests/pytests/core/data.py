@@ -130,6 +130,13 @@ def build_flash_attn_params(
         layout_out=layout_out,
     )
 
+    # === sinks ===
+    sinks = None
+    if p.get("sinks") is not None:
+        sinks = inputs.get("sinks")
+        if sinks is not None:
+            sinks = sinks.to(device)
+
     # === kernel kwargs ===
     kernel_kwargs = dict(
         softmax_scale=scale,
@@ -137,7 +144,7 @@ def build_flash_attn_params(
         win_left=wl,
         win_right=wr,
         block_table=bt,
-        sinks=None,
+        sinks=sinks,
         attn_mask=attn_mask,
         cu_seqlens_q=cu_q,
         cu_seqlens_kv=cu_kv,

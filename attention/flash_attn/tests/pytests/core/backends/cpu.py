@@ -43,6 +43,8 @@ class CPUBackend(Backend):
 
         tforward_kwargs = dict(params)
         tforward_kwargs["scale"] = params.get("scale", 1 / (params["D"] ** 0.5))
+        if inputs.get("sinks") is not None:
+            tforward_kwargs["sinks"] = inputs["sinks"]
 
         out_cpu, x_max, x_sum = tforward(q_cpu, k_cpu, v_cpu, **tforward_kwargs)
         lse = torch.log(x_sum) + x_max

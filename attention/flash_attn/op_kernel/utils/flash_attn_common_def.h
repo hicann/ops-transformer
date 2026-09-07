@@ -232,6 +232,7 @@ struct RunInfo {
     // uint32_t curS2LoopTimes = 0;
     bool isS2SplitCore = false;
     uint32_t faTmpOutWsPos = 0; // FA阶段，S2外切，需要写到workspace时，写出到第几块M*D的GM块
+    bool isFirstFdBlock = false;
 
     int64_t preTokensLeftUp = 0;
     int64_t nextTokensLeftUp = 0;
