@@ -1271,7 +1271,7 @@ ge::graphStatus CommonChecker::CheckInputLayout(const FiaTilingInfo &fiaInfo)
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 fiaInfo.opName, "input_layout", inputLayout.c_str(),
                 "The value of input_layout must be in BSH, BSND, "
-                "BNSD, TND ,BNSD_BSND, BSND_NBSD, BSH_NBSD, TND_NTD in the Decode MLA scenario");
+                "BNSD, TND, BNSD_NBSD, BSND_NBSD, BSH_NBSD, TND_NTD in the Decode MLA scenario");
             return ge::GRAPH_FAILED;
         }
     } else { // prefill mla
