@@ -1026,8 +1026,8 @@ int main()
     auto actualSeqLengths = aclCreateIntArray(actualSeqlenVector.data(), actualSeqlenVector.size());
 
     double scaleValue = 1 / sqrt(headDims); // 1 / sqrt(d)
-    int64_t preTokens = 65535;
-    int64_t nextTokens = 65535;
+    int64_t preTokens = 2147483647;
+    int64_t nextTokens = 2147483647;
     string sLayerOut = "BNSD";
     char layerOut[sLayerOut.length()+1];
     strcpy(layerOut, sLayerOut.c_str());

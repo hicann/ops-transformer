@@ -666,7 +666,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```c++
+```cpp
 #include <iostream>
 #include <vector>
 #include <math.h>
@@ -760,11 +760,11 @@ int main() {
   int64_t valueShapeSize = GetShapeSize(valueShape); // BNSD
   int64_t attenShapeSize = GetShapeSize(attenShape); // B 1 S1 S2
   int64_t outShapeSize = GetShapeSize(outShape); // BNSD
-  std::vector<float> queryHostData(queryShapeSize, 1);
-  std::vector<float> keyHostData(keyShapeSize, 1);
-  std::vector<float> valueHostData(valueShapeSize, 1);
-  std::vector<float> attenHostData(attenShapeSize, 1);
-  std::vector<float> outHostData(outShapeSize, 1);
+  std::vector<op::fp16_t> queryHostData(queryShapeSize, 1);
+  std::vector<op::fp16_t> keyHostData(keyShapeSize, 1);
+  std::vector<op::fp16_t> valueHostData(valueShapeSize, 1);
+  std::vector<int8_t> attenHostData(attenShapeSize, 1);
+  std::vector<op::fp16_t> outHostData(outShapeSize, 1);
 
   // Create query aclTensor
   ret = CreateAclTensor(queryHostData, queryShape, &queryDeviceAddr, aclDataType::ACL_FLOAT16, &queryTensor);
@@ -787,8 +787,8 @@ int main() {
   int64_t numHeads=2; // N
   int64_t numKeyValueHeads = numHeads;
   double scaleValue= 1 / sqrt(2); // 1/sqrt(d)
-  int64_t preTokens = 65535;
-  int64_t nextTokens = 65535;
+  int64_t preTokens = 2147483647;
+  int64_t nextTokens = 0;
   char layerOut[] = "BNSD";
   int64_t sparseMode = 0;
   // 3. Call the CANN operator library API

@@ -548,32 +548,31 @@ int main(int argc, char **argv)
     // query、key、value对应的shape值，并重新gen data，再执行
 
     int64_t batch = 1;
-    int sequenceLengthK = 48;
+    int64_t kvSeqlen = 48;
     aclIntArray * actualCmpKvSeqLen = nullptr;
     aclIntArray * actualCmpQSeqLen = nullptr;
     // 创建actualCmpKvSeqLen aclIntArray
-    std::vector<int64_t> actualCmpKvSeqLenVector(batch, sequenceLengthK);
+    std::vector<int64_t> actualCmpKvSeqLenVector(batch, kvSeqlen);
     actualCmpKvSeqLen = aclCreateIntArray(actualCmpKvSeqLenVector.data(), actualCmpKvSeqLenVector.size());
     // 创建actualCmpQSeqLen aclIntArray
-    int64_t s1 = 1;
-    std::vector<int64_t> actualCmpQSeqLenVector(batch, s1);
+    int64_t qSeqlen = 1;
+    std::vector<int64_t> actualCmpQSeqLenVector(batch, qSeqlen);
     actualCmpQSeqLen = aclCreateIntArray(actualCmpQSeqLenVector.data(), actualCmpQSeqLenVector.size());
     int64_t d1 = 192;
     int64_t d2 = 128;
-    int64_t g = 1;
-
-    int64_t n2 = 1;
+    int64_t numHeads = 1;
+    int64_t numKeyValueHeads = 1;
     int64_t blockSize = 64;
     int64_t selectBlockSize = 64;
     int64_t selectBlockCount = 1;
     int64_t blockTableLength = 1;
     int64_t numBlocks = batch * blockTableLength;
-    std::vector<int64_t> queryShape = {batch, s1, n2 * g, d1};
-    std::vector<int64_t> keyShape = {numBlocks, blockSize, n2,d1};
-    std::vector<int64_t> valueShape = {numBlocks, blockSize, n2,d2};
-    std::vector<int64_t> topkIndicesShape = {batch, s1, n2, selectBlockCount};
+    std::vector<int64_t> queryShape = {batch, qSeqlen, numHeads, d1};
+    std::vector<int64_t> keyShape = {numBlocks, blockSize, numKeyValueHeads, d1};
+    std::vector<int64_t> valueShape = {numBlocks, blockSize, numKeyValueHeads, d2};
+    std::vector<int64_t> topkIndicesShape = {batch, qSeqlen, numKeyValueHeads, selectBlockCount};
     std::vector<int64_t> blockTableOptionalShape = {batch, blockTableLength};
-    std::vector<int64_t> outputShape = {batch, s1, n2 * g, d2};
+    std::vector<int64_t> outputShape = {batch, qSeqlen, numHeads, d2};
 
     long long queryShapeSize = GetShapeSize(queryShape);
     long long keyShapeSize = GetShapeSize(keyShape);
@@ -590,8 +589,8 @@ int main(int argc, char **argv)
 
     std::vector<int32_t> topkIndicesHostData;
     for (int b = 0; b < batch; ++b) {
-       for (int s = 0; s < s1; ++s) {
-        for (int h = 0; h < n2; ++h) {
+       for (int s = 0; s < qSeqlen; ++s) {
+        for (int h = 0; h < numKeyValueHeads; ++h) {
             for (int k = 0; k < selectBlockCount; ++k) {
                 if (k == 0) {
                     topkIndicesHostData.push_back(k);
@@ -604,8 +603,7 @@ int main(int argc, char **argv)
     }
     // attr
     double scaleValue = 1.0;
-    int64_t sparseMod = 0;
-    int64_t numHeads= static_cast<int64_t>(n2 * g);
+    int64_t sparseMode = 0;
     std::string sLayerOut = "BSND";
     char layOut[sLayerOut.length()+1];
     std::strcpy(layOut, sLayerOut.c_str());
@@ -655,10 +653,10 @@ int main(int argc, char **argv)
     // 调用aclnnNsaSelectedAttention第一段接口
     ret = aclnnNsaSelectedAttentionInferGetWorkspaceSize(queryTensor, keyTensor, valueTensor, topkIndicesTensor, nullptr,
                 blockTableOptionalTensor, actualCmpQSeqLen, actualCmpKvSeqLen, layOut,
-                numHeads, n2, selectBlockSize, selectBlockCount, blockSize,
-                scaleValue, sparseMod, outputTensor,
+                numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount, blockSize,
+                scaleValue, sparseMode, outputTensor,
                 &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaSelectedAttentionInferGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
     if (workspaceSize > 0) {

@@ -699,7 +699,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```c++
+```cpp
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -800,11 +800,11 @@ int InitializeTensors(TensorResources& resources) {
     int64_t attenShapeSize = GetShapeSize(attenShape);
     int64_t outShapeSize = GetShapeSize(outShape);
 
-    std::vector<float> queryHostData(queryShapeSize, 1);
-    std::vector<float> keyHostData(keyShapeSize, 1);
-    std::vector<float> valueHostData(valueShapeSize, 1);
-    std::vector<float> attenHostData(attenShapeSize, 1);
-    std::vector<float> outHostData(outShapeSize, 1);
+    std::vector<op::fp16_t> queryHostData(queryShapeSize, 1);
+    std::vector<op::fp16_t> keyHostData(keyShapeSize, 1);
+    std::vector<op::fp16_t> valueHostData(valueShapeSize, 1);
+    std::vector<int8_t> attenHostData(attenShapeSize, 1);
+    std::vector<op::fp16_t> outHostData(outShapeSize, 1);
 
     int ret = CreateAclTensor(queryHostData, queryShape, &resources.queryDeviceAddr,
                              aclDataType::ACL_FLOAT16, &resources.queryTensor);
@@ -848,8 +848,8 @@ int ExecutePromptFlashAttention(TensorResources& resources, aclrtStream stream,
     int64_t numHeads = 2;
     int64_t numKeyValueHeads = numHeads;
     double scaleValue = 1 / sqrt(2);
-    int64_t preTokens = 65535;
-    int64_t nextTokens = 65535;
+    int64_t preTokens = 2147483647;
+    int64_t nextTokens = 0;
     int64_t sparseMode = 0;
     int64_t innerPrecise = 1;
 

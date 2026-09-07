@@ -470,7 +470,7 @@ int main() {
     std::vector<uint16_t> biasQuantHostData(S, 1);
     std::vector<int32_t> biasDequant1HostData(S, 1);
     std::vector<int32_t> biasDequant2HostData(H, 1);
-    std::vector<uint16_t> paddingMask1HostData(1*N*S*H, 1);
+    std::vector<uint16_t> paddingMask1HostData(1*N*S*S, 1);
     std::vector<uint16_t> attentionScoreHostData(B*N*S*H, 0);
     // 创建input aclTensor
     ret = CreateAclTensor(queryHostData, qkvShape, &queryDeviceAddr, aclDataType::ACL_INT8, &query);

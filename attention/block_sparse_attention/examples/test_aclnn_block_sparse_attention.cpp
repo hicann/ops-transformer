@@ -111,8 +111,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 void FreeResource(aclTensor *query, aclTensor *key, aclTensor *value, aclTensor *blockSparseMask,
                   aclTensor *attentionOut, aclIntArray *actualSeqLengths, aclIntArray *actualSeqLengthsKv,
                   aclIntArray *blockShape, void *queryDeviceAddr, void *keyDeviceAddr, void *valueDeviceAddr,
-                  void *blockSparseMaskDeviceAddr, void *attentionOutDeviceAddr, void *actualSeqLengthsDeviceAddr,
-                  void *actualSeqLengthsKvDeviceAddr, void *workspaceAddr, int32_t deviceId, aclrtStream *stream)
+                  void *blockSparseMaskDeviceAddr, void *attentionOutDeviceAddr, void *workspaceAddr, int32_t deviceId,
+                  aclrtStream *stream)
 {
     // 释放资源
     if (query) {
@@ -154,12 +154,6 @@ void FreeResource(aclTensor *query, aclTensor *key, aclTensor *value, aclTensor 
     }
     if (attentionOutDeviceAddr) {
         aclrtFree(attentionOutDeviceAddr);
-    }
-    if (actualSeqLengthsDeviceAddr) {
-        aclrtFree(actualSeqLengthsDeviceAddr);
-    }
-    if (actualSeqLengthsKvDeviceAddr) {
-        aclrtFree(actualSeqLengthsKvDeviceAddr);
     }
     if (workspaceAddr) {
         aclrtFree(workspaceAddr);
@@ -213,19 +207,16 @@ int main()
     void *valueDeviceAddr = nullptr;
     void *blockSparseMaskDeviceAddr = nullptr;
     void *attentionOutDeviceAddr = nullptr;
-    void *actualSeqLengthsDeviceAddr = nullptr;
-    void *actualSeqLengthsKvDeviceAddr = nullptr;
     void *workspaceAddr = nullptr;
 
     // 3. 创建Query tensor (TND format: [totalQTokens, numHeads, headDim])
     std::vector<int64_t> queryShape = {totalQTokens, numHeads, headDim};
     std::vector<op::fp16_t> queryHostData(GetShapeSize(queryShape), 1.0f);
     ret = CreateAclTensor(queryHostData, queryShape, &queryDeviceAddr, aclDataType::ACL_FLOAT16, &queryTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create query tensor\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create query tensor\n"); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
 
     // 4. 创建Key/Value tensor (TND format: [totalKvTokens, numKvHeads, headDim])
@@ -233,18 +224,16 @@ int main()
     std::vector<op::fp16_t> keyHostData(GetShapeSize(kvShape), 1.0f);
     std::vector<op::fp16_t> valueHostData(GetShapeSize(kvShape), 1.0f);
     ret = CreateAclTensor(keyHostData, kvShape, &keyDeviceAddr, aclDataType::ACL_FLOAT16, &keyTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create key tensor\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create key tensor\n"); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
     ret = CreateAclTensor(valueHostData, kvShape, &valueDeviceAddr, aclDataType::ACL_FLOAT16, &valueTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create value tensor\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create value tensor\n"); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
 
     // 5. 创建blockSparseMask tensor ([batch, numHeads, qBlockNum, kvBlockNum])
@@ -252,11 +241,10 @@ int main()
     std::vector<int8_t> blockSparseMaskHostData(GetShapeSize(blockSparseMaskShape), 1);
     ret = CreateAclTensor(blockSparseMaskHostData, blockSparseMaskShape, &blockSparseMaskDeviceAddr,
                           aclDataType::ACL_INT8, &blockSparseMaskTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create block sparse mask tensor\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create block sparse mask tensor\n"); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
 
     // 6. 创建输出tensor
@@ -264,71 +252,34 @@ int main()
     std::vector<op::fp16_t> attentionOutHostData(GetShapeSize(attentionOutShape), 0.0f);
     ret = CreateAclTensor(attentionOutHostData, attentionOutShape, &attentionOutDeviceAddr, aclDataType::ACL_FLOAT16,
                           &attentionOutTensor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create attentionOut tensor\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create attentionOut tensor\n"); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
 
     // 7. 创建blockShape数组
     std::vector<int64_t> blockShapeData = {blockShapeX, blockShapeY};
     blockShape = aclCreateIntArray(blockShapeData.data(), blockShapeData.size());
-    CHECK_RET(blockShape != nullptr, LOG_PRINT("Failed to create blockShape array\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(blockShape != nullptr, LOG_PRINT("Failed to create blockShape array\n"); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return -1);
 
     // 8. 创建actualSeqLengths和actualSeqLengthsKv (必需参数)
     std::vector<int64_t> actualSeqLengthsHost(batch, static_cast<int64_t>(qSeqlen));
     std::vector<int64_t> actualSeqLengthsKvHost(batch, static_cast<int64_t>(kvSeqlen));
 
-    size_t seqLengthsSize = batch * sizeof(int64_t);
-
-    ret = aclrtMalloc(&actualSeqLengthsDeviceAddr, seqLengthsSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to allocate actualSeqLengths memory\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
-              return ret);
-    ret = aclrtMalloc(&actualSeqLengthsKvDeviceAddr, seqLengthsSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to allocate actualSeqLengthsKv memory\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
-              return ret);
-
-    ret = aclrtMemcpy(actualSeqLengthsDeviceAddr, seqLengthsSize, actualSeqLengthsHost.data(), seqLengthsSize,
-                      ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to copy actualSeqLengths to device\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
-              return ret);
-    ret = aclrtMemcpy(actualSeqLengthsKvDeviceAddr, seqLengthsSize, actualSeqLengthsKvHost.data(), seqLengthsSize,
-                      ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to copy actualSeqLengthsKv to device\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
-              return ret);
-
-    // aclCreateIntArray 期望的是 host 侧的数据指针，而不是 device 侧的数据
     actualSeqLengths = aclCreateIntArray(actualSeqLengthsHost.data(), batch);
     actualSeqLengthsKv = aclCreateIntArray(actualSeqLengthsKvHost.data(), batch);
-    CHECK_RET(actualSeqLengths != nullptr && actualSeqLengthsKv != nullptr,
-              LOG_PRINT("Failed to create actualSeqLengths arrays\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
-              return -1);
+    CHECK_RET(
+        actualSeqLengths != nullptr && actualSeqLengthsKv != nullptr,
+        LOG_PRINT("Failed to create actualSeqLengths arrays\n");
+        FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                     actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                     blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
+        return -1);
 
     // 9. 准备字符串参数（确保缓冲区大小足够，包含null terminator）
     const char *qLayoutStr = "TND";
@@ -369,17 +320,16 @@ int main()
                                                     &workspaceSize,     // workspaceSize (out)
                                                     &executor);         // executor (out)
 
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockSparseAttentionGetWorkspaceSize failed. ERROR: %d\n", ret);
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
-              return ret);
-    CHECK_RET(executor != nullptr, LOG_PRINT("executor is null after GetWorkspaceSize\n");
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(
+        ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockSparseAttentionGetWorkspaceSize failed. ERROR: %d\n", ret);
+        FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                     actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                     blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
+        return ret);
+    CHECK_RET(executor != nullptr, LOG_PRINT("executor is null after GetWorkspaceSize\n"); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return -1);
 
     // 12. 分配workspace
@@ -388,27 +338,24 @@ int main()
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); FreeResource(
                       queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
                       actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
-                      blockSparseMaskDeviceAddr, attentionOutDeviceAddr, actualSeqLengthsDeviceAddr,
-                      actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+                      blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
                   return ret);
     }
 
     // 12. 调用第二段接口
     ret = aclnnBlockSparseAttention(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockSparseAttention failed. ERROR: %d\n", ret);
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockSparseAttention failed. ERROR: %d\n", ret); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
 
     // 13. 同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret);
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
 
     // 14. 获取输出的值，将device侧内存上的结果拷贝至host侧
@@ -416,11 +363,10 @@ int main()
     std::vector<op::fp16_t> resultData(attentionOutSize, 0);
     ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(op::fp16_t), attentionOutDeviceAddr,
                       attentionOutSize * sizeof(op::fp16_t), ACL_MEMCPY_DEVICE_TO_HOST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret);
-              FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
-                           actualSeqLengths, actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr,
-                           valueDeviceAddr, blockSparseMaskDeviceAddr, attentionOutDeviceAddr,
-                           actualSeqLengthsDeviceAddr, actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); FreeResource(
+                  queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
+                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
+                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
               return ret);
 
     // 15. 打印部分结果
@@ -433,8 +379,7 @@ int main()
     // 16. 释放资源
     FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
-                 blockSparseMaskDeviceAddr, attentionOutDeviceAddr, actualSeqLengthsDeviceAddr,
-                 actualSeqLengthsKvDeviceAddr, workspaceAddr, deviceId, &stream);
+                 blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);
     LOG_PRINT("Test completed successfully!\n");
     return 0;
 }
