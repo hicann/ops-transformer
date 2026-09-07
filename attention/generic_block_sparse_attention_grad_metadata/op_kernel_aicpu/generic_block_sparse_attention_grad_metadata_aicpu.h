@@ -72,8 +72,8 @@ private:
     bool GenMetadata();
 
 private:
-    Tensor *rsvdBlockIdx_ = nullptr;
-    Tensor *rsvdBlockCount_ = nullptr;
+    Tensor *sparseBlockIdx_ = nullptr;
+    Tensor *sparseBlockCount_ = nullptr;
     Tensor *cuSeqLengthsQ_ = nullptr;
     Tensor *cuSeqLengthsKv_ = nullptr;
     Tensor *sequsedQ_ = nullptr;
@@ -118,8 +118,8 @@ private:
 
 private:
     enum class ParamId : uint32_t {
-        rsvdBlockIdx = 0,
-        rsvdBlockCount = 1,
+        sparseBlockIdx = 0,
+        sparseBlockCount = 1,
         cuSeqLengthsQ = 2,
         cuSeqLengthsKv = 3,
         sequsedQ = 4,

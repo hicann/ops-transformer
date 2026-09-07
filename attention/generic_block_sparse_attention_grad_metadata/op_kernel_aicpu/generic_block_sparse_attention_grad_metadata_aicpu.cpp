@@ -31,8 +31,8 @@ uint32_t GenericBlockSparseAttentionGradMetadataCpuKernel::Compute(CpuKernelCont
 // 从 CpuKernelContext 取输入输出与属性，并进行参数检查和初始化
 bool GenericBlockSparseAttentionGradMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
 {
-    rsvdBlockIdx_ = ctx.Input(static_cast<uint32_t>(ParamId::rsvdBlockIdx));
-    rsvdBlockCount_ = ctx.Input(static_cast<uint32_t>(ParamId::rsvdBlockCount));
+    sparseBlockIdx_ = ctx.Input(static_cast<uint32_t>(ParamId::sparseBlockIdx));
+    sparseBlockCount_ = ctx.Input(static_cast<uint32_t>(ParamId::sparseBlockCount));
     cuSeqLengthsQ_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqLengthsQ));
     cuSeqLengthsKv_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqLengthsKv));
     sequsedQ_ = ctx.Input(static_cast<uint32_t>(ParamId::sequsedQ));
@@ -52,12 +52,12 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::Prepare(CpuKernelContext 
     GetAttrValueOpt(ctx, "is_packed_gqa", isPackedGQA_);
     GetAttrValueOpt(ctx, "mask_type", maskType_);
     GetAttrValueOpt(ctx, "softmax_precision", softmaxPrecision_);
-    GetAttrValueOpt(ctx, "window_size_left", winLeft_);
-    GetAttrValueOpt(ctx, "window_size_right", winRight_);
+    GetAttrValueOpt(ctx, "win_left", winLeft_);
+    GetAttrValueOpt(ctx, "win_right", winRight_);
     GetAttrValueOpt(ctx, "aic_core_num", aicCoreNum_);
     GetAttrValueOpt(ctx, "aiv_core_num", aivCoreNum_);
-    GetAttrValueOpt(ctx, "q_input_layout", layoutQ_);
-    GetAttrValueOpt(ctx, "kv_input_layout", layoutKv_);
+    GetAttrValueOpt(ctx, "layout_q", layoutQ_);
+    GetAttrValueOpt(ctx, "layout_kv", layoutKv_);
     GetAttrValueOpt(ctx, "soc_version", socVersion_);
 
     return ParamsCheck() && ParamsInit();
@@ -74,19 +74,19 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::ParamsCheck()
         KERNEL_LOG_ERROR("metadata must be a 1D tensor");
         return false;
     }
-    if (rsvdBlockIdx_ == nullptr || rsvdBlockIdx_->GetData() == nullptr || rsvdBlockIdx_->GetTensorShape() == nullptr ||
-        rsvdBlockIdx_->GetTensorShape()->GetDims() != 4) {
-        KERNEL_LOG_ERROR("rsvd_block_idx must be a valid 4D tensor");
+    if (sparseBlockIdx_ == nullptr || sparseBlockIdx_->GetData() == nullptr ||
+        sparseBlockIdx_->GetTensorShape() == nullptr || sparseBlockIdx_->GetTensorShape()->GetDims() != 4) {
+        KERNEL_LOG_ERROR("sparse_block_idx must be a valid 4D tensor");
         return false;
     }
-    if (rsvdBlockCount_ == nullptr || rsvdBlockCount_->GetData() == nullptr ||
-        rsvdBlockCount_->GetTensorShape() == nullptr || rsvdBlockCount_->GetTensorShape()->GetDims() != 3) {
-        KERNEL_LOG_ERROR("rsvd_block_count must be a valid 3D tensor");
+    if (sparseBlockCount_ == nullptr || sparseBlockCount_->GetData() == nullptr ||
+        sparseBlockCount_->GetTensorShape() == nullptr || sparseBlockCount_->GetTensorShape()->GetDims() != 3) {
+        KERNEL_LOG_ERROR("sparse_block_count must be a valid 3D tensor");
         return false;
     }
     if (layoutQ_ == "TND") {
         if (cuSeqLengthsQ_ == nullptr || cuSeqLengthsQ_->GetData() == nullptr) {
-            KERNEL_LOG_ERROR("cu_seq_lengths is required when layout_q is TND");
+            KERNEL_LOG_ERROR("cu_seq_lengths_q is required when layout_q is TND");
             return false;
         }
         if (cuSeqLengthsKv_ == nullptr || cuSeqLengthsKv_->GetData() == nullptr) {
@@ -100,8 +100,8 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::ParamsCheck()
 // 初始化参数
 bool GenericBlockSparseAttentionGradMetadataCpuKernel::ParamsInit()
 {
-    auto idxShape = rsvdBlockIdx_->GetTensorShape();
-    auto cntShape = rsvdBlockCount_->GetTensorShape();
+    auto idxShape = sparseBlockIdx_->GetTensorShape();
+    auto cntShape = sparseBlockCount_->GetTensorShape();
     batchSize_ = static_cast<uint32_t>(idxShape->GetDimSize(0));
     n2Size_ = static_cast<uint32_t>(idxShape->GetDimSize(1));
     jSize_ = static_cast<uint32_t>(idxShape->GetDimSize(2));
@@ -110,7 +110,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::ParamsInit()
     if (static_cast<uint32_t>(cntShape->GetDimSize(0)) != batchSize_ ||
         static_cast<uint32_t>(cntShape->GetDimSize(1)) != n2Size_ ||
         static_cast<uint32_t>(cntShape->GetDimSize(2)) != jSize_) {
-        KERNEL_LOG_ERROR("rsvd_block_count shape mismatch with rsvd_block_idx");
+        KERNEL_LOG_ERROR("sparse_block_count shape mismatch with sparse_block_idx");
         return false;
     }
     if (numKvHeads_ <= 0 || numQHeads_ % numKvHeads_ != 0) {
@@ -138,7 +138,8 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::ParamsInit()
     }
 
     baseM_ = GSAG_DEFAULT_BASE_M;
-    baseN_ = static_cast<uint32_t>(blockShapeY_ > 0 ? blockShapeY_ : GSAG_DEFAULT_BASE_N);
+    // Cube/Softmax tile size (decoupled from sparse BlockY).
+    baseN_ = GSAG_DEFAULT_BASE_N;
     coreGroupStart_.assign(aicCoreNum_, 0U);
     coreGroupEnd_.assign(aicCoreNum_, 0U);
     return true;
@@ -146,13 +147,17 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::ParamsInit()
 
 uint32_t GenericBlockSparseAttentionGradMetadataCpuKernel::GetKvSeqLen(uint32_t bIdx) const
 {
-    if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
-        const int32_t *sequsedPtr = static_cast<const int32_t *>(sequsedKv_->GetData());
-        return static_cast<uint32_t>(sequsedPtr[bIdx]);
-    }
-    if (layoutKv_ == "TND" && cuSeqLengthsKv_ != nullptr && cuSeqLengthsKv_->GetData() != nullptr) {
-        const int64_t *cuPtr = static_cast<const int64_t *>(cuSeqLengthsKv_->GetData());
-        return static_cast<uint32_t>(cuPtr[bIdx + 1U] - cuPtr[bIdx]);
+    // seqused_kv is only meaningful for TND (same contract as Grad kernel).
+    // BNSD/BSND must use max_kv_seqlen (aligned with dense Q/K S dims).
+    if (layoutKv_ == "TND") {
+        if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
+            const int32_t *sequsedPtr = static_cast<const int32_t *>(sequsedKv_->GetData());
+            return static_cast<uint32_t>(sequsedPtr[bIdx]);
+        }
+        if (cuSeqLengthsKv_ != nullptr && cuSeqLengthsKv_->GetData() != nullptr) {
+            const int64_t *cuPtr = static_cast<const int64_t *>(cuSeqLengthsKv_->GetData());
+            return static_cast<uint32_t>(cuPtr[bIdx + 1U] - cuPtr[bIdx]);
+        }
     }
     return static_cast<uint32_t>(maxKvSeqlen_);
 }
@@ -160,12 +165,13 @@ uint32_t GenericBlockSparseAttentionGradMetadataCpuKernel::GetKvSeqLen(uint32_t 
 uint32_t GenericBlockSparseAttentionGradMetadataCpuKernel::GetKvBlockLen(uint32_t bIdx, uint32_t jIdx) const
 {
     const uint32_t actS2 = GetKvSeqLen(bIdx);
-    const uint32_t s2Start = jIdx * baseN_;
+    const uint32_t blockY = static_cast<uint32_t>(blockShapeY_ > 0 ? blockShapeY_ : GSAG_DEFAULT_BASE_N);
+    const uint32_t s2Start = jIdx * blockY;
     if (s2Start >= actS2) {
         return 0U;
     }
     const uint32_t remain = actS2 - s2Start;
-    return remain < baseN_ ? remain : baseN_;
+    return remain < blockY ? remain : blockY;
 }
 
 uint64_t GenericBlockSparseAttentionGradMetadataCpuKernel::CalcGroupBlockCost(int32_t count, uint32_t kvBlockLen) const
@@ -178,17 +184,19 @@ uint64_t GenericBlockSparseAttentionGradMetadataCpuKernel::CalcGroupBlockCost(in
     return mTiles * nTiles * static_cast<uint64_t>(groupSize_);
 }
 
-// 构建 KV 块组,遍历顺序 B → N2 → J。每个 count>0 的 (b,n2,j) 成一个 KV 块组，并记录总的任务数量（baseN=128）
+// 构建 KV 块组,遍历顺序 B → N2 → J。每个 count>0 的 (b,n2,j) 成一个 KV 块组。
+// cost = mTiles * nTiles * G，nTiles = CeilDiv(kvBlockLen, baseN)，baseN 为 Cube tile(128)。
 bool GenericBlockSparseAttentionGradMetadataCpuKernel::BuildKvBlockGroups()
 {
-    const int32_t *countPtr = static_cast<const int32_t *>(rsvdBlockCount_->GetData());
+    const int32_t *countPtr = static_cast<const int32_t *>(sparseBlockCount_->GetData());
     kvBlockGroups_.clear();
     totalBlockCost_ = 0U;
     maxTaskCount_ = 0;
 
+    const uint32_t blockY = static_cast<uint32_t>(blockShapeY_ > 0 ? blockShapeY_ : GSAG_DEFAULT_BASE_N);
     // Traverse B → N2 → J; each (b,n2,j) with count>0 is one schedulable KV block.
     for (uint32_t bIdx = 0U; bIdx < batchSize_; ++bIdx) {
-        const uint32_t jLimit = CeilDiv(GetKvSeqLen(bIdx), baseN_);
+        const uint32_t jLimit = CeilDiv(GetKvSeqLen(bIdx), blockY);
         for (uint32_t n2Idx = 0U; n2Idx < n2Size_; ++n2Idx) {
             for (uint32_t jIdx = 0U; jIdx < jSize_; ++jIdx) {
                 if (jIdx >= jLimit) {
@@ -200,7 +208,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::BuildKvBlockGroups()
                     continue;
                 }
                 if (count > static_cast<int32_t>(maxS1_)) {
-                    KERNEL_LOG_ERROR("rsvd_block_count[%u,%u,%u]=%d exceeds maxS1=%u", bIdx, n2Idx, jIdx, count,
+                    KERNEL_LOG_ERROR("sparse_block_count[%u,%u,%u]=%d exceeds maxS1=%u", bIdx, n2Idx, jIdx, count,
                                      maxS1_);
                     return false;
                 }
@@ -358,7 +366,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernel::GenMetadata()
     (void)layoutQ_;
     (void)sequsedQ_;
     (void)cuSeqLengthsQ_;
-    (void)rsvdBlockIdx_;
+    (void)sparseBlockIdx_;
     (void)aivCoreNum_;
     (void)socVersion_;
     return true;

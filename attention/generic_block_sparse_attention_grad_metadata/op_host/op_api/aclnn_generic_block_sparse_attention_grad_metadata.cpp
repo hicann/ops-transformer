@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
-    const aclTensor *rsvdBlockIdx, const aclTensor *rsvdBlockCount, const aclTensor *cuSeqLengthsQOptional,
+    const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
     int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
     const aclIntArray *blockShape, int64_t isPackedGQA, char *layoutQ, char *layoutKv, int64_t maskType,
@@ -49,9 +49,9 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
         return ACLNN_ERR_INNER_NULLPTR;
     }
     L2_DFX_PHASE_1(aclnnGenericBlockSparseAttentionGradMetadata,
-                   DFX_IN(rsvdBlockIdx, rsvdBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional,
-                          sequsedKvOptional, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShape,
-                          isPackedGQA, layoutQ, layoutKv, maskType, softmaxPrecision, winLeft, winRight),
+                   DFX_IN(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional,
+                          sequsedQOptional, sequsedKvOptional, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim,
+                          blockShape, isPackedGQA, layoutQ, layoutKv, maskType, softmaxPrecision, winLeft, winRight),
                    DFX_OUT(metadata));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -74,16 +74,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
         }
     }
 
-    auto ret = ParamsCheck(rsvdBlockIdx, rsvdBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional,
+    auto ret = ParamsCheck(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional,
                            sequsedQOptional, sequsedKvOptional, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim,
                            blockShapeX, blockShapeY, isPackedGQA, layoutQ, layoutKv, maskType, softmaxPrecision,
                            winLeft, winRight, aicCoreNum, aivCoreNum, socVersion, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const aclTensor *rsvdBlockIdxContiguous = l0op::Contiguous(rsvdBlockIdx, uniqueExecutor.get());
-    CHECK_RET(rsvdBlockIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *rsvdBlockCountContiguous = l0op::Contiguous(rsvdBlockCount, uniqueExecutor.get());
-    CHECK_RET(rsvdBlockCountContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    const aclTensor *sparseBlockIdxContiguous = l0op::Contiguous(sparseBlockIdx, uniqueExecutor.get());
+    CHECK_RET(sparseBlockIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    const aclTensor *sparseBlockCountContiguous = l0op::Contiguous(sparseBlockCount, uniqueExecutor.get());
+    CHECK_RET(sparseBlockCountContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     const aclTensor *cuSeqLengthsQOptionalContiguous = nullptr;
     if (cuSeqLengthsQOptional != nullptr) {
@@ -107,7 +107,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     }
 
     auto output = l0op::GenericBlockSparseAttentionGradMetadata(
-        rsvdBlockIdxContiguous, rsvdBlockCountContiguous, cuSeqLengthsQOptionalContiguous,
+        sparseBlockIdxContiguous, sparseBlockCountContiguous, cuSeqLengthsQOptionalContiguous,
         cuSeqLengthsKvOptionalContiguous, sequsedQOptionalContiguous, sequsedKvOptionalContiguous, maxQSeqlen,
         maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGQA, layoutQ, layoutKv, maskType,
         softmaxPrecision, winLeft, winRight, socVersion, aicCoreNum, aivCoreNum, metadata, uniqueExecutor.get());

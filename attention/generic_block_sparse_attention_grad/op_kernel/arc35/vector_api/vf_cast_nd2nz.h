@@ -11,17 +11,17 @@
 #include "kernel_tensor.h"
 namespace AscendC {
 
-using namespace MicroAPI;
-constexpr AscendC::MicroAPI::CastTrait castTraitFp322Fp16Odd = {
-    AscendC::MicroAPI::RegLayout::ONE,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+using namespace Reg;
+constexpr AscendC::Reg::CastTrait castTraitFp322Fp16Odd = {
+    AscendC::Reg::RegLayout::ONE,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
-constexpr AscendC::MicroAPI::CastTrait castTraitFp322Fp16Even = {
-    AscendC::MicroAPI::RegLayout::ZERO,
-    AscendC::MicroAPI::SatMode::SAT,
-    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+constexpr AscendC::Reg::CastTrait castTraitFp322Fp16Even = {
+    AscendC::Reg::RegLayout::ZERO,
+    AscendC::Reg::SatMode::SAT,
+    AscendC::Reg::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT,
 };
 
@@ -48,7 +48,7 @@ __aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTe
 
         // [m,n] -> [n1,m1,16,16] -> [n1,m1*16,16] -> [n1,m1*16+1,16]
         for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
-            DataCopy<float, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_DINTLV_B32>(
+            DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
                 vregSrcEven, vregSrcOdd, ((__ubuf__ float *&)srcLocalInt), fullExeSize);
             Cast<T1, float, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
             Cast<T1, float, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
@@ -56,7 +56,7 @@ __aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTe
             Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
                (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
             // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
-            DataCopy<T1, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
         }
     }
@@ -85,9 +85,9 @@ __aicore__ inline void TransdataND2NZ(const LocalTensor<T> &dstTensor, const Loc
         // with DATA_BLOCK_COPY. Do not deinterleave: that path is only for
         // FP32->FP16 CastND2NZ.
         for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); ++m) {
-            LoadAlign<T, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::LoadDist::DIST_NORM>(
+            LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(
                 vregSrc, ((__ubuf__ T *&)srcLocalInt), srcN);
-            DataCopy<T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
+            DataCopy<T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
                 ((__ubuf__ T *&)dstLocalInt), vregSrc, blockStride, repeatStride, pregFullExe);
         }
     }

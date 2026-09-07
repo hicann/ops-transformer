@@ -215,14 +215,14 @@ public:
 
     /**
      * Entry: wire GM, allocate ping-pong UB/L1, dispatch AIC / AIV pipelines.
-     * IR order matches host: query,key,value,dout,out,lse,rsvd_idx,rsvd_count,metadata,
-     * attenMask?,cuQ?,cuKv?,sequsedQ?,sequsedKv?
+     * IR order matches host: query,key,value,dout,out,lse,sparse_block_idx,sparse_block_count,metadata,
+     * attenMask?,cuSeqLengthsQ?,cuSeqLengthsKv?,sequsedQ?,sequsedKv?
      */
     __aicore__ inline void Process(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dout, GM_ADDR attention_out,
-                                   GM_ADDR softmaxLse, GM_ADDR rsvdBlockIdx, GM_ADDR rsvdBlockCount, GM_ADDR metadata,
-                                   GM_ADDR attenMask, GM_ADDR cuSeqLengthsQ, GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ,
-                                   GM_ADDR sequsedKv, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace,
-                                   const TILING_CLASS *tilingData, TPipe *tPipe)
+                                   GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount,
+                                   GM_ADDR metadata, GM_ADDR attenMask, GM_ADDR cuSeqLengthsQ, GM_ADDR cuSeqLengthsKv,
+                                   GM_ADDR sequsedQ, GM_ADDR sequsedKv, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
+                                   GM_ADDR workspace, const TILING_CLASS *tilingData, TPipe *tPipe)
     {
         uint32_t base_m = tilingData->baseM;
         uint32_t base_n = tilingData->baseN;
@@ -249,13 +249,13 @@ public:
         sftg_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->sftgWorkspaceOffset), sftgElems);
         const int64_t sparseIdxElems =
             static_cast<int64_t>(tilingData->batchNum) * tilingData->kvHeadNum * tilingData->numJ * tilingData->maxS1;
-        sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)rsvdBlockIdx, sparseIdxElems);
+        sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)sparseBlockIdx, sparseIdxElems);
         q_head_num_ = static_cast<int32_t>(tilingData->qHeadNum);
         head_dim_ = static_cast<int32_t>(tilingData->headDim);
         vec_ub_matrix_elements_ = vec_base_m * vec_base_n;
         vec_base_m_ = vec_base_m;
 
-        addr_.Init(tilingData, cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, rsvdBlockIdx, rsvdBlockCount,
+        addr_.Init(tilingData, cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, sparseBlockIdx, sparseBlockCount,
                    metadata);
         tPipe->InitBuffer(ub_buffer_, UB_SIZE);
         tPipe->InitBuffer(l1_buffer_, L1_SIZE);
@@ -309,12 +309,13 @@ public:
         (void)attenMask;
 
         if ASCEND_IS_AIC {
-            CubeProcess(query, key, value, dout, attention_out, softmaxLse, rsvdBlockIdx, rsvdBlockCount, metadata,
+            CubeProcess(query, key, value, dout, attention_out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata,
                         cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, workspace, tilingData, tPipe);
         }
         if ASCEND_IS_AIV {
-            VectorProcess(query, key, value, dout, attention_out, softmaxLse, rsvdBlockIdx, rsvdBlockCount, metadata,
-                          cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, workspace, tilingData, tPipe);
+            VectorProcess(query, key, value, dout, attention_out, softmaxLse, sparseBlockIdx, sparseBlockCount,
+                          metadata, cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, workspace,
+                          tilingData, tPipe);
         }
     }
 
@@ -425,14 +426,14 @@ public:
     }
 
     __aicore__ inline void CubeProcess(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dout, GM_ADDR attention_out,
-                                       GM_ADDR softmaxLse, GM_ADDR rsvdBlockIdx, GM_ADDR rsvdBlockCount,
+                                       GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount,
                                        GM_ADDR metadata, GM_ADDR cuSeqLengthsQ, GM_ADDR cuSeqLengthsKv,
                                        GM_ADDR sequsedQ, GM_ADDR sequsedKv, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
                                        GM_ADDR workspace, const TILING_CLASS *tilingData, TPipe *tPipe)
     {
         CubeOp<GSAG_TYPE> cubeOp;
         cubeOp.Init(tilingData, tPipe, l1_buffer_, l1_offset_, query_l1_tensor_ping_, query_l1_tensor_pong_,
-                    dout_l1_tensor_ping_, dout_l1_tensor_pong_, rsvdBlockIdx, workspace);
+                    dout_l1_tensor_ping_, dout_l1_tensor_pong_, sparseBlockIdx, workspace);
         // Boot: no Wait FLAG_CUBE_POST — Cube's first barrier is Wait gather (armed while Vec runs Pre).
         (void)query;
         (void)key;
@@ -440,7 +441,7 @@ public:
         (void)dout;
         (void)attention_out;
         (void)softmaxLse;
-        (void)rsvdBlockCount;
+        (void)sparseBlockCount;
         (void)metadata;
         (void)cuSeqLengthsQ;
         (void)cuSeqLengthsKv;
@@ -479,13 +480,13 @@ public:
     }
 
     __aicore__ inline void VectorProcess(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dout, GM_ADDR attention_out,
-                                         GM_ADDR softmaxLse, GM_ADDR rsvdBlockIdx, GM_ADDR rsvdBlockCount,
+                                         GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount,
                                          GM_ADDR metadata, GM_ADDR cuSeqLengthsQ, GM_ADDR cuSeqLengthsKv,
                                          GM_ADDR sequsedQ, GM_ADDR sequsedKv, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
                                          GM_ADDR workspace, const TILING_CLASS *tilingData, TPipe *tPipe)
     {
         VecOp<GSAG_TYPE> vecOp;
-        vecOp.Init(dout, query, key, value, attention_out, softmaxLse, rsvdBlockIdx, rsvdBlockCount, metadata,
+        vecOp.Init(dout, query, key, value, attention_out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata,
                    cuSeqLengthsQ, cuSeqLengthsKv, dq, dk, dv, workspace, tilingData, ub_buffer_, ub_offset_);
 
         (void)tPipe;

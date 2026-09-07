@@ -69,7 +69,7 @@ struct ConstInfo {
 };
 
 /**
- * Per-task runtime info. Cube/Vec reuse s1Len/s2Len as m/n (count / kvBlockLen).
+ * Per-task runtime info. Cube/Vec reuse s1Len/s2Len as m/n (S1 count tile / S2 compute tile <=baseN).
  * Sparse Gather uses sparseIdxOffset + count; KV share via need_copy_kv.
  */
 struct RunTimeInfo {

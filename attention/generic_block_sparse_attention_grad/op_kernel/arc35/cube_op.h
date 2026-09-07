@@ -70,7 +70,7 @@ public:
                                 const LocalTensor<INPUT_TYPE> &query_l1_tensor_pong,
                                 const LocalTensor<INPUT_TYPE> &dy_l1_tensor_ping,
                                 const LocalTensor<INPUT_TYPE> &dy_l1_tensor_pong,
-                                __gm__ uint8_t *rsvdBlockIdx = nullptr, __gm__ uint8_t *workspace = nullptr)
+                                __gm__ uint8_t *sparseBlockIdx = nullptr, __gm__ uint8_t *workspace = nullptr)
     {
         this->batch_num_ = tilingData->batchNum;
         this->q_seq_len_ = tilingData->qSeqLen;
@@ -125,10 +125,10 @@ public:
         SET_FLAG(FIX, M, event_ping_);
         SET_FLAG(FIX, M, event_pong_);
         q_token_stride_ = q_stride_;
-        if (rsvdBlockIdx != nullptr) {
+        if (sparseBlockIdx != nullptr) {
             const int64_t sparseIdxElems = static_cast<int64_t>(tilingData->batchNum) * tilingData->kvHeadNum *
                                            tilingData->numJ * tilingData->maxS1;
-            sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)rsvdBlockIdx, sparseIdxElems);
+            sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)sparseBlockIdx, sparseIdxElems);
         }
         if (workspace != nullptr) {
             const int64_t selElems = static_cast<int64_t>(base_m_) * head_dim_align_;

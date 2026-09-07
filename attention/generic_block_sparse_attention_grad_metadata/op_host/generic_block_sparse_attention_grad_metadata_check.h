@@ -39,9 +39,9 @@ static constexpr int64_t GSAG_SUPPORTED_HEAD_DIM = 128;
 static constexpr int64_t GSAG_BLOCK_SHAPE_Y_MIN = 128;
 static constexpr int64_t GSAG_BLOCK_SHAPE_Y_ALIGN = 64;
 static constexpr int64_t GSAG_SUPPORTED_MASK_TYPE = 1;
-// rsvd_block_idx: [B, N2, J, maxS1]; rsvd_block_count: [B, N2, J]
-static constexpr size_t RSVD_BLOCK_IDX_DIM_NUM = 4;
-static constexpr size_t RSVD_BLOCK_COUNT_DIM_NUM = 3;
+// sparse_block_idx: [B, N2, J, maxS1]; sparse_block_count: [B, N2, J]
+static constexpr size_t SPARSE_BLOCK_IDX_DIM_NUM = 4;
+static constexpr size_t SPARSE_BLOCK_COUNT_DIM_NUM = 3;
 static constexpr size_t DIM_B = 0;
 static constexpr size_t DIM_N2 = 1;
 static constexpr size_t DIM_J = 2;
@@ -119,9 +119,9 @@ aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t nu
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (winLeft != -1 || winRight != -1) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GSAG_ACLNN_OP_NAME, "window_size_left/right",
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GSAG_ACLNN_OP_NAME, "win_left/right",
                                               std::to_string(winLeft) + ", " + std::to_string(winRight),
-                                              "window_size_left and window_size_right must be -1 in current version");
+                                              "win_left and win_right must be -1 in current version");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (aicCoreNum == 0 || aivCoreNum == 0) {
@@ -133,24 +133,24 @@ aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t nu
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistence(const aclTensor *rsvdBlockIdx, const aclTensor *rsvdBlockCount,
+aclnnStatus CheckExistence(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
                            const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional,
                            const char *layoutQ, const char *layoutKv, const aclTensor *metadata)
 {
-    if (!IsTensorExist(rsvdBlockIdx)) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "rsvd_block_idx",
-                                                 "rsvd_block_idx cannot be empty");
+    if (!IsTensorExist(sparseBlockIdx)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx",
+                                                 "sparse_block_idx cannot be empty");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (!IsTensorExist(rsvdBlockCount)) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "rsvd_block_count",
-                                                 "rsvd_block_count cannot be empty");
+    if (!IsTensorExist(sparseBlockCount)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_count",
+                                                 "sparse_block_count cannot be empty");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (strcmp(layoutQ, "TND") == 0) {
         if (!IsTensorExist(cuSeqLengthsQOptional)) {
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "cu_seq_lengths",
-                                                     "cu_seq_lengths is required when layout_q is TND");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "cu_seq_lengths_q",
+                                                     "cu_seq_lengths_q is required when layout_q is TND");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (!IsTensorExist(cuSeqLengthsKvOptional)) {
@@ -166,24 +166,24 @@ aclnnStatus CheckExistence(const aclTensor *rsvdBlockIdx, const aclTensor *rsvdB
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckConsistency(const aclTensor *rsvdBlockIdx, const aclTensor *rsvdBlockCount, int64_t maxQSeqlen,
+aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, int64_t maxQSeqlen,
                              int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t blockShapeY,
                              int64_t isPackedGQA, const aclTensor *metadata)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
-    if (rsvdBlockIdx->GetViewShape().GetDimNum() != RSVD_BLOCK_IDX_DIM_NUM) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM(GSAG_ACLNN_OP_NAME, "rsvd_block_idx",
-                                     std::to_string(rsvdBlockIdx->GetViewShape().GetDimNum()), "4");
+    if (sparseBlockIdx->GetViewShape().GetDimNum() != SPARSE_BLOCK_IDX_DIM_NUM) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM(GSAG_ACLNN_OP_NAME, "sparse_block_idx",
+                                     std::to_string(sparseBlockIdx->GetViewShape().GetDimNum()), "4");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (rsvdBlockCount->GetViewShape().GetDimNum() != RSVD_BLOCK_COUNT_DIM_NUM) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM(GSAG_ACLNN_OP_NAME, "rsvd_block_count",
-                                     std::to_string(rsvdBlockCount->GetViewShape().GetDimNum()), "3");
+    if (sparseBlockCount->GetViewShape().GetDimNum() != SPARSE_BLOCK_COUNT_DIM_NUM) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM(GSAG_ACLNN_OP_NAME, "sparse_block_count",
+                                     std::to_string(sparseBlockCount->GetViewShape().GetDimNum()), "3");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    const auto &idxShape = rsvdBlockIdx->GetViewShape();
-    const auto &cntShape = rsvdBlockCount->GetViewShape();
+    const auto &idxShape = sparseBlockIdx->GetViewShape();
+    const auto &cntShape = sparseBlockCount->GetViewShape();
     int64_t batchSize = idxShape.GetDim(DIM_B);
     int64_t n2 = idxShape.GetDim(DIM_N2);
     int64_t j = idxShape.GetDim(DIM_J);
@@ -191,26 +191,26 @@ aclnnStatus CheckConsistency(const aclTensor *rsvdBlockIdx, const aclTensor *rsv
 
     if (cntShape.GetDim(DIM_B) != batchSize || cntShape.GetDim(DIM_N2) != n2 || cntShape.GetDim(DIM_J) != j) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            GSAG_ACLNN_OP_NAME, "rsvd_block_count",
+            GSAG_ACLNN_OP_NAME, "sparse_block_count",
             std::to_string(cntShape.GetDim(DIM_B)) + ", " + std::to_string(cntShape.GetDim(DIM_N2)) + ", " +
                 std::to_string(cntShape.GetDim(DIM_J)),
-            "rsvd_block_count shape must be [B, N2, J] and consistent with rsvd_block_idx");
+            "sparse_block_count shape must be [B, N2, J] and consistent with sparse_block_idx");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (n2 != numKvHeads) {
-        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "rsvd_block_idx N2", std::to_string(n2),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx N2", std::to_string(n2),
                                                   "N2 must equal num_kv_heads");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (maxS1 < maxQSeqlen) {
-        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "rsvd_block_idx maxS1", std::to_string(maxS1),
-                                                  "last dim of rsvd_block_idx must be >= max_q_seqlen");
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx maxS1", std::to_string(maxS1),
+                                                  "last dim of sparse_block_idx must be >= max_q_seqlen");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     int64_t expectedJ = (maxKvSeqlen + blockShapeY - 1) / blockShapeY;
     if (j != expectedJ) {
-        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "rsvd_block_idx J", std::to_string(j),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx J", std::to_string(j),
                                                   "J must equal ceilDiv(max_kv_seqlen, block_shape[1])");
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -228,16 +228,16 @@ aclnnStatus CheckConsistency(const aclTensor *rsvdBlockIdx, const aclTensor *rsv
     const int64_t requiredMetadataSize = static_cast<int64_t>(optiling::CalcGsagMetadataSize(
         static_cast<uint64_t>(batchSize), static_cast<uint64_t>(numQHeads), static_cast<uint64_t>(j)));
 
-    aclGetDataType(rsvdBlockIdx, &dataType);
+    aclGetDataType(sparseBlockIdx, &dataType);
     if (dataType != aclDataType::ACL_INT32) {
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GSAG_ACLNN_OP_NAME, "rsvd_block_idx", ToString(dataType).GetString(),
-                                              "dtype of rsvd_block_idx must be int32");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx", ToString(dataType).GetString(),
+                                              "dtype of sparse_block_idx must be int32");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    aclGetDataType(rsvdBlockCount, &dataType);
+    aclGetDataType(sparseBlockCount, &dataType);
     if (dataType != aclDataType::ACL_INT32) {
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GSAG_ACLNN_OP_NAME, "rsvd_block_count", ToString(dataType).GetString(),
-                                              "dtype of rsvd_block_count must be int32");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_count", ToString(dataType).GetString(),
+                                              "dtype of sparse_block_count must be int32");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -259,7 +259,7 @@ aclnnStatus CheckConsistency(const aclTensor *rsvdBlockIdx, const aclTensor *rsv
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParamsCheck(const aclTensor *rsvdBlockIdx, const aclTensor *rsvdBlockCount,
+static aclnnStatus ParamsCheck(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
                                const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional,
                                const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
                                int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads,
@@ -277,11 +277,11 @@ static aclnnStatus ParamsCheck(const aclTensor *rsvdBlockIdx, const aclTensor *r
                          layoutQ, layoutKv, maskType, winLeft, winRight, aicCoreNum, aivCoreNum) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (CheckExistence(rsvdBlockIdx, rsvdBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, layoutQ, layoutKv,
-                       metadata) != ACLNN_SUCCESS) {
+    if (CheckExistence(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, layoutQ,
+                       layoutKv, metadata) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (CheckConsistency(rsvdBlockIdx, rsvdBlockCount, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, blockShapeY,
+    if (CheckConsistency(sparseBlockIdx, sparseBlockCount, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, blockShapeY,
                          isPackedGQA, metadata) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }

@@ -51,7 +51,7 @@ private:
     uint32_t vec_base_m;
     uint32_t vec_base_n;
     GM_ADDR act_seq_q_len;
-    GM_ADDR rsvd_block_idx_;
+    GM_ADDR sparse_block_idx_;
     GlobalTensor<float> lse_gm_;
     GlobalTensor<float> sftg_workspace_;
     GlobalTensor<float> dq_workspace_;
@@ -113,7 +113,7 @@ public:
     __aicore__ inline VecOp(){};
 
     __aicore__ inline void Init(GM_ADDR dout, GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR attention_out,
-                                GM_ADDR softmaxLse, GM_ADDR rsvdBlockIdx, GM_ADDR rsvdBlockCount, GM_ADDR metadata,
+                                GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount, GM_ADDR metadata,
                                 GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
                                 GM_ADDR workspace, const TILING_CLASS *tilingData, TBuf<TPosition::VECCALC> &ub_buffer,
                                 uint32_t ub_offset)
@@ -133,7 +133,7 @@ public:
         this->vec_base_m = tilingData->baseM / 2; // 2 is the vec_base_m
         this->vec_base_n = tilingData->baseN;
         this->act_seq_q_len = actualQseqlen;
-        this->rsvd_block_idx_ = rsvdBlockIdx;
+        this->sparse_block_idx_ = sparseBlockIdx;
         v_core_idx_ = GetBlockIdx();
         v_sub_core_idx_ = GetSubBlockIdx();
         q_stride_lse_ = (INPUT_LAYOUT == TND) ? q_head_num_ : 1;
@@ -158,8 +158,8 @@ public:
         dq_sel_workspace_.SetGlobalBuffer(
             (__gm__ float *)(workspace + dq_sel_workspace_offset_) + cubeBlk * 2 * dq_sel_core_elems_,
             2 * dq_sel_core_elems_);
-        sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)rsvdBlockIdx, sparseIdxElems);
-        (void)rsvdBlockCount;
+        sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)sparseBlockIdx, sparseIdxElems);
+        (void)sparseBlockCount;
         (void)metadata;
         (void)dout;
         (void)q;
@@ -375,7 +375,7 @@ public:
     }
 
     /**
-     * RIGHT_DOWN_CAUSAL: origin at bottom-right; valid when k <= q + (S2 - S1).
+     * CAUSAL: origin at bottom-right; valid when k <= q + (S2 - S1).
      * Invalid columns form a contiguous tail per row — Duplicate(NEG_INF) on
      * 32B-aligned spans; unaligned head of the tail uses SetValue.
      */

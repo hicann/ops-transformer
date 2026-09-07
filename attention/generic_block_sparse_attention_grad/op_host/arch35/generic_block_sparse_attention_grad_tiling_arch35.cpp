@@ -62,13 +62,9 @@ protected:
             OP_LOGE(context_->GetNodeName(), "block_shape[1] must be >= 128 and 64-aligned.");
             return false;
         }
-        // Cube tile baseN shares UB/L1 with baseM; current layout budgets baseN<=128.
-        if (blockShapeY_ > BASE_M) {
-            OP_LOGE(context_->GetNodeName(), "block_shape[1]=%ld exceeds supported cube baseN=%ld (UB/L1 budget).",
-                    blockShapeY_, BASE_M);
-            return false;
-        }
-        if (isPackedGqa_ != 1) {
+        // BlockY is sparse-block width only. Cube/Softmax tile is fixed baseN=128;
+        // kernel splits each J block into S2 tiles of size <= baseN.
+        if (isPackedGQA_ != 1) {
             OP_LOGE(context_->GetNodeName(), "only support is_packed_gqa == 1.");
             return false;
         }
@@ -89,8 +85,8 @@ protected:
 
     ge::graphStatus GetShapeAttrsInfo() override
     {
-        // Inputs: query=0, key=1, value=2, ..., rsvd_block_idx=6, rsvd_block_count=7, metadata=8
-        // Optional: atten_mask=9, cu_seq_lengths=10, cu_seq_lengths_kv=11, seqused_q=12, seqused_kv=13.
+        // Inputs: query=0, key=1, value=2, ..., sparse_block_idx=6, sparse_block_count=7, metadata=8
+        // Optional: atten_mask=9, cu_seq_lengths_q=10, cu_seq_lengths_kv=11, seqused_q=12, seqused_kv=13.
         auto qInputDesc = context_->GetInputDesc(0);
         const gert::StorageShape *queryShape = context_->GetInputShape(0);
         const gert::StorageShape *keyShape = context_->GetInputShape(1);
@@ -108,19 +104,19 @@ protected:
 
         dataType_ = qInputDesc->GetDataType();
 
-        // Attrs: block_shape, is_packed_gqa, q_input_layout, kv_input_layout, scale_value,
-        //        mask_type, softmax_precision, window_size_left, window_size_right
+        // Attrs: block_shape, is_packed_gqa, layout_q, layout_kv, scale_value,
+        //        mask_type, softmax_precision, win_left, win_right
         const auto *blockShapeList = attrs->GetListInt(0);
-        isPackedGqa_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(1));
+        isPackedGQA_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(1));
         qLayout_ = attrs->GetAttrPointer<char>(2);
         kvLayout_ = attrs->GetAttrPointer<char>(3);
         softmaxScale_ = *attrs->GetAttrPointer<float>(4);
         maskType_ = static_cast<uint32_t>(*attrs->GetAttrPointer<int64_t>(5));
-        windowSizeLeft_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(7));
-        windowSizeRight_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(8));
+        winLeft_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(7));
+        winRight_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(8));
 
         if (qLayout_ == nullptr || kvLayout_ == nullptr || strcmp(qLayout_, kvLayout_) != 0) {
-            OP_LOGE(context_->GetNodeName(), "q_input_layout must equal kv_input_layout.");
+            OP_LOGE(context_->GetNodeName(), "layout_q must equal layout_kv.");
             return ge::GRAPH_FAILED;
         }
 
@@ -134,7 +130,7 @@ protected:
         }
 
         if (idxShape->GetOriginShape().GetDimNum() != 4 || cntShape->GetOriginShape().GetDimNum() != 3) {
-            OP_LOGE(context_->GetNodeName(), "rsvd_block_idx must be 4D and rsvd_block_count must be 3D.");
+            OP_LOGE(context_->GetNodeName(), "sparse_block_idx must be 4D and sparse_block_count must be 3D.");
             return ge::GRAPH_FAILED;
         }
         batchNum_ = idxShape->GetStorageShape().GetDim(0);
@@ -150,7 +146,7 @@ protected:
             auto cuQ = context_->GetOptionalInputTensor(10);
             auto cuKv = context_->GetOptionalInputTensor(11);
             if (cuQ == nullptr || cuKv == nullptr) {
-                OP_LOGE(context_->GetNodeName(), "TND requires cu_seq_lengths and cu_seq_lengths_kv.");
+                OP_LOGE(context_->GetNodeName(), "TND requires cu_seq_lengths_q and cu_seq_lengths_kv.");
                 return ge::GRAPH_FAILED;
             }
             // seqused_q/kv (inputs 12/13) are dynamic device values. They are
@@ -160,7 +156,7 @@ protected:
             headDim_ = queryShape->GetStorageShape().GetDim(2);
             kvSeqLen_ = keyShape->GetStorageShape().GetDim(0);
             if (static_cast<int64_t>(keyShape->GetStorageShape().GetDim(1)) != kvHeadNum_) {
-                OP_LOGE(context_->GetNodeName(), "key N2 mismatch with rsvd_block_idx.");
+                OP_LOGE(context_->GetNodeName(), "key N2 mismatch with sparse_block_idx.");
                 return ge::GRAPH_FAILED;
             }
         } else if (strcmp(qLayout_, BSND_STR) == 0) {
@@ -199,9 +195,9 @@ protected:
         tilingData_.set_maxS1(maxS1_);
         tilingData_.set_numJ(numJ_);
         tilingData_.set_maskType(maskType_);
-        tilingData_.set_isPackedGqa(static_cast<uint32_t>(isPackedGqa_));
-        tilingData_.set_windowSizeLeft(windowSizeLeft_);
-        tilingData_.set_windowSizeRight(windowSizeRight_);
+        tilingData_.set_isPackedGQA(static_cast<uint32_t>(isPackedGQA_));
+        tilingData_.set_winLeft(winLeft_);
+        tilingData_.set_winRight(winRight_);
         return ge::GRAPH_SUCCESS;
     }
 
@@ -214,8 +210,9 @@ protected:
     {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
         auto cubeCoreNum = ascendcPlatform.GetCoreNumAic();
+        // Decouple sparse BlockY from Cube tile: UB/L1 always budgets baseM x baseN.
         uint32_t baseM = BASE_M;
-        uint32_t baseN = static_cast<uint32_t>(blockShapeY_);
+        uint32_t baseN = BASE_M; // 128; addr_compute S2-tiles each J block
 
         tilingData_.set_BlockX(static_cast<uint32_t>(blockShapeX_));
         tilingData_.set_BlockY(static_cast<uint32_t>(blockShapeY_));
@@ -320,11 +317,11 @@ private:
     int64_t numJ_{0};
     int32_t blockShapeX_{1};
     int32_t blockShapeY_{128};
-    int32_t isPackedGqa_{1};
+    int32_t isPackedGQA_{1};
     uint32_t maskType_{0};
     float softmaxScale_{1.0f};
-    int32_t windowSizeLeft_{-1};
-    int32_t windowSizeRight_{-1};
+    int32_t winLeft_{-1};
+    int32_t winRight_{-1};
 };
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(GenericBlockSparseAttentionGrad, GenericBlockSparseAttentionGradArch35Tiling,

@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-+ 算子功能：GenericBlockSparseAttentionGrad是通用块稀疏注意力的反向计算算子。依据`rsvdBlockIdx`/`rsvdBlockCount`（稀疏块索引表）定义的索引，仅在被选中的KV块上计算和传播梯度，支持动态、可变长的分块稀疏模式。调用前须先通过`aclnnGenericBlockSparseAttentionGradMetadata`生成分核`metadata`。
++ 算子功能：GenericBlockSparseAttentionGrad是通用块稀疏注意力的反向计算算子。依据`sparseBlockIdx`/`sparseBlockCount`（稀疏块索引表）定义的索引，仅在被选中的KV块上计算和传播梯度，支持动态、可变长的分块稀疏模式。调用前须先通过`aclnnGenericBlockSparseAttentionGradMetadata`生成分核`metadata`。
 + 计算公式：
 
 $$
@@ -94,14 +94,14 @@ $$
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
-    <td class="tg-0pky">rsvdBlockIdx</td>
+    <td class="tg-0pky">sparseBlockIdx</td>
     <td class="tg-0pky">输入</td>
     <td class="tg-0pky">稀疏块索引数组，指定每个KV块选择的Q块/token索引。</td>
     <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
-    <td class="tg-0pky">rsvdBlockCount</td>
+    <td class="tg-0pky">sparseBlockCount</td>
     <td class="tg-0pky">输入</td>
     <td class="tg-0pky">指定每个KV块实际选择的Q数量。</td>
     <td class="tg-0pky">INT32</td>
@@ -122,58 +122,58 @@ $$
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
-    <td class="tg-0pky">cuSeqLengthsOptional</td>
+    <td class="tg-0pky">cuSeqLengthsQOptional</td>
     <td class="tg-0pky">可选输入</td>
-    <td class="tg-0pky">TND layout下query的累积序列长度。</td>
+    <td class="tg-0pky">TND layout下query的序列前缀和，layout为TND时必传。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
     <td class="tg-0pky">cuSeqLengthsKvOptional</td>
     <td class="tg-0pky">可选输入</td>
-    <td class="tg-0pky">TND layout下key/value的累积序列长度。</td>
+    <td class="tg-0pky">TND layout下key/value的序列前缀和，layout为TND时必传。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
     <td class="tg-0pky">sequsedQOptional</td>
     <td class="tg-0pky">可选输入</td>
-    <td class="tg-0pky">各batch中query的实际序列长度。</td>
+    <td class="tg-0pky">各batch中query的实际序列长度。仅layout为TND时生效；BNSD/BSND须传nullptr，实际长度取自query的S维。</td>
     <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
     <td class="tg-0pky">sequsedKvOptional</td>
     <td class="tg-0pky">可选输入</td>
-    <td class="tg-0pky">各batch中kv的实际序列长度。</td>
+    <td class="tg-0pky">各batch中kv的实际序列长度。仅layout为TND时生效；BNSD/BSND须传nullptr，实际长度取自key/value的S维。</td>
     <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
     <td class="tg-0pky">blockShape</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">稀疏块形状[blockShapeX, blockShapeY]，当前支持[1, 128]。</td>
+    <td class="tg-0pky">稀疏块形状[blockShapeX, blockShapeY]；X仅支持1，Y须≥128且为64倍数。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
-    <td class="tg-0pky">isPackedGqa</td>
+    <td class="tg-0pky">isPackedGQA</td>
     <td class="tg-0pky">属性</td>
     <td class="tg-0pky">同一group内qHead是否共享稀疏pattern，当前仅支持1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
-    <td class="tg-0pky">qInputLayout</td>
+    <td class="tg-0pky">layoutQ</td>
     <td class="tg-0pky">属性</td>
     <td class="tg-0pky">query侧layout格式，支持TND/BNSD/BSND。</td>
     <td class="tg-0pky">STRING</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
-    <td class="tg-0pky">kvInputLayout</td>
+    <td class="tg-0pky">layoutKv</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">key/value侧layout格式，须与qInputLayout一致。</td>
+    <td class="tg-0pky">key/value侧layout格式，须与layoutQ一致。</td>
     <td class="tg-0pky">STRING</td>
     <td class="tg-0pky">-</td>
   </tr>
@@ -187,7 +187,7 @@ $$
   <tr>
     <td class="tg-0pky">maskType</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">mask模式，当前仅支持1（RIGHT_DOWN_CAUSAL）。</td>
+    <td class="tg-0pky">mask模式，当前仅支持1（CAUSAL）。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
@@ -199,14 +199,14 @@ $$
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
-    <td class="tg-0pky">windowSizeLeft</td>
+    <td class="tg-0pky">winLeft</td>
     <td class="tg-0pky">属性</td>
     <td class="tg-0pky">滑窗向前包含token数，不使能时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
-    <td class="tg-0pky">windowSizeRight</td>
+    <td class="tg-0pky">winRight</td>
     <td class="tg-0pky">属性</td>
     <td class="tg-0pky">滑窗向后包含token数，不使能时须为-1。</td>
     <td class="tg-0pky">INT64</td>
@@ -239,10 +239,14 @@ $$
 
 * <term>Ascend 950PR/Ascend 950DT</term>：支持FLOAT16、BFLOAT16的query/key/value/dout/out/dQuery/dKey/dValue，且数据类型保持一致；lse为FLOAT32。
 * 须先调用GenericBlockSparseAttentionGradMetadata生成metadata，再调用本算子。
-* qInputLayout与kvInputLayout须相同，取值TND/BNSD/BSND；TND布局下须传入对应cuSeqLengths。
+* layoutQ与layoutKv须相同，取值TND/BNSD/BSND；TND布局下须传入对应cuSeqLengths。
+* sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自Q/K的S维。
 * HeadDim固定为128；N1/N2取值范围[1, 128]，且N1 % N2 == 0。
-* blockShape当前仅支持[1, 128]；isPackedGqa当前仅支持1；maskType当前仅支持1。
-* windowSizeLeft/windowSizeRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
+* blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数（Cube按baseN=128切分S2）；
+* isPackedGQA当前仅支持1；
+* maskType当前仅支持1。
+* softmaxPrecision当前仅支持0；
+* winLeft/winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
 * 默认为非确定性实现，暂不支持确定性实现。
 
 ## 调用说明

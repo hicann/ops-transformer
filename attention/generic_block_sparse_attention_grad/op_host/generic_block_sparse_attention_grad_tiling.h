@@ -44,9 +44,9 @@ TILING_DATA_FIELD_DEF(uint32_t, sftgTmpSpaceSize);
 TILING_DATA_FIELD_DEF(uint32_t, BlockX);
 TILING_DATA_FIELD_DEF(uint32_t, BlockY);
 TILING_DATA_FIELD_DEF(uint32_t, maskType);
-TILING_DATA_FIELD_DEF(uint32_t, isPackedGqa);
-TILING_DATA_FIELD_DEF(int32_t, windowSizeLeft);
-TILING_DATA_FIELD_DEF(int32_t, windowSizeRight);
+TILING_DATA_FIELD_DEF(uint32_t, isPackedGQA);
+TILING_DATA_FIELD_DEF(int32_t, winLeft);
+TILING_DATA_FIELD_DEF(int32_t, winRight);
 TILING_DATA_FIELD_DEF_STRUCT(SoftMaxTiling, softmaxGradFrontTilingData);
 END_TILING_DATA_DEF;
 

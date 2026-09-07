@@ -113,7 +113,7 @@ int main()
     const int64_t blockY = 128;
     const int64_t J = (S2 + blockY - 1) / blockY;
     const int64_t maskType = 1;
-    const int64_t isPackedGqa = 1;
+    const int64_t isPackedGQA = 1;
     const int64_t softmaxPrecision = 0;
     const int64_t windowLeft = -1;
     const int64_t windowRight = -1;
@@ -156,7 +156,7 @@ int main()
     aclOpExecutor *executor = nullptr;
     LOG_PRINT("Calling aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize...\n");
     ret = aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
-        idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, isPackedGqa, layout, layout,
+        idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, isPackedGQA, layout, layout,
         maskType, softmaxPrecision, windowLeft, windowRight, metadata, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS,
               LOG_PRINT("aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);

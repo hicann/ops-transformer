@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-+ 算子功能：GenericBlockSparseAttentionGradMetadata根据KV2Q稀疏块索引表`rsvdBlockIdx`/`rsvdBlockCount`，按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做负载均衡，供后续GenericBlockSparseAttentionGrad算子消费。
++ 算子功能：GenericBlockSparseAttentionGradMetadata根据KV2Q稀疏块索引表`sparseBlockIdx`/`sparseBlockCount`，按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做负载均衡，供后续GenericBlockSparseAttentionGrad算子消费。
 + 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用。
 
 $$
@@ -34,14 +34,14 @@ $$
   </tr></thead>
 <tbody>
   <tr>
-    <td class="tg-0pky">rsvdBlockIdx</td>
+    <td class="tg-0pky">sparseBlockIdx</td>
     <td class="tg-0pky">输入</td>
     <td class="tg-0pky">稀疏块索引数组，指定每个KV块选择的Q块/token索引。</td>
     <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
-    <td class="tg-0pky">rsvdBlockCount</td>
+    <td class="tg-0pky">sparseBlockCount</td>
     <td class="tg-0pky">输入</td>
     <td class="tg-0pky">指定每个KV块实际选择的Q数量。</td>
     <td class="tg-0pky">INT32</td>
@@ -64,14 +64,14 @@ $$
   <tr>
     <td class="tg-0pky">sequsedQOptional</td>
     <td class="tg-0pky">可选输入</td>
-    <td class="tg-0pky">各batch中query的实际序列长度。</td>
+    <td class="tg-0pky">各batch中query的实际序列长度。仅layout为TND时生效；BNSD/BSND须传nullptr，实际长度与maxQSeqlen/query的S维一致。</td>
     <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
     <td class="tg-0pky">sequsedKvOptional</td>
     <td class="tg-0pky">可选输入</td>
-    <td class="tg-0pky">各batch中kv的实际序列长度。</td>
+    <td class="tg-0pky">各batch中kv的实际序列长度。仅layout为TND时生效；BNSD/BSND须传nullptr，实际长度取自maxKvSeqlen（须与key/value的S维一致）。</td>
     <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
@@ -141,7 +141,7 @@ $$
   <tr>
     <td class="tg-0pky">maskType</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">mask模式，当前仅支持1（RIGHT_DOWN_CAUSAL）。</td>
+    <td class="tg-0pky">mask模式，当前仅支持1（CAUSAL）。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
@@ -180,6 +180,7 @@ $$
 * <term>Ascend 950PR/Ascend 950DT</term>：支持本算子。
 * 须与aclnnGenericBlockSparseAttentionGrad配合使用；主算子调用前必须先成功执行本算子。
 * layoutQ与layoutKv须相同，取值TND/BNSD/BSND；TND布局下cuSeqLengthsQOptional/cuSeqLengthsKvOptional必选。
+* sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
 * HeadDim固定为128；numQHeads/numKvHeads取值范围[1, 128]，且numQHeads % numKvHeads == 0。
 * blockShape当前仅支持[1, 128]；isPackedGQA当前仅支持1；maskType当前仅支持1。
 * winLeft/winRight不使能时必须为-1。
