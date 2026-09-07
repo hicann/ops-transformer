@@ -16,6 +16,10 @@
 
 namespace EngramFetchGradUnique {
 
+constexpr uint32_t RECV_INDEX_UB_OFFSET = 2U;
+constexpr uint32_t COMPACT_INDEX_UB_OFFSET = 3U;
+constexpr uint32_t DIRECT_FLAG_UB_OFFSET = 4U;
+
 template <AscendC::HardEvent event>
 __aicore__ inline void SyncFunc(AscendC::TPipe &pipe)
 {
@@ -79,15 +83,15 @@ public:
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> RecvIdxUb()
     {
-        return entryBuf_->Get<int32_t>()[2 * Mc2Kernel::ENTRY_BATCH_CAP];
+        return entryBuf_->Get<int32_t>()[RECV_INDEX_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> CompactIdxUb()
     {
-        return entryBuf_->Get<int32_t>()[3 * Mc2Kernel::ENTRY_BATCH_CAP];
+        return entryBuf_->Get<int32_t>()[COMPACT_INDEX_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> DirectFlagUb()
     {
-        return entryBuf_->Get<int32_t>()[4 * Mc2Kernel::ENTRY_BATCH_CAP];
+        return entryBuf_->Get<int32_t>()[DIRECT_FLAG_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
     }
 
 private:

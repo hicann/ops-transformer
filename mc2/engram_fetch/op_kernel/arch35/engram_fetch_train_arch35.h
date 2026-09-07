@@ -62,6 +62,7 @@ constexpr int RECV_INDICES_FROM_PEER_TIME_CHECK = 3;
 constexpr int RECV_TOKEN_CHUNK_TIME_CHECK = 4;
 constexpr int WAIT_INDICES_READY_FLAG_TIME_CHECK = 5;
 constexpr int LOCAL_READ_TABLE_SEND_REMOTE_TIME_CHECK = 6;
+constexpr int RETIRE_CREDIT_COUNTER_TIME_CHECK = 7;
 constexpr AscendC::UrmaWqeEntry URMA_NO_CQE_CFG = {
     .odr = 5,
     .fence = 1,
@@ -846,7 +847,7 @@ __aicore__ inline void EngramFetchTrainArch35::RetireCreditCounter()
         return;
     }
     uint64_t startTime = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_CYCLES_PER_US;
-    (void)CompleteCreditCounter(startTime, 7);
+    (void)CompleteCreditCounter(startTime, RETIRE_CREDIT_COUNTER_TIME_CHECK);
 }
 
 __aicore__ inline void EngramFetchTrainArch35::LoadSendCountsToUb()
@@ -952,8 +953,8 @@ __aicore__ inline void EngramFetchTrainArch35::SendIndicesRemote(uint32_t dstRan
             while (localWriteCnt >= static_cast<uint32_t>(remoteReadCnt) &&
                    localWriteCnt - static_cast<uint32_t>(remoteReadCnt) >= NUM_SLOTS) {
                 PrefetchCreditCounter(dstRank, indicesReadOffset_, 0U, false);
-                remoteReadCnt = CompleteCreditCounter(startTime, 2);
-                TimeoutCheck(startTime, 2);
+                remoteReadCnt = CompleteCreditCounter(startTime, SEND_INDICES_REMOTE_TIME_CHECK);
+                TimeoutCheck(startTime, SEND_INDICES_REMOTE_TIME_CHECK);
             }
         }
 
@@ -1482,8 +1483,8 @@ __aicore__ inline void EngramFetchTrainArch35::LocalReadTableAndSendRemote(uint3
             }
             while (totalSent >= static_cast<uint32_t>(remoteReadCnt) + maxTokensPerSlot_) {
                 PrefetchCreditCounter(dstRank, tokenReadOffset_, subIdx, true);
-                remoteReadCnt = CompleteCreditCounter(startTime, 6);
-                TimeoutCheck(startTime, 6);
+                remoteReadCnt = CompleteCreditCounter(startTime, LOCAL_READ_TABLE_SEND_REMOTE_TIME_CHECK);
+                TimeoutCheck(startTime, LOCAL_READ_TABLE_SEND_REMOTE_TIME_CHECK);
             }
         }
         uint32_t remaining = myCount - totalSent;
