@@ -147,14 +147,50 @@ def _rmsnorm(x, weight, eps):
     return x * inv * weight.unsqueeze(1)
 
 
+def _fma_f32(a, b, c):
+    """模拟 FP32 round-to-nearest-even 的 a*b+c，仅在最后舍入一次。
+
+    FP32 乘积可由 FP64 精确表示。TwoSum 提取加法舍入残差，再将非精确
+    FP64 和 round-to-odd，避免直接 double().float() 在 FP32 中点处二次舍入。
+    Inf/NaN 保持 IEEE 运算结果，不做饱和或比较豁免。
+    """
+    a, b, c = torch.broadcast_tensors(a, b, c)
+    shape = a.shape
+    a, b, c = (v.reshape(-1) for v in (a, b, c))
+    result = torch.empty_like(a, dtype=torch.float32)
+    # 限制 FP64 中间张量的峰值内存，避免大 T 的 golden 占用随中间量倍增。
+    for start in range(0, a.numel(), 65536):
+        sl = slice(start, start + 65536)
+        product = a[sl].double() * b[sl].double()
+        addend = c[sl].double()
+        summed = product + addend
+        recovered = summed - product
+        residual = (product - (summed - recovered)) + (addend - recovered)
+        correct = (
+            torch.isfinite(summed)
+            & (residual != 0)
+            & ((summed.view(torch.int64) & 1) == 0)
+        )
+        direction = torch.where(residual > 0, float("inf"), -float("inf"))
+        rounded_odd = torch.where(
+            correct, torch.nextafter(summed, direction.double()), summed
+        )
+        result[sl] = rounded_odd.float()
+    return result.reshape(shape)
+
+
 def _rope(x, cos, sin):
-    """x: [T, H, D] float32；cos/sin: [T, half] float32（已按 mask 合并三轴）。"""
+    """RoPE 按 Mul + FMA 计算，匹配 Reg::MulAddDst 的中间舍入语义。
+
+    x: [T, H, D] float32；cos/sin: [T, half] float32。
+    极值下不能写成两个独立乘积再加减：第二个乘积提前溢出会误报 Inf/NaN。
+    """
     half = x.shape[-1] // 2
     x1 = x[..., :half]
     x2 = x[..., half:]
     c = cos.unsqueeze(1)
     s = sin.unsqueeze(1)
-    return torch.cat([x1 * c - x2 * s, x2 * c + x1 * s], dim=-1)
+    return torch.cat([_fma_f32(x2, -s, x1 * c), _fma_f32(x1, s, x2 * c)], dim=-1)
 
 
 # 稠密段：split + index + rmsnorm + mrope（不含 cache 写入）
