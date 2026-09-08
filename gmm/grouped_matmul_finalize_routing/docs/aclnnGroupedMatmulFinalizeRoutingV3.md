@@ -139,7 +139,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>INT8，FLOAT8_E5M2，FLOAT8_E4M3FN，FLOAT4_E2M1</td>
       <td>ND</td>
       <td>(m, k)</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>x2</td>
@@ -149,7 +149,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>INT4，FLOAT8_E5M2，FLOAT8_E4M3FN，FLOAT4_E2M1</td>
       <td>ND</td>
       <td>支持三维</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>scaleOptional</td>
@@ -159,7 +159,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>INT64，FLOAT8_E8M0</td>
       <td>ND</td>
       <td>-</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>biasOptional</td>
@@ -169,7 +169,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>FLOAT32，BF16</td>
       <td>ND</td>
       <td>支持二维，维度为(e, n)</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>offsetOptional</td>
@@ -209,7 +209,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>FLOAT32，FLOAT8_E8M0</td>
       <td>ND</td>
       <td>-</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>groupListOptional</td>
@@ -219,7 +219,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>INT64</td>
       <td>ND</td>
       <td>支持一维，维度为(e)</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>sharedInputOptional</td>
@@ -229,7 +229,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>BF16</td>
       <td>ND</td>
       <td>-</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>logitOptional</td>
@@ -239,7 +239,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>FLOAT32</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>rowIndexOptional</td>
@@ -249,7 +249,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>INT64</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>dtype</td>
