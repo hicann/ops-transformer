@@ -50,7 +50,7 @@ else()
         OPTYPE quant_grouped_matmul_inplace_add ACLNNTYPE aclnn_exclude)
 endif()
 
-if((UT_TEST_ALL OR OP_HOST_UT) AND TARGET ${OPHOST_NAME}_tiling_obj)
+if(TARGET ${OPHOST_NAME}_tiling_obj)
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../../grouped_matmul/op_host/op_tiling/arch35/grouped_quant_matmul_tiling.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/../../grouped_matmul/op_host/op_tiling/arch35/grouped_quant_basic_api_matmul_tiling.cpp)
