@@ -26,7 +26,7 @@ if (BUILD_OPEN_PROJECT)  # custom
 
     set(SUB_MC2_COMPILE TRUE PARENT_SCOPE)
     set(MC2_OPT ON PARENT_SCOPE)
-    set(grouped_mat_mul_allto_allv_depends mc2/common mc2/3rd mc2/allto_allv_grouped_mat_mul mc2/quant_grouped_mat_mul_allto_allv mc2/allto_allv_quant_grouped_mat_mul PARENT_SCOPE)
+    set(grouped_mat_mul_allto_allv_depends mc2/common mc2/3rd mc2/quant_grouped_mat_mul_allto_allv mc2/allto_allv_quant_grouped_mat_mul PARENT_SCOPE)
 
     # --cce-auto-sync=off：指定CCE编译器是否自动执行线程间或模块间的同步操作
     # -mllvm -cce-aicore-dcci-before-kernel-end=false：禁用在kernel函数结束前插入DCCI指令
