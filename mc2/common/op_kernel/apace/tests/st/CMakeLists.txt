@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
+
 # ============================================================
 # tests/st/CMakeLists.txt — apace ST 顶层构建入口
 # ============================================================
@@ -117,6 +127,7 @@ target_include_directories(apace_blaze_api INTERFACE
 
 # ---- ST 用例 ----
 add_subdirectory(all_to_all_quant_matmul)
+add_subdirectory(quant_matmul_all_to_all)
 add_subdirectory(all_gather_quant_matmul/urma)
 add_subdirectory(all_gather_quant_matmul/ubmem)
 add_subdirectory(quant_matmul_reduce_scatter/ubmem)

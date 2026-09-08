@@ -128,7 +128,7 @@ public:
     __aicore__ inline void Wait(bool waitLast = false)
     {
         uint64_t totalTiles = tilingData_->splitAxisTileCnt + tilingData_->splitAxisTailCnt;
-        if (waitLast && currentTileIdx_ != totalTiles - 1) {
+        if (waitLast && currentTileIdx_ != totalTiles) {
             return;
         }
         for (uint32_t i = 0; i < targetRankCnt_; i++) {

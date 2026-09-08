@@ -27,6 +27,7 @@ namespace mm {
 enum class DataType {
     DT_FLOAT4_E2M1,
     DT_FLOAT8_E4M3FN,
+    DT_FLOAT8_E5M2,
 };
 
 // Bias element dtype for the SWAT tiling L1 budget; width mapping mirrors the

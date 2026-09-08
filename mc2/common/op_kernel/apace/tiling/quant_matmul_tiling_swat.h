@@ -238,7 +238,7 @@ private:
         uint64_t nMaxtile = CeilDiv(args_.n, baseNAlignNum);
         uint64_t tempBaseM = runInfo_.baseM;
         uint64_t tempBaseN = runInfo_.baseN;
-        uint64_t coreNumMN = platformInfo_.aicNum;
+        uint64_t coreNumMN = platformInfo_.aicNum / args_.batch;
 
         if (mMaxtile * nMaxtile >= coreNumMN || (!args_.transA && args_.transB)) {
             uint64_t mCnt = CeilDiv(args_.m, runInfo_.baseM);
@@ -247,28 +247,28 @@ private:
             if (mMaxtile > nMaxtile) {
                 tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
                 nCnt = CeilDiv(args_.n, tempBaseN);
-                mCnt = platformInfo_.aicNum / nCnt;
+                mCnt = coreNumMN / nCnt;
                 tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
             } else {
                 tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
                 mCnt = CeilDiv(args_.m, tempBaseM);
-                nCnt = platformInfo_.aicNum / mCnt;
+                nCnt = coreNumMN / mCnt;
                 tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
             }
 
-            while (tempBaseN > tempBaseM * BASEM_BASEN_RATIO && nCnt < platformInfo_.aicNum / NUM_TWO &&
+            while (tempBaseN > tempBaseM * BASEM_BASEN_RATIO && nCnt < coreNumMN / NUM_TWO &&
                    tempBaseN != baseNAlignNum) {
                 nCnt = nCnt * NUM_TWO;
-                mCnt = platformInfo_.aicNum / nCnt;
+                mCnt = coreNumMN / nCnt;
                 tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
                 tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
                 mCnt = CeilDiv(args_.m, tempBaseM);
                 nCnt = CeilDiv(args_.n, tempBaseN);
             }
-            while (tempBaseM >= tempBaseN * BASEM_BASEN_RATIO && mCnt < platformInfo_.aicNum / NUM_TWO &&
+            while (tempBaseM >= tempBaseN * BASEM_BASEN_RATIO && mCnt < coreNumMN / NUM_TWO &&
                    tempBaseM != baseMAlignNum) {
                 mCnt = mCnt * NUM_TWO;
-                nCnt = platformInfo_.aicNum / mCnt;
+                nCnt = coreNumMN / mCnt;
                 tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
                 tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
                 mCnt = CeilDiv(args_.m, tempBaseM);
@@ -306,7 +306,7 @@ private:
             std::min(args_.k, aDataType == mm::DataType::DT_FLOAT4_E2M1 ? BASIC_BLOCK_SIZE_256 : BASIC_BLOCK_SIZE_128),
             TILING_MXFP_DIVISOR_SIZE);
 
-        uint64_t blockNum = CeilDiv(args_.m, runInfo_.baseM) * CeilDiv(args_.n, runInfo_.baseN);
+        uint64_t blockNum = CeilDiv(args_.m, runInfo_.baseM) * CeilDiv(args_.n, runInfo_.baseN) * args_.batch;
         if (enableAdjustBasicBlock_ && blockNum < platformInfo_.aicNum) {
             AdjustBasicBlock();
         }
@@ -318,7 +318,7 @@ private:
 
         runInfo_.mBlockCnt = CeilDiv(args_.m, runInfo_.baseM);
         runInfo_.nBlockCnt = CeilDiv(args_.n, runInfo_.baseN);
-        runInfo_.totalBlockCnt = runInfo_.mBlockCnt * runInfo_.nBlockCnt;
+        runInfo_.totalBlockCnt = runInfo_.mBlockCnt * runInfo_.nBlockCnt * args_.batch;
         runInfo_.tailBlockCnt = runInfo_.totalBlockCnt % platformInfo_.aicNum;
         runInfo_.mTailSize = args_.m - (runInfo_.mBlockCnt - 1UL) * runInfo_.baseM;
         runInfo_.nTailSize = args_.n - (runInfo_.nBlockCnt - 1UL) * runInfo_.baseN;

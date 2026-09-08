@@ -39,6 +39,7 @@ struct QuantMatmulArgs {
     uint64_t m = 0UL;
     uint64_t k = 0UL;
     uint64_t n = 0UL;
+    uint64_t batch = 1UL;
     bool transA = false;
     bool transB = true;
 };
