@@ -28,6 +28,28 @@ enum class DataType {
     DT_FLOAT4_E2M1,
     DT_FLOAT8_E4M3FN,
 };
+
+// Bias element dtype for the SWAT tiling L1 budget; width mapping mirrors the
+// ops-nn v4 SWAT solver's GetBiasDataSize (fp32 = 4B, fp16/bf16 = 2B).
+enum class BiasDataType {
+    DT_FLOAT,
+    DT_FLOAT16,
+    DT_BFLOAT16,
+};
+
+template <BiasDataType biasDtype>
+constexpr uint64_t GetBiasDataSize()
+{
+    // apace_common_utils.h is included ahead of apace_constant.h, so keep the
+    // named widths local instead of pulling in that dependency.
+    constexpr uint64_t FP32_BYTES = 4UL;
+    constexpr uint64_t FP16_BYTES = 2UL;
+    if constexpr (biasDtype == BiasDataType::DT_FLOAT) {
+        return FP32_BYTES;
+    } else {
+        return FP16_BYTES;
+    }
+}
 } // namespace mm
 
 #define ERROR_LOG(fmt, args...) fprintf(stdout, "[ERROR]  " fmt "\n", ##args)

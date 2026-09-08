@@ -731,21 +731,27 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
 
     // mm tiling via SWAT engine：按 x1 实际 dtype 分发。 fp8 统一用 e4m3 实例化，fp4统一用 e2m1 实例化
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    bool hasBias = context->GetOptionalInputShape(IDX_INPUT_BIAS) != nullptr;
     if (context->GetInputDesc(IDX_INPUT_X1)->GetDataType() == ge::DT_FLOAT4_E2M1) {
-        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT4_E2M1, mm::DataType::DT_FLOAT4_E2M1> tilingEngine;
+        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT4_E2M1, mm::DataType::DT_FLOAT4_E2M1, mm::BiasDataType::DT_FLOAT>
+            tilingEngine;
         tilingEngine.SetPlatformInfoPtr(context->GetPlatformInfo());
         tilingEngine.SetCoreLimit(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv());
         tilingEngine.SetOptimizeEnable(false);
         tilingEngine.SetMTailAlignEnable(true);
         tilingEngine.SetAdjustBasicBlockEnable(false);
+        tilingEngine.SetBiasInfo(hasBias);
         tilingEngine.GetTilingData(totalLogicalM, n, k, tilingData->mmTile);
     } else {
-        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;
+        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN,
+                              mm::BiasDataType::DT_FLOAT>
+            tilingEngine;
         tilingEngine.SetPlatformInfoPtr(context->GetPlatformInfo());
         tilingEngine.SetCoreLimit(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv());
         tilingEngine.SetOptimizeEnable(false);
         tilingEngine.SetMTailAlignEnable(true);
         tilingEngine.SetAdjustBasicBlockEnable(false);
+        tilingEngine.SetBiasInfo(hasBias);
         tilingEngine.GetTilingData(totalLogicalM, n, k, tilingData->mmTile);
     }
     OP_LOGD(nodeName, "mmTile(swat): baseM=%u baseN=%u baseK=%u dbL0c=%u swatUsedCoreNum=%u",
@@ -761,8 +767,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
     tilingData->mmTile.usedCoreNum = usedCoreNum;
 
     // bias: 非空时设 isBias=1
-    auto biasShape = context->GetOptionalInputShape(IDX_INPUT_BIAS);
-    tilingData->isBias = (biasShape != nullptr) ? 1 : 0;
+    tilingData->isBias = hasBias ? 1 : 0;
 
     // 独占全核，设置以后会让所有核空闲以后才启动，有多核同步指令需要设置避免出现网络挂死
     context->SetScheduleMode(1);
