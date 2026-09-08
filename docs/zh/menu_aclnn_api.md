@@ -267,6 +267,7 @@
 - [aclnnWeightQuantMatmulAllReduceV2](../../mc2/matmul_all_reduce/docs/aclnnWeightQuantMatmulAllReduceV2.md)
 - [aclnnDenseLightningIndexerKLLossGrad](../../attention/dense_lightning_indexer_kl_loss_grad/docs/aclnnDenseLightningIndexerKLLossGrad.md)
 - [aclnnDenseLightningIndexerKLLossGradMetadata](../../attention/dense_lightning_indexer_kl_loss_grad_metadata/docs/aclnnDenseLightningIndexerKLLossGradMetadata.md)
+- [aclnnKeyPool](../../attention/key_pool/docs/aclnnKeyPool.md)
 - [aclnnPoolKeyIndexer](../../attention/pool_key_indexer/docs/aclnnPoolKeyIndexer.md)
 - [编译与运行样例](context/compile_and_run_sample.md)
 - [aclnn返回码](context/aclnn_return_code.md)
