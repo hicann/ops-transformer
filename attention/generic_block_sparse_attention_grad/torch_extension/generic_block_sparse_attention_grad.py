@@ -19,6 +19,7 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 GSAG_TASK_LIST_OFFSET = 80  # 8 + 2 * 36
 GSAG_TASK_ENTRY_SIZE = 4
 GSAG_METADATA_OP_NAME = "generic_block_sparse_attention_grad_metadata"
+ARC22_GBSAG_TASK_LIST_SIZE = 198  # 6 + 64 * 3
 
 
 class MaskMode(IntEnum):
@@ -52,10 +53,14 @@ def _resolve_mask_mode(mask_mode: Union[str, int, MaskMode, None]) -> int:
 
 
 def calc_gsag_metadata_size(batch_size: int, num_heads_q: int, num_j: int) -> int:
-    """Required metadata int32 length: TASK_LIST_OFFSET + B * N1 * J * TASK_ENTRY_SIZE."""
-    return (
+    """Required metadata int32 length:
+    A5 : TASK_LIST_OFFSET + B * N1 * J * TASK_ENTRY_SIZE
+    A2 : 6 (param_nums) + 64 (max_aicore_nums) * 3
+    """
+    arc35_size = (
         GSAG_TASK_LIST_OFFSET + batch_size * num_heads_q * num_j * GSAG_TASK_ENTRY_SIZE
     )
+    return max(arc35_size, ARC22_GBSAG_TASK_LIST_SIZE)
 
 
 def _max_segment_from_cu_seqlens(cu_seqlens: torch.Tensor) -> int:
