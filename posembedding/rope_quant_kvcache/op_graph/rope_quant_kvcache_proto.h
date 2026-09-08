@@ -26,6 +26,7 @@ namespace ge {
 * @li cos: A 4D Tensor of type float16 with shape (B, S, 1, D), shape must same with k, format support ND
 * @li sin: A 4D Tensor of type float16 with shape (B, S, 1, D), shape must same with k, format support ND
 * @li quant_scale: A 1D Tensor of type float with shape (D), shape D must same with k, format support ND
+* @li quant_offset: A 1D Tensor of type int32 with shape (D), shape D must same with k, format support ND
 * @li k_cache: A 4D Tensor of type int8 with shape (B, S, Nkv, D), shape B/N/D must same with k,
 * S must large than k, format support ND
 * @li v_cache: A 4D Tensor of type int8 with shape (B, S, Nkv, D), shape B/N/D must same with v,

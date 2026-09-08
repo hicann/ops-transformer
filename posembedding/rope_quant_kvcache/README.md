@@ -4,7 +4,7 @@
 
 |产品             |  是否支持  |
 |:-------------------------|:----------:|
-|  <term>Ascend 950PR/Ascend 950DT</term>   |     ×    |
+|  <term>Ascend 950PR/Ascend 950DT</term>   |     √    |
 |  <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   |     ×    |
 |  <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |     √    |
 |  <term>Atlas 200I/500 A2 推理产品</term>    |     ×    |
@@ -15,7 +15,7 @@
 
 ## 功能说明
 
-- 算子功能：对输入张量的尾轴进行切分，划分为q、k、v，对q、k进行旋转位置编码，生成q与k，之后对k与v进行量化并按照indices更新到kCacheRef和vCacheRef上。
+- 算子功能：对输入张量的尾轴进行切分，划分为q、k、v，对q、k进行旋转位置编码；当前Kernel写出q，并将量化后的k、v按照indice更新到kCacheRef和vCacheRef，保留的k、v输出当前未写入。
 
 ## 参数说明
 
@@ -62,21 +62,21 @@
       <td style="white-space: nowrap">输入</td>
       <td style="white-space: nowrap">Device侧的aclTensor，表示量化偏移量的张量。</td>
       <td style="white-space: nowrap">INT32</td>
-      <td style="white-space: nowrap">-</td>
+      <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
       <td style="white-space: nowrap">k_cache</td>
       <td style="white-space: nowrap">输入</td>
       <td style="white-space: nowrap">用于原地更新的输入。</td>
       <td style="white-space: nowrap">INT8</td>
-      <td style="white-space: nowrap">-</td>
+      <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
       <td style="white-space: nowrap">v_cache</td>
       <td style="white-space: nowrap">输入</td>
       <td style="white-space: nowrap">用于原地更新的输入。</td>
       <td style="white-space: nowrap">INT8</td>
-      <td style="white-space: nowrap">-</td>
+      <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
       <td style="white-space: nowrap">indice</td>
@@ -145,7 +145,10 @@
 
 ## 约束说明
 
-- cos、sin的shape与k相同。
+- `qkv`为3维`[B, S, H]`，`H=(Nq+Nkv+Nkv)*D`；`cos`、`sin`为4维`[B, S, 1, D]`，其B、S、D必须与切分后的k一致，不支持Broadcast。
+- `quant_scale`和`quant_offset`均为1维`[D]`；kCache和vCache均为4维`[B, S_cache, Nkv, D]`且shape相同，`S_cache`必须能容纳更新位置；`indice`的元素数为B。
+- `size_splits`为3项`[Nq*D, Nkv*D, Nkv*D]`，三项之和必须等于`qkv`尾轴H；`layout`和`kv_output`当前均未被实现消费。
+- 不支持动态Shape（-1）和动态Rank（-2）。
 
 ## 调用说明
 

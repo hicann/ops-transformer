@@ -100,6 +100,7 @@ public:
         this->Attr("layout").AttrType(OPTIONAL).String("BSND");
         this->Attr("kv_output").AttrType(OPTIONAL).Bool(false);
         this->AICore().AddConfig("ascend910b");
+        this->AICore().AddConfig("ascend950");
         this->AICore().AddConfig("kirinx90");
         this->AICore().AddConfig("kirin9030");
     }
