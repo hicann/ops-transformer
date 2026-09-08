@@ -16,6 +16,7 @@ FA_METADATA_OP_NAME = "flash_attn_metadata"
 METADATA_STRIDE = 16
 AIC_NUM = torch.npu.get_device_properties().cube_core_num
 AIV_NUM = torch.npu.get_device_properties().vector_core_num
+FAG_METADATA_SIZE = 121  # FAG (Flash Attn Grad) metadata size, in int32 elements
 
 
 def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
@@ -44,6 +45,7 @@ def _calculate_metadata_size(batch_size, num_heads_kv):
     fd_size = AIV_NUM * METADATA_STRIDE * batch_size * num_heads_kv
 
     metadata_size = head_size + fa_size + fd_size
+    metadata_size += FAG_METADATA_SIZE  # FAG (Flash Attn Grad) metadata size
     return ((metadata_size + align_size - 1) // align_size) * align_size
 
 
@@ -63,7 +65,8 @@ class FlashAttenOpBuilder(OpBuilder):
             "Tensor? cu_seqlens_q=None, Tensor? cu_seqlens_kv=None, Tensor? seqused_q=None, Tensor? seqused_kv=None,"
             "int? batch_size=None, int? max_seqlen_q=None, int? max_seqlen_kv=None, "
             "int? mask_mode=None, int? win_left=None, int? win_right=None, "
-            "str? layout_q=None, str? layout_kv=None, str? layout_out=None) -> Tensor",
+            "str? layout_q=None, str? layout_kv=None, str? layout_out=None, "
+            "bool is_grad_enabled=False) -> Tensor",
             "flash_attn(Tensor q, Tensor k, Tensor v,"
             "Tensor?block_table=None, Tensor?cu_seqlens_q=None,"
             "Tensor?cu_seqlens_kv=None, Tensor?seqused_q=None,"
@@ -99,6 +102,7 @@ class FlashAttenOpBuilder(OpBuilder):
             layout_q: Optional[str] = None,
             layout_kv: Optional[str] = None,
             layout_out: Optional[str] = None,
+            is_grad_enabled: Optional[bool] = False,
         ):
             b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
             metadata_size = _calculate_metadata_size(b_size, num_heads_kv)
@@ -195,6 +199,7 @@ def flash_attn_metadata(
     layout_q: Optional[str] = "BSND",
     layout_kv: Optional[str] = "BSND",
     layout_out: Optional[str] = "BSND",
+    is_grad_enabled: Optional[bool] = False,
 ):
     """
     Dispatcher implementation: NPU.
@@ -234,6 +239,7 @@ def flash_attn_metadata(
         layout_q,
         layout_kv,
         layout_out,
+        is_grad_enabled,
         output,
     )
 
@@ -260,6 +266,7 @@ def flash_attn_metadata_fallback(
     layout_q: Optional[str] = None,
     layout_kv: Optional[str] = None,
     layout_out: Optional[str] = None,
+    is_grad_enabled: Optional[bool] = False,
 ):
     # 处理所有 tensor 都为 None 的情况
     return _flash_attn_metadata(
@@ -280,6 +287,7 @@ def flash_attn_metadata_fallback(
         layout_q=layout_q,
         layout_kv=layout_kv,
         layout_out=layout_out,
+        is_grad_enabled=is_grad_enabled,
     )
 
 

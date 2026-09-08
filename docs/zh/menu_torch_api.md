@@ -11,6 +11,7 @@
 - [compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)
 - [ElasticBuffer](../../torch_extension/cann_ops_transformer/docs/zh/ElasticBuffer.md)
 - [flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)
+- [flash_attn_grad](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn_grad.md)
 - [fused_causal_conv1d](../../torch_extension/cann_ops_transformer/docs/zh/fused_causal_conv1d.md)
 - [fused_causal_conv1d_](../../torch_extension/cann_ops_transformer/docs/zh/fused_causal_conv1d_.md)
 - [get_low_latency_ccl_buffer_size](../../torch_extension/cann_ops_transformer/docs/zh/get_low_latency_ccl_buffer_size.md)

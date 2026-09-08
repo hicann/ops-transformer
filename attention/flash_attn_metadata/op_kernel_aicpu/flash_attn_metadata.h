@@ -51,6 +51,53 @@ constexpr uint32_t FD_WORKSPACE_NUM_INDEX = 3U;
 constexpr uint32_t FD_M_START_INDEX = 4U;
 constexpr uint32_t FD_M_NUM_INDEX = 5U;
 
+// FAG (Flash Attn Grad) Metadata Index Definitions — head[7] records FAG start offset
+// (head[4]/[5]/[6] are taken by HEAD_AIC_NUM_INDEX/HEAD_AIV_NUM_INDEX/HEAD_OUTPUT_LAYOUT_INDEX)
+constexpr uint32_t HEAD_FAG_START_OFFSET_INDEX = 7U;
+constexpr uint32_t FAG_METADATA_SIZE = 121U;
+constexpr uint32_t FAG_CORE_LIST_NUM = 36U;
+
+// FAG Metadata field indices (relative to fagStartOffset)
+constexpr uint32_t FAG_SPLIT_AXIS_INDEX = 0U;
+constexpr uint32_t FAG_BLOCK_OUTER_INDEX = 1U;
+constexpr uint32_t FAG_BLOCK_FACTOR_INDEX = 2U;
+constexpr uint32_t FAG_S1_OUTER_INDEX = 3U;
+constexpr uint32_t FAG_S2_OUTER_INDEX = 4U;
+constexpr uint32_t FAG_LAYOUT_TYPE_INDEX = 5U;
+constexpr uint32_t FAG_IS_SPARSE_INDEX = 6U;
+constexpr uint32_t FAG_SPARSE_MODE_INDEX = 7U;
+constexpr uint32_t FAG_BLOCK_STARTS_OFFSET = 8U;
+constexpr uint32_t FAG_BLOCK_ENDS_OFFSET = 44U;
+constexpr uint32_t FAG_TND_START_BIDX_OFFSET = 80U;
+constexpr uint32_t FAG_MASK_MODE_INDEX = 116U;
+constexpr uint32_t FAG_WIN_LEFT_INDEX = 117U;
+constexpr uint32_t FAG_WIN_RIGHT_INDEX = 118U;
+constexpr uint32_t FAG_MAX_SEQLEN_Q_INDEX = 119U;
+constexpr uint32_t FAG_MAX_SEQLEN_KV_INDEX = 120U;
+
+// FAG internal constants
+constexpr uint32_t FAG_S1CV_RATIO_DEFAULT = 2U;
+constexpr uint32_t FAG_S2CV_RATIO_DEFAULT = 1U;
+constexpr int64_t FAG_ALIGN64 = 64;
+constexpr uint32_t FAG_ARRAY_LENGTH = 3U;
+constexpr uint32_t FAG_BATCH_MAX_SIZE = 2048U;
+constexpr uint32_t FAG_MAX_S2_OUTER = 1024U;
+
+// FAG layout type values (matching flash_attention_score_grad tiling common_regbase.h)
+constexpr uint32_t FAG_INPUT_FORMAT_BS2N2GD = 1U; // BSND
+constexpr uint32_t FAG_INPUT_FORMAT_BN2GS2D = 3U; // BNSD
+constexpr uint32_t FAG_INPUT_FORMAT_TND = 4U;     // TND
+
+// FAG sparse mode values (matching flash_attention_score_grad SparseMode enum)
+constexpr uint32_t FAG_SPARSE_NO_MASK = 0U;
+constexpr uint32_t FAG_SPARSE_RIGHT_DOWN_CAUSAL = 3U;
+constexpr uint32_t FAG_SPARSE_BAND = 4U;
+
+// FAG split axis values (matching SplitAxisEnum)
+constexpr uint32_t FAG_SPLIT_AXIS_BN2GS1S2 = 0U;
+constexpr uint32_t FAG_SPLIT_AXIS_BN2 = 1U;
+constexpr uint32_t FAG_SPLIT_AXIS_BN2S2 = 2U;
+
 namespace detail {
 struct FaMetadata {
     uint32_t sectionNum;

@@ -17,6 +17,8 @@
 #define FLASH_ATTN_METADATA_AICPU_H
 
 #include <string>
+#include <cstring>
+#include <vector>
 #include "cpu_context.h"
 #include "cpu_kernel.h"
 #include "cpu_tensor.h"
@@ -24,6 +26,12 @@
 #include "../../common/op_kernel/load_balance/section_stream_k/section_stream_k.h"
 
 namespace aicpu {
+
+using optiling::FAG_CORE_LIST_NUM;
+using optiling::FAG_ARRAY_LENGTH;
+using optiling::FAG_SPLIT_AXIS_BN2GS1S2;
+using optiling::FAG_SPARSE_NO_MASK;
+using optiling::FAG_INPUT_FORMAT_BS2N2GD;
 
 class FlashAttnMetadataCpuKernel : public CpuKernel {
 public:
@@ -93,8 +101,76 @@ private:
     load_balance::BaseInfo baseInfo;
     load_balance::SectionStreamKParam param;
 
+    // FAG split params (Flash Attn Grad metadata)
+    int64_t fagS1Inner_ = 64;
+    int64_t fagS2Inner_ = 128;
+    int64_t fagS1CvInner_ = 128;
+    int64_t fagCvS2Inner_ = 128;
+    int64_t fagS1Outer_ = 0;
+    int64_t fagS2Outer_ = 0;
+    int64_t fagG_ = 0;
+    int64_t fagBlockStarts_[FAG_CORE_LIST_NUM] = {0};
+    int64_t fagBlockEnds_[FAG_CORE_LIST_NUM] = {0};
+    int64_t fagTndStartBIdx_[FAG_CORE_LIST_NUM] = {0};
+    uint32_t fagBlockOuter_ = 0;
+    int64_t fagBlockFactor_ = 0;
+    uint32_t fagSplitAxis_ = FAG_SPLIT_AXIS_BN2GS1S2;
+    bool fagIsSparse_ = false;
+    uint32_t fagSparseMode_ = FAG_SPARSE_NO_MASK;
+    uint32_t fagLayoutType_ = FAG_INPUT_FORMAT_BS2N2GD;
+    int64_t fagS1Token_ = -1;
+    int64_t fagS2Token_ = -1;
+    bool fagIsBn2_ = false;
+    bool fagIsBn2MultiBlk_ = false;
+    bool fagIsAllSame_ = false;
+    bool fagIsInvalidCol_ = false;
+    bool fagIsInvalidRow_ = false;
+    bool fagIsGradEnabled_ = false;
+    bool fagUseTndSplit_ = false;
+    bool fagIsSeqExistZero_ = false;
+
+    // FAG method declarations
+    void InitFagParams();
+    void InitFagBaseDims();
+    void InitFagLayoutAndSparse();
+    void InitFagActualSeqlen();
+    void DoFagSparse();
+    void GenFagMetadata(uint32_t sectionNum);
+
+    // FAG split implementations (defined in flash_attn_grad_metadata_split.h)
+    void SetFagSplitAxis();
+    void SupportTransBSND();
+    void DoFagDenseSplit();
+    void DoFagTndSplit();
+    void DoFagSparseBlockInfo();
+    void GetFagParseS1S2OuterInfo(std::vector<std::vector<int64_t>> &parseInfo);
+    bool FagCheckSparseLeftAndRight(int64_t s1oDimIdx, int64_t s2IdxLeft, int64_t s2IdxRight, int64_t bIdx);
+    bool FagIsValid(int64_t blockIdx);
+    bool FagIsValidUnpad(int64_t blockIdx);
+    bool FagCheckUnpadSparseLeftAndRight(int64_t s1oDimIdx, int64_t s2IdxLeft, int64_t s2IdxRight, int64_t bIdx);
+    void FagFillBlockInfoLoadBalance(std::vector<std::vector<int64_t>> &totalBlockInfo,
+                                     std::vector<std::vector<float>> &acturalBlockInfo);
+
+    // BN2S2 split implementations
+    void TryBn2s2Sparse();
+    void DoFagBn2s2DenseSplit();
+    void DoFagBn2s2SparseTndSplit();
+    float Bn2s2BinarySearchMaxBlockNumPerCore(int64_t b, int64_t n2, int64_t g, int64_t aicNum,
+                                              std::vector<std::vector<int64_t>> &totalBlockInfo,
+                                              std::vector<std::vector<float>> &acturalBlockInfo);
+    bool Bn2s2IsPossible(int64_t b, int64_t n2, int64_t g, int64_t aicNum, float possibleMax,
+                         std::vector<std::vector<float>> &acturalBlockInfo);
+    bool Bn2s2CaclePerCoreBlockInfo(int64_t b, int64_t n2, int64_t g, int64_t aicNum,
+                                    std::vector<std::vector<int64_t>> &totalBlockInfo,
+                                    std::vector<std::vector<float>> &acturalBlockInfo, float maxBlockNumPerCore);
+
+    // BN2 split implementations
+    bool TryBn2MultiBlkSparse();
+    void DoFagBn2DenseSplit();
+    bool DoFagBn2SparseBlockInfo();
+
 private:
-    enum class ParamId : uint32_t {
+    enum ParamId {
         // input
         cuSeqlensQ = 0,
         cuSeqlensKv = 1,

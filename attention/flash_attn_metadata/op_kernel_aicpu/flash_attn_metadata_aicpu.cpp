@@ -20,6 +20,7 @@
 #include <algorithm>
 #include "log.h"
 #include "status.h"
+#include "flash_attn_grad_metadata_split.h"
 #include "../../common/op_kernel/aicpu_common.h"
 #include "../../flash_attn/op_host/fa_adjust_sinner_souter.h"
 
@@ -40,6 +41,15 @@ uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext &ctx)
 
     success = GenMetadata(splitRes);
     KERNEL_CHECK_FALSE(success, FA_KERNEL_STATUS_PARAM_INVALID, "Generate balance result failed!");
+
+    // ===== FAG metadata start =====
+    // FAG (Flash Attn Grad) metadata: only executed when is_grad_enabled=true.
+    if (fagIsGradEnabled_) {
+        InitFagParams();
+        DoFagSparse();
+        GenFagMetadata(splitRes.sectionNum);
+    }
+    // ===== FAG metadata end =====
 
     return FA_KERNEL_STATUS_OK;
 }
@@ -77,6 +87,7 @@ bool FlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     if (headDimV_ == -1) {
         headDimV_ = headDim_;
     }
+    GetAttrValueOpt(ctx, "is_grad_enabled", fagIsGradEnabled_);
 
     KERNEL_CHECK_FALSE(ParamsCheck(), false, "Params check failed");
     return ParamsInit();

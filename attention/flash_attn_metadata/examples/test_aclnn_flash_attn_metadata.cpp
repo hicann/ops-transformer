@@ -61,8 +61,11 @@ int Init(int32_t deviceId, aclrtStream *stream)
 
 static void DumpMeta(void *data)
 {
-    int32_t sectionNum = static_cast<int32_t>(((int32_t *)data)[0]);
-    optiling::detail::FaMetadata faMetadata(data, sectionNum);
+    auto *raw = static_cast<int32_t *>(data);
+    int32_t sectionNum = raw[0];
+    uint32_t aicNum = static_cast<uint32_t>(raw[optiling::HEAD_AIC_NUM_INDEX]);
+    uint32_t aivNum = static_cast<uint32_t>(raw[optiling::HEAD_AIV_NUM_INDEX]);
+    optiling::detail::FaMetadata faMetadata(aicNum, aivNum, static_cast<uint32_t>(sectionNum), data);
     printf("sectionNum:%d\n", faMetadata.GetHeadMetadata(optiling::HEAD_SECTION_NUM_INDEX));
     printf("isFd:%d\n", faMetadata.GetHeadMetadata(optiling::HEAD_IS_FD_INDEX));
     printf("mBaseSize:%d\n", faMetadata.GetHeadMetadata(optiling::HEAD_M_BASE_SIZE_INDEX));
@@ -70,7 +73,7 @@ static void DumpMeta(void *data)
     for (uint32_t sectionId = 0; sectionId < sectionNum; ++sectionId) {
         // FA Metadata Generate
         printf("sectionIdx:%d\n", sectionId);
-        for (size_t i = 0; i < AIC_CORE_NUM; ++i) {
+        for (uint32_t i = 0; i < aicNum; ++i) {
             // FA start
             printf("bn2 start: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_BN_START_INDEX));
             printf("m start: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_M_START_INDEX));
@@ -85,7 +88,7 @@ static void DumpMeta(void *data)
         }
 
         // FD Metadata Generate
-        for (size_t i = 0; i < AIV_CORE_NUM; ++i) {
+        for (uint32_t i = 0; i < aivNum; ++i) {
             printf("bn2 idx: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_BN_IDX_INDEX));
             printf("m idx: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_M_IDX_INDEX));
             printf("fd workspace idx: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_WORKSPACE_IDX_INDEX));
@@ -160,7 +163,8 @@ int main()
     int32_t attentionMode = 0;
     bool return_softmax_lse = false;
 
-    int64_t metadataSize = ((36 + 72) * batchSize * numKeyValueHeads + 1) * 16;
+    int64_t faSize = ((36 + 72) * batchSize * numKeyValueHeads + 1) * 16;
+    int64_t metadataSize = faSize + optiling::FAG_METADATA_SIZE; // FAG (Flash Attn Grad) metadata size
     int64_t alignedSize = ((metadataSize + 4095) / 4096) * 4096;
 
     std::vector<int64_t> actualSeqLengthsQueryShape = {batchSize};
@@ -204,9 +208,9 @@ int main()
 
     char socVersion[] = "ascend950";
     printf("start aclnnFlashAttnMetadata\n");
-    ret = aclnnFlashAttnMetadataGetWorkspaceSize(nullptr, nullptr, nullptr, nullptr, batchSize, qS, kvS, numHeads,
-                                                 numKeyValueHeads, headDim, headDimV, sparseMode, preTokens, nextTokens,
-                                                 "BSND", "BSND", "BSND", metadataTensor, &workspaceSize, &executor);
+    ret = aclnnFlashAttnMetadataGetWorkspaceSize(
+        nullptr, nullptr, nullptr, nullptr, batchSize, qS, kvS, numHeads, numKeyValueHeads, headDim, headDimV,
+        sparseMode, preTokens, nextTokens, "BSND", "BSND", "BSND", false, metadataTensor, &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
         printf("aclnnFlashAttnMetadataGetWorkspaceSize %d\n", ret);
         return -1;
