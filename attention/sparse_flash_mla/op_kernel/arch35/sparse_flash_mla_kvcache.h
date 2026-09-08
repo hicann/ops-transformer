@@ -236,7 +236,7 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstIn
         if (constInfo.subBlockIdx == 1) {
             runParam.attentionOutOffset += runParam.firstHalfMRealSize * constInfo.dSizeV;
         }
-        if (constInfo.returnSoftmaxLse) {
+        if (constInfo.isSoftmaxLseEnable) {
             if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
                 // [N2, T, G] (TND)
                 runParam.softmaxLseOffset = runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +

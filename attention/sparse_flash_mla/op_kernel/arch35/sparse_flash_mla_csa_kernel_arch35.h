@@ -269,13 +269,10 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Par
     constInfo.cmpMaskMode = sparseFlashMLACmpParams.cmpMaskMode;
     constInfo.oriWinLeft = sparseFlashMLABaseParams.oriWinLeft;
     constInfo.oriWinRight = sparseFlashMLABaseParams.oriWinRight;
-    constInfo.layoutType = sparseFlashMLABaseParams.outputLayout;
-    constInfo.returnSoftmaxLse = sparseFlashMLABaseParams.returnSoftmaxLse;
-    constInfo.tileSize = 0;
-    constInfo.dSizeRope = 64;
-    constInfo.oriKeyStride0 = sparseFlashMLABaseParams.oriKeyStride0;
+    constInfo.isSoftmaxLseEnable = sparseFlashMLABaseParams.returnSoftmaxLse;
+    constInfo.oriKvStride = sparseFlashMLABaseParams.oriKeyStride0;
     if constexpr (TEMPLATE_MODE != SMLATemplateMode::SWA_TEMPLATE_MODE) {
-        constInfo.cmpKeyStride0 = sparseFlashMLACmpParams.cmpKeyStride0;
+        constInfo.cmpKvStride = sparseFlashMLACmpParams.cmpKeyStride0;
     }
     if ASCEND_IS_AIV {
         constInfo.softmaxScale = sparseFlashMLABaseParams.softmaxScale;
@@ -283,14 +280,8 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Par
     constInfo.dSize = 512;
     constInfo.dSizeV = constInfo.dSize;
     constInfo.dSizeVInput = constInfo.dSize;
-    constInfo.dSizeNope = constInfo.dSize - constInfo.dSizeRope;
     constInfo.sparseBlockSize = 1;
     constInfo.actualSeqLenSize = constInfo.bSize + 1;
-    constInfo.actualLenDimsOriKV = sparseFlashMLABaseParams.actualLenDimsOriKV;
-    if constexpr (TEMPLATE_MODE != SMLATemplateMode::SWA_TEMPLATE_MODE) {
-        constInfo.actualLenDimsCmpKV = sparseFlashMLABaseParams.actualLenDimsCmpKV;
-        constInfo.cmpResidualKVSize = sparseFlashMLABaseParams.cmpResidualKVSize;
-    }
     if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::TND) {
         this->constInfo.isActualLenDimsOriKVNull = 0U;
     } else {
