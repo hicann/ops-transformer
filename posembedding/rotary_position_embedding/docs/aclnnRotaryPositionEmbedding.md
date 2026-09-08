@@ -261,6 +261,42 @@ aclnnStatus aclnnRotaryPositionEmbedding(
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
+  第一段接口完成入参校验，出现以下场景时报错：
+
+  <table style="undefined;table-layout: fixed; width: 1155px"><colgroup>
+  <col style="width: 288px">
+  <col style="width: 125px">
+  <col style="width: 742px">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>返回码</th>
+      <th>错误码</th>
+      <th>描述</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ACLNN_ERR_PARAM_NULLPTR</td>
+      <td>161001</td>
+      <td>传入的x、cos、sin或out是空指针。</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_PARAM_INVALID</td>
+      <td>161002</td>
+      <td>传入的x、cos、sin、out的数据类型和格式不在支持的范围内。</td>
+    </tr>
+    <tr>
+      <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td rowspan="2">561002</td>
+      <td>传入的x、cos、sin、out的shape不匹配。</td>
+    </tr>
+    <tr>
+      <td>传入的mode参数不在支持的范围内。 </td>
+    </tr>
+  </tbody>
+  </table>
+
 ## aclnnRotaryPositionEmbedding
 
 - **参数说明：**
