@@ -98,7 +98,7 @@ init_install_env() {
   if [ "$(id -u)" != "0" ]; then
     LOG_PATH_PERM="740"
     LOG_FILE_PERM="640"
-    INSTALL_INFO_PERM="600"
+    INSTALL_INFO_PERM="640"
   else
     LOG_PATH_PERM="750"
     LOG_FILE_PERM="640"
@@ -342,9 +342,7 @@ install_es_whl_package() {
 install_es_whl() {
  	local es_whl_path="${OPS_SOURCE_DIR}/es_packages/whl/es_transformer-1.0.0-py3-none-any.whl"
  	local python_es_whl_name="es_transformer"
-  chmod u+w "${TARGET_VERSION_DIR}/python" 2> /dev/null
  	local whl_install_dir_path="${TARGET_VERSION_DIR}/python/site-packages"
- 	chmod u+w "${whl_install_dir_path}" 2> /dev/null
  	install_es_whl_package "${es_whl_path}" "${python_es_whl_name}" "${whl_install_dir_path}"
   if [ -d "${TARGET_VERSION_DIR}/ops_transformer" ]; then
  	  rm -rf "${TARGET_VERSION_DIR}/ops_transformer"
@@ -356,9 +354,6 @@ add_init_py() {
   local built_in_impl_path=${TARGET_OPP_BUILT_IN}/op_impl/ai_core/tbe/impl/ops_transformer
   if [ -d ${built_in_impl_path} ]; then
     opp_builtin_mod=$(stat -c %a ${built_in_impl_path})
-    if [ "$(id -u)" != 0 ] && [ ! -w "${built_in_impl_path}" ]; then
-      chmod u+w -R "${built_in_impl_path}" 2>/dev/null
-    fi
   fi
   touch ${built_in_impl_path}/__init__.py
 
@@ -454,21 +449,6 @@ main() {
   check_env
 
   install_opp
-
-  # change log dir and file owner and rights
-  chmod "${LOG_PATH_PERM}" "${COMM_LOG_DIR}" 2>/dev/null
-  chmod "${LOG_FILE_PERM}" "${COMM_LOGFILE}" 2>/dev/null
-  chmod "${LOG_FILE_PERM}" "${COMM_OPERATION_LOGFILE}" 2>/dev/null
-
-  if [ "$(id -u)" = "0" ]; then
-    chmod "${CUSTOM_PERM}" -R "${TARGET_OPP_BUILT_IN}" 2>/dev/null
-  else
-    chmod "${BUILTIN_PERM}" -R "${TARGET_OPP_BUILT_IN}" 2>/dev/null
-  fi
-
-  chmod "${ONLYREAD_PERM}" "${TARGET_SHARED_INFO_DIR}/${OPP_PLATFORM_DIR}/scene.info" 2>/dev/null
-  chmod "${ONLYREAD_PERM}" "${TARGET_SHARED_INFO_DIR}/${OPP_PLATFORM_DIR}/version.info" 2>/dev/null
-  chmod "${ONLYREAD_PERM}" "${INSTALL_INFO_FILE}" 2>/dev/null
 
   # change installed folder's owner and group except aicpu
   log_with_errorlevel "$?" "error" "[ERROR]: ERR_NO:${INSTALL_FAILED};ERR_DES:Change opp onwership failed.."
