@@ -21,6 +21,9 @@
 namespace MoeGatingTopKBackwardNs {
 using namespace AscendC;
 
+// 单次向量归约的 lane 数(64): 由向量寄存器宽度 / int32 位宽推导, Init(UB sizing) 与 VF(归约chunk) 共用
+constexpr uint16_t kReduceChunkLane = VECTOR_REG_WIDTH / sizeof(int32_t);
+
 constexpr Reg::CastTrait castTraitB322B16 = {
     Reg::RegLayout::ZERO,
     Reg::SatMode::NO_SAT,
@@ -128,9 +131,10 @@ __simd_vf__ void CastGradYRowsVF(__ubuf__ T *srcAddr, __ubuf__ float *dstAddr, u
 
 __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int32_t *expertIdxBase,
                                          __ubuf__ float *gradYBase, __ubuf__ float *gradNormXBase, float eps,
-                                         uint16_t curRows, uint16_t k, uint16_t kAlign, uint16_t n)
+                                         uint16_t curRows, uint16_t k, uint16_t kAlign, uint16_t n,
+                                         __ubuf__ float *partialSumBuf)
 {
-    constexpr uint16_t chunkSize = VECTOR_REG_WIDTH / sizeof(int32_t); // 64 for int32_t/float
+    constexpr uint16_t chunkSize = kReduceChunkLane; // 单次向量归约 chunk 的 lane 数(64)
     uint16_t repeatTimes = static_cast<uint16_t>((k + chunkSize - 1) / chunkSize);
     Reg::MaskReg maskLane0 = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
 
@@ -140,9 +144,10 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
         __ubuf__ float *gradYRow = gradYBase + row * kAlign;
         __ubuf__ float *gradNormXRow = gradNormXBase + row * n;
 
-        // ---- Phase 1a: accumulate global D across all chunks, add eps last. ----
+        // ---- Phase 1a: per-chunk partial sums into partialSumBuf, then tree-reduce. ----
         Reg::RegTensor<float> globalD;
         Reg::Duplicate(globalD, 0.0f, maskLane0);
+        Reg::RegTensor<float> chunkSum;
 
         uint32_t remainingK1 = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
@@ -151,20 +156,28 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
 
             Reg::RegTensor<int32_t> idxReg;
             Reg::RegTensor<uint32_t> idxU32Reg;
-            Reg::RegTensor<float> wPrimeReg, chunkSum;
+            Reg::RegTensor<float> wPrimeReg;
 
             Reg::LoadAlign(idxReg, idxRow + chunkOffset);
             idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
             Reg::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
 
             Reg::ReduceSum(chunkSum, wPrimeReg, chunkMask);
-            Reg::Add(globalD, globalD, chunkSum, maskLane0);
+            // 部分和(lane0) 落 partialSumBuf[c]
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(partialSumBuf + c, chunkSum, chunkMask);
         }
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
+        // 二级归约：整段 LoadAlign → 一次树状 ReduceSum → D
+        uint32_t partCount = repeatTimes;
+        Reg::MaskReg partMask = Reg::UpdateMask<float>(partCount);
+        Reg::LoadAlign(globalD, partialSumBuf);
+        Reg::ReduceSum(globalD, globalD, partMask);
         Reg::Adds(globalD, globalD, eps, maskLane0);
 
-        // ---- Phase 1b: re-gather w', compute w'/D, multiply by gradY, accumulate betaNum. ----
+        // ---- Phase 1b: re-gather w', compute w'/D, multiply by gradY, tree-reduce betaNum. ----
         Reg::RegTensor<float> globalBetaNum;
         Reg::Duplicate(globalBetaNum, 0.0f, maskLane0);
+        Reg::RegTensor<float> chunkSumB;
 
         uint32_t remainingK1b = k;
         for (uint16_t c = 0; c < repeatTimes; c++) {
@@ -173,7 +186,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
 
             Reg::RegTensor<int32_t> idxReg;
             Reg::RegTensor<uint32_t> idxU32Reg;
-            Reg::RegTensor<float> wPrimeReg, gradYReg, wNormReg, tmpReg, chunkSum;
+            Reg::RegTensor<float> wPrimeReg, gradYReg, wNormReg, tmpReg;
 
             Reg::LoadAlign(idxReg, idxRow + chunkOffset);
             idxU32Reg = (Reg::RegTensor<uint32_t> &)idxReg;
@@ -187,9 +200,16 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float *xNormBase, __ubuf__ int
 
             Reg::LoadAlign(gradYReg, gradYRow + chunkOffset);
             Reg::Mul(tmpReg, gradYReg, wNormReg, chunkMask);
-            Reg::ReduceSum(chunkSum, tmpReg, chunkMask);
-            Reg::Add(globalBetaNum, globalBetaNum, chunkSum, maskLane0);
+            Reg::ReduceSum(chunkSumB, tmpReg, chunkMask);
+            // 部分和(lane0) 落 partialSumBuf[c]（与 Phase1a 时序复用同一段）
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(partialSumBuf + c, chunkSumB, chunkMask);
         }
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
+        // 二级归约：整段 LoadAlign → 一次树状 ReduceSum → beta
+        uint32_t partCountB = repeatTimes;
+        Reg::MaskReg partMaskB = Reg::UpdateMask<float>(partCountB);
+        Reg::LoadAlign(globalBetaNum, partialSumBuf);
+        Reg::ReduceSum(globalBetaNum, globalBetaNum, partMaskB);
 
         // ---- Phase 2: recompute gradWPrime per chunk, scatter. ----
         uint32_t remainingK2 = k;
@@ -257,13 +277,16 @@ __aicore__ inline void CallCastGradYRowsVF(LocalTensor<T> gradYSrc, LocalTensor<
 
 __aicore__ inline void CallSigmoidRenormBackwardVF(LocalTensor<float> xNorm, LocalTensor<int32_t> expertIdx,
                                                    LocalTensor<float> gradY, LocalTensor<float> gradNormX, float eps,
-                                                   uint16_t curRows, uint16_t k, uint16_t kAlign, uint16_t n)
+                                                   uint16_t curRows, uint16_t k, uint16_t kAlign, uint16_t n,
+                                                   LocalTensor<float> partialSumBuf)
 {
     __ubuf__ float *xNormAddr = (__ubuf__ float *)xNorm.GetPhyAddr();
     __ubuf__ int32_t *expertIdxAddr = (__ubuf__ int32_t *)expertIdx.GetPhyAddr();
     __ubuf__ float *gradYAddr = (__ubuf__ float *)gradY.GetPhyAddr();
     __ubuf__ float *gradNormXAddr = (__ubuf__ float *)gradNormX.GetPhyAddr();
-    SigmoidRenormBackwardVF(xNormAddr, expertIdxAddr, gradYAddr, gradNormXAddr, eps, curRows, k, kAlign, n);
+    __ubuf__ float *partialSumAddr = (__ubuf__ float *)partialSumBuf.GetPhyAddr();
+    SigmoidRenormBackwardVF(xNormAddr, expertIdxAddr, gradYAddr, gradNormXAddr, eps, curRows, k, kAlign, n,
+                            partialSumAddr);
 }
 
 } // namespace MoeGatingTopKBackwardNs
