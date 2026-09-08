@@ -67,10 +67,10 @@ TEST_F(AclnnMegaMoeTest, activation_param_domain)
     // test_mega_moe_tiling.cpp), which every aclnn path goes through. Here we only verify that
     // valid parameter sets are accepted and forwarded to the mocked inner op, which returns
     // ACLNN_ERR_RUNTIME_ERROR in this test environment. Rejection of invalid parameter sets
-    // (wrong count, NaN/Inf, zero scale) is covered by the arch22 tiling UT.
+    // (wrong count, NaN/Inf, non-positive scale) is covered by the arch-specific tiling UTs.
     EXPECT_EQ(RunActivationParamCase("swigluoai", {kMax, 0.0f, -1.0f}), ACLNN_ERR_RUNTIME_ERROR);
-    EXPECT_EQ(RunActivationParamCase("situglu", {-4.0f}), ACLNN_ERR_RUNTIME_ERROR);
-    EXPECT_EQ(RunActivationParamCase("situglu", {-4.0f, -25.0f}), ACLNN_ERR_RUNTIME_ERROR);
+    EXPECT_EQ(RunActivationParamCase("situglu", {4.0f}), ACLNN_ERR_RUNTIME_ERROR);
+    EXPECT_EQ(RunActivationParamCase("situglu", {4.0f, 25.0f}), ACLNN_ERR_RUNTIME_ERROR);
 }
 
 TEST_F(AclnnMegaMoeTest, ascend950_nullptr_context)
