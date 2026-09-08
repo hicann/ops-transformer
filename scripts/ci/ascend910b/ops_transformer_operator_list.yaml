@@ -46,6 +46,7 @@ operator_group_6:
   - rain_fusion_attention
   - block_sparse_attention
   - generic_block_sparse_attention
+  - generic_block_sparse_attention_grad
   - recurrent_gated_delta_rule
   - ring_attention_update
   - sparse_lightning_indexer_grad_kl_loss

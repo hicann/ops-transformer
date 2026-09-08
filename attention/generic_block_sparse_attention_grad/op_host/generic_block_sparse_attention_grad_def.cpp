@@ -102,6 +102,8 @@ public:
         this->Attr("win_right").AttrType(OPTIONAL).Int(-1);
 
         this->AICore().AddConfig("ascend950");
+        this->AICore().AddConfig("ascend910b");
+        this->AICore().AddConfig("ascend910_93");
     }
 };
 

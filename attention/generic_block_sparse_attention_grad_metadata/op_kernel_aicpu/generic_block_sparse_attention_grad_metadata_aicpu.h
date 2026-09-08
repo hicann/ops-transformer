@@ -53,10 +53,10 @@ inline T CeilDiv(T num, T rnd)
     return ((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd));
 }
 
-class GenericBlockSparseAttentionGradMetadataCpuKernel : public CpuKernel {
+class GenericBlockSparseAttentionGradMetadataCpuKernelArch35 : public CpuKernel {
 public:
-    GenericBlockSparseAttentionGradMetadataCpuKernel() = default;
-    ~GenericBlockSparseAttentionGradMetadataCpuKernel() override = default;
+    GenericBlockSparseAttentionGradMetadataCpuKernelArch35() = default;
+    ~GenericBlockSparseAttentionGradMetadataCpuKernelArch35() override = default;
     uint32_t Compute(CpuKernelContext &ctx) override;
 
 private:

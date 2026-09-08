@@ -10,7 +10,11 @@
 
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
+#if __CCE_AICORE__ == 310
 #include "arc35/generic_block_sparse_attention_grad.h"
+#else
+#include "arc22/generic_block_sparse_attention_grad_interface.h"
+#endif
 
 // ============================================================================
 // Kernel Entry Point — GenericBlockSparseAttentionGrad (design §1 / IR)
@@ -28,6 +32,7 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention_grad(
 {
     __gm__ uint8_t *user = AscendC::GetUserWorkspace(workspace);
 
+#if __CCE_AICORE__ == 310
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttentionGradTilingDataArch35, tiling_data_in, tiling);
     const GenericBlockSparseAttentionGradTilingDataArch35 *__restrict tilingDataPtr = &tiling_data_in;
@@ -66,4 +71,31 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention_grad(
         op.Process(query, key, value, dout, out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata, attenMask,
                    cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, user, tilingDataPtr, &tPipe);
     }
+#else
+    if (TILING_KEY_IS(100)) {
+        GBSAG::GenericBlockSparseAttentionGradInfer<half, 0>(
+            query, key, value, dout, out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata, attenMask,
+            cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, user, tiling);
+    } else if (TILING_KEY_IS(101)) {
+        GBSAG::GenericBlockSparseAttentionGradInfer<half, 1>(
+            query, key, value, dout, out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata, attenMask,
+            cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, user, tiling);
+    } else if (TILING_KEY_IS(102)) {
+        GBSAG::GenericBlockSparseAttentionGradInfer<half, 2>(
+            query, key, value, dout, out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata, attenMask,
+            cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, user, tiling);
+    } else if (TILING_KEY_IS(110)) {
+        GBSAG::GenericBlockSparseAttentionGradInfer<bfloat16_t, 0>(
+            query, key, value, dout, out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata, attenMask,
+            cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, user, tiling);
+    } else if (TILING_KEY_IS(111)) {
+        GBSAG::GenericBlockSparseAttentionGradInfer<bfloat16_t, 1>(
+            query, key, value, dout, out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata, attenMask,
+            cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, user, tiling);
+    } else if (TILING_KEY_IS(112)) {
+        GBSAG::GenericBlockSparseAttentionGradInfer<bfloat16_t, 2>(
+            query, key, value, dout, out, softmaxLse, sparseBlockIdx, sparseBlockCount, metadata, attenMask,
+            cuSeqLengthsQ, cuSeqLengthsKv, sequsedQ, sequsedKv, dq, dk, dv, user, tiling);
+    }
+#endif
 }
