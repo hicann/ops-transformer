@@ -846,6 +846,13 @@ class QuantLightningIndexerV2InputAdapter:
 INPUT_ADAPTER = QuantLightningIndexerV2InputAdapter()
 
 
+def is_negative_case(kwargs):
+    value = kwargs.get("is_negative_case", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def rebuild_qli_v2_compare_data(compare_context):
     return INPUT_ADAPTER.rebuild_compare_data(compare_context)
 
@@ -883,6 +890,9 @@ def generate_qli_v2_inputs(
     **kwargs,
 ):
     """Populate pytest-derived inputs; metadata is filled by npu_preprocess."""
+    if is_negative_case(kwargs):
+        return None
+
     if metadata is None:
         raise ValueError("QLI_V2 direct API CSV must reserve the metadata tensor slot")
     params = dict(kwargs)
