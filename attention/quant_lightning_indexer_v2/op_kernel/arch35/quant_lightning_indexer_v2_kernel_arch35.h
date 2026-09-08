@@ -816,6 +816,10 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::ProcessMain()
                                                                               0);
         CrossCoreWaitFlag<QLIV2Common::ConstInfo::QLIV2_SYNC_MODE4, PIPE_FIX>(QLIV2Common::ConstInfo::CROSS_VC_EVENT +
                                                                               1);
+        CrossCoreWaitFlag<QLIV2Common::ConstInfo::QLIV2_SYNC_MODE4, PIPE_FIX>(
+            QLIV2Common::ConstInfo::CROSS_VC_EVENT + 0 + QLIV2Common::ConstInfo::AIV0_AIV1_OFFSET);
+        CrossCoreWaitFlag<QLIV2Common::ConstInfo::QLIV2_SYNC_MODE4, PIPE_FIX>(
+            QLIV2Common::ConstInfo::CROSS_VC_EVENT + 1 + QLIV2Common::ConstInfo::AIV0_AIV1_OFFSET);
     }
 }
 
