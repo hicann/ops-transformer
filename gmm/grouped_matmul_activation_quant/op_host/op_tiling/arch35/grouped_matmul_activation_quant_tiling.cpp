@@ -70,6 +70,10 @@ constexpr uint32_t MXFP4_PACK_FACTOR = 2;
 // while its epilogue buffers hold at most 128 * 256 elements.
 constexpr uint64_t MX_EPILOGUE_MAX_ELEMENTS_PER_AIV = 128UL * 256UL;
 constexpr uint64_t MX_EPILOGUE_AIV_COUNT = 2UL;
+constexpr uint32_t EPILOGUE_UB_SINGLE_BUFFER_COUNT = 1U;
+constexpr uint32_t EPILOGUE_UB_DOUBLE_BUFFER_COUNT = GroupedMatmul::QUEUE_DOUBLE_BUFFER;
+constexpr uint32_t EPILOGUE_SCALE_INTERMEDIATE_COUNT = 2U;
+constexpr uint32_t EPILOGUE_BASE_M_SEARCH_STEP = GmmConstant::CUBE_BLOCK;
 constexpr uint32_t FP8_E4M3FN_VALUE = 36;
 constexpr uint32_t FP8_E5M2_VALUE = 35;
 constexpr uint32_t FP4_E2M1_VALUE = 40;
@@ -469,6 +473,7 @@ ge::graphStatus GroupedMatmulActivationQuantTiling950::DoLibApiTiling()
                 OP_LOGE(context_->GetNodeName(), "baseN=%lu exceeds the MX epilogue UB capacity.", basicTiling_.baseN),
                 return ge::GRAPH_FAILED);
     basicTiling_.baseM = std::min(alignedBaseM, maxBaseMByUb);
+    AdjustBasicBlockForEpilogueDoubleBuffer();
     OP_CHECK_IF(GroupedQmmBasicApiTiling::CalL1Tiling() != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed."), return ge::GRAPH_FAILED);
     tilingData_.mmTilingData.m = inputParams_.mSize;
@@ -493,6 +498,50 @@ ge::graphStatus GroupedMatmulActivationQuantTiling950::DoLibApiTiling()
     tilingData_.mmTilingData.isBias = 0;
     tilingData_.mmTilingData.dbL0C = basicTiling_.dbL0c;
     return ge::GRAPH_SUCCESS;
+}
+
+uint64_t GroupedMatmulActivationQuantTiling950::CalcEpilogueUbBytes(uint64_t baseM, uint64_t baseN,
+                                                                    uint32_t bufferCount) const
+{
+    const uint32_t effectiveBufferCount = std::max(bufferCount, EPILOGUE_UB_SINGLE_BUFFER_COUNT);
+    const uint64_t mPerVector = GroupedMatmul::CeilDiv(baseM, GroupedMatmul::QUEUE_DOUBLE_BUFFER);
+    const uint64_t maxBlockCount = mPerVector * baseN;
+    const uint64_t maxScaleCount = GroupedMatmul::CeilDiv(maxBlockCount, static_cast<uint64_t>(AscendC::ONE_BLK_SIZE));
+    const uint64_t afterIn = maxBlockCount * sizeof(float);
+    const uint64_t scaleBlockBytes = mPerVector * AscendC::ONE_BLK_SIZE * sizeof(int8_t);
+    const uint64_t singleBufferBytes =
+        afterIn + maxBlockCount * sizeof(int8_t) + maxScaleCount * sizeof(int8_t) + maxBlockCount * sizeof(uint16_t) +
+        maxScaleCount * sizeof(uint16_t) * EPILOGUE_SCALE_INTERMEDIATE_COUNT + scaleBlockBytes;
+    const uint64_t extraBufferBytes = maxBlockCount * sizeof(int8_t) + scaleBlockBytes;
+    return singleBufferBytes + (effectiveBufferCount - EPILOGUE_UB_SINGLE_BUFFER_COUNT) * extraBufferBytes;
+}
+
+bool GroupedMatmulActivationQuantTiling950::CanEnableEpilogueDoubleBuffer(uint64_t baseM, uint64_t baseN) const
+{
+    return CalcEpilogueUbBytes(baseM, baseN, EPILOGUE_UB_DOUBLE_BUFFER_COUNT) <= aicoreParams_.ubSize;
+}
+
+void GroupedMatmulActivationQuantTiling950::AdjustBasicBlockForEpilogueDoubleBuffer()
+{
+    if (basicTiling_.baseM == 0 || basicTiling_.baseN == 0 || inputParams_.groupNum == 0 ||
+        CanEnableEpilogueDoubleBuffer(basicTiling_.baseM, basicTiling_.baseN)) {
+        return;
+    }
+
+    const uint64_t originalBaseM = basicTiling_.baseM;
+    const uint64_t averageGroupM = GroupedMatmul::CeilDiv(inputParams_.mSize, inputParams_.groupNum);
+    const uint64_t originalBlockCount = GroupedMatmul::CeilDiv(averageGroupM, originalBaseM);
+    for (uint64_t candidateBaseM = originalBaseM; candidateBaseM >= EPILOGUE_BASE_M_SEARCH_STEP;
+         candidateBaseM -= EPILOGUE_BASE_M_SEARCH_STEP) {
+        if (!CanEnableEpilogueDoubleBuffer(candidateBaseM, basicTiling_.baseN)) {
+            continue;
+        }
+        const uint64_t candidateBlockCount = GroupedMatmul::CeilDiv(averageGroupM, candidateBaseM);
+        if (candidateBlockCount <= originalBlockCount) {
+            basicTiling_.baseM = static_cast<uint32_t>(candidateBaseM);
+        }
+        return;
+    }
 }
 
 uint64_t GroupedMatmulActivationQuantTiling950::GetTilingKey() const
