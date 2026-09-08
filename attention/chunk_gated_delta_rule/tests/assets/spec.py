@@ -66,10 +66,10 @@ class ChunkGatedDeltaRuleSpec:
         "bfloat16": {"standard": "cross_check", "level": "L1"},
     }
 
-    def compare(*outputs, **kwargs):
-        ctx = golden_module.get_golden_context()
-        kwargs["bench_out"] = ctx.get("bench_out")
-        kwargs["bench_state"] = ctx.get("bench_state")
+    def compare(*outputs, compare_context=None, **kwargs):
+        kwargs["bench_out"], kwargs["bench_state"] = golden_module.resolve_bench(
+            compare_context
+        )
         return compare_module.compare(*outputs, **kwargs)
 
 
@@ -80,10 +80,10 @@ class AclnnChunkGatedDeltaRuleSpec:
         "bfloat16": {"standard": "cross_check", "level": "L1"},
     }
 
-    def compare(*outputs, **kwargs):
-        ctx = golden_module.get_golden_context()
-        kwargs["bench_out"] = ctx.get("bench_out")
-        kwargs["bench_state"] = ctx.get("bench_state")
+    def compare(*outputs, compare_context=None, **kwargs):
+        kwargs["bench_out"], kwargs["bench_state"] = golden_module.resolve_bench(
+            compare_context
+        )
         return compare_module.compare(*outputs, **kwargs)
 
 

@@ -22,16 +22,28 @@ the custom compare to retrieve and perform three-party cross_check.
 
 import gc
 import importlib.util
+import logging
+import re
 import sys
+import numpy
 import torch
 import torch.nn.functional as F
 from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 PYTEST_GOLDEN_MODULE = None
 PYTEST_BENCHMARK_MODULE = None
 
 _GOLDEN_CONTEXT = {}
+
+_BENCH_DIR_SUFFIX = ".bench"
+_BENCH_FILE_COUNT = 2
+_BENCH_FILE_PATTERN = re.compile(
+    r"^bench_([0-9]+)_([A-Za-z0-9][A-Za-z0-9_.-]*?)__shape_(scalar|[0-9]+(?:x[0-9]+)*)\.bin$"
+)
 
 
 def load_pytest_golden_module():
@@ -188,7 +200,15 @@ def _run_benchmark(
 
 
 def _compute_and_store(
-    query, key, value, beta, initial_state, actual_seq_lengths, scale, g
+    query,
+    key,
+    value,
+    beta,
+    initial_state,
+    actual_seq_lengths,
+    scale,
+    g,
+    testcase_name=None,
 ):
     """Compute both golden and benchmark, store benchmark in _GOLDEN_CONTEXT.
 
@@ -220,6 +240,9 @@ def _compute_and_store(
 
     _GOLDEN_CONTEXT["bench_out"] = o_b
     _GOLDEN_CONTEXT["bench_state"] = state_b
+    _GOLDEN_CONTEXT["bench_case"] = testcase_name
+
+    _save_bench(testcase_name, (o_b, state_b))
 
     return o_g, state_g
 
@@ -244,6 +267,7 @@ def cpu_chunk_gated_delta_rule(query, key, value, *args, **kwargs):
         p["actual_seq_lengths"],
         p["scale"],
         p["g"],
+        testcase_name=kwargs.get("testcase_name"),
     )
     return [o, state]
 
@@ -276,9 +300,189 @@ def aclnn_chunk_gated_delta_rule_golden(
         actualSeqLengths,
         scaleValue,
         gOptional,
+        testcase_name=kwargs.get("testcase_name"),
     )
     return [o, state]
 
 
 def get_golden_context():
     return _GOLDEN_CONTEXT
+
+
+def _bench_to_numpy(value):
+    if hasattr(value, "detach"):
+        value = value.detach().cpu()
+        if value.dtype in (torch.bfloat16, torch.float16):
+            value = value.to(torch.float32)
+        return value.numpy()
+    return numpy.asarray(value)
+
+
+def _manual_bench_dirs(testcase_name, mode):
+    """Sibling bench dirs (<case_dir>.bench) matching the manual-data mode."""
+    try:
+        from ttk.core_modules.manual_data import case_directory_name
+        from ttk.utilities import get_global_storage
+    except ImportError:
+        return []
+    switches = get_global_storage()
+    if getattr(switches, "manual_data_mode", None) != mode:
+        return []
+    roots = tuple(getattr(switches, "manual_data_dirs", ()) or ())
+    stem = case_directory_name(testcase_name) + _BENCH_DIR_SUFFIX
+    return [Path(root) / stem for root in roots]
+
+
+def _encode_shape(shape):
+    shape = tuple(int(dimension) for dimension in shape)
+    return "scalar" if not shape else "x".join(str(dimension) for dimension in shape)
+
+
+def _save_bench(testcase_name, bench_outputs):
+    """Persist benchmark outputs beside the manual-data case dir at prepare.
+
+    The TTK manual-data case dir has a strict file schema (input/scalar/golden
+    with slot counts fixed by the CSV), so the benchmark lives in a sibling
+    directory and is written only when goldens are dumped (--dump in,golden).
+    Uses the same bin convention as TTK golden files: raw bytes with the dtype
+    and shape encoded in the filename (bench_<i>_<dtype>__shape_<DxN>.bin).
+    """
+    if testcase_name is None:
+        return
+    bench_dirs = _manual_bench_dirs(testcase_name, "prepare")
+    if not bench_dirs:
+        return
+    try:
+        from ttk.utilities import get_global_storage, dump_to_file
+    except ImportError:
+        return
+    dump_config = getattr(get_global_storage(), "dump_config", None)
+    if dump_config is None or not dump_config.is_golden_enabled():
+        return
+    bench_dir = bench_dirs[0]
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    for index, value in enumerate(bench_outputs):
+        array = _bench_to_numpy(value)
+        stem = f"bench_{index}_{array.dtype.name}__shape_{_encode_shape(array.shape)}"
+        dump_to_file(array, str(bench_dir), stem, file_format="bin")
+    logger.info("[%s] persisted benchmark data at %s", testcase_name, bench_dir)
+
+
+def _load_bench(testcase_name):
+    """Load benchmark outputs persisted at prepare; None when unavailable."""
+    if testcase_name is None:
+        return None
+    try:
+        from ttk.utilities import load_numpy_data
+    except ImportError:
+        return None
+    for bench_dir in _manual_bench_dirs(testcase_name, "replay"):
+        entries = {}
+        for path in sorted(bench_dir.glob("bench_*.bin")):
+            match = _BENCH_FILE_PATTERN.fullmatch(path.name)
+            if match is None:
+                continue
+            entries[int(match.group(1))] = (match.group(2), match.group(3), path)
+        indexes = sorted(entries)
+        if indexes != list(range(_BENCH_FILE_COUNT)):
+            continue
+        try:
+            values = []
+            for index in indexes:
+                dtype_name, shape_token, path = entries[index]
+                shape = (
+                    ()
+                    if shape_token == "scalar"
+                    else tuple(int(d) for d in shape_token.split("x"))
+                )
+                values.append(
+                    load_numpy_data(str(path), numpy.dtype(dtype_name), shape).copy()
+                )
+        except Exception:
+            logger.warning(
+                "[%s] failed to load persisted benchmark: %s", testcase_name, path
+            )
+            continue
+        logger.info("[%s] loaded persisted benchmark from %s", testcase_name, bench_dir)
+        return values
+    return None
+
+
+def _flatten_values(values):
+    flat = []
+    for item in values or ():
+        if isinstance(item, (list, tuple)):
+            flat.extend(_flatten_values(item))
+        else:
+            flat.append(item)
+    return flat
+
+
+def _scalar_to_float(value):
+    if value is None:
+        return None
+    if hasattr(value, "detach"):
+        value = value.detach().cpu()
+    if hasattr(value, "reshape"):
+        return float(value.reshape(-1)[0])
+    return float(value)
+
+
+def _recompute_bench_from_context(compare_context):
+    """Recompute the benchmark from inputs restored by manual-data replay.
+
+    Both CSV layouts (e2e and aclnn) place q, k, v, beta, initial_state,
+    actual_seq_lengths, g in the first seven tensor slots; scale is the first
+    aclnn scalar or the e2e 'scale' attribute.
+    """
+    tensors = _flatten_values(getattr(compare_context, "input_tensors", None))
+    scalars = _flatten_values(getattr(compare_context, "input_scalars", None))
+    attributes = dict(getattr(compare_context, "attributes", None) or {})
+    if len(tensors) < 7:
+        raise ValueError(
+            f"compare_context provides {len(tensors)} tensors, expected at least 7"
+        )
+
+    query, key, value, beta, initial_state, actual_seq_lengths, g = tensors[:7]
+
+    scale = None
+    for scalar in scalars:
+        scale = _scalar_to_float(scalar)
+        if scale is not None:
+            break
+    if scale is None:
+        for name in ("scale", "scaleValue"):
+            if attributes.get(name) is not None:
+                scale = _scalar_to_float(attributes[name])
+                break
+
+    o_b, state_b = _run_benchmark(
+        query, key, value, beta, initial_state, actual_seq_lengths, scale, g
+    )
+    return o_b, state_b
+
+
+def resolve_bench(compare_context=None):
+    """Return (bench_out, bench_state) for the three-party compare hook.
+
+    Prefers the in-memory benchmark computed alongside the golden function for
+    the current testcase (direct and input-only replay). Full-mode manual-data
+    replay skips the golden function, so the benchmark persisted at prepare is
+    loaded from the <case_dir>.bench sibling of the manual-data directory —
+    mirroring how the golden itself is restored from bin. Recomputing from the
+    restored inputs remains a fallback for datasets prepared without it.
+    """
+    name = getattr(compare_context, "testcase_name", None)
+    if name is None or _GOLDEN_CONTEXT.get("bench_case") != name:
+        if name is None:
+            return _GOLDEN_CONTEXT.get("bench_out"), _GOLDEN_CONTEXT.get("bench_state")
+        loaded = _load_bench(name)
+        if loaded is None:
+            logger.warning(
+                "[%s] persisted benchmark not found, recomputing from restored inputs",
+                name,
+            )
+            loaded = list(_recompute_bench_from_context(compare_context))
+        _GOLDEN_CONTEXT["bench_out"], _GOLDEN_CONTEXT["bench_state"] = loaded
+        _GOLDEN_CONTEXT["bench_case"] = name
+    return _GOLDEN_CONTEXT.get("bench_out"), _GOLDEN_CONTEXT.get("bench_state")
