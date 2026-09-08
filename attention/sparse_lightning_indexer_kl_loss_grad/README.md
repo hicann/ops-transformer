@@ -343,7 +343,7 @@
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：N1支持8、16、32、64。
     - <term>Ascend 950PR/Ascend 950DT</term>：N1支持1~128。
   - 参数K的支持情况:
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：K支持512、1024、2048、4096、8192。
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：K支持1~8192。
     - <term>Ascend 950PR/Ascend 950DT</term>：K支持0~2048。
 
 - 典型值

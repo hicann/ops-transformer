@@ -56,7 +56,6 @@ static bool IsPrivateScatter(int64_t scatterElems, int64_t totalS1, int64_t batc
     return scatterElems * kReal <= PRIVATE_SCATTER_RATIO_K_MAX * totalS1;
 }
 
-static constexpr uint32_t BUFFER_SIZE_BYTE_1K = 1024;
 static constexpr uint32_t BUFFER_SIZE_BYTE_2K = 2 * 1024;
 static constexpr uint32_t BUFFER_SIZE_BYTE_8K = 8 * 1024;
 static constexpr uint32_t BUFFER_SIZE_BYTE_32K = 32 * 1024;
@@ -282,10 +281,9 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeLayout()
                     softmaxShape.GetDim(softmaxShape.GetDimNum() - 2) != n2Size ||
                     softmaxShape.GetDim(softmaxShape.GetDimNum() - 1) != kSize,
                 OP_LOGE(opName, "sparse_indices/attn_softmax_l1_norm N2/K shape mismatch."), return false);
-    OP_CHECK_IF(kSize > BUFFER_SIZE_BYTE_8K || (kSize != 512 && kSize % BUFFER_SIZE_BYTE_1K != 0),
-                OP_LOGE(opName, "K(%d) should be <=8192 and be 512 or an integer multiple of 1024.", kSize),
+    OP_CHECK_IF(kSize < 1 || kSize > BUFFER_SIZE_BYTE_8K, OP_LOGE(opName, "K(%d) should be in range [1, 8192].", kSize),
                 return false);
-    topkSize = static_cast<TopKRange>(kSize);
+    topkSize = (kSize <= static_cast<int32_t>(BUFFER_SIZE_BYTE_2K)) ? TopKRange::RANGE_0_2K : TopKRange::RANGE_2K_8K;
     return true;
 }
 
@@ -401,7 +399,8 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::DoOpTiling()
     SetMultiCoreParamsRegbase(totalSize, static_cast<int64_t>(aicNum));
     context_->SetBlockDim(sliGradkllossMultiCoreParams_->get_coreNum());
 
-    std::vector<int64_t> shapeVec = {1, kSize};
+    int64_t kAlign8Softmax = ((static_cast<int64_t>(kSize) + 7) / 8) * 8;
+    std::vector<int64_t> shapeVec = {1, kAlign8Softmax};
     ge::Shape srcShape(shapeVec);
     int64_t softmaxTmpBufferSize = (kSize > BUFFER_SIZE_BYTE_2K) ? BUFFER_SIZE_BYTE_33K : BUFFER_SIZE_BYTE_32K;
     SoftMaxTilingFunc(srcShape, sizeof(float), softmaxTmpBufferSize, tilingData->vectorParams.softmaxYTilingData);
@@ -431,12 +430,13 @@ uint64_t SparseLightningIndexerKLLossGradTilingBase::GetTilingKey() const
 ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetWorkspaceSize()
 {
     size_t *workspaces = context_->GetWorkspaceSizes(1);
+    int64_t kAlign16 = ((static_cast<int64_t>(kSize) + 15) / 16) * 16;
     int64_t pSize = static_cast<int64_t>(kSize) * dSizeQuery * sizeof(uint16_t);
     int64_t sySize = static_cast<int64_t>(kSize) * dSizeQueryIndex * sizeof(uint16_t);
-    int64_t bmm1Size = static_cast<int64_t>(gSizeQuery) * kSize * sizeof(float);
-    int64_t bmm2Size = static_cast<int64_t>(gSizeQueryIndex) * kSize * sizeof(float);
-    int64_t reluGradSize = static_cast<int64_t>(gSizeQueryIndex) * kSize * sizeof(float);
-    int64_t psySyncSize = (static_cast<int64_t>(kSize) * 2 + 32 / sizeof(float)) * sizeof(float);
+    int64_t bmm1Size = static_cast<int64_t>(gSizeQuery) * kAlign16 * sizeof(float);
+    int64_t bmm2Size = static_cast<int64_t>(gSizeQueryIndex) * kAlign16 * sizeof(float);
+    int64_t reluGradSize = static_cast<int64_t>(gSizeQueryIndex) * kAlign16 * sizeof(float);
+    int64_t psySyncSize = (kAlign16 * 2 + 32 / sizeof(float)) * sizeof(float);
     int64_t bmm3Size = static_cast<int64_t>(kSize) * dSizeQueryIndex * sizeof(float);
 
     int64_t scatterElems = (tilingKeyLayout == LayoutType::LAYOUT_TND) ? accumS2 : static_cast<int64_t>(bSize) * s2Size;
