@@ -51,8 +51,8 @@ namespace ge {
  *     Output dtype is the same as the corresponding input.
  *
  * @par Attributes:
- * @li valid_block_num: An optional int attribute. Defaults to 0. Reserved and
- *     not used by the current kernel.
+ * @li valid_block_num: An optional int attribute. Defaults to -1 (all N blocks).
+ *     Only -1 or N (block_res.shape[1]) is supported.
  */
 REG_OP(BlockAttentionResidualsGrad)
     .INPUT(partial_block, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
@@ -66,7 +66,7 @@ REG_OP(BlockAttentionResidualsGrad)
     .OUTPUT(grad_block_res, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
     .OUTPUT(grad_proj_weight, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
     .OUTPUT(grad_norm_weight, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
-    .ATTR(valid_block_num, Int, 0)
+    .ATTR(valid_block_num, Int, -1)
     .OP_END_FACTORY_REG(BlockAttentionResidualsGrad)
 } // namespace ge
 

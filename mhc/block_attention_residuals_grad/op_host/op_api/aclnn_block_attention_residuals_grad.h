@@ -37,7 +37,7 @@ extern "C" {
  * @param [in] probs:
  * 表示softmax概率probs，数据类型支持FLOAT32，数据格式支持ND。
  * @param [in] validBlockNum:
- * 表示预留属性，当前内核未使用，默认值为0。
+ * 仅支持-1或blockRes.shape[1]，-1表示使用全部N个block。
  * @param [out] gradPartialBlock:
  * 表示partialBlock的梯度，数据类型支持FLOAT16、BFLOAT16、FLOAT32，数据格式支持ND。
  * @param [out] gradBlockRes:

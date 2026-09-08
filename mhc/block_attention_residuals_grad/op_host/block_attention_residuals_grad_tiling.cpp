@@ -290,6 +290,16 @@ static ge::graphStatus CheckShapeBlockAttentionResidualsGrad(gert::TilingContext
     int64_t blockResBatch = blockResShape.GetDim(0);
     int64_t N = blockResShape.GetDim(1);
     int64_t blockResHidden = blockResShape.GetDim(2);
+    const auto *attrs = context->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    const auto *validBlockNum = attrs->GetInt(0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, validBlockNum);
+    if (*validBlockNum != -1 && *validBlockNum != N) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "valid_block_num",
+                                              std::to_string(*validBlockNum).c_str(),
+                                              "valid_block_num must be -1 or block_res.shape[1]");
+        return ge::GRAPH_FAILED;
+    }
     if (B <= 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "partialBlock.shape[0]",
                                               std::to_string(B).c_str(),

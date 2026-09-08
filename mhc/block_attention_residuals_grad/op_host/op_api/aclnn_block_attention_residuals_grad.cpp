@@ -20,8 +20,12 @@
 #include "opdev/tensor_view_utils.h"
 
 #include "aclnn_kernels/contiguous.h"
+#include "aclnn_kernels/reshape.h"
+#include "level0/zero_op.h"
 
+#include <initializer_list>
 #include <string>
+#include <vector>
 
 using namespace op;
 
@@ -33,10 +37,10 @@ constexpr size_t DIM_NUM_3D = 3;
 constexpr size_t DIM_INDEX_0 = 0;
 constexpr size_t DIM_INDEX_1 = 1;
 constexpr size_t DIM_INDEX_2 = 2;
-constexpr int64_t MIN_TOKEN_NUM = 1;
+constexpr int64_t MIN_TOKEN_NUM = 0;
 constexpr int64_t MIN_BLOCK_NUM = 0;
 constexpr int64_t MAX_BLOCK_NUM = 128;
-constexpr int64_t MIN_HIDDEN_SIZE = 1;
+constexpr int64_t MIN_HIDDEN_SIZE = 0;
 constexpr int64_t PROJ_WEIGHT_ROW_NUM = 1;
 
 aclnnStatus CheckRequiredParameter(const void *parameter, const char *parameterName)
@@ -171,7 +175,7 @@ aclnnStatus CheckInputShapes(const aclTensor *partialBlock, const aclTensor *blo
     const int64_t blockNum = blockResShape.GetDim(DIM_INDEX_1);
     if (tokenNum < MIN_TOKEN_NUM) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[0]", std::to_string(tokenNum).c_str(),
-                                              "partialBlock.shape[0] must be greater than or equal to 1");
+                                              "partialBlock.shape[0] must be greater than or equal to 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockNum < MIN_BLOCK_NUM || blockNum > MAX_BLOCK_NUM) {
@@ -181,7 +185,7 @@ aclnnStatus CheckInputShapes(const aclTensor *partialBlock, const aclTensor *blo
     }
     if (hiddenSize < MIN_HIDDEN_SIZE) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[1]", std::to_string(hiddenSize).c_str(),
-                                              "partialBlock.shape[1] must be greater than or equal to 1");
+                                              "partialBlock.shape[1] must be greater than or equal to 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockResShape.GetDim(DIM_INDEX_0) != tokenNum || blockResShape.GetDim(DIM_INDEX_2) != hiddenSize) {
@@ -250,11 +254,85 @@ aclnnStatus CheckOutputShapes(const aclTensor *gradPartialBlock, const aclTensor
     return ACLNN_SUCCESS;
 }
 
+aclnnStatus CheckValidBlockNum(const aclTensor *blockRes, int64_t validBlockNum)
+{
+    const int64_t blockNum = blockRes->GetViewShape().GetDim(DIM_INDEX_1);
+    if (validBlockNum != -1 && validBlockNum != blockNum) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "validBlockNum", std::to_string(validBlockNum).c_str(),
+                                              "validBlockNum must be -1 or blockRes.shape[1]");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+const aclTensor *CreateZeroLikeOutput(const aclTensor *grad, const aclTensor *reshapeRef,
+                                      UniqueExecutor &uniqueExecutor)
+{
+    const auto *zero = l0op::ZerosLike(grad, uniqueExecutor.get());
+    if (zero == nullptr) {
+        return nullptr;
+    }
+    if (reshapeRef == nullptr) {
+        return zero;
+    }
+
+    const auto &shape = reshapeRef->GetViewShape();
+    const size_t dimNum = shape.GetDimNum();
+    std::vector<int64_t> dims(dimNum);
+    for (size_t i = 0; i < dimNum; ++i) {
+        dims[i] = shape.GetDim(i);
+    }
+    auto *shapeArray = uniqueExecutor->AllocIntArray(dims.data(), dimNum);
+    if (shapeArray == nullptr) {
+        return nullptr;
+    }
+    return l0op::Reshape(zero, shapeArray, uniqueExecutor.get());
+}
+
+aclnnStatus HandleEmptyTensor(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
+                              const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
+                              const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
+                              const aclTensor *gradProjWeight, const aclTensor *gradNormWeight,
+                              UniqueExecutor &uniqueExecutor, uint64_t *workspaceSize, aclOpExecutor **executor,
+                              bool &handled)
+{
+    handled = false;
+    const bool hasEmptyInput = partialBlock->IsEmpty() || blockRes->IsEmpty() || projWeight->IsEmpty() ||
+                               normWeight->IsEmpty() || gradHiddenStates->IsEmpty() || invNorm->IsEmpty() ||
+                               probs->IsEmpty();
+    if (!hasEmptyInput) {
+        return ACLNN_SUCCESS;
+    }
+    // CheckParams has validated all shape relationships. Only blockRes can be
+    // empty while partialBlock is nonempty (N=0); that case still needs computation.
+    if (blockRes->IsEmpty() && !partialBlock->IsEmpty()) {
+        return ACLNN_SUCCESS;
+    }
+    // T=0 or H=0: skip empty outputs and zero any nonempty gradients.
+    for (const aclTensor *grad : {gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight}) {
+        if (grad->IsEmpty()) {
+            continue;
+        }
+
+        // ZerosLike may drop the leading singleton dimension of [1, H].
+        // Restore gradProjWeight's view shape before copying the zero result.
+        const aclTensor *zero =
+            CreateZeroLikeOutput(grad, grad == gradProjWeight ? gradProjWeight : nullptr, uniqueExecutor);
+        CHECK_RET(zero != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        const auto *output = l0op::ViewCopy(zero, grad, uniqueExecutor.get());
+        CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    }
+    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
+    uniqueExecutor.ReleaseTo(executor);
+    handled = true;
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus CheckParams(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
                         const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                        const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
-                        const aclTensor *gradProjWeight, const aclTensor *gradNormWeight, uint64_t *workspaceSize,
-                        aclOpExecutor **executor)
+                        const aclTensor *probs, int64_t validBlockNum, const aclTensor *gradPartialBlock,
+                        const aclTensor *gradBlockRes, const aclTensor *gradProjWeight, const aclTensor *gradNormWeight,
+                        uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     if (CheckNotNull(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, gradPartialBlock,
                      gradBlockRes, gradProjWeight, gradNormWeight, workspaceSize, executor) != ACLNN_SUCCESS) {
@@ -266,6 +344,9 @@ aclnnStatus CheckParams(const aclTensor *partialBlock, const aclTensor *blockRes
     }
     if (CheckDimensions(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs,
                         gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckValidBlockNum(blockRes, validBlockNum) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (CheckInputShapes(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs) !=
@@ -295,9 +376,18 @@ aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     const aclnnStatus checkRet =
-        CheckParams(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, gradPartialBlock,
-                    gradBlockRes, gradProjWeight, gradNormWeight, workspaceSize, executor);
+        CheckParams(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, validBlockNum,
+                    gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight, workspaceSize, executor);
     CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
+
+    bool emptyHandled = false;
+    const aclnnStatus emptyRet = HandleEmptyTensor(
+        partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, gradPartialBlock,
+        gradBlockRes, gradProjWeight, gradNormWeight, uniqueExecutor, workspaceSize, executor, emptyHandled);
+    CHECK_RET(emptyRet == ACLNN_SUCCESS, emptyRet);
+    if (emptyHandled) {
+        return ACLNN_SUCCESS;
+    }
 
     // 与正向算子对齐：输入统一转 Contiguous 后再下发
     auto partialBlock_ = l0op::Contiguous(partialBlock, uniqueExecutor.get());

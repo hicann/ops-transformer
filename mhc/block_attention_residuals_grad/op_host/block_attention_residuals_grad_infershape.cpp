@@ -217,6 +217,21 @@ static bool CheckShapeBlockAttentionResidualsGrad(gert::InferShapeContext *conte
     return true;
 }
 
+static ge::graphStatus CheckValidBlockNum(gert::InferShapeContext *context, int64_t blockNum)
+{
+    const auto *attrs = context->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    const auto *validBlockNum = attrs->GetInt(0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, validBlockNum);
+    // Defer equality with N until the block dimension is known.
+    if (*validBlockNum < -1 || (*validBlockNum != -1 && blockNum != UNKNOWN_DIM && *validBlockNum != blockNum)) {
+        OP_LOGE(context->GetNodeName(), "valid_block_num must be -1 or N=%ld (when known), got %ld", blockNum,
+                *validBlockNum);
+        return GRAPH_FAILED;
+    }
+    return GRAPH_SUCCESS;
+}
+
 static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeContext *context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("BlockAttentionResidualsGrad", "infer shape context is nullptr"),
@@ -247,6 +262,11 @@ static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeCon
     OP_CHECK_NULL_WITH_CONTEXT(context, gradProjWeightShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradNormWeightShape);
 
+    const int64_t blockNum = blockResShape->GetDimNum() == RANK_3D ? blockResShape->GetDim(DIM_BLOCK) : UNKNOWN_DIM;
+    if (CheckValidBlockNum(context, blockNum) != GRAPH_SUCCESS) {
+        return GRAPH_FAILED;
+    }
+
     // -2 unknown rank：输出直接继承对应输入 shape。
     if (IsUnknownRankShape(partialBlockShape) || IsUnknownRankShape(blockResShape) ||
         IsUnknownRankShape(projWeightShape) || IsUnknownRankShape(normWeightShape) ||
@@ -265,6 +285,9 @@ static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeCon
     int64_t N = 0;
     int64_t H = 0;
     if (!CheckShapeBlockAttentionResidualsGrad(context, B, N, H)) {
+        return GRAPH_FAILED;
+    }
+    if (CheckValidBlockNum(context, N) != GRAPH_SUCCESS) {
         return GRAPH_FAILED;
     }
 

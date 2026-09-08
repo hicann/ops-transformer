@@ -78,7 +78,7 @@ int main()
     const int64_t N = 4;
     const int64_t H = 64;
     const int64_t N1 = N + 1;
-    const int64_t validBlockNum = N; // Reserved attribute; currently not used by the kernel.
+    const int64_t validBlockNum = N; // Use all N blocks; -1 is also supported.
 
     std::vector<int64_t> partialBlockShape = {B, H};
     std::vector<int64_t> blockResShape = {B, N, H};

@@ -33,12 +33,6 @@ MAX_BLOCK_NUM = 100
 SUPPORTED_DTYPES = (torch.float16, torch.bfloat16, torch.float32)
 
 
-def _resolve_valid_block_num(block_res, valid_block_num):
-    if valid_block_num is None or valid_block_num < 0:
-        return block_res.size(N_DIM_INDEX)
-    return valid_block_num
-
-
 def _check_inputs(
     partial_block,
     block_res,
@@ -130,8 +124,8 @@ def _check_inputs(
         lambda: f"norm_weight must be [H], but got {tuple(norm_weight.shape)}",
     )
     torch_check(
-        valid_block_num == num_blocks,
-        lambda: f"only default valid_block_num=N is supported, got {valid_block_num}",
+        valid_block_num == -1 or valid_block_num == num_blocks,
+        lambda: f"valid_block_num must be -1 or block_res.shape[1], got {valid_block_num}",
     )
     torch_check(
         math.isfinite(norm_eps) and norm_eps > 0.0,
@@ -151,9 +145,8 @@ class BlockAttentionResidualsOpBuilder(OpBuilder):
     def schema(self) -> str:
         return (
             "block_attention_residuals(Tensor partial_block, Tensor block_res, "
-            "Tensor proj_weight, Tensor norm_weight, int validBlockNum, "
-            f"float normEps={DEFAULT_NORM_EPS}, bool needBackward=False) -> "
-            "(Tensor, Tensor, Tensor)"
+            "Tensor proj_weight, Tensor norm_weight, int valid_block_num=-1, "
+            f"float norm_eps={DEFAULT_NORM_EPS}) -> Tensor"
         )
 
     def register_meta(self):
@@ -163,9 +156,8 @@ class BlockAttentionResidualsOpBuilder(OpBuilder):
             block_res,
             proj_weight,
             norm_weight,
-            valid_block_num,
-            norm_eps,
-            need_backward,
+            valid_block_num=-1,
+            norm_eps=DEFAULT_NORM_EPS,
         ):
             _check_inputs(
                 partial_block,
@@ -175,48 +167,34 @@ class BlockAttentionResidualsOpBuilder(OpBuilder):
                 valid_block_num,
                 norm_eps,
             )
-            num_tokens = partial_block.size(T_DIM_INDEX)
-            hidden_size = partial_block.size(H_DIM_INDEX)
-            block_count = block_res.size(N_DIM_INDEX) + 1
-            hidden = torch.empty(
-                num_tokens, hidden_size, dtype=partial_block.dtype, device="meta"
-            )
-            if need_backward:
-                inv_norm = torch.empty(
-                    num_tokens, block_count, dtype=torch.float32, device="meta"
-                )
-                probs = torch.empty(
-                    num_tokens, block_count, dtype=torch.float32, device="meta"
-                )
-            else:
-                inv_norm = torch.empty(0, dtype=torch.float32, device="meta")
-                probs = torch.empty(0, dtype=torch.float32, device="meta")
-            return hidden, inv_norm, probs
+            return torch.empty_like(partial_block, device="meta")
 
 
 block_attention_residuals_op_builder = BlockAttentionResidualsOpBuilder()
 block_attention_residuals_op_builder._ensure_initialized()
 
 
+# Both the package-level torch.ops export and direct dispatcher calls use the
+# same Python wrapper. The wrapper calls pybind directly, avoiding redispatch.
+@impl(
+    get_as_library(), block_attention_residuals_op_builder.name, "AutogradPrivateUse1"
+)
 @impl(get_as_library(), block_attention_residuals_op_builder.name, "PrivateUse1")
 def _block_attention_residuals_dispatch(
     partial_block,
     block_res,
     proj_weight,
     norm_weight,
-    valid_block_num,
-    norm_eps,
-    need_backward,
+    valid_block_num=-1,
+    norm_eps=DEFAULT_NORM_EPS,
 ):
-    op_module = block_attention_residuals_op_builder.load()
-    return op_module.block_attention_residuals(
+    return block_attention_residuals(
         partial_block,
         block_res,
         proj_weight,
         norm_weight,
         valid_block_num,
         norm_eps,
-        need_backward,
     )
 
 
@@ -225,21 +203,30 @@ def block_attention_residuals(
     block_res,
     proj_weight,
     norm_weight,
-    valid_block_num=None,
+    valid_block_num=-1,
     norm_eps=DEFAULT_NORM_EPS,
 ):
     """Attention Residual 加权融合前向，封装 aclnnBlockAttentionResiduals。
 
-    正向始终只返回 hidden_states。反向算子未上库，仅走 need_backward=False，
-    不保存 inv_norm / probs。
+    始终返回 hidden_states；需要梯度时保存中间结果并关联反向算子。
     """
-    valid_block_num = _resolve_valid_block_num(block_res, valid_block_num)
     _check_inputs(
         partial_block, block_res, proj_weight, norm_weight, valid_block_num, norm_eps
     )
-    # 普通路径：need_backward=False，不保存中间变量，只返回主输出
-    op_module = block_attention_residuals_op_builder.load()
-    hidden, _, _ = op_module.block_attention_residuals(
+    needs_backward = torch.is_grad_enabled() and any(
+        tensor.requires_grad
+        for tensor in (partial_block, block_res, proj_weight, norm_weight)
+    )
+    if needs_backward:
+        return _BlockAttentionResidualsFunction.apply(
+            partial_block,
+            block_res,
+            proj_weight,
+            norm_weight,
+            valid_block_num,
+            norm_eps,
+        )
+    hidden, _, _ = _run_block_attention_residuals(
         partial_block,
         block_res,
         proj_weight,
@@ -249,3 +236,74 @@ def block_attention_residuals(
         False,
     )
     return hidden
+
+
+def _run_block_attention_residuals(
+    partial_block,
+    block_res,
+    proj_weight,
+    norm_weight,
+    valid_block_num,
+    norm_eps,
+    need_backward,
+):
+    op_module = block_attention_residuals_op_builder.load()
+    hidden, inv_norm, probs = op_module.block_attention_residuals(
+        partial_block,
+        block_res,
+        proj_weight,
+        norm_weight,
+        valid_block_num,
+        norm_eps,
+        need_backward,
+    )
+    return hidden, inv_norm, probs
+
+
+class _BlockAttentionResidualsFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        ctx,
+        partial_block,
+        block_res,
+        proj_weight,
+        norm_weight,
+        valid_block_num,
+        norm_eps,
+    ):
+        hidden, inv_norm, probs = _run_block_attention_residuals(
+            partial_block,
+            block_res,
+            proj_weight,
+            norm_weight,
+            valid_block_num,
+            norm_eps,
+            True,
+        )
+        ctx.save_for_backward(
+            partial_block, block_res, proj_weight, norm_weight, inv_norm, probs
+        )
+        ctx.valid_block_num = valid_block_num
+        return hidden
+
+    @staticmethod
+    def backward(ctx, grad_hidden_states):
+        from cann_ops_transformer import block_attention_residuals_backward
+
+        partial_block, block_res, proj_weight, norm_weight, inv_norm, probs = (
+            ctx.saved_tensors
+        )
+        return (
+            *block_attention_residuals_backward(
+                partial_block,
+                block_res,
+                proj_weight,
+                norm_weight,
+                grad_hidden_states,
+                inv_norm,
+                probs,
+                valid_block_num=ctx.valid_block_num,
+            ),
+            None,
+            None,
+        )

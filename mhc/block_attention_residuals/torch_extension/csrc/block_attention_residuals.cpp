@@ -86,10 +86,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> block_attention_residuals(
     TORCH_CHECK(projWeight.size(-1) == hiddenSize, "proj_weight last dim must equal H=", hiddenSize, ", but got ",
                 projWeight.sizes());
     TORCH_CHECK(normWeight.size(0) == hiddenSize, "norm_weight must be [H], but got ", normWeight.sizes());
-    if (validBlockNum < 0) {
-        validBlockNum = numBlocks;
-    }
-    TORCH_CHECK(validBlockNum == numBlocks, "only default valid_block_num=N is supported, got ", validBlockNum);
+    TORCH_CHECK(validBlockNum == -1 || validBlockNum == numBlocks,
+                "valid_block_num must be -1 or block_res.shape[1], got ", validBlockNum);
     TORCH_CHECK(std::isfinite(normEps) && normEps > 0.0, "norm_eps must be finite and greater than zero, but got ",
                 normEps);
 

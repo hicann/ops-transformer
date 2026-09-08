@@ -28,10 +28,10 @@ constexpr int64_t PARTIAL_BLOCK_DIM_NUM = 2;
 constexpr int64_t BLOCK_RES_DIM_NUM = 3;
 constexpr int64_t PROJ_WEIGHT_DIM_NUM = 2;
 constexpr int64_t NORM_WEIGHT_DIM_NUM = 1;
-constexpr int64_t MIN_TOKEN_NUM = 1;
+constexpr int64_t MIN_TOKEN_NUM = 0;
 constexpr int64_t MIN_BLOCK_NUM = 0;
 constexpr int64_t MAX_BLOCK_NUM = 128;
-constexpr int64_t MIN_HIDDEN_SIZE = 1;
+constexpr int64_t MIN_HIDDEN_SIZE = 0;
 
 bool IsSupportedMainDtype(at::ScalarType dtype)
 {
@@ -84,8 +84,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> block_attention_resid
     const int64_t tokenNum = partial_block.size(DIM_0);
     const int64_t hiddenSize = partial_block.size(DIM_1);
     const int64_t blockNum = block_res.size(DIM_1);
-    TORCH_CHECK(tokenNum >= MIN_TOKEN_NUM, "partial_block.size(0) must be >= 1, but got ", tokenNum);
-    TORCH_CHECK(hiddenSize >= MIN_HIDDEN_SIZE, "partial_block.size(1) must be >= 1, but got ", hiddenSize);
+    TORCH_CHECK(tokenNum >= MIN_TOKEN_NUM, "partial_block.size(0) must be >= 0, but got ", tokenNum);
+    TORCH_CHECK(hiddenSize >= MIN_HIDDEN_SIZE, "partial_block.size(1) must be >= 0, but got ", hiddenSize);
     TORCH_CHECK(blockNum >= MIN_BLOCK_NUM && blockNum <= MAX_BLOCK_NUM,
                 "block_res.size(1) must be in [0, 128], but got ", blockNum);
     TORCH_CHECK(block_res.size(DIM_0) == tokenNum, "block_res.size(0) must equal partial_block.size(0), but got ",
@@ -103,6 +103,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> block_attention_resid
                 tokenNum, ", ", blockNum + 1, "], but got ", inv_norm.sizes());
     TORCH_CHECK(probs.size(DIM_0) == tokenNum && probs.size(DIM_1) == blockNum + 1, "probs must have shape [", tokenNum,
                 ", ", blockNum + 1, "], but got ", probs.sizes());
+
+    TORCH_CHECK(valid_block_num == -1 || valid_block_num == blockNum,
+                "valid_block_num must be -1 or block_res.size(1), but got ", valid_block_num);
 
     at::Tensor gradPartialBlock;
     at::Tensor gradBlockRes;
@@ -125,7 +128,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> block_attention_resid
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("block_attention_residuals_backward", &block_attention_residuals_backward,
-          "block_attention_residuals_backward");
+          "block_attention_residuals_backward", py::arg("partial_block"), py::arg("block_res"), py::arg("proj_weight"),
+          py::arg("norm_weight"), py::arg("grad_hidden_states"), py::arg("inv_norm"), py::arg("probs"),
+          py::arg("valid_block_num") = -1);
 }
 
 } // namespace op_api
