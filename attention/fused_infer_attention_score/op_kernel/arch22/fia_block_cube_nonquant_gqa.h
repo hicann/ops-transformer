@@ -201,16 +201,16 @@ class FiaBlockCubeNonQuantGqa {
 
 public:
     __aicore__ inline void InitParams(const ConstInfo &constInfo);
-    __aicore__ inline void
-    Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-         __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
-         __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
-         __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
-         __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-         __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
-         __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-         __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-         __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
+    __aicore__ inline void Init(
+        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
+        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
+        __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
+        __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
+        __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
+        __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
+        __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
+        __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+        __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
     __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<MM_OUT_T> &mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(const GlobalTensor<KV_T> &vec1ResGm,
                                                const GlobalTensor<MM_OUT_T> &mm2ResGm);
@@ -410,16 +410,16 @@ class FiaBlockCubeNonQuantGqaDummy {
 
 public:
     __aicore__ inline void InitParams(const ConstInfo &constInfo);
-    __aicore__ inline void
-    Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-         __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
-         __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
-         __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
-         __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-         __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
-         __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-         __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-         __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
+    __aicore__ inline void Init(
+        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
+        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
+        __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
+        __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
+        __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
+        __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
+        __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
+        __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+        __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
     __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<MM_OUT_T> &mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(const GlobalTensor<KV_T> &vec1ResGm,
                                                const GlobalTensor<MM_OUT_T> &mm2ResGm);
@@ -656,17 +656,16 @@ __aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::Init(
 }
 
 template <typename FIAT, typename Config>
-__aicore__ inline void
-FiaBlockCubeNonQuantGqa<FIAT, Config>::InitMm1GlobalTensor(const GlobalTensor<MM_OUT_T> &mm1ResGm)
+__aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::InitMm1GlobalTensor(
+    const GlobalTensor<MM_OUT_T> &mm1ResGm)
 {
     // mm1
     this->mm1ResGm.Init(mm1ResGm, constInfo.mmResUbSize);
 }
 
 template <typename FIAT, typename Config>
-__aicore__ inline void
-FiaBlockCubeNonQuantGqa<FIAT, Config>::InitMm2GlobalTensor(const GlobalTensor<KV_T> &vec1ResGm,
-                                                           const GlobalTensor<MM_OUT_T> &mm2ResGm)
+__aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::InitMm2GlobalTensor(
+    const GlobalTensor<KV_T> &vec1ResGm, const GlobalTensor<MM_OUT_T> &mm2ResGm)
 {
     // mm2
     this->vec1ResGm.Init(vec1ResGm, constInfo.vec1ResUbSize);
@@ -749,12 +748,12 @@ __aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::CopyQToL1(uint32_t
     uint32_t nopeDealSize = constInfo.ropeSplitMode ? constInfo.headDim : (constInfo.headDim + constInfo.headDimRope);
 
     FaL1Tensor<Q_T, L1Format::NZ> dstTensor{.tensor = qL1Tensor, .rowCount = subMSizeAlign};
-    GmCoord gmCoord{.bIdx = info.bIdx,
-                    .n2Idx = info.n2Idx,
-                    .gS1Idx = info.gS1Idx + subMStart,
-                    .dIdx = 0,
-                    .gS1DealSize = subMSize,
-                    .dDealSize = nopeDealSize};
+    GmCoordGs1Merge gmCoord{.bIdx = info.bIdx,
+                            .n2Idx = info.n2Idx,
+                            .gS1Idx = info.gS1Idx + subMStart,
+                            .dIdx = 0,
+                            .gS1DealSize = subMSize,
+                            .dDealSize = nopeDealSize};
     copyQueryGmToL1(dstTensor, queryGmTensor, gmCoord);
 
     if (constInfo.ropeSplitMode) {
@@ -867,10 +866,11 @@ __aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::ResetLoad3DConfig(
 
 template <typename FIAT, typename Config>
 template <uint32_t M_L1_SPLIT_Size, typename T1>
-__aicore__ inline void
-FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadAToL0(uint32_t dstBufId, const LocalTensor<T1> &l1Tensor, uint32_t mL1Size,
-                                                 uint32_t subMStart, uint32_t subMSize, uint32_t subKStart,
-                                                 uint32_t subKSize)
+__aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadAToL0(uint32_t dstBufId,
+                                                                        const LocalTensor<T1> &l1Tensor,
+                                                                        uint32_t mL1Size, uint32_t subMStart,
+                                                                        uint32_t subMSize, uint32_t subKStart,
+                                                                        uint32_t subKSize)
 {
     auto srcTensor = l1Tensor[mL1Size * subKStart][GetC0Num<T1>() * subMStart];
     auto dstTensor = this->aL0Tensor[dstBufId];
@@ -889,10 +889,11 @@ FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadAToL0(uint32_t dstBufId, const LocalT
 }
 
 template <typename FIAT, typename Config>
-__aicore__ inline void
-FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadBTransposeToL0(uint32_t dstBufId, const LocalTensor<KV_T> &l1Tensor,
-                                                          uint32_t nL1Size, uint32_t subNStart, uint32_t subNSize,
-                                                          uint32_t subKStart, uint32_t subKSize)
+__aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadBTransposeToL0(uint32_t dstBufId,
+                                                                                 const LocalTensor<KV_T> &l1Tensor,
+                                                                                 uint32_t nL1Size, uint32_t subNStart,
+                                                                                 uint32_t subNSize, uint32_t subKStart,
+                                                                                 uint32_t subKSize)
 {
     auto srcTensor = l1Tensor[nL1Size * subKStart][GetC0Num<KV_T>() * subNStart];
     auto dstTensor = this->bL0Tensor[dstBufId];
@@ -911,10 +912,11 @@ FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadBTransposeToL0(uint32_t dstBufId, con
 }
 
 template <typename FIAT, typename Config>
-__aicore__ inline void
-FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadBToL0(uint32_t dstBufId, const LocalTensor<KV_T> &l1Tensor, uint32_t kL1Size,
-                                                 uint32_t subKStart, uint32_t subKSize, uint32_t subNStart,
-                                                 uint32_t subNSize)
+__aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::LoadBToL0(uint32_t dstBufId,
+                                                                        const LocalTensor<KV_T> &l1Tensor,
+                                                                        uint32_t kL1Size, uint32_t subKStart,
+                                                                        uint32_t subKSize, uint32_t subNStart,
+                                                                        uint32_t subNSize)
 {
     mm2LoadDataBToL0Params.srcStride = kL1Size / BLOCK_CUBE;
 
@@ -1067,8 +1069,7 @@ __aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::ComputeMm1(const R
                     }
                     FixpipeCToGM<OutFormat>(
                         mmResGm, this->cL0BufId,
-                        (OutFormat == CubeFormat::NZ) ? m.sizeAct : info.actualSingleProcessSInnerSizeAlign, /* 输出ND时，mm1ResGm两行之间间隔元素个数按32对齐
-                                                                                                              */
+                        (OutFormat == CubeFormat::NZ) ? m.sizeAct : info.actualSingleProcessSInnerSizeAlign,
                         mL1.start + mL0.start, mL0.sizeAct, nL1.start + nL0.start,
                         (OutFormat == CubeFormat::NZ) ? nL0.AlignedSize() : nL0.sizeAct);
                     SetFlag<HardEvent::FIX_M>(L0C_EVENT0 + this->cL0BufId);

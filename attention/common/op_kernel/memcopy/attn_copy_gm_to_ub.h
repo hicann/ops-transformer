@@ -166,7 +166,7 @@ template <typename T, GmFormat GM_FORMAT>
 class CopyQueryScaleGmToUb {
 public:
     template <typename FaGmTensorType>
-    __aicore__ inline void operator()(FaUbTensor<T> &dstTensor, FaGmTensorType &srcTensor, GmCoord &gmCoord)
+    __aicore__ inline void operator()(FaUbTensor<T> &dstTensor, FaGmTensorType &srcTensor, GmCoordGs1Merge &gmCoord)
     {
         if constexpr (GM_FORMAT == GmFormat::NGT) {
             ProcessGS1(dstTensor, srcTensor, gmCoord);
@@ -178,7 +178,7 @@ public:
 
 private:
     template <typename FaGmTensorType>
-    __aicore__ inline void ProcessGS1(FaUbTensor<T> &dstTensor, FaGmTensorType &srcTensor, GmCoord &gmCoord)
+    __aicore__ inline void ProcessGS1(FaUbTensor<T> &dstTensor, FaGmTensorType &srcTensor, GmCoordGs1Merge &gmCoord)
     {
         auto &offsetCalculator = srcTensor.offsetCalculator;
         uint64_t s1Size = 0;
@@ -199,7 +199,8 @@ private:
                     dataCopyPadParams);
     }
 
-    __aicore__ inline void ProcessS1G(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor, GmCoord &gmCoord)
+    __aicore__ inline void ProcessS1G(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor,
+                                      GmCoordGs1Merge &gmCoord)
     {
         OffsetCalculator<GM_FORMAT> &offsetCalculator = srcTensor.offsetCalculator;
         uint64_t gSize = offsetCalculator.GetDimG();
@@ -224,7 +225,8 @@ private:
 template <typename T, GmFormat GM_FORMAT>
 class CopyQueryGmToUb {
 public:
-    __aicore__ inline void operator()(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor, GmCoord &gmCoord)
+    __aicore__ inline void operator()(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor,
+                                      GmCoordGs1Merge &gmCoord)
     {
         if constexpr ((GM_FORMAT == GmFormat::BSNGD) || (GM_FORMAT == GmFormat::TNGD)) {
             ProcessS1G(dstTensor, srcTensor, gmCoord);
@@ -241,7 +243,8 @@ public:
     }
 
 private:
-    __aicore__ inline void ProcessGS1(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor, GmCoord &gmCoord)
+    __aicore__ inline void ProcessGS1(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor,
+                                      GmCoordGs1Merge &gmCoord)
     {
         OffsetCalculator<GM_FORMAT> &offsetCalculator = srcTensor.offsetCalculator;
         uint64_t s1Size = 0;
@@ -295,7 +298,7 @@ private:
     }
 
     __aicore__ inline void ProcessContinuous(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor,
-                                             GmCoord &gmCoord)
+                                             GmCoordGs1Merge &gmCoord)
     {
         // B*N2*GS1*D
         OffsetCalculator<GM_FORMAT> &offsetCalculator = srcTensor.offsetCalculator;
@@ -307,7 +310,8 @@ private:
                                   offsetCalculator.GetStrideS1(), dstTensor.colCount);
     }
 
-    __aicore__ inline void ProcessS1G(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor, GmCoord &gmCoord)
+    __aicore__ inline void ProcessS1G(FaUbTensor<T> &dstTensor, FaGmTensor<T, GM_FORMAT> &srcTensor,
+                                      GmCoordGs1Merge &gmCoord)
     {
         OffsetCalculator<GM_FORMAT> &offsetCalculator = srcTensor.offsetCalculator;
         uint32_t s1IdxStart = gmCoord.gS1Idx / offsetCalculator.GetDimG();
@@ -355,7 +359,7 @@ template <typename KV_T, GmFormat GM_FORMAT>
 class CopyKvGmToUb {
 public:
     __aicore__ inline void operator()(FaUbTensor<KV_T> &dstTensor, FaGmTensor<KV_T, GM_FORMAT> &srcTensor,
-                                      GmCoord &gmCoord)
+                                      GmCoordGs1Merge &gmCoord)
     {
         if constexpr (GM_FORMAT == GmFormat::BNSD || GM_FORMAT == GmFormat::BSND || GM_FORMAT == GmFormat::NTD ||
                       GM_FORMAT == GmFormat::TND) {

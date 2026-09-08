@@ -52,16 +52,16 @@ public:
 
     __aicore__ inline FiaBlockCubeNonQuantMla(){};
     __aicore__ inline void InitParams(const AttentionCommon::ConstInfo &constInfo);
-    __aicore__ inline void
-    Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-         __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
-         __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
-         __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
-         __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-         __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
-         __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-         __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-         __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
+    __aicore__ inline void Init(
+        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
+        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
+        __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
+        __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
+        __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
+        __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
+        __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
+        __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+        __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<MM_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<MM_OUT_T> mm2ResGm);
     __aicore__ inline void InitBuffers(TPipe *pipe);
@@ -206,16 +206,16 @@ public:
 
     __aicore__ inline FiaBlockCubeNonQuantMlaDummy(){};
     __aicore__ inline void InitParams(const AttentionCommon::ConstInfo &constInfo);
-    __aicore__ inline void
-    Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-         __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
-         __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
-         __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
-         __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-         __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
-         __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-         __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-         __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
+    __aicore__ inline void Init(
+        __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
+        __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
+        __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
+        __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
+        __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
+        __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
+        __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
+        __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+        __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<MM_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<MM_OUT_T> mm2ResGm);
     __aicore__ inline void InitBuffers(TPipe *pipe);
@@ -353,8 +353,7 @@ __aicore__ inline void FiaBlockCubeNonQuantMla<FIAT>::Init(
             if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_BNBD) {
                 keyRopeGmTensor.offsetCalculator.Init(constInfo.kvHeadNum, constInfo.kvCacheBlockSize,
                                                       constInfo.headDimRope, blockTableGm,
-                                                      constInfo.maxBlockNumPerBatch,
-                                                      constInfo.keyRopeBnStride);
+                                                      constInfo.maxBlockNumPerBatch, constInfo.keyRopeBnStride);
             } else if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_NZ) {
                 uint32_t d0 = 32 / sizeof(KV_T);
                 uint32_t d1 = constInfo.headDimRope / d0;
@@ -506,9 +505,10 @@ __aicore__ inline void FiaBlockCubeNonQuantMla<FIAT>::CopyGmToL1(LocalTensor<KV_
 }
 
 template <typename FIAT>
-__aicore__ inline void
-FiaBlockCubeNonQuantMla<FIAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const AttentionCommon::RunInfo &info,
-                                              uint32_t mSeqIdx, uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset)
+__aicore__ inline void FiaBlockCubeNonQuantMla<FIAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor,
+                                                                     const AttentionCommon::RunInfo &info,
+                                                                     uint32_t mSeqIdx, uint32_t subMSizeAct,
+                                                                     uint32_t nSize, uint32_t nOffset)
 {
     // 全量拷贝 确认是否是紧密排布, actualSingleProcessSInnerSize是否需要32B对齐
     auto srcGm = vec1ResGm[(info.loop % constInfo.preLoadNum) * constInfo.mmResUbSize +
@@ -698,21 +698,23 @@ __aicore__ inline void FiaBlockCubeNonQuantMla<FIAT>::ProcessMm1(const Attention
                     if (kL1 == 0) {
                         FaL1Tensor<Q_T, L1Format::NZ> dstTensor{.tensor = aL1Tensor,
                                                                 .rowCount = AttentionCommon::Align(mL1Size, 16U)};
-                        GmCoord gmCoord{.bIdx = info.bIdx,
-                                        .n2Idx = info.n2Idx,
-                                        .gS1Idx = info.gS1Idx + mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE,
-                                        .dIdx = kL1 * 256,
-                                        .gS1DealSize = mL1Size,
-                                        .dDealSize = 256};
+                        GmCoordGs1Merge gmCoord{
+                            .bIdx = info.bIdx,
+                            .n2Idx = info.n2Idx,
+                            .gS1Idx = info.gS1Idx + mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE,
+                            .dIdx = kL1 * 256,
+                            .gS1DealSize = mL1Size,
+                            .dDealSize = 256};
                         LocalTensor<Q_T> qRopeTensor = aL1Tensor[mL1SizeAlign * 256];
                         FaL1Tensor<Q_T, L1Format::NZ> dstRopeTensor{.tensor = aL1Tensor[mL1SizeAlign * 256],
                                                                     .rowCount = AttentionCommon::Align(mL1Size, 16U)};
-                        GmCoord gmCoordQRope{.bIdx = info.bIdx,
-                                             .n2Idx = info.n2Idx,
-                                             .gS1Idx = info.gS1Idx + mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE,
-                                             .dIdx = 0,
-                                             .gS1DealSize = mL1Size,
-                                             .dDealSize = 64};
+                        GmCoordGs1Merge gmCoordQRope{
+                            .bIdx = info.bIdx,
+                            .n2Idx = info.n2Idx,
+                            .gS1Idx = info.gS1Idx + mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE,
+                            .dIdx = 0,
+                            .gS1DealSize = mL1Size,
+                            .dDealSize = 64};
 #ifdef BASE_MM
                         auto mm1ANextK = l1QP4Buffers.PeekNextK();
                         mm1A.Wait<HardEvent::MTE1_MTE2>();
@@ -731,12 +733,13 @@ __aicore__ inline void FiaBlockCubeNonQuantMla<FIAT>::ProcessMm1(const Attention
                         FaL1Tensor<Q_T, L1Format::NZ> dstTensor{
                             .tensor = aL1Tensor[mL1SizeAlign * 32], // 32 : rope headDim的一半
                             .rowCount = AttentionCommon::Align(mL1Size, 16U)};
-                        GmCoord gmCoord{.bIdx = info.bIdx,
-                                        .n2Idx = info.n2Idx,
-                                        .gS1Idx = info.gS1Idx + mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE,
-                                        .dIdx = kL1 * 256,
-                                        .gS1DealSize = mL1Size,
-                                        .dDealSize = 256};
+                        GmCoordGs1Merge gmCoord{
+                            .bIdx = info.bIdx,
+                            .n2Idx = info.n2Idx,
+                            .gS1Idx = info.gS1Idx + mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE,
+                            .dIdx = kL1 * 256,
+                            .gS1DealSize = mL1Size,
+                            .dDealSize = 256};
                         copyQueryGmToL1(dstTensor, queryGmTensor, gmCoord);
                     }
 #ifdef BASE_MM

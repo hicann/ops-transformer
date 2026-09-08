@@ -65,6 +65,7 @@ public:
     static constexpr LayOutTypeEnum LAYOUT = layout;
     static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0);
     static constexpr bool USE_DN = useDn;
+    static constexpr InnerMLayout Q_M_LAYOUT = USE_DN ? InnerMLayout::S1_ONLY_LAYOUT : InnerMLayout::GS1_MERGE_LAYOUT;
     static constexpr FixpipeConfig BMM2_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, true};
     static constexpr GmFormat Q_FORMAT = GmFormat::NGTD;
     static constexpr GmFormat KV_FORMAT = GmFormat::PA_BnNBsD;
@@ -114,7 +115,7 @@ public:
     QSeqParserType *qSeqParserPtr_ = nullptr;
     KvSeqParserType *kvSeqParserPtr_ = nullptr;
 
-    CopyQueryGmToL1<Q_T, Q_FORMAT> copyQueryGmToL1_;
+    CopyQueryGmToL1<Q_T, Q_FORMAT, L1Format::NZ, Q_M_LAYOUT> copyQueryGmToL1_;
     CopyKvGmToL1<KV_T, KV_FORMAT> copyKvGmToL1_;
 
     /* =====================LocalBuffer变量====================*/
@@ -239,13 +240,25 @@ public:
         uint32_t dstStride = (runInfo.actMSize + 31) >> 5 << 5;
         FaL1Tensor<Q_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
 
-        GmCoord gmCoord{.bIdx = runInfo.bIdx,
-                        .n2Idx = runInfo.realN2Idx,
-                        .gS1Idx = runInfo.gS1Idx,
-                        .dIdx = dOffset,
-                        .gS1DealSize = runInfo.actMSize,
-                        .dDealSize = nopeDealSize};
-        copyQueryGmToL1_(l1Tensor, queryGm_, gmCoord);
+        if constexpr (USE_DN) {
+            // DN分支下realGSize=1，gS1Idx即s1Idx，gIdx恒为0
+            GmCoordS1Only gmCoord{.bIdx = runInfo.bIdx,
+                                  .n2Idx = runInfo.realN2Idx,
+                                  .gIdx = 0,
+                                  .s1Idx = runInfo.gS1Idx,
+                                  .dIdx = dOffset,
+                                  .s1DealSize = runInfo.actMSize,
+                                  .dDealSize = nopeDealSize};
+            copyQueryGmToL1_(l1Tensor, queryGm_, gmCoord);
+        } else {
+            GmCoordGs1Merge gmCoord{.bIdx = runInfo.bIdx,
+                                    .n2Idx = runInfo.realN2Idx,
+                                    .gS1Idx = runInfo.gS1Idx,
+                                    .dIdx = dOffset,
+                                    .gS1DealSize = runInfo.actMSize,
+                                    .dDealSize = nopeDealSize};
+            copyQueryGmToL1_(l1Tensor, queryGm_, gmCoord);
+        }
     }
 
     __aicore__ inline void CopyQueryTile(const LocalTensor<Q_T> &dstTensor, RunInfoX &runInfo)

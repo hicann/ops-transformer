@@ -15,7 +15,16 @@
 #ifndef GM_COORD_H
 #define GM_COORD_H
 
-struct GmCoord {
+enum class InnerMLayout {
+    GS1_MERGE_LAYOUT = 0,
+    S1_ONLY_LAYOUT = 1,
+};
+
+template <InnerMLayout M_LAYOUT>
+struct GmCoordT;
+
+template <>
+struct GmCoordT<InnerMLayout::GS1_MERGE_LAYOUT> {
     uint32_t bIdx;
     uint32_t n2Idx;
     uint32_t gS1Idx;
@@ -23,4 +32,18 @@ struct GmCoord {
     uint32_t gS1DealSize;
     uint32_t dDealSize;
 };
+
+template <>
+struct GmCoordT<InnerMLayout::S1_ONLY_LAYOUT> {
+    uint32_t bIdx;
+    uint32_t n2Idx;
+    uint32_t gIdx;
+    uint32_t s1Idx;
+    uint32_t dIdx;
+    uint32_t s1DealSize;
+    uint32_t dDealSize;
+};
+
+using GmCoordGs1Merge = GmCoordT<InnerMLayout::GS1_MERGE_LAYOUT>;
+using GmCoordS1Only = GmCoordT<InnerMLayout::S1_ONLY_LAYOUT>;
 #endif

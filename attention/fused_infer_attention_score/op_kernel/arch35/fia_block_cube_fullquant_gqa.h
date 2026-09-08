@@ -354,12 +354,12 @@ public:
         uint32_t dstStride = (runInfo.actMSize + 31) >> 5 << 5;
         FaL1Tensor<Q_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
 
-        GmCoord gmCoord{.bIdx = runInfo.bIdx,
-                        .n2Idx = runInfo.realN2Idx,
-                        .gS1Idx = runInfo.gS1Idx,
-                        .dIdx = dOffset,
-                        .gS1DealSize = runInfo.actMSize,
-                        .dDealSize = nopeDealSize};
+        GmCoordGs1Merge gmCoord{.bIdx = runInfo.bIdx,
+                                .n2Idx = runInfo.realN2Idx,
+                                .gS1Idx = runInfo.gS1Idx,
+                                .dIdx = dOffset,
+                                .gS1DealSize = runInfo.actMSize,
+                                .dDealSize = nopeDealSize};
         copyQueryGmToL1(l1Tensor, queryGm, gmCoord);
 
         if constexpr (HAS_ROPE) {
@@ -370,12 +370,12 @@ public:
             FaL1Tensor<ROPE_T, L1Format::NZ> l1Tensor{.tensor = (dstTensor[offset]).template ReinterpretCast<ROPE_T>(),
                                                       .rowCount = dstStrideRope};
 
-            GmCoord gmCoord = {.bIdx = runInfo.bIdx,
-                               .n2Idx = runInfo.realN2Idx,
-                               .gS1Idx = runInfo.gS1Idx,
-                               .dIdx = 0,
-                               .gS1DealSize = runInfo.actMSize,
-                               .dDealSize = ropeDealSize};
+            GmCoordGs1Merge gmCoord = {.bIdx = runInfo.bIdx,
+                                       .n2Idx = runInfo.realN2Idx,
+                                       .gS1Idx = runInfo.gS1Idx,
+                                       .dIdx = 0,
+                                       .gS1DealSize = runInfo.actMSize,
+                                       .dDealSize = ropeDealSize};
             copyQueryRopeGmToL1(l1Tensor, queryRopeGm, gmCoord);
         }
     }

@@ -203,12 +203,11 @@ public:
 };
 
 template <typename FIAT>
-__aicore__ inline void
-FiaBlockVecFlashDecode<FIAT>::InitGlobalTensor(GlobalTensor<T> lseMaxFdGm, GlobalTensor<T> lseSumFdGm,
-                                               GlobalTensor<T> accumOutGm, GlobalTensor<OUT_T> attentionOutGm,
-                                               GlobalTensor<uint64_t> actualSeqLengthsGmQ,
-                                               GlobalTensor<uint64_t> actualSeqLengthsGm, __gm__ uint8_t *key,
-                                               __gm__ uint8_t *quantScale2, __gm__ uint8_t *quantOffset2)
+__aicore__ inline void FiaBlockVecFlashDecode<FIAT>::InitGlobalTensor(
+    GlobalTensor<T> lseMaxFdGm, GlobalTensor<T> lseSumFdGm, GlobalTensor<T> accumOutGm,
+    GlobalTensor<OUT_T> attentionOutGm, GlobalTensor<uint64_t> actualSeqLengthsGmQ,
+    GlobalTensor<uint64_t> actualSeqLengthsGm, __gm__ uint8_t *key, __gm__ uint8_t *quantScale2,
+    __gm__ uint8_t *quantOffset2)
 {
     this->lseMaxFdGm = lseMaxFdGm;
     this->lseSumFdGm = lseSumFdGm;
@@ -244,7 +243,6 @@ __aicore__ inline void FiaBlockVecFlashDecode<FIAT>::InitParams(const AttentionC
 {
     this->constInfo = constInfo;
 }
-
 
 template <typename FIAT>
 __aicore__ inline void FiaBlockVecFlashDecode<FIAT>::InitDecodeParams()
@@ -488,12 +486,12 @@ __aicore__ inline void FiaBlockVecFlashDecode<FIAT>::Bmm2DataCopyOutTrans(LocalT
                                                                           uint32_t columnCount)
 {
     FaUbTensor<OUT_T> ubTensor{.tensor = attenOutUb, .rowCount = dealRowCount, .colCount = columnCount};
-    GmCoord gmCoord{.bIdx = taskInfo.bIdx,
-                    .n2Idx = taskInfo.n2Idx,
-                    .gS1Idx = taskInfo.gS1Idx + startRow,
-                    .dIdx = 0,
-                    .gS1DealSize = dealRowCount,
-                    .dDealSize = (uint32_t)constInfo.headDim};
+    GmCoordGs1Merge gmCoord{.bIdx = taskInfo.bIdx,
+                            .n2Idx = taskInfo.n2Idx,
+                            .gS1Idx = taskInfo.gS1Idx + startRow,
+                            .dIdx = 0,
+                            .gS1DealSize = dealRowCount,
+                            .dDealSize = (uint32_t)constInfo.headDim};
 
     if (constInfo.outputLayout == FIA_LAYOUT::BSH) {
         constexpr GmFormat OUT_FORMAT = GmFormat::BSNGD;

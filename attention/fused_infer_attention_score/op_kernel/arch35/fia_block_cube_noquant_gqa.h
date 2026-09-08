@@ -130,7 +130,8 @@ public:
     const ConstInfoX &constInfo;
 
     /*============================================================================== */
-    __aicore__ inline FANoQuantGqaBlockCube(ConstInfoX &constInfo) : constInfo(constInfo){};
+    __aicore__ inline FANoQuantGqaBlockCube(ConstInfoX &constInfo)
+        : constInfo(constInfo){};
 
     __aicore__ inline void InitCubeBlock(TPipe *pipe, BufferManager<BufferType::L1> *l1BuffMgr, __gm__ uint8_t *query,
                                          __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
@@ -275,12 +276,12 @@ public:
         if (nopeDealSize > 0) {
             FaL1Tensor<Q_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
 
-            GmCoord gmCoord{.bIdx = runInfo.bIdx,
-                            .n2Idx = runInfo.n2Idx,
-                            .gS1Idx = runInfo.gS1Idx,
-                            .dIdx = dOffset,
-                            .gS1DealSize = runInfo.actMSize,
-                            .dDealSize = nopeDealSize};
+            GmCoordGs1Merge gmCoord{.bIdx = runInfo.bIdx,
+                                    .n2Idx = runInfo.n2Idx,
+                                    .gS1Idx = runInfo.gS1Idx,
+                                    .dIdx = dOffset,
+                                    .gS1DealSize = runInfo.actMSize,
+                                    .dDealSize = nopeDealSize};
             copyQueryGmToL1(l1Tensor, queryGm, gmCoord);
         }
     }
