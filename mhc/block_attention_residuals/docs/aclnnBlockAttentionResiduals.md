@@ -172,8 +172,8 @@ aclnnStatus aclnnBlockAttentionResiduals(
   <tr>
       <td>validBlockNum（int64_t）</td>
       <td>输入</td>
-      <td>当前有效的block数量。</td>
-      <td><ul><li>默认值：-1，表示使用blockRes的N。</li><li>当前须为-1或等于blockRes的N。</li></ul></td>
+      <td>预留属性，当前不参与计算。</td>
+      <td><ul><li>默认值：-1。</li><li>仅支持传入-1。</li></ul></td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -284,7 +284,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
     <td>partialBlock、blockRes、projWeight、normWeight、hiddenStates、invNorm、probs的shape维度不在支持的范围内。</td>
     </tr>
     <tr>
-    <td>validBlockNum既不是-1也不等于blockRes的N，或normEps小于等于0。</td>
+    <td>validBlockNum不为-1，或normEps小于等于0。</td>
     </tr>
     <tr>
     <td> ACLNN_ERR_INNER_CREATE_EXECUTOR </td>
@@ -359,7 +359,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
   - T大于等于0，H大于等于1，N取值范围为1~100。
   - partialBlock、blockRes、projWeight、normWeight、hiddenStates的数据类型须一致，支持FLOAT16、BFLOAT16、FLOAT32；invNorm、probs仅支持FLOAT32。
   - shape须满足：partialBlock为(T, H)，blockRes为(T, N, H)，projWeight为(H)或(1, H)，normWeight为(H)，hiddenStates为(T, H)；needBackward为true时invNorm、probs为(T, N+1)。
-  - validBlockNum须为-1（默认，使用N）或等于blockRes的N。
+  - validBlockNum为预留属性，默认值为-1，当前不参与计算；仅支持传入-1。
   - normEps须大于0，默认值为1e-6。
   - 输入张量支持非连续Tensor，接口内部转为Contiguous后计算；输出不支持非连续Tensor。
   - workspace仅使用平台系统预留，不追加用户侧workspace。

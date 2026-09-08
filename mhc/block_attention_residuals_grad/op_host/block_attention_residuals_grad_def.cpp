@@ -58,8 +58,7 @@ public:
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .AutoContiguous();
-        // Reserved attribute. It is exposed for interface compatibility and is not used by the current kernel.
-        this->Attr("valid_block_num").AttrType(OPTIONAL).Int(0);
+        this->Attr("valid_block_num").AttrType(OPTIONAL).Int(-1);
         this->Output("grad_partial_block")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT})

@@ -77,9 +77,9 @@
 
     - $partial\_block \in \mathbb{R}^{T \times H}$ 表示输入 `partial_block`，作为拼接后的第 $N$ 行 value。
     - $block\_res \in \mathbb{R}^{T \times N \times H}$ 表示输入 `block_res`，作为拼接后的前 $N$ 行 value。
-    - $proj\_weight$ 表示输入 `proj_weight`，shape 为 $[1, H]$ 或 $[H]$；$proj\_weight_{0,h}$ 表示其第 $h$ 个元素。
+    - $proj\_weight$ 表示输入 `proj_weight`，shape 为 $[1, H]$；$proj\_weight_{0,h}$ 表示其第 $h$ 个元素。
     - $norm\_weight \in \mathbb{R}^{H}$ 表示输入 `norm_weight`。
-    - $valid\_block\_num$ 表示输入 `valid_block_num`。Torch 适配层可不传，默认等于 $N$；当前仅支持该默认值。
+    - $valid\_block\_num$ 表示输入 `valid_block_num`。为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`，不参与计算。
     - $norm\_eps$ 表示输入 `norm_eps`，是计算 RMS 归一化因子时使用的数值稳定项。
     - $t \in [0, T)$、$i \in [0, N]$、$h \in [0, H)$ 分别表示 token、逻辑行和 hidden dimension 的索引。
     - $v_{t,i,h}$ 表示拼接后的 value；$inv\_rms_{t,i}$ 表示逐行 RMS 归一化系数；$score\_weight_{h}$ 表示 `norm_weight` 与 `proj_weight` 逐元素相乘结果。
@@ -94,7 +94,7 @@ cann_ops_transformer.block_attention_residuals(
     block_res,
     proj_weight,
     norm_weight,
-    valid_block_num=None,
+    valid_block_num=-1,
     norm_eps=1.0e-6,
 ) -> Tensor
 ```
@@ -105,14 +105,14 @@ cann_ops_transformer.block_attention_residuals(
 | --- | --- | --- | --- | --- | --- |
 | partial_block | Tensor | 必选 | 拼接后的第 $N$ 行 value，对应公式中的 $partial\_block$。数据格式为 ND。 | float16、bfloat16、float32 | [T, H] |
 | block_res | Tensor | 必选 | 前 $N$ 行 value，对应公式中的 $block\_res$。数据格式为 ND；dtype 必须与 `partial_block` 一致。 | 同 partial_block | [T, N, H] |
-| proj_weight | Tensor | 必选 | 投影权重，与 `norm_weight` 共同构成 $score\_weight$。数据格式为 ND；dtype 必须与 `partial_block` 一致。 | 同 partial_block | [H] 或 [1, H] |
+| proj_weight | Tensor | 必选 | 投影权重，与 `norm_weight` 共同构成 $score\_weight$。数据格式为 ND；dtype 必须与 `partial_block` 一致。 | 同 partial_block | [1, H] |
 | norm_weight | Tensor | 必选 | RMS 缩放权重。数据格式为 ND；dtype 必须与 `partial_block` 一致。 | 同 partial_block | [H] |
-| valid_block_num | int | 可选 | 不传或传入 `None` / `-1` 时默认使用 $N$；当前仅支持等于 $N$，其它取值报错。 | int | - |
+| valid_block_num | int | 可选 | 预留属性，默认值为 `-1`，当前仅支持传入 `-1`，不参与计算。 | int | - |
 | norm_eps | float | 可选 | RMS 归一化的数值稳定项，必须为有限正数，默认值为 `1.0e-6`。 | float | - |
 
 ## 返回值说明
 
-始终返回 `hidden_states`。反向算子未上库，不返回 `inv_norm` / `probs`。
+返回 `hidden_states`。
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | --- | --- | --- | --- | --- | --- |
@@ -120,14 +120,12 @@ cann_ops_transformer.block_attention_residuals(
 
 ## 约束说明
 
-- 当前反向算子未上库，Torch 接口仅支持正向调用。
 - 该接口支持单算子模式调用，暂不支持 TorchAir 图模式调用。
 - 主路径 dtype 必须一致，支持 float16 / bfloat16 / float32。
-- shape 要求：`T >= 0`，`H >= 1`，`1 <= N <= 100`。`T == 0` 时返回对应 shape 的空输出。
+- shape 要求：`T >= 0`，`H >= 0`，`1 <= N <= 100`。`T == 0` 或 `H == 0` 时返回对应 shape 的空输出。
 - `block_res.shape[0]`、`block_res.shape[2]` 必须分别等于 `partial_block` 的 $T$、$H$；`proj_weight` 最后一维与 `norm_weight` 长度必须等于 $H$。
-- `valid_block_num` 为可选参数：Torch 不传或传入 `None` / `-1` 时默认等于 $N$；ACLNN 传 `-1` 时同样回落到 $N$。当前仅支持该默认值（等于 $N$）。
+- `valid_block_num` 为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`，不参与计算。
 - `norm_eps` 必须为有限正数。
-- 输入 Tensor 支持非连续布局，接口内部转为连续后再计算。
 - `partial_block` 或 `block_res` 含 `NaN`、`Inf`，或平方、乘法及累加发生溢出时，结果可能包含 `NaN` 或 `Inf`。
 
 ## 确定性/Batch一致性
@@ -162,10 +160,10 @@ cann_ops_transformer.block_attention_residuals(
         dtype=torch.bfloat16,
         device="npu",
     )
-    proj_weight = torch.tensor([0.5, 0.25, 0.25, 0.0], dtype=torch.bfloat16, device="npu")
+    proj_weight = torch.tensor([[0.5, 0.25, 0.25, 0.0]], dtype=torch.bfloat16, device="npu")
     norm_weight = torch.ones(4, dtype=torch.bfloat16, device="npu")
 
-    # valid_block_num / norm_eps 为可选参数；省略时分别使用 N、1e-6。反向未上库，仅返回 hidden_states。
+    # valid_block_num / norm_eps 为可选参数，默认值分别为 -1、1e-6；仅返回 hidden_states。
     hidden_states = cann_ops_transformer.block_attention_residuals(
         partial_block,
         block_res,

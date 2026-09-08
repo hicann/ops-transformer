@@ -17,15 +17,15 @@ from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 MAIN_DTYPES = (torch.float16, torch.bfloat16, torch.float32)
-DEFAULT_VALID_BLOCK_NUM = 0
+DEFAULT_VALID_BLOCK_NUM = -1
 DIM_INDEX_BATCH = 0
 DIM_INDEX_BLOCK = 1
 DIM_INDEX_HIDDEN = 1
 DIM_INDEX_BLOCK_RES_HIDDEN = 2
-MIN_TOKEN_NUM = 1
+MIN_TOKEN_NUM = 0
 MIN_BLOCK_NUM = 0
 MAX_BLOCK_NUM = 128
-MIN_HIDDEN_SIZE = 1
+MIN_HIDDEN_SIZE = 0
 
 
 def _check_dtypes(
@@ -195,6 +195,7 @@ def _check_inputs(
     grad_hidden_states: torch.Tensor,
     inv_norm: torch.Tensor,
     probs: torch.Tensor,
+    valid_block_num: int,
 ) -> None:
     _check_dimensions(
         partial_block,
@@ -232,6 +233,14 @@ def _check_inputs(
         inv_norm,
         probs,
     )
+    _check_valid_block_num(block_res, valid_block_num)
+
+
+def _check_valid_block_num(block_res: torch.Tensor, valid_block_num: int) -> None:
+    torch_check(
+        valid_block_num == -1 or valid_block_num == block_res.size(DIM_INDEX_BLOCK),
+        lambda: f"valid_block_num must be -1 or block_res.size(1), but got {valid_block_num}",
+    )
 
 
 class BlockAttentionResidualsBackwardOpBuilder(OpBuilder):
@@ -245,7 +254,7 @@ class BlockAttentionResidualsBackwardOpBuilder(OpBuilder):
         return (
             "block_attention_residuals_backward(Tensor partial_block, Tensor block_res, "
             "Tensor proj_weight, Tensor norm_weight, Tensor grad_hidden_states, "
-            "Tensor inv_norm, Tensor probs, *, int valid_block_num=0) -> "
+            "Tensor inv_norm, Tensor probs, *, int valid_block_num=-1) -> "
             "(Tensor, Tensor, Tensor, Tensor)"
         )
 
@@ -270,6 +279,7 @@ class BlockAttentionResidualsBackwardOpBuilder(OpBuilder):
                 grad_hidden_states,
                 inv_norm,
                 probs,
+                valid_block_num,
             )
             meta_options = {"dtype": partial_block.dtype, "device": "meta"}
             grad_partial_block = torch.empty(partial_block.shape, **meta_options)
@@ -304,6 +314,16 @@ def _block_attention_residuals_backward_dispatch(
     *,
     valid_block_num: int = DEFAULT_VALID_BLOCK_NUM,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    _check_inputs(
+        partial_block,
+        block_res,
+        proj_weight,
+        norm_weight,
+        grad_hidden_states,
+        inv_norm,
+        probs,
+        valid_block_num,
+    )
     op_module = block_attention_residuals_backward_op_builder.load()
     return op_module.block_attention_residuals_backward(
         partial_block,
@@ -342,8 +362,7 @@ def block_attention_residuals_backward(
         grad_hidden_states (Tensor): FP16/BF16/FP32 tensor of shape ``[T, H]``.
         inv_norm (Tensor): FP32 tensor of shape ``[T, N + 1]``.
         probs (Tensor): FP32 tensor of shape ``[T, N + 1]``.
-        valid_block_num (int): Reserved attribute; defaults to 0 and is not used
-            by the current kernel.
+        valid_block_num (int): Defaults to -1 (all blocks). Only -1 or N is supported.
 
     Returns:
         Tuple[Tensor, Tensor, Tensor, Tensor]: gradients of partial_block,
@@ -358,6 +377,7 @@ def block_attention_residuals_backward(
         grad_hidden_states,
         inv_norm,
         probs,
+        valid_block_num,
     )
     return torch.ops.cann_ops_transformer.block_attention_residuals_backward(
         partial_block,

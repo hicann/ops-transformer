@@ -158,6 +158,7 @@ _legacy_map = {
     "fused_causal_conv1d_": "attention.inplace_fused_causal_conv1d",
     "block_sparse_attention": "attention.block_sparse_attention",
     "block_attention_residuals": "mhc.block_attention_residuals",
+    "block_attention_residuals_backward": "mhc.block_attention_residuals_grad",
     "apply_rotary_pos_emb": "posembedding.apply_rotary_pos_emb",
     "apply_rotary_pos_emb_grad": "posembedding.apply_rotary_pos_emb_grad",
 }

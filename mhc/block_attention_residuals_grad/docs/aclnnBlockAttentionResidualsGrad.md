@@ -25,7 +25,7 @@
 
 ## 功能说明
 
-- 接口功能：`BlockAttentionResidualsGrad` 是正向算子 `BlockAttentionResiduals`（注意力残差）的反向传播算子，该接口根据前向保存的invNorm、probs以及正向参数projWeight、normWeight，结合gradHiddenStates，计算partialBlock、blockRes、projWeight和normWeight的梯度。validBlockNum是预留属性，当前版本不参与计算，取值不会影响输出。
+- 接口功能：`BlockAttentionResidualsGrad` 是正向算子 `BlockAttentionResiduals`（注意力残差）的反向传播算子，该接口根据前向保存的invNorm、probs以及正向参数projWeight、normWeight，结合gradHiddenStates，计算partialBlock、blockRes、projWeight和normWeight的梯度。validBlockNum仅支持传入-1，其他值报错。
 
 - 计算公式：
 
@@ -132,7 +132,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>partialBlock（aclTensor*）</td>
               <td>输入</td>
               <td>前向输入前缀和，对应公式中第N+1个value。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型与其余输入保持一致。</li></td>
+              <td><li>数据类型与其余输入保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(T,H)</td>
@@ -142,7 +142,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>blockRes（aclTensor*）</td>
               <td>输入</td>
               <td>前向输入分块残差，对应公式中前N个value。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型与partialBlock保持一致。</li></td>
+              <td><li>数据类型与partialBlock保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(T,N,H)</td>
@@ -152,7 +152,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>projWeight（aclTensor*）</td>
               <td>输入</td>
               <td>前向线性投影权重，与normWeight共同构成score_weight。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型与partialBlock保持一致。</li></td>
+              <td><li>数据类型与partialBlock保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(1,H)</td>
@@ -162,7 +162,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>normWeight（aclTensor*）</td>
               <td>输入</td>
               <td>前向归一化权重，与projWeight共同构成score_weight。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型与partialBlock保持一致。</li></td>
+              <td><li>数据类型与partialBlock保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(H)</td>
@@ -171,8 +171,8 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
           <tr>
               <td>validBlockNum（int64_t）</td>
               <td>属性</td>
-              <td>预留属性，当前版本不参与计算。</td>
-              <td><li>预留属性，当前版本不参与计算。</li></td>
+              <td>预留属性，当前不参与计算；仅支持传入-1。</td>
+              <td><li>预留属性，当前不参与计算；仅支持传入-1。</li></td>
               <td>INT64</td>
               <td>-</td>
               <td>标量</td>
@@ -182,7 +182,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>gradHiddenStates（aclTensor*）</td>
               <td>输入</td>
               <td>前向输出out的梯度。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型与partialBlock保持一致。</li></td>
+              <td><li>数据类型与partialBlock保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(T,H)</td>
@@ -192,7 +192,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>invNorm（aclTensor*）</td>
               <td>输入</td>
               <td>前向保存的逐行归一化系数。</td>
-              <td><li>不支持空Tensor。</li><li>仅支持FLOAT32。</li></td>
+              <td><li>仅支持FLOAT32。</li></td>
               <td>FLOAT32</td>
               <td>ND</td>
               <td>(T,N+1)</td>
@@ -202,7 +202,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>probs（aclTensor*）</td>
               <td>输入</td>
               <td>前向softmax输出概率。</td>
-              <td><li>不支持空Tensor。</li><li>仅支持FLOAT32。</li></td>
+              <td><li>仅支持FLOAT32。</li></td>
               <td>FLOAT32</td>
               <td>ND</td>
               <td>(T,N+1)</td>
@@ -212,7 +212,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>gradPartialBlock（aclTensor*）</td>
               <td>输出</td>
               <td>partialBlock的梯度。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型和shape与partialBlock保持一致。</li></td>
+              <td><li>数据类型和shape与partialBlock保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(T,H)</td>
@@ -222,7 +222,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>gradBlockRes（aclTensor*）</td>
               <td>输出</td>
               <td>blockRes的梯度。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型和shape与blockRes保持一致。</li></td>
+              <td><li>数据类型和shape与blockRes保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(T,N,H)</td>
@@ -232,7 +232,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>gradProjWeight（aclTensor*）</td>
               <td>输出</td>
               <td>projWeight的梯度。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型和shape与projWeight保持一致。</li></td>
+              <td><li>数据类型和shape与projWeight保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(1,H)</td>
@@ -242,7 +242,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <td>gradNormWeight（aclTensor*）</td>
               <td>输出</td>
               <td>normWeight的梯度。</td>
-              <td><li>不支持空Tensor。</li><li>数据类型和shape与normWeight保持一致。</li></td>
+              <td><li>数据类型和shape与normWeight保持一致。</li></td>
               <td>FLOAT16、BFLOAT16、FLOAT32</td>
               <td>ND</td>
               <td>(H)</td>
@@ -350,12 +350,14 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
 
 - 确定性计算：aclnnBlockAttentionResidualsGrad默认确定性实现。
 - partialBlock、blockRes、projWeight、normWeight、gradHiddenStates及其对应输出的数据类型保持一致，支持FLOAT16、BFLOAT16、FLOAT32。
-- validBlockNum为INT64预留属性，当前版本不参与shape推导、tiling或Kernel计算，建议传入0。
+- validBlockNum为INT64预留属性，默认值为-1，当前不参与计算；仅支持传入-1，其他值返回参数错误。
 - partialBlock、blockRes、projWeight、normWeight、gradHiddenStates、invNorm和probs均只支持ND格式。
-- shape需满足：partialBlock为(T,H)，blockRes为(T,N,H)，projWeight为(1,H)，normWeight为(H)，gradHiddenStates为(T,H)，invNorm为(T,N+1)，probs为(T,N+1)，其中B、N、H均为正整数，且各张量中的B、H以及invNorm和probs的N+1保持一致。
+- shape需满足：partialBlock为(T,H)，blockRes为(T,N,H)，projWeight为(1,H)，normWeight为(H)，gradHiddenStates为(T,H)，invNorm为(T,N+1)，probs为(T,N+1)，其中T、H为非负整数，N在[0,128]内，且各张量中的T、H以及invNorm和probs的N+1保持一致。
 - 输入张量支持非连续Tensor，接口内部统一转为Contiguous后计算。
 - probs应为前向softmax输出，invNorm应为前向逐行归一化系数，且invNorm和probs仅支持FLOAT32。当前实现完全以保存的probs和invNorm为准。
-- validBlockNum取不同值时，当前版本的计算结果保持不变。
+- validBlockNum为预留属性，不参与实际计算；仅支持传入-1。
+- T=0或H=0时，aclnn层跳过主算子；非空的权重梯度输出清零，空输出保持对应输入shape。H=0时所有输出均为空，不安排清零任务；T=0且H>0的清零任务仍需调用第二阶段接口执行。
+- 仅N=0且T、H非零时不提前返回，仍计算partialBlock及权重梯度。
 
 ## 调用示例
 
@@ -449,7 +451,7 @@ int main()
     std::vector<uint16_t> gradHiddenStatesData    (GetShapeSize(gradHiddenStatesShape),     0x3C00);
     std::vector<float> invNormData           (GetShapeSize(invNormShape),         1.0f);
     std::vector<float> probsData            (GetShapeSize(probsShape),          1.0f);
-    int64_t validBlockNum = 0; // 预留属性，当前版本不参与计算
+    int64_t validBlockNum = -1; // 预留属性，仅支持传入-1
 
     aclTensor *partialBlock = nullptr, *blockRes = nullptr, *projWeight = nullptr, *normWeight = nullptr;
     aclTensor *gradHiddenStates = nullptr, *invNorm = nullptr, *probs = nullptr;
