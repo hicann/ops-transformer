@@ -66,9 +66,8 @@ void InputPreProcessInt4(const aclTensor *&x1, const aclTensor *&x2, const aclTe
 }
 
 // 检查必要输入是否为空，必须非空
-static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
-                         const aclTensor *x1ScaleOptional, const aclTensor *x2Scale, const aclTensor *output,
-                         int64_t x1QuantMode)
+static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *x1ScaleOptional,
+                         const aclTensor *x2Scale, const aclTensor *output, int64_t x1QuantMode)
 {
     if (x1 == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Input x1 should not be null.");
@@ -184,8 +183,8 @@ static bool Check3DScaleShape(const aclTensor *x2, const aclTensor *x1Scale, con
 }
 
 // 校验输入Scaleshape
-static bool CheckScaleShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *x1Scale,
-                            const aclTensor *x2Scale, int64_t x1QuantMode, int64_t x2QuantMode, bool transposeX2)
+static bool CheckScaleShape(const aclTensor *x2, const aclTensor *x1Scale, const aclTensor *x2Scale,
+                            int64_t x1QuantMode, int64_t x2QuantMode, bool transposeX2)
 {
     bool scaleShapeValid = true;
     if (static_cast<QuantModeType>(x1QuantMode) == QuantModeType::MX_QUANT &&
@@ -215,9 +214,9 @@ static const std::initializer_list<op::DataType> OUTPUT_DTYPE_SUPPORT_LIST = {op
                                                                               op::DataType::DT_BF16};
 
 // 校验所有输入的参数类型是否正确
-static bool CheckAllDtypesValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
-                                int64_t x1QuantMode, const aclTensor *x1ScaleOptional, const aclTensor *x2Scale,
-                                const aclTensor *output, const aclTensor *alltoAllOutOptional)
+static bool CheckAllDtypesValid(const aclTensor *x1, const aclTensor *x2, int64_t x1QuantMode,
+                                const aclTensor *x1ScaleOptional, const aclTensor *x2Scale, const aclTensor *output,
+                                const aclTensor *alltoAllOutOptional)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, X1_DTYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(x2, X2_DTYPE_SUPPORT_LIST, return false);
@@ -457,8 +456,7 @@ static aclnnStatus CheckAndHandleParams(const aclTensor *x1, const aclTensor *x2
                                         const aclTensor *alltoAllOutOptional)
 {
     // 检查参数是否为空指针
-    CHECK_RET(CheckNotNull(x1, x2, biasOptional, x1ScaleOptional, x2Scale, output, x1QuantMode),
-              ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(CheckNotNull(x1, x2, x1ScaleOptional, x2Scale, output, x1QuantMode), ACLNN_ERR_PARAM_NULLPTR);
     // 检查空tensor
     CHECK_RET(CheckNotEmptyTensor(x1, x2, transposeX2), ACLNN_ERR_PARAM_INVALID);
     // 检查shape
@@ -466,13 +464,12 @@ static aclnnStatus CheckAndHandleParams(const aclTensor *x1, const aclTensor *x2
         CHECK_RET(
             CheckShapeAAMM("allto_all_quant_matmul", x1, x2, biasOptional, transposeX2, output, alltoAllOutOptional),
             ACLNN_ERR_PARAM_INVALID);
-        CHECK_RET(CheckScaleShape(x1, x2, x1ScaleOptional, x2Scale, x1QuantMode, x2QuantMode, transposeX2),
+        CHECK_RET(CheckScaleShape(x2, x1ScaleOptional, x2Scale, x1QuantMode, x2QuantMode, transposeX2),
                   ACLNN_ERR_PARAM_INVALID);
     }
     // 检查输入的数据类型是否在API支持的数据类型范围之内，需要根据芯片型号和api定义校验
     if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B) {
-        CHECK_RET(CheckAllDtypesValid(x1, x2, biasOptional, x1QuantMode, x1ScaleOptional, x2Scale, output,
-                                      alltoAllOutOptional),
+        CHECK_RET(CheckAllDtypesValid(x1, x2, x1QuantMode, x1ScaleOptional, x2Scale, output, alltoAllOutOptional),
                   ACLNN_ERR_PARAM_INVALID);
     } else if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         CHECK_RET(CheckDtypesValid(x1, x2, biasOptional, x1ScaleOptional, x2Scale, x1QuantMode, x2QuantMode,
@@ -545,7 +542,7 @@ extern "C" aclnnStatus InnerAlltoAllQuantMatmulGetWorkspaceSize(
                 "This is an error in launch aicore, aclnnAlltoAllQuantMatmulGetWorkspaceSize interface call failed.");
     }
 
-    if (ret == ACLNN_SUCCESS && *executor != nullptr) {
+    if (ret == ACLNN_SUCCESS && executor != nullptr && *executor != nullptr) {
         void *args = reinterpret_cast<void *>(static_cast<uint8_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, args);
     }
@@ -618,6 +615,7 @@ extern "C" aclnnStatus aclnnAlltoAllQuantMatmulBase(void *workspace, uint64_t wo
 {
     if (NnopbaseSetHcclServerType) {
         if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+            CHECK_RET(executor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
             void *arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
