@@ -40,7 +40,10 @@ public:
                                 bool isA2avGmmFlag)
     {
         // init member variables
-        GET_TILING_DATA(tilingData, tilingGM);
+        // The caller may advertise a larger default wrapper for another tiling
+        // key. Decode this scheduler's own legacy ABI explicitly so that the
+        // wrapper is neither copied to the AIC stack nor reinterpreted here.
+        GET_TILING_DATA_WITH_STRUCT(TilingDataType, tilingData, tilingGM);
         tilingData_ = &tilingData;
         e_ = tilingData_->taskTilingInfo.e;
         expertNum_ = tilingData_->taskTilingInfo.expertNum;
