@@ -19,8 +19,10 @@
 #endif
 #include "allto_allv_grouped_mat_mul_tiling.h"
 #include "allto_allv_grouped_mat_mul_tiling_key.h"
+#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || defined(__CCE_KT_TEST__)
 #include "allto_allv_grouped_mat_mul_aiv_mode.h"
 #include "allto_allv_grouped_mat_mul_catlass.h"
+#endif
 #include "../../allto_allv_quant_grouped_mat_mul/op_kernel/mc2_templates/mc2_templates.h"
 
 using namespace AscendC;
@@ -48,6 +50,7 @@ __global__ __aicore__ void allto_allv_grouped_mat_mul(GM_ADDR gmmxGM, GM_ADDR gm
     REGISTER_TILING_DEFAULT(AlltoAllvGmmKernelTilingData);
 
     if constexpr (TILINGKEY_COMM_MODE == TILINGKEY_TPL_AIV) {
+#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || defined(__CCE_KT_TEST__)
         constexpr bool isBf16 = std::is_same_v<DTYPE_GMM_X, bfloat16_t> &&
                                 std::is_same_v<DTYPE_GMM_WEIGHT, bfloat16_t> && std::is_same_v<DTYPE_GMM_Y, bfloat16_t>;
         constexpr bool isFp16 = std::is_same_v<DTYPE_GMM_X, half> && std::is_same_v<DTYPE_GMM_WEIGHT, half> &&
@@ -60,6 +63,11 @@ __global__ __aicore__ void allto_allv_grouped_mat_mul(GM_ADDR gmmxGM, GM_ADDR gm
                 gmmxGM, gmmweightGM, mmxOptionalGM, mmweightOptionalGM, gmmyGM, mmyOptionalGM, permuteOutOptionalGM,
                 userWorkspace, *aivTilingData);
         }
+#else
+        // Host rejects AIV on unsupported architectures. Do not silently
+        // succeed if an incompatible tiling key is nevertheless dispatched.
+        trap();
+#endif
     } else {
         TPipe pipe;
 
