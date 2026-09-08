@@ -30,6 +30,7 @@
 #include "../../../attn_infra/gemm/tile_common/bsa_tile_mmad.hpp"
 #include "../../../tla/layout_bsa.hpp"
 #include "../../../tla/tensor_bsa.hpp"
+#include "bsa_block_eff_rows_gather.hpp"
 
 ////////////////////////////////////////////////////////////////////
 
@@ -159,10 +160,17 @@ public:
                                                      AscendC::GlobalTensor<int32_t> gSparseBlockIdx,
                                                      uint32_t gatheredKvSTileIdx, uint32_t kvSeqlen,
                                                      uint32_t kvSBaseTile, uint32_t blockShapeY, uint32_t yBlockNumAval,
-                                                     uint32_t yBlockNumRsvd, uint32_t curBaseTileSize, uint32_t embed)
+                                                     uint32_t yBlockNumRsvd, uint32_t curBaseTileSize, uint32_t embed,
+                                                     EffRowsCtx *effRowsCtx = nullptr)
     {
         using CopyGmToL1B = typename TileCopy_::template CopyGmToL1B<TensorB>;
         CopyGmToL1B copyGmToL1B;
+        if (effRowsCtx != nullptr && effRowsCtx->enabled) {
+            // V 为正常布局 [N, embed]，Transposed=false
+            EffRowsGatherCopy<false>(gBTensor, l1BTensorTla, gSparseBlockIdx, *effRowsCtx, yBlockNumRsvd, kvSeqlen,
+                                     blockShapeY, embed, curBaseTileSize, copyGmToL1B);
+            return;
+        }
         uint32_t baseTileStartOffset = gatheredKvSTileIdx * kvSBaseTile;
         uint32_t baseTileEndOffset = baseTileStartOffset + curBaseTileSize;
         // 稀疏情况下对实际选中的部分gather后进行基本块切分
@@ -216,7 +224,7 @@ public:
                                       uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumRsvd,
                                       uint64_t prefixSumL0AStages, uint64_t prefixSumL0BStages,
                                       Arch::CrossCoreFlag smToMm2Flag, Arch::CrossCoreFlag mm2ToReFlag,
-                                      uint64_t deqScalar = 0)
+                                      uint64_t deqScalar = 0, EffRowsCtx *effRowsCtx = nullptr)
     {
         using CopyL0CToDst = typename TileCopy_::template CopyL0CToDst<TensorC>;
 
@@ -235,7 +243,7 @@ public:
         // load V full base tile to L1 before crossCoreSync
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventId);
         SparseVBaseTileL1FullLoad(gBTensor, l1BTensorTla, gSparseBlockIdx, gatheredKvSTileIdx, kvSeqlen, kvSBaseTile,
-                                  blockShapeY, yBlockNumAval, yBlockNumRsvd, curBaseTileSize, embed);
+                                  blockShapeY, yBlockNumAval, yBlockNumRsvd, curBaseTileSize, embed, effRowsCtx);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
         // fwd crossCoreSync from online sm to mm2

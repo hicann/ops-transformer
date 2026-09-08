@@ -39,6 +39,9 @@ enum QuantMode : int64_t {
     FP8_QUANT = 1,
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
+    // fp8 全量化 + per-head kv 反量化(k/v scale 为 [B, kvHeads] 两维) + blockEffRows
+    // quantMode=4 已规划给其它分支，per-head 使用较大值 20
+    FP8_PERHEAD_QUANT = 20,
 };
 
 static bool CheckDataType(const aclTensor *query, const aclTensor *key, const aclTensor *value)
@@ -119,7 +122,8 @@ static bool CheckQuantModeAndDtype(int64_t quantMode, const aclTensor *query, co
     switch (quantMode) {
         case NO_QUANT:
             return CheckNoQuantParams(query, key, value, qScale, kScale, vScale);
-        case FP8_QUANT: // quantMode=1: QKV=FP8_E4M3FN, scales=FP32
+        case FP8_QUANT:         // quantMode=1: QKV=FP8_E4M3FN, scales=FP32
+        case FP8_PERHEAD_QUANT: // quantMode=20: per-head 量化, QKV=FP8_E4M3FN, scales=FP32 (k/v 为 2D)
             return CheckQuantParams(query, key, value, qScale, kScale, vScale, DataType::DT_FLOAT8_E4M3FN,
                                     DataType::DT_FLOAT, quantMode, "FP8_E4M3FN", "FP32");
         case MXFP4_OCP_QUANT:
@@ -288,6 +292,31 @@ static aclnnStatus MakeContiguous(const aclTensor *&query, const aclTensor *&key
         CHECK_RET(vDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
         if (vDequantScaleOptional->GetStorageShape().GetDimNum() != 4) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "vDequantScaleOptional must be 4D tensor.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+
+    } else if (quantMode == FP8_PERHEAD_QUANT) {
+        // per-head 量化: q 仍为 4D, k/v 必须为 [batch, numKVHeads] 两维
+        qDequantScaleOptional = l0op::Contiguous(qDequantScaleOptional, executor);
+        CHECK_RET(qDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        if (qDequantScaleOptional->GetStorageShape().GetDimNum() != 4) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qDequantScaleOptional must be 4D tensor.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+
+        kDequantScaleOptional = l0op::Contiguous(kDequantScaleOptional, executor);
+        CHECK_RET(kDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        if (kDequantScaleOptional->GetStorageShape().GetDimNum() != 2) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "kDequantScaleOptional must be 2D (batch, numKVHeads) tensor in per-head quant mode.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+
+        vDequantScaleOptional = l0op::Contiguous(vDequantScaleOptional, executor);
+        CHECK_RET(vDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        if (vDequantScaleOptional->GetStorageShape().GetDimNum() != 2) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "vDequantScaleOptional must be 2D (batch, numKVHeads) tensor in per-head quant mode.");
             return ACLNN_ERR_PARAM_INVALID;
         }
 

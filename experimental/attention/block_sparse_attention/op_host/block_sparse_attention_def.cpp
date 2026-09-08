@@ -33,7 +33,7 @@ public:
                        ge::DT_FLOAT4_E2M1})
             .FormatList({ge::FORMAT_ND});
         this->Input("blockSparseMask").ParamType(OPTIONAL).DataTypeList({ge::DT_INT8}).FormatList({ge::FORMAT_ND});
-        this->Input("attenMask").ParamType(OPTIONAL).DataTypeList({ge::DT_INT8}).FormatList({ge::FORMAT_ND});
+        this->Input("attenMask").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Input("blockShape").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
         this->Input("actualSeqLengths").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
         this->Input("actualSeqLengthsKv").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});

@@ -30,6 +30,7 @@
 #include "../../../attn_infra/gemm/tile_common/bsa_tile_mmad.hpp"
 #include "../../../tla/layout_bsa.hpp"
 #include "../../../tla/tensor_bsa.hpp"
+#include "bsa_block_eff_rows_gather.hpp"
 
 ////////////////////////////////////////////////////////////////////
 
@@ -120,10 +121,17 @@ public:
                                               AscendC::GlobalTensor<int32_t> gSparseBlockIdx,
                                               uint32_t gatheredKvSTileIdx, uint32_t kvSeqlen, uint32_t kvSBaseTile,
                                               uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumRsvd,
-                                              uint32_t l1KTileNAct, uint32_t embed, uint32_t kvSBaseTileInnerOffset)
+                                              uint32_t l1KTileNAct, uint32_t embed, uint32_t kvSBaseTileInnerOffset,
+                                              EffRowsCtx *effRowsCtx = nullptr)
     {
         using CopyGmToL1B = typename TileCopy_::template CopyGmToL1B<TensorK>;
         CopyGmToL1B copyGmToL1B;
+        if (effRowsCtx != nullptr && effRowsCtx->enabled) {
+            // K 为转置布局 [embed, N]，Transposed=true
+            EffRowsGatherCopy<true>(gKTensor, l1KTensorTla, gSparseBlockIdx, *effRowsCtx, yBlockNumRsvd, kvSeqlen,
+                                    blockShapeY, embed, l1KTileNAct, copyGmToL1B);
+            return;
+        }
         uint32_t baseTileStartOffset = gatheredKvSTileIdx * kvSBaseTile + kvSBaseTileInnerOffset;
         uint32_t baseTileEndOffset = baseTileStartOffset + l1KTileNAct;
         // 稀疏情况下对实际选中的部分gather后进行基本块切分
@@ -175,7 +183,8 @@ public:
                                       uint32_t gatheredKvSTileIdx, uint32_t kvSeqlen, uint32_t kvSBaseTile,
                                       uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumRsvd,
                                       uint64_t prefixSumL0AStages, uint64_t prefixSumL0BStages,
-                                      Arch::CrossCoreFlag mm1ToSmFlag, uint64_t deqScalar = 0)
+                                      Arch::CrossCoreFlag mm1ToSmFlag, uint64_t deqScalar = 0,
+                                      EffRowsCtx *effRowsCtx = nullptr)
     {
         using CopyL0CToDst = typename TileCopy::template CopyL0CToDst<TensorS>;
         CopyL0CToDst copyL0CToDstSub0;
@@ -207,7 +216,8 @@ public:
             auto l1KTensorTla = tla::MakeTensor(l1KTensor[l1KBufId], l1KLayoutTla, Arch::PositionL1{});
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventId);
             SparseKL1TileNLoad(gKTensor, l1KTensorTla, gSparseBlockIdx, gatheredKvSTileIdx, kvSeqlen, kvSBaseTile,
-                               blockShapeY, yBlockNumAval, yBlockNumRsvd, l1TileNAct, embed, nL1Itr * l1BTileN);
+                               blockShapeY, yBlockNumAval, yBlockNumRsvd, l1TileNAct, embed, nL1Itr * l1BTileN,
+                               effRowsCtx);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
             uint32_t nL0LoopNum = CeilDiv(l1TileNAct, L0_TILE_N);

@@ -93,6 +93,10 @@ TILING_DATA_FIELD_DEF(uint32_t, useUniformKvSeqlen); // 是否使用统一的kvs
 TILING_DATA_FIELD_DEF(uint64_t, tilingKey);
 TILING_DATA_FIELD_DEF(uint64_t, selectNumIdxSize);
 TILING_DATA_FIELD_DEF(uint64_t, selectIdxSize);
+// effectiveRows related
+TILING_DATA_FIELD_DEF(uint32_t, enableEffRows);
+TILING_DATA_FIELD_DEF(uint32_t, maxBlockNumEff);
+TILING_DATA_FIELD_DEF(uint32_t, perHeadKvScale); // kv dequantScale 为 [B, kvHeads] 两维(per-head 量化)
 // Workspace大小
 TILING_DATA_FIELD_DEF(uint64_t, mm1OutSize);
 TILING_DATA_FIELD_DEF(uint64_t, smOnlineOutSize);
@@ -252,6 +256,11 @@ private:
     uint64_t updateSize_ = 0;
     uint64_t selectNumIdxSize_ = 0;
     uint64_t selectIdxSize_ = 0;
+    // effectiveRows related
+    bool enableEffRows_ = false;
+    uint32_t maxBlockNumEff_ = 0;
+    // per-head kv 反量化(k/v dequantScale 为 [B, kvHeads] 两维)
+    bool perHeadKvScale_ = false;
 
     BSAQInputLayout qInputLayout_ = BSAQInputLayout::TND_Q;
     BSAKvCacheLayout kvCacheLayout_ = BSAKvCacheLayout::TND_KV;
