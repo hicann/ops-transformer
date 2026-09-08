@@ -28,6 +28,12 @@ SoftmaxTilingMocker &SoftmaxTilingMocker::GetInstance()
     return instance;
 }
 
+namespace {
+// PlatformAscendCManager::GetInstance only initializes once. Passing nullptr on the
+// first SoftMax call fails Init and permanently poisons later SetSocVersion suites
+constexpr const char *kDefaultSoftmaxSocVersion = "Ascend910B";
+} // namespace
+
 void SoftmaxTilingMocker::SetSocVersion(const std::string &socVersion)
 {
     socVersion_ = socVersion;
@@ -35,12 +41,13 @@ void SoftmaxTilingMocker::SetSocVersion(const std::string &socVersion)
 
 const char *SoftmaxTilingMocker::GetSocVersion() const
 {
-    return socVersion_.empty() ? nullptr : socVersion_.c_str();
+    return socVersion_.empty() ? kDefaultSoftmaxSocVersion : socVersion_.c_str();
 }
 
 void SoftmaxTilingMocker::Reset()
 {
-    socVersion_.clear();
+    // Keep a valid SoC so TearDown between suites cannot reintroduce GetInstance(nullptr).
+    socVersion_ = kDefaultSoftmaxSocVersion;
 }
 
 // Mock implementation for AscendC high-level API
@@ -103,6 +110,34 @@ uint32_t GetSoftMaxMinTmpSize(const ge::Shape &srcShape, const uint32_t dataType
         needSize = elementNumPerBlk + srcK + SOFTMAX_BASICBLOCK_UNIT;
     }
     return needSize * SOFTMAX_FLOAT_SIZE;
+}
+
+// Mock: GetSoftMaxMaxTmpSize
+uint32_t GetSoftMaxMaxTmpSize(const ge::Shape &srcShape, const uint32_t dataTypeSize, const bool /*isReuseSource*/)
+{
+    const uint32_t inputSize = static_cast<uint32_t>(srcShape.GetShapeSize());
+    if (inputSize == 0U) {
+        return 0U;
+    }
+    if (dataTypeSize == 0U || (dataTypeSize != SOFTMAX_HALF_SIZE && dataTypeSize != SOFTMAX_FLOAT_SIZE)) {
+        return 0U;
+    }
+
+    const std::vector<uint32_t> retVec = GetLastAxisShapeND(srcShape);
+    const uint32_t srcM = retVec[0];
+    const uint32_t srcK = retVec[1];
+    const uint32_t elementNumPerBlk = SOFTMAX_DEFAULT_BLK_SIZE / dataTypeSize;
+
+    platform_ascendc::PlatformAscendC *platform =
+        platform_ascendc::PlatformAscendCManager::GetInstance(SoftmaxTilingMocker::GetInstance().GetSocVersion());
+    if (platform == nullptr) {
+        return 0U;
+    }
+
+    const uint32_t needSize1 = srcM * (BASIC_TILE_NUM + srcK) + SOFTMAX_BASICBLOCK_UNIT * SOFTMAX_TMPFLASHUPDATE_COUNT +
+                               (srcM + BASIC_TILE_NUM - 1U) / BASIC_TILE_NUM * BASIC_TILE_NUM;
+    const uint32_t needSize2 = srcM * (elementNumPerBlk + srcK);
+    return std::max(needSize1, needSize2) * SOFTMAX_FLOAT_SIZE;
 }
 
 // Mock: GetSoftMaxFlashV2MinTmpSize
