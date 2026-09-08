@@ -13,7 +13,6 @@
 #include <gmock/gmock.h>
 #include <iostream>
 
-#include "ut_stub.h"
 #include "opdev/make_op_executor.h"
 
 using namespace op;
@@ -22,37 +21,43 @@ using namespace std;
 const int64_t DATA_SIZE = 1024;
 
 class AttentionWorkerScheduler : public ::testing::Test {
- public:
-  AttentionWorkerScheduler() : exe(nullptr) {
-  }
+public:
+    AttentionWorkerScheduler()
+        : exe(nullptr)
+    {}
 
-  aclTensor* CreateAclTensor(std::vector<int64_t> shape, aclDataType dtype) {
-    return aclCreateTensor(shape.data(), shape.size(), dtype, nullptr, 0, ACL_FORMAT_ND, shape.data(), shape.size(),
-                           data);
-  }
+    aclTensor *CreateAclTensor(std::vector<int64_t> shape, aclDataType dtype)
+    {
+        return aclCreateTensor(shape.data(), shape.size(), dtype, nullptr, 0, ACL_FORMAT_ND, shape.data(), shape.size(),
+                               data);
+    }
 
-  void Clear() {
-    exe->kernelLaunchObjList_.clear();
-  }
+    void Clear()
+    {
+        exe->kernelLaunchObjList_.clear();
+    }
 
-  void SetUp() override {
-    auto executor = &exe;
-    auto unique_executor = CREATE_EXECUTOR();
-    unique_executor.ReleaseTo(executor);
-  }
+    void SetUp() override
+    {
+        auto executor = &exe;
+        auto unique_executor = CREATE_EXECUTOR();
+        unique_executor.ReleaseTo(executor);
+    }
 
-  void TearDown() override {
-    delete exe;
-  }
+    void TearDown() override
+    {
+        delete exe;
+    }
 
- public:
-  aclOpExecutor* exe;
-  int64_t data[DATA_SIZE] = {0};
+public:
+    aclOpExecutor *exe;
+    int64_t data[DATA_SIZE] = {0};
 };
 
-TEST_F(AttentionWorkerScheduler, AttentionWorkerScheduler_SUCC) {
-  auto scheduleContext = CreateAclTensor({1024}, ACL_INT8);
-  auto out = CreateAclTensor({1024}, ACL_INT8);
-  auto res = l0op::AttentionWorkerScheduler(scheduleContext, out, exe);
-  EXPECT_NE(res, nullptr);
+TEST_F(AttentionWorkerScheduler, AttentionWorkerScheduler_SUCC)
+{
+    auto scheduleContext = CreateAclTensor({1024}, ACL_INT8);
+    auto out = CreateAclTensor({1024}, ACL_INT8);
+    auto res = l0op::AttentionWorkerScheduler(scheduleContext, out, exe);
+    EXPECT_NE(res, nullptr);
 }

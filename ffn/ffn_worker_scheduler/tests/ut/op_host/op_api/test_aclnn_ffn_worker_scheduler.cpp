@@ -21,66 +21,74 @@
 #include "op_api_ut_common/scalar_desc.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "opdev/platform.h"
-#include "ut_stub.h"
 
 using namespace std;
 using namespace op;
 
 class l2_ffn_worker_scheduler_test : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    cout << "l2_ffn_worker_scheduler_test SetUp" << endl;
-  }
-  static void TearDownTestCase() {
-    cout << "l2_ffn_worker_scheduler_test TearDown" << endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        cout << "l2_ffn_worker_scheduler_test SetUp" << endl;
+    }
+    static void TearDownTestCase()
+    {
+        cout << "l2_ffn_worker_scheduler_test TearDown" << endl;
+    }
 };
 
-
-  TEST_F(l2_ffn_worker_scheduler_test, case_norm_int8) {
+TEST_F(l2_ffn_worker_scheduler_test, case_norm_int8)
+{
     TensorDesc scheduleContextDesc = TensorDesc({1024}, ACL_INT8, ACL_FORMAT_ND);
     int32_t syncGroupSize = 1;
     int32_t executeMode = 0;
-    auto ut = OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
-  
+    auto ut =
+        OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
+
     // SAMPLE: only test GetWorkspaceSize
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
     EXPECT_EQ(aclRet, ACLNN_SUCCESS);
-  }
+}
 
-  TEST_F(l2_ffn_worker_scheduler_test, case_norm_empty_tensor) {
+TEST_F(l2_ffn_worker_scheduler_test, case_norm_empty_tensor)
+{
     TensorDesc scheduleContextDesc = TensorDesc({0}, ACL_INT8, ACL_FORMAT_ND);
     int32_t syncGroupSize = 1;
     int32_t executeMode = 0;
-    auto ut = OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
-  
+    auto ut =
+        OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
+
     // SAMPLE: only test GetWorkspaceSize
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
     EXPECT_EQ(aclRet, 161002);
-  }
+}
 
-  TEST_F(l2_ffn_worker_scheduler_test, invalid_input_dim) {
+TEST_F(l2_ffn_worker_scheduler_test, invalid_input_dim)
+{
     TensorDesc scheduleContextDesc = TensorDesc({1024, 2}, ACL_INT8, ACL_FORMAT_ND);
     int32_t syncGroupSize = 1;
     int32_t executeMode = 0;
-    auto ut = OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
-  
+    auto ut =
+        OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
+
     // SAMPLE: only test GetWorkspaceSize
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
     EXPECT_EQ(aclRet, 161002);
-  }
+}
 
-  TEST_F(l2_ffn_worker_scheduler_test, invalid_input_excute_mode) {
+TEST_F(l2_ffn_worker_scheduler_test, invalid_input_excute_mode)
+{
     TensorDesc scheduleContextDesc = TensorDesc({1024}, ACL_INT8, ACL_FORMAT_ND);
     int32_t syncGroupSize = 1;
     int32_t executeMode = 1;
-    auto ut = OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
-  
+    auto ut =
+        OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
+
     // SAMPLE: only test GetWorkspaceSize
     uint64_t workspace_size = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
     EXPECT_EQ(aclRet, 161002);
-  }
+}
