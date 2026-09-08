@@ -51,15 +51,8 @@ enum class SLILayout {
 };
 
 enum class SLITopKRange {
-    TOPK_512 = 512,
-    TOPK_1k = 1024,
-    TOPK_2k = 2048,
-    TOPK_3k = 3072,
-    TOPK_4k = 4096,
-    TOPK_5k = 5120,
-    TOPK_6k = 6144,
-    TOPK_7k = 7168,
-    TOPK_8k = 8192
+    RANGE_0_2K = 0,
+    RANGE_2K_8K = 1
 };
 
 enum class SLISparseMode {
@@ -133,6 +126,8 @@ struct SLIKLLossGradConstInfo {
     uint32_t dSizeQueryIndex;     // 默认不带Rope，固定等于128
     uint32_t dSizeQueryRope = 64; // Rope，固定等于64
     uint32_t kSize;
+    uint32_t kAlign8;
+    uint32_t kAlign16;
     SLISparseMode sparseMode; // 0或者3
     float scaleValue;
     int64_t cmpRatio;

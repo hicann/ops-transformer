@@ -186,8 +186,8 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::ParamsCheck
         KERNEL_LOG_ERROR("batch_size/topk must be positive, but got batch_size=%ld topk=%ld", bSize_, kSize_);
         return false;
     }
-    if (kSize_ > 8192 || (kSize_ != 512 && kSize_ % 1024 != 0)) {
-        KERNEL_LOG_ERROR("topk must be 512 or a multiple of 1024 in [1024, 8192], but got %ld.", kSize_);
+    if (kSize_ < 1 || kSize_ > 8192) {
+        KERNEL_LOG_ERROR("topk must be in range [1, 8192], but got %ld.", kSize_);
         return false;
     }
     if (layoutType_ == SliLayout::BSND && (s1Size_ <= 0 || s2Size_ <= 0)) {
