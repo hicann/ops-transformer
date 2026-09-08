@@ -184,7 +184,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     </tr>
     <tr>
       <td>rotate</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>旋转矩阵</td>
       <td>与x数据类型一致。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
@@ -231,7 +231,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：0=half，1=interleave。V2接口不同mode参数约束和V1接口相同，开发者可以根据mode在调用示例的辅助矩阵rotate生成中选择合适的rotate生成方式。
     <!-- end id8 -->
     <!-- npu="950" id9 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：2=quarter，3=interleave-half。
+    - <term>Ascend 950PR/Ascend 950DT</term>：0=half，1=interleave，2=quarter，3=interleave-half。
 
     <!-- end id9 -->
 
@@ -264,7 +264,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>传入的x、cos、sin、out的数据类型和格式不在支持的范围内。</td>
+      <td>传入的x、cos、sin、rotate、out的数据类型和格式不在支持的范围内。</td>
     </tr>
     <tr>
       <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
