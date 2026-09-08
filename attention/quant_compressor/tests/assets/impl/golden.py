@@ -353,7 +353,7 @@ def aclnn_quant_compressor_golden(
     #   idx 12 = cmpKvOut (pure output)         -> cmp_kv
     # load_goldens validates saved golden shape against device output shape in
     # this same order; a mismatch raises MANUAL_DATA_READ_FAILURE.
-    return [golden_state_cache, cmp_kv]
+    return [cmp_kv, golden_state_cache]
 
 
 def get_golden_context():
