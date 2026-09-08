@@ -16,7 +16,8 @@ if (BUILD_OPEN_PROJECT)  # custom
         OP_API_INDEPENDENT ON
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
         OP_MC2_ENABLE ON
-        OPTYPE grouped_mat_mul_allto_allv grouped_mat_mul_allto_allv ACLNNTYPE aclnn aclnn_inner)
+        OPTYPE grouped_mat_mul_allto_allv grouped_mat_mul_allto_allv
+        ACLNNTYPE aclnn aclnn_inner)
 
     set(QUANT_TILING_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../quant_grouped_mat_mul_allto_allv/op_host/op_tiling)
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
@@ -27,6 +28,7 @@ if (BUILD_OPEN_PROJECT)  # custom
     set(SUB_MC2_COMPILE TRUE PARENT_SCOPE)
     set(MC2_OPT ON PARENT_SCOPE)
     set(grouped_mat_mul_allto_allv_depends mc2/common mc2/3rd mc2/quant_grouped_mat_mul_allto_allv mc2/allto_allv_quant_grouped_mat_mul PARENT_SCOPE)
+    set(grouped_mat_mul_allto_allv_a3_depends mc2/common mc2/3rd mc2/quant_grouped_mat_mul_allto_allv mc2/allto_allv_quant_grouped_mat_mul PARENT_SCOPE)
 
     # --cce-auto-sync=off：指定CCE编译器是否自动执行线程间或模块间的同步操作
     # -mllvm -cce-aicore-dcci-before-kernel-end=false：禁用在kernel函数结束前插入DCCI指令
@@ -39,13 +41,23 @@ if (BUILD_OPEN_PROJECT)  # custom
                     -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
     elseif("${CONDITION_UNIT}" STREQUAL "ascend910_93")
+        # The AIV path uses CATLASS templates selected by this architecture macro.
         add_ops_compile_options(
             OP_NAME GroupedMatMulAlltoAllv
             OPTIONS --cce-auto-sync=off
+                    -DCATLASS_ARCH=2201
                     -DAICORE_EXCEPTION_RESTART
+        )
+    elseif("${CONDITION_UNIT}" STREQUAL "ascend910b")
+        add_ops_compile_options(
+            OP_NAME GroupedMatMulAlltoAllv
+            OPTIONS --cce-auto-sync=off
+                    -DCATLASS_ARCH=2201
         )
     endif()
 else() # 回黄host
-    add_mc2_modules_sources(OPTYPE grouped_mat_mul_allto_allv grouped_mat_mul_allto_allv ACLNNTYPE aclnn aclnn_inner)
+    add_mc2_modules_sources(
+        OPTYPE grouped_mat_mul_allto_allv grouped_mat_mul_allto_allv
+        ACLNNTYPE aclnn aclnn_inner)
     set(SUB_MC2_COMPILE TRUE PARENT_SCOPE)
 endif()

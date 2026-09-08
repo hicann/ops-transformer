@@ -322,6 +322,13 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::GetPlatformInfo()
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Failed to get platform info."), return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
+    std::string socVersion;
+    (void)platformInfo->GetPlatformResWithLock("version", "Short_SoC_version", socVersion);
+    // AIV has its own MTE tiling and GetPlatformInfo override. Reject 910B in
+    // this legacy candidate before GetTilingKey, whose failure is only a key.
+    OP_TILING_CHECK(socVersion == "Ascend910B",
+                    OP_LOGE(opName_, "Ascend 910B only supports commMode 'aiv'; AICPU tiling is not supported."),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

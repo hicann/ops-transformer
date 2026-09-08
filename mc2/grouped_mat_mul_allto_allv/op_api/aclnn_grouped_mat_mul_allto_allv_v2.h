@@ -34,7 +34,7 @@ extern "C" {
  * @param [in] mmXOptional: 可选入参，计算输入，并行进行的共享专家matmul计算中的左矩阵。*当前暂未支持
  * @param [in] mmWeightOptional: 可选入参，计算输入，并行进行的共享专家matmul计算中的右矩阵。*当前暂未支持
  * @param [in] group: 计算输入，str。ep通信域名称，专家并行的通信域
- * @param [in] commMode: 计算输入，str。通信引擎参数，指定当前通信类型，支持输入"default"、"ai_cpu"和"ccu"
+ * @param [in] commMode: 计算输入，str。通信引擎参数，指定当前通信类型
  * @param [in] epWorldSize: 计算输入，int。ep通信域size
  * @param [in] sendCounts: 计算输入，list int。通信发送的数据量
  * @param [in] recvCounts: 计算输入，list int。通信接受的数据量

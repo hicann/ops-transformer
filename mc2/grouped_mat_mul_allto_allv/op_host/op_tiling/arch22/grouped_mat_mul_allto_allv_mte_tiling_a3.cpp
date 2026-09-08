@@ -9,16 +9,13 @@
  */
 
 /*!
- * \file grouped_mat_mul_allto_allv_tiling_a3.cpp
+ * \file grouped_mat_mul_allto_allv_mte_tiling_a3.cpp
  */
 
-#include "grouped_mat_mul_allto_allv_tiling_a3.h"
+#include "grouped_mat_mul_allto_allv_mte_tiling.h"
 #include "op_host/tiling_templates_registry.h"
 
-using namespace AscendC;
-using namespace ge;
-using namespace Ops::Transformer::OpTiling;
-
 namespace optiling {
-REGISTER_OPS_TILING_TEMPLATE(GroupedMatMulAlltoAllv, GroupedMatmulAllToAllvTiling, 1);
-}
+// The external "aiv" mode selects the AIV-driven MTE communication path.
+REGISTER_OPS_TILING_TEMPLATE(GroupedMatMulAlltoAllv, GroupedMatmulAllToAllvMteTiling, 0);
+} // namespace optiling

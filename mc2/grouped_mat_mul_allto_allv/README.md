@@ -6,7 +6,7 @@
 | :----------------------------------------------------------- | :------: |
 | <term>Ascend 950DT</term>                             |    √     |
 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
+| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
 | <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
 | <term>Atlas 推理系列产品</term>                               |    ×     |
 | <term>Atlas 训练系列产品</term>                              |    ×     |
@@ -100,21 +100,21 @@
   <tr>
    <td>epWorldSize</td>
    <td>输入</td>
-   <td>ep通信域size：<br><term>Atlas A3系列产品</term>支持8、16、32、64、128；<br><term>Ascend 950DT</term>支持2、4、8、16、32、64。</td>
+   <td>ep通信域size：<br><term>Atlas A2系列产品</term>支持2、4、8；<br><term>Atlas A3系列产品</term>支持8、16、32、64、128；<br><term>Ascend 950DT</term>支持2、4、8、16、32、64。</td>
    <td>INT64</td>
    <td>ND</td>
   </tr>
   <tr>
    <td>sendCounts</td>
    <td>输入</td>
-   <td>表示发送给其他卡的token数，数据类型支持INT64，取值大小为e * epWorldSize，最大为256。</td>
+   <td>表示发送给其他卡的token数，数据类型支持INT64，取值大小为e * epWorldSize，AIV通信最大为1024，其他通信引擎最大为256。</td>
    <td>aclIntArray*（元素类型INT64）</td>
    <td>ND</td>
   </tr>
   <tr>
    <td>recvCounts</td>
    <td>输入</td>
-   <td>表示接收其他卡的token数，数据类型支持INT64，取值大小为e * epWorldSize，最大为256。</td>
+   <td>表示接收其他卡的token数，数据类型支持INT64，取值大小为e * epWorldSize，AIV通信最大为1024，其他通信引擎最大为256。</td>
    <td>aclIntArray*（元素类型INT64）</td>
    <td>ND</td>
   </tr>
@@ -151,24 +151,25 @@
 ## 约束说明
 
 - 通信引擎约束：
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持AI_CPU通信。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅支持AIV通信
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持AI_CPU通信和AIV通信。
   - <term>Ascend 950DT</term>：支持CCU通信和AI_CPU通信，CCCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
-
 
 - 参数说明里shape使用的变量：
   - BSK：本卡接收的token数，是recvCounts参数累加之和，取值范围(0, 52428800)。
   - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
   - H2：表示共享专家hidden size隐藏层大小，取值范围(0, 12288]。
-  - e：表示单卡上专家个数，e<=32，e * epWorldSize最大支持256。
+  - e：表示单卡上专家个数，AIV通信要求e > 0且e * epWorldSize最大支持1024；其他通信引擎要求e<=32且e * epWorldSize最大支持256。
   - N1：表示路由专家的head_num，取值范围(0, 65536)。
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。
-  - K：表示选取TopK个专家，K的范围[2, 8]。
+  - K：表示选取TopK个专家，Atlas A3系列产品的AIV通信支持[2, 16]，其他场景支持[2, 8]。
   - A：本卡发送的token数，是sendCounts参数累加之和。
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  : 单卡通信量在2MB以下可能存在性能劣化。
 
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：A和BSK均需在[1, 5000000]范围内，N1不超过32768。通信域内各卡的`HCCL_BUFFSIZE`需按最大发送量设置，满足`HCCL_BUFFSIZE >= max(200, ceil(A * N1 * 2 / 1048576) + 21)`，单位为MiB；FLOAT16和BFLOAT16每个元素均占2字节。
 
 ## 调用说明
 

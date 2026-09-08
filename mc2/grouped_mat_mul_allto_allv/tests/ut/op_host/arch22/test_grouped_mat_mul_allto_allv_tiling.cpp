@@ -20,6 +20,9 @@ struct TestParam {
     std::vector<std::pair<string, std::vector<int64_t>>> tilingParamsVecPair{};
     std::vector<std::pair<size_t, ge::DataType>> tilingDTypesPair{};
     ge::graphStatus status;
+    bool omitCommMode{false};
+    std::string socVersion{"Ascend910_93"};
+    std::string commMode{"ai_cpu"};
 };
 
 struct TilingParams {
@@ -100,7 +103,7 @@ TEST_P(GroupedMatMulAlltoAllvArch22TilingTest, ShapeSize)
     auto testParam = GetParam();
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = testParam.socVersion;
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
@@ -144,21 +147,47 @@ TEST_P(GroupedMatMulAlltoAllvArch22TilingTest, ShapeSize)
             {"recvCounts", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(tilingParams.recvCounts)},
             {"transGmmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"transMmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-            {"commMode", Ops::Transformer::AnyValue::CreateFrom<std::string>("ai_cpu")},
+            {"commMode", Ops::Transformer::AnyValue::CreateFrom<std::string>(testParam.commMode)},
         },
         &compileInfo, socVersion, coreNum, ubSize, tilingData);
+    if (testParam.omitCommMode) {
+        tilingContextPara.attrs_.pop_back();
+    }
     if (testParam.status == ge::GRAPH_FAILED) {
         Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
         Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
     } else {
         Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", tilingParams.epWorldSize}};
-        uint64_t expectTilingKey = 9UL;
+        // Match master: conversion failure is returned as the key, not the outer status.
+        uint64_t expectTilingKey = testParam.omitCommMode ? static_cast<uint64_t>(ge::GRAPH_FAILED) : 9UL;
         Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
     }
 }
 
 static TestParam g_testParams[] = {
     {"Test_sample", {}, {}, {}, ge::GRAPH_SUCCESS},
+    {"Test_910b_aicpu_rejected", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend910B"},
+    {"Test_910b_missing_comm_mode_rejected", {}, {}, {}, ge::GRAPH_FAILED, true, "Ascend910B"},
+    {"Test_910b_default_rejected", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend910B", "default"},
+    {"Test_910b_ccu_rejected", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend910B", "ccu"},
+    {"Test_950_aicpu_unchanged", {}, {}, {}, ge::GRAPH_SUCCESS, false, "Ascend950"},
+    {"Test_missing_comm_mode_matches_master_a3", {}, {}, {}, ge::GRAPH_SUCCESS, true, "Ascend910_93"},
+    // 950 validates commMode in SetHcclTiling, before the final key conversion.
+    {"Test_950_missing_comm_mode_rejected", {}, {}, {}, ge::GRAPH_FAILED, true, "Ascend950"},
+    {"Test_a3_aicpu_topk8", {{"BS", "512"}}, {}, {}, ge::GRAPH_SUCCESS},
+    {"Test_a3_aicpu_topk9",
+     {{"BS", "512"}, {"BSK", "4608"}},
+     {{"recvCounts", std::vector<int64_t>(32, 144)}},
+     {},
+     ge::GRAPH_FAILED},
+    {"Test_950_aicpu_topk8", {{"BS", "512"}}, {}, {}, ge::GRAPH_SUCCESS, false, "Ascend950"},
+    {"Test_950_aicpu_topk9",
+     {{"BS", "512"}, {"BSK", "4608"}},
+     {{"recvCounts", std::vector<int64_t>(32, 144)}},
+     {},
+     ge::GRAPH_FAILED,
+     false,
+     "Ascend950"},
     {"Test_BSK_1", {{"BSK", "52428800"}}, {}, {}, ge::GRAPH_FAILED},
     {"Test_BS_1", {{"BS", "52428800"}}, {}, {}, ge::GRAPH_FAILED},
     {"Test_H1", {{"H1", "65536"}}, {}, {}, ge::GRAPH_FAILED},
@@ -204,7 +233,7 @@ TEST_F(GroupedMatMulAlltoAllvArch22TilingTest, Dim1)
 {
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = "Ascend910_93";
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
@@ -239,7 +268,7 @@ TEST_F(GroupedMatMulAlltoAllvArch22TilingTest, Dim2)
 {
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = "Ascend910_93";
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
@@ -274,7 +303,7 @@ TEST_F(GroupedMatMulAlltoAllvArch22TilingTest, Dim3)
 {
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = "Ascend910_93";
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
@@ -309,7 +338,7 @@ TEST_F(GroupedMatMulAlltoAllvArch22TilingTest, Dim4)
 {
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = "Ascend910_93";
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
@@ -345,7 +374,7 @@ TEST_F(GroupedMatMulAlltoAllvArch22TilingTest, Dim5)
 {
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = "Ascend910_93";
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
@@ -381,7 +410,7 @@ TEST_F(GroupedMatMulAlltoAllvArch22TilingTest, Dim6)
 {
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = "Ascend910_93";
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
@@ -417,7 +446,7 @@ TEST_F(GroupedMatMulAlltoAllvArch22TilingTest, TransMmWeightInvalid)
 {
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
-    std::string socVersion = "Ascend910B";
+    std::string socVersion = "Ascend910_93";
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     uint64_t tilingData = 8192;
