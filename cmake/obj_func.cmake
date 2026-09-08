@@ -260,6 +260,8 @@ macro(add_modules_sources_with_soc)
  	list(REMOVE_DUPLICATES OP_ARCH_DIRECTORY)
 
   file(GLOB OPINFER_SRCS ${SOURCE_DIR}/*_infershape*.cpp)
+  file(GLOB GRAPH_INFER_SRCS ${SOURCE_DIR}/../op_graph/*_graph_infer*.cpp)
+  list(APPEND OPINFER_SRCS ${GRAPH_INFER_SRCS})
   foreach(ARCH ${OP_ARCH_DIRECTORY})
     file(GLOB_RECURSE files ${SOURCE_DIR}/${ARCH}/*_infershape*.cpp)
     list(APPEND OPINFER_SRCS ${files})
