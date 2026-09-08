@@ -26,13 +26,8 @@
 #include "../common/mega_moe_gmm_common.h"
 #include "../common/mega_moe_utils.h"
 #include "../common/mega_moe_mxfp8_utils.h"
-#if __has_include("../../../common/mc2_kernel_utils.h")
-#include "../../../common/mc2_kernel_utils.h"
-#include "../../../common/quantize_functions.h"
-#else
 #include "../../../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../../../common/op_kernel/quantize_functions.h"
-#endif
 
 namespace MegaMoeImpl {
 

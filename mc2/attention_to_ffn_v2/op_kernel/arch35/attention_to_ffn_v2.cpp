@@ -18,11 +18,7 @@
 #else
 #include "kernel_operator.h"
 #endif
-#if __has_include("../../attention_to_ffn/attention_to_ffn_tiling.h")
-#include "../../attention_to_ffn/attention_to_ffn_tiling.h"
-#else
 #include "../../../attention_to_ffn/op_kernel/attention_to_ffn_tiling.h"
-#endif
 #include "../attention_to_ffn_v2_tiling.h"
 #include "../attention_to_ffn_v2_tiling_key.h"
 #include "../attention_to_ffn_urma.h"

@@ -33,13 +33,8 @@
 #include "kernel_operator.h"
 #endif
 
-#if __has_include("../common/mc2_moe_context.h")
-#include "../common/mc2_moe_context.h"
-#include "../common/mc2_kernel_utils.h"
-#else
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
-#endif
 
 namespace MoeEpDispatchBase {
 

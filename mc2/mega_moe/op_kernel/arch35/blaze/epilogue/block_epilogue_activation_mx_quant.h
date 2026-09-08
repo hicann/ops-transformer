@@ -22,11 +22,7 @@
 #else
 #include "kernel_operator.h"
 #endif
-#if __has_include("../../../../common/quantize_functions.h")
-#include "../../../../common/quantize_functions.h"
-#else
 #include "../../../../../common/op_kernel/quantize_functions.h"
-#endif
 #include "../../common/mega_moe_constants.h"
 #include "../../common/mega_moe_utils.h"
 #include "activation/activation_common.h"

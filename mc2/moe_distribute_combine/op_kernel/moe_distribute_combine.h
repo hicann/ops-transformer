@@ -21,15 +21,9 @@
 #include "kernel_operator.h"
 #endif
 #include "adv_api/reduce/sum.h"
-#if __has_include("../common/moe_distribute_base.h")
-#include "../common/moe_distribute_base.h"
-#include "../common/mc2_kernel_utils.h"
-#include "../moe_distribute_combine_v2/moe_distribute_combine_tiling.h"
-#else
 #include "../../common/op_kernel/moe_distribute_base.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../moe_distribute_combine_v2/op_kernel/moe_distribute_combine_tiling.h"
-#endif
 namespace MoeDistributeCombineImpl {
 constexpr uint8_t BUFFER_NUM = 2;            // 多buf
 constexpr uint32_t STATE_OFFSET = 512;       // 状态空间偏移地址

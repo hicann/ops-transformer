@@ -38,17 +38,10 @@
 #include "adv_api/reduce/reduce.h"
 #include "adv_api/reduce/sum.h"
 #include <cstddef>
-#if __has_include("../common/moe_distribute_base.h")
-#include "../common/moe_distribute_base.h"
-#include "../common/mc2_kernel_utils.h"
-#include "../common/mc2_moe_context.h"
-#include "../common/moe_ep_exception_dump_writer.h"
-#else
 #include "../../common/op_kernel/moe_distribute_base.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/moe_ep_exception_dump_writer.h"
-#endif
 
 #include "moe_ep_combine_epilogue_tiling_key.h"
 #include "moe_ep_combine_epilogue_tiling.h"

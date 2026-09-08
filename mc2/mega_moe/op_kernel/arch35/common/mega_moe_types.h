@@ -19,11 +19,7 @@
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 #include "adv_api/hcomm/hcomm.h"
 #endif
-#if __has_include("../../../common/mc2_moe_context.h")
-#include "../../../common/mc2_moe_context.h"
-#else
 #include "../../../../common/op_kernel/mc2_moe_context.h"
-#endif
 
 namespace MegaMoeImpl {
 

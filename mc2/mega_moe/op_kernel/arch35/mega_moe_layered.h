@@ -28,11 +28,7 @@
 #endif
 
 #include "kernel_tiling/kernel_tiling.h"
-#if __has_include("../../common/mc2_kernel_utils.h")
-#include "../../common/mc2_kernel_utils.h"
-#else
 #include "../../../common/op_kernel/mc2_kernel_utils.h"
-#endif
 #include "kernel_operator_list_tensor_intf.h"
 #include "common/mega_moe_types.h"
 #include "common/mega_moe_workspace.h"
@@ -42,11 +38,7 @@
 #include "stage/mega_moe_gmm1_activation.h"
 #include "stage/mega_moe_gmm2_combine.h"
 #include "common/mega_moe_mxfp8_utils.h"
-#if __has_include("../../common/quantize_functions.h")
-#include "../../common/quantize_functions.h"
-#else
 #include "../../../common/op_kernel/quantize_functions.h"
-#endif
 
 namespace MegaMoeImpl {
 

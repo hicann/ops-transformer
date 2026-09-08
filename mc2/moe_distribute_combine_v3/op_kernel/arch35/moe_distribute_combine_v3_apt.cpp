@@ -19,16 +19,8 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#if __has_include("../../moe_distribute_combine_v2/op_kernel/arch35/moe_distribute_combine_v2_a5_mte.h")
-#include "../../moe_distribute_combine_v2/op_kernel/arch35/moe_distribute_combine_v2_a5_mte.h"
-#include "../../moe_distribute_combine_v2/op_kernel/arch35/moe_distribute_combine_v2_apt_tiling_key.h"
-#elif __has_include("../../moe_distribute_combine_v2/arch35/moe_distribute_combine_v2_a5_mte.h")
-#include "../../moe_distribute_combine_v2/arch35/moe_distribute_combine_v2_a5_mte.h"
-#include "../../moe_distribute_combine_v2/arch35/moe_distribute_combine_v2_apt_tiling_key.h"
-#else
 #include "../../../moe_distribute_combine_v2/op_kernel/arch35/moe_distribute_combine_v2_a5_mte.h"
 #include "../../../moe_distribute_combine_v2/op_kernel/arch35/moe_distribute_combine_v2_apt_tiling_key.h"
-#endif
 using namespace MoeDistributeCombineV2A5MteImpl;
 using namespace AscendC;
 using namespace Mc2Kernel;

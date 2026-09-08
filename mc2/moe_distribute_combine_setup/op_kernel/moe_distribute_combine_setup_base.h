@@ -16,11 +16,7 @@
 #ifndef MOE_DISTRIBUTE_COMBINE_SETUP_BASE_H
 #define MOE_DISTRIBUTE_COMBINE_SETUP_BASE_H
 
-#if __has_include("../common/mc2_kernel_utils.h")
-#include "../common/mc2_kernel_utils.h"
-#else
 #include "../../common/op_kernel/mc2_kernel_utils.h"
-#endif
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"

@@ -45,17 +45,10 @@
 #include "moe_ep_dispatch_tiling.h"
 #include "moe_ep_dispatch_base.h"
 
-#if __has_include("../common/moe_distribute_base.h")
-#include "../common/moe_distribute_base.h"
-#include "../common/mc2_kernel_utils.h"
-#include "../common/mc2_moe_context.h"
-#include "../common/moe_ep_exception_dump_writer.h"
-#else
 #include "../../common/op_kernel/moe_distribute_base.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/moe_ep_exception_dump_writer.h"
-#endif
 
 namespace MoeEpDispatchHybridImpl {
 

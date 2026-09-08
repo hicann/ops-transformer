@@ -37,20 +37,11 @@
 #include "adv_api/reduce/reduce.h"
 #include "attention_to_ffn_v2_tiling.h"
 
-#if __has_include("../common/attention_ffn_context.h")
-#include "../common/attention_ffn_context.h"
-#include "../common/mc2_kernel_utils.h"
-#else
 #include "../../common/op_kernel/attention_ffn_context.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
-#endif
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-#if __has_include("../common/quantize_functions.h")
-#include "../common/quantize_functions.h"
-#else
 #include "../../common/op_kernel/quantize_functions.h"
-#endif
 #endif
 
 #ifndef FLOAT_OVERFLOW_MODE_CTRL

@@ -984,7 +984,7 @@ if (NOT ENABLE_AICPU_KERNEL)
     # Whitelist: *_depends paths (e.g. mc2/common) whose op_kernel is installed in one place below.
     # Skipped in the per-operator depends loop to avoid duplicate CMake install rules. Add new deps here
     # and add matching install(DIRECTORY ...) if they need the same dedup treatment.
-    set(OPS_TRANSFORMER_SHARED_KERNEL_INSTALL_DEPS mc2/common)
+    set(OPS_TRANSFORMER_SHARED_KERNEL_INSTALL_DEPS mc2/common mc2/3rd)
 
     # pypto-pro ops (marked by enable_pypto_kernel, global property PYPTO_ENABLED_OPS keyed by op_file):
     # forward so ascendc_impl_build.py emits the pypto wrapper variant (calls pypto_compile_op).
@@ -1072,7 +1072,7 @@ foreach(_3rd_op_dir ${_3rd_op_dirs})
         if(EXISTS "${_3rd_op_dir}/op_kernel" AND IS_DIRECTORY "${_3rd_op_dir}/op_kernel")
             get_filename_component(_3rd_op_name "${_3rd_op_dir}" NAME)
             install(DIRECTORY ${_3rd_op_dir}/op_kernel/
-                        DESTINATION ${IMPL_INSTALL_DIR}/ascendc/3rd/${_3rd_op_name}
+                        DESTINATION ${IMPL_INSTALL_DIR}/ascendc/3rd/${_3rd_op_name}/op_kernel
             )
         endif()
     endif()

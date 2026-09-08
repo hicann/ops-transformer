@@ -18,13 +18,8 @@
 #else
 #include "kernel_operator.h"
 #endif
-#if __has_include("../distribute_barrier/distribute_barrier_tiling.h")
-#include "../distribute_barrier/distribute_barrier_tiling.h"
-#include "../distribute_barrier/distribute_barrier.h"
-#else
 #include "../../distribute_barrier/op_kernel/distribute_barrier_tiling.h"
 #include "../../distribute_barrier/op_kernel/distribute_barrier.h"
-#endif
 
 using namespace AscendC;
 using namespace DistributeBarrierImpl;

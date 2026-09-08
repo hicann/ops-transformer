@@ -14,11 +14,7 @@
 #include "kernel_operator.h"
 #include "op_kernel/math_util.h"
 #include "mega_moe_constants.h"
-#if __has_include("../../../common/quantize_functions.h")
-#include "../../../common/quantize_functions.h"
-#else
 #include "../../../../common/op_kernel/quantize_functions.h"
-#endif
 
 namespace MegaMoeImpl {
 

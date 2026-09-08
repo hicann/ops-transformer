@@ -31,11 +31,7 @@
 
 #include "moe_distribute_v2_base.h"
 #include "check_winsize.h"
-#if __has_include("../../common/moe_distribute_base.h")
-#include "../../common/moe_distribute_base.h"
-#else
 #include "../../../common/op_kernel/moe_distribute_base.h"
-#endif
 
 namespace MoeDistributeDispatchV2HostKfcImpl {
 constexpr uint32_t STATE_SIZE = 2048 * 1024; // 2M

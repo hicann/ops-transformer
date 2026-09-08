@@ -20,13 +20,8 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "../moe_distribute_dispatch_setup_tiling.h"
 #include "../moe_distribute_dispatch_setup_base.h"
-#if __has_include("../../common/mc2_kernel_utils.h")
-#include "../../common/quantize_functions.h"
-#include "../../common/mc2_kernel_utils.h"
-#else
 #include "../../../common/op_kernel/quantize_functions.h"
 #include "../../../common/op_kernel/mc2_kernel_utils.h"
-#endif
 #include "../moe_distribute_dispatch_setup_common.h"
 
 #define FLOAT_OVERFLOW_MODE_CTRL 60

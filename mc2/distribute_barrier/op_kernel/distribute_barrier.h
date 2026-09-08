@@ -22,15 +22,9 @@
 #include "kernel_operator.h"
 #endif
 #include "kernel_tiling/kernel_tiling.h"
-#if __has_include("../common/moe_distribute_base.h")
-#include "../common/mc2_moe_context.h"
-#include "../common/moe_distribute_base.h"
-#include "../common/mc2_kernel_utils.h"
-#else
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/moe_distribute_base.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
-#endif
 
 namespace DistributeBarrierImpl {
 constexpr uint8_t BUFFER_NUM = 2;      // 多buf

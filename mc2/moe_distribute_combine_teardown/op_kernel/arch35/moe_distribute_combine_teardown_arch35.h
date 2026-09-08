@@ -15,20 +15,12 @@
 #ifndef MOE_DISTRIBUTE_COMBINE_TEARDOWN_ARCH35_H
 #define MOE_DISTRIBUTE_COMBINE_TEARDOWN_ARCH35_H
 
-#if __has_include("../../common/mc2_kernel_utils.h")
-#include "../../common/mc2_kernel_utils.h"
-#else
 #include "../../../common/op_kernel/mc2_kernel_utils.h"
-#endif
 
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "../moe_distribute_combine_teardown_tiling_data.h"
-#if __has_include("../../moe_distribute_combine_setup/moe_distribute_combine_setup_base.h")
-#include "../../moe_distribute_combine_setup/moe_distribute_combine_setup_base.h"
-#else
 #include "../../../moe_distribute_combine_setup/op_kernel/moe_distribute_combine_setup_base.h"
-#endif
 
 namespace MoeDistributeCombineTeardownImpl {
 

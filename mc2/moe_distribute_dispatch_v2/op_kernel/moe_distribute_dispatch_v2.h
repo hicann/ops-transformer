@@ -31,13 +31,8 @@
 #include "moe_distribute_elastic.h"
 
 #include "check_winsize.h"
-#if __has_include("../common/mc2_moe_context.h")
-#include "../common/mc2_moe_context.h"
-#include "../common/moe_distribute_base.h"
-#else
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/moe_distribute_base.h"
-#endif
 #include "hccl_context_holder.h"
 #include "mc2_moe_context_holder.h"
 
