@@ -86,6 +86,9 @@ template <uint32_t Dims, uint32_t MaxFragments = MAX_FRAGMENT_COUNT, typename La
           typename ElementType = uint8_t>
 class FragmentTensor {
 public:
+    // 跨 fragment 的区间由首（head）尾（tail）两个非完整块 + 若干完整 body 块组成
+    static constexpr uint32_t EDGE_FRAGMENT_CNT = 2U; // head + tail
+
     __aicore__ inline FragmentTensor() = default;
 
     /*!
@@ -215,7 +218,7 @@ public:
                 comp.totalFragmentCnt--;
             }
 
-            comp.bodyCnt = comp.totalFragmentCnt - 2;
+            comp.bodyCnt = comp.totalFragmentCnt - EDGE_FRAGMENT_CNT;
         }
 
         return comp;

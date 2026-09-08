@@ -412,19 +412,19 @@ protected:
                                                   ("x1=[" + std::to_string(x1M) + "," + std::to_string(x1K) +
                                                    "], x2=[" + std::to_string(x2N) + "," + std::to_string(x2K) + "]")
                                                       .c_str(),
-                                                  "The dimensions of x1 and x2 must be non-zero.");
+                                                  "The dimensions of x1 and x2 must be non-zero");
             return false;
         }
         if (x1M > static_cast<uint64_t>(MAX_INT32_VAL) || x2N > static_cast<uint64_t>(MAX_INT32_VAL)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "x1 dim0, x2 dim0",
                                                   ("M=" + std::to_string(x1M) + ", N=" + std::to_string(x2N)).c_str(),
-                                                  "The dim0 of x1 and dim0 of x2 must not exceed INT32_MAX.");
+                                                  "The dim0 of x1 and dim0 of x2 must not exceed INT32_MAX");
             return false;
         }
         if (x1K > K_MAX_VAL || x2K > K_MAX_VAL) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 opName, "x1_k, x2_k", ("x1_k=" + std::to_string(x1K) + ", x2_k=" + std::to_string(x2K)).c_str(),
-                ("The K dimension must not exceed " + std::to_string(K_MAX_VAL) + ".").c_str());
+                ("The K dimension must not exceed " + std::to_string(K_MAX_VAL)).c_str());
             return false;
         }
         return true;
@@ -447,19 +447,19 @@ protected:
 
         if (x1M % worldSize != 0) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "x1 dim0", ("M=" + std::to_string(x1M)).c_str(),
-                                                  "The dim0 of x1 must be divisible by world_size.");
+                                                  "The dim0 of x1 must be divisible by world_size");
             return false;
         }
         if (x1K % MX_SCALE_ALIGN != 0 || x2K % MX_SCALE_ALIGN != 0) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 opName, "x1_k, x2_k", ("x1_k=" + std::to_string(x1K) + ", x2_k=" + std::to_string(x2K)).c_str(),
-                ("The K dimension must be divisible by " + std::to_string(MX_SCALE_ALIGN) + ".").c_str());
+                ("The K dimension must be divisible by " + std::to_string(MX_SCALE_ALIGN)).c_str());
             return false;
         }
         if (x2K != x1K * worldSize) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 opName, "x2_k", std::to_string(x2K).c_str(),
-                ("x2.K must equal x1.K * world_size = " + std::to_string(x1K * worldSize) + ".").c_str());
+                ("x2.K must equal x1.K * world_size = " + std::to_string(x1K * worldSize)).c_str());
             return false;
         }
         if (yM != x1M / worldSize || yN != x2N) {
@@ -486,7 +486,7 @@ protected:
         uint64_t x2N = context_->GetInputShape(IDX_INPUT_X2)->GetStorageShape().GetDim(0U);
         if (biasDim0 != x2N) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "bias dim0", std::to_string(biasDim0).c_str(),
-                                                  ("bias dim0 must equal N = " + std::to_string(x2N) + ".").c_str());
+                                                  ("bias dim0 must equal N = " + std::to_string(x2N)).c_str());
             return false;
         }
         return true;
@@ -624,12 +624,17 @@ protected:
             constexpr uint64_t HCCL_BUFFER_RESERVED_BYTES = 2UL * 1024UL * 1024UL;
             uint64_t needBytes = commDataBytes + HCCL_BUFFER_RESERVED_BYTES;
             if (hccBufPtr != nullptr && static_cast<uint64_t>(*hccBufPtr) < needBytes) {
-                OP_LOGE_WITHOUT_REPORT(opName,
-                                       "[hcclBufferSize] hcclBufferSize(%ld) is less than "
-                                       "worldSize(%lu) * m_per_rank(%lu) * (Ka(%lu) * %lu bits + "
-                                       "scale(%lu * %lu * 8 bits)) / 8 + reserved(%lu) = %lu bytes",
-                                       static_cast<long>(*hccBufPtr), worldSize_, m_, kPerRank, x1Bits, scaleKGroups,
-                                       SCALE_LAST_DIM, HCCL_BUFFER_RESERVED_BYTES, needBytes);
+                constexpr uint64_t BYTES_PER_MB = 1024UL * 1024UL;
+                uint64_t needMb = (needBytes + BYTES_PER_MB - 1UL) / BYTES_PER_MB;
+                OP_LOGE_WITH_INVALID_ATTR(
+                    opName, "hccl_buffer_size", std::to_string(*hccBufPtr).c_str(),
+                    ("no less than worldSize(" + std::to_string(worldSize_) + ") * mPerRank(" + std::to_string(m_) +
+                     ") * (Ka(" + std::to_string(kPerRank) + ") * " + std::to_string(x1Bits) + " bits + scale(" +
+                     std::to_string(scaleKGroups) + " * " + std::to_string(SCALE_LAST_DIM) +
+                     " * 8 bits)) / 8 + reserved(" + std::to_string(HCCL_BUFFER_RESERVED_BYTES) +
+                     " bytes) = " + std::to_string(needBytes) + " bytes (" + std::to_string(needMb) +
+                     " MB). Please export HCCL_BUFFSIZE=" + std::to_string(needMb) + " and retry")
+                        .c_str());
                 return ge::GRAPH_FAILED;
             }
         }
@@ -662,6 +667,7 @@ protected:
                                   mm::BiasDataType::DT_FLOAT>
                 tilingEngine;
             tilingEngine.SetPlatformInfoPtr(context_->GetPlatformInfo());
+            tilingEngine.SetBiasInfo(hasBias);
             tilingEngine.EnableBaseMHalving(true);
             tilingEngine.SetBiasInfo(hasBias);
             tilingEngine.GetTilingData(m_, n_, k_, false, true, td->tileQbmmTilingData);
@@ -670,6 +676,7 @@ protected:
                                   mm::BiasDataType::DT_FLOAT>
                 tilingEngine;
             tilingEngine.SetPlatformInfoPtr(context_->GetPlatformInfo());
+            tilingEngine.SetBiasInfo(hasBias);
             tilingEngine.EnableBaseMHalving(true);
             tilingEngine.SetBiasInfo(hasBias);
             tilingEngine.GetTilingData(m_, n_, k_, false, true, td->tileQbmmTilingData);

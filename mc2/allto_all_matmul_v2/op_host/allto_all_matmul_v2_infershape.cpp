@@ -67,7 +67,7 @@ bool ValidateInferKCrossCheck(const char *nodeName, int64_t ka, int64_t kTotal, 
     if (kTotal != ka * worldSize) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             nodeName, "x2 K_total", std::to_string(kTotal).c_str(),
-            ("K_total must equal x1.Ka * world_size = " + std::to_string(ka * worldSize) + ".").c_str());
+            ("K_total must equal x1.Ka * world_size = " + std::to_string(ka * worldSize)).c_str());
         return false;
     }
     return true;
