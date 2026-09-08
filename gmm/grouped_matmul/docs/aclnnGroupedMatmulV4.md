@@ -1196,7 +1196,7 @@ int main() {
     }
     // 调用aclnnGroupedMatmulV4第二段接口
     ret = aclnnGroupedMatmulV4(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmul failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulV4 failed. ERROR: %d\n", ret); return ret);
 
     // 4.（固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
