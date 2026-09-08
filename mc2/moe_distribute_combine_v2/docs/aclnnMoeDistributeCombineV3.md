@@ -1222,7 +1222,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
 
 <!-- end id18 -->
 <!-- npu="950" id19 -->
-- <term>Ascend 950DT</term> ：请参考[aclnnMoeDistributeCombineV2](../docs/aclnnMoeDistributeCombineV2.md)中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V4接口相较于V3接口新增的场景参数按上述参数说明传值即可。
+- <term>Ascend 950DT</term> ：请参考 [aclnnMoeDistributeCombineV2](./aclnnMoeDistributeCombineV2.md) 中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V4 接口相较于 V3 接口新增的场景参数按上述参数说明传值即可。
 
 <!-- end id19 -->
 <!-- npu="A3" id20 -->

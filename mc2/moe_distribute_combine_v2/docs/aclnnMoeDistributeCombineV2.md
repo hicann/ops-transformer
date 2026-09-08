@@ -604,7 +604,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
       - commAlg为""或nullptr：依HCCL环境变量选择“fullmesh”或“hierarchy”公式。
       - commAlg为"fullmesh"：设置大小要求(≥ 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB))。
-      - commAlg为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512)。
+      - commAlg为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
     <!-- end id11 -->
     <!-- npu="A3" id12 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：

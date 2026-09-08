@@ -801,13 +801,13 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 
     本示例支持A2算子运行在卡数为[2, 8]的单机环境中，用户可以根据需要在示例代码中设置EP_WORLD_SIZE_A2为卡数，并更改moeExpertNum，使得moeExpertNum可以被EP_WORLD_SIZE_A2整除。
 
-    - 编译算子：算子编译命令如下，moe_distribute_dispatch_v2和moe_distribute_combine_v2算子都需要编译，这两个算子需要成对执行。
+    - 编译算子：算子编译命令如下，V4 接口底层编译目标为 moe_distribute_combine_v2，与 V2/V3 接口复用同一编译产物，无需单独编译 V4 版本；moe_distribute_dispatch_v2和moe_distribute_combine_v2算子都需要编译，这两个算子需要成对执行。
 
         ```bash
         bash build.sh --pkg --soc=ascend910b --ops=moe_distribute_dispatch_v2,moe_distribute_combine_v2
         ```
 
-    - 创建A2示例代码：编译完成后请在算子[examples](../examples/)目录下参考已有[test_aclnn_moe_distribute_combine_v2.cpp](../examples/test_aclnn_moe_distribute_combine_v2.cpp)文件，用A2示例代码新建测试文件test_aclnn_moe_distribute_combine_v2.cpp。
+    - 创建A2示例代码：编译完成后请在算子[examples](../examples/)目录下参考已有[test_aclnn_moe_distribute_combine_v2.cpp](../examples/test_aclnn_moe_distribute_combine_v2.cpp)文件，用A2示例代码新建测试文件test_aclnn_moe_distribute_combine_v4.cpp。
 
     - 执行算子样例：示例算子执行命令如下，该命令会执行算子[examples](../examples/)目录下所有的示例代码文件。
 
@@ -1038,7 +1038,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
             std::vector<float> expandScalesHostData(expandScalesShapeSize, 0);
 
             std::vector<int16_t> oriXHostData(oriXSize, 1);
-            std::vector<int16_t> performanceInfoHostData(performanceInfoShapeSize, 0);
+            std::vector<int64_t> performanceInfoHostData(performanceInfoShapeSize, 0);
             std::vector<int16_t> xOutHostData(xOutShapeSize, 0);
 
 
@@ -1068,7 +1068,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 
             ret = CreateAclTensor(oriXHostData, oriXShape, &oriXDeviceAddr, aclDataType::ACL_BF16, &oriX);
             CHECK_RET(ret == ACL_SUCCESS, return ret);
-            ret = CreateAclTensor(performanceInfoHostData, performanceInfoShape, &performanceInfoDeviceAddr, aclDataType::ACL_BF16, &performanceInfo);
+            ret = CreateAclTensor(performanceInfoHostData, performanceInfoShape, &performanceInfoDeviceAddr, aclDataType::ACL_INT64, &performanceInfo);
             CHECK_RET(ret == ACL_SUCCESS, return ret);
 
             ret = CreateAclTensor(xOutHostData, xOutShape, &xOutDeviceAddr, aclDataType::ACL_BF16, &xOut);
@@ -1247,7 +1247,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 
 <!-- end id20 -->
 <!-- npu="950" id21 -->
-- <term>Ascend 950DT</term> ：请参考[aclnnMoeDistributeCombineV2](../docs/aclnnMoeDistributeCombineV2.md)中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V4接口相较于V3接口新增的场景参数按上述参数说明传值即可。
+- <term>Ascend 950DT</term> ：请参考 [aclnnMoeDistributeCombineV2](./aclnnMoeDistributeCombineV2.md) 中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V4 接口相较于 V3 接口新增的场景参数按上述参数说明传值即可。
 
 <!-- end id21 -->
 <!-- npu="A3" id22 -->
