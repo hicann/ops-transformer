@@ -94,6 +94,7 @@ cann_ops_transformer.flash_attn_metadata(
     num_heads_kv,
     head_dim,
     *,
+    head_dim_v=None,
     cu_seqlens_q=None,
     cu_seqlens_kv=None,
     seqused_q=None,
@@ -144,7 +145,8 @@ cann_ops_transformer.flash_attn(
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | num_heads_q | int | 必选 | Query head数 | int32 | - | - |
 | num_heads_kv | int | 必选 | Key/Value head数 | int32 | - | - |
-| head_dim | int | 必选 | 每个注意力头的维度 | int32 | - | - |
+| head_dim | int | 必选 | Query/Key 每个注意力头的维度 | int32 | - | - |
+| head_dim_v | int | 可选 | Value 每个注意力头的维度。缺省 None（内部传 -1）表示等于 head_dim；QK 与 V 维度不同（如 QK 192 / V 128）时必须传入，且需与后续 flash_attn 调用中 value 的 head_dim 一致（连续布局为 value 末维；PA_NZ 布局 value 形状为 (blocks, N2, D/16, block_size, 16)，head_dim = dim2*dim4） | int32 | - | - |
 | cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)
 | cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)
 | seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)
@@ -158,6 +160,12 @@ cann_ops_transformer.flash_attn(
 | layout_q | string | 可选 | 定义输入q张量的布局格式 | string | - | - |
 | layout_kv | string | 可选 | 定义输入k和v张量的布局格式 | string | - | - |
 | layout_out | string | 可选 | 定义输出张量的布局格式 | string | - | - |
+
+**关于 `head_dim_v`**：`flash_attn_metadata` 无 q/k/v 张量输入，无法从张量 shape 推导 V 的 head_dim，因此通过标量参数 `head_dim_v` 显式声明：
+
+- 缺省 None（内部传 -1）表示 **V 的 head_dim 等于 `head_dim`**（QK 维），与 qk==v 的常规场景行为一致。
+- QK 与 V 维度不同（如 QK 192 / V 128，MLA 非吸收形态）时**必须传入**，且必须与后续 `flash_attn` 调用中 value 的 head_dim 一致——连续布局（BSND/BNSD/TND）即 value 末维；PA_NZ 布局 value 形状为 (blocks, N2, D/16, block_size, 16)，head_dim = dim2 × dim4。不一致时负载均衡切分与主算子不一致，可能导致结果错误。
+- 主算子 `flash_attn` 无对应参数：其 V 的 head_dim 直接取自 value 张量末维。当前支持的 (QK D, V DV) 组合以 `flash_attn` 的校验为准：(64,64)、(72,72)、(128,128)、(256,256)、(192,128)。
 
 ### flash_attn
 

@@ -72,6 +72,11 @@ bool FlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     GetAttrValueOpt(ctx, "layout_q", layoutQ_);
     GetAttrValueOpt(ctx, "layout_kv", layoutKv_);
     GetAttrValueOpt(ctx, "layout_out", layoutOut_);
+    GetAttrValueOpt(ctx, "head_dim_v", headDimV_);
+    // head_dim_v 未指定(-1)时, v 的 head_dim 等于 head_dim
+    if (headDimV_ == -1) {
+        headDimV_ = headDim_;
+    }
 
     KERNEL_CHECK_FALSE(ParamsCheck(), false, "Params check failed");
     return ParamsInit();
@@ -198,7 +203,7 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
         qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_TND;
     }
     uint32_t gSize = static_cast<uint32_t>(numHeadsQ_ / numHeadsKv_);
-    optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(headDim_, gSize, maxSeqlenQ_, maxSeqlenKv_, maskMode_,
+    optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(headDimV_, gSize, maxSeqlenQ_, maxSeqlenKv_, maskMode_,
                                                                 baseInfo.preToken, baseInfo.nextToken, qlayout,
                                                                 mBaseSize_, s2BaseSize_);
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);
@@ -219,7 +224,7 @@ void FlashAttnMetadataCpuKernel::InitBaseInfo()
     baseInfo.kvSeqSize = maxSeqlenKv_;
     baseInfo.kvHeadNum = numHeadsKv_;
     baseInfo.headDimQk = headDim_;
-    baseInfo.headDimV = headDim_;
+    baseInfo.headDimV = headDimV_;
     load_balance::SparseMode maskMode = load_balance::SparseMode::BUTT;
     if (maskMode_ != 0) {
         maskMode = static_cast<load_balance::SparseMode>(maskMode_);

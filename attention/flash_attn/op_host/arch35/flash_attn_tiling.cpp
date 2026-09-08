@@ -137,23 +137,29 @@ void FlashAttnTilingImpl::SplitPolicy()
 
 void FlashAttnTilingImpl::UpdateTilingKeyConfig()
 {
-    // config:
-    //   config=0: D=64,  sOuter=64,  sInner=128
-    //   config=1: D=64,  sOuter=32,  sInner=256
-    //   config=2: D=128, sOuter=64,  sInner=128 (D=72 复用, kernel 内 pad 到 128)
-    //   config=3: D=128, sOuter=32,  sInner=256 (D=72 复用, kernel 内 pad 到 128)
-    //   config=4: D=256, sOuter=64, sInner=128
-    //   config=5: D=256, sOuter=32, sInner=256
-    if (faInfo_->qkHeadDim == 64) {
-        tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 0 : 1;
-    } else if (faInfo_->qkHeadDim == 72 || faInfo_->qkHeadDim == 128) {
-        tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 2 : 3;
-    } else if (faInfo_->qkHeadDim == 256) {
-        tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 4 : 5;
+    if (faInfo_->qkHeadDim == faInfo_->vHeadDim) {
+        // 等长 (QK D == V DV) 按 D 值映射:
+        //   config=0: Dk=64,  Dv=64,  sOuter=64,  sInner=128
+        //   config=1: Dk=64,  Dv=64,  sOuter=32,  sInner=256
+        //   config=2: Dk=128, Dv=128, sOuter=64,  sInner=128 (Dk=72 复用, kernel 内 pad 到 128)
+        //   config=3: Dk=128, Dv=128, sOuter=32,  sInner=256 (Dk=72 复用, kernel 内 pad 到 128)
+        //   config=4: Dk=256, Dv=256, sOuter=64, sInner=128
+        //   config=5: Dk=256, Dv=256, sOuter=32, sInner=256
+        if (faInfo_->qkHeadDim == 64) {
+            tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 0 : 1;
+        } else if (faInfo_->qkHeadDim == 128 || faInfo_->qkHeadDim == 72) {
+            tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 2 : 3;
+        } else if (faInfo_->qkHeadDim == 256) {
+            tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 4 : 5;
+        }
     } else {
-        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(faInfo_->opName, "qkHeadDim(Head num of Q/K)",
-                                               std::to_string(faInfo_->qkHeadDim).c_str(),
-                                               "The value of qkHeadDim(Head num of Q/K) can only be 64/72/128/256");
+        // 不等长 (qkHeadDim != vHeadDim) 按 (QK D, V DV) 组合映射:
+        if (faInfo_->qkHeadDim == 192 && faInfo_->vHeadDim == 128) {
+            // QK D=192 且 V DV=128 (MLA 非吸收形态) 进入此分支:
+            //   config=6: Dk=192, Dv=128, sOuter=64, sInner=128
+            //   config=7: Dk=192, Dv=128, sOuter=32, sInner=256
+            tilingKeyInfo_.config = (sOuterFactor_ == fa_tiling_util::SOUTER_64) ? 6 : 7;
+        }
     }
 }
 

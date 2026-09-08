@@ -84,7 +84,7 @@ __aicore__ inline constexpr bool EnableSoftmaxDn()
     if constexpr (hasAttenMask) {
         return false;
     }
-    return ((config == 0) || (config == 2));
+    return ((config == 0) || (config == 2) || (config == 6));
 }
 
 template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, uint8_t config>

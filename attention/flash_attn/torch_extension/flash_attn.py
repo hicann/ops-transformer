@@ -59,6 +59,7 @@ class FlashAttenOpBuilder(OpBuilder):
         """PyTorch operator signature."""
         return [
             "flash_attn_metadata(int num_heads_q, int num_heads_kv, int head_dim, *, "
+            "int? head_dim_v=None, "
             "Tensor? cu_seqlens_q=None, Tensor? cu_seqlens_kv=None, Tensor? seqused_q=None, Tensor? seqused_kv=None,"
             "int? batch_size=None, int? max_seqlen_q=None, int? max_seqlen_kv=None, "
             "int? mask_mode=None, int? win_left=None, int? win_right=None, "
@@ -84,6 +85,7 @@ class FlashAttenOpBuilder(OpBuilder):
             num_heads_q: int,
             num_heads_kv: int,
             head_dim: int,
+            head_dim_v: Optional[int] = None,
             cu_seqlens_q: Optional[torch.Tensor] = None,
             cu_seqlens_kv: Optional[torch.Tensor] = None,
             seqused_q: Optional[torch.Tensor] = None,
@@ -179,6 +181,7 @@ def flash_attn_metadata(
     num_heads_q: int,
     num_heads_kv: int,
     head_dim: int,
+    head_dim_v: Optional[int] = None,
     cu_seqlens_q: Optional[torch.Tensor] = None,
     cu_seqlens_kv: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
@@ -200,6 +203,7 @@ def flash_attn_metadata(
     b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
 
     batch_size = -1 if batch_size is None else batch_size
+    head_dim_v = -1 if head_dim_v is None else head_dim_v
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
     mask_mode = 1 if mask_mode is None else mask_mode
     win_left = -1 if win_left is None else win_left
@@ -220,6 +224,7 @@ def flash_attn_metadata(
         num_heads_q,
         num_heads_kv,
         head_dim,
+        head_dim_v,
         batch_size,
         max_seqlen_q,
         max_seqlen_kv,
@@ -241,6 +246,7 @@ def flash_attn_metadata_fallback(
     num_heads_q: int,
     num_heads_kv: int,
     head_dim: int,
+    head_dim_v: Optional[int] = None,
     cu_seqlens_q: Optional[torch.Tensor] = None,
     cu_seqlens_kv: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
@@ -260,6 +266,7 @@ def flash_attn_metadata_fallback(
         num_heads_q=num_heads_q,
         num_heads_kv=num_heads_kv,
         head_dim=head_dim,
+        head_dim_v=head_dim_v,
         cu_seqlens_q=cu_seqlens_q,
         cu_seqlens_kv=cu_seqlens_kv,
         seqused_q=seqused_q,

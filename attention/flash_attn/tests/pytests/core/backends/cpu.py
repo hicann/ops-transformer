@@ -81,7 +81,8 @@ def _pa_to_bnsd(t: torch.Tensor, layout: str, params: dict) -> torch.Tensor:
     """PA 格式 → BNSD 重建。"""
     b = params.get("actual_b", params["B"])  # TND 时 B=1，用 actual_b
     n2 = params.get("N2", params["N1"])
-    d = params["D"]
+    # D 维从张量末维推导（qk 维 D 与 v 维 DV 可不同；PA_NZ 分支另行按分形推导）
+    d = t.shape[-1]
     s2 = params["S2"]  # 用 S2，不是 max(seqused_kv)
     seq_kv = params["seqused_kv"]
     bs = params.get("block_size", 128)

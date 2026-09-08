@@ -119,6 +119,7 @@ def build_flash_attn_params(
         num_heads_q=nqh,
         num_heads_kv=nkh,
         head_dim=hd,
+        head_dim_v=p.get("DV", d),
         batch_size=bs,
         max_seqlen_q=msq,
         max_seqlen_kv=msk,

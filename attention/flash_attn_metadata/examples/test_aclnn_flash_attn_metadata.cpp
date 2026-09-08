@@ -145,6 +145,7 @@ int main()
     int32_t qS = 1;
     int32_t kvS = 8192;
     int32_t headDim = 128;
+    int32_t headDimV = -1;
     int32_t ropeHeadDim = 0;
 
     int32_t preTokens = -1;
@@ -204,8 +205,8 @@ int main()
     char socVersion[] = "ascend950";
     printf("start aclnnFlashAttnMetadata\n");
     ret = aclnnFlashAttnMetadataGetWorkspaceSize(nullptr, nullptr, nullptr, nullptr, batchSize, qS, kvS, numHeads,
-                                                 numKeyValueHeads, headDim, sparseMode, preTokens, nextTokens, "BSND",
-                                                 "BSND", "BSND", metadataTensor, &workspaceSize, &executor);
+                                                 numKeyValueHeads, headDim, headDimV, sparseMode, preTokens, nextTokens,
+                                                 "BSND", "BSND", "BSND", metadataTensor, &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
         printf("aclnnFlashAttnMetadataGetWorkspaceSize %d\n", ret);
         return -1;

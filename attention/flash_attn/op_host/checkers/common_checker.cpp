@@ -237,22 +237,17 @@ ge::graphStatus CommonChecker::CheckAxis(const FaTilingInfo &faInfo)
                                                       "S of key/value must be greater than 0"),
                 return ge::GRAPH_FAILED);
 
-    const std::vector<int64_t> supportedHeadDims = {64, 72, 128, 256};
-    OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckValueSupport(faInfo.qkHeadDim, supportedHeadDims),
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-                    faInfo.opName, "axis D of query and key", std::to_string(faInfo.qkHeadDim).c_str(),
-                    "The value of axis D of query and key can only be 64/72/128/256"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        ge::GRAPH_SUCCESS != CheckValueSupport(faInfo.vHeadDim, supportedHeadDims),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "axis D of value", std::to_string(faInfo.vHeadDim).c_str(),
-                                              "The value of axis D of value can only be 64/72/128/256"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(faInfo.qkHeadDim != faInfo.vHeadDim,
+    // 支持的 (QK head_dim, V head_dim) 组合
+    static const std::vector<pair<int64_t, int64_t>> supportedDimCombos = {
+        {64, 64}, {72, 72}, {128, 128}, {256, 256}, {192, 128}};
+    const auto dimCombIt = std::find(supportedDimCombos.begin(), supportedDimCombos.end(),
+                                     std::make_pair(faInfo.qkHeadDim, faInfo.vHeadDim));
+    OP_CHECK_IF(dimCombIt == supportedDimCombos.end(),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     faInfo.opName, "axis D of query/key and value",
                     (std::to_string(faInfo.qkHeadDim) + " and " + std::to_string(faInfo.vHeadDim)).c_str(),
-                    "The value of axis D of query/key must be equal to the value of axis D of value"),
+                    "The (head_dim of query/key, head_dim of value) combination is not supported, supported: "
+                    "(64,64), (72,72), (128,128), (256,256), (192,128)"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

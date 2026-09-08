@@ -279,7 +279,7 @@ TestCases = {
 
         # ── 可选 ──
         "N2":       [1],          # KV head数，默认 = N1
-        "DV":       [128],        # value head dim，默认 = D
+        "DV":       [128],        # value head dim，默认 = D；DV != D 时 metadata 透传 head_dim_v=DV（支持 (192,128) 组合）
         "scale":    [None],       # 缩放系数，默认1/sqrt(D)
         "mask_mode":[0],          # 0=无mask, 3=causal, 4=band+causal
         "win_left": [-1],
