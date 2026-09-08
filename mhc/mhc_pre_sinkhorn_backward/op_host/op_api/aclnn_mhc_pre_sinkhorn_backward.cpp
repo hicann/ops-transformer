@@ -642,7 +642,7 @@ aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
 {
     L2_DFX_PHASE_1(
         aclnnMhcPreSinkhornBackward,
-        DFX_IN(gradHin, gradHPost, gradHRes, x, phi, alpha, bias, hPre, hcBeforeNorm, invRms, sumOut, normOut),
+        DFX_IN(gradHin, gradHPost, gradHRes, x, phi, alpha, bias, hPre, hcBeforeNorm, invRms, sumOut, normOut, hcEps),
         DFX_OUT(gradX, gradPhi, gradAlpha, gradBias));
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);

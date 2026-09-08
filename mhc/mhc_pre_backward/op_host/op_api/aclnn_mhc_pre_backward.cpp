@@ -740,7 +740,7 @@ aclnnStatus aclnnMhcPreBackwardGetWorkspaceSize(
 {
     L2_DFX_PHASE_1(
         aclnnMhcPreBackward,
-        DFX_IN(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, gradXPostOptional),
+        DFX_IN(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, gradXPostOptional, hcEps),
         DFX_OUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
     auto uniqueExecutor = CREATE_EXECUTOR();
     AclnnMhcPreBackwardParams params = AclnnMhcPreBackward::Create()
