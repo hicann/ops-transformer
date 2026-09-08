@@ -78,7 +78,10 @@ u = Akk @ u_seed
 kg[i] = k[i] * exp2(gk[last] - gk[i])
 ```
 
-`Akk` 的 head 循环按 `H_v` 执行，GQA 映射只在读取 q/k head 时换算，避免按 `H_k` 重复或漏算。
+`H_v>H_k` 时为 GVA（Grouped Value Attention，分组值注意力）场景：每组 `H_v/H_k` 个连续 Value head
+共享一个 q/k head；head 编号从 0 开始时，Value head `h_v` 对应的 q/k head 编号为
+`floor(h_v/(H_v/H_k))`。`Akk` 的 head 循环按 `H_v` 执行，GVA 映射只在读取 q/k head 时换算，
+避免按 `H_k` 重复或漏算。
 Post-WU 是否作为单独的内部阶段执行由 tiling 决定。满足 A5 dense-aligned 融合条件时，Prepare
 直接调用 Post-WU 计算组件；其他场景在 Prepare 结束并完成同步后执行内部 Post-WU 阶段。两种
 方式都复用同一 `ChunkKdaFwd` L0 调用接口和 device kernel launch 入口。
@@ -170,7 +173,7 @@ C++ 中仅用于 dtype、常量传播或代码复用的普通 `template` helper 
 
 | tiling key | 编译期常量 | A2/A3 实现 | A5 实现 | 覆盖场景 |
 | --- | --- | --- | --- | --- |
-| `key=1` 通用 shape 模板 | `COMPILE_BT/K/V=0/0/0` | 根目录通用实现 | 根目录通用实现 | 不满足 `chunk=64,K=128,V=128` 的 dense、tail、varlen、GQA 等场景 |
+| `key=1` 通用 shape 模板 | `COMPILE_BT/K/V=0/0/0` | 根目录通用实现 | 根目录通用实现 | 不满足 `chunk=64,K=128,V=128` 的 dense、tail、varlen、GVA 等场景 |
 | `key=2` chunk64/K128/V128 模板 | `COMPILE_BT/K/V=64/128/128` | 根目录通用实现，使用编译期常量 | `arch35` 特化实现 | `chunk=64,K=V=128` 的 dense、tail、varlen 和不同 head 数 |
 
 `SetTilingKey` 只检查 chunk、K、V，不检查 SoC、layout、是否 varlen 或是否存在尾块。因此 tiling
@@ -269,5 +272,5 @@ A5 的 H96/T16K、K=V=128、chunk=64、BF16 关键场景以 10 ms 为目标值�
 - dtype：FP16/BF16。
 - layout：BSND/BNSD/TND/NTD。
 - gate：raw/已激活、safe true/false。
-- Shape：K=128，V=128/256，chunk=64/128，dense/varlen/tail/GQA。
+- Shape：K=128，V=128/256，chunk=64/128，dense/varlen/tail/GVA。
 - 属性：final state、重计算策略、`state_v_first`。

@@ -17,7 +17,7 @@
 
 - 计算公式：
 
-  将每条序列按$C=chunk\_size$划分为$M$个chunk。以第$c$个chunk为例，$i$、$j$为chunk内token下标，$l_c$为该chunk最后一个有效token下标。公式省略batch和head下标；GQA场景中，每个Value head使用其对应的Query/Key head。
+  将每条序列按$C=chunk\_size$划分为$M$个chunk。以第$c$个chunk为例，$i$、$j$为chunk内token下标，$l_c$为该chunk最后一个有效token下标。公式省略batch和head下标。当$HV>H$时为分组值注意力（Grouped Value Attention，GVA）场景：每组$HV/H$个连续Value head共享一个Query/Key head；head编号从0开始时，编号为$h_v$的Value head对应编号为$\lfloor h_v/(HV/H)\rfloor$的Query/Key head。
 
   令$x_{c,i,d}=g_{c,i,d}+dt\_bias_d$，未传入`dt_bias`时令$dt\_bias_d=0$。激活后gate为：
 
@@ -145,7 +145,7 @@
 | scale | 必选属性 | Query缩放系数。通常取$K^{-0.5}$。 | FLOAT | - |
 | chunk_size | 必选属性 | chunk大小。支持64、128，默认值为64。 | INT | - |
 | safe_gate | 必选属性 | 是否使用有界gate。默认值为false。 | BOOL | - |
-| lower_bound | 可选属性 | 有界gate下界。`safe_gate=true`时取值范围为[-5, 0)，默认值为-5.0。 | FLOAT | - |
+| lower_bound | 可选属性 | 有界gate下界。`safe_gate=true`且`use_gate_in_kernel=true`时取值范围为[-5, 0)，默认值为-5.0。 | FLOAT | - |
 | use_gate_in_kernel | 必选属性 | 是否在kernel内由raw gate计算激活。默认值为false。 | BOOL | - |
 | state_v_first | 可选属性 | 是否将状态张量末两维排列为(V, K)。默认值为false。 | BOOL | - |
 
