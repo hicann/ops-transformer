@@ -35,7 +35,14 @@ if (BUILD_OPEN_PROJECT)  # custom
         add_ops_compile_options(
             OP_NAME AlltoAllvGroupedMatMul
             OPTIONS --cce-auto-sync=off
+                    -DCATLASS_ARCH=2201
                     -DAICORE_EXCEPTION_RESTART
+        )
+    elseif("${CONDITION_UNIT}" STREQUAL "ascend910b")
+        add_ops_compile_options(
+            OP_NAME AlltoAllvGroupedMatMul
+            OPTIONS --cce-auto-sync=off
+                    -DCATLASS_ARCH=2201
         )
     endif()
 else() # 回黄host

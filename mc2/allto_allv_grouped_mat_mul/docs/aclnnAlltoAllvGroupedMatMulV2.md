@@ -11,7 +11,7 @@
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
@@ -46,6 +46,12 @@
 
 - 新增`commMode`参数，用户根据该参数指定芯片使用的通信引擎。
 
+  <!-- npu="910b" id12 -->
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持`aiv`。
+  <!-- end id12 -->
+  <!-- npu="A3" id13 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持`aiv`和`ai_cpu`。
+  <!-- end id13 -->
   <!-- npu="950" id7 -->
   - <term>Ascend 950DT</term>：支持`ai_cpu`和`ccu`。
 
@@ -186,7 +192,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>commMode(char*)</td>
         <td>输入</td>
         <td>指定当前通信类型。</td>
-        <td>支持输入"ai_cpu"和"ccu"。</td>
+        <td><term>Atlas A2系列产品</term>支持输入"aiv"；<br><term>Atlas A3系列产品</term>支持输入"aiv"和"ai_cpu"；<br><term>Ascend 950DT</term>支持输入"ai_cpu"和"ccu"。</td>
         <td>STRING</td>
         <td>-</td>
         <td>-</td>
@@ -196,7 +202,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>epWorldSize（int64_t）</td>
         <td>输入</td>
         <td>ep通信域的大小。</td>
-        <td><br><term>Atlas A3系列产品</term>支持8、16、32、64、128；<br><term>Ascend 950DT</term>支持2、4、8、16、32、64。</td>
+        <td><term>Atlas A2系列产品</term>在commMode为"aiv"时支持2、4、8；<br><term>Atlas A3系列产品</term>支持2、4、8、16、32、64、128；<br><term>Ascend 950DT</term>支持2、4、8、16、32、64。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -206,7 +212,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>sendCounts(aclIntArray*)</td>
         <td>输入</td>
         <td>表示发送给其他卡的token数。</td>
-        <td>数据类型支持INT64，长度为e * epWorldSize，最大为256。输入类型需为list。</td>
+        <td>数据类型支持INT64，长度为e * epWorldSize。commMode为"aiv"时最大为1024，其他模式最大为256。输入类型需为list。</td>
         <td>aclIntArray*（元素类型INT64）</td>
         <td>-</td>
         <td>-</td>
@@ -216,7 +222,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>recvCounts(aclIntArray*)</td>
         <td>输入</td>
         <td>表示接收其他卡的token数。</td>
-        <td>数据类型支持INT64，长度为e * epWorldSize，最大为256。输入类型需为list。</td>
+        <td>数据类型支持INT64，长度为e * epWorldSize。commMode为"aiv"时最大为1024，其他模式最大为256。输入类型需为list。</td>
         <td>aclIntArray*（元素类型INT64）</td>
         <td>-</td>
         <td>-</td>
@@ -380,8 +386,11 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
 
 - 通信引擎约束：
 
+  <!-- npu="910b" id14 -->
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持AIV通信；AIV模式的epWorldSize支持2、4、8。
+  <!-- end id14 -->
   <!-- npu="A3" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持AICPU通信。
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持AIV和AICPU通信。
   <!-- end id8 -->
   <!-- npu="950" id9 -->
   - <term>Ascend 950DT</term>：支持 CCU 通信和 AICPU 通信，CCU 仅支持单机UB域内互联，AI_CPU 可支持跨机 UB 域内互联。
@@ -402,6 +411,11 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
   - K：表示选取TopK个专家，K的范围[2, 8]。
   - A：本卡收到的token数，是recvCounts参数累加之和。
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
+
+- commMode为`"aiv"`时的附加约束与内存布局：
+  - Atlas A2的epWorldSize支持2、4、8；Atlas A3支持2、4、8、16、32、64、128。gmmX、gmmWeight、gmmY必须为相同的FLOAT16或BFLOAT16类型、ND格式，shape分别为2维、3维、2维。
+  - AIV模式下BSK/A取值范围为[1, 5000000]，H1/N1取值范围为[1, 65535]；本卡专家数e不超过512，`epWorldSize * e`不超过1024。
+  - sendCounts和recvCounts接口属性为INT64直接计数数组，布局为`[rank][localExpert]`。Host侧校验每项非负且不超过对应本卡输入/输出M，并校验sendCounts之和等于BSK、recvCounts之和等于A。
 
 <!-- npu="A3" id10 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  : 单卡通信量在2MB以下可能存在性能劣化。

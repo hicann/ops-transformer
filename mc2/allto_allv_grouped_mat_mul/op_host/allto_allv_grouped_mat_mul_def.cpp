@@ -17,7 +17,8 @@
 namespace ops {
 class AlltoAllvGroupedMatMul : public OpDef {
 public:
-    explicit AlltoAllvGroupedMatMul(const char *name) : OpDef(name)
+    explicit AlltoAllvGroupedMatMul(const char *name)
+        : OpDef(name)
     {
         this->Input("gmm_x")
             .ParamType(REQUIRED)
@@ -92,6 +93,7 @@ public:
             .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
         this->AICore().AddConfig("ascend910_93", aicore_config);
+        this->AICore().AddConfig("ascend910b", aicore_config);
         this->AICore().AddConfig("ascend950", aicore_config);
         this->MC2().HcclGroup({"group"});
     }

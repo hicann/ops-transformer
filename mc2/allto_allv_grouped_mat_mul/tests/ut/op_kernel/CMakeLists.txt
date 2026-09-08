@@ -9,5 +9,12 @@
 # -----------------------------------------------------------------------------------------------------------
 
 if (UT_TEST_ALL OR OP_KERNEL_UT)
-    AddOpTestCase(allto_allv_grouped_mat_mul "Ascend910_9391" "-DDTYPE_X_REF=half -include${CMAKE_CURRENT_SOURCE_DIR}/allto_allv_grouped_mat_mul_tiling_def.h" "")
+    if("ascend910b" IN_LIST ASCEND_COMPUTE_UNIT)
+        set(A2AVGMM_UT_SOC "Ascend910B1")
+    else()
+        set(A2AVGMM_UT_SOC "Ascend910_9391")
+    endif()
+    AddOpTestCase(allto_allv_grouped_mat_mul "${A2AVGMM_UT_SOC}"
+        "-DDTYPE_X_REF=half -include${CMAKE_CURRENT_SOURCE_DIR}/allto_allv_grouped_mat_mul_tiling_def.h" ""
+        "${CMAKE_CURRENT_SOURCE_DIR}/allto_allv_grouped_mat_mul_v2_kt_stub.cpp")
 endif()
