@@ -75,8 +75,20 @@ public:
         this->Attr("trans_mm_weight").AttrType(OPTIONAL).Bool(false);
         this->Attr("comm_mode").AttrType(OPTIONAL).String("ai_cpu");
 
-        OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
+        OpAICoreConfig aicore_config_a3;
+        aicore_config_a3.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+            .ExtendCfgInfo("opFile.value", "grouped_mat_mul_allto_allv_a3");
+
+        OpAICoreConfig aicore_config_a5;
+        aicore_config_a5.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
@@ -85,8 +97,9 @@ public:
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
-        this->AICore().AddConfig("ascend910_93", aicore_config);
-        this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend910_93", aicore_config_a3);
+        this->AICore().AddConfig("ascend910b", aicore_config_a3);
+        this->AICore().AddConfig("ascend950", aicore_config_a5);
         this->MC2().HcclGroup({"group"});
     }
 };

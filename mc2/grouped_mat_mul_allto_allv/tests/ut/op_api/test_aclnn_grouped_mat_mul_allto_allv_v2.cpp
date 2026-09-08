@@ -255,6 +255,46 @@ TEST_F(L2GroupedMatMulAlltoAllvV2Test, TestWithValidSendRecvCounts)
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
+TEST_F(L2GroupedMatMulAlltoAllvV2Test, TestAivModeAcceptedOnA3)
+{
+    TensorDesc gmmX = TensorDesc({4096, 7168}, ACL_BF16, ACL_FORMAT_ND);
+    TensorDesc gmmWeight = TensorDesc({4, 7168, 4096}, ACL_BF16, ACL_FORMAT_ND);
+    constexpr int64_t epWorldSize = 8;
+    std::vector<int64_t> sendCountsList(32, 128);
+    std::vector<int64_t> recvCountsList(32, 128);
+    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_BF16, ACL_FORMAT_ND);
+    auto ut =
+        OP_API_UT(aclnnGroupedMatMulAlltoAllvV2,
+                  INPUT(gmmX, gmmWeight, nullptr, nullptr, nullptr, nullptr, "test_grouped_mat_mul_allto_allv_ep_group",
+                        "aiv", epWorldSize, sendCounts, recvCounts, false, false),
+                  OUTPUT(yDesc, nullptr));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST_F(L2GroupedMatMulAlltoAllvV2Test, TestNullCommModeRejected)
+{
+    TensorDesc gmmX = TensorDesc({4096, 7168}, ACL_BF16, ACL_FORMAT_ND);
+    TensorDesc gmmWeight = TensorDesc({4, 7168, 4096}, ACL_BF16, ACL_FORMAT_ND);
+    TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_BF16, ACL_FORMAT_ND);
+    std::vector<int64_t> counts(32, 128);
+    aclIntArray *sendCounts = aclCreateIntArray(counts.data(), counts.size());
+    aclIntArray *recvCounts = aclCreateIntArray(counts.data(), counts.size());
+    auto ut =
+        OP_API_UT(aclnnGroupedMatMulAlltoAllvV2,
+                  INPUT(gmmX, gmmWeight, nullptr, nullptr, nullptr, nullptr, "test_grouped_mat_mul_allto_allv_ep_group",
+                        static_cast<const char *>(nullptr), int64_t{8}, sendCounts, recvCounts, false, false),
+                  OUTPUT(yDesc, nullptr));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+}
+
 // recvCounts empty array - covers lines 83-85
 TEST_F(L2GroupedMatMulAlltoAllvV2Test, TestRecvCountsEmpty)
 {

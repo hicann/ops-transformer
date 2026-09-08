@@ -44,14 +44,9 @@ __global__ __aicore__ void grouped_mat_mul_allto_allv(GM_ADDR gmmxGM, GM_ADDR gm
         return;
     }
 
-    TPipe pipe;
     REGISTER_TILING_DEFAULT(QuantGmmA2avTilingData);
     GET_TILING_DATA(tilingData, tilingGM);
     const QuantGmmA2avTilingData *tilingData_ = &tilingData;
-    const void *hcclInitTiling = &(tilingData_->hcclA2avTiling.hcclInitTiling);
-    uint64_t hcclCcTilingOffset = offsetof(QuantGmmA2avTilingData, hcclA2avTiling) +
-                                  offsetof(MC2KernelTemplate::HcclA2avTilingInfo, a2avCcTiling);
-    constexpr CubeFormat W_FORMAT = CubeFormat::ND;
 
     using HcclOpType = HcclA2avOp<DTYPE_Y, false, TILINGKEY_COMM_MODE>;
     using ComputeOpType =
@@ -63,31 +58,39 @@ __global__ __aicore__ void grouped_mat_mul_allto_allv(GM_ADDR gmmxGM, GM_ADDR gm
     using GmmA2avSchedulerType =
         GmmA2avScheduler<HcclOpType, ComputeOpType, SharedGmmExpertOpType, TILINGKEY_COMPUTE_MATMUL>;
 
-    uint64_t wsOffset = 0;
-    GM_ADDR gmmOutputGM = userWorkspace + wsOffset;
-    wsOffset += tilingData_->workspaceInfo.wsGmmOutputSize;
-    GM_ADDR gmmComputeWSGM = userWorkspace + wsOffset;
-    wsOffset += tilingData_->workspaceInfo.wsGmmComputeWorkspaceSize;
-    GM_ADDR sharedGmmComputeWSGM = userWorkspace + wsOffset;
-    wsOffset += tilingData_->workspaceInfo.wsSharedGmmComputeWorkspaceSize;
+    GM_ADDR gmmOutputGM = userWorkspace;
 
-    GM_ADDR sendBufferAddr = gmmOutputGM;
-    HcclOpType hcclOp;
-    hcclOp.Init(hcclInitTiling, hcclCcTilingOffset, &tilingData.taskTilingInfo, sendBufferAddr, yGM,
-                static_cast<uint32_t>(tilingData_->taskTilingInfo.aivCoreNum));
+    if ASCEND_IS_AIC {
+        uint64_t wsOffset = tilingData_->workspaceInfo.wsGmmOutputSize;
+        GM_ADDR gmmComputeWSGM = userWorkspace + wsOffset;
+        wsOffset += tilingData_->workspaceInfo.wsGmmComputeWorkspaceSize;
+        GM_ADDR sharedGmmComputeWSGM = userWorkspace + wsOffset;
 
-    GET_NESTED_TILING_DATA_MEMBER_ADDR(QuantGmmA2avTilingData, GMMQuantTilingData, gmmBaseTiling, gmmArray,
-                                       gmmArrayAddr_, tilingGM);
-    ComputeOpType computeOp;
-    computeOp.Init(gmmxGM, gmmweightGM, nullptr, nullptr, gmmOutputGM, gmmComputeWSGM, tilingData_,
-                   &tilingData_->gmmBaseTiling, gmmArrayAddr_, &pipe);
+        TPipe pipe;
+        GET_NESTED_TILING_DATA_MEMBER_ADDR(QuantGmmA2avTilingData, GMMQuantTilingData, gmmBaseTiling, gmmArray,
+                                           gmmArrayAddr_, tilingGM);
+        ComputeOpType computeOp;
+        computeOp.Init(gmmxGM, gmmweightGM, nullptr, nullptr, gmmOutputGM, gmmComputeWSGM, tilingData_,
+                       &tilingData_->gmmBaseTiling, gmmArrayAddr_, &pipe);
 
-    GET_NESTED_TILING_DATA_MEMBER_ADDR(QuantGmmA2avTilingData, GMMQuantTilingData, sharedGmmTiling, gmmArray,
-                                       mmArrayAddr_, tilingGM);
-    SharedGmmExpertOpType shareComputeOp;
-    shareComputeOp.Init(mmxOptionalGM, mmweightOptionalGM, nullptr, nullptr, mmyOptionalGM, sharedGmmComputeWSGM,
-                        tilingData_, &tilingData_->sharedGmmTiling, mmArrayAddr_, &pipe);
+        GET_NESTED_TILING_DATA_MEMBER_ADDR(QuantGmmA2avTilingData, GMMQuantTilingData, sharedGmmTiling, gmmArray,
+                                           mmArrayAddr_, tilingGM);
+        SharedGmmExpertOpType shareComputeOp;
+        shareComputeOp.Init(mmxOptionalGM, mmweightOptionalGM, nullptr, nullptr, mmyOptionalGM, sharedGmmComputeWSGM,
+                            tilingData_, &tilingData_->sharedGmmTiling, mmArrayAddr_, &pipe);
 
-    GmmA2avSchedulerType gmmA2avScheduler(hcclOp, computeOp, shareComputeOp, &tilingData.taskTilingInfo);
-    gmmA2avScheduler.Process();
+        GmmA2avSchedulerType::ProcessAic(computeOp, shareComputeOp, &tilingData.taskTilingInfo);
+    }
+
+    if ASCEND_IS_AIV {
+        const void *hcclInitTiling = &(tilingData_->hcclA2avTiling.hcclInitTiling);
+        uint64_t hcclCcTilingOffset = offsetof(QuantGmmA2avTilingData, hcclA2avTiling) +
+                                      offsetof(MC2KernelTemplate::HcclA2avTilingInfo, a2avCcTiling);
+        GM_ADDR sendBufferAddr = gmmOutputGM;
+        HcclOpType hcclOp;
+        hcclOp.Init(hcclInitTiling, hcclCcTilingOffset, &tilingData.taskTilingInfo, sendBufferAddr, yGM,
+                    static_cast<uint32_t>(tilingData_->taskTilingInfo.aivCoreNum));
+
+        GmmA2avSchedulerType::ProcessAiv(hcclOp, &tilingData.taskTilingInfo);
+    }
 }

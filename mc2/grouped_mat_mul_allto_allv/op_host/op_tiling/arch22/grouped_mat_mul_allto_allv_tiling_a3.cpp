@@ -20,5 +20,5 @@ using namespace ge;
 using namespace Ops::Transformer::OpTiling;
 
 namespace optiling {
-REGISTER_OPS_TILING_TEMPLATE(GroupedMatMulAlltoAllv, GroupedMatmulAllToAllvTiling, 0);
+REGISTER_OPS_TILING_TEMPLATE(GroupedMatMulAlltoAllv, GroupedMatmulAllToAllvTiling, 1);
 }

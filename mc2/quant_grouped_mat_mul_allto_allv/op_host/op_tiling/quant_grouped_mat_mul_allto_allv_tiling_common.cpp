@@ -712,6 +712,16 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetSendRecvCoun
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckTopK(uint64_t topK)
+{
+    OP_TILING_CHECK(
+        (topK < MIN_K_VALUE) || (topK > MAX_K_VALUE),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "K", std::to_string(topK),
+                                  "[" + std::to_string(MIN_K_VALUE) + ", " + std::to_string(MAX_K_VALUE) + "]"),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckLocalParams()
 {
     OP_TILING_CHECK((localParams_.H1 == 0) || (localParams_.H1 >= MAX_H1_VALUE),
@@ -736,12 +746,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckLocalParams()
                                   "BSK=" + std::to_string(localParams_.BsK) + " BS=" + std::to_string(localParams_.Bs),
                                   "BSK should be an integer multiple of BS"),
         return ge::GRAPH_FAILED);
-    uint64_t k = localParams_.BsK / localParams_.Bs;
-    OP_TILING_CHECK(
-        (k < MIN_K_VALUE) || (k > MAX_K_VALUE),
-        OP_LOGE_FOR_INVALID_VALUE(opName_, "K", std::to_string(k),
-                                  "[" + std::to_string(MIN_K_VALUE) + ", " + std::to_string(MAX_K_VALUE) + "]"),
-        return ge::GRAPH_FAILED);
+    MC2_CHECK_LOG_RET(opName_, CheckTopK(localParams_.BsK / localParams_.Bs));
     OP_TILING_CHECK((localParams_.H2 == 0) || (localParams_.H2 > MAX_SHARED_H_SHAPE_SIZE),
                     OP_LOGE_FOR_INVALID_VALUE(opName_, "H2", std::to_string(localParams_.H2),
                                               "(0, " + std::to_string(MAX_SHARED_H_SHAPE_SIZE) + "]"),

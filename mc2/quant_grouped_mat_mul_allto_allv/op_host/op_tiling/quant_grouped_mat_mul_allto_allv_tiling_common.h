@@ -136,6 +136,7 @@ protected:
     virtual ge::graphStatus CheckParamsAttrEpAndSetLocalParams();
     virtual ge::graphStatus CheckAndSetSendRecvCountsAttr();
     virtual ge::graphStatus CheckLocalParams();
+    virtual ge::graphStatus CheckTopK(uint64_t topK);
     virtual ge::graphStatus CheckParamsRelationAndSetLocalParams();
 };
 

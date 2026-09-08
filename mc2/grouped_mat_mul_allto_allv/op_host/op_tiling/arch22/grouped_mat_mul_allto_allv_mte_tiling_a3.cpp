@@ -8,34 +8,14 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef MC2_COMM_UTILS_H
-#define MC2_COMM_UTILS_H
+/*!
+ * \file grouped_mat_mul_allto_allv_mte_tiling_a3.cpp
+ */
 
-#include <cstdint>
-#include <cstdlib>
+#include "grouped_mat_mul_allto_allv_mte_tiling.h"
+#include "op_host/tiling_templates_registry.h"
 
-namespace Mc2Comm {
-
-constexpr char COMM_MODE_ENV[] = "ENV_MC2_COMM_MODE_AICPU";
-
-constexpr uint8_t COMM_MODE_CCU = 0;
-constexpr uint8_t COMM_MODE_AICPU = 1;
-constexpr uint8_t COMM_MODE_AIV = 2;
-
-constexpr uint8_t ENGINE_CCU = 0;
-constexpr uint8_t ENGINE_AICPU = 2;
-constexpr uint8_t ENGINE_MTE = 3;
-constexpr uint8_t ENGINE_CCU_SCHED = 6;
-
-inline uint8_t GetCommModeFromEnv()
-{
-    auto commModeEnv = getenv(COMM_MODE_ENV);
-    if (commModeEnv != nullptr) {
-        return COMM_MODE_AICPU;
-    }
-    return COMM_MODE_CCU;
-}
-
-} // namespace Mc2Comm
-
-#endif
+namespace optiling {
+// The external "aiv" mode selects the AIV-driven MTE communication path.
+REGISTER_OPS_TILING_TEMPLATE(GroupedMatMulAlltoAllv, GroupedMatmulAllToAllvMteTiling, 0);
+} // namespace optiling
