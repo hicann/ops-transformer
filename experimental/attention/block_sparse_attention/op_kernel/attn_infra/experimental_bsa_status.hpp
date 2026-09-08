@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef STATUS_HPP
-#define STATUS_HPP
+#ifndef BSA_STATUS_HPP
+#define BSA_STATUS_HPP
 
 namespace NpuArch {
 

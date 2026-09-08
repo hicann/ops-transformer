@@ -23,9 +23,15 @@ using namespace op;
 
 class aclnn_block_sparse_attention_v1_ut : public testing::Test {
 protected:
-    static void SetUpTestCase() { cout << "aclnn_block_sparse_attention_v1_ut SetUp" << endl; }
+    static void SetUpTestCase()
+    {
+        cout << "aclnn_block_sparse_attention_v1_ut SetUp" << endl;
+    }
 
-    static void TearDownTestCase() { cout << "aclnn_block_sparse_attention_v1_ut TearDown" << endl; }
+    static void TearDownTestCase()
+    {
+        cout << "aclnn_block_sparse_attention_v1_ut TearDown" << endl;
+    }
 };
 
 namespace {

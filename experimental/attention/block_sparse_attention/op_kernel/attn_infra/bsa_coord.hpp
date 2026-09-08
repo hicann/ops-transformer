@@ -53,19 +53,31 @@ public:
     }
 
     HOST_DEVICE
-    int Argmin() const { return ArgminImpl<1>(0); }
+    int Argmin() const
+    {
+        return ArgminImpl<1>(0);
+    }
 
     // Returns the index of the dimension with greatest value
     HOST_DEVICE
-    int Argmax() const { return ArgmaxImpl<1>(0); }
+    int Argmax() const
+    {
+        return ArgmaxImpl<1>(0);
+    }
 
     // Returns true if Coord is non-zero
     HOST_DEVICE
-    explicit operator bool() const { return AnyImpl<0>(); }
+    explicit operator bool() const
+    {
+        return AnyImpl<0>();
+    }
 
     // Return true if Coord is uniformly zero.
     HOST_DEVICE
-    bool operator!() const { return !AnyImpl<0>(); }
+    bool operator!() const
+    {
+        return !AnyImpl<0>();
+    }
 
     // Element-wise addition
     HOST_DEVICE
@@ -140,19 +152,31 @@ public:
 
     // In-place equal
     HOST_DEVICE
-    bool operator==(Coord const &b) const { return EqualCoordImpl<0>(b); }
+    bool operator==(Coord const &b) const
+    {
+        return EqualCoordImpl<0>(b);
+    }
 
     // In-place equal
     HOST_DEVICE
-    bool operator==(Index const val) const { return EqualScalarImpl<0>(val); }
+    bool operator==(Index const val) const
+    {
+        return EqualScalarImpl<0>(val);
+    }
 
     // Member acces operator
     HOST_DEVICE
-    Index &operator[](int dim) { return idx[dim]; }
+    Index &operator[](int dim)
+    {
+        return idx[dim];
+    }
 
     // Member access operator
     HOST_DEVICE
-    Index const &operator[](int dim) const { return idx[dim]; }
+    Index const &operator[](int dim) const
+    {
+        return idx[dim];
+    }
 
     // Gets the index of a given Coord element
     template <int DIM>
@@ -163,7 +187,10 @@ public:
 
     // Access via index; may limit unrolling potential
     HOST_DEVICE
-    Index &At(int dim) { return idx[dim]; }
+    Index &At(int dim)
+    {
+        return idx[dim];
+    }
 
     // Gets the index of a given Coord element
     template <int DIM>
@@ -174,7 +201,10 @@ public:
 
     // Access via index; may limit unrolling potential
     HOST_DEVICE
-    Index const &At(int dim) const { return idx[dim]; }
+    Index const &At(int dim) const
+    {
+        return idx[dim];
+    }
 
     template <int... Is>
     HOST_DEVICE auto GetCoordByAxis() const

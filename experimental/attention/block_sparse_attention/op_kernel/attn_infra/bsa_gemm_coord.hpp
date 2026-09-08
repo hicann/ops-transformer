@@ -42,16 +42,28 @@ struct GemmShape {
 
     /// Returns a Coord object
     HOST_DEVICE
-    static Coord<3> ToCoord() { return MakeCoord(M, N, K); }
+    static Coord<3> ToCoord()
+    {
+        return MakeCoord(M, N, K);
+    }
 
     HOST_DEVICE
-    static Coord<2> ToCoordMN() { return MakeCoord(M, N); }
+    static Coord<2> ToCoordMN()
+    {
+        return MakeCoord(M, N);
+    }
 
     HOST_DEVICE
-    static Coord<2> ToCoordMK() { return MakeCoord(M, K); }
+    static Coord<2> ToCoordMK()
+    {
+        return MakeCoord(M, K);
+    }
 
     HOST_DEVICE
-    static Coord<2> ToCoordKN() { return MakeCoord(K, N); }
+    static Coord<2> ToCoordKN()
+    {
+        return MakeCoord(K, N);
+    }
 };
 
 /// GemmCoord is a structure derived from Coord<3> that specifies a location within the
@@ -90,36 +102,63 @@ struct GemmCoord : public Coord<3, uint32_t> {
 
     /// Returns the Gemm M coordinate
     HOST_DEVICE
-    Index const &m() const { return this->At(M_INDEX); }
+    Index const &m() const
+    {
+        return this->At(M_INDEX);
+    }
 
     /// Returns reference to the Gemm M coordinate
     HOST_DEVICE
-    Index &m() { return this->At(M_INDEX); }
+    Index &m()
+    {
+        return this->At(M_INDEX);
+    }
 
     /// Returns the Gemm N coordinate
     HOST_DEVICE
-    Index const &n() const { return this->At(N_INDEX); }
+    Index const &n() const
+    {
+        return this->At(N_INDEX);
+    }
 
     /// Returns reference to the Gemm N coordinate
     HOST_DEVICE
-    Index &n() { return this->At(N_INDEX); }
+    Index &n()
+    {
+        return this->At(N_INDEX);
+    }
 
     /// Returns the Gemm K coordinate
     HOST_DEVICE
-    Index const &k() const { return this->At(K_INDEX); }
+    Index const &k() const
+    {
+        return this->At(K_INDEX);
+    }
 
     /// Returns reference to the Gemm K coordinate
     HOST_DEVICE
-    Index &k() { return this->At(K_INDEX); }
+    Index &k()
+    {
+        return this->At(K_INDEX);
+    }
 
     HOST_DEVICE
-    auto GetCoordMN() const { return this->GetCoordByAxis<M_INDEX, N_INDEX>(); }
+    auto GetCoordMN() const
+    {
+        return this->GetCoordByAxis<M_INDEX, N_INDEX>();
+    }
 
     HOST_DEVICE
-    auto GetCoordMK() const { return this->GetCoordByAxis<M_INDEX, K_INDEX>(); }
+    auto GetCoordMK() const
+    {
+        return this->GetCoordByAxis<M_INDEX, K_INDEX>();
+    }
 
     HOST_DEVICE
-    auto GetCoordKN() const { return this->GetCoordByAxis<K_INDEX, N_INDEX>(); }
+    auto GetCoordKN() const
+    {
+        return this->GetCoordByAxis<K_INDEX, N_INDEX>();
+    }
 };
 
 } // namespace NpuArch

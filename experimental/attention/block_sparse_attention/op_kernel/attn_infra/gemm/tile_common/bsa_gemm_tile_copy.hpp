@@ -13,19 +13,19 @@
 
 #include <type_traits>
 #include "../../../attn_infra/bsa_base_defs.hpp"
-#include "../../../attn_infra/detail/tag_to_layout.hpp"
+#include "../../../attn_infra/detail/experimental_bsa_tag_to_layout.hpp"
 #include "../../../tla/tensor_bsa.hpp"
 #if (__CCE_AICORE__ == 310)
-#include "../../../attn_infra/gemm/tile_common/copy_gm_to_l1_a5.hpp"
-#include "../../../attn_infra/gemm/tile_common/copy_l0c_to_ub_a5.hpp"
-#include "../../../attn_infra/gemm/tile_common/copy_l1_to_l0a_a5.hpp"
-#include "../../../attn_infra/gemm/tile_common/copy_l1_to_l0b_a5.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_gm_to_l1_a5.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_l0c_to_ub_a5.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_l1_to_l0a_a5.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_l1_to_l0b_a5.hpp"
 #endif
 #if (__CCE_AICORE__ == 220)
-#include "../../../attn_infra/gemm/tile_common/copy_gm_to_l1_a2.hpp"
-#include "../../../attn_infra/gemm/tile_common/copy_l0c_to_gm_a2.hpp"
-#include "../../../attn_infra/gemm/tile_common/copy_l1_to_l0a_a2.hpp"
-#include "../../../attn_infra/gemm/tile_common/copy_l1_to_l0b_a2.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_gm_to_l1_a2.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_l0c_to_gm_a2.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_l1_to_l0a_a2.hpp"
+#include "../../../attn_infra/gemm/tile_common/experimental_bsa_copy_l1_to_l0b_a2.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_copy_l1_to_bt.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_gemm_copy_gm_to_ub.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_gemm_copy_ub_to_gm.hpp"

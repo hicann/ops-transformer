@@ -134,7 +134,7 @@ BlockSparseAttention使用blockSparseMask稀疏pattern,不需要selectIdx索引�
 
 对于qSeqlen=512, kvSeqlen=1024, blockShapeX=128, blockShapeY=128:
 
-```text
+```
 Q方向: ceil(512/128)=4块 [0, 1, 2, 3]
 KV方向: ceil(1024/128)=8块 [0, 1, 2, 3, 4, 5, 6, 7]
 

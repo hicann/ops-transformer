@@ -16,13 +16,13 @@ using namespace tla;
 namespace BsaKernelArch35 {
 
 template <class EpilogueMask2Idx, class BlockMmadQK, class EpilogueOnlineSoftmax, class BlockMmadPV,
-          class EpilogueRescaleO, Format qFormat, Format kvFormat>
+          class EpilogueRescaleO, Format qFormat, Format kvFormat, bool transposedMm1, bool zNOnlineSoftmax>
 class BsaFullQuantKernelArch35 {
 public:
     using ArchTag = typename BlockMmadPV::ArchTag;
 
-    using ElementQ = typename BlockMmadQK::ElementA;               // fp8_e4m3fn_t
-    using ElementK = typename BlockMmadQK::ElementB;               // fp8_e4m3fn_t
+    using ElementQ = typename BlockMmadQK::ElementQ;               // fp8_e4m3fn_t
+    using ElementK = typename BlockMmadQK::ElementK;               // fp8_e4m3fn_t
     using ElementS = typename EpilogueOnlineSoftmax::ElementInput; // half/bloat16_t
     using ElementP = typename BlockMmadPV::ElementA;               // fp8_e4m3fn_t
     using ElementV = typename BlockMmadPV::ElementB;               // fp8_e4m3fn_t
@@ -35,7 +35,7 @@ public:
 
     using LayoutQ = layout::RowMajor;
     using LayoutK = layout::ColumnMajor;
-    using LayoutS = layout::RowMajor;
+    using LayoutS = std::conditional_t<zNOnlineSoftmax, layout::zN, layout::RowMajor>;
     using LayoutP = layout::RowMajor;
     using LayoutV = layout::RowMajor;
     using LayoutO = layout::RowMajor;
@@ -58,7 +58,8 @@ public:
         __gm__ BlockSparseAttentionTilingData *bsaTilingData =
             reinterpret_cast<__gm__ BlockSparseAttentionTilingData *>(params.tiling);
         FetchBaseShapeInfo(bsaTilingData);
-        CalcOnChipBufTileInfo(bsaTilingData);
+        CalcL1L0BufTileInfo(bsaTilingData);
+        CalcUBufTileInfo();
         // global buffers
         AscendC::GlobalTensor<ElementQ> gQ;
         gQ.SetGlobalBuffer((__gm__ ElementQ *)params.query);
@@ -110,8 +111,8 @@ public:
 #endif
 #ifdef __DAV_VEC__
         coreIdx = AscendC::GetBlockIdx() / AscendC::GetSubBlockNum();
-        EpilogueOnlineSoftmax epilogueOnlineSoftmax(resource, scaleValue_);
-        EpilogueRescaleO epilogueRescaleO(resource);
+        EpilogueOnlineSoftmax epilogueOnlineSoftmax(resource, scaleValue_, uBufTileHelper_);
+        EpilogueRescaleO epilogueRescaleO(resource, uBufTileHelper_);
 #endif
         uint32_t qSTileNumPerFullXBlock = CeilDiv(blockShapeX_, qBaseTile_);
         // Calculate strides based on layout
@@ -280,8 +281,12 @@ public:
             uint32_t kvSLoopNum = static_cast<uint32_t>(CeilDiv(gatheredKvSeqlen, static_cast<int64_t>(kvBaseTile_)));
             uint32_t kvSTileSizeAct = kvBaseTile_;
 #ifdef __DAV_CUBE__
-            uint32_t kvShapeCol = 0;
             uint32_t qShapeCol = 0;
+            uint32_t qShapeRow = 0;
+            uint32_t kShapeCol = 0;
+            uint32_t kShapeRow = 0;
+            uint32_t vShapeCol = 0;
+            uint32_t vShapeRow = 0;
 
             if constexpr (qFormat == Format::TND) {
                 qShapeCol = strideQO;
@@ -291,22 +296,28 @@ public:
                 qShapeCol = strideQOS;
             }
             if constexpr (kvFormat == Format::TND) {
-                kvShapeCol = strideKV;
+                kShapeRow = strideKV;
+                vShapeCol = strideKV;
             } else if constexpr (kvFormat == Format::BNSD) {
-                kvShapeCol = strideKVS;
+                kShapeRow = strideKVS;
+                vShapeCol = strideKVS;
             } else if constexpr (qFormat == Format::BSND) {
-                kvShapeCol = strideKVS;
+                kShapeRow = strideKVS;
+                vShapeCol = strideKVS;
             }
+            vShapeRow = kvBaseTile_;
+            qShapeRow = qBaseTile_;
+            kShapeCol = kvBaseTile_;
 
-            auto gmQLayoutTla = tla::MakeLayout<ElementQ, LayoutQ>(qBaseTile_, qShapeCol);
+            auto gmQLayoutTla = tla::MakeLayout<ElementQ, LayoutQ>(qShapeRow, qShapeCol);
             auto gmQTensorTla = tla::MakeTensor(gQ[gmOffsetQ], gmQLayoutTla, Arch::PositionGM{});
             GemmCoord actualBlockShapeQ{rowNum, embed_, 0};
             blockMmadQK.loadQGM(gmQTensorTla, actualBlockShapeQ);
 
-            auto gmKLayoutTla = tla::MakeLayout<ElementK, LayoutK>(kvShapeCol, kvBaseTile_);
+            auto gmKLayoutTla = tla::MakeLayout<ElementK, LayoutK>(kShapeRow, kShapeCol);
             auto gmKTensorTla = tla::MakeTensor(gK[gmOffsetK], gmKLayoutTla, Arch::PositionGM{});
 
-            auto gmVLayoutTla = tla::MakeLayout<ElementV, LayoutV>(kvBaseTile_, kvShapeCol);
+            auto gmVLayoutTla = tla::MakeLayout<ElementV, LayoutV>(vShapeRow, vShapeCol);
             auto gmVTensorTla = tla::MakeTensor(gV[gmOffsetV], gmVLayoutTla, Arch::PositionGM{});
 
             uint32_t qDequantScaleOffset =
@@ -342,7 +353,14 @@ public:
                     // QK
                     GemmCoord actualBlockShapeQK{rowNum, kvSTileSizeAct, embed_};
                     uint32_t ubSBufId = gatheredKvSTileIdx % UB_S_OTMP_BUF_STAGES;
-                    auto ubSLayoutTla = tla::MakeLayout<ElementS, LayoutS>(rowNumRound, RoundUp(kvSTileSizeAct, 16));
+                    uint32_t sShapeRow = 0;
+                    uint32_t sShapeCol = 0;
+                    sShapeRow = rowNumRound;
+                    if constexpr (zNOnlineSoftmax) {
+                        sShapeRow = RoundUp(rowNum, 8) / 2;
+                    }
+                    sShapeCol = RoundUp(kvSTileSizeAct, 16);
+                    auto ubSLayoutTla = tla::MakeLayout<ElementS, LayoutS>(sShapeRow, sShapeCol);
                     auto ubSTensorTla = tla::MakeTensor(ubSTensor[ubSBufId], ubSLayoutTla, Arch::PositionUB{});
                     uint32_t Mm1ToSmFlagId = ubSBufId;
                     Arch::CrossCoreFlag mm1ToSmFlag(Mm1ToSmFlagId);
@@ -357,6 +375,9 @@ public:
                         curBatch * kvHeads_ * yBlockNumAligned_ + kvHeadIdx * yBlockNumAligned_ + yBlockIndex;
                     float kDequantScaleValue = gKDequantScale.GetValue(kvDequantScaleOffset);
                     float combinedDeqScalar = qDequantScaleValue * kDequantScaleValue;
+                    if constexpr (zNOnlineSoftmax) {
+                        combinedDeqScalar *= scaleValue_;
+                    }
                     uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t *>(&combinedDeqScalar));
                     blockMmadQK(gmKTensorTla, ubSTensorTla, gSparseIdx[gmOffsetSparseIdx], actualBlockShapeQK,
                                 gatheredKvSTileIdx, kvSeqlen, kvBaseTile_, blockShapeY_, yBlockNumAval, yBlockNumRsvd,
@@ -372,10 +393,15 @@ public:
                     auto l1PLayoutTla = tla::MakeLayout<ElementP, NpuArch::layout::zN>(rowNum, kvSTileSizeAct);
                     auto l1PTensorTla = tla::MakeTensor(l1PTensor[l1PBufId], l1PLayoutTla, Arch::PositionL1{});
 #ifdef __DAV_VEC__
-                    // Stage 2: Online softmax (computed on VECTOR core)
                     // online softmax
-                    epilogueOnlineSoftmax(l1PTensorTla, actualBlockShapeQK, (gatheredKvSTileIdx == 0), ubSBufId,
-                                          l1PBufId, mm1ToSmFlag, smToMm2Flag);
+                    if constexpr (zNOnlineSoftmax) {
+                        epilogueOnlineSoftmax(l1PTensorTla, actualBlockShapeQK, (gatheredKvSTileIdx == 0),
+                                              (gatheredKvSTileIdx == kvSLoopNum - 1), ubSBufId, l1PBufId, mm1ToSmFlag,
+                                              smToMm2Flag);
+                    } else {
+                        epilogueOnlineSoftmax(l1PTensorTla, actualBlockShapeQK, (gatheredKvSTileIdx == 0), ubSBufId,
+                                              l1PBufId, mm1ToSmFlag, smToMm2Flag);
+                    }
 #endif
                 }
                 if (gatheredKvSTileIdx >= PRE_LAUNCH) {
@@ -455,7 +481,7 @@ public:
         kvSeqlenAligned_ = bsaTilingData->maxKvSeqlen;
     }
 
-    __aicore__ inline void CalcOnChipBufTileInfo(__gm__ BlockSparseAttentionTilingData *bsaTilingData)
+    __aicore__ inline void CalcL1L0BufTileInfo(__gm__ BlockSparseAttentionTilingData *bsaTilingData)
     {
         mm1L1TileM_ = bsaTilingData->BsaMmPhaseL1TileInfo.mm1L1TileM;
         mm1L1TileN_ = bsaTilingData->BsaMmPhaseL1TileInfo.mm1L1TileN;
@@ -477,10 +503,57 @@ public:
         mm2L1TileHelper_ = mm2L1TileHelper;
         mm2L1AddrStart_ = mm1L1TileM_ * mm1L1TileKLeft_ * qL1BufNum_ * sizeof(ElementQ) +
                           mm1L1TileKRight_ * mm1L1TileN_ * kL1BufNum_ * sizeof(ElementK);
-        mm1L0ATotalStages_ = CeilDiv(qBaseTile_, BlockMmadQK::L0_TILE_M) * (embed_ / BlockMmadQK::L0_TILE_K);
-        mm1L0BTotalStages_ = CeilDiv(kvBaseTile_, BlockMmadQK::L0_TILE_N) * (embed_ / BlockMmadQK::L0_TILE_K);
-        mm2L0ATotalStages_ = CeilDiv(qBaseTile_, BlockMmadPV::L0_TILE_M) * CeilDiv(kvBaseTile_, BlockMmadPV::L0_TILE_K);
-        mm2L0BTotalStages_ = CeilDiv(kvBaseTile_, BlockMmadPV::L0_TILE_K) * (embed_ / BlockMmadPV::L0_TILE_N);
+        mm1L0ATotalStages_ = (qBaseTile_ / BlockMmadQK::L0_TILE_M) * (embed_ / BlockMmadQK::L0_TILE_K);
+        mm1L0BTotalStages_ = (kvBaseTile_ / BlockMmadQK::L0_TILE_N) * (embed_ / BlockMmadQK::L0_TILE_K);
+        mm2L0ATotalStages_ = (qBaseTile_ / BlockMmadPV::L0_TILE_M) * (kvBaseTile_ / BlockMmadPV::L0_TILE_K);
+        mm2L0BTotalStages_ = (kvBaseTile_ / BlockMmadPV::L0_TILE_K) * (embed_ / BlockMmadPV::L0_TILE_N);
+    }
+
+    __aicore__ inline void CalcUBufTileInfo()
+    {
+        // Prerequisites: qBaseTile_ <= 128, and kvBaseTile_ is a multiple of 128, guaranteed by tiling strategy.
+        uBufTileHelper_.qBaseTilePerSubCore = 64;
+        uBufTileHelper_.kvBaseTilePerSubCore = RoundUp(kvBaseTile_, 128);
+        uBufTileHelper_.embedPerSubCore = RoundUp(embed_, 32);
+        // The vectors' space consumption is only relevant to qBaseTilePerSubCore
+        // qBaseTilePerSubCore is 64 and unlikely to change, thus the vectors consume no more than 5120B in total.
+        // Thus the vectors' offset starts from 248832(243KB).
+        uBufTileHelper_.lmStartOffset = 248832;
+        uBufTileHelper_.gmStartOffset =
+            uBufTileHelper_.lmStartOffset + uBufTileHelper_.qBaseTilePerSubCore * sizeof(float);
+        uBufTileHelper_.dmStartOffset =
+            uBufTileHelper_.gmStartOffset + uBufTileHelper_.qBaseTilePerSubCore * sizeof(float);
+        uBufTileHelper_.llStartOffset =
+            uBufTileHelper_.dmStartOffset + uBufTileHelper_.qBaseTilePerSubCore * (PRE_LAUNCH + 1) * sizeof(float);
+        uBufTileHelper_.glStartOffset =
+            uBufTileHelper_.llStartOffset + uBufTileHelper_.qBaseTilePerSubCore * sizeof(float);
+        uBufTileHelper_.lseStartOffset =
+            uBufTileHelper_.glStartOffset + uBufTileHelper_.qBaseTilePerSubCore * sizeof(float);
+        // The matrices offset starts from 0.
+        // Different specTactics mostly alter matrices' space consumption.
+        uBufTileHelper_.sStartOffset = 0;
+        uBufTileHelper_.pStartOffset = uBufTileHelper_.sStartOffset + uBufTileHelper_.qBaseTilePerSubCore *
+                                                                          uBufTileHelper_.kvBaseTilePerSubCore *
+                                                                          sizeof(ElementS) * UB_S_OTMP_BUF_STAGES;
+        uBufTileHelper_.loStartOffset = uBufTileHelper_.pStartOffset +
+                                        (uBufTileHelper_.qBaseTilePerSubCore * uBufTileHelper_.kvBaseTilePerSubCore) *
+                                            sizeof(ElementP) * UB_S_OTMP_BUF_STAGES;
+        if constexpr (zNOnlineSoftmax) {
+            if (kvBaseTile_ == 512) {
+                // while kvBaseTile_ is 512, S has layout zN and shares the same space with P.
+                uBufTileHelper_.pStartOffset = 0;
+                uBufTileHelper_.loStartOffset =
+                    uBufTileHelper_.pStartOffset + uBufTileHelper_.qBaseTilePerSubCore *
+                                                       uBufTileHelper_.kvBaseTilePerSubCore * sizeof(ElementS) *
+                                                       UB_S_OTMP_BUF_STAGES;
+            }
+        }
+        uBufTileHelper_.goStartOffset = uBufTileHelper_.loStartOffset + uBufTileHelper_.qBaseTilePerSubCore *
+                                                                            uBufTileHelper_.embedPerSubCore *
+                                                                            sizeof(ElementOTmp) * UB_S_OTMP_BUF_STAGES;
+        uBufTileHelper_.maskStartOffset = uBufTileHelper_.goStartOffset + uBufTileHelper_.qBaseTilePerSubCore *
+                                                                              uBufTileHelper_.embedPerSubCore *
+                                                                              sizeof(float);
     }
 
     __aicore__ inline uint64_t CalcCrossMm1Mm2PrefixSumL0ABStages(uint32_t gatheredKvSTileIdx,
@@ -511,16 +584,13 @@ public:
             l1PTensor[i] = resource.l1Buf.template GetBufferByByte<ElementP>(
                 mm2L1AddrStart_ + mm2L1TileM_ * mm2L1TileKLeft_ * sizeof(ElementP) * i);
         }
-        uint32_t rowNumPerSubCore = EpilogueOnlineSoftmax::SM_ROW_MAX_ELEM_NUM;
-        uint32_t colNumPerSubCore = EpilogueOnlineSoftmax::SM_COL_MAX_ELEM_NUM;
-        uint32_t rescaleCol = EpilogueRescaleO::RESCALE_COL_MAX_ELEM_NUM;
         for (uint32_t i = 0; i < UB_S_OTMP_BUF_STAGES; i++) {
-            ubSTensor[i] = resource.ubBuf.template GetBufferByByte<ElementS>(rowNumPerSubCore * colNumPerSubCore *
-                                                                             sizeof(ElementS) * i);
+            ubSTensor[i] = resource.ubBuf.template GetBufferByByte<ElementS>(
+                uBufTileHelper_.sStartOffset +
+                uBufTileHelper_.qBaseTilePerSubCore * uBufTileHelper_.kvBaseTilePerSubCore * sizeof(ElementS) * i);
             ubOTmpTensor[i] = resource.ubBuf.template GetBufferByByte<ElementOTmp>(
-                rowNumPerSubCore * colNumPerSubCore * sizeof(ElementS) * UB_S_OTMP_BUF_STAGES +
-                rowNumPerSubCore * colNumPerSubCore * sizeof(ElementS) * UB_S_OTMP_BUF_STAGES +
-                rowNumPerSubCore * rescaleCol * sizeof(ElementOTmp) * i);
+                uBufTileHelper_.loStartOffset +
+                uBufTileHelper_.qBaseTilePerSubCore * uBufTileHelper_.embedPerSubCore * sizeof(ElementOTmp) * i);
         }
     }
 
@@ -685,6 +755,7 @@ private:
     uint32_t mm2L1AddrStart_ = 0;
     Gemm::Block::Mm1L1TileHelper mm1L1TileHelper_;
     Gemm::Block::Mm2L1TileHelper mm2L1TileHelper_;
+    Epilogue::Block::UBufTileHelper uBufTileHelper_;
 };
 
 } // namespace BsaKernelArch35

@@ -21,8 +21,14 @@ using namespace std;
 
 class block_sparse_attention_infershape_ut : public testing::Test {
 protected:
-    static void SetUpTestCase() { cout << "block_sparse_attention_infershape_ut SetUp" << endl; }
-    static void TearDownTestCase() { cout << "block_sparse_attention_infershape_ut TearDown" << endl; }
+    static void SetUpTestCase()
+    {
+        cout << "block_sparse_attention_infershape_ut SetUp" << endl;
+    }
+    static void TearDownTestCase()
+    {
+        cout << "block_sparse_attention_infershape_ut TearDown" << endl;
+    }
 };
 
 namespace {

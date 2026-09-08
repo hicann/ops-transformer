@@ -104,9 +104,6 @@ TILING_DATA_FIELD_DEF(uint64_t, workSpaceSize);
 TILING_DATA_FIELD_DEF(float, log2Cx);
 TILING_DATA_FIELD_DEF(float, log2CxCeil);
 
-// V3 新增:blockEffRows(attenMask) dim2参数
-TILING_DATA_FIELD_DEF(uint32_t, maxBlockNumEff);
-
 TILING_DATA_FIELD_DEF_STRUCT(BsaMask2IdxTiling, BsaMask2IdxTileInfo);
 TILING_DATA_FIELD_DEF_STRUCT(BsaBaseTiling, BsaBaseTileInfo);
 TILING_DATA_FIELD_DEF_STRUCT(BsaMmPhaseL1Tiling, BsaMmPhaseL1TileInfo);
@@ -202,6 +199,9 @@ private:
     void CalcSplitCoreTilingParams950();
     void CalcWorkspaceTilingParams950(gert::TilingContext *bsaContext);
     void CalcMatmulPhaseL1TileInfo950();
+    void B8FullQuantKVPL1TileInfo950(uint32_t qBaseTileAligned128, uint32_t embeddingSizeAligned128,
+                                     uint32_t kvBaseTileAligned128);
+    void TransposedMatmulConfig950();
     // 910 exclusive
     ge::graphStatus CalculateTaskSplit(gert::TilingContext *bsaContext);
     ge::graphStatus CalculateWorkSpace(gert::TilingContext *bsaContext);
@@ -233,7 +233,6 @@ private:
     uint32_t totalQBlocks_ = 0;
     uint32_t maxKvBlockNum_ = 0;
     uint32_t maxQBlockNum_ = 0;
-    uint32_t maxBlockNumEff_ = 0; // 0=未启用blockEffRows(attenMask)
     uint32_t avgRowNumPerSubCore_ = 0;
     uint32_t preActivateSubCoreNum_ = 0;
     uint32_t firstQBlockNum_ = 0;
@@ -293,6 +292,9 @@ private:
     uint32_t kL1BufNum_;
     uint32_t vL1BufNum_;
     uint32_t pL1BufNum_;
+
+    bool transposedMm1_ = false;
+    bool transposedMm2_ = false;
 
     ge::DataType dataType_ = ge::DT_FLOAT16;
     ge::DataType attentionOutDataType_ = ge::DT_FLOAT16;

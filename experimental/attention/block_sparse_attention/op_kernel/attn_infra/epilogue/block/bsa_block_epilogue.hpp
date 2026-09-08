@@ -28,11 +28,14 @@ class BlockEpilogue {
 #include "../../../attn_infra/epilogue/block/bsa_block_epilogue_rescale_o_low_prec.hpp"
 #endif
 #if (__CCE_AICORE__ == 310)
-#include "../../../attn_infra/epilogue/block/block_epilogue_mask2idx_arch35.hpp"
-#include "../../../attn_infra/epilogue/block/block_epilogue_rescale_o_arch35_reg_high_prec.hpp"
+#include "../../../attn_infra/epilogue/block/experimental_bsa_block_epilogue_mask2idx_arch35.hpp"
+#include "../../../attn_infra/epilogue/block/experimental_bsa_block_epilogue_rescale_o_arch35_reg_high_prec.hpp"
 #include "../../../attn_infra/epilogue/block/block_epilogue_rescale_o_arch35_reg_high_prec_mxfp4.hpp"
-#include "../../../attn_infra/epilogue/block/block_epilogue_online_softmax_arch35_reg_low_prec.hpp"
-#include "../../../attn_infra/epilogue/block/block_epilogue_online_softmax_arch35_reg_low_prec_bf16.hpp"
+#include "../../../attn_infra/epilogue/block/experimental_block_epilogue_online_softmax_arch35_reg_high_prec_S_trans.hpp"
+#include "../../../attn_infra/epilogue/block/experimental_bsa_block_epilogue_online_softmax_arch35_reg_low_prec.hpp"
+#include "../../../attn_infra/epilogue/block/experimental_bsa_block_epilogue_online_softmax_arch35_reg_low_prec_bf16.hpp"
+#include "../../../attn_infra/epilogue/block/experimental_block_epilogue_online_softmax_arch35_reg_S_fp16_zN_P_fp8_Mask_free.hpp"
+#include "../../../attn_infra/epilogue/block/experimental_block_epilogue_online_softmax_arch35_reg_S_bf16_zN_P_fp8_Mask_free.hpp"
 #include "../../../attn_infra/epilogue/block/block_epilogue_online_softmax_arch35_reg_low_prec_fp16_mxfp4.hpp"
 #include "../../../attn_infra/epilogue/block/block_epilogue_compute_pscale_arch35_mxfp4.hpp"
 #include "../../../attn_infra/epilogue/block/block_epilogue_copy_global_max_ub_to_l1_arch35_mxfp4.hpp"

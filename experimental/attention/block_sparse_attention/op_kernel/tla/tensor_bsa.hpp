@@ -40,19 +40,40 @@ struct Tensor {
 
     static constexpr int rank = Layout::rank;
 
-    HOST_DEVICE constexpr decltype(auto) tensor() const { return *this; }
+    HOST_DEVICE constexpr decltype(auto) tensor() const
+    {
+        return *this;
+    }
 
-    HOST_DEVICE constexpr decltype(auto) data() const { return get<0>(rep_); }
+    HOST_DEVICE constexpr decltype(auto) data() const
+    {
+        return get<0>(rep_);
+    }
 
-    HOST_DEVICE constexpr decltype(auto) data() { return get<0>(rep_); }
+    HOST_DEVICE constexpr decltype(auto) data()
+    {
+        return get<0>(rep_);
+    }
 
-    HOST_DEVICE constexpr decltype(auto) layout() const { return get<1>(rep_); }
+    HOST_DEVICE constexpr decltype(auto) layout() const
+    {
+        return get<1>(rep_);
+    }
 
-    HOST_DEVICE constexpr decltype(auto) coord() const { return get<2>(rep_); }
+    HOST_DEVICE constexpr decltype(auto) coord() const
+    {
+        return get<2>(rep_);
+    }
 
-    HOST_DEVICE constexpr decltype(auto) shape() const { return layout().shape(); }
+    HOST_DEVICE constexpr decltype(auto) shape() const
+    {
+        return layout().shape();
+    }
 
-    HOST_DEVICE constexpr decltype(auto) stride() const { return layout().stride(); }
+    HOST_DEVICE constexpr decltype(auto) stride() const
+    {
+        return layout().stride();
+    }
 
     tla::tuple<BuiltinTensor, Layout, Coord> rep_;
 };

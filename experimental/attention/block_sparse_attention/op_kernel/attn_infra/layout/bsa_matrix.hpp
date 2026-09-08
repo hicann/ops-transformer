@@ -80,43 +80,73 @@ public:
 
     /// Returns the layout of a tile_common.
     HOST_DEVICE
-    RowMajor GetTileLayout(MatrixCoord const &tileShape) const { return RowMajor(tileShape, stride()); }
+    RowMajor GetTileLayout(MatrixCoord const &tileShape) const
+    {
+        return RowMajor(tileShape, stride());
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
     /// Returns the length of the layout
     HOST_DEVICE
-    LongIndex Capacity() const { return static_cast<LongIndex>(shape_[0]) * stride_[0]; }
+    LongIndex Capacity() const
+    {
+        return static_cast<LongIndex>(shape_[0]) * stride_[0];
+    }
 
 protected:
     //
@@ -188,43 +218,73 @@ public:
 
     /// Returns the layout of a tile_common.
     HOST_DEVICE
-    ColumnMajor GetTileLayout(MatrixCoord const &tileShape) const { return ColumnMajor(tileShape, stride()); }
+    ColumnMajor GetTileLayout(MatrixCoord const &tileShape) const
+    {
+        return ColumnMajor(tileShape, stride());
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
     /// Returns the length of the layout
     HOST_DEVICE
-    LongIndex Capacity() const { return static_cast<LongIndex>(shape_[1]) * stride_[1]; }
+    LongIndex Capacity() const
+    {
+        return static_cast<LongIndex>(shape_[1]) * stride_[1];
+    }
 
 protected:
     //
@@ -321,47 +381,80 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index orgShape(int idx) const { return orgShape_[idx]; }
+    typename OrgShape::Index orgShape(int idx) const
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx) { return orgShape_[idx]; }
+    typename OrgShape::Index &orgShape(int idx)
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
     /// Returns the length of the layout
     HOST_DEVICE
-    LongIndex Capacity() const { return static_cast<LongIndex>(stride_[1]) * shape_[1]; }
+    LongIndex Capacity() const
+    {
+        return static_cast<LongIndex>(stride_[1]) * shape_[1];
+    }
 
 private:
     /// Origin Shape data member
@@ -466,47 +559,80 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index orgShape(int idx) const { return orgShape_[idx]; }
+    typename OrgShape::Index orgShape(int idx) const
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx) { return orgShape_[idx]; }
+    typename OrgShape::Index &orgShape(int idx)
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
     /// Returns the length of the layout
     HOST_DEVICE
-    LongIndex Capacity() const { return static_cast<LongIndex>(stride_[3]) * shape_[3]; }
+    LongIndex Capacity() const
+    {
+        return static_cast<LongIndex>(stride_[3]) * shape_[3];
+    }
 
 private:
     /// Origin Shape data member
@@ -592,43 +718,73 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index orgShape(int idx) const { return orgShape_[idx]; }
+    typename OrgShape::Index orgShape(int idx) const
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx) { return orgShape_[idx]; }
+    typename OrgShape::Index &orgShape(int idx)
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
 private:
     /// Origin Shape data member
@@ -696,43 +852,73 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index orgShape(int idx) const { return orgShape_[idx]; }
+    typename OrgShape::Index orgShape(int idx) const
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx) { return orgShape_[idx]; }
+    typename OrgShape::Index &orgShape(int idx)
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
 private:
     //
@@ -804,43 +990,73 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index orgShape(int idx) const { return orgShape_[idx]; }
+    typename OrgShape::Index orgShape(int idx) const
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx) { return orgShape_[idx]; }
+    typename OrgShape::Index &orgShape(int idx)
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
 private:
     //
@@ -938,43 +1154,73 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index orgShape(int idx) const { return orgShape_[idx]; }
+    typename OrgShape::Index orgShape(int idx) const
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx) { return orgShape_[idx]; }
+    typename OrgShape::Index &orgShape(int idx)
+    {
+        return orgShape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape shape() const { return shape_; }
+    Shape shape() const
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape() { return shape_; }
+    Shape &shape()
+    {
+        return shape_;
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index shape(int idx) const { return shape_[idx]; }
+    typename Shape::Index shape(int idx) const
+    {
+        return shape_[idx];
+    }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx) { return shape_[idx]; }
+    typename Shape::Index &shape(int idx)
+    {
+        return shape_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride stride() const { return stride_; }
+    Stride stride() const
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride() { return stride_; }
+    Stride &stride()
+    {
+        return stride_;
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index stride(int idx) const { return stride_[idx]; }
+    typename Stride::Index stride(int idx) const
+    {
+        return stride_[idx];
+    }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx) { return stride_[idx]; }
+    typename Stride::Index &stride(int idx)
+    {
+        return stride_[idx];
+    }
 
 private:
     /// Origin Shape data member

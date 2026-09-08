@@ -103,6 +103,7 @@ constexpr uint32_t INF_WINDOW_SIZE_PRE_NEXT = 2147483647;
 constexpr uint32_t TILE_SIZE_16 = 16;
 constexpr uint32_t TILE_SIZE_128 = 128;
 constexpr uint32_t TILE_SIZE_256 = 256;
+constexpr uint32_t TILE_SIZE_512 = 512;
 constexpr uint32_t D_SIZE_128 = 128;
 constexpr uint32_t D_SIZE_256 = 256;
 
@@ -747,52 +748,10 @@ ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext *bsaContext)
 ge::graphStatus BSATiling::ParseAttenMask(gert::TilingContext *bsaContext)
 {
     const auto *attenMaskTensor = bsaContext->GetOptionalInputTensor(ATTEN_MASK_INDEX);
-    if (attenMaskTensor == nullptr) {
-        return ge::GRAPH_SUCCESS;
-    }
-
-    if (!IsMxfp4Quant(quantMode_)) {
-        OP_LOGE(bsaContext->GetNodeName(), "AttenMask is NOT YET supported in non-mxfp4 mode.");
+    if (attenMaskTensor != nullptr) {
+        OP_LOGE(bsaContext->GetNodeName(), "AttenMask is NOT YET supported.");
         return ge::GRAPH_FAILED;
     }
-
-    auto attenMaskDtype = attenMaskTensor->GetDataType();
-    if (attenMaskDtype != ge::DT_INT32) {
-        OP_LOGE(bsaContext->GetNodeName(), "attenMask (blockEffRows) must be INT32, but got %s.",
-                DataTypeToString(attenMaskDtype).c_str());
-        return ge::GRAPH_FAILED;
-    }
-    auto &attenMaskShape = attenMaskTensor->GetStorageShape();
-    if (attenMaskShape.GetDimNum() != DIM_NUM_4) {
-        OP_LOGE(bsaContext->GetNodeName(), "attenMask (blockEffRows) must be 4D, but got dimNum %zu.",
-                attenMaskShape.GetDimNum());
-        return ge::GRAPH_FAILED;
-    }
-    if (attenMaskShape.GetDim(DIM_3) != 2) {
-        OP_LOGE(bsaContext->GetNodeName(), "attenMask (blockEffRows) last dim must be 2, but got %ld.",
-                attenMaskShape.GetDim(DIM_3));
-        return ge::GRAPH_FAILED;
-    }
-
-    uint32_t attenMaskBatch = static_cast<uint32_t>(attenMaskShape.GetDim(DIM_0));
-    uint32_t attenMaskNumHeads = static_cast<uint32_t>(attenMaskShape.GetDim(DIM_1));
-    uint32_t attenMaskMaxBlockNum = static_cast<uint32_t>(attenMaskShape.GetDim(DIM_2));
-    if (attenMaskBatch != batch_ || attenMaskNumHeads != numHeads_) {
-        OP_LOGE(bsaContext->GetNodeName(),
-                "attenMask (blockEffRows) batch/numHeads mismatch: expected (%u, %u), got (%u, %u).", batch_, numHeads_,
-                attenMaskBatch, attenMaskNumHeads);
-        return ge::GRAPH_FAILED;
-    }
-
-    uint32_t expectedMaxBlockNum = std::max(maxQBlockNum_, maxKvBlockNum_);
-    if (attenMaskMaxBlockNum < expectedMaxBlockNum) {
-        OP_LOGE(bsaContext->GetNodeName(),
-                "attenMask (blockEffRows) dim2 (%u) must be >= max(maxQBlockNum, maxKvBlockNum) = %u.",
-                attenMaskMaxBlockNum, expectedMaxBlockNum);
-        return ge::GRAPH_FAILED;
-    }
-
-    maxBlockNumEff_ = attenMaskMaxBlockNum;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1032,18 +991,26 @@ ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext *bsaContext)
     if (attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX) != nullptr) {
         innerPrecise_ = *attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX);
     }
+    auto qInputDesc = bsaContext->GetInputDesc(QUERY_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(bsaContext, qInputDesc);
+    auto dtypeQ = qInputDesc->GetDataType();
     if (socVer_ == SOC_VER_950_CODE) {
-        if (innerPrecise_ != BsaInnerCalcPrec::LOW_HIGH_MIXED) {
+        const bool isFp16OrBf16 = dtypeQ == ge::DT_FLOAT16 || dtypeQ == ge::DT_BF16;
+        if (isFp16OrBf16 && innerPrecise_ != BsaInnerCalcPrec::LOW_HIGH_MIXED &&
+            innerPrecise_ != BsaInnerCalcPrec::ALL_HIGH) {
             OP_LOGE(bsaContext->GetNodeName(),
-                    "On chip 950, only innerPrec = 4 is supported, "
-                    "but got %u.",
+                    "On chip 950, when query dtype is float16 or bfloat16, only "
+                    "innerPrec = 0 or 4 is supported, but got %u.",
                     innerPrecise_);
+            return ge::GRAPH_FAILED;
+        } else if (!isFp16OrBf16 && innerPrecise_ != BsaInnerCalcPrec::LOW_HIGH_MIXED) {
+            OP_LOGE(bsaContext->GetNodeName(),
+                    "On chip 950, when query dtype is %s, only innerPrec = 4 is "
+                    "supported, but got %u.",
+                    DataTypeToString(dtypeQ).c_str(), innerPrecise_);
             return ge::GRAPH_FAILED;
         }
     } else {
-        auto qInputDesc = bsaContext->GetInputDesc(QUERY_INDEX);
-        OP_CHECK_NULL_WITH_CONTEXT(bsaContext, qInputDesc);
-        auto dtypeQ = qInputDesc->GetDataType();
         if (innerPrecise_ != BsaInnerCalcPrec::ALL_HIGH && innerPrecise_ != BsaInnerCalcPrec::ALL_LOW) {
             OP_LOGE(bsaContext->GetNodeName(),
                     "On chip 910 & 910_93, only innerPrec = 0 or 1 is supported, "
@@ -1182,11 +1149,26 @@ void BSATiling::CalcBaseTileTilingParams950()
     qBaseTile_ = (blockShapeX_ > TILE_SIZE_128) ? TILE_SIZE_128 : static_cast<uint32_t>(blockShapeX_);
     const bool isMixedPrecision = (innerPrecise_ == BsaInnerCalcPrec::LOW_HIGH_MIXED && embeddingSize_ <= D_SIZE_128);
     if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
-        const uint32_t preferredTile = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
-        kvBaseTile_ = CalcFp8KvBaseTile(static_cast<uint32_t>(blockShapeY_), preferredTile);
+        bool enableKvBaseTile512 = isMixedPrecision && (quantMode_ == FP8_QUANT) && (blockShapeY_ == 512);
+        if (enableKvBaseTile512) {
+            kvBaseTile_ = TILE_SIZE_512;
+        } else {
+            const uint32_t preferredTile = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
+            kvBaseTile_ = CalcFp8KvBaseTile(static_cast<uint32_t>(blockShapeY_), preferredTile);
+        }
     } else {
         kvBaseTile_ = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
     }
+}
+
+void BSATiling::TransposedMatmulConfig950()
+{
+    if (innerPrecise_ == BsaInnerCalcPrec::ALL_HIGH && maskType_ == 0) {
+        transposedMm1_ = true;
+    } else {
+        transposedMm1_ = false;
+    }
+    transposedMm2_ = false;
 }
 
 void BSATiling::CalcSplitCoreTilingParams950()
@@ -1290,6 +1272,26 @@ ge::graphStatus BSATiling::CalculateWorkSpace(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
+void BSATiling::B8FullQuantKVPL1TileInfo950(uint32_t qBaseTileAligned128, uint32_t embeddingSizeAligned128,
+                                            uint32_t kvBaseTileAligned128)
+{
+    if (embeddingSizeAligned128 == D_SIZE_128) {
+        // fp8/hif8全量化场景下，kvBaseTile_最大达到512
+        // K矩阵开启2buf，可以全载
+        mm1L1TileN_ = kvBaseTileAligned128;
+        mm1L1TileKRight_ = TILE_SIZE_128;
+        kL1BufNum_ = DUO_BUF;
+        // D不大于128时可以将V矩阵全载并开2buf
+        mm2L1TileN_ = TILE_SIZE_128;
+        mm2L1TileKRight_ = kvBaseTileAligned128;
+        vL1BufNum_ = DUO_BUF;
+        // P矩阵在950上会常驻L1，由于基块的prelaunch为2，因此最好有3 buf，以免基块间流水阻塞
+        mm2L1TileM_ = qBaseTileAligned128;
+        mm2L1TileKLeft_ = kvBaseTileAligned128;
+        pL1BufNum_ = TRIO_BUF;
+    }
+}
+
 void BSATiling::CalcMatmulPhaseL1TileInfo950()
 {
     uint32_t qBaseTileAligned128 = (qBaseTile_ + TILE_SIZE_128 - 1) / TILE_SIZE_128 * TILE_SIZE_128;
@@ -1322,12 +1324,15 @@ void BSATiling::CalcMatmulPhaseL1TileInfo950()
         // V矩阵开启db，D按128分割，kvBaseTile_不分割，指令同样提前于核间同步下发
         // 如果kvBaseTile_进一步增大，考虑关闭db，使得kvBaseTile_不分割
         mm2L1TileN_ = TILE_SIZE_128;
-        mm2L1TileKLeft_ = TILE_SIZE_256;
+        mm2L1TileKRight_ = TILE_SIZE_256;
         vL1BufNum_ = DUO_BUF;
         // P矩阵在950上会常驻L1，由于基块的prelaunch为2，因此最好有3 buf，以免基块间流水阻塞
         mm2L1TileM_ = qBaseTileAligned128;
-        mm2L1TileKRight_ = kvBaseTileAligned128;
+        mm2L1TileKLeft_ = kvBaseTileAligned128;
         pL1BufNum_ = TRIO_BUF;
+    }
+    if (quantMode_ == FP8_QUANT) {
+        B8FullQuantKVPL1TileInfo950(qBaseTileAligned128, embeddingSizeAligned128, kvBaseTileAligned128);
     }
 }
 
@@ -1385,8 +1390,6 @@ ge::graphStatus BSATiling::FillTilingData(gert::TilingContext *bsaContext)
     // V3 新增:填充量化参数
     tilingData_->set_log2Cx(log2Cx_);
     tilingData_->set_log2CxCeil(log2CxCeil_);
-    // V3 新增:填充 blockEffRows(attenMask)参数
-    tilingData_->set_maxBlockNumEff(maxBlockNumEff_);
     // fill 950 mask2idx tile info
     tilingData_->BsaMask2IdxTileInfo.set_xBlockNumAligned(xBlockNumAligned_);
     tilingData_->BsaMask2IdxTileInfo.set_yBlockNumAligned(yBlockNumAligned_);
@@ -1439,12 +1442,6 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext *bsaContext)
         tilingKey += 0; // 00 for FP16
     } else if (dataType_ == ge::DT_BF16) {
         tilingKey += 22220ULL; // 22 for BF16 -> 9000000030000002 + 22220 = 9000000030022222
-    } else if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
-        if (attentionOutDataType_ == ge::DT_FLOAT16) {
-            tilingKey += 10;
-        } else if (attentionOutDataType_ == ge::DT_BF16) {
-            tilingKey += 20;
-        }
     }
     if (quantMode_ == MXFP4_OCP_QUANT) {
         if (attentionOutDataType_ == ge::DT_FLOAT16) {
@@ -1457,6 +1454,17 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext *bsaContext)
             tilingKey += 41;
         } else {
             tilingKey += 40;
+        }
+    } else if (quantMode_ == FP8_QUANT) {
+        if (attentionOutDataType_ == ge::DT_FLOAT16) {
+            tilingKey += 10;
+        } else if (attentionOutDataType_ == ge::DT_BF16) {
+            tilingKey += 20;
+        }
+        // tmp tilingkey for 512 tile opt
+        // using zN onlineSoftmax tactic(with S/P sharing UB space)
+        if (kvBaseTile_ == 512) {
+            tilingKey += 100000000000000;
         }
     }
 
@@ -1503,6 +1511,11 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext *bsaContext)
         tilingKey += 100000000ULL; // 1 for lse out
     }
 
+    // matmul是否转置
+    if (transposedMm1_) {
+        tilingKey += 1000000000ULL;
+    }
+
     return tilingKey;
 }
 
@@ -1537,6 +1550,7 @@ ge::graphStatus BSATiling::GetBsaTiling(gert::TilingContext *bsaContext, BlockSp
     if (socVer_ == SOC_VER_950_CODE) {
         CalcSplitCoreTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
+        TransposedMatmulConfig950();
         CalcWorkspaceTilingParams950(bsaContext);
     } else {
         ret = CalculateTaskSplit(bsaContext);

@@ -23,8 +23,14 @@ struct C {
     using type = C<v>;
     static constexpr auto value = v;
     using value_type = decltype(v);
-    HOST_DEVICE constexpr operator value_type() const noexcept { return value; }
-    HOST_DEVICE constexpr value_type operator()() const noexcept { return value; }
+    HOST_DEVICE constexpr operator value_type() const noexcept
+    {
+        return value;
+    }
+    HOST_DEVICE constexpr value_type operator()() const noexcept
+    {
+        return value;
+    }
 };
 
 // Deprecate
@@ -46,7 +52,10 @@ struct integral_constant : C<v> {
     using type = integral_constant<T, v>;
     static constexpr T value = v;
     using value_type = T;
-    HOST_DEVICE constexpr value_type operator()() const noexcept { return value; }
+    HOST_DEVICE constexpr value_type operator()() const noexcept
+    {
+        return value;
+    }
 };
 
 // Use tla::is_std_integral<T> to match built-in integral types (int, int64_t, unsigned, etc)

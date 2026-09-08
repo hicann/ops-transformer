@@ -30,9 +30,15 @@ public:
     LocalTensorBuffer<Arch::AtlasA5, AscendC::TPosition::VECCALC> ubBuf;
     LocalTensorBuffer<Arch::AtlasA5, AscendC::TPosition::C2PIPE2GM> fpBuf;
 
-    __aicore__ inline Resource() { AscendC::InitSocState(); }
+    __aicore__ inline Resource()
+    {
+        AscendC::InitSocState();
+    }
 
-    __aicore__ inline ~Resource() { AscendC::InitSocState(); }
+    __aicore__ inline ~Resource()
+    {
+        AscendC::InitSocState();
+    }
 };
 
 template <>
@@ -47,7 +53,10 @@ public:
     LocalTensorBuffer<Arch::AtlasA2, AscendC::TPosition::CO1> l0CBuf;
     LocalTensorBuffer<Arch::AtlasA2, AscendC::TPosition::VECCALC> ubBuf;
 
-    __aicore__ inline Resource() { pipe.Destroy(); }
+    __aicore__ inline Resource()
+    {
+        pipe.Destroy();
+    }
 };
 
 } // namespace NpuArch::Arch

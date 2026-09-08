@@ -19,7 +19,10 @@ namespace tla {
 template <typename T, T... Ns>
 struct IntegerSequence {
     using value_type = T;
-    static constexpr size_t size() { return sizeof...(Ns); }
+    static constexpr size_t size()
+    {
+        return sizeof...(Ns);
+    }
 };
 
 template <typename Sequence, typename T, size_t N>

@@ -28,7 +28,10 @@ struct MatrixShape {
     static constexpr int64_t COUNT = ROW * COLUMN;
 
     HOST_DEVICE
-    static Coord<2> ToCoord() { return MakeCoord(ROW, COLUMN); }
+    static Coord<2> ToCoord()
+    {
+        return MakeCoord(ROW, COLUMN);
+    }
 };
 
 /// MatrixCoord wraps Coord<2, uint32_t> to provide a helper for accessing named dimensions. Classes
@@ -73,23 +76,38 @@ struct MatrixCoord : public Coord<2, uint32_t> {
 
     /// Returns the row of the coordinate
     HOST_DEVICE
-    Index const &row() const { return this->At(ROW_INDEX); }
+    Index const &row() const
+    {
+        return this->At(ROW_INDEX);
+    }
 
     /// Returns the row of the coordinate
     HOST_DEVICE
-    Index &row() { return this->At(ROW_INDEX); }
+    Index &row()
+    {
+        return this->At(ROW_INDEX);
+    }
 
     /// Returns the column of the coordinate
     HOST_DEVICE
-    Index const &column() const { return this->At(COLUMN_INDEX); }
+    Index const &column() const
+    {
+        return this->At(COLUMN_INDEX);
+    }
 
     /// Returns the column of the coordinate
     HOST_DEVICE
-    Index &column() { return this->At(COLUMN_INDEX); }
+    Index &column()
+    {
+        return this->At(COLUMN_INDEX);
+    }
 
     /// Element-wise addition
     HOST_DEVICE
-    MatrixCoord operator+(Base const &b) const { return MatrixCoord(Base::operator+(b)); }
+    MatrixCoord operator+(Base const &b) const
+    {
+        return MatrixCoord(Base::operator+(b));
+    }
 
     /// In-place addition
     HOST_DEVICE
