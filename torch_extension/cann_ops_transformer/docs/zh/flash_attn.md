@@ -310,7 +310,7 @@ cann_ops_transformer.flash_attn(
                 <li>KV_N > 0</li>
                 <li>Q_S > 0</li>
                 <li>KV_S > 0</li>
-                <li>D支持64、128、256</li>
+                <li>D支持64、72、128、256</li>
                 <li>q与k/v的D维度必须相等</li>
                 <li>Q_N % KV_N == 0且Q_N / KV_N > 0</li>
             </ul>
@@ -650,6 +650,7 @@ mask_mode参数解释
                 <ul>
                     <li>PagedAttention开启情况下，必须传入seqused_kv</li>
                     <li>PagedAttention开启情况下，block_table必须不为空</li>
+                    <li>layout_kv为PA_NZ时，D必须为16的倍数</li>
                 </ul>
             </td>
         </tr>
