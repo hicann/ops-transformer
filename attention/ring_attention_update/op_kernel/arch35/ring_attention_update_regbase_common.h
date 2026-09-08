@@ -85,14 +85,14 @@ __aicore__ inline void SoftmaxCompute(LocalTensor<float> prevCurSoftmaxMaxLocal,
         for (uint16_t i = 0; i < repeatTimes; i++) {
             maskReg = AscendC::Reg::UpdateMask<float>(count);
             // copyin prevSoftmaxMax curSoftmaxMax ub->regTensor
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg0, prevSoftmaxMaxUbAddr, VL_FP32);
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg1, curSoftmaxMaxUbAddr, VL_FP32);
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg0, prevSoftmaxMaxUbAddr, VL_FP32);
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg1, curSoftmaxMaxUbAddr, VL_FP32);
 
             AscendC::Reg::Max(outreg0, vreg0, vreg1, maskReg);
 
             // copyout softmaxMax regTensor->ub
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(softmaxMaxUbAddr, outreg0, VL_FP32,
-                                                                              maskReg);
+            AscendC::Reg::StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(softmaxMaxUbAddr, outreg0, VL_FP32,
+                                                                                maskReg);
 
             AscendC::Reg::Sub(vreg2, vreg0, outreg0, maskReg);
             AscendC::Reg::Sub(vreg3, vreg1, outreg0, maskReg);
@@ -102,8 +102,8 @@ __aicore__ inline void SoftmaxCompute(LocalTensor<float> prevCurSoftmaxMaxLocal,
             AscendC::Reg::Exp(vreg5, vreg3, maskReg);
 
             // copyin prevSoftmaxSum curSoftmaxSum ub->regTensor
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg6, prevSoftmaxSumUbAddr, VL_FP32);
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg7, curSoftmaxSumUbAddr, VL_FP32);
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg6, prevSoftmaxSumUbAddr, VL_FP32);
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vreg7, curSoftmaxSumUbAddr, VL_FP32);
 
             // prev_softmax_sum_scaled = prev_softmax_sum * prev_scale
             AscendC::Reg::Mul(vreg8, vreg6, vreg4, maskReg);
@@ -113,8 +113,8 @@ __aicore__ inline void SoftmaxCompute(LocalTensor<float> prevCurSoftmaxMaxLocal,
             AscendC::Reg::Add(outreg1, vreg8, vreg9, maskReg);
 
             // copyout softmaxSum regTensor->ub
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(softmaxSumUbAddr, outreg1, VL_FP32,
-                                                                              maskReg);
+            AscendC::Reg::StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(softmaxSumUbAddr, outreg1, VL_FP32,
+                                                                                maskReg);
 
             // cur_out_scale = cur_softmax_sum_scaled / softmax_sum
             AscendC::Reg::Div<float, &mode>(vreg11, vreg9, outreg1, maskReg);
@@ -122,10 +122,10 @@ __aicore__ inline void SoftmaxCompute(LocalTensor<float> prevCurSoftmaxMaxLocal,
             AscendC::Reg::Div<float, &mode>(vreg10, vreg8, outreg1, maskReg);
 
             // copyout prev_out_scale cur_out_scale regTensor->ub
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(tempFp32Buf1UbAddr, vreg10, VL_FP32,
-                                                                              maskReg);
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE>(tempFp32Buf2UbAddr, vreg11, VL_FP32,
-                                                                              maskReg);
+            AscendC::Reg::StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tempFp32Buf1UbAddr, vreg10, VL_FP32,
+                                                                                maskReg);
+            AscendC::Reg::StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tempFp32Buf2UbAddr, vreg11, VL_FP32,
+                                                                                maskReg);
         }
     }
 }
@@ -157,17 +157,17 @@ __aicore__ inline void AttnComputeFp32(LocalTensor<T> prevCurAttnOutLocal, Local
 
         for (uint16_t idx = 0; idx < loop; idx++) { // 外循环
             // copyin prev_out_scale cur_out_scale ub->regTensor
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                 vreg2, tempFp32Buf1UbAddr,
                 softmaxTailSize); // prev_out_scale
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                 vreg3, tempFp32Buf2UbAddr,
                 softmaxTailSize); // cur_out_scale
             for (uint16_t i = 0; i < repeatTimes; i++) {
                 AscendC::Reg::AddrReg srcAddrReg = AscendC::Reg::CreateAddrReg<T>(idx, headDimLoopEach, i, VL_FP32);
                 // copyin prev_attn_out cur_attn_out ub->regTensor
-                AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_NORM>(vreg0, prevAttnOutUbAddr, srcAddrReg);
-                AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_NORM>(vreg1, curAttnOutUbAddr, srcAddrReg);
+                AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_NORM>(vreg0, prevAttnOutUbAddr, srcAddrReg);
+                AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_NORM>(vreg1, curAttnOutUbAddr, srcAddrReg);
 
                 // prev_attn_out * prev_out_scale
                 AscendC::Reg::Mul(vreg4, vreg0, vreg2, maskReg);
@@ -177,8 +177,8 @@ __aicore__ inline void AttnComputeFp32(LocalTensor<T> prevCurAttnOutLocal, Local
                 AscendC::Reg::Add(outreg0, vreg4, vreg5, maskReg);
 
                 // copyout attn_out regTensor->ub
-                AscendC::Reg::DataCopy<float, AscendC::Reg::StoreDist::DIST_NORM_B32>(attnOutUbAddr, outreg0,
-                                                                                      srcAddrReg, maskReg);
+                AscendC::Reg::StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>(attnOutUbAddr, outreg0,
+                                                                                        srcAddrReg, maskReg);
             }
         }
     }
@@ -214,18 +214,19 @@ __aicore__ inline void AttnComputeBf16Fp16(LocalTensor<T> prevCurAttnOutLocal, L
 
         for (uint16_t idx = 0; idx < loop; idx++) { // 外循环
             // copyin prev_out_scale cur_out_scale ub->regTensor
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                 vreg3, tempFp32Buf1UbAddr,
                 softmaxTailSize); // prev_out_scale
-            AscendC::Reg::DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
+            AscendC::Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, AscendC::Reg::LoadDist::DIST_BRC_B32>(
                 vreg4, tempFp32Buf2UbAddr,
                 softmaxTailSize); // cur_out_scale
             for (uint16_t i = 0; i < repeatTimes; i++) {
                 AscendC::Reg::AddrReg srcAddrReg = AscendC::Reg::CreateAddrReg<T>(idx, headDimLoopEach, i, VL_FP32);
                 // copyin prev_attn_out cur_attn_out ub->regTensor
-                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(vreg0, prevAttnOutUbAddr,
-                                                                                   srcAddrReg);
-                AscendC::Reg::DataCopy<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(vreg1, curAttnOutUbAddr, srcAddrReg);
+                AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(vreg0, prevAttnOutUbAddr,
+                                                                                    srcAddrReg);
+                AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(vreg1, curAttnOutUbAddr,
+                                                                                    srcAddrReg);
 
                 // prev_attn_out bf16/fp16 -> fp32
                 AscendC::Reg::Cast<float, T, castTrait0>(vreg2, vreg0, maskReg);
@@ -241,8 +242,8 @@ __aicore__ inline void AttnComputeBf16Fp16(LocalTensor<T> prevCurAttnOutLocal, L
                 AscendC::Reg::Cast<T, float, castTrait1>(outreg0, vreg8, maskReg);
 
                 // copyout attn_out regTensor->ub
-                AscendC::Reg::DataCopy<T, AscendC::Reg::StoreDist::DIST_PACK_B32>(attnOutUbAddr, outreg0, srcAddrReg,
-                                                                                  maskReg);
+                AscendC::Reg::StoreAlign<T, AscendC::Reg::StoreDist::DIST_PACK_B32>(attnOutUbAddr, outreg0, srcAddrReg,
+                                                                                    maskReg);
             }
         }
     }
