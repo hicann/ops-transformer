@@ -253,7 +253,7 @@ cann_ops_transformer.quant_flash_attn(
 
 > [!NOTE]
 >
-> k/v/k_descale/v_descale仅在Paged Attention场景下支持非连续Tensor，非连续时支持的轴约束见<a href="#Paged Attention参数组">Paged Attention参数组</a>特性交叉校验。
+> k/v/k_descale/v_descale仅在Paged Attention场景下支持非连续Tensor，非连续时支持的轴约束见<a href="#Paged Attention参数组">Paged Attention参数组</a>特性交叉校验。<br>注：非连续Tensor每一维的stride均不能为0。
 
 ## 返回值说明
 

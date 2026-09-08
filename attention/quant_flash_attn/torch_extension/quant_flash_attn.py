@@ -491,6 +491,19 @@ def quant_flash_attn(
         lambda: f"v with layout {layout_kv} expects {kv_expected} dims, but got {v.dim()} dims",
     )
 
+    # QFA 不支持 k/v/kscale/vscale 的 stride 中含 0
+    for name, tensor in (
+        ("k", k),
+        ("v", v),
+        ("k_descale", k_descale),
+        ("v_descale", v_descale),
+    ):
+        if tensor is not None and 0 in tensor.stride():
+            raise ValueError(
+                f"quant_flash_attn does not support {name} with stride containing 0, "
+                f"got {name}.stride() = {tensor.stride()}"
+            )
+
     if quant_mode == int(QuantMode.A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16):
         if q.dtype != torch.uint8:
             raise ValueError(
