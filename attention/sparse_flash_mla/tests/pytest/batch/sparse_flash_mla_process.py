@@ -166,6 +166,8 @@ def call_npu(input_data):
     softmax_scale = tensor_input["softmax_scale"]
     ori_mask_mode = tensor_input["ori_mask_mode"]
     cmp_mask_mode = tensor_input["cmp_mask_mode"]
+    if input_data.get("template_run_mode") == "SWA":
+        cmp_mask_mode = 0
     ori_win_left = tensor_input["ori_win_left"]
     ori_win_right = tensor_input["ori_win_right"]
     layout_q = (
@@ -351,6 +353,8 @@ def call_npu_graph(input_data, device_id=0):
     softmax_scale = tensor_input["softmax_scale"]
     ori_mask_mode = tensor_input["ori_mask_mode"]
     cmp_mask_mode = tensor_input["cmp_mask_mode"]
+    if input_data.get("template_run_mode") == "SWA":
+        cmp_mask_mode = 0
     ori_win_left = tensor_input["ori_win_left"]
     ori_win_right = tensor_input["ori_win_right"]
     layout_q = (

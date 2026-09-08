@@ -15,6 +15,7 @@ import copy
 import pytest
 import torch
 import torch_npu
+import utils
 
 from .config import (
     PERSISTED_KEYS,
@@ -58,6 +59,29 @@ def make_schema_case(operator, params=None):
 
 def test_auto_without_parameters_is_disabled():
     assert resolve_consistency_config(make_case(), "auto") is None
+
+
+def test_normal_excel_save_defaults_do_not_enable_consistency():
+    params = utils.generate_param_combinations([{}], is_save_pt=True)[0]
+
+    assert params["batch_consistency"] is False
+    assert params["ori_sparse_indices_mode"] == "full"
+    assert params["cmp_sparse_indices_mode"] == "full"
+    assert not prepare_consistency_params(params, "auto")
+    assert not any(key in params for key in PERSISTED_KEYS)
+
+
+def test_batch_excel_save_values_keep_their_scalar_and_list_shapes():
+    source = {
+        "batch_consistency": True,
+        "batch_consistency_seed": 7,
+        "batch_consistency_order": [1, 0],
+    }
+    params = utils.generate_param_combinations([source], is_save_pt=True)[0]
+
+    assert params["batch_consistency"] is True
+    assert params["batch_consistency_seed"] == 7
+    assert params["batch_consistency_order"] == [1, 0]
 
 
 def test_explicit_parameters_are_preserved_and_persisted():

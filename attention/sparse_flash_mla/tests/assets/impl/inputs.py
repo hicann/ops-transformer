@@ -836,10 +836,15 @@ class SparseFlashMlaInputAdapter:
             )
         dst.copy_(src_cpu.to(dtype=dst.dtype, device=dst.device))
 
-    def generate_case(self, params, batch_random=None):
+    def generate_case(
+        self, params, batch_random=None, legacy_empty_actual_length_slots=()
+    ):
         pytest_utils = self.load_pytest_module("utils", "utils.py")
         pytest_golden = self.load_pytest_module("golden", "sparse_flash_mla_golden.py")
         pytest_input = {name: [value] for name, value in params.items()}
+        if params.get("actlen_mode") in ("等长", "不等长"):
+            # Historical TTK labels describe the saved vectors, which remain authoritative.
+            pytest_input["actlen_mode"] = ["full"]
         param_combinations = pytest_utils.generate_param_combinations([pytest_input])
         if len(param_combinations) != 1:
             raise ValueError(
@@ -848,6 +853,8 @@ class SparseFlashMlaInputAdapter:
         case_params = pytest_utils.generate_case_with_default_param(
             param_combinations[0]
         )
+        for name in legacy_empty_actual_length_slots:
+            case_params[name] = None
         if batch_random is None:
             data = pytest_golden.gen_data(
                 case_params, prepare_device_storage=False, generate_golden=False
@@ -872,6 +879,7 @@ class SparseFlashMlaInputAdapter:
         layout_kv,
         kwargs,
         batch_random=None,
+        legacy_empty_actual_length_slots=(),
     ):
         params = self.build_case_params(
             q,
@@ -883,7 +891,9 @@ class SparseFlashMlaInputAdapter:
             layout_kv,
             kwargs,
         )
-        return self.generate_case(params, batch_random)
+        return self.generate_case(
+            params, batch_random, legacy_empty_actual_length_slots
+        )
 
 
 INPUT_ADAPTER = SparseFlashMlaInputAdapter()
@@ -953,6 +963,26 @@ def generate_sparse_flash_mla_inputs(
         }
     )
     batch_random = TorchBatchRandomContext.from_case(q, ori_kv, cmp_kv, params)
+    legacy_empty_actual_length_slots = []
+    if (
+        layout_q == "TND"
+        and seqused_q is None
+        and INPUT_ADAPTER.list_value(params, "seqused_q") is None
+    ):
+        legacy_empty_actual_length_slots.append("seqused_q")
+    if (
+        layout_kv == "TND"
+        and INPUT_ADAPTER.list_value(params, "cu_seqlens_cmp_kv") is not None
+        and seqused_ori_kv is None
+        and INPUT_ADAPTER.list_value(params, "seqused_ori_kv") is None
+    ):
+        for name, tensor in (
+            ("seqused_ori_kv", seqused_ori_kv),
+            ("seqused_cmp_kv", seqused_cmp_kv),
+            ("cmp_residual_kv", cmp_residual_kv),
+        ):
+            if tensor is None and INPUT_ADAPTER.list_value(params, name) is None:
+                legacy_empty_actual_length_slots.append(name)
     data = INPUT_ADAPTER.customize(
         q,
         ori_kv,
@@ -963,6 +993,7 @@ def generate_sparse_flash_mla_inputs(
         layout_kv,
         params,
         batch_random,
+        tuple(legacy_empty_actual_length_slots),
     )
     op_input = data["input"]
     metadata_input = data.get("metadata_input", {})

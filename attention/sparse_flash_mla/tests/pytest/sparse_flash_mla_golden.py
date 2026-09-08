@@ -1695,9 +1695,63 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
     batch_consistency = params.get("batch_consistency", False)
     template_mode = params.get("template_mode")
 
+    # 路由到各算子的逻辑。必须先于Tensor转换和压缩长度推导执行，
+    # 否则SWA会从共享参数中生成无效的cmp_kv相关Tensor。
+    template_idx = 0
+    mapping = {"SWA": 0, "HCA": 1, "CSA": 2, "ORI_SPARSE": 3, "ORI_CMP_SPARSE": 4}
+    if template_mode is not None and template_mode in mapping:
+        template_run_mode = template_mode
+        template_idx = mapping[template_mode]
+        if template_mode == "SWA":
+            cmp_ratio = None
+            K1 = None
+            K = None
+        elif template_mode == "HCA":
+            cmp_ratio = int(cmp_ratio) if cmp_ratio is not None else 1
+            K1 = None
+            K = None
+        elif template_mode == "CSA":
+            cmp_ratio = int(cmp_ratio) if cmp_ratio is not None else 1
+            K = int(K) if K is not None else None
+        elif template_mode == "ORI_SPARSE":
+            cmp_ratio = 1
+            K1 = int(K1) if K1 is not None else None
+            K = None
+        elif template_mode == "ORI_CMP_SPARSE":
+            cmp_ratio = int(cmp_ratio) if cmp_ratio is not None else 1
+            K1 = int(K1) if K1 is not None else None
+            K = int(K) if K is not None else None
+    else:
+        if K is None or K == ["None"]:
+            if cmp_ratio is None:
+                template_idx = 0  # SWA
+                template_run_mode = "SWA"
+            else:
+                template_idx = 1  # HCA
+                template_run_mode = "HCA"
+                cmp_ratio = int(cmp_ratio)
+        else:
+            template_idx = 2  # CSA
+            template_run_mode = "CSA"
+            cmp_ratio = 1 if cmp_ratio is None else int(cmp_ratio)
+            K = int(K)
+
     # 支持外部指定topk_length
     ori_topk_length_override = params.get("ori_topk_length", None)
     cmp_topk_length_override = params.get("cmp_topk_length", None)
+
+    if template_idx == 0:
+        # SWA only consumes ori_kv. Do not materialize or retain any compressed-KV
+        # tensor/shape metadata, even when it was supplied by a shared case source.
+        cmp_mask_mode = 0
+        cmp_kv_type = None
+        T3 = None
+        block_num2 = None
+        block_size2 = None
+        cu_seqlens_cmp_kv = None
+        seqused_cmp_kv = None
+        cmp_residual_kv = None
+        cmp_topk_length_override = None
     if (
         isinstance(ori_topk_length_override, list)
         and len(ori_topk_length_override) == 1
@@ -1820,53 +1874,10 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
     else:
         raise ValueError(f"layout_kv is not support {layout_kv}")
 
-    seqused_cmp_kv, cmp_residual_kv = resolve_compressed_actual_lengths(
-        seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio
-    )
-    # 路由到三个算子的逻辑：
-    template_idx = 0
-
-    mapping = {"SWA": 0, "HCA": 1, "CSA": 2, "ORI_SPARSE": 3, "ORI_CMP_SPARSE": 4}
-    if template_mode is not None and template_mode in mapping:
-        template_run_mode = template_mode
-        template_idx = mapping[template_mode]
-        if template_mode == "SWA":
-            cmp_ratio = None
-            K1 = None
-            K = None
-        elif template_mode == "HCA":
-            cmp_ratio = int(cmp_ratio) if cmp_ratio is not None else 1
-            K1 = None
-            K = None
-        elif template_mode == "CSA":
-            cmp_ratio = int(cmp_ratio) if cmp_ratio is not None else 1
-            K = int(K) if K is not None else None
-        elif template_mode == "ORI_SPARSE":
-            cmp_ratio = 1
-            K1 = int(K1) if K1 is not None else None
-            K = None
-        elif template_mode == "ORI_CMP_SPARSE":
-            cmp_ratio = int(cmp_ratio) if cmp_ratio is not None else 1
-            K1 = int(K1) if K1 is not None else None
-            K = int(K) if K is not None else None
-    else:
-        # TODO 删除这部分逻辑 替换所有template_idx
-        if K is None or K == ["None"]:
-            if cmp_ratio is None:
-                template_idx = 0  # SWA
-                template_run_mode = "SWA"
-            else:
-                template_idx = 1  # HCA
-                template_run_mode = "HCA"
-                cmp_ratio = int(cmp_ratio)
-        else:
-            template_idx = 2  # CSA
-            template_run_mode = "CSA"
-            if cmp_ratio == None:
-                cmp_ratio = 1
-            else:
-                cmp_ratio = int(cmp_ratio)
-            K = int(K)
+    if template_idx in (1, 2, 4):
+        seqused_cmp_kv, cmp_residual_kv = resolve_compressed_actual_lengths(
+            seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio
+        )
     print("template_run_mode: ", template_run_mode)
     if layout_kv == "PA_BBND":
         block_size1, block_num1 = int(block_size1), int(block_num1)

@@ -472,7 +472,7 @@ TEST_PARAMS = {
         "cmp_kv_topk_mode": ["fullK"],
         "ori_sparse_indices_mode": ["full"],
         "cmp_sparse_indices_mode": ["full"],
-        "random_seq": [True],
+        "actlen_mode": ["full"],
     },
     "ori_sparse_bsnd_bsnd": {
         "testcase_name": ["ori_sparse_bsnd_bsnd"],
@@ -504,7 +504,7 @@ TEST_PARAMS = {
         "cmp_kv_topk_mode": ["random"],
         "ori_sparse_indices_mode": ["full"],
         "cmp_sparse_indices_mode": ["full"],
-        "random_seq": [True],
+        "actlen_mode": ["full"],
     },
     "ori_sparse_tnd_tnd": {
         "testcase_name": ["ori_sparse_tnd_tnd"],
@@ -537,7 +537,7 @@ TEST_PARAMS = {
         "cmp_kv_topk_mode": ["random"],
         "ori_sparse_indices_mode": ["full"],
         "cmp_sparse_indices_mode": ["full"],
-        "random_seq": [True],
+        "actlen_mode": ["full"],
     },
     "ori_sparse_bsnd_pa": {
         "testcase_name": ["ori_sparse_bsnd_pa"],
