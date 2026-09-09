@@ -643,7 +643,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
         std::vector<int64_t> biasShape = {128};
         std::vector<int64_t> x1ScaleShape = {32};
         std::vector<int64_t> x2ScaleShape = {128};
-        std::vector<int64_t> outShape = {32, 128};
+        std::vector<int64_t> outShape = {32 * ndev, 128 / ndev};
         void *x1DeviceAddr = nullptr;
         void *x2DeviceAddr = nullptr;
         void *biasDeviceAddr = nullptr;
@@ -811,9 +811,10 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     #include <vector>
     #include <acl/acl.h>
     #include <hccl/hccl.h>
+    #include "aclnn/opdev/fp16_t.h"
     #include "aclnnop/aclnn_quant_matmul_allto_all.h"
 
-    int ndev = 2;
+    constexpr int ndev = 2;
 
     #define CHECK_RET(cond, return_expr) \
     do {                               \
@@ -867,7 +868,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
         int ret;
         ret = aclrtSetCurrentContext(args.context);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetCurrentContext failed. ERROR: %d\n", ret); return ret);
-        char hcom_name[128];
+        char hcom_name[128] = {0};
         ret = HcclGetCommName(args.hcclComm, hcom_name);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret = %d \n", ret); return -1);
         LOG_PRINT("[INFO] rank %d hcom: %s stream: %p, context : %p\n", args.rankId, hcom_name, args.stream,
@@ -910,12 +911,12 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
         long long x1ScaleShapeSize = GetShapeSize(x1ScaleShape);
         long long x2ScaleShapeSize = GetShapeSize(x2ScaleShape);
         long long outShapeSize = GetShapeSize(outShape);
-        std::vector<int16_t> x1HostData(x1ShapeSize, 1);
-        std::vector<int16_t> x2HostData(x2ShapeSize, 1);
-        std::vector<int16_t> biasHostData(biasShapeSize, 1);
-        std::vector<int16_t> x1ScaleHostData(x1ShapeSize, 1);
-        std::vector<int16_t> x2ScaleHostData(x2ShapeSize, 1);
-        std::vector<int16_t> outHostData(outShapeSize, 0);
+        std::vector<int8_t> x1HostData(x1ShapeSize, 1);
+        std::vector<int8_t> x2HostData(x2ShapeSize, 1);
+        std::vector<float> biasHostData(biasShapeSize, 1);
+        std::vector<float> x1ScaleHostData(x1ScaleShapeSize, 1);
+        std::vector<float> x2ScaleHostData(x2ScaleShapeSize, 1);
+        std::vector<op::fp16_t> outHostData(outShapeSize, 0);
         // 创建tensor
         ret = CreateAclTensor(x1HostData, x1Shape, &x1DeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN, &x1);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -975,6 +976,12 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
         }
         if (biasDeviceAddr != nullptr) {
             aclrtFree(biasDeviceAddr);
+        }
+        if (x1ScaleDeviceAddr != nullptr) {
+            aclrtFree(x1ScaleDeviceAddr);
+        }
+        if (x2ScaleDeviceAddr != nullptr) {
+            aclrtFree(x2ScaleDeviceAddr);
         }
         if (outDeviceAddr != nullptr) {
             aclrtFree(outDeviceAddr);
