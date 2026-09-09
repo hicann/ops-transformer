@@ -30,6 +30,10 @@ using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
 constexpr size_t kCsvColumnCount = 22;
+constexpr const char *kRunModeGetWorkspace = "GET_WORKSPACE";
+constexpr const char *kRunModeScale2Null = "SCALE2_NULL";
+constexpr const char *kRunModeGroupListNull = "GROUP_LIST_NULL";
+constexpr const char *kRunModeYNull = "Y_NULL";
 
 vector<int64_t> ParseDims(const string &value)
 {
@@ -56,12 +60,34 @@ struct QGmmInplaceAddOpApiCase {
             groupListDesc.Value(groupVals);
         }
 
-        auto ut = OP_API_UT(aclnnQuantGroupedMatmulInplaceAdd,
-                            INPUT(x1Desc, x2Desc, scale1Desc, scale2Desc, groupListDesc, yDesc, groupListType,
-                                  groupSize),
-                            OUTPUT());
         uint64_t workspaceSize = 0;
-        aclnnStatus ret = ut.TestGetWorkspaceSize(&workspaceSize);
+        aclnnStatus ret = ACLNN_SUCCESS;
+        if (runMode == kRunModeScale2Null) {
+            auto ut = OP_API_UT(
+                aclnnQuantGroupedMatmulInplaceAdd,
+                INPUT(x1Desc, x2Desc, scale1Desc, nullptr, groupListDesc, yDesc, groupListType, groupSize), OUTPUT());
+            aclOpExecutor *executor = nullptr;
+            ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+        } else if (runMode == kRunModeGroupListNull) {
+            auto ut = OP_API_UT(aclnnQuantGroupedMatmulInplaceAdd,
+                                INPUT(x1Desc, x2Desc, scale1Desc, scale2Desc, nullptr, yDesc, groupListType, groupSize),
+                                OUTPUT());
+            aclOpExecutor *executor = nullptr;
+            ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+        } else if (runMode == kRunModeYNull) {
+            auto ut = OP_API_UT(
+                aclnnQuantGroupedMatmulInplaceAdd,
+                INPUT(x1Desc, x2Desc, scale1Desc, scale2Desc, groupListDesc, nullptr, groupListType, groupSize),
+                OUTPUT());
+            aclOpExecutor *executor = nullptr;
+            ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+        } else {
+            auto ut =
+                OP_API_UT(aclnnQuantGroupedMatmulInplaceAdd,
+                          INPUT(x1Desc, x2Desc, scale1Desc, scale2Desc, groupListDesc, yDesc, groupListType, groupSize),
+                          OUTPUT());
+            ret = ut.TestGetWorkspaceSize(&workspaceSize);
+        }
         if (checkRet) {
             EXPECT_EQ(ret, ops::ut::ParseAclnnStatus(expectRet)) << "case=" << caseName;
         }
@@ -89,6 +115,7 @@ struct QGmmInplaceAddOpApiCase {
     int64_t groupSize = 0;
     string expectRet;
     bool checkRet = true;
+    string runMode = kRunModeGetWorkspace;
 };
 
 vector<QGmmInplaceAddOpApiCase> LoadCases(const string &csvFilePath)
@@ -140,6 +167,9 @@ vector<QGmmInplaceAddOpApiCase> LoadCases(const string &csvFilePath)
             c.groupSize = stoll(Trim(cols[i++]));
             c.expectRet = Trim(cols[i++]);
             c.checkRet = ParseBool(Trim(cols[i++]));
+            if (i < cols.size()) {
+                c.runMode = Trim(cols[i++]);
+            }
             cases.emplace_back(c);
         } catch (const std::exception &error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, caseName, error);
@@ -161,13 +191,11 @@ TEST_P(qgmm_inplace_add_opapi_csv_test, run_case)
     GetParam().Run();
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    qgmm_inplace_add_opapi_csv,
-    qgmm_inplace_add_opapi_csv_test,
-    testing::ValuesIn(LoadCases(ops::ut::ResolveCsvPath(
-        "test_aclnn_quant_grouped_matmul_inplace_add.csv",
-        "gmm/quant_grouped_matmul_inplace_add/tests/ut/op_host/op_api", __FILE__))),
-    BuildCaseName);
+INSTANTIATE_TEST_SUITE_P(qgmm_inplace_add_opapi_csv, qgmm_inplace_add_opapi_csv_test,
+                         testing::ValuesIn(LoadCases(ops::ut::ResolveCsvPath(
+                             "test_aclnn_quant_grouped_matmul_inplace_add.csv",
+                             "gmm/quant_grouped_matmul_inplace_add/tests/ut/op_host/op_api", __FILE__))),
+                         BuildCaseName);
 
 TEST(qgmm_inplace_add_opapi_direct_test, phase2_null_executor_path)
 {
