@@ -131,6 +131,10 @@ static constexpr inferPFALayoutTypeEnum InOutLayoutPFATypeValue[5][2] = {
 #define KvLayoutType_PA_BNBD 2
 #define KvLayoutType_PA_NZ 3
 
+// templateId
+#define FA_Template_ND 0
+#define FA_Template_DN 1
+
 struct ConfigParams {
     inferS1TemplateType s1;
     inferS2TemplateType s2;

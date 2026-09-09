@@ -27,12 +27,14 @@
 #include "../../../common/op_kernel/init_output.h"
 #include "memory_copy_arch35.h"
 #include "../utils/attn_sink_gs1.h"
+#include "../../../common/op_kernel/arch_info.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;
 using namespace AscendC::Impl::Detail;
 
 namespace FlashAttnKernel {
+using ArchInfo::CV_RATIO;
 
 template <typename FA_T>
 class FANoQuantGqaBlockVecDn {
@@ -83,6 +85,13 @@ public:
     static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
     static constexpr uint32_t UB_MM_RES_BUF_BYTES =
         mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T);
+    // bmm1/bmm2(mmRes) 区域总字节数：FD block 以此作为 FD 业务区的 UB 起始偏移
+    static constexpr uint32_t UB_MM_RES_TOTAL_BYTES = UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES;
+    // FD 业务区在 UB 中的起始字节偏移，供 kernel 传给 FD block 的 InitBuffers
+    static __aicore__ inline constexpr uint32_t GetFdBaseOffset()
+    {
+        return UB_MM_RES_TOTAL_BYTES;
+    }
     LocalTensor<uint8_t> ubMmResBuffers_;
     uint32_t mmResBufId_ = 0;
 
@@ -95,17 +104,21 @@ public:
     uint32_t vec1ResUbBufId_ = 0;
 
     static constexpr uint32_t UB_SOFTMAX_MAX_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_MAX_BUF_BYTES = 256U;
+    static constexpr uint32_t UB_SOFTMAX_MAX_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<T> softmaxSumBuf_;
     static constexpr uint32_t UB_SOFTMAX_SUM_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_SUM_BUF_BYTES = 256U;
+    static constexpr uint32_t UB_SOFTMAX_SUM_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<T> softmaxMaxBuf_;
     static constexpr uint32_t UB_SOFTMAX_EXP_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_EXP_BUF_BYTES = 256U;
+    static constexpr uint32_t UB_SOFTMAX_EXP_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<T> softmaxExpBuf_;
 
     static constexpr uint32_t UB_LSE_OUT_BUFCNT = 2U;
-    static constexpr uint32_t UB_LSE_OUT_BUF_BYTES = 2048U;
+    static constexpr uint32_t UB_LSE_OUT_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * 8 * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<uint8_t> ubLseOutBuffers_;
     uint32_t lseOutUbBufId_ = 0;
 
@@ -199,7 +212,8 @@ public:
         ubLseOutBuffers_ = LocalTensor<uint8_t>(
             TPosition::VECIN, addrUb,
             UB_LSE_OUT_BUFCNT *
-                UB_LSE_OUT_BUF_BYTES); // 2 * 2K = 4K, 输出BUF: FD中间结果SUM和MAX拷出至GM，或者LSE结果拷出
+                UB_LSE_OUT_BUF_BYTES); // 输出BUF:
+                                       // FD中间结果SUM和MAX拷出至GM，或者LSE结果拷出；按actVecMSize*8(fp32块对齐)定容
         addrUb += UB_LSE_OUT_BUFCNT * UB_LSE_OUT_BUF_BYTES;
     }
 
@@ -288,7 +302,7 @@ public:
     __aicore__ inline void ClearOutput()
     {
         if (constInfo_.needInitOutput) {
-            uint32_t vecCoreNum = 2 * constInfo_.coreNum;
+            uint32_t vecCoreNum = CV_RATIO * constInfo_.coreNum;
             uint64_t tSize = constInfo_.bSize * constInfo_.s1Size;
             if constexpr (LAYOUT_T == FA_LAYOUT::TND) {
                 tSize = qSeqLensTool_.cuSeqLensParser.GetTSize();
@@ -388,9 +402,9 @@ public:
             return;
         }
 
-        static constexpr uint32_t vec1S2CopyLenDn = s2BaseSize >> 1;
+        static constexpr uint32_t vec1S2CopyLenDn = s2BaseSize / CV_RATIO;
         static constexpr uint32_t vec1HalfS1BaseSize = mBaseSize >> 1;
-        static constexpr uint32_t vec1S2CopyCountDn = mBaseSize >> 5;
+        static constexpr uint32_t vec1S2CopyCountDn = (mBaseSize >> 4) / CV_RATIO;
         static constexpr uint32_t vec1S2strideDn = s2BaseSize * 8;
         static constexpr uint32_t vec1ResOffsetDn = s2BaseSize * 32 + 64;
 

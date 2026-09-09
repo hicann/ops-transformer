@@ -31,7 +31,7 @@ enum class TASK_DEAL_MODE : uint32_t {
 };
 
 template <typename T>
-__aicore__ inline T Align(T num, T rnd)
+__aicore__ inline constexpr T Align(T num, T rnd)
 {
     return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }

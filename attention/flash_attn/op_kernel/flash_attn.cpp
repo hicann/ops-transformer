@@ -78,16 +78,7 @@ __aicore__ inline constexpr bool IsPageAttention()
     return (KV_STORAGE_MODE != KV_STORAGE_MODE_CONTINUE);
 }
 
-template <bool hasAttenMask, uint8_t config>
-__aicore__ inline constexpr bool EnableSoftmaxDn()
-{
-    if constexpr (hasAttenMask) {
-        return false;
-    }
-    return ((config == 0) || (config == 2) || (config == 6));
-}
-
-template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, uint8_t config>
+template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, uint8_t templateId, uint8_t config>
 __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                       __gm__ uint8_t *blockTable, __gm__ uint8_t *cuSeqLensQ,
                                       __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv,
@@ -123,7 +114,6 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(ConfigValue[config].d);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(ConfigValue[config].dv);
-    constexpr bool useDn = EnableSoftmaxDn<hasAttenMask, config>();
 
     // 根因（静态图）：固定 shape 下 tiling 是编译期常量字节数组而非 __gm__ buffer，
     // 不能直接 reinterpret_cast 成结构体指针访问，必须先拷贝到栈局部结构体对象再取指针。
@@ -137,13 +127,13 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key
     using FA_T = FlashAttnKernel::FAType<INPUT_T, OUT_T, pageAttention, qLayout, kvLayout, outLayout, s1TemplateType,
                                          s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask>;
 
-    if constexpr (useDn) {
+    if constexpr (templateId == FA_Template_DN) {
         using CubeBlock = FlashAttnKernel::FANoQuantGqaBlockCubeDn<FA_T>;
         using VecFaBlock = FlashAttnKernel::FANoQuantGqaBlockVecDn<FA_T>;
         using VecFdBlock = FlashAttnKernel::FiaBlockVecFlashDecode<FA_T>;
         using VecDummy = FlashAttnKernel::FANoQuantGqaBlockVecDummyDn<FA_T>;
         using CubeDummy = FlashAttnKernel::FANoQuantGqaBlockCubeDummyDn<FA_T>;
-#ifdef __DAV_C310_CUBE__
+#ifdef __DAV_CUBE__
         using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelDn<FA_T, CubeBlock, VecDummy, VecDummy>;
 #else
         using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelDn<FA_T, CubeDummy, VecFaBlock, VecFdBlock>;
@@ -158,7 +148,7 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key
         using VecFdBlock = FlashAttnKernel::FiaBlockVecFlashDecode<FA_T>;
         using VecDummy = FlashAttnKernel::FANoQuantGqaBlockVecDummyNd<FA_T>;
         using CubeDummy = FlashAttnKernel::FANoQuantGqaBlockCubeDummyNd<FA_T>;
-#ifdef __DAV_C310_CUBE__
+#ifdef __DAV_CUBE__
         using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelNd<FA_T, CubeBlock, VecDummy, VecDummy>;
 #else
         using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelNd<FA_T, CubeDummy, VecFaBlock, VecFdBlock>;

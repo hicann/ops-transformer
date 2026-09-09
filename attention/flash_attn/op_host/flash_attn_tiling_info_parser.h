@@ -125,7 +125,7 @@ public:
     int32_t blockNum_ = 0;
 
     // NPU信息
-    NpuArch npuArch_ = NpuArch::DAV_3510;
+    NpuArch npuArch_ = NpuArch::DAV_RESV;
 
     // Dtype信息
     ge::DataType inputQType_ = ge::DT_FLOAT16;

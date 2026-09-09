@@ -16,6 +16,7 @@
 #define BUFFER_H
 #include <type_traits>
 #include "lib/matmul_intf.h"
+#include "arch_info.h"
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else
@@ -201,7 +202,7 @@ public:
                     c2pEventId_ = GetTPipePtr()->AllocEventID<BufferInfo<bufferType>::EventC2P>();
                     SetFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_);
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
                     mutexId_ = AllocMutexID();
 #endif
                 }
@@ -221,7 +222,7 @@ public:
                     c2pEventId_ = id;
                     SetFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_);
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
                     mutexId_ = id;
 #endif
                 }
@@ -242,7 +243,7 @@ public:
                         GetTPipePtr()->ReleaseEventID<BufferInfo<bufferType>::EventC2P>(c2pEventId_);
                     }
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
                     if constexpr (idSource == IdSource::INTERNAL) {
                         ReleaseMutexID(mutexId_);
                     }
@@ -255,7 +256,7 @@ public:
     template <pipe_t pipe>
     __aicore__ inline void Lock()
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
         if ASCEND_IS_AIC {
             if constexpr (syncType == SyncType::INNER_CORE_SYNC && syncMode == SyncMode::LOCK_UNLOCK) {
                 Mutex::Lock<pipe>(mutexId_);
@@ -267,7 +268,7 @@ public:
     template <pipe_t pipe>
     __aicore__ inline void Unlock()
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
         if ASCEND_IS_AIC {
             if constexpr (syncType == SyncType::INNER_CORE_SYNC && syncMode == SyncMode::LOCK_UNLOCK) {
                 Mutex::Unlock<pipe>(mutexId_);
@@ -288,7 +289,7 @@ public:
                         WaitFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_); // 生产者等待消费者完成消费
                     }
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
                     if constexpr (EventType == BufferInfo<bufferType>::EventP2C) {
                         Mutex::Lock<BufferInfo<bufferType>::ConsPipe>(mutexId_); // 消费者加锁
                     } else {
@@ -312,7 +313,7 @@ public:
                         SetFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_); // 消费者通知生产者已完成消费
                     }
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
                     if constexpr (EventType == BufferInfo<bufferType>::EventP2C) {
                         Mutex::Unlock<BufferInfo<bufferType>::ProdPipe>(mutexId_); // 生产者解锁
                     } else {
@@ -361,7 +362,9 @@ public:
             // AIC属于消费者，AIV属于生产者，且一个AIC对应两个AIV
             if ASCEND_IS_AIC {
                 CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE2>(id1_);
-                CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE2>(id1_ + AIV0_AIV1_OFFSET);
+                if constexpr (ArchInfo::CV_RATIO == 2) {
+                    CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE2>(id1_ + AIV0_AIV1_OFFSET);
+                }
             } else {
                 CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE2>(id0_);
             }
@@ -369,7 +372,9 @@ public:
             // AIC属于生产者，AIV属于消费者，且一个AIC对应两个AIV
             if ASCEND_IS_AIC {
                 CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id1_);
-                CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id1_ + AIV0_AIV1_OFFSET);
+                if constexpr (ArchInfo::CV_RATIO == 2) {
+                    CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id1_ + AIV0_AIV1_OFFSET);
+                }
             } else {
                 if constexpr (isReuse) {
                     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(id0_);
@@ -381,7 +386,9 @@ public:
             // AIC属于消费者，AIV属于生产者，且一个AIC对应两个AIV
             if ASCEND_IS_AIC {
                 CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(id0_);
-                CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(id0_ + AIV0_AIV1_OFFSET);
+                if constexpr (ArchInfo::CV_RATIO == 2) {
+                    CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(id0_ + AIV0_AIV1_OFFSET);
+                }
             } else {
                 if constexpr (syncType == SyncType::CROSS_CORE_SYNC_BOTH) {
                     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(id1_);
@@ -397,7 +404,9 @@ public:
             // AIC属于消费者，AIV属于生产者，且一个AIC对应两个AIV
             if ASCEND_IS_AIC {
                 CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id0_);
-                CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id0_ + AIV0_AIV1_OFFSET);
+                if constexpr (ArchInfo::CV_RATIO == 2) {
+                    CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id0_ + AIV0_AIV1_OFFSET);
+                }
             } else {
                 CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(id1_);
             }
@@ -405,7 +414,9 @@ public:
             // AIC属于生产者，AIV属于消费者，且一个AIC对应两个AIV
             if ASCEND_IS_AIC {
                 CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id0_);
-                CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id0_ + AIV0_AIV1_OFFSET);
+                if constexpr (ArchInfo::CV_RATIO == 2) {
+                    CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(id0_ + AIV0_AIV1_OFFSET);
+                }
             } else {
                 if constexpr (isReuse) {
                     CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(id1_);
@@ -418,7 +429,9 @@ public:
             if ASCEND_IS_AIC {
                 if constexpr (syncType == SyncType::CROSS_CORE_SYNC_BOTH) {
                     CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(id1_);
-                    CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(id1_ + AIV0_AIV1_OFFSET);
+                    if constexpr (ArchInfo::CV_RATIO == 2) {
+                        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(id1_ + AIV0_AIV1_OFFSET);
+                    }
                 }
             } else {
                 CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(id0_);
@@ -446,7 +459,7 @@ private:
     TEventID c2pEventId_;
     uint32_t id0_; // 用作正向同步：生产者通知消费者，或者消费者等待生产者；
     uint32_t id1_; // 用作反向同步：消费者通知生产者，或者生产者等待消费者；
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#ifdef ATTN_MUTEX_ENABLE
     MutexID mutexId_;
 #endif
 };

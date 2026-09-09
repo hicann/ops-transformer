@@ -69,5 +69,23 @@ private:
     uint32_t offset_ = 0;
     TensorType mem_;
 };
+
+template <BufferType bufferType>
+class DualBankBufferManager {
+public:
+    BufferManager<bufferType> bank[2];
+    __aicore__ inline void Init(TPipe *pipe, uint32_t size)
+    {
+        bank[0].Init(pipe, size / 2);
+        bank[1].Init(pipe, size / 2);
+    }
+
+    template <SyncType syncType = SyncType::INNER_CORE_SYNC, uint32_t bankId = 0>
+    __aicore__ inline Buffer<bufferType, syncType> AllocBuffer(uint32_t size)
+    {
+        Buffer<bufferType, syncType> buf = bank[bankId].template AllocBuffer<syncType>(size);
+        return buf;
+    }
+};
 } // namespace fa_base_matmul
 #endif

@@ -189,24 +189,36 @@ void FlashAttnTilingImpl::UpdateTilingKeyKvLayout()
     }
 }
 
+void FlashAttnTilingImpl::UpdateTilingKeyTemplateId()
+{
+    // templateId: 0=ND模板, 1=DN模板
+    // DN模板仅支持无attenMask且config=0/2/6（sOuter=64, D=64/128, QK
+    // D=192/DV=128）场景，与kernel侧模板实例化范围保持一致
+    dnFlag_ = (!tilingKeyInfo_.hasAttenMask) &&
+              ((tilingKeyInfo_.config == 0) || (tilingKeyInfo_.config == 2) || (tilingKeyInfo_.config == 6));
+    tilingKeyInfo_.templateId = dnFlag_ ? 1 : 0;
+}
+
 void FlashAttnTilingImpl::UpdateTilingKeyInfo()
 {
     UpdateTilingKeyLayout();
     UpdateTilingKeyConfig();
     UpdateTilingKeyKvLayout();
     tilingKeyInfo_.hasAttenMask = (faInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) ? 0 : 1;
+    UpdateTilingKeyTemplateId();
 }
 
 void FlashAttnTilingImpl::GenTilingKey()
 {
     UpdateTilingKeyInfo();
     tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType,
-                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.config);
+                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
     OP_LOGI(faInfo_->opName, "The tilingkey is %llu.", tilingKey_);
     OP_LOGI(faInfo_->opName,
-            "The tilingkey param is inOutLayoutType: %llu, kvLayoutType: %llu, hasAttenMask: %llu, config: %llu.",
+            "The tilingkey param is inOutLayoutType: %llu, kvLayoutType: %llu, hasAttenMask: %llu, templateId: %llu, "
+            "config: %llu.",
             tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
-            tilingKeyInfo_.config);
+            tilingKeyInfo_.templateId, tilingKeyInfo_.config);
 }
 
 void FlashAttnTilingImpl::CalcNumBlocks(uint32_t aicNum)

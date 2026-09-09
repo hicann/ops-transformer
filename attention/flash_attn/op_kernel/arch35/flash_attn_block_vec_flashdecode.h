@@ -163,17 +163,16 @@ public:
         this->accumOutGm_ = accumOutGm;
     }
 
+    template <uint32_t UB_FD_BASE_OFFSET>
     __aicore__ inline void InitBuffers()
     {
         if ASCEND_IS_AIV {
             // 与 FA block 共享UB布局：bmm1/bmm2 区域在前，FD 业务缓冲区紧随其后。
             // 使用 LocalTensor 构造函数直接指定绝对字节偏移，实现内存完全自主管理，
             // 无需 LocalMemAllocator 线性分配器。
-            // bmm1和bmm2复用buffer
-            constexpr uint32_t mmSz = mBaseSize / 2U * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T);
-
-            // FD 业务区起始字节偏移（跳过 bmm1/bmm2/mm2In 区域）
-            constexpr uint32_t BASE = mmSz * ((dVBaseSize > 128) ? 2U : 4U);
+            // FD 业务区起始字节偏移（跳过 FA 侧 bmm1/bmm2/mm2In 区域），
+            // 以模板参数传入（取值为 FA vec block 的 GetFdBaseOffset()），避免两侧重复推导漂移
+            constexpr uint32_t BASE = UB_FD_BASE_OFFSET;
 
             // 各共享区块的绝对字节偏移（与原 LocalMemAllocator 分配顺序完全一致）
             // SharedBuffer2[0]：attenMaskBuf[0](FA) / fdLseMaxUb(FD)，8192 bytes

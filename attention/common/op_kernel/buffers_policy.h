@@ -81,6 +81,30 @@ public:
         }
     }
 
+    template <uint32_t startBankId>
+    __aicore__ inline void Init(DualBankBufferManager<bufferType> &dualBankBufferManager, uint32_t size)
+    {
+        static_assert(startBankId == 0 || startBankId == 1,
+                      "startBankId must be BANK0_START_ID(0) or BANK1_START_ID(1)!");
+        ping_ = dualBankBufferManager.template AllocBuffer<syncType, startBankId>(size);
+        pong_ = dualBankBufferManager.template AllocBuffer<syncType, (startBankId ^ 1)>(size);
+
+        ping_.Init();
+        pong_.Init();
+    }
+
+    template <uint32_t startBankId>
+    __aicore__ inline void Uninit(DualBankBufferManager<bufferType> &dualBankBufferManager)
+    {
+        static_assert(startBankId == 0 || startBankId == 1,
+                      "startBankId must be BANK0_START_ID(0) or BANK1_START_ID(1)!");
+        ping_.UnInit();
+        pong_.UnInit();
+
+        dualBankBufferManager.bank[startBankId].template FreeBuffer<syncType>(ping_);
+        dualBankBufferManager.bank[startBankId ^ 1].template FreeBuffer<syncType>(pong_);
+    }
+
     __aicore__ inline void Uninit(BufferManager<bufferType> &bufferManager)
     {
         ping_.template UnInit<idSource>();

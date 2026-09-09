@@ -30,12 +30,14 @@
 #endif
 
 #include "flash_attn_tiling_data.h"
+#include "../../../common/op_kernel/arch_info.h"
 
 using namespace AscendC;
 using namespace optiling;
 using namespace AscendC::Impl::Detail;
 
 namespace FlashAttnKernel {
+using ArchInfo::CV_RATIO;
 template <typename FA_T, typename CubeBlockType, typename VecFaBlockType, typename VecFdBlockType>
 class FlashAttentionNoQuantGqaKernelDn {
 public:
@@ -525,7 +527,7 @@ public:
         info.faTmpOutWsPos = coreFirstTmpOutWsPos_;
         info.isLastS2Loop = (s2Cur + 1 == curS2End_);
         info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
-        info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign32 >> 1);
+        info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign32 / CV_RATIO);
         info.vecMbaseIdx = 0;
         if (constInfo_.subBlockIdx == 1) {
             info.vecMbaseIdx = info.actVecMSize;
@@ -583,7 +585,7 @@ public:
             return;
         }
         GetFDSectionInfo(sectionIdx);
-        vecFdBlock_.InitBuffers();
+        vecFdBlock_.template InitBuffers<VecFaBlockType::GetFdBaseOffset()>();
         AscendC::ICachePreLoad(2);
         AscendC::SyncAll();
         vecFdBlock_.FlashDecode(fdParams_);

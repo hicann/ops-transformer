@@ -29,12 +29,14 @@
 #include "../../../common/op_kernel/init_output.h"
 #include "memory_copy_arch35.h"
 #include "../utils/attn_sink_gs1.h"
+#include "../../../common/op_kernel/arch_info.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;
 using namespace AscendC::Impl::Detail;
 
 namespace FlashAttnKernel {
+using ArchInfo::CV_RATIO;
 
 template <typename FA_T>
 class FANoQuantGqaBlockVecNd {
@@ -88,6 +90,13 @@ public:
     static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
     static constexpr uint32_t UB_MM_RES_BUF_BYTES =
         mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T);
+    // bmm1/bmm2(mmRes) 区域总字节数：FD block 以此作为 FD 业务区的 UB 起始偏移
+    static constexpr uint32_t UB_MM_RES_TOTAL_BYTES = UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES;
+    // FD 业务区在 UB 中的起始字节偏移，供 kernel 传给 FD block 的 InitBuffers
+    static __aicore__ inline constexpr uint32_t GetFdBaseOffset()
+    {
+        return UB_MM_RES_TOTAL_BYTES;
+    }
     LocalTensor<uint8_t> ubMmResBuffers_;
     uint32_t mmResBufId_ = 0;
 
@@ -104,17 +113,21 @@ public:
     uint32_t vec1ResUbBufId_ = 0;
 
     static constexpr uint32_t UB_SOFTMAX_MAX_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_MAX_BUF_BYTES = 256U;
+    static constexpr uint32_t UB_SOFTMAX_MAX_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<T> softmaxSumBuf_;
     static constexpr uint32_t UB_SOFTMAX_SUM_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_SUM_BUF_BYTES = 256U;
+    static constexpr uint32_t UB_SOFTMAX_SUM_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<T> softmaxMaxBuf_;
     static constexpr uint32_t UB_SOFTMAX_EXP_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_EXP_BUF_BYTES = 256U;
+    static constexpr uint32_t UB_SOFTMAX_EXP_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<T> softmaxExpBuf_;
 
     static constexpr uint32_t UB_LSE_OUT_BUFCNT = 2U;
-    static constexpr uint32_t UB_LSE_OUT_BUF_BYTES = 2048U;
+    static constexpr uint32_t UB_LSE_OUT_BUF_BYTES =
+        AttentionCommon::Align(mBaseSize / CV_RATIO * 8 * static_cast<uint32_t>(sizeof(T)), 256U);
     LocalTensor<uint8_t> ubLseOutBuffers_;
     uint32_t lseOutUbBufId_ = 0;
 
@@ -203,7 +216,7 @@ public:
                                                          // FD中间结果SUM和MAX拷出至GM，或者LSE结果拷出
             uint8_t softmaxTmpBuf[512U];                 // 0.5K, 常驻BUF, 用于softmax计算的中间结果缓存
         };
-        static_assert(sizeof(UbLayout) <= 248 * 1024, "UB buffer too large");
+        static_assert(sizeof(UbLayout) <= (CV_RATIO == 1 ? 376 * 1024 : 248 * 1024), "UB buffer too large");
         ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, mmResBuffers),
                                                SIZE_OF_MEMBER(UbLayout, mmResBuffers));
         ubMaskBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, maskBuffers),
@@ -314,7 +327,7 @@ public:
     __aicore__ inline void ClearOutput()
     {
         if (constInfo_.needInitOutput) {
-            uint32_t vecCoreNum = 2 * constInfo_.coreNum;
+            uint32_t vecCoreNum = CV_RATIO * constInfo_.coreNum;
             uint64_t tSize = constInfo_.bSize * constInfo_.s1Size;
             if constexpr (LAYOUT_T == FA_LAYOUT::TND) {
                 tSize = qSeqLensTool_.cuSeqLensParser.GetTSize();
@@ -480,7 +493,7 @@ public:
         Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
         LocalTensor<INPUT_T> mm2AL1Tensor = pL1Tensor;
         if (likely(runInfo.actVecMSize != 0)) {
-            static constexpr uint32_t VEC1_SRC_STRIDE = (mBaseSize >> 1) + 1;
+            static constexpr uint32_t VEC1_SRC_STRIDE = (mBaseSize / CV_RATIO) + 1;
             DataCopy(mm2AL1Tensor[constInfo_.subBlockIdx * (blockBytes / sizeof(INPUT_T)) *
                                   (runInfo.actMSize - runInfo.actVecMSize)],
                      stage1CastTensor,

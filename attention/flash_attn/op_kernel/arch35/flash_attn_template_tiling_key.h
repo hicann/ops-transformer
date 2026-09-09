@@ -57,6 +57,11 @@ ASCENDC_TPL_ARGS_DECL(FlashAttn,
                       //    1: true
                       ASCENDC_TPL_BOOL_DECL(HasAttenMask, false, true),
 
+                      // templateId (8-bit)
+                      //    0: ND模板
+                      //    1: DN模板
+                      ASCENDC_TPL_UINT_DECL(TemplateId, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 1),
+
                       // config (4-bit), support D=64/128/256 and (D=192, DV=128)
                       //    config=0: sOuter=64, sInner=128 → D=64,  DV=64
                       //    config=1: sOuter=32, sInner=256 → D=64,  DV=64
@@ -68,12 +73,22 @@ ASCENDC_TPL_ARGS_DECL(FlashAttn,
                       //    config=7: sOuter=32, sInner=256 → D=192, DV=128
                       ASCENDC_TPL_UINT_DECL(Config, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 15), );
 
-ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
-                                                          InOutLayoutType_BNSD, InOutLayoutType_TND,
-                                                          InOutLayoutType_BNSD_BSND),
-                                     ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
-                                     ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
-                                     ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7),
-                                     ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)), );
+ASCENDC_TPL_SEL(
+    // ND模板（templateId=0）：全组合
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
+                                              InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
+    // DN模板（templateId=1）：仅无attenMask且config=0/2/6（sOuter=64, D=64/128, QK D=192/DV=128）
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
+                                              InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false),
+                         ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 1),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 2, 6),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)), );
 
 #endif // TEMPLATE_TILING_KEY_FLASH_ATTN_H_

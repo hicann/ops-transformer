@@ -343,7 +343,6 @@ constexpr uint32_t DSIZE_192 = 192;
 constexpr uint32_t DSIZE_256 = 256;
 constexpr uint32_t DSIZE_512 = 512;
 constexpr uint32_t DSIZE_576 = 576;
-constexpr uint32_t CV_RATIO = 2;
 
 constexpr uint32_t DOUBLE_BUFFER_NUM = 2;
 
