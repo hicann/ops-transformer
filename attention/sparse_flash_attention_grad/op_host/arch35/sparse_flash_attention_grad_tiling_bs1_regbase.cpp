@@ -431,10 +431,12 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
     // attrs
     const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::INPUT_LAYOUT));
     auto selected_block_count = indicesShape.GetDim(dimSize - 1);
-    if (selected_block_count % 1024 != 0 || selected_block_count < 1024 || selected_block_count > 8192) {
+    if (selected_block_count != 1024 && selected_block_count != 2048 && selected_block_count != 2051 &&
+        selected_block_count != 3072 && selected_block_count != 4096 && selected_block_count != 5120 &&
+        selected_block_count != 6144 && selected_block_count != 7168 && selected_block_count != 8192) {
         OP_LOGE(context_,
-                "SparseFlashAttentionGrad only support selected_block_count [1024, 2048, 3072, 4096, 5120, 6144, 7168, "
-                "8192] now, but got selected_block_count=%ld.",
+                "SparseFlashAttentionGrad only support selected_block_count [1024, 2048, 2051, 3072, 4096, 5120, 6144, "
+                "7168, 8192] now, but got selected_block_count=%ld.",
                 selected_block_count);
         return ge::GRAPH_FAILED;
     }
