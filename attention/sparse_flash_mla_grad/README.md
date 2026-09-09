@@ -351,4 +351,9 @@
     接口方式调用算子
     </td>
   </tr>
+  <tr>
+    <td class="tg-9wq8">PyTorch API</td>
+    <td class="tg-0pky">-</td>
+    <td class="tg-lboi">通过<a href="../../attention/sparse_flash_mla_grad/docs/torchapi_sparse_flash_mla_grad.md">sparse_flash_mla_grad</a>接口调用sparse_flash_mla_grad算子。</td>
+  </tr>
 </tbody></table>

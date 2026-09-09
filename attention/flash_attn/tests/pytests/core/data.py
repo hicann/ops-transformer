@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 # ============================================================
-# 参数组构造 — 按 flash_attn.md 的 6 组参数规范化
+# 参数组构造 — 按 torchapi_flash_attn.md 的 6 组参数规范化
 # ============================================================
 
 

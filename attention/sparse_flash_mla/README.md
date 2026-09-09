@@ -317,4 +317,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn API | [test_aclnnSparseFlashMla](./examples/test_aclnn_sparse_flash_mla.cpp) | 通过[aclnnSparseFlashMla](./docs/aclnnSparseFlashMla.md)调用SparseFlashMla算子 |
-| PyTorch API | [sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla.md) | 通过`cann_ops_transformer.sparse_flash_mla`调用SparseFlashMla算子 |
+| PyTorch API | [sparse_flash_mla](../../attention/sparse_flash_mla/docs/torchapi_sparse_flash_mla.md) | 通过`cann_ops_transformer.sparse_flash_mla`调用SparseFlashMla算子 |

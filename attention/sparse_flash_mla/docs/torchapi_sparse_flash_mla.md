@@ -351,7 +351,7 @@ layout匹配关系表：
 - `cu_seqlens_q`、`cu_seqlens_ori_kv`和`cu_seqlens_cmp_kv`必须为当前Batch与前序Batch有效token数的累加值，第一个元素为0，后一个元素不得小于前一个元素。
 - `seqused_q`、`seqused_ori_kv`和`seqused_cmp_kv`表示各Batch的实际有效token数。`seqused_cmp_kv`在所有kv布局下均可选，显式传入时用于覆盖cmp侧逻辑有效长度。
 - `cmp_residual_kv[i]`必须小于`cmp_ratio`；CSA和HCA场景下，其长度必须等于Batch大小。
-- `ori_mask_mode`及`cmp_mask_mode`的详细含义请参见[sparse_mode参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。当前规格中`ori_mask_mode`支持0、3、4和`cmp_mask_mode`支持3和4，`ori_win_left`和`ori_win_right`支持-1和非负数。
+- `ori_mask_mode`及`cmp_mask_mode`的详细含义请参见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。当前规格中`ori_mask_mode`支持0、3、4和`cmp_mask_mode`支持3和4，`ori_win_left`和`ori_win_right`支持-1和非负数。
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
 | :--- | :--- | :--- | :--- | :--- |

@@ -55,3 +55,4 @@
 | --------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | aclnn接口 | [test_aclnn_indexer_quant_cache](./examples/test_aclnn_indexer_quant_cache.cpp)    | 通过[aclnnIndexerQuantCache](./docs/aclnnIndexerQuantCache.md)调用IndexerQuantCache算子。 |
 | 图模式    | -                                                                                 | 通过[算子IR](./op_graph/indexer_quant_cache_proto.h)接入GE图模式调用IndexerQuantCache算子。 |
+| PyTorch API | - | 通过[indexer_quant_cache](../../attention/indexer_quant_cache/docs/torchapi_indexer_quant_cache.md)接口调用indexer_quant_cache算子。 |

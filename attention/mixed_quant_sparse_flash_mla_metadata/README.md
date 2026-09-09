@@ -293,4 +293,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn API | [test_aclnn_mixed_quant_sparse_flash_mla_metadata](./examples/test_aclnn_mixed_quant_sparse_flash_mla_metadata.cpp) | 通过[aclnnMixedQuantSparseFlashMlaMetadata](./docs/aclnnMixedQuantSparseFlashMlaMetadata.md)接口调用MixedQuantSparseFlashMlaMetadata算子 |
-| PyTorch API | [test_torch_mixed_quant_sparse_flash_mla_metadata](./examples/test_torch_mixed_quant_sparse_flash_mla_metadata.py) | 通过[mixed_quant_sparse_flash_mla_metadata](../../torch_extension/cann_ops_transformer/docs/zh/mixed_quant_sparse_flash_mla.md)接口调用MixedQuantSparseFlashMlaMetadata算子 |
+| PyTorch API | [test_torch_mixed_quant_sparse_flash_mla_metadata](./examples/test_torch_mixed_quant_sparse_flash_mla_metadata.py) | 通过[mixed_quant_sparse_flash_mla_metadata](../../attention/mixed_quant_sparse_flash_mla/docs/torchapi_mixed_quant_sparse_flash_mla.md)接口调用MixedQuantSparseFlashMlaMetadata算子 |

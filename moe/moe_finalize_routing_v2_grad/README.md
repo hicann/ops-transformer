@@ -18,7 +18,7 @@
   R: batch * sequence
 
   H: hidden
-  
+
   K: topk
 
   gradY: (R, H)
@@ -32,7 +32,7 @@
   expertIdxOptional: (R, K)
 
   biasOptional: (E, H)
-  
+
   i : 0 ~ R * K - 1
 
   j : 0 ~ H
@@ -54,7 +54,7 @@
   $$
 
   (3) scalesOptional不为空指针， biasOptional不为空指针：
-  
+
   $$
   gradExpandedXOut[expandedRowIdx[i]][j] = gradY[i / K][j] * scalesOptional[i]
   $$
@@ -172,3 +172,4 @@
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | aclnn接口  | [test_aclnn_moe_finalize_routing_v2_grad.cpp](examples/test_aclnn_moe_finalize_routing_v2_grad.cpp) | 通过[aclnnMoeFinalizeRoutingV2Grad](docs/aclnnMoeFinalizeRoutingV2Grad.md)接口方式调用MoeFinalizeRoutingV2Grad算子。 |
+| PyTorch API | - | 通过[moe_finalize_routing_grad](../../moe/moe_finalize_routing_v2_grad/docs/torchapi_moe_finalize_routing_grad.md)接口调用moe_finalize_routing_grad算子。 |

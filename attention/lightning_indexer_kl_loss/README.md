@@ -135,4 +135,9 @@
     通过 aclnnLightningIndexerKLLoss 接口方式调用算子
     </td>
   </tr>
+  <tr>
+    <td class="tg-9wq8">PyTorch API</td>
+    <td class="tg-0pky">-</td>
+    <td class="tg-lboi">通过<a href="../../attention/lightning_indexer_kl_loss/docs/torchapi_lightning_indexer_kl_loss.md">lightning_indexer_kl_loss</a>接口调用lightning_indexer_kl_loss算子。</td>
+  </tr>
 </tbody></table>

@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-    执行双路旋转位置编码[apply_rotary_pos_emb](./apply_rotary_pos_emb.md)的反向计算，将query和key两路梯度计算融合为一次kernel调用。
+    执行双路旋转位置编码[apply_rotary_pos_emb](../../apply_rotary_pos_emb/docs/torchapi_apply_rotary_pos_emb.md)的反向计算，将query和key两路梯度计算融合为一次kernel调用。
 
 - **计算公式**：
 
@@ -138,7 +138,7 @@ cann_ops_transformer.apply_rotary_pos_emb_grad(
 
 ## 配套接口
 
-该算子为[apply_rotary_pos_emb](./apply_rotary_pos_emb.md)的反向算子。正向接口使用`rotary_mode="half"`时，对loss执行`.backward()`会自动触发本算子；仅在需要显式控制梯度时手动调用本接口。
+该算子为[apply_rotary_pos_emb](../../apply_rotary_pos_emb/docs/torchapi_apply_rotary_pos_emb.md)的反向算子。正向接口使用`rotary_mode="half"`时，对loss执行`.backward()`会自动触发本算子；仅在需要显式控制梯度时手动调用本接口。
 
 ## 调用示例
 

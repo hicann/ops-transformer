@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-    需与[low_latency_dispatch](low_latency_dispatch.md)和[low_latency_combine](low_latency_combine.md)配套使用，用于计算dispatch_v3和combine_v3算子所需的HCCL通信buffer_size大小（单位：MB）。该接口为静态方法，可在初始化`MoeDistributeBuffer`前调用。
+    需与[low_latency_dispatch](torchapi_low_latency_dispatch.md)和[low_latency_combine](torchapi_low_latency_combine.md)配套使用，用于计算dispatch_v3和combine_v3算子所需的HCCL通信buffer_size大小（单位：MB）。该接口为静态方法，可在初始化`MoeDistributeBuffer`前调用。
 
 - **计算公式**：
 

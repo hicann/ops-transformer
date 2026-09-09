@@ -123,3 +123,4 @@
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | aclnn接口  | [test_aclnn_moe_finalize_routing_v2.cpp](examples/test_aclnn_moe_finalize_routing_v2.cpp) | 通过[aclnnMoeFinalizeRoutingV2](docs/aclnnMoeFinalizeRoutingV2.md)接口调用MoeFinalizeRoutingV2算子。 |
+| PyTorch API | - | 通过[moe_finalize_routing](../../moe/moe_finalize_routing_v2/docs/torchapi_moe_finalize_routing.md)接口调用moe_finalize_routing算子。 |

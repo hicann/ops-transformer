@@ -274,4 +274,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn API | [test_aclnn_sparse_flash_mla_grad_metadata](./examples/test_aclnn_sparse_flash_mla_grad_metadata.cpp) | 通过[aclnnSparseFlashMlaGradMetadata](./docs/aclnnSparseFlashMlaGradMetadata.md)接口调用SparseFlashMlaGradMetadata算子。 |
-| PyTorch API | [test_torch_sparse_flash_mla_grad_metadata](./examples/test_torch_sparse_flash_mla_grad_metadata.py) | 通过[sparse_flash_mla_grad_metadata](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla_grad.md)接口调用SparseFlashMlaGradMetadata算子。 |
+| PyTorch API | [test_torch_sparse_flash_mla_grad_metadata](./examples/test_torch_sparse_flash_mla_grad_metadata.py) | 通过[sparse_flash_mla_grad_metadata](../../attention/sparse_flash_mla_grad/docs/torchapi_sparse_flash_mla_grad.md)接口调用SparseFlashMlaGradMetadata算子。 |

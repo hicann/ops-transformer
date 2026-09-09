@@ -218,4 +218,4 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{tokenInfoSize} + \mathrm{toke
 
 | 调用方式  | 样例代码                                  | 说明                                                     |
 | :--------: | :----------------------------------------: | :-------------------------------------------------------: |
-| PyTorch接口调用 | - | 通过[attention_to_ffn](../../torch_extension/cann_ops_transformer/docs/zh/attention_to_ffn.md)PyTorch接口方式调用attention_to_ffn_v2算子。 |
+| PyTorch接口调用 | - | 通过[attention_to_ffn](../../mc2/attention_to_ffn_v2/docs/torchapi_attention_to_ffn.md)PyTorch接口方式调用attention_to_ffn_v2算子。 |

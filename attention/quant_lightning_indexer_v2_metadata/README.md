@@ -202,4 +202,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn API | [test_aclnn_quant_lightning_indexer_v2_metadata](./examples/test_aclnn_quant_lightning_indexer_v2_metadata.cpp) | 通过[aclnnQuantLightningIndexerV2Metadata](./docs/aclnnQuantLightningIndexerV2Metadata.md)接口调用QuantLightningIndexerV2Metadata算子 |
-| PyTorch API | [test_torch_quant_lightning_indexer_v2_metadata](./examples/test_torch_quant_lightning_indexer_v2_metadata.py) | 通过[quant_lightning_indexer_metadata](../../torch_extension/cann_ops_transformer/docs/zh/quant_lightning_indexer.md)接口调用QuantLightningIndexerV2Metadata算子 |
+| PyTorch API | [test_torch_quant_lightning_indexer_v2_metadata](./examples/test_torch_quant_lightning_indexer_v2_metadata.py) | 通过[quant_lightning_indexer_metadata](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)接口调用QuantLightningIndexerV2Metadata算子 |

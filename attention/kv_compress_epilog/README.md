@@ -65,3 +65,4 @@
 | --------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
 | aclnn接口 | [test_aclnn_kv_compress_epilog](./examples/test_aclnn_kv_compress_epilog.cpp)   | 通过[aclnnKvCompressEpilog](./docs/aclnnKvCompressEpilog.md)调用KvCompressEpilog算子。 |
 | 图模式    | -                                                                              | 通过[算子IR](./op_graph/kv_compress_epilog_proto.h)接入GE图模式调用KvCompressEpilog算子。 |
+| PyTorch API | - | 通过[kv_compress_epilog](../../attention/kv_compress_epilog/docs/torchapi_kv_compress_epilog.md)接口调用kv_compress_epilog算子。 |

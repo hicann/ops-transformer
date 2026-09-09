@@ -151,4 +151,4 @@
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_block_attention_residuals](examples/test_aclnn_block_attention_residuals.cpp) | 通过[aclnnBlockAttentionResiduals](docs/aclnnBlockAttentionResiduals.md)接口方式调用BlockAttentionResiduals算子。 |
-| PyTorch API | - | 通过[cann_ops_transformer.block_attention_residuals](../../torch_extension/cann_ops_transformer/docs/zh/block_attention_residuals.md)接口方式调用BlockAttentionResiduals算子。 |
+| PyTorch API | - | 通过[cann_ops_transformer.block_attention_residuals](../../mhc/block_attention_residuals/docs/torchapi_block_attention_residuals.md)接口方式调用BlockAttentionResiduals算子。 |

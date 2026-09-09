@@ -158,3 +158,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn接口 | [aclnnRecurrentKda](./docs/aclnnRecurrentKda.md) | 通过[aclnnRecurrentKda](./docs/aclnnRecurrentKda.md)调用RecurrentKda算子 |
+| PyTorch API | - | 通过[recurrent_kda](../../attention/recurrent_kda/docs/torchapi_recurrent_kda.md)接口调用recurrent_kda算子。 |

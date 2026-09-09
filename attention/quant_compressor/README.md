@@ -294,4 +294,4 @@
 | 调用方式 | 样例代码 | 说明 |
 | ------- | ------- | ---- |
 | aclnn API | [test_aclnn_quant_compressor](./examples/arch35/test_aclnn_quant_compressor.cpp) | 通过[aclnnQuantCompressor](./docs/aclnnQuantCompressor.md)接口调用QuantCompressor算子。 |
-| PyTorch API | - | 通过[quant_compressor](../../torch_extension/cann_ops_transformer/docs/zh/quant_compressor.md)接口调用QuantCompressor算子。 |
+| PyTorch API | - | 通过[quant_compressor](../../attention/quant_compressor/docs/torchapi_quant_compressor.md)接口调用QuantCompressor算子。 |

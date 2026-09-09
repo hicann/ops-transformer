@@ -16,7 +16,7 @@
 
   FlashAttention算法将$Q_S \times KV_S$的注意力矩阵按块（tile）分块计算，避免实例化完整注意力矩阵，显存复杂度由$O(Q_S \cdot KV_S)$降至$O(tile_M \cdot tile_N)$。
 
-- **head_dim 支持规格**：QK 的 head_dim 与 V 的 head_dim 可以不同，由 q/k/v 张量各自的末维（D 维）表达（主算子无独立参数）。当前支持的 (QK D, V DV) 组合：**(64,64)、(72,72)、(128,128)、(256,256)、(192,128)**（192/128 为 MLA 非吸收形态，Q/K 走 bmm1 的 192 维、V 与输出走 128 维；72 复用 config 2/3 变体，见 §3）。metadata 算子配套参数 `head_dim_v` 的语义与契约见[torch 接口文档](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)。
+- **head_dim 支持规格**：QK 的 head_dim 与 V 的 head_dim 可以不同，由 q/k/v 张量各自的末维（D 维）表达（主算子无独立参数）。当前支持的 (QK D, V DV) 组合：**(64,64)、(72,72)、(128,128)、(256,256)、(192,128)**（192/128 为 MLA 非吸收形态，Q/K 走 bmm1 的 192 维、V 与输出走 128 维；72 复用 config 2/3 变体，见 §3）。metadata 算子配套参数 `head_dim_v` 的语义与契约见[torch 接口文档](../../attention/flash_attn/docs/torchapi_flash_attn.md)。
 
 ## Quick Start
 
@@ -104,9 +104,9 @@ python3 -c "from cann_ops_transformer.ops import flash_attn, flash_attn_metadata
 
 ### 3. 接口调用
 
-- **torch 接口**（`flash_attn_metadata` + `flash_attn` 的函数原型、参数说明、返回值说明）：[flash_attn.md](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)
+- **torch 接口**（`flash_attn_metadata` + `flash_attn` 的函数原型、参数说明、返回值说明）：[torchapi_flash_attn.md](../../attention/flash_attn/docs/torchapi_flash_attn.md)
 
-调用分两步：先用`flash_attn_metadata`生成负载均衡metadata，再调用`flash_attn`主算子。完整调用示例（含代码）见接口文档的[调用示例](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md#调用示例)章节。
+调用分两步：先用`flash_attn_metadata`生成负载均衡metadata，再调用`flash_attn`主算子。完整调用示例（含代码）见接口文档的[调用示例](../../attention/flash_attn/docs/torchapi_flash_attn.md#调用示例)章节。
 
 导入路径与安装包名一致（按步骤 2 构建的全量包）：
 
@@ -240,7 +240,7 @@ cd build && ctest -R flash_attn_tiling --output-on-failure
 | `torch_extension/graph_convert_flash_attn.py` | torchair 图模式（graph mode）下发转换 |
 | `torch_extension/csrc/` | C++ 绑定层，承载 `OpBuilder` 编译与底层调用 |
 
-对外函数原型、参数/返回值说明及调用示例见接口文档 `flash_attn.md`（不在此重复）。
+对外函数原型、参数/返回值说明及调用示例见接口文档 `torchapi_flash_attn.md`（不在此重复）。
 
 #### 2.2 AICPU 侧（flash_attn_metadata）
 
@@ -700,7 +700,7 @@ common 层位于 `attention/common/op_kernel/`，按功能分四类基础设施�
 
 ## 参考资源
 
-- 接口文档：`../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md`
+- 接口文档：`../../attention/flash_attn/docs/torchapi_flash_attn.md`
 - e2e 测试框架：`tests/pytests/readme.md`
 - SectionStreamK 算法：`../common/op_kernel/load_balance/section_stream_k/`
 - 共享 VF 公共 API：`../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h`

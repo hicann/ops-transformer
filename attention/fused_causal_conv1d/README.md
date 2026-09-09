@@ -508,3 +508,4 @@
   | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
   | aclnn接口 | [test_aclnn_fused_causal_conv1d](./examples/test_aclnn_fused_causal_conv1d.cpp) / [test_aclnn_fused_causal_conv1d_v2](./examples/test_aclnn_fused_causal_conv1d_v2.cpp)| 通过[aclnnFusedCausalConv1d](./docs/aclnnFusedCausalConv1d.md)或[aclnnFusedCausalConv1dV2](./docs/aclnnFusedCausalConv1dV2.md)调用FusedCausalConv1d算子 |
   | 图模式 | - | 通过[算子IR](./op_graph/fused_causal_conv1d_proto.h)构图方式调用FusedCausalConv1d算子 |
+  | PyTorch API | - | 通过[fused_causal_conv1d](../../attention/fused_causal_conv1d/docs/torchapi_fused_causal_conv1d.md)接口调用fused_causal_conv1d算子。 |

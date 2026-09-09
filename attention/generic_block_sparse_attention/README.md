@@ -222,3 +222,4 @@
 | 调用方式 | 样例代码 | 说明 |
 | -------- | -------- | ---- |
 | aclnn API | [test_aclnn_generic_block_sparse_attention](./examples/test_aclnn_generic_block_sparse_attention.cpp) | 通过[aclnnGenericBlockSparseAttention](./docs/aclnnGenericBlockSparseAttention.md)两段式接口调用GenericBlockSparseAttention算子 |
+| PyTorch API | - | 通过[generic_block_sparse_attention](../../attention/generic_block_sparse_attention/docs/torchapi_generic_block_sparse_attention.md)接口调用generic_block_sparse_attention算子。 |

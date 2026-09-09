@@ -45,7 +45,7 @@
 
   - `layout`为`"TND"`时输入为3维Tensor，其他`layout`下输入为4维Tensor。其中B（Batch）表示批量大小，S（Seq-Length）表示序列长度，N（Head-Num）表示多头数，D（Head-Dim）表示每个头的隐藏维度大小，T表示B和S合轴。
   - `"BSH"`与`"BSND"`共用底层布局，按`"BSND"`的维度语义处理。
-  - `rotary_mode`为`"half"`时，该接口支持自动微分，反向自动调用[apply_rotary_pos_emb_grad](./apply_rotary_pos_emb_grad.md)。
+  - `rotary_mode`为`"half"`时，该接口支持自动微分，反向自动调用[apply_rotary_pos_emb_grad](../../apply_rotary_pos_emb_grad/docs/torchapi_apply_rotary_pos_emb_grad.md)。
 
 ## 函数原型
 

@@ -254,3 +254,4 @@ $$
 | 调用方式  | 样例代码                                                                | 说明                                                                                          |
 | ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | aclnn接口 | [test_aclnn_generic_block_sparse_attention_grad](./examples/test_aclnn_generic_block_sparse_attention_grad.cpp) | 通过[aclnnGenericBlockSparseAttentionGrad](./docs/aclnnGenericBlockSparseAttentionGrad.md)接口方式调用GenericBlockSparseAttentionGrad算子。 |
+| PyTorch API | - | 通过[generic_block_sparse_attention_grad](../../attention/generic_block_sparse_attention_grad/docs/torchapi_generic_block_sparse_attention_grad.md)接口调用generic_block_sparse_attention_grad算子。 |

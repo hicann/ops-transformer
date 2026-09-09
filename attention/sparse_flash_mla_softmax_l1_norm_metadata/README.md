@@ -80,4 +80,4 @@ metadata输出为INT32 Tensor，shape固定为(64,)，字段布局如下：
 | 调用方式 | 调用样例 | 说明 |
 | -------- | -------- | ---- |
 | aclnn API | - | 通过[aclnnSparseFlashMlaSoftmaxL1NormMetadata](docs/aclnnSparseFlashMlaSoftmaxL1NormMetadata.md)接口方式调用算子，输出metadata供`SparseFlashMlaSoftmaxL1Norm`使用。 |
-| PyTorch API | - | 通过[sparse_flash_mla_softmax_l1_norm_metadata](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla_softmax_l1_norm.md)（内置在主算子接口中）调用算子。 |
+| PyTorch API | - | 通过[sparse_flash_mla_softmax_l1_norm_metadata](../../attention/sparse_flash_mla_softmax_l1_norm/docs/torchapi_sparse_flash_mla_softmax_l1_norm.md)（内置在主算子接口中）调用算子。 |

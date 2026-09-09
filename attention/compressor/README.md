@@ -273,4 +273,4 @@
   | 调用方式   | 样例代码 | 说明                                          |
   | ---------- | -------- | --------------------------------------------- |
   | aclnn API  | [test_aclnn_compressor](./examples/arch35/test_aclnn_compressor.cpp) | 通过[aclnnCompressor](./docs/aclnnCompressor.md)接口调用Compressor算子。 |
-  | PyTorch API | -        | 通过[compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)接口调用Compressor算子。 |
+  | PyTorch API | -        | 通过[compressor](../../attention/compressor/docs/torchapi_compressor.md)接口调用Compressor算子。 |

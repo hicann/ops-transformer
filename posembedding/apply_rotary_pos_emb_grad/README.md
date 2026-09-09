@@ -98,3 +98,4 @@
 | 调用方式           | 调用样例                                                                                    | 说明                                                                                                  |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_apply_rotary_pos_emb_grad](./examples/test_aclnn_apply_rotary_pos_emb_grad.cpp) | 通过[aclnnApplyRotaryPosEmbGrad](./docs/aclnnApplyRotaryPosEmbGrad.md)接口方式调用ApplyRotaryPosEmbGrad算子。             |
+| PyTorch API | - | 通过[apply_rotary_pos_emb_grad](../../posembedding/apply_rotary_pos_emb_grad/docs/torchapi_apply_rotary_pos_emb_grad.md)接口调用apply_rotary_pos_emb_grad算子。 |

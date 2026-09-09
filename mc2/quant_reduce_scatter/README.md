@@ -148,3 +148,4 @@
 | 调用方式  | 样例代码                                  | 说明                                                     |
 | :--------: | :----------------------------------------: | :-------------------------------------------------------: |
 | aclnn接口 | [test_aclnn_quant_reduce_scatter.cpp](./examples/test_aclnn_quant_reduce_scatter.cpp) | 通过[aclnnQuantReduceScatter](./docs/aclnnQuantReduceScatter.md)接口方式调用quant_reduce_scatter算子。 |
+| PyTorch API | - | 通过[quant_reduce_scatter](../../mc2/quant_reduce_scatter/docs/torchapi_quant_reduce_scatter.md)接口调用quant_reduce_scatter算子。 |

@@ -34,7 +34,7 @@ ops-transformer/
 │   │   │   └── extension.cpp                        # C++ stub
 │   │   ├── ops/
 │   │   │   └── __init__.py                          # 自动发现算子（目录扫描 + entry point）
-│   │   └── docs/                                    # 文档（保持原位）
+│   │   └── docs/                                    # 开发规范等（接口文档放在算子 docs/）
 ```
 
 新增一个算子api的标准动作清单（以`mc2/mega_moe`为例）：
@@ -44,7 +44,7 @@ ops-transformer/
 3. 在`mc2/mega_moe/torch_extension/graph_convert_mega_moe.py`中编写图模式Converter（若需支持图模式）；
 4. 在`mc2/mega_moe/torch_extension/__init__.py`中定义`__all__`并导出算子接口与Converter；
 5. 算子导入后自动被`ops/__init__.py`的自动发现机制加载，无需手动注册；
-6. 在`docs/zh/mega_moe.md`中补充算子文档。
+6. 在`<category>/<op>/docs/torchapi_${op_api}.md`中补充算子文档，并同步更新`docs/zh/menu_torch_api.md`与`docs/zh/torch_api_list.md`。
 
 >新增文件请放在对应算子的`<category>/<op>/torch_extension/`目录下，import路径统一以`cann_ops_transformer`为根。
 
@@ -83,7 +83,7 @@ ops-transformer/
   - 算子`__init__.py`：`<category>/<op>/torch_extension/__init__.py`，定义`__all__`并导出算子接口；
   - C++后端：`<category>/<op>/torch_extension/csrc/${op_api}.cpp`，主名与Python前端一致；
   - 图模式：`<category>/<op>/torch_extension/graph_convert_${op_api}.py`，统一加`graph_convert_`前缀；
-  - 文档：`docs/zh/${op_api}.md`。
+  - 文档：`<category>/<op>/docs/torchapi_${op_api}.md`（与 aclnn 文档同目录，文件名加`torchapi_`前缀，主名与对外 api 一致）。
 - 公共头文件放在`torch_extension/cann_ops_transformer/common/`下，按能力域命名（如`aclnn_common.h`、`hccl_common.h`）。
 
 ### 2.3 标识符命名
@@ -207,7 +207,7 @@ ops-transformer/
     ```
 3. **PrivateUse1 dispatcher**：用`@impl(get_as_library(), builder.name, "PrivateUse1")`注册NPU后端实现，函数体透传到编译产物`builder.load().<算子名>(...)`。`PrivateUse1`是PyTorch为自定义NPU后端预留的dispatch key。
 4. **对外接口**：提供面向用户的函数`flash_attn(...)`，负责参数整理、默认值处理等，最终调用dispatcher实现。
-5. **对外api必须书写注释（docstring）**：每个对外导出的接口都要有docstring，至少覆盖「功能说明、各参数含义/shape/dtype/取值范围、返回值说明」，必要时给出简短调用示例。docstring内容应与`docs/zh/${op_api}.md`保持一致，便于IDE提示与`help()`查看。例如：
+5. **对外api必须书写注释（docstring）**：每个对外导出的接口都要有docstring，至少覆盖「功能说明、各参数含义/shape/dtype/取值范围、返回值说明」，必要时给出简短调用示例。docstring内容应与`<category>/<op>/docs/torchapi_${op_api}.md`保持一致，便于IDE提示与`help()`查看。例如：
    ```python
    def flash_attn(
        query: torch.Tensor,
@@ -260,9 +260,9 @@ ops-transformer/
 2. **`ops/__init__.py`（子包层）**：已改造为自动发现模式（目录扫描 + entry point），无需手动添加import。新增算子只要按规范放置文件并定义`__init__.py`的`__all__`，就会被自动加载。
 3. **`cann_ops_transformer/__init__.py`（包根层）**：通过`from . import ops`触发注册，并通过`__getattr__`和`__dir__`动态导出算子接口，使用户可直接通过`cann_ops_transformer.<接口名>`访问。
 
-## 4. 文档规范（`docs/zh/${op_api}.md`）
+## 4. 文档规范（`<category>/<op>/docs/torchapi_${op_api}.md`）
 
-每个对外算子api需配套一份中文文档，建议章节顺序与已有算子文档（如`flash_attn.md`）对齐：
+每个对外算子api需配套一份中文文档，放在对应算子的`docs/`目录下（与`aclnn${OpName}.md`并列，文件名形如`torchapi_${op_api}.md`），建议章节顺序与已有算子文档（如`attention/flash_attn/docs/torchapi_flash_attn.md`）对齐：
 
 1. **标题**：算子名（特殊字符如`_`需转义为`\_`）。
 2. **产品支持情况**：表格列出支持的产品形态（如`Ascend 950PR/Ascend 950DT`）及是否支持。

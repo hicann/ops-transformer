@@ -160,4 +160,4 @@ $$cclBufferSize \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoSize}
 
 | 调用方式  | 样例代码                                  | 说明                                                     |
 | :--------: | :----------------------------------------: | :-------------------------------------------------------: |
-| PyTorch接口调用 | - | 通过[ffn_to_attention](../../torch_extension/cann_ops_transformer/docs/zh/ffn_to_attention.md)PyTorch接口方式调用ffn_to_attention算子。 |
+| PyTorch接口调用 | - | 通过[ffn_to_attention](../../mc2/ffn_to_attention_v2/docs/torchapi_ffn_to_attention.md)PyTorch接口方式调用ffn_to_attention算子。 |

@@ -115,9 +115,9 @@ python3 -c "from cann_ops_transformer.ops import flash_attn_grad; print('ok')"
 
 ### 3. 接口调用
 
-- **torch 接口**（`flash_attn_grad` 的函数原型、参数说明、返回值说明）：[flash_attn_grad.md](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn_grad.md)
+- **torch 接口**（`flash_attn_grad` 的函数原型、参数说明、返回值说明）：[torchapi_flash_attn_grad.md](../../attention/flash_attn_grad/docs/torchapi_flash_attn_grad.md)
 
-调用分两步：先用 `flash_attn_metadata` 生成反向分核 metadata（必须设置 `is_grad_enabled=True`，并保证与主算子的 shape、layout、mask 和序列长度参数一致），再调用 `flash_attn_grad` 主算子。完整调用示例（含代码）见接口文档的[调用示例](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn_grad.md#调用示例)章节。
+调用分两步：先用 `flash_attn_metadata` 生成反向分核 metadata（必须设置 `is_grad_enabled=True`，并保证与主算子的 shape、layout、mask 和序列长度参数一致），再调用 `flash_attn_grad` 主算子。完整调用示例（含代码）见接口文档的[调用示例](../../attention/flash_attn_grad/docs/torchapi_flash_attn_grad.md#调用示例)章节。
 
 导入路径与安装包名一致（按步骤 2 构建的全量包）：
 
