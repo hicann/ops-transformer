@@ -565,7 +565,8 @@ aclnnStatus NormalizeDim0CacheTensorList(const aclTensorList *&tensorList, const
         const aclTensor *normalizedTensor = nullptr;
         std::string itemName = std::string(name) + "[" + std::to_string(i) + "]";
         if (IsContiguous(tensor)) {
-            auto contiguousTensor = l0op::Contiguous(tensor, executor);
+            // Keep the original storage extent when a stride view will validate the offset.
+            auto contiguousTensor = completeStrideMetadata ? tensor : l0op::Contiguous(tensor, executor);
             if (contiguousTensor == nullptr) {
                 OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Try normalize contiguous %s failed.", itemName.c_str());
                 return ACLNN_ERR_INNER_NULLPTR;
@@ -609,10 +610,8 @@ aclnnStatus NormalizeDim0CacheTensor(const aclTensor *&tensor, const char *name,
 
     const aclTensor *normalizedTensor = nullptr;
     if (IsContiguous(tensor)) {
-        auto contiguousTensor = l0op::Contiguous(tensor, executor);
-        if (contiguousTensor != nullptr) {
-            normalizedTensor = CreateStrideAwareView(contiguousTensor, name, executor);
-        }
+        // Validate the offset against the original storage extent of a sliced cache.
+        normalizedTensor = CreateStrideAwareView(tensor, name, executor);
     } else if (IsFirstAxisOnlyNonContiguous(tensor, name)) {
         normalizedTensor = CreateStrideAwareView(tensor, name, executor);
     } else {
