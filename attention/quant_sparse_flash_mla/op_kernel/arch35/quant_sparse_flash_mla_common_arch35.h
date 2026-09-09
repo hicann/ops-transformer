@@ -17,46 +17,17 @@
 #include <type_traits>
 #include "kernel_tiling/kernel_tiling.h"
 #include "../quant_sparse_flash_mla_common.h"
-
-constexpr uint64_t BLOCK_BYTE = 32;
-constexpr uint32_t NEGATIVE_MIN_VAULE_FP32 = 0xFF7FFFFF;
-
-constexpr uint32_t L0AB_SHARED_SIZE_64K = 65536;  // 65536表示64*1024
-constexpr uint32_t L0C_SHARED_SIZE_256K = 262144; // 262144表示256 * 1024
-
-constexpr uint32_t BUFFER_SIZE_16K = 16384;   // 16384表示16 * 1024
-constexpr uint32_t BUFFER_SIZE_32K = 32768;   // 32768表示32 * 1024
-constexpr uint32_t BUFFER_SIZE_64K = 65536;   // 65536表示64 * 1024
-constexpr uint32_t BUFFER_SIZE_96K = 98304;   // 98304表示96 * 1024
-constexpr uint32_t BUFFER_SIZE_256K = 262144; // 262144表示256 * 1024
-
-constexpr uint32_t CV_RATIO = 2;
-constexpr uint64_t SYNC_MODE = 4;
+#include "../../../sparse_flash_mla/op_kernel/arch35/common/smla_common_defs.h"
 
 namespace BaseApi {
-__aicore__ constexpr uint64_t Align2Func(uint64_t data)
-{
-    return (data + 1UL) >> 1UL << 1UL; // 向上2对齐, +1移位2
-}
-
-__aicore__ constexpr uint64_t Align8Func(uint64_t data)
-{
-    return (data + 7UL) >> 3UL << 3UL; // 向上8对齐, +7移位3
-}
-
-__aicore__ constexpr uint64_t Align16Func(uint64_t data)
-{
-    return (data + 15UL) >> 4UL << 4UL; // 向上16对齐, +15移位4
-}
+using AttentionCommon::Align2Func;
+using AttentionCommon::Align8Func;
+using AttentionCommon::Align16Func;
+using AttentionCommon::Align64Func;
 
 __aicore__ constexpr uint64_t Align32Func(uint64_t data)
 {
     return (data + 31UL) >> 5UL << 5UL; // 向上16对齐, +15移位4
-}
-
-__aicore__ constexpr uint64_t Align64Func(uint64_t data)
-{
-    return (data + 63UL) >> 6UL << 6UL; // 向上64对齐, +63移位6
 }
 } // namespace BaseApi
 

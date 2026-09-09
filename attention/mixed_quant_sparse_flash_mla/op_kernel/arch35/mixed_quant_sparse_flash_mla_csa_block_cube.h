@@ -14,35 +14,16 @@
  */
 #ifndef MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_CUBE_H
 #define MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_CUBE_H
-#if __has_include("../../common/op_kernel/offset_calculator.h")
-#include "../../common/op_kernel/offset_calculator.h"
-#else
-#include "../common/offset_calculator.h"
-#endif
-#if __has_include("../../common/op_kernel/matmul.h")
-#include "../../common/op_kernel/matmul.h"
-#else
-#include "../common/matmul.h"
-#endif
-#if __has_include("../../common/op_kernel/FixpipeOut.h")
-#include "../../common/op_kernel/FixpipeOut.h"
-#else
-#include "../common/FixpipeOut.h"
-#endif
-#if __has_include("../../common/op_kernel/CopyInL1.h")
-#include "../../common/op_kernel/CopyInL1.h"
-#else
-#include "../common/CopyInL1.h"
-#endif
 
+#include "../../common/op_kernel/offset_calculator.h"
+#include "../../common/op_kernel/matmul.h"
+#include "../../common/op_kernel/FixpipeOut.h"
+#include "../../common/op_kernel/CopyInL1.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "util_regbase.h"
 #include "mixed_quant_sparse_flash_mla_common_arch35.h"
-#if __has_include("../../../sparse_flash_mla/op_kernel/arch35/common/static_matmul.h")
 #include "../../../sparse_flash_mla/op_kernel/arch35/common/static_matmul.h"
-#else
-#include "../../sparse_flash_mla/arch35/common/static_matmul.h"
-#endif
+#include "../../../sparse_flash_mla/op_kernel/arch35/common/cube_local_buffer.h"
 
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;
@@ -123,53 +104,8 @@ private:
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitLocalBuffer(uint32_t l1BaseAddr)
 {
-    if ASCEND_IS_AIC {
-        uint32_t l1Addr = l1BaseAddr;
-
-        l1QBufs[0] = {LocalTensor<Q_T>(TPosition::A1, l1Addr, L1Q_ELEM_PER_BUF), 0};
-        l1Addr += L1Q_ELEM_PER_BUF * sizeof(Q_T);
-        l1QBufs[1] = {LocalTensor<Q_T>(TPosition::A1, l1Addr, L1Q_ELEM_PER_BUF), 1};
-        l1Addr += L1Q_ELEM_PER_BUF * sizeof(Q_T);
-        l1QBufs[2] = {LocalTensor<Q_T>(TPosition::A1, l1Addr, L1Q_ELEM_PER_BUF), 2};
-        l1Addr += L1Q_ELEM_PER_BUF * sizeof(Q_T);
-
-        l1RightBufs[0] = {LocalTensor<Q_T>(TPosition::B1, l1Addr, L1_RIGHT_ELEM_PER_BLOCK), 0};
-        l1Addr += L1_RIGHT_ELEM_PER_BLOCK * sizeof(Q_T);
-        l1RightBufs[1] = {LocalTensor<Q_T>(TPosition::B1, l1Addr, L1_RIGHT_ELEM_PER_BLOCK), 1};
-        l1Addr += L1_RIGHT_ELEM_PER_BLOCK * sizeof(Q_T);
-        l1RightBufs[2] = {LocalTensor<Q_T>(TPosition::B1, l1Addr, L1_RIGHT_ELEM_PER_BLOCK), 2};
-        l1Addr += L1_RIGHT_ELEM_PER_BLOCK * sizeof(Q_T);
-
-        uint32_t l0aAddr = 0;
-        l0ABufs[0] = {LocalTensor<Q_T>(TPosition::A2, l0aAddr, L0A_ELEM_PER_BUF), 0};
-        l0aAddr += L0A_ELEM_PER_BUF * sizeof(Q_T);
-        l0ABufs[1] = {LocalTensor<Q_T>(TPosition::A2, l0aAddr, L0A_ELEM_PER_BUF), 1};
-
-        uint32_t l0bAddr = 0;
-        l0BBufs[0] = {LocalTensor<Q_T>(TPosition::B2, l0bAddr, L0B_ELEM_PER_BUF), 0};
-        l0bAddr += L0B_ELEM_PER_BUF * sizeof(Q_T);
-        l0BBufs[1] = {LocalTensor<Q_T>(TPosition::B2, l0bAddr, L0B_ELEM_PER_BUF), 1};
-
-        uint32_t l0cAddr = 0;
-        l0CBufs[0] = {LocalTensor<T>(TPosition::CO1, l0cAddr, L0C_ELEM_PER_BUF), 0};
-        l0cAddr += L0C_ELEM_PER_BUF * sizeof(T);
-        l0CBufs[1] = {LocalTensor<T>(TPosition::CO1, l0cAddr, L0C_ELEM_PER_BUF), 1};
-
-        l0A = RingBuffer<Q_T>(l0ABufs, 2);
-        l0B = RingBuffer<Q_T>(l0BBufs, 2);
-        l0C = RingBuffer<T>(l0CBufs, 2);
-
-        SetFlag<HardEvent::FIX_M>(INNERCORE_L0C(0));
-        SetFlag<HardEvent::FIX_M>(INNERCORE_L0C(1));
-        SetFlag<HardEvent::M_MTE1>(INNERCORE_L0AB(0));
-        SetFlag<HardEvent::M_MTE1>(INNERCORE_L0AB(1));
-        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(0));
-        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(1));
-        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(2));
-        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(0));
-        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(1));
-        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(2));
-    }
+    AttentionCommon::InitCubeLocalBuffer<Q_T, T>(l1QBufs, l1RightBufs, l0ABufs, l0A, l0BBufs, l0B, l0CBufs, l0C,
+                                                 l1BaseAddr);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
