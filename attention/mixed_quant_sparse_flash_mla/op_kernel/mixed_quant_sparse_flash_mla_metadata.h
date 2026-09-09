@@ -17,55 +17,12 @@
 #define MIXED_QUANT_SPARSE_FLASH_MLA_METADATA_H
 
 #include <cstdint>
+#include "../../sparse_flash_mla/op_kernel/arch35/common/smla_metadata_common.h"
 
 namespace optiling {
 
-// Constants
-constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-constexpr uint32_t AIV_CORE_MAX_NUM = 72;
 constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 1024;
 using MQSMLA_METADATA_T = int32_t;
-
-constexpr uint32_t FA_METADATA_SIZE = 9;
-constexpr uint32_t FD_METADATA_SIZE = 8;
-
-// FA Metadata Index Definitions
-constexpr uint32_t FA_CORE_ENABLE_INDEX = 0;
-constexpr uint32_t FA_BN2_START_INDEX = 1;
-constexpr uint32_t FA_M_START_INDEX = 2;
-constexpr uint32_t FA_S2_START_INDEX = 3;
-constexpr uint32_t FA_BN2_END_INDEX = 4;
-constexpr uint32_t FA_M_END_INDEX = 5;
-constexpr uint32_t FA_S2_END_INDEX = 6;
-constexpr uint32_t FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX = 7;
-constexpr uint32_t FA_S2_MAX_NUM = 8;
-
-// FD Metadata Index Definitions
-constexpr uint32_t FD_CORE_ENABLE_INDEX = 0;
-constexpr uint32_t FD_BN2_IDX_INDEX = 1;
-constexpr uint32_t FD_M_IDX_INDEX = 2; // 当前AIV核上的规约任务的s1gIdx
-constexpr uint32_t FD_WORKSPACE_IDX_INDEX = 3;
-constexpr uint32_t FD_WORKSPACE_NUM_INDEX = 4;
-constexpr uint32_t FD_M_START_INDEX = 5;
-constexpr uint32_t FD_M_NUM_INDEX = 6;
-
-/**
- * @brief 获取属性的绝对索引
- * @param coreIdx 核索引
- * @param metaIdx 元数据索引
- * @param isAIV 是否为AIV数据，默认为false
- * @return 返回属性的绝对索引
- */
-#ifdef __CCE_AICORE__
-__aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, bool isAIV = false)
-{
-    if (isAIV) {
-        return FA_METADATA_SIZE * AIC_CORE_MAX_NUM + FD_METADATA_SIZE * coreIdx + metaIdx;
-    } else {
-        return FA_METADATA_SIZE * coreIdx + metaIdx;
-    }
-}
-#endif
 
 namespace detail {
 struct MqsmlaMetadata {
