@@ -150,6 +150,12 @@ def _convert_cases(cases):
                 "has_g": [has_g],
                 "is_contiguous": [is_contiguous],
                 "pt_path": [""],
+                "query_datarange": [[0, 1]],
+                "key_datarange": [[0, 1]],
+                "value_datarange": [[0, 1]],
+                "gamma_datarange": [[-1, 0]],
+                "beta_datarange": [[0, 1]],
+                "state_datarange": [[0, 1]],
             }
         )
     return result

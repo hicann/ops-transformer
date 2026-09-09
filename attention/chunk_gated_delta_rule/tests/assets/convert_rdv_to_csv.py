@@ -30,7 +30,40 @@ import sys
 from pathlib import Path
 
 
+class _MockDtype:
+    """Mock dtype: str(torch.bfloat16) -> 'torch.bfloat16'"""
+
+    def __init__(self, name):
+        self._name = name
+
+    def __repr__(self):
+        return f"torch.{self._name}"
+
+    def __str__(self):
+        return f"torch.{self._name}"
+
+    def __hash__(self):
+        return hash(self._name)
+
+    def __eq__(self, other):
+        return isinstance(other, _MockDtype) and self._name == other._name
+
+
+def _install_mock_torch():
+    """Inject a minimal mock torch module so paramset_rdv.py can be loaded
+    without torch/CANN installed (only dtype constants are needed)."""
+    if "torch" in sys.modules:
+        return
+    import types
+
+    mock = types.ModuleType("torch")
+    for dt in ("bfloat16", "float16", "float32", "int32", "int64"):
+        setattr(mock, dt, _MockDtype(dt))
+    sys.modules["torch"] = mock
+
+
 def _load_rdv_module(rdv_path):
+    _install_mock_torch()
     spec = importlib.util.spec_from_file_location("rdv_cases", rdv_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules["rdv_cases"] = module

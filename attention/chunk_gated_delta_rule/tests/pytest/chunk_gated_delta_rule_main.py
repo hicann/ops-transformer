@@ -21,12 +21,14 @@ import torch.nn.functional as F
 import numpy as np
 import logging
 import os
+import gc
 
 _USE_GRAPH = os.environ.get("USE_GRAPH", "false").lower() in ("true", "1", "yes")
 _ENABLE_PROF = os.environ.get("ENABLE_PROF", "false").lower() in ("true", "1", "yes")
 _SAVE_PT = os.environ.get("SAVE_PT", "false").lower() in ("true", "1", "yes")
 _LOAD_PT = os.environ.get("LOAD_PT", "false").lower() in ("true", "1", "yes")
 _LOAD_PT_FILE = os.environ.get("LOAD_PT_FILE", "")
+SKIP_GOLDEN = os.environ.get("SKIP_GOLDEN", "0") == "1"
 
 if _USE_GRAPH:
     import torchair
@@ -279,6 +281,12 @@ def cgdr_npu(q, k, v, g, beta, scale, initial_state, actual_seq_lengths):
     return o_npu, state_npu
 
 
+def rand_range(shape, data_range=[-10, 10], dtype=torch.bfloat16, device=None):
+    return data_range[0] + (data_range[1] - data_range[0]) * torch.rand(
+        shape, dtype=dtype, device=device
+    )
+
+
 def _pt_filename(
     B,
     seqlen,
@@ -434,6 +442,12 @@ def run_chunk_gated_delta_rule_eager(
     has_g=True,
     is_contiguous=True,
     pt_path="",
+    query_datarange=[0, 1],
+    key_datarange=[0, 1],
+    value_datarange=[0, 1],
+    gamma_datarange=[-1, 0],
+    beta_datarange=[0, 1],
+    state_datarange=[0, 1],
 ):
     torch_npu.npu.set_device(int(DEVICE_ID))
     # ======================== gen input data start =============================
@@ -470,22 +484,35 @@ def run_chunk_gated_delta_rule_eager(
         else:
             seqlen_list = [seqlen] * B
             T = B * seqlen
-        q = torch.rand((T, nk, dk), dtype=data_type, device="npu:%s" % DEVICE_ID)
-        k = torch.rand((T, nk, dk), dtype=data_type, device="npu:%s" % DEVICE_ID)
-        v = torch.rand((T, nv, dv), dtype=data_type, device="npu:%s" % DEVICE_ID)
+        q = rand_range(
+            (T, nk, dk), query_datarange, data_type, device="npu:%s" % DEVICE_ID
+        )
+        k = rand_range(
+            (T, nk, dk), key_datarange, data_type, device="npu:%s" % DEVICE_ID
+        )
+        v = rand_range(
+            (T, nv, dv), value_datarange, data_type, device="npu:%s" % DEVICE_ID
+        )
         if has_g:
-            g = (
-                torch.rand((T, nv), dtype=torch.float32, device="npu:%s" % DEVICE_ID)
-                * -1.0
+            g = rand_range(
+                (T, nv),
+                gamma_datarange,
+                dtype=torch.float32,
+                device="npu:%s" % DEVICE_ID,
             )
         else:
             g = None
-        beta = torch.rand((T, nv), dtype=data_type, device="npu:%s" % DEVICE_ID)
+        beta = rand_range(
+            (T, nv), beta_datarange, data_type, device="npu:%s" % DEVICE_ID
+        )
         q = torch.nn.functional.normalize(q, p=2, dim=-1)
         k = torch.nn.functional.normalize(k, p=2, dim=-1)
         scale = 1 / (dk**0.5)
-        initial_state = torch.rand(
-            (B, nv, dv, dk), dtype=state_data_type, device="npu:%s" % DEVICE_ID
+        initial_state = rand_range(
+            (B, nv, dv, dk),
+            state_datarange,
+            state_data_type,
+            device="npu:%s" % DEVICE_ID,
         )
         if not is_contiguous:
             state_pad = torch.zeros(
@@ -530,6 +557,18 @@ def run_chunk_gated_delta_rule_eager(
             cgdr_npu(q, k, v, g, beta, scale, initial_state, actual_seq_lengths)
         torch.npu.synchronize()
         logger.info("PASSED (prof)")
+        return True
+
+    if SKIP_GOLDEN:
+        o_npu, state_npu = cgdr_npu(
+            q, k, v, g, beta, scale, initial_state, actual_seq_lengths
+        )
+        del o_npu, state_npu
+        gc.collect()
+        torch.npu.empty_cache()
+        logger.info(
+            "SKIP_GOLDEN=1, skip golden/benchmark/precision check, npu execute finished"
+        )
         return True
 
     # ======================== execute golden/benchmark/npu ================================

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 from chunk_gated_delta_rule_main import run_chunk_gated_delta_rule_eager
 
 
-def run_precision_test(params, pt_path=""):
+def run_precision_test(params, pt_path="", **kwargs):
     # 解包参数
     (
         B,
@@ -45,5 +45,6 @@ def run_precision_test(params, pt_path=""):
         has_g=has_g,
         is_contiguous=is_contiguous,
         pt_path=pt_path,
+        **kwargs,
     )
     assert ret, "precision check failed"
