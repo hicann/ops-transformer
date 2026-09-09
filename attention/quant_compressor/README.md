@@ -3,7 +3,7 @@
 ## 产品支持情况
 
 | 产品                                                         | 是否支持 |
-| :----------------------------------------- | ------|
+| :----------------------------------------------------------- | :------: |
 | <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    ×     |
 | <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
@@ -116,37 +116,37 @@
     </tr>
     <tr>
       <td>state_cache</td>
-      <td>输入</td>
+      <td>输入/输出</td>
       <td>公式中的<span class="math-inline">[kv_state, score_state]</span>，表示kv_state和score_state的历史数据。</td>
-      <td>FLOAT32</td>
+      <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>ape</td>
       <td>输入</td>
       <td>公式中的<span class="math-inline">Ape</span>，表示positional biases。</td>
-      <td>FLOAT32</td>
+      <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>x_descale</td>
       <td>可选输入</td>
       <td>x的反量化缩放因子，per-tensor缩放。quant_mode=1时必选。</td>
-      <td>FLOAT32</td>
+      <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>wkv_descale</td>
       <td>可选输入</td>
-      <td>wkv的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。</td>
-      <td>FLOAT32</td>
+      <td>wkv的反量化缩放因子，per-channel缩放，通道数为coff*D。quant_mode=1时必选。</td>
+      <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>wgate_descale</td>
       <td>可选输入</td>
-      <td>wgate的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。</td>
-      <td>FLOAT32</td>
+      <td>wgate的反量化缩放因子，per-channel缩放，通道数为coff*D。quant_mode=1时必选。</td>
+      <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -226,16 +226,9 @@
 
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
-    - wkv支持输入shape[coff* D,H]
-    - wgate支持输入shape[coff* D,H]
-    - state\_cache支持输入shape[block_num,block_size,2*coff* D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
-    - ape支持输入shape[cmp_ratio,coff* D]
-    - x\_descale支持输入shape[1,]，per-tensor缩放。
-    - wkv\_descale支持输入shape[coff* D,]，per-channel缩放。
-    - wgate\_descale支持输入shape[coff* D,]，per-channel缩放。
-    - start\_pos支持输入shape[B,]
+    - state\_cache支持输入shape[block_num,block_size,2\*coff\*D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]
-        - cu\_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须位0。
+        - cu\_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
         - cache_mode=1时，state\_block\_table支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+max(cu\_seqlens[n+1] - cu\_seqlens[n])。cache_mode=2时，state\_block\_table支持输入shape[B]。
         - cmp\_kv，输出shape为[min(T,T//cmp_ratio+B),D]：compressed_tokens + compressed_tokens + ... + compressed_tokens + pad。
@@ -246,10 +239,10 @@
         - cmp\_kv，输出shape为[B,ceil(S/cmp_ratio),D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ...  + (compressed_tokens+padN)。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
-      - 只支持B、S为0
       - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
       <div style="overflow-x: auto;">
       <table style="undefined;table-layout: fixed; width: 400px"><colgroup>
+      <col style="width: 100px">
       <col style="width: 100px">
       <col style="width: 100px">
       </colgroup><thead>
@@ -294,11 +287,11 @@
       - C128A: D=512, coff=1, cmp_ratio=128。
 - 确定性计算与batch一致性：
   - 默认确定性实现，相同输入多次调用结果一致。
-  - <term>Ascend 950PR/Ascend 950DT</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
+  - 通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
 
 ## 调用说明
 
-  | 调用方式 | 样例代码 | 说明 |
-  | ------- | ------- | ---- |
-  | aclnn API | [test_aclnn_quant_compressor](./examples/arch35/test_aclnn_quant_compressor.cpp) | 通过[aclnnQuantCompressor](./docs/aclnnQuantCompressor.md)接口调用QuantCompressor算子。 |
-  | PyTorch API | - | 通过[quant_compressor](../../torch_extension/cann_ops_transformer/docs/zh/quant_compressor.md)接口调用QuantCompressor算子。 |
+| 调用方式 | 样例代码 | 说明 |
+| ------- | ------- | ---- |
+| aclnn API | [test_aclnn_quant_compressor](./examples/arch35/test_aclnn_quant_compressor.cpp) | 通过[aclnnQuantCompressor](./docs/aclnnQuantCompressor.md)接口调用QuantCompressor算子。 |
+| PyTorch API | - | 通过[quant_compressor](../../torch_extension/cann_ops_transformer/docs/zh/quant_compressor.md)接口调用QuantCompressor算子。 |

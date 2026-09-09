@@ -145,7 +145,7 @@ aclnnStatus aclnnCompressor(
   </thead>
   <tbody>
     <tr>
-      <td>x（aclTensor*）</td>
+      <td>x（const aclTensor*）</td>
       <td>输入</td>
       <td>公式中的<span class="math-inline">X</span>，表示原始不经压缩的数据。</td>
       <td><ul><li>支持B=0、S=0、T=0的空Tensor。</li><li>B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、T表示所有Batch输入样本序列长度的累加和。</li></ul></td>
@@ -155,7 +155,7 @@ aclnnStatus aclnnCompressor(
       <td>×</td>
     </tr>
     <tr>
-      <td>wkv（aclTensor*）</td>
+      <td>wkv（const aclTensor*）</td>
       <td>输入</td>
       <td>公式中的<span class="math-inline">W<sup>KV</sup></span>，表示kv压缩权重。</td>
       <td>不支持空Tensor。</td>
@@ -165,7 +165,7 @@ aclnnStatus aclnnCompressor(
       <td>×</td>
     </tr>
     <tr>
-      <td>wgate（aclTensor*）</td>
+      <td>wgate（const aclTensor*）</td>
       <td>输入</td>
       <td>公式中的<span class="math-inline">W<sup>Gate</sup></span>，表示gate压缩权重。</td>
       <td>不支持空Tensor。</td>
@@ -176,8 +176,8 @@ aclnnStatus aclnnCompressor(
     </tr>
     <tr>
       <td>stateCacheRef（aclTensor*）</td>
-      <td>输入</td>
-      <td>公式中的<span class="math-inline">[kv_state, score_state]</span>，表示kv_state和score_state的历史数据。</td>
+      <td>输入/输出</td>
+      <td>公式中的<span class="math-inline">[kv_state, score_state]</span>，表示kv_state和score_state的历史数据。计算后 kv_state 和 score_state 会原位更新到此 Tensor</td>
       <td>不支持空Tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>
@@ -185,7 +185,7 @@ aclnnStatus aclnnCompressor(
       <td>支持0轴非连续</td>
     </tr>
     <tr>
-      <td>ape（aclTensor*）</td>
+      <td>ape（const aclTensor*）</td>
       <td>输入</td>
       <td>公式中的<span class="math-inline">Ape</span>，表示positional biases。</td>
       <td>不支持空Tensor。</td>
@@ -195,17 +195,17 @@ aclnnStatus aclnnCompressor(
       <td>×</td>
     </tr>
     <tr>
-      <td>stateBlockTableOptional（aclTensor*）</td>
+      <td>stateBlockTableOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>表示state_cache存储使用的block映射表。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作。</td>
-      <td><ul><li>支持S=0、T=0的空Tensor。</li><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(start_pos)+S；当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。</li><li>cacheMode=2时，shape为[B]。</li></ul></td>
+      <td><ul><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(start_pos)+S；当x的shape为[T,H]时，Smax=max(start_pos)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。</li><li>cacheMode=2时，shape为[B]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>cacheMode=1时：[B, ceil(Smax/block_size)]<br>cacheMode=2时：[B]</td>
       <td>×</td>
     </tr>
     <tr>
-      <td>cuSeqlensOptional（aclTensor*）</td>
+      <td>cuSeqlensOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>表示不同Batch中的有效token数。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。</td>
       <td><ul><li>支持B=0、S=0、T=0的空Tensor。</li><li>当x的shape为[B,S,H]时，该参数必须传入空指针。</li></ul></td>
@@ -215,17 +215,17 @@ aclnnStatus aclnnCompressor(
       <td>×</td>
     </tr>
     <tr>
-      <td>sequsedOptional（aclTensor*）</td>
+      <td>sequsedOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>表示不同Batch中实际参与压缩的token数。传入空指针时，表示与每个Batch上的Sequence Length长度相同。</td>
-      <td><ul><li>支持B=0的空Tensor。</li><li>当x的shape为[B,S,H]时，要求0 ≤ seqused[n] ≤ S。</li><li>当x的shape为[T,H]时，要求0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。</li></ul></td>
+      <td><ul><li>支持B=0的空Tensor。</li><li>当x的shape为[B,S,H]时，要求0 ≤ sequsedOptional[n] ≤ S。</li><li>当x的shape为[T,H]时，要求0 ≤ sequsedOptional[n] ≤ cuSeqlensOptional[n+1] - cuSeqlensOptional[n]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>[B,]</td>
       <td>×</td>
     </tr>
     <tr>
-      <td>startPosOptional（aclTensor*）</td>
+      <td>startPosOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>表示计算起始位置。</td>
       <td><ul><li>支持B=0、T=0的空Tensor。</li><li>传入空指针时，表示从0开始进行计算。</li></ul></td>
@@ -339,12 +339,11 @@ aclnnStatus aclnnCompressor(
 
   - D（Head Dim）表示hidden层的最小单元大小，D取值由wkv的第一维大小除以coff得到。
 
-<!-- npu="A3,910b" id7 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：
-  - cacheMode不支持输入2，且stateCacheRef不支持0轴非连续。
-  - cmpRatio仅支持2/4/8/16/32/64/128。
-  - gradEnabled不支持为true。
-<!-- end id7 -->
+  <!-- npu="A3,910b" id7 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：
+    - cmpRatio仅支持2/4/8/16/32/64/128。
+    - gradEnabled不支持为true。
+  <!-- end id7 -->
 
 - **返回值**
 
@@ -450,20 +449,19 @@ aclnnStatus aclnnCompressor(
   <!-- end id8 -->
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
-  - stateCacheRef支持输入shape为[block_num, block_size, 2* coff* D]，要求block_num>0；cacheMode=2时，需满足block_size >= coff*cmp_ratio + S - 1。
+  - stateCacheRef支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0；cacheMode=2时，需满足block_size >= coff * cmp_ratio + S - 1。
   - 当x采用BS合轴，即x的输入shape为[T,H]时：
     - cuSeqlensOptional输入shape必须为[B+1,]，且该参数为前缀和数组，后一个元素的值必须大于等于前一个元素的值，第一位必须为0。
-    - sequsedOptional支持输入shape为[B,]，要求0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。
-    - cacheMode=1时，stateBlockTableOptional支持输入shape为[B, ceil(Smax/block_size)]，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])；cacheMode=2时，支持输入shape为[B]。
+    - sequsedOptional支持输入shape为[B,]，要求0 ≤ sequsedOptional[n] ≤ cuSeqlensOptional[n+1] - cuSeqlensOptional[n]。
+    - cacheMode=1时，stateBlockTableOptional支持输入shape为[B, ceil(Smax/block_size)]，Smax=max(start_pos)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])；cacheMode=2时，支持输入shape为[B]。
     - cmpKvOut输出shape为[min(T, T/cmp_ratio+B), D]。
   - 当x不采用BS合轴，即x的输入shape为[B,S,H]时：
     - cuSeqlensOptional必须传入空指针。
-    - sequsedOptional支持输入shape为[B,]，要求0 ≤ seqused[n] ≤ S。
+    - sequsedOptional支持输入shape为[B,]，要求0 ≤ sequsedOptional[n] ≤ S。
     - cacheMode=1时，stateBlockTableOptional支持输入shape为[B, ceil(Smax/block_size)]，Smax=max(start_pos)+S；cacheMode=2时，支持输入shape为[B]。
     - cmpKvOut输出shape为[B, ceil(S/cmp_ratio), D]。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
-    - 只支持B、S为0。
     - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
 
       <table style="undefined;table-layout: fixed; width: 400px"><colgroup>

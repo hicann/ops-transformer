@@ -92,35 +92,35 @@
   <tr>
     <td>x</td>
     <td>输入</td>
-    <td>公式中的$X$，表示原始不经压缩的数据。</td>
+    <td>公式中的<em>X</em>，表示原始不经压缩的数据。</td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>wkv</td>
     <td>输入</td>
-    <td>公式中的$W^{KV}$，表示kv压缩权重。</td>
+    <td>公式中的<em>W<sup>KV</sup></em>，表示kv压缩权重。</td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>wgate</td>
     <td>输入</td>
-    <td>公式中的$W^{Gate}$，表示gate压缩权重。</td>
+    <td>公式中的<em>W<sup>Gate</sup></em>，表示gate压缩权重。</td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>state_cache</td>
-    <td>输入</td>
-    <td>公式中的$\left[kv\_state, score\_state\right]$，表示kv_state和score_state的历史数据。</td>
+    <td>输入/输出</td>
+    <td>公式中的<em>[kv_state, score_state]</em>，表示kv_state和score_state的历史数据。</td>
     <td>FLOAT</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>ape</td>
     <td>输入</td>
-    <td>公式中的$Ape$，表示positional biases。</td>
+    <td>公式中的<em>Ape</em>，表示positional biases。</td>
     <td>FLOAT</td>
     <td>ND</td>
   </tr>
@@ -212,18 +212,14 @@
 </table>
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> 、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：
-  - cache_mode不支持输入2，且state_cache不支持0轴非连续。
   - cmp_ratio仅支持2/4/8/16/32/64/128。
+  - gradEnabled不支持为true。
 
 ## 约束说明
 
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
-    - wkv支持输入shape为[coff*D,H]。
-    - wgate支持输入shape为[coff*D,H]。
-    - state_cache支持输入shape为[block_num, block_size, 2*coff*D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff*cmp_ratio + S - 1。
-    - ape支持输入shape为[cmp_ratio, coff*D]。
-    - start_pos支持输入shape为[B,]。
+    - state_cache支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]：
         - cu_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。
         - seqused，支持输入shape为[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu_seqlens[n+1] - cu_seqlens[n]，且不小于0。
@@ -236,7 +232,6 @@
         - cmp_kv，输出shape为[B, ceil(S/cmp_ratio), D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN)。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
-      - 只支持B、S为0。
       - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
 
       <table style="undefined;table-layout: fixed; width: 400px"><colgroup>
@@ -277,5 +272,5 @@
 
   | 调用方式   | 样例代码 | 说明                                          |
   | ---------- | -------- | --------------------------------------------- |
-  | aclnn API  | -        | 通过[aclnnCompressor](./docs/aclnnCompressor.md)接口调用Compressor算子。 |
+  | aclnn API  | [test_aclnn_compressor](./examples/arch35/test_aclnn_compressor.cpp) | 通过[aclnnCompressor](./docs/aclnnCompressor.md)接口调用Compressor算子。 |
   | PyTorch API | -        | 通过[compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)接口调用Compressor算子。 |

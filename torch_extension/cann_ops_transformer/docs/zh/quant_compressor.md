@@ -114,7 +114,7 @@ cann_ops_transformer.quant_compressor(
 | x | Tensor | 必选 | 原始不经压缩的数据，对应公式中的 $X$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [B,S,H]、[T,H] |
 | wkv | Tensor | 必选 | kv压缩权重，对应公式中的 $W^{KV}$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [coff\*D,H] |
 | wgate | Tensor | 必选 | gate压缩权重，对应公式中的 $W^{Gate}$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [coff\*D,H] |
-| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。不支持非连续，数据格式支持ND。 | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
+| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。支持0轴非连续，数据格式支持ND。计算后 kv_state 和 score_state 会原位更新到此 Tensor | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
 | ape | Tensor | 必选 | positional biases，对应公式中的 $Ape$。不支持非连续，数据格式支持ND。 | float32 | [cmp_ratio,coff\*D] |
 | quant_mode | int | 必选 | 量化模式。取值范围为[1]，1表示A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL（HIFLOAT8输入，x按per-tensor缩放、wkv/wgate按per-channel缩放反量化）。 | - | - |
 | cmp_ratio | int | 必选 | 数据压缩率。取值范围为[2, 128]内的整数。 | - | - |
@@ -125,8 +125,8 @@ cann_ops_transformer.quant_compressor(
 | cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0。 | int32 | [B+1,] |
 | seqused | Tensor | 可选 | 不同Batch中实际参与压缩的token数。不支持非连续，数据格式支持ND。<br>指定为None时，数值等于每个Batch上的Sequence Length。<br>[B,S,H]场景：0 ≤ seqused[n] ≤ S<br>[T,H]场景：0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。 | int32 | [B,] |
 | start_pos | Tensor | 可选 | 计算起始位置。不支持非连续，数据格式支持ND，输入为None时从0开始计算 | int32 | [B,] |
-| coff | int | 可选 | 默认值1，仅支持1/2。<br>coff=1：无需进行overlap数据重排<br>coff=2：需要进行overlap数据重排。 | int32 | - |
-| cache_mode | int | 可选 | state_cache的存储模式。<br>1：连续buffer<br>2：循环buffer<br>默认值1。 | int32 | - |
+| coff | int | 可选 | 默认值1，仅支持1/2。<br>coff=1：无需进行overlap数据重排<br>coff=2：需要进行overlap数据重排。 | int | - |
+| cache_mode | int | 可选 | state_cache的存储模式。<br>1：连续buffer<br>2：循环buffer<br>默认值1。 | int | - |
 
 ## 返回值说明
 
@@ -143,10 +143,10 @@ cann_ops_transformer.quant_compressor(
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 
 - 该接口支持B、S泛化，且存在如下场景限制：
-  - 只支持B、S为0。
   - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
     <div style="overflow-x: auto;">
     <table style="undefined;table-layout: fixed; width: 400px"><colgroup>
+    <col style="width: 100px">
     <col style="width: 100px">
     <col style="width: 100px">
     </colgroup><thead>
@@ -179,6 +179,7 @@ cann_ops_transformer.quant_compressor(
     </tbody>
     </table>
     </div>
+- 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下state_cache不做更新，输出cmp_kv为空tensor。
 - 支持D为128/512。
 - 支持H为1K~10K，512对齐。
 - 支持block_size为1~1024。
@@ -195,6 +196,9 @@ cann_ops_transformer.quant_compressor(
 
 ## 调用示例
 
+> **说明：**<br>
+> - 以下示例以C128A场景为例（B=1、S=128、H=4096、D=512、coff=1、cmp_ratio=128），更多参数组合请参考[约束说明](#约束说明)。
+
 - 单算子模式调用：
 
     ```python
@@ -202,175 +206,60 @@ cann_ops_transformer.quant_compressor(
     import torch_npu
     import numpy as np
     from cann_ops_transformer import quant_compressor
-    import torch.nn as nn
-    import math
 
-    def get_seq_used_by_batch(batch_idx, S, seqused, cu_seqlens):
-        if seqused is not None:
-            return seqused[batch_idx]
-        else:
-            if cu_seqlens is not None:
-                return cu_seqlens[batch_idx + 1] - cu_seqlens[batch_idx]
-            else:
-                return S
-
-    data_type = torch.uint8  # HIFLOAT8 在 torch 中以 uint8 承载
-    hidden_size = 4096
-    coff = 1 # 1:no overlap 2:overlap
-    cmp_ratio = 128
-    cache_mode = 1
-    head_dim = 512
-    cu_seqlens = [0, 1]
-    quant_mode = 1
-    # -------------
+    # 参数设置
     B = 1
-    S = 1
-    S_max = 0
+    S = 128
+    H = 4096
+    D = 512
+    coff = 1  # 1: no overlap  2: overlap
+    cmp_ratio = 128
+    cache_mode = quant_compressor.CacheMode.LINEAR_BUFFER
     block_size = 128
-    start_pos = [8191] * B # (B,)
-    start_p=8191
-    seqused = None # (B,), None时cu_seqlens的数据全部参与计算，否则按传参实际值计算
+    quant_mode = quant_compressor.QuantMode.A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL
 
-    # BS是否合轴
-    bs_combine_flag = True
-    update_flag = 1
-    save_state_seqlens = None
-    if seqused is not None:
-        seqused = torch.tensor(seqused).to(torch.int32)
-    if start_pos is not None:
-        start_pos = torch.tensor(start_pos).to(torch.int32)
-    else:
-        start_pos = torch.full((B,), start_p, dtype=torch.int32)
+    # block_table构造：cache_mode=1时shape为[B, ceil(Smax/block_size)]
+    block_num = (S + block_size - 1) // block_size
+    block_table = torch.zeros(size=(B, block_num), dtype=torch.int32)
+    next_block_id = 1
+    for i in range(B):
+        for j in range(block_num):
+            block_table[i][j] = next_block_id
+            next_block_id = next_block_id + 1
 
-    if bs_combine_flag:
-        if cu_seqlens is None:
-            T = B * S
-            if T !=0:
-                cu_seqlens = torch.arange(0, T + 1, S, dtype=torch.int32)
-            else:
-                cu_seqlens = torch.zeros((B+1), dtype=torch.int32)
-        else:
-            cu_seqlens = torch.tensor(cu_seqlens).to(torch.int32)
-        for i in range(B):
-            if start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] > S_max:
-                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i]
-    else:
-        cu_seqlens = None
-        S_max = max(start_pos) + S
-    ### ======================== gen input data start =============================
-    # page state
-    if cache_mode == 1:
-        max_block_num_per_batch = (S_max + block_size - 1) // block_size
-        block_num = B * max_block_num_per_batch
-        next_block_id = 1
-        print(f"max_block_num_per_batch: {max_block_num_per_batch}")
-        block_table = torch.zeros(size=(B, max_block_num_per_batch), dtype=torch.int32)
-        for i in range(B):
-            # 需要读取state的范围
-            cur_start = start_pos[i] // cmp_ratio * cmp_ratio - cmp_ratio
-            cur_end = start_pos[i] // cmp_ratio * cmp_ratio + cmp_ratio
-            if start_pos[i] % cmp_ratio == 0:
-                cur_end = start_pos[i]
-            cur_end = min(cur_end, start_pos[i] + S)
-            cur_start_block_id = (cur_start // block_size) if cur_start >= 0 else 0
-            cur_end_block_id = (cur_end - 1) // block_size
-            for j in range(cur_start_block_id, cur_end_block_id + 1):
-                block_table[i][j] = next_block_id
-                next_block_id = next_block_id + 1
-            # 需要写入state的范围
-            end_pos = get_seq_used_by_batch(i, S, seqused, cu_seqlens)
-            if save_state_seqlens is not None:
-                next_start = start_pos[i] + end_pos - save_state_seqlens[i]
-                next_end = start_pos[i] + end_pos
-            else:
-                next_start = (start_pos[i] + end_pos) // cmp_ratio * cmp_ratio - cmp_ratio
-                next_end = (start_pos[i] + end_pos) // cmp_ratio * cmp_ratio + cmp_ratio
-                if (start_pos[i] + end_pos) % cmp_ratio == 0:
-                    next_end = start_pos[i] + end_pos
-            next_end = min(next_end, start_pos[i] + end_pos)
-            next_start_block_id = (next_start // block_size) if next_start >= 0 else 0
-            next_end_block_id = (next_end - 1) // block_size
-            for j in range(next_start_block_id, next_end_block_id + 1):
-                if block_table[i][j] == 0:
-                    block_table[i][j] = next_block_id
-                    next_block_id = next_block_id + 1
-
-        if B==0:
-            kv_state = torch.tensor(np.random.uniform(-10, 10, (0, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(-10, 10, (0, block_size, coff * head_dim))).to(torch.float32)
-        else:
-            kv_state = torch.tensor(np.random.uniform(-10, 10, (torch.max(block_table) + 1, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(-10, 10, (torch.max(block_table) + 1, block_size, coff * head_dim))).to(torch.float32)
-    else:
-        block_table = torch.tensor(random.sample(list(range(B)), B), dtype=torch.int32)
-        block_size = (2 * cmp_ratio + S - 1) if coff == 2 else (cmp_ratio + S - 1)
-        if B==0:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (0, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (0, block_size, coff * head_dim))).to(torch.float32)
-        else:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (B, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (B, block_size, coff * head_dim))).to(torch.float32)
-
-    # other input
-    if bs_combine_flag:
-        x_shape = (cu_seqlens[-1], hidden_size)
-    else:
-        x_shape = (B, S, hidden_size)
-
-    x = torch.tensor(np.random.uniform(-10.0, 10.0, x_shape)).to(data_type).npu()
-    wkv = torch.tensor(np.random.uniform(-10, 10, (coff * head_dim, hidden_size))).to(data_type).npu()
-    wgate = torch.tensor(np.random.uniform(-10, 10, (coff * head_dim, hidden_size))).to(data_type).npu()
-    ape = torch.tensor(np.random.uniform(-10, 10, (cmp_ratio, coff * head_dim))).to(torch.float32).npu()
-    # descale 缩放因子
-    x_descale = torch.tensor(np.random.uniform(0.1, 1.0, (1,))).to(torch.float32).npu()
-    wkv_descale = torch.tensor(np.random.uniform(0.1, 1.0, (coff * head_dim,))).to(torch.float32).npu()
-    wgate_descale = torch.tensor(np.random.uniform(0.1, 1.0, (coff * head_dim,))).to(torch.float32).npu()
-    if cache_mode == 1:  # 连续buffer
-        state_cache = torch.zeros((kv_state.shape[0], kv_state.shape[1], 2*kv_state.shape[2]))
-        state_cache = state_cache.npu()
-        state_cache[:, :, :state_cache.shape[2]//2] = kv_state.clone()
-        state_cache[:, :, state_cache.shape[2]//2:] = score_state.clone()
-    else:
-        layer_pad = random.randint(1, 50)
-        layer_start_idx = random.randint(0, layer_pad-1)
-        print(f"layer_pad: {layer_pad}")
-        print(f"layer_start_idx: {layer_start_idx}")
-        state_cache_pad = torch.zeros((kv_state.shape[0],kv_state.shape[1]*kv_state.shape[2]*2+layer_pad))
-        print(f"state_cache_pad: shape {state_cache_pad.shape}")
-        state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
-        state_cache = state_cache_pad[:, layer_start_idx : layer_start_idx + kv_state.shape[1]*kv_state.shape[2]*2].view(-1, kv_state.shape[1], kv_state.shape[2]*2)
-        state_cache = state_cache.to("npu:%s" % DEVICE_ID)
-        state_cache[:, :, :state_cache.shape[2]//2] = kv_state.clone()
-        state_cache[:, :, state_cache.shape[2]//2:] = score_state.clone()
-        print(f"state_cache: shape {state_cache.shape}, dtype: {state_cache.dtype}, is_contiguous: {state_cache.is_contiguous()}, stride0: {state_cache.stride(0)}")
-
+    # 构造输入（HIFLOAT8在torch中以uint8承载）
+    x = torch.randint(0, 256, (B, S, H), dtype=torch.uint8).npu()
+    wkv = torch.randint(0, 256, (coff * D, H), dtype=torch.uint8).npu()
+    wgate = torch.randint(0, 256, (coff * D, H), dtype=torch.uint8).npu()
+    ape = torch.randn((cmp_ratio, coff * D), dtype=torch.float32).npu()
+    state_cache = torch.zeros((torch.max(block_table).item() + 1, block_size, 2 * coff * D),
+                              dtype=torch.float32).npu()
+    x_descale = torch.rand((1,), dtype=torch.float32).npu()
+    wkv_descale = torch.rand((coff * D,), dtype=torch.float32).npu()
+    wgate_descale = torch.rand((coff * D,), dtype=torch.float32).npu()
+    start_pos = torch.zeros((B,), dtype=torch.int32).npu()
     block_table = block_table.npu()
-    start_pos = torch.tensor(start_pos).to(torch.int32).npu()
-    if cu_seqlens is not None:
-        cu_seqlens = torch.tensor(cu_seqlens).to(torch.int32).npu()
-    if seqused is not None:
-        seqused = torch.tensor(seqused).to(torch.int32).npu()
 
-    cmp_kv = (
-        quant_compressor(
-            x,
-            wkv,
-            wgate,
-            state_cache,
-            ape,
-            quant_mode = quant_mode,
-            cmp_ratio = cmp_ratio,
-            x_descale = x_descale,
-            wkv_descale = wkv_descale,
-            wgate_descale = wgate_descale,
-            state_block_table = block_table,
-            cu_seqlens = cu_seqlens,
-            seqused = seqused,
-            start_pos = start_pos,
-            coff = coff,
-            cache_mode = cache_mode
-        )
+    # 调用quant_compressor执行压缩计算
+    cmp_kv = quant_compressor(
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        ape,
+        quant_mode=quant_mode,
+        cmp_ratio=cmp_ratio,
+        x_descale=x_descale,
+        wkv_descale=wkv_descale,
+        wgate_descale=wgate_descale,
+        state_block_table=block_table,
+        cu_seqlens=None,
+        seqused=None,
+        start_pos=start_pos,
+        coff=coff,
+        cache_mode=cache_mode
     )
+    print(f"cmp_kv shape: {cmp_kv.shape}")
     ```
 
 - TorchAir图模式调用：
@@ -379,207 +268,70 @@ cann_ops_transformer.quant_compressor(
     import torch
     import torch_npu
     import numpy as np
-    import torch.nn as nn
     import torchair
     from cann_ops_transformer import quant_compressor
-    import math
-
-    def get_seq_used_by_batch(batch_idx, S, seqused, cu_seqlens):
-        if seqused is not None:
-            return seqused[batch_idx]
-        else:
-            if cu_seqlens is not None:
-                return cu_seqlens[batch_idx + 1] - cu_seqlens[batch_idx]
-            else:
-                return S
-
-    data_type = torch.uint8  # HIFLOAT8 在 torch 中以 uint8 承载
-    hidden_size = 4096
-    coff = 1 # 1:no overlap 2:overlap
-    cmp_ratio = 128
-    cache_mode = 1
-    head_dim = 512
-    cu_seqlens = [0, 1]
-    quant_mode = 1
-    # -------------
-    B = 1
-    S = 1
-    S_max = 0
-    block_size = 128
-    start_pos = [8191] * B # (B,)
-    start_p=8191
-    seqused = None # (B,), None时cu_seqlens的数据全部参与计算，否则按传参实际值计算
-
-    # BS是否合轴
-    bs_combine_flag = True
-    update_flag = 1
-    save_state_seqlens = None
-    if seqused is not None:
-        seqused = torch.tensor(seqused).to(torch.int32)
-    if start_pos is not None:
-        start_pos = torch.tensor(start_pos).to(torch.int32)
-    else:
-        start_pos = torch.full((B,), start_p, dtype=torch.int32)
-
-    if bs_combine_flag:
-        if cu_seqlens is None:
-            T = B * S
-            if T !=0:
-                cu_seqlens = torch.arange(0, T + 1, S, dtype=torch.int32)
-            else:
-                cu_seqlens = torch.zeros((B+1), dtype=torch.int32)
-        else:
-            cu_seqlens = torch.tensor(cu_seqlens).to(torch.int32)
-        for i in range(B):
-            if start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] > S_max:
-                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i]
-    else:
-        cu_seqlens = None
-        S_max = max(start_pos) + S
-    ### ======================== gen input data start =============================
-    # page state
-    if cache_mode == 1:
-        max_block_num_per_batch = (S_max + block_size - 1) // block_size
-        block_num = B * max_block_num_per_batch
-        next_block_id = 1
-        print(f"max_block_num_per_batch: {max_block_num_per_batch}")
-        block_table = torch.zeros(size=(B, max_block_num_per_batch), dtype=torch.int32)
-        for i in range(B):
-            # 需要读取state的范围
-            cur_start = start_pos[i] // cmp_ratio * cmp_ratio - cmp_ratio
-            cur_end = start_pos[i] // cmp_ratio * cmp_ratio + cmp_ratio
-            if start_pos[i] % cmp_ratio == 0:
-                cur_end = start_pos[i]
-            cur_end = min(cur_end, start_pos[i] + S)
-            cur_start_block_id = (cur_start // block_size) if cur_start >= 0 else 0
-            cur_end_block_id = (cur_end - 1) // block_size
-            for j in range(cur_start_block_id, cur_end_block_id + 1):
-                block_table[i][j] = next_block_id
-                next_block_id = next_block_id + 1
-            # 需要写入state的范围
-            end_pos = get_seq_used_by_batch(i, S, seqused, cu_seqlens)
-            if save_state_seqlens is not None:
-                next_start = start_pos[i] + end_pos - save_state_seqlens[i]
-                next_end = start_pos[i] + end_pos
-            else:
-                next_start = (start_pos[i] + end_pos) // cmp_ratio * cmp_ratio - cmp_ratio
-                next_end = (start_pos[i] + end_pos) // cmp_ratio * cmp_ratio + cmp_ratio
-                if (start_pos[i] + end_pos) % cmp_ratio == 0:
-                    next_end = start_pos[i] + end_pos
-            next_end = min(next_end, start_pos[i] + end_pos)
-            next_start_block_id = (next_start // block_size) if next_start >= 0 else 0
-            next_end_block_id = (next_end - 1) // block_size
-            for j in range(next_start_block_id, next_end_block_id + 1):
-                if block_table[i][j] == 0:
-                    block_table[i][j] = next_block_id
-                    next_block_id = next_block_id + 1
-
-        if B==0:
-            kv_state = torch.tensor(np.random.uniform(-10, 10, (0, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(-10, 10, (0, block_size, coff * head_dim))).to(torch.float32)
-        else:
-            kv_state = torch.tensor(np.random.uniform(-10, 10, (torch.max(block_table) + 1, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(-10, 10, (torch.max(block_table) + 1, block_size, coff * head_dim))).to(torch.float32)
-    else:
-        block_table = torch.tensor(random.sample(list(range(B)), B), dtype=torch.int32)
-        block_size = (2 * cmp_ratio + S - 1) if coff == 2 else (cmp_ratio + S - 1)
-        if B==0:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (0, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (0, block_size, coff * head_dim))).to(torch.float32)
-        else:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (B, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (B, block_size, coff * head_dim))).to(torch.float32)
-
-    # other input
-    if bs_combine_flag:
-        x_shape = (cu_seqlens[-1], hidden_size)
-    else:
-        x_shape = (B, S, hidden_size)
-
-    x = torch.tensor(np.random.uniform(-10.0, 10.0, x_shape)).to(data_type).npu()
-    wkv = torch.tensor(np.random.uniform(-10, 10, (coff * head_dim, hidden_size))).to(data_type).npu()
-    wgate = torch.tensor(np.random.uniform(-10, 10, (coff * head_dim, hidden_size))).to(data_type).npu()
-    ape = torch.tensor(np.random.uniform(-10, 10, (cmp_ratio, coff * head_dim))).to(torch.float32).npu()
-    # descale 缩放因子
-    x_descale = torch.tensor(np.random.uniform(0.1, 1.0, (1,))).to(torch.float32).npu()
-    wkv_descale = torch.tensor(np.random.uniform(0.1, 1.0, (coff * head_dim,))).to(torch.float32).npu()
-    wgate_descale = torch.tensor(np.random.uniform(0.1, 1.0, (coff * head_dim,))).to(torch.float32).npu()
-    if cache_mode == 1:  # 连续buffer
-        state_cache = torch.zeros((kv_state.shape[0], kv_state.shape[1], 2*kv_state.shape[2]))
-        state_cache = state_cache.npu()
-        state_cache[:, :, :state_cache.shape[2]//2] = kv_state.clone()
-        state_cache[:, :, state_cache.shape[2]//2:] = score_state.clone()
-    else:
-        layer_pad = random.randint(1, 50)
-        layer_start_idx = random.randint(0, layer_pad-1)
-        print(f"layer_pad: {layer_pad}")
-        print(f"layer_start_idx: {layer_start_idx}")
-        state_cache_pad = torch.zeros((kv_state.shape[0],kv_state.shape[1]*kv_state.shape[2]*2+layer_pad))
-        print(f"state_cache_pad: shape {state_cache_pad.shape}")
-        state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
-        state_cache = state_cache_pad[:, layer_start_idx : layer_start_idx + kv_state.shape[1]*kv_state.shape[2]*2].view(-1, kv_state.shape[1], kv_state.shape[2]*2)
-        state_cache = state_cache.to("npu:%s" % DEVICE_ID)
-        state_cache[:, :, :state_cache.shape[2]//2] = kv_state.clone()
-        state_cache[:, :, state_cache.shape[2]//2:] = score_state.clone()
-        print(f"state_cache: shape {state_cache.shape}, dtype: {state_cache.dtype}, is_contiguous: {state_cache.is_contiguous()}, stride0: {state_cache.stride(0)}")
-
-    block_table = block_table.npu()
-    start_pos = torch.tensor(start_pos).to(torch.int32).npu()
-    if cu_seqlens is not None:
-        cu_seqlens = torch.tensor(cu_seqlens).to(torch.int32).npu()
-    if seqused is not None:
-        seqused = torch.tensor(seqused).to(torch.int32).npu()
-
-    class QuantCompressorNetwork(nn.Module):
-        def __init__(self):
-            super(QuantCompressorNetwork, self).__init__()
-
-        def forward(self, x, wkv, wgate, state_cache, ape, quant_mode, cmp_ratio, x_descale=None, wkv_descale=None,
-                    wgate_descale=None, state_block_table=None, cu_seqlens=None,
-                    seqused=None, start_pos=None, coff=1, cache_mode=1):
-            cmp_kv = (
-                torch.ops.cann_ops_transformer.quant_compressor(
-                    x,
-                    wkv,
-                    wgate,
-                    state_cache,
-                    ape,
-                    quant_mode = quant_mode,
-                    cmp_ratio = cmp_ratio,
-                    x_descale = x_descale,
-                    wkv_descale = wkv_descale,
-                    wgate_descale = wgate_descale,
-                    state_block_table = state_block_table,
-                    cu_seqlens = cu_seqlens,
-                    seqused = seqused,
-                    start_pos = start_pos,
-                    coff = coff,
-                    cache_mode = cache_mode
-                )
-            )
-            return cmp_kv
-
     from torchair.configs.compiler_config import CompilerConfig
+
+    # 参数设置
+    B = 1
+    S = 128
+    H = 4096
+    D = 512
+    coff = 1
+    cmp_ratio = 128
+    cache_mode = quant_compressor.CacheMode.LINEAR_BUFFER
+    block_size = 128
+    quant_mode = quant_compressor.QuantMode.A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL
+
+    block_num = (S + block_size - 1) // block_size
+    block_table = torch.zeros(size=(B, block_num), dtype=torch.int32)
+    next_block_id = 1
+    for i in range(B):
+        for j in range(block_num):
+            block_table[i][j] = next_block_id
+            next_block_id = next_block_id + 1
+
+    x = torch.randint(0, 256, (B, S, H), dtype=torch.uint8).npu()
+    wkv = torch.randint(0, 256, (coff * D, H), dtype=torch.uint8).npu()
+    wgate = torch.randint(0, 256, (coff * D, H), dtype=torch.uint8).npu()
+    ape = torch.randn((cmp_ratio, coff * D), dtype=torch.float32).npu()
+    state_cache = torch.zeros((torch.max(block_table).item() + 1, block_size, 2 * coff * D),
+                              dtype=torch.float32).npu()
+    x_descale = torch.rand((1,), dtype=torch.float32).npu()
+    wkv_descale = torch.rand((coff * D,), dtype=torch.float32).npu()
+    wgate_descale = torch.rand((coff * D,), dtype=torch.float32).npu()
+    start_pos = torch.zeros((B,), dtype=torch.int32).npu()
+    block_table = block_table.npu()
+
+
+    class QuantCompressorNetwork(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, x, wkv, wgate, state_cache, ape, block_table,
+                    x_descale, wkv_descale, wgate_descale, start_pos):
+            return torch.ops.cann_ops_transformer.quant_compressor(
+                x, wkv, wgate, state_cache, ape,
+                quant_mode=quant_mode,
+                cmp_ratio=cmp_ratio,
+                x_descale=x_descale,
+                wkv_descale=wkv_descale,
+                wgate_descale=wgate_descale,
+                state_block_table=block_table,
+                cu_seqlens=None,
+                seqused=None,
+                start_pos=start_pos,
+                coff=coff,
+                cache_mode=cache_mode
+            )
+
+
     config = CompilerConfig()
     config.mode = "reduce-overhead"
     npu_backend = torchair.get_npu_backend(compiler_config=config)
     torch._dynamo.reset()
     npu_mode = torch.compile(QuantCompressorNetwork(), fullgraph=True, backend=npu_backend, dynamic=False)
-    cmp_kv = npu_mode(
-                    x,
-                    wkv,
-                    wgate,
-                    state_cache,
-                    ape,
-                    quant_mode = quant_mode,
-                    cmp_ratio = cmp_ratio,
-                    x_descale = x_descale,
-                    wkv_descale = wkv_descale,
-                    wgate_descale = wgate_descale,
-                    state_block_table = block_table,
-                    cu_seqlens = cu_seqlens,
-                    seqused = seqused,
-                    start_pos = start_pos,
-                    coff = coff,
-                    cache_mode = cache_mode)
+    cmp_kv = npu_mode(x, wkv, wgate, state_cache, ape, block_table,
+                     x_descale, wkv_descale, wgate_descale, start_pos)
+    print(f"cmp_kv shape: {cmp_kv.shape}")
     ```

@@ -211,7 +211,7 @@ aclnnStatus aclnnQuantCompressor(
     <tr>
       <td>wkvDescaleOptional（const aclTensor*）</td>
       <td>可选输入</td>
-      <td>wkv的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。</td>
+      <td>wkv的反量化缩放因子，per-channel缩放，通道数为coff*D。quant_mode=1时必选。</td>
       <td>不支持空Tensor。</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -221,7 +221,7 @@ aclnnStatus aclnnQuantCompressor(
     <tr>
       <td>wgateDescaleOptional（const aclTensor*）</td>
       <td>可选输入</td>
-      <td>wgate的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。</td>
+      <td>wgate的反量化缩放因子，per-channel缩放，通道数为coff*D。quant_mode=1时必选。</td>
       <td>不支持空Tensor。</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -231,11 +231,11 @@ aclnnStatus aclnnQuantCompressor(
     <tr>
       <td>stateBlockTableOptional（const aclTensor*）</td>
       <td>可选输入</td>
-      <td>表示state_cache存储使用的block映射表。</td>
-      <td>当其中元素的值为0时，表示当前位置无需进行更新state_cache操作；不支持空Tensor。</td>
+      <td>表示state_cache存储使用的block映射表。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作。</td>
+      <td><ul><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(startPosOptional)+S；当x的shape为[T,H]时，Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。</li><li>cacheMode=2时，shape为[B]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B]。</td>
+      <td>cacheMode=1时：[B, ceil(Smax/block_size)]<br>cacheMode=2时：[B]</td>
       <td>×</td>
     </tr>
     <tr>
@@ -252,7 +252,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>sequsedOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>表示不同Batch中实际参与压缩的token数。</td>
-      <td>如果指定为None时，表示和每个Batch上的Sequence Length长度相同；支持B=0的空Tensor。该入参中每个Batch的有效token数要求小于等于对应Sequence Length长度。当x的shape为[B,S,H]时，要求seqused[n] <= S，且不小于0；当x的shape为[T,H]时，要求seqused[n] <= cu_seqlens[n+1] - cu_seqlens[n]，且不小于0。</td>
+      <td>如果指定为None时，表示和每个Batch上的Sequence Length长度相同；支持B=0的空Tensor。该入参中每个Batch的有效token数要求小于等于对应Sequence Length长度。当x的shape为[B,S,H]时，要求sequsedOptional[n] <= S，且不小于0；当x的shape为[T,H]时，要求sequsedOptional[n] <= cuSeqlensOptional[n+1] - cuSeqlensOptional[n]，且不小于0。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>[B,]</td>
@@ -273,7 +273,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>输入</td>
       <td>量化模式。</td>
       <td>取值范围为[1]，1表示A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL（HIFLOAT8输入，x按per-tensor缩放、wkv/wgate按per-channel缩放反量化）。</td>
-      <td>INT32</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -283,7 +283,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>输入</td>
       <td>用于稀疏计算，表示数据压缩率。</td>
       <td>取值范围为[2, 128]内的整数。</td>
-      <td>INT32</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -292,8 +292,8 @@ aclnnStatus aclnnQuantCompressor(
       <td>coff（int64_t）</td>
       <td>输入</td>
       <td>表示是否进行overlap数据重排。</td>
-      <td>取值范围为[1, 2]。当coff=1时，无需进行overlap数据重排。当coff=2时，需要进行overlap数据重排。</td>
-      <td>INT32</td>
+      <td>取值范围为{1, 2}。当coff=1时，无需进行overlap数据重排。当coff=2时，需要进行overlap数据重排。</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -303,7 +303,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>输入</td>
       <td>表示state_cache的存储模式。</td>
       <td>取值范围为[1, 2]；1表示连续buffer，2表示循环buffer。</td>
-      <td>INT32</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -313,13 +313,13 @@ aclnnStatus aclnnQuantCompressor(
       <td>输入</td>
       <td>表示state_cache的0轴stride。</td>
       <td>-</td>
-      <td>INT32</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>cmpKvOut（const aclTensor*）</td>
+      <td>cmpKvOut（aclTensor*）</td>
       <td>输出</td>
       <td>表示压缩后的数据。</td>
       <td>支持B=0,S=0,T=0的空Tensor。</td>
@@ -333,9 +333,9 @@ aclnnStatus aclnnQuantCompressor(
       <td>输出</td>
       <td>表示需要在Device侧申请的workspace大小。</td>
       <td>-</td>
-      <td>UINT64</td>
       <td>-</td>
-      <td>[1,]</td>
+      <td>-</td>
+      <td>-</td>
       <td>-</td>
     </tr>
     <tr>
@@ -343,7 +343,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>输出</td>
       <td>op执行器，包含了算子计算流程。</td>
       <td>-</td>
-      <td>aclOpExecutor</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -438,28 +438,26 @@ aclnnStatus aclnnQuantCompressor(
 ## 约束说明
 - 确定性计算：
   - aclnnQuantCompressor默认确定性实现。
-  <!-- npu="950" id8 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
-  <!-- end id8 -->
+  - batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
-    - stateCache支持输入shape[block_num,block_size,2* coff* D]，要求blockNum>0，cacheMode=2时，需要满足blockSize >= coff * cmp_ratio + S - 1。
+    - stateCache支持输入shape[block_num,block_size,2\*coff\*D]，要求blockNum>0，cacheMode=2时，需要满足blockSize >= coff * cmp_ratio + S - 1。
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]
-        - cuSeqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须位0。
-        - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
-        - cacheMode=1时，state\_block\_table支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+max(cu\_seqlens[n+1] - cu\_seqlens[n])。cacheMode=2时，state\_block\_table支持输入shape[B]。
+        - cuSeqlensOptional输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。
+        - sequsedOptional，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即sequsedOptional[n] <= cuSeqlensOptional[n+1] - cuSeqlensOptional[n]，且不小于0。
+        - cacheMode=1时，stateBlockTableOptional支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。cacheMode=2时，stateBlockTableOptional支持输入shape[B]。
         - cmpKv，输出shape为[min(T,T//cmp_ratio+B),D]：compressed_tokens + compressed_tokens + ... + compressed_tokens + pad。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
-        - cuSeqlens，参数必须为空。
-        - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
-        - cacheMode=1时，stateBlockTable支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+S。cacheMode=2时，stateBlockTable支持输入shape[B]。
+        - cuSeqlensOptional，参数必须为空。
+        - sequsedOptional，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即要求sequsedOptional[n] <= S，且不小于0。
+        - cacheMode=1时，stateBlockTable支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(startPosOptional)+S。cacheMode=2时，stateBlockTable支持输入shape[B]。
         - cmpKv，输出shape为[B,ceil(S/cmp_ratio),D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ...  + (compressed_tokens+padN)。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
-      - 只支持B、S为0
       - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
       <div style="overflow-x: auto;">
       <table style="undefined;table-layout: fixed; width: 400px"><colgroup>
+      <col style="width: 100px">
       <col style="width: 100px">
       <col style="width: 100px">
       </colgroup><thead>
