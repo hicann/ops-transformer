@@ -129,7 +129,7 @@ public:
         if (effRowsCtx != nullptr && effRowsCtx->enabled) {
             // K 为转置布局 [embed, N]，Transposed=true
             EffRowsGatherCopy<true>(gKTensor, l1KTensorTla, gSparseBlockIdx, *effRowsCtx, yBlockNumRsvd, kvSeqlen,
-                                    blockShapeY, embed, l1KTileNAct, copyGmToL1B);
+                                    blockShapeY, embed, l1KTileNAct, copyGmToL1B, kvSBaseTileInnerOffset);
             return;
         }
         uint32_t baseTileStartOffset = gatheredKvSTileIdx * kvSBaseTile + kvSBaseTileInnerOffset;
