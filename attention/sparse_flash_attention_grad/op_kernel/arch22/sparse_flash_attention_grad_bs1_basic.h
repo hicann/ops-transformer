@@ -161,6 +161,7 @@ private:
     event_t scatterTmpVMte2WaitV;
     event_t scatterTmpKMte2WaitVPong;
     event_t scatterTmpVMte2WaitVPong;
+    event_t processMte2WaitV;
 
     RunInfo runInfo[2];
     RunInfo scatterRunInfo;
@@ -267,7 +268,9 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessNonDeterministi
         bool changeS1 = false;
         uint64_t scatterBufferNum = enableOptimizedScatter ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
         for (int32_t i = 0; i < processBS1ByCore; i++) {
-            scatterTaskId = i % scatterBufferNum;
+            if (!enableOptimizedScatter) {
+                scatterTaskId = i % scatterBufferNum;
+            }
             int32_t t1Index = cubeBlockIdx + usedCoreNum * i;
             if (!IS_BSND && t1Index >= validT1) {
                 break;
@@ -279,6 +282,9 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessNonDeterministi
                 GetActualSelCount(t1Index, n2Index, actualSelectedBlockCount);
                 t1HasTask = t1HasTask || actualSelectedBlockCount != 0;
                 for (blkCntOffset = 0; blkCntOffset < actualSelectedBlockCount; blkCntOffset += selectedCountOffset) {
+                    if (enableOptimizedScatter) {
+                        scatterTaskId = task % scatterBufferNum;
+                    }
                     UpdateGmOffset(task, true);
                     CubeCompute(cubeOp);
                     if (!enableOptimizedScatter && changeS1) {
@@ -324,6 +330,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessNonDeterministi
         scatterTmpVMte2WaitV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
         scatterTmpKMte2WaitVPong = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
         scatterTmpVMte2WaitVPong = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
+        processMte2WaitV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
 
         SET_FLAG(MTE3, MTE2, gatherMte2WaitMte3);
         SET_FLAG(MTE3, MTE2, gatherMte2WaitMte3Pong);
@@ -333,10 +340,13 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessNonDeterministi
         SET_FLAG(V, MTE2, scatterTmpVMte2WaitV);
         SET_FLAG(V, MTE2, scatterTmpKMte2WaitVPong);
         SET_FLAG(V, MTE2, scatterTmpVMte2WaitVPong);
+        SET_FLAG(V, MTE2, processMte2WaitV);
 
         uint64_t scatterBufferNum = enableOptimizedScatter ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
         for (int32_t i = 0; i < processBS1ByCore; i++) {
-            scatterTaskId = i % scatterBufferNum;
+            if (!enableOptimizedScatter) {
+                scatterTaskId = i % scatterBufferNum;
+            }
             int32_t t1Index = cubeBlockIdx + usedCoreNum * i;
             if (!IS_BSND && t1Index >= validT1) {
                 break;
@@ -352,6 +362,9 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessNonDeterministi
                     vecOp.CleanDqRow(runInfo[mmPingPongIdx]);
                 }
                 for (blkCntOffset = 0; blkCntOffset < actualSelectedBlockCount; blkCntOffset += selectedCountOffset) {
+                    if (enableOptimizedScatter) {
+                        scatterTaskId = task % scatterBufferNum;
+                    }
                     UpdateGmOffset(task, true);
                     VecCompute(vecOp, actual_seq_qlen, actual_seq_kvlen);
                     if (enableOptimizedScatter) {
@@ -404,6 +417,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessNonDeterministi
         WAIT_FLAG(V, MTE2, scatterTmpVMte2WaitV);
         WAIT_FLAG(V, MTE2, scatterTmpKMte2WaitVPong);
         WAIT_FLAG(V, MTE2, scatterTmpVMte2WaitVPong);
+        WAIT_FLAG(V, MTE2, processMte2WaitV);
         SyncAll();
         pipeVec.Destroy();
 
@@ -895,6 +909,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::UpdateGmOffset(int64_t
     runInfo[mmPingPongIdx].scatterTmpVMte2WaitV = scatterTmpVMte2WaitV;
     runInfo[mmPingPongIdx].scatterTmpKMte2WaitVPong = scatterTmpKMte2WaitVPong;
     runInfo[mmPingPongIdx].scatterTmpVMte2WaitVPong = scatterTmpVMte2WaitVPong;
+    runInfo[mmPingPongIdx].processMte2WaitV = processMte2WaitV;
 
     if (runInfo[mmPingPongIdx].s1End > totalS1) {
         runInfo[mmPingPongIdx].s1End = totalS1;

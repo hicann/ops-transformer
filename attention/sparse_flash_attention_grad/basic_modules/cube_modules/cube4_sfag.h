@@ -35,8 +35,8 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(
     mmParam.isRightTranspose = true;
     mmParam.dstStride = dimDTotal * dimN2;
 
-    int64_t mm4ResOutBaseOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * selectedBlockSizeDtotal +
-                                  cBlockIdx * selectedBlockCount * selectedBlockSizeDtotal;
+    int64_t mm4ResOutBaseOffset = runInfo.scatterTaskId * MAX_CORE_NUM * scatterTokenCapacity * dimDTotal +
+                                  cBlockIdx * scatterTokenCapacity * dimDTotal;
     const bool reloadQuery = !runInfo.noReload && runInfo.isLastBasicBlock;
 
     LocalTensor<T1> l1_ds_tensor = l1_ds_tensors[ping_pong_flag_l1_ds_];
@@ -57,7 +57,8 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(
         LocalTensor<T1> current_l1_ds_tensor, current_l1_query_tensor;
         current_l1_ds_tensor = l1_ds_tensor[l1Offset];
         int64_t currentQueryOffset;
-        int64_t mm4ResOutOffset = mm4ResOutBaseOffset + mIdx * selectedBlockSizeDtotal;
+        int64_t localMIdx = enableOptimizedScatter ? (mIdx - blkCntOffset) : mIdx;
+        int64_t mm4ResOutOffset = mm4ResOutBaseOffset + localMIdx * selectedBlockSizeDtotal;
 
         for (uint32_t dIdx = 0; dIdx < dLoopTimes - 1; dIdx++) {
             LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_];

@@ -177,6 +177,7 @@ protected:
     float scaleValue;
     uint32_t selectedBlockCount;
     uint32_t selectedBlockSize;
+    int64_t scatterTokenCapacity;
     uint32_t selectedCountOffset;
     uint32_t actualSelectedCount;
     int32_t maxSelCnt;
@@ -267,6 +268,7 @@ __aicore__ inline void VecOp<SFAGT>::InitParams(const TILING_CLASS *__restrict o
     params.singleN = tilingData->splitCoreParams.singleN;
     params.sftBaseM = tilingData->splitCoreParams.sftBaseM;
     params.sftBaseN = tilingData->splitCoreParams.sftBaseN;
+    scatterTokenCapacity = enableOptimizedScatter ? params.singleN : selectedBlockCount * selectedBlockSize;
 
     selectedS2 = selectedBlockCount * selectedBlockSize;
     selectedCountOffset = PER_LOOP_BLOCK_SIZE / selectedBlockSize;
@@ -347,9 +349,9 @@ __aicore__ inline void VecOp<SFAGT>::InitGMBuffer(GM_ADDR key, GM_ADDR value, GM
     // scatter add
     uint64_t scatterBufferNum = tilingData->opInfo.enableOptimizedScatter ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
     int64_t mm4ResAddr = usedWorkspaceLen / sizeof(float);
-    int64_t mm5ResAddr = mm4ResAddr + MAX_CORE_NUM * selectedBlockCount * selectedBlockSizeDimDAlign * scatterBufferNum;
-    usedWorkspaceLen += MAX_CORE_NUM * selectedBlockCount * selectedBlockSize * (dimDAlign + dimD2Align) *
-                        scatterBufferNum * sizeof(float);
+    int64_t mm5ResAddr = mm4ResAddr + MAX_CORE_NUM * scatterTokenCapacity * dimDAlign * scatterBufferNum;
+    usedWorkspaceLen +=
+        MAX_CORE_NUM * scatterTokenCapacity * (dimDAlign + dimD2Align) * scatterBufferNum * sizeof(float);
 
     mm1WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm1Addr);
     mm2WorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm2Addr);
@@ -727,6 +729,7 @@ __aicore__ inline void VecOp<SFAGT>::CalSoftmax(const int32_t loopIdx, const int
     int64_t actualSelS2Align = AlignUp(actualSelS2, 8);
     int64_t dataSize = processM * actualSelS2Align;
 
+    WAIT_FLAG(V, MTE2, runInfo.processMte2WaitV);
     DataCopyPad(pTensor, mm1WorkspaceGm[mm12Addr],
                 {static_cast<uint16_t>(processM), static_cast<uint32_t>(actualSelS2 * sizeof(float)),
                  static_cast<uint32_t>((params.sftBaseN - actualSelS2) * sizeof(float)), 0, 0},
@@ -806,6 +809,7 @@ __aicore__ inline void VecOp<SFAGT>::CalSoftmaxGrad(const int32_t loopIdx, const
              {1, 1, static_cast<uint8_t>(CeilDiv(actualSelS2Align, 16)),
               static_cast<uint8_t>(CeilDiv(actualSelS2Align, 8))});
     }
+    SET_FLAG(V, MTE2, runInfo.processMte2WaitV);
     SET_FLAG(V, MTE3, mte3WaitV);
     WAIT_FLAG(V, MTE3, mte3WaitV);
 
@@ -1351,18 +1355,14 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddUnDeter(const RunInfo &runInfo)
     int64_t maxLoops = CeilDiv(actTotalRows, scatterRowSize);
     int64_t tailRows = actTotalRows - (maxLoops - 1) * scatterRowSize;
 
-    int64_t currentDkSrcOffset =
-        runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * selectedBlockSizeDimDAlign +
-        cubeBlockIdx * selectedBlockCount * selectedBlockSizeDimDAlign;
-    int64_t currentDvSrcOffset =
-        runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * selectedBlockSizeDimD2Align +
-        cubeBlockIdx * selectedBlockCount * selectedBlockSizeDimD2Align;
+    int64_t currentDkSrcOffset = runInfo.scatterTaskId * MAX_CORE_NUM * scatterTokenCapacity * dimDAlign +
+                                 cubeBlockIdx * scatterTokenCapacity * dimDAlign;
+    int64_t currentDvSrcOffset = runInfo.scatterTaskId * MAX_CORE_NUM * scatterTokenCapacity * dimD2Align +
+                                 cubeBlockIdx * scatterTokenCapacity * dimD2Align;
     int64_t currentIndicesOffset = runInfo.indicesGmOffset + subBlockIdx * firstCoreKSize;
     if (enableOptimizedScatter) {
-        currentDkSrcOffset +=
-            runInfo.blkCntOffset * selectedBlockSizeDimDAlign + subBlockIdx * firstCoreKSize * selectedBlockSize * 16;
-        currentDvSrcOffset +=
-            runInfo.blkCntOffset * selectedBlockSizeDimD2Align + subBlockIdx * firstCoreKSize * selectedBlockSize * 16;
+        currentDkSrcOffset += subBlockIdx * firstCoreKSize * selectedBlockSize * 16;
+        currentDvSrcOffset += subBlockIdx * firstCoreKSize * selectedBlockSize * 16;
         currentIndicesOffset += runInfo.blkCntOffset;
     } else {
         currentDkSrcOffset += subBlockIdx * firstCoreKSize * selectedBlockSizeDimDAlign;
@@ -1398,6 +1398,7 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddUnDeter(const RunInfo &runInfo)
             WaitFlag<AscendC::HardEvent::MTE2_V>(event);
 
             if constexpr (KV_MERGE) {
+                PIPE_BARRIER(PIPE_V);
                 for (int64_t row = 0; row < scatterRowSize; row++) {
                     Add(dkInUb[row * dimDAlign], dkInUb[row * dimDAlign], dvInUb[row * dimD2Align], dimD2Align);
                 }
@@ -1449,6 +1450,7 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddUnDeter(const RunInfo &runInfo)
         WaitFlag<AscendC::HardEvent::MTE2_V>(event);
 
         if constexpr (KV_MERGE) {
+            PIPE_BARRIER(PIPE_V);
             for (int64_t row = 0; row < tailRows; row++) {
                 Add(dkInUb[row * dimDAlign], dkInUb[row * dimDAlign], dvInUb[row * dimD2Align], dimD2Align);
             }
@@ -1687,6 +1689,7 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddDeter(const RunInfo &runInfo)
         WaitFlag<AscendC::HardEvent::MTE2_V>(event);
 
         if constexpr (KV_MERGE) {
+            PIPE_BARRIER(PIPE_V);
             for (int64_t row = 0; row < UB_ROW_SIZE; row++) {
                 Add(dkInUb[row * dimDAlign], dkInUb[row * dimDAlign], dvInUb[row * dimD2Align], dimD2Align);
             }
@@ -1736,6 +1739,7 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddDeter(const RunInfo &runInfo)
     WaitFlag<AscendC::HardEvent::MTE2_V>(event);
 
     if constexpr (KV_MERGE) {
+        PIPE_BARRIER(PIPE_V);
         for (int64_t row = 0; row < tailRows; row++) {
             Add(dkInUb[row * dimDAlign], dkInUb[row * dimDAlign], dvInUb[row * dimD2Align], dimD2Align);
         }

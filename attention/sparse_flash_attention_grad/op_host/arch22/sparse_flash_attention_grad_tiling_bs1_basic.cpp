@@ -273,8 +273,10 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetWorkspaceSize()
     int64_t dAlign = (tilingData.opInfo.get_D() + tilingData.opInfo.get_ropeD() + 15) / 16 * 16;
     int64_t d2Align = (tilingData.opInfo.get_D2() + 15) / 16 * 16;
     uint32_t scatterBufferNum = tmpData.enableOptimizedScatter ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
-    workspaces[0] +=
-        24 * scatterBufferNum * tmpData.selected_block_count * tmpData.selected_block_size * (dAlign + d2Align) * B32;
+    int64_t scatterTokenCapacity = tmpData.enableOptimizedScatter ?
+                                       static_cast<int64_t>(tmpData.singleN) :
+                                       static_cast<int64_t>(tmpData.selected_block_count) * tmpData.selected_block_size;
+    workspaces[0] += 24 * scatterBufferNum * scatterTokenCapacity * (dAlign + d2Align) * B32;
 
     tilingData.opInfo.set_mm12WorkspaceLen(mm12WorkspaceLen);
     tilingData.opInfo.set_selectedKWorkspaceLen(selectedKWorkspaceLen);
