@@ -36,6 +36,9 @@ public:
     __aicore__ inline void InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, bool isGather);
     __aicore__ inline void UpdateSlice(uint32_t idx, bool isTail);
     __aicore__ inline void Process(bool isLast = true, uint8_t enAtomic = 0);
+
+    GlobalTensor<typename C_TYPE::T> cOwnGlobal_;
+    bool ownRedirect_ = false;
 };
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
@@ -47,6 +50,11 @@ __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYP
     this->block_.template Init<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
     this->block_.InitForMC2(tilingData, cfg, isTail, isGather);
     InitInputs(aGM, bGM, cGM, biasGM, isGather);
+    if (offsetGM != nullptr) {
+        this->cOwnGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ typename C_TYPE::T *>(offsetGM),
+                                          static_cast<uint64_t>(this->block_.rankMN_));
+        this->ownRedirect_ = true;
+    }
     this->mm_.SetSubBlockIdx(0);
     this->mm_.Init(&this->block_.matmulTilingData_->tCubeTiling, this->pipe_);
 }
@@ -109,7 +117,14 @@ __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYP
                     this->mm_.SetBias(this->biasGlobal_[this->block_.offset_.offsetBias]);
                 }
                 this->mm_.Iterate();
-                this->mm_.GetTensorC(this->cGlobal_[this->block_.offset_.offsetC], enAtomic);
+                uint32_t mc2MIdx = this->block_.params_.mCntIndex / this->block_.mSliceCnt_;
+                if (this->ownRedirect_ && (mc2MIdx == this->block_.cfg_.rankID)) {
+                    this->mm_.GetTensorC(this->cOwnGlobal_[this->block_.offset_.offsetC -
+                                                           this->block_.cfg_.rankID * this->block_.rankMN_],
+                                         enAtomic);
+                } else {
+                    this->mm_.GetTensorC(this->cGlobal_[this->block_.offset_.offsetC], enAtomic);
+                }
             }
         }
     }

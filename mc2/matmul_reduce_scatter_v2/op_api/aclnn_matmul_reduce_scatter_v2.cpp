@@ -12,6 +12,7 @@
  * \file aclnn_matmul_reduce_scatter_v2.cpp
  * \brief
  */
+#include <cstring>
 #include "securec.h"
 #include "acl/acl.h"
 #include "common/utils/op_mc2.h"
@@ -49,6 +50,8 @@ static constexpr int64_t DIM_NUM_TWO = 2;
 static constexpr int64_t DIM_NUM_ONE = 1;
 static constexpr int64_t AICPU_STRLEN = 6;
 static constexpr int64_t CCU_STRLEN = 3;
+static constexpr char ACLNN_CCU_PEER_ONLY_MODE[] = "ccu_peer_only";
+static constexpr char GRAPH_CCU_MODE[] = "ccu_graph";
 typedef struct {
     uint32_t id;
     const char *funcName;
@@ -399,6 +402,12 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor *x1, const a
     CommType commModeEnum = CommType::INVALID;
     auto retCommmode = CheckAndSetCommMode(commMode, commModeEnum);
     CHECK_RET(retCommmode == ACLNN_SUCCESS, retCommmode);
+    if (std::strcmp(commMode, "ai_cpu") != 0 && std::strcmp(commMode, "ccu") != 0 &&
+        std::strcmp(commMode, GRAPH_CCU_MODE) != 0) {
+        OP_LOGE_FOR_INVALID_VALUE("aclnnMatmulReduceScatterV2GetWorkspaceSize", "commMode", commMode,
+                                  "\"ccu\" or \"ai_cpu\"");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     if (commModeEnum >= CommType::INVALID) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnmatmulReduceScatterV2GetWorkSpaceSize", "commModeEnum", "invalid",
                                               "Does not match any available case, please check the input commMode.");
@@ -449,10 +458,17 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor *x1, const a
         transX2 = TransX2Tensor(x2);
         OP_LOGD("X2 dim0 is %ld, dim1 is %ld.", x2->GetViewShape().GetDim(0), x2->GetViewShape().GetDim(1));
     }
+    // Keep peer-only as an ACLNN-only optimization. Graph execution uses its own comm-mode marker.
+    const char *innerCommMode = commMode;
+    if (std::strcmp(commMode, "ccu") == 0) {
+        innerCommMode = ACLNN_CCU_PEER_ONLY_MODE;
+    } else if (std::strcmp(commMode, GRAPH_CCU_MODE) == 0) {
+        innerCommMode = "ccu";
+    }
     ret = aclnnInnerMatmulReduceScatterV2GetWorkspaceSize(
         x1, transX2, bias, x1Scale, transX2Scale, quantScale, const_cast<char *>(group), const_cast<char *>(reduceOp),
         transposeX1, transposeX2, commTurn, rankSize, blockSize, groupSize, isAmaxOut, yDtype,
-        const_cast<char *>(commMode), output, amaxOutOptional, workspaceSize, executor);
+        const_cast<char *>(innerCommMode), output, amaxOutOptional, workspaceSize, executor);
     if ((ret == ACLNN_SUCCESS) && (executor != nullptr) && (*executor != nullptr)) {
         SetNnopbaseHcclServerTypeByArch(*executor, commModeEnum);
         void *args = reinterpret_cast<void *>(static_cast<uintptr_t>(commModeEnum));

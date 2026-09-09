@@ -49,7 +49,7 @@ constexpr uint32_t IS_TRANS_B = 3;
 constexpr uint32_t COMM_TURN = 4;
 constexpr int64_t AICPU_STRLEN = 6;
 const std::set<int> SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64};
-const std::set<std::string> SUPPORT_COMM_MODE_A5{"ai_cpu", "ccu"};
+const std::set<std::string> SUPPORT_COMM_MODE_A5{"ai_cpu", "ccu", "ccu_peer_only"};
 
 uint32_t MatmulReduceScatterTilingBase::ReduceScatterSpliteM(mc2tiling::TilingArgs &args, uint32_t maxTileCnt) const
 {
@@ -256,7 +256,8 @@ uint64_t MatmulReduceScatterTilingBase::GetTilingKey() const
     if ((args_.geAType == ge::DT_BF16) || (args_.geAType == ge::DT_FLOAT16)) {
         inputIsBf16Fp16 = INPUT_TYPE_IS_FP16_BF16;
     }
-    uint8_t commAlg = isA2APath_ ? TPL_CCU_ALL2ALL_VEC_REDUCE : TPL_CCU_REDUCESUM;
+    uint8_t commAlg =
+        isPeerOnly_ ? TPL_CCU_REDUCESUM_PEER_ONLY : (isA2APath_ ? TPL_CCU_ALL2ALL_VEC_REDUCE : TPL_CCU_REDUCESUM);
     uint64_t tilingKey = GET_TPL_TILING_KEY(false, args_.isATrans, args_.isBTrans, inputIsBf16Fp16, OUTPUT_TYPE_IS_FP8,
                                             TPL_X1_X2_DTYPE_IS_OTHER, commAlg, commMode_);
     OP_LOGD(opName_, "args_.isATrans, args_.isBTrans, inputIsBf16Fp16 is: [%d, %d, %d]", args_.isATrans, args_.isBTrans,
@@ -450,6 +451,7 @@ void MatmulReduceScatterTilingBase::Reset()
     tailMValue_ = 0UL;  // mc2 切块后尾块M的大小；
     longTileLen_ = 0UL; // mc2 切块后长块的大小；
     mmResultLen_ = 0UL; // mc2 matmul计算后结果的大小
+    isPeerOnly_ = false;
 }
 
 void MatmulReduceScatterTilingBase::SetReduceScatterTilingArgsDataType()

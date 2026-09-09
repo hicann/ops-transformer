@@ -34,7 +34,8 @@ public:
     __aicore__ inline Mc2QuantBatchMatmulASWKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
                                 GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *que,
-                                const Mc2Tiling::RCSTiling &cfg, bool isTail, bool isGather, uint64_t preCoreNum);
+                                const Mc2Tiling::RCSTiling &cfg, bool isTail, bool isGather, uint64_t preCoreNum,
+                                GM_ADDR offsetGM = nullptr);
     __aicore__ inline void UpdateSlice(uint32_t idx, bool isTail);
     __aicore__ inline void Process(bool isLast = true);
     __aicore__ inline uint64_t GetPreCoreNum();
@@ -52,6 +53,8 @@ protected:
     GlobalTensor<X1Type> aGlobal_;
     GlobalTensor<X2Type> bGlobal_;
     GlobalTensor<YType> cGlobal_;
+    GlobalTensor<YType> cOwnGlobal_;
+    bool ownRedirect_ = false;
     GlobalTensor<BiasType> biasGlobal_;
     Mc2MatmulV3::QuantBatchMatmulAswBlock block_;
 
@@ -81,7 +84,7 @@ LOCAL_TEMPLATE_CLASS_PARAMS
 __aicore__ inline void Mc2QuantBatchMatmulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale, GM_ADDR cGM, GM_ADDR workSpace,
     const void *tilingData, TPipe *que, const Mc2Tiling::RCSTiling &cfg, bool isTail, bool isGather,
-    uint64_t preCoreNum)
+    uint64_t preCoreNum, GM_ADDR offsetGM)
 {
     if ASCEND_IS_AIV {
         return;
@@ -91,6 +94,10 @@ __aicore__ inline void Mc2QuantBatchMatmulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>:
     block_.Init(quantBmmTilingData_, blockIdx_);
     block_.InitForMC2(cfg, isTail, isGather, preCoreNum);
     UpdateGlobalAddr(aGM, bGM, bias, scale, perTokenScale, cGM, workSpace);
+    if (offsetGM != nullptr) {
+        cOwnGlobal_.SetGlobalBuffer((__gm__ YType *)offsetGM, block_.rankMN_);
+        ownRedirect_ = true;
+    }
     mm_.SetSubBlockIdx(0);
     mm_.Init(&quantBmmTilingData_->matmulTiling, que);
 }
@@ -217,7 +224,12 @@ __aicore__ inline void Mc2QuantBatchMatmulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>:
     mm_.SetTensorA(aGlobal_[block_.offset_.offsetA], ATrans);
     mm_.SetTensorB(bGlobal_[block_.offset_.offsetB], BTrans);
     mm_.Iterate();
-    mm_.GetTensorC(cGlobal_[block_.offset_.offsetC]);
+    uint32_t mc2MIdx = block_.params_.mIndex / block_.mSliceCnt_;
+    if (ownRedirect_ && (mc2MIdx == block_.cfg_.rankID)) {
+        mm_.GetTensorC(cOwnGlobal_[block_.offset_.offsetC - block_.cfg_.rankID * block_.rankMN_]);
+    } else {
+        mm_.GetTensorC(cGlobal_[block_.offset_.offsetC]);
+    }
 }
 
 LOCAL_TEMPLATE_CLASS_PARAMS

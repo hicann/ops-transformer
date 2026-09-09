@@ -13,12 +13,14 @@
  * \brief
  */
 
+#include <cstring>
 #include "fallback/fallback.h"
 #include "common/utils/op_mc2.h"
 #include "mc2_common_log.h"
 
 namespace fallback {
 const char *reduceScatterV2Info = "MmReduceScatterV2Fallback";
+constexpr char GRAPH_CCU_MODE[] = "ccu_graph";
 
 static ge::graphStatus MatmulReduceScatterV2ExecuteFunc(gert::OpExecuteContext *host_api_ctx)
 {
@@ -75,8 +77,11 @@ static ge::graphStatus MatmulReduceScatterV2ExecuteFunc(gert::OpExecuteContext *
     const char *commMode = attrs->GetStr(static_cast<size_t>(ops::MmReduceScatterV2AttrIdx::K_COMM_MODE));
     OPS_CHECK(commMode == nullptr, OPS_LOG_E(reduceScatterV2Info, "commMode is null"), return ge::GRAPH_FAILED);
 
-    const auto apiRet = EXEC_OPAPI_CMD(aclnnMatmulReduceScatterV2, x1Acl, x2Acl, bias, x1Scale, x2Scale, quantScale,
-                                       blockSize, group, op, commTurn, streamMode, groupSize, commMode, y, amaxOut);
+    // Do not let graph fallback be identified as a direct ACLNN peer-only call.
+    const char *graphCommMode = (std::strcmp(commMode, "ccu") == 0) ? GRAPH_CCU_MODE : commMode;
+    const auto apiRet =
+        EXEC_OPAPI_CMD(aclnnMatmulReduceScatterV2, x1Acl, x2Acl, bias, x1Scale, x2Scale, quantScale, blockSize, group,
+                       op, commTurn, streamMode, groupSize, graphCommMode, y, amaxOut);
     OPS_CHECK(apiRet != ge::GRAPH_SUCCESS, OPS_LOG_E(reduceScatterV2Info, "Aclnn api error code %d", apiRet),
               return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
