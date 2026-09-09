@@ -26,8 +26,12 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: Environment / 环境信息 (Mandatory / 必填)
+      label: Environment Information / 环境信息 (Mandatory / 必填)
       description: 请提供昇腾硬件型号与软件环境信息
+      placeholder: |
+        - 昇腾硬件型号：如 Ascend 910B 等
+        - CANN 版本：如 8.0.0、8.5.0 等
+        - Python 版本：如 3.9.0
     validations:
       required: true
   - type: textarea
