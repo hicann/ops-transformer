@@ -35,7 +35,7 @@ extern "C" {
  * @param [in] epWorldSize: 计算输入，int。ep通信域size。
  * @param [in] epRankId: 计算输入，int。ep本卡Id。同一个EP通信域中各卡的epRankId不重复。
  * @param [in] moeExpertNum: 计算输入，int。MOE专家数量。
- * @param [in] expertSharedType: 计算可选输入，int。共享专家卡分布类型。当前仅支持传0。
+ * @param [in] expertShardType: 计算可选输入，int。共享专家卡分布类型。当前仅支持传0。
  * @param [in] sharedExpertNum: 计算可选输入，int。共享专家数量。
  * @param [in] sharedExpertRankNum: 计算可选输入，int。共享专家卡数量。
  * @param [in] globalBs: 计算可选输入，int。
@@ -51,7 +51,7 @@ extern "C" {
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
     const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine, const char *groupEp,
-    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertSharedType, int64_t sharedExpertNum,
+    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg,
     aclTensor *quantExpandXOut, aclTensor *commCmdInfoOut, uint64_t *workspaceSize, aclOpExecutor **executor);
 
@@ -66,7 +66,7 @@ ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
  * @param [in] epWorldSize: 计算输入，int。ep通信域size。
  * @param [in] epRankId: 计算输入，int。ep本卡Id。同一个EP通信域中各卡的epRankId不重复。
  * @param [in] moeExpertNum: 计算输入，int。MOE专家数量。
- * @param [in] expertSharedType: 计算可选输入，int。共享专家卡分布类型。当前仅支持传0。
+ * @param [in] expertShardType: 计算可选输入，int。共享专家卡分布类型。当前仅支持传0。
  * @param [in] sharedExpertNum: 计算可选输入，int。共享专家数量。
  * @param [in] sharedExpertRankNum: 计算可选输入，int。共享专家卡数量。
  * @param [in] globalBs: 计算可选输入，int。
@@ -80,7 +80,7 @@ ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
     const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine, const char *groupEp,
-    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertSharedType, int64_t sharedExpertNum,
+    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg,
     uint64_t &tokenMsgSize, uint64_t &commCmdInfoOutSize);
 

@@ -804,7 +804,7 @@ aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
         int64_t bs = 16;
         int64_t h = 4096;
         int64_t k = 6;
-        int64_t expertSharedType = 0;
+        int64_t expertShardType = 0;
         int64_t sharedExpertNum = 0;
         int64_t sharedExpertRankNum = 0;
         int64_t moeExpertNum = 32;
@@ -912,7 +912,7 @@ aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
         /******************************调用combine_setup********************************************/
         ret = aclnnMoeDistributeCombineSetupGetWorkspaceSize(
             expandX, expertIds, assistInfoForCombineOut, hcomEpName, epWorldSize, args.epRankId, moeExpertNum,
-            expertSharedType, sharedExpertNum, sharedExpertRankNum, globalBS, commQuantMode, commType, nullptr,
+            expertShardType, sharedExpertNum, sharedExpertRankNum, globalBS, commQuantMode, commType, nullptr,
             quantExpandXOut, commCmdInfoOutforCombine, &workspaceSize, &executor);
         CHECK_RET(ret == ACL_SUCCESS,
                 LOG_PRINT("[ERROR] aclnnMoeDistributeCombineSetupGetWorkspaceSize failed. ret = %d \n", ret);
@@ -936,7 +936,7 @@ aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
         /******************************调用combine_teardown********************************************/
         ret = aclnnMoeDistributeCombineTeardownGetWorkspaceSize(
             expandX, quantExpandXOut, expertIds, expandIdx, expertScales, commCmdInfoOutforCombine, nullptr, nullptr,
-            hcomEpName, epWorldSize, args.epRankId, moeExpertNum, expertSharedType, sharedExpertNum, sharedExpertRankNum,
+            hcomEpName, epWorldSize, args.epRankId, moeExpertNum, expertShardType, sharedExpertNum, sharedExpertRankNum,
             globalBS, commQuantMode, commType, nullptr, xOut, &workspaceSize, &executor);
         CHECK_RET(ret == ACL_SUCCESS,
                 LOG_PRINT("[ERROR] aclnnMoeDistributeCombineTeardownGetWorkspaceSize failed. ret = %d \n", ret);
