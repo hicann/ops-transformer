@@ -1131,7 +1131,7 @@ def run_compressor_eager(
             return
         old_S = S
         if seqused is not None:
-            S = max(seqused)
+            S = max(seqused) if len(seqused) > 0 else 0
         else:
             S = 0
             for i in range(B):

@@ -525,7 +525,7 @@ def compare(*outputs, **kwargs):
 
     npu_cmp_kv = npu_outputs[0]
     npu_state_cache = npu_outputs[1]
-    cpu_cmp_kv = golden_outputs[0]
+    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype)
     cpu_state_cache = golden_outputs[1]
 
     update_kv = kwargs.get("update_kv", None)
@@ -631,7 +631,9 @@ def compare_aclnn(*outputs, **kwargs):
         results = [
             _tensor_compare(
                 npu_outputs[0][cmp_kv_mask].to(torch.float32),
-                golden_outputs[1][cmp_kv_mask].to(torch.float32),
+                golden_outputs[1][cmp_kv_mask]
+                .to(npu_outputs[0].dtype)
+                .to(torch.float32),
                 "cmp_kv",
             )
         ]
@@ -654,7 +656,7 @@ def compare_aclnn(*outputs, **kwargs):
     # aclnn golden return order aligns with output_tensor_indexes=(3,12):
     #   golden[0] = state_cache (idx 3), golden[1] = cmp_kv (idx 12)
     cpu_state_cache = golden_outputs[1].to(torch.float32)
-    cpu_cmp_kv = golden_outputs[0].to(torch.float32)
+    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype).to(torch.float32)
 
     update_kv = kwargs.get("update_kv", None)
     update_score = kwargs.get("update_score", None)

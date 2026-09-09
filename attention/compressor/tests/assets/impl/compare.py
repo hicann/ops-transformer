@@ -354,7 +354,7 @@ def compare(*outputs, **kwargs):
 
     npu_cmp_kv = npu_outputs[0]
     npu_state_cache = npu_outputs[-1]
-    cpu_cmp_kv = golden_outputs[0]
+    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype)
     cpu_state_cache = golden_outputs[-1]
 
     update_kv = kwargs.get("update_kv", None)
@@ -446,7 +446,7 @@ def compare_aclnn(*outputs, **kwargs):
 
     npu_cmp_kv = npu_outputs[0].to(torch.float32)
     npu_state_cache = npu_outputs[-1].to(torch.float32)
-    cpu_cmp_kv = golden_outputs[0].to(torch.float32)
+    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype).to(torch.float32)
     cpu_state_cache = golden_outputs[-1].to(torch.float32)
 
     update_kv = kwargs.get("update_kv", None)
@@ -748,7 +748,9 @@ def _split_e2e_outputs(outputs, kwargs, bench_outputs):
 
     if len(npu_outputs) == 1:
         npu_sub.append(npu_outputs[0][cmp_kv_mask].to(torch.float32))
-        golden_sub.append(golden_outputs[0][cmp_kv_mask].to(torch.float32))
+        golden_sub.append(
+            golden_outputs[0][cmp_kv_mask].to(npu_outputs[0].dtype).to(torch.float32)
+        )
         bench = bench_outputs[0] if bench_outputs else None
         bench_sub.append(
             bench[cmp_kv_mask].to(torch.float32) if bench is not None else None

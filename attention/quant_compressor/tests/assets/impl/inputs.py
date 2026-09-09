@@ -224,7 +224,7 @@ def _fill_seq_descriptors(
         else:
             print("Error: layout of x is [T, hidden_size], cu_seqlens is required!!!")
         B = len(cu_seqlens_list) - 1
-        S = T // B
+        S = T // B if B > 0 else 0
     else:
         cu_seqlens_list = None
         B = x.shape[0]
@@ -252,10 +252,18 @@ def _fill_seq_descriptors(
             if start_pos_list[i] + cu_seqlens_list[i + 1] - cu_seqlens_list[i] > S_max:
                 S_max = start_pos_list[i] + cu_seqlens_list[i + 1] - cu_seqlens_list[i]
     else:
-        S_max = max(start_pos_list) + S
+        S_max = (
+            max(start_pos_list)
+            if start_pos_list is not None and len(start_pos_list) > 0
+            else 0
+        ) + S
 
     if is_th:
-        S = max(seqused_list)
+        S = (
+            max(seqused_list)
+            if seqused_list is not None and len(seqused_list) > 0
+            else 0
+        )
 
     return cu_seqlens_list, seqused_list, start_pos_list, B, S, S_max, block_size
 

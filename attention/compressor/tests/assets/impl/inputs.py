@@ -140,7 +140,7 @@ def _fill_seq_descriptors(
         else:
             print("Error: layout of x is [T, hidden_size], cu_seqlens is required!!!")
         B = len(cu_seqlens_list) - 1
-        S = T // B
+        S = T // B if B > 0 else 0
     else:
         cu_seqlens_list = None
         B = x.shape[0]
@@ -168,10 +168,18 @@ def _fill_seq_descriptors(
             if start_pos_list[i] + cu_seqlens_list[i + 1] - cu_seqlens_list[i] > S_max:
                 S_max = start_pos_list[i] + cu_seqlens_list[i + 1] - cu_seqlens_list[i]
     else:
-        S_max = max(start_pos_list) + S
+        S_max = (
+            max(start_pos_list)
+            if start_pos_list is not None and len(start_pos_list) > 0
+            else 0
+        ) + S
 
     if is_th:
-        S = max(seqused_list)
+        S = (
+            max(seqused_list)
+            if seqused_list is not None and len(seqused_list) > 0
+            else 0
+        )
 
     return cu_seqlens_list, seqused_list, start_pos_list, B, S, S_max, block_size
 
@@ -284,15 +292,21 @@ def apply_batch_slice_seeded(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
                                 block_id = state_block_table[start]
-                                state_cache[block_id:(block_id + length), :, :] = torch.from_numpy(
-                                    cache_data
-                                ).to(state_cache.dtype)
+                                state_cache[block_id : (block_id + length), :, :] = (
+                                    torch.from_numpy(cache_data).to(state_cache.dtype)
+                                )
                             else:
                                 cache_shape = list(state_cache.shape)
                                 cache_shape[0] = length
                                 start_seq_id = start_pos_list[start]
-                                cur_seq_id = start_seq_id - start_seq_id % cmp_ratio - cmp_ratio if start_seq_id >=  cmp_ratio else start_seq_id - start_seq_id % cmp_ratio
-                                block_id = state_block_table[start][int(cur_seq_id // state_cache.shape[1])]
+                                cur_seq_id = (
+                                    start_seq_id - start_seq_id % cmp_ratio - cmp_ratio
+                                    if start_seq_id >= cmp_ratio
+                                    else start_seq_id - start_seq_id % cmp_ratio
+                                )
+                                block_id = state_block_table[start][
+                                    int(cur_seq_id // state_cache.shape[1])
+                                ]
                                 cache_rng = np.random.RandomState(seed_value)
                                 cache_range = input_ranges[3]
                                 cache_lo, cache_hi = cache_range[0], cache_range[1]
@@ -327,9 +341,9 @@ def apply_batch_slice_seeded(
                             data = rng.uniform(lo, hi, size=tuple(sliced_shape)).astype(
                                 np.float32
                             )
-                            tensor[bidx, (start - cmp_ratio) : end, :] = torch.from_numpy(
-                                data
-                            ).to(tensor.dtype)
+                            tensor[bidx, (start - cmp_ratio) : end, :] = (
+                                torch.from_numpy(data).to(tensor.dtype)
+                            )
                         else:
                             sliced_shape[axis_pos] = length
                             data = rng.uniform(lo, hi, size=tuple(sliced_shape)).astype(
@@ -348,15 +362,21 @@ def apply_batch_slice_seeded(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
                                 block_id = state_block_table[start]
-                                state_cache[block_id:(block_id + length), :, :] = torch.from_numpy(
-                                    cache_data
-                                ).to(state_cache.dtype)
+                                state_cache[block_id : (block_id + length), :, :] = (
+                                    torch.from_numpy(cache_data).to(state_cache.dtype)
+                                )
                             else:
                                 cache_shape = list(state_cache.shape)
                                 cache_shape[0] = length
                                 start_seq_id = start_pos_list[start]
-                                cur_seq_id = start_seq_id - start_seq_id % cmp_ratio - cmp_ratio if start_seq_id >=  cmp_ratio else start_seq_id - start_seq_id % cmp_ratio
-                                block_id = state_block_table[start][int(cur_seq_id // state_cache.shape[1])]
+                                cur_seq_id = (
+                                    start_seq_id - start_seq_id % cmp_ratio - cmp_ratio
+                                    if start_seq_id >= cmp_ratio
+                                    else start_seq_id - start_seq_id % cmp_ratio
+                                )
+                                block_id = state_block_table[start][
+                                    int(cur_seq_id // state_cache.shape[1])
+                                ]
                                 cache_rng = np.random.RandomState(seed_value)
                                 cache_range = input_ranges[3]
                                 cache_lo, cache_hi = cache_range[0], cache_range[1]
@@ -368,6 +388,7 @@ def apply_batch_slice_seeded(
                                     :,
                                     :,
                                 ] = torch.from_numpy(cache_data).to(state_cache.dtype)
+
 
 def generate_compressor_inputs(
     x,
