@@ -141,6 +141,32 @@ run_rdv() {
     return ${exit_code}
 }
 
+# 随机用例测试
+run_random() {
+    local count="${1:-100}"
+    echo "===== 执行随机用例调测 ($count 条) ====="
+    TEST_MODE=random RANDOM_CASE_COUNT=$count USE_GRAPH=${USE_GRAPH} CSV_FILE="${CSV_FILE}" \
+        python3 -m pytest -rA -s $TEST_CHUNK_GATED_DELTA_RULE_SINGLE_SCRIPT \
+        -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning 2>&1 | tee "${LOG_FILE}"
+    local exit_code=${PIPESTATUS[0]}
+    echo "执行日志: ${LOG_FILE}"
+    echo "CSV: ${CSV_FILE}"
+    return ${exit_code}
+}
+
+# 随机用例测试（不跑golden，仅NPU执行，加快速度）
+run_random_npu() {
+    local count="${1:-100}"
+    echo "===== 执行随机用例调测-仅NPU ($count 条) ====="
+    TEST_MODE=random SKIP_GOLDEN=1 RANDOM_CASE_COUNT=$count USE_GRAPH=${USE_GRAPH} CSV_FILE="${CSV_FILE}" \
+        python3 -m pytest -rA -s $TEST_CHUNK_GATED_DELTA_RULE_SINGLE_SCRIPT \
+        -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning 2>&1 | tee "${LOG_FILE}"
+    local exit_code=${PIPESTATUS[0]}
+    echo "执行日志: ${LOG_FILE}"
+    echo "CSV: ${CSV_FILE}"
+    return ${exit_code}
+}
+
 # 自定义单条用例执行（指定pt或指定参数）
 run_custom() {
     local pt_file=""
@@ -250,17 +276,19 @@ print(json.dumps({'_name':'custom','B':${c_B},'seqlen':${py_seqlen},'nk':${c_nk}
 # 显示帮助信息
 show_help() {
     echo "用法:"
-    echo "  $0 <single|rdv> [graph] [prof] [save] [load]"
+    echo "  $0 <single|rdv|random [N]|random_npu [N]> [graph] [prof] [save] [load]"
     echo "  $0 run --pt <pt文件> [graph] [prof] [save]"
     echo "  $0 run --B <B> --seqlen <S> --nk <Nk> --nv <Nv> --dk <Dk> --dv <Dv> [选项]"
     echo ""
     echo "模式:"
-    echo "  single    执行单算子用例调测"
-    echo "  rdv       执行RDV参数集测试"
-    echo "  run       自定义单条用例（指定pt或指定参数生成）"
-    echo "  help      显示本帮助信息"
+    echo "  single          执行单算子用例调测"
+    echo "  rdv             执行RDV参数集测试"
+    echo "  random [N]      随机生成并执行N条用例（默认100，含golden精度对比）"
+    echo "  random_npu [N]  随机生成并执行N条用例，不跑golden仅NPU执行（默认100）"
+    echo "  run             自定义单条用例（指定pt或指定参数生成）"
+    echo "  help            显示本帮助信息"
     echo ""
-    echo "可选标志 (single/rdv 模式):"
+    echo "可选标志 (single/rdv/random/random_npu 模式):"
     echo "  graph     启用aclgraph模式"
     echo "  prof      启用msprof性能采集"
     echo "  save      保存输入数据为 .pt (output/pt/)"
@@ -289,6 +317,8 @@ show_help() {
     echo "  $0 run --B 1 --seqlen 64 --nk 4 --nv 4 --dk 128 --dv 128   # 指定参数生成执行"
     echo "  $0 run --B 1 --seqlen 64 --nk 4 --nv 4 --dk 128 --dv 128 save  # 生成并保存pt"
     echo "  $0 rdv graph                        # rdv模式+aclgraph"
+    echo "  $0 random 100                       # 随机执行100条用例"
+    echo "  $0 random_npu 100                   # 随机执行100条用例（仅NPU）"
 }
 
 # ====================== 主逻辑 ======================
@@ -310,6 +340,20 @@ LOAD_PT=false
 if [ "${TEST_MODE_ARG}" == "run" ]; then
     shift
     run_custom "$@"
+    exit $?
+fi
+
+# random / random_npu 模式：第二个参数为可选的用例数量
+if [ "${TEST_MODE_ARG}" == "random" ] || [ "${TEST_MODE_ARG}" == "random_npu" ]; then
+    RANDOM_COUNT=""
+    if [ $# -ge 2 ]; then
+        RANDOM_COUNT="$2"
+    fi
+    if [ "${TEST_MODE_ARG}" == "random" ]; then
+        run_random "${RANDOM_COUNT}"
+    else
+        run_random_npu "${RANDOM_COUNT}"
+    fi
     exit $?
 fi
 
@@ -369,7 +413,7 @@ case "$TEST_MODE_ARG" in
         show_help
         ;;
     *)
-        echo "错误：未知参数 '$TEST_MODE_ARG'，仅支持 single/rdv/run/help"
+        echo "错误：未知参数 '$TEST_MODE_ARG'，仅支持 single/rdv/random/random_npu/run/help"
         show_help
         exit 1
         ;;

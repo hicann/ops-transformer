@@ -21,6 +21,14 @@ _RESULT_ROWS = []
 _CURRENT_SEED = 0
 
 
+def _get_check_type():
+    """precision=带CPU golden精度对比；
+    execution_only=仅NPU执行（random_npu模式）。"""
+    if os.environ.get("SKIP_GOLDEN", "0") != "1":
+        return "precision"
+    return "execution_only"
+
+
 @pytest.fixture(autouse=True)
 def _set_random_seed():
     global _CURRENT_SEED
@@ -66,8 +74,11 @@ def pytest_runtest_makereport(item, call):
         error = str(report.longreprtext).replace("\n", " | ")[:2000]
 
     row = {
+        "random_seed": os.environ.get("RANDOM_SEED", ""),
         "seed": _CURRENT_SEED,
         "test_name": params.get("_name", ""),
+        "test_mode": os.environ.get("TEST_MODE", ""),
+        "check_type": _get_check_type(),
         "model": _get_model_name(),
         "status": status,
         "B": params.get("B", ""),
@@ -81,6 +92,12 @@ def pytest_runtest_makereport(item, call):
         "state_data_type": str(params.get("state_data_type", "")),
         "has_g": params.get("has_g", ""),
         "is_continue": params.get("is_contiguous", ""),
+        "query_datarange": str(params.get("query_datarange", "")),
+        "key_datarange": str(params.get("key_datarange", "")),
+        "value_datarange": str(params.get("value_datarange", "")),
+        "gamma_datarange": str(params.get("gamma_datarange", "")),
+        "beta_datarange": str(params.get("beta_datarange", "")),
+        "state_datarange": str(params.get("state_datarange", "")),
         "errmsg": error,
         "durations": "",
     }
@@ -97,8 +114,11 @@ def pytest_sessionfinish(session, exitstatus):
         return
 
     fields = [
+        "random_seed",
         "seed",
         "test_name",
+        "test_mode",
+        "check_type",
         "model",
         "status",
         "B",
@@ -112,12 +132,26 @@ def pytest_sessionfinish(session, exitstatus):
         "state_data_type",
         "has_g",
         "is_continue",
+        "query_datarange",
+        "key_datarange",
+        "value_datarange",
+        "gamma_datarange",
+        "beta_datarange",
+        "state_datarange",
         "errmsg",
         "durations",
     ]
-    with open(csv_file, "w", newline="", encoding="utf-8-sig") as f:
+
+    append = os.environ.get("CSV_APPEND", "0") == "1"
+    mode = "a" if append else "w"
+    write_header = not (
+        append and os.path.exists(csv_file) and os.path.getsize(csv_file) > 0
+    )
+
+    with open(csv_file, mode, newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader()
+        if write_header:
+            writer.writeheader()
         writer.writerows(_RESULT_ROWS)
 
     total = len(_RESULT_ROWS)

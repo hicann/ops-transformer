@@ -27,6 +27,12 @@ TEST_PARAMS = {
         "has_g": [True],
         "is_contiguous": [True],
         "pt_path": [""],
+        "query_datarange": [[0, 1]],
+        "key_datarange": [[0, 1]],
+        "value_datarange": [[0, 1]],
+        "gamma_datarange": [[-1, 0]],
+        "beta_datarange": [[0, 1]],
+        "state_datarange": [[0, 1]],
     },
     "Testcase1": {
         "_name": ["Testcase1"],
@@ -41,6 +47,13 @@ TEST_PARAMS = {
         "state_data_type": [torch.bfloat16],
         "has_g": [True],
         "is_contiguous": [True],
+        "pt_path": [""],
+        "query_datarange": [[0, 1]],
+        "key_datarange": [[0, 1]],
+        "value_datarange": [[0, 1]],
+        "gamma_datarange": [[-1, 0]],
+        "beta_datarange": [[0, 1]],
+        "state_datarange": [[0, 1]],
     },
 }
 # 注意单个用例组内的用例尽量不要超过32
