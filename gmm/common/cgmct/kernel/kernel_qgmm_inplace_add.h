@@ -225,6 +225,10 @@ public:
         int64_t m = Get<M_VALUE>(problemShape_);
         int64_t n = Get<N_VALUE>(problemShape_);
         int64_t k = Get<K_VALUE>(problemShape_);
+        // Keep the logical group shape separate from the aligned tile shape.
+        // The matmul implementation uses it to clip tail loads in GM/L1 for
+        // small groups whose dimensions are not block aligned.
+        blockMmadOp.SetOrgShape(m, n, k);
         CoordClass coord(m, n, k, params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
         BlockCoord tileIdx;
         while (bs.GetTileIdx(tileIdx)) {

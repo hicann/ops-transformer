@@ -251,6 +251,12 @@ public:
         int64_t m = Get<M_VALUE>(problemShape_);
         int64_t n = Get<N_VALUE>(problemShape_);
         int64_t k = Get<K_VALUE>(problemShape_);
+        // Keep the logical group shape separate from the aligned tile shape.
+        // The matmul implementation uses it to clip tail loads in GM/L1 for
+        // small groups whose dimensions are not block aligned.
+        if ASCEND_IS_AIC {
+            mmadOp_.SetOrgShape(m, n, k);
+        }
         UpdateGlobalBuffer(params);
         if ASCEND_IS_AIV {
             AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t> aivBaseOffset{
