@@ -453,6 +453,7 @@ aclnnStatus aclnnQuantLightningIndexer(
   - query和key的数据类型支持`INT8`。
   - 仅支持weights、queryDequantScale、keyDequantScale数据类型为`FLOAT16、FLOAT16、FLOAT16`。
   - key和keyDequantScale在layout_key为PA_BSND时支持0轴非连续，其余轴必须连续。
+<!-- end id8 -->
 
 <!-- npu="950" id7 -->
 - Ascend 950PR/Ascend 950DT：

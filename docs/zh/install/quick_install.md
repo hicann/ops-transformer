@@ -96,7 +96,7 @@ docker run --name cann_container --device /dev/davinci0 --device /dev/davinci_ma
 
 - **场景1：基于CANN weekly版本体验最新master能力或开发**
 
-    请参考《[CANN快速安装](https://www.hiascend.com/cann/download)》，选择`Weekly版本`，并根据产品系列、CPU架构、操作系统等下载对应包，最后参考页面提供的命令完成安装。
+    请参考《[CANN快速安装](https://www.hiascend.com/cann/download?versionId=794&ids=d806%2Ch0501%2Ch0601%2Ch0703&currentTab=1)》，选择`Weekly版本`，并根据产品系列、CPU架构、操作系统等下载对应包，最后参考页面提供的命令完成安装。
 
 - **场景2：基于CANN 稳定版本体验分支能力或开发**
 

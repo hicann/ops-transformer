@@ -28,7 +28,7 @@
 
 - 非CANNLab云开发环境：
 
-  根据[release仓库](https://gitcode.com/cann/release-management)源码与CANN版本配套关系，执行如下命令下载源码，\$\{tag\_version\}替换为目标分支标签，例如9.0.0。
+  从[release仓库](https://gitcode.com/cann/release-management)各文件夹下的release-notes文件获取源码与CANN版本配套关系（CANN ops组合包内可独立升级子包配套关系），执行如下命令下载源码，\$\{tag\_version\}替换为目标分支标签，例如9.0.0。
 
   ```bash
   git clone -b ${tag_version} https://gitcode.com/cann/ops-transformer.git && cd ops-transformer
@@ -93,13 +93,18 @@ export LD_LIBRARY_PATH=${ASCEND_HOME_PATH}/opp/vendors/custom_transformer/op_api
 
 ### 5. 快速验证：运行算子样例
 
-通用的运行命令格式：`bash build.sh --run_example <算子名> <运行模式> <包模式>`。
+通用的运行命令格式：`bash build.sh --run_example <算子名> <运行模式> <包模式> --vendor_name=<自定义算子包名>`。
 
 以AddExample为例，其提供了简单算子样例`add_example/examples/test_aclnn_add_example.cpp`，运行该样例验证算子功能是否正常。
 
 ```bash
 bash build.sh --run_example add_example eager cust --vendor_name=custom
 ```
+
+- <算子名>:add_example
+- <运行模式>：eager
+- <包模式>:cust
+- --vendor_name(可选)：vendorname表示构建的自定义算子包名，默认名为custom.
 
 预期输出：打印算子`AddExample`的加法计算结果，表明算子已成功部署并正确执行。
 
