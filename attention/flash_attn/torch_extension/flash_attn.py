@@ -135,20 +135,22 @@ class FlashAttenOpBuilder(OpBuilder):
             if layout_q == "TND":
                 t_size = q.size(0)
                 n_size = q.size(1)
-                d_size = v.size(2)
                 softmax_out_size = (n_size, t_size)
             elif layout_q == "BSND":
                 b_size = q.size(0)
                 s_size = q.size(1)
                 n_size = q.size(2)
-                d_size = v.size(3)
                 softmax_out_size = (b_size, n_size, s_size)
             else:
                 b_size = q.size(0)
                 n_size = q.size(1)
                 s_size = q.size(2)
-                d_size = v.size(3)
                 softmax_out_size = (b_size, n_size, s_size)
+
+            if layout_kv == "PA_NZ":
+                d_size = v.size(-3) * v.size(-1)
+            else:
+                d_size = v.size(-1)
 
             if layout_out == "TND":
                 torch._check(
