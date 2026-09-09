@@ -253,7 +253,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>normQueryWeight</td>
         <td>输入</td>
         <td>表示LayerNorm的仿射变换参数，作用在Query上。</td>
-        <td>可选，normType=2或4时需要提供。</td>
+        <td>可选，normType=2时需要提供。</td>
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
         <td>[D]</td>
@@ -791,9 +791,9 @@ aclnnStatus aclnnNormRopeConcat(
       std::vector<int64_t> ropeSinShape = {ropeSeq, headDim};
       std::vector<int64_t> ropeCosShape = {ropeSeq, headDim};
 
-      std::vector<int64_t> queryOutputShape = {batchSize, headNum, querySeq * 2, headDim};
-      std::vector<int64_t> keyOutputShape = {batchSize, headNum, querySeq * 2, headDim};
-      std::vector<int64_t> valueOutputShape = {batchSize, headNum, querySeq * 2, headDim};
+      std::vector<int64_t> queryOutputShape = {batchSize, headNum, querySeq + encoderQuerySeq, headDim};
+      std::vector<int64_t> keyOutputShape = {batchSize, headNum, keySeq + encoderKeySeq, headDim};
+      std::vector<int64_t> valueOutputShape = {batchSize, headNum, valueSeq + encoderValueSeq, headDim};
 
       std::vector<int64_t> normQueryMeanShape = {batchSize, querySeq, headNum, 1};
       std::vector<int64_t> normQueryRstdShape = {batchSize, querySeq, headNum, 1};
@@ -867,13 +867,13 @@ aclnnStatus aclnnNormRopeConcat(
       aclTensor *keyOutput = nullptr;
       aclTensor *valueOutput = nullptr;
 
-      std::vector<float> queryOutputHostData(batchSize * headNum * (querySeq * 2) + encoderQuerySeq * headDim, 0.0);
-      std::vector<float> keyOutputHostData(batchSize * headNum * keySeq + encoderKeySeq * headDim, 0.0);
-      std::vector<float> valueOutputHostData(batchSize * headNum * valueSeq + encoderValueSeq * headDim, 0.0);
+      std::vector<float> queryOutputHostData(batchSize * headNum * (querySeq + encoderQuerySeq) * headDim, 0.0);
+      std::vector<float> keyOutputHostData(batchSize * headNum * (keySeq + encoderKeySeq) * headDim, 0.0);
+      std::vector<float> valueOutputHostData(batchSize * headNum * (valueSeq + encoderValueSeq) * headDim, 0.0);
 
       std::vector<float> encoderQueryHostData(batchSize * headNum * encoderQuerySeq * headDim, 4.0);
       std::vector<float> encoderKeyHostData(batchSize * headNum * encoderKeySeq * headDim, 5.0);
-      std::vector<float> encoderValueHostData(batchSize * headNum * encoderKeySeq * headDim, 6.0);
+      std::vector<float> encoderValueHostData(batchSize * headNum * encoderValueSeq * headDim, 6.0);
 
       std::vector<float> normQueryWeightHostData(headDim, 1.0);
       std::vector<float> normQueryBiasHostData(headDim, 2.0);
@@ -951,14 +951,12 @@ aclnnStatus aclnnNormRopeConcat(
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(valueOutputHostData, valueOutputShape, &valueOutputDeviceAddr, aclDataType::ACL_FLOAT,
                             &valueOutput);
+      CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(normQueryMeanHostData, normQueryMeanShape, &normQueryMeanDeviceAddr, aclDataType::ACL_FLOAT,
                             &normQueryMean);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(normQueryRstdHostData, normQueryRstdShape, &normQueryRstdDeviceAddr, aclDataType::ACL_FLOAT,
                             &normQueryRstd);
-      CHECK_RET(ret == ACL_SUCCESS, return ret);
-      ret = CreateAclTensor(normKeyWeightHostData, normKeyWeightShape, &normKeyWeightDeviceAddr, aclDataType::ACL_FLOAT,
-                            &normKeyWeight);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(normKeyMeanHostData, normKeyMeanShape, &normKeyMeanDeviceAddr, aclDataType::ACL_FLOAT,
                             &normKeyMean);
@@ -966,17 +964,11 @@ aclnnStatus aclnnNormRopeConcat(
       ret = CreateAclTensor(normKeyRstdHostData, normKeyRstdShape, &normKeyRstdDeviceAddr, aclDataType::ACL_FLOAT,
                             &normKeyRstd);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
-      ret = CreateAclTensor(normAddedQueryWeightHostData, normAddedQueryWeightShape, &normAddedQueryWeightDeviceAddr,
-                            aclDataType::ACL_FLOAT, &normAddedQueryWeight);
-      CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(normAddedQueryMeanHostData, normAddedQueryMeanShape, &normAddedQueryMeanDeviceAddr,
                             aclDataType::ACL_FLOAT, &normAddedQueryMean);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(normAddedQueryRstdHostData, normAddedQueryRstdShape, &normAddedQueryRstdDeviceAddr,
                             aclDataType::ACL_FLOAT, &normAddedQueryRstd);
-      CHECK_RET(ret == ACL_SUCCESS, return ret);
-      ret = CreateAclTensor(normAddedKeyWeightHostData, normAddedKeyWeightShape, &normAddedKeyWeightDeviceAddr,
-                            aclDataType::ACL_FLOAT, &normAddedKeyWeight);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(normAddedKeyMeanHostData, normAddedKeyMeanShape, &normAddedKeyMeanDeviceAddr,
                             aclDataType::ACL_FLOAT, &normAddedKeyMean);
@@ -989,7 +981,7 @@ aclnnStatus aclnnNormRopeConcat(
       uint64_t workspaceSize = 0;
       aclOpExecutor *executor;
       bool isTraining = false;
-      // 调用aclnnGeGluBackward第一段接口
+      // 调用aclnnNormRopeConcat第一段接口
       ret = aclnnNormRopeConcatGetWorkspaceSize(
           query, key, value, encoderQuery, encoderKey, encoderValue, normQueryWeight, normQueryBias, normKeyWeight,
           normKeyBias, normAddedQueryWeight, normAddedQueryBias, normAddedKeyWeight, normAddedKeyBias, ropeSin, ropeCos,
@@ -1004,7 +996,7 @@ aclnnStatus aclnnNormRopeConcat(
           ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
           CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
       }
-      // 调用aclnnGeGluBackward第二段接口
+      // 调用aclnnNormRopeConcat第二段接口
       ret = aclnnNormRopeConcat(workspaceAddr, workspaceSize, executor, stream);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNormRopeConcat failed. ERROR: %d\n", ret); return ret);
 
