@@ -209,18 +209,20 @@ Ascend 950系列引入了Regbase编程范式，相比传统的Membase（Vector A
 
 **特点**
 
-- 使用`AscendC::MicroAPI`命名空间下的底层API
+- 使用`AscendC::Reg`命名空间下的底层API
 - 直接操作寄存器`RegTensor<T>`而非显式管理UB缓冲队列
 - 通过`MaskReg`实现灵活的元素级掩码控制
 
+> 注：`MicroAPI` 为 `Reg` 的历史别名（CANN 头文件中定义 `namespace MicroAPI = Reg;`，仅在部分新架构生效）。新代码统一使用 `AscendC::Reg` 命名空间，本仓已全量完成 MicroAPI→Reg 整改。
+
 **与Membase编程模型对比**
 
-| 特性 | Membase（传统Vector API） | Regbase（MicroAPI） |
+| 特性 | Membase（传统Vector API） | Regbase（Reg） |
 |------|---------------------------|---------------------|
 | 数据载体 | `LocalTensor<T>` + Queue机制 | `RegTensor<T>`寄存器 |
 | 内存管理 | 显式Alloc/EnQue/DeQue/Free | 寄存器自动分配 |
 | 掩码控制 | 函数参数控制 | `MaskReg`寄存器控制 |
-| 数据搬运 | `DataCopy`/`DataCopyPad` | `MicroAPI::DataCopy` + 分发模式 |
+| 数据搬运 | `DataCopy`/`DataCopyPad` | `Reg::DataCopy` + 分发模式 |
 
 **代码示例**
 
@@ -228,26 +230,26 @@ Ascend 950系列引入了Regbase编程范式，相比传统的Membase（Vector A
 __simd_vf__ __aicore__ void GenIndexBuf(ubuf int32_t* helpAddr, int32_t colFactor)
 {
     // 声明寄存器张量
-    AscendC::MicroAPI::RegTensor<int32_t> v0;
-    AscendC::MicroAPI::RegTensor<int32_t> v1;
-    AscendC::MicroAPI::RegTensor<int32_t> vd1;
-    AscendC::MicroAPI::RegTensor<int32_t> vd2;
-    AscendC::MicroAPI::RegTensor<int32_t> vd3;
+    AscendC::Reg::RegTensor<int32_t> v0;
+    AscendC::Reg::RegTensor<int32_t> v1;
+    AscendC::Reg::RegTensor<int32_t> vd1;
+    AscendC::Reg::RegTensor<int32_t> vd2;
+    AscendC::Reg::RegTensor<int32_t> vd3;
 
     // 创建全量掩码
-    AscendC::MicroAPI::MaskReg preg =
-        AscendC::MicroAPI::CreateMask<int32_t, AscendC::MicroAPI::MaskPattern::ALL>();
+    AscendC::Reg::MaskReg preg =
+        AscendC::Reg::CreateMask<int32_t, AscendC::Reg::MaskPattern::ALL>();
 
     // 标量复制到寄存器
-    AscendC::MicroAPI::Duplicate(v1, colFactor, preg);
+    AscendC::Reg::Duplicate(v1, colFactor, preg);
     // 生成序列 [0, 1, 2, ...]
-    AscendC::MicroAPI::Arange(v0, 0);
+    AscendC::Reg::Arange(v0, 0);
     // 向量运算
-    AscendC::MicroAPI::Div(vd1, v0, v1, preg);
-    AscendC::MicroAPI::Mul(vd2, vd1, v1, preg);
-    AscendC::MicroAPI::Sub(vd3, v0, vd2, preg);
+    AscendC::Reg::Div(vd1, v0, v1, preg);
+    AscendC::Reg::Mul(vd2, vd1, v1, preg);
+    AscendC::Reg::Sub(vd3, v0, vd2, preg);
     // 寄存器数据写回UB
-    AscendC::MicroAPI::DataCopy(helpAddr, vd3, preg);
+    AscendC::Reg::DataCopy(helpAddr, vd3, preg);
 }
 ```
 
@@ -255,19 +257,19 @@ __simd_vf__ __aicore__ void GenIndexBuf(ubuf int32_t* helpAddr, int32_t colFacto
 // 动态掩码：处理尾部不完整数据
 __simd_vf__ __aicore__ void GatherProcess(ubuf int8_t* curXAddr, ubuf int8_t* curYAddr, uint16_t repeatTimes, uint16_t computeSize)
 {
-    MicroAPI::RegTensor<int8_t> vregTemp;
-    MicroAPI::MaskReg preg;
+    Reg::RegTensor<int8_t> vregTemp;
+    Reg::MaskReg preg;
     // sreg为剩余待处理元素（普通unit32_t标量计数）
     unit32_t sreg = static_cast<unit32_t>(repeatimes)*computeSize;
 
     for (uint16_t r = 0; r < repeatTimes; r++) {
         // 根据剩余元素数更新掩码
-        preg = MicroAPI::UpdateMask<int8_t>(sreg);
+        preg = Reg::UpdateMask<int8_t>(sreg);
         // 创建地址偏移寄存器
-        MicroAPI::AddrReg offset = MicroAPI::CreateAddrReg<int8_t>(r, computeSize);
-        MicroAPI::DataCopy(vregTemp, curXAddr, offset);
+        Reg::AddrReg offset = Reg::CreateAddrReg<int8_t>(r, computeSize);
+        Reg::DataCopy(vregTemp, curXAddr, offset);
         // 带掩码的数据存储
-        MicroAPI::DataCopy(curYAddr, vregTemp, offset, preg);
+        Reg::DataCopy(curYAddr, vregTemp, offset, preg);
     }
 }
 ```
@@ -276,16 +278,16 @@ __simd_vf__ __aicore__ void GatherProcess(ubuf int8_t* curXAddr, ubuf int8_t* cu
 // 数据聚合
 __VEC_SCOPE__
 {
-    MicroAPI::RegTensor<uint32_t> indicesReg;
-    MicroAPI::RegTensor<int32_t> vd0;
+    Reg::RegTensor<uint32_t> indicesReg;
+    Reg::RegTensor<int32_t> vd0;
 
     for (uint16_t indices = 0; indices < indicesLoopNum; indices++) {
         // 加载索引（E2B分发模式：将标量广播到向量）
-        MicroAPI::DataCopy<uint32_t, MicroAPI::LoadDist::DIST_E2B_B32>(indicesReg, indicesAddr);
+        Reg::DataCopy<uint32_t, Reg::LoadDist::DIST_E2B_B32>(indicesReg, indicesAddr);
         // 根据索引进行Gather数据聚合
-        MicroAPI::DataCopyGather(vd0, curXAddr, indicesReg, preg);
+        Reg::DataCopyGather(vd0, curXAddr, indicesReg, preg);
         // 数据块拷贝输出
-        MicroAPI::DataCopy<int32_t, MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+        Reg::DataCopy<int32_t, Reg::DataCopyMode::DATA_BLOCK_COPY>(
             curYAddr, vd0, blockStride, preg);
     }
 }
