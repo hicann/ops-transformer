@@ -1591,17 +1591,10 @@ int CreateAclTensorNz(const std::vector<T> &hostData, const std::vector<int64_t>
     void *dstDeviceAddr = nullptr;
 
     uint64_t tensorSize = 1;
-    for (int64_t i = 0; i < dstShape[i]; i++) {
+    for (uint64_t i = 0; i < dstShapeSize; ++i) {
         tensorSize *= dstShape[i];
     }
-    ret = aclrtMalloc(&dstDeviceAddr, tensorSize * sizeof(T), ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
-
-    int64_t weightLen = shape.size();
-    for (int64_t i = 0; i < weightLen + 2; i++) {
-        tensorSize = tensorSize * dstShape[i];
-    }
-    std::vector<uint16_t> dstTensorHostData(tensorSize, 0);
+    std::vector<T> dstTensorHostData(tensorSize, 0);
 
     ret = CreateAclTensorWithFormat(dstTensorHostData, shape, &dstShape, &dstShapeSize, &dstDeviceAddr, dataType,
                                     &dstTensor, static_cast<aclFormat>(actualFormat));
@@ -1631,6 +1624,7 @@ int CreateAclTensorNz(const std::vector<T> &hostData, const std::vector<int64_t>
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
+    *deviceAddr = dstDeviceAddr;
     *tensor = dstTensor;
     return ACL_SUCCESS;
 }
