@@ -12,7 +12,7 @@
  * \file test_aclnn_lightning_indexer_grad.cpp
  * \brief
  */
-//testci
+// testci
 #include <iostream>
 #include <cstdio>
 #include <string>
@@ -22,16 +22,16 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_lightning_indexer_grad.h"
 
-#define CHECK_RET(cond, return_expr)                   \
-    do {                                               \
-        if (!(cond)) {                                 \
-            return_expr;                               \
-        }                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                        \
-    do {                                               \
-        printf(message, ##__VA_ARGS__);                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -43,15 +43,16 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-template <typename T> 
-void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
+template <typename T>
+void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+{
     auto size = GetShapeSize(shape);
-    std::vector<float> resultData(size, 0);
-    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]),
-                            *deviceAddr, size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    std::vector<T> resultData(size, 0);
+    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(T), *deviceAddr, size * sizeof(T),
+                           ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < 10; i++) {
-        LOG_PRINT("mean result[%ld] is: %f\n", i, resultData[i]);
+        LOG_PRINT("mean result[%ld] is: %f\n", i, static_cast<float>(resultData[i]));
     }
 }
 
@@ -64,13 +65,13 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); aclFinalize(); return ret);
     ret = aclrtCreateContext(context, deviceId);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateContext failed. ERROR: %d\n", ret); aclrtResetDevice(deviceId);
-        aclFinalize(); return ret);
+              aclFinalize(); return ret);
     ret = aclrtSetCurrentContext(*context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetCurrentContext failed. ERROR: %d\n", ret);
-        aclrtDestroyContext(context); aclrtResetDevice(deviceId); aclFinalize(); return ret);
+              aclrtDestroyContext(context); aclrtResetDevice(deviceId); aclFinalize(); return ret);
     ret = aclrtCreateStream(stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret);
-        aclrtDestroyContext(context); aclrtResetDevice(deviceId); aclFinalize(); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); aclrtDestroyContext(context);
+              aclrtResetDevice(deviceId); aclFinalize(); return ret);
     return 0;
 }
 
@@ -99,11 +100,10 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-
-void FreeResource(aclTensor *q, aclTensor *k, aclTensor *dy, aclTensor *sparseIndices, aclTensor *weights, 
-                  aclTensor *dQuery, aclTensor *dKey, aclTensor *dWeights, void *qDeviceAddr, void *kDeviceAddr, 
-                  void *dyDeviceAddr, void *sparseIndicesDeviceAddr, void *weightsDeviceAddr, void *dQueryAddr, 
-                  void *dKeyAddr, void *dWeightsAddr, uint64_t workspaceSize, void *workspaceAddr, int32_t deviceId, 
+void FreeResource(aclTensor *q, aclTensor *k, aclTensor *dy, aclTensor *sparseIndices, aclTensor *weights,
+                  aclTensor *dQuery, aclTensor *dKey, aclTensor *dWeights, void *qDeviceAddr, void *kDeviceAddr,
+                  void *dyDeviceAddr, void *sparseIndicesDeviceAddr, void *weightsDeviceAddr, void *dQueryAddr,
+                  void *dKeyAddr, void *dWeightsAddr, uint64_t workspaceSize, void *workspaceAddr, int32_t deviceId,
                   aclrtContext *context, aclrtStream *stream)
 {
     // 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
@@ -239,91 +239,92 @@ int main()
     // 创建acl Tensor
     ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
     ret = CreateAclTensor(kHostData, kShape, &kDeviceAddr, aclDataType::ACL_FLOAT16, &k);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
     ret = CreateAclTensor(dyHostData, dyShape, &dyDeviceAddr, aclDataType::ACL_FLOAT16, &dy);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
-    ret = CreateAclTensor(sparseIndicesHostData, sparseIndicesShape, &sparseIndicesDeviceAddr, aclDataType::ACL_INT32, &sparseIndices);
+    ret = CreateAclTensor(sparseIndicesHostData, sparseIndicesShape, &sparseIndicesDeviceAddr, aclDataType::ACL_INT32,
+                          &sparseIndices);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
     ret = CreateAclTensor(weightsHostData, weightsShape, &weightsDeviceAddr, aclDataType::ACL_FLOAT16, &weights);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
-    
+
     ret = CreateAclTensor(dQueryHostData, dQueryShape, &dQueryAddr, aclDataType::ACL_FLOAT16, &dQuery);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
     ret = CreateAclTensor(dKeyHostData, dKeyShape, &dKeyAddr, aclDataType::ACL_FLOAT16, &dKey);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
     ret = CreateAclTensor(dWeightsHostData, dWeightsShape, &dWeightsAddr, aclDataType::ACL_FLOAT16, &dWeights);
     CHECK_RET(ret == ACL_SUCCESS,
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     aclOpExecutor *executor;
 
     // 调用aclnnLightningIndexerGrad第一段接口
-    ret = aclnnLightningIndexerGradGetWorkspaceSize(
-        q, k, dy, sparseIndices, weights, nullptr, nullptr, headNum,
-        layoutStr, sparseMode, preToken, nextToken, deteminstic, dQuery, dKey, dWeights, &workspaceSize, &executor);
+    ret = aclnnLightningIndexerGradGetWorkspaceSize(q, k, dy, sparseIndices, weights, nullptr, nullptr, headNum,
+                                                    layoutStr, sparseMode, preToken, nextToken, deteminstic, dQuery,
+                                                    dKey, dWeights, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnLightningIndexerGradGetWorkspaceSize failed. ERROR: %d\n", ret);
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret);
-            FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
-            return ret);
+                  FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                               dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr,
+                               dWeightsAddr, workspaceSize, workspaceAddr, deviceId, &context, &stream);
+                  return ret);
     }
 
     // 调用aclnnLightningIndexerGrad第二段接口
     ret = aclnnLightningIndexerGrad(workspaceAddr, workspaceSize, executor, stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnLightningIndexerGrad failed. ERROR: %d\n", ret);
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
 
     // 4. （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret);
-              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+              FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,
+                           dyDeviceAddr, sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr,
+                           workspaceSize, workspaceAddr, deviceId, &context, &stream);
               return ret);
 
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
@@ -333,8 +334,8 @@ int main()
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改; 释放device资源
     FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr, dyDeviceAddr,
-                  sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize, workspaceAddr,
-                  deviceId, &context, &stream);
+                 sparseIndicesDeviceAddr, weightsDeviceAddr, dQueryAddr, dKeyAddr, dWeightsAddr, workspaceSize,
+                 workspaceAddr, deviceId, &context, &stream);
 
     return 0;
 }
