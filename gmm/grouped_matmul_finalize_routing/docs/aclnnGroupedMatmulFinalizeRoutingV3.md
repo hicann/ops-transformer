@@ -28,7 +28,7 @@
 - 接口功能：
   GroupedMatmul和MoeFinalizeRouting的融合算子，GroupedMatmul计算后的输出按照索引做combine动作。
 
-  相较于aclnnGroupedMatmulFinalizeRoutingV2接口，**此接口新增:**
+  相较于aclnnGroupedMatmulFinalizeRoutingV2接口，**此接口新增：**
 
     <!-- npu="A3,910b" id7 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：新增入参tuningConfigOptional，调优参数。数组中的第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值合理进行tiling切分，性能更优。
@@ -264,7 +264,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     <tr>
       <td>sharedInputWeight</td>
       <td>输入</td>
-      <td>共享专家与moe专家进行combine的系数，sharedInput先与该参数乘，然后在和moe专家结果累加。</td>
+      <td>共享专家与moe专家进行combine的系数，sharedInput先与该参数相乘，然后再与moe专家结果累加。</td>
       <td></td>
       <td>FLOAT32</td>
       <td></td>
@@ -756,7 +756,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       CHECK_RET(ret == ACL_SUCCESS, return ret);
 
       aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
-      CHECK_RET(tuningConfig != nullptr, return -1);
+      CHECK_RET(tuningConfig != nullptr, LOG_PRINT("aclCreateIntArray failed.\n"); return -1);
       // 3. 调用CANN算子库API，需要修改为具体的Api名称
       uint64_t workspaceSize = 0;
       aclOpExecutor *executor;

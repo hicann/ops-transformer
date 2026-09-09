@@ -247,7 +247,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     aclIntArray *tuningConfig = aclCreateIntArray(tuningConfigVal.data(), tuningConfigVal.size());
-    CHECK_RET(tuningConfig != nullptr, return -1);
+    CHECK_RET(tuningConfig != nullptr, LOG_PRINT("aclCreateIntArray failed.\n"); return -1);
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor;
