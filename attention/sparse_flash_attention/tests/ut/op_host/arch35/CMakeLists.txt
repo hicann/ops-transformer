@@ -8,21 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+
 if(UT_TEST_ALL OR OP_HOST_UT)
     add_modules_ut_sources(UT_NAME ${OP_TILING_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
-    add_modules_ut_sources(UT_NAME ${OP_INFERSHAPE_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
-    # checker unit tests in test_sparse_flash_mla_tiling.cpp need the checker implementations
-    include(${CMAKE_CURRENT_SOURCE_DIR}/../../../op_host/checkers/checker_sources.cmake)
-    if(TARGET ${OP_TILING_MODULE_NAME}_cases_obj)
-        add_sparse_mla_common_checker_sources(${OP_TILING_MODULE_NAME}_cases_obj)
-        target_sources(${OP_TILING_MODULE_NAME}_cases_obj PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_host/checkers/sparse_flash_mla_checker.cpp)
-    endif()
 endif()
-
-file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
-foreach(SUB_DIR ${CURRENT_DIRS})
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SUB_DIR}/CMakeLists.txt")
-        add_subdirectory(${SUB_DIR})
-    endif()
-endforeach()

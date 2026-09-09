@@ -23,7 +23,10 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor) { Release(tensor); }
+void DestroyAclTensor(aclTensor *tensor)
+{
+    Release(tensor);
+}
 } // namespace
 
 class sparse_flash_attention_opapi_ut : public testing::Test {
@@ -34,7 +37,10 @@ protected:
         cout << "sparse_flash_attention_opapi_ut SetUp" << endl;
     }
 
-    static void TearDownTestCase() { cout << "sparse_flash_attention_opapi_ut TearDown" << endl; }
+    static void TearDownTestCase()
+    {
+        cout << "sparse_flash_attention_opapi_ut TearDown" << endl;
+    }
 };
 
 // Missing lse outputs
@@ -143,4 +149,100 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_a3_witho
 
     EXPECT_NE(aclRet, ACLNN_ERR_RUNTIME_ERROR);
     EXPECT_EQ(executor, nullptr);
+}
+
+// V2: returnSoftmaxLse is false and both lse outputs are null
+TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_lse_false_both_null)
+{
+    char layoutQ[] = "BSND";
+    char layoutKv[] = "BSND";
+    auto query = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 128, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto value = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 128, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndices = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 1, 2}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+
+    aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
+        query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, false, attentionOut.get(), nullptr,
+        nullptr, &workspaceSize, &executor);
+
+    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V2: value is null, key is used as value and the call reaches the inner api
+TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_value_null_passthrough)
+{
+    char layoutQ[] = "BSND";
+    char layoutKv[] = "BSND";
+    auto query = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 128, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndices = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 1, 2}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto softmaxMax = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 32, 1}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+
+    aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
+        query.get(), key.get(), nullptr, sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, false, attentionOut.get(),
+        softmaxMax.get(), nullptr, &workspaceSize, &executor);
+
+    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V2: sinks is supported on Ascend950 and the call reaches the inner api
+TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_950_sinks_supported)
+{
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+    char layoutQ[] = "BSND";
+    char layoutKv[] = "BSND";
+    auto query = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 128, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto value = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 128, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndices = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 1, 2}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sinks = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({32}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+
+    aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
+        query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        sinks.get(), 0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, false, attentionOut.get(),
+        nullptr, nullptr, &workspaceSize, &executor);
+
+    EXPECT_NE(aclRet, ACLNN_ERR_RUNTIME_ERROR);
+    EXPECT_EQ(executor, nullptr);
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+}
+
+// Null executor of the second phase entry
+TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_aclnn_entry)
+{
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+    aclnnStatus aclRet = aclnnSparseFlashAttention(nullptr, 0, nullptr, nullptr);
+    EXPECT_EQ(aclRet, ACL_SUCCESS);
+
+    aclRet = aclnnSparseFlashAttentionV2(nullptr, 0, nullptr, nullptr);
+    EXPECT_EQ(aclRet, ACL_SUCCESS);
 }

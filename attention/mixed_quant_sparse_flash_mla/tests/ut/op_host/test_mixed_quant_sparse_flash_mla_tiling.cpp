@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
+#include "register/tilingdata_base.h"
 #include "../../../../sparse_flash_mla/tests/ut/op_host/test_sparse_flash_mla_tiling.h"
 
 using namespace std;
@@ -324,4 +325,12 @@ TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_cmp_block_table_dim1_zero_fai
     c.cmpRatio = 128;
     c.cmpMaskMode = 3;
     RunMQSmlaTilingCase(c, ge::GRAPH_FAILED);
+}
+
+// Tiling data classes are registered for the op
+TEST_F(MixedQuantSparseFlashMlaTiling, MixedQuantSparseFlashMla_tiling_data_class_registered)
+{
+    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    EXPECT_NE(factory.CreateTilingDataInstance("MixedQuantSparseFlashMla"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("MixedQuantSparseFlashMlaBaseParamsOp"), nullptr);
 }

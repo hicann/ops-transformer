@@ -17,9 +17,15 @@
 
 class SparseFlashAttentionProto : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "SparseFlashAttentionProto SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "SparseFlashAttentionProto SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "SparseFlashAttentionProto TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "SparseFlashAttentionProto TearDown" << std::endl;
+    }
 };
 
 // BNSD
@@ -190,4 +196,36 @@ TEST_F(SparseFlashAttentionProto, SparseFlashAttention_inferdtype)
         EXPECT_EQ(context->GetOutputDataType(1), output_ref1);
         EXPECT_EQ(context->GetOutputDataType(1), output_ref1);
     }
+}
+
+// TND key with zero head num, expect failure
+TEST_F(SparseFlashAttentionProto, SparseFlashAttention_infershape_3)
+{
+    gert::InfershapeContextPara infershapeContextPara(
+        "SparseFlashAttention",
+        {
+            {{{128, 128, 512}, {128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // query TND
+            {{{128, 0, 512}, {128, 0, 512}}, ge::DT_BF16, ge::FORMAT_ND},     // key TND, head num is 0
+            {{{128, 0, 512}, {128, 0, 512}}, ge::DT_BF16, ge::FORMAT_ND},     // value TND
+            {{{128, 1, 2048}, {128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},  // sparse_indices
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                          // block_table
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                          // actual_seq_lengths_query
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                          // actual_seq_lengths_kv
+            {{{128, 128, 64}, {128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},   // query_rope
+            {{{128, 0, 64}, {128, 0, 64}}, ge::DT_BF16, ge::FORMAT_ND}        // key_rope
+        },
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
+
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED);
 }

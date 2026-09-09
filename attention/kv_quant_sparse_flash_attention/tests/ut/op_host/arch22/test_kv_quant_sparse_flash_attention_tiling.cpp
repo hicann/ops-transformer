@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 #include "tiling_case_executor.h"
+#include "register/tilingdata_base.h"
 #include "tiling_context_faker.h"
 
 class KvQuantSparseFlashAttentionTiling : public testing::Test {
@@ -738,4 +739,16 @@ TEST_F(KvQuantSparseFlashAttentionTiling, KvQuantSparseFlashAttention_910b_18)
         &compileInfo, "Ascend910B", 64, 262144, 16384);
 
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Tiling data classes are registered for the op
+TEST_F(KvQuantSparseFlashAttentionTiling, KvQuantSparseFlashAttention_tiling_data_class_registered)
+{
+    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    EXPECT_NE(factory.CreateTilingDataInstance("KvQuantSparseFlashAttention"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("KvQuantSparseFlashAttentionBaseParamsMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("KvQuantSparseFlashAttentionSingleCoreParamsMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("KvQuantSparseFlashAttentionSingleCoreTensorSizeMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("KvQuantSparseFlashAttentionSplitKVParamsMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("KvQuantSparseFlashAttentionInnerSplitParamsOp"), nullptr);
 }

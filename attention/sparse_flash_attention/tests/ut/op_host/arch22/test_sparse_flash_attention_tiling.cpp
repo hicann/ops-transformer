@@ -12,13 +12,20 @@
 #include <gtest/gtest.h>
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
+#include "register/tilingdata_base.h"
 using namespace std;
 
 class SparseFlashAttentionTiling : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "SparseFlashAttentionTiling SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "SparseFlashAttentionTiling SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "SparseFlashAttentionTiling TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "SparseFlashAttentionTiling TearDown" << std::endl;
+    }
 };
 
 // Shape of tensor softmaxMax is nullptr
@@ -727,4 +734,314 @@ TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_18)
                                    "262144 64 281474976776192 2199023255680 ";
     std::vector<size_t> expectWorkspaces = {252051456};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
+}
+
+// TND query and TND key layout, success
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_20)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    int64_t actual_seq_qlist[] = {128};
+    int64_t actual_seq_kvlist[] = {128};
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {
+            {{{128, 128, 512}, {128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},   // query TND
+            {{{128, 1, 512}, {128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},       // key TND
+            {{{128, 1, 512}, {128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},       // value TND
+            {{{128, 1, 2048}, {128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},    // sparse_indices
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                            // block_table
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},  // actual_seq_lengths_query
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist}, // actual_seq_lengths_kv
+            {{{128, 128, 64}, {128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},     // query_rope
+            {{{128, 1, 64}, {128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}          // key_rope
+        },
+        {
+            {{{128, 128, 512}, {128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // attention_out
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                        // softmax_max
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                         // softmax_sum
+        },
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+// BSND query and BSND key layout with return_softmax_lse, success
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_21)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    int64_t actual_seq_qlist[] = {113};
+    int64_t actual_seq_kvlist[] = {113};
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 2048}, {1, 128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist},
+         {{{1, 128, 128, 64}, {1, 128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 1, 128, 128}, {1, 1, 128, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{1, 1, 128, 128}, {1, 1, 128, 128}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+// FP16 dtype with BSND query and PA_BSND key layout, success
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_22)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    int64_t actual_seq_qlist[] = {113};
+    int64_t actual_seq_kvlist[] = {113};
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1, 128, 1, 2048}, {1, 128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist},
+         {{{1, 128, 128, 64}, {1, 128, 128, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+// layout_kv is invalid
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_23)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 2048}, {1, 128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 128, 128, 64}, {1, 128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("INVALID")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// layout_query is invalid
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_24)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 2048}, {1, 128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 128, 128, 64}, {1, 128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("INVALID")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// layout_query is BSND but layout_kv is TND, mismatch
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_25)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{128, 1, 512}, {128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{128, 1, 512}, {128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{128, 1, 2048}, {128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{128, 128, 64}, {128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{128, 1, 64}, {128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{128, 128, 512}, {128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// layout_kv is PA_BSND but key dim num is 3
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_26)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{128, 1, 512}, {128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 2048}, {1, 128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 128, 128, 64}, {1, 128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// return_softmax_lse is true while layout_kv is PA_BSND
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_27)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 2048}, {1, 128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 128, 128, 64}, {1, 128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 128, 1}, {1, 128, 128, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{1, 128, 128, 1}, {1, 128, 128, 1}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// soc is not supported by the op
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_28)
+{
+    struct SparseFlashAttentionCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashAttention",
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 512}, {1, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 2048}, {1, 128, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 128, 128, 64}, {1, 128, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{1, 128, 128, 512}, {1, 128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0416666666666667)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend310P", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Tiling data classes are registered for the op
+TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_tiling_data_class_registered)
+{
+    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttention"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttentionBaseParamsMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttentionSingleCoreParamsMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttentionSingleCoreTensorSizeMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttentionSplitKVParamsMlaOp"), nullptr);
+    EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttentionInnerSplitParamsOp"), nullptr);
 }

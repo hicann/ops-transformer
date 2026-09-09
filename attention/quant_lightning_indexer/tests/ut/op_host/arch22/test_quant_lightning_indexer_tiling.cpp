@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 #include "tiling_case_executor.h"
+#include "register/tilingdata_base.h"
 #include "tiling_context_faker.h"
 
 class QuantLightningIndexerTiling : public testing::Test {
@@ -53,8 +54,7 @@ TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_910b_tiling_0)
         &compileInfo, "Ascend910B", 64, 262144, 16384);
 
     int64_t expectTilingKey = 197122;
-    std::string expectTilingData =
-        "1099511627778 274877906944 2199023255680 1024 274877906944 0 3 ";
+    std::string expectTilingData = "1099511627778 274877906944 2199023255680 1024 274877906944 0 3 ";
     std::vector<size_t> expectWorkspaces = {167903232};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -89,8 +89,7 @@ TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_910b_tiling_1)
         &compileInfo, "Ascend910B", 64, 262144, 16384);
 
     int64_t expectTilingKey = 570622466;
-    std::string expectTilingData =
-        "824633720835 68719476736 1649267441664 512 274877906944 0 0 ";
+    std::string expectTilingData = "824633720835 68719476736 1649267441664 512 274877906944 0 0 ";
     std::vector<size_t> expectWorkspaces = {167903232};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -124,8 +123,7 @@ TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_910b_tiling_2)
         &compileInfo, "Ascend910B", 64, 262144, 16384);
 
     int64_t expectTilingKey = 1090716162;
-    std::string expectTilingData =
-        "549755813890 274877906944 2199023255616 8796093022464 274877906960 137438953488 3 ";
+    std::string expectTilingData = "549755813890 274877906944 2199023255616 8796093022464 274877906960 137438953488 3 ";
     std::vector<size_t> expectWorkspaces = {167903232};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -161,7 +159,8 @@ TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_910b_tiling_3)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-// outside of PA, input attr layout_query and input attr layout_key must be the same,but now layout_key is TND, layout_query is BSND.
+// outside of PA, input attr layout_query and input attr layout_key must be the same,but now layout_key is TND,
+// layout_query is BSND.
 TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_910b_tiling_4)
 {
     struct QuantLightningIndexerCompileInfo {
@@ -289,4 +288,11 @@ TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_910b_tiling_7)
         &compileInfo, "Ascend910B", 64, 262144, 16384);
 
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Tiling data classes are registered for the op
+TEST_F(QuantLightningIndexerTiling, QuantLightningIndexer_tiling_data_class_registered)
+{
+    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    EXPECT_NE(factory.CreateTilingDataInstance("QuantLightningIndexer"), nullptr);
 }

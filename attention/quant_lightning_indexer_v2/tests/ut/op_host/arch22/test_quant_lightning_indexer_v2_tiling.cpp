@@ -9,6 +9,7 @@
  */
 #include <iostream>
 #include <gtest/gtest.h>
+#include "register/tilingdata_base.h"
 #include "../test_quant_lightning_indexer_v2_utils.h"
 
 // DAV_2201 (Ascend910B) tiling cases for QuantLightningIndexerV2
@@ -188,4 +189,11 @@ TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_tiling_unsup
     qliv2_ut::CaseParam p;
     p.soc = "Ascend310P";
     qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// Tiling data classes are registered for the op
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_tiling_data_class_registered)
+{
+    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    EXPECT_NE(factory.CreateTilingDataInstance("QuantLightningIndexerV2"), nullptr);
 }

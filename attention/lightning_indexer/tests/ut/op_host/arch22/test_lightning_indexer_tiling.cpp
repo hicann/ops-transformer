@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
+#include "register/tilingdata_base.h"
 using namespace std;
 
 class LightningIndexerTiling : public testing::Test {
@@ -382,4 +383,11 @@ TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_10)
          {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
         &compileInfo, "Ascend910B", 64, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Tiling data classes are registered for the op
+TEST_F(LightningIndexerTiling, LightningIndexer_tiling_data_class_registered)
+{
+    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    EXPECT_NE(factory.CreateTilingDataInstance("LightningIndexer"), nullptr);
 }

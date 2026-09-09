@@ -219,6 +219,7 @@ attention:
       - attention/sparse_flash_mla/README.md
     ut_cov_exclude:
       - attention/sparse_flash_mla/tests
+      - attention/sparse_flash_mla/op_host/checkers/checker_context.h # 纯数据结构声明头，无函数体，无覆盖率数据
     test:
       examples: False
       ut: True
@@ -234,6 +235,8 @@ attention:
       - attention/mixed_quant_sparse_flash_mla/README.md
     ut_cov_exclude:
       - attention/mixed_quant_sparse_flash_mla/tests
+      - attention/mixed_quant_sparse_flash_mla/op_api/aclnn_mixed_quant_sparse_flash_mla.h # 纯声明头，无覆盖率数据
+      - attention/mixed_quant_sparse_flash_mla/op_api/aclnn_mixed_quant_sparse_flash_mla_inner.h # 纯声明头，无覆盖率数据
     test:
       examples: False
       ut: True
@@ -606,6 +609,7 @@ attention:
     ut_cov_exclude:
       - attention/lightning_indexer/examples
       - attention/lightning_indexer/tests
+      - attention/lightning_indexer/op_host/op_api/aclnn_lightning_indexer.h # 纯声明头，无覆盖率数据
     test:
       examples: False
       ut: True
@@ -653,6 +657,8 @@ attention:
     ut_cov_exclude:
       - attention/sparse_flash_attention/examples
       - attention/sparse_flash_attention/tests
+      - attention/sparse_flash_attention/op_host/op_api/aclnn_sparse_flash_attention.h # 纯声明头，无覆盖率数据
+      - attention/sparse_flash_attention/op_host/op_api/aclnn_sparse_flash_attention_v2.h # 纯声明头，无覆盖率数据
     test:
       examples: False
       ut: True
@@ -667,6 +673,7 @@ attention:
       - attention/quant_lightning_indexer/README.md
     ut_cov_exclude:
       - attention/quant_lightning_indexer/tests
+      - attention/quant_lightning_indexer/op_host/op_api/aclnn_quant_lightning_indexer.h # 纯声明头，无覆盖率数据
     test:
       examples: False
       ut: True
@@ -701,6 +708,22 @@ attention:
       ut: True
     options:
       - kv_quant_sparse_flash_attention
+
+  kv_quant_sparse_flash_attention_v2:
+    module: True
+    src:
+      - attention/kv_quant_sparse_flash_attention_v2
+    exclude:
+      - attention/kv_quant_sparse_flash_attention_v2/README.md
+    ut_cov_exclude:
+      - attention/kv_quant_sparse_flash_attention_v2/tests
+      # tiling_register.cpp （IMPL_OP_OPTILING 静态注册，可执行代码均在 CANN 头文件内联）
+      - attention/kv_quant_sparse_flash_attention_v2/op_host/kv_quant_sparse_flash_attention_v2_tiling_register.cpp
+    test:
+      examples: False
+      ut: True
+    options:
+      - kv_quant_sparse_flash_attention_v2
 
   recurrent_gated_delta_rule:
     module: True
