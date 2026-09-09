@@ -89,8 +89,9 @@ static void PrintTilingDataInfo(const char *nodeName, FFNToAttentionTilingData &
     OP_LOGD(nodeName, "totalWinSize is %lu.", tilingData.ffnToAttentionInfo.totalWinSize);
 }
 
-static bool CheckAndSetAttrs(gert::TilingContext *context, const char *nodeName, FFNToAttentionTilingData &tilingData,
-                             std::string &group, const FFNToAttentionTilingConfig &config)
+static bool CheckAndSetAttrs(const gert::TilingContext *context, const char *nodeName,
+                             FFNToAttentionTilingData &tilingData, std::string &group,
+                             const FFNToAttentionTilingConfig &config)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return false);
@@ -518,7 +519,7 @@ static void CalWinSize(FFNToAttentionTilingData &tilingData, uint64_t &neededSiz
     return;
 }
 
-static ge::graphStatus SetHcommCfg(gert::TilingContext *context, FFNToAttentionTilingData &tilingData,
+static ge::graphStatus SetHcommCfg(const gert::TilingContext *context, FFNToAttentionTilingData &tilingData,
                                    const std::string group)
 {
     const char *nodeName = context->GetNodeName();

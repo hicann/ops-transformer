@@ -121,8 +121,6 @@ struct TileCastFp8ToFp16Dequant {
         uint32_t tileTailLen = tileLen % COMPUTE_LENGTH;
         uint64_t srcProcessOffset, dstProcessOffset;
         uint32_t loadLen = COMPUTE_LENGTH, storeLen, loadRepeat = 1, storeRepeat = 1;
-        // uint32_t srcLoadStride = srcStride, dstLoadStride = tileLenRoundFp8,
-        //         srcStoreStride = tileLenRoundFp8, dstStoreStride = dstStride;
         for (int ldx = 0; ldx < totalLoops; ldx++) {
             // Dynamic compute length
             if (tileLenRoundFp8 > COMPUTE_LENGTH / 2) {
@@ -149,10 +147,6 @@ struct TileCastFp8ToFp16Dequant {
                     storeRepeat = loadRepeat;
                 }
             }
-            // uint32_t srcLoadStride = srcStride;
-            // uint32_t dstLoadStride = tileLenRoundFp8;
-            // uint32_t srcStoreStride = tileLenRoundFp8;
-
             // GM -> UB
             AscendC::DataCopyExtParams dataCopyParamsIn(loadRepeat, loadLen * sizeof(ElementSrc),
                                                         (srcStride - loadLen) * sizeof(ElementSrc), //
@@ -239,8 +233,6 @@ struct TileCastFp8ToFp16Dequant {
         uint32_t tileTailLen = tileLen % COMPUTE_LENGTH;
         uint64_t srcProcessOffset, dstProcessOffset;
         uint32_t loadLen = COMPUTE_LENGTH, storeLen, loadRepeat = 1, storeRepeat = 1;
-        // uint32_t srcLoadStride = srcStride, dstLoadStride = tileLenRoundFp8,
-        //         srcStoreStride = tileLenRoundFp8, dstStoreStride = dstStride;
         for (int ldx = 0; ldx < totalLoops; ldx++) {
             // Dynamic compute length
             if (tileLenRoundFp8 > COMPUTE_LENGTH / 2) {

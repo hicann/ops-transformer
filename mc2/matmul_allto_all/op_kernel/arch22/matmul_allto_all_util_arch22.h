@@ -32,6 +32,7 @@ constexpr static int32_t FLAG_VALUE = 1;
 constexpr static int32_t USED_UB_SIZE = 160 * 1024;
 constexpr static int32_t FLAG_OFFSET = 180 * 1024 * 1024 / sizeof(int32_t);
 constexpr static uint32_t UB_OFFSET = 97440 / sizeof(int16_t); // 2 是 size of T
+constexpr static uint64_t AIC_SYNC_MODE = 2U;
 } // namespace
 
 template <typename T, size_t SIZE>
@@ -123,7 +124,7 @@ public:
 
     __aicore__ inline void SetAicSync(uint64_t flag_idx)
     {
-        FFTSCrossCoreSync<PIPE_MTE3, 2>(flag_idx);
+        FFTSCrossCoreSync<PIPE_MTE3, AIC_SYNC_MODE>(flag_idx);
     }
 
     template <typename T>

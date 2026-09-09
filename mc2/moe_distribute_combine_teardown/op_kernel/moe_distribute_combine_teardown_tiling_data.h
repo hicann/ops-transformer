@@ -16,6 +16,7 @@
 #ifndef MOE_DISTRIBUTE_COMBINE_TEARDOWN_TILING_DATA_H
 #define MOE_DISTRIBUTE_COMBINE_TEARDOWN_TILING_DATA_H
 
+#include <cstdint>
 #include <kernel_tiling/kernel_tiling.h>
 
 struct MoeDistributeCombineTeardownInfo {

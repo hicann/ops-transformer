@@ -17,6 +17,8 @@
 #define _ALL_GATHER_MATMUL_OP_TILING_H_
 
 #pragma once
+
+#include <cstdint>
 #include "kernel_tiling/kernel_tiling.h"
 #include "../../common/op_kernel/mc2_tiling_struct.h"
 namespace Mc2Tiling {

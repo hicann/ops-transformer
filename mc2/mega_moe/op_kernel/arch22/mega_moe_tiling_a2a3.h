@@ -13,10 +13,10 @@
  * \brief
  */
 
-#include "moe_permute_prologue/moe_permute_prologue_tiling.h"
-
 #ifndef ASCENDC_MEGA_MOE_TILING_H
 #define ASCENDC_MEGA_MOE_TILING_H
+
+#include "moe_permute_prologue/moe_permute_prologue_tiling.h"
 
 using namespace Mc2Tiling;
 

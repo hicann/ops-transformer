@@ -24,6 +24,10 @@ namespace Catlass::Gemm::Tile {
 template <class ElementAccumulator_, class ElementDst_, bool ReluEnable_>
 struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<ElementDst_, layout::RowMajor>,
                    ScaleGranularity::PER_CHANNEL, ReluEnable_> {
+    static constexpr int32_t M_DIM = 0;
+    static constexpr int32_t N_DIM = 1;
+    static constexpr int32_t ZN_OUTER_STRIDE_DIM = 3;
+
     using ArchTag = Catlass::Arch::AtlasA2;
     using ElementDst = ElementDst_;
     using ElementSrc = ElementAccumulator_;
@@ -41,10 +45,10 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
         AscendC::FixpipeParamsV220 intriParams;
 
         // Fixpipe layout information
-        intriParams.nSize = dstLayout.shape(1);
-        intriParams.mSize = dstLayout.shape(0);
-        intriParams.srcStride = srcLayout.stride(3) / srcLayout.stride(0);
-        intriParams.dstStride = dstLayout.stride(0);
+        intriParams.nSize = dstLayout.shape(N_DIM);
+        intriParams.mSize = dstLayout.shape(M_DIM);
+        intriParams.srcStride = srcLayout.stride(ZN_OUTER_STRIDE_DIM) / srcLayout.stride(M_DIM);
+        intriParams.dstStride = dstLayout.stride(M_DIM);
 
         // Fixpipe auxiliary arguments
         intriParams.quantPre = quantPre;

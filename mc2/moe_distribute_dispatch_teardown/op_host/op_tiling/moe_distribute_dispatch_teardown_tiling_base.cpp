@@ -131,7 +131,7 @@ uint64_t MoeDistributeDispatchTeardownTilingBase::GetTilingKey() const
     return tilingKey;
 }
 
-const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckRequiredAttrValue()
+const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckRequiredAttrValue() const
 {
     auto attrs = context_->GetAttrs();
     auto groupEpPtr = attrs->GetAttrPointer<char>(ATTR_GROUP_EP_INDEX);
@@ -381,7 +381,7 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckInputTensorShapeDim()
     return true;
 }
 
-const bool MoeDistributeDispatchTeardownTilingBase::CheckOutputTensorShapeDim()
+const bool MoeDistributeDispatchTeardownTilingBase::CheckOutputTensorShapeDim() const
 {
     const gert::StorageShape *expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
     const gert::StorageShape *dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
@@ -648,7 +648,7 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckInputTensorDataType()
     return true;
 }
 
-const bool MoeDistributeDispatchTeardownTilingBase::CheckOutputTensorDataType()
+const bool MoeDistributeDispatchTeardownTilingBase::CheckOutputTensorDataType() const
 {
     OP_TILING_CHECK((context_->GetOutputDesc(OUTPUT_EXPAND_X_INDEX)->GetDataType() !=
                      context_->GetInputDesc(INPUT_Y_INDEX)->GetDataType()),
@@ -660,7 +660,7 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckOutputTensorDataType()
     return true;
 }
 
-const bool MoeDistributeDispatchTeardownTilingBase::CheckRelationTensorDataType()
+const bool MoeDistributeDispatchTeardownTilingBase::CheckRelationTensorDataType() const
 {
     OP_TILING_CHECK((context_->GetOutputDesc(OUTPUT_EXPAND_X_INDEX) == nullptr),
                     OP_LOGE_WITH_INVALID_INPUT(nodeName_, "expandXOut"), return false);
