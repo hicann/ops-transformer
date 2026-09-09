@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-    需与[low_latency_dispatch](low_latency_dispatch.md)配套使用，相当于按low_latency_dispatch算子收集数据的路径原路返回。
+    需与[low_latency_dispatch](torchapi_low_latency_dispatch.md)配套使用，相当于按low_latency_dispatch算子收集数据的路径原路返回。
   - 支持数据整合功能，进行alltoallv通信，最后将接收的数据整合（乘权重再相加）；
   - 支持特殊专家场景。
 
@@ -90,7 +90,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>topk_idx</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>每个token的topK个专家索引，数据格式为ND。对应[low_latency_dispatch](low_latency_dispatch.md)的`topk_idx`输入，张量里value取值范围为[0, num_experts)，且同一行中的K个value不能重复。</td>
+        <td>每个token的topK个专家索引，数据格式为ND。对应[low_latency_dispatch](torchapi_low_latency_dispatch.md)的`topk_idx`输入，张量里value取值范围为[0, num_experts)，且同一行中的K个value不能重复。</td>
         <td>int32</td>
         <td>(BS, K)</td>
     </tr>
@@ -106,7 +106,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>assist_info_for_combine</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>表示给同一专家发送的token个数，数据格式为ND。对应[low_latency_dispatch](low_latency_dispatch.md)的`assist_info_for_combine`输出。</td>
+        <td>表示给同一专家发送的token个数，数据格式为ND。对应[low_latency_dispatch](torchapi_low_latency_dispatch.md)的`assist_info_for_combine`输出。</td>
         <td>int32</td>
         <td>(A*128, )</td>
     </tr>
@@ -114,7 +114,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>ep_send_counts</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>表示本卡每个专家发给EP（Expert Parallelism）域每个卡的token数（token数以前缀和的形式表示），数据格式为ND。对应[low_latency_dispatch](low_latency_dispatch.md)的`ep_recv_counts`输出。</td>
+        <td>表示本卡每个专家发给EP（Expert Parallelism）域每个卡的token数（token数以前缀和的形式表示），数据格式为ND。对应[low_latency_dispatch](torchapi_low_latency_dispatch.md)的`ep_recv_counts`输出。</td>
         <td>int32</td>
         <td>(ep_world_size*local_expert_num, )</td>
     </tr>
@@ -159,7 +159,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>expand_scales</td>
         <td>Optional[Tensor]</td>
         <td>可选</td>
-        <td>对应[low_latency_dispatch](low_latency_dispatch.md)的`expand_scales`输出。暂不支持该参数，使用默认值即可。默认值为None。</td>
+        <td>对应[low_latency_dispatch](torchapi_low_latency_dispatch.md)的`expand_scales`输出。暂不支持该参数，使用默认值即可。默认值为None。</td>
         <td>float</td>
         <td>-</td>
     </tr>
@@ -423,7 +423,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
 
 - `low_latency_dispatch`和`low_latency_combine`必须配套使用。
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。
-- 调用接口过程中使用的`group_ep`、`ep_world_size`、`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`group_ep`、`ep_world_size`、`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_dispatch](low_latency_dispatch.md)对应参数也保持一致。
+- 调用接口过程中使用的`group_ep`、`ep_world_size`、`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`group_ep`、`ep_world_size`、`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_dispatch](torchapi_low_latency_dispatch.md)对应参数也保持一致。
 - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 - num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_int32。
 - 相关约束：

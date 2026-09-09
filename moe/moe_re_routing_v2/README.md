@@ -168,3 +168,4 @@
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | 图模式     | [test_geir_moe_re_routing_v2](examples/test_geir_moe_re_routing_v2.cpp) | 通过[算子IR](op_graph/moe_re_routing_v2_proto.h)构图方式调用MoeReRoutingV2算子。 |
+| PyTorch API | - | 通过[moe_re_routing](../../moe/moe_re_routing_v2/docs/torchapi_moe_re_routing.md)接口调用moe_re_routing算子。 |

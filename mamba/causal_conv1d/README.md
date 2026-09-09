@@ -150,3 +150,5 @@
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn接口 (prefill) | [test_aclnn_causal_conv1d_fn.cpp](./examples/test_aclnn_causal_conv1d_fn.cpp) | 通过 [aclnnCausalConv1dFn](./docs/aclnnCausalConv1dFn.md) 调用 prefill 模式 |
 | aclnn接口 (update) | [test_aclnn_causal_conv1d_update.cpp](./examples/test_aclnn_causal_conv1d_update.cpp) | 通过 [aclnnCausalConv1dUpdate](./docs/aclnnCausalConv1dUpdate.md) 调用 update 模式 |
+| PyTorch API | - | 通过[causal_conv1d_fn](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_fn.md)接口调用causal_conv1d_fn算子。 |
+| PyTorch API | - | 通过[causal_conv1d_update](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_update.md)接口调用causal_conv1d_update算子。 |

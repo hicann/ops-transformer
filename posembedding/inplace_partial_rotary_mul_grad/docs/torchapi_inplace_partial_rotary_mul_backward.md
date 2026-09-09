@@ -96,7 +96,7 @@ cann_ops_transformer.inplace_partial_rotary_mul_backward(grad_output, r1, r2, *,
 
 ## 配套接口
 
-该算子为[inplace_partial_rotary_mul](./inplace_partial_rotary_mul.md)的反向算子，两者参数`r1`、`r2`、`rotary_mode`、`partial_slice`需保持一致。
+该算子为[inplace_partial_rotary_mul](../../inplace_partial_rotary_mul/docs/torchapi_inplace_partial_rotary_mul.md)的反向算子，两者参数`r1`、`r2`、`rotary_mode`、`partial_slice`需保持一致。
 
 > **说明**：当正向 `inplace_partial_rotary_mul` 中 `x.requires_grad` 为True时，`loss.backward()` 会自动触发本算子，无需手动调用。仅在需要显式控制梯度的场景下保留手动调用路径。
 

@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  需与[low_latency_combine](low_latency_combine.md)配套使用，完成MoE的并行部署下的token的dispatch和combine。
+  需与[low_latency_combine](torchapi_low_latency_combine.md)配套使用，完成MoE的并行部署下的token的dispatch和combine。
   - 支持非量化、静态量化、pertoken动态量化、pergroup动态量化、mx动态量化和mx clip动态量化场景，对token数据先进行量化（可选），进行EP（Expert Parallelism）域的alltoallv通信；
   - 支持特殊专家场景。
 
@@ -219,7 +219,7 @@
       Moe(ori\_x) = const\_expert\_alpha\_1 * ori\_x + const\_expert\_alpha\_2 * const\_expert\_v
       $$
 
-      参数ori\_x、const\_expert\_alpha\_1、const\_expert\_alpha\_2、const\_expert\_v见[low_latency_combine](low_latency_combine.md)文档。
+      参数ori\_x、const\_expert\_alpha\_1、const\_expert\_alpha\_2、const\_expert\_v见[low_latency_combine](torchapi_low_latency_combine.md)文档。
 
 ## 函数原型
 
@@ -260,7 +260,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
         <td>topk_idx</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>表示每个token的topK个专家索引，决定每个token要发给哪些专家。要求为2维张量，数据格式为ND，支持非连续的Tensor。对应[low_latency_combine](low_latency_combine.md)的`topk_idx`输入，张量里value取值范围为[0, num_experts)，且同一行中的K个value不能重复。</td>
+        <td>表示每个token的topK个专家索引，决定每个token要发给哪些专家。要求为2维张量，数据格式为ND，支持非连续的Tensor。对应[low_latency_combine](torchapi_low_latency_combine.md)的`topk_idx`输入，张量里value取值范围为[0, num_experts)，且同一行中的K个value不能重复。</td>
         <td>int32</td>
         <td>(BS, K)</td>
     </tr>
@@ -497,7 +497,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
         <td>assist_info_for_combine</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>表示给同一专家发送的token个数，要求是一个1维张量，数据格式为ND，支持非连续的Tensor。对应[low_latency_combine](low_latency_combine.md)的`assist_info_for_combine`输入。</td>
+        <td>表示给同一专家发送的token个数，要求是一个1维张量，数据格式为ND，支持非连续的Tensor。对应[low_latency_combine](torchapi_low_latency_combine.md)的`assist_info_for_combine`输入。</td>
         <td>int32</td>
         <td>(A * 128, )</td>
     </tr>
@@ -513,7 +513,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
         <td>ep_recv_counts</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>表示EP通信域各卡收到的token数（token数以前缀和的形式表示），要求为1维张量，数据格式支持ND，支持非连续的Tensor。对应[low_latency_combine](low_latency_combine.md)的`ep_send_counts`输入。</td>
+        <td>表示EP通信域各卡收到的token数（token数以前缀和的形式表示），要求为1维张量，数据格式支持ND，支持非连续的Tensor。对应[low_latency_combine](torchapi_low_latency_combine.md)的`ep_send_counts`输入。</td>
         <td>int32</td>
         <td>(ep_world_size*local_expert_num, )</td>
     </tr>
@@ -592,7 +592,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
     - 对于MoE专家卡，local\_expert\_num=num\_experts/\(ep\_world\_size-shared\_expert\_rank\_num)，应满足0 < local_expert_num * ep_world_size ≤ 2048。
 
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。
-- 调用接口过程中使用的`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_combine](low_latency_combine.md)对应参数也保持一致。
+- 调用接口过程中使用的`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_combine](torchapi_low_latency_combine.md)对应参数也保持一致。
 - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 - num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_int32。
 - 相关约束：

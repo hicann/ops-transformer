@@ -266,3 +266,4 @@
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | aclnn接口  | [test_aclnn_moe_init_routing_v4](examples/test_aclnn_moe_init_routing_v4.cpp) | 通过[aclnnMoeInitRoutingV4](docs/aclnnMoeInitRoutingV4.md)接口方式调用MoeInitRoutingV4算子。 |
 | 图模式     | [test_geir_moe_init_routing_v4](examples/test_geir_moe_init_routing_v4.cpp) | 通过[算子IR](op_graph/moe_init_routing_v4_proto.h)构图方式调用MoeInitRoutingV4算子。 |
+| PyTorch API | - | 通过[moe_init_routing](../../moe/moe_init_routing_v4/docs/torchapi_moe_init_routing.md)接口调用moe_init_routing算子。 |

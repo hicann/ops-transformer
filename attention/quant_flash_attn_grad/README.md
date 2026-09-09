@@ -143,7 +143,7 @@
 
 | 调用方式 | 调用样例 | 说明 |
 | -------- | -------- | ---- |
-| PyTorch API | - | 通过[quant_flash_attn_grad](../../torch_extension/cann_ops_transformer/docs/zh/quant_flash_attn_grad.md)接口调用算子。 |
+| PyTorch API | - | 通过[quant_flash_attn_grad](../../attention/quant_flash_attn_grad/docs/torchapi_quant_flash_attn_grad.md)接口调用算子。 |
 
 ## 参考资源（可选）
 

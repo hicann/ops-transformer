@@ -86,3 +86,4 @@
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | aclnn接口  | [test_aclnn_moe_init_routing_v2_grad](examples/test_aclnn_moe_init_routing_v2_grad.cpp) | 通过[aclnnMoeInitRoutingV2Grad](docs/aclnnMoeInitRoutingV2Grad.md)接口方式调用MoeInitRoutingV2Grad算子。 |
+| PyTorch API | - | 通过[moe_init_routing_grad](../../moe/moe_init_routing_v2_grad/docs/torchapi_moe_init_routing_grad.md)接口调用moe_init_routing_grad算子。 |

@@ -80,6 +80,7 @@
 | aclnn 单算子调用 | [test_aclnn_msa_index_score.cpp](./examples/test_aclnn_msa_index_score.cpp) | 内置 CPU golden 的端到端精度自验证 |
 | 接口文档 | [aclnnMsaIndexScore.md](./docs/aclnnMsaIndexScore.md) | 两段式接口说明 |
 | 测试说明 | [tests/README.md](./tests/README.md) | 用例矩阵与运行方式 |
+| PyTorch API | - | 通过[msa_index_score](../../attention/msa_index_score/docs/torchapi_msa_index_score.md)接口调用msa_index_score算子。 |
 
 编译与运行：
 

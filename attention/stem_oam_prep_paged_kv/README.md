@@ -145,3 +145,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn接口 | [test_aclnn_stem_oam_prep_paged_kv](./examples/test_aclnn_stem_oam_prep_paged_kv.cpp) | 通过[aclnnStemOamPrepPagedKv](./docs/aclnnStemOamPrepPagedKv.md)调用StemOamPrepPagedKv算子 |
+| PyTorch API | - | 通过[stem_oam_prep_paged_kv](../../attention/stem_oam_prep_paged_kv/docs/torchapi_stem_oam_prep_paged_kv.md)接口调用stem_oam_prep_paged_kv算子。 |

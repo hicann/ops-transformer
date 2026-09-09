@@ -387,3 +387,4 @@
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | aclnn调用 | [aclnnSparseLightningIndexerKLLossGrad](./docs/aclnnSparseLightningIndexerKLLossGrad.md) | 通过[aclnnSparseLightningIndexerKLLossGrad](./docs/aclnnSparseLightningIndexerKLLossGrad.md)接口方式调用SparseLightningIndexerKLLossGrad算子。 |
 | pytest调用 | [test_sparse_lightning_indexer_kl_loss_grad](./tests/pytest/test_sparse_lightning_indexer_kl_loss_grad.py) | 通过torch extension接口进行功能和精度验证。 |
+| PyTorch API | - | 通过[sparse_lightning_indexer_kl_loss_grad](../../attention/sparse_lightning_indexer_kl_loss_grad/docs/torchapi_sparse_lightning_indexer_kl_loss_grad.md)接口调用sparse_lightning_indexer_kl_loss_grad算子。 |

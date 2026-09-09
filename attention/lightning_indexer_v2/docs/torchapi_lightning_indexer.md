@@ -163,7 +163,7 @@ cann_ops_transformer.lightning_indexer(
 - 参数cu_seqlens_q、cu_seqlens_k要求其值为当前batch与前序batch有效token数的累加值，第一个元素必须为0，且后一个元素的值必须大于等于前一个元素的值。
 - 参数seqused_q、seqused_k要求其值表示每个batch中的有效token数。
 - 参数cmp_residual_k需满足cmp_residual_k\[i\] < cmp_ratio。
-- mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。
+- mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。
 - pa_kv_cache支持0轴非连续；pa_block_size支持[16, 1024]，且是16的倍数。
 - 参数q、k的数据类型应保持一致。
 - 该接口的TopK排序过程对NaN排序是未定义行为。

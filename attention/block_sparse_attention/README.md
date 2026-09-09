@@ -152,6 +152,12 @@ KV方向: ceil(1024/128)=8块 [0, 1, 2, 3, 4, 5, 6, 7]
 - **灵活配置**: 支持任意blockShape的稀疏块配置
 - **硬件优化**: 充分利用昇腾A2的AI Core和Vector Core
 
+## 调用说明
+
+| 调用方式   | 样例代码 | 说明                                          |
+| ---------- | -------- | --------------------------------------------- |
+| PyTorch API | - | 通过[block_sparse_attention](../../attention/block_sparse_attention/docs/torchapi_block_sparse_attention.md)接口调用block_sparse_attention算子。 |
+
 ## 注意事项
 
 1. qInputLayout当前仅支持"TND"和"BNSD"。

@@ -193,7 +193,7 @@ $$
   <tr>
     <td>PyTorch API</td>
     <td>-</td>
-    <td>通过<a href="../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_update.md">cann_ops_transformer.block_attn_res_update</a>接口调用。</td>
+    <td>通过<a href="../../attention/block_attn_res_update/docs/torchapi_block_attn_res_update.md">cann_ops_transformer.block_attn_res_update</a>接口调用。</td>
   </tr>
 </tbody>
 </table>

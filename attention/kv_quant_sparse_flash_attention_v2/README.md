@@ -230,4 +230,4 @@
 
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | -------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
-| PyTorch API | [kv_quant_sparse_flash_attention](../../torch_extension/cann_ops_transformer/docs/zh/kv_quant_sparse_flash_attention.md) | 通过`cann_ops_transformer.kv_quant_sparse_flash_attention`调用KvQuantSparseFlashAttentionV2算子 |
+| PyTorch API | [kv_quant_sparse_flash_attention](../../attention/kv_quant_sparse_flash_attention_v2/docs/torchapi_kv_quant_sparse_flash_attention.md) | 通过`cann_ops_transformer.kv_quant_sparse_flash_attention`调用KvQuantSparseFlashAttentionV2算子 |

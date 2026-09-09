@@ -185,7 +185,7 @@ dense_lightning_indexer_softmax_lse(
 - 参数 D 固定为 128。
 - `layout_q` 和 `layout_k` 支持 `BSND` 和 `TND`，且二者必须一致。
 - `layout_q="TND"` 时需要传入 `cu_seqlens_q`；`layout_k="TND"` 时需要传入 `cu_seqlens_k`。
-- `mask_mode` 当前支持 `0` 和 `3`。`mask_mode` 的具体含义参见[sparse_mode 参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。
+- `mask_mode` 当前支持 `0` 和 `3`。`mask_mode` 的具体含义参见[sparse_mode 参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。
 - `cmp_ratio` 取值范围为 `[1, 128]`。
 - 参数 `cu_seqlens_q`、`cu_seqlens_k` 要求其值为当前 Batch 与前序 Batch 有效 token 数的累加值，后一个元素的值必须大于等于前一个元素的值。
 - 参数 `seqused_q`、`seqused_k` 要求其值不大于各 Batch 的实际序列长度。

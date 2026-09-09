@@ -884,7 +884,7 @@
 ## 约束说明
 
 - **预留和非对外参数说明**：
-  - 参数表格中的部分参数、部分数据类型暂未对外提供，为预留或内部实现使用。接口参数的介绍及其约束在接口文档[MegaMoE算子接口文档](../../torch_extension/cann_ops_transformer/docs/zh/mega_moe.md)中详细说明。
+  - 参数表格中的部分参数、部分数据类型暂未对外提供，为预留或内部实现使用。接口参数的介绍及其约束在接口文档[MegaMoE算子接口文档](../../mc2/mega_moe/docs/torchapi_mega_moe.md)中详细说明。
 
 - **参数一致性约束**：
   - 调用算子过程中使用的`moeExpertNum`、`maxRecvTokenNum`、`dispatchQuantMode`、`dispatchQuantOutDtype`、`numMaxTokensPerRank`等参数取值，所有卡需保持一致，网络中不同层中也需保持一致。
@@ -951,4 +951,4 @@
 
 | 调用方式  | 样例代码                                  | 说明                                                     |
 | :--------: | :----------------------------------------: | :-------------------------------------------------------: |
-| PyTorch接口调用 | - | 通过[mega_moe](../../torch_extension/cann_ops_transformer/docs/zh/mega_moe.md)PyTorch接口方式调用mega_moe算子。 |
+| PyTorch接口调用 | - | 通过[mega_moe](../../mc2/mega_moe/docs/torchapi_mega_moe.md)PyTorch接口方式调用mega_moe算子。 |

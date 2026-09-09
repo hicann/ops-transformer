@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能**：QuantCompressor是推理场景下SMLA和QLI的前处理算子，是[compressor](./compressor.md)的量化版本。用于将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。在长序列的情况下，QuantCompressor可以有效地减少计算开销。与compressor的区别在于：输入$x$、$W^{KV}$、$W^{Gate}$为HIFLOAT8量化数据，直接以HIFLOAT8参与Matmul运算（硬件原生支持），再对Matmul输出的FLOAT32结果乘以合并后的缩放因子进行反量化，从而降低显存占用与搬运开销。主要计算过程为：
+- **接口功能**：QuantCompressor是推理场景下SMLA和QLI的前处理算子，是[compressor](../../compressor/docs/torchapi_compressor.md)的量化版本。用于将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。在长序列的情况下，QuantCompressor可以有效地减少计算开销。与compressor的区别在于：输入$x$、$W^{KV}$、$W^{Gate}$为HIFLOAT8量化数据，直接以HIFLOAT8参与Matmul运算（硬件原生支持），再对Matmul输出的FLOAT32结果乘以合并后的缩放因子进行反量化，从而降低显存占用与搬运开销。主要计算过程为：
     1. Matmul与反量化：将HIFLOAT8量化的输入$X$与$W^{KV}$做Matmul运算得到FLOAT32结果，再乘以合并缩放因子$x\_descale \cdot wkv\_descale$完成反量化得到$kv\_state$；将$X$与$W^{Gate}$做Matmul运算得到FLOAT32结果，再乘以合并缩放因子$x\_descale \cdot wgate\_descale$完成反量化得到$score\_state$。其中x_descale为per-tensor缩放（单个标量），wkv_descale与wgate_descale为per-channel缩放（通道数为coff\*D），合并后仍为per-channel缩放。$kv\_state$与$score\_state$根据输入的start_pos及cu_seqlens完成更新。
     2. 在coff为2的情况下对$kv\_state$和$score\_state$进行数据重排。
     3. 对$score\_state$按压缩比分组并与$Ape$相加，然后进行softmax运算，将softmax结果与$kv\_state$做Mul计算，后进行ReduceSum运算。

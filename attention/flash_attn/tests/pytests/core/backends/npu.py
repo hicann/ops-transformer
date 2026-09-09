@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""NPU 后端 — 按 flash_attn.md 参数组调用，支持 eager / graph 两种模式。"""
+"""NPU 后端 — 按 torchapi_flash_attn.md 参数组调用，支持 eager / graph 两种模式。"""
 
 import numpy as np
 import torch

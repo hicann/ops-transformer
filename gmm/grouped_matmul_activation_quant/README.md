@@ -86,3 +86,4 @@
 | 调用方式 | 调用样例 | 说明 |
 | -------- | -------- | ---- |
 | aclnn API | [test_aclnn_grouped_matmul_activation_quant_weight_nz](examples/arch35/test_aclnn_grouped_matmul_activation_quant_weight_nz.cpp) | 通过[aclnnGroupedMatmulActivationQuantWeightNz](docs/aclnnGroupedMatmulActivationQuantWeightNz.md)方式调用GroupedMatmulActivationQuant算子。 |
+| PyTorch API | - | 通过[grouped_matmul_activation_quant](../../gmm/grouped_matmul_activation_quant/docs/torchapi_grouped_matmul_activation_quant.md)接口调用grouped_matmul_activation_quant算子。 |

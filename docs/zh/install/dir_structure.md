@@ -27,7 +27,8 @@
 │   │   ├── CMakeLists.txt                              # 算子cmakelist入口
 │   │   ├── README.md                                   # 算子介绍文档
 │   │   ├── docs                                        # 算子文档目录
-│   │   │   └── aclnn${OpName}.md                       # 算子aclnn接口介绍文档，${OpName}表示算子名（大驼峰形式）
+│   │   │   ├── aclnn${OpName}.md                       # 算子aclnn接口介绍文档，${OpName}表示算子名（大驼峰形式）
+│   │   │   └── torchapi_${op_api}.md                   # 可选，torch_extension接口文档，主名与对外Python api一致（小写下划线）
 │   │   ├── examples                                    # 算子调用示例目录
 │   │   │   ├── test_aclnn_${op_name}.cpp               # 算子通过aclnn调用的示例
 │   │   │   └── test_geir_${op_name}.cpp                # 算子通过geir调用的示例
@@ -83,7 +84,7 @@
 ├── torch_extension                                     # torch扩展目录，用于开放torch扩展api
 │   ├── cann_ops_transformer                            # torch扩展module根目录
 │       ├── common                                      # torch扩展用到的公共能力目录
-│       ├── docs                                         # 扩展api文档目录（含开发规范torch_extension_guidelines.md）
+│       ├── docs                                        # torch_extension开发规范等（接口文档见各算子 docs/）
 │       ├── op_builder                                  # OpBuilder基类，管理JIT编译与schema/meta注册
 │       ├── ops                                         # torch扩展算子api目录
 │       │   ├── csrc                                    # 算子api的c++实现文件目录

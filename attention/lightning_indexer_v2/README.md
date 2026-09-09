@@ -216,4 +216,4 @@
 | 调用方式 | 调用样例                                                                   | 说明                                                           |
 |--------------|------------------------------------------------------------------------|--------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_lightning_indexer_v2](./examples/test_aclnn_lightning_indexer_v2.cpp) | 通过[aclnnLightningIndexerV2](./docs/aclnnLightningIndexerV2.md)接口方式调用LightningIndexerV2算子。 |
-| PyTorch API | - | 通过[torch.ops.cann_ops_transformer.lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/lightning_indexer.md)接口调用LightningIndexerV2算子。|
+| PyTorch API | - | 通过[torch.ops.cann_ops_transformer.lightning_indexer](../../attention/lightning_indexer_v2/docs/torchapi_lightning_indexer.md)接口调用LightningIndexerV2算子。|

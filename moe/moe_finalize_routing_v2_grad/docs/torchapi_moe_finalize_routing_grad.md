@@ -111,7 +111,7 @@ cann_ops_transformer.moe_finalize_routing_grad(
 - `drop_pad_mode=1`时，`expert_num`必须大于0（当`bias`传入时必须等于`bias`的第0维大小E），`expert_capacity`必须大于0。
 - `expanded_x`、`bias`的数据类型必须与`grad_y`一致。`scales`的数据类型在<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>上必须与`grad_y`一致；在<term>Ascend 950PR/Ascend 950DT</term>上可以与`grad_y`不一致。
 - 该反向算子仅支持常规专家场景，不支持aclnnMoeFinalizeRoutingV4特有特性（正向的`x`、`alpha1`、`alpha2`、`v`以及有效的`zero_expert_range`、`copy_expert_range`、`constant_expert_range`）。当正向使用了这些特性时，调用自动反向会抛出`NotImplementedError`。
-- 该算子为[moe\_finalize\_routing](./moe_finalize_routing.md)的反向算子，各参数需与正向调用保持一致。
+- 该算子为[moe\_finalize\_routing](../../moe_finalize_routing_v2/docs/torchapi_moe_finalize_routing.md)的反向算子，各参数需与正向调用保持一致。
 - `expanded_row_idx`布局差异：正向`moe_finalize_routing`的`expanded_row_idx`采用`(K, R)`布局（`drop_pad_mode`为0或1时），本反向算子采用`(R, K)`布局。自动反向下框架会自动转置；手动调用时需注意提供正确布局。
 
 ## 确定性计算
@@ -120,7 +120,7 @@ cann_ops_transformer.moe_finalize_routing_grad(
 
 ## 配套接口
 
-该算子为[moe\_finalize\_routing](./moe_finalize_routing.md)的反向算子。
+该算子为[moe\_finalize\_routing](../../moe_finalize_routing_v2/docs/torchapi_moe_finalize_routing.md)的反向算子。
 
 > **说明**：当正向 `moe_finalize_routing` 中 `expanded_x`、`scales` 等可微输入的 `requires_grad` 为True，且未使用aclnnMoeFinalizeRoutingV4特有特性（`x`、`alpha1`、`alpha2`、`v`、`zero_expert_range`等）时，`loss.backward()` 会自动触发本算子，无需手动调用。仅在需要显式控制梯度的场景下保留手动调用路径。注意：`x1`、`x2`、`bias`的梯度不会被计算，如需对`x1`/`x2`求梯度，建议使用外部残差加法替代将其作为正向输入。
 

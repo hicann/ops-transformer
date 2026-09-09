@@ -358,10 +358,10 @@
         - `shared_expert_num`：当前取值范围[0, 4]。
         - `comm_quant_mode`：int8量化支持。
         - `performance_info_optional`：预留参数，当前版本不支持，传空指针即可。
-        - `ccl_buffer_size`：调用get_low_latency_ccl_buffer_size接口(../../torch_extension/cann_ops_transformer/ops/deep_ep.py)。
+        - `ccl_buffer_size`：调用get_low_latency_ccl_buffer_size接口(../common/torch_extension/moe_distribute_buffer.py)。
 
 ## 调用说明
 
 | 调用方式  | 样例代码                                  | 说明                                                     |
 | :--------: | :----------------------------------------: | :-------------------------------------------------------: |
-| low_latency_combine接口 | [deepep.py](../../torch_extension/cann_ops_transformer/ops/deep_ep.py) | 通过[low_latency_combine](../../torch_extension/cann_ops_transformer/docs/zh/low_latency_combine.md)接口方式调用moe_distribute_combine_v3算子。 |
+| low_latency_combine接口 | [moe_distribute_buffer.py](../common/torch_extension/moe_distribute_buffer.py) | 通过[low_latency_combine](../common/docs/torchapi_low_latency_combine.md)接口方式调用moe_distribute_combine_v3算子。 |

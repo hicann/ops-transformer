@@ -77,7 +77,7 @@ cann_ops_transformer.ops.moe_finalize_routing(
 - `scales`不为空时，若显式传入`k`，则`k`必须与`scales`的第二维一致。
 - `scales`为空时，则必须传入`k`。
 - `zero_expert_range`、`copy_expert_range`、`constant_expert_range`三个范围不能重叠。
-- **自动反向（autograd）**：当`expanded_x`、`scales`等可微输入的`requires_grad`为True时支持自动反向，反向算子为[moe\_finalize\_routing\_grad](./moe_finalize_routing_grad.md)（封装`aclnnMoeFinalizeRoutingV2Grad`）。自动反向约束如下：
+- **自动反向（autograd）**：当`expanded_x`、`scales`等可微输入的`requires_grad`为True时支持自动反向，反向算子为[moe\_finalize\_routing\_grad](../../moe_finalize_routing_v2_grad/docs/torchapi_moe_finalize_routing_grad.md)（封装`aclnnMoeFinalizeRoutingV2Grad`）。自动反向约束如下：
   - 仅在正向退化为aclnnMoeFinalizeRoutingV2场景时支持，即不传入aclnnMoeFinalizeRoutingV4特有输入`x`、`alpha1`、`alpha2`、`v`，且`zero_expert_range`、`copy_expert_range`、`constant_expert_range`均为None或无效（如`[-1, -1]`）。当使用了上述aclnnMoeFinalizeRoutingV4特有特性时，调用自动反向会抛出`NotImplementedError`。
   - `drop_pad_mode`仅支持0或1（列排列模式），不支持2或3（行排列模式）。
   - 仅计算`grad_expanded_x`和`grad_scales`；`x1`、`x2`、`bias`的梯度不会被计算（返回`None`）。如需对`x1`/`x2`求梯度，建议使用外部残差加法替代将其作为正向输入。

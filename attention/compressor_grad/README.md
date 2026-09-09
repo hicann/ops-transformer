@@ -106,4 +106,4 @@
 | 调用方式  | 样例代码                                                                          | 说明                                                                          |
 | --------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | aclnn接口 | -| 通过[aclnnCompressorGrad](./docs/aclnnCompressorGrad.md)调用CompressorGrad算子。 |
-| PyTorch API | - | 通过[cann_ops_transformer.compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)调用Compressor算子，反向经其autograd自动调用CompressorGrad。 |
+| PyTorch API | - | 通过[cann_ops_transformer.compressor](../../attention/compressor/docs/torchapi_compressor.md)调用Compressor算子，反向经其autograd自动调用CompressorGrad。 |

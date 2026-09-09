@@ -185,3 +185,4 @@
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_inplace_partial_rotary_mul_grad](./examples/arch35/test_aclnn_inplace_partial_rotary_mul_grad.cpp) | 通过[aclnnInplacePartialRotaryMulGrad](./docs/aclnnInplacePartialRotaryMulGrad.md)接口方式调用InplacePartialRotaryMulGrad算子。             |
 | 图模式调用 | [test_geir_inplace_partial_rotary_mul_grad](./examples/arch35/test_geir_inplace_partial_rotary_mul_grad.cpp) | 通过[算子IR](./op_graph/inplace_partial_rotary_mul_grad_proto.h)构图方式调用InplacePartialRotaryMulGrad算子。 |
+| PyTorch API | - | 通过[inplace_partial_rotary_mul_backward](../../posembedding/inplace_partial_rotary_mul_grad/docs/torchapi_inplace_partial_rotary_mul_backward.md)接口调用inplace_partial_rotary_mul_backward算子。 |

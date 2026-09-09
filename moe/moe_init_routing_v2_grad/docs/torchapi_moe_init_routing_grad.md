@@ -72,7 +72,7 @@ cann_ops_transformer.moe_init_routing_grad(
 - `active_num`必须大于等于0。
 - Dropless场景且`active_num=0`时，`grad_expanded_x`的第0维大小必须与`expanded_row_idx`的长度一致；Dropless场景且`active_num>0`时，`grad_expanded_x`的第0维大小必须等于`active_num`。
 - `grad_expanded_x`的最后一维（DropPad场景下为第三维）必须与输出`grad_x`的第二维一致。
-- 该算子为[moe\_init\_routing](./moe_init_routing.md)的反向算子，`expanded_row_idx`、`top_k`、`drop_pad_mode`、`active_num`需与正向调用保持一致。
+- 该算子为[moe\_init\_routing](../../moe_init_routing_v4/docs/torchapi_moe_init_routing.md)的反向算子，`expanded_row_idx`、`top_k`、`drop_pad_mode`、`active_num`需与正向调用保持一致。
 - 该反向算子仅支持非量化场景（正向`quant_mode=-1`），不支持aclnnMoeInitRoutingV4特有特性（`scale`、`offset`、`topk_weight`、`x_dtype`、`row_idx_type`非0）。当正向使用了这些特性时，调用自动反向会抛出`NotImplementedError`。
 
 ## 确定性计算
@@ -81,7 +81,7 @@ cann_ops_transformer.moe_init_routing_grad(
 
 ## 配套接口
 
-该算子为[moe\_init\_routing](./moe_init_routing.md)的反向算子。
+该算子为[moe\_init\_routing](../../moe_init_routing_v4/docs/torchapi_moe_init_routing.md)的反向算子。
 
 > **说明**：当正向 `moe_init_routing` 中 `x.requires_grad` 为True，且未使用aclnnMoeInitRoutingV4特有特性（量化、`scale`、`offset`、`topk_weight`等）时，`loss.backward()` 会自动触发本算子，无需手动调用。仅在需要显式控制梯度的场景下保留手动调用路径。
 

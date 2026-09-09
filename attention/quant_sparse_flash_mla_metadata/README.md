@@ -254,4 +254,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn API | [test_aclnn_quant_sparse_flash_mla_metadata](./examples/test_aclnn_quant_sparse_flash_mla_metadata.cpp) | 通过[aclnnQuantSparseFlashMlaMetadata](./docs/aclnnQuantSparseFlashMlaMetadata.md)接口调用QuantSparseFlashMlaMetadata算子 |
-| PyTorch API | [test_torch_quant_sparse_flash_mla_metadata](./examples/test_torch_quant_sparse_flash_mla_metadata.py) | 通过[quant_sparse_flash_mla_metadata](../../torch_extension/cann_ops_transformer/docs/zh/quant_sparse_flash_mla.md)接口调用QuantSparseFlashMlaMetadata算子 |
+| PyTorch API | [test_torch_quant_sparse_flash_mla_metadata](./examples/test_torch_quant_sparse_flash_mla_metadata.py) | 通过[quant_sparse_flash_mla_metadata](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md)接口调用QuantSparseFlashMlaMetadata算子 |

@@ -102,9 +102,9 @@ python3 -c "from cann_ops_transformer.ops import flash_attn, flash_attn_metadata
 
 ### 3. 接口调用
 
-- **torch 接口**（`flash_attn_metadata` + `flash_attn` 的函数原型、参数说明、返回值说明）：[flash_attn.md](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)
+- **torch 接口**（`flash_attn_metadata` + `flash_attn` 的函数原型、参数说明、返回值说明）：[torchapi_flash_attn.md](../../attention/flash_attn/docs/torchapi_flash_attn.md)
 
-调用分两步：先用`flash_attn_metadata`生成负载均衡metadata，再调用`flash_attn`主算子。完整调用示例（含代码）见接口文档的[调用示例](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md#调用示例)章节。
+调用分两步：先用`flash_attn_metadata`生成负载均衡metadata，再调用`flash_attn`主算子。完整调用示例（含代码）见接口文档的[调用示例](../../attention/flash_attn/docs/torchapi_flash_attn.md#调用示例)章节。
 
 导入路径与安装包名一致（按步骤 2 构建的全量包）：
 
@@ -238,7 +238,7 @@ cd build && ctest -R flash_attn_tiling --output-on-failure
 | `torch_extension/graph_convert_flash_attn.py` | torchair 图模式（graph mode）下发转换 |
 | `torch_extension/csrc/` | C++ 绑定层，承载 `OpBuilder` 编译与底层调用 |
 
-对外函数原型、参数/返回值说明及调用示例见接口文档 `flash_attn.md`（不在此重复）。
+对外函数原型、参数/返回值说明及调用示例见接口文档 `torchapi_flash_attn.md`（不在此重复）。
 
 #### 2.2 AICPU 侧（flash_attn_metadata）
 
@@ -690,7 +690,7 @@ common 层位于 `attention/common/op_kernel/`，按功能分四类基础设施�
 
 ## 参考资源
 
-- 接口文档：`../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md`
+- 接口文档：`../../attention/flash_attn/docs/torchapi_flash_attn.md`
 - e2e 测试框架：`tests/pytests/readme.md`
 - SectionStreamK 算法：`../common/op_kernel/load_balance/section_stream_k/`
 - 共享 VF 公共 API：`../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h`

@@ -339,4 +339,4 @@
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn API | [test_aclnn_quant_sparse_flash_mla](./examples/test_aclnn_quant_sparse_flash_mla.cpp) | 通过[aclnnQuantSparseFlashMla](./docs/aclnnQuantSparseFlashMla.md)调用QuantSparseFlashMla算子 |
-| PyTorch API | [quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/quant_sparse_flash_mla.md) | 通过`cann_ops_transformer.quant_sparse_flash_mla`调用QuantSparseFlashMla算子 |
+| PyTorch API | [quant_sparse_flash_mla](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md) | 通过`cann_ops_transformer.quant_sparse_flash_mla`调用QuantSparseFlashMla算子 |

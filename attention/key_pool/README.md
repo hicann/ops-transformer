@@ -241,4 +241,4 @@
 | 调用方式 | 调用样例                                                                   | 说明                                                           |
 |--------------|------------------------------------------------------------------------|--------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_key_pool](./examples/test_aclnn_key_pool.cpp) | 通过[aclnnKeyPool](./docs/aclnnKeyPool.md)接口方式调用KeyPool算子。 |
-| PyTorch API | - | 通过 [key_pool.md](../../torch_extension/cann_ops_transformer/docs/zh/key_pool.md) 接口调用 KeyPool 算子。 |
+| PyTorch API | - | 通过 [torchapi_key_pool.md](../../attention/key_pool/docs/torchapi_key_pool.md) 接口调用 KeyPool 算子。 |

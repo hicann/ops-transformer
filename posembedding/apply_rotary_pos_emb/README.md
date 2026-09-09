@@ -22,31 +22,31 @@
   $$
   query\_q1 = query[..., : query.shape[-1] // 2]
   $$
-  
+
   $$
   query\_q2 = query[..., query.shape[-1] // 2 :]
   $$
-  
+
   $$
   query\_rotate = torch.cat((-query\_q2, query\_q1), dim=-1)
   $$
-  
+
   $$
   key\_k1 = key[..., : key.shape[-1] // 2]
   $$
-  
+
   $$
   key\_k2 = key[..., key.shape[-1] // 2 :]
   $$
-  
+
   $$
   key\_rotate = torch.cat((-key\_k2, key\_k1), dim=-1)
   $$
-  
+
   $$
   q\_embed = (query * cos) + query\_rotate * sin
   $$
-  
+
   $$
   k\_embed = (key * cos) + key\_rotate * sin
   $$
@@ -56,7 +56,7 @@
   $$
   query\_q1 = query[..., : query.shape[-1] // 4]
   $$
-  
+
   $$
   query\_q2 = query[..., query.shape[-1] // 4 : query.shape[-1] // 2]
   $$
@@ -68,15 +68,15 @@
   $$
   query\_q4 = query[..., query.shape[-1] // 4 * 3 :]
   $$
-  
+
   $$
   query\_rotate = torch.cat((-query\_q2, query\_q1, -query\_q4, query\_q3), dim=-1)
   $$
-  
+
   $$
   key\_q1 = key[..., : key.shape[-1] // 4]
   $$
-  
+
   $$
   key\_q2 = key[..., key.shape[-1] // 4 : key.shape[-1] // 2]
   $$
@@ -88,15 +88,15 @@
   $$
   key\_q4 = key[..., key.shape[-1] // 4 * 3 :]
   $$
-  
+
   $$
   key\_rotate = torch.cat((-key\_q2, key\_q1, -key\_q4, key\_q3), dim=-1)
   $$
-  
+
   $$
   q\_embed = (query * cos) + query\_rotate * sin
   $$
-  
+
   $$
   k\_embed = (key * cos) + key\_rotate * sin
   $$
@@ -106,7 +106,7 @@
   $$
   query\_q1 = query[..., ::2].view(-1, 1)
   $$
-  
+
   $$
   query\_q2 = query[..., 1::2].view(-1, 1)
   $$
@@ -118,7 +118,7 @@
   $$
   key\_q1 = key[..., ::2].view(-1, 1)
   $$
-  
+
   $$
   key\_q2 = key[..., 1::2].view(-1, 1)
   $$
@@ -130,7 +130,7 @@
   $$
   q\_embed = (query * cos) + query\_rotate * sin
   $$
-  
+
   $$
   k\_embed = (key * cos) + key\_rotate * sin
   $$
@@ -165,7 +165,7 @@
       当计算出`ub_required`的大小超过当前AI处理器的UB空间总大小时，不支持使用该融合算子。
     - rotary_mode只支持"half"。
     - 不支持空tensor场景。
-  
+
 - <term>Ascend 950PR/Ascend 950DT</term>：
     - 输入张量query、key、cos、sin只支持4维的shape，对于任意layout，query与key除N维度外其他维度必须相同；cos与sin shape必须相同；cos与sin的B维度与query、key的B维度一致，或者等于1；cos和sin的N维度必须等于1；query、key、cos、sin的S,D维度必须相同，且D维度小于等于1024。
     - 输入张量query、key、cos、sin的dtype必须相同。
@@ -177,3 +177,4 @@
 |--------------|------------------------------------------------------------------------|----------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_apply_rotary_pos_emb.cpp](examples/test_aclnn_apply_rotary_pos_emb.cpp) | 通过[aclnnApplyRotaryPosEmb](./docs/aclnnApplyRotaryPosEmb.md)接口方式调用ApplyRotaryPosEmb算子。    |
 | aclnn调用 | [test_aclnn_apply_rotary_pos_emb_v2.cpp](examples/test_aclnn_apply_rotary_pos_emb_v2.cpp) | 通过[aclnnApplyRotaryPosEmbV2](./docs/aclnnApplyRotaryPosEmbV2.md)接口方式调用ApplyRotaryPosEmb算子。    |
+| PyTorch API | - | 通过[apply_rotary_pos_emb](../../posembedding/apply_rotary_pos_emb/docs/torchapi_apply_rotary_pos_emb.md)接口调用apply_rotary_pos_emb算子。 |

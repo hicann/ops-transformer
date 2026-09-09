@@ -134,4 +134,4 @@
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | aclnn接口 | [test_aclnn_stem_oam_prep_varlen_q](./examples/test_aclnn_stem_oam_prep_varlen_q.cpp) | 通过[aclnnStemOamPrepVarlenQ](./docs/aclnnStemOamPrepVarlenQ.md)调用StemOamPrepVarlenQ算子 |
 | 图模式 | [test_geir_stem_oam_prep_varlen_q](./examples/test_geir_stem_oam_prep_varlen_q.cpp) | 通过[算子IR](./op_graph/stem_oam_prep_varlen_q_proto.h)调用StemOamPrepVarlenQ算子 |
-| torch接口 | [test_torch_stem_oam_prep_varlen_q](./examples/test_torch_stem_oam_prep_varlen_q.py) | 通过`torch.ops.cann_ops_transformer.npu_stem_oam_prep_varlen_q`调用StemOamPrepVarlenQ算子 |
+| PyTorch API | - | 通过[stem_oam_prep_varlen_q](../../attention/stem_oam_prep_varlen_q/docs/torchapi_stem_oam_prep_varlen_q.md)接口调用stem_oam_prep_varlen_q算子。 |

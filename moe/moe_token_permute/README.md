@@ -118,3 +118,4 @@
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | aclnn接口  | [test_aclnn_moe_token_permute](examples/test_aclnn_moe_token_permute.cpp) | 通过[aclnnMoeTokenPermute](docs/aclnnMoeTokenPermute.md)接口方式调用MoeTokenPermute算子。 |
+| PyTorch API | - | 通过[moe_token_permute](../../moe/moe_token_permute/docs/torchapi_moe_token_permute.md)接口调用moe_token_permute算子。 |

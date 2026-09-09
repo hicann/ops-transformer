@@ -242,7 +242,7 @@ cann_ops_transformer.moe_init_routing(
 
 ## 约束说明
 
-- 该接口支持推理场景和训练场景下使用。训练场景下，当`x.requires_grad`为True时支持自动反向，反向算子为[moe\_init\_routing\_grad](./moe_init_routing_grad.md)（封装`aclnnMoeInitRoutingV2Grad`）。
+- 该接口支持推理场景和训练场景下使用。训练场景下，当`x.requires_grad`为True时支持自动反向，反向算子为[moe\_init\_routing\_grad](../../moe_init_routing_v2_grad/docs/torchapi_moe_init_routing_grad.md)（封装`aclnnMoeInitRoutingV2Grad`）。
 - 该接口支持单算子模式和TorchAir图模式调用。
 - `topk_weight`不受`quant_mode`影响，`expanded_topk_weight`数据类型始终为`float32`。
 - `expert_num`必须大于0。

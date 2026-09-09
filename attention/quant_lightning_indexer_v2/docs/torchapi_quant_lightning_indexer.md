@@ -171,7 +171,7 @@ cann_ops_transformer.quant_lightning_indexer(
 - 参数cu_seqlens_q、cu_seqlens_k要求其值为当前batch与前序batch有效token数的累加值，第一个元素必须为0，且后一个元素的值必须大于等于前一个元素的值。
 - 参数seqused_q、seqused_k要求其值表示每个batch中的有效token数。
 - 参数cmp_residual_k需满足0 <= cmp_residual_k\[i\] < cmp_ratio。
-- mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。
+- mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。
 - pa_kv_cache支持0轴非连续；pa_block_size支持[16, 1024]，且是16的倍数。
 - 参数q、k的数据类型应保持一致。
 - 该接口的TopK排序过程对NaN排序是未定义行为。
@@ -192,7 +192,7 @@ cann_ops_transformer.quant_lightning_indexer(
   - cmp_ratio仅支持2的幂次方值：1/2/4/8/16/32/64/128。
   - 不支持return_value功能，不建议传入该参数。
 <!-- end id7 -->
-<!-- npu="950" id8 -->
+<!-- npu="950" id5 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
   - topk取值范围当前仅支持[1, 8192]。
   - 支持num_heads_q = 1~64、q_n = 1~64。
@@ -203,7 +203,7 @@ cann_ops_transformer.quant_lightning_indexer(
   - q、k在quant_mode为1/3时支持float8_e4m3fn，quant_mode为4时支持HIfloat8，quant_mode为5时支持float4_e2m1，quant_mode为2时支持int8。
   - q_descale和k_descale在quant_mode为3/5时支持float8_e8m0，quant_mode为1/4时支持float32，quant_mode为2时支持float16。
   - w在quant_mode为2时支持float16，quant_mode为1/3/4/5时支持float32。
-<!-- end id8 -->
+<!-- end id5 -->
 
 ### 特性参数组
 

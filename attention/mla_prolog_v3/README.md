@@ -292,4 +292,9 @@
     接口方式调用算子（新增doRope开关控制是否执行旋转位置编码）
     </td>
   </tr>
+  <tr>
+    <td class="tg-9wq8">PyTorch API</td>
+    <td class="tg-0pky">-</td>
+    <td class="tg-lboi">通过<a href="../../attention/mla_prolog_v3/docs/torchapi_mla_prolog.md">mla_prolog</a>接口调用mla_prolog算子。</td>
+  </tr>
 </tbody></table>
