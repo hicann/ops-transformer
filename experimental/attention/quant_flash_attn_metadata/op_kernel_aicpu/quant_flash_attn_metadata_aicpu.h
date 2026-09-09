@@ -63,7 +63,6 @@ private:
     Tensor *cuSeqlensKv_ = nullptr;
     Tensor *sequsedQ_ = nullptr;
     Tensor *sequsedKv_ = nullptr;
-    Tensor *dequantScaleV_ = nullptr;
     // output tensor
     Tensor *metaData_ = nullptr;
 
@@ -74,6 +73,7 @@ private:
     int32_t numHeadsQ_ = 0;
     int32_t numHeadsKv_ = 0;
     int32_t headDim_ = 0;
+    int32_t headDimV_ = 0;
     int32_t quantMode_ = 1;
     int32_t maskMode_ = 1;
     int32_t winLeft_ = -1;
@@ -85,6 +85,7 @@ private:
     std::string socVersion_ = "";
     int32_t aicCoreNum_ = 36U;
     int32_t aivCoreNum_ = 72U;
+    bool isGradEnabled_ = false;
 
     // SplitParams
     uint32_t groupSize_ = 0;
@@ -101,7 +102,6 @@ private:
         cuSeqlensKv = 1,
         sequsedQ = 2,
         sequsedKv = 3,
-        dequantScaleV = 4,
         // output
         metaData = 0,
     };

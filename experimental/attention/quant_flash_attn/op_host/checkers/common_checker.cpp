@@ -180,9 +180,9 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QuantFlashAttnTilin
     const gert::Tensor *metadataTensor = qfaInfo.opParamInfo.metadata.tensor;
     if (metadataTensor != nullptr) {
         uint32_t dimNum = metadataTensor->GetStorageShape().GetDimNum();
-        OP_CHECK_IF(dimNum != DIM_NUM_1,
+        OP_CHECK_IF(dimNum != DIM_NUM_1 && dimNum != DIM_NUM_2,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, METADATA_NAME.c_str(),
-                                                 (std::to_string(dimNum) + "D").c_str(), "1D"),
+                                                 (std::to_string(dimNum) + "D").c_str(), "1D or 2D"),
                     return ge::GRAPH_FAILED);
 
         int64_t dim0 = metadataTensor->GetStorageShape().GetDim(0);

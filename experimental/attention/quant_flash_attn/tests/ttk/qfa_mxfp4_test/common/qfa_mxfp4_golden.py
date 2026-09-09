@@ -1021,10 +1021,10 @@ def _call_npu_fa_op(data_dict):
         cu_seqlens_kv=cu_seqlens_kv_t,
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
-        v_descale=v_descale,
         batch_size=B,
         max_seqlen_q=MAX_SEQLEN_Q,
         max_seqlen_kv=MAX_SEQLEN_KV,
+        head_dim_v=V_D,
         mask_mode=SPARSE_MODE,
         win_left=PRE_TOKENS,
         win_right=NEXT_TOKENS,
@@ -1032,6 +1032,7 @@ def _call_npu_fa_op(data_dict):
         layout_q_descale=LAYOUT_Q_DESCALE,
         layout_kv=kv_layout,
         layout_out=attn_out_layout,
+        is_grad_enabled=False,
     )
 
     main_kwargs = dict(
@@ -1107,10 +1108,10 @@ class Network(nn.Module):
             cu_seqlens_kv=cu_seqlens_kv,
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
-            v_descale=v_descale,
             batch_size=B,
             max_seqlen_q=MAX_SEQLEN_Q,
             max_seqlen_kv=MAX_SEQLEN_KV,
+            head_dim_v=V_D,
             mask_mode=SPARSE_MODE,
             win_left=PRE_TOKENS,
             win_right=NEXT_TOKENS,
@@ -1118,6 +1119,7 @@ class Network(nn.Module):
             layout_q_descale=layout_q_descale,
             layout_kv=layout_kv,
             layout_out=layout_out,
+            is_grad_enabled=False,
         )
         main_kwargs = dict(
             q=q,
@@ -1287,8 +1289,6 @@ def call_npu_metadata(data_dict):
 
     分离测试入口: 验证 metadata 算子独立正确性, 不调主算子。
     """
-    v_descale = _to_npu(data_dict["v_descale"])
-
     cu_seqlens_q = data_dict["cu_seqlens_q"]
     cu_seqlens_kv = data_dict["cu_seqlens_kv"]
     seqused_q = data_dict["act_seq_lens_q"]
@@ -1336,10 +1336,10 @@ def call_npu_metadata(data_dict):
         cu_seqlens_kv=cu_seqlens_kv_t,
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
-        v_descale=v_descale,
         batch_size=B,
         max_seqlen_q=MAX_SEQLEN_Q,
         max_seqlen_kv=MAX_SEQLEN_KV,
+        head_dim_v=V_D,
         mask_mode=SPARSE_MODE,
         win_left=PRE_TOKENS,
         win_right=NEXT_TOKENS,
@@ -1347,6 +1347,7 @@ def call_npu_metadata(data_dict):
         layout_q_descale=LAYOUT_Q_DESCALE,
         layout_kv=kv_layout,
         layout_out=attn_out_layout,
+        is_grad_enabled=False,
     )
     torch.npu.synchronize()
     return [metadata]

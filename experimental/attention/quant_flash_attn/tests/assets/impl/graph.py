@@ -435,10 +435,10 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
             cu_seqlens_kv=cu_seqlens_kv_t,
             seqused_q=seqused_q_t,
             seqused_kv=seqused_kv_t,
-            v_descale=v_descale_npu,
             batch_size=B,
             max_seqlen_q=max_seqlen_q,
             max_seqlen_kv=max_seqlen_kv,
+            head_dim_v=D,
             mask_mode=mask_mode,
             win_left=pre_tokens,
             win_right=next_tokens,
@@ -446,6 +446,7 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
             layout_q_descale=layout_q_descale,
             layout_kv=layout_kv,
             layout_out=layout_out,
+            is_grad_enabled=False,
         )
 
         if self.metadata.device != q_npu.device:
