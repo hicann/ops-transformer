@@ -356,7 +356,9 @@ FusedFloydAttentionS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     this->ComputeConstexpr();
     this->InitBuffer();
     LocalTensor<T> apiTmpBuffer = this->commonTBuf.template Get<T>();
+#if defined(__DAV_C220_CUBE__)
     DropOutBitModeInit(apiTmpBuffer);
+#endif
     if (this->blockIdx < this->tilingData->multiCoreParams.coreNum) {
         LocalTensor<half> pseHelpBuffer = this->stage1PingBuf.template Get<half>();
     }

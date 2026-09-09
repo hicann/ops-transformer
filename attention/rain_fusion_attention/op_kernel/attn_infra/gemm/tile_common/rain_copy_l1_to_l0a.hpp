@@ -140,6 +140,36 @@ struct CopyL1ToL0A<ArchTag, NpuArch::Gemm::GemmType<int8_t, layout::nZ, AscendC:
 };
 //////////////////////////////////////////
 
+#if defined(__DAV_C310_CUBE__)
+/// Partial specialization for zN in and zN out (Ascend 950: L0A format is zN, no conversion needed).
+template <class ArchTag, class Element>
+struct CopyL1ToL0A<ArchTag, Gemm::GemmType<Element, layout::zN, AscendC::TPosition::A1>> {
+    using LayoutDst = layout::zN;
+    using LayoutSrc = layout::zN;
+
+    static constexpr uint32_t ELE_NUM_PER_C0 = BYTE_PER_C0 / sizeof(Element);
+    static constexpr uint32_t ELE_NUM_PER_FRACTAL = BYTE_PER_FRACTAL / sizeof(Element);
+
+    __aicore__ inline CopyL1ToL0A(){};
+
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const &dstTensor,
+                                      AscendC::LocalTensor<Element> const &srcTensor, LayoutDst const &layoutDst,
+                                      LayoutSrc const &layoutSrc)
+    {
+        AscendC::LoadData2DParams loadDataParams;
+
+        loadDataParams.startIndex = 0;
+        loadDataParams.repeatTimes = static_cast<uint16_t>(layoutDst.shape(1) * layoutDst.shape(3));
+        loadDataParams.srcStride = 1;
+        loadDataParams.sid = 0;
+        loadDataParams.dstGap = 0;
+        loadDataParams.ifTranspose = false;
+        loadDataParams.addrMode = 0;
+
+        AscendC::LoadData(dstTensor, srcTensor, loadDataParams);
+    }
+};
+#else
 /// Partial specialization for zN in and zZ out.
 template <class ArchTag, class Element>
 struct CopyL1ToL0A<ArchTag, Gemm::GemmType<Element, layout::zN, AscendC::TPosition::A1>> {
@@ -172,6 +202,7 @@ struct CopyL1ToL0A<ArchTag, Gemm::GemmType<Element, layout::zN, AscendC::TPositi
         }
     }
 };
+#endif // defined(__DAV_C310_CUBE__)
 
 /// Partial specialization for float, zN in and zZ out.
 template <class ArchTag>
