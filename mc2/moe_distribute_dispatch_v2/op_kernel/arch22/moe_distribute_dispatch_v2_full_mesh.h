@@ -97,6 +97,8 @@ private:
     __aicore__ inline void SetTilingDataAndCal(const MoeDistributeDispatchV2TilingData *tilingData);
     __aicore__ inline void SendToSharedExpert(TQue<QuePosition::VECIN, 1> inQueue, TBuf<> outBuf);
     __aicore__ inline void SendToMoeExpert(TQue<QuePosition::VECIN, 1> inQueue, TBuf<> expertMaskBuf, TBuf<> outBuf);
+    __aicore__ inline void SendToMoeExpertLoop(TQue<QuePosition::VECIN, 1> inQueue, TBuf<> expertMaskBuf,
+                                               bool writeExpertScale);
     __aicore__ inline void SendToMoeExpertByBS(TQue<QuePosition::VECIN, 1> inQueue, TBuf<> outBuf);
     __aicore__ inline void CalcBSTokenRange(uint32_t &startTokenId, uint32_t &endTokenId, uint32_t &myStartK,
                                             uint32_t &myEndK, bool &isMultiCorePerToken);
@@ -133,13 +135,14 @@ private:
     __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId,
                                        uint32_t &endTokenId, uint32_t &sendTokenNum, bool isFront = true);
     __aicore__ inline void SplitExpertNumToCore();
-    __aicore__ inline void FillTriple(LocalTensor<XOutType> &xOutTensor, uint32_t tokenIndex, uint32_t k);
+    __aicore__ inline void FillTriple(LocalTensor<XOutType> &xOutTensor, uint32_t tokenIndex, uint32_t k,
+                                      bool writeExpertScale);
     __aicore__ inline void CalTokenSendExpertCnt(uint32_t dstExpertId, int32_t calCnt, int32_t &curExpertCnt);
     __aicore__ inline void TokenToExpertInQuant(GlobalTensor<XOutType> dstWinGMTensor,
                                                 TQue<QuePosition::VECIN, 1> inQueue, uint32_t srcTokenIndex,
-                                                uint32_t toExpertId, uint32_t toExpertIndex);
+                                                uint32_t toExpertId, uint32_t toExpertIndex, bool writeExpertScale);
     __aicore__ inline void TokenToExpert(GlobalTensor<XOutType> dstWinGMTensor, TQue<QuePosition::VECIN, 1> inQueue,
-                                         uint32_t srcTokenIndex, uint32_t toExpertIndex);
+                                         uint32_t srcTokenIndex, uint32_t toExpertIndex, bool writeExpertScale);
     __aicore__ inline void RecordRankCommDuration(LocalTensor<int32_t> &performanceInfoTensor, uint64_t startTime);
     __aicore__ inline GM_ADDR GetExpertWinAddr(uint32_t dstExpertId, uint32_t tokenOffset);
     __aicore__ inline GM_ADDR GetWindAddrByRankId(const int32_t rankId)
@@ -465,15 +468,15 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
 
 template <TemplateMC2TypeFullmeshClass>
 __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::FillTriple(
-    LocalTensor<XOutType> &xOutTensor, uint32_t tokenIndex, uint32_t k)
+    LocalTensor<XOutType> &xOutTensor, uint32_t tokenIndex, uint32_t k, bool writeExpertScale)
 {
     SyncFunc<AscendC::HardEvent::MTE3_S>();
     LocalTensor<int32_t> xOutTint32 = xOutTensor.template ReinterpretCast<int32_t>();
     xOutTint32(tokenQuantAlign_) = epRankId_;      // 0:epRankId index
     xOutTint32(tokenQuantAlign_ + 1) = tokenIndex; // 1:token index
     xOutTint32(tokenQuantAlign_ + 2) = k;          // 2:topK value index
-    LocalTensor<float> xOutTfloat = xOutTensor.template ReinterpretCast<float>();
-    if ((k < axisK_) && hasExpertScalesFlag_) {
+    if ((k < axisK_) && writeExpertScale) {
+        LocalTensor<float> xOutTfloat = xOutTensor.template ReinterpretCast<float>();
         xOutTfloat(expertScaleAlign_) = expertScalesTensor_.GetValue(tokenIndex * axisK_ + k);
     }
     SyncFunc<AscendC::HardEvent::S_MTE3>();
@@ -482,7 +485,7 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
 template <TemplateMC2TypeFullmeshClass>
 __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::TokenToExpertInQuant(
     GlobalTensor<XOutType> dstWinGMTensor, TQue<QuePosition::VECIN, 1> inQueue, uint32_t srcTokenIndex,
-    uint32_t fillExpertIdx, uint32_t quantExpertIdx)
+    uint32_t fillExpertIdx, uint32_t quantExpertIdx, bool writeExpertScale)
 {
     DataCopyPadParams copyPadParams{true, 0U, 0U, 0U};
     LocalTensor<XInType> xInTensor = inQueue.AllocTensor<XInType>();
@@ -493,7 +496,7 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
     if constexpr (QuantMode > UNQUANT) {
         quantInst_.QuantProcess(tempTensor_, xInTensor, quantExpertIdx, scalesCount_, scalesGMTensor_);
     }
-    FillTriple(tempTensor_, srcTokenIndex, fillExpertIdx);
+    FillTriple(tempTensor_, srcTokenIndex, fillExpertIdx, writeExpertScale);
     inQueue.FreeTensor<XInType>(xInTensor);
     SyncFunc<AscendC::HardEvent::S_V>();
     LocalTensor<int32_t> tempTensorInt32 = tempTensor_.template ReinterpretCast<int32_t>();
@@ -514,7 +517,7 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
 template <TemplateMC2TypeFullmeshClass>
 __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::TokenToExpert(
     GlobalTensor<XOutType> dstWinGMTensor, TQue<QuePosition::VECIN, 1> inQueue, uint32_t srcTokenIndex,
-    uint32_t toExpertIndex)
+    uint32_t toExpertIndex, bool writeExpertScale)
 {
     DataCopyPadParams copyPadParams{false, 0U, 0U, 0U};
     LocalTensor<XInType> xInTensor = inQueue.AllocTensor<XInType>();
@@ -523,7 +526,7 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
     }
     inQueue.EnQue(xInTensor);
     xInTensor = inQueue.DeQue<XInType>();
-    FillTriple(xInTensor, srcTokenIndex, toExpertIndex);
+    FillTriple(xInTensor, srcTokenIndex, toExpertIndex, writeExpertScale);
     SyncFunc<AscendC::HardEvent::S_V>();
     LocalTensor<int32_t> xInTensorInt32 = xInTensor.template ReinterpretCast<int32_t>();
     LocalTensor<int32_t> outTensorInt32 = outTensor_.template ReinterpretCast<int32_t>();
@@ -601,9 +604,9 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
         if constexpr ((QuantMode > UNQUANT) || (QuantMode == UNQUANT && !Std::IsSame<ExpandXOutType, XType>::value)) {
             uint32_t fillExpertIdx = axisK_ + toSharedExpertIndex;
             uint32_t quantExpertIdx = toSharedExpertIndex;
-            TokenToExpertInQuant(dstWinGMTensor, inQueue, srcTokenIndex, fillExpertIdx, quantExpertIdx);
+            TokenToExpertInQuant(dstWinGMTensor, inQueue, srcTokenIndex, fillExpertIdx, quantExpertIdx, false);
         } else {
-            TokenToExpert(dstWinGMTensor, inQueue, srcTokenIndex, axisK_ + toSharedExpertIndex);
+            TokenToExpert(dstWinGMTensor, inQueue, srcTokenIndex, axisK_ + toSharedExpertIndex, false);
         }
     }
 }
@@ -656,10 +659,22 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
     TQue<QuePosition::VECIN, 1> inQueue, TBuf<> expertMaskBuf, TBuf<> outBuf)
 {
     // 按专家分核（步进）
-    uint32_t calExpertIdsIdx;
     SplitExpertNumToCore();
     // 计算专家发送数据量 && 发送
     CalExpertSendNum(outBuf, expertMaskBuf);
+    // 在循环外区分有无专家权重，避免性能劣化
+    if (hasExpertScalesFlag_) {
+        SendToMoeExpertLoop(inQueue, expertMaskBuf, true);
+    } else {
+        SendToMoeExpertLoop(inQueue, expertMaskBuf, false);
+    }
+}
+
+template <TemplateMC2TypeFullmeshClass>
+__aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::SendToMoeExpertLoop(
+    TQue<QuePosition::VECIN, 1> inQueue, TBuf<> expertMaskBuf, bool writeExpertScale)
+{
+    uint32_t calExpertIdsIdx;
     uint32_t maskN64Num = Ceil(expertIdsCnt_, 64); // 64：ScalarGetSFFValue按照64长度一次计算
     GlobalTensor<XOutType> dstWinGMTensor;
     LocalTensor<uint64_t> expertMaskTensorU64 = expertMaskBuf.Get<uint64_t>();
@@ -689,9 +704,10 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
                 if constexpr ((QuantMode > UNQUANT) ||
                               (QuantMode == UNQUANT && !Std::IsSame<ExpandXOutType, XType>::value)) {
                     uint32_t quantExpertIdx = dstExpertId + sharedExpertNum_;
-                    TokenToExpertInQuant(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex, quantExpertIdx);
+                    TokenToExpertInQuant(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex, quantExpertIdx,
+                                         writeExpertScale);
                 } else {
-                    TokenToExpert(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex);
+                    TokenToExpert(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex, writeExpertScale);
                 }
                 dstTokenPreCnt++;
                 uint64_t cleanMask = ~(uint64_t(1) << curValidIdx);
