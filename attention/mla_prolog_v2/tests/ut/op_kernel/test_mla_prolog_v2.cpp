@@ -91,8 +91,14 @@ protected:
         if (tiling != nullptr)
             AscendC::GmFree(tiling);
     }
-    static void SetUpTestCase() { std::cout << "MlaPrologV2Kernel SetUp\n" << std::endl; }
-    static void TearDownTestCase() { std::cout << "MlaPrologV2Kernel TearDown\n" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "MlaPrologV2Kernel SetUp\n" << std::endl;
+    }
+    static void TearDownTestCase()
+    {
+        std::cout << "MlaPrologV2Kernel TearDown\n" << std::endl;
+    }
 };
 
 // 半量化kv非量化场景
@@ -153,7 +159,7 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_semiQuantKVNoQuant)
     uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
     uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
     uint8_t *dequantScaleQNopeOut = (uint8_t *)AscendC::GmAlloc(1);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048 * 2048 * 2048);
+    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048ULL * 2048 * 2048);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(sizeof(optiling::MlaPrologBaseParams));
 
     // ===================tiligndata赋值====================
@@ -278,7 +284,7 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_semiQuantKVQuant)
     uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
     uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
     uint8_t *dequantScaleQNopeOut = (uint8_t *)AscendC::GmAlloc(1);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048 * 2048 * 2048);
+    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048ULL * 2048 * 2048);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(sizeof(optiling::MlaPrologBaseParams));
 
     // ===================tiligndata赋值====================
@@ -403,7 +409,7 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_QuantKVNoQuant)
     uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
     uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
     uint8_t *dequantScaleQNopeOut = (uint8_t *)AscendC::GmAlloc(1);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048 * 2048 * 2048);
+    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048ULL * 2048 * 2048);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(sizeof(optiling::MlaPrologBaseParams));
 
     // ===================tiligndata赋值====================
@@ -528,7 +534,7 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_QuantKVQuant)
     uint8_t *queryOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Hckv * sizeof(half));
     uint8_t *queryRopeOut = (uint8_t *)AscendC::GmAlloc(B * S1 * N * Dr * sizeof(half));
     uint8_t *dequantScaleQNopeOut = (uint8_t *)AscendC::GmAlloc(1);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048 * 2048 * 2048);
+    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(2048ULL * 2048 * 2048);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(sizeof(optiling::MlaPrologBaseParams));
 
     // ===================tiligndata赋值====================

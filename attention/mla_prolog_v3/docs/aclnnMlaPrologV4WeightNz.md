@@ -488,7 +488,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
         <td>kNopeClipAlphaOptional</td>
         <td>输入</td>
         <td>表示对kvCache做clip操作时的缩放因子。</td>
-        <td>在部分量化pertoken-pergroup场景和int8全量化pertoken-pergroup场景下shape为1，其余场景可不填，不支持空Tensor</td>
+        <td>在部分量化pertoken-pergroup场景和int8全量化pertoken-pergroup场景下shape为1，其余场景不支持，不支持空Tensor</td>
         <td>FLOAT</td>
         <td>ND</td>
         <td>(1)</td>
@@ -1525,10 +1525,10 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
       <td>NULLPTR</td>
       <td>NULLPTR</td>
       <td>NULLPTR</td>
-      <td>FLOAT</td>
       <td>NULLPTR</td>
       <td>NULLPTR</td>
-      <td>FLOAT</td>
+      <td>NULLPTR</td>
+      <td>NULLPTR</td>
     </tr>
     <tr>
       <td> queryOut </td>

@@ -393,6 +393,7 @@ public:
 
     ge::graphStatus RunBigKernelTiling(MlaPrologContext &context, MlaPrologTilingData *tilingData);
     static ge::graphStatus ConvertContext(gert::TilingContext &context, MlaPrologContext &mlaPrologContext);
+    static ge::graphStatus ConvertContextAttrs(gert::TilingContext &context, MlaPrologContext &mlaPrologContext);
 
 private:
     static void ConvertRequiredParams(gert::TilingContext &context, MlaPrologContext &mlaPrologContext);
@@ -404,6 +405,7 @@ private:
     QUANT_MODE GetQuantizationModeV3() const;
     QUANT_MODE GetQuantizationModeV3Dav() const;
     ge::graphStatus SetShapeInfo();
+    void SetShapeInfoDrSize();
     ge::graphStatus ProcessBaseInputs();
     ge::graphStatus FillTiling();
     void FillTilingCoreParams();
