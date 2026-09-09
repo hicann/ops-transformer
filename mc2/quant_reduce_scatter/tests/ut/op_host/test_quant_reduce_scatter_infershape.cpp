@@ -32,14 +32,17 @@ protected:
 
 TEST_F(QuantReduceScatterInferShapeTest, Basic2D_Rank8)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{1024, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{1024, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});
@@ -51,14 +54,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Basic2D_Rank8)
 
 TEST_F(QuantReduceScatterInferShapeTest, Basic2D_Rank2)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{1024, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{1024, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)}});
@@ -70,14 +76,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Basic2D_Rank2)
 
 TEST_F(QuantReduceScatterInferShapeTest, Basic2D_Rank4)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{1024, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{1024, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)}});
@@ -89,14 +98,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Basic2D_Rank4)
 
 TEST_F(QuantReduceScatterInferShapeTest, Basic3D_Rank8)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{8, 128, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{8, 128, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});
@@ -108,14 +120,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Basic3D_Rank8)
 
 TEST_F(QuantReduceScatterInferShapeTest, Basic3D_Rank2)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{4, 256, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{4, 256, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)}});
@@ -127,14 +142,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Basic3D_Rank2)
 
 TEST_F(QuantReduceScatterInferShapeTest, Dynamic3D)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{-1, 128, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{-1, 128, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});
@@ -146,14 +164,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Dynamic3D)
 
 TEST_F(QuantReduceScatterInferShapeTest, Dynamic2D)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{-1, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{-1, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});
@@ -165,14 +186,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Dynamic2D)
 
 TEST_F(QuantReduceScatterInferShapeTest, Dim1D)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{5120}, {}};
     gert::StorageShape scalesStorageShape = {{40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});
@@ -184,14 +208,17 @@ TEST_F(QuantReduceScatterInferShapeTest, Dim1D)
 
 TEST_F(QuantReduceScatterInferShapeTest, InvalidRankSize)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{1024, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{1024, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)}});
@@ -202,14 +229,17 @@ TEST_F(QuantReduceScatterInferShapeTest, InvalidRankSize)
 
 TEST_F(QuantReduceScatterInferShapeTest, Dim4D)
 {
+    gert::StorageShape contextStorageShape = {{1}, {}};
     gert::StorageShape xStorageShape = {{2, 8, 128, 5120}, {}};
     gert::StorageShape scalesStorageShape = {{2, 8, 128, 40}, {}};
 
     gert::InfershapeContextPara infershapeContextPara(
         "QuantReduceScatter",
-        {{xStorageShape, ge::DT_INT8, ge::FORMAT_ND}, {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{contextStorageShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xStorageShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesStorageShape, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{{}, ge::DT_FLOAT16, ge::FORMAT_ND}},
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("hcclCom")},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(314572800)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>("sum")},
          {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_FLOAT16))},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});

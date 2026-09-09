@@ -39,29 +39,6 @@ static void PrintTilingDataInfo(const gert::TilingContext *context, QuantAllRedu
 }
 
 /**
- * @brief 设置hcomm参数
- * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
- * @param tilingData: 框架根据context的opName匹配tiling模板，计算产生的tilingData
- * @param runInfo: 封装的doTiling所需要的参数
- * @return
- */
-static ge::graphStatus SetHcommCfg(const gert::TilingContext *context, QuantAllReduceTilingData *tilingData,
-                                   const TilingRunInfo &runInfo)
-{
-    const char *nodeName = context->GetNodeName();
-    OP_LOGD(nodeName, "group is %s in quant_all_reduce.", runInfo.group.c_str());
-    AscendC::Mc2CcTilingConfig mc2CcTilingConfig(runInfo.group, OP_TYPE_ALL_TO_ALL,
-                                                 "AlltoAll=level0:fullmesh;level1:pairwise");
-    // MTE方式必须适配，且要在getTiling之前
-    mc2CcTilingConfig.SetCommEngine(AIV_TYPE);
-    OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling) != 0,
-                    OP_LOGE(nodeName, "mc2CcTilingConfig mc2InitTiling GetTiling failed"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling) != 0,
-                    OP_LOGE(nodeName, "mc2CcTilingConfig mc2CcTiling GetTiling failed"), return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
-}
-
-/**
  * @brief 设置tilingData
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @param tilingData: 框架根据context的opName匹配tiling模板，计算产生的tilingData
@@ -143,9 +120,8 @@ static ge::graphStatus QuantAllReduceTilingFunc(gert::TilingContext *context)
     OP_TILING_CHECK(QuantReduceScatterUtilTiling::CheckTilingFunc(context, runInfo, OpType::OP_QUANT_ALL_REDUCE) !=
                         ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "tiling check failed in quant_all_reduce."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(SetHcommCfg(context, tilingData, runInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "SetHCommCfg failed."), return ge::GRAPH_FAILED);
     SetTilingData(context, *tilingData);
+    tilingData->quantAllReduceTilingInfo.hcclBufferSize = runInfo.hcclBufferSize;
     SetXPerBlock(*tilingData);
     SetTilingKey(context);
     PrintTilingDataInfo(context, *tilingData);

@@ -28,8 +28,8 @@ using namespace QuantAllReduceImpl;
 #endif
 
 template <uint32_t quantAllReduceCommMode>
-__global__ __aicore__ void quant_all_reduce(GM_ADDR x, GM_ADDR scales, GM_ADDR output, GM_ADDR workspaceGM,
-                                            GM_ADDR tilingGM)
+__global__ __aicore__ void quant_all_reduce(GM_ADDR context, GM_ADDR x, GM_ADDR scales, GM_ADDR output,
+                                            GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     REGISTER_TILING_DEFAULT(QuantAllReduceTilingData);
@@ -37,7 +37,7 @@ __global__ __aicore__ void quant_all_reduce(GM_ADDR x, GM_ADDR scales, GM_ADDR o
     TPipe pipe;
     if constexpr (quantAllReduceCommMode == MTE_ONE_SHOT) {
         QuantAllReduceMteOneShot<DTYPE_X, DTYPE_SCALES, DTYPE_OUT_PUT> op;
-        op.Init(x, scales, output, &pipe, &tilingData);
+        op.Init(context, x, scales, output, &pipe, &tilingData);
         op.Process();
     }
 }

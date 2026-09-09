@@ -12,7 +12,6 @@
  * \file aclnn_quant_all_reduce.cpp
  * \brief
  */
-#include "aclnn_quant_all_reduce.h"
 #include "securec.h"
 #include "acl/acl.h"
 #include "common/utils/op_mc2.h"
@@ -28,6 +27,7 @@
 #include "opdev/format_utils.h"
 #include "common/utils/hccl_util.h"
 #include "aclnn_kernels/transdata.h"
+#include "aclnnInner_quant_all_reduce.h"
 
 namespace {
 
@@ -125,47 +125,11 @@ static bool QuantAllReduceCheckAllFormatValid(const aclTensor *x, const aclTenso
         return false;
     }
 
-    // 内部只处理ND格式，这里做reformat操作
-    if (x->GetStorageFormat() != op::Format::FORMAT_ND) {
-        OP_LOGW("x origin format is: %s.", op::ToString(x->GetStorageFormat()).GetString());
-        x = l0op::ReFormat(x, op::Format::FORMAT_ND);
-        CHECK_RET(x != nullptr, false);
-    }
-    if (scales->GetStorageFormat() != op::Format::FORMAT_ND) {
-        OP_LOGW("scales origin format is: %s.", op::ToString(scales->GetStorageFormat()).GetString());
-        scales = l0op::ReFormat(scales, op::Format::FORMAT_ND);
-        CHECK_RET(scales != nullptr, false);
-    }
-    if (output->GetStorageFormat() != op::Format::FORMAT_ND) {
-        OP_LOGW("output origin format is: %s.", op::ToString(output->GetStorageFormat()).GetString());
-        output = l0op::ReFormat(output, op::Format::FORMAT_ND);
-        CHECK_RET(output != nullptr, false);
-    }
-
-    return true;
-}
-
-static bool QuantAllReduceCheckGroupLength(const char *group)
-{
-    if (group == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT("aclnnQuantAllReduceGetWorkspaceSize", "group");
-        return false;
-    }
-
-    size_t groupLen = strnlen(group, HCCL_GROUP_NAME_LENGTH_MAX); // group长度≥128字符, 返回HCCL_GROUP_NAME_LENGTH_MAX
-    if (groupLen >= HCCL_GROUP_NAME_LENGTH_MAX) {
-        OP_LOGE_FOR_INVALID_VALUE("aclnnQuantAllReduceGetWorkspaceSize", "group length",
-                                  std::to_string(groupLen).c_str(),
-                                  ("less than " + std::to_string(HCCL_GROUP_NAME_LENGTH_MAX)).c_str());
-        return false;
-    }
-
     return true;
 }
 
 // 参数综合校验
-static aclnnStatus QuantAllReduceCheckParams(const aclTensor *x, const aclTensor *scales, const char *group,
-                                             const aclTensor *output)
+static aclnnStatus QuantAllReduceCheckParams(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(QuantAllReduceCheckNotNull(x, scales, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -176,33 +140,40 @@ static aclnnStatus QuantAllReduceCheckParams(const aclTensor *x, const aclTensor
     // 3. 检查参数数据格式是否在API支持的数据类型范围之内，需要根据api定义校验
     CHECK_RET(QuantAllReduceCheckAllFormatValid(x, scales, output), ACLNN_ERR_PARAM_INVALID);
 
-    // 4. 检查group参数是否在要求范围之内
-    CHECK_RET(QuantAllReduceCheckGroupLength(group), ACLNN_ERR_PARAM_INVALID);
-
     return ACLNN_SUCCESS;
 }
 } // namespace
 
-extern "C" aclnnStatus aclnnInnerQuantAllReduceGetWorkspaceSize(const aclTensor *x, const aclTensor *scales,
-                                                                const char *group, const char *reduceOp,
-                                                                uint64_t yDtype, int64_t worldSize, aclTensor *output,
-                                                                uint64_t *workspaceSize, aclOpExecutor **executor);
-
-extern "C" aclnnStatus aclnnInnerQuantAllReduce(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                                const aclrtStream stream);
-
 extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
 
-extern "C" aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *x, const aclTensor *scales,
-                                                           const char *group, const char *reduceOp, aclTensor *output,
+extern "C" aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *context, const aclTensor *x,
+                                                           const aclTensor *scales, int64_t hcclBufferSize,
+                                                           int64_t worldSize, const char *reduceOp, aclTensor *output,
                                                            uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    aclnnStatus retParam = QuantAllReduceCheckParams(x, scales, group, output);
+    aclnnStatus retParam = QuantAllReduceCheckParams(x, scales, output);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
+
+    // 内部只处理ND格式：非ND(非私有)格式统一转为ND后重绑定形参，再传给inner
+    if (x->GetStorageFormat() != op::Format::FORMAT_ND) {
+        OP_LOGW("x origin format is: %s.", op::ToString(x->GetStorageFormat()).GetString());
+        x = l0op::ReFormat(x, op::Format::FORMAT_ND);
+        CHECK_RET(x != nullptr, ACLNN_ERR_PARAM_INVALID);
+    }
+    if (scales->GetStorageFormat() != op::Format::FORMAT_ND) {
+        OP_LOGW("scales origin format is: %s.", op::ToString(scales->GetStorageFormat()).GetString());
+        scales = l0op::ReFormat(scales, op::Format::FORMAT_ND);
+        CHECK_RET(scales != nullptr, ACLNN_ERR_PARAM_INVALID);
+    }
+    if (output->GetStorageFormat() != op::Format::FORMAT_ND) {
+        OP_LOGW("output origin format is: %s.", op::ToString(output->GetStorageFormat()).GetString());
+        output = const_cast<aclTensor *>(l0op::ReFormat(output, op::Format::FORMAT_ND));
+        CHECK_RET(output != nullptr, ACLNN_ERR_PARAM_INVALID);
+    }
+
     uint64_t yDtype = static_cast<uint64_t>(output->GetDataType());
-    int64_t worldSize = -1;
     aclnnStatus ret =
-        aclnnInnerQuantAllReduceGetWorkspaceSize(x, scales, const_cast<char *>(group), const_cast<char *>(reduceOp),
+        aclnnInnerQuantAllReduceGetWorkspaceSize(context, x, scales, hcclBufferSize, const_cast<char *>(reduceOp),
                                                  yDtype, worldSize, output, workspaceSize, executor);
     OP_LOGD("QuantAllReduce, aclnnGetWorkspaceSize ret %d.", ret);
     return ret;

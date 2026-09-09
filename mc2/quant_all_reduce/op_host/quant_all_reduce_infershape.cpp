@@ -25,8 +25,8 @@ using namespace ge;
 
 static const char *INNER_DEBUG = "MC2: QuantAllReduce InferShape Debug";
 // 原型IR中input的index
-constexpr size_t X_INDEX = 0;
-constexpr size_t SCALES_INDEX = 1;
+constexpr size_t X_INDEX = 1;
+constexpr size_t SCALES_INDEX = 2;
 // 原型IR中output的index
 constexpr size_t OUTPUT_INDEX = 0;
 // 原型IR中attr的index

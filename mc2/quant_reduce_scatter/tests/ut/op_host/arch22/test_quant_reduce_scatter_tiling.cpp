@@ -1,7 +1,7 @@
 /**
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -38,7 +38,7 @@ struct QuantReduceScatterTestParam {
     ge::DataType outputDtype;
     ge::Format outputFormat;
     // attrs
-    std::string groupAttr;
+    int64_t hcclBufferSizeAttr;
     std::string reduceOpAttr;
     int64_t outputDtypeAttr;
     // rank size
@@ -70,7 +70,7 @@ static QuantReduceScatterTestParam g_testCases[] = {
      {128, 5120},
      ge::DT_FLOAT16,
      ge::FORMAT_ND,
-     "group",
+     314572800,
      "sum",
      ge::DT_FLOAT16,
      8,
@@ -102,18 +102,21 @@ static gert::TilingContextPara BuildTilingContextPara(const QuantReduceScatterTe
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     // 参数封装
+    gert::StorageShape contextShape = {{1}, {1}};
     gert::StorageShape xShape = {param.xShape, param.xShape};
     gert::StorageShape scalesShape = {param.scalesShape, param.scalesShape};
     gert::StorageShape outputShape = {param.outputShape, param.outputShape};
     std::vector<gert::TilingContextPara::TensorDescription> inputTensorDesc_(
-        {{xShape, param.xDtype, param.xFormat}, {scalesShape, param.scalesDtype, param.scalesFormat}});
+        {{contextShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xShape, param.xDtype, param.xFormat},
+         {scalesShape, param.scalesDtype, param.scalesFormat}});
     std::vector<gert::TilingContextPara::TensorDescription> outputTensorDesc_(
         {{outputShape, param.outputDtype, param.outputFormat}});
     std::vector<gert::TilingContextPara::OpAttr> attrs_(
-        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.groupAttr)},
+        {{"hccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.hcclBufferSizeAttr)},
          {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.reduceOpAttr)},
-         {"output_dtype",
-          Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(param.outputDtypeAttr))}});
+         {"output_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(param.outputDtypeAttr))},
+         {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(param.rankNum))}});
     return gert::TilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo,
                                    param.socVersion);
 }

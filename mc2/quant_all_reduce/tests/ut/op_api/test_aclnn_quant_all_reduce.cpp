@@ -18,7 +18,7 @@
 #include <vector>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "../../../op_api/aclnn_quant_all_reduce.h"
+#include "aclnn_quant_all_reduce.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "op_api_ut_common/op_api_ut.h"
 #include "opdev/platform.h"
@@ -47,8 +47,6 @@ struct QuantAllReduceAclnnTestParam {
     vector<int64_t> xShape;
     vector<int64_t> scalesShape;
     vector<int64_t> outputShape;
-    // 通信域标识
-    char *group;
     // dtype
     aclDataType xDtype;
     aclDataType scalesDtype;
@@ -67,7 +65,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 7168},
      {96, 112, 2},
      {96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT,
@@ -79,7 +76,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 7168},
      {96, 112, 2},
      {96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT16,
@@ -91,7 +87,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 7168},
      {1, 96, 112, 2},
      {1, 96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT,
@@ -103,7 +98,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 7168},
      {1, 96, 112, 2},
      {1, 96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT8_E8M0,
      ACL_BF16,
@@ -115,7 +109,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT,
@@ -127,7 +120,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT16,
@@ -139,7 +131,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 64, 2},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT16,
@@ -151,7 +142,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 64, 2},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT,
@@ -164,7 +154,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 7168},
      {96, 56},
      {96, 7168},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -176,7 +165,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 7168},
      {96, 56},
      {96, 7168},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -188,7 +176,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 7168},
      {96, 56},
      {96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -200,7 +187,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 7168},
      {96, 56},
      {96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -212,7 +198,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 7168},
      {1, 96, 56},
      {1, 96, 7168},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT,
      ACL_BF16,
@@ -224,7 +209,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 7168},
      {1, 96, 56},
      {1, 96, 7168},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -236,7 +220,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 7168},
      {1, 96, 56},
      {1, 96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT,
      ACL_BF16,
@@ -248,7 +231,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 7168},
      {1, 96, 56},
      {1, 96, 7168},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT,
      ACL_BF16,
@@ -260,7 +242,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT,
      ACL_FLOAT16,
@@ -272,7 +253,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT,
      ACL_BF16,
@@ -284,7 +264,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT,
      ACL_BF16,
@@ -296,7 +275,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT,
      ACL_FLOAT16,
@@ -308,7 +286,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 32},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT,
      ACL_BF16,
@@ -320,7 +297,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 32},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT,
      ACL_BF16,
@@ -332,7 +308,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 32},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT,
      ACL_BF16,
@@ -344,7 +319,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 32},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT,
      ACL_FLOAT16,
@@ -357,7 +331,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 64, 2},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT8_E8M0,
      ACL_BF16,
@@ -369,7 +342,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT16,
@@ -381,7 +353,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 64, 2},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT16,
      ACL_FLOAT8_E8M0,
      ACL_BF16,
@@ -393,7 +364,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT16,
      ACL_FLOAT,
@@ -405,7 +375,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E5M2,
      ACL_FLOAT8_E8M0,
      ACL_INT8,
@@ -417,7 +386,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 32},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT16,
      ACL_FLOAT,
      ACL_BF16,
@@ -429,7 +397,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {1, 96, 4096},
      {1, 96, 32},
      {1, 96, 4096},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT16,
      ACL_FLOAT,
@@ -441,7 +408,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT,
      ACL_INT8,
@@ -453,7 +419,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT,
      ACL_INT8,
@@ -465,7 +430,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_HIFLOAT8,
      ACL_FLOAT,
      ACL_INT8,
@@ -478,7 +442,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -490,7 +453,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -502,7 +464,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 32},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_INT8,
      ACL_FLOAT,
      ACL_FLOAT,
@@ -514,7 +475,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT,
@@ -526,7 +486,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT,
@@ -538,7 +497,6 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      {96, 4096},
      {96, 64, 2},
      {96, 4096},
-     "quantallreduce_test_group",
      ACL_FLOAT8_E4M3FN,
      ACL_FLOAT8_E8M0,
      ACL_FLOAT,
@@ -548,69 +506,12 @@ static QuantAllReduceAclnnTestParam g_dtypeCasesParams[] = {
      ACLNN_ERR_PARAM_INVALID},
 };
 
-static QuantAllReduceAclnnTestParam g_groupCasesParams[] = {
-    // group长度校验用例, this_is_a_very_long_groupname_长度为30字符
-    {"test_aclnn_quant_all_reduce_mx_BS96_H7168_FLOAT8E4M3FN_FLOAT8E8M0_FLOAT_false_group_length_127",
-     {96, 7168},
-     {96, 112, 2},
-     {96, 7168},
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is",
-     ACL_FLOAT8_E4M3FN,
-     ACL_FLOAT8_E8M0,
-     ACL_FLOAT,
-     ACL_FORMAT_ND,
-     ACL_FORMAT_ND,
-     ACL_FORMAT_ND,
-     ACLNN_SUCCESS}, // group长度为127
-    {"test_aclnn_quant_all_reduce_mx_BS96_H7168_FLOAT8E4M3FN_FLOAT8E8M0_FLOAT_false_group_length_128",
-     {96, 7168},
-     {96, 112, 2},
-     {96, 7168},
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_",
-     ACL_FLOAT8_E4M3FN,
-     ACL_FLOAT8_E8M0,
-     ACL_FLOAT,
-     ACL_FORMAT_ND,
-     ACL_FORMAT_ND,
-     ACL_FORMAT_ND,
-     ACLNN_ERR_PARAM_INVALID}, // group长度为128-越界
-    {"test_aclnn_quant_all_reduce_mx_BS96_H7168_FLOAT8E4M3FN_FLOAT8E8M0_FLOAT_false_group_length_129",
-     {96, 7168},
-     {96, 112, 2},
-     {96, 7168},
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_a_very_long_groupname_"
-     "this_is_a",
-     ACL_FLOAT8_E4M3FN,
-     ACL_FLOAT8_E8M0,
-     ACL_FLOAT,
-     ACL_FORMAT_ND,
-     ACL_FORMAT_ND,
-     ACL_FORMAT_ND,
-     ACLNN_ERR_PARAM_INVALID}, // group长度为129-越界
-};
-
 static void TestOneParamCase(const QuantAllReduceAclnnTestParam &param)
 {
     std::cout << "run case " << param.caseName << std::endl;
-    if (param.group == nullptr) {
-        std::cerr << "[ERROR]: group is null" << std::endl;
-        return;
-    }
     vector<int64_t> xShape = param.xShape;
     vector<int64_t> scalesShape = param.scalesShape;
     vector<int64_t> outputShape = param.outputShape;
-    char *group = param.group;
     aclDataType xDtype = param.xDtype;
     aclDataType scalesDtype = param.scalesDtype;
     aclDataType outputDtype = param.outputDtype;
@@ -619,11 +520,15 @@ static void TestOneParamCase(const QuantAllReduceAclnnTestParam &param)
     aclFormat outputFormat = param.outputFormat;
     aclnnStatus retStatus = param.aclnnStatusUt;
     // 封装
+    TensorDesc context = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND);
     TensorDesc x = TensorDesc(xShape, xDtype, xFormat);
     TensorDesc scales = TensorDesc(scalesShape, scalesDtype, scalesFormat);
     TensorDesc output = TensorDesc(outputShape, outputDtype, outputFormat);
+    int64_t hcclBufferSize = 2097152;
+    int64_t worldSize = 2;
     const char *reduceOp = "sum";
-    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT(x, scales, group, reduceOp), OUTPUT(output));
+    auto ut =
+        OP_API_UT(aclnnQuantAllReduce, INPUT(context, x, scales, hcclBufferSize, worldSize, reduceOp), OUTPUT(output));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -644,34 +549,28 @@ TEST_F(TestAclnnQuantAllReduce, DtypeCasesParamsTest)
     }
 }
 
-TEST_F(TestAclnnQuantAllReduce, GroupCasesParamsTest)
-{
-    if (std::size(g_groupCasesParams) != 0) {
-        uint64_t numCases = sizeof(g_groupCasesParams) / sizeof(g_groupCasesParams[0]);
-        for (size_t idx = 0; idx < numCases; idx += 1) {
-            TestOneParamCase(g_groupCasesParams[idx]);
-        }
-    }
-}
-
-TEST_F(TestAclnnQuantAllReduce, NullptrGroupTest)
+TEST_F(TestAclnnQuantAllReduce, NullptrContextTest)
 {
     auto x = TensorDesc({96, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto scales = TensorDesc({96, 64, 2}, ACL_FLOAT8_E8M0, ACL_FORMAT_ND);
     auto output = TensorDesc({96, 4096}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT(x, scales, (char *)nullptr, "sum"), OUTPUT(output));
+    auto ut = OP_API_UT(aclnnQuantAllReduce,
+                        INPUT((aclTensor *)nullptr, x, scales, (int64_t)2097152, (int64_t)2, "sum"), OUTPUT(output));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
-    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
 
 TEST_F(TestAclnnQuantAllReduce, NullptrInputTest)
 {
+    TensorDesc context = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND);
     auto scales = TensorDesc({96, 32}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = TensorDesc({96, 4096}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT((aclTensor *)nullptr, scales, "quantallreduce_test_group", "sum"),
-                        OUTPUT(output));
+    int64_t hcclBufferSize = 2097152;
+    int64_t worldSize = 2;
+    auto ut = OP_API_UT(aclnnQuantAllReduce,
+                        INPUT(context, (aclTensor *)nullptr, scales, hcclBufferSize, worldSize, "sum"), OUTPUT(output));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -680,9 +579,12 @@ TEST_F(TestAclnnQuantAllReduce, NullptrInputTest)
 
 TEST_F(TestAclnnQuantAllReduce, NullptrScalesTest)
 {
+    TensorDesc context = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND);
     auto x = TensorDesc({96, 4096}, ACL_INT8, ACL_FORMAT_ND);
     auto output = TensorDesc({96, 4096}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT(x, (aclTensor *)nullptr, "quantallreduce_test_group", "sum"),
+    int64_t hcclBufferSize = 2097152;
+    int64_t worldSize = 2;
+    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT(context, x, (aclTensor *)nullptr, hcclBufferSize, worldSize, "sum"),
                         OUTPUT(output));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
@@ -692,38 +594,50 @@ TEST_F(TestAclnnQuantAllReduce, NullptrScalesTest)
 
 TEST_F(TestAclnnQuantAllReduce, ReFormatXTest)
 {
+    TensorDesc context = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND);
     auto x = TensorDesc({96, 4096}, ACL_INT8, ACL_FORMAT_NCHW);
     auto scales = TensorDesc({96, 32}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = TensorDesc({96, 4096}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT(x, scales, "quantallreduce_test_group", "sum"), OUTPUT(output));
+    int64_t hcclBufferSize = 2097152;
+    int64_t worldSize = 2;
+    auto ut =
+        OP_API_UT(aclnnQuantAllReduce, INPUT(context, x, scales, hcclBufferSize, worldSize, "sum"), OUTPUT(output));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
-    EXPECT_NE(aclRet, ACLNN_SUCCESS);
+    EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
 TEST_F(TestAclnnQuantAllReduce, ReFormatScalesTest)
 {
+    TensorDesc context = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND);
     auto x = TensorDesc({96, 4096}, ACL_INT8, ACL_FORMAT_ND);
     auto scales = TensorDesc({96, 32}, ACL_FLOAT, ACL_FORMAT_NCHW);
     auto output = TensorDesc({96, 4096}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT(x, scales, "quantallreduce_test_group", "sum"), OUTPUT(output));
+    int64_t hcclBufferSize = 2097152;
+    int64_t worldSize = 2;
+    auto ut =
+        OP_API_UT(aclnnQuantAllReduce, INPUT(context, x, scales, hcclBufferSize, worldSize, "sum"), OUTPUT(output));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
-    EXPECT_NE(aclRet, ACLNN_SUCCESS);
+    EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
 TEST_F(TestAclnnQuantAllReduce, ReFormatOutputTest)
 {
+    TensorDesc context = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND);
     auto x = TensorDesc({96, 4096}, ACL_INT8, ACL_FORMAT_ND);
     auto scales = TensorDesc({96, 32}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = TensorDesc({96, 4096}, ACL_FLOAT, ACL_FORMAT_NCHW);
-    auto ut = OP_API_UT(aclnnQuantAllReduce, INPUT(x, scales, "quantallreduce_test_group", "sum"), OUTPUT(output));
+    int64_t hcclBufferSize = 2097152;
+    int64_t worldSize = 2;
+    auto ut =
+        OP_API_UT(aclnnQuantAllReduce, INPUT(context, x, scales, hcclBufferSize, worldSize, "sum"), OUTPUT(output));
     uint64_t workspace_size = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
-    EXPECT_NE(aclRet, ACLNN_SUCCESS);
+    EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
 } // namespace QuantAllReduceUT

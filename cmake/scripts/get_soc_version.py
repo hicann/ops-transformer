@@ -17,7 +17,6 @@ import argparse
 import logging
 from pathlib import Path
 from typing import List
-import sys
 from parse_changed_files import Module
 from parse_changed_files import Parser
 
@@ -195,10 +194,8 @@ class ParserSoc(Parser):
 
 if __name__ == "__main__":
     logging.basicConfig(
-        stream=sys.stdout,
         format="[%(asctime)s][%(filename)s:%(lineno)d] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         level=logging.INFO,
     )
-    result = ParserSoc.main()
-    logging.info(result)
+    print(ParserSoc.main())

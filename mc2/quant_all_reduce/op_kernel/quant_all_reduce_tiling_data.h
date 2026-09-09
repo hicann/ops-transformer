@@ -27,11 +27,13 @@ struct QuantAllReduceTilingInfo {
     uint64_t totalWinSize;    // Win区总大小，即HCCL_BUFFER_SIZE
     uint32_t xPerBlock;       // host 侧基于 TARGET_ITER 公式推荐的每块元素数
     uint32_t alignBlock;      // xPerBlock 对齐粒度（元素数，host/kernel共享）
+    uint64_t hcclBufferSize;
 };
 
 struct QuantAllReduceTilingData {
-    Mc2InitTiling mc2InitTiling; // 初始化通信任务配置
-    Mc2CcTiling mc2CcTiling;     // 具体每个通信任务的参数配置
+    // 注意：不能声明Mc2InitTiling/Mc2CcTiling字段，
+    // GE/HCCL框架侧按tilingData中是否存在Mc2InitTiling结构识别task-sink MC2算子，并解析其内容创建通信资源，
+    // 本算子走context张量MTE自同步，proto无group，该字段从未填充且kernel不读，残留会导致GE图加载时读到脏数据触发
     QuantAllReduceTilingInfo quantAllReduceTilingInfo;
 };
 

@@ -28,6 +28,7 @@ extern "C" {
  * 算子功能：实现低比特数据的AllReduce通信，并且在通信的过程中对数据进行反量化，输出半精度或者全精度的通信结果。
  * @brief aclnn aclnnQuantAllReduce的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
+ * @param [in] context: 通信上下文信息，由框架侧通信上下文管理模块创建，数据类型支持：INT32，数据格式支持ND。
  * @param [in] x: 公式中的输入x，不支持空Tensor，支持的维度为2-3维，shape为(bs, H)或者(b, s, H)，
  * 当量化方式为mx量化时，数据类型支持：FLOAT8_E4M3FN、FLOAT8_E5M2，数据格式支持ND，
  * 当量化方式为pertoken-pergroup量化时，数据类型支持：INT8, HIFLOAT8, FLOAT8_E4M3FN, FLOAT8_E5M2，数据格式支持ND。
@@ -36,7 +37,8 @@ extern "C" {
  * 2)，数据类型支持：FLOAT8_E8M0，数据格式支持ND，
  * 当量化方式为pertoken-pergroup量化时，支持的维度为2-3维，shape必须对应x的shape为(bs, H/128)或者(b, s,
  * H/128)，数据类型支持：FLOAT，数据格式支持ND。
- * @param [in] group: 通信域标识，数据类型支持String。
+ * @param [in] hcclBufferSize: hccl通信buffer大小，单位为字节。
+ * @param [in] worldSize: 通信域卡数，取值支持：2、4、8。
  * @param [in] reduceOp: 公式中的reduce操作类型，默认值：sum，当前版本只支持sum，数据类型支持String。
  * @param [out] output: 公式中的输出output，不支持空Tensor，
  * 数据类型支持：FLOAT、FLOAT16、BFLOAT16，支持的维度为2-3维，shape必须与x的shape保持一致，数据格式支持ND。
@@ -45,9 +47,11 @@ extern "C" {
  * @return aclnnStatus: 返回值，返回状态码
  *
  */
-ACLNN_API aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *x, const aclTensor *scales,
-                                                          const char *group, const char *reduceOp, aclTensor *output,
-                                                          uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *context, const aclTensor *x,
+                                                          const aclTensor *scales, const int64_t hcclBufferSize,
+                                                          const int64_t worldSize, const char *reduceOp,
+                                                          aclTensor *output, uint64_t *workspaceSize,
+                                                          aclOpExecutor **executor);
 
 /**
  * @brief aclnnQuantAllReduce的第二段接口，用于执行计算。

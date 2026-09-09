@@ -21,7 +21,7 @@ namespace ops {
 
 static ge::Status QuantAllReduceCalcOpParam(gert::ExeResGenerationContext *context)
 {
-    // 不设置 attached stream infos，避免框架生成 hcom wait/record 任务与 kHcom 隐藏输入
+    // 空实现：不设置 attached stream infos（避免框架生成 hcom wait/record 任务与 kHcom 隐藏输入）
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
@@ -29,7 +29,7 @@ static ge::Status QuantAllReduceCalcOpParam(gert::ExeResGenerationContext *conte
 static ge::Status QuantAllReduceGenTask(const gert::ExeResGenerationContext *context,
                                         std::vector<std::vector<uint8_t>> &tasks)
 {
-    // 保留框架默认生成的 aicore taks，不做任何注入/改写
+    // 空实现：保留框架默认生成的 aicore task，不做任何注入/改写
     (void)context;
     (void)tasks;
     return ge::GRAPH_SUCCESS;

@@ -17,8 +17,14 @@
 namespace ops {
 class QuantReduceScatter : public OpDef {
 public:
-    explicit QuantReduceScatter(const char *name) : OpDef(name)
+    explicit QuantReduceScatter(const char *name)
+        : OpDef(name)
     {
+        this->Input("context")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
         this->Input("x")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,          ge::DT_HIFLOAT8,
@@ -29,7 +35,7 @@ public:
                        ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E1M2,
                        ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E1M2,
                        ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E1M2})
-            .FormatList({ge::FORMAT_ND});
+            .FormatList({ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC});
         this->Input("scales")
             .ParamType(REQUIRED)
             .DataType(
@@ -39,7 +45,7 @@ public:
                  ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT,       ge::DT_FLOAT,
                  ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT8_E8M0,
                  ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
-            .FormatList({ge::FORMAT_ND});
+            .FormatList({ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC});
 
         this->Output("out_put")
             .ParamType(REQUIRED)
@@ -48,9 +54,9 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT,
                        ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT,
                        ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND});
+            .FormatList({ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC});
 
-        this->Attr("group").AttrType(REQUIRED).String();
+        this->Attr("hccl_buffer_size").AttrType(REQUIRED).Int();
         this->Attr("reduce_op").AttrType(OPTIONAL).String("sum");
         this->Attr("output_dtype")
             .AttrType(OPTIONAL)
@@ -69,9 +75,6 @@ public:
             .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape，复用二进制，后续图支持后修改
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
         this->AICore().AddConfig("ascend950", aicore_config_950);
-
-        // 将group配置为该算子的通信域
-        this->MC2().HcclGroup("group");
     }
 };
 

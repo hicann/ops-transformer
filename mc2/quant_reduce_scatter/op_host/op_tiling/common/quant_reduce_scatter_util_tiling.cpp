@@ -39,13 +39,7 @@ static ge::graphStatus CheckAttrsInfo(const gert::TilingContext *context, Tiling
     const char *nodeName = context->GetNodeName();
     const gert::RuntimeAttrs *attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
-    // 校验group是否为空
-    const char *groupPtr = attrs->GetAttrPointer<char>(GROUP_INDEX);
-    OP_TILING_CHECK(groupPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "group"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(std::string(groupPtr).empty(), OP_LOGE_WITH_INVALID_INPUT(nodeName, "group"),
-                    return ge::GRAPH_FAILED);
-    runInfo.groupPtr = groupPtr;
-    runInfo.group = std::string(groupPtr);
+
     // 校验reduce_op的类型是否为sum
     const char *reduceOpPtr = attrs->GetAttrPointer<char>(REDUCE_OP_INDEX);
     OP_TILING_CHECK(reduceOpPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "reduce_op"), return ge::GRAPH_FAILED);
@@ -65,6 +59,24 @@ static ge::graphStatus CheckAttrsInfo(const gert::TilingContext *context, Tiling
 }
 
 /**
+ * @brief 设置hcclBufferSize
+ * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
+ * @param runInfo: 封装的doTiling所需要的参数
+ * @return
+ */
+static ge::graphStatus SetHcclBufferSize(const gert::TilingContext *context, TilingRunInfo &runInfo)
+{
+    const char *nodeName = context->GetNodeName();
+    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const int64_t *hcclBufferSizePtr = attrs->GetAttrPointer<int64_t>(HCCL_BUFFER_SIZE_INDEX);
+    OP_TILING_CHECK(hcclBufferSizePtr == nullptr,
+                    OP_LOGE(nodeName, "Get hcclBufferSize failed, the hcclBufferSize is nullptr."),
+                    return ge::GRAPH_FAILED);
+    runInfo.hcclBufferSize = *hcclBufferSizePtr;
+    return ge::GRAPH_SUCCESS;
+}
+
+/**
  * @brief 设置rankSize
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @param runInfo: 封装的doTiling所需要的参数
@@ -76,14 +88,10 @@ static ge::graphStatus SetRankSize(const gert::TilingContext *context, TilingRun
     // attrs在函数CheckAttrsInfo中已做校验
     const gert::RuntimeAttrs *attrs = context->GetAttrs();
     const int64_t *rankSizePtr = attrs->GetAttrPointer<int64_t>(WORLD_SIZE_INDEX);
-    if (rankSizePtr == nullptr || *rankSizePtr == RANK_SIZE_DEFAULT) {
-        int64_t rankSize = 0;
-        OP_TILING_CHECK(!mc2tiling::GetRankSize(nodeName, runInfo.groupPtr, rankSize),
-                        OP_LOGE(nodeName, "Get rankSize failed."), return ge::GRAPH_FAILED);
-        runInfo.rankSize = rankSize;
-    } else {
-        runInfo.rankSize = *rankSizePtr;
-    }
+    OP_TILING_CHECK(rankSizePtr == nullptr || *rankSizePtr == RANK_SIZE_DEFAULT,
+                    OP_LOGE(nodeName, "Get rankSize failed, the rankSize is nullptr or invalid value."),
+                    return ge::GRAPH_FAILED);
+    runInfo.rankSize = *rankSizePtr;
     OP_TILING_CHECK(std::find(RANK_SIZE_LIST.begin(), RANK_SIZE_LIST.end(), runInfo.rankSize) >= RANK_SIZE_LIST.end(),
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "rankSize", std::to_string(runInfo.rankSize).c_str(),
                                               VectorToString(RANK_SIZE_LIST).c_str()),
@@ -576,21 +584,25 @@ static bool CheckOutputTensorDim(const gert::TilingContext *context, TilingRunIn
 static bool CheckTensorFormat(const gert::TilingContext *context)
 {
     const char *nodeName = context->GetNodeName();
+    // 3维及以上NPU输入经torchair入图时，Data节点npu_format默认为NCHW并被FE传播至下游，proto/tiling仅放行ND会导致报错
+    // MC2通信数据为连续排布，非分形格式与ND存储等价，放行NCHW/NHWC等非分形格式
+    // (proto生成器对NCL等格式不支持，故集合与proto FormatList保持一致)
+    const std::set<ge::Format> nonFractalFormats = {ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC};
     // context->GetInputDesc在CheckTensorDataType函数中已经校验
     auto xDesc = context->GetInputDesc(X_INDEX);
     ge::Format xFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(xDesc->GetStorageFormat()));
-    OP_TILING_CHECK(xFormat != ge::FORMAT_ND,
+    OP_TILING_CHECK(nonFractalFormats.find(xFormat) == nonFractalFormats.end(),
                     OP_LOGE_FOR_INVALID_FORMAT(nodeName, "x", Ops::Base::ToString(xFormat).c_str(), "ND"),
                     return false);
     auto scalesDesc = context->GetInputDesc(SCALES_INDEX);
     ge::Format scalesFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(scalesDesc->GetStorageFormat()));
-    OP_TILING_CHECK(scalesFormat != ge::FORMAT_ND,
+    OP_TILING_CHECK(nonFractalFormats.find(scalesFormat) == nonFractalFormats.end(),
                     OP_LOGE_FOR_INVALID_FORMAT(nodeName, "scales", Ops::Base::ToString(scalesFormat).c_str(), "ND"),
                     return false);
     // context->GetOutputDesc在CheckTensorDataType函数中已经校验
     auto outputDesc = context->GetOutputDesc(OUTPUT_INDEX);
     ge::Format outPutFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(outputDesc->GetStorageFormat()));
-    OP_TILING_CHECK(outPutFormat != ge::FORMAT_ND,
+    OP_TILING_CHECK(nonFractalFormats.find(outPutFormat) == nonFractalFormats.end(),
                     OP_LOGE_FOR_INVALID_FORMAT(nodeName, "output", Ops::Base::ToString(outPutFormat).c_str(), "ND"),
                     return false);
     return true;
@@ -697,11 +709,12 @@ ge::graphStatus QuantReduceScatterUtilTiling::CheckTilingFunc(gert::TilingContex
                                                               const OpType opType)
 {
     const char *nodeName = context->GetNodeName();
-    // set group
     if (CheckAttrsInfo(context, runInfo) != ge::GRAPH_SUCCESS) {
         OP_LOGE(nodeName, "CheckAttrsInfo failed");
         return ge::GRAPH_FAILED;
     }
+    OP_TILING_CHECK(SetHcclBufferSize(context, runInfo) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "set hcclBufferSize failed."), return ge::GRAPH_FAILED);
     // set rankSize
     OP_TILING_CHECK(SetRankSize(context, runInfo) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "set rankSize failed."),
                     return ge::GRAPH_FAILED);
