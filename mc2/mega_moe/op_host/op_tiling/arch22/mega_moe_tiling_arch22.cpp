@@ -334,7 +334,7 @@ static bool IsFiniteActivationParam(float value)
 
 static bool IsValidSituScale(float value)
 {
-    return std::isfinite(value) && value != 0.0f;
+    return std::isfinite(value) && value > 0.0f;
 }
 
 static ge::graphStatus CheckActivationParamCount(uint32_t activationCode, size_t actualCount, size_t minCount,
@@ -415,13 +415,13 @@ static ge::graphStatus CheckActivationParamsAttr(const gert::TypedContinuousVect
         OP_TILING_CHECK(
             !IsValidSituScale(info.activationParams1),
             OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[0]", std::to_string(info.activationParams1).c_str(),
-                                      "finite and non-zero"),
+                                      "finite and greater than 0"),
             return GRAPH_FAILED);
         if (paramCount == 2U) {
             OP_TILING_CHECK(
                 !IsValidSituScale(info.activationParams2),
                 OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[1]",
-                                          std::to_string(info.activationParams2).c_str(), "finite and non-zero"),
+                                          std::to_string(info.activationParams2).c_str(), "finite and greater than 0"),
                 return GRAPH_FAILED);
         }
     }
