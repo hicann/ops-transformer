@@ -379,7 +379,7 @@ __aicore__ inline WorkRange GetWaveCombineOwnedRange(const AivJobContext &job, u
     if (combineJob.totalJobs == 0U || combineJob.jobIndex >= combineJob.totalJobs) {
         return {};
     }
-    return GetRotatedBalancedTokenRange(tokenCount, combineJob.jobIndex, combineJob.totalJobs, expertRowPrefix);
+    return GetRotatedBalancedWorkRange(tokenCount, combineJob.jobIndex, combineJob.totalJobs, expertRowPrefix);
 }
 
 // 等待并消费当前 Wave 的 Combine 发送在行环形 buffer 上产生的全部完成事件，使该环不再有在途 slot。

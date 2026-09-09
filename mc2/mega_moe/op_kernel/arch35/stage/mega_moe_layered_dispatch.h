@@ -616,7 +616,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::QuantizeT
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::QuantizeLocalTokensToRelay()
 {
-    WorkRange tokenRange = GetBalancedTokenRange(m_, aivCoreIdx_, blockAivNum_);
+    WorkRange tokenRange = GetBalancedWorkRange(m_, aivCoreIdx_, blockAivNum_);
     uint32_t tokenNumInCore = tokenRange.count;
     uint32_t tokenStart = tokenRange.start;
     if (tokenNumInCore == 0U) {
