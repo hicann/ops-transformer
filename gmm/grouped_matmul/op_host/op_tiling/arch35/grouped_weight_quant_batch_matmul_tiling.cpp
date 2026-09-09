@@ -716,7 +716,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckGroupList(const gert::TilingConte
     return true;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext *context)
+bool GroupedWeightQuantBatchMatmulTiling::AnalyzeCompileInfoAndAttrs(const gert::TilingContext *context)
 {
     auto compileInfoPtr = context->GetCompileInfo<GMMCompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is nullptr."), return false);
@@ -737,7 +737,11 @@ bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext 
     groupListType_ = groupListTypePtr != nullptr ? *groupListTypePtr : 0;
     isSingleX_ = (groupType_ != static_cast<int64_t>(GroupType::NO_SPLIT) &&
                   context->GetDynamicInputTensor(X_IDX, 1) == nullptr);
+    return true;
+}
 
+bool GroupedWeightQuantBatchMatmulTiling::AnalyzeTensorLayout(const gert::TilingContext *context)
+{
     // 2: when x is multi-tensor, y is single-tensor; 3: when x is single-tensor, y is single-tensor
     isSingleY_ = (splitItem_ == 2 || splitItem_ == 3);
     GetNumOfInputs(context);
@@ -750,7 +754,11 @@ bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext 
                        context->GetDynamicInputTensor(WEIGHT_IDX, 0) != nullptr &&
                        context->GetDynamicInputTensor(WEIGHT_IDX, 0)->GetStorageShape().GetDimNum() == singleWeightDim);
     isSingleMultiSingle_ = IsMxA8W4() && isSingleX_ && !isSingleWeight_ && isSingleY_;
+    return true;
+}
 
+bool GroupedWeightQuantBatchMatmulTiling::CheckAllParams(const gert::TilingContext *context)
+{
     // 参数校验
     OP_CHECK_IF(!CheckCoreNum(context), OP_LOGE(context->GetNodeName(), "Invalid core number ratio"), return false);
     OP_CHECK_IF(!CheckUnsupportDataFlow(),
@@ -768,6 +776,22 @@ bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext 
     } else {
         OP_CHECK_IF(!CheckEveryTensor(context), OP_LOGE(context->GetNodeName(), "CheckEveryTensor failed."),
                     return false);
+    }
+    return true;
+}
+
+bool GroupedWeightQuantBatchMatmulTiling::AnalyzeAttr(const gert::TilingContext *context)
+{
+    if (!AnalyzeCompileInfoAndAttrs(context)) {
+        return false;
+    }
+
+    if (!AnalyzeTensorLayout(context)) {
+        return false;
+    }
+
+    if (!CheckAllParams(context)) {
+        return false;
     }
 
     // 参数设置
@@ -1267,8 +1291,9 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckEmptyTensorSingleXMultiWeightSing
         int64_t n = transB_ ? wShape.GetDim(wDimNum - 2) : wShape.GetDim(wDimNum - 1);
         if (weightNzFlag_) {
             // 非转置NZ排布(N1, K1, K0, N0), 转置NZ排布(K1, N1, N0, K0)
-            n = transB_ ? wShape.GetDim(wDimNum - 3) * wShape.GetDim(wDimNum - 2) :
-                          wShape.GetDim(wDimNum - 4) * wShape.GetDim(wDimNum - 1);
+            n = transB_ ?
+                    wShape.GetDim(wDimNum - 3) * wShape.GetDim(wDimNum - 2) : // -3/-2：转置NZ取倒数第3、2维（N1/N0）
+                    wShape.GetDim(wDimNum - 4) * wShape.GetDim(wDimNum - 1); // -4/-1：非转置NZ取倒数第4、1维（N1/N0）
         }
         // k不能单独为0
         OP_CHECK_IF(
@@ -1552,7 +1577,8 @@ bool GroupedWeightQuantBatchMatmulTiling::DeriveGroupSizeSingle(const gert::Tili
         } else {
             // (g, K, N) format: K axis index depends on transB
             groupNum = transB_ ? antiquantScaleShape.GetDim(antiquantScaleDimNum - 1) :
-                                 antiquantScaleShape.GetDim(antiquantScaleDimNum - 2);
+                                 antiquantScaleShape.GetDim(antiquantScaleDimNum -
+                                                            2); //- 2代表倒数第二个维度，目的是在是否转置时取得N维度
         }
     } else if (antiquantScaleDimNum == ANTIQUANT_SCALE_DIM_NUM) {
         // antiquantScaleShape: (g,n,k/64,2) or (g,k/64,n,2)
@@ -1929,7 +1955,7 @@ ge::graphStatus GroupedS8S4BasicApiTiling::GetShapeAttrsInfo()
     return GroupedQmmTiling::GetShapeAttrsInfo();
 }
 
-bool GroupedS8S4BasicApiTiling::AnalyzeDtype()
+bool GroupedS8S4BasicApiTiling::AnalyzeInputDtypes()
 {
     auto xDesc = context_->GetDynamicInputDesc(X_INDEX, 0);
     auto weightDesc = context_->GetDynamicInputDesc(WEIGHT_INDEX, 0);
@@ -1954,7 +1980,11 @@ bool GroupedS8S4BasicApiTiling::AnalyzeDtype()
                 OP_LOGE(context_->GetNodeName(), "S8S4 BasicApi expects weight format ND, NCL, NCHW or FRACTAL_NZ."),
                 return false);
     inputParams_.bFormat = weightFormat == ge::FORMAT_FRACTAL_NZ ? ge::FORMAT_FRACTAL_NZ : ge::FORMAT_ND;
+    return true;
+}
 
+bool GroupedS8S4BasicApiTiling::CheckDtypeAndFormat()
+{
     OP_CHECK_IF(inputParams_.aDtype != ge::DT_INT8 ||
                     (inputParams_.bDtype != ge::DT_INT4 && inputParams_.bDtype != ge::DT_INT32),
                 OP_LOGE(context_->GetNodeName(), "S8S4 BasicApi expects x INT8 and weight INT4/packed INT32."),
@@ -1968,6 +1998,11 @@ bool GroupedS8S4BasicApiTiling::AnalyzeDtype()
                 OP_LOGE(context_->GetNodeName(), "S8S4 BasicApi expects out BF16 or FLOAT16."), return false);
     OP_CHECK_IF(inputParams_.aFormat != ge::FORMAT_ND,
                 OP_LOGE(context_->GetNodeName(), "S8S4 BasicApi expects x in ND format."), return false);
+    return true;
+}
+
+bool GroupedS8S4BasicApiTiling::AnalyzeBiasAndOffset()
+{
     auto biasShape = context_->GetDynamicInputShape(BIAS_INDEX, 0);
     inputParams_.hasBias = biasShape != nullptr && biasShape->GetStorageShape().GetShapeSize() != 0;
     auto biasDesc = context_->GetDynamicInputDesc(BIAS_INDEX, 0);
@@ -1989,6 +2024,21 @@ bool GroupedS8S4BasicApiTiling::AnalyzeDtype()
     return true;
 }
 
+bool GroupedS8S4BasicApiTiling::AnalyzeDtype()
+{
+    if (!AnalyzeInputDtypes()) {
+        return false;
+    }
+
+    if (!CheckDtypeAndFormat()) {
+        return false;
+    }
+    if (!AnalyzeBiasAndOffset()) {
+        return false;
+    }
+    return true;
+}
+
 bool GroupedS8S4BasicApiTiling::AnalyzeAttrs()
 {
     auto attrs = context_->GetAttrs();
@@ -1999,7 +2049,7 @@ bool GroupedS8S4BasicApiTiling::AnalyzeAttrs()
     const int64_t *groupTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
     const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
     const int64_t *actTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_ACT_TYPE);
-    const auto tuningConfigPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_INDEX_TUNING_CONFIG);
+    const auto tuningConfigPtr = attrs->GetAttrPointer<gert::TypedContinuousVector<int64_t>>(ATTR_INDEX_TUNING_CONFIG);
 
     inputParams_.splitItem = splitItemPtr != nullptr ? static_cast<int8_t>(*splitItemPtr) : inputParams_.splitItem;
     inputParams_.transB = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
@@ -2013,7 +2063,7 @@ bool GroupedS8S4BasicApiTiling::AnalyzeAttrs()
     OP_CHECK_IF(inputParams_.splitItem != X_SEPARATED && inputParams_.splitItem != NO_SEPARATED,
                 OP_LOGE(context_->GetNodeName(), "S8S4 BasicApi expects splitItem to be 2 or 3."), return false);
     if (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > 0) {
-        const auto tuningConfig = reinterpret_cast<const int64_t *>(tuningConfigPtr->GetData());
+        const auto tuningConfig = tuningConfigPtr->GetData();
         OP_CHECK_IF(tuningConfig[TUNING_CONFIG_EXPECTED_TOKEN_INDEX] < 0 ||
                         static_cast<uint64_t>(tuningConfig[TUNING_CONFIG_EXPECTED_TOKEN_INDEX]) > UINT32_MAX,
                     OP_LOGE(context_->GetNodeName(), "tuningConfig[0] must be in [0, UINT32_MAX]."), return false);
@@ -2146,39 +2196,44 @@ bool GroupedS8S4BasicApiTiling::CheckAntiquantInputsEmpty() const
     return true;
 }
 
+bool GroupedS8S4BasicApiTiling::CheckWeightNzStorageShape(const gert::Shape &storageShape)
+{
+    // torch_npu constructs the normal A5 KN-NZ path as follows:
+    //   INT8 NZ:          [E, ceil(N/32), ceil(K/16), 16, 32]
+    //   packed INT32:     [E, ceil(N/32), ceil(K/16), 16, 4]
+    // The special ENK-NZ path uses the same C0 and swaps the logical K/N
+    // block axes: [E, ceil(K/32), ceil(N/16), 16, 32/4].
+    // ACLNN reinterprets the INT32 carrier as INT4 and restores the last
+    // storage dimension from 4 to 32 before Host tiling. Keep support for
+    // a direct INT32 Host invocation as well, but reject all other physical
+    // layouts instead of accepting a same-sized, differently blocked NZ.
+    const uint64_t expectedC0 = weightPackedInt32_ ? 4UL : 32UL;
+    const uint64_t expectedOuter0 = specialWeightFormat_ ? CeilDiv(inputParams_.kSize, NZ_SPECIAL_K_ALIGN) :
+                                                           CeilDiv(inputParams_.nSize, NZ_BASE_N_ALIGN);
+    const uint64_t expectedOuter1 = specialWeightFormat_ ? CeilDiv(inputParams_.nSize, NZ_SPECIAL_N_ALIGN) :
+                                                           CeilDiv(inputParams_.kSize, NZ_BASE_K_ALIGN);
+    const bool shapeMatches = storageShape.GetDimNum() == 5 &&
+                              static_cast<uint64_t>(storageShape.GetDim(0)) == inputParams_.groupNum &&
+                              static_cast<uint64_t>(storageShape.GetDim(1)) == expectedOuter0 &&
+                              static_cast<uint64_t>(storageShape.GetDim(2)) == expectedOuter1 &&
+                              static_cast<uint64_t>(storageShape.GetDim(3)) == NZ_BASE_K_ALIGN &&
+                              static_cast<uint64_t>(storageShape.GetDim(4)) == expectedC0;
+    OP_CHECK_IF(!shapeMatches,
+                OP_LOGE(context_->GetNodeName(),
+                        "A5 INT4 %s weight storage shape must be "
+                        "[E,%s,%s,16,%lu].",
+                        specialWeightFormat_ ? "special ENK-NZ" : "normal KN-NZ",
+                        specialWeightFormat_ ? "ceil(K/32)" : "ceil(N/32)",
+                        specialWeightFormat_ ? "ceil(N/16)" : "ceil(K/16)", expectedC0),
+                return false);
+    return true;
+}
+
 bool GroupedS8S4BasicApiTiling::CheckWeightStorageShape(const gert::StorageShape &weightShape)
 {
     const gert::Shape &storageShape = weightShape.GetStorageShape();
     if (inputParams_.bFormat == ge::FORMAT_FRACTAL_NZ) {
-        // torch_npu constructs the normal A5 KN-NZ path as follows:
-        //   INT8 NZ:          [E, ceil(N/32), ceil(K/16), 16, 32]
-        //   packed INT32:     [E, ceil(N/32), ceil(K/16), 16, 4]
-        // The special ENK-NZ path uses the same C0 and swaps the logical K/N
-        // block axes: [E, ceil(K/32), ceil(N/16), 16, 32/4].
-        // ACLNN reinterprets the INT32 carrier as INT4 and restores the last
-        // storage dimension from 4 to 32 before Host tiling. Keep support for
-        // a direct INT32 Host invocation as well, but reject all other physical
-        // layouts instead of accepting a same-sized, differently blocked NZ.
-        const uint64_t expectedC0 = weightPackedInt32_ ? 4UL : 32UL;
-        const uint64_t expectedOuter0 = specialWeightFormat_ ? CeilDiv(inputParams_.kSize, NZ_SPECIAL_K_ALIGN) :
-                                                               CeilDiv(inputParams_.nSize, NZ_BASE_N_ALIGN);
-        const uint64_t expectedOuter1 = specialWeightFormat_ ? CeilDiv(inputParams_.nSize, NZ_SPECIAL_N_ALIGN) :
-                                                               CeilDiv(inputParams_.kSize, NZ_BASE_K_ALIGN);
-        const bool shapeMatches = storageShape.GetDimNum() == 5 &&
-                                  static_cast<uint64_t>(storageShape.GetDim(0)) == inputParams_.groupNum &&
-                                  static_cast<uint64_t>(storageShape.GetDim(1)) == expectedOuter0 &&
-                                  static_cast<uint64_t>(storageShape.GetDim(2)) == expectedOuter1 &&
-                                  static_cast<uint64_t>(storageShape.GetDim(3)) == NZ_BASE_K_ALIGN &&
-                                  static_cast<uint64_t>(storageShape.GetDim(4)) == expectedC0;
-        OP_CHECK_IF(!shapeMatches,
-                    OP_LOGE(context_->GetNodeName(),
-                            "A5 INT4 %s weight storage shape must be "
-                            "[E,%s,%s,16,%lu].",
-                            specialWeightFormat_ ? "special ENK-NZ" : "normal KN-NZ",
-                            specialWeightFormat_ ? "ceil(K/32)" : "ceil(N/32)",
-                            specialWeightFormat_ ? "ceil(N/16)" : "ceil(K/16)", expectedC0),
-                    return false);
-        return true;
+        return CheckWeightNzStorageShape(storageShape);
     }
 
     uint64_t scalarSlotNum = inputParams_.groupNum * inputParams_.kSize * inputParams_.nSize;
@@ -2351,16 +2406,8 @@ void GroupedS8S4BasicApiTiling::SetBasicBlock()
     basicTiling_.baseK = S8S4_BASE_K;
 }
 
-ge::graphStatus GroupedS8S4BasicApiTiling::DoLibApiTiling()
+void GroupedS8S4BasicApiTiling::SetMmTilingData(uint64_t kL1)
 {
-    SetBasicBlock();
-    uint64_t kL1 = dequantMode_ == DequantMode::SYMMETRIC_PER_GROUP ? S8S4_PER_GROUP_K_L1 : S8S4_PER_CHANNEL_K_L1;
-    const uint64_t alignedK = CeilAlign(inputParams_.kSize, static_cast<uint64_t>(QUANT_GROUP_SIZE));
-    kL1 = std::min(kL1, alignedK);
-    OP_CHECK_IF(ValidateFixedTileResources(kL1) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "S8S4 fixed tile resource validation failed."),
-                return ge::GRAPH_FAILED);
-
     tilingData_.mmTilingData.m = static_cast<uint32_t>(inputParams_.mSize);
     tilingData_.mmTilingData.n = static_cast<uint32_t>(inputParams_.nSize);
     tilingData_.mmTilingData.k = static_cast<uint32_t>(inputParams_.kSize);
@@ -2376,7 +2423,10 @@ ge::graphStatus GroupedS8S4BasicApiTiling::DoLibApiTiling()
     tilingData_.mmTilingData.isBias = 0U;
     const uint64_t l0cTileBytes = basicTiling_.baseM * basicTiling_.baseN * sizeof(int32_t);
     tilingData_.mmTilingData.dbL0C = l0cTileBytes * 2UL <= aicoreParams_.l0cSize ? 2U : 1U;
+}
 
+ge::graphStatus GroupedS8S4BasicApiTiling::ComputeWorkspaceLayout()
+{
     {
         constexpr uint64_t WORKSPACE_ALIGN = 512UL;
         constexpr uint64_t NZ_K_ALIGN = 16UL;
@@ -2396,7 +2446,7 @@ ge::graphStatus GroupedS8S4BasicApiTiling::DoLibApiTiling()
             result = lhs + rhs;
             return true;
         };
-        auto checkedAlign = [&](uint64_t value, uint64_t &result) {
+        auto checkedAlign = [](uint64_t value, uint64_t &result) {
             if (value > UINT64_MAX_VALUE - (WORKSPACE_ALIGN - 1UL)) {
                 return false;
             }
@@ -2452,6 +2502,20 @@ ge::graphStatus GroupedS8S4BasicApiTiling::DoLibApiTiling()
         tilingData_.s8s4Params.userWorkspaceSizeBytes = totalSize;
     }
     return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus GroupedS8S4BasicApiTiling::DoLibApiTiling()
+{
+    SetBasicBlock();
+    uint64_t kL1 = dequantMode_ == DequantMode::SYMMETRIC_PER_GROUP ? S8S4_PER_GROUP_K_L1 : S8S4_PER_CHANNEL_K_L1;
+    const uint64_t alignedK = CeilAlign(inputParams_.kSize, static_cast<uint64_t>(QUANT_GROUP_SIZE));
+    kL1 = std::min(kL1, alignedK);
+    OP_CHECK_IF(ValidateFixedTileResources(kL1) != ge::GRAPH_SUCCESS,
+                OP_LOGE(context_->GetNodeName(), "S8S4 fixed tile resource validation failed."),
+                return ge::GRAPH_FAILED);
+
+    SetMmTilingData(kL1);
+    return ComputeWorkspaceLayout();
 }
 
 ge::graphStatus GroupedS8S4BasicApiTiling::PostTiling()

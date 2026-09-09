@@ -16,7 +16,8 @@
 #ifndef OP_HOST_GROUPED_MATMUL_SWIGLU_QUANT_V2_HOST_UTILS_H
 #define OP_HOST_GROUPED_MATMUL_SWIGLU_QUANT_V2_HOST_UTILS_H
 
-#include <map>
+#include <cstddef>
+#include <cstdint>
 
 namespace GroupedMatmulSwigluQuantParamsV2 {
 constexpr uint32_t X_INDEX = 0UL;

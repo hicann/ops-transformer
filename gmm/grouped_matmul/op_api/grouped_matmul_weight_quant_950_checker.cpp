@@ -273,6 +273,80 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorDtype(const 
     return ACLNN_SUCCESS;
 }
 
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::GetExpectedDimNum(
+    const AclnnGroupedMatmulWeightQuantDAV3510Checker &checker, const std::string &tensorType, size_t tensorDimNum,
+    size_t &expectedDimNum)
+{
+    if ((checker.IsA16MxFp4NZ() || checker.IsS8S4NZ()) && tensorType.find("antiquant") != std::string::npos) {
+        expectedDimNum = 3; // Mx / PerGroup量化，仅支持antiquantSacle/antiquantOffset维度为3
+    } else if (checker.IsMxA8W4NZ()) {
+        if (tensorType.find("antiquant") != std::string::npos) {
+            expectedDimNum =
+                checker.IsMultiTensorWeight() ? MX_MULTI_ANTIQUANT_SCALE_DIM : MX_SINGLE_ANTIQUANT_SCALE_DIM;
+        } else if (tensorType.find("token") != std::string::npos) {
+            expectedDimNum = 3; // MxA8W4场景，perTokenScale维度为3
+        } else if (tensorType.find("bias") != std::string::npos) {
+            expectedDimNum = checker.IsMultiTensorWeight() ? MX_MULTI_BIAS_DIM : MX_SINGLE_BIAS_DIM;
+        }
+    } else if (checker.IsA16W4() && tensorType.find("antiquant") != std::string::npos) {
+        size_t perchannelDim =
+            checker.gmmParams_.groupType == SPLIT_M ? 2 : 1; // 单单单场景默认维度为2，多多多场景默认维度为1
+        size_t pergroupDim = perchannelDim + 1;
+        if (tensorDimNum != perchannelDim && tensorDimNum != pergroupDim) {
+            std::string reason = "When x_dtype-weight_dtype is fp16/bf16-int4, Dim must be [" +
+                                 std::to_string(perchannelDim) + "] (perchannel) or [" + std::to_string(pergroupDim) +
+                                 "] (pergroup), but now is [" + std::to_string(tensorDimNum) + "]";
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(checker.GetAclnnName(), tensorType, std::to_string(tensorDimNum),
+                                                     reason);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        expectedDimNum = tensorDimNum;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckBatchSizeConsistency(
+    const AclnnGroupedMatmulWeightQuantDAV3510Checker &checker, const op::Shape &tensorShape,
+    const op::Shape &weightShape, const std::string &tensorType)
+{
+    if (checker.gmmParams_.groupType == SPLIT_M && !checker.IsMultiTensorWeight()) {
+        uint64_t groupNum = weightShape.GetDim(0);
+        uint64_t batchSize = tensorShape.GetDim(0);
+        if (unlikely(batchSize != groupNum)) {
+            std::string incorrectValue = std::to_string(batchSize);
+            std::string reason = "batch size[" + incorrectValue + "] should be equal with groupList length[" +
+                                 std::to_string(groupNum) + "]";
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(checker.GetAclnnName(), tensorType, incorrectValue, reason);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+// Check tensor’s Ndim must match weight’s Ndim.
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckNDimConsistency(
+    const AclnnGroupedMatmulWeightQuantDAV3510Checker &checker, const op::Shape &tensorShape,
+    const op::Shape &weightShape, size_t tensorDimNum, const std::string &tensorType)
+{
+    uint64_t weightNDimIdx = checker.IsS8S4SpecialWeightFormat() ? S8S4_WEIGHT_K_DIM : weightShape.GetDimNum() - 1;
+    int64_t weightNDimValue = weightShape.GetDim(weightNDimIdx);
+    int64_t tensorNDimValue;
+    if (checker.IsMxA8W4NZ() && tensorType.find("antiquant") != std::string::npos) { // viewShape,所以是-2
+        tensorNDimValue = tensorShape.GetDim(tensorDimNum - 2);
+    } else {
+        tensorNDimValue = tensorShape.GetDim(tensorDimNum - 1);
+    }
+    if (unlikely(tensorNDimValue != weightNDimValue)) {
+        std::string incorrectValues = std::to_string(tensorNDimValue) + ", " + std::to_string(weightNDimValue);
+        std::string reason = "NDim[" + std::to_string(tensorNDimValue) + "] of " + tensorType +
+                             " must be equal to NDim[" + std::to_string(weightNDimValue) + "] of weight";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(checker.GetAclnnName(), tensorType + ", weight", incorrectValues,
+                                               reason);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorShape(const aclTensorList *tensorList, size_t idx,
                                                                           const std::string &tensorType) const
 {
@@ -283,28 +357,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorShape(const 
     size_t tensorDimNum = tensorShape.GetDimNum();
     size_t expectedDimNum = gmmParams_.groupType == SPLIT_M ? 2 : 1; // 单单单场景默认维度为2，多多多场景默认维度为1
 
-    if ((IsA16MxFp4NZ() || IsS8S4NZ()) && tensorType.find("antiquant") != std::string::npos) {
-        expectedDimNum = 3; // Mx / PerGroup量化，仅支持antiquantSacle/antiquantOffset维度为3
-    } else if (IsMxA8W4NZ()) {
-        if (tensorType.find("antiquant") != std::string::npos) {
-            expectedDimNum = IsMultiTensorWeight() ? MX_MULTI_ANTIQUANT_SCALE_DIM : MX_SINGLE_ANTIQUANT_SCALE_DIM;
-        } else if (tensorType.find("token") != std::string::npos) {
-            expectedDimNum = 3; // MxA8W4场景，perTokenScale维度为3
-        } else if (tensorType.find("bias") != std::string::npos) {
-            expectedDimNum = IsMultiTensorWeight() ? MX_MULTI_BIAS_DIM : MX_SINGLE_BIAS_DIM;
-        }
-    } else if (IsA16W4() && tensorType.find("antiquant") != std::string::npos) {
-        size_t perchannelDim = gmmParams_.groupType == SPLIT_M ? 2 : 1; // 单单单场景默认维度为2，多多多场景默认维度为1
-        size_t pergroupDim = perchannelDim + 1;
-        if (tensorDimNum != perchannelDim && tensorDimNum != pergroupDim) {
-            std::string reason = "When x_dtype-weight_dtype is fp16/bf16-int4, Dim must be [" +
-                                 std::to_string(perchannelDim) + "] (perchannel) or [" + std::to_string(pergroupDim) +
-                                 "] (pergroup), but now is [" + std::to_string(tensorDimNum) + "]";
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(GetAclnnName(), tensorType, std::to_string(tensorDimNum), reason);
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-        expectedDimNum = tensorDimNum;
-    }
+    CHECK_RET(GetExpectedDimNum(*this, tensorType, tensorDimNum, expectedDimNum) == ACLNN_SUCCESS,
+              ACLNN_ERR_PARAM_INVALID);
 
     if (unlikely(tensorDimNum != expectedDimNum)) {
         std::string incorrectDim = std::to_string(tensorDimNum);
@@ -313,34 +367,11 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorShape(const 
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    if (gmmParams_.groupType == SPLIT_M && !IsMultiTensorWeight()) {
-        uint64_t groupNum = wShape.GetDim(0);
-        uint64_t batchSize = tensorShape.GetDim(0);
-        if (unlikely(batchSize != groupNum)) {
-            std::string incorrectValue = std::to_string(batchSize);
-            std::string reason = "batch size[" + incorrectValue + "] should be equal with groupList length[" +
-                                 std::to_string(groupNum) + "]";
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnName(), tensorType, incorrectValue, reason);
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-    }
+    CHECK_RET(CheckBatchSizeConsistency(*this, tensorShape, wShape, tensorType) == ACLNN_SUCCESS,
+              ACLNN_ERR_PARAM_INVALID);
 
-    // Check tensor’s Ndim must match weight’s Ndim.
-    uint64_t weightNDimIdx = IsS8S4SpecialWeightFormat() ? S8S4_WEIGHT_K_DIM : wShape.GetDimNum() - 1;
-    int64_t weightNDimValue = wShape.GetDim(weightNDimIdx);
-    int64_t tensorNDimValue;
-    if (IsMxA8W4NZ() && tensorType.find("antiquant") != std::string::npos) { // viewShape,所以是-2
-        tensorNDimValue = tensorShape.GetDim(tensorDimNum - 2);
-    } else {
-        tensorNDimValue = tensorShape.GetDim(tensorDimNum - 1);
-    }
-    if (unlikely(tensorNDimValue != weightNDimValue)) {
-        std::string incorrectValues = std::to_string(tensorNDimValue) + ", " + std::to_string(weightNDimValue);
-        std::string reason = "NDim[" + std::to_string(tensorNDimValue) + "] of " + tensorType +
-                             " must be equal to NDim[" + std::to_string(weightNDimValue) + "] of weight";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(GetAclnnName(), tensorType + ", weight", incorrectValues, reason);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
+    CHECK_RET(CheckNDimConsistency(*this, tensorShape, wShape, tensorDimNum, tensorType) == ACLNN_SUCCESS,
+              ACLNN_ERR_PARAM_INVALID);
 
     return ACLNN_SUCCESS;
 }
@@ -417,8 +448,7 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckQuantParams() cons
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimNumAndFormat(size_t xIdx, size_t yIdx,
-                                                                              size_t wIdx) const
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckInputFormat(size_t xIdx, size_t yIdx) const
 {
     if (IsS8S4PseudoQuant()) {
         CHECK_COND(ge::GetPrimaryFormat((*gmmParams_.x)[xIdx]->GetStorageFormat()) == op::Format::FORMAT_ND &&
@@ -435,7 +465,11 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimNumAndFormat(si
                                    op::ToString((*gmmParams_.y)[yIdx]->GetStorageFormat()).GetString(), "ND");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    return ACLNN_SUCCESS;
+}
 
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckWeightFormat(size_t wIdx) const
+{
     if (IsS8S4PseudoQuant()) {
         const auto weightFormat =
             static_cast<op::Format>(ge::GetPrimaryFormat((*gmmParams_.weight)[wIdx]->GetStorageFormat()));
@@ -464,12 +498,13 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimNumAndFormat(si
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
+    return ACLNN_SUCCESS;
+}
 
-    // check dimNum
-    size_t xDimNum = (*gmmParams_.x)[xIdx]->GetViewShape().GetDimNum();
-    size_t weightDimNum = (*gmmParams_.weight)[wIdx]->GetViewShape().GetDimNum();
-    size_t yDimNum = (*gmmParams_.y)[yIdx]->GetViewShape().GetDimNum();
-
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimNumByGroupType(size_t xIdx, size_t wIdx,
+                                                                                size_t xDimNum,
+                                                                                size_t weightDimNum) const
+{
     if (gmmParams_.groupType == NO_SPLIT) {
         if (IsA16W4Pergroup(wIdx)) {
             if (unlikely(xDimNum != MIN_FM_DIM)) {
@@ -515,6 +550,21 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimNumAndFormat(si
             }
         }
     }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimNumAndFormat(size_t xIdx, size_t yIdx,
+                                                                              size_t wIdx) const
+{
+    CHECK_RET(CheckInputFormat(xIdx, yIdx) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckWeightFormat(wIdx) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+
+    // check dimNum
+    size_t xDimNum = (*gmmParams_.x)[xIdx]->GetViewShape().GetDimNum();
+    size_t weightDimNum = (*gmmParams_.weight)[wIdx]->GetViewShape().GetDimNum();
+    size_t yDimNum = (*gmmParams_.y)[yIdx]->GetViewShape().GetDimNum();
+
+    CHECK_RET(CheckDimNumByGroupType(xIdx, wIdx, xDimNum, weightDimNum) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     if (unlikely(xDimNum != yDimNum)) {
         std::string incorrectValues = std::to_string(xDimNum) + ", " + std::to_string(yDimNum);
@@ -952,7 +1002,7 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4NZScaleShape()
         return ACLNN_ERR_PARAM_INVALID;
     }
     auto scaleShape = (*gmmParams_.scaleOptional)[0]->GetViewShape();
-    if (unlikely(scaleShape.GetDimNum() != 2)) {
+    if (unlikely(scaleShape.GetDimNum() != 2)) { // S8S4 NZ 模式下 scale tensor 必须是 2 维
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(GetAclnnName(), "scale", std::to_string(scaleShape.GetDimNum()),
                                                  "The shape dim of scale must be 2");
         return ACLNN_ERR_PARAM_INVALID;
@@ -962,7 +1012,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4NZScaleShape()
                                               "The dim0 of scale must be equal to g");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (unlikely(scaleShape.GetDim(1) != weightShape.GetDim(2))) {
+    if (unlikely(scaleShape.GetDim(1) !=
+                 weightShape.GetDim(2))) { // 校验 S8S4 NZ 格式下 scale 第2维与 weight 第3维（N 维度）一致
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnName(), "scale", std::to_string(scaleShape.GetDim(1)),
                                               "The dim1 of scale must be equal to n");
         return ACLNN_ERR_PARAM_INVALID;

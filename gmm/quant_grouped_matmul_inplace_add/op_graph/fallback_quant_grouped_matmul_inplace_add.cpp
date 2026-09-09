@@ -32,6 +32,57 @@ constexpr size_t INDEX_OUTPUT_Y = 0;
 constexpr size_t INDEX_ATTR_GROUP_LIST_TYPE = 0;
 constexpr size_t DIM_TWO = 2;
 
+static bool BuildViewShapeAndStrides(const gert::Tensor *geTensor, std::vector<int64_t> &viewShape,
+                                     std::vector<int64_t> &strides)
+{
+    auto origin_shape = geTensor->GetOriginShape();
+    for (size_t i = 0; i < origin_shape.GetDimNum(); ++i) {
+        viewShape.push_back(origin_shape.GetDim(i));
+    }
+    strides.assign(viewShape.size(), 1);
+    // Compute the strides of contiguous tensor
+    OP_CHECK_IF(viewShape.size() < DIM_TWO,
+                OP_LOGE("QuantGroupedMatmulInplaceAdd aclnnfallback",
+                        "The dim num of viewshape should be greater than or equal to 2, but the actual is %zu.",
+                        viewShape.size()),
+                return false);
+    // -2：从倒数第二维开始倒序计算stride，最后一维stride已为1
+    for (int64_t i = viewShape.size() - 2; i >= 0; i--) {
+        strides[i] = viewShape[i + 1] * strides[i + 1];
+    }
+    return true;
+}
+
+static bool ApplyTranspose(size_t index, bool enableTranspose, ge::DataType dataType_ge,
+                           std::vector<int64_t> &viewShape, std::vector<int64_t> &strides)
+{
+    if (index == INDEX_INPUT_SCALE1 && dataType_ge == ge::DataType::DT_FLOAT8_E8M0 && enableTranspose) {
+        OP_CHECK_IF(viewShape.size() < 3,
+                    OP_LOGE("aclnnfallback",
+                            "Mx type: wrong perTokenScale size, dim num should be greater than or equal to 3."),
+                    return false);
+        auto swap = viewShape[0];
+        viewShape[0] = viewShape[1];
+        viewShape[1] = swap;
+        strides[0] = 2;                // 2 in shape(k//64 + g, M, 2)
+        strides[1] = viewShape[0] * 2; // since last dim is contiguous 2
+        strides[2] = 1;                // last axis of stride with index 2 has velue 1
+    } else if (enableTranspose) {      // when tensor is transposed, last two dims in strides and viewShape should swap
+        // dimM the second-to-last dim， dimN the last dim
+        auto dimM = viewShape.size() - 2;
+        auto dimN = viewShape.size() - 1;
+        if (viewShape[dimM] != 1 && viewShape[dimN] != 0) {
+            auto swap = strides[dimN];
+            strides[dimN] = strides[dimM];
+            strides[dimM] = swap;
+            swap = viewShape[dimN];
+            viewShape[dimN] = viewShape[dimM];
+            viewShape[dimM] = swap;
+        }
+    }
+    return true;
+}
+
 static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTranspose, size_t index)
 {
     if (geTensor == nullptr) {
@@ -56,45 +107,14 @@ static inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool e
     } else {
         dataType = ToAclDataType(dataType_ge);
     }
-    auto origin_shape = geTensor->GetOriginShape();
     std::vector<int64_t> viewShape;
-    for (size_t i = 0; i < origin_shape.GetDimNum(); ++i) {
-        viewShape.push_back(origin_shape.GetDim(i));
-    }
-    std::vector<int64_t> strides(viewShape.size(), 1);
-    // Compute the strides of contiguous tensor
-    OP_CHECK_IF(viewShape.size() < DIM_TWO,
-                OP_LOGE("QuantGroupedMatmulInplaceAdd aclnnfallback",
-                        "The dim num of viewshape should be greater than or equal to 2, but the actual is %zu.",
-                        viewShape.size()),
-                return nullptr);
-    for (int64_t i = viewShape.size() - 2; i >= 0; i--) {
-        strides[i] = viewShape[i + 1] * strides[i + 1];
+    std::vector<int64_t> strides;
+    if (!BuildViewShapeAndStrides(geTensor, viewShape, strides)) {
+        return nullptr;
     }
 
-    if (index == INDEX_INPUT_SCALE1 && dataType_ge == ge::DataType::DT_FLOAT8_E8M0 && enableTranspose) {
-        OP_CHECK_IF(viewShape.size() < 3,
-                    OP_LOGE("aclnnfallback",
-                            "Mx type: wrong perTokenScale size, dim num should be greater than or equal to 3."),
-                    return nullptr);
-        auto swap = viewShape[0];
-        viewShape[0] = viewShape[1];
-        viewShape[1] = swap;
-        strides[0] = 2;                // 2 in shape(k//64 + g, M, 2)
-        strides[1] = viewShape[0] * 2; // since last dim is contiguous 2
-        strides[2] = 1;                // last axis of stride with index 2 has velue 1
-    } else if (enableTranspose) {      // when tensor is transposed, last two dims in strides and viewShape should swap
-        // dimM the second-to-last dim， dimN the last dim
-        auto dimM = viewShape.size() - 2;
-        auto dimN = viewShape.size() - 1;
-        if (viewShape[dimM] != 1 && viewShape[dimN] != 0) {
-            auto swap = strides[dimN];
-            strides[dimN] = strides[dimM];
-            strides[dimM] = swap;
-            swap = viewShape[dimN];
-            viewShape[dimN] = viewShape[dimM];
-            viewShape[dimM] = swap;
-        }
+    if (!ApplyTranspose(index, enableTranspose, dataType_ge, viewShape, strides)) {
+        return nullptr;
     }
     auto aclFormat = aclFormat::ACL_FORMAT_ND;
     aclTensor *out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,

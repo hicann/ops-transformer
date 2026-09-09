@@ -27,6 +27,7 @@
 #include "log/log.h"
 #include "platform/platform_info.h"
 #include "version/ge-compiler_version.h"
+#include "securec.h"
 
 using namespace ge;
 using namespace ge::fusion;
@@ -165,11 +166,17 @@ bool GetConstScalar(const GNode &node, int32_t inputIndex, int64_t &value)
         return false;
     }
     if (desc.GetDataType() == DT_INT32 && tensor.GetSize() >= sizeof(int32_t)) {
-        value = static_cast<int64_t>(*reinterpret_cast<const int32_t *>(tensor.GetData()));
+        int32_t int32Value = 0;
+        if (memcpy_s(&int32Value, sizeof(int32Value), tensor.GetData(), sizeof(int32_t)) != EOK) {
+            return false;
+        }
+        value = static_cast<int64_t>(int32Value);
         return true;
     }
     if (desc.GetDataType() == DT_INT64 && tensor.GetSize() >= sizeof(int64_t)) {
-        value = *reinterpret_cast<const int64_t *>(tensor.GetData());
+        if (memcpy_s(&value, sizeof(value), tensor.GetData(), sizeof(int64_t)) != EOK) {
+            return false;
+        }
         return true;
     }
     return false;
@@ -297,6 +304,24 @@ bool IsMxWeightQuantMode(const GNode &groupedMatmulNode)
            antiquantScaleDesc.GetDataType() == DT_FLOAT8_E8M0;
 }
 
+bool GetTransposeAxesForScale(bool isMxScale, bool isMxPertokenScale, std::size_t dimNum,
+                              std::size_t &firstTransposeAxis, std::size_t &secondTransposeAxis)
+{
+    firstTransposeAxis = dimNum - kMiniShapeLen;
+    secondTransposeAxis = dimNum - 1;
+    if (isMxScale) {
+        if (dimNum < kPermScale.size()) {
+            return false;
+        }
+        firstTransposeAxis = dimNum - 3;  // -3：倒数索引，定位N轴
+        secondTransposeAxis = dimNum - 2; // -2：倒数索引，定位K/gs
+    } else if (isMxPertokenScale) {
+        firstTransposeAxis = 0;
+        secondTransposeAxis = 1;
+    }
+    return true;
+}
+
 bool IsReshapeTransForScale(int32_t index, const GNodePtr &nodePerInput, bool isMxQuantMode,
                             bool allowFullyDynamicMxFp4Scale)
 {
@@ -317,19 +342,13 @@ bool IsReshapeTransForScale(int32_t index, const GNodePtr &nodePerInput, bool is
         return false;
     }
 
-    std::size_t firstTransposeAxis = expectedOutputDims.size() - kMiniShapeLen;
-    std::size_t secondTransposeAxis = expectedOutputDims.size() - 1;
     const bool isMxScale = index == kScaleIndex && (isMxQuantMode || inputDesc.GetDataType() == DT_FLOAT8_E8M0);
     const bool isMxPertokenScale = index == kPertokenScaleIndex && inputDesc.GetDataType() == DT_FLOAT8_E8M0;
-    if (isMxScale) {
-        if (expectedOutputDims.size() < kPermScale.size()) {
-            return false;
-        }
-        firstTransposeAxis = expectedOutputDims.size() - 3;
-        secondTransposeAxis = expectedOutputDims.size() - 2;
-    } else if (isMxPertokenScale) {
-        firstTransposeAxis = 0;
-        secondTransposeAxis = 1;
+    std::size_t firstTransposeAxis = 0;
+    std::size_t secondTransposeAxis = 0;
+    if (!GetTransposeAxesForScale(isMxScale, isMxPertokenScale, expectedOutputDims.size(), firstTransposeAxis,
+                                  secondTransposeAxis)) {
+        return false;
     }
 
     if (expectedOutputDims[firstTransposeAxis] != 1 && expectedOutputDims[secondTransposeAxis] != 1) {
@@ -383,12 +402,20 @@ bool GetTransposePerm(const GNodePtr &transposeNode, std::vector<int64_t> &perm)
         if (permDtype == DT_INT32) {
             size = permTensor.GetSize() / sizeof(int32_t);
             for (std::size_t i = 0; i < size; ++i) {
-                perm.emplace_back(static_cast<int64_t>(*(reinterpret_cast<const int32_t *>(constDataPtr) + i)));
+                int32_t val32 = 0;
+                if (memcpy_s(&val32, sizeof(val32), constDataPtr + i * sizeof(int32_t), sizeof(int32_t)) != EOK) {
+                    return false;
+                }
+                perm.emplace_back(val32);
             }
         } else if (permDtype == DT_INT64) {
             size = permTensor.GetSize() / sizeof(int64_t);
             for (std::size_t i = 0; i < size; ++i) {
-                perm.emplace_back(*(reinterpret_cast<const int64_t *>(constDataPtr) + i));
+                int64_t val64 = 0;
+                if (memcpy_s(&val64, sizeof(val64), constDataPtr + i * sizeof(int64_t), sizeof(int64_t)) != EOK) {
+                    return false;
+                }
+                perm.emplace_back(val64);
             }
         } else {
             OP_LOGW(kPassName, "Transpose perm dtype must be int32 or int64.");
