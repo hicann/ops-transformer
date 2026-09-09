@@ -536,93 +536,6 @@ mask_mode参数解释
     </tbody>
 </table>
 
-#### SeqLengths参数组
-
-<table style="undefined;table-layout: fixed; width:1625px">
-    <colgroup>
-        <col style="width: 147px">
-        <col style="width: 232px">
-        <col style="width: 232px">
-        <col style="width: 293px">
-        <col style="width: 185px">
-    </colgroup>
-    <thead>
-        <tr>
-            <th>参数</th>
-            <th>单参数校验</th>
-            <th>存在性校验</th>
-            <th>一致性校验</th>
-            <th>特性交叉校验</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>seqused_q</td>
-            <td rowspan="2">
-                <ul>
-                    <li>tensor_type支持int32</li>
-                    <li>tensor_shape为(B,)</li>
-                    <li>仅支持非负整数</li>
-                    <li>seqused_q中的值需小于等于Q_S</li>
-                    <li>seqused_kv中的值需小于等于KV_S</li>
-                </ul>
-            </td>
-            <td rowspan="2">可选参数</td>
-            <td rowspan="4">无</td>
-            <td rowspan="6">无</td>
-        </tr>
-        <tr>
-            <td>seqused_kv</td>
-        </tr>
-        <tr>
-            <td>cu_seqlens_q</td>
-            <td rowspan="2">
-                <ul>
-                    <li>tensor_type支持int32</li>
-                    <li>tensor_shape为(B+1,)</li>
-                    <li>值仅支持非负整数</li>
-                    <li>其值应非递减（大于等于前一个值）排列</li>
-                    <li>cu_seqlens_q：第一个元素为0且最后一个元素等于Q_T</li>
-                    <li>cu_seqlens_kv：第一个元素为0且最后一个元素等于KV_T</li>
-                </ul>
-            </td>
-            <td rowspan="2">
-                <ul>
-                    <li>当layout_q为TND时，cu_seqlens_q必须传入</li>
-                    <li>当layout_q不为TND时，cu_seqlens_q不支持传入</li>
-                    <li>当layout_kv为TND时，cu_seqlens_kv必须传入</li>
-                    <li>当layout_kv不为TND时，cu_seqlens_kv不支持传入</li>
-                </ul>
-            </td>
-        </tr>
-        <tr>
-            <td>cu_seqlens_kv</td>
-        </tr>
-        <tr>
-            <td>max_seqlen_q</td>
-            <td rowspan="2">
-                <ul>
-                    <li>data_type支持INT</li>
-                    <li>默认值为-1</li>
-                </ul>
-            </td>
-            <td rowspan="2">
-                <ul>
-                    <li>可选参数</li>
-                </ul>
-            </td>
-            <td rowspan="2">
-                <ul>
-                    <li>值必须大于等于-1；传入时必须等于实际的最大序列长度，否则行为未定义</li>
-                </ul>
-            </td>
-        </tr>
-        <tr>
-            <td>max_seqlen_kv</td>
-        </tr>
-        </tbody>
-</table>
-
 #### Paged Attention参数组
 
 当block_table不为空时，开启Paged Attention
@@ -666,6 +579,122 @@ mask_mode参数解释
         </tr>
     </tbody>
 </table>
+
+#### SeqLengths参数组
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>seqused_q</td>
+            <td rowspan="2">
+                <ul>
+                    <li>tensor_type支持int32</li>
+                    <li>tensor_shape为(B,)</li>
+                    <li>仅支持非负整数</li>
+                    <li>seqused_q中的值需小于等于Q_S</li>
+                    <li>seqused_kv中的值需小于等于KV_S</li>
+                </ul>
+            </td>
+            <td>可选参数</td>
+            <td>无</td>
+            <td>
+                <ul>
+                    <li>当layout_q为TND时，seqused_q可选</li>
+                    <li>当layout_q不为TND时，seqused_q与max_seqlen_q二选一传入</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>seqused_kv</td>
+            <td>可选参数</td>
+            <td>无</td>
+            <td>
+                <ul>
+                    <li>当layout_kv为TND时，seqused_kv可选</li>
+                    <li>当layout_kv为PA时，seqused_kv必须传入</li>
+                    <li>当layout_kv不为TND且不为PA时，seqused_kv与max_seqlen_kv二选一传入</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>cu_seqlens_q</td>
+            <td rowspan="2">
+                <ul>
+                    <li>tensor_type支持int32</li>
+                    <li>tensor_shape为(B+1,)</li>
+                    <li>值仅支持非负整数</li>
+                    <li>其值应非递减（大于等于前一个值）排列</li>
+                    <li>cu_seqlens_q：第一个元素为0且最后一个元素等于Q_T</li>
+                    <li>cu_seqlens_kv：第一个元素为0且最后一个元素等于KV_T</li>
+                </ul>
+            </td>
+            <td rowspan="2">可选参数</td>
+            <td rowspan="2">无</td>
+            <td rowspan="2">
+                <ul>
+                    <li>当layout_q为TND时，cu_seqlens_q必须传入</li>
+                    <li>当layout_q不为TND时，cu_seqlens_q不支持传入</li>
+                    <li>当layout_kv为TND时，cu_seqlens_kv必须传入</li>
+                    <li>当layout_kv不为TND时，cu_seqlens_kv不支持传入</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>cu_seqlens_kv</td>
+        </tr>
+        <tr>
+            <td>max_seqlen_q</td>
+            <td rowspan="2">
+                <ul>
+                    <li>data_type支持INT</li>
+                    <li>默认值为-1</li>
+                </ul>
+            </td>
+            <td rowspan="2">可选参数</td>
+            <td rowspan="2">
+                <ul>
+                    <li>值必须大于等于-1；传入时必须等于实际的最大序列长度，否则行为未定义</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layout_q为TND时，max_seqlen_q可选</li>
+                    <li>当layout_q不为TND时，max_seqlen_q与seqused_q二选一传入</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>max_seqlen_kv</td>
+            <td>
+                <ul>
+                    <li>当layout_kv为TND或PA时，max_seqlen_kv可选</li>
+                    <li>当layout_kv不为TND且不为PA时，max_seqlen_kv与seqused_kv二选一传入</li>
+                </ul>
+            </td>
+        </tr>
+        </tbody>
+</table>
+
+layout_q、layout_kv与SeqLens参数的组合关系：
+
+- 当layout_q不为TND时，seqused_q与max_seqlen_q二选一传入，不支持传入cu_seqlens_q；当layout_q为TND时，cu_seqlens_q必须传入，seqused_q与max_seqlen_q均为可选参数。
+- 当layout_kv不为TND且不为PA时，seqused_kv与max_seqlen_kv二选一传入，不支持传入cu_seqlens_kv；当layout_kv为PA时，seqused_kv必须传入，max_seqlen_kv为可选参数；当layout_kv为TND时，cu_seqlens_kv必须传入，seqused_kv与max_seqlen_kv均为可选参数。
 
 #### Sinks参数组
 
