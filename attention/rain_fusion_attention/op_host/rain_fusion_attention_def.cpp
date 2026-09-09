@@ -39,7 +39,7 @@ public:
         this->Input("blockShape")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT64, ge::DT_INT64})
-            .FormatList({ge::FORMAT_ND});
+            .FormatList({ge::FORMAT_ND}); 
         this->Input("attenMask")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16})
@@ -64,7 +64,7 @@ public:
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND});
-
+        
         this->Attr("qInputLayout").AttrType(OPTIONAL).String("TND");
         this->Attr("kvInputLayout").AttrType(OPTIONAL).String("TND");
         this->Attr("numKeyValueHeads").AttrType(OPTIONAL).Int(1);
@@ -75,10 +75,10 @@ public:
 
         this->AICore().AddConfig("ascend910b");
         this->AICore().AddConfig("ascend910_93");
-        this->AICore().AddConfig("ascend950");
     }
 };
 
 OP_ADD(RainFusionAttention);
 
 }  // namespace ops
+

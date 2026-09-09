@@ -137,7 +137,7 @@ public:
         uint32_t coreIdx = AscendC::GetBlockIdx();
         uint32_t coreNum = AscendC::GetBlockNum();
 
-#if defined(__DAV_C220_CUBE__) || defined(__DAV_C310_CUBE__)
+#ifdef __DAV_C220_CUBE__
         // Initialize hardware events for cube core
         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(EVENT_ID0);
         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(EVENT_ID1);
@@ -165,7 +165,7 @@ public:
         BlockMmadPV blockMmadPV(resource, L1_QK_SIZE);
 #endif
 
-#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
+#ifdef __DAV_C220_VEC__
         // Initialize hardware events for vector core
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID0);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID1);
@@ -379,7 +379,7 @@ public:
             uint32_t preKVNum = PRE_LAUNCH * blockStackNum;
             int32_t stackSeqCount = 0;
 
-#if defined(__DAV_C220_CUBE__) || defined(__DAV_C310_CUBE__)
+#ifdef __DAV_C220_CUBE__
             LayoutQ layoutQTemp(rowNum, embed);
             // For BNSD format, use strideKVS; for TND, use strideKV (compile-time)
             uint64_t actualStrideKV = 0;
@@ -412,7 +412,7 @@ public:
                                          curStackTileMod * WORKSPACE_BLOCK_SIZE_DB;
                     GemmCoord actualBlockShapeQK{rowNum, stackSeqTile, embed};
                     LayoutS layOutS(rowNum, stackSeqTile, stackSeqTilePad);
-#if defined(__DAV_C220_CUBE__) || defined(__DAV_C310_CUBE__)
+#ifdef __DAV_C220_CUBE__
                     // For BNSD format, pass strideKVS; for TND, pass strideKV (compile-time)
                     uint64_t actualStrideKVForQK = 0;
                     if constexpr (KV_CACHE_LAYOUT == 1) {
@@ -426,7 +426,7 @@ public:
                                 qBlockY, curSelectNum, kvYBlockNum, kvSeqlen);
                     NpuArch::Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(qkReady);
 #endif
-#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
+#ifdef __DAV_C220_VEC__
                     // Stage 2: Online softmax (computed on VECTOR core)
                     LayoutP layOutP(rowNum, stackSeqTile, stackSeqTilePad);
                     uint64_t gmOffsetP = gmOffsetS;
@@ -450,7 +450,7 @@ public:
                                             curStackTileMod * WORKSPACE_BLOCK_SIZE_DB;
                     GemmCoord actualBlockShapePV{rowNum, embed, stackSeqTile};
                     LayoutOTmp layoutOTmp(rowNum, embed, embedRound);
-#if defined(__DAV_C220_CUBE__) || defined(__DAV_C310_CUBE__)
+#ifdef __DAV_C220_CUBE__
                     LayoutP layoutPTemp(rowNum, stackSeqTile, stackSeqTilePad);
                     uint64_t gmOffsetP = coreIdx * WORKSPACE_BLOCK_SIZE_DB * (PRE_LAUNCH + 1) +
                                          curStackTileMod * WORKSPACE_BLOCK_SIZE_DB;
@@ -467,7 +467,7 @@ public:
                                 actualStrideKVForPV, blockStackNum, softmaxReady, qBlockY, curSelectNum, kvYBlockNum);
                     NpuArch::Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(pvReady);
 #endif
-#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
+#ifdef __DAV_C220_VEC__
                     // Setup layoutO based on data format
                     LayoutO layoutO;
                     if constexpr (QUERY_LAYOUT == 1) { // BNSD: [B, N, S, D]
@@ -491,7 +491,7 @@ public:
                 stackSeqCount++;
             }
         }
-#if defined(__DAV_C220_CUBE__) || defined(__DAV_C310_CUBE__)
+#ifdef __DAV_C220_CUBE__
         // Wait for all CUBE core events
         AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(EVENT_ID1);
@@ -514,7 +514,7 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID6);
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID7);
 #endif
-#if defined(__DAV_C220_VEC__) || defined(__DAV_C310_VEC__)
+#ifdef __DAV_C220_VEC__
         // Wait for all VECTOR core events
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID2);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID3);

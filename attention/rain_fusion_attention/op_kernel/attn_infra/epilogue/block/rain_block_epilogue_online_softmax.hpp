@@ -19,23 +19,6 @@
 #include "../../../attn_infra/rain_gemm_coord.hpp"
 #include "../../../attn_infra/rain_matrix_coord.hpp"
 
-// A5 adaptation: BlockReduceSum/BlockReduceMax use different mask semantics.
-// A3: mask=0 means all elements are masked; A5: mask=0 means no elements participate.
-// Use ReduceDataBlock on A5 and replace a zero mask with FLOAT_VECTOR_SIZE.
-#if defined(__DAV_C310_VEC__)
-#define RFA_BLOCK_REDUCE_SUM(dst, src, repeat, mask, dstStride, srcBlkStride, srcRepStride) \
-    AscendC::ReduceDataBlock<AscendC::ReduceType::SUM, float, float, false>( \
-        dst, src, ((mask) == 0) ? FLOAT_VECTOR_SIZE : (mask), repeat, dstStride, srcBlkStride, srcRepStride)
-#define RFA_BLOCK_REDUCE_MAX(dst, src, repeat, mask, dstStride, srcBlkStride, srcRepStride) \
-    AscendC::ReduceDataBlock<AscendC::ReduceType::MAX, float, float, false>( \
-        dst, src, ((mask) == 0) ? FLOAT_VECTOR_SIZE : (mask), repeat, dstStride, srcBlkStride, srcRepStride)
-#else
-#define RFA_BLOCK_REDUCE_SUM(dst, src, repeat, mask, dstStride, srcBlkStride, srcRepStride) \
-    AscendC::BlockReduceSum<float, false>(dst, src, repeat, mask, dstStride, srcBlkStride, srcRepStride)
-#define RFA_BLOCK_REDUCE_MAX(dst, src, repeat, mask, dstStride, srcBlkStride, srcRepStride) \
-    AscendC::BlockReduceMax<float, false>(dst, src, repeat, mask, dstStride, srcBlkStride, srcRepStride)
-#endif
-
 namespace NpuArch::Epilogue::Block {
 
 template <class OutputType_, class InputType_, class MaskType_, LseMode LSE_MODE_>
@@ -147,14 +130,17 @@ public:
                                              const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
-        RFA_BLOCK_REDUCE_SUM(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceSum<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
 
-        RFA_BLOCK_REDUCE_SUM(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
-                             numRowsRound * numElemsAligned / FLOAT_BLOCK_SIZE / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceSum<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
+                                              numRowsRound * numElemsAligned / FLOAT_BLOCK_SIZE / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
-        RFA_BLOCK_REDUCE_SUM(rowsumUb, tvUbTensor[REDUCE_UB_SIZE],
-                             numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceSum<float, false>(rowsumUb, tvUbTensor[REDUCE_UB_SIZE],
+                                              numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
     }
 
@@ -163,14 +149,15 @@ public:
                                              const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
-        RFA_BLOCK_REDUCE_SUM(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceSum<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
         SetVecMask(ROW_OPS_SPEC_MASK_32);
-        RFA_BLOCK_REDUCE_SUM(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor, numRowsRound, 0, 1, 1, 4);
+        AscendC::BlockReduceSum<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor, numRowsRound, 0, 1, 1, 4);
         AscendC::PipeBarrier<PIPE_V>();
         SetBlockReduceMask(ROW_OPS_SPEC_MASK_4);
-        RFA_BLOCK_REDUCE_SUM(rowsumUb, tvUbTensor[REDUCE_UB_SIZE],
-                             CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
+        AscendC::BlockReduceSum<float, false>(rowsumUb, tvUbTensor[REDUCE_UB_SIZE],
+                                              CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
         AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
     }
@@ -181,17 +168,19 @@ public:
                                           uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
-            RFA_BLOCK_REDUCE_SUM(tvUbTensor, srcUb, numRowsRound, 0, 1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
+            AscendC::BlockReduceSum<float, false>(tvUbTensor, srcUb, numRowsRound, 0, 1, 1,
+                                                  numElemsAligned / FLOAT_BLOCK_SIZE);
             AscendC::PipeBarrier<PIPE_V>();
-            RFA_BLOCK_REDUCE_SUM(rowsumUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0,
-                                 1, 1, 8);
+            AscendC::BlockReduceSum<float, false>(
+                rowsumUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
             AscendC::PipeBarrier<PIPE_V>();
             for (uint64_t rowSumIdx = 1; rowSumIdx < (uint64_t)numElems / FLOAT_VECTOR_SIZE; ++rowSumIdx) {
-                RFA_BLOCK_REDUCE_SUM(tvUbTensor, srcUb[rowSumIdx * FLOAT_VECTOR_SIZE], numRowsRound, 0, 1, 1,
-                                     numElemsAligned / FLOAT_BLOCK_SIZE);
+                AscendC::BlockReduceSum<float, false>(tvUbTensor, srcUb[rowSumIdx * FLOAT_VECTOR_SIZE], numRowsRound, 0,
+                                                      1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
                 AscendC::PipeBarrier<PIPE_V>();
-                RFA_BLOCK_REDUCE_SUM(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
-                                     CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
+                AscendC::BlockReduceSum<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
+                                                      CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1,
+                                                      1, 8);
                 AscendC::PipeBarrier<PIPE_V>();
                 SetVecMask(numRowsRound);
                 AscendC::Add<float, false>(rowsumUb, rowsumUb, tvUbTensor[REDUCE_UB_SIZE], (uint64_t)0, 1,
@@ -202,17 +191,18 @@ public:
         }
         if (numElems % FLOAT_VECTOR_SIZE > 0) {
             SetVecMask(numElems % FLOAT_VECTOR_SIZE);
-            RFA_BLOCK_REDUCE_SUM(tvUbTensor, srcUb[numElems / FLOAT_VECTOR_SIZE * FLOAT_VECTOR_SIZE], numRowsRound, 0,
-                                 1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
+            AscendC::BlockReduceSum<float, false>(tvUbTensor, srcUb[numElems / FLOAT_VECTOR_SIZE * FLOAT_VECTOR_SIZE],
+                                                  numRowsRound, 0, 1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
             AscendC::PipeBarrier<PIPE_V>();
             SetBlockReduceMask(CeilDiv(numElems % FLOAT_VECTOR_SIZE, FLOAT_BLOCK_SIZE));
             if (numElems < FLOAT_VECTOR_SIZE) {
-                RFA_BLOCK_REDUCE_SUM(rowsumUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE),
-                                     0, 1, 1, 8);
+                AscendC::BlockReduceSum<float, false>(
+                    rowsumUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
                 AscendC::PipeBarrier<PIPE_V>();
             } else {
-                RFA_BLOCK_REDUCE_SUM(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
-                                     CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
+                AscendC::BlockReduceSum<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
+                                                      CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1,
+                                                      1, 8);
                 AscendC::PipeBarrier<PIPE_V>();
                 SetVecMask(numRowsRound);
                 AscendC::Add<float, false>(rowsumUb, rowsumUb, tvUbTensor[REDUCE_UB_SIZE], (uint64_t)0, 1,
@@ -228,13 +218,16 @@ public:
                                              const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
-        RFA_BLOCK_REDUCE_MAX(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceMax<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
-        RFA_BLOCK_REDUCE_MAX(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
-                             numRowsRound * numElemsAligned / FLOAT_BLOCK_SIZE / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceMax<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
+                                              numRowsRound * numElemsAligned / FLOAT_BLOCK_SIZE / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
-        RFA_BLOCK_REDUCE_MAX(rowmaxUb, tvUbTensor[REDUCE_UB_SIZE],
-                             numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceMax<float, false>(rowmaxUb, tvUbTensor[REDUCE_UB_SIZE],
+                                              numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
     }
 
@@ -243,14 +236,15 @@ public:
                                              const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
-        RFA_BLOCK_REDUCE_MAX(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
+        AscendC::BlockReduceMax<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
+                                              1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
         SetVecMask(ROW_OPS_SPEC_MASK_32);
-        RFA_BLOCK_REDUCE_MAX(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor, numRowsRound, 0, 1, 1, 4);
+        AscendC::BlockReduceMax<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor, numRowsRound, 0, 1, 1, 4);
         AscendC::PipeBarrier<PIPE_V>();
         SetBlockReduceMask(ROW_OPS_SPEC_MASK_4);
-        RFA_BLOCK_REDUCE_MAX(rowmaxUb, tvUbTensor[REDUCE_UB_SIZE],
-                             CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
+        AscendC::BlockReduceMax<float, false>(rowmaxUb, tvUbTensor[REDUCE_UB_SIZE],
+                                              CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
         AscendC::PipeBarrier<PIPE_V>();
         AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
     }
@@ -261,17 +255,19 @@ public:
                                           uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
-            RFA_BLOCK_REDUCE_MAX(tvUbTensor, srcUb, numRowsRound, 0, 1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
+            AscendC::BlockReduceMax<float, false>(tvUbTensor, srcUb, numRowsRound, 0, 1, 1,
+                                                  numElemsAligned / FLOAT_BLOCK_SIZE);
             AscendC::PipeBarrier<PIPE_V>();
-            RFA_BLOCK_REDUCE_MAX(rowmaxUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0,
-                                 1, 1, 8);
+            AscendC::BlockReduceMax<float, false>(
+                rowmaxUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
             AscendC::PipeBarrier<PIPE_V>();
             for (uint64_t rowmax_idx = 1; rowmax_idx < (uint64_t)numElems / FLOAT_VECTOR_SIZE; ++rowmax_idx) {
-                RFA_BLOCK_REDUCE_MAX(tvUbTensor, srcUb[rowmax_idx * FLOAT_VECTOR_SIZE], numRowsRound, 0, 1, 1,
-                                     numElemsAligned / FLOAT_BLOCK_SIZE);
+                AscendC::BlockReduceMax<float, false>(tvUbTensor, srcUb[rowmax_idx * FLOAT_VECTOR_SIZE], numRowsRound,
+                                                      0, 1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
                 AscendC::PipeBarrier<PIPE_V>();
-                RFA_BLOCK_REDUCE_MAX(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
-                                     CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
+                AscendC::BlockReduceMax<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
+                                                      CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1,
+                                                      1, 8);
                 AscendC::PipeBarrier<PIPE_V>();
                 SetVecMask(numRowsRound);
                 AscendC::Max<float, false>(rowmaxUb, rowmaxUb, tvUbTensor[REDUCE_UB_SIZE], (uint64_t)0, 1,
@@ -282,17 +278,18 @@ public:
         }
         if (numElems % FLOAT_VECTOR_SIZE > 0) {
             SetVecMask(numElems % FLOAT_VECTOR_SIZE);
-            RFA_BLOCK_REDUCE_MAX(tvUbTensor, srcUb[numElems / FLOAT_VECTOR_SIZE * FLOAT_VECTOR_SIZE], numRowsRound, 0,
-                                 1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
+            AscendC::BlockReduceMax<float, false>(tvUbTensor, srcUb[numElems / FLOAT_VECTOR_SIZE * FLOAT_VECTOR_SIZE],
+                                                  numRowsRound, 0, 1, 1, numElemsAligned / FLOAT_BLOCK_SIZE);
             AscendC::PipeBarrier<PIPE_V>();
             SetBlockReduceMask(CeilDiv(numElems % FLOAT_VECTOR_SIZE, FLOAT_BLOCK_SIZE));
             if (numElems < FLOAT_VECTOR_SIZE) {
-                RFA_BLOCK_REDUCE_MAX(rowmaxUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE),
-                                     0, 1, 1, 8);
+                AscendC::BlockReduceMax<float, false>(
+                    rowmaxUb, tvUbTensor, CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
                 AscendC::PipeBarrier<PIPE_V>();
             } else {
-                RFA_BLOCK_REDUCE_MAX(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
-                                     CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1, 1, 8);
+                AscendC::BlockReduceMax<float, false>(tvUbTensor[REDUCE_UB_SIZE], tvUbTensor,
+                                                      CeilDiv(numRowsRound * FLOAT_BLOCK_SIZE, FLOAT_VECTOR_SIZE), 0, 1,
+                                                      1, 8);
                 AscendC::PipeBarrier<PIPE_V>();
                 SetVecMask(numRowsRound);
                 AscendC::Max<float, false>(rowmaxUb, rowmaxUb, tvUbTensor[REDUCE_UB_SIZE], (uint64_t)0, 1,
