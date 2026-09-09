@@ -39,8 +39,8 @@ using namespace Mc2Kernel;
 template <uint32_t EngramFetchMode>
 __global__ __aicore__ void engram_fetch(GM_ADDR commContext, GM_ADDR indices, GM_ADDR localStorageAddr, GM_ADDR fetched,
                                         GM_ADDR permOut, GM_ADDR sendCountsOut, GM_ADDR recvCountsOut,
-                                        GM_ADDR recvLocalEntryOut, GM_ADDR numRecvOut, GM_ADDR workspaceGM,
-                                        GM_ADDR tilingGM)
+                                        GM_ADDR recvLocalEntryOut, GM_ADDR numRecvOut, GM_ADDR fetchedSf,
+                                        GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(EngramFetchTilingData);
     GET_TILING_DATA_WITH_STRUCT(EngramFetchTilingData, tilingData, tilingGM);
@@ -49,7 +49,7 @@ __global__ __aicore__ void engram_fetch(GM_ADDR commContext, GM_ADDR indices, GM
     if constexpr (EngramFetchMode == ENGRAM_FETCH_DEFAULT_MODE) {
         AscendC::TPipe pipe;
         EngramFetchArch35 op;
-        op.Init(commContext, indices, fetched, workspaceGM, &pipe, &tilingData);
+        op.Init(commContext, indices, fetched, fetchedSf, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if constexpr (EngramFetchMode == ENGRAM_FETCH_TRAIN_MODE) {
         AscendC::TPipe pipe;

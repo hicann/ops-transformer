@@ -24,13 +24,13 @@ public:
 
         this->Input("fetched")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT})
+            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
 
         this->Output("fetched")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT})
+            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2})
             .FormatList({ge::FORMAT_ND});
 
         OpAICoreConfig aicore_config_950;

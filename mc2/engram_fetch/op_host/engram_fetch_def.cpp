@@ -26,7 +26,7 @@ public:
 
         this->Output("fetched")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT})
+            .DataTypeList({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2})
             .FormatList({ge::FORMAT_ND});
         this->Output("perm_out").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Output("send_counts_out").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
@@ -36,11 +36,13 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND});
         this->Output("num_recv_out").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("fetched_sf").ParamType(OPTIONAL).DataTypeList({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0}).FormatList({ge::FORMAT_ND});
         this->Attr("hidden_size").AttrType(REQUIRED).Int();
         this->Attr("num_entries_per_rank").AttrType(REQUIRED).Int();
         this->Attr("num_max_tokens_per_rank").AttrType(OPTIONAL).Int();
         this->Attr("comm_buffer_size").AttrType(OPTIONAL).Int();
         this->Attr("with_grad").AttrType(OPTIONAL).Int();
+        this->Attr("sf_table_addr").AttrType(OPTIONAL).Int();
 
         OpAICoreConfig aicore_config_950;
         aicore_config_950.DynamicCompileStaticFlag(true)
