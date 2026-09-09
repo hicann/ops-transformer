@@ -192,10 +192,10 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::FreeEvent()
     WaitFlag<HardEvent::FIX_M>(INNERCORE_L0C(1));
     WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(0));
     WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(1));
-    WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(2));
+    WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(2)); // 2 for l1q buffer id
     WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(0));
     WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(1));
-    WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(2));
+    WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(2)); // 2 for l1kv buffer id
 }
 /* 初始化GmTensor,设置shape信息并计算strides */
 TEMPLATES_DEF_NO_DEFAULT
@@ -362,7 +362,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(StaticBuffer<
     SetFlag<HardEvent::M_FIX>(INNERCORE_L0C(cBuf.idx));
     WaitFlag<HardEvent::M_FIX>(INNERCORE_L0C(cBuf.idx));
     SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(l1KMatmul2BufId));
-    l1KMatmul2BufId = (l1KMatmul2BufId + 1) % 3;
+    l1KMatmul2BufId = (l1KMatmul2BufId + 1) % 3; // 3：循环使用三个L1 KV缓冲区
 
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2);
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2 + AIV0_AIV1_OFFSET);

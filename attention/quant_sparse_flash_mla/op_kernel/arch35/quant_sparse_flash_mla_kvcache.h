@@ -89,10 +89,10 @@ __aicore__ inline void GetSingleCoreParam(
     if (constInfo.oriMaskMode == 0) {
         runParam.nextTokensPerBatchOri = runParam.actualS2OriSize;
         runParam.preTokensPerBatch = runParam.actualS1Size;
-    } else if (constInfo.oriMaskMode == 3) {
+    } else if (constInfo.oriMaskMode == 3) { // 3: RightDownCausal模式
         runParam.nextTokensPerBatchOri = runParam.actualS2OriSize - runParam.actualS1Size;
         runParam.preTokensPerBatch = runParam.actualS1Size;
-    } else if (constInfo.oriMaskMode == 4) {
+    } else if (constInfo.oriMaskMode == 4) { // 4: Band模式
         const int64_t casualOffset = runParam.actualS2OriSize - runParam.actualS1Size;
         runParam.preTokensPerBatch =
             (constInfo.oriWinLeft == -1) ? runParam.actualS1Size : constInfo.oriWinLeft - casualOffset;

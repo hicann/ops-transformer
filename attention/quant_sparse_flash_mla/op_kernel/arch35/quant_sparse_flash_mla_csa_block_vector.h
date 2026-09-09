@@ -425,7 +425,7 @@ __aicore__ inline uint32_t CSABlockVec<TEMPLATE_ARGS>::CopyInKvSparse(LocalTenso
     int64_t s2IdLimit = runInfo.s2RealSize;
     s2IdLimit = (runInfo.s2RealSize - runInfo.actualS1Size + runInfo.s1oIdx + 1) / constInfo.cmpRatio;
     uint32_t dealRow = 0;
-    for (uint32_t i = 0; i < 8; i += 2) {
+    for (uint32_t i = 0; i < 8; i += 2) { // 遍历8个元素的数组/缓冲区，每次处理2个元素
         int64_t keyOffset0;
         int64_t keyOffset1;
         if constexpr (IS_VEC_S2PHYADDR) {
@@ -468,7 +468,7 @@ __aicore__ inline uint32_t CSABlockVec<TEMPLATE_ARGS>::CopyInKvSparse(LocalTenso
             DataCopyPad(kvInUb[startRow * combineDimAlign], keyGm[keyOffset], intriParams, padParams);
         }
         dealRow += (keyOffset0 >= 0) + (keyOffset1 >= 0);
-        startRow += 2;
+        startRow += 2; // 每次迭代处理2个输入元素
     }
     return dealRow;
 }
@@ -525,7 +525,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyOutKvUb2L1(
     dataCopyParams.blockCount = constInfo.dSize / blockElementNum;
     dataCopyParams.blockLen = dealRow;
     dataCopyParams.srcGap = (dealRow | 0x1) - dealRow;
-    dataCopyParams.dstGap = ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow;
+    dataCopyParams.dstGap = ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow; // 31：计算目标地址间隙，确保对齐到32的倍数
     DataCopy(dst[s2StartIdx * blockElementNum], kvOutUb, dataCopyParams);
 }
 
@@ -540,7 +540,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyOutKvUb2Gm(
     dataCopyParams.blockCount = constInfo.dSize / blockElementNum;
     dataCopyParams.blockLen = dealRow;
     dataCopyParams.srcGap = (dealRow | 0x1) - dealRow;
-    dataCopyParams.dstGap = ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow;
+    dataCopyParams.dstGap = ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow; // 31：计算目标地址间隙，确保对齐到32的倍数
     DataCopy(v0ResGmTensor[s2StartIdx * blockElementNum], kvOutUb, dataCopyParams);
 }
 
@@ -660,22 +660,26 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CalProcessSize(const RunInfo 
         uint32_t aicIdx = constInfo.aivIdx >> 1U;
         uint32_t v0S2SizeFirstCore = CeilDiv(runInfo.s2RealSize, 2);
         uint32_t v0S2SizeSecondCore = runInfo.s2RealSize - v0S2SizeFirstCore;
-        int32_t vecCnt = (aicIdx % 2U == 0) ? (GetSubBlockIdx() == 0 ? 0 : 1) : (GetSubBlockIdx() == 0 ? 2 : 3);
+        int32_t vecCnt = (aicIdx % 2U == 0) ?
+                             (GetSubBlockIdx() == 0 ? 0 : 1) :
+                             (GetSubBlockIdx() == 0 ? 2 : 3); // 2，3：根据核心索引和子块索引设置处理参数
         if (aicIdx % 2U == 0) {
             if (GetSubBlockIdx() == 0) {
-                processSize = CeilDiv(v0S2SizeFirstCore, 2);
+                processSize = CeilDiv(v0S2SizeFirstCore, 2); // 2：处理大小为v0S2SizeFirstCore的一半
                 processS2Start = 0;
             } else {
-                processSize = v0S2SizeFirstCore - CeilDiv(v0S2SizeFirstCore, 2);
-                processS2Start = CeilDiv(v0S2SizeFirstCore, 2);
+                processSize = v0S2SizeFirstCore - CeilDiv(v0S2SizeFirstCore, 2); // 2：处理剩余部分
+                processS2Start = CeilDiv(v0S2SizeFirstCore, 2); // 2：起始位置为v0S2SizeFirstCore的一半
             }
         } else {
             if (GetSubBlockIdx() == 0) {
-                processSize = CeilDiv(v0S2SizeSecondCore, 2);
+                processSize = CeilDiv(v0S2SizeSecondCore, 2); // 2：处理大小为v0S2SizeSecondCore的一半
                 processS2Start = v0S2SizeFirstCore;
             } else {
-                processSize = v0S2SizeSecondCore - CeilDiv(v0S2SizeSecondCore, 2);
-                processS2Start = v0S2SizeFirstCore + CeilDiv(v0S2SizeSecondCore, 2);
+                processSize = v0S2SizeSecondCore - CeilDiv(v0S2SizeSecondCore, 2); // 2：处理剩余部分
+                processS2Start =
+                    v0S2SizeFirstCore +
+                    CeilDiv(v0S2SizeSecondCore, 2); // 2：起始位置为v0S2SizeFirstCore加上v0S2SizeSecondCore的一半
             }
         }
         processS2End = processS2Start + processSize;
@@ -823,7 +827,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
             // s1切1,vec0: 0 ~ halfMRealSize - 1, vec1: gSize - halfMRealSize ~ gSize
             int64_t sinksOffset = 0;
             if constexpr (!IS_SPLIT_G) {
-                sinksOffset = GetBlockIdx() % 2 == 0 ? 0 : runInfo.firstHalfMRealSize;
+                sinksOffset = GetBlockIdx() % 2 == 0 ? 0 : runInfo.firstHalfMRealSize; // 2：判断块索引的奇偶性
             } else {
                 sinksOffset = runInfo.goIdx;
                 if (constInfo.subBlockIdx == 1) {
@@ -1461,9 +1465,9 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
     tmpGS1Start = gS1StartIdx;
     bool done = false;
 
-    SetFlag<AscendC::HardEvent::V_MTE2>(3);
-    SetFlag<AscendC::HardEvent::V_MTE2>(4);
-    SetFlag<AscendC::HardEvent::MTE3_V>(7);
+    SetFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
+    SetFlag<AscendC::HardEvent::V_MTE2>(4); // 4: 同步标志位值
+    SetFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
 
     for (uint32_t bIdx = bN2StartIdx; bIdx < bN2EndIdx && !done; ++bIdx) {
         bool lastBN = (bIdx == bN2EndIdx - 1);
@@ -1501,10 +1505,10 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
         PhyAddrValidInfo validInfo =
             CalcPhyAddrValidInfo(isOriKv, actualS1Size, actualOriS2Size, restoredSize, constInfo);
 
-        WaitFlag<AscendC::HardEvent::V_MTE2>(3);
+        WaitFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
         CopyPaTableToUb(blkTableUb, bIdx, blockTableGm, maxBlockNumPerBatch);
-        SetFlag<AscendC::HardEvent::MTE2_V>(8);
-        WaitFlag<AscendC::HardEvent::MTE2_V>(8);
+        SetFlag<AscendC::HardEvent::MTE2_V>(8);  // 8: 同步标志位值
+        WaitFlag<AscendC::HardEvent::MTE2_V>(8); // 8: 同步标志位值
 
         for (int32_t s1Idx = tmpGS1Start; s1Idx < s1End; ++s1Idx) {
             int32_t curValidS2 = CalcCurValidS2(bIdx, s1Idx, actualS1Size, isOriKv, cuSeqlensQGm, topkLengthGm,
@@ -1521,19 +1525,19 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
 
             uint16_t s2Loop = (curValidS2 + s2NumPerLoop - 1) / s2NumPerLoop;
             int32_t s2Tail = curValidS2 - (s2Loop - 1) * s2NumPerLoop;
-            WaitFlag<AscendC::HardEvent::V_MTE2>(4);
+            WaitFlag<AscendC::HardEvent::V_MTE2>(4); // 4: 同步标志位值
             CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, curValidS2, sparseIndicesGm, sparseBlockCount);
-            SetFlag<AscendC::HardEvent::MTE2_V>(6);
+            SetFlag<AscendC::HardEvent::MTE2_V>(6); // 6: 同步标志位值
 
-            WaitFlag<AscendC::HardEvent::MTE2_V>(6);
-            WaitFlag<AscendC::HardEvent::MTE3_V>(7);
+            WaitFlag<AscendC::HardEvent::MTE2_V>(6); // 6: 同步标志位值
+            WaitFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
             GetKVPhyAddrVF<uint32_t>(kvPhyAddrUb, sparseIdxUb, blkTableUb, s2Loop, s2Tail, blockSize, shiftRightNum,
                                      constInfo.sparseBlockSize, dVTemplateTypeInput, kvStride);
-            SetFlag<AscendC::HardEvent::V_MTE2>(4);
-            SetFlag<AscendC::HardEvent::V_MTE3>(5);
-            WaitFlag<AscendC::HardEvent::V_MTE3>(5);
+            SetFlag<AscendC::HardEvent::V_MTE2>(4);  // 4: 同步标志位值
+            SetFlag<AscendC::HardEvent::V_MTE3>(5);  // 5: 同步标志位值
+            WaitFlag<AscendC::HardEvent::V_MTE3>(5); // 5: 同步标志位值
             CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, curValidS2, s2NumPerLoop, phyAddrGm, alignedSparseBlockCount);
-            SetFlag<AscendC::HardEvent::MTE3_V>(7);
+            SetFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
 
             processedCount++;
             if (processedCount >= curCount) {
@@ -1696,14 +1700,14 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
     tPipe->InitBuffer(commonTBuf, 512); // commonTBuf内存申请512B
     tPipe->InitBuffer(sinksBuf, 512);   // sinksBuf内存申请512B
     if (constInfo.isSoftmaxLseEnable) {
-        tPipe->InitBuffer(outLseBuf[0], 256);
-        tPipe->InitBuffer(outLseBuf[1], 256);
+        tPipe->InitBuffer(outLseBuf[0], 256); // outLseBuf[0]内存申请256B
+        tPipe->InitBuffer(outLseBuf[1], 256); // outLseBuf[1]内存申请256B
     }
-    tPipe->InitBuffer(stage0InBuf[0], dVTemplateTypeInput * 32 * sizeof(KV_T)); // V0阶段每次处理16个seq, 开2 buffer
-    tPipe->InitBuffer(stage0InBuf[1], dVTemplateTypeInput * 32 * sizeof(KV_T));
+    tPipe->InitBuffer(stage0InBuf[0], dVTemplateTypeInput * 32 * sizeof(KV_T)); // 32：V0阶段每次处理16个seq, 开2 buffer
+    tPipe->InitBuffer(stage0InBuf[1], dVTemplateTypeInput * 32 * sizeof(KV_T)); // 32：同上
     // kv输入D轴512, V0阶段每次处理16个seq, 开2 buffer
-    tPipe->InitBuffer(stage0OutBuf[0], dVTemplateTypeInput * (32 + 1) * sizeof(Q_T));
-    tPipe->InitBuffer(stage0OutBuf[1], dVTemplateTypeInput * (32 + 1) * sizeof(Q_T));
+    tPipe->InitBuffer(stage0OutBuf[0], dVTemplateTypeInput * (32 + 1) * sizeof(Q_T)); // 32：同上
+    tPipe->InitBuffer(stage0OutBuf[1], dVTemplateTypeInput * (32 + 1) * sizeof(Q_T)); // 32：同上
 
     tPipe->InitBuffer(stage1OutQue[0], 1, vec1Srcstride * s2BaseSize * sizeof(Q_T));
     tPipe->InitBuffer(stage1OutQue[1], 1, vec1Srcstride * s2BaseSize * sizeof(Q_T));
@@ -1735,18 +1739,19 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
     }
 
     // vselrIndexesBuf
-    tPipe->InitBuffer(vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)], 128);
-    tPipe->InitBuffer(vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)], 64);
+    tPipe->InitBuffer(vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)],
+                      128); // 128：缓冲区大小
+    tPipe->InitBuffer(vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)], 64); // 64：缓冲区大小
 
     LocalTensor<uint8_t> vselrIndexesTensor =
         vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
-    for (int i = 0; i < 128; i++) {
-        vselrIndexesTensor.SetValue(i, i * 2);
+    for (int i = 0; i < 128; i++) {            // 128：缓冲区大小
+        vselrIndexesTensor.SetValue(i, i * 2); // 2：循环填充数据，每个元素的值为索引的2倍
     }
     vselrIndexesTensor =
         vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)].template Get<uint8_t>();
-    for (int i = 0; i < 64; i++) {
-        vselrIndexesTensor.SetValue(i, i * 4);
+    for (int i = 0; i < 64; i++) {             // 64：缓冲区大小
+        vselrIndexesTensor.SetValue(i, i * 4); // 2：循环填充数据，每个元素的值为索引的4倍
     }
 }
 

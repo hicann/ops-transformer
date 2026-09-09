@@ -177,10 +177,10 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitLocalBuffer(BufferManage
     SetFlag<HardEvent::FIX_M>(l0CFixToMFlagId + 1);
     SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId); // {0, 1, 2}, 用于l1Q
     SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 1);
-    SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2);
-    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId); // {3, 4, 5}, 用于l1K
+    SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2); // 2：同上
+    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId);     // {3, 4, 5}, 用于l1K
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 1);
-    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2);
+    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2); // 2：同上
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -193,10 +193,10 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::FreeEvent()
     WaitFlag<HardEvent::FIX_M>(l0CFixToMFlagId + 1);
     WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId); // {0, 1, 2}, 用于l1Q
     WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 1);
-    WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2);
-    WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId); // {3, 4, 5}, 用于l1K
+    WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2); // 2：同上
+    WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId);     // {3, 4, 5}, 用于l1K
     WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 1);
-    WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2);
+    WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2); // 2：同上
 }
 
 /* 初始化GmTensor,设置shape信息并计算strides */
@@ -239,7 +239,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::CopyQGmToL1(RunInfo &runInfo
 {
     uint64_t gmOffset = this->queryGm.offsetCalculator.GetOffset(runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx,
                                                                  runInfo.s1oIdx * runInfo.qSNumInOneBlock, 0);
-    for (uint32_t i = 0; i < 2; i++) {
+    for (uint32_t i = 0; i < 2; i++) { // 2：循环两次，每次处理query数据的一半
         uint32_t curL1QBufId = (l1QBufId + i) % 3;
         WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + curL1QBufId);
         uint64_t curGmOffset = gmOffset + i * (constInfo.dSize >> 1);
@@ -263,13 +263,13 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateLoadQK(
     LocalTensor<Q_T> dst = inputRightBuf.GetTensor<Q_T>();
     v0ResGm.WaitCrossCore();
     if constexpr (IS_SPLIT_G) {
-        CrossCoreSetFlag<0, PIPE_MTE2>(15);
-        CrossCoreWaitFlag<0, PIPE_MTE2>(15);
+        CrossCoreSetFlag<0, PIPE_MTE2>(15); // 触发跨核心同步事件15，通知其他核心准备进行下一步操作
+        CrossCoreWaitFlag<0, PIPE_MTE2>(15); // 15：同上
     }
     GlobalTensor<Q_T> v0ResGmTensor = v0ResGm.template GetTensor<Q_T>();
     DataCopy(dst, v0ResGmTensor, Align32Func(runInfo.s2RealSize) * constInfo.dSize);
     SetFlag<HardEvent::MTE2_MTE1>(l1KMte2ToMte1FlagId + l1KLoadBufId);
-    l1KLoadBufId = (l1KLoadBufId + 1) % 3;
+    l1KLoadBufId = (l1KLoadBufId + 1) % 3; // 3：循环使用三个L1缓冲区来存储加载的K矩阵数据
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -280,7 +280,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     RunInfo &runInfo, ConstInfo &constInfo)
 {
     WaitFlag<HardEvent::MTE2_MTE1>(l1KMte2ToMte1FlagId + l1KMatmul1BufId);
-    l1KMatmul1BufId = (l1KMatmul1BufId + 1) % 3;
+    l1KMatmul1BufId = (l1KMatmul1BufId + 1) % 3; // 3：循环使用三个L1缓冲区来存储K矩阵数据
     WaitFlag<HardEvent::FIX_M>(l0CFixToMFlagId + l0CBufId);
 
     MMParam param = {
@@ -300,7 +300,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
         l1QTensor[curL1QBufId * BUFFER_SIZE_16K], inputRightBuf.GetTensor<Q_T>(), mmL0ABuffers, mmL0BBuffers,
         mmL0CTensor[BUFFER_SIZE_32K * l0CBufId], param);
 
-    curL1QBufId = (curL1QBufId + 1) % 3;
+    curL1QBufId = (curL1QBufId + 1) % 3; // 3：循环使用三个L1缓冲区来存储Q矩阵数据
     if (unlikely(runInfo.s2LoopCount == 0)) {
         WaitFlag<HardEvent::MTE2_MTE1>(l1QMte2ToMte1FlagId + curL1QBufId);
     }
@@ -316,7 +316,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     if (unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {
         SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + l1QBufId);
         SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + curL1QBufId);
-        l1QBufId = (l1QBufId + 2) % 3;
+        l1QBufId = (l1QBufId + 2) % 3; // {2, 3}：循环使用三个L1缓冲区来存储Q矩阵数据，跳过一个缓冲区
         if (notLastTwoLoop) {
             CopyQGmToL1(runInfoNext, constInfo);
         }
@@ -373,7 +373,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(
     SetFlag<HardEvent::M_FIX>(l0CMToFixFlagId + l0CBufId);
     WaitFlag<HardEvent::M_FIX>(l0CMToFixFlagId + l0CBufId);
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + l1KMatmul2BufId);
-    l1KMatmul2BufId = (l1KMatmul2BufId + 1) % 3;
+    l1KMatmul2BufId = (l1KMatmul2BufId + 1) % 3; // 3：循环使用三个L1缓冲区来存储K矩阵数据
 
     outputBuf.WaitCrossCore();                             // 占用
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB;FixpipeParamsM300:L0C→UB

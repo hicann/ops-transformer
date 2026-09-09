@@ -160,9 +160,9 @@ public:
                                           hisIndexLocal[loopIdx % 2], topK, curProcess, s2SeqLen);
             if (loopIdx == s2LoopNum - 1) {
                 PipeBarrier<PIPE_V>();
-                if ((loopIdx + 1) % 2 == 1) { // 2:pingpong
-                    AscendC::DataCopy(indicesOutLocal, hisIndexLocal[(loopIdx + 1) % 2],
-                                      QLIV2Common::Align(topK, (uint32_t)256));
+                if ((loopIdx + 1) % 2 == 1) {                                            // 2:pingpong
+                    AscendC::DataCopy(indicesOutLocal, hisIndexLocal[(loopIdx + 1) % 2], // 2：同上
+                                      QLIV2Common::Align(topK, (uint32_t)256));          // 256：对齐处理大小
                 }
             }
         }

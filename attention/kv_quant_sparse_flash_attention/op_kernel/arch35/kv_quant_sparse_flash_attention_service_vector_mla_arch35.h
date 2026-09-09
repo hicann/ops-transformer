@@ -309,7 +309,6 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline uint32_t QSFAVectorService<TEMPLATE_A
 
     keyOffset0 = GetkeyOffset(token0Idx, runInfo, constInfo);
     keyOffset1 = GetkeyOffset(token1Idx, runInfo, constInfo);
-
     if (unlikely(keyOffset0 < 0 && keyOffset1 < 0)) {
         return 0;
     }
@@ -951,7 +950,7 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::SoftmaxInitBuffer()
     tPipe->InitBuffer(softmaxExpBuf[0], softmaxBufSize);
     tPipe->InitBuffer(softmaxExpBuf[1], softmaxBufSize);
 #if KVQSFA_VERSION >= 2
-    tPipe->InitBuffer(lseBuf, 512); // lse的最大容量
+    tPipe->InitBuffer(lseBuf, 512); // 512：lse的最大容量
     lseUb = this->lseBuf.template Get<float>();
     mte3ToVLseOutId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
     SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
