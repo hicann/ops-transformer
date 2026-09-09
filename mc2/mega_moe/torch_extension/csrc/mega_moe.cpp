@@ -33,8 +33,9 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     const c10::optional<std::vector<at::Tensor>> &sharedBias2, const c10::optional<at::Tensor> &maskBuffer,
     int64_t maxRecvTokenNum, int64_t dispatchQuantMode, int64_t combineQuantMode, std::string commAlg,
     int64_t numMaxTokensPerRank, std::string activation, std::vector<float> activationParams,
-    c10::optional<int64_t> dispatchQuantOutDtype, c10::optional<int64_t> weight1Type,
-    c10::optional<int64_t> weight2Type, c10::optional<int64_t> topoType, c10::optional<int64_t> rankNumPerServer,
+    c10::optional<int64_t> dispatchQuantOutDtype, c10::optional<int64_t> sharedExpertQuantOutDtype,
+    c10::optional<int64_t> weight1Type, c10::optional<int64_t> weight2Type, c10::optional<int64_t> sharedWeight1Type,
+    c10::optional<int64_t> sharedWeight2Type, c10::optional<int64_t> topoType, c10::optional<int64_t> rankNumPerServer,
     int64_t topkWeightsType)
 {
     TORCH_CHECK((epWorldSize > 0), "The ep_world_sizes should be greater than 0, current is: ", epWorldSize);
@@ -87,10 +88,14 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     int64_t h = xSize[1];
     int64_t k = topkIdsSize[1];
 
-    if ((dispatchQuantOutDtype.has_value()) &&
-        (dispatchQuantOutDtype.value() == static_cast<int64_t>(DType::FLOAT4_E2M1))) {
+    const bool dispatchQuantOutIsFp4 =
+        dispatchQuantOutDtype.has_value() && dispatchQuantOutDtype.value() == static_cast<int64_t>(DType::FLOAT4_E2M1);
+    const bool sharedQuantOutIsFp4 = sharedExpertQuantOutDtype.has_value() ?
+                                         sharedExpertQuantOutDtype.value() == static_cast<int64_t>(DType::FLOAT4_E2M1) :
+                                         dispatchQuantOutIsFp4;
+    if (dispatchQuantOutIsFp4 || sharedQuantOutIsFp4) {
         TORCH_CHECK(h % 2 == 0, "The last dim input shape must be divisible by 2 if "
-                                "dispatch quant output type is torch_npu.float4_e2m1");
+                                "an expert quant output type is torch_npu.float4_e2m1");
     }
 
     int64_t localMoeExpertNum = 1;
@@ -110,6 +115,9 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
 
     int64_t dispatchQuantResultType =
         dispatchQuantOutDtype.has_value() ? static_cast<int64_t>(GetAclDataType(dispatchQuantOutDtype.value())) : 28;
+    int64_t sharedExpertQuantResultType = sharedExpertQuantOutDtype.has_value() ?
+                                              static_cast<int64_t>(GetAclDataType(sharedExpertQuantOutDtype.value())) :
+                                              dispatchQuantResultType;
 
     at::Tensor y;
     y = at::empty({bs, h}, topkIds.options().dtype(x.scalar_type()));
@@ -128,10 +136,25 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     at::TensorList sharedBias1Ref = toTensorList(sharedBias1);
     at::TensorList sharedBias2Ref = toTensorList(sharedBias2);
 
-    TensorListWrapper sharedWeight1Wrapper = {sharedWeight1Ref, weight1RefDtype};
-    TensorListWrapper sharedWeight2Wrapper = {sharedWeight2Ref, weight2RefDtype};
-    TensorListWrapper sharedWeightScales1Wrapper = {sharedWeightScales1Ref, weightScales1Dtype};
-    TensorListWrapper sharedWeightScales2Wrapper = {sharedWeightScales2Ref, weightScales2Dtype};
+    aclDataType sharedWeight1RefDtype =
+        sharedWeight1Type.has_value() ?
+            GetAclDataType(sharedWeight1Type.value()) :
+            (sharedWeight1Ref.size() > 0 ? ConvertToAclDataType(sharedWeight1Ref[0].scalar_type()) : weight1RefDtype);
+    aclDataType sharedWeight2RefDtype =
+        sharedWeight2Type.has_value() ?
+            GetAclDataType(sharedWeight2Type.value()) :
+            (sharedWeight2Ref.size() > 0 ? ConvertToAclDataType(sharedWeight2Ref[0].scalar_type()) : weight2RefDtype);
+    const auto getWeightScaleDtype = [](aclDataType weightDtype) {
+        return weightDtype == aclDataType::ACL_FLOAT8_E5M2 || weightDtype == aclDataType::ACL_FLOAT8_E4M3FN ||
+                       weightDtype == aclDataType::ACL_FLOAT4_E2M1 ?
+                   aclDataType::ACL_FLOAT8_E8M0 :
+                   aclDataType::ACL_UINT64;
+    };
+
+    TensorListWrapper sharedWeight1Wrapper = {sharedWeight1Ref, sharedWeight1RefDtype};
+    TensorListWrapper sharedWeight2Wrapper = {sharedWeight2Ref, sharedWeight2RefDtype};
+    TensorListWrapper sharedWeightScales1Wrapper = {sharedWeightScales1Ref, getWeightScaleDtype(sharedWeight1RefDtype)};
+    TensorListWrapper sharedWeightScales2Wrapper = {sharedWeightScales2Ref, getWeightScaleDtype(sharedWeight2RefDtype)};
     TensorListWrapper sharedBias1Wrapper = {sharedBias1Ref, aclDataType::ACL_FLOAT};
     TensorListWrapper sharedBias2Wrapper = {sharedBias2Ref, aclDataType::ACL_FLOAT};
 
@@ -139,8 +162,9 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
               weightScales2Wrapper, bias1Wrapper, bias2Wrapper, xActiveMask, sharedWeight1Wrapper, sharedWeight2Wrapper,
               sharedWeightScales1Wrapper, sharedWeightScales2Wrapper, sharedBias1Wrapper, sharedBias2Wrapper,
               maskBuffer, moeExpertNum, epWorldSize, cclBufferSize, maxRecvTokenNum, dispatchQuantMode,
-              dispatchQuantResultType, combineQuantMode, commAlgPtr, numMaxTokensPerRank, activationPtr,
-              activationParams, topoTypeValue, rankNumPerServerValue, topkWeightsType, y, expertTokenNums);
+              dispatchQuantResultType, sharedExpertQuantResultType, combineQuantMode, commAlgPtr, numMaxTokensPerRank,
+              activationPtr, activationParams, topoTypeValue, rankNumPerServerValue, topkWeightsType, y,
+              expertTokenNums);
 
     return std::tie(y, expertTokenNums);
 }

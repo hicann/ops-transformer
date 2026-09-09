@@ -83,8 +83,10 @@ TEST_F(MegaMoeArch22TilingTest, Test0)
          {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
          {"dispatch_quant_mode",
           Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)}, // INT4/INT8 -> dispatch_quant_mode=2
-         {"dispatch_quant_out_type",
-          Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)}, // INT4/INT8 -> dispatch_quant_out_type=INT8
+         {"dispatch_quant_out_dtype",
+          Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)}, // INT4/INT8 -> dispatch_quant_out_dtype=INT8
+         {"shared_expert_quant_out_dtype",
+          Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
          {"combine_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
          {"num_max_token_per_rank", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
@@ -170,6 +172,8 @@ TEST_F(MegaMoeArch22TilingTest, ActivationParamValidationWithLargeIntermediateHi
              {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
              {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
              {"dispatch_quant_out_dtype",
+              Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
+             {"shared_expert_quant_out_dtype",
               Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
              {"combine_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
              {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},

@@ -269,7 +269,7 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const
     return bufferConfig;
 }
 
-// 原型：MegaMoe::Unpermute。执行当前 token 分区的完整 Unpermute 流水。
+// 执行当前 token 分区的完整 Unpermute 流水。
 template <uint8_t CombineMode, typename TopkWeightsType, bool TopkWeightsPrefetch, uint32_t Gmm1TileM>
 __aicore__ inline void UnpermuteTokens(const TokenUnpermuteConfig &context, const MoeStageCommonConfig &common,
                                        const Params &params, TokenUnpermuteScratch &scratch,

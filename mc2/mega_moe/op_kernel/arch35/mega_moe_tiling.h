@@ -172,7 +172,8 @@ struct MegaMoeTilingData {
     uint32_t blockAivNum;
     int64_t combineQuantMode;
     float clampLimit;
-    uint8_t groupedMatmulMode;
+    uint8_t moeGmmMode;
+    uint8_t sharedGmmMode;
     int64_t topoType;
     uint32_t sharedExpertNum; // 独立 dense 路径的共享专家数，不进入 topK/SendMask expert id 空间
 

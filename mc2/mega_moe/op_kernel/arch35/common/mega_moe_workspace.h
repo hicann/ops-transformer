@@ -34,6 +34,16 @@ HOST_DEVICE int64_t CalcSharedActivationFlagElementsPerExpert(int64_t tokenNum)
     return Ops::Base::CeilDiv(tokenNum, static_cast<int64_t>(L1_TILE_M_256)) * static_cast<int64_t>(INT_CACHELINE);
 }
 
+HOST_DEVICE bool IsW4GmmMode(uint8_t gmmMode)
+{
+    return gmmMode == GMM_MODE_A8W4_NZ || gmmMode == GMM_MODE_A4W4_ND || gmmMode == GMM_MODE_A4W4_NZ;
+}
+
+HOST_DEVICE bool IsA4W4GmmMode(uint8_t gmmMode)
+{
+    return gmmMode == GMM_MODE_A4W4_ND || gmmMode == GMM_MODE_A4W4_NZ;
+}
+
 // 仅描述各 workspace 分区相对基址的字节偏移，不持有或构造任何地址。
 struct WorkspaceLayout {
     int64_t dispatchRevDataOffset{INVALID_WORKSPACE_OFFSET};
@@ -55,6 +65,7 @@ struct WorkspaceLayout {
     int64_t gmm2MmadResOffset{INVALID_WORKSPACE_OFFSET};
     int64_t sharedExpertResultOffset{INVALID_WORKSPACE_OFFSET};
     int64_t sharedExpertGmm1OutOffset{INVALID_WORKSPACE_OFFSET};
+    int64_t sharedExpertInputOffset{INVALID_WORKSPACE_OFFSET};
     int64_t sharedExpertInputDataOffset{INVALID_WORKSPACE_OFFSET};
     int64_t sharedExpertInputScaleOffset{INVALID_WORKSPACE_OFFSET};
     int64_t sharedExpertActivationDataOffset{INVALID_WORKSPACE_OFFSET};
@@ -166,9 +177,8 @@ private:
         // 每个 AIC 的就绪序列与前面的 flag 连续存放，使 ResetFlagList 能用同一次 MTE reset 清理；
         // 每个序列独占一个 64B cache line。
         // W4 GMM1 activation 始终使用该序号；非量化 GMM2/Combine 也复用它做 tile 一对一通知。
-        bool isW4Mode = tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 ||
-                        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||
-                        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ;
+        bool hasSharedW4Gmm = tilingData->sharedExpertNum > 0 && IsW4GmmMode(tilingData->sharedGmmMode);
+        bool isW4Mode = IsW4GmmMode(tilingData->moeGmmMode) || hasSharedW4Gmm;
         if (isW4Mode || (tilingData->topoType == TOPO_TYPE_MTE && tilingData->combineQuantMode == COMBINE_NO_QUANT)) {
             flagGmmToEpilogueOffset = workspaceSize;
             workspaceSize += static_cast<int64_t>(tilingData->aicNum) * INT_CACHELINE * SIZE_INT_32;
@@ -196,18 +206,17 @@ private:
         }
         flagResetElementCount = (workspaceSize - flagRegionBeginOffset) / SIZE_INT_32;
 
-        // A8W4 / Combine 量化路径的条件 workspace 分配。
-        // 以下条件分配与 mega_moe.h 编译期守卫 (ENABLE_A8W4 / ENABLE_A4W4 / CombineQuantMode) 一致，
-        // 由 TilingKey 保证同步。
+        // 按 GMM 实现路径和 Combine 量化模式分配条件 workspace；host 侧 GMM mode 与 kernel 的
+        // QuantConfig::AXW_MODE 由同一组量化 dtype、权重 dtype 和 format 推导，并由 TilingKey 保证匹配。
         // W4 Wave-ahead Dispatch 与 layered A8W4 都会跨 Activation 保留 cumsum；Activation 会覆盖对应 UB，
         // 因此需要逐物理 block 的 GM 备份；URMA Layered 的 A8W8/A8W4/A4W4 均使用该 Wave 状态机。
         cumsumInfoOffset = INVALID_WORKSPACE_OFFSET;
         gmm1MmadResOffset = INVALID_WORKSPACE_OFFSET;
         gmm2MmadResOffset = INVALID_WORKSPACE_OFFSET;
         bool activationOverwritesDispatchCumsum =
-            tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 || tilingData->topoType == TOPO_TYPE_URMA ||
-            (tilingData->topoType == TOPO_TYPE_MTE && (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||
-                                                       tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ));
+            tilingData->moeGmmMode == GMM_MODE_A8W4_NZ || tilingData->topoType == TOPO_TYPE_URMA ||
+            (tilingData->topoType == TOPO_TYPE_MTE &&
+             (tilingData->moeGmmMode == GMM_MODE_A4W4_ND || tilingData->moeGmmMode == GMM_MODE_A4W4_NZ));
         if (activationOverwritesDispatchCumsum) {
             // cumsumInfo：逐核备份 cumsum 状态，每核 moeExpertPerRank × epWorldSize 个 int32。
             cumsumInfoOffset = workspaceSize;
@@ -216,7 +225,7 @@ private:
                                                   ALIGN_32) *
                              tilingData->aicNum;
         }
-        if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 || tilingData->topkWeightsPrefetch == 1) {
+        if (tilingData->moeGmmMode == GMM_MODE_A8W4_NZ || tilingData->topkWeightsPrefetch == 1) {
             // gmm1MmadRes：GMM1 matmul 输出，布局为 maxOutputSize × hiddenDim 个 BF16。
             gmm1MmadResOffset = workspaceSize;
             workspaceSize += SIZE_BF_16 * tilingData->maxOutputSize * tilingData->hiddenDim;
@@ -276,16 +285,26 @@ private:
             sharedExpertGmm1OutOffset = workspaceSize;
             workspaceSize += Ops::Base::CeilAlign(
                 SIZE_BF_16 * tilingData->bs * tilingData->sharedExpertNum * tilingData->hiddenDim, ALIGN_512);
-            // sharedExpertInputData：GMM1 输入数据 [bs × h]。
-            sharedExpertInputDataOffset = workspaceSize;
-            workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs * tilingData->h, ALIGN_512);
-            // sharedExpertInputScale：GMM1 输入 scale [bs × CeilDiv(h, 32) × 2]。
-            sharedExpertInputScaleOffset = workspaceSize;
-            workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs *
-                                                      Ops::Base::CeilDiv(static_cast<uint32_t>(tilingData->h),
-                                                                         static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM)) *
-                                                      MXFP_MULTI_BASE_SIZE,
-                                                  ALIGN_512);
+            if (tilingData->topoType == TOPO_TYPE_MTE) {
+                // MTE shared GMM1 统一读取逐 token 交织记录 [Align256(data) | Align32(scale)]。
+                sharedExpertInputOffset = workspaceSize;
+                uint32_t elementsPerByte = IsA4W4GmmMode(tilingData->sharedGmmMode) ? 2U : 1U;
+                int64_t recordBytes =
+                    CalcQuantTokenScaleBytes(static_cast<int64_t>(tilingData->h), elementsPerByte, 0LL, false);
+                workspaceSize += Ops::Base::CeilAlign(static_cast<int64_t>(tilingData->bs) * recordBytes,
+                                                      static_cast<int64_t>(ALIGN_512));
+            } else {
+                // URMA layered kernel 仍使用连续 data/scale，两块地址契约保持不变。
+                sharedExpertInputDataOffset = workspaceSize;
+                workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs * tilingData->h, ALIGN_512);
+                sharedExpertInputScaleOffset = workspaceSize;
+                workspaceSize +=
+                    Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs *
+                                             Ops::Base::CeilDiv(static_cast<uint32_t>(tilingData->h),
+                                                                static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM)) *
+                                             MXFP_MULTI_BASE_SIZE,
+                                         ALIGN_512);
+            }
             // sharedExpertActivationData：SwiGLU 量化输出 [sharedExpertNum × bs × hiddenDim / 2] FP8。
             sharedExpertActivationDataOffset = workspaceSize;
             workspaceSize += Ops::Base::CeilAlign(
@@ -323,6 +342,7 @@ struct WorkspaceInfo {
     GM_ADDR gmm2MmadResPtr{nullptr};
     GM_ADDR sharedExpertResultPtr{nullptr};
     GM_ADDR sharedExpertGmm1OutPtr{nullptr};
+    GM_ADDR sharedExpertInputPtr{nullptr};
     GM_ADDR sharedExpertInputDataPtr{nullptr};
     GM_ADDR sharedExpertInputScalePtr{nullptr};
     GM_ADDR sharedExpertActivationDataPtr{nullptr};
@@ -369,6 +389,7 @@ public:
         gmm2MmadResPtr = ResolveWorkspaceAddress(base, layout.gmm2MmadResOffset);
         sharedExpertResultPtr = ResolveWorkspaceAddress(base, layout.sharedExpertResultOffset);
         sharedExpertGmm1OutPtr = ResolveWorkspaceAddress(base, layout.sharedExpertGmm1OutOffset);
+        sharedExpertInputPtr = ResolveWorkspaceAddress(base, layout.sharedExpertInputOffset);
         sharedExpertInputDataPtr = ResolveWorkspaceAddress(base, layout.sharedExpertInputDataOffset);
         sharedExpertInputScalePtr = ResolveWorkspaceAddress(base, layout.sharedExpertInputScaleOffset);
         sharedExpertActivationDataPtr = ResolveWorkspaceAddress(base, layout.sharedExpertActivationDataOffset);

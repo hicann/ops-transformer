@@ -893,8 +893,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::RunGmm1Wi
                                                               startBlockIdx_, gmTileSequence, state.expertBeforeCnt,
                                                               expertIdx);
     } else {
-        if (params_.tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W8_NZ ||
-            params_.tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ) {
+        if (params_.tilingData->moeGmmMode == GMM_MODE_A8W8_NZ || params_.tilingData->moeGmmMode == GMM_MODE_A4W4_NZ) {
             RunGmm1Generic<QuantOutType, ActivationQuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType,
                            QuantScaleOutType, true, GMM1_TILE_M, epilogueTileM, prefetchWeights, IsShared,
                            GMM1_INTERLEAVED>(epilogue, params_, state.problemShape, gmmAddrInfo, startBlockIdx_,
@@ -936,7 +935,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GroupMatm
                                                                         startBlockIdx_);
     } else {
         // A8W8_NZ / Generic 共用 RunGmm2Generic，仅 LayoutB 不同（ZN/ND）。
-        if (params_.tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W8_NZ) {
+        if (params_.tilingData->moeGmmMode == GMM_MODE_A8W8_NZ) {
             RunGmm2Generic<CombineQuantMode, QuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType,
                            QuantScaleOutType, true, true, L1_TILE_M_256, TopkWeightsPrefetch, IsShared,
                            GMM1_INTERLEAVED, false>(state.problemShape, gmmAddrInfo, startBlockIdx_);

@@ -22,10 +22,13 @@
 namespace MegaMoeImpl {
 
 #define TemplateMegaMoeA8W4WaveTypeClass \
-    typename XType, typename OutputType, typename TopkWeightsType, typename Weight1Type, int32_t QuantMode, \
-        int32_t CombineQuantMode, bool TopkWeightsPrefetch
+    typename XType, typename OutputType, typename TopkWeightsType, typename MoeWeightType, int32_t MoeQuantMode, \
+        typename SharedWeightType, int32_t SharedQuantMode, int32_t MoeWeight1Format, int32_t MoeWeight2Format, \
+        int32_t SharedWeight1Format, int32_t SharedWeight2Format, int32_t CombineQuantMode, bool TopkWeightsPrefetch
 #define TemplateMegaMoeA8W4WaveTypeFunc \
-    XType, OutputType, TopkWeightsType, Weight1Type, QuantMode, CombineQuantMode, TopkWeightsPrefetch
+    XType, OutputType, TopkWeightsType, MoeWeightType, MoeQuantMode, SharedWeightType, SharedQuantMode, \
+        MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format, CombineQuantMode, \
+        TopkWeightsPrefetch
 
 template <TemplateMegaMoeA8W4WaveTypeClass>
 class MegaMoeA8W4Wave : public MegaMoe<TemplateMegaMoeA8W4WaveTypeFunc, false> {
@@ -38,12 +41,8 @@ public:
     __aicore__ inline void Process();
 
 private:
-    using QuantOutType = typename MegaMoeBase::QuantOutType;
-    using ActivationType = typename MegaMoeBase::ActivationType;
-    using QuantScaleOutType = typename MegaMoeBase::QuantScaleOutType;
-    using ActivationQuantOutType = typename MegaMoeBase::ActivationQuantOutType;
+    using MoeQuantConfig = typename MegaMoeBase::MoeQuantConfig;
 
-    static constexpr uint32_t A_ELEMS_PER_BYTE = MegaMoeBase::A_ELEMS_PER_BYTE;
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
     static constexpr uint32_t EPILOGUE_TILE_M = MegaMoeBase::EPILOGUE_TILE_M;
 
@@ -91,13 +90,15 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::RunGmm1
     if (HandleWaveProblemWithoutWork(problemTileCount, gmmExecutionConfig_.blockJob, startBlockIdx)) {
         return;
     }
-    UpdateMoeExpertGmm1GlobalBuffer<ActivationType, Weight1Type, ActivationQuantOutType, QuantScaleOutType,
-                                    A_ELEMS_PER_BYTE, true, TopkWeightsPrefetch>(
+    UpdateMoeExpertGmm1GlobalBuffer<
+        typename MoeQuantConfig::QuantStorageType, MoeWeightType, typename MoeQuantConfig::ActivationQuantOutType,
+        typename MoeQuantConfig::QuantScaleType, MoeQuantConfig::A_ELEMS_PER_BYTE, true, TopkWeightsPrefetch>(
         gmmExecutionConfig_, syncWorkspaceLayout_, params_.workspaceInfo, moeWeightTensorListAddrs_, epilogueOp_,
         gmmAddrInfo, state, tokenStartIndexInExpert, gmm1TilesPerMGroup);
     ProblemShape sliceProblemShape = state.problemShape;
     Get<M_VALUE>(sliceProblemShape) = sliceTokenCount;
-    RunGmm1A8W4<QuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType, GMM1_TILE_M,
+    RunGmm1A8W4<typename MoeQuantConfig::QuantOutType, MoeWeightType, bfloat16_t,
+                typename MoeQuantConfig::QuantScaleType, typename MoeQuantConfig::QuantScaleType, GMM1_TILE_M,
                 EPILOGUE_TILE_M, TopkWeightsPrefetch, false, true>(
         epilogueOp_, params_, sliceProblemShape, gmmAddrInfo, startBlockIdx, gmmTileSequence_,
         gmmExecutionConfig_.blockJob, static_cast<uint32_t>(state.globalTokenStartIndex) + tokenStartIndexInExpert,
@@ -198,7 +199,8 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::Process
                 firstDispatchRange.end = nextDispatchRange.end;
             }
             // count-table 准备刚完成，UB prefix 仍有效；首 WAVE 无需从 GM 备份重复恢复。
-            DispatchTokenRange<ActivationType, QuantScaleOutType, GMM1_TILE_M, TopkWeightsPrefetch>(
+            DispatchTokenRange<typename MoeQuantConfig::QuantStorageType, typename MoeQuantConfig::QuantScaleType,
+                               GMM1_TILE_M, TopkWeightsPrefetch>(
                 tokenDispatchConfig_, commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_, params_,
                 g_winRankAddr_, tokenDispatchScratch_, firstDispatchRange);
             // 首 WAVE 的全部数据和 ready flag 发布完成后，再提交 Dispatch 进度。
@@ -235,7 +237,8 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::Process
                         ReloadDispatchCumsumRange(commonConfig_, tokenDispatchScratch_,
                                                   nextExpertDispatchRange.begin.expertIdx,
                                                   nextExpertDispatchRange.begin.expertIdx);
-                        DispatchTokenRange<ActivationType, QuantScaleOutType, GMM1_TILE_M, TopkWeightsPrefetch>(
+                        DispatchTokenRange<typename MoeQuantConfig::QuantStorageType,
+                                           typename MoeQuantConfig::QuantScaleType, GMM1_TILE_M, TopkWeightsPrefetch>(
                             tokenDispatchConfig_, commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_,
                             params_, g_winRankAddr_, tokenDispatchScratch_, nextExpertDispatchRange);
                     }

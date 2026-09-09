@@ -504,8 +504,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadTopkW
                                   mxQuantScaleNumAlignPerToken_};
         QuantProcessScratch<ActivationType> scratch{};
         scratch.mxTempTensor = mxTempTensor_;
-        MegaMoeImpl::LoadTopkWeightsToUb<TopkWeightsType, ActivationType, TopkWeightsPrefetch>(
-            params_, config, scratch, xOutTensor, currentOffset + index, event);
+        uint32_t tokenIndex = currentOffset + index;
+        GM_ADDR tokenTopkWeightsAddr =
+            params_.probsGmAddr + static_cast<uint64_t>(tokenIndex) * topK_ * sizeof(TopkWeightsType);
+        PrefetchTopkWeights<TopkWeightsType>(tokenTopkWeightsAddr, topK_, config, scratch, xOutTensor, event);
     } else {
         // Without weight prefetch, this event still waits for the input token copy.
         SetFlag<AscendC::HardEvent::MTE2_V>(event);

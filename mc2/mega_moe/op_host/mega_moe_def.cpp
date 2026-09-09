@@ -48,31 +48,77 @@ public:
         this->Input("weight1")
             .ParamType(DYNAMIC)
             .DataType({
-                ge::DT_FLOAT8_E5M2,                         // E5M2 (ND)
-                ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, // E4M3FN (ND/NZ)
-                ge::DT_FLOAT4_E2M1,                         // E2M1 (ND)
+                // MoE W8 configs x shared W8 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1 // E2M1 (NZ / NZ_C0_32)
+                // MoE W8 configs x shared W4 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                // MoE W4 configs x shared W8 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                // MoE W4 configs x shared W4 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
 #endif
             })
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,
+            .Format({
+                // MoE W8 configs x shared W8 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32
+                // MoE W8 configs x shared W4 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
+                // MoE W4 configs x shared W8 configs
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                // MoE W4 configs x shared W4 configs
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
 #endif
             });
         this->Input("weight2")
             .ParamType(DYNAMIC)
             .DataType({
-                ge::DT_FLOAT8_E5M2,                         // E5M2 (ND)
-                ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, // E4M3FN (ND/NZ)
-                ge::DT_FLOAT4_E2M1,                         // E2M1 (ND)
+                // MoE W8 configs x shared W8 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1 // E2M1 (NZ_C0_32 / NZ_C0_32)
+                // MoE W8 configs x shared W4 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                // MoE W4 configs x shared W8 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                // MoE W4 configs x shared W4 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
 #endif
             })
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,
+            .Format({
+                // MoE W8 configs x shared W8 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                     ge::FORMAT_FRACTAL_NZ_C0_32, ge::FORMAT_FRACTAL_NZ_C0_32
+                // MoE W8 configs x shared W4 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_ND,                ge::FORMAT_ND,
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
+                // MoE W4 configs x shared W8 configs
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                // MoE W4 configs x shared W4 configs
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
 #endif
             });
         this->Input("weight_scales1")
@@ -108,31 +154,77 @@ public:
         this->Input("shared_weight1")
             .ParamType(DYNAMIC)
             .DataType({
-                ge::DT_FLOAT8_E5M2,                         // E5M2 (ND)
-                ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, // E4M3FN (ND/NZ)
-                ge::DT_FLOAT4_E2M1,                         // E2M1 (ND)
+                // MoE W8 configs x shared W8 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1 // E2M1 (NZ / NZ_C0_32)
+                // MoE W8 configs x shared W4 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                // MoE W4 configs x shared W8 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                // MoE W4 configs x shared W4 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
 #endif
             })
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,
+            .Format({
+                // MoE W8 configs x shared W8 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32
+                // MoE W8 configs x shared W4 configs
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
+                // MoE W4 configs x shared W8 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                // MoE W4 configs x shared W4 configs
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
 #endif
             });
         this->Input("shared_weight2")
             .ParamType(DYNAMIC)
             .DataType({
-                ge::DT_FLOAT8_E5M2,                         // E5M2 (ND)
-                ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, // E4M3FN (ND/NZ)
-                ge::DT_FLOAT4_E2M1,                         // E2M1 (ND)
+                // MoE W8 configs x shared W8 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1 // E2M1 (NZ_C0_32 / NZ_C0_32)
+                // MoE W8 configs x shared W4 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                // MoE W4 configs x shared W8 configs
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
+                // MoE W4 configs x shared W4 configs
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
+                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
 #endif
             })
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,
+            .Format({
+                // MoE W8 configs x shared W8 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
 #ifdef ENABLE_FORMAT_NZ_C0_32
-                     ge::FORMAT_FRACTAL_NZ_C0_32, ge::FORMAT_FRACTAL_NZ_C0_32
+                // MoE W8 configs x shared W4 configs
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                // MoE W4 configs x shared W8 configs
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
+                // MoE W4 configs x shared W4 configs
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
+                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
 #endif
             });
         this->Input("shared_weight_scales1")
@@ -170,6 +262,7 @@ public:
         this->Attr("max_recv_token_num").AttrType(OPTIONAL).Int(0);
         this->Attr("dispatch_quant_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("dispatch_quant_out_dtype").AttrType(OPTIONAL).Int(static_cast<int>(ge::DT_UNDEFINED));
+        this->Attr("shared_expert_quant_out_dtype").AttrType(OPTIONAL).Int(static_cast<int>(ge::DT_UNDEFINED));
         this->Attr("combine_quant_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("comm_alg").AttrType(OPTIONAL).String("");
         this->Attr("num_max_tokens_per_rank").AttrType(OPTIONAL).Int(0);

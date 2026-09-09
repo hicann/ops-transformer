@@ -40,21 +40,22 @@ const char *K_INNER_DEBUG = "MegaMoeA2A3 Tiling Debug";
 const char *K_OP_NAME = "MegaMoe";
 
 // 算子属性索引
-constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 0;          // moe 专家数
-constexpr uint32_t ATTR_EP_WORLD_SIZE_INDEX = 1;           // EP 并行 world size
-constexpr uint32_t ATTR_CCL_BUFFER_SIZE_INDEX = 2;         // HCCL 通信缓冲区大小
-constexpr uint32_t ATTR_MAX_RECV_TOKEN_NUM_INDEX = 3;      // 最大接收 token 数（用于预分配 workspace）
-constexpr uint32_t ATTR_DISPATCH_QUANT_MODE_INDEX = 4;     // 分发阶段量化模式
-constexpr uint32_t ATTR_DISPATCH_QUANT_OUT_TYPE_INDEX = 5; // 分发阶段量化输出数据类型
-constexpr uint32_t ATTR_COMBINE_QUANT_MODE_INDEX = 6;      // 合并阶段量化模式
-constexpr uint32_t ATTR_COMM_ALG_INDEX = 7;                // 通信算法配置
-constexpr uint32_t ATTR_NUM_MAX_TOKENS_PER_RANK_INDEX = 8; // 每个 rank 的最大 token 数(bs数量)
-constexpr uint32_t ATTR_ACTIVATION_INDEX = 9;              // 激活函数类型（如 "swiglu"）
-constexpr uint32_t ATTR_ACTIVATION_PARAMS_INDEX = 10;      // 激活函数参数列表
-constexpr uint32_t ATTR_ACTIVATION_OUT_DTYPE_INDEX = 11;   // 激活函数输出数据类型
-constexpr uint32_t ATTR_TRANSPOSE_WEIGHT1_INDEX = 12;      // weight1 是否转置
-constexpr uint32_t ATTR_TRANSPOSE_WEIGHT2_INDEX = 13;      // weight2 是否转置
-constexpr uint32_t ATTR_WEIGHT1_INTERLEAVE_INDEX = 14;     // weight1 交错模式
+constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 0;               // moe 专家数
+constexpr uint32_t ATTR_EP_WORLD_SIZE_INDEX = 1;                // EP 并行 world size
+constexpr uint32_t ATTR_CCL_BUFFER_SIZE_INDEX = 2;              // HCCL 通信缓冲区大小
+constexpr uint32_t ATTR_MAX_RECV_TOKEN_NUM_INDEX = 3;           // 最大接收 token 数（用于预分配 workspace）
+constexpr uint32_t ATTR_DISPATCH_QUANT_MODE_INDEX = 4;          // 分发阶段量化模式
+constexpr uint32_t ATTR_DISPATCH_QUANT_OUT_TYPE_INDEX = 5;      // 分发阶段量化输出数据类型
+constexpr uint32_t ATTR_SHARED_EXPERT_QUANT_OUT_TYPE_INDEX = 6; // 共享专家量化输出类型（arch22 不使用）
+constexpr uint32_t ATTR_COMBINE_QUANT_MODE_INDEX = 7;           // 合并阶段量化模式
+constexpr uint32_t ATTR_COMM_ALG_INDEX = 8;                     // 通信算法配置
+constexpr uint32_t ATTR_NUM_MAX_TOKENS_PER_RANK_INDEX = 9;      // 每个 rank 的最大 token 数(bs数量)
+constexpr uint32_t ATTR_ACTIVATION_INDEX = 10;                  // 激活函数类型（如 "swiglu"）
+constexpr uint32_t ATTR_ACTIVATION_PARAMS_INDEX = 11;           // 激活函数参数列表
+constexpr uint32_t ATTR_ACTIVATION_OUT_DTYPE_INDEX = 12;        // 激活函数输出数据类型
+constexpr uint32_t ATTR_TRANSPOSE_WEIGHT1_INDEX = 13;           // weight1 是否转置
+constexpr uint32_t ATTR_TRANSPOSE_WEIGHT2_INDEX = 14;           // weight2 是否转置
+constexpr uint32_t ATTR_WEIGHT1_INTERLEAVE_INDEX = 15;          // weight1 交错模式
 
 constexpr uint32_t ACTIVATION_CODE_SWIGLU = 0;
 constexpr uint32_t ACTIVATION_CODE_SITU = 2;

@@ -908,33 +908,6 @@ __aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int
                                            allowWeightL2Bypass, rowOffsetInExpert, params, gmTileSequence);
 }
 
-// Generic GMM2 的计算路径不变，仅根据 groupedMatmulMode 选择 ND/NZ 权重布局。
-template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
-          typename ElementMxScaleB, bool IsLayered = false, uint32_t Gmm1TileM = L1_TILE_M_256,
-          bool TopkWeightsPrefetch = false, bool IsShared = false, bool IsGmm1Interleaved = false,
-          bool IsWaveFlagGrained = false, bool NotifyCombineTileReady = false>
-__aicore__ inline void RunGmm2GenericByWeightFormat(const GmmExecutionConfig &gmmConfig,
-                                                    const ProblemShape &problemShape, const GMMAddrInfo &gmmAddrInfo,
-                                                    uint32_t &startBlockIdx, void *blockMmadContext = nullptr,
-                                                    bool allowWeightL2Bypass = false, uint32_t rowOffsetInExpert = 0U,
-                                                    const Params *params = nullptr, int32_t *gmTileSequence = nullptr)
-{
-    if (gmmConfig.groupedMatmulMode == GROUPED_MATMUL_MODE_A8W8_NZ ||
-        gmmConfig.groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ) {
-        RunGmm2Generic<CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, true,
-                       IsLayered, Gmm1TileM, TopkWeightsPrefetch, IsShared, IsGmm1Interleaved, IsWaveFlagGrained,
-                       NotifyCombineTileReady>(problemShape, gmmAddrInfo, startBlockIdx, gmmConfig.blockJob,
-                                               blockMmadContext, allowWeightL2Bypass, rowOffsetInExpert, params,
-                                               gmTileSequence);
-    } else {
-        RunGmm2Generic<CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
-                       IsLayered, Gmm1TileM, TopkWeightsPrefetch, IsShared, IsGmm1Interleaved, IsWaveFlagGrained,
-                       NotifyCombineTileReady>(problemShape, gmmAddrInfo, startBlockIdx, gmmConfig.blockJob,
-                                               blockMmadContext, allowWeightL2Bypass, rowOffsetInExpert, params,
-                                               gmTileSequence);
-    }
-}
-
 // RunGmm2A8W4：AIV0执行W4→W8 prologue，AIC执行GMM2；可选由配对AIV1逐tile Combine。
 template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
           uint32_t Gmm1TileM = L1_TILE_M_256, bool TopkWeightsPrefetch = false, bool IsShared = false,
