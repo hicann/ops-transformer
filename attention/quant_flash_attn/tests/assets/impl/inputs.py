@@ -14,7 +14,6 @@ import logging
 import math
 import os
 import sys
-from typing import List
 
 import numpy
 import torch
@@ -28,8 +27,6 @@ import quant_flash_attn_golden as mxfp8_golden_mod
 import quant_flash_attn_fp8_golden as fp8_golden_mod
 
 logger = logging.getLogger(__name__)
-
-__input__ = {"e2e": {"qfa_wrapper.npu_qfa": "generate_qfa_mxfp8_inputs"}}
 
 _SEED_MAP = {"q": 54, "k": 3, "v": 4}
 
@@ -76,6 +73,34 @@ def _write_int32_list(slot, values, slot_name):
         slot[...] = arr
 
 
+def _write_causal_mask(slot, mask_mode, mask_shape):
+    """mask_mode != 0 时生成上三角 causal mask 写入 attn_mask slot。
+
+    直调 op 后主算子的 attn_mask 直接来自 CSV slot (ttk 随机生成), 需在这里用与
+    golden _build_causal_mask 一致的方式重建: triu(ones, diagonal=1)。
+    mask_mode == 0 或 slot 为 None 时跳过。
+    """
+    if mask_mode == 0 or slot is None:
+        return
+    shape = tuple(int(v) for v in mask_shape) if mask_shape else (2048, 2048)
+    causal = torch.triu(torch.ones(shape, dtype=torch.int8), diagonal=1)
+    if isinstance(slot, torch.Tensor):
+        if tuple(slot.shape) != tuple(causal.shape):
+            raise ValueError(
+                f"[INPUTS] attn_mask shape mismatch: CSV slot {tuple(slot.shape)} "
+                f"!= causal {tuple(causal.shape)}"
+            )
+        slot.copy_(causal.to(slot.dtype))
+    else:
+        arr = causal.numpy().astype(numpy.asarray(slot).dtype)
+        if tuple(slot.shape) != tuple(arr.shape):
+            raise ValueError(
+                f"[INPUTS] attn_mask shape mismatch: CSV slot {tuple(slot.shape)} "
+                f"!= causal {tuple(arr.shape)}"
+            )
+        slot[...] = arr
+
+
 def generate_qfa_mxfp8_inputs(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -83,8 +108,9 @@ def generate_qfa_mxfp8_inputs(
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
     dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
+    quant_mode: int,
     block_table: torch.Tensor,
+    p_scale: torch.Tensor,
     cu_seqlens_q_t: torch.Tensor,
     cu_seqlens_kv_t: torch.Tensor,
     seqused_q_t: torch.Tensor,
@@ -92,38 +118,32 @@ def generate_qfa_mxfp8_inputs(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
-    *,
-    batch_size: int,
-    N_q: int,
-    N_kv: int,
-    D: int,
-    cu_seqlens_q: List[int],
-    cu_seqlens_kv: List[int],
-    seqused_q: List[int],
-    seqused_kv: List[int],
-    max_seqlen_q: int,
-    max_seqlen_kv: int,
-    enable_pa: bool,
-    kv_cache_layout: str,
-    block_size: int,
-    mask_mode: int,
-    q_scale_layout: str,
-    quant_mode: int = 1,
-    enable_lse: bool = False,
-    graph_path: int = 0,
-    input_layout: str = "TND",
-    is_contiguous: bool = True,
-    device_id: int = 0,
-    softmax_scale: float = None,
-    data_range_q: float = 1.0,
-    data_range_k: float = 1.0,
-    data_range_v: float = 1.0,
-    layout_q: str = "TND",
-    layout_q_descale: str = "TND",
-    layout_kv: str = "TND",
-    layout_out: str = "TND",
+    softmax_scale: float = 1.0,
+    mask_mode: int = 0,
+    win_left: int = -1,
+    win_right: int = -1,
+    max_seqlen_q: int = -1,
+    max_seqlen_kv: int = -1,
+    layout_q: str = "BSND",
+    layout_q_descale: str = "BSND",
+    layout_kv: str = "BSND",
+    layout_out: str = "BSND",
+    return_softmax_lse: bool = False,
     **kwargs,
 ):
+    # —— op-schema 直调: 额外适配参数与真实值 sidecar 经 kwargs 传入 ——
+    N_q = kwargs.get("N_q")
+    N_kv = kwargs.get("N_kv")
+    D = kwargs.get("D")
+    enable_pa = bool(kwargs.get("enable_pa", False))
+    kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
+    block_size = kwargs.get("block_size", 0)
+    q_scale_layout = kwargs.get("q_scale_layout") or layout_q_descale
+    cu_seqlens_q = kwargs.get("cu_seqlens_q_values")
+    cu_seqlens_kv = kwargs.get("cu_seqlens_kv_values")
+    seqused_q = kwargs.get("seqused_q_values")
+    seqused_kv = kwargs.get("seqused_kv_values")
+    input_layout = kwargs.get("input_layout", "TND")
     # cu_seqlens -> actual_seq (差分还原)
     cu_seqlens_q = list(cu_seqlens_q) if cu_seqlens_q is not None else [0]
     cu_seqlens_kv = list(cu_seqlens_kv) if cu_seqlens_kv is not None else [0]
@@ -389,17 +409,18 @@ def generate_qfa_mxfp8_inputs(
 
     if enable_pa:
         block_table[...] = bt_real
-    else:
+    elif block_table is not None:
         block_table[...] = 0
 
     # ----- 新增 slot 8-14: 用 attributes 真实值覆盖 ttk 随机生成的 cu_seqlens/seqused。
     # sinks/metadata (slot 12,14) 无 value，保持 None 语义（CSV shape (0,) → 空 tensor，
-    # wrapper/golden 不消费）；attn_mask (slot 13) 不传值覆盖——mask 由 golden
+    # sink/golden 不消费）；attn_mask (slot 13) 不传值覆盖——mask 由 golden
     # _build_causal_mask() 按 attributes 里 attn_mask_shape 重建。 -----
     _write_int32_list(cu_seqlens_q_t, cu_seqlens_q, "cu_seqlens_q (slot 8)")
     _write_int32_list(cu_seqlens_kv_t, cu_seqlens_kv, "cu_seqlens_kv (slot 9)")
     _write_int32_list(seqused_q_t, seqused_q, "seqused_q (slot 10)")
     _write_int32_list(seqused_kv_t, seqused_kv, "seqused_kv (slot 11)")
+    _write_causal_mask(attn_mask_t, mask_mode, kwargs.get("attn_mask_shape"))
 
     logger.info(
         "[INPUTS] in-place wrote fp8 q/k/v (q=%s), e8m0 descale (dq=%s, dk=%s, dv=%s), "
@@ -427,8 +448,9 @@ def generate_qfa_gqa_fp8_inputs(
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
     dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
+    quant_mode: int,
     block_table: torch.Tensor,
+    p_scale: torch.Tensor,
     cu_seqlens_q_t: torch.Tensor,
     cu_seqlens_kv_t: torch.Tensor,
     seqused_q_t: torch.Tensor,
@@ -436,34 +458,32 @@ def generate_qfa_gqa_fp8_inputs(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
-    *,
-    batch_size: int,
-    N_q: int,
-    N_kv: int,
-    D: int,
-    cu_seqlens_q: List[int],
-    cu_seqlens_kv: List[int],
-    seqused_q: List[int],
-    seqused_kv: List[int],
-    max_seqlen_q: int,
-    max_seqlen_kv: int,
-    enable_pa: bool,
-    kv_cache_layout: str,
-    block_size: int,
-    mask_mode: int,
-    q_scale_layout: str,
-    quant_mode: int = 6,
-    enable_lse: bool = False,
-    graph_path: int = 0,
-    input_layout: str = "NTD",
-    is_contiguous: bool = True,
-    device_id: int = 0,
-    softmax_scale: float = None,
-    data_range_q: float = 1.0,
-    data_range_k: float = 1.0,
-    data_range_v: float = 1.0,
+    softmax_scale: float = 1.0,
+    mask_mode: int = 0,
+    win_left: int = -1,
+    win_right: int = -1,
+    max_seqlen_q: int = -1,
+    max_seqlen_kv: int = -1,
+    layout_q: str = "BSND",
+    layout_q_descale: str = "BSND",
+    layout_kv: str = "BSND",
+    layout_out: str = "BSND",
+    return_softmax_lse: bool = False,
     **kwargs,
 ):
+    # —— op-schema 直调: 额外适配参数与真实值 sidecar 经 kwargs 传入 ——
+    N_q = kwargs.get("N_q")
+    N_kv = kwargs.get("N_kv")
+    D = kwargs.get("D")
+    enable_pa = bool(kwargs.get("enable_pa", False))
+    kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
+    block_size = kwargs.get("block_size", 0)
+    q_scale_layout = kwargs.get("q_scale_layout") or layout_q_descale
+    cu_seqlens_q = kwargs.get("cu_seqlens_q_values")
+    cu_seqlens_kv = kwargs.get("cu_seqlens_kv_values")
+    seqused_q = kwargs.get("seqused_q_values")
+    seqused_kv = kwargs.get("seqused_kv_values")
+    input_layout = kwargs.get("input_layout", "NTD")
     """GQA FP8 输入生成 (quant_mode=6, 仅 PA)
 
     输出 slot 约定 (in-place 写入 ttk 分配的 numpy slot):
@@ -560,8 +580,6 @@ def generate_qfa_gqa_fp8_inputs(
     )
 
     # ----- Step 2: GQA FP8 量化 (per-token-head Q/K, per-head V), descale=FP32 -----
-    fp8_dtype = torch.float8_e4m3fn
-
     quant_scale_q_bnsd = fp8_golden_mod.get_fp8_per_token_head_quant_scale(q_bf16)
     quant_scale_k_bnsd = fp8_golden_mod.get_fp8_per_token_head_quant_scale(k_bf16)
     quant_scale_v_bnsd = fp8_golden_mod.get_fp8_per_head_quant_scale(v_bf16)
@@ -588,8 +606,6 @@ def generate_qfa_gqa_fp8_inputs(
     )
 
     # block_table (确定性, seed=42 与 mxfp8 inputs 一致)
-    total_blocks_k = int(dequant_scale_k.shape[0]) if dequant_scale_k.ndim >= 1 else 0
-    total_blocks_v = int(dequant_scale_v.shape[0]) if dequant_scale_v.ndim >= 1 else 0
     # CSV 分配的 k/v slot 形状决定物理 block 数 (slot 第一维)
     k_slot_blocks = int(k.shape[0]) if k.ndim >= 4 else 0
     v_slot_blocks = int(v.shape[0]) if v.ndim >= 4 else 0
@@ -690,6 +706,7 @@ def generate_qfa_gqa_fp8_inputs(
     _write_int32_list(cu_seqlens_kv_t, cu_seqlens_kv, "cu_seqlens_kv (slot 9)")
     _write_int32_list(seqused_q_t, seqused_q, "seqused_q (slot 10)")
     _write_int32_list(seqused_kv_t, seqused_kv, "seqused_kv (slot 11)")
+    _write_causal_mask(attn_mask_t, mask_mode, kwargs.get("attn_mask_shape"))
 
     logger.info(
         "[INPUTS GQA FP8] in-place wrote fp8 q (NTD %s), k/v (PA cache %s, %s), "
@@ -710,8 +727,9 @@ def generate_qfa_hif8_inputs(
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
     dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
+    quant_mode: int,
     block_table: torch.Tensor,
+    p_scale: torch.Tensor,
     cu_seqlens_q_t: torch.Tensor,
     cu_seqlens_kv_t: torch.Tensor,
     seqused_q_t: torch.Tensor,
@@ -719,37 +737,36 @@ def generate_qfa_hif8_inputs(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
-    *,
-    batch_size: int,
-    N_q: int,
-    N_kv: int,
-    D: int,
-    cu_seqlens_q: List[int],
-    cu_seqlens_kv: List[int],
-    seqused_q: List[int],
-    seqused_kv: List[int],
-    max_seqlen_q: int,
-    max_seqlen_kv: int,
-    enable_pa: bool,
-    kv_cache_layout: str,
-    block_size: int,
-    mask_mode: int,
-    q_scale_layout: str,
-    quant_mode: int = 0,
-    enable_lse: bool = False,
-    graph_path: int = 0,
-    input_layout: str = "TND",
-    layout_q: str = None,
-    layout_kv: str = None,
-    layout_out: str = None,
-    is_contiguous: bool = True,
-    device_id: int = 0,
-    softmax_scale: float = None,
-    data_range_q: float = 1.0,
-    data_range_k: float = 1.0,
-    data_range_v: float = 1.0,
+    softmax_scale: float = 1.0,
+    mask_mode: int = 0,
+    win_left: int = -1,
+    win_right: int = -1,
+    max_seqlen_q: int = -1,
+    max_seqlen_kv: int = -1,
+    layout_q: str = "BSND",
+    layout_q_descale: str = "BSND",
+    layout_kv: str = "BSND",
+    layout_out: str = "BSND",
+    return_softmax_lse: bool = False,
     **kwargs,
 ):
+    # —— op-schema 直调: 额外适配参数与真实值 sidecar 经 kwargs 传入 ——
+    batch_size = kwargs.get("batch_size")
+    N_q = kwargs.get("N_q")
+    N_kv = kwargs.get("N_kv")
+    D = kwargs.get("D")
+    q_scale_layout = kwargs.get("q_scale_layout") or layout_q_descale
+    cu_seqlens_q = kwargs.get("cu_seqlens_q_values")
+    cu_seqlens_kv = kwargs.get("cu_seqlens_kv_values")
+    seqused_q = kwargs.get("seqused_q_values")
+    seqused_kv = kwargs.get("seqused_kv_values")
+    input_layout = kwargs.get("input_layout", "TND")
+    is_contiguous = kwargs.get("is_contiguous", True)
+    device_id = kwargs.get("device_id", 0)
+    graph_path = kwargs.get("graph_path", 0)
+    data_range_q = kwargs.get("data_range_q", 1.0)
+    data_range_k = kwargs.get("data_range_k", 1.0)
+    data_range_v = kwargs.get("data_range_v", 1.0)
     """HIF8 输入生成 (quant_mode=0, per-tensor, 仅 TND, 无 PA)。
 
     输出 slot 约定 (in-place 写入 ttk 分配的 numpy slot):
@@ -943,13 +960,15 @@ def generate_qfa_hif8_inputs(
     if isinstance(p_scale_value, torch.Tensor):
         p_scale_value = float(p_scale_value.item())
     p_scale.copy_(torch.tensor([float(p_scale_value)], dtype=torch.float32))
-    block_table.copy_(torch.zeros_like(block_table))
+    if block_table is not None:
+        block_table.copy_(torch.zeros_like(block_table))
 
     # ----- slot 8-14: 用 attributes 真实值覆盖 ttk 随机生成的 cu_seqlens/seqused -----
     _write_int32_list(cu_seqlens_q_t, cu_seqlens_q, "cu_seqlens_q (slot 8)")
     _write_int32_list(cu_seqlens_kv_t, cu_seqlens_kv, "cu_seqlens_kv (slot 9)")
     _write_int32_list(seqused_q_t, seqused_q, "seqused_q (slot 10)")
     _write_int32_list(seqused_kv_t, seqused_kv, "seqused_kv (slot 11)")
+    _write_causal_mask(attn_mask_t, mask_mode, kwargs.get("attn_mask_shape"))
 
     logger.info(
         "[INPUTS] HIF8 in-place wrote q/k/v (q=%s), fp32 descale (dq=%s, dk=%s, dv=%s), "

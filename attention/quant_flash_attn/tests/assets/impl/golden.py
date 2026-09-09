@@ -28,8 +28,6 @@ import quant_flash_attn_hif8_golden as hif8_golden_mod
 
 logger = logging.getLogger(__name__)
 
-__golden__ = {"e2e": {"qfa_wrapper.npu_qfa": "cpu_qfa_mxfp8"}}
-
 
 # ==============================================================================
 # 框架 fp8/e8m0 -> torch 转换
@@ -333,8 +331,9 @@ def cpu_qfa_mxfp8(
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
     dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
+    quant_mode: int,
     block_table: torch.Tensor,
+    p_scale: torch.Tensor,
     cu_seqlens_q_t: torch.Tensor,
     cu_seqlens_kv_t: torch.Tensor,
     seqused_q_t: torch.Tensor,
@@ -342,30 +341,32 @@ def cpu_qfa_mxfp8(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
-    *,
-    batch_size: int,
-    N_q: int,
-    N_kv: int,
-    D: int,
-    max_seqlen_q: int,
-    max_seqlen_kv: int,
-    enable_pa: bool,
-    kv_cache_layout: str,
-    block_size: int,
-    mask_mode: int,
-    q_scale_layout: str,
-    quant_mode: int = 1,
-    enable_lse: bool = False,
-    graph_path: int = 0,
-    input_layout: str = "TND",
-    is_contiguous: bool = True,
-    device_id: int = 0,
-    softmax_scale: float = None,
-    data_range_q: float = 1.0,
-    data_range_k: float = 1.0,
-    data_range_v: float = 1.0,
+    softmax_scale: float = 1.0,
+    mask_mode: int = 0,
+    win_left: int = -1,
+    win_right: int = -1,
+    max_seqlen_q: int = -1,
+    max_seqlen_kv: int = -1,
+    layout_q: str = "BSND",
+    layout_q_descale: str = "BSND",
+    layout_kv: str = "BSND",
+    layout_out: str = "BSND",
+    return_softmax_lse: bool = False,
     **kwargs,
 ):
+    # —— op-schema 直调: 额外适配参数经 kwargs 传入 ——
+    N_q = kwargs.get("N_q")
+    N_kv = kwargs.get("N_kv")
+    D = kwargs.get("D")
+    enable_pa = bool(kwargs.get("enable_pa", False))
+    kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
+    block_size = kwargs.get("block_size", 0)
+    q_scale_layout = kwargs.get("q_scale_layout") or layout_q_descale
+    input_layout = kwargs.get("input_layout", "TND")
+    is_contiguous = kwargs.get("is_contiguous", True)
+    device_id = kwargs.get("device_id", 0)
+    graph_path = kwargs.get("graph_path", 0)
+    enable_lse = return_softmax_lse
     # csv precision_tolerances / absolute_precision 经 testcase.attributes → kwargs 传入,
     # 暂存到 mxfp8_golden_mod 供 compare 插件读取（ttk 不把 testcase 直接传给 custom compare）。
     mxfp8_golden_mod._csv_precision_tolerances = kwargs.get("precision_tolerances")
@@ -654,8 +655,9 @@ def cpu_qfa_gqa_fp8(
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
     dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
+    quant_mode: int,
     block_table: torch.Tensor,
+    p_scale: torch.Tensor,
     cu_seqlens_q_t: torch.Tensor,
     cu_seqlens_kv_t: torch.Tensor,
     seqused_q_t: torch.Tensor,
@@ -663,30 +665,32 @@ def cpu_qfa_gqa_fp8(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
-    *,
-    batch_size: int,
-    N_q: int,
-    N_kv: int,
-    D: int,
-    max_seqlen_q: int,
-    max_seqlen_kv: int,
-    enable_pa: bool,
-    kv_cache_layout: str,
-    block_size: int,
-    mask_mode: int,
-    q_scale_layout: str,
-    quant_mode: int = 6,
-    enable_lse: bool = False,
-    graph_path: int = 0,
-    input_layout: str = "NTD",
-    is_contiguous: bool = True,
-    device_id: int = 0,
-    softmax_scale: float = None,
-    data_range_q: float = 1.0,
-    data_range_k: float = 1.0,
-    data_range_v: float = 1.0,
+    softmax_scale: float = 1.0,
+    mask_mode: int = 0,
+    win_left: int = -1,
+    win_right: int = -1,
+    max_seqlen_q: int = -1,
+    max_seqlen_kv: int = -1,
+    layout_q: str = "BSND",
+    layout_q_descale: str = "BSND",
+    layout_kv: str = "BSND",
+    layout_out: str = "BSND",
+    return_softmax_lse: bool = False,
     **kwargs,
 ):
+    # —— op-schema 直调: 额外适配参数经 kwargs 传入 ——
+    N_q = kwargs.get("N_q")
+    N_kv = kwargs.get("N_kv")
+    D = kwargs.get("D")
+    enable_pa = bool(kwargs.get("enable_pa", False))
+    kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
+    block_size = kwargs.get("block_size", 0)
+    q_scale_layout = kwargs.get("q_scale_layout") or layout_q_descale
+    input_layout = kwargs.get("input_layout", "NTD")
+    is_contiguous = kwargs.get("is_contiguous", True)
+    device_id = kwargs.get("device_id", 0)
+    graph_path = kwargs.get("graph_path", 0)
+    enable_lse = return_softmax_lse
     """GQA FP8 CPU golden (quant_mode=6, 仅 PA)
 
     前 8 个入参 slot (0 q, 1 k, 2 v, 3 dequant_scale_q, 4 dequant_scale_k,
@@ -853,8 +857,9 @@ def cpu_qfa_hif8(
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
     dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
+    quant_mode: int,
     block_table: torch.Tensor,
+    p_scale: torch.Tensor,
     cu_seqlens_q_t: torch.Tensor,
     cu_seqlens_kv_t: torch.Tensor,
     seqused_q_t: torch.Tensor,
@@ -862,33 +867,28 @@ def cpu_qfa_hif8(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
-    *,
-    batch_size: int,
-    N_q: int,
-    N_kv: int,
-    D: int,
-    max_seqlen_q: int,
-    max_seqlen_kv: int,
-    enable_pa: bool,
-    kv_cache_layout: str,
-    block_size: int,
-    mask_mode: int,
-    q_scale_layout: str,
-    quant_mode: int = 0,
-    enable_lse: bool = False,
-    graph_path: int = 0,
-    input_layout: str = "TND",
-    layout_q: str = None,
-    layout_kv: str = None,
-    layout_out: str = None,
-    is_contiguous: bool = True,
-    device_id: int = 0,
-    softmax_scale: float = None,
-    data_range_q: float = 1.0,
-    data_range_k: float = 1.0,
-    data_range_v: float = 1.0,
+    softmax_scale: float = 1.0,
+    mask_mode: int = 0,
+    win_left: int = -1,
+    win_right: int = -1,
+    max_seqlen_q: int = -1,
+    max_seqlen_kv: int = -1,
+    layout_q: str = "BSND",
+    layout_q_descale: str = "BSND",
+    layout_kv: str = "BSND",
+    layout_out: str = "BSND",
+    return_softmax_lse: bool = False,
     **kwargs,
 ):
+    # —— op-schema 直调: 额外适配参数经 kwargs 传入 ——
+    batch_size = kwargs.get("batch_size")
+    N_q = kwargs.get("N_q")
+    N_kv = kwargs.get("N_kv")
+    D = kwargs.get("D")
+    q_scale_layout = kwargs.get("q_scale_layout") or layout_q_descale
+    input_layout = kwargs.get("input_layout", "TND")
+    graph_path = kwargs.get("graph_path", 0)
+    enable_lse = return_softmax_lse
     """HIF8 CPU golden (quant_mode=0, per-tensor, TND, 无 PA)。
 
     入参 slot 由 inputs.py generate_qfa_hif8_inputs 写入:

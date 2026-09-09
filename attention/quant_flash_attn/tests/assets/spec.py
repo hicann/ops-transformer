@@ -13,24 +13,33 @@
 import importlib.util
 from pathlib import Path
 
+try:
+    from cann_ops_transformer.ops import quant_flash_attn_metadata, quant_flash_attn
+except ImportError as e:
+    logging.warning("Failed to import cann_ops_transformer.ops: %s", e)
 
 ASSET_IMPL_DIR = Path(__file__).with_name("impl")
 
+_impl_cache = {}
+
 
 def load_impl_module(stem):
-    path = ASSET_IMPL_DIR / f"{stem}.py"
-    spec = importlib.util.spec_from_file_location(
-        f"qfa_assets_impl_{stem}_{abs(hash(path))}", path
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    """懒加载 impl 模块。
 
-
-golden_module = load_impl_module("golden")
-inputs_module = load_impl_module("inputs")
-compare_module = load_impl_module("compare")
-graph_module = load_impl_module("graph")
+    与 flash_attn 资产一致: 不在 import spec.py 时 (主进程) 级联 import
+    golden/graph (其中会 import torch_npu), 避免 fork 子进程 re-init NPU 报错。
+    改为在 golden/customize_inputs/compare/npu_preprocess 首次被 ttk 调用时
+    (fork 之后的 worker) 才加载。
+    """
+    if stem not in _impl_cache:
+        path = ASSET_IMPL_DIR / f"{stem}.py"
+        spec = importlib.util.spec_from_file_location(
+            f"qfa_assets_impl_{stem}_{abs(hash(path))}", path
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _impl_cache[stem] = module
+    return _impl_cache[stem]
 
 
 # ==============================================================================
@@ -43,8 +52,15 @@ graph_module = load_impl_module("graph")
 # ==============================================================================
 
 
+def _resolve_quant_mode(args, kwargs):
+    """直调 op 后 quant_mode 是位置参数 (args[6])，不再出现在 kwargs。"""
+    qm = args[6] if len(args) > 6 else kwargs.get("quant_mode", 1)
+    return int(qm) if qm is not None else 1
+
+
 def _golden_dispatch(*args, **kwargs):
-    qm = kwargs.get("quant_mode", 1)
+    golden_module = load_impl_module("golden")
+    qm = _resolve_quant_mode(args, kwargs)
     if qm == 6:
         return golden_module.cpu_qfa_gqa_fp8(*args, **kwargs)
     if qm == 0:
@@ -53,7 +69,8 @@ def _golden_dispatch(*args, **kwargs):
 
 
 def _inputs_dispatch(*args, **kwargs):
-    qm = kwargs.get("quant_mode", 1)
+    inputs_module = load_impl_module("inputs")
+    qm = _resolve_quant_mode(args, kwargs)
     if qm == 6:
         return inputs_module.generate_qfa_gqa_fp8_inputs(*args, **kwargs)
     if qm == 0:
@@ -61,18 +78,32 @@ def _inputs_dispatch(*args, **kwargs):
     return inputs_module.generate_qfa_mxfp8_inputs(*args, **kwargs)
 
 
-class QfaMxfp8Spec:
-    """quant_flash_attn 测试规范 (MXFP8 + GQA FP8, 按 quant_mode 派发)。
+class QuantFlashAttnSpec:
+    """quant_flash_attn 测试规范 (MXFP8 + GQA FP8 + HIF8, 按 quant_mode 派发)。
 
     quant_mode=1: MXFP8 (Q/K per-token-group, V per-channel-group, descale=e8m0)
     quant_mode=6: GQA FP8 全量化 (Q/K per-token-head, V per-head, descale=FP32)
+    quant_mode=0: HIF8 per-tensor 量化
+
+    metadata 由 npu_preprocess 在主算子调用前生成并回填 metadata slot,
+    主算子直接由 ttk 调用 torch.ops.cann_ops_transformer.quant_flash_attn。
+
+    golden/customize_inputs/compare/npu_preprocess 均懒加载 impl 模块,
+    避免主进程 fork 前 import torch_npu (与 flash_attn 资产一致)。
     """
 
-    golden = _golden_dispatch
-    customize_inputs = _inputs_dispatch
-    compare = compare_module.compare
+    golden = staticmethod(_golden_dispatch)
+    customize_inputs = staticmethod(_inputs_dispatch)
 
-    torch_graph = graph_module.QuantFlashAttnAclGraph
+    @staticmethod
+    def compare(*outputs, **kwargs):
+        return load_impl_module("compare").compare(*outputs, **kwargs)
+
+    @staticmethod
+    def npu_preprocess(*args, **kwargs):
+        return load_impl_module("npu_preprocess").run(*args, **kwargs)
+
+    torch_graph = load_impl_module("graph").QuantFlashAttnAclGraph
 
     tolerance = {
         "float16": {
@@ -88,60 +119,21 @@ class QfaMxfp8Spec:
     }
 
 
-class QfaMetadataSpec:
-    """quant_flash_attn_metadata 独立测试规范 (T4 metadata/main 分离)。
+class QuantFlashAttnMetadataSpec:
+    """quant_flash_attn_metadata 生成器的 TestSpec。
 
-    复用 QfaMxfp8Spec 的 golden / customize_inputs / compare / tolerance:
-    输入生成与 golden 计算路径与合并测试一致, 仅 wrapper 分流到 metadata-only op。
-    按 quant_mode 派发到 MXFP8 或 GQA FP8 路径。
+    与 flash_attn 资产的 FlashAttnMetadataSpec 一致: 只提供 customized inputs
+    (把 cu_seqlens/seqused 描述向量回填进 metadata API 输入), 无独立测试套件。
     """
 
-    golden = _golden_dispatch
-    customize_inputs = _inputs_dispatch
-    compare = compare_module.compare
-
-    tolerance = {
-        "float16": {
-            "rtol": 0.005,
-            "ptol": 0.005,
-            "atol": 0.000025,
-        },
-        "bfloat16": {
-            "rtol": 0.0078125,
-            "ptol": 0.005,
-            "atol": 0.0001,
-        },
-    }
-
-
-class QfaMainSpec:
-    """quant_flash_attn 主算子独立测试规范 (T4 metadata/main 分离)。
-
-    run_main 内部重建 metadata 后调主算子; golden / customize_inputs / compare
-    与合并测试一致, 仅 wrapper 分流到 main-only 路径。
-    按 quant_mode 派发到 MXFP8 或 GQA FP8 路径。
-    """
-
-    golden = _golden_dispatch
-    customize_inputs = _inputs_dispatch
-    compare = compare_module.compare
-
-    tolerance = {
-        "float16": {
-            "rtol": 0.005,
-            "ptol": 0.005,
-            "atol": 0.000025,
-        },
-        "bfloat16": {
-            "rtol": 0.0078125,
-            "ptol": 0.005,
-            "atol": 0.0001,
-        },
-    }
+    customize_inputs = load_impl_module(
+        "metadata_inputs"
+    ).generate_quant_flash_attn_metadata_inputs
 
 
 __spec__ = {
-    "qfa_wrapper.npu_qfa": "QfaMxfp8Spec",
-    "qfa_metadata_wrapper.run_metadata": "QfaMetadataSpec",
-    "qfa_main_wrapper.run_main": "QfaMainSpec",
+    "torch.ops.cann_ops_transformer.quant_flash_attn": "QuantFlashAttnSpec",
+    "torch.ops.cann_ops_transformer.quant_flash_attn_metadata": (
+        "QuantFlashAttnMetadataSpec"
+    ),
 }

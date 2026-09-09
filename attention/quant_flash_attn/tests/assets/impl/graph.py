@@ -13,24 +13,34 @@
 import logging
 import os
 import sys
-from typing import List, Optional
 
 import torch
-import torch_npu
 
 # 复用 quant_flash_attn_golden / quant_flash_attn_fp8_golden 的 layout 转换 / e8m0 打包 / prepare_npu_inputs / 全局变量
 _ASSETS_DIR = os.path.dirname(os.path.abspath(__file__))
 _TESTS_DIR = os.path.join(_ASSETS_DIR, "..")
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
-import quant_flash_attn_golden as mxfp8_golden_mod
-import quant_flash_attn_fp8_golden as fp8_golden_mod
-import quant_flash_attn_hif8_golden as hif8_golden_mod
 
 logger = logging.getLogger(__name__)
 
 
-def _apply_golden_globals(params, quant_mode=1):
+def _load_npu_modules():
+    """懒加载 torch_npu 与三个 golden 模块。
+
+    延迟到 worker (fork 之后) 再 import torch_npu, 避免主进程 fork 前 import
+    torch_npu 导致 fork 子进程 re-init NPU 报错 (Cannot re-initialize NPU in
+    forker subprocess)。与 flash_attn 资产一致: impl 模块不进 torch_npu。
+    """
+    import torch_npu
+    import quant_flash_attn_golden as mxfp8_golden_mod
+    import quant_flash_attn_fp8_golden as fp8_golden_mod
+    import quant_flash_attn_hif8_golden as hif8_golden_mod
+
+    return torch_npu, mxfp8_golden_mod, fp8_golden_mod, hif8_golden_mod
+
+
+def _apply_golden_globals(params, quant_mode, modules):
     """把 case 参数注入 golden 模块全局变量 (按 quant_mode 选择目标模块, 与 qfa_wrapper 一致).
 
     prepare_npu_inputs 读目标 golden_mod 的全局变量 (B/N_q/N_kv/D/ENABLE_PA/...),
@@ -40,6 +50,7 @@ def _apply_golden_globals(params, quant_mode=1):
     quant_mode=0 → hif8_golden_mod (HIF8 per-tensor 量化路径)
     其他 → mxfp8_golden_mod (MXFP8 路径)
     """
+    _, mxfp8_golden_mod, fp8_golden_mod, hif8_golden_mod = modules
     if quant_mode == 6:
         target = fp8_golden_mod
     elif quant_mode == 0:
@@ -74,53 +85,85 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
-        dequant_scale_q: torch.Tensor,
-        dequant_scale_k: torch.Tensor,
-        dequant_scale_v: torch.Tensor,
-        p_scale: torch.Tensor,
+        q_descale: torch.Tensor,
+        k_descale: torch.Tensor,
+        v_descale: torch.Tensor,
+        quant_mode: int,
         block_table: torch.Tensor,
-        cu_seqlens_q_t: torch.Tensor,
-        cu_seqlens_kv_t: torch.Tensor,
-        seqused_q_t: torch.Tensor,
-        seqused_kv_t: torch.Tensor,
-        sinks_t: torch.Tensor,
-        attn_mask_t: torch.Tensor,
-        metadata_t: torch.Tensor,
-        *,
-        batch_size: int,
-        N_q: int,
-        N_kv: int,
-        D: int,
-        cu_seqlens_q: Optional[List[int]] = None,
-        cu_seqlens_kv: Optional[List[int]] = None,
-        seqused_q: Optional[List[int]] = None,
-        seqused_kv: Optional[List[int]] = None,
+        p_scale: torch.Tensor,
+        cu_seqlens_q: torch.Tensor,
+        cu_seqlens_kv: torch.Tensor,
+        seqused_q: torch.Tensor,
+        seqused_kv: torch.Tensor,
+        sinks: torch.Tensor,
+        attn_mask: torch.Tensor,
+        metadata: torch.Tensor,
+        softmax_scale: float = 1.0,
+        mask_mode: int = 0,
+        win_left: int = -1,
+        win_right: int = -1,
         max_seqlen_q: int = -1,
         max_seqlen_kv: int = -1,
-        enable_pa: bool = False,
-        kv_cache_layout: str = "BnNBsD",
-        block_size: int = 0,
-        mask_mode: int = 0,
-        q_scale_layout: str = "TND",
-        quant_mode: int = 1,
-        enable_lse: bool = False,
-        graph_path: int = 0,
-        input_layout: str = "TND",
-        layout_q: str = "TND",
-        layout_q_descale: str = "TND",
-        layout_kv: str = "TND",
-        layout_out: str = "TND",
-        is_contiguous: bool = True,
-        device_id: int = 0,
-        softmax_scale: Optional[float] = None,
-        head_dim_v: Optional[int] = None,
-        data_range_q: float = 1.0,
-        data_range_k: float = 1.0,
-        data_range_v: float = 1.0,
+        layout_q: str = "BSND",
+        layout_q_descale: str = "BSND",
+        layout_kv: str = "BSND",
+        layout_out: str = "BSND",
+        return_softmax_lse: bool = False,
         **kwargs,
     ):
         super().__init__()
-        torch_npu.npu.set_device(int(device_id))
+        torch_npu_mod, mxfp8_golden_mod, fp8_golden_mod, hif8_golden_mod = (
+            _load_npu_modules()
+        )
+        torch_npu_mod.npu.set_device(int(kwargs.get("device_id", 0)))
+
+        # ---- 0. 从 op-schema 入参推导配置 (graph 路径拿不到额外 attr) ----
+        dequant_scale_q = q_descale
+        dequant_scale_k = k_descale
+        dequant_scale_v = v_descale
+        cu_seqlens_q_t = cu_seqlens_q
+        cu_seqlens_kv_t = cu_seqlens_kv
+        seqused_q_t = seqused_q
+        seqused_kv_t = seqused_kv
+        attn_mask_t = attn_mask
+
+        layout_q = str(layout_q)
+        layout_q_descale = str(layout_q_descale)
+        layout_kv = str(layout_kv)
+        layout_out = str(layout_out)
+
+        q_shape = tuple(int(value) for value in q.shape)
+        k_shape = tuple(int(value) for value in k.shape)
+        D = int(kwargs.get("D") or q_shape[-1])
+        N_q = int(
+            kwargs.get("N_q") or (q_shape[2] if layout_q == "BSND" else q_shape[1])
+        )
+        N_kv = int(
+            kwargs.get("N_kv") or (k_shape[2] if layout_kv == "PA_BBND" else k_shape[1])
+        )
+        head_dim_v = kwargs.get("head_dim_v")
+        enable_pa = bool(kwargs.get("enable_pa")) or layout_kv.startswith("PA_")
+        kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
+        q_scale_layout = kwargs.get("q_scale_layout") or layout_q_descale
+        input_layout = kwargs.get("input_layout") or layout_q
+        is_contiguous = bool(kwargs.get("is_contiguous", True))
+        graph_path = kwargs.get("graph_path", 0)
+        device_id = kwargs.get("device_id", 0)
+        enable_lse = return_softmax_lse
+        batch_size = kwargs.get("batch_size")
+        quant_mode = int(quant_mode) if quant_mode is not None else 1
+        if enable_pa:
+            if layout_kv == "PA_NZ":
+                bs_idx = 3
+            elif layout_kv == "PA_BBND":
+                bs_idx = 1
+            else:
+                bs_idx = 2
+            raw_bs = k_shape[bs_idx] if len(k_shape) > bs_idx else 0
+            block_size = max(0, raw_bs - 4) if quant_mode == 6 else raw_bs
+        else:
+            block_size = 0
+        block_size = kwargs.get("block_size", block_size)
 
         # ---- 1. 从函数参数取 final-layout fp8 + e8m0  ----
         # q, k, v 是 torch.float8_e4m3fn, final layout (TND / PA paged)
@@ -133,7 +176,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         )
 
         # cu_seqlens/seqused 真实值由 inputs.py 写入 _t tensor slot (8-11)；
-        # 这里从 tensor 读回 list（与 qfa_wrapper/qfa_main_wrapper 一致）。
+        # 这里从 tensor 读回 list（与 qfa_wrapper 一致）。
         # _t 端可能是 NPU tensor，.cpu().tolist() 读回；空 tensor (numel==0) → None。
         def _tolist_t(t, default=None):
             if t is None:
@@ -199,11 +242,12 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 "SEED_Q": kwargs.get("seed_q"),
                 "SEED_K": kwargs.get("seed_k"),
                 "SEED_V": kwargs.get("seed_v"),
-                "DATA_RANGE_Q": kwargs.get("data_range_q", data_range_q),
-                "DATA_RANGE_K": kwargs.get("data_range_k", data_range_k),
-                "DATA_RANGE_V": kwargs.get("data_range_v", data_range_v),
+                "DATA_RANGE_Q": kwargs.get("data_range_q", 1.0),
+                "DATA_RANGE_K": kwargs.get("data_range_k", 1.0),
+                "DATA_RANGE_V": kwargs.get("data_range_v", 1.0),
             },
             quant_mode=quant_mode,
+            modules=(torch_npu_mod, mxfp8_golden_mod, fp8_golden_mod, hif8_golden_mod),
         )
 
         # ---- 3. 透传 ----
@@ -325,13 +369,14 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             seqused_q=seqused_q_t,
             seqused_kv=seqused_kv_t,
             batch_size=batch_size if not is_tnd_q else None,
+            max_seqlen_q=int(inputs["max_seqlen_q"]),
+            max_seqlen_kv=int(inputs["max_seqlen_kv"]),
+            head_dim_v=head_dim_v,
             mask_mode=int(inputs["sparse_mode"]),
             layout_q=layout_q,
             layout_q_descale=inputs["layout_q_descale"],
             layout_kv=layout_kv,
             layout_out=inputs["layout_out"],
-            max_seqlen_q=int(inputs["max_seqlen_q"]),
-            max_seqlen_kv=int(inputs["max_seqlen_kv"]),
         )
         # metadata 可能建在错误的 device 上, 对齐 q.device
         if self.metadata.device != inputs["q"].device:
