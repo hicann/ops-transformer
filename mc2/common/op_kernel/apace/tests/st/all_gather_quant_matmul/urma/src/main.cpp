@@ -117,7 +117,8 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
     uint32_t paddedTailM = (tailM > 0) ? ((tailM + 15U) / 16U * 16U) : 0U;
     uint32_t totalLogicalM = static_cast<uint32_t>(rankNum) * (tileCnt * tileM + tailCnt * paddedTailM);
 
-    QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;
+    QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN, mm::BiasDataType::DT_FLOAT>
+        tilingEngine;
     tilingEngine.SetOptimizeEnable(false);
     tilingEngine.SetMTailAlignEnable(true);
     tilingEngine.GetTilingData(totalLogicalM, static_cast<uint32_t>(n), static_cast<uint32_t>(k), tilingData.mmTile);

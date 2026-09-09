@@ -273,14 +273,17 @@ private:
 
         uint32_t memNum = 0;
         CommMem *remoteMems = nullptr;
-        char **memTags = nullptr;
-        if (HcclChannelGetRemoteMems(comm_, channel, &memNum, &remoteMems, &memTags) != ::HCCL_SUCCESS || memNum == 0 ||
-            remoteMems == nullptr) {
+        // HCCL C 接口按 char*** 返回远端注册内存的 tag 列表，边界处立即转为 std::string 管理
+        char **memTagsRaw = nullptr;
+        if (HcclChannelGetRemoteMems(comm_, channel, &memNum, &remoteMems, &memTagsRaw) != ::HCCL_SUCCESS ||
+            memNum == 0 || remoteMems == nullptr) {
             return false;
         }
+        std::string targetTag = (memTag != nullptr) ? memTag : "";
 
         for (uint32_t i = 0; i < memNum; i++) {
-            if (memTags != nullptr && memTags[i] != nullptr && std::strcmp(memTags[i], memTag) == 0) {
+            std::string curTag = (memTagsRaw != nullptr && memTagsRaw[i] != nullptr) ? memTagsRaw[i] : "";
+            if (curTag == targetTag) {
                 remoteAddr = reinterpret_cast<uint64_t>(remoteMems[i].addr);
                 break;
             }

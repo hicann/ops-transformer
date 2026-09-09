@@ -138,7 +138,8 @@ int CreateTilingDataAndContext(const char *hcomName, aclrtStream stream, int m, 
     // Each rank computes the full M x N matmul (not M*rankNum).
     // The AlltoAll epilogue scatters the result, and ReduceAdd reduces.
     uint64_t totalM = static_cast<uint64_t>(m);
-    QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;
+    QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN, mm::BiasDataType::DT_FLOAT>
+        tilingEngine;
     tilingEngine.SetOptimizeEnable(false);
     tilingEngine.SetMTailAlignEnable(true);
 

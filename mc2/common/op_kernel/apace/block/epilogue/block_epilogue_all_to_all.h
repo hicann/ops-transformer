@@ -61,7 +61,6 @@ public:
         winContext_ = (__gm__ Apace::HcclOpParam *)params.hcclContext;
         rankId_ = Apace::GetRankId(winContext_);
         tpWorldSize_ = Apace::GetRankDim(winContext_);
-
         if (tpWorldSize_ > 0) {
             tpSizeM_ = m_ / tpWorldSize_;
         }
