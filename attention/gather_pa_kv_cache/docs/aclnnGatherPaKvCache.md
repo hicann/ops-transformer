@@ -249,8 +249,8 @@ aclnnStatus aclnnGatherPaKvCache(
         <td>输入是空指针。</td>
       </tr>
       <tr>
-        <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="3">161002</td>
+        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="2">161002</td>
         <td>输入数据类型不在支持的范围内。</td>
       </tr>
       <tr>
@@ -415,7 +415,7 @@ int main() {
 
   char cacheMode[] = "Norm";
   const bool isSeqLensCumsum = false;
-  // 创建gradOut aclTensor
+  // 创建GatherPaKvCache的输入输出aclTensor
   ret = CreateAclTensor(keyCacheHostData, keyCacheShape, &keyCacheDeviceAddr, aclDataType::ACL_FLOAT16, &keyCache);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 
@@ -460,7 +460,7 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
   // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
-  auto size = 256;
+  auto size = GetShapeSize(keyShape);
   std::vector<uint16_t> resultData(size, 0);
   ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), keyDeviceAddr,
                     size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
