@@ -1887,6 +1887,10 @@ static uint64_t GetCommBufferSize(const gert::TilingContext *context,
     // flag检查和比较复用计算scratch，通信侧只保留清零buffer
     uint32_t clearFlagCount = flagRcvCount * blockCntPerToken * SPLIT_BLOCK_FLAG_COUNT;
     uint32_t clearFlagBufSize = (clearFlagCount * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
+    if (isA5 && isMxFp8Quant) {
+        // A5 MXFP8接收端不再分配独立的scaleDiv临时区，预算与kernel保持一致
+        scaleNumAlignSize = 0U;
+    }
     uint64_t commBufferSize = static_cast<uint64_t>(scaleNumAlignSize) + clearFlagBufSize;
     dispatchBufferSize =
         isA5 ? GetDispatchBufferSize(tilingData, moeQueueBytes, commDataBytes, packedDataBytes, quantBufferSize) : 0U;
