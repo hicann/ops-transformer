@@ -416,6 +416,9 @@ install_opp() {
   update_install_infos "${TARGET_USERNAME}" "${TARGET_USERGROUP}" "${INSTALL_TYPE}" "${relative_path_val}"
   log_with_errorlevel "$?" "error" "[ERROR]: ERR_NO:${INSTALL_FAILED};ERR_DES:Update opp install info failed."
 
+  # 先安装 whl 包，再通过 install_common_parser.sh 统一安装权限
+  install_whl_package
+
   bash "${COMMON_PARSER_FILE}" --copy_all --package="${OPP_PLATFORM_DIR}" --install --username="${TARGET_USERNAME}" \
     --usergroup="${TARGET_USERGROUP}" --set-cann-uninstall --version=$RUN_PKG_VERSION \
     --use-share-info --version-dir=$PKG_VERSION_DIR $INSTALL_OPTION ${INSTALL_FOR_ALL} "--feature=all" "--chip=all" \
@@ -425,8 +428,6 @@ install_opp() {
   logandprint "[INFO]: upgradePercentage:30%"
 
   add_init_py
-
-  install_whl_package
 
   install_es_whl
 
