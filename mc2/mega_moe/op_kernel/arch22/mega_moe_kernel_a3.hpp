@@ -24,14 +24,14 @@
 
 #include "utils/copy_l0c_to_gm_custom.hpp"
 
-#include "template_linear_algebra_v2/mega_moe_catlass.hpp"
-#include "template_linear_algebra_v2/arch/tla_v2_cross_core_sync.hpp"
-#include "template_linear_algebra_v2/arch/mega_moe_resource.hpp"
-#include "template_linear_algebra_v2/tla_v2_coord.hpp"
-#include "template_linear_algebra_v2/detail/tla_v2_callback.hpp"
-#include "template_linear_algebra_v2/mega_moe_gemm_coord.hpp"
-#include "template_linear_algebra_v2/mega_moe_matrix_coord.hpp"
-#include "template_linear_algebra_v2/epilogue/tile/mega_moe_epilogue_tile_copy.hpp"
+#include "catlass/catlass.hpp"
+#include "catlass/arch/cross_core_sync.hpp"
+#include "catlass/arch/resource.hpp"
+#include "catlass/coord.hpp"
+#include "catlass/detail/callback.hpp"
+#include "catlass/gemm_coord.hpp"
+#include "catlass/matrix_coord.hpp"
+#include "catlass/epilogue/tile/tile_copy.hpp"
 
 #include "utils/block_mmad_w4a4.hpp"
 #include "utils/block_mmad_preload_async_fixpipe_quant.hpp"

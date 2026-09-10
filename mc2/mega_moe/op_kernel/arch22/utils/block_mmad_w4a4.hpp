@@ -16,15 +16,15 @@
 #ifndef CATLASS_GEMM_BLOCK_BLOCK_MMAD_W4A4_PERCHANNEL_HPP
 #define CATLASS_GEMM_BLOCK_BLOCK_MMAD_W4A4_PERCHANNEL_HPP
 
-#include "../template_linear_algebra_v2/mega_moe_catlass.hpp"
-#include "../template_linear_algebra_v2/arch/mega_moe_resource.hpp"
-#include "../template_linear_algebra_v2/tla_v2_coord.hpp"
-#include "../template_linear_algebra_v2/detail/tla_v2_callback.hpp"
-#include "../template_linear_algebra_v2/mega_moe_gemm_coord.hpp"
-#include "../template_linear_algebra_v2/gemm/mega_moe_gemm_dispatch_policy.hpp"
-#include "../template_linear_algebra_v2/gemm/mega_moe_gemm_helper.hpp"
-#include "../template_linear_algebra_v2/gemm/tile/mega_moe_gemm_tile_copy.hpp"
-#include "../template_linear_algebra_v2/gemm/tile/mega_moe_tile_mmad.hpp"
+#include "catlass/catlass.hpp"
+#include "catlass/arch/resource.hpp"
+#include "catlass/coord.hpp"
+#include "catlass/detail/callback.hpp"
+#include "catlass/gemm_coord.hpp"
+#include "catlass/gemm/dispatch_policy.hpp"
+#include "catlass/gemm/helper.hpp"
+#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm/tile/tile_mmad.hpp"
 #include "const_args.hpp"
 #include "dispatch_policy_custom.hpp"
 

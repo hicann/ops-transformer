@@ -33,7 +33,7 @@ if (BUILD_OPEN_PROJECT)  # custom
             OP_NAME MegaMoe
             OPTIONS --cce-auto-sync=on
             OPTIONS -I${CMAKE_SOURCE_DIR}/mc2/common/op_kernel
-            OPTIONS -I${CMAKE_SOURCE_DIR}/mc2/common/inc/kernel
+            OPTIONS -DCATLASS_ARCH=2201
         )
     endif()
 

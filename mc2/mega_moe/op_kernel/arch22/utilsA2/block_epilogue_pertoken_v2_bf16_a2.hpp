@@ -11,13 +11,13 @@
 #ifndef CATLASS_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_V2_BF16_A2_HPP
 #define CATLASS_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_V2_BF16_A2_HPP
 
-#include "../template_linear_algebra_v2/mega_moe_catlass.hpp"
-#include "../template_linear_algebra_v2/arch/mega_moe_resource.hpp"
-#include "../template_linear_algebra_v2/epilogue/mega_moe_epilogue_dispatch_policy.hpp"
-#include "../template_linear_algebra_v2/mega_moe_gemm_coord.hpp"
-#include "../template_linear_algebra_v2/mega_moe_matrix_coord.hpp"
-#include "../template_linear_algebra_v2/layout/mega_moe_layout.hpp"
-#include "../template_linear_algebra_v2/detail/tla_v2_callback.hpp"
+#include "catlass/catlass.hpp"
+#include "catlass/arch/resource.hpp"
+#include "catlass/epilogue/dispatch_policy.hpp"
+#include "catlass/gemm_coord.hpp"
+#include "catlass/matrix_coord.hpp"
+#include "catlass/layout/layout.hpp"
+#include "catlass/detail/callback.hpp"
 
 #include "../utils/hccl_shmem.hpp"
 #include "../utils/layout3d.hpp"
