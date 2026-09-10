@@ -365,8 +365,8 @@ aclnnStatus aclnnMoeGatingTopK(
       <td>输入和输出的数据类型不在支持的范围内。</td>
     </tr>
     <tr>
-      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td>561002</td>
+      <td>ACLNN_ERR_INNER_NULLPTR</td>
+      <td>561103</td>
       <td>
       x的shape不满足要求。<br />
       x和biasOptional的shape不匹配。<br />

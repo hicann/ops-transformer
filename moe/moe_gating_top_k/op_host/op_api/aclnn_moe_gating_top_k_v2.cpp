@@ -28,6 +28,7 @@ static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_V2_DTYPE_SUPPO
 static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_INT = {DataType::DT_INT32,
                                                                                                DataType::DT_INT64};
 static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_INT32 = {DataType::DT_INT32};
+static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_FLOAT = {DataType::DT_FLOAT};
 
 static inline bool CheckNotNull(const aclTensor *x, const aclTensor *yOut, const aclTensor *expertIdxOut,
                                 const aclTensor *outOut)
@@ -64,7 +65,7 @@ static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *biasOpti
         OP_CHECK_DTYPE_NOT_SUPPORT(expertIdxOut, MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_INT32, return false);
     }
     if (outOut != nullptr && outOut->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(outOut, MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_X, return false);
+        OP_CHECK_DTYPE_NOT_SUPPORT(outOut, MOE_GATING_TOP_K_V2_DTYPE_SUPPORT_LIST_FLOAT, return false);
     }
     return true;
 }

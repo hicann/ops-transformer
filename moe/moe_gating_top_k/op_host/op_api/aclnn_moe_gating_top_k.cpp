@@ -27,6 +27,7 @@ namespace MoeGatingTopKCheck {
 static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_DTYPE_SUPPORT_LIST_X = {
     DataType::DT_FLOAT16, DataType::DT_BF16, DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_DTYPE_SUPPORT_LIST_INT = {DataType::DT_INT32};
+static const std::initializer_list<op::DataType> MOE_GATING_TOP_K_DTYPE_SUPPORT_LIST_FLOAT = {DataType::DT_FLOAT};
 
 static inline bool CheckNotNull(const aclTensor *x, const aclTensor *yOut, const aclTensor *expertIdxOut,
                                 const aclTensor *outOut)
@@ -56,7 +57,7 @@ static inline bool CheckDtypeValid(const aclTensor *x, const aclTensor *biasOpti
         OP_CHECK_DTYPE_NOT_SUPPORT(expertIdxOut, MOE_GATING_TOP_K_DTYPE_SUPPORT_LIST_INT, return false);
     }
     if (outOut != nullptr && outOut->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(outOut, MOE_GATING_TOP_K_DTYPE_SUPPORT_LIST_X, return false);
+        OP_CHECK_DTYPE_NOT_SUPPORT(outOut, MOE_GATING_TOP_K_DTYPE_SUPPORT_LIST_FLOAT, return false);
     }
     return true;
 }
