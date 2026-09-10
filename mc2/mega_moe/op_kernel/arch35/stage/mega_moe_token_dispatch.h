@@ -375,7 +375,7 @@ __aicore__ inline void DispatchTokenRange(const TokenDispatchConfig &context, co
     uint32_t dispatchRowCount = dispatchGlobalRowEnd - dispatchGlobalRowBegin;
     // 对整个输入范围一次连续均分；按全局起点轮转首 owner，避免余数长期集中在低编号 AIV1。
     WorkRange ownedRange =
-        GetRotatedBalancedTokenRange(dispatchRowCount, blockJob.jobIndex, blockJob.totalJobs, dispatchGlobalRowBegin);
+        GetRotatedBalancedWorkRange(dispatchRowCount, blockJob.jobIndex, blockJob.totalJobs, dispatchGlobalRowBegin);
     if (ownedRange.count == 0U) {
         return;
     }

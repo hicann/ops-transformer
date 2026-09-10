@@ -238,28 +238,28 @@ __aicore__ inline uint32_t GetWaveEndRowOffsetInExpert(uint64_t expertRowCount, 
     return static_cast<uint32_t>(expertRowCount < maxWaveEndRowOffset ? expertRowCount : maxWaveEndRowOffset);
 }
 
-// 连续均衡分配 token，前 totalTokens % workerCount 个任务各多处理一个 token。
-__aicore__ inline WorkRange GetBalancedTokenRange(uint32_t totalTokens, uint32_t workerIdx, uint32_t workerCount)
+// 连续均衡分配任务，前 totalWorkItems % workerCount 个执行单元各多处理一个任务。
+__aicore__ inline WorkRange GetBalancedWorkRange(uint32_t totalWorkItems, uint32_t workerIdx, uint32_t workerCount)
 {
     if (workerCount == 0U || workerIdx >= workerCount) {
         return {};
     }
-    uint32_t base = totalTokens / workerCount;
-    uint32_t remainder = totalTokens % workerCount;
+    uint32_t base = totalWorkItems / workerCount;
+    uint32_t remainder = totalWorkItems % workerCount;
     uint32_t extraBefore = workerIdx < remainder ? workerIdx : remainder;
     return {workerIdx * base + extraBefore, base + static_cast<uint32_t>(workerIdx < remainder)};
 }
 
-// 以全局 row 前缀轮转“多一个 token”的首 owner；Dispatch/Combine 共用这一公式。
-__aicore__ inline WorkRange GetRotatedBalancedTokenRange(uint32_t totalTokens, uint32_t workerIdx, uint32_t workerCount,
-                                                         uint64_t globalRowPrefix)
+// 以全局任务前缀轮转“多一个任务”的首 owner；Dispatch/Combine 共用这一公式。
+__aicore__ inline WorkRange GetRotatedBalancedWorkRange(uint32_t totalWorkItems, uint32_t workerIdx,
+                                                        uint32_t workerCount, uint64_t globalWorkPrefix)
 {
     if (workerCount == 0U || workerIdx >= workerCount) {
         return {};
     }
-    uint32_t firstOwner = static_cast<uint32_t>(globalRowPrefix % workerCount);
+    uint32_t firstOwner = static_cast<uint32_t>(globalWorkPrefix % workerCount);
     uint32_t logicalWorkerIdx = workerIdx >= firstOwner ? workerIdx - firstOwner : workerIdx + workerCount - firstOwner;
-    return GetBalancedTokenRange(totalTokens, logicalWorkerIdx, workerCount);
+    return GetBalancedWorkRange(totalWorkItems, logicalWorkerIdx, workerCount);
 }
 
 #if defined(__DAV_C310_CUBE__) || defined(__DAV_C310_VEC__)
