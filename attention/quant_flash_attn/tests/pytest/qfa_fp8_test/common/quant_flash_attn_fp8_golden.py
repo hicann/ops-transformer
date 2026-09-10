@@ -58,8 +58,27 @@ N_q = 2
 N_kv = 1
 D = 128
 
-ACTUAL_SEQ_Q = [128]
-ACTUAL_SEQ_KV = [256]
+CU_SEQLENS_Q = [0, 128]
+CU_SEQLENS_KV = None
+SEQUSED_Q = [128]
+SEQUSED_KV = [256]
+MAX_SEQLEN_Q = 128
+MAX_SEQLEN_KV = 256
+
+
+def _derive_seqused(cu_seqlens):
+    if cu_seqlens is None:
+        return None
+    return [cu_seqlens[i + 1] - cu_seqlens[i] for i in range(len(cu_seqlens) - 1)]
+
+
+def _get_seqused_q():
+    return SEQUSED_Q if SEQUSED_Q is not None else _derive_seqused(CU_SEQLENS_Q)
+
+
+def _get_seqused_kv():
+    return SEQUSED_KV if SEQUSED_KV is not None else _derive_seqused(CU_SEQLENS_KV)
+
 
 # QFA layout 属性 (GQA 固定值)
 LAYOUT_Q = "NTD"
@@ -103,7 +122,7 @@ NUM_BLOCKS = 0
 
 
 # ==============================================================================
-# 序列长度转换: actual_seq → QFA cu_seqlens / seqused
+# 序列长度转换: 兼容旧接口 (actual_seq → QFA cu_seqlens / seqused)
 # ==============================================================================
 def make_cu_seqlens(actual_seq):
     """actual_seq (per-batch length list) → cu_seqlens (prefix sum, prepend 0)"""
@@ -256,8 +275,20 @@ def bnsd_to_v_cache(tensor_bnsd, seq_lens, block_size, block_table, num_blocks=0
 
 def generate_data():
     """生成 BNSD FP16 Q/K/V 并做 FP8 量化"""
-    max_sq = max(ACTUAL_SEQ_Q)
-    max_skv = max(ACTUAL_SEQ_KV) if max(ACTUAL_SEQ_KV) > 0 else 1
+    seqused_q = _get_seqused_q()
+    seqused_kv = _get_seqused_kv()
+    max_sq = (
+        MAX_SEQLEN_Q
+        if (MAX_SEQLEN_Q is not None and MAX_SEQLEN_Q >= 0)
+        else max(seqused_q)
+    )
+    max_skv = (
+        MAX_SEQLEN_KV
+        if (MAX_SEQLEN_KV is not None and MAX_SEQLEN_KV >= 0)
+        else max(seqused_kv)
+    )
+    if max_skv <= 0:
+        max_skv = 1
     logger.info("[INFO] max_sq=%d, max_skv=%d", max_sq, max_skv)
 
     def _generate_one(seed, data_range, shape, amp_shape):
@@ -307,8 +338,8 @@ def generate_data():
     # k_fp8 = torch.ones_like(k_fp8)
     # v_fp8 = torch.ones_like(v_fp8)
 
-    if max(ACTUAL_SEQ_KV) == 0:
-        real_skv = max(ACTUAL_SEQ_KV)
+    if max(seqused_kv) == 0:
+        real_skv = max(seqused_kv)
         k_fp8 = k_fp8[:, :, :real_skv, :].contiguous()
         v_fp8 = v_fp8[:, :, :real_skv, :].contiguous()
 
@@ -364,7 +395,7 @@ def printmm(matrix, layout, z_size):
 
 
 def cpu_fp8_fullquant_golden(
-    q_fp8, k_fp8, v_fp8, deq_q, deq_k, deq_v, p_scale, actual_seq_q, actual_seq_kv
+    q_fp8, k_fp8, v_fp8, deq_q, deq_k, deq_v, p_scale, seqused_q, seqused_kv
 ):
     """CPU golden reference - 所有操作在CPU上执行"""
     softmax_scale = get_softmax_scale(SCALE_VALUE, D)
@@ -404,8 +435,8 @@ def cpu_fp8_fullquant_golden(
         ..., None
     ].contiguous()
 
-    q_lens_t = torch.tensor(actual_seq_q, dtype=torch.int32).contiguous()
-    k_lens_t = torch.tensor(actual_seq_kv, dtype=torch.int32).contiguous()
+    q_lens_t = torch.tensor(seqused_q, dtype=torch.int32).contiguous()
+    k_lens_t = torch.tensor(seqused_kv, dtype=torch.int32).contiguous()
     q_lens_acl = q_lens_t.view(batch, 1, 1, 1).contiguous()
     k_lens_acl = k_lens_t.view(batch, 1, 1, 1).contiguous()
 
@@ -879,8 +910,12 @@ def prepare_npu_inputs_gqa_fp8(
     dequant_scale_k,
     dequant_scale_v,
     p_scale,
-    actual_seq_q,
-    actual_seq_kv,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    max_seqlen_q,
+    max_seqlen_kv,
     block_table_torch=None,
 ):
     """准备 NPU 侧入参 (GQA FP8, 仅 PA).
@@ -892,36 +927,29 @@ def prepare_npu_inputs_gqa_fp8(
       softmax_scale, max_seqlen_q, max_seqlen_kv
     """
     softmax_scale = 1.0 / math.sqrt(D)
-    cu_seqlens_q = make_cu_seqlens(actual_seq_q)
-    seqused_q = make_seqused(actual_seq_q)
-    seqused_kv = make_seqused(actual_seq_kv)
-    max_seqlen_q = max(actual_seq_q) if actual_seq_q else -1
-    max_seqlen_kv = max(actual_seq_kv) if actual_seq_kv else -1
 
-    q_npu = convert_q_bnsd_to_layout(q_fp8, actual_seq_q, LAYOUT_Q)
-    deq_q_npu = convert_scale_to_layout(dequant_scale_q, actual_seq_q, "deq_q")
-    deq_v_npu = convert_scale_to_layout(dequant_scale_v, actual_seq_kv, "deq_v")
+    q_npu = convert_q_bnsd_to_layout(q_fp8, seqused_q, LAYOUT_Q)
+    deq_q_npu = convert_scale_to_layout(dequant_scale_q, seqused_q, "deq_q")
+    deq_v_npu = convert_scale_to_layout(dequant_scale_v, seqused_kv, "deq_v")
     mask_arg = _build_mask()
 
     if block_table_torch is not None:
         block_table = block_table_torch.cpu().numpy().astype(np.int32).copy()
         block_table_tensor = torch.as_tensor(block_table, dtype=torch.int32)
     else:
-        block_table = create_block_table(
-            actual_seq_kv, BLOCK_SIZE, num_blocks=NUM_BLOCKS
-        )
+        block_table = create_block_table(seqused_kv, BLOCK_SIZE, num_blocks=NUM_BLOCKS)
         block_table_tensor = torch.as_tensor(block_table, dtype=torch.int32)
 
     k_pa = bnsd_to_k_cache(
         k_fp8,
         dequant_scale_k,
-        actual_seq_kv,
+        seqused_kv,
         BLOCK_SIZE,
         block_table,
         num_blocks=NUM_BLOCKS,
     )
     v_pa = bnsd_to_v_cache(
-        v_fp8, actual_seq_kv, BLOCK_SIZE, block_table, num_blocks=NUM_BLOCKS
+        v_fp8, seqused_kv, BLOCK_SIZE, block_table, num_blocks=NUM_BLOCKS
     )
 
     if not IS_CONTIGUOUS:
@@ -1071,8 +1099,12 @@ def npu_fp8_full_quant(
     dequant_scale_k,
     dequant_scale_v,
     p_scale,
-    actual_seq_q,
-    actual_seq_kv,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    max_seqlen_q,
+    max_seqlen_kv,
     block_table_torch=None,
 ):
     """主 NPU 量化函数 - 准备数据并调用 NPU QFA 双算子"""
@@ -1087,8 +1119,12 @@ def npu_fp8_full_quant(
         dequant_scale_k,
         dequant_scale_v,
         p_scale,
-        actual_seq_q,
-        actual_seq_kv,
+        cu_seqlens_q,
+        cu_seqlens_kv,
+        seqused_q,
+        seqused_kv,
+        max_seqlen_q,
+        max_seqlen_kv,
         block_table_torch=block_table_torch,
     )
 
@@ -1122,7 +1158,10 @@ def npu_fp8_full_quant(
     )
 
     atten_out = output[0]
-    T_actual = sum(actual_seq_q)
+    act_seqused_q = (
+        seqused_q if seqused_q is not None else _derive_seqused(cu_seqlens_q)
+    )
+    T_actual = sum(act_seqused_q)
     if atten_out.shape[0] > T_actual:
         atten_out = atten_out[:T_actual]
 
@@ -1132,14 +1171,14 @@ def npu_fp8_full_quant(
 # ==============================================================================
 # PA cache → BNSD 还原 (NUM_BLOCKS != 0 时用)
 # ==============================================================================
-def _bnbd_to_bnsd(kv_bnbd, block_table, actual_seq_kv, block_size):
-    b = len(actual_seq_kv)
+def _bnbd_to_bnsd(kv_bnbd, block_table, seqused_kv, block_size):
+    b = len(seqused_kv)
     n_kv = kv_bnbd.shape[1]
     d_dim = kv_bnbd.shape[-1]
-    max_skv = max(max(actual_seq_kv), 1)
+    max_skv = max(max(seqused_kv), 1)
     kv_bnsd = torch.zeros((b, n_kv, max_skv, d_dim), dtype=kv_bnbd.dtype)
     for b_idx in range(b):
-        seq_len = actual_seq_kv[b_idx]
+        seq_len = seqused_kv[b_idx]
         block_num_per_seq = math.ceil(seq_len / block_size)
         for blk_idx in range(block_num_per_seq):
             block_id = int(block_table[b_idx, blk_idx])
@@ -1154,13 +1193,13 @@ def _bnbd_to_bnsd(kv_bnbd, block_table, actual_seq_kv, block_size):
     return kv_bnsd
 
 
-def _bnb_to_bns1(k_scale_bnb, block_table, actual_seq_kv, block_size):
-    b = len(actual_seq_kv)
+def _bnb_to_bns1(k_scale_bnb, block_table, seqused_kv, block_size):
+    b = len(seqused_kv)
     n_kv = k_scale_bnb.shape[1]
-    max_skv = max(max(actual_seq_kv), 1)
+    max_skv = max(max(seqused_kv), 1)
     k_scale_bns1 = torch.zeros((b, n_kv, max_skv, 1), dtype=torch.float32)
     for b_idx in range(b):
-        seq_len = actual_seq_kv[b_idx]
+        seq_len = seqused_kv[b_idx]
         block_num_per_seq = math.ceil(seq_len / block_size)
         for blk_idx in range(block_num_per_seq):
             block_id = int(block_table[b_idx, blk_idx])
@@ -1175,7 +1214,7 @@ def _bnb_to_bns1(k_scale_bnb, block_table, actual_seq_kv, block_size):
     return k_scale_bns1
 
 
-def pa_cache_to_bnsd(k_pa, v_pa, block_table, actual_seq_kv, block_size):
+def pa_cache_to_bnsd(k_pa, v_pa, block_table, seqused_kv, block_size):
     """从 PA cache 还原 BNSD 格式的 K/V/deq_k"""
     k_data = k_pa[:, :, :block_size, :].contiguous().float()
     v_data = v_pa[:, :, :block_size, :].contiguous().float()
@@ -1185,9 +1224,9 @@ def pa_cache_to_bnsd(k_pa, v_pa, block_table, actual_seq_kv, block_size):
         .view(torch.float32)
     )
     deq_k_flat = k_pa_f32[:, :, -block_size:].contiguous()
-    k_bnsd = _bnbd_to_bnsd(k_data, block_table, actual_seq_kv, block_size)
-    v_bnsd = _bnbd_to_bnsd(v_data, block_table, actual_seq_kv, block_size)
-    deq_k_bns1 = _bnb_to_bns1(deq_k_flat, block_table, actual_seq_kv, block_size)
+    k_bnsd = _bnbd_to_bnsd(k_data, block_table, seqused_kv, block_size)
+    v_bnsd = _bnbd_to_bnsd(v_data, block_table, seqused_kv, block_size)
+    deq_k_bns1 = _bnb_to_bns1(deq_k_flat, block_table, seqused_kv, block_size)
     return k_bnsd, v_bnsd, deq_k_bns1
 
 
@@ -1236,7 +1275,7 @@ if __name__ == "__main__":
         LAYOUT_OUT,
     )
     logger.info("B=%d, N_q=%d, N_kv=%d, D=%d", B, N_q, N_kv, D)
-    logger.info("ACTUAL_SEQ_Q=%s, ACTUAL_SEQ_KV=%s", ACTUAL_SEQ_Q, ACTUAL_SEQ_KV)
+    logger.info("SEQUSED_Q=%s, SEQUSED_KV=%s", SEQUSED_Q, SEQUSED_KV)
 
     block_table_torch = None
     if "gen" in mode:
@@ -1297,8 +1336,8 @@ if __name__ == "__main__":
             dequant_scale_k,
             dequant_scale_v,
             p_scale,
-            ACTUAL_SEQ_Q,
-            ACTUAL_SEQ_KV,
+            SEQUSED_Q,
+            SEQUSED_KV,
         )
         golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
     else:
@@ -1319,8 +1358,12 @@ if __name__ == "__main__":
             dequant_scale_k,
             dequant_scale_v,
             p_scale,
-            ACTUAL_SEQ_Q,
-            ACTUAL_SEQ_KV,
+            CU_SEQLENS_Q,
+            CU_SEQLENS_KV,
+            SEQUSED_Q,
+            SEQUSED_KV,
+            MAX_SEQLEN_Q,
+            MAX_SEQLEN_KV,
             block_table_torch,
         )
         atten_out, lse_out = output
@@ -1333,11 +1376,11 @@ if __name__ == "__main__":
         exit(0)
 
     logger.info("\n[Step 4] Atten OUT 精度对比")
-    cpu_tnd_torch = convert_q_bnsd_to_layout(cpu_out, ACTUAL_SEQ_Q, LAYOUT_OUT)
+    cpu_tnd_torch = convert_q_bnsd_to_layout(cpu_out, SEQUSED_Q, LAYOUT_OUT)
     result_compare_method.check_result(cpu_tnd_torch, atten_out)
 
     if ENABLE_LSE:
         logger.info("\n[Step 5] LSE 精度对比")
-        cpu_lse_tnd_torch = convert_q_bnsd_to_layout(cpu_lse, ACTUAL_SEQ_Q, "TND")
+        cpu_lse_tnd_torch = convert_q_bnsd_to_layout(cpu_lse, SEQUSED_Q, "TND")
         cpu_lse_nt_torch = cpu_lse_tnd_torch.squeeze(-1).permute(1, 0).contiguous()
         result_compare_method.check_result(cpu_lse_nt_torch, lse_out)
