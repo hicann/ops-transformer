@@ -43,19 +43,20 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnEngramFetchGetWorkspaceSize(const aclTensor *commContext, const aclTensor *indices,
-                                             const aclTensor *localStorageAddr, aclTensor *fetched, aclTensor *permOut,
-                                             aclTensor *sendCountsOut, aclTensor *recvCountsOut,
-                                             aclTensor *recvLocalEntryOut, aclTensor *numRecvOut, aclTensor *fetchedSf,
-                                             int32_t hiddenSize, int64_t numEntriesPerRank, int64_t numMaxTokensPerRank,
-                                             int64_t commBufferSize, int64_t withGrad, int64_t sfTableAddr,
-                                             uint64_t *workspaceSize, aclOpExecutor **executor)
+                                             const aclTensor *localStorageAddr, const aclTensor *sfTable,
+                                             aclTensor *fetched, aclTensor *permOut, aclTensor *sendCountsOut,
+                                             aclTensor *recvCountsOut, aclTensor *recvLocalEntryOut,
+                                             aclTensor *numRecvOut, aclTensor *fetchedSf, int32_t hiddenSize,
+                                             int64_t numEntriesPerRank, int64_t numMaxTokensPerRank,
+                                             int64_t commBufferSize, int64_t withGrad, uint64_t *workspaceSize,
+                                             aclOpExecutor **executor)
 {
     auto retParam = CheckParams(commContext, indices, fetched);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     aclnnStatus ret = aclnnInnerEngramFetchGetWorkspaceSize(
-        commContext, indices, localStorageAddr, hiddenSize, numEntriesPerRank, numMaxTokensPerRank, commBufferSize,
-        withGrad, sfTableAddr, fetched, permOut, sendCountsOut, recvCountsOut, recvLocalEntryOut, numRecvOut, fetchedSf,
-        workspaceSize, executor);
+        commContext, indices, localStorageAddr, sfTable, hiddenSize, numEntriesPerRank, numMaxTokensPerRank,
+        commBufferSize, withGrad, fetched, permOut, sendCountsOut, recvCountsOut, recvLocalEntryOut, numRecvOut,
+        fetchedSf, workspaceSize, executor);
     return ret;
 }
 

@@ -74,8 +74,9 @@ class EngramFetchArch35 {
 public:
     __aicore__ inline EngramFetchArch35() = default;
 
-    __aicore__ inline void Init(GM_ADDR commContext, GM_ADDR indices, GM_ADDR fetched, GM_ADDR fetchedSf,
-                                GM_ADDR workspaceGM, AscendC::TPipe *pipe, const EngramFetchTilingData *tilingData);
+    __aicore__ inline void Init(GM_ADDR commContext, GM_ADDR indices, GM_ADDR fetched, GM_ADDR sfTable,
+                                GM_ADDR fetchedSf, GM_ADDR workspaceGM, AscendC::TPipe *pipe,
+                                const EngramFetchTilingData *tilingData);
 
     __aicore__ inline void Process();
 
@@ -137,14 +138,15 @@ private:
     __aicore__ inline void FlushPreparedReads();
 };
 
-__aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indices, GM_ADDR fetched, GM_ADDR fetchedSf,
-                                               GM_ADDR workspaceGM, AscendC::TPipe *pipe,
+__aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indices, GM_ADDR fetched, GM_ADDR sfTable,
+                                               GM_ADDR fetchedSf, GM_ADDR workspaceGM, AscendC::TPipe *pipe,
                                                const EngramFetchTilingData *tilingData)
 {
     tpipe_ = pipe;
     indicesGM_ = indices;
     fetchedGM_ = fetched;
     fetchedSfGM_ = fetchedSf;
+    sfTableGM_ = reinterpret_cast<__gm__ uint8_t *>(sfTable);
     aivId_ = AscendC::GetBlockIdx();
     (void)workspaceGM;
 
@@ -161,7 +163,6 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     hiddenBytes_ = tilingData->hiddenBytes;
     ubSize_ = tilingData->ubSize;
 
-    sfTableGM_ = reinterpret_cast<__gm__ uint8_t *>(tilingData->sfTableAddr);
     numSfPacks_ = tilingData->numSfPacks;
     sfElemSize_ = tilingData->sfElemSize;
 

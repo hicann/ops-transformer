@@ -23,6 +23,7 @@ public:
         this->Input("comm_context").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Input("indices").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Input("local_storage_addr").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
+        this->Input("sf_table").ParamType(OPTIONAL).DataTypeList({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0}).FormatList({ge::FORMAT_ND});
 
         this->Output("fetched")
             .ParamType(REQUIRED)
@@ -42,7 +43,6 @@ public:
         this->Attr("num_max_tokens_per_rank").AttrType(OPTIONAL).Int();
         this->Attr("comm_buffer_size").AttrType(OPTIONAL).Int();
         this->Attr("with_grad").AttrType(OPTIONAL).Int();
-        this->Attr("sf_table_addr").AttrType(OPTIONAL).Int();
 
         OpAICoreConfig aicore_config_950;
         aicore_config_950.DynamicCompileStaticFlag(true)

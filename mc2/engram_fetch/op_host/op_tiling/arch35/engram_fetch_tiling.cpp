@@ -43,7 +43,7 @@ constexpr uint32_t ATTR_NUM_ENTRIES_PER_RANK_INDEX = 1U;
 constexpr uint32_t ATTR_NUM_MAX_TOKENS_PER_RANK_INDEX = 2U;
 constexpr uint32_t ATTR_COMM_BUFFER_SIZE_INDEX = 3U;
 constexpr uint32_t ATTR_WITH_GRAD_INDEX = 4U;
-constexpr uint32_t ATTR_SF_TABLE_ADDR_INDEX = 5U;
+constexpr uint32_t SF_TABLE_INDEX = 3U;
 
 constexpr uint32_t DIM_ONE = 1U;
 constexpr uint32_t DIM_TWO = 2U;
@@ -499,7 +499,6 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
     tilingData.commBufferSize = 0;
     tilingData.numSfPacks = 0;
     tilingData.sfElemSize = 0;
-    tilingData.sfTableAddr = 0;
 
     auto hiddenSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_HIDDEN_SIZE_INDEX);
     tilingData.hiddenDim = *hiddenSizePtr;
@@ -525,11 +524,6 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
         }
         ge::DataType sfDtype = fetchedSfDesc->GetDataType();
         tilingData.sfElemSize = ge::GetSizeByDataType(sfDtype);
-    }
-
-    auto sfTableAddrPtr = attrs->GetAttrPointer<int64_t>(ATTR_SF_TABLE_ADDR_INDEX);
-    if (sfTableAddrPtr != nullptr) {
-        tilingData.sfTableAddr = static_cast<uint64_t>(*sfTableAddrPtr);
     }
 
     auto platformInfo = context->GetPlatformInfo();
