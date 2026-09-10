@@ -237,16 +237,16 @@ ge::graphStatus CommonChecker::CheckAxis(const FaTilingInfo &faInfo)
                                                       "S of key/value must be greater than 0"),
                 return ge::GRAPH_FAILED);
 
-    const std::vector<int64_t> supportedHeadDims = {64, 72, 128, 256};
+    const std::vector<int64_t> supportedHeadDims = {64, 128, 256};
     OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckValueSupport(faInfo.qkHeadDim, supportedHeadDims),
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-                    faInfo.opName, "axis D of query and key", std::to_string(faInfo.qkHeadDim).c_str(),
-                    "The value of axis D of query and key can only be 64/72/128/256"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(faInfo.opName, "axis D of query and key",
+                                                       std::to_string(faInfo.qkHeadDim).c_str(),
+                                                       "The value of axis D of query and key can only be 64/128/256"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         ge::GRAPH_SUCCESS != CheckValueSupport(faInfo.vHeadDim, supportedHeadDims),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "axis D of value", std::to_string(faInfo.vHeadDim).c_str(),
-                                              "The value of axis D of value can only be 64/72/128/256"),
+                                              "The value of axis D of value can only be 64/128/256"),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(faInfo.qkHeadDim != faInfo.vHeadDim,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
