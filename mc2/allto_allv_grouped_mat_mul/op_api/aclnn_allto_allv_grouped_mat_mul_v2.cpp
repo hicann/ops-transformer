@@ -1,12 +1,12 @@
-/* *
+/**
  * Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
-  */
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 #include "aclnn_allto_allv_grouped_mat_mul_v2.h"
 #include <algorithm>
 #include <cstring>
@@ -14,6 +14,7 @@
 #include "aclnn_kernels/common/op_error_check.h"
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 #include "opdev/common_types.h"
 #include "aclnnInner_allto_allv_grouped_mat_mul.h"
 #include "mc2_comm_utils.h"
@@ -48,11 +49,11 @@ static aclnnStatus CheckAndHandleCommMode(const char *commModeStr, uint8_t &comm
         commModeEnum = Mc2Comm::COMM_MODE_AICPU;
         return ACLNN_SUCCESS;
     }
-    if (arch == NpuArch::DAV_2201 && std::strcmp(commModeStr, "aiv") == 0) {
+    if (arch == Ops::Base::DAV_2201 && std::strcmp(commModeStr, "aiv") == 0) {
         commModeEnum = Mc2Comm::COMM_MODE_AIV;
         return ACLNN_SUCCESS;
     }
-    if (arch == NpuArch::DAV_3510 && std::strcmp(commModeStr, "ccu") == 0) {
+    if (arch == Ops::Base::DAV_3510 && std::strcmp(commModeStr, "ccu") == 0) {
         commModeEnum = Mc2Comm::COMM_MODE_CCU;
         return ACLNN_SUCCESS;
     }
@@ -237,7 +238,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(void *workspace, uint64_t workspaceSiz
             OP_LOGD("AlltoAllvGroupedMatMulV2 uses AIV/MTE communication mode");
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_MTE);
         } else if (commMode == Mc2Comm::COMM_MODE_CCU &&
-                   GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+                   GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
             OP_LOGD("AlltoAllvGroupedMatMulV2 uses CCU communication mode");
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_CCU);
         } else {

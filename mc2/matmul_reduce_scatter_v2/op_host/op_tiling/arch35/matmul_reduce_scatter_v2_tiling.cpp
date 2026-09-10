@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
-*/
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file matmul_reduce_scatter_v2_tiling.cpp
@@ -50,7 +50,7 @@ constexpr uint32_t COMMMODE_INDEX = 10;
 // 新功能从这里开始
 bool MatmulReduceScatterV2Tiling::IsCapable()
 {
-    if ((npuArch_ == NpuArch::DAV_3510) && ((args_.geAType == ge::DT_BF16) || (args_.geAType == ge::DT_FLOAT16))) {
+    if ((npuArch_ == Ops::Base::DAV_3510) && ((args_.geAType == ge::DT_BF16) || (args_.geAType == ge::DT_FLOAT16))) {
         OP_LOGI(opName_, "start with MatmulReduceScatterV2Tiling tiling.");
         return true;
     }
@@ -231,7 +231,7 @@ CutResult MatmulReduceScatterV2Tiling::GetTilingResult()
                                                       (commMode_ == TPL_AICPU_COMM_MODE));
         return scatterTiling.GetTiling();
     } else {
-        SocVersion inputSocVersion = (npuArch_ == NpuArch::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
+        SocVersion inputSocVersion = (npuArch_ == Ops::Base::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
         MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, inputSocVersion, false,
                                           (commMode_ == TPL_AICPU_COMM_MODE));
         scatterTiling.GetTiling();
@@ -241,6 +241,6 @@ CutResult MatmulReduceScatterV2Tiling::GetTilingResult()
 
 // 注册Tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MatmulReduceScatterV2, MatmulReduceScatterV2Tiling,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 0);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 0);
 
 } // namespace optiling

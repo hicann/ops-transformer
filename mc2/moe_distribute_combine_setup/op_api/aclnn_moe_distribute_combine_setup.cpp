@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file aclnn_moe_distribute_combine_setup.cpp
@@ -21,6 +21,7 @@
 #include "opdev/op_log.h"
 #include "opdev/common_types.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 #include "mc2_log_compat.h"
 
 namespace {
@@ -146,11 +147,11 @@ extern "C" aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
     aclTensor *quantExpandXOut, aclTensor *commCmdInfoOut, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_LOGD("aclnnMoeDistributeCombineSetupGetWorkspaceSize start.");
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             "aclnnMoeDistributeCombineSetup", "npuArch",
             std::to_string(static_cast<int64_t>(GetCurrentPlatformInfo().GetCurNpuArch())).c_str(),
-            "only support NpuArch::DAV_3510");
+            "only support Ops::Base::DAV_3510");
         return ACLNN_ERR_PARAM_INVALID;
     }
 

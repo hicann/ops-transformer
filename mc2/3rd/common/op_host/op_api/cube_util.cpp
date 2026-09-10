@@ -1,16 +1,17 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 #include "cube_util.h"
 #include "aclnn_kernels/contiguous.h"
 #include "opdev/tensor_view_utils.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 using namespace op;
 
 namespace Ops {
@@ -30,7 +31,7 @@ static const std::initializer_list<DataType> NPUARCH3510_CONVBP_DTYPE_SUPPORT_LI
 const std::initializer_list<DataType> &GetDtypeSupportListBySocVersion()
 {
     auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch == NpuArch::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         return NPUARCH3510_DTYPE_SUPPORT_LIST;
     }
     return (IsCubeSupportFp32()) ? V200_DTYPE_SUPPORT_LIST : V100_DTYPE_SUPPORT_LIST;
@@ -39,7 +40,7 @@ const std::initializer_list<DataType> &GetDtypeSupportListBySocVersion()
 const std::initializer_list<DataType> &GetDtypeSupportListBySocVersion4ConvBackward(bool transposed)
 {
     auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch == NpuArch::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         return transposed ? NPUARCH3510_DTYPE_SUPPORT_LIST : NPUARCH3510_CONVBP_DTYPE_SUPPORT_LIST;
     }
     return (IsCubeSupportFp32()) ? V200_DTYPE_SUPPORT_LIST : V100_DTYPE_SUPPORT_LIST;

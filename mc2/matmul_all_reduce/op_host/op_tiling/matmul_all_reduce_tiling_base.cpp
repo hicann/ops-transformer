@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file matmul_all_reduce_tiling_base.cc
@@ -236,7 +236,7 @@ uint8_t MatmulAllReduceTilingBase::CalcBufferTypeByWindowSize()
 void MatmulAllReduceTilingBase::setUseBufferType()
 {
     uint8_t buffer_type;
-    if (npuArch_ == NpuArch::DAV_2002) {
+    if (npuArch_ == Ops::Base::DAV_2002) {
         buffer_type = static_cast<uint8_t>(mc2tiling::MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_OUTPUT);
         OP_LOGI(opName_, "Set buffer type to output for non-910B soc.");
     } else if (MutableMc2MsgData().debugMode == MC2_DEBUG_ONLY_AICPU) {
@@ -281,13 +281,13 @@ void MatmulAllReduceTilingBase::DoRCSTiling()
 
 void MatmulAllReduceTilingBase::SetMCutSocVersion(SocVersion &inputSocVersion)
 {
-    if (npuArch_ == NpuArch::DAV_2002) {
+    if (npuArch_ == Ops::Base::DAV_2002) {
         inputSocVersion = SocVersion::SOC310_P;
         OP_LOGD(opName_, "TileCnt enter 310P branch.");
         return;
     }
     // __NPU_ARCH__ == 3510
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == Ops::Base::DAV_3510) {
         inputSocVersion = SocVersion::SOC950;
         OP_LOGD(opName_, "TileCnt enter 3510 branch.");
         return;
@@ -493,7 +493,7 @@ ge::graphStatus MatmulAllReduceTilingBase::GetWorkspaceSize()
 
     // __NPU_ARCH__ == 3510
     // 950需要自己申请一块workSpace存放mm的输出
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == Ops::Base::DAV_3510) {
         gmcFloat = static_cast<uint64_t>(MutableRCSTilingData().rankM) *
                    static_cast<uint64_t>(MutableRCSTilingData().rankN) * static_cast<uint64_t>(args_.outputDtypeSize);
     }
@@ -780,10 +780,10 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckA8W8()
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "antiquantScale/antiquantOffset", "not null",
                                               "antiquantScale and antiquantOffset must be nullptr in A8W8 mode"),
         return ge::GRAPH_FAILED);
-    if ((socVersion_ == platform_ascendc::SocVersion::ASCEND910B) || (npuArch_ == NpuArch::DAV_3510)) {
+    if ((socVersion_ == platform_ascendc::SocVersion::ASCEND910B) || (npuArch_ == Ops::Base::DAV_3510)) {
         OP_TILING_CHECK(!CheckCommQuantScaleShape(nValue),
                         OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "commQuantScale"), return ge::GRAPH_FAILED);
-    } else if (npuArch_ == NpuArch::DAV_2002) {
+    } else if (npuArch_ == Ops::Base::DAV_2002) {
         OP_TILING_CHECK(
             ((mmrCtxInfo_.comm_quant_scale_1_shape != nullptr) || (mmrCtxInfo_.comm_quant_scale_2_shape != nullptr)),
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "comm_quant_scale", "not null",
@@ -1514,7 +1514,7 @@ void MatmulAllReduceTilingBase::CalcUbTiling()
     if (commQuantModePtr != nullptr) {
         isPertile = (*commQuantModePtr == 1);
     }
-    uint32_t addX3UbBufFac = ((args_.geCType == ge::DT_BF16) && (npuArch_ != NpuArch::DAV_3510)) || isPertile ?
+    uint32_t addX3UbBufFac = ((args_.geCType == ge::DT_BF16) && (npuArch_ != Ops::Base::DAV_3510)) || isPertile ?
                                  ADD_X3_BF16_UB_BUF_FACTOR :
                                  ADD_X3_FP16_UB_BUF_FACTOR;
     addX3UbBufFac *= isPertile ? sizeof(float) : D_MTYPE_SIZE_MAP.at(args_.cType);

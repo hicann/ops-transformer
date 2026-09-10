@@ -51,7 +51,7 @@ class TestAclnnMoeDistributeCombineTeardown : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(NpuArch::DAV_3510);
+        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
         cout << "TestAclnnMoeDistributeCombineTeardown SetUp" << endl;
     }
 
@@ -465,13 +465,13 @@ class TestAclnnMoeDistributeCombineTeardownUnsupportedArch : public testing::Tes
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(NpuArch::DAV_3113);
+        op::SetPlatformNpuArch(Ops::Base::DAV_3113);
         cout << "TestAclnnMoeDistributeCombineTeardownUnsupportedArch SetUp" << endl;
     }
 
     static void TearDownTestCase()
     {
-        op::SetPlatformNpuArch(NpuArch::DAV_3510);
+        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
         cout << "TestAclnnMoeDistributeCombineTeardownUnsupportedArch TearDown" << endl;
     }
 };
