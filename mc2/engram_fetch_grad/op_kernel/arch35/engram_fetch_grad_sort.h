@@ -669,11 +669,11 @@ __aicore__ inline void EngramFetchGradSort::ProcessHist(uint32_t byteRound, uint
     AscendC::Duplicate(coreSumAccum, (int32_t)0, HISTOGRAM_BINS);
 
     for (uint32_t batch = 0; batch < batchCount; batch++) {
-        uint32_t firstTile = batch * coreCount_;
-        uint32_t batchCores = MinU32(tileCount_ - firstTile, coreCount_);
         uint32_t coreId = AscendC::GetBlockIdx();
-        if (coreId < batchCores) {
-            uint32_t tileId = firstTile + coreId;
+        uint32_t coreStart = coreId * batchCount;
+        uint32_t myTiles = (coreStart < tileCount_) ? (MinU32(coreStart + batchCount, tileCount_) - coreStart) : 0U;
+        if (batch < myTiles) {
+            uint32_t tileId = coreStart + batch;
             uint32_t offset = tileId * tileElements_;
             uint32_t tileLen = MinU32(elementCount_ - offset, tileElements_);
 
@@ -738,9 +738,11 @@ __aicore__ inline void EngramFetchGradSort::ProcessScatter(
     event_t evtMte2Mte3 = static_cast<event_t>(pipe.FetchEventID(AscendC::HardEvent::MTE2_MTE3));
 
     for (uint32_t batch = 0; batch < batchCount; batch++) {
-        uint32_t firstTile = batch * coreCount_;
-        uint32_t batchCores = MinU32(tileCount_ - firstTile, coreCount_);
         uint32_t coreId = AscendC::GetBlockIdx();
+
+        uint32_t coreStart = coreId * batchCount;
+        uint32_t myTiles = (coreStart < tileCount_) ? (MinU32(coreStart + batchCount, tileCount_) - coreStart) : 0U;
+        bool tileActive = (batch < myTiles);
 
         AscendC::LocalTensor<int32_t> valueLocal = ValsUb();
         AscendC::LocalTensor<int32_t> indexLocal = IdxsUb();
@@ -750,8 +752,8 @@ __aicore__ inline void EngramFetchGradSort::ProcessScatter(
         AscendC::LocalTensor<int32_t> prefixLocal = prefixBuffer_.Get<int32_t>();
         AscendC::LocalTensor<int32_t> offsetLocal = histogramBuffer_.Get<int32_t>();
 
-        if (coreId < batchCores) {
-            uint32_t tileId = firstTile + coreId;
+        if (tileActive) {
+            uint32_t tileId = coreStart + batch;
             uint32_t offset = tileId * tileElements_;
             uint32_t tileLen = MinU32(elementCount_ - offset, tileElements_);
 
@@ -771,8 +773,8 @@ __aicore__ inline void EngramFetchGradSort::ProcessScatter(
         // entry (same-core MTE3->MTE3_S->MTE2 ordering from the prefix phase), and the
         // round input data was ordered by the previous round's trailing SyncAll.
 
-        if (coreId < batchCores) {
-            uint32_t tileId = firstTile + coreId;
+        if (tileActive) {
+            uint32_t tileId = coreStart + batch;
             uint32_t offset = tileId * tileElements_;
             uint32_t tileLen = MinU32(elementCount_ - offset, tileElements_);
 

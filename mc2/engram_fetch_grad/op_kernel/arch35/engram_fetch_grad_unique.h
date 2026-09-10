@@ -71,6 +71,10 @@ public:
     {
         gradSubBatch_ = batch;
     }
+    __aicore__ inline void SetEntryBufBytes(uint32_t bytes)
+    {
+        entryBufBytes_ = bytes;
+    }
 
     // entryBuf_ int32 slot layout: one ENTRY_BATCH_CAP-sized slot per array.
     __aicore__ inline AscendC::LocalTensor<int32_t> CompUb()
@@ -142,6 +146,7 @@ private:
     AscendC::TBuf<> *castBuf_{nullptr};
     AscendC::TBuf<> *accumBuf_{nullptr};
     uint32_t gradSubBatch_{Mc2Kernel::GRAD_SUB_BATCH};
+    uint32_t entryBufBytes_{Mc2Kernel::ENTRY_BUF_BYTES};
 
     int32_t myPreCoreOffset_{0};
     int32_t mySegCount_{0};
@@ -468,10 +473,9 @@ __aicore__ inline void EngramFetchGradUnique::FlushAccum(GM_ADDR gradUniqueOutGM
                                  Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
         // 双缓冲借用区必须完整落在 entryBuf_ 尾部内（Host 侧已按 hiddenDim 上界拒绝超限 shape，此处兜底）
         uint32_t castTailBytes = flushCastOffset + 2U * castHalfBytes;
-        if (castTailBytes > Mc2Kernel::ENTRY_BUF_BYTES) {
-            RUNTIME_ABORT("FlushAccum cast staging overflow: need %u bytes, entryBuf=%u bytes, hiddenDim=%u",
-                          castTailBytes, Mc2Kernel::ENTRY_BUF_BYTES, static_cast<uint32_t>(hiddenDim_));
-        }
+        ascendc_assert(castTailBytes <= entryBufBytes_,
+                       "FlushAccum cast staging overflow: need %u bytes, entryBuf=%u bytes, hiddenDim=%u",
+                       castTailBytes, entryBufBytes_, static_cast<uint32_t>(hiddenDim_));
         AscendC::LocalTensor<uint8_t> flushCastBuf = entryRaw[flushCastOffset + bufIdx * castHalfBytes];
         uint32_t castCount = static_cast<uint32_t>(hiddenDim_);
 
