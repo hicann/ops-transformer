@@ -20,8 +20,8 @@
 #define MC2_MOE_PERMUTE_PROLOGUE_HPP
 
 #include "kernel_operator.h"
-#include "../template_linear_algebra_v2/mega_moe_catlass.hpp"
-#include "../template_linear_algebra_v2/arch/mega_moe_resource.hpp"
+#include "catlass/catlass.hpp"
+#include "catlass/arch/resource.hpp"
 
 namespace MoePermute {
 
