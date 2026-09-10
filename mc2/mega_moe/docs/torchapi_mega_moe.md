@@ -1311,11 +1311,11 @@ sym_buffer.update_group(group) -> None
   <!-- npu="A3,910b" id17 -->
   - **Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品：**
 
-    - 各卡 `num_tokens` 需保持一致。
+    - 各卡 `num_tokens` 需保持一致，取值范围为 `1 ≤ num_tokens ≤ num_max_tokens_per_rank`。
     - `ep_world_size`：取值为 `2`、`4`、`8`、`16`、`32`、`48`、`64`、`96`、`128`。
     - `num_experts`：取值范围为`world_size ≤ num_experts ≤ 1024`，且 `num_experts % ep_world_size == 0`。
     - `num_experts_per_rank`：取值范围为 `1 ≤ num_experts_per_rank ≤ 128`，且 `num_experts_per_rank = num_experts / world_size`。
-    - `num_max_tokens_per_rank`：取值范围为 `1 ≤ num_max_tokens_per_rank ≤ 4096`。
+    - `num_max_tokens_per_rank`：取值范围为 `1 ≤ num_max_tokens_per_rank < +∞`。
     - `max_recv_token_num` 需大于0，输入0表示自动计算，公式为 `num_tokens × ep_world_size × min(num_topk, local_moe_expert_num)`。
     - `num_topk`：取值范围为 `1 ≤ num_topk ≤ 16`。
     - `hidden`：取值范围为 `1024 ≤ hidden ≤ 8192`，且 `hidden % 512 == 0`。
