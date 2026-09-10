@@ -420,6 +420,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
     OP_TILING_CHECK(cclBufferSizePtr == nullptr, OP_LOGE(nodeName, "cclBufferSizePtr is null."),
                     return ge::GRAPH_FAILED);
     const uint64_t maxWindowSize = static_cast<uint64_t>(*cclBufferSizePtr);
+    uint32_t aivNum = info.aivNum;
     const MoeEpWindowLayoutParams params = {info.cfg.epWorldSize,
                                             info.cfg.numLocalExperts,
                                             info.cfg.numMaxTokensPerRank,
@@ -434,7 +435,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
     OP_TILING_CHECK(CheckMoeEpWindowCapacity(layout.requiredBytes, maxWindowSize, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Check Moe EP window capacity failed."), return ge::GRAPH_FAILED);
 
-    info.dumpMetadata = BuildMoeEpDumpMetadata(params, layout, info.aivNum);
+    info.dumpMetadata = BuildMoeEpDumpMetadata(params, layout, aivNum);
     info.winDataOffset = layout.winDataOffset;
     info.slotWinStateOffset = layout.slotWinStateOffset;
     info.dispatchNotifyCount = layout.dispatchNotifyCount;

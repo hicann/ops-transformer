@@ -44,8 +44,6 @@ ge::graphStatus ResolveMoeEpTopology(uint32_t epWorldSize, int64_t requestedNetw
 ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, MoeEpWindowLayout &layout)
 {
     std::memset(&layout, 0, sizeof(layout));
-    layout.dispatchNotifyCount = static_cast<uint32_t>(
-        (static_cast<uint64_t>(params.nmt) + MOE_EP_NOTIFY_TOKEN_LIMIT - 1UL) / MOE_EP_NOTIFY_TOKEN_LIMIT);
 
     layout.metadataOffset = 0UL;
     layout.metadataSize = MOE_EP_DUMP_METADATA_BYTES;
@@ -59,11 +57,19 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, Moe
     const uint64_t countNotifySize = epWorldSize * MOE_EP_WIN_ALIGN;
     const uint64_t expertCountSize = epWorldSize * AlignMoeEpWin(params.localExpertNum * sizeof(int32_t));
 
+    uint64_t notifySlots = MOE_EP_CHANNEL_BUDGET / (epWorldSize - 1UL);
+    if (notifySlots > MOE_EP_DISPATCH_NOTIFY_COUNT) {
+        notifySlots = MOE_EP_DISPATCH_NOTIFY_COUNT;
+    }
+    layout.dispatchNotifyCount = static_cast<uint32_t>(notifySlots == 0UL ? 1UL : notifySlots);
+
     layout.cntWinStateOffset = MOE_EP_FIXED_PREFIX_BYTES;
     layout.cntWinStateSize = countNotifySize + expertCountSize;
     layout.slotWinStateOffset = layout.cntWinStateOffset + layout.cntWinStateSize;
     layout.dispatchSlotStateSize = layout.dispatchNotifyCount * epWorldSize * MOE_EP_WIN_ALIGN;
-    layout.combineStateWinOffset = layout.slotWinStateOffset + layout.dispatchSlotStateSize;
+    layout.payloadWinStateOffset = layout.slotWinStateOffset + layout.dispatchSlotStateSize;
+    layout.payloadWinStateSize = layout.dispatchNotifyCount * MOE_EP_WIN_ALIGN;
+    layout.combineStateWinOffset = layout.payloadWinStateOffset + layout.payloadWinStateSize;
     const uint64_t combineReceiveStateSize =
         nmt * topK * MOE_EP_WIN_ALIGN + epWorldSize * MOE_EP_COMBINE_CHANNEL_COUNT * MOE_EP_WIN_ALIGN;
     layout.combineFlagSourceWinOffset = layout.combineStateWinOffset + combineReceiveStateSize;
@@ -75,6 +81,7 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, Moe
     const uint64_t hiddenAlign = AlignMoeEpUb(params.hidden * MOE_EP_MAX_OUT_DTYPE_SIZE);
     const uint64_t topKAlign = AlignMoeEpUb(topK * MOE_EP_METADATA_DTYPE_SIZE);
     layout.dispatchReservedPerSlotBytes = AlignMoeEpWin(hiddenAlign + 2UL * topKAlign + MOE_EP_UB_ALIGN);
+    layout.dispatchMetaPerSlotBytes = AlignMoeEpWin(AlignMoeEpUb(params.hidden) + 2UL * topKAlign + MOE_EP_UB_ALIGN);
     layout.scaleoutReservedPerSlotBytes = AlignMoeEpWin(layout.dispatchReservedPerSlotBytes + topK * sizeof(int32_t));
     layout.combineReservedPerSlotBytes = AlignMoeEpWin(hiddenAlign + MOE_EP_UB_ALIGN);
     layout.dispatchRecvDataSize = epWorldSize * nmt * layout.dispatchReservedPerSlotBytes;
@@ -93,7 +100,7 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, Moe
         layout.winDataOffset = dataBase;
         layout.combineDataWinOffset = layout.winDataOffset + layout.dispatchRecvDataSize;
         layout.payloadStashWinOffset = layout.combineDataWinOffset + layout.combineDataSize;
-        layout.payloadStashWinSize = layout.dispatchRecvDataSize;
+        layout.payloadStashWinSize = nmt * layout.dispatchMetaPerSlotBytes;
     }
     layout.requiredBytes = layout.payloadStashWinOffset + layout.payloadStashWinSize;
     return ge::GRAPH_SUCCESS;

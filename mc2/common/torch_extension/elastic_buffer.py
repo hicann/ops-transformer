@@ -314,6 +314,7 @@ class _MoeEpWindowLayout:
     dispatch_slot_bytes: int
     combine_slot_bytes: int
     scaleup_receive_buffer_bytes: int
+    dispatch_stash_buffer_bytes: int
 
 
 def _get_moe_ep_window_layout(
@@ -325,7 +326,8 @@ def _get_moe_ep_window_layout(
 ) -> _MoeEpWindowLayout:
     win_addr_align = 512
     ub_align = 32
-    notify_cnt_align = 15000
+    max_dispatch_channel_count = 56
+    max_dispatch_notify_count = 8
     combine_channel_count = 7
     max_out_dtype_size = 2
     metadata_dtype_size = 4
@@ -337,9 +339,11 @@ def _get_moe_ep_window_layout(
     dispatch_count_size = world_size * _inline_align(
         local_experts_num * state_dtype_size, win_addr_align
     )
-    dispatch_notify_count = (
-        _inline_align(num_max_tokens_per_rank, notify_cnt_align) // notify_cnt_align
+    dispatch_notify_count = min(
+        max_dispatch_notify_count, max_dispatch_channel_count // (world_size - 1)
     )
+    dispatch_notify_count = max(dispatch_notify_count, 1)
+
     dispatch_notify_size = (
         world_size * win_addr_align
         + world_size * dispatch_notify_count * win_addr_align
@@ -349,11 +353,13 @@ def _get_moe_ep_window_layout(
         + world_size * combine_channel_count * win_addr_align
         + win_addr_align  # Persistent constant source for asynchronous combine completion flags.
     )
+    # payload 发送状态位区: 按每对端预留 notify 槽位数预留
     state_buffer_size = (
         dump_metadata_bytes
         + per_core_diag_bytes
         + dispatch_count_size
         + dispatch_notify_size
+        + dispatch_notify_count * win_addr_align
         + combine_state_size
     )
 
@@ -366,11 +372,19 @@ def _get_moe_ep_window_layout(
     scaleup_receive_buffer_bytes = (
         world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
     )
+    # stash 仅存元数据（scales+topk+topkWeights），scales 信息按 AlignUb(hidden) 做上界预留
+    dispatch_stash_per_slot_bytes = _inline_align(
+        _inline_align(hidden, ub_align) + metadata_bytes * 2 + ub_align, win_addr_align
+    )
+    dispatch_stash_buffer_bytes = (
+        num_max_tokens_per_rank * dispatch_stash_per_slot_bytes
+    )
     return _MoeEpWindowLayout(
         state_buffer_bytes=state_buffer_size,
         dispatch_slot_bytes=dispatch_per_slot_bytes,
         combine_slot_bytes=combine_per_slot_bytes,
         scaleup_receive_buffer_bytes=scaleup_receive_buffer_bytes,
+        dispatch_stash_buffer_bytes=dispatch_stash_buffer_bytes,
     )
 
 
@@ -384,8 +398,9 @@ def _get_moe_ep_direct_window_bytes(
     )
     return (
         layout.state_buffer_bytes
-        + layout.scaleup_receive_buffer_bytes * 2
+        + layout.scaleup_receive_buffer_bytes
         + combine_receive_buffer_bytes
+        + layout.dispatch_stash_buffer_bytes
     )
 
 
@@ -403,6 +418,10 @@ def _get_moe_ep_window_bytes(
     torch._check(
         1 <= topk <= 32,
         lambda: f"topk only support in [1, 32], but got {topk=}.",
+    )
+    torch._check(
+        world_size > 1,
+        lambda: f"world_size mast be greater than 1, but got {world_size=}.",
     )
 
     mb_conversion = 1024 * 1024

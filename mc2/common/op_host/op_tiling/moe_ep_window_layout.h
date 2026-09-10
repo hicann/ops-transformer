@@ -20,7 +20,8 @@ namespace Mc2Tiling {
 
 constexpr uint64_t MOE_EP_UB_ALIGN = 32UL;
 constexpr uint64_t MOE_EP_WIN_ALIGN = 512UL;
-constexpr uint64_t MOE_EP_NOTIFY_TOKEN_LIMIT = 15000UL;
+constexpr uint64_t MOE_EP_CHANNEL_BUDGET = 56UL;
+constexpr uint64_t MOE_EP_DISPATCH_NOTIFY_COUNT = 8UL;
 constexpr uint64_t MOE_EP_COMBINE_CHANNEL_COUNT = 7UL;
 constexpr uint64_t MOE_EP_MAX_OUT_DTYPE_SIZE = 2UL;
 constexpr uint64_t MOE_EP_METADATA_DTYPE_SIZE = 4UL;
@@ -56,6 +57,8 @@ struct MoeEpWindowLayout {
     uint64_t cntWinStateSize;
     uint64_t slotWinStateOffset;
     uint64_t dispatchSlotStateSize;
+    uint64_t payloadWinStateOffset; // payload 发送状态位区（slot 状态区之后）
+    uint64_t payloadWinStateSize;
     uint64_t combineStateWinOffset;
     uint64_t combineStateWinSize;
     uint64_t combineFlagSourceWinOffset; // Shared 512B constant source, after the receive completion flags.
@@ -72,6 +75,7 @@ struct MoeEpWindowLayout {
     uint64_t payloadStashWinSize;
 
     uint64_t dispatchReservedPerSlotBytes;
+    uint64_t dispatchMetaPerSlotBytes; // dispatch stash 的纯元数据（无 x）
     uint64_t scaleoutReservedPerSlotBytes;
     uint64_t combineReservedPerSlotBytes;
     uint64_t requiredBytes;
