@@ -269,31 +269,32 @@ __aicore__ inline void MergeSort(const LocalTensor<float> &mrgDst, int32_t mrgDs
 {
     if (mrgDstNum <= 3072) { // 3072: threshold of data size for different processing strategy
         AscendC::MrgSort4Info params;
-        params.elementLengths[MRG_QUE_0] = mrgSrcNum;
-        params.elementLengths[MRG_QUE_1] = mrgDstNum;
+        // src 顺序: 累加器(mrgDst)必须在 src1, 新块(mrgSrc)在 src2, 否则输出不完整污染累加器
+        params.elementLengths[MRG_QUE_0] = mrgDstNum;
+        params.elementLengths[MRG_QUE_1] = mrgSrcNum;
         params.ifExhaustedSuspension = false;
         params.validBit = 0b0011;
         params.repeatTimes = 1;
 
         AscendC::MrgSortSrcList<float> srcList;
-        srcList.src1 = mrgSrc;
-        srcList.src2 = mrgDst;
+        srcList.src1 = mrgDst;
+        srcList.src2 = mrgSrc;
 
         AscendC::MrgSort<float>(tmpTensor, srcList, params);
         AscendC::PipeBarrier<PIPE_V>();
         AscendC::DataCopy(mrgDst, tmpTensor, mrgDstNum * VALUE_AND_INDEX_NUM);
         AscendC::PipeBarrier<PIPE_V>();
     } else {
-        int64_t unitElements = 1024;
-        int64_t segNum = mrgDstNum / unitElements;
-        int64_t mrgQuelen_1 = (segNum + 2) / 3;
-        int64_t mrgQuelen_2 = ((segNum - mrgQuelen_1) + 1) / 2;
-        int64_t mrgQuelen_3 = segNum - mrgQuelen_1 - mrgQuelen_2;
+        // 4 路归并: 累加器 mrgDst 精确三等分(各段>=1, 完整覆盖 [0, mrgDstNum)) + 新块 mrgSrc,
+        // 避免 1024 整除切分时尾部被静默丢弃(输出混入无效索引)或出现零长度队列。
+        int64_t len1 = (mrgDstNum + 2) / 3;
+        int64_t len2 = (mrgDstNum - len1 + 1) / 2;
+        int64_t len3 = mrgDstNum - len1 - len2;
 
         AscendC::MrgSort4Info params;
-        params.elementLengths[MRG_QUE_0] = mrgQuelen_1 * unitElements;
-        params.elementLengths[MRG_QUE_1] = mrgQuelen_2 * unitElements;
-        params.elementLengths[MRG_QUE_2] = mrgQuelen_3 * unitElements;
+        params.elementLengths[MRG_QUE_0] = len1;
+        params.elementLengths[MRG_QUE_1] = len2;
+        params.elementLengths[MRG_QUE_2] = len3;
         params.elementLengths[MRG_QUE_3] = mrgSrcNum;
 
         params.ifExhaustedSuspension = false;
@@ -302,8 +303,8 @@ __aicore__ inline void MergeSort(const LocalTensor<float> &mrgDst, int32_t mrgDs
 
         AscendC::MrgSortSrcList<float> srcList;
         srcList.src1 = mrgDst[0];
-        srcList.src2 = mrgDst[mrgQuelen_1 * VALUE_AND_INDEX_NUM * unitElements];
-        srcList.src3 = mrgDst[(mrgQuelen_1 + mrgQuelen_2) * VALUE_AND_INDEX_NUM * unitElements];
+        srcList.src2 = mrgDst[len1 * VALUE_AND_INDEX_NUM];
+        srcList.src3 = mrgDst[(len1 + len2) * VALUE_AND_INDEX_NUM];
         srcList.src4 = mrgSrc;
 
         AscendC::MrgSort<float>(tmpTensor, srcList, params);

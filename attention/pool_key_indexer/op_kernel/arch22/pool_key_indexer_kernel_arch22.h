@@ -196,6 +196,9 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::InitTilingData(const PoolKeyIn
 
     constInfo.kHeadNum = K_HEAD_NUM;
     constInfo.headDim = HEAD_DIM;
+    // arch22 切分常量以 kernel 侧硬编码为准, 覆盖 host tiling 字段(host 下发的
+    // s1BaseSize/s2BaseSize/mBaseSizeMax 供 arch35 消费); workspace 公式已按
+    // kernel 侧口径镜像推导, 两端自洽。
     constInfo.s2BaseSize = S2_BASE_SIZE;
     constInfo.isSparseCountOver2K = (constInfo.sparseCount <= BASE_TOPK) ? false : true;
 
@@ -318,6 +321,10 @@ __aicore__ void inline PoolKeyIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx,
     bool findLastCoreEnd = true;
     uint32_t actS1Size, actS2Size, actS2SizeOrig;
     uint32_t s1GBaseNum, s2BaseNum, s2Loop;
+    // 尾部残余 fill 的高水位终点跟踪(见函数末尾注释)
+    uint32_t tailBN2End = 0;
+    uint32_t tailGS1End = 0;
+    uint32_t tailS2End = 0;
     for (uint32_t bN2Idx = 0; bN2Idx < constInfo.batchSize * constInfo.kHeadNum; bN2Idx++) {
         uint32_t bIdx = bN2Idx / constInfo.kHeadNum;
         if (bN2Idx % constInfo.kHeadNum == 0) {
@@ -352,6 +359,11 @@ __aicore__ void inline PoolKeyIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx,
                     findLastCoreEnd = false;
                 }
                 uint32_t s2RemainBaseNum = s2Loop - s2Idx;
+                // S2 跨核规避: 保证每个 (batch, gS1) 的 S2 块完整落在单核内(arch22
+                // LD 跨核归并存在缺陷), 代价是多 batch 大 S2 场景核利用率下降。
+                if (s2Idx == 0 && lastGS1RemainBlockCnt + s2RemainBaseNum > coreDealBlockCnt) {
+                    coreDealBlockCnt = lastGS1RemainBlockCnt + s2RemainBaseNum;
+                }
                 if (lastGS1RemainBlockCnt + s2RemainBaseNum >= coreDealBlockCnt) {
                     info.bN2End = bN2Idx;
                     info.gS1End = gS1Idx;
@@ -378,10 +390,26 @@ __aicore__ void inline PoolKeyIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx,
                     coreDealBlockCnt = coreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
                 } else {
                     lastGS1RemainBlockCnt += s2RemainBaseNum;
+                    // 记录未完成 fill 的高水位终点(尾部残余 fill 用)
+                    tailBN2End = bN2Idx;
+                    tailGS1End = gS1Idx;
+                    tailS2End = s2Loop - 1;
                     break;
                 }
             }
         }
+    }
+    // 尾部残余 fill: 最后一段块数可能永远凑不满配额, 由当前核吃满剩余块, 防尾部块漏执行。
+    if (!findLastCoreEnd && coreIdx == curCoreIdx) {
+        info.bN2End = tailBN2End;
+        info.gS1End = tailGS1End;
+        info.s2End = tailS2End;
+        if (info.bN2End != constInfo.batchSize - 1) {
+            info.bN2End = constInfo.batchSize - 1;
+            info.gS1End = 0;
+            info.s2End = 0;
+        }
+        return;
     }
 }
 

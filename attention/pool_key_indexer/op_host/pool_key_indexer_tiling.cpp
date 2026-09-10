@@ -1041,7 +1041,6 @@ ge::graphStatus PoolKeyIndexerTiling::CheckKeyContiguous(const PoolKeyIndexerTil
 
 ge::graphStatus PoolKeyIndexerTiling::CalcTilingParams(PoolKeyIndexerTilingInfo &info)
 {
-    // s1BaseSize / mBaseSizeMax selection (ref design §5.2)
     if (info.sparseCount > PKI_TOPK_6K) {
         tilingData_.set_s1BaseSize(PKI_S1_BASE_SIZE_SMALL);
         tilingData_.set_mBaseSizeMax(PKI_M_BASE_SIZE_SMALL);

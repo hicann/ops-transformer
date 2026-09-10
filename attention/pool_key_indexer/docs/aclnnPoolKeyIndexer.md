@@ -630,7 +630,7 @@ aclnnStatus aclnnPoolKeyIndexer(
   - 输出维度约束：sparseIndicesOut和sparseValuesOut的B、S1（或T1）维度必须与query对应维度一致。
 - 输入属性限制：
   - topk需满足topk % pool_size == 0，pool_size支持[1, 128]，topk支持[1, 2048]以及3072、4096、5120、6144、7168、8192。
-  - block_size取值为16的倍数，最大支持1024。
+  - block_size取值为16的倍数，最大支持2048。
   - 当layoutKeyOptional为PA_BBND且poolKey为0轴非连续输入时，keyStride0应传入poolKey的实际stride(0)（元素单位，且不小于block_size * N2 * D）；keyStride0为-1时表示未指定，按连续输入推导；keyStride0指定值与poolKey运行时实际stride冲突时报错。
   - 当layoutKeyOptional为PA_BBND且kDescaleOptional为0轴非连续输入时（量化场景），kDescaleStride0应传入kDescaleOptional的实际stride(0)（元素单位，且不小于连续stride：quantMode为0时为block_size * N2，quantMode为1时为block_size * N2 * (D / 32)）；kDescaleStride0为-1时表示未指定，按连续输入推导；kDescaleStride0指定值与kDescaleOptional运行时实际stride冲突时报错。
 - 输入数据类型限制：
