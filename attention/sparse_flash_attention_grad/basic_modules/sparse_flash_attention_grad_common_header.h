@@ -87,6 +87,7 @@ struct RunInfo {
     event_t scatterTmpVMte2WaitV;
     event_t scatterTmpKMte2WaitVPong;
     event_t scatterTmpVMte2WaitVPong;
+    event_t processMte2WaitV;
 };
 
 struct Nz2NdInfo {

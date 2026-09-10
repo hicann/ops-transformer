@@ -33,8 +33,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(
     mmParam.dstStride = dimDv * dimN2;
 
     int64_t mm5ResOutBaseOffset =
-        runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * selectedBlockSize * dimDv +
-        cBlockIdx * selectedBlockCount * selectedBlockSize * dimDv;
+        runInfo.scatterTaskId * MAX_CORE_NUM * scatterTokenCapacity * dimDv + cBlockIdx * scatterTokenCapacity * dimDv;
     const bool reloadDy = !runInfo.noReload && runInfo.isLastBasicBlock;
 
     uint32_t totalSel = selectedCntOffset * selectedBlockSize;
@@ -51,7 +50,8 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(
 
         mmParam.singleM = min(selectedBlockSize * blockOffset, totalSel - (mIdx - blkCntOffset) * selectedBlockSize);
 
-        int64_t mm5ResOutOffset = mm5ResOutBaseOffset + mIdx * selectedBlockSize * dimDv;
+        int64_t localMIdx = enableOptimizedScatter ? (mIdx - blkCntOffset) : mIdx;
+        int64_t mm5ResOutOffset = mm5ResOutBaseOffset + localMIdx * selectedBlockSize * dimDv;
         CopyGmToL1(l1_p_tensor, pWorkspaceGm[currentPGmOffset + (mIdx - blkCntOffset) * selectedBlockSize], dimG,
                    mmParam.singleM, PER_LOOP_BLOCK_SIZE);
         for (int32_t dIdx = 0; dIdx < dLoopTimes; dIdx++) {
