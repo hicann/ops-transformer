@@ -59,7 +59,7 @@ aclnnStatus aclnnSparseFlashAttentionGetWorkspaceSize(
     int64_t             nextTokens,
     int64_t             attentionMode,
     bool                returnSoftmaxLse,
-    const aclTensor     *attentionOutOut,
+    const aclTensor     *attentionOut,
     const aclTensor     *softmaxMaxOut,
     const aclTensor     *softmaxSumOut,
     uint64_t            *workspaceSize,

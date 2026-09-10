@@ -317,7 +317,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnMoeTokenPermuteWithRoutingMapGrad默认非确定性实现，支持通过alcrtCtxSetSysParamOpt开启确定性。
+  - aclnnMoeTokenPermuteWithRoutingMapGrad默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
 
 - 非dropPaddedMode场景topK_num <= 512
 

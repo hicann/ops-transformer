@@ -214,7 +214,7 @@ aclnnStatus aclnnBlitzSparseAttention(
         <td>BMM2后面的反量化因子。</td>
         <td><ul><li>支持per-tensor。 </li></ul>
             <ul><li>不使用该功能时可传入nullptr。</li></ul></td>
-        <td>UINT64、FLOAT32r</td>
+        <td>UINT64、FLOAT32</td>
         <td>ND</td>
         <td>1</td>
         <td>-</td>

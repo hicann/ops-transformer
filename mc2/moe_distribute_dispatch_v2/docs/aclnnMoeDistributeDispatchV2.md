@@ -52,7 +52,7 @@
 
     $$
     xFp32 = CastToFp32(X) \times scales \\
-    quantOut = Cast(xFp32，dstType) \\
+    quantOut = Cast(xFp32,dstType) \\
     allToAllXOut = AllToAllV(quantOut)\\
     expandXOut = AllToAllV(quantOut)
     $$
@@ -1387,7 +1387,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
         aclrtDestroyStream(args.dispatchV2Stream);
         aclrtDestroyStream(args.combineV2Stream);
         aclrtDestroyContext(args.context);
-        LOG_PRINT("[INFO] device_%d DeStroy.\n", args.rankId);
+        LOG_PRINT("[INFO] device_%d Destroy.\n", args.rankId);
         aclrtResetDevice(args.rankId);
         LOG_PRINT("[INFO] device_%d Reset.\n", args.rankId);
         return 0;

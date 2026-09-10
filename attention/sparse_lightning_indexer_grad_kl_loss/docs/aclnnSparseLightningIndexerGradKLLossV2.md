@@ -175,7 +175,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         <tr>
             <td>queryIndex</td>
             <td>输入</td>
-            <td>lightingIndexer结构的输入queryIndex。</td>
+            <td>lightningIndexer结构的输入queryIndex。</td>
             <td>
             <ul>
                 <li>数据类型与query/key/keyIndex保持一致。</li>
@@ -190,7 +190,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         <tr>
             <td>keyIndex</td>
             <td>输入</td>
-            <td>lightingIndexer结构的输入keyIndex。</td>
+            <td>lightningIndexer结构的输入keyIndex。</td>
             <td>
             <ul>
                 <li>数据类型与query/key/queryIndex保持一致。</li>

@@ -816,7 +816,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
         //（固定写法）同步等待任务执行结束
         ret = aclrtSynchronizeStreamWithTimeout(args.stream, 10000);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
-        LOG_PRINT("device%d aclnnMatmulAlltoAll execute success \n", args.rankId);
+        LOG_PRINT("device%d aclnnAlltoAllQuantMatmulV2 execute success \n", args.rankId);
         // 释放device资源，需要根据具体API的接口定义修改
         if (x1 != nullptr) {
             aclDestroyTensor(x1);

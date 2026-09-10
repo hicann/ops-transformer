@@ -364,7 +364,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMap(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnMoeTokenUnpermuteWithRoutingMap默认非确定性实现，支持通过alcrtCtxSetSysParamOpt开启确定性。
+  - aclnnMoeTokenUnpermuteWithRoutingMap默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
 
 - topK_num <= 512。paddedMode为false时，每个token最多预留topK_num个专家槽位，routingMap中每行为1或true的个数小于等于topK_num；sortedIndices中允许使用-1表示无效槽位。
 

@@ -32,7 +32,7 @@
 
     ```Cpp
     x: [batch, seqLen, dim]
-    weight: [K, dim]，其中K∈{2,3,4}
+    weight: [K,dim]，其中K∈{2,3,4}
     convStatesRef: [numCacheLines, stateLen, dim]
     biasOptional: [dim] 或 nullptr
     queryStartLocOptional: [batch+1] 或 nullptr

@@ -465,7 +465,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <tr>
         <td rowspan="2"> ACLNN_ERR_INNER_TILING_ERROR </td>
         <td rowspan="2"> 361001 </td>
-        <td>query或者key非64B对齐。</td>
+        <td>query或者key非64 Byte对齐。</td>
         </tr>
         <tr>
         <td>rotaryDim>headSize。</td>

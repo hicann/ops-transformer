@@ -614,7 +614,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       - 在全量化场景下，当x和weight为INT8，量化模式为静态T-C量化或动态K-C量化，scale数据类型为FLOAT32或BFLOAT16时，actType支持传入0、1、2、4、5。其余全量化场景actType仅支持0。
   - 当前支持非量化场景、伪量化场景与全量化场景
   - 非量化场景支持的数据类型为：
-    - 输入weight矩阵的n轴与k轴需要满足32B对齐
+    - 输入weight矩阵的n轴与k轴需要满足32 Byte对齐
     - 以下入参为空：scaleOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、perTokenScaleOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
     - 不为空的参数支持的数据类型组合要满足下表
 
