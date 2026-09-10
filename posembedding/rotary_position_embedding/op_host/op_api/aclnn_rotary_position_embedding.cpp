@@ -27,6 +27,50 @@ extern "C" {
 
 namespace {
 
+static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT16, DataType::DT_FLOAT,
+                                                                       DataType::DT_BF16};
+
+static bool IsAscend950()
+{
+    return GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+}
+
+static aclnnStatus CheckDtype(const aclTensor *x, const aclTensor *cos, const aclTensor *sin, const aclTensor *rotate,
+                              const aclTensor *out)
+{
+    // Keep nullptr handling in the existing preprocessing path. This function is
+    // responsible only for validating tensors that are present.
+    if (x != nullptr) {
+        OP_CHECK_DTYPE_NOT_SUPPORT(x, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
+    }
+    if (cos != nullptr) {
+        OP_CHECK_DTYPE_NOT_SUPPORT(cos, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
+    }
+    if (sin != nullptr) {
+        OP_CHECK_DTYPE_NOT_SUPPORT(sin, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
+    }
+    if (rotate != nullptr) {
+        OP_CHECK_DTYPE_NOT_SUPPORT(rotate, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
+    }
+    if (out != nullptr) {
+        OP_CHECK_DTYPE_NOT_SUPPORT(out, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
+    }
+
+    if (x != nullptr && cos != nullptr) {
+        OP_CHECK_DTYPE_NOT_SAME(x, cos, return ACLNN_ERR_PARAM_INVALID);
+    }
+    if (x != nullptr && sin != nullptr) {
+        OP_CHECK_DTYPE_NOT_SAME(x, sin, return ACLNN_ERR_PARAM_INVALID);
+    }
+    if (x != nullptr && rotate != nullptr) {
+        OP_CHECK_DTYPE_NOT_SAME(x, rotate, return ACLNN_ERR_PARAM_INVALID);
+    }
+    if (x != nullptr && out != nullptr) {
+        OP_CHECK_DTYPE_NOT_SAME(x, out, return ACLNN_ERR_PARAM_INVALID);
+    }
+    return ACLNN_SUCCESS;
+}
+
 static inline bool TensorContiguousProcess(const aclTensor *&contiguousTensor, aclOpExecutor *executor)
 {
     if (contiguousTensor == nullptr) {
@@ -53,12 +97,18 @@ static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor *x, cons
                                                         const aclTensor *rotate, int64_t mode, aclTensor *out,
                                                         aclOpExecutor *executor)
 {
+    aclnnStatus ret = ACLNN_SUCCESS;
+    if (IsAscend950()) {
+        ret = CheckDtype(x, cos, sin, rotate, out);
+        CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    }
+
     const aclTensor *xProcessed = x;
     const aclTensor *cosProcessed = cos;
     const aclTensor *sinProcessed = sin;
     const aclTensor *rotateProcessed = rotate;
 
-    auto ret = PreProcess(xProcessed, cosProcessed, sinProcessed, rotateProcessed, executor);
+    ret = PreProcess(xProcessed, cosProcessed, sinProcessed, rotateProcessed, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     auto result =
