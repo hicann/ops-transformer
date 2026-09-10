@@ -92,20 +92,20 @@ struct MoeV3Arch35SrcToDstCapacityComputeTilingData {
 // countingSortMode: 0=未启用, 1=FullLoad(核内全载), 2=CutOrigin(核内4096 chunk切T)
 struct MoeV3Arch35CountingSortTilingData {
     int64_t countingSortMode{0};
-    int64_t filterNeedCoreNum{0};   // 过滤阶段使用的核数
-    int64_t filterPerCoreTokens{0}; // 每核处理的 token 数（按 n 维切）
-    int64_t lastCoreTokens{0};      // 尾核 token 数
-    int64_t coreEntries{0};         // 每核 flat entries = filterPerCoreTokens * k（上限）
-    int64_t expertCountStride{0};   // align8(actualExpertNum)，专家计数 stride
-    int64_t filterChunkSize{0};     // CutOrigin chunk 大小（4096），FullLoad 不用
-    int64_t csPerLoopCols{0};       // Phase C gather 每轮列数
-    int64_t csColsLoops{0};         // Phase C gather 列方向循环数
-    int64_t csLastLoopCols{0};      // Phase C gather 尾轮列数
-    int64_t maxPerLoopEntries{0};   // CutOrigin 单 chunk 处理上限
+    int64_t filterNeedCoreNum{0};    // 过滤阶段使用的核数
+    int64_t filterPerCoreTokens{0};  // 每核处理的 token 数（按 n 维切）
+    int64_t lastCoreTokens{0};       // 尾核 token 数
+    int64_t coreEntries{0};          // 每核 flat entries = filterPerCoreTokens * k（上限）
+    int64_t expertCountStride{0};    // align8(actualExpertNum)，专家计数 stride
+    int64_t filterChunkSize{0};      // CutOrigin chunk 大小（4096），FullLoad 不用
+    int64_t coutSortPerLoopCols{0};  // Phase C gather 每轮列数
+    int64_t coutSortColsLoops{0};    // Phase C gather 列方向循环数
+    int64_t coutSortLastLoopCols{0}; // Phase C gather 尾轮列数
+    int64_t maxPerLoopEntries{0};    // CutOrigin 单 chunk 处理上限
     int64_t pairsWsOffset{0}; // CutOrigin 拆分：pairs/expertCount 区在 workspace 中的起始偏移（int32 元素）
-    int64_t csAggrEnable{0};      // 聚合搬出开关：0=逐行(现状), 1=按专家k行切批
-    int64_t csAggrOutRows{0};     // 搬出聚合 UB 容纳行数 k
-    int64_t csAggrOutBufBytes{0}; // 搬出聚合区字节数 = k * colsAligned * sizeof(T)
+    int64_t coutSortAggrEnable{0};      // 聚合搬出开关：0=逐行(现状), 1=按专家k行切批
+    int64_t coutSortAggrOutRows{0};     // 搬出聚合 UB 容纳行数 k
+    int64_t coutSortAggrOutBufBytes{0}; // 搬出聚合区字节数 = k * colsAligned * sizeof(T)
 };
 
 // Arch35用的TilingData
