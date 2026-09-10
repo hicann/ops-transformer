@@ -147,7 +147,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
         <td>输入</td>
         <td>公式中用于切分的输入x。</td>
         <td>shape为[B, S, H]或[B, H]，H=(Nq+Nkv+Nkv)*D。x的尾轴小于等于4096，且按64对齐。</td>
-        <td>FLOAT16、BFLOAT16、FLOAT32</td>
+        <td>FLOAT16、BFLOAT16、INT32</td>
         <td>ND</td>
         <td>2-3</td>
         <td>√</td>
@@ -179,7 +179,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
         <td>shape为[C_1, C_2, Nkv, D]。</td>
         <td>INT8</td>
         <td>ND</td>
-        <td>2-3</td>
+        <td>4</td>
         <td>√</td>
     </tr>
     <tr>
@@ -199,53 +199,53 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
         <td>当cache_mode为page且x为3维时shape为[B*S]，否则shape为[B]。</td>
         <td>INT32</td>
         <td>ND</td>
-        <td>1-2</td>
+        <td>1</td>
         <td>√</td>
     </tr>
     <tr>
         <td>scaleK</td>
         <td>输入</td>
         <td>公式中的输入scaleK用于量化k的scale因子。</td>
-        <td>当cache_mode为page且x为3维时shape为[B*S]，否则shape为[B]。</td>
+        <td>元素个数为Nkv*D，推荐shape为[Nkv, D]，兼容一维展平shape [Nkv*D]。</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>1-2</td>
+        <td>≥1</td>
         <td>√</td>
     </tr>
     <tr>
         <td>scaleV</td>
         <td>输入</td>
         <td>公式中的输入scaleV用于量化v的scale因子。</td>
-        <td>shape为[Nkv, D]</td>
+        <td>元素个数为Nkv*D，推荐shape为[Nkv, D]，兼容一维展平shape [Nkv*D]。</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>2</td>
+        <td>≥1</td>
         <td>√</td>
     </tr>
     <tr>
         <td>offsetKOptional</td>
         <td>输入</td>
-        <td>公式中的输入offsetKoptional用于量化k的offset因子。</td>
-        <td>shape为[Nkv, D]。</td>
+        <td>公式中的输入offsetKOptional用于量化k的offset因子。</td>
+        <td>元素个数为Nkv*D，推荐shape为[Nkv, D]，兼容一维展平shape [Nkv*D]。</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>2</td>
+        <td>≥1</td>
         <td>√</td>
     </tr>
     <tr>
         <td>offsetVOptional</td>
         <td>输入</td>
         <td>公式中的输入offsetVOptional用于量化v的offset因子。</td>
-        <td>shape为[Nkv, D]。</td>
+        <td>元素个数为Nkv*D，推荐shape为[Nkv, D]，兼容一维展平shape [Nkv*D]。</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>2</td>
+        <td>≥1</td>
         <td>√</td>
     </tr>
     <tr>
         <td>weightScaleOptional</td>
         <td>输入</td>
-        <td>公式中的输入weightScaleoptional用于反量化的权重scale因子。</td>
+        <td>公式中的输入weightScaleOptional用于反量化的权重scale因子。</td>
         <td>shape为[H]。</td>
         <td>FLOAT</td>
         <td>ND</td>
@@ -405,7 +405,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
   </tbody>
   </table>
 
-## aclnnDequantRopeQuantKvcache
+## aclnnDequantRopeQuantKvcache接口
 
 - **参数说明**
 
@@ -453,7 +453,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
 1. 确定性计算：
      - aclnnDequantRopeQuantKvcache默认确定性实现。
 
-2. cacheModeOptional为contiguous时：kCacheRef的第0维大于x的第0维，indices数据值大于等于0且小于等于vCacheRef的第1维([b，s，n，d]格式中的s)减x的第1维。
+2. cacheModeOptional为contiguous时：kCacheRef的第0维大于等于x的第0维。x为3维时，indices数据值大于等于0且小于等于kCacheRef的第1维减x的第1维；x为2维时，indices数据值大于等于0且小于等于kCacheRef的第1维减1。
 3. cacheModeOptional为page时：indices数据值大于等于0，小于kCacheRef的第0维*第1维且不重复。
 4. 输入x不为INT32时，x、cos、sin与输出qOut、kOut、vOut的数据类型保持一致，此时activationScaleOptional，weightScaleOptional、biasOptional不生效。
 5. 输入x为INT32时，cos、sin与输出qOut、kOut、vOut的数据类型保持一致，此时weightScaleOptional必选，activationScaleOptional、biasOptional可选（biasOptional不需要与其他输入类型一致）。
@@ -549,29 +549,29 @@ int main() {
   std::vector<int64_t> kcacheShape = {320, 1280, 1, 128};
   std::vector<int64_t> vcacheShape = {320, 1280, 1, 128};
   std::vector<int64_t> indicesShape = {320};
-  std::vector<int64_t> kscaleShape = {128};
-  std::vector<int64_t> vscaleShape = {128};
-  std::vector<int64_t> koffsetShape = {128};
-  std::vector<int64_t> voffsetShape = {128};
+  std::vector<int64_t> kscaleShape = {1, 128};
+  std::vector<int64_t> vscaleShape = {1, 128};
+  std::vector<int64_t> koffsetShape = {1, 128};
+  std::vector<int64_t> voffsetShape = {1, 128};
 
   std::vector<int64_t> weightShape = {1280};
-  std::vector<int64_t> activationShape = {1280};
-  std::vector<int64_t> biasShape = {8192};
+  std::vector<int64_t> activationShape = {320};
+  std::vector<int64_t> biasShape = {1280};
 
-  std::vector<int16_t> inputHostData(320*1280, 1);
+  std::vector<int32_t> inputHostData(320*1280, 1);
   std::vector<int16_t> cosHostData(320*128, 1);
   std::vector<int16_t> sinHostData(320*128, 1);
   std::vector<int8_t> kcacheHostData(320*1280*128, 6);
   std::vector<int8_t> vcacheHostData(320*1280*128, 6);
   std::vector<int32_t> indicesHostData(320, 0);
-  std::vector<int32_t> kscaleHostData(128, 2);
-  std::vector<int32_t> vscaleHostData(128, 2);
-  std::vector<int32_t> koffsetHostData(128, 2);
-  std::vector<int32_t> voffsetHostData(128, 2);
+  std::vector<float> kscaleHostData(128, 2);
+  std::vector<float> vscaleHostData(128, 2);
+  std::vector<float> koffsetHostData(128, 2);
+  std::vector<float> voffsetHostData(128, 2);
 
-  std::vector<int32_t> weightHostData(1280, 2);
-  std::vector<int32_t> activationHostData(1280, 2);
-  std::vector<int32_t> biasHostData(8192, 2);
+  std::vector<float> weightHostData(1280, 2);
+  std::vector<float> activationHostData(320, 2);
+  std::vector<float> biasHostData(1280, 2);
 
   void* inputDeviceAddr = nullptr;
   void* cosDeviceAddr = nullptr;
@@ -653,6 +653,9 @@ int main() {
 
   std::vector<int64_t> splitData = {1024, 128, 128};
   aclIntArray *sizeSplits = aclCreateIntArray(splitData.data(), splitData.size());
+  char quantMode[] = "static";
+  char layout[] = "BSND";
+  char cacheMode[] = "contiguous";
 
   // 3. 调用CANN算子库API，需要修改为具体的API
   uint64_t workspaceSize = 0;
@@ -660,8 +663,8 @@ int main() {
 
   // 调用aclnnDequantRopeQuantKvcache第一段接口
   ret = aclnnDequantRopeQuantKvcacheGetWorkspaceSize(input, cos, sin, kcache, vcache, indices, kscale, vscale, koffset,
-                                                     voffset, weight, activation, bias,sizeSplits, "static", "BSND", true,
-                                                     "contiguous", q, k, v, &workspaceSize, &executor);
+                                                     voffset, weight, activation, bias, sizeSplits, quantMode, layout,
+                                                     true, cacheMode, q, k, v, &workspaceSize, &executor);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnDequantRopeQuantKvcacheGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
   // 根据第一段接口计算出的workspaceSize申请device内存
@@ -683,13 +686,42 @@ int main() {
   PrintOutResult(kcacheShape, &kcacheDeviceAddr);
   PrintOutResult(vcacheShape, &vcacheDeviceAddr);
 
-  // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
+  // 6. 释放aclTensor和aclIntArray，需要根据具体API的接口定义修改
   aclDestroyTensor(input);
+  aclDestroyTensor(cos);
+  aclDestroyTensor(sin);
+  aclDestroyTensor(kcache);
+  aclDestroyTensor(vcache);
+  aclDestroyTensor(indices);
+  aclDestroyTensor(kscale);
+  aclDestroyTensor(vscale);
+  aclDestroyTensor(koffset);
+  aclDestroyTensor(voffset);
+  aclDestroyTensor(weight);
+  aclDestroyTensor(activation);
+  aclDestroyTensor(bias);
   aclDestroyTensor(q);
+  aclDestroyTensor(k);
+  aclDestroyTensor(v);
+  aclDestroyIntArray(sizeSplits);
 
   // 7. 释放device资源
   aclrtFree(inputDeviceAddr);
+  aclrtFree(cosDeviceAddr);
+  aclrtFree(sinDeviceAddr);
+  aclrtFree(kcacheDeviceAddr);
+  aclrtFree(vcacheDeviceAddr);
+  aclrtFree(indicesDeviceAddr);
+  aclrtFree(kscaleDeviceAddr);
+  aclrtFree(vscaleDeviceAddr);
+  aclrtFree(koffsetDeviceAddr);
+  aclrtFree(voffsetDeviceAddr);
+  aclrtFree(weightDeviceAddr);
+  aclrtFree(activationDeviceAddr);
+  aclrtFree(biasDeviceAddr);
   aclrtFree(qDeviceAddr);
+  aclrtFree(kDeviceAddr);
+  aclrtFree(vDeviceAddr);
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
   }
