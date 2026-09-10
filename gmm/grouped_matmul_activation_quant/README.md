@@ -76,8 +76,10 @@
 ## 约束说明
 
 - `x`仅支持非转置输入；`weight`支持非转置和转置输入，`weight_scale`转置属性需要与`weight`保持一致。
-- `N`必须为64的整数倍，`group_list`第一维取值范围为[1, 1024]。
+- `N`必须为64的整数倍，非空场景下最小有效N为64；`group_list`第一维取值范围为[1, 1024]。
+- `group_list_type=0`时，`group_list`必须为非负单调非递减序列且最后一个值不大于M；`group_list_type=1`时，元素必须为非负数且总和不大于M。运行时Tensor的元素值由调用方保证，第一段接口不读取设备侧数据。
 - MXFP4场景下`K`必须为偶数且不能为2，weight的NZ storageShape尾维为64；MXFP8场景尾维为32。
+- 非空场景下K必须大于0。
 - `scale_alg=1`仅支持FLOAT8输出；`scale_alg=2`仅支持FLOAT4_E2M1输出；FLOAT4_E1M2输出仅支持`scale_alg=0`。
 - `bias`为空时，支持nullptr、空tensorList或长度为1且元素shape为(0)的空tensorList。
 

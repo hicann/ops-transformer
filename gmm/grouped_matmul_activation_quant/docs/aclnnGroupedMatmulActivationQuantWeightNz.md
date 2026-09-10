@@ -244,6 +244,8 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
       <td>表示分组信息，对应公式中的groupList。</td>
       <td><ul>
       <li>必选参数。根据groupListType输入不同格式数据。当groupListType为0时，最后一个值不大于x中tensor的第一维, 当groupListType为1时，数值的总和不大于x中tensor的第一维。</li>
+      <li>groupListType=0时，groupList元素必须非负且单调不减，最后一个元素不大于M；groupListType=1时，元素必须非负且总和不大于M。</li>
+      <li>GetWorkspaceSize的第一阶段只校验groupList的指针、dtype和shape，不读取设备侧tensor的元素值；调用方需保证上述值域约束。</li>
       <li>groupList中的值约束了输出数据的有效部分，groupList未指定的部分将不会参与更新。</li>
       </ul></td>
       <td>INT64</td>
@@ -611,8 +613,8 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
 
      - 表中xScale、weightScale、outputScale的shape最后一维为2，表示每个64元素的存储block中包含2个MX量化group，每个group覆盖32个元素。
 
-     - N必须为64整数倍。
-      - MXFP4场景下x和weight必须同时为FLOAT4，二者可分别选择E2M1或E1M2；K必须为偶数且不能为2。
+     - 非空场景下N必须为64整数倍，且N至少为64。
+     - 非空场景下K必须大于0；MXFP4场景下x和weight必须同时为FLOAT4，二者可分别选择FLOAT4_E2M1或FLOAT4_E1M2，且K必须为偶数且不能为2。
 
 ## 调用示例
 
