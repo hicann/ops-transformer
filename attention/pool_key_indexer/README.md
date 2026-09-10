@@ -68,7 +68,7 @@
 - 当pool_size=1且pool_tail_k=0时，退化为lightning_indexer行为，输出维度为topk。
 - 当layout_k为PA_BBND时，必须传入block_table和actual_seq_k；当layout_k不为PA_BBND时，不支持传入block_table。
 - 当layout_q为BSND时，不支持传入actual_seq_q；当layout_q为TND时，必须传入actual_seq_q。当layout_k为BSND时，不支持传入actual_seq_k；当layout_k为TND时，必须传入actual_seq_k。
-- PA_BBND场景下，block_size取值为16的倍数，最大支持1024。
+- PA_BBND场景下，block_size取值为16的倍数，最大支持2048。
 - pool_key、k_descale仅支持在PA_BBND布局下0轴非连续（需配合key_stride0/k_descale_stride0属性），BSND/TND布局要求连续输入。
 - 当quant_mode=-1时，不支持传入q_descale和k_descale。
 - pool_tail_k取值校验仅对CPU输入在host侧执行；NPU输入经aclnn Tensor变体直传device数据，host侧不做值校验，调用方须自行保证取值合法，否则kernel行为未定义。
