@@ -37,6 +37,8 @@ constexpr size_t OUTPUT_AMAX = 2;
 
 // Attr
 constexpr size_t GROUPSIZE_IDX = 7;
+constexpr int64_t PEER_ONLY_RANK_SIZE = 2;
+inline constexpr char PEER_ONLY_ALGORITHM[] = "CcuSchedReduceScatterSoleMeshPeerOnly";
 
 // Dtype
 constexpr std::initializer_list<ge::DataType> MXDTYPE_SUPPORT_LIST = {
@@ -106,6 +108,7 @@ protected:
     const char *opName_ = nullptr;
     int64_t rankSize_{0};
     uint8_t commMode_{0};
+    bool isPeerOnly_{false};
     uint64_t tileMValue_{0};  // mc2 切块后主块M的大小；
     uint64_t tailMValue_{0};  // mc2 切块后尾块M的大小；
     uint64_t longTileLen_{0}; // mc2 切块后长块的大小；

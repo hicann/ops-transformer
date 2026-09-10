@@ -98,6 +98,8 @@ __global__ __aicore__ void matmul_reduce_scatter_v2(GM_ADDR aGM, GM_ADDR bGM, GM
         using BType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, B_DTYPE, TPL_TRANSB>;
         if constexpr (TPL_COMMALG == TPL_CCU_ALL2ALL_VEC_REDUCE) {
             INVOKE_MMREDUCESCATTER_FP16_BF16_OP_IMPL(MatmulA2AVecReduceFP16BF16);
+        } else if constexpr (TPL_COMMALG == TPL_CCU_REDUCESUM_PEER_ONLY) {
+            INVOKE_MMREDUCESCATTER_FP16_BF16_OP_IMPL(MatmulReduceScatterFP16BF16PeerOnly);
         } else {
             INVOKE_MMREDUCESCATTER_FP16_BF16_OP_IMPL(MatmulReduceScatterFP16BF16);
         }
@@ -110,6 +112,9 @@ __global__ __aicore__ void matmul_reduce_scatter_v2(GM_ADDR aGM, GM_ADDR bGM, GM
     if constexpr (TPL_SCALETYPE == TPL_X1_X2_DTYPE_IS_FP8E8M0) {
         if constexpr (TPL_COMMALG == TPL_CCU_ALL2ALL_VEC_REDUCE) {
             INVOKE_QUANT_BATCHMM_PERTENSOR_MXFP8_REDUCE_SCATTER_OP_IMPL(QuantBmmA2AVecReduceFP8HiF8, false, TPL_TRANSB);
+        } else if constexpr (TPL_COMMALG == TPL_CCU_REDUCESUM_PEER_ONLY) {
+            INVOKE_QUANT_BATCHMM_PERTENSOR_MXFP8_REDUCE_SCATTER_OP_IMPL(QuantBMMReduceScatterPeerOnly, false,
+                                                                        TPL_TRANSB);
         } else {
             INVOKE_QUANT_BATCHMM_PERTENSOR_MXFP8_REDUCE_SCATTER_OP_IMPL(QuantBMMReduceScatter, false, TPL_TRANSB);
         }
@@ -118,6 +123,8 @@ __global__ __aicore__ void matmul_reduce_scatter_v2(GM_ADDR aGM, GM_ADDR bGM, GM
     if constexpr (!TPL_ISPERBLOCK && TPL_INPUT == INPUT_TYPE_IS_FP8 && TPL_SCALETYPE == TPL_X1_X2_DTYPE_IS_OTHER) {
         if constexpr (TPL_COMMALG == TPL_CCU_ALL2ALL_VEC_REDUCE) {
             INVOKE_QUANT_BATCHMM_REDUCE_SCATTER_OP_IMPL(QuantBmmA2AVecReduceFP8HiF8, TPL_TRANSA, TPL_TRANSB);
+        } else if constexpr (TPL_COMMALG == TPL_CCU_REDUCESUM_PEER_ONLY) {
+            INVOKE_QUANT_BATCHMM_REDUCE_SCATTER_OP_IMPL(QuantBMMReduceScatterPeerOnly, TPL_TRANSA, TPL_TRANSB);
         } else {
             INVOKE_QUANT_BATCHMM_REDUCE_SCATTER_OP_IMPL(QuantBMMReduceScatter, TPL_TRANSA, TPL_TRANSB);
         }
