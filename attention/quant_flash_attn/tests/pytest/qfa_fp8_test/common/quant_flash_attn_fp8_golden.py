@@ -58,8 +58,27 @@ N_q = 2
 N_kv = 1
 D = 128
 
-ACTUAL_SEQ_Q = [128]
-ACTUAL_SEQ_KV = [256]
+CU_SEQLENS_Q = [0, 128]
+CU_SEQLENS_KV = None
+SEQUSED_Q = [128]
+SEQUSED_KV = [256]
+MAX_SEQLEN_Q = 128
+MAX_SEQLEN_KV = 256
+
+
+def _derive_seqused(cu_seqlens):
+    if cu_seqlens is None:
+        return None
+    return [cu_seqlens[i + 1] - cu_seqlens[i] for i in range(len(cu_seqlens) - 1)]
+
+
+def _get_seqused_q():
+    return SEQUSED_Q if SEQUSED_Q is not None else _derive_seqused(CU_SEQLENS_Q)
+
+
+def _get_seqused_kv():
+    return SEQUSED_KV if SEQUSED_KV is not None else _derive_seqused(CU_SEQLENS_KV)
+
 
 # QFA layout 属性 (GQA 固定值)
 LAYOUT_Q = "NTD"
@@ -256,8 +275,20 @@ def bnsd_to_v_cache(tensor_bnsd, seq_lens, block_size, block_table, num_blocks=0
 
 def generate_data():
     """生成 BNSD FP16 Q/K/V 并做 FP8 量化"""
-    max_sq = max(ACTUAL_SEQ_Q)
-    max_skv = max(ACTUAL_SEQ_KV) if max(ACTUAL_SEQ_KV) > 0 else 1
+    seqused_q = _get_seqused_q()
+    seqused_kv = _get_seqused_kv()
+    max_sq = (
+        MAX_SEQLEN_Q
+        if (MAX_SEQLEN_Q is not None and MAX_SEQLEN_Q >= 0)
+        else max(seqused_q)
+    )
+    max_skv = (
+        MAX_SEQLEN_KV
+        if (MAX_SEQLEN_KV is not None and MAX_SEQLEN_KV >= 0)
+        else max(seqused_kv)
+    )
+    if max_skv <= 0:
+        max_skv = 1
     logger.info("[INFO] max_sq=%d, max_skv=%d", max_sq, max_skv)
 
     def _generate_one(seed, data_range, shape, amp_shape):
@@ -307,8 +338,8 @@ def generate_data():
     # k_fp8 = torch.ones_like(k_fp8)
     # v_fp8 = torch.ones_like(v_fp8)
 
-    if max(ACTUAL_SEQ_KV) == 0:
-        real_skv = max(ACTUAL_SEQ_KV)
+    if max(seqused_kv) == 0:
+        real_skv = max(seqused_kv)
         k_fp8 = k_fp8[:, :, :real_skv, :].contiguous()
         v_fp8 = v_fp8[:, :, :real_skv, :].contiguous()
 
@@ -364,7 +395,7 @@ def printmm(matrix, layout, z_size):
 
 
 def cpu_fp8_fullquant_golden(
-    q_fp8, k_fp8, v_fp8, deq_q, deq_k, deq_v, p_scale, actual_seq_q, actual_seq_kv
+    q_fp8, k_fp8, v_fp8, deq_q, deq_k, deq_v, p_scale, seqused_q, seqused_kv
 ):
     """CPU golden reference - 所有操作在CPU上执行"""
     softmax_scale = get_softmax_scale(SCALE_VALUE, D)
@@ -404,8 +435,8 @@ def cpu_fp8_fullquant_golden(
         ..., None
     ].contiguous()
 
-    q_lens_t = torch.tensor(actual_seq_q, dtype=torch.int32).contiguous()
-    k_lens_t = torch.tensor(actual_seq_kv, dtype=torch.int32).contiguous()
+    q_lens_t = torch.tensor(seqused_q, dtype=torch.int32).contiguous()
+    k_lens_t = torch.tensor(seqused_kv, dtype=torch.int32).contiguous()
     q_lens_acl = q_lens_t.view(batch, 1, 1, 1).contiguous()
     k_lens_acl = k_lens_t.view(batch, 1, 1, 1).contiguous()
 
@@ -879,8 +910,12 @@ def prepare_npu_inputs_gqa_fp8(
     dequant_scale_k,
     dequant_scale_v,
     p_scale,
-    actual_seq_q,
-    actual_seq_kv,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    max_seqlen_q,
+    max_seqlen_kv,
     block_table_torch=None,
 ):
     """准备 NPU 侧入参 (GQA FP8, 仅 PA).
@@ -892,15 +927,10 @@ def prepare_npu_inputs_gqa_fp8(
       softmax_scale, max_seqlen_q, max_seqlen_kv
     """
     softmax_scale = 1.0 / math.sqrt(D)
-    cu_seqlens_q = make_cu_seqlens(actual_seq_q)
-    seqused_q = make_seqused(actual_seq_q)
-    seqused_kv = make_seqused(actual_seq_kv)
-    max_seqlen_q = max(actual_seq_q) if actual_seq_q else -1
-    max_seqlen_kv = max(actual_seq_kv) if actual_seq_kv else -1
 
-    q_npu = convert_q_bnsd_to_layout(q_fp8, actual_seq_q, LAYOUT_Q)
-    deq_q_npu = convert_scale_to_layout(dequant_scale_q, actual_seq_q, "deq_q")
-    deq_v_npu = convert_scale_to_layout(dequant_scale_v, actual_seq_kv, "deq_v")
+    q_npu = convert_q_bnsd_to_layout(q_fp8, seqused_q, LAYOUT_Q)
+    deq_q_npu = convert_scale_to_layout(dequant_scale_q, seqused_q, "deq_q")
+    deq_v_npu = convert_scale_to_layout(dequant_scale_v, seqused_kv, "deq_v")
     mask_arg = _build_mask()
 
     if block_table_torch is not None:

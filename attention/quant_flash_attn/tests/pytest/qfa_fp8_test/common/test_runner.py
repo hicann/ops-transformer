@@ -23,8 +23,12 @@ PARAM_MAP = {
     "N_q": "N_q",
     "N_kv": "N_kv",
     "D": "D",
-    "actual_seq_q": "ACTUAL_SEQ_Q",
-    "actual_seq_kv": "ACTUAL_SEQ_KV",
+    "cu_seqlens_q": "CU_SEQLENS_Q",
+    "cu_seqlens_kv": "CU_SEQLENS_KV",
+    "seqused_q": "SEQUSED_Q",
+    "seqused_kv": "SEQUSED_KV",
+    "max_seqlen_q": "MAX_SEQLEN_Q",
+    "max_seqlen_kv": "MAX_SEQLEN_KV",
     "enable_pa": "ENABLE_PA",
     "enable_lse": "ENABLE_LSE",
     "block_size": "BLOCK_SIZE",
@@ -121,8 +125,8 @@ def execute_test(params, mode, cdir=None):
                 deq_k,
                 deq_v,
                 p_scale,
-                golden.ACTUAL_SEQ_Q,
-                golden.ACTUAL_SEQ_KV,
+                golden.SEQUSED_Q,
+                golden.SEQUSED_KV,
             )
             golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
     else:
@@ -143,8 +147,12 @@ def execute_test(params, mode, cdir=None):
                 deq_k,
                 deq_v,
                 p_scale,
-                golden.ACTUAL_SEQ_Q,
-                golden.ACTUAL_SEQ_KV,
+                golden.CU_SEQLENS_Q,
+                golden.CU_SEQLENS_KV,
+                golden.SEQUSED_Q,
+                golden.SEQUSED_KV,
+                golden.MAX_SEQLEN_Q,
+                golden.MAX_SEQLEN_KV,
                 block_table_torch,
             )
         npu_out, lse_out = output
@@ -159,7 +167,7 @@ def execute_test(params, mode, cdir=None):
     if cache_info is not None and cpu_out is None:
         k_pa_cache, v_pa_cache, bt_cache = cache_info
         k_bnsd_recon, v_bnsd_recon, deq_k_bnsd_recon = golden.pa_cache_to_bnsd(
-            k_pa_cache, v_pa_cache, bt_cache, golden.ACTUAL_SEQ_KV, golden.BLOCK_SIZE
+            k_pa_cache, v_pa_cache, bt_cache, golden.SEQUSED_KV, golden.BLOCK_SIZE
         )
         cpu_out, cpu_lse = golden.cpu_fp8_fullquant_golden(
             q_fp8,
@@ -169,23 +177,21 @@ def execute_test(params, mode, cdir=None):
             deq_k_bnsd_recon,
             deq_v,
             p_scale,
-            golden.ACTUAL_SEQ_Q,
-            golden.ACTUAL_SEQ_KV,
+            golden.SEQUSED_Q,
+            golden.SEQUSED_KV,
         )
         if "cpu" in mode:
             golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
 
     # ---- Step 4/5: 精度对比 ----
     compare_layout = "TND" if golden.ENABLE_PA else golden.LAYOUT_Q
-    cpu_cmp = golden.convert_q_bnsd_to_layout(
-        cpu_out, golden.ACTUAL_SEQ_Q, compare_layout
-    )
+    cpu_cmp = golden.convert_q_bnsd_to_layout(cpu_out, golden.SEQUSED_Q, compare_layout)
     atten_result = result_compare_method.check_result(cpu_cmp, npu_out)
 
     lse_result = None
     if golden.ENABLE_LSE:
         lse_cmp = golden.convert_q_bnsd_to_layout(
-            cpu_lse, golden.ACTUAL_SEQ_Q, compare_layout
+            cpu_lse, golden.SEQUSED_Q, compare_layout
         )
         lse_cmp = lse_cmp.squeeze(-1).permute(1, 0).contiguous()
         lse_result = result_compare_method.check_result(lse_cmp, lse_out)
