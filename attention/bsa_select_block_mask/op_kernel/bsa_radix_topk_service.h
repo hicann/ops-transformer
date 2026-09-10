@@ -1446,6 +1446,9 @@ __aicore__ inline void BSARadixTopKService<BSAT>::TileTopK(uint32_t batchIdx, ui
     }
     uint64_t outputOffset = (static_cast<uint64_t>(batchIdx) * constInfo.numHeads + headIdx) * outputStride;
 
+    // 有效列数小于输出行跨距时，有效区域在满网格输出中不连续，需按 compact 索引分段写入。
+    bool compactWrite = useCompactTopKMapping_ || (validYBlocks_ < maskOutRowStride_);
+
     // Restore boundary value (twiddle inverse transform)
     int16_t boundaryInt16 = involvedMask16_ ^ ((~(involvedMask16_ >> 15)) | 0x8000);
     half boundaryHalf = *reinterpret_cast<half *>(&boundaryInt16);
@@ -1496,14 +1499,14 @@ __aicore__ inline void BSARadixTopKService<BSAT>::TileTopK(uint32_t batchIdx, ui
 
             LocalTensor<half> xLocal = curBuf.template Get<half>()[tileLenScoreAlign_].template ReinterpretCast<half>();
 
-            if (useCompactTopKMapping_) {
+            if (compactWrite) {
                 SubTopKAndWriteMaskGTTnd(xLocal, boundaryHalf, curTileLen, tileGmOffset, outputOffset, curTileK);
             } else {
                 SubTopKAndWriteMaskGT(xLocal, boundaryHalf, curTileLen, outputGmOffset, curTileK);
             }
 
             if (curTileK > 0) {
-                if (useCompactTopKMapping_) {
+                if (compactWrite) {
                     SubTopKAndWriteMaskEQTnd(xLocal, boundaryHalf, curTileLen, tileGmOffset, outputOffset, curTileK);
                 } else {
                     SubTopKAndWriteMaskEQ(xLocal, boundaryHalf, curTileLen, outputGmOffset, curTileK);
