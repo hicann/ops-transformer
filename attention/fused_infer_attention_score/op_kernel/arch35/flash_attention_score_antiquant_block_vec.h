@@ -669,6 +669,42 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::SetAntiqPar
             }
         }
     }
+    if constexpr (isPa) {
+        if (taskParam.paKvShapeType == static_cast<uint32_t>(KvCacheLayout::KV_CACHE_NZ)) {
+            uint64_t nzHeadStride = static_cast<uint64_t>(taskParam.headDim) * taskParam.kvCacheBlockSize;
+            if (taskParam.kvN2Stride != 0) {
+                nzHeadStride = taskParam.kvN2Stride;
+            }
+            uint64_t nzBlockStride = static_cast<uint64_t>(taskParam.kvHeadNum) * nzHeadStride;
+            if (taskParam.kvBnStride != 0) {
+                nzBlockStride = taskParam.kvBnStride;
+            }
+            taskParam.paBlockStride = nzBlockStride;
+            taskParam.paRowStride = taskParam.isKvCacheNz ? taskParam.kvCacheNzD0 : (ONE_BLK_SIZE / sizeof(Q_T));
+            taskParam.paN2HeadOffset = static_cast<uint64_t>(taskParam.n2Idx) * nzHeadStride;
+        } else if (taskParam.paKvShapeType == static_cast<uint32_t>(KvCacheLayout::KV_CACHE_BSH)) {
+            uint64_t bsStride = static_cast<uint64_t>(taskParam.kvHeadNum) * taskParam.headDim;
+            uint64_t bnStride = static_cast<uint64_t>(taskParam.kvCacheBlockSize) * bsStride;
+            if (taskParam.kvBnStride != 0) {
+                bnStride = taskParam.kvBnStride;
+            }
+            taskParam.paBlockStride = bnStride;
+            taskParam.paRowStride = bsStride;
+            taskParam.paN2HeadOffset = static_cast<uint64_t>(taskParam.n2Idx) * taskParam.headDim;
+        } else {
+            uint64_t headStride = static_cast<uint64_t>(taskParam.kvCacheBlockSize) * taskParam.headDim;
+            if (taskParam.kvN2Stride != 0) {
+                headStride = taskParam.kvN2Stride;
+            }
+            uint64_t blockStride = static_cast<uint64_t>(taskParam.kvHeadNum) * headStride;
+            if (taskParam.kvBnStride != 0) {
+                blockStride = taskParam.kvBnStride;
+            }
+            taskParam.paBlockStride = blockStride;
+            taskParam.paRowStride = taskParam.headDim;
+            taskParam.paN2HeadOffset = static_cast<uint64_t>(taskParam.n2Idx) * headStride;
+        }
+    }
 }
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT

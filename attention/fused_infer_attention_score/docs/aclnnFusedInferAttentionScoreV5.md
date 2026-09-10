@@ -164,7 +164,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>公式中的输入K。</td>
         <td>
         <ul>
-            <li>不支持非连续tensor。</li>
+            <li>部分场景支持非连续tensor，具体见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
         <td>FLOAT16、BFLOAT16、INT8、HIFLOAT8、FLOAT8_E4M3FN、INT4(INT32)、FLOAT4_E2M1</td>
@@ -178,7 +178,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>公式中的输入V。</td>
         <td>
         <ul>
-            <li>不支持非连续tensor。</li>
+            <li>部分场景支持非连续tensor，具体见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
         <td>FLOAT16、BFLOAT16、INT8、HIFLOAT8、FLOAT8_E4M3FN、INT4(INT32)、FLOAT4_E2M1</td>
@@ -411,7 +411,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <ul>
             <li>不支持空Tensor。</li>
             <li>不使用该功能时可传入nullptr。</li>
-            <li>不支持非连续tensor。</li>
+            <li>部分场景支持非连续tensor，具体见<a href="#约束说明">约束说明</a>。</li>
             <li>支持per-tensor，per-channel，per-token，per-token-group，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per-head并使用page attention模式管理scale/offset和per-token-group。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
@@ -430,6 +430,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>不支持空Tensor。</li>
             <li>使用时，shape必须与keyAntiquantScaleOptional保持一致。</li>
             <li>不使用该功能时可传入nullptr。</li>
+            <li>部分场景支持非连续tensor，具体见<a href="#约束说明">约束说明</a>。</li>
             <li>支持per-tensor，per-channel，per-token，per-channel-group，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per-head并使用page attention模式管理scale/offset。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
@@ -447,7 +448,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <ul>
             <li>不支持空Tensor。</li>
             <li>不使用该功能时可传入nullptr。</li>
-            <li>不支持非连续tensor。</li>
+            <li>部分场景支持非连续tensor，具体见<a href="#约束说明">约束说明</a>。</li>
             <li>支持per-tensor，per-channel，per-token，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per-head并使用page attention模式管理scale/offset和per-token-group。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
@@ -466,6 +467,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>不支持空Tensor。</li>
             <li>使用时，shape必须与valueAntiquantScaleOptional保持一致。</li>
             <li>不使用该功能时可传入nullptr。</li>
+            <li>部分场景支持非连续tensor，具体见<a href="#约束说明">约束说明</a>。</li>
             <li>支持per-tensor，per-channel，per-token，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per head并使用page attention模式管理scale/offset。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
@@ -1744,6 +1746,9 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
         - per-token模式，shape的最后一维应大于等于maxBlockNumPerBatch * blockSize
         - per-token叠加per-head模式，shape的最后一维应大于等于maxBlockNumPerBatch * blockSize
         - per-token-group模式，shape的倒数第二维应大于等于maxBlockNumPerBatch * blockSize
+    - PagedAttention场景下，支持kv cache及scale/offset传入非连续tensor，约束如下：
+      - kv cache排布为BnNBsD或NZ时支持axis 0、axis 1非连续，BnBsH时仅支持axis 0非连续；非PagedAttention场景不支持非连续
+      - scale/offset仅per-token模式使用page attention管理scale/offset(mode 4)或per-token叠加per-head模式并使用page attention管理scale/offset(mode 5)时支持非连续：mode 4时shape为(blockNum, blockSize)仅支持axis 0非连续，mode 5时shape为(blockNum, N, blockSize)支持axis 0、axis 1非连续；非PagedAttention场景不支持非连续
     - 不支持合并rope
     - kv cache排布为NZ且最后一维D0维等于32的场景（kv cache排布为[blockNum, KV_N, D/32, blockSize, 32]）：
       - query：BFLOAT16，Q_S支持[1,16]，Q_D=128

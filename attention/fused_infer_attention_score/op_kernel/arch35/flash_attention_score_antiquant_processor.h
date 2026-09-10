@@ -91,6 +91,10 @@ struct AntiquantTaskParamBaseAPI {
     uint64_t scaleN2Stride = 0;
     uint64_t offsetBnStride = 0;
     uint64_t offsetN2Stride = 0;
+
+    uint64_t paBlockStride = 0;
+    uint64_t paRowStride = 0;
+    uint64_t paN2HeadOffset = 0;
 };
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
@@ -646,53 +650,24 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
     uint32_t typeElementSize = taskParam.isKvCacheNz ? taskParam.kvCacheNzD0 : (ONE_BLK_SIZE / sizeof(Q_T));
     uint64_t blockTableBaseOffset = taskParam.bIdx * taskParam.maxBlockNumPerSeq;
     uint32_t copyFinishRowCnt = 0;
+    uint64_t paBlockStride = taskParam.paBlockStride;
+    uint64_t paRowStride = taskParam.paRowStride;
+    uint64_t paN2HeadOffset = taskParam.paN2HeadOffset;
+    uint32_t kvCacheBlockSize = taskParam.kvCacheBlockSize;
+
     while (copyFinishRowCnt < dealRowCount) {
-        uint64_t blockIdOffset = curSequence / taskParam.kvCacheBlockSize;
-        uint64_t reaminRowCnt = curSequence % taskParam.kvCacheBlockSize;
+        uint64_t blockIdOffset = curSequence / kvCacheBlockSize;
+        uint64_t reaminRowCnt = curSequence % kvCacheBlockSize;
         uint64_t idInBlockTable = blockTableGm.GetValue(blockTableBaseOffset + blockIdOffset);
-        uint32_t copyRowCnt = taskParam.kvCacheBlockSize - reaminRowCnt;
+        uint32_t copyRowCnt = kvCacheBlockSize - reaminRowCnt;
         if (copyFinishRowCnt + copyRowCnt > dealRowCount) {
             copyRowCnt = dealRowCount - copyFinishRowCnt;
         }
-        uint64_t curOffset = 0;
+        uint64_t curOffset = idInBlockTable * paBlockStride + reaminRowCnt * paRowStride + paN2HeadOffset;
         if (taskParam.paKvShapeType == static_cast<uint32_t>(KvCacheLayout::KV_CACHE_NZ)) { // NZ
-            uint64_t nzHeadStride = taskParam.headDim * taskParam.kvCacheBlockSize;
-            uint64_t nzBlockStride = taskParam.kvHeadNum * nzHeadStride;
-            if (taskParam.kvN2Stride != 0) {
-                nzHeadStride = taskParam.kvN2Stride;
-            }
-            if (taskParam.kvBnStride != 0) {
-                nzBlockStride = taskParam.kvBnStride;
-            } else if (taskParam.kvN2Stride != 0) {
-                nzBlockStride = taskParam.kvHeadNum * nzHeadStride;
-            }
-            curOffset = idInBlockTable * nzBlockStride + (uint64_t)(taskParam.n2Idx * nzHeadStride) +
-                        reaminRowCnt * typeElementSize;
             CopyKVPaNz(dstLocal[copyFinishRowCnt * typeElementSize], srcGm, curOffset, copyRowCnt, dealRowCount,
                        taskParam);
-        } else {
-            if (taskParam.paKvShapeType == static_cast<uint32_t>(KvCacheLayout::KV_CACHE_BSH)) { // BBH
-                uint64_t bsStride = taskParam.kvHeadNum * taskParam.headDim;
-                uint64_t bnStride = taskParam.kvCacheBlockSize * bsStride;
-                if (taskParam.kvBnStride != 0) {
-                    bnStride = taskParam.kvBnStride;
-                }
-                curOffset = idInBlockTable * bnStride + reaminRowCnt * bsStride +
-                            (uint64_t)(taskParam.n2Idx * taskParam.headDim);
-            } else { // BNBD
-                uint64_t headStride = taskParam.kvCacheBlockSize * taskParam.headDim;
-                uint64_t blockStride = taskParam.kvHeadNum * headStride;
-                if (taskParam.kvN2Stride != 0) {
-                    headStride = taskParam.kvN2Stride;
-                }
-                if (taskParam.kvBnStride != 0) {
-                    blockStride = taskParam.kvBnStride;
-                } else if (taskParam.kvN2Stride != 0) {
-                    blockStride = taskParam.kvHeadNum * headStride;
-                }
-                curOffset = idInBlockTable * blockStride + (uint64_t)(taskParam.n2Idx * headStride) +
-                            reaminRowCnt * taskParam.headDim;
-            }
+        } else { // BBH / BNBD
             CopyKV(dstLocal[copyFinishRowCnt * dBaseSize], srcGm, curOffset, copyRowCnt, taskParam.headDim,
                    taskParam.kvHeadNum, taskParam.paKvShapeType);
         }
