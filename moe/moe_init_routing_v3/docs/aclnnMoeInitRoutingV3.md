@@ -38,7 +38,7 @@
       <td>0</td>
       <td>true</td>
       <td>0</td>
-      <td align="left">comsum模式，expertTokensCountOrCumsumOut表示按排序后各专家处理token的计数前缀和直方图。</td>
+      <td align="left">cumsum模式，expertTokensCountOrCumsumOut表示按排序后各专家处理token的计数前缀和直方图。</td>
     </tr>
     <tr align="center">
       <td>0</td>
@@ -321,7 +321,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>输入</td>
       <td>表示直方图的不同模式</td>
       <td>取值为0、1和2
-        <br>0：表示comsum模式；
+        <br>0：表示cumsum模式；
         <br>1：表示count模式；
         <br>2：表示key_value模式；
       </td>

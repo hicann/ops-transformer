@@ -426,7 +426,7 @@ aclnnStatus aclnnScatterPaCache(
     // 创建key aclTensor
     ret = CreateAclTensor(hostKey, keyShape, &keyDeviceAddr, aclDataType::ACL_FLOAT, &key);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    // 创建slotMappitng aclTensor
+    // 创建slotMapping aclTensor
     ret = CreateAclTensor(hostSlotMapping, slotMappingShape, &slotMappingDeviceAddr, aclDataType::ACL_INT32, &slotMapping);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建keyCache aclTensor

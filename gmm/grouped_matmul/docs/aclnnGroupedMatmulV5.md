@@ -136,7 +136,7 @@ $$
 
 - **V4 → V5**：
 <!-- npu="A3" id13 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、：增加可选参数tuningConfigOptional，调优参数。数组中第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值进行最优tiling。
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：增加可选参数tuningConfigOptional，调优参数。数组中第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值进行最优tiling。
 <!-- end id13 -->
 
 - **V1 → V4**：

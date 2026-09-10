@@ -878,7 +878,7 @@ int main()
         printf("    End BN2     : %u\n", result.faMetadata[i][FA_BN2_END_INDEX]);
         printf("    End M       : %u\n", result.faMetadata[i][FA_M_END_INDEX]);
         printf("    End S2      : %u\n", result.faMetadata[i][FA_S2_END_INDEX]);
-        printf("    First Worksapce Index : %u\n", result.faMetadata[i][FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX]);
+        printf("    First Workspace Index : %u\n", result.faMetadata[i][FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX]);
         printf("    Max S2 Block Num : %u\n", result.faMetadata[i][FA_S2_MAX_NUM]);
     }
     for (uint32_t i = 0; i < AIV_CORE_MAX_NUM; ++i) {

@@ -694,7 +694,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - initialStateIdxOptional[i] <= blockIdxLastScheduledTokenOptional[i]
     - blockIdxFirstScheduledTokenOptional[i] <= blockIdxLastScheduledTokenOptional[i]
     - blockIdxLastScheduledTokenOptional[i] < maxNumBlocks
-  - numAcceptedTokensOptional分为None和非None，非None情况下长度为batch，prefile对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
+  - numAcceptedTokensOptional分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
   - numComputedTokensOptional中每个元素取值大于等于0。
   - cacheIndicesOptional的取值范围为[0, convStates.dim[0]-1],且值均不能相等（除非等于padSlotId）。
   - maxQueryLen = batch中的最大seqLen。

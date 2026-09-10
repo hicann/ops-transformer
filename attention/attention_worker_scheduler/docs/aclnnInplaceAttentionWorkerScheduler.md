@@ -357,7 +357,7 @@ struct ScheduleContext {
   AttentionArea attention;
   FfnArea ffn;
   // reserve area
-  int8_t reserve6[384];  // Padding to 1024 bytes.
+  int8_t reserve6[384];  // Padding to 1024 Byte.
 };
 
 static_assert(sizeof(ScheduleContext) == 1024, "ScheduleContext size must be 1024 bytes");

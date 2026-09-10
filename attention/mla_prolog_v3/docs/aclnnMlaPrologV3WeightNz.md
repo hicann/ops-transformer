@@ -982,7 +982,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td colspan="2">非量化</td>
       <td>
-          weight_quant_mode=0，kv_cache_quant_mode=0，query_quant_mode=0<br>
+          weight_quant_mode=0,kv_cache_quant_mode=0,query_quant_mode=0<br>
           入参：所有入参皆为非量化数据 <br>
           出参：所有出参皆为非量化数据
       </td>
@@ -991,7 +991,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <td rowspan="3">部分量化</td>
       <td>kvCache非量化 </td>
       <td>
-          weight_quant_mode=1，kv_cache_quant_mode=0，query_quant_mode=0<br>
+          weight_quant_mode=1,kv_cache_quant_mode=0,query_quant_mode=0<br>
           入参：weightUqQr传入pertoken量化数据，其余入参皆为非量化数据。dequantScaleWUqQr字段必须传入，smoothScalesCq字段可选传入 <br>
           出参：所有出参返回非量化数据
       </td>
@@ -999,7 +999,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td>kvCache perchannel量化 </td>
       <td>
-          weight_quant_mode=1，kv_cache_quant_mode=2，query_quant_mode=0<br>
+          weight_quant_mode=1,kv_cache_quant_mode=2,query_quant_mode=0<br>
           入参：weightUqQr传入pertoken量化数据，kvCacheRef、krCacheRef传入perchannel量化数据，其余入参皆为非量化数据。dequantScaleWUqQr、quantScaleCkv、quant_scale_ckr字段必须传入，smoothScalesCq字段可选传入 <br>
           出参：kvCacheRef、krCacheRef返回perchannel量化数据，其余出参返回非量化数据
       </td>
@@ -1007,7 +1007,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td>kvCache pertoken-pergroup量化 </td>
       <td>
-          weight_quant_mode=1, kv_cache_quant_mode=3, query_quant_mode=0<br>
+          weight_quant_mode=1,kv_cache_quant_mode=3,query_quant_mode=0<br>
           入参：weightUqQr传入pertoken量化数据，其余入参皆为非量化数据。dequantScaleWUqQr字段必须传入，smoothScalesCq字段可选传入 <br>
           出参：kvCacheRef返回pertoken-pergroup量化数据，其余出参返回非量化数据
       </td>
@@ -1016,7 +1016,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <td rowspan="3">int8/fp8/hif8全量化</td>
       <td> kvCache非量化</td>
       <td>
-          weight_quant_mode=2/4/5，kv_cache_quant_mode=0，query_quant_mode=0<br>
+          weight_quant_mode=2/4/5,kv_cache_quant_mode=0,query_quant_mode=0<br>
           入参：tokenX传入pertoken量化数据，weightDq、weightUqQr、weightDkvKr传入perchannel量化数据，其余入参皆为非量化数据。dequantScaleX、dequantScaleWDq、dequantScaleWUqQr、dequantScaleWDkvKr字段必须传入，smoothScalesCq字段可选传入 <br>
           出参：所有出参返回非量化数据
       </td>
@@ -1024,7 +1024,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td> kvCache pertensor量化 </td>
       <td>
-          weight_quant_mode=2/4/5，kv_cache_quant_mode=1，query_quant_mode=1<br>
+          weight_quant_mode=2/4/5,kv_cache_quant_mode=1,query_quant_mode=1<br>
           入参：tokenX传入pertoken量化数据，weightDq、weightUqQr、weightDkvKr传入perchannel量化数据，kvCacheRef传入pertensor量化数据，其余入参皆为非量化数据。dequantScaleX、dequantScaleWDq、dequantScaleWUqQr、dequantScaleWDkvKr、quantScaleCkv字段必须传入，smoothScalesCq字段可选传入 <br>
           出参：queryOut返回per-token-head量化数据，kvCacheRef出参返回pertensor量化数据，其余出参返回非量化数据
       </td>
@@ -1032,7 +1032,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td> kvCache pertoken-pergroup量化 </td>
       <td>
-          weight_quant_mode=2/4/5，kv_cache_quant_mode=3，query_quant_mode=0<br>
+          weight_quant_mode=2/4/5,kv_cache_quant_mode=3,query_quant_mode=0<br>
           入参：tokenX传入pertoken量化数据，weightDq、weightUqQr、weightDkvKr传入perchannel量化数据，其余入参皆为非量化数据。dequantScaleX、dequantScaleWDq、dequantScaleWUqQr、dequantScaleWDkvKr字段必须传入，smoothScalesCq字段可选传入 <br>
           出参：kvCacheRef出参返回pertoken-pergroup量化数据，其余出参返回非量化数据
       </td>
@@ -1041,7 +1041,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <td rowspan="3">mxfp8全量化</td>
       <td> kvCache非量化</td>
       <td>
-          weight_quant_mode=3，kv_cache_quant_mode=0，query_quant_mode=0<br>
+          weight_quant_mode=3,kv_cache_quant_mode=0,query_quant_mode=0<br>
           入参：tokenX传入pertoken量化数据，weightDq、weightUqQr、weightDkvKr传入perchannel量化数据，其余入参皆为非量化数据。dequantScaleX、dequantScaleWDq、dequantScaleWUqQr、dequantScaleWDkvKr字段必须传入 <br>
           出参：所有出参返回非量化数据
       </td>
@@ -1049,7 +1049,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td> kvCache pertensor量化 </td>
       <td>
-          weight_quant_mode=3，kv_cache_quant_mode=1，query_quant_mode=1<br>
+          weight_quant_mode=3,kv_cache_quant_mode=1,query_quant_mode=1<br>
           入参：tokenX传入pertoken量化数据，weightDq、weightUqQr、weightDkvKr传入perchannel量化数据，kvCacheRef传入pertensor量化数据，其余入参皆为非量化数据。dequantScaleX、dequantScaleWDq、dequantScaleWUqQr、dequantScaleWDkvKr、quantScaleCkv字段必须传入 <br>
           出参：queryOut返回per-token-head量化数据，kvCacheRef出参返回pertensor量化数据，其余出参返回非量化数据
       </td>
@@ -1057,7 +1057,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td> kvCache pertoken-pergroup量化 </td>
       <td>
-          weight_quant_mode=3，kv_cache_quant_mode=3，query_quant_mode=0<br>
+          weight_quant_mode=3,kv_cache_quant_mode=3,query_quant_mode=0<br>
           入参：tokenX传入pertoken量化数据，weightDq、weightUqQr、weightDkvKr传入perchannel量化数据，其余入参皆为非量化数据。dequantScaleX、dequantScaleWDq、dequantScaleWUqQr、dequantScaleWDkvKr字段必须传入 <br>
           出参：kvCacheRef出参返回pertoken-pergroup量化数据，其余出参返回非量化数据
       </td>
