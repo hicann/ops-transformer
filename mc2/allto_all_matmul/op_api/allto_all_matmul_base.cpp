@@ -280,7 +280,7 @@ extern "C" aclnnStatus InnerAlltoAllMatmulGetWorkspaceSize(
                 "This is an error in launch aicore, aclnnAlltoAllMatmulBaseGetWorkspaceSize interface call failed.");
     }
 
-    if (ret == ACLNN_SUCCESS && *executor != nullptr) {
+    if (ret == ACLNN_SUCCESS && executor != nullptr && *executor != nullptr) {
         void *args = reinterpret_cast<void *>(static_cast<uint8_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, args);
     }
@@ -349,6 +349,7 @@ extern "C" aclnnStatus aclnnAlltoAllMatmulBase(void *workspace, uint64_t workspa
         } else if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93) {
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_AICPU);
         } else if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+            CHECK_RET(executor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
             void *arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
