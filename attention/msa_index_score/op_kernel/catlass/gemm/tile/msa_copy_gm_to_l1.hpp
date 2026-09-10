@@ -1141,6 +1141,10 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {
 };
 /////////////////////////////////
 
+template <class Element>
+struct CopyGmToL1<Arch::AtlasA5, Gemm::GemmType<Element, layout::RowMajor>>
+    : CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {};
+
 /// Partial specialization for AtlasA2, ColumnMajor in and nZ out.
 template <class Element>
 struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::ColumnMajor>> {
@@ -1189,6 +1193,10 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::ColumnMajor>> {
         }
     }
 };
+
+template <class Element>
+struct CopyGmToL1<Arch::AtlasA5, Gemm::GemmType<Element, layout::ColumnMajor>>
+    : CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::ColumnMajor>> {};
 
 /// Partial specialization for zN in and zN out.
 template <class ArchTag, class Element>

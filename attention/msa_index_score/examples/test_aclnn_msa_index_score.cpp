@@ -13,12 +13,16 @@
  * \brief aclnnMsaIndexScore 调用示例，内置 CPU golden 做端到端精度自验证。
  *
  * 用例矩阵覆盖：Prefill 多 M-tile、prefix 非 128 对齐的边界 block、varlen 多 batch、
- * Decode(q_len=1)、投机解码(q_len>1)、长序列多 S-tile 轮转、block_table 乱序、
- * 无效尾填充、bf16 / fp16 双 dtype、int8 key 前融合反量化、PA BNBD、TND packed key。
+ * Decode(q_len=1)、投机解码(q_len>1)、短 decode（Hq=4 / 宽 block_table）、
+ * 长序列多 S-tile 轮转、block_table 乱序、
+ * 无效尾填充、q_len/kv_len=0 的 mixed-batch pad、bf16 / fp16 双 dtype、
+ * int8 key 前融合反量化、PA BNBD、TND packed key、A2/A3 与 950 PA key dim0 非连续。
  */
 
 #include <algorithm>
 #include <cmath>
+#include <cfenv>
+#include <fenv.h>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -38,6 +42,8 @@ constexpr int64_t SCORE_STRIDE_ALIGN = 16;
 constexpr float kNegInf = -3.4028234663852886e+38F;
 constexpr float kAtol = 1e-3F;
 constexpr float kRtol = 1e-3F;
+constexpr float kAtolFp8 = 2e-2F;
+constexpr float kRtolFp8 = 2e-2F;
 constexpr int64_t kSparseModeRightDown = 3;
 constexpr uint32_t kBf16Shift = 16;
 constexpr uint32_t kPrngMulA = 1664525U;
@@ -53,6 +59,8 @@ constexpr float kBoostThr = 1.0e28F;
 constexpr float kInt8Scale = 64.0F;
 constexpr float kDeqScaleBase = 0.01F;
 constexpr float kDeqScaleSpan = 0.02F;
+constexpr float kKeyStridePoisonFp = 99.0F;
+constexpr int8_t kKeyStridePoisonI8 = 90;
 constexpr uint32_t kKeySeedOff = 999983U;
 constexpr uint32_t kDeqSeedOff = 424242U;
 constexpr int64_t kBlockTableMulB = 7;
@@ -60,6 +68,16 @@ constexpr int64_t kBlockTableMulK = 3;
 constexpr int64_t kTraceExtraTok = 2;
 constexpr int64_t kPrevDimOffset = 2; // 从末维向前推 stride 时的偏移
 constexpr size_t kLayoutKeyBufSize = 8;
+constexpr int kFp8E4M3ExpBits = 4;
+constexpr int kFp8E4M3MantissaBits = 3;
+constexpr int kFp8E4M3ExpBias = (1 << (kFp8E4M3ExpBits - 1)) - 1;
+constexpr float kFp8E4M3MantissaScale = static_cast<float>(1 << kFp8E4M3MantissaBits);
+constexpr int kFp8E5M2ExpBits = 5;
+constexpr int kFp8E5M2MantissaBits = 2;
+constexpr int kFp8E5M2ExpBias = (1 << (kFp8E5M2ExpBits - 1)) - 1;
+constexpr float kFp8E5M2MantissaScale = static_cast<float>(1 << kFp8E5M2MantissaBits);
+constexpr int kFp8MinNormalExp = 1; // IEEE 次正规数 ldexp 指数为 1-bias
+constexpr int kFp8CodeCount = static_cast<int>(std::numeric_limits<uint8_t>::max()) + 1;
 
 enum class KeyLayout {
     BBND = 0,
@@ -92,6 +110,12 @@ struct TestCase {
     bool useInt8Key; // true: key=int8，scale=[NP,N_kv,P] 或 TND [T2,N2]
     int64_t sparseMode = kSparseModeRightDown;
     KeyLayout keyLayout = KeyLayout::BBND;
+    // 0=无；1=float8_e4m3fn；2=float8_e5m2。仅 950，query/key 同型。
+    int fp8Kind = 0;
+    // PA key dim0 间隔：1=紧凑；>1 时 storage 为 key|gap|key|...（A2/A3 与 950）。
+    int64_t keyDim0Gap = 1;
+    // PA block_table 第二维；0 表示按 kv_len 取 maxBlocks。>256 覆盖 950 C2UB 滑窗 flush。
+    int64_t tableWidth = 0;
 };
 
 constexpr float kLocalScoreInit = 1.0e30F;
@@ -100,9 +124,15 @@ constexpr int64_t kInitBlocks = 0;
 constexpr int64_t kLocalBlocks = 1;
 constexpr int64_t kAttenMaskSize = 2048;
 
-int64_t CeilDivI64(int64_t a, int64_t b) { return (a + b - 1) / b; }
+int64_t CeilDivI64(int64_t a, int64_t b)
+{
+    return (a + b - 1) / b;
+}
 
-int64_t RoundUpI64(int64_t a, int64_t b) { return CeilDivI64(a, b) * b; }
+int64_t RoundUpI64(int64_t a, int64_t b)
+{
+    return CeilDivI64(a, b) * b;
+}
 
 // 简单可复现的伪随机源，取值落在 [-1, 1)。
 float PseudoRandom(uint32_t seed)
@@ -136,6 +166,81 @@ float Bf16ToFloat(uint16_t v)
     return out;
 }
 
+// OCP E4M3FN：exp=15 且 mant=7 为 NaN，其余有限；bias=7。
+float Fp8E4M3fnToFloat(uint8_t x)
+{
+    const uint32_t s = (static_cast<uint32_t>(x) >> 7) & 1U;
+    const uint32_t e = (static_cast<uint32_t>(x) >> 3) & 0xFU;
+    const uint32_t m = static_cast<uint32_t>(x) & 7U;
+    if (e == 0xFU && m == 7U) {
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+    const float sign = (s != 0U) ? -1.0F : 1.0F;
+    if (e == 0U) {
+        return sign * std::ldexp(static_cast<float>(m) / kFp8E4M3MantissaScale, kFp8MinNormalExp - kFp8E4M3ExpBias);
+    }
+    return sign *
+           std::ldexp(1.0F + static_cast<float>(m) / kFp8E4M3MantissaScale, static_cast<int>(e) - kFp8E4M3ExpBias);
+}
+
+// IEEE-like E5M2：bias=15，exp=31 为 Inf/NaN。
+float Fp8E5M2ToFloat(uint8_t x)
+{
+    const uint32_t s = (static_cast<uint32_t>(x) >> 7) & 1U;
+    const uint32_t e = (static_cast<uint32_t>(x) >> 2) & 0x1FU;
+    const uint32_t m = static_cast<uint32_t>(x) & 3U;
+    const float sign = (s != 0U) ? -1.0F : 1.0F;
+    if (e == 0x1FU) {
+        return (m == 0U) ? (sign * std::numeric_limits<float>::infinity()) : std::numeric_limits<float>::quiet_NaN();
+    }
+    if (e == 0U) {
+        return sign * std::ldexp(static_cast<float>(m) / kFp8E5M2MantissaScale, kFp8MinNormalExp - kFp8E5M2ExpBias);
+    }
+    return sign *
+           std::ldexp(1.0F + static_cast<float>(m) / kFp8E5M2MantissaScale, static_cast<int>(e) - kFp8E5M2ExpBias);
+}
+
+uint8_t FloatToFp8Nearest(float v, bool e5m2)
+{
+    uint8_t best = 0;
+    float bestDiff = std::numeric_limits<float>::infinity();
+    for (int i = 0; i < kFp8CodeCount; ++i) {
+        const uint8_t b = static_cast<uint8_t>(i);
+        const float d = e5m2 ? Fp8E5M2ToFloat(b) : Fp8E4M3fnToFloat(b);
+        if (!std::isfinite(d)) {
+            continue;
+        }
+        const float diff = std::fabs(d - v);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            best = b;
+        }
+    }
+    return best;
+}
+
+template <typename T>
+std::vector<T> ScatterPaKeyDim0(const std::vector<T> &packed, int64_t numPages, int64_t pageElems, int64_t gap,
+                                T poison)
+{
+    std::vector<T> wide(static_cast<size_t>(numPages * gap * pageElems), poison);
+    for (int64_t p = 0; p < numPages; ++p) {
+        const auto src = packed.begin() + static_cast<size_t>(p * pageElems);
+        const auto dst = wide.begin() + static_cast<size_t>(p * gap * pageElems);
+        std::copy(src, src + static_cast<size_t>(pageElems), dst);
+    }
+    return wide;
+}
+
+std::vector<int64_t> ContiguousStrides(const std::vector<int64_t> &shape)
+{
+    std::vector<int64_t> strides(shape.size(), 1);
+    for (int64_t i = static_cast<int64_t>(shape.size()) - kPrevDimOffset; i >= 0; i--) {
+        strides[static_cast<size_t>(i)] = shape[static_cast<size_t>(i + 1)] * strides[static_cast<size_t>(i + 1)];
+    }
+    return strides;
+}
+
 class DeviceBuffer {
 public:
     ~DeviceBuffer()
@@ -154,23 +259,33 @@ public:
 
     template <typename T>
     aclTensor *Create(const std::vector<T> &host, const std::vector<int64_t> &shape, aclDataType dtype,
-                      void **addrOut = nullptr)
+                      void **addrOut = nullptr, const std::vector<int64_t> *storageShape = nullptr,
+                      const std::vector<int64_t> *stridesIn = nullptr)
     {
         void *devAddr = nullptr;
         const size_t bytes = host.size() * sizeof(T);
-        if (aclrtMalloc(&devAddr, bytes, ACL_MEM_MALLOC_HUGE_FIRST) != ACL_SUCCESS) {
+        // 空张量（T1=0 / T2=0）仍需要合法 device 指针；aclrtMalloc(0) 会失败。
+        const size_t allocBytes = (bytes == 0) ? static_cast<size_t>(32) : bytes;
+        if (aclrtMalloc(&devAddr, allocBytes, ACL_MEM_MALLOC_HUGE_FIRST) != ACL_SUCCESS) {
             return nullptr;
         }
         addrs_.push_back(devAddr);
-        if (aclrtMemcpy(devAddr, bytes, host.data(), bytes, ACL_MEMCPY_HOST_TO_DEVICE) != ACL_SUCCESS) {
+        if (bytes > 0 && aclrtMemcpy(devAddr, bytes, host.data(), bytes, ACL_MEMCPY_HOST_TO_DEVICE) != ACL_SUCCESS) {
             return nullptr;
         }
-        std::vector<int64_t> strides(shape.size(), 1);
-        for (int64_t i = static_cast<int64_t>(shape.size()) - kPrevDimOffset; i >= 0; i--) {
-            strides[i] = shape[i + 1] * strides[i + 1];
+        const std::vector<int64_t> &stShape = (storageShape != nullptr) ? *storageShape : shape;
+        std::vector<int64_t> strides;
+        if (stridesIn != nullptr) {
+            strides = *stridesIn;
+        } else {
+            strides.assign(shape.size(), 1);
+            for (int64_t i = static_cast<int64_t>(shape.size()) - kPrevDimOffset; i >= 0; i--) {
+                strides[static_cast<size_t>(i)] =
+                    shape[static_cast<size_t>(i + 1)] * strides[static_cast<size_t>(i + 1)];
+            }
         }
         aclTensor *t = aclCreateTensor(shape.data(), shape.size(), dtype, strides.data(), 0, ACL_FORMAT_ND,
-                                       shape.data(), shape.size(), devAddr);
+                                       stShape.data(), stShape.size(), devAddr);
         tensors_.push_back(t);
         if (addrOut != nullptr) {
             *addrOut = devAddr;
@@ -337,7 +452,8 @@ void PrintTracePipeline(const TestCase &tc, const std::vector<int32_t> &actualSe
     (void)maxBlocks;
 }
 
-bool Compare(const std::string &name, const std::vector<float> &actual, const std::vector<float> &golden)
+bool Compare(const std::string &name, const std::vector<float> &actual, const std::vector<float> &golden, float atol,
+             float rtol)
 {
     size_t badCount = 0;
     size_t infBad = 0;
@@ -350,7 +466,7 @@ bool Compare(const std::string &name, const std::vector<float> &actual, const st
         const float g = golden[i];
         const float a = actual[i];
         if (g <= kNegInf * kFillCmpScale) { // 填充位：要求实测同样是极小值
-            if (!(a <= kNegInf * kFillCmpScale)) {
+            if (!(std::isfinite(a) && a <= kNegInf * kFillCmpScale) && !(std::isinf(a) && a < 0)) {
                 if (!hasBad) {
                     firstBad = i;
                     hasBad = true;
@@ -370,9 +486,17 @@ bool Compare(const std::string &name, const std::vector<float> &actual, const st
             continue;
         }
         ++total;
+        if (!std::isfinite(a) || !std::isfinite(g)) {
+            if (!hasBad) {
+                firstBad = i;
+                hasBad = true;
+            }
+            ++badCount;
+            continue;
+        }
         const float diff = std::fabs(a - g);
         maxAbsDiff = diff > maxAbsDiff ? diff : maxAbsDiff;
-        if (diff > kAtol + kRtol * std::fabs(g)) {
+        if (diff > atol + rtol * std::fabs(g)) {
             if (!hasBad) {
                 firstBad = i;
                 hasBad = true;
@@ -404,14 +528,19 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
     for (int64_t b = 0; b < batch; ++b) {
         maxBlocks = std::max<int64_t>(maxBlocks, CeilDivI64(tc.kvLen[b], BLOCK_SIZE));
     }
+    if (tc.tableWidth > maxBlocks) {
+        maxBlocks = tc.tableWidth;
+    }
     const int64_t scoreStride = RoundUpI64(maxBlocks, SCORE_STRIDE_ALIGN);
 
     // block_table 故意打乱，验证 paged 间接寻址。
     std::vector<int32_t> blockTable(static_cast<size_t>(batch * maxBlocks), 0);
-    for (int64_t b = 0; b < batch; ++b) {
-        for (int64_t k = 0; k < maxBlocks; ++k) {
-            blockTable[b * maxBlocks + k] =
-                static_cast<int32_t>((b * kBlockTableMulB + k * kBlockTableMulK + 1) % tc.numPages);
+    if (tc.numPages > 0) {
+        for (int64_t b = 0; b < batch; ++b) {
+            for (int64_t k = 0; k < maxBlocks; ++k) {
+                blockTable[b * maxBlocks + k] =
+                    static_cast<int32_t>((b * kBlockTableMulB + k * kBlockTableMulK + 1) % tc.numPages);
+            }
         }
     }
 
@@ -432,10 +561,17 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
     std::vector<uint16_t> keyBf(keyF.size());
     std::vector<aclFloat16> queryHf(queryF.size());
     std::vector<aclFloat16> keyHf(keyF.size());
+    std::vector<uint8_t> queryFp8(queryF.size());
+    std::vector<uint8_t> keyFp8(keyF.size());
+    const bool isFp8 = (tc.fp8Kind != 0);
+    const bool isE5M2 = (tc.fp8Kind == 2);
 
     for (size_t i = 0; i < queryF.size(); ++i) {
         const float v = PseudoRandom(static_cast<uint32_t>(i) + 1U) * kQueryAmp;
-        if (tc.useBf16) {
+        if (isFp8) {
+            queryFp8[i] = FloatToFp8Nearest(v, isE5M2);
+            queryF[i] = isE5M2 ? Fp8E5M2ToFloat(queryFp8[i]) : Fp8E4M3fnToFloat(queryFp8[i]);
+        } else if (tc.useBf16) {
             queryBf[i] = FloatToBf16(v);
             queryF[i] = Bf16ToFloat(queryBf[i]);
         } else {
@@ -451,7 +587,10 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
             keyF[i] = static_cast<float>(qv);
         } else {
             const float v = PseudoRandom(static_cast<uint32_t>(i) + kKeySeedOff) * kQueryAmp;
-            if (tc.useBf16) {
+            if (isFp8) {
+                keyFp8[i] = FloatToFp8Nearest(v, isE5M2);
+                keyF[i] = isE5M2 ? Fp8E5M2ToFloat(keyFp8[i]) : Fp8E4M3fnToFloat(keyFp8[i]);
+            } else if (tc.useBf16) {
                 keyBf[i] = FloatToBf16(v);
                 keyF[i] = Bf16ToFloat(keyBf[i]);
             } else {
@@ -485,13 +624,63 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
     }
     const std::vector<int64_t> scoreShape = {tc.numQHeads, totalQ, scoreStride};
 
-    aclTensor *queryT =
-        tc.useBf16 ? buf.Create(queryBf, queryShape, ACL_BF16) : buf.Create(queryHf, queryShape, ACL_FLOAT16);
+    aclTensor *queryT = nullptr;
+    if (isFp8) {
+        const aclDataType fp8Dt = isE5M2 ? ACL_FLOAT8_E5M2 : ACL_FLOAT8_E4M3FN;
+        queryT = buf.Create(queryFp8, queryShape, fp8Dt);
+    } else {
+        queryT = tc.useBf16 ? buf.Create(queryBf, queryShape, ACL_BF16) : buf.Create(queryHf, queryShape, ACL_FLOAT16);
+    }
+
+    const int64_t keyDim0Gap = (isTnd || tc.keyDim0Gap < 1) ? 1 : tc.keyDim0Gap;
+    std::vector<int64_t> keyStorageShape = keyShape;
+    std::vector<int64_t> keyStrides = ContiguousStrides(keyShape);
+    const std::vector<int64_t> *keyStoragePtr = nullptr;
+    const std::vector<int64_t> *keyStridePtr = nullptr;
+    int64_t pageElems = 1;
+    if (keyDim0Gap > 1) {
+        for (size_t d = 1; d < keyShape.size(); ++d) {
+            pageElems *= keyShape[d];
+        }
+        keyStorageShape[0] = tc.numPages * keyDim0Gap;
+        keyStrides[0] = keyDim0Gap * keyStrides[0];
+        keyStoragePtr = &keyStorageShape;
+        keyStridePtr = &keyStrides;
+    }
+
     aclTensor *keyT = nullptr;
     if (tc.useInt8Key) {
-        keyT = buf.Create(keyI8, keyShape, ACL_INT8);
+        if (keyDim0Gap > 1) {
+            const auto wide = ScatterPaKeyDim0(keyI8, tc.numPages, pageElems, keyDim0Gap, kKeyStridePoisonI8);
+            keyT = buf.Create(wide, keyShape, ACL_INT8, nullptr, keyStoragePtr, keyStridePtr);
+        } else {
+            keyT = buf.Create(keyI8, keyShape, ACL_INT8);
+        }
+    } else if (isFp8) {
+        const aclDataType fp8Dt = isE5M2 ? ACL_FLOAT8_E5M2 : ACL_FLOAT8_E4M3FN;
+        if (keyDim0Gap > 1) {
+            const uint8_t poison = FloatToFp8Nearest(kKeyStridePoisonFp, isE5M2);
+            const auto wide = ScatterPaKeyDim0(keyFp8, tc.numPages, pageElems, keyDim0Gap, poison);
+            keyT = buf.Create(wide, keyShape, fp8Dt, nullptr, keyStoragePtr, keyStridePtr);
+        } else {
+            keyT = buf.Create(keyFp8, keyShape, fp8Dt);
+        }
+    } else if (tc.useBf16) {
+        if (keyDim0Gap > 1) {
+            const auto wide =
+                ScatterPaKeyDim0(keyBf, tc.numPages, pageElems, keyDim0Gap, FloatToBf16(kKeyStridePoisonFp));
+            keyT = buf.Create(wide, keyShape, ACL_BF16, nullptr, keyStoragePtr, keyStridePtr);
+        } else {
+            keyT = buf.Create(keyBf, keyShape, ACL_BF16);
+        }
     } else {
-        keyT = tc.useBf16 ? buf.Create(keyBf, keyShape, ACL_BF16) : buf.Create(keyHf, keyShape, ACL_FLOAT16);
+        if (keyDim0Gap > 1) {
+            const auto wide =
+                ScatterPaKeyDim0(keyHf, tc.numPages, pageElems, keyDim0Gap, aclFloatToFloat16(kKeyStridePoisonFp));
+            keyT = buf.Create(wide, keyShape, ACL_FLOAT16, nullptr, keyStoragePtr, keyStridePtr);
+        } else {
+            keyT = buf.Create(keyHf, keyShape, ACL_FLOAT16);
+        }
     }
     aclTensor *blockTableT = nullptr;
     if (!isTnd) {
@@ -554,7 +743,9 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
         (void)aclrtFree(workspaceAddr);
         return false;
     }
+    (void)printf("  [%s] kernel launched, synchronizing...\n", tc.name.c_str());
     (void)aclrtSynchronizeStream(stream);
+    (void)printf("  [%s] synchronized\n", tc.name.c_str());
 
     std::vector<float> actual(scoreInit.size(), 0.0F);
     (void)aclrtMemcpy(actual.data(), actual.size() * sizeof(float), scoreDev, actual.size() * sizeof(float),
@@ -570,13 +761,19 @@ bool RunCase(const TestCase &tc, aclrtStream stream)
         PrintTracePipeline(tc, actualSeqQlen, blockTable, maxBlocks, scoreStride, totalQ, queryF, keyF, deqScale,
                            actual);
     }
-    return Compare(tc.name, actual, golden);
+    return Compare(tc.name, actual, golden, isFp8 ? kAtolFp8 : kAtol, isFp8 ? kRtolFp8 : kRtol);
 }
 
 } // namespace
 
 int main()
 {
+    setvbuf(stdout, nullptr, _IONBF, 0);
+#if defined(__linux__)
+    (void)fedisableexcept(FE_ALL_EXCEPT);
+    fenv_t fenvHold;
+    (void)feholdexcept(&fenvHold);
+#endif
     const int32_t deviceId = 0;
     aclrtStream stream = nullptr;
     if (aclInit(nullptr) != ACL_SUCCESS || aclrtSetDevice(deviceId) != ACL_SUCCESS ||
@@ -624,19 +821,180 @@ int main()
          KeyLayout::TND},
         {"L1-tnd-int8", 8, 128, 0, {32, 17}, {300, 130}, {2, 0}, false, true, kSparseModeRightDown, KeyLayout::TND},
         {"L0-tnd-tiny", 2, 16, 0, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::TND},
+        // FP8：C0=32，headDim 用 128 对齐；D=16 半个 C0 数值不可靠。
+        {"L0-fp8-e4m3fn", 2, 128, 2, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::BBND, 1},
+        {"L0-fp8-e5m2", 2, 128, 2, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::BBND, 2},
+        {"L1-fp8-e4m3fn-prefill", 8, 128, 8, {32}, {256}, {1}, false, false, kSparseModeRightDown, KeyLayout::BBND, 1},
+        // mixed-batch 零长度：部分请求 pad。整 batch 全 0 见文末 L0-all-* / L0-tnd-all-*。
+        {"L1-pad-q0", 8, 128, 8, {0, 32}, {256, 256}, {1, 1}, false, false},
+        {"L1-pad-kv0", 8, 128, 8, {32, 32}, {0, 256}, {0, 1}, false, false},
+        {"L1-pad-q0-kv0", 8, 128, 8, {0, 32}, {0, 256}, {0, 1}, false, false},
+        {"L1-pad-mid-q0", 8, 128, 8, {16, 0, 16}, {200, 0, 200}, {1, 0, 1}, false, false},
+        {"L1-tnd-pad-q0-kv0", 8, 128, 0, {0, 32}, {0, 256}, {0, 1}, false, false, kSparseModeRightDown, KeyLayout::TND},
+        // 整 batch 空序列：host 跳过计算（A2/A3 与 950）。
+        {"L0-all-q0", 8, 128, 8, {0}, {256}, {1}, false, false},
+        {"L0-all-kv0", 8, 128, 8, {32}, {0}, {0}, false, false},
+        {"L0-all-q0-kv0", 8, 128, 8, {0}, {0}, {0}, false, false},
+        {"L1-all-q0", 8, 128, 8, {0, 0}, {256, 256}, {1, 1}, false, false},
+        {"L0-tnd-all-q0", 8, 128, 0, {0}, {256}, {1}, false, false, kSparseModeRightDown, KeyLayout::TND},
+        {"L0-tnd-all-kv0", 8, 128, 0, {32}, {0}, {0}, false, false, kSparseModeRightDown, KeyLayout::TND},
+        {"L0-tnd-all-q0-kv0", 8, 128, 0, {0}, {0}, {0}, false, false, kSparseModeRightDown, KeyLayout::TND},
+        // PA key dim0 非连续（A2/A3 与 950）：间隔槽下毒，错 stride 会读到 poison。
+        {"L0-stride-bbnd", 2, 16, 2, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::BBND, 0, 2},
+        {"L1-stride-bbnd",
+         8,
+         128,
+         8,
+         {32, 17},
+         {300, 130},
+         {2, 0},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         0,
+         2},
+        {"L1-stride-bnbd",
+         8,
+         128,
+         8,
+         {32, 17},
+         {300, 130},
+         {2, 0},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BNBD,
+         0,
+         2},
+        {"L1-stride-int8",
+         8,
+         128,
+         8,
+         {32, 17},
+         {300, 130},
+         {2, 0},
+         false,
+         true,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         0,
+         2},
+        // block_table 宽 257：score 末维 RoundUp=272 > UB 单窗 256，950 C2UB 滑窗 flush。
+        {"L0-wide-table-257", 2, 16, 2, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::BBND, 0, 1, 257},
+        {"L0-fp8-wide-table-257",
+         2,
+         128,
+         2,
+         {2},
+         {5},
+         {16},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         1,
+         1,
+         257},
+        {"L1-wide-table-257-bf16",
+         8,
+         128,
+         8,
+         {32},
+         {256},
+         {1},
+         true,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         0,
+         1,
+         257},
+        // 短 decode：少量 M-tile + 可选宽 block_table（对齐 vLLM decode 类输入）。
+        {"L0-decode-q4-kv4", 4, 128, 4, {4}, {4}, {16}, false, false},
+        {"L0-decode-q4-kv4-b2", 4, 128, 8, {4, 4}, {4, 8}, {16, 16}, false, false},
+        {"L0-decode-q4-kv4-table275",
+         4,
+         128,
+         4,
+         {4},
+         {4},
+         {16},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         0,
+         1,
+         275},
+        {"L0-fp8-decode-q4-kv4", 4, 128, 4, {4}, {4}, {16}, false, false, kSparseModeRightDown, KeyLayout::BBND, 1},
+        {"L0-fp8-decode-q4-kv4-table275",
+         4,
+         128,
+         4,
+         {4},
+         {4},
+         {16},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         1,
+         1,
+         275},
+        {"L0-fp8-decode-q1-kv4-table275",
+         4,
+         128,
+         4,
+         {1},
+         {4},
+         {16},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         1,
+         1,
+         275},
+        {"L0-fp8-decode-q4-kv128-table275",
+         4,
+         128,
+         4,
+         {4},
+         {128},
+         {16},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         1,
+         1,
+         275},
     };
 
     size_t passed = 0;
-    (void)printf("running %zu MsaIndexScore cases\n", cases.size());
+    size_t ran = 0;
+    size_t skipped = 0;
+    const char *socName = aclrtGetSocName();
+    const std::string soc = (socName == nullptr) ? "" : socName;
+    const bool isAscend950 = (soc.find("950") != std::string::npos) || (soc.find("910_95") != std::string::npos);
+    (void)printf("running %zu MsaIndexScore cases (soc=%s)\n", cases.size(), soc.empty() ? "?" : soc.c_str());
     for (const auto &tc : cases) {
+        if (tc.fp8Kind != 0 && !isAscend950) {
+            (void)printf("  [%s] SKIP: FP8 is Ascend 950 only\n", tc.name.c_str());
+            ++skipped;
+            continue;
+        }
+        ++ran;
         if (RunCase(tc, stream)) {
             ++passed;
         }
     }
-    (void)printf("%s: %zu/%zu cases passed\n", passed == cases.size() ? "[PASS]" : "[FAIL]", passed, cases.size());
+    const std::string extra = (skipped == 0) ? "" : (" (skipped " + std::to_string(skipped) + ")");
+    (void)printf("%s: %zu/%zu cases passed%s\n", passed == ran ? "[PASS]" : "[FAIL]", passed, ran, extra.c_str());
 
     (void)aclrtDestroyStream(stream);
     (void)aclrtResetDevice(deviceId);
     (void)aclFinalize();
-    return passed == cases.size() ? 0 : -1;
+    return passed == ran ? 0 : -1;
 }

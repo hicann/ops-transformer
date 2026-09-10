@@ -468,6 +468,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/msa_index_score/README.md">msa_index_score</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算 MSA Index Branch 的 block score，对每个 query token 与 KV sparse block 做 matmul+maxpool 得到重要性分数。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/nsa_compress/README.md">nsa_compress</a></td>
     <td>✓</td>
     <td>✓</td>
