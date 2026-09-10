@@ -23,7 +23,7 @@ using namespace Ops::Transformer::OpTiling;
 
 namespace optiling {
 namespace FFAG {
-constexpr uint32_t CORE_LIST_NUM = 50;
+constexpr uint32_t CORE_LIST_NUM = 128;
 constexpr uint32_t ARRAY_LENGTH = 3;
 struct FuzzyBaseInfoParams { // 频繁使用的基础参数
     int64_t coreNum = 0;
@@ -129,11 +129,11 @@ struct FuzzyBaseInfoParams { // 频繁使用的基础参数
 
 class FusedFloydAttentionGradTilingS1s2Bn2gs1s2 : public TilingBaseClass {
 public:
-    explicit FusedFloydAttentionGradTilingS1s2Bn2gs1s2(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-
-    }
+    explicit FusedFloydAttentionGradTilingS1s2Bn2gs1s2(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
     FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2 tilingData;
+
 protected:
     bool IsCapable() override;
     ge::graphStatus GetPlatformInfo() override;

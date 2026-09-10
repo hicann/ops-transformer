@@ -264,7 +264,9 @@ __aicore__ inline void FusedFloydAttentionS1s2Bn2gs1Special<
     this->ComputeConstexpr();
     this->InitBuffer();
     LocalTensor<T> apiTmpBuffer = this->commonTBuf.template Get<T>();
+#if defined(__DAV_C220_CUBE__)
     DropOutBitModeInit(apiTmpBuffer);
+#endif
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
