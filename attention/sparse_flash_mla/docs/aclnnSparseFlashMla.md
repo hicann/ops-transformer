@@ -897,7 +897,7 @@ int main()
   std::vector<int64_t> metadataShape = {1024};
   std::vector<int64_t> attnOutShape = {T1, N1, D};
   std::vector<int64_t> softmaxLseShape = {T1, N1, 1};
-  // 对全部 5 个输入调用 Contiguous，optional 输入传 shape 为 {0} 的空 tensor。
+  // optional 输入传 shape 为 {0} 的空 tensor。
   std::vector<int64_t> emptyShape = {0};
 
   void* qDeviceAddr = nullptr;

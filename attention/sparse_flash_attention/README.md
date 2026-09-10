@@ -119,7 +119,7 @@
       <td>scale_value</td>
       <td>可选属性</td>
       <td>代表缩放系数。</td>
-      <td>FLOAT16</td>
+      <td>FLOAT</td>
       <td>-</td>
     </tr>
     <tr>

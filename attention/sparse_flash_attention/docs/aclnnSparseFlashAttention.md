@@ -257,7 +257,7 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>输入</td>
       <td>代表缩放系数。</td>
       <td>-</td>
-      <td>FLOAT16</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -644,8 +644,8 @@ int InitializeTensors(TensorResources& resources) {
     std::vector<int64_t> valueShape = {1, 2, 1, 512};
     std::vector<int64_t> sparseIndicesShape = {1, 2, 1, 2};
     std::vector<int64_t> attentionOutShape = {1, 2, 1, 512};
-    std::vector<int64_t> softmaxMaxShape = {1, 2, 1, 16};
-    std::vector<int64_t> softmaxSumShape = {1, 2, 1, 16};
+    std::vector<int64_t> softmaxMaxShape = {1, 1, 2, 1};
+    std::vector<int64_t> softmaxSumShape = {1, 1, 2, 1};
     std::vector<int64_t> queryRopeShape = {1, 2, 1, 64};
     std::vector<int64_t> keyRopeShape = {1, 2, 1, 64};
 
@@ -659,15 +659,15 @@ int InitializeTensors(TensorResources& resources) {
     int64_t queryRopeShapeSize = GetShapeSize(queryRopeShape);
     int64_t keyRopeShapeSize = GetShapeSize(keyRopeShape);
 
-    std::vector<float> queryHostData(queryShapeSize, 1);
-    std::vector<float> keyHostData(keyShapeSize, 1);
-    std::vector<float> valueHostData(valueShapeSize, 1);
+    std::vector<aclFloat16> queryHostData(queryShapeSize, 1);
+    std::vector<aclFloat16> keyHostData(keyShapeSize, 1);
+    std::vector<aclFloat16> valueHostData(valueShapeSize, 1);
     std::vector<int32_t> sparseIndicesHostData(sparseIndicesShapeSize, 1);
-    std::vector<float> attentionOutHostData(attentionOutShapeSize, 1);
+    std::vector<aclFloat16> attentionOutHostData(attentionOutShapeSize, 1);
     std::vector<float> softmaxMaxHostData(softmaxMaxShapeSize, 1);
     std::vector<float> softmaxSumHostData(softmaxSumShapeSize, 1);
-    std::vector<float> queryRopeHostData(queryRopeShapeSize, 1);
-    std::vector<float> keyRopeHostData(keyRopeShapeSize, 1);
+    std::vector<aclFloat16> queryRopeHostData(queryRopeShapeSize, 1);
+    std::vector<aclFloat16> keyRopeHostData(keyRopeShapeSize, 1);
 
     // Create query aclTensor.
     int ret = CreateAclTensor(queryHostData, queryShape, &resources.queryDeviceAddr,
@@ -880,9 +880,9 @@ int main() {
     TensorResources resources = {};
     void* workspaceAddr = nullptr;
     uint64_t workspaceSize = 0;
-    std::vector<int64_t> attentionOutShape = {1, 2, 1, 16};
-    std::vector<int64_t> softmaxMaxShape = {1, 2, 1, 16};
-    std::vector<int64_t> softmaxSumShape = {1, 2, 1, 16};
+    std::vector<int64_t> attentionOutShape = {1, 2, 1, 512};
+    std::vector<int64_t> softmaxMaxShape = {1, 1, 2, 1};
+    std::vector<int64_t> softmaxSumShape = {1, 1, 2, 1};
     int ret = ACL_SUCCESS;
 
     // 1. Initialize device and stream
