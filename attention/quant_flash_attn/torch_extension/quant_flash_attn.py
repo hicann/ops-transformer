@@ -205,7 +205,7 @@ class QuantFlashAttnOpBuilder(OpBuilder):
         ):
             b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
             max_schedule_size = _calculate_max_schedule_size(b_size, num_heads_kv)
-            return torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
+            return torch.empty((2, max_schedule_size), dtype=torch.int32, device="meta")
 
         @impl(get_as_library(), self.name, "Meta")
         def quant_flash_attn_meta(
@@ -287,8 +287,8 @@ class QuantFlashAttnOpBuilder(OpBuilder):
                 attention_out_size = (b_size, s_size, n_size, d_size)
 
             return (
-                torch.empty(attention_out_size, dtype=torch.bfloat16, device="meta"),
-                torch.empty(softmax_out_size, dtype=torch.float32, device="meta"),
+                torch.empty(attention_out_size, dtype=torch.bfloat16, device=q.device),
+                torch.empty(softmax_out_size, dtype=torch.float32, device=q.device),
             )
 
 
