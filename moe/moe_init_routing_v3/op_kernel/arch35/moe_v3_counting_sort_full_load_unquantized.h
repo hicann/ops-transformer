@@ -281,7 +281,9 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::Process()
 {
     if (blockIdx_ >= filterNeedCoreNum_) {
         SyncAll(); // 等 Phase A：各核计数写回 GM 完成
-        SyncAll(); // 等 Phase C：各核 expandedRowIdx 写 GM 完成（tail 核与会者补全，保证 barrier 对称）
+        if (isInputTopkWeight_) {
+            SyncAll(); // 等 Phase C：各核 expandedRowIdx 写 GM 完成（tail 核与会者补全，保证 barrier 对称）
+        }
         return;
     }
 
@@ -305,8 +307,10 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::Process()
     GatherAndWrite();
 
     // Phase D: topk 重排输出（scatter/gather dropless，见 TopkWeightPhase）
-    SyncAll(); // 等全部核的 expandedRowIdx 写 GM 完成，随后 SIMT 读回 map
-    TopkWeightPhase();
+    if (isInputTopkWeight_) {
+        SyncAll(); // 等全部核的 expandedRowIdx 写 GM 完成，随后 SIMT 读回 map
+        TopkWeightPhase();
+    }
 }
 
 template <typename T>
