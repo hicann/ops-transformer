@@ -26,7 +26,7 @@ bool UnQuantMatmulAllReduceTiling310::IsCapable()
     OP_TILING_CHECK(weightTensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "weight"),
                     return false);
     auto format = weightTensor->GetStorageFormat();
-    if ((npuArch_ != Ops::Base::DAV_2002) || (format == ge::Format::FORMAT_ND)) {
+    if ((npuArch_ != NpuArch::DAV_2002) || (format == ge::Format::FORMAT_ND)) {
         OP_LOGI(opName_, "skip normalized unquant tiling when is not 310p or not weight nz[%d].", format);
         return false;
     }

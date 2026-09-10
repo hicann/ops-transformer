@@ -65,7 +65,7 @@ TEST_F(AclnnAllGatherMatmulNullptrTest, TestStreamModeInvalid)
 
 TEST_F(AclnnAllGatherMatmulNullptrTest, TestAscend910A5Platform)
 {
-    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+    op::SetPlatformNpuArch(NpuArch::DAV_3510);
     TensorDesc x1Desc = TensorDesc({16, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({256, 16}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outDesc = TensorDesc({16, 16}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -76,7 +76,7 @@ TEST_F(AclnnAllGatherMatmulNullptrTest, TestAscend910A5Platform)
     aclOpExecutor *executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_SUCCESS);
-    op::SetPlatformNpuArch(Ops::Base::DAV_3103);
+    op::SetPlatformNpuArch(NpuArch::DAV_3103);
 }
 
 } // namespace AllGatherMatmulUT

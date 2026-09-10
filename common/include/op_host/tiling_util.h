@@ -14,7 +14,7 @@
  */
 
 #pragma once
-#include "op_host/util/op_const_def.h"
+#include "platform/soc_spec.h"
 #include "register/op_impl_registry.h"
 
 namespace Ops {

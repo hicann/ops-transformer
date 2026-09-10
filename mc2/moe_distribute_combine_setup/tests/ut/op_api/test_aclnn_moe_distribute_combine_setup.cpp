@@ -52,7 +52,7 @@ class TestAclnnMoeDistributeCombineSetup : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+        op::SetPlatformNpuArch(NpuArch::DAV_3510);
         std::cout << "TestAclnnMoeDistributeCombineSetup SetUp" << std::endl;
     }
     static void TearDownTestCase()
@@ -651,7 +651,7 @@ TEST_F(TestAclnnMoeDistributeCombineSetup, TestTeardownCalcOutputSizeInvalidDimV
 
 TEST_F(TestAclnnMoeDistributeCombineSetup, TestUnsupportedNpuArch)
 {
-    op::SetPlatformNpuArch(Ops::Base::DAV_1001);
+    op::SetPlatformNpuArch(NpuArch::DAV_1001);
     std::vector<int64_t> expandXShape = {192, 4096};
     aclTensor *expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
     std::vector<int64_t> expertIdsShape = {16, 6};
@@ -669,7 +669,7 @@ TEST_F(TestAclnnMoeDistributeCombineSetup, TestUnsupportedNpuArch)
                                                                      0, 32, 0, 0, 0, 0, 0, 2, "", quantExpandX,
                                                                      commCmdInfo, &workspaceSize, &executor);
     EXPECT_EQ(ret, ACLNN_ERR_PARAM_INVALID);
-    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+    op::SetPlatformNpuArch(NpuArch::DAV_3510);
 }
 
 TEST_F(TestAclnnMoeDistributeCombineSetup, ExecuteCall)

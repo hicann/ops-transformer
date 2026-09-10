@@ -400,9 +400,8 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckParamsAttrEpAndSetLocalPar
                     return ge::GRAPH_FAILED);
 
     std::string supportRankSizeRange;
-    const std::set<int64_t> &supportRankSize = (npuArch_ == Ops::Base::DAV_3510) ?
-                                                   A5_SUPPORT_RANK_SIZE :
-                                                   (isA3_ ? A3_SUPPORT_RANK_SIZE : A2_SUPPORT_RANK_SIZE);
+    const std::set<int64_t> &supportRankSize =
+        (npuArch_ == NpuArch::DAV_3510) ? A5_SUPPORT_RANK_SIZE : (isA3_ ? A3_SUPPORT_RANK_SIZE : A2_SUPPORT_RANK_SIZE);
     for (const auto &v : supportRankSize) {
         supportRankSizeRange += (std::to_string(v) + " ");
     }
@@ -705,7 +704,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetAndConvertCommMode(gert::Til
                     return ge::GRAPH_FAILED);
     constexpr size_t maxLength = 7UL;
     OP_TILING_CHECK(
-        npuArch_ == Ops::Base::DAV_3510,
+        npuArch_ == NpuArch::DAV_3510,
         OP_LOGE(context->GetNodeName(), "GroupedMatMulAlltoAllv AIV-driven MTE mode only supports Atlas A2/A3."),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(strncmp(commModeStr, "aiv", maxLength) != 0,

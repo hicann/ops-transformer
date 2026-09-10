@@ -27,12 +27,12 @@
 
 #include "matmul_base_tiling.h"
 #include "matmul_tiling_cfg.h"
-#include "op_host/util/op_const_def.h"
+#include "platform/soc_spec.h"
 
 namespace optiling {
 struct Mc2MMRegisterCfg {
     const char *opType{nullptr};
-    NpuArch npuArch{Ops::Base::DAV_RESV};
+    NpuArch npuArch{NpuArch::DAV_RESV};
     std::vector<int32_t> priorities{}; // 0 base
 };
 
@@ -192,7 +192,7 @@ private:
 #define MC2_MM_REGISTER_TILING_TEMPLATE(opType, className, npuArch, priority) \
     [[maybe_unused]] uint32_t op_impl_register_template_##opType##_##className##_##npuArch##_##priority; \
     static Mc2MMRegister __attribute__((unused)) mc2_mm_register_##opType##_##className##_##npuArch##_##priority##_ = \
-        Mc2MMRegister(#opType).tiling<className>(static_cast<int32_t>(priority), Ops::Base::npuArch)
+        Mc2MMRegister(#opType).tiling<className>(static_cast<int32_t>(priority), NpuArch::npuArch)
 } // namespace optiling
 
 #endif // __OP_HOST_MATMUL_TILING_REGISTRY_H__

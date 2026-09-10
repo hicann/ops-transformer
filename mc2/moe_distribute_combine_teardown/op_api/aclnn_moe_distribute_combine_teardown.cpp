@@ -22,7 +22,6 @@
 #include "mc2_log_compat.h"
 #include "opdev/common_types.h"
 #include "opdev/platform.h"
-#include "op_host/util/op_const_def.h"
 
 namespace {
 
@@ -95,7 +94,7 @@ extern "C" aclnnStatus aclnnMoeDistributeCombineTeardownGetWorkspaceSize(
     uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_LOGD("aclnn_moe_distribute_combine_teardown get_workspace_size start");
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
         OP_LOGE_LIBOPAPI_REPORT("aclnnMoeDistributeCombineTeardown", "Unsupported npuArch");
         return ACLNN_ERR_PARAM_INVALID;
     }

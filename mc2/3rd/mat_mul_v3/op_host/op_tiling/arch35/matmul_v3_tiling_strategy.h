@@ -20,7 +20,7 @@
 #include <cstdint>
 
 #include "tiling/platform/platform_ascendc.h"
-#include "op_host/util/op_const_def.h"
+#include "platform/soc_spec.h"
 
 namespace optiling {
 namespace mc2_matmul_v3_advanced {
@@ -32,9 +32,8 @@ constexpr int32_t FULL_LOAD_BASE = 3;
 constexpr int32_t BASE = 999;
 
 const static std::map<NpuArch, std::vector<int32_t>> MatMulV3PrioritiesMap = {
-    {Ops::Base::DAV_3510,
-     {strategy::BASIC_STREAM_K, strategy::STREAM_K, strategy::BASIC_ASWT, strategy::FULL_LOAD_BASE}},
-    {Ops::Base::DAV_RESV, {strategy::BASE}}, // supportMmadS8S4平台
+    {NpuArch::DAV_3510, {strategy::BASIC_STREAM_K, strategy::STREAM_K, strategy::BASIC_ASWT, strategy::FULL_LOAD_BASE}},
+    {NpuArch::DAV_RESV, {strategy::BASE}}, // supportMmadS8S4平台
 };
 
 inline std::vector<int32_t> GetMatMulV3Priorities(NpuArch npuArch)

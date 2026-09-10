@@ -56,7 +56,7 @@ bool CheckStreamKSKTiling91095(const Mc2MatmulV3CompileInfo &compileInfo, const 
 using CheckStreamKSKTilingFunc = bool (*)(const Mc2MatmulV3CompileInfo &, const Mc2MatMulV3Args &);
 
 const static std::map<NpuArch, CheckStreamKSKTilingFunc> CheckStreamKSKTilingFuncMap = {
-    {Ops::Base::DAV_3510, CheckStreamKSKTiling91095},
+    {NpuArch::DAV_3510, CheckStreamKSKTiling91095},
 };
 
 // ------------------------------ CheckStreamKDPSKTiling -------------------------------------------//
@@ -86,7 +86,7 @@ bool CheckStreamKDPSKTiling91095(const Mc2MatmulV3CompileInfo &compileInfo, cons
 using CheckStreamKDPSKTilingFunc = bool (*)(const Mc2MatmulV3CompileInfo &, const Mc2MatMulV3Args &);
 
 const static std::map<NpuArch, CheckStreamKDPSKTilingFunc> CheckStreamKDPSKTilingFuncMap = {
-    {Ops::Base::DAV_3510, CheckStreamKDPSKTiling91095},
+    {NpuArch::DAV_3510, CheckStreamKDPSKTiling91095},
 };
 
 // ------------------------------ GetL0C2OutFlag -------------------------------------------//
@@ -107,7 +107,7 @@ Mc2MatMulV3L0C2Out GetL0C2OutFlag91095(const Mc2MatMulV3Args &args)
 using GetL0C2OutFlagFunc = Mc2MatMulV3L0C2Out (*)(const Mc2MatMulV3Args &);
 
 const static std::map<NpuArch, GetL0C2OutFlagFunc> GetL0C2OutFlagFuncMap = {
-    {Ops::Base::DAV_3510, GetL0C2OutFlag91095},
+    {NpuArch::DAV_3510, GetL0C2OutFlag91095},
 };
 } // namespace
 

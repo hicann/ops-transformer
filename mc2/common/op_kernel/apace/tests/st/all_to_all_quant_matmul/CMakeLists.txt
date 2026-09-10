@@ -36,7 +36,7 @@ set(KERNEL_INCLUDES
     ${ASCEND_DIR}/include
 )
 
-# host 模式 include 路径：apace tiling + CANN tiling（platform_ascendc.h）
+# host 模式 include 路径：apace tiling + CANN tiling（platform_ascendc.h + soc_spec.h）
 set(HOST_INCLUDES
     ${APACE_ROOT}
     ${APACE_ROOT}/utils

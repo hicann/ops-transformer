@@ -526,7 +526,7 @@ uint32_t AllGatherMatmulTilingBase::AllGatherSplitM(mc2tiling::TilingArgs &args,
 
 CutResult AllGatherMatmulTilingBase::GetTilingResult()
 {
-    SocVersion inputSocVersion = (npuArch_ == Ops::Base::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
+    SocVersion inputSocVersion = (npuArch_ == NpuArch::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
     OP_LOGD(opName_, "Start to find proper tileCnt by formulaic tiling.");
     AllGatherPlusMMV2 tileFormulate(args_, args_.rankDim, KernelType::ALL_GATHER, inputSocVersion);
     tileFormulate.GetTiling();
@@ -705,7 +705,7 @@ uint64_t AllGatherMatmulTilingBase::GetStorageA(Mc2Tiling::RCSTiling &rcsCfg)
     uint64_t storageA = 0;
 
     // DAV_3510 全场景未使用nd2nzLen这个空间，无需申请
-    if (npuArch_ != Ops::Base::DAV_3510) {
+    if (npuArch_ != NpuArch::DAV_3510) {
         // step1: ND2NZ
         if (gatherIndex == 0U) { // 转置B
             // 计算ND2NZ需使用空间方法保持与MMV3 tiling计算逻辑一致
@@ -759,7 +759,7 @@ uint64_t AllGatherMatmulTilingBase::GetTilingKey() const
 
     // Non-A5 platform must use AICPU mode
     uint8_t commMode = Mc2Comm::COMM_MODE_AICPU;
-    if (npuArch_ == Ops::Base::DAV_3510) {
+    if (npuArch_ == NpuArch::DAV_3510) {
         if (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
             commMode = Mc2Comm::COMM_MODE_CCU;
         }

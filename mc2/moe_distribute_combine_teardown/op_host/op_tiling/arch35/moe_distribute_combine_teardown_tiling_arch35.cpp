@@ -66,7 +66,7 @@ REGISTER_OPS_TILING_TEMPLATE(MoeDistributeCombineTeardown, MoeDistributeCombineT
 bool MoeDistributeCombineTeardownTilingA5::IsCapable()
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
-    if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
         return true;
     }
     return false;

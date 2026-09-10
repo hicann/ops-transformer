@@ -41,12 +41,12 @@ bool ABL1FullLoadExtraCond91095(uint64_t al1SingleCoreSize, uint64_t bl1SingleCo
 using ABL1FullLoadExtraCondFunc = bool (*)(uint64_t, uint64_t);
 
 const static std::map<NpuArch, ABL1FullLoadExtraCondFunc> ABL1FullLoadExtraCondFuncMap = {
-    {Ops::Base::DAV_3510, ABL1FullLoadExtraCond91095},
+    {NpuArch::DAV_3510, ABL1FullLoadExtraCond91095},
 };
 
 using CheckBL1FullLoadFunc = bool (Mc2MatMulV3AswFullLoadTiling::*)(bool &, uint64_t, uint64_t);
 const static std::map<NpuArch, CheckBL1FullLoadFunc> CheckBL1FullLoadMap = {
-    {Ops::Base::DAV_3510, &Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad91095},
+    {NpuArch::DAV_3510, &Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad91095},
 };
 
 // ------------------------------ GetStepSmallK -------------------------------------------//
@@ -88,7 +88,7 @@ uint64_t GetStepSmallK91095(const Mc2MatMulV3Args &args, const Mc2MatMulV3RunInf
 using GetStepSmallKFunc = uint64_t (*)(const Mc2MatMulV3Args &, const Mc2MatMulV3RunInfo &, bool);
 
 const static std::map<NpuArch, GetStepSmallKFunc> GetStepSmallKFuncMap = {
-    {Ops::Base::DAV_3510, GetStepSmallK91095},
+    {NpuArch::DAV_3510, GetStepSmallK91095},
 };
 
 void ResetLoadBalance(Mc2MatMulV3RunInfo &runInfo)

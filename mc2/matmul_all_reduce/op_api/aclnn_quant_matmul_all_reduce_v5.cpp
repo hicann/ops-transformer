@@ -13,7 +13,6 @@
  * \brief
  */
 #include "aclnn_quant_matmul_all_reduce_v5.h"
-#include "op_host/util/op_const_def.h"
 #include "aclnnInner_matmul_all_reduce.h"
 #include "common/op_api/mc2_aclnn_util.h"
 #include "matmul_all_reduce_util.h"
@@ -276,7 +275,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5GetWorkspaceSize(
     aclTensor *offset = nullptr;
     int64_t antiquantGroupSize = 0;
     auto tempX2 = x2;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2002 && MatmulAllReduceIsWeightNZFormat(x2)) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2002 && MatmulAllReduceIsWeightNZFormat(x2)) {
         if (x2->GetTensor() == nullptr) {
             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Tensor of x2 is null.");
             return ACLNN_ERR_INNER_NULLPTR;
@@ -332,7 +331,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(void *workspace, uint64_t workspaceSize,
         return ACLNN_ERR_INNER;
     }
     if (NnopbaseSetHcclServerType) {
-        if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+        if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
             void *arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);

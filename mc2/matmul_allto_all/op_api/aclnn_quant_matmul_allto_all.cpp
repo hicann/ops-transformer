@@ -16,7 +16,6 @@
 #include "quant_matmul_allto_all_base.h"
 #include "opdev/platform.h"
 #include "opdev/op_log.h"
-#include "op_host/util/op_const_def.h"
 
 // 两段式接口
 extern "C" aclnnStatus aclnnQuantMatmulAlltoAllGetWorkspaceSize(
@@ -31,7 +30,7 @@ extern "C" aclnnStatus aclnnQuantMatmulAlltoAllGetWorkspaceSize(
     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
     auto socVersion = op::GetCurrentPlatformInfo().GetSocVersion();
     const char *commMode =
-        (npuArch == Ops::Base::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
+        (npuArch == NpuArch::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
 
     return aclnnQuantMatmulAlltoAllBaseGetWorkspaceSize(
         x1, x2, biasOptional, x1Scale, x2Scale, commScaleOptional, x1OffsetOptional, x2OffsetOptional,

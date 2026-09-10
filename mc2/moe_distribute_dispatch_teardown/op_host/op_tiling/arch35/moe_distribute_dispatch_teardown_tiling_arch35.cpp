@@ -23,7 +23,7 @@ namespace optiling {
 REGISTER_OPS_TILING_TEMPLATE(MoeDistributeDispatchTeardown, MoeDistributeDispatchTeardownTilingA5, 0);
 bool MoeDistributeDispatchTeardownTilingA5::IsCapable()
 {
-    if (npuArch_ == Ops::Base::DAV_3510) {
+    if (npuArch_ == NpuArch::DAV_3510) {
         OP_LOGD(nodeName_, "Do MoeDistributeDispatchTeardownTilingA5 tiling.");
         return true;
     }

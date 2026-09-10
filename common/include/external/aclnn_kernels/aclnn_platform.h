@@ -12,7 +12,6 @@
 #define ACLNN_PLATFORM_H_
 
 #include "opdev/platform.h"
-#include "op_host/util/op_const_def.h"
 #include <set>
 
 namespace Ops {
@@ -26,7 +25,7 @@ using namespace op;
  */
 inline static bool IsRegbase(NpuArch npuArch)
 {
-    const static std::set<NpuArch> regbaseNpuArchs = {Ops::Base::DAV_3510, Ops::Base::DAV_5102};
+    const static std::set<NpuArch> regbaseNpuArchs = {NpuArch::DAV_3510, NpuArch::DAV_5102};
     return regbaseNpuArchs.find(npuArch) != regbaseNpuArchs.end();
 }
 

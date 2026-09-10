@@ -13,7 +13,6 @@
  * \brief
  */
 #include "aclnn_matmul_all_reduce_v3.h"
-#include "op_host/util/op_const_def.h"
 #include "aclnnInner_matmul_all_reduce.h"
 #include "matmul_all_reduce_util.h"
 #include "common/utils/hccl_util.h"
@@ -116,7 +115,7 @@ aclnnStatus aclnnMatmulAllReduceV3(void *workspace, uint64_t workspaceSize, aclO
         return ACLNN_ERR_INNER;
     }
     if (NnopbaseSetHcclServerType) {
-        if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+        if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
             void *arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);

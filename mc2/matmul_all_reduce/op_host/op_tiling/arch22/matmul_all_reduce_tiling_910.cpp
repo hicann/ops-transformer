@@ -260,7 +260,7 @@ ge::graphStatus MatmulAllReduceTiling910::CheckInput()
     MC2_CHECK_LOG_RET(opName_, CheckInputDtype());
 
     //  非量化场景不支持B矩阵Nz格式 除了310P
-    if (npuArch_ != Ops::Base::DAV_2002) {
+    if (npuArch_ != NpuArch::DAV_2002) {
         MC2_CHECK_LOG_RET(opName_, CheckInputFormat());
     }
 

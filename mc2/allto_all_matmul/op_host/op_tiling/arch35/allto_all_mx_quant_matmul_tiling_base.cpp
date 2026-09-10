@@ -1015,6 +1015,6 @@ AllToAllMxQuantMatmulTilingBase::AllToAllMxQuantMatmulTilingBase(gert::TilingCon
 
 // 注册tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(AlltoAllMatmul, AllToAllMxQuantMatmulTilingBase,
-                                   static_cast<int32_t>(Ops::Base::DAV_3510), 2);
+                                   static_cast<int32_t>(NpuArch::DAV_3510), 2);
 
 } // namespace MC2Tiling

@@ -16,7 +16,7 @@
 #include "mc2_log.h"
 #include "platform/platform_info.h"
 #include "runtime/rt_external_base.h"
-#include "op_host/util/op_const_def.h"
+#include "platform/soc_spec.h"
 #include "mc2_log_compat.h"
 
 using namespace ge;
@@ -69,7 +69,7 @@ static constexpr size_t DISPATCH_INPUT_ATTR_Y_DTYPE_INDEX = 17;
 
 static constexpr uint32_t VERSION_SIZE = 32;
 const std::set<std::string> PLATFORM_A2 = {"Ascend910B"};
-const std::set<std::string> NPUARCH_A5 = {std::to_string(static_cast<uint32_t>(Ops::Base::DAV_3510))};
+const std::set<std::string> NPUARCH_A5 = {std::to_string(static_cast<uint32_t>(NpuArch::DAV_3510))};
 
 static bool IsTargetSocVersionInfershape(const char *nodeName, const std::set<std::string> &targetPlatform)
 {

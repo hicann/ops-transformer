@@ -52,7 +52,7 @@ class test_aclnn_allto_all_quant_matmul_v2 : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+        op::SetPlatformNpuArch(NpuArch::DAV_3510);
         cout << "test_aclnn_allto_all_quant_matmul_v2 SetUp" << endl;
     }
 

@@ -21,7 +21,7 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
-#include "op_host/util/op_const_def.h"
+#include "platform/soc_spec.h"
 #include "opdev/platform.h"
 #include "securec.h"
 #include <algorithm>
@@ -307,7 +307,7 @@ static aclnnStatus HandleGmmMxTranspose(const aclTensor *&weight, const aclTenso
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "gmmWeight not contiguous and transGmmWeight is already set!");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         transWeight = !transWeight;
         OP_LOGD("gmmWeight transposed detected: transWeight flipped to %d", transWeight);
         weight = SwapTensorDims(weight, GMM_WEIGHT_SWAP_DIM_1, GMM_WEIGHT_SWAP_DIM_2);
@@ -327,7 +327,7 @@ static aclnnStatus HandleGmmTtTranspose(const aclTensor *&weight, bool &transWei
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "gmmWeight not contiguous and transGmmWeight is already set!");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         weight = SwapTensorDims(weight, GMM_WEIGHT_SWAP_DIM_1, GMM_WEIGHT_SWAP_DIM_2);
         CHECK_RET(weight != nullptr, ACLNN_ERR_INNER_NULLPTR);
         transWeight = !transWeight;
@@ -345,7 +345,7 @@ static aclnnStatus HandleMmMxTranspose(const aclTensor *&weight, const aclTensor
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "mmWeight not contiguous and transMmWeight is already set!");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         transWeight = !transWeight;
         OP_LOGD("mmWeight transposed detected: transWeight flipped to %d", transWeight);
         weight = SwapTensorDims(weight, 0, 1);
@@ -365,7 +365,7 @@ static aclnnStatus HandleMmTtTranspose(const aclTensor *&weight, bool &transWeig
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "mmWeight not contiguous and transMmWeight is already set!");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (notContiguous && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         weight = SwapTensorDims(weight, 0, 1);
         CHECK_RET(weight != nullptr, ACLNN_ERR_INNER_NULLPTR);
         transWeight = !transWeight;
@@ -408,7 +408,7 @@ static aclnnStatus CheckAndHandleCommMode(const char *commModeStr, uint8_t &comm
 {
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
-    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
             commModeEnum = Mc2Comm::COMM_MODE_AICPU;
         } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
@@ -495,7 +495,7 @@ extern "C" aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(void *workspace, uint6
                                                           aclOpExecutor *executor, aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {
-        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
             void *arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);

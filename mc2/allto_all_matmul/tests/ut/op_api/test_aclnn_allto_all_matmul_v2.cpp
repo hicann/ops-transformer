@@ -26,7 +26,7 @@ class TestAclnnAlltoAllMatmulV2 : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+        op::SetPlatformNpuArch(NpuArch::DAV_3510);
         cout << "TestAclnnAlltoAllMatmulV2 SetUp" << endl;
     }
 

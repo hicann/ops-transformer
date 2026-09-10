@@ -13,7 +13,6 @@
  * \brief
  */
 #include "aclnn_quant_matmul_all_reduce_v4.h"
-#include "op_host/util/op_const_def.h"
 
 #include "aclnnInner_matmul_all_reduce.h"
 #include "common/op_api/mc2_aclnn_util.h"
@@ -249,7 +248,7 @@ static aclnnStatus PrepareTransposedX2(const aclTensor *x2, const aclTensor *x2S
                                        const aclTensor *&transX2, const aclTensor *&transX2Scale)
 {
     auto tempX2 = x2;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2002 && MatmulAllReduceIsWeightNZFormat(x2)) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2002 && MatmulAllReduceIsWeightNZFormat(x2)) {
         if (x2->GetTensor() == nullptr) {
             OP_LOGE_WITH_INVALID_INPUT("aclnnQuantMatmulAllReduceV4", "x2");
             return ACLNN_ERR_INNER_NULLPTR;
@@ -323,7 +322,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(void *workspace, uint64_t workspaceSize,
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     if (NnopbaseSetHcclServerType) {
-        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_AICPU);
         }
     }

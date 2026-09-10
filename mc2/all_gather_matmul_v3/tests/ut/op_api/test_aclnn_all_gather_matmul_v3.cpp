@@ -31,7 +31,7 @@ class TestAclnnAllGatherMatmulV3 : public testing::TestWithParam<AllGatherMatmul
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+        op::SetPlatformNpuArch(NpuArch::DAV_3510);
         cout << "TestAclnnAllGatherMatmulV3 SetUp" << endl;
     }
 

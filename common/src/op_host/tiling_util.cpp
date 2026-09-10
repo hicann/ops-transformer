@@ -15,7 +15,6 @@
 
 #include "op_host/tiling_util.h"
 #include "platform/platform_ascendc.h"
-#include "op_host/util/op_const_def.h"
 
 namespace Ops {
 namespace Transformer {
@@ -24,7 +23,7 @@ static const gert::Shape g_vec_1_shape = {1};
 
 static bool IsRegbaseSocVersion(NpuArch npuArch)
 {
-    const static std::set<NpuArch> regbaseArch = {Ops::Base::DAV_3510, Ops::Base::DAV_5102};
+    const static std::set<NpuArch> regbaseArch = {NpuArch::DAV_3510, NpuArch::DAV_5102};
 
     return regbaseArch.find(npuArch) != regbaseArch.end();
 }

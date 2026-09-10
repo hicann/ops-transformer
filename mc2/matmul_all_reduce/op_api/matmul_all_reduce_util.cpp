@@ -15,7 +15,6 @@
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
-#include "op_host/util/op_const_def.h"
 #include "common/op_api/mc2_aclnn_util.h"
 #include "mc2_comm_utils.h"
 #include "mc2_log_compat.h"
@@ -95,7 +94,7 @@ aclnnStatus MatmulAllReduceCheckParams(const aclTensor *x1, const aclTensor *x2,
                                        const aclTensor *bias, const char *reduceOp, int64_t streamMode,
                                        const aclTensor *output)
 {
-    const static bool is310P = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2002;
+    const static bool is310P = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2002;
 
     // 1. 检查参数是否为空指针
     CHECK_RET(MatmulAllReduceCheckNotNull(x1, x2, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -271,11 +270,11 @@ bool QuantMatmulAllReduceCheckDtypeValid(const aclTensor *x1, const aclTensor *x
                                          const aclTensor *dequantScale, const aclTensor *pertokenScale,
                                          const aclTensor *x3, const aclTensor *output)
 {
-    const auto &dequantDtypeSupport = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2002 ?
+    const auto &dequantDtypeSupport = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2002 ?
                                           DTYPE_SUPPORT_LIST_DEQUANT_310P :
                                           DTYPE_SUPPORT_LIST_DEQUANT;
 
-    const auto &outDtypeSupport = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2002 ?
+    const auto &outDtypeSupport = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2002 ?
                                       DTYPE_SUPPORT_LIST_310P :
                                       DTYPE_SUPPORT_LIST;
 
@@ -350,7 +349,7 @@ bool QuantMatmulAllReduceIsAclnnPreTransposed(const aclTensor *x2)
 {
     auto viewFormat = ge::GetPrimaryFormat(x2->GetViewFormat());
     auto storageFormat = ge::GetPrimaryFormat(x2->GetStorageFormat());
-    bool isAclnnPreTransposed = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2002 &&
+    bool isAclnnPreTransposed = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2002 &&
                                 viewFormat == Format::FORMAT_ND && storageFormat == Format::FORMAT_FRACTAL_NZ;
     OP_LOGD("MatmulAllReduce, IsAclnnPreTransposed is %d", isAclnnPreTransposed);
     return isAclnnPreTransposed;
@@ -560,8 +559,7 @@ aclnnStatus InnerQuantMatmulAllReduceGetWorkspaceSize(const aclTensor *x1, const
     aclTensor *commQuantScale2Optional = nullptr;
     int64_t antiquantGroupSize = 0;
     auto tempX2 = x2;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2002 &&
-        QuantMatmulAllReduceIsWeightNZFormat(x2)) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2002 && QuantMatmulAllReduceIsWeightNZFormat(x2)) {
         if (x2->GetTensor() == nullptr) {
             OP_LOGE_WITH_INVALID_INPUT("MatmulAllReduce", "x2");
             return ACLNN_ERR_INNER_NULLPTR;
@@ -569,7 +567,7 @@ aclnnStatus InnerQuantMatmulAllReduceGetWorkspaceSize(const aclTensor *x1, const
         tempX2 = QuantMatmulAllReduceCopyTensor(x2);
     }
     if (NnopbaseSetHcclServerType) {
-        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_AICPU);
         }
     }
@@ -601,7 +599,7 @@ aclnnStatus InnerQuantMatmulAllReduceGetWorkspaceSize(const aclTensor *x1, const
 // 检查commMode入参是否合法
 bool IsCommModeValid(const char *commModePtr)
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         if (commModePtr == nullptr) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Its new Aclnn interface for A5, commModePtr should not be nullptr!");
             return false;
