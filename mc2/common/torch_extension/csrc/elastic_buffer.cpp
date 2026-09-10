@@ -58,11 +58,14 @@ constexpr int64_t NETWORK_HYBRID = 1;
 constexpr int64_t BUFFER_ALIGNMENT = 2 * 1024 * 1024;
 constexpr int64_t MB_SIZE = 1024LL * 1024LL;
 constexpr int64_t HUGE1G_SIZE = 1024ULL * 1024ULL * 1024ULL;
+constexpr int DIM_ONE = 1;
 constexpr int DIM_TWO = 2;
 constexpr uint32_t MOE_CHANNEL_HANDLE_NUM = 64U;
 constexpr uint32_t MOE_CHANNEL_NOTIFY_NUM = 3U;
 constexpr uint32_t MEM_HANDLE_NUM = 1U;
 constexpr int64_t SEND_COUNTS_ALIGN_FACTOR = 8;
+constexpr int64_t MOE_EP_METADATA_FIELDS = 5;
+constexpr int64_t MOE_EP_METADATA_ALIGN_BYTES = 512;
 
 // RAII guard for multi-step host buffer allocation
 struct HostBufferGuard {
@@ -99,6 +102,26 @@ static inline int64_t AlignTo(int64_t x, int64_t y)
     TORCH_CHECK(y > 0, "AlignTo divisor must be positive, got ", y);
     TORCH_CHECK(x <= INT64_MAX - y + 1, "AlignTo overflow: x=", x, " y=", y);
     return CeilDiv(x, y) * y;
+}
+
+static inline void CheckMoeEpMetadataTensor(const at::Tensor &metadata, const char *name, int64_t capacity,
+                                            int64_t epWorldSize, const at::Device &device)
+{
+    TORCH_CHECK(capacity >= 0 && capacity <= INT32_MAX, "metadata capacity must be in [0, INT32_MAX]");
+    TORCH_CHECK(epWorldSize >= 2 && epWorldSize <= 1024, "ep_world_size must be in [2, 1024]");
+    // Packed ABI: five-column A_alloc rows, then separately 512B-aligned rank offsets.
+    const int64_t elementBytes = sizeof(int32_t);
+    const int64_t offsetBytes = AlignTo(capacity * MOE_EP_METADATA_FIELDS * elementBytes, MOE_EP_METADATA_ALIGN_BYTES);
+    const int64_t elements =
+        (offsetBytes + AlignTo((epWorldSize + 1) * elementBytes, MOE_EP_METADATA_ALIGN_BYTES)) / elementBytes;
+    TORCH_CHECK(metadata.scalar_type() == at::kInt && metadata.dim() == DIM_ONE, name,
+                " must be a 1D int32 packed tensor");
+    TORCH_CHECK(metadata.numel() == static_cast<int64_t>(elements), name, " packed length must be ", elements);
+    TORCH_CHECK(metadata.is_contiguous() && metadata.storage_offset() == 0, name,
+                " must describe the full contiguous packed allocation, not a metadata-only view");
+    TORCH_CHECK(metadata.device() == device, name, " must be on device ", device);
+    TORCH_CHECK(reinterpret_cast<uintptr_t>(metadata.data_ptr()) % MOE_EP_METADATA_ALIGN_BYTES == 0, name,
+                " base address must be 512-byte aligned");
 }
 
 static inline void NpuStreamWait(aclrtStream waitStream, aclrtStream recordStream)
@@ -1739,6 +1762,13 @@ Mc2Api::ElasticBuffer::DispatchEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpDi
     int64_t numMaxTokensPerRank, int64_t cclBufferSize, at::Tensor &recvX, at::Tensor &recvSrcMetadata,
     const c10::optional<at::Tensor> &recvTopkWeightsOpt, const c10::optional<at::Tensor> &recvScalesOpt)
 {
+    TORCH_CHECK(recvX.dim() == DIM_TWO, "recv_x dims must be 2, but got ", recvX.dim());
+    CheckMoeEpMetadataTensor(recvSrcMetadata, "recv_src_metadata", recvX.size(0), epWorldSize, recvX.device());
+    if (cachedRecvSrcMetadata.has_value()) {
+        CheckMoeEpMetadataTensor(*cachedRecvSrcMetadata, "cached_recv_src_metadata", recvX.size(0), epWorldSize,
+                                 recvX.device());
+    }
+
     EnsureMoeContext(cclBufferSize);
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
@@ -1782,6 +1812,7 @@ void Mc2Api::ElasticBuffer::MoeEpCombine(const at::Tensor &x, const at::Tensor &
 {
     TORCH_CHECK(x.dim() == DIM_TWO, "x dims must be 2, but got ", x.dim());
     TORCH_CHECK(topkIdx.dim() == DIM_TWO, "topk_idx dims must be 2, but got ", topkIdx.dim());
+    CheckMoeEpMetadataTensor(recvSrcMetadata, "recv_src_metadata", x.size(0), epWorldSize, x.device());
     EnsureMoeContext(cclBufferSize);
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);

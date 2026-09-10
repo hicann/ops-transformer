@@ -28,6 +28,73 @@ _ENGRAM_DTYPE_TO_INT = {
 }
 _ENGRAM_INT_TO_DTYPE = {v: k for k, v in _ENGRAM_DTYPE_TO_INT.items()}
 _ENGRAM_SF_DTYPES = (torch.float32, torch.float8_e8m0fnu)
+_MOE_EP_METADATA_FIELDS = 5
+
+_MOE_EP_METADATA_ALIGN_ELEMENTS = 128  # 512 bytes, int32 elements
+
+
+def _metadata_buffer_layout(capacity: int, ep_world_size: int):
+    torch._check(
+        0 <= capacity <= 2147483647,
+        lambda: "metadata capacity must be in [0, INT32_MAX]",
+    )
+    torch._check(
+        2 <= ep_world_size <= 1024, lambda: "ep_world_size must be in [2, 1024]"
+    )
+    align = _MOE_EP_METADATA_ALIGN_ELEMENTS
+    offset = (capacity * _MOE_EP_METADATA_FIELDS + align - 1) // align * align
+    total = offset + (ep_world_size + 1 + align - 1) // align * align
+    return offset, total
+
+
+def _metadata_buffer_views(buffer: torch.Tensor, capacity: int, ep_world_size: int):
+    offset, total = _metadata_buffer_layout(capacity, ep_world_size)
+    torch._check(
+        buffer.dtype == torch.int32 and buffer.dim() == 1 and buffer.numel() == total,
+        lambda: "metadata buffer must have the full packed int32 shape",
+    )
+    torch._check(
+        buffer.is_contiguous() and buffer.storage_offset() == 0,
+        lambda: "metadata buffer must be a full contiguous allocation",
+    )
+    return (
+        buffer[: capacity * _MOE_EP_METADATA_FIELDS].view(
+            capacity, _MOE_EP_METADATA_FIELDS
+        ),
+        buffer[offset : offset + ep_world_size + 1],
+    )
+
+
+def _checked_handle_metadata_buffer(handle, capacity: int, ep_world_size: int, device):
+    buffer = handle.recv_metadata_buffer
+    torch._check(
+        buffer is not None,
+        lambda: "EPHandle requires packed recv_metadata_buffer; regenerate or explicitly repack the old handle",
+    )
+    rows, offsets = _metadata_buffer_views(buffer, capacity, ep_world_size)
+    torch._check(
+        buffer.device == device,
+        lambda: "metadata buffer and x must be on the same device",
+    )
+    for actual, expected in (
+        (handle.recv_src_metadata, rows),
+        (handle.recv_rank_offsets, offsets),
+    ):
+        torch._check(
+            actual.shape == expected.shape
+            and actual.dtype == expected.dtype
+            and actual.device == device,
+            lambda: "EPHandle metadata views have incompatible shape/dtype/device",
+        )
+        torch._check(
+            actual.is_contiguous(), lambda: "EPHandle metadata views must be contiguous"
+        )
+        if expected.numel() != 0:
+            torch._check(
+                actual.data_ptr() == expected.data_ptr(),
+                lambda: "EPHandle metadata and offsets must be views of recv_metadata_buffer",
+            )
+    return buffer
 
 
 @dataclass
@@ -280,6 +347,7 @@ def _get_moe_ep_window_layout(
     combine_state_size = (
         num_max_tokens_per_rank * topk * win_addr_align
         + world_size * combine_channel_count * win_addr_align
+        + win_addr_align  # Persistent constant source for asynchronous combine completion flags.
     )
     state_buffer_size = (
         dump_metadata_bytes
@@ -398,6 +466,7 @@ def _get_moe_ep_window_bytes(
 class EPHandle:
     dst_buffer_slot_idx: torch.Tensor
     recv_src_metadata: torch.Tensor
+    recv_rank_offsets: torch.Tensor
     num_recv_tokens_per_rank: torch.Tensor
     num_recv_tokens_per_expert: torch.Tensor
     num_experts: int
@@ -407,6 +476,9 @@ class EPHandle:
     route_count: Optional[torch.Tensor] = None
     route_dst_scaleout: Optional[torch.Tensor] = None
     route_scaleout_slot: Optional[torch.Tensor] = None
+    recv_metadata_buffer: Optional[torch.Tensor] = (
+        None  # owns both views; full packed tensor passed to kernels
+    )
 
     @property
     def num_recv_tokens(self) -> int:
@@ -427,7 +499,7 @@ class _DispatchArgs:
     num_max_tokens_per_rank: int
     expert_alignment: int
     do_cpu_sync: bool
-    cached_recv_tokens: Optional[int]
+    cached_output_capacity: Optional[int]
 
 
 class ElasticBuffer:
@@ -963,6 +1035,7 @@ class ElasticBuffer:
             args,
             dst_slot,
             recv_src_meta,
+            actual_a,
             num_recv_per_rank,
             num_recv_per_expert,
             route_count,
@@ -1023,7 +1096,9 @@ class ElasticBuffer:
         self._runtime.moe_ep_combine(
             x,
             handle.topk_idx,
-            handle.recv_src_metadata,
+            _checked_handle_metadata_buffer(
+                handle, x.shape[0], self._ep_world_size, x.device
+            ),
             handle.num_recv_tokens_per_expert,
             topk_weights,
             self._ep_world_size,
@@ -1214,6 +1289,17 @@ class ElasticBuffer:
                 ((do_cpu_sync is None) or (do_cpu_sync is False)),
                 lambda: ("do_cpu_sync is not supported when cached."),
             )
+            capacity = handle.recv_src_metadata.shape[0]
+            packed_metadata = _checked_handle_metadata_buffer(
+                handle, capacity, self._ep_world_size, x.device
+            )
+            torch._check(
+                x.shape[0] == handle.topk_idx.shape[0],
+                lambda: (
+                    "cached x token count must equal handle.topk_idx token count, "
+                    f"but got {x.shape[0]} and {handle.topk_idx.shape[0]}."
+                ),
+            )
             return _DispatchArgs(
                 x,
                 scales,
@@ -1222,12 +1308,12 @@ class ElasticBuffer:
                 handle.route_count,
                 handle.route_dst_scaleout,
                 handle.route_scaleout_slot,
-                handle.recv_src_metadata,
+                packed_metadata,
                 handle.num_experts,
                 handle.num_max_tokens_per_rank,
                 handle.expert_alignment,
                 False,
-                handle.recv_src_metadata.shape[0],
+                capacity,
             )
 
         torch._check(
@@ -1265,8 +1351,8 @@ class ElasticBuffer:
         return self._host_pinned_counter.device_ptr()
 
     def _get_dispatch_recv_count(self, args: _DispatchArgs) -> int:
-        if args.cached_recv_tokens is not None:
-            return args.cached_recv_tokens
+        if args.cached_output_capacity is not None:
+            return args.cached_output_capacity
         if args.do_cpu_sync:
             return self._host_pinned_counter.spin_wait()
         return (
@@ -1281,8 +1367,9 @@ class ElasticBuffer:
         recv_x = torch.empty(
             (actual_a, self._hidden), dtype=args.x.dtype, device=args.x.device
         )
+        _, packed_elements = _metadata_buffer_layout(actual_a, self._ep_world_size)
         recv_src_meta = torch.empty(
-            (actual_a, 4), dtype=torch.int32, device=args.x.device
+            (packed_elements,), dtype=torch.int32, device=args.x.device
         )
         recv_topk_weights = (
             None
@@ -1305,20 +1392,26 @@ class ElasticBuffer:
         args: _DispatchArgs,
         dst_slot: torch.Tensor,
         recv_src_meta: torch.Tensor,
+        capacity: int,
         num_recv_per_rank: torch.Tensor,
         num_recv_per_expert: torch.Tensor,
         route_count: torch.Tensor,
         route_dst_scaleout: torch.Tensor,
         route_scaleout_slot: torch.Tensor,
     ) -> EPHandle:
+        metadata_rows, rank_offsets = _metadata_buffer_views(
+            recv_src_meta, capacity, self._ep_world_size
+        )
         topk_idx = (
             args.topk_idx
-            if args.cached_recv_tokens is not None
+            if args.cached_output_capacity is not None
             else args.topk_idx.clone()
         )
         return EPHandle(
             dst_buffer_slot_idx=dst_slot,
-            recv_src_metadata=recv_src_meta,
+            recv_src_metadata=metadata_rows,
+            recv_rank_offsets=rank_offsets,
+            recv_metadata_buffer=recv_src_meta,
             num_recv_tokens_per_rank=num_recv_per_rank,
             num_recv_tokens_per_expert=num_recv_per_expert,
             num_experts=args.num_experts,

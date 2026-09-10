@@ -58,11 +58,11 @@ constexpr int64_t MIN_NUM_EXPERTS = 2;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024U * 1024U;
 constexpr uint64_t UB_ALIGN = 32UL;
 constexpr uint64_t COMM_ALIGN = 512UL;
+constexpr uint64_t METADATA_FIELDS = 5UL;
 constexpr uint64_t MAX_OUT_DTYPE_SIZE = 2UL;
 constexpr int64_t H_MIN = 1;
 constexpr int64_t H_MAX = 8192;
 constexpr int64_t K_MAX = 32;
-constexpr int64_t META_INNER_DIM = 4;
 constexpr uint32_t NETWORK_DIRECT = 0U;
 constexpr uint32_t NETWORK_HYBRID = 1U;
 
@@ -72,13 +72,13 @@ static void PrintTilingDataInfo(const char *nodeName, const MoeEpCombineInfo &in
             info.cfg.epRankId, info.cfg.numExperts, info.cfg.numLocalExperts);
     OP_LOGD(nodeName, "numTokens=%u, hidden=%u, topK=%u, numMaxTokensPerRank=%u", info.cfg.numTokens, info.cfg.hidden,
             info.cfg.topK, info.cfg.numMaxTokensPerRank);
-    OP_LOGD(nodeName, "perSlotBytes=%u, hasTopkWeights=%u, aivNum=%u", info.cfg.perSlotBytes, info.hasTopkWeights,
-            info.aivNum);
+    OP_LOGD(nodeName, "perSlotBytes=%u, hasTopkWeights=%u, aivNum=%u, recvCapacity=%lu", info.cfg.perSlotBytes,
+            info.hasTopkWeights, info.aivNum, info.recvCapacity);
     OP_LOGD(nodeName,
             "totalWinSizeEp=%lu, combineStateWinOffset=%lu, combineDataWinOffset=%lu, "
-            "sendDataWorkspaceSizePerRank=%lu, totalUbSize=%lu",
-            info.totalWinSizeEp, info.combineStateWinOffset, info.combineDataWinOffset,
-            info.sendDataWorkspaceSizePerRank, info.totalUbSize);
+            "combineFlagSourceWinOffset=%lu, totalUbSize=%lu",
+            info.totalWinSizeEp, info.combineStateWinOffset, info.combineDataWinOffset, info.combineFlagSourceWinOffset,
+            info.totalUbSize);
 }
 
 static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context, const char *nodeName,
@@ -139,23 +139,23 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
     info.cfg.hidden = static_cast<uint32_t>(recvxDim1);
     info.cfg.numTokens = static_cast<uint32_t>(topkDim0);
     info.cfg.topK = static_cast<uint32_t>(topkDim1);
+    OP_TILING_CHECK(recvxDim0 > INT32_MAX, OP_LOGE(nodeName, "x capacity exceeds int32 metadata row range."),
+                    return ge::GRAPH_FAILED);
+    info.recvCapacity = static_cast<uint64_t>(recvxDim0);
+    // Use A_alloc, not the valid row count, to locate the packed rank-offset tail.
+    info.metadataRankOffsetsOffset = AlignMoeEpWin(info.recvCapacity * METADATA_FIELDS * sizeof(int32_t));
 
     const gert::StorageShape *recvSrcMetadataShape = context->GetInputShape(RECV_SRC_METADATA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetadataShape);
-    OP_TILING_CHECK(recvSrcMetadataShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE(nodeName, "recv_src_metadata dims must be 2, but got %lu.",
-                            recvSrcMetadataShape->GetStorageShape().GetDimNum()),
+    const uint64_t packedElements =
+        (info.metadataRankOffsetsOffset +
+         AlignMoeEpWin((static_cast<uint64_t>(info.cfg.epWorldSize) + 1U) * sizeof(int32_t))) /
+        sizeof(int32_t);
+    OP_TILING_CHECK(recvSrcMetadataShape->GetStorageShape().GetDimNum() != ONE_DIMS,
+                    OP_LOGE(nodeName, "recv_src_metadata must be a 1D packed tensor."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(recvSrcMetadataShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(packedElements),
+                    OP_LOGE(nodeName, "recv_src_metadata packed length must be %lu.", packedElements),
                     return ge::GRAPH_FAILED);
-    const int64_t recvSrcMetadataDim0 = recvSrcMetadataShape->GetStorageShape().GetDim(0);
-    const int64_t recvSrcMetadataDim1 = recvSrcMetadataShape->GetStorageShape().GetDim(1);
-    OP_TILING_CHECK(recvSrcMetadataDim0 != recvxDim0,
-                    OP_LOGE(nodeName, "recv_src_metadata dim0 must equal x dim0(%ld), but got %ld.", recvxDim0,
-                            recvSrcMetadataDim0),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        recvSrcMetadataDim1 != META_INNER_DIM,
-        OP_LOGE(nodeName, "recv_src_metadata dim1 must be %ld, but got %ld.", META_INNER_DIM, recvSrcMetadataDim1),
-        return ge::GRAPH_FAILED);
 
     const gert::StorageShape *numRecvPerExpertShape = context->GetInputShape(NUM_RECV_PER_EXPERT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvPerExpertShape);
@@ -329,7 +329,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
     info.totalWinSizeEp = maxWindowSize;
     info.combineStateWinOffset = layout.combineStateWinOffset;
     info.combineDataWinOffset = layout.combineDataWinOffset;
-    info.sendDataWorkspaceSizePerRank = layout.combineDataSize;
+    info.combineFlagSourceWinOffset = layout.combineFlagSourceWinOffset;
 
     return ge::GRAPH_SUCCESS;
 }
@@ -377,13 +377,9 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
 
     size_t *workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
-    uint64_t perCoreRankCountStride =
-        ops::CeilDiv(static_cast<uint64_t>(info.cfg.epWorldSize) * UB_ALIGN, COMM_ALIGN) * COMM_ALIGN;
-    // Address tables, per-AIV flags, rank totals, and one aligned per-rank count row for every AIV.
-    workSpaces[0] =
-        SYSTEM_NEED_WORKSPACE + static_cast<uint64_t>(info.cfg.epWorldSize) * info.sendDataWorkspaceSizePerRank +
-        static_cast<uint64_t>(aivNum) * COMM_ALIGN + static_cast<uint64_t>(info.cfg.epWorldSize) * COMM_ALIGN +
-        static_cast<uint64_t>(aivNum) * perCoreRankCountStride;
+    // Metadata provides the addresses and the persistent window holds the flag source.
+    // No operator-private address table or per-AIV flag workspace is needed.
+    workSpaces[0] = SYSTEM_NEED_WORKSPACE;
 
     uint32_t tplHasTopkWeights = info.hasTopkWeights ? 1 : 0;
     uint64_t tilingKey = GET_TPL_TILING_KEY(tplHasTopkWeights, TILINGKEY_TPL_A5);
