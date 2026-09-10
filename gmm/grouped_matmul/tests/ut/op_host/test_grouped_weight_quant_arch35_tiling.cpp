@@ -14,6 +14,7 @@
  */
 
 #include <iostream>
+#include <vector>
 #include <gtest/gtest.h>
 #include "../../../op_host/op_tiling/arch35/grouped_weight_quant_batch_matmul_tiling.h"
 #include "tiling_context_faker.h"
@@ -26,9 +27,15 @@ using namespace ge;
 
 class GroupedWeightQuantBatchMatmulTilingTest : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "GroupedWeightQuantBatchMatmulTiling SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "GroupedWeightQuantBatchMatmulTiling SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "GroupedWeightQuantBatchMatmulTiling TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "GroupedWeightQuantBatchMatmulTiling TearDown" << std::endl;
+    }
 };
 
 namespace {
@@ -71,7 +78,10 @@ size_t GetConfiguredSize(int64_t configuredSize, size_t defaultSize)
     return configuredSize == DEFAULT_DYNAMIC_SIZE ? defaultSize : static_cast<size_t>(configuredSize);
 }
 
-size_t GetNumWeight(const MxA8W4SmsTilingParam &param) { return GetConfiguredSize(param.numWeight, param.groupNum); }
+size_t GetNumWeight(const MxA8W4SmsTilingParam &param)
+{
+    return GetConfiguredSize(param.numWeight, param.groupNum);
+}
 
 size_t GetNumAntiquantScale(const MxA8W4SmsTilingParam &param)
 {
@@ -211,7 +221,7 @@ gert::TilingContextPara MakeMxA8W4SmsContext(const MxA8W4SmsTilingParam &param, 
         MakeMxA8W4SmsAttrs(param), MakeMxA8W4SmsInputInstanceNums(param), {1U}, compileInfo);
 }
 
-uint64_t GetTilingKeyIndex(uint64_t value, std::initializer_list<uint64_t> supportedValues)
+uint64_t GetTilingKeyIndex(uint64_t value, std::vector<uint64_t> supportedValues)
 {
     size_t index = 0;
     for (const auto supportedValue : supportedValues) {
@@ -710,10 +720,10 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a8w4_nz_int8_int4)
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // bias
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // scale
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // offset
-            {{{E, K / 128, N}, {E, K / 128, N}}, ge::DT_UINT64, ge::FORMAT_ND},               // antiquantScale (groupsize=128)
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                        // antiquantOffset
-            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                                        // groupList
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // perTokenScale
+            {{{E, K / 128, N}, {E, K / 128, N}}, ge::DT_UINT64, ge::FORMAT_ND}, // antiquantScale (groupsize=128)
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                          // antiquantOffset
+            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                          // groupList
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // perTokenScale
         },
         {// output info
          {{{M, N}, {M, N}}, ge::DT_BF16, ge::FORMAT_ND}},
@@ -871,10 +881,10 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a8w4_nz_groupsize_19
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // bias
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // scale
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // offset
-            {{{E, K / 192, N}, {E, K / 192, N}}, ge::DT_UINT64, ge::FORMAT_ND},               // antiquantScale (groupsize=192)
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                        // antiquantOffset
-            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                                        // groupList
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // perTokenScale
+            {{{E, K / 192, N}, {E, K / 192, N}}, ge::DT_UINT64, ge::FORMAT_ND}, // antiquantScale (groupsize=192)
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                          // antiquantOffset
+            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                          // groupList
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // perTokenScale
         },
         {// output info
          {{{M, N}, {M, N}}, ge::DT_BF16, ge::FORMAT_ND}},
@@ -1191,10 +1201,10 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a8w4_nz_groupsize_25
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // bias
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // scale
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // offset
-            {{{E, K / 256, N}, {E, K / 256, N}}, ge::DT_UINT64, ge::FORMAT_ND},               // antiquantScale (groupsize=256)
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                        // antiquantOffset
-            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                                        // groupList
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // perTokenScale
+            {{{E, K / 256, N}, {E, K / 256, N}}, ge::DT_UINT64, ge::FORMAT_ND}, // antiquantScale (groupsize=256)
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                          // antiquantOffset
+            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                          // groupList
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // perTokenScale
         },
         {// output info
          {{{M, N}, {M, N}}, ge::DT_BF16, ge::FORMAT_ND}},

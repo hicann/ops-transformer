@@ -28,6 +28,7 @@
 #include "opdev/tensor_view_utils.h"
 #include "opdev/make_op_executor.h"
 #include "grouped_matmul_swiglu_quant_v2.h"
+#include "../../grouped_matmul/op_api/grouped_matmul_util.h"
 
 namespace gmm_dsq {
 using namespace op;

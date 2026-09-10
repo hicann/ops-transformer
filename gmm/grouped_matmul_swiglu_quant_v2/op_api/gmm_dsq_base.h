@@ -12,6 +12,7 @@
 #define OP_HOST_OP_API_ACLNN_GMM_DSQ_BASE_H
 
 #include "grouped_matmul_swiglu_quant_utils.h"
+#include <vector>
 
 namespace gmm_dsq_base {
 
@@ -50,17 +51,17 @@ constexpr size_t NZ_ALIGN_N = 32UL;
 constexpr size_t SMOOTH_SCALE_1D_DIM_LIMIT = 1UL;
 constexpr size_t SMOOTH_SCALE_2D_DIM_LIMIT = 2UL;
 
-const std::initializer_list<DataType> X_DTYPE_SUPPORT_LIST = {DataType::DT_INT8, DataType::DT_INT4};
-const std::initializer_list<DataType> WEIGHT_DTYPE_SUPPORT_LIST = {DataType::DT_INT8, DataType::DT_INT4};
-const std::initializer_list<DataType> WEIGHT_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT, DataType::DT_FLOAT16,
-                                                                         DataType::DT_BF16};
-const std::initializer_list<DataType> WEIGHT_SCALE_A8W4_DTYPE_SUPPORT_LIST = {DataType::DT_UINT64};
-const std::initializer_list<DataType> X_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
-const std::initializer_list<DataType> GROUP_LIST_DTYPE_SUPPORT_LIST = {DataType::DT_INT64};
-const std::initializer_list<DataType> QUANTOUT_DTYPE_SUPPORT_LIST = {DataType::DT_INT8};
-const std::initializer_list<DataType> QUANTSCALEOUT_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
-const std::initializer_list<DataType> WEIGHT_ASSIST_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
-const std::initializer_list<DataType> SMOOTH_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
+const std::vector<DataType> X_DTYPE_SUPPORT_LIST = {DataType::DT_INT8, DataType::DT_INT4};
+const std::vector<DataType> WEIGHT_DTYPE_SUPPORT_LIST = {DataType::DT_INT8, DataType::DT_INT4};
+const std::vector<DataType> WEIGHT_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT, DataType::DT_FLOAT16,
+                                                               DataType::DT_BF16};
+const std::vector<DataType> WEIGHT_SCALE_A8W4_DTYPE_SUPPORT_LIST = {DataType::DT_UINT64};
+const std::vector<DataType> X_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
+const std::vector<DataType> GROUP_LIST_DTYPE_SUPPORT_LIST = {DataType::DT_INT64};
+const std::vector<DataType> QUANTOUT_DTYPE_SUPPORT_LIST = {DataType::DT_INT8};
+const std::vector<DataType> QUANTSCALEOUT_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
+const std::vector<DataType> WEIGHT_ASSIST_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
+const std::vector<DataType> SMOOTH_SCALE_DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT};
 
 class GroupedMatmulSwigluQuantBaseHandler : public GroupedMatmulSwigluQuantHandler {
 protected:

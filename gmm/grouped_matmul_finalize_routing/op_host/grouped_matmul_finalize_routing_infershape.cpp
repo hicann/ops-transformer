@@ -15,7 +15,7 @@
 #include <map>
 #include <string>
 #include <sstream>
-#include <initializer_list>
+#include <vector>
 
 #include "exe_graph/runtime/infer_shape_context.h"
 #include "exe_graph/runtime/shape.h"
@@ -67,12 +67,11 @@ struct ConstraintShape {
     uint32_t n;
 };
 
-static const std::initializer_list<ConstraintShape> W4A8_K_N_SUPPORT_LIST = {{2048, 7168}};
-static const std::initializer_list<ge::DataType> MX_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
-                                                                            ge::DT_FLOAT4_E2M1};
-static const std::initializer_list<ge::DataType> MXFP4_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOAT4_E2M1};
-static const std::initializer_list<ge::DataType> MXFP8_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOAT8_E4M3FN,
-                                                                               ge::DT_FLOAT8_E5M2};
+static const std::vector<ConstraintShape> W4A8_K_N_SUPPORT_LIST = {{2048, 7168}};
+static const std::vector<ge::DataType> MX_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
+                                                                  ge::DT_FLOAT4_E2M1};
+static const std::vector<ge::DataType> MXFP4_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOAT4_E2M1};
+static const std::vector<ge::DataType> MXFP8_IN_TYPE_SUPPORT_LIST = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2};
 
 template <typename T>
 std::string Shape2String(const T &shape)
@@ -90,7 +89,7 @@ std::string Shape2String(const T &shape)
 }
 
 template <typename T>
-bool CheckType(const T &value, const std::initializer_list<T> list)
+bool CheckType(const T &value, const std::vector<T> &list)
 {
     for (const auto &item : list) {
         if (item == value) {

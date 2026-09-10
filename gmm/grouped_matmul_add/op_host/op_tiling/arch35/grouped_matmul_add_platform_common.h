@@ -16,13 +16,14 @@
 #define __GROUPED_MATMUL_ADD_PLATFORM_COMMON_H__
 
 #include "tiling/platform/platform_ascendc.h"
+#include <vector>
 #include "exe_graph/runtime/tiling_parse_context.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "platform/platform_infos_def.h"
 #include "err/ops_err.h"
 #include "platform/soc_spec.h"
 namespace optiling {
-const std::initializer_list<NpuArch> AdvancedNpuArch = {NpuArch::DAV_3510};
+const std::vector<NpuArch> AdvancedNpuArch = {NpuArch::DAV_3510};
 
 template <typename T>
 inline typename std::enable_if<

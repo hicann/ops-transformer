@@ -14,12 +14,15 @@
  */
 
 #include "quant_grouped_matmul_inplace_add_param.h"
+#include <vector>
 
 using namespace ops::adv::tests::quant_grouped_matmul_inplace_add;
 
 Param::Param(std::vector<TensorList> inputs, Tensor perTokenScale, Tensor groupList, std::vector<int64_t> groupListData,
              int32_t groupListType, int32_t groupSize)
-    : mPerTokenScale(perTokenScale), mGroupListData(std::move(groupListData)), mGroupListType(groupListType),
+    : mPerTokenScale(perTokenScale),
+      mGroupListData(std::move(groupListData)),
+      mGroupListType(groupListType),
       mGroupSize(groupSize)
 {
     for (auto &tensorList : inputs) {
@@ -28,8 +31,7 @@ Param::Param(std::vector<TensorList> inputs, Tensor perTokenScale, Tensor groupL
     mGroupList = groupList;
 }
 
-Tensor ops::adv::tests::quant_grouped_matmul_inplace_add::GenTensor(const char *name,
-                                                                    const std::initializer_list<int64_t> &shape,
+Tensor ops::adv::tests::quant_grouped_matmul_inplace_add::GenTensor(const char *name, const std::vector<int64_t> &shape,
                                                                     ge::DataType dType, ge::Format format)
 {
     return Tensor(name, shape, "", dType, format);

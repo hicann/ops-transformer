@@ -12,6 +12,7 @@
 #define GROUPED_MATMUL_INFERSHAPE_COMMON_H_
 
 #include "register/op_impl_registry.h"
+#include <vector>
 #include "log/log.h"
 #include "platform/platform_info.h"
 
@@ -108,8 +109,8 @@ enum class GMMActType : int64_t {
     END_ACT_TYPE_ENUM
 };
 
-const std::initializer_list<ge::DataType> BIAS_DTYPE_SUPPORT_LIST = {ge::DataType::DT_FLOAT, ge::DataType::DT_FLOAT16,
-                                                                     ge::DataType::DT_BF16};
+const std::vector<ge::DataType> BIAS_DTYPE_SUPPORT_LIST = {ge::DataType::DT_FLOAT, ge::DataType::DT_FLOAT16,
+                                                           ge::DataType::DT_BF16};
 
 class GroupedMatmulCommonUtil {
 public:

@@ -11,9 +11,48 @@
 #define OP_API_INC_GROUPED_MATMUL_UTIL_H
 #include "opdev/common_types.h"
 #include "opdev/op_executor.h"
+#include "log/log.h"
+#include <algorithm>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace gmm {
 using namespace op;
+
+inline bool CheckDTypeInVector(const op::DataType dtype, const std::vector<op::DataType> &validTypes)
+{
+    return std::find(validTypes.begin(), validTypes.end(), dtype) != validTypes.end();
+}
+
+inline std::string DTypeVectorToString(const std::vector<op::DataType> &dataTypes)
+{
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < dataTypes.size(); ++i) {
+        if (i != 0) {
+            oss << ", ";
+        }
+        oss << op::ToString(dataTypes[i]).GetString();
+    }
+    oss << "]";
+    return oss.str();
+}
+
+#ifdef OP_CHECK_DTYPE_NOT_SUPPORT
+#undef OP_CHECK_DTYPE_NOT_SUPPORT
+#endif
+#define OP_CHECK_DTYPE_NOT_SUPPORT(tensor, supportList, retExpr) \
+    do { \
+        if (!gmm::CheckDTypeInVector((tensor)->GetDataType(), (supportList))) { \
+            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON( \
+                __func__, #tensor, op::ToString((tensor)->GetDataType()).GetString(), \
+                "the dtype of " + std::string(#tensor) + " must be one of " + gmm::DTypeVectorToString(supportList)); \
+            retExpr; \
+        } \
+    } while (0)
+
 constexpr int64_t NO_SPLIT = -1L;
 constexpr int64_t SPLIT_M = 0L;
 constexpr int64_t SPLIT_K = 2L;
@@ -127,8 +166,7 @@ const std::map<DataType, std::string> DTYPE_STRING{{DataType::DT_FLOAT16, "FLOAT
                                                    {DataType::DT_FLOAT8_E5M2, "FLOAT8_E5M2"},
                                                    {DataType::DT_HIFLOAT8, "HIFLOAT8"}};
 
-const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT, DataType::DT_FLOAT16,
-                                                                DataType::DT_BF16};
+const std::vector<op::DataType> DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT, DataType::DT_FLOAT16, DataType::DT_BF16};
 
 bool IsTransposeLastTwoDims(const aclTensor *tensor);
 bool IsTransposeForMxShape(const aclTensor *tensor);

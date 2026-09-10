@@ -11,6 +11,7 @@
 #ifndef OP_API_INC_GROUPED_MATMUL_FINALIZE_ROUTING_950_CHECKER_H
 #define OP_API_INC_GROUPED_MATMUL_FINALIZE_ROUTING_950_CHECKER_H
 #include "opdev/format_utils.h"
+#include <vector>
 #include "aclnn_kernels/common/op_error_check.h"
 #include "quant_grouped_matmul_finalize_routing_util.h"
 #include "../../grouped_matmul/op_api/grouped_matmul_util.h"
@@ -58,10 +59,10 @@ inline std::string ViewShapeToString(const aclTensor *tensor)
 
 #define GMMFR_CHECK_DTYPE(tensor, paramName, supportList, retExpr) \
     do { \
-        if (!CheckType((tensor)->GetDataType(), supportList)) { \
+        if (!gmm::CheckDTypeInVector((tensor)->GetDataType(), supportList)) { \
             OP_LOGE_FOR_INVALID_DTYPE(GMMFR_ACLNN_OP_NAME, paramName, \
                                       op::ToString((tensor)->GetDataType()).GetString(), \
-                                      op::ToString(supportList).GetString()); \
+                                      gmm::DTypeVectorToString(supportList).c_str()); \
             retExpr; \
         } \
     } while (0)
@@ -77,29 +78,28 @@ constexpr int64_t MOD2 = 2L;
 constexpr int64_t MAX_NUM_EXPERTS = 1024L;
 constexpr const char *GMMFR_ACLNN_OP_NAME = "aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize";
 
-const std::initializer_list<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_MX = {
+const std::vector<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_MX = {
     op::DataType::DT_FLOAT8_E4M3FN, op::DataType::DT_FLOAT8_E5M2, op::DataType::DT_FLOAT4_E2M1};
-const std::initializer_list<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_FP4 = {op::DataType::DT_FLOAT4_E2M1};
-const std::initializer_list<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_FP8 = {op::DataType::DT_FLOAT4_E2M1};
-static const std::initializer_list<op::DataType> SCALE_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_FLOAT8_E8M0};
-static const std::initializer_list<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_INT64};
-static const std::initializer_list<op::DataType> BIAS_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_BF16};
-static const std::initializer_list<op::DataType> PERTOKEN_SCALE_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_FLOAT8_E8M0};
-static const std::initializer_list<op::DataType> GROUP_LIST_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
-static const std::initializer_list<op::DataType> SHARED_INPUT_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
-static const std::initializer_list<op::DataType> LOGIT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> OUT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+const std::vector<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_FP4 = {op::DataType::DT_FLOAT4_E2M1};
+const std::vector<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_FP8 = {op::DataType::DT_FLOAT4_E2M1};
+static const std::vector<op::DataType> SCALE_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_FLOAT8_E8M0};
+static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_INT64};
+static const std::vector<op::DataType> BIAS_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_BF16};
+static const std::vector<op::DataType> PERTOKEN_SCALE_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_FLOAT8_E8M0};
+static const std::vector<op::DataType> GROUP_LIST_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
+static const std::vector<op::DataType> SHARED_INPUT_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
+static const std::vector<op::DataType> LOGIT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> OUT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
 
-const std::initializer_list<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_PERTOKEN = {
-    DataType::DT_INT8, DataType::DT_FLOAT8_E4M3FN, DataType::DT_HIFLOAT8};
-static const std::initializer_list<op::DataType> PERTOKEN_SCALE_TYPE_SUPPORT_LIST_PERTOKEN = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> BIAS_TYPE_SUPPORT_LIST_PERTOKEN = {op::DataType::DT_BF16};
-static const std::initializer_list<op::DataType> SCALE_TYPE_SUPPORT_LIST_PERTOKEN = {op::DataType::DT_FLOAT,
-                                                                                     op::DataType::DT_BF16};
-static const std::initializer_list<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_PERTOKEN_INT8 = {op::DataType::DT_INT64,
-                                                                                              op::DataType::DT_INT32};
-static const std::initializer_list<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_PERTOKEN_FP8HIFLOAT8 = {
-    op::DataType::DT_INT64};
+const std::vector<DataType> X_WEIGHT_TYPE_SUPPORT_LIST_PERTOKEN = {DataType::DT_INT8, DataType::DT_FLOAT8_E4M3FN,
+                                                                   DataType::DT_HIFLOAT8};
+static const std::vector<op::DataType> PERTOKEN_SCALE_TYPE_SUPPORT_LIST_PERTOKEN = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> BIAS_TYPE_SUPPORT_LIST_PERTOKEN = {op::DataType::DT_BF16};
+static const std::vector<op::DataType> SCALE_TYPE_SUPPORT_LIST_PERTOKEN = {op::DataType::DT_FLOAT,
+                                                                           op::DataType::DT_BF16};
+static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_PERTOKEN_INT8 = {op::DataType::DT_INT64,
+                                                                                    op::DataType::DT_INT32};
+static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_PERTOKEN_FP8HIFLOAT8 = {op::DataType::DT_INT64};
 enum class QuantMode {
     PERTOKEN = 0, // pertoken 量化
     MX = 2        // MX量化
@@ -117,9 +117,9 @@ public:
                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GMMFR_ACLNN_OP_NAME, "scale", "nullptr",
                                                                  "the value of scale cannot be nullptr"));
         DataType scaleDtype = gmmParams_.scale->GetDataType();
-        if (CheckType(scaleDtype, SCALE_TYPE_SUPPORT_LIST_MX)) {
+        if (gmm::CheckDTypeInVector(scaleDtype, SCALE_TYPE_SUPPORT_LIST_MX)) {
             quantMode_ = QuantMode::MX;
-        } else if (CheckType(scaleDtype, SCALE_TYPE_SUPPORT_LIST_PERTOKEN)) {
+        } else if (gmm::CheckDTypeInVector(scaleDtype, SCALE_TYPE_SUPPORT_LIST_PERTOKEN)) {
             quantMode_ = QuantMode::PERTOKEN;
         } else {
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -137,7 +137,7 @@ public:
         // 4. 校验输入、输出shape参数
         CHECK_RET(CheckInputOutShape(), ACLNN_ERR_PARAM_INVALID);
         // 5. 校验输入、输出shape参数针对MXFP4
-        if (CheckType(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4)) {
+        if (gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4)) {
             CHECK_RET(CheckInputOutShapeForMXFP4(), ACLNN_ERR_PARAM_INVALID);
         }
         // 6. 检查数据形状是否支持
@@ -446,10 +446,10 @@ public:
         }
         GMMFR_CHECK_DTYPE(gmmParams_.logit, "logit", LOGIT_TYPE_SUPPORT_LIST, return false);
         GMMFR_CHECK_DTYPE(gmmParams_.out, "y", OUT_TYPE_SUPPORT_LIST, return false);
-        if ((CheckType(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4) !=
-             CheckType(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4)) ||
-            (CheckType(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8) !=
-             CheckType(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8))) {
+        if ((gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4) !=
+             gmm::CheckDTypeInVector(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4)) ||
+            (gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8) !=
+             gmm::CheckDTypeInVector(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8))) {
             OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
                 GMMFR_ACLNN_OP_NAME, "x and weight",
                 "x=" + std::string(op::ToString(gmmParams_.x1->GetDataType()).GetString()) +
@@ -485,8 +485,8 @@ public:
         GMMFR_CHECK_DTYPE(gmmParams_.logit, "logit", LOGIT_TYPE_SUPPORT_LIST, return false);
         GMMFR_CHECK_DTYPE(gmmParams_.out, "y", OUT_TYPE_SUPPORT_LIST, return false);
         if (gmmParams_.x1->GetDataType() != gmmParams_.x2->GetDataType()) {
-            bool xIsFP8 = CheckType(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8);
-            bool wIsFP8 = CheckType(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8);
+            bool xIsFP8 = gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8);
+            bool wIsFP8 = gmm::CheckDTypeInVector(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP8);
             if (!xIsFP8 || !wIsFP8) {
                 OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
                     GMMFR_ACLNN_OP_NAME, "x and weight",

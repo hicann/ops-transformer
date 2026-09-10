@@ -9,6 +9,7 @@
  */
 
 #include <dlfcn.h>
+#include <vector>
 #include "aclnn_grouped_matmul_finalize_routing_weight_nz.h"
 #include "aclnn_grouped_matmul_finalize_routing_weight_nz_v2.h"
 #include "aclnn_grouped_matmul_finalize_routing_v3.h"
@@ -91,26 +92,25 @@ static const int64_t N_VALUE_64 = 64;
 static const int64_t PER_INT4_IN_U32 = 8;
 static const int64_t PER_INT4_IN_U8 = 2;
 
-static const std::initializer_list<op::DataType> IN_TYPE_SUPPORT_LIST = {op::DataType::DT_INT8, op::DataType::DT_INT4};
-static const std::initializer_list<op::DataType> OUT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> SCALE_TYPE_SUPPORT_LIST = {
-    op::DataType::DT_FLOAT, op::DataType::DT_INT64, op::DataType::DT_BF16};
-static const std::initializer_list<op::DataType> BIAS_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
-static const std::initializer_list<op::DataType> OFFSET_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> PERTOKEN_SCALE_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> GROUP_LIST_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
-static const std::initializer_list<op::DataType> SHARED_INPUT_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
-static const std::initializer_list<op::DataType> LOGIT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64,
-                                                                                op::DataType::DT_INT32};
+static const std::vector<op::DataType> IN_TYPE_SUPPORT_LIST = {op::DataType::DT_INT8, op::DataType::DT_INT4};
+static const std::vector<op::DataType> OUT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> SCALE_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT, op::DataType::DT_INT64,
+                                                                  op::DataType::DT_BF16};
+static const std::vector<op::DataType> BIAS_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
+static const std::vector<op::DataType> OFFSET_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> PERTOKEN_SCALE_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> GROUP_LIST_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
+static const std::vector<op::DataType> SHARED_INPUT_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
+static const std::vector<op::DataType> LOGIT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64, op::DataType::DT_INT32};
 
 // w4a8 support dtype
-static const std::initializer_list<op::DataType> W4A8_BIAS_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> W4A8_IN1_TYPE_SUPPORT_LIST = {op::DataType::DT_INT8};
-static const std::initializer_list<op::DataType> W4A8_IN2_TYPE_SUPPORT_LIST = {op::DataType::DT_INT4};
-static const std::initializer_list<op::DataType> W4A8_OUT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> W4A8_SCALE_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
-static const std::initializer_list<op::DataType> W4A8_ROW_INDEX_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
+static const std::vector<op::DataType> W4A8_BIAS_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> W4A8_IN1_TYPE_SUPPORT_LIST = {op::DataType::DT_INT8};
+static const std::vector<op::DataType> W4A8_IN2_TYPE_SUPPORT_LIST = {op::DataType::DT_INT4};
+static const std::vector<op::DataType> W4A8_OUT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
+static const std::vector<op::DataType> W4A8_SCALE_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
+static const std::vector<op::DataType> W4A8_ROW_INDEX_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
 
 // CheckW4orW8 Params
 struct CheckW4orW8DimParams {
@@ -240,7 +240,7 @@ static inline bool CheckDimRange(const GroupedMatmulParams &params)
     OP_CHECK_MIN_DIM(params.x1, MIN_DIM_NUM_ND, return false);
     OP_CHECK_MIN_DIM(params.out, MIN_DIM_NUM_ND, return false);
 
-    if (CheckType(params.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX)) {
+    if (gmm::CheckDTypeInVector(params.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX)) {
         OP_CHECK_WRONG_DIMENSION(params.scale, MX_SCALE_DIM, return false);
         if (params.bias != nullptr) {
             OP_CHECK_WRONG_DIMENSION(params.bias, TWO_DIM_NUM, return false);
@@ -257,7 +257,7 @@ static inline bool CheckDimRange(const GroupedMatmulParams &params)
         OP_CHECK_WRONG_DIMENSION(params.scale, SCALE_DIM, return false);
     }
 
-    if (CheckType(params.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX)) {
+    if (gmm::CheckDTypeInVector(params.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX)) {
         OP_CHECK_WRONG_DIMENSION(params.pertokenScaleOptional, MX_PERTOKEN_SCALE_DIM, return false);
     } else if (params.pertokenScaleOptional != nullptr) {
         OP_CHECK_WRONG_DIMENSION(params.pertokenScaleOptional, 1, return false);
@@ -891,8 +891,8 @@ static aclnnStatus PreMatmulCalcProcess(GroupedMatmulParams &params, aclOpExecut
     auto ret = WeightNZCaseProcess(x2, transposeX2, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    if (scale != nullptr && CheckType(x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX) &&
-        CheckType(scale->GetDataType(), SCALE_TYPE_SUPPORT_LIST_MX)) {
+    if (scale != nullptr && gmm::CheckDTypeInVector(x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX) &&
+        gmm::CheckDTypeInVector(scale->GetDataType(), SCALE_TYPE_SUPPORT_LIST_MX)) {
         bool transposeScale = false;
         ret = WeightNZCaseProcessForMXScale(scale, transposeScale, executor);
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -1572,8 +1572,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
-    bool isMXValid = CheckType(x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX) &&
-                     CheckType(tmpWeightV3->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX);
+    bool isMXValid = gmm::CheckDTypeInVector(x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX) &&
+                     gmm::CheckDTypeInVector(tmpWeightV3->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX);
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && !isMXValid) {
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
             "aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize", "x and weight",

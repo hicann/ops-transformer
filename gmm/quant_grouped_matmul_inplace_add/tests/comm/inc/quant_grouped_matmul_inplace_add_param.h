@@ -17,6 +17,7 @@
 #define UTEST_QUANT_GROUPED_MATMUL_INPLACE_ADD_PARAM_H
 
 #include <register/op_impl_registry.h>
+#include <vector>
 #include "tests/utils/tensor.h"
 #include "tests/utils/tensor_list.h"
 #include "tests/utils/aclnn_tensor.h"
@@ -41,7 +42,7 @@ public:
           int32_t groupListType, int32_t groupSize);
 };
 
-Tensor GenTensor(const char *name, const std::initializer_list<int64_t> &shape, ge::DataType dType,
+Tensor GenTensor(const char *name, const std::vector<int64_t> &shape, ge::DataType dType,
                  ge::Format format = ge::FORMAT_ND);
 
 TensorList GenTensorList(const char *name, const std::vector<std::vector<int64_t>> &shapes, ge::DataType dType,
