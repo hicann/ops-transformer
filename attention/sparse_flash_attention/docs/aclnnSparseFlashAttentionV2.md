@@ -272,7 +272,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
       <td>输入</td>
       <td>代表缩放系数。</td>
       <td>-</td>
-      <td>FLOAT16</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
