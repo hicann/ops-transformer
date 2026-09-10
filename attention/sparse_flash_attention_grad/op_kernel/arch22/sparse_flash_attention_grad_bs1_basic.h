@@ -528,6 +528,9 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessDeterministic(
         scatterRunInfo.changeS1 = false;
         int64_t task = 0;
 
+        processMte2WaitV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
+        SET_FLAG(V, MTE2, processMte2WaitV);
+
         for (int32_t i = 0; i < processBS1ByCore; i++) {
             scatterTaskId = i % PING_PONG_BUFFER;
             int32_t t1Index = cubeBlockIdx + usedCoreNum * i;
@@ -611,6 +614,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::ProcessDeterministic(
                 CrossCoreWaitFlag<0, PIPE_MTE3>(SCATTER_VECTOR_SYNC_FLAG);
             }
         }
+        WAIT_FLAG(V, MTE2, processMte2WaitV);
         SyncAll();
         pipeVec.Destroy();
 
