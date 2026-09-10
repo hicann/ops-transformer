@@ -100,6 +100,28 @@ HcclResult MC2HcomTopology::CommGetHcclBufferByGroup([[maybe_unused]] const char
     return HCCL_SUCCESS;
 }
 
+HcclResult MC2HcomTopology::CommGetNetLayersByGroup([[maybe_unused]] const char *group, std::vector<uint32_t> &layers)
+{
+    layers.clear();
+    uint64_t layerNum = MC2HcomTopologyMocker::GetInstance().GetValue("layerNum", 1);
+    for (uint64_t i = 0; i < layerNum; i++) {
+        std::string key = "layer" + std::to_string(i);
+        layers.push_back(static_cast<uint32_t>(MC2HcomTopologyMocker::GetInstance().GetValue(key.c_str(), 0)));
+    }
+    return static_cast<HcclResult>(MC2HcomTopologyMocker::GetInstance().GetValue("getLayersRet", HCCL_SUCCESS));
+}
+
+HcclResult MC2HcomTopology::CommGetTopoTypeByLayer([[maybe_unused]] const char *group, uint32_t layer,
+                                                   uint32_t *topoType)
+{
+    if (topoType == nullptr) {
+        return HCCL_E_PARA;
+    }
+    std::string key = "layer" + std::to_string(layer) + "TopoType";
+    *topoType = static_cast<uint32_t>(MC2HcomTopologyMocker::GetInstance().GetValue(key.c_str(), COMM_MESH));
+    return static_cast<HcclResult>(MC2HcomTopologyMocker::GetInstance().GetValue("getTopoTypeRet", HCCL_SUCCESS));
+}
+
 // private:
 MC2HcomTopology &MC2HcomTopology::GetInstance()
 {
@@ -107,9 +129,7 @@ MC2HcomTopology &MC2HcomTopology::GetInstance()
     return instance;
 }
 
-MC2HcomTopology::MC2HcomTopology([[maybe_unused]] const char *libPath)
-{
-}
+MC2HcomTopology::MC2HcomTopology([[maybe_unused]] const char *libPath) {}
 
 HcclResult MC2HcomTopology::CallHcomGetCommHandleByGroup([[maybe_unused]] const char *group,
                                                          [[maybe_unused]] HcclComm *commHandle) const
@@ -137,6 +157,22 @@ HcclResult MC2HcomTopology::CallHcomGetL0TopoTypeEx([[maybe_unused]] const char 
                                                     [[maybe_unused]] CommTopo *topoType,
                                                     [[maybe_unused]] uint32_t flag) const
 {
+    return HCCL_SUCCESS;
+}
+
+HcclResult MC2HcomTopology::CallCommGetNetLayers([[maybe_unused]] HcclComm comm, uint32_t **netLayer,
+                                                 uint32_t *netLayerNum) const
+{
+    return HCCL_SUCCESS;
+}
+
+HcclResult MC2HcomTopology::CallCommGetInstTopoTypeByNetLayer([[maybe_unused]] HcclComm comm,
+                                                              [[maybe_unused]] uint32_t netLayer,
+                                                              uint32_t *topoType) const
+{
+    if (topoType == nullptr) {
+        return HCCL_E_PARA;
+    }
     return HCCL_SUCCESS;
 }
 
