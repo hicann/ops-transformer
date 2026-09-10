@@ -139,6 +139,7 @@ public:
     AscendC::LocalTensor<CType> l0cOutUbFirst_;
     AscendC::LocalTensor<CType> l0cOutUbSecond_;
     bool isVecSetSyncCom_ = false;
+    uint32_t curBaseM_ = 0U;
 
     struct GMMTiling {
         uint32_t groupNum;
@@ -290,6 +291,15 @@ public:
         bRightOffset += bRightOffsetStep_;
     }
 
+    __aicore__ inline void BaseMBalance(BlockSchedulerOp &bs, int64_t m, int64_t baseM)
+    {
+        const int64_t safeBaseM = baseM > 0 ? baseM : static_cast<int64_t>(AscendC::BLOCK_CUBE);
+        const int64_t mCnt = CeilDiv(m, safeBaseM);
+        const int64_t balancedBaseM = CeilDiv(m, mCnt);
+        curBaseM_ = static_cast<uint32_t>(CeilAlign(balancedBaseM, static_cast<int64_t>(AscendC::BLOCK_CUBE)));
+        bs.UpdateBaseM(curBaseM_);
+    }
+
     __aicore__ inline void ProcessSingleGroup(const Params &params, BlockSchedulerOp &bs, uint32_t groupIdx)
     {
         int64_t m = Get<M_VALUES>(problemShape_);
@@ -297,13 +307,15 @@ public:
         int64_t k = Get<K_VALUES>(problemShape_);
         TupleShape resProblemShape{Get<M_VALUES>(problemShape_), Get<N_VALUES>(problemShape_) >> 1,
                                    Get<K_VALUES>(problemShape_)};
-        bs.UpdateNextProblem(resProblemShape);
         epilogueDequantAndSwigluOp_.UpdateNextProblem(resProblemShape);
         UpdateGlobalBuffer(params);
-        CoordClass coord(m, n, k, params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
+        CoordClass coord(m, n, k, curBaseM_, params.gmmParams.baseN, params.gmmParams.baseK);
         BlockCoord tileIdx;
         while (bs.GetTileIdx(tileIdx)) {
             BlockShape singleShape = bs.GetBlockShape(tileIdx);
+            if (Get<M_VALUES>(singleShape) <= 0 || Get<N_VALUES>(singleShape) <= 0) {
+                continue;
+            }
             // isMx = true
             blockOffset_ = coord.template GetQuantIOOffset<GroupedMatmul::QuantMode::PERTOKEN_MODE>(
                 Get<INDEX_M_TILEIDX>(tileIdx), Get<INDEX_N_TILEIDX>(tileIdx),
@@ -349,6 +361,11 @@ public:
         }
         InitParamsAndTensor(params);
         BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
+        if constexpr (transB) {
+            bs.SetTailAlign(1, AscendC::BLOCK_CUBE);
+        } else {
+            bs.SetTailAlign(1, MATMUL_MNK_ALIGN_INT8);
+        }
         if ASCEND_IS_AIV {
             epilogueDequantAndSwigluOp_.Init(params.epilogueDequantSwigluParams);
         }
@@ -356,6 +373,23 @@ public:
         for (uint32_t groupIdx = 0; groupIdx < groupNum; groupIdx++) {
             if (!UpdateGroupParams(params, groupIdx)) {
                 continue;
+            }
+            int64_t m = Get<M_VALUES>(problemShape_);
+            TupleShape resProblemShape{Get<M_VALUES>(problemShape_), Get<N_VALUES>(problemShape_) >> 1,
+                                       Get<K_VALUES>(problemShape_)};
+            if constexpr (formatB == CubeFormat::NZ) {
+                BaseMBalance(bs, m, params.gmmParams.baseM);
+            } else {
+                curBaseM_ = static_cast<uint32_t>(params.gmmParams.baseM);
+            }
+            bs.UpdateNextProblem(resProblemShape);
+            if constexpr (!transA) {
+                // Match QGMM MX: split only the final group's tail round when
+                // at least half of the cores are available after its last tile.
+                if (groupIdx + 1 == groupNum && m > 0 && Get<K_VALUES>(problemShape_) > 0 &&
+                    (bs.GetEndBlockIdx() + 1) <= (AscendC::GetBlockNum() >> 1)) {
+                    bs.UpdateTailTile();
+                }
             }
             ProcessSingleGroup(params, bs, groupIdx);
         }
