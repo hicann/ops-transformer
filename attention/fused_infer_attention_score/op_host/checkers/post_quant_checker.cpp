@@ -182,13 +182,11 @@ ge::graphStatus PostQuantChecker::CheckFeatureOutputEqual(const FiaTilingInfo &f
 
 ge::graphStatus PostQuantChecker::CheckFeatureMLAOutQuant(const FiaTilingInfo &fiaInfo) const
 {
-    // 950 上非量化 MLA decode 且 num_heads 非 2 的幂次方时，后量化不支持
-    bool isArch35NonQuant = (enableNonQuant_ && fiaInfo.npuArch == NpuArch::DAV_3510);
-    if (fiaInfo.isOutQuantEnable && fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512 && isArch35NonQuant &&
-        (fiaInfo.n1Size & (fiaInfo.n1Size - 1)) != 0) {
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-            fiaInfo.opName, "attention_out", ToString(fiaInfo.opParamInfo.attenOut.desc->GetDataType()).c_str(),
-            "post quant is not supported when num_heads is not a power of 2 in the Decode MLA scenario on 950");
+    // 非量化 MLA decode 场景下，后量化不支持
+    if (fiaInfo.isOutQuantEnable && fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512 && enableNonQuant_) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(fiaInfo.opName, "attention_out",
+                                              ToString(fiaInfo.opParamInfo.attenOut.desc->GetDataType()).c_str(),
+                                              "post quant is not supported in the Decode MLA scenario");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
