@@ -80,8 +80,6 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn(
     int64_t win_right, int64_t max_seqlen_q, int64_t max_seqlen_kv, std::string layout_q, std::string layout_q_descale,
     std::string layout_kv, std::string layout_out, bool return_softmax_lse)
 {
-    const c10::string_view device = "npu";
-    at::Device outputDevice = at::Device(std::string(device));
     int64_t tSize = 0;
     int64_t nSize = 0;
     int64_t dSize = 0;
@@ -121,7 +119,7 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn(
     } else {
         softmaxOutSize = {0};
     }
-    at::Tensor softmaxLse = at::empty(softmaxOutSize, torch::dtype(at::kFloat).device(outputDevice));
+    at::Tensor softmaxLse = at::empty(softmaxOutSize, q.options().dtype(at::kFloat));
     int64_t qDtypeRatio = GetQkvDtypeRatio(quant_mode);
     if (layout_out == "TND") {
         attentionOutSize = {tSize, nSize, qDtypeRatio * dSize};
@@ -130,7 +128,7 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn(
     } else {
         attentionOutSize = {bSize, sSize, nSize, qDtypeRatio * dSize};
     }
-    at::Tensor attentionOutput = at::empty(attentionOutSize, torch::dtype(at::kBFloat16).device(outputDevice));
+    at::Tensor attentionOutput = at::empty(attentionOutSize, q.options().dtype(at::kBFloat16));
 
     char *layout_q_ptr = const_cast<char *>(layout_q.c_str());
     char *layout_q_descale_ptr = const_cast<char *>(layout_q_descale.c_str());
