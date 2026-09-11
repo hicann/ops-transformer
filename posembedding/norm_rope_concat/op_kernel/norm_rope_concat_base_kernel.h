@@ -85,6 +85,20 @@ __aicore__ inline T CeilAlign(T a, T b)
     return (a + b - 1) / b * b;
 }
 
+__aicore__ inline void VToSSync()
+{
+    event_t eventIDVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));
+    SetFlag<HardEvent::V_S>(eventIDVToS);
+    WaitFlag<HardEvent::V_S>(eventIDVToS);
+}
+
+__aicore__ inline void SToVSync()
+{
+    event_t eventIDSToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_V));
+    SetFlag<HardEvent::S_V>(eventIDSToV);
+    WaitFlag<HardEvent::S_V>(eventIDSToV);
+}
+
 template <RopeType ropeType>
 class RopeOperation {
 public:
@@ -94,6 +108,7 @@ public:
           ropeNum_(ropeNum),
           alignedRopeDim_(alignedRopeDim),
           totalRopeDim_(ropeNum * alignedRopeDim),
+          alignedTotalRopeDim_(ropeNum * CeilAlign(alignedRopeDim, static_cast<uint32_t>(B32_DATA_NUM_PER_REPEAT))),
           actualSeq_(actualSeq)
     {
         if constexpr (ropeType == RopeType::NONE) {
@@ -102,11 +117,12 @@ public:
 
         sinGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN *)sin);
         cosGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN *)cos);
-        pipe->InitBuffer(ropeQueue_, SINGLE_BUFFER, totalRopeDim_ * NUM_TWO * sizeof(DTYPE_ROPE_SIN));
-        pipe->InitBuffer(buf_, (totalRopeDim_ * sizeof(int32_t) + totalRopeDim_ * NUM_TWO * sizeof(float)));
-        sin_ = buf_.GetWithOffset<float>(totalRopeDim_, 0);
-        cos_ = buf_.GetWithOffset<float>(totalRopeDim_, totalRopeDim_ * sizeof(float));
-        mask_ = buf_.GetWithOffset<uint32_t>(totalRopeDim_, totalRopeDim_ * sizeof(float) * NUM_TWO);
+        pipe->InitBuffer(ropeQueue_, SINGLE_BUFFER, alignedTotalRopeDim_ * NUM_TWO * sizeof(DTYPE_ROPE_SIN));
+        pipe->InitBuffer(buf_,
+                         (alignedTotalRopeDim_ * sizeof(int32_t) + alignedTotalRopeDim_ * NUM_TWO * sizeof(float)));
+        sin_ = buf_.GetWithOffset<float>(alignedTotalRopeDim_, 0);
+        cos_ = buf_.GetWithOffset<float>(alignedTotalRopeDim_, alignedTotalRopeDim_ * sizeof(float));
+        mask_ = buf_.GetWithOffset<uint32_t>(alignedTotalRopeDim_, alignedTotalRopeDim_ * sizeof(float) * NUM_TWO);
 
         sinRepeatTimes_ =
             static_cast<uint8_t>(CeilDiv(alignedRopeDim, static_cast<uint32_t>(B32_DATA_NUM_PER_REPEAT))) - 1;
@@ -115,6 +131,7 @@ public:
             tailNum == B32_DATA_NUM_PER_REPEAT ? 0x5555555555555555 : 0x5555555555555555 & ((1UL << tailNum) - 1);
         uint32_t halfDim = ropeDim_ / NUM_TWO;
         Duplicate(mask_, 0U, alignedRopeDim_);
+        VToSSync();
         if constexpr (ropeType == RopeType::INTERLEAVE) {
             // 0, 1, 2, 3, 4, 5, 6, 7 -> 1, 0, 3, 2, 5, 4, 7, 6
             for (uint32_t i = 0; i < halfDim; ++i) {
@@ -128,6 +145,7 @@ public:
                 mask_.SetValue(halfDim + i, i * SIZE_OF_FLOAT);
             }
         }
+        SToVSync();
         for (int32_t i = 1; i < ropeNum_; ++i) {
             Adds(mask_[i * alignedRopeDim_].ReinterpretCast<int32_t>(), mask_.ReinterpretCast<int32_t>(),
                  static_cast<int32_t>(i * alignedRopeDim_ * NUM_FOUR), alignedRopeDim_);
@@ -148,18 +166,30 @@ public:
         DataCopyExtParams copyParams{1, static_cast<uint32_t>(ropeDim_ * sizeof(DTYPE_QUERY)), 0, 0, 0};
         DataCopyPadExtParams<DTYPE_QUERY> padParams{false, 0, 0, 0};
         DataCopyPad(rope, sinGm_[curSeq * ropeDim_], copyParams, padParams);
-        DataCopyPad(rope[totalRopeDim_], cosGm_[curSeq * ropeDim_], copyParams, padParams);
+        DataCopyPad(rope[alignedTotalRopeDim_], cosGm_[curSeq * ropeDim_], copyParams, padParams);
         ropeQueue_.EnQue(rope);
         LocalTensor<DTYPE_ROPE_SIN> deQue = ropeQueue_.DeQue<DTYPE_ROPE_SIN>();
         if (sizeof(DTYPE_ROPE_SIN) < sizeof(float)) {
             Cast(sin_, deQue, RoundMode::CAST_NONE, totalRopeDim_);
-            Cast(cos_, deQue[totalRopeDim_], RoundMode::CAST_NONE, totalRopeDim_);
+            Cast(cos_, deQue[alignedTotalRopeDim_], RoundMode::CAST_NONE, totalRopeDim_);
         } else {
             Adds(sin_, deQue.ReinterpretCast<float>(), 0.f, totalRopeDim_);
-            Adds(cos_, deQue[totalRopeDim_].ReinterpretCast<float>(), 0.f, totalRopeDim_);
+            Adds(cos_, deQue[alignedTotalRopeDim_].ReinterpretCast<float>(), 0.f, totalRopeDim_);
         }
         ropeQueue_.FreeTensor(deQue);
         PipeBarrier<PIPE_V>();
+        if (ropeDim_ < alignedRopeDim_) {
+            for (uint32_t i = 0; i < ropeNum_; ++i) {
+                for (uint32_t j = ropeDim_; j < alignedRopeDim_; ++j) {
+                    sin_.SetValue(i * alignedRopeDim_ + j, 0.0f);
+                    cos_.SetValue(i * alignedRopeDim_ + j, 1.0f);
+                }
+            }
+        }
+        if (totalRopeDim_ < alignedTotalRopeDim_) {
+            Duplicate(sin_[totalRopeDim_], 0.f, alignedTotalRopeDim_ - totalRopeDim_);
+            Duplicate(cos_[totalRopeDim_], 1.f, alignedTotalRopeDim_ - totalRopeDim_);
+        }
         if constexpr (ropeType == RopeType::INTERLEAVE) {
             const UnaryRepeatParams params;
             if (sinRepeatTimes_ > 0) {
@@ -202,6 +232,7 @@ protected:
     uint32_t ropeNum_;
     uint32_t alignedRopeDim_;
     uint32_t totalRopeDim_;
+    uint32_t alignedTotalRopeDim_;
     bool isActive_;
     uint32_t actualSeq_;
     uint64_t sinRepeatMask_[1] = {0x5555555555555555};

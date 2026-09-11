@@ -55,8 +55,8 @@ ge::graphStatus NormRopeConcatTiling::CheckInput(const InputTensorInfo &x)
                 OP_CHECK_IF(shape.GetDimNum() != 1, OP_LOGE(context_.opName, "Shape Dims of tensor should be 1"),
                             return ge::GRAPH_FAILED);
                 OP_CHECK_IF(shape.GetDim(0) != headDim_, // NOTE: not support cross heads
-                            OP_LOGE(context_.opName, "DIM0(%ld) Value of Shape should be headDim_(%ld)", shape.GetDim(0),
-                                    headDim_),
+                            OP_LOGE(context_.opName, "DIM0(%ld) Value of Shape should be headDim_(%ld)",
+                                    shape.GetDim(0), headDim_),
                             return ge::GRAPH_FAILED);
                 break;
             case TensorType::ROPE_TENSOR:
@@ -267,15 +267,20 @@ ge::graphStatus NormRopeConcatTiling::ComputeUBTilingStrategy()
     int64_t alignedNormDim_ = CeilAlign(normDim_, alignNum);
     int64_t alignedRopeDim_ = CeilAlign(ropeDim_, alignNum);
     int64_t normCoef = *(context_.normType) == static_cast<int64_t>(NormType::NONE) &&
-                                *(context_.normAddedType) == static_cast<int64_t>(NormType::NONE) ?
-                            0 :
-                            1;
+                               *(context_.normAddedType) == static_cast<int64_t>(NormType::NONE) ?
+                           0 :
+                           1;
     int64_t ropeCoef = *(context_.ropeType) == static_cast<int64_t>(RopeType::NONE) ? 0 : 1;
     int64_t trainingCoef = *(context_.isTraining) ? 1 : 0;
-    int64_t ropeUsedUbSize = SINGLE_BUFFER * alignedRopeDim_ * 2 * dataTypeSize + alignedRopeDim_ * sizeof(int32_t) +
-                              alignedRopeDim_ * 2 * sizeof(float); // mask, sin, cos, max(20480)
+    constexpr int64_t B32_DATA_NUM = 32 / sizeof(float);
+    int64_t alignedRopeDimForRepeat = CeilAlign(alignedRopeDim_, B32_DATA_NUM);
+    int64_t ropeUsedUbSize =
+        SINGLE_BUFFER * alignedRopeDimForRepeat * 2 * sizeof(float) + // ropeQueue_ (sin/cos as float)
+        alignedRopeDimForRepeat * sizeof(int32_t) +                   // mask_
+        alignedRopeDimForRepeat * 2 * sizeof(float) +                 // sin_, cos_
+        DOUBLE_BUFFER * alignedRopeDim_ * dataTypeSize;               // outQue_ per head
     int64_t normUsedUbSize = SINGLE_BUFFER * alignedNormDim_ * 2 * dataTypeSize + alignedNormDim_ * 2 * sizeof(float) +
-                              MIN_SHARE_BUFFER; // weight, bias, max(16384)
+                             MIN_SHARE_BUFFER; // weight, bias, max(16384)
     int64_t oneHeadUbSize =
         2 * alignedNormDim_ * sizeof(float) + 2 * DOUBLE_BUFFER * alignedNormDim_ * dataTypeSize +
         ropeCoef * ropeUsedUbSize +
@@ -321,7 +326,8 @@ ge::graphStatus NormRopeConcatTiling::DoTiling(gert::TilingContext *ctx)
     context_.eps = attrs->GetAttrPointer<float>(static_cast<size_t>(AttrIndexForward::EPS_INDEX));
     context_.isTraining = attrs->GetAttrPointer<bool>(static_cast<size_t>(AttrIndexForward::IS_TRAINING_INDEX));
     context_.normType = attrs->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndexForward::NORM_TYPE_INDEX));
-    context_.normAddedType = attrs->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndexForward::NORM_ADDED_TYPE_INDEX));
+    context_.normAddedType =
+        attrs->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndexForward::NORM_ADDED_TYPE_INDEX));
     context_.ropeType = attrs->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndexForward::ROPE_TYPE_INDEX));
     context_.concatOrder = attrs->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndexForward::CONCAT_ORDER_INDEX));
     OP_CHECK_NULL_WITH_CONTEXT(ctx, context_.eps);
