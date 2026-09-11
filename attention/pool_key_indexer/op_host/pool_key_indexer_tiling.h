@@ -58,10 +58,7 @@ constexpr uint32_t PKI_HEAD_DIM = 128;
 constexpr uint32_t PKI_N2_FIXED = 1;
 constexpr uint32_t PKI_N1_LIMIT = 64;
 constexpr uint32_t PKI_POOL_SIZE_LIMIT = 128;
-// PA block_size 上限。原为 1024(lightning_indexer 家族沿袭的规格保守值,
-// 非实现能力上限): arch22(A2/A3) 与 arch35(A5) 的 PA 寻址(KeyNd2NzForPA
-// 除模查表 + 块边界钳制 / descale 分块搬运 / scoreGm 布局)均按运行时
-// blockSize 动态计算, 对任意 16 对齐 blockSize 通用, 统一放开至 2048。
+// PA block_size 上限: PA 寻址按运行时 blockSize 动态计算, 支持 16 对齐的任意 blockSize
 constexpr uint32_t PKI_BLOCK_SIZE_LIMIT = 2048;
 constexpr uint32_t PKI_BLOCK_SIZE_FACTOR = 16;
 constexpr uint32_t PKI_TOPK_DEFAULT = 2048;
@@ -72,11 +69,11 @@ constexpr int32_t PKI_QUANT_FP8_PER_TOKEN = 0;
 constexpr int32_t PKI_QUANT_MXFP8 = 1;
 constexpr int32_t PKI_MASK_DEFAULT = 0;
 constexpr int32_t PKI_MASK_CAUSAL = 3;
-// mxFP8 scale 布局(与 QLIv2 一致): 每 MX_SCALE_GROUP_SIZE 个 D 元素共享一个
+// mxFP8 scale 布局: 每 MX_SCALE_GROUP_SIZE 个 D 元素共享一个
 // E8M0 scale, 尾维 [headDim/MX_SCALE_GROUP_ALIGN, MX_E8M0_SCALE_PACK_NUM] 打包
 constexpr uint32_t PKI_MX_SCALE_GROUP_SIZE = 32;   // 每 32 个 D 元素一个 scale
 constexpr uint32_t PKI_MX_E8M0_SCALE_PACK_NUM = 2; // E8M0 尾维打包数(2 个 e8m0 打包寻址)
-constexpr uint32_t PKI_MX_SCALE_SHAPE_ALIGN = 64;  // headDim 对齐约束(headDim=128 恒真, 防御保留)
+constexpr uint32_t PKI_MX_SCALE_SHAPE_ALIGN = 64;  // headDim 对齐约束(当前 headDim 恒为 128)
 
 // ------------------ Tiling Constants ------------------
 // 以下 S1/S2/M 基本块常量为 arch35/host 侧口径; arch22 kernel 以自有硬编码覆盖, 不消费这些字段。
@@ -133,9 +130,7 @@ END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(PoolKeyIndexer, PoolKeyIndexerTilingData)
 
 // ------------------ CompileInfo ------------------
-// 图模式(GE/torchair)必需: 注册 TilingParse 后框架才会为算子生成 compile info
-// JSON(含 _pattern 等字段), 供 FE 在图编译期解析(TbeOpTilingPyInterfaceNew ->
-// ParseAutoTilingRun)。未注册时图编译报 "compile info not contain [_pattern]"。
+// 图模式必需: 注册 TilingParse 后框架才生成 compile info JSON 供 FE 解析, 未注册图编译报错
 struct PoolKeyIndexerCompileInfo {
     platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
     NpuArch npuArch = NpuArch::DAV_2201;

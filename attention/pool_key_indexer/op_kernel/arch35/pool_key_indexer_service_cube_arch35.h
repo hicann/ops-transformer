@@ -36,7 +36,7 @@ public:
     using SCALE_T =
         std::conditional_t<std::is_same_v<typename LIT::scaleType, void>, bfloat16_t, typename LIT::scaleType>;
     // mode=1 (mxFP8): LoadData-Mx 要求 fp8_e4m3fn 源操作数的 L0 dst 为
-    // mx_fp8_e4m3_t(参考 QLIv2 MX_DATA_DST_T); 其他模式 L0 类型与源一致
+    // mx_fp8_e4m3_t; 其他模式 L0 类型与源一致
     using L0_Q_T = std::conditional_t<LIT::isMxFp8, mx_fp8_e4m3_t, Q_T>;
     using L0_K_T = std::conditional_t<LIT::isMxFp8, mx_fp8_e4m3_t, K_T>;
 
@@ -73,7 +73,7 @@ public:
     static constexpr uint64_t S2_BASIC_BLOCK_L0 = 128;
 
     static constexpr uint64_t FP16_BLOCK_CUBE = 16;
-    // FP8 NZ 布局因子: L1 中 fp8 数据的 C0 粒度是 32(参考 QLIv2 FP8_BLOCK_CUBE)
+    // FP8 NZ 布局因子: L1 中 fp8 数据的 C0 粒度是 32
     static constexpr uint64_t FP8_BLOCK_CUBE = 32;
     static constexpr FixpipeConfig LI_CFG_ROW_MAJOR_UB = {CO2Layout::ROW_MAJOR, true};
 
@@ -138,8 +138,7 @@ protected:
     uint64_t queryL1Mte1BufIdx_ = 0;
     uint64_t l0BufIdx_ = 0;
     uint64_t kl0BufIdx_ = 0;
-    // mxFP8 scale L1 乒乓步长(以 e8m0 计; InitParams 按 mBaseSizeMax/s2BasicBlock 计算,
-    // 参考 QLIv2 queryScaleBufferOffset/keyScaleBufferOffset_)
+    // mxFP8 scale L1 乒乓步长(以 e8m0 计; InitParams 按 mBaseSizeMax/s2BasicBlock 计算)
     uint64_t queryScaleBufferOffset_ = 0;
     uint64_t keyScaleBufferOffset_ = 0;
 
@@ -153,7 +152,7 @@ template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::InitParams(const ConstInfo &constInfo)
 {
     constInfo_ = constInfo;
-    // mxFP8 scale L1 乒乓步长(以 e8m0 计, 与 L1 数据乒乓容量一致; 参考 QLIv2)
+    // mxFP8 scale L1 乒乓步长(以 e8m0 计, 与 L1 数据乒乓容量一致)
     queryScaleBufferOffset_ = constInfo_.mBaseSizeMax * constInfo_.headDim / MX_SCALE_GROUP_SIZE;
     keyScaleBufferOffset_ = constInfo_.s2BaseSize * constInfo_.headDim / MX_SCALE_GROUP_SIZE;
 }
@@ -219,9 +218,8 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::ComputeMm1(const PkiCommo
             KeyNd2Nz(s2L1RealSize, s2GmOffset, runInfo);
         }
         if constexpr (LIT::isMxFp8) {
-            // mxFP8: K scale 与 K 数据同批入 L1。
-            // PA 分支需绝对池号查 block_table; 非 PA 分支以 tensorKeyScaleOffset
-            // (含 s2Idx 前缀) 为基 + 块内相对偏移, 不可叠加绝对偏移(双重叠加)
+            // mxFP8: K scale 与 K 数据同批入 L1; PA 分支用绝对池号查
+            // block_table, 非 PA 以 tensorKeyScaleOffset 为基加块内相对偏移
             if constexpr (PAGE_ATTENTION) {
                 LoadKScaleToL1(s2L1RealSize, s2GmBaseOffset + s2GmOffset, runInfo);
             } else {
@@ -314,8 +312,8 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1Rea
     nd2nzPara.nValue = s2L1RealSize; // 行数
     nd2nzPara.dValue = constInfo_.headDim;
     nd2nzPara.srcDValue = constInfo_.headDim;
-    // dstNzC0Stride 对齐单位: NZ C0 粒度按 16 元素 block 计(与 QLIv2 一致,
-    // fp8 亦为 BLOCK_CUBE 对齐; 类型相关的只是 KeyNd2NzForPA 的 dst 写偏移)
+    // dstNzC0Stride 对齐单位: NZ C0 粒度按 16 元素 block 计(fp8 同样按 BLOCK_CUBE 对齐,
+    // 类型相关的差异只在 KeyNd2NzForPA 的 dst 写偏移)
     nd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE);
     nd2nzPara.dstNzNStride = 1;
     nd2nzPara.srcNdMatrixStride = 0;
@@ -350,8 +348,8 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t s2
         nd2nzPara.dstNzNStride = 1;
         nd2nzPara.srcNdMatrixStride = 0;
         nd2nzPara.dstNzMatrixStride = 0;
-        // NZ 布局偏移因子按数据类型选择(fp8: 32, fp16: 16; 参考 QLIv2 KeyNd2NzForPA;
-        // 与 dstNzC0Stride 的对齐粒度联动: QLIv2 dstNzC0Stride 对齐 16 时 fp8 实测须 32)
+        // NZ 布局偏移因子按数据类型选择(fp8: 32, fp16: 16), 与 dstNzC0Stride 的
+        // 对齐粒度联动(dstNzC0Stride 对齐 16 时 fp8 须取 32)
         DataCopy(keyL1_[(keyL1BufIdx_ % KEY_BUF_NUM) * KEY_BUFFER_OFFSET + s2L1Offset * QK_BLOCK_CUBE],
                  keyGm_[keyGmOffset], nd2nzPara);
 
@@ -379,7 +377,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1gL1
              queryGm_[runInfo.tensorQueryOffset + s1gGmOffset * constInfo_.headDim], nd2nzPara);
 }
 
-// mxFP8: q_descale GM -> L1(Dn2Nz, 2 个 E8M0 打包 1 个 bf16; 参考 QLIv2 LoadQScaleToL1)
+// mxFP8: q_descale GM -> L1(Dn2Nz, 2 个 E8M0 打包 1 个 bf16)
 // scale GM 布局: (B,S1,N1,D/64,2) 连续展开 -> 每 s1 行 scalePerToken 个 e8m0
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQScaleToL1(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
@@ -401,8 +399,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQScaleToL1(uint64_t s
     DataCopy(scaleL1, mxQueryScaleGmBf16_[gmOffset / FP8_TWO], dn2Nzparam);
 }
 
-// mxFP8: k_descale GM -> L1(非 PA 连续; PA 按 block_table × keyDequantScaleStride0;
-// 参考 QLIv2 LoadKScaleToL1)
+// mxFP8: k_descale GM -> L1(非 PA 连续; PA 按 block_table × keyDequantScaleStride0)
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadKScaleToL1(uint64_t s2L1RealSize, uint64_t s2GmOffset,
                                                                       const PkiCommon::RunInfo &runInfo)
@@ -502,7 +499,7 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s
         loadData2DParamsV2.ifTranspose = false;
 
         if constexpr (LIT::isMxFp8) {
-            // MX 变体: 数据与 scale 同入 L0, 硬件按 32 元素组反量化(参考 QLIv2)
+            // MX 变体: 数据与 scale 同入 L0, 硬件按 32 元素组反量化
             LoadData2DMxParams loadDataMxParams;
             loadDataMxParams.xStartPosition = CeilDiv(s1gL1Offset, BLOCK_CUBE);
             loadDataMxParams.yStartPosition = 0;

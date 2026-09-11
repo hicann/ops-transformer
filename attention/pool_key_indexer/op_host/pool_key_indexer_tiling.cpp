@@ -19,13 +19,8 @@
 using namespace ge;
 namespace optiling {
 
-// ValueDepend 输入(pool_tail_k / actual_seq_q / actual_seq_k)的 host 可见性判断。
-// GetData() 对 device tensor 同样返回非空指针(device 地址), 在 host 侧解引用会
-// 段错误, 因此取值前必须先确认数据位于 host。仅以下两种来源允许读取值:
-//   - aclnn Array 变体(eager CPU 输入): 框架桥接的 fake tensor, kOnHost;
-//   - aclnn Tensor 变体的 CPU 输入: host 指针原样包装, kOnHost/kFollowing。
-// device tensor(GE 图模式 / eager 经 Tensor 变体直传 NPU 输入)跳过 host 侧值
-// 校验, 由 kernel 运行期从 GM 读值(GetActualSeqLen), 与既有 GE 图模式口径一致。
+// ValueDepend 输入的 host 可见性判断: GetData() 对 device tensor 返回 device
+// 地址(host 解引用段错误); 仅 kOnHost/kFollowing 可读, 其余由 kernel 从 GM 读值
 static bool IsHostVisibleValue(const gert::Tensor *tensor)
 {
     if (tensor == nullptr) {
@@ -198,10 +193,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     OP_CHECK_IF(keyShape->GetStorageShape().GetShapeSize() == 0, OP_LOGE(context_, "pool_key must not be empty tensor"),
                 return ge::GRAPH_FAILED);
 
-    // Capture the actual runtime strides of pool_key (for 0-axis non-contiguous support).
-    // 优先级: 属性 key_stride0(torch_extension 直读, 见 PA 分支) > tiling context
-    // 运行时 stride(图模式由框架填 TensorV2 view; eager/aclnn 路径不填充,
-    // GetInputStride/GetDynamicInputStride 均返回 nullptr)。
+    // 捕获 pool_key 运行时 stride(0 轴非连续支持); 优先级: key_stride0 属性 >
+    // tiling context 运行时 stride(仅图模式填充, eager/aclnn 返回 nullptr)
     auto keyStrides = context_->GetInputStride(PKI_POOL_KEY_INDEX);
     if (keyStrides == nullptr) {
         keyStrides = context_->GetDynamicInputStride(PKI_POOL_KEY_INDEX, 0);
@@ -219,9 +212,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
             return ge::GRAPH_FAILED;
         }
     }
-    // k_descale 运行时 stride 捕获(量化场景 PA 0 轴非连续支持, 参考 QLIv2 :228-236)。
-    // 与 pool_key 在 token 维度一一对应, PA 场景必须跟随 pool_key 的 0 轴非连续。
-    // 图模式下属性与运行时 stride 同时存在, 必须一致(否则以错误来源寻址)。
+    // k_descale 运行时 stride 捕获(量化场景 PA 0 轴非连续, 与 pool_key 一一对应);
+    // 属性与运行时 stride 同时存在时必须一致
     auto kDescaleStrides = context_->GetInputStride(PKI_K_DESCALE_INDEX);
     if (kDescaleStrides == nullptr) {
         kDescaleStrides = context_->GetDynamicInputStride(PKI_K_DESCALE_INDEX, 0);
@@ -265,8 +257,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
     const gert::Tensor *kDescaleTensor = context_->GetOptionalInputTensor(PKI_K_DESCALE_INDEX);
 
     // ---- FP8 量化仅 arch35 (Ascend 950) 支持: 架构门禁 ----
-    // kernel 侧反量化路径仅实现在 arch35(FP8 Mmad + vector scale 融合 / LoadData-Mx);
-    // arch22 (A2/A3) 硬件不支持 FP8, 必须在 tiling 层拒绝而非静默产出错误结果。
+    // arch22 (A2/A3) 硬件不支持 FP8, 必须在 tiling 层拒绝而非静默产出错误结果
     if ((info.quantMode == PKI_QUANT_FP8_PER_TOKEN || info.quantMode == PKI_QUANT_MXFP8) &&
         info.npuArch != NpuArch::DAV_3510) {
         OP_LOGE(context_, "quant_mode=%d is only supported on Ascend950 (DAV_3510), current arch=%d", info.quantMode,
@@ -375,7 +366,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         OP_LOGE(context_, "headDim(%u) must be 128", info.headDim);
         return ge::GRAPH_FAILED;
     }
-    // mxFP8 尾维 [D/64, 2] 要求 headDim 是 64 的倍数(headDim=128 恒真, 防御保留)
+    // mxFP8 尾维 [D/64, 2] 要求 headDim 是 64 的倍数
     if (info.quantMode == PKI_QUANT_MXFP8 && info.headDim % PKI_MX_SCALE_SHAPE_ALIGN != 0) {
         OP_LOGE(context_, "quant_mode=1 (mxFP8) requires headDim %% %u == 0, got %u", PKI_MX_SCALE_SHAPE_ALIGN,
                 info.headDim);
@@ -401,12 +392,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
             static_cast<uint32_t>(keyShape->GetStorageShape().GetDim(3)) != info.headDim,
             OP_LOGE(context_, "PA key D(%ld) must be %u(128)", keyShape->GetStorageShape().GetDim(3), info.headDim),
             return ge::GRAPH_FAILED);
-        // keyStride0 优先级(参考 compressor/QLI 方案):
-        //   1. 属性 key_stride0: torch_extension 层从 at::Tensor::stride(0) 直读传入,
-        //      eager/aclnn 路径下 tiling context 不上报运行时 stride, 该属性是
-        //      0 轴非连续寻址的唯一可靠来源(-1 表示未指定);
-        //   2. tiling context 运行时 stride(图模式由框架填充 TensorV2 view);
-        //   3. 连续推导: stride0 = blockSize * N2 * headDim (element units)
+        // keyStride0 优先级: 属性 key_stride0(eager 路径来源) >
+        // 运行时 stride(图模式) > 连续推导 blockSize*N2*headDim
         const int64_t *keyStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
         if (keyStride0Attr != nullptr && *keyStride0Attr >= 0) {
             uint64_t contiguousStride0 = static_cast<uint64_t>(info.blockSize) * info.n2Size * info.headDim;
@@ -423,12 +410,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         // S2 = maxBlockNumPerBatch * blockSize, 在 block_table 解析处设置
         // (kernel kSeqSize 用作 scoreGm 行距, 不可为 0)
         info.s2Size = 0;
-        // k_descale stride0 接线(量化场景, 参考 QLIv2 tiling.cpp:1374-1381 与 key_stride0 属性模式):
-        //   优先级: k_descale_stride0 属性(eager 唯一可靠来源, torch_extension 直读
-        //   at::Tensor::stride(0) 传入) > tiling context 运行时 stride(图模式) > shape 连续推导。
-        //   mode=0 (per-token-head): k_descale 每 (N2) 池 1 个 scale, 连续 stride0 = blockSize*N2
-        //   mode=1 (mxFP8): k_descale 每池 D/32 个 scale(打包 2/bf16), 连续 stride0 = blockSize*N2*(D/32)
-        //   非量化场景保持 0(kernel 不读)
+        // k_descale stride0 接线(量化场景): 优先级同 key_stride0;
+        // 连续 stride0: mode=0=blockSize*N2, mode=1=blockSize*N2*(D/32); 非量化保持 0
         if (info.quantMode == PKI_QUANT_FP8_PER_TOKEN || info.quantMode == PKI_QUANT_MXFP8) {
             const int64_t *kdsStride0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_K_DESCALE_STRIDE0);
             if (kdsStride0Attr != nullptr && *kdsStride0Attr >= 0) {
@@ -463,10 +446,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
             static_cast<uint32_t>(keyShape->GetStorageShape().GetDim(3)) != info.headDim,
             OP_LOGE(context_, "BSND key D(%ld) must be %u(128)", keyShape->GetStorageShape().GetDim(3), info.headDim),
             return ge::GRAPH_FAILED);
-        // BSND: kernel KeyNd2Nz uses tensorKeyOffset for contiguous addressing, keyStride0 not used
-        // key_stride0/k_descale_stride0 属性仅 PA 分支消费; 非 PA 下显式指定(>=0)
-        // 说明输入非连续, kernel 连续寻址会静默错算, 显式拒绝(eager 由 csrc
-        // 前置拦截, 此处覆盖图模式属性透传/直调 aclnn 的场景)
+        // BSND: kernel 按 tensorKeyOffset 连续寻址, stride0 属性仅 PA 分支消费;
+        // 非 PA 下显式指定说明输入非连续, 显式拒绝
         {
             const int64_t *ks0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
             OP_CHECK_IF(ks0Attr != nullptr && *ks0Attr >= 0,
@@ -494,13 +475,10 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
             static_cast<uint32_t>(keyShape->GetStorageShape().GetDim(2)) != info.headDim,
             OP_LOGE(context_, "TND key D(%ld) must be %u(128)", keyShape->GetStorageShape().GetDim(2), info.headDim),
             return ge::GRAPH_FAILED);
-        // T2 = 累计 pool 总数。kernel 侧 kSeqSize 用于 scoreGm 行距
-        // (arch35: Align(kSeqSize, s2BaseSize) 为 score 行 stride) 与每核 score
-        // 区域大小, 取 0 会导致所有行的分数互相覆盖(参照 LIV2 GetS2Size 的 TND 分支)
+        // T2 = 累计 pool 总数; kSeqSize 用作 scoreGm 行距, 取 0 会导致行间覆盖
         info.s2Size = static_cast<uint32_t>(keyShape->GetStorageShape().GetDim(0));
-        // TND: kernel KeyNd2Nz uses tensorKeyOffset for contiguous addressing, keyStride0 not used
-        // key_stride0/k_descale_stride0 属性仅 PA 分支消费; 非 PA 下显式指定(>=0)
-        // 说明输入非连续, kernel 连续寻址会静默错算, 显式拒绝(与 BSND 分支同因)
+        // TND: kernel 按 tensorKeyOffset 连续寻址, stride0 属性仅 PA 分支消费;
+        // 非 PA 下显式指定说明输入非连续, 显式拒绝
         {
             const int64_t *ks0Attr = attrs->GetAttrPointer<int64_t>(PKI_ATTR_KEY_STRIDE0);
             OP_CHECK_IF(ks0Attr != nullptr && *ks0Attr >= 0,
@@ -528,9 +506,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         OP_CHECK_IF(btShape->GetStorageShape().GetDimNum() != 2,
                     OP_LOGE(context_, "block_table must be 2D (B, maxBlockNumPerSeq)"), return ge::GRAPH_FAILED);
         info.maxBlockNumPerBatch = btShape->GetStorageShape().GetDim(1);
-        // S2 = maxBlockNumPerBatch * blockSize(每 batch 最大 pool 数上界, 参照 LIV2
-        // GetS2SizeForPageAttention)。kernel 侧 kSeqSize 用于 scoreGm 行距与每核
-        // score 区域大小, 取 0 会导致所有行的分数互相覆盖
+        // S2 = maxBlockNumPerBatch * blockSize(每 batch 最大 pool 数上界);
+        // kSeqSize 用作 scoreGm 行距, 取 0 会导致行间覆盖
         info.s2Size = info.maxBlockNumPerBatch * info.blockSize;
     }
 
@@ -605,9 +582,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         }
     }
 
-    // q_descale shape (non-null, quantMode>=0):
-    //   mode=0 (per-token-head): BSND (B,S1,N1) 3D / TND (T1,N1) 2D
-    //   mode=1 (mxFP8, 与 QLIv2 一致): 追加 [D/64, 2] 尾维 -> BSND 5D / TND 4D
+    // q_descale shape (non-null, quantMode>=0): mode=0 为 BSND 3D / TND 2D;
+    // mode=1 (mxFP8) 追加 [D/64, 2] 尾维 -> BSND 5D / TND 4D
     if (qDescaleTensor != nullptr) {
         const gert::StorageShape *qdsShape = context_->GetOptionalInputShape(PKI_Q_DESCALE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, qdsShape);
@@ -630,7 +606,7 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
                                 qdsShape->GetStorageShape().GetDim(2), info.n1Size),
                         return ge::GRAPH_FAILED);
             if (info.quantMode == PKI_QUANT_MXFP8) {
-                // mxFP8 尾维 [D/64, 2] 校验(参考 QLIv2 tiling.cpp:1187-1199)
+                // mxFP8 尾维 [D/64, 2] 校验
                 uint32_t expectScaleD = info.headDim / PKI_MX_SCALE_SHAPE_ALIGN;
                 OP_CHECK_IF(
                     qdsShape->GetStorageShape().GetDim(3) != static_cast<int64_t>(expectScaleD) ||
@@ -665,9 +641,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         }
     }
 
-    // k_descale shape (non-null, quantMode>=0):
-    //   mode=0: BSND (B,S2,N2) 3D / TND (T2,N2) 2D / PA (blockNum,blockSize,N2) 3D
-    //   mode=1 (mxFP8): 追加 [D/64, 2] 尾维 -> BSND/PA 5D / TND 4D
+    // k_descale shape (non-null, quantMode>=0): mode=0 为 BSND/PA 3D 或 TND 2D;
+    // mode=1 (mxFP8) 追加 [D/64, 2] 尾维 -> BSND/PA 5D / TND 4D
     if (kDescaleTensor != nullptr) {
         const gert::StorageShape *kdsShape = context_->GetOptionalInputShape(PKI_K_DESCALE_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, kdsShape);
@@ -873,9 +848,8 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
                     return ge::GRAPH_FAILED);
 
         if (askData == nullptr) {
-            // Device tensor(GE 图模式 / eager Tensor 变体 NPU 输入): tiling 期值不可见。
-            // 跳过 host 侧值校验; kernel 运行期从 GM 读值(GetActualSeqLen)。
-            // PA maxBlockNumPerSeq 检查同样推迟(block_table 上界由 kernel 寻址保证)。
+            // Device tensor: tiling 期值不可见, 跳过 host 侧值校验,
+            // kernel 运行期从 GM 读值; PA maxBlockNumPerSeq 检查同样推迟
             OP_LOGI(context_, "actual_seq_k data is not host-visible (device tensor), skip value validation");
         } else if (info.layoutK == PkiDataLayout::TND) {
             int64_t prev = 0;
@@ -996,8 +970,7 @@ ge::graphStatus PoolKeyIndexerTiling::CheckKeyContiguous(const PoolKeyIndexerTil
             }
         }
     }
-    // ---- k_descale 非连续校验(量化场景, 与 pool_key 同规则: PA 仅 0 轴可非连续,
-    // 其余轴必须连续; 参考 QLIv2 tiling.cpp CheckKeyContiguous 的 scale 检查) ----
+    // ---- k_descale 非连续校验(量化场景, 与 pool_key 同规则: PA 仅 0 轴可非连续, 其余轴必须连续) ----
     if (info.quantMode == PKI_QUANT_FP8_PER_TOKEN || info.quantMode == PKI_QUANT_MXFP8) {
         if (!keyDequantScaleStridesVec_.empty()) {
             const gert::StorageShape *kdsShape = context_->GetOptionalInputShape(PKI_K_DESCALE_INDEX);
@@ -1076,12 +1049,10 @@ uint32_t PoolKeyIndexerTiling::GetTrunkLen(uint32_t sparseCount)
 
 ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo &info, uint64_t &workspaceSize)
 {
-    // 布局必须与 kernel 侧一致（op_kernel/arch22/pool_key_indexer_kernel_arch22.h Init）:
-    // | mm1ResGm(双缓冲score) | vec1ResGm(LD中间结果) | vec1ParamGm(LD参数) |
-    // MIX 核上 GetBlockNum() 返回 blockDim = CalcTschBlockDim(aivNum, aicNum, aivNum) = aicNum，
-    // 与 LIV1/LIV2 一致直接使用 aicNum
+    // workspace 布局须与 kernel 侧一致: | mm1ResGm(双缓冲score) | vec1ResGm(LD中间结果) |
+    // vec1ParamGm(LD参数) |; MIX 核上 GetBlockNum() = aicNum, 直接使用 aicNum
     constexpr uint64_t PKI_BASE_TOPK = 2048;
-    constexpr uint64_t PKI_TOPK_MAX_SIZE = 8192; // 与 LIV2 一致：LD 区域按 topk 上限预留余量
+    constexpr uint64_t PKI_TOPK_MAX_SIZE = 8192; // LD 区域按 topk 上限预留余量
     constexpr uint64_t PKI_SPARSE_COUNT_8K = 8192;
     constexpr uint64_t PKI_S2_BASE_SIZE = 512;
     constexpr uint64_t PKI_BLOCK_CUBE_SIZE = 16;
@@ -1103,9 +1074,8 @@ ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo
     uint64_t scoreGmSize =
         RoundUp64(static_cast<uint64_t>(aicNum) * PKI_WS_DOUBLE * mBaseSizeAlign * PKI_S2_BASE_SIZE * PKI_SCORE_T_SIZE,
                   PKI_GM_ALIGN_BYTES);
-    // arch35 kernel score 区域: GetBlockNum()(=aicNum) × s1BaseSize(4|2) ×
-    // Align(s2Size, 128) × sizeof(SCORE_T)(arch35 不用 LD 区域, 仅此一段;
-    // TND/PA 的 s2Size 为累计池数/块槽上界, 可能大于 arch22 场景, 需取 max 覆盖)
+    // arch35 kernel score 区域: aicNum × s1BaseSize(4|2) × Align(s2Size,128) × 4B;
+    // TND/PA 的 s2Size 可能更大, 需取 max 覆盖
     uint64_t s1BaseSize35 = (info.sparseCount > PKI_BASE_TOPK) ? PKI35_S1_BASE_SIZE_SMALL : PKI35_S1_BASE_SIZE;
     uint64_t s2Size35Align = (info.s2Size + PKI35_S2_BASE_SIZE - 1) / PKI35_S2_BASE_SIZE * PKI35_S2_BASE_SIZE;
     uint64_t scoreGmSize35 =
@@ -1187,9 +1157,8 @@ ge::graphStatus PoolKeyIndexerTiling::DoTiling(PoolKeyIndexerTilingInfo *tilingI
     if (ret != ge::GRAPH_SUCCESS) {
         return ret;
     }
-    // kernel 侧 GetUserWorkspace() 会跳过系统保留区（arch22 为 16MB，
-    // 即 GetLibApiWorkSpaceSize()），必须计入总 workspace，否则 kernel 实际
-    // 可用空间不足导致 GM 越界（参照 lightning_indexer_v2_tiling.cpp）
+    // GetUserWorkspace() 会跳过系统保留区(GetLibApiWorkSpaceSize), 必须计入
+    // 总 workspace, 否则 kernel 可用空间不足导致 GM 越界
     workspaceSize += ascendcPlatform.GetLibApiWorkSpaceSize();
 
     // Set tiling data fields
@@ -1200,10 +1169,7 @@ ge::graphStatus PoolKeyIndexerTiling::DoTiling(PoolKeyIndexerTilingInfo *tilingI
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 
     // Set workspace size
-    // GE 图模式运行期 tiling 时 workspaces[0] 可能为 -1(SIZE_MAX) 哨兵(未定态),
-    // 若与计算值取 max 会把 SIZE_MAX 烘焙进图, 导致 GenTask 溢出检查失败或
-    // 巨量内存分配(E29999/OOM)。必须直接覆写(参照 lightning_indexer_v2 /
-    // grouped_matmul_finalize_routing 的权威写法)。
+    // GE 图模式 workspaces[0] 可能为 SIZE_MAX 哨兵, 必须直接覆写(取 max 会烘焙进图导致溢出/OOM)
     size_t *workspaces = context_->GetWorkspaceSizes(1);
     if (workspaces != nullptr) {
         workspaces[0] = static_cast<size_t>(workspaceSize);
@@ -1246,9 +1212,8 @@ static ge::graphStatus TilingPoolKeyIndexer(gert::TilingContext *context)
     return tiling.DoTiling(&info);
 }
 
-// 图模式 compile info 解析回调: te 编译期调用, 将平台信息写入 CompileInfo,
-// 框架据此生成 compile info JSON(_pattern 等字段), 供 FE 图编译期解析。
-// 参照 grouped_matmul_finalize_routing / grouped_matmul_add 的注册范式。
+// 图模式 compile info 解析回调: te 编译期将平台信息写入 CompileInfo,
+// 框架据此生成 compile info JSON 供 FE 图编译期解析
 static ge::graphStatus TilingPrepareForPoolKeyIndexer(gert::TilingParseContext *context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("PoolKeyIndexer", "TilingParseContext is nullptr!"),

@@ -43,25 +43,16 @@ __global__ __aicore__ void pool_key_indexer(__gm__ uint8_t *query, __gm__ uint8_
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
 #if (__CCE_AICORE__ == 310)
-    // arch35 (A5/950): radix/histogram TopK, dual-dst Fixpipe, shared UB
-    // NOTE: must use `if constexpr`, NOT plain `if`: ORIG_DTYPE_* are -D macros
-    // (per-bin constants), and a plain `if` still instantiates ALL dtype
-    // branches, including fp8_e4m3fn_t. Instantiating the fp8 branch for
-    // bf16/fp16 bins drags scalar-fp8 semantics into codegen, which the
-    // bisheng backend rejects with
-    //   "fp8eXmY/... type only supports pointer operations, scalar float type
-    //    semantics are not supported" (exit code 70).
-    // QUANT_MODE tpl 值: 0=none / 1=fp8 per-token(scale=float, vector 融合) /
-    // 2=mxFP8(scale=e8m0, LoadData-Mx 硬件反量化)
+    // arch35 (A5/950): radix/histogram TopK, dual-dst Fixpipe, shared UB。
+    // 必须用 if constexpr(dtype 分支互斥, 普通 if 会全量实例化, fp8 标量语义编译器不支持); QUANT_MODE: 0/1/2
     if constexpr (ORIG_DTYPE_QUERY == DT_BF16) {
         INVOKE_PKI_OP_IMPL(PoolKeyIndexerKernel, bfloat16_t, bfloat16_t, int32_t, PKI_LAYOUT(LAYOUT_Q),
                            PKI_LAYOUT(LAYOUT_K));
     } else if constexpr (ORIG_DTYPE_QUERY == DT_FLOAT16) {
         INVOKE_PKI_OP_IMPL(PoolKeyIndexerKernel, half, half, int32_t, PKI_LAYOUT(LAYOUT_Q), PKI_LAYOUT(LAYOUT_K));
     } else if constexpr (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) {
-        // 量化场景 weights 支持 FP16/BF16(规格+tiling 均允许), kernel 按
-        // ORIG_DTYPE_WEIGHTS 分发 WEIGHTS_T(参考 quant_lightning_indexer 的双 dtype 模式)。
-        // 注意模板参数顺序: ..., DT_W_FLAG, SCALE_T, WEIGHTS_T —— scale 在前, weights 在后
+        // 量化场景 weights 支持 FP16/BF16, 按 ORIG_DTYPE_WEIGHTS 分发 WEIGHTS_T;
+        // 模板参数顺序: ..., DT_W_FLAG, SCALE_T, WEIGHTS_T(scale 在前, weights 在后)
         if constexpr (ORIG_DTYPE_WEIGHTS == DT_BF16) {
             if constexpr (QUANT_MODE == PKI_TPL_QUANT_MXFP8) {
                 INVOKE_PKI_OP_IMPL(PoolKeyIndexerKernel, fp8_e4m3fn_t, fp8_e4m3fn_t, int32_t, PKI_LAYOUT(LAYOUT_Q),

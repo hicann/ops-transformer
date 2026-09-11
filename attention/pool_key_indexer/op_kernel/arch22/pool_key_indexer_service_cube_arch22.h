@@ -245,9 +245,8 @@ template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
                                                                      const PkiCommon::RunInfo &runInfo)
 {
-    // PA key (blockNum, blockSize, N2, D): 块内每行 = 1 个池(与 LIV2 语义一致),
-    // srcDValue=headDim 连续行; actS2SizeOrig(池数*poolSize+tail) 的 token 语义仅用于
-    // causal 可见性换算, 与 key 搬运无关
+    // PA key (blockNum, blockSize, N2, D): 块内每行 = 1 个池, srcDValue=headDim
+    // 连续行; actS2SizeOrig 的 token 语义仅用于 causal 可见性换算, 与搬运无关
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
         uint64_t s2BlkId = (s2L1Offset + s2GmOffset) / constInfo_.kCacheBlockSize;

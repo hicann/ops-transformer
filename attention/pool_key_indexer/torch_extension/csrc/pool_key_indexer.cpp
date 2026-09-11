@@ -17,11 +17,8 @@
 namespace op_api {
 using namespace at_npu::native;
 
-// ACLNN_CMD 宏将 GetWorkspaceSize 函数名绑定为 "<api>GetWorkspaceSize"(字符串拼接),
-// 无法覆盖 GWS 与 run 函数名不同前缀的场景: aclnnPoolKeyIndexerTensorGetWorkspaceSize
-// (Tensor 变体, ValueDepend 输入为 aclTensor*) 与 run 函数共享 aclnnPoolKeyIndexer。
-// 本辅助函数按显式函数名调用, 执行语义与 ACLNN_CMD 一致。
-// 函数地址经名称缓存(线程安全), 避免每次调用重复 dlsym。
+// ACLNN_CMD 宏按 "<api>GetWorkspaceSize" 拼接函数名, 无法覆盖 GWS 与 run 函数
+// 前缀不同的场景; 本辅助函数按显式函数名调用(语义同 ACLNN_CMD), 并缓存函数地址。
 static void *CachedOpApiFuncAddr(const char *apiName)
 {
     static std::mutex mu;
@@ -116,11 +113,8 @@ inline bool PkiIsE8M0Tensor(const at::Tensor &tensor)
 
 constexpr int64_t PKI_E8M0_SCALE_PACK_NUM = 2;
 
-// PKI 量化 dtype 修正(参考 QLIv2 FixQLIV2AclDtypes 模式):
-//   quantMode=0: q/k=FP8_E4M3FN, descale=FLOAT —— aclnn 按输入 dtype 自动识别,
-//                仅校验 dtype 匹配;
-//   quantMode=1: descale=FLOAT8_E8M0 —— 需显式设置 scale dtype(ACL_FLOAT8_E8M0),
-//                并校验 2 元素 E8M0 打包对齐(Cube 按 bf16 视图成对加载)。
+// PKI 量化 dtype 修正: quantMode=0 的 descale=FLOAT 按 aclnn 输入 dtype 自动
+// 识别; quantMode=1 需显式设置 ACL_FLOAT8_E8M0 并校验 2 元素打包对齐。
 inline void FixPkiAclDtypes(int64_t quantMode, TensorWrapper &queryWrapper, TensorWrapper &poolKeyWrapper,
                             TensorWrapper &qScaleWrapper, TensorWrapper &kScaleWrapper)
 {
@@ -160,10 +154,8 @@ inline void FixPkiAclDtypes(int64_t quantMode, TensorWrapper &queryWrapper, Tens
     }
 }
 
-// Derive output shapes from query shape + layout.
-//   BSND: query (B,S1,N1,D) -> indices (B,S1,topk+poolSize-1) / values (B,S1,topk/poolSize)
-//   TND:  query (T1,N1,D)   -> indices (T1,topk+poolSize-1)     / values (T1,topk/poolSize)
-// Note: PKI output has no N2 dimension (N2 is fixed to 1), unlike LIV2 which emits keyHeadNum.
+// Derive output shapes from query shape + layout: BSND query (B,S1,N1,D) -> indices
+// (B,S1,topk+poolSize-1) / values (B,S1,topk/poolSize); TND 少一维且无 N2(N2 恒 1)。
 std::tuple<at::Tensor, at::Tensor> ConstructPoolKeyIndexerOutputTensor(const at::Tensor &query, int64_t topk,
                                                                        int64_t poolSize,
                                                                        const std::string &queryLayoutStr,
@@ -249,13 +241,8 @@ std::tuple<at::Tensor, at::Tensor> PoolKeyIndexer(
     char *queryLayoutPtr = const_cast<char *>(queryLayoutStr.c_str());
     char *keyLayoutPtr = const_cast<char *>(keyLayoutStr.c_str());
 
-    // pool_key 0轴非连续支持(参考 compressor 方案): eager/aclnn 链路的
-    // tiling context 不上报运行时 stride, 故在 torch extension 层直读
-    // at::Tensor::stride(0) 作为 key_stride0 属性下传; 非 0 轴必须连续。
-    // PA_BBND 下 0 轴 stride >= blockSize*N2*D 时按非连续寻址, 否则等价连续。
-    // 非 PA(BSND/TND) 布局: kernel KeyNd2Nz 连续寻址且 tiling 不消费
-    // key_stride0 属性(该属性仅 PA 分支接线), 0 轴非连续输入会静默错算,
-    // 必须在此显式拒绝(图模式由框架上报运行时 stride 经 tiling 拦截)。
+    // pool_key 0轴非连续支持: eager 链路 tiling 不上报运行时 stride, 此处直读
+    // stride(0) 作为 key_stride0 属性下传; 非 0 轴必须连续, 非 PA 布局显式拒绝。
     int64_t keyStride0 = -1;
     if (!poolKey.is_contiguous()) {
         auto contiguousAxes = IsContiguousAxes(poolKey);
@@ -282,12 +269,8 @@ std::tuple<at::Tensor, at::Tensor> PoolKeyIndexer(
     const bool kDescaleDefined = kDescale.has_value() && kDescale.value().defined();
     const bool isQuantPath = (quantMode == 0 || quantMode == 1);
 
-    // k_descale 0轴非连续支持(与 pool_key 的 key_stride0 属性同机制):
-    // eager/aclnn 链路的 tiling context 不上报运行时 stride, 故在 torch extension
-    // 层直读 at::Tensor::stride(0) 作为 k_descale_stride0 属性下传; 非 0 轴必须连续。
-    // 仅 PA_BBND 布局支持 0 轴非连续(kernel GetKeyScale 按 block_table 逐物理块
-    // 寻址, 块基址 = blockId * keyDequantScaleStride0); 非 PA 布局 kernel 连续
-    // 寻址且 tiling 不消费该属性, 非连续输入会静默错算, 必须显式拒绝。
+    // k_descale 0轴非连续支持(与 key_stride0 同机制): 此处直读 stride(0) 作为
+    // k_descale_stride0 属性下传; 仅 PA_BBND 支持, 非 0 轴必须连续, 否则拒绝。
     int64_t kDescaleStride0 = -1;
     if (kDescaleDefined && !kDescale.value().is_contiguous()) {
         bool isPaBbndKds = (keyLayoutStr == "PA_BBND");
@@ -302,9 +285,8 @@ std::tuple<at::Tensor, at::Tensor> PoolKeyIndexer(
         }
         kDescaleStride0 = kDescale.value().stride(0);
         if (isPaBbndKds) {
-            // PA: 属性须 >= 连续 stride(0 轴非连续只允许加 padding);
-            // 连续值因 quant_mode 而异(mode=0: blockSize*N2*D/32_e8m0_per_token... 此处
-            // 按元素单位校验下界, tiling 侧做精确校验)
+            // PA: 属性须 >= 连续 stride(0 轴非连续只允许加 padding),
+            // 此处仅校验下界, tiling 侧做精确校验
             TORCH_CHECK(kDescaleStride0 > 0, "k_descale stride0(", kDescaleStride0, ") must be positive");
         }
     }
@@ -326,19 +308,8 @@ std::tuple<at::Tensor, at::Tensor> PoolKeyIndexer(
         FixPkiAclDtypes(quantMode, queryWrapper, poolKeyWrapper, qScaleWrapper, kScaleWrapper);
     }
 
-    // pool_tail_k / actual_seq_q / actual_seq_k 为 ValueDepend(OPTIONAL) 输入,
-    // 生成的 aclnn API 有两个变体, 按输入设备分流:
-    //   - aclnnPoolKeyIndexerGetWorkspaceSize (aclIntArray*, host 值):
-    //     全部值输入在 CPU 时使用。tiling 期可读 host 值做校验(前缀和单调性 /
-    //     tail 范围), 无任何拷贝; aclgraph 捕获期无 D2H, 值烘焙为图常量
-    //     (捕获后改 CPU 值不生效, 需重新捕获)。
-    //   - aclnnPoolKeyIndexerTensorGetWorkspaceSize (aclTensor*, run 函数共享
-    //     aclnnPoolKeyIndexer): 任一值输入在 NPU 时使用。无阻塞 D2H —— 消除
-    //     eager 每次调用的同步点, 并使 NPUGraph/aclgraph 捕获成为可能
-    //     (device 输入为图输入, 捕获后修改 buffer 内容 replay 自动生效)。
-    //     代价: tiling 跳过这些输入的 host 值校验(与 GE 图模式口径一致),
-    //     kernel 运行期从 GM 读值。混布输入(CPU+NPU)统一搬至计算设备,
-    //     host->device 拷贝仅 eager 可用(捕获期内禁止)。
+    // pool_tail_k/actual_seq_q/actual_seq_k 为 ValueDepend(OPTIONAL) 输入: 全 CPU 走
+    // aclnnPoolKeyIndexer(aclIntArray*); 任一在 NPU 走 Tensor 变体(无 D2H, 支持图捕获)。
     const bool actualSeqQDefined = actualSeqQ.has_value() && actualSeqQ.value().defined();
     const bool actualSeqKDefined = actualSeqK.has_value() && actualSeqK.value().defined();
     const bool valueInputsAllHost = poolTailK.is_cpu() && (!actualSeqQDefined || actualSeqQ.value().is_cpu()) &&

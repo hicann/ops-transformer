@@ -16,8 +16,7 @@
 using namespace AscendC;
 namespace PkiCommon {
 
-// mxFP8 scale 布局(与 QLIv2/host tiling 常量一致): 每 32 个 D 元素共享一个
-// E8M0 scale, 2 个 E8M0 打包成 1 个 bf16 寻址单位
+// mxFP8 scale 布局: 每 32 个 D 元素共享一个 E8M0 scale, 2 个 E8M0 打包成 1 个 bf16 寻址单位
 constexpr uint32_t PKI_MX_SCALE_GROUP_SIZE = 32;
 constexpr uint32_t PKI_FP8_TWO = 2;
 
@@ -42,7 +41,7 @@ struct PkiType {
     static constexpr bool pageAttention = (K_LAYOUT_T == PkiLayout::PA_BSND);
     static constexpr PkiLayout layout = LAYOUT_T;
     static constexpr PkiLayout keyLayout = K_LAYOUT_T;
-    // 量化模式判定(与 QLIv2 一致): FP8 输入 + E8M0 scale => mxFP8 硬件路径;
+    // 量化模式判定: FP8 输入 + E8M0 scale => mxFP8 硬件路径;
     // FP8 输入 + float scale => per-token-head vector 融合路径
     static constexpr bool isMxFp8 = std::is_same<Q_T, fp8_e4m3fn_t>::value && std::is_same<K_T, fp8_e4m3fn_t>::value &&
                                     std::is_same<SCALE_T, fp8_e8m0_t>::value;
@@ -71,7 +70,7 @@ struct RunInfo {
     uint64_t tensorQueryOffset;
     uint64_t tensorKeyOffset;
     uint64_t tensorWeightsOffset;
-    // 量化场景 scale GM 偏移(仅 quantMode>=0 有效; 参考 QLIv2 RunInfo)
+    // 量化场景 scale GM 偏移(仅 quantMode>=0 有效)
     uint64_t tensorQScaleOffset = 0;
     uint64_t tensorKeyScaleOffset = 0;
     uint64_t indiceOutOffset;

@@ -190,20 +190,15 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::InitTilingData(const PoolKeyIn
     constInfo.returnValue = tilingData->returnValue;
     constInfo.splitMFlag = (constInfo.gSize == 64 && constInfo.sparseCount <= 2048);
     if constexpr (LIT::isQuant) {
-        // 量化路径禁用 splitM: splitM 分支的 LoadData2D dst 布局按 fp16 M 切分
-        // 推导(dstOffset=i*64*16 等), fp8 的 L1 NZ 行深变化后该分支布局错位
-        // (fp8+n1=64+PA+sparse<256 组合实测分数错乱出负值); QLIv2 无 splitM 机制可参照。
-        // 正确性优先, 量化场景走常规单块路径
+        // 量化路径禁用 splitM: splitM 的 LoadData2D dst 布局按 fp16 M 切分推导,
+        // fp8 的 L1 NZ 行深变化后布局错位, 量化场景走常规单块路径
         constInfo.splitMFlag = false;
-        // 禁用 splitM 后 mBaseSize 必须钳到 L0 容量(M_BASIC_BLOCK_L0=128 行):
-        // splitM 本将 gSize=64 的 256 行 M 切两半进 L0, 禁用后 s1gL0RealSize
-        // 可达 256 直写 128 行 L0A/L0C 越界(aicore l1 error, 507015 偶发崩溃)。
-        // 钳制值必须能被 gSize 整除(s1BaseSize 整数), 否则 Fixpipe dualDstCtl
-        // 的半区行(mBaseSize/2)与 Vec 读取行距(gSize)错位(n1=48 实测集合失败)
+        // 禁用后 mBaseSize 必须钳到 L0 容量(128 行), 且能被 gSize 整除,
+        // 否则 L0 越界或 Fixpipe 半区行与 Vec 读取行距错位
         if (constInfo.mBaseSize > 128) {
             uint32_t s1PerL0 = 128 / constInfo.gSize; // L0 128 行可容纳的 s1 行数(整除截断)
             if (s1PerL0 == 0) {
-                s1PerL0 = 1; // gSize>128 理论不发生(N1<=64), 防御
+                s1PerL0 = 1; // gSize>128 时兜底(N1<=64, 正常不触达)
             }
             // 半区(mBaseSize/2)必须含整数个 s1 行(dualDstCtl 按半区拆分给
             // 两个 AIV, Vec 按 gSize 行距读取), s1PerL0 取偶
@@ -506,8 +501,7 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
         }
         keyGm.SetGlobalBuffer((__gm__ K_T *)poolKey);
         if constexpr (LIT::isMxFp8) {
-            // mode=1: E8M0 scale 按 2 个打包成 1 个 bf16 寻址(参考 QLIv2),
-            // 块数 = 原始 e8m0 元素数 / 2
+            // mode=1: E8M0 scale 按 2 个打包成 1 个 bf16 寻址, 块数 = e8m0 元素数 / 2
             qScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t *)qDescale);
             kScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t *)kDescale);
             matmulService.InitMm1GlobalTensor(blockTableGm, keyGm, queryGm, kScaleGmBf16, qScaleGmBf16);
@@ -620,9 +614,8 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::CalcRunInfo(uint32_t loop, uin
         queryCoreOffset = tndBIdxOffset + runInfo.gS1Idx * constInfo.mBaseSize * constInfo.headDim;
         // B,S1,N1(N2,G)/T,N1(N2,G)
         weightsCoreOffset = actualSeqQPrefixSum * constInfo.qHeadNum + runInfo.n2Idx * constInfo.gSize;
-        // 量化 q_descale 偏移:
-        //   mode=0: shape 与 weights 同构(B,S1,N1 / T1,N1), 直接复用 weights 公式
-        //   mode=1: shape (B,S1,N1,D/64,2), 每 s1 行 scalePerToken=D/32 个 e8m0
+        // 量化 q_descale 偏移: mode=0 与 weights 同构直接复用其公式;
+        // mode=1 为 (B,S1,N1,D/64,2), 每 s1 行 D/32 个 e8m0
         if constexpr (LIT::isFp8PerToken) {
             qScaleCoreOffset = weightsCoreOffset;
         } else if constexpr (LIT::isMxFp8) {
@@ -631,17 +624,14 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::CalcRunInfo(uint32_t loop, uin
                 runInfo.gS1Idx * constInfo.mBaseSize * (constInfo.headDim / PKI_MX_SCALE_GROUP_SIZE) +
                 runInfo.n2Idx * constInfo.gSize * (constInfo.headDim / PKI_MX_SCALE_GROUP_SIZE);
         }
-        // B,S1,N2,k/T,N2,k
-        // 注意: poolSize>1 时 indices 输出行宽为 outputLen(=sparseCount*poolSize+poolSize-1),
-        // 而非 sparseCount(仅 poolSize==1 时二者相等), 否则 batch>0 的行基址错位,
-        // 写入会跨界覆盖相邻行(ProcessTopK 按 outputLen_ 行宽寻址, 见 service_vector)
+        // B,S1,N2,k/T,N2,k; poolSize>1 时 indices 行宽为 outputLen(≠sparseCount),
+        // 否则 batch>0 行基址错位, 写入覆盖相邻行
         uint32_t idxOutStride = (constInfo.poolSize > 1) ?
                                     (constInfo.sparseCount * constInfo.poolSize + constInfo.poolSize - 1) :
                                     constInfo.sparseCount;
         indiceOutCoreOffset = actualSeqQPrefixSum * constInfo.kHeadNum * idxOutStride + runInfo.n2Idx * idxOutStride;
-        // values 输出行宽恒为 sparseCount(与 indices 的 outputLen 行宽不同),
-        // batch>0 时若复用 indiceOutCoreOffset(poolSize>1) 会按 outputLen 行距
-        // 错位寻址, 导致 valueOutGm 写到相邻 batch 的错误位置
+        // values 输出行宽恒为 sparseCount(与 indices 的 outputLen 不同),
+        // 不可复用 indiceOutCoreOffset, 否则错位写到相邻 batch
         valueOutCoreOffset =
             actualSeqQPrefixSum * constInfo.kHeadNum * constInfo.sparseCount + runInfo.n2Idx * constInfo.sparseCount;
     }
@@ -654,11 +644,8 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::CalcRunInfo(uint32_t loop, uin
     }
     uint64_t tndBIdxOffsetForK = actualSeqKPrefixSum * constInfo.kHeadNum * constInfo.headDim;
     keyCoreOffset = tndBIdxOffsetForK + runInfo.s2Idx * constInfo.s2BaseSize * constInfo.kHeadNum * constInfo.headDim;
-    // 量化 k_descale 偏移:
-    //   mode=0: shape 与 key 去 D 同构(B,S2,N2 / T2,N2), 每池 1 个 float,
-    //           偏移 = 池前缀 + s2Idx * s2BaseSize
-    //   mode=1: shape (B,S2,N2,D/64,2), 每池 D/32 个 e8m0,
-    //           偏移 = (池前缀 + s2Idx*s2BaseSize) * N2 * (D/32)
+    // 量化 k_descale 偏移: mode=0 每池 1 个 float(偏移=池前缀+s2Idx*s2BaseSize);
+    // mode=1 每池 D/32 个 e8m0(偏移=(池前缀+s2Idx*s2BaseSize)*N2*(D/32))
     if constexpr (LIT::isFp8PerToken) {
         kScaleCoreOffset =
             actualSeqKPrefixSum * constInfo.kHeadNum + runInfo.s2Idx * constInfo.s2BaseSize * constInfo.kHeadNum;
@@ -707,9 +694,8 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::ProcessInvalid()
             AscendC::InitGlobalMemory(output, dealSize, constInfo.INVALID_IDX);
         }
         if (constInfo.returnValue) {
-            // values 输出行宽恒为 sparseCount(与 indices 的 outputLen 行宽不同),
-            // 不可复用 indices 的 baseSize/dealSize(poolSize>1 时二者总大小不同,
-            // 复用会越出 values 张量边界), 需按自身总大小独立切分清理
+            // values 总大小与 indices 不同(行宽 sparseCount vs outputLen),
+            // 需按自身总大小独立切分清理
             uint64_t totalValueSize =
                 constInfo.batchSize * constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount;
             uint64_t singleCoreValueSize =
