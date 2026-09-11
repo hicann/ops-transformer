@@ -49,6 +49,7 @@ private:
     TQue<QuePosition::VECOUT, 1> outQue_;
     TBuf<TPosition::VECCALC> gradNormXBuf_;
     TBuf<TPosition::VECCALC> wPrimeCache_;
+    TBuf<TPosition::VECCALC> partialSumBuf_;
     GlobalTensor<float> xNormGm_;
     GlobalTensor<T> gradYGm_;
     GlobalTensor<int32_t> expertIdxGm_;
@@ -79,6 +80,8 @@ __aicore__ inline void MoeGatingTopKBackward<T>::Init(GM_ADDR xNorm, GM_ADDR gra
         loopTimes_ = tilingData_->perLoopTimes;
         tailRows_ = tilingData_->perTailRows;
     }
+    int64_t chunkLane = kReduceChunkLane; // 归约 chunk lane 数(64)
+    int64_t partialSumBytes = ((tilingData_->k + chunkLane - 1) / chunkLane) * SIZE_OF_FLOAT32;
     xNormGm_.SetGlobalBuffer((__gm__ float *)xNorm + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
     gradYGm_.SetGlobalBuffer((__gm__ T *)gradY + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
     expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertIdx + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
@@ -90,6 +93,7 @@ __aicore__ inline void MoeGatingTopKBackward<T>::Init(GM_ADDR xNorm, GM_ADDR gra
                       AlignBytes(tilingData_->baseRows * tilingData_->expertCount, tilingData_->gradYDtypeSize));
     pipe_->InitBuffer(gradNormXBuf_, AlignBytes(tilingData_->baseRows * tilingData_->expertCount, SIZE_OF_FLOAT32));
     pipe_->InitBuffer(wPrimeCache_, tilingData_->baseRows * AlignBytes(tilingData_->k, SIZE_OF_FLOAT32));
+    pipe_->InitBuffer(partialSumBuf_, AlignBytes(partialSumBytes, SIZE_OF_FLOAT32));
 }
 
 template <typename T>
@@ -182,7 +186,8 @@ __aicore__ inline void MoeGatingTopKBackward<T>::SigmoidRenormBackward()
     PipeBarrier<PIPE_V>();
     CallSigmoidRenormBackwardVF(xNormLocal_, expertIdxLocal_, wCache, gradNormX, tilingData_->eps,
                                 static_cast<uint16_t>(curRows_), static_cast<uint16_t>(tilingData_->k),
-                                static_cast<uint16_t>(kAlign_), static_cast<uint16_t>(tilingData_->expertCount));
+                                static_cast<uint16_t>(kAlign_), static_cast<uint16_t>(tilingData_->expertCount),
+                                partialSumBuf_.Get<float>());
     PipeBarrier<PIPE_V>();
     indicesQue_.FreeTensor(expertIdxLocal_);
 }
