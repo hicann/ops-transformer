@@ -196,9 +196,8 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::InitTilingData(const PoolKeyIn
 
     constInfo.kHeadNum = K_HEAD_NUM;
     constInfo.headDim = HEAD_DIM;
-    // arch22 切分常量以 kernel 侧硬编码为准, 覆盖 host tiling 字段(host 下发的
-    // s1BaseSize/s2BaseSize/mBaseSizeMax 供 arch35 消费); workspace 公式已按
-    // kernel 侧口径镜像推导, 两端自洽。
+    // arch22 切分常量以 kernel 侧硬编码为准, 覆盖 host tiling 字段
+    // (host 下发字段供 arch35 消费); workspace 公式按 kernel 口径镜像推导
     constInfo.s2BaseSize = S2_BASE_SIZE;
     constInfo.isSparseCountOver2K = (constInfo.sparseCount <= BASE_TOPK) ? false : true;
 
@@ -359,8 +358,8 @@ __aicore__ void inline PoolKeyIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx,
                     findLastCoreEnd = false;
                 }
                 uint32_t s2RemainBaseNum = s2Loop - s2Idx;
-                // S2 跨核规避: 保证每个 (batch, gS1) 的 S2 块完整落在单核内(arch22
-                // LD 跨核归并存在缺陷), 代价是多 batch 大 S2 场景核利用率下降。
+                // S2 跨核规避: 保证每个 (batch, gS1) 的 S2 块完整落在单核内
+                // (LD 归并要求 S2 分段完整), 代价是多 batch 大 S2 场景核利用率下降。
                 if (s2Idx == 0 && lastGS1RemainBlockCnt + s2RemainBaseNum > coreDealBlockCnt) {
                     coreDealBlockCnt = lastGS1RemainBlockCnt + s2RemainBaseNum;
                 }
@@ -469,9 +468,7 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
     SplitCore(aiCoreIdx, usedCoreNum, splitCoreInfo);
 
     pipe = tPipe;
-    // workspace 内存排布
-    // |mm1ResGm(存S)|vec1ResGm(存LD中间结果)|vec1ParamGm(存LD参数)
-    // |Core0_mm1ResDB0-Core0_mm1ResDB1-Core1_mm1ResDB0....Core23_mm1ResDB0-Core23_mm1ResDB1|Core0_vec1Res...
+    // workspace 排布: |mm1ResGm(存S)|vec1ResGm(LD中间结果)|vec1ParamGm(LD参数)|
     uint64_t offset = 0;
 
     // mm1开DoubleBuffer
@@ -479,14 +476,11 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
     mm1ResGm.SetGlobalBuffer((__gm__ MM1_OUT_T *)(workspace + offset + aiCoreIdx * singleCoreMm1ResSize));
     offset += GetBlockNum() * singleCoreMm1ResSize;
 
-    // ld流程需要ws大小: [aicnum, 2, CeilDiv(constInfo.mBaseSize, constInfo.gSize), topkOut_*2]
-    // (aic, 8, 2, 2, 2048)
-    // (aic, s1_cube, 头尾, idx/value, K)
+    // ld流程 ws: [aic, s1_cube, 头尾, idx/value, 2048] float
     vec1ResGm.SetGlobalBuffer((__gm__ float *)(workspace + offset));
     offset += GetBlockNum() * constInfo.s1BaseSize * WS_DOUBLE * WS_DOUBLE * BASE_TOPK * sizeof(float);
 
-    // (aic, 8, 2, 16)
-    // (aic, s1_cube, 头尾，16ele)
+    // ld参数 ws: [aic, s1_cube, 头尾, 16ele] int64
     vec1ParamGm.SetGlobalBuffer((__gm__ int64_t *)(workspace + offset));
     offset += GetBlockNum() * constInfo.s1BaseSize * WS_DOUBLE * LD_PARAM_NUM * sizeof(int64_t);
 
@@ -575,8 +569,7 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::CalcRunInfo(uint32_t loop, uin
     runInfo.actS1Size = tempLoopInfo.actS1Size;
     runInfo.actS2Size = tempLoopInfo.actS2Size;
     runInfo.actS2SizeOrig = tempLoopInfo.actS2SizeOrig;
-    // 当前 batch 的尾部 token 数(ExpandAndAppendIndices 尾块追加与 LD 参数均依赖,
-    // 此前漏赋值恒为 0, 导致 pool_size>1 时尾块永不输出)
+    // 当前 batch 的尾部 token 数(ExpandAndAppendIndices 尾块追加与 LD 参数均依赖)
     runInfo.poolTailK = hasPoolTailK_ ? static_cast<int32_t>(poolTailKGm_.GetValue(tempLoopInfo.bIdx)) : 0;
     // 计算实际基本块size
     runInfo.actMBaseSize = tempLoopInfo.actMBaseSize;
@@ -612,17 +605,14 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::CalcRunInfo(uint32_t loop, uin
         keyCoreOffset = tndKeyBIdxOffset + runInfo.n2Idx * constInfo.headDim;
         // B,S1,N1(N2,G)/T,N1(N2,G)
         weightsCoreOffset = actualSeqQPrefixSum * constInfo.qHeadNum + runInfo.n2Idx * constInfo.gSize;
-        // B,S1,N2,k/T,N2,k
-        // 注意: poolSize>1 时 indices 输出行宽为 outputLen(=sparseCount*poolSize+poolSize-1),
-        // 而非 sparseCount(仅 poolSize==1 时二者相等), 否则 batch>0 的行基址错位,
-        // 写入会跨界覆盖相邻行(参照 ProcessVec 的 idxStride 处理)
+        // B,S1,N2,k/T,N2,k; poolSize>1 时 indices 行宽为 outputLen(≠sparseCount),
+        // 否则 batch>0 行基址错位, 写入覆盖相邻行
         uint32_t idxOutStride = (constInfo.poolSize > 1) ?
                                     (constInfo.sparseCount * constInfo.poolSize + constInfo.poolSize - 1) :
                                     constInfo.sparseCount;
         indiceOutCoreOffset = actualSeqQPrefixSum * constInfo.kHeadNum * idxOutStride + runInfo.n2Idx * idxOutStride;
-        // values 输出行宽恒为 sparseCount(与 indices 的 outputLen 行宽不同),
-        // batch>0 时若复用 indiceOutCoreOffset(poolSize>1) 会按 outputLen 行距
-        // 错位寻址, 导致 valueOutGm 写到相邻 batch 的错误位置
+        // values 输出行宽恒为 sparseCount(与 indices 的 outputLen 不同),
+        // 不可复用 indiceOutCoreOffset, 否则错位写到相邻 batch
         valueOutCoreOffset =
             actualSeqQPrefixSum * constInfo.kHeadNum * constInfo.sparseCount + runInfo.n2Idx * constInfo.sparseCount;
     }
@@ -666,9 +656,8 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::ProcessInvalid()
             AscendC::InitGlobalMemory(output, dealSize, constInfo.INVALID_IDX);
         }
         if (constInfo.returnValue) {
-            // values 输出行宽恒为 sparseCount(与 indices 的 outputLen 行宽不同),
-            // 不可复用 indices 的 baseSize/dealSize(poolSize>1 时二者总大小不同,
-            // 复用会越出 values 张量边界), 需按自身总大小独立切分清理
+            // values 总大小与 indices 不同(行宽 sparseCount vs outputLen),
+            // 需按自身总大小独立切分清理
             uint64_t totalValueSize =
                 constInfo.batchSize * constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount;
             uint64_t singleCoreValueSize =

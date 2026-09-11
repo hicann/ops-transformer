@@ -31,11 +31,9 @@ class LITopk<uint32_t> {
 public:
     __aicore__ inline uint32_t GetSharedTmpBufferSize()
     {
-        // 2 * PkiCommon::Align(topK, (uint32_t)256): 两块hisIndexLocal
-        // 5 * 256：histogramsLocal + idxLocal[0-3]
-        // 64：nkValueLocal
+        // 两块 hisIndexLocal + (histograms + idx[0-3])*256 + nkValue 64
         uint64_t bufferSize1 = (2 * PkiCommon::Align(topK, (uint32_t)256) + 5 * 256 + 64) * sizeof(uint32_t);
-        // PkiCommon::Align(topK, (uint32_t)256) + trunkLen：tmpIndexLocal
+        // tmpIndexLocal: Align(topK,256) + trunkLen
         uint64_t bufferSize2 = (PkiCommon::Align(topK, (uint32_t)256) + trunkLen) * sizeof(uint32_t);
         uint64_t reuseBufferSize = PkiCommon::Align(topK, (uint32_t)256) * sizeof(uint32_t);
         return bufferSize1 + bufferSize2 - reuseBufferSize;

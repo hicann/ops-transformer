@@ -30,9 +30,8 @@
 #define PKI_TPL_MASK_DEFAULT 0
 #define PKI_TPL_MASK_CAUSAL 3
 
-// quant_mode template values = host value (def.cpp attr) + 1
-// host: -1(none) / 0(fp8_per_token) / 1(mxfp8)  →  tpl: 0 / 1 / 2
-// CANN TPL framework only supports UINT, so negative host values must be offset
+// quant_mode template values = host value (def.cpp attr) + 1:
+// host -1/0/1(none/per-token/mxfp8) → tpl 0/1/2(TPL 框架仅支持 UINT, 负值需偏移)
 #define PKI_TPL_QUANT_NONE 0
 #define PKI_TPL_QUANT_FP8_PER_TOKEN 1
 #define PKI_TPL_QUANT_MXFP8 2

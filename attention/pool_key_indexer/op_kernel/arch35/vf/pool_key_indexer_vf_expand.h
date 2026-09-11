@@ -29,14 +29,8 @@
 namespace pkiexpand {
 using namespace AscendC;
 
-// pow2 pool_size ∈ [2,64] 的向量化展开。
-//   tokenIndices: 输出行缓冲(expandOutLocal_, 基址 256B 对齐)
-//   poolIdxTable: 池索引表(TopK 输出的 indicesOutLocal_, 基址对齐)
-//   tpl:         [0,64)=r/ps 模板; [64,128)=r%ps 模板(均 256B 段对齐)
-//   effExpand:   有效展开元素数 = Min(validS2Len, sparseCount) * ps (<= topk)
-//   ps:          pool size(2 的幂, 且 <= 64, 由调用方保证)
-// 尾块(lane >= effExpand)的展开结果为垃圾值, 由调用方负责用
-// -1 Duplicate 覆盖 [effExpand, topk) 区间(垃圾不会越过 outputLen 暴露)。
+// pow2 pool_size ∈ [2,64] 的向量化展开: out[m] = ps*idx[m/ps] + m%ps, 消除逐
+// pool 标量循环; 尾块(lane >= effExpand)为垃圾值, 由调用方用 -1 Duplicate 覆盖
 __aicore__ inline void ExpandPow2PoolIndices(const LocalTensor<int32_t> &tokenIndices,
                                              const LocalTensor<uint32_t> &poolIdxTable, const LocalTensor<int32_t> &tpl,
                                              uint32_t effExpand, uint32_t ps)
@@ -49,7 +43,7 @@ __aicore__ inline void ExpandPow2PoolIndices(const LocalTensor<int32_t> &tokenIn
     if (effExpand == 0) {
         return;
     }
-    // __VEC_SCOPE__ 内向量循环归纳变量/条件必须为 uint16_t(bisheng 约束);
+    // __VEC_SCOPE__ 内向量循环归纳变量/条件必须为 uint16_t(编译器约束);
     // chunkNum <= Align(4096,64)/64 = 64, ps <= 64, 均不溢出
     uint16_t chunkNum = static_cast<uint16_t>((effExpand + 63U) / 64U);
     const uint16_t psU16 = static_cast<uint16_t>(ps);
@@ -58,21 +52,21 @@ __aicore__ inline void ExpandPow2PoolIndices(const LocalTensor<int32_t> &tokenIn
 
     __VEC_SCOPE__
     {
-        MicroAPI::MaskReg maskAll = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
-        MicroAPI::RegTensor<uint32_t> rIdx;
-        MicroAPI::RegTensor<uint32_t> rOff;
-        MicroAPI::RegTensor<uint32_t> psReg;
-        MicroAPI::RegTensor<uint32_t> poolReg;
-        MicroAPI::RegTensor<uint32_t> gatherIdx;
-        MicroAPI::RegTensor<uint32_t> gathered;
+        Reg::MaskReg maskAll = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+        Reg::RegTensor<uint32_t> rIdx;
+        Reg::RegTensor<uint32_t> rOff;
+        Reg::RegTensor<uint32_t> psReg;
+        Reg::RegTensor<uint32_t> poolReg;
+        Reg::RegTensor<uint32_t> gatherIdx;
+        Reg::RegTensor<uint32_t> gathered;
 
-        MicroAPI::LoadAlign<uint32_t>(rIdx, rIdxTpl);
-        MicroAPI::LoadAlign<uint32_t>(rOff, rOffTpl);
-        MicroAPI::Duplicate<uint32_t>(psReg, ps, maskAll);
+        Reg::LoadAlign<uint32_t>(rIdx, rIdxTpl);
+        Reg::LoadAlign<uint32_t>(rOff, rOffTpl);
+        Reg::Duplicate<uint32_t>(psReg, ps, maskAll);
 
         for (uint16_t g = 0; g < groupNum; g++) {
             // 本组 64 个池索引装入寄存器(256B 对齐读)
-            MicroAPI::LoadAlign<uint32_t>(poolReg, table + static_cast<uint32_t>(g) * 64U);
+            Reg::LoadAlign<uint32_t>(poolReg, table + static_cast<uint32_t>(g) * 64U);
             // 本组实际输出 chunk 数: 尾组可能不足 ps 个(g < groupNum 保证 > 0)
             uint16_t chunksInGroup = static_cast<uint16_t>(chunkNum - static_cast<uint32_t>(g) * psU16);
             if (chunksInGroup > psU16) {
@@ -80,15 +74,14 @@ __aicore__ inline void ExpandPow2PoolIndices(const LocalTensor<int32_t> &tokenIn
             }
             for (uint16_t j = 0; j < chunksInGroup; j++) {
                 uint32_t c = static_cast<uint32_t>(g) * psU16 + j; // 全局输出 chunk 号
-                // 组内相对选源索引基址: j*64/ps ∈ [0,64)(pow2 ps 可分解性),
-                // lane 索引 = j*64/ps + r/ps, 恒落在 poolReg 的 64 lane 内;
-                // ps <= 64 时 ps|64, chunkBase%ps==0, lane 偏移恒为 r%ps
+                // 选源索引 = j*64/ps + r/ps, 恒落在 poolReg 的 64 lane 内
+                // (ps <= 64 时 ps|64, lane 偏移恒为 r%ps)
                 uint32_t relBase = (static_cast<uint32_t>(j) * 64U) / ps;
-                MicroAPI::Adds(gatherIdx, rIdx, relBase, maskAll);
-                MicroAPI::Gather(gathered, poolReg, gatherIdx);
-                MicroAPI::Mul(gathered, gathered, psReg, maskAll);
-                MicroAPI::Add(gathered, gathered, rOff, maskAll);
-                MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_NORM>(out + c * 64U, gathered, maskAll);
+                Reg::Adds(gatherIdx, rIdx, relBase, maskAll);
+                Reg::Gather(gathered, poolReg, gatherIdx);
+                Reg::Mul(gathered, gathered, psReg, maskAll);
+                Reg::Add(gathered, gathered, rOff, maskAll);
+                Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(out + c * 64U, gathered, maskAll);
             }
         }
     }

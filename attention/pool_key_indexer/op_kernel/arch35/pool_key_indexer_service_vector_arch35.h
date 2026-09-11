@@ -39,15 +39,8 @@ struct PkiTypeTraits<Q_T, float> {
     using weightsType = float; // W_T=float时，强制weightsType为float
 };
 
-// FP8模式：weights张量为半精度(FP16/BF16, 由 entry 按 ORIG_DTYPE_WEIGHTS 分发,
-// 见 op_host def.cpp dtype 约束: quant_mode=0/1时 q/k=FP8_E4M3FN, weights=FP16/BF16)。
-// W_T必须绑定为半精度类型：
-// 1) 功能上weights以半精度解释才是正确数据
-// 2) 若W_T=fp8_e4m3fn_t，vector侧weights搬运/加载路径（DataCopyPadExtParams<W_T>、
-//    LoadAlign<W_T>等）会实例化fp8标量语义，bisheng后端报错：
-//    "fp8...type only supports pointer operations, scalar float type semantics
-//    are not supported"
-// 量化场景的 weightsType 由 PkiType 显式携带(half/bfloat16_t), 此处泛型分发
+// FP8模式: weights 为半精度(FP16/BF16, entry 按 ORIG_DTYPE_WEIGHTS 分发), W_T 必须绑定
+// 半精度(fp8 标量语义编译器不支持); 量化场景 weightsType 由 PkiType 显式携带
 template <typename W_HALF_T>
 struct PkiQuantWeightsTraits {
     using weightsType = W_HALF_T;
@@ -93,16 +86,13 @@ private:
                                                   LocalTensor<int32_t> &workBuf, uint32_t sparseCount,
                                                   uint32_t poolSize, uint32_t validS2Len, int32_t poolTailK,
                                                   int32_t L_orig, uint32_t curS1Idx, uint32_t curS1Size);
-    // mode=0: k_descale GM -> UB 搬运(非 PA 连续寻址 / PA 按 block_table
-    // × keyDequantScaleStride0, 参考 QLIv2 GetKeyScale)。
-    // dstOffset: 乒乓区内本 s2 块的段偏移((s2Idx-s2Start)%16 * s2BaseSize),
-    // 写入与读取(MulWeightAndReduceSumWithScale)位置一致
+    // mode=0: k_descale GM->UB 搬运(非 PA 连续寻址 / PA 按 block_table 查物理块)。
+    // dstOffset 为乒乓区内本 s2 块的段偏移, 与读取位置一致
     __aicore__ inline void GetKeyScale(LocalTensor<float> kScaleUB, uint64_t keyScaleGmOffset, int64_t batchId,
                                        int64_t startS2, int64_t getLen, uint32_t dstOffset = 0);
 
-    // arch35(950) 标量(S pipe)与向量(V pipe)/MTE3 间必须显式硬同步,
-    // PipeBarrier<PIPE_V> 不保证 S 侧读写顺序(参照 bsa_select_block_mask
-    // arch35 的 VToSSync/SToVSync/SToMTE3Sync 模式)
+    // arch35 标量(S pipe)与向量(V pipe)/MTE3 间必须显式硬同步,
+    // PipeBarrier<PIPE_V> 不保证 S 侧读写顺序
     __aicore__ inline void VToSSync()
     {
         event_t eventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));
@@ -159,12 +149,11 @@ private:
     // tmp buff for weight
     TBuf<TPosition::VECCALC> weightBuf_;
     LocalTensor<W_T> weightUB_;
-    // mode=0: weight(fp32 cast) × qScale 预乘结果的 fp32 UB(向量 SIMD 预乘,
-    // 参考 QLIV2 weightTempUB_; 替代逐 g 标量预乘)
+    // mode=0: weight(fp32 cast) × qScale 预乘结果的 fp32 UB(向量 SIMD 预乘)
     TBuf<TPosition::VECCALC> weightScaleFp32Buf_;
     LocalTensor<float> weightScaleFp32UB_;
 
-    // mode=0 (FP8 per-token-head) scale UB(乒乓, 参考 QLIv2 qScaleBuf_/kScaleBuf_)
+    // mode=0 (FP8 per-token-head) scale UB(乒乓)
     TBuf<TPosition::VECCALC> qScaleBuf_;
     LocalTensor<float> qScaleUB_;
     TBuf<TPosition::VECCALC> kScaleBuf_;
@@ -225,32 +214,23 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe
     pipe->InitBuffer(resMm1Buf_, 2 * CeilDiv(constInfo_.mBaseSize, 2) * s2BaseSize_ * sizeof(float));
     resMm1UB_ = resMm1Buf_.Get<float>();
 
-    // weightBuf_: 行距 Align(gSize,16)。
-    // 注意: MulWeightQScaleSIMD(量化 mode=0)的 LoadAlign<W_T, DIST_UNPACK_B16>
-    // 每行固定读 64 个 W_T 元素; gSizeAlign16 < 64 时, 最后一个 pingpong 区
-    // 末行的读取越出缓冲末端 (64 - gSizeAlign16) 个元素, 触发 VEC UB 越界
-    // (aicore 507015, 实测 gSize=24/行距 32 时量化+0池 batch 崩溃)。
+    // weightBuf_: 行距 Align(gSize,16); 量化路径 LoadAlign 每行固定读 64 个 W_T,
+    // gSizeAlign16<64 时末行读取越过缓冲末端
     pipe->InitBuffer(weightBuf_,
                      2 * CeilDiv(s1BaseSize_, 2) * PkiCommon::Align((uint64_t)gSize_, (uint64_t)16) * sizeof(W_T));
     weightUB_ = weightBuf_.Get<W_T>();
     if constexpr (LIT::isFp8PerToken) {
-        // mode=0: weight×qScale SIMD 预乘输出缓冲(fp32, 行距 128 元素 bank 对齐,
-        // 与 qScaleUB 同布局)。向量预乘替代原逐 g 标量循环(gSize 次标量 ->
-        // 每行 3~4 条向量指令, W_T=bfloat16_t 也不再实例化 bf16 标量语义)
+        // mode=0: weight×qScale SIMD 预乘输出缓冲(fp32, 行距 128 元素 bank 对齐),
+        // 向量预乘替代逐 g 标量循环
         pipe->InitBuffer(weightScaleFp32Buf_, 2 * CeilDiv(s1BaseSize_, 2) * 128 * sizeof(float));
         weightScaleFp32UB_ = weightScaleFp32Buf_.Get<float>();
-        // mode=0 scale UB: qScale 行距固定 128 元素(512B bank 对齐)——
-        // MulWeightAndReduceSumWithScale 的 LoadAlign<float> 一次取 64 lanes
-        // (256B), 要求行起点 256B 对齐; 紧凑 gSizeAlign16 布局在 n1 非 64
-        // 倍数时行距非 256B 对齐, LoadAlign 错位(参考 QLIv2 的 bank 交错布局)。
-        // kScale 为 s2 维度(16 轮乒乓 × s2BaseSize, 参考 QLIv2 kScaleBuf_)
+        // mode=0 scale UB: qScale 行距固定 128 元素(512B bank 对齐, 满足
+        // LoadAlign 256B 对齐要求); kScale 为 s2 维度 16 轮乒乓
         pipe->InitBuffer(qScaleBuf_, 2 * CeilDiv(s1BaseSize_, 2) * 128 * sizeof(float));
         qScaleUB_ = qScaleBuf_.Get<float>();
         pipe->InitBuffer(kScaleBuf_, 2 * 16 * s2BaseSize_ * sizeof(float));
         kScaleUB_ = kScaleBuf_.Get<float>();
-        // kScale 铺 0(参考 QLIv2): 尾部未搬运区(如 S2 尾块不足 s2BaseSize)是
-        // 垃圾值, 乘入聚合和会产出随机大分数污染 TopK(分数恒>=0, 0 与 ReLU
-        // 后被 mask 的无效池语义一致)
+        // kScale 铺 0: 尾部未搬运区为垃圾值, 乘入会污染 TopK(0 与无效池语义一致)
         Duplicate(kScaleUB_, 0.0f, 2 * 16 * s2BaseSize_);
         SetFlag<HardEvent::V_MTE2>(KSCALE_S_MTE2_EVENT);
         WaitFlag<HardEvent::V_MTE2>(KSCALE_S_MTE2_EVENT);
@@ -276,9 +256,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe
         uint32_t expandOutLen = PkiCommon::Align(static_cast<uint64_t>(outputLen_ + 64), (uint64_t)8);
         pipe->InitBuffer(expandOutBuf_, expandOutLen * sizeof(uint32_t));
         expandOutLocal_ = expandOutBuf_.Get<int32_t>();
-        // workLocal_ 布局(段起始均 256B 对齐):
-        //   [0, 64) rIdxTpl=r/ps 与 [64,128) rOffTpl=r%ps: pow2 ps gather 向量展开模板
-        //   [128, 128+ps) offsetTpl=0..ps-1: 非 pow2 ps 的 Duplicate+Add 回退路径模板
+        // workLocal_ 布局(段起始均 256B 对齐): [0,64)=r/ps 与 [64,128)=r%ps 为
+        // pow2 ps gather 模板, [128,128+ps) 为非 pow2 ps 的 offsetTpl 回退模板
         uint32_t workSize = 128 + PkiCommon::Align(static_cast<uint64_t>(poolSize_ + 64), (uint64_t)8);
         pipe->InitBuffer(workBuf_, workSize * sizeof(uint32_t));
         workLocal_ = workBuf_.Get<int32_t>();
@@ -353,10 +332,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitVecWorkspaceTensor(
     this->scoreGm = scoreGm; // resucesum*k
 }
 
-// mode=0: k_descale GM -> UB(每池 1 个 float scale)
-// 非 PA: 连续寻址 tensorKeyScaleOffset + startS2 起 getLen 个;
-// PA: 按 block_table 逐物理块搬运, 块内偏移 + 物理块基址 blockId * keyDequantScaleStride0
-// (参考 QLIv2 QLIV2Vector::GetKeyScale)
+// mode=0: k_descale GM->UB(每池 1 个 float scale); 非 PA 连续寻址,
+// PA 按 block_table 逐物理块搬运(块基址 × keyDequantScaleStride0)
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::GetKeyScale(LocalTensor<float> kScaleUB,
                                                                      uint64_t keyScaleGmOffset, int64_t batchId,
@@ -370,9 +347,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::GetKeyScale(LocalTensor
     copyInParams.dstStride = 0;
     copyInParams.rsv = 0;
     if constexpr (PAGE_ATTENTION) {
-        // 按池号连续写入 UB 段(dstOffset 起 getLen 个), GM 源按物理块跳转。
-        // 注意 kCacheBlockSize_(=pa_block_size) 可大于 s2BaseSize(段容量),
-        // 段内偏移始终用相对本段起点的池号, 与块边界解耦。
+        // 按池号连续写入 UB 段, GM 源按物理块跳转; 段内偏移用相对本段
+        // 起点的池号, 与块边界解耦
         int64_t written = 0; // 段内已写池数
         while (written < getLen) {
             int64_t absPool = startS2 + written; // batch 内绝对池号
@@ -423,16 +399,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::FreeEventID()
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::CleanInvalidOutput(int64_t invalidS1Offset)
 {
-    // init -1 and copy to output
-    // 与 ProcessVec1 无效行路径(validS2Len<=0)同构: Duplicate 铺 UB → V_MTE3
-    // 硬同步 → DataCopyPad 出 GM → MTE3_V 回执。三点缺一不可:
-    // 1) DataCopyPad: indices 行距 outputLen(=sparseCount*ps+ps-1) 非 32B 对齐,
-    //    普通 DataCopy 的 MTE3 源/目的对齐校验失败(aivec 81 地址越界);
-    // 2) 入口 WaitFlag<MTE3_V>: 等上一个 MTE3(TopK/Vec1/上次 clean)读完 staging
-    //    (expandOutLocal_/indicesOutLocal_/valueOutLocal_ 复用)再覆写;
-    // 3) 行尾 SetFlag<MTE3_V>: 维持事件链, 否则后续 ProcessVec1/FreeEventID 的
-    //    WaitFlag<MTE3_V> 挂死。InitGlobalMemory 在 arch35 AIV 上以内部向量
-    //    staging 直写 GM, dealSize 大时越界(aivec 341), 故弃用。
+    // 无效行清理(与 ProcessVec1 无效行路径同构): Duplicate 铺 UB → V_MTE3 硬同步
+    // → DataCopyPad 出 GM(行宽非 32B 对齐, 不可用普通 DataCopy/InitGlobalMemory)
     AscendC::DataCopyParams copyOutParams;
     copyOutParams.blockCount = 1;
     copyOutParams.blockLen = (poolSize_ > 1 ? outputLen_ : topkCount_) * sizeof(uint32_t);
@@ -644,9 +612,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
                 qwDataCopyExtParams, padWeightsParams);
 
     if constexpr (LIT::isFp8PerToken) {
-        // mode=0: q_descale 与 weights 同 pattern 同 GM 偏移(shape 同构,
-        // 参考 QLIv2 直接复用 weightGmOffset 的做法)。dst 行距 128 元素
-        // (512B bank 对齐, 与 qScaleUB 布局一致; 块间 dstStride 单位 32B)
+        // mode=0: q_descale 与 weights 同 pattern 同 GM 偏移(shape 同构),
+        // dst 行距 128 元素(512B bank 对齐)
         DataCopyPadExtParams<float> padQScaleParams{true, 0, 0, 0};
         DataCopyExtParams qScaleDataCopyExtParams;
         qScaleDataCopyExtParams.blockCount = curAivS1ProcNum;
@@ -655,17 +622,15 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
         qScaleDataCopyExtParams.dstStride = (128 - gSize_) * sizeof(float) / 32;
         DataCopyPad(qScaleUB_[pingpong * CeilDiv(s1BaseSize_, 2) * 128], qScaleGm[weightGmOffset],
                     qScaleDataCopyExtParams, padQScaleParams);
-        // k_descale: 每 16 轮 s2BaseSize 乒乓搬运一次(参考 QLIv2 kScale 机制:
-        // (s2Idx - s2Start) % 16 == 0 时刷新, 一次刷 16 块容量滚动覆盖)。
-        // 写入起点 = 乒乓区头 + 本块段偏移((s2Idx-s2Start)%16 * s2BaseSize),
-        // 与读取位置一致(读侧 MulWeightAndReduceSumWithScale 同偏移取段)
+        // k_descale: 每 16 轮 s2BaseSize 乒乓搬运一次((s2Idx-s2Start)%16==0 时刷新),
+        // 写入起点 = 乒乓区头 + 本块段偏移, 与读取位置一致
         if ((info.s2Idx - info.s2Start) % 16 == 0) {
             uint32_t kScalePingpong = (kScaleLoop_ % 2);
             uint32_t kScaleBlkOff = ((info.s2Idx - info.s2Start) % 16) * s2BaseSize_;
             uint32_t getLen = 16 * s2BaseSize_ > (info.actS2Size - info.s2Idx * s2BaseSize_) ?
                                   (info.actS2Size - info.s2Idx * s2BaseSize_) :
                                   16 * s2BaseSize_;
-            // 钳制到本乒乓区剩余容量(理论不触发: 刷新点在段头, 防御保留)
+            // 钳制到本乒乓区剩余容量(刷新点在段头, 通常不触达)
             uint32_t capacity = 16 * s2BaseSize_ - kScaleBlkOff;
             if (getLen > capacity) {
                 getLen = capacity;
@@ -681,11 +646,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
     WaitFlag<HardEvent::MTE3_V>(VEC1_MTE3_V_EVENT + pingpong);
 
     if constexpr (LIT::isFp8PerToken) {
-        // mode=0: weight(半精度) -> fp32 cast × qScale 的 SIMD 向量预乘落 UB。
-        // 参考 QLIV2 MulWeightAndReduceSum2F32VF 的 weightTemp 模式
-        // (LoadAlign + Mul + StoreAlign, 3~4 条向量指令/行), 替代逐 g 标量
-        // 预乘循环(gSize 次/行; W_T=bfloat16_t 时还触发 bf16 标量语义限制)。
-        // 行内 [gSize, 64) 补 0(LoadAlign 一次取 64 lanes, 0 与无效 g 语义一致)
+        // mode=0: weight 半精度 -> fp32 cast × qScale 的 SIMD 向量预乘落 UB,
+        // 替代逐 g 标量循环; 行内 [gSize,64) 补 0(0 与无效 g 语义一致)
         for (int64_t s1IdxTmp = 0; s1IdxTmp < curAivS1ProcNum; s1IdxTmp++) {
             uint64_t dstOff = pingpong * CeilDiv(s1BaseSize_, 2) * 128 + s1IdxTmp * 128;
             Duplicate<float>(weightScaleFp32UB_[dstOff], 0.0f, 128);
@@ -694,11 +656,8 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
         for (int64_t s1IdxTmp = 0; s1IdxTmp < curAivS1ProcNum; s1IdxTmp++) {
             uint64_t srcOff = pingpong * CeilDiv(s1BaseSize_, 2) * gSizeAlign16 + s1IdxTmp * gSizeAlign16;
             uint64_t dstOff = pingpong * CeilDiv(s1BaseSize_, 2) * 128 + s1IdxTmp * 128;
-            // 向量预乘: 半精度 weight -> fp32 cast, 乘 qScale, 落 fp32 UB。
-            // 独立 __simd_vf__ helper(同 QLI v1 的 vector1 函数模式):
-            // bf16 的 Cast<float,bfloat16_t> 在 __simd_vf__ 内有硬件展开,
-            // 内联到普通 __aicore__ 函数会触发 bisheng
-            // "Do not know how to split the result of this operator"
+            // 独立 __simd_vf__ helper: bf16 Cast 需硬件展开,
+            // 内联到普通 __aicore__ 函数不被编译器支持
             vector1::MulWeightQScaleSIMD((__local_mem__ W_T *)weightUB_[srcOff].GetPhyAddr(),
                                          (__local_mem__ float *)qScaleUB_[dstOff].GetPhyAddr(),
                                          (__local_mem__ float *)weightScaleFp32UB_[dstOff].GetPhyAddr());
