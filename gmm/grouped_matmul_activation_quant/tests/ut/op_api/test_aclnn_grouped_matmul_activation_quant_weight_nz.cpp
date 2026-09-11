@@ -47,6 +47,7 @@ constexpr const char *kQuantMode = "mx";
 constexpr const char *kRoundMode = "rint";
 constexpr const char *kRunModeGetWorkspace = "GET_WORKSPACE";
 constexpr const char *kRunModeWorkspaceOutputPtrNull = "WORKSPACE_OUTPUT_PTR_NULL";
+constexpr const char *kRunModeGroupListNull = "GROUP_LIST_NULL";
 constexpr const char *kRunModeRequiredTensorListNull = "REQUIRED_TENSORLIST_NULL";
 constexpr const char *kRunModeEmptyTensorList = "EMPTY_TENSORLIST";
 constexpr const char *kRunModeTensorListElementNull = "TENSORLIST_ELEMENT_NULL";
@@ -90,6 +91,23 @@ struct GroupedMatmulActivationQuantWeightNzOpApiCase {
         return aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
             x.get(), groupList.get(), weight.get(), weightScale.get(), nullptr, xScale.get(), activationType.c_str(),
             groupListType, nullptr, GetQuantModePtr(), roundMode.c_str(), scaleAlg, dstTypeMax, nullptr, yScale.get(),
+            workspaceSize, executor);
+    }
+
+    aclnnStatus RunGetWorkspaceWithGroupListNull(const TensorDesc &xDesc, const TensorListDesc &weightDesc,
+                                                 const TensorListDesc &weightScaleDesc, const TensorDesc &xScaleDesc,
+                                                 const TensorDesc &yDesc, const TensorDesc &yScaleDesc,
+                                                 uint64_t *workspaceSize, aclOpExecutor **executor) const
+    {
+        auto x = xDesc.ToAclType();
+        auto weight = weightDesc.ToAclType();
+        auto weightScale = weightScaleDesc.ToAclType();
+        auto xScale = xScaleDesc.ToAclType();
+        auto y = yDesc.ToAclType();
+        auto yScale = yScaleDesc.ToAclType();
+        return aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
+            x.get(), nullptr, weight.get(), weightScale.get(), nullptr, xScale.get(), activationType.c_str(),
+            groupListType, nullptr, GetQuantModePtr(), roundMode.c_str(), scaleAlg, dstTypeMax, y.get(), yScale.get(),
             workspaceSize, executor);
     }
 
@@ -211,7 +229,11 @@ struct GroupedMatmulActivationQuantWeightNzOpApiCase {
         uint64_t workspaceSize = 0;
         aclOpExecutor *executor = nullptr;
         aclnnStatus ret = ACLNN_SUCCESS;
-        if (runMode == kRunModeRequiredTensorListNull) {
+        if (runMode == kRunModeGroupListNull) {
+            TensorDesc xScaleDesc = MakeTensorDesc(xScaleShape, xScaleDtype, xScaleFormat);
+            ret = RunGetWorkspaceWithGroupListNull(xDesc, weightDesc, weightScaleDesc, xScaleDesc, yDesc, yScaleDesc,
+                                                   &workspaceSize, &executor);
+        } else if (runMode == kRunModeRequiredTensorListNull) {
             TensorDesc xScaleDesc = MakeTensorDesc(xScaleShape, xScaleDtype, xScaleFormat);
             ret = RunGetWorkspaceWithRequiredTensorListNull(xDesc, groupListDesc, xScaleDesc, yDesc, yScaleDesc,
                                                             &workspaceSize, &executor);

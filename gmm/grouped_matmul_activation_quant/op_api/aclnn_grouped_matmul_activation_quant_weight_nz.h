@@ -27,7 +27,9 @@ extern "C" {
  * FLOAT4_E1M2，数据格式支持ND。
  * @param [in] groupList:
  * 表示分组信息，数据类型支持INT64，数据格式支持ND。groupListType为0时，表示每个group在M轴上尾部索引的累积和；
- * groupListType为1时，表示每个group在M轴上的大小。
+ * groupListType为1时，表示每个group在M轴上的大小。groupListType为0时，数值必须为非负单调非递减序列，
+ * 最后一个值不大于M；groupListType为1时，数值必须为非负数，数值总和不大于M。groupList为运行时Tensor时，
+ * 第一段接口只校验其指针、dtype和shape，不读取设备侧数据，调用方需要保证上述值域约束。
  * @param [in] weight:
  * 表示公式中的weight，tensorList长度当前仅支持1。调用者必须传入FRACTAL_NZ格式的weight，
  * 当前MX场景下数据类型支持FLOAT8_E4M3FN、FLOAT4_E2M1、FLOAT4_E1M2，viewShape要求为3维，

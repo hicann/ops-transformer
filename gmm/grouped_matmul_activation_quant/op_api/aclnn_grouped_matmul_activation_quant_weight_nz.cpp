@@ -462,10 +462,49 @@ aclnnStatus CheckMxQuantShape(const aclTensor *x, const aclTensor *groupList, co
     return ACLNN_SUCCESS;
 }
 
+aclnnStatus CheckHostGroupListValues(const aclTensor *x, const aclTensor *groupList, int64_t groupListType)
+{
+    if (!gert::TensorPlacementUtils::IsOnHost(groupList->GetPlacement())) {
+        // Runtime groupList tensors are normally on device.  Their values are consumed by the
+        // kernel and cannot be dereferenced by the host-side GetWorkspaceSize path.
+        return ACLNN_SUCCESS;
+    }
+    const auto *groupListData = static_cast<const int64_t *>(groupList->GetData());
+    if (groupListData == nullptr) {
+        return ACLNN_SUCCESS;
+    }
+    const int64_t m = x->GetViewShape().GetDim(gmaq::DIM_0);
+    const int64_t groupNum = groupList->GetViewShape().GetDim(gmaq::DIM_0);
+    int64_t previous = 0;
+    int64_t sum = 0;
+    for (int64_t index = 0; index < groupNum; ++index) {
+        const int64_t value = groupListData[index];
+        GMMAQ_CHECK_WITH_LOG(value >= 0, ACLNN_ERR_PARAM_INVALID,
+                             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "groupList", std::to_string(value),
+                                                                   "groupList values must be non-negative"));
+        if (groupListType == 0) {
+            GMMAQ_CHECK_WITH_LOG(value >= previous && value <= m, ACLNN_ERR_PARAM_INVALID,
+                                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                     OP_NAME, "groupList", std::to_string(value),
+                                     "groupListType 0 requires a non-decreasing sequence not greater than M"));
+            previous = value;
+        } else {
+            GMMAQ_CHECK_WITH_LOG(value <= m - sum, ACLNN_ERR_PARAM_INVALID,
+                                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                     OP_NAME, "groupList", std::to_string(value),
+                                     "groupListType 1 requires the sum of values to be no greater than M"));
+            sum += value;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus CheckRequiredParams(const aclTensor *x, const aclTensor *groupList, const aclTensorList *weight,
                                 const aclTensorList *weightScale, const char *activationType, const aclTensor *y,
                                 const aclTensor *yScale)
 {
+    // groupList is a runtime tensor and may be resident in device memory.  Only validate its
+    // descriptor here; device-resident values must not be dereferenced by the host.
     GMMAQ_CHECK_WITH_LOG(x != nullptr, ACLNN_ERR_PARAM_NULLPTR,
                          OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(OP_NAME, "x", "does not support nullptr"));
     GMMAQ_CHECK_WITH_LOG(groupList != nullptr, ACLNN_ERR_PARAM_NULLPTR,
@@ -669,6 +708,8 @@ aclnnStatus CheckMxQuantParams(const aclTensor *x, const aclTensor *groupList, c
     w = (*weight)[gmaq::FIRST_TENSOR_INDEX];
     wScale = (*weightScale)[gmaq::FIRST_TENSOR_INDEX];
     checkRet = CheckMxQuantShape(x, groupList, xScaleOptional, w, wScale, transposeWeight, y, yScale);
+    CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
+    checkRet = CheckHostGroupListValues(x, groupList, groupListType);
     CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
     return ACLNN_SUCCESS;
 }
