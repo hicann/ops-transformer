@@ -535,7 +535,16 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::GetInputStrides()
                                                      "The shape dim of x stride must be equal to that of x");
             return ge::GRAPH_FAILED;
         }
-        xStride_ = xStride->GetStride(DIM_0);
+        // [cu_seq_len, dim]：token 维（dim0）stride >= 1，其余维 stride 必须 == 1
+        int64_t xTokenStride = xStride->GetStride(DIM_0);
+        if (xTokenStride < 1 || xStride->GetStride(DIM_1) != 1) {
+            OP_LOGE_FOR_INVALID_STRIDE(
+                context_->GetNodeName(), "x",
+                (std::to_string(xTokenStride) + ", " + std::to_string(xStride->GetStride(DIM_1))).c_str(),
+                "stride[0] (token) >= 1 and other dims == 1");
+            return ge::GRAPH_FAILED;
+        }
+        xStride_ = static_cast<uint64_t>(xTokenStride);
     } else {
         xStride_ = dim_;
     }
@@ -550,8 +559,20 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::GetInputStrides()
                 "The shape dim of cache_states stride must be equal to that of cache_states");
             return ge::GRAPH_FAILED;
         }
-        cacheStride0_ = cacheStride->GetStride(DIM_0);
-        cacheStride1_ = cacheStride->GetStride(DIM_1);
+        // [batch, state_len, dim]：dim0 / dim1 stride >= 1，dim2 stride 必须 == 1
+        int64_t cacheStride0Value = cacheStride->GetStride(DIM_0);
+        int64_t cacheStride1Value = cacheStride->GetStride(DIM_1);
+        int64_t cacheStride2Value = cacheStride->GetStride(DIM_2);
+        if (cacheStride0Value < 1 || cacheStride1Value < 1 || cacheStride2Value != 1) {
+            OP_LOGE_FOR_INVALID_STRIDE(context_->GetNodeName(), "cache_states",
+                                       (std::to_string(cacheStride0Value) + ", " + std::to_string(cacheStride1Value) +
+                                        ", " + std::to_string(cacheStride2Value))
+                                           .c_str(),
+                                       "stride[0] >= 1, stride[1] >= 1 and stride[2] == 1");
+            return ge::GRAPH_FAILED;
+        }
+        cacheStride0_ = static_cast<uint64_t>(cacheStride0Value);
+        cacheStride1_ = static_cast<uint64_t>(cacheStride1Value);
     } else {
         cacheStride0_ = cacheStatesShape_.GetDim(DIM_1) * dim_;
         cacheStride1_ = dim_;

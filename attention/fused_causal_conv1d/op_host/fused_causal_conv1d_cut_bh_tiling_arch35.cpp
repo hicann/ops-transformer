@@ -342,7 +342,17 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetStrideInfo()
                                                          "The shape dim of x stride must be 3");
                 return ge::GRAPH_FAILED;
             }
-            xStride_ = xStride->GetStride(DIM_1); // [batch, seq_len, dim] 中 seq_len 维的 stride
+            // [batch, seq_len, dim]：token 维（dim1）stride >= 1，其余维 stride 必须 == 1
+            xStride_ = xStride->GetStride(DIM_1);
+            if (xStride_ < 1 || xStride->GetStride(DIM_0) != 1 || xStride->GetStride(DIM_2) != 1) {
+                OP_LOGE_FOR_INVALID_STRIDE(
+                    context_->GetNodeName(), "x",
+                    (std::to_string(xStride->GetStride(DIM_0)) + ", " + std::to_string(xStride->GetStride(DIM_1)) +
+                     ", " + std::to_string(xStride->GetStride(DIM_2)))
+                        .c_str(),
+                    "stride[1] (token) >= 1 and all other dims == 1");
+                return ge::GRAPH_FAILED;
+            }
         } else {
             if (xStride->GetDimNum() != DIM_2) {
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x stride",
@@ -350,7 +360,16 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetStrideInfo()
                                                          "The shape dim of x stride must be 2");
                 return ge::GRAPH_FAILED;
             }
-            xStride_ = xStride->GetStride(DIM_0); // [cu_seq_len, dim] 中 cu_seq_len 维的 stride
+            // [cu_seq_len, dim]：token 维（dim0）stride >= 1，其余维 stride 必须 == 1
+            xStride_ = xStride->GetStride(DIM_0);
+            if (xStride_ < 1 || xStride->GetStride(DIM_1) != 1) {
+                OP_LOGE_FOR_INVALID_STRIDE(
+                    context_->GetNodeName(), "x",
+                    (std::to_string(xStride->GetStride(DIM_0)) + ", " + std::to_string(xStride->GetStride(DIM_1)))
+                        .c_str(),
+                    "stride[0] (token) >= 1 and all other dims == 1");
+                return ge::GRAPH_FAILED;
+            }
         }
     } else {
         // 连续张量：stride = dim_（每行 dim_ 个元素）
@@ -369,8 +388,18 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetStrideInfo()
                                                      "The shape dim of conv_states stride must be 3");
             return ge::GRAPH_FAILED;
         }
+        // [batch, state_len, dim]：dim0 / dim1 stride >= 1，dim2 stride 必须 == 1
         cacheStride0_ = cacheStride->GetStride(DIM_0); // batch 维 stride
         cacheStride1_ = cacheStride->GetStride(DIM_1); // state_len 维 stride
+        if (cacheStride0_ < 1 || cacheStride1_ < 1 || cacheStride->GetStride(DIM_2) != 1) {
+            OP_LOGE_FOR_INVALID_STRIDE(
+                context_->GetNodeName(), "conv_states",
+                (std::to_string(cacheStride->GetStride(DIM_0)) + ", " + std::to_string(cacheStride->GetStride(DIM_1)) +
+                 ", " + std::to_string(cacheStride->GetStride(DIM_2)))
+                    .c_str(),
+                "stride[0] >= 1, stride[1] >= 1 and stride[2] == 1");
+            return ge::GRAPH_FAILED;
+        }
     } else {
         // 连续张量默认 stride
         cacheStride0_ = dim_ * stateLen_; // batch 步长
