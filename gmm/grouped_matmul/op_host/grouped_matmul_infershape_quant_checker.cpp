@@ -29,6 +29,10 @@ static const std::unordered_set<ge::DataType> PERTOEKN_SCALE_TYPE_SUPPORT_SET = 
 constexpr size_t GROUP_LIST_DIM_NUM = 1UL;
 constexpr size_t GROUP_LIST_SPARSE_DIM_NUM = 2UL;
 constexpr int64_t GROUP_LIST_TYPE_SPARSE_M = 2L;
+constexpr size_t X_SHAPE_DIM_SPLIT_M = 2UL;
+constexpr size_t W_SHAPE_DIM_SPLIT_M = 3UL;
+constexpr size_t X_SHAPE_DIM_SPLIT_K = 2UL;
+constexpr size_t W_SHAPE_DIM_SPLIT_K = 2UL;
 
 static bool inline IsNonEmpty(const gert::Shape *shape)
 {
@@ -540,7 +544,7 @@ ge::graphStatus GroupedMatmulQuantChecker::CheckShapeValid(const gert::InferShap
     OP_CHECK_IF(CheckShapeForGrouplist(context) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context->GetNodeName(), "CheckShapeForGrouplist failed."), return ge::GRAPH_FAILED);
     if (gmmAttrs.groupType == GMM_SPLIT_M) {
-        OP_CHECK_IF(xdimNum_ != 2 && weightdimNum_ != 3,
+        OP_CHECK_IF(xdimNum_ != X_SHAPE_DIM_SPLIT_M || weightdimNum_ != W_SHAPE_DIM_SPLIT_M,
                     OP_LOGE(context->GetNodeName(),
                             "When split m, x dim num should be 2, weight dim num should be 3, y dim num should be 2 \
 but the actual x dim num is [%zu], actual weight dim num is [%zu].",
@@ -553,7 +557,7 @@ but the actual x dim num is [%zu], actual weight dim num is [%zu].",
                     groupNum_, weightShape->GetDim(0)),
             return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(xdimNum_ != 2 && weightdimNum_ != 2,
+        OP_CHECK_IF(xdimNum_ != X_SHAPE_DIM_SPLIT_K || weightdimNum_ != W_SHAPE_DIM_SPLIT_K,
                     OP_LOGE(context->GetNodeName(),
                             "When split k, x dim num should be 2, weight dim num should be 2, y dim num should be 3 \
 but the actual x dim num is [%zu], actual weight dim num is [%zu].",
