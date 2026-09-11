@@ -206,6 +206,13 @@ static aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, co
     } else if (shapeInfo.dimNum == DIM_NUM_3 && inputLayoutStr == "TND") {
         // query: (T,N1,D)
         // key/value: (T,N2,D)
+        if (headNum != qShape[1]) {
+            std::string reason =
+                "For TND layout, headNum must equal the N dim of query, but got query N " + std::to_string(qShape[1]);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScore", "headNum", std::to_string(headNum).c_str(),
+                                                  reason.c_str());
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         AnalysisAxisForTnd(qShape, kShape, vShape, shapeInfo);
     } else {
         OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON("FlashAttentionScore", "inputLayout", inputLayoutStr.c_str(),
