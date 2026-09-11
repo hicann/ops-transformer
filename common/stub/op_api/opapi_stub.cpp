@@ -25,7 +25,7 @@
 #include "level0/add.h"
 #include "level0/axpy.h"
 #include "level0/broadcast_to.h"
-#include "level0/dot.h"
+#include "level0/mc2_dot.h"
 #include "level0/fill.h"
 #include "level0/mul.h"
 #include "level0/muls.h"

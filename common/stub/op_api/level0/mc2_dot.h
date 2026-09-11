@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file dot.h
+ * \file mc2_dot.h
  * \brief
  */
 
-#ifndef OP_API_INC_LEVEL0_DOT_H_
-#define OP_API_INC_LEVEL0_DOT_H_
+#ifndef OP_API_INC_LEVEL0_MC2_DOT_H_
+#define OP_API_INC_LEVEL0_MC2_DOT_H_
 
 #include "opdev/op_executor.h"
 
@@ -24,4 +24,4 @@ const aclTensor *Dot(const aclTensor *self, const aclTensor *tensor, aclOpExecut
 
 }
 
-#endif // OP_API_INC_LEVEL0_DOT_H_
+#endif // OP_API_INC_LEVEL0_MC2_DOT_H_
