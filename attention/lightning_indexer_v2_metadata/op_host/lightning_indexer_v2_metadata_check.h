@@ -439,20 +439,22 @@ aclnnStatus CheckConsistencyLiV2(int64_t batchSize, const aclTensor *cuSeqlensQO
         }
     }
     // 校验 cmp_residual_k 元素数
-    auto cmpResidualKBatch = cmpResidualKOptional->GetViewShape().GetDim(0);
-    if (IsTensorExistLiV2(cmpResidualKOptional) && (cmpResidualKBatch != queryBatchSize)) {
-        if (IsTensorSourceLiV2(querySource)) {
-            OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
-                LI_V2_ACLNN_OP_NAME, "cmp_residual_k and " + querySource,
-                std::to_string(cmpResidualKBatch) + " and " +
-                    std::to_string(GetRawShapeSizeLiV2(querySource, queryBatchSize)),
-                "The batch_size of cmp_residual_k should match the valid batch size");
-        } else {
-            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                LI_V2_ACLNN_OP_NAME, "cmp_residual_k", std::to_string(cmpResidualKBatch),
-                "The batch_size of cmp_residual_k should match the valid batch size");
+    if (IsTensorExistLiV2(cmpResidualKOptional)) {
+        auto cmpResidualKBatch = cmpResidualKOptional->GetViewShape().GetDim(0);
+        if (cmpResidualKBatch != queryBatchSize) {
+            if (IsTensorSourceLiV2(querySource)) {
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    LI_V2_ACLNN_OP_NAME, "cmp_residual_k and " + querySource,
+                    std::to_string(cmpResidualKBatch) + " and " +
+                        std::to_string(GetRawShapeSizeLiV2(querySource, queryBatchSize)),
+                    "The batch_size of cmp_residual_k should match the valid batch size");
+            } else {
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    LI_V2_ACLNN_OP_NAME, "cmp_residual_k", std::to_string(cmpResidualKBatch),
+                    "The batch_size of cmp_residual_k should match the valid batch size");
+            }
+            return ACLNN_ERR_PARAM_INVALID;
         }
-        return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
 }
