@@ -910,6 +910,18 @@ mc2_training@ops-transformer:
     src:
         release:
             huawei_style:
+                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_host/
+                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_api/
+                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_graph/
+                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_kernel/
+                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/CMakeLists.txt
+                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/README.md
+                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_host/
+                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_api/
+                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_graph/
+                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_kernel/
+                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/CMakeLists.txt
+                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/README.md
                 - ops/ops-transformer/mc2/allto_all_matmul/op_host/allto_all_matmul_def.cpp
                 - ops/ops-transformer/mc2/allto_all_matmul/op_host/allto_all_matmul_infershape.cpp
                 - ops/ops-transformer/mc2/allto_all_matmul/op_host/CMakeLists.txt
@@ -1062,24 +1074,12 @@ mc2_inference@ops-transformer:
     src:
         release:
             huawei_style:
-                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_host/
-                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_api/
-                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_graph/
-                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/op_kernel/
-                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/CMakeLists.txt
-                - ops/ops-transformer/mc2/allto_all_all_gather_batch_mat_mul/README.md
                 - ops/ops-transformer/mc2/attention_to_ffn/op_host/
                 - ops/ops-transformer/mc2/attention_to_ffn/op_api/
                 - ops/ops-transformer/mc2/attention_to_ffn/op_graph/
                 - ops/ops-transformer/mc2/attention_to_ffn/op_kernel/
                 - ops/ops-transformer/mc2/attention_to_ffn/CMakeLists.txt
                 - ops/ops-transformer/mc2/attention_to_ffn/README.md
-                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_host/
-                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_api/
-                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_graph/
-                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/op_kernel/
-                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/CMakeLists.txt
-                - ops/ops-transformer/mc2/batch_mat_mul_reduce_scatter_allto_all/README.md
                 - ops/ops-transformer/mc2/ffn_to_attention/op_host/
                 - ops/ops-transformer/mc2/ffn_to_attention/op_api/
                 - ops/ops-transformer/mc2/ffn_to_attention/op_graph/
