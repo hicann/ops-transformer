@@ -28,7 +28,7 @@ using namespace op;
 namespace MoeTokenPermuteCheck {
 
 static const std::initializer_list<op::DataType> MOE_DTYPE_SUPPORT_LIST_X = {DataType::DT_FLOAT16, DataType::DT_BF16,
-                                                                             DataType::DT_FLOAT};
+                                                                             DataType::DT_FLOAT, DataType::DT_INT8};
 static const std::initializer_list<op::DataType> MOE_DTYPE_SUPPORT_LIST_EXPERT_IDX_REGBASE = {DataType::DT_INT32,
                                                                                               DataType::DT_INT64};
 static const std::initializer_list<op::DataType> MOE_DTYPE_SUPPORT_LIST_ROW_IDX = {DataType::DT_INT32};
