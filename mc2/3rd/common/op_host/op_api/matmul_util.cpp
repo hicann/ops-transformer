@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 #include "common/op_host/op_api/mc2_3rd_matmul_util.h"
 
 #include "aclnn_kernels/cast.h"
@@ -33,6 +33,7 @@
 #include "op_api/op_api_def.h"
 #include "common/op_host/op_api/cube_util.h"
 #include "common/op_host/mc2_3rd_math_util.h"
+#include "op_host/util/op_const_def.h"
 
 using namespace std;
 using namespace op;
@@ -452,7 +453,7 @@ bool CheckGemmV3Support(const aclTensor *mat1, const aclTensor *mat2, MmOpInfo &
         return false;
     }
     // 当前支持平台
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         OP_LOGI("Current SOC version does not support GemmV3.");
         return false;
     }
@@ -466,8 +467,8 @@ bool CheckGemmV3Support(const aclTensor *mat1, const aclTensor *mat2, MmOpInfo &
 
 bool IsInputSupportFp32()
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2201 &&
-        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2201 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         return false;
     }
     return true;
@@ -530,8 +531,8 @@ bool NeedToConvertBias(const aclTensor *self, const aclTensor *mat1, const aclTe
     TensorInfo Tensor_mat2 = {mat2, mat2->GetDataType(), Format::FORMAT_ND};
 
     bool isSplitK = false;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2201 &&
-        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2201 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         isSplitK = IsSplitk(&Tensor_matl, &Tensor_mat2);
         ;
     }
@@ -599,7 +600,7 @@ bool IsSplitk(const TensorInfo *self, const TensorInfo *mat2)
 
 bool IsFormatSupportNd(const aclTensor *self, const aclTensor *mat2)
 {
-    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
         return true;
     }
     if (GetCurrentPlatformInfo().GetSocVersion() != SocVersion::ASCEND910B &&
@@ -960,7 +961,7 @@ const aclTensor *ContiguousBias(const aclTensor *self, const aclTensor *bias, ac
     CHECK_RET(contiguousBias != nullptr, nullptr);
     // bias为bf16时cast为fp32保证精度
     if ((contiguousBias->GetDataType() == DataType::DT_BF16 &&
-         GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) ||
+         GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) ||
         self->GetDataType() == DataType::DT_FLOAT) {
         contiguousBias = l0op::Cast(contiguousBias, op::DataType::DT_FLOAT, executor);
         CHECK_RET(contiguousBias != nullptr, nullptr);

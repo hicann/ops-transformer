@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 #include <float.h>
 #include <array>
@@ -48,7 +48,7 @@ class TestAclnnQuantMatmulAlltoAll : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(NpuArch::DAV_3510);
+        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
         cout << "TestAclnnQuantMatmulAlltoAll SetUp" << endl;
     }
 
@@ -4869,7 +4869,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, MXQuant_cases_params)
 // 测试无效量化模式组合（覆盖 CheckDtypesValid else 分支）
 TEST_F(TestAclnnQuantMatmulAlltoAll, InvalidQuantModeCombo)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -4891,7 +4891,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, InvalidQuantModeCombo)
 // 另一种无效量化模式组合 (x1QuantMode=1, x2QuantMode=1)
 TEST_F(TestAclnnQuantMatmulAlltoAll, InvalidQuantModeCombo2)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -4913,7 +4913,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, InvalidQuantModeCombo2)
 // KC量化场景 - x1 为空指针
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX1)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto x1Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -4934,7 +4934,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX1)
 // KC量化场景 - x2 为空指针
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX2)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto x1Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -4955,7 +4955,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX2)
 // KC量化场景 - x1Scale 为空指针
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX1Scale)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -4976,7 +4976,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX1Scale)
 // KC量化场景 - x2Scale 为空指针
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX2Scale)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -4997,7 +4997,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX2Scale)
 // KC量化场景 - output 为空指针
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullOutput)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5018,7 +5018,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullOutput)
 // KC量化场景 - group 为 null 指针
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullGroup)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5040,7 +5040,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullGroup)
 // KC量化场景 - bias 为空指针（不传 bias）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullBias)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x1Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5062,7 +5062,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullBias)
 // alltoAllAxesOptional 为空指针（应被兼容处理，不报错）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullAlltoAllAxes)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5083,7 +5083,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullAlltoAllAxes)
 // alltoAllAxesOptional 大小不为 2（长度为 3）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongSize)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5105,7 +5105,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongSize)
 // alltoAllAxesOptional data1 != -1（第一个轴不为 -1）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongData1)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5127,7 +5127,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongData1)
 // alltoAllAxesOptional data2 != -2（第二个轴不为 -2）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongData2)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5149,7 +5149,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongData2)
 // KC量化场景 - output 为 FLOAT 类型（覆盖 yDtype == DT_FLOAT 分支，enumYDtype=0）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputFloat)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5171,7 +5171,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputFloat)
 // KC量化场景 - output 为 FLOAT16 类型（覆盖 yDtype == DT_FLOAT16 分支，enumYDtype=1）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputFloat16)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5193,7 +5193,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputFloat16)
 // KC量化场景 - output 为 BF16 类型（覆盖 yDtype == DT_BF16 分支，enumYDtype=27）
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputBF16)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5215,7 +5215,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputBF16)
 // MX量化场景 - x2 不转置（transposeX2=false），覆盖 mx 场景下 x2 必须转置的检查
 TEST_F(TestAclnnQuantMatmulAlltoAll, MXQuant_NoTransposeX2)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5238,7 +5238,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, MXQuant_NoTransposeX2)
 /*
 TEST_F(TestAclnnQuantMatmulAlltoAll, SecondApi_NullParams)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     aclnnStatus ret = aclnnQuantMatmulAlltoAll(nullptr, 0, nullptr, nullptr);
     EXPECT_EQ(ret, ACLNN_SUCCESS);
 }
@@ -5263,7 +5263,7 @@ static aclTensor *CreateNonContiguousAclTensor(const std::vector<int64_t> &shape
 // Cover lines 443-444: non-contiguous x2 with transposeX2=true on DAV_3510 -> error
 TEST_F(TestAclnnQuantMatmulAlltoAll, NonContiguousX2_WithTranspose)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateNonContiguousAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5286,7 +5286,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, NonContiguousX2_WithTranspose)
 // Cover lines 447, 449-451: non-contiguous x2 with transposeX2=false on DAV_3510 -> transposes x2
 TEST_F(TestAclnnQuantMatmulAlltoAll, NonContiguousX2_NoTranspose)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto x2 = CreateNonContiguousAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -5312,7 +5312,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, NonContiguousX2_NoTranspose)
 /*
 TEST_F(TestAclnnQuantMatmulAlltoAll, Phase2ApiDirect)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     // Direct call to phase-2 covers the NnopbaseSetHcclServerType check and inner call
     aclnnStatus ret = aclnnQuantMatmulAlltoAll(nullptr, 0, nullptr, nullptr);
     EXPECT_EQ(ret, ACLNN_SUCCESS);
@@ -5322,7 +5322,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, Phase2ApiDirect)
 // Cover lines 346-375: ReFormatNotND with NCHW format on all tensors
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_ReFormatNotND)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     // Use NCHW format (not private, not ND) to trigger ReFormatNotND
     auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_NCHW);
     auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_NCHW);

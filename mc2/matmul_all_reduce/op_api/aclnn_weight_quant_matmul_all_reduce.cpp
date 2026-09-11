@@ -1,14 +1,15 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 #include "aclnn_weight_quant_matmul_all_reduce.h"
+#include "op_host/util/op_const_def.h"
 
 #include "aclnnInner_matmul_all_reduce.h"
 #include "opdev/tensor_view_utils.h"
@@ -50,16 +51,17 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
                             const aclTensor *offset, const aclTensor *x3, const aclTensor *output)
 {
     const auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
-    const auto dtypeSupportList = (npuArch == NpuArch::DAV_2002) ? DTYPE_SUPPORT_LIST_310P : DTYPE_SUPPORT_LIST;
+    const auto dtypeSupportList = (npuArch == Ops::Base::DAV_2002) ? DTYPE_SUPPORT_LIST_310P : DTYPE_SUPPORT_LIST;
 
     const std::initializer_list<op::DataType> dtypeSupportListQuantA5 = {
         DataType::DT_INT8, DataType::DT_INT4, DataType::DT_FLOAT8_E4M3FN, DataType::DT_HIFLOAT8};
 
     const std::initializer_list<op::DataType> dtypeSupportListBiasA5 = {DataType::DT_FLOAT16, DataType::DT_BF16};
 
-    const auto x2DtypeSupportList = (npuArch == NpuArch::DAV_3510) ? dtypeSupportListQuantA5 : DTYPE_SUPPORT_LIST_QUANT;
+    const auto x2DtypeSupportList =
+        (npuArch == Ops::Base::DAV_3510) ? dtypeSupportListQuantA5 : DTYPE_SUPPORT_LIST_QUANT;
 
-    const auto biasDtypeSupportList = (npuArch == NpuArch::DAV_3510) ? dtypeSupportListBiasA5 : dtypeSupportList;
+    const auto biasDtypeSupportList = (npuArch == Ops::Base::DAV_3510) ? dtypeSupportListBiasA5 : dtypeSupportList;
     // 检查x1、x2、bias、scale、offset、x3、output的数据类型是否在算子的支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, dtypeSupportList, return false);
     // 对于量化来说，x2只为INT8/INT4
@@ -291,7 +293,7 @@ static bool CheckContiguous(const aclTensor *x2, const aclTensor *scale, const a
 {
     // check x2(weight) is transposed, scale and offset should also be transposed
     const bool transposeX2 = IsTransposeLastTwoDims(x2) || QuantMatmulAllReduceIsAclnnPreTransposed(x2);
-    const bool isNpuArch3510 = (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510);
+    const bool isNpuArch3510 = (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510);
     const bool isASCEND910B = (op::GetCurrentPlatformInfo().GetSocVersion() == op::SocVersion::ASCEND910B);
     if ((!isNpuArch3510) && (!isASCEND910B)) {
         return true;
@@ -431,7 +433,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduce(void *workspace, uint64_t workspaceS
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     if (NnopbaseSetHcclServerType) {
-        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_AICPU);
         }
     }

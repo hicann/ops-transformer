@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 #include <float.h>
 #include <array>
@@ -873,7 +873,7 @@ static void TestOneParamCase(const MatmulAlltoAllAclnnTestParam &param)
 
 TEST_F(TestAclnnMatmulAlltoAll, CasesParamsTest)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     if (std::size(g_casesParams) != 0) {
         uint64_t numCases = sizeof(g_casesParams) / sizeof(g_casesParams[0]);
         for (size_t idx = 0; idx < numCases; idx += 1) {
@@ -1143,7 +1143,7 @@ TEST_F(TestAclnnMatmulAlltoAll, CasesParamsTest910B)
 // Cover CheckNotNull: x1=null (lines 38-39)
 TEST_F(TestAclnnMatmulAlltoAll, NullX1)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
@@ -1160,7 +1160,7 @@ TEST_F(TestAclnnMatmulAlltoAll, NullX1)
 // Cover CheckNotNull: x2=null (lines 42-43)
 TEST_F(TestAclnnMatmulAlltoAll, NullX2)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
@@ -1177,7 +1177,7 @@ TEST_F(TestAclnnMatmulAlltoAll, NullX2)
 // Cover CheckNotNull: output=null (lines 46-47)
 TEST_F(TestAclnnMatmulAlltoAll, NullOutput)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
@@ -1232,7 +1232,7 @@ TEST_F(TestAclnnMatmulAlltoAll, Dtypes910BBf16BiasInvalid)
 // Cover ReFormatNotND: x1 with ACL_FORMAT_NCHW on DAV_3510 (lines 174-176)
 TEST_F(TestAclnnMatmulAlltoAll, ReFormatX1NCHW)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_NCHW);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -1251,7 +1251,7 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatX1NCHW)
 // Cover ReFormatNotND: x2 with ACL_FORMAT_NCHW on DAV_3510 (lines 179-181)
 TEST_F(TestAclnnMatmulAlltoAll, ReFormatX2NCHW)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_NCHW);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -1269,7 +1269,7 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatX2NCHW)
 // Cover ReFormatNotND: bias with ACL_FORMAT_NCHW on DAV_3510 (lines 185-187)
 TEST_F(TestAclnnMatmulAlltoAll, ReFormatBiasNCHW)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc biasDesc = TensorDesc({256}, ACL_FLOAT16, ACL_FORMAT_NCHW);
@@ -1288,7 +1288,7 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatBiasNCHW)
 // Cover ReFormatNotND: output with ACL_FORMAT_NCHW on DAV_3510 (lines 191-193)
 TEST_F(TestAclnnMatmulAlltoAll, ReFormatOutputNCHW)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_NCHW);
@@ -1307,7 +1307,7 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatOutputNCHW)
 // x2 with transposed strides (non-contiguous), transposeX2=false
 TEST_F(TestAclnnMatmulAlltoAll, NonContiguousX2)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     // x1: [256, 128], x2: [128, 256] with transposed strides, output: [512, 128]
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     // Create x2 with transposed strides: stride[0]=1, stride[1]=128 -> transposed (non-contiguous)
@@ -1329,7 +1329,7 @@ TEST_F(TestAclnnMatmulAlltoAll, NonContiguousX2)
 // This should return error: "x2 not contiguous, and set x2 transpose, it is error!"
 TEST_F(TestAclnnMatmulAlltoAll, NonContiguousX2WithTranspose)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     // x2 with transposed strides (non-contiguous)
     TensorDesc x2Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND, {1, 256}, 0, {256, 128});
@@ -1348,7 +1348,7 @@ TEST_F(TestAclnnMatmulAlltoAll, NonContiguousX2WithTranspose)
 // Cover phase-2 API aclnnMatmulAlltoAll (lines 335-357) on DAV_3510
 TEST_F(TestAclnnMatmulAlltoAll, Phase2ApiDav3510)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -1415,7 +1415,7 @@ TEST_F(TestAclnnMatmulAlltoAll, Phase2Api91093)
 // Cover dtype mismatch: x1 and x2 different dtypes on DAV_3510
 TEST_F(TestAclnnMatmulAlltoAll, DtypeMismatchX1X2)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_BF16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -1433,7 +1433,7 @@ TEST_F(TestAclnnMatmulAlltoAll, DtypeMismatchX1X2)
 // Cover dtype mismatch: x1 and output different dtypes on DAV_3510
 TEST_F(TestAclnnMatmulAlltoAll, DtypeMismatchX1Output)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_BF16, ACL_FORMAT_ND);
@@ -1451,7 +1451,7 @@ TEST_F(TestAclnnMatmulAlltoAll, DtypeMismatchX1Output)
 // Cover CheckAllDtypesValid: bias with invalid dtype (neither x1dtype nor float32) on DAV_3510 (line 104)
 TEST_F(TestAclnnMatmulAlltoAll, BiasInvalidDtypeDav3510)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_BF16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_BF16, ACL_FORMAT_ND);
     TensorDesc biasDesc = TensorDesc({256}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -1470,7 +1470,7 @@ TEST_F(TestAclnnMatmulAlltoAll, BiasInvalidDtypeDav3510)
 // Cover empty tensor with m=0 on DAV_3510 (line 322-323, DealWithEmptyTensor)
 TEST_F(TestAclnnMatmulAlltoAll, EmptyTensorM0Dav3510)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({0, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({0, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -1488,7 +1488,7 @@ TEST_F(TestAclnnMatmulAlltoAll, EmptyTensorM0Dav3510)
 // Cover phase-2 API aclnnMatmulAlltoAll lines 335-357 via direct call
 TEST_F(TestAclnnMatmulAlltoAll, Phase2DirectCall)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);

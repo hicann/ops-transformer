@@ -1,18 +1,19 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file aclnn_quant_matmul_all_reduce_v3.cpp
  * \brief
  */
 #include "aclnn_quant_matmul_all_reduce_v3.h"
+#include "op_host/util/op_const_def.h"
 
 #include "aclnnInner_matmul_all_reduce.h"
 #include "matmul_all_reduce_util.h"
@@ -65,11 +66,11 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
                             const aclTensor *commQuantScale1Optional, const aclTensor *commQuantScale2Optional,
                             const aclTensor *output)
 {
-    const auto &dequantDtypeList = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2002 ?
+    const auto &dequantDtypeList = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2002 ?
                                        DTYPE_SUPPORT_LIST_DEQUANT_310P :
                                        DTYPE_SUPPORT_LIST_DEQUANT;
 
-    const auto &outDtypeList = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2002 ?
+    const auto &outDtypeList = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2002 ?
                                    DTYPE_SUPPORT_LIST_310P :
                                    DTYPE_SUPPORT_LIST;
 
@@ -367,7 +368,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3GetWorkspaceSize(
     aclTensor *offset = nullptr;
     int64_t antiquantGroupSize = 0;
     auto tempX2 = x2;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2002 && MatmulAllReduceIsWeightNZFormat(x2)) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2002 && MatmulAllReduceIsWeightNZFormat(x2)) {
         if (x2->GetTensor() == nullptr) {
             OP_LOGE_WITH_INVALID_INPUT("aclnnQuantMatmulAllReduceV3", "x2");
             return ACLNN_ERR_INNER_NULLPTR;
@@ -402,7 +403,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(void *workspace, uint64_t workspaceSize,
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     if (NnopbaseSetHcclServerType) {
-        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_AICPU);
         }
     }

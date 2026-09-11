@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -13,6 +13,7 @@
 #include "allto_all_quant_matmul_base.h"
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 
 // 两段式接口
 extern "C" aclnnStatus aclnnAlltoAllQuantMatmulGetWorkspaceSize(
@@ -28,7 +29,7 @@ extern "C" aclnnStatus aclnnAlltoAllQuantMatmulGetWorkspaceSize(
     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
     auto socVersion = op::GetCurrentPlatformInfo().GetSocVersion();
     const char *commMode =
-        (npuArch == NpuArch::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
+        (npuArch == Ops::Base::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
 
     return aclnnAlltoAllQuantMatmulBaseGetWorkspaceSize(
         x1, x2, biasOptional, x1ScaleOptional, x2Scale, commScaleOptional, x1OffsetOptional, x2OffsetOptional, group,

@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file weight_quant_batch_matmul_v2_tiling.cpp
@@ -19,6 +19,7 @@
 #include "common/op_host/mc2_3rd_math_util.h"
 #include "common/op_host/op_tiling/debug_tiling.h"
 #include "platform/platform_infos_def.h"
+#include "op_host/util/op_const_def.h"
 
 namespace optiling {
 
@@ -504,14 +505,14 @@ bool CheckBiasShape(Mc2WeightQuantBatchMatmulInfo *inputParams, const gert::Stor
 bool CheckShapeDims(Mc2WeightQuantBatchMatmulInfo *inputParams, NpuArch npuArch)
 {
     OP_TILING_CHECK(
-        (npuArch != NpuArch::DAV_3510) && (inputParams->kSize > MAX_SHAPE_DIM || inputParams->nSize > MAX_SHAPE_DIM),
+        (npuArch != Ops::Base::DAV_3510) && (inputParams->kSize > MAX_SHAPE_DIM || inputParams->nSize > MAX_SHAPE_DIM),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             inputParams->opName, "k/n dims",
             (std::to_string(inputParams->kSize) + ", " + std::to_string(inputParams->nSize)).c_str(),
             "The value of k/n dims must not be more than 65535."),
         return false);
     uint64_t batchMax = inputParams->transA ? MAX_SHAPE_DIM : MAX_INT32;
-    OP_TILING_CHECK((npuArch != NpuArch::DAV_3510) && (inputParams->mSize > batchMax),
+    OP_TILING_CHECK((npuArch != Ops::Base::DAV_3510) && (inputParams->mSize > batchMax),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         inputParams->opName, "m", std::to_string(inputParams->mSize).c_str(),
                         (std::string("The value of m must not be more than ") + std::to_string(batchMax)).c_str()),
@@ -877,7 +878,7 @@ bool CheckTempLimit(Mc2WeightQuantBatchMatmulInfo *inputParams)
 
 bool CheckNzSupportedScenarios(Mc2WeightQuantBatchMatmulInfo *inputParams, NpuArch npuArch)
 {
-    if (npuArch == NpuArch::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         // WeightNZ only support the following scenarios:
         // (1) Weight in int4 dtye with per-channel or per-group quantization without transA, transB or C8.
         // (2) Weight in fp4 dtye with per-group or MX quantization without transA, transB or C8.
@@ -978,7 +979,7 @@ ge::graphStatus Mc2CheckPara(gert::TilingContext *context, platform_ascendc::Soc
             "The value of weight FP8 must not be used with transA, int8 output or weightNz.");
         return ge::GRAPH_FAILED;
     }
-    if (npuArch == NpuArch::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         OP_TILING_CHECK(!CheckTempLimit(&inputParams),
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             inputParams.opName, "input params",

@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -16,6 +16,7 @@
 #include <register/op_impl_registry.h>
 
 #include "allto_all_matmul_tiling_base.h"
+#include "op_host/util/op_const_def.h"
 
 using namespace ge;
 using Ops::Transformer::OpTiling::TilingRegistryArch;
@@ -28,7 +29,7 @@ static ge::graphStatus AlltoAllMatmulTilingFunc(gert::TilingContext *context)
     auto platformInfo = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
     NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
-    if (npuArch == NpuArch::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         return TilingRegistryArch::GetInstance().DoTilingImpl(context);
     }
     return TilingRegistryNew::GetInstance().DoTilingImpl(context);
