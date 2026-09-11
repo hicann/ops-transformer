@@ -18,6 +18,59 @@
 using namespace std;
 using namespace op;
 
+class flash_attention_score_tnd_head_num_ut : public testing::TestWithParam<int64_t> {};
+
+TEST_P(flash_attention_score_tnd_head_num_ut, rejects_mismatched_query_head_num)
+{
+    auto query = TensorDesc({2, 4, 16}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto key = TensorDesc({2, 4, 16}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto value = TensorDesc({2, 4, 16}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto prefix = IntArrayDesc(vector<int64_t>{2, 2});
+    auto softmaxMax = TensorDesc({2, 4, 8}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto softmaxSum = TensorDesc({2, 4, 8}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto softmaxOut = TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND);
+    auto attentionOut = TensorDesc({2, 4, 16}, ACL_BF16, ACL_FORMAT_ND);
+    char layout[] = "TND";
+
+    auto ut = OP_API_UT(aclnnFlashAttentionScore,
+                        INPUT(query, key, value, nullptr, nullptr, nullptr, nullptr, prefix, 0.25, 1.0, INT32_MAX,
+                              INT32_MAX, GetParam(), layout, 0, 1),
+                        OUTPUT(softmaxMax, softmaxSum, softmaxOut, attentionOut));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_ERR_PARAM_INVALID);
+}
+
+// Include a multiple of the KV head count: divisibility alone cannot detect this error.
+INSTANTIATE_TEST_SUITE_P(query_n_is_four, flash_attention_score_tnd_head_num_ut, testing::Values(1, 2, 8));
+
+class flash_attention_score_tnd_kv_head_num_ut : public testing::TestWithParam<int64_t> {};
+
+TEST_P(flash_attention_score_tnd_kv_head_num_ut, accepts_matching_query_head_num)
+{
+    auto query = TensorDesc({2, 4, 16}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto key = TensorDesc({2, GetParam(), 16}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto value = TensorDesc({2, GetParam(), 16}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto prefix = IntArrayDesc(vector<int64_t>{2, 2});
+    auto actualSeqLen = IntArrayDesc(vector<int64_t>{1, 2});
+    auto softmaxMax = TensorDesc({2, 4, 8}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto softmaxSum = TensorDesc({2, 4, 8}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto softmaxOut = TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND);
+    auto attentionOut = TensorDesc({2, 4, 16}, ACL_BF16, ACL_FORMAT_ND);
+    char layout[] = "TND";
+
+    auto ut = OP_API_UT(aclnnFlashAttentionVarLenScore,
+                        INPUT(query, key, value, nullptr, nullptr, nullptr, nullptr, prefix, actualSeqLen, actualSeqLen,
+                              0.25, 1.0, INT32_MAX, INT32_MAX, int64_t{4}, layout, 0, 1),
+                        OUTPUT(softmaxMax, softmaxSum, softmaxOut, attentionOut));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+}
+
+// Matching query heads must work for both MHA and GQA.
+INSTANTIATE_TEST_SUITE_P(valid_kv_heads, flash_attention_score_tnd_kv_head_num_ut, testing::Values(4, 2));
+
 class flash_attention_score_v3_opapi_ut : public testing::Test {
 protected:
     static void SetUpTestCase()
