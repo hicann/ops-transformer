@@ -21,28 +21,28 @@
 
 namespace optiling {
 
-#define OPS_CHECK_NULL_WITH_CONTEXT(context, ptr)                                                                      \
-    if ((ptr) == nullptr) {                                                                                            \
-        printf("nullptr error!");                                                                                      \
-        return ge::GRAPH_FAILED;                                                                                       \
+#define OPS_CHECK_NULL_WITH_CONTEXT(context, ptr) \
+    if ((ptr) == nullptr) { \
+        printf("nullptr error!"); \
+        return ge::GRAPH_FAILED; \
     }
 
-#define OPS_CHECK_NULL_WITH_CONTEXT_RET(context, ptr, ret)                                                             \
-    if ((ptr) == nullptr) {                                                                                            \
-        const char *name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName();                   \
-        printf("EZ9999 op[%s], %s is nullptr!", name, #ptr);                                                           \
-        return ret;                                                                                                    \
+#define OPS_CHECK_NULL_WITH_CONTEXT_RET(context, ptr, ret) \
+    if ((ptr) == nullptr) { \
+        const char *name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
+        printf("EZ9999 op[%s], %s is nullptr!", name, #ptr); \
+        return ret; \
     }
 
 #define VECTOR_INNER_ERR_REPORT_TILIING(op_name, err_msg, ...) printf(err_msg, ##__VA_ARGS__)
 
-#define OP_TILING_CHECK(cond, log_func, expr)                                                                          \
-    do {                                                                                                               \
-        if (cond) {                                                                                                    \
-            log_func;                                                                                                  \
-            fflush(stdout);                                                                                            \
-            expr;                                                                                                      \
-        }                                                                                                              \
+#define OP_TILING_CHECK(cond, log_func, expr) \
+    do { \
+        if (cond) { \
+            log_func; \
+            fflush(stdout); \
+            expr; \
+        } \
     } while (0)
 
 bool AddWorkspaceFFN(gert::TilingContext *context, const size_t workspace)
@@ -304,20 +304,20 @@ bool MoeFFNTiling::GetCheckAttr(gert::TilingContext *context)
                     VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(),
                                                     "MoeFFN get scale_group_size is nullptr, please check."),
                     return false);
-    OP_TILING_CHECK(*scale_group_size <= 0,
-                    VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(),
-                                                    "MoeFFN get scale_group_size <= 0, please check."),
-                    return false);
+    OP_TILING_CHECK(
+        *scale_group_size <= 0,
+        VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), "MoeFFN get scale_group_size <= 0, please check."),
+        return false);
     OP_TILING_CHECK(*scale_group_size % 32 != 0,
                     VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(),
                                                     "MoeFFN get scale_group_size not aligned to 32, please check."),
                     return false);
     _Params.scaleGroupSize = *scale_group_size;
     const int64_t *topk = attrs->GetAttrPointer<int64_t>(1);
-    OP_TILING_CHECK(topk == nullptr,
-                    VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(),
-                                                    "MoeFFN get topk is nullptr, please check."),
-                    return false);
+    OP_TILING_CHECK(
+        topk == nullptr,
+        VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), "MoeFFN get topk is nullptr, please check."),
+        return false);
     OP_TILING_CHECK(*topk <= 0,
                     VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), "MoeFFN get topk <= 0, please check."),
                     return false);
@@ -363,4 +363,6 @@ ge::graphStatus TilingMoeFFN(gert::TilingContext *context)
     MoeFFNTiling tiling_handle;
     return tiling_handle.runTiling(context);
 }
+
+IMPL_OP_OPTILING(MoeFFN).Tiling(TilingMoeFFN);
 } // namespace optiling

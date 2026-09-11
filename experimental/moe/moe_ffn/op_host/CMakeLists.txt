@@ -11,7 +11,6 @@
 if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnn PRIVATE
         moe_ffn_def.cpp
-        moe_ffn_tiling.cpp
     )
     add_ops_compile_options(
         OP_NAME MoeFFN
