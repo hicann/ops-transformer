@@ -610,7 +610,7 @@ int main() {
   schedule_context.common.schedule_mode = 0;
   schedule_context.ffn.polling_index = 1;
   InitFfn(schedule_context);
-  ret = aclrtMemcpy(selfHostData.data(), sizeof(ScheduleContext), &schedule_context, sizeof(ScheduleContext), ACL_MEMCPY_DEVICE_TO_HOST);
+  ret = aclrtMemcpy(selfHostData.data(), sizeof(ScheduleContext), &schedule_context, sizeof(ScheduleContext), ACL_MEMCPY_HOST_TO_HOST);
   if (ret != ACL_SUCCESS) {
     LOG_PRINT("copy schedule context to host failed. ERROR: %d\n", ret);
     UninitFfn(schedule_context);
