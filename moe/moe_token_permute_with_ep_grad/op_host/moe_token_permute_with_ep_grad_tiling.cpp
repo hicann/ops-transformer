@@ -32,7 +32,10 @@ ge::graphStatus TilingMoeTokenPermuteWithEpGrad(gert::TilingContext *context)
     return PermuteWithEpGradTilingCompute(context, -1, true);
 }
 
-static inline int64_t AlignN(const int64_t x, const int64_t N) { return (x + N - 1) & ~(N - 1); }
+static inline int64_t AlignN(const int64_t x, const int64_t N)
+{
+    return (x + N - 1) & ~(N - 1);
+}
 
 static inline int64_t GetLengthByType(const int32_t dtype)
 {
@@ -55,9 +58,15 @@ static inline int64_t GetLengthByType(const int32_t dtype)
     }
 }
 
-static inline int64_t safeMod(const int64_t a, const int64_t b) { return b == 0 ? 0 : a % b; }
+static inline int64_t safeMod(const int64_t a, const int64_t b)
+{
+    return b == 0 ? 0 : a % b;
+}
 
-static inline int64_t safeDiv(const int64_t a, const int64_t b) { return b == 0 ? 0 : a / b; }
+static inline int64_t safeDiv(const int64_t a, const int64_t b)
+{
+    return b == 0 ? 0 : a / b;
+}
 
 static inline bool isFloatDtype(const int64_t inputDtypeSize)
 {
@@ -359,6 +368,13 @@ ge::graphStatus PermuteWithEpGradTilingCompute(gert::TilingContext *context, con
     SetTilingKey(context, isUnpermute, param);
     SetTilingData(context, param);
     DebugPrint(context, param);
+
+    // 框架要求必须无条件分配系统 workspace(库内部原子操作等使用), 否则运行时 kernel 启动缺参会触发 VEC_ERROR
+    const auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context, workSpaces);
+    workSpaces[0] = ascendcPlatform.GetLibApiWorkSpaceSize();
+    OP_LOGD(context->GetNodeName(), "system workspace size is %zu", workSpaces[0]);
 
     return context->SetTilingKey(param.core.tilingKey);
 }
