@@ -336,6 +336,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     GM_ADDR stateGM = GetUrmaStateAddrByRankId(rankId_, combineStateWinOffset_) + flagOffset;
     LocalTensor<uint32_t> stateTensor = stateBuf_.Get<uint32_t>();
     uint32_t totalFlagCount = epWorldSize_ * combineChannelCount_;
+    SyncFunc<AscendC::HardEvent::S_V>();
     Duplicate<uint32_t>(stateTensor, 0U, totalFlagCount * STATE_OFFSET / sizeof(uint32_t));
     SyncFunc<AscendC::HardEvent::V_MTE3>();
 

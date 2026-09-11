@@ -58,6 +58,7 @@ struct MoeEpWindowLayout {
     uint64_t dispatchSlotStateSize;
     uint64_t combineStateWinOffset;
     uint64_t combineStateWinSize;
+    uint64_t combineFlagSourceWinOffset; // Shared 512B constant source, after the receive completion flags.
 
     uint64_t scaleoutRecvDataOffset;
     uint64_t scaleoutRecvDataSize;
