@@ -13,9 +13,9 @@
 
 ## 功能说明
 
-- 算子功能：MoE的routing计算，根据[aclnnMoeGatingTopKSoftmaxV2](../moe_gating_top_k_softmax_v2/docs/aclnnMoeGatingTopKSoftmaxV2.md)的计算结果做routing处理，支持不量化和动态量化模式。本接口针对V2接口[aclnnMoeInitRoutingV2](../moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)做了如下功能变更，请根据实际情况选择合适的接口：
+- 算子功能：MoE的routing计算，根据[aclnnMoeGatingTopKSoftmaxV2](../moe_gating_top_k_softmax_v2/docs/aclnnMoeGatingTopKSoftmaxV2.md)的计算结果做routing处理，支持不量化、静态量化和动态量化模式。本接口针对V2接口[aclnnMoeInitRoutingV2](../moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)做了如下功能变更，请根据实际情况选择合适的接口：
 
-    1.增加动态量化功能，支持输出expendX的int8动态量化输出。
+    1.增加动态与静态量化功能，支持输出expandX的int8量化模式输出，并新增多种FP8/FP4/INT4/HIFLOAT8量化模式。
 
     2.增加参数activeExpertRangeOptional，支持筛选有效范围内的expertId。
 
@@ -95,7 +95,14 @@
         <td>x</td>
         <td>输入</td>
         <td>MOE的输入，即token特征输入，对应公式中x。</td>
-        <td>FLOAT32、FLOAT16、BFLOAT16、INT8、HIFLOAT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2。</td>
+        <td><ul>
+          <li>quantMode=-1：支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2;</li>
+          <li>quantMode=0、1：支持FLOAT16、BFLOAT16、FLOAT32;</li>
+          <li>quantMode=2、3、4、5、6、7、8、9、11、12、14、15、16、17：支持FLOAT16、BFLOAT16;</li>
+          <li>quantMode=13：支持FLOAT32、BFLOAT16;</li>
+          <li>以上类型需同时满足下文的产品支持限制：A2/A3仅支持quantMode=-1、0、1，且非量化输入仅支持FLOAT16、BFLOAT16、FLOAT32、INT8；其余列出的类型和量化模式仅950支持。</li>
+          <li><term>Ascend 950PR/Ascend 950DT</term>在quantMode=1时仅为兼容历史调用允许INT8输入，此时expandedXOut和expandedScaleOut无意义，不应使用。</li>
+          </ul></td>
         <td>ND</td>
       </tr>
       <tr>
@@ -122,7 +129,7 @@
       <tr>
         <td>activeNum</td>
         <td>属性</td>
-        <td>表示总的最大处理row数，输出expandedXOut只有这么多行是有效的。</td>
+        <td><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR/Ascend 950DT</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。</td>
         <td>INT</td>
         <td>-</td>
       </tr>
@@ -136,7 +143,7 @@
       <tr>
         <td>expertNum</td>
         <td>属性</td>
-        <td>表示专家数，expertTokensNumType为key\_value模式时，取值范围为[0, 5120],其它模式取值范围[0, 10240]。</td>
+        <td>表示专家数，expertTokensNumType为key\_value模式时，取值范围为[1, 5120],其它模式取值范围[1, 10240]。</td>
         <td>INT</td>
         <td>-</td>
       </tr>
@@ -150,7 +157,7 @@
       <tr>
         <td>expertTokensNumType</td>
         <td>属性</td>
-        <td>取值为0、1和2 。<br>• 0：表示comsum模式。<br>• 1：表示count模式，即输出的值为各个专家处理的token数量的累计值。<br>• 2：表示key\_value模式，即输出的值为专家和对应专家处理token数量的累计值。</td>
+        <td>取值为0、1和2 。<br>• 0：表示cumsum模式。<br>• 1：表示count模式，即输出的值为各个专家处理的token数量的累计值。<br>• 2：表示key\_value模式，即输出的值为专家和对应专家处理token数量的累计值。</td>
         <td>INT</td>
         <td>-</td>
       </tr>
@@ -217,15 +224,15 @@
 ## 约束说明
 
 - 输入值域限制：
-  - activeNum当前未使用，校验需等于NUM_ROWS*K。
+  - activeNum：<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR/Ascend 950DT</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。
   - expertCapacity在Dropless场景下不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。
   - dropPadMode支持取值为0和1，分别代表Dropless场景和DropPad场景。
   - expertTokensNumType当前只支持0、1 和2，分别代表cumsum模式、count模式和key\_value模式。
   - expertTokensNumFlag只支持true，代表输出expertTokensCountOrCumsumOut。
   - quantMode:
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持1、-1，分别代表动态量化场景和不量化场景。
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持1、0、-1，分别代表动态量化、静态量化和不量化场景。quantMode=-1时x仅支持FLOAT16、BFLOAT16、FLOAT32、INT8。
     - <term>Ascend 950PR/Ascend 950DT</term>：
-      - 支持-1、1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17，分别表示不量化、动态量化到INT8、MXFP8量化到FLOAT8_E5M2、MXFP8量化到FLOAT8_E4M3FN、FP8 PerGroup量化到FLOAT8_E5M2、FP8 PerGroup量化到FLOAT8_E4M3FN、按直转方式量化到HIFLOAT8、按PERTENSOR模式量化到HIFLOAT8、按PERTOKEN模式量化到HIFLOAT8，MXFP4量化到FLOAT4_E2M1，FP8 PerBlock量化到FLOAT8_E5M2，FP8 PerBlock量化到FLOAT8_E4M3FN，FP8 PerGroup量化到FLOAT8_E5M2并启用Amax下限，FP8 PerGroup量化到FLOAT8_E4M3FN并启用Amax下限，INT4动态量化，MXFP8 RoundScale+Amax量化到FLOAT8_E5M2，MXFP8 RoundScale+Amax量化到FLOAT8_E4M3FN。
+      - 支持-1、0、1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17，分别表示不量化、静态量化到INT8、动态量化到INT8、MXFP8量化到FLOAT8_E5M2、MXFP8量化到FLOAT8_E4M3FN、FP8 PerGroup量化到FLOAT8_E5M2、FP8 PerGroup量化到FLOAT8_E4M3FN、按直转方式量化到HIFLOAT8、按PERTENSOR模式量化到HIFLOAT8、按PERTOKEN模式量化到HIFLOAT8，MXFP4量化到FLOAT4_E2M1，FP8 PerBlock量化到FLOAT8_E5M2，FP8 PerBlock量化到FLOAT8_E4M3FN，INT4动态量化，FP8 PerGroup量化到FLOAT8_E5M2并启用Amax下限，FP8 PerGroup量化到FLOAT8_E4M3FN并启用Amax下限，MXFP8 RoundScale+Amax量化到FLOAT8_E5M2，MXFP8 RoundScale+Amax量化到FLOAT8_E4M3FN。
       - 支持quantMode为13的INT4动态量化场景，需同时满足：
         - x数据类型为FLOAT32或BFLOAT16，expandedXOut数据类型为INT4。
         - H为偶数，用于沿H维每两个INT4值打包为1个字节；NUM_ROWS不要求为偶数。
@@ -236,7 +243,7 @@
   - rowIdxType仅支持取值为0（gather索引）。
   - activeExpertRangeOptional必须为[0, expertNum]。
   - expertTokensNumType仅支持取值为1（count模式）。
-  - quantMode在DropPad模式下仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8。
+  - quantMode在DropPad模式下仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
   - expandedXOut必须是3D Tensor，shape为[expertNum, expertCapacity, H]。
 
 - 其他限制：该算子部分产品支持两种性能模板，进入两种性能模板需要分别额外满足以下条件，不满足条件则进入通用模板。

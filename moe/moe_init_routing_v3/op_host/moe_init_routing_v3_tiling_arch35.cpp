@@ -631,8 +631,8 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::CheckInputScale()
 {
     OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::CheckInputScale()");
 
-    if (quantMode_ == QUANT_MODE_STATIC) {
-        return CheckStaticQuantScale();
+    if (quantMode_ == QUANT_MODE_STATIC || quantMode_ == QUANT_MODE_HIF8_PERTENSOR) {
+        return CheckEssentialQuantScale();
     }
 
     if (isInputScale_ == 0) {
@@ -645,27 +645,23 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::CheckInputScale()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV3TilingArch35::CheckStaticQuantScale()
+ge::graphStatus MoeInitRoutingV3TilingArch35::CheckEssentialQuantScale()
 {
-    // 静态量化模式：scale必须输入，shape为[1]，dtype为FLOAT
-    if (quantMode_ == QUANT_MODE_STATIC) {
-        OP_CHECK_IF(isInputScale_ == 0, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "scale"),
-                    return ge::GRAPH_FAILED);
-        auto rankScale = static_cast<int64_t>(scaleShape_.GetDimNum());
-        OP_CHECK_IF(rankScale != RANK_ONE,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "scale", std::to_string(rankScale), "1"),
-                    return ge::GRAPH_FAILED);
-        auto dim0 = scaleShape_.GetDim(0);
-        OP_CHECK_IF(dim0 != 1,
-                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "scale dim[0]", std::to_string(dim0), "1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(scaleDtype_ != ge::DataType::DT_FLOAT,
-                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "scale",
-                                              Ops::Base::ToString(scaleDtype_).c_str(), "DT_FLOAT"),
-                    return ge::GRAPH_FAILED);
-        return ge::GRAPH_SUCCESS;
-    }
-
+    // 静态量化/HIF8 PERTENSOR量化模式：scale必须输入，shape为[1]，dtype为FLOAT
+    OP_CHECK_IF(isInputScale_ == 0, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "scale"),
+                return ge::GRAPH_FAILED);
+    auto rankScale = static_cast<int64_t>(scaleShape_.GetDimNum());
+    OP_CHECK_IF(rankScale != RANK_ONE,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "scale", std::to_string(rankScale), "1"),
+                return ge::GRAPH_FAILED);
+    auto dim0 = scaleShape_.GetDim(0);
+    OP_CHECK_IF(dim0 != 1,
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "scale dim[0]", std::to_string(dim0), "1"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(scaleDtype_ != ge::DataType::DT_FLOAT,
+                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "scale", Ops::Base::ToString(scaleDtype_).c_str(),
+                                          "DT_FLOAT"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1134,7 +1130,8 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::CheckOutputExpandedScale()
 {
     OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::CheckOutputExpandedScale()");
 
-    if (quantMode_ == QUANT_MODE_STATIC || quantMode_ == QUANT_MODE_HIF8_CAST) {
+    if (quantMode_ == QUANT_MODE_STATIC || quantMode_ == QUANT_MODE_HIF8_CAST ||
+        quantMode_ == QUANT_MODE_HIF8_PERTENSOR) {
         return ge::GRAPH_SUCCESS;
     }
 
