@@ -18,6 +18,7 @@
 #include "common/utils/op_mc2_def.h"
 #include "opdev/op_log.h"
 #include "opdev/common_types.h"
+#include "op_host/util/op_const_def.h"
 #include "aclnn_kernels/common/op_error_check.h"
 #include "mc2_log_compat.h"
 #include "moe_distribute_dispatch_v2_base.h"
@@ -165,7 +166,7 @@ aclnnStatus aclnnMoeDistributeDispatchGetWorkspaceSizeBase(
 {
     OP_LOGD("enter to the  aclnnMoeDistributeDispatchGetWorkspaceSizeBase\n");
     const static bool is910B = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B;
-    const static bool is950 = GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+    const static bool is950 = GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
     auto retParam =
         DispatchCheckParams(x, expertIds, scalesOptional, groupEp, groupTp, quantMode, expandXOut, dynamicScalesOut,
                             assistInfoForCombineOut, expertTokenNumsOut, epRecvCountsOut, tpRecvCountsOut);
@@ -224,7 +225,7 @@ aclnnStatus aclnnMoeDistributeDispatchBase(void *workspace, uint64_t workspaceSi
                                            aclrtStream stream)
 {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    const static bool is950 = GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+    const static bool is950 = GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
     if (is950) {
         void *arg = NnopbaseGetUserHandle(executor);
         uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);

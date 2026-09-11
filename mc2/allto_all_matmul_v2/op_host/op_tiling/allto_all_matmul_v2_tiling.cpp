@@ -37,7 +37,7 @@ static ge::graphStatus AlltoAllMatmulV2TilingFunc(gert::TilingContext *context)
     }
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
     NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
-    if (npuArch != NpuArch::DAV_3510) {
+    if (npuArch != Ops::Base::DAV_3510) {
         OP_LOGE_WITHOUT_REPORT(context->GetNodeName(),
                                "[platform] AlltoAllMatmulV2 only supports DAV_3510, current arch is not supported");
         return ge::GRAPH_FAILED;

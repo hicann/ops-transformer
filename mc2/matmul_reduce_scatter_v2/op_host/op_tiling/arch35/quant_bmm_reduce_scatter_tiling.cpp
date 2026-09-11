@@ -83,7 +83,7 @@ constexpr std::initializer_list<ge::DataType> HIF8FP8FP4DTYPE_SUPPORT_LIST = {
 
 bool QuantBmmReduceScatterTiling::IsCapable()
 {
-    if (npuArch_ != NpuArch::DAV_3510) {
+    if (npuArch_ != Ops::Base::DAV_3510) {
         OP_LOGI(opName_, "skip quantbmm reducescatter tiling when npuArch is not 3510.");
         return false;
     }
@@ -980,7 +980,7 @@ CutResult QuantBmmReduceScatterTiling::GetTilingResult()
                                                               (commMode_ == TPL_AICPU_COMM_MODE));
         return quantBmmScatterTiling.GetTiling();
     } else {
-        SocVersion inputSocVersion = (npuArch_ == NpuArch::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
+        SocVersion inputSocVersion = (npuArch_ == Ops::Base::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
         MMPlusReduceScatter quantBmmScatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, inputSocVersion,
                                                   false, (commMode_ == TPL_AICPU_COMM_MODE));
         quantBmmScatterTiling.GetTiling();
@@ -989,7 +989,7 @@ CutResult QuantBmmReduceScatterTiling::GetTilingResult()
 }
 // 注册Tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MatmulReduceScatterV2, QuantBmmReduceScatterTiling,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 1);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 1);
 } // namespace optiling
 
 #endif //_QUANT_BMM_MATMUL_REDUCE_SCATTER_TILING_CC_

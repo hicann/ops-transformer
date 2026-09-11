@@ -19,7 +19,7 @@
 #include "exe_graph/runtime/exe_res_generation_context.h"
 #include "graph/kernel_launch_info.h"
 #include "graph/arg_desc_info.h"
-#include "platform/soc_spec.h"
+#include "op_host/util/op_const_def.h"
 #include "platform/platform_ascendc.h"
 
 namespace ops {

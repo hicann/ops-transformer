@@ -48,7 +48,7 @@ void MoeDistributeDispatchSetupTilingA5::SetHcommCfg()
     OP_LOGD(nodeName_, "MoeDistributeCombineSetup groupEp = %s", groupEp_.c_str());
     uint32_t opType = OP_TYPE_ALL_TO_ALL;
     std::string algConfigStr = "AlltoAll=level0:fullmesh;level1:pairwise";
-    uint8_t aivEngineValue = npuArch_ == NpuArch::DAV_3510 ? mc2tiling::AIV_ENGINE : mc2tiling::AIV_ENGINE;
+    uint8_t aivEngineValue = npuArch_ == Ops::Base::DAV_3510 ? mc2tiling::AIV_ENGINE : mc2tiling::AIV_ENGINE;
 
     AscendC::Mc2CcTilingConfig mc2CcTilingConfig(groupEp_, opType, algConfigStr);
     mc2CcTilingConfig.SetCommEngine(aivEngineValue); // AIV_UB-MEM or AIV_URMA
@@ -59,7 +59,7 @@ void MoeDistributeDispatchSetupTilingA5::SetHcommCfg()
 
 bool MoeDistributeDispatchSetupTilingA5::IsCapable()
 {
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == Ops::Base::DAV_3510) {
         OP_LOGD(nodeName_, "Do MoeDistributeDispatchSetupTilingA5 tiling.");
         return true;
     }

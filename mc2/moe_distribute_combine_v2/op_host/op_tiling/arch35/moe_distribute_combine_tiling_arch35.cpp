@@ -808,7 +808,7 @@ uint64_t MoeDistributeCombineV2TilingFuncA5::CalTilingKey(uint32_t commQuantMode
 
 bool MoeDistributeCombineTilingA5::IsCapable()
 {
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == Ops::Base::DAV_3510) {
         const char *nodeName = context_->GetNodeName();
         OP_LOGD(nodeName, "Do MoeDistributeCombineTilingA5 tiling.");
         return true;

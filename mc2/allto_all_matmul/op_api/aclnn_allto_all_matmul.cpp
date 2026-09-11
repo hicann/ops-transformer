@@ -13,6 +13,7 @@
 #include "allto_all_matmul_base.h"
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 
 // 两段式接口
 extern "C" aclnnStatus aclnnAlltoAllMatmulGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
@@ -27,7 +28,7 @@ extern "C" aclnnStatus aclnnAlltoAllMatmulGetWorkspaceSize(const aclTensor *x1, 
     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
     auto socVersion = op::GetCurrentPlatformInfo().GetSocVersion();
     const char *commMode =
-        (npuArch == NpuArch::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
+        (npuArch == Ops::Base::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
 
     return aclnnAlltoAllMatmulBaseGetWorkspaceSize(x1, x2, biasOptional, alltoAllAxesOptional, group, commMode,
                                                    transposeX1, transposeX2, output, alltoAllOutOptional, workspaceSize,

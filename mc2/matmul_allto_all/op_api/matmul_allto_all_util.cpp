@@ -21,6 +21,7 @@
 #include "opdev/op_log.h"
 #include "mc2_log_compat.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 #include "common/utils/hccl_util.h"
 #include "mc2_comm_utils.h"
 
@@ -233,7 +234,7 @@ aclnnStatus CheckAndHandleCommMode(const char *opName, const char *group, const 
     (void)group;
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
-    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
         if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
             commModeEnum = Mc2Comm::COMM_MODE_AICPU;
         } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
@@ -264,7 +265,7 @@ bool IsAll2AllOut(const char *opName, const aclTensor *alltoAllOut)
     if (alltoAllOut == nullptr) {
         return false;
     }
-    if (alltoAllOut->IsEmpty() && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201) {
+    if (alltoAllOut->IsEmpty() && op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2201) {
         OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllOutOptional", "empty tensor", "non-empty tensor");
         return false;
     }

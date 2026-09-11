@@ -19,10 +19,10 @@
 #include "exe_graph/runtime/tiling_context.h"
 #include "platform/platform_infos_def.h"
 #include "mc2_log.h"
-#include "platform/soc_spec.h"
+#include "op_host/util/op_const_def.h"
 namespace optiling {
-const std::initializer_list<NpuArch> Mc2AdvancedSocVersion = {NpuArch::DAV_3510,
-                                                              NpuArch::DAV_RESV}; // supportMmadS8S4平台
+const std::initializer_list<NpuArch> Mc2AdvancedSocVersion = {Ops::Base::DAV_3510,
+                                                              Ops::Base::DAV_RESV}; // supportMmadS8S4平台
 
 template <typename T>
 inline typename std::enable_if<
@@ -37,7 +37,7 @@ Mc2IsAdvancedSocVersion(T *context)
     std::string mmad;
     bool res = platformInfo->GetPlatformRes("AICoreintrinsicDtypeMap", "Intrinsic_mmad", mmad);
     bool supportMmadS8S4 = res && mmad.find("s8s4") != std::string::npos;
-    NpuArch npuArch = supportMmadS8S4 ? NpuArch::DAV_RESV : ascendcPlatform.GetCurNpuArch();
+    NpuArch npuArch = supportMmadS8S4 ? Ops::Base::DAV_RESV : ascendcPlatform.GetCurNpuArch();
     return std::find(Mc2AdvancedSocVersion.begin(), Mc2AdvancedSocVersion.end(), npuArch) !=
            Mc2AdvancedSocVersion.end();
 }

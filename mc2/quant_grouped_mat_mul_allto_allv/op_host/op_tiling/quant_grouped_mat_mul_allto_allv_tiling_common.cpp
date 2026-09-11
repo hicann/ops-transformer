@@ -966,7 +966,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::SetHcclTiling()
     auto platformInfo = context_->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint8_t commMode = 0;
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_3510) {
         if (QuantGetAndConvertCommMode(context_, commMode) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }

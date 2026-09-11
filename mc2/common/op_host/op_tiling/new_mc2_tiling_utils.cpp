@@ -20,6 +20,7 @@
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h"
 #include "mc2_log.h"
 #include "mc2_tiling_utils.h"
+#include "op_host/util/op_const_def.h"
 
 namespace mc2tiling {
 
@@ -64,7 +65,7 @@ ge::graphStatus NewGetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<
                                              const char *opName)
 {
     const static std::map<NpuArch, std::vector<int32_t>> MATMUL_V3_PRIOR_MAP = {
-        {NpuArch::DAV_3510, {optiling::mc2_matmul_v3_advanced::strategy::BASE}},
+        {Ops::Base::DAV_3510, {optiling::mc2_matmul_v3_advanced::strategy::BASE}},
     };
 
     if (MATMUL_V3_PRIOR_MAP.find(npuArch) != MATMUL_V3_PRIOR_MAP.end()) {

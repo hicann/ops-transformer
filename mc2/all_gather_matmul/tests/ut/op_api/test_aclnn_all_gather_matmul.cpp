@@ -65,9 +65,9 @@ TEST_F(AclnnAllGatherMatmulLaunchTest, LaunchApiCoverage)
 
 TEST_F(AclnnAllGatherMatmulLaunchTest, Ascend950LaunchCcuCommMode)
 {
-    op::SetPlatformNpuArch(NpuArch::DAV_3510);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
     (void)aclnnAllGatherMatmul(nullptr, 0, nullptr, nullptr);
-    op::SetPlatformNpuArch(NpuArch::DAV_3103);
+    op::SetPlatformNpuArch(Ops::Base::DAV_3103);
     op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
 }
 

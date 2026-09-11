@@ -15,7 +15,7 @@
 
 #include "matmul_v3_tiling_helper.h"
 #include "common/op_host/mc2_3rd_math_util.h"
-#include "platform/soc_spec.h"
+#include "op_host/util/op_const_def.h"
 
 using Ops::Transformer::MathUtil;
 namespace {
@@ -53,7 +53,7 @@ void ResetBase91095(const Mc2MatmulV3CompileInfo &compileInfo, const Mc2MatMulV3
 using ResetBaseFunc = void (*)(const Mc2MatmulV3CompileInfo &, const Mc2MatMulV3Args &, Mc2MatMulV3RunInfo &);
 
 const static std::map<NpuArch, ResetBaseFunc> ResetBaseFuncMap = {
-    {NpuArch::DAV_3510, ResetBase91095},
+    {Ops::Base::DAV_3510, ResetBase91095},
 };
 
 // ------------------------------ CalL1Tiling -------------------------------------------//
@@ -169,7 +169,7 @@ using GetL0C2OutFunc = Mc2MatMulV3L0C2Out (*)(const Mc2MatmulV3CompileInfo &, co
                                               const Mc2MatMulV3RunInfo &);
 
 const static std::map<NpuArch, GetL0C2OutFunc> GetL0C2OutFuncMap = {
-    {NpuArch::DAV_3510, GetL0C2Out91095},
+    {Ops::Base::DAV_3510, GetL0C2Out91095},
 };
 
 // ------------------------------ CheckIfDoubleAswt -------------------------------------------//
@@ -198,7 +198,7 @@ bool CheckIfDoubleAswt91095(const Mc2MatMulV3Args &args, const uint64_t batchC)
 using CheckIfDoubleAswtFunc = bool (*)(const Mc2MatMulV3Args &, const uint64_t);
 
 const static std::map<NpuArch, CheckIfDoubleAswtFunc> CheckIfDoubleAswtFuncMap = {
-    {NpuArch::DAV_3510, CheckIfDoubleAswt91095},
+    {Ops::Base::DAV_3510, CheckIfDoubleAswt91095},
 };
 } // namespace
 

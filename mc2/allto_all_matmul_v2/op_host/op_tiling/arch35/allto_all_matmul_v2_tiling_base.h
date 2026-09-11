@@ -772,6 +772,6 @@ private:
 
 using AlltoAllMatmulV2TilingClass = MC2Tiling::AlltoAllMatmulV2TilingClass;
 REGISTER_TILING_TEMPLATE_WITH_ARCH(AlltoAllMatmulV2, AlltoAllMatmulV2TilingClass,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 1);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 1);
 
 #endif

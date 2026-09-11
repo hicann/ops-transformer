@@ -691,7 +691,7 @@ ge::graphStatus QuantReduceScatterUtilTiling::CheckNpuArch(const gert::TilingCon
                     return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
-    OP_TILING_CHECK(npuArch != NpuArch::DAV_3510,
+    OP_TILING_CHECK(npuArch != Ops::Base::DAV_3510,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "npuArch", "non-DAV_3510",
                                                           "The value of npuArch must be DAV_3510"),
                     return ge::GRAPH_FAILED);

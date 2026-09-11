@@ -179,7 +179,7 @@ class MatmulReduceScatterV2CcuModeTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        op::SetPlatformNpuArch(NpuArch::DAV_3510);
+        op::SetPlatformNpuArch(Ops::Base::DAV_3510);
         cout << "MatmulReduceScatterV2CcuModeTest SetUp" << endl;
     }
     static void TearDownTestCase()

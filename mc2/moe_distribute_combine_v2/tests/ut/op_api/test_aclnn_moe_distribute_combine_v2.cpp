@@ -73,7 +73,7 @@ TEST(MoeDistributeCombineV2BaseCoverageTest, TestBaseGetWorkspaceSize950Ccu)
 {
     EXPECT_EXIT(
         {
-            op::SetPlatformNpuArch(NpuArch::DAV_3510);
+            op::SetPlatformNpuArch(Ops::Base::DAV_3510);
             (void)CallBaseGetWorkspaceSize("test_moe_distribute_combine_tp", "ccu");
             std::exit(0);
         },

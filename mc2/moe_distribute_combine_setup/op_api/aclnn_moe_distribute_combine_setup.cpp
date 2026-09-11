@@ -21,6 +21,7 @@
 #include "opdev/op_log.h"
 #include "opdev/common_types.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 #include "mc2_log_compat.h"
 
 namespace {
@@ -146,11 +147,11 @@ extern "C" aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
     aclTensor *quantExpandXOut, aclTensor *commCmdInfoOut, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_LOGD("aclnnMoeDistributeCombineSetupGetWorkspaceSize start.");
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             "aclnnMoeDistributeCombineSetup", "npuArch",
             std::to_string(static_cast<int64_t>(GetCurrentPlatformInfo().GetCurNpuArch())).c_str(),
-            "only support NpuArch::DAV_3510");
+            "only support Ops::Base::DAV_3510");
         return ACLNN_ERR_PARAM_INVALID;
     }
 

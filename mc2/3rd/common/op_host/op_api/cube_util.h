@@ -14,6 +14,7 @@
 #include "op_api/op_api_def.h"
 #include "opdev/common_types.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 
 namespace Ops {
 namespace Transformer {
@@ -41,8 +42,8 @@ bool NeedCubeGoHF32(const op::DataType cubeTensorPromoteType, int8_t cubeMathTyp
 // 检查针对x芯片，cube算子是否支持FP32
 inline bool IsCubeSupportFp32()
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2201 &&
-        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2201 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         return false;
     }
     return true;
@@ -51,8 +52,8 @@ inline bool IsCubeSupportFp32()
 // 检查针对x芯片，cube算子是否支持HF32
 inline bool IsCubeSupportHf32()
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_2201 &&
-        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2201 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         return false;
     }
     return true;
