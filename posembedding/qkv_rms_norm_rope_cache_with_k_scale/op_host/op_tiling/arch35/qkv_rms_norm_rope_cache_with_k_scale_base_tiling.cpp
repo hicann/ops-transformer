@@ -337,6 +337,19 @@ ge::graphStatus QkvRmsNormRopeCacheWithKScaleBaseTiling::ValidateDtypes() const
                                               DtypeName(rule.expected)),
                     return ge::GRAPH_FAILED);
     }
+    // NoQuant does not write qScale; ACLNN may supply an internal placeholder.
+    if (qQuantMode_ != QQuantMode::NO_QUANT) {
+        const auto *qScaleDesc = context_->GetOutputDesc(Q_SCALE_INDEX);
+        OP_CHECK_IF(qScaleDesc == nullptr,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "qScale", "nullptr",
+                                                          "qScale descriptor is required when Q is quantized"),
+                    return ge::GRAPH_FAILED);
+        const auto expectedDtype = traits.usesMxScaleLayout ? ge::DT_FLOAT8_E8M0 : ge::DT_FLOAT;
+        OP_CHECK_IF(qScaleDesc->GetDataType() != expectedDtype,
+                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "qScale", DtypeName(qScaleDesc->GetDataType()),
+                                              DtypeName(expectedDtype)),
+                    return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
