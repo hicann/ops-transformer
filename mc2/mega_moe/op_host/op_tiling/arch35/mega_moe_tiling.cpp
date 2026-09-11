@@ -1518,11 +1518,12 @@ static ge::graphStatus CheckTensorListEntryMatchesReference(const gert::StorageS
     const std::string entryName = tensorName + "[" + std::to_string(tensorIndex) + "]";
     const uint32_t referenceDimNum = referenceShape->GetStorageShape().GetDimNum();
     const uint32_t currentDimNum = currentShape->GetStorageShape().GetDimNum();
-    OP_TILING_CHECK(
-        currentDimNum != referenceDimNum,
-        OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName, entryName.c_str(), (std::to_string(currentDimNum) + "D").c_str(),
-                                     (std::to_string(referenceDimNum) + "D").c_str()),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(currentDimNum != referenceDimNum,
+                    OP_LOGE(nodeName,
+                            "%s has %u dimensions, but %s[0] has %u dimensions; "
+                            "tensors in the same list must have matching dimensions.",
+                            entryName.c_str(), currentDimNum, tensorName.c_str(), referenceDimNum),
+                    return ge::GRAPH_FAILED);
 
     bool shapeMismatch = false;
     for (uint32_t dimIndex = 0; dimIndex < referenceDimNum && !shapeMismatch; ++dimIndex) {
@@ -1578,6 +1579,20 @@ static ge::graphStatus CheckTensorListInternalConsistency(const gert::TilingCont
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckWeightDimRelation(const gert::StorageShape *shape, uint32_t expectedDimNum,
+                                              uint32_t referenceDimNum, const char *tensorName,
+                                              const char *referenceName, const char *nodeName)
+{
+    const uint32_t actualDimNum = shape->GetStorageShape().GetDimNum();
+    OP_TILING_CHECK(
+        actualDimNum != expectedDimNum,
+        OP_LOGE(nodeName, "%s must have %s %s, but got %u and %u dimensions, respectively.", tensorName,
+                expectedDimNum == referenceDimNum ? "the same number of dimensions as" : "one more dimension than",
+                referenceName, actualDimNum, referenceDimNum),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 /*
  * 校验一侧专家的 weight 与 scale tensor 维数符合当前权重组织形式。
  */
@@ -1587,10 +1602,10 @@ static ge::graphStatus CheckWeightAndScaleDimNum(const gert::TilingContext *cont
     const auto &inputs = expertParams.inputs;
     const uint32_t scaleDimNum = weightDimNum + 1U;
     const std::string nameSuffix = std::string(" of ") + expertParams.expertTypeName;
-    const std::string weightOneName = "weight1" + nameSuffix;
-    const std::string weightTwoName = "weight2" + nameSuffix;
-    const std::string weightScalesOneName = "weight_scales1" + nameSuffix;
-    const std::string weightScalesTwoName = "weight_scales2" + nameSuffix;
+    const std::string weightOneName = "weight1[0]" + nameSuffix;
+    const std::string weightTwoName = "weight2[0]" + nameSuffix;
+    const std::string weightScalesOneName = "weight_scales1[0]" + nameSuffix;
+    const std::string weightScalesTwoName = "weight_scales2[0]" + nameSuffix;
 
     auto weightOneShape = context->GetDynamicInputShape(inputs.weightOne, 0);
     auto weightTwoShape = context->GetDynamicInputShape(inputs.weightTwo, 0);
@@ -1602,12 +1617,14 @@ static ge::graphStatus CheckWeightAndScaleDimNum(const gert::TilingContext *cont
     OP_CHECK_NULL_WITH_CONTEXT(context, weightScalesTwoShape);
 
     bool hasInvalidDimNum =
-        CheckTensorDimNum(weightOneShape, weightDimNum, weightOneName.c_str(), nodeName) != ge::GRAPH_SUCCESS ||
-        CheckTensorDimNum(weightTwoShape, weightDimNum, weightTwoName.c_str(), nodeName) != ge::GRAPH_SUCCESS ||
-        CheckTensorDimNum(weightScalesOneShape, scaleDimNum, weightScalesOneName.c_str(), nodeName) !=
-            ge::GRAPH_SUCCESS ||
-        CheckTensorDimNum(weightScalesTwoShape, scaleDimNum, weightScalesTwoName.c_str(), nodeName) !=
-            ge::GRAPH_SUCCESS;
+        CheckWeightDimRelation(weightOneShape, weightDimNum, weightDimNum, weightOneName.c_str(),
+                               "weight1[0] of MoE expert", nodeName) != ge::GRAPH_SUCCESS ||
+        CheckWeightDimRelation(weightTwoShape, weightDimNum, weightDimNum, weightTwoName.c_str(), weightOneName.c_str(),
+                               nodeName) != ge::GRAPH_SUCCESS ||
+        CheckWeightDimRelation(weightScalesOneShape, scaleDimNum, weightDimNum, weightScalesOneName.c_str(),
+                               weightOneName.c_str(), nodeName) != ge::GRAPH_SUCCESS ||
+        CheckWeightDimRelation(weightScalesTwoShape, scaleDimNum, weightDimNum, weightScalesTwoName.c_str(),
+                               weightTwoName.c_str(), nodeName) != ge::GRAPH_SUCCESS;
     return hasInvalidDimNum ? ge::GRAPH_FAILED : ge::GRAPH_SUCCESS;
 }
 
@@ -1633,7 +1650,7 @@ static ge::graphStatus CheckWeightScaleTrailingDim(const gert::TilingContext *co
     OP_TILING_CHECK(
         scaleOneMultiBase != WEIGHT_SCALE_MULTI_BASE_DIM_SIZE || scaleTwoMultiBase != WEIGHT_SCALE_MULTI_BASE_DIM_SIZE,
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(nodeName, scaleNames.c_str(), trailingDimensions.c_str(),
-                                               "The trailing dimension of each weight scale tensor must be 2."),
+                                               "The trailing dimension of each weight scale tensor must be 2"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1813,7 +1830,7 @@ static ge::graphStatus CheckWeightPairShapeRelations(const gert::TilingContext *
     OP_TILING_CHECK(weightOneColumnCount != weightTwoRowCount || weightOneColumnCount != xColumnCount,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         nodeName, expertParams.expertTypeName, commonMatrixDimensionsString.c_str(),
-                        "weight1 column count and weight2 row count must equal x column count."),
+                        "weight1 column count and weight2 row count must equal x column count"),
                     return ge::GRAPH_FAILED);
 
     const std::string weightRowColumnDimensionsString =
@@ -1821,7 +1838,7 @@ static ge::graphStatus CheckWeightPairShapeRelations(const gert::TilingContext *
     OP_TILING_CHECK(weightOneRowCount != weightTwoColumnCount * SWIGLU_GATE_UP_SPLIT_FACTOR,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         nodeName, expertParams.expertTypeName, weightRowColumnDimensionsString.c_str(),
-                        "weight1 row count must equal weight2 column count multiplied by 2."),
+                        "weight1 row count must equal weight2 column count multiplied by 2"),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1921,7 +1938,7 @@ static ge::graphStatus CheckWeightScaleShapeRelation(const gert::StorageShape *w
                         nodeName, (std::string(expertTypeName) + " " + weightScaleRole).c_str(),
                         (std::string("matrix dimension=") + std::to_string(weightScaleMatrixDimSize)).c_str(),
                         (std::string("The matrix dimension must equal the row count of ") + expertTypeName + " " +
-                         weightRole + "(" + std::to_string(weightRowCount) + ").")
+                         weightRole + "(" + std::to_string(weightRowCount) + ")")
                             .c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(weightScaleGroupDimSize != ops::CeilDiv(weightColumnCount, INPUT_WEIGHT_SCALES_CEIL_ALIGN),
@@ -1930,7 +1947,7 @@ static ge::graphStatus CheckWeightScaleShapeRelation(const gert::StorageShape *w
                         (std::string("group dimension=") + std::to_string(weightScaleGroupDimSize)).c_str(),
                         (std::string("The group dimension must equal CeilDiv(") + expertTypeName + " " + weightRole +
                          " column count, INPUT_WEIGHT_SCALES_CEIL_ALIGN) = " +
-                         std::to_string(ops::CeilDiv(weightColumnCount, INPUT_WEIGHT_SCALES_CEIL_ALIGN)) + ".")
+                         std::to_string(ops::CeilDiv(weightColumnCount, INPUT_WEIGHT_SCALES_CEIL_ALIGN)))
                             .c_str()),
                     return ge::GRAPH_FAILED);
 

@@ -129,9 +129,10 @@ __aicore__ inline void PublishExpertCounts(const MoeStageCommonConfig &common, G
      * 避开窗口零初值)，低 24 位为真实 count(上限 maxOutputSize 远小于 2^24)。
      * 接收端逐槽校验 epoch 后取低 24 位(见 token_dispatch.h PrepareMoeExpertTokenCountTable)。
      */
+    constexpr uint32_t EXPERT_COUNT_EPOCH_SHIFT = 24U; // Low 24 bits store the count; high 8 bits store the epoch.
     for (int32_t ownedIdx = 0; ownedIdx < ownedExpertNum; ++ownedIdx) {
         int32_t rawCount = scratch.sendCntAccTensor.GetValue(ownedIdx);
-        scratch.sendCntAccTensor.SetValue(ownedIdx, (arrivalEpoch << 24) | rawCount);
+        scratch.sendCntAccTensor.SetValue(ownedIdx, (arrivalEpoch << EXPERT_COUNT_EPOCH_SHIFT) | rawCount);
     }
 
     int32_t sourceRank = static_cast<int32_t>(common.rankId);
