@@ -145,6 +145,8 @@ public:
     TBuf<> stage2OutBuf;
     TEventID mte3ToVId[2]; // 存放MTE3_V的eventId, 2份表示可能存在pingpong
     TEventID vToMte3Id[2]; // 存放V_MTE3的eventId, 2份表示可能存在pingpong
+    TEventID vToMte2Id[2]; // 存放V_MTE2的eventId, 匹配keyAntiqScaleInputBuf的double buffer
+
     TBuf<> softmaxMaxBuf[PRELOAD_N];
     TBuf<> softmaxSumBuf[PRELOAD_N];
     TBuf<> softmaxExpBuf[PRELOAD_N];
@@ -440,20 +442,19 @@ public:
 
         auto expUb = this->softmaxExpBuf[runInfo.loop % PRELOAD_N].template Get<T>()[0];
         int64_t stage1Offset = runInfo.loop % DB;
-        int64_t kscaleOffset = (runInfo.s2Idx >> 8) & 1;
-
         float descaleQK = 1.0;
 
         // 加载qScale/kScale
         LocalTensor<float> qScaleUbTensor;
         LocalTensor<float> kScaleUbTensor;
         if (unlikely(runInfo.isFirstS2Loop)) {
+            WaitFlag<HardEvent::V_MTE2>(vToMte2Id[stage1Offset]);
             qScaleUbTensor = queryAntiqScaleInputBuf.template Get<float>();
             CopyQueryScaleTile(qScaleUbTensor, runInfo);
-            kScaleUbTensor = keyAntiqScaleInputBuf[kscaleOffset].template Get<float>();
+            kScaleUbTensor = keyAntiqScaleInputBuf[stage1Offset].template Get<float>();
             CopyKeyScaleTile(kScaleUbTensor, runInfo, false);
         } else {
-            kScaleUbTensor = keyAntiqScaleInputBuf[kscaleOffset].template Get<float>();
+            kScaleUbTensor = keyAntiqScaleInputBuf[stage1Offset].template Get<float>();
         }
 
         event_t mte2VEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
@@ -505,9 +506,11 @@ public:
                     negativeFloatScalar, 0.0F, maskLine);
             }
         }
+        SetFlag<HardEvent::V_MTE2>(vToMte2Id[stage1Offset]);
 
         if (likely(!runInfo.isLastS2Loop)) {
-            LocalTensor<float> kScaleUbNextTensor = keyAntiqScaleInputBuf[1 - kscaleOffset].template Get<float>();
+            WaitFlag<HardEvent::V_MTE2>(vToMte2Id[1 - stage1Offset]);
+            LocalTensor<float> kScaleUbNextTensor = keyAntiqScaleInputBuf[1 - stage1Offset].template Get<float>();
             CopyKeyScaleTile(kScaleUbNextTensor, runInfo, true);
         }
 
@@ -961,18 +964,28 @@ public:
         mte3ToVId[1] = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
         vToMte3Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
         vToMte3Id[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
+        vToMte2Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+        vToMte2Id[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+
         SetFlag<HardEvent::MTE3_V>(mte3ToVId[0]);
         SetFlag<HardEvent::MTE3_V>(mte3ToVId[1]);
+        SetFlag<HardEvent::V_MTE2>(vToMte2Id[0]);
+        SetFlag<HardEvent::V_MTE2>(vToMte2Id[1]);
     }
 
     __aicore__ inline void FreeEventID()
     {
         WaitFlag<AscendC::HardEvent::MTE3_V>(mte3ToVId[0]);
         WaitFlag<AscendC::HardEvent::MTE3_V>(mte3ToVId[1]);
+        WaitFlag<HardEvent::V_MTE2>(vToMte2Id[0]);
+        WaitFlag<HardEvent::V_MTE2>(vToMte2Id[1]);
+
         GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId[0]);
         GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId[1]);
         GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3Id[0]);
         GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3Id[1]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(vToMte2Id[0]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(vToMte2Id[1]);
     }
 
     __aicore__ inline int64_t ComputeMaskLineDN(RunInfoX &runInfo, uint32_t vecMIdx)
