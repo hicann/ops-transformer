@@ -32,7 +32,9 @@ struct MoeEpCombineEpilogueInfo {
     MoeEpDumpMetadata dumpMetadata;
     uint32_t hasTopkWeights = 0;
     uint32_t aivNum = 0;
+    uint64_t recvCapacity = 0;
     uint64_t totalUbSize = 0;
+    uint64_t metadataRankOffsetsOffset = 0;
     uint64_t combineStateWinOffset = 0;
     uint64_t combineDataWinOffset = 0;
 };

@@ -64,8 +64,9 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, Moe
     layout.slotWinStateOffset = layout.cntWinStateOffset + layout.cntWinStateSize;
     layout.dispatchSlotStateSize = layout.dispatchNotifyCount * epWorldSize * MOE_EP_WIN_ALIGN;
     layout.combineStateWinOffset = layout.slotWinStateOffset + layout.dispatchSlotStateSize;
-    const uint64_t combineReceiveStateSize =
-        nmt * topK * MOE_EP_WIN_ALIGN + epWorldSize * MOE_EP_COMBINE_CHANNEL_COUNT * MOE_EP_WIN_ALIGN;
+    const uint64_t combineFlagCount =
+        epWorldSize > MOE_EP_COMBINE_CHANNEL_HANDLE_COUNT ? epWorldSize : MOE_EP_COMBINE_CHANNEL_HANDLE_COUNT;
+    const uint64_t combineReceiveStateSize = nmt * topK * MOE_EP_WIN_ALIGN + combineFlagCount * MOE_EP_WIN_ALIGN;
     layout.combineFlagSourceWinOffset = layout.combineStateWinOffset + combineReceiveStateSize;
     // The non-inline asynchronous completion write must read from persistent window storage, not op workspace.
     // This source is separate from the receive flags cleared by Combine Epilogue.

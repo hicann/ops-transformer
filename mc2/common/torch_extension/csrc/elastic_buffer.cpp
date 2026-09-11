@@ -1238,7 +1238,8 @@ public:
                       const at::Tensor &numRecvTokensPerExpert, const c10::optional<at::Tensor> &topkWeights,
                       int64_t epWorldSize, int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank,
                       int64_t cclBufferSize);
-    CombineEpilogueTensorList MoeEpCombineEpilogue(const at::Tensor &topkIdx,
+    CombineEpilogueTensorList MoeEpCombineEpilogue(const at::Tensor &x, const at::Tensor &topkIdx,
+                                                   const at::Tensor &recvSrcMetadata,
                                                    const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize,
                                                    int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank,
                                                    int64_t cclBufferSize, at::Tensor &combinedX,
@@ -1821,10 +1822,14 @@ void Mc2Api::ElasticBuffer::MoeEpCombine(const at::Tensor &x, const at::Tensor &
 }
 
 Mc2Api::ElasticBuffer::CombineEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpCombineEpilogue(
-    const at::Tensor &topkIdx, const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize, int64_t epRankId,
-    int64_t numExperts, int64_t numMaxTokensPerRank, int64_t cclBufferSize, at::Tensor &combinedX,
+    const at::Tensor &x, const at::Tensor &topkIdx, const at::Tensor &recvSrcMetadata,
+    const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize, int64_t epRankId, int64_t numExperts,
+    int64_t numMaxTokensPerRank, int64_t cclBufferSize, at::Tensor &combinedX,
     const c10::optional<at::Tensor> &combinedTopkWeightsOpt)
 {
+    TORCH_CHECK(x.dim() == DIM_TWO, "x dims must be 2, but got ", x.dim());
+    TORCH_CHECK(topkIdx.dim() == DIM_TWO, "topk_idx dims must be 2, but got ", topkIdx.dim());
+    CheckMoeEpMetadataTensor(recvSrcMetadata, "recv_src_metadata", x.size(0), epWorldSize, x.device());
     EnsureMoeContext(cclBufferSize);
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
@@ -1834,9 +1839,9 @@ Mc2Api::ElasticBuffer::CombineEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpCom
                                                *combinedTopkWeightsOpt :
                                                at::empty({1}, combinedX.options().dtype(at::kFloat));
 
-    ACLNN_CMD(aclnnMoeEpCombineEpilogue, moeContextTensor_, topkIdx, epWorldSize, epRankId, numExperts,
-              numMaxTokensPerRank, moeCclBufferSize_, hasTopkWeights, topoType, rankNumPerServer, combinedX,
-              combinedTopkWeightsTensor);
+    ACLNN_CMD(aclnnMoeEpCombineEpilogue, moeContextTensor_, x, topkIdx, recvSrcMetadata, topkWeights, epWorldSize,
+              epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_, hasTopkWeights, topoType, rankNumPerServer,
+              combinedX, combinedTopkWeightsTensor);
 
     c10::optional<at::Tensor> combinedTopkWeightsOutput;
     if (hasTopkWeights) {

@@ -22,10 +22,13 @@ constexpr int64_t NETWORK_DIRECT = 0;
 constexpr int64_t NETWORK_HYBRID = 1;
 } // namespace
 
-static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *topkIdx, const aclTensor *combinedX)
+static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx,
+                                const aclTensor *recvSrcMetadata, const aclTensor *combinedX)
 {
     CHECK_RET(context != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(x != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(topkIdx != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(recvSrcMetadata != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(combinedX != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     return ACLNN_SUCCESS;
 }
@@ -53,7 +56,8 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_MTE
 };
 
-aclnnStatus MoeEpCombineEpilogueGetWorkspaceSize(const aclTensor *context, const aclTensor *topkIdx,
+aclnnStatus MoeEpCombineEpilogueGetWorkspaceSize(const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx,
+                                                 const aclTensor *recvSrcMetadata, const aclTensor *topkWeights,
                                                  int64_t epWorldSize, int64_t epRankId, int64_t numExperts,
                                                  int64_t numMaxTokensPerRank, int64_t cclBufferSize,
                                                  bool hasTopkWeights, int64_t topoType, int64_t rankNumPerServer,
@@ -61,27 +65,28 @@ aclnnStatus MoeEpCombineEpilogueGetWorkspaceSize(const aclTensor *context, const
                                                  uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     OP_LOGD("MoeEpCombineEpilogue", "Begin to do MoeEpCombineEpilogueGetWorkspaceSize");
-    auto retNotNull = CheckNotNull(context, topkIdx, combinedX);
+    auto retNotNull = CheckNotNull(context, x, topkIdx, recvSrcMetadata, combinedX);
     CHECK_RET(retNotNull == ACLNN_SUCCESS, retNotNull);
     auto retParams =
         CheckParams(epWorldSize, epRankId, numExperts, numMaxTokensPerRank, cclBufferSize, topoType, rankNumPerServer);
     CHECK_RET(retParams == ACLNN_SUCCESS, retParams);
 
-    return aclnnInnerMoeEpCombineEpilogueGetWorkspaceSize(
-        context, topkIdx, epWorldSize, epRankId, numExperts, numMaxTokensPerRank, cclBufferSize, hasTopkWeights,
-        topoType, rankNumPerServer, combinedX, combinedTopkWeights, workspaceSize, executor);
+    return aclnnInnerMoeEpCombineEpilogueGetWorkspaceSize(context, x, topkIdx, recvSrcMetadata, topkWeights,
+                                                          epWorldSize, epRankId, numExperts, numMaxTokensPerRank,
+                                                          cclBufferSize, hasTopkWeights, topoType, rankNumPerServer,
+                                                          combinedX, combinedTopkWeights, workspaceSize, executor);
 }
 
-aclnnStatus aclnnMoeEpCombineEpilogueGetWorkspaceSize(const aclTensor *context, const aclTensor *topkIdx,
-                                                      int64_t epWorldSize, int64_t epRankId, int64_t numExperts,
-                                                      int64_t numMaxTokensPerRank, int64_t cclBufferSize,
-                                                      bool hasTopkWeights, int64_t topoType, int64_t rankNumPerServer,
-                                                      aclTensor *combinedX, aclTensor *combinedTopkWeights,
-                                                      uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMoeEpCombineEpilogueGetWorkspaceSize(
+    const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx, const aclTensor *recvSrcMetadata,
+    const aclTensor *topkWeights, int64_t epWorldSize, int64_t epRankId, int64_t numExperts,
+    int64_t numMaxTokensPerRank, int64_t cclBufferSize, bool hasTopkWeights, int64_t topoType, int64_t rankNumPerServer,
+    aclTensor *combinedX, aclTensor *combinedTopkWeights, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    return MoeEpCombineEpilogueGetWorkspaceSize(
-        context, topkIdx, epWorldSize, epRankId, numExperts, numMaxTokensPerRank, cclBufferSize, hasTopkWeights,
-        topoType, rankNumPerServer, combinedX, combinedTopkWeights, workspaceSize, executor);
+    return MoeEpCombineEpilogueGetWorkspaceSize(context, x, topkIdx, recvSrcMetadata, topkWeights, epWorldSize,
+                                                epRankId, numExperts, numMaxTokensPerRank, cclBufferSize,
+                                                hasTopkWeights, topoType, rankNumPerServer, combinedX,
+                                                combinedTopkWeights, workspaceSize, executor);
 }
 
 extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
