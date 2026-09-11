@@ -124,9 +124,9 @@ if _TORCHAIR_AVAILABLE:
         )
 
     @register_fx_node_ge_converter(
-        torch.ops.cann_ops_transformer.minimax_sparse_attention_split_kv.default
+        torch.ops.custom.npu_minimax_sparse_attention_split_kv.default
     )
-    def convert_minimax_sparse_attention_split_kv(
+    def convert_npu_minimax_sparse_attention_split_kv(
         query: Tensor,
         key: Tensor,
         value: Tensor,
@@ -166,7 +166,7 @@ if _TORCHAIR_AVAILABLE:
 
 else:
 
-    def convert_minimax_sparse_attention_split_kv(*args, **kwargs):
+    def convert_npu_minimax_sparse_attention_split_kv(*args, **kwargs):
         raise RuntimeError(
             "GE converter requires torchair, but torchair is not available."
         )
