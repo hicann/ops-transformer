@@ -137,7 +137,7 @@ def get_sparse_offset(const_info, run_info, first_core_half_s2_base_size):
 def get_seqused(seq_dim, has_seqused, seqused_tensor, batch_id):
     seq_length = 0
     if has_seqused:
-        seq_length = seqused_tensor[batch_id]
+        seq_length = 0 + seqused_tensor[batch_id]
     else:
         seq_length = seq_dim
     return seq_length

@@ -382,7 +382,7 @@ def _vf_kahan_accumulate(
 def _get_start_pos(b_idx, start_pos, ctx):
     result = 0
     if start_pos is not None:
-        result = pl.getval(
+        result = 0 + pl.getval(
             pl.make_tensor(start_pos, [ctx.batch_size], [1], dtype=pl.DT_INT32), b_idx
         )
     return result
@@ -391,19 +391,27 @@ def _get_start_pos(b_idx, start_pos, ctx):
 def _get_seq_length(b_idx, cu_seqlens, ctx):
     result = ctx.seq_size
     if ctx.layout == 1:  # TH (1=TH)
-        result = pl.getval(
-            pl.make_tensor(cu_seqlens, [ctx.batch_size + 1], [1], dtype=pl.DT_INT32),
-            b_idx + 1,
-        ) - pl.getval(
-            pl.make_tensor(cu_seqlens, [ctx.batch_size + 1], [1], dtype=pl.DT_INT32),
-            b_idx,
+        result = (
+            0
+            + pl.getval(
+                pl.make_tensor(
+                    cu_seqlens, [ctx.batch_size + 1], [1], dtype=pl.DT_INT32
+                ),
+                b_idx + 1,
+            )
+            - pl.getval(
+                pl.make_tensor(
+                    cu_seqlens, [ctx.batch_size + 1], [1], dtype=pl.DT_INT32
+                ),
+                b_idx,
+            )
         )
     return result
 
 
 def _get_seq_used(b_idx, seq_used, cu_seqlens, ctx):
     if seq_used is not None:
-        result = pl.getval(
+        result = 0 + pl.getval(
             pl.make_tensor(seq_used, [ctx.batch_size], [1], dtype=pl.DT_INT32), b_idx
         )
     else:
@@ -418,7 +426,8 @@ def _get_token_idx(b_idx, s_idx, cu_seqlens, ctx):
     result = b_idx * ctx.seq_size + s_idx
     if ctx.layout == 1:
         result = (
-            pl.getval(
+            0
+            + pl.getval(
                 pl.make_tensor(
                     cu_seqlens, [ctx.batch_size + 1], [1], dtype=pl.DT_INT32
                 ),
