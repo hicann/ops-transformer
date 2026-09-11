@@ -22,9 +22,24 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+        this->Input("x")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_BF16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
         this->Input("topk_idx")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("recv_src_metadata")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("topk_weights")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
 

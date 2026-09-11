@@ -327,7 +327,8 @@ def _get_moe_ep_window_layout(
     ub_align = 32
     max_dispatch_channel_count = 56
     max_dispatch_notify_count = 8
-    combine_channel_count = 7
+    # Must match ElasticBuffer's direct-network MOE_CHANNEL_HANDLE_NUM reservation.
+    combine_channel_handle_count = 64
     max_out_dtype_size = 2
     metadata_dtype_size = 4
     state_dtype_size = 4
@@ -349,7 +350,7 @@ def _get_moe_ep_window_layout(
     )
     combine_state_size = (
         num_max_tokens_per_rank * topk * win_addr_align
-        + world_size * combine_channel_count * win_addr_align
+        + max(world_size, combine_channel_handle_count) * win_addr_align
         + win_addr_align  # Persistent constant source for asynchronous combine completion flags.
     )
     # payload 发送状态位区: 按每对端预留 notify 槽位数预留
@@ -1125,7 +1126,11 @@ class ElasticBuffer:
         )
 
         combined_x, combined_topk_weights = self._runtime.moe_ep_combine_epilogue(
+            x,
             handle.topk_idx,
+            _checked_handle_metadata_buffer(
+                handle, x.shape[0], self._ep_world_size, x.device
+            ),
             topk_weights,
             self._ep_world_size,
             self._rank_id,
