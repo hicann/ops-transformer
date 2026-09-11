@@ -32,13 +32,13 @@ quant_flash_attn HIF8 全量化（`quant_mode=0`，A8C8_QKV_HIF8_P_PER_TENSOR_SO
 source /home/user/Ascend/cann/set_env.sh
 conda activate your-env-name
 pip install pytest
-cd attention/quant_flash_attn/tests/pytest/fia_fullquant_hif8_test
+cd attention/quant_flash_attn/tests/pytest/qfa_hif8_test
 ```
 
 ## 3. 文件结构
 
 ```
-fia_fullquant_hif8_test/
+qfa_hif8_test/
 ├── pytest.ini                                  # pytest 配置（自定义 marker）
 ├── conftest.py                                 # pytest 命令行选项（--golden-mode, --cache-dir, --msprof, --parse-prof, --perf-baseline）
 ├── common/

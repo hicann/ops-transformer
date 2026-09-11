@@ -390,10 +390,10 @@ def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale):
     S_ij = S_ij.masked_fill(mask_j, float("-inf"))
 
     m_block_j, _ = torch.max(S_ij, dim=-1, keepdims=True)
+    m_block_j = m_block_j - ln_p_scale
     m_block_j = torch.max(mi, m_block_j)
-    m_block_j_copy = m_block_j - ln_p_scale
 
-    P_ij_raw = torch.exp(S_ij - m_block_j_copy)
+    P_ij_raw = torch.exp(S_ij - m_block_j)
     s_block_j = torch.sum(P_ij_raw, dim=-1, keepdims=True)
     P_ij_drop = hif8_cast_p(P_ij_raw)
 
