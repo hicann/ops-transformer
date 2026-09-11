@@ -58,6 +58,7 @@ struct WorkspaceLayout {
     int64_t flagDispatchToGmm1Offset{INVALID_WORKSPACE_OFFSET};
     int64_t flagSendCntCalToUpdParamsOffset{INVALID_WORKSPACE_OFFSET};
     int64_t flagGmmToEpilogueOffset{INVALID_WORKSPACE_OFFSET};
+    int64_t flagTopkValidIndexSyncOffset{INVALID_WORKSPACE_OFFSET}; // 每个 block 的 AIV1 子组同步阶段。
     int64_t gmm2ReadyOffset{INVALID_WORKSPACE_OFFSET};
     int64_t gmm2CombineSyncCounterOffset{INVALID_WORKSPACE_OFFSET};
     int64_t cumsumInfoOffset{INVALID_WORKSPACE_OFFSET};
@@ -204,6 +205,10 @@ private:
             workspaceSize +=
                 SIZE_INT_32 * tokenGroupCount * static_cast<int64_t>(tilingData->sharedExpertNum) * INT_CACHELINE;
         }
+        if (tilingData->sharedExpertNum > 0 && tilingData->topoType == TOPO_TYPE_MTE) {
+            flagTopkValidIndexSyncOffset = workspaceSize;
+            workspaceSize += static_cast<int64_t>(tilingData->aicNum) * INT_CACHELINE * SIZE_INT_32;
+        }
         flagResetElementCount = (workspaceSize - flagRegionBeginOffset) / SIZE_INT_32;
 
         // 按 GMM 实现路径和 Combine 量化模式分配条件 workspace；host 侧 GMM mode 与 kernel 的
@@ -335,6 +340,7 @@ struct WorkspaceInfo {
     GM_ADDR flagDispatchToGmm1Ptr{nullptr};
     GM_ADDR flagSendCntCalToUpdParamsPtr{nullptr};
     GM_ADDR flagGmmToEpiloguePtr{nullptr};
+    GM_ADDR flagTopkValidIndexSyncPtr{nullptr};
     GM_ADDR gmm2ReadyPtr{nullptr};
     GM_ADDR gmm2CombineSyncCounterPtr{nullptr};
     GM_ADDR cumsumInfoPtr{nullptr};
@@ -382,6 +388,7 @@ public:
         flagDispatchToGmm1Ptr = ResolveWorkspaceAddress(base, layout.flagDispatchToGmm1Offset);
         flagSendCntCalToUpdParamsPtr = ResolveWorkspaceAddress(base, layout.flagSendCntCalToUpdParamsOffset);
         flagGmmToEpiloguePtr = ResolveWorkspaceAddress(base, layout.flagGmmToEpilogueOffset);
+        flagTopkValidIndexSyncPtr = ResolveWorkspaceAddress(base, layout.flagTopkValidIndexSyncOffset);
         gmm2ReadyPtr = ResolveWorkspaceAddress(base, layout.gmm2ReadyOffset);
         gmm2CombineSyncCounterPtr = ResolveWorkspaceAddress(base, layout.gmm2CombineSyncCounterOffset);
         cumsumInfoPtr = ResolveWorkspaceAddress(base, layout.cumsumInfoOffset);

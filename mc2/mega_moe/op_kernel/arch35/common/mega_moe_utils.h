@@ -529,26 +529,70 @@ __aicore__ inline void WaitUntilGmFlagAtLeast(__gm__ int32_t *flagAddr, int32_t 
     }
 }
 
-// 全卡同步：各 AIV 按任务分工分摊 rank 握手，末尾执行本卡 AIV 同步。
-__aicore__ inline void CrossRankSyncInWorldSize(GM_ADDR rankSyncInWorldPtr, uint32_t rankId, uint32_t worldSize,
-                                                const AivJobContext &aivJob)
+// 同一 launch 内阶段由 0 单调推进到 1、2；公共输入屏障前由 ResetSyncStatus 清零。
+// 每个 topK 有效下标发送核独占一个 cache line，达到更晚阶段也表示已通过此前阶段。
+// 当前共享并行路径的发送核均为 AIV1，包括共享专家使用 A8W4 的场景。
+__aicore__ inline void SyncTopkValidIndexSendCores(GM_ADDR syncPtr, const AivJobContext &job, int32_t phase)
 {
-    if constexpr (g_coreType == AIC) {
-        return;
+    auto *arrivals = reinterpret_cast<__gm__ int32_t *>(syncPtr);
+    WriteGmByPassDCache(arrivals + job.jobIndex * INT_CACHELINE, phase);
+    for (uint32_t peer = 0; peer < job.totalJobs; ++peer) {
+        while (ReadGmByPassDCache(arrivals + peer * INT_CACHELINE) < phase) {
+            const int64_t pollStart = GetSystemCycle();
+            while (GetSystemCycle() - pollStart < GM_FLAG_POLL_BACKOFF_CYCLES) {
+            }
+        }
     }
-    __gm__ int32_t *syncRank = reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr);
-    __gm__ int32_t *syncCount = reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr + 48U * 1024U +
-                                                                   static_cast<uint64_t>(aivJob.jobIndex) * 64U);
-    int32_t count = ReadGmByPassDCache(syncCount) + 1;
-    for (uint32_t rankIdx = aivJob.jobIndex; rankIdx < worldSize; rankIdx += aivJob.totalJobs) {
-        __gm__ int32_t *remoteSyncAddr =
-            reinterpret_cast<__gm__ int32_t *>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
+}
+
+// 两种同步模式共用跨卡握手；逻辑分工和物理计数槽由调用方明确指定。
+__aicore__ inline int32_t CrossRankHandshakeInWorldSize(GM_ADDR rankSyncInWorldPtr, uint32_t rankId, uint32_t worldSize,
+                                                        const AivJobContext &syncJob, __gm__ int32_t *syncCount)
+{
+    auto *syncRank = reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr);
+    const int32_t count = ReadGmByPassDCache(syncCount) + 1;
+    for (uint32_t rankIdx = syncJob.jobIndex; rankIdx < worldSize; rankIdx += syncJob.totalJobs) {
+        auto *remoteSyncAddr = reinterpret_cast<__gm__ int32_t *>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
         WriteGmByPassDCache(remoteSyncAddr, count);
         GmSignalWaitBarrier(syncRank + rankIdx * INT_CACHELINE, count);
     }
     WriteGmByPassDCache(syncCount, count);
+    return count;
+}
+
+// Caller selects participating AIV cores; this entry performs full-AIV synchronization.
+__aicore__ inline void CrossRankSyncInWorldSize(GM_ADDR rankSyncInWorldPtr, uint32_t rankId, uint32_t worldSize,
+                                                const AivJobContext &aivJob)
+{
+    auto *syncCount =
+        reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr + RANK_SYNC_COUNTER_OFFSET_BYTES +
+                                           static_cast<uint64_t>(aivJob.jobIndex) * RANK_SYNC_COUNTER_SLOT_BYTES);
+    CrossRankHandshakeInWorldSize(rankSyncInWorldPtr, rankId, worldSize, aivJob, syncCount);
     PipeBarrier<PIPE_ALL>();
     SyncAll<true>();
+}
+
+/*
+ * Caller passes a logical block job and the first physical AIV counter of that block.
+ * Only AIV1 participates; core selection belongs to SyncInputAcrossRanks.
+ */
+template <bool Aiv1Only>
+__aicore__ inline void CrossRankSyncInWorldSize(GM_ADDR rankSyncInWorldPtr, uint32_t rankId, uint32_t worldSize,
+                                                const AivJobContext &syncJob, uint32_t firstPhysicalCoreIdx,
+                                                GM_ADDR sendCoreSyncPtr)
+{
+    static_assert(Aiv1Only, "Use the four-argument entry for full-AIV synchronization.");
+    int32_t phase = 0;
+    // All local route producers must finish before publishing rank readiness.
+    SyncTopkValidIndexSendCores(sendCoreSyncPtr, syncJob, ++phase);
+    auto *syncCount =
+        reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr + RANK_SYNC_COUNTER_OFFSET_BYTES +
+                                           static_cast<uint64_t>(firstPhysicalCoreIdx) * RANK_SYNC_COUNTER_SLOT_BYTES);
+    const int32_t count = CrossRankHandshakeInWorldSize(rankSyncInWorldPtr, rankId, worldSize, syncJob, syncCount);
+    // Handshake updated AIV0; update AIV1 for the later full-AIV output synchronization.
+    WriteGmByPassDCache(syncCount + RANK_SYNC_COUNTER_SLOT_BYTES / sizeof(int32_t), count);
+    PipeBarrier<PIPE_ALL>();
+    SyncTopkValidIndexSendCores(sendCoreSyncPtr, syncJob, ++phase);
 }
 
 template <AscendC::HardEvent event, int32_t eventId>

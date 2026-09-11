@@ -15,6 +15,10 @@
 
 namespace MegaMoeImpl {
 
+// Physical-AIV launch counters in the rank synchronization window (byte units).
+constexpr uint32_t RANK_SYNC_COUNTER_OFFSET_BYTES = 48U * 1024U;
+constexpr uint32_t RANK_SYNC_COUNTER_SLOT_BYTES = 64U;
+
 enum class MegaMoeActMode : uint8_t {
     SWIGLU = 0U,
     SITU = 1U,

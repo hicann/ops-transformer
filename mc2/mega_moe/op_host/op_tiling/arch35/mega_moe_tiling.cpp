@@ -1275,6 +1275,9 @@ static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData *tilingData)
             static_cast<uint64_t>(CalcSharedActivationFlagElementsPerExpert(static_cast<int64_t>(tilingData->bs))) *
             tilingData->sharedExpertNum;
     }
+    if (tilingData->sharedExpertNum > 0 && tilingData->topoType == TOPO_TYPE_MTE) {
+        flagElementCount += static_cast<uint64_t>(tilingData->aicNum) * INT_CACHELINE;
+    }
     return flagElementCount;
 }
 
@@ -1284,7 +1287,7 @@ static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData *tilingData)
 static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData *tilingData,
                                                    uint32_t moeActivationElementsPerByte,
                                                    uint32_t sharedActivationElementsPerByte,
-                                                   bool needsIndependentSharedQuant)
+                                                   bool needsIndependentSharedQuant, uint32_t topkValidIndexCoreNum)
 {
     uint64_t totalFlagElementCount = CalcHostFlagElementCount(tilingData);
     uint32_t resetElementCountPerCore =
@@ -1303,8 +1306,9 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData *tili
     }
 
     uint32_t quantInputBufferBytes = ops::CeilAlign(tilingData->h, static_cast<uint32_t>(ALIGN_128)) * sizeof(uint16_t);
+    // sendCntAccTensor_ 按每个 topK 有效下标计算发送核负责的最大专家数分配，与 kernel 地址布局一致。
     uint32_t maxExpertCountPerCore =
-        ops::CeilDiv(tilingData->epWorldSize * tilingData->moeExpertPerRank, tilingData->blockAivNum);
+        ops::CeilDiv(tilingData->epWorldSize * tilingData->moeExpertPerRank, topkValidIndexCoreNum);
     uint32_t sendCountAccumulatorBytes = static_cast<uint32_t>(ops::CeilAlign(
         static_cast<uint64_t>(maxExpertCountPerCore) * sizeof(int32_t), static_cast<uint64_t>(ALIGN_32)));
     // mxTempTensor_ 占 2KB，xOutTensor_ 和 xInTensor_ 各使用双 buffer。
@@ -1322,16 +1326,19 @@ static void SetTopkValidIndexBufferConfigs(MegaMoeTilingData *tilingData, uint32
                                            uint32_t sharedActivationElementsPerByte, bool needsIndependentSharedQuant,
                                            uint32_t availableUbBytes)
 {
-    uint32_t sendMaskFixedBufferBytes = CalcTopkValidIndexFixedBufferBytes(
-        tilingData, moeActivationElementsPerByte, sharedActivationElementsPerByte, needsIndependentSharedQuant);
+    const bool sharedMte = tilingData->sharedExpertNum > 0U && tilingData->topoType == TOPO_TYPE_MTE;
+    const uint32_t topkValidIndexCoreNum = sharedMte ? tilingData->aicNum : tilingData->blockAivNum;
+    uint32_t sendMaskFixedBufferBytes =
+        CalcTopkValidIndexFixedBufferBytes(tilingData, moeActivationElementsPerByte, sharedActivationElementsPerByte,
+                                           needsIndependentSharedQuant, topkValidIndexCoreNum);
 
     /*
-     * 与 kernel topK 有效下标发送的 expert 连续均衡分核一一对应。前 remainder 个 AIV job
-     * 各多处理一个 expert，因此只需预计算两套配置。
+     * 按发送核数均衡分配专家，前 remainder 个发送核多处理一个专家。
+     * 分别计算这两类发送核的 UB 配置。
      */
     uint32_t totalExpertCount = tilingData->epWorldSize * tilingData->moeExpertPerRank;
-    uint32_t expertCountPerCoreWithoutExtraExpert = totalExpertCount / tilingData->blockAivNum;
-    tilingData->sendMaskCoreCountWithExtraExpert = totalExpertCount % tilingData->blockAivNum;
+    uint32_t expertCountPerCoreWithoutExtraExpert = totalExpertCount / topkValidIndexCoreNum;
+    tilingData->sendMaskCoreCountWithExtraExpert = totalExpertCount % topkValidIndexCoreNum;
     uint32_t expertCountPerCoreWithExtraExpert = expertCountPerCoreWithoutExtraExpert + 1U;
     tilingData->sendMaskConfigForCoreWithExtraExpert = CalcTopkValidIndexBufferConfig(
         tilingData, sendMaskFixedBufferBytes, expertCountPerCoreWithExtraExpert, availableUbBytes);

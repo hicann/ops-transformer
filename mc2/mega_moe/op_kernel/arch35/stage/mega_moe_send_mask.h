@@ -227,8 +227,11 @@ __aicore__ inline void GatherAndSendExpertCompactRoutes(const AivJobContext &job
     for (int32_t bufferIdx = 0; bufferIdx < bufferConfig.bufferCount; ++bufferIdx) {
         WaitFlag<AscendC::HardEvent::MTE3_V>(static_cast<TEventID>(bufferIdx));
     }
-    __gm__ int32_t *launchCountSlot = reinterpret_cast<__gm__ int32_t *>(
-        params.peermemInfo.rankSyncInWorldPtr + 48U * 1024U + static_cast<uint64_t>(job.jobIndex) * 64U);
+    // 专家分配使用逻辑 job 编号，epoch 始终使用当前物理 AIV 的计数槽。
+    const uint32_t physicalCoreIdx = GetBlockIdx();
+    __gm__ int32_t *launchCountSlot =
+        reinterpret_cast<__gm__ int32_t *>(params.peermemInfo.rankSyncInWorldPtr + RANK_SYNC_COUNTER_OFFSET_BYTES +
+                                           static_cast<uint64_t>(physicalCoreIdx) * RANK_SYNC_COUNTER_SLOT_BYTES);
     // 本 launch epoch = 计数槽值+1(跨卡同步在本阶段之后执行,槽值仍为上一 launch)。
     int32_t arrivalEpoch = ((ReadGmByPassDCache(launchCountSlot) + 1) & 0x7F) | 0x80;
     PublishExpertCounts(common, winRankAddr, config, scratch, ownedExpertBegin, ownedExpertNum, arrivalEpoch);

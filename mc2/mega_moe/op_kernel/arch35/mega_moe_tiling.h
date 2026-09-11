@@ -87,7 +87,8 @@ constexpr uint32_t DEQUANT_FP32_SCALE_EXPANSION = 4U;
  * CalcDispatchBufferConfig 固定选中的 buffer 数后，用剩余 UB 扩大 batch，并向下对齐到 ALIGN_256。
  * 每个 route item 占 1 bit mask 和两个 int32 index，因此：
  *   maxRouteItems = routeItemBudgetBytes * 8 / 65。
- * CopyGMToGMPerToken 的 copyTmp、triple 和 event ID 三类槽位一一对应，统一使用 2~6 个 buffer。
+ * CopyGMToGMPerToken 的 copyTmp、triple 和 event ID 三类槽位一一对应，MTE 启动轮沿用自适应 2~6 个 buffer，稳态使用前 2
+ * 个槽，UB 地址保持不变。
  */
 constexpr int32_t MIN_DISPATCH_BUFFER_COUNT = 2;
 constexpr int32_t MAX_DISPATCH_BUFFER_COUNT = 6;
