@@ -255,7 +255,7 @@ static aclnnStatus CheckParams(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParam
     QGMM_INPLACE_ADD_CHECK_REPORT(
         params.groupSize == 0, return ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_VALUE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "groupSize", std::to_string(params.groupSize), "0"));
-    CHECK_RET(CheckNotNull(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckNotNull(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckFormat(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckShape(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckDtype(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
@@ -373,7 +373,7 @@ static aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSizeCommon(
     }
     // 固定写法，参数检查
     ret = CheckParams(params);
-    CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     bool transposeX = gmm::IsTransposeLastTwoDims(params.x1);      // check is transpose x
     bool transposeWeight = gmm::IsTransposeLastTwoDims(params.x2); // check is transpose weight
     // when the last two dims of weight are (1, 1), consider tranB as false
