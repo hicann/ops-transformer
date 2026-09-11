@@ -10,7 +10,6 @@
 from typing import List, Optional, Tuple
 
 import torch
-import torch_npu
 from torch.library import impl
 
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
@@ -29,23 +28,6 @@ FP8_E4M3_BLOCK_SIZE = 32
 
 # 290 -> torch_npu.hifloat8（ACL_HIFLOAT8=34，hifloat8 以 uint8 存储时，须通过 *_dtype 显式指定）
 HIFLOAT8_DTYPE_ENUM = 290
-
-# shape 格式字段约束
-SUPPORTED_HE = (1024, 2048, 3072, 4096, 5120, 6144, 7168, 7680, 8192)
-SUPPORTED_HCQ = (1536, 2048)
-SUPPORTED_D = (128, 192)
-HCKV = 512
-DR = 64
-NKV = 1
-BLOCK_SIZE_MIN = 16
-BLOCK_SIZE_MAX = 1024
-DTILE_NON_PTPG = 512
-DTILE_PTPG = 656
-# N（Head-Num 多头数）支持 [1, 128] 之间的任意整型值
-HEAD_NUM_MIN = 1
-HEAD_NUM_MAX = 128
-PA_CACHE_MODES = ("PA_BSND", "PA_NZ", "PA_BLK_BSND", "PA_BLK_NZ")
-SUPPORTED_CACHE_MODES = PA_CACHE_MODES + ("BSND", "TND")
 
 
 def _has_defined(tensor: Optional[torch.Tensor]) -> bool:
@@ -86,232 +68,6 @@ def _resolve_rope_dim(
     return rope_sin.size(1)
 
 
-def _resolve_weight_dims(tensor: torch.Tensor) -> Tuple[int, int]:
-    """返回权重张量的逻辑行列数：2 维（ND）直接取 (s0, s1)；4 维（FRACTAL_NZ）取 (s0*16, s1*16)。"""
-    if tensor.dim() == 4:
-        return tensor.size(0) * 16, tensor.size(1) * 16
-    return tensor.size(0), tensor.size(1)
-
-
-def _require_fractal_nz(tensor: torch.Tensor, name: str) -> None:
-    """算子对 weight_dq/weight_uq_qr/weight_dkv_kr 严格要求 FRACTAL_NZ 格式，此处提前校验。"""
-    if tensor.device.type != "npu":
-        return
-    fmt = torch_npu.get_npu_format(tensor)
-    # 兼容返回 int（ACL 格式枚举值）或 Format 枚举的不同 torch_npu 版本
-    fmt_id = fmt.value if hasattr(fmt, "value") else int(fmt)
-    if fmt_id != 29:  # 29 = ACL_FORMAT_FRACTAL_NZ
-        raise ValueError(
-            f"{name} must be in FRACTAL_NZ format "
-            f"(use torch_npu.npu_format_cast(t, 29)), but got format {fmt}"
-        )
-
-
-def _validate_shape_constraints(
-    token_x: torch.Tensor,
-    weight_dq: torch.Tensor,
-    weight_uq_qr: torch.Tensor,
-    weight_uk: torch.Tensor,
-    weight_dkv_kr: torch.Tensor,
-    rmsnorm_gamma_cq: torch.Tensor,
-    rmsnorm_gamma_ckv: torch.Tensor,
-    kv_cache: torch.Tensor,
-    kr_cache: torch.Tensor,
-    rope_sin: Optional[torch.Tensor],
-    rope_cos: Optional[torch.Tensor],
-    cache_index: Optional[torch.Tensor],
-    cache_mode: str,
-    kv_cache_quant_mode: int,
-) -> None:
-    """校验接口的 shape 格式字段约束。"""
-    if token_x.dim() not in (DIM_2, DIM_3):
-        raise ValueError(
-            f"token_x dim num should be 2 or 3, but the actual value is {token_x.dim()}"
-        )
-    he = token_x.size(-1)
-    if type(he) is int and he not in SUPPORTED_HE:
-        raise ValueError(
-            f"head size He (token_x last dim) must be one of {SUPPORTED_HE}, but got {he}"
-        )
-    # B 约束：3 维时 B = size(0) 需在 [0, 65536] 内
-    if (
-        token_x.dim() == DIM_3
-        and type(token_x.size(0)) is int
-        and not (0 <= token_x.size(0) <= 65536)
-    ):
-        raise ValueError(
-            f"batch B (token_x.size(0)) must be in [0, 65536], but got {token_x.size(0)}"
-        )
-
-    if weight_uk.dim() != DIM_3:
-        raise ValueError(
-            f"weight_uk dim num should be 3, but the actual value is {weight_uk.dim()}"
-        )
-    head_num, qk_dim, kv_lora_rank = (
-        weight_uk.size(0),
-        weight_uk.size(1),
-        weight_uk.size(2),
-    )
-    if not (HEAD_NUM_MIN <= head_num <= HEAD_NUM_MAX):
-        raise ValueError(
-            f"head num N (weight_uk.size(0)) must be an integer in [{HEAD_NUM_MIN}, {HEAD_NUM_MAX}], "
-            f"but got {head_num}"
-        )
-    if type(qk_dim) is int and qk_dim not in SUPPORTED_D:
-        raise ValueError(
-            f"qk dim D (weight_uk.size(1)) must be one of {SUPPORTED_D}, but got {qk_dim}"
-        )
-    if type(kv_lora_rank) is int and kv_lora_rank != HCKV:
-        raise ValueError(
-            f"kv lora rank Hckv (weight_uk.size(2)) must be {HCKV}, but got {kv_lora_rank}"
-        )
-
-    dq_rows, hcq = _resolve_weight_dims(weight_dq)
-    _require_fractal_nz(weight_dq, "weight_dq")
-    if type(dq_rows) is int and dq_rows != he:
-        raise ValueError(f"weight_dq.size(0) ({dq_rows}) must equal He ({he})")
-    if type(hcq) is int and hcq not in SUPPORTED_HCQ:
-        raise ValueError(
-            f"q lora rank Hcq (weight_dq.size(1)) must be one of {SUPPORTED_HCQ}, but got {hcq}"
-        )
-
-    rope_dim = _resolve_rope_dim(token_x, rope_sin, weight_uk, weight_dkv_kr)
-    if type(rope_dim) is int and rope_dim != DR:
-        raise ValueError(f"qk rope dim Dr must be {DR}, but got {rope_dim}")
-    if _has_defined(rope_cos) and rope_cos.size(-1) != rope_dim:
-        raise ValueError("rope_sin and rope_cos last dim must be equal")
-
-    uq_rows, uq_cols = _resolve_weight_dims(weight_uq_qr)
-    _require_fractal_nz(weight_uq_qr, "weight_uq_qr")
-    if type(uq_rows) is int and uq_rows != hcq:
-        raise ValueError(f"weight_uq_qr.size(0) ({uq_rows}) must equal Hcq ({hcq})")
-    expected_uq_cols = head_num * (qk_dim + rope_dim)
-    if (
-        type(uq_cols) is int
-        and type(expected_uq_cols) is int
-        and uq_cols != expected_uq_cols
-    ):
-        raise ValueError(
-            f"weight_uq_qr.size(1) ({uq_cols}) must equal N*(D+Dr) = {expected_uq_cols}"
-        )
-
-    dkv_rows, dkv_cols = _resolve_weight_dims(weight_dkv_kr)
-    _require_fractal_nz(weight_dkv_kr, "weight_dkv_kr")
-    if type(dkv_rows) is int and dkv_rows != he:
-        raise ValueError(f"weight_dkv_kr.size(0) ({dkv_rows}) must equal He ({he})")
-    expected_dkv_cols = kv_lora_rank + rope_dim
-    if (
-        type(dkv_cols) is int
-        and type(expected_dkv_cols) is int
-        and dkv_cols != expected_dkv_cols
-    ):
-        raise ValueError(
-            f"weight_dkv_kr.size(1) ({dkv_cols}) must equal Hckv+Dr = {expected_dkv_cols}"
-        )
-
-    if rmsnorm_gamma_cq.dim() != 1 or (
-        type(rmsnorm_gamma_cq.size(0)) is int and rmsnorm_gamma_cq.size(0) != hcq
-    ):
-        raise ValueError(
-            f"rmsnorm_gamma_cq must be 1D with shape [{hcq}], but got {tuple(rmsnorm_gamma_cq.shape)}"
-        )
-    if rmsnorm_gamma_ckv.dim() != 1 or (
-        type(rmsnorm_gamma_ckv.size(0)) is int
-        and rmsnorm_gamma_ckv.size(0) != kv_lora_rank
-    ):
-        raise ValueError(
-            f"rmsnorm_gamma_ckv must be 1D with shape [{kv_lora_rank}], "
-            f"but got {tuple(rmsnorm_gamma_ckv.shape)}"
-        )
-
-    _validate_cache_shapes(
-        kv_cache, kr_cache, cache_mode, kv_cache_quant_mode, rope_dim, cache_index
-    )
-
-
-def _validate_cache_shapes(
-    kv_cache: torch.Tensor,
-    kr_cache: torch.Tensor,
-    cache_mode: str,
-    kv_cache_quant_mode: int,
-    rope_dim: int,
-    cache_index: Optional[torch.Tensor],
-) -> None:
-    if cache_mode not in SUPPORTED_CACHE_MODES:
-        raise ValueError(
-            f"cache_mode must be one of {SUPPORTED_CACHE_MODES}, but got {cache_mode}"
-        )
-
-    if cache_mode == "TND":
-        if kv_cache.dim() != DIM_3 or kr_cache.dim() != DIM_3:
-            raise ValueError("when cache_mode is TND, kv_cache/kr_cache must be 3D")
-        if type(kv_cache.size(-2)) is int and kv_cache.size(-2) != NKV:
-            raise ValueError(
-                f"kv head num Nkv (kv_cache dim -2) must be {NKV}, but got {kv_cache.size(-2)}"
-            )
-        if type(kr_cache.size(-2)) is int and kr_cache.size(-2) != NKV:
-            raise ValueError(
-                f"kv head num Nkv (kr_cache dim -2) must be {NKV}, but got {kr_cache.size(-2)}"
-            )
-        if type(kr_cache.size(-1)) is int and kr_cache.size(-1) != rope_dim:
-            raise ValueError(
-                f"kr_cache last dim must equal Dr={rope_dim}, but got {kr_cache.size(-1)}"
-            )
-        _check_dtile(kv_cache, kv_cache_quant_mode)
-        return
-
-    if kv_cache.dim() != 4 or kr_cache.dim() != 4:
-        raise ValueError(
-            f"when cache_mode is {cache_mode}, kv_cache/kr_cache must be 4D"
-        )
-    if type(kv_cache.size(-2)) is int and kv_cache.size(-2) != NKV:
-        raise ValueError(
-            f"kv head num Nkv (kv_cache dim -2) must be {NKV}, but got {kv_cache.size(-2)}"
-        )
-    if type(kr_cache.size(-2)) is int and kr_cache.size(-2) != NKV:
-        raise ValueError(
-            f"kv head num Nkv (kr_cache dim -2) must be {NKV}, but got {kr_cache.size(-2)}"
-        )
-    if type(kr_cache.size(-1)) is int and kr_cache.size(-1) != rope_dim:
-        raise ValueError(
-            f"kr_cache last dim must equal Dr={rope_dim}, but got {kr_cache.size(-1)}"
-        )
-    _check_dtile(kv_cache, kv_cache_quant_mode)
-
-    if cache_mode in PA_CACHE_MODES:
-        if not _has_defined(cache_index):
-            raise ValueError(
-                f"when cache_mode is {cache_mode}, cache_index must be provided "
-                f"(PagedAttention cache modes require a non-empty cache_index)"
-            )
-        block_size = kv_cache.size(1)
-        if type(block_size) is int and not (
-            BLOCK_SIZE_MIN <= block_size <= BLOCK_SIZE_MAX and block_size % 16 == 0
-        ):
-            raise ValueError(
-                f"BlockSize (kv_cache dim 1) must be in [{BLOCK_SIZE_MIN}, {BLOCK_SIZE_MAX}] "
-                f"and a multiple of 16, but got {block_size}"
-            )
-        if (
-            type(kr_cache.size(1)) is int
-            and type(block_size) is int
-            and kr_cache.size(1) != block_size
-        ):
-            raise ValueError(
-                f"kr_cache dim 1 must equal BlockSize ({block_size}), but got {kr_cache.size(1)}"
-            )
-
-
-def _check_dtile(kv_cache: torch.Tensor, kv_cache_quant_mode: int) -> None:
-    dtile = kv_cache.size(-1)
-    expected_dtile = DTILE_PTPG if kv_cache_quant_mode == MODE_3 else DTILE_NON_PTPG
-    if type(dtile) is int and dtile != expected_dtile:
-        raise ValueError(
-            f"kv_cache last dim (Dtile) must be {expected_dtile} "
-            f"(kv_cache_quant_mode={kv_cache_quant_mode}), but got {dtile}"
-        )
-
-
 def _is_full_quant_kv(weight_quant_mode: int, kv_cache_quant_mode: int) -> bool:
     return (
         weight_quant_mode in (MODE_2, MODE_3, MODE_4, MODE_5)
@@ -334,6 +90,7 @@ def _meta_outputs(
     weight_dq: torch.Tensor,
     weight_uq_qr: torch.Tensor,
     weight_uk: torch.Tensor,
+    weight_dkv_kr: torch.Tensor,
     rope_sin: Optional[torch.Tensor],
     rope_cos: Optional[torch.Tensor],
     kr_cache: torch.Tensor,
@@ -374,8 +131,9 @@ def _meta_outputs(
     else:
         dequant_scale_q_nope = torch.empty([0], dtype=torch.float32, device="meta")
 
+    # 空输出占位 dtype 与 op_plugin npu_mla_prolog_v3 对齐
+    qn_dtype = torch.uint8 if is_hifloat8 else weight_uq_qr.dtype
     if query_norm_flag:
-        qn_dtype = torch.uint8 if is_hifloat8 else weight_uq_qr.dtype
         if token_x.dim() == DIM_3:
             query_norm = torch.empty(
                 [token_x.size(0), token_x.size(1), weight_dq.size(1)],
@@ -387,7 +145,7 @@ def _meta_outputs(
                 [token_x.size(0), weight_dq.size(1)], dtype=qn_dtype, device="meta"
             )
     else:
-        query_norm = torch.empty([0], dtype=torch.bfloat16, device="meta")
+        query_norm = torch.empty([0], dtype=weight_uq_qr.dtype, device="meta")
 
     if query_norm_flag and weight_quant_mode != 0:
         dsn0 = (
@@ -396,14 +154,19 @@ def _meta_outputs(
             else token_x.size(0)
         )
         if weight_quant_mode == MODE_3:
-            dtype = dequant_scale_x.dtype
+            qnorm_dtype = dequant_scale_x.dtype
             dim1 = weight_dq.size(1) // FP8_E4M3_BLOCK_SIZE
         else:
-            dtype = torch.float32
+            qnorm_dtype = torch.float32
             dim1 = 1
-        dequant_scale_q_norm = torch.empty([dsn0, dim1], dtype=dtype, device="meta")
+        dequant_scale_q_norm = torch.empty(
+            [dsn0, dim1], dtype=qnorm_dtype, device="meta"
+        )
     else:
-        dequant_scale_q_norm = torch.empty([0], dtype=torch.float32, device="meta")
+        empty_qnorm_dtype = (
+            dequant_scale_x.dtype if weight_quant_mode == MODE_3 else torch.float32
+        )
+        dequant_scale_q_norm = torch.empty([0], dtype=empty_qnorm_dtype, device="meta")
 
     return query, query_rope, dequant_scale_q_nope, query_norm, dequant_scale_q_norm
 
@@ -494,27 +257,12 @@ class MlaPrologOpBuilder(OpBuilder):
                 raise ValueError("token_x dim num should be 2 or 3")
             if weight_uk.dim() != DIM_3:
                 raise ValueError("weight_uk dim num should be 3")
-            _validate_shape_constraints(
-                token_x,
-                weight_dq,
-                weight_uq_qr,
-                weight_uk,
-                weight_dkv_kr,
-                rmsnorm_gamma_cq,
-                rmsnorm_gamma_ckv,
-                kv_cache,
-                kr_cache,
-                rope_sin,
-                rope_cos,
-                cache_index,
-                cache_mode,
-                kv_cache_quant_mode,
-            )
             return _meta_outputs(
                 token_x,
                 weight_dq,
                 weight_uq_qr,
                 weight_uk,
+                weight_dkv_kr,
                 rope_sin,
                 rope_cos,
                 kr_cache,
@@ -626,22 +374,6 @@ def mla_prolog(
             query、query_rope、dequant_scale_q_nope、query_norm、dequant_scale_q_norm。
     """
     _resolve_do_rope(rope_sin, rope_cos)
-    _validate_shape_constraints(
-        token_x,
-        weight_dq,
-        weight_uq_qr,
-        weight_uk,
-        weight_dkv_kr,
-        rmsnorm_gamma_cq,
-        rmsnorm_gamma_ckv,
-        kv_cache,
-        kr_cache,
-        rope_sin,
-        rope_cos,
-        cache_index,
-        cache_mode,
-        kv_cache_quant_mode,
-    )
     op_module = mla_prolog_op_builder.load()
     return op_module.mla_prolog(
         token_x,
