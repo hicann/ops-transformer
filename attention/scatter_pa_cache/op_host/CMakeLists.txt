@@ -20,6 +20,12 @@ if (BUILD_OPEN_PROJECT)
             COMPUTE_UNIT Ascend950PR_9599
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend350")
+        add_ops_compile_options(
+            OP_NAME ScatterPaCache
+            COMPUTE_UNIT Ascend350_355e
+            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
+        )
     else()
         add_ops_compile_options(
             OP_NAME ScatterPaCache
@@ -29,7 +35,6 @@ if (BUILD_OPEN_PROJECT)
         )
     endif()
 endif()
-
 
 if(NOT BUILD_OPS_RTY_KERNEL)
     add_op_to_compiled_list()
