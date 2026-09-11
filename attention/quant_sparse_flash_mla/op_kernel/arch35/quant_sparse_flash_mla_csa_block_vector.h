@@ -21,6 +21,7 @@
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "../../../sparse_flash_mla/op_kernel/arch35/common/get_kv_phy_addr_vf.h"
+#include "../../../sparse_flash_mla/op_kernel/arch35/common/smla_vector_common_arch35.h"
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else
@@ -205,14 +206,6 @@ private:
     __aicore__ inline void SoftmaxInitBuffer();
     __aicore__ inline void GetExtremeValue(T &negativeScalar);
     __aicore__ inline void InitSinksBuffer(ConstInfo &constInfo);
-    __aicore__ inline void CopyPhyAddrToGm(LocalTensor<uint32_t> kvPhyAddrUb, int64_t bS1Idx, int64_t s1Idx,
-                                           int64_t validS2, int64_t alignNum, GlobalTensor<uint32_t> &phyAddrGm,
-                                           uint32_t alignedSparseBlockCount);
-    __aicore__ inline void CopyPaTableToUb(LocalTensor<int32_t> blkTableUb, int64_t bIdx,
-                                           GlobalTensor<int32_t> &blockTableGm, uint32_t maxBlockNumPerBatch);
-    __aicore__ inline void CopySparseIdxToUb(LocalTensor<int32_t> sparseIdxUb, int64_t bS1Idx, int64_t s1Idx,
-                                             int64_t validS2, GlobalTensor<int32_t> &sparseIndicesGm,
-                                             uint32_t sparseBlockCount);
     __aicore__ inline void GetKVPhyAddrForKvType(
         uint32_t bN2StartIdx, uint32_t bN2EndIdx, uint32_t gS1StartIdx, uint32_t nextGs1Idx, bool hasActualSeqQlen,
         bool hasCuSeqlensQ, bool hasActualSeqKvlen, bool hasCuSeqlensKv, GlobalTensor<int32_t> actualSeqQlenGm,
@@ -1141,50 +1134,6 @@ __aicore__ inline int32_t CSABlockVec<TEMPLATE_ARGS>::CalcCurValidS2(uint32_t bI
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyPhyAddrToGm(LocalTensor<uint32_t> kvPhyAddrUb, int64_t bS1Idx,
-                                                                   int64_t s1Idx, int64_t validS2, int64_t alignNum,
-                                                                   GlobalTensor<uint32_t> &phyAddrGm,
-                                                                   uint32_t alignedSparseBlockCount)
-{
-    constexpr int64_t numPerBlock = 32;
-    DataCopyParams dataCopyParams;
-    dataCopyParams.blockCount = 1U;
-    dataCopyParams.blockLen = ((validS2 + alignNum - 1) / alignNum * alignNum) * sizeof(int64_t) / numPerBlock;
-    dataCopyParams.srcGap = 0U;
-    dataCopyParams.dstGap = 0U;
-    DataCopy(phyAddrGm[(bS1Idx + s1Idx) * alignedSparseBlockCount * 2], kvPhyAddrUb, dataCopyParams);
-}
-
-TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyPaTableToUb(LocalTensor<int32_t> blkTableUb, int64_t bIdx,
-                                                                   GlobalTensor<int32_t> &blockTableGm,
-                                                                   uint32_t maxBlockNumPerBatch)
-{
-    DataCopyExtParams dataCopyParams;
-    dataCopyParams.blockCount = 1U;
-    dataCopyParams.blockLen = maxBlockNumPerBatch * sizeof(int32_t);
-    dataCopyParams.srcStride = 0U;
-    dataCopyParams.dstStride = 0U;
-    DataCopyPadExtParams<int32_t> padParams;
-    DataCopyPad(blkTableUb, blockTableGm[bIdx * maxBlockNumPerBatch], dataCopyParams, padParams);
-}
-
-TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopySparseIdxToUb(LocalTensor<int32_t> sparseIdxUb, int64_t bS1Idx,
-                                                                     int64_t s1Idx, int64_t validS2,
-                                                                     GlobalTensor<int32_t> &sparseIndicesGm,
-                                                                     uint32_t sparseBlockCount)
-{
-    DataCopyExtParams dataCopyParams;
-    dataCopyParams.blockCount = 1U;
-    dataCopyParams.blockLen = validS2 * sizeof(int32_t);
-    dataCopyParams.srcStride = 0U;
-    dataCopyParams.dstStride = 0U;
-    DataCopyPadExtParams<int32_t> padParams;
-    DataCopyPad(sparseIdxUb, sparseIndicesGm[(bS1Idx + s1Idx) * sparseBlockCount], dataCopyParams, padParams);
-}
-
-TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
     uint32_t bN2StartIdx, uint32_t bN2EndIdx, uint32_t gS1StartIdx, uint32_t nextGs1Idx, bool hasActualSeqQlen,
     bool hasCuSeqlensQ, bool hasActualSeqKvlen, bool hasCuSeqlensKv, GlobalTensor<int32_t> actualSeqQlenGm,
@@ -1320,7 +1269,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             CalcPhyAddrValidInfo(isOriKv, actualS1Size, actualOriS2Size, restoredSize, constInfo);
 
         WaitFlag<AscendC::HardEvent::V_MTE2>(3);
-        CopyPaTableToUb(blkTableUb, bIdx, blockTableGm, maxBlockNumPerBatch);
+        AttentionCommon::CopyPaTableToUb(blkTableUb, bIdx, blockTableGm, maxBlockNumPerBatch);
         SetFlag<AscendC::HardEvent::MTE2_V>(8);
         WaitFlag<AscendC::HardEvent::MTE2_V>(8);
 
@@ -1340,7 +1289,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             uint16_t s2Loop = (curValidS2 + s2NumPerLoop - 1) / s2NumPerLoop;
             int32_t s2Tail = curValidS2 - (s2Loop - 1) * s2NumPerLoop;
             WaitFlag<AscendC::HardEvent::V_MTE2>(4);
-            CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, curValidS2, sparseIndicesGm, sparseBlockCount);
+            AttentionCommon::CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, curValidS2, sparseIndicesGm,
+                                               sparseBlockCount);
             SetFlag<AscendC::HardEvent::MTE2_V>(6);
 
             WaitFlag<AscendC::HardEvent::MTE2_V>(6);
@@ -1351,7 +1301,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             SetFlag<AscendC::HardEvent::V_MTE2>(4);
             SetFlag<AscendC::HardEvent::V_MTE3>(5);
             WaitFlag<AscendC::HardEvent::V_MTE3>(5);
-            CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, curValidS2, s2NumPerLoop, phyAddrGm, alignedSparseBlockCount);
+            AttentionCommon::CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, curValidS2, s2NumPerLoop, phyAddrGm,
+                                             alignedSparseBlockCount);
             SetFlag<AscendC::HardEvent::MTE3_V>(7);
 
             processedCount++;

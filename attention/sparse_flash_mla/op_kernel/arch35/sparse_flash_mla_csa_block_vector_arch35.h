@@ -25,6 +25,7 @@ using AscendC::Reg::StoreDist;
 
 #include "common/flash_decode.h"
 #include "common/get_kv_phy_addr_vf.h"
+#include "common/smla_vector_common_arch35.h"
 
 #if __has_include("../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h")
 #include "../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
@@ -283,14 +284,6 @@ private:
                                              GlobalTensor<int32_t> &cuSeqlensQGm, GlobalTensor<int32_t> &topkLengthGm,
                                              ConstInfo &constInfo, int32_t sparseBlockCount,
                                              const PhyAddrValidInfo &validInfo);
-    __aicore__ inline void CopyPhyAddrToGm(LocalTensor<uint32_t> kvPhyAddrUb, int64_t bS1Idx, int64_t s1Idx,
-                                           int64_t validS2, int64_t alignNum, GlobalTensor<uint32_t> &phyAddrGm,
-                                           uint32_t alignedSparseBlockCount);
-    __aicore__ inline void CopyPaTableToUb(LocalTensor<int32_t> blkTableUb, int64_t bIdx,
-                                           GlobalTensor<int32_t> &blockTableGm, uint32_t maxBlockNumPerBatch);
-    __aicore__ inline void CopySparseIdxToUb(LocalTensor<int32_t> sparseIdxUb, int64_t bS1Idx, int64_t s1Idx,
-                                             int64_t validS2, GlobalTensor<int32_t> &sparseIndicesGm,
-                                             uint32_t sparseBlockCount);
     /* VEC2_RES_T 表示bmm2ResUb当前的类型，VEC2_RES_T = Q_T那么不需要做Cast。另外，无效行场景当前默认需要做Cast */
     template <typename VEC2_RES_T>
     __aicore__ inline void Bmm2DataCopyOut(RunInfo &runInfo, ConstInfo &constInfo, LocalTensor<VEC2_RES_T> &vec2ResUb,
@@ -1583,50 +1576,6 @@ __aicore__ inline int32_t CSABlockVec<TEMPLATE_ARGS>::CalcCurValidS2(uint32_t bI
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyPhyAddrToGm(LocalTensor<uint32_t> kvPhyAddrUb, int64_t bS1Idx,
-                                                                   int64_t s1Idx, int64_t validS2, int64_t alignNum,
-                                                                   GlobalTensor<uint32_t> &phyAddrGm,
-                                                                   uint32_t alignedSparseBlockCount)
-{
-    constexpr int64_t numPerBlock = 32;
-    DataCopyParams dataCopyParams;
-    dataCopyParams.blockCount = 1U;
-    dataCopyParams.blockLen = ((validS2 + alignNum - 1) / alignNum * alignNum) * sizeof(int64_t) / numPerBlock;
-    dataCopyParams.srcGap = 0U;
-    dataCopyParams.dstGap = 0U;
-    DataCopy(phyAddrGm[(bS1Idx + s1Idx) * alignedSparseBlockCount * 2], kvPhyAddrUb, dataCopyParams);
-}
-
-TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyPaTableToUb(LocalTensor<int32_t> blkTableUb, int64_t bIdx,
-                                                                   GlobalTensor<int32_t> &blockTableGm,
-                                                                   uint32_t maxBlockNumPerBatch)
-{
-    DataCopyExtParams dataCopyParams;
-    dataCopyParams.blockCount = 1U;
-    dataCopyParams.blockLen = maxBlockNumPerBatch * sizeof(int32_t);
-    dataCopyParams.srcStride = 0U;
-    dataCopyParams.dstStride = 0U;
-    DataCopyPadExtParams<int32_t> padParams;
-    DataCopyPad(blkTableUb, blockTableGm[bIdx * maxBlockNumPerBatch], dataCopyParams, padParams);
-}
-
-TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopySparseIdxToUb(LocalTensor<int32_t> sparseIdxUb, int64_t bS1Idx,
-                                                                     int64_t s1Idx, int64_t validS2,
-                                                                     GlobalTensor<int32_t> &sparseIndicesGm,
-                                                                     uint32_t sparseBlockCount)
-{
-    DataCopyExtParams dataCopyParams;
-    dataCopyParams.blockCount = 1U;
-    dataCopyParams.blockLen = validS2 * sizeof(int32_t);
-    dataCopyParams.srcStride = 0U;
-    dataCopyParams.dstStride = 0U;
-    DataCopyPadExtParams<int32_t> padParams;
-    DataCopyPad(sparseIdxUb, sparseIndicesGm[(bS1Idx + s1Idx) * sparseBlockCount], dataCopyParams, padParams);
-}
-
-TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
     uint32_t bN2StartIdx, uint32_t bN2EndIdx, uint32_t gS1StartIdx, uint32_t nextGs1Idx, bool hasActualSeqQlen,
     bool hasCuSeqlensQ, bool hasActualSeqKvlen, bool hasCuSeqlensKv, GlobalTensor<int32_t> actualSeqQlenGm,
@@ -1777,7 +1726,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
 
         if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
             WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
-            CopyPaTableToUb(blkTableUb, bIdx, blockTableGm, maxBlockNumPerBatch);
+            AttentionCommon::CopyPaTableToUb(blkTableUb, bIdx, blockTableGm, maxBlockNumPerBatch);
             SetFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_BLKTABLE_READY);
             WaitFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_BLKTABLE_READY);
         }
@@ -1798,7 +1747,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             uint16_t s2Loop = (curValidS2 + s2NumPerLoop - 1) / s2NumPerLoop;
             int32_t s2Tail = curValidS2 - (s2Loop - 1) * s2NumPerLoop;
             WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
-            CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, curValidS2, sparseIndicesGm, sparseBlockCount);
+            AttentionCommon::CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, curValidS2, sparseIndicesGm,
+                                               sparseBlockCount);
             SetFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_SPARSEIDX_READY);
 
             WaitFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_SPARSEIDX_READY);
@@ -1819,7 +1769,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
             SetFlag<AscendC::HardEvent::V_MTE3>(INNERCORE_PHYADDR_KVADDR_READY);
             WaitFlag<AscendC::HardEvent::V_MTE3>(INNERCORE_PHYADDR_KVADDR_READY);
-            CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, curValidS2, s2NumPerLoop, phyAddrGm, alignedSparseBlockCount);
+            AttentionCommon::CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, curValidS2, s2NumPerLoop, phyAddrGm,
+                                             alignedSparseBlockCount);
             SetFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
 
             processedCount++;
