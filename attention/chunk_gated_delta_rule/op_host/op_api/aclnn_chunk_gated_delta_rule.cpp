@@ -161,8 +161,10 @@ aclnnStatus aclnnChunkGatedDeltaRuleGetWorkspaceSize(const aclTensor *query, con
     // 仅在Ascend950支持initialState 0或1轴非连续时传入非连续tensor，使用CreateView设置stride信息
     const auto &stateShape = initialState->GetViewShape();
     const auto &stateStrides = initialState->GetViewStrides();
-    CHECK_RET(stateShape.GetDimNum() == INITIAL_STATE_DIMS_NUM &&
-              stateStrides.size() == INITIAL_STATE_DIMS_NUM, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+    CHECK_COND(stateShape.GetDimNum() == INITIAL_STATE_DIMS_NUM && stateStrides.size() == INITIAL_STATE_DIMS_NUM,
+               ACLNN_ERR_INNER_CREATE_EXECUTOR,
+               "The number of dimensions of initialState should be %zu, but got dimNum=%zu, strides size=%zu",
+               INITIAL_STATE_DIMS_NUM, stateShape.GetDimNum(), stateStrides.size());
     auto initialState_ = initialState;
 
     const char *socName = aclrtGetSocName();
