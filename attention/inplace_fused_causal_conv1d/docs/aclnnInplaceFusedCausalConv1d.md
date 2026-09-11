@@ -340,7 +340,8 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
       <td>x（aclTensor*）</td>
       <td>输入/输出</td>
       <td>计算公式中的x，代表输入序列。卷积结果将原地更新至x。</td>
-      <td><ul><li>不支持空tensor。</li><li>prefill场景：shape为[cuSeqLen, dim]。</li><li>decode场景：shape为[cuSeqLen, dim]或[batch, seqLen, dim]。</li></ul></td>
+      <td><ul><li>不支持空tensor。</li><li>prefill场景：shape为[cuSeqLen, dim]。</li><li>decode场景：shape为[cuSeqLen, dim]或[batch, seqLen, dim]。</li>
+      <li>只支持token维 (2D为dim0，3D为dim1)非连续且stride大于等于1</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2-3</td>
@@ -360,7 +361,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
       <td>convStates（aclTensor*）</td>
       <td>输入/输出</td>
       <td>计算公式中的cacheState，代表缓存状态张量，存储各序列的历史token数据，各序列计算完成后原地更新。</td>
-      <td><ul><li>不支持空tensor。</li><li>shape为[..., stateLen, dim]，第0维的大小不固定。</li><li>stateLen == K-1+m，prefill场景下m=0，decode、PD混部场景下m=[0,7]。</li><li>m表示投机个数，映射numAcceptedTokens参数的值。</li></ul></td>
+      <td><ul><li>不支持空tensor。</li><li>shape为[..., stateLen, dim]，第0维的大小不固定。</li><li>stateLen == K-1+m，prefill场景下m=0，decode、PD混部场景下m=[0,7]。</li><li>m表示投机个数，映射numAcceptedTokens参数的值。</li><li>支持dim0和dim1非连续且stride大于等于1</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
       <td>3</td>
@@ -680,7 +681,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     - initialStateIdx[i] <= blockIdxLastScheduledToken[i]
     - blockIdxFirstScheduledToken[i] <= blockIdxLastScheduledToken[i]
     - blockIdxLastScheduledToken[i] < maxNumBlocks
-  - numAcceptedTokens分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
+  - numAcceptedTokens分为None和非None，非None情况下长度为batch，prefile对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
   - numComputedTokens中每个元素取值大于等于0。
   - cacheIndices的取值范围为[0, convStates.dim[0]-1],且值均不能相等（除非等于padSlotId）。
   - maxQueryLen = batch中的最大seqLen。
