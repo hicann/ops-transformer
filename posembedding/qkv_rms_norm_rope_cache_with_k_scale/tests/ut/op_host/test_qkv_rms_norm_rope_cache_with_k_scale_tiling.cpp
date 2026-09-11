@@ -507,6 +507,45 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxHeadRoutesSelectSingleVecto
     }
 }
 
+TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, ChecksQuantizedQScaleDtype)
+{
+    const std::array<std::pair<const char *, ge::DataType>, 3> scenes = {{
+        {"q16_k2_v2_tnd", ge::DT_FLOAT},
+        {"q16_k2_v2_tnd_to_ntd", ge::DT_FLOAT},
+        {"mrope_mx_h8_t129_current_route", ge::DT_FLOAT8_E8M0},
+    }};
+    const std::array<ge::DataType, 6> dtypes = {ge::DT_FLOAT, ge::DT_FLOAT16,       ge::DT_BF16,
+                                                ge::DT_INT8,  ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E8M0};
+    for (const auto &[caseName, expectedDtype] : scenes) {
+        const auto *baseCase = FindTilingCase(caseName);
+        ASSERT_NE(baseCase, nullptr);
+        for (const auto dtype : dtypes) {
+            SCOPED_TRACE(std::string(caseName) + ":" + std::to_string(dtype));
+            auto testCase = *baseCase;
+            testCase.qScale.dtype_ = dtype;
+            TilingInfo tilingInfo;
+            EXPECT_EQ(RunTiling(testCase, tilingInfo), dtype == expectedDtype);
+        }
+    }
+}
+
+TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, ChecksQScaleDtypeForDefaultQuantMode)
+{
+    const auto *baseCase = FindTilingCase("q16_k2_v2_tnd");
+    ASSERT_NE(baseCase, nullptr);
+    for (const auto *mode : {"<null>", "<empty>", "PerTokenPerHead"}) {
+        SCOPED_TRACE(mode);
+        for (const auto dtype : {ge::DT_FLOAT, ge::DT_FLOAT8_E8M0}) {
+            auto testCase = *baseCase;
+            testCase.mropeSection = "<empty>";
+            testCase.qQuantMode = mode;
+            testCase.qScale.dtype_ = dtype;
+            TilingInfo tilingInfo;
+            EXPECT_EQ(RunTiling(testCase, tilingInfo), dtype == ge::DT_FLOAT);
+        }
+    }
+}
+
 TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, MropeMxQTailWaveFallsBackToSingleTokenUnderUbPressure)
 {
     const auto *baseCase = FindTilingCase("mrope_mx_h8_t129_current_route");
