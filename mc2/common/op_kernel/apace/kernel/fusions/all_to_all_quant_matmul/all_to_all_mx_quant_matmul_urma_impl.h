@@ -39,7 +39,7 @@ namespace Apace {
 
 using namespace AscendC;
 using namespace Blaze::Gemm;
-using AscendC::Te::Get;
+using asc::te::get;
 using namespace Apace::AivComm;
 
 struct UrmaCommWaitPolicy {
@@ -50,7 +50,7 @@ struct UrmaCommWaitPolicy {
 };
 
 // 定义问题形状：[M, N, K, Batch]
-using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
 
 /**
  * @brief All2All-Matmul 核心实现类 (Hcomm GET 版本，计算通信融合)
@@ -86,17 +86,17 @@ public:
 
     // Layout 定义
     using LayoutA =
-        typename AscendC::Std::conditional_t<TransA, AscendC::Te::DNExtLayoutPtn, AscendC::Te::NDExtLayoutPtn>;
+        typename AscendC::Std::conditional_t<TransA, asc::te::dn_ext_layout_ptn, asc::te::nd_ext_layout_ptn>;
     using LayoutB =
-        typename AscendC::Std::conditional_t<TransB, AscendC::Te::DNExtLayoutPtn, AscendC::Te::NDExtLayoutPtn>;
-    using LayoutC = AscendC::Te::NDExtLayoutPtn;
-    using LayoutBias = AscendC::Te::NDExtLayoutPtn;
+        typename AscendC::Std::conditional_t<TransB, asc::te::dn_ext_layout_ptn, asc::te::nd_ext_layout_ptn>;
+    using LayoutC = asc::te::nd_ext_layout_ptn;
+    using LayoutBias = asc::te::nd_ext_layout_ptn;
     using BiasType = float;
-    using LayoutScaleA = typename AscendC::Te::FrameLayoutFormat<
-        AscendC::Std::conditional_t<TransA, AscendC::Te::ScaleADNLayoutPtn, AscendC::Te::ScaleANDLayoutPtn>,
+    using LayoutScaleA = typename asc::te::frame_layout_format<
+        AscendC::Std::conditional_t<TransA, asc::te::scalea_dn_layout_ptn, asc::te::scalea_nd_layout_ptn>,
         AscendC::Std::Int<SCALE_C0>>;
-    using LayoutScaleB = typename AscendC::Te::FrameLayoutFormat<
-        AscendC::Std::conditional_t<TransB, AscendC::Te::ScaleBDNLayoutPtn, AscendC::Te::ScaleBNDLayoutPtn>,
+    using LayoutScaleB = typename asc::te::frame_layout_format<
+        AscendC::Std::conditional_t<TransB, asc::te::scaleb_dn_layout_ptn, asc::te::scaleb_nd_layout_ptn>,
         AscendC::Std::Int<SCALE_C0>>;
 
     // 组件定义
@@ -183,18 +183,18 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
 
     baseParams_.selfWinAddr = reinterpret_cast<GM_ADDR>(udmaCtx_->commBufferAddrs[baseParams_.rankId]);
     uint32_t ubOffset = 0;
-    auto commBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset); // 用512B
+    auto commBuf = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset); // 用512B
     ubOffset += COMM_WORKSPACE_SIZE;
-    auto commScaleBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset); // 用512B
+    auto commScaleBuf = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset); // 用512B
     ubOffset += COMM_WORKSPACE_SIZE;
-    auto barrierBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
-    teamBarrier_.Init(barrierBuf.Get(), syncBuffer_, baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()));
+    auto barrierBuf = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset);
+    teamBarrier_.Init(barrierBuf.get(), syncBuffer_, baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()));
 
     allToAllA_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, tilingData->commTilingData, baseParams_.aGm,
-                                           commBuf.Get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()));
+                                           commBuf.get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()));
 
     allToAllScaleA_.Init(udmaCtx_, teamBarrier_, tilingData->scaleCommTilingData, baseParams_.scaleAGm,
-                         commScaleBuf.Get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()),
+                         commScaleBuf.get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()),
                          baseParams_.rankSize * baseParams_.rankDataBytes);
 }
 

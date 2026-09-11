@@ -121,7 +121,7 @@ __global__ __aicore__ void grouped_matmul_swiglu_quant_v2(GM_ADDR x, GM_ADDR xSc
     } else {
         if (QUANT_B_TRANS == GMM_SWIGLU_QUANT_NO_TRANS && QUANT_A_TRANS == GMM_SWIGLU_QUANT_NO_TRANS) {
             if constexpr (KERNEL_TYPE == GMM_SWIGLU_QUANT_TENSOR_LEVEL_KERNEL_TYPE && isMxFp8Input) {
-                GmmTensorApiSwigluQuantMxFp8Kernel<AscendC::Te::NDExtLayoutPtn, AscendC::Te::NDExtLayoutPtn>(
+                GmmTensorApiSwigluQuantMxFp8Kernel<asc::te::nd_ext_layout_ptn, asc::te::nd_ext_layout_ptn>(
                     x, weight, weightScale, xScale, weightAssistanceMatrix, smoothScale, groupList, y, yScale,
                     workspace, tiling);
             } else {
@@ -131,7 +131,7 @@ __global__ __aicore__ void grouped_matmul_swiglu_quant_v2(GM_ADDR x, GM_ADDR xSc
             }
         } else if (QUANT_B_TRANS == GMM_SWIGLU_QUANT_TRANS && QUANT_A_TRANS == GMM_SWIGLU_QUANT_NO_TRANS) {
             if constexpr (KERNEL_TYPE == GMM_SWIGLU_QUANT_TENSOR_LEVEL_KERNEL_TYPE && isMxFp8Input) {
-                GmmTensorApiSwigluQuantMxFp8Kernel<AscendC::Te::NDExtLayoutPtn, AscendC::Te::DNExtLayoutPtn>(
+                GmmTensorApiSwigluQuantMxFp8Kernel<asc::te::nd_ext_layout_ptn, asc::te::dn_ext_layout_ptn>(
                     x, weight, weightScale, xScale, weightAssistanceMatrix, smoothScale, groupList, y, yScale,
                     workspace, tiling);
             } else {

@@ -31,10 +31,10 @@ namespace Apace {
 using namespace AscendC;
 using namespace Apace::AivComm;
 
-using LayoutA = AscendC::Te::NDExtLayoutPtn;
-using LayoutB = AscendC::Te::DNExtLayoutPtn;
-using LayoutC = AscendC::Te::NDExtLayoutPtn;
-using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+using LayoutA = asc::te::nd_ext_layout_ptn;
+using LayoutB = asc::te::dn_ext_layout_ptn;
+using LayoutC = asc::te::nd_ext_layout_ptn;
+using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
 
 template <typename AType, typename BType, typename CType>
 class AllGatherMxMatmulUrmaImpl {
@@ -141,12 +141,12 @@ __aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::Init(
 
     // 静态 tensor 替代 tpipe buffer
     uint32_t ubOffset = 0;
-    auto commBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
+    auto commBuf = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset);
     ubOffset += COMM_WORKSPACE_SIZE;
-    auto commScaleBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
+    auto commScaleBuf = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset);
     ubOffset += COMM_WORKSPACE_SIZE;
-    auto barrierBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
-    teamBarrier_.Init(barrierBuf.Get(), ubmemCtx_, rankSize_, static_cast<uint32_t>(GetBlockIdx()));
+    auto barrierBuf = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset);
+    teamBarrier_.Init(barrierBuf.get(), ubmemCtx_, rankSize_, static_cast<uint32_t>(GetBlockIdx()));
 
     commTilingData_.splitAxisTileSize = tileM_;  // 每个 tile 搬 tileM 行
     commTilingData_.splitAxisTileCnt = tileCnt_; // head 段 tile 数量
@@ -161,9 +161,9 @@ __aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::Init(
     commTilingScale_.splitAxisTailCnt = tailCnt_;
     scaleKLen_ = scaleKGroups_ * static_cast<uint64_t>(Blaze::Gemm::MXFP_MULTI_BASE_SIZE);
     commTilingScale_.nonSplitAxisSize = scaleKLen_;
-    allGatherData_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_, aGM_, commBuf.Get(), rankSize_,
+    allGatherData_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_, aGM_, commBuf.get(), rankSize_,
                                                static_cast<uint32_t>(GetBlockIdx()));
-    allGatherScale_.Init(udmaCtx_, teamBarrier_, commTilingScale_, aScaleGM_, commScaleBuf.Get(), rankSize_,
+    allGatherScale_.Init(udmaCtx_, teamBarrier_, commTilingScale_, aScaleGM_, commScaleBuf.get(), rankSize_,
                          static_cast<uint32_t>(GetBlockIdx()), dataRegionBytes_);
 }
 

@@ -25,10 +25,10 @@ namespace Block {
 template <uint32_t SwizzleOffset = 1, uint32_t SwizzleDirection = 0>
 class BlockSchedulerSwizzle {
 public:
-    using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t>;
-    using BlockShape = AscendC::Te::Shape<int64_t, int64_t, int64_t>;
-    using BlockCoord = AscendC::Te::Coord<int64_t, int64_t, int64_t>;
-    using TileShape = AscendC::Te::Shape<int64_t, int64_t>;
+    using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t>;
+    using BlockShape = asc::te::shape<int64_t, int64_t, int64_t>;
+    using BlockCoord = asc::te::coord<int64_t, int64_t, int64_t>;
+    using TileShape = asc::te::shape<int64_t, int64_t>;
 
     struct Params {
         TileShape tileShape;

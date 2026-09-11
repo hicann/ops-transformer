@@ -42,19 +42,17 @@ __aicore__ inline void AllGatherQuantMatmulUbmemKernelImpl(GM_ADDR hcclContext, 
     using TypeC = bfloat16_t;
     using BiasType = float;
 
-    using LayoutA = AscendC::Te::NDExtLayoutPtn;
-    using LayoutB =
-        typename AscendC::Std::conditional_t<!isX2Nz, AscendC::Te::DNExtLayoutPtn, AscendC::Te::NZLayoutPtn>;
-    using LayoutC = AscendC::Te::NDExtLayoutPtn;
+    using LayoutA = asc::te::nd_ext_layout_ptn;
+    using LayoutB = typename AscendC::Std::conditional_t<!isX2Nz, asc::te::dn_ext_layout_ptn, asc::te::nz_layout_ptn>;
+    using LayoutC = asc::te::nd_ext_layout_ptn;
 
     using DispatchPolicy = MatmulWithScaleMx<0, false>;
     using BlockMmad =
         Block::BlockMmad<DispatchPolicy, TypeA, LayoutA, TypeB, LayoutB, TypeC, LayoutC, BiasType, LayoutC>;
-    using BlockScheduler =
-        Block::BlockSchedulerQuantBatchMatmulV3<AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>, 0, LayoutA,
-                                                LayoutB, TypeA>;
+    using BlockScheduler = Block::BlockSchedulerQuantBatchMatmulV3<asc::te::shape<int64_t, int64_t, int64_t, int64_t>,
+                                                                   0, LayoutA, LayoutB, TypeA>;
     using BlockEpilogue = Block::BlockEpilogueEmpty;
-    using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+    using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
 
     using Impl = Apace::AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
     using KernelImpl = typename Impl::KernelImpl;

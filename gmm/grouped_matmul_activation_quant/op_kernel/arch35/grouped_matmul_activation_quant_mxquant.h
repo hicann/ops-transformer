@@ -52,9 +52,9 @@ __aicore__ inline void GmmActivationMxQuant(GM_ADDR x, GM_ADDR weight, GM_ADDR w
     using MmadCType = float;
     using LayoutA = layoutA;
     using LayoutB = layoutB;
-    using LayoutC = AscendC::Te::NDExtLayoutPtn;
+    using LayoutC = asc::te::nd_ext_layout_ptn;
     using BiasType = float;
-    using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+    using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
     using BlockMmadPolicy =
         Blaze::Gemm::GroupedMatmulWithScaleMx<0, false, Blaze::Gemm::KernelGroupedMmadWithScaleMxActivationQuant>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<BlockMmadPolicy, AType, LayoutA, BType, LayoutB, MmadCType, LayoutC,

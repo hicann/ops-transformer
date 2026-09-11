@@ -55,12 +55,12 @@ public:
     __aicore__ inline void Run();
 
     // Layout 定义
-    using LayoutA = AscendC::Te::NDExtLayoutPtn;
-    using LayoutB = AscendC::Te::DNExtLayoutPtn;
-    using LayoutC = AscendC::Te::NDExtLayoutPtn;
-    using LayoutBias = AscendC::Te::NDExtLayoutPtn;
+    using LayoutA = asc::te::nd_ext_layout_ptn;
+    using LayoutB = asc::te::dn_ext_layout_ptn;
+    using LayoutC = asc::te::nd_ext_layout_ptn;
+    using LayoutBias = asc::te::nd_ext_layout_ptn;
     using BiasType = float;
-    using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+    using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
 
     // 组件定义
     using BlockScheduler =
@@ -165,11 +165,11 @@ __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::In
     baseParams_.selfWinAddr = reinterpret_cast<GM_ADDR>(udmaCtx_->commBufferAddrs[baseParams_.rankId]);
 
     uint32_t ubOffset = 0;
-    auto commPtr = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
+    auto commPtr = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset);
     ubOffset += COMM_WORKSPACE_SIZE;
-    auto barrierPtr = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
-    teamBarrier_.Init(barrierPtr.Get(), barrierCtx_, udmaCtx_->rankSize, static_cast<uint32_t>(GetBlockIdx()));
-    allToAll_.Init(udmaCtx_, teamBarrier_, tilingData->commTilingData, cGM, commPtr.Get(),
+    auto barrierPtr = asc::te::make_mem_ptr<asc::te::location::ub, uint8_t>(ubOffset);
+    teamBarrier_.Init(barrierPtr.get(), barrierCtx_, udmaCtx_->rankSize, static_cast<uint32_t>(GetBlockIdx()));
+    allToAll_.Init(udmaCtx_, teamBarrier_, tilingData->commTilingData, cGM, commPtr.get(),
                    static_cast<uint32_t>(udmaCtx_->rankSize), static_cast<uint32_t>(GetBlockIdx()));
 }
 

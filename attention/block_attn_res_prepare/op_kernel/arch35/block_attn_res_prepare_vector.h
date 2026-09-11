@@ -138,52 +138,51 @@ private:
     template <typename T>
     __aicore__ inline static __ubuf__ T *GetUbAddr(uint64_t byteOffset)
     {
-        return AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, T>(byteOffset).Get();
+        return asc::te::make_mem_ptr<asc::te::location::ub, T>(byteOffset).get();
     }
 
     template <typename T>
     __aicore__ inline static auto MakeGmTensor(__gm__ T *address, int64_t rows, int64_t columns)
     {
-        return AscendC::Te::MakeTensor(
-            AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(address),
-            AscendC::Te::MakeFrameLayout<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<T>>(rows,
-                                                                                                          columns));
+        return asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::gm>(address),
+            asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<T>>(rows, columns));
     }
 
     template <typename T, typename GmTensor>
     __aicore__ inline static void CopyGmToUb(uint64_t dstByteOffset, const GmTensor &srcTensor, int64_t rowIndex,
                                              int64_t columnIndex, int64_t validElements, int64_t ubPitch)
     {
-        auto ubStorageTensor = AscendC::Te::MakeTensor(
-            AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, T>(dstByteOffset),
-            AscendC::Te::MakeFrameLayout<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<T>>(1, ubPitch));
-        auto ubTensor = ubStorageTensor.Slice(AscendC::Te::MakeCoord(static_cast<int64_t>(0), static_cast<int64_t>(0)),
-                                              AscendC::Te::MakeShape(static_cast<int64_t>(1), validElements));
-        auto gmTensor = srcTensor.Slice(AscendC::Te::MakeCoord(rowIndex, columnIndex),
-                                        AscendC::Te::MakeShape(static_cast<int64_t>(1), validElements));
-        auto copyGmToUb = AscendC::Te::MakeCopy(AscendC::Te::CopyGM2UB{});
-        AscendC::Te::Copy(copyGmToUb, ubTensor, gmTensor);
+        auto ubStorageTensor = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::ub, T>(dstByteOffset),
+            asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<T>>(1, ubPitch));
+        auto ubTensor = ubStorageTensor.slice(asc::te::make_coord(static_cast<int64_t>(0), static_cast<int64_t>(0)),
+                                              asc::te::make_shape(static_cast<int64_t>(1), validElements));
+        auto gmTensor = srcTensor.slice(asc::te::make_coord(rowIndex, columnIndex),
+                                        asc::te::make_shape(static_cast<int64_t>(1), validElements));
+        auto copyGmToUb = asc::te::make_copy(asc::te::copy_gm_to_ub{});
+        asc::te::copy(copyGmToUb, ubTensor, gmTensor);
     }
 
     template <typename T, typename GmTensor>
     __aicore__ inline static void CopyUbToGm(GmTensor &dstTensor, int64_t rowIndex, int64_t columnIndex,
                                              uint64_t srcByteOffset, int64_t validElements, int64_t ubPitch)
     {
-        auto gmTensor = dstTensor.Slice(AscendC::Te::MakeCoord(rowIndex, columnIndex),
-                                        AscendC::Te::MakeShape(static_cast<int64_t>(1), validElements));
-        auto ubStorageTensor = AscendC::Te::MakeTensor(
-            AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, T>(srcByteOffset),
-            AscendC::Te::MakeFrameLayout<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<T>>(1, ubPitch));
-        auto ubTensor = ubStorageTensor.Slice(AscendC::Te::MakeCoord(static_cast<int64_t>(0), static_cast<int64_t>(0)),
-                                              AscendC::Te::MakeShape(static_cast<int64_t>(1), validElements));
-        auto copyUbToGm = AscendC::Te::MakeCopy(AscendC::Te::CopyUB2GM{});
-        AscendC::Te::Copy(copyUbToGm, gmTensor, ubTensor);
+        auto gmTensor = dstTensor.slice(asc::te::make_coord(rowIndex, columnIndex),
+                                        asc::te::make_shape(static_cast<int64_t>(1), validElements));
+        auto ubStorageTensor = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::ub, T>(srcByteOffset),
+            asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<T>>(1, ubPitch));
+        auto ubTensor = ubStorageTensor.slice(asc::te::make_coord(static_cast<int64_t>(0), static_cast<int64_t>(0)),
+                                              asc::te::make_shape(static_cast<int64_t>(1), validElements));
+        auto copyUbToGm = asc::te::make_copy(asc::te::copy_ub_to_gm{});
+        asc::te::copy(copyUbToGm, gmTensor, ubTensor);
     }
 
     __aicore__ inline uint64_t ReadValidBlocks() const
     {
         auto validBlocksTensor = MakeGmTensor<uint64_t>(validBlocksAddr_, 1, 1);
-        return validBlocksTensor[AscendC::Te::MakeCoord(static_cast<int64_t>(0), static_cast<int64_t>(0))];
+        return validBlocksTensor[asc::te::make_coord(static_cast<int64_t>(0), static_cast<int64_t>(0))];
     }
 
     __aicore__ inline __ubuf__ float *CopyInQ(uint64_t sIndex, uint32_t dOffset, uint32_t validD, uint32_t qBufferIndex)

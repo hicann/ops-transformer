@@ -48,18 +48,17 @@ __global__ __aicore__ void QuantMatmulReduceScatterUbmemKernel(GM_ADDR hcclConte
     using TypeC = bfloat16_t;
     using BiasType = float;
 
-    using LayoutA = AscendC::Te::NDExtLayoutPtn;
-    using LayoutB = AscendC::Te::NZLayoutPtn;
-    using LayoutC = AscendC::Te::NDExtLayoutPtn;
+    using LayoutA = asc::te::nd_ext_layout_ptn;
+    using LayoutB = asc::te::nz_layout_ptn;
+    using LayoutC = asc::te::nd_ext_layout_ptn;
 
     using DispatchPolicy = MatmulWithScaleMx<0, 0>;
     using BlockMmad =
         Block::BlockMmad<DispatchPolicy, TypeA, LayoutA, TypeB, LayoutB, TypeC, LayoutC, BiasType, LayoutC>;
-    using BlockScheduler =
-        Block::BlockSchedulerQuantBatchMatmulV3<AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>, 0, LayoutA,
-                                                LayoutB, TypeA>;
+    using BlockScheduler = Block::BlockSchedulerQuantBatchMatmulV3<asc::te::shape<int64_t, int64_t, int64_t, int64_t>,
+                                                                   0, LayoutA, LayoutB, TypeA>;
     using BlockEpilogue = Block::BlockEpilogueAlltoAll<TypeC, LayoutC>;
-    using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+    using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
 
     using Impl = Apace::QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
     using KernelImpl = typename Impl::KernelImpl;

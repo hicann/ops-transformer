@@ -38,16 +38,16 @@ __aicore__ inline void GmmWeightQuantTensorApiMxKernel(
     using ScaleAType = ScaleBType;
     using CType = YType;
     using DispatchPolicy = Blaze::Gemm::GroupedMatmulWithWeightQuantMx;
-    using LayoutA = AscendC::Te::NDExtLayoutPtn;
-    using LayoutB = AscendC::Te::ZNLayoutPtn;
-    using LayoutC = AscendC::Te::NDExtLayoutPtn;
-    using LayoutBias = AscendC::Te::NDExtLayoutPtn;
-    using LayoutScaleA = AscendC::Te::ScaleANDLayoutPtn;
-    using LayoutScaleB = AscendC::Te::ScaleBDNLayoutPtn;
+    using LayoutA = asc::te::nd_ext_layout_ptn;
+    using LayoutB = asc::te::zn_layout_ptn;
+    using LayoutC = asc::te::nd_ext_layout_ptn;
+    using LayoutBias = asc::te::nd_ext_layout_ptn;
+    using LayoutScaleA = asc::te::scalea_nd_layout_ptn;
+    using LayoutScaleB = asc::te::scaleb_dn_layout_ptn;
 
-    using ProblemShape = decltype(AscendC::Te::MakeShape(0UL, 0UL, 0UL, 0UL));
+    using ProblemShape = decltype(asc::te::make_shape(0UL, 0UL, 0UL, 0UL));
     using BlockScheduler =
-        Blaze::Gemm::Kernel::BlockSchedulerWqgmmNResplit<decltype(AscendC::Te::MakeShape(0UL, 0UL, 0UL))>;
+        Blaze::Gemm::Kernel::BlockSchedulerWqgmmNResplit<decltype(asc::te::make_shape(0UL, 0UL, 0UL))>;
     using BlockMmad =
         Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AscendC::Std::tuple<AType, ScaleAType>,
                                       AscendC::Std::tuple<LayoutA, LayoutScaleA>,

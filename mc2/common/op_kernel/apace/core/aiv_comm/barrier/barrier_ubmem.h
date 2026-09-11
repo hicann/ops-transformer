@@ -65,18 +65,20 @@ __aicore__ inline void TeamBarrier::CrossDevice()
             (__gm__ int32_t *)(ctx_->commBufferAddrs[ctx_->rankId] + ctx_->rankSize * BARRIER_FLAG_SIZE +
                                jobIndex_ * BARRIER_FLAG_SIZE);
 
-        auto copyGM2UB = Te::MakeCopy(Te::CopyGM2UB{});
-        auto copyUB2GM = Te::MakeCopy(Te::CopyUB2GM{});
-        auto ubTmp = Te::MakeTensor(
-            Te::MakeMemPtr<Te::Location::UB, int32_t>(reinterpret_cast<uint64_t>(syncBuf_)),
-            Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
-        auto teamSyncGmTensor = Te::MakeTensor(
-            Te::MakeMemPtr<Te::Location::GM>((__gm__ int32_t *)(teamSyncCounter)),
-            Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
+        auto copyGM2UB = asc::te::make_copy(asc::te::copy_gm_to_ub{});
+        auto copyUB2GM = asc::te::make_copy(asc::te::copy_ub_to_gm{});
+        auto ubTmp = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::ub, int32_t>(reinterpret_cast<uint64_t>(syncBuf_)),
+            asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+                1, BARRIER_FLAG_ELEMS));
+        auto teamSyncGmTensor = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int32_t *)(teamSyncCounter)),
+            asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+                1, BARRIER_FLAG_ELEMS));
 
         SetFlag<HardEvent::S_MTE2>(1);
         WaitFlag<HardEvent::S_MTE2>(1);
-        Te::Copy(copyGM2UB, ubTmp, teamSyncGmTensor);
+        asc::te::copy(copyGM2UB, ubTmp, teamSyncGmTensor);
         SetFlag<HardEvent::MTE2_S>(1);
         WaitFlag<HardEvent::MTE2_S>(1);
         int64_t count = *reinterpret_cast<__ubuf__ int64_t *>(syncBuf_) + 1;
@@ -85,7 +87,7 @@ __aicore__ inline void TeamBarrier::CrossDevice()
         *reinterpret_cast<__ubuf__ int64_t *>(syncBuf_) = count;
         SetFlag<HardEvent::S_MTE3>(1);
         WaitFlag<HardEvent::S_MTE3>(1);
-        Te::Copy(copyUB2GM, teamSyncGmTensor, ubTmp);
+        asc::te::copy(copyUB2GM, teamSyncGmTensor, ubTmp);
         SetFlag<HardEvent::MTE3_S>(1);
         WaitFlag<HardEvent::MTE3_S>(1);
     }
@@ -101,18 +103,20 @@ __aicore__ inline void TeamBarrier::CrossCore()
                                  ctx_->rankSize * BARRIER_FLAG_SIZE + totalJobs_ * BARRIER_FLAG_SIZE;
         __gm__ int32_t *localFlag = (__gm__ int32_t *)(crossCoreBase + jobIndex_ * BARRIER_FLAG_SIZE);
 
-        auto copyGM2UB = Te::MakeCopy(Te::CopyGM2UB{});
-        auto copyUB2GM = Te::MakeCopy(Te::CopyUB2GM{});
-        auto ubTmp = Te::MakeTensor(
-            Te::MakeMemPtr<Te::Location::UB, int32_t>(reinterpret_cast<uint64_t>(syncBuf_)),
-            Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
-        auto gmLocal = Te::MakeTensor(
-            Te::MakeMemPtr<Te::Location::GM>(localFlag),
-            Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
+        auto copyGM2UB = asc::te::make_copy(asc::te::copy_gm_to_ub{});
+        auto copyUB2GM = asc::te::make_copy(asc::te::copy_ub_to_gm{});
+        auto ubTmp = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::ub, int32_t>(reinterpret_cast<uint64_t>(syncBuf_)),
+            asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+                1, BARRIER_FLAG_ELEMS));
+        auto gmLocal = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::gm>(localFlag),
+            asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+                1, BARRIER_FLAG_ELEMS));
 
         SetFlag<HardEvent::S_MTE2>(1);
         WaitFlag<HardEvent::S_MTE2>(1);
-        Te::Copy(copyGM2UB, ubTmp, gmLocal);
+        asc::te::copy(copyGM2UB, ubTmp, gmLocal);
         SetFlag<HardEvent::MTE2_S>(1);
         WaitFlag<HardEvent::MTE2_S>(1);
         int64_t count = *reinterpret_cast<__ubuf__ int64_t *>(syncBuf_) + 1;
@@ -120,7 +124,7 @@ __aicore__ inline void TeamBarrier::CrossCore()
         *reinterpret_cast<__ubuf__ int64_t *>(syncBuf_) = count;
         SetFlag<HardEvent::S_MTE3>(1);
         WaitFlag<HardEvent::S_MTE3>(1);
-        Te::Copy(copyUB2GM, gmLocal, ubTmp);
+        asc::te::copy(copyUB2GM, gmLocal, ubTmp);
         SetFlag<HardEvent::MTE3_S>(1);
         WaitFlag<HardEvent::MTE3_S>(1);
 
@@ -129,13 +133,14 @@ __aicore__ inline void TeamBarrier::CrossCore()
                 continue;
             }
             __gm__ int32_t *remotePtr = (__gm__ int32_t *)(crossCoreBase + i * BARRIER_FLAG_SIZE);
-            auto gmRemote = Te::MakeTensor(
-                Te::MakeMemPtr<Te::Location::GM>(remotePtr),
-                Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
+            auto gmRemote = asc::te::make_tensor(
+                asc::te::make_mem_ptr<asc::te::location::gm>(remotePtr),
+                asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+                    1, BARRIER_FLAG_ELEMS));
             do {
                 SetFlag<HardEvent::S_MTE2>(1);
                 WaitFlag<HardEvent::S_MTE2>(1);
-                Te::Copy(copyGM2UB, ubTmp, gmRemote);
+                asc::te::copy(copyGM2UB, ubTmp, gmRemote);
                 SetFlag<HardEvent::MTE2_S>(1);
                 WaitFlag<HardEvent::MTE2_S>(1);
                 if (*reinterpret_cast<__ubuf__ int64_t *>(syncBuf_) >= count) {
@@ -153,20 +158,22 @@ __aicore__ inline void TeamBarrier::CrossDeviceExecute(int64_t count)
     int32_t step = totalJobs_ < nranks ? (int32_t)totalJobs_ : (int32_t)nranks;
     auto localFlag = (__gm__ int32_t *)(ctx_->commBufferAddrs[ctx_->rankId]);
 
-    auto copyGM2UB = Te::MakeCopy(Te::CopyGM2UB{});
-    auto copyUB2GM = Te::MakeCopy(Te::CopyUB2GM{});
-    auto ubTmp = Te::MakeTensor(
-        Te::MakeMemPtr<Te::Location::UB, int32_t>(reinterpret_cast<uint64_t>(syncBuf_)),
-        Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
+    auto copyGM2UB = asc::te::make_copy(asc::te::copy_gm_to_ub{});
+    auto copyUB2GM = asc::te::make_copy(asc::te::copy_ub_to_gm{});
+    auto ubTmp = asc::te::make_tensor(
+        asc::te::make_mem_ptr<asc::te::location::ub, int32_t>(reinterpret_cast<uint64_t>(syncBuf_)),
+        asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+            1, BARRIER_FLAG_ELEMS));
 
     for (uint32_t i = jobIndex_; i < nranks; i += (uint32_t)step) {
-        auto gmFlag = Te::MakeTensor(
-            Te::MakeMemPtr<Te::Location::GM>((__gm__ int32_t *)(localFlag + i * BARRIER_FLAG_ELEMS)),
-            Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
+        auto gmFlag = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int32_t *)(localFlag + i * BARRIER_FLAG_ELEMS)),
+            asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+                1, BARRIER_FLAG_ELEMS));
         *reinterpret_cast<__ubuf__ int64_t *>(syncBuf_) = count;
         SetFlag<HardEvent::S_MTE3>(1);
         WaitFlag<HardEvent::S_MTE3>(1);
-        Te::Copy(copyUB2GM, gmFlag, ubTmp);
+        asc::te::copy(copyUB2GM, gmFlag, ubTmp);
         SetFlag<HardEvent::MTE3_S>(1);
         WaitFlag<HardEvent::MTE3_S>(1);
 
@@ -174,13 +181,14 @@ __aicore__ inline void TeamBarrier::CrossDeviceExecute(int64_t count)
             continue;
         }
         __gm__ int32_t *remotePtr = (__gm__ int32_t *)(ctx_->commBufferAddrs[i] + myRank * BARRIER_FLAG_SIZE);
-        auto gmRemote = Te::MakeTensor(
-            Te::MakeMemPtr<Te::Location::GM>(remotePtr),
-            Te::FrameLayoutFormat<Te::NDExtLayoutPtn, Te::LayoutTraitDefault<int32_t>>{}(1, BARRIER_FLAG_ELEMS));
+        auto gmRemote = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::gm>(remotePtr),
+            asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int32_t>>{}(
+                1, BARRIER_FLAG_ELEMS));
         do {
             SetFlag<HardEvent::S_MTE2>(1);
             WaitFlag<HardEvent::S_MTE2>(1);
-            Te::Copy(copyGM2UB, ubTmp, gmRemote);
+            asc::te::copy(copyGM2UB, ubTmp, gmRemote);
             SetFlag<HardEvent::MTE2_S>(1);
             WaitFlag<HardEvent::MTE2_S>(1);
             if (*reinterpret_cast<__ubuf__ int64_t *>(syncBuf_) >= count) {
