@@ -16,6 +16,8 @@
 #include "reduce_scatter_formulaic_tiling.h"
 
 constexpr static uint64_t AICPU_M_TILE_CAP = 4; // AICPU通路通信切分膨胀较大，限制最大切分轮数
+constexpr static uint64_t RANK_SIZE_16P = 16U;  // 16P跨机场景
+constexpr static uint64_t EVEN_SPLIT2_M_PER_RANK = 1024U; // 单rank M轴长度上限
 
 void MMPlusReduceScatter::SetCommTimeFactorForA5()
 {
@@ -101,6 +103,24 @@ void MMPlusReduceScatter::SelectTilingMethod()
         tilingM_.SetMaxTileCnt(AICPU_M_TILE_CAP);
     }
     if (tilingM_.SetShortTileLen()) { // 如果shape太小就不切
+        return;
+    }
+    // 16P AICPU计算bound场景小M场景：通信切分膨胀大，切分轮次越少越好，尽量等分利用aicpu展开缓存
+    bool evenSplitTwo = isAicpuComm_ && (rankDim_ == RANK_SIZE_16P) &&
+                        (clusterInfo_.mValue <= EVEN_SPLIT2_M_PER_RANK) &&
+                        (clusterInfo_.mValue % (TWO * tilingM_.GetAlignLength()) == 0U) &&
+                        (clusterInfo_.inMatrixADtypeSize == TWO) && tilingM_.cutRes.shortTileAtBack;
+    if (evenSplitTwo) {
+        tilingM_.cutRes.longTileLen = tilingM_.totalLen / TWO;
+        tilingM_.cutRes.numLongTile = TWO;
+        tilingM_.cutRes.shortTileLen = 0U;
+        tilingM_.cutRes.numShortTile = 0U;
+        tilingM_.cutRes.totalTileCnt = TWO;
+        OP_LOGD("MatmulReduceScatter",
+                "AICPU 16P even split 2: shortTileAtBack %d, longTileLen %lu, "
+                "numLongTile %lu, shortTileLen %lu, numShortTile %lu",
+                tilingM_.cutRes.shortTileAtBack, tilingM_.cutRes.longTileLen, tilingM_.cutRes.numLongTile,
+                tilingM_.cutRes.shortTileLen, tilingM_.cutRes.numShortTile);
         return;
     }
     // 流水配平，找到理论切分长度

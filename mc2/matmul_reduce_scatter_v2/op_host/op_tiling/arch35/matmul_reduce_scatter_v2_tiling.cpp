@@ -47,6 +47,7 @@ constexpr char ACLNN_CCU_PEER_ONLY_MODE[] = "ccu_peer_only";
 constexpr uint32_t X1SCALE_INDEX = 3;
 constexpr uint32_t X2SCALE_INDEX = 4;
 constexpr uint32_t COMMMODE_INDEX = 10;
+constexpr uint32_t ALG_CONFIG_RANK_SIZE = 16U;
 // 新功能从这里开始
 bool MatmulReduceScatterV2Tiling::IsCapable()
 {
@@ -117,6 +118,11 @@ ge::graphStatus MatmulReduceScatterV2Tiling::SetMc2Hcomm()
     if (commMode_ == TPL_AICPU_COMM_MODE) {
         mc2CcTilingConfig.SetCommEngine(mc2tiling::A5_AICPU_TS_ENGINE);
         OP_LOGD(opName_, "[SetCommEngine] Set CommEngine to AiCPU for matmul_reduce_scatter_v2_tiling.");
+        // 16p跨机场景，根据通信api benchmark，使用InsReduceScatterParallelMesh1DNHR算法速度更快
+        if (args_.rankDim == ALG_CONFIG_RANK_SIZE) {
+            mc2CcTilingConfig.SetAlgConfig("InsReduceScatterParallelMesh1DNHR");
+            OP_LOGD(opName_, "[SetAlgConfig] Set AlgConfig to InsReduceScatterParallelMesh1DNHR.");
+        }
     } else {
         mc2CcTilingConfig.SetCommEngine(mc2tiling::A5_CCU_ENGINE);
         OP_LOGD(opName_, "[SetCommEngine] Set CommEngine to CCU for matmul_reduce_scatter_v2_tiling.");

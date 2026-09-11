@@ -71,6 +71,7 @@ constexpr uint32_t QUANTSCALE_INDEX = 5;
 // Attr
 constexpr uint32_t YDTYPE_INDEX = 9;
 constexpr uint32_t OUTPUT_TYPE_FLOAT = 2;
+constexpr uint32_t ALG_CONFIG_RANK_SIZE = 16U;
 constexpr uint32_t BLOCKSIZE_INDEX = 6;
 constexpr uint32_t GROUPSIZE_INDEX = 7;
 constexpr uint32_t TRANSPOSEB_INDEX = 3;
@@ -470,6 +471,10 @@ ge::graphStatus QuantBmmReduceScatterTiling::SetMc2Hcomm()
     if (commMode_ == TPL_AICPU_COMM_MODE) {
         mc2CcTilingConfig.SetCommEngine(mc2tiling::A5_AICPU_TS_ENGINE);
         OP_LOGD(opName_, "[SetCommEngine] Set CommEngine to AiCPU for quant_bmm_reduce_scatter_tiling.");
+        if (args_.rankDim == ALG_CONFIG_RANK_SIZE) {
+            mc2CcTilingConfig.SetAlgConfig("InsReduceScatterParallelMesh1DNHR");
+            OP_LOGD(opName_, "[SetAlgConfig] Set AlgConfig to InsReduceScatterParallelMesh1DNHR.");
+        }
     } else {
         mc2CcTilingConfig.SetCommEngine(mc2tiling::A5_CCU_ENGINE);
         OP_LOGD(opName_, "[SetCommEngine] Set CommEngine to CCU for quant_bmm_reduce_scatter_tiling.");
