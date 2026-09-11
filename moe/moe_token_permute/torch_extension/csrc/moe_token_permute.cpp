@@ -11,14 +11,8 @@
 #include <algorithm>
 #include <cstring>
 #include <tuple>
-
 #include <torch/extension.h>
 #include "aclnn_common.h"
-#if __has_include("aclnnop/aclnn_moe_token_permute_v2.h")
-#include "aclnnop/aclnn_moe_token_permute_v2.h"
-#elif __has_include("aclnn_moe_token_permute_v2.h")
-#include "aclnn_moe_token_permute_v2.h"
-#endif
 
 namespace {
 constexpr int64_t DIM_ONE = 1;
@@ -49,9 +43,15 @@ bool IsAscend950()
     return socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
 }
 
-int64_t CeilDiv(int64_t value, int64_t divisor) { return (value + divisor - 1) / divisor; }
+int64_t CeilDiv(int64_t value, int64_t divisor)
+{
+    return (value + divisor - 1) / divisor;
+}
 
-int64_t AlignUp(int64_t value, int64_t align) { return CeilDiv(value, align) * align; }
+int64_t AlignUp(int64_t value, int64_t align)
+{
+    return CeilDiv(value, align) * align;
+}
 
 void CheckMoeTokenPermuteInputs(const at::Tensor &tokens, const at::Tensor &indices)
 {
@@ -145,5 +145,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> MoeTokenPermute(const at::Tensor 
                            std::move(output.expandedScale));
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("moe_token_permute", &MoeTokenPermute, "moe_token_permute"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("moe_token_permute", &MoeTokenPermute, "moe_token_permute");
+}
 } // namespace op_api
