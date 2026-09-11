@@ -17,7 +17,6 @@
 #define QUANT_ALL_REDUCE_TILING_DATA_H
 
 #include <cstdint>
-#include <kernel_tiling/kernel_tiling.h>
 
 struct QuantAllReduceTilingInfo {
     uint64_t bs;              // bs轴

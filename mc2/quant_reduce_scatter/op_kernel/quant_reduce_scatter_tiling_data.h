@@ -17,7 +17,6 @@
 #define QUANT_REDUCE_SCATTER_TILING_DATA_H
 
 #include <cstdint>
-#include <kernel_tiling/kernel_tiling.h>
 
 struct QuantReduceScatterTilingInfo {
     uint64_t bs;

@@ -48,10 +48,9 @@ extern "C" {
  *
  */
 ACLNN_API aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *context, const aclTensor *x,
-                                                          const aclTensor *scales, const int64_t hcclBufferSize,
-                                                          const int64_t worldSize, const char *reduceOp,
-                                                          aclTensor *output, uint64_t *workspaceSize,
-                                                          aclOpExecutor **executor);
+                                                          const aclTensor *scales, int64_t hcclBufferSize,
+                                                          int64_t worldSize, const char *reduceOp, aclTensor *output,
+                                                          uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /**
  * @brief aclnnQuantAllReduce的第二段接口，用于执行计算。

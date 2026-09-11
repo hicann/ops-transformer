@@ -12,6 +12,7 @@
  * \file aclnn_quant_reduce_scatter.h
  * \brief
  */
+
 #ifndef OP_API_INC_QUANT_REDUCE_SCATTER_
 #define OP_API_INC_QUANT_REDUCE_SCATTER_
 
@@ -49,8 +50,8 @@ extern "C" {
  * @return aclnnStatus: 返回状态码
  */
 ACLNN_API aclnnStatus aclnnQuantReduceScatterGetWorkspaceSize(const aclTensor *context, const aclTensor *x,
-                                                              const aclTensor *scales, const int64_t hcclBufferSize,
-                                                              const int64_t worldSize, const char *reduceOp,
+                                                              const aclTensor *scales, int64_t hcclBufferSize,
+                                                              int64_t worldSize, const char *reduceOp,
                                                               aclTensor *output, uint64_t *workspaceSize,
                                                               aclOpExecutor **executor);
 
