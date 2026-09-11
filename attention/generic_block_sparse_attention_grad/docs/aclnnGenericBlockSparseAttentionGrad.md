@@ -6,10 +6,10 @@
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
@@ -245,7 +245,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>
                       <ul>
                           <li>必须传入。</li>
-                          <li>长度≥80+B×N1×J×4（int32元素个数）。</li>
+                          <li>长度≥ max(80+B×N1×J×4, 198)（int32元素个数）。</li>
                       </ul>
                   </td>
                   <td>INT32</td>
@@ -311,7 +311,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                       <ul>
                           <li>含两个元素[blockShapeX, blockShapeY]。</li>
                           <li>blockShapeX当前仅支持1。</li>
-                          <li>blockShapeY须≥128且按64对齐。Cube/Softmax按baseN=128对每个稀疏块做S2切分（LSE Softmax，与整块数值等价）。</li>
+                          <li>blockShapeY须≥128且按64对齐。</li>
                       </ul>
                   </td>
                   <td>INT64</td>
@@ -551,7 +551,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 - 当layoutQ为TND时，需要传入cuSeqLengthsQOptional；当layoutKv为TND时，需要传入cuSeqLengthsKvOptional。
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自Q/K的S维。
 - HeadDim固定为128；N1/N2取值范围[1, 128]，且N1 > N2，N1 % N2 == 0。
-- blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数（Cube按baseN=128对每个稀疏块做S2切分）；isPackedGQA当前仅支持1；maskType当前仅支持1；softmaxPrecision当前仅支持0。
+- blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数；isPackedGQA当前仅支持1；maskType当前仅支持1；softmaxPrecision当前仅支持0。
 - winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
 - Softmax LSE的head/seq轴语义须与query布局一致。
 - `sparseBlockIdx`第4维maxS1应≥`sparseBlockCount`中所有元素的最大值。

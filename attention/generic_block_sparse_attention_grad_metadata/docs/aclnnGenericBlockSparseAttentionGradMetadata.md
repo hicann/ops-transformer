@@ -6,10 +6,10 @@
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
@@ -23,14 +23,39 @@
 
 ## 功能说明
 
-- 接口功能：aclnnGenericBlockSparseAttentionGradMetadata根据sparseBlockIdx、sparseBlockCount、seqlen等信息进行稀疏attention的分核与负载均衡，为aclnnGenericBlockSparseAttentionGrad的前置AICPU算子。按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
-- 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用，形成完整工作流。
+- 接口功能：
 
-$$
-\text{metaSize} = 80 + B \times N1 \times J \times 4
-$$
+  aclnnGenericBlockSparseAttentionGradMetadata根据sparseBlockIdx、sparseBlockCount、seqlen等信息进行稀疏attention的分核与负载均衡，为aclnnGenericBlockSparseAttentionGrad的前置AICPU算子。
 
-其中`J = ceilDiv(maxKvSeqlen, blockShapeY)`。
+  <!-- npu="950" id9 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>：
+    按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
+  <!-- end id9 -->
+
+  <!-- npu="A3,910b" id10 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    按B → N2 → J顺序展开`(b, n2, j)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
+   <!-- end id10 -->
+
+  - 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用，形成完整工作流。
+- Metadata size计算公式：
+  <!-- npu="950" id7 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>:
+
+    $$
+    \text{metaSize} = 80 + B \times N1 \times J \times 4
+    $$
+
+    其中`J = ceilDiv(maxKvSeqlen, blockShapeY)`。
+  <!-- end id7 -->
+
+  <!-- npu="A3,910b" id8 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> 以及 <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
+
+    $$
+    \text{metaSize} = 198
+    $$
+  <!-- end id8 -->
 
 ## 函数原型
 
@@ -292,7 +317,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>metadata</td>
         <td>输出</td>
         <td>稀疏attention的分核信息。</td>
-        <td>不支持空Tensor。metaSize ≥ 80 + B×N1×J×4。</td>
+        <td>不支持空Tensor。metaSize ≥ max(80 + B×N1×J×4, 198)。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>[metaSize]</td>
@@ -411,12 +436,12 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
   - 本算子输出为确定性结果。
 - 须与[aclnnGenericBlockSparseAttentionGrad](../../generic_block_sparse_attention_grad/docs/aclnnGenericBlockSparseAttentionGrad.md)配合使用；主算子调用前必须先成功执行本算子。
 - HeadDim固定为128；numQHeads/numKvHeads须落在[1, 128]，且numQHeads % numKvHeads == 0。
-- blockShape当前仅支持[1, 128]；isPackedGQA当前仅支持1；maskType当前仅支持1。
+- blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数, blockShapeY须≥128且为64的倍数；isPackedGQA当前仅支持1；maskType当前仅支持1。
 - layoutQ与layoutKv须相同，取值"TND"/"BNSD"/"BSND"；TND布局下cuSeqLengthsQOptional/cuSeqLengthsKvOptional必选。
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
 - winLeft和winRight不使能时必须为-1。
 - sparseBlockIdx最后一维maxS1须≥maxQSeqlen；J = ceilDiv(maxKvSeqlen, blockShapeY)须与sparseBlockIdx第3维一致。
-- metadata长度须满足shape[0] ≥ 80 + B × numQHeads × J × 4；任务数上界B × numQHeads × J ≤ 1048576。
+- metadata长度须满足shape[0] ≥ max(80 + B × numQHeads × J × 4, 198)；任务数上界B × numQHeads × J ≤ 1048576。
 
 ## 调用示例
 
