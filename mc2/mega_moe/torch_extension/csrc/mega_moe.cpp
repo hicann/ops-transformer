@@ -19,6 +19,169 @@ namespace op_api {
 using npu_utils = at_npu::native::NpuUtils;
 const int DIM_TWO = 2;
 
+static void CheckNpuInput(const at::Tensor &tensor, const std::string &name, const char *socName)
+{
+    TORCH_CHECK(tensor.defined(), name, " must not be None on ", socName, ".");
+    TORCH_CHECK(torch_npu::utils::is_npu(tensor), name, " must be on NPU on ", socName, ", but got ", tensor.device());
+}
+
+static void CheckNpuInput(const std::vector<at::Tensor> &tensors, const std::string &name, const char *socName)
+{
+    for (size_t i = 0; i < tensors.size(); ++i) {
+        CheckNpuInput(tensors[i], name + "[" + std::to_string(i) + "]", socName);
+    }
+}
+
+template <typename T>
+static void CheckNpuInput(const c10::optional<T> &input, const std::string &name, const char *socName)
+{
+    if (input.has_value()) {
+        CheckNpuInput(input.value(), name, socName);
+    }
+}
+
+template <typename T>
+static void CheckInputAbsent(const c10::optional<T> &input, const std::string &name, const char *socName)
+{
+    TORCH_CHECK(!input.has_value(), name, " must be None on ", socName, ".");
+}
+
+// Validate the public type value before GetAclDataType interprets it.
+static void CheckWeightType(const c10::optional<int64_t> &weightType, const char *name, const char *socName)
+{
+    if (!weightType.has_value()) {
+        return;
+    }
+    const int64_t value = weightType.value();
+    TORCH_CHECK(value == static_cast<int64_t>(at::ScalarType::Float8_e5m2) ||
+                    value == static_cast<int64_t>(at::ScalarType::Float8_e4m3fn) ||
+                    value == static_cast<int64_t>(DType::FLOAT4_E2M1),
+                name, " must be None, float8_e5m2 (", static_cast<int64_t>(at::ScalarType::Float8_e5m2),
+                "), float8_e4m3fn (", static_cast<int64_t>(at::ScalarType::Float8_e4m3fn), ") or float4_e2m1 (",
+                static_cast<int64_t>(DType::FLOAT4_E2M1), ") on ", socName, ", but got ", value, ".");
+}
+
+// Validate storage types before TensorListWrapper replaces the ACL dtype.
+static void CheckWeightDtype(at::TensorList weights, aclDataType expectedDtype, const char *name, const char *socName)
+{
+    if (weights.empty()) {
+        return;
+    }
+    const char *expectedName = nullptr;
+    switch (expectedDtype) {
+        case aclDataType::ACL_FLOAT8_E5M2:
+            expectedName = "float8_e5m2";
+            break;
+        case aclDataType::ACL_FLOAT8_E4M3FN:
+            expectedName = "float8_e4m3fn";
+            break;
+        case aclDataType::ACL_FLOAT4_E2M1:
+            expectedName = "uint8 (packed FP4)";
+            break;
+        default:
+            TORCH_CHECK(false, name, "[0] has unsupported dtype ", weights[0].scalar_type(), " on ", socName,
+                        ". Without an explicit weight type, only float8_e5m2 and float8_e4m3fn are supported. "
+                        "For uint8 packed FP4, specify the corresponding weight type as ",
+                        static_cast<int64_t>(DType::FLOAT4_E2M1), ".");
+    }
+    for (size_t i = 0; i < weights.size(); ++i) {
+        const auto dtype = weights[i].scalar_type();
+        const bool matches =
+            (expectedDtype == aclDataType::ACL_FLOAT8_E5M2 && dtype == at::ScalarType::Float8_e5m2) ||
+            (expectedDtype == aclDataType::ACL_FLOAT8_E4M3FN && dtype == at::ScalarType::Float8_e4m3fn) ||
+            (expectedDtype == aclDataType::ACL_FLOAT4_E2M1 && dtype == at::ScalarType::Byte);
+        TORCH_CHECK(matches, name, "[", i, "] dtype must be ", expectedName, " on ", socName, ", but got ", dtype, ".");
+    }
+}
+
+struct MegaMoeTensorInputs {
+    const at::Tensor &context;
+    const at::Tensor &x;
+    const at::Tensor &topkIds;
+    const at::Tensor &topkWeights;
+    const std::vector<at::Tensor> &weight1;
+    const std::vector<at::Tensor> &weight2;
+    const c10::optional<std::vector<at::Tensor>> &weightScales1;
+    const c10::optional<std::vector<at::Tensor>> &weightScales2;
+    const c10::optional<std::vector<at::Tensor>> &bias1;
+    const c10::optional<std::vector<at::Tensor>> &bias2;
+    const c10::optional<std::vector<at::Tensor>> &sharedWeight1;
+    const c10::optional<std::vector<at::Tensor>> &sharedWeight2;
+    const c10::optional<std::vector<at::Tensor>> &sharedWeightScales1;
+    const c10::optional<std::vector<at::Tensor>> &sharedWeightScales2;
+    const c10::optional<std::vector<at::Tensor>> &sharedBias1;
+    const c10::optional<std::vector<at::Tensor>> &sharedBias2;
+    const c10::optional<at::Tensor> &xActiveMask;
+    const c10::optional<at::Tensor> &maskBuffer;
+};
+
+static void CheckMegaMoeInputsA5(const MegaMoeTensorInputs &inputs, int64_t epWorldSize, int64_t moeExpertNum,
+                                 const char *socName)
+{
+    TORCH_CHECK(moeExpertNum >= epWorldSize && moeExpertNum <= 2048 && moeExpertNum % epWorldSize == 0,
+                "num_experts must be in [ep_world_size, 2048] and divisible by ep_world_size on ", socName,
+                ", but got num_experts=", moeExpertNum, " and ep_world_size=", epWorldSize);
+    TORCH_CHECK(!inputs.weight1.empty(), "l1_weights must not be empty on Ascend950.");
+    TORCH_CHECK(!inputs.weight2.empty(), "l2_weights must not be empty on Ascend950.");
+    TORCH_CHECK(inputs.weightScales1.has_value() && !inputs.weightScales1->empty(),
+                "l1_weights_sf must not be None or empty on Ascend950.");
+    TORCH_CHECK(inputs.weightScales2.has_value() && !inputs.weightScales2->empty(),
+                "l2_weights_sf must not be None or empty on Ascend950.");
+    CheckInputAbsent(inputs.xActiveMask, "x_active_mask", socName);
+    CheckInputAbsent(inputs.bias1, "l1_bias", socName);
+    CheckInputAbsent(inputs.bias2, "l2_bias", socName);
+    CheckInputAbsent(inputs.sharedBias1, "shared_l1_bias", socName);
+    CheckInputAbsent(inputs.sharedBias2, "shared_l2_bias", socName);
+    CheckNpuInput(inputs.x, "x", socName);
+    CheckNpuInput(inputs.context, "context", socName);
+    CheckNpuInput(inputs.topkIds, "topk_ids", socName);
+    CheckNpuInput(inputs.topkWeights, "topk_weights", socName);
+    CheckNpuInput(inputs.weight1, "l1_weights", socName);
+    CheckNpuInput(inputs.weight2, "l2_weights", socName);
+    CheckNpuInput(inputs.weightScales1, "l1_weights_sf", socName);
+    CheckNpuInput(inputs.weightScales2, "l2_weights_sf", socName);
+    CheckNpuInput(inputs.sharedWeight1, "shared_l1_weights", socName);
+    CheckNpuInput(inputs.sharedWeight2, "shared_l2_weights", socName);
+    CheckNpuInput(inputs.sharedWeightScales1, "shared_l1_weights_sf", socName);
+    CheckNpuInput(inputs.sharedWeightScales2, "shared_l2_weights_sf", socName);
+    CheckNpuInput(inputs.maskBuffer, "mask_buffer", socName);
+    // Check the original dtype before TensorListWrapper overrides the ACL dtype.
+    const auto checkScaleDtype = [socName](const c10::optional<std::vector<at::Tensor>> &scales, const char *name) {
+        if (!scales.has_value()) {
+            return;
+        }
+        for (size_t i = 0; i < scales->size(); ++i) {
+            const auto dtype = (*scales)[i].scalar_type();
+            TORCH_CHECK(dtype == at::ScalarType::Float8_e8m0fnu, name, "[", i, "] dtype must be float8_e8m0fnu on ",
+                        socName, ", but got ", dtype, ".");
+        }
+    };
+    checkScaleDtype(inputs.weightScales1, "l1_weights_sf");
+    checkScaleDtype(inputs.weightScales2, "l2_weights_sf");
+    checkScaleDtype(inputs.sharedWeightScales1, "shared_l1_weights_sf");
+    checkScaleDtype(inputs.sharedWeightScales2, "shared_l2_weights_sf");
+}
+
+static void CheckMegaMoeInputs(const MegaMoeTensorInputs &inputs, int64_t epWorldSize, int64_t moeExpertNum,
+                               const char *socName, bool isAscend950)
+{
+    TORCH_CHECK((epWorldSize > 0), "The ep_world_sizes should be greater than 0, current is: ", epWorldSize);
+    if (isAscend950) {
+        CheckMegaMoeInputsA5(inputs, epWorldSize, moeExpertNum, socName);
+    }
+    TORCH_CHECK((inputs.x.dim() == DIM_TWO) && (inputs.topkIds.dim() == DIM_TWO), "The x and topk_ids should be 2D");
+    TORCH_CHECK(((inputs.x.scalar_type() == at::kBFloat16) || (inputs.x.scalar_type() == at::kHalf)) &&
+                    (inputs.topkIds.scalar_type() == at::kInt),
+                "dtype of x should be bfloat16, float16, dtype of topk_ids should be int.");
+    if (inputs.maskBuffer.has_value()) {
+        const at::Tensor &mask = inputs.maskBuffer.value();
+        TORCH_CHECK(mask.scalar_type() == at::kInt, "mask_buffer dtype must be int32.");
+        TORCH_CHECK(mask.dim() == 1 && mask.numel() == epWorldSize, "mask_buffer shape must be [ep_world_size].");
+        TORCH_CHECK(mask.device() == inputs.x.device(), "mask_buffer must be on the same device as x.");
+        TORCH_CHECK(mask.is_contiguous(), "mask_buffer must be contiguous.");
+    }
+}
+
 std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     const at::Tensor &context, const at::Tensor &x, const at::Tensor &topkIds, const at::Tensor &topkWeights,
     const std::vector<at::Tensor> &weight1, const std::vector<at::Tensor> &weight2, int64_t moeExpertNum,
@@ -37,17 +200,30 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     c10::optional<int64_t> weight2Type, c10::optional<int64_t> topoType, c10::optional<int64_t> rankNumPerServer,
     int64_t topkWeightsType)
 {
-    TORCH_CHECK((epWorldSize > 0), "The ep_world_sizes should be greater than 0, current is: ", epWorldSize);
-    TORCH_CHECK((x.dim() == DIM_TWO) && (topkIds.dim() == DIM_TWO), "The x and topk_ids should be 2D");
-    TORCH_CHECK(
-        ((x.scalar_type() == at::kBFloat16) || (x.scalar_type() == at::kHalf)) && (topkIds.scalar_type() == at::kInt),
-        "dtype of x should be bfloat16, float16, dtype of topk_ids should be int.");
-    if (maskBuffer.has_value()) {
-        const at::Tensor &mask = maskBuffer.value();
-        TORCH_CHECK(mask.scalar_type() == at::kInt, "mask_buffer dtype must be int32.");
-        TORCH_CHECK(mask.dim() == 1 && mask.numel() == epWorldSize, "mask_buffer shape must be [ep_world_size].");
-        TORCH_CHECK(mask.device() == x.device(), "mask_buffer must be on the same device as x.");
-        TORCH_CHECK(mask.is_contiguous(), "mask_buffer must be contiguous.");
+    const MegaMoeTensorInputs inputs{context,
+                                     x,
+                                     topkIds,
+                                     topkWeights,
+                                     weight1,
+                                     weight2,
+                                     weightScales1,
+                                     weightScales2,
+                                     bias1,
+                                     bias2,
+                                     sharedWeight1,
+                                     sharedWeight2,
+                                     sharedWeightScales1,
+                                     sharedWeightScales2,
+                                     sharedBias1,
+                                     sharedBias2,
+                                     xActiveMask,
+                                     maskBuffer};
+    const char *socName = aclrtGetSocName();
+    const bool isAscend950 = socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
+    CheckMegaMoeInputs(inputs, epWorldSize, moeExpertNum, socName, isAscend950);
+    if (isAscend950) {
+        CheckWeightType(weight1Type, "weight1_type", socName);
+        CheckWeightType(weight2Type, "weight2_type", socName);
     }
 
     at::TensorList weight1Ref = weight1;
@@ -114,6 +290,11 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     at::Tensor y;
     y = at::empty({bs, h}, topkIds.options().dtype(x.scalar_type()));
 
+    if (isAscend950) {
+        CheckWeightDtype(weight1Ref, weight1RefDtype, "l1_weights", socName);
+        CheckWeightDtype(weight2Ref, weight2RefDtype, "l2_weights", socName);
+    }
+
     TensorListWrapper weight1Wrapper = {weight1Ref, weight1RefDtype};
     TensorListWrapper weight2Wrapper = {weight2Ref, weight2RefDtype};
     TensorListWrapper weightScales1Wrapper = {weightScales1Ref, weightScales1Dtype};
@@ -127,6 +308,11 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     at::TensorList sharedWeightScales2Ref = toTensorList(sharedWeightScales2);
     at::TensorList sharedBias1Ref = toTensorList(sharedBias1);
     at::TensorList sharedBias2Ref = toTensorList(sharedBias2);
+
+    if (isAscend950) {
+        CheckWeightDtype(sharedWeight1Ref, weight1RefDtype, "shared_l1_weights", socName);
+        CheckWeightDtype(sharedWeight2Ref, weight2RefDtype, "shared_l2_weights", socName);
+    }
 
     TensorListWrapper sharedWeight1Wrapper = {sharedWeight1Ref, weight1RefDtype};
     TensorListWrapper sharedWeight2Wrapper = {sharedWeight2Ref, weight2RefDtype};
