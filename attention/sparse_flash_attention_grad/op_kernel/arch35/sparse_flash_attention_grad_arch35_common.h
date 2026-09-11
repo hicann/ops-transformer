@@ -173,6 +173,7 @@ struct FagConstInfo {
     int64_t selectedBlockCount = 2048;
     int64_t selectedBlockSize = 1;
     int64_t selectedCountOffset = 0;
+    int64_t scatterWsRows = 0;
     // true: host tiling 判定 gSize <= SFAG_HEAD_N_L1_RESIDENT，gather 64 + K/Q/Dy 双槽常驻
     bool isHeadNLe64 = false;
 };
@@ -234,6 +235,8 @@ struct FagRunInfo {
     int64_t actualSelectedBlockCount = 0;
     int64_t blkCntOffset = 0;
     int64_t actualSelCntOffset = 0;
+    int64_t lastBlockSize = 1;
+    bool isLastBasicBlock = false;
 
     int64_t kSelectedWsAddr = 0;
     int64_t mm4ResWsAddr = 0;

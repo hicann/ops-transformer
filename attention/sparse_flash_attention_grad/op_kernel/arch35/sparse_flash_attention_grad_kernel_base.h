@@ -47,6 +47,8 @@ public:
     __aicore__ inline int64_t GetValueOffset(FagRunInfo &runInfo);
     __aicore__ inline void SyncALLCores();
     __aicore__ inline void GetActualSelCount(const int64_t t1Idx, const int64_t n2Idx, int64_t &actSelBlkCount);
+    __aicore__ inline int64_t GetLastBlockSize(const int64_t t1Idx, const int64_t n2Idx, const int64_t maxS2,
+                                               const int64_t maxS2Blk, const int64_t actSelBlkCount);
     __aicore__ inline void GetTndSeqLen(const int64_t t1Idx, int64_t &bIdx);
     __aicore__ inline int64_t GetValidTndT1Size();
     __aicore__ inline bool IsValidTndT1Index(const int64_t t1Idx);
@@ -121,6 +123,7 @@ protected:
 
     GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm, mm4ResWorkSpaceGm, mm5ResWorkSpaceGm;
     GlobalTensor<INPUT_TYPE> selectedKWorkSpaceGm;
+    GlobalTensor<int32_t> topkIndicesGm;
     // CV核间共享Buffer
     TBuf<> mm1ResBuf[2];
     TBuf<> mm2ResBuf[2];
@@ -166,6 +169,7 @@ protected:
 
     int64_t blkCntOffset = 0;
     int64_t actualSelectedBlockCount = 0;
+    int64_t curLastBlockSize = 1;
     int64_t t1Index = 0;
     int64_t n2Index = 0;
     int64_t lastT1Index = -1;
@@ -247,6 +251,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
     actualCalcS1Token = constInfo.s1Token;
     actualCalcS2Token = constInfo.s2Token;
 
+    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t *)sparseIndices);
     actualSeqQlenAddr = actualSeqQlen;
     actualSeqKvlenAddr = actualSeqKvlen;
     constInfo.seqS1_addr = actualSeqQlen;
@@ -313,12 +318,10 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::Init
                                           tilingData->baseParams.mm5ResWorkSpaceOffset / sizeof(float));
     } else {
         int64_t mm4ResWorkSpaceOffset = tilingData->baseParams.mm4ResWorkSpaceOffset / sizeof(float) +
-                                        cBlockIdx * constInfo.selectedBlockCount * constInfo.selectedBlockSize *
-                                            (constInfo.commonConstInfo.dSize + constInfo.dRopeSize) * 2;
+                                        cBlockIdx * constInfo.scatterWsRows * constInfo.dTotalSize * 2;
         mm4ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm4ResWorkSpaceOffset);
         int64_t mm5ResWorkSpaceOffset = tilingData->baseParams.mm5ResWorkSpaceOffset / sizeof(float) +
-                                        cBlockIdx * constInfo.selectedBlockCount * constInfo.selectedBlockSize *
-                                            constInfo.commonConstInfo.dSizeV * 2;
+                                        cBlockIdx * constInfo.scatterWsRows * constInfo.commonConstInfo.dSizeV * 2;
         mm5ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm5ResWorkSpaceOffset);
     }
 }
@@ -354,6 +357,8 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
     constInfo.bSize = tilingData->baseParams.b;
     constInfo.n2Size = tilingData->baseParams.n2;
     constInfo.selectedBlockCount = tilingData->baseParams.selectedBlockCount;
+    constInfo.selectedBlockSize = tilingData->baseParams.selectedBlockSize;
+    constInfo.scatterWsRows = tilingData->baseParams.scatterWsRows;
     constInfo.commonConstInfo.gSize = tilingData->baseParams.g;
     constInfo.isHeadNLe64 = tilingData->baseParams.isHeadNLe64 != 0;
     constInfo.commonConstInfo.s1Size = tilingData->baseParams.s1;
@@ -484,11 +489,16 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
 
     runInfo.commonRunInfo.actualS1Size = curS1;
     runInfo.commonRunInfo.actualS2Size = curS2;
-    runInfo.commonRunInfo.s2RealSize = blkCntOffset + constInfo.selectedCountOffset <= actualSelectedBlockCount ?
-                                           constInfo.selectedCountOffset :
-                                           actualSelectedBlockCount - blkCntOffset;
-    runInfo.actualSelCntOffset = runInfo.commonRunInfo.s2RealSize;
+    runInfo.actualSelCntOffset = blkCntOffset + constInfo.selectedCountOffset <= actualSelectedBlockCount ?
+                                     constInfo.selectedCountOffset :
+                                     actualSelectedBlockCount - blkCntOffset;
     runInfo.actualSelectedBlockCount = actualSelectedBlockCount;
+    runInfo.isLastBasicBlock = blkCntOffset + constInfo.selectedCountOffset >= actualSelectedBlockCount;
+    runInfo.lastBlockSize = curLastBlockSize;
+    runInfo.commonRunInfo.s2RealSize =
+        runInfo.isLastBasicBlock ?
+            (runInfo.actualSelCntOffset - 1) * constInfo.selectedBlockSize + runInfo.lastBlockSize :
+            runInfo.actualSelCntOffset * constInfo.selectedBlockSize;
 
     runInfo.commonRunInfo.taskId = taskId;
     runInfo.commonRunInfo.taskIdMod2 = taskId & 1;
@@ -539,13 +549,13 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
         // deter workspace 布局是 [parity][core][block][d]：每个 epoch 每核只放一个 token 的贡献，
         // 没有 n2 维度。消费侧 ScatterAddDeter 的 topkIndices 寻址同样按 n2 == 1 展开。
         // host tiling 已经硬性拒绝 n2 != 1，这里依赖该前提。
-        runInfo.mm4ResWsAddr = runInfo.deterTaskIdMod2 * constInfo.selectedBlockCount * constInfo.dTotalSize * coreNum +
-                               cBlockIdx * constInfo.selectedBlockCount * constInfo.dTotalSize +
-                               runInfo.blkCntOffset * constInfo.dTotalSize;
+        runInfo.mm4ResWsAddr = runInfo.deterTaskIdMod2 * constInfo.scatterWsRows * constInfo.dTotalSize * coreNum +
+                               cBlockIdx * constInfo.scatterWsRows * constInfo.dTotalSize +
+                               runInfo.blkCntOffset * constInfo.selectedBlockSize * constInfo.dTotalSize;
         runInfo.mm5ResWsAddr =
-            runInfo.deterTaskIdMod2 * constInfo.selectedBlockCount * constInfo.commonConstInfo.dSizeV * coreNum +
-            cBlockIdx * constInfo.selectedBlockCount * constInfo.commonConstInfo.dSizeV +
-            runInfo.blkCntOffset * constInfo.commonConstInfo.dSizeV;
+            runInfo.deterTaskIdMod2 * constInfo.scatterWsRows * constInfo.commonConstInfo.dSizeV * coreNum +
+            cBlockIdx * constInfo.scatterWsRows * constInfo.commonConstInfo.dSizeV +
+            runInfo.blkCntOffset * constInfo.selectedBlockSize * constInfo.commonConstInfo.dSizeV;
     }
 }
 
@@ -619,16 +629,33 @@ template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetActualSelCount(
     const int64_t t1Idx, const int64_t n2Idx, int64_t &actSelBlkCount)
 {
-    // t1Idx / n2Idx 不直接参与计算：因果上界由 GetTndSeqLen 先行写入的 curS1 / curS2 / s1Index 给出，
-    // n2 方向不影响 sel 数（deter 路径也只支持 n2 == 1，见 host tiling 校验）。
-    (void)t1Idx;
-    (void)n2Idx;
+    // 因果上界由 GetTndSeqLen 先行写入的 curS1 / curS2 / s1Index 给出；n2 方向不影响 sel 数
+    // （deter 路径也只支持 n2 == 1，见 host tiling 校验），t1Idx / n2Idx 只用于定位 topk。
     int64_t maxS2 = curS2;
     if (constInfo.sparseMode == RIGHT_DOWN_CAUSAL) {
         maxS2 = Max(curS2 - curS1 + s1Index + 1, 0);
     }
     // 与 FAGBlockVec::GetRunInfo 的消费侧公式必须逐字一致，否则 Scatter 会遍历到生产侧没写过的 block。
-    actSelBlkCount = Min(constInfo.selectedBlockCount, Ceil<int64_t>(maxS2, constInfo.selectedBlockSize));
+    int64_t maxS2Blk = Ceil<int64_t>(maxS2, constInfo.selectedBlockSize);
+    actSelBlkCount = Min(constInfo.selectedBlockCount, maxS2Blk);
+    curLastBlockSize = GetLastBlockSize(t1Idx, n2Idx, maxS2, maxS2Blk, actSelBlkCount);
+}
+
+template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
+__aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetLastBlockSize(
+    const int64_t t1Idx, const int64_t n2Idx, const int64_t maxS2, const int64_t maxS2Blk, const int64_t actSelBlkCount)
+{
+    // 因果场景下 maxS2Blk-1 号 block 只有 maxS2 - (maxS2Blk-1)*blockSize 行落在下三角内。topk 升序，
+    // 它若被选中必然排在最后一个位置；没被选中时本 tile 全是满块，不能截断。
+    // blockSize=1 时 tailRows 恒等于 blockSize，整段短路，不读 GM。
+    int64_t blockSize = constInfo.selectedBlockSize;
+    int64_t tailRows = maxS2 - (maxS2Blk - 1) * blockSize;
+    if (actSelBlkCount <= 0 || tailRows == blockSize) {
+        return blockSize;
+    }
+    int64_t topkOffset = t1Idx * constInfo.n2Size * constInfo.selectedBlockCount +
+                         n2Idx * constInfo.selectedBlockCount + actSelBlkCount - 1;
+    return topkIndicesGm.GetValue(topkOffset) == maxS2Blk - 1 ? tailRows : blockSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>

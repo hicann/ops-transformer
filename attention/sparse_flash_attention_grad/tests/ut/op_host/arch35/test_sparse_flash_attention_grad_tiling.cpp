@@ -50,6 +50,40 @@ const std::string kAscend950SocInfo = "{\n"
 // 模板 128/128/512 在声明 [128]/[128]/[512,576] 中均位于 index 0 → G/S2/D 编码 0。
 // kvMerge=true 置 bit34，BF16 置 bit0。最终 key = (1 << 34) + 1 = 17179869185。
 constexpr uint64_t kKeyBsndBf16KvMerge = 17179869185UL;
+// Deterministic 在 ASCENDC_TPL_ARGS_DECL 中紧邻 KvMerge 之前声明，故占 bit33。
+constexpr uint64_t kKeyBsndBf16KvMergeDeter = kKeyBsndBf16KvMerge | (1UL << 33);
+
+gert::TilingContextPara MakeKvMergePara(CompileInfo &compileInfo, int64_t sparseBlockSize, int64_t s2,
+                                        int32_t deterministicInfo = 0)
+{
+    return gert::TilingContextPara(
+        "SparseFlashAttentionGrad",
+        {{{{1, 16, 8, 512}, {1, 16, 8, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, s2, 1, 512}, {1, s2, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 16, 1, 1024}, {1, 16, 1, 1024}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1, 16, 8, 512}, {1, 16, 8, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 16, 8, 512}, {1, 16, 8, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, 8, 16}, {1, 8, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{1, 8, 16}, {1, 8, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{{{1, 16, 8, 512}, {1, 16, 8, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{1, s2, 1, 512}, {1, s2, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.0441941738f)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseBlockSize)},
+         {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(deterministicInfo != 0)}},
+        &compileInfo, "Ascend950", kAscend950SocInfo, 4096, deterministicInfo);
+}
 } // namespace
 
 class SparseFlashAttentionGradArch35Tiling : public testing::Test {};
@@ -118,4 +152,46 @@ TEST_F(SparseFlashAttentionGradArch35Tiling, kvmerge_nonempty_dv_should_fail)
                                  &compileInfo, "Ascend950", kAscend950SocInfo, 4096);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+TEST_F(SparseFlashAttentionGradArch35Tiling, sparse_block_size_support_list)
+{
+    CompileInfo compileInfo;
+    for (int64_t sparseBlockSize : {1, 8, 16, 32, 64}) {
+        auto para = MakeKvMergePara(compileInfo, sparseBlockSize, 128);
+        ExecuteTestCase(para, ge::GRAPH_SUCCESS, kKeyBsndBf16KvMerge);
+    }
+}
+
+TEST_F(SparseFlashAttentionGradArch35Tiling, sparse_block_size_not_in_support_list_should_fail)
+{
+    CompileInfo compileInfo;
+    for (int64_t sparseBlockSize : {0, 2, 4, 128}) {
+        auto para = MakeKvMergePara(compileInfo, sparseBlockSize, 128);
+        ExecuteTestCase(para, ge::GRAPH_FAILED);
+    }
+}
+
+// 确定性计算每核常驻一整份 selected 区：S2=128 时只需 min(1024, ceil(128/64)) * 64 = 128 行。
+TEST_F(SparseFlashAttentionGradArch35Tiling, deterministic_sparse_block_size_support_list)
+{
+    CompileInfo compileInfo;
+    for (int64_t sparseBlockSize : {1, 8, 16, 32, 64}) {
+        auto para = MakeKvMergePara(compileInfo, sparseBlockSize, 128, 1);
+        ExecuteTestCase(para, ge::GRAPH_SUCCESS, kKeyBsndBf16KvMergeDeter);
+    }
+}
+
+TEST_F(SparseFlashAttentionGradArch35Tiling, deterministic_large_s2_block_size_64)
+{
+    CompileInfo compileInfo;
+    auto para = MakeKvMergePara(compileInfo, 64, 16384, 1);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, kKeyBsndBf16KvMergeDeter);
+}
+
+TEST_F(SparseFlashAttentionGradArch35Tiling, non_deterministic_large_s2_block_size_64)
+{
+    CompileInfo compileInfo;
+    auto para = MakeKvMergePara(compileInfo, 64, 16384);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, kKeyBsndBf16KvMerge);
 }
