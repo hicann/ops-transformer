@@ -28,6 +28,20 @@ FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
 
+def restore_cmp_kv_lengths(seqused_cmp_kv, cmp_ratio, cmp_residual_kv=None):
+    """Restore the logical CMP context lengths used by the Arch35 kernels."""
+    if seqused_cmp_kv is None:
+        return None
+    if cmp_residual_kv is not None and len(cmp_residual_kv) != len(seqused_cmp_kv):
+        raise ValueError("cmp_residual_kv and seqused_cmp_kv must have the same length")
+
+    return [
+        int(cmp_len) * cmp_ratio
+        + (int(cmp_residual_kv[index]) if cmp_residual_kv is not None else 0)
+        for index, cmp_len in enumerate(seqused_cmp_kv)
+    ]
+
+
 class GeneralizedSFAQuant:
     def __init__(
         self,
@@ -135,16 +149,17 @@ class GeneralizedSFAQuant:
         act_q = self.seqused_q
         G = int(self.N1 / self.N2)
         s2_base_size = 128
+        cmp_restored_lengths = restore_cmp_kv_lengths(
+            seqused_cmp_kv, self.cmp_ratio, cmp_residual_kv
+        )
 
         for i_B in range(B):
             logging.info(f"i_B = {i_B}/{B}")
             cur_act_q = act_q[i_B]
             cur_ori_act_kv = seqused_ori_kv[i_B]
-            cur_cmp_act_kv = seqused_cmp_kv[i_B] if seqused_cmp_kv is not None else 0
-            cur_cmp_residual = (
-                cmp_residual_kv[i_B] if cmp_residual_kv is not None else 0
+            cur_cmp_restored = (
+                cmp_restored_lengths[i_B] if cmp_restored_lengths is not None else 0
             )
-            cur_cmp_restored = cur_cmp_act_kv * self.cmp_ratio + cur_cmp_residual
 
             for i_N2 in range(self.N2):
                 logging.info(f"    i_N2 = {i_N2}/{self.N2}")
@@ -1187,7 +1202,6 @@ def gen_cmp_kv(
     cmp_max_block_num_per_batch,
     cu_seqlens_q,
     seqused_q,
-    seqused_ori_kv,
     seqused_cmp_kv,
     cu_seqlens_cmp_kv,
     cmp_residual_kv,
@@ -1233,12 +1247,9 @@ def gen_cmp_kv(
     cmp_sparse_indices = None
     cmp_topk_length = None
     if template_run_mode in ("CSA", "ORI_CMP_SPARSE") and cmp_max_s2 != 0:
-        if cmp_residual_kv is not None:
-            cmp_restored_len = [
-                seqused_cmp_kv[i] * cmp_ratio + cmp_residual_kv[i] for i in range(B)
-            ]
-        else:
-            cmp_restored_len = [seqused_cmp_kv[i] * cmp_ratio for i in range(B)]
+        cmp_restored_len = restore_cmp_kv_lengths(
+            seqused_cmp_kv, cmp_ratio, cmp_residual_kv
+        )
         if layout_q == "BSND":
             cmp_sparse_indices, cmp_topk_length = gen_sparse_indices_bsnd(
                 cmp_ratio,
@@ -1508,7 +1519,6 @@ def gen_data(params, generate_golden=True):
             cmp_max_block_num_per_batch,
             cu_seqlens_q,
             seqused_q,
-            seqused_ori_kv,
             seqused_cmp_kv,
             cu_seqlens_cmp_kv,
             cmp_residual_kv,
