@@ -27,44 +27,13 @@ using AscendC::Reg::StoreDist;
 #include "common/get_kv_phy_addr_vf.h"
 #include "common/smla_vector_common_arch35.h"
 
-#if __has_include("../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h")
-#include "../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
-#else
-#include "../common/arch35/vf/vf_flash_decode_arch35.h"
-#endif
-
-#if __has_include("../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_sfa.h")
-#include "../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_sfa.h"
-#else
-#include "../../common/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_sfa.h"
-#endif
-
-#if __has_include("../../common/op_kernel/arch35/vf/vf_flashupdate_new.h")
-#include "../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
-#else
-#include "../../common/arch35/vf/vf_flashupdate_new.h"
-#endif
-
-#if __has_include("../../common/op_kernel/buffers_policy.h")
-#include "../../common/op_kernel/buffers_policy.h"
-#else
-#include "../common/buffers_policy.h"
-#endif
-#if __has_include("../../common/op_kernel/attn_buffer_manager.h")
-#include "../../common/op_kernel/attn_buffer_manager.h"
-#else
-#include "../common/attn_buffer_manager.h"
-#endif
-#if __has_include("../../common/op_kernel/attn_buffer.h")
-#include "../../common/op_kernel/attn_buffer.h"
-#else
-#include "../common/attn_buffer.h"
-#endif
-#if __has_include("../../common/op_kernel/init_output.h")
-#include "../../common/op_kernel/init_output.h"
-#else
-#include "../common/init_output.h"
-#endif
+#include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
+#include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_sfa.h"
+#include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
+#include "../../../common/op_kernel/buffers_policy.h"
+#include "../../../common/op_kernel/attn_buffer_manager.h"
+#include "../../../common/op_kernel/attn_buffer.h"
+#include "../../../common/op_kernel/init_output.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;

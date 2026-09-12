@@ -22,24 +22,10 @@
 #include "kernel_operator.h"
 #include "../sparse_flash_mla_kernel_metadata.h"
 
-#if __has_include("../../common/op_kernel/matmul.h")
-#include "../../common/op_kernel/matmul.h"
-#else
-#include "../common/matmul.h"
-#endif
-#if __has_include("../../common/op_kernel/FixpipeOut.h")
-#include "../../common/op_kernel/FixpipeOut.h"
-#else
-#include "../common/FixpipeOut.h"
-#endif
-#if __has_include("../../common/op_kernel/CopyInL1.h")
-#include "../../common/op_kernel/CopyInL1.h"
-#else
-#include "../common/CopyInL1.h"
-#endif
-#if __has_include("common/buffers_policy_3buff_sfa.h")
+#include "../../../common/op_kernel/matmul.h"
+#include "../../../common/op_kernel/FixpipeOut.h"
+#include "../../../common/op_kernel/CopyInL1.h"
 #include "common/buffers_policy_3buff_sfa.h"
-#endif
 
 #include "kernel_operator_list_tensor_intf.h"
 #include "common/smla_kernel_common_arch35.h"
