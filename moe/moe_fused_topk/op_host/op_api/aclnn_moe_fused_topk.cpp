@@ -237,14 +237,15 @@ aclnnStatus aclnnMoeFusedTopkGetWorkspaceSize(const aclTensor *x, const aclTenso
                           scale, enableExpertMapping),
                    DFX_OUT(y, indices));
 
-    // 固定写法，创建OpExecutor
-    auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-
     // 固定写法，参数检查
     auto ret = CheckParams(x, addNum, mappingNum, mappingTable, groupNum, groupTopk, topN, topK, activateType, isNorm,
                            scale, enableExpertMapping, y, indices);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
+
+    // Create the executor only after validation to avoid ReleaseTo warnings on invalid parameters.
+    auto uniqueExecutor = CREATE_EXECUTOR();
+    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
     // 空Tensor处理
     if (x->IsEmpty()) {
         *workspaceSize = 0;
