@@ -203,7 +203,7 @@ def compressor_forward(
     return_update_mask: bool = False,  # 是否返回 kv/score state 的写入位置 mask（与 kv_state_out/score_state_out 同 shape）
     device: str = "cpu",
     compute_dtype: torch.dtype = torch.float32,
-    matmul_mode: str = "two",
+    matmul_mode: str = "same",
 ) -> Tuple:
     """
     执行 compressor 前向计算。
@@ -215,8 +215,7 @@ def compressor_forward(
       score_state: 更新后的 score_state
 
     matmul_mode:
-      "two"（两方，现状）：x/wkv/wgate 提升 compute_dtype 后 FP32 matmul + _QuantGrad 量化模拟；
-      "same"（三方 B）：输入不提升，BF16×BF16 → BF16 出，matmul→vec 前 cast 回 compute_dtype；
+      "same"（两方，现状）：x/wkv/wgate 提升 compute_dtype 后 FP32 matmul + _QuantGrad 量化模拟；
       "high"（三方 C）：全程 compute_dtype（float64），无量化。
     """
     orig_dtype = x.dtype
@@ -234,14 +233,10 @@ def compressor_forward(
 
     # ---- 第一步：matmul ----
     ape_f32 = ape.to(compute_dtype)
-    if matmul_mode == "same":
-        # 三方 B：输入不提升（BF16 进），matmul 输出 BF16
-        x_mm, wkv_mm, wgate_mm = x, wkv, wgate
-    else:
-        # two/high：提升到 compute_dtype
-        x_mm = x.to(compute_dtype)
-        wkv_mm = wkv.to(compute_dtype)
-        wgate_mm = wgate.to(compute_dtype)
+    # two/high：提升到 compute_dtype
+    x_mm = x.to(compute_dtype)
+    wkv_mm = wkv.to(compute_dtype)
+    wgate_mm = wgate.to(compute_dtype)
 
     if bs_combine:
         # x 形状为 (T, H)，直接做矩阵乘法
@@ -256,10 +251,6 @@ def compressor_forward(
         T = B_in * S_in
 
     if matmul_mode == "same":
-        # matmul→vec cast：BF16 出 → FP32（vec 侧 +ape/softmax/加权求和需 FP32 输入）
-        flat_kv = flat_kv.to(compute_dtype)
-        flat_score = flat_score.to(compute_dtype)
-    elif matmul_mode == "two":
         # 模拟 kernel 反向中间精度：dkv/dsb 梯度经 FP16/BF16 存储（golden 同款量化）
         flat_kv = _QuantGrad.apply(flat_kv, orig_dtype)
         flat_score = _QuantGrad.apply(flat_score, orig_dtype)

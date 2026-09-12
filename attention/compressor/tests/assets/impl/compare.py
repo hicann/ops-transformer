@@ -348,6 +348,7 @@ def compare(*outputs, **kwargs):
         }
 
     GOLDEN_OUTPUT_COUNT = 2
+    outputs = tuple(_to_torch(o) for o in outputs)
     npu_outputs = list(outputs[:GOLDEN_OUTPUT_COUNT])
     golden_outputs = list(outputs[GOLDEN_OUTPUT_COUNT:])
     cmp_kv_mask = kwargs.get("cmp_kv_mask", None)

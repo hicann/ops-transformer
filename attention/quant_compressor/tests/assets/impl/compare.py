@@ -498,8 +498,10 @@ def compare(*outputs, **kwargs):
         }
 
     GOLDEN_OUTPUT_COUNT = 2
+    outputs = tuple(_to_torch(o) for o in outputs)
     golden_outputs = list(outputs[-GOLDEN_OUTPUT_COUNT:])
     npu_outputs = list(outputs[:-GOLDEN_OUTPUT_COUNT])
+
     cmp_kv_mask = kwargs.get("cmp_kv_mask", None)
 
     # Fallback: single NPU output (cmp_kv only) — compare cmp_kv, skip state_cache
@@ -598,13 +600,23 @@ def compare(*outputs, **kwargs):
     return results
 
 
+def _try_hifloat8_dtype():
+    try:
+        return np.dtype("hifloat8")
+    except TypeError:
+        return None
+
+
+_HIF8_DTYPE = _try_hifloat8_dtype()
+
+
 def _to_torch(val):
     if val is None:
         return None
     if torch.is_tensor(val):
         return val
     if isinstance(val, np.ndarray):
-        if val.dtype == np.dtype("hifloat8"):
+        if _HIF8_DTYPE is not None and val.dtype == _HIF8_DTYPE:
             return torch.from_numpy(val.view(np.uint8))
         if val.dtype.itemsize == 2 and str(val.dtype) == "bfloat16":
             return torch.from_numpy(val.view(np.uint16)).view(torch.bfloat16)

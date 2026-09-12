@@ -1402,6 +1402,8 @@ def run_compressor_eager(
                 )
             )
             print(f"state_cache_pad: shape {state_cache_pad.shape}")
+            # 先搬到 NPU，再从 NPU tensor 建非连续视图（否则 state_cache 仍是 CPU 视图）
+            state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
             # 使用 as_strided 创建非连续视图
             # stride(0) = (b + stride) * c, stride(1) = c, stride(2) = 1
             state_cache = torch.as_strided(
@@ -1414,9 +1416,12 @@ def run_compressor_eager(
                 ),
             )
             # 填充数据
-            state_cache[:, :, : kv_state.shape[2]] = kv_state.clone()
-            state_cache[:, :, kv_state.shape[2] :] = score_state.clone()
-            state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
+            state_cache[:, :, : kv_state.shape[2]] = kv_state.clone().to(
+                "npu:%s" % DEVICE_ID
+            )
+            state_cache[:, :, kv_state.shape[2] :] = score_state.clone().to(
+                "npu:%s" % DEVICE_ID
+            )
             print(
                 f"state_cache: shape {state_cache.shape}, dtype: {state_cache.dtype}, is_contiguous: {state_cache.is_contiguous()}, stride: {state_cache.stride()}"
             )
@@ -1429,14 +1434,19 @@ def run_compressor_eager(
             (kv_state.shape[0], kv_state.shape[1] * kv_state.shape[2] * 2 + layer_pad)
         )
         print(f"state_cache_pad: shape {state_cache_pad.shape}")
+        # 先搬到 NPU，再从 NPU tensor 建非连续视图（否则 state_cache 仍是 CPU 视图）
+        state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
         state_cache = state_cache_pad[
             :,
             layer_start_idx : layer_start_idx
             + kv_state.shape[1] * kv_state.shape[2] * 2,
         ].view(-1, kv_state.shape[1], kv_state.shape[2] * 2)
-        state_cache[:, :, : state_cache.shape[2] // 2] = kv_state.clone()
-        state_cache[:, :, state_cache.shape[2] // 2 :] = score_state.clone()
-        state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
+        state_cache[:, :, : state_cache.shape[2] // 2] = kv_state.clone().to(
+            "npu:%s" % DEVICE_ID
+        )
+        state_cache[:, :, state_cache.shape[2] // 2 :] = score_state.clone().to(
+            "npu:%s" % DEVICE_ID
+        )
         print(
             f"state_cache: shape {state_cache.shape}, dtype: {state_cache.dtype}, is_contiguous: {state_cache.is_contiguous()}, stride0: {state_cache.stride(0)}"
         )

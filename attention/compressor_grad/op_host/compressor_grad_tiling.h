@@ -72,6 +72,12 @@ constexpr uint32_t MAX_CMP_RATIO = 128;
 constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
 const uint32_t CMP_MAX_AIC_CORE_NUM = 36;
 
+// TILING BLOCK SIZE
+constexpr uint32_t D_BASE_SIZE = 128; // D 方向分块基大小（UB/L1 物理行宽）
+constexpr uint32_t M_BASE_SIZE = 128; // M 方向分块基大小
+constexpr uint32_t DB_RATIO = 2;      // workspace 双缓冲倍数
+constexpr uint32_t COFF_MAX = 2;      // coff 上限
+
 static const std::string X_NAME = "query";
 static const std::string WKV_NAME = "wkv";
 static const std::string WGATE_NAME = "wgate";
@@ -87,8 +93,6 @@ static const std::string D_X_NAME = "d_x";
 static const std::string D_WKV_NAME = "d_wkv";
 static const std::string D_WGATE_NAME = "d_wgate";
 static const std::string D_APE_NAME = "d_ape";
-
-static std::string DataTypeToSerialString(ge::DataType type);
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
     {X_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
@@ -295,6 +299,79 @@ REGISTER_TILING_DATA_CLASS(CompressorGrad, CompressorGradTilingData)
 
 struct CompressorGradCompileInfo {
     int64_t core_num;
+};
+
+// 类名不可用 CompressorGradTiling，与 pypto codegen 生成的 tiling data 类重名，
+// C++ injected-class-name 会遮蔽外部同名类型，导致 tilingData 成员类型错误。
+class CompressorGradTilingImpl {
+public:
+    explicit CompressorGradTilingImpl(CompressorGradContext *context)
+        : context_(context)
+    {}
+    ~CompressorGradTilingImpl() = default;
+
+    static ge::graphStatus ConvertContext(gert::TilingContext &context, CompressorGradContext &compressorGradContext);
+    ge::graphStatus RunBigKernelTiling();
+    CompressorGradTiling *tilingData = nullptr;
+
+private:
+    static ge::graphStatus ConvertRequiredParams(gert::TilingContext &context,
+                                                 CompressorGradContext &compressorGradContext);
+    static void ConvertOptionalParams(gert::TilingContext &context, CompressorGradContext &compressorGradContext);
+    ge::graphStatus GetNpuInfo();
+    ge::graphStatus SetBaseInfo();
+    ge::graphStatus SetTilingData();
+    ge::graphStatus CalcWorkSpace();
+    ge::graphStatus CheckSinglePara() const;
+    ge::graphStatus GenTilingKey() const;
+    ge::graphStatus CheckDimNumInLayoutSupport(const std::string &layout, const gert::StorageShape *shape,
+                                               const std::string &name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape, const std::string &name) const;
+    ge::graphStatus LogErrorShapeConsistency(const std::string &name, const gert::StorageShape *shape,
+                                             const uint32_t &dimNum, const std::string &subName,
+                                             const uint32_t &expectNum) const;
+    ge::graphStatus CheckSingleParaX() const;
+    ge::graphStatus CheckSingleParaWkv() const;
+    ge::graphStatus CheckSingleParaWgate() const;
+    ge::graphStatus CheckSingleParaDCmpKv() const;
+    ge::graphStatus CheckSingleParaSoftmaxScore() const;
+    ge::graphStatus CheckSingleParaKV() const;
+    ge::graphStatus CheckSingleParaCuSeqlens() const;
+    ge::graphStatus CheckSingleParaSeqused() const;
+    ge::graphStatus CheckSingleParaStartPos() const;
+    ge::graphStatus CheckSingleParaDX() const;
+    ge::graphStatus CheckSingleParaDWkv() const;
+    ge::graphStatus CheckSingleParaDWgate() const;
+    ge::graphStatus CheckSingleParaDApe() const;
+    ge::graphStatus CheckSingleParaCmpRatio() const;
+    ge::graphStatus CheckSingleParaCoff() const;
+    ge::graphStatus CheckRequiredParaExistence() const;
+    ge::graphStatus CheckRequiredInOutExistence() const;
+    ge::graphStatus CheckRequiredAttrExistence() const;
+    ge::graphStatus CheckFeature() const;
+    ge::graphStatus CheckShapeConsistency() const;
+    ge::graphStatus CheckDtypeConsistencyX(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDtypeConsistency() const;
+    ge::graphStatus CheckMultiParaConsistency() const;
+    ge::graphStatus CheckDimNumConsistency() const;
+    ge::graphStatus CheckEmptyTensor() const;
+    ge::graphStatus CheckBlockDimConstrain() const;
+
+    size_t ubSize_ = 0;
+    size_t l1Size_ = 0;
+    size_t l0cSize_ = 0;
+    size_t l0bSize_ = 0;
+    uint32_t coreNum_ = 0;
+    uint32_t aicNum_ = 0;
+    uint32_t aivNum_ = 0;
+    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND950;
+    size_t libapiSize_ = 0;
+    size_t workspaceSize_ = 0;
+    uint8_t coff_ = 1;
+    CompressorGradBaseParams baseParams_;
+    CompressorGradWorkspaceParams workspaceParams_;
+    CompressorGradContext *context_ = nullptr;
 };
 
 } // namespace optiling

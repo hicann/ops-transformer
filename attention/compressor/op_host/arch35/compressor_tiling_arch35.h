@@ -271,9 +271,11 @@ private:
     ge::graphStatus SetBaseInfo();
     ge::graphStatus SetPageAttentionInfo();
     ge::graphStatus SetWorkSpaceInfo();
-    ge::graphStatus SetScenarioInfo();
+    ge::graphStatus SetScenarioInfo() const;
     ge::graphStatus SetTemplateId();
     ge::graphStatus SetInnerSplitInfo();
+    ge::graphStatus SetFullLoadSplitInfo();
+    ge::graphStatus SetNormalSplitInfo();
     ge::graphStatus CalcWorkSpace();
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus GenTilingKey() const;

@@ -40,7 +40,6 @@ def _small_ops_golden(
 
     matmul_mode/compute_dtype 决定精度口径（与 compressor_forward 对齐）：
       two:  CPU f32 提升 + 中间量量化（两方 golden）
-      same: 输入不提升，bf16 进 bf16 出（三方 B，模拟 kernel 同精度）
       high: float64 全程（三方 C，高精度真值）
     """
     dev = x.device if device == "cpu" else device
@@ -98,7 +97,7 @@ def run_small_ops_case(case, device, compare_mode=3):
     ⚠️ loss 只对有效压缩块计算（cmp_mask 过滤），无效 padding 不附加梯度。
     golden 全部来自小算子自动反向（不调手写 compressor_grad_golden）：
     compare_mode=2 时用 CPU 小算子 two 口径；compare_mode=3 时
-    B=NPU 小算子 same（bf16 进 bf16 出）、C=CPU 小算子 high（float64）。
+    B=NPU 小算子 two（f32 提升）、C=CPU 小算子 high（float64）。
     """
     p = _parse_case(case, device)
     B, S1, H, D = p["B"], p["S1"], p["H"], p["D"]
@@ -176,7 +175,7 @@ def run_small_ops_case(case, device, compare_mode=3):
     d_xNpu = npu_result["d_x"].cpu().float().reshape(-1, H)
     if compare_mode == 2:
         g_dx, g_dwkv, g_dwgate, g_dape = _small_ops_golden(
-            device="cpu", matmul_mode="two", compute_dtype=torch.float32, **golden_kw
+            device="cpu", matmul_mode="same", compute_dtype=torch.float32, **golden_kw
         )
         p_pct_thd = get_pct_thd(dataType)
         checks = [
@@ -208,8 +207,7 @@ def run_small_ops_case(case, device, compare_mode=3):
             r = check_one_output(name, exp, act, dt, True, 1, thd)
             statuses.append(f"{name}={r['status']}")
     else:
-        # 三方：B=NPU 小算子 same（bf16 进 bf16 出，模拟 kernel 同精度）、
-        #      C=CPU 小算子 high（float64 高精度真值）——均来自自动反向推导
+        # 三方：B=NPU 小算子 two（f32 提升）、C=CPU 小算子 high（float64 高精度真值）——均来自自动反向推导
         b_dx, b_dwkv, b_dwgate, b_dape = _small_ops_golden(
             device=device, matmul_mode="same", compute_dtype=torch.float32, **golden_kw
         )
@@ -263,7 +261,7 @@ from compressor_grad import compressor_grad, CompressorGradTiling  # noqa: E402
 from test_compressor_grad_cases import REDLINE_CASES
 from compressor_grad_cpu_golden import compressor_grad_golden
 from compressor_grad_npu import NPUBackend
-from cann_ops_transformer.ops.compressor import (
+from cann_ops_transformer.ops.attention.compressor.compressor import (
     _compressor_forward,
     _compressor_backward,
 )
@@ -428,7 +426,7 @@ def check_forward_outputs(
     仅比对有效压缩块行（padding 行参考为 0、NPU 不保证写）。
     ref: 可选预计算参考（return_intermediates=True 的 6/8 元组），避免重复计算；
          为 None 时内部调用 compressor_forward。
-    compare_mode=3 时：cmp_kv/sm/kv 与三方参考比对（B=NPU 小算子 same，
+    compare_mode=3 时：cmp_kv/sm/kv 与三方参考比对（B=NPU 小算子 two、C=float64 高精度 high）；
     C=float64 高精度 high）；state 校验仍由调用方用两方 ref 完成。
     """
     coffD = coff * headDim
@@ -664,7 +662,7 @@ def run_forward_direct_case(case, p, b, totalValid, device, compare_mode=3):
 
     校验：
       - 正向 3 输出：cmp_kv / softmax_score / kv vs compressor_forward 参考（check_forward_outputs）；
-        compare_mode=3 时与三方参考比对（B=NPU 小算子 same、C=float64 高精度 high）；
+        compare_mode=3 时与三方参考比对（B=NPU 小算子 two、C=float64 高精度 high）；
       - state_cache 4 项：kv_state_update / score_state_update / kv_state_origin /
         score_state_origin（check_state_outputs，与正向 pytest 一致；origin 严格相等）。
 
@@ -813,7 +811,7 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
     通路 1 拼接时由通路 5 传入复用同一份中间量。
 
     校验反向 4 输出：compare_mode=2 两方（vs compressor_grad_golden two）；
-    compare_mode=3 三方（vs NPU 小算子 same + float64 高精度 high）。
+    compare_mode=3 三方（vs NPU 小算子 two + float64 高精度 high）。
     """
     batchSize, seqSize, headDim, hiddenSize = p["B"], p["S1"], p["D"], p["H"]
     cmpRatio, coff = p["cr"], p["coff"]
@@ -864,7 +862,7 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
     )
     torch.npu.synchronize()
 
-    # ── Golden（一份参数化实现：2=两方 two；3=三方 B same + C high）──
+    # ── Golden（一份参数化实现：2=两方 two；3=三方 B two + C high）──
     dcCpu = dcNpu.cpu().float()
     spGolden = spNpu.cpu() if spNpu is not None else None
     sqGolden = sqNpu.cpu() if sqNpu is not None else None
