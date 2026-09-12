@@ -74,7 +74,7 @@ private:
 
 class AlltoAllKcQuantMatmulHelper : public Mc2AdaptiveSlidingWindowTiling {
 public:
-    AlltoAllKcQuantMatmulHelper(AllToAllKcQuantMatmulTilingBase &AllToAllKcQuantMatmulTilingBase,
+    AlltoAllKcQuantMatmulHelper(AllToAllKcQuantMatmulTilingBase &allToAllKcQuantMatmulTilingBase,
                                 DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &out, uint64_t &mmMvalueLen);
     const gert::Shape GetX1Shape(const size_t index) override;
     const gert::Shape GetX2Shape(const size_t index) override;
