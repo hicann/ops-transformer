@@ -103,8 +103,8 @@ ge::graphStatus QLIV2VariantChecker::CheckScaleShape(const LightningIndexerV2Che
         if (scaleShape.GetDim(i) != inputShape.GetDim(i)) {
             const std::string names = std::string(inputName) + " and " + scaleName;
             const std::string actual = ShapeToString(input) + " and " + ShapeToString(scale);
-            const std::string reason = std::string("Input ") + inputName + " and " + scaleName +
-                                       " must have equal dimensions before the head_dim axis";
+            const std::string reason = "The size of dimension " + std::to_string(i) + " must be the same for " +
+                                       inputName + " and " + scaleName;
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(info.opName, names.c_str(), actual.c_str(), reason.c_str());
             return ge::GRAPH_FAILED;
         }

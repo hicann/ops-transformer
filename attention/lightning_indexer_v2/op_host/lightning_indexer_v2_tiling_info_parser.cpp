@@ -147,6 +147,9 @@ void PopulateTilingInfo(const lightning_indexer_v2_checker::LightningIndexerV2Ch
     if (info.key.stride != nullptr && info.key.stride->GetDimNum() > 0) {
         tilingInfo.keyStride0 = static_cast<uint32_t>(info.key.stride->GetStride(0));
     }
+    if (tilingInfo.pageAttentionFlag && tilingInfo.keyStride0 == 0) {
+        tilingInfo.keyStride0 = static_cast<uint32_t>(info.blockSize * info.kHeads * info.headDim);
+    }
     SetDataLayouts(info, tilingInfo);
 }
 } // namespace

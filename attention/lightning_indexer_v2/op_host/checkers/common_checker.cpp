@@ -55,9 +55,9 @@ bool SameDim(const gert::Shape &lhs, uint32_t lhsIndex, const gert::Shape &rhs, 
 }
 
 ge::graphStatus LogShapeMismatch(const LightningIndexerV2CheckerInfo &info, const char *names,
-                                 const std::string &actual, const char *reason)
+                                 const std::string &actual, const std::string &reason)
 {
-    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(info.opName, names, actual.c_str(), reason);
+    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(info.opName, names, actual.c_str(), reason.c_str());
     return ge::GRAPH_FAILED;
 }
 
@@ -266,20 +266,20 @@ ge::graphStatus CommonChecker::CheckMainShapes(const LightningIndexerV2CheckerIn
     const gert::Shape &q = *info.query.GetShape();
     const gert::Shape &k = *info.key.GetShape();
     const gert::Shape &w = *info.weights.GetShape();
-    const uint32_t qS = info.layoutQ == CheckerLayout::BSND ? BSND_SEQ_AXIS : TND_TOKEN_AXIS;
-    const uint32_t qN = info.layoutQ == CheckerLayout::BSND ? BSND_HEAD_AXIS : TND_HEAD_AXIS;
     const uint32_t qD = info.layoutQ == CheckerLayout::BSND ? BSND_HEAD_DIM_AXIS : TND_HEAD_DIM_AXIS;
     const uint32_t kN = info.layoutK == CheckerLayout::TND ? TND_HEAD_AXIS : BSND_HEAD_AXIS;
     const uint32_t kD = info.layoutK == CheckerLayout::TND ? TND_HEAD_DIM_AXIS : BSND_HEAD_DIM_AXIS;
-    const uint32_t wS = info.layoutQ == CheckerLayout::BSND ? BSND_SEQ_AXIS : TND_TOKEN_AXIS;
-    const uint32_t wN = info.layoutQ == CheckerLayout::BSND ? BSND_HEAD_AXIS : TND_HEAD_AXIS;
-    if (!SameDim(q, qS, w, wS) || !SameDim(q, qN, w, wN) || !SameDim(q, qD, k, kD) ||
-        (info.layoutQ == CheckerLayout::BSND && !SameDim(q, BSND_BATCH_AXIS, w, BSND_BATCH_AXIS))) {
-        const std::string actual =
-            ShapeToString(info.query) + ", " + ShapeToString(info.key) + " and " + ShapeToString(info.weights);
-        return LogShapeMismatch(info, "q, k and w", actual,
-                                "Q and w must share sequence/head axes and, for BSND, the batch axis; "
-                                "q and k must share head_dim");
+    for (uint32_t i = 0; i < qD; ++i) {
+        if (!SameDim(q, i, w, i)) {
+            const std::string actual = ShapeToString(info.query) + " and " + ShapeToString(info.weights);
+            const std::string reason = "The size of dimension " + std::to_string(i) + " must be the same for q and w";
+            return LogShapeMismatch(info, "q and w", actual, reason);
+        }
+    }
+    if (!SameDim(q, qD, k, kD)) {
+        const std::string actual = ShapeToString(info.query) + " and " + ShapeToString(info.key);
+        const std::string reason = "The last dimensions of q and k must have the same size";
+        return LogShapeMismatch(info, "q and k", actual, reason);
     }
     if (info.layoutQ == CheckerLayout::BSND && info.layoutK == CheckerLayout::BSND &&
         !SameDim(q, BSND_BATCH_AXIS, k, BSND_BATCH_AXIS)) {

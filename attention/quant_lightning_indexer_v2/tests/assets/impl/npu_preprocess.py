@@ -16,6 +16,7 @@ import logging
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 
 
@@ -135,9 +136,10 @@ def build_metadata_arguments(
     k_shape = tuple(int(value) for value in key.shape)
     num_heads_q = q_shape[2] if layout_q == "BSND" else q_shape[1]
     num_heads_k = k_shape[1] if layout_k == "TND" else k_shape[2]
-    head_dim = q_shape[-1] * (
-        2 if int(quant_mode) in (QUANT_MODE_MXFP4, QUANT_MODE_HIF4) else 1
-    )
+    head_dim = q_shape[-1]
+    is_aclnn_float4 = isinstance(query, np.ndarray) and "float4" in str(query.dtype)
+    if int(quant_mode) in (QUANT_MODE_MXFP4, QUANT_MODE_HIF4) and not is_aclnn_float4:
+        head_dim *= 2
     cu_q = kwargs.get("cu_seqlens_q")
     cu_k = kwargs.get("cu_seqlens_k")
     seq_q = kwargs.get("seqused_q")
@@ -293,6 +295,32 @@ def run(
             arguments_kwargs,
         )
         source = "main API fallback (sidecar unavailable)"
+    if (
+        int(quant_mode) == QUANT_MODE_MXFP4
+        and int(arguments["quant_mode"]) == QUANT_MODE_MXFP4
+        and int(arguments["head_dim"]) == 64
+        and all(
+            torch.is_tensor(tensor)
+            and tensor.dtype == torch.float4_e2m1fn_x2
+            and tensor.shape[-1] == 64
+            for tensor in (query, key)
+        )
+        and all(
+            torch.is_tensor(scale)
+            and scale.dtype == torch.float8_e8m0fnu
+            and tuple(scale.shape) == tuple(tensor.shape[:-1]) + (2, 2)
+            for tensor, scale in (
+                (query, query_dequant_scale),
+                (key, key_dequant_scale),
+            )
+        )
+    ):
+        arguments = dict(arguments, head_dim=128)
+        logging.warning(
+            "[%s] Legacy MXFP4 metadata head_dim=64 uses the packed storage dimension; "
+            "using logical head_dim=128 from Q/K and scales",
+            testcase_name,
+        )
     logging.info(
         "[%s] build QLI_V2 metadata from %s; forced=%s",
         testcase_name,
