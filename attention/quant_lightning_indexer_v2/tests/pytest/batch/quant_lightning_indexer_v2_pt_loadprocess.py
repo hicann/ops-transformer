@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import os
+import logging
 import pandas as pd
 import numpy as np
 import torch
@@ -22,12 +23,72 @@ import ast
 import cann_ops_transformer
 from qliv2_parameter_normalization import normalize_qliv2_params
 
+QUANT_MODE_MXFP8 = 3
 QUANT_MODE_MXFP4 = 5
+
+
+def _normalize_legacy_pt_data(test_data):
+    quant_mode = int(test_data["quant_mode"])
+    if quant_mode in (QUANT_MODE_MXFP8, QUANT_MODE_MXFP4):
+        params = normalize_qliv2_params(test_data["params"])
+        if test_data.get("blockFusion") is not None:
+            raise ValueError(
+                "QLI_V2 MX PT has unsupported fused storage; regenerate the PT"
+            )
+        for name in ("query_dequant_scale", "key_dequant_scale"):
+            tensor = test_data[name]
+            if tensor.dtype == torch.uint8:
+                if params[12] not in (
+                    "FLOAT8_E8M0",
+                    "FLOAT8_E8M0FNU",
+                    torch.float8_e8m0fnu,
+                ):
+                    raise ValueError(
+                        f"QLI_V2 PT {name} uses ambiguous uint8 scale storage; regenerate the PT"
+                    )
+                # Restore E8M0 storage bytes without converting their numeric values.
+                test_data[name] = tensor.view(torch.float8_e8m0fnu)
+                logging.warning(
+                    "Legacy QLI_V2 PT restores %s uint8 storage to E8M0", name
+                )
+            elif tensor.dtype != torch.float8_e8m0fnu:
+                raise ValueError(
+                    f"QLI_V2 MX PT {name} must store E8M0 values; regenerate the PT "
+                    "instead of requantizing scales independently of the saved CPU golden"
+                )
+        if quant_mode == QUANT_MODE_MXFP8:
+            for name in ("query", "key"):
+                tensor = test_data[name]
+                if tensor.dtype == torch.uint8:
+                    if params[10] not in ("FLOAT8_E4M3FN", torch.float8_e4m3fn):
+                        raise ValueError(
+                            f"QLI_V2 PT {name} uses ambiguous uint8 Q/K storage; regenerate the PT"
+                        )
+                    test_data[name] = tensor.view(torch.float8_e4m3fn)
+        else:
+            for name in ("query", "key"):
+                tensor = test_data[name]
+                if tensor.dtype not in (torch.uint8, torch.float4_e2m1fn_x2) or (
+                    tensor.shape[-1] * 2 != params[7]
+                ):
+                    raise ValueError(
+                        f"QLI_V2 MXFP4 PT {name} must use packed FP4 storage; regenerate the PT"
+                    )
+    if test_data["layout_query"] == "BSND":
+        max_seqlen_q_meta = int(test_data["query"].shape[1])
+        if test_data["max_seqlen_q_meta"] != max_seqlen_q_meta:
+            logging.warning(
+                "Legacy QLI_V2 PT metadata query length corrected from %s to %s",
+                test_data["max_seqlen_q_meta"],
+                max_seqlen_q_meta,
+            )
+            test_data["max_seqlen_q_meta"] = max_seqlen_q_meta
 
 
 def test_qliv2_process(filepath, device_id=0):
     # 加载测试数据
-    test_data = torch.load(filepath, map_location="cpu")
+    test_data = torch.load(filepath, map_location="cpu", weights_only=False)
+    _normalize_legacy_pt_data(test_data)
 
     params = normalize_qliv2_params(test_data["params"])
     cpu_result = test_data["cpu_result"]
@@ -198,7 +259,8 @@ def test_qliv2_process_graph(filepath, device_id=0):
     """
     import quant_lightning_indexer_v2_acl_graph
 
-    test_data = torch.load(filepath, map_location="cpu")
+    test_data = torch.load(filepath, map_location="cpu", weights_only=False)
+    _normalize_legacy_pt_data(test_data)
     params = normalize_qliv2_params(test_data["params"])
     output_idx_offset = test_data.get("output_idx_offset", None)
 
