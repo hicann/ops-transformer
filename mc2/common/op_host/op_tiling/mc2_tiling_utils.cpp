@@ -69,6 +69,8 @@ matmul_tiling::DataType ConvertGeTypeToMmType(const std::string &opName, ge::Dat
         {ge::DT_HIFLOAT8, matmul_tiling::DataType::DT_HIFLOAT8},
         {ge::DT_FLOAT8_E4M3FN, matmul_tiling::DataType::DT_FLOAT8_E4M3FN},
         {ge::DT_FLOAT8_E5M2, matmul_tiling::DataType::DT_FLOAT8_E5M2},
+        {ge::DT_FLOAT4_E2M1, matmul_tiling::DataType::DT_FLOAT4_E2M1},
+        {ge::DT_FLOAT4_E1M2, matmul_tiling::DataType::DT_FLOAT4_E1M2},
     };
 
     auto iterator = GE_TO_MM_MAP.find(type);
@@ -89,6 +91,8 @@ ge::DataType ConvertMmTypeToGeType(const std::string &opName, matmul_tiling::Dat
         {matmul_tiling::DataType::DT_HIFLOAT8, ge::DT_HIFLOAT8},
         {matmul_tiling::DataType::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN},
         {matmul_tiling::DataType::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E5M2},
+        {matmul_tiling::DataType::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1},
+        {matmul_tiling::DataType::DT_FLOAT4_E1M2, ge::DT_FLOAT4_E1M2},
     };
 
     auto iterator = MM_TO_GE_MAP.find(type);

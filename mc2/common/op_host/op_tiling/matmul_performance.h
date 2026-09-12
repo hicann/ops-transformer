@@ -80,7 +80,9 @@ public:
         if ((mmShapeInfo_.socType == SocVersion::SOC950) &&
             ((args.aType == matmul_tiling::DataType::DT_HIFLOAT8) ||
              (args.aType == matmul_tiling::DataType::DT_FLOAT8_E4M3FN) ||
-             (args.aType == matmul_tiling::DataType::DT_FLOAT8_E5M2))) {
+             (args.aType == matmul_tiling::DataType::DT_FLOAT8_E5M2) ||
+             (args.aType == matmul_tiling::DataType::DT_FLOAT4_E2M1) ||
+             (args.aType == matmul_tiling::DataType::DT_FLOAT4_E1M2))) {
             calcType_ = MatmulCalcType::QUANT;
         } else if ((args.aType == matmul_tiling::DataType::DT_INT8) &&
                    (mmShapeInfo_.socType != SocVersion::SOC910_B)) { // A8W8
