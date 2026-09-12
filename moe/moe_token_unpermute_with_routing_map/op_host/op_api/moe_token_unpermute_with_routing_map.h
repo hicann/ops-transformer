@@ -7,8 +7,8 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#ifndef OP_API_INC_LEVEL0_MOE_TOKEN_UNPERMUTE_WITH_ROTING_MAP_H_
-#define OP_API_INC_LEVEL0_MOE_TOKEN_UNPERMUTE_WITH_ROTING_MAP_H_
+#ifndef OP_API_INC_LEVEL0_MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_H_
+#define OP_API_INC_LEVEL0_MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_H_
 
 #include "opdev/op_executor.h"
 
@@ -18,4 +18,4 @@ const std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *> MoeTokenUnp
     const aclTensor *probsOptional, bool paddedMode, const aclIntArray *restoreShapeOptional, aclOpExecutor *executor);
 }
 
-#endif // OP_API_INC_LEVEL0_MOE_TOKEN_UNPERMUTE_WITH_ROTING_MAP_H_
+#endif // OP_API_INC_LEVEL0_MOE_TOKEN_UNPERMUTE_WITH_ROUTING_MAP_H_

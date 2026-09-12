@@ -39,22 +39,24 @@ extern "C" {
  *
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(
-    const aclTensor* permutedTokenOutputGrad, const aclTensor* permutedProbsOutputGradOptional,
-    const aclTensor* sortedIndices, const aclTensor* routingMapOptional, int64_t numExperts, int64_t tokensNum,
-    bool dropAndPad, aclTensor* tokensGradOut, aclTensor* probsGradOutOptional, uint64_t* workspaceSize,
-    aclOpExecutor** executor);
+    const aclTensor *permutedTokenOutputGrad, const aclTensor *permutedProbsOutputGradOptional,
+    const aclTensor *sortedIndices, const aclTensor *routingMapOptional, int64_t numExperts, int64_t tokensNum,
+    bool dropAndPad, aclTensor *tokensGradOut, aclTensor *probsGradOutOptional, uint64_t *workspaceSize,
+    aclOpExecutor **executor);
 
 /**
  * @brief aclnnMoeTokenPermuteWithRoutingMapGrad的第二段接口，用于执行计算。
  * @param [in] workspace: 在npu device侧申请的workspace内存起址。
  * @param [in] workspaceSize: 在npu
  * device侧申请的workspace大小，由第一段接口aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize获取。
- * @param [in] exector: op执行器，包含了算子计算流程。
+ * @param [in] executor: op执行器，包含了算子计算流程。
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
-    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, const aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(void *workspace,
+                                                                                          uint64_t workspaceSize,
+                                                                                          aclOpExecutor *executor,
+                                                                                          const aclrtStream stream);
 
 #ifdef __cplusplus
 }
