@@ -31,11 +31,10 @@ __aicore__ inline void InvokeGmmS8S4TensorApi(GM_ADDR x, GM_ADDR weight, GM_ADDR
                                               AscendC::TPipe *pipe,
                                               const GroupedMatmulTilingData::GMMS8S4BasicApiTilingData *tiling)
 {
-    using LayoutB =
-        std::conditional_t<WFormat == CubeFormat::NZ, AscendC::Te::NZLayoutPtn, AscendC::Te::NDExtLayoutPtn>;
-    using LayoutA = AscendC::Te::NDExtLayoutPtn;
-    using LayoutC = AscendC::Te::NDExtLayoutPtn;
-    using LayoutBias = AscendC::Te::NDExtLayoutPtn;
+    using LayoutB = std::conditional_t<WFormat == CubeFormat::NZ, asc::te::nz_layout_ptn, asc::te::nd_ext_layout_ptn>;
+    using LayoutA = asc::te::nd_ext_layout_ptn;
+    using LayoutC = asc::te::nd_ext_layout_ptn;
+    using LayoutBias = asc::te::nd_ext_layout_ptn;
     using BTypeTuple = AscendC::Std::tuple<int8_t, uint64_t>;
     using DispatchPolicy =
         Blaze::Gemm::MatmulWithScaleFixpipeQuant<0UL, false, Blaze::Gemm::KernelGroupedMmadWithScaleFixpipeQuant>;

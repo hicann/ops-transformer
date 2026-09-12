@@ -38,10 +38,10 @@ __global__ __aicore__ void grouped_matmul_activation_quant(GM_ADDR x, GM_ADDR gr
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
     if (QUANT_B_TRANS == GMM_ACTIVATION_QUANT_NO_TRANS && QUANT_A_TRANS == GMM_ACTIVATION_QUANT_NO_TRANS) {
-        GroupedMatmulActivationQuant::GmmActivationMxQuant<AscendC::Te::NDExtLayoutPtn, AscendC::Te::NZLayoutPtn>(
+        GroupedMatmulActivationQuant::GmmActivationMxQuant<asc::te::nd_ext_layout_ptn, asc::te::nz_layout_ptn>(
             x, weight, weightScale, xScale, groupList, y, yScale, workspace, tiling);
     } else if (QUANT_B_TRANS == GMM_ACTIVATION_QUANT_TRANS && QUANT_A_TRANS == GMM_ACTIVATION_QUANT_NO_TRANS) {
-        GroupedMatmulActivationQuant::GmmActivationMxQuant<AscendC::Te::NDExtLayoutPtn, AscendC::Te::ZNLayoutPtn>(
+        GroupedMatmulActivationQuant::GmmActivationMxQuant<asc::te::nd_ext_layout_ptn, asc::te::zn_layout_ptn>(
             x, weight, weightScale, xScale, groupList, y, yScale, workspace, tiling);
     }
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);

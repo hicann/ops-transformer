@@ -36,9 +36,8 @@ class BlockEpilogueAlltoAll {
 public:
     using TypeC = TypeC_;
     using LayoutC = LayoutC_;
-    using MakeLayoutUB =
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<TypeC>>;
-    using BlockShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+    using MakeLayoutUB = asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<TypeC>>;
+    using BlockShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
 
     struct Params {
         GM_ADDR cGmAddr{nullptr};
@@ -75,7 +74,7 @@ public:
     static __aicore__ uint64_t GetRequiredUBSize(const BlockShape &singleShape)
     {
         // 计算当前单次tile alltoall所需UB 空间
-        int64_t singleN = AscendC::Te::Get<IDX_N_TILEIDX>(singleShape);
+        int64_t singleN = asc::te::get<IDX_N_TILEIDX>(singleShape);
         uint64_t padBytesPerRow =
             Blaze::Gemm::CeilDiv(static_cast<uint64_t>(singleN * sizeof(TypeC)), UB_ALIGN_BYTES) * UB_ALIGN_BYTES;
         return (static_cast<uint64_t>(AIV_UB_TILE_M) * padBytesPerRow);
@@ -96,16 +95,16 @@ private:
 
     __gm__ Apace::HcclOpParam *winContext_{nullptr};
 
-    decltype(AscendC::Te::MakeCopy(AscendC::Te::CopyGM2UB{})) copyGM2UB_;
-    decltype(AscendC::Te::MakeCopy(AscendC::Te::CopyUB2GM{})) copyUB2GM_;
+    decltype(asc::te::make_copy(asc::te::copy_gm_to_ub{})) copyGM2UB_;
+    decltype(asc::te::make_copy(asc::te::copy_ub_to_gm{})) copyUB2GM_;
 };
 
 template <typename TypeC_, typename LayoutC_>
 __aicore__ inline void BlockEpilogueAlltoAll<TypeC_, LayoutC_>::CommProcess(int64_t mPos, int64_t nPos,
                                                                             const BlockShape &singleShape)
 {
-    int64_t singleM = AscendC::Te::Get<IDX_M_TILEIDX>(singleShape);
-    int64_t singleN = AscendC::Te::Get<IDX_N_TILEIDX>(singleShape);
+    int64_t singleM = asc::te::get<IDX_M_TILEIDX>(singleShape);
+    int64_t singleN = asc::te::get<IDX_N_TILEIDX>(singleShape);
     if (singleM <= 0 || singleN <= 0) {
         return;
     }
@@ -113,8 +112,8 @@ __aicore__ inline void BlockEpilogueAlltoAll<TypeC_, LayoutC_>::CommProcess(int6
     int64_t aivIdx = AscendC::GetBlockIdx() % AIV_AIC_RATIO; // 两个V核交替搬运
     int64_t subTileCnt = Blaze::Gemm::CeilDiv(singleM, AIV_UB_TILE_M);
 
-    auto layoutTensorC = AscendC::Te::FrameLayoutFormat<LayoutC, TypeC>{}(m_, n_);
-    auto gmC = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(cGmAddr_), layoutTensorC);
+    auto layoutTensorC = asc::te::frame_layout_format<LayoutC, TypeC>{}(m_, n_);
+    auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(cGmAddr_), layoutTensorC);
 
     uint64_t rowPaddedBytes =
         Blaze::Gemm::CeilDiv(static_cast<uint64_t>(singleN * sizeof(TypeC)), UB_ALIGN_BYTES) * UB_ALIGN_BYTES;
@@ -129,10 +128,10 @@ __aicore__ inline void BlockEpilogueAlltoAll<TypeC_, LayoutC_>::CommProcess(int6
 
         auto layoutPaddingUB = MakeLayoutUB{}(subTileM, paddingN);
         auto layoutUB = MakeLayoutUB{}(subTileM, singleN);
-        auto ubTensor = AscendC::Te::MakeTensor(
-            AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, TypeC>(ubBaseOffset_), layoutPaddingUB);
-        auto gmTensor = gmC.Slice(AscendC::Te::MakeCoord(globalBaseM, nPos), AscendC::Te::MakeShape(subTileM, singleN));
-        AscendC::Te::Copy(copyGM2UB_, ubTensor, gmTensor);
+        auto ubTensor =
+            asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, TypeC>(ubBaseOffset_), layoutPaddingUB);
+        auto gmTensor = gmC.slice(asc::te::make_coord(globalBaseM, nPos), asc::te::make_shape(subTileM, singleN));
+        asc::te::copy(copyGM2UB_, ubTensor, gmTensor);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(MTE2_MTE3_FLAG);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(MTE2_MTE3_FLAG);
 
@@ -155,15 +154,15 @@ __aicore__ inline void BlockEpilogueAlltoAll<TypeC_, LayoutC_>::CommProcess(int6
             GM_ADDR remoteWinAddr = Apace::GetBaseWindAddrByRankId(winContext_, dstRankId);
             __gm__ TypeC *remoteGmAddr = reinterpret_cast<__gm__ TypeC *>(remoteWinAddr);
 
-            auto layoutTensorRemote = AscendC::Te::FrameLayoutFormat<LayoutC, TypeC>{}(m_, static_cast<int64_t>(n_));
-            auto gmRemote = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(remoteGmAddr),
-                                                    layoutTensorRemote);
-            auto remoteGMTensor = gmRemote.Slice(
-                AscendC::Te::MakeCoord(static_cast<uint64_t>(rankId_) * tpSizeM_ + globalRow % tpSizeM_, nPos),
-                AscendC::Te::MakeShape(rowsInBatch, singleN));
+            auto layoutTensorRemote = asc::te::frame_layout_format<LayoutC, TypeC>{}(m_, static_cast<int64_t>(n_));
+            auto gmRemote =
+                asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(remoteGmAddr), layoutTensorRemote);
+            auto remoteGMTensor = gmRemote.slice(
+                asc::te::make_coord(static_cast<uint64_t>(rankId_) * tpSizeM_ + globalRow % tpSizeM_, nPos),
+                asc::te::make_shape(rowsInBatch, singleN));
             auto ubProcessTensor =
-                ubTensor.Slice(AscendC::Te::MakeCoord(processed, 0), AscendC::Te::MakeShape(rowsInBatch, paddingN));
-            AscendC::Te::Copy(copyUB2GM_, remoteGMTensor, ubProcessTensor);
+                ubTensor.slice(asc::te::make_coord(processed, 0), asc::te::make_shape(rowsInBatch, paddingN));
+            asc::te::copy(copyUB2GM_, remoteGMTensor, ubProcessTensor);
 
             processed += rowsInBatch;
         }

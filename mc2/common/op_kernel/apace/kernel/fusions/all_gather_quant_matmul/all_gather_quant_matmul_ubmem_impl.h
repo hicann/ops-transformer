@@ -79,20 +79,20 @@ public:
     using ScalesType = int8_t;
 
     using MakeLayoutGM =
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<int8_t>>;
+        asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int8_t>>;
     using MakeLayoutUB =
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<int8_t>>;
+        asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<int8_t>>;
     using MakeLayoutScaleGM =
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<ScalesType>>;
+        asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<ScalesType>>;
     using MakeLayoutScaleUB =
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<ScalesType>>;
+        asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<ScalesType>>;
     using MakeLayoutStatusGM =
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<float>>;
+        asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<float>>;
     using MakeLayoutStatusUB =
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<float>>;
+        asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, asc::te::layout_trait_default<float>>;
 
-    using CopyGM2UB_t = decltype(AscendC::Te::MakeCopy(AscendC::Te::CopyGM2UB{}));
-    using CopyUB2GM_t = decltype(AscendC::Te::MakeCopy(AscendC::Te::CopyUB2GM{}));
+    using CopyGM2UB_t = decltype(asc::te::make_copy(asc::te::copy_gm_to_ub{}));
+    using CopyUB2GM_t = decltype(asc::te::make_copy(asc::te::copy_ub_to_gm{}));
 
     struct Params {
         typename KernelImpl::Params matmulKernelParams;
@@ -177,8 +177,8 @@ private:
     GM_ADDR allGatherDataOutAddr_{nullptr};
     GM_ADDR allGatherScalesOutAddr_{nullptr};
 
-    CopyGM2UB_t copyGM2UB_ = AscendC::Te::MakeCopy(AscendC::Te::CopyGM2UB{});
-    CopyUB2GM_t copyUB2GM_ = AscendC::Te::MakeCopy(AscendC::Te::CopyUB2GM{});
+    CopyGM2UB_t copyGM2UB_ = asc::te::make_copy(asc::te::copy_gm_to_ub{});
+    CopyUB2GM_t copyUB2GM_ = asc::te::make_copy(asc::te::copy_ub_to_gm{});
 };
 
 template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
@@ -325,25 +325,25 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
             uint64_t curChunkPaddedN = Blaze::Gemm::CeilAlign(curChunkSize, UB_ALIGN_BYTES) / sizeof(ScalesType);
 
             auto scaleSrcLayout = MakeLayoutScaleGM{}(1, curChunkSize);
-            auto scaleSrcTensor = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(
-                                                              (__gm__ ScalesType *)(inputXScaleAddr_ + chunkOffset)),
-                                                          scaleSrcLayout);
+            auto scaleSrcTensor = asc::te::make_tensor(
+                asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType *)(inputXScaleAddr_ + chunkOffset)),
+                scaleSrcLayout);
 
             auto scaleUbLayout = MakeLayoutScaleUB{}(1, curChunkPaddedN);
-            auto scaleUbTensor = AscendC::Te::MakeTensor(
-                AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, ScalesType>(ubOff), scaleUbLayout);
+            auto scaleUbTensor =
+                asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, ScalesType>(ubOff), scaleUbLayout);
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
-            AscendC::Te::Copy(copyGM2UB_, scaleUbTensor, scaleSrcTensor);
+            asc::te::copy(copyGM2UB_, scaleUbTensor, scaleSrcTensor);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
 
             auto scaleDstLayout = MakeLayoutScaleGM{}(1, curChunkSize);
             auto scaleDstTensor =
-                AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(
-                                            (__gm__ ScalesType *)(localWinGm + winScaleBase + chunkOffset)),
-                                        scaleDstLayout);
-            AscendC::Te::Copy(copyUB2GM_, scaleDstTensor, scaleUbTensor);
+                asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
+                                         (__gm__ ScalesType *)(localWinGm + winScaleBase + chunkOffset)),
+                                     scaleDstLayout);
+            asc::te::copy(copyUB2GM_, scaleDstTensor, scaleUbTensor);
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
         }
 
@@ -382,24 +382,22 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
         uint64_t globalOffset = startGlobalOffset + done;
 
         auto xUbLayout = MakeLayoutUB{}(1, chunkElems);
-        auto xUbTensor =
-            AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, int8_t>(ubOff), xUbLayout);
+        auto xUbTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, int8_t>(ubOff), xUbLayout);
 
         auto xSrcLayout = MakeLayoutGM{}(1, chunkElems);
-        auto xSrcTensor = AscendC::Te::MakeTensor(
-            AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>((__gm__ int8_t *)(inputXAddr_ + globalOffset)),
-            xSrcLayout);
+        auto xSrcTensor = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(inputXAddr_ + globalOffset)), xSrcLayout);
 
         auto xDstLayout = MakeLayoutGM{}(1, chunkElems);
-        auto xDstTensor = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(
-                                                      (__gm__ int8_t *)(localWinGm + selfDataOffset + globalOffset)),
-                                                  xDstLayout);
+        auto xDstTensor = asc::te::make_tensor(
+            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(localWinGm + selfDataOffset + globalOffset)),
+            xDstLayout);
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
-        AscendC::Te::Copy(copyGM2UB_, xUbTensor, xSrcTensor);
+        asc::te::copy(copyGM2UB_, xUbTensor, xSrcTensor);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
-        AscendC::Te::Copy(copyUB2GM_, xDstTensor, xUbTensor);
+        asc::te::copy(copyUB2GM_, xDstTensor, xUbTensor);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
     }
 
@@ -433,31 +431,31 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
                 uint64_t curChunkPaddedN = Blaze::Gemm::CeilAlign(curChunkSize, UB_ALIGN_BYTES) / sizeof(ScalesType);
 
                 auto scaleSrcLayout = MakeLayoutScaleGM{}(1, curChunkSize);
-                auto scaleSrcTensor = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(
-                                                                  (__gm__ ScalesType *)(remoteScaleAddr + chunkOffset)),
-                                                              scaleSrcLayout);
+                auto scaleSrcTensor = asc::te::make_tensor(
+                    asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType *)(remoteScaleAddr + chunkOffset)),
+                    scaleSrcLayout);
 
                 auto scaleUbLayout = MakeLayoutScaleUB{}(1, curChunkPaddedN);
-                auto scaleUbTensor = AscendC::Te::MakeTensor(
-                    AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, ScalesType>(ubOff), scaleUbLayout);
+                auto scaleUbTensor = asc::te::make_tensor(
+                    asc::te::make_mem_ptr<asc::te::location::ub, ScalesType>(ubOff), scaleUbLayout);
 
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
-                AscendC::Te::Copy(copyGM2UB_, scaleUbTensor, scaleSrcTensor);
+                asc::te::copy(copyGM2UB_, scaleUbTensor, scaleSrcTensor);
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
 
                 auto localScaleLayout = MakeLayoutScaleGM{}(1, curChunkSize);
-                auto localScaleTensor = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>((
-                                                                    __gm__ ScalesType *)(localScaleAddr + chunkOffset)),
-                                                                localScaleLayout);
+                auto localScaleTensor = asc::te::make_tensor(
+                    asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType *)(localScaleAddr + chunkOffset)),
+                    localScaleLayout);
                 auto allGatherScaleLayout = MakeLayoutScaleGM{}(1, curChunkSize);
                 auto allGatherScaleTensor =
-                    AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(
-                                                (__gm__ ScalesType *)(allGatherScaleAddr + chunkOffset)),
-                                            allGatherScaleLayout);
+                    asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
+                                             (__gm__ ScalesType *)(allGatherScaleAddr + chunkOffset)),
+                                         allGatherScaleLayout);
 
-                AscendC::Te::Copy(copyUB2GM_, localScaleTensor, scaleUbTensor);
-                AscendC::Te::Copy(copyUB2GM_, allGatherScaleTensor, scaleUbTensor);
+                asc::te::copy(copyUB2GM_, localScaleTensor, scaleUbTensor);
+                asc::te::copy(copyUB2GM_, allGatherScaleTensor, scaleUbTensor);
                 AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
             }
 
@@ -499,19 +497,19 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
     uint64_t curOffset = (aivId_ % sendCoreNumPerRank_ + curRankId_ * sendCoreNumPerRank_) * FLOAT_UB_ALIGN_NUM;
 
     auto statusUbLayout = MakeLayoutStatusUB{}(1, FLOAT_UB_ALIGN_NUM);
-    auto statusUbTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, float>(ubWriteStateOffset_), statusUbLayout);
+    auto statusUbTensor =
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(ubWriteStateOffset_), statusUbLayout);
 
-    statusUbTensor[AscendC::Te::MakeCoord(0, 0)] = STATUS_FLAG_VAL;
+    statusUbTensor[asc::te::make_coord(0, 0)] = STATUS_FLAG_VAL;
 
     AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVT_ID);
     AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVT_ID);
 
     GM_ADDR dstAddr = WinStatusAddr(remoteRankId_) + curOffset * sizeof(float);
     auto dstLayout = MakeLayoutStatusGM{}(1, FLOAT_UB_ALIGN_NUM);
-    auto dstTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>((__gm__ float *)(dstAddr)), dstLayout);
-    AscendC::Te::Copy(copyUB2GM_, dstTensor, statusUbTensor);
+    auto dstTensor =
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ float *)(dstAddr)), dstLayout);
+    asc::te::copy(copyUB2GM_, dstTensor, statusUbTensor);
 
     AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVT_ID);
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(EVT_ID);
@@ -525,12 +523,12 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
     GM_ADDR statusAddr = WinStatusAddr(curRankId_) + offset * sizeof(float);
 
     auto statusGmLayout = MakeLayoutStatusGM{}(1, FLOAT_UB_ALIGN_NUM);
-    auto statusGmTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>((__gm__ float *)(statusAddr)), statusGmLayout);
+    auto statusGmTensor = asc::te::make_tensor(
+        asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ float *)(statusAddr)), statusGmLayout);
 
     auto statusUbLayout = MakeLayoutStatusUB{}(1, FLOAT_UB_ALIGN_NUM);
-    auto statusUbTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, float>(ubReadStateOffset_), statusUbLayout);
+    auto statusUbTensor =
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(ubReadStateOffset_), statusUbLayout);
 
     float minTarget = STATUS_FLAG_VAL - STATUS_FLAG_THREDSHOLD;
     float maxTarget = STATUS_FLAG_VAL + STATUS_FLAG_THREDSHOLD;
@@ -538,15 +536,15 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
     while ((flag < minTarget) || (flag > maxTarget)) {
         AscendC::SetFlag<AscendC::HardEvent::S_MTE2>(EVT_ID);
         AscendC::WaitFlag<AscendC::HardEvent::S_MTE2>(EVT_ID);
-        AscendC::Te::Copy(copyGM2UB_, statusUbTensor, statusGmTensor);
+        asc::te::copy(copyGM2UB_, statusUbTensor, statusGmTensor);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(EVT_ID);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(EVT_ID);
-        flag = statusUbTensor[AscendC::Te::MakeCoord(0, 0)];
+        flag = statusUbTensor[asc::te::make_coord(0, 0)];
     }
-    statusUbTensor[AscendC::Te::MakeCoord(0, 0)] = 0.0f;
+    statusUbTensor[asc::te::make_coord(0, 0)] = 0.0f;
     AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVT_ID);
     AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVT_ID);
-    AscendC::Te::Copy(copyUB2GM_, statusGmTensor, statusUbTensor);
+    asc::te::copy(copyUB2GM_, statusGmTensor, statusUbTensor);
 }
 
 template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
@@ -578,37 +576,37 @@ __aicore__ inline void AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, Bl
         rowsPerSlot = 1;
     }
 
-    auto srcTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>((__gm__ int8_t *)(remoteXAddr)), MakeLayoutGM{}(M_, K_));
-    auto localTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>((__gm__ int8_t *)(localXAddr)), MakeLayoutGM{}(M_, K_));
-    auto agTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>((__gm__ int8_t *)(allGatherXAddr)), MakeLayoutGM{}(M_, K_));
+    auto srcTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(remoteXAddr)),
+                                          MakeLayoutGM{}(M_, K_));
+    auto localTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(localXAddr)),
+                                            MakeLayoutGM{}(M_, K_));
+    auto agTensor = asc::te::make_tensor(
+        asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(allGatherXAddr)), MakeLayoutGM{}(M_, K_));
 
     for (uint32_t rowDone = 0; rowDone < mCnt; rowDone += rowsPerSlot) {
         uint32_t curRows = (rowDone + rowsPerSlot > mCnt) ? (mCnt - rowDone) : rowsPerSlot;
         uint64_t rowStart = rowStartBase + rowDone;
 
-        auto srcSlice = srcTensor.Slice(
-            AscendC::Te::MakeCoord(rowStart, colStart),
-            AscendC::Te::MakeShape(static_cast<int64_t>(curRows), static_cast<int64_t>(X_PER_BLOCK_NUM)));
-        auto ubTensor = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, int8_t>(ubOff),
-                                                MakeLayoutUB{}(curRows, static_cast<int64_t>(X_PER_BLOCK_NUM)));
+        auto srcSlice =
+            srcTensor.slice(asc::te::make_coord(rowStart, colStart),
+                            asc::te::make_shape(static_cast<int64_t>(curRows), static_cast<int64_t>(X_PER_BLOCK_NUM)));
+        auto ubTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, int8_t>(ubOff),
+                                             MakeLayoutUB{}(curRows, static_cast<int64_t>(X_PER_BLOCK_NUM)));
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
-        AscendC::Te::Copy(copyGM2UB_, ubTensor, srcSlice);
+        asc::te::copy(copyGM2UB_, ubTensor, srcSlice);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(evtId);
 
-        auto localSlice = localTensor.Slice(
-            AscendC::Te::MakeCoord(rowStart, colStart),
-            AscendC::Te::MakeShape(static_cast<int64_t>(curRows), static_cast<int64_t>(X_PER_BLOCK_NUM)));
-        auto agSlice = agTensor.Slice(
-            AscendC::Te::MakeCoord(rowStart, colStart),
-            AscendC::Te::MakeShape(static_cast<int64_t>(curRows), static_cast<int64_t>(X_PER_BLOCK_NUM)));
+        auto localSlice = localTensor.slice(
+            asc::te::make_coord(rowStart, colStart),
+            asc::te::make_shape(static_cast<int64_t>(curRows), static_cast<int64_t>(X_PER_BLOCK_NUM)));
+        auto agSlice =
+            agTensor.slice(asc::te::make_coord(rowStart, colStart),
+                           asc::te::make_shape(static_cast<int64_t>(curRows), static_cast<int64_t>(X_PER_BLOCK_NUM)));
 
-        AscendC::Te::Copy(copyUB2GM_, localSlice, ubTensor);
-        AscendC::Te::Copy(copyUB2GM_, agSlice, ubTensor);
+        asc::te::copy(copyUB2GM_, localSlice, ubTensor);
+        asc::te::copy(copyUB2GM_, agSlice, ubTensor);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
     }
 }
