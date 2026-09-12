@@ -15,6 +15,8 @@
 #include "allto_all_mx_quant_matmul_tiling_base.h"
 
 #include "../allto_all_matmul_tiling_base.h"
+#include "allto_all_comm_algo_table.h"
+#include "common/utils/mc2_comm_algo_selector.h"
 #include "common/utils/mc2_comm_utils.h"
 #include "common/utils/op_mc2.h"
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_util_tiling.h"
@@ -537,9 +539,6 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::SetHcclTiling()
         mc2tiling::ConvertGeTypeToHcclType(opName_, hcclDtype) == mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
         OP_LOGE(opName_, "Cannot find HcclDataType according to ge datatype = %d.", static_cast<int32_t>(hcclDtype)),
         return ge::GRAPH_FAILED;);
-    Mc2CcTilingConfigBuilder allToAllMatmulBuilder =
-        Mc2CcTilingConfigBuilder::create(contextInfo_.group, mc2tiling::AicpuComType::HCCL_CMD_ALLTOALL,
-                                         Mc2CcTilingConfigBuilder::AlgConfigType::ALL_TO_ALL);
 
     // 获取commMode
     uint8_t hcclServerEngine = 0;
@@ -547,6 +546,21 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::SetHcclTiling()
                                                         hcclServerEngine) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
+    uint64_t commDataBytes =
+        inferredInfo_.tileM * contextInfo_.args_.kValue * static_cast<uint64_t>(contextInfo_.args_.inputDtypeSize);
+    OP_LOGI(opName_, "[SetHcclTiling] commDataBytes=%llu, tileM=%u, kValue=%llu, rankDim=%u, engine=%u", commDataBytes,
+            inferredInfo_.tileM, contextInfo_.args_.kValue, contextInfo_.args_.rankDim, hcclServerEngine);
+    uint32_t algoCount = 0;
+    const Mc2Hcom::CommAlgoEntry *algoEntries = Mc2Tiling::GetAllToAllCommAlgoTable(algoCount);
+    std::string algoName =
+        Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(opName_, contextInfo_.group.c_str(), hcclServerEngine,
+                                                     commDataBytes, static_cast<uint32_t>(contextInfo_.args_.rankDim),
+                                                     algoEntries, algoCount, Mc2Tiling::ALLTOALL_DEFAULT_ALGO_NAME);
+    OP_LOGI(opName_, "[SetHcclTiling] selected algoName=%s, group=%s", algoName.c_str(), contextInfo_.group.c_str());
+
+    Mc2CcTilingConfigBuilder allToAllMatmulBuilder =
+        Mc2CcTilingConfigBuilder::create(contextInfo_.group, mc2tiling::AicpuComType::HCCL_CMD_ALLTOALL, algoName);
+
     // reducetype接口附带的数据类型优先于调用通信接口传入的数据类型，因此这里需要设置
     AscendC::Mc2CcTilingConfig allToAllTilingConfig =
         allToAllMatmulBuilder.withReduceType(opName_, mc2tiling::HcclReduceOp::HCCL_REDUCE_SUM, hcclDtype, hcclDtype)
