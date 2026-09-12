@@ -977,7 +977,8 @@ CutResult QuantBmmReduceScatterTiling::GetTilingResult()
 {
     if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
         MMReduceScatterFitBalanceTiling quantBmmScatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
-                                                              TopoType::STANDARD_CARD);
+                                                              TopoType::STANDARD_CARD, SocVersion::SOC950,
+                                                              (commMode_ == TPL_AICPU_COMM_MODE));
         return quantBmmScatterTiling.GetTiling();
     } else if (mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         MMReduceScatterFitBalanceTiling quantBmmScatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
