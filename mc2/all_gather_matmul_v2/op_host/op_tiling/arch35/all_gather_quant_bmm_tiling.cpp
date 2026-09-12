@@ -563,6 +563,42 @@ void AllGatherQuantBmmTiling::SetTilingKeyParams()
     castBias_ = false;
 }
 
+#if MC2_DFX_ENABLE
+void AllGatherQuantBmmTiling::BuildWorkspaceLayout()
+{
+    uint64_t libApiSize = (args_.nValue == 0) ? libApiWorkSpaceSize_ : matmulWs_;
+
+    uint64_t offset = 0;
+    uint32_t idx = 0;
+
+    workspaceLayout_.segments[idx++] = {offset, libApiSize, static_cast<uint8_t>(Utils::WS_SEG_LIB_API), {}};
+    offset += libApiSize;
+
+    if (scale1kSpaceSize_ > 0) {
+        workspaceLayout_.segments[idx++] = {
+            offset, scale1kSpaceSize_, static_cast<uint8_t>(Utils::WS_SEG_GATHER_SCALE1), {}};
+        offset += scale1kSpaceSize_;
+    }
+
+    if (storageA_ > 0) {
+        workspaceLayout_.segments[idx++] = {offset, storageA_, static_cast<uint8_t>(Utils::WS_SEG_GATHER), {}};
+        offset += storageA_;
+    }
+
+    if (biasLen_ > 0) {
+        workspaceLayout_.segments[idx++] = {offset, biasLen_, static_cast<uint8_t>(Utils::WS_SEG_BIAS), {}};
+        offset += biasLen_;
+    }
+
+    workspaceLayout_.segments[idx++] = {
+        offset, Utils::STATE_DUMP_TOTAL_SIZE, static_cast<uint8_t>(Utils::WS_SEG_STATE_DUMP), {}};
+    offset += Utils::STATE_DUMP_TOTAL_SIZE;
+
+    workspaceLayout_.totalSize = offset;
+    workspaceLayout_.segCount = idx;
+}
+#endif // MC2_DFX_ENABLE
+
 ge::graphStatus AllGatherQuantBmmTiling::GetWorkspaceSize()
 {
     MC2_CHECK_LOG_RET(opName_, AllGatherMatmulTilingBase::GetWorkspaceSize());
@@ -574,9 +610,14 @@ ge::graphStatus AllGatherQuantBmmTiling::GetWorkspaceSize()
     } else {
         myWorkSpaceSize_ = myWorkSpaceSize_ + MutableRCSTilingDataA5().gatherLen + scale1kSpaceSize_;
     }
-    OP_LOGI(opName_, "Set max workspace size %lu to context", myWorkSpaceSize_);
     size_t *workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = myWorkSpaceSize_;
+#if MC2_DFX_ENABLE
+    BuildWorkspaceLayout();
+    // DFX: workspace 尾部追加 64KB 状态打点区
+    workspaces[0] += Utils::STATE_DUMP_TOTAL_SIZE;
+#endif
+    OP_LOGI(opName_, "Set max workspace size %lu to context", workspaces[0]);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -679,6 +720,9 @@ void Mc2PrintTCubeTilingL2cache(const std::string &opName, DequantBmm::Mc2L2cach
 
 ge::graphStatus AllGatherQuantBmmTiling::PostTiling()
 {
+#if MC2_DFX_ENABLE
+    allGatherMatmulTilingDataFp8_->dumpInfo.workspaceLayout = workspaceLayout_;
+#endif
     OP_LOGD(opName_, "The final tiling data size=%zu and context capacity size=%zu ",
             sizeof(AllGatherMatmulTilingDataFp8), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(sizeof(AllGatherMatmulTilingDataFp8));
@@ -1005,6 +1049,9 @@ ge::graphStatus AllGatherQuantBmmHelper::PostTiling()
 {
     // 此处需要后续考虑补充相关tiling打印，当前该函数已不存在。
     tilingProcesser_.myWorkSpaceSize_ = std::max(tilingProcesser_.myWorkSpaceSize_, workspaceSize_);
+#if MC2_DFX_ENABLE
+    tilingProcesser_.matmulWs_ = tilingProcesser_.myWorkSpaceSize_;
+#endif
     OP_LOGI(tilingProcesser_.opName_, " set mm workspace size %lu to mc2", tilingProcesser_.myWorkSpaceSize_);
     return ge::GRAPH_SUCCESS;
 }

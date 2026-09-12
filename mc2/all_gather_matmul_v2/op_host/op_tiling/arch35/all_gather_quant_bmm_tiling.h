@@ -37,6 +37,9 @@ protected:
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
     ge::graphStatus GetWorkspaceSize() override;
+#if MC2_DFX_ENABLE
+    void BuildWorkspaceLayout();
+#endif
     ge::graphStatus PostTiling() override;
     uint64_t GetTilingKey() const override;
     CutResult GetTilingResult() override;
@@ -80,6 +83,9 @@ private:
     Mc2Tiling::AllGatherMatmulTilingDataFp8 allGatherMatmulTilingDataFp8Self_;
     Mc2Tiling::AllGatherMatmulTilingDataFp8 *allGatherMatmulTilingDataFp8_;
     uint64_t myWorkSpaceSize_{0U};
+#if MC2_DFX_ENABLE
+    uint64_t matmulWs_{0U};
+#endif
     uint64_t scale1kSpaceSize_{0U};
     mc2tiling::Mc2QuantMode quantMmMode_{mc2tiling::Mc2QuantMode::INVALID_MODE};
     bool isFp4_ = false;

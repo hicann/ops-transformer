@@ -13,10 +13,10 @@
  * \brief host侧tiling实现 (AllGatherMatmulV3, MX-quant FP8/FP4, apace UDMA path)
  */
 
-#include <string>
 #include <climits>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include "mc2_log.h"
 #include "graph/utils/type_utils.h"
 #include "register/op_def_registry.h"
@@ -29,6 +29,7 @@
 #include "apace/tiling/quant_matmul_tiling_swat.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "../../op_kernel/arch35/all_gather_matmul_v3_tiling_key.h"
+#include "mc2_exception_dump.h"
 
 using namespace AscendC;
 using namespace ge;
@@ -772,7 +773,9 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
     // 独占全核，设置以后会让所有核空闲以后才启动，有多核同步指令需要设置避免出现网络挂死
     context->SetScheduleMode(1);
     context->SetBlockDim(usedCoreNum);
-    rawTilingData->SetDataSize(rawTilingData->GetCapacity());
+    // tiling 数据只声明结构体大小（capacity-8），尾部 8 字节留给框架写入 DFX 指针（atomicIndex），
+    // 否则异常 dump 时 IDEDD 从 opParaSize-8 处读到 0，导致 exception_info 解析中止
+    rawTilingData->SetDataSize(sizeof(AllGatherMxMatmulUrmaTilingData));
 
     OP_LOGI(nodeName,
             "AllGatherMatmulV3 tiling: mPerRank=%lu totalLogicalM=%lu k=%lu n=%lu rankSize=%lu usedCoreNum=%u "
@@ -781,6 +784,29 @@ static ge::graphStatus SetTilingData(gert::TilingContext *context, const ShapeIn
             tilingData->commTile.splitAxisTileSize, tilingData->commTile.splitAxisTileCnt,
             tilingData->commTile.splitAxisTailSize, tilingData->commTile.splitAxisTailCnt);
 
+#if MC2_DFX_ENABLE
+    uint64_t libApiSize = ascendcPlatform.GetLibApiWorkSpaceSize();
+    tilingData->dumpInfo.workspaceLayout.totalSize = libApiSize;
+    tilingData->dumpInfo.workspaceLayout.segCount = 1;
+    tilingData->dumpInfo.workspaceLayout.segments[0] = {
+        0UL, libApiSize, static_cast<uint8_t>(Utils::WS_SEG_LIB_API), {}};
+    tilingData->dumpInfo.workspaceLayout.totalSize += Utils::STATE_DUMP_TOTAL_SIZE;
+    tilingData->dumpInfo.workspaceLayout.segCount = 2;
+    tilingData->dumpInfo.workspaceLayout.segments[1] = {
+        libApiSize, Utils::STATE_DUMP_TOTAL_SIZE, static_cast<uint8_t>(Utils::WS_SEG_STATE_DUMP), {}};
+    auto x1Dtype = context->GetInputDesc(IDX_INPUT_X1)->GetDataType();
+    double typeSize = (x1Dtype == ge::DT_FLOAT4_E2M1) ? 0.5 : 1.0;
+    uint64_t scaleKDim = (k + 63) / 64;
+    uint64_t dataRegionBytes = rankSize * m * static_cast<uint64_t>(static_cast<double>(k) * typeSize);
+    uint64_t scaleRegionBytes = rankSize * m * scaleKDim * 2;
+    tilingData->dumpInfo.peermemDataSize = dataRegionBytes + scaleRegionBytes;
+    tilingData->dumpInfo.peermemLayout.totalSize = tilingData->dumpInfo.peermemDataSize;
+    tilingData->dumpInfo.peermemLayout.segCount = 2;
+    tilingData->dumpInfo.peermemLayout.segments[0] = {
+        0UL, dataRegionBytes, static_cast<uint8_t>(Utils::PEERMEM_SEG_DATA), {}};
+    tilingData->dumpInfo.peermemLayout.segments[1] = {
+        dataRegionBytes, scaleRegionBytes, static_cast<uint8_t>(Utils::PEERMEM_SEG_SCALE), {}};
+#endif
     return ge::GRAPH_SUCCESS;
 }
 
@@ -801,6 +827,9 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context)
 {
     platform_ascendc::PlatformAscendC ascendcPlatform(context->GetPlatformInfo());
     uint64_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
+#if MC2_DFX_ENABLE
+    workspaceSize += Utils::STATE_DUMP_TOTAL_SIZE;
+#endif
     size_t *workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(context->GetNodeName(), "workSpaces is nullptr"),
                     return ge::GRAPH_FAILED);
@@ -856,5 +885,26 @@ static ge::graphStatus TilingParseForAllGatherMatmulV3(gert::TilingParseContext 
 IMPL_OP_OPTILING(AllGatherMatmulV3)
     .Tiling(AllGatherMatmulV3TilingFunc)
     .TilingParse<AllGatherMatmulV3CompileInfo>(TilingParseForAllGatherMatmulV3);
+
+#if MC2_DFX_ENABLE
+inline void AllGatherMatmulV3ExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+{
+    const char *socName = aclrtGetSocName();
+    if (std::strstr(socName, "Ascend950") == nullptr) {
+        return;
+    }
+    Mc2Exception::Mc2DumpTilingAndWorkspace(args, "AllGatherMatmulV3",
+                                            10U, // tilingGmArgIdx
+                                            9U); // workspaceGmArgIdx
+    Mc2Exception::Mc2DumpUrmaContext(args, "AllGatherMatmulV3",
+                                     0U,   // contextArgIdx
+                                     10U); // tilingGmArgIdx
+}
+
+__attribute__((constructor)) void RegisterAllGatherMatmulV3ExceptionFunc()
+{
+    IMPL_OP(AllGatherMatmulV3).ExceptionDumpParseFunc(AllGatherMatmulV3ExceptionImplWrapper);
+}
+#endif // MC2_DFX_ENABLE
 
 } // namespace Mc2Tiling

@@ -17,6 +17,7 @@
 #define ALLTO_ALL_MX_QUANT_MATMUL_PIPELINE_H
 
 #include "../../../common/op_kernel/mc2_templates/scheduler/pipeline_builder.h"
+#include "../../../common/op_kernel/apace/utils/op_state_dump.h"
 
 // 流水线模板
 namespace Mc2Kernel {
@@ -54,11 +55,24 @@ public:
 
     __aicore__ inline void End();
 
+    // 注入 opStateDump，使 pipeline 循环内可记录 tile/tail 进度
+    __aicore__ inline void SetOpStateDump(Mc2Kernel::OpStateDump &rt)
+    {
+        opStateDump_ = rt;
+    }
+
 private:
-    CommunicationType *commStage_;        // 通信节点
-    TransposeType *transStage_;           // 转置计算的计算节点
-    ScaleTransposeType *scaleTransStage_; // 缩放转置的计算节点
-    ComputationType *computeStage_;       // 矩阵乘的计算节点
+    // position 枚举 (pipeline 内部使用)
+    static constexpr uint8_t POS_COMM_BEFORE = 0U;             // x1通信 前
+    static constexpr uint8_t POS_SCALE_COMM_BEFORE = 1U;       // scale 通信前
+    static constexpr uint8_t POS_COMP_CUBE_MATMUL_BEFORE = 2U; // C核 matmul 前
+    static constexpr uint8_t POS_COMP_VEC_PERMUTE_BEFORE = 3U; // V核转置前
+    CommunicationType *commStage_;                             // 通信节点
+    TransposeType *transStage_;                                // 转置计算的计算节点
+    ScaleTransposeType *scaleTransStage_;                      // 缩放转置的计算节点
+    ComputationType *computeStage_;                            // 矩阵乘的计算节点
+    // 状态打点，由 arch35/kernel_base 通过 SetOpStateDump 注入；未注入时 DoDump 为空操作
+    Mc2Kernel::OpStateDump opStateDump_{};
 };
 
 template <typename CommunicationType, typename TransposeType, typename ScaleTransposeType, typename ComputationType,
@@ -68,6 +82,7 @@ __aicore__ inline void AlltoAllMXQuantMatmulPipeLine<CommunicationType, Transpos
 {
     commStage_->Init();
     computeStage_->Init();
+    commStage_->SetOpStateDump(opStateDump_);
 }
 
 template <typename CommunicationType, typename TransposeType, typename ScaleTransposeType, typename ComputationType,
@@ -86,11 +101,14 @@ template <typename CommunicationType, typename TransposeType, typename ScaleTran
 __aicore__ inline void AlltoAllMXQuantMatmulPipeLine<CommunicationType, TransposeType, ScaleTransposeType,
                                                      ComputationType, ContextType>::Process(uint32_t taskCnt)
 {
+    opStateDump_.DoDump(DUMP_FIELD_POSITION | DUMP_FIELD_PHASE, POS_COMM_BEFORE,
+                        static_cast<uint8_t>(Utils::RT_PHASE_COMM_PREPARE));
     commStage_->PrepareAll(taskCnt);
     for (uint32_t index = 0; index < taskCnt; index++) {
         if ASCEND_IS_AIV {
             commStage_->Process(index);
             AscendC::SyncAll<true>();
+            opStateDump_.DoDump(DUMP_FIELD_POSITION, POS_COMP_VEC_PERMUTE_BEFORE);
             transStage_->Process(index);
             // 核间使用软同步，当前搭配的matmul没有使用软同步标识索引8和9，后续如果matmul有变化需要同步调整
             AscendC::CrossCoreSetFlag<0, PIPE_MTE3>(8);
@@ -99,6 +117,7 @@ __aicore__ inline void AlltoAllMXQuantMatmulPipeLine<CommunicationType, Transpos
         }
         if ASCEND_IS_AIC {
             AscendC::CrossCoreWaitFlag(9);
+            opStateDump_.DoDump(DUMP_FIELD_TURN_INC | DUMP_FIELD_POSITION, POS_COMP_CUBE_MATMUL_BEFORE);
             computeStage_->Process(index);
         }
     }
@@ -109,6 +128,8 @@ template <typename CommunicationType, typename TransposeType, typename ScaleTran
 __aicore__ inline void AlltoAllMXQuantMatmulPipeLine<CommunicationType, TransposeType, ScaleTransposeType,
                                                      ComputationType, ContextType>::ProcessScale()
 {
+    opStateDump_.DoDump(DUMP_FIELD_POSITION | DUMP_FIELD_PHASE, POS_SCALE_COMM_BEFORE,
+                        static_cast<uint8_t>(Utils::RT_PHASE_COMM_PREPARE));
     if ASCEND_IS_AIV {
         commStage_->PrepareAll(1);
         commStage_->Process(0);

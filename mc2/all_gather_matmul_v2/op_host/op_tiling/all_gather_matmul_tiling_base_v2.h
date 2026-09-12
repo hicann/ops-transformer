@@ -132,6 +132,9 @@ protected:
     bool enableNd2Nz_{false};
     bool castBias_{false};
     uint32_t gatherIndex_{0};
+#if MC2_DFX_ENABLE
+    Utils::DfxWorkspaceLayoutInfo workspaceLayout_{};
+#endif
 };
 } // namespace optiling
 

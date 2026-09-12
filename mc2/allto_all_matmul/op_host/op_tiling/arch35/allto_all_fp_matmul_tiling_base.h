@@ -58,7 +58,7 @@ private:
     void PrintAlltoAllMatmulTilingInfo(const std::string &opName, AlltoAllMatmulTilingInfo &tilingInfo);
     void PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &tiling);
 
-    AlltoAllMatmulTilingData localTilingData_;
+    AlltoAllMatmulTilingData localTilingData_{};
     Mc2MatMulV3Args mmV3Args_;
     Mc2MatmulV3CompileInfo mmV3compileInfo_;
     QuantType matmulQuantType_ = QuantType::FP_QUANT;

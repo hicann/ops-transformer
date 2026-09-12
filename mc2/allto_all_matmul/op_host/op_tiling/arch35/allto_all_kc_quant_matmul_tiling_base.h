@@ -63,7 +63,7 @@ protected:
     void PrintAlltoAllKcQuantMatmulTilingData(AlltoAllQuantMatmulTilingData &outTilingData);
 
 private:
-    AlltoAllQuantMatmulTilingData localTilingData_;
+    AlltoAllQuantMatmulTilingData localTilingData_{};
     uint64_t mm_mvalue_len = 0;
     QuantType matmulQuantType_ = QuantType::KC_QUANT;
     void PrintAlltoAllKcQuantMatmulTilingInfo(const std::string &opName, AlltoAllMatmulTilingInfo &tilingInfo);

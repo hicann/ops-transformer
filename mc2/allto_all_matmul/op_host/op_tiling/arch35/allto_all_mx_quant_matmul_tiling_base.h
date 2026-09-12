@@ -73,6 +73,10 @@ protected:
     ge::graphStatus CheckGroupSize(const gert::TilingContext *context, const char *opName,
                                    const OpAttrIndexSchema &indexSchema);
     void SetUserWorkSpace();
+#if MC2_DFX_ENABLE
+    void BuildWorkspaceLayout();
+    void BuildWorkspaceLayoutApace();
+#endif
     ge::graphStatus CheckMxTensorFormat(const gert::TilingContext *context, const char *opName);
     ge::graphStatus SetMxDataTypeInfo(const gert::TilingContext *context, const char *opName,
                                       TilingContextInfo &contextInfo);

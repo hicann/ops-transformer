@@ -25,6 +25,7 @@
 #include "apace/core/aiv_comm/barrier/barrier_ubmem.h"
 #include "apace/tiling/comm_tiling_data.h"
 #include "include/tensor_api/tensor.h"
+#include "../../../utils/op_state_dump.h"
 
 namespace Apace {
 
@@ -41,7 +42,7 @@ class AllGatherMxMatmulUrmaImpl {
 public:
     __aicore__ inline AllGatherMxMatmulUrmaImpl() {}
     __aicore__ inline void Init(__gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR aScaleGM, GM_ADDR bGM,
-                                GM_ADDR bScaleGM, GM_ADDR cGM, GM_ADDR biasGM,
+                                GM_ADDR bScaleGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR workspaceGM,
                                 const AllGatherMxMatmulUrmaTilingData *tilingData);
     __aicore__ inline void Process();
 
@@ -107,12 +108,15 @@ private:
     uint64_t scaleRegionBytes_{};
 
     const AllGatherMxMatmulUrmaTilingData *tilingData_{};
+    Mc2Kernel::OpStateDump opStateDump_{};
+    static constexpr uint8_t POS_COMM_BEFORE = 0U;
+    static constexpr uint8_t POS_COMP_CUBE_MATMUL_BEFORE = 1U;
 };
 
 template <typename AType, typename BType, typename CType>
 __aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::Init(
     __gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR aScaleGM, GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
-    GM_ADDR biasGM, const AllGatherMxMatmulUrmaTilingData *tilingData)
+    GM_ADDR biasGM, GM_ADDR workspaceGM, const AllGatherMxMatmulUrmaTilingData *tilingData)
 {
     tilingData_ = tilingData;
     hcommCtx_ = hcommCtx;
@@ -122,6 +126,9 @@ __aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::Init(
     bScaleGM_ = bScaleGM;
     cGM_ = cGM;
     biasGM_ = biasGM;
+#if MC2_DFX_ENABLE
+    opStateDump_.Init(workspaceGM, &tilingData->dumpInfo.workspaceLayout, tilingData->mmTile.usedCoreNum);
+#endif
 
     InitBaseParams(tilingData);
 
@@ -235,7 +242,8 @@ __aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::MatmulPro
     params.dataBytesPerMRow = dataBytesPerMRow_;
     params.scaleBytesPerMRow = scaleBytesPerMRow_;
     params.cBytesPerM = cBytesPerM_;
-    quantMatmulKernelImpl_(params);
+    opStateDump_.DoDump(DUMP_FIELD_STEP, POS_COMP_CUBE_MATMUL_BEFORE, static_cast<uint8_t>(Utils::RT_PHASE_COMM_WAIT));
+    quantMatmulKernelImpl_(params, opStateDump_);
 }
 
 template <typename AType, typename BType, typename CType>
@@ -256,11 +264,14 @@ __aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::AllGather
     // 预触发 dependTileIdx=0：自身数据始终就绪，AIC 可直接消费。
     CrossCoreSetFlag<0x2, PIPE_MTE3>(0);
 
+    opStateDump_.DoDump(DUMP_FIELD_STEP, POS_COMM_BEFORE, static_cast<uint8_t>(Utils::RT_PHASE_COMM_COMMIT));
     for (uint32_t round = 0; round < commTurn_; ++round) {
         if (static_cast<uint32_t>(GetBlockIdx()) < rankSize_) {
             allGatherScale_.Commit();
             allGatherData_.Commit();
+            opStateDump_.DoDump(DUMP_FIELD_COMMIT);
             allGatherData_.template Wait<BARRIER_DEVICE>();
+            opStateDump_.DoDump(DUMP_FIELD_WAIT);
         }
         AscendC::SyncAll<true>();
         // round 0 对应 dependTileIdx=1，AIC 侧按 dependTileIdx 等待对应的远端 round 数据。
@@ -268,7 +279,7 @@ __aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::AllGather
     }
     allGatherScale_.Finalize();
     allGatherData_.Finalize();
-
+    opStateDump_.DoDump(DUMP_FIELD_PHASE, 0, static_cast<uint8_t>(Utils::RT_PHASE_COMM_FINALIZE));
     // 通信接口使用了 channel 内的字段，需要刷新 GM 地址保证跨 kernel launch 的 GM 状态与 aiCore cache 一致
     // 后续通信接口会内置刷 cache 机制，届时可移除此处调用
     dcci(reinterpret_cast<__gm__ void *>(udmaCtx_->commBufferAddrs),
@@ -283,6 +294,6 @@ __global__ __aicore__ void AllGatherQuantMatmulKernel(__gm__ Apace::AivComm::Com
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
     Apace::AllGatherMxMatmulUrmaImpl<fp8_e4m3fn_t, fp8_e4m3fn_t, bfloat16_t> impl;
-    impl.Init(hcommCtx, aGM, aScaleGM, bGM, bScaleGM, cGM, biasGM, &tilingData);
+    impl.Init(hcommCtx, aGM, aScaleGM, bGM, bScaleGM, cGM, biasGM, nullptr, &tilingData);
     impl.Process();
 }

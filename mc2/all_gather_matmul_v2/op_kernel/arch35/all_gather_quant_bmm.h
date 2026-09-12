@@ -26,6 +26,7 @@
 #include "all_gather_matmul_base_v2.h"
 #include "../../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmm_cube_on_the_fly.h"
 #include "../../../common/op_kernel/mc2_quant_batch_matmul.h"
+#include "../../../common/op_kernel/apace/utils/op_state_dump.h"
 #include "../all_gather_matmul_tiling_data.h"
 
 /**
@@ -49,9 +50,14 @@ public:
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void AllGatherCommit();         /* allgather通信 */
-    __aicore__ inline void QuantMatmulCompute();      /* 计算入口 */
-    __aicore__ inline void QuantMatmulLocalCompute(); /* 本地块计算 */
+    // position 枚举 (AllGather 专用)
+    static constexpr uint8_t POS_COMM_BEFORE = 0U;        // AllGatherCommit 前
+    static constexpr uint8_t POS_COMP_LOCAL_BEFORE = 1U;  // 本地 matmul 前
+    static constexpr uint8_t POS_COMP_GATHER_BEFORE = 2U; // 远端 gather matmul 前
+    static constexpr uint8_t POS_FINALIZE_BEFORE = 3U;    // Finalize 前
+    __aicore__ inline void AllGatherCommit();             /* allgather通信 */
+    __aicore__ inline void QuantMatmulCompute();          /* 计算入口 */
+    __aicore__ inline void QuantMatmulLocalCompute();     /* 本地块计算 */
 
     __aicore__ inline void QuantMatmulGatherCompute(); /* 远端计算 */
     __aicore__ inline void PostProcess();              /* 后处理 */
@@ -81,6 +87,7 @@ private:
     HcclHandle handleList_[MAX_HANDLE_WITH_SCALE1]; /* hccl handle */
     typename HcclTypeSelector<ServerMode>::type hcclAllgather_;
     uint64_t preCoreNum_ = 0;
+    Mc2Kernel::OpStateDump opStateDump_;
 };
 
 /**
@@ -126,6 +133,9 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
     debugMode_ = tilingData_->debugMode;
     dataType_ = static_cast<AscendC::HcclDataType>(tilingData_->dataType);
     rankId_ = hcclAllgather_.GetRankId();
+#if MC2_DFX_ENABLE
+    opStateDump_.Init(workspaceGM, &tilingData->dumpInfo.workspaceLayout, cfg.aicCoreNum);
+#endif
     // 若有指定gatherout地址则用指定地址，若未指定gatherOut地址则为workspace空间
     if ((cfg.gatherLen != 0) || (!gatherOut)) {
         gatherOut_ = workspaceGM_;
@@ -196,12 +206,14 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
         uint64_t scaleStride = mxfpScalesCount;
         handleList_[SCALE1_HANDLE_IDX] = hcclAllgather_.template AllGather<true>(
             dequantGM1_, gatherDequantGM1_, mxfpScalesCount, dataType_, scaleStride, repeat);
+        opStateDump_.DoDump(DUMP_FIELD_PHASE | DUMP_FIELD_COMMIT, 0, Utils::RT_PHASE_COMM_COMMIT);
     }
 
     // 对于mxfp4场景，实际传输数据量需要做减半处理，已在前面代码中进行处理
     for (uint32_t i = 0U; i < tileCnt; i++) {
         handleList_[i] =
             hcclAllgather_.template AllGather<true>(aGM, gatherOut, tileSendCount, dataType_, stride, repeat);
+        opStateDump_.DoDump(DUMP_FIELD_PHASE | DUMP_FIELD_COMMIT, 0, Utils::RT_PHASE_COMM_COMMIT);
         // 刷新aGM和目的地址
         aGM += tileSendCount * sizeof(AType);
         gatherOut += tileSendCount * sizeof(AType);
@@ -211,6 +223,7 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
     for (uint32_t i = 0U; i < tailCnt; i++) {
         handleList_[tileCnt + i] =
             hcclAllgather_.template AllGather<true>(aGM, gatherOut, tailSendCount, dataType_, stride, repeat);
+        opStateDump_.DoDump(DUMP_FIELD_PHASE | DUMP_FIELD_COMMIT, 0, Utils::RT_PHASE_COMM_COMMIT);
         aGM += tailSendCount * sizeof(AType);
         gatherOut += tailSendCount * sizeof(AType);
     }
@@ -279,6 +292,7 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
             for (uint32_t i = 0; i < count; i++) {
                 // 所有核Prepare，因此需要所有核做Wait
                 hcclAllgather_.Wait(handleList_[i + shift]);
+                opStateDump_.DoDump(DUMP_FIELD_WAIT);
             }
         }
         return;
@@ -308,9 +322,11 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
         // 开始计算前确认是否搬运完成，debug模式只做本片内计算，则不需要判断搬运状态
         if (debugMode_ != MC2_DEBUG_ONLY_CUBE) {
             hcclAllgather_.Wait(handleList_[i + shift]);
+            opStateDump_.DoDump(DUMP_FIELD_WAIT);
         }
 
         mmv3.UpdateSlice(i, isTail);
+        opStateDump_.DoDump(DUMP_FIELD_TURN_INC | DUMP_FIELD_POSITION, POS_COMP_GATHER_BEFORE);
         mmv3.Process(isLast && (i == (count - 1)));
     }
     preCoreNum_ = mmv3.GetPreCoreNum();
@@ -330,6 +346,7 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
     // 计算本片的块
     // 未用到的AIC核不需要参与计算
     if ((GetBlockIdx() < tilingData_->quantBmmv3LocalTiling.matmulTiling.usedCoreNum) && (cfg.rankN != 0)) {
+        opStateDump_.DoDump(DUMP_FIELD_EXEC_INC | DUMP_FIELD_POSITION, POS_COMP_LOCAL_BEFORE);
         QuantMatmulLocalCompute();
     }
     Mc2SyncAll<Mc2CoreType::ON_CUBE>();
@@ -340,6 +357,7 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
         if constexpr (DequantBmm::IsMxType<X2ScaleType>()) {
             // 计算其他片数据前先wait scale1
             hcclAllgather_.Wait(handleList_[SCALE1_HANDLE_IDX]);
+            opStateDump_.DoDump(DUMP_FIELD_WAIT);
         }
     }
     QuantMatmulGatherCompute();
@@ -389,6 +407,7 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
     Mc2SyncAll<Mc2CoreType::ON_CUBE>();
     if (debugMode_ != MC2_DEBUG_ONLY_CUBE) {
         hcclAllgather_.Finalize();
+        opStateDump_.DoDump(DUMP_FIELD_PHASE, 0, Utils::RT_PHASE_COMM_FINALIZE);
     }
 }
 
@@ -410,6 +429,7 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
         }
         // 计算
         QuantMatmulCompute();
+        opStateDump_.DoDump(DUMP_FIELD_POSITION, POS_FINALIZE_BEFORE);
         // 后处理：AIC全核同步+终止hcclserver
         PostProcess();
     }

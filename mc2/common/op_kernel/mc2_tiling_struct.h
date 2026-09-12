@@ -16,6 +16,7 @@
 #define MC2_TILING_STRUCT_H
 
 #include "kernel_tiling/kernel_tiling.h"
+#include "apace/utils/op_state_dump_struct.h"
 
 namespace Mc2Tiling {
 constexpr uint8_t COMM_ALG_DEFAULT = 0;
