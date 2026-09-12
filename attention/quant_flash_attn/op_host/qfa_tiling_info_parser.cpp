@@ -634,39 +634,6 @@ ge::graphStatus QfaInfoParser::ParseAxisInfo()
         return ge::GRAPH_FAILED;
     }
 
-    uint32_t qDescaleDimNum = opParamInfo_.qDescale.shape->GetStorageShape().GetDimNum();
-    using QM = QfaQuantMode;
-    if (quantMode_ == QM::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
-        if (qDescaleDimNum != 1) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, Q_DESCALE_NAME.c_str(),
-                                                     (std::to_string(qDescaleDimNum) + "D").c_str(),
-                                                     "In HIF8 scenario, the shape dim of q_descale must be 1D");
-            return ge::GRAPH_FAILED;
-        }
-    } else if (quantMode_ ==
-               QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
-        if (qDescaleDimNum != 2) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                opName_, Q_DESCALE_NAME.c_str(), (std::to_string(qDescaleDimNum) + "D").c_str(),
-                "In GQA_FP8_FULLQUANT scenario, the shape dim of q_descale must be 2D");
-            return ge::GRAPH_FAILED;
-        }
-    } else {
-        bool isDecode = (layoutQDescale_ == QfaLayout::N2TGD);
-        if (isDecode && qDescaleDimNum != 5) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                opName_, Q_DESCALE_NAME.c_str(), (std::to_string(qDescaleDimNum) + "D").c_str(),
-                "In MxFP8 decode scenario(layout_q_descale=N2TGD), the shape dim of q_descale must be 5D");
-            return ge::GRAPH_FAILED;
-        }
-        if (!isDecode && qDescaleDimNum != 4) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                opName_, Q_DESCALE_NAME.c_str(), (std::to_string(qDescaleDimNum) + "D").c_str(),
-                "In MxFP8 prefill scenario(layout_q_descale=TND), the shape dim of q_descale must be 4D");
-            return ge::GRAPH_FAILED;
-        }
-    }
-
     return ge::GRAPH_SUCCESS;
 }
 
