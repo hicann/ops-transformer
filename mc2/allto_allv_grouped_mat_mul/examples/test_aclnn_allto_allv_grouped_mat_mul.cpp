@@ -238,6 +238,12 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }
+    if (sendCounts != nullptr) {
+        aclDestroyIntArray(sendCounts);
+    }
+    if (recvCounts != nullptr) {
+        aclDestroyIntArray(recvCounts);
+    }
     HcclCommDestroy(args.hcclComm);
     aclrtDestroyStream(args.stream);
     aclrtDestroyContext(args.context);
