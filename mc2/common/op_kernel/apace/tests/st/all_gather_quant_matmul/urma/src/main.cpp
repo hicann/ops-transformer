@@ -32,7 +32,7 @@
 #include "apace_st_utils.h"
 #include "apace/utils/apace_constant.h"
 #include "apace/tiling/quant_matmul_tiling_swat.h"
-#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_tiling_data.h"
+#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_tiling_data.h"
 #include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_impl.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
 #include "apace/utils/comm_channel_builder.h"

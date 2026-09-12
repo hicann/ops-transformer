@@ -15,7 +15,7 @@
 
 #include <kernel_operator.h>
 #include "all_gather_matmul_v3_tiling_key.h"
-#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_tiling_data.h"
+#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_tiling_data.h"
 #include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_impl.h"
 
 using namespace AscendC;
