@@ -741,12 +741,13 @@ static uint64_t BuildDispatchWorkspaceLayout(MoeEpDispatchInfo &info)
     uint64_t superNodeCount = static_cast<uint64_t>(info.hybrid.serverNum);
     uint64_t numTokens = static_cast<uint64_t>(info.cfg.numTokens);
 
-    // counter 区: [aivNum][epAlignWin] 布局，每核写自己的行，独占 cache line
+    // counter 区: [aivNum][epAlignWin] 布局，每核写自己的行
     uint64_t epAlignWinBytes = AlignUpWin(epWorldSize * sizeof(int32_t));
     uint64_t counterBytes = aivNum * epAlignWinBytes;
 
-    // sendCntPerRank区
-    uint64_t sendCntPerRankBytes = epAlignWinBytes;
+    // sendCntPerRank 区  HYBRID [ep][512B]， DIRECT [epAlignWin]
+    uint64_t sendCntPerRankBytes =
+        (info.networkMode == NETWORK_HYBRID) ? epWorldSize * WIN_ADDR_ALIGN : epAlignWinBytes;
 
     // sendCntPerExpert 区: 两边一致
     uint64_t sendCntPerExpertBytes = AlignUpWin(moeExpertNumPerRank * epWorldSize * sizeof(int32_t));

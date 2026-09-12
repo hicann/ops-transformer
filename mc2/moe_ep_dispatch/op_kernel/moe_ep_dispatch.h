@@ -716,6 +716,7 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Communicati
         PipeBarrier<PIPE_MTE3>(); // perExpert 写完再写notifyVal
         DataCopy(notifyGMTensor, notifyLocalTensor, INT64_UB_STRIDE);
     }
+    SyncFunc<AscendC::HardEvent::MTE3_MTE2>(); // tempBuf_ 复用
 }
 
 template <TemplateMoeEpDispatchTypeClass>
@@ -816,7 +817,6 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::GetSlotStar
     LocalTensor<uint8_t> sharedTmpTensor = tempBuf_.Get<uint8_t>();
     DataCopyParams counterCopyParams = {1U, static_cast<uint16_t>(epWorldSizeAlign_),
                                         static_cast<uint16_t>(epWorldSizeAlign512_ - epWorldSizeAlign_), 0U};
-    SyncFunc<AscendC::HardEvent::MTE3_MTE2>();
     for (uint32_t i = 0; i < groupCnt; i++) {
         uint32_t copyNum = (i == groupCnt - 1) ? (aivId_ - copyNumPerGroup * i) : copyNumPerGroup;
         uint32_t gmOffset = i * copyNumPerGroup * epWorldSizeAlign512_ / sizeof(int32_t);
@@ -983,7 +983,7 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::SendPhase()
     if (startTokenId_ >= axisBS_) {
         return;
     }
-    GetSlotStartNum(); // 计算起始slot id 并落盘 slotStart 供发送侧读取
+    GetSlotStartNum(); // 计算起始slot id
 
     uint32_t groupCnt = Ceil(sendTokenNum_, perGroupTokenNum_);
     uint32_t tokenCnt = perGroupTokenNum_;
