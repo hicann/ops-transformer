@@ -554,6 +554,7 @@ void AllToAllKcQuantMatmulTilingBase::SetTilingInfo(AlltoAllMatmulTilingInfo &ti
     tilingInfo.permuteLen = inferredInfo_.permuteLen;
     tilingInfo.x1ScaleOptionalLen = inferredInfo_.x1ScaleOptionalLen;
     tilingInfo.rankDim = contextInfo_.args_.rankDim;
+    tilingInfo.aicCoreNum = contextInfo_.args_.aicCoreNum;
     tilingInfo.hcclDataType =
         (static_cast<uint8_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, contextInfo_.hcclGeType))); // hccl数据类型
     tilingInfo.x1QuantDtype = contextInfo_.x1KcDynQuantDTypeVal;

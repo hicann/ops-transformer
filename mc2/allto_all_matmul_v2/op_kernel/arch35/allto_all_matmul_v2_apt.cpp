@@ -44,6 +44,6 @@ __global__ __aicore__ void allto_all_matmul_v2(GM_ADDR context, GM_ADDR x1, GM_A
 #endif
 
     Impl impl;
-    impl.Init(hcommCtx, x1, x1_scale, x2, x2_scale, y, bias, &tilingData);
+    impl.Init(hcommCtx, x1, x1_scale, x2, x2_scale, y, bias, workspaceGM, &tilingData);
     impl.Run();
 }

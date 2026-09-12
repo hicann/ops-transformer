@@ -28,6 +28,7 @@
 #define WINDOW_LEN 1L // 调度器窗口设置为1，非侵入式修改
 #include "blaze/gemm/block/block_scheduler_qbmm.h"
 #undef WINDOW_LEN
+#include "../../../utils/op_state_dump.h"
 
 namespace Blaze {
 namespace Gemm {
@@ -137,10 +138,10 @@ public:
 
 public:
     __aicore__ inline void Init(const Params &params);
-    __aicore__ inline void Run(const Params &params);
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void Run(const Params &params, Mc2Kernel::OpStateDump &opStateDump);
+    __aicore__ inline void operator()(const Params &params, Mc2Kernel::OpStateDump &opStateDump)
     {
-        Run(params);
+        Run(params, opStateDump);
     }
 
     __aicore__ inline CommPolicy &GetCommPolicy()
@@ -151,7 +152,7 @@ public:
 private:
     __aicore__ inline void ResetGmAddr(const Params &params);
     __aicore__ inline void ProcessSingleBatch(const Params &params, BlockScheduler &bs, uint64_t restBatch,
-                                              bool isTailRound);
+                                              bool isTailRound, Mc2Kernel::OpStateDump &opStateDump);
     __aicore__ inline int32_t CalcDependTileIdx(int64_t mPos, uint32_t headTileSize, uint32_t totalTiles) const;
 
     template <typename TensorB, typename TensorScaleB, typename TensorC>
@@ -181,7 +182,8 @@ private:
 };
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(const Params &params)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(const Params &params,
+                                                                                 Mc2Kernel::OpStateDump &opStateDump)
 {
     Init(params);
 
@@ -194,7 +196,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run
     mmadOp_.Init(params.problemShape, l0TileShape, params.l1Params, isBias_, params.qbmmParams.dbL0C > 1,
                  params.localParams.splitKNum);
 
-    ProcessSingleBatch(params, bs, 0, true);
+    ProcessSingleBatch(params, bs, 0, true, opStateDump);
 
     if (isAtomicAdd_) {
         AscendC::SetAtomicNone();
@@ -304,10 +306,8 @@ __aicore__ inline int32_t AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ProcessSingleBatch(const Params &params,
-                                                                                                BlockScheduler &bs,
-                                                                                                uint64_t restBatch,
-                                                                                                bool isTailRound)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ProcessSingleBatch(
+    const Params &params, BlockScheduler &bs, uint64_t restBatch, bool isTailRound, Mc2Kernel::OpStateDump &opStateDump)
 {
     auto rankId = params.localParams.rankId;
     auto rankSize = params.localParams.rankSize;
@@ -370,6 +370,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
             return;
         }
 
+        opStateDump.DoDump(DUMP_FIELD_TURN_INC);
         bs.GetTileCoord(blockIdx, mPos, nPos);
         // 切分输出块：地址基址已在外部按流水步偏移，此处仅按调度器位置切局部块
         auto gmBlockC =
@@ -417,6 +418,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
             while (readyTileIdx < dependTileIdx) {
                 readyTileIdx++;
                 commPolicy_.WaitTile(readyTileIdx);
+                opStateDump.DoDump(DUMP_FIELD_WAIT);
             }
             // Phase 3: 遍历其它 rank，在 L0C 上累加（最后一个 rank 触发 fixpipe）
             uint32_t remoteRankCnt = 1;
@@ -448,6 +450,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
             while (readyTileIdx < dependTileIdx) {
                 readyTileIdx++;
                 commPolicy_.WaitTile(readyTileIdx);
+                opStateDump.DoDump(DUMP_FIELD_WAIT);
             }
             for (uint64_t rank = 0; rank < rankSize; rank++) {
                 auto actualMPos = rank * oriM + mPos;
@@ -490,6 +493,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
         while (readyTileIdx < totalTiles - 1) {
             readyTileIdx++;
             commPolicy_.WaitTile(readyTileIdx);
+            opStateDump.DoDump(DUMP_FIELD_WAIT);
         }
     }
 }

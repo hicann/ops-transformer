@@ -44,6 +44,7 @@
 #include "blaze/gemm/block/block_scheduler_qbmm.h"
 #include "../../matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel.h"
 #include "include/tensor_api/tensor.h"
+#include "../../../utils/op_state_dump.h"
 
 namespace Apace {
 template <typename T>
@@ -71,6 +72,8 @@ template <AscendC::HcclServerType ServerType>
 struct HcommCommWaitPolicy {
     HcommCommState<ServerType> *state_{nullptr};
 
+    // 返回本次实际执行的 hccl.Wait 次数: tile0=2(scale+data)，其余=1(data)，
+    // 供 kernel 侧经 DoDump 的 waitDelta 计入 commWaitCount，与 commit 侧 tiles 计数对称。
     __aicore__ inline void WaitTile(uint32_t tileIdx)
     {
         if (tileIdx == 0) {
@@ -126,6 +129,10 @@ public:
     HcommCommState<ServerType> commState_;
 
 private:
+    static constexpr uint8_t POS_COMM_BEFORE = 0U;
+    static constexpr uint8_t POS_COMP_LOCAL_BEFORE = 1U;
+    static constexpr uint8_t POS_COMP_REMOTE_BEFORE = 2U;
+    static constexpr uint8_t POS_FINALIZE_BEFORE = 3U;
     AlltoAllMatmulTilingDataType *tilingData_;
 
     GM_ADDR x1_;
@@ -149,6 +156,8 @@ private:
     static constexpr uint64_t MXFP_MULTI_BASE_SIZE = 2UL;
     static constexpr uint64_t MXFP_DATA_NUM_PER_BYTE = 2UL;
     static constexpr uint64_t ALIGN_NUM = 512UL;
+
+    Mc2Kernel::OpStateDump opStateDump_;
 
     __aicore__ inline void SetupParams(Params &out, MatmulMode matmulMode);
     __aicore__ inline void MatmulProcess(MatmulMode matmulMode);
@@ -180,6 +189,10 @@ AllToAllMxQuantMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMa
     if (all2all_out == nullptr) {
         commOutGM_ = workspaceGM + x1ScaleLen;
     }
+#if MC2_DFX_ENABLE
+    opStateDump_.Init(workspaceGM_, &tilingData_->dumpInfo.workspaceLayout,
+                      tilingData_->tileQbmmTilingData.usedCoreNum);
+#endif
     quantMatmulKernelImpl_.GetCommPolicy().state_ = &commState_;
     commState_.hccl_.InitV2(AscendC::GetHcclContext<0>(), &(tilingData_->mc2InitTiling));
     commState_.hccl_.SetCcTilingV2(static_cast<uint64_t>(offsetof(AlltoAllMatmulTilingDataType, mc2CcTiling)));
@@ -196,15 +209,17 @@ AllToAllMxQuantMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMa
 
     uint64_t dataStrideCount = static_cast<uint64_t>(splitAxisSize_) * rankForComm;
     uint64_t scaleSendCount = static_cast<uint64_t>(splitAxisSize_) * scaleKPerRank;
+    opStateDump_.DoDump(DUMP_FIELD_STEP, POS_COMM_BEFORE, static_cast<uint8_t>(Utils::RT_PHASE_COMM_PREPARE));
+    // DoDump不统计scale commit次数
     commState_.scaleHandle_ = commState_.hccl_.template AlltoAll<true>(
         x1Scale_, commX1ScaleGM1_, scaleSendCount, static_cast<AscendC::HcclDataType>(mxScaleHcclDataType_),
         scaleSendCount, 1);
-
     if (commTiling.splitAxisTileCnt > 0) {
         uint64_t headSendCount = static_cast<uint64_t>(commTiling.splitAxisTileSize) * rankForComm;
         commState_.dataHeadHandle_ = commState_.hccl_.template AlltoAll<true>(
             x1_, commOutGM_, headSendCount, static_cast<AscendC::HcclDataType>(x1HcclDataType_), dataStrideCount,
             static_cast<uint8_t>(commTiling.splitAxisTileCnt));
+        opStateDump_.DoDump(DUMP_FIELD_COMMIT, 0, 0, 0, commTiling.splitAxisTileCnt);
     }
 
     if (commTiling.splitAxisTailCnt > 0) {
@@ -215,6 +230,7 @@ AllToAllMxQuantMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMa
             x1_ + headOffset, commOutGM_ + headOffset, tailSendCount,
             static_cast<AscendC::HcclDataType>(x1HcclDataType_), dataStrideCount,
             static_cast<uint8_t>(commTiling.splitAxisTailCnt));
+        opStateDump_.DoDump(DUMP_FIELD_COMMIT, 0, 0, 0, commTiling.splitAxisTailCnt);
     }
     commState_.headTileCnt_ = static_cast<uint32_t>(commTiling.splitAxisTileCnt);
 }
@@ -225,11 +241,14 @@ __aicore__ inline void AllToAllMxQuantMatmulHcommImpl<X1Type, X2Type, YType, Com
                                                       AlltoAllMatmulTilingDataType, ServerType, IsMxFp4>::Run()
 {
     if (tilingData_->localMatmul != 0) {
+        opStateDump_.DoDump(DUMP_FIELD_POSITION, POS_COMP_LOCAL_BEFORE);
         MatmulProcess(MatmulMode::LOCAL);
     }
+    opStateDump_.DoDump(DUMP_FIELD_POSITION, POS_COMP_REMOTE_BEFORE);
     MatmulProcess(MatmulMode::REMOTE);
     AscendC::SyncAll();
     commState_.hccl_.Finalize();
+    opStateDump_.DoDump(DUMP_FIELD_PHASE, 0, static_cast<uint8_t>(Utils::RT_PHASE_COMM_FINALIZE));
 }
 
 template <typename X1Type, typename X2Type, typename YType, typename CommDataTypeX1,
@@ -288,7 +307,7 @@ AllToAllMxQuantMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMa
 {
     Params params;
     SetupParams(params, matmulMode);
-    quantMatmulKernelImpl_(params);
+    quantMatmulKernelImpl_(params, opStateDump_);
 }
 
 } // namespace Apace

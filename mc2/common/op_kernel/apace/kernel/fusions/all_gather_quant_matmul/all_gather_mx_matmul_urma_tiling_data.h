@@ -19,6 +19,7 @@
 #include "apace/tiling/quant_matmul_tiling_data.h"
 #include "apace/tiling/comm_tiling_data.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
+#include "../../../../mc2_tiling_struct.h"
 
 namespace Apace {
 namespace AivComm {
@@ -32,7 +33,9 @@ struct CommContext {
 
 #pragma pack(push, 8)
 // 8 means 8 bytes aligned
+// DFX 头部约定: dumpInfo 必须是第一个成员(offset 0)
 struct alignas(8) AllGatherMxMatmulUrmaTilingData {
+    Utils::DfxDumpInfo dumpInfo{};
     QuantMatmulTilingData mmTile;
     CommTilingData commTile;
     uint8_t isBias{0};

@@ -18,6 +18,7 @@
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/allto_all_formulaic_tiling.h"
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_util_tiling.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
+#include "op_host/op_tiling/mc2_tiling_struct.h"
 #include "op_host/tiling_base.h"
 #include "op_host/tiling_templates_registry.h"
 #include "tiling/tiling_api.h"
@@ -59,6 +60,9 @@ protected:
     uint32_t libApiWorkSpaceSize_{0};
     TilingContextInfo contextInfo_;
     TilingInferredInfo inferredInfo_;
+#if MC2_DFX_ENABLE
+    Utils::DfxWorkspaceLayoutInfo workspaceLayout_{};
+#endif
 
 private:
     // 功能后移，基类的GetShapeAttrsInfo在isCapable之前，当前将校验和参数获取放到子类的DoOptiling中

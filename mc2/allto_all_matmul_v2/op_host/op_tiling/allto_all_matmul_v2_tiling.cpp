@@ -17,10 +17,12 @@
 
 #include <cstdio>
 #include <string>
+#include <cstring>
 #include <register/op_def_registry.h>
 #include <register/op_impl_registry.h>
 #include "graph/types.h"
 #include "tiling/platform/platform_ascendc.h"
+#include "mc2_exception_dump.h"
 
 using namespace ge;
 
@@ -57,4 +59,24 @@ IMPL_OP_OPTILING(AlltoAllMatmulV2)
     .Tiling(AlltoAllMatmulV2TilingFunc)
     .TilingParse<AlltoAllMatmulV2CompileInfo>(TilingParseForAlltoAllMatmulV2);
 
+#if MC2_DFX_ENABLE
+inline void AlltoAllMatmulV2ExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+{
+    const char *socName = aclrtGetSocName();
+    if (std::strstr(socName, "Ascend950") == nullptr) {
+        return;
+    }
+    Mc2Exception::Mc2DumpTilingAndWorkspace(args, "AlltoAllMatmulV2",
+                                            9U,  // tilingGmArgIdx
+                                            8U); // workspaceGmArgIdx
+    Mc2Exception::Mc2DumpUrmaContext(args, "AlltoAllMatmulV2",
+                                     0U,  // contextArgIdx
+                                     9U); // tilingGmArgIdx
+}
+
+__attribute__((constructor)) void RegisterAlltoAllMatmulV2ExceptionFunc()
+{
+    IMPL_OP(AlltoAllMatmulV2).ExceptionDumpParseFunc(AlltoAllMatmulV2ExceptionImplWrapper);
+}
+#endif // MC2_DFX_ENABLE
 } // namespace MC2Tiling

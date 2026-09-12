@@ -78,6 +78,9 @@ protected:
 
     Mc2Tiling::RCSTiling &MutableRCSTilingDataA5() const;
 
+#if MC2_DFX_ENABLE
+    ge::graphStatus BuildQuantWorkspaceLayout();
+#endif
     ge::graphStatus DoAdaptSlidWindowTiling();
     ge::graphStatus SetMc2Hcomm();
     ge::graphStatus CheckInput() override;

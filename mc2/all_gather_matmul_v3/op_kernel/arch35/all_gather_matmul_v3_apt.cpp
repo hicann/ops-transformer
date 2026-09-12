@@ -28,7 +28,6 @@ __global__ __aicore__ void all_gather_matmul_v3(GM_ADDR context, GM_ADDR x1, GM_
 {
     (void)gather_out;
     (void)amax_out;
-    (void)workspaceGM;
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
 
     REGISTER_TILING_DEFAULT(AllGatherMxMatmulUrmaTilingData);
@@ -39,6 +38,6 @@ __global__ __aicore__ void all_gather_matmul_v3(GM_ADDR context, GM_ADDR x1, GM_
     using Impl = AllGatherMxMatmulUrmaImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y>;
 
     Impl impl;
-    impl.Init(hcommCtx, x1, x1_scale, x2, x2_scale, y, bias, &tilingData);
+    impl.Init(hcommCtx, x1, x1_scale, x2, x2_scale, y, bias, workspaceGM, &tilingData);
     impl.Process();
 }

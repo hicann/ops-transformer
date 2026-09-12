@@ -100,6 +100,7 @@ protected:
                         const ::TCubeTiling &tailTiling, uint32_t debugMode);
     ge::graphStatus CheckHCCLSize();
     ge::graphStatus AdjustHCCLLimit(Mc2Tiling::RCSTiling &rcsCfg, mc2tiling::Mc2QuantMode quantMmMode);
+    void BuildWorkspaceLayout();
 
     mc2tiling::TilingArgs args_;
     platform_ascendc::SocVersion socVersion_;
@@ -114,6 +115,9 @@ protected:
     uint64_t longTileLen_{0}; // mc2 切块后长块的大小；
     uint64_t mmResultLen_{0};
     uint32_t libApiWorkSpaceSize_{0};
+#if MC2_DFX_ENABLE
+    Utils::DfxWorkspaceLayoutInfo workspaceLayout_{};
+#endif
 };
 } // namespace optiling
 
