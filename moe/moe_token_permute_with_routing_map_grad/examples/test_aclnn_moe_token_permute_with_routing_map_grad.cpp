@@ -236,13 +236,19 @@ int main()
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     aclDestroyTensor(permuted_output_grad);
+    aclDestroyTensor(ppermutedProbsOutputGrad);
     aclDestroyTensor(sortedIndices);
+    aclDestroyTensor(proutingMapOptional);
     aclDestroyTensor(out);
+    aclDestroyTensor(out2);
 
     // 7. 释放device资源
     aclrtFree(permuted_output_grad_Addr);
+    aclrtFree(permutedProbsOutputGrad_Addr);
     aclrtFree(sortedIndicesAddr);
+    aclrtFree(routingMapOptionalAddr);
     aclrtFree(outAddr);
+    aclrtFree(outAddr2);
 
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
