@@ -699,8 +699,8 @@ ge::graphStatus AlltoAllMxQuantMatmulHelper::PostTiling()
  */
 AlltoAllMxQuantMatmulHelper::AlltoAllMxQuantMatmulHelper(
     AllToAllMxQuantMatmulTilingBase &allToAllMxQuantMatmulTilingBase,
-    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &data, uint64_t &mmMvalueLen_)
-    : Mc2AdaptiveSlidingWindowTiling(allToAllMxQuantMatmulTilingBase.context_, &data),
+    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &out, uint64_t &mmMvalueLen_)
+    : Mc2AdaptiveSlidingWindowTiling(allToAllMxQuantMatmulTilingBase.context_, &out),
       tilingProcesser_(allToAllMxQuantMatmulTilingBase),
       mmLen_(mmMvalueLen_)
 {}

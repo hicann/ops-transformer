@@ -53,10 +53,10 @@ protected:
     uint64_t CalcMByTime(double time);
     uint64_t CalcMWhenT1EqualT2();
     void FitTileLengthDiscrete();
-    uint64_t primeMinFactor(uint64_t num);
+    uint64_t primeMinFactor(uint64_t num) const;
     void ReTilingByFactor();
     uint64_t CalcLongTileLen(uint64_t shortTileLen);
-    uint32_t GetRank();
+    uint32_t GetRank() const;
     double totalMatmulTime_ = 0.0;
     double totalTpTime_ = 0.0;
     uint64_t alltoallMaxTilingNum_ = MAX_TILE_CNT;
