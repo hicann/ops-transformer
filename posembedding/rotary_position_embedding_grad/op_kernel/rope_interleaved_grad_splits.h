@@ -932,6 +932,9 @@ __aicore__ inline void RopeInterleavedGrad<T, LARGE, NEEDBACKWARD>::LargeCosSinC
         dataCopyCosParams.dstStride = 0;
         DataCopyPad(cosGradGm[(sIndex + seqOffset) * headDim], outCosGradTemp, dataCopyCosParams);
         DataCopyPad(sinGradGm[(sIndex + seqOffset) * headDim], outSinGradTemp, dataCopyCosParams);
+        event_t eventIdMTE3ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));
+        SetFlag<HardEvent::MTE3_V>(eventIdMTE3ToV);
+        WaitFlag<HardEvent::MTE3_V>(eventIdMTE3ToV);
         outQueueCosSinGrad.FreeTensor(outCosSinGradTensor);
     }
 }
