@@ -37,12 +37,7 @@
 #define SPARSE_FLASH_MLA_FLASH_DECODE_H
 
 #include <stdint.h>
-
-#if __has_include("../../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h")
 #include "../../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
-#elif __has_include("../../../common/arch35/vf/vf_flash_decode_arch35.h")
-#include "../../../common/arch35/vf/vf_flash_decode_arch35.h"
-#endif
 #include "static_buffer.h"
 
 namespace AttentionCommon {

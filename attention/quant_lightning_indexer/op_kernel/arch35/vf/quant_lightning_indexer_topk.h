@@ -16,21 +16,9 @@
 #define QUANT_LIGHTNING_INDEXER_TOPK_H
 
 #include "kernel_operator.h"
-#if __has_include("../../../lightning_indexer/lightning_indexer_common.h")
-#include "../../../lightning_indexer/lightning_indexer_common.h"
-#else
 #include "../../../../lightning_indexer/op_kernel/lightning_indexer_common.h"
-#endif
-#if __has_include("../../../lightning_indexer/arch35/vf/vf_topk_gather.h")
-#include "../../../lightning_indexer/arch35/vf/vf_topk_gather.h"
-#else
 #include "../../../../lightning_indexer/op_kernel/arch35/vf/vf_topk_gather.h"
-#endif
-#if __has_include("../../../lightning_indexer/arch35/vf/common/vf_topk_16_gather.h")
-#include "../../../lightning_indexer/arch35/vf/common/vf_topk_16_gather.h"
-#else
 #include "../../../../lightning_indexer/op_kernel/arch35/vf/common/vf_topk_16_gather.h"
-#endif
 
 namespace topk {
 template <typename T>

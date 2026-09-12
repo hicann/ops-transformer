@@ -15,11 +15,7 @@
 #ifndef BUFFER_POLICY_SFA_H
 #define BUFFER_POLICY_SFA_H
 
-#if __has_include("../../../../common/op_kernel/buffers_policy.h")
 #include "../../../../common/op_kernel/buffers_policy.h"
-#elif __has_include("../../../common/buffers_policy.h")
-#include "../../../common/buffers_policy.h"
-#endif
 
 namespace fa_base_matmul {
 // 申请3个buffer, 轮转

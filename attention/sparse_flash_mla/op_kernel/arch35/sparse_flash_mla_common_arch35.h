@@ -17,9 +17,7 @@
 #include <type_traits>
 #include "kernel_tiling/kernel_tiling.h"
 #include "../sparse_flash_mla_common.h"
-#if __has_include("common/static_buffer.h")
 #include "common/static_buffer.h"
-#endif
 #include "common/smla_common_defs.h"
 
 // ===== V 侧主流程 =====

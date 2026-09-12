@@ -20,15 +20,7 @@
 #ifndef SPARSE_FLASH_MLA_MATMUL_STATIC_H
 #define SPARSE_FLASH_MLA_MATMUL_STATIC_H
 
-#if __has_include("../../../../common/op_kernel/matmul.h")
 #include "../../../../common/op_kernel/matmul.h"
-#elif __has_include("../../../common/op_kernel/matmul.h")
-#include "../../../common/op_kernel/matmul.h"
-#elif __has_include("../../common/op_kernel/matmul.h")
-#include "../../common/op_kernel/matmul.h"
-#else
-#include "../common/matmul.h"
-#endif
 #include "static_buffer.h"
 using namespace AscendC;
 

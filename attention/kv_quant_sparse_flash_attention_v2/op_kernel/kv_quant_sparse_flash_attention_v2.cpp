@@ -20,18 +20,9 @@
 #else
 #include "kernel_operator.h"
 #endif
-#if __has_include( \
-    "../../kv_quant_sparse_flash_attention/op_kernel/kv_quant_sparse_flash_attention_template_tiling_key.h")
+
 #include "../../kv_quant_sparse_flash_attention/op_kernel/kv_quant_sparse_flash_attention_template_tiling_key.h"
-#else
-#include "../kv_quant_sparse_flash_attention/kv_quant_sparse_flash_attention_template_tiling_key.h"
-#endif
-#if __has_include( \
-    "../../kv_quant_sparse_flash_attention/op_kernel/arch35/kv_quant_sparse_flash_attention_kernel_mla_arch35.h")
 #include "../../kv_quant_sparse_flash_attention/op_kernel/arch35/kv_quant_sparse_flash_attention_kernel_mla_arch35.h"
-#else
-#include "../kv_quant_sparse_flash_attention/arch35/kv_quant_sparse_flash_attention_kernel_mla_arch35.h"
-#endif
 
 using namespace AscendC;
 
