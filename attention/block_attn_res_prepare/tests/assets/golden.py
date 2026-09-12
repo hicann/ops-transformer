@@ -25,6 +25,32 @@ LAST_DIM_INDEX = -1
 FLATTENED_SIZE = -1
 
 
+def _torch_ftz_float32(value):
+    """Flush FP32 subnormal values to signed zero."""
+    tiny = torch.tensor(
+        torch.finfo(torch.float32).tiny, dtype=value.dtype, device=value.device
+    )
+    signed_zero = torch.copysign(torch.zeros_like(value), value)
+    return torch.where(torch.abs(value) < tiny, signed_zero, value)
+
+
+def _torch_div_ftz_float32(lhs, rhs):
+    """Model Ascend 950's default FP32 Div behavior with ``--cce-ftz=true``."""
+    quotient = torch.div(_torch_ftz_float32(lhs), _torch_ftz_float32(rhs))
+    return _torch_ftz_float32(quotient)
+
+
+def _torch_sqrt_ftz_float32(value):
+    """Model Ascend 950's default FP32 Sqrt behavior with ``--cce-ftz=true``."""
+    return _torch_ftz_float32(torch.sqrt(_torch_ftz_float32(value)))
+
+
+def _torch_exp_sub_ftz_float32(lhs, rhs):
+    """Model the default-FTZ Sub-plus-Exp instruction boundaries."""
+    difference = _torch_ftz_float32(_torch_ftz_float32(lhs) - _torch_ftz_float32(rhs))
+    return _torch_ftz_float32(torch.exp(difference))
+
+
 def block_attn_res_prepare_golden(
     block_res, valid_blocks, pseudo_query, eps=DEFAULT_EPS, **kwargs
 ):
@@ -58,12 +84,15 @@ def block_attn_res_prepare_golden(
             return tuple(output.cpu().numpy().astype(np.float32) for output in outputs)
         return outputs
     history = residual[:, :valid, :]
-    inv_rms = torch.rsqrt(
-        torch.mean(history * history, dim=LAST_DIM_INDEX) + float(eps)
+    square_sum = torch.sum(history * history, dim=LAST_DIM_INDEX)
+    rms = _torch_sqrt_ftz_float32(
+        square_sum / history.shape[LAST_DIM_INDEX] + float(eps)
     )
-    logits = torch.einsum("sd,tnd->stn", query, history) * inv_rms.unsqueeze(0)
+    logits = _torch_div_ftz_float32(
+        torch.einsum("sd,tnd->stn", query, history), rms.unsqueeze(0)
+    )
     logit_max = torch.max(logits, dim=LAST_DIM_INDEX).values
-    weights = torch.exp(logits - logit_max.unsqueeze(LAST_DIM_INDEX))
+    weights = _torch_exp_sub_ftz_float32(logits, logit_max.unsqueeze(LAST_DIM_INDEX))
     exp_sum = torch.sum(weights, dim=LAST_DIM_INDEX)
     numerator = torch.einsum("stn,tnd->std", weights, history)
     outputs = (
