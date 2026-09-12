@@ -902,10 +902,8 @@ ge::graphStatus QSFATilingCheck::CheckDequantScaleNotExistence()
     if (quantScaleRepoMode_ == 1) {
         OP_CHECK_IF(
             (opParamInfo_.keyDequantScale.tensor != nullptr || opParamInfo_.valueDequantScale.tensor != nullptr),
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                opName_, "key_dequant_scale and value_dequant_scale",
-                "When quant_scale_repo_mode is 1(combine), dequant scales are combined with kv data, "
-                "key_dequant_scale and value_dequant_scale should not be provided"),
+            OP_LOGW(opName_, "When quant_scale_repo_mode is 1(combine), dequant scales are combined with kv data, "
+                             "key_dequant_scale and value_dequant_scale should not be provided"),
             return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
