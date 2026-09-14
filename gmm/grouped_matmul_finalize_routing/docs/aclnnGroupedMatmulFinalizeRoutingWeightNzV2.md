@@ -29,7 +29,7 @@ GroupedMatmul和MoeFinalizeRouting的融合算子，GroupedMatmul计算后的输
 
 本接口相较于aclnnGroupedMatmulFinalizeRoutingWeightNz，此接口新增：
 
-- 新增入参offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、tuningConfigOptional，其中前三个参数当前为预留参数，暂不生效，传入空指针即可。
+- 新增入参offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、tuningConfigOptional。<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>的INT4权重场景支持使用offsetOptional传入非对称量化偏移量；antiquantScaleOptional、antiquantOffsetOptional当前为预留参数，暂不生效，传入空指针即可。
 
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：新增对INT4类型weight矩阵的支持，支持tuningConfigOptional调优参数，数组中的第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值合理进行tiling切分，性能更优。请根据实际情况选择合适的接口。
@@ -147,10 +147,10 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>offsetOptional</td>
       <td>输入</td>
       <td>非对称量化的偏移量。</td>
-      <td>目前暂未启用。</td>
+      <td>Atlas A2/A3的INT4权重非对称量化场景支持传入；对称量化场景传入nullptr。Ascend 950PR/Ascend 950DT暂不支持，必须传入nullptr。</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>-</td>
+      <td>Atlas A2/A3场景支持三维，维度为(e, 1, n)</td>
       <td>✗</td>
     </tr>
     <tr>
@@ -334,7 +334,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     - offsetOptional的shape支持三维，维度为(e, 1, n)，e、n和weight的e、n一致。
     - scale支持INT64、FLOAT、BF16。
     - rowIndex支持INT64、INT32。
-    - x1、x2、groupList是必选参数，scale、pertokenScaleOptional、logit、rowIndex、bias、sharedInput是可选参数。
+    - x1、x2、scale、groupList、logit、rowIndex是必选参数，bias、sharedInput是可选参数。x2为INT4或INT32时，pertokenScaleOptional是必选参数；x2为INT8时，pertokenScaleOptional是可选参数。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
@@ -453,9 +453,9 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
     | x1    | x2    | scale   | bias    | offsetOptional  | antiquantScaleOptional | antiquantOffsetOptional | pertokenScaleOptional | groupList | sharedInput | logit   |   rowIndex | out   | tuningConfigOptional |
     |------|------|---------|---------|---------|----------------|-----------------|---------------|-----------|-------------|---------|----------|-------| ----------------------|
-    | INT8 | INT8 | FLOAT | null    | null    | null           | null            | FLOAT       | INT64     | BFLOAT16    | FLOAT | INT64    | FLOAT |   IntArray             |
-    | INT8 | INT4 | INT64   | FLOAT | FLOAT | null           | null            | FLOAT       | INT64     | BFLOAT16    | FLOAT | INT64    | FLOAT |   IntArray             |
-    | INT8 | INT4 | INT64   | FLOAT | null    | null           | null            | FLOAT       | INT64     | BFLOAT16    | FLOAT | INT64    | FLOAT |   IntArray             |
+    | INT8 | INT8 | FLOAT | BFLOAT16 / null | null | null | null | FLOAT / null | INT64 | BFLOAT16 / null | FLOAT | INT64 / INT32 | FLOAT | IntArray |
+    | INT8 | INT4 | INT64 | FLOAT / null | FLOAT | null | null | FLOAT | INT64 | BFLOAT16 / null | FLOAT | INT64 | FLOAT | IntArray |
+    | INT8 | INT4 | INT64 | FLOAT / null | null | null | null | FLOAT | INT64 | BFLOAT16 / null | FLOAT | INT64 | FLOAT | IntArray |
 
 </details>
 <!-- end id13 -->

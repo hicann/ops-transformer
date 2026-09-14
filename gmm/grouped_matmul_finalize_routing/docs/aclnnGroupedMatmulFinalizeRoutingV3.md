@@ -246,7 +246,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>输入</td>
       <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
       <td></td>
-      <td>INT64</td>
+      <td>INT64，INT32</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)</td>
       <td>√</td>
@@ -366,8 +366,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - groupListOptional支持e和w的e一致。
     - sharedInputOptional支持二维，维度为(bsdp,n)，bsdp必须小于等于batchSize/e，n和w的n一致。
     - logitOptional支持m和x的m一致。
-    - rowIndexOptional支持m和x的m一致。
-    - x1、x2、groupListOptional、biasOptional是必选参数，scaleOptional、pertokenScaleOptional、logitOptional、rowIndexOptional、sharedInputOptional是可选参数。
+    - rowIndexOptional支持INT64、INT32，且m和x的m一致。
+    - x1、x2、scaleOptional、biasOptional、pertokenScaleOptional、groupListOptional、logitOptional、rowIndexOptional是必选参数，sharedInputOptional是可选参数。
 
   <!-- end id9 -->
   <!-- npu="950" id10 -->
@@ -378,6 +378,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - biasOptional支持BF16。
     - sharedInputOptional支持二维，维度为(bsdp,n)，bsdp代表batchSize / dataParallelSize。
     - perTokenScaleOptional支持FLOAT8_E8M0。shape支持三维，维度为(m,Ceil(k/64),2)。
+    - rowIndexOptional仅支持INT64。
     - x1、x2、scaleOptional、pertokenScaleOptional、groupListOptional、logitOptional、rowIndexOptional是必选参数，biasOptional，sharedInputOptional是可选参数。目前暂不支持offsetOptional参数。
     - 当groupListType为0时，groupListOptional须为非负单调非递减数列（累积和），且最后一个值不大于x1中tensor的第一维；当groupListType为1时，groupListOptional须为非负数组（各组大小），且数值的总和不大于x1中tensor的第一维。
     - out的第一维batch、sharedInputOffset必须大于等于0，且小于等于m。
@@ -485,8 +486,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 
     | x1   | x2   | scaleOptional | biasOptional | offsetOptional | antiquantScaleOptional | antiquantOffsetOptional | pertokenScaleOptional | groupListOptional | sharedInputOptional | logitOptional | rowIndexOptional | out     |
     | ---- | ---- | ------------- | ------------ | -------------- | ---------------------- | ----------------------- | --------------------- | ----------------- | ------------------- | ------------- | ---------------- | ------- |
-    | INT8 | INT4 | INT64         | FLOAT32      | FLOAT32        | null                   | null                    | FLOAT32               | INT64             | BFLOAT16            | FLOAT32       | INT64            | FLOAT32 |
-    | INT8 | INT4 | INT64         | FLOAT32      | null           | null                   | null                    | FLOAT32               | INT64             | BFLOAT16            | FLOAT32       | INT64            | FLOAT32 |
+    | INT8 | INT4 | INT64         | FLOAT32      | FLOAT32        | null                   | null                    | FLOAT32               | INT64             | BFLOAT16 / null     | FLOAT32       | INT64 / INT32    | FLOAT32 |
+    | INT8 | INT4 | INT64         | FLOAT32      | null           | null                   | null                    | FLOAT32               | INT64             | BFLOAT16 / null     | FLOAT32       | INT64 / INT32    | FLOAT32 |
 
   - 在该场景中，scaleOptional代表per-channel和per-group离线融合的结果。
   - 在该场景中，biasOptional代表离线计算的辅助结果，值要求为$8 \times w \times scaleOptional$，并在第一维累加。
