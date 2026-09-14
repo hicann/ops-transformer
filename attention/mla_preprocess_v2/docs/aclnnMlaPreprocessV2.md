@@ -216,7 +216,7 @@ aclnnStatus aclnnMlaPreprocessV2(
       <td>输入</td>
       <td>与输入首次做矩阵乘的降维矩阵。</td>
       <td>-</td>
-      <td>INT8、FLOAT16、BFLOAT16</td>
+      <td>INT8、BFLOAT16</td>
       <td>NZ</td>
       <td>[qLoraDim + keyTotalDim,hiddenSize]</td>
       <td>-</td>
@@ -286,7 +286,7 @@ aclnnStatus aclnnMlaPreprocessV2(
       <td>输入</td>
       <td>权重矩阵。</td>
       <td>-</td>
-      <td>INT8、FLOAT16、BFLOAT16</td>
+      <td>INT8、BFLOAT16</td>
       <td>NZ</td>
       <td>[headNum * (qNoRopeDim + qRopeDim),qLoraDim]</td>
       <td>-</td>
