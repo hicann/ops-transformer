@@ -79,6 +79,7 @@
                           ${ASCEND_PATH}/lib64/libnnopbase.so
                           ${ASCEND_PATH}/lib64/libopapi_math.so
                           ${ASCEND_PATH}/lib64/libopapi_transformer.so
+                          ${ASCEND_PATH}/lib64/libc_sec.so
                           # custom包需要将libopapi_transformer.so替换为libcust_opapi.so，参考路径如下，
                           # 其中${vendor_name}需要修改为编译custom包时指定的，默认设置"custom"
                           # ${ASCEND_PATH}/opp/vendors/${vendor_name}_transformer/op_api/lib/libcust_opapi.so
@@ -100,6 +101,7 @@
                         ${ASCEND_PATH}/lib64/libnnopbase.so
                         ${ASCEND_PATH}/lib64/libopapi_math.so
                         ${ASCEND_PATH}/lib64/libopapi_transformer.so
+                        ${ASCEND_PATH}/lib64/libc_sec.so
                         # custom包需要将libopapi_transformer.so替换为libcust_opapi.so，参考路径如下，
                         # 其中${vendor_name}需要修改为编译custom包时指定的，默认设置"custom"
                         # ${ASCEND_PATH}/opp/vendors/${vendor_name}_transformer/op_api/lib/libcust_opapi.so
