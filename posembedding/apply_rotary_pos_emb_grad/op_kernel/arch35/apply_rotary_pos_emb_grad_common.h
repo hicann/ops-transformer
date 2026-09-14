@@ -21,11 +21,7 @@
 #include "op_kernel/math_util.h"
 
 // 复用原有 apply_rotary_pos_emb 常量定义
-#if __has_include("../../apply_rotary_pos_emb/arch35/apply_rotary_pos_emb_common.h")
-#include "../../apply_rotary_pos_emb/arch35/apply_rotary_pos_emb_common.h"
-#else
 #include "../../apply_rotary_pos_emb/op_kernel/arch35/apply_rotary_pos_emb_common.h"
-#endif
 
 using namespace AscendC;
 
