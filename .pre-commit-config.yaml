@@ -83,6 +83,7 @@ repos:
         name: OAT Compliance Check
         entry: bash scripts/oat_check.sh
         language: system
+        require_serial: true
         pass_filenames: true
         types: [file]
         stages: [pre-commit]

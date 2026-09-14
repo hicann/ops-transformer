@@ -135,6 +135,7 @@ if [ -n "$_HEAD_SHA" ]; then
         mkdir -p "$OAT_RESULT_DIR"
         _DONE_MARKER="$OAT_RESULT_DIR/.done_${_HEAD_SHA}"
         if [ -f "$_DONE_MARKER" ]; then
+            echo "[OAT] [SKIP] Already scanned HEAD=${_HEAD_SHA}. Skipping duplicate invocation."
             exit 0
         fi
     else
