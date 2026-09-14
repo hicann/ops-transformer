@@ -47,9 +47,35 @@ static const std::string QUERY_ROPE_NAME = "query_rope";
 static const std::string KEY_ROPE_NAME = "key_rope";
 static const std::string ATTEN_OUT_NAME = "attention_out";
 
+static ge::graphStatus CheckRequiredInputsNotEmpty(gert::TilingContext *context)
+{
+    constexpr uint32_t requiredInputIndices[] = {QUERY_INPUT_INDEX, KEY_INPUT_INDEX, WEIGHT_INPUT_INDEX,
+                                                 SPARSE_INDICES_INPUT_INDEX, ATTN_SOFTMAX_L1_NORM_INPUT_INDEX};
+    constexpr const char *requiredInputNames[] = {"q", "k", "w", "sparse_indices", "attn_softmax_l1_norm"};
+
+    for (size_t inputIdx = 0; inputIdx < sizeof(requiredInputIndices) / sizeof(requiredInputIndices[0]); ++inputIdx) {
+        const gert::StorageShape *inputShape = context->GetInputShape(requiredInputIndices[inputIdx]);
+        OP_CHECK_NULL_WITH_CONTEXT(context, inputShape);
+        const gert::Shape &storageShape = inputShape->GetStorageShape();
+        for (size_t axis = 0; axis < storageShape.GetDimNum(); ++axis) {
+            OP_CHECK_IF(storageShape.GetDim(axis) == 0,
+                        OP_LOGE(context, "Input %s has an empty dimension at axis %zu, which is not supported.",
+                                requiredInputNames[inputIdx], axis),
+                        return ge::GRAPH_FAILED);
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus TilingSparseLightningIndexerKLLossGrad(gert::TilingContext *context)
 {
+    if (context == nullptr) {
+        return ge::GRAPH_FAILED;
+    }
+    OP_CHECK_IF(CheckRequiredInputsNotEmpty(context) != ge::GRAPH_SUCCESS,
+                OP_LOGE(context, "SparseLightningIndexerKLLossGrad does not support empty input tensors."),
+                return ge::GRAPH_FAILED);
+
     auto platformInfoPtr = context->GetPlatformInfo();
     auto sligPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     if (sligPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
