@@ -39,20 +39,19 @@ __aicore__ inline void CalcA2avCommBeforeParams(A2avCommParams &params, const ui
         }
     }
 
-    params.sendOffset[0] = 0UL;
-    for (uint32_t j = 0U; j < startExpertIdx; j++) {
-        params.sendOffset[0] += static_cast<uint64_t>(rawSendCounts[j]) * axis;
-    }
-    for (uint32_t i = 1U; i < rankDim; i++) {
-        params.sendOffset[i] = 0UL;
-        for (uint32_t k = 0U; k < i; k++) {
-            for (uint32_t j = 0U; j < e; j++) {
-                params.sendOffset[i] += static_cast<uint64_t>(rawSendCounts[j + k * e]) * axis;
-            }
-        }
+    // prefix sum: sendRowPrefixSum = scaled sum of all experts on ranks [0, i)
+    uint64_t sendRowPrefixSum = 0UL;
+    for (uint32_t i = 0U; i < rankDim; i++) {
+        uint64_t rowSum = 0UL; // scaled sum of experts [0, startExpertIdx) on rank i
         for (uint32_t j = 0U; j < startExpertIdx; j++) {
-            params.sendOffset[i] += static_cast<uint64_t>(rawSendCounts[j + i * e]) * axis;
+            rowSum += static_cast<uint64_t>(rawSendCounts[j + i * e]) * axis;
         }
+        params.sendOffset[i] = sendRowPrefixSum + rowSum;
+        for (uint32_t j = startExpertIdx; j < e; j++) {
+            rowSum += static_cast<uint64_t>(rawSendCounts[j + i * e]) * axis;
+        }
+        // rowSum is now the scaled sum of all experts on rank i
+        sendRowPrefixSum += rowSum;
     }
 
     for (uint32_t i = 0U; i < rankDim; i++) {

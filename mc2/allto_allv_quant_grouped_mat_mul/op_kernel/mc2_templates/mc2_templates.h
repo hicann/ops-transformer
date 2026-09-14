@@ -20,8 +20,8 @@
 #if defined(CONST_TILING)
 #define GET_NESTED_TILING_DATA_MEMBER_ADDR(outerType, innerType, outerMember, innerMember, var, tiling) \
     const outerType *outerPtr##var = (const outerType *)(tiling); \
-    const innerType *innerPtr##var = &(outerPtr##var->outerPtr##var); \
-    const int32_t *(var) = (const int32_t)((const uint8_t *)&(innerPtr##var->innerMember))
+    const innerType *innerPtr##var = &(outerPtr##var->outerMember); \
+    const int32_t *(var) = (const int32_t *)((const uint8_t *)&(innerPtr##var->innerMember))
 #else
 #define GET_NESTED_TILING_DATA_MEMBER_ADDR(outerType, innerType, outerMember, innerMember, var, tiling) \
     size_t outerOffset##var = (size_t)(&((outerType *)0)->outerMember); \
