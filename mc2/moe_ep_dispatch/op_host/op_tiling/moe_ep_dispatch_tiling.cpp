@@ -567,20 +567,24 @@ static ge::graphStatus CheckInputTensor(const gert::TilingContext *context, cons
                     OP_LOGE(nodeName, "Check scales input failed."), return ge::GRAPH_FAILED);
 
     uint32_t xDtypeSize = isXFp8 ? FP8_DTYPE_SIZE : MAX_OUT_DTYPE_SIZE;
-    uint32_t hAlign32 = ((info.cfg.hidden * xDtypeSize + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
+    uint32_t tokenSize = info.cfg.hidden * xDtypeSize;
     uint32_t kAlign32 = ((info.cfg.topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
     uint32_t scalesSizeAlign32 = isXFp8 ? ((info.scalesBytes + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN : 0;
-    info.perSlotBytes =
-        ((hAlign32 + scalesSizeAlign32 + kAlign32 * TOPK_AND_TOPK_WEIGHT_NUMBER + UB_ALIGN + WIN_ADDR_ALIGN - 1) /
-         WIN_ADDR_ALIGN) *
-        WIN_ADDR_ALIGN;
-    // stash 的元数据 slot：scales + topk + topkWeights + pad（不含 hidden）。
-    // 与共享布局 dispatchMetaPerSlotBytes 严格同构（窗口预留=步长基准），
-    // 且 ≤ perSlotBytes - hAlign32（远端槽 meta 区容量），WQE2 整槽搬运贴合不越界
-    info.metaSlotBytes = scalesSizeAlign32 + kAlign32 * TOPK_AND_TOPK_WEIGHT_NUMBER + UB_ALIGN;
+    // stash 的元数据 slot：scales + topk + topkWeights + pad（不含 x）
+    uint32_t metaSize = scalesSizeAlign32 + kAlign32 * TOPK_AND_TOPK_WEIGHT_NUMBER + UB_ALIGN;
+    if (info.networkMode == NETWORK_HYBRID) {
+        // hybrid 槽布局保持原样: [x: ALIGN32(tokenSize)][scales][meta]，整槽 512 对齐（hybrid kernel 整槽搬运）
+        uint32_t hAlign32 = ((tokenSize + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
+        info.metaSlotBytes = metaSize;
+        info.perSlotBytes = ((hAlign32 + metaSize + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN) * WIN_ADDR_ALIGN;
+    } else {
+        // direct 紧凑槽布局: [x: tokenSize][meta: metaSlotBytes]，multi-sge 连续打包
+        info.metaSlotBytes = (metaSize + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN * WIN_ADDR_ALIGN;
+        info.perSlotBytes = tokenSize + info.metaSlotBytes;
+    }
     info.isTopkWeights = (context->GetOptionalInputShape(TOPK_WEIGHTS_INDEX) != nullptr) ? 1 : 0;
-    OP_LOGD(nodeName, "perSlotBytes = %u(hidden=%u), metaSlotBytes = %u", info.perSlotBytes, info.cfg.hidden,
-            info.metaSlotBytes);
+    OP_LOGD(nodeName, "metaSlotBytes = %u, perSlotBytes = %u(hidden=%u, networkMode=%u)", info.metaSlotBytes,
+            info.perSlotBytes, info.cfg.hidden, info.networkMode);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -804,6 +808,15 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
                     OP_LOGE(nodeName, "Calculate Moe EP window layout failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMoeEpWindowCapacity(layout.requiredBytes, maxWindowSize, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Check Moe EP window capacity failed."), return ge::GRAPH_FAILED);
+    //  kernel 按 perSlotBytes 步长写接收区、按 align512(metaSlotBytes) 步长写 stash 区, 均不得超过窗口预留, 避免踩踏
+    OP_TILING_CHECK(static_cast<uint64_t>(info.perSlotBytes) > layout.dispatchReservedPerSlotBytes,
+                    OP_LOGE(nodeName, "perSlotBytes %u exceeds window reserved slot bytes %lu.", info.perSlotBytes,
+                            layout.dispatchReservedPerSlotBytes),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(AlignUpWin(info.metaSlotBytes) > layout.dispatchMetaPerSlotBytes,
+                    OP_LOGE(nodeName, "metaSlotBytes %u exceeds window stash reserved bytes %lu.", info.metaSlotBytes,
+                            layout.dispatchMetaPerSlotBytes),
+                    return ge::GRAPH_FAILED);
 
     info.dumpMetadata = BuildMoeEpDumpMetadata(params, layout, aivNum);
     info.totalWinSizeEp = maxWindowSize;

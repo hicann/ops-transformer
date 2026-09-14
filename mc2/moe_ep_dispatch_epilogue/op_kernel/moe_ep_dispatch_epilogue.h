@@ -51,6 +51,7 @@ using namespace AscendC;
 
 static constexpr uint32_t UB_ALIGN = 32U;
 static constexpr uint32_t WIN_ADDR_ALIGN = 512;
+static constexpr uint32_t NETWORK_HYBRID = 1U; // 1 = hybrid dispatch, 0 = direct
 // recv_src_metadata is compact in GM: [srcRank, srcToken, srcTopk, srcSlot, recvXIdx].
 // The valid prefix is ordered by (srcRank, recvXIdx); each rank range follows increasing send-source rows.
 // UB staging still uses an aligned stride so that every non-aligned 20-byte copy starts from a 32-byte boundary.
@@ -76,7 +77,7 @@ template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWe
 class MoeEpDispatchEpilogue {
 public:
     __aicore__ inline MoeEpDispatchEpilogue(){};
-    __aicore__ inline void Init(GM_ADDR context, GM_ADDR dstBufferSlotIdx, GM_ADDR numRecvPerRank,
+    __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR numRecvPerRank,
                                 GM_ADDR numRecvPerExpert, GM_ADDR cachedRecvSrcMetadata, GM_ADDR recvX,
                                 GM_ADDR recvSrcMetadata, GM_ADDR recvTopkWeights, GM_ADDR recvScales, GM_ADDR workspace,
                                 GM_ADDR tilingGM, TPipe *pipe, const MoeEpDispatchEpilogueInfo *tilingData);
@@ -110,10 +111,13 @@ private:
     __gm__ Mc2Aclnn::MoeCommContext *mc2Context_{nullptr};
     MoeEpExceptionDump::MoeEpCoreDiagWriter diagWriter_;
     uint32_t epRankId_{0};
+    uint32_t networkMode_{0};      // 0 = direct(自段 x 直读输入), 1 = hybrid(自段 x 读win)
+    bool isDirectSelfRank_{false}; // 当前遍历的源 rank 是否为 direct 本端段
     uint32_t aivId_{0};
     GlobalTensor<int32_t> numRecvPerRankGm_;
     GlobalTensor<int64_t> numRecvPerExpertGm_;
 
+    GlobalTensor<XType> xGm_; // 本端源 x（direct: 从输入直接获取）
     GlobalTensor<XType> recvXGm_;
     GlobalTensor<float> recvTopkWeightsGm_;
     GlobalTensor<int32_t> recvSrcMetadataGm_;
@@ -168,7 +172,9 @@ private:
     GM_ADDR localWinAddr_{nullptr};
     GM_ADDR localSlotStateWinAddr_{nullptr};
     uint32_t scalesOffset_{0};
+    uint32_t scalesStride_{0}; // token UB 槽内 scales 暂存偏移(32B 对齐, 与 GM slot 紧拼偏移解耦)
     uint32_t scalesBytes_{0};
+    uint32_t scalesBytesAlign_{0};
     uint32_t scalesElems_{0};
     uint32_t metaOffset_{0};
     uint32_t tokenQueueBufBytes_{0};
@@ -213,7 +219,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
 __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::Init(
-    GM_ADDR context, GM_ADDR dstBufferSlotIdx, GM_ADDR numRecvPerRank, GM_ADDR numRecvPerExpert,
+    GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR numRecvPerRank, GM_ADDR numRecvPerExpert,
     GM_ADDR cachedRecvSrcMetadata, GM_ADDR recvX, GM_ADDR recvSrcMetadata, GM_ADDR recvTopkWeights, GM_ADDR recvScales,
     GM_ADDR workspace, GM_ADDR tilingGM, TPipe *pipe, const MoeEpDispatchEpilogueInfo *tilingData)
 {
@@ -222,6 +228,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     workspaceGM_ = workspace;
     numLocalExperts_ = tilingData->cfg.numLocalExperts;
     aivNum_ = tilingData->aivNum;
+    networkMode_ = tilingData->networkMode;
     axisK_ = tilingData->cfg.topK;
     axisH_ = tilingData->cfg.hidden;
     epWorldSize_ = tilingData->cfg.epWorldSize;
@@ -239,7 +246,11 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     diagWriter_.Init(context, MOE_EP_CORE_DIAG_DISPATCH_EPILOGUE, tpipe_);
     localSlotStateWinAddr_ = GetWinAddrByRankId(mc2Context_, epRankId_, slotWinStateOffset_);
     localWinAddr_ = GetWinAddrByRankId(mc2Context_, epRankId_, winDataOffset_);
-    metaOffset_ = Ceil((uint32_t)(axisH_ * sizeof(XType)), UB_ALIGN) * UB_ALIGN;
+    // 槽内 scales/meta 基址: direct 紧拼 tokenSize; hybrid 为 ALIGN32(tokenSize)（hybrid dispatch 整槽布局）
+    uint32_t hAlignSize = Ceil((uint32_t)(axisH_ * sizeof(XType)), UB_ALIGN) * UB_ALIGN;
+    uint32_t slotMetaBase = (tilingData->networkMode == NETWORK_HYBRID) ? hAlignSize : axisH_ * sizeof(XType);
+    metaOffset_ = slotMetaBase;
+    scalesStride_ = hAlignSize / sizeof(XType);
 
     numRecvPerRankGm_.SetGlobalBuffer((__gm__ int32_t *)numRecvPerRank);
     numRecvPerExpertGm_.SetGlobalBuffer((__gm__ int64_t *)numRecvPerExpert);
@@ -248,6 +259,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         cachedRecvRankOffsetsGm_.SetGlobalBuffer(
             reinterpret_cast<__gm__ int32_t *>(cachedRecvSrcMetadata + tilingData->metadataRankOffsetsOffset));
     }
+    xGm_.SetGlobalBuffer((__gm__ XType *)x);
     recvXGm_.SetGlobalBuffer((__gm__ XType *)recvX);
     recvSrcMetadataGm_.SetGlobalBuffer((__gm__ int32_t *)recvSrcMetadata);
     recvRankOffsetsGm_.SetGlobalBuffer(
@@ -331,15 +343,15 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     }
 
     if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
-        scalesOffset_ = Ceil((uint32_t)(axisH_ * sizeof(XType)), UB_ALIGN) * UB_ALIGN;
+        scalesOffset_ = slotMetaBase;
         scalesBytes_ = tilingData->cfg.scalesBytes;
         scalesElems_ = (scalesBytes_ == 0U) ? 0U : (scalesBytes_ / sizeof(ScalesType));
-        uint32_t scalesBytesAlign = Ceil(scalesBytes_, UB_ALIGN) * UB_ALIGN;
-        metaOffset_ += scalesBytesAlign;
+        scalesBytesAlign_ = Ceil(scalesBytes_, UB_ALIGN) * UB_ALIGN;
+        metaOffset_ += scalesBytesAlign_;
         recvScalesGm_.SetGlobalBuffer((__gm__ ScalesType *)recvScales);
     }
 
-    tokenQueueBufBytes_ = metaOffset_;
+    tokenQueueBufBytes_ = hAlignSize + scalesBytesAlign_;
 
     tpipe_->InitBuffer(tokenQueue_, BUFFER_NUM, tokenQueueBufBytes_);
 
@@ -468,8 +480,6 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 
         GM_ADDR srcRankBase = localWinAddr_ + (int64_t)rankId * numMaxTokensPerRank_ * perSlotBytes_;
         GlobalTensor<int32_t> srcTopkIdsGm;
-        srcTopkIdsGm.SetGlobalBuffer(
-            reinterpret_cast<__gm__ int32_t *>(srcRankBase + (int64_t)slotStart * perSlotBytes_ + metaOffset_));
 
         uint32_t topkBytes = axisK_ * sizeof(int32_t);
         LocalTensor<uint8_t> sharedTmpInt8 = ubMetaBuf_.Get<uint8_t>();
@@ -478,11 +488,12 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         for (uint32_t tileStart = 0; tileStart < slotCntPerAiv; tileStart += SLOTS_TILE) {
             uint32_t tileCnt = (slotCntPerAiv - tileStart > SLOTS_TILE) ? SLOTS_TILE : (slotCntPerAiv - tileStart);
 
+            srcTopkIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+                srcRankBase + (int64_t)(slotStart + tileStart) * perSlotBytes_ + metaOffset_));
             DataCopyExtParams topkCopyParams{static_cast<uint16_t>(tileCnt), static_cast<uint32_t>(topkBytes),
                                              static_cast<int64_t>(perSlotBytes_ - topkBytes), 0, 0};
             DataCopyPadExtParams<int32_t> topkPadParams{true, 0, static_cast<uint8_t>(paddedTopkElems_ - axisK_), -1};
-            DataCopyPad(ubTopkIds_, srcTopkIdsGm[(int64_t)tileStart * (perSlotBytes_ / sizeof(int32_t))],
-                        topkCopyParams, topkPadParams);
+            DataCopyPad(ubTopkIds_, srcTopkIdsGm, topkCopyParams, topkPadParams);
             SyncFunc<AscendC::HardEvent::MTE2_V>();
 
             int32_t calCnt = static_cast<int32_t>(tileCnt * paddedTopkElems_);
@@ -633,18 +644,19 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
             continue;
         }
 
+        // direct 本端x 直读输入；hybrid 保持读窗口
+        isDirectSelfRank_ = (networkMode_ != NETWORK_HYBRID) && (rankId == static_cast<uint32_t>(epRankId_));
         GM_ADDR srcRankBase = localWinAddr_ + (int64_t)rankId * numMaxTokensPerRank_ * perSlotBytes_;
         GlobalTensor<int32_t> srcMetaGm;
-        srcMetaGm.SetGlobalBuffer(
-            reinterpret_cast<__gm__ int32_t *>(srcRankBase + (int64_t)slotStart * perSlotBytes_ + metaOffset_));
 
         for (uint32_t tileStart = 0; tileStart < slotCntPerAiv; tileStart += SLOTS_TILE) {
             uint32_t tileCnt = (slotCntPerAiv - tileStart > SLOTS_TILE) ? SLOTS_TILE : (slotCntPerAiv - tileStart);
 
+            srcMetaGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+                srcRankBase + (int64_t)(slotStart + tileStart) * perSlotBytes_ + metaOffset_));
             DataCopyExtParams metaCopyParams{static_cast<uint16_t>(tileCnt), metaBytes_, perSlotBytes_ - metaBytes_, 0,
                                              0};
-            DataCopyPad(ubMeta_, srcMetaGm[(int64_t)tileStart * (perSlotBytes_ / sizeof(int32_t))], metaCopyParams,
-                        metaPadParams);
+            DataCopyPad(ubMeta_, srcMetaGm, metaCopyParams, metaPadParams);
             SyncFunc<AscendC::HardEvent::MTE2_S>();
 
             for (uint32_t localSlot = 0; localSlot < tileCnt; ++localSlot) {
@@ -682,7 +694,11 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
                 }
 
                 GlobalTensor<XType> srcTokenTensor;
-                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType *>(slotAddr), axisH_);
+                if (isDirectSelfRank_) { // direct 自段 x 未入窗口，直读输入 x
+                    srcTokenTensor = xGm_[static_cast<int64_t>(tokenIdxMeta) * axisH_];
+                } else {
+                    srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType *>(slotAddr), axisH_);
+                }
 
                 LocalTensor<XType> tokenTensor = tokenQueue_.AllocTensor<XType>();
                 DataCopyPad(tokenTensor, srcTokenTensor, tokenCopyParams, tokenPadParams);
@@ -693,8 +709,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
                     DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U,
                                                     0U};
                     DataCopyPadParams scalesPadParams{false, 0, 0, 0};
-                    DataCopyPad(tokenTensor[scalesOffset_ / sizeof(XType)].template ReinterpretCast<ScalesType>(),
-                                srcScalesTensor, scalesCopyParams, scalesPadParams);
+                    DataCopyPad(tokenTensor[scalesStride_].template ReinterpretCast<ScalesType>(), srcScalesTensor,
+                                scalesCopyParams, scalesPadParams);
                 }
                 tokenQueue_.EnQue(tokenTensor);
                 LocalTensor<XType> tokenOut = tokenQueue_.DeQue<XType>();
@@ -708,8 +724,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
                         DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)),
                                                         0U, 0U};
                         DataCopyPad(recvScalesGm_[recvXRow * scalesElems_],
-                                    tokenOut[scalesOffset_ / sizeof(XType)].template ReinterpretCast<ScalesType>(),
-                                    scalesCopyParams);
+                                    tokenOut[scalesStride_].template ReinterpretCast<ScalesType>(), scalesCopyParams);
                     }
 
                     if constexpr (HasTopkWeights) {
@@ -802,6 +817,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         for (uint32_t i = 0; i < tileCnt; ++i) {
             uint32_t metaBase = i * RECV_META_FIELDS;
             int32_t srcRankId = ubStageMeta_.GetValue(metaBase + META_SRC_RANK_OFFSET);
+            int32_t tokenIdx = ubStageMeta_.GetValue(metaBase + META_TOKEN_IDX_OFFSET);
             int32_t srcTopkIdx = ubStageMeta_.GetValue(metaBase + META_TOPK_IDX_OFFSET);
             int32_t slotIdx = ubStageMeta_.GetValue(metaBase + META_SLOT_IDX_OFFSET);
             int32_t recvXIdx = ubStageMeta_.GetValue(metaBase + META_RECV_X_IDX_OFFSET);
@@ -814,9 +830,14 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 
             GM_ADDR slotAddr = localWinAddr_ + (int64_t)srcRankId * numMaxTokensPerRank_ * perSlotBytes_ +
                                (int64_t)slotIdx * perSlotBytes_;
-
+            // direct 自段 x 未入窗口（dispatch 已省略本端拷贝），x 直读输入；hybrid 保持读窗口
+            bool directSelfRank = (networkMode_ != NETWORK_HYBRID) && (srcRankId == static_cast<int32_t>(epRankId_));
             GlobalTensor<XType> srcTokenTensor;
-            srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType *>(slotAddr), axisH_);
+            if (directSelfRank) {
+                srcTokenTensor = xGm_[static_cast<int64_t>(tokenIdx) * axisH_];
+            } else {
+                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType *>(slotAddr), axisH_);
+            }
             LocalTensor<XType> tokenTensor = tokenQueue_.AllocTensor<XType>();
             DataCopyPad(tokenTensor, srcTokenTensor, tokenCopyParams, tokenPadParams);
 
@@ -826,8 +847,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
                                                 scalesElems_);
                 DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
                 DataCopyPadParams scalesPadParams{false, 0, 0, 0};
-                DataCopyPad(tokenTensor[scalesOffset_ / sizeof(XType)].template ReinterpretCast<ScalesType>(),
-                            srcScalesTensor, scalesCopyParams, scalesPadParams);
+                DataCopyPad(tokenTensor[scalesStride_].template ReinterpretCast<ScalesType>(), srcScalesTensor,
+                            scalesCopyParams, scalesPadParams);
             }
 
             if constexpr (HasTopkWeights) {
@@ -848,8 +869,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
             if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
                 DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
                 DataCopyPad(recvScalesGm_[(int64_t)recvXRow * scalesElems_],
-                            tokenOut[scalesOffset_ / sizeof(XType)].template ReinterpretCast<ScalesType>(),
-                            scalesCopyParams);
+                            tokenOut[scalesStride_].template ReinterpretCast<ScalesType>(), scalesCopyParams);
             }
             tokenQueue_.FreeTensor(tokenOut);
 

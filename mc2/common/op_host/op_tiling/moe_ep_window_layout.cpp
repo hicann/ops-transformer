@@ -81,8 +81,8 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, Moe
     const uint64_t dataBase = layout.combineStateWinOffset + layout.combineStateWinSize;
     const uint64_t hiddenAlign = AlignMoeEpUb(params.hidden * MOE_EP_MAX_OUT_DTYPE_SIZE);
     const uint64_t topKAlign = AlignMoeEpUb(topK * MOE_EP_METADATA_DTYPE_SIZE);
-    layout.dispatchReservedPerSlotBytes = AlignMoeEpWin(hiddenAlign + 2UL * topKAlign + MOE_EP_UB_ALIGN);
     layout.dispatchMetaPerSlotBytes = AlignMoeEpWin(AlignMoeEpUb(params.hidden) + 2UL * topKAlign + MOE_EP_UB_ALIGN);
+    layout.dispatchReservedPerSlotBytes = AlignMoeEpWin(hiddenAlign + layout.dispatchMetaPerSlotBytes);
     layout.scaleoutReservedPerSlotBytes = AlignMoeEpWin(layout.dispatchReservedPerSlotBytes + topK * sizeof(int32_t));
     layout.combineReservedPerSlotBytes = AlignMoeEpWin(hiddenAlign + MOE_EP_UB_ALIGN);
     layout.dispatchRecvDataSize = epWorldSize * nmt * layout.dispatchReservedPerSlotBytes;
