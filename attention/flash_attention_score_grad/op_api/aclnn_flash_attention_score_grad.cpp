@@ -2738,9 +2738,9 @@ aclnnStatus aclnnFlashAttentionScoreGradV3GetWorkspaceSize(
     L2_DFX_PHASE_1(
         aclnnFlashAttentionScoreGradV3,
         DFX_IN(query, keyIn, value, dy, pseShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional,
-               softmaxMaxOptional, softmaxSumOptional, softmaxInOptional, attentionInOptional, prefixOptional,
-               qStartIdxOptional, kvStartIdxOptional, scaleValue, keepProb, preTokens, nextTokens, headNum, inputLayout,
-               innerPrecise, sparseMode, pseType, sinkInOptional),
+               softmaxMaxOptional, softmaxSumOptional, softmaxInOptional, attentionInOptional, sinkInOptional,
+               prefixOptional, qStartIdxOptional, kvStartIdxOptional, scaleValue, keepProb, preTokens, nextTokens,
+               headNum, inputLayout, innerPrecise, sparseMode, pseType),
         DFX_OUT(dqOut, dkOut, dvOut, dpseOut, dsinkOut));
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
