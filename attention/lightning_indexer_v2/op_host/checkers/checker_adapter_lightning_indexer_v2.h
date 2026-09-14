@@ -17,6 +17,7 @@
 #define CHECKER_ADAPTER_LIGHTNING_INDEXER_V2_H
 
 #include "checker_context_lightning_indexer_v2.h"
+#include "exe_graph/runtime/tiling_context.h"
 
 namespace optiling {
 namespace lightning_indexer_v2_checker {

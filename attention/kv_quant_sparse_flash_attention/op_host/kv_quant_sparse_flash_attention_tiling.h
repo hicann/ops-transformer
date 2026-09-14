@@ -638,7 +638,7 @@ struct KvQuantSparseFlashAttentionCompileInfo {
     int64_t coreNum;
 };
 
-ge::graphStatus TilingPrepareForKvQuantSparseFlashAttention(gert::TilingParseContext *context);
+ge::graphStatus TilingPrepareForKvQuantSparseFlashAttention(gert::TilingParseContext *const context);
 ge::graphStatus TilingKvQuantSparseFlashAttention(gert::TilingContext *context);
 } // namespace optiling
 #endif // KV_QUANT_SPARSE_FLASH_ATTENTION_TILING_H

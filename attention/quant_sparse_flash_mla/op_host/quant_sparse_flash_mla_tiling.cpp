@@ -252,10 +252,9 @@ size_t QSMLAInfoParser::GetAxisIdx(const QSMLAAxis &axis, const QSMLALayout &lay
     return std::distance(axes.begin(), axisIt);
 }
 
-uint32_t QSMLAInfoParser::GetAxisNum(const gert::Shape &shape, const QSMLAAxis &axis, const QSMLALayout &layout) const
+int64_t QSMLAInfoParser::GetAxisNum(const gert::Shape &shape, const QSMLAAxis &axis, const QSMLALayout &layout) const
 {
-    return HasAxis(axis, layout, shape) ? static_cast<uint32_t>(shape.GetDim(GetAxisIdx(axis, layout))) :
-                                          invalidDimValue_;
+    return HasAxis(axis, layout, shape) ? shape.GetDim(GetAxisIdx(axis, layout)) : invalidDimValue_;
 }
 
 void QSMLAInfoParser::SetQSMLAShape()
@@ -656,11 +655,13 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
     uint32_t totalBS1 =
         (tilingInfo->qLayout == QSMLALayout::TND) ? tilingInfo->s1Size : (tilingInfo->bSize * tilingInfo->s1Size);
 
-    uint32_t oriBlocksizeFlag = static_cast<uint32_t>((tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0);
-    uint32_t cmpBlocksizeFlag = static_cast<uint32_t>((tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0);
+    uint32_t oriBlockSize = static_cast<uint32_t>(tilingInfo->oriBlockSize);
+    uint32_t cmpBlockSize = static_cast<uint32_t>(tilingInfo->cmpBlockSize);
+    uint32_t oriBlocksizeFlag = static_cast<uint32_t>((oriBlockSize & (oriBlockSize - 1)) == 0);
+    uint32_t cmpBlocksizeFlag = static_cast<uint32_t>((cmpBlockSize & (cmpBlockSize - 1)) == 0);
     uint32_t blocksizeFlag = (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ?
                                  oriBlocksizeFlag :
-                                 (oriBlocksizeFlag && cmpBlocksizeFlag);
+                                 (oriBlocksizeFlag != 0 && cmpBlocksizeFlag != 0);
 
     uint64_t cmpUbSize = static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t) +
                          static_cast<uint64_t>(alignedCmpSparseBlockCount) * sizeof(int32_t) +
@@ -673,7 +674,7 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
     uint32_t vectorizeFlag = static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                                                     perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                                                     perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
-                                                   (vectorizeUbSize <= UB_SIZE) && blocksizeFlag &&
+                                                   (vectorizeUbSize <= UB_SIZE) && blocksizeFlag != 0 &&
                                                    (tilingInfo->kvLayout == QSMLALayout::PA_BBND));
     uint64_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     if (tilingInfo->gSize > 64) { // 64：当前gSize大于64时，使用半精度计算，需要将aic数量减半
@@ -681,7 +682,7 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
     } else {
         workspaceSize += (S2_BASE_SIZE * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM * aicNum);
     }
-    if (vectorizeFlag) {
+    if (vectorizeFlag != 0) {
         uint64_t oriPhyAddrSize = 0;
         if (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
             perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {

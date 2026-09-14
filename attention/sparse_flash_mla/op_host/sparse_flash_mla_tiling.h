@@ -16,11 +16,8 @@
 #define SPARSE_FLASH_MLA_TILING_H
 
 #include <exe_graph/runtime/tiling_context.h>
-#include <tiling/platform/platform_ascendc.h>
-#include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "err/ops_err.h"
-#include "platform/soc_spec.h"
 #include "common/smla_host_common_defs.h"
 
 namespace optiling {
@@ -416,8 +413,8 @@ public:
 
     bool HasAxis(const SMLAAxis &axis, const SMLALayout &layout, const gert::Shape &shape) const;
     size_t GetAxisIdx(const SMLAAxis &axis, const SMLALayout &layout) const;
-    uint32_t GetAxisNum(const gert::Shape &shape, const SMLAAxis &axis, const SMLALayout &layout) const;
-    static constexpr uint32_t invalidDimValue_ = std::numeric_limits<uint32_t>::min();
+    int64_t GetAxisNum(const gert::Shape &shape, const SMLAAxis &axis, const SMLALayout &layout) const;
+    static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
     // BaseParams
     uint32_t bSize_ = 0;

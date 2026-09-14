@@ -1660,7 +1660,7 @@ static size_t GetAxisIdx(const SFAAxis &axis, const SFALayout &layout)
     return std::distance(axes.begin(), axisIt);
 }
 
-static uint32_t GetAxisNum(const gert::Shape &shape, const SFAAxis &axis, const SFALayout &layout)
+static int64_t GetAxisNum(const gert::Shape &shape, const SFAAxis &axis, const SFALayout &layout)
 {
     return HasAxis(axis, layout, shape) ? shape.GetDim(GetAxisIdx(axis, layout)) : kInvalidDimValue;
 }

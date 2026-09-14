@@ -12,7 +12,6 @@
  * \file lightning_indexer_v2_def.cpp
  * \brief
  */
-#include <cstdint>
 #include "register/op_def_registry.h"
 
 namespace ops {
