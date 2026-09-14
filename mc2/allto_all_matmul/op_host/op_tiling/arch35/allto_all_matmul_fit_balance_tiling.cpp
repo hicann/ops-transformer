@@ -42,7 +42,7 @@ const static std::map<uint32_t, double> permuteBMap = {{4, 9.85}, {8, 9.85}};
 const static std::map<uint32_t, double> dynamicPertokenKMap = {{4, 88.6523}, {8, 81.9156}};
 const static std::map<uint32_t, double> dynamicPertokenBMap = {{4, 9.6494}, {8, 9.9191}};
 constexpr uint64_t ALIGN_M = 256;
-constexpr uint64_t AICPU_TILING_COST = 100;
+constexpr uint64_t AICPU_TILING_COST = 30;
 constexpr uint64_t CCU_TILING_COST = 10;
 void AlltoAllMatmulFitBalanceTiling::EstimateMMCommTime()
 {
