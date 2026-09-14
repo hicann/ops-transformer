@@ -546,7 +546,7 @@ bool NeedToConvertBias(const aclTensor *self, const aclTensor *mat1, const aclTe
     if (selfDimNum == 1) {
         canBeBiasFlag = (mat2->GetViewShape().GetDim(1 + rightMove) == self->GetViewShape().GetDim(0)) &&
                         CheckDtypeSupportBias(self, mat1, mat2) && batchIsOne;
-        // When input tensor is a 2 dimentional tensor
+        // When input tensor is a 2 dimensional tensor
     } else if (selfDimNum == 2) {
         canBeBiasFlag = (selfShape.GetDim(0) == 1) && (selfShape.GetDim(1) == mat2Shape.GetDim(1 + rightMove)) &&
                         CheckDtypeSupportBias(self, mat1, mat2) && batchIsOne;
