@@ -272,13 +272,8 @@ ge::graphStatus NormRopeConcatTiling::ComputeUBTilingStrategy()
                            1;
     int64_t ropeCoef = *(context_.ropeType) == static_cast<int64_t>(RopeType::NONE) ? 0 : 1;
     int64_t trainingCoef = *(context_.isTraining) ? 1 : 0;
-    constexpr int64_t B32_DATA_NUM = 32 / sizeof(float);
-    int64_t alignedRopeDimForRepeat = CeilAlign(alignedRopeDim_, B32_DATA_NUM);
-    int64_t ropeUsedUbSize =
-        SINGLE_BUFFER * alignedRopeDimForRepeat * 2 * sizeof(float) + // ropeQueue_ (sin/cos as float)
-        alignedRopeDimForRepeat * sizeof(int32_t) +                   // mask_
-        alignedRopeDimForRepeat * 2 * sizeof(float) +                 // sin_, cos_
-        DOUBLE_BUFFER * alignedRopeDim_ * dataTypeSize;               // outQue_ per head
+    int64_t ropeUsedUbSize = SINGLE_BUFFER * alignedRopeDim_ * 2 * dataTypeSize + alignedRopeDim_ * sizeof(int32_t) +
+                             alignedRopeDim_ * 2 * sizeof(float); // mask, sin, cos, max(20480)
     int64_t normUsedUbSize = SINGLE_BUFFER * alignedNormDim_ * 2 * dataTypeSize + alignedNormDim_ * 2 * sizeof(float) +
                              MIN_SHARE_BUFFER; // weight, bias, max(16384)
     int64_t oneHeadUbSize =
