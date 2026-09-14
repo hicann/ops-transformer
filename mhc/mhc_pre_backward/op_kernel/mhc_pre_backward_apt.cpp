@@ -18,16 +18,14 @@
 #include "arch35/mhc_pre_backward_tiling_key.h"
 
 using namespace AscendC;
-using namespace matmul;
 using namespace MhcPreBackward;
 
 template <int8_t TILING_MODE>
-__global__ __aicore__ void mhc_pre_backward(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR gradHIn,
-                                                       GM_ADDR gradHPost, GM_ADDR gradHRes, GM_ADDR invRms,
-                                                       GM_ADDR hMix, GM_ADDR hPre, GM_ADDR hPost, GM_ADDR gamma,
-                                                       GM_ADDR gradXPostOptional, GM_ADDR gradX, GM_ADDR gradPhi,
-                                                       GM_ADDR gradAlpha, GM_ADDR gradBias, GM_ADDR gradGamma,
-                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM)
+__global__ __aicore__ void mhc_pre_backward(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR gradHIn, GM_ADDR gradHPost,
+                                            GM_ADDR gradHRes, GM_ADDR invRms, GM_ADDR hMix, GM_ADDR hPre, GM_ADDR hPost,
+                                            GM_ADDR gamma, GM_ADDR gradXPostOptional, GM_ADDR gradX, GM_ADDR gradPhi,
+                                            GM_ADDR gradAlpha, GM_ADDR gradBias, GM_ADDR gradGamma, GM_ADDR workspaceGM,
+                                            GM_ADDR tilingGM)
 {
     GET_TILING_DATA(tilingData, tilingGM);
     __gm__ uint8_t *user = GetUserWorkspace(workspaceGM);
@@ -35,15 +33,10 @@ __global__ __aicore__ void mhc_pre_backward(GM_ADDR x, GM_ADDR phi, GM_ADDR alph
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipe;
     if constexpr (TILING_MODE == MHC_PRE_BACKWARD_DEFAULT) {
-        InitParams initParams{
-            x,          phi,      alpha, gradHIn,   gradHPost, gradHRes, invRms,  hMix,
-            hPre,      hPost,   gamma, gradXPostOptional, gradX, gradPhi, gradAlpha, gradBias,
-            gradGamma, user,     &pipe, &tilingData};
-        MT_C0 mm0;
-        MT_C1 mm1;
-        mm0.Init(&tilingData.matmulTilingC0, &pipe);
-        mm1.Init(&tilingData.matmulTilingC1, &pipe);
-        MhcPreBackwardKernel<DTYPE_X, float32_t> op(mm0, mm1);
+        InitParams initParams{x,         phi,   alpha, gradHIn,           gradHPost, gradHRes, invRms,    hMix,
+                              hPre,      hPost, gamma, gradXPostOptional, gradX,     gradPhi,  gradAlpha, gradBias,
+                              gradGamma, user,  &pipe, &tilingData};
+        MhcPreBackwardKernel<DTYPE_X, float32_t> op;
         op.Init(initParams);
         op.Process();
     }

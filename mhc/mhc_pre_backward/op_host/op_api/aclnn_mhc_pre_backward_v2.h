@@ -8,17 +8,18 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef OP_API_INC_MHC_PRE_BACKWARD_H
-#define OP_API_INC_MHC_PRE_BACKWARD_H
+#ifndef OP_API_INC_MHC_PRE_BACKWARD_V2_H
+#define OP_API_INC_MHC_PRE_BACKWARD_V2_H
 
 #include "aclnn/aclnn_base.h"
+#include "aclnn_util.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief aclnnMhcPreBackwardGetWorkspaceSize 的第一段接口，根据具体的计算流程，计算workspace大小。
+ * @brief aclnnMhcPreBackwardV2GetWorkspaceSize 的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  * 算子功能：MhcPre反向算子
  * @param [in] x: 输入tensor，shape为[B,S,N,D]或[T,N,D]，数据类型支持：BF16/FP16。
@@ -32,9 +33,9 @@ extern "C" {
  * @param [in] hPre: 输入tensor，shape为[B,S,N]或[T,N]，数据类型：FP32。
  * @param [in] hPost: 输入tensor，shape为[B,S,N]或[T,N]，数据类型：FP32。
  * @param [in] gammaOptional: 可选输入tensor，shape为[N,D]，数据类型：FP32。
- * @param [in]
- * gradXPostOptional: 可选输入tensor，shape为[B,S,N,D]或[T,N,D]，数据类型：BF16/FP16。
+ * @param [in] gradXPostOptional: 可选输入tensor，shape为[B,S,N,D]或[T,N,D]，数据类型：BF16/FP16。
  * @param [in] hcEps: 可选属性，默认值为1e-6。
+ * @param [in] opImplMode: Cube计算模式，0表示使用FP32模式，1表示使用HF32模式。
  * @param [out] gradX: 输出梯度，数据类型支持：BF16/FP16。
  * @param [out] gradPhi: 输出梯度，数据类型支持：FP32。
  * @param [out] gradAlpha: 输出梯度，数据类型支持：FP32。
@@ -44,25 +45,27 @@ extern "C" {
  * @param [out] executor: 返回op执行器，包含了算子计算流程。
  * @return aclnnStatus: 返回状态码
  */
-aclnnStatus aclnnMhcPreBackwardGetWorkspaceSize(
+ACLNN_API aclnnStatus aclnnMhcPreBackwardV2GetWorkspaceSize(
     const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
     const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms, const aclTensor *hMix,
     const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gammaOptional, const aclTensor *gradXPostOptional,
-    float hcEps, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
+    float hcEps, int64_t opImplMode, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
     const aclTensor *gradBias, const aclTensor *gradGamma, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /**
- * @brief aclnnMhcPreBackward 的第二段接口。
+ * @brief aclnnMhcPreBackwardV2 的第二段接口。
  * @param [in] workspace: 在npu device侧申请的workspace内存起址。
- * @param [in] workspaceSize: 在npu device侧申请的workspace大小，由第一段接口 aclnnMhcPreBackwardGetWorkspaceSize 获取。
+ * @param [in] workspaceSize: 在npu device侧申请的workspace大小，由第一段接口
+ * aclnnMhcPreBackwardV2GetWorkspaceSize 获取。
  * @param [in] executor: op执行器，包含了算子计算流程。
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-aclnnStatus aclnnMhcPreBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMhcPreBackwardV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                            aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // OP_API_INC_MHC_PRE_BACKWARD_H
+#endif // OP_API_INC_MHC_PRE_BACKWARD_V2_H

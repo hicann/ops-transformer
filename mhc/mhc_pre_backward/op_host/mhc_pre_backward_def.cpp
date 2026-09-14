@@ -126,6 +126,7 @@ public:
         this->AICore().AddConfig("ascend910b", aicoreConfig910b);
         this->AICore().AddConfig("ascend910_93", aicoreConfig910b);
         this->Attr("hc_eps").AttrType(OPTIONAL).Float(1e-6f);
+        this->Attr("op_impl_mode").AttrType(OPTIONAL).Int(0);
     }
 };
 

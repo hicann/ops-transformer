@@ -22,14 +22,14 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(MhcPreBackward);
 
-const std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *, aclTensor *>
-MhcPreBackward(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
-               const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms,
-               const aclTensor *hMix, const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gamma,
-               const aclTensor *gradXPostOptional, float hcEps, aclOpExecutor *executor)
+const std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *, aclTensor *> MhcPreBackward(
+    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
+    const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms, const aclTensor *hMix,
+    const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gamma, const aclTensor *gradXPostOptional,
+    float hcEps, int64_t opImplMode, aclOpExecutor *executor)
 {
     L0_DFX(MhcPreBackward, x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma,
-           gradXPostOptional, hcEps);
+           gradXPostOptional, hcEps, opImplMode);
 
     DataType outType = DataType::DT_FLOAT; // 输出类型
     Format format = Format::FORMAT_ND;     // 输出分形
@@ -42,13 +42,13 @@ MhcPreBackward(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
     auto ret = INFER_SHAPE(
         MhcPreBackward,
         OP_INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, gradXPostOptional),
-        OP_OUTPUT(outGradX, outGradPhi, outGradAlpha, outGradBias, outGradGamma), OP_ATTR(hcEps));
+        OP_OUTPUT(outGradX, outGradPhi, outGradAlpha, outGradBias, outGradGamma), OP_ATTR(hcEps, opImplMode));
     OP_CHECK_INFERSHAPE(ret != ACLNN_SUCCESS, return std::tuple(nullptr, nullptr, nullptr, nullptr, nullptr),
                         "MhcPreBackward InferShape failed.");
     auto ret1 = ADD_TO_LAUNCHER_LIST_AICORE(
         MhcPreBackward,
         OP_INPUT(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, gradXPostOptional),
-        OP_OUTPUT(outGradX, outGradPhi, outGradAlpha, outGradBias, outGradGamma), OP_ATTR(hcEps));
+        OP_OUTPUT(outGradX, outGradPhi, outGradAlpha, outGradBias, outGradGamma), OP_ATTR(hcEps, opImplMode));
     OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret1 != ACLNN_SUCCESS,
                                          return std::tuple(nullptr, nullptr, nullptr, nullptr, nullptr),
                                          "MhcPreBackward ADD_TO_LAUNCHER_LIST_AICORE failed.");

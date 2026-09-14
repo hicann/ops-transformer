@@ -136,6 +136,7 @@
 - [aclnnMhcPre](../../mhc/mhc_pre/docs/aclnnMhcPre.md)
 - [aclnnMhcPreV2](../../mhc/mhc_pre/docs/aclnnMhcPreV2.md)
 - [aclnnMhcPreBackward](../../mhc/mhc_pre_backward/docs/aclnnMhcPreBackward.md)
+- [aclnnMhcPreBackwardV2](../../mhc/mhc_pre_backward/docs/aclnnMhcPreBackwardV2.md)
 - [aclnnMhcPreSinkhorn](../../mhc/mhc_pre_sinkhorn/docs/aclnnMhcPreSinkhorn.md)
 - [aclnnMhcPreSinkhornBackward](../../mhc/mhc_pre_sinkhorn_backward/docs/aclnnMhcPreSinkhornBackward.md)
 - [aclnnMhcSinkhorn](../../mhc/mhc_sinkhorn/docs/aclnnMhcSinkhorn.md)

@@ -17,7 +17,6 @@
 #define ASCENDC_MHC_PRE_BACKWARD_UTILS_H
 
 #include "kernel_operator.h"
-#include "lib/matmul_intf.h"
 
 namespace MhcPreBackwardUtils {
 
@@ -57,16 +56,22 @@ __aicore__ inline constexpr uint16_t GetVRegSize()
 #endif
 }
 
-using namespace matmul;
 using namespace AscendC;
 
-constexpr uint32_t DOUBLE_BUFFER = 2;
-constexpr uint32_t INOUT_QUEUE_SIZE = 32 * 1024;              // 32KB
-constexpr uint32_t SMALL_QUEUE_SIZE = 1 * 1024;               // 1KB
-constexpr uint32_t FP32_BUF_SIZE = (248 - 32 * 3 - 1) * 1024; // 151KB
-constexpr uint32_t PROCESS_V2_CHUNK_SIZE = 128;               // ProcessV2函数使用的chunk大小
-constexpr uint32_t SINGLE_M = 1024;
-constexpr uint32_t ND_BLOCK_SIZE = 128;
+constexpr uint32_t NUMBER_TWO = 2U;
+constexpr uint32_t KIBIBYTE = 1024U;
+constexpr uint32_t DOUBLE_BUFFER = NUMBER_TWO;
+constexpr uint32_t INOUT_QUEUE_SIZE = 32U * KIBIBYTE; // 32KB
+constexpr uint32_t SMALL_QUEUE_SIZE = 1U * KIBIBYTE;  // 1KB
+constexpr uint32_t UB_USABLE_SIZE = 248U * KIBIBYTE;
+constexpr uint32_t MAIN_QUEUE_COUNT = 3U;
+// V0/V1的最大占用约49.5KB；V2统一使用64行chunk后最大占用约42.75KB。
+// 将TBuf压缩到55KB，为后续VECOUT双缓冲预留32KB。
+constexpr uint32_t FP32_BUF_SIZE =
+    UB_USABLE_SIZE - MAIN_QUEUE_COUNT * DOUBLE_BUFFER * INOUT_QUEUE_SIZE - SMALL_QUEUE_SIZE;
+constexpr uint32_t PROCESS_V2_CHUNK_SIZE = 128U;
+constexpr uint32_t BS_BLOCK_SIZE = 512U;
+constexpr uint32_t ND_BLOCK_SIZE = 128U;
 constexpr uint32_t ALPHA_GRAD_LAST_DIM_SIZE = 3;
 constexpr uint32_t ALPHA_GRAD_PADDING = 24;
 constexpr uint32_t ALPHA_GRAD_SHAPE_1_OFFSET = 0;
@@ -74,7 +79,7 @@ constexpr uint32_t ALPHA_GRAD_SHAPE_2_OFFSET = 8;
 constexpr uint32_t ALPHA_GRAD_SHAPE_3_OFFSET = 16;
 
 constexpr uint32_t LARGE_N_THRESHOLD = 6;
-constexpr uint32_t VEC_CORE_VECIDX_MOD = 2;
+constexpr uint32_t VEC_CORE_VECIDX_MOD = NUMBER_TWO;
 constexpr uint32_t MAX_D_LEN = 16384;
 constexpr uint32_t VEC_DEAL_CHUNK_LARGE_N = 32;
 constexpr uint32_t VEC_DEAL_CHUNK_SMALL_N = 64;
@@ -84,12 +89,12 @@ constexpr uint32_t CEIL_ALIGN_128 = 128;
 constexpr float NEG_HALF = -0.5f;
 constexpr float ONE = 1.0f;
 constexpr float ZERO = 0.0f;
-constexpr uint32_t MATMUL_WRITE_OFFSET_M = 256;
+constexpr uint32_t MATMUL_WRITE_OFFSET_M = 128;
 constexpr uint32_t MATMUL_WRITE_OFFSET_N = 128;
-constexpr uint32_t CROSS_CORE_FLAG_INDEX = 0x2;
+constexpr uint32_t CROSS_CORE_FLAG_INDEX = NUMBER_TWO;
 constexpr uint32_t CROSS_CORE_WAIT_FLAG_C0 = 0x9;
 constexpr uint32_t CROSS_CORE_WAIT_FLAG_C1 = 0x8;
-constexpr uint32_t VEC_DEAL_VECIDX_DIV = 2;
+constexpr uint32_t VEC_DEAL_VECIDX_DIV = NUMBER_TWO;
 
 constexpr Reg::CastTrait ctHalf2Fp32Zero = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
                                             RoundMode::UNKNOWN};
@@ -140,16 +145,6 @@ struct V0V1Buffers {
     uint32_t gatherLength;
 };
 
-using aT_C0 = MatmulType<TPosition::GM, CubeFormat::ND, float>;
-using bT_C0 = MatmulType<TPosition::GM, CubeFormat::ND, float>;
-using cT_C0 = MatmulType<TPosition::GM, CubeFormat::ND, float>;
-using MT_C0 = matmul::MatmulImpl<aT_C0, bT_C0, cT_C0>;
-
-using aT_C1 = MatmulType<TPosition::GM, CubeFormat::ND, float, true>;
-using bT_C1 = MatmulType<TPosition::GM, CubeFormat::ND, float>;
-using cT_C1 = MatmulType<TPosition::GM, CubeFormat::ND, float>;
-using MT_C1 = matmul::MatmulImpl<aT_C1, bT_C1, cT_C1>;
-
 /**
  * @brief Workspace buffer管理结构体
  * 内存布局：
@@ -157,8 +152,9 @@ using MT_C1 = matmul::MatmulImpl<aT_C1, bT_C1, cT_C1>;
  * 2. alpha_grad: [ALPHA_GRAD_PADDING, vecCoreNum] = [24 * vecCoreNum]
  * 3. bias_grad: [vecCoreNum, 2N + N*N] = [vecCoreNum * fusionSize]
  * 4. inv_rms_grad: [B, S] = [totalLength]
- * 5. x_rs_grad_mm: [cubeCoreNum * DOUBLE_BUFFER, SINGLE_M * ND_BLOCK_SIZE]
- * 6. x_rs: [cubeCoreNum * DOUBLE_BUFFER, SINGLE_M * ND_BLOCK_SIZE]
+ * 5. x_rs_grad_mm: [cubeCoreNum * DOUBLE_BUFFER, BS_BLOCK_SIZE * ND_BLOCK_SIZE]
+ * 6. x_rs: [cubeCoreNum *
+ * DOUBLE_BUFFER, BS_BLOCK_SIZE * ND_BLOCK_SIZE]
  */
 template <class P>
 struct WorkspaceBuffer {
@@ -188,7 +184,7 @@ struct WorkspaceBuffer {
         biasGradOffset = alphaGradOffset + alphaGradSize;
         invRmsGradOffset = biasGradOffset + biasGradRows * fusionSize;
         xRsGradOffset = invRmsGradOffset + totalLength;
-        xRsOffset = xRsGradOffset + SINGLE_M * ND_BLOCK_SIZE * DOUBLE_BUFFER * cubeCoreNum;
+        xRsOffset = xRsGradOffset + BS_BLOCK_SIZE * ND_BLOCK_SIZE * DOUBLE_BUFFER * cubeCoreNum;
     }
 
     /**
@@ -235,13 +231,13 @@ struct WorkspaceBuffer {
     __aicore__ inline uint64_t GetXRsGradOffset(uint32_t coreId, uint32_t buffId)
     {
         return CeilAlign(xRsGradOffset, uint64_t(CEIL_ALIGN_DEFAULT)) +
-               (coreId * DOUBLE_BUFFER + buffId) * SINGLE_M * ND_BLOCK_SIZE;
+               (coreId * DOUBLE_BUFFER + buffId) * BS_BLOCK_SIZE * ND_BLOCK_SIZE;
     }
 
     __aicore__ inline uint64_t GetXRsOffset(uint32_t coreId, uint32_t buffId)
     {
         return CeilAlign(xRsOffset, uint64_t(CEIL_ALIGN_DEFAULT)) +
-               (coreId * DOUBLE_BUFFER + buffId) * SINGLE_M * ND_BLOCK_SIZE;
+               (coreId * DOUBLE_BUFFER + buffId) * BS_BLOCK_SIZE * ND_BLOCK_SIZE;
     }
 };
 } // namespace MhcPreBackwardUtils

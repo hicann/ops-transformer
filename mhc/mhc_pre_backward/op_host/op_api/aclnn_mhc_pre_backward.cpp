@@ -8,11 +8,15 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "aclnn_mhc_pre_backward.h"
+#include "aclnn_mhc_pre_backward_v2.h"
 #include <dlfcn.h>
 #include <new>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include "securec.h"
+#include "log/log.h"
 #include "aclnn_kernels/common/op_error_check.h"
 #include "opdev/common_types.h"
 #include "opdev/op_dfx.h"
@@ -33,6 +37,10 @@ extern "C" {
 
 namespace {
 
+constexpr const char *ACLNN_OP_NAME = "aclnnMhcPreBackwardGetWorkspaceSize";
+constexpr int64_t MHC_PRE_BACKWARD_USE_FP32 = 0;
+constexpr int64_t MHC_PRE_BACKWARD_USE_HF32 = 1;
+
 struct AclnnMhcPreBackwardParams {
     const aclTensor *x = nullptr;
     const aclTensor *phi = nullptr;
@@ -47,6 +55,7 @@ struct AclnnMhcPreBackwardParams {
     const aclTensor *gamma = nullptr;
     const aclTensor *gradXPostOptional = nullptr;
     float hcEps;
+    int64_t opImplMode = MHC_PRE_BACKWARD_USE_FP32;
 
     const aclTensor *gradX = nullptr;
     const aclTensor *gradPhi = nullptr;
@@ -113,9 +122,10 @@ public:
         return *this;
     }
 
-    AclnnMhcPreBackward &SetAttr(float hcEps)
+    AclnnMhcPreBackward &SetAttr(float hcEps, int64_t opImplMode)
     {
         obj_.hcEps = hcEps;
+        obj_.opImplMode = opImplMode;
 
         return *this;
     }
@@ -655,6 +665,13 @@ aclnnStatus MhcGradCheckParams(const AclnnMhcPreBackwardParams &params)
     // 5. 检查数据形状是否支持
     CHECK_RET(MhcGradCheckFormat(params), ACLNN_ERR_PARAM_INVALID);
 
+    // 6. 校验算子实现模式
+    if (params.opImplMode != MHC_PRE_BACKWARD_USE_FP32 && params.opImplMode != MHC_PRE_BACKWARD_USE_HF32) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "opImplMode", std::to_string(params.opImplMode).c_str(),
+                                              "must be 0 (FP32) or 1 (HF32)");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
     return ACLNN_SUCCESS;
 }
 
@@ -714,11 +731,11 @@ static aclnnStatus mhcPreBackwardCommonProcess(AclnnMhcPreBackwardParams &params
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     ret = MhcGradCovertDataContiguous(params, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    auto outParams =
-        l0op::MhcPreBackward(params.xContiguous, params.phiContiguous, params.alphaContiguous, params.gradHInContiguous,
-                             params.gradHPostContiguous, params.gradHResContiguous, params.invRmsContiguous,
-                             params.hMixContiguous, params.hPreContiguous, params.hPostContiguous,
-                             params.gammaContiguous, params.gradXPostOptionalContiguous, params.hcEps, executor);
+    auto outParams = l0op::MhcPreBackward(
+        params.xContiguous, params.phiContiguous, params.alphaContiguous, params.gradHInContiguous,
+        params.gradHPostContiguous, params.gradHResContiguous, params.invRmsContiguous, params.hMixContiguous,
+        params.hPreContiguous, params.hPostContiguous, params.gammaContiguous, params.gradXPostOptionalContiguous,
+        params.hcEps, params.opImplMode, executor);
     CHECK_RET(outParams != std::tuple(nullptr, nullptr, nullptr, nullptr, nullptr), ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(CopyOutput(std::get<0>(outParams), params.gradX, executor), ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(CopyOutput(std::get<1>(outParams), params.gradPhi, executor), ACLNN_ERR_INNER_NULLPTR);
@@ -729,26 +746,31 @@ static aclnnStatus mhcPreBackwardCommonProcess(AclnnMhcPreBackwardParams &params
     }
     return ACLNN_SUCCESS;
 }
-} // namespace
 
-aclnnStatus aclnnMhcPreBackwardGetWorkspaceSize(
+static aclnnStatus MhcPreBackwardGetWorkspaceSizeCommon(
     const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
     const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms, const aclTensor *hMix,
     const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gamma, const aclTensor *gradXPostOptional,
-    float hcEps, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
+    float hcEps, int64_t opImplMode, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
     const aclTensor *gradBias, const aclTensor *gradGamma, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    L2_DFX_PHASE_1(
-        aclnnMhcPreBackward,
-        DFX_IN(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gamma, gradXPostOptional, hcEps),
-        DFX_OUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
+    if (workspaceSize == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "workspaceSize", "nullptr",
+                                              "output parameter must not be nullptr");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    if (executor == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "executor", "nullptr",
+                                              "output parameter must not be nullptr");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
     auto uniqueExecutor = CREATE_EXECUTOR();
     AclnnMhcPreBackwardParams params = AclnnMhcPreBackward::Create()
                                            .SetInput(x, phi, alpha, gamma)
                                            .SetGradInput(gradHIn, gradHPost, gradHRes)
                                            .SetGradXPostOptional(gradXPostOptional)
                                            .SetForwardInput(invRms, hMix, hPre, hPost)
-                                           .SetAttr(hcEps)
+                                           .SetAttr(hcEps, opImplMode)
                                            .SetOutput(gradX, gradPhi, gradAlpha, gradBias, gradGamma)
                                            .Build();
     auto ret = mhcPreBackwardCommonProcess(params, uniqueExecutor.get());
@@ -757,10 +779,49 @@ aclnnStatus aclnnMhcPreBackwardGetWorkspaceSize(
     uniqueExecutor.ReleaseTo(executor);
     return ACLNN_SUCCESS;
 }
+} // namespace
+
+aclnnStatus aclnnMhcPreBackwardGetWorkspaceSize(
+    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
+    const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms, const aclTensor *hMix,
+    const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gammaOptional, const aclTensor *gradXPostOptional,
+    float hcEps, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
+    const aclTensor *gradBias, const aclTensor *gradGamma, uint64_t *workspaceSize, aclOpExecutor **executor)
+{
+    L2_DFX_PHASE_1(aclnnMhcPreBackward,
+                   DFX_IN(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gammaOptional,
+                          gradXPostOptional, hcEps),
+                   DFX_OUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
+    return MhcPreBackwardGetWorkspaceSizeCommon(
+        x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gammaOptional, gradXPostOptional, hcEps,
+        MHC_PRE_BACKWARD_USE_FP32, gradX, gradPhi, gradAlpha, gradBias, gradGamma, workspaceSize, executor);
+}
+
+aclnnStatus aclnnMhcPreBackwardV2GetWorkspaceSize(
+    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *gradHIn,
+    const aclTensor *gradHPost, const aclTensor *gradHRes, const aclTensor *invRms, const aclTensor *hMix,
+    const aclTensor *hPre, const aclTensor *hPost, const aclTensor *gammaOptional, const aclTensor *gradXPostOptional,
+    float hcEps, int64_t opImplMode, const aclTensor *gradX, const aclTensor *gradPhi, const aclTensor *gradAlpha,
+    const aclTensor *gradBias, const aclTensor *gradGamma, uint64_t *workspaceSize, aclOpExecutor **executor)
+{
+    L2_DFX_PHASE_1(aclnnMhcPreBackwardV2,
+                   DFX_IN(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost, gammaOptional,
+                          gradXPostOptional, hcEps, opImplMode),
+                   DFX_OUT(gradX, gradPhi, gradAlpha, gradBias, gradGamma));
+    return MhcPreBackwardGetWorkspaceSizeCommon(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost,
+                                                gammaOptional, gradXPostOptional, hcEps, opImplMode, gradX, gradPhi,
+                                                gradAlpha, gradBias, gradGamma, workspaceSize, executor);
+}
 
 aclnnStatus aclnnMhcPreBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMhcPreBackward);
+    return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
+}
+
+aclnnStatus aclnnMhcPreBackwardV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+{
+    L2_DFX_PHASE_2(aclnnMhcPreBackwardV2);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 
