@@ -172,6 +172,9 @@ class OpBuilder(ABC):
         if self.name in OpBuilder._loaded_ops:
             return OpBuilder._loaded_ops[self.name]
 
+        # Lazy import avoids pulling arg_check into every builder import path.
+        from cann_ops_transformer.utils.arg_check import wrap_op_module
+
         op_module = load(
             name=self.name,
             sources=self.get_absolute_paths(self.sources()),
@@ -180,6 +183,8 @@ class OpBuilder(ABC):
             extra_ldflags=self.extra_ldflags(),
             verbose=verbose,
         )
+        # Arg type-check proxy; ops can call through load() unchanged.
+        op_module = wrap_op_module(op_module)
         OpBuilder._loaded_ops[self.name] = op_module
 
         return op_module
