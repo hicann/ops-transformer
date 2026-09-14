@@ -66,7 +66,8 @@ static constexpr uint32_t WIN_ADDR_ALIGN = 512;
 constexpr uint64_t UB_ALIGN = 32UL;
 constexpr uint32_t STATE_OFFSET = 32U;
 constexpr uint64_t ALIGNED_LEN_256 = 256UL;
-constexpr uint32_t DOUBLE_BUFFER_NUM = 2U;
+static constexpr uint32_t MAX_BUFFERNUM = 8U;
+static constexpr uint32_t MIN_BUFFERNUM = 1U;
 static constexpr uint32_t RECV_META_FIELDS = 5U;
 static constexpr uint32_t META_TOKEN_IDX_OFFSET = 1U;
 static constexpr uint32_t META_TOPK_IDX_OFFSET = 2U;
@@ -95,6 +96,7 @@ private:
     __aicore__ inline void ClearCompletionFlags();
     __aicore__ inline void BuildLocalRecvIndex();
     __aicore__ inline void ProcessTopKToken(uint32_t tokenIndex);
+    __aicore__ inline uint32_t CalcBufferNum();
     __aicore__ inline void RecvPhaseReduce();
     __aicore__ inline GM_ADDR GetUrmaWinAddrByRankId(uint32_t rankId, uint64_t offset)
     {
@@ -160,6 +162,8 @@ private:
     TBuf<QuePosition::VECIN> ubTmpFp32Buf_;
     TBuf<> stateBuf_;
     TBuf<> waitSumBuf_;
+    TBuf<> ubBeginBuf_;
+    TBuf<> ubEndBuf_;
     TBuf<> rankOffsetsBuf_;
     TBuf<> metadataBuf_;
     TBuf<> localRecvIdxBuf_;
@@ -171,6 +175,10 @@ private:
     TBuf<> tokenBuf_;
     TBuf<> tokenTargetTBuf_;
 
+    DataCopyPadParams padParams_{false, 0, 0, 0};
+    DataCopyParams weightCopyParams_{1U, static_cast<uint16_t>(sizeof(float)), 0U, 0U};
+    DataCopyParams xCopyParams_;
+
     GM_ADDR winRankAddr_[Mc2Aclnn::HCCL_MAX_RANK_SIZE];
 };
 
@@ -181,6 +189,8 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     const MoeEpCombineEpilogueInfo *tilingData)
 {
     tpipe_ = pipe;
+    // UB 起始标记
+    tpipe_->InitBuffer(ubBeginBuf_, UB_ALIGN);
     tilingData_ = tilingData;
     (void)workspace;
     aivId_ = GetBlockIdx();
@@ -192,7 +202,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     aivNum_ = tilingData->aivNum;
     recvCapacity_ = tilingData->recvCapacity;
     hAlignSize_ = Ceil(axisH_ * sizeof(XType), UB_ALIGN) * UB_ALIGN;
-
+    xCopyParams_ = {1U, static_cast<uint16_t>(hAlignSize_), 0U, 0U};
     mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext *>(context);
     rankId_ = mc2Context_->epRankId;
     combineChannelCount_ = mc2Context_->channelsPerRank;
@@ -269,13 +279,6 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
         tpipe_->InitBuffer(localRecvIdxBuf_, bsKInt32Align);
         topkIdsTensor_ = topkIdsBuf_.Get<int32_t>();
         localRecvIdxTensor_ = localRecvIdxBuf_.Get<int32_t>();
-    }
-    if constexpr (HasTopkWeight == 1) {
-        tpipe_->InitBuffer(weightQue_, DOUBLE_BUFFER_NUM, UB_ALIGN);
-    }
-    tpipe_->InitBuffer(xInQue_, DOUBLE_BUFFER_NUM, hAlignSize_);
-    if (tStart_ < numTokens_) {
-        tpipe_->InitBuffer(xOutQue_, DOUBLE_BUFFER_NUM, hAlignSize_);
         uint32_t ubFp32Bytes = Ceil(axisH_ * sizeof(float), UB_ALIGN) * UB_ALIGN;
         tpipe_->InitBuffer(ubAccFp32Buf_, ubFp32Bytes);
         tpipe_->InitBuffer(ubTmpFp32Buf_, ubFp32Bytes);
@@ -454,9 +457,6 @@ template <TemplateMoeEpCombineEpilogueTypeClass>
 __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc>::ProcessTopKToken(uint32_t tokenIndex)
 {
     Duplicate<float>(ubAccFp32_, (float)0, axisH_);
-    DataCopyPadParams padParams = {false, 0, 0, 0};
-    DataCopyParams xCopyParams = {1U, static_cast<uint16_t>(hAlignSize_), 0U, 0U};
-    DataCopyParams weightCopyParams = {1U, static_cast<uint16_t>(sizeof(float)), 0U, 0U};
     uint32_t localExpertBegin = rankId_ * tilingData_->cfg.numLocalExperts;
     uint32_t localExpertEnd = localExpertBegin + tilingData_->cfg.numLocalExperts;
     for (uint32_t topkId = 0U; topkId < topK_; topkId++) {
@@ -473,13 +473,13 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
         }
         LocalTensor<XType> xLocal = xInQue_.AllocTensor<XType>();
         if (localRecvXIdx >= 0) {
-            DataCopyPad(xLocal, xGm_[static_cast<uint64_t>(localRecvXIdx) * axisH_], xCopyParams, padParams);
+            DataCopyPad(xLocal, xGm_[static_cast<uint64_t>(localRecvXIdx) * axisH_], xCopyParams_, padParams_);
         } else {
             uint64_t slotOffset = (static_cast<uint64_t>(tokenIndex) * topK_ + topkId) * tilingData_->cfg.perSlotBytes;
             GM_ADDR tokenAddr = GetUrmaWinAddrByRankId(rankId_, combineDataWinOffset_) + slotOffset;
             GlobalTensor<XType> srcTokenTensor;
             srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType *>(tokenAddr));
-            DataCopyPad(xLocal, srcTokenTensor, xCopyParams, padParams);
+            DataCopyPad(xLocal, srcTokenTensor, xCopyParams_, padParams_);
         }
         xInQue_.EnQue(xLocal);
         LocalTensor<XType> xIn = xInQue_.DeQue<XType>();
@@ -490,23 +490,43 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
         if constexpr (HasTopkWeight == 1) {
             LocalTensor<float> weightLocal = weightQue_.AllocTensor<float>();
             if (localRecvXIdx >= 0) {
-                DataCopyPad(weightLocal, topkWeightsGm_[localRecvXIdx], weightCopyParams, padParams);
+                DataCopyPad(weightLocal, topkWeightsGm_[localRecvXIdx], weightCopyParams_, padParams_);
             } else {
                 GM_ADDR weightAddr = GetUrmaStateAddrByRankId(rankId_, combineStateWinOffset_) +
                                      (tokenIndex * topK_ + topkId) * WIN_ADDR_ALIGN;
                 GlobalTensor<float> srcWeightTensor;
                 srcWeightTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(weightAddr));
-                DataCopyPad(weightLocal, srcWeightTensor, weightCopyParams, padParams);
+                DataCopyPad(weightLocal, srcWeightTensor, weightCopyParams_, padParams_);
             }
             weightQue_.EnQue(weightLocal);
             LocalTensor<float> weightOut = weightQue_.DeQue<float>();
-            DataCopyPad(combinedTopkWeightsGm_[tokenIndex * topK_ + topkId], weightOut, weightCopyParams);
+            DataCopyPad(combinedTopkWeightsGm_[tokenIndex * topK_ + topkId], weightOut, weightCopyParams_);
             weightQue_.FreeTensor(weightOut);
         }
     }
     LocalTensor<XType> ubResultBf16 = xOutQue_.AllocTensor<XType>();
     Cast(ubResultBf16, ubAccFp32_, RoundMode::CAST_RINT, axisH_);
     xOutQue_.EnQue(ubResultBf16);
+}
+
+template <TemplateMoeEpCombineEpilogueTypeClass>
+__aicore__ inline uint32_t MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc>::CalcBufferNum()
+{
+    tpipe_->InitBuffer(ubEndBuf_, UB_ALIGN);
+    uint64_t beginUbAddr = (ubBeginBuf_.Get<uint8_t>()).GetPhyAddr();
+    uint64_t endUbAddr = (ubEndBuf_.Get<uint8_t>()).GetPhyAddr();
+    // 有符号中间量防无符号下溢：已分配 >= totalUbSize（如 tiling 与实际 UB 容量不符）时
+    int64_t remainUbSize =
+        static_cast<int64_t>(tilingData_->totalUbSize) - static_cast<int64_t>(endUbAddr - beginUbAddr + UB_ALIGN);
+    int64_t perNumBytes = static_cast<int64_t>(2UL * hAlignSize_);
+    if constexpr (HasTopkWeight == 1) {
+        perNumBytes += UB_ALIGN;
+    }
+    if (remainUbSize < perNumBytes) {
+        return MIN_BUFFERNUM;
+    }
+    uint32_t bufferNum = static_cast<uint32_t>(remainUbSize / perNumBytes);
+    return bufferNum > MAX_BUFFERNUM ? MAX_BUFFERNUM : bufferNum;
 }
 
 template <TemplateMoeEpCombineEpilogueTypeClass>
@@ -531,7 +551,13 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
         return;
     }
 
-    DataCopyPadParams padParams = {false, 0, 0, 0};
+    uint32_t bufferNum = CalcBufferNum();
+    tpipe_->InitBuffer(xInQue_, bufferNum, hAlignSize_);
+    tpipe_->InitBuffer(xOutQue_, bufferNum, hAlignSize_);
+    if constexpr (HasTopkWeight == 1) {
+        tpipe_->InitBuffer(weightQue_, bufferNum, UB_ALIGN);
+    }
+
     DataCopyParams xCopyParams = {1U, static_cast<uint16_t>(axisH_ * sizeof(XType)), 0U, 0U};
     for (uint32_t tokenIdx = tStart_; tokenIdx < tEnd_; ++tokenIdx) {
         ProcessTopKToken(tokenIdx);
