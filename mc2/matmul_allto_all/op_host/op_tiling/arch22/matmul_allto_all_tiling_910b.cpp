@@ -79,7 +79,7 @@ T ClampValue(T value, T minVal, T maxVal)
     return (value < minVal) ? minVal : (value > maxVal) ? maxVal : value;
 }
 
-void TilingParamDeal(CoCTiling &cocTilingData, MatmulAlltoAllInfo &info)
+static void TilingParamDeal(CoCTiling &cocTilingData, MatmulAlltoAllInfo &info)
 {
     int32_t dataTypeSize = ELEMENT_SIZE;
     int32_t peerMemSize = (MAX_BUFF_BYTES - FLAG_BUFF_BYTES) / dataTypeSize;

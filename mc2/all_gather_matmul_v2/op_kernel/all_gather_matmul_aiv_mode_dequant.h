@@ -49,6 +49,9 @@
 template <typename OutputType>
 class DequantRunner {
 public:
+    static constexpr int32_t EPILOGUE_TILE_ROWS = 64;
+    static constexpr int32_t EPILOGUE_TILE_COLUMNS = 128;
+
     using ArchTag = Arch::AtlasA2;
     using ScaleType = Gemm::GemmType<float, layout::VectorLayout>;
     using PerTokenScaleType = Gemm::GemmType<float, layout::VectorLayout>;
@@ -58,7 +61,7 @@ public:
     using BroadcastOneBlkType = Gemm::GemmType<float, layout::RowMajor>;
     using OneBlkColumnBroadcastMulType = Gemm::GemmType<float, layout::RowMajor>;
 
-    using EpilogueTileShape = MatrixShape<64, 128>;
+    using EpilogueTileShape = MatrixShape<EPILOGUE_TILE_ROWS, EPILOGUE_TILE_COLUMNS>;
     using TileRowBroadcastMul = Epilogue::Tile::TileRowBroadcastMul<ArchTag, RowBroadcastMulType, EpilogueTileShape>;
     using TileBroadcastOneBlk =
         Epilogue::Tile::TileBroadcastOneBlk<ArchTag, BroadcastOneBlkType, EpilogueTileShape::ROW>;

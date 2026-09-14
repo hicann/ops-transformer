@@ -13,8 +13,6 @@
  * \brief
  */
 #include <vector>
-#include <set>
-#include <string>
 
 #include "common/utils/op_mc2.h"
 #include "platform/platform_info.h"

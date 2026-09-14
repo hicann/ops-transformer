@@ -13,6 +13,9 @@
  * \brief
  */
 
+#ifndef ALL_GATHER_MATMUL_V2_TILING_COMMON_H
+#define ALL_GATHER_MATMUL_V2_TILING_COMMON_H
+
 #include "graph/utils/type_utils.h"
 
 using namespace AscendC;
@@ -21,3 +24,5 @@ using namespace ge;
 namespace optiling {
 ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext *context);
 } // namespace optiling
+
+#endif // ALL_GATHER_MATMUL_V2_TILING_COMMON_H

@@ -28,7 +28,7 @@ public:
           nodeName_(context->GetNodeName()) {};
 
 protected:
-    enum TensorType {
+    enum class TensorType {
         INPUT = 0,
         OUTPUT = 1,
         OPTIONINPUT = 2

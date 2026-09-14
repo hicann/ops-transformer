@@ -80,7 +80,7 @@ constexpr uint32_t COMM_TYPE_NUM = 2;
 } // namespace
 namespace MC2Tiling {
 
-void MoeDistributeCombineTeardownTilingBase::PrintTilingDataInfo()
+void MoeDistributeCombineTeardownTilingBase::PrintTilingDataInfo() const
 {
     const MoeDistributeCombineTeardownInfo &info = tilingData_->moeDistributeCombineTeardownInfo;
     OP_LOGD(nodeName_, "epWorldSize is %u.", info.epWorldSize);
@@ -470,7 +470,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorShapeRelation
     return CheckTensorShapeRelationThirdPart();
 }
 
-ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorShapeRelationThirdPart()
+ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorShapeRelationThirdPart() const
 {
     auto expandXStorageShape = context_->GetInputShape(EXPAND_X_INDEX);     // A, H
     auto expertIdsStorageShape = context_->GetInputShape(EXPERT_IDS_INDEX); // Bs, K
@@ -630,7 +630,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorDataType()
     return CheckTensorDataTypeSecondPart();
 }
 
-ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorDataTypeSecondPart()
+ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorDataTypeSecondPart() const
 {
     if (tilingData_->moeDistributeCombineTeardownInfo.isActiveMask) {
         auto xActiveMaskDesc = context_->GetOptionalInputDesc(X_ACTIVE_MASK_INDEX);
@@ -668,7 +668,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorDataTypeSecon
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorFormat()
+ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorFormat() const
 {
     auto expandXDesc = context_->GetInputDesc(EXPAND_X_INDEX);
     OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "expandXDesc"),

@@ -71,19 +71,18 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *sessionId, c
 
 aclnnStatus aclnnAttentionToFFNGetWorkspaceSize(
     const aclTensor *x, const aclTensor *sessionId, const aclTensor *microBatchId, const aclTensor *layerId,
-    const aclTensor *expertIds, const aclTensor *expertRankTable, const aclTensor *scalesOptional,
-    const aclTensor *activeMaskOptional, const char *group, int64_t worldSize,
-    const aclIntArray *ffnTokenInfoTableShape, const aclIntArray *ffnTokenDataShape,
-    const aclIntArray *attnTokenInfoTableShape, int64_t moeExpertNum, int64_t quantMode, int64_t syncFlag,
-    int64_t ffnStartRankId, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor *expertIds, const aclTensor *expertRankTable, const aclTensor *scales, const aclTensor *activeMask,
+    const char *group, int64_t worldSize, const aclIntArray *ffnTokenInfoTableShape,
+    const aclIntArray *ffnTokenDataShape, const aclIntArray *attnTokenInfoTableShape, int64_t moeExpertNum,
+    int64_t quantMode, int64_t syncFlag, int64_t ffnStartRankId, uint64_t *workspaceSize, aclOpExecutor **executor)
 
 {
     auto retParam = CheckParams(x, sessionId, microBatchId, layerId, expertIds, expertRankTable, group);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     aclnnStatus ret = aclnnInnerAttentionToFFNGetWorkspaceSize(
-        x, sessionId, microBatchId, layerId, expertIds, expertRankTable, scalesOptional, activeMaskOptional,
-        const_cast<char *>(group), worldSize, ffnTokenInfoTableShape, ffnTokenDataShape, attnTokenInfoTableShape,
-        moeExpertNum, quantMode, syncFlag, ffnStartRankId, workspaceSize, executor);
+        x, sessionId, microBatchId, layerId, expertIds, expertRankTable, scales, activeMask, const_cast<char *>(group),
+        worldSize, ffnTokenInfoTableShape, ffnTokenDataShape, attnTokenInfoTableShape, moeExpertNum, quantMode,
+        syncFlag, ffnStartRankId, workspaceSize, executor);
     return ret;
 }
 

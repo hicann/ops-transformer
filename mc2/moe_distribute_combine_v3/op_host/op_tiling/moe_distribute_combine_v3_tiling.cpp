@@ -101,7 +101,7 @@ inline void MoeDistributeCombineV3ExceptionImplWrapper(aclrtExceptionInfo *args,
     Mc2Exception::Mc2ExceptionImpl(args, userdata, "MoeDistributeCombineV3");
 }
 
-__attribute__((constructor)) void RegisterMoeDistributeCombineV3ExceptionFunc()
+__attribute__((constructor)) static void RegisterMoeDistributeCombineV3ExceptionFunc()
 {
     int32_t runtimeVersionNum = 0;
     int32_t metadefVersionNum = 0;
