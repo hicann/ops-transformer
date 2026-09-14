@@ -2504,7 +2504,6 @@ def gen_data(params, generate_golden=True):
         if quant_mode == 2
         else d_aligned_32 - nope_head_dim - rope_head_dim * 2 - quant_scale_head_dim * 2
     )
-    block_num = block_num1 if block_num1 >= block_num2 else block_num2
     # 根据输入的data range，计算scale范围，生成scale tensor，取倒数保存为bin
     ori_quant_param_range_left = ori_kv_datarange[0] / FP8_DATA_RANGE_LEFT
     ori_quant_param_range_right = ori_kv_datarange[1] / FP8_DATA_RANGE_RIGHT
@@ -2537,7 +2536,7 @@ def gen_data(params, generate_golden=True):
             quant_scale_head_dim,
             d_aligned_32,
             pad_d,
-            block_num,
+            block_num1,
             block_size1,
             ori_max_s2,
             ori_max_block_num_per_batch,
@@ -2628,7 +2627,7 @@ def gen_data(params, generate_golden=True):
                 quant_scale_head_dim,
                 d_aligned_32,
                 pad_d,
-                block_num,
+                block_num2,
                 block_size2,
                 cmp_max_s2,
                 cmp_max_block_num_per_batch,
@@ -2671,7 +2670,7 @@ def gen_data(params, generate_golden=True):
                 quant_scale_head_dim,
                 d_combined_quant_2,
                 pad_d,
-                block_num,
+                block_num2,
                 block_size2,
                 cmp_max_s2,
                 cmp_max_block_num_per_batch,

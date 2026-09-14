@@ -1447,7 +1447,6 @@ def gen_data(params, generate_golden=True):
         )
 
     # D维度固定512，已对齐128，无需padding
-    block_num = block_num1 if block_num1 >= block_num2 else block_num2
 
     # generate sinks tensor (only when isSink=True)
     if isSink:
@@ -1473,7 +1472,7 @@ def gen_data(params, generate_golden=True):
         T1,
         N2,
         D,
-        block_num,
+        block_num1,
         block_size1,
         ori_max_s2,
         ori_max_block_num_per_batch,
@@ -1513,7 +1512,7 @@ def gen_data(params, generate_golden=True):
             N2,
             D,
             K,
-            block_num,
+            block_num2,
             block_size2,
             cmp_max_s2,
             cmp_max_block_num_per_batch,
@@ -1547,22 +1546,29 @@ def gen_data(params, generate_golden=True):
         and (template_run_mode in ("HCA", "CSA", "ORI_CMP_SPARSE"))
         and cmp_k_in_pa_shape is not None
     ):
+        # 0轴非连续：ori/cmp独立成池后，每个物理块仍补齐到block_size1+block_size2行，
+        # 保持与原融合布局相同的stride覆盖
         total_block = block_size1 + block_size2
-        fusion_base = torch.zeros((block_num, total_block, N2, D), dtype=ori_kv_type)
-        fusion_base[:, :block_size1, :, :] = ori_k_in_pa_shape
-        fusion_base[:, block_size1:, :, :] = cmp_k_in_pa_shape
+        ori_fusion_base = torch.zeros(
+            (block_num1, total_block, N2, D), dtype=ori_kv_type
+        )
+        ori_fusion_base[:, :block_size1, :, :] = ori_k_in_pa_shape
+        cmp_fusion_base = torch.zeros(
+            (block_num2, total_block, N2, D), dtype=cmp_kv_type
+        )
+        cmp_fusion_base[:, block_size1:, :, :] = cmp_k_in_pa_shape
         stride_n = total_block * N2 * D
         stride_bs = N2 * D
         stride_n2 = D
         stride_d = 1
         ori_k_in_pa_shape = torch.as_strided(
-            fusion_base,
-            size=[block_num, block_size1, N2, D],
+            ori_fusion_base,
+            size=[block_num1, block_size1, N2, D],
             stride=[stride_n, stride_bs, stride_n2, stride_d],
         )
         cmp_k_in_pa_shape = torch.as_strided(
-            fusion_base,
-            size=[block_num, block_size2, N2, D],
+            cmp_fusion_base,
+            size=[block_num2, block_size2, N2, D],
             stride=[stride_n, stride_bs, stride_n2, stride_d],
             storage_offset=block_size1 * N2 * D,
         )
