@@ -177,6 +177,11 @@ static bool ReFormatNotND(const aclTensor *x1, const aclTensor *x2, const aclTen
                           const aclTensor *output)
 {
     // 内部只处理ND格式，这里做reformat操作
+    if (output->GetStorageFormat() != op::Format::FORMAT_ND) {
+        OP_LOGW("output origin format is %s.", op::ToString(output->GetStorageFormat()).GetString());
+        output = l0op::ReFormat(output, op::Format::FORMAT_ND);
+        CHECK_RET(output != nullptr, false);
+    }
     if (x1->GetStorageFormat() != op::Format::FORMAT_ND) {
         OP_LOGW("x1 origin format is %s.", op::ToString(x1->GetStorageFormat()).GetString());
         x1 = l0op::ReFormat(x1, op::Format::FORMAT_ND);
@@ -193,11 +198,6 @@ static bool ReFormatNotND(const aclTensor *x1, const aclTensor *x2, const aclTen
             biasOptional = l0op::ReFormat(biasOptional, op::Format::FORMAT_ND);
             CHECK_RET(biasOptional != nullptr, false);
         }
-    }
-    if (output->GetStorageFormat() != op::Format::FORMAT_ND) {
-        OP_LOGW("output origin format is %s.", op::ToString(output->GetStorageFormat()).GetString());
-        output = l0op::ReFormat(output, op::Format::FORMAT_ND);
-        CHECK_RET(output != nullptr, false);
     }
     return true;
 }
