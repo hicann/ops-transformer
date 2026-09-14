@@ -83,7 +83,6 @@ private:
                                                 int32_t sortedBaseRow, int32_t quotient, int32_t remainder,
                                                 int32_t nextBaseRow);
     __aicore__ inline void SelectTopKExpertScore();
-    __aicore__ inline void TopKCompute();
     __aicore__ inline void HashCompute(int64_t row);
     __aicore__ inline void CopyOut(int64_t progress);
 
@@ -262,8 +261,9 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::GenerateIndexAndCopy(__u
     RegTensor<float> vregSoftmaxResult;
     Reg::MaskReg preg0 = Reg::CreateMask<float>();
 
+    uint32_t sizeRemain = size;
     for (uint16_t i = 0; i < vfLoopNum; i++) {
-        preg0 = Reg::UpdateMask<float>(size);
+        preg0 = Reg::UpdateMask<float>(sizeRemain);
         ops::LoadOneTensorForDtypeT<float>(sigmoidOutAddr, vregSoftmaxResult, preg0, i * VL_FLOAT_SIZE);
         Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
         Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSoftmaxResult, preg0);
@@ -293,8 +293,9 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftMaxWithBias(LocalTen
         RegTensor<float> vregBiasResult;
         Reg::MaskReg preg0 = Reg::CreateMask<float>();
 
+        uint32_t sizeRemain = size;
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = Reg::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(sizeRemain);
             ops::LoadOneTensorForDtypeT<float>(sigmoidOutAddr, vregSoftmaxResult, preg0, i * VL_FLOAT_SIZE);
             ops::LoadOneTensorForDtypeT<T>(biasAddr, vregBiasFp32, preg0, i * VL_FLOAT_SIZE);
             Reg::Add(vregBiasResult, vregSoftmaxResult, vregBiasFp32, preg0);
@@ -392,8 +393,9 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithBias(LocalTen
         Reg::MaskReg preg0 = Reg::CreateMask<float>();
         Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
 
+        uint32_t sizeRemain = size;
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = Reg::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(sizeRemain);
             ops::LoadTwoTensorForDtypeT<T>(inputAddr, biasAddr, vregInFp32, vregBiasFp32, preg0, preg0,
                                            i * VL_FLOAT_SIZE, i * VL_FLOAT_SIZE);
             Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
@@ -437,8 +439,9 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithoutBias(Local
         Reg::MaskReg preg0 = Reg::CreateMask<float>();
         Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
 
+        uint32_t sizeRemain = size;
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = Reg::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(sizeRemain);
             ops::LoadOneTensorForDtypeT<T>(inputAddr, vregInFp32, preg0, i * VL_FLOAT_SIZE);
             Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
             Reg::Exp(vreg2, vreg1, preg0);
@@ -491,19 +494,38 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithBias(LocalTe
         RegTensor<float> vregBiasResult;
         RegTensor<float> vregOne;
         RegTensor<float> vregInFp32;
+        RegTensor<float> vregAbsX;
+        RegTensor<float> vregApprox;
+        RegTensor<float> vregHalfT;
+        RegTensor<float> vregOneMinusHalfT;
+        RegTensor<float> vregZero;
         RegTensor<float> vreg1;
         RegTensor<float> vreg2;
         RegTensor<float> vreg3;
         Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::MaskReg pregCmp = Reg::CreateMask<float>();
         Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
+        Reg::Duplicate(vregZero, static_cast<float>(0), preg0);
 
+        uint32_t sizeRemain = size;
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = Reg::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(sizeRemain);
             ops::LoadTwoTensorForDtypeT<T>(inputAddr, biasAddr, vregInFp32, vregBiasFp32, preg0, preg0,
                                            i * VL_FLOAT_SIZE, i * VL_FLOAT_SIZE);
-            Reg::Exp(vreg1, vregInFp32, preg0);
+            // softplus(x) = max(x, 0) + log1p(exp(-|x|)); t < 2^-8 时用 t - t^2/2 近似,
+            // 避免 exp 溢出与 1+t 吸收
+            Reg::Abs(vregAbsX, vregInFp32, preg0);
+            Reg::Muls(vreg1, vregAbsX, static_cast<float>(-1), preg0);
+            Reg::Exp(vreg1, vreg1, preg0);
+            Reg::CompareScalar<float, CMPMODE::LT>(pregCmp, vreg1, LOG1P_TAYLOR_THRESHOLD, preg0);
+            Reg::Muls(vregHalfT, vreg1, static_cast<float>(0.5), preg0);
+            Reg::Sub(vregOneMinusHalfT, vregOne, vregHalfT, preg0);
+            Reg::Mul(vregApprox, vreg1, vregOneMinusHalfT, preg0);
             Reg::Adds(vreg2, vreg1, static_cast<float>(1), preg0);
             Reg::Ln(vreg3, vreg2, preg0);
+            Reg::Select<float>(vreg3, vregApprox, vreg3, pregCmp);
+            Reg::Max(vreg1, vregInFp32, vregZero, preg0);
+            Reg::Add(vreg3, vreg1, vreg3, preg0);
             Reg::Sqrt(vregSoftplusResult, vreg3, preg0);
             Reg::Add(vregBiasResult, vregSoftplusResult, vregBiasFp32, preg0);
             Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
@@ -536,18 +558,37 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithoutBias(Loca
         RegTensor<float> vregSoftplusResult;
         RegTensor<float> vregOne;
         RegTensor<float> vregInFp32;
+        RegTensor<float> vregAbsX;
+        RegTensor<float> vregApprox;
+        RegTensor<float> vregHalfT;
+        RegTensor<float> vregOneMinusHalfT;
+        RegTensor<float> vregZero;
         RegTensor<float> vreg1;
         RegTensor<float> vreg2;
         RegTensor<float> vreg3;
         Reg::MaskReg preg0 = Reg::CreateMask<float>();
+        Reg::MaskReg pregCmp = Reg::CreateMask<float>();
         Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
+        Reg::Duplicate(vregZero, static_cast<float>(0), preg0);
 
+        uint32_t sizeRemain = size;
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = Reg::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(sizeRemain);
             ops::LoadOneTensorForDtypeT<T>(inputAddr, vregInFp32, preg0, i * VL_FLOAT_SIZE);
-            Reg::Exp(vreg1, vregInFp32, preg0);
+            // softplus(x) = max(x, 0) + log1p(exp(-|x|)); t < 2^-8 时用 t - t^2/2 近似,
+            // 避免 exp 溢出与 1+t 吸收
+            Reg::Abs(vregAbsX, vregInFp32, preg0);
+            Reg::Muls(vreg1, vregAbsX, static_cast<float>(-1), preg0);
+            Reg::Exp(vreg1, vreg1, preg0);
+            Reg::CompareScalar<float, CMPMODE::LT>(pregCmp, vreg1, LOG1P_TAYLOR_THRESHOLD, preg0);
+            Reg::Muls(vregHalfT, vreg1, static_cast<float>(0.5), preg0);
+            Reg::Sub(vregOneMinusHalfT, vregOne, vregHalfT, preg0);
+            Reg::Mul(vregApprox, vreg1, vregOneMinusHalfT, preg0);
             Reg::Adds(vreg2, vreg1, static_cast<float>(1), preg0);
             Reg::Ln(vreg3, vreg2, preg0);
+            Reg::Select<float>(vreg3, vregApprox, vreg3, pregCmp);
+            Reg::Max(vreg1, vregInFp32, vregZero, preg0);
+            Reg::Add(vreg3, vreg1, vreg3, preg0);
             Reg::Sqrt(vregSoftplusResult, vreg3, preg0);
             Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
             Reg::StoreAlign(softplusOutAddr + i * VL_FLOAT_SIZE, vregSoftplusResult, preg0);
@@ -762,45 +803,6 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashCompute(int64_t row)
     } else {
         HashGatherWithSmallKAlignE(xSigmoidTensor, expertIdxTensor, yTensor, k_, eps_, routedScalingFactor_);
     }
-    yOutQueue_.EnQue(yTensor);
-    expertIdxOutQueue_.EnQue<int32_t>(expertIdxTensor);
-}
-
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::TopKCompute()
-{
-    LocalTensor<float> xBiasTensor = xBiasBuf_.Get<float>();
-    LocalTensor<float> sortedInGroupTensor = sortedInGroupBuf_.Get<float>(); // 组内排序的结果, 后续归并需要
-    LocalTensor<float> tmpLocal = finalSortBuffer_.Get<float>();
-
-    Sort<float, true>(sortedInGroupTensor, xBiasTensor, indexTensor, tmpLocal,
-                      perGroupExpertCountAlign_ * groupCount_ / ONE_REPEAT_SORT_NUM);
-
-    LocalTensor<float> xSigmoidTensor = xSigmoidBuf_.Get<float>();
-    LocalTensor<T> yTensor = yOutQueue_.AllocTensor<T>();
-    LocalTensor<int32_t> expertIdxTensor = expertIdxOutQueue_.AllocTensor<int32_t>();
-
-    LocalTensor<int32_t> sortedInGroupTensorCast = sortedInGroupTensor.template ReinterpretCast<int32_t>();
-
-    int32_t expertIdxPad = perGroupExpertCountAlign_ - perGroupExpertCount_;
-    if (k_ <= VL_FLOAT_SIZE) {
-        if (expertIdxPad != 0) {
-            smallKNotAlignEVF(xSigmoidTensor, sortedInGroupTensorCast, expertIdxTensor, yTensor, k_, eps_,
-                              routedScalingFactor_, expertIdxPad, perGroupExpertCountAlign_);
-        } else {
-            smallKAlignEVF(xSigmoidTensor, sortedInGroupTensorCast, expertIdxTensor, yTensor, k_, eps_,
-                           routedScalingFactor_);
-        }
-    } else {
-        if (expertIdxPad != 0) {
-            largeKNotAlignEVF(xSigmoidTensor, sortedInGroupTensorCast, expertIdxTensor, yTensor, k_, eps_,
-                              routedScalingFactor_, expertIdxPad, perGroupExpertCountAlign_);
-        } else {
-            largeKAlignEVF(xSigmoidTensor, sortedInGroupTensorCast, expertIdxTensor, yTensor, k_, eps_,
-                           routedScalingFactor_);
-        }
-    }
-
     yOutQueue_.EnQue(yTensor);
     expertIdxOutQueue_.EnQue<int32_t>(expertIdxTensor);
 }
@@ -1462,26 +1464,20 @@ template <typename T, typename U1, typename U2>
 __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::Process()
 {
     CopyInBias();
-    if (kGroup_ == groupCount_ || groupCount_ == expertCount_) {
+    // 非hash的简化路径(kGroup==groupCount或groupCount==expertCount)由tiling路由到
+    // MoeGatingTopKWithoutGroupRegbase(tiling key 10005), 本kernel的逐行流水分支仅服务hash模式
+    if (hashFlag_) {
         CopyInX(0);
         for (int64_t row = 1; row < curCoreRowCount_; row++) {
             ComputeX();
             CopyOutXNorm(row - 1);
             CopyInX(row);
-            if (hashFlag_) {
-                HashCompute(row - 1 + tilingData_->perCoreRowCount * blockIdx_);
-            } else {
-                TopKCompute();
-            }
+            HashCompute(row - 1 + tilingData_->perCoreRowCount * blockIdx_);
             CopyOut(row - 1);
         }
         ComputeX();
         CopyOutXNorm(curCoreRowCount_ - 1);
-        if (hashFlag_) {
-            HashCompute(curCoreRowCount_ - 1 + tilingData_->perCoreRowCount * blockIdx_);
-        } else {
-            TopKCompute();
-        }
+        HashCompute(curCoreRowCount_ - 1 + tilingData_->perCoreRowCount * blockIdx_);
         CopyOut(curCoreRowCount_ - 1);
         return;
     }

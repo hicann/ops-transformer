@@ -735,7 +735,7 @@ TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_regbase_succ_02)
         },
         &compileInfo, "Ascend950");
     std::vector<size_t> expectWorkspaces = {16777216};
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 10000, "", expectWorkspaces);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 10005, "", expectWorkspaces);
 }
 
 TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_regbase_succ_03)
@@ -765,7 +765,7 @@ TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_regbase_succ_03)
         },
         &compileInfo, "Ascend950");
     std::vector<size_t> expectWorkspaces = {16777216};
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 10000, "", expectWorkspaces);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 10005, "", expectWorkspaces);
 }
 
 TEST_F(MoeGatingTopKTiling, moe_gating_top_k_tiling_regbase_succ_04)

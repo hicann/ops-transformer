@@ -17,6 +17,7 @@ __spec__ = {
     "moe_gating_top_k": "MoeGatingTopKTestSpec",
     "aclnnMoeGatingTopK": "AclnnMoeGatingTopKTestSpec",
     "aclnnMoeGatingTopKV2": "AclnnMoeGatingTopKV2TestSpec",
+    "torch_npu.npu_moe_gating_top_k": "E2eMoeGatingTopKTestSpec",
 }
 
 
@@ -28,6 +29,100 @@ def _softmax_torch(x, axis=-1):
     y = torch.exp(x_sub)
     x_sum = y.sum(dim=axis, keepdim=True)
     return y / x_sum
+
+
+def _pre_compare_topk(*arrays):
+    """topk 输出顺序对排序键(normValue)ULP 级差异敏感: 相邻键不可区分时, kernel 与
+    golden 的浮点路径微差会使相邻元素交换; 并列值(输入量化/下溢产生完全相同的键)时
+    选取的专家集合也可能不同, 属于实现自由度。比对前逐行按 (值降序, 索引升序) 规范
+    化; golden 侧值完全相同的并列段(长度>=2 且输出侧同段值也完全一致)内, 以及值差
+    在输出精度 4 ULP 内的位置, 索引替换为输出侧索引——不可区分值下任意等值选取均
+    合法, 值本身的精度由 out0 的 stat_rel_err 保证(阈值远大于 4 ULP, 不会掩盖真实
+    值错误)。normOut 为按位置对齐的全量输出, 不做处理。kernel 通路输出为 numpy,
+    aclnn/e2e 通路为 torch。"""
+
+    def _as_numpy(a):
+        if torch.is_tensor(a):
+            if a.dtype == torch.bfloat16:
+                return a.detach().cpu().to(torch.float32).numpy()
+            return a.detach().cpu().numpy()
+        return numpy.asarray(a)
+
+    def _write_back(slot, arr):
+        # 长度为 1 的轴反转后 strides 为负但 numpy 仍视为 C 连续(ascontiguousarray 不拷贝),
+        # torch.from_numpy 却拒绝负 stride, 这里显式拷贝成正 stride
+        if any(stride < 0 for stride in arr.strides):
+            arr = arr.copy()
+        if torch.is_tensor(slot):
+            slot.copy_(torch.from_numpy(arr).to(slot.dtype))
+        else:
+            slot[:] = arr
+
+    half = len(arrays) // 2
+    if half < 2:
+        return
+    y_out = _as_numpy(arrays[0]).copy()
+    y_gold = _as_numpy(arrays[half]).copy()
+    if y_out.ndim != 2 or y_out.shape != y_gold.shape:
+        return
+    # golden 侧 idx 可能为 None(aclnn golden 不建模 expertIdxOut, 该输出比对自动抑制):
+    # 仅对 y 两侧做行降序规范化(消除 topk 顺序敏感性)
+    if arrays[half + 1] is None or arrays[1] is None:
+        y_out = numpy.sort(y_out, axis=1)[:, ::-1].copy()
+        y_gold = numpy.sort(y_gold, axis=1)[:, ::-1].copy()
+        _write_back(arrays[0], y_out)
+        _write_back(arrays[half], y_gold)
+        return
+    idx_out = _as_numpy(arrays[1]).copy()
+    idx_gold = _as_numpy(arrays[half + 1]).copy()
+    if idx_out.shape != idx_gold.shape or idx_out.ndim != 2:
+        return
+    # 输出精度下的不可区分容差(4 ULP): 覆盖 kernel 与 golden 浮点路径微差引起的
+    # 相邻交换与 k 边界并列, 远小于 out0 的 stat_rel_err 阈值, 不掩盖真实值错误
+    # (bfloat16 无原生 numpy finfo, eps 固定为 2^-7; 需在 bf16->fp32 转换前判断)
+    y_raw = arrays[0]
+    y_dtype_str = str(
+        y_raw.dtype if torch.is_tensor(y_raw) else numpy.asarray(y_raw).dtype
+    )
+    if "bfloat16" in y_dtype_str:
+        ulp_tol = 4.0 * (2.0**-7)
+    else:
+        ulp_tol = 4.0 * numpy.finfo(y_out.dtype).eps
+
+    for r in range(y_out.shape[0]):
+        yo = y_out[r].astype(numpy.float64)
+        io = idx_out[r]
+        yg = y_gold[r].astype(numpy.float64)
+        ig = idx_gold[r]
+        oo = numpy.lexsort((io, -yo))
+        yo, io = yo[oo], io[oo]
+        og = numpy.lexsort((ig, -yg))
+        yg, ig = yg[og], ig[og]
+        k = yo.shape[0]
+        j = 0
+        while j < k:
+            j2 = j + 1
+            while j2 < k and yg[j2] == yg[j]:
+                j2 += 1
+            if j2 > j + 1 and numpy.all(yo[j:j2] == yo[j]):
+                ig[j:j2] = io[j:j2]
+            j = j2
+        # k 边界并列/相邻交换: 值在输出精度(4 ULP)内不可区分, 或绝对差低于
+        # stat_rel_err 的 FLOOR(1e-7, 如 exp 下溢 denormal 被 FTZ 为 0 的场景)时,
+        # 被选专家视为等价——与 out0 的值判定口径保持一致
+        scale = numpy.maximum(numpy.maximum(numpy.abs(yg), numpy.abs(yo)), 1e-30)
+        diff = numpy.abs(yo - yg)
+        tie = (ig != io) & ((diff <= ulp_tol * scale) | (diff <= 1e-7))
+        ig[tie] = io[tie]
+        y_out[r] = yo
+        idx_out[r] = io
+        y_gold[r] = yg
+        idx_gold[r] = ig
+
+    _write_back(arrays[0], y_out)
+    _write_back(arrays[1], idx_out)
+    _write_back(arrays[half], y_gold)
+    _write_back(arrays[half + 1], idx_gold)
 
 
 def _softmax_numpy(x, axis=-1):
@@ -122,6 +217,8 @@ class AclnnMoeGatingTopKTestSpec:
         "bfloat16": {"standard": "stat_rel_err"},
     }
 
+    pre_compare = _pre_compare_topk
+
 
 class AclnnMoeGatingTopKV2TestSpec:
     @staticmethod
@@ -204,6 +301,8 @@ class AclnnMoeGatingTopKV2TestSpec:
         "bfloat16": {"standard": "stat_rel_err"},
     }
 
+    pre_compare = _pre_compare_topk
+
 
 class MoeGatingTopKTestSpec:
     @staticmethod
@@ -234,7 +333,10 @@ class MoeGatingTopKTestSpec:
         elif norm_type == 1:
             x = 1 / (1 + numpy.exp(-x))
         elif norm_type == 2:
-            x = numpy.sqrt(numpy.log1p(numpy.exp(x)))
+            # 数值稳定 softplus: sqrt(max(x,0) + log1p(exp(-|x|))), 避免大 |x| 溢出/吸收
+            x = numpy.sqrt(
+                numpy.maximum(x, 0.0) + numpy.log1p(numpy.exp(-numpy.abs(x)))
+            )
 
         original_x = x
         if bias is not None:
@@ -280,3 +382,94 @@ class MoeGatingTopKTestSpec:
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
     }
+
+    pre_compare = _pre_compare_topk
+
+
+class E2eMoeGatingTopKTestSpec:
+    """E2E spec for torch_npu.npu_moe_gating_top_k — snake_case params, torch CPU golden.
+
+    Signature mirrors the torch_npu API: golden(x, k, bias=..., input_ids=...,
+    tid2eid=..., k_group=..., ...). Inputs/outputs are torch tensors; the golden
+    runs the norm -> (group select ->) topk / hash lookup -> gather -> renorm ->
+    scale pipeline in float32 and returns [yOut, expertIdxOut, normOut], where
+    normOut is None when out_flag is False (content not guaranteed by the API).
+    """
+
+    @staticmethod
+    def golden(
+        x,
+        k,
+        bias=None,
+        input_ids=None,
+        tid2eid=None,
+        k_group=1,
+        group_count=1,
+        group_select_mode=0,
+        renorm=0,
+        norm_type=0,
+        out_flag=False,
+        routed_scaling_factor=1.0,
+        eps=1e-20,
+        **kwargs,
+    ):
+        ori_dtype = x.dtype
+        x = x.to(torch.float32)
+        if bias is not None:
+            bias = bias.to(torch.float32)
+
+        if norm_type == 0:
+            x = _softmax_torch(x, -1)
+        elif norm_type == 1:
+            x = 1 / (1 + torch.exp(-x))
+        elif norm_type == 2:
+            x = torch.sqrt(torch.nn.functional.softplus(x))
+
+        original_x = x
+        if bias is not None:
+            x = x + bias
+
+        hash_flag = input_ids is not None and tid2eid is not None
+        if hash_flag:
+            indices = tid2eid[input_ids.to(torch.int64)].to(torch.int64)
+        else:
+            if group_count > 1:
+                x_reshaped = x.reshape(x.shape[0], group_count, -1)
+                if group_select_mode == 0:
+                    group_x = torch.amax(x_reshaped, dim=-1)
+                else:
+                    top2 = torch.topk(x_reshaped, 2, dim=-1).values
+                    group_x = top2.sum(dim=-1)
+                _, group_indices = torch.sort(
+                    group_x, dim=-1, descending=True, stable=True
+                )
+                group_indices = group_indices[:, :k_group]
+
+                mask = torch.ones((x_reshaped.shape[0], group_count), dtype=torch.bool)
+                mask[torch.arange(x_reshaped.shape[0])[:, None], group_indices] = False
+                x = torch.where(mask.unsqueeze(-1), float("-inf"), x_reshaped)
+                x = x.reshape(x.shape[0], -1)
+
+            _, indices = torch.sort(x, dim=-1, stable=True, descending=True)
+            indices = indices[:, :k].to(torch.int64)
+
+        y = torch.gather(original_x, 1, indices)
+
+        if norm_type != 0 or renorm != 0:
+            y = y / (y.sum(dim=-1, keepdim=True) + eps)
+        y = y * routed_scaling_factor
+
+        if out_flag:
+            out = original_x.to(torch.float32)
+        else:
+            out = None
+
+        return [y.to(ori_dtype), indices.to(torch.int32), out]
+
+    tolerance = {
+        "float32": {"standard": "stat_rel_err"},
+        "float16": {"standard": "stat_rel_err"},
+        "bfloat16": {"standard": "stat_rel_err"},
+    }
+
+    pre_compare = _pre_compare_topk

@@ -34,6 +34,11 @@ constexpr int64_t MERGE_LIST_FOUR = 4;
 constexpr int64_t MERGE_LIST_IDX_TWO = 2;
 constexpr int64_t MERGE_LIST_IDX_THREE = 3;
 
+// softplus 稳定公式中 log1p(t) 的泰勒多项式切换阈值(2^-8, 1/256, fp32 精确表示):
+// t < 该值时用 t - t^2/2 近似(截断相对误差 t^2/3 <= 2^-17),
+// t >= 该值时直接 ln(1+t)(舍入相对误差 ~2^-24/t <= 2^-16), 均远小于比对阈值 2^-13
+constexpr float LOG1P_TAYLOR_THRESHOLD = 0.00390625f;
+
 __aicore__ inline int64_t Align(int64_t elementNum, int64_t bytes)
 {
     if (bytes == 0) {
@@ -175,6 +180,7 @@ __aicore__ inline void LargeKAlignEVFWithNorm(__ubuf__ float *inputAddr, __ubuf_
                                               __ubuf__ T *outputAddr, __ubuf__ uint32_t *expertIdxAddr, uint32_t k,
                                               float eps, float routedScalingFactor)
 {
+    uint32_t k1 = k;
     __VEC_SCOPE__
     {
         RegTensor<uint32_t> vregSortValue;
@@ -202,7 +208,7 @@ __aicore__ inline void LargeKAlignEVFWithNorm(__ubuf__ float *inputAddr, __ubuf_
         Reg::Adds(vregSum, vregSum, eps, preg1);
         Reg::Duplicate(vregSumBcast, vregSum, preg1);
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg1 = Reg::UpdateMask<uint32_t>(k);
+            preg1 = Reg::UpdateMask<uint32_t>(k1);
             Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vregSortValue, vregExpertIdx,
                                                                      mrgSortAddr + i * 2 * VL_FLOAT_SIZE);
             Reg::Gather(vregGathered, inputAddr, vregExpertIdx, preg1);

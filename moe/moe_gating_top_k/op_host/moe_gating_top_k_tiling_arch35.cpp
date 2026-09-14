@@ -45,7 +45,6 @@ const static int64_t EK_FULLLOAD_EXPERT_COUNT = 256;
 const static int64_t EK_FULLLOAD_GROUP_COUNT = 8;
 const static int64_t EK_FULLLOAD_K_GROUP = 4;
 const static int64_t EK_FULLLOAD_MAX_K = 32;
-const static int64_t WITHOUT_GROUP_K = 1;
 const static size_t X_INPUT_DIMS = 2;
 const static size_t BIAS_INPUT_DIMS = 1;
 const static size_t Y_OUTPUT_DIMS = 2;
@@ -670,7 +669,7 @@ void MoeGatingTopKTilingRegbase::SplitRows()
         batchRows = std::min(std::max(maxBatchByUb, static_cast<int64_t>(1)), MAX_SINGLE_EXPERT_BATCH_ROWS);
     } else {
         bool isSimplifiedPath = (kGroup_ == groupCount_ || groupCount_ == expertCount_);
-        if (isSimplifiedPath && k_ == WITHOUT_GROUP_K && !hashFlag_) {
+        if (isSimplifiedPath && !hashFlag_) {
             // without_group path: batchRows scales xIn/yOut/expertIdx, fixed buffers occupy UB too
             // all queues use double buffer
             int64_t dtypeRatio = sizeof(float) / inputDtypeSize_;
@@ -747,7 +746,7 @@ uint64_t MoeGatingTopKTilingRegbase::GetTilingKey() const
             return MOE_GATING_TOP_K_E_K_FULLLOAD_REGBASE_TILING_KEY;
         }
         bool isSimplifiedPath = (kGroup_ == groupCount_ || groupCount_ == expertCount_);
-        if (isSimplifiedPath && k_ == WITHOUT_GROUP_K) {
+        if (isSimplifiedPath) {
             return MOE_GATING_TOP_K_WITHOUT_GROUP_REGBASE_TILING_KEY;
         }
         return MOE_GATING_TOP_K_REGBASE_TILING_KEY;

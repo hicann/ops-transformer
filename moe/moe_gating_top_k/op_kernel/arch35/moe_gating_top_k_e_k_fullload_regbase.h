@@ -155,8 +155,9 @@ __aicore__ inline void MoeGatingTopKEKFullloadRegbase<T>::ComputeX()
         Reg::MaskReg preg0 = Reg::CreateMask<float>();
         Reg::Duplicate<float, Reg::MaskMergeMode::ZEROING, float>(vregOne, static_cast<float>(1), preg0);
 
+        uint32_t sizeRemain = size;
         for (uint16_t i = 0; i < vfLoopNum; i++) {
-            preg0 = Reg::UpdateMask<float>(size);
+            preg0 = Reg::UpdateMask<float>(sizeRemain);
             ops::LoadTwoTensorForDtypeT<T>(inputAddr, biasAddr, vregInFp32, vregBiasFp32, preg0, preg0,
                                            i * VL_FLOAT_SIZE, i * VL_FLOAT_SIZE);
             Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
