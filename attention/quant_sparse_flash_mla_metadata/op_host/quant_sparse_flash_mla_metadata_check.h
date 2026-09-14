@@ -730,6 +730,7 @@ aclnnStatus CheckConsistencyQsmla(const aclTensor *cuSeqlensQOptional, const acl
                                                        "When layout_q is TND and seqused_q is passed, "
                                                        "the shape size of cu_seqlens_q minus 1 must be equal to "
                                                        "the shape size of seqused_q");
+            return ACLNN_ERR_PARAM_INVALID;
         }
     }
     if (hasOriKv) {
@@ -767,6 +768,7 @@ aclnnStatus CheckConsistencyQsmla(const aclTensor *cuSeqlensQOptional, const acl
                     "When layout_kv is TND and seqused_ori_kv is passed, "
                     "the shape size of cu_seqlens_ori_kv minus 1 must be "
                     "equal to the shape size of seqused_ori_kv");
+                return ACLNN_ERR_PARAM_INVALID;
             }
         }
         // 校验 ori_topk_length 维度一致性
@@ -839,6 +841,7 @@ aclnnStatus CheckConsistencyQsmla(const aclTensor *cuSeqlensQOptional, const acl
                     "When layout_kv is TND and seqused_cmp_kv is passed, "
                     "the shape size of cu_seqlens_cmp_kv minus 1 must be "
                     "equal to the shape size of seqused_cmp_kv");
+                return ACLNN_ERR_PARAM_INVALID;
             }
         }
         // 校验 cmp_residual_kv 元素数
