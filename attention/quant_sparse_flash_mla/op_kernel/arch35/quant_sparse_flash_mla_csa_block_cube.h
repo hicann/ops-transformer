@@ -191,10 +191,10 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ uint8_t 
         this->queryGm.offsetCalculator.Init(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size,
                                             constInfo.dSize);
     } else { // QSMLA_LAYOUT::TND
-        uint32_t sequsedQSize = (sequsedQ == nullptr) ? 0 : constInfo.bSize;
-        ActualSeqLensParser<ActualSeqLensMode::ACCUM, int32_t, true> parser;
-        parser.Init(cuSeqlensQ, constInfo.bSize + 1, sequsedQ, sequsedQSize);
-        this->queryGm.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize, constInfo.dSize, parser);
+        uint32_t qsmlaSequsedQSize = (sequsedQ == nullptr) ? 0 : constInfo.bSize;
+        ActualSeqLensParser<ActualSeqLensMode::ACCUM, int32_t, true> qsmlaParser;
+        qsmlaParser.Init(cuSeqlensQ, constInfo.bSize + 1, sequsedQ, qsmlaSequsedQSize);
+        this->queryGm.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize, constInfo.dSize, qsmlaParser);
     }
 }
 
@@ -309,24 +309,24 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     WaitFlag<HardEvent::M_FIX>(l0CMToFixFlagId + l0CBufId);
 
     outputBuf.WaitCrossCore();
-    FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB
+    FixpipeParamsC310<CO2Layout::ROW_MAJOR> qsmlaFixpipeParams; // L0C→UB
     // L0C上的bmm1结果矩阵N方向的size大小; 同mmadParams.n; 为什么要8个元素对齐(32B对齐) // 128
-    fixpipeParams.nSize = Align8Func(runInfo.s2RealSize);
+    qsmlaFixpipeParams.nSize = Align8Func(runInfo.s2RealSize);
     // 有效数据不足16行，只需要输出部分行即可; L0C上的bmm1结果矩阵M方向的size大小(必须为偶数) // 128
-    fixpipeParams.mSize = Align2Func(runInfo.mRealSize);
+    qsmlaFixpipeParams.mSize = Align2Func(runInfo.mRealSize);
     // L0C上bmm1结果相邻连续数据片段间隔(前面一个数据块的头与后面数据块的头的间隔), 单位为16*sizeof(T) //
     // 源Nz矩阵中相邻大Z排布的起始地址偏移
-    fixpipeParams.srcStride = Align16Func(fixpipeParams.mSize);
-    fixpipeParams.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 // 128:根据比对dump文件得到,
-                                          // ND方案(S1*S2)时脏数据用mask剔除
-    fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分，M / 2 * N写入每个UB, M必须为2的倍数
-    fixpipeParams.params.ndNum = 1;
-    fixpipeParams.params.srcNdStride = 0;
-    fixpipeParams.params.dstNdStride = 0;
+    qsmlaFixpipeParams.srcStride = Align16Func(qsmlaFixpipeParams.mSize);
+    qsmlaFixpipeParams.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 // 128:根据比对dump文件得到,
+                                               // ND方案(S1*S2)时脏数据用mask剔除
+    qsmlaFixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分，M / 2 * N写入每个UB, M必须为2的倍数
+    qsmlaFixpipeParams.params.ndNum = 1;
+    qsmlaFixpipeParams.params.srcNdStride = 0;
+    qsmlaFixpipeParams.params.dstNdStride = 0;
 
     // 将matmul结果从L0C搬运到UB
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputBuf.template GetTensor<T>(), mmL0CTensor[BUFFER_SIZE_32K * l0CBufId],
-                                        fixpipeParams); // 将matmul结果从L0C搬运到UB
+                                        qsmlaFixpipeParams); // 将matmul结果从L0C搬运到UB
     SetFlag<HardEvent::FIX_M>(l0CFixToMFlagId + l0CBufId);
     l0CBufId ^= 1;
     outputBuf.SetCrossCore();
@@ -358,22 +358,22 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + l1KMatmul2BufId);
     l1KMatmul2BufId = (l1KMatmul2BufId + 1) % 3; // 3：循环使用三个L1缓冲区来存储K矩阵数据
 
-    outputBuf.WaitCrossCore();                             // 占用
-    FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB;FixpipeParamsM300:L0C→UB
-    fixpipeParams.nSize =
+    outputBuf.WaitCrossCore();                                  // 占用
+    FixpipeParamsC310<CO2Layout::ROW_MAJOR> qsmlaFixpipeParams; // L0C→UB;FixpipeParamsM300:L0C→UB
+    qsmlaFixpipeParams.nSize =
         Align8Func(constInfo.dSizeV); // L0C上的bmm1结果矩阵N方向的size大小, 分档计算且vector2中通过mask筛选出实际有效值
-    fixpipeParams.mSize = Align2Func(
+    qsmlaFixpipeParams.mSize = Align2Func(
         runInfo
             .mRealSize); // 有效数据不足16行，只需要输出部分行即可; L0C上的bmm1结果矩阵M方向的size大小; 同mmadParams.m
-    fixpipeParams.srcStride = Align16Func(
-        fixpipeParams.mSize); // L0C上bmm1结果相邻连续数据片段间隔（前面一个数据块的头与后面数据块的头的间隔）
-    fixpipeParams.dstStride = Align16Func(constInfo.dSizeV);
-    fixpipeParams.dualDstCtl = 1;
-    fixpipeParams.params.ndNum = 1;
-    fixpipeParams.params.srcNdStride = 0;
-    fixpipeParams.params.dstNdStride = 0;
+    qsmlaFixpipeParams.srcStride = Align16Func(
+        qsmlaFixpipeParams.mSize); // L0C上bmm1结果相邻连续数据片段间隔（前面一个数据块的头与后面数据块的头的间隔）
+    qsmlaFixpipeParams.dstStride = Align16Func(constInfo.dSizeV);
+    qsmlaFixpipeParams.dualDstCtl = 1;
+    qsmlaFixpipeParams.params.ndNum = 1;
+    qsmlaFixpipeParams.params.srcNdStride = 0;
+    qsmlaFixpipeParams.params.dstNdStride = 0;
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputBuf.template GetTensor<T>(), mmL0CTensor[BUFFER_SIZE_32K * l0CBufId],
-                                        fixpipeParams); // 将matmul结果从L0C搬运到UB
+                                        qsmlaFixpipeParams); // 将matmul结果从L0C搬运到UB
     SetFlag<HardEvent::FIX_M>(l0CFixToMFlagId + l0CBufId);
     l0CBufId ^= 1;
 

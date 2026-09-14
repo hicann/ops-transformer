@@ -658,24 +658,24 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MixedQuantSparseFlashMla", "cmp_sparse_indices",
                                                      "Cmp_sparse_indices must be empty when cmpKv is not provided"),
             return ge::GRAPH_FAILED);
-        if (tilingInfo->opParamInfo.oriSparseIndices.tensor != nullptr) {
-            perfMode_ = QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE;
-        } else {
+        if (tilingInfo->opParamInfo.oriSparseIndices.tensor == nullptr) {
             perfMode_ = QSMLATemplateMode::SWA_TEMPLATE_MODE;
+        } else {
+            perfMode_ = QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE;
         }
     } else if (tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr) {
-        if (tilingInfo->opParamInfo.oriSparseIndices.tensor != nullptr) {
-            perfMode_ = QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE;
-        } else {
+        if (tilingInfo->opParamInfo.oriSparseIndices.tensor == nullptr) {
             perfMode_ = QSMLATemplateMode::CSA_TEMPLATE_MODE;
+        } else {
+            perfMode_ = QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE;
         }
     } else {
         perfMode_ = QSMLATemplateMode::HCA_TEMPLATE_MODE;
     }
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
-    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
+    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
     context_->SetBlockDim(blockDim);
     OP_LOGI(tilingInfo->opName, "QSMLA block dim: %u aiv Num: %u aic Num: %u.", blockDim, aivNum, aicNum);

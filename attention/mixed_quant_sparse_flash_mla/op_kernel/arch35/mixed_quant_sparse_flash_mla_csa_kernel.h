@@ -515,14 +515,14 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ProcessMainLoop()
 {
-    int64_t maxS2LoopCnt = 0;
+    int64_t mqsmlaMaxS2LoopCnt = 0;
     if constexpr (IS_SPLIT_G) {
-        maxS2LoopCnt = static_cast<int64_t>(metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_MAX_NUM, false)));
+        mqsmlaMaxS2LoopCnt = static_cast<int64_t>(metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_MAX_NUM, false)));
     }
     if (hasLoad == 0) {
         if ASCEND_IS_AIC {
             if constexpr (IS_SPLIT_G) {
-                for (int64_t loopCnt = 0; loopCnt < maxS2LoopCnt; loopCnt++) {
+                for (int64_t loopCnt = 0; loopCnt < mqsmlaMaxS2LoopCnt; loopCnt++) {
                     CrossCoreSetFlag<0, PIPE_MTE2>(15);
                     CrossCoreWaitFlag<0, PIPE_MTE2>(15);
                 }
@@ -537,8 +537,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     uint32_t s2LoopLimit = 0;
     int64_t taskId = 0;
     bool isFirstLoop = true;
-    bool notLast = true;
-    bool notLastTwoLoop = true;
+    bool mqsmlaNotLast = true;
+    bool mqsmlaNotLastTwoLoop = true;
     RunInfo<HIGH_PERF> runInfo[4];
     RunParamStr<HIGH_PERF> runParam;
     runParam.firstFdDataWorkspaceIdx = firstFdDataWorkspaceIdx;
@@ -555,33 +555,33 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                                               this->hasActualSeqOriKvlen, this->hasActualSeqCmpKvlen);
         ComputeS1LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, lastBN, nextGs1Idx, gS1StartIdx, s2EndIdx);
 
-        int64_t gS1LoopEnd = lastBN ? (runParam.gs1LoopEndIdx + PRELOAD_NUM) : runParam.gs1LoopEndIdx;
-        for (int64_t gS1Index = runParam.gs1LoopStartIdx; gS1Index < gS1LoopEnd; gS1Index++) {
-            bool notLastThreeLoop = true;
+        int64_t mqsmlaGS1LoopEnd = lastBN ? (runParam.gs1LoopEndIdx + PRELOAD_NUM) : runParam.gs1LoopEndIdx;
+        for (int64_t gS1Index = runParam.gs1LoopStartIdx; gS1Index < mqsmlaGS1LoopEnd; gS1Index++) {
+            bool mqsmlaNotLastThreeLoop = true;
             if (lastBN) {
-                int32_t extraGS1 = gS1Index - runParam.gs1LoopEndIdx;
-                switch (extraGS1) {
+                int32_t mqsmlaExtraGS1 = gS1Index - runParam.gs1LoopEndIdx;
+                switch (mqsmlaExtraGS1) {
                     case 0:
-                        notLastThreeLoop = false;
+                        mqsmlaNotLastThreeLoop = false;
                         break;
                     case 1:
-                        notLastTwoLoop = false;
-                        notLastThreeLoop = false;
+                        mqsmlaNotLastTwoLoop = false;
+                        mqsmlaNotLastThreeLoop = false;
                         break;
                     case 2:
-                        notLast = false;
-                        notLastTwoLoop = false;
-                        notLastThreeLoop = false;
+                        mqsmlaNotLast = false;
+                        mqsmlaNotLastTwoLoop = false;
+                        mqsmlaNotLastThreeLoop = false;
                         break;
                     default:
                         break;
                 }
             }
-            if (notLastThreeLoop) {
+            if (mqsmlaNotLastThreeLoop) {
                 this->ComputeAxisIdxByBnAndGs1(bnIdx, gS1Index, runParam);
-                bool s1NoNeedCalc =
+                bool mqsmlaS1NoNeedCalc =
                     ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, gS1Index, this->cuSeqlensQGm);
-                bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(
+                bool mqsmlaS2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(
                     bnIdx, gS1Index, this->cuSeqlensQGm, oriTopkLengthGm, cmpTopkLengthGm, runParam, this->constInfo);
                 if constexpr (IS_BATCH_CONSISTENCY) {
                     int64_t s2Load = runParam.s2LineOriEndIdx - runParam.s2LineStartIdx + runParam.s2CmpLineEndIdx;
@@ -590,24 +590,24 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                     int64_t baseBlockNum = s2PerReduceBlock >> 7;
                     runParam.baseBlockNumPerReductionBlock = baseBlockNum > 0 ? baseBlockNum : 1LL;
                 }
-                if (!s2NoNeedCalc) {
+                if (!mqsmlaS2NoNeedCalc) {
                     bool isFirstS2RangeTask = (bnIdx == bN2StartIdx && gS1Index == runParam.gs1LoopStartIdx);
                     bool isLastS2RangeTask = (lastBN && gS1Index == runParam.gs1LoopEndIdx - 1);
                     int64_t s2StartPoint = ConvertS2MetadataBlockToToken(runParam, this->constInfo, s2StartIdx);
                     int64_t s2EndPoint = (isLastS2RangeTask && s2EndIdx == 0) ?
                                              0 :
                                              ConvertS2MetadataBlockToToken(runParam, this->constInfo, s2EndIdx);
-                    s2NoNeedCalc = ApplyS2MetadataRange(runParam, this->constInfo, s2StartPoint, s2EndPoint,
-                                                        isFirstS2RangeTask, isLastS2RangeTask);
+                    mqsmlaS2NoNeedCalc = ApplyS2MetadataRange(runParam, this->constInfo, s2StartPoint, s2EndPoint,
+                                                              isFirstS2RangeTask, isLastS2RangeTask);
                 } else {
                     runParam.isCrossCoreSplit = false;
                 }
                 // s1和s2有任意一个不需要算, 则continue, 如果是当前核最后一次循环，则补充计算taskIdx+2的部分
-                if (s1NoNeedCalc || s2NoNeedCalc) {
+                if (mqsmlaS1NoNeedCalc || mqsmlaS2NoNeedCalc) {
                     continue;
                 }
                 if constexpr (IS_SPLIT_G) {
-                    maxS2LoopCnt -= runParam.s2LoopEndIdx;
+                    mqsmlaMaxS2LoopCnt -= runParam.s2LoopEndIdx;
                 }
                 s2LoopLimit = runParam.s2LoopEndIdx - 1;
             } else {
@@ -619,16 +619,16 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                 if (runParam.isCrossCoreSplit && (s2LoopCount % safeBaseBlockNum == 0)) {
                     runParam.s2SplitIdx = s2SplitIdxCounter++;
                 }
-                if (notLastThreeLoop) {
+                if (mqsmlaNotLastThreeLoop) {
                     RunInfo<HIGH_PERF> &runInfo1 = runInfo[taskId % 4];
                     this->SetRunInfo(runInfo1, runParam, taskId, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
                 }
                 if ASCEND_IS_AIV {
-                    if (notLastThreeLoop) {
+                    if (mqsmlaNotLastThreeLoop) {
                         RunInfo<HIGH_PERF> &runInfo1 = runInfo[taskId % 4];
                         this->vecBlock.ProcessVec0(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1, this->constInfo);
                     }
-                    if (taskId > 1 && notLast) {
+                    if (taskId > 1 && mqsmlaNotLast) {
                         uint32_t bmm1Slot = bmm1GetFlag;
                         bmm1GetFlag ^= 1;
                         uint32_t l1PSlot = l1PGetFlag;
@@ -642,27 +642,27 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                         this->vecBlock.ProcessVec2(this->bmm2Buffers, runInfo3, this->constInfo);
                     }
                 } else {
-                    if (taskId > 0 && notLastTwoLoop) {
+                    if (taskId > 0 && mqsmlaNotLastTwoLoop) {
                         RunInfo<HIGH_PERF> &runInfo1 = runInfo[(taskId + 3) % 4];
                         this->cubeBlock.IterateLoadQK(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1,
                                                       this->constInfo, isFirstLoop);
                         isFirstLoop = false;
                     } else {
                         if constexpr (IS_SPLIT_G) {
-                            if (taskId > 0 && maxS2LoopCnt > 0) {
-                                maxS2LoopCnt--;
+                            if (taskId > 0 && mqsmlaMaxS2LoopCnt > 0) {
+                                mqsmlaMaxS2LoopCnt--;
                                 CrossCoreSetFlag<0, PIPE_MTE2>(15);
                                 CrossCoreWaitFlag<0, PIPE_MTE2>(15);
                             }
                         }
                     }
-                    if (taskId > 1 && notLast) {
+                    if (taskId > 1 && mqsmlaNotLast) {
                         uint32_t bmm1Slot = bmm1GetFlag;
                         bmm1GetFlag ^= 1;
                         RunInfo<HIGH_PERF> &runInfo2 = runInfo[(taskId + 2) % 4];
                         RunInfo<HIGH_PERF> &runInfoNext = runInfo[(taskId + 3) % 4];
                         this->cubeBlock.IterateBmm1(this->bmm1Buffers[bmm1Slot],
-                                                    v0ResGmBuffers.Get(runInfo2.taskIdMod3), notLastTwoLoop,
+                                                    v0ResGmBuffers.Get(runInfo2.taskIdMod3), mqsmlaNotLastTwoLoop,
                                                     runInfoNext, runInfo2, this->constInfo);
                     }
                     if (taskId > 2) {
@@ -681,7 +681,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     }
     if ASCEND_IS_AIC {
         if constexpr (IS_SPLIT_G) {
-            for (int64_t loopCnt = 0; loopCnt < maxS2LoopCnt; loopCnt++) {
+            for (int64_t loopCnt = 0; loopCnt < mqsmlaMaxS2LoopCnt; loopCnt++) {
                 CrossCoreSetFlag<0, PIPE_MTE2>(15);
                 CrossCoreWaitFlag<0, PIPE_MTE2>(15);
             }
@@ -786,9 +786,9 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     // GS1合轴, 不切G, 只切S1
     runParam.s1oIdx = gS1Index * runParam.qSNumInOneBlock;
     if constexpr (IS_SPLIT_G) {
-        int64_t halfG = (constInfo.gSize + 1) / 2; // ceil(gSize/2), 第一个AIC多处理一行
-        runParam.goIdx = (aicIdx % 2 == 0) ? 0 : halfG;
-        runParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG);
+        int64_t mqsmlaHalfG = (constInfo.gSize + 1) / 2; // ceil(gSize/2), 第一个AIC多处理一行
+        runParam.goIdx = (aicIdx % 2 == 0) ? 0 : mqsmlaHalfG;
+        runParam.gSplitSize = (aicIdx % 2 == 0) ? mqsmlaHalfG : (constInfo.gSize - mqsmlaHalfG);
     } else {
         runParam.goIdx = 0;
         runParam.gSplitSize = constInfo.gSize;
@@ -882,11 +882,11 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     // ------------------------S2 Base Related----------------------------
     runInfo.s2RealSize = constInfo.s2BaseSize;
     runInfo.s2AlignedSize = runInfo.s2RealSize;
-    int64_t curS2LoopCnt = (runInfo.s2LoopCount >= runParam.oriKvLoopEndIdx) ?
-                               (runInfo.s2LoopCount - runParam.oriKvLoopEndIdx) :
-                               runInfo.s2LoopCount;
-    if (runInfo.s2StartIdx + (curS2LoopCnt + 1) * runInfo.s2RealSize > runInfo.s2EndIdx) {
-        runInfo.s2RealSize = runInfo.s2EndIdx - curS2LoopCnt * runInfo.s2RealSize - runInfo.s2StartIdx;
+    int64_t mqsmlaCurS2LoopCnt = (runInfo.s2LoopCount >= runParam.oriKvLoopEndIdx) ?
+                                     (runInfo.s2LoopCount - runParam.oriKvLoopEndIdx) :
+                                     runInfo.s2LoopCount;
+    if (runInfo.s2StartIdx + (mqsmlaCurS2LoopCnt + 1) * runInfo.s2RealSize > runInfo.s2EndIdx) {
+        runInfo.s2RealSize = runInfo.s2EndIdx - mqsmlaCurS2LoopCnt * runInfo.s2RealSize - runInfo.s2StartIdx;
         runInfo.s2AlignedSize = Align(runInfo.s2RealSize);
     }
 }
