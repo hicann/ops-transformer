@@ -38,20 +38,23 @@ static int64_t ComputeTileLength(int64_t K, int64_t ubSize)
     // UB 划分为 7 块连续 buffer:
     // ub_target_score_in: tileLen * K * dtypeSize
     // ub_index_probs_in:  tileLen * K * dtypeSize
-    // ub_reduce_sum:      tileLen * 8 * dtypeSize  (8 元素对齐)
+    // ub_reduce_sum:      ceil(tileLen, 8) * 8 * dtypeSize  (Brcb 广播展开区，单次固定写 64 个 float)
     // ub_log_P:           tileLen * K * dtypeSize
     // ub_log_Y:           tileLen * K * dtypeSize
     // ub_out:             8 * dtypeSize
     // tmp_ub:             tileLen * K * dtypeSize
-    // 总元素数 = tileLen * (5K + 8) + 8
+    // 总元素数 <= tileLen * (5K + 8) + 72（tileLen >= 8 时取等号之外的保守上界）
     // 总内存占用 <= ubSize
     int64_t totalElems = ubSize / sizeof(float);
-    int64_t maxTileLen = (totalElems - 8) / (5 * K + 8);
+    int64_t maxTileLen = (totalElems - 72) / (5 * K + 8);
     return maxTileLen;
 }
 
 // 先定义一个向上取整函数
-int Ceil(int a, int b) { return (a + b - 1) / b; }
+int Ceil(int a, int b)
+{
+    return (a + b - 1) / b;
+}
 
 ge::graphStatus GetWorkspaceSize(gert::TilingContext *context, bool deterministic, bool isHalf, int64_t coreNum)
 {

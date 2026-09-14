@@ -33,7 +33,7 @@ public:
     __aicore__ inline LightningIndexerKLLoss(){};
     __aicore__ inline void Init(GM_ADDR targetScore, GM_ADDR indexProbs, GM_ADDR loss, GM_ADDR workspace,
                                 const LightningIndexerKLLossTilingData *tilingData, TPipe *pipe);
-    __aicore__ inline void InitWorkspaceDet(GM_ADDR workspace);
+    __aicore__ inline void ZeroAccZone();
     __aicore__ inline void InitHalfBufs();
     __aicore__ inline void Process();
     __aicore__ inline void WriteBackNonDet();
@@ -116,18 +116,19 @@ __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::I
     inputGMTargetScore.SetGlobalBuffer((__gm__ T *)targetScore, totalLength_ * K_);
     inputGMIndexProbs.SetGlobalBuffer((__gm__ T *)indexProbs, totalLength_ * K_);
     outputGMLoss.SetGlobalBuffer((__gm__ T *)loss, 1);
-    if (std::is_same_v<T, float> && !isDeterministic) {
-        if (blockIdx_ == 0) {
-            outputGMLoss.SetValue(0, (T)0);
-            DataCacheCleanAndInvalid<T, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(outputGMLoss);
-        }
-    } else {
-        InitWorkspaceDet(workspace);
+    if constexpr (!(std::is_same_v<T, float> && !isDeterministic)) {
+        perCoreSumWS.SetGlobalBuffer((__gm__ float *)(workspace) + blockIdx_ * FLOAT_BLOCK_SIZE, FLOAT_BLOCK_SIZE);
+        userWorkspace_ = workspace;
     }
 
-    // 分配 UB buffer：7 块连续 LocalTensor，总大小 = tileLen_ * (5 * KAligned_ + 8) + 8
+    // 分配 UB buffer：7 块连续 LocalTensor
+    // ubReduceSum 需容纳 Brcb 广播展开（每次调用固定写 repeat*64 个 float，repeat=ceil(tileLen/8)），
+    // 因此大小为 8 * align_up(tileLen_, 8)：tileLen_ 非 8 倍数时 repeat*64 会超出 8*tileLen_，
+    // 向上取整到 8 的倍数避免写越界踩到后续 ubLogP/ubLogY。
     uint32_t tileElemsAligned = tileLength_ * KAligned_;
-    int64_t totalUbElems = tileLength_ * (5 * KAligned_ + 8) + 8;
+    int64_t reduceSumElems =
+        FLOAT_BLOCK_SIZE * ((tileLength_ + FLOAT_BLOCK_SIZE - 1) / FLOAT_BLOCK_SIZE * FLOAT_BLOCK_SIZE);
+    int64_t totalUbElems = tileLength_ * 5 * KAligned_ + reduceSumElems + FLOAT_BLOCK_SIZE;
 
     pipePtr = pipe;
     pipePtr->InitBuffer(tmpBuf_, totalUbElems * sizeof(float));
@@ -136,8 +137,8 @@ __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::I
     ubOffset += tileElemsAligned * sizeof(float);
     ubIndexProbsIn = tmpBuf_.GetWithOffset<float>(tileElemsAligned, ubOffset);
     ubOffset += tileElemsAligned * sizeof(float);
-    ubReduceSum = tmpBuf_.GetWithOffset<float>(FLOAT_BLOCK_SIZE * tileLength_, ubOffset);
-    ubOffset += FLOAT_BLOCK_SIZE * tileLength_ * sizeof(float);
+    ubReduceSum = tmpBuf_.GetWithOffset<float>(reduceSumElems, ubOffset);
+    ubOffset += reduceSumElems * sizeof(float);
     ubLogP = tmpBuf_.GetWithOffset<float>(tileElemsAligned, ubOffset);
     ubOffset += tileElemsAligned * sizeof(float);
     ubLogY = tmpBuf_.GetWithOffset<float>(tileElemsAligned, ubOffset);
@@ -154,6 +155,7 @@ __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::I
     eventVToMTE2y_ = static_cast<int32_t>(pipePtr->AllocEventID<HardEvent::V_MTE2>());
     eventVToMTE3_ = static_cast<int32_t>(pipePtr->AllocEventID<HardEvent::V_MTE3>());
     eventMTE3ToV_ = static_cast<int32_t>(pipePtr->AllocEventID<HardEvent::MTE3_V>());
+    ZeroAccZone();
 
     copyParams.blockLen = K_ * sizeof(float);
     copyParams.srcStride = 0;
@@ -166,13 +168,30 @@ __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::I
     padParams.paddingValue = 0;
 }
 
-/* ---------- InitWorkspaceDet: 初始化 deterministic workspace ---------- */
+/* ---------- ZeroAccZone: 清零 GM 累加区（确定性 workspace / 非确定性输出） ----------*/
 template <typename T, bool isDeterministic, bool weightType>
-__aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::InitWorkspaceDet(GM_ADDR workspace)
+__aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::ZeroAccZone()
 {
-    perCoreSumWS.SetGlobalBuffer((__gm__ float *)(workspace) + blockIdx_ * FLOAT_BLOCK_SIZE, FLOAT_BLOCK_SIZE);
-    Fill(perCoreSumWS, FLOAT_BLOCK_SIZE, (float)0);
-    userWorkspace_ = workspace;
+    if constexpr (std::is_same_v<T, float> && !isDeterministic) {
+        if (blockIdx_ == 0) {
+            // 输出仅 1 个 float，blockLen 只能写 4B，不可越界
+            Duplicate<float>(ubOut, (float)0, FLOAT_BLOCK_SIZE);
+            SetFlag<HardEvent::V_MTE3>(eventVToMTE3_);
+            WaitFlag<HardEvent::V_MTE3>(eventVToMTE3_);
+            DataCopyPad(outputGMLoss, ubOut, {1, sizeof(float), 0, 0});
+            SetFlag<HardEvent::MTE3_V>(eventMTE3ToV_);
+            WaitFlag<HardEvent::MTE3_V>(eventMTE3ToV_);
+        }
+        SyncAll();
+    } else {
+        Duplicate<float>(ubOut, (float)0, FLOAT_BLOCK_SIZE);
+        SetFlag<HardEvent::V_MTE3>(eventVToMTE3_);
+        WaitFlag<HardEvent::V_MTE3>(eventVToMTE3_);
+        DataCopyPad(perCoreSumWS, ubOut, {1, BLOCK_SIZE, 0, 0});
+        // 等待清零的 MTE3 读 ubOut 完成，再放行后续 Compute 对 ubOut 的写
+        SetFlag<HardEvent::MTE3_V>(eventMTE3ToV_);
+        WaitFlag<HardEvent::MTE3_V>(eventMTE3ToV_);
+    }
 }
 
 /* ---------- InitHalfBufs: half/bf16 版本 ubHalf 指向 float buffer 后半段 ---------- */
