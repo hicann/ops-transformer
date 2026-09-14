@@ -137,42 +137,42 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo 
         TEMPLATE_MODE != SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if constexpr (TEMPLATE_MODE == SMLATemplateMode::HCA_TEMPLATE_MODE ||
                       TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE) {
-            int64_t skipThreshold = 0;
+            int64_t smlaSkipThreshold = 0;
             if (runParam.nextTokensPerBatchOri < 0 && runParam.nextTokensPerBatchCmp < 0) {
-                skipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
+                smlaSkipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
             }
-            if (skipThreshold > 0) {
-                int64_t gs1LoopStartIdx = skipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
-                if (gs1LoopStartIdx > gS1StartIdx) {
-                    runParam.gs1LoopStartIdx = gs1LoopStartIdx;
+            if (smlaSkipThreshold > 0) {
+                int64_t smlaGs1LoopStartIdx = smlaSkipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
+                if (smlaGs1LoopStartIdx > gS1StartIdx) {
+                    runParam.gs1LoopStartIdx = smlaGs1LoopStartIdx;
                 }
             }
         } else {
             if (runParam.nextTokensPerBatchOri < 0) {
-                int64_t gs1LoopStartIdx =
+                int64_t smlaGs1LoopStartIdx =
                     runParam.nextTokensPerBatchOri * (-1) / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
-                if (gs1LoopStartIdx > gS1StartIdx) {
-                    runParam.gs1LoopStartIdx = gs1LoopStartIdx;
+                if (smlaGs1LoopStartIdx > gS1StartIdx) {
+                    runParam.gs1LoopStartIdx = smlaGs1LoopStartIdx;
                 }
             }
         }
     }
 
-    int32_t gs1LoopEndIdx = 0;
+    int32_t smlaGs1LoopEndIdx = 0;
     if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE ||
                   TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                   TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        gs1LoopEndIdx = runParam.actualS1Size;
+        smlaGs1LoopEndIdx = runParam.actualS1Size;
     } else { // SWA/HCA
         // 不需要取topk, 每次计算gSize行, 循环qs次
-        gs1LoopEndIdx = (runParam.actualS1Size + runParam.qSNumInOneBlock - 1) / runParam.qSNumInOneBlock;
+        smlaGs1LoopEndIdx = (runParam.actualS1Size + runParam.qSNumInOneBlock - 1) / runParam.qSNumInOneBlock;
     }
     // 不是最后一个bn, 赋值souterBlockNum
     if (!lastBN) {
-        runParam.gs1LoopEndIdx = gs1LoopEndIdx;
+        runParam.gs1LoopEndIdx = smlaGs1LoopEndIdx;
     } else { // 最后一个bn, 从数组下一个元素取值
-        uint32_t actualNextGs1Idx = s2EndIdx == 0 ? nextGs1Idx : nextGs1Idx + 1;
-        runParam.gs1LoopEndIdx = (nextGs1Idx == 0 && s2EndIdx == 0) ? gs1LoopEndIdx : actualNextGs1Idx;
+        uint32_t smlaActualNextGs1Idx = s2EndIdx == 0 ? nextGs1Idx : nextGs1Idx + 1;
+        runParam.gs1LoopEndIdx = (nextGs1Idx == 0 && s2EndIdx == 0) ? smlaGs1LoopEndIdx : smlaActualNextGs1Idx;
     }
 
     if (runParam.gs1LoopStartIdx > runParam.gs1LoopEndIdx) {
@@ -183,19 +183,19 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo 
 TEMPLATE_INTF
 __aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx)
 {
-    int64_t cubeSOuterOffset = sOuterLoopIdx * runParam.qSNumInOneBlock;
+    int64_t smlaCubeSOuterOffset = sOuterLoopIdx * runParam.qSNumInOneBlock;
     if (runParam.actualS1Size == 0) {
         runParam.s1RealSize = 0;
         runParam.mRealSize = 0;
     } else {
-        runParam.s1RealSize = Min(runParam.qSNumInOneBlock, runParam.actualS1Size - cubeSOuterOffset);
+        runParam.s1RealSize = Min(runParam.qSNumInOneBlock, runParam.actualS1Size - smlaCubeSOuterOffset);
         runParam.mRealSize = runParam.s1RealSize * constInfo.gSize;
         if constexpr (IS_SPLIT_G) {
             runParam.mRealSize = runParam.s1RealSize * runParam.gSplitSize;
         }
     }
 
-    runParam.cubeMOuterOffset = cubeSOuterOffset * constInfo.gSize;
+    runParam.cubeMOuterOffset = smlaCubeSOuterOffset * constInfo.gSize;
     runParam.halfMRealSize = (runParam.mRealSize + 1) >> 1;
     runParam.firstHalfMRealSize = runParam.halfMRealSize;
     if (constInfo.subBlockIdx == 1) {
@@ -209,11 +209,11 @@ __aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo
     runParam.firstHalfS1RealSize = runParam.halfS1RealSize;
     if (constInfo.subBlockIdx == 1) {
         runParam.halfS1RealSize = runParam.s1RealSize - runParam.halfS1RealSize;
-        runParam.sOuterOffset = cubeSOuterOffset + runParam.firstHalfMRealSize / constInfo.gSize;
+        runParam.sOuterOffset = smlaCubeSOuterOffset + runParam.firstHalfMRealSize / constInfo.gSize;
     } else {
-        runParam.sOuterOffset = cubeSOuterOffset;
+        runParam.sOuterOffset = smlaCubeSOuterOffset;
     }
-    runParam.cubeSOuterOffset = cubeSOuterOffset;
+    runParam.cubeSOuterOffset = smlaCubeSOuterOffset;
 }
 
 TEMPLATE_INTF
@@ -265,12 +265,12 @@ __aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &co
         TEMPLATE_MODE != SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if constexpr (TEMPLATE_MODE == SMLATemplateMode::HCA_TEMPLATE_MODE ||
                       TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE) {
-            int64_t skipThreshold = 0;
+            int64_t smlaSkipThreshold = 0;
             if (runParam.nextTokensPerBatchOri < 0 && runParam.nextTokensPerBatchCmp < 0) {
-                skipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
+                smlaSkipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
             }
-            if (skipThreshold > 0) {
-                if (runParam.s1oIdx < skipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
+            if (smlaSkipThreshold > 0) {
+                if (runParam.s1oIdx < smlaSkipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
                     return true;
                 }
             }
@@ -326,27 +326,27 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
             return true;
         }
     }
-    uint32_t s2BaseSize = constInfo.s2BaseSize;
+    uint32_t smlaS2BaseSize = constInfo.s2BaseSize;
 
     // 计算topk length
     if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
-        uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
-        runParam.oriSparseBlockCount =
-            constInfo.hasOriTopkLength ?
-                Min(oriTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.oriSparseBlockCount) :
-                constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount =
-            constInfo.hasCmpTopkLength ?
-                Min(cmpTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.cmpSparseBlockCount) :
-                constInfo.cmpSparseBlockCount;
-    } else {
-        uint64_t bsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
+        uint64_t smlaActualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
         runParam.oriSparseBlockCount = constInfo.hasOriTopkLength ?
-                                           Min(oriTopkLengthGm.GetValue(bsndTopkIdx), constInfo.oriSparseBlockCount) :
+                                           Min(oriTopkLengthGm.GetValue(smlaActualSeqQPrefixSum + runParam.s1oIdx),
+                                               constInfo.oriSparseBlockCount) :
                                            constInfo.oriSparseBlockCount;
         runParam.cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
-                                           Min(cmpTopkLengthGm.GetValue(bsndTopkIdx), constInfo.cmpSparseBlockCount) :
+                                           Min(cmpTopkLengthGm.GetValue(smlaActualSeqQPrefixSum + runParam.s1oIdx),
+                                               constInfo.cmpSparseBlockCount) :
                                            constInfo.cmpSparseBlockCount;
+    } else {
+        uint64_t smlaBsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
+        runParam.oriSparseBlockCount =
+            constInfo.hasOriTopkLength ? Min(oriTopkLengthGm.GetValue(smlaBsndTopkIdx), constInfo.oriSparseBlockCount) :
+                                         constInfo.oriSparseBlockCount;
+        runParam.cmpSparseBlockCount =
+            constInfo.hasCmpTopkLength ? Min(cmpTopkLengthGm.GetValue(smlaBsndTopkIdx), constInfo.cmpSparseBlockCount) :
+                                         constInfo.cmpSparseBlockCount;
     }
 
     // orikv
@@ -361,7 +361,8 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
         runParam.s2OriLineEndIdx = Min(oriSparseRangeLen, runParam.oriSparseBlockCount);
         runParam.s2OriLineEndIdx = Min(runParam.s2OriLineEndIdx, runParam.actualS2OriSize);
     }
-    runParam.oriKvLoopEndIdx = (runParam.s2OriLineEndIdx - runParam.s2OriLineStartIdx + s2BaseSize - 1) / s2BaseSize;
+    runParam.oriKvLoopEndIdx =
+        (runParam.s2OriLineEndIdx - runParam.s2OriLineStartIdx + smlaS2BaseSize - 1) / smlaS2BaseSize;
 
     // cmpkv
     if constexpr (TEMPLATE_MODE == SMLATemplateMode::SWA_TEMPLATE_MODE ||
@@ -375,7 +376,7 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
             (runParam.cubeSOuterOffset + runParam.s1RealSize + runParam.nextTokensPerBatchCmp) / constInfo.cmpRatio, 0,
             runParam.actualS2CmpSize);
         runParam.s2CmpLineEndIdx = Min(runParam.s2CmpLineEndIdx, runParam.actualS2CmpSize);
-        runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
+        runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + smlaS2BaseSize - 1) / smlaS2BaseSize;
     } else if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE ||
                          TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         runParam.s2CmpLineStartIdx = 0;
@@ -384,7 +385,7 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
             runParam.actualS2CmpSize);
         runParam.s2CmpLineEndIdx = Min(runParam.s2CmpLineEndIdx, runParam.cmpSparseBlockCount);
         runParam.s2CmpLineEndIdx = Min(runParam.s2CmpLineEndIdx, runParam.actualS2CmpSize);
-        runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
+        runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + smlaS2BaseSize - 1) / smlaS2BaseSize;
     }
 
     runParam.s2LoopEndIdx = runParam.oriKvLoopEndIdx + runParam.cmpKvLoopEndIdx;

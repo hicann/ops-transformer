@@ -258,33 +258,33 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetRealCmpS2Idx(int64_t *tokenData, int64_t s2IdxInBase,
                                                                    const RunInfo &runInfo, ConstInfo &constInfo)
 {
-    int64_t sparseBlockCount = 0;
+    int64_t qsmlaSparseBlockCount = 0;
     int64_t curS2LoopCnt = runInfo.s2LoopCount;
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE) {
-        sparseBlockCount = constInfo.cmpSparseBlockCount;
+        qsmlaSparseBlockCount = constInfo.cmpSparseBlockCount;
         curS2LoopCnt -= runInfo.oriKvLoopEndIdx;
     } else if constexpr (TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        sparseBlockCount = constInfo.oriSparseBlockCount;
+        qsmlaSparseBlockCount = constInfo.oriSparseBlockCount;
     } else if constexpr (TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if (runInfo.isCmp) {
-            sparseBlockCount = constInfo.cmpSparseBlockCount;
+            qsmlaSparseBlockCount = constInfo.cmpSparseBlockCount;
             curS2LoopCnt -= runInfo.oriKvLoopEndIdx;
         } else {
-            sparseBlockCount = constInfo.oriSparseBlockCount;
+            qsmlaSparseBlockCount = constInfo.oriSparseBlockCount;
         }
     }
     uint64_t topkBS1Idx = 0;
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
         uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runInfo.boIdx);
-        topkBS1Idx += (actualSeqQPrefixSum + runInfo.s1oIdx) * sparseBlockCount;
+        topkBS1Idx += (actualSeqQPrefixSum + runInfo.s1oIdx) * qsmlaSparseBlockCount;
     } else {
-        topkBS1Idx += runInfo.boIdx * constInfo.s1Size * sparseBlockCount + runInfo.s1oIdx * sparseBlockCount;
+        topkBS1Idx += runInfo.boIdx * constInfo.s1Size * qsmlaSparseBlockCount + runInfo.s1oIdx * qsmlaSparseBlockCount;
     }
 
     uint64_t topkKIdx = s2IdxInBase + curS2LoopCnt * constInfo.s2BaseSize;
     for (uint64_t i = 0; i < 8; ++i) { // 每次处理8个数据块
         uint64_t idx = topkBS1Idx + runInfo.s2StartIdx + topkKIdx + i;
-        if (likely((topkKIdx + i < sparseBlockCount) && (s2IdxInBase + i < processS2End))) {
+        if (likely((topkKIdx + i < qsmlaSparseBlockCount) && (s2IdxInBase + i < processS2End))) {
             tokenData[i] = sparseIndicesGm.GetValue(idx);
         } else {
             break;
@@ -297,30 +297,30 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetRealS2Addr(int64_t *tokenD
                                                                  const RunInfo &runInfo, ConstInfo &constInfo)
 {
     uint32_t sparseBlockCount = runInfo.isCmp ? constInfo.cmpSparseBlockCount : constInfo.oriSparseBlockCount;
-    uint32_t alignedSparseBlockCount =
+    uint32_t qsmlaAlignedSparseBlockCount =
         runInfo.isCmp ? constInfo.alignedCmpSparseBlockCount : constInfo.alignedOriSparseBlockCount;
-    int64_t curS2LoopCnt = runInfo.s2LoopCount;
-    GlobalTensor<int64_t> phyAddrGm64;
+    int64_t qsmlaCurS2LoopCnt = runInfo.s2LoopCount;
+    GlobalTensor<int64_t> qsmlaPhyAddrGm64;
     if (runInfo.isCmp) {
-        curS2LoopCnt -= runInfo.oriKvLoopEndIdx;
-        phyAddrGm64 = cmpKvPhyAddrGm.template ReinterpretCast<int64_t>();
+        qsmlaCurS2LoopCnt -= runInfo.oriKvLoopEndIdx;
+        qsmlaPhyAddrGm64 = cmpKvPhyAddrGm.template ReinterpretCast<int64_t>();
     } else {
-        phyAddrGm64 = oriKvPhyAddrGm.template ReinterpretCast<int64_t>();
+        qsmlaPhyAddrGm64 = oriKvPhyAddrGm.template ReinterpretCast<int64_t>();
     }
 
-    uint64_t topkBS1Idx = 0;
+    uint64_t qsmlaTopkBS1Idx = 0;
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
         uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runInfo.boIdx);
-        topkBS1Idx += (actualSeqQPrefixSum + runInfo.s1oIdx) * alignedSparseBlockCount;
+        qsmlaTopkBS1Idx += (actualSeqQPrefixSum + runInfo.s1oIdx) * qsmlaAlignedSparseBlockCount;
     } else {
-        topkBS1Idx +=
-            runInfo.boIdx * constInfo.s1Size * alignedSparseBlockCount + runInfo.s1oIdx * alignedSparseBlockCount;
+        qsmlaTopkBS1Idx += runInfo.boIdx * constInfo.s1Size * qsmlaAlignedSparseBlockCount +
+                           runInfo.s1oIdx * qsmlaAlignedSparseBlockCount;
     }
-    uint64_t topkKIdx = s2IdxInBase + curS2LoopCnt * constInfo.s2BaseSize;
+    uint64_t topkKIdx = s2IdxInBase + qsmlaCurS2LoopCnt * constInfo.s2BaseSize;
     for (uint64_t i = 0; i < 8; ++i) { // 每次处理8个数据块
-        uint64_t idx = topkBS1Idx + runInfo.s2StartIdx + topkKIdx + i;
+        uint64_t idx = qsmlaTopkBS1Idx + runInfo.s2StartIdx + topkKIdx + i;
         if (likely((topkKIdx + i < sparseBlockCount) && (s2IdxInBase + i < processS2End))) {
-            tokenData[i] = phyAddrGm64.GetValue(idx);
+            tokenData[i] = qsmlaPhyAddrGm64.GetValue(idx);
         } else {
             break;
         }
@@ -334,29 +334,29 @@ __aicore__ inline int64_t CSABlockVec<TEMPLATE_ARGS>::GetkeyOffset(int64_t s2Idx
     if (s2Idx < 0) {
         return -1;
     }
-    int64_t realkeyOffset = 0;
+    int64_t qsmlaRealkeyOffset = 0;
     if constexpr (isPa) {
         int64_t blkTableIdx = s2Idx / blockSize;
         int64_t blkTableOffset = s2Idx % blockSize;
         int64_t paBlockStride = runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride;
-        realkeyOffset = blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + blkTableIdx) * paBlockStride +
-                        blkTableOffset * constInfo.dSizeVInput;
+        qsmlaRealkeyOffset = blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + blkTableIdx) * paBlockStride +
+                             blkTableOffset * constInfo.dSizeVInput;
     } else if constexpr (KV_LAYOUT_T == QSMLA_LAYOUT::TND) {
         int64_t tPrefix =
             runInfo.isCmp ? cuSeqlensCmpKvGm.GetValue(runInfo.boIdx) : cuSeqlensOriKvGm.GetValue(runInfo.boIdx);
-        realkeyOffset =
+        qsmlaRealkeyOffset =
             (tPrefix + s2Idx) * constInfo.n2Size * constInfo.dSizeVInput + runInfo.n2oIdx * constInfo.dSizeVInput;
     } else {
         if (runInfo.isCmp) {
-            realkeyOffset = runInfo.boIdx * constInfo.n2Size * constInfo.cmpS2Size * constInfo.dSizeVInput +
-                            runInfo.n2oIdx * constInfo.cmpS2Size * constInfo.dSizeVInput +
-                            s2Idx * constInfo.dSizeVInput; // BSN(1)D
+            qsmlaRealkeyOffset = runInfo.boIdx * constInfo.n2Size * constInfo.cmpS2Size * constInfo.dSizeVInput +
+                                 runInfo.n2oIdx * constInfo.cmpS2Size * constInfo.dSizeVInput +
+                                 s2Idx * constInfo.dSizeVInput; // BSN(1)D
         } else {
-            realkeyOffset = runInfo.boIdx * constInfo.n2S2Dv + runInfo.n2oIdx * constInfo.s2Dv +
-                            s2Idx * constInfo.dSizeVInput; // BSN(1)D
+            qsmlaRealkeyOffset = runInfo.boIdx * constInfo.n2S2Dv + runInfo.n2oIdx * constInfo.s2Dv +
+                                 s2Idx * constInfo.dSizeVInput; // BSN(1)D
         }
     }
-    return realkeyOffset;
+    return qsmlaRealkeyOffset;
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -392,37 +392,39 @@ __aicore__ inline uint32_t CSABlockVec<TEMPLATE_ARGS>::CopyInKvSparse(LocalTenso
     int64_t s2IdLimit = runInfo.s2RealSize;
     s2IdLimit = (runInfo.s2RealSize - runInfo.actualS1Size + runInfo.s1oIdx + 1) / constInfo.cmpRatio;
     uint32_t dealRow = 0;
-    for (uint32_t i = 0; i < 8; i += 2) {
-        int64_t keyOffset0;
-        int64_t keyOffset1;
+
+    for (uint32_t i = 0; i < 8; i += 2) { // 遍历8个元素的数组/缓冲区，每次处理2个元素
+        int64_t qsmlaKeyOffset0;
+        int64_t qsmlaKeyOffset1;
         if constexpr (IS_VEC_S2PHYADDR) {
-            keyOffset0 = tokenData[i];
-            keyOffset1 = tokenData[i + 1];
+            qsmlaKeyOffset0 = tokenData[i];
+            qsmlaKeyOffset1 = tokenData[i + 1];
         } else {
-            keyOffset0 = GetkeyOffset(tokenData[i], runInfo, constInfo);
-            keyOffset1 = GetkeyOffset(tokenData[i + 1], runInfo, constInfo);
+            qsmlaKeyOffset0 = GetkeyOffset(tokenData[i], runInfo, constInfo);
+            qsmlaKeyOffset1 = GetkeyOffset(tokenData[i + 1], runInfo, constInfo);
         }
-        if (unlikely(keyOffset0 < 0 && keyOffset1 < 0)) {
+        if (unlikely(qsmlaKeyOffset0 < 0 && qsmlaKeyOffset1 < 0)) {
             return dealRow;
         }
         uint32_t combineBytes = constInfo.dSizeVInput;
-        int64_t keySrcStride =
-            (keyOffset0 > keyOffset1 ? (keyOffset0 - keyOffset1) : (keyOffset1 - keyOffset0)) - combineBytes;
+        int64_t keySrcStride = (qsmlaKeyOffset0 > qsmlaKeyOffset1 ? (qsmlaKeyOffset0 - qsmlaKeyOffset1) :
+                                                                    (qsmlaKeyOffset1 - qsmlaKeyOffset0)) -
+                               combineBytes;
         if (unlikely(keySrcStride >= INT32_MAX || keySrcStride < 0) || constInfo.sparseBlockSize > 1) {
             // stride溢出、stride为负数、s2超长等异常场景，还原成2条搬运指令
-            CopyInSingleKv(kvInUb, startRow, keyOffset0);
-            CopyInSingleKv(kvInUb, startRow + 1, keyOffset1);
+            CopyInSingleKv(kvInUb, startRow, qsmlaKeyOffset0);
+            CopyInSingleKv(kvInUb, startRow + 1, qsmlaKeyOffset1);
         } else {
             DataCopyExtParams intriParams;
-            intriParams.blockCount = (keyOffset0 >= 0) + (keyOffset1 >= 0);
+            intriParams.blockCount = (qsmlaKeyOffset0 >= 0) + (qsmlaKeyOffset1 >= 0);
             intriParams.blockLen = combineBytes;
             intriParams.dstStride = 0;
             intriParams.srcStride = keySrcStride;
             DataCopyPadExtParams<KV_T> padParams;
 
-            int64_t keyOffset = keyOffset0 > -1 ? keyOffset0 : keyOffset1;
-            if (keyOffset1 > -1 && keyOffset1 < keyOffset0) {
-                keyOffset = keyOffset1;
+            int64_t keyOffset = qsmlaKeyOffset0 > -1 ? qsmlaKeyOffset0 : qsmlaKeyOffset1;
+            if (qsmlaKeyOffset1 > -1 && qsmlaKeyOffset1 < qsmlaKeyOffset0) {
+                keyOffset = qsmlaKeyOffset1;
             }
 
             // 当前仅支持COMBINE模式
@@ -434,8 +436,8 @@ __aicore__ inline uint32_t CSABlockVec<TEMPLATE_ARGS>::CopyInKvSparse(LocalTenso
             padParams.paddingValue = 0;
             DataCopyPad(kvInUb[startRow * combineDimAlign], keyGm[keyOffset], intriParams, padParams);
         }
-        dealRow += (keyOffset0 >= 0) + (keyOffset1 >= 0);
-        startRow += 2;
+        dealRow += (qsmlaKeyOffset0 >= 0) + (qsmlaKeyOffset1 >= 0);
+        startRow += 2; // 每次迭代处理2个输入元素
     }
     return dealRow;
 }
@@ -574,42 +576,43 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyInKvNotSparse(LocalTensor
     padParams.rightPadding = combineDimAlign - combineDim;
     padParams.paddingValue = 0;
     if constexpr (isPa) {
-        uint64_t blockTableBaseOffset = runInfo.boIdx * maxBlockNumPerBatch;
-        uint64_t dstOffset = 0;
-        uint32_t copyFinishElmenCnt = 0;
-        uint32_t curSequence = s2Idx;
-        int64_t paBlockStride = runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride;
-        while (copyFinishElmenCnt < v0ProcessSize) {
-            uint64_t blockIdOffset = curSequence / blockSize;
-            uint64_t remainElmenCnt = curSequence % blockSize;
-            uint64_t idInBlockTable = blockTableGm.GetValue(blockTableBaseOffset + blockIdOffset);
+        uint64_t qsmlaBlockTableBaseOffset = runInfo.boIdx * maxBlockNumPerBatch;
+        uint64_t qsmlaDstOffset = 0;
+        uint32_t qsmlaCopyFinishElmenCnt = 0;
+        uint32_t qsmlaCurSequence = s2Idx;
+        int64_t qsmlaPaBlockStride = runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride;
+        while (qsmlaCopyFinishElmenCnt < v0ProcessSize) {
+            uint64_t blockIdOffset = qsmlaCurSequence / blockSize;
+            uint64_t remainElmenCnt = qsmlaCurSequence % blockSize;
+            uint64_t idInBlockTable = blockTableGm.GetValue(qsmlaBlockTableBaseOffset + blockIdOffset);
             uint32_t copyElmenCnt = blockSize - remainElmenCnt;
-            if (copyElmenCnt + copyFinishElmenCnt > v0ProcessSize) {
-                copyElmenCnt = v0ProcessSize - copyFinishElmenCnt;
+            if (copyElmenCnt + qsmlaCopyFinishElmenCnt > v0ProcessSize) {
+                copyElmenCnt = v0ProcessSize - qsmlaCopyFinishElmenCnt;
             }
-            uint64_t srcOffset = idInBlockTable * paBlockStride + remainElmenCnt * constInfo.n2Size * combineBytes +
+            uint64_t srcOffset = idInBlockTable * qsmlaPaBlockStride +
+                                 remainElmenCnt * constInfo.n2Size * combineBytes +
                                  (uint64_t)(runInfo.n2oIdx * combineBytes); // BlockNum, BlockSize, N, D
             intriParams.blockCount = copyElmenCnt;                          // base s2 size
-            DataCopyPad(kvMergUb[dstOffset * combineDimAlign], keyGm[srcOffset], intriParams, padParams);
-            dstOffset += copyElmenCnt;
-            copyFinishElmenCnt += copyElmenCnt;
-            curSequence += copyElmenCnt;
+            DataCopyPad(kvMergUb[qsmlaDstOffset * combineDimAlign], keyGm[srcOffset], intriParams, padParams);
+            qsmlaDstOffset += copyElmenCnt;
+            qsmlaCopyFinishElmenCnt += copyElmenCnt;
+            qsmlaCurSequence += copyElmenCnt;
         }
     } else if constexpr (KV_LAYOUT_T == QSMLA_LAYOUT::TND) {
-        int64_t tPrefix =
+        int64_t tPrefixLen =
             runInfo.isCmp ? cuSeqlensCmpKvGm.GetValue(runInfo.boIdx) : cuSeqlensOriKvGm.GetValue(runInfo.boIdx);
-        DataCopyPad(kvMergUb, keyGm[(tPrefix + s2Idx) * constInfo.n2Size * combineDim + runInfo.n2oIdx * combineDim],
+        DataCopyPad(kvMergUb, keyGm[(tPrefixLen + s2Idx) * constInfo.n2Size * combineDim + runInfo.n2oIdx * combineDim],
                     intriParams, padParams);
     } else {
-        int64_t realKeyOffset;
+        int64_t qsmlaRealKeyOffset;
         if (runInfo.isCmp) {
-            realKeyOffset = runInfo.boIdx * constInfo.cmpS2Size * constInfo.n2Size * constInfo.dSizeVInput +
-                            runInfo.n2oIdx * constInfo.dSizeVInput + s2Idx * constInfo.dSizeVInput;
+            qsmlaRealKeyOffset = runInfo.boIdx * constInfo.cmpS2Size * constInfo.n2Size * constInfo.dSizeVInput +
+                                 runInfo.n2oIdx * constInfo.dSizeVInput + s2Idx * constInfo.dSizeVInput;
         } else {
-            realKeyOffset = runInfo.boIdx * constInfo.s2Size * constInfo.n2Size * constInfo.dSizeVInput +
-                            runInfo.n2oIdx * constInfo.dSizeVInput + s2Idx * constInfo.dSizeVInput;
+            qsmlaRealKeyOffset = runInfo.boIdx * constInfo.s2Size * constInfo.n2Size * constInfo.dSizeVInput +
+                                 runInfo.n2oIdx * constInfo.dSizeVInput + s2Idx * constInfo.dSizeVInput;
         }
-        DataCopyPad(kvMergUb, keyGm[realKeyOffset], intriParams, padParams);
+        DataCopyPad(kvMergUb, keyGm[qsmlaRealKeyOffset], intriParams, padParams);
     }
 }
 
@@ -624,34 +627,39 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CalProcessSize(const RunInfo 
         sparseIndicesGm = cmpSparseIndicesGm;
     }
     if constexpr (IS_SPLIT_G) {
-        uint32_t aicIdx = constInfo.aivIdx >> 1U;
-        uint32_t v0S2SizeFirstCore = CeilDiv(runInfo.s2RealSize, 2);
-        uint32_t v0S2SizeSecondCore = runInfo.s2RealSize - v0S2SizeFirstCore;
-        int32_t vecCnt = (aicIdx % 2U == 0) ? (GetSubBlockIdx() == 0 ? 0 : 1) : (GetSubBlockIdx() == 0 ? 2 : 3);
-        if (aicIdx % 2U == 0) {
+        uint32_t qsmlaAicIdx = constInfo.aivIdx >> 1U;
+        uint32_t qsmlaV0S2SizeFirstCore = CeilDiv(runInfo.s2RealSize, 2);
+        uint32_t qsmlaV0S2SizeSecondCore = runInfo.s2RealSize - qsmlaV0S2SizeFirstCore;
+        int32_t vecCnt = (qsmlaAicIdx % 2U == 0) ?
+                             (GetSubBlockIdx() == 0 ? 0 : 1) :
+                             (GetSubBlockIdx() == 0 ? 2 : 3); // 2，3：根据核心索引和子块索引设置处理参数
+        if (qsmlaAicIdx % 2U == 0) {
             if (GetSubBlockIdx() == 0) {
-                processSize = CeilDiv(v0S2SizeFirstCore, 2);
+                processSize = CeilDiv(qsmlaV0S2SizeFirstCore, 2); // 2：处理大小为v0S2SizeFirstCore的一半
                 processS2Start = 0;
             } else {
-                processSize = v0S2SizeFirstCore - CeilDiv(v0S2SizeFirstCore, 2);
-                processS2Start = CeilDiv(v0S2SizeFirstCore, 2);
+                processSize = qsmlaV0S2SizeFirstCore - CeilDiv(qsmlaV0S2SizeFirstCore, 2); // 2：处理剩余部分
+                processS2Start = CeilDiv(qsmlaV0S2SizeFirstCore, 2); // 2：起始位置为v0S2SizeFirstCore的一半
             }
         } else {
             if (GetSubBlockIdx() == 0) {
-                processSize = CeilDiv(v0S2SizeSecondCore, 2);
-                processS2Start = v0S2SizeFirstCore;
+                processSize = CeilDiv(qsmlaV0S2SizeSecondCore, 2); // 2：处理大小为v0S2SizeSecondCore的一半
+                processS2Start = qsmlaV0S2SizeFirstCore;
             } else {
-                processSize = v0S2SizeSecondCore - CeilDiv(v0S2SizeSecondCore, 2);
-                processS2Start = v0S2SizeFirstCore + CeilDiv(v0S2SizeSecondCore, 2);
+                processSize = qsmlaV0S2SizeSecondCore - CeilDiv(qsmlaV0S2SizeSecondCore, 2); // 2：处理剩余部分
+                processS2Start =
+                    qsmlaV0S2SizeFirstCore +
+                    CeilDiv(qsmlaV0S2SizeSecondCore, 2); // 2：起始位置为v0S2SizeFirstCore加上v0S2SizeSecondCore的一半
             }
         }
         processS2End = processS2Start + processSize;
     } else {
-        int64_t s2PerVecLoop = 2LL;
-        int64_t vecNum = 2LL;
-        int64_t s2Loops = CeilDiv(CeilDiv(runInfo.s2RealSize, vecNum), s2PerVecLoop);
-        processS2Start = GetSubBlockIdx() == 0 ? 0 : Min(s2Loops * s2PerVecLoop, runInfo.s2RealSize);
-        processS2End = GetSubBlockIdx() == 0 ? Min(s2Loops * s2PerVecLoop, runInfo.s2RealSize) : runInfo.s2RealSize;
+        int64_t qsmlaS2PerVecLoop = 2LL;
+        int64_t qsmlaVecNum = 2LL;
+        int64_t qsmlaS2Loops = CeilDiv(CeilDiv(runInfo.s2RealSize, qsmlaVecNum), qsmlaS2PerVecLoop);
+        processS2Start = GetSubBlockIdx() == 0 ? 0 : Min(qsmlaS2Loops * qsmlaS2PerVecLoop, runInfo.s2RealSize);
+        processS2End =
+            GetSubBlockIdx() == 0 ? Min(qsmlaS2Loops * qsmlaS2PerVecLoop, runInfo.s2RealSize) : runInfo.s2RealSize;
         processSize = processS2End - processS2Start;
     }
 }
@@ -661,8 +669,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec0(
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputL1,
     Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm, const RunInfo &runInfo, ConstInfo &constInfo)
 {
-    bool isCmp = runInfo.s2LoopCount >= runInfo.oriKvLoopEndIdx;
-    if (isCmp) {
+    bool qsmlaIsCmp = runInfo.s2LoopCount >= runInfo.oriKvLoopEndIdx;
+    if (qsmlaIsCmp) {
         keyGm = cmpKVGm;
         if constexpr (isPa) {
             blockTableGm = cmpBlockTableGm;
@@ -679,7 +687,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec0(
     }
     CalProcessSize(runInfo, constInfo);
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE) {
-        if (isCmp) {
+        if (qsmlaIsCmp) {
             ProcessSparseKv(outputL1, v0ResGm, runInfo, constInfo);
         } else {
             ProcessNotSparseKv(outputL1, v0ResGm, runInfo, constInfo);
@@ -951,7 +959,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyOutAttentionOut(RunInfo &
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitOutputSingleCore(ConstInfo &constInfo)
 {
-    uint32_t coreNum = GetBlockNum();
+    uint32_t qsmlaCoreNum = GetBlockNum();
     uint64_t totalOutputSize = 0;
 
     // n2 = 1, n1 = gn2 = gSize
@@ -961,8 +969,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitOutputSingleCore(ConstInf
         totalOutputSize = constInfo.s1Size * constInfo.gSize * constInfo.dSizeV;
     }
 
-    if (coreNum != 0) {
-        uint64_t singleCoreSize = (totalOutputSize + (CV_RATIO * coreNum) - 1) / (CV_RATIO * coreNum);
+    if (qsmlaCoreNum != 0) {
+        uint64_t singleCoreSize = (totalOutputSize + (CV_RATIO * qsmlaCoreNum) - 1) / (CV_RATIO * qsmlaCoreNum);
         uint64_t tailSize = totalOutputSize - constInfo.aivIdx * singleCoreSize;
         uint64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
         if (singleInitOutputSize > 0) {
@@ -979,8 +987,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitOutputSingleCore(ConstInf
         } else if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
             totalLseSize = constInfo.n2Size * constInfo.s1Size * constInfo.gSize;
         }
-        if (coreNum != 0 && totalLseSize > 0) {
-            uint64_t singleCoreLse = (totalLseSize + (CV_RATIO * coreNum) - 1) / (CV_RATIO * coreNum);
+        if (qsmlaCoreNum != 0 && totalLseSize > 0) {
+            uint64_t singleCoreLse = (totalLseSize + (CV_RATIO * qsmlaCoreNum) - 1) / (CV_RATIO * qsmlaCoreNum);
             uint64_t tailLse = totalLseSize - constInfo.aivIdx * singleCoreLse;
             uint64_t singleInitLse = tailLse < singleCoreLse ? tailLse : singleCoreLse;
             if (constInfo.aivIdx * singleCoreLse < totalLseSize && singleInitLse > 0) {
@@ -1066,26 +1074,26 @@ __aicore__ inline int32_t CSABlockVec<TEMPLATE_ARGS>::CalcCurValidS2(uint32_t bI
                                                                      ConstInfo &constInfo, int32_t sparseBlockCount,
                                                                      const PhyAddrValidInfo &validInfo)
 {
-    bool topkMode = false;
-    bool hasTopk = false;
+    bool qsmlaTopkMode = false;
+    bool qsmlaHasTopk = false;
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if (isOriKv) {
-            topkMode = validInfo.oriTopkMode;
-            hasTopk = constInfo.hasOriTopkLength;
+            qsmlaTopkMode = validInfo.oriTopkMode;
+            qsmlaHasTopk = constInfo.hasOriTopkLength;
         }
     }
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if (!isOriKv) {
-            topkMode = validInfo.cmpTopkMode;
-            hasTopk = constInfo.hasCmpTopkLength;
+            qsmlaTopkMode = validInfo.cmpTopkMode;
+            qsmlaHasTopk = constInfo.hasCmpTopkLength;
         }
     }
-    if (topkMode) {
-        uint64_t topkIdx =
+    if (qsmlaTopkMode) {
+        uint64_t qsmlaTopkIdx =
             (LAYOUT_T == QSMLA_LAYOUT::TND) ? (cuSeqlensQGm.GetValue(bIdx) + s1Idx) : (bIdx * constInfo.s1Size + s1Idx);
-        int32_t topkLen = hasTopk ? topkLengthGm.GetValue(topkIdx) : sparseBlockCount;
+        int32_t topkLen = qsmlaHasTopk ? topkLengthGm.GetValue(qsmlaTopkIdx) : sparseBlockCount;
         return Min(topkLen, sparseBlockCount);
     }
 
@@ -1093,15 +1101,15 @@ __aicore__ inline int32_t CSABlockVec<TEMPLATE_ARGS>::CalcCurValidS2(uint32_t bI
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if (isOriKv) {
             int64_t thr = validInfo.oriS2Act - actualS1Size + 1 + s1Idx;
-            int64_t leftBound = Max(thr - validInfo.oriLeftBias, 0);
-            int64_t rightBound = Min(thr + validInfo.oriRightBias, static_cast<int64_t>(validInfo.oriS2Act));
-            return Min(static_cast<int32_t>(Max(0, rightBound - leftBound)), sparseBlockCount);
+            int64_t left = Max(thr - validInfo.oriLeftBias, 0);
+            int64_t right = Min(thr + validInfo.oriRightBias, static_cast<int64_t>(validInfo.oriS2Act));
+            return Min(static_cast<int32_t>(Max(0, right - left)), sparseBlockCount);
         }
     }
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        int64_t numerator = Max(validInfo.cmpBase + s1Idx, 0);
-        return Min(sparseBlockCount, static_cast<int32_t>(numerator / static_cast<int32_t>(constInfo.cmpRatio)));
+        int64_t validLen = Max(validInfo.cmpBase + s1Idx, 0);
+        return Min(sparseBlockCount, static_cast<int32_t>(validLen / static_cast<int32_t>(constInfo.cmpRatio)));
     }
     return 0;
 }
@@ -1118,7 +1126,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
 {
     static constexpr uint16_t s2NumPerLoop = 128;
     static constexpr uint32_t vecCoreNum = IS_SPLIT_G ? 4 : 2;
-    uint32_t vecCoreIdx = IS_SPLIT_G ? constInfo.aivIdx % 4 : constInfo.aivIdx % 2;
+    uint32_t qsmlaVecCoreIdx = IS_SPLIT_G ? constInfo.aivIdx % 4 : constInfo.aivIdx % 2;
 
     int32_t blkSize = static_cast<int32_t>(blockSize);
     int16_t shiftRightNum = 0;
@@ -1138,22 +1146,22 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
     LocalTensor<uint32_t> kvPhyAddrUb = kvPhyAddrBuf.template Get<uint32_t>();
 
     // 第一遍: 统计totalValidS1
-    int64_t totalValidS1 = 0;
-    uint32_t tmpGS1Start = gS1StartIdx;
+    int64_t qsmlaTotalValidS1 = 0;
+    uint32_t qsmlaTmpGS1Start = gS1StartIdx;
     for (uint32_t bIdx = bN2StartIdx; bIdx < bN2EndIdx; ++bIdx) {
-        bool lastBN = (bIdx == bN2EndIdx - 1);
-        int32_t actualS1Size =
+        bool qsmlaLastBN = (bIdx == bN2EndIdx - 1);
+        int32_t qsmlaActualS1Size =
             GetSeqLen(bIdx, hasActualSeqQlen, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
-        int32_t s1End = actualS1Size;
-        if (lastBN && nextGs1Idx != 0) {
-            s1End = nextGs1Idx;
+        int32_t qsmlaS1End = qsmlaActualS1Size;
+        if (qsmlaLastBN && nextGs1Idx != 0) {
+            qsmlaS1End = nextGs1Idx;
         }
 
-        int64_t bS1IdxBase = 0;
+        int64_t qsmlaBS1IdxBase = 0;
         if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
-            bS1IdxBase = hasCuSeqlensQ ? cuSeqlensQGm.GetValue(bIdx) : constInfo.s1Size * bIdx;
+            qsmlaBS1IdxBase = hasCuSeqlensQ ? cuSeqlensQGm.GetValue(bIdx) : constInfo.s1Size * bIdx;
         } else {
-            bS1IdxBase = constInfo.s1Size * bIdx;
+            qsmlaBS1IdxBase = constInfo.s1Size * bIdx;
         }
 
         int32_t restoredSize = 0;
@@ -1174,40 +1182,41 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             }
         }
         PhyAddrValidInfo validInfo =
-            CalcPhyAddrValidInfo(isOriKv, actualS1Size, actualOriS2Size, restoredSize, constInfo);
+            CalcPhyAddrValidInfo(isOriKv, qsmlaActualS1Size, actualOriS2Size, restoredSize, constInfo);
 
-        for (int32_t s1Idx = tmpGS1Start; s1Idx < s1End; ++s1Idx) {
-            int32_t curValidS2 = CalcCurValidS2(bIdx, s1Idx, actualS1Size, isOriKv, cuSeqlensQGm, topkLengthGm,
-                                                constInfo, static_cast<int32_t>(sparseBlockCount), validInfo);
-            if (curValidS2 > 0) {
-                totalValidS1++;
+        for (int32_t s1Idx = qsmlaTmpGS1Start; s1Idx < qsmlaS1End; ++s1Idx) {
+            int32_t qsmlaCurValidS2 =
+                CalcCurValidS2(bIdx, s1Idx, qsmlaActualS1Size, isOriKv, cuSeqlensQGm, topkLengthGm, constInfo,
+                               static_cast<int32_t>(sparseBlockCount), validInfo);
+            if (qsmlaCurValidS2 > 0) {
+                qsmlaTotalValidS1++;
             }
         }
-        tmpGS1Start = 0;
+        qsmlaTmpGS1Start = 0;
     }
 
-    int64_t s1PerVecCore = totalValidS1 / vecCoreNum;
-    int64_t s1Tail = totalValidS1 % vecCoreNum;
-    int64_t curStart = s1PerVecCore * vecCoreIdx + Min((int64_t)vecCoreIdx, s1Tail);
-    int64_t curCount = s1PerVecCore + (vecCoreIdx < (uint32_t)s1Tail ? 1 : 0);
+    int64_t qsmlaS1PerVecCore = qsmlaTotalValidS1 / vecCoreNum;
+    int64_t qsmlaS1Tail = qsmlaTotalValidS1 % vecCoreNum;
+    int64_t qsmlaCurStart = qsmlaS1PerVecCore * qsmlaVecCoreIdx + Min((int64_t)qsmlaVecCoreIdx, qsmlaS1Tail);
+    int64_t qsmlaCurCount = qsmlaS1PerVecCore + (qsmlaVecCoreIdx < (uint32_t)qsmlaS1Tail ? 1 : 0);
 
-    if (curCount == 0) {
+    if (qsmlaCurCount == 0) {
         return;
     }
 
     // 第二遍: 实际计算
-    int64_t validCounter = 0;
-    int64_t processedCount = 0;
-    tmpGS1Start = gS1StartIdx;
-    bool done = false;
+    int64_t qsmlaValidCounter = 0;
+    int64_t qsmlaProcessedCount = 0;
+    qsmlaTmpGS1Start = gS1StartIdx;
+    bool qsmlaDone = false;
 
     SetFlag<AscendC::HardEvent::V_MTE2>(3);
     SetFlag<AscendC::HardEvent::V_MTE2>(4);
     SetFlag<AscendC::HardEvent::MTE3_V>(7);
 
-    for (uint32_t bIdx = bN2StartIdx; bIdx < bN2EndIdx && !done; ++bIdx) {
-        bool lastBN = (bIdx == bN2EndIdx - 1);
-        int32_t actualS1Size =
+    for (uint32_t bIdx = bN2StartIdx; bIdx < bN2EndIdx && !qsmlaDone; ++bIdx) {
+        bool qsmlaLastBN = (bIdx == bN2EndIdx - 1);
+        int32_t qsmlaActualS1Size =
             GetSeqLen(bIdx, hasActualSeqQlen, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
         int64_t bS1Idx = 0;
         if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
@@ -1216,9 +1225,9 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             bS1Idx = constInfo.s1Size * bIdx;
         }
 
-        int32_t s1End = actualS1Size;
-        if (lastBN && nextGs1Idx != 0) {
-            s1End = nextGs1Idx;
+        int32_t qsmlaS1End = qsmlaActualS1Size;
+        if (qsmlaLastBN && nextGs1Idx != 0) {
+            qsmlaS1End = nextGs1Idx;
         }
 
         int32_t restoredSize = 0;
@@ -1239,53 +1248,54 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
             }
         }
         PhyAddrValidInfo validInfo =
-            CalcPhyAddrValidInfo(isOriKv, actualS1Size, actualOriS2Size, restoredSize, constInfo);
+            CalcPhyAddrValidInfo(isOriKv, qsmlaActualS1Size, actualOriS2Size, restoredSize, constInfo);
 
         WaitFlag<AscendC::HardEvent::V_MTE2>(3);
         AttentionCommon::CopyPaTableToUb(blkTableUb, bIdx, blockTableGm, maxBlockNumPerBatch);
         SetFlag<AscendC::HardEvent::MTE2_V>(8);
         WaitFlag<AscendC::HardEvent::MTE2_V>(8);
 
-        for (int32_t s1Idx = tmpGS1Start; s1Idx < s1End; ++s1Idx) {
-            int32_t curValidS2 = CalcCurValidS2(bIdx, s1Idx, actualS1Size, isOriKv, cuSeqlensQGm, topkLengthGm,
-                                                constInfo, static_cast<int32_t>(sparseBlockCount), validInfo);
-            if (curValidS2 <= 0) {
+        for (int32_t s1Idx = qsmlaTmpGS1Start; s1Idx < qsmlaS1End; ++s1Idx) {
+            int32_t qsmlaCurValidS2 =
+                CalcCurValidS2(bIdx, s1Idx, qsmlaActualS1Size, isOriKv, cuSeqlensQGm, topkLengthGm, constInfo,
+                               static_cast<int32_t>(sparseBlockCount), validInfo);
+            if (qsmlaCurValidS2 <= 0) {
                 continue;
             }
 
-            if (validCounter < curStart || validCounter >= curStart + curCount) {
-                validCounter++;
+            if (qsmlaValidCounter < qsmlaCurStart || qsmlaValidCounter >= qsmlaCurStart + qsmlaCurCount) {
+                qsmlaValidCounter++;
                 continue;
             }
-            validCounter++;
+            qsmlaValidCounter++;
 
-            uint16_t s2Loop = (curValidS2 + s2NumPerLoop - 1) / s2NumPerLoop;
-            int32_t s2Tail = curValidS2 - (s2Loop - 1) * s2NumPerLoop;
-            WaitFlag<AscendC::HardEvent::V_MTE2>(4);
-            AttentionCommon::CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, curValidS2, sparseIndicesGm,
+            uint16_t qsmlaS2Loop = (qsmlaCurValidS2 + s2NumPerLoop - 1) / s2NumPerLoop;
+            int32_t qsmlaS2Tail = qsmlaCurValidS2 - (qsmlaS2Loop - 1) * s2NumPerLoop;
+            WaitFlag<AscendC::HardEvent::V_MTE2>(4); // 4: 同步标志位值
+            AttentionCommon::CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, qsmlaCurValidS2, sparseIndicesGm,
                                                sparseBlockCount);
             SetFlag<AscendC::HardEvent::MTE2_V>(6);
 
-            WaitFlag<AscendC::HardEvent::MTE2_V>(6);
-            WaitFlag<AscendC::HardEvent::MTE3_V>(7);
-            AttentionCommon::GetKVPhyAddrVFPa<uint32_t>(kvPhyAddrUb, sparseIdxUb, blkTableUb, s2Loop, s2Tail, blockSize,
-                                                        shiftRightNum, constInfo.sparseBlockSize, dVTemplateTypeInput,
-                                                        kvStride);
-            SetFlag<AscendC::HardEvent::V_MTE2>(4);
-            SetFlag<AscendC::HardEvent::V_MTE3>(5);
-            WaitFlag<AscendC::HardEvent::V_MTE3>(5);
-            AttentionCommon::CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, curValidS2, s2NumPerLoop, phyAddrGm,
+            WaitFlag<AscendC::HardEvent::MTE2_V>(6); // 6: 同步标志位值
+            WaitFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
+            AttentionCommon::GetKVPhyAddrVFPa<uint32_t>(kvPhyAddrUb, sparseIdxUb, blkTableUb, qsmlaS2Loop, qsmlaS2Tail,
+                                                        blockSize, shiftRightNum, constInfo.sparseBlockSize,
+                                                        dVTemplateTypeInput, kvStride);
+            SetFlag<AscendC::HardEvent::V_MTE2>(4);  // 4: 同步标志位值
+            SetFlag<AscendC::HardEvent::V_MTE3>(5);  // 5: 同步标志位值
+            WaitFlag<AscendC::HardEvent::V_MTE3>(5); // 5: 同步标志位值
+            AttentionCommon::CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, qsmlaCurValidS2, s2NumPerLoop, phyAddrGm,
                                              alignedSparseBlockCount);
             SetFlag<AscendC::HardEvent::MTE3_V>(7);
 
-            processedCount++;
-            if (processedCount >= curCount) {
-                done = true;
+            qsmlaProcessedCount++;
+            if (qsmlaProcessedCount >= qsmlaCurCount) {
+                qsmlaDone = true;
                 break;
             }
         }
         SetFlag<AscendC::HardEvent::V_MTE2>(3);
-        tmpGS1Start = 0;
+        qsmlaTmpGS1Start = 0;
     }
 
     WaitFlag<AscendC::HardEvent::V_MTE2>(3);
@@ -1310,12 +1320,12 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddr(
     }
 
     // GM分配: ori在前, cmp在后
-    int64_t v0TotalOffset = 0;
-    uint32_t v0ResSize = constInfo.s2BaseSize * constInfo.dSize * sizeof(Q_T);
+    int64_t qsmlaV0TotalOffset = 0;
+    uint32_t qsmlaV0ResSize = constInfo.s2BaseSize * constInfo.dSize * sizeof(Q_T);
     if constexpr (IS_SPLIT_G) {
-        v0TotalOffset = v0ResSize * 3 * (GetBlockNum() >> 1U);
+        qsmlaV0TotalOffset = qsmlaV0ResSize * 3 * (GetBlockNum() >> 1U);
     } else {
-        v0TotalOffset = v0ResSize * 3 * GetBlockNum();
+        qsmlaV0TotalOffset = qsmlaV0ResSize * 3 * GetBlockNum();
     }
 
     uint32_t totalBS1 = (LAYOUT_T == QSMLA_LAYOUT::TND) ? constInfo.s1Size : (constInfo.bSize * constInfo.s1Size);
@@ -1324,14 +1334,14 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddr(
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         oriPhyAddrSize = static_cast<uint64_t>(totalBS1) * constInfo.alignedOriSparseBlockCount * sizeof(int64_t);
-        this->oriKvPhyAddrGm.SetGlobalBuffer((__gm__ uint32_t *)(workspace + v0TotalOffset));
+        this->oriKvPhyAddrGm.SetGlobalBuffer((__gm__ uint32_t *)(workspace + qsmlaV0TotalOffset));
     }
 
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         uint64_t cmpPhyAddrSize =
             static_cast<uint64_t>(totalBS1) * constInfo.alignedCmpSparseBlockCount * sizeof(int64_t);
-        this->cmpKvPhyAddrGm.SetGlobalBuffer((__gm__ uint32_t *)(workspace + v0TotalOffset + oriPhyAddrSize));
+        this->cmpKvPhyAddrGm.SetGlobalBuffer((__gm__ uint32_t *)(workspace + qsmlaV0TotalOffset + oriPhyAddrSize));
     }
 
     // ori部分 (先计算)
@@ -1509,8 +1519,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent(ConstInfo &constInf
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetExtremeValue(T &negativeScalar)
 {
-    uint32_t tmp1 = NEGATIVE_MIN_VALUE_FP32;
-    negativeScalar = *((float *)&tmp1);
+    uint32_t qsmlaTmp1 = NEGATIVE_MIN_VALUE_FP32;
+    negativeScalar = *((float *)&qsmlaTmp1);
 }
 
 TEMPLATES_DEF

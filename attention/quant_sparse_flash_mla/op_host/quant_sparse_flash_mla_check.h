@@ -221,29 +221,29 @@ public:
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
-    void GetInputParaInfo();
     void GetOutputParaInfo();
+    void GetInputParaInfo();
     ge::graphStatus GetAttrParaInfo();
 
     ge::graphStatus GetOpParaInfo();
 
+    void SetQSMLAShape();
     ge::graphStatus GetInOutDataType();
     ge::graphStatus GetQueryAndOutLayout();
     ge::graphStatus GetKvLayout();
-    void SetQSMLAShape();
+    ge::graphStatus GetBatchSize();
     ge::graphStatus GetN1Size();
     ge::graphStatus GetN2Size();
     ge::graphStatus GetGSize();
-    ge::graphStatus GetBatchSize();
     ge::graphStatus GetQTSize();
     ge::graphStatus GetS1Size();
-    ge::graphStatus GetS2SizeForPageAttention();
     ge::graphStatus GetS2Size();
+    ge::graphStatus GetS2SizeForPageAttention();
     ge::graphStatus GetMaxBlockNumPerBatch();
     ge::graphStatus GetBlockSize();
-    ge::graphStatus GetQkHeadDim();
     ge::graphStatus GetSparseBlockCount();
     ge::graphStatus GetActualseqInfo();
+    ge::graphStatus GetQkHeadDim();
     ge::graphStatus GetDSizeQ();
     ge::graphStatus GetDSizeKV();
     ge::graphStatus GetKvstride();
