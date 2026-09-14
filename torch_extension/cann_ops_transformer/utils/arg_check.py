@@ -18,6 +18,7 @@ Policy: only reject clear type mismatches; uncertain cases are left to pybind
 
 from __future__ import annotations
 
+import collections.abc
 import functools
 import inspect
 import numbers
@@ -155,46 +156,66 @@ def _raise_type_error(name: str, expected: str, value) -> None:
     raise ArgTypeError(name, expected, value)
 
 
-def require_int(name: str, value, *, allow_bool: bool = False) -> int:
+def _is_numpy_bool(value) -> bool:
+    """True for numpy.bool_ / bool8 without importing numpy."""
+    cls = type(value)
+    return cls.__module__.startswith("numpy") and cls.__name__ in ("bool_", "bool8")
+
+
+def _is_list_like(value) -> bool:
+    """True for list/tuple and sequence-like values; False for clear non-lists.
+
+    Prefer false pass: custom sequences and array-likes are accepted so pybind
+    remains the authority for ambiguous containers. Tensor / str / mapping are
+    clear mismatches for list[...] parameters.
+    """
+    if isinstance(value, (list, tuple)):
+        return True
+    if isinstance(value, (str, bytes, bytearray, memoryview, dict, torch.Tensor)):
+        return False
+    if isinstance(value, collections.abc.Mapping):
+        return False
+    if isinstance(value, collections.abc.Sequence):
+        return True
+    # np.ndarray is not a collections Sequence; sized+iterable is ambiguous.
+    return hasattr(value, "__iter__") and hasattr(value, "__len__")
+
+
+def require_int(name: str, value) -> int:
     """Accept int-like values; do not reject ambiguous cases (e.g. bool, numpy)."""
-    if allow_bool and isinstance(value, bool):
-        return int(value)
     # Includes bool (int subclass); ambiguous cases are left to the callee.
     if isinstance(value, int):
         return value
     if isinstance(value, numbers.Integral):
         return value  # type: ignore[return-value]
+    # numpy.bool_ is not Integral; pybind often accepts it — do not reject.
+    if _is_numpy_bool(value):
+        return value  # type: ignore[return-value]
     _raise_type_error(name, "int", value)
 
 
-def require_optional_int(
-    name: str, value, *, allow_bool: bool = False
-) -> Optional[int]:
+def require_optional_int(name: str, value) -> Optional[int]:
     if value is None:
         return None
-    return require_int(name, value, allow_bool=allow_bool)
+    return require_int(name, value)
 
 
-def require_float(name: str, value, *, allow_int: bool = False) -> float:
+def require_float(name: str, value) -> float:
     """Accept float-like values; do not reject ambiguous cases (e.g. bool, numpy)."""
     if isinstance(value, float):
         return value
-    if allow_int and isinstance(value, int):  # includes bool
-        return float(value)
     if isinstance(value, numbers.Real) and not isinstance(value, (int, bool)):
         return value  # type: ignore[return-value]
-    # bool/int when allow_int=False: ambiguous — do not reject.
-    if isinstance(value, (int, bool)):
-        return value  # type: ignore[return-value]
+    # bool/int (and numpy.bool_): ambiguous — convert rather than reject.
+    if isinstance(value, int) or _is_numpy_bool(value):
+        return float(value)
     _raise_type_error(name, "float", value)
 
 
-def require_optional_float(
-    name: str, value, *, allow_int: bool = False
-) -> Optional[float]:
+def require_optional_float(name: str, value) -> Optional[float]:
     if value is None:
         return None
-    return require_float(name, value, allow_int=allow_int)
+    return require_float(name, value)
 
 
 def require_str(name: str, value) -> str:
@@ -210,9 +231,9 @@ def require_optional_str(name: str, value) -> Optional[str]:
 
 
 def require_bool(name: str, value) -> bool:
-    if not isinstance(value, bool):
-        _raise_type_error(name, "bool", value)
-    return value
+    if isinstance(value, bool) or _is_numpy_bool(value):
+        return value  # type: ignore[return-value]
+    _raise_type_error(name, "bool", value)
 
 
 def require_tensor(name: str, value) -> torch.Tensor:
@@ -228,7 +249,7 @@ def require_optional_tensor(name: str, value) -> Optional[torch.Tensor]:
 
 
 def require_list_tensor(name: str, value) -> List[torch.Tensor]:
-    if not isinstance(value, (list, tuple)):
+    if not _is_list_like(value):
         _raise_type_error(name, "list[Tensor]", value)
     for i, item in enumerate(value):
         if not isinstance(item, torch.Tensor):
@@ -264,38 +285,28 @@ def check_value(name: str, value, annotation) -> None:
     args = get_args(annotation)
 
     if origin is Union:
-        non_none = [a for a in args if a is not type(None)]
-        if type(None) in args:
-            if value is None:
-                return
-            if len(non_none) == 1:
-                check_value(name, value, non_none[0])
-                return
-            last_error = None
-            for alt in non_none:
-                try:
-                    check_value(name, value, alt)
-                    return
-                except TypeError as e:
-                    last_error = e
-            if last_error is not None:
-                raise last_error
-            _raise_type_error(name, _annotation_label(annotation), value)
+        # Optional[T] / Union[..., None]: None is handled here; remaining alts below.
+        alts = (
+            [a for a in args if a is not type(None)]
+            if type(None) in args
+            else list(args)
+        )
+        if type(None) in args and value is None:
             return
-        last_error = None
-        for alt in args:
+        if len(alts) == 1:
+            check_value(name, value, alts[0])
+            return
+        for alt in alts:
             try:
                 check_value(name, value, alt)
                 return
-            except TypeError as e:
-                last_error = e
-        if last_error is not None:
-            raise last_error
+            except TypeError:
+                continue
         _raise_type_error(name, _annotation_label(annotation), value)
         return
 
     if origin in (list, List):
-        if not isinstance(value, (list, tuple)):
+        if not _is_list_like(value):
             _raise_type_error(name, _annotation_label(annotation), value)
         elem_ann = args[0] if args else Any
         for i, item in enumerate(value):
@@ -316,7 +327,7 @@ def check_value(name: str, value, annotation) -> None:
         require_int(name, value)
         return
     if annotation is float:
-        require_float(name, value, allow_int=True)
+        require_float(name, value)
         return
     if annotation is str:
         require_str(name, value)
@@ -528,7 +539,8 @@ class _CheckedOpModule:
             return cache[name]
         module = object.__getattribute__(self, "_module")
         attr = getattr(module, name)
-        if callable(attr):
+        # pybind classes are callable; wrapping them breaks inheritance / type(x) is.
+        if callable(attr) and not isinstance(attr, type):
             attr = _wrap_op_callable(attr, name)
         cache[name] = attr
         return attr
