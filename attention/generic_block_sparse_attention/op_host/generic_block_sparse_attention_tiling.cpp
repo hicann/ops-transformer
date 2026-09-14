@@ -328,6 +328,12 @@ static ge::graphStatus ValidatePagedBbndDim0OnlyNonContig(gert::TilingContext *c
 
     uint64_t expectedStride = 1;
     for (size_t i = shape.GetDimNum() - 1; i >= 1; --i) {
+        const int64_t dimSize = shape.GetDim(i);
+        // size<=1 axes are not used in addressing; PyTorch often leaves non-canonical strides
+        // (e.g. Nkv=1). Skip so dim0-strided KV is not falsely rejected.
+        if (dimSize <= 1) {
+            continue;
+        }
         const uint64_t actualStride = static_cast<uint64_t>(stride->GetStride(i));
         if (actualStride != expectedStride) {
             OP_LOGE(context->GetNodeName(),
@@ -337,10 +343,7 @@ static ge::graphStatus ValidatePagedBbndDim0OnlyNonContig(gert::TilingContext *c
                     static_cast<unsigned long long>(expectedStride));
             return ge::GRAPH_FAILED;
         }
-        expectedStride *= static_cast<uint64_t>(shape.GetDim(i));
-        if (i == 1) {
-            break;
-        }
+        expectedStride *= static_cast<uint64_t>(dimSize);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -567,10 +570,7 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext *context)
         uint64_t identityIdxSize = static_cast<uint64_t>(topK_) * sizeof(int32_t);
         pipelineWorkspaceSize = mm1OutSize_ + smOnlineOutSize_ + mm2OutSize_ + updateSize_ + identityIdxSize;
     } else {
-        uint32_t dtypeSize = (dataType_ == ge::DT_FLOAT8_E4M3FN) ? 1 : 2;
-        uint64_t perTaskWorkspace = static_cast<uint64_t>(topK_) * blockShapeY_ * embeddingSize_ * dtypeSize * 2;
-        uint64_t identityIdxSize = static_cast<uint64_t>(topK_) * sizeof(int32_t);
-        pipelineWorkspaceSize = identityIdxSize + static_cast<uint64_t>(blockDim_) * perTaskWorkspace;
+        pipelineWorkspaceSize = static_cast<uint64_t>(topK_) * sizeof(int32_t);
     }
 
     uint64_t userWorkspaceSize = pipelineWorkspaceSize;
