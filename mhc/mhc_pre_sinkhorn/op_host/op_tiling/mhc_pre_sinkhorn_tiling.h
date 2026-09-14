@@ -167,6 +167,10 @@ TILING_DATA_FIELD_DEF(int64_t, rowInnerFactor);
 TILING_DATA_FIELD_DEF(int64_t, bufferPool0Size);
 TILING_DATA_FIELD_DEF(int64_t, bufferPool1Size);
 TILING_DATA_FIELD_DEF(int64_t, mUbSize);
+// A5 key 1000 MPMD second-stage layout: pre/post AIVs and Sinkhorn AIVs use
+// separate row factors while sharing the K-reduced workspace.
+TILING_DATA_FIELD_DEF(int64_t, sinkhornCoreNum);
+TILING_DATA_FIELD_DEF(int64_t, sinkhornRowFactor);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_1000, MhcPreSinkhornRegbaseTilingData)

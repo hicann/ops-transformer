@@ -1344,6 +1344,302 @@ __aicore__ inline void CopyOutWithLoopMode(const LocalTensor<T> &outputTensor, c
     ResetLoopModePara(DataCopyMVType::UB_TO_OUT);
 }
 
+// Compact and element-major Sinkhorn vector paths.
+
+template <bool MaxReduce = false>
+__aicore__ inline void VFCompactRowReduce(RegTensor<float> &result, RegTensor<float> &value,
+                                          RegTensor<uint32_t> &index0, RegTensor<uint32_t> &index1,
+                                          RegTensor<uint32_t> &index2, RegTensor<uint32_t> &index3, MaskReg &mask)
+{
+    RegTensor<float> part1;
+    RegTensor<float> part2;
+    RegTensor<float> part3;
+    Gather(result, value, index0);
+    Gather(part1, value, index1);
+    Gather(part2, value, index2);
+    Gather(part3, value, index3);
+    if constexpr (MaxReduce) {
+        Max(result, result, part1, mask);
+        Max(part2, part2, part3, mask);
+        Max(result, result, part2, mask);
+    } else {
+        Add(result, result, part1, mask);
+        Add(part2, part2, part3, mask);
+        Add(result, result, part2, mask);
+    }
+}
+
+__aicore__ inline void VFCompactColumnReduce(RegTensor<float> &result, RegTensor<float> &value,
+                                             RegTensor<uint32_t> &index0, RegTensor<uint32_t> &index1,
+                                             RegTensor<uint32_t> &index2, RegTensor<uint32_t> &index3, MaskReg &mask)
+{
+    RegTensor<float> part;
+    Gather(result, value, index0);
+    Gather(part, value, index1);
+    Add(result, result, part, mask);
+    Gather(part, value, index2);
+    Add(result, result, part, mask);
+    Gather(part, value, index3);
+    Add(result, result, part, mask);
+}
+
+__aicore__ inline void VFProcessCombFragCompact(const LocalTensor<float> &output, const LocalTensor<float> &input,
+                                                const LocalTensor<float> &bias, float scale, float eps, uint16_t iters,
+                                                uint16_t rows, uint16_t hcMix)
+{
+    __ubuf__ float *outputAddr = (__ubuf__ float *)output.GetPhyAddr();
+    __ubuf__ float *inputAddr = (__ubuf__ float *)input.GetPhyAddr();
+    __ubuf__ float *biasAddr = (__ubuf__ float *)bias.GetPhyAddr();
+    uint32_t inputStride = RoundUp<float>(hcMix);
+    constexpr uint32_t MATRIX_ELEMENTS = 16;
+    constexpr uint32_t MATRICES_PER_REG = VL_FP32 / MATRIX_ELEMENTS;
+    constexpr uint32_t PADDED_MATRIX_ELEMENTS = 32;
+    uint16_t loops = CeilDiv(rows, MATRICES_PER_REG);
+    __VEC_SCOPE__
+    {
+        RegTensor<uint32_t> order;
+        RegTensor<uint32_t> bits;
+        RegTensor<uint32_t> element;
+        RegTensor<uint32_t> token;
+        RegTensor<uint32_t> inputIndex;
+        RegTensor<uint32_t> outputIndex;
+        RegTensor<uint32_t> biasIndex;
+        RegTensor<uint32_t> col;
+        RegTensor<uint32_t> row0;
+        RegTensor<uint32_t> row1;
+        RegTensor<uint32_t> row2;
+        RegTensor<uint32_t> row3;
+        RegTensor<uint32_t> col0;
+        RegTensor<uint32_t> col1;
+        RegTensor<uint32_t> col2;
+        RegTensor<uint32_t> col3;
+        MaskReg fullMask = CreateMask<float>();
+        Arange((RegTensor<int32_t> &)order, static_cast<int32_t>(0));
+        Duplicate(bits, static_cast<uint32_t>(15));
+        And(element, order, bits, fullMask);
+        ShiftRights(token, order, static_cast<int16_t>(4), fullMask);
+        Muls(inputIndex, token, inputStride, fullMask);
+        Add(inputIndex, inputIndex, element, fullMask);
+
+        Duplicate(bits, static_cast<uint32_t>(3));
+        And(col, element, bits, fullMask);
+        ShiftRights(biasIndex, element, static_cast<int16_t>(2), fullMask);
+        ShiftLefts(biasIndex, biasIndex, static_cast<int16_t>(3), fullMask);
+        Add(biasIndex, biasIndex, col, fullMask);
+        Muls(outputIndex, token, PADDED_MATRIX_ELEMENTS, fullMask);
+        Add(outputIndex, outputIndex, biasIndex, fullMask);
+
+        Duplicate(bits, static_cast<uint32_t>(60));
+        And(row0, order, bits, fullMask);
+        Adds(row1, row0, static_cast<uint32_t>(1), fullMask);
+        Adds(row2, row0, static_cast<uint32_t>(2), fullMask);
+        Adds(row3, row0, static_cast<uint32_t>(3), fullMask);
+        Duplicate(bits, static_cast<uint32_t>(51));
+        And(col0, order, bits, fullMask);
+        Adds(col1, col0, static_cast<uint32_t>(4), fullMask);
+        Adds(col2, col0, static_cast<uint32_t>(8), fullMask);
+        Adds(col3, col0, static_cast<uint32_t>(12), fullMask);
+
+        RegTensor<float> base;
+        RegTensor<float> mix;
+        RegTensor<float> sum;
+        Gather(base, biasAddr, biasIndex, fullMask);
+        uint32_t remaining = rows * MATRIX_ELEMENTS;
+        for (uint16_t batch = 0; batch < loops; ++batch) {
+            MaskReg mask = UpdateMask<float>(remaining);
+            // Keep each 4x4 matrix compact through softmax and all Sinkhorn iterations.
+            Gather(mix, inputAddr + batch * MATRICES_PER_REG * inputStride, inputIndex, mask);
+            Muls(mix, mix, scale, mask);
+            Add(mix, mix, base, mask);
+            VFCompactRowReduce<true>(sum, mix, row0, row1, row2, row3, mask);
+            Sub(mix, mix, sum, mask);
+            Exp(mix, mix, mask);
+            VFCompactRowReduce(sum, mix, row0, row1, row2, row3, mask);
+            Div(mix, mix, sum, mask);
+            Adds(mix, mix, eps, mask);
+            VFCompactColumnReduce(sum, mix, col0, col1, col2, col3, mask);
+            Adds(sum, sum, eps, mask);
+            Div(mix, mix, sum, mask);
+            for (uint16_t iter = 0; iter < iters; ++iter) {
+                VFCompactRowReduce(sum, mix, row0, row1, row2, row3, mask);
+                Adds(sum, sum, eps, mask);
+                Div(mix, mix, sum, mask);
+                VFCompactColumnReduce(sum, mix, col0, col1, col2, col3, mask);
+                Adds(sum, sum, eps, mask);
+                Div(mix, mix, sum, mask);
+            }
+            Scatter(outputAddr + batch * MATRICES_PER_REG * PADDED_MATRIX_ELEMENTS, mix, outputIndex, mask);
+        }
+    }
+}
+
+template <bool Pairwise>
+__aicore__ inline void VFElementMajorSum(RegTensor<float> &sum, RegTensor<float> &a, RegTensor<float> &b,
+                                         RegTensor<float> &c, RegTensor<float> &d, MaskReg &mask)
+{
+    Add(sum, a, b, mask);
+    if constexpr (Pairwise) {
+        RegTensor<float> tail;
+        Add(tail, c, d, mask);
+        Add(sum, sum, tail, mask);
+    } else {
+        Add(sum, sum, c, mask);
+        Add(sum, sum, d, mask);
+    }
+}
+
+template <bool Pairwise>
+__aicore__ inline void VFElementMajorNormalize(RegTensor<float> &a, RegTensor<float> &b, RegTensor<float> &c,
+                                               RegTensor<float> &d, float eps, MaskReg &mask)
+{
+    RegTensor<float> sum;
+    VFElementMajorSum<Pairwise>(sum, a, b, c, d, mask);
+    Adds(sum, sum, eps, mask);
+    Div(a, a, sum, mask);
+    Div(b, b, sum, mask);
+    Div(c, c, sum, mask);
+    Div(d, d, sum, mask);
+}
+
+__aicore__ inline void VFElementMajorSoftmax(RegTensor<float> &a, RegTensor<float> &b, RegTensor<float> &c,
+                                             RegTensor<float> &d, float eps, MaskReg &mask)
+{
+    RegTensor<float> maximum;
+    RegTensor<float> tail;
+    RegTensor<float> sum;
+    Max(maximum, a, b, mask);
+    Max(tail, c, d, mask);
+    Max(maximum, maximum, tail, mask);
+    Sub(a, a, maximum, mask);
+    Sub(b, b, maximum, mask);
+    Sub(c, c, maximum, mask);
+    Sub(d, d, maximum, mask);
+    Exp(a, a, mask);
+    Exp(b, b, mask);
+    Exp(c, c, mask);
+    Exp(d, d, mask);
+    VFElementMajorSum<true>(sum, a, b, c, d, mask);
+    Div(a, a, sum, mask);
+    Div(b, b, sum, mask);
+    Div(c, c, sum, mask);
+    Div(d, d, sum, mask);
+    Adds(a, a, eps, mask);
+    Adds(b, b, eps, mask);
+    Adds(c, c, eps, mask);
+    Adds(d, d, eps, mask);
+}
+
+template <bool NormalizeInput, uint32_t Element>
+__aicore__ inline void VFElementMajorLoad(RegTensor<float> &value, __ubuf__ float *input, __ubuf__ float *bias,
+                                          RegTensor<uint32_t> &index, RegTensor<float> &invRms, float scale,
+                                          MaskReg &mask)
+{
+    RegTensor<float> base;
+    Gather(value, input + (NormalizeInput ? 8 : 0) + Element, index, mask);
+    LoadAlign<float, LoadDist::DIST_BRC_B32>(base, bias + Element / 4 * 8 + Element % 4);
+    if constexpr (NormalizeInput) {
+        Mul(value, value, invRms, mask);
+    }
+    Muls(value, value, scale, mask);
+    Add(value, value, base, mask);
+}
+
+template <bool NormalizeInput = true>
+__aicore__ inline void VFProcessCombFragElementMajor(const LocalTensor<float> &mm, const LocalTensor<float> &rms,
+                                                     const LocalTensor<float> &bias, float scale, float eps,
+                                                     float normEps, uint16_t iters, uint16_t rows)
+{
+    __ubuf__ float *mmAddr = (__ubuf__ float *)mm.GetPhyAddr();
+    __ubuf__ float *rmsAddr = (__ubuf__ float *)rms.GetPhyAddr();
+    __ubuf__ float *biasAddr = (__ubuf__ float *)bias.GetPhyAddr();
+    uint16_t loops = CeilDiv(rows, VL_FP32);
+    __VEC_SCOPE__
+    {
+        RegTensor<uint32_t> lane;
+        RegTensor<uint32_t> inputIndex;
+        RegTensor<uint32_t> outputIndex;
+        MaskReg fullMask = CreateMask<float>();
+        Arange((RegTensor<int32_t> &)lane, static_cast<int32_t>(0));
+        constexpr uint32_t INPUT_STRIDE = NormalizeInput ? 24 : 16;
+        Muls(inputIndex, lane, INPUT_STRIDE, fullMask);
+        Muls(outputIndex, lane, static_cast<uint32_t>(16), fullMask);
+        uint32_t remaining = rows;
+        for (uint16_t batch = 0; batch < loops; ++batch) {
+            MaskReg mask = UpdateMask<float>(remaining);
+            RegTensor<float> invRms;
+            RegTensor<float> one;
+            if constexpr (NormalizeInput) {
+                Gather(invRms, rmsAddr + batch * VL_FP32, lane, mask);
+                Adds(invRms, invRms, normEps, mask);
+                Sqrt(invRms, invRms, mask);
+                Duplicate(one, static_cast<float>(1), mask);
+                Div(invRms, one, invRms, mask);
+            }
+
+            RegTensor<float> m00, m01, m02, m03;
+            RegTensor<float> m10, m11, m12, m13;
+            RegTensor<float> m20, m21, m22, m23;
+            RegTensor<float> m30, m31, m32, m33;
+            __ubuf__ float *input = mmAddr + batch * VL_FP32 * INPUT_STRIDE;
+            VFElementMajorLoad<NormalizeInput, 0>(m00, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 1>(m01, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 2>(m02, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 3>(m03, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 4>(m10, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 5>(m11, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 6>(m12, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 7>(m13, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 8>(m20, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 9>(m21, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 10>(m22, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 11>(m23, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 12>(m30, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 13>(m31, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 14>(m32, input, biasAddr, inputIndex, invRms, scale, mask);
+            VFElementMajorLoad<NormalizeInput, 15>(m33, input, biasAddr, inputIndex, invRms, scale, mask);
+
+            VFElementMajorSoftmax(m00, m01, m02, m03, eps, mask);
+            VFElementMajorSoftmax(m10, m11, m12, m13, eps, mask);
+            VFElementMajorSoftmax(m20, m21, m22, m23, eps, mask);
+            VFElementMajorSoftmax(m30, m31, m32, m33, eps, mask);
+            VFElementMajorNormalize<false>(m00, m10, m20, m30, eps, mask);
+            VFElementMajorNormalize<false>(m01, m11, m21, m31, eps, mask);
+            VFElementMajorNormalize<false>(m02, m12, m22, m32, eps, mask);
+            VFElementMajorNormalize<false>(m03, m13, m23, m33, eps, mask);
+            for (uint16_t iter = 0; iter < iters; ++iter) {
+                VFElementMajorNormalize<true>(m00, m01, m02, m03, eps, mask);
+                VFElementMajorNormalize<true>(m10, m11, m12, m13, eps, mask);
+                VFElementMajorNormalize<true>(m20, m21, m22, m23, eps, mask);
+                VFElementMajorNormalize<true>(m30, m31, m32, m33, eps, mask);
+                VFElementMajorNormalize<false>(m00, m10, m20, m30, eps, mask);
+                VFElementMajorNormalize<false>(m01, m11, m21, m31, eps, mask);
+                VFElementMajorNormalize<false>(m02, m12, m22, m32, eps, mask);
+                VFElementMajorNormalize<false>(m03, m13, m23, m33, eps, mask);
+            }
+
+            // All input elements of this batch have been loaded. Compact output
+            // ends before the next batch's 24-element input, so in-place reuse is safe.
+            __ubuf__ float *output = mmAddr + batch * VL_FP32 * 16;
+            Scatter(output + 0, m00, outputIndex, mask);
+            Scatter(output + 1, m01, outputIndex, mask);
+            Scatter(output + 2, m02, outputIndex, mask);
+            Scatter(output + 3, m03, outputIndex, mask);
+            Scatter(output + 4, m10, outputIndex, mask);
+            Scatter(output + 5, m11, outputIndex, mask);
+            Scatter(output + 6, m12, outputIndex, mask);
+            Scatter(output + 7, m13, outputIndex, mask);
+            Scatter(output + 8, m20, outputIndex, mask);
+            Scatter(output + 9, m21, outputIndex, mask);
+            Scatter(output + 10, m22, outputIndex, mask);
+            Scatter(output + 11, m23, outputIndex, mask);
+            Scatter(output + 12, m30, outputIndex, mask);
+            Scatter(output + 13, m31, outputIndex, mask);
+            Scatter(output + 14, m32, outputIndex, mask);
+            Scatter(output + 15, m33, outputIndex, mask);
+        }
+    }
+}
+
 } // namespace MhcPreSinkhornNs
 
 #endif

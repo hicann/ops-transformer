@@ -279,9 +279,6 @@ public:
                     tilingData->rowInnerFactor * tilingData->hcMult * RoundUp<T>(tilingData->dFactor) * sizeof(T));
                 tbufPool1.InitBuffer(yQue, 2, tilingData->rowInnerFactor * RoundUp<T>(tilingData->dFactor) * sizeof(T));
                 tbufPool1.InitBuffer(postQue, 2, tilingData->rowInnerFactor * tilingData->hcMultAlign * sizeof(float));
-                tbufPool1.InitBuffer(
-                    combFragQue, 2,
-                    tilingData->rowInnerFactor * tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
 
                 // TBuf
                 tbufPool1.InitBuffer(mixesBuf,
@@ -345,23 +342,16 @@ public:
                                roundIdx * tilingData->mL1Size * tilingData->hcMult + innerRowIdx * tilingData->hcMult],
                         currentInnerRowFactor, tilingData->hcMult);
                     postQue.FreeTensor(postLocal);
-
-                    // combFrag
-                    combFragLocal = combFragQue.AllocTensor<float>();
-                    VFProcessCombFragRLessVLUseFourUnfold(combFragLocal, mixesLocal[tilingData->hcMult * 2],
-                                                          hcBase2Local, hcScaleGm.GetValue(2), tilingData->hcEps,
-                                                          tilingData->iterTimes - 1, currentInnerRowFactor,
-                                                          tilingData->hcMult, tilingData->hcMult, tilingData->hcMix);
-
-                    combFragQue.EnQue(combFragLocal);
-                    combFragLocal = combFragQue.DeQue<float>();
-                    CopyOut(combFragLocal,
-                            combFragGm[combFragGmBaseOffset + combFragSplitOffset +
-                                       roundIdx * tilingData->mL1Size * tilingData->hcMult * tilingData->hcMult +
-                                       innerRowIdx * tilingData->hcMult * tilingData->hcMult],
-                            currentInnerRowFactor * tilingData->hcMult, tilingData->hcMult);
-                    combFragQue.FreeTensor(combFragLocal);
                 }
+                // Sinkhorn batches are independent of the x/y tile's UB row factor.
+                VFProcessCombFragElementMajor(mmXLocal, rmsNormLocal, hcBase2Local, hcScaleGm.GetValue(2),
+                                              tilingData->hcEps, tilingData->normEps, tilingData->iterTimes - 1,
+                                              currentRow);
+                SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
+                CopyOut(mmXLocal,
+                        combFragGm[combFragGmBaseOffset + combFragSplitOffset +
+                                   roundIdx * tilingData->mL1Size * tilingData->hcMult * tilingData->hcMult],
+                        1, currentRow * tilingData->hcMult * tilingData->hcMult);
                 SetFlag<HardEvent::MTE3_MTE2>(static_cast<event_t>(0));
             }
         }

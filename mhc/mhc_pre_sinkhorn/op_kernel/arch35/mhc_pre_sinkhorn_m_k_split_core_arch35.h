@@ -23,6 +23,69 @@
 namespace MhcPreSinkhornNs {
 using namespace AscendC;
 
+class MhcPreSinkhornMPMDSinkhorn {
+public:
+    __aicore__ inline void Init(GM_ADDR scale, GM_ADDR bias, GM_ADDR output, GM_ADDR workspace,
+                                const MhcPreSinkhornRegbaseTilingData *data, TPipe *pipe)
+    {
+        td = data;
+        scaleGm.SetGlobalBuffer((__gm__ float *)scale);
+        biasGm.SetGlobalBuffer((__gm__ float *)bias);
+        outputGm.SetGlobalBuffer((__gm__ float *)output);
+        mmGm.SetGlobalBuffer((__gm__ float *)workspace);
+        rmsGm.SetGlobalBuffer((__gm__ float *)workspace + td->kBlockFactor * td->bs * td->hcMix);
+        mmLocalSize = td->kBlockFactor * td->sinkhornRowFactor * MATRIX_ELEMENTS;
+        int64_t rmsLocalSize = td->kBlockFactor * RoundUp<float>(td->sinkhornRowFactor);
+        pipe->InitBuffer(partialQue, 2, (mmLocalSize + rmsLocalSize) * sizeof(float));
+        pipe->InitBuffer(outputQue, 2, td->sinkhornRowFactor * MATRIX_ELEMENTS * sizeof(float));
+        pipe->InitBuffer(biasBuf, td->hcMult * td->hcMultAlign * sizeof(float));
+    }
+
+    __aicore__ inline void Process()
+    {
+        const int64_t core = GetBlockIdx() - td->secondUsedCoreNum;
+        const int64_t rowsPerCore = CeilDiv(td->bs, td->sinkhornCoreNum);
+        const int64_t begin = core * rowsPerCore;
+        const int64_t end = AscendC::Std::min(begin + rowsPerCore, td->bs);
+        if (begin >= end) {
+            return;
+        }
+        LocalTensor<float> bias = biasBuf.Get<float>();
+        CopyIn(biasGm[2 * td->hcMult], bias, td->hcMult, td->hcMult);
+        SetWaitFlag<HardEvent::MTE2_V>(HardEvent::MTE2_V);
+        const float scale = scaleGm.GetValue(2);
+        for (int64_t row = begin; row < end; row += td->sinkhornRowFactor) {
+            const int64_t rows = AscendC::Std::min(td->sinkhornRowFactor, end - row);
+            LocalTensor<float> partial = partialQue.AllocTensor<float>();
+            // Compact [K, rows, 16], retaining the GM token pitch of 24.
+            CopyInWithLoopMode(mmGm[row * td->hcMix + 2 * td->hcMult], partial, td->kBlockFactor, rows, MATRIX_ELEMENTS,
+                               td->bs * td->hcMix, td->hcMix - MATRIX_ELEMENTS);
+            CopyIn(rmsGm[row], partial[mmLocalSize], td->kBlockFactor, rows, td->bs - rows);
+            partialQue.EnQue(partial);
+            partial = partialQue.DeQue<float>();
+            LocalTensor<float> output = outputQue.AllocTensor<float>();
+            VFProcessInvRmsPart3WithGroupReduce(output, partial, partial[mmLocalSize], td->normEps, td->kBlockFactor,
+                                                rows, MATRIX_ELEMENTS);
+            VFProcessCombFragElementMajor<false>(output, output, bias, scale, td->hcEps, td->normEps, td->iterTimes - 1,
+                                                 rows);
+            partialQue.FreeTensor(partial);
+            outputQue.EnQue(output);
+            output = outputQue.DeQue<float>();
+            CopyOut(output, outputGm[row * MATRIX_ELEMENTS], 1, rows * MATRIX_ELEMENTS);
+            outputQue.FreeTensor(output);
+        }
+    }
+
+private:
+    static constexpr int64_t MATRIX_ELEMENTS = 16;
+    const MhcPreSinkhornRegbaseTilingData *td;
+    int64_t mmLocalSize;
+    GlobalTensor<float> scaleGm, biasGm, outputGm, mmGm, rmsGm;
+    TQue<QuePosition::VECIN, 1> partialQue;
+    TQue<QuePosition::VECOUT, 1> outputQue;
+    TBuf<QuePosition::VECCALC> biasBuf;
+};
+
 template <typename T>
 class MhcPreSinkhornMKSplitCorePart1 {
 public:
@@ -289,6 +352,15 @@ public:
         pipe = pipePtr;
         tilingData = tilingDataPtr;
 
+        if ASCEND_IS_AIV {
+            if (tilingData->sinkhornCoreNum > 0 && GetBlockIdx() >= tilingData->secondUsedCoreNum) {
+                if (GetBlockIdx() < tilingData->secondUsedCoreNum + tilingData->sinkhornCoreNum) {
+                    sinkhorn.Init(hcScale, hcBase, combFrag, workspace, tilingData, pipe);
+                }
+                return;
+            }
+        }
+
         xGm.SetGlobalBuffer((__gm__ T *)x);
         hcScaleGm.SetGlobalBuffer((__gm__ float *)hcScale);
         hcBaseGm.SetGlobalBuffer((__gm__ float *)hcBase);
@@ -310,18 +382,25 @@ public:
         // OutQue
         pipe->InitBuffer(yQue, 2, tilingData->stage2RowFactor * RoundUp<T>(tilingData->dFactor) * sizeof(T));
         pipe->InitBuffer(postQue, 2, tilingData->stage2RowFactor * tilingData->hcMultAlign * sizeof(float));
-        pipe->InitBuffer(combFragQue, 2,
-                         tilingData->stage2RowFactor * tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
+        if (tilingData->sinkhornCoreNum == 0) {
+            pipe->InitBuffer(
+                combFragQue, 2,
+                tilingData->stage2RowFactor * tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
+        }
 
         // TBuf
         pipe->InitBuffer(hcBaseBuf0, tilingData->hcMultAlign * sizeof(float));
         pipe->InitBuffer(hcBaseBuf1, tilingData->hcMultAlign * sizeof(float));
-        pipe->InitBuffer(hcBaseBuf2, tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
+        if (tilingData->sinkhornCoreNum == 0) {
+            pipe->InitBuffer(hcBaseBuf2, tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
+        }
         pipe->InitBuffer(mixesBuf, tilingData->stage2RowFactor * RoundUp<float>(tilingData->hcMix) * sizeof(float));
 
         hcBase0Local = hcBaseBuf0.Get<float>();
         hcBase1Local = hcBaseBuf1.Get<float>();
-        hcBase2Local = hcBaseBuf2.Get<float>();
+        if (tilingData->sinkhornCoreNum == 0) {
+            hcBase2Local = hcBaseBuf2.Get<float>();
+        }
         mixesLocal = mixesBuf.Get<float>();
     }
 
@@ -332,6 +411,9 @@ public:
             int64_t curBlockIdx = GetBlockIdx();
             int64_t stage2UsedCoreNum = tilingData->secondUsedCoreNum;
             if (curBlockIdx >= stage2UsedCoreNum) {
+                if (curBlockIdx < stage2UsedCoreNum + tilingData->sinkhornCoreNum) {
+                    sinkhorn.Process();
+                }
                 return;
             }
             int64_t rowOuterLoop = (curBlockIdx == stage2UsedCoreNum - 1) ? tilingData->rowLoopOfTailBlock :
@@ -341,7 +423,9 @@ public:
 
             CopyIn(hcBaseGm, hcBase0Local, 1, tilingData->hcMult);
             CopyIn(hcBaseGm[tilingData->hcMult], hcBase1Local, 1, tilingData->hcMult);
-            CopyIn(hcBaseGm[tilingData->hcMult * 2], hcBase2Local, tilingData->hcMult, tilingData->hcMult);
+            if (tilingData->sinkhornCoreNum == 0) {
+                CopyIn(hcBaseGm[tilingData->hcMult * 2], hcBase2Local, tilingData->hcMult, tilingData->hcMult);
+            }
             event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
             SetFlag<HardEvent::MTE2_V>(eventId);
             WaitFlag<HardEvent::MTE2_V>(eventId);
@@ -406,27 +490,30 @@ public:
                         curRowFactor, tilingData->hcMult);
                 postQue.FreeTensor(postLocal);
 
-                // combFrag
-                combFragLocal = combFragQue.AllocTensor<float>();
-                VFProcessCombFragRLessVLUseFourUnfold(combFragLocal, mixesLocal[tilingData->hcMult * 2], hcBase2Local,
-                                                      hcScaleGm.GetValue(2), tilingData->hcEps,
-                                                      tilingData->iterTimes - 1, curRowFactor, tilingData->hcMult,
-                                                      tilingData->hcMult, tilingData->hcMix);
-                rmsAndmmQue.FreeTensor(rmsAndmmLocal);
+                if (tilingData->sinkhornCoreNum == 0) {
+                    // combFrag
+                    combFragLocal = combFragQue.AllocTensor<float>();
+                    VFProcessCombFragCompact(combFragLocal, mixesLocal[tilingData->hcMult * 2], hcBase2Local,
+                                             hcScaleGm.GetValue(2), tilingData->hcEps, tilingData->iterTimes - 1,
+                                             curRowFactor, tilingData->hcMix);
 
-                combFragQue.EnQue(combFragLocal);
-                combFragLocal = combFragQue.DeQue<float>();
-                CopyOut(
-                    combFragLocal,
-                    combFragGm[curBlockIdx * tilingData->rowOfFormerBlock * tilingData->hcMult * tilingData->hcMult +
-                               rowOuterIdx * tilingData->stage2RowFactor * tilingData->hcMult * tilingData->hcMult],
-                    curRowFactor * tilingData->hcMult, tilingData->hcMult);
-                combFragQue.FreeTensor(combFragLocal);
+                    combFragQue.EnQue(combFragLocal);
+                    combFragLocal = combFragQue.DeQue<float>();
+                    CopyOut(
+                        combFragLocal,
+                        combFragGm[curBlockIdx * tilingData->rowOfFormerBlock * tilingData->hcMult *
+                                       tilingData->hcMult +
+                                   rowOuterIdx * tilingData->stage2RowFactor * tilingData->hcMult * tilingData->hcMult],
+                        curRowFactor * tilingData->hcMult, tilingData->hcMult);
+                    combFragQue.FreeTensor(combFragLocal);
+                }
+                rmsAndmmQue.FreeTensor(rmsAndmmLocal);
             }
         }
     }
 
 private:
+    MhcPreSinkhornMPMDSinkhorn sinkhorn;
     TPipe *pipe;
     const MhcPreSinkhornRegbaseTilingData *tilingData;
     GlobalTensor<float> hcScaleGm;

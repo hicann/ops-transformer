@@ -121,8 +121,7 @@ T ReadTilingField(const uint8_t *buffer, size_t &offset)
     return value;
 }
 
-void DeserializeRegbaseTilingData(const TilingInfo &tilingInfo,
-                                  optiling::MhcPreSinkhornRegbaseTilingData &tilingData)
+void DeserializeRegbaseTilingData(const TilingInfo &tilingInfo, optiling::MhcPreSinkhornRegbaseTilingData &tilingData)
 {
     size_t offset = 0;
 #define READ_TILING_FIELD(type, field) \
@@ -157,6 +156,8 @@ void DeserializeRegbaseTilingData(const TilingInfo &tilingInfo,
     READ_TILING_FIELD(int64_t, bufferPool0Size);
     READ_TILING_FIELD(int64_t, bufferPool1Size);
     READ_TILING_FIELD(int64_t, mUbSize);
+    READ_TILING_FIELD(int64_t, sinkhornCoreNum);
+    READ_TILING_FIELD(int64_t, sinkhornRowFactor);
 #undef READ_TILING_FIELD
     EXPECT_EQ(offset, tilingInfo.tilingDataSize) << "Regbase tiling data schema changed; update the deserializer";
 }
@@ -174,8 +175,7 @@ void ExpectRegbaseTilingData(const RegbaseTilingBaseline &baseline)
     ASSERT_EQ(tilingInfo.tilingDataSize, actual.GetDataSize());
     DeserializeRegbaseTilingData(tilingInfo, actual);
 
-#define EXPECT_TILING_FIELD(field, expected) \
-    EXPECT_EQ(actual.get_##field(), (expected)) << baseline.name << ": " #field
+#define EXPECT_TILING_FIELD(field, expected) EXPECT_EQ(actual.get_##field(), (expected)) << baseline.name << ": " #field
     EXPECT_TILING_FIELD(bs, baseline.sequenceLength);
     EXPECT_TILING_FIELD(hcMix, baseline.hcMix);
     EXPECT_TILING_FIELD(hcMult, HC_MULT);
@@ -235,11 +235,46 @@ TEST_F(MhcPreSinkhornTiling, ascend950_regbase_tilingdata_matches_pre_refactor)
 {
     // The first four cases cover the original functions: K/M split x no-grad/grad-out; the last covers D splitting.
     const std::array<RegbaseTilingBaseline, 5> baselines = {{
-        {"k_split_no_grad", 256, 4096, false, 262144, 1000, 18415616, {{4, 2, 2, 2, 2}, {1, 4096, 4096}, {64, 2, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
-        {"m_split_no_grad", 16384, 4096, false, 262144, 1001, SYS_WORKSPACE_SIZE, {{256, 86, 86, 1, 1}, {1, 4096, 4096}, {1, 0, 128, 256, 64, 1, 64, 16384, 0, 3, 262144, 249152, 128}}},
-        {"k_split_grad_out", 256, 7168, true, 262144, 2000, 18210816, {{4, 4, 4, 1, 1}, {1, 7168, 7168}, {56, 1, 128, 256, 1, 56, 64, 512, 64, 0, 0, 0, 128}}},
-        {"m_split_grad_out", 16384, 7168, true, 262144, 2001, SYS_WORKSPACE_SIZE, {{256, 256, 256, 1, 1}, {1, 7168, 7168}, {1, 0, 128, 256, 64, 1, 64, 28672, 0, 1, 262144, 249152, 128}}},
-        {"k_split_no_grad_d_split", 256, 4096, false, 49152, 1000, 18415616, {{4, 4, 4, 1, 1}, {4, 1344, 64}, {64, 1, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
+        {"k_split_no_grad",
+         256,
+         4096,
+         false,
+         262144,
+         1000,
+         18415616,
+         {{4, 2, 2, 2, 2}, {1, 4096, 4096}, {64, 2, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
+        {"m_split_no_grad",
+         16384,
+         4096,
+         false,
+         262144,
+         1001,
+         SYS_WORKSPACE_SIZE,
+         {{256, 86, 86, 1, 1}, {1, 4096, 4096}, {1, 0, 128, 256, 64, 1, 64, 16384, 0, 3, 262144, 249152, 128}}},
+        {"k_split_grad_out",
+         256,
+         7168,
+         true,
+         262144,
+         2000,
+         18210816,
+         {{4, 4, 4, 1, 1}, {1, 7168, 7168}, {56, 1, 128, 256, 1, 56, 64, 512, 64, 0, 0, 0, 128}}},
+        {"m_split_grad_out",
+         16384,
+         7168,
+         true,
+         262144,
+         2001,
+         SYS_WORKSPACE_SIZE,
+         {{256, 256, 256, 1, 1}, {1, 7168, 7168}, {1, 0, 128, 256, 64, 1, 64, 28672, 0, 1, 262144, 249152, 128}}},
+        {"k_split_no_grad_d_split",
+         256,
+         4096,
+         false,
+         49152,
+         1000,
+         18415616,
+         {{4, 4, 4, 1, 1}, {4, 1344, 64}, {64, 1, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
     }};
 
     for (const auto &baseline : baselines) {
@@ -253,9 +288,30 @@ TEST_F(MhcPreSinkhornTiling, ascend950_regbase_core_tiling_boundary_branches)
     // These cases cover Ascend950-only common tiling boundaries: partial core rows, the dFactor path without
     // DownAlign, and M-split grad-out UB accounting. The preceding regression case covers dFactor DownAlign.
     const std::array<RegbaseTilingBaseline, 3> baselines = {{
-        {"k_split_partial_core_rows", 65, 4096, false, 262144, 1000, 17193216, {{2, 1, 1, 2, 1}, {1, 4096, 4096}, {64, 2, 384, 80, 1, 64, 192, 256, 33, 0, 0, 0, 40}}},
-        {"k_split_d_factor_at_ub_limit", 256, 4096, false, 17312, 1000, 18415616, {{4, 4, 4, 1, 1}, {256, 16, 16}, {64, 1, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
-        {"m_split_grad_out_d_factor_at_ub_limit", 16384, 4096, true, 51232, 2001, SYS_WORKSPACE_SIZE, {{256, 256, 256, 1, 1}, {256, 16, 16}, {1, 0, 128, 256, 64, 1, 64, 16384, 0, 1, 51232, 38240, 128}}},
+        {"k_split_partial_core_rows",
+         65,
+         4096,
+         false,
+         262144,
+         1000,
+         17193216,
+         {{2, 1, 1, 2, 1}, {1, 4096, 4096}, {64, 2, 384, 80, 1, 64, 192, 256, 33, 0, 0, 0, 40}}},
+        {"k_split_d_factor_at_ub_limit",
+         256,
+         4096,
+         false,
+         17312,
+         1000,
+         18415616,
+         {{4, 4, 4, 1, 1}, {256, 16, 16}, {64, 1, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
+        {"m_split_grad_out_d_factor_at_ub_limit",
+         16384,
+         4096,
+         true,
+         51232,
+         2001,
+         SYS_WORKSPACE_SIZE,
+         {{256, 256, 256, 1, 1}, {256, 16, 16}, {1, 0, 128, 256, 64, 1, 64, 16384, 0, 1, 51232, 38240, 128}}},
     }};
 
     for (const auto &baseline : baselines) {
