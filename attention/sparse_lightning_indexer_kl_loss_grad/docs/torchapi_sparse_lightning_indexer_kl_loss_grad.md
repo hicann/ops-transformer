@@ -221,7 +221,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
     - B：支持1~256。
     - S1、S2：S1支持1~8192，S2支持1~524288。
     - N1：支持8、16、32、64。
-    - K：支持512、1024、2048、4096、8192。
+    - K：支持1~8192。
   <!-- end id10 -->
 
   <!-- npu="950" id11 -->
