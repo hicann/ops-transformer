@@ -78,6 +78,9 @@ protected:
     void PrintAlltoAllMatmulTilingData(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
 
 private:
+    ge::graphStatus CheckQuantScaleDataType(const AlltoAllMatmulInfo &info, ge::DataType x1Dtype, ge::DataType x2Dtype);
+    ge::graphStatus CheckQuantScaleShape(const AlltoAllMatmulInfo &info, int64_t tokenSize);
+
     bool x2Transpose = false;
     bool hasBias = false;
     uint32_t quantType = TILINGKEY_TPL_NOQUANT;

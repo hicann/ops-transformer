@@ -901,41 +901,12 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckAndSetAttrsInfo(AlltoAllMatmulInf
 }
 
 /**
- * @brief 非量化场景校验参数的DType
+ * @brief 校验量化 scale 的数据类型并选择量化模式
  * @return ge::graphStatus
  */
-ge::graphStatus AlltoAllMatmulTiling910b::CheckTensorDataType(AlltoAllMatmulInfo &info)
+ge::graphStatus AlltoAllMatmulTiling910b::CheckQuantScaleDataType(const AlltoAllMatmulInfo &info, ge::DataType x1Dtype,
+                                                                  ge::DataType x2Dtype)
 {
-    // 获取并校验输入张量描述符
-    auto x1TensorDesc = context_->GetInputDesc(INPUT_X1_INDEX);
-    OP_TILING_CHECK((x1TensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x1"), return ge::GRAPH_FAILED);
-    auto x2TensorDesc = context_->GetInputDesc(INPUT_X2_INDEX);
-    OP_TILING_CHECK((x2TensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x2"), return ge::GRAPH_FAILED);
-    auto yDesc = context_->GetOutputDesc(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
-    auto alltoallOutDesc = context_->GetOutputDesc(ALLTO_ALL_OUT_INDEX);
-    ;
-    if (info.isAlltoallOut) { // 可选参数
-        OP_TILING_CHECK((alltoallOutDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "alltoallOut"),
-                        return ge::GRAPH_FAILED);
-    }
-
-    // 获取数据类型并校验一致性与范围
-    ge::DataType x1Dtype = x1TensorDesc->GetDataType();
-    ge::DataType x2Dtype = x2TensorDesc->GetDataType();
-    ge::DataType yDtype = yDesc->GetDataType();
-
-    if (info.isAlltoallOut) { // 校验alltoallout类型
-        ge::DataType alltoallOutDtype = alltoallOutDesc->GetDataType();
-        OP_TILING_CHECK((alltoallOutDtype != x1Dtype),
-                        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
-                            opName_, "x1 and alltoallOut",
-                            (Ops::Base::ToString(x1Dtype) + " and " + Ops::Base::ToString(alltoallOutDtype)).c_str(),
-                            "The dtypes of x1 and alltoallOut must be the same"),
-                        return ge::GRAPH_FAILED);
-    }
-    auto biasTensorDesc = context_->GetOptionalInputDesc(INPUT_BIAS_INDEX);
-
     auto x1ScaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X1_SCALE_INDEX);
     auto x2ScaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
     // 校验 scale 张量，量化模式
@@ -1004,6 +975,47 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckTensorDataType(AlltoAllMatmulInfo
         quantType = TILINGKEY_TPL_A16W4;
     }
 
+    return ge::GRAPH_SUCCESS;
+}
+
+// Validate tensor dtypes in the original order, including quantization scales.
+ge::graphStatus AlltoAllMatmulTiling910b::CheckTensorDataType(AlltoAllMatmulInfo &info)
+{
+    // 获取并校验输入张量描述符
+    auto x1TensorDesc = context_->GetInputDesc(INPUT_X1_INDEX);
+    OP_TILING_CHECK((x1TensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x1"), return ge::GRAPH_FAILED);
+    auto x2TensorDesc = context_->GetInputDesc(INPUT_X2_INDEX);
+    OP_TILING_CHECK((x2TensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x2"), return ge::GRAPH_FAILED);
+    auto yDesc = context_->GetOutputDesc(OUTPUT_Y_INDEX);
+    OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
+    auto alltoallOutDesc = context_->GetOutputDesc(ALLTO_ALL_OUT_INDEX);
+    ;
+    if (info.isAlltoallOut) { // 可选参数
+        OP_TILING_CHECK((alltoallOutDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "alltoallOut"),
+                        return ge::GRAPH_FAILED);
+    }
+
+    // 获取数据类型并校验一致性与范围
+    ge::DataType x1Dtype = x1TensorDesc->GetDataType();
+    ge::DataType x2Dtype = x2TensorDesc->GetDataType();
+    ge::DataType yDtype = yDesc->GetDataType();
+
+    if (info.isAlltoallOut) { // 校验alltoallout类型
+        ge::DataType alltoallOutDtype = alltoallOutDesc->GetDataType();
+        OP_TILING_CHECK((alltoallOutDtype != x1Dtype),
+                        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                            opName_, "x1 and alltoallOut",
+                            (Ops::Base::ToString(x1Dtype) + " and " + Ops::Base::ToString(alltoallOutDtype)).c_str(),
+                            "The dtypes of x1 and alltoallOut must be the same"),
+                        return ge::GRAPH_FAILED);
+    }
+    auto biasTensorDesc = context_->GetOptionalInputDesc(INPUT_BIAS_INDEX);
+
+    const auto scaleStatus = CheckQuantScaleDataType(info, x1Dtype, x2Dtype);
+    if (scaleStatus != ge::GRAPH_SUCCESS) {
+        return scaleStatus;
+    }
+
     // 校验类型组合
     if (biasTensorDesc != nullptr) {
         hasBias = true;
@@ -1050,9 +1062,54 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckTensorDataType(AlltoAllMatmulInfo
 }
 
 /**
- * @brief 校验tiling输入的shape信息
+ * @brief 校验量化 scale 的形状
  * @return ge::graphStatus
  */
+ge::graphStatus AlltoAllMatmulTiling910b::CheckQuantScaleShape(const AlltoAllMatmulInfo &info, int64_t tokenSize)
+{
+    if (quantType == TILINGKEY_TPL_A16W8 || quantType == TILINGKEY_TPL_A16W4) {
+        if (info.isSmoothQuant) {
+            const gert::StorageShape *x1ScaleShape = context_->GetOptionalInputShape(INPUT_X1_SCALE_INDEX);
+            uint64_t x1ScaleShapeDimNum = x1ScaleShape->GetStorageShape().GetDimNum();
+            uint64_t x1ScaleDim0 = x1ScaleShape->GetStorageShape().GetDim(0);
+            OP_TILING_CHECK((x1ScaleDim0 != tokenSize),
+                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                                opName_, "x1Scale", Ops::Base::ToString(x1ScaleShape->GetStorageShape()).c_str(),
+                                "The dim0 of x1Scale should be " + std::to_string(tokenSize)),
+                            return ge::GRAPH_FAILED);
+        }
+        const gert::StorageShape *x2ScaleShape = context_->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
+        uint64_t x2ScaleShapeDimNum = x2ScaleShape->GetStorageShape().GetDimNum();
+        uint64_t x2ScaleDim0 = x2ScaleShape->GetStorageShape().GetDim(0);
+        OP_TILING_CHECK((x2ScaleDim0 != info.N),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            opName_, "x2Scale", Ops::Base::ToString(x2ScaleShape->GetStorageShape()).c_str(),
+                            "The shape of x2Scale dim0 must be " + std::to_string(info.N)),
+                        return ge::GRAPH_FAILED);
+    }
+    if (quantType == TILINGKEY_TPL_A4W4) {
+        const gert::StorageShape *x1ScaleShape = context_->GetOptionalInputShape(INPUT_X1_SCALE_INDEX);
+        uint64_t x1ScaleShapeDimNum = x1ScaleShape->GetStorageShape().GetDimNum();
+        uint64_t x1ScaleDim0 = x1ScaleShape->GetStorageShape().GetDim(0);
+        OP_TILING_CHECK((x1ScaleDim0 != info.M),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            opName_, "x1Scale", Ops::Base::ToString(x1ScaleShape->GetStorageShape()).c_str(),
+                            "The shape of x1Scale dim0 must be " + std::to_string(info.M)),
+                        return ge::GRAPH_FAILED);
+
+        const gert::StorageShape *x2ScaleShape = context_->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
+        uint64_t x2ScaleShapeDimNum = x2ScaleShape->GetStorageShape().GetDimNum();
+        uint64_t x2ScaleDim0 = x2ScaleShape->GetStorageShape().GetDim(0);
+        OP_TILING_CHECK((x2ScaleDim0 != info.N),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            opName_, "x2Scale", Ops::Base::ToString(x2ScaleShape->GetStorageShape()).c_str(),
+                            "The shape of x2Scale dim0 must be " + std::to_string(info.N)),
+                        return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+// Validate input, output and optional tensor shapes in the original order.
 ge::graphStatus AlltoAllMatmulTiling910b::CheckShapeInfo(AlltoAllMatmulInfo &info)
 {
     ge::graphStatus status;
@@ -1127,44 +1184,9 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckShapeInfo(AlltoAllMatmulInfo &inf
     orgM = info.M;
     orgN = info.N;
     orgK = info.K;
-    if (quantType == TILINGKEY_TPL_A16W8 || quantType == TILINGKEY_TPL_A16W4) {
-        if (info.isSmoothQuant) {
-            const gert::StorageShape *x1ScaleShape = context_->GetOptionalInputShape(INPUT_X1_SCALE_INDEX);
-            uint64_t x1ScaleShapeDimNum = x1ScaleShape->GetStorageShape().GetDimNum();
-            uint64_t x1ScaleDim0 = x1ScaleShape->GetStorageShape().GetDim(0);
-            OP_TILING_CHECK((x1ScaleDim0 != tokenSize),
-                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                                opName_, "x1Scale", Ops::Base::ToString(x1ScaleShape->GetStorageShape()).c_str(),
-                                "The dim0 of x1Scale should be " + std::to_string(tokenSize)),
-                            return ge::GRAPH_FAILED);
-        }
-        const gert::StorageShape *x2ScaleShape = context_->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
-        uint64_t x2ScaleShapeDimNum = x2ScaleShape->GetStorageShape().GetDimNum();
-        uint64_t x2ScaleDim0 = x2ScaleShape->GetStorageShape().GetDim(0);
-        OP_TILING_CHECK((x2ScaleDim0 != info.N),
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            opName_, "x2Scale", Ops::Base::ToString(x2ScaleShape->GetStorageShape()).c_str(),
-                            "The shape of x2Scale dim0 must be " + std::to_string(info.N)),
-                        return ge::GRAPH_FAILED);
-    }
-    if (quantType == TILINGKEY_TPL_A4W4) {
-        const gert::StorageShape *x1ScaleShape = context_->GetOptionalInputShape(INPUT_X1_SCALE_INDEX);
-        uint64_t x1ScaleShapeDimNum = x1ScaleShape->GetStorageShape().GetDimNum();
-        uint64_t x1ScaleDim0 = x1ScaleShape->GetStorageShape().GetDim(0);
-        OP_TILING_CHECK((x1ScaleDim0 != info.M),
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            opName_, "x1Scale", Ops::Base::ToString(x1ScaleShape->GetStorageShape()).c_str(),
-                            "The shape of x1Scale dim0 must be " + std::to_string(info.M)),
-                        return ge::GRAPH_FAILED);
-
-        const gert::StorageShape *x2ScaleShape = context_->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
-        uint64_t x2ScaleShapeDimNum = x2ScaleShape->GetStorageShape().GetDimNum();
-        uint64_t x2ScaleDim0 = x2ScaleShape->GetStorageShape().GetDim(0);
-        OP_TILING_CHECK((x2ScaleDim0 != info.N),
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            opName_, "x2Scale", Ops::Base::ToString(x2ScaleShape->GetStorageShape()).c_str(),
-                            "The shape of x2Scale dim0 must be " + std::to_string(info.N)),
-                        return ge::GRAPH_FAILED);
+    status = CheckQuantScaleShape(info, tokenSize);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
     }
     const gert::StorageShape *biasShape = context_->GetOptionalInputShape(INPUT_BIAS_INDEX);
     if (biasShape != nullptr) {
