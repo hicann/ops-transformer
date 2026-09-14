@@ -45,6 +45,9 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::A1> tbufA1;
         GetTPipePtr()->InitBuffer(tbufA1, ArchTag::L1_SIZE);
         tensor = tbufA1.Get<uint8_t>();
@@ -62,6 +65,9 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::A2> tbufA2;
         GetTPipePtr()->InitBuffer(tbufA2, ArchTag::L0A_SIZE);
         tensor = tbufA2.Get<uint8_t>();
@@ -79,6 +85,9 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::B1> tbufB1;
         GetTPipePtr()->InitBuffer(tbufB1, ArchTag::L1_SIZE);
         tensor = tbufB1.Get<uint8_t>();
@@ -96,6 +105,9 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::B2> tbufB2;
         GetTPipePtr()->InitBuffer(tbufB2, ArchTag::L0B_SIZE);
         tensor = tbufB2.Get<uint8_t>();
@@ -114,6 +126,9 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::C1> tbufC1;
         GetTPipePtr()->InitBuffer(tbufC1, ArchTag::L1_SIZE);
         tensor = tbufC1.Get<uint8_t>();
@@ -132,6 +147,9 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::C2> tbufC2;
         GetTPipePtr()->InitBuffer(tbufC2, ArchTag::BIAS_SIZE);
         tensor = tbufC2.Get<uint8_t>();
@@ -149,6 +167,9 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::CO1> tbufCO1;
         GetTPipePtr()->InitBuffer(tbufCO1, ArchTag::L0C_SIZE);
         tensor = tbufCO1.Get<uint8_t>();
@@ -167,6 +188,63 @@ public:
     CATLASS_DEVICE
     LocalTensorBuffer()
     {
+        if ASCEND_IS_AIV {
+            return;
+        }
+        AscendC::TBuf<AscendC::TPosition::C2PIPE2GM> tbufC2PIPE2GM;
+        GetTPipePtr()->InitBuffer(tbufC2PIPE2GM, ArchTag::FIXBUF_SIZE);
+        tensor = tbufC2PIPE2GM.Get<uint8_t>();
+    }
+};
+
+template <>
+struct LocalTensorBuffer<Arch::AtlasA5, AscendC::TPosition::C1> : LocalTensorBufferBase {
+public:
+    using ArchTag = Arch::AtlasA5;
+    static constexpr AscendC::TPosition Position = AscendC::TPosition::C1;
+
+    CATLASS_DEVICE
+    LocalTensorBuffer()
+    {
+        if ASCEND_IS_AIV {
+            return;
+        }
+        AscendC::TBuf<AscendC::TPosition::C1> tbufC1;
+        GetTPipePtr()->InitBuffer(tbufC1, ArchTag::L1_SIZE);
+        tensor = tbufC1.Get<uint8_t>();
+    }
+};
+
+template <>
+struct LocalTensorBuffer<Arch::AtlasA5, AscendC::TPosition::C2> : LocalTensorBufferBase {
+public:
+    using ArchTag = Arch::AtlasA5;
+    static constexpr AscendC::TPosition Position = AscendC::TPosition::C2;
+
+    CATLASS_DEVICE
+    LocalTensorBuffer()
+    {
+        if ASCEND_IS_AIV {
+            return;
+        }
+        AscendC::TBuf<AscendC::TPosition::C2> tbufC2;
+        GetTPipePtr()->InitBuffer(tbufC2, ArchTag::BIAS_SIZE);
+        tensor = tbufC2.Get<uint8_t>();
+    }
+};
+
+template <>
+struct LocalTensorBuffer<Arch::AtlasA5, AscendC::TPosition::C2PIPE2GM> : LocalTensorBufferBase {
+public:
+    using ArchTag = Arch::AtlasA5;
+    static constexpr AscendC::TPosition Position = AscendC::TPosition::C2PIPE2GM;
+
+    CATLASS_DEVICE
+    LocalTensorBuffer()
+    {
+        if ASCEND_IS_AIV {
+            return;
+        }
         AscendC::TBuf<AscendC::TPosition::C2PIPE2GM> tbufC2PIPE2GM;
         GetTPipePtr()->InitBuffer(tbufC2PIPE2GM, ArchTag::FIXBUF_SIZE);
         tensor = tbufC2PIPE2GM.Get<uint8_t>();
@@ -219,7 +297,12 @@ public:
     LocalTensorBuffer()
     {
         AscendC::TBuf<AscendC::TPosition::VECCALC> tbufVECCALC;
-        GetTPipePtr()->InitBuffer(tbufVECCALC, ArchTag::UB_SIZE);
+        uint32_t ubBytes = ArchTag::UB_SIZE;
+        if ASCEND_IS_AIC {
+            // Cube 只需 dual-dst pingpong（2*64*128*4=64KB）；AIC 上 InitBuffer 256KB VECCALC 可能卡住 Fixpipe。
+            ubBytes = 64 * 1024;
+        }
+        GetTPipePtr()->InitBuffer(tbufVECCALC, ubBytes);
         tensor = tbufVECCALC.Get<uint8_t>();
     }
 };

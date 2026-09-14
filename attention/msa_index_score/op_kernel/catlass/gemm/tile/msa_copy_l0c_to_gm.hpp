@@ -38,6 +38,16 @@ struct CopyL0CToGmQuantMode<Catlass::Arch::AtlasA2, float, float, ScaleGranulari
     static constexpr auto VALUE = QuantMode_t::NoQuant;
 };
 
+template <>
+struct CopyL0CToGmQuantMode<Catlass::Arch::AtlasA5, float, float, ScaleGranularity::NO_QUANT> {
+    static constexpr auto VALUE = QuantMode_t::NoQuant;
+};
+
+template <>
+struct CopyL0CToGmQuantMode<Catlass::Arch::AtlasA5, float, half, ScaleGranularity::NO_QUANT> {
+    static constexpr auto VALUE = QuantMode_t::F322F16;
+};
+
 // CopyL0CToGm cast fp32 to fp16
 template <>
 struct CopyL0CToGmQuantMode<Catlass::Arch::AtlasA2, float, half, ScaleGranularity::NO_QUANT> {
@@ -166,6 +176,50 @@ struct CopyL0CToGm<Catlass::Arch::AtlasA2, ElementAccumulator_, Gemm::GemmType<E
 
         // Call AscendC Fixpipe
         AscendC::Fixpipe<ElementDst, ElementSrc, AscendC::CFG_ROW_MAJOR>(dst, src, intriParams);
+    }
+};
+
+/// AtlasA5 / C310：Fixpipe L0C→GM（950 主路径是 L0C→UB；本特化仅满足 TileCopy 实例化 / 编译期回退）。
+template <class ElementAccumulator_, class ElementDst_, bool ReluEnable_>
+struct CopyL0CToGm<Catlass::Arch::AtlasA5, ElementAccumulator_, Gemm::GemmType<ElementDst_, layout::RowMajor>,
+                   ScaleGranularity::NO_QUANT, ReluEnable_> {
+    using ArchTag = Catlass::Arch::AtlasA5;
+    using ElementDst = ElementDst_;
+    using ElementSrc = ElementAccumulator_;
+    using LayoutSrc = Catlass::layout::zN;
+    using LayoutDst = Catlass::layout::RowMajor;
+    static constexpr auto quantPre =
+        CopyL0CToGmQuantMode<ArchTag, ElementSrc, ElementDst, ScaleGranularity::NO_QUANT>::VALUE;
+    static constexpr auto reluEn = ReluEnable_;
+
+    struct Params {};
+    Params params;
+
+    CATLASS_DEVICE
+    CopyL0CToGm() = default;
+
+    CATLASS_DEVICE
+    CopyL0CToGm(Params const &params_)
+        : params(params_) {};
+
+    CATLASS_DEVICE
+    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
+                    LayoutDst const &dstLayout, LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    {
+        // 950 L0C→GM：与仓内 KDA 相同的 DataCopyCO12Dst + SetFixpipeNz2ndFlag。
+        // mSize 用实际 M（dstLayout），srcStride 用 L0C 16 对齐步长。
+        // 写 mRound 行会把 D=16（M=4）打成全 -inf。
+        AscendC::DataCopyCO12DstParams copyParams;
+        copyParams.nSize = dstLayout.shape(1);
+        copyParams.mSize = dstLayout.shape(0);
+        copyParams.srcStride = srcLayout.stride(LayoutSrc::RANK - 1) / srcLayout.stride(0);
+        copyParams.dstStride = dstLayout.stride(0);
+        copyParams.quantPre = quantPre;
+        copyParams.nz2ndEn = true;
+        copyParams.reluPre = reluEn;
+        copyParams.unitFlag = unitFlag;
+        AscendC::SetFixpipeNz2ndFlag(1, 1, 1);
+        AscendC::DataCopy(dst, src, copyParams);
     }
 };
 

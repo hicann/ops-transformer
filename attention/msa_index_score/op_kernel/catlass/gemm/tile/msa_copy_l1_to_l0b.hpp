@@ -475,6 +475,37 @@ struct CopyL1ToL0B<ArchTag, Gemm::GemmType<Element, layout::nZ, AscendC::TPositi
     }
 };
 
+#if defined(__CCE_AICORE__) && (__CCE_AICORE__ == 310)
+/// AtlasA5：nZ→nZ 用 LoadData2DParamsV2 一次搬完（A2 LoadData2D 在 950 上只对单 C0 正确）。
+/// 参数对齐 chunk_kda_fwd 仓内已验证的 Ascend950 CopyL1ToL0B；ifTranspose 必须为 false。
+template <class Element>
+struct CopyL1ToL0B<Arch::AtlasA5, Gemm::GemmType<Element, layout::nZ, AscendC::TPosition::A1>> {
+    using LayoutDst = layout::nZ;
+    using LayoutSrc = layout::nZ;
+
+    static constexpr uint32_t ELE_NUM_PER_C0 = BytesToBits(BYTE_PER_C0) / SizeOfBits<Element>::value;
+    static constexpr uint32_t ELE_NUM_PER_FRACTAL = BytesToBits(BYTE_PER_FRACTAL) / SizeOfBits<Element>::value;
+
+    CATLASS_DEVICE
+    CopyL1ToL0B() {};
+
+    CATLASS_DEVICE
+    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::LocalTensor<Element> const &srcTensor,
+                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    {
+        AscendC::LoadData2DParamsV2 loadDataParams;
+        loadDataParams.mStartPosition = 0;
+        loadDataParams.kStartPosition = 0;
+        loadDataParams.mStep = layoutDst.shape(LayoutDst::RANK - 1);
+        loadDataParams.kStep = layoutDst.shape(1);
+        loadDataParams.srcStride = CeilDiv<ELE_NUM_PER_FRACTAL>(layoutSrc.stride(1));
+        loadDataParams.dstStride = CeilDiv<ELE_NUM_PER_FRACTAL>(layoutDst.stride(1));
+        loadDataParams.ifTranspose = false;
+        AscendC::LoadData(dstTensor, srcTensor, loadDataParams);
+    }
+};
+#endif
+
 } // namespace Catlass::Gemm::Tile
 
 #endif // CATLASS_MSA_GEMM_TILE_COPY_L1_TO_L0B_HPP

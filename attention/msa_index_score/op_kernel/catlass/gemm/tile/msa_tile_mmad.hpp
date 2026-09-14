@@ -12,6 +12,7 @@
 #define CATLASS_MSA_GEMM_TILE_TILE_MMAD_HPP
 
 #include "catlass/msa_catlass.hpp"
+#include "catlass/arch/msa_arch.hpp"
 #include "catlass/gemm/msa_gemm_helper.hpp"
 namespace Catlass::Gemm::Tile {
 
@@ -48,6 +49,12 @@ struct TileMmad {
         mmadParams.k = k;
         mmadParams.unitFlag = unitFlag;
         mmadParams.cmatrixInitVal = initC;
+        // disableGemv 仅 950 MmadParams 有；if constexpr 挡不住非依赖成员检查。
+#if defined(__CCE_AICORE__) && (__CCE_AICORE__ == 310)
+        if constexpr (std::is_same_v<ArchTag_, Catlass::Arch::AtlasA5>) {
+            mmadParams.disableGemv = true;
+        }
+#endif
         if constexpr (std::is_same_v<ElementA, float> &&
                       (std::is_same_v<typename AType_::Layout, layout::ColumnMajor> ||
                        std::is_same_v<typename AType_::Layout, layout::nZ>)) {
@@ -74,6 +81,11 @@ struct TileMmad {
         mmadParams.k = k;
         mmadParams.unitFlag = unitFlag;
         mmadParams.cmatrixInitVal = false;
+#if defined(__CCE_AICORE__) && (__CCE_AICORE__ == 310)
+        if constexpr (std::is_same_v<ArchTag_, Catlass::Arch::AtlasA5>) {
+            mmadParams.disableGemv = true;
+        }
+#endif
         if constexpr (std::is_same_v<ElementA, float> &&
                       (std::is_same_v<typename AType_::Layout, layout::ColumnMajor> ||
                        std::is_same_v<typename AType_::Layout, layout::nZ>)) {

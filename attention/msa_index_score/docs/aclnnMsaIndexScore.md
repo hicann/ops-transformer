@@ -4,11 +4,15 @@
 
 ## 产品支持情况
 
-| 产品                                                      | 是否支持 |
-| --------------------------------------------------------- | :------: |
-| <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品</term> |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  |    √     |
-| <term>Ascend 950PR/Ascend 950DT</term>                    |    ×     |
+<!-- npu="910b" id1 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="950" id3 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id3 -->
 
 ## 功能说明
 
@@ -75,62 +79,290 @@ aclnnStatus aclnnMsaIndexScore(
 
 ## aclnnMsaIndexScoreGetWorkspaceSize
 
-### 参数说明
+- **参数说明：**
 
-| 参数名                        | 输入/输出 | 描述                                              | 使用说明                                                     | 数据类型                     | 数据格式 | 维度                                                         |
-| ----------------------------- | --------- | ------------------------------------------------- | ------------------------------------------------------------ | ---------------------------- | -------- | ------------------------------------------------------------ |
-| query                         | 输入      | 公式中的$Q_{idx}$                                 | 支持的shape为：TND                                           | BFLOAT16, FLOAT16            | ND       | 3（$[T1, N1, D]$）                                           |
-| key                           | 输入      | 公式中的$K_{idx}$                                 | 支持的shape为：TND、BNBD、BBND                               | BFLOAT16, FLOAT16, INT8      | ND, NZ   | 3（$[T2, N2, D]$）或 4（$[block\_num, N2, block\_size, D]$、$[block\_num, block\_size, N2, D]$） |
-| blockTableOptional            | 输入      | 表示当前传入的使用PageAttention存储的block映射表  | PageAttention场景下，blockTableOptional需为2维；第二维长度不能小于 $maxBlockNumPerSeq$ | INT32                        | ND       | 2（$[B, S2/block\_size]$）                                   |
-| scaleOptional                 | 输入      | 公式中的$scale$，反量化系数                       | 非量化场景传入`nullptr`；量化场景时必选。PA 为 BNB/BBN；TND 为 $[T2, N2]$（N2=1 时可 $[T2]$） | FLOAT                        | ND, NZ   | 3（$[block\_num, N2, block\_size]$、$[block\_num, block\_size, N2]$）或 2（$[T2, N2]$） |
-| attenMaskOptional             | 输入      | 控制因果可见的mask掩码。                          | 仅在sparseMode=3时使用，作为base mask控制causal可见；取值为1代表该位不参与计算，为0代表该位参与计算 | INT8                         | ND       | 2（$[2048, 2048]$）                                          |
-| actualSeqQlenOptional | 输入      | 每个Batch中，Query的有效token数                   | 当传入TND时，该入参必须传入，单调不减（前缀和）              | INT32                        | ND       | 1（$[B+1]$）                                                 |
-| actualSeqKlenOptional   | 输入      | 每个Batch中，Key的有效token数                     | key 为 TND 时必须传入，单调不减（前缀和，$[B+1]$）；PageAttention 场景下为各请求可见 $S2$（$[B]$） | INT32                        | ND       | 1（$[B]$ 或 $[B+1]$）                                        |
-| startLoc                      | 输入      | 当前 query 所在逻辑 block 索引（非 token 前缀） | 与 `initBlocks` / `localBlocks` 一起生成 $local\_mask$ | INT32                        | ND       | 1（$[B]$）                                                   |
-| layoutKeyOptional             | 输入      | key 的数据排布                                | 取值 `"TND"` / `"BBND"` / `"BNBD"`。不传或空串时默认 `"BBND"`。必须与 `key` 实际 shape 一致，不可仅凭维度推断 | CHAR*                        | -        | -                                                            |
-| sparseMode                    | 输入      | 表示sparse的模式                                  | 为0时，代表defaultMask模式；为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。 | INT64                        | -        | -                                                            |
-| initBlocks                    | 输入      | $local\_mask$ 强制选中的头部 block 数             | 对逻辑 block $[0, initBlocks)$ 写入高分 $1\mathrm{e}30$。可选，默认 $0$；须 $\ge 0$ 且 $\le maxBlockNumPerSeq$ | INT64                        | -        | -                                                            |
-| localBlocks                   | 输入      | $local\_mask$ 强制选中的局部窗口长度              | 窗口为 $[max(0, startLoc+1-localBlocks), startLoc]$，写入高分 $1\mathrm{e}29$（覆盖同位置 init）。可选，默认 $1$（对齐 MiniMax HF）；与 Triton raw score 对齐时置 $0$ | INT64                        | -        | -                                                            |
-| score                         | 输出      | 公式中的$score$                                   | 逐block的重要性分数；末维为对齐后的逻辑 block 数             | FLOAT                        | ND       | 3（$[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$）              |
-| workspaceSize                 | 输出      | 所需 workspace 字节数                             | -                                                            | uint64_t                     | -        | -                                                            |
-| executor                      | 输出      | 算子执行器                                        | -                                                            | aclOpExecutor**              | -        | -                                                            |
+  <table style="undefined;table-layout: fixed; width: 1600px"><colgroup>
+  <col style="width: 200px">
+  <col style="width: 100px">
+  <col style="width: 280px">
+  <col style="width: 420px">
+  <col style="width: 280px">
+  <col style="width: 100px">
+  <col style="width: 220px">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>参数名</th>
+      <th>输入/输出</th>
+      <th>描述</th>
+      <th>使用说明</th>
+      <th>数据类型</th>
+      <th>数据格式</th>
+      <th>维度(shape)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>query</td>
+      <td>输入</td>
+      <td>公式中的$Q_{idx}$。</td>
+      <td>支持的shape为：TND。</td>
+      <td>BFLOAT16、FLOAT16、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN</td>
+      <td>ND</td>
+      <td>3（$[T1, N1, D]$）</td>
+    </tr>
+    <tr>
+      <td>key</td>
+      <td>输入</td>
+      <td>公式中的$K_{idx}$。</td>
+      <td>支持的shape为：TND、BNBD、BBND。A2/A3 与 Ascend 950 上 PA key 允许 dim0（物理 page）非连续，page 内其余轴须连续。TND 不允许非连续。</td>
+      <td>BFLOAT16、FLOAT16、INT8、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN</td>
+      <td>ND</td>
+      <td>3（$[T2, N2, D]$）或 4（$[block\_num, N2, block\_size, D]$、$[block\_num, block\_size, N2, D]$）</td>
+    </tr>
+    <tr>
+      <td>blockTableOptional</td>
+      <td>输入</td>
+      <td>表示当前传入的使用PageAttention存储的block映射表。</td>
+      <td>PageAttention场景下，blockTableOptional需为2维；第二维长度不能小于 $maxBlockNumPerSeq$。</td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>2（$[B, S2/block\_size]$）</td>
+    </tr>
+    <tr>
+      <td>scaleOptional</td>
+      <td>输入</td>
+      <td>公式中的$scale$，反量化系数。</td>
+      <td>非量化场景传入 <code>nullptr</code>；量化场景时必选。PA 为 BNB/BBN；TND 为 $[T2, N2]$（N2=1 时可 $[T2]$）。</td>
+      <td>FLOAT</td>
+      <td>ND</td>
+      <td>3（$[block\_num, N2, block\_size]$、$[block\_num, block\_size, N2]$）或 2（$[T2, N2]$）</td>
+    </tr>
+    <tr>
+      <td>attenMaskOptional</td>
+      <td>输入</td>
+      <td>控制因果可见的mask掩码。</td>
+      <td>仅在sparseMode=3时使用，作为base mask控制causal可见；取值为1代表该位不参与计算，为0代表该位参与计算。</td>
+      <td>INT8</td>
+      <td>ND</td>
+      <td>2（$[2048, 2048]$）</td>
+    </tr>
+    <tr>
+      <td>actualSeqQlenOptional</td>
+      <td>输入</td>
+      <td>每个Batch中，Query的有效token数。</td>
+      <td>当传入TND时，该入参必须传入，单调不减（前缀和）。</td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>1（$[B+1]$）</td>
+    </tr>
+    <tr>
+      <td>actualSeqKlenOptional</td>
+      <td>输入</td>
+      <td>每个Batch中，Key的有效token数。</td>
+      <td>key 为 TND 时必须传入，单调不减（前缀和，$[B+1]$）；PageAttention 场景下为各请求可见 $S2$（$[B]$）。</td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>1（$[B]$ 或 $[B+1]$）</td>
+    </tr>
+    <tr>
+      <td>startLoc</td>
+      <td>输入</td>
+      <td>当前 query 所在逻辑 block 索引（非 token 前缀）。</td>
+      <td>与 <code>initBlocks</code> / <code>localBlocks</code> 一起生成 $local\_mask$。</td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>1（$[B]$）</td>
+    </tr>
+    <tr>
+      <td>layoutKeyOptional</td>
+      <td>输入</td>
+      <td>key 的数据排布。</td>
+      <td>取值 <code>"TND"</code> / <code>"BBND"</code> / <code>"BNBD"</code>。不传或空串时默认 <code>"BBND"</code>。必须与 <code>key</code> 实际 shape 一致，不可仅凭维度推断。</td>
+      <td>CHAR*</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>sparseMode</td>
+      <td>输入</td>
+      <td>表示sparse的模式。</td>
+      <td>为0时，代表defaultMask模式；为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</td>
+      <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>initBlocks</td>
+      <td>输入</td>
+      <td>$local\_mask$ 强制选中的头部 block 数。</td>
+      <td>对逻辑 block $[0, initBlocks)$ 写入高分 $1\mathrm{e}30$。可选，默认 $0$；须 $\ge 0$ 且 $\le maxBlockNumPerSeq$。</td>
+      <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>localBlocks</td>
+      <td>输入</td>
+      <td>$local\_mask$ 强制选中的局部窗口长度。</td>
+      <td>窗口为 $[max(0, startLoc+1-localBlocks), startLoc]$，写入高分 $1\mathrm{e}29$（覆盖同位置 init）。可选，默认 $1$（对齐 MiniMax HF）；与 Triton raw score 对齐时置 $0$。</td>
+      <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>score</td>
+      <td>输出</td>
+      <td>公式中的$score$。</td>
+      <td>逐block的重要性分数；末维为对齐后的逻辑 block 数。</td>
+      <td>FLOAT</td>
+      <td>ND</td>
+      <td>3（$[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$）</td>
+    </tr>
+    <tr>
+      <td>workspaceSize</td>
+      <td>输出</td>
+      <td>返回需要在Device侧申请的workspace大小。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>executor</td>
+      <td>输出</td>
+      <td>返回op执行器，包含了算子计算流程。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+  </tbody>
+  </table>
 
-### 返回值
+- **返回值：**
 
-| 返回码                  | 错误码 | 说明                                     |
-| ----------------------- | ------ | ---------------------------------------- |
-| ACLNN_SUCCESS           | 0      | 执行成功                                 |
-| ACLNN_ERR_PARAM_NULLPTR | 161001 | 必选入参或出参为空指针                   |
-| ACLNN_ERR_PARAM_INVALID | 161002 | 数据类型、数据格式、维度或取值不满足约束 |
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+  第一段接口会完成入参校验，出现以下场景时报错：
+
+  <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
+  <col style="width: 319px">
+  <col style="width: 144px">
+  <col style="width: 671px">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>返回码</th>
+      <th>错误码</th>
+      <th>描述</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ACLNN_SUCCESS</td>
+      <td>0</td>
+      <td>执行成功。</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_PARAM_NULLPTR</td>
+      <td>161001</td>
+      <td>必选入参或出参为空指针。</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_PARAM_INVALID</td>
+      <td>161002</td>
+      <td>数据类型、数据格式、维度或取值不满足约束。</td>
+    </tr>
+  </tbody>
+  </table>
 
 ## aclnnMsaIndexScore
 
-### 参数说明
+- **参数说明：**
 
-| 参数名        | 输入/输出 | 描述                               |
-| ------------- | --------- | ---------------------------------- |
-| workspace     | 输入      | device 侧 workspace 地址           |
-| workspaceSize | 输入      | workspace 字节数，由第一段接口返回 |
-| executor      | 输入      | 算子执行器，由第一段接口返回       |
-| stream        | 输入      | acl stream                         |
+  <table style="undefined;table-layout: fixed; width: 953px"><colgroup>
+  <col style="width: 173px">
+  <col style="width: 112px">
+  <col style="width: 668px">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>参数名</th>
+      <th>输入/输出</th>
+      <th>描述</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>workspace</td>
+      <td>输入</td>
+      <td>在Device侧申请的workspace内存地址。</td>
+    </tr>
+    <tr>
+      <td>workspaceSize</td>
+      <td>输入</td>
+      <td>在Device侧申请的workspace大小，由第一段接口aclnnMsaIndexScoreGetWorkspaceSize获取。</td>
+    </tr>
+    <tr>
+      <td>executor</td>
+      <td>输入</td>
+      <td>op执行器，包含了算子计算流程。</td>
+    </tr>
+    <tr>
+      <td>stream</td>
+      <td>输入</td>
+      <td>指定执行任务的Stream。</td>
+    </tr>
+  </tbody>
+  </table>
 
-### 返回值
+- **返回值：**
 
-| 返回码                  | 错误码 | 说明       |
-| ----------------------- | ------ | ---------- |
-| ACLNN_SUCCESS           | 0      | 执行成功   |
-| ACLNN_ERR_PARAM_INVALID | 161002 | 参数不合法 |
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+  <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
+  <col style="width: 319px">
+  <col style="width: 144px">
+  <col style="width: 671px">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>返回码</th>
+      <th>错误码</th>
+      <th>描述</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ACLNN_SUCCESS</td>
+      <td>0</td>
+      <td>执行成功。</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_PARAM_INVALID</td>
+      <td>161002</td>
+      <td>参数不合法。</td>
+    </tr>
+  </tbody>
+  </table>
 
 ## 约束说明
 
 - 当前 $block\_size$ 值使用128。
 - `layoutKeyOptional` 必须显式指定 key 布局：`"BBND"`（$[block\_num, block\_size, N2, D]$）、`"BNBD"`（$[block\_num, N2, block\_size, D]$）或 `"TND"`（$[T2, N2, D]$）。不传时默认 `"BBND"`。
 - PageAttention（`layoutKey` 为 `"BBND"` / `"BNBD"`）场景下，`blockTableOptional` 必须传入；TND key 场景不得传入 `blockTableOptional`，`actualSeqKlenOptional` 为 $[B+1]$ 前缀和。
-- 非量化场景下，`key` dtype 与 `query` 相同（当前为 BFLOAT16 / FLOAT16），`scaleOptional` 必须为 `nullptr`；量化场景下仅支持 INT8，`scaleOptional` 必选，dtype 为 FLOAT：PA 为 $[block\_num, N2, block\_size]$ 或 $[block\_num, block\_size, N2]$，TND 为 $[T2, N2]$。当前不支持 FP8 与 <term>Ascend 950PR/Ascend 950DT</term>。
+- 非量化场景下，`key` dtype 与 `query` 相同（BFLOAT16 / FLOAT16；Ascend 950 另支持 HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN），`scaleOptional` 必须为 `nullptr`。量化场景仅支持 INT8（fp16 query），`scaleOptional` 必选，dtype 为 FLOAT：PA 为 $[block\_num, N2, block\_size]$ 或 $[block\_num, block\_size, N2]$，TND 为 $[T2, N2]$。三种 FP8 仅 950，query 与 key 必须同型。
 - `sparseMode` 当前仅支持 0、3：
     - 为 0 时，代表 defaultMask 模式，`attenMaskOptional` 传入 `nullptr`；
     - 为 3 时，代表 rightDownCausal 模式，`attenMaskOptional` 必须传入，shape 为 $[2048, 2048]$，取值为 1 代表该位不参与计算，为 0 代表该位参与计算。
 - `initBlocks`、`localBlocks` 必须 $\ge 0$ 且不超过逻辑 block 数（PA 为 `blockTableOptional` 第二维；TND 为 score 末维对齐宽度）。两者均为 0 时跳过 $local\_mask$。
+- `q_len` / `kv_len` 允许为 0（含整 batch）。对应请求跳过 QK；空 KV 的 score 填 $-inf$；整 batch $T1=0$ 时 `SetBlockDim(1)`（对齐 FIA PR 9246）。
+- A2/A3 与 Ascend 950：按估计 M-task 数启动 MIX（单 batch 为 $\mathrm{CeilDiv}(T1\cdot N1,128)$；多 batch 取 packed+$B$ 上界并截到 AIC 数），短 decode 不打满空核。
+- PageAttention `key`（BBND/BNBD）允许首轴非连续（`key | gap | key | ...`），tiling 通过 `GetInputStride` 读取 dim0 元素 stride 写入 `strideKvBlock`；非首轴必须连续。TND `key` 不允许非连续。`scale` 仍按逻辑 page 紧凑布局。
+- PageAttention `blockTable` 第二维可以大于实际 KV 逻辑 block 数；score 末维为 $\mathrm{RoundUp}(width, 16)$。Ascend 950 C2UB 路径对超过 256 列的末维按 256 列滑窗 flush，并补写后续 $-inf$。
+- 精度自验证矩阵：39 条 fp16/bf16/int8（含 PA key dim0 stride、宽 `blockTable`、短 decode）+ 8 条 FP8。950 通过标准末行 `[PASS]: 47/47 cases passed`。A2/A3 跳过 FP8，期望 39/39（skipped 8）。容差 fp16/bf16/int8 为 $1\mathrm{e}{-3}$，FP8 为 $2\mathrm{e}{-2}$。
+- Ascend 950 核实现位于 `op_kernel/arch35/`：当前与 A2 共用 8-page S workspace（非量化 fp16 / int8 fp32）；Cube 原生三种 FP8。`--run_example` 默认 soc 为 910b，950 必须显式 `--soc=ascend950`。
 
 
 ## 调用示例
