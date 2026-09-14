@@ -20,7 +20,7 @@
 #include "fia_block_cube_fullquant_mx.h"
 #include "fia_block_vec_fullquant_mx.h"
 #include "memory_copy_arch35_fused_infer.h"
-#include "fia_block_vec_flashdecode_fullquant.h"
+#include "fia_block_vec_flashdecode_arch35.h"
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
@@ -236,7 +236,6 @@ public:
         constInfo.actualSeqLenSize = fiaBaseParams.actualSeqLengthsQSize;
         constInfo.actualSeqLenKVSize = fiaBaseParams.actualSeqLengthsKVSize;
         constInfo.scaleValue = static_cast<float>(fiaBaseParams.scaleValue);
-        constInfo.isKvContinuous = true; // 不支持tensorlist
         constInfo.coreNum = fiaBaseParams.coreNum;
         constInfo.outputLayout = static_cast<FIA_LAYOUT>(fiaBaseParams.outputLayout);
         // constInfo.strides从fiaBaseParams赋值

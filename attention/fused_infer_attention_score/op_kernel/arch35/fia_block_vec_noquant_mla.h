@@ -75,7 +75,7 @@ public:
     using mm2ResPos = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
     using attenMaskGmType = typename std::conditional<hasAtten, GlobalTensor<uint8_t>, int8_t>::type;
     using flashdecodeGmType = typename std::conditional<FLASH_DECODE, GlobalTensor<float>, int8_t>::type;
-    using ConstInfoNoQuant = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoNoQuant = ConstInfo_t;
     using OUT_T = OUTPUT_T;
 
     // gm
@@ -834,7 +834,7 @@ public:
     static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;
     using OUT_T = OUTPUT_T;
-    using ConstInfoNoQuant = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoNoQuant = ConstInfo_t;
     __aicore__ inline FANoQuantMlaBlockVecDummy(ConstInfoNoQuant &constInfo){};
 };
 

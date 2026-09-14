@@ -108,7 +108,7 @@ public:
     using flashdecodeGmType = typename std::conditional<FLASH_DECODE, GlobalTensor<float>, int8_t>::type;
     using quantGmType = typename std::conditional<(isFp8), GlobalTensor<float>, int8_t>::type;
 
-    using ConstInfoX = ConstInfo_t<FiaKernelType::FULL_QUANT>;
+    using ConstInfoX = ConstInfo_t;
 
     using MM1_OUT_T = T;
     using MM2_OUT_T = T;
@@ -1017,7 +1017,7 @@ public:
     static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;
     using OUT_T = OUTPUT_T;
-    using ConstInfoX = ConstInfo_t<FiaKernelType::FULL_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     __aicore__ inline FAFullQuantGqaBlockVecDummy(ConstInfoX &constInfo){};
 };
 } // namespace BaseApi

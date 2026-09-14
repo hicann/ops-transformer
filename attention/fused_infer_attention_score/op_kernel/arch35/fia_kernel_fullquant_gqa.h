@@ -20,7 +20,7 @@
 #include "fia_block_cube_fullquant_gqa.h"
 #include "fia_block_vec_fullquant_gqa.h"
 #include "memory_copy_arch35_fused_infer.h"
-#include "fia_block_vec_flashdecode_fullquant.h"
+#include "fia_block_vec_flashdecode_arch35.h"
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
@@ -232,7 +232,6 @@ public:
         constInfo.actualSeqLenSize = fiaBaseParams.actualSeqLengthsQSize;
         constInfo.actualSeqLenKVSize = fiaBaseParams.actualSeqLengthsKVSize;
         constInfo.scaleValue = static_cast<float>(fiaBaseParams.scaleValue);
-        constInfo.isKvContinuous = fiaBaseParams.isKvContinuous != 0;
         constInfo.coreNum = fiaBaseParams.coreNum;
         constInfo.outputLayout = static_cast<FIA_LAYOUT>(fiaBaseParams.outputLayout);
         // constInfo.strides从fiaBaseParams赋值
@@ -387,11 +386,7 @@ public:
         uint32_t bIdx = bN2Cur / constInfo.realN2Size;
         if (isFirstTask || prevBIdx != bIdx) {
             prevBIdx = bIdx;
-            if (constInfo.actualSeqLenKVSize == 0 && !constInfo.isKvContinuous) {
-                actSeqLensKv = SeqLenFromTensorList<LAYOUT_KV>(keyPtr, bIdx);
-            } else {
-                actSeqLensKv = kvActSeqLensParser.GetActualSeqLength(bIdx);
-            }
+            actSeqLensKv = kvActSeqLensParser.GetActualSeqLength(bIdx);
             actSeqLensQ = qActSeqLensParser.GetActualSeqLength(bIdx);
         }
         uint64_t s2LoopTimes = (actSeqLensKv + s2BaseSize - 1) / s2BaseSize;
@@ -617,17 +612,7 @@ public:
         info.actSingleLoopS2SizeAlign =
             AttentionCommon::Align((uint32_t)info.actSingleLoopS2Size, (uint32_t)(FA_BYTE_BLOCK / sizeof(INPUT_T)));
 
-        if (constInfo.isKvContinuous) {
-            info.isChangeBatch = false;
-        } else {
-            // for tensor-list
-            if (loop == 0) { // 第一个有效任务才需要重置KV的tensor
-                info.isChangeBatch = true;
-            } else {
-                info.isChangeBatch = (info.n2Idx == 0 && s2Cur == curS2Start);
-            }
-        }
-
+        info.isChangeBatch = false;
         GetPreNextTokenLeftUp(actSeqLensQ, actSeqLensKv, info.preTokensLeftUp, info.nextTokensLeftUp);
 
         // 情况1: loop不等于0时, 第一个S2 inner循环就是第一个S2 outer循环, 即s2Cur=0
