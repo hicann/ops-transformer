@@ -1242,13 +1242,15 @@ ge::graphStatus MoeDistributeDispatchV2TilingFuncA5::MoeDistributeDispatchTiling
     auto attrs = context->GetAttrs();
     const char *nodeName = context->GetNodeName();
     auto commAlgPtr = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_COMM_ALG_INDEX));
-    OP_LOGD(nodeName, "Set 'commAlg' as '%s'", commAlgPtr);
+    if (commAlgPtr != nullptr) {
+        OP_LOGD(nodeName, "Set 'commAlg' as '%s'", commAlgPtr);
+    }
     // 检查 commAlg 参数合法性校验
     bool isNullOrEmpty = (commAlgPtr == nullptr) || (std::strlen(commAlgPtr) == 0);
-    bool isFullmeshV1 = (std::strcmp(commAlgPtr, "fullmesh_v1") == 0);
-    bool isFullmeshV2 = (std::strcmp(commAlgPtr, "fullmesh_v2") == 0);
+    bool isFullmeshV1 = !isNullOrEmpty && (std::strcmp(commAlgPtr, "fullmesh_v1") == 0);
+    bool isFullmeshV2 = !isNullOrEmpty && (std::strcmp(commAlgPtr, "fullmesh_v2") == 0);
     bool isMte = isFullmeshV1 || isFullmeshV2;
-    bool isCcu = std::strcmp(commAlgPtr, "ccu") == 0;
+    bool isCcu = !isNullOrEmpty && (std::strcmp(commAlgPtr, "ccu") == 0);
     OP_TILING_CHECK(!(isNullOrEmpty || isMte || isCcu),
                     OP_LOGE(nodeName,
                             "Invalid parameter: 'commAlg'='%s'. "

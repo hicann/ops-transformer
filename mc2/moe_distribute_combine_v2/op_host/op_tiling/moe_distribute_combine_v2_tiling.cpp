@@ -328,7 +328,7 @@ static ge::graphStatus GetAttrAndSetTilingData(const gert::TilingContext *contex
 
     OP_TILING_CHECK(commQuantModePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "commQuantMode"),
                     return ge::GRAPH_FAILED);
-    isLayered = strcmp(commAlgPtr, "hierarchy") == 0;
+    isLayered = (commAlgPtr != nullptr) && (strcmp(commAlgPtr, "hierarchy") == 0);
     if (config.isMc2Context) {
         OP_TILING_CHECK(
             isLayered, OP_LOGE_FOR_INVALID_VALUE(nodeName, "commAlg", commAlgPtr, "does not support comm with context"),
@@ -507,9 +507,9 @@ static bool CheckOptionalScalesTensorDim(const gert::TilingContext *context, con
 {
     if (isLayered) {
         const gert::StorageShape *expandScaleStorageShape = context->GetOptionalInputShape(EXPAND_SCALES_INDEX);
-        const int64_t expandScaleDim = expandScaleStorageShape->GetStorageShape().GetDimNum();
         OP_TILING_CHECK(expandScaleStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandScales"),
                         return false);
+        const int64_t expandScaleDim = expandScaleStorageShape->GetStorageShape().GetDimNum();
         OP_TILING_CHECK(
             expandScaleDim != ONE_DIM,
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "expandScales", std::to_string(expandScaleDim).c_str(),
@@ -1250,6 +1250,8 @@ static bool CheckFromDispatchTensorShape(const gert::TilingContext *context,
     // 校验expandScales的维度
     if (isLayered) {
         const gert::StorageShape *expandScaleStorageShape = context->GetOptionalInputShape(EXPAND_SCALES_INDEX);
+        OP_TILING_CHECK(expandScaleStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandScales"),
+                        return false);
         int64_t expandScalesDim0 = expandScaleStorageShape->GetStorageShape().GetDim(0);
         int64_t minexpandScalesDim0 = static_cast<int64_t>(A);
         OP_TILING_CHECK(expandScalesDim0 < minexpandScalesDim0,

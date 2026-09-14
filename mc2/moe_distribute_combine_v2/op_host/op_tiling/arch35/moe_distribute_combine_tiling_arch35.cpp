@@ -824,7 +824,7 @@ ge::graphStatus MoeDistributeCombineV2TilingFuncA5::MoeDistributeCombineTilingFu
     auto commAlgPtr = attrs->GetAttrPointer<char>(static_cast<int>((config.attrCommAlgIndex)));
     // 检查 commAlg 参数合法性校验
     bool isNullOrEmpty = (commAlgPtr == nullptr) || (std::strlen(commAlgPtr) == 0);
-    bool isCcu = std::strcmp(commAlgPtr, "ccu") == 0;
+    bool isCcu = !isNullOrEmpty && (std::strcmp(commAlgPtr, "ccu") == 0);
     OP_TILING_CHECK(
         !(isNullOrEmpty || isCcu),
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "commAlg", commAlgPtr != nullptr ? commAlgPtr : "null",
