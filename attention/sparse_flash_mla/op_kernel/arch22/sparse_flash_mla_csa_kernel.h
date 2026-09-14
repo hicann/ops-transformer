@@ -650,16 +650,9 @@ __aicore__ inline void SparseFlashMlaCsa<SMLAT>::CalcParams(uint32_t loop, uint3
         }
         info.s2StartPoint = 0;
         info.cmpS2IdLimit = (tempLoopInfo.cmpMaskRight + tempLoopInfo.s1EndIdx + 1) / constInfo.cmpRatio;
-        if constexpr (HEAD_RATIO_ONE) {
-            info.v0S2Start = static_cast<int32_t>(s2Offset);
-            info.v0S2DealSize = static_cast<int32_t>(info.actualSingleProcessSInnerSize);
-        } else {
-            info.v0S2Start = 0;
-            if (s2LoopIdx + 1 == tempLoopInfo.s2LoopTimes && s2LoopIdx == 2) {
-                info.v0S2Start = 512;
-            }
-            info.v0S2DealSize = 512;
-        }
+        // Each compressed block reads its own slice, including a partial final block.
+        info.v0S2Start = static_cast<int32_t>(s2Offset);
+        info.v0S2DealSize = static_cast<int32_t>(info.actualSingleProcessSInnerSize);
     }
 
     info.actualSingleProcessSInnerSizeAlign =
