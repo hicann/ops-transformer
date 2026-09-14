@@ -283,7 +283,7 @@ private:
 
     __simd_vf__ inline void GenB16zNTailMask(__ubuf__ int32_t *tailMaskUb, uint32_t tailSizePerB16Fractal)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<int32_t> tailMaskElemVreg;
         UnalignReg tailMaskUreg;
         int32_t tailMaskElemVal = (1 << (2 * tailSizePerB16Fractal - 1)) - 1;
@@ -299,7 +299,7 @@ private:
                                                 uint32_t rowAligned16, uint32_t colAligned16, ElementInput minValue,
                                                 float pScale)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<half> vreg_p_scale;
         RegTensor<half> vreg_ln_p_scale;
         RegTensor<ElementInput> vreg_input_x_1;
@@ -356,7 +356,7 @@ private:
                                                     __ubuf__ uint8_t *gatherPIdxUbAddr, uint32_t row,
                                                     uint32_t rowAligned16, uint32_t colAligned32)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<ElementInput> vreg_input_x_1;
         RegTensor<ElementInput> vreg_input_x_unroll_1;
         RegTensor<half> vreg_input_x_2;
@@ -503,7 +503,7 @@ private:
                                                   __ubuf__ int16_t *tailMaskUbAddr, uint32_t row, uint32_t rowAligned16,
                                                   uint32_t colMainLoopNum16, ElementInput minValue, float pScale)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<half> vreg_p_scale;
         RegTensor<half> vreg_ln_p_scale;
         RegTensor<half> vreg_input_x_1;
@@ -582,7 +582,7 @@ private:
                                                       uint32_t rowAligned16, uint32_t colMainLoopNum32,
                                                       ElementInput minValue)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<half> vreg_input_x_1;
         RegTensor<half> vreg_input_x_unroll_1;
         RegTensor<half> vreg_input_x_2;
@@ -817,7 +817,7 @@ private:
     __simd_vf__ inline void UpdateRowMaxImpl(__ubuf__ float *dmUbAddr, __ubuf__ ElementInput *gmUbAddr,
                                              __ubuf__ ElementInput *lmUbAddr, uint32_t row)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<half> vreg_in_max;
         RegTensor<half> vreg_input_max;
         RegTensor<half> vreg_max_new;
@@ -834,7 +834,7 @@ private:
                                              __ubuf__ ElementInput *lmUbAddr, __ubuf__ float *glUbAddr,
                                              __ubuf__ float *llUbAddr)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> vreg_in_exp_sum;
         RegTensor<float> vreg_exp_sum_brc;
         RegTensor<float> vreg_exp_sum_update;
@@ -871,7 +871,7 @@ private:
                                                      __ubuf__ float *gmUbAddr32, __ubuf__ ElementInput *lmUbAddr,
                                                      __ubuf__ float *glUbAddr, __ubuf__ float *llUbAddr)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<float> vreg_in_exp_sum;
         RegTensor<float> vreg_exp_sum_brc;
         RegTensor<float> vreg_exp_sum_update;
@@ -916,7 +916,7 @@ private:
     __simd_vf__ inline void RestoreRowMaxLastAndFirstTileImpl(__ubuf__ ElementInput *gmUbAddr,
                                                               __ubuf__ float *gmUbAddr32)
     {
-        using namespace AscendC::MicroAPI;
+        using namespace AscendC::Reg;
         RegTensor<half> vreg_in_max;
         RegTensor<float> vreg_gmax;
         RegTensor<float> vreg_gmax_odd;
