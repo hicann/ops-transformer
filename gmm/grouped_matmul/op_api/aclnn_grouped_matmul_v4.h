@@ -29,7 +29,7 @@ typedef enum {
  * @domain aclnn_ops_infer
  *
  * @param [in] x:
- * 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT4数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] weight:
  * 表示公式中的weight，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT4、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] biasOptional:
@@ -54,27 +54,32 @@ typedef enum {
  * 整数型参数，代表需要切分的轴，-1代表不需要切分；0代表需要切分M轴；1代表需要切分N轴；2代表需要切分K轴。
  * @param [in] groupListType:
  * 整数型参数，可取值0,1或2，0代表groupListOptional中数值为分组轴大小的cumsum结果（累积和），
- * 1代表groupListOptional中数值为分组轴上每组大小，2代表groupListOptional以稀疏键值对的形式处理，每个元素为[groupedIdx, groupedSize]。
+ * 1代表groupListOptional中数值为分组轴上每组大小，2代表groupListOptional以稀疏键值对的形式处理，每个元素为[groupedIdx,
+ * groupedSize]。
  * @param [in] actType:整数型参数，代表激活函数类型，各激活函数枚举值参考枚举类GMMActType。
- * @param [out] out: 表示公式中的out，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * @param [out] out:
+ * 表示公式中的out，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT32数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [out] activationFeatureOutOptional: 激活函数的输入数据。
  * @param [out] dynQuantScaleOutOptional: 预留参数。
  * @param [out] workspaceSize: 返回用户需要在npu device侧申请的workspace大小。
  * @param [out] executor: 返回op执行器，包含算子计算流程。
  * @return aclnnStatus: 返回状态码。
  */
-__attribute__((visibility("default"), deprecated("aclnnGroupedMatmulV4GetWorkspaceSize is scheduled to be deprecated in a post-December 2026 version update, "
-"and will be replaced by the aclnnGroupedMatmulV5GetWorkspaceSize. We apologize for any inconvenience caused and appreciate your timely migration to the new interface.")))
-aclnnStatus aclnnGroupedMatmulV4GetWorkspaceSize(
+__attribute__((
+    visibility("default"),
+    deprecated(
+        "aclnnGroupedMatmulV4GetWorkspaceSize is scheduled to be deprecated in a post-December 2026 version update, "
+        "and will be replaced by the aclnnGroupedMatmulV5GetWorkspaceSize. We apologize for any inconvenience caused "
+        "and appreciate your timely migration to the new interface."))) aclnnStatus
+aclnnGroupedMatmulV4GetWorkspaceSize(
     const aclTensorList *x, const aclTensorList *weight, const aclTensorList *biasOptional,
     const aclTensorList *scaleOptional, const aclTensorList *offsetOptional,
     const aclTensorList *antiquantScaleOptional, const aclTensorList *antiquantOffsetOptional,
     const aclTensorList *perTokenScaleOptional, const aclTensor *groupListOptional,
     const aclTensorList *activationInputOptional, const aclTensorList *activationQuantScaleOptional,
-    const aclTensorList *activationQuantOffsetOptional,  int64_t splitItem, int64_t groupType,
-    int64_t groupListType, int64_t actType, aclTensorList *out, aclTensorList *activationFeatureOutOptional,
-    aclTensorList *dynQuantScaleOutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensorList *activationQuantOffsetOptional, int64_t splitItem, int64_t groupType, int64_t groupListType,
+    int64_t actType, aclTensorList *out, aclTensorList *activationFeatureOutOptional,
+    aclTensorList *dynQuantScaleOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /**
  * @brief aclnnGroupedMatmulV4的第二段接口，用于执行计算。
@@ -84,10 +89,11 @@ aclnnStatus aclnnGroupedMatmulV4GetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-__attribute__((visibility("default"), deprecated("aclnnGroupedMatmulV4 is scheduled to be deprecated in a post-December 2026 version update, "
-"and will be replaced by the aclnnGroupedMatmulV5. We apologize for any inconvenience caused and appreciate your timely migration to the new interface.")))
-aclnnStatus aclnnGroupedMatmulV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
-                                           aclrtStream stream);
+__attribute__((visibility("default"),
+               deprecated("aclnnGroupedMatmulV4 is scheduled to be deprecated in a post-December 2026 version update, "
+                          "and will be replaced by the aclnnGroupedMatmulV5. We apologize for any inconvenience caused "
+                          "and appreciate your timely migration to the new interface."))) aclnnStatus
+aclnnGroupedMatmulV4(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

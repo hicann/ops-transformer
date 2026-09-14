@@ -412,15 +412,14 @@ aclnnStatus aclnnGroupedMatmul(
       - 以下入参为空：scaleOptional、offsetOptional
       - 不为空的参数支持的数据类型组合要满足下表：
 
-          | x       | weight  | biasOptional | antiquantScaleOptional | antiquantOffsetOptional | y     |
-          |:-------:|:-------:| :------      |:------ |:------ |:------ |
-          |BFLOAT16    |INT8     |BFLOAT16/FLOAT32/null    | BFLOAT16 | BFLOAT16 | BFLOAT16 |
-          |FLOAT16     |INT8     |FLOAT16/null             | FLOAT16  | FLOAT16  | FLOAT16  |
+        | x       | weight  | biasOptional | antiquantScaleOptional | antiquantOffsetOptional | y     |
+        |:-------:|:-------:| :------      |:------ |:------ |:------ |
+        |BFLOAT16    |INT8     |BFLOAT16/FLOAT32/null    | BFLOAT16 | BFLOAT16 | BFLOAT16 |
+        |FLOAT16     |INT8     |FLOAT16/null             | FLOAT16  | FLOAT16  | FLOAT16  |
 
       - antiquantScaleOptional和非空的biasOptional、antiquantOffsetOptional要满足下表：
 
         | 使用场景 | shape限制 |
-
         |:---------:| :------ |
         |weight多tensor|每个tensor 1维，shape为（$n_i$），不允许存在一个tensorList中部分tensor的shape为（$n_i$）部分tensor为空的情况 |
 

@@ -1149,6 +1149,8 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 伪量化调用示例
 
 ```c++
+#include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"
@@ -1165,6 +1167,14 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
   do {                              \
     printf(message, ##__VA_ARGS__); \
   } while (0)
+
+float Bf16ToFloat(uint16_t value)
+{
+    uint32_t bits = static_cast<uint32_t>(value) << 16;
+    float result;
+    std::memcpy(&result, &bits, sizeof(result));
+    return result;
+}
 
 int64_t GetShapeSize(const std::vector<int64_t>& shape) {
   int64_t shapeSize = 1;
@@ -1414,7 +1424,7 @@ int main() {
                       size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t j = 0; j < 20; j++) {
-      LOG_PRINT("result[%ld] is: %d\n", j, resultData[j]);
+      LOG_PRINT("result[%ld] is: %g\n", j, Bf16ToFloat(resultData[j]));
     }
     LOG_PRINT("......\n");
   }
@@ -1447,6 +1457,8 @@ int main() {
 全量化调用示例
 
 ```c++
+#include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -1475,6 +1487,14 @@ int main() {
     do {                                \
         printf(message, ##__VA_ARGS__); \
     } while (0)
+
+float Bf16ToFloat(uint16_t value)
+{
+    uint32_t bits = static_cast<uint32_t>(value) << 16;
+    float result;
+    std::memcpy(&result, &bits, sizeof(result));
+    return result;
+}
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {
@@ -1774,7 +1794,7 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret);
                   return ret);
         for (int64_t j = 0; j < size; j++) {
-            LOG_PRINT("result[%ld] is: %d\n", j, resultData[j]);
+            LOG_PRINT("result[%ld] is: %g\n", j, Bf16ToFloat(resultData[j]));
         }
     }
     return ACL_SUCCESS;
@@ -1798,6 +1818,8 @@ int main()
   MxA8W4伪量化（单多单场景）调用示例
 
 ```c++
+#include <cstdint>
+#include <cstring>
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -1825,6 +1847,14 @@ int main()
     do {                                                                                                               \
         printf(message, ##__VA_ARGS__);                                                                                \
     } while (0)
+
+float Bf16ToFloat(uint16_t value)
+{
+    uint32_t bits = static_cast<uint32_t>(value) << 16;
+    float result;
+    std::memcpy(&result, &bits, sizeof(result));
+    return result;
+}
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {
@@ -2113,7 +2143,7 @@ int aclnnGroupedMatmulWeightNzMxA8W4MultiTest(int32_t deviceId, aclrtStream &str
                       ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t j = 0; j < std::min<int64_t>(size, 10); j++) {
-        LOG_PRINT("result[%ld] is: %d\n", j, resultData[j]);
+        LOG_PRINT("result[%ld] is: %g\n", j, Bf16ToFloat(resultData[j]));
     }
 
     // 释放 device 资源
