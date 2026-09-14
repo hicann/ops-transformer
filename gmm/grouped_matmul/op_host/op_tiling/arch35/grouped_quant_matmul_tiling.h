@@ -263,7 +263,7 @@ protected:
     bool IsMxfp4() const;
     bool IsMultiTensorWeight() const;
     bool IsWeightNzMultiTensorLayout() const;
-    uint16_t GetTensorListSize(uint32_t index) const;
+    uint16_t GetTensorListSize(uint32_t index, uint16_t maxCount = GroupedMatmul::MAX_TENSOR_CONT) const;
     bool CheckWeightTensorListForWeightNz() const;
     uint64_t GetWeightLogicalNSize(const gert::Shape &wShape) const;
     bool CheckMultiWeightNzInputs(const gert::StorageShape *xScaleStorageShape) const;
