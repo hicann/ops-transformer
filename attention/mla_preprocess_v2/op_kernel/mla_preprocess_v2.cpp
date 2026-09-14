@@ -15,34 +15,21 @@
 #include "kernel_operator.h"
 
 #if ORIG_DTYPE_INPUT == DT_FLOAT16
-
-#if __has_include("../../mla_preprocess/op_kernel/mla_preprocess_fp16.h")
 #include "../../mla_preprocess/op_kernel/mla_preprocess_fp16.h"
-#else
-#include "../mla_preprocess/mla_preprocess_fp16.h"
-#endif
-
 #elif ORIG_DTYPE_INPUT == DT_BF16
-
-#if __has_include("../../mla_preprocess/op_kernel/mla_preprocess_bf16.h")
 #include "../../mla_preprocess/op_kernel/mla_preprocess_bf16.h"
 #include "../../mla_preprocess/op_kernel/mla_preprocess_no_quant.h"
-#else
-#include "../mla_preprocess/mla_preprocess_bf16.h"
-#include "../mla_preprocess/mla_preprocess_no_quant.h"
-#endif
-
 #endif
 
 using namespace MlaPreprocess;
 
-extern "C" __global__ __aicore__ void
-mla_preprocess_v2(GM_ADDR hiddenStateGm, GM_ADDR gamma1Gm, GM_ADDR beta1Gm, GM_ADDR quantScale1Gm, GM_ADDR quantOffset1Gm,
-               GM_ADDR wdqkvGm, GM_ADDR descale1Gm, GM_ADDR bias1Gm, GM_ADDR gamma2Gm, GM_ADDR beta2Gm,
-               GM_ADDR quantScale2Gm, GM_ADDR quantOffset2Gm, GM_ADDR wuqGm, GM_ADDR descale2Gm, GM_ADDR bias2Gm,
-               GM_ADDR gamma3Gm, GM_ADDR cos1Gm, GM_ADDR sin1Gm, GM_ADDR wukGm, GM_ADDR keycacheGm,
-               GM_ADDR keycacheRopeGm, GM_ADDR slotMappingGm, GM_ADDR gmCtkvScale, GM_ADDR gmQnopeScale, GM_ADDR qGm,
-               GM_ADDR keycacheOutGm, GM_ADDR qGm2, GM_ADDR keycacheOutGm2, GM_ADDR qDownGm, GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void mla_preprocess_v2(
+    GM_ADDR hiddenStateGm, GM_ADDR gamma1Gm, GM_ADDR beta1Gm, GM_ADDR quantScale1Gm, GM_ADDR quantOffset1Gm,
+    GM_ADDR wdqkvGm, GM_ADDR descale1Gm, GM_ADDR bias1Gm, GM_ADDR gamma2Gm, GM_ADDR beta2Gm, GM_ADDR quantScale2Gm,
+    GM_ADDR quantOffset2Gm, GM_ADDR wuqGm, GM_ADDR descale2Gm, GM_ADDR bias2Gm, GM_ADDR gamma3Gm, GM_ADDR cos1Gm,
+    GM_ADDR sin1Gm, GM_ADDR wukGm, GM_ADDR keycacheGm, GM_ADDR keycacheRopeGm, GM_ADDR slotMappingGm,
+    GM_ADDR gmCtkvScale, GM_ADDR gmQnopeScale, GM_ADDR qGm, GM_ADDR keycacheOutGm, GM_ADDR qGm2, GM_ADDR keycacheOutGm2,
+    GM_ADDR qDownGm, GM_ADDR workspace, GM_ADDR tiling)
 {
     SetAtomicnone();
     SetMasknorm();
