@@ -2329,7 +2329,7 @@ mhc:
       - block_attention_residuals
 
 mamba:
-    causal_conv1d:
+  causal_conv1d:
     module: True
     src:
       - mamba/causal_conv1d

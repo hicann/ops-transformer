@@ -26,7 +26,7 @@
 namespace CausalConv1d {
 
 using namespace AscendC;
-using namespace AscendC::MicroAPI;
+using namespace AscendC::Reg;
 using namespace CausalConv1dUtil;
 
 constexpr uint16_t V_LENGTH = VECTOR_REG_WIDTH / sizeof(float);
@@ -416,7 +416,10 @@ protected:
         return hasInitialStateMode ? (this->initialStateModeGm_.GetValue(batchId) != 0) : false;
     }
 
-    __aicore__ inline const CausalConv1dTilingData *GetTilingData() const { return tilingData_; }
+    __aicore__ inline const CausalConv1dTilingData *GetTilingData() const
+    {
+        return tilingData_;
+    }
 
 protected:
     TPipe pipe_;

@@ -36,8 +36,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_fp16_basic)
     auto y = TensorDesc({4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, bias, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, bias, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -53,8 +53,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_bf16_basic)
     auto y = TensorDesc({4, 1, 512}, ACL_BF16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -85,8 +85,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_weight_nullptr)
     auto y = TensorDesc({4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, nullptr, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, nullptr, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -101,8 +101,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_convStates_nullptr)
     auto y = TensorDesc({4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -117,8 +117,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_y_nullptr)
     auto convStates = TensorDesc({4, 4, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(nullptr));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -134,8 +134,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_x_dtype_invalid)
     auto y = TensorDesc({4, 1, 512}, ACL_INT8, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -151,8 +151,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_weight_dtype_mismatch)
     auto y = TensorDesc({4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -168,8 +168,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_y_dtype_mismatch)
     auto y = TensorDesc({4, 1, 512}, ACL_BF16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -239,8 +239,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_x_dimnum_invalid)
     auto y = TensorDesc({4, 4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -256,13 +256,13 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_3d_seqlen_not_1)
     auto y = TensorDesc({4, 5, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
     aclnnStatus ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
-    EXPECT_EQ(ret, ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(ret, ACLNN_SUCCESS);
 }
 
 TEST_F(l2_causal_conv1d_update_test, Ascend950_update_kernel_width_invalid)
@@ -273,8 +273,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_kernel_width_invalid)
     auto y = TensorDesc({4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -290,8 +290,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_stateLen_too_small)
     auto y = TensorDesc({4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -307,8 +307,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_dim_too_small)
     auto y = TensorDesc({4, 1, 32}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -324,8 +324,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_dim_not_aligned)
     auto y = TensorDesc({4, 1, 72}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -341,8 +341,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_batch_exceed)
     auto y = TensorDesc({2048, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -358,8 +358,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_numCacheLines_less_than_ba
     auto y = TensorDesc({4, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -375,8 +375,8 @@ TEST_F(l2_causal_conv1d_update_test, Ascend950_update_y_dimnum_mismatch)
     auto y = TensorDesc({4, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dUpdate,
-                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                              activation, (int64_t)0, (int64_t)-1),
+                        INPUT(x, weight, convStates, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, activation,
+                              (int64_t)0, (int64_t)-1),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;

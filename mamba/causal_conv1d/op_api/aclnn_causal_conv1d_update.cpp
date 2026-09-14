@@ -170,8 +170,8 @@ static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, in
 
     auto csShape = convStatesRef->GetViewShape();
     if (csShape.GetDimNum() != 3) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "convStatesRef dim num must be 3 [numCacheLines, stateLen, dim], but got %zuD.",
-                csShape.GetDimNum());
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "convStatesRef dim num must be 3 [numCacheLines, stateLen, dim], but got %zuD.", csShape.GetDimNum());
         return false;
     }
     if (csShape.GetDim(2) != dim) {
@@ -189,16 +189,16 @@ static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, in
     }
     int64_t dtypeSize = GetDtypeSize(convStatesRef);
     if (dtypeSize == 0 || (dim * dtypeSize) % DIM_ALIGN_BYTES != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "dim(%ld) * dtypeSize(%ld) must be %ld-byte aligned.", dim, dtypeSize, DIM_ALIGN_BYTES);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "dim(%ld) * dtypeSize(%ld) must be %ld-byte aligned.", dim, dtypeSize,
+                DIM_ALIGN_BYTES);
         return false;
     }
     return true;
 }
 
 static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convStatesRef,
-                                     const aclTensor *queryStartLocOptional,
-                                     const aclTensor *numAcceptedTokensOptional, int64_t kernelWidth)
+                                     const aclTensor *queryStartLocOptional, const aclTensor *numAcceptedTokensOptional,
+                                     int64_t kernelWidth)
 {
     const int64_t BATCH_MIN = 1;
     const int64_t BATCH_MAX = 1024;
@@ -220,8 +220,8 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
     }
 
     if (numAcceptedTokensOptional != nullptr && kernelWidth != 4) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "numAcceptedTokensOptional is only supported when K=4, but got K=%ld.", kernelWidth);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "numAcceptedTokensOptional is only supported when K=4, but got K=%ld.",
+                kernelWidth);
         return false;
     }
 
@@ -233,8 +233,8 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
         } else {
             batch = xBatch;
             if (qslPresent && qslSize != batch + 1) {
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                        "queryStartLocOptional size(%ld) must equal batch+1(%ld) for 3D x.", qslSize, batch + 1);
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "queryStartLocOptional size(%ld) must equal batch+1(%ld) for 3D x.",
+                        qslSize, batch + 1);
                 return false;
             }
         }
@@ -248,8 +248,8 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
     }
     int64_t numCacheLines = convStatesRef->GetViewShape().GetDim(0);
     if (numCacheLines < batch) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "convStatesRef numCacheLines(%ld) must be >= batch(%ld).", numCacheLines, batch);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "convStatesRef numCacheLines(%ld) must be >= batch(%ld).", numCacheLines,
+                batch);
         return false;
     }
     return true;
@@ -278,8 +278,7 @@ static bool CheckShape(const aclTensor *x, const aclTensor *weight, const aclTen
 
     CHECK_RET(CheckConvStatesShape(convStatesRef, dim, kernelWidth), false);
 
-    CHECK_RET(CheckScenarioConstraints(x, convStatesRef, queryStartLocOptional, numAcceptedTokensOptional,
-                                       kernelWidth),
+    CHECK_RET(CheckScenarioConstraints(x, convStatesRef, queryStartLocOptional, numAcceptedTokensOptional, kernelWidth),
               false);
 
     CHECK_RET(CheckOutputShape(x, y), false);
@@ -358,7 +357,7 @@ ACLNN_API aclnnStatus aclnnCausalConv1dUpdateGetWorkspaceSize(
 {
     L2_DFX_PHASE_1(aclnnCausalConv1dUpdate,
                    DFX_IN(x, weight, convStatesRef, biasOptional, queryStartLocOptional, cacheIndicesOptional,
-                          numAcceptedTokensOptional),
+                          numAcceptedTokensOptional, activation, nullBlockId),
                    DFX_OUT(convStatesRef, y));
     return CausalConv1dUpdateCommonProcess(x, weight, convStatesRef, biasOptional, queryStartLocOptional,
                                            cacheIndicesOptional, numAcceptedTokensOptional,

@@ -176,8 +176,8 @@ static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, in
     const int64_t DIM_ALIGN_BYTES = 32;
     auto csShape = convStatesRef->GetViewShape();
     if (csShape.GetDimNum() != 3) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "convStatesRef dim num must be 3 [numCacheLines, stateLen, dim], but got %zuD.",
-                csShape.GetDimNum());
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "convStatesRef dim num must be 3 [numCacheLines, stateLen, dim], but got %zuD.", csShape.GetDimNum());
         return false;
     }
     if (csShape.GetDim(2) != dim) {
@@ -195,8 +195,8 @@ static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, in
     }
     int64_t dtypeSize = GetDtypeSize(convStatesRef);
     if (dtypeSize == 0 || (dim * dtypeSize) % DIM_ALIGN_BYTES != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "dim(%ld) * dtypeSize(%ld) must be %ld-byte aligned.", dim, dtypeSize, DIM_ALIGN_BYTES);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "dim(%ld) * dtypeSize(%ld) must be %ld-byte aligned.", dim, dtypeSize,
+                DIM_ALIGN_BYTES);
         return false;
     }
     return true;
@@ -223,8 +223,8 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
     } else {
         batch = xShape.GetDim(0);
         if (qslPresent && qslSize != batch + 1) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "queryStartLocOptional size(%ld) must equal batch+1(%ld) for 3D x.", qslSize, batch + 1);
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "queryStartLocOptional size(%ld) must equal batch+1(%ld) for 3D x.",
+                    qslSize, batch + 1);
             return false;
         }
     }
@@ -235,8 +235,8 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
     }
     int64_t numCacheLines = convStatesRef->GetViewShape().GetDim(0);
     if (numCacheLines < batch) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "convStatesRef numCacheLines(%ld) must be >= batch(%ld).", numCacheLines, batch);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "convStatesRef numCacheLines(%ld) must be >= batch(%ld).", numCacheLines,
+                batch);
         return false;
     }
     return true;
@@ -341,7 +341,7 @@ ACLNN_API aclnnStatus aclnnCausalConv1dFnGetWorkspaceSize(
 {
     L2_DFX_PHASE_1(aclnnCausalConv1dFn,
                    DFX_IN(x, weight, convStatesRef, biasOptional, queryStartLocOptional, cacheIndicesOptional,
-                          initialStateModeOptional),
+                          initialStateModeOptional, activation, nullBlockId),
                    DFX_OUT(convStatesRef, y));
     return CausalConv1dFnCommonProcess(
         x, weight, convStatesRef, biasOptional, queryStartLocOptional, cacheIndicesOptional, initialStateModeOptional,
