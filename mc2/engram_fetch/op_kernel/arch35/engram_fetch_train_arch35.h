@@ -299,7 +299,7 @@ __aicore__ inline void EngramFetchTrainArch35::PrepareWrite(uint64_t commHandle,
     if (preparedWriteCount_ == HCOMM_BATCH_CAPACITY) {
         FlushPreparedWrites();
     }
-    if (preparedWriteCount_ == 0U && activeBatchChannel_ != commHandle) {
+    if (preparedWriteCount_ == 0U) {
         LocalTensor<uint8_t> hcommBatchTensor = hcommBatchBuf_.Get<uint8_t>();
         activeBatchHandle_ = hcomm_.MakeBatchHandle(commHandle, hcommBatchTensor, HCOMM_BATCH_BUFFER_BYTES, dstBase);
         activeBatchChannel_ = commHandle;

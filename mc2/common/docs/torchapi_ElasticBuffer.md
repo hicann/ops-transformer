@@ -3,7 +3,7 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950DT</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
@@ -671,7 +671,7 @@ def train_worker(rank):
 
     # ==================== 生成 embedding 和 indices ====================
     torch.manual_seed(42 + rank)
-    storage = torch.randn(num_entries, hidden, dtype=dtype)
+    storage = torch.randn(num_entries, hidden, dtype=dtype, pin_memory=True)
     total_entries = num_entries * world_size
 
     torch.manual_seed(100 + rank)
