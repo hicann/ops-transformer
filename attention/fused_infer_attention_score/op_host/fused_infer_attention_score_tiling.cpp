@@ -28,6 +28,7 @@
 #include "../../incre_flash_attention/op_host/incre_flash_attention_tiling_impl.h"
 #include "arch35/fused_infer_attention_score_tiling_v4.h"
 #include "arch38/fused_infer_attention_score_tiling_arch38.h"
+#include "fused_infer_attention_score_tiling_cache.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -1748,6 +1749,8 @@ static ge::graphStatus TilingProcess4SplitFuse(gert::TilingContext *context)
                 return ge::GRAPH_FAILED);
     // 使用SyncAll，需要设置为batchmode模式，所有核同时启动，否则多流方式下执行可能会卡死
     constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
+    // 记录 schedule mode 供 tiling 结果缓存快照使用（thread_local，见 fia_tiling_schedule_recorder.h）
+    FiaTilingScheduleRecorder::Record(BATCH_MODE_SCHEDULE);
     context->SetScheduleMode(BATCH_MODE_SCHEDULE);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     uint32_t aicoreNum = ascendcPlatform.GetCoreNumAic();
@@ -2508,19 +2511,47 @@ FIA_EXTERN_C ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingCont
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+
+    // 手写路径 tiling 结果缓存：同一 (shape, attr) 的 tiling 只执行一次，后续直接恢复结果。
+    // 手写框架的 GWS/Run 两阶段各自触发一次 tiling，缓存可消除第二次重复计算（可用环境变量
+    // FIA_TILING_CACHE_DISABLE=1 关闭）。仅 arch22 路由（else 分支）生效，arch35/arch38 路径
+    // 行为与修复前保持一致。
+    const bool isArch22Route = (ascendcPlatform.GetCurNpuArch() != NpuArch::DAV_3510) &&
+                               (ascendcPlatform.GetCurNpuArch() != NpuArch::DAV_5102);
+    const bool cacheEnabled = isArch22Route && !FusedInferAttentionScoreTilingCache::IsCacheDisabled();
+    std::string cacheKey;
+    const bool cacheKeyValid =
+        cacheEnabled && FusedInferAttentionScoreTilingCache::BuildKey(
+                            context, static_cast<int32_t>(ascendcPlatform.GetCurNpuArch()), cacheKey);
+    if (cacheKeyValid) {
+        FusedInferAttentionScoreTilingCache::TilingResult cachedResult;
+        if (FusedInferAttentionScoreTilingCache::GetInstance().Get(cacheKey, cachedResult) &&
+            (FusedInferAttentionScoreTilingCache::Restore(context, cachedResult) == ge::GRAPH_SUCCESS)) {
+            return ge::GRAPH_SUCCESS;
+        }
+    }
+
+    FiaTilingScheduleRecorder::Reset();
+    ge::graphStatus tilingRet = ge::GRAPH_FAILED;
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
-        return TilingFusedInferAttentionScoreV4(context);
+        tilingRet = TilingFusedInferAttentionScoreV4(context);
     } else if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_5102) {
         OP_CHECK_IF(
             HasNonContiguousCacheInput(context),
             OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
                                         "Non-contiguous key/value/keyRope cache is not supported by the arch38 route."),
             return ge::GRAPH_FAILED);
-        return TilingFusedInferAttentionScoreArch38(context);
+        tilingRet = TilingFusedInferAttentionScoreArch38(context);
     } else {
-        return TilingFusedInferAttentionScore(context);
+        tilingRet = TilingFusedInferAttentionScore(context);
     }
-    return ge::GRAPH_SUCCESS;
+    if (tilingRet == ge::GRAPH_SUCCESS && cacheKeyValid) {
+        FusedInferAttentionScoreTilingCache::TilingResult newResult;
+        if (FusedInferAttentionScoreTilingCache::Snapshot(context, newResult)) {
+            FusedInferAttentionScoreTilingCache::GetInstance().Add(cacheKey, newResult);
+        }
+    }
+    return tilingRet;
 }
 
 extern "C" {
