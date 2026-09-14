@@ -271,6 +271,7 @@ static aclnnStatus CheckParams(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParam
     gmmParams.xDtype = params.x1->GetDataType();
     gmmParams.transposeX = true;
     gmmParams.transposeWeight = false;
+    gmmParams.apiVersion = gmm::GMMApiVersion::QuantGroupedMatmulInplaceAdd;
     if (params.x1->GetDataType() == DataType::DT_HIFLOAT8 && params.x2->GetDataType() == DataType::DT_HIFLOAT8) {
         auto checker = QGmmInPlaceAdd::AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<aclTensor>(gmmParams);
         checker.SetInputName("x1", "x2", "scale1Optional", "scale2", "groupList");

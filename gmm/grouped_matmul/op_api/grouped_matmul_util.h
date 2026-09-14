@@ -115,7 +115,8 @@ enum class GMMApiVersion : uint32_t {
     V3 = 3U,
     V4 = 4U,
     V5 = 5U,
-    WeightNz = 6U
+    WeightNz = 6U,
+    QuantGroupedMatmulInplaceAdd = 7U
 };
 
 template <typename T>

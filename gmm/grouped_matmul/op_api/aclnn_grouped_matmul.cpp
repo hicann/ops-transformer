@@ -1450,6 +1450,8 @@ const char *GetAclnnGetWorkspaceSizeOpName(gmm::GMMApiVersion apiVersion)
             return "aclnnGroupedMatmulV5GetWorkspaceSize";
         case gmm::GMMApiVersion::WeightNz:
             return "aclnnGroupedMatmulWeightNzGetWorkspaceSize";
+        case gmm::GMMApiVersion::QuantGroupedMatmulInplaceAdd:
+            return "aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize";
         default:
             return "aclnnGroupedMatmulGetWorkspaceSize";
     }

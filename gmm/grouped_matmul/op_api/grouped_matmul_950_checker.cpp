@@ -142,6 +142,8 @@ const char *AclnnGroupedMatmulDAV3510Checker<T>::GetAclnnOpName() const
             return "aclnnGroupedMatmulV5GetWorkspaceSize";
         case gmm::GMMApiVersion::WeightNz:
             return "aclnnGroupedMatmulWeightNzGetWorkspaceSize";
+        case gmm::GMMApiVersion::QuantGroupedMatmulInplaceAdd:
+            return "aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize";
         default:
             return "aclnnGroupedMatmulGetWorkspaceSize";
     }
