@@ -292,7 +292,7 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::IsCapable()
     const bool checkBNoTransMLimlit =
         inputParams_.transB ? true : inputParams_.mSize > TENSOR_API_B_NOTRANS_M_LOWER_LIMIT;
     const bool checkKSize = inputParams_.kSize > 64;
-    const bool checkKSizeAlign = inputParams_.kSize % MX_SCALE_K_ALIGN == 0;
+    const bool checkKSizeAlign = inputParams_.kSize % GmmConstant::BASIC_BLOCK_SIZE_128 == 0;
     const bool capable = dtypeSupported && quantDtypeSupported && formatSupported && checkMSizeGroupNumRatio &&
                          checkNSizeAlign && coreSupported && checkTensorApiShapes && checkTensorApiScaleShapes &&
                          checkBNoTransMLimlit && checkKSize && checkKSizeAlign;
