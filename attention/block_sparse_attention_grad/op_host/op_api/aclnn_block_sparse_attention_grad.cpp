@@ -53,14 +53,9 @@ struct BSAGParams {
     const aclTensor *dvOut = nullptr;
 };
 
-
-static aclnnStatus CheckMandatoryTensors(const aclTensor *dout,
-                                         const aclTensor *query,
-                                         const aclTensor *key,
-                                         const aclTensor *value,
-                                         const aclTensor *attentionOut,
-                                         const aclTensor *softmaxLse,
-                                         const aclTensor *blockSparseMaskOptional)
+static aclnnStatus CheckMandatoryTensors(const aclTensor *dout, const aclTensor *query, const aclTensor *key,
+                                         const aclTensor *value, const aclTensor *attentionOut,
+                                         const aclTensor *softmaxLse, const aclTensor *blockSparseMaskOptional)
 {
     CHECK_RET(dout != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -92,52 +87,53 @@ static aclnnStatus ParseBlockShape(const aclIntArray *blockShapeOptional)
     }
 
     if (data[0] <= 0 || data[1] <= 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShapeOptional values must be positive, got [%ld, %ld].", data[0], data[1]);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShapeOptional values must be positive, got [%ld, %ld].", data[0],
+                data[1]);
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     return ACLNN_SUCCESS;
 }
-static aclnnStatus ValidateParams(const BSAGParams& params)
+static aclnnStatus ValidateParams(const BSAGParams &params)
 {
-    CHECK_COND(params.qInputLayout != nullptr && params.kvInputLayout != nullptr,
-        ACLNN_ERR_PARAM_INVALID, "qInputLayout or kvInputLayout is nullptr.");
+    CHECK_COND(params.qInputLayout != nullptr && params.kvInputLayout != nullptr, ACLNN_ERR_PARAM_INVALID,
+               "qInputLayout or kvInputLayout is nullptr.");
     std::string qLayout(params.qInputLayout);
     std::string kvLayout(params.kvInputLayout);
-    CHECK_RET(CheckMandatoryTensors(params.attentionOutGrad, params.query, params.key, params.value,
-                                    params.attentionOut, params.softmaxLse, params.blockSparseMaskOptional) == ACLNN_SUCCESS,
-              ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(
+        CheckMandatoryTensors(params.attentionOutGrad, params.query, params.key, params.value, params.attentionOut,
+                              params.softmaxLse, params.blockSparseMaskOptional) == ACLNN_SUCCESS,
+        ACLNN_ERR_PARAM_NULLPTR);
     // dtype检查
     DataType qDtype = params.query->GetDataType();
     DataType kDtype = params.key->GetDataType();
     DataType vDtype = params.value->GetDataType();
     DataType attnOutDtype = params.attentionOut->GetDataType();
-    DataType gradDtype = params.attentionOutGrad->GetDataType();   // dout
+    DataType gradDtype = params.attentionOutGrad->GetDataType(); // dout
     DataType lseDtype = params.softmaxLse->GetDataType();
     DataType maskDtype = params.blockSparseMaskOptional->GetDataType();
     DataType dqDtype = params.dqOut->GetDataType();
     DataType dkDtype = params.dkOut->GetDataType();
     DataType dvDtype = params.dvOut->GetDataType();
-    CHECK_COND(qDtype == ACL_FLOAT16 || qDtype == ACL_BF16, ACLNN_ERR_PARAM_INVALID, "The dtype of query is not support.");
+    CHECK_COND(qDtype == ACL_FLOAT16 || qDtype == ACL_BF16, ACLNN_ERR_PARAM_INVALID,
+               "The dtype of query is not support.");
     CHECK_COND(qDtype == kDtype, ACLNN_ERR_PARAM_INVALID, "key dtype error.");
     CHECK_COND(qDtype == vDtype, ACLNN_ERR_PARAM_INVALID, "value dtype error.");
     CHECK_COND(attnOutDtype == qDtype, ACLNN_ERR_PARAM_INVALID, "attentionOut dtype must match query dtype.");
     CHECK_COND(gradDtype == qDtype, ACLNN_ERR_PARAM_INVALID, "attentionOutGrad dtype must match query dtype.");
     CHECK_COND(lseDtype == ACL_FLOAT, ACLNN_ERR_PARAM_INVALID, "softmaxLse dtype must be FLOAT32.");
-    CHECK_COND(maskDtype == ACL_BOOL || maskDtype == ACL_UINT8, ACLNN_ERR_PARAM_INVALID, "blockSparseMask dtype must be BOOL or UINT8.");
+    CHECK_COND(maskDtype == ACL_BOOL || maskDtype == ACL_UINT8, ACLNN_ERR_PARAM_INVALID,
+               "blockSparseMask dtype must be BOOL or UINT8.");
     CHECK_COND(dqDtype == qDtype, ACLNN_ERR_PARAM_INVALID, "dqOut dtype must match query dtype.");
     CHECK_COND(dkDtype == qDtype, ACLNN_ERR_PARAM_INVALID, "dkOut dtype must match query dtype.");
     CHECK_COND(dvDtype == qDtype, ACLNN_ERR_PARAM_INVALID, "dvOut dtype must match query dtype.");
     // format检查
-    if (params.query->GetStorageFormat() != ge::FORMAT_ND ||
-        params.key->GetStorageFormat() != ge::FORMAT_ND ||
-        params.value->GetStorageFormat() != ge::FORMAT_ND ||
-        params.attentionOut->GetStorageFormat() != ge::FORMAT_ND ||
+    if (params.query->GetStorageFormat() != ge::FORMAT_ND || params.key->GetStorageFormat() != ge::FORMAT_ND ||
+        params.value->GetStorageFormat() != ge::FORMAT_ND || params.attentionOut->GetStorageFormat() != ge::FORMAT_ND ||
         params.attentionOutGrad->GetStorageFormat() != ge::FORMAT_ND ||
         params.softmaxLse->GetStorageFormat() != ge::FORMAT_ND ||
         params.blockSparseMaskOptional->GetStorageFormat() != ge::FORMAT_ND ||
-        params.dqOut->GetStorageFormat() != ge::FORMAT_ND ||
-        params.dkOut->GetStorageFormat() != ge::FORMAT_ND ||
+        params.dqOut->GetStorageFormat() != ge::FORMAT_ND || params.dkOut->GetStorageFormat() != ge::FORMAT_ND ||
         params.dvOut->GetStorageFormat() != ge::FORMAT_ND) {
         OP_LOGW("Format of input is not ND, this format may lead to precision failure.");
     }
@@ -153,29 +149,50 @@ static aclnnStatus ValidateParams(const BSAGParams& params)
     auto dvShape = params.dvOut->GetViewShape();
     if (qLayout == "TND") {
         // check head_dim
-        CHECK_COND(queryShape.GetDim(2) == keyShape.GetDim(2), ACLNN_ERR_PARAM_INVALID, "The dim's 2 of query and key must be same.");
-        CHECK_COND(queryShape.GetDim(2) == valueShape.GetDim(2), ACLNN_ERR_PARAM_INVALID, "The dim's 2 of query and value must be same.");
-        CHECK_COND(queryShape.GetDim(2) == attnOutShape.GetDim(2), ACLNN_ERR_PARAM_INVALID, "The dim's 2 of query and attentionOut must be same.");
-        CHECK_COND(queryShape.GetDim(2) == gradShape.GetDim(2), ACLNN_ERR_PARAM_INVALID, "The dim's 2 of query and attentionOutGrad must be same.");
-        CHECK_COND(queryShape.GetDim(2) == dqShape.GetDim(2), ACLNN_ERR_PARAM_INVALID, "The dim's 2 of query and dqOut must be same.");
-        CHECK_COND(queryShape.GetDim(2) == dkShape.GetDim(2), ACLNN_ERR_PARAM_INVALID, "The dim's 2 of query and dkOut must be same.");
-        CHECK_COND(queryShape.GetDim(2) == dvShape.GetDim(2), ACLNN_ERR_PARAM_INVALID, "The dim's 2 of query and dvOut must be same.");
+        CHECK_COND(queryShape.GetDim(2) == keyShape.GetDim(2), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 2 of query and key must be same.");
+        CHECK_COND(queryShape.GetDim(2) == valueShape.GetDim(2), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 2 of query and value must be same.");
+        CHECK_COND(queryShape.GetDim(2) == attnOutShape.GetDim(2), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 2 of query and attentionOut must be same.");
+        CHECK_COND(queryShape.GetDim(2) == gradShape.GetDim(2), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 2 of query and attentionOutGrad must be same.");
+        CHECK_COND(queryShape.GetDim(2) == dqShape.GetDim(2), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 2 of query and dqOut must be same.");
+        CHECK_COND(queryShape.GetDim(2) == dkShape.GetDim(2), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 2 of query and dkOut must be same.");
+        CHECK_COND(queryShape.GetDim(2) == dvShape.GetDim(2), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 2 of query and dvOut must be same.");
     } else {
-        //check batch_num, head_dim
-        CHECK_COND(queryShape.GetDim(0) == keyShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and key must be same.");
-        CHECK_COND(queryShape.GetDim(0) == valueShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and value must be same.");
-        CHECK_COND(queryShape.GetDim(0) == attnOutShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and attentionOut must be same.");
-        CHECK_COND(queryShape.GetDim(0) == gradShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and attentionOutGrad must be same.");
-        CHECK_COND(queryShape.GetDim(0) == lseShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and softmaxLse must be same.");
-        CHECK_COND(queryShape.GetDim(0) == dqShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and dqOut must be same.");
-        CHECK_COND(queryShape.GetDim(0) == dkShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and dkOut must be same.");
-        CHECK_COND(queryShape.GetDim(0) == dvShape.GetDim(0), ACLNN_ERR_PARAM_INVALID, "The dim's 0 of query and dvOut must be same.");
-        CHECK_COND(queryShape.GetDim(3) == keyShape.GetDim(3), ACLNN_ERR_PARAM_INVALID, "The dim's 3 of query and key must be same.");
-        CHECK_COND(valueShape.GetDim(3) == attnOutShape.GetDim(3), ACLNN_ERR_PARAM_INVALID, "The dim's 3 of value and attentionOut must be same.");
-        CHECK_COND(valueShape.GetDim(3) == gradShape.GetDim(3), ACLNN_ERR_PARAM_INVALID, "The dim's 3 of value and attentionOutGrad must be same.");
-        CHECK_COND(queryShape.GetDim(3) == dqShape.GetDim(3), ACLNN_ERR_PARAM_INVALID, "The dim's 3 of query and dqOut must be same.");
-        CHECK_COND(keyShape.GetDim(3) == dkShape.GetDim(3), ACLNN_ERR_PARAM_INVALID, "The dim's 3 of key and dkOut must be same.");
-        CHECK_COND(valueShape.GetDim(3) == dvShape.GetDim(3), ACLNN_ERR_PARAM_INVALID, "The dim's 3 of value and dvOut must be same.");
+        // check batch_num, head_dim
+        CHECK_COND(queryShape.GetDim(0) == keyShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and key must be same.");
+        CHECK_COND(queryShape.GetDim(0) == valueShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and value must be same.");
+        CHECK_COND(queryShape.GetDim(0) == attnOutShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and attentionOut must be same.");
+        CHECK_COND(queryShape.GetDim(0) == gradShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and attentionOutGrad must be same.");
+        CHECK_COND(queryShape.GetDim(0) == lseShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and softmaxLse must be same.");
+        CHECK_COND(queryShape.GetDim(0) == dqShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and dqOut must be same.");
+        CHECK_COND(queryShape.GetDim(0) == dkShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and dkOut must be same.");
+        CHECK_COND(queryShape.GetDim(0) == dvShape.GetDim(0), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 0 of query and dvOut must be same.");
+        CHECK_COND(queryShape.GetDim(3) == keyShape.GetDim(3), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 3 of query and key must be same.");
+        CHECK_COND(valueShape.GetDim(3) == attnOutShape.GetDim(3), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 3 of value and attentionOut must be same.");
+        CHECK_COND(valueShape.GetDim(3) == gradShape.GetDim(3), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 3 of value and attentionOutGrad must be same.");
+        CHECK_COND(queryShape.GetDim(3) == dqShape.GetDim(3), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 3 of query and dqOut must be same.");
+        CHECK_COND(keyShape.GetDim(3) == dkShape.GetDim(3), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 3 of key and dkOut must be same.");
+        CHECK_COND(valueShape.GetDim(3) == dvShape.GetDim(3), ACLNN_ERR_PARAM_INVALID,
+                   "The dim's 3 of value and dvOut must be same.");
     }
 
     if (params.attenMaskOptional != nullptr) {
@@ -215,21 +232,17 @@ static aclnnStatus ValidateParams(const BSAGParams& params)
     if (qIsBNSD != kvIsBNSD) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "Q and KV layouts must match: if one is BNSD, the other must also be BNSD. "
-                "Q layout: %s, KV layout: %s", qLayout.c_str(), kvLayout.c_str());
+                "Q layout: %s, KV layout: %s",
+                qLayout.c_str(), kvLayout.c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     return ParseBlockShape(params.blockShapeOptional);
 }
 
-static aclnnStatus MakeContiguous(const aclTensor *&dout,
-                                  const aclTensor *&query,
-                                  const aclTensor *&key,
-                                  const aclTensor *&value,
-                                  const aclTensor *&attentionOut,
-                                  const aclTensor *&softmaxLse,
-                                  const aclTensor *&blockSparseMaskOptional,
-                                  const aclTensor *&attenMaskOptional,
+static aclnnStatus MakeContiguous(const aclTensor *&dout, const aclTensor *&query, const aclTensor *&key,
+                                  const aclTensor *&value, const aclTensor *&attentionOut, const aclTensor *&softmaxLse,
+                                  const aclTensor *&blockSparseMaskOptional, const aclTensor *&attenMaskOptional,
                                   aclOpExecutor *executor)
 {
     dout = l0op::Contiguous(dout, executor);
@@ -269,29 +282,12 @@ static string ConvertLayoutString(char *layoutStr)
 } // namespace
 
 __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGradGetWorkspaceSize(
-    const aclTensor *dout,
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *attentionOut,
-    const aclTensor *softmaxLse,
-    const aclTensor *blockSparseMaskOptional,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *blockShapeOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    char *qInputLayout,
-    char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t preTokens,
-    int64_t nextTokens,
-    aclTensor *dq,
-    aclTensor *dk,
-    aclTensor *dv,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor *dout, const aclTensor *query, const aclTensor *key, const aclTensor *value,
+    const aclTensor *attentionOut, const aclTensor *softmaxLse, const aclTensor *blockSparseMaskOptional,
+    const aclTensor *attenMaskOptional, const aclIntArray *blockShapeOptional,
+    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional, char *qInputLayout,
+    char *kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t preTokens,
+    int64_t nextTokens, aclTensor *dq, aclTensor *dk, aclTensor *dv, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     BSAGParams bsag_params;
     bsag_params.query = query;
@@ -319,9 +315,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad
         return ret;
     }
     L2_DFX_PHASE_1(aclnnBlockSparseAttentionGrad,
-                   DFX_IN(dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional, attenMaskOptional, blockShapeOptional,
-                          actualSeqLengthsOptional, actualSeqLengthsKvOptional, qInputLayout, qInputLayout, numKeyValueHeads,
-                          maskType, scaleValue, preTokens, nextTokens),
+                   DFX_IN(dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional, attenMaskOptional,
+                          blockShapeOptional, actualSeqLengthsOptional, actualSeqLengthsKvOptional, qInputLayout,
+                          kvInputLayout, numKeyValueHeads, maskType, scaleValue, preTokens, nextTokens),
                    DFX_OUT(dq, dk, dv));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -338,19 +334,20 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad
         }
     }
 
-    ret = MakeContiguous(dout, query, key, value, attentionOut, softmaxLse,blockSparseMaskOptional, attenMaskOptional, executorImpl);
+    ret = MakeContiguous(dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional, attenMaskOptional,
+                         executorImpl);
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }
 
     string qInputLayoutStr = ConvertLayoutString(qInputLayout);
     string kvInputLayoutStr = ConvertLayoutString(kvInputLayout);
-    
-    auto outputs = l0op::BlockSparseAttentionGrad(dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional, 
-                                                  attenMaskOptional, blockShapeOptional,actualSeqLengthsOptional, actualSeqLengthsKvOptional,
-                                                  const_cast<char*>(qInputLayoutStr.c_str()), 
-                                                  const_cast<char*>(kvInputLayoutStr.c_str()), numKeyValueHeads,
-                                                  maskType, scaleValue, preTokens, nextTokens, executorImpl);
+
+    auto outputs = l0op::BlockSparseAttentionGrad(
+        dout, query, key, value, attentionOut, softmaxLse, blockSparseMaskOptional, attenMaskOptional,
+        blockShapeOptional, actualSeqLengthsOptional, actualSeqLengthsKvOptional,
+        const_cast<char *>(qInputLayoutStr.c_str()), const_cast<char *>(kvInputLayoutStr.c_str()), numKeyValueHeads,
+        maskType, scaleValue, preTokens, nextTokens, executorImpl);
     if (outputs[0] == nullptr || outputs[1] == nullptr || outputs[2] == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "BlockSparseAttentionGrad returned nullptr outputs.");
         return ACLNN_ERR_INNER_NULLPTR;
@@ -368,11 +365,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    const aclrtStream stream)
+__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad(void *workspace,
+                                                                                 uint64_t workspaceSize,
+                                                                                 aclOpExecutor *executor,
+                                                                                 const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnBlockSparseAttentionGrad);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
