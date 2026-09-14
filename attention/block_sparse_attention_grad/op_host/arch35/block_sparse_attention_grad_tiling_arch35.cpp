@@ -65,10 +65,9 @@ ge::graphStatus InputCheck(const std::vector<int32_t> &q_shape, const std::vecto
 
 class BlockSparseAttentionGradArch35Tiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit BlockSparseAttentionGradArch35Tiling(gert::TilingContext *context_) : TilingBaseClass(context_)
-    {
-    }
-
+    explicit BlockSparseAttentionGradArch35Tiling(gert::TilingContext *context_)
+        : TilingBaseClass(context_)
+    {}
 
 protected:
     bool IsCapable() override
@@ -88,7 +87,7 @@ protected:
             return false;
         }
 
-        if (blockShapeX_ % 16 != 0 || blockShapeY_ % 16 != 0) {
+        if (blockShapeX_ == 0 || blockShapeY_ == 0 || blockShapeX_ % 16 != 0 || blockShapeY_ % 16 != 0) {
             OP_LOGE(context_->GetNodeName(),
                     "BlockSparseAttentionGrad only supports blockShapeX and blockShapeY that are multiples of 16.");
             return false;
@@ -366,7 +365,6 @@ private:
     int32_t max_q_seq_len_ = 0;
     int32_t max_kv_seq_len_ = 0;
 };
-
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(BlockSparseAttentionGrad, BlockSparseAttentionGradArch35Tiling,
                                    static_cast<int32_t>(NpuArch::DAV_3510), 1);
