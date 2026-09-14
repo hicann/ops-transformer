@@ -136,7 +136,7 @@ void FusedInferAttentionScoreTilingImpl::SetGSMerge(const FiaTilingInfo &fiaInfo
 
 bool FusedInferAttentionScoreTilingImpl::CheckPFAMergeSupport(const FiaTilingInfo &fiaInfo) const
 {
-    if (fiaInfo.s1Size * fiaInfo.gSize >= NUM_64) {
+    if (fiaInfo.gSize <= 1 || fiaInfo.s1Size * fiaInfo.gSize >= NUM_64) {
         return false;
     }
     bool isTransposeLayout = CheckTransposeLayout(fiaInfo);
