@@ -55,6 +55,12 @@ constexpr AscendC::Reg::CastTrait BARU_CAST_FP32_TO_BF16 = {
     AscendC::RoundMode::CAST_RINT,
 };
 
+constexpr AscendC::Reg::DivSpecificMode BARU_DIV_0ULP_FTZ_TRUE_MODE = {
+    AscendC::Reg::MaskMergeMode::ZEROING,
+    true,
+    AscendC::DivAlgo::PRECISION_0ULP_FTZ_TRUE,
+};
+
 // Phase 1 computes p = partial + delta and
 // score = dot(p, pseudoQuery) / sqrt(mean(p * p) + eps), then stores p and one score per T row.
 // One-VREG specialization: the query is invariant across T, so load and tail-clear it once.
@@ -104,7 +110,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1OneVLVF(__ubuf__ float *partial,
         Reg::Muls<float>(squareSumReg, squareSumReg, invD, scalarMask);
         Reg::Adds<float>(squareSumReg, squareSumReg, eps, scalarMask);
         Reg::Sqrt<float>(rmsReg, squareSumReg, scalarMask);
-        Reg::Div<float>(scoreReg, dotSumReg, rmsReg, scalarMask);
+        Reg::Div<float, &BARU_DIV_0ULP_FTZ_TRUE_MODE>(scoreReg, dotSumReg, rmsReg, scalarMask);
         Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(
             stats + BARU_SCORE_PLANE_INDEX * statsTStride + tIdx, scoreReg, scalarMask);
     }
@@ -173,7 +179,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1TwoVLVF(__ubuf__ float *partial,
         Reg::Muls<float>(squareSumReg, squareSumReg, invD, scalarMask);
         Reg::Adds<float>(squareSumReg, squareSumReg, eps, scalarMask);
         Reg::Sqrt<float>(rmsReg, squareSumReg, scalarMask);
-        Reg::Div<float>(scoreReg, dotSumReg, rmsReg, scalarMask);
+        Reg::Div<float, &BARU_DIV_0ULP_FTZ_TRUE_MODE>(scoreReg, dotSumReg, rmsReg, scalarMask);
         Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(
             stats + BARU_SCORE_PLANE_INDEX * statsTStride + tIdx, scoreReg, scalarMask);
     }
@@ -305,7 +311,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase1VF(__ubuf__ float *partial, __ub
         Reg::Muls<float>(squareSumReg, squareSumReg, invD, scalarMask);
         Reg::Adds<float>(squareSumReg, squareSumReg, eps, scalarMask);
         Reg::Sqrt<float>(rmsReg, squareSumReg, scalarMask);
-        Reg::Div<float>(scoreReg, dotSumReg, rmsReg, scalarMask);
+        Reg::Div<float, &BARU_DIV_0ULP_FTZ_TRUE_MODE>(scoreReg, dotSumReg, rmsReg, scalarMask);
         Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(
             stats + BARU_SCORE_PLANE_INDEX * statsTStride + tIdx, scoreReg, scalarMask);
     }
@@ -332,6 +338,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2OneVLVF(__ubuf__ float *partial,
     Reg::RegTensor<float> currentMaxReg;
     Reg::RegTensor<float> alphaReg;
     Reg::RegTensor<float> betaReg;
+    Reg::RegTensor<float> invDenomReg;
     Reg::RegTensor<float> numeratorReg;
     Reg::RegTensor<bfloat16_t> outputBf16Reg;
 
@@ -346,15 +353,18 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2OneVLVF(__ubuf__ float *partial,
         Reg::ExpSub<float>(alphaReg, historyMaxReg, currentMaxReg, allMask);
         Reg::ExpSub<float>(betaReg, scoreReg, currentMaxReg, allMask);
         Reg::MulDstAdd<float>(historyEllReg, alphaReg, betaReg, allMask);
+        Reg::Duplicate(invDenomReg, 1.0F, allMask);
+        Reg::Div<float, &BARU_DIV_0ULP_FTZ_TRUE_MODE>(invDenomReg, invDenomReg, historyEllReg, allMask);
+        Reg::Mul<float>(alphaReg, alphaReg, invDenomReg, allMask);
+        Reg::Mul<float>(betaReg, betaReg, invDenomReg, allMask);
 
         const uint32_t fp32TOffset = static_cast<uint32_t>(tIdx) * dAlignFp32;
         const uint32_t bf16TOffset = static_cast<uint32_t>(tIdx) * dAlignBf16;
         Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(partialReg, partial + fp32TOffset);
         Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(numeratorReg, numerator + fp32TOffset);
-        // Factor the shared denominator into the single output VREG to replace two coefficient divisions with one.
+        // Match the TwoVL/Generic order: normalize the weights before forming h.
         Reg::Mul<float>(tmpReg, partialReg, betaReg, dMask);
         Reg::MulDstAdd<float>(numeratorReg, alphaReg, tmpReg, dMask);
-        Reg::Div<float>(numeratorReg, numeratorReg, historyEllReg, dMask);
         Reg::Cast<bfloat16_t, float, BARU_CAST_FP32_TO_BF16>(outputBf16Reg, numeratorReg, dMask);
         Reg::StoreAlign<bfloat16_t, Reg::StoreDist::DIST_PACK_B32>(deltaH + bf16TOffset, outputBf16Reg, dMask);
     }
@@ -380,6 +390,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2TwoVLVF(__ubuf__ float *partial,
     Reg::RegTensor<float> currentMaxReg;
     Reg::RegTensor<float> alphaReg;
     Reg::RegTensor<float> betaReg;
+    Reg::RegTensor<float> invDenomReg;
     Reg::RegTensor<float> numeratorReg0;
     Reg::RegTensor<float> numeratorReg1;
     Reg::RegTensor<bfloat16_t> outputBf16Reg0;
@@ -396,8 +407,10 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2TwoVLVF(__ubuf__ float *partial,
         Reg::ExpSub<float>(alphaReg, historyMaxReg, currentMaxReg, allMask);
         Reg::ExpSub<float>(betaReg, scoreReg, currentMaxReg, allMask);
         Reg::MulDstAdd<float>(historyEllReg, alphaReg, betaReg, allMask);
-        Reg::Div<float>(alphaReg, alphaReg, historyEllReg, allMask);
-        Reg::Div<float>(betaReg, betaReg, historyEllReg, allMask);
+        Reg::Duplicate(invDenomReg, 1.0F, allMask);
+        Reg::Div<float, &BARU_DIV_0ULP_FTZ_TRUE_MODE>(invDenomReg, invDenomReg, historyEllReg, allMask);
+        Reg::Mul<float>(alphaReg, alphaReg, invDenomReg, allMask);
+        Reg::Mul<float>(betaReg, betaReg, invDenomReg, allMask);
 
         const uint32_t fp32TOffset = static_cast<uint32_t>(tIdx) * dAlignFp32;
         const uint32_t bf16TOffset = static_cast<uint32_t>(tIdx) * dAlignBf16;
@@ -439,6 +452,7 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2VF(__ubuf__ float *partial, __ub
     Reg::RegTensor<float> currentMaxReg;
     Reg::RegTensor<float> alphaReg;
     Reg::RegTensor<float> betaReg;
+    Reg::RegTensor<float> invDenomReg;
     Reg::RegTensor<float> numeratorReg0;
     Reg::RegTensor<float> numeratorReg1;
     Reg::RegTensor<bfloat16_t> outputBf16Reg0;
@@ -463,9 +477,10 @@ __simd_vf__ inline void BlockAttnResUpdatePhase2VF(__ubuf__ float *partial, __ub
         Reg::ExpSub<float>(alphaReg, historyMaxReg, currentMaxReg, allMask);
         Reg::ExpSub<float>(betaReg, scoreReg, currentMaxReg, allMask);
         Reg::MulDstAdd<float>(historyEllReg, alphaReg, betaReg, allMask);
-        // The two direct divisions are independent and remove the reciprocal-and-multiply dependency chain.
-        Reg::Div<float>(alphaReg, alphaReg, historyEllReg, allMask);
-        Reg::Div<float>(betaReg, betaReg, historyEllReg, allMask);
+        Reg::Duplicate(invDenomReg, 1.0F, allMask);
+        Reg::Div<float, &BARU_DIV_0ULP_FTZ_TRUE_MODE>(invDenomReg, invDenomReg, historyEllReg, allMask);
+        Reg::Mul<float>(alphaReg, alphaReg, invDenomReg, allMask);
+        Reg::Mul<float>(betaReg, betaReg, invDenomReg, allMask);
         const uint32_t fp32TOffset = static_cast<uint32_t>(tIdx) * dAlignFp32;
         const uint32_t bf16TOffset = static_cast<uint32_t>(tIdx) * dAlignBf16;
         // Separate register sets expose two adjacent D vectors to RVEC dual issue.

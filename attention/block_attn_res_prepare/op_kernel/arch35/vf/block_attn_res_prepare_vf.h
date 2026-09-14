@@ -53,6 +53,11 @@ constexpr uint32_t DOT_OFFSET = FP32_REG_ELEMS;
 constexpr uint32_t MAX_OFFSET = STAT_VECTOR_COUNT * FP32_REG_ELEMS;
 constexpr uint32_t SUM_OFFSET = MAX_OFFSET + SCALAR_BLOCK_ELEMS;
 constexpr float FP32_LOWEST_FINITE = -3.4028234663852886e+38F;
+constexpr AscendC::Reg::DivSpecificMode BARP_DIV_0ULP_FTZ_TRUE_MODE = {
+    MaskMergeMode::ZEROING,
+    true,
+    AscendC::DivAlgo::PRECISION_0ULP_FTZ_TRUE,
+};
 
 __simd_vf__ inline void InitializeEmptyOnlineSoftmax(__ubuf__ float *statAddr)
 {
@@ -146,7 +151,7 @@ __simd_vf__ inline void FinalizeSingleBlock(__ubuf__ float *statAddr, float reci
     Muls<float, float, MaskMergeMode::ZEROING>(sumSquareReg, sumSquareReg, reciprocalD, oneMask);
     Adds<float, float, MaskMergeMode::ZEROING>(sumSquareReg, sumSquareReg, eps, oneMask);
     Sqrt<float, MaskMergeMode::ZEROING>(rmsReg, sumSquareReg, oneMask);
-    Div<float, MaskMergeMode::ZEROING>(zReg, dotReg, rmsReg, oneMask);
+    Div<float, &BARP_DIV_0ULP_FTZ_TRUE_MODE>(zReg, dotReg, rmsReg, oneMask);
     Duplicate(oneReg, 1.0F, oneMask);
 
     StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(statAddr + MAX_OFFSET, zReg, oneMask);
@@ -175,7 +180,7 @@ __simd_vf__ inline void FinalizeSoftmax(__ubuf__ float *statAddr, uint32_t valid
     Muls<float, float, MaskMergeMode::ZEROING>(sumSquareReg, sumSquareReg, reciprocalD, validMask);
     Adds<float, float, MaskMergeMode::ZEROING>(sumSquareReg, sumSquareReg, eps, validMask);
     Sqrt<float, MaskMergeMode::ZEROING>(rmsReg, sumSquareReg, validMask);
-    Div<float, MaskMergeMode::ZEROING>(zReg, dotReg, rmsReg, validMask);
+    Div<float, &BARP_DIV_0ULP_FTZ_TRUE_MODE>(zReg, dotReg, rmsReg, validMask);
 
     Reduce<ReduceType::MAX, float, float, MaskMergeMode::ZEROING>(maxReg, zReg, validMask);
     Duplicate<float, HighLowPart::LOWEST, MaskMergeMode::ZEROING>(maxBroadcastReg, maxReg, allMask);
