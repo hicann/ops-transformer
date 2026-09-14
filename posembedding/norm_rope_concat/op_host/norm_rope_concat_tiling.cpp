@@ -281,7 +281,6 @@ ge::graphStatus NormRopeConcatTiling::ComputeUBTilingStrategy()
         ropeCoef * ropeUsedUbSize +
         normCoef * (alignedNormDim_ * sizeof(float) + (trainingCoef * 2 * DOUBLE_BUFFER + 1) * sizeof(float));
     avgHeads_ = (compileInfo_.ubSize - ropeCoef * ropeUsedUbSize - normCoef * normUsedUbSize) / oneHeadUbSize;
-
     avgHeads_ = std::min(avgHeads_, static_cast<int64_t>(AVGHEAD_MAX_NUM));
     avgHeads_ = std::min(avgHeads_, headNum_);
     OP_CHECK_IF(avgHeads_ == 0, OP_LOGE(context_.opName, "input dim is too large"), return ge::GRAPH_FAILED);
