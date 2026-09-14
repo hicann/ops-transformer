@@ -738,8 +738,9 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
   - K-G（pertoken-pergroup）量化场景支持的输入类型与shape为：
     - 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
     - 不为空的参数支持的数据类型组合要满足下表：
-    |groupType| x       | weight  | scaleOptional | perTokenScaleOptional |out     |
-      |:-------:|:-------:|:-------:| :------      |:-------    | :------   | :------ |
+
+      |groupType| x       | weight  | scaleOptional | perTokenScaleOptional |out     |
+      |:-------:|:-------:|:-------:| :------      |:-------    | :------   |
       |0|INT4  |INT4     |UINT64    | FLOAT32/null   | FLOAT16/BFLOAT16 |
 
     - scaleOptional要满足下表（其中g为matmul组数即分组数）
@@ -756,7 +757,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
     - 约束说明：
 
-      - S4S4的weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐。
+      - 全量化的int4的weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐。
 
 
   - 动态量化（mx量化）场景支持的输入类型与shape为：
