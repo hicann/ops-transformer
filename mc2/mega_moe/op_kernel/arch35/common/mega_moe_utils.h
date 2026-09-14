@@ -21,15 +21,13 @@
 #include "kernel_operator.h"
 #include "op_kernel/math_util.h"
 #include "mega_moe_constants.h"
+#include "mega_moe_gmm_epilogue_sync.h"
 #include "mega_moe_types.h"
 
 namespace MegaMoeImpl {
 
 using namespace AscendC;
 
-constexpr uint8_t SYNC_AIC_AIV_MODE = 4;
-constexpr uint16_t AIC_SYNC_AIV_FLAG = 4;
-constexpr uint16_t AIV_SYNC_AIC_FLAG = 6;
 constexpr uint32_t UINT64_BYTE_OFFSET_SHIFT = 3U;
 
 struct WorkRange {
@@ -283,46 +281,6 @@ __aicore__ inline void ResetWorkspaceRegion(const AivJobContext &job, GM_ADDR re
 
 #endif
 
-__aicore__ inline void NotifyCube(uint16_t value = 0)
-{
-    CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_V>(AIV_SYNC_AIC_FLAG + value);
-}
-
-__aicore__ inline void WaitForVector(uint16_t value = 0)
-{
-    CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIV_SYNC_AIC_FLAG + value);
-}
-
-__aicore__ inline void NotifyVector(uint16_t value = 0)
-{
-    CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIC_SYNC_AIV_FLAG + value);
-}
-
-__aicore__ inline void WaitForCube(uint16_t value = 0)
-{
-    CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_V>(AIC_SYNC_AIV_FLAG + value);
-}
-
-template <bool IsPingPong = false>
-__aicore__ inline void EndSync(int32_t vecSetSyncCom, uint16_t pingpongIdx = 0)
-{
-    if (vecSetSyncCom == 0) {
-        return;
-    }
-    if constexpr (g_coreType == AIC) {
-        if constexpr (IsPingPong) {
-            if (vecSetSyncCom == 1) {
-                WaitForVector(1U - pingpongIdx);
-            } else {
-                WaitForVector(pingpongIdx);
-                WaitForVector(1U - pingpongIdx);
-            }
-        } else {
-            WaitForVector();
-        }
-    }
-}
-
 __aicore__ inline void TilingByCore(int32_t totalLen, int32_t &coreLen, int32_t &coreOffset, int32_t align = ALIGN_32)
 {
     int32_t coreIdx = GetBlockIdx();
@@ -506,27 +464,6 @@ __aicore__ inline ExpertTokenRange PlanNextExpertTokenRangeInWave(GM_ADDR expert
         return range;
     }
     return {plannedPosition, plannedPosition};
-}
-
-// 轮询 GM 中的 int32 flag 直至等于期望值，并在两次读取之间加入短暂退避。
-__aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t *flagAddr, int32_t expectedValue,
-                                             int64_t pollBackoffCycles = GM_FLAG_POLL_BACKOFF_CYCLES)
-{
-    while (AscendC::ReadGmByPassDCache(flagAddr) != expectedValue) {
-        int64_t startCycle = AscendC::GetSystemCycle();
-        while (AscendC::GetSystemCycle() - startCycle < pollBackoffCycles) {
-        }
-    }
-}
-
-// 轮询 GM 中的 int32 计数直至不小于目标值，并在两次读取之间加入短暂退避。
-__aicore__ inline void WaitUntilGmFlagAtLeast(__gm__ int32_t *flagAddr, int32_t targetValue)
-{
-    while (AscendC::ReadGmByPassDCache(flagAddr) < targetValue) {
-        int64_t startCycle = AscendC::GetSystemCycle();
-        while (AscendC::GetSystemCycle() - startCycle < GM_FLAG_POLL_BACKOFF_CYCLES) {
-        }
-    }
 }
 
 // 同一 launch 内阶段由 0 单调推进到 1、2；公共输入屏障前由 ResetSyncStatus 清零。

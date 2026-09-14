@@ -11,12 +11,13 @@
 #ifndef MEGA_MOE_GMM_COMMON_H
 #define MEGA_MOE_GMM_COMMON_H
 
+#include "mega_moe_gmm_epilogue_sync.h"
 #include "kernel_operator.h"
 #include "tensor_api/tensor.h"
 #include "mega_moe_constants.h"
 #include "mega_moe_types.h"
 #include "mega_moe_utils.h"
-#include "blaze/gemm/block/block_mmad_qbmm_mx.h"
+#include "../blaze/gemm/tile/copy_gmm1_concat.h"
 #include "../blaze/gemm/block/block_scheduler_swizzle.h"
 #include "../blaze/gemm/block/block_mmad_mx_fp8fp4.h"
 #include "../blaze/prologue/block_prologue_mx_fp8fp4.h"
@@ -58,7 +59,7 @@ struct BlockMmadSelector<true, C> {
 // 汇总 GMM1/GMM2 在不同量化路径下共用的类型、shape 和 layout 配置。
 template <bool IsA8W4, uint8_t CombineQuantMode, typename ElementA, typename ElementB, typename ElementC,
           typename ElementMxScaleA, typename ElementMxScaleB, bool IsWeightNZ = false, bool TopkWeightsPrefetch = false,
-          bool IsShared = false, bool IsLayered = false, bool IsGmm1Interleaved = false, bool IsWaveFlagGrained = false>
+          bool IsShared = false, bool IsLayered = false, bool IsWaveFlagGrained = false>
 struct Config {
     static constexpr bool IS_SHARED = IsShared;
     static constexpr bool IS_WEIGHT_NZ = IsWeightNZ;
@@ -82,8 +83,8 @@ struct Config {
     using LayoutScaleB = asc::te::scaleb_dn_layout_ptn;
 
     using LayoutBias = asc::te::nd_ext_layout_ptn;
-    using DispatchPolicy =
-        Std::conditional_t<IsA8W4, Blaze::Gemm::MatmulMxFp8Fp4DynamicKL1TailResplit, Blaze::Gemm::MatmulWithScaleMx<>>;
+    using DispatchPolicy = Std::conditional_t<IsA8W4, Blaze::Gemm::MatmulMxFp8Fp4DynamicKL1TailResplit,
+                                              Blaze::Gemm::GroupedMatmulWithScaleMx<>>;
     using LayoutB =
         Std::conditional_t<IsA8W4, asc::te::zn_layout_ptn,
                            Std::conditional_t<IsWeightNZ, asc::te::zn_layout_ptn, asc::te::dn_ext_layout_ptn>>;
@@ -106,19 +107,20 @@ struct Config {
     using LayoutScaleATrait = Te::get_layout_trait<LayoutScaleAType>;
 
     using BlockMmad = typename BlockMmadSelector<IsA8W4, Config>::type;
+    using L1Params = typename BlockMmad::L1Params;
     using BlockPrologue =
         Std::conditional_t<IsA8W4, Blaze::Gemm::Prologue::BlockPrologue<DispatchPolicy, ElementA, ElementB>, void>;
 
-    static __aicore__ inline typename BlockMmad::L1Params MakeL1Params(uint64_t kL1, uint64_t scaleKL1)
+    static __aicore__ inline L1Params MakeL1Params(uint64_t kL1, uint64_t scaleKL1)
     {
         if constexpr (IsA8W4) {
-            return typename BlockMmad::L1Params{.kL1 = kL1, .scaleKL1 = scaleKL1};
+            return L1Params{.kL1 = kL1, .scaleKL1 = scaleKL1};
         } else {
-            return typename BlockMmad::L1Params{.kL1 = kL1, .scaleKL1 = scaleKL1, .l1BufNum = 2};
+            return L1Params{.kAL1 = kL1, .kBL1 = kL1, .scaleKL1 = scaleKL1};
         }
     }
 
-    static __aicore__ inline typename BlockMmad::L1Params DefaultL1Params()
+    static __aicore__ inline L1Params DefaultL1Params()
     {
         if constexpr (IsA8W4) {
             return MakeL1Params(L1_TILE_K, Blaze::Gemm::MX_FP8FP4_SCALE_K_L1_SIZE);
@@ -131,7 +133,7 @@ struct Config {
     struct BlockMmadTilingConfig {
         uint32_t tileM;
         uint32_t tileN;
-        typename BlockMmad::L1Params l1Params;
+        L1Params l1Params;
     };
 
     static __aicore__ inline BlockMmadTilingConfig MakeBaselineBlockMmadTilingConfig(uint32_t tileM)
@@ -156,8 +158,7 @@ struct Config {
      * 在 A/B 数据占用之外，用半片 L1 的剩余空间尽可能放大 scaleFactor，从而减少 MX scale 搬运轮数。
      * K 尾块不计入可复用的完整窗口，避免 scaleKL1 跨过实际 K 后再从大窗口内部读取 tail scale。
      */
-    static __aicore__ inline typename BlockMmad::L1Params CalcAdaptiveL1Params(uint32_t blockM, uint32_t blockN,
-                                                                               uint32_t k)
+    static __aicore__ inline L1Params CalcAdaptiveL1Params(uint32_t blockM, uint32_t blockN, uint32_t k)
     {
         constexpr uint64_t halfL1Size = AscendC::TOTAL_L1_SIZE / 2U;
         constexpr uint64_t scaleGroupK = 64U;
@@ -238,12 +239,11 @@ struct Config {
              * kL1=0 让 BlockMmad 与 AIV prologue 按相同规则、基于实际 tile M/N 自动选择 kbL1；
              * BlockMmad 还会独立按实际 M/N 选择 kaL1。scale 使用专用实现固定的 4096K 窗口。
              */
-            return BlockMmadTilingConfig{
-                tileM, L1_TILE_N,
-                typename BlockMmad::L1Params{.kL1 = 0U, .scaleKL1 = Blaze::Gemm::MX_FP8FP4_SCALE_K_L1_SIZE}};
+            return BlockMmadTilingConfig{tileM, L1_TILE_N,
+                                         L1Params{.kL1 = 0U, .scaleKL1 = Blaze::Gemm::MX_FP8FP4_SCALE_K_L1_SIZE}};
         }
 
-        if constexpr (g_coreType == AscendC::AIC) {
+        if constexpr (!IsA8W4 && g_coreType == AscendC::AIC) {
             // K<=256 时所有配置都只搬运一轮，保留基线可避免无收益的 Init。
             if (k <= L1_TILE_K) {
                 return baselineConfig;
@@ -251,7 +251,7 @@ struct Config {
 
             BlockMmadTilingConfig adaptiveConfig = MakeAdaptiveBlockMmadTilingConfig(m, k);
             // 512K 一旦可用，必然比 256K 减少 A/B 的 K 搬运轮数。
-            if (adaptiveConfig.l1Params.kL1 > baselineConfig.l1Params.kL1) {
+            if (adaptiveConfig.l1Params.kAL1 > baselineConfig.l1Params.kAL1) {
                 return adaptiveConfig;
             }
 
@@ -267,7 +267,6 @@ struct Config {
 
     struct ProblemConfig {
         using KernelConfig = Config;
-        static constexpr bool SOURCE_GMM1_INTERLEAVED = IsGmm1Interleaved;
         static constexpr bool IS_WAVE_FLAG_GRAINED = IsWaveFlagGrained;
 
         uint32_t m = 0;
@@ -310,7 +309,7 @@ struct Config {
         config.n = Get<N_VALUE>(problemShape);
         config.k = Get<K_VALUE>(problemShape);
         config.outputN = config.n / ACTIVATION_N_HALF;
-        config.schedulerN = IsGmm1Interleaved ? config.n : config.outputN;
+        config.schedulerN = config.n;
         config.tileM = gmm1TileM;
         FinalizeProblemConfig(config, blockJob, gmm1TileM);
         return config;
@@ -362,7 +361,7 @@ struct Config {
 };
 
 // 统一描述一次 BlockMmad::Init 的可变配置，避免 Context 分散保存并逐字段比较。
-// 通用 MX BlockMmad 的 l1BufNum 始终固定为 2，A8W4 L1Params 则没有该字段，因此不纳入运行时状态。
+// QGMM 的 L1 buffer stage 固定为 2；当前 A/B 的 K 窗口相同，因此只缓存一份 K 长度。
 struct BlockMmadInitConfig {
     uint32_t problemK = 0U;
     uint32_t tileM = 0U;
@@ -377,31 +376,63 @@ struct BlockMmadInitConfig {
     }
 };
 
-// Wave 流程可持有同一个 BlockMmad；普通路径也复用该结构完成一致的初始化。
-template <typename BlockMmad>
-struct BlockMmadContext {
-    BlockMmad blockMmad;
-    BlockMmadInitConfig initConfig{};
-    bool initialized = false;
+enum class GmmStage {
+    GMM1,
+    GMM2
 };
 
-// 仅当 BlockMmad::Init 消费的配置发生变化时刷新，problem 的实际 M/N 由每次 MMAD 调用传入。
-template <typename MmadContext, typename ProblemConfig>
-__aicore__ inline void InitBlockMmad(MmadContext &context, const ProblemConfig &config)
-{
-    using BlockMmad = decltype(context.blockMmad);
-    const auto &tilingConfig = config.blockMmadTiling;
-    const BlockMmadInitConfig requestedConfig{config.k, tilingConfig.tileM, tilingConfig.tileN,
-                                              tilingConfig.l1Params.kL1, tilingConfig.l1Params.scaleKL1};
-    if (!context.initialized || context.initConfig != requestedConfig) {
-        typename BlockMmad::BlockShape l0TileShape{tilingConfig.tileM, tilingConfig.tileN, L0_TILE_K, 0};
-        typename BlockMmad::ProblemShape matmulShape{config.m, config.n, config.k, 0};
-        constexpr bool enableL0CPingPong = false;
-        context.blockMmad.Init(matmulShape, l0TileShape, tilingConfig.l1Params, false, enableL0CPingPong);
-        context.initConfig = requestedConfig;
-        context.initialized = true;
+template <typename BlockMmad, typename DispatchPolicy = typename BlockMmad::DispatchPolicy>
+struct BlockMmadContext {
+    BlockMmad blockMmad;
+
+    template <GmmStage Stage, typename ProblemConfig>
+    __aicore__ inline void Init(const ProblemConfig &config)
+    {
+        const auto &tiling = config.blockMmadTiling;
+        const BlockMmadInitConfig requestedConfig{config.k, tiling.tileM, tiling.tileN, tiling.l1Params.kL1,
+                                                  tiling.l1Params.scaleKL1};
+        if (!initialized_ || initConfig_ != requestedConfig) {
+            typename BlockMmad::BlockShape tileShape{tiling.tileM, tiling.tileN, L0_TILE_K, 0};
+            typename BlockMmad::ProblemShape problemShape{config.m, config.n, config.k, 0};
+            blockMmad.Init(problemShape, tileShape, tiling.l1Params);
+            initConfig_ = requestedConfig;
+            initialized_ = true;
+        }
     }
-}
+
+private:
+    BlockMmadInitConfig initConfig_{};
+    bool initialized_ = false;
+};
+
+template <typename BlockMmad>
+struct BlockMmadContext<BlockMmad, Blaze::Gemm::GroupedMatmulWithScaleMx<>> {
+    BlockMmad blockMmad;
+
+    template <GmmStage Stage, typename ProblemConfig>
+    __aicore__ inline void Init(const ProblemConfig &config)
+    {
+        const auto &tiling = config.blockMmadTiling;
+        // tiling.tileN is the full MMAD output width (gate + up, currently 256).
+        // QGMM concat takes one half (128) and doubles it internally; GMM2 uses the full width.
+        const uint32_t tileN = Stage == GmmStage::GMM1 ? tiling.tileN / ACTIVATION_N_HALF : tiling.tileN;
+        const BlockMmadInitConfig requestedConfig{config.k, tiling.tileM, tileN, tiling.l1Params.kAL1,
+                                                  tiling.l1Params.scaleKL1};
+        if (!initialized_ || initConfig_ != requestedConfig) {
+            typename BlockMmad::ProblemShape problemShape{config.m, config.n, config.k, 0};
+            typename BlockMmad::MmadParams params{
+                {tiling.tileM, tileN, L0_TILE_K, 0}, tiling.l1Params, false, false, 2U};
+            blockMmad.Init(problemShape, params);
+            initConfig_ = requestedConfig;
+            initialized_ = true;
+        }
+        blockMmad.UpdateParamsForNextProblem({config.m, config.n, config.k, 0});
+    }
+
+private:
+    BlockMmadInitConfig initConfig_{};
+    bool initialized_ = false;
+};
 
 /*
  * CACHE_MODE_DISABLE 会使读取不填入 L2，仅适用于后续不会复用的数据。

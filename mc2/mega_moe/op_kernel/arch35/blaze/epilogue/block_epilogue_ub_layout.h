@@ -29,7 +29,6 @@ namespace MegaMoeImpl {
 struct ActivationMxQuantUbOffsets {
     uint32_t firstInputOffsetBytes;
     uint32_t firstInputElementCapacity;
-    uint32_t secondInputOffsetBytes;
     uint32_t activationQuantElementCapacity;
     uint32_t activationOutputOffsetBytes;
     uint32_t quantOutputOffsetBytes;
@@ -41,12 +40,11 @@ struct ActivationMxQuantUbOffsets {
     uint32_t topkWeightElementCapacity;
 };
 
-template <typename InputType, uint32_t TileM, uint32_t TileN, bool IsInterleaved>
+template <typename InputType, uint32_t TileM, uint32_t TileN>
 __aicore__ constexpr inline ActivationMxQuantUbOffsets BuildActivationMxQuantUbOffsets()
 {
     constexpr uint32_t maxSingleElementCount = TileM * TileN;
-    constexpr uint32_t activationQuantElementCapacity =
-        IsInterleaved ? maxSingleElementCount / ACTIVATION_N_HALF : maxSingleElementCount;
+    constexpr uint32_t activationQuantElementCapacity = maxSingleElementCount / ACTIVATION_N_HALF;
     constexpr uint32_t activationOutputOffsetBytes = 0;
     constexpr uint32_t quantOutputOffsetBytes =
         activationOutputOffsetBytes + activationQuantElementCapacity * sizeof(bfloat16_t);
@@ -55,12 +53,9 @@ __aicore__ constexpr inline ActivationMxQuantUbOffsets BuildActivationMxQuantUbO
     constexpr uint32_t maxExpOffsetBytes = quantScaleOffsetBytes + scaleElementCapacity * sizeof(int8_t);
     constexpr uint32_t inverseMxScaleOffsetBytes = maxExpOffsetBytes + scaleElementCapacity * sizeof(uint16_t);
     constexpr uint32_t vecInEndBytes = maxSingleElementCount * sizeof(InputType) * 2U;
-    constexpr uint32_t secondInputOffsetBytes =
-        (vecInEndBytes <= 256U * 1024U) ? (maxSingleElementCount * sizeof(InputType)) : 0U;
 
     return {0U,
             maxSingleElementCount,
-            secondInputOffsetBytes,
             activationQuantElementCapacity,
             activationOutputOffsetBytes,
             quantOutputOffsetBytes,
@@ -84,25 +79,21 @@ struct ActivationMxQuantUbPointers {
     uint32_t selectedInt8BufferOffsetElements;
 };
 
-template <typename InputType, uint32_t MaxSingleElementCount, bool IsInterleaved>
+template <typename InputType, uint32_t MaxSingleElementCount>
 __aicore__ inline ActivationMxQuantUbPointers<InputType> ResolveActivationMxQuantUbPointers(
-    __ubuf__ InputType *firstInputBase, __ubuf__ InputType *secondInputBase, __ubuf__ bfloat16_t *activationOutputBase,
-    __ubuf__ int8_t *quantOutputBase, __ubuf__ uint16_t *quantScaleBase, __ubuf__ uint16_t *maxExpBase,
-    __ubuf__ uint16_t *inverseMxScaleBase, uint32_t validColumnCount, uint16_t pingpongIdx)
+    __ubuf__ InputType *firstInputBase, __ubuf__ bfloat16_t *activationOutputBase, __ubuf__ int8_t *quantOutputBase,
+    __ubuf__ uint16_t *quantScaleBase, __ubuf__ uint16_t *maxExpBase, __ubuf__ uint16_t *inverseMxScaleBase,
+    uint32_t validColumnCount, uint16_t pingpongIdx)
 {
     constexpr uint32_t pongElementOfInput = MaxSingleElementCount;
     constexpr uint32_t pongElementOfBfloat16 = MaxSingleElementCount * sizeof(InputType) / sizeof(bfloat16_t);
     constexpr uint32_t pongElementOfInt8 = MaxSingleElementCount * sizeof(InputType);
     constexpr uint32_t pongElementOfUint16 = MaxSingleElementCount * sizeof(InputType) / sizeof(uint16_t);
-    const uint32_t pongMultiplier = (IsInterleaved && pingpongIdx == 1U) ? 1U : 0U;
+    const uint32_t pongMultiplier = (pingpongIdx == 1U) ? 1U : 0U;
 
     ActivationMxQuantUbPointers<InputType> pointers{};
     pointers.firstInput = firstInputBase + pongMultiplier * pongElementOfInput;
-    if constexpr (IsInterleaved) {
-        pointers.secondInput = pointers.firstInput + validColumnCount;
-    } else {
-        pointers.secondInput = secondInputBase;
-    }
+    pointers.secondInput = pointers.firstInput + validColumnCount;
     pointers.activationOutput = activationOutputBase + pongMultiplier * pongElementOfBfloat16;
     pointers.quantOutput = quantOutputBase + pongMultiplier * pongElementOfInt8;
     pointers.quantScale = quantScaleBase + pongMultiplier * pongElementOfUint16;

@@ -13,6 +13,7 @@
  * \brief MMAD block implementation for weight-quant grouped matmul split-M pipeline.
  */
 #pragma once
+#include "../tile/copy_gmm1_concat.h"
 
 #include "../policy/dispatch_policy_mega_moe.h"
 #include "blaze/gemm/tile/tile_trait.h"
@@ -112,7 +113,7 @@ public:
     };
 
     __aicore__ inline void Init(const ProblemShape &problemShape, const BlockShape &l0TileShape,
-                                const L1Params &l1Params);
+                                const L1Params &l1Params, bool interleave = false);
 
     __aicore__ inline BlockMmad();
     // When copyUbToV1 is true, L0C->UB copies the result to V1 core instead of V0.
@@ -172,6 +173,7 @@ private:
         typename asc::te::frame_layout_format<asc::te::nn_layout_ptn, AscendC::Std::Int<SCALE_C0>>;
 
     // Init state used by the Tensor-based operator() path.
+    uint64_t concatHalfN_{0};
     uint64_t k_{1};
     uint64_t kL1_{1};
     uint64_t scaleKL1_{MX_FP8FP4_SCALE_K_L1_SIZE};
@@ -411,7 +413,11 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyMxScaleGmToL1(co
     auto gmBlockScaleB =
         tensorScaleB.slice(asc::te::make_coord(CeilDiv(kbL1Offset, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE, 0),
                            asc::te::make_shape(scaleKL1RealSize, param.nL1Size));
-    asc::te::copy(CopyScaleGM2L1, tensorScaleBL1_, gmBlockScaleB);
+    if (concatHalfN_ != 0U) {
+        MegaMoeImpl::CopyGmm1ScaleConcatToL1(tensorScaleBL1_, gmBlockScaleB, concatHalfN_, k_);
+    } else {
+        asc::te::copy(CopyScaleGM2L1, tensorScaleBL1_, gmBlockScaleB);
+    }
 }
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
@@ -461,8 +467,9 @@ __aicore__ inline BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::~BlockMmad()
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::Init(const ProblemShape &problemShape,
                                                                  const BlockShape &l0TileShape,
-                                                                 const L1Params &l1Params)
+                                                                 const L1Params &l1Params, bool interleave)
 {
+    concatHalfN_ = interleave ? asc::te::get<IDX_N_IDX>(problemShape) / MegaMoeImpl::ACTIVATION_N_HALF : 0U;
     k_ = asc::te::get<IDX_K_IDX>(problemShape);
     kL1_ = l1Params.kL1;
     scaleKL1_ = l1Params.scaleKL1;
