@@ -22,22 +22,22 @@
 namespace optiling {
 namespace lightning_indexer_v2_checker {
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckFeature(const LightningIndexerV2CheckerInfo &) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckFeature(const LightningIndexerV2CheckerInfo &info) const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const
 {
     return ge::GRAPH_SUCCESS;
 }

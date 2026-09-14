@@ -16,8 +16,6 @@
 #ifndef CHECKER_CONTEXT_LIGHTNING_INDEXER_V2_H
 #define CHECKER_CONTEXT_LIGHTNING_INDEXER_V2_H
 
-#include <cstdint>
-#include <string>
 #include "exe_graph/runtime/tiling_context.h"
 
 namespace optiling {

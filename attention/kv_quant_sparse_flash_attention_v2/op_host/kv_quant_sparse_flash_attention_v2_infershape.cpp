@@ -144,7 +144,7 @@ ge::graphStatus InferDataTypeKvQuantSparseFlashAttentionV2(gert::InferDataTypeCo
     const auto inputDataType = context->GetInputDataType(QSFA_QUERY_INPUT_INDEX);
     context->SetOutputDataType(0, inputDataType);
     context->SetOutputDataType(1, ge::DT_FLOAT);
-    context->SetOutputDataType(2, ge::DT_FLOAT);
+    context->SetOutputDataType(2, ge::DT_FLOAT); // 2：设置输出数据类型，第三个输出为浮点型
     return GRAPH_SUCCESS;
 }
 

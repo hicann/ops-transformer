@@ -300,7 +300,7 @@ void QSFAMlaTiling::CalcVectorizeFlag()
     }
     if (qsfaInfo_->kvLayout == QSFALayout::PA_BSND) {
         constexpr uint32_t S2_NUM_PER_LOOP = 128U;
-        int64_t blockSize = qsfaInfo_->blockSize;
+        uint64_t blockSize = static_cast<uint64_t>(qsfaInfo_->blockSize);
         uint32_t blocksizeFlag = static_cast<uint32_t>((blockSize & (blockSize - 1)) == 0);
         uint32_t sparseBlockCountFlag =
             static_cast<uint32_t>((static_cast<uint32_t>(qsfaInfo_->sparseBlockCount) & (S2_NUM_PER_LOOP - 1U)) == 0U);
@@ -312,8 +312,8 @@ void QSFAMlaTiling::CalcVectorizeFlag()
             Align<uint32_t>(qsfaInfo_->maxBlockNumPerBatch * sizeof(int32_t), 512U) +
             Align<uint32_t>(static_cast<uint32_t>(qsfaInfo_->sparseBlockCount) * sizeof(int32_t), BYTE_BLOCK) +
             alignedSparseBlockCount * sizeof(int64_t);
-        vectorizeFlag_ = static_cast<uint32_t>(vectorizeUbSize <= UB_SIZE && blocksizeFlag && sparseBlockCountFlag &&
-                                               sparseModeFlag);
+        vectorizeFlag_ = static_cast<uint32_t>(vectorizeUbSize <= UB_SIZE && blocksizeFlag != 0 &&
+                                               sparseBlockCountFlag != 0 && sparseModeFlag != 0);
     }
 }
 
@@ -507,7 +507,7 @@ void QSFAMlaTiling::GetWorkspaceSize()
                 (S2_BASE_SIZE * D_SIZE * GetTypeSize(qsfaInfo_->inputQType) * TRIPLE_BUFFER_NUM * (aicNum >> 1));
         }
         // 稀疏kv物理地址向量化：仅向量化开启时预计算物理地址表（挂在V0结果区之后）
-        if (vectorizeFlag_) {
+        if (vectorizeFlag_ != 0) {
             uint32_t totalBS1 =
                 (qsfaInfo_->qLayout == QSFALayout::TND) ? qsfaInfo_->s1Size : (qsfaInfo_->bSize * qsfaInfo_->s1Size);
             workspaceSize_ += totalBS1 * static_cast<uint32_t>(qsfaInfo_->sparseBlockCount) * sizeof(int64_t);
@@ -1574,7 +1574,7 @@ static size_t GetAxisIdx(const QSFAAxis &axis, const QSFALayout &layout)
     return std::distance(axes.begin(), axisIt);
 }
 
-static uint32_t GetAxisNum(const gert::Shape &shape, const QSFAAxis &axis, const QSFALayout &layout)
+static int64_t GetAxisNum(const gert::Shape &shape, const QSFAAxis &axis, const QSFALayout &layout)
 {
     return HasAxis(axis, layout, shape) ? shape.GetDim(GetAxisIdx(axis, layout)) : kInvalidDimValue;
 }

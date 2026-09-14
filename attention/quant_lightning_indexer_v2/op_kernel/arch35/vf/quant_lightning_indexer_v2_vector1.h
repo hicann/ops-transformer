@@ -456,7 +456,7 @@ __aicore__ inline void MulWeightAndReduceSum(const LocalTensor<uint16_t> &out_, 
     __ubuf__ float *qScale = (__ubuf__ float *)qScale_.GetPhyAddr();
     __ubuf__ float *kScale = (__ubuf__ float *)kScale_.GetPhyAddr();
     __ubuf__ float *qk = (__ubuf__ float *)qk_.GetPhyAddr();
-    if (gSize % 2 == 0) {
+    if (gSize % 2 == 0) { // 2：判断奇偶性
         MulWeightAndReduceSumF32GSizeEvenVF(out, qk, qkVLStride, weight, kScale, qScale, (uint16_t)gSize);
     } else {
         MulWeightAndReduceSumF32GSizeOddVF(out, qk, qkVLStride, weight, kScale, qScale, (uint16_t)gSize);
@@ -476,7 +476,7 @@ __aicore__ inline void MulWeightAndReduceSum(const LocalTensor<uint16_t> &out_, 
     __ubuf__ half *qScale = (__ubuf__ half *)qScale_.GetPhyAddr();
     __ubuf__ half *kScale = (__ubuf__ half *)kScale_.GetPhyAddr();
     __ubuf__ int32_t *qk = (__ubuf__ int32_t *)qk_.GetPhyAddr();
-    if (gSize % 2 != 0) {
+    if (gSize % 2 != 0) { // 2：判断奇偶性
         MulWeightAndReduceSumInt32GSizeOddVF(out, qk, qkVLStride, weight, kScale, qScale, (uint16_t)gSize);
     } else {
         MulWeightAndReduceSumInt32GSizeEvenVF(out, qk, qkVLStride, weight, kScale, qScale, (uint16_t)gSize);

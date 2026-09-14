@@ -85,8 +85,9 @@ public:
                                                   idx0Local, idx1Local, idx2Local, idx3Local, nkValueLocal, topK,
                                                   s2SeqLen);
                 PipeBarrier<PIPE_V>();
-                AscendC::DataCopy(hisIndexLocal[(loopIdx + 1) % 2], tmpIndexLocal,
-                                  LIV2Common::Align(topK, (uint32_t)256));
+                AscendC::DataCopy(
+                    hisIndexLocal[(loopIdx + 1) % 2], tmpIndexLocal, // 2：使用两个本地存储单元进行循环交替存储
+                    LIV2Common::Align(topK, (uint32_t)256)); // 对复制的数据量进行对齐处理，确保其为256的倍数
             } else if (loopIdx != 0) {
                 liV2Topkb32gather::LiTopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal,
                                                   idx0Local, idx1Local, idx2Local, idx3Local, nkValueLocal, topK,
@@ -100,8 +101,10 @@ public:
                 if (loopIdx == s2LoopNum - 1) {
                     PipeBarrier<PIPE_V>();
                     if ((loopIdx + 1) % 2 == 1) {
-                        AscendC::DataCopy(indicesOutLocal, hisIndexLocal[(loopIdx + 1) % 2],
-                                          LIV2Common::Align(topK, (uint32_t)256));
+                        AscendC::DataCopy(
+                            indicesOutLocal,
+                            hisIndexLocal[(loopIdx + 1) % 2], // 2：使用两个本地存储单元进行循环交替存储
+                            LIV2Common::Align(topK, (uint32_t)256)); // 对复制的数据量进行对齐处理，确保其为256的倍数
                     }
                 }
             }

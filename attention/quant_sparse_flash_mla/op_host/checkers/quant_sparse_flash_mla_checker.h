@@ -12,6 +12,7 @@
 #define QUANT_SPARSE_FLASH_MLA_CHECKER_V2_H
 
 #include "../quant_sparse_flash_mla_check.h"
+#include "graph/error_codes.h"
 
 namespace optiling {
 

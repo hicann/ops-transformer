@@ -12,7 +12,6 @@
  * \file lightning_indexer_v2_def.cpp
  * \brief
  */
-#include <cstdint>
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -83,7 +82,7 @@ public:
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND});
-        this->Attr("topk").AttrType(REQUIRED).Int(2048);
+        this->Attr("topk").AttrType(REQUIRED).Int(2048); // 筛选前2048个作为输出index
         this->Attr("max_seqlen_q").AttrType(OPTIONAL).Int(-1);
         this->Attr("layout_q").AttrType(OPTIONAL).String("BSND");
         this->Attr("layout_k").AttrType(OPTIONAL).String("BSND");
