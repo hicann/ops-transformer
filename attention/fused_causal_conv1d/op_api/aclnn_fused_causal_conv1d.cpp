@@ -140,8 +140,9 @@ ACLNN_API aclnnStatus aclnnFusedCausalConv1dGetWorkspaceSize(
 {
     L2_DFX_PHASE_1(aclnnFusedCausalConv1d,
                    DFX_IN(x, weight, convStates, queryStartLoc, cacheIndices, initialStateMode, bias, numAcceptedTokens,
-                          numComputedTokens, blockIdxFirstScheduledToken, blockIdxLastScheduledToken, initialStateIdx),
-                   DFX_OUT(y, convStates));
+                          numComputedTokens, blockIdxFirstScheduledToken, blockIdxLastScheduledToken, initialStateIdx,
+                          activationMode, padSlotId, runMode, maxQueryLen, residualConnection, blockSize, convMode),
+                   DFX_OUT(convStates, y));
 
     return FusedCausalConv1dCommonProcess(x, weight, convStates, queryStartLoc, cacheIndices, initialStateMode, bias,
                                           numAcceptedTokens, numComputedTokens, blockIdxFirstScheduledToken,
