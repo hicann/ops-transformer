@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file test_aclnn_mla_prolog_v3_pq_pc.cpp
+ * \file test_aclnn_mla_prolog_v3_weight_nz_pq_pc.cpp
  * \brief Example: 部分量化 kvCache per-channel, PA_BLK_BSND, BS合轴, queryNormFlag=true
  */
 

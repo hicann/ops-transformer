@@ -60,7 +60,7 @@
     $$
 
 ## 参数说明
-  
+
 | 参数名                     | 输入/输出/属性 | 描述  | 数据类型       | 数据格式   |
 |----------------------------|-----------|----------------------------------------------------------------------|----------------|------------|
 | token_x                     | 输入      | 公式中计算Query和Key的输入tensor | INT8, BF16 | ND         |
@@ -88,7 +88,7 @@
 | query                   | 输出      | 公式中Query的输出tensor（对应$q^N$） | FLOAT16, BF16, INT8 | ND         |
 | query_rope               | 输出      | 公式中Query位置编码的输出tensor（对应$q^R$） | FLOAT16, BF16, INT8       | ND |
 | dequant_scale_q_nope | 输出     | 表示Query的输出tensor的量化参数   | FLOAT             | ND         |
-                   
+
 ## 约束说明
 
 - shape约束
@@ -119,7 +119,7 @@
       <tr>
         <td colspan="2">非量化</td>
         <td>
-            入参：所有入参皆为非量化数据 <br> 
+            入参：所有入参皆为非量化数据 <br>
             出参：所有出参皆为非量化数据
         </td>
       </tr>
@@ -127,22 +127,22 @@
         <td rowspan="2">部分量化</td>
         <td>kv_cache非量化 </td>
         <td>
-            入参：weight_uq_qr传入pertoken量化数据，其余入参皆为非量化数据 <br> 
-            出参：所有出参返回非量化数据 
+            入参：weight_uq_qr传入pertoken量化数据，其余入参皆为非量化数据 <br>
+            出参：所有出参返回非量化数据
         </td>
       </tr>
       <tr>
         <td>kv_cache量化 </td>
-        <td> 
-            入参：weight_uq_qr传入pertoken量化数据，kv_cache、kr_cache传入perchannel量化数据，其余入参皆为非量化数据 <br> 
-            出参：kv_cache、kr_cache返回perchannel量化数据，其余出参返回非量化数据 
+        <td>
+            入参：weight_uq_qr传入pertoken量化数据，kv_cache、kr_cache传入perchannel量化数据，其余入参皆为非量化数据 <br>
+            出参：kv_cache、kr_cache返回perchannel量化数据，其余出参返回非量化数据
         </td>
       </tr>
       <tr>
         <td rowspan="2">全量化</td>
         <td> kv_cache非量化</td>
-        <td> 
-            入参：token_x传入pertoken量化数据，weight_dq、weight_uq_qr、weight_dkv_kr传入perchannel量化数据，其余入参皆为非量化数据 <br> 
+        <td>
+            入参：token_x传入pertoken量化数据，weight_dq、weight_uq_qr、weight_dkv_kr传入perchannel量化数据，其余入参皆为非量化数据 <br>
             出参：所有出参皆为非量化数据
         </td>
       </tr>
@@ -150,7 +150,7 @@
         <td> kv_cache量化 </td>
         <td>
             入参：token_x传入pertoken量化数据，weight_dq、weight_uq_qr、weight_dkv_kr传入perchannel量化数据，kv_cache传入pertensor量化数据，其余入参皆为非量化数据 <br>
-            出参：query返回pertoken_head量化数据，kv_cache出参返回pertensor量化数据，其余出参范围非量化数据 
+            出参：query返回pertoken_head量化数据，kv_cache出参返回pertensor量化数据，其余出参范围非量化数据
         </td>
       </tr>
     </table>
@@ -483,7 +483,7 @@
   <tr>
     <td class="tg-9wq8" rowspan="10">aclnn接口</td>
     <td class="tg-0pky">
-    <a href="./examples/test_aclnn_mla_prolog_v2_nq_bsh.cpp">MlaPrologV2非量化（BSH）接口测试用例代码
+    <a href="./examples/test_aclnn_mla_prolog_v2_weight_nz_nq_bsh.cpp">MlaPrologV2非量化（BSH）接口测试用例代码
     </a>
     </td>
     <td class="tg-lboi" rowspan="10">通过
@@ -494,7 +494,7 @@
   </tr>
   <tr>
     <td class="tg-0lax">
-    <a href="./examples/test_aclnn_mla_prolog_v2_fq.cpp">MlaPrologV2全量化KV量化（BSH）接口测试用例代码
+    <a href="./examples/test_aclnn_mla_prolog_v2_weight_nz_fq.cpp">MlaPrologV2全量化KV量化（BSH）接口测试用例代码
     </a>
     </td>
   </tr>

@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file test_aclnn_mla_prolog_v4_fqkvq.cpp
+ * \file test_aclnn_mla_prolog_v4_weight_nz_fqkvq.cpp
  * \brief
  */
 

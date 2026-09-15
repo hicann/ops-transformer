@@ -268,12 +268,12 @@
   </tr></thead>
 <tbody>
   <tr>
-    <td class="tg-9wq8" rowspan="6">aclnn接口</td>
+    <td class="tg-9wq8" rowspan="2">aclnn API</td>
     <td class="tg-0pky">
-    <a href="./examples/test_aclnn_mla_prolog_v3.cpp">MlaPrologV3接口测试用例代码
+    <a href="./examples/test_aclnn_mla_prolog_v3_weight_nz.cpp">aclnnMlaPrologV3WeightNz接口测试用例代码
     </a>
     </td>
-    <td class="tg-lboi" rowspan="6">
+    <td class="tg-lboi">
     通过
     <a href="./docs/aclnnMlaPrologV3WeightNz.md">aclnnMlaPrologV3WeightNz
     </a>
@@ -282,10 +282,10 @@
   </tr>
   <tr>
     <td class="tg-0pky">
-    <a href="./examples/test_aclnn_mla_prolog_v4.cpp">MlaPrologV4WeightNz接口测试用例代码
+    <a href="./examples/test_aclnn_mla_prolog_v4_weight_nz.cpp">aclnnMlaPrologV4WeightNz接口测试用例代码
     </a>
     </td>
-    <td class="tg-lboi" rowspan="6">
+    <td class="tg-lboi">
     通过
     <a href="./docs/aclnnMlaPrologV4WeightNz.md">aclnnMlaPrologV4WeightNz
     </a>
