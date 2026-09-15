@@ -314,7 +314,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     const TokenDispatchConfig &context = tokenDispatchConfig_;
     TokenDispatchScratch<ActivationType> &scratch = tokenDispatchScratch_;
     scratch.expertRevNumsGlobalTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.expertRevTokenNumsPtr));
+        reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.expertRecvTokenCountPtr));
     if constexpr (g_coreType == AIC) {
         return;
     }
@@ -686,7 +686,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::PrepareGmmExpertState(E
         }
     }
     uint32_t expertTokenCount = GetExpertTokenCountFromWorkspace(
-        params_.workspaceInfo.expertRevTokenNumsPtr, countWorkspace_, commonConfig_.moeExpertPerRank, expertIdx);
+        params_.workspaceInfo.expertRecvTokenCountPtr, countWorkspace_, commonConfig_.moeExpertPerRank, expertIdx);
     UpdateExpertLoopState(state, expertIdx, expertTokenCount);
 }
 
@@ -722,7 +722,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::SyncInputAcrossRanks()
         const AivJobContext syncJob{.jobIndex = blockIdx_, .totalJobs = blockNum_};
         const uint32_t firstPhysicalCoreIdx = aivCoreIdx_ - GetSubBlockIdx();
         CrossRankSyncInWorldSize<true>(params_.peermemInfo.rankSyncInWorldPtr, rankId_, worldSize_, syncJob,
-                                       firstPhysicalCoreIdx, params_.workspaceInfo.flagTopkValidIndexSyncPtr);
+                                       firstPhysicalCoreIdx, params_.workspaceInfo.flagAiv1TopkValidIndexSyncPtr);
     } else {
         if constexpr (g_coreType == AIV) {
             CrossRankSyncInWorldSize(params_.peermemInfo.rankSyncInWorldPtr, rankId_, worldSize_, aivJob_);

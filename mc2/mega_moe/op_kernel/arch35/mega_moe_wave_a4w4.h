@@ -129,7 +129,7 @@ __aicore__ inline ExpertTokenPosition MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTyp
         uint32_t firstDispatchWaveMGroupCount = 0U;
         while (IsPositionWithinWave(plannedDispatchPosition, firstDispatchWaveMGroupCount)) {
             ExpertTokenRange nextDispatchRange = PlanNextExpertTokenRangeInWave<GMM1_TILE_M>(
-                params_.workspaceInfo.expertRevTokenNumsPtr, countWorkspace_, commonConfig_.moeExpertPerRank,
+                params_.workspaceInfo.expertRecvTokenCountPtr, countWorkspace_, commonConfig_.moeExpertPerRank,
                 mGroupsPerWave_, firstDispatchWaveMGroupCount, plannedDispatchPosition);
             plannedDispatchPosition = nextDispatchRange.end;
             firstDispatchRange.end = nextDispatchRange.end;
@@ -153,7 +153,7 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Dispatc
             return;
         }
         ExpertTokenRange nextExpertDispatchRange = PlanNextExpertTokenRangeInWave<GMM1_TILE_M>(
-            params_.workspaceInfo.expertRevTokenNumsPtr, countWorkspace_, commonConfig_.moeExpertPerRank,
+            params_.workspaceInfo.expertRecvTokenCountPtr, countWorkspace_, commonConfig_.moeExpertPerRank,
             mGroupsPerWave_, nextDispatchWaveMGroupCount, dispatchPosition);
         // 规划完成后再判断是否得到有效专家 slice，调度函数本身不参与流程分支。
         if (nextExpertDispatchRange.end.globalTokenIndex > nextExpertDispatchRange.begin.globalTokenIndex) {

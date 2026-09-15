@@ -15,6 +15,12 @@
 
 namespace MegaMoeImpl {
 
+// Mode 4：同一 AI Core 内 AIC 与单个 AIV 的同步，支持双向通知。
+constexpr uint8_t SYNC_AIC_AIV_MODE = 4;
+constexpr uint16_t AIC_SYNC_AIV_FLAG = 4;
+constexpr uint16_t AIV_SYNC_AIC_FLAG = 6;
+constexpr uint16_t GMM_AIV_FLAG_OFFSET = 16U;
+
 // 每条同步链路各允许 AIC 领先 15 个逻辑 tile，计数跨 expert/wave 保留。
 // 每个 tile 的所有 GM 输出完成后通知消费者，消费者处理完所有子 tile 后通知 AIC。
 constexpr uint32_t GMM_MAX_PENDING_TILES = 15;
@@ -25,7 +31,6 @@ enum class GmmEventPair : uint16_t {
     MOE_GMM2 = 10,
     SHARED_GMM1 = 12,
 };
-constexpr uint16_t GMM_AIV_FLAG_OFFSET = 16U;
 
 // 轮询 GM 中的 int32 flag 直至等于期望值，并在两次读取之间加入短暂退避。
 __aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t *flagAddr, int32_t expectedValue,
@@ -47,10 +52,6 @@ __aicore__ inline void WaitUntilGmFlagAtLeast(__gm__ int32_t *flagAddr, int32_t 
         }
     }
 }
-
-constexpr uint8_t SYNC_AIC_AIV_MODE = 4;
-constexpr uint16_t AIC_SYNC_AIV_FLAG = 4;
-constexpr uint16_t AIV_SYNC_AIC_FLAG = 6;
 
 __aicore__ inline void NotifyCube(uint16_t value = 0)
 {
@@ -87,7 +88,8 @@ public:
 
     __aicore__ inline void WaitForActivation()
     {
-        if (*submittedTiles_ >= 2) {
+        // 首次填满双缓冲后，复用槽位前等待 Activation 完成。
+        if (*submittedTiles_ >= static_cast<int32_t>(DOUBLE_BUFFER)) {
             WaitForVector(pingpongIdx_);
         }
     }
@@ -146,7 +148,7 @@ public:
     __aicore__ inline void WaitForActivation()
     {
         if (pendingTiles_ == GMM_MAX_PENDING_TILES) {
-            AscendC::CrossCoreWaitFlag<4, PIPE_S>(activationFinishedFlag_ + aivFlagOffset_);
+            AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_S>(activationFinishedFlag_ + aivFlagOffset_);
             --pendingTiles_;
         }
         ++pendingTiles_;
@@ -155,19 +157,19 @@ public:
     // AIC：整个交织 tile 的 Fixpipe 已提交，由 FIX 通知 Activation 读取 GM。
     __aicore__ inline void NotifyActivation()
     {
-        AscendC::CrossCoreSetFlag<4, PIPE_FIX>(gmm1FinishedFlag_ + aivFlagOffset_);
+        AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(gmm1FinishedFlag_ + aivFlagOffset_);
     }
 
     // AIV：在 MTE2 读取 GMM1 结果前等待。
     __aicore__ inline void WaitForGmm1()
     {
-        AscendC::CrossCoreWaitFlag<4, PIPE_MTE2>(gmm1FinishedFlag_);
+        AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_MTE2>(gmm1FinishedFlag_);
     }
 
     // AIV：整个逻辑 tile 的 Activation/量化输出写回后，归还一个额度。
     __aicore__ inline void NotifyGmm1()
     {
-        AscendC::CrossCoreSetFlag<4, PIPE_MTE3>(activationFinishedFlag_);
+        AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_MTE3>(activationFinishedFlag_);
     }
 
     // MTE 主流程末尾统一排空；独立事件允许 ACK 跨过后续共享计算保留。
@@ -175,7 +177,7 @@ public:
     {
         if constexpr (g_coreType == AscendC::AIC) {
             while (pendingTiles_ != 0U) {
-                AscendC::CrossCoreWaitFlag<4, PIPE_S>(activationFinishedFlag_ + aivFlagOffset_);
+                AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_S>(activationFinishedFlag_ + aivFlagOffset_);
                 --pendingTiles_;
             }
         }
@@ -289,6 +291,10 @@ private:
 
 // GMM2 -> 非量化 Combine：固定使用 AIV1，事件和计数独立于 GMM1/Activation。
 class Gmm2CombineSync {
+private:
+    static constexpr uint16_t GMM2_FINISHED_FLAG = static_cast<uint16_t>(GmmEventPair::MOE_GMM2);
+    static constexpr uint16_t COMBINE_FINISHED_FLAG = GMM2_FINISHED_FLAG + 1U;
+
 public:
     // AIC：提交前预留额度。累计第 16 个 tile 起，每次消费一个 ACK；已到达的 ACK 可直接通过。
     // PIPE_S gates submission itself. PIPE_MTE2 would only stall loads and cannot
@@ -296,7 +302,7 @@ public:
     __aicore__ inline void WaitForCombine()
     {
         if (pendingTiles_ == GMM_MAX_PENDING_TILES) {
-            AscendC::CrossCoreWaitFlag<4, PIPE_S>(COMBINE_FINISHED_FLAG + GMM_AIV_FLAG_OFFSET);
+            AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_S>(COMBINE_FINISHED_FLAG + GMM_AIV_FLAG_OFFSET);
             --pendingTiles_;
         }
         ++pendingTiles_;
@@ -304,33 +310,31 @@ public:
 
     __aicore__ inline void NotifyCombine()
     {
-        AscendC::CrossCoreSetFlag<4, PIPE_FIX>(GMM2_FINISHED_FLAG + GMM_AIV_FLAG_OFFSET);
+        AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(GMM2_FINISHED_FLAG + GMM_AIV_FLAG_OFFSET);
     }
 
     __aicore__ inline void WaitForGmm2()
     {
-        AscendC::CrossCoreWaitFlag<4, PIPE_MTE2>(GMM2_FINISHED_FLAG);
+        AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_MTE2>(GMM2_FINISHED_FLAG);
     }
 
     // AIV1：Combine 输出写回后，归还一个额度。
     __aicore__ inline void NotifyGmm2()
     {
-        AscendC::CrossCoreSetFlag<4, PIPE_MTE3>(COMBINE_FINISHED_FLAG);
+        AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_MTE3>(COMBINE_FINISHED_FLAG);
     }
 
     __aicore__ inline void EndSync()
     {
         if constexpr (g_coreType == AscendC::AIC) {
             while (pendingTiles_ != 0U) {
-                AscendC::CrossCoreWaitFlag<4, PIPE_S>(COMBINE_FINISHED_FLAG + GMM_AIV_FLAG_OFFSET);
+                AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_S>(COMBINE_FINISHED_FLAG + GMM_AIV_FLAG_OFFSET);
                 --pendingTiles_;
             }
         }
     }
 
 private:
-    static constexpr uint16_t GMM2_FINISHED_FLAG = static_cast<uint16_t>(GmmEventPair::MOE_GMM2);
-    static constexpr uint16_t COMBINE_FINISHED_FLAG = GMM2_FINISHED_FLAG + 1U;
     uint32_t pendingTiles_ = 0;
 };
 

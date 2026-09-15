@@ -520,9 +520,10 @@ __aicore__ inline void ExportCompactExpertTokenCounts(const MoeStageCommonConfig
     }
 
     uint64_t countOffset = GetExpertCountWorkspaceOffset(countWorkspace, common.moeExpertPerRank, 0U, true);
-    GlobalTensor<int32_t> expertRevTokenNums;
-    expertRevTokenNums.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.expertRevTokenNumsPtr));
-    DataCopyPad(scratch.expertTokenNumsOutTensor, expertRevTokenNums[countOffset],
+    GlobalTensor<int32_t> expertRecvTokenCount;
+    expertRecvTokenCount.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.expertRecvTokenCountPtr));
+    DataCopyPad(scratch.expertTokenNumsOutTensor, expertRecvTokenCount[countOffset],
                 {1U, common.moeExpertPerRank * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U}, {true, 0U, 0U, 0U});
     SyncFuncStatic<HardEvent::MTE2_MTE3, SYNC_EVENT_ID2>();
 

@@ -533,7 +533,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorks
                              static_cast<uint64_t>(blockIdx_) * INT_CACHELINE;
     }
     expertTokenNumsOut_.SetGlobalBuffer((__gm__ int32_t *)params_.expertTokenNumsOutGmAddr);
-    expertRevNumsGlobalTensor_.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.expertRevTokenNumsPtr);
+    expertRevNumsGlobalTensor_.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.expertRecvTokenCountPtr);
     metaInfoGlobalTensor_.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.metaInfoPtr);
     // 每个 block 负责一个专家，cumsumInfo 中每个专家占 worldSize 个
     // int32_t 存 rank 维度的 cumsum 结果，blockIdx 决定了负责哪个专家。
