@@ -827,6 +827,26 @@
     <td>大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention的前置评分模块。</td>
   </tr>
   <tr>
+    <td>attention</td>
+    <td><a href="../../attention/pool_key_indexer/README.md">pool_key_indexer</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>将多个连续token打包成一个pool（池），以pool为单位计算注意力相关性分数并选取top-k位置，从而在保持稀疏注意力优势的同时减少索引开销。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/key_pool/README.md">key_pool</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>对每个输入token分别执行K投影和Gate投影，将连续的`cmpRatio`个token分为一组，按Gate与位置偏置确定的权重将组内K合并为一个Key，并将未完成压缩组所需的中间状态写入分页`stateCache`。</td>
+  </tr>
+  <tr>
     <td>ffn</td>
     <td><a href="../../ffn/ffn/README.md">ffn</a></td>
     <td>✓</td>
