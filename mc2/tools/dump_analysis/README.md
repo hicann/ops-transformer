@@ -188,6 +188,125 @@ aiv_mte3_time：AI CORE->片上内存搬运类指令在AI Vector Core上的耗�
 | dump_analysis.sh脚本直调 | bash dump_analysis.sh TARGET_DIR=xxx TOOL_PATH=xxx PROFILING_PATH=xxx SP_MOE_NUM=0 TP_WORLDSIZE=1 SOC_VERSION=950 SHARE_EXPERT_CARD_COUNT=1 SHARE_EXPERT_NUM=1 GRAPH_PATH=xxx PLOG_PATH=xxx| 通过对sh脚本进行入参对指定的TARGET_DIR路径下的dump数据进行dump数据解析、对PROFILING_PATH下的profiling数据进行分析、对GRAPH_PATH下的图文件数据进行分析以及对PLOG_PATH下的plog日志进行分析。 |
 | dump_analysis.sh脚本直调 | bash dump_analysis.sh SOC_VERSION=910B START_A2_CLUSTER=1 | 将START_A2_CLUSTER=0时解析的结果放在同一台设备相同路径后执行，通过sh脚本对各机进行解析多机数据, A2 Dispatch和Combine Fullmesh方案建议使用 |
 
+## MC2 融合算子 dump 解析脚本
+
+更完整的命令示例、Workspace Segment 说明和矩阵查看方法见 [MC2 Dump 解析脚本使用说明](./MC2_DUMP_USAGE.md)。
+
+`parse_mc2_dump.py` 是统一入口。传入一个 Dump 文件时只解析该文件；传入算子名和 Dump 根目录时递归查找并批量解析 `tiling_data`、`args_info`、`workspace`、CCU XN/CKE 地址表以及 URMA 通信上下文。统一入口不读取 `exception_info.*`，也不生成 NPY。
+
+### 支持的算子和通路
+
+| 算子名 | 通路 | 可用简称 |
+| :--- | :--- | :--- |
+| `AllGatherMatmulV2` | CCU | `agmmv2` |
+| `AllGatherMatmulV3` | AIV + URMA | `agmmv3` |
+| `AlltoAllMatmul` | 主线 CCU；Apace CCU 自动识别 | `a2amm`、`AlltoAllMatmulApace` |
+| `AlltoAllMatmulV2` | AIV + URMA | `a2ammv2` |
+| `MatmulReduceScatterV2` | CCU | `mmrs`、`mmrsv2`、`MatmulReduceScatter` |
+
+### 最简使用方法
+
+在 dump 根目录中执行，只传算子名：
+
+```bash
+cd /path/to/data-dump
+python3 /path/to/ops-transformer_dfx/mc2/tools/dump_analysis/parse_mc2_dump.py mmrs
+```
+
+也可以在脚本目录执行，并把 dump 根目录作为第二个参数：
+
+```bash
+cd /path/to/ops-transformer_dfx/mc2/tools/dump_analysis
+python3 parse_mc2_dump.py AllGatherMatmulV2 /path/to/data-dump
+python3 parse_mc2_dump.py AllGatherMatmulV3 /path/to/data-dump
+python3 parse_mc2_dump.py AlltoAllMatmul /path/to/data-dump
+python3 parse_mc2_dump.py AlltoAllMatmulV2 /path/to/data-dump
+python3 parse_mc2_dump.py MatmulReduceScatterV2 /path/to/data-dump
+```
+
+`AlltoAllMatmul` 的主线 CCU 和 Apace CCU 共用同一个命令，脚本根据 `tiling_data` 中的结构和 WorkspaceLayout 自动判断通路。
+
+### 输入文件和输出结果
+
+统一入口会识别以下文件，文件名需要包含对应算子名：
+
+| 文件前缀 | 适用通路 | 是否应有 | 解析内容 |
+| :--- | :--- | :--- | :--- |
+| `tiling_data_` | 全部 | 必有 | Tiling 参数、通路信息、WorkspaceLayout 和各段偏移/长度 |
+| `args_info_` | 全部 | 必有 | Kernel 参数地址 |
+| `workspace_segN_typeM_` | 全部 | 必有 | Workspace 段编号、类型和大小；`type12` 按每核 StateDump 结构解析 |
+| `xn_addr_info_`、`cke_addr_info_` | CCU | 应有 | 小端 `uint64` 地址表 |
+| `comm_context_` | AIV + URMA | 应有 | URMA 通信上下文，并提示使用 `parse_matrix.py` 查看原始字节 |
+
+`tiling_data_*`、`args_info_*` 和 `workspace_segN_typeM_*` 是已开启 MC2 DFX Dump 后的核心文件。XN/CKE 只在 CCU 通路出现，`comm_context_*` 只在 URMA 通路出现。`peermem_window_*`、`peermem_segN_typeM_*`、`exception_info.*`、算子 `.json`、`.o` 和 `*_host.o` 不参与统一解析。
+
+更新后的算子代码有两种 TilingData 前缀。AllGatherMatmulV2、AlltoAllMatmul 主线/Apace 和 MatmulReduceScatterV2 使用 `Mc2InitTiling → Mc2CcTiling → DfxDumpInfo`，当前默认 WorkspaceLayout offset 为 576；AllGatherMatmulV3、AlltoAllMatmulV2 仍以 `DfxDumpInfo` 开头，WorkspaceLayout offset 为 0。当前源码始终声明 `dumpInfo` 成员，是否包含 DFX 内容由 `DfxDumpInfo` 内部的 `MC2_DFX_ENABLE` 控制；开启 DFX 时，Peermem 总大小和 PeermemLayout 的相对偏移为 208、216，解析脚本会按算子选取正确位置。
+
+批量解析结果输出到 `<dump根目录>/mc2_dump_analysis/<标准算子名>/`。每个源文件分别生成一个同名 `.txt`，并保留原 rank 子目录。单文件解析只需传入一个 Dump 文件，结果保存到 `<该文件所在目录>/mc2_dump_analysis/<标准算子名>/<原始文件名>.txt`。两种模式都不生成 NPY，也不生成合并的 `analysis.txt`；TilingData、ArgsInfo、StateDump 等后端脚本在终端显示的字段级结果会写入对应 TXT。
+
+`segN` 中的 `N` 只是该次 Tiling 中的段序号，不能单独代表数据语义；应以文件名中的 `typeM` 和 TilingData TXT 中的 `workspaceLayout` 为准。当前 Workspace 类型定义如下：
+
+| type | 含义 | type | 含义 |
+| :---: | :--- | :---: | :--- |
+| 0 | LIB_API | 1 | ND2NZ |
+| 2 | GATHER | 3 | GATHER_SCALE1 |
+| 4 | GATHER_SCALE | 5 | COMM_OUT |
+| 6 | PERMUTE_OUT | 7 | BIAS |
+| 8 | MM_RESULT | 9 | RECV_BUF |
+| 10 | COMM_INT8 | 11 | DYNAMIC_QUANT |
+| 12 | STATE_DUMP | 13 | MM_WORKSPACE |
+| 255 | RESERVED |  |  |
+
+其中 `type12` 是每核通信运行状态，不是矩阵结果；对应 TXT 会显示有效核数、commit/wait 总数，以及源码 `StateDumpPerCore` 中的逐核字段。数据型 Workspace 不会整段展开为文本；若要查看指定行列或解码特殊数据类型，请对原始 Dump 使用下面的 `parse_matrix.py`。
+
+`type13/MM_WORKSPACE` 是 Matmul helper 使用的内部临时区，不是 Matmul 结果。它没有固定元素类型或逻辑 shape，因此统一入口只按原始 `uint8` 字节显示；MMRS 的 Matmul 结果应查看 `type8/MM_RESULT`。
+
+### 指定行列查看 workspace 数据
+
+`parse_matrix.py` 需要提供真实数据类型和逻辑 shape。以下命令查看 BF16 矩阵第 0 到 9 行、每行第 0 到 63 列：
+
+```bash
+python3 parse_matrix.py workspace_seg1_type8_xxx \
+  --dtype bf16 --rows 8192 --cols 12288 \
+  --row-range 0 10 --col-range 0 64
+```
+
+只查看若干离散行列：
+
+```bash
+python3 parse_matrix.py workspace_seg1_type8_xxx \
+  --dtype bf16 --rows 8192 --cols 12288 \
+  --row 0 10 100 --col 0 1 2 3
+```
+
+支持的数据类型为 `fp16`、`bf16`、`fp8_e4m3`、`fp8_e5m2`、`fp4_e2m1`、`e8m0`、`int8`、`uint8` 和 `fp32`。当 dump 按列优先存放时增加 `--transpose`。为避免超大 workspace 被展开成大量 Python 对象，脚本只解码指定的显示范围，统计信息也仅针对该范围。
+
+矩阵的 `rows`、`cols` 和 `dtype` 不能只根据 `segN` 猜测，应结合用例输入、tiling 中的 M/K/N、量化模式和 WorkspaceLayout 确定。文件字节数应满足：普通类型为 `rows * cols * 每元素字节数`，FP4 为 `ceil(rows * cols / 2)`。
+
+### 单文件解析
+
+单独排查某个文件时仍使用统一入口，只传入该 Dump 文件。脚本会从文件名自动识别算子和文件类型，不需要选择后端脚本或增加解析模式：
+
+```bash
+# 解析 TilingData
+python3 parse_mc2_dump.py /path/to/tiling_data_MatmulReduceScatterV2.xxx
+
+# 解析 Kernel 参数地址
+python3 parse_mc2_dump.py /path/to/args_info_MatmulReduceScatterV2.xxx
+
+# 解析 StateDump Workspace
+python3 parse_mc2_dump.py /path/to/workspace_seg2_type12_MatmulReduceScatterV2.xxx
+```
+
+解析 `type12/STATE_DUMP` 时，脚本会自动在同目录查找时间戳最接近的同算子 TilingData，用它推导 AIC 核数和通路标签。单文件模式把结果直接打印到终端；需要给目录内每个 Dump 分别生成 TXT 时，使用前面的“算子名 + Dump 目录”批量调用。
+
+### 常见问题
+
+- 提示“没有找到受支持 dump 文件”：确认传入的是 `data-dump` 根目录，并确认文件名中包含正确的算子名。统一入口按文件名关联同一次算子 dump，不会把其他算子的同名前缀文件混进来。
+- StateDump 中核类型显示“未知”：一般是同次调用的 `tiling_data` 缺失、损坏，或文件名后缀无法关联；状态字段仍会解析，但无法可靠区分 C 核和 V 核。
+- workspace 文件大小和 shape 不一致：先检查 WorkspaceLayout 中该段的 `size` 是否等于 dump 文件大小，再检查量化类型、对齐/padding 和通信 rank 维度。
+- `type12` 中所有预期 slot 的 magic 都无效：这不是 commit/wait 字段偏移问题，而是该 StateDump 段没有被 Kernel 初始化，或 Dump 的段起始地址/时机不正确。统一入口会给出明确警告；对应 TXT 中这些 slot 会显示 `magicValid=false`。如果 magic 出现在非 512B 对齐位置，还会提示可能的段起点错位。
+
 ## 样例代码结果说明
 
 [INFO] 开始分析卡1数据<br>
