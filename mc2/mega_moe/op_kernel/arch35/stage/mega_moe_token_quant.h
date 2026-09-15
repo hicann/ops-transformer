@@ -91,6 +91,27 @@ __aicore__ inline void LoadTopkWeightsToUb(const Params &params, const QuantProc
     }
 }
 
+template <int32_t QuantMode, typename QuantOutType, typename ActivationType>
+__aicore__ inline void QuantizeTokenToLocal(const LocalTensor<bfloat16_t> &xInTensor,
+                                            const LocalTensor<ActivationType> &xOutTensor,
+                                            const QuantProcessConfig &config, uint32_t hiddenDim,
+                                            __ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *halfScaleAddr)
+{
+    __ubuf__ bfloat16_t *srcAddr = (__ubuf__ bfloat16_t *)xInTensor.GetPhyAddr();
+    __ubuf__ int8_t *outDataAddr = (__ubuf__ int8_t *)xOutTensor.GetPhyAddr();
+    __ubuf__ uint16_t *mxScaleAddr = (__ubuf__ uint16_t *)xOutTensor[config.quantTokenAlignBytes].GetPhyAddr();
+
+    Quant::ComputeMaxExp(srcAddr, maxExpAddr, hiddenDim);
+    Quant::ComputeScale<QuantOutType>(maxExpAddr, mxScaleAddr, halfScaleAddr, config.quantScaleNumAlignPerToken);
+    if constexpr (QuantMode == E2M1_QUANT) {
+        Quant::ComputeFp4Data<bfloat16_t, QuantOutType, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
+            srcAddr, halfScaleAddr, outDataAddr, hiddenDim);
+    } else {
+        Quant::ComputeFp8Data<bfloat16_t, QuantOutType, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
+            srcAddr, halfScaleAddr, outDataAddr, hiddenDim);
+    }
+}
+
 // 原型：MegaMoe::QuantProcessInRank。量化一个逻辑 AIV 任务负责的本卡 token。
 template <int32_t QuantMode, typename QuantOutType, typename ActivationType, typename TopkWeightsType,
           bool TopkWeightsPrefetch>
@@ -137,20 +158,8 @@ __aicore__ inline void QuantizeLocalTokens(const AivJobContext &job, const MoeSt
             SetFlag<AscendC::HardEvent::MTE2_V>(event);
             WaitFlag<AscendC::HardEvent::MTE2_V>(event);
         }
-        __ubuf__ bfloat16_t *srcAddr = (__ubuf__ bfloat16_t *)xInTensor.GetPhyAddr();
-        __ubuf__ int8_t *outDataAddr = (__ubuf__ int8_t *)xOutTensor.GetPhyAddr();
-        __ubuf__ uint16_t *mxScaleAddr = (__ubuf__ uint16_t *)xOutTensor[config.quantTokenAlignBytes].GetPhyAddr();
-
-        if constexpr (QuantMode == E2M1_QUANT) {
-            Quant::ComputeMaxExp(srcAddr, maxExpAddr, hiddenDim);
-            Quant::ComputeScale<QuantOutType>(maxExpAddr, mxScaleAddr, halfScaleAddr,
-                                              config.quantScaleNumAlignPerToken);
-            Quant::ComputeFp4Data<bfloat16_t, QuantOutType, AscendC::RoundMode::CAST_TRUNC,
-                                  AscendC::RoundMode::CAST_RINT>(srcAddr, halfScaleAddr, outDataAddr, hiddenDim);
-        } else {
-            Mxfp8::ComputeFp8Token<bfloat16_t, QuantOutType>(srcAddr, maxExpAddr, mxScaleAddr, halfScaleAddr,
-                                                             outDataAddr, hiddenDim, config.quantScaleNumAlignPerToken);
-        }
+        QuantizeTokenToLocal<QuantMode, QuantOutType>(xInTensor, xOutTensor, config, hiddenDim, maxExpAddr,
+                                                      halfScaleAddr);
         SetFlag<AscendC::HardEvent::V_MTE3>(event);
         WaitFlag<AscendC::HardEvent::V_MTE3>(event);
         auto xOutBytesTensor = xOutTensor.template ReinterpretCast<uint8_t>();

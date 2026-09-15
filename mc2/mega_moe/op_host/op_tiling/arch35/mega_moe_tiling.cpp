@@ -703,24 +703,9 @@ static int64_t CalcLeastCclBufferSize(const gert::TilingContext *context, MegaMo
     return leastCclBufferSize;
 }
 
-/*
- * 容量这一组：单卡 token 数上界、topk 权重预取开关、peermem 窗口大小、能收多少 token。
- * topkWeightsType 归在这里，是因为开了预取之后 peermem 里每个 token 要多存一份 topk 权重，
- * 它直接决定窗口要开多大，所以先把它校验掉，再拿去算下面的容量。
- * MTE 下 numMaxTokensPerRank 传 0 表示按本卡 bs 计算。URMA 使用跨卡对称窗口，host 无法从
- * 本卡 bs 推导全卡一致的容量上界，因此必须显式传入非 0 值。
- */
-static ge::graphStatus CheckCapacityAttrs(const gert::TilingContext *context, MegaMoeConfig &config,
-                                          const char *nodeName, const MegaMoeAttrShapeContext &shape,
-                                          int64_t epWorldSize, int64_t moeExpertPerRank)
+static ge::graphStatus CheckNumMaxTokensPerRank(int64_t numMaxTokensPerRank, int64_t topoType,
+                                                const MegaMoeAttrShapeContext &shape, const char *nodeName)
 {
-    auto attrs = context->GetAttrs();
-
-    auto numMaxTokensPerRankPtr = attrs->GetAttrPointer<int64_t>((config.attrNumMaxTokensPerRankIndex));
-    OP_TILING_CHECK(numMaxTokensPerRankPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "numMaxTokensPerRank"),
-                    return ge::GRAPH_FAILED);
-    int64_t numMaxTokensPerRank = static_cast<int64_t>(*numMaxTokensPerRankPtr);
-    const int64_t topoType = *attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
     OP_TILING_CHECK(topoType == TOPO_TYPE_URMA && shape.bs <= 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "bs", std::to_string(shape.bs).c_str(),
                                               "should be greater than 0 for URMA"),
@@ -738,6 +723,39 @@ static ge::graphStatus CheckCapacityAttrs(const gert::TilingContext *context, Me
                                    std::to_string(shape.bs))
                                       .c_str()),
         return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckMaxRecvTokenNum(int64_t maxRecvTokenNum, int64_t topoType, int64_t maxOutputCapacity,
+                                            const char *nodeName)
+{
+    OP_TILING_CHECK(
+        maxRecvTokenNum < 0,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(), ">= 0"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topoType == TOPO_TYPE_URMA && maxRecvTokenNum > maxOutputCapacity,
+                    OP_LOGE_FOR_INVALID_VALUE(
+                        nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(),
+                        (std::string("should be in [0, ") + std::to_string(maxOutputCapacity) + "] for URMA").c_str()),
+                    return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
+}
+
+// 校验 token 容量和通信窗口大小，窗口容量计算包含 topk 权重预取所需空间。
+static ge::graphStatus CheckCapacityAttrs(const gert::TilingContext *context, MegaMoeConfig &config,
+                                          const char *nodeName, const MegaMoeAttrShapeContext &shape,
+                                          int64_t epWorldSize, int64_t moeExpertPerRank)
+{
+    auto attrs = context->GetAttrs();
+    auto numMaxTokensPerRankPtr = attrs->GetAttrPointer<int64_t>((config.attrNumMaxTokensPerRankIndex));
+    OP_TILING_CHECK(numMaxTokensPerRankPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "numMaxTokensPerRank"),
+                    return ge::GRAPH_FAILED);
+    int64_t numMaxTokensPerRank = static_cast<int64_t>(*numMaxTokensPerRankPtr);
+    const int64_t topoType = *attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
+    if (CheckNumMaxTokensPerRank(numMaxTokensPerRank, topoType, shape, nodeName) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (numMaxTokensPerRank == 0) {
         numMaxTokensPerRank = shape.bs;
     }
@@ -772,17 +790,7 @@ static ge::graphStatus CheckCapacityAttrs(const gert::TilingContext *context, Me
 
     const int64_t maxRecvTokenNum =
         static_cast<int64_t>(*attrs->GetAttrPointer<int64_t>((config.attrMaxRecvTokenNumIndex)));
-    OP_TILING_CHECK(
-        maxRecvTokenNum < 0,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(), ">= 0"),
-        return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(topoType == TOPO_TYPE_URMA && maxRecvTokenNum > maxOutputCapacity,
-                    OP_LOGE_FOR_INVALID_VALUE(
-                        nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(),
-                        (std::string("should be in [0, ") + std::to_string(maxOutputCapacity) + "] for URMA").c_str()),
-                    return ge::GRAPH_FAILED);
-
-    return ge::GRAPH_SUCCESS;
+    return CheckMaxRecvTokenNum(maxRecvTokenNum, topoType, maxOutputCapacity, nodeName);
 }
 
 static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, MegaMoeConfig &config, const char *nodeName)
@@ -2204,32 +2212,11 @@ static ge::graphStatus CheckTensorDataType(const gert::TilingContext *context, M
     return CheckOutputDataType(context, config, nodeName);
 }
 
-static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context, MegaMoeConfig &config,
-                                         const char *nodeName)
+static ge::graphStatus CheckWeightTensorFormat(const gert::TilingContext *context, MegaMoeConfig &config,
+                                               const char *nodeName)
 {
-    auto xDesc = context->GetInputDesc(config.xIndex);
-    auto topkIdsDesc = context->GetInputDesc(config.topkIdsIndex);
-    auto topkWeightsDesc = context->GetInputDesc(config.topkWeightsIndex);
-
     auto weightOneDesc = context->GetDynamicInputDesc(config.weight1Index, 0);
     auto weightTwoDesc = context->GetDynamicInputDesc(config.weight2Index, 0);
-    auto weightScalesOneDesc = context->GetDynamicInputDesc(config.weightScales1Index, 0);
-    auto weightScalesTwoDesc = context->GetDynamicInputDesc(config.weightScales2Index, 0);
-
-    auto yDesc = context->GetOutputDesc(config.yIndex);
-    auto expertTokenNumsDesc = context->GetOutputDesc(config.expertTokenNumsIndex);
-
-    OP_TILING_CHECK(static_cast<ge::Format>(ge::GetPrimaryFormat(xDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
-                    OP_LOGE(nodeName, "x format is invalid."), return ge::GRAPH_FAILED);
-
-    OP_TILING_CHECK(
-        static_cast<ge::Format>(ge::GetPrimaryFormat(topkIdsDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
-        OP_LOGE(nodeName, "topkIds format is invalid."), return ge::GRAPH_FAILED);
-
-    OP_TILING_CHECK(
-        static_cast<ge::Format>(ge::GetPrimaryFormat(topkWeightsDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
-        OP_LOGE(nodeName, "topkWeights format is invalid."), return ge::GRAPH_FAILED);
-
     bool isW4 = weightOneDesc->GetDataType() == ge::DT_FLOAT4_E2M1;
     int64_t dispatchOutType = GetOpQuantModeByAttrDispatchOutType(context, config);
     ge::Format weightOnePrimaryFormat =
@@ -2260,6 +2247,37 @@ static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context, Meg
                                                    Ops::Base::ToString(weightTwoDesc->GetStorageFormat()).c_str(),
                                                    "FORMAT_FRACTAL_NZ_C0_32"),
                         return ge::GRAPH_FAILED);
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context, MegaMoeConfig &config,
+                                         const char *nodeName)
+{
+    auto xDesc = context->GetInputDesc(config.xIndex);
+    auto topkIdsDesc = context->GetInputDesc(config.topkIdsIndex);
+    auto topkWeightsDesc = context->GetInputDesc(config.topkWeightsIndex);
+
+    auto weightScalesOneDesc = context->GetDynamicInputDesc(config.weightScales1Index, 0);
+    auto weightScalesTwoDesc = context->GetDynamicInputDesc(config.weightScales2Index, 0);
+
+    auto yDesc = context->GetOutputDesc(config.yIndex);
+    auto expertTokenNumsDesc = context->GetOutputDesc(config.expertTokenNumsIndex);
+
+    OP_TILING_CHECK(static_cast<ge::Format>(ge::GetPrimaryFormat(xDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
+                    OP_LOGE(nodeName, "x format is invalid."), return ge::GRAPH_FAILED);
+
+    OP_TILING_CHECK(
+        static_cast<ge::Format>(ge::GetPrimaryFormat(topkIdsDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
+        OP_LOGE(nodeName, "topkIds format is invalid."), return ge::GRAPH_FAILED);
+
+    OP_TILING_CHECK(
+        static_cast<ge::Format>(ge::GetPrimaryFormat(topkWeightsDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
+        OP_LOGE(nodeName, "topkWeights format is invalid."), return ge::GRAPH_FAILED);
+
+    if (CheckWeightTensorFormat(context, config, nodeName) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
     OP_TILING_CHECK(

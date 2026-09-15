@@ -549,14 +549,9 @@ __aicore__ inline void NotifySharedExpertTileCompletion(uint32_t rowTileOffset, 
 
 namespace GmmKernel {
 
-// 执行通用 GMM2 tile 循环。
-template <uint8_t CombineQuantMode, typename BlockMmad, bool IsShared, bool IsLayered = false,
-          bool NotifyCombineTileReady = false, typename WorkSet, typename Config>
-__aicore__ inline void Gmm2AicMmadGeneric(BlockMmad &blockMmad, WorkSet &workSet, const GMMAddrInfo &gmmAddrInfo,
-                                          const Config &config, uint32_t startLoopIdx, uint32_t tileNum,
-                                          uint32_t rowOffsetInExpert = 0U, int32_t *gmTileSequence = nullptr)
+template <uint8_t CombineQuantMode, bool IsShared, bool IsLayered, typename Config>
+__aicore__ inline GroupSyncSlotLayout GetGmm2GroupSyncSlotLayout(const GMMAddrInfo &gmmAddrInfo, const Config &config)
 {
-    uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     GroupSyncSlotLayout groupSyncSlotLayout{};
     if constexpr ((CombineQuantMode != COMBINE_NO_QUANT || IsLayered) && !IsShared) {
         uint32_t logicalCoreCount = gmmAddrInfo.gmm2CombineLogicalCoreCount;
@@ -568,6 +563,19 @@ __aicore__ inline void Gmm2AicMmadGeneric(BlockMmad &blockMmad, WorkSet &workSet
         }
         groupSyncSlotLayout = CalcGroupSyncSlotLayout(config.m, logicalCoreCount);
     }
+    return groupSyncSlotLayout;
+}
+
+// 执行通用 GMM2 tile 循环。
+template <uint8_t CombineQuantMode, typename BlockMmad, bool IsShared, bool IsLayered = false,
+          bool NotifyCombineTileReady = false, typename WorkSet, typename Config>
+__aicore__ inline void Gmm2AicMmadGeneric(BlockMmad &blockMmad, WorkSet &workSet, const GMMAddrInfo &gmmAddrInfo,
+                                          const Config &config, uint32_t startLoopIdx, uint32_t tileNum,
+                                          uint32_t rowOffsetInExpert = 0U, int32_t *gmTileSequence = nullptr)
+{
+    uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
+    GroupSyncSlotLayout groupSyncSlotLayout =
+        GetGmm2GroupSyncSlotLayout<CombineQuantMode, IsShared, IsLayered>(gmmAddrInfo, config);
 
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
         auto blockCoord = workSet.scheduler.GetBlockCoord(loopIdx);
@@ -735,6 +743,27 @@ __aicore__ inline void Gmm2Aiv0PrologueA8W4(BlockPrologue &blockPrologue, Schedu
     }
 }
 
+template <uint8_t CombineQuantMode, typename BlockMmad, bool IsShared, bool IsLayered, bool NotifyCombineTileReady,
+          typename WorkSet, typename Config>
+__aicore__ inline void Gmm2ExecAicWithContext(WorkSet &workSet, const GMMAddrInfo &gmmAddrInfo, const Config &config,
+                                              uint32_t startLoopIdx, uint32_t tileNum,
+                                              BlockMmadContext<BlockMmad> *blockMmadContext, uint32_t rowOffsetInExpert,
+                                              int32_t *gmTileSequence)
+{
+    if (blockMmadContext != nullptr) {
+        InitBlockMmad(*blockMmadContext, config);
+        Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
+            blockMmadContext->blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum, rowOffsetInExpert,
+            gmTileSequence);
+    } else {
+        BlockMmadContext<BlockMmad> localBlockMmadContext;
+        InitBlockMmad(localBlockMmadContext, config);
+        Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
+            localBlockMmadContext.blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum, rowOffsetInExpert,
+            gmTileSequence);
+    }
+}
+
 // 根据 GM 地址建立执行资源，并执行通用 GMM2 阶段。
 template <uint8_t CombineQuantMode, typename BlockMmad, typename ElementC, bool IsLayered = false,
           bool IsShared = false, bool NotifyCombineTileReady = false, typename Scheduler, typename Config>
@@ -778,18 +807,8 @@ __aicore__ inline void Gmm2ExecGeneric(Scheduler &scheduler, const GMMAddrInfo &
     WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmBias, gmC};
 
     if constexpr (g_coreType == AscendC::AIC) {
-        if (blockMmadContext != nullptr) {
-            InitBlockMmad(*blockMmadContext, config);
-            Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
-                blockMmadContext->blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum, rowOffsetInExpert,
-                gmTileSequence);
-        } else {
-            BlockMmadContext<BlockMmad> localBlockMmadContext;
-            InitBlockMmad(localBlockMmadContext, config);
-            Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
-                localBlockMmadContext.blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum, rowOffsetInExpert,
-                gmTileSequence);
-        }
+        Gmm2ExecAicWithContext<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
+            workSet, gmmAddrInfo, config, startLoopIdx, tileNum, blockMmadContext, rowOffsetInExpert, gmTileSequence);
     } else if constexpr (NotifyCombineTileReady) {
         if (GetSubBlockIdx() == 1U) {
             using MakeLayoutC = typename KernelConfig::MakeLayoutC;
