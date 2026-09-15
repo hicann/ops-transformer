@@ -106,6 +106,10 @@ while [[ $# -gt 0 ]]; do
         ENABLE_OOM="$2"
         shift 2
         ;;
+    --enable_mssanitizer)
+        ENABLE_MSSANITIZER="$2"
+        shift 2
+        ;;
     --enable_tiling_sink)
         ENABLE_TILING_SINK="$2"
         shift 2
@@ -184,6 +188,7 @@ function build() {
         -DENABLE_AICPU=${ENABLE_AICPU} \
         -DENABLE_AICPU_KERNEL=${ENABLE_AICPU_KERNEL}  \
         -DENABLE_OOM=${ENABLE_OOM} \
+        -DENABLE_MSSANITIZER=${ENABLE_MSSANITIZER} \
         -DASCEND_MODULE_NAME=${ASCEND_MODULE_NAME}
 
     make ${JOB_NUM} prepare_build

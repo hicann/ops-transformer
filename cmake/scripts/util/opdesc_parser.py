@@ -317,8 +317,12 @@ def _is_op_type_in_opdesc(op_descs: list, op_type: str):
 
 
 def _set_all_options_to_opdescs(op_descs, soc_ver_compile_options):
+    # 按_soc key 合并多行 ALL 配置(如 add_opc_config 基础行 + 用户 --ops-compile-options 行),
+    # 不能直接赋值覆盖,否则先写入的 func.cmake 开关选项(-sanitizer 等)会被后行整行冲掉
     for op in op_descs:
-        op.custom_all_compile_options = soc_ver_compile_options
+        for soc_key, options in soc_ver_compile_options.items():
+            op.custom_all_compile_options.setdefault(soc_key, [])
+            op.custom_all_compile_options[soc_key].extend(options)
 
 
 def _set_options_to_opdesc(op_descs, op_type, soc_ver_compile_options):

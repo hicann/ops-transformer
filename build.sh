@@ -119,13 +119,13 @@ function help_info() {
                 echo "    --experimental         Build experimental version"
                 echo "    --cann_3rd_lib_path=<PATH>"
                 echo "                           Set ascend third_party package install path, default ./third_party"
-                echo "    --oom                  Build with oom mode on the kernel side, with options: '-g --cce-enable-oom'"
+                echo "    --oom                  Build with oom mode on the kernel side (no '-g' by default, add '--ops-compile-options -g' if needed; cannot be used with: --mssanitizer, --bisheng_flags, --build-type=Debug)"
                 echo "    --asan                 Enable ASAN (Address Sanitizer) on the host side"
                 echo "    --kernel_template_input=args0,args1"
                 echo "                           Specify kernel template input arguments (comma-separated for multiple)"
-                echo "    --bisheng_flags        Specify bisheng compiler flags (comma-separated for multiple)"
-                echo "    --mssanitizer          Build with mssanitizer mode on the kernel side, with options: '-g --cce-enable-sanitizer'"
-                echo "    --dump_cce             Dump kernel precompiled files"
+                echo "    --bisheng_flags        Specify bisheng compiler flags (comma-separated for multiple; cannot be used with: --mssanitizer, --oom, --dump_cce)"
+                echo "    --mssanitizer          Build with mssanitizer mode on the kernel side (memory/race/init/sync check, with '-g -sanitizer'; cannot be used with: --oom, --dump_cce, --bisheng_flags, --build-type=Debug)"
+                echo "    --dump_cce             Dump kernel precompiled files (cannot be used with: --mssanitizer, --bisheng_flags, --build-type=Debug)"
                 echo $dotted_line
                 echo "Examples:"
                 echo "    bash build.sh --pkg --soc=ascend910b --vendor_name=customize -j16 -O3"
@@ -228,7 +228,9 @@ function help_info() {
                 echo "    --opkernel             Build binary kernel"
                 echo "    --soc=soc_version      Compile for specified Ascend SoC (comma-separated for multiple)"
                 echo "    --ops=op1,op2,...      Compile specified operators (comma-separated for multiple)"
-                echo "    --oom                  Build with oom mode on the kernel side, with options: '-g --cce-enable-oom'"
+                echo "    --oom                  Build with oom mode on the kernel side (no '-g' by default, add '--ops-compile-options -g' if needed; cannot be used with: --mssanitizer, --bisheng_flags, --build-type=Debug)"
+                echo "    --mssanitizer          Build with mssanitizer mode on the kernel side (memory/race/init/sync check, with '-g -sanitizer'; cannot be used with: --oom, --dump_cce, --bisheng_flags, --build-type=Debug)"
+                echo "    --dump_cce             Dump kernel precompiled files (cannot be used with: --mssanitizer, --bisheng_flags, --build-type=Debug)"
                 echo "    --kernel_template_input=args0,args1"
  	            echo "                           Specify kernel template input arguments (comma-separated for multiple)"
                 echo "    --bisheng_flags        Specify bisheng compiler flags (comma-separated for multiple)"
@@ -246,8 +248,8 @@ function help_info() {
                 echo "    --soc=soc_version      Compile for specified Ascend SoC"
                 echo "    --ops=op1,op2,...      Compile specified operators (comma-separated for multiple)"
                 echo "    --build-type=<Type>    Specify build-type (Type options: Release/Debug), Default:Release"
-                echo "    --mssanitizer          Build with mssanitizer mode on the kernel side"
-                echo "    --oom                  Build with oom mode on the kernel side"
+                echo "    --mssanitizer          Build with mssanitizer mode on the kernel side (cannot be used with: --oom, --dump_cce, --bisheng_flags, --build-type=Debug)"
+                echo "    --oom                  Build with oom mode on the kernel side (cannot be used with: --mssanitizer, --bisheng_flags, --build-type=Debug)"
                 echo $dotted_line
                 echo "Examples:"
                 echo "    bash build.sh --opkernel_aicpu --soc=ascend910b --ops=add_example"
@@ -376,7 +378,7 @@ function help_info() {
     echo "    --torch_extension_only       Build torch_extension whl package only"
     echo "    --experimental build experimental version"
     echo "    --opkernel_aicpu build aicpu kernel"
-    echo "    --mssanitizer Build with mssanitizer mode on the kernel side, with options: '-g --cce-enable-sanitizer'"
+    echo "    --mssanitizer Build with mssanitizer mode on the kernel side (with '-g -sanitizer'; cannot be used with: --oom, --dump_cce, --bisheng_flags, --build-type=Debug)"
     echo "    --dump_cce Dump kernel precompiled files"
     echo "    --opapi_test build and run opapi unit tests"
     echo "    --ophost_test build and run ophost unit tests"
@@ -1372,25 +1374,32 @@ check_option_validity() {
 }
 
 check_param() {
-  if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$OOM" == "true" ]]; then
-    echo "[ERROR] --mssanitizer cannot be used with --oom"
+  # -sanitizer 的三个入口语义等价(--mssanitizer / --ops-compile-options -sanitizer / --op_debug_config sanitizer),
+  # 统一识别后参与同一组互斥检查,避免绕过
+  local ENABLE_SANITIZER_ANY="FALSE"
+  if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "${OPS_COMPILE_OPTIONS}" == *"-sanitizer"* || "${OP_DEBUG_CONFIG}" == *"sanitizer"* ]]; then
+    ENABLE_SANITIZER_ANY="TRUE"
+  fi
+
+  if [[ "$ENABLE_SANITIZER_ANY" == "TRUE" && "$OOM" == "true" ]]; then
+    echo "[ERROR] --mssanitizer(-sanitizer) cannot be used with --oom"
     exit 1
   fi
 
-  if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
-    echo "[ERROR] --mssanitizer cannot be used with --dump_cce"
+  if [[ "$ENABLE_SANITIZER_ANY" == "TRUE" && "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+    echo "[ERROR] --mssanitizer(-sanitizer) cannot be used with --dump_cce"
     exit 1
   fi
 
   if [ -n "$BISHENG_FLAGS" ]; then
-    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+    if [[ "$ENABLE_SANITIZER_ANY" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
       echo "[ERROR] --bisheng_flags= cannot be used with --mssanitizer, --oom, --dump_cce"
       exit 1
     fi
   fi
 
   if [[ "$BUILD_TYPE" == "Debug" ]]; then
-    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+    if [[ "$ENABLE_SANITIZER_ANY" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
       echo "[ERROR] --build-type=Debug cannot be used with --mssanitizer, --oom, --dump_cce"
       exit 1
     fi
@@ -1921,9 +1930,17 @@ while [[ $# -gt 0 ]]; do
         OP_DEBUG_CONFIG="$2"
         shift 2
         ;;
+    --op_debug_config=*)
+        OP_DEBUG_CONFIG="${1#*=}"
+        shift
+        ;;
     --ops-compile-options)
         OPS_COMPILE_OPTIONS="$2"
         shift 2
+        ;;
+    --ops-compile-options=*)
+        OPS_COMPILE_OPTIONS="${1#*=}"
+        shift
         ;;
     --ophost_test)
         ENABLE_TEST=TRUE

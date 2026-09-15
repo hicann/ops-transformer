@@ -530,8 +530,12 @@ function(add_opc_config)
     endif()
 
     if(ENABLE_MSSANITIZER)
+        # 注意:此处必须写 -sanitizer(单横线)。
+        # adapt py/算子工程层消费的是 -sanitizer(CANN is_enable_sanitizer 按 list 元素精确匹配),
+        # bisheng 编译器层的 --cce-enable-sanitizer 由 CANN 侧检测到 -sanitizer 后统一追加,
+        # 直接透传双横线形式会导致 stub 库不链接、插桩失效。
         list(APPEND _OPC_CONFIG "-g")
-        list(APPEND _OPC_CONFIG "--cce-enable-sanitizer")
+        list(APPEND _OPC_CONFIG "-sanitizer")
     endif()
 
     if(ENABLE_DUMP_CCE)

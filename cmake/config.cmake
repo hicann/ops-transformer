@@ -251,6 +251,7 @@ if (BUILD_OPEN_PROJECT)
                 --build_type ${BUILD_TYPE}
                 --version ${VERSION}
                 --enable_oom ${ENABLE_OOM}
+                --enable_mssanitizer ${ENABLE_MSSANITIZER}
                 --enable_tiling_sink ${ENABLE_TILING_SINK}
                 --enable_aicpu ${ENABLE_AICPU}
                 --enable_aicpu_kernel ${ENABLE_AICPU_KERNEL}
