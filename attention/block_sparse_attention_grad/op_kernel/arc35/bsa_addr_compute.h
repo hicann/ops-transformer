@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #pragma once
-#include "common_header.h"
+#include "bsa_common_header.h"
 using namespace AscendC;
 
 namespace BSA_ARC35 {
