@@ -10,3 +10,5 @@
 - [互转换关系](./conversion_relationship.md)
 - [量化介绍](./quant_mode_introduction.md)
 - [sparse模式介绍](./sparse_mode_introduction.md)
+- [确定性计算](determinism_compute.md)
+- [Batch一致性](batch_consistency.md)
