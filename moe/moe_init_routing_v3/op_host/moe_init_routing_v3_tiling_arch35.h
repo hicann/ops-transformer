@@ -369,7 +369,7 @@ private:
     ge::graphStatus CheckInputX();
     ge::graphStatus CheckInputExpertIdx();
     ge::graphStatus CheckInputScale();
-    ge::graphStatus CheckStaticQuantScale();
+    ge::graphStatus CheckEssentialQuantScale();
     struct ScaleShapeCheckInfo {
         int64_t rank = -1;
         int64_t dim0 = -1;
