@@ -169,7 +169,8 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor *x, c
 
     if (rotate != nullptr) {
         CHECK_COND(op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201, ACLNN_ERR_PARAM_INVALID,
-                   "the soc version is not supported");
+                   "the rotate parameter is only supported on Ascend910B/Ascend910_93, "
+                   "please pass nullptr for rotate");
     }
 
     auto uniqueExecutor = CREATE_EXECUTOR();
