@@ -584,6 +584,7 @@ __aicore__ inline void CalcAIVMlaAttentionOutOffset(RunParamStr<isInfer> &runPar
             curGIdx = (curS1Idx % 2 == 0) ? curGIdx : (uint32_t)s1TemplateType;
             curS1Idx /= 2;
         } else if (constInfo.gSize <= 32) {
+            curGIdx = runParam.cubeSOuterOffset % constInfo.gSize;
             curS1Idx = runParam.cubeSOuterOffset / constInfo.gSize;
         }
         if (constInfo.subBlockIdx == 1) {

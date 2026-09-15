@@ -25,6 +25,7 @@ set(src_files
   ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch22/fia_tiling_nonquant.cpp
   ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch22/fia_tiling_empty_tensor.cpp
   ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_nonquant_gqa.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_nonquant_mla.cpp
   ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_fullquant_mx.cpp
   ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_fullquant_gqa.cpp
   ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_fullquant_mla.cpp
