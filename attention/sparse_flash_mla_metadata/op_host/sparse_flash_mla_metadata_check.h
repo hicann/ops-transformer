@@ -265,11 +265,10 @@ aclnnStatus CheckSingleParamSmla(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
                                                   "greater than or equal to 0");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        if (!(socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr) && cmpTopk != 0 && cmpTopk != 512 &&
-            cmpTopk != 1024) {
+        if (!(socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr) && cmpTopk > 8192) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLA_ACLNN_OP_NAME, "cmp_topk", std::to_string(cmpTopk),
                                                   "When has_cmp_kv is true, the value of cmp_topk must be "
-                                                  "in [0, 512, 1024]");
+                                                  "in [1, 8192]");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr) {

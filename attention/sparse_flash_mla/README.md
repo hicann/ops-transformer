@@ -281,7 +281,7 @@
   - `layout_q`和`layout_kv`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layout_q`和`layout_kv`必须一致。
   - SWA稀疏ori_kv场景下，`ori_topk_length`必须传入，配套Metadata接口的`ori_topk`为`ori_sparse_indices`最后一维K，且`ori_topk_length`的元素取值应在[0, K]范围内；其他场景`ori_topk_length`传入nullptr或空Tensor。
 - 产品型号约束如下：
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：Q\_N支持1、2、4、8、16、32、64、128，KV\_N只支持1；cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持`ori_sparse_indices`和`ori_topk_length`，`ori_mask_mode`为0，`ori_win_left`和`ori_win_right`为非负数；非SWA稀疏ori_kv场景的`ori_mask_mode`为4、`ori_win_left`为127、`ori_win_right`为0，`cmp_sparse_indices`的最后一维K2当前支持512或1024，`cmp_mask_mode`仅支持3。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：Q\_N支持1、2、4、8、16、32、64、128，KV\_N只支持1；cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持`ori_sparse_indices`和`ori_topk_length`，`ori_mask_mode`为0，`ori_win_left`和`ori_win_right`为非负数；非SWA稀疏ori_kv场景的`ori_mask_mode`为4、`ori_win_left`为127、`ori_win_right`为0，`cmp_sparse_indices`的最后一维K2支持[1, 8192]内的任意整数，`cmp_mask_mode`仅支持3。
   - <term>Ascend 950PR/Ascend 950DT</term>：Q\_N支持1-128，KV\_N只支持1。`ori_mask_mode`支持0、3、4，`cmp_mask_mode`支持0、3；`ori_win_left`和`ori_win_right`支持-1或非负数，-1表示对应方向不受限。只有`ori_mask_mode`为4时，`ori_win_left`和`ori_win_right`可以>=0。
 
 - 当`layout_q`为TND时，功能使用限制如下：
