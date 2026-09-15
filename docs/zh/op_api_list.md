@@ -198,7 +198,6 @@
 |[aclnnPromptFlashAttentionV3](../../attention/prompt_flash_attention/docs/aclnnPromptFlashAttentionV3.md)|全量推理场景的FlashAttention算子。|默认确定性实现| - |
 |[aclnnQkvRmsNormRopeCache](../../posembedding/qkv_rms_norm_rope_cache/docs/aclnnQkvRmsNormRopeCache.md)|输入qkv融合张量，通过SplitVD拆分q、k、v张量，执行RmsNorm、ApplyRotaryPosEmb、Quant、Scatter融合操作，输出qOut、kCache、vCache、qBeforeQuant(可选)、kBeforeQuant(可选)、vBeforeQuant(可选)。|默认确定性实现| - |
 |[aclnnQkvRmsNormRopeCacheWithKScale](../../posembedding/qkv_rms_norm_rope_cache_with_k_scale/docs/aclnnQkvRmsNormRopeCacheWithKScale.md)|输入Q/K/V融合张量，拆分Q、K、V后对Q/K执行RMSNorm、RoPE、共享rotation矩阵乘和FP8动态量化，输出qOut和qScale；K/V分支按slotMapping更新kCacheRef、kScaleCacheRef和vCacheRef。|-|默认确定性实现|
-|[aclnnQuantAllReduce](../../mc2/quant_all_reduce/docs/aclnnQuantAllReduce.md)|实现quant + allReduce融合计算。|- | 默认非确定性说明，支持配置开启 |
 |[aclnnQuantFlashAttentionScore](../../attention/flash_attention_score/docs/aclnnQuantFlashAttentionScore.md)| 量化的训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。|- | 默认确定性说明 |
 |[aclnnQuantGroupedMatmulDequantWeightNZ](../../gmm/quant_grouped_matmul_dequant/docs/aclnnQuantGroupedMatmulDequantWeightNZ.md)|对输入x进行量化，分组矩阵乘以及反量化，输入权重Weight会被强制视为NZ格式。| - | - |
 |[aclnnQuantLightningIndexer](../../attention/quant_lightning_indexer/docs/aclnnQuantLightningIndexer.md)|QuantLightningIndexer在LightningIndexer的基础上支持了Per-Token-Head量化输入。| - | 默认确定性实现 |
@@ -211,7 +210,6 @@
 |[aclnnQuantMatmulAlltoAll](../../mc2/matmul_allto_all/docs/aclnnQuantMatmulAlltoAll.md)|对量化后的入参x1、x2进行MatMul计算后，接着进行Dequant计算，最后做AlltoAll通信。|默认确定性实现| 默认确定性实现 |
 |[aclnnQuantMatmulAlltoAllV2](../../mc2/matmul_allto_all/docs/aclnnQuantMatmulAlltoAllV2.md)|兼容[aclnnQuantMatmulAlltoAll](../../mc2/matmul_allto_all/docs/aclnnQuantMatmulAlltoAll.md)支持的功能，在此基础上新增commMode参数，供用户指定通信引擎参数。|默认确定性实现| 默认确定性实现 |
 |[aclnnQuantGroupedMatmulDequant](../../gmm/quant_grouped_matmul_dequant/docs/aclnnQuantGroupedMatmulDequant.md)|对输入x进行量化，分组矩阵乘以及反量化。|默认确定性实现| 默认确定性实现 |
-|[aclnnQuantReduceScatter](../../mc2/quant_reduce_scatter/docs/aclnnQuantReduceScatter.md)|实现quant + reduceScatter融合计算。|默认确定性实现| 默认确定性实现 |
 |[aclnnRainFusionAttention](../../attention/rain_fusion_attention/docs/aclnnRainFusionAttention.md)|RainFusionAttention稀疏注意力计算，支持灵活的块级稀疏模式，通过selectIdx指定每个Q块选择的KV块，实现高效的稀疏注意力计算。|默认确定性实现| - |
 |[aclnnRecurrentGatedDeltaRule](../../attention/recurrent_gated_delta_rule/docs/aclnnRecurrentGatedDeltaRule.md)|完成变步长的Recurrent Gated Delta Rule计算。|默认确定性实现| 默认确定性实现 |
 |[aclnnRingAttentionUpdate](../../attention/ring_attention_update/docs/aclnnRingAttentionUpdate.md)|将两次FlashAttention的输出根据其不同的softmax的max和sum更新。|默认确定性实现| 默认确定性实现 |
