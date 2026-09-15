@@ -111,13 +111,14 @@ uint64_t AlltoAllMatmulFitBalanceTiling::CalcLongTileLen(uint64_t shortTileLen)
         if (matmulQuantType_ != QuantType::KC_QUANT) {
             double singleRankPermuteTime = CalcPermuteTime(shortTileLen);
             uint32_t rank = GetRank();
-            longTileLen =
+            double longLen =
                 mmInfo_.kValue == 0 ?
-                    0U :
+                    0.0 :
                     (singleRankPermuteTime + singleRankMatmulTime - all2allBMap.at(rank) - permuteBMap.at(rank)) *
-                        ONE_MBYTE /
-                        ((all2allKMap.at(rank) + permuteKMap.at(rank)) * mmInfo_.kValue *
+                        static_cast<double>(ONE_MBYTE) /
+                        ((all2allKMap.at(rank) + permuteKMap.at(rank)) * static_cast<double>(mmInfo_.kValue) *
                          all2allDtypeSizeMap.at(matmulQuantType_));
+            longTileLen = longLen > 0.0 ? static_cast<uint64_t>(longLen) : 0U;
         } else {
             longTileLen = commPerf_.InverseCommTime(singleRankMatmulTime);
         }
