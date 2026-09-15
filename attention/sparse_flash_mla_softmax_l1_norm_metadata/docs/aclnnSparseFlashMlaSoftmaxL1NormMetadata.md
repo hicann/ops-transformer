@@ -563,12 +563,12 @@ struct ArgContext {
     int64_t maxSeqLenK { 0 };
     int64_t numHeadsQ { 8 };
     int64_t numHeadsK { 1 };
-    int64_t headDim { 128 };
+    int64_t headDim { 512 };
     int64_t topk { 64 };
     char *layoutQ { nullptr };
     char *layoutK { nullptr };
     int64_t maskMode { 3 };
-    int64_t cmpRatio { 4 };
+    int64_t cmpRatio { 1 };
 };
 
 int64_t GetShapeSize(const std::vector<int64_t>& shape)
