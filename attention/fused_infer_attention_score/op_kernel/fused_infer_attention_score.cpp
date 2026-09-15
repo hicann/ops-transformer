@@ -25,13 +25,8 @@
 
 #if (__NPU_ARCH__ == 5102)
 #ifdef NOT_DYNAMIC_COMPILE
-#if __has_include("../../prompt_flash_attention/op_kernel/arch38/prompt_flash_attention_entry_regbase.h")
 #include "../../prompt_flash_attention/op_kernel/arch38/prompt_flash_attention_entry_regbase.h"
 #include "../../incre_flash_attention/op_kernel/incre_flash_attention.cpp"
-#else
-#include "../prompt_flash_attention/arch38/prompt_flash_attention_entry_regbase.h"
-#include "../incre_flash_attention/incre_flash_attention.cpp"
-#endif
 #else
 #include "../prompt_flash_attention/arch38/prompt_flash_attention_entry_regbase.h"
 #include "../incre_flash_attention/incre_flash_attention.cpp"

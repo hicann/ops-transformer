@@ -4,12 +4,7 @@
 
 ### 1.1 安装 CANN / PyTorch + torch-npu
 
-参考根目录 README.md，或使用项目根目录下的安装脚本：
-
-```bash
-bash install_cann_950.sh    # 安装 CANN 9.1.0 + 950 ops
-bash install_torch_npu.sh   # 安装 PyTorch + torch-npu
-```
+参考根目录 README.md 中的安装指引。
 
 ### 1.2 每次执行前加载环境
 
