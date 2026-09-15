@@ -12,6 +12,7 @@
 #define FLASH_ATTN_FA_ADJUST_SINNER_SOUTER_H
 
 #include <cstdint>
+#include <initializer_list>
 
 namespace optiling {
 namespace flash_attn {
@@ -85,6 +86,33 @@ inline void AdjustSinnerAndSouter(uint32_t vHeadDim, uint32_t gSize, int64_t max
             sInnerFactor = SINNER_128;
         }
     }
+}
+
+// Both tiling and metadata must use the same static bounds, without reading sequence tensors.
+// Count dense (B, N2, ceil(Q * G / M), ceil(KV / N)) blocks to retain split-KV parallelism.
+// Unknown/empty dimensions keep the platform limit, including the existing empty-output path.
+inline uint32_t GetMaxUsedAicCores(uint32_t aicNum, uint32_t batchSize, uint32_t kvHeads, uint32_t groupSize,
+                                   int64_t maxSeqQ, int64_t maxSeqKv, uint32_t mBaseSize, uint32_t s2BaseSize)
+{
+    if (aicNum == 0 || batchSize == 0 || kvHeads == 0 || groupSize == 0 || maxSeqQ <= 0 || maxSeqKv <= 0 ||
+        mBaseSize == 0 || s2BaseSize == 0) {
+        return aicNum;
+    }
+    // Cap before multiplying Q by G, so even very large static bounds cannot overflow.
+    if (static_cast<uint64_t>(maxSeqQ) > static_cast<uint64_t>(aicNum) * mBaseSize / groupSize) {
+        return aicNum;
+    }
+    const uint64_t mSize = static_cast<uint64_t>(maxSeqQ) * groupSize;
+    const uint64_t mBlocks = (mSize - 1) / mBaseSize + 1;
+    const uint64_t s2Blocks = (static_cast<uint64_t>(maxSeqKv) - 1) / s2BaseSize + 1;
+    uint32_t cores = 1;
+    for (uint64_t factor : {static_cast<uint64_t>(batchSize), static_cast<uint64_t>(kvHeads), mBlocks, s2Blocks}) {
+        if (factor >= (static_cast<uint64_t>(aicNum) - 1) / cores + 1) {
+            return aicNum;
+        }
+        cores *= static_cast<uint32_t>(factor);
+    }
+    return cores;
 }
 
 } // namespace fa_tiling_util
