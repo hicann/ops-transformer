@@ -546,11 +546,25 @@ TEST_F(SparseFlashMlaTilingArch35, test_tiling_950_csa_omit_seqused_cmp_success)
     c.cmpSparseIndicesShape = {512, 1, 512};
     c.cmpTopkLengthShape = {512, 1};
     c.cmpBlockTableShape = {4, 8};
-    c.cmpResidualKvShape = {4};
     c.cmpRatio = 4;
     c.cmpMaskMode = 0;
     c.sequsedCmpKvShape = {};
     RunSmlaTilingCase(c, ge::GRAPH_SUCCESS);
+}
+
+// cmp_residual_kv is not supported when cmp_mask_mode=0 or cmp_ratio=1
+TEST_F(SparseFlashMlaTilingArch35, test_tiling_950_cmp_residual_kv_not_supported_failed)
+{
+    SmlaCase c;
+    c.cmpKvShape = {32, 128, 1, 512};
+    c.cmpSparseIndicesShape = {512, 1, 512};
+    c.cmpTopkLengthShape = {512, 1};
+    c.cmpBlockTableShape = {4, 8};
+    c.cmpResidualKvShape = {4};
+    c.cmpRatio = 4;
+    c.cmpMaskMode = 0;
+    c.sequsedCmpKvShape = {};
+    RunSmlaTilingCase(c, ge::GRAPH_FAILED);
 }
 
 // length of seqused_ori_kv must match batch size

@@ -588,10 +588,14 @@ def generate_case_with_default_param(
             ]
             print("seqused_cmp_kv auto set to: ", case_param["seqused_cmp_kv"])
         if case_param["cmp_residual_kv"] is None:
-            case_param["cmp_residual_kv"] = [
-                length % effective_cmp_ratio for length in case_param["seqused_ori_kv"]
-            ]
-            print("cmp_residual_kv auto set to: ", case_param["cmp_residual_kv"])
+            if case_param.get("cmp_mask_mode") == 0 or effective_cmp_ratio == 1:
+                case_param["cmp_residual_kv"] = None
+            else:
+                case_param["cmp_residual_kv"] = [
+                    length % effective_cmp_ratio
+                    for length in case_param["seqused_ori_kv"]
+                ]
+                print("cmp_residual_kv auto set to: ", case_param["cmp_residual_kv"])
         if layout_kv == "TND":
             if case_param["cu_seqlens_cmp_kv"] is None:
                 cmp_full_lengths = [

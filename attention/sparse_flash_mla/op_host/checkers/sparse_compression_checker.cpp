@@ -14,7 +14,10 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *Op(const CheckContext &context) { return context.opName == nullptr ? "SparseMla" : context.opName; }
+const char *Op(const CheckContext &context)
+{
+    return context.opName == nullptr ? "SparseMla" : context.opName;
+}
 } // namespace
 
 ge::graphStatus SparseCompressionChecker::CheckIndex(const CheckContext &context, const TensorParam &param,
@@ -106,6 +109,13 @@ ge::graphStatus SparseCompressionChecker::CheckParaExistence(const CheckContext 
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     Op(context), "cmp_residual_kv",
                     "Cmp_residual_kv is required when cmp_mask_mode is 3 and cmp_ratio is not 1"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context.cmpResidualKv.present && (context.cmpMaskMode == 0 || context.cmpRatio == 1),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    Op(context), "cmp_residual_kv",
+                    std::string("Cmp_residual_kv is not supported when cmp_mask_mode is 0 or cmp_ratio is 1, "
+                                "but got cmp_mask_mode=") +
+                        std::to_string(context.cmpMaskMode) + ", cmp_ratio=" + std::to_string(context.cmpRatio)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context.oriSparseIndices.present && context.oriMaskMode == 0 && !context.oriTopkLength.present,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(

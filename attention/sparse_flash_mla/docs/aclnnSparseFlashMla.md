@@ -332,7 +332,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>cmpResidualKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。</td>
-      <td>可选输入。传入时shape必须为(B,)，第b个batch按cmp_len * cmpRatio + cmpResidualKvOptional[b]恢复压缩前KV长度；在cmpRatio不等于1且cmpMaskMode为3场景必传。</td>
+      <td>可选输入。传入时shape必须为(B,)，第b个batch按cmp_len * cmpRatio + cmpResidualKvOptional[b]恢复压缩前KV长度；在cmpMaskMode为3且cmpRatio不等于1场景必传，cmpMaskMode为0或cmpRatio等于1时不允许传入。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -693,7 +693,7 @@ aclnnStatus aclnnSparseFlashMla(
   - SWA稀疏ori_kv场景下，`oriTopkLengthOptional`的元素表示实际有效索引条目数，取值应在[0, K]范围内。对每个q token和KV head，`oriSparseIndicesOptional`的[0, oriTopkLengthOptional)区间为左对齐的有效索引条目，[oriTopkLengthOptional, K)区间为无效或填充条目，建议填-1；其他场景`oriTopkLengthOptional`传入nullptr或空Tensor。
   - 除`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
   - `metadataOptional`参数必须传入，由`aclnnSparseFlashMlaMetadata`算子生成，shape固定为(1024,)。
-  - `cmpResidualKvOptional`为主算子和`aclnnSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。
+  - `cmpResidualKvOptional`为主算子和`aclnnSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。主算子仅在cmpMaskMode为3且cmpRatio不等于1时允许传入，cmpMaskMode为0或cmpRatio等于1时不允许传入。
 
 - 三种Attention场景输入要求
 

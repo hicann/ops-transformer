@@ -34,8 +34,10 @@ def is_empty(obj):
     return obj is None
 
 
-def restore_cmp_kv_length(cmp_kv_length, cmp_ratio, cmp_residual=0):
+def restore_cmp_kv_length(cmp_kv_length, cmp_ratio, cmp_residual=0, cmp_mask_mode=3):
     """Restore the pre-compression length from CMP-KV inputs, as arch35 does."""
+    if cmp_mask_mode == 0 or int(cmp_ratio) == 1:
+        cmp_residual = 0
     return int(cmp_kv_length) * int(cmp_ratio) + int(cmp_residual)
 
 
@@ -291,7 +293,9 @@ class GeneralizedSFA:
                 cmp_residual_kv[i_B] if cmp_residual_kv is not None else 0
             )
             restored_cmp_act_kv = (
-                restore_cmp_kv_length(cur_cmp_act_kv, self.cmp_ratio, cur_cmp_residual)
+                restore_cmp_kv_length(
+                    cur_cmp_act_kv, self.cmp_ratio, cur_cmp_residual, self.cmp_mask_mode
+                )
                 if template_idx in (1, 2, 4)
                 else 0
             )
@@ -1137,7 +1141,7 @@ def gen_sparse_indices_bsnd(
                 cmp_residual_kv[i_B] if cmp_residual_kv is not None else 0
             )
             cur_act_kv = restore_cmp_kv_length(
-                cur_cmp_act_kv, cmp_ratio, cur_cmp_residual
+                cur_cmp_act_kv, cmp_ratio, cur_cmp_residual, mask_mode
             )
         else:
             cur_cmp_act_kv = None
@@ -1269,7 +1273,7 @@ def gen_sparse_indices_tnd(
                 cmp_residual_kv[i_B] if cmp_residual_kv is not None else 0
             )
             cur_act_kv = restore_cmp_kv_length(
-                cur_cmp_act_kv, cmp_ratio, cur_cmp_residual
+                cur_cmp_act_kv, cmp_ratio, cur_cmp_residual, mask_mode
             )
         elif seqused_ori_kv != None:
             cur_cmp_act_kv = None
@@ -1672,7 +1676,7 @@ def gen_cmp_kv(
 
 
 def resolve_compressed_actual_lengths(
-    seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio
+    seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio, cmp_mask_mode=3
 ):
     """Resolve compressed actual lengths exactly as SMLA input generation does."""
     if seqused_ori_kv is None or cmp_ratio is None:
@@ -1684,6 +1688,8 @@ def resolve_compressed_actual_lengths(
             seqused_cmp_kv = seqused_ori_kv // cmp_ratio
         else:
             seqused_cmp_kv = [value // cmp_ratio for value in seqused_ori_kv]
+    if cmp_mask_mode == 0 or int(cmp_ratio) == 1:
+        return seqused_cmp_kv, None
     if cmp_residual_kv is None:
         if torch.is_tensor(seqused_ori_kv):
             cmp_residual_kv = seqused_ori_kv % cmp_ratio
@@ -1927,7 +1933,7 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
 
     if template_idx in (1, 2, 4):
         seqused_cmp_kv, cmp_residual_kv = resolve_compressed_actual_lengths(
-            seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio
+            seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio, cmp_mask_mode
         )
     print("template_run_mode: ", template_run_mode)
     if layout_kv == "PA_BBND":
