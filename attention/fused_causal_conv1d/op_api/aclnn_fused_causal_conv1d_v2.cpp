@@ -59,8 +59,8 @@ aclnnStatus FusedCausalConv1dV2CommonProcess(
 
     // Optional tensors: contiguous if non-null.
     // CHECK_COND at each call site distinguishes "not provided" (t == nullptr, legal) from
-    // "provided but Contiguous failed" (final == nullptr), so a genuine conversion failure is
-    // never silently degraded into "input not provided".
+    // "provided but Contiguous failed" (final == nullptr), so a genuine conversion failure is never silently degraded
+    // into "input not provided".
     auto ensureContiguous = [&](const aclTensor *t) -> const aclTensor * {
         if (t == nullptr) {
             return nullptr;
@@ -136,8 +136,10 @@ ACLNN_API aclnnStatus aclnnFusedCausalConv1dV2GetWorkspaceSize(
 {
     L2_DFX_PHASE_1(aclnnFusedCausalConv1dV2,
                    DFX_IN(x, weight, convStates, queryStartLoc, cacheIndices, initialStateMode, bias, numAcceptedTokens,
-                          numComputedTokens, blockIdxFirstScheduledToken, blockIdxLastScheduledToken, initialStateIdx),
-                   DFX_OUT(y, convStates));
+                          numComputedTokens, blockIdxFirstScheduledToken, blockIdxLastScheduledToken, initialStateIdx,
+                          activationMode, padSlotId, runMode, maxQueryLen, residualConnection, blockSize, convMode,
+                          maxDraftTokens),
+                   DFX_OUT(convStates, y));
 
     return FusedCausalConv1dV2CommonProcess(x, weight, convStates, queryStartLoc, cacheIndices, initialStateMode, bias,
                                             numAcceptedTokens, numComputedTokens, blockIdxFirstScheduledToken,
