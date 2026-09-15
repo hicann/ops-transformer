@@ -16,7 +16,7 @@
 #define ATTN_RES_FWD_REGBASE_COMMON_H
 
 #include "kernel_operator.h"
-#include "reduce_common.h"
+#include "reduce_common_arch35.h"
 
 namespace BlockAttentionResiduals {
 namespace RegBase {

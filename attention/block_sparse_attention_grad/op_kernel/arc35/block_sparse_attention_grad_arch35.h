@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #pragma once
-#include "common_header.h"
-#include "addr_compute.h"
+#include "bsa_common_header.h"
+#include "bsa_addr_compute.h"
 #include "cube_op_bsag_arch35.h"
 #include "vec_op_bsag_arch35.h"
 using namespace AscendC;

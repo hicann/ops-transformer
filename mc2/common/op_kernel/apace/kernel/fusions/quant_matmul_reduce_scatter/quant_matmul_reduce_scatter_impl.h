@@ -16,7 +16,7 @@
 #pragma once
 
 #include "apace/utils/comm_resource_builder.h"
-#include "kernel_qbmm_mx_mix.h"
+#include "mc2_kernel_qbmm_mx_mix.h"
 
 namespace Apace {
 

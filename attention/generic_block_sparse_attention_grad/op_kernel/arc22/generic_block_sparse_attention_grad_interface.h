@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file generic_block_sparse_attention_grad.h
+ * \file generic_block_sparse_attention_grad_interface.h
  * \brief Block Sparse Attention Grad Interface
  */
 

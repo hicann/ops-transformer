@@ -18,9 +18,9 @@
 
 #include "compressor_comm_arch35.h"
 #include "compressor_tools.h"
-#include "vf/vf_softmax.h"
-#include "vf/vf_add.h"
-#include "vf/vf_mul.h"
+#include "vf/compressor_vf_softmax.h"
+#include "vf/compressor_vf_add.h"
+#include "vf/compressor_vf_mul.h"
 #include "limits"
 
 using namespace AscendC;

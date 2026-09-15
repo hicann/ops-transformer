@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "../../../../op_host/op_tiling/allto_allv_grouped_mat_mul_tiling.h"
+#include "../../../../op_host/op_tiling/allto_allv_grouped_mat_mul_tiling_host.h"
 #include "../../../../op_host/op_tiling/arch22/allto_allv_grouped_mat_mul_aiv_plan.h"
 #include "../../../../op_kernel/allto_allv_grouped_mat_mul_aiv_comm.h"
 #include "../../../../op_kernel/allto_allv_grouped_mat_mul_aiv_mode.h"

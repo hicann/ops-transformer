@@ -20,7 +20,7 @@
 
 #include "kernel_operator.h"
 #include "../block_attention_residuals_tiling_data.h"
-#include "reduce_common.h"
+#include "reduce_common_arch22.h"
 
 namespace BlockAttentionResiduals {
 

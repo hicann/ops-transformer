@@ -13,8 +13,8 @@
  * \brief block_attention_residuals_grad kernel entry with template dispatch
  */
 
-#include "arch22/block_attention_residuals_grad.h"
-#include "arch22/block_attention_residuals_grad_split_h.h"
+#include "arch22/block_attention_residuals_grad_kernel.h"
+#include "arch22/block_attention_residuals_grad_split_h_arch22.h"
 
 using namespace AscendC;
 

@@ -16,11 +16,11 @@
 #ifndef KEY_POOL_BLOCK_VEC_FULL_LOAD_H
 #define KEY_POOL_BLOCK_VEC_FULL_LOAD_H
 
-#include "key_pool_comm.h"
+#include "key_pool_comm_arch35.h"
 #include "key_pool_tools.h"
-#include "vf/vf_softmax.h"
-#include "vf/vf_add.h"
-#include "vf/vf_mul.h"
+#include "vf/key_pool_vf_softmax.h"
+#include "vf/key_pool_vf_add.h"
+#include "vf/key_pool_vf_mul.h"
 #include "../key_pool_layer_norm.h"
 #include <cstdint>
 

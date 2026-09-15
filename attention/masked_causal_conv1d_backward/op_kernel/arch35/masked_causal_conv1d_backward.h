@@ -17,7 +17,7 @@
 #define MASKED_CAUSAL_CONV1D_BACKWARD_ARCH35_H
 
 #include "kernel_operator.h"
-#include "vf/compute.h"
+#include "vf/masked_causal_conv1d_backward_vf_compute.h"
 #include "masked_causal_conv1d_backward_struct.h"
 
 namespace MaskedCausalConv1dBackwardKernelNS {

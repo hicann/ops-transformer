@@ -15,7 +15,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../../../op_host/arch22/key_pool_tiling.h"
+#include "../../../../op_host/arch22/key_pool_tiling_arch22.h"
 #include "tiling_case_executor.h"
 #include "tiling_context_faker.h"
 

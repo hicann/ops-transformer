@@ -16,7 +16,7 @@
 #ifndef KEY_POOL_BLOCK_CUBE_PERF_H
 #define KEY_POOL_BLOCK_CUBE_PERF_H
 
-#include "key_pool_comm.h"
+#include "key_pool_comm_arch22.h"
 #include "key_pool_tools.h"
 
 using namespace AscendC;

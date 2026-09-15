@@ -15,7 +15,7 @@
 #ifndef ALLTO_ALLV_GROUPED_MATMUL_TILING_A5_H
 #define ALLTO_ALLV_GROUPED_MATMUL_TILING_A5_H
 #include <vector>
-#include "../allto_allv_grouped_mat_mul_tiling.h"
+#include "../allto_allv_grouped_mat_mul_tiling_host.h"
 
 namespace optiling {
 class AlltoAllvGmmTilingA5 : public AlltoAllvGmmTiling {

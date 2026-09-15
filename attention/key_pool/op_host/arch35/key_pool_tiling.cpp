@@ -20,7 +20,7 @@
 #include <graph/utils/type_utils.h>
 #include "err/ops_err.h"
 #include "register/op_def_registry.h"
-#include "key_pool_tiling.h"
+#include "key_pool_tiling_arch35.h"
 
 using namespace ge;
 using namespace AscendC;

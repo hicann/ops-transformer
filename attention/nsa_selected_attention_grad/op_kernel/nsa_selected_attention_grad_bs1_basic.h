@@ -15,8 +15,8 @@
 
 #pragma once
 #include "kernel_operator.h"
-#include "../basic_modules/cube_op.h"
-#include "../basic_modules/vec_op.h"
+#include "../basic_modules/nsa_cube_op.h"
+#include "../basic_modules/nsa_vec_op.h"
 #include "../basic_modules/nsa_selected_attention_grad_common_header.h"
 #include "nsa_selected_attention_grad_post.h"
 

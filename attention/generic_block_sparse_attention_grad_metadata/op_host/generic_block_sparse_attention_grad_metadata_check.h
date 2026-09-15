@@ -19,7 +19,7 @@
 #include "opdev/format_utils.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/tensor_view_utils.h"
-#include "../op_kernel/generic_block_sparse_attention_grad_metadata.h"
+#include "../op_kernel/generic_block_sparse_attention_grad_metadata_kernel.h"
 
 #ifdef __cplusplus
 extern "C" {

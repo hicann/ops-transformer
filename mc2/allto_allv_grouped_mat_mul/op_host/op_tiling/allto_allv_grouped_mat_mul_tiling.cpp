@@ -13,7 +13,7 @@
  * \brief
  */
 
-#include "allto_allv_grouped_mat_mul_tiling.h"
+#include "allto_allv_grouped_mat_mul_tiling_host.h"
 #include <algorithm>
 #include <cstddef>
 #include <numeric>

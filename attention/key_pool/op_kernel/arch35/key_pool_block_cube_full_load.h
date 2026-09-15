@@ -16,7 +16,7 @@
 #ifndef KEY_POOL_BLOCK_CUBE_FULL_LOAD_H
 #define KEY_POOL_BLOCK_CUBE_FULL_LOAD_H
 
-#include "key_pool_comm.h"
+#include "key_pool_comm_arch35.h"
 #include "key_pool_tools.h"
 
 using namespace AscendC;

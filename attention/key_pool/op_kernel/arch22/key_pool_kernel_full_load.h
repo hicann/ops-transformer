@@ -16,7 +16,7 @@
 #ifndef KEY_POOL_KERNEL_FULL_LOAD_H
 #define KEY_POOL_KERNEL_FULL_LOAD_H
 
-#include "key_pool_comm.h"
+#include "key_pool_comm_arch22.h"
 #include "key_pool_template_tiling_key.h"
 #include "key_pool_tiling_data.h"
 #include "key_pool_tools.h"

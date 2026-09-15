@@ -16,7 +16,7 @@
 #ifndef KEY_POOL_VECTOR_COMM_H
 #define KEY_POOL_VECTOR_COMM_H
 
-#include "key_pool_comm.h"
+#include "key_pool_comm_arch22.h"
 namespace KeyPool {
 
 struct MatRpeatParam {

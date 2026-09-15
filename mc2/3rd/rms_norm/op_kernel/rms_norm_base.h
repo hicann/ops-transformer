@@ -15,7 +15,7 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "../../norm_common/op_kernel/reduce_common.h"
+#include "../../norm_common/op_kernel/mc2_reduce_common.h"
 
 namespace RmsNorm {
 using namespace AscendC;

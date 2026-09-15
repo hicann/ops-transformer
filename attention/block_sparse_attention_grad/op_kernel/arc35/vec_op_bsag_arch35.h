@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #pragma once
-#include "vector_api/vf_cast_nd2nz.h"
+#include "vector_api/bsa_vf_cast_nd2nz.h"
 using namespace AscendC;
 
 namespace BSA_ARC35 {

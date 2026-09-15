@@ -19,7 +19,7 @@
 
 #include "kernel_operator.h"
 #include "../block_attention_residuals_tiling_data.h"
-#include "reduce_common.h"
+#include "reduce_common_arch35.h"
 #include "block_attention_residuals_regbase_common.h"
 #include "block_attention_residuals_reload.h" // BlockAttentionResidualsInitParams
 

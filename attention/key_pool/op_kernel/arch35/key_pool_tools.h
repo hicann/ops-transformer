@@ -16,7 +16,7 @@
 #ifndef KEY_POOL_TOOLS_H
 #define KEY_POOL_TOOLS_H
 
-#include "key_pool_comm.h"
+#include "key_pool_comm_arch35.h"
 
 using namespace AscendC;
 

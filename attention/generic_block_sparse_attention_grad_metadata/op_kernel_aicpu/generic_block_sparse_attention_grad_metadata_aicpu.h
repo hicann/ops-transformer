@@ -24,7 +24,7 @@
 #include "cpu_context.h"
 #include "cpu_kernel.h"
 #include "cpu_tensor.h"
-#include "../op_kernel/generic_block_sparse_attention_grad_metadata.h"
+#include "../op_kernel/generic_block_sparse_attention_grad_metadata_kernel.h"
 #include "../../common/op_kernel/aicpu_common.h"
 
 namespace aicpu {

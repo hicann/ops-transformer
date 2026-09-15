@@ -16,11 +16,11 @@
 #ifndef KEY_POOL_BLOCK_VEC_FULL_LOAD_H
 #define KEY_POOL_BLOCK_VEC_FULL_LOAD_H
 
-#include "key_pool_comm.h"
+#include "key_pool_comm_arch22.h"
 #include "key_pool_tools.h"
 #include "key_pool_vector_comm.h"
 #include "../key_pool_layer_norm.h"
-#include "soft_max.h"
+#include "key_pool_soft_max.h"
 
 using namespace AscendC;
 

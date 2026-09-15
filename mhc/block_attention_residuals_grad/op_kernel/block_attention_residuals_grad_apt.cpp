@@ -18,7 +18,7 @@
 #include "block_attention_residuals_grad_tiling_data.h"
 #include "block_attention_residuals_grad_tiling_key.h"
 #include "arch35/block_attention_residuals_grad_regbase.h"
-#include "arch35/block_attention_residuals_grad_split_h.h"
+#include "arch35/block_attention_residuals_grad_split_h_arch35.h"
 
 using namespace AscendC;
 using namespace NsBlockAttentionResidualsGrad;

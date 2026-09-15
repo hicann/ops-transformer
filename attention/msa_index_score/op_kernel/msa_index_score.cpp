@@ -21,9 +21,9 @@
 #include "lib/matmul_intf.h"
 #include "msa_index_score_common.h"
 #if (__CCE_AICORE__ == 310)
-#include "arch35/msa_index_score_kernel.h"
+#include "arch35/msa_index_score_kernel_arch35.h"
 #else
-#include "arch22/msa_index_score_kernel.h"
+#include "arch22/msa_index_score_kernel_arch22.h"
 #endif
 
 using namespace MsaIndexScoreNs;
