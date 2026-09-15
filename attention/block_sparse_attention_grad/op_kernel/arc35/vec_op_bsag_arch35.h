@@ -28,7 +28,6 @@ class VecOp {
     using INPUT_TYPE = typename BSA_TYPE::input_type;
     static constexpr uint32_t INPUT_LAYOUT = BSA_TYPE::input_layout;
     using TILING_CLASS = typename BSA_TYPE::tiling_class;
-    static constexpr bool DETERMINISTIC_ENABLE = BSA_TYPE::deterministic_enable;
 
 private:
     uint32_t v_core_num_;
@@ -127,7 +126,6 @@ public:
         // gm_tensor
         lse_gm_.SetGlobalBuffer((__gm__ float *)softmaxLse);
         sftg_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->sftgWorkspaceOffset));
-        // local_tensor
         softmax_res_nz_tensor_ = ub_buffer.GetWithOffset<INPUT_TYPE>(vec_base_m * vec_base_n, ub_offset);
         ub_offset += vec_base_m * vec_base_n * sizeof(INPUT_TYPE);
         sftg_res_nz_tensor_ = ub_buffer.GetWithOffset<INPUT_TYPE>(vec_base_m * vec_base_n, ub_offset);
@@ -140,18 +138,6 @@ public:
         ub_offset += vec_base_m * BLOCK_FP32 * sizeof(float);
         sftg_front_tensor_pong_ = ub_buffer.GetWithOffset<float>(vec_base_m * BLOCK_FP32, ub_offset);
         ub_offset += vec_base_m * BLOCK_FP32 * sizeof(float);
-    }
-
-    __aicore__ inline void SetFlag()
-    {
-        SET_FLAG(V, MTE2, event_ping_);
-        SET_FLAG(V, MTE2, event_pong_);
-    }
-
-    __aicore__ inline void WaitFlag()
-    {
-        WAIT_FLAG(V, MTE2, event_ping_);
-        WAIT_FLAG(V, MTE2, event_pong_);
     }
 
     __aicore__ inline void SendVecPre(const GlobalTensor<float> &dq_workspace, const GlobalTensor<float> &dk_workspace,

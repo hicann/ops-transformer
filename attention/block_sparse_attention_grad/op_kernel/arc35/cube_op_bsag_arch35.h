@@ -17,7 +17,6 @@ class CubeOp {
     using INPUT_TYPE = typename BSA_TYPE::input_type;
     static constexpr uint32_t INPUT_LAYOUT = BSA_TYPE::input_layout;
     using TILING_CLASS = typename BSA_TYPE::tiling_class;
-    static constexpr bool DETERMINISTIC_ENABLE = BSA_TYPE::deterministic_enable;
 
 private:
     int32_t batch_num_;
@@ -82,7 +81,6 @@ public:
             q_stride_ = q_head_num_ * head_dim_;
             kv_stride_ = kv_head_num_ * head_dim_;
         }
-
         TBuf<TPosition::A2> l0_a_buffer_;
         TBuf<TPosition::B2> l0_b_buffer_;
         TBuf<TPosition::CO1> l0_c_buffer_;
@@ -119,18 +117,6 @@ public:
         l0_c_tensor_pong_ = l0_c_buffer_.GetWithOffset<float>(64 * 1024 / sizeof(float), 64 * 1024);
         l0_c_dk_tensor_ = l0_c_buffer_.GetWithOffset<float>(64 * 1024 / sizeof(float), 128 * 1024);
         l0_c_dv_tensor_ = l0_c_buffer_.GetWithOffset<float>(64 * 1024 / sizeof(float), 192 * 1024);
-        SET_FLAG(M, MTE1, event_ping_);
-        SET_FLAG(M, MTE1, event_pong_);
-        SET_FLAG(FIX, M, event_ping_);
-        SET_FLAG(FIX, M, event_pong_);
-    }
-
-    __aicore__ inline void Destroy()
-    {
-        WAIT_FLAG(M, MTE1, event_ping_);
-        WAIT_FLAG(M, MTE1, event_pong_);
-        WAIT_FLAG(FIX, M, event_ping_);
-        WAIT_FLAG(FIX, M, event_pong_);
     }
 
     __aicore__ inline void SendMatmulQK(const GlobalTensor<INPUT_TYPE> &queryGm, const GlobalTensor<INPUT_TYPE> &keyGm,
@@ -277,8 +263,8 @@ private:
             fixpipeParamsV220.mSize = nProcess;
             fixpipeParamsV220.nSize = head_dim_;
             fixpipeParamsV220.srcStride = nProcessAlign;
-            fixpipeParamsV220.dstStride = kv_stride_;
             fixpipeParamsV220.unitFlag = 3;
+            fixpipeParamsV220.dstStride = kv_stride_;
             MM345CopyOut<true>(outGm, l0_c_tensor, fixpipeParamsV220);
         }
         SET_FLAG(FIX, M, evnet_id);
@@ -318,8 +304,8 @@ private:
         fixpipeParamsV220.mSize = mProcess;
         fixpipeParamsV220.nSize = head_dim_;
         fixpipeParamsV220.srcStride = mProcessAlign;
-        fixpipeParamsV220.dstStride = q_stride_;
         fixpipeParamsV220.unitFlag = 3;
+        fixpipeParamsV220.dstStride = q_stride_;
         MM345CopyOut<true>(outGm, l0_c_tensor, fixpipeParamsV220);
         SET_FLAG(FIX, M, evnet_id);
     }
