@@ -20,11 +20,14 @@ extern "C" {
  * @domain aclnn_ops_infer
  *
  * @param [in] x:
- * 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [in] weight:
- * 表示公式中的weight，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的weight，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [in] biasOptional:
- * 表示公式中的bias，数据类型支持BFLOAT16、FLOAT16、FLOAT32、INT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的bias，数据类型支持BFLOAT16、FLOAT16、FLOAT32、INT32数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [in] scaleOptional: 表示量化参数，数据类型支持UINT64，INT64数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] offsetOptional: 表示量化参数，数据类型支持FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] antiquantScaleOptional:
@@ -38,7 +41,8 @@ extern "C" {
  * @param [in] groupType:
  * 整数型参数，代表需要切分的轴，-1代表不需要切分；0代表需要切分M轴；1代表需要切分N轴；2代表需要切分K轴。
  * @param [out] y:
- * 表示公式中的out，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的out，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT32数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [out] workspaceSize: 返回用户需要在npu device侧申请的workspace大小。
  * @param [out] executor: 返回op执行器，包含算子计算流程。
  * @return aclnnStatus: 返回状态码。
