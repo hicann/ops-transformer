@@ -169,7 +169,7 @@ cann_ops_transformer.moe_init_routing(
 |  topk_weight  |  Tensor |  可选  |  表示topk专家的路由权重，用于按排序索引重排以与`expanded_x`一一对应。默认值为None，不输入表示不输出`expanded_topk_weight`。shape为(NUM_ROWS, K)，与`expanded_topk_weight`联动：必须同时传入或同时不传入。  |  float32   | 2  |
 |  active_num  |  Union[int, torch.SymInt] |  可选  |  表示总的最大处理row数，输出`expanded_x`只有这么多行是有效的，约束所有专家共同处理tokens总量。默认值为-1，入参校验需大于等于0，0表示Dropless场景，大于0时表示Active场景。仅支持值等于NUM_ROWS*K。支持`int`或`torch.SymInt`类型，图模式下传入`torch.SymInt`（如`x.size(0) * k`）可避免被固化为常量，实现动态shape编译缓存复用。eager模式下传入`int`即可，上层调用脚本无需感知类型差异，同一份代码在两种模式下均可正常运行。  |  int  | - |
 |  expert_capacity  |  int |  可选  |  表示每个专家能够处理的tokens数。默认值为-1，入参校验大于0小于NUM_ROWS。Dropless场景下仅校验其值，不使用该参数；DropPad场景下取值范围为(0, NUM_ROWS]。  |  -  | - |
-|  expert_num  |  int |  可选  |  表示专家数。默认值为-1，必须大于0。`expert_tokens_num_type`为key_value模式时，取值范围为[0, 5120]；其他模式取值范围为[0, 10240]。  |  -  | - |
+|  expert_num  |  int |  可选  |  表示专家数。默认值为-1，必须大于0。`expert_tokens_num_type`为key_value模式时，取值范围为[1, 5120]；其他模式取值范围为[1, 10240]。  |  -  | - |
 |  drop_pad_mode  |  int |  可选  |  表示是否为drop_pad场景。默认值为0，0表示Dropless场景，该场景下不校验`expert_capacity`；1表示Drop_Pad场景。  |  -  | - |
 |  expert_tokens_num_type  |  int |  可选  |  表示直方图的不同模式。默认值为0，取值为0、1和2。0表示cumsum模式；1表示count模式；2表示key_value模式。  |  -  | - |
 |  expert_tokens_num_flag  |  bool |  可选  |  表示是否输出`expert_token_cumsum_or_count`。默认值为False，仅支持取值为true。  |  -  | - |
@@ -226,10 +226,10 @@ cann_ops_transformer.moe_init_routing(
 
 **expanded_scale不同场景下的输出shape和数据类型：**
 
-- 非量化场景下，当`scale`输入时，shape为[NUM_ROWS*K, 1]，前availableIdxNum个元素为有效数据，输出`float32`类型。当输入x数据类型为`float8_e5m2`、`float8_e4m3fn`或`float4_e2m1`时，如果`scale`输入，则shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出`float8_e8m0`类型。
+- 非量化场景下，当`scale`输入时，shape为[NUM_ROWS*K]，前availableIdxNum个元素为有效数据，输出`float32`类型。当输入x数据类型为`float8_e5m2`、`float8_e4m3fn`或`float4_e2m1`时，如果`scale`输入，则shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出`float8_e8m0`类型。
 - 动态量化场景下，当`scale`输入时，前availableIdxNum个元素为有效数据。
 - 静态量化场景下、HIF8直转量化场景下、HIF8 PERTENSOR量化场景下，输出为空tensor。
-- HIF8 PERTOKEN量化场景下，shape为[NUM_ROWS*K, 1]，输出`float32`类型。
+- HIF8 PERTOKEN量化场景下，shape为[NUM_ROWS*K]，输出`float32`类型。
 - MXFP8量化场景下（quantMode为2、3、16、17），输出`float8_e8m0`类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H, 32), 2)，前availableIdxNum行为有效数据。
 - MXFP4量化场景下，输出`float8_e8m0`类型，Shape为[NUM_ROWS*K, M, 2]，其中M=CeilDiv(H, 64)，前availableIdxNum行为有效数据。
 - FP8 PerGroup量化场景下（quantMode为4、5、14、15），输出`float32`类型，Shape为[NUM_ROWS*K, CeilDiv(H, 128)]，前availableIdxNum行为有效数据。
@@ -250,7 +250,7 @@ cann_ops_transformer.moe_init_routing(
 - `expert_tokens_num_flag`仅支持取值为true。
 - `active_num`仅支持值等于NUM_ROWS*K。
 - quantMode为13的INT4动态量化场景，需同时满足：`x`数据类型为`float32`或`bfloat16`；H为偶数。
-- 空tensor处理：当输入的x首个维度的值为0时，DropPadMode必须为0，expanded_x、expanded_row_idx和expanded_scale为空tensor，expert_token_cumsum_or_count返回全0的tensor。
+- 空tensor处理：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。NUM_ROWS*K>0且H=0时仍走正常路由流程，生成`expanded_row_idx`和`expert_token_cumsum_or_count`。
 - **自动反向（autograd）约束**：自动反向仅在正向退化为aclnnMoeInitRoutingV2场景时支持，即不使用aclnnMoeInitRoutingV4特有特性。具体要求：`scale`不传入、`offset`不传入、`topk_weight`不传入、`quant_mode=-1`（非量化）、`row_idx_type=0`（gather索引）、`x_dtype`为None、`drop_pad_mode`为0或1。当使用了aclnnMoeInitRoutingV4特有特性（量化、`scale`、`offset`、`topk_weight`、`x_dtype`、`row_idx_type`非0等）时，调用自动反向会抛出`NotImplementedError`。`active_expert_range`不影响反向，不视为aclnnMoeInitRoutingV4特有特性。
 - 自动反向仅对`x`求梯度，`expert_idx`为整数索引张量无梯度，`expanded_row_idx`及其他整数/统计输出无梯度。
 

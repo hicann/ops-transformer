@@ -101,7 +101,6 @@
           <li>quantMode=2、3、4、5、6、7、8、9、11、12、14、15、16、17：支持FLOAT16、BFLOAT16;</li>
           <li>quantMode=13：支持FLOAT32、BFLOAT16;</li>
           <li>以上类型需同时满足下文的产品支持限制：A2/A3仅支持quantMode=-1、0、1，且非量化输入仅支持FLOAT16、BFLOAT16、FLOAT32、INT8；其余列出的类型和量化模式仅950支持。</li>
-          <li><term>Ascend 950PR/Ascend 950DT</term>在quantMode=1时仅为兼容历史调用允许INT8输入，此时expandedXOut和expandedScaleOut无意义，不应使用。</li>
           </ul></td>
         <td>ND</td>
       </tr>

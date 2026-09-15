@@ -116,7 +116,12 @@
         <td>x</td>
         <td>输入</td>
         <td>MOE的输入，即token特征输入，对应公式中x。</td>
-        <td>FLOAT32、FLOAT16、BFLOAT16、INT8、HIFLOAT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2。</td>
+        <td><ul>
+          <li>quantMode=-1：支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2;</li>
+          <li>quantMode=0、1：支持FLOAT16、BFLOAT16、FLOAT32;</li>
+          <li>quantMode=2、3、4、5、6、7、8、9、11、12、14、15、16、17：支持FLOAT16、BFLOAT16;</li>
+          <li>quantMode=13：支持FLOAT32、BFLOAT16;</li>
+          </ul></td>
         <td>ND</td>
       </tr>
       <tr>
@@ -178,7 +183,7 @@
       <tr>
         <td>expertTokensNumType</td>
         <td>属性</td>
-        <td>取值为0、1和2 。<br>• 0：表示comsum模式。<br>• 1：表示count模式，即输出的值为各个专家处理的token数量的累计值。<br>• 2：表示key\_value模式，即输出的值为专家和对应专家处理token数量的累计值。</td>
+        <td>取值为0、1和2 。<br>• 0：表示cumsum模式。<br>• 1：表示count模式，即输出的值为各个专家处理的token数量的累计值。<br>• 2：表示key\_value模式，即输出的值为专家和对应专家处理token数量的累计值。</td>
         <td>INT</td>
         <td>-</td>
       </tr>
@@ -235,7 +240,7 @@
       <tr>
         <td>expandedScaleOut</td>
         <td>输出</td>
-        <td>输出量化计算过程中scaleOptional的中间值。<br>• 非量化场景下，当scaleOptional输入时，shape为[NUM_ROWS*K, 1]，输出FLOAT32类型；当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果scaleOptional输入，则shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出FLOAT8_E8M0类型。DropPad场景下shape为[expertNum * expertCapacity]，输出FLOAT32类型。<br>• 动态量化场景下（quantMode为1），当scaleOptional输入时，shape为[NUM_ROWS*K]，输出FLOAT32类型。<br>• 静态量化场景下（quantMode为0）、HIF8直转量化场景下（quantMode为6）、HIF8 PERTENSOR量化场景下（quantMode为7），输出为空tensor。<br>• HIF8 PERTOKEN量化场景下（quantMode为8），shape为[NUM_ROWS*K]，输出FLOAT32类型。<br>• MXFP8量化场景下（quantMode为2、3、16、17），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H,32),2)。<br>• MXFP4量化场景下（quantMode为9），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M, 2]，其中M=CeilDiv(H, 64)。<br>• FP8 PerGroup量化场景下（quantMode为4、5、14、15），输出FLOAT32类型，Shape为[NUM_ROWS*K, CeilDiv(H, 128)]。<br>• FP8 PerBlock量化场景下（quantMode为11、12），输出FLOAT32类型，Shape为[NUM_ROWS*K, CeilDiv(H, 256), 2]。</td>
+        <td>输出量化计算过程中scaleOptional的中间值。<br>• 非量化场景下，当scaleOptional输入时，shape为[NUM_ROWS*K]，输出FLOAT32类型；当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果scaleOptional输入，则shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出FLOAT8_E8M0类型。DropPad场景下shape为[expertNum * expertCapacity]，输出FLOAT32类型。<br>• 动态量化场景下（quantMode为1），当scaleOptional输入时，shape为[NUM_ROWS*K]，输出FLOAT32类型。<br>• 静态量化场景下（quantMode为0）、HIF8直转量化场景下（quantMode为6）、HIF8 PERTENSOR量化场景下（quantMode为7），输出为空tensor。<br>• HIF8 PERTOKEN量化场景下（quantMode为8），shape为[NUM_ROWS*K]，输出FLOAT32类型。<br>• MXFP8量化场景下（quantMode为2、3、16、17），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H,32),2)。<br>• MXFP4量化场景下（quantMode为9），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M, 2]，其中M=CeilDiv(H, 64)。<br>• FP8 PerGroup量化场景下（quantMode为4、5、14、15），输出FLOAT32类型，Shape为[NUM_ROWS*K, CeilDiv(H, 128)]。<br>• FP8 PerBlock量化场景下（quantMode为11、12），输出FLOAT32类型，Shape为[NUM_ROWS*K, CeilDiv(H, 256), 2]。</td>
         <td>FLOAT32、FLOAT8_E8M0</td>
         <td>ND</td>
       </tr>
@@ -257,7 +262,7 @@
   - H为偶数，用于沿H维每两个INT4值打包为1个字节。
   - scaleOptional不输入，或输入shape为(1, H)、数据类型为FLOAT32；offsetOptional不输入。
 - DropPad模式特殊约束（dropPadMode=1时）：
-  - quantMode仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8。
+  - quantMode仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
   - rowIdxType仅支持0（gather索引）。
 
 ## 调用说明
