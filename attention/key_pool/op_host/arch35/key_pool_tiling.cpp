@@ -827,8 +827,17 @@ ge::graphStatus KeyPoolTiling::CheckDtypeConsistency() const
 
 ge::graphStatus KeyPoolTiling::CheckDimNumConsistency() const
 {
-    OP_CHECK_IF(context_->pooledKey.shape->GetStorageShape().GetDimNum() != KEY_POOL_DIM_NUM_3,
-                OP_LOGE(context_->opName, "pooledKey must be a BSH rank-3 tensor"), return ge::GRAPH_FAILED);
+    const auto &outputShape = context_->pooledKey.shape->GetStorageShape();
+    const bool isBsh = context_->layout == LayoutType::LAYOUT_BSH;
+    const uint32_t rank = isBsh ? KEY_POOL_DIM_NUM_3 : KEY_POOL_DIM_NUM_2;
+    OP_CHECK_IF(outputShape.GetDimNum() != rank,
+                OP_LOGE(context_->opName, "pooledKey rank must match hidden_states rank"), return ge::GRAPH_FAILED);
+    const uint32_t capacity = isBsh ? (baseParams_->seqSize + baseParams_->cmpRatio - 1) / baseParams_->cmpRatio :
+                                      std::min(baseParams_->tokenSize,
+                                               baseParams_->tokenSize / baseParams_->cmpRatio + baseParams_->batchSize);
+    OP_CHECK_IF(outputShape.GetDim(rank - 1) != baseParams_->headDim || outputShape.GetDim(rank - 2) != capacity ||
+                    (isBsh && outputShape.GetDim(0) != baseParams_->batchSize),
+                OP_LOGE(context_->opName, "pooledKey shape must use current-input capacity"), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

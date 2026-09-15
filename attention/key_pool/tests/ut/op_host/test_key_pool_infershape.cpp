@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "gmm_csv_ge_parse_utils.h"
 #include "infer_shape_case_executor.h"
 #include "infer_shape_context_faker.h"
 
@@ -23,7 +24,7 @@ using OpAttr = gert::InfershapeContextPara::OpAttr;
 
 TensorDesc Desc(const std::vector<int64_t> &dims, ge::DataType dtype)
 {
-    return TensorDesc(gert::StorageShape(dims, dims), dtype, ge::FORMAT_ND);
+    return TensorDesc(ops::ut::MakeGertStorageShape(dims), dtype, ge::FORMAT_ND);
 }
 
 TensorDesc Empty(ge::DataType dtype)
@@ -90,13 +91,13 @@ TEST(KeyPoolInfershape, BshLayerNorm)
 TEST(KeyPoolInfershape, ThUnevenBatch)
 {
     auto para = MakePara("TH", ge::DT_BF16, 3, 17, 4096, 512, 4, 4, 4);
-    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{3, 4, 512}});
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{7, 512}});
 }
 
 TEST(KeyPoolInfershape, ThFp16)
 {
     auto para = MakePara("TH", ge::DT_FLOAT16, 2, 256, 2048, 128, 16, 16, 2);
-    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{2, 2, 128}});
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{18, 128}});
 }
 
 TEST(KeyPoolInfershape, EmptyBatch)
@@ -109,4 +110,28 @@ TEST(KeyPoolInfershape, ZeroCmpRatio)
 {
     auto para = MakePara("BSH", ge::DT_BF16, 2, 8, 2048, 128, 0, 4, 2);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+TEST(KeyPoolInfershape, BshLargeCacheTable)
+{
+    auto para = MakePara("BSH", ge::DT_BF16, 1, 4, 4096, 128, 4, 4, 32773);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{1, 1, 128}});
+}
+
+TEST(KeyPoolInfershape, ThLargeCacheTable)
+{
+    auto para = MakePara("TH", ge::DT_BF16, 1, 4, 4096, 128, 4, 4, 32773);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{2, 128}});
+}
+
+TEST(KeyPoolInfershape, ThTokenBound)
+{
+    auto para = MakePara("TH", ge::DT_BF16, 8, 3, 4096, 128, 128, 128, 1);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{3, 128}});
+}
+
+TEST(KeyPoolInfershape, ThEmptyTokens)
+{
+    auto para = MakePara("TH", ge::DT_BF16, 3, 0, 4096, 128, 4, 4, 1);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, {{0, 128}});
 }

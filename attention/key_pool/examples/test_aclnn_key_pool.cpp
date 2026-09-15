@@ -131,7 +131,7 @@ int main()
     constexpr int64_t blockSize = 4;
     constexpr int64_t maxBlockNumPerBatch = (seqLength + blockSize - 1) / blockSize;
     constexpr int64_t blockNum = batchSize * maxBlockNumPerBatch + 1; // block 0 is reserved.
-    constexpr int64_t pooledSeqLength = (maxBlockNumPerBatch * blockSize + cmpRatio - 1) / cmpRatio;
+    constexpr int64_t pooledSeqLength = (seqLength + cmpRatio - 1) / cmpRatio;
     constexpr double normEps = 1e-6;
     constexpr int64_t rotaryMode = 1;
     constexpr int64_t stateCacheStrideDim0 = blockSize * 2 * headDim;

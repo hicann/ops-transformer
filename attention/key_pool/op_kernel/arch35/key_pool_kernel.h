@@ -532,11 +532,6 @@ __aicore__ inline void KeyPoolKernel<COMP>::Process()
             ComputeVec1(vec1Info);
         }
     }
-    if ASCEND_IS_AIV {
-        PipeBarrier<PIPE_ALL>();
-        SyncAll();
-        blockVec_.ComputeIncrementalPool();
-    }
     FreeEventID();
 }
 
