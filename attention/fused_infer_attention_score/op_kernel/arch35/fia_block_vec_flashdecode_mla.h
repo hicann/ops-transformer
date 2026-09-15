@@ -74,7 +74,7 @@ private:
     uint32_t preLoadNum = 2U;
     uint32_t dSizeV_Align;
     static constexpr bool attenMaskFlag = hasAtten;
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     // 基本块大小
     static constexpr uint32_t s1BaseSize = (uint32_t)s1TemplateType;
 
@@ -530,7 +530,7 @@ template <typename INPUT_T, typename T, typename OUTPUT_T, LayOutTypeEnum layout
           DTemplateType dVTemplateType = DTemplateType::Aligned128, bool hasAtten = false, uint8_t KvLayoutType = 0>
 class FiaBlockVecFlashDecodeMlaDummy {
 public:
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     __aicore__ inline FiaBlockVecFlashDecodeMlaDummy(ConstInfoX &constInfo){};
 };
 

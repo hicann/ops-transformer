@@ -93,7 +93,7 @@ public:
     using L0BType = typename L0BBuffSel<s2BaseSize, dBaseSize>::Type;
     using L0CType = typename L0CBuffSel<mBaseSize, s2BaseSize, dVBaseSize>::Type;
 
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
 
     TPipe *tPipe = nullptr;
 
@@ -130,7 +130,8 @@ public:
     const ConstInfoX &constInfo;
 
     /*============================================================================== */
-    __aicore__ inline FANoQuantGqaBlockCube(ConstInfoX &constInfo) : constInfo(constInfo){};
+    __aicore__ inline FANoQuantGqaBlockCube(ConstInfoX &constInfo)
+        : constInfo(constInfo){};
 
     __aicore__ inline void InitCubeBlock(TPipe *pipe, BufferManager<BufferType::L1> *l1BuffMgr, __gm__ uint8_t *query,
                                          __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
@@ -615,7 +616,7 @@ public:
     using MM2_ABUF_POLICY_T = BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
     using MM2_ABUF_T = Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
 
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     __aicore__ inline FANoQuantGqaBlockCubeDummy(ConstInfoX &constInfo){};
 };
 

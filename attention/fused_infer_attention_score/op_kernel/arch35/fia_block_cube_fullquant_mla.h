@@ -135,7 +135,7 @@ public:
     using L0BType = typename L0BBuffSelMla<INPUT_T, s2BaseSize, dBaseSize>::Type;
     using L0CType = typename L0CBuffSelMla<INPUT_T, mBaseSize, s2BaseSize, dVBaseSize>::Type;
 
-    using ConstInfoX = ConstInfo_t<FiaKernelType::FULL_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     TPipe *tPipe = nullptr;
 
     /* =====================GM变量(with layout)==================== */
@@ -605,7 +605,7 @@ public:
     using MM1_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
     using MM2_ABUF_POLICY_T = BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
     using MM2_ABUF_T = Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
-    using ConstInfoX = ConstInfo_t<FiaKernelType::FULL_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     __aicore__ inline FAFullQuantMlaBlockCubeDummy(ConstInfoX &constInfo)
         : constInfo(constInfo){};
     __aicore__ inline void InitCubeBlock(TPipe *, BufferManager<BufferType::L1> *, __gm__ uint8_t *, __gm__ uint8_t *,

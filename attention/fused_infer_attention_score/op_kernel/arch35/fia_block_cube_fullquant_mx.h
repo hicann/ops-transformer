@@ -133,7 +133,7 @@ public:
     using KeyScaleGmToL1Type = typename KeyScaleGmToL1Sel<KvLayoutType>::Type;
     using ValueScaleGmToL1Type = typename ValueScaleGmToL1Sel<KvLayoutType>::Type;
 
-    using ConstInfoX = ConstInfo_t<FiaKernelType::FULL_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     TPipe *tPipe = nullptr;
     /* =====================GM变量(with layout)==================== */
     FaGmTensor<Q_T, Q_FORMAT> queryGm;
@@ -1081,7 +1081,7 @@ public:
     using MM1_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
     using MM2_ABUF_POLICY_T = BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
     using MM2_ABUF_T = Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
-    using ConstInfoX = ConstInfo_t<FiaKernelType::FULL_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     __aicore__ inline FAFullQuantMxBlockCubeDummy(ConstInfoX &constInfo){};
 };
 } // namespace BaseApi
