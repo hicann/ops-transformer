@@ -16,6 +16,7 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 
 OP_NAME = "mla_prolog"
+FUNCTIONAL_OP_NAME = "mla_prolog_functional"
 DEFAULT_CACHE_MODE = "PA_BSND"
 DIM_2 = 2
 DIM_3 = 3
@@ -171,6 +172,35 @@ def _meta_outputs(
     return query, query_rope, dequant_scale_q_nope, query_norm, dequant_scale_q_norm
 
 
+def _schema_common_kw() -> str:
+    return (
+        "*, Tensor? rope_sin=None, Tensor? rope_cos=None, "
+        "Tensor? cache_index=None, Tensor? dequant_scale_x=None, Tensor? dequant_scale_w_dq=None, "
+        "Tensor? dequant_scale_w_uq_qr=None, Tensor? dequant_scale_w_dkv_kr=None, Tensor? quant_scale_ckv=None, "
+        "Tensor? quant_scale_ckr=None, Tensor? smooth_scales_cq=None, Tensor? actual_seq_len=None, "
+        "Tensor? k_nope_clip_alpha=None, "
+        "float rmsnorm_epsilon_cq=1e-05, float rmsnorm_epsilon_ckv=1e-05, "
+        'str cache_mode="PA_BSND", '
+        "bool query_norm_flag=False, int weight_quant_mode=0, int kv_cache_quant_mode=0, int query_quant_mode=0, "
+        "int ckvkr_repo_mode=0, int quant_scale_repo_mode=0, int tile_size=128, "
+        "float qc_qr_scale=1.0, float kc_scale=1.0, "
+        "int? token_x_dtype=None, int? weight_dq_dtype=None, int? weight_uq_qr_dtype=None, "
+        "int? weight_dkv_kr_dtype=None, int? kv_cache_dtype=None"
+    )
+
+
+def _schema_inputs(inplace: bool) -> str:
+    cache_args = (
+        "Tensor(a!) kv_cache, Tensor(b!) kr_cache, "
+        if inplace
+        else "Tensor kv_cache, Tensor kr_cache, "
+    )
+    return (
+        "Tensor token_x, Tensor weight_dq, Tensor weight_uq_qr, Tensor weight_uk, Tensor weight_dkv_kr, "
+        "Tensor rmsnorm_gamma_cq, Tensor rmsnorm_gamma_ckv, " + cache_args
+    )
+
+
 class MlaPrologOpBuilder(OpBuilder):
     def __init__(self):
         super(MlaPrologOpBuilder, self).__init__(OP_NAME, category="attention")
@@ -180,98 +210,97 @@ class MlaPrologOpBuilder(OpBuilder):
         return ["csrc/attention/mla_prolog.cpp"]
 
     def schema(self) -> List[str]:
-        """PyTorch operator signatures."""
-        common_kw = (
-            "*, Tensor? rope_sin=None, Tensor? rope_cos=None, "
-            "Tensor? cache_index=None, Tensor? dequant_scale_x=None, Tensor? dequant_scale_w_dq=None, "
-            "Tensor? dequant_scale_w_uq_qr=None, Tensor? dequant_scale_w_dkv_kr=None, Tensor? quant_scale_ckv=None, "
-            "Tensor? quant_scale_ckr=None, Tensor? smooth_scales_cq=None, Tensor? actual_seq_len=None, "
-            "Tensor? k_nope_clip_alpha=None, "
-            "float rmsnorm_epsilon_cq=1e-05, float rmsnorm_epsilon_ckv=1e-05, "
-            'str cache_mode="PA_BSND", '
-            "bool query_norm_flag=False, int weight_quant_mode=0, int kv_cache_quant_mode=0, int query_quant_mode=0, "
-            "int ckvkr_repo_mode=0, int quant_scale_repo_mode=0, int tile_size=128, "
-            "float qc_qr_scale=1.0, float kc_scale=1.0, "
-            "int? token_x_dtype=None, int? weight_dq_dtype=None, int? weight_uq_qr_dtype=None, "
-            "int? weight_dkv_kr_dtype=None, int? kv_cache_dtype=None"
-        )
-        inputs = (
-            "Tensor token_x, Tensor weight_dq, Tensor weight_uq_qr, Tensor weight_uk, Tensor weight_dkv_kr, "
-            "Tensor rmsnorm_gamma_cq, Tensor rmsnorm_gamma_ckv, "
-            "Tensor(a!) kv_cache, Tensor(b!) kr_cache, "
-        )
+        """PyTorch operator signatures.
+
+        inplace `mla_prolog` 对齐 npu_mla_prolog_v3；
+        `mla_prolog_functional` 对齐 npu_mla_prolog_v3_functional（图模式，7 输出）。
+        """
+        common_kw = _schema_common_kw()
         return [
             OP_NAME
             + "("
-            + inputs
+            + _schema_inputs(inplace=True)
             + common_kw
             + ") -> (Tensor, Tensor, Tensor, Tensor, Tensor)",
+            FUNCTIONAL_OP_NAME
+            + "("
+            + _schema_inputs(inplace=False)
+            + common_kw
+            + ") -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)",
         ]
 
     def register_meta(self):
         """Registers the Meta implementation (Shape/Dtype inference)."""
 
-        @impl(get_as_library(), OP_NAME, "Meta")
-        def mla_prolog_meta(
-            token_x,
-            weight_dq,
-            weight_uq_qr,
-            weight_uk,
-            weight_dkv_kr,
-            rmsnorm_gamma_cq,
-            rmsnorm_gamma_ckv,
-            kv_cache,
-            kr_cache,
-            *,
-            rope_sin=None,
-            rope_cos=None,
-            cache_index=None,
-            dequant_scale_x=None,
-            dequant_scale_w_dq=None,
-            dequant_scale_w_uq_qr=None,
-            dequant_scale_w_dkv_kr=None,
-            quant_scale_ckv=None,
-            quant_scale_ckr=None,
-            smooth_scales_cq=None,
-            actual_seq_len=None,
-            k_nope_clip_alpha=None,
-            rmsnorm_epsilon_cq=1e-05,
-            rmsnorm_epsilon_ckv=1e-05,
-            cache_mode=DEFAULT_CACHE_MODE,
-            query_norm_flag=False,
-            weight_quant_mode=0,
-            kv_cache_quant_mode=0,
-            query_quant_mode=0,
-            ckvkr_repo_mode=0,
-            quant_scale_repo_mode=0,
-            tile_size=128,
-            qc_qr_scale=1.0,
-            kc_scale=1.0,
-            token_x_dtype=None,
-            weight_dq_dtype=None,
-            weight_uq_qr_dtype=None,
-            weight_dkv_kr_dtype=None,
-            kv_cache_dtype=None,
-        ):
-            if token_x.dim() not in (DIM_2, DIM_3):
-                raise ValueError("token_x dim num should be 2 or 3")
-            if weight_uk.dim() != DIM_3:
-                raise ValueError("weight_uk dim num should be 3")
-            return _meta_outputs(
+        def make_meta_impl(functional: bool):
+            def mla_prolog_meta(
                 token_x,
                 weight_dq,
                 weight_uq_qr,
                 weight_uk,
                 weight_dkv_kr,
-                rope_sin,
-                rope_cos,
+                rmsnorm_gamma_cq,
+                rmsnorm_gamma_ckv,
+                kv_cache,
                 kr_cache,
-                query_norm_flag,
-                weight_quant_mode,
-                kv_cache_quant_mode,
-                dequant_scale_x,
-                token_x_dtype,
-            )
+                *,
+                rope_sin=None,
+                rope_cos=None,
+                cache_index=None,
+                dequant_scale_x=None,
+                dequant_scale_w_dq=None,
+                dequant_scale_w_uq_qr=None,
+                dequant_scale_w_dkv_kr=None,
+                quant_scale_ckv=None,
+                quant_scale_ckr=None,
+                smooth_scales_cq=None,
+                actual_seq_len=None,
+                k_nope_clip_alpha=None,
+                rmsnorm_epsilon_cq=1e-05,
+                rmsnorm_epsilon_ckv=1e-05,
+                cache_mode=DEFAULT_CACHE_MODE,
+                query_norm_flag=False,
+                weight_quant_mode=0,
+                kv_cache_quant_mode=0,
+                query_quant_mode=0,
+                ckvkr_repo_mode=0,
+                quant_scale_repo_mode=0,
+                tile_size=128,
+                qc_qr_scale=1.0,
+                kc_scale=1.0,
+                token_x_dtype=None,
+                weight_dq_dtype=None,
+                weight_uq_qr_dtype=None,
+                weight_dkv_kr_dtype=None,
+                kv_cache_dtype=None,
+            ):
+                if token_x.dim() not in (DIM_2, DIM_3):
+                    raise ValueError("token_x dim num should be 2 or 3")
+                if weight_uk.dim() != DIM_3:
+                    raise ValueError("weight_uk dim num should be 3")
+                outs = _meta_outputs(
+                    token_x,
+                    weight_dq,
+                    weight_uq_qr,
+                    weight_uk,
+                    weight_dkv_kr,
+                    rope_sin,
+                    rope_cos,
+                    kr_cache,
+                    query_norm_flag,
+                    weight_quant_mode,
+                    kv_cache_quant_mode,
+                    dequant_scale_x,
+                    token_x_dtype,
+                )
+                if not functional:
+                    return outs
+                return (*outs, torch.empty_like(kv_cache), torch.empty_like(kr_cache))
+
+            return mla_prolog_meta
+
+        impl(get_as_library(), OP_NAME, "Meta")(make_meta_impl(False))
+        impl(get_as_library(), FUNCTIONAL_OP_NAME, "Meta")(make_meta_impl(True))
 
 
 mla_prolog_op_builder = MlaPrologOpBuilder()
@@ -415,3 +444,244 @@ def mla_prolog(
         weight_dkv_kr_dtype,
         kv_cache_dtype,
     )
+
+
+@impl(get_as_library(), FUNCTIONAL_OP_NAME, "PrivateUse1")
+def mla_prolog_functional(
+    token_x: torch.Tensor,
+    weight_dq: torch.Tensor,
+    weight_uq_qr: torch.Tensor,
+    weight_uk: torch.Tensor,
+    weight_dkv_kr: torch.Tensor,
+    rmsnorm_gamma_cq: torch.Tensor,
+    rmsnorm_gamma_ckv: torch.Tensor,
+    kv_cache: torch.Tensor,
+    kr_cache: torch.Tensor,
+    *,
+    rope_sin: Optional[torch.Tensor] = None,
+    rope_cos: Optional[torch.Tensor] = None,
+    cache_index: Optional[torch.Tensor] = None,
+    dequant_scale_x: Optional[torch.Tensor] = None,
+    dequant_scale_w_dq: Optional[torch.Tensor] = None,
+    dequant_scale_w_uq_qr: Optional[torch.Tensor] = None,
+    dequant_scale_w_dkv_kr: Optional[torch.Tensor] = None,
+    quant_scale_ckv: Optional[torch.Tensor] = None,
+    quant_scale_ckr: Optional[torch.Tensor] = None,
+    smooth_scales_cq: Optional[torch.Tensor] = None,
+    actual_seq_len: Optional[torch.Tensor] = None,
+    k_nope_clip_alpha: Optional[torch.Tensor] = None,
+    rmsnorm_epsilon_cq: float = 1e-05,
+    rmsnorm_epsilon_ckv: float = 1e-05,
+    cache_mode: str = DEFAULT_CACHE_MODE,
+    query_norm_flag: bool = False,
+    weight_quant_mode: int = 0,
+    kv_cache_quant_mode: int = 0,
+    query_quant_mode: int = 0,
+    ckvkr_repo_mode: int = 0,
+    quant_scale_repo_mode: int = 0,
+    tile_size: int = 128,
+    qc_qr_scale: float = 1.0,
+    kc_scale: float = 1.0,
+    token_x_dtype: Optional[int] = None,
+    weight_dq_dtype: Optional[int] = None,
+    weight_uq_qr_dtype: Optional[int] = None,
+    weight_dkv_kr_dtype: Optional[int] = None,
+    kv_cache_dtype: Optional[int] = None,
+) -> Tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
+    """MLA Prolog 图模式接口，对齐 torch_npu.npu_mla_prolog_v3_functional。
+
+    不原地写 kv_cache/kr_cache：内部 clone 后再计算，额外返回 kv_cache_out、kr_cache_out。
+    """
+    _resolve_do_rope(rope_sin, rope_cos)
+    op_module = mla_prolog_op_builder.load()
+    return op_module.mla_prolog_functional(
+        token_x,
+        weight_dq,
+        weight_uq_qr,
+        weight_uk,
+        weight_dkv_kr,
+        rmsnorm_gamma_cq,
+        rmsnorm_gamma_ckv,
+        kv_cache,
+        kr_cache,
+        rope_sin,
+        rope_cos,
+        cache_index,
+        dequant_scale_x,
+        dequant_scale_w_dq,
+        dequant_scale_w_uq_qr,
+        dequant_scale_w_dkv_kr,
+        quant_scale_ckv,
+        quant_scale_ckr,
+        smooth_scales_cq,
+        actual_seq_len,
+        k_nope_clip_alpha,
+        rmsnorm_epsilon_cq,
+        rmsnorm_epsilon_ckv,
+        cache_mode,
+        query_norm_flag,
+        weight_quant_mode,
+        kv_cache_quant_mode,
+        query_quant_mode,
+        ckvkr_repo_mode,
+        quant_scale_repo_mode,
+        tile_size,
+        qc_qr_scale,
+        kc_scale,
+        token_x_dtype,
+        weight_dq_dtype,
+        weight_uq_qr_dtype,
+        weight_dkv_kr_dtype,
+        kv_cache_dtype,
+    )
+
+
+_OPTIONAL_TENSOR_NAMES = (
+    "rope_sin",
+    "rope_cos",
+    "cache_index",
+    "dequant_scale_x",
+    "dequant_scale_w_dq",
+    "dequant_scale_w_uq_qr",
+    "dequant_scale_w_dkv_kr",
+    "quant_scale_ckv",
+    "quant_scale_ckr",
+    "smooth_scales_cq",
+    "actual_seq_len",
+    "k_nope_clip_alpha",
+)
+
+
+@torch.ops.cann_ops_transformer.mla_prolog.default.py_functionalize_impl
+def _mla_prolog_functionalize(
+    ctx,
+    token_x,
+    weight_dq,
+    weight_uq_qr,
+    weight_uk,
+    weight_dkv_kr,
+    rmsnorm_gamma_cq,
+    rmsnorm_gamma_ckv,
+    kv_cache,
+    kr_cache,
+    *,
+    rope_sin=None,
+    rope_cos=None,
+    cache_index=None,
+    dequant_scale_x=None,
+    dequant_scale_w_dq=None,
+    dequant_scale_w_uq_qr=None,
+    dequant_scale_w_dkv_kr=None,
+    quant_scale_ckv=None,
+    quant_scale_ckr=None,
+    smooth_scales_cq=None,
+    actual_seq_len=None,
+    k_nope_clip_alpha=None,
+    rmsnorm_epsilon_cq=1e-05,
+    rmsnorm_epsilon_ckv=1e-05,
+    cache_mode=DEFAULT_CACHE_MODE,
+    query_norm_flag=False,
+    weight_quant_mode=0,
+    kv_cache_quant_mode=0,
+    query_quant_mode=0,
+    ckvkr_repo_mode=0,
+    quant_scale_repo_mode=0,
+    tile_size=128,
+    qc_qr_scale=1.0,
+    kc_scale=1.0,
+    token_x_dtype=None,
+    weight_dq_dtype=None,
+    weight_uq_qr_dtype=None,
+    weight_dkv_kr_dtype=None,
+    kv_cache_dtype=None,
+):
+    """Compile 时把 inplace mla_prolog 落到 mla_prolog_functional，避免 auto_functionalized_v2。"""
+    pos = (
+        token_x,
+        weight_dq,
+        weight_uq_qr,
+        weight_uk,
+        weight_dkv_kr,
+        rmsnorm_gamma_cq,
+        rmsnorm_gamma_ckv,
+        kv_cache,
+        kr_cache,
+    )
+    opts = (
+        rope_sin,
+        rope_cos,
+        cache_index,
+        dequant_scale_x,
+        dequant_scale_w_dq,
+        dequant_scale_w_uq_qr,
+        dequant_scale_w_dkv_kr,
+        quant_scale_ckv,
+        quant_scale_ckr,
+        smooth_scales_cq,
+        actual_seq_len,
+        k_nope_clip_alpha,
+    )
+    pos_u = ctx.unwrap_tensors(pos)
+    opts_u = ctx.unwrap_tensors(opts)
+    opt_kwargs = dict(zip(_OPTIONAL_TENSOR_NAMES, opts_u))
+    with ctx.redispatch_to_next():
+        outs = torch.ops.cann_ops_transformer.mla_prolog_functional(
+            *pos_u,
+            **opt_kwargs,
+            rmsnorm_epsilon_cq=rmsnorm_epsilon_cq,
+            rmsnorm_epsilon_ckv=rmsnorm_epsilon_ckv,
+            cache_mode=cache_mode,
+            query_norm_flag=query_norm_flag,
+            weight_quant_mode=weight_quant_mode,
+            kv_cache_quant_mode=kv_cache_quant_mode,
+            query_quant_mode=query_quant_mode,
+            ckvkr_repo_mode=ckvkr_repo_mode,
+            quant_scale_repo_mode=quant_scale_repo_mode,
+            tile_size=tile_size,
+            qc_qr_scale=qc_qr_scale,
+            kc_scale=kc_scale,
+            token_x_dtype=token_x_dtype,
+            weight_dq_dtype=weight_dq_dtype,
+            weight_uq_qr_dtype=weight_uq_qr_dtype,
+            weight_dkv_kr_dtype=weight_dkv_kr_dtype,
+            kv_cache_dtype=kv_cache_dtype,
+        )
+    (
+        query,
+        query_rope,
+        dequant_scale_q_nope,
+        query_norm,
+        dequant_scale_q_norm,
+        kv_out,
+        kr_out,
+    ) = outs
+    ctx.replace(kv_cache, kv_out)
+    ctx.replace(kr_cache, kr_out)
+    ctx.commit_update(kv_cache)
+    ctx.commit_update(kr_cache)
+    ctx.sync(kv_cache)
+    ctx.sync(kr_cache)
+    return ctx.wrap_tensors(
+        (query, query_rope, dequant_scale_q_nope, query_norm, dequant_scale_q_norm)
+    )
+
+
+@impl(get_as_library(), OP_NAME, "Functionalize")
+def _mla_prolog_functionalize_dispatch(*args, **kwargs):
+    """C++ dispatcher 上的 Functionalize kernel。
+
+    py_functionalize_impl 只写入 Python py_kernels，不会让
+    can_auto_functionalize 返回 False。必须再注册这条 dispatch kernel，
+    torch.compile 才会走 mla_prolog_functional 而不是 auto_functionalized_v2。
+    """
+    from torch._subclasses.functional_tensor import CppFunctionalizeAPI
+
+    return _mla_prolog_functionalize(CppFunctionalizeAPI(), *args, **kwargs)
