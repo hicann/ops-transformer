@@ -375,7 +375,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>cmpResidualKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。</td>
-      <td>可选输入。传入时shape必须为(B,)，第b个batch按cmp_len * cmpRatio + cmpResidualKvOptional[b]恢复压缩前KV长度；当cmpRatio!=1且cmpMaskMode为3场景必传。</td>
+      <td>可选输入。传入时shape必须为(B,)，第b个batch按cmp_len * cmpRatio + cmpResidualKvOptional[b]恢复压缩前KV长度；当cmpMaskMode为3且cmpRatio!=1场景必传，cmpMaskMode为0或cmpRatio等于1时不允许传入。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(b,)</td>
@@ -702,7 +702,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
   - aclnnQuantSparseFlashMlaMetadata和aclnnQuantSparseFlashMla的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由用户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
   - oriTopkLengthOptional、cmpTopkLengthOptional表示ori/cmp sparseIndices实际参与计算的长度。其值不能大于sparseIndicesOptional的最后一维大小，且当sequsedQOptional传入时，topkLength对应有效部分的值需要大于等于0。
   - 当oriMaskMode/cmpMaskMode为0时，oriKvK/cmpKvK需要大于等于oriTopkLengthOptional/cmpTopkLengthOptional的最大值。
-  - cmpResidualKvOptional配合cmpRatio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmpRatio。
+  - cmpResidualKvOptional配合cmpRatio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmpRatio。仅当cmpMaskMode为3且cmpRatio!=1时允许传入；cmpMaskMode为0或cmpRatio等于1时不允许传入。
   - attnOutOut：tensor类型，公式中的输出，数据类型支持BFLOAT16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致。
   - returnSoftmaxLse=False时返回shape为[1]的值为0的tensor；returnSoftmaxLse=True时返回FLOAT32的log-sum-exp结果。
   - cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。

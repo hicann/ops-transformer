@@ -552,7 +552,9 @@ def generate_case_with_default_param(
                 ]
             print("seqused_cmp_kv auto set to: ", case_param["seqused_cmp_kv"])
 
-        if case_param["cmp_residual_kv"] is None:
+        if case_param.get("cmp_mask_mode") == 0 or effective_cmp_ratio == 1:
+            case_param["cmp_residual_kv"] = None
+        elif case_param["cmp_residual_kv"] is None:
             case_param["cmp_residual_kv"] = [0] * B
             print("cmp_residual_kv auto set to: ", case_param["cmp_residual_kv"])
 

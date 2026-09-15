@@ -80,7 +80,7 @@ __aicore__ inline void GetSingleCoreParam(
         if (constInfo.cmpMaskMode == 0) {
             runParam.nextTokensPerBatchCmp = runParam.actualS2CmpSize * constInfo.cmpRatio;
         } else {
-            runParam.cmpResidual = cmpResidualKvGm.GetValue(bIdx);
+            runParam.cmpResidual = (constInfo.cmpRatio != 1) ? cmpResidualKvGm.GetValue(bIdx) : 0;
             runParam.nextTokensPerBatchCmp =
                 (int64_t)runParam.actualS2CmpSize * constInfo.cmpRatio + runParam.cmpResidual - runParam.actualS1Size;
         }

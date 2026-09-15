@@ -86,7 +86,7 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr &runParam, const ConstInfo
         if (constInfo.cmpMaskMode == 0) {
             runParam.nextTokensPerBatchCmp = runParam.actualS2CmpSize * constInfo.cmpRatio;
         } else {
-            runParam.cmpResidual = (cmpResidualKvGm.GetPhyAddr() != nullptr) ? cmpResidualKvGm.GetValue(bIdx) : 0;
+            runParam.cmpResidual = (constInfo.cmpRatio != 1) ? cmpResidualKvGm.GetValue(bIdx) : 0;
             runParam.nextTokensPerBatchCmp =
                 (int64_t)runParam.actualS2CmpSize * constInfo.cmpRatio + runParam.cmpResidual - runParam.actualS1Size;
         }

@@ -28,10 +28,14 @@ FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
 
-def restore_cmp_kv_lengths(seqused_cmp_kv, cmp_ratio, cmp_residual_kv=None):
+def restore_cmp_kv_lengths(
+    seqused_cmp_kv, cmp_ratio, cmp_residual_kv=None, cmp_mask_mode=3
+):
     """Restore the logical CMP context lengths used by the Arch35 kernels."""
     if seqused_cmp_kv is None:
         return None
+    if cmp_mask_mode == 0 or int(cmp_ratio) == 1:
+        cmp_residual_kv = None
     if cmp_residual_kv is not None and len(cmp_residual_kv) != len(seqused_cmp_kv):
         raise ValueError("cmp_residual_kv and seqused_cmp_kv must have the same length")
 
@@ -150,7 +154,7 @@ class GeneralizedSFAQuant:
         G = int(self.N1 / self.N2)
         s2_base_size = 128
         cmp_restored_lengths = restore_cmp_kv_lengths(
-            seqused_cmp_kv, self.cmp_ratio, cmp_residual_kv
+            seqused_cmp_kv, self.cmp_ratio, cmp_residual_kv, self.cmp_mask_mode
         )
 
         for i_B in range(B):
@@ -1248,7 +1252,7 @@ def gen_cmp_kv(
     cmp_topk_length = None
     if template_run_mode in ("CSA", "ORI_CMP_SPARSE") and cmp_max_s2 != 0:
         cmp_restored_len = restore_cmp_kv_lengths(
-            seqused_cmp_kv, cmp_ratio, cmp_residual_kv
+            seqused_cmp_kv, cmp_ratio, cmp_residual_kv, cmp_mask_mode
         )
         if layout_q == "BSND":
             cmp_sparse_indices, cmp_topk_length = gen_sparse_indices_bsnd(

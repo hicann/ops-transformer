@@ -194,7 +194,7 @@ cann_ops_transformer.sparse_flash_mla(
 | seqused_q | Tensor | 可选 | 每个Batch中`q`实际参与计算的token数。 | int32 | ND | (b,) |
 | seqused_ori_kv | Tensor | 可选 | 每个Batch中`ori_kv`实际参与计算的token数。 | int32 | ND | (b,) |
 | seqused_cmp_kv | Tensor | 可选 | 每个Batch中`cmp_kv`实际参与计算的token数。 | int32 | ND | (b,) |
-| cmp_residual_kv | Tensor | 可选 | 每个Batch的压缩余数；`cmp_kv`存在且`cmp_mask_mode=3`时必须传入。 | int32 | ND | (b,) |
+| cmp_residual_kv | Tensor | 可选 | 每个Batch的压缩余数；`cmp_kv`存在、`cmp_mask_mode=3`且`cmp_ratio!=1`时必须传入；`cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入。 | int32 | ND | (b,) |
 | ori_topk_length | Tensor | 可选 | 表示`ori_sparse_indices`实际参与计算的长度。 | int32 | ND | - |
 | cmp_topk_length | Tensor | 可选 | 表示`cmp_sparse_indices`实际参与计算的长度。 | int32 | ND | - |
 | sinks | Tensor | 可选 | 表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性。 | float32 | ND | (q_n,) |
@@ -236,7 +236,7 @@ cann_ops_transformer.sparse_flash_mla(
   - 当layout_kv为PA_BBND时，`ori_kv`和`cmp_kv`支持0轴非连续。
   - 当`ori_mask_mode`、`cmp_mask_mode`为0时，`ori_kv_k`、`cmp_kv_k`需要大于等于`ori_topk_length`、`cmp_topk_length`的最大值。
   - `ori_topk_length`、`cmp_topk_length`表示ori/cmp sparse_indices实际参与计算的长度。其值不能大于sparse_indices的最后一维大小，且当`seqused_q`传入时，topk_length对应有效部分的值需要大于等于0。
-  - `cmp_residual_kv`配合`cmp_ratio`使用，可恢复压缩前KV长度。且每个batch的值需要小于`cmp_ratio`，即`cmp_residual_kv[i]` < `cmp_ratio`。
+  - `cmp_residual_kv`配合`cmp_ratio`使用，可恢复压缩前KV长度。且每个batch的值需要小于`cmp_ratio`，即`cmp_residual_kv[i]` < `cmp_ratio`。仅当`cmp_kv`存在、`cmp_mask_mode=3`且`cmp_ratio!=1`时传入；`cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入。
   - `attention_out`：tensor类型，公式中的输出，数据类型支持bfloat16和float16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
   - `return_softmax_lse`为False时返回shape为[1]且值为0的tensor；`return_softmax_lse`为True时返回float32的log-sum-exp结果。
   - `cu_seqlens_q`、`cu_seqlens_ori_kv`、`cu_seqlens_cmp_kv`须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
@@ -334,8 +334,8 @@ layout匹配关系表：
 | 场景 | 必选输入与属性 | 不允许或固定的输入与属性 |
 | :--- | :--- | :--- |
 | SWA | 仅传入`ori_kv`；`cmp_ratio=1`。 | 不传`cmp_kv`、`cmp_sparse_indices`和`cmp_block_table`；`cmp_topk=0`、`cmp_mask_mode=0`。 |
-| CSA | 传入`ori_kv`、`cmp_kv`、`cmp_sparse_indices`和`cmp_residual_kv`；`cmp_mask_mode=3`且`cmp_topk`为非0。 | - |
-| HCA | 传入`ori_kv`、`cmp_kv`和`cmp_residual_kv`；`cmp_mask_mode=3`。 | 不传`cmp_sparse_indices`；`cmp_topk=0`。 |
+| CSA | 传入`ori_kv`、`cmp_kv`、`cmp_sparse_indices`；`cmp_mask_mode=3`且`cmp_topk`为非0；`cmp_ratio!=1`时还需传入`cmp_residual_kv`。 | `cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入`cmp_residual_kv`。 |
+| HCA | 传入`ori_kv`、`cmp_kv`；`cmp_mask_mode=3`；`cmp_ratio!=1`时还需传入`cmp_residual_kv`。 | 不传`cmp_sparse_indices`；`cmp_topk=0`；`cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入`cmp_residual_kv`。 |
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -361,7 +361,7 @@ layout匹配关系表：
 | seqused_q | `int32`、ND、shape为(b,)；每项非负整数且不超过对应q长度。 | 可选。 | b必须与`q`、`metadata`一致。 | Tensor具体值由用户保证。 |
 | seqused_ori_kv | `int32`、ND、shape为(b,)；每项非负整数且不超过对应`ori_kv`长度。 | PA场景必传；其他场景可选。 | b必须与`ori_kv`、`ori_block_table`和`metadata`一致。 | 无。 |
 | seqused_cmp_kv | `int32`、ND、shape为(b,)；每项非负整数且不超过对应`cmp_kv`长度。 | 可选。 | b必须与`cmp_kv`和`metadata`一致。 | 无。 |
-| cmp_residual_kv | `int32`、ND、shape为(b,)；每项范围[0, cmp_ratio)。 | cmp_mask_mode=0时可不传 | 必须与`metadata`、`cmp_ratio`和`cmp_kv`长度一致。 | 恢复长度必须满足`cmp_len * cmp_ratio + residual = ori_len_for_cmp_mask`。 |
+| cmp_residual_kv | `int32`、ND、shape为(b,)；每项范围[0, cmp_ratio)。 | `cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入 | 必须与`metadata`、`cmp_ratio`和`cmp_kv`长度一致。 | 恢复长度必须满足`cmp_len * cmp_ratio + residual = ori_len_for_cmp_mask`。 |
 | ori_mask_mode | `int32`；接口定义支持0、3、4。 | 可选。 | 必须与`metadata`一致。 | 当前支持0、3、4。 |
 | cmp_mask_mode | `int32`；接口定义支持0、3。 | 可选。 | 必须与`metadata`一致。 | 当前支持0、3。 |
 | ori_win_left | `int32`；接口定义为-1或非负数。 | 可选。 | 必须与`metadata`一致。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：取非127时拦截；<term>Ascend 950PR/Ascend 950DT</term>：取值小于-1时拦截。 |
