@@ -79,9 +79,9 @@ bool FlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
 
 bool FlashAttnMetadataCpuKernel::ParamsInit()
 {
-    InitDeviceInfo();
     InitBaseInfo();
     InitLoadBalanceParams();
+    InitDeviceInfo();
     return true;
 }
 
@@ -183,10 +183,15 @@ bool FlashAttnMetadataCpuKernel::CheckActualKvSeq()
 
 void FlashAttnMetadataCpuKernel::InitDeviceInfo()
 {
-    deviceInfo.aicCoreMaxNum = aicCoreNum_;
-    deviceInfo.aivCoreMaxNum = aivCoreNum_;
-    deviceInfo.aicCoreMinNum = aicCoreNum_;
-    deviceInfo.aivCoreMinNum = aivCoreNum_;
+    // Keep aicCoreNum_/aivCoreNum_ unchanged: they define metadata strides and the FAG layout.
+    uint32_t maxUsedAicCores = optiling::flash_attn::fa_tiling_util::GetMaxUsedAicCores(
+        aicCoreNum_, baseInfo.batchSize, numHeadsKv_, numHeadsQ_ / numHeadsKv_, maxSeqlenQ_, maxSeqlenKv_, mBaseSize_,
+        s2BaseSize_);
+    uint32_t maxUsedAivCores = maxUsedAicCores * (aivCoreNum_ / aicCoreNum_);
+    deviceInfo.aicCoreMaxNum = maxUsedAicCores;
+    deviceInfo.aivCoreMaxNum = maxUsedAivCores;
+    deviceInfo.aicCoreMinNum = maxUsedAicCores;
+    deviceInfo.aivCoreMinNum = maxUsedAivCores;
 }
 
 void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
