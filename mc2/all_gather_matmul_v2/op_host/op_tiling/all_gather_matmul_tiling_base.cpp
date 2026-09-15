@@ -613,6 +613,7 @@ bool AllGatherMatmulTilingBase::AnalyzeAttrs()
     auto attrs = context_->GetAttrs();
     OP_TILING_CHECK((attrs == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return false);
     group_ = attrs->GetAttrPointer<char>(GROUP);
+    OP_TILING_CHECK(group_ == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return false);
     commMode_ = attrs->GetAttrPointer<char>(COMM_MODE_INDEX);
     auto isTransA = attrs->GetAttrPointer<bool>(IS_TRANS_A);
     auto isTransB = attrs->GetAttrPointer<bool>(IS_TRANS_B);

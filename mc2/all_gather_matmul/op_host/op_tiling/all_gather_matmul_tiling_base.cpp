@@ -544,9 +544,9 @@ static bool NeedGatherOut(const gert::TilingContext *context)
 
 ge::graphStatus AllGatherMatmulTilingBase::InitHcclParam(const gert::TilingContext *context,
                                                          Mc2Tiling::AllGatherMatmulTilingData *tilingData,
-                                                         const char *group)
+                                                         const char *group, mc2tiling::TilingArgs &args)
 {
-    std::string algConfig = GetAlgConfig(tilingData);
+    std::string algConfig = GetAlgConfig(tilingData, args);
     Mc2CcTilingConfig mc2CcTilingConfig(group, tilingData->param.commtype, algConfig);
     uint8_t skipBufferWindowCopy = (tilingData->param.gatherLen == 0) ?
                                        static_cast<uint8_t>(mc2tiling::MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_DEFAULT) :
@@ -567,7 +567,9 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
     int index = 0;
     Mc2Tiling::AllGatherMatmulTilingData *tilingData = context->GetTilingData<Mc2Tiling::AllGatherMatmulTilingData>();
     mc2tiling::TilingArgs args;
-    auto group = context->GetAttrs()->GetAttrPointer<char>(index++);
+    group_ = context->GetAttrs()->GetAttrPointer<char>(index++);
+    OP_TILING_CHECK(group_ == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "group"),
+                    return ge::GRAPH_FAILED);
     if (AllGatherParamsCheck(context) != ge::GRAPH_SUCCESS) {
         OP_LOGE(context->GetNodeName(), "AllGatherParamsCheck failed");
         return ge::GRAPH_FAILED;
@@ -581,7 +583,7 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
                     return ge::GRAPH_FAILED);
     auto commTurn = *commTurnPtr;
 
-    auto rankSize = mc2tiling::MatmulFormulaicTiling::GetRankSize(group);
+    auto rankSize = mc2tiling::MatmulFormulaicTiling::GetRankSize(group_);
     OP_TILING_CHECK(
         commTurn != 0,
         OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "commTurn", std::to_string(commTurn).c_str(), "0"),
@@ -590,7 +592,7 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
     OP_LOGD("AllGatherMatmul",
             " group is %s, rankSize is %u, isTransA is %d, isTransB is %d, gatherIndex is %d,"
             "commTurn is %ld.",
-            group, rankSize, isTransA ? *isTransA : 0, isTransB ? *isTransB : 0, gatherIndex ? *gatherIndex : 0,
+            group_, rankSize, isTransA ? *isTransA : 0, isTransB ? *isTransB : 0, gatherIndex ? *gatherIndex : 0,
             commTurn);
     tilingData->param.rankDim = rankSize;
     tilingData->param.isTransposeA = isTransA ? *isTransA : 0;
@@ -600,7 +602,7 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
     tilingData->param.subtype = 0;
     tilingData->param.storageGather = 0;
 
-    SetSocParam(tilingData, group);
+    SetSocParam(tilingData, group_);
 
     OP_TILING_CHECK(SetCommAlg(*tilingData) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context->GetNodeName(), " Set comm algorithm failed."), return ge::GRAPH_FAILED);
@@ -625,7 +627,7 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
     }
 
     SetMatmulTilingAllGatherMatmul(context, *tilingData, args);
-    OP_TILING_CHECK(InitHcclParam(context, tilingData, group) != ge::GRAPH_SUCCESS,
+    OP_TILING_CHECK(InitHcclParam(context, tilingData, group_, args) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context->GetNodeName(), "Tiling InitHcclParam failed."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

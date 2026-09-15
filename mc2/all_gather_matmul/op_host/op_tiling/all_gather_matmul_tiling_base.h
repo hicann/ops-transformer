@@ -39,14 +39,18 @@ public:
                                                  Mc2Tiling::AllGatherMatmulTilingData &tilingData,
                                                  mc2tiling::TilingArgs &args);
     ge::graphStatus InitHcclParam(const gert::TilingContext *context, Mc2Tiling::AllGatherMatmulTilingData *tilingData,
-                                  const char *group);
+                                  const char *group, mc2tiling::TilingArgs &args);
     virtual CutResult GetCutResult(Mc2Tiling::AllGatherMatmulTilingData &tilingData, mc2tiling::TilingArgs &args) = 0;
     virtual ge::graphStatus CheckValidRank(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
                                            const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK,
                                            gert::TilingContext *context, uint32_t rankSize) = 0;
     virtual void SetSocParam(Mc2Tiling::AllGatherMatmulTilingData *tilingData, const char *group) = 0;
-    virtual std::string GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData *tilingData) = 0;
+    virtual std::string GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
+                                     const mc2tiling::TilingArgs &args) = 0;
     virtual ~AllGatherMatmulTilingBase() = default;
+
+protected:
+    const char *group_{nullptr};
 };
 } // namespace optiling
 

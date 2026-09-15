@@ -15,9 +15,11 @@
 #ifndef _ALL_GATHER_QUANT_BMM_TILING_CPP_
 #define _ALL_GATHER_QUANT_BMM_TILING_CPP_
 #include "all_gather_quant_bmm_tiling.h"
+#include "all_gather_comm_algo_table.h"
 #include "all_gather_fit_balance_tiling.h"
 #include "all_gather_hccl_utils.h"
 #include "common/utils/op_mc2.h"
+#include "mc2_comm_algo_selector.h"
 #include "mc2_comm_utils.h"
 #include "mc2_log.h"
 #include "../../../op_kernel/all_gather_matmul_v2_apt_tiling_key.h"
@@ -501,18 +503,6 @@ ge::graphStatus AllGatherQuantBmmTiling::CheckInput()
 
 ge::graphStatus AllGatherQuantBmmTiling::SetMc2Hcomm()
 {
-    int index = 0;
-    auto group = context_->GetAttrs()->GetAttrPointer<char>(index++);
-    std::string algConfig = "AllGather=level0:fullmesh";
-    // mxfp4场景使用int8类型通信，通信量减半
-    uint32_t hcclDataType;
-    if (isFp4_) {
-        hcclDataType = static_cast<uint32_t>(mc2tiling::HcclDataType::HCCL_DATA_TYPE_UINT8);
-    } else {
-        hcclDataType = static_cast<uint32_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geAType));
-    }
-    Mc2CcTilingConfig mc2CcTilingConfig(group, static_cast<uint32_t>(mc2tiling::AicpuComType::HCCL_CMD_ALLGATHER),
-                                        algConfig, 0, hcclDataType, hcclDataType);
     // Set hccl comm engine with comm_mode
     uint8_t commEngine = Mc2Comm::ENGINE_AICPU;
     if (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
@@ -520,6 +510,26 @@ ge::graphStatus AllGatherQuantBmmTiling::SetMc2Hcomm()
     }
     OP_LOGD(opName_, "Tiling SetMc2Hcom commMode_: %s", commMode_);
     OP_LOGD(opName_, "Tiling SetMc2Hcom commEngine: %d", commEngine);
+    // 单轮通信量 = 每轮切分的 tileM × K × dtypeSize（对齐 alltoall 口径；mxfp4场景使用int8类型通信，通信量减半）
+    uint64_t commKValue = isFp4_ ? (args_.kValue / EVEN_ALIGN) : args_.kValue;
+    uint64_t commDtypeSize = isFp4_ ? 1 : args_.inputDtypeSize;
+    uint64_t commDataBytes = tileMValue_ * commKValue * commDtypeSize;
+    OP_LOGI(opName_, "[SetMc2Hcomm] commDataBytes=%llu, tileM=%llu, commKValue=%llu, rankDim=%u, commEngine=%u",
+            commDataBytes, tileMValue_, commKValue, args_.rankDim, commEngine);
+    uint32_t algoCount = 0;
+    const Mc2Hcom::CommAlgoEntry *algoEntries = Mc2Tiling::GetAllGatherCommAlgoTable(algoCount);
+    std::string algConfig =
+        Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(opName_, group_, commEngine, commDataBytes, args_.rankDim,
+                                                     algoEntries, algoCount, Mc2Tiling::ALLGATHER_DEFAULT_ALGO_NAME);
+    OP_LOGI(opName_, "[SetMc2Hcomm] selected algConfig=%s, group=%s", algConfig.c_str(), group_);
+    uint32_t hcclDataType;
+    if (isFp4_) {
+        hcclDataType = static_cast<uint32_t>(mc2tiling::HcclDataType::HCCL_DATA_TYPE_UINT8);
+    } else {
+        hcclDataType = static_cast<uint32_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geAType));
+    }
+    Mc2CcTilingConfig mc2CcTilingConfig(group_, static_cast<uint32_t>(mc2tiling::AicpuComType::HCCL_CMD_ALLGATHER),
+                                        algConfig, 0, hcclDataType, hcclDataType);
     mc2CcTilingConfig.SetCommEngine(commEngine);
     uint8_t skipBufferWindowCopy = (allGatherMatmulTilingDataFp8_->param.gatherLen == 0) ?
                                        static_cast<uint8_t>(mc2tiling::MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_DEFAULT) :
@@ -539,13 +549,14 @@ ge::graphStatus AllGatherQuantBmmTiling::DoOpTiling()
     MC2_CHECK_LOG_RET(opName_, CheckHCCLSize());
     MC2_CHECK_LOG_RET(opName_, CheckInput());
     SetTilingKeyParams();
-    OP_TILING_CHECK(SetMc2Hcomm() != ge::GRAPH_SUCCESS, OP_LOGE(opName_, "Tiling SetHcommCfg failed."),
-                    return ge::GRAPH_FAILED);
     SetRcsTilingData(MutableRCSTilingDataA5());
     DoSplitMTiling(MutableRCSTilingDataA5());
     if (quantMmMode_ == mc2tiling::Mc2QuantMode::PERBLOCK_MODE) {
         PostDoSplitMTiling(MutableRCSTilingDataA5(), GetQuantScene());
     }
+    // 通信配置放在切分之后：单轮通信量依赖切分结果 tileMValue_（对齐 alltoall 先切分后配置的时序）
+    OP_TILING_CHECK(SetMc2Hcomm() != ge::GRAPH_SUCCESS, OP_LOGE(opName_, "Tiling SetHcommCfg failed."),
+                    return ge::GRAPH_FAILED);
     if (args_.nValue != 0) {
         MC2_CHECK_LOG_RET(opName_, DoAdaptSlidWindowTiling());
     }
