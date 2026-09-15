@@ -29,11 +29,14 @@ typedef enum {
  * @domain aclnn_ops_infer
  *
  * @param [in] x:
- * 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT4数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT4数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [in] weight:
- * 表示公式中的weight，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT4、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的weight，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT4、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [in] biasOptional:
- * 表示公式中的bias，数据类型支持FLOAT16、FLOAT32、INT32、BFLOAT16数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的bias，数据类型支持FLOAT16、FLOAT32、INT32、BFLOAT16数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [in] scaleOptional:
  * 表示量化参数，数据类型支持UINT64、INT64、BFLOAT16、FLOAT32、FLOAT8_E8M0数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] offsetOptional: 表示量化参数，数据类型支持FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
@@ -58,7 +61,8 @@ typedef enum {
  * groupedSize]。
  * @param [in] actType:整数型参数，代表激活函数类型，各激活函数枚举值参考枚举类GMMActType。
  * @param [out] out:
- * 表示公式中的out，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的out，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32、INT32数据类型，数据格式支持ND。
+ * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [out] activationFeatureOutOptional: 激活函数的输入数据。
  * @param [out] dynQuantScaleOutOptional: 预留参数。
  * @param [out] workspaceSize: 返回用户需要在npu device侧申请的workspace大小。

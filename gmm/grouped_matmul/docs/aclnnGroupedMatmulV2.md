@@ -410,7 +410,7 @@ aclnnStatus aclnnGroupedMatmulV2(
       <a id="非量化场景约束"></a>
 
     - 非量化场景支持的数据类型为：
-      - 如果传入groupListOptional，groupListOptional必须为非负递增数列，groupListOptional长度不能为1
+      - 如果传入groupListOptional，groupListOptional必须为非负单调非递减数列，groupListOptional长度不能为1
       - 以下入参为空：scaleOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional
       - 不为空的参数支持的数据类型组合要满足下表：
 
