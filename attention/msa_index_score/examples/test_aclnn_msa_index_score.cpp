@@ -14,6 +14,7 @@
  *
  * 用例矩阵覆盖：Prefill 多 M-tile、prefix 非 128 对齐的边界 block、varlen 多 batch、
  * Decode(q_len=1)、投机解码(q_len>1)、短 decode（Hq=4 / 宽 block_table）、
+ * 长 KV decode（q4 × 275 page，950 S-split）、
  * 长序列多 S-tile 轮转、block_table 乱序、
  * 无效尾填充、q_len/kv_len=0 的 mixed-batch pad、bf16 / fp16 双 dtype、
  * int8 key 前融合反量化、PA BNBD、TND packed key、A2/A3 与 950 PA key dim0 非连续。
@@ -913,6 +914,8 @@ int main()
         // 短 decode：少量 M-tile + 可选宽 block_table（对齐 vLLM decode 类输入）。
         {"L0-decode-q4-kv4", 4, 128, 4, {4}, {4}, {16}, false, false},
         {"L0-decode-q4-kv4-b2", 4, 128, 8, {4, 4}, {4, 8}, {16, 16}, false, false},
+        // vLLM A5 decode 类：T1=4 Hq=4、275 可见 page（跨 C2UB 256 列窗 + 950 S-split）。
+        {"L0-decode-q4-kv275", 4, 128, 275, {4}, {35200}, {274}, false, false},
         {"L0-decode-q4-kv4-table275",
          4,
          128,
@@ -970,6 +973,30 @@ int main()
          1,
          1,
          275},
+        {"L0-fp8-decode-q4-kv275",
+         4,
+         128,
+         275,
+         {4},
+         {35200},
+         {274},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         1},
+        {"L0-fp8-e5m2-decode-q4-kv275",
+         4,
+         128,
+         275,
+         {4},
+         {35200},
+         {274},
+         false,
+         false,
+         kSparseModeRightDown,
+         KeyLayout::BBND,
+         2},
     };
 
     size_t passed = 0;

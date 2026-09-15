@@ -10,7 +10,7 @@ bash build.sh --pkg --soc=ascend910b --ops=msa_index_score -j32
 bash ./build_out/cann-ops-transformer-custom_linux-x86_64.run --quiet --install-path=/tmp/msa_opp
 export ASCEND_CUSTOM_OPP_PATH=/tmp/msa_opp/vendors/custom_transformer
 bash build.sh --run_example msa_index_score eager cust --vendor_name=custom --soc=ascend910b
-# 通过：末行 [PASS]: 39/39 cases passed（A2 跳过 8 条 FP8）
+# 通过：末行 [PASS]: 40/40 cases passed（A2 跳过 10 条 FP8）
 
 # Ascend 950：必须 --soc=ascend950；安装后 source vendors/custom_transformer/bin/set_env.bash
 bash build.sh --pkg --soc=ascend950 --ops=msa_index_score -j32
@@ -18,7 +18,7 @@ bash ./build_out/cann-ops-transformer-custom_linux-x86_64.run --quiet --install-
 source /tmp/msa_opp/vendors/custom_transformer/bin/set_env.bash
 export ASCEND_CUSTOM_OPP_PATH=/tmp/msa_opp/vendors/custom_transformer
 bash build.sh --run_example msa_index_score eager cust --vendor_name=custom --soc=ascend950
-# 通过：末行 [PASS]: 47/47 cases passed
+# 通过：末行 [PASS]: 50/50 cases passed
 ```
 
 ## 2. 用例矩阵
@@ -57,8 +57,10 @@ bash build.sh --run_example msa_index_score eager cust --vendor_name=custom --so
 | `L0-decode-q4-kv4-table275` | 短 decode + 宽表 275 | score 末维 288，滑窗 + `-inf` 尾 |
 | `L0-fp8-decode-q4-kv4` | 短 decode FP8 | 紧凑表 |
 | `L0-fp8-decode-q4-kv4-table275` / `q1` / `kv128` | 短 decode FP8 + 宽表 | 对齐 vLLM decode 类输入 |
+| `L0-decode-q4-kv275` | 长 KV decode（275 page） | 跨 C2UB 256 列窗 + 950 S-split |
+| `L0-fp8-decode-q4-kv275` / `L0-fp8-e5m2-decode-q4-kv275` | 同上 + FP8 | e4m3fn / e5m2 |
 
-默认跑完整用例矩阵（含 TND / BNBD、mixed-batch pad、整 batch `q_len`/`kv_len=0`、PA key dim0 stride、宽 `block_table`、短 decode）。950 另含 8 条 FP8，共 47 条；A2/A3 跳过 FP8，期望 39/39。key 布局由 `layout_key`（aclnn：`layoutKeyOptional`）指定，不再从 shape 推断。
+默认跑完整用例矩阵（含 TND / BNBD、mixed-batch pad、整 batch `q_len`/`kv_len=0`、PA key dim0 stride、宽 `block_table`、短 decode、q4-kv275）。950 另含 10 条 FP8，共 50 条；A2/A3 跳过 FP8，期望 40/40。key 布局由 `layout_key`（aclnn：`layoutKeyOptional`）指定，不再从 shape 推断。
 
 ## 3. Python 参考
 

@@ -26,8 +26,8 @@ $$
 - `init_blocks` / `local_blocks`：Maxpool 之后的强制高分块；与 Triton raw score 对齐时置 0。默认 `0` / `1`。
 - Ascend 950 额外支持 query/key 同型 `torch.float8_e4m3fn` / `torch.float8_e5m2` / `torch_npu.hifloat8`（无 `scale`）。`hifloat8.npu()` 当前不安全，测试脚本跳过；kernel 已注册。
 - `q_len` / `kv_len` 允许为 0（含整 batch）。对应请求跳过 QK；空 KV 的 score 为 `-inf`。
-- A2/A3 与 Ascend 950 短 decode 按估计 M-task 启动 MIX，不打满空核。
-- PageAttention `key` 允许 dim0（物理 page）非连续，须保持为 view（不要 `.contiguous()`）；TND 不允许。
+- A2/A3 与 Ascend 950 短 decode 按估计 M-task 启动 MIX，不打满空核。950 短 M 长 S 再按 KV stile 切 `kvChunks`。
+- PageAttention `key` 允许 dim0（物理 page）非连续，须保持为 view（不要 `.contiguous()`）；size>1 的非首轴必须连续，否则 tiling 拒绝。TND 不允许非连续。
 - PageAttention `block_table` 第二维可以大于实际 KV 逻辑 block 数（例如 vLLM 预分配宽表）。950 C2UB 对 score 末维超过 256 列按窗 flush。
 
 ## 函数原型
