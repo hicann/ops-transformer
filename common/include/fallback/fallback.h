@@ -471,7 +471,7 @@ using ResetCacheThreadLocal = void (*)();
 
 #define EXEC_OPAPI_CMD(aclnn_api, ...) \
     ({ \
-        static auto ret = GRAPH_SUCCESS; \
+        auto ret = GRAPH_SUCCESS; \
         do { \
             static const auto ResetCacheThreadLocalAddr = GetOpApiFuncAddr("ResetCacheThreadLocal"); \
             static const auto getWorkspaceSizeFuncAddr = GetOpApiFuncAddr(#aclnn_api "GetWorkspaceSize"); \
