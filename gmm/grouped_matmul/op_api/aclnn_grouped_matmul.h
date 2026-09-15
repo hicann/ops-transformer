@@ -19,11 +19,12 @@ extern "C" {
  * @brief aclnnGroupedMatmul的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  *
- * @param [in] x: 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * @param [in] x:
+ * 表示公式中的x，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] weight:
  * 表示公式中的weight，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] biasOptional:
- * 表示公式中的bias，数据类型支持BLOAT16、FLOAT16、FLOAT32、INT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * 表示公式中的bias，数据类型支持BFLOAT16、FLOAT16、FLOAT32、INT32数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] scaleOptional: 表示量化参数，数据类型支持UINT64数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] offsetOptional: 表示量化参数，数据类型支持FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [in] antiquantScaleOptional:
@@ -33,19 +34,24 @@ extern "C" {
  * @param [in] groupListOptional: 可选参数，代表输入和输出M轴上的索引情况，数据类型支持INT64，支持的最大长度为128个。
  * @param [in] splitItem:
  * 整数型参数，代表输出是否要做tensor切分，0/1代表输出为多tensor；2/3代表输出为单tensor，默认值为0。
- * @param [out] y: 表示公式中的y，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
+ * @param [out] y:
+ * 表示公式中的y，数据类型支持FLOAT16、BFLOAT16、INT8、FLOAT32数据类型，数据格式支持ND，支持的最大长度为128个。
  * @param [out] workspaceSize: 返回用户需要在npu device侧申请的workspace大小。
  * @param [out] executor: 返回op执行器，包含算子计算流程。
  * @return aclnnStatus: 返回状态码。
  */
-__attribute__((visibility("default"), deprecated("aclnnGroupedMatmulGetWorkspaceSize is scheduled to be deprecated in a post-December 2026 version update, "
-"and will be replaced by the aclnnGroupedMatmulV5GetWorkspaceSize. We apologize for any inconvenience caused and appreciate your timely migration to the new interface.")))
-aclnnStatus aclnnGroupedMatmulGetWorkspaceSize(
-    const aclTensorList* x, const aclTensorList* weight, const aclTensorList* biasOptional,
-    const aclTensorList* scaleOptional, const aclTensorList* offsetOptional,
-    const aclTensorList* antiquantScaleOptional, const aclTensorList* antiquantOffsetOptional,
-    const aclIntArray* groupListOptional, int64_t splitItem, const aclTensorList* y, uint64_t* workspaceSize,
-    aclOpExecutor** executor);
+__attribute__((
+    visibility("default"),
+    deprecated(
+        "aclnnGroupedMatmulGetWorkspaceSize is scheduled to be deprecated in a post-December 2026 version update, "
+        "and will be replaced by the aclnnGroupedMatmulV5GetWorkspaceSize. We apologize for any inconvenience caused "
+        "and appreciate your timely migration to the new interface."))) aclnnStatus
+aclnnGroupedMatmulGetWorkspaceSize(const aclTensorList *x, const aclTensorList *weight,
+                                   const aclTensorList *biasOptional, const aclTensorList *scaleOptional,
+                                   const aclTensorList *offsetOptional, const aclTensorList *antiquantScaleOptional,
+                                   const aclTensorList *antiquantOffsetOptional, const aclIntArray *groupListOptional,
+                                   int64_t splitItem, const aclTensorList *y, uint64_t *workspaceSize,
+                                   aclOpExecutor **executor);
 
 /**
  * @brief aclnnGroupedMatmul的第二段接口，用于执行计算。
@@ -55,10 +61,11 @@ aclnnStatus aclnnGroupedMatmulGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-__attribute__((visibility("default"), deprecated("aclnnGroupedMatmul is scheduled to be deprecated in a post-December 2026 version update, "
-"and will be replaced by the aclnnGroupedMatmulV5. We apologize for any inconvenience caused and appreciate your timely migration to the new interface.")))
-aclnnStatus aclnnGroupedMatmul(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
-                                         aclrtStream stream);
+__attribute__((visibility("default"),
+               deprecated("aclnnGroupedMatmul is scheduled to be deprecated in a post-December 2026 version update, "
+                          "and will be replaced by the aclnnGroupedMatmulV5. We apologize for any inconvenience caused "
+                          "and appreciate your timely migration to the new interface."))) aclnnStatus
+aclnnGroupedMatmul(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

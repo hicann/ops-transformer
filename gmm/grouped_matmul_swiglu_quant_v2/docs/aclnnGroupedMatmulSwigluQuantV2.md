@@ -322,7 +322,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2GetWorkspaceSize(
     int64_t              dequantDtype,
     int64_t              quantMode,
     int64_t              groupListType,
-    const aclIntArray   *tuningConfig,
+    const aclIntArray   *tuningConfigOptional,
     aclTensor           *output,
     aclTensor           *outputScale,
     uint64_t            *workspaceSize,
@@ -368,7 +368,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         <td rowspan="1">输入</td>
         <td>表示左矩阵，对应公式中的X。</td>
         <td>-</td>
-        <td>FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、INT8、HIFLOAT8</td>
+        <td>FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、INT8、INT4、INT32、HIFLOAT8</td>
         <td>ND</td>
         <td>2</td>
         <td>√</td>
@@ -443,7 +443,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
       <tr>
         <td>groupList</td>
         <td rowspan="1">输入</td>
-        <td>表示每个分组参与计算的Token个数，公式中的grouplist。</td>
+        <td>表示输入和输出在分组轴方向的matmul大小分布，对应公式中的grouplist，具体含义由groupListType确定。</td>
         <td><ul>
           <li>长度需与weight的首轴维度相等。</li>
           <li>当groupListType为0时，最后一个值不大于x中tensor的第一维，当groupListType为1时，数值的总和不大于x中tensor的第一维。</li>
@@ -508,7 +508,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         <td>-</td>
       </tr>
       <tr>
-        <td>tuningConfig</td>
+        <td>tuningConfigOptional</td>
         <td rowspan="1">可选输入</td>
         <td>用于算子预估M/E的大小，走不同的算子模板，以适配不同场景性能要求。</td>
         <td>数组，传入的第一个数字表示各个专家处理的token数的预期值，用于优化tiling，A4W4 右矩阵NZ输入时开启，其他输入请传入空指针。</td>
@@ -628,7 +628,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         <td>传入的dequantMode、quantMode、dequantDtype不满足约束条件。</td>
       </tr>
       <tr>
-        <td>传入的bias、weightAssistMatrix、smoothScale、tuningConfig不满足约束条件。</td>
+        <td>传入的bias、weightAssistMatrix、smoothScale、tuningConfigOptional不满足约束条件。</td>
       </tr>
     </tbody>
     </table>

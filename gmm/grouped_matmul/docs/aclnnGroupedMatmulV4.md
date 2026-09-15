@@ -183,7 +183,7 @@ aclnnStatus aclnnGroupedMatmulV4(
       <td>输入</td>
       <td>公式中的bias。</td>
       <td>长度与weight相同。</td>
-      <td>INT32、BFLOAT16、FLOAT16、FLOAT32、INT8</td>
+      <td>INT32、BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>-</td>
       <td>-</td>

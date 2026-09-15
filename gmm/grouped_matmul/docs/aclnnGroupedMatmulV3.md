@@ -380,7 +380,7 @@ aclnnStatus aclnnGroupedMatmulV3(
 
 - 确定性计算：
   - aclnnGroupedMatmulV3默认确定性实现。
-- 如果传入groupListOptional，groupListOptional必须为非负递增数列。
+- 如果传入groupListOptional，groupListOptional必须为非负单调非递减数列。
 - x和weight中每一组tensor的每一维大小在32字节对齐后都应小于int32的最大值2147483647。
 
 <!-- npu="A3,910b" id11 -->
