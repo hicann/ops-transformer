@@ -8,52 +8,85 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "onnx_common.h"
-#include "nlohmann/json.hpp"
+#include <cstdint>
+#include <limits>
 
-using namespace ge;
-using json = nlohmann::json;
+#include "nlohmann/json.hpp"
+#include "graph/operator.h"
+#include "register/register.h"
 
 namespace domi {
-using NodeProto = ge::onnx::NodeProto;
-static const int REQ_ATTR_NUM = 1;
-
-static Status ParseParamsNpuMoeInitRouting(const Message* op_src, ge::Operator& op_dest) {
-    const NodeProto *node = dynamic_cast<const NodeProto *>(op_src);
-    if (node == nullptr) {
-      OP_LOGE(GetOpName(op_dest).c_str(), "Dynamic cast op_src to NodeProto failed.");
-      return FAILED;
+static Status ParseParamsNpuMoeInitRouting(const ge::Operator &op_src, ge::Operator &op_dest)
+{
+    int64_t parsed_value = 0;
+    bool found = false;
+    ge::AscendString attributes;
+    // ONNX repeated AttributeProto messages are exposed as JSON in "attribute".
+    if (op_src.GetAttr("attribute", attributes) == ge::GRAPH_SUCCESS) {
+        if (attributes.GetString() == nullptr) {
+            return FAILED;
+        }
+        try {
+            const auto root = nlohmann::json::parse(attributes.GetString());
+            if (!root.is_object()) {
+                return FAILED;
+            }
+            if (root.contains("attribute")) {
+                const auto &attrs = root.at("attribute");
+                if (!attrs.is_array()) {
+                    return FAILED;
+                }
+                for (const auto &attr : attrs) {
+                    if (!attr.is_object()) {
+                        return FAILED;
+                    }
+                    // ONNX AttributeProto::INT is 2. Other types were ignored by the old parser.
+                    if (attr.value("name", "") != "active_num" || attr.value("type", 0) != 2) {
+                        continue;
+                    }
+                    if (found) {
+                        return FAILED;
+                    }
+                    found = true;
+                    // An omitted protobuf integer field has the default value zero.
+                    if (!attr.contains("i")) {
+                        parsed_value = 0;
+                        continue;
+                    }
+                    const auto &value = attr.at("i");
+                    if (!value.is_number_integer() ||
+                        (value.is_number_unsigned() &&
+                         value.get<uint64_t>() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))) {
+                        return FAILED;
+                    }
+                    parsed_value = value.get<int64_t>();
+                }
+            }
+        } catch (const nlohmann::json::exception &) {
+            return FAILED;
+        }
     }
-    // The initialization of required attributes count
-    int req_attr_count = 0;
-    for (const auto& attr: node->attribute()) {
-      if (attr.name() == "active_num" && attr.type() == ge::onnx::AttributeProto::INT) {
-        int active_num = attr.i();
-        op_dest.SetAttr("active_num", active_num);
-        ++req_attr_count;
-      }
+    if (!found) {
+        return FAILED;
     }
-    // Node must have required attribute active_num
-    if (req_attr_count != REQ_ATTR_NUM) {
-      OP_LOGE(GetOpName(op_dest).c_str(), "Node must have attr active_num.");
-      return FAILED;
-    }
+    op_dest.SetAttr("active_num", parsed_value);
     return SUCCESS;
 }
 
 // register npu_moe_init_routing op info to GE
 REGISTER_CUSTOM_OP("MoeInitRouting")
-  .FrameworkType(ONNX)
-  .OriginOpType({ge::AscendString("npu::1::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::11::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::12::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::13::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::14::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::15::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::16::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::17::NPUMoeInitRouting"),
-                 ge::AscendString("ai.onnx::18::NPUMoeInitRouting"),
-                })
-  .ParseParamsFn(ParseParamsNpuMoeInitRouting)
-  .ImplyType(ImplyType::TVM);
+    .FrameworkType(ONNX)
+    .OriginOpType({
+        ge::AscendString("npu::1::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::11::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::12::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::13::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::14::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::15::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::16::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::17::NPUMoeInitRouting"),
+        ge::AscendString("ai.onnx::18::NPUMoeInitRouting"),
+    })
+    .ParseParamsByOperatorFn(ParseParamsNpuMoeInitRouting)
+    .ImplyType(ImplyType::TVM);
 } // namespace domi

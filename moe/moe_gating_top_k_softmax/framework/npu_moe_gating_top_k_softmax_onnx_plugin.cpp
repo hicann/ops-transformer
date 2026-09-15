@@ -12,43 +12,78 @@
  * \file npu_moe_gating_top_k_softmax_onnx_plugin.cpp
  * \brief
  */
-#include "onnx_common.h"
+#include <cstdint>
+#include <limits>
+
+#include "nlohmann/json.hpp"
+#include "graph/operator.h"
+#include "register/register.h"
 
 namespace domi {
-using NodeProto = ge::onnx::NodeProto;
-
-static Status  ParseParamsMoeGatingTopKSoftmax(const Message* op_src, ge::Operator& op_dest) {
-  const NodeProto* node = dynamic_cast<const NodeProto*>(op_src);
-  if (node == nullptr) {
-    OP_LOGE("MoeGatingTopKSoftmax", "Dynamic cast op_src to NodeProto failed.");
-    return FAILED;
-  }
-
-  int k = -1;
-  for (auto& attr : node->attribute()) {
-    if (attr.name() == "k" && attr.type() == ge::onnx::AttributeProto::INT) {
-      k = attr.i();
+static Status ParseParamsMoeGatingTopKSoftmax(const ge::Operator &op_src, ge::Operator &op_dest)
+{
+    int64_t parsed_value = -1;
+    ge::AscendString attributes;
+    // ONNX repeated AttributeProto messages are exposed as JSON in "attribute".
+    if (op_src.GetAttr("attribute", attributes) == ge::GRAPH_SUCCESS) {
+        if (attributes.GetString() == nullptr) {
+            return FAILED;
+        }
+        try {
+            const auto root = nlohmann::json::parse(attributes.GetString());
+            if (!root.is_object()) {
+                return FAILED;
+            }
+            if (root.contains("attribute")) {
+                const auto &attrs = root.at("attribute");
+                if (!attrs.is_array()) {
+                    return FAILED;
+                }
+                for (const auto &attr : attrs) {
+                    if (!attr.is_object()) {
+                        return FAILED;
+                    }
+                    // ONNX AttributeProto::INT is 2. Other types were ignored by the old parser.
+                    if (attr.value("name", "") != "k" || attr.value("type", 0) != 2) {
+                        continue;
+                    }
+                    // An omitted protobuf integer field has the default value zero.
+                    if (!attr.contains("i")) {
+                        parsed_value = 0;
+                        continue;
+                    }
+                    const auto &value = attr.at("i");
+                    if (!value.is_number_integer() ||
+                        (value.is_number_unsigned() &&
+                         value.get<uint64_t>() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))) {
+                        return FAILED;
+                    }
+                    parsed_value = value.get<int64_t>();
+                }
+            }
+        } catch (const nlohmann::json::exception &) {
+            return FAILED;
+        }
     }
-  }
-  if (k == -1) {
-    return FAILED;
-  }
-  op_dest.SetAttr("k", k);
-  return SUCCESS;
+    if (parsed_value == -1) {
+        return FAILED;
+    }
+    op_dest.SetAttr("k", parsed_value);
+    return SUCCESS;
 }
 
-// register npu_flash_attention_score op info to GE
+// register npu_moe_gating_top_k_softmax op info to GE
 REGISTER_CUSTOM_OP("MoeGatingTopKSoftmax")
-  .FrameworkType(ONNX)
-  .OriginOpType({ge::AscendString("npu::1::NPUMoeGatingTopKSoftmax"), 
-                 ge::AscendString("ai.onnx::11::NPUMoeGatingTopKSoftmax"),
-                 ge::AscendString("ai.onnx::12::NPUMoeGatingTopKSoftmax"),
-                 ge::AscendString("ai.onnx::13::NPUMoeGatingTopKSoftmax"),
-                 ge::AscendString("ai.onnx::14::NPUMoeGatingTopKSoftmax"),
-                 ge::AscendString("ai.onnx::15::NPUMoeGatingTopKSoftmax"),
-                 ge::AscendString("ai.onnx::16::NPUMoeGatingTopKSoftmax"),
-                 ge::AscendString("ai.onnx::17::NPUMoeGatingTopKSoftmax"),
-                 ge::AscendString("ai.onnx::18::NPUMoeGatingTopKSoftmax")})
-  .ParseParamsFn(ParseParamsMoeGatingTopKSoftmax)
-  .ImplyType(ImplyType::TVM);
-}  // namespace domi
+    .FrameworkType(ONNX)
+    .OriginOpType({ge::AscendString("npu::1::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::11::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::12::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::13::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::14::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::15::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::16::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::17::NPUMoeGatingTopKSoftmax"),
+                   ge::AscendString("ai.onnx::18::NPUMoeGatingTopKSoftmax")})
+    .ParseParamsByOperatorFn(ParseParamsMoeGatingTopKSoftmax)
+    .ImplyType(ImplyType::TVM);
+} // namespace domi

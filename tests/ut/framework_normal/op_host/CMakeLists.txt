@@ -34,6 +34,9 @@ if(UT_TEST_ALL OR OP_HOST_UT)
   ## add opinfershape ut cases static lib: libtransformer_op_infershape_ut_cases.a
   add_infershape_ut_modules(${OP_INFERSHAPE_MODULE_NAME})
 
+  ## add ONNX plugin ut cases static lib: libtransformer_op_onnx_ut_cases.a
+  add_onnx_ut_modules(${OP_ONNX_MODULE_NAME})
+
   ## add ophost source so: libophost_transformer_ut.so
   add_library(${OPHOST_NAME}_ut SHARED
       $<$<TARGET_EXISTS:${OPHOST_NAME}_infer_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_infer_obj>>
@@ -94,6 +97,7 @@ if(UT_TEST_ALL OR OP_HOST_UT)
       -Wl,--whole-archive
           ${OP_TILING_MODULE_NAME}_cases
           ${OP_INFERSHAPE_MODULE_NAME}_cases
+          ${OP_ONNX_MODULE_NAME}_cases
       -Wl,--no-whole-archive
       tiling_api
       -Wl,--no-as-needed
@@ -102,6 +106,7 @@ if(UT_TEST_ALL OR OP_HOST_UT)
       register
       opp_registry
       graph
+      graph_base
       platform
       gtest
       unified_dlog

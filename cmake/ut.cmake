@@ -32,6 +32,34 @@ if(UT_TEST_ALL OR OP_HOST_UT)
       ${PKG_NAME}_op_infershape_ut
       CACHE STRING "op_infershape ut module name" FORCE
     )
+  set(OP_ONNX_MODULE_NAME
+      ${PKG_NAME}_op_onnx_ut
+      CACHE STRING "ONNX plugin ut module name" FORCE
+    )
+
+  function(add_onnx_ut_modules OP_ONNX_MODULE_NAME)
+    if(TARGET ${OP_ONNX_MODULE_NAME}_cases)
+      return()
+    endif()
+
+    if(NOT TARGET ${OP_ONNX_MODULE_NAME}_cases_obj)
+      add_library(${OP_ONNX_MODULE_NAME}_cases_obj OBJECT ${UT_PATH}/empty.cpp)
+    endif()
+    target_include_directories(
+      ${OP_ONNX_MODULE_NAME}_cases_obj PRIVATE ${JSON_INCLUDE_DIR} ${GTEST_INCLUDE}
+          ${ASCEND_DIR}/include ${ASCEND_DIR}/pkg_inc
+      )
+    target_link_libraries(
+      ${OP_ONNX_MODULE_NAME}_cases_obj
+      PRIVATE $<BUILD_INTERFACE:intf_llt_pub_asan_cxx17> graph register gtest
+      )
+
+    add_library(${OP_ONNX_MODULE_NAME}_cases STATIC)
+    target_link_libraries(
+      ${OP_ONNX_MODULE_NAME}_cases PRIVATE ${OP_ONNX_MODULE_NAME}_cases_obj
+      )
+  endfunction()
+
   function(add_optiling_ut_modules OP_TILING_MODULE_NAME)
     # add optiling ut common object: transformer_op_tiling_ut_common_obj
     add_library(${OP_TILING_MODULE_NAME}_common_obj OBJECT)
@@ -359,6 +387,27 @@ if(UT_TEST_ALL
       endif()
       file(GLOB OPAPI_CASES_SRC ${MODULE_DIR}/test_aclnn_*.cpp)
       target_sources(${MODULE_UT_NAME}_cases_obj ${MODULE_MODE} ${OPAPI_CASES_SRC})
+    endif()
+
+    # ONNX plugin ut under <op>/tests/ut/framework/.
+    if((UT_TEST_ALL OR OP_HOST_UT) AND "${MODULE_UT_NAME}" STREQUAL "${OP_ONNX_MODULE_NAME}")
+      get_filename_component(UT_DIR ${MODULE_DIR} DIRECTORY)
+      get_filename_component(TESTS_DIR ${UT_DIR} DIRECTORY)
+      get_filename_component(OP_NAME_DIR ${TESTS_DIR} DIRECTORY)
+      get_filename_component(OP_NAME ${OP_NAME_DIR} NAME)
+      list(FIND ASCEND_OP_NAME ${OP_NAME} INDEX)
+      if(NOT "${ASCEND_OP_NAME}" STREQUAL "ALL" AND INDEX EQUAL -1)
+        return()
+      endif()
+
+      file(GLOB ONNX_CASES_SRC ${MODULE_DIR}/test_*_onnx_plugin.cpp)
+      if(NOT ONNX_CASES_SRC)
+        return()
+      endif()
+      if(NOT TARGET ${MODULE_UT_NAME}_cases_obj)
+        add_library(${MODULE_UT_NAME}_cases_obj OBJECT)
+      endif()
+      target_sources(${MODULE_UT_NAME}_cases_obj ${MODULE_MODE} ${ONNX_CASES_SRC})
     endif()
 
     # op_graph ut
