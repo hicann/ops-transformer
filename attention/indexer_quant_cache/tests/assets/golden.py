@@ -11,8 +11,12 @@
 indexer_quant_cache kernel (single-op direct-invoke) golden -- SELF-CONTAINED.
 
 Per-block quantize x and scatter into cache[slot] (+ per-block scale). Two in-place outputs
-(cache, scale). quant_mode 0=MXFP8 1=Normal 2=HiFloat8(scale suppressed) 3=MXFP4. Mirrors
+(cache, scale). quant_mode 0=MXFP8 1=Normal 2=HiFloat8(scale unchanged) 3=MXFP4. Mirrors
 the kernel math; reuses no external module (per-mode independent-golden convention of this repo).
+
+Normal mode stores HiFloat8 encodings in uint8 caches. Only finite elements contribute
+to the row maximum; non-finite elements retain their value before the target-format
+cast (FP8 conversion or saturating HiFloat8 conversion). An all-nonfinite row has scale 0.
 """
 
 import numpy as np
@@ -115,7 +119,11 @@ def _to_numpy(t):
 
 
 def _cache_fp8_type(cache):
-    """fp8 element type of the cache tensor (mode 0/1)."""
+    """FP8 element type; uint8 is the storage type for Normal HiFloat8."""
+    if str(getattr(cache, "dtype", "")) in ("uint8", "torch.uint8", "hifloat8"):
+        if not HAS_HIF8:
+            raise RuntimeError("Normal uint8 golden needs en_dtypes.hifloat8")
+        return HIF8, HIFLOAT8_MAX_VALUE, np.float32(1.0 / HIFLOAT8_MAX_VALUE)
     try:
         import torch
 
@@ -143,6 +151,9 @@ def _round_scale_pow2_kernel(s):
     bits = np.float32(s).view(np.uint32)
     exp = np.int64((bits >> np.uint32(23)) & np.uint32(0xFF))
     man = np.int64(bits & np.uint32(0x7FFFFF))
+    if exp == 255:
+        # E8M0 reserves 255 for NaN; never wrap 255 + 1 back to zero.
+        return np.float32(np.nan), np.uint8(255)
     exp_scale = exp - 127 + (1 if man != 0 else 0)
     e8m0 = np.uint8((exp_scale + 127) & 0xFF)
     s_div = np.float32(np.uint32((exp_scale + 127) << 23).view(np.float32))
@@ -177,22 +188,25 @@ def _encode_normal_row(x_f32_row, d, fp8_type, fp8_max, inv_fp8max, round_scale)
     # VFProcessDynamicBlockQuant roundScale branch (== kv_compress_epilog roundScale); the rounded
     # value is both the divisor and the stored float32 scale.
     cache = np.zeros(d, dtype=np.uint8)
-    m = np.float32(np.max(np.abs(x_f32_row)))
+    # Non-finite elements do not contribute to the row scale. Preserve them
+    # through quantization, then apply the target format's conversion rules.
+    finite = np.isfinite(x_f32_row)
+    m = np.max(np.where(finite, np.abs(x_f32_row), np.float32(0.0)))
     if m != np.float32(0.0):
         s = np.float32(m * inv_fp8max)  # rowmax / fp8max
         if round_scale:
             s, _ = _round_scale_pow2_kernel(s)
-        q = x_f32_row / s
+        q = x_f32_row.copy()
+        np.divide(x_f32_row, s, out=q, where=finite)
     else:
         s = np.float32(0.0)
         q = x_f32_row
+    if fp8_type is HIF8:
+        # HiFloat8 uses the same saturating conversion as static quantization.
+        q = np.where(np.isnan(q), np.float32(0.0), q)
+        q = np.clip(q, -fp8_max, fp8_max)
     cache[:] = q.astype(fp8_type).view(np.uint8)
-    # Degenerate rowmax: for x = ±inf the rowmax is inf and the float32 scale overflows
-    # to inf in this reference, but the device emits 0.0 for a non-finite rowmax (the
-    # quantized fp8 cache itself still matches under requant). Replicate the device's
-    # stored scale so the float32 scale output compares exactly.
-    s_store = np.float32(0.0) if not np.isfinite(m) else s
-    return cache.view(fp8_type), np.array([s_store], dtype=np.float32)  # scaleCol == 1
+    return cache.view(fp8_type), np.array([s], dtype=np.float32)  # scaleCol == 1
 
 
 # ---------------- quant_mode 2 : HiFloat8 (cache only; kernel does not write scale) ----------------
@@ -202,7 +216,7 @@ HIFLOAT8_MAX_VALUE = np.float32(32768.0)
 def _encode_hifloat8_row(x_f32_row, d, scale_attr):
     """Mirror VFProcessHifp8Quant: y = x * scale_attr, cast to hifloat8 (round-nearest).
     The kernel writes hifloat8 bytes into the cache buffer and does NOT write the scale
-    output, so only the cache (output 0) is verified for mode 2.
+    output. The caller preserves and verifies the original scale tensor as well.
 
     Device hifloat8 cast (SatMode::SAT) is a FINITE format: it saturates overflow/±inf
     to the max finite magnitude and maps NaN -> 0 (0x00), whereas en_dtypes emits the
@@ -425,7 +439,7 @@ def _indexer_core(
         cv = c.view(cache2d.dtype)
         cache2d[slot, : cv.shape[0]] = cv
         if quant_mode == 2:
-            continue  # mode 2 (HiFloat8): kernel does not write the scale output -> leave it suppressed
+            continue  # HiFloat8 uses x_scale; preserve and verify the input cache scale.
         # scale: e8m0 is a raw 1-byte code (bit-reinterpret, NOT numeric astype); float32 is a value
         if s.dtype == scale2d.dtype:
             sv = s
@@ -435,9 +449,7 @@ def _indexer_core(
             sv = s.astype(scale2d.dtype)
         scale2d[slot, : sv.shape[0]] = sv
 
-    # mode 2 scale is never written by the kernel -> None (TTK marks the output SUPPRESSED)
-    scale_ret = None if quant_mode == 2 else scale_arr
-    return cache, scale_ret
+    return cache, scale_arr
 
 
 class IndexerQuantCacheTestSpec:
@@ -468,8 +480,6 @@ class IndexerQuantCacheTestSpec:
             round_scale=int(round_scale),
             scale=float(x_scale),
         )
-        if scale_out is None:
-            return [np.ascontiguousarray(cache_out), None]
         return [np.ascontiguousarray(cache_out), np.ascontiguousarray(scale_out)]
 
     @staticmethod

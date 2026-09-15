@@ -146,10 +146,12 @@ __simd_callee__ inline void StoreOutputData(__ubuf__ T *dst, RegTensor<float> &s
         RegTensor<T> tmp;
         Cast<T, float, castTraitF32toFp8Even>(tmp, src, pregLoop);
         StoreAlign<T, AscendC::Reg::StoreDist::DIST_PACK4_B32>(dst + dstOffset, tmp, pregLoop);
-    } else if constexpr (IsSameType<T, hifloat8_t>::value) {
-        RegTensor<T> tmp;
-        Cast<T, float, castTraitF32toh8>(tmp, src, pregLoop);
-        StoreAlign<T, AscendC::Reg::StoreDist::DIST_PACK4_B32>(dst + dstOffset, tmp, pregLoop);
+    } else if constexpr (IsSameType<T, hifloat8_t>::value || IsSameType<T, uint8_t>::value) {
+        // ACL stores HiFloat8 as uint8 bytes, not numerically converted integers.
+        RegTensor<hifloat8_t> tmp;
+        Cast<hifloat8_t, float, castTraitF32toh8>(tmp, src, pregLoop);
+        StoreAlign<hifloat8_t, AscendC::Reg::StoreDist::DIST_PACK4_B32>(
+            reinterpret_cast<__ubuf__ hifloat8_t *>(dst + dstOffset), tmp, pregLoop);
     }
 }
 
@@ -392,7 +394,7 @@ __simd_vf__ inline void VFProcessDynamicBlockQuantVF(__ubuf__ T0 *yLocalAddr, __
             Duplicate(rsMantMask, FAST_LOG_AND_VALUE2, preg1);
         }
         for (uint16_t i = 0; i < curRowNum; i++) {
-            // pass 1: 整行 amax (排除 NaN)
+            // pass 1: whole-row amax over finite values only.
             Duplicate(rowMax, 0.0f, preg1);
             uint32_t sreg = curColNum;
             for (uint16_t j = 0; j < loopCount; j++) {
@@ -456,7 +458,7 @@ __aicore__ inline void VFProcessDynamicBlockQuant(const LocalTensor<T0> &yLocal,
         maxValueInt = INV_FP8_E5M2_MAX_VALUE;
     } else if constexpr (IsSameType<T0, fp8_e4m3fn_t>::value) {
         maxValueInt = INV_FP8_E4M3_MAX_VALUE;
-    } else if constexpr (IsSameType<T0, hifloat8_t>::value) {
+    } else if constexpr (IsSameType<T0, hifloat8_t>::value || IsSameType<T0, uint8_t>::value) {
         maxValueInt = INV_HIFP8_MAX_VALUE;
     }
 

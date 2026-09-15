@@ -89,10 +89,13 @@ public:
                     cacheGm[PagedSlotOffset(slot, tilingData->blockSize, tilingData->cacheBlockStride,
                                             tilingData->cacheRowStride)],
                     1, tilingData->d);
-            CopyOut(cacheScaleLocal,
-                    cacheScaleGm[PagedSlotOffset(slot, tilingData->blockSize, tilingData->scaleBlockStride,
-                                                 tilingData->scaleRowStride)],
-                    1, tilingData->scaleCol);
+            // HiFloat8 uses xScale and does not produce a per-row scale.
+            if (quantMode_ != HIFLOAT_QUANT_MODE) {
+                CopyOut(cacheScaleLocal,
+                        cacheScaleGm[PagedSlotOffset(slot, tilingData->blockSize, tilingData->scaleBlockStride,
+                                                     tilingData->scaleRowStride)],
+                        1, tilingData->scaleCol);
+            }
 
             cacheQue.template FreeTensor(cacheLocal);
             cacheScaleQue.template FreeTensor(cacheScaleLocal);
