@@ -1085,7 +1085,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cache-dir", default=None, help="缓存目录路径（默认 golden_cache/）"
     )
+    parser.add_argument(
+        "--softmax-scale",
+        type=float,
+        default=None,
+        help="覆写 softmax_scale (默认 None=1/sqrt(d))",
+    )
     args = parser.parse_args()
+
+    if args.softmax_scale is not None:
+        SOFTMAX_SCALE = args.softmax_scale
 
     raw_parts = {m.strip() for m in args.mode.split(",") if m.strip()}
     invalid = raw_parts - _VALID_MODES
@@ -1168,8 +1177,9 @@ if __name__ == "__main__":
             p_scale,
             _get_seqused_q(),
             _get_seqused_kv(),
-            qr_bf16,
-            kr_bf16,
+            softmax_scale=SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
         )
         golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
     else:
