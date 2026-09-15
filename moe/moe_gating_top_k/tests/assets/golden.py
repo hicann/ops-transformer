@@ -48,31 +48,32 @@ def _pre_compare_topk(*arrays):
             return a.detach().cpu().numpy()
         return numpy.asarray(a)
 
-    def _write_back(slot, arr):
-        # 长度为 1 的轴反转后 strides 为负但 numpy 仍视为 C 连续(ascontiguousarray 不拷贝),
-        # torch.from_numpy 却拒绝负 stride, 这里显式拷贝成正 stride
-        if any(stride < 0 for stride in arr.strides):
-            arr = arr.copy()
+    def _restore(slot, arr):
+        # numpy 结果按原 slot 类型还原: torch 侧保 dtype/device(等价 copy_ 的设备搬运),
+        # numpy 侧原样返回。只读 slot(如 GEIR 通路 frombuffer 解析的输出)无法 in-place
+        # 回写, 走框架支持的返回值路径(apply_pre_compare 用返回列表替换比对输入)
+        if slot is None:
+            return None
         if torch.is_tensor(slot):
-            slot.copy_(torch.from_numpy(arr).to(slot.dtype))
-        else:
-            slot[:] = arr
+            return torch.from_numpy(arr).to(dtype=slot.dtype, device=slot.device)
+        return arr
 
     half = len(arrays) // 2
     if half < 2:
-        return
+        return None
     y_out = _as_numpy(arrays[0]).copy()
     y_gold = _as_numpy(arrays[half]).copy()
     if y_out.ndim != 2 or y_out.shape != y_gold.shape:
-        return
+        return None
     # golden 侧 idx 可能为 None(aclnn golden 不建模 expertIdxOut, 该输出比对自动抑制):
     # 仅对 y 两侧做行降序规范化(消除 topk 顺序敏感性)
     if arrays[half + 1] is None or arrays[1] is None:
         y_out = numpy.sort(y_out, axis=1)[:, ::-1].copy()
         y_gold = numpy.sort(y_gold, axis=1)[:, ::-1].copy()
-        _write_back(arrays[0], y_out)
-        _write_back(arrays[half], y_gold)
-        return
+        result = list(arrays)
+        result[0] = _restore(arrays[0], y_out)
+        result[half] = _restore(arrays[half], y_gold)
+        return result
     idx_out = _as_numpy(arrays[1]).copy()
     idx_gold = _as_numpy(arrays[half + 1]).copy()
     if idx_out.shape != idx_gold.shape or idx_out.ndim != 2:
@@ -119,10 +120,12 @@ def _pre_compare_topk(*arrays):
         y_gold[r] = yg
         idx_gold[r] = ig
 
-    _write_back(arrays[0], y_out)
-    _write_back(arrays[1], idx_out)
-    _write_back(arrays[half], y_gold)
-    _write_back(arrays[half + 1], idx_gold)
+    result = list(arrays)
+    result[0] = _restore(arrays[0], y_out)
+    result[1] = _restore(arrays[1], idx_out)
+    result[half] = _restore(arrays[half], y_gold)
+    result[half + 1] = _restore(arrays[half + 1], idx_gold)
+    return result
 
 
 def _softmax_numpy(x, axis=-1):
