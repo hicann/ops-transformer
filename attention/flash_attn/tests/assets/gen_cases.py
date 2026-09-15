@@ -430,6 +430,9 @@ def _fa_metadata_size(batch, kv_heads):
         再向上 4096 对齐(元素个数, 非字节数)。
     """
     metadata_size = ((36 + 72) * int(batch) * int(kv_heads) + 1) * 16
+    metadata_size += (
+        412  # FAG region (int32 elements), mirrors flash_attn.py FAG_METADATA_SIZE
+    )
     return ((metadata_size + 4095) // 4096) * 4096
 
 

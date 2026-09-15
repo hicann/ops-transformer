@@ -49,6 +49,33 @@ if(NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources(OPTYPE flash_attn_grad ACLNNTYPE aclnn_inner)
 endif()
 
+# 分层目录（info/ checkers/ plan/ base/）不在父级 GLOB 里：add_modules_sources
+# 只收 op_host/*_tiling*.cpp。子目录必须显式收集，否则会静默漏编。
+# base/regbase.cpp 写 codegen 的 TilingData，必须跟入口一样 force-include 生成头。
+file(GLOB FAG_TILING_SUBDIR_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/info/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/plan/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/base/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/checkers/*.cpp
+)
+
 if(NOT BUILD_OPS_RTY_KERNEL)
     add_tiling_modules()
+    target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
+        ${FAG_TILING_SUBDIR_SRC}
+    )
+    if(NOT PYPTO_GEN_DIR AND DEFINED flash_attn_grad_pypto_gen_dir)
+        set(PYPTO_GEN_DIR ${flash_attn_grad_pypto_gen_dir})
+    endif()
+    if(DEFINED PYPTO_GEN_DIR)
+        file(GLOB _fag_pypto_key_h  ${PYPTO_GEN_DIR}/*_tilingkey.h)
+        file(GLOB _fag_pypto_data_h ${PYPTO_GEN_DIR}/*_tiling.h)
+        set(_fag_pypto_force_opts "")
+        foreach(_h ${_fag_pypto_key_h} ${_fag_pypto_data_h})
+            list(APPEND _fag_pypto_force_opts -include ${_h})
+        endforeach()
+        set_source_files_properties(${FAG_TILING_SUBDIR_SRC}
+            TARGET_DIRECTORY ${OPHOST_NAME}_tiling_obj
+            PROPERTIES COMPILE_OPTIONS "${_fag_pypto_force_opts}")
+    endif()
 endif()

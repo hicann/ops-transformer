@@ -19,6 +19,11 @@
 
 namespace optiling {
 
+// 这份声明只用于 REGISTER_TILING_DATA_CLASS，让框架知道 tiling data 该分配多大。
+// host 实际写入的是 codegen 出的 FlashAttnGradTilingData（由 op_kernel/flash_attn_grad.py
+// 的 dataclass 生成），两者没有任何编译期关联。字段增删必须两边同步 ——
+// flash_attn_grad_tiling.cpp 里有一组 static_assert 钉住了 codegen 侧的布局，
+// 只改 py 侧会在那里断编译；只改这里则由同文件的 nullptr 检查在运行时拦住。
 BEGIN_TILING_DATA_DEF(FlashAttnGradTilingDataTmp)
 TILING_DATA_FIELD_DEF(int64_t, b)
 TILING_DATA_FIELD_DEF(int64_t, s1)
@@ -53,10 +58,29 @@ TILING_DATA_FIELD_DEF(int64_t, viewD2KV)
 TILING_DATA_FIELD_DEF(int64_t, coefB0KV)
 TILING_DATA_FIELD_DEF(int64_t, coefN0)
 TILING_DATA_FIELD_DEF(int64_t, coefN2)
+// mask_mode 3=causal / 4=band. sparseType is the host remap
+// (0=DENSE, 1=CASUAL, 2=BAND). s1Token/s2Token are ProcessTokensInfo
+// corrected windows. totalPerBatchNum is valid 128x128 tiles per head.
+TILING_DATA_FIELD_DEF(int64_t, maskMode)
+TILING_DATA_FIELD_DEF(int64_t, winLeft)
+TILING_DATA_FIELD_DEF(int64_t, winRight)
+TILING_DATA_FIELD_DEF(int64_t, sparseType)
+TILING_DATA_FIELD_DEF(int64_t, s1Token)
+TILING_DATA_FIELD_DEF(int64_t, s2Token)
+TILING_DATA_FIELD_DEF(int64_t, totalPerBatchNum)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(FlashAttnGrad, FlashAttnGradTilingDataTmp)
 
+// 编译期缓存的平台信息。图模式下 Tiling 阶段可能拿不到 PlatformInfo，那时只能
+// 从这里回退取值，所以 ParsePlatform 是双路的（见 info/flash_attn_grad_tiling_info_parser.cpp）。
+// 只放当前真正用到的字段：核数与 L2。L2 是 swizzle 判据的分母，各 ascend950 变体
+// 从 16MB 到 128MB 不等，不能硬编码。
 struct FlashAttnGradCompileInfo {
+    uint32_t aivNum = 0;
+    uint32_t aicNum = 0;
+    uint64_t l2CacheSize = 0;
+    uint64_t libapiWorkspaceSize = 0;
+
     static ge::graphStatus ParamCheck(gert::TilingContext *context)
     {
         return ge::GRAPH_SUCCESS;

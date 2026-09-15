@@ -14,7 +14,7 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 FA_METADATA_OP_NAME = "flash_attn_metadata"
 METADATA_STRIDE = 16
-FAG_METADATA_SIZE = 121  # FAG (Flash Attn Grad) metadata size, in int32 elements
+FAG_METADATA_SIZE = 412  # FAG (Flash Attn Grad) metadata size, in int32 elements
 
 
 def _get_npu_core_nums():

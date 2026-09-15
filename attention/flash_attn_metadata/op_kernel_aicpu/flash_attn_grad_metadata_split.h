@@ -242,41 +242,27 @@ void FlashAttnMetadataCpuKernel::SetFagSplitAxis()
     // isAllSame: all batches have same seq lengths (for TND)
     SupportTransBSND();
 
-    // isBn2: S<=128, N1==N2, D<=512, no zero-length sequences in TND
-    // Source: common_regbase.cpp:1584-1589 (tailZeroCount==0 && !isSeqExistZero)
-    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= 512) && !fagIsSeqExistZero_;
-
-    // bnLimit: BN >= 256, or BN >= 128 with S1/S2 aligned to 128
-    bool bnLimit = ((b * n1) >= 256) || ((b * n1) >= 128 && (s1 % 128 == 0) && (s2 % 128 == 0));
-    bool bnSparseLimit = bnLimit && !fagUseTndSplit_;
-
-    // isBn2MultiBlk: BN limit + S>128 + S<=640 + N1==N2 + D<=512
-    fagIsBn2MultiBlk_ = bnSparseLimit && (s1 > 128 || s2 > 128) && (s1 <= 640 && s2 <= 640) && (n1 == n2) && (d <= 512);
-    fagIsBn2_ = fagIsBn2MultiBlk_ ? true : fagIsBn2_;
-
-    // Source: common_regbase.cpp:1608-1614
-    // isBn2 && !isBn2MultiBlk: TND+D>128 时关闭 isBn2 (dropMaskOuter 不涉及)
-    if (fagIsBn2_ && !fagIsBn2MultiBlk_) {
-        if (fagUseTndSplit_ && d > 128) {
-            fagIsBn2_ = false;
-        }
+    // Match pypto host: single-block BN2 (S<=128) or MultiBlk (S in (128, 640]
+    // and BN gate). Mask 3/4 is allowed on BN2 (kernel skip_invalid / packed).
+    // GQA / D>128 / TND stay on GS1S2.
+    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= 128) && !fagIsSeqExistZero_;
+    constexpr int64_t BN2_MULTIBLK_SEQ = 640;
+    constexpr int64_t BN2_MULTIBLK_BN_128 = 128;
+    constexpr int64_t BN2_MULTIBLK_BN_256 = 256;
+    constexpr int64_t ALIGN128 = 128;
+    bool bnLimit = ((b * n1) >= BN2_MULTIBLK_BN_256) ||
+                   ((b * n1) >= BN2_MULTIBLK_BN_128 && (s1 % ALIGN128 == 0) && (s2 % ALIGN128 == 0));
+    fagIsBn2MultiBlk_ = bnLimit && !fagUseTndSplit_ && (s1 > 128 || s2 > 128) &&
+                        (s1 <= BN2_MULTIBLK_SEQ && s2 <= BN2_MULTIBLK_SEQ) && (n1 == n2) && (d <= 128) &&
+                        !fagIsSeqExistZero_;
+    if (fagIsBn2MultiBlk_) {
+        fagIsBn2_ = true;
     }
-
-    // BN2S2 route: Source common_regbase.cpp:1631-1639
-    // bn2S2RouteLimit = !hasRope(removed) && d<=512 &&
-    //   (isTND || (isAllSame && !isDeterministic(removed)) || bn2S2NotTndLimit) &&
-    //   (keepProb>=1(removed) || ...) && (n1==n2) && (queryType checks removed)
-    // Simplified: d<=512 && (isTND || isAllSame || bn2S2NotTndLimit) && (n1==n2)
-    bool bn2S2NotTndLimit = (s1 < s2) && (s2 <= 1024) && (s2 - s1 >= 128) && (d <= 128) && !fagIsSparse_;
-    bool bn2S2RouteLimit = (d <= 512) && (fagUseTndSplit_ || fagIsAllSame_ || bn2S2NotTndLimit) && (n1 == n2);
-
+    if (fagIsBn2_ && fagUseTndSplit_ && d > 128) {
+        fagIsBn2_ = false;
+    }
     if (fagIsBn2_) {
         fagSplitAxis_ = FAG_SPLIT_AXIS_BN2;
-    } else if (bn2S2RouteLimit) {
-        fagSplitAxis_ = FAG_SPLIT_AXIS_BN2S2;
-        if (fagIsAllSame_) {
-            fagUseTndSplit_ = true;
-        }
     } else {
         fagSplitAxis_ = FAG_SPLIT_AXIS_BN2GS1S2;
     }
@@ -941,12 +927,10 @@ bool FlashAttnMetadataCpuKernel::TryBn2MultiBlkSparse()
     if (fagUseTndSplit_) {
         return false;
     }
-    if (fagIsSparse_) {
-        return DoFagBn2SparseBlockInfo();
-    } else {
-        DoFagBn2DenseSplit();
-        return true;
-    }
+    // PyPTO BN2 线性路径按 dense [blockStart, blockEnd) + skip_invalid 消费，
+    // 与 GS1S2 mask 相同：AICPU 仍切 dense 矩形，不在这里做 packed 重映射。
+    DoFagBn2DenseSplit();
+    return true;
 }
 
 // ===== BN2 dense: BN 合轴多块均匀分核 =====
@@ -1056,6 +1040,29 @@ bool FlashAttnMetadataCpuKernel::DoFagBn2SparseBlockInfo()
     return true;
 }
 
+// Consecutive row split across live AIV cores. Remainder goes to the first rem cores
+// so max(rows)-min(rows) <= 1 among participants. Idle slots stay [0,0).
+static inline void FagSplitRows(int64_t totalRows, uint32_t nAiv, FA_METADATA_T *starts, FA_METADATA_T *ends)
+{
+    for (uint32_t i = 0; i < FAG_AIV_SLOT_NUM; i++) {
+        starts[i] = 0;
+        ends[i] = 0;
+    }
+    if (nAiv == 0U || totalRows <= 0) {
+        return;
+    }
+    uint32_t live = (nAiv > FAG_AIV_SLOT_NUM) ? FAG_AIV_SLOT_NUM : nAiv;
+    int64_t base = totalRows / static_cast<int64_t>(live);
+    int64_t rem = totalRows % static_cast<int64_t>(live);
+    int64_t cur = 0;
+    for (uint32_t i = 0; i < live; i++) {
+        int64_t n = base + (static_cast<int64_t>(i) < rem ? 1 : 0);
+        starts[i] = static_cast<FA_METADATA_T>(cur);
+        ends[i] = static_cast<FA_METADATA_T>(cur + n);
+        cur += n;
+    }
+}
+
 // ===== GenFagMetadata: serialize FAG split results to metadata tensor =====
 // FAG data is appended after FA/FD data, core counts are dynamic (read from attrs)
 void FlashAttnMetadataCpuKernel::GenFagMetadata(uint32_t sectionNum)
@@ -1095,6 +1102,24 @@ void FlashAttnMetadataCpuKernel::GenFagMetadata(uint32_t sectionNum)
     fag[FAG_WIN_RIGHT_INDEX] = static_cast<FA_METADATA_T>(winRight_);
     fag[FAG_MAX_SEQLEN_Q_INDEX] = static_cast<FA_METADATA_T>(maxSeqlenQ_);
     fag[FAG_MAX_SEQLEN_KV_INDEX] = static_cast<FA_METADATA_T>(maxSeqlenKv_);
+
+    // pre/post 行区间。与 kernel 展平视图一致：dqRows=B*S1*N1，dkvRows=B*S2*N2。
+    int64_t s1 = (maxSeqlenQ_ > 0) ? static_cast<int64_t>(maxSeqlenQ_) : 0;
+    int64_t s2 = (maxSeqlenKv_ > 0) ? static_cast<int64_t>(maxSeqlenKv_) : 0;
+    int64_t b = (batchSize_ > 0) ? static_cast<int64_t>(batchSize_) : 0;
+    int64_t n1 = (numHeadsQ_ > 0) ? static_cast<int64_t>(numHeadsQ_) : 0;
+    int64_t n2 = (numHeadsKv_ > 0) ? static_cast<int64_t>(numHeadsKv_) : 0;
+    int64_t dqRows = b * s1 * n1;
+    int64_t dkvRows = b * s2 * n2;
+    uint32_t nAiv = fagBlockOuter_ * 2U;
+    if (nAiv > FAG_AIV_SLOT_NUM) {
+        nAiv = FAG_AIV_SLOT_NUM;
+    }
+    fag[FAG_PRE_AIV_NUM_INDEX] = nAiv;
+    fag[FAG_DQ_ROWS_INDEX] = static_cast<FA_METADATA_T>(dqRows);
+    fag[FAG_DKV_ROWS_INDEX] = static_cast<FA_METADATA_T>(dkvRows);
+    FagSplitRows(dqRows, nAiv, fag + FAG_DQ_ROW_STARTS_OFFSET, fag + FAG_DQ_ROW_ENDS_OFFSET);
+    FagSplitRows(dkvRows, nAiv, fag + FAG_DKV_ROW_STARTS_OFFSET, fag + FAG_DKV_ROW_ENDS_OFFSET);
 }
 
 // ===== FAG metadata end =====

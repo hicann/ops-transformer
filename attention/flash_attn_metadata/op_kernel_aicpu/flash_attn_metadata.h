@@ -54,7 +54,8 @@ constexpr uint32_t FD_M_NUM_INDEX = 5U;
 // FAG (Flash Attn Grad) Metadata Index Definitions — head[7] records FAG start offset
 // (head[4]/[5]/[6] are taken by HEAD_AIC_NUM_INDEX/HEAD_AIV_NUM_INDEX/HEAD_OUTPUT_LAYOUT_INDEX)
 constexpr uint32_t HEAD_FAG_START_OFFSET_INDEX = 7U;
-constexpr uint32_t FAG_METADATA_SIZE = 121U;
+constexpr uint32_t FAG_METADATA_SIZE = 412U;
+constexpr uint32_t FAG_AIV_SLOT_NUM = 72U;
 constexpr uint32_t FAG_CORE_LIST_NUM = 36U;
 
 // FAG Metadata field indices (relative to fagStartOffset)
@@ -74,6 +75,14 @@ constexpr uint32_t FAG_WIN_LEFT_INDEX = 117U;
 constexpr uint32_t FAG_WIN_RIGHT_INDEX = 118U;
 constexpr uint32_t FAG_MAX_SEQLEN_Q_INDEX = 119U;
 constexpr uint32_t FAG_MAX_SEQLEN_KV_INDEX = 120U;
+// pre/post 行区间：按实际启动的 AIV 数均分（nAiv = blockOuter * 2）
+constexpr uint32_t FAG_PRE_AIV_NUM_INDEX = 121U;
+constexpr uint32_t FAG_DQ_ROWS_INDEX = 122U;
+constexpr uint32_t FAG_DKV_ROWS_INDEX = 123U;
+constexpr uint32_t FAG_DQ_ROW_STARTS_OFFSET = 124U;  // [72]
+constexpr uint32_t FAG_DQ_ROW_ENDS_OFFSET = 196U;    // [72]
+constexpr uint32_t FAG_DKV_ROW_STARTS_OFFSET = 268U; // [72]
+constexpr uint32_t FAG_DKV_ROW_ENDS_OFFSET = 340U;   // [72]  // 340+72=412
 
 // FAG internal constants
 constexpr uint32_t FAG_S1CV_RATIO_DEFAULT = 2U;
