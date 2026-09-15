@@ -10,112 +10,9 @@
 from typing import Optional, Tuple
 
 import torch
-from torch.library import impl
-from cann_ops_transformer.op_builder import OpBuilder, get_as_library
-from .minimax_sparse_attention_split_kv_csr import build_k2q_csr
-
-OP_NAME = "minimax_sparse_attention_split_kv"
 
 
-class MinimaxSparseAttentionSplitKvOpBuilder(OpBuilder):
-    def __init__(self):
-        super(MinimaxSparseAttentionSplitKvOpBuilder, self).__init__(OP_NAME)
-
-    def sources(self):
-        return ["csrc/attention/minimax_sparse_attention_split_kv.cpp"]
-
-    def schema(self) -> str:
-        return (
-            "minimax_sparse_attention_split_kv("
-            "Tensor query, Tensor key, Tensor value, Tensor? block_table, "
-            "Tensor k2q_row_ptr, Tensor k2q_q_indices, Tensor k2q_slot_indices, "
-            "Tensor actual_seq_lengths, Tensor actual_seq_lengths_kv, "
-            "int num_key_value_heads, float scale_value, int block_size, int top_k, "
-            'int inner_precise=4, bool softmax_lse_flag=False, str input_layout="TND"'
-            ") -> (Tensor, Tensor)"
-        )
-
-    def register_meta(self):
-        @impl(get_as_library(), self.name, "Meta")
-        def minimax_sparse_attention_split_kv_meta(
-            query,
-            key,
-            value,
-            block_table,
-            k2q_row_ptr,
-            k2q_q_indices,
-            k2q_slot_indices,
-            actual_seq_lengths,
-            actual_seq_lengths_kv,
-            num_key_value_heads,
-            scale_value,
-            block_size,
-            top_k,
-            inner_precise=4,
-            softmax_lse_flag=False,
-            input_layout="TND",
-        ):
-            out_dtype = (
-                torch.bfloat16 if query.dtype == torch.float8_e4m3fn else query.dtype
-            )
-            attention_out = torch.empty(query.shape, dtype=out_dtype, device="meta")
-            if softmax_lse_flag:
-                if input_layout == "TND":
-                    lse_shape = (query.size(0), query.size(1), 1)
-                else:
-                    lse_shape = (query.size(0), query.size(1), query.size(2), 1)
-                softmax_lse = torch.empty(lse_shape, dtype=torch.float, device="meta")
-            else:
-                softmax_lse = torch.empty((0,), dtype=torch.float, device="meta")
-            return (attention_out, softmax_lse)
-
-
-_minimax_sparse_attention_split_kv_op_builder = MinimaxSparseAttentionSplitKvOpBuilder()
-
-
-@impl(
-    get_as_library(), _minimax_sparse_attention_split_kv_op_builder.name, "PrivateUse1"
-)
-def _minimax_sparse_attention_split_kv(
-    query,
-    key,
-    value,
-    block_table,
-    k2q_row_ptr,
-    k2q_q_indices,
-    k2q_slot_indices,
-    actual_seq_lengths,
-    actual_seq_lengths_kv,
-    num_key_value_heads,
-    scale_value,
-    block_size,
-    top_k,
-    inner_precise=4,
-    softmax_lse_flag=False,
-    input_layout="TND",
-):
-    op_module = _minimax_sparse_attention_split_kv_op_builder.load()
-    return op_module.minimax_sparse_attention_split_kv(
-        query,
-        key,
-        value,
-        block_table,
-        k2q_row_ptr,
-        k2q_q_indices,
-        k2q_slot_indices,
-        actual_seq_lengths,
-        actual_seq_lengths_kv,
-        num_key_value_heads,
-        scale_value,
-        block_size,
-        top_k,
-        inner_precise,
-        softmax_lse_flag,
-        input_layout,
-    )
-
-
-def minimax_sparse_attention_split_kv(
+def npu_minimax_sparse_attention_split_kv(
     query: torch.Tensor,
     key: torch.Tensor,
     value: torch.Tensor,
@@ -140,9 +37,11 @@ def minimax_sparse_attention_split_kv(
     QK → softmax → PV into per-slot partials; Phase2 FlashDecode-combines them.
 
     Args:
-        query (Tensor): Query, bf16. TND [T, N, D], BNSD [B, N, S, D], or BSND [B, S, N, D].
-        key (Tensor): Key, bf16. Paged [num_blocks, block_size, kv_heads, D] (TND only)
-            or contiguous matching query layout.
+        query (Tensor): Query, bf16 or fp8 e4m3fn. TND [T, N, D], BNSD [B, N, S, D],
+            or BSND [B, S, N, D].
+        key (Tensor): Key, same dtype as query. Paged
+            [num_blocks, block_size, kv_heads, D] (TND only) or contiguous matching
+            query layout.
         value (Tensor): Value, same layout/dtype as key.
         k2q_row_ptr (Tensor): int32 CSR row pointers [kv_heads, total_kv_rows+1].
         k2q_q_indices (Tensor): int32 CSR q-token ids [kv_heads, nnz].
@@ -166,22 +65,21 @@ def minimax_sparse_attention_split_kv(
 
     Returns:
         Tuple[Tensor, Tensor]: (attention_out, softmax_lse). attention_out matches
-            query shape/dtype. softmax_lse is fp32 when softmax_lse_flag is True.
+            query shape; dtype is bf16 when query is fp8 e4m3fn, otherwise query dtype.
+            softmax_lse is fp32 when softmax_lse_flag is True.
 
     Example:
         Training people usually have indexer ``select_idx``, not CSR. Build CSR
         first, then call this op. Typical BNSD contiguous (no paged cache)::
 
-            from cann_ops_transformer import (
-                build_k2q_csr,
-                minimax_sparse_attention_split_kv,
-            )
+            import custom_ops
+            from custom_ops import build_k2q_csr, npu_minimax_sparse_attention_split_kv
 
             row_ptr, q_idx, slot_idx = build_k2q_csr(
                 select_idx, actual_seq_lengths, actual_seq_lengths_kv, block_size,
                 input_layout="BNSD",
             )
-            attn_out, softmax_lse = minimax_sparse_attention_split_kv(
+            attn_out, softmax_lse = npu_minimax_sparse_attention_split_kv(
                 query, key, value, row_ptr, q_idx, slot_idx,
                 actual_seq_lengths, actual_seq_lengths_kv,
                 num_key_value_heads, scale_value, block_size, top_k,
@@ -193,7 +91,7 @@ def minimax_sparse_attention_split_kv(
         ``group_size = num_q_heads / num_key_value_heads`` must be in ``[1, 16]``,
         and head dim must be 128.
     """
-    return _minimax_sparse_attention_split_kv(
+    return torch.ops.custom.npu_minimax_sparse_attention_split_kv(
         query,
         key,
         value,

@@ -32,12 +32,9 @@ from torch_npu.testing.testcase import TestCase, run_tests
 DEVICE_ID = int(os.environ.get("ASCEND_DEVICE_ID", os.environ.get("DEVICE_ID", "0")))
 torch_npu.npu.set_device(int(DEVICE_ID))
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_TORCH_EXT = _REPO_ROOT / "torch_extension"
 _GOLDEN_TEST = (
     Path(__file__).resolve().parent / "test_minimax_sparse_attention_split_kv_golden.py"
 )
-sys.path.insert(0, str(_TORCH_EXT))
 sys.path.insert(0, str(_GOLDEN_TEST.parent))
 
 _golden_spec = importlib.util.spec_from_file_location(
@@ -54,7 +51,7 @@ layout_golden_lse = prefill_golden.layout_golden_lse
 
 
 def _load_op():
-    import cann_ops_transformer.ops.minimax_sparse_attention_split_kv  # noqa: F401
+    import custom_ops  # noqa: F401
 
 
 _load_op()
@@ -136,25 +133,23 @@ class TestMinimaxSparseAttentionSplitKvNPU(TestCase):
         golden_lse_cmp = layout_golden_lse(golden_lse, q_seqlens, layout, s_q)
 
         bt = npu_data["block_table"]
-        npu_attn, npu_lse = (
-            torch.ops.cann_ops_transformer.minimax_sparse_attention_split_kv(
-                npu_data["query"].npu(),
-                npu_data["key"].npu(),
-                npu_data["value"].npu(),
-                None if bt is None else bt.npu(),
-                npu_data["k2q_row_ptr"].npu(),
-                npu_data["k2q_q_indices"].npu(),
-                npu_data["k2q_slot_indices"].npu(),
-                npu_data["actual_seq_lengths"].npu(),
-                npu_data["actual_seq_lengths_kv"].npu(),
-                kv_heads,
-                data["scale_value"],
-                block_size,
-                top_k,
-                inner_precise,
-                softmax_lse_flag,
-                layout,
-            )
+        npu_attn, npu_lse = torch.ops.custom.npu_minimax_sparse_attention_split_kv(
+            npu_data["query"].npu(),
+            npu_data["key"].npu(),
+            npu_data["value"].npu(),
+            None if bt is None else bt.npu(),
+            npu_data["k2q_row_ptr"].npu(),
+            npu_data["k2q_q_indices"].npu(),
+            npu_data["k2q_slot_indices"].npu(),
+            npu_data["actual_seq_lengths"].npu(),
+            npu_data["actual_seq_lengths_kv"].npu(),
+            kv_heads,
+            data["scale_value"],
+            block_size,
+            top_k,
+            inner_precise,
+            softmax_lse_flag,
+            layout,
         )
 
         npu_attn_cpu = npu_attn.cpu()

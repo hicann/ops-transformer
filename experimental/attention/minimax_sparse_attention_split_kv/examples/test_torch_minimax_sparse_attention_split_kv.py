@@ -15,10 +15,11 @@
        source ${ASCEND_HOME_PATH}/set_env.sh
        export ASCEND_CUSTOM_OPP_PATH=${ASCEND_HOME_PATH}/opp/vendors/custom_transformer
        export LD_LIBRARY_PATH=${ASCEND_CUSTOM_OPP_PATH}/op_api/lib:${LD_LIBRARY_PATH}
-  2. 已 pip install cann_ops_transformer（或 PYTHONPATH 指向 torch_extension）
-  3. 首次调用会 JIT 编 C++ wrapper，需要 g++ / ninja
+  2. 已安装本算子独立 torch 包（不依赖 cann_ops_transformer）：
+       cd experimental/attention/minimax_sparse_attention_split_kv/torch_ops_extension
+       bash build_and_install.sh
 
-  python3 demo_torch_minimax_sparse_attention_split_kv.py
+  python3 test_torch_minimax_sparse_attention_split_kv.py
 """
 
 import math
@@ -26,7 +27,8 @@ import os
 
 import torch
 import torch_npu
-import cann_ops_transformer
+import custom_ops
+from custom_ops import build_k2q_csr, npu_minimax_sparse_attention_split_kv
 
 
 def main():
@@ -67,7 +69,7 @@ def main():
     select_idx[:, 1, :, 1] = min(1, n_blocks_1 - 1)
     # padding token（batch1 的 t>=24）保持 -1
 
-    k2q_row_ptr, k2q_q_indices, k2q_slot_indices = cann_ops_transformer.build_k2q_csr(
+    k2q_row_ptr, k2q_q_indices, k2q_slot_indices = build_k2q_csr(
         select_idx,
         actual_seq_lengths,
         actual_seq_lengths_kv,
@@ -76,7 +78,7 @@ def main():
         # index_mode="batch_local",  # 默认；若 select_idx 是跨 batch 全局 id，改成 "global"
     )
 
-    attn_out, softmax_lse = cann_ops_transformer.minimax_sparse_attention_split_kv(
+    attn_out, softmax_lse = npu_minimax_sparse_attention_split_kv(
         query,
         key,
         value,
