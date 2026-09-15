@@ -21,7 +21,7 @@
 - <term>Atlas 训练系列产品</term>：不支持
 <!-- end id6 -->
 
-**说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的8.0.RC2版本或者配套的更高版本，否则将会引发报错，比如BUS ERROR等。
+**说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的9.2.0版本或者配套的更高版本，否则将会引发报错，比如BUS ERROR等。
 
 ## 功能说明
 
@@ -50,7 +50,7 @@
 ## 函数原型
 
 ```python
-cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
+cann_ops_transformer.ops.quant_reduce_scatter(
     x: torch.Tensor,
     scales: torch.Tensor,
     hcom: str,
@@ -190,6 +190,7 @@ cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
     import torch.multiprocessing as mp
     import numpy as np
     from en_dtypes import float8_e8m0
+    from cann_ops_transformer.ops import quant_reduce_scatter
 
     def run_quant_reduce_scatter(rank, world_size, master_ip, master_port, x_shape, scales_shape, x_dtype, quant_type):
         torch_npu.npu.set_device(rank)
@@ -203,7 +204,7 @@ cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
             hcom_info = default_pg.get_hccl_comm_name(rank)
         x_ = torch.randn(x_shape, dtype=torch.float32).to(x_dtype).npu()
         scales_ = torch.rand(size=scales_shape, dtype=torch.float32).npu()
-        output = cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
+        output = quant_reduce_scatter(
             x_,
             scales_,
             hcom_info,
@@ -239,10 +240,10 @@ cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
     import torchair as tng
     from torchair.ge_concrete_graph import ge_apis as ge
     from torchair.configs.compiler_config import CompilerConfig
-
     import torch.distributed as dist
     import torch.multiprocessing as mp
     import numpy as np
+    from cann_ops_transformer.ops import quant_reduce_scatter
 
     config = CompilerConfig()
     config.debug.graph_dump.type = "pbtxt"
@@ -254,7 +255,7 @@ cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
             super().__init__()
 
         def forward(self, x, scales, hcom, world_size, reduce_op="sum", output_dtype=None, x_dtype=None, scales_dtype=None):
-            return cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
+            return quant_reduce_scatter(
                 x=x,
                 scales=scales,
                 hcom=hcom,
@@ -279,7 +280,7 @@ cann_ops_transformer.ops.quant_reduce_scatter.quant_reduce_scatter(
         scales_ = torch.rand(size=scales_shape, dtype=torch.float32).npu()
 
         cpu_model = Model()
-        model = torch.compile(cpu_model, backend=npu_backend, dynamic=False, fullgraph=True)
+        model = torch.compile(cpu_model, backend=npu_backend, dynamic=False, fullgraph=False)
         output = model(
             x=x_,
             scales=scales_,
