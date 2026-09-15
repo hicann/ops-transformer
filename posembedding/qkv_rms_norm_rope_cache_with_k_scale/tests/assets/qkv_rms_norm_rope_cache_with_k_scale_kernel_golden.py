@@ -803,7 +803,13 @@ def _prepare(
         else:
             base, remainder = divmod(token_num, batch)
             current = [base + (index < remainder) for index in range(batch)]
-        starts = np.concatenate(([0], np.cumsum(current))).astype(np.int32)
+        current_array = np.asarray(current, dtype=np.int32)
+        cos_sin_rows = int(cos_sin.shape[0])
+        _require(
+            bool(np.all(current_array <= cos_sin_rows)),
+            "current token count per batch exceeds cos_sin rows",
+        )
+        starts = np.concatenate(([0], np.cumsum(current_array))).astype(np.int32)
         if full_meta is not None and full_meta["history"]:
             histories = (
                 257 + 113 * np.arange(batch, dtype=np.int32) + full_meta["seed"] % 97
@@ -812,7 +818,12 @@ def _prepare(
             histories = np.zeros(batch, dtype=np.int32)
         else:
             histories = np.arange(1, batch + 1, dtype=np.int32) * 3
-        seq_data = np.asarray(current, dtype=np.int32) + histories
+        # Bound the shared inputs before the NPU/CPU split so both paths use
+        # valid RoPE positions. A current span larger than the table cannot
+        # be repaired by shortening history and is rejected above.
+        max_histories = cos_sin_rows - current_array
+        histories = np.minimum(np.asarray(histories, dtype=np.int32), max_histories)
+        seq_data = current_array + histories
         _write_back(query_start_loc, starts)
         _write_back(seq_lens, seq_data)
 

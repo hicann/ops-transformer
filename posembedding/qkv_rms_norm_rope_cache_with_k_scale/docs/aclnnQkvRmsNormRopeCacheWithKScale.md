@@ -434,7 +434,7 @@ aclnnStatus aclnnQkvRmsNormRopeCacheWithKScale(
       <td style="white-space: nowrap">seqLensOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>每个batch追加本次token后的实际序列长度，对应公式中的<code>seqLens</code>。</td>
-      <td><ul><li>传入时不支持空指针或空Tensor；是否传入及其与其他位置输入的组合见“约束说明”。</li><li>长度需等于<code>queryStartLocOptional.shape[0]-1</code>。</li></ul></td>
+      <td><ul><li>传入时不支持空指针或空Tensor；是否传入及其与其他位置输入的组合见“约束说明”。</li><li>长度需等于<code>queryStartLocOptional.shape[0]-1</code>。</li><li>每个batch的当前token数和实际序列长度均不得超过<code>MaxSeqLen</code>，具体限制见“约束说明”。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td><code>[Batch]</code></td>
@@ -709,7 +709,8 @@ aclnnStatus aclnnQkvRmsNormRopeCacheWithKScale(
   - `kCacheRef`和`vCacheRef`均为4维正stride，最后一维stride为1，head维和token维stride均不小于`D=128`；`kCacheRef`和`vCacheRef`前三维stride必须一致。RoPE/M-RoPE的`kScaleCacheRef`为4维正stride且最后一维stride为1；M-RoPE MX同样为4维，末轴`ceil(D/32)`连续且stride为1。
   - M-RoPE的`mropePositionOptional`逻辑shape固定为`[T,3]`，位置索引按`P[u,0]`、`P[u,1]`、`P[u,2]`分别读取token `u`的T/H/W坐标。
 - 输入值域限制：
-  - `seqLensOptional[b]`必须满足`seqLensOptional[b] >= queryStartLocOptional[b+1] - queryStartLocOptional[b]`。若`seqLensOptional[b]`小于该batch本次调用的token数，行为未定义。
+  - RoPE场景下，`queryStartLocOptional`必须单调不减。令第`b`个batch本次调用的token数为`L_b=queryStartLocOptional[b+1]-queryStartLocOptional[b]`，则必须满足`0 <= L_b <= MaxSeqLen`以及`L_b <= seqLensOptional[b] <= MaxSeqLen`，其中`MaxSeqLen=cosSin.shape[0]`。非空batch的实际序列长度超过表容量时，位置编码将访问表外位置，行为未定义。
+  - `slotMapping`必须为INT32一维Tensor且shape为`[T]`，每个元素必须位于`[0,BlockNum*BlockSize-1]`。RoPE和M-RoPE存在重复slot时最终写入顺序和结果未定义；M-RoPE MX的slot唯一性要求见下文。
   - 两个M-RoPE场景中，`mropePositionOptional`的每个位置索引必须满足`0 <= value < MaxSeqLen`。
   - 三个场景均要求`1<=T<=262144`；M-RoPE MX还要求`slotMapping`中的slot在本次调用内互不重复。
   - M-RoPE场景下`mropeSectionOptional=[t,h,w]`的长度必须为3。令$\boldsymbol{s}=(s_{\mathrm T},s_{\mathrm H},s_{\mathrm W})$，其中$i=0,1,2$依次对应T/H/W，则
