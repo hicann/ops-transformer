@@ -14,21 +14,12 @@
  */
 #ifndef QUANT_FLASH_ATTN_BLOCK_CUBE_HIF8_H_
 #define QUANT_FLASH_ATTN_BLOCK_CUBE_HIF8_H_
-#if __has_include("../../../common/op_kernel/offset_calculator.h")
 #include "../../../common/op_kernel/offset_calculator.h"
 #include "../../../common/op_kernel/matmul.h"
 #include "../../../common/op_kernel/FixpipeOut.h"
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "../../../common/op_kernel/arch35/util_regbase.h"
-#else
-#include "../../common/op_kernel/offset_calculator.h"
-#include "../../common/op_kernel/matmul.h"
-#include "../../common/op_kernel/FixpipeOut.h"
-#include "../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
-#include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
-#include "../../common/op_kernel/arch35/util_regbase.h"
-#endif
 #include "kernel_operator_list_tensor_intf.h"
 #include "memory_copy_arch35_quant_flash_attn.h"
 using namespace AscendC;
