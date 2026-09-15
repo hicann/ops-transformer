@@ -106,6 +106,20 @@ __aicore__ inline void MTE2ToVSync()
     WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
 }
 
+__aicore__ inline void VToSSync()
+{
+    event_t eventIDVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));
+    SetFlag<HardEvent::V_S>(eventIDVToS);
+    WaitFlag<HardEvent::V_S>(eventIDVToS);
+}
+
+__aicore__ inline void SToVSync()
+{
+    event_t eventIDSToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_V));
+    SetFlag<HardEvent::S_V>(eventIDSToV);
+    WaitFlag<HardEvent::S_V>(eventIDSToV);
+}
+
 template <RopeType ropeType, bool forward>
 class RopeOperation {
 public:
@@ -150,6 +164,7 @@ public:
         }
         uint32_t halfDim = ropeDim_ / NUM_TWO;
         Duplicate(mask_, 0U, alignedRopeDim_);
+        VToSSync();
         if constexpr (ropeType == RopeType::INTERLEAVE) {
             // 0, 1, 2, 3, 4, 5, 6, 7 -> 1, 0, 3, 2, 5, 4, 7, 6
             for (uint32_t i = 0; i < halfDim; ++i) {
@@ -168,6 +183,7 @@ public:
                 }
             }
         }
+        SToVSync();
     }
 
     __aicore__ inline void PreProcess(uint32_t curSeq)
