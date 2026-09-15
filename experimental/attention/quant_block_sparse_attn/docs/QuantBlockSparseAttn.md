@@ -87,6 +87,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
 - `max_Kb`：每个 Query block 最多保存的稀疏 KV block 索引数量，对应 `sparse_indices` 第 4 维。
 - `max_block_num_per_batch`：每个 batch 在 `block_table` 中可索引的最大逻辑 KV block 数，对应 `block_table` 第 2 维。
 - `block_num`：PageAttention KV Cache 物理 block 总数。
+- `pa_block_size`：PageAttention KV Cache 的物理 block 大小，对应 `key`、`value` 和 `k_descale` 的第 3 维。当前 FP8 路径仅支持 128。
 
 - **参数说明：**
 
@@ -124,19 +125,19 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>key</td>
       <td>输入</td>
       <td>PageAttention KV Cache 中的 Key。</td>
-      <td>layout_kv 仅支持 PA_BNBD。按 4D PA BNBD 视图传入，0 轴为非连续存储。</td>
+      <td>layout_kv 仅支持 PA_BNBD。按 4D PA BNBD 视图传入，第 3 维为 pa_block_size，0 轴为非连续存储。</td>
       <td>FLOAT8_E4M3FN</td>
       <td>ND</td>
-      <td>(block_num,N2,sparse_kv_block_size,D)</td>
+      <td>(block_num,N2,pa_block_size,D)</td>
     </tr>
     <tr>
       <td>value</td>
       <td>输入</td>
       <td>PageAttention KV Cache 中的 Value。</td>
-      <td>layout_kv 仅支持 PA_BNBD。按 4D PA BNBD 视图传入，0 轴为非连续存储。</td>
+      <td>layout_kv 仅支持 PA_BNBD。按 4D PA BNBD 视图传入，第 3 维为 pa_block_size，与 key 第 3 维一致，0 轴为非连续存储。</td>
       <td>FLOAT8_E4M3FN</td>
       <td>ND</td>
-      <td>(block_num,N2,sparse_kv_block_size,D_v)</td>
+      <td>(block_num,N2,pa_block_size,D_v)</td>
     </tr>
     <tr>
       <td>q_descale</td>
@@ -151,10 +152,10 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>k_descale</td>
       <td>输入</td>
       <td>Key 反量化缩放因子。</td>
-      <td>PERTOKEN_PERHEAD。按 4D PA BNB1 视图传入，0 轴为非连续存储。</td>
+      <td>PERTOKEN_PERHEAD。按 4D PA BNB1 视图传入，第 3 维为 pa_block_size，与 key 第 3 维一致，0 轴为非连续存储。</td>
       <td>FLOAT32</td>
       <td>ND</td>
-      <td>(block_num,N2,sparse_kv_block_size,1)</td>
+      <td>(block_num,N2,pa_block_size,1)</td>
     </tr>
     <tr>
       <td>v_descale</td>
@@ -555,7 +556,7 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
 | 命名 | 含义 |
 | :---: | :--- |
 | FP8全量化 | `query`、`key`、`value` 为 `FLOAT8_E4M3FN`，`q_descale`、`k_descale`、`v_descale`、`p_scale` 参与反量化/再量化缩放的场景。 |
-| PA_BNBD | Paged Attention KV Cache 排布，逻辑形态为 `[block_num, N2, sparse_kv_block_size, D或D_v]`。 |
+| PA_BNBD | Paged Attention KV Cache 排布，逻辑形态为 `[block_num, N2, pa_block_size, D或D_v]`。 |
 | 4D PA 0 轴非连续存储 | 当前支持的 KV Cache 存储形态；接口传入 4D `key`、4D `value` 和 4D `k_descale` BNB1 视图，各视图的 0 轴均为非连续存储。 |
 | BatchSize | Batch 数，对应 `sparse_indices`、`sparse_seq_len`、`block_table` 的第 1 维。 |
 | QueryTokenNum | 所有 batch 的 Query 有效 token 数之和，对应 `query` 的 T 轴。 |
@@ -569,6 +570,7 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
 | max_Qb | Query block 最大数量，对应 `sparse_indices` 第 3 维和 `sparse_seq_len` 第 3 维。 |
 | max_Kb | 每个 Query block 最多保存的稀疏 KV block 索引数量，对应 `sparse_indices` 第 4 维。 |
 | block_num | PA KV Cache 物理 block 总数，对应 4D `key` 第 1 维。 |
+| pa_block_size | PA KV Cache 物理 block 大小，对应 `key`、`value` 和 `k_descale` 第 3 维；当前 FP8 路径仅支持 128。 |
 | max_block_num_per_batch | 每个 batch 在 `block_table` 中可索引的最大逻辑 block 数，对应 `block_table` 第 2 维。 |
 | key.stride(0) | 相邻物理 PA block 的外步长，表示 Key、Value、`k_descale` 各视图在 0 轴上的非连续存储跨度。 |
 
@@ -584,8 +586,8 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
     - `layout_q="TND"` 时，shape 为 `(QueryTokenNum, N1, D)`。
     - `layout_q="NTD"` 时，shape 为 `(N1, QueryTokenNum, D)`。
   - `query` 不支持空 Tensor，且 `D` 当前固定为 128。
-  - `key` 仅支持 4D PA 形态，shape 为 `(block_num, N2, sparse_kv_block_size, D)`，其中 `D` 固定为 128。
-  - `value` 仅支持与 `key` 对应的 4D PA 形态，shape 为 `(block_num, N2, sparse_kv_block_size, D_v)`，其中 `D_v` 固定为 128。
+  - `key` 仅支持 4D PA 形态，shape 为 `(block_num, N2, pa_block_size, D)`，其中 `D` 固定为 128。
+  - `value` 仅支持与 `key` 对应的 4D PA 形态，shape 为 `(block_num, N2, pa_block_size, D_v)`，其中 `D_v` 固定为 128，`pa_block_size` 必须与 `key` 第 3 维一致。
   - `attention_out` 数据类型为 `BFLOAT16`，数据格式为 ND。`layout_q="TND"` 时输出 shape 为 `(QueryTokenNum, N1, D_v)`；`layout_q="NTD"` 时 PyTorch 接入层输出仍为 TND 语义的 `(QueryTokenNum, N1, D_v)`。
   - `sparse_q_block_size` 和 `sparse_kv_block_size` 当前均仅支持 128。
   - `layout_q` 当前仅支持 `TND`、`NTD`。
@@ -627,7 +629,7 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
 - 一致性约束
 
   - `q_descale` 的 token/head 维度必须与 `query` 的 N1 对齐。
-  - `k_descale` 的 PA block、KV head、block 内 token 维度必须与 `key`、`block_table`、`sparse_kv_block_size` 对齐。
+  - `k_descale` 的 PA block、KV head、block 内 token 维度必须与 `key`、`block_table`、`pa_block_size` 对齐。
   - `v_descale` 第 1 维必须等于 `N2`。
   - `p_scale` 非空时数值应大于 0；Tiling 阶段无法读取 Tensor 数值，该数值合法性由调用者保证。
 
@@ -678,10 +680,10 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
 
   - 当前仅支持 4D PA 输入。
   - 4D PA 输入下，接口分别传入 `key`、`value`、`k_descale` 对应的 4D/4D/4D 视图，各视图的 0 轴均为非连续存储。
-  - `key` stride 必须满足 `[key.stride(0), sparse_kv_block_size * D, D, 1]`。
-  - `value` stride 必须满足 `[value.stride(0), sparse_kv_block_size * D_v, D_v, 1]`。
+  - `key` stride 必须满足 `[key.stride(0), pa_block_size * D, D, 1]`。
+  - `value` stride 必须满足 `[value.stride(0), pa_block_size * D_v, D_v, 1]`。
   - `value.stride(0)` 必须等于 `key.stride(0)`，表示 Value 视图与 Key 视图使用相同的物理 PA block 外步长。
-  - `k_descale` shape 必须为 `[block_num, N2, sparse_kv_block_size, 1]`；`k_descale.stride(0) * 4` 必须等于 `key.stride(0)`，表示 `k_descale` 以 FLOAT32 字节数对齐同一物理 PA block 外步长；`k_descale` 后三维 stride 必须为 `[sparse_kv_block_size, 1, 1]`。
+  - `k_descale` shape 必须为 `[block_num, N2, pa_block_size, 1]`；`k_descale.stride(0) * 4` 必须等于 `key.stride(0)`，表示 `k_descale` 以 FLOAT32 字节数对齐同一物理 PA block 外步长；`k_descale` 后三维 stride 必须为 `[pa_block_size, 1, 1]`。
   - `block_table` 的有效值必须在 `[0, block_num - 1]` 范围内，该逻辑由用户外部保证。
 
 - 特性交叉约束
@@ -794,7 +796,9 @@ device = torch.device("npu:0")
 B, N1, N2 = 1, 1, 1
 S1, S2 = 128, 128
 D = D_v = 128
-block_size = 128
+pa_block_size = 128  # PA KV Cache 物理 block 大小
+sparse_q_block_size = 128  # Query 方向稀疏 block 大小
+sparse_kv_block_size = 128  # KV 方向稀疏 block 大小
 num_blocks = 1
 head_dim = D
 layout_q = "TND"
@@ -805,30 +809,30 @@ mask_mode = 0
 
 
 def make_kv_views(storage):
-    key_segment = num_kv_heads * block_size * head_dim
-    value_segment = num_kv_heads * block_size * head_dim
-    k_descale_segment = num_kv_heads * block_size * 4
+    key_segment = num_kv_heads * pa_block_size * head_dim
+    value_segment = num_kv_heads * pa_block_size * head_dim
+    k_descale_segment = num_kv_heads * pa_block_size * 4
     block_stride = key_segment + value_segment + k_descale_segment
-    key_stride = (block_stride, block_size * head_dim, head_dim, 1)
-    k_descale_stride = (block_stride // 4, block_size, 1, 1)
+    key_stride = (block_stride, pa_block_size * head_dim, head_dim, 1)
+    k_descale_stride = (block_stride // 4, pa_block_size, 1, 1)
 
     fp8_storage = storage.view(torch.float8_e4m3fn)
     key = torch.as_strided(
         fp8_storage,
-        (num_blocks, num_kv_heads, block_size, head_dim),
+        (num_blocks, num_kv_heads, pa_block_size, head_dim),
         key_stride,
         0,
     )
     value = torch.as_strided(
         fp8_storage,
-        (num_blocks, num_kv_heads, block_size, D_v),
+        (num_blocks, num_kv_heads, pa_block_size, D_v),
         key_stride,
         key_segment,
     )
     fp32_storage = storage.view(torch.float32)
     k_descale = torch.as_strided(
         fp32_storage,
-        (num_blocks, num_kv_heads, block_size, 1),
+        (num_blocks, num_kv_heads, pa_block_size, 1),
         k_descale_stride,
         (key_segment + value_segment) // 4,
     )
@@ -836,9 +840,9 @@ def make_kv_views(storage):
 
 
 num_kv_heads = N2
-key_segment = num_kv_heads * block_size * head_dim
-value_segment = num_kv_heads * block_size * head_dim
-k_descale_segment = num_kv_heads * block_size * 4
+key_segment = num_kv_heads * pa_block_size * head_dim
+value_segment = num_kv_heads * pa_block_size * head_dim
+k_descale_segment = num_kv_heads * pa_block_size * 4
 block_stride = key_segment + value_segment + k_descale_segment
 storage = torch.empty(num_blocks * block_stride, dtype=torch.uint8)
 key_cpu, value_cpu, k_descale_cpu = make_kv_views(storage)
@@ -853,7 +857,7 @@ q_descale = torch.ones((S1, N1), dtype=torch.float32, device=device)
 v_descale = torch.ones((N2,), dtype=torch.float32, device=device)
 p_scale = torch.ones((1,), dtype=torch.float32, device=device)
 sparse_indices = torch.tensor([[[[0]]]], dtype=torch.int32, device=device)
-sparse_seq_len = torch.ones((B, N1, S1 // block_size), dtype=torch.int32, device=device)
+sparse_seq_len = torch.ones((B, N1, S1 // sparse_q_block_size), dtype=torch.int32, device=device)
 cu_seqlens_q = torch.tensor([0, S1], dtype=torch.int32, device=device)
 seqused_kv = torch.tensor([S2], dtype=torch.int32, device=device)
 block_table = torch.zeros((B, num_blocks), dtype=torch.int32, device=device)
@@ -868,8 +872,8 @@ metadata = torch.ops.custom.npu_quant_block_sparse_attn_metadata(
     seqused_q=None,
     seqused_kv=seqused_kv,
     batch_size=B,
-    sparse_block_size_q=block_size,
-    sparse_block_size_k=block_size,
+    sparse_block_size_q=sparse_q_block_size,
+    sparse_block_size_k=sparse_kv_block_size,
     quant_mode=quant_mode,
     mask_mode=mask_mode,
     layout_q=layout_q,
@@ -889,8 +893,8 @@ attn_out, softmax_lse = torch.ops.custom.npu_quant_block_sparse_attn(
     sparse_seq_len,
     None,
     1.0 / (D ** 0.5),
-    block_size,
-    block_size,
+    sparse_q_block_size,
+    sparse_kv_block_size,
     cu_seqlens_q=cu_seqlens_q,
     cu_seqlens_kv=None,
     seqused_q=None,
