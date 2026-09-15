@@ -37,7 +37,7 @@ def get_log_path(log_path_func):
 
 def get_graph_path(graph_path_func):
     graph_path_dict_func = {}
-    pattern = re.compile("graph_.*_device(\d+)\.json$", re.I)
+    pattern = re.compile(r"graph_.*_device(\d+)\.json$", re.I)
     for file in Path(graph_path_func).rglob("graph_*.json"):
         match = pattern.match(file.name)
         if match:
