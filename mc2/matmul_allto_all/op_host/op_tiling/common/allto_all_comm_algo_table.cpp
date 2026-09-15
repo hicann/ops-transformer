@@ -10,6 +10,7 @@
 
 #include "allto_all_comm_algo_table.h"
 #include "hccl/hccl_rank_graph.h"
+#include "mc2_log_compat.h"
 
 namespace Mc2Tiling {
 
@@ -49,6 +50,32 @@ const Mc2Hcom::CommAlgoEntry *GetAllToAllCommAlgoTable(uint32_t &count)
 {
     count = sizeof(ALLTOALL_COMM_ALGO_TABLE) / sizeof(ALLTOALL_COMM_ALGO_TABLE[0]);
     return ALLTOALL_COMM_ALGO_TABLE;
+}
+
+std::string SelectAllToAllAlgoName(const std::string &opName, const std::string &group, uint8_t commEngine,
+                                   uint32_t tileM, uint64_t dimSize, uint64_t dtypeSize, uint32_t rankDim)
+{
+    uint64_t commDataBytes = 0;
+    if (dimSize != 0 && tileM > UINT64_MAX / dimSize) {
+        OP_LOGW(opName.c_str(), "tileM * dimSize overflow, clamp to UINT64_MAX.");
+        commDataBytes = UINT64_MAX;
+    } else {
+        commDataBytes = static_cast<uint64_t>(tileM) * dimSize;
+    }
+    if (dtypeSize != 0 && commDataBytes > UINT64_MAX / dtypeSize) {
+        OP_LOGW(opName.c_str(), "commDataBytes overflow, clamp to UINT64_MAX.");
+        commDataBytes = UINT64_MAX; // 钳位命中大数据量分支/默认算法，避免回绕成小值误入小数据算法
+    } else {
+        commDataBytes *= dtypeSize;
+    }
+    OP_LOGI(opName.c_str(), "[SetHcclTiling] commDataBytes=%llu, tileM=%u, dimSize=%llu, rankDim=%u, engine=%u",
+            commDataBytes, tileM, dimSize, rankDim, static_cast<uint32_t>(commEngine));
+    uint32_t algoCount = 0;
+    const Mc2Hcom::CommAlgoEntry *algoEntries = GetAllToAllCommAlgoTable(algoCount);
+    std::string algoName = Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(
+        opName, group.c_str(), commEngine, commDataBytes, rankDim, algoEntries, algoCount, ALLTOALL_DEFAULT_ALGO_NAME);
+    OP_LOGI(opName.c_str(), "[SetHcclTiling] selected algoName=%s, group=%s", algoName.c_str(), group.c_str());
+    return algoName;
 }
 
 } // namespace Mc2Tiling
