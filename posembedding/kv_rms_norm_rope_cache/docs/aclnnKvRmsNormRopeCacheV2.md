@@ -118,12 +118,12 @@
    Quant表示前述量化计算过程，对原地更新参数k\_cache和ckv\_cache：
 
   $$
-  k\_cache[scatter\_idx, ...] = Quant[x = rope\_out, scale = k\_scale, offset = k\_offset](b, n, s)
+  k\_cache[scatter\_idx, ...] = Quant[x = rope\_out, scale = k\_scale, offset = k\_offset]\left(b, n, s\right)
   $$
 
   $$
   ckv\_cache[scatter\_idx, ...] = \begin{cases} Quant(x = \operatorname{RmsNorm}(x), scale = v\_scale, offset = v\_offset)[b, n, s], \quad vOptional = None \\
-  Quant[x = vOptional, scale = v\_scale, offset = v\_offset](b, n, s),  \quad vOptional != None
+  Quant[x = vOptional, scale = v\_scale, offset = v\_offset]\left(b, n, s\right),  \quad vOptional != None
   \end{cases}
   $$
 
@@ -721,8 +721,17 @@ void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
   auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]),
                          *deviceAddr, size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
-  for (int64_t i = 0; i < size; i++) {
-    LOG_PRINT("result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+  auto batchKv = shape[0];
+  auto batchSeq = shape[2];
+  // Print by [B, S]
+  uint64_t bIdx = 0;
+  uint64_t sIdx = 0;
+  for (uint64_t i = 0; i < size; i++) {
+    LOG_PRINT("result[%lu] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+    // Fast diagonal traverse
+    bIdx = (bIdx >= batchKv) ? batchKv : (bIdx + 1);
+    sIdx = (sIdx >= batchSeq) ? batchSeq : (sIdx + 1);
+    i += bIdx * batchKv * batchSeq + sIdx * batchSeq;
   }
 }
 
@@ -769,35 +778,35 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
   // 2. 构造输入与输出，需要根据API的接口定义构造
+  // 本示例演示V1场景（kv合轴模式，vOptional传入nullptr），支持本算子的所有产品均可运行。
+  // V2场景（kv分离模式）仅Atlas A3/Atlas A2系列产品支持，需要传入非空vOptional，此时：
+  // N取值1/2/4/8；kv shape为[Bkv, N, Skv, 192]；gamma shape为[192]；vOptional shape为[Bkv, N, Skv, 128]；
+  // kCacheRef shape为[Bkv, N, Scache, 192]；ckvCacheRef shape为[Bkv, N, Scache, 128]；
+  // kRopeOut shape为[Bkv, N, Skv, 192]；cKvOut shape为[Bkv, N, Skv, 128]。
   uint64_t totalBatch = 32;
-  uint64_t totalHeads = 2;
-  uint64_t seqLength = 64;
-  uint64_t hDimK = 192;
-  uint64_t hDimV = 128;
-  uint64_t hDimRope = 64;
-  uint64_t idxSlotNum = totalBatch * seqLength;
-  std::vector<int64_t> kvShape = {totalBatch, totalHeads, seqLength, hDimK};
-  std::vector<int64_t> gammaShape = {hDimK,};
-  std::vector<int64_t> cosShape = {totalBatch, totalHeads, seqLength, hDimRope};
-  std::vector<int64_t> sinShape = {totalBatch, totalHeads, seqLength, hDimRope};
-  std::vector<int64_t> indexShape = {idxSlotNum,1};
-  std::vector<int64_t> kpeCacheShape = {totalBatch, totalHeads, seqLength, hDimK};
-  std::vector<int64_t> ckvCacheShape = {totalBatch, totalHeads, seqLength, hDimV};
-  std::vector<int64_t> kRopeShape = {totalBatch, totalHeads, seqLength, hDimK};
-  std::vector<int64_t> cKvShape = {totalBatch, totalHeads, seqLength, hDimV};
-  std::vector<int64_t> vOptionalShape = {totalBatch, totalHeads, seqLength, hDimV};
+  uint64_t hDimV = 512;    // V1场景下rms_norm计算的尾轴长度Dv
+  uint64_t hDimRope = 64;  // RoPE计算的尾轴长度Dk
+  uint64_t hDimKv = hDimV + hDimRope;  // V1场景下kv的尾轴长度需满足Dkv = Dv + Dk
+  std::vector<int64_t> kvShape = {totalBatch, 1, 1, hDimKv};
+  std::vector<int64_t> gammaShape = {hDimV,};
+  std::vector<int64_t> cosShape = {totalBatch, 1, 1, hDimRope};
+  std::vector<int64_t> sinShape = {totalBatch, 1, 1, hDimRope};
+  std::vector<int64_t> indexShape = {totalBatch, 1};  // Norm模式下index的shape为2维[Bkv, Skv]
+  std::vector<int64_t> kpeCacheShape = {totalBatch, 1, 1, hDimRope};
+  std::vector<int64_t> ckvCacheShape = {totalBatch, 1, 1, hDimV};
+  std::vector<int64_t> kRopeShape = {totalBatch, 1, 1, hDimRope};
+  std::vector<int64_t> cKvShape = {totalBatch, 1, 1, hDimV};
 
-  uint64_t totalEleHeads = totalBatch * totalHeads * seqLength;
-  std::vector<int16_t> kvHostData(totalEleHeads*hDimK,0);
-  std::vector<int16_t> gammaHostData(hDimK,0);
-  std::vector<int16_t> cosHostData(totalEleHeads*hDimRope,0);
-  std::vector<int16_t> sinHostData(totalEleHeads*hDimRope,0);
-  std::vector<int64_t> indexHostData(idxSlotNum*1,0);           // Bkv * Skv
-  std::vector<int16_t> kpeCacheHostData(totalEleHeads*hDimK,0);
-  std::vector<int16_t> ckvCacheHostData(totalEleHeads*hDimV,0);
-  std::vector<int16_t> kRopeHostData(totalEleHeads*hDimK,0);
-  std::vector<int16_t> cKvHostData(totalEleHeads*hDimV,0);
-  std::vector<int16_t> vOptionalHostData(totalEleHeads*hDimV,0);
+  uint64_t totalEle = totalBatch * 1 * 1;  // 本示例中N=1、Skv=1，totalEle = Bkv * N * Skv
+  std::vector<int16_t> kvHostData(totalEle * hDimKv, 0);
+  std::vector<int16_t> gammaHostData(hDimV, 0);
+  std::vector<int16_t> cosHostData(totalEle * hDimRope, 0);
+  std::vector<int16_t> sinHostData(totalEle * hDimRope, 0);
+  std::vector<int64_t> indexHostData(totalEle, 0);  // index的value值范围为[-1, Scache)，-1表示跳过更新
+  std::vector<int16_t> kpeCacheHostData(totalEle * hDimRope, 0);
+  std::vector<int16_t> ckvCacheHostData(totalEle * hDimV, 0);
+  std::vector<int16_t> kRopeHostData(totalEle * hDimRope, 0);
+  std::vector<int16_t> cKvHostData(totalEle * hDimV, 0);
 
   void* kvDeviceAddr = nullptr;
   void* gammaDeviceAddr = nullptr;
@@ -806,7 +815,6 @@ int main() {
   void* indexDeviceAddr = nullptr;
   void* kpeCacheDeviceAddr = nullptr;
   void* ckvCacheDeviceAddr = nullptr;
-  void* vOptionalDeviceAddr = nullptr;
   void* kRopeDeviceAddr = nullptr;
   void* cKvDeviceAddr = nullptr;
 
@@ -817,7 +825,6 @@ int main() {
   aclTensor* index = nullptr;
   aclTensor* kpeCache = nullptr;
   aclTensor* ckvCache = nullptr;
-  aclTensor* vOpt = nullptr;
   aclTensor* kRope = nullptr;
   aclTensor* cKv = nullptr;
 
@@ -839,8 +846,6 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(ckvCacheHostData, ckvCacheShape, &ckvCacheDeviceAddr, aclDataType::ACL_FLOAT16, &ckvCache);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  ret = CreateAclTensor(vOptionalHostData, vOptionalShape, &vOptionalDeviceAddr, aclDataType::ACL_FLOAT16, &vOpt);
-  CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(kRopeHostData, kRopeShape, &kRopeDeviceAddr, aclDataType::ACL_FLOAT16, &kRope);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   ret = CreateAclTensor(cKvHostData, cKvShape, &cKvDeviceAddr, aclDataType::ACL_FLOAT16, &cKv);
@@ -850,9 +855,9 @@ int main() {
   uint64_t workspaceSize = 0;
   aclOpExecutor* executor;
 
-  // 调用aclnnKvRmsNormRopeCacheV2第一段接口
+  // 调用aclnnKvRmsNormRopeCacheV2第一段接口，vOptional传入nullptr表示V1场景
   ret = aclnnKvRmsNormRopeCacheV2GetWorkspaceSize(kv,gamma,cos,sin,index,
-                                                kpeCache,ckvCache,nullptr,nullptr,nullptr,nullptr,vOpt,epsilon,cacheMode,isOutputKv,kRope,cKv,&workspaceSize,&executor);
+                                                kpeCache,ckvCache,nullptr,nullptr,nullptr,nullptr,nullptr,epsilon,cacheMode,isOutputKv,kRope,cKv,&workspaceSize,&executor);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnKvRmsNormRopeCacheV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
   // 根据第一段接口计算出的workspaceSize申请device内存
@@ -882,7 +887,6 @@ int main() {
   aclDestroyTensor(index);
   aclDestroyTensor(kpeCache);
   aclDestroyTensor(ckvCache);
-  aclDestroyTensor(vOpt);
   aclDestroyTensor(kRope);
   aclDestroyTensor(cKv);
 
@@ -894,7 +898,6 @@ int main() {
   aclrtFree(indexDeviceAddr);
   aclrtFree(kpeCacheDeviceAddr);
   aclrtFree(ckvCacheDeviceAddr);
-  aclrtFree(vOptionalDeviceAddr);
   aclrtFree(kRopeDeviceAddr);
   aclrtFree(cKvDeviceAddr);
 
