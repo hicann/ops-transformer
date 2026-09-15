@@ -40,7 +40,8 @@ void AllGatherMatmulTilingA2A3::SetSocParam(Mc2Tiling::AllGatherMatmulTilingData
     tilingData->socParam.isND2NZ = 1U;
 }
 
-std::string AllGatherMatmulTilingA2A3::GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData *tilingData)
+std::string AllGatherMatmulTilingA2A3::GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
+                                                    [[maybe_unused]] const mc2tiling::TilingArgs &args)
 {
     return (tilingData->socParam.isA3 == 0) ? "AllGather=level0:fullmesh" : "AllGather=level0:doublering";
 }
