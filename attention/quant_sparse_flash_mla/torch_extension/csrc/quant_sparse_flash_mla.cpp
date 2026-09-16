@@ -167,6 +167,7 @@ std::tuple<at::Tensor, at::Tensor> QuantSparseFlashMla(
 
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKvStr = std::string(layoutKv);
+    TORCH_CHECK(oriKv.has_value(), "ori_kv must be provided.");
     const at::Tensor &oriKvVal = *oriKv;
     // convert str
     char *layoutQPtr = const_cast<char *>(layoutQStr.c_str());
