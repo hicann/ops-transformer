@@ -187,7 +187,7 @@ aclnnStatus aclnnGroupedMatmulAddV2(
     <tr>
       <td>yRef（aclTensor）</td>
       <td>输入/输出</td>
-      <td>表示原地累加的输入输出矩阵，Device侧的aclTensor类型，公式中的yRef。</td>
+      <td>表示原地累加的输入输出矩阵，Device侧的aclTensor类型，公式中的y/yRef。</td>
       <td>-</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -463,12 +463,12 @@ int aclnnGroupedMatmulAddV2Test(int32_t deviceId, aclrtStream &stream) {
 
     // 5. 获取输出的值，将Device侧内存上的结果拷贝至Host侧，需要根据具体API的接口定义修改
     auto size = GetShapeSize(yShape);
-    std::vector<uint16_t> resultData(size, 0);
+    std::vector<float> resultData(size, 0);
     ret = aclrtMemcpy(resultData.data(), size * sizeof(resultData[0]), yDeviceAddr,
                           size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t j = 0; j < size; j++) {
-        LOG_PRINT("result[%ld] is: %d\n", j, resultData[j]);
+        LOG_PRINT("result[%ld] is: %f\n", j, resultData[j]);
     }
     return ACL_SUCCESS;
 }
