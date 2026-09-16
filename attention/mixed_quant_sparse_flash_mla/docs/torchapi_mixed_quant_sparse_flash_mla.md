@@ -512,7 +512,7 @@ metadata校验
              </td>
              <td>
                    <ul>
-                              <li>cmpKvOptional未传入时，cmpMaskMode必须为0 </li>
+                              <li>cmp_kv未传入时，cmp_mask_mode必须为0 </li>
                      </ul>
             </td>
         </tr>
