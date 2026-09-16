@@ -754,6 +754,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
+    - queryRopeOptional和keyRopeOptional非空时，query和keyIn的每头D必须为128，value和dy的每头D必须为128，queryRopeOptional和keyRopeOptional的每头D必须为64。
     - seedOptional和offsetOptional只在keepProbOptional小于1.0时生效，否则不生效。
     - keepProbOptional小于1.0时，若dropMaskOptional非nullptr，则使用输入的dropMask；否则使用seed和offset生成的dropMask。
 <!-- end id8 -->

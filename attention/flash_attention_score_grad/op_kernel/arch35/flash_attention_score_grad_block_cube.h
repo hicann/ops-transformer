@@ -242,6 +242,7 @@ public:
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR queryRope,
                                             GM_ADDR keyRope, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace);
     __aicore__ inline void InitCubeBuffer(FagConstInfo &constInfo);
+    __aicore__ inline void UnInitCubeBuffer();
     __aicore__ inline void IterateMmDyV(LocalTensor<CALC_TYPE> &mm1ResTensor, FagConstInfo &constInfo,
                                         FagRunInfo &runInfo, PreloadArgs<IS_ROPE> &preloadArgs); // mm1
     __aicore__ inline void IterateMmQK(LocalTensor<CALC_TYPE> &mm2ResTensor, FagConstInfo &constInfo,
@@ -459,6 +460,47 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitCubeBuffer(FagConstInfo 
             } else {
                 commonl0CBuf.Init(l0cBufferManager, L0C_MAX_SIZE);
             }
+        }
+    }
+}
+
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::UnInitCubeBuffer()
+{
+    // uninit l0c buffer
+    if constexpr (IS_DKV_RESIDENT_L0C) {
+        mm1Mm2Mm3L0CBuf.Uninit(l0cBufferManager);
+        dkL0CBuf.Uninit(l0cBufferManager);
+        dvL0CBuf.Uninit(l0cBufferManager);
+    } else {
+        if (isDkvL0CResidentForD192Dv128) {
+            mm1Mm2Mm3L0CSpecialBuf.Uninit(l0cBufferManager);
+            dkL0CSpecialBuf.Uninit(l0cBufferManager);
+            dvL0CSpecialBuf.Uninit(l0cBufferManager);
+        } else if (isDvL0CResidentForD192ToD256) {
+            partHeadDimCommonL0CBuf.Uninit(l0cBufferManager);
+            dvL0CResidentBuf.Uninit(l0cBufferManager);
+        } else {
+            commonl0CBuf.Uninit(l0cBufferManager);
+        }
+    }
+
+    // uninit l0a l0b buffer
+    l0aBuf.Uninit(l0aBufferManager);
+    l0bBuf.Uninit(l0bBufferManager);
+
+    // uninit l1 buffer
+    if constexpr (IS_L1_REUSE || IS_L1_PRELOAD) {
+        dYL1Buf.Uninit(*l1BufferManagerPtr);
+        vL1Buf.Uninit(*l1BufferManagerPtr);
+        qL1Buf.Uninit(*l1BufferManagerPtr);
+        kL1Buf.Uninit(*l1BufferManagerPtr);
+    } else {
+        if constexpr (IS_FP32_D_EXCEED_256) {
+            fp32L1Buf1.Uninit(*l1BufferManagerPtr);
+            fp32L1Buf2.Uninit(*l1BufferManagerPtr);
+        } else {
+            commonL1Buf.Uninit(*l1BufferManagerPtr);
         }
     }
 }
@@ -1798,6 +1840,7 @@ public:
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR queryRope,
                                             GM_ADDR keyRope, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace) {};
     __aicore__ inline void InitCubeBuffer(FagConstInfo &constInfo) {};
+    __aicore__ inline void UnInitCubeBuffer() {};
     __aicore__ inline void IterateMmDyV(LocalTensor<CALC_TYPE> &mm1ResTensor, FagConstInfo &constInfo,
                                         FagRunInfo &runInfo, PreloadArgs<IS_ROPE> &preloadArgs) {};
     __aicore__ inline void IterateMmQK(LocalTensor<CALC_TYPE> &mm2ResTensor, FagConstInfo &constInfo,

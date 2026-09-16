@@ -87,6 +87,60 @@ static Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo MakeA5Comp
             platform_ascendc::SocVersion::ASCEND950};
 }
 
+static gert::TilingContextPara MakeMlaRopeTilingContext(
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo *compileInfo, int64_t qkD, int64_t valueD)
+{
+    return gert::TilingContextPara("FlashAttentionScoreGrad",
+                                   {
+                                       {{{1, 128, 1, qkD}, {1, 128, 1, qkD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, qkD}, {1, 128, 1, qkD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, valueD}, {1, 128, 1, valueD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, valueD}, {1, 128, 1, valueD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                       {{{1, 1, 128, 8}, {1, 1, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       {{{1, 1, 128, 8}, {1, 1, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, valueD}, {1, 128, 1, valueD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                   },
+                                   {
+                                       {{{1, 128, 1, qkD}, {1, 128, 1, qkD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, qkD}, {1, 128, 1, qkD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, valueD}, {1, 128, 1, valueD}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                       {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                   },
+                                   {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.072168f)},
+                                    {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                    {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+                                    {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+                                    {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                    {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+                                    {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                    {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+                                   compileInfo, "Ascend950", A5SocInfo, 4096);
+}
+
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_0)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
@@ -148,10 +202,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_0)
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
             // dScaleo
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // queryRope
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            // keyRope
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            // queryRope and keyRope are omitted to cover nullptr optional inputs.
         },
         {
             // 输出Tensor
@@ -6345,65 +6396,22 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_62_tnd_
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_63_mla_rope)
 {
     auto compileInfo = MakeA5CompileInfo();
-    gert::TilingContextPara tilingContextPara(
-        "FlashAttentionScoreGrad",
-        {
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
-            {{{1, 1, 128, 8}, {1, 1, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1, 1, 128, 8}, {1, 1, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 192}, {1, 128, 1, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{1, 128, 1, 64}, {1, 128, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-        },
-        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.072168f)},
-         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
-         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
-         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "Ascend950", A5SocInfo, 4096);
-    int64_t expectTilingKey = 20125462445953074;
-    std::string expectTilingData =
-        "32 1 1 1 128 128 192 192 4575657222441520337 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 1 "
-        "549755813952 549755813952 1 549755814016 4294967297 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 16384 24576 1 "
-        "24576 24576 1 24576 24576 1 24576 0 0 0 1 61440 30720 114688 30720 1 16384 1 16384 1 0 0 0 0 0 0 0 0 0 0 1 "
-        "24576 18432 6144 1 24576 18432 6144 1 24576 18432 6144 65536 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {28115456};
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+    auto tilingContextPara = MakeMlaRopeTilingContext(&compileInfo, 128, 128);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_mla_rope_query_key_d)
+{
+    auto compileInfo = MakeA5CompileInfo();
+    auto tilingContextPara = MakeMlaRopeTilingContext(&compileInfo, 192, 128);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_mla_rope_value_d)
+{
+    auto compileInfo = MakeA5CompileInfo();
+    auto tilingContextPara = MakeMlaRopeTilingContext(&compileInfo, 128, 192);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_64_sink)

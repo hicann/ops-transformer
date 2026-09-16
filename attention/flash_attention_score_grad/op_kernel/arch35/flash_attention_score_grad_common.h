@@ -66,8 +66,6 @@ constexpr uint32_t MIN_SWIZZLE_S1 = 16384;
 constexpr uint32_t BASE_SWIZZLE_BLOCK_NUM = 8;
 constexpr uint32_t M_SWIZZLE_SIZE = 32768;
 constexpr uint32_t N_SWIZZLE_SIZE = 32768;
-constexpr uint32_t SWIZZLE_CONTINUOUS_BLOCK_NUM = 16;
-constexpr uint8_t MULTIPLY_COEF = 8;
 
 // shift left by three bits
 constexpr uint8_t kShiftToMultiplyByEight = 3;
@@ -430,17 +428,7 @@ struct FagConstInfo {
     int64_t dRopeSize = 64;          // rope旋转的维度
     uint32_t continuousBlockNum = 0; // 核内连续块数量
     // swizzle相关
-    int64_t mSwizzleBlockNum = 0;
-    int64_t mSwizzleBlockNumTail = 0;
-    int64_t nSwizzleBlockNum = 0;
-    int64_t nSwizzleBlockNumTail = 0;
-    int64_t leftUpTotalRound = 0;
-    int64_t leftDownTotalRound = 0;
-    int64_t rightUpTotalRound = 0;
-    int64_t rightDownTotalRound = 0;
-    int64_t leftSingleColTotalRound = 0;
-    int64_t leftTotalRound = 0;
-    int64_t batchTotalRound = 0;
+    int64_t swizzleMaxRound = 0;
     int64_t actualS1Outer;         // m
     int64_t actualS2Outer;         // n
     int64_t firstValidColBlockNum; // p
