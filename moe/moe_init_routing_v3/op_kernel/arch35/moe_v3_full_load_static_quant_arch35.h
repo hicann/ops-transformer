@@ -171,6 +171,7 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::ScatterOutXStaticQuant()
         inputXInQueue_.EnQue<T>(inLocal);
 
         Compute(1);
+        inputXInQueue_.FreeTensor(inLocal);
 
         LocalTensor<int8_t> outLocal = inputXOutQueue_.DeQue<int8_t>();
         DataCopyPad(expandedXGm_[xDstOffset], outLocal, copyOutParams);
