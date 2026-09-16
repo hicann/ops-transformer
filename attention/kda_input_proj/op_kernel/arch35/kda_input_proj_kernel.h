@@ -56,7 +56,7 @@ public:
         mmBgg_.Init(x_, weightBeta_, weightGate_, weightG_, beta_, gate_, g_, workspace_, tiling_);
         mxQuant_.Init(x_, quantX, scaleX, tiling_);
         qmmQkv_.Init(quantX, weightQkv_, scaleX, weightQkvScale_, qkv_, tiling_);
-        sigmoid_.Init(beta_, gate_, g_, tiling_);
+        sigmoid_.Init(beta_, tiling_);
     }
 
     __aicore__ inline void Process();
@@ -112,7 +112,9 @@ template <typename TypePack>
 __aicore__ inline void KdaInputProjKernel<TypePack>::Process()
 {
     ProcessStage1();
-    // MIX 默认 SyncAll() 是 isAIVOnly=true，只栅栏 AIV；Stage2 的 QMM(AIC) 与 Sigmoid(AIV) 需要全核屏障。
+    // MIX 默认 SyncAll() 是 isAIVOnly=true，只栅栏 AIV，这里两个方向都需要全核屏障：
+    // Stage2 的 QMM 在 AIC 上读 Stage1 由 AIV 写进 workspace 的 quantX / scaleX；
+    // Stage2 的 Sigmoid 在 AIV 上读 Stage1 由 AIC 写出的 beta / gate / g。
     AscendC::SyncAll<false>();
     ProcessStage2();
 }

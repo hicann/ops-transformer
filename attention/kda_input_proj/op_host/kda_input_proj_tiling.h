@@ -78,8 +78,10 @@ public:
     bool transWeightGate = true;
     bool transWeightG = true;
     uint32_t aicNum = 0;
+    uint32_t aivNum = 0;
     uint64_t l1Size = 0;
     uint64_t l0cSize = 0;
+    uint64_t ubSize = 0;
 };
 
 class KdaInputProjInfoParser {
@@ -109,8 +111,10 @@ private:
     KdaInputProjParaInfo opParamInfo_;
     KdaInputProjBaseParams baseParams_;
     uint32_t aicNum_ = 0;
+    uint32_t aivNum_ = 0;
     uint64_t l1Size_ = 0;
     uint64_t l0cSize_ = 0;
+    uint64_t ubSize_ = 0;
 };
 
 class KdaInputProjTiling {

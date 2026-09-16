@@ -62,11 +62,21 @@ public:
         uint8_t nBufferNum = L1_TWO_BUFFER;
         CalcNBufferNum(baseM, baseN, baseK, stepKa, stepKb, initScaleKL1, kL1, scaleKL1, nBufferNum);
 
+        // 兜底：L1 超配在设备上只会表现为 LOAD2D 读越界（aicore error 507015），很难定位，
+        // 这里在 host 侧把它拦成明确的 tiling 失败。
+        const L1Estimate finalEst{kL1, scaleKL1, baseM, baseN};
+        const uint64_t finalL1 = CalcUsedL1Size(finalEst, nBufferNum);
+        if (finalL1 > l1Size_) {
+            OP_LOGE(opName_, "QMM L1 overflow: used=%lu l1=%lu base(%lu,%lu,%lu) kL1=%lu scaleKL1=%lu nBuf=%u", finalL1,
+                    l1Size_, baseM, baseN, baseK, kL1, scaleKL1, nBufferNum);
+            return ge::GRAPH_FAILED;
+        }
+
         params.kL1 = static_cast<uint32_t>(kL1);
         params.scaleKL1 = static_cast<uint32_t>(scaleKL1);
-        params.baseM = static_cast<uint16_t>(baseM);
-        params.baseN = static_cast<uint16_t>(baseN);
-        params.baseK = static_cast<uint16_t>(baseK);
+        params.baseM = static_cast<uint32_t>(baseM);
+        params.baseN = static_cast<uint32_t>(baseN);
+        params.baseK = static_cast<uint32_t>(baseK);
         params.nBufferNum = nBufferNum;
         params.dbL0C = CalcDbL0C(baseM, baseN);
         CalcTailTiles(baseM, baseN, params);
@@ -259,8 +269,11 @@ private:
         if (fullCover <= params.scaleKL1) {
             return params.scaleKL1;
         }
+        // params 是按值传入的副本，必须先存下原值：否则赋值后两个分支返回的都是
+        // fullCover，放不下时的回退失效，会让 L1 超配并触发 LOAD2D 读越界。
+        const uint64_t fallback = params.scaleKL1;
         params.scaleKL1 = fullCover;
-        return CanFitL1BufferNum(params, l1BufferNum) ? fullCover : params.scaleKL1;
+        return CanFitL1BufferNum(params, l1BufferNum) ? fullCover : fallback;
     }
 
     bool IsInnerKAlignedForStepK2(uint64_t stepKTwoKL1) const
@@ -356,8 +369,8 @@ private:
                 }
             }
         }
-        params.mTailTile = static_cast<uint16_t>(bestM);
-        params.nTailTile = static_cast<uint16_t>(bestN);
+        params.mTailTile = static_cast<uint32_t>(bestM);
+        params.nTailTile = static_cast<uint32_t>(bestN);
     }
 
     const char *opName_{nullptr};

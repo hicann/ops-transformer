@@ -15,6 +15,9 @@
 
 #include "kda_input_proj_tiling.h"
 
+#include <algorithm>
+#include <cstring>
+
 #include "../op_kernel/kda_input_proj_template_tiling_key.h"
 #include "../op_kernel/kda_input_proj_workspace.h"
 #include "kda_input_proj_tiling_mm_bgg.h"
@@ -24,27 +27,32 @@
 
 namespace optiling {
 namespace {
+constexpr uint32_t DIM_IDX_ZERO = 0U;
+constexpr uint32_t DIM_IDX_ONE = 1U;
+constexpr uint32_t DIM_IDX_TWO = 2U;
 constexpr uint32_t DIM_NUM_TWO = 2U;
 constexpr uint32_t DIM_NUM_THREE = 3U;
 constexpr int64_t MX_BLOCK_SIZE = 64L;
 constexpr int64_t WEIGHT_QKV_SCALE_PACK_NUM = 2L;
 
-ge::graphStatus InferOutFeatures(const char *opName, const gert::Shape &weightStorage, int64_t hiddenSize,
-                                 bool transWeight, const char *weightName, int64_t &outFeatures)
+static bool GetAttrOrDefault(const bool *ptr, bool defaultValue)
 {
-    const int64_t dim0 = weightStorage.GetDim(0);
-    const int64_t dim1 = weightStorage.GetDim(1);
-    OP_CHECK_IF(dim0 <= 0L || dim1 <= 0L, OP_LOGE(opName, "%s shape [%ld, %ld] is invalid.", weightName, dim0, dim1),
-                return ge::GRAPH_FAILED);
-    const int64_t inFeatures = transWeight ? dim1 : dim0;
-    OP_CHECK_IF(inFeatures != hiddenSize,
-                OP_LOGE(opName, "%s inFeatures=%ld does not match x.dim1=%ld (trans_weight=%d).", weightName,
-                        inFeatures, hiddenSize, static_cast<int32_t>(transWeight)),
-                return ge::GRAPH_FAILED);
-    outFeatures = transWeight ? dim0 : dim1;
-    OP_CHECK_IF(outFeatures <= 0L, OP_LOGE(opName, "%s outFeatures=%ld is invalid.", weightName, outFeatures),
-                return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
+    return (ptr != nullptr) ? *ptr : defaultValue;
+}
+
+static const gert::Shape &GetWeightLogicShape(const gert::StorageShape *shape)
+{
+    const auto &origin = shape->GetOriginShape();
+    if (origin.GetDimNum() == DIM_NUM_TWO) {
+        return origin;
+    }
+    return shape->GetStorageShape();
+}
+
+// trans=true：存储 [N, K]，N=dim0；trans=false：逻辑 [K, N]，N=dim1。
+static uint32_t InferOutFeatures(const gert::Shape &weightShape, bool transWeight)
+{
+    return static_cast<uint32_t>(transWeight ? weightShape.GetDim(DIM_IDX_ZERO) : weightShape.GetDim(DIM_IDX_ONE));
 }
 
 ge::graphStatus CheckExpectDataType(ge::DataType actual, ge::DataType expect, const char *tensorName,
@@ -77,6 +85,7 @@ ge::graphStatus KdaInputProjInfoParser::GetNpuInfo()
     const uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     OP_CHECK_IF(aicNum == 0U || aivNum == 0U, OP_LOGE(opName_, "num of core obtained is 0."), return ge::GRAPH_FAILED);
     aicNum_ = aicNum;
+    aivNum_ = aivNum;
 
     const auto socVersion = ascendcPlatform.GetSocVersion();
     OP_CHECK_IF(socVersion != platform_ascendc::SocVersion::ASCEND950,
@@ -90,6 +99,11 @@ ge::graphStatus KdaInputProjInfoParser::GetNpuInfo()
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0cSize_);
     OP_CHECK_IF(l1Size_ == 0UL || l0cSize_ == 0UL,
                 OP_LOGE(opName_, "l1Size or l0cSize is 0, platform mem info is invalid."), return ge::GRAPH_FAILED);
+
+    ubSize_ = 0UL;
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize_);
+    OP_CHECK_IF(ubSize_ == 0UL, OP_LOGE(opName_, "ubSize is 0, platform mem info is invalid."),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -237,38 +251,27 @@ ge::graphStatus KdaInputProjInfoParser::CheckShapeDim()
 
 ge::graphStatus KdaInputProjInfoParser::GetBaseShapeInfo()
 {
-    const int64_t tSize = opParamInfo_.x.shape->GetStorageShape().GetDim(0);
-    const int64_t hiddenSize = opParamInfo_.x.shape->GetStorageShape().GetDim(1);
-    const bool transWeightQkv = opParamInfo_.transWeightQkv != nullptr ? *opParamInfo_.transWeightQkv : true;
-    const bool transWeightBeta = opParamInfo_.transWeightBeta != nullptr ? *opParamInfo_.transWeightBeta : true;
-    const bool transWeightGate = opParamInfo_.transWeightGate != nullptr ? *opParamInfo_.transWeightGate : true;
-    const bool transWeightG = opParamInfo_.transWeightG != nullptr ? *opParamInfo_.transWeightG : true;
+    const auto &xShape = opParamInfo_.x.shape->GetStorageShape();
+    baseParams_.tSize = static_cast<uint32_t>(xShape.GetDim(DIM_IDX_ZERO));
+    baseParams_.hiddenSize = static_cast<uint32_t>(xShape.GetDim(DIM_IDX_ONE));
+    OP_CHECK_IF(baseParams_.tSize == 0 || baseParams_.hiddenSize == 0,
+                OP_LOGE(opName_, "x shape [%u, %u] is invalid.", baseParams_.tSize, baseParams_.hiddenSize),
+                return ge::GRAPH_FAILED);
 
-    int64_t qkvSize = 0L;
-    int64_t betaSize = 0L;
-    int64_t gateSize = 0L;
-    int64_t gSize = 0L;
-    if (InferOutFeatures(opName_, opParamInfo_.weightQkv.shape->GetStorageShape(), hiddenSize, transWeightQkv,
-                         kda_input_proj::WEIGHT_QKV_NAME, qkvSize) != ge::GRAPH_SUCCESS ||
-        InferOutFeatures(opName_, opParamInfo_.weightBeta.shape->GetStorageShape(), hiddenSize, transWeightBeta,
-                         kda_input_proj::WEIGHT_BETA_NAME, betaSize) != ge::GRAPH_SUCCESS ||
-        InferOutFeatures(opName_, opParamInfo_.weightGate.shape->GetStorageShape(), hiddenSize, transWeightGate,
-                         kda_input_proj::WEIGHT_GATE_NAME, gateSize) != ge::GRAPH_SUCCESS ||
-        InferOutFeatures(opName_, opParamInfo_.weightG.shape->GetStorageShape(), hiddenSize, transWeightG,
-                         kda_input_proj::WEIGHT_G_NAME, gSize) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
+    const bool transQkv = GetAttrOrDefault(opParamInfo_.transWeightQkv, true);
+    const bool transBeta = GetAttrOrDefault(opParamInfo_.transWeightBeta, true);
+    const bool transGate = GetAttrOrDefault(opParamInfo_.transWeightGate, true);
+    const bool transG = GetAttrOrDefault(opParamInfo_.transWeightG, true);
 
-    OP_CHECK_IF(tSize > static_cast<int64_t>(UINT32_MAX) || hiddenSize > static_cast<int64_t>(UINT32_MAX) ||
-                    qkvSize > static_cast<int64_t>(UINT32_MAX) || betaSize > static_cast<int64_t>(UINT32_MAX) ||
-                    gateSize > static_cast<int64_t>(UINT32_MAX) || gSize > static_cast<int64_t>(UINT32_MAX),
-                OP_LOGE(opName_, "Shape exceeds uint32 range for tiling base params."), return ge::GRAPH_FAILED);
-    baseParams_.tSize = static_cast<uint32_t>(tSize);
-    baseParams_.hiddenSize = static_cast<uint32_t>(hiddenSize);
-    baseParams_.qkvSize = static_cast<uint32_t>(qkvSize);
-    baseParams_.betaSize = static_cast<uint32_t>(betaSize);
-    baseParams_.gateSize = static_cast<uint32_t>(gateSize);
-    baseParams_.gSize = static_cast<uint32_t>(gSize);
+    baseParams_.qkvSize = InferOutFeatures(GetWeightLogicShape(opParamInfo_.weightQkv.shape), transQkv);
+    baseParams_.betaSize = InferOutFeatures(GetWeightLogicShape(opParamInfo_.weightBeta.shape), transBeta);
+    baseParams_.gateSize = InferOutFeatures(GetWeightLogicShape(opParamInfo_.weightGate.shape), transGate);
+    baseParams_.gSize = InferOutFeatures(GetWeightLogicShape(opParamInfo_.weightG.shape), transG);
+    OP_CHECK_IF(
+        baseParams_.qkvSize == 0 || baseParams_.betaSize == 0 || baseParams_.gateSize == 0 || baseParams_.gSize == 0,
+        OP_LOGE(opName_, "output features qkv/beta/gate/g must be >0, got %u/%u/%u/%u.", baseParams_.qkvSize,
+                baseParams_.betaSize, baseParams_.gateSize, baseParams_.gSize),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -303,13 +306,16 @@ void KdaInputProjInfoParser::GenerateInfo(KdaInputProjTilingInfo &tilingInfo)
     tilingInfo.transWeightGate = opParamInfo_.transWeightGate != nullptr ? *opParamInfo_.transWeightGate : true;
     tilingInfo.transWeightG = opParamInfo_.transWeightG != nullptr ? *opParamInfo_.transWeightG : true;
     tilingInfo.aicNum = aicNum_;
+    tilingInfo.aivNum = aivNum_;
     tilingInfo.l1Size = l1Size_;
     tilingInfo.l0cSize = l0cSize_;
+    tilingInfo.ubSize = ubSize_;
 
-    OP_LOGI(opName_, "KdaInputProj ParseAndCheck: T=%u K=%u qkv=%u beta=%u gate=%u g=%u aic=%u l1=%lu l0c=%lu.",
+    OP_LOGI(opName_,
+            "KdaInputProj ParseAndCheck: T=%u K=%u qkv=%u beta=%u gate=%u g=%u aic=%u aiv=%u l1=%lu l0c=%lu ub=%lu.",
             tilingInfo.baseParams.tSize, tilingInfo.baseParams.hiddenSize, tilingInfo.baseParams.qkvSize,
             tilingInfo.baseParams.betaSize, tilingInfo.baseParams.gateSize, tilingInfo.baseParams.gSize,
-            tilingInfo.aicNum, tilingInfo.l1Size, tilingInfo.l0cSize);
+            tilingInfo.aicNum, tilingInfo.aivNum, tilingInfo.l1Size, tilingInfo.l0cSize, tilingInfo.ubSize);
 }
 
 ge::graphStatus KdaInputProjInfoParser::ParseAndCheck(KdaInputProjTilingInfo &tilingInfo)
@@ -327,6 +333,11 @@ ge::graphStatus KdaInputProjInfoParser::ParseAndCheck(KdaInputProjTilingInfo &ti
         return ge::GRAPH_FAILED;
     }
     GenerateInfo(tilingInfo);
+    OP_LOGI(opName_, "KdaInputProj parse: T=%u K=%u qkv=%u beta=%u gate=%u g=%u trans(qkv/beta/gate/g)=%d/%d/%d/%d.",
+            baseParams_.tSize, baseParams_.hiddenSize, baseParams_.qkvSize, baseParams_.betaSize, baseParams_.gateSize,
+            baseParams_.gSize, static_cast<int32_t>(tilingInfo.transWeightQkv),
+            static_cast<int32_t>(tilingInfo.transWeightBeta), static_cast<int32_t>(tilingInfo.transWeightGate),
+            static_cast<int32_t>(tilingInfo.transWeightG));
     return ge::GRAPH_SUCCESS;
 }
 
@@ -344,7 +355,7 @@ ge::graphStatus KdaInputProjTiling::FillBaseParams(const KdaInputProjTilingInfo 
 ge::graphStatus KdaInputProjTiling::CalcModuleTilings(const KdaInputProjTilingInfo &tilingInfo)
 {
     // 与 kernel 四组件一一对应；跨模块 workspace / 核数协调在编排层汇总
-    if (KdaInputProjMmBggTiling(tilingInfo).CalcTiling(tilingData_.mmBggParams) != ge::GRAPH_SUCCESS ||
+    if (KdaInputProjMmBggTiling(tilingInfo, context_).CalcTiling(tilingData_.mmBggParams) != ge::GRAPH_SUCCESS ||
         KdaInputProjMxQuantTiling(tilingInfo).CalcTiling(tilingData_.mxQuantParams) != ge::GRAPH_SUCCESS ||
         KdaInputProjQmmQkvTiling(tilingInfo).CalcTiling(tilingData_.qmmQkvParams) != ge::GRAPH_SUCCESS ||
         KdaInputProjSigmoidTiling(tilingInfo).CalcTiling(tilingData_.sigmoidParams) != ge::GRAPH_SUCCESS) {
@@ -381,9 +392,30 @@ ge::graphStatus KdaInputProjTiling::WriteTilingResult(const KdaInputProjTilingIn
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo.platformInfo);
     const uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    const uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    const uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
-    OP_CHECK_IF(blockDim == 0U, OP_LOGE(opName, "blockDim is 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicNum == 0U, OP_LOGE(opName, "num of aic obtained is 0."), return ge::GRAPH_FAILED);
+
+    const uint32_t tileNum =
+        tilingData_.mmBggParams.numBetaTile + tilingData_.mmBggParams.numGateTile + tilingData_.mmBggParams.numGTile;
+    constexpr uint32_t kAivPerAic = 2U;
+    // MxQuant 把行按核号分给 0..usedCoreNum-1，编号超出实际启动核数的那部分行不会有核去处理，
+    // quantX 里对应行保持脏数据，Stage2 的 QMM 会照着算出错误的 qkv。所以 blockDim 不能只看
+    // mm_bgg 的块数，必须同时够 MxQuant 用。
+    const uint32_t mxQuantAic =
+        static_cast<uint32_t>((tilingData_.mxQuantParams.usedCoreNum + static_cast<int64_t>(kAivPerAic) - 1) /
+                              static_cast<int64_t>(kAivPerAic));
+    // 与 MatMulV3 usedCoreNum = min(mCnt*nCnt, aicNum) 一致：块数不够时允许不满核。
+    const uint32_t needAic = std::max(tileNum, mxQuantAic);
+    const uint32_t blockDim = (needAic == 0U) ? 1U : std::min(aicNum, needAic);
+
+    // 这类不一致是静默的（输出脏数据而非报错），宁可在 tiling 阶段就拦下来。
+    OP_CHECK_IF(tilingData_.mxQuantParams.usedCoreNum > static_cast<int64_t>(blockDim * kAivPerAic),
+                OP_LOGE(opName, "MxQuant usedCoreNum=%ld exceeds launched aiv=%u (blockDim=%u).",
+                        tilingData_.mxQuantParams.usedCoreNum, blockDim * kAivPerAic, blockDim),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(KdaInputProjSigmoidTiling(tilingInfo).FillAivSplit(tilingData_.sigmoidParams, blockDim * kAivPerAic) !=
+                    ge::GRAPH_SUCCESS,
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "Sigmoid FillAivSplit failed."), return ge::GRAPH_FAILED);
+
     context_->SetBlockDim(blockDim);
     context_->SetScheduleMode(1);
 
@@ -398,7 +430,8 @@ ge::graphStatus KdaInputProjTiling::WriteTilingResult(const KdaInputProjTilingIn
                 return ge::GRAPH_FAILED);
     *outTiling = tilingData_;
 
-    OP_LOGI(opName, "KdaInputProj WriteTilingResult: blockDim=%u workspace=%zu.", blockDim, workspaces[0]);
+    OP_LOGI(opName, "KdaInputProj WriteTilingResult: blockDim=%u tileNum=%u workspace=%zu.", blockDim, tileNum,
+            workspaces[0]);
     return ge::GRAPH_SUCCESS;
 }
 

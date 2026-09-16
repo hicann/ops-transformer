@@ -37,15 +37,14 @@ $$
 
 在Stage 2，KdaInputProj算子分别利用AIC和AIV并行执行 `QuantMatmul (qkv)` 和 `Sigmoid` 两个计算任务。其中 `QuantMatmul` 的激活为Stage 1中的 `DynamicMxQuant` 任务的输出，`qkv_weight` 为离线量化好的权重。
 
-
 ## 接口说明
 
-该算子通过PyTorch扩展注册为`torch.ops.custom.npu_kda_input_proj`。
+该算子通过`cann_ops_transformer`注册为`torch.ops.cann_ops_transformer.kda_input_proj`。
 
 ### PyTorch接口原型
 
 ```python
-torch.ops.custom.npu_kda_input_proj(
+cann_ops_transformer.kda_input_proj(
     x: Tensor,
     weight_qkv: Tensor,
     weight_beta: Tensor,
@@ -64,11 +63,11 @@ torch.ops.custom.npu_kda_input_proj(
 | 参数名 | 输入 / 输出 | 数据类型 | 数据格式 | 维度（shape） | 描述 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `x` | 输入 | BFLOAT16 | ND | `[T, 7168]` | 隐藏层输入。 |
-| `weight_qkv` | 输入 | FLOAT8_E4M3 | ND | `[4608, 7168]` | qkv投影的权重。 |
-| `weight_beta` | 输入 | BFLOAT16 | ND | `[12, 7168]` | beta投影的权重。 |
-| `weight_gate` | 输入 | BFLOAT16 | ND | `[1536, 7168]` | gate投影的权重。 |
-| `weight_g` | 输入 | BFLOAT16 | ND | `[1536, 7168]` | g投影的权重。 |
-| `weight_qkv_scale` | 输入 | FLOAT8_E8M0 | ND | `[4608, 112, 2]` | qkv投影权重的缩放系数。 |
+| `weight_qkv` | 输入 | FLOAT8_E4M3 | ND | `[7168, 4608]` | qkv投影权重，matmul RHS `[K, N]`。 |
+| `weight_beta` | 输入 | BFLOAT16 | ND | `[7168, 12]` | beta投影权重，matmul RHS `[K, N]`。 |
+| `weight_gate` | 输入 | BFLOAT16 | ND | `[7168, 1536]` | gate投影权重，matmul RHS `[K, N]`。 |
+| `weight_g` | 输入 | BFLOAT16 | ND | `[7168, 1536]` | g投影权重，matmul RHS `[K, N]`。 |
+| `weight_qkv_scale` | 输入 | FLOAT8_E8M0 | ND | `[112, 4608, 2]` | `weight_qkv` 的 MX 量化缩放因子。 |
 
 ## 约束说明
 
@@ -93,14 +92,9 @@ torch.ops.custom.npu_kda_input_proj(
 ```python
 import torch
 import torch_npu
-import custom_ops
+import cann_ops_transformer
 
-# 安装 torch_ops_extension 后调用（见 torch_ops_extension/build_and_install.sh）
-out = torch.ops.custom.npu_kda_input_proj(
-    x, weight_qkv, weight_beta, weight_gate, weight_g, weight_qkv_scale
+qkv, beta, gate, g = cann_ops_transformer.kda_input_proj(
+    x, weight_qkv, weight_beta, weight_gate, weight_g, weight_qkv_scale=weight_qkv_scale
 )
 ```
-
-## 相关接口
-
-PyTorch 扩展编译与安装说明见[build_and_install.sh](../torch_ops_extension/build_and_install.sh)。精度与 pytest 用例在后续 PR 合入后提供。

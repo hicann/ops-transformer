@@ -30,23 +30,19 @@ public:
         this->Input(kda_input_proj::WEIGHT_QKV_NAME)
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT8_E4M3FN})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .FormatList({ge::FORMAT_ND});
         this->Input(kda_input_proj::WEIGHT_BETA_NAME)
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .FormatList({ge::FORMAT_ND});
         this->Input(kda_input_proj::WEIGHT_GATE_NAME)
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .FormatList({ge::FORMAT_ND});
         this->Input(kda_input_proj::WEIGHT_G_NAME)
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .FormatList({ge::FORMAT_ND});
         this->Input(kda_input_proj::WEIGHT_QKV_SCALE_NAME)
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT8_E8M0})
