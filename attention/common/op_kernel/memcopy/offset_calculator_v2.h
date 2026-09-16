@@ -39,6 +39,9 @@ enum class FormatCategory {
     GM_K_SCALE_PA_NZ = 14,
     GM_ANTIQ_NT = 15,
     GM_ANTIQ_TN = 16,
+    GM_ANTIQ_BnNDBs = 17,
+    GM_ANTIQ_BNDS = 18,
+    GM_V_SCALE_PA_NZ = 19,
 };
 
 template <GmFormat FORMAT>
@@ -387,6 +390,11 @@ struct OffsetCalculatorImpl<FORMAT, FormatCategory::GM_KV_BNSD, ACTLEN_T> {
         gmLayout.MakeLayout(b, n2, s2, d);
     }
 
+    __aicore__ inline void Init(const ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, ACTLEN_T> &parser)
+    {
+        actualSeqLensKVParser = parser;
+    }
+
     __aicore__ inline uint64_t GetOffset(uint32_t bIdx, uint32_t n2Idx, uint32_t s2Idx, uint32_t dIdx)
     {
         if (isKvPaddingFlag) {
@@ -723,11 +731,7 @@ struct OffsetCalculatorImpl<FORMAT, FormatCategory::GM_K_SCALE_PA_NZ, ACTLEN_T> 
                                 uint64_t bn2Stride = 0, uint64_t n2Stride = 0)
     {
         blockTableParser.Init(blockTableGm, maxblockNumPerBatch);
-#if ((__CCE_AICORE__ == 310) || (defined __DAV_310R6__))
         gmLayout.MakeLayout(n2, blockSize, d1, d0, bn2Stride, n2Stride);
-#else
-        gmLayout.MakeLayout(n2, blockSize, d1, d0);
-#endif
     }
 
     __aicore__ inline uint64_t GetOffset(uint32_t bIdx, uint32_t n2Idx, uint32_t s2Idx, uint32_t dIdx)

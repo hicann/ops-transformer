@@ -125,6 +125,15 @@ public:
         this->seqUsedDims = seqUsedDims;
     }
 
+    __aicore__ inline void Init(GlobalTensor<ACTLEN_T> cuSeqLensGm, GlobalTensor<ACTLEN_T> seqUsedGm,
+                                uint32_t cuSeqLensSize, uint32_t seqUsedSize, uint64_t defaultVal = 0)
+    {
+        this->cuSeqLensGm = cuSeqLensGm;
+        this->seqUsedGm = seqUsedGm;
+        this->actualLenDims = cuSeqLensSize + 1;
+        this->seqUsedDims = seqUsedSize;
+    }
+
     __aicore__ inline uint64_t GetTBase(uint32_t bIdx) const
     {
         return cuSeqLensGm.GetValue(bIdx);

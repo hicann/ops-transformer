@@ -109,7 +109,8 @@ public:
     {
         // per tensor场景在接口外部直接getvalue
         // per channel / per token
-        if constexpr ((GM_FORMAT == GmFormat::ND) || (GM_FORMAT == GmFormat::BS2) || (GM_FORMAT == GmFormat::BNS2)) {
+        if constexpr ((GM_FORMAT == GmFormat::ND) || (GM_FORMAT == GmFormat::BS2) || (GM_FORMAT == GmFormat::BNS2) ||
+                      (GM_FORMAT == GmFormat::BNSD) || (GM_FORMAT == GmFormat::BSND)) {
             ProcessAntiqPerChannelOrPerToken(dstTensor, srcTensor, antiqGmCoord);
         }
         // per token + PA
@@ -125,7 +126,7 @@ private:
     {
         OffsetCalculator<GM_FORMAT> &offsetCalculator = srcTensor.offsetCalculator;
         uint64_t offset = offsetCalculator.GetOffset(antiqGmCoord.bIdx, antiqGmCoord.n2Idx, antiqGmCoord.s2Idx, 0);
-        if constexpr (GM_FORMAT == GmFormat::ND) {
+        if constexpr (GM_FORMAT == GmFormat::ND || GM_FORMAT == GmFormat::BNSD || GM_FORMAT == GmFormat::BSND) {
             CopySingleMatrixNDToND<T>(dstTensor.tensor, srcTensor.gmTensor[offset], 1, offsetCalculator.GetDimD(),
                                       offsetCalculator.GetDimD(), dstTensor.colCount);
         } else if constexpr (GM_FORMAT == GmFormat::BS2 || GM_FORMAT == GmFormat::BNS2) {

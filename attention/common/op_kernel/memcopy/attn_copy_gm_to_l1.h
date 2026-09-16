@@ -31,7 +31,8 @@ __aicore__ inline void CopySingleMatrixNDToNZ(LocalTensor<T> l1Tensor, const Glo
     if (unlikely(srcDValue < SRCDVALUE_LIMIT)) {
         nd2nzPara.ndNum = 1;
         nd2nzPara.nValue = nValue; // nd矩阵的行数
-        if constexpr (IsSameType<T, int4b_t>::value) {
+        if constexpr (IsSameType<T, int4b_t>::value || IsSameType<T, hifloat4x2_t>::value ||
+                      IsSameType<T, fp4x2_e2m1_t>::value) {
             constexpr uint32_t HALF_SIZE_DIVISOR = 2;
             nd2nzPara.dValue = dValue / HALF_SIZE_DIVISOR;
             nd2nzPara.srcDValue = srcDValue / HALF_SIZE_DIVISOR;
@@ -55,7 +56,8 @@ __aicore__ inline void CopySingleMatrixNDToNZ(LocalTensor<T> l1Tensor, const Glo
         nd2nzPara.dstNzMatrixStride = 0;
         nd2nzPara.ndNum = 1;
         nd2nzPara.nValue = 1;
-        if constexpr (IsSameType<T, int4b_t>::value) {
+        if constexpr (IsSameType<T, int4b_t>::value || IsSameType<T, hifloat4x2_t>::value ||
+                      IsSameType<T, fp4x2_e2m1_t>::value) {
             constexpr uint32_t HALF_SIZE_DIVISOR = 2;
             nd2nzPara.dValue = dValue / HALF_SIZE_DIVISOR;
             nd2nzPara.srcDValue = dValue / HALF_SIZE_DIVISOR;
@@ -320,7 +322,8 @@ private:
         uint32_t curS2Idx = gmCoord.s2Idx;
         uint32_t copyFinishRowCnt = 0;
         uint32_t blockElementCnt = 32 / sizeof(KV_T);
-        if constexpr (IsSameType<KV_T, int4b_t>::value) {
+        if constexpr (IsSameType<KV_T, int4b_t>::value || IsSameType<KV_T, hifloat4x2_t>::value ||
+                      IsSameType<KV_T, fp4x2_e2m1_t>::value) {
             blockElementCnt = 64; // int4b时32B可以存64个元素
         }
         while (copyFinishRowCnt < gmCoord.s2DealSize) {
@@ -456,7 +459,7 @@ private:
     }
 };
 
-#if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
+#if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__) || (__NPU_ARCH__ == 9201)
 // ----------------------------------------------CopyQueryScaleGmToL1--------------------------------
 template <typename T>
 __aicore__ inline void CopySingleMXScaleDNToNZ(LocalTensor<T> l1Tensor, const GlobalTensor<T> gmTensor, uint32_t nValue,
@@ -469,6 +472,26 @@ __aicore__ inline void CopySingleMXScaleDNToNZ(LocalTensor<T> l1Tensor, const Gl
     dn2nzPara.srcDnMatrixStride = 0; // 相邻Dn矩阵起始地址之间的偏移， 单位为元素个数
     dn2nzPara.srcDValue = srcDValue / 2; // 同一个Dn矩阵中相邻行起始地址之间的偏移， 单位为元素个数
     dn2nzPara.dstNzC0Stride = dstNzC0Stride / 2;
+    dn2nzPara.dstNzNStride = 1; // 转换为NZ矩阵后，ND之间相邻两行在NZ矩阵中起始地址之间的偏移， 单位为Block个数
+    dn2nzPara.dstNzMatrixStride = dn2nzPara.nValue; // 两个NZ矩阵，起始地址之间的偏移， 单位为元素数量
+
+    LocalTensor<bfloat16_t> l1TensorCast = l1Tensor.template ReinterpretCast<bfloat16_t>();
+    GlobalTensor<bfloat16_t> gmTensorCast;
+    gmTensorCast.SetGlobalBuffer(((__gm__ bfloat16_t *)(gmTensor.GetPhyAddr())));
+    DataCopy(l1TensorCast, gmTensorCast, dn2nzPara);
+}
+
+template <typename T>
+__aicore__ inline void CopySingleHIScaleDNToNZ(LocalTensor<T> l1Tensor, const GlobalTensor<T> gmTensor, uint32_t nValue,
+                                               uint32_t dValue, uint32_t srcDValue, uint32_t dstNzC0Stride)
+{
+    Dn2NzParams dn2nzPara;
+    dn2nzPara.dnNum = 1;             // ND矩阵的个数
+    dn2nzPara.nValue = nValue * 2;   // 单个DN矩阵的实际列数，单位为元素个数
+    dn2nzPara.dValue = dValue;       // 单个DN矩阵的实际行数，单位为元素个数
+    dn2nzPara.srcDnMatrixStride = 0; // 相邻Dn矩阵起始地址之间的偏移， 单位为元素个数
+    dn2nzPara.srcDValue = srcDValue * 2; // 同一个Dn矩阵中相邻行起始地址之间的偏移， 单位为元素个数
+    dn2nzPara.dstNzC0Stride = dstNzC0Stride * 2;
     dn2nzPara.dstNzNStride = 1; // 转换为NZ矩阵后，ND之间相邻两行在NZ矩阵中起始地址之间的偏移， 单位为Block个数
     dn2nzPara.dstNzMatrixStride = dn2nzPara.nValue; // 两个NZ矩阵，起始地址之间的偏移， 单位为元素数量
 
@@ -561,7 +584,7 @@ private:
         uint32_t s1IdxStart = gmCoord.gS1Idx % offsetCalculator.GetDimS1();
 
         uint64_t offset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, gIdxStart, s1IdxStart, gmCoord.dIdx);
-        CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.gS1DealSize, gmCoord.dDealSize,
+        CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, gmCoord.gS1DealSize,
                                 offsetCalculator.GetDimD(), gmCoord.dDealSize);
     }
 
@@ -649,8 +672,16 @@ private:
     {
         auto &offsetCalculator = srcTensor.offsetCalculator;
         uint64_t offset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, gmCoord.s2Idx, gmCoord.dIdx);
-        CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, gmCoord.s2DealSize,
-                                offsetCalculator.GetStrideS2(), gmCoord.dDealSize);
+        if constexpr (std::is_same_v<K_SCALE_T, fp8_e8m0_t>) {
+            CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, gmCoord.s2DealSize,
+                                    offsetCalculator.GetStrideS2(), gmCoord.dDealSize);
+        }
+#if (__NPU_ARCH__ == 9201)
+        else if (std::is_same_v<K_SCALE_T, hif4_scale>) {
+            CopySingleHIScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, gmCoord.s2DealSize,
+                                    offsetCalculator.GetStrideS2(), gmCoord.dDealSize);
+        }
+#endif
     }
 
     template <typename FaGmTensorType>
@@ -736,7 +767,7 @@ public:
                       GM_FORMAT == GmFormat::TND || GM_FORMAT == GmFormat::TND2) {
             ProcessContinuousOrTensorlist(dstTensor, srcTensor, gmCoord);
         } else if constexpr (GM_FORMAT == GmFormat::PA_BnBsND || GM_FORMAT == GmFormat::PA_BnNBsD ||
-                             GM_FORMAT == GmFormat::PA_NZ) {
+                             GM_FORMAT == GmFormat::PA_NZ || GM_FORMAT == GmFormat::PA_NZ_V_SCALE) {
             ProcessPageAttention(dstTensor, srcTensor, gmCoord);
         }
     }
@@ -752,8 +783,16 @@ private:
             CopySingleMXScaleNDToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.s2DealSize, gmCoord.dDealSize,
                                     offsetCalculator.GetStrideS2(), dstTensor.rowCount);
         } else if (SCALE_TRANS == ScaleTrans::DN2NZ) {
-            CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, gmCoord.s2DealSize,
-                                    offsetCalculator.GetStrideS2(), gmCoord.dDealSize);
+            if constexpr (std::is_same_v<V_SCALE_T, fp8_e8m0_t>) {
+                CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.s2DealSize,
+                                        gmCoord.dDealSize, offsetCalculator.GetStrideD(), gmCoord.s2DealSize);
+            }
+#if (__NPU_ARCH__ == 9201)
+            else if (std::is_same_v<V_SCALE_T, hif4_scale>) {
+                CopySingleHIScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.s2DealSize,
+                                        gmCoord.dDealSize, offsetCalculator.GetStrideD(), gmCoord.s2DealSize);
+            }
+#endif
         }
     }
 
@@ -776,7 +815,25 @@ private:
             uint64_t l1Offset = copyFinishRowCnt * blockElementCnt;
 
             // 拷贝数据
-            if constexpr (GM_FORMAT == GmFormat::PA_NZ) {
+            if constexpr (GM_FORMAT == GmFormat::PA_NZ_V_SCALE) {
+                DataCopyParams intriParams;
+                intriParams.blockCount = gmCoord.dDealSize / 16U;
+#if (__NPU_ARCH__ == 9201)
+                if constexpr (std::is_same_v<V_SCALE_T, hif4_scale>) {
+                    intriParams.blockLen = copyRowCnt * 2U; // 每个最小分型组64B 要 * 2
+                    intriParams.dstStride = (dstTensor.rowCount - copyRowCnt) * 2U;
+                    intriParams.srcStride = (offsetCalculator.GetBlockSize() - copyRowCnt) * 2U;
+                } else
+#endif
+                {
+                    // for mxfp4
+                    intriParams.blockLen = (copyRowCnt + 1U) / 2U;
+                    intriParams.dstStride = (dstTensor.rowCount - copyRowCnt) / 2;
+                    intriParams.srcStride = (offsetCalculator.GetBlockSize() - copyRowCnt) / 2;
+                }
+                DataCopy(dstTensor.tensor[l1Offset], srcTensor.gmTensor[gmOffset], intriParams);
+                l1Offset += intriParams.blockLen * 32 / sizeof(V_SCALE_T);
+            } else if constexpr (GM_FORMAT == GmFormat::PA_NZ) {
                 DataCopyParams intriParams;
                 intriParams.blockCount = gmCoord.dDealSize / blockElementCnt;
                 intriParams.blockLen = copyRowCnt;

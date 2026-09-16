@@ -50,6 +50,9 @@ enum class GmFormat {
     PA_NZ_K_SCALE = 23,
     NGT = 24,
     TNG = 25,
+    PA_NZ_V_SCALE = 26,
+    PA_BnNDBs = 27,
+    BNDS = 28,
 };
 
 template <GmFormat FORMAT>
