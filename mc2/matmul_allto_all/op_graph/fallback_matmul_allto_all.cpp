@@ -101,10 +101,10 @@ static ge::graphStatus GetCommonMatmulInputPara(const gert::OpExecuteContext *ho
               return ge::GRAPH_FAILED);
 
     // 获取x1_quant_mode和x2_quant_mode
-    const int64_t *x1QuantModePtr = attrs->GetInt(INDEX_ATTR_X1_QUANT_MODE);
-    const int64_t x1QuantMode = (x1QuantModePtr != nullptr ? *x1QuantModePtr : 0);
     const int64_t *x2QuantModePtr = attrs->GetInt(INDEX_ATTR_X2_QUANT_MODE);
     const int64_t x2QuantMode = (x2QuantModePtr != nullptr ? *x2QuantModePtr : 0);
+    const int64_t *x1QuantModePtr = attrs->GetInt(INDEX_ATTR_X1_QUANT_MODE);
+    const int64_t x1QuantMode = (x1QuantModePtr != nullptr ? *x1QuantModePtr : 0);
 
     if (x1QuantMode == X1_MX_QUANT_MODE_NUM && x2QuantMode == X2_MX_QUANT_MODE_NUM) {
         // 适配fusion pass的.t()场景，这里固定传false
@@ -139,17 +139,17 @@ static ge::graphStatus ParseRecvCounts(const gert::TypedContinuousVector<int64_t
  * @param host_api_ctx
  * @param para
  */
-static ge::graphStatus GetAttrPara(const gert::OpExecuteContext *host_api_ctx, const gert::RuntimeAttrs *attrs,
+static ge::graphStatus GetAttrPara(const gert::OpExecuteContext *host_api_ctx, const gert::RuntimeAttrs *rtAttrs,
                                    AttrParas &para)
 {
-    para.group = attrs->GetStr(INDEX_ATTR_GROUP);
+    para.group = rtAttrs->GetStr(INDEX_ATTR_GROUP);
     OPS_CHECK(para.group == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "group"),
               return ge::GRAPH_FAILED);
-    para.commMode = attrs->GetStr(INDEX_ATTR_COMM_MODE);
+    para.commMode = rtAttrs->GetStr(INDEX_ATTR_COMM_MODE);
     OPS_CHECK(para.commMode == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "commMode"),
               return ge::GRAPH_FAILED);
 
-    const bool *transX2Ptr = attrs->GetBool(INDEX_ATTR_TRANS_X2);
+    const bool *transX2Ptr = rtAttrs->GetBool(INDEX_ATTR_TRANS_X2);
     const bool transX2 = (transX2Ptr != nullptr ? *transX2Ptr : false);
     const auto commScaleOptional = host_api_ctx->GetOptionalInputTensor(INDEX_IN_COMM_SCALE);
     if (commScaleOptional != nullptr) {
@@ -171,15 +171,15 @@ static ge::graphStatus GetAttrPara(const gert::OpExecuteContext *host_api_ctx, c
                   OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "x1OffsetOptional"), return ge::GRAPH_FAILED);
     }
 
-    const int64_t *commQuantModePtr = attrs->GetInt(INDEX_ATTR_COMMON_QUANT_MODE);
+    const int64_t *commQuantModePtr = rtAttrs->GetInt(INDEX_ATTR_COMMON_QUANT_MODE);
     para.commQuantMode = (commQuantModePtr != nullptr ? *commQuantModePtr : 0);
-    const int64_t *commQuantDtypePtr = attrs->GetInt(INDEX_ATTR_COMMON_QUANT_DTYPE);
+    const int64_t *commQuantDtypePtr = rtAttrs->GetInt(INDEX_ATTR_COMMON_QUANT_DTYPE);
     para.commQuantDtype =
         (commQuantDtypePtr != nullptr ? *commQuantDtypePtr : static_cast<uint64_t>(ge::DataType::DT_UNDEFINED));
-    const bool *transX1Ptr = attrs->GetBool(INDEX_ATTR_TRANS_X1);
+    const bool *transX1Ptr = rtAttrs->GetBool(INDEX_ATTR_TRANS_X1);
     para.transposeX1 = (transX1Ptr != nullptr ? *transX1Ptr : false);
     para.transposeX2 = (transX2Ptr != nullptr ? *transX2Ptr : false);
-    const int64_t *groupSize_ptr = attrs->GetInt(INDEX_ATTR_GROUP_SIZE);
+    const int64_t *groupSize_ptr = rtAttrs->GetInt(INDEX_ATTR_GROUP_SIZE);
     para.groupSize = (groupSize_ptr != nullptr ? *groupSize_ptr : 0);
 
     return ge::SUCCESS;

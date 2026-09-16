@@ -97,19 +97,19 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::CheckMxTensorFormat(const gert:
 {
     OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckTensorFormat(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check format failed."), return ge::GRAPH_FAILED);
-    auto x1ScaleTensorDesc = context->GetOptionalInputDesc(INPUT_X1_SCALE_INDEX);
-    OP_TILING_CHECK((x1ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x1Scale"),
+    auto x1ScaleTensorInfo = context->GetOptionalInputDesc(INPUT_X1_SCALE_INDEX);
+    OP_TILING_CHECK((x1ScaleTensorInfo == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x1Scale"),
                     return ge::GRAPH_FAILED);
-    ge::Format x1ScaleFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(x1ScaleTensorDesc->GetStorageFormat()));
-    OP_TILING_CHECK(x1ScaleFormat != ge::FORMAT_ND,
-                    OP_LOGE_FOR_INVALID_FORMAT(opName, "x1Scale", Ops::Base::ToString(x1ScaleFormat).c_str(), "ND"),
+    ge::Format x1ScaleTensorFmt = static_cast<ge::Format>(ge::GetPrimaryFormat(x1ScaleTensorInfo->GetStorageFormat()));
+    OP_TILING_CHECK(x1ScaleTensorFmt != ge::FORMAT_ND,
+                    OP_LOGE_FOR_INVALID_FORMAT(opName, "x1Scale", Ops::Base::ToString(x1ScaleTensorFmt).c_str(), "ND"),
                     return ge::GRAPH_FAILED);
-    auto x2ScaleTensorDesc = context->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
-    OP_TILING_CHECK((x2ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x2Scale"),
+    auto x2ScaleTensorInfo = context->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
+    OP_TILING_CHECK((x2ScaleTensorInfo == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x2Scale"),
                     return ge::GRAPH_FAILED);
-    ge::Format x2ScaleFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(x2ScaleTensorDesc->GetStorageFormat()));
-    OP_TILING_CHECK(x2ScaleFormat != ge::FORMAT_ND,
-                    OP_LOGE_FOR_INVALID_FORMAT(opName, "x2Scale", Ops::Base::ToString(x2ScaleFormat).c_str(), "ND"),
+    ge::Format x2ScaleTensorFmt = static_cast<ge::Format>(ge::GetPrimaryFormat(x2ScaleTensorInfo->GetStorageFormat()));
+    OP_TILING_CHECK(x2ScaleTensorFmt != ge::FORMAT_ND,
+                    OP_LOGE_FOR_INVALID_FORMAT(opName, "x2Scale", Ops::Base::ToString(x2ScaleTensorFmt).c_str(), "ND"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
