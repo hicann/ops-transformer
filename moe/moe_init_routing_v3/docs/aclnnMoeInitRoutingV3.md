@@ -222,7 +222,10 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>x（aclTensor）</td>
       <td>输入</td>
       <td>MOE的输入，即token特征输入</td>
-      <td>shape为(NUM_ROWS, H)</td>
+      <td><ul>
+        <li>shape为(NUM_ROWS, H);</li>
+        <li>quantMode为9或13的MXFP4/INT4动态量化场景，以及quantMode为-1且x数据类型为FLOAT4_E2M1的非量化透传场景，H要求为偶数。</li>
+        </ul></td>
       <td><ul>
         <li>quantMode=-1：支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2;</li>
         <li>quantMode=0、1：支持FLOAT16、BFLOAT16、FLOAT32;</li>
@@ -271,7 +274,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>表示用于计算quant结果的偏移值</td>
       <td><ul>
         <li>在非量化场景下不输入;</li><li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]；</li>
-        <li>动态量化、MXFP8量化、HIF8量化、MXFP4量化、MXFP8 RoundScale+Amax量化场景下不输入。</li>
+        <li>动态量化（quantMode为1）、MXFP8量化（quantMode为2、3）、HIF8量化（quantMode为6、7、8）、MXFP4量化（quantMode为9）、FP8 PerGroup量化（quantMode为4、5、14、15）、FP8 PerBlock量化（quantMode为11、12）、INT4动态量化（quantMode为13）、MXFP8 RoundScale+Amax量化场景下（quantMode为16、17）不输入。</li>
       </ul></td>
       <td>FLOAT32</td>
       <td>ND</td>

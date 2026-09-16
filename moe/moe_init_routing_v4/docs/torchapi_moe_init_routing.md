@@ -220,8 +220,8 @@ cann_ops_transformer.moe_init_routing(
 
 |  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
 |---------|----------|----------|---------------|---------------|------------|
-|  expanded_x  |  Tensor |  必选  |  根据expert_idx进行扩展过的特征。非量化场景下数据类型同`x`；量化场景下数据类型根据quant_mode确定。量化场景下，当`x`的数据类型为`int8`时，输出值无意义。Dropless场景shape为[NUM_ROWS *K, H]，Active场景shape为[min(activeNum, NUM_ROWS* K), H]，Drop/Pad场景下shape为[expertNum * expertCapacity, H]。  |  float16、bfloat16、float32、int8、float8_e5m2、float8_e4m3fn、hifloat8、float4_e2m1、int4   | 2-3  |
-|  expanded_row_idx  |  Tensor |  必选  |  expanded_x和x的映射关系，shape与expanded_x第一维一致。前availableIdxNum个元素为有效数据，其余无效数据由`row_idx_type`决定：为0时由-1填充，为1时未初始化。  |  int32   | 1-2  |
+|  expanded_x  |  Tensor |  必选  |  根据expert_idx进行扩展过的特征。非量化场景下数据类型同`x`；量化场景下数据类型根据quant_mode确定。量化场景下，当`x`的数据类型为`int8`时，输出值无意义。Dropless场景shape为[NUM_ROWS *K, H]，Active场景shape为[min(activeNum, NUM_ROWS* K), H]，Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。  |  float16、bfloat16、float32、int8、float8_e5m2、float8_e4m3fn、hifloat8、float4_e2m1、int4   | 2-3  |
+|  expanded_row_idx  |  Tensor |  必选  |  expanded_x和x的映射关系，shape为[NUM_ROWS*K]。前availableIdxNum个元素为有效数据，其余无效数据由`row_idx_type`决定：为0时由-1填充，为1时未初始化。  |  int32   | 1-2  |
 |  expert_token_cumsum_or_count  |  Tensor |  必选  |  表示每个专家处理的token数量的统计结果或累加值。  |  int64   | 1-2  |
 |  expanded_scale  |  Tensor |  必选  |  输出不同量化过程中scale的中间值。不同场景下的输出shape和数据类型见下方说明。  |  float32、float8_e8m0   | 1-3  |
 |  expanded_topk_weight  |  Tensor |  可选  |  按排序索引重排后的路由权重，与`expanded_x`一一对应。`topk_weight`输入时必须同时输出；`topk_weight`未输入时输出为空tensor（shape为(0,)）。不同场景下的输出shape见下方说明。  |  float32   | 2  |
@@ -257,7 +257,7 @@ cann_ops_transformer.moe_init_routing(
 - `drop_pad_mode=1`时，`row_idx_type`仅支持取值为0（gather索引），`quant_mode`仅支持-1（非量化），且`x`数据类型仅支持`float16`、`bfloat16`、`float32`、`int8`、`hifloat8`。
 - `expert_tokens_num_flag`仅支持取值为true。
 - `active_num`仅支持值等于NUM_ROWS*K。
-- quantMode为9或13的MXFP4/INT4动态量化场景，`x`的最后一维H要求为偶数。quantMode为13的INT4动态量化场景还需满足：`x`数据类型为`float32`或`bfloat16`，`drop_pad_mode`为0，不支持输入`offset`。
+- quantMode为9或13的MXFP4/INT4动态量化场景，以及quantMode为-1且`x`数据类型为`float4_e2m1`（通过`x_dtype`指定）的非量化透传场景，`x`的最后一维H要求为偶数。quantMode为13的INT4动态量化场景还需满足：`x`数据类型为`float32`或`bfloat16`，`drop_pad_mode`为0，不支持输入`offset`。
 - 空tensor处理：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。NUM_ROWS*K>0且H=0时仍走正常路由流程，生成`expanded_row_idx`和`expert_token_cumsum_or_count`。
 - **自动反向（autograd）约束**：自动反向仅在正向退化为aclnnMoeInitRoutingV2场景时支持，即不使用aclnnMoeInitRoutingV4特有特性。具体要求：`scale`不传入、`offset`不传入、`topk_weight`不传入、`quant_mode=-1`（非量化）、`row_idx_type=0`（gather索引）、`x_dtype`为None、`drop_pad_mode`为0或1。当使用了aclnnMoeInitRoutingV4特有特性（量化、`scale`、`offset`、`topk_weight`、`x_dtype`、`row_idx_type`非0等）时，调用自动反向会抛出`NotImplementedError`。`active_expert_range`不影响反向，不视为aclnnMoeInitRoutingV4特有特性。
 - 自动反向仅对`x`求梯度，`expert_idx`为整数索引张量无梯度，`expanded_row_idx`及其他整数/统计输出无梯度。
