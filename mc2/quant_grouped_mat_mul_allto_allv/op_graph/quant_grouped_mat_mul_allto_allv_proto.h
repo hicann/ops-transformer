@@ -12,8 +12,8 @@
  * \file grouped_mat_mul_allto_allv_proto.h
  * \brief
  */
-#ifndef GROUPED_MAT_MUL_ALLTO_ALLV_PROTO_H_
-#define GROUPED_MAT_MUL_ALLTO_ALLV_PROTO_H_
+#ifndef QUANT_GROUPED_MAT_MUL_ALLTO_ALLV_PROTO_H_
+#define QUANT_GROUPED_MAT_MUL_ALLTO_ALLV_PROTO_H_
 
 #include "graph/operator_reg.h"
 
@@ -110,4 +110,4 @@ REG_OP(QuantGroupedMatMulAlltoAllv)
 
 } // namespace ge
 
-#endif // GROUPED_MAT_MUL_ALLTO_ALLV_PROTO_H_
+#endif // QUANT_GROUPED_MAT_MUL_ALLTO_ALLV_PROTO_H_

@@ -79,6 +79,9 @@ ge::Status QuantGroupedMatMulAlltoAllvGenTaskFunc(const gert::ExeResGenerationCo
         OPS_LOG_D(context->GetNodeName(), "QuantGroupedMatMulAlltoAllvGenTaskFunc use CCU GenTask");
         return Mc2Arch35GenTaskOpsUtils::Mc2Arch35GenTaskCallBack(context, tasks);
     }
+
+    OPS_LOG_E(context->GetNodeName(), "Unsupported platform or commMode: %s.", commMode.c_str());
+    return ge::GRAPH_FAILED;
 }
 
 // new ver
