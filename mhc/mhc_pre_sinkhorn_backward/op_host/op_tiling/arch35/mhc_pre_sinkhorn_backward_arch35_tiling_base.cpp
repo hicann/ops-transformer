@@ -24,8 +24,8 @@ using namespace AscendC;
 namespace optiling {
 
 namespace {
-const gert::StorageShape *GetInputShapeChecked(gert::TilingContext *context, const char *opName,
-                                               const char *tensorName, uint8_t idx)
+const gert::StorageShape *GetInputShapeChecked(gert::TilingContext *context, const char *opName, const char *tensorName,
+                                               uint8_t idx)
 {
     const gert::StorageShape *ptr = context->GetInputShape(idx);
     OP_CHECK_IF(ptr == nullptr,
@@ -45,14 +45,14 @@ const gert::StorageShape *GetOutputShapeChecked(gert::TilingContext *context, co
 }
 
 ge::graphStatus VerifyShape(const char *opName, const char *tensorName, const gert::StorageShape *shapePtr,
-                            const int64_t *batchDims, size_t batchDimCount,
-                            std::initializer_list<int64_t> suffixDims, size_t startDim = 0)
+                            const int64_t *batchDims, size_t batchDimCount, std::initializer_list<int64_t> suffixDims,
+                            size_t startDim = 0)
 {
     const gert::Shape &shape = shapePtr->GetStorageShape();
     size_t expectedDimNum = startDim + batchDimCount + suffixDims.size();
     OP_CHECK_IF(shape.GetDimNum() != expectedDimNum,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, %s must be %luD, but got %lu dims",
-                                            tensorName, expectedDimNum, shape.GetDimNum()),
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, %s must be %luD, but got %lu dims", tensorName,
+                                            expectedDimNum, shape.GetDimNum()),
                 return ge::GRAPH_FAILED);
 
     size_t dimIdx = startDim;
@@ -118,7 +118,10 @@ using namespace ge;
 using namespace std;
 using namespace AscendC;
 
-bool MhcPreSinkhornBackwardArch35Tiling::IsCapable() { return true; }
+bool MhcPreSinkhornBackwardArch35Tiling::IsCapable()
+{
+    return true;
+}
 
 ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetPlatformInfo()
 {
@@ -127,11 +130,11 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetPlatformInfo()
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(opName, "fail to get platform info"), return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     auto coreNumAiv = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF((coreNumAiv <= 0), OP_LOGE(opName, "ScatterNdUpdateTiling fail to get coreNumAiv."),
+    OP_CHECK_IF((coreNumAiv <= 0), OP_LOGE(opName, "ScatterNdUpdateTiling fails to get coreNumAiv."),
                 return ge::GRAPH_FAILED);
     coreNumAiv_ = coreNumAiv;
     auto coreNumAic = ascendcPlatform.GetCoreNumAic();
-    OP_CHECK_IF((coreNumAic <= 0), OP_LOGE(opName, "ScatterNdUpdateTiling fail to get coreNumAic."),
+    OP_CHECK_IF((coreNumAic <= 0), OP_LOGE(opName, "ScatterNdUpdateTiling fails to get coreNumAic."),
                 return ge::GRAPH_FAILED);
     coreNumAic_ = coreNumAic;
     uint64_t ubSizePlatForm;
@@ -176,17 +179,16 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
     skIterCount_ = skSumShape.GetDim(ITER_COUNT_IDX) / ITER_COUNT_DIVISOR;
     OP_CHECK_IF(CheckShape(batchSize_, seqLength_, n_, c_) != ge::GRAPH_SUCCESS,
                 OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CheckShape failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        skIterCount_ != EXPECTED_SK_ITER_COUNT,
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "sk_iter_count must be %ld, but got %ld",
-                                    EXPECTED_SK_ITER_COUNT, skIterCount_),
-        return ge::GRAPH_FAILED);
-
-    OP_CHECK_IF(c_ <= 0 || c_ >= MAX_C_VALUE || c_ % C_ALIGNMENT != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                            "c must be > 0, < %ld and divisible by %ld, but got %ld", MAX_C_VALUE,
-                                            C_ALIGNMENT, c_),
+    OP_CHECK_IF(skIterCount_ != EXPECTED_SK_ITER_COUNT,
+                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "sk_iter_count must be %ld, but got %ld",
+                                            EXPECTED_SK_ITER_COUNT, skIterCount_),
                 return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        c_ <= 0 || c_ >= MAX_C_VALUE || c_ % C_ALIGNMENT != 0,
+        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "c must be > 0, < %ld and divisible by %ld, but got %ld",
+                                    MAX_C_VALUE, C_ALIGNMENT, c_),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -488,7 +490,10 @@ void MhcPreSinkhornBackwardArch35Tiling::DumpTilingInfo()
     OP_LOGI(opName, "Tiling info is: %s", info.str().c_str());
 }
 
-ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 REGISTER_OPS_TILING_TEMPLATE(MhcPreSinkhornBackward, MhcPreSinkhornBackwardArch35Tiling, 10);
 } // namespace optiling
