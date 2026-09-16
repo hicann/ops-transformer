@@ -261,8 +261,9 @@ def normalize_pytest_outputs(outputs, query, return_softmax_lse):
         attn_fp32,
     ).to(dtype=query.dtype)
     if not bool(return_softmax_lse):
-        empty = torch.zeros(0, dtype=torch.float32)
-        return attn_out, empty, empty
+        # None 占位落盘为 golden_i_none marker，TTK 原生按抑制比较处理，
+        # 使 e2e prepare 的 bin 目录可被 aclnn replay 直接复用。
+        return attn_out, None, None
     return tuple(output.detach().cpu() for output in outputs)
 
 
