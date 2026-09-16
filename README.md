@@ -70,6 +70,9 @@ git clone -b 9.0.0 https://gitcode.com/cann/ops-transformer.git
 ## 💬相关信息
 
 - [目录结构](docs/zh/install/dir_structure.md)
+- [算子索引](docs/zh/op_list.md)
+- [aclnn接口索引](docs/zh/op_api_list.md)
+- [torch接口索引](docs/zh/torch_api_list.md)
 - [贡献指南](CONTRIBUTING.md)
 - [安全声明](SECURITY.md)
 - [许可证](LICENSE)
