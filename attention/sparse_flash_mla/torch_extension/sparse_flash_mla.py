@@ -131,7 +131,7 @@ class SparseFlashMlaOpBuilder(OpBuilder):
             key_headnum = ori_kv.shape[1] if layout_kv == "TND" else ori_kv.shape[2]
             if layout_q == "BSND":
                 ## 添加softmax_lse
-                attn_out = torch.empty(q.shape, dtype=q.dtype, device="meta")
+                attn_out = torch.empty(q.shape, dtype=q.dtype, device=q.device)
                 if return_softmax_lse:
                     softmax_lse = torch.empty(
                         [
@@ -141,22 +141,22 @@ class SparseFlashMlaOpBuilder(OpBuilder):
                             q.shape[2] // ori_kv.shape[2],
                         ],
                         dtype=torch.float32,
-                        device="meta",
+                        device=q.device,
                     )
                 else:
-                    # 给一个空的合法张量，不能�?nullptr
-                    softmax_lse = torch.empty([], dtype=torch.float32, device="meta")
+                    # 给一个空的合法张量，不能返回nullptr
+                    softmax_lse = torch.empty([], dtype=torch.float32, device=q.device)
             else:
-                attn_out = torch.empty(q.shape, dtype=q.dtype, device="meta")
+                attn_out = torch.empty(q.shape, dtype=q.dtype, device=q.device)
                 if return_softmax_lse:
                     softmax_lse = torch.empty(
                         [ori_kv.shape[1], q.shape[0], q.shape[1] // ori_kv.shape[1]],
                         dtype=torch.float32,
-                        device="meta",
+                        device=q.device,
                     )
                 else:
-                    # 给一个空的合法张量，不能�?nullptr
-                    softmax_lse = torch.empty([], dtype=torch.float32, device="meta")
+                    # 给一个空的合法张量，不能返回nullptr
+                    softmax_lse = torch.empty([], dtype=torch.float32, device=q.device)
             return (attn_out, softmax_lse)
 
 

@@ -135,7 +135,7 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
                 raise ValueError("The shape size of q should not be 0")
             if ori_kv is not None and ori_kv.numel() == 0:
                 raise ValueError("The shape size of ori_kv should not be 0")
-            attn_out = torch.empty(q.shape, dtype=q.dtype, device="meta")
+            attn_out = torch.empty(q.shape, dtype=q.dtype, device=q.device)
             if return_softmax_lse:
                 if layout_q == "TND":
                     if layout_kv == "PA_BBND":
@@ -146,7 +146,7 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
                                 int(q.shape[1] / ori_kv.shape[2]),
                             ],
                             dtype=torch.float32,
-                            device="meta",
+                            device=q.device,
                         )
                     else:
                         softmax_lse = torch.empty(
@@ -156,7 +156,7 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
                                 int(q.shape[1] / ori_kv.shape[1]),
                             ],
                             dtype=torch.float32,
-                            device="meta",
+                            device=q.device,
                         )
                 else:
                     softmax_lse = torch.empty(
@@ -167,10 +167,10 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
                             int(q.shape[2] / ori_kv.shape[2]),
                         ],
                         dtype=torch.float32,
-                        device="meta",
+                        device=q.device,
                     )
             else:
-                softmax_lse = torch.empty([], dtype=torch.float32, device="meta")
+                softmax_lse = torch.empty([], dtype=torch.float32, device=q.device)
             return (attn_out, softmax_lse)
 
 

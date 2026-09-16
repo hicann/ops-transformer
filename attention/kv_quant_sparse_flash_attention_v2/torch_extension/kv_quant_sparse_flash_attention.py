@@ -75,8 +75,8 @@ class KvQuantSparseFlashAttentionOpBuilder(OpBuilder):
                 raise ValueError("The shape size of query should not be 0")
             out_shape = list(query.shape)
             out_shape[-1] -= rope_head_dim
-            attn_out = torch.empty(out_shape, dtype=query.dtype, device="meta")
-            empty_lse = torch.empty(0, dtype=torch.float32, device="meta")
+            attn_out = torch.empty(out_shape, dtype=query.dtype, device=query.device)
+            empty_lse = torch.empty(0, dtype=torch.float32, device=query.device)
             if not return_softmax_lse:
                 return attn_out, empty_lse, empty_lse
             kv_head_num = (
@@ -93,8 +93,12 @@ class KvQuantSparseFlashAttentionOpBuilder(OpBuilder):
                 lse_shape = [query.shape[0], kv_head_num, query.shape[1], g]
             else:
                 lse_shape = [kv_head_num, query.shape[0], g]
-            softmax_max = torch.empty(lse_shape, dtype=torch.float32, device="meta")
-            softmax_sum = torch.empty(lse_shape, dtype=torch.float32, device="meta")
+            softmax_max = torch.empty(
+                lse_shape, dtype=torch.float32, device=query.device
+            )
+            softmax_sum = torch.empty(
+                lse_shape, dtype=torch.float32, device=query.device
+            )
             return attn_out, softmax_max, softmax_sum
 
 
