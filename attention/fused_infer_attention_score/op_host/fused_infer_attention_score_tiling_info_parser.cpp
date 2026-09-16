@@ -962,6 +962,10 @@ ge::graphStatus FiaInfoParser::GetS1Size()
                 s1Size_ = opParamInfo_.query.shape->GetStorageShape().GetDim(1);
             }
         }
+        uint32_t b = 0;
+        if (GetActualSeqLenQSize(b) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
         const int64_t *actualSeqQ = opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>();
         if (actualSeqQ == nullptr) {
             if (queryShape_->CheckHasShapeT(__func__) != ge::GRAPH_SUCCESS) {
@@ -970,11 +974,6 @@ ge::graphStatus FiaInfoParser::GetS1Size()
             s1Size_ = static_cast<uint32_t>(queryShape_->GetShapeT());
             qSize_.push_back(s1Size_);
             return ge::GRAPH_SUCCESS;
-        }
-
-        uint32_t b = 0;
-        if (GetActualSeqLenQSize(b) != ge::GRAPH_SUCCESS) {
-            return ge::GRAPH_FAILED;
         }
         int64_t qActualSeqMax = 0;
         for (uint32_t i = 0; i < b; i++) {
@@ -1481,11 +1480,16 @@ ge::graphStatus FiaInfoParser::GetAttenMaskInfo()
 {
     // only bss & b1ss & bs need to calc attenMaskSize_ , attenMaskSize_ is uesed to calc batch offset
     if (attenMaskFlag_) {
-        if (*opParamInfo_.sparseMode == 9U && npuArch_ == NpuArch::DAV_3510) {
+        if (opParamInfo_.sparseMode == nullptr) {
+            OP_LOGE(opName_, "sparse_mode attr is nullptr");
+            return ge::GRAPH_FAILED;
+        }
+        int32_t sparseMode = *opParamInfo_.sparseMode;
+        if (sparseMode == 9U && npuArch_ == NpuArch::DAV_3510) {
             OP_LOGE(opName_, "NpuArch[%d] currently does not support sparse9.", static_cast<int32_t>(npuArch_));
             return ge::GRAPH_FAILED;
         }
-        if (*opParamInfo_.sparseMode == 9U) {
+        if (sparseMode == 9U) {
             return GetAttenMaskSparse9Info();
         }
         auto *maskTensor = opParamInfo_.attenMask.tensor;
@@ -1508,7 +1512,7 @@ ge::graphStatus FiaInfoParser::GetAttenMaskInfo()
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "atten_mask", std::to_string(maskDimNum).c_str(),
                                                      reason.c_str());
         }
-        if (*opParamInfo_.sparseMode == 0U || *opParamInfo_.sparseMode == 1U) {
+        if (sparseMode == 0U || sparseMode == 1U) {
             attenMaskStride_ = maskTensor->GetStorageShape().GetDim(maskTensor->GetStorageShape().GetDimNum() - 1);
         } else {
             attenMaskStride_ = 2048U; // compress mask
