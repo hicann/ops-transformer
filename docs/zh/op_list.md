@@ -811,8 +811,8 @@
     <td><a href="../../attention/quant_flash_attn_grad/README.md">quant_flash_attn_grad</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
     <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>计算量化注意力（QuantFlashAttention）的反向梯度。</td>
   </tr>
