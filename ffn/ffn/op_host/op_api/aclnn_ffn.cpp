@@ -1021,12 +1021,11 @@ aclnnStatus aclnnFFNGetWorkspaceSize(const aclTensor *x, const aclTensor *weight
                         y};
     aclnnStatus ret = TransDataTypeDeqscale(ffnParams);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    L2_DFX_PHASE_1(aclnnFFN,
-                   DFX_IN(ffnParams.x, ffnParams.weight1, ffnParams.weight2, expertTokens, ffnParams.bias1,
-                          ffnParams.bias2, ffnParams.scale, ffnParams.offset, ffnParams.deqScale1, ffnParams.deqScale2,
-                          ffnParams.antiquantScale1, ffnParams.antiquantScale2, ffnParams.antiquantOffset1,
-                          ffnParams.antiquantOffset2, activation, ffnParams.innerPrecise, -1, false),
-                   DFX_OUT(ffnParams.y));
+    L2_DFX_PHASE_1(
+        aclnnFFN,
+        DFX_IN(x, weight1, weight2, expertTokens, bias1, bias2, scale, offset, deqScale1, deqScale2, antiquantScale1,
+               antiquantScale2, antiquantOffset1, antiquantOffset2, activation, innerPrecise),
+        DFX_OUT(y));
     return GetFFNResultByL0Api(ffnParams, activation, workspaceSize, executor);
 }
 
@@ -1079,12 +1078,11 @@ aclnnStatus aclnnFFNV2GetWorkspaceSize(const aclTensor *x, const aclTensor *weig
                         y};
     aclnnStatus ret = TransDataTypeDeqscale(ffnParams);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    L2_DFX_PHASE_1(aclnnFFNV2,
-                   DFX_IN(ffnParams.x, ffnParams.weight1, ffnParams.weight2, expertTokens, ffnParams.bias1,
-                          ffnParams.bias2, ffnParams.scale, ffnParams.offset, ffnParams.deqScale1, ffnParams.deqScale2,
-                          ffnParams.antiquantScale1, ffnParams.antiquantScale2, ffnParams.antiquantOffset1,
-                          ffnParams.antiquantOffset2, activation, ffnParams.innerPrecise, -1, tokensIndexFlag),
-                   DFX_OUT(ffnParams.y));
+    L2_DFX_PHASE_1(
+        aclnnFFNV2,
+        DFX_IN(x, weight1, weight2, expertTokens, bias1, bias2, scale, offset, deqScale1, deqScale2, antiquantScale1,
+               antiquantScale2, antiquantOffset1, antiquantOffset2, activation, innerPrecise, tokensIndexFlag),
+        DFX_OUT(y));
     return GetFFNResultByL0Api(ffnParams, activation, workspaceSize, executor);
 }
 
@@ -1136,12 +1134,12 @@ aclnnStatus aclnnFFNV3GetWorkspaceSize(
                         y};
     aclnnStatus ret = TransDataTypeDeqscale(ffnParams);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    L2_DFX_PHASE_1(aclnnFFNV3,
-                   DFX_IN(ffnParams.x, ffnParams.weight1, ffnParams.weight2, expertTokensOptional, ffnParams.bias1,
-                          ffnParams.bias2, ffnParams.scale, ffnParams.offset, ffnParams.deqScale1, ffnParams.deqScale2,
-                          ffnParams.antiquantScale1, ffnParams.antiquantScale2, ffnParams.antiquantOffset1,
-                          ffnParams.antiquantOffset2, activation, ffnParams.innerPrecise, -1, tokensIndexFlag),
-                   DFX_OUT(ffnParams.y));
+    L2_DFX_PHASE_1(
+        aclnnFFNV3,
+        DFX_IN(x, weight1, weight2, expertTokensOptional, bias1Optional, bias2Optional, scaleOptional, offsetOptional,
+               deqScale1Optional, deqScale2Optional, antiquantScale1Optional, antiquantScale2Optional,
+               antiquantOffset1Optional, antiquantOffset2Optional, activation, innerPrecise, tokensIndexFlag),
+        DFX_OUT(y));
     return GetFFNResultByL0Api(ffnParams, activation, workspaceSize, executor);
 }
 
