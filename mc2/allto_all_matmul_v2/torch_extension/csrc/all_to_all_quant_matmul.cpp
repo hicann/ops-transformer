@@ -89,7 +89,7 @@ std::tuple<at::Tensor, at::Tensor> NpuAlltoAllQuantMatmul(
     const c10::optional<at::Tensor> &x2ScaleOptional, c10::optional<int64_t> x1QuantMode,
     c10::optional<int64_t> x2QuantMode, c10::IntArrayRef groupSizes, c10::optional<int64_t> x1Dtype,
     c10::optional<int64_t> x2Dtype, c10::optional<int64_t> x1ScaleDtype, c10::optional<int64_t> x2ScaleDtype,
-    c10::optional<int64_t> yDtype, std::string commMode, int64_t precisionMode)
+    c10::optional<int64_t> yDtype, std::string commMode, c10::optional<int64_t> precisionMode)
 {
     CheckNpuAlltoAllQuantMatmulInputs(x1, x2, worldSize);
 
@@ -115,6 +115,7 @@ std::tuple<at::Tensor, at::Tensor> NpuAlltoAllQuantMatmul(
     char *groupPtr = const_cast<char *>(groupStr.c_str());
     int64_t x1QuantModeVal = x1QuantMode.has_value() ? x1QuantMode.value() : DYN_PERTOKEN_QUANT_MODE;
     int64_t x2QuantModeVal = x2QuantMode.has_value() ? x2QuantMode.value() : PERCHANNEL_QUANT_MODE;
+    int64_t precisionModeVal = precisionMode.has_value() ? precisionMode.value() : 0;
 
     aclDataType x1AclDtype = GetTensorAclDtype(x1Dtype, x1);
     aclDataType x2AclDtype = GetTensorAclDtype(x2Dtype, x2);
@@ -132,7 +133,7 @@ std::tuple<at::Tensor, at::Tensor> NpuAlltoAllQuantMatmul(
     int64_t groupSize = CheckAndGetGroupSize(groupSizes);
 
     ACLNN_CMD(AlltoAllMatmulV2, context, x1Wrapper, x2Wrapper, biasOptional, x1ScaleWrapper, x2ScaleWrapper, groupPtr,
-              worldSize, hcclBufferSize, x1QuantModeVal, x2QuantModeVal, groupSize, commModePtr, precisionMode, y,
+              worldSize, hcclBufferSize, x1QuantModeVal, x2QuantModeVal, groupSize, commModePtr, precisionModeVal, y,
               alltoallOutWrapper);
 
     return std::make_tuple(y, alltoallOut);

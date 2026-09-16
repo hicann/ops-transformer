@@ -124,52 +124,83 @@ cann_ops_transformer.all_to_all_quant_matmul(
 
 ## 调用说明
 
-- 单算子模式调用（MX FP8 场景）：
+- 单算子模式调用示例（MX FP8 场景，2 卡），文件名为demo.py，示例细节如下：
 
   ```python
-  import math
   import os
+  import math
+  from torch.multiprocessing import Process
+
+  os.environ.setdefault("HCCL_BUFFSIZE", "2000")  # 通信 buffer，单位 MB
+
   import torch
   import torch_npu
-  import cann_ops_transformer
   import torch.distributed as dist
+  import cann_ops_transformer
 
-  # 绑定本rank对应的设备（多进程必须，否则所有rank默认使用device 0）
-  local_rank = int(os.environ["LOCAL_RANK"])
-  torch_npu.npu.set_device(local_rank)
 
-  # 初始化多卡通信域，使用默认通信域
-  dist.init_process_group(backend="hccl")
-  group = dist.group.WORLD
-  world_size = dist.get_world_size()
+  def run_all_to_all_quant_matmul(rank, world_size, bs, h, n):
+      torch_npu.npu.set_device(rank % 2)
 
-  BS = 128
-  H = 128
-  N = 64
+      dist.init_process_group(
+          backend="hccl",
+          rank=rank,
+          world_size=world_size,
+          init_method="tcp://127.0.0.1:29500",
+      )
+      group = dist.new_group(ranks=list(range(world_size)))
 
-  x1 = torch.randn(BS, H).to(torch_npu.float8_e4m3fn).npu()
-  # x2 需以转置视图（非连续tensor）传入：先构造 (N, K_total)（K_total = H * world_size），
-  # 再 .t() 得到 (K_total, N) 的转置视图。算子按 transpose_x2 语义处理。
-  x2 = torch.randn(N, H * world_size).to(torch_npu.float8_e4m3fn).npu().t()
-  x1_scale = torch.randint(0, 256, (BS, math.ceil(H / 64), 2), dtype=torch.uint8).npu().view(torch_npu.float8_e8m0fnu)
-  x2_scale = torch.randint(0, 256, (N, math.ceil(H * world_size / 64), 2), dtype=torch.uint8).npu().view(torch_npu.float8_e8m0fnu)
+      # 构造输入（各 rank 生成不同的数据）
+      torch.manual_seed(rank)
+      x1 = torch.randn(bs, h).to(torch.float8_e4m3fn).npu()
+      # x2 需以转置视图（非连续tensor）传入：先构造 (N, H*world_size)，
+      # 再 .t() 得到 (H*world_size, N) 的转置视图。算子按 transpose_x2 语义处理。
+      x2 = torch.randn(n, h * world_size).to(torch.float8_e4m3fn).npu()
+      x1_scale = torch.randint(0, 256, (bs, math.ceil(h / 64), 2), dtype=torch.uint8).npu()
+      x2_scale = torch.randint(0, 256, (n, math.ceil(h * world_size / 64), 2), dtype=torch.uint8).npu()
 
-  # 输出为y和一个预留的None
-  y, _ = cann_ops_transformer.all_to_all_quant_matmul(
-      x1,
-      x2,
-      group,
-      x1_scale=x1_scale,
-      x2_scale=x2_scale,
-      y_dtype=15,              # BF16
-      x1_quant_mode=6,         # MX
-      x2_quant_mode=6,         # MX
-      group_sizes=[1, 1, 32],
-      x1_scale_dtype=293,      # float8_e8m0fnu
-      x2_scale_dtype=293,      # float8_e8m0fnu
-      comm_mode="aiv_urma",
-      precision_mode=0,
-  )
+      # 调用算子（x2 须传入 [N, H*world_size] 存储的 .t() 转置视图），
+      # 输出为 y 和一个预留的 None
+      y, _ = cann_ops_transformer.all_to_all_quant_matmul(
+          x1,
+          x2.t(),
+          group,
+          x1_scale=x1_scale,
+          x2_scale=x2_scale,
+          y_dtype=15,           # BF16
+          x1_quant_mode=6,      # MX
+          x2_quant_mode=6,      # MX
+          group_sizes=[1, 1, 32],
+          x1_scale_dtype=293,   # fp8_e8m0（uint8 存储，需用 enum 覆盖 dtype）
+          x2_scale_dtype=293,
+          comm_mode="aiv_urma",
+          precision_mode=0,
+      )
+      torch.npu.synchronize()
+
+      print(f"[rank {rank}] y.shape={tuple(y.shape)}, y.dtype={y.dtype}")
+      dist.barrier()
+      dist.destroy_process_group()
+
+
+  if __name__ == "__main__":
+      world_size = 2
+      bs, h, n = 128, 128, 64
+
+      torch.multiprocessing.set_start_method("spawn", force=True)
+
+      procs = []
+      for rank in range(world_size):
+          p = Process(target=run_all_to_all_quant_matmul, args=(rank, world_size, bs, h, n))
+          p.start()
+          procs.append(p)
+
+      for p in procs:
+          p.join()
   ```
+  运行方式：
 
-  上述示例可通过 `torchrun --standalone --nproc_per_node=2 example.py` 启动。
+  ```bash
+  # 需在多卡 NPU 环境下执行（2 卡）
+  python3 demo.py
+  ```
