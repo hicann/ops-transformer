@@ -17,6 +17,7 @@
 #include <array>
 
 #include "../../../../quant_grouped_mat_mul_allto_allv/op_host/op_tiling/quant_grouped_mat_mul_allto_allv_tiling_common.h"
+#include "../../../op_kernel/arch22/grouped_mat_mul_allto_allv_mte_tiling.h"
 
 namespace optiling {
 class GroupedMatmulAllToAllvMteTiling : public Mc2Tiling::Mc2GroupedMatmul::QuantGroupedMatmulAllToAllvTilingCommon {
@@ -33,6 +34,10 @@ protected:
     ge::graphStatus CheckOpInputSingleParamsTensorMM() override;
     ge::graphStatus CheckAndSetLocalParamsGmm() override;
     ge::graphStatus CheckAndSetLocalParamsMm() override;
+    ge::graphStatus CheckAndSetGmmDtypes(const gert::StorageShape *&gmmWeightStorageShape);
+    ge::graphStatus CheckAndSetGmmShapes(const gert::StorageShape *gmmWeightStorageShape);
+    ge::graphStatus CheckAndSetMmDtypes();
+    ge::graphStatus CheckAndSetMmShapes();
     ge::graphStatus CheckAndSetLocalParamsAttr() override;
     ge::graphStatus CheckAndSetLocalParams() override;
     ge::graphStatus CheckFormat() override;
@@ -44,6 +49,10 @@ protected:
     ge::graphStatus CheckTopK(uint64_t topK) override;
     ge::graphStatus GetPlatformInfo() override;
     ge::graphStatus PostTiling() override;
+    ge::graphStatus FillTaskTiling(MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const;
+    ge::graphStatus FillCommTiling(MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const;
+    ge::graphStatus CheckCommBuffer(const MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const;
+    ge::graphStatus FinishPostTiling(MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData);
     ge::graphStatus GetWorkspaceSize() override;
     ge::graphStatus SetMteWorkspaceInfo();
     ge::graphStatus CheckExpertPipeline() const;

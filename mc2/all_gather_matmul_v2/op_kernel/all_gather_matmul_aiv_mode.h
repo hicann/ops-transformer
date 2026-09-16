@@ -106,12 +106,18 @@ public:
     __aicore__ inline void Process();
 
 private:
+    __aicore__ inline void ResetFlags(int32_t num_flags);
+    __aicore__ inline void CopyGatherResult(int32_t cal_idx);
     __aicore__ inline void AIVInit();
     __aicore__ inline void AICInit();
     __aicore__ inline void Padding();
     __aicore__ inline void Dequant(int32_t cal_idx);
     __aicore__ inline void AllGatherPerTokenScale(int64_t buff_st);
     __aicore__ inline void CatlassMatmul();
+    template <typename LayoutB>
+    __aicore__ inline void DispatchMatmul(const LayoutB &layoutB);
+    template <typename LayoutB, int32_t TileM, int32_t TileN>
+    __aicore__ inline void LaunchMatmul(const LayoutB &layoutB);
     __aicore__ inline void MoveWithSplit(__gm__ supportX1Type *gm_src, int64_t rank_offset, int64_t len);
     __aicore__ inline void MoveToOtherRankWithSkip(__gm__ supportX1Type *gm_src, int64_t rank_offset, int32_t len,
                                                    int32_t rank_st, int32_t skip_num, int32_t group_num,
@@ -321,29 +327,6 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AICInit()
 }
 
 template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CrossRankSyncV1(int32_t flag_idx, int32_t flag_data)
-{
-    if (aivIdx == 0 && blockIdx == rankId) {
-        SetBuffFlagByAdd((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + flag_idx, uBuf_, FLAG_VALUE);
-    } else if (aivIdx == 0 && blockIdx < worldSize) {
-        CheckBuffFlag((__gm__ int32_t *)stateAddrPerRank[blockIdx] + FLAG_OFFSET + flag_idx, uBuf_,
-                      FLAG_VALUE * flag_data);
-    }
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CrossRankSyncV2(int32_t flag_idx, int32_t flag_data)
-{
-    if (aivIdx == 0 && blockIdx < worldSize) {
-        SetBuffFlagByAdd((__gm__ int32_t *)stateAddrPerRank[blockIdx] + FLAG_OFFSET + flag_idx, uBuf_, FLAG_VALUE);
-    }
-    if (aivIdx == 0 && blockIdx == rankId) {
-        CheckBuffFlag((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + flag_idx, uBuf_,
-                      FLAG_VALUE * worldSize * flag_data);
-    }
-}
-
-template <TemplateAGMMClass>
 __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AIVInit()
 {
     if ASCEND_IS_AIV {
@@ -366,474 +349,6 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AIVInit()
 }
 
 template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CatlassMatmul()
-{
-    if ASCEND_IS_AIC {
-        int64_t peer_mem_m = static_cast<int64_t>(m0) * pValue * worldSize;
-        uint32_t layout_b_col = (TB || weightNZ) ? static_cast<uint32_t>(n) : static_cast<uint32_t>(n_align);
-        uint32_t layout_b_row = (TB && !weightNZ) ? static_cast<uint32_t>(k_align) : static_cast<uint32_t>(k);
-        bool need_fixpipe = quantFlag && std::is_same<YType, half>::value && isX2ScaleTypeInt64 &&
-                            (!std::is_same_v<X1Type, AscendC::int4b_t>);
-
-        using ArchTag = Arch::AtlasA2;
-        constexpr bool ENABLE_UNIT_FLAG = false;
-        constexpr bool ENABLE_SHUFFLE_K = true;
-        using ElementA = X1Type;
-        using ElementB = X2Type;
-        using ElementC = typename std::conditional<quantFlag, int32_t, YType>::type;
-        using LayoutA = layout::RowMajor;
-        using LayoutC = layout::RowMajor;
-        using LayoutScale = layout::VectorLayout;
-        LayoutA layoutA{static_cast<uint32_t>(m), static_cast<uint32_t>(k_align)};
-        LayoutC layoutC{static_cast<uint32_t>(m * worldSize), static_cast<uint32_t>(n)};
-        LayoutA layoutPeerMem{static_cast<uint32_t>(peer_mem_m * MAX_BLOCK_COUNT), static_cast<uint32_t>(k_align)};
-        LayoutScale layoutScale{static_cast<uint32_t>(n)};
-        GemmCoord processSize{static_cast<uint32_t>(m), static_cast<uint32_t>(n), static_cast<uint32_t>(k)};
-
-        constexpr int32_t L1TileShapeK = TILE_SHAPE_K_512B<X1Type, int32_t>::value;
-        constexpr int32_t L0TileShapeK = TILE_SHAPE_K_128B<X1Type, int32_t>::value;
-        using DispatchPolicy = Gemm::MmadAtlasA2Preload<ENABLE_UNIT_FLAG, ENABLE_SHUFFLE_K>;
-        using AType = Gemm::GemmType<ElementA, LayoutA>;
-        using CType = Gemm::GemmType<ElementC, LayoutC>;
-
-        if (weightNZ) {
-            using LayoutNZ = typename std::conditional<TB, layout::nZ, layout::zN>::type;
-            using BType = Gemm::GemmType<ElementB, LayoutNZ>;
-            LayoutNZ layoutBNZ = LayoutNZ::template MakeLayout<ElementB>(layout_b_row, layout_b_col);
-
-            struct TileCopyOpt : public Catlass::Gemm::Tile::TileCopy<ArchTag, AType, BType, CType, void> {
-                using Base = Catlass::Gemm::Tile::TileCopy<ArchTag, AType, BType, CType, void>;
-                using ElementA = typename Base::ElementA;
-                using ElementB = typename Base::ElementB;
-                using ElementAccumulator = typename Base::ElementAccumulator;
-                using CopyGmToL1A = typename Base::CopyGmToL1A;
-                using CopyGmToL1B = typename Base::CopyGmToL1B;
-                using CopyL1ToL0A = typename Base::CopyL1ToL0A;
-                using CopyL1ToL0B = typename Base::CopyL1ToL0B;
-                using CopyL0CToGm = typename Base::CopyL0CToGm;
-            };
-            using TileCopy = TileCopyOpt;
-
-            if (m0 == TILE_SHAPE_128) {
-                using L1TileShape = GemmShape<TILE_SHAPE_128, TILE_SHAPE_256, L1TileShapeK>; // m n k
-                using L0TileShape = GemmShape<TILE_SHAPE_128, TILE_SHAPE_256, L0TileShapeK>;
-                using BlockMmadOpt = Gemm::Block::BlockMmad<DispatchPolicy, L1TileShape, L0TileShape, AType, BType,
-                                                            CType, void, TileCopy>;
-                using MatmulKernel = Gemm::Kernel::AllGatherMatmulV2<void, void, BlockMmadOpt>;
-                typename MatmulKernel::Params params{processSize,
-                                                     reinterpret_cast<GM_ADDR>(gm_a_src),
-                                                     layoutA,
-                                                     reinterpret_cast<GM_ADDR>(gm_b_src),
-                                                     layoutBNZ,
-                                                     reinterpret_cast<GM_ADDR>(cGM_),
-                                                     layoutC,
-                                                     reinterpret_cast<GM_ADDR>(x2ScaleGM_),
-                                                     layoutScale,
-                                                     reinterpret_cast<GM_ADDR>(gm_peer_mem),
-                                                     layoutPeerMem,
-                                                     reinterpret_cast<GM_ADDR>(gm_accum),
-                                                     pValue,
-                                                     swizzlCount,
-                                                     swizzlDirect,
-                                                     rankId,
-                                                     worldSize,
-                                                     need_fixpipe,
-                                                     accumWorkSpacePingPong};
-                MatmulKernel matmul_op;
-                matmul_op(params);
-            } else {
-                using L1TileShape = GemmShape<TILE_SHAPE_256, TILE_SHAPE_128, L1TileShapeK>; // m n k
-                using L0TileShape = GemmShape<TILE_SHAPE_256, TILE_SHAPE_128, L0TileShapeK>;
-                using BlockMmadOpt = Gemm::Block::BlockMmad<DispatchPolicy, L1TileShape, L0TileShape, AType, BType,
-                                                            CType, void, TileCopy>;
-                using MatmulKernel = Gemm::Kernel::AllGatherMatmulV2<void, void, BlockMmadOpt>;
-                typename MatmulKernel::Params params{processSize,
-                                                     reinterpret_cast<GM_ADDR>(gm_a_src),
-                                                     layoutA,
-                                                     reinterpret_cast<GM_ADDR>(gm_b_src),
-                                                     layoutBNZ,
-                                                     reinterpret_cast<GM_ADDR>(cGM_),
-                                                     layoutC,
-                                                     reinterpret_cast<GM_ADDR>(x2ScaleGM_),
-                                                     layoutScale,
-                                                     reinterpret_cast<GM_ADDR>(gm_peer_mem),
-                                                     layoutPeerMem,
-                                                     reinterpret_cast<GM_ADDR>(gm_accum),
-                                                     pValue,
-                                                     swizzlCount,
-                                                     swizzlDirect,
-                                                     rankId,
-                                                     worldSize,
-                                                     need_fixpipe,
-                                                     accumWorkSpacePingPong};
-                MatmulKernel matmul_op;
-                matmul_op(params);
-            }
-        } else {
-            using LayoutB = typename std::conditional<TB, layout::ColumnMajor, layout::RowMajor>::type;
-            LayoutB layoutB{layout_b_row, layout_b_col};
-            using BType = Gemm::GemmType<ElementB, LayoutB>;
-
-            struct TileCopyOpt : public Catlass::Gemm::Tile::TileCopy<ArchTag, AType, BType, CType, void> {
-                using Base = Catlass::Gemm::Tile::TileCopy<ArchTag, AType, BType, CType, void>;
-                using ElementA = typename Base::ElementA;
-                using ElementB = typename Base::ElementB;
-                using ElementAccumulator = typename Base::ElementAccumulator;
-                using CopyGmToL1A = typename Base::CopyGmToL1A;
-                using CopyGmToL1B = typename Base::CopyGmToL1B;
-                using CopyL1ToL0A = typename Base::CopyL1ToL0A;
-                using CopyL1ToL0B = typename Base::CopyL1ToL0B;
-                using CopyL0CToGm = typename Base::CopyL0CToGm;
-            };
-            using TileCopy = TileCopyOpt;
-
-            if (m0 == TILE_SHAPE_128) {
-                using L1TileShape = GemmShape<TILE_SHAPE_128, TILE_SHAPE_256, L1TileShapeK>; // m n k
-                using L0TileShape = GemmShape<TILE_SHAPE_128, TILE_SHAPE_256, L0TileShapeK>;
-                using BlockMmadOpt = Gemm::Block::BlockMmad<DispatchPolicy, L1TileShape, L0TileShape, AType, BType,
-                                                            CType, void, TileCopy>;
-                using MatmulKernel = Gemm::Kernel::AllGatherMatmulV2<void, void, BlockMmadOpt>;
-                typename MatmulKernel::Params params{processSize,
-                                                     reinterpret_cast<GM_ADDR>(gm_a_src),
-                                                     layoutA,
-                                                     reinterpret_cast<GM_ADDR>(gm_b_src),
-                                                     layoutB,
-                                                     reinterpret_cast<GM_ADDR>(cGM_),
-                                                     layoutC,
-                                                     reinterpret_cast<GM_ADDR>(x2ScaleGM_),
-                                                     layoutScale,
-                                                     reinterpret_cast<GM_ADDR>(gm_peer_mem),
-                                                     layoutPeerMem,
-                                                     reinterpret_cast<GM_ADDR>(gm_accum),
-                                                     pValue,
-                                                     swizzlCount,
-                                                     swizzlDirect,
-                                                     rankId,
-                                                     worldSize,
-                                                     need_fixpipe,
-                                                     accumWorkSpacePingPong};
-                MatmulKernel matmul_op;
-                matmul_op(params);
-            } else {
-                using L1TileShape = GemmShape<TILE_SHAPE_256, TILE_SHAPE_128, L1TileShapeK>; // m n k
-                using L0TileShape = GemmShape<TILE_SHAPE_256, TILE_SHAPE_128, L0TileShapeK>;
-                using BlockMmadOpt = Gemm::Block::BlockMmad<DispatchPolicy, L1TileShape, L0TileShape, AType, BType,
-                                                            CType, void, TileCopy>;
-                using MatmulKernel = Gemm::Kernel::AllGatherMatmulV2<void, void, BlockMmadOpt>;
-                typename MatmulKernel::Params params{processSize,
-                                                     reinterpret_cast<GM_ADDR>(gm_a_src),
-                                                     layoutA,
-                                                     reinterpret_cast<GM_ADDR>(gm_b_src),
-                                                     layoutB,
-                                                     reinterpret_cast<GM_ADDR>(cGM_),
-                                                     layoutC,
-                                                     reinterpret_cast<GM_ADDR>(x2ScaleGM_),
-                                                     layoutScale,
-                                                     reinterpret_cast<GM_ADDR>(gm_peer_mem),
-                                                     layoutPeerMem,
-                                                     reinterpret_cast<GM_ADDR>(gm_accum),
-                                                     pValue,
-                                                     swizzlCount,
-                                                     swizzlDirect,
-                                                     rankId,
-                                                     worldSize,
-                                                     need_fixpipe,
-                                                     accumWorkSpacePingPong};
-                MatmulKernel matmul_op;
-                matmul_op(params);
-            }
-        }
-    }
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Padding()
-{
-    if (!aligned_a && !aligned_b) {
-        Catlass::Arch::CrossCoreBarrier<0x0, PIPE_MTE3>();
-        Arch::CrossCoreFlag flagAivFinishPadding{AIC_WAIT_AIV_FINISH_ALIGN_FLAG_ID};
-        Catlass::Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(flagAivFinishPadding);
-        return;
-    }
-    bool transA = false; // 当前暂未支持A矩阵转置
-    bool transB = TB;
-    bool alignedA = aligned_a;
-    bool alignedB = aligned_b;
-    uint32_t matrixAM = m;
-    uint32_t matrixAK = k;
-    uint32_t matrixBK = k;
-    uint32_t matrixBN = n;
-    uint32_t matrixAMAlign = m_align;
-    uint32_t matrixAKAlign = k_align;
-    uint32_t matrixBKAlign = k_align;
-    uint32_t matrixBNAlign = n_align;
-    GM_ADDR gmA = reinterpret_cast<GM_ADDR>(aGM_);
-    GM_ADDR gmB = reinterpret_cast<GM_ADDR>(bGM_);
-    GM_ADDR gmAAlign = reinterpret_cast<GM_ADDR>(gm_a_align);
-    GM_ADDR gmBAlign = reinterpret_cast<GM_ADDR>(gm_b_align);
-    PaddingRunner<X1Type, X2Type> padding_runner;
-    padding_runner.Run(PADDING_ARGS_CALL());
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveResultFromSrcToDst(__gm__ supportX1Type *gm_src,
-                                                                                        __gm__ supportX1Type *gm_dst,
-                                                                                        int32_t len)
-{
-    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0); // MTE2等MTE3
-    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1); // MTE2等MTE3
-    MoveResultToDst(gm_src, gm_dst, len);
-    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0); // MTE2等MTE3
-    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1); // MTE2等MTE3
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AllGatherPerTokenScale(int64_t buff_st)
-{
-    if (!needPerToken) {
-        return;
-    }
-
-    int32_t multi = sizeof(float32_t) / sizeof(supportX1Type);
-    int32_t scale_size = m * multi;
-    int32_t scale_st = rankId * scale_size;
-    __gm__ supportX1Type *scale = reinterpret_cast<__gm__ supportX1Type *>(x1ScaleGM_);
-    __gm__ supportX1Type *scaleOut = reinterpret_cast<__gm__ supportX1Type *>(gm_scale_workspace);
-    SetAndWaitAivSync(FLAG_VALUE);
-    // 将本卡的scale拷贝到buff中
-    if (aivIdx == 0 && rankId == blockIdx) {
-        MoveResultFromSrcToDst(
-            scale, reinterpret_cast<__gm__ supportX1Type *>(stateAddrPerRank[rankId]) + buff_st + scale_st, scale_size);
-    }
-    CrossRankSyncV1(FLAG_TWO_IDX, FLAG_VALUE);
-    SetAndWaitAivSync(FLAG_VALUE);
-    // 将其他卡的scale拷贝到buff中
-    scale_st = blockIdx * scale_size;
-    if (aivIdx == 0 && blockIdx < worldSize) {
-        MoveResultFromSrcToDst(
-            reinterpret_cast<__gm__ supportX1Type *>(stateAddrPerRank[blockIdx]) + buff_st + scale_st,
-            scaleOut + scale_st, scale_size);
-    }
-    SetAndWaitAivSync(FLAG_VALUE);
-    CrossRankSyncV2(FLAG_THREE_IDX, FLAG_VALUE);
-    SetAndWaitAivSync(FLAG_VALUE);
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Dequant(int32_t cal_idx)
-{
-    // per token 反量化实现
-    if (!needPerChannel && !needPerToken) {
-        return;
-    }
-
-    uint32_t rowNum = cal_idx == cal_count - 1 ? m - cal_idx * m0 * pValue : m0 * pValue;
-    uint32_t colNum = n;
-    uint32_t tileM0 = m0;
-    uint32_t tileN0 = n0;
-
-    int64_t blockSt = static_cast<int64_t>(cal_idx) * m0 * pValue * n;
-    int64_t blockSize = static_cast<int64_t>(m) * n;
-    int64_t blockStInWorkspace = static_cast<int64_t>(cal_idx % MAX_BLOCK_COUNT) * worldSize * m0 * pValue * n;
-    int64_t blockSizeInWorkspace = static_cast<int64_t>(m0) * pValue * n;
-
-    if (!accumWorkSpacePingPong) {
-        blockStInWorkspace = blockSt;
-        blockSizeInWorkspace = blockSize;
-    }
-
-    __gm__ float32_t *perChannelScale = needPerChannel ? reinterpret_cast<__gm__ float32_t *>(x2ScaleGM_) : nullptr;
-    __gm__ float32_t *perTokenScale = needPerToken ? reinterpret_cast<__gm__ float32_t *>(gm_scale_workspace) : nullptr;
-    __gm__ int32_t *workspace = needPerChannel ? reinterpret_cast<__gm__ int32_t *>(gm_accum) : nullptr;
-    __gm__ YType *output = reinterpret_cast<__gm__ YType *>(cGM_);
-
-    // 当 X1Type 为 int4_t 时，只让 subblockIdx == 1 的核参与计算
-    constexpr bool isInt4Type = std::is_same_v<X1Type, AscendC::int4b_t>;
-    if (isInt4Type && aivIdx != 1) {
-        return;
-    }
-
-    dequantRunner.Run(DEQUANT_ARGS_CALL());
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveToOtherRankWithSkip(
-    __gm__ supportX1Type *gm_src, int64_t rank_offset, int32_t len, int32_t rank_st, int32_t skip_num,
-    int32_t group_num, int32_t rank_scope)
-{
-    LocalTensor<supportX1Type> ubTensor = uBuf_.AllocTensor<supportX1Type>();
-    LocalTensor<supportX1Type> copyTensor0 = ubTensor;
-    LocalTensor<supportX1Type> copyTensor1 = ubTensor[UB_OFFSET];
-    int32_t ping_pong_move_count = (len + max_ub_ping_pong_size - 1) / max_ub_ping_pong_size;
-    for (int32_t move_idx = 0; move_idx < ping_pong_move_count; ++move_idx) {
-        int32_t actual_move_size = max_ub_ping_pong_size;
-        if (move_idx == ping_pong_move_count - 1) {
-            actual_move_size = len - move_idx * max_ub_ping_pong_size;
-        }
-        int32_t block_len = actual_move_size * Catlass::SizeOfBits<X1Type>::value / 8;
-        auto event_id = (move_idx & 1) ? EVENT_ID0 : EVENT_ID1;
-        LocalTensor<supportX1Type> copyTensor = (move_idx & 1) ? copyTensor0 : copyTensor1;
-        WaitFlag<HardEvent::MTE3_MTE2>(event_id);
-        CopyGmToUbufAlignB16(copyTensor, gm_src, 1, block_len, 0, 0);
-        SetFlag<HardEvent::MTE2_MTE3>(event_id);
-        WaitFlag<HardEvent::MTE2_MTE3>(event_id);
-        int32_t dst_rank = rank_st % rank_scope;
-        for (int32_t cycle_idx = 0; cycle_idx < group_num; ++cycle_idx) {
-            if (dst_rank != rankId && dst_rank < worldSize) {
-                if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                    CopyUbufToGmAlignB16((__gm__ int8_t *)stateAddrPerRank[dst_rank] + rank_offset / 2, copyTensor, 1,
-                                         block_len, 0, 0);
-                } else {
-                    CopyUbufToGmAlignB16((__gm__ X1Type *)stateAddrPerRank[dst_rank] + rank_offset, copyTensor, 1,
-                                         block_len, 0, 0);
-                }
-            }
-            dst_rank = (dst_rank + skip_num) % rank_scope;
-        }
-        if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-            gm_src += (max_ub_ping_pong_size / 2);
-        } else {
-            gm_src += max_ub_ping_pong_size;
-        }
-        rank_offset += max_ub_ping_pong_size;
-        SetFlag<HardEvent::MTE3_MTE2>(event_id);
-    }
-    uBuf_.FreeTensor<supportX1Type>(ubTensor);
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveResultFromPeerMemToOut(
-    __gm__ supportX1Type *gm_src, __gm__ supportX1Type *gm_dst, int32_t actual_m)
-{
-    LocalTensor<supportX1Type> ubTensor = uBuf_.AllocTensor<supportX1Type>();
-    LocalTensor<supportX1Type> copyTensor0 = ubTensor;
-    LocalTensor<supportX1Type> copyTensor1 = ubTensor[UB_OFFSET];
-    max_move_m = max_ub_ping_pong_size > max_move_k ? max_ub_ping_pong_size / max_move_k : 1;
-    int32_t ping_pong_move_count = (actual_m + max_move_m - 1) / max_move_m;
-    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0); // MTE2等MTE3
-    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1); // MTE2等MTE3
-    for (int32_t move_idx = 0; move_idx < ping_pong_move_count; ++move_idx) {
-        int32_t actual_move_m = max_move_m;
-        if (move_idx == ping_pong_move_count - 1) {
-            actual_move_m = actual_m - move_idx * max_move_m;
-        }
-        auto event_id = (move_idx & 1) ? EVENT_ID0 : EVENT_ID1;
-        LocalTensor<supportX1Type> ub_buff_st = (move_idx & 1) ? copyTensor0 : copyTensor1;
-        int32_t k_move_count = (k_align + max_move_k - 1) / max_move_k;
-        for (int32_t k_move_idx = 0; k_move_idx < k_move_count; ++k_move_idx) {
-            int32_t actual_k_move_num_in_peer_mem = max_move_k;
-            int32_t actual_k_move_num_in_out = max_move_k;
-            if (k_move_idx == k_move_count - 1) {
-                actual_k_move_num_in_peer_mem = k_align - k_move_idx * max_move_k;
-                actual_k_move_num_in_out = k - k_move_idx * max_move_k;
-            }
-            WaitFlag<HardEvent::MTE3_MTE2>(event_id);
-            int64_t gm_src_offset_k_align =
-                static_cast<int64_t>(move_idx) * max_move_m * k_align + k_move_idx * max_move_k;
-            if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                gm_src_offset_k_align = gm_src_offset_k_align / 2;
-            }
-            CopyGmToUbuf(ub_buff_st, gm_src + gm_src_offset_k_align, actual_move_m,
-                         actual_k_move_num_in_peer_mem * Catlass::SizeOfBits<X1Type>::value / (8 * 32),
-                         (k_align - actual_k_move_num_in_peer_mem) * Catlass::SizeOfBits<X1Type>::value / (8 * 32), 0);
-            SetFlag<HardEvent::MTE2_MTE3>(event_id);
-            WaitFlag<HardEvent::MTE2_MTE3>(event_id);
-            int64_t gm_src_offset = static_cast<int64_t>(move_idx) * max_move_m * k + k_move_idx * max_move_k;
-            if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                gm_src_offset = gm_src_offset / 2;
-            }
-            CopyUbufToGmAlignB16(gm_dst + gm_src_offset, ub_buff_st, actual_move_m,
-                                 actual_k_move_num_in_out * Catlass::SizeOfBits<X1Type>::value / 8,
-                                 (actual_k_move_num_in_peer_mem - actual_k_move_num_in_out) *
-                                     Catlass::SizeOfBits<X1Type>::value / (8 * 32),
-                                 (k - actual_k_move_num_in_out) * Catlass::SizeOfBits<X1Type>::value / (8 * 32));
-            SetFlag<HardEvent::MTE3_MTE2>(event_id);
-        }
-    }
-    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0); // MTE2等MTE3
-    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1); // MTE2等MTE3
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveResultToDst(__gm__ supportX1Type *gm_src,
-                                                                                 __gm__ supportX1Type *gm_dst,
-                                                                                 int32_t len)
-{
-    LocalTensor<supportX1Type> ubTensor = uBuf_.AllocTensor<supportX1Type>();
-    LocalTensor<supportX1Type> copyTensor0 = ubTensor;
-    LocalTensor<supportX1Type> copyTensor1 = ubTensor[UB_OFFSET];
-    int32_t ping_pong_move_count = (len + max_ub_ping_pong_size - 1) / max_ub_ping_pong_size;
-    for (int32_t move_idx = 0; move_idx < ping_pong_move_count; ++move_idx) {
-        int32_t actual_move_size = max_ub_ping_pong_size;
-        if (move_idx == ping_pong_move_count - 1) {
-            actual_move_size = len - move_idx * max_ub_ping_pong_size;
-        }
-        auto event_id = (move_idx & 1) ? EVENT_ID0 : EVENT_ID1;
-        LocalTensor<supportX1Type> copyTensor = (move_idx & 1) ? copyTensor0 : copyTensor1;
-        WaitFlag<HardEvent::MTE3_MTE2>(event_id);
-        CopyGmToUbufAlignB16(copyTensor, gm_src, 1, actual_move_size * sizeof(supportX1Type), 0, 0);
-        SetFlag<HardEvent::MTE2_MTE3>(event_id);
-        WaitFlag<HardEvent::MTE2_MTE3>(event_id);
-        CopyUbufToGmAlignB16(gm_dst, copyTensor, 1, actual_move_size * sizeof(supportX1Type), 0, 0);
-        gm_src += max_ub_ping_pong_size;
-        gm_dst += max_ub_ping_pong_size;
-        SetFlag<HardEvent::MTE3_MTE2>(event_id);
-    }
-    uBuf_.FreeTensor<supportX1Type>(ubTensor);
-}
-
-template <TemplateAGMMClass>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveWithSplit(__gm__ supportX1Type *gm_src,
-                                                                               int64_t rank_offset, int64_t len)
-{
-    int64_t data_split = DivCeil(len, static_cast<int64_t>(len_per_loop));
-    int32_t data_block = len_per_loop; // 每份数据量 len_per_loop = 2560
-    int32_t rank_st = blockIdx;
-    int32_t group_num = DivCeil(worldSize, comm_npu_split); // 1？ comm_npu_split=worldSize?
-    int32_t scope = comm_npu_split * group_num;             // worldSize？
-    int64_t data_offset = -data_block;                      // 当前份数据的起始位置
-    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);               // MTE2等MTE3
-    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);               // MTE2等MTE3
-    for (int64_t data_block_idx = 0; data_block_idx < data_split; ++data_block_idx) {
-        data_offset += data_block; // 当前份数据的起始位置
-        data_block = data_block_idx == data_split - 1 ? static_cast<int32_t>(len - data_offset) : data_block;
-        int32_t num_per_core = DivCeil(data_block, comm_data_split); // 2560
-
-        int64_t data_src = data_offset + (blockIdx / comm_npu_split) * num_per_core;
-        int32_t data_len = static_cast<int32_t>(data_block + data_offset - data_src);
-        data_len = data_len >= num_per_core ? num_per_core : data_len;
-        // npu 方向：一份数据先发送到所有目标卡，再发送下一份数据，以此类推
-        if (comm_direct) { // comm_direct=0？
-            if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                MoveToOtherRankWithSkip(gm_src + data_src / 2, rank_offset + data_src, data_len, rank_st,
-                                        comm_npu_split, group_num, scope);
-            } else {
-                MoveToOtherRankWithSkip(gm_src + data_src, rank_offset + data_src, data_len, rank_st, comm_npu_split,
-                                        group_num, scope);
-            }
-            continue;
-        }
-        // data len 方向：所有的数据先发送到目标卡0，再发送到目标卡1，以此类推
-        int32_t dst_rank = rank_st % scope;
-        for (int32_t rank_group_idx = 0; rank_group_idx < group_num; ++rank_group_idx) {
-            if (dst_rank != rankId && dst_rank < worldSize) {
-                if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                    MoveResultToDst(gm_src + data_src / 2,
-                                    (__gm__ int8_t *)stateAddrPerRank[dst_rank] + (rank_offset + data_src) / 2,
-                                    data_len / 2);
-                } else {
-                    MoveResultToDst(gm_src + data_src,
-                                    (__gm__ X1Type *)stateAddrPerRank[dst_rank] + rank_offset + data_src, data_len);
-                }
-            }
-            dst_rank = (dst_rank + comm_npu_split) % scope;
-        }
-    }
-    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0); // MTE2等MTE3
-    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1); // MTE2等MTE3
-}
-
-template <TemplateAGMMClass>
 __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Process()
 {
     if ASCEND_IS_AIV {
@@ -842,11 +357,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Process()
         Padding();
         int32_t num_flags = 4;
         // flag[0] - flag[3] 清0
-        for (int32_t idx = 0; idx < num_flags; ++idx) {
-            if (blockIdx == 0 && aivIdx == 0) {
-                SetBuffFlag((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + idx, uBuf_, 0);
-            }
-        }
+        ResetFlags(num_flags);
         PipeBarrier<PIPE_ALL>();
 
         for (int32_t cal_idx = 0; cal_idx < cal_count + MAX_BLOCK_COUNT; ++cal_idx) {
@@ -885,45 +396,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Process()
                 src_offset += num_per_rank_move;
             } else if (cal_idx > 0 && cal_idx < cal_count + 1 && aivIdx == 1 && blockIdx >= core_count &&
                        blockIdx < worldSize + core_count) { // peermem to out
-                // 如果剩余的core数不够，则循环搬运
-                int32_t other_core_num = coreNum - core_count;                         // 剩余的core数
-                int32_t cycle_num = (other_core_num + worldSize - 1) / other_core_num; // 循环次数
-                uint64_t s2_flag_idx = (cal_idx - 1) % MAX_BLOCK_COUNT;
-                int64_t src_offset = static_cast<int64_t>(cal_idx - 1) * pValue * m0 * k_align;
-                int32_t s2_actual_m = cal_idx == cal_count ? m - (cal_idx - 1) * pValue * m0 : pValue * m0;
-
-                for (int32_t cycle_idx = 0; cycle_idx < cycle_num; ++cycle_idx) {
-                    int32_t s2_other_rank = blockIdx - core_count + cycle_idx * other_core_num;
-                    int64_t other_rank_offset = static_cast<int64_t>(s2_flag_idx) * gm_a_pingpong_size +
-                                                static_cast<int64_t>(s2_other_rank) * pValue * m0 * k_align;
-                    int64_t dst_offset = static_cast<int64_t>(s2_other_rank) * m * k +
-                                         static_cast<int64_t>(cal_idx - 1) * pValue * m0 * k;
-                    if (s2_other_rank >= worldSize) {
-                        break;
-                    }
-
-                    if (s2_other_rank != rankId) {
-                        if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                            MoveResultFromPeerMemToOut(
-                                (__gm__ int8_t *)stateAddrPerRank[rankId] + other_rank_offset / 2,
-                                reinterpret_cast<__gm__ int8_t *>(allgatherGM_) + dst_offset / 2, s2_actual_m);
-                        } else {
-                            MoveResultFromPeerMemToOut((__gm__ X1Type *)stateAddrPerRank[rankId] + other_rank_offset,
-                                                       reinterpret_cast<__gm__ X1Type *>(allgatherGM_) + dst_offset,
-                                                       s2_actual_m);
-                        }
-                    } else {
-                        if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                            MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ int8_t *>(gm_a_src) + src_offset / 2,
-                                                       reinterpret_cast<__gm__ int8_t *>(allgatherGM_) + dst_offset / 2,
-                                                       s2_actual_m);
-                        } else {
-                            MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ X1Type *>(gm_a_src) + src_offset,
-                                                       reinterpret_cast<__gm__ X1Type *>(allgatherGM_) + dst_offset,
-                                                       s2_actual_m);
-                        }
-                    }
-                }
+                CopyGatherResult(cal_idx);
             }
 
             // dequant
@@ -940,11 +413,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Process()
             }
         }
 
-        for (int32_t idx = 0; idx < num_flags; ++idx) {
-            if (blockIdx == 0 && aivIdx == 0) {
-                SetBuffFlag((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + idx, uBuf_, 0);
-            }
-        }
+        ResetFlags(num_flags);
 
         SetAndWaitAivSync(FLAG_ONE_IDX);
 
@@ -959,4 +428,59 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Process()
     SyncAll<false>();
 }
 
+template <TemplateAGMMClass>
+__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::ResetFlags(int32_t num_flags)
+{
+    for (int32_t idx = 0; idx < num_flags; ++idx) {
+        if (blockIdx == 0 && aivIdx == 0) {
+            SetBuffFlag((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + idx, uBuf_, 0);
+        }
+    }
+}
+
+template <TemplateAGMMClass>
+__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CopyGatherResult(int32_t cal_idx)
+{
+    // 如果剩余的core数不够，则循环搬运
+    int32_t other_core_num = coreNum - core_count;                         // 剩余的core数
+    int32_t cycle_num = (other_core_num + worldSize - 1) / other_core_num; // 循环次数
+    uint64_t s2_flag_idx = (cal_idx - 1) % MAX_BLOCK_COUNT;
+    int64_t src_offset = static_cast<int64_t>(cal_idx - 1) * pValue * m0 * k_align;
+    int32_t s2_actual_m = cal_idx == cal_count ? m - (cal_idx - 1) * pValue * m0 : pValue * m0;
+
+    for (int32_t cycle_idx = 0; cycle_idx < cycle_num; ++cycle_idx) {
+        int32_t s2_other_rank = blockIdx - core_count + cycle_idx * other_core_num;
+        int64_t other_rank_offset = static_cast<int64_t>(s2_flag_idx) * gm_a_pingpong_size +
+                                    static_cast<int64_t>(s2_other_rank) * pValue * m0 * k_align;
+        int64_t dst_offset =
+            static_cast<int64_t>(s2_other_rank) * m * k + static_cast<int64_t>(cal_idx - 1) * pValue * m0 * k;
+        if (s2_other_rank >= worldSize) {
+            break;
+        }
+
+        if (s2_other_rank != rankId) {
+            if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
+                MoveResultFromPeerMemToOut((__gm__ int8_t *)stateAddrPerRank[rankId] + other_rank_offset / 2,
+                                           reinterpret_cast<__gm__ int8_t *>(allgatherGM_) + dst_offset / 2,
+                                           s2_actual_m);
+            } else {
+                MoveResultFromPeerMemToOut((__gm__ X1Type *)stateAddrPerRank[rankId] + other_rank_offset,
+                                           reinterpret_cast<__gm__ X1Type *>(allgatherGM_) + dst_offset, s2_actual_m);
+            }
+        } else {
+            if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
+                MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ int8_t *>(gm_a_src) + src_offset / 2,
+                                           reinterpret_cast<__gm__ int8_t *>(allgatherGM_) + dst_offset / 2,
+                                           s2_actual_m);
+            } else {
+                MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ X1Type *>(gm_a_src) + src_offset,
+                                           reinterpret_cast<__gm__ X1Type *>(allgatherGM_) + dst_offset, s2_actual_m);
+            }
+        }
+    }
+}
+
 } // namespace AllGatherMatmulAIVModeImpl
+
+#include "all_gather_matmul_aiv_mode_matmul.h"
+#include "all_gather_matmul_aiv_mode_data_move.h"

@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * the CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -9,22 +9,23 @@
  */
 
 /*!
- * \file allto_all_matmul_block_epilogue_dequant.hpp
- * \brief
+ * \file mc2_block_epilogue_per_token_dequant.h
+ * \brief BlockEpilogue for EpilogueAtlasA2PerTokenDequant (perChannel + perToken dequant with optional bias),
+ *        shared by matmul_allto_all / allto_all_matmul (arch22).
  */
 
-#ifndef ALLTO_ALL_MATMUL_BLOCK_EPILOGUE_DEQUANT_HPP
-#define ALLTO_ALL_MATMUL_BLOCK_EPILOGUE_DEQUANT_HPP
+#ifndef MC2_BLOCK_EPILOGUE_PER_TOKEN_DEQUANT_H
+#define MC2_BLOCK_EPILOGUE_PER_TOKEN_DEQUANT_H
 
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_catlass.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/arch/tla_arch_resource.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tla_epilogue_dispatch_policy.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_gemm_coord.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tla_gemm_gemm_type.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_matrix_coord.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/layout/tla_layout_layout.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/detail/tla_detail_callback.hpp"
-#include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/block/tla_block_epilogue.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_catlass.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/arch/tla_arch_resource.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tla_epilogue_dispatch_policy.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_gemm_coord.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tla_gemm_gemm_type.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_matrix_coord.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/layout/tla_layout_layout.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/detail/tla_detail_callback.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/block/tla_block_epilogue.hpp"
 
 namespace Catlass::Epilogue::Block {
 
@@ -70,9 +71,13 @@ public:
     using TileShape = typename TileRowBroadcastMul::TileShape;
 
     static_assert((UB_STAGES * (TileShape::COUNT * sizeof(ElementC) + TileShape::COLUMN * sizeof(ElementScale) +
-                                TileShape::ROW * sizeof(ElementPerTokenScale) + TileShape::COUNT * sizeof(ElementD)) +
-                   (TileShape::COUNT + TileShape::COUNT) * sizeof(float) + TileShape::ROW * BYTE_PER_BLK) <=
-                      ArchTag::UB_SIZE,
+                                TileShape::ROW * sizeof(ElementPerTokenScale) +
+                                TileShape::COLUMN * sizeof(ElementBias) + TileShape::COUNT * sizeof(ElementD)) +
+                   (TileShape::COUNT + TileShape::COUNT) * sizeof(float) + TileShape::ROW * BYTE_PER_BLK +
+                   ((AscendC::IsSameType<ElementBias, bfloat16_t>::value ||
+                     AscendC::IsSameType<ElementBias, half>::value) ?
+                        TileShape::COLUMN * sizeof(float) :
+                        0)) <= ArchTag::UB_SIZE,
                   "TileShape is too large to fit in UB");
 
     struct Params {
@@ -275,7 +280,7 @@ public:
             AscendC::Cast(ubCFp32, ubC, AscendC::RoundMode::CAST_RINT, TileShape::COUNT);
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
 
-            // // 在UB上做广播乘法
+            // 在UB上做广播乘法
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbScaleMTE2VList[ubListId]);
             tileRowBroadcastMul(ubMul, ubCFp32, ubScale);
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[ubListId]);
@@ -367,4 +372,4 @@ private:
 };
 } // namespace Catlass::Epilogue::Block
 
-#endif // ALLTO_ALL_MATMUL_BLOCK_EPILOGUE_DEQUANT_HPP
+#endif // MC2_BLOCK_EPILOGUE_PER_TOKEN_DEQUANT_H

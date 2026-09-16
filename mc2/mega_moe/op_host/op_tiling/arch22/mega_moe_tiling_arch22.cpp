@@ -351,6 +351,63 @@ static ge::graphStatus CheckActivationParamCount(uint32_t activationCode, size_t
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus SetActivationParams(const float *data, size_t paramCount, MegaMoeA2A3TilingData &info)
+{
+    if (info.activationCode == ACTIVATION_CODE_SWIGLU || info.activationCode == ACTIVATION_CODE_SWIGLU_STEP) {
+        OP_TILING_CHECK(CheckActivationParamCount(info.activationCode, paramCount, 1U, 1U) != ge::GRAPH_SUCCESS,
+                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckActivationParamCount failed."),
+                        return GRAPH_FAILED);
+        info.activationClamp = data[0];
+    } else if (info.activationCode == ACTIVATION_CODE_SWIGLU_OAI) {
+        OP_TILING_CHECK(CheckActivationParamCount(info.activationCode, paramCount, 3U, 3U) != ge::GRAPH_SUCCESS,
+                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckActivationParamCount failed."),
+                        return GRAPH_FAILED);
+        info.activationClamp = data[0];
+        info.activationParams1 = data[1];
+        info.activationParams2 = data[2];
+    } else {
+        OP_TILING_CHECK(CheckActivationParamCount(info.activationCode, paramCount, 1U, 2U) != ge::GRAPH_SUCCESS,
+                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckActivationParamCount failed."),
+                        return GRAPH_FAILED);
+        info.activationParams1 = data[0];
+        info.activationParams2 = paramCount == 2U ? data[1] : SITU_LINEAR_BETA_DISABLED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus ValidateActivationParams(size_t paramCount, const MegaMoeA2A3TilingData &info)
+{
+    if (info.activationCode != ACTIVATION_CODE_SITU) {
+        OP_TILING_CHECK(!IsValidActivationClamp(info.activationClamp),
+                        OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[0]",
+                                                  std::to_string(info.activationClamp).c_str(), ">= 0 and not NaN"),
+                        return GRAPH_FAILED);
+    }
+    if (info.activationCode == ACTIVATION_CODE_SWIGLU_OAI) {
+        OP_TILING_CHECK(!IsFiniteActivationParam(info.activationParams1),
+                        OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[1]",
+                                                  std::to_string(info.activationParams1).c_str(), "finite"),
+                        return GRAPH_FAILED);
+        OP_TILING_CHECK(!IsFiniteActivationParam(info.activationParams2),
+                        OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[2]",
+                                                  std::to_string(info.activationParams2).c_str(), "finite"),
+                        return GRAPH_FAILED);
+    }
+    if (info.activationCode == ACTIVATION_CODE_SITU) {
+        OP_TILING_CHECK(
+            !IsValidSituScale(info.activationParams1),
+            OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[0]", std::to_string(info.activationParams1).c_str(),
+                                      "finite and greater than 0"),
+            return GRAPH_FAILED);
+        OP_TILING_CHECK(
+            paramCount == 2U && !IsValidSituScale(info.activationParams2),
+            OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[1]", std::to_string(info.activationParams2).c_str(),
+                                      "finite and greater than 0"),
+            return GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 static ge::graphStatus CheckActivationParamsAttr(const gert::TypedContinuousVector<float> *params,
                                                  MegaMoeA2A3TilingData &info)
 {
@@ -372,61 +429,11 @@ static ge::graphStatus CheckActivationParamsAttr(const gert::TypedContinuousVect
     OP_TILING_CHECK(data == nullptr, OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get activation_params data."),
                     return GRAPH_FAILED);
 
-    if (info.activationCode == ACTIVATION_CODE_SWIGLU || info.activationCode == ACTIVATION_CODE_SWIGLU_STEP) {
-        OP_TILING_CHECK(CheckActivationParamCount(info.activationCode, paramCount, 1U, 1U) != ge::GRAPH_SUCCESS,
-                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckActivationParamCount failed."),
-                        return GRAPH_FAILED);
-        info.activationClamp = data[0];
-    } else if (info.activationCode == ACTIVATION_CODE_SWIGLU_OAI) {
-        OP_TILING_CHECK(CheckActivationParamCount(info.activationCode, paramCount, 3U, 3U) != ge::GRAPH_SUCCESS,
-                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckActivationParamCount failed."),
-                        return GRAPH_FAILED);
-        info.activationClamp = data[0];
-        info.activationParams1 = data[1];
-        info.activationParams2 = data[2];
-    } else {
-        // SITU prototype order is [beta, linear_beta]; activationParams1 carries beta (data[0]) and
-        // activationParams2 carries linear_beta (data[1]), matching the order passed by the prototype.
-        OP_TILING_CHECK(CheckActivationParamCount(info.activationCode, paramCount, 1U, 2U) != ge::GRAPH_SUCCESS,
-                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckActivationParamCount failed."),
-                        return GRAPH_FAILED);
-        info.activationParams1 = data[0];
-        info.activationParams2 = paramCount == 2U ? data[1] : SITU_LINEAR_BETA_DISABLED;
+    auto status = SetActivationParams(data, paramCount, info);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
     }
-
-    if (info.activationCode != ACTIVATION_CODE_SITU) {
-        OP_TILING_CHECK(!IsValidActivationClamp(info.activationClamp),
-                        OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[0]",
-                                                  std::to_string(info.activationClamp).c_str(), ">= 0 and not NaN"),
-                        return GRAPH_FAILED);
-    }
-    if (info.activationCode == ACTIVATION_CODE_SWIGLU_OAI) {
-        OP_TILING_CHECK(!IsFiniteActivationParam(info.activationParams1),
-                        OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[1]",
-                                                  std::to_string(info.activationParams1).c_str(), "finite"),
-                        return GRAPH_FAILED);
-    }
-    if (info.activationCode == ACTIVATION_CODE_SWIGLU_OAI) {
-        OP_TILING_CHECK(!IsFiniteActivationParam(info.activationParams2),
-                        OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[2]",
-                                                  std::to_string(info.activationParams2).c_str(), "finite"),
-                        return GRAPH_FAILED);
-    }
-    if (info.activationCode == ACTIVATION_CODE_SITU) {
-        OP_TILING_CHECK(
-            !IsValidSituScale(info.activationParams1),
-            OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[0]", std::to_string(info.activationParams1).c_str(),
-                                      "finite and greater than 0"),
-            return GRAPH_FAILED);
-        if (paramCount == 2U) {
-            OP_TILING_CHECK(
-                !IsValidSituScale(info.activationParams2),
-                OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params[1]",
-                                          std::to_string(info.activationParams2).c_str(), "finite and greater than 0"),
-                return GRAPH_FAILED);
-        }
-    }
-    return ge::GRAPH_SUCCESS;
+    return ValidateActivationParams(paramCount, info);
 }
 
 static ge::graphStatus CheckActivationOutDtypeAttr(const int64_t *ptr)
@@ -901,64 +908,9 @@ static ge::graphStatus CheckWeight1Input(gert::TilingContext *context, int64_t h
     return ge::GRAPH_SUCCESS;
 }
 
-// 校验 weight2 动态输入，与 weight1 做交叉校验
-static ge::graphStatus CheckWeight2Input(gert::TilingContext *context, int64_t hiddenSize, uint32_t N,
-                                         uint32_t expertPerRank, ge::DataType w1DataType, ge::Format w1Format,
-                                         ge::DataType &outW2DataType)
+static ge::graphStatus CheckWeight2TensorShapes(gert::TilingContext *context, int64_t hiddenSize, uint32_t n2,
+                                                uint32_t expertPerRank)
 {
-    auto w2Tensor = context->GetDynamicInputTensor(WEIGHT2_INDEX, 0);
-    OP_TILING_CHECK(w2Tensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "weight2"), return GRAPH_FAILED);
-
-    auto w2Desc = context->GetDynamicInputDesc(WEIGHT2_INDEX, 0);
-    OP_TILING_CHECK(w2Desc == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "weight2"), return GRAPH_FAILED);
-    ge::DataType w2DataType = w2Desc->GetDataType();
-    OP_TILING_CHECK(w2DataType != ge::DT_BF16 && w2DataType != ge::DT_INT8 && w2DataType != ge::DT_INT4,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(K_OP_NAME, "weight2", Ops::Base::ToString(w2DataType).c_str(),
-                                                          "The dtype of weight2 must be DT_BF16, DT_INT8 or DT_INT4."),
-                    return GRAPH_FAILED);
-
-    // weight1 和 weight2 数据类型必须一致
-    OP_TILING_CHECK(
-        w1DataType != w2DataType,
-        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
-            K_OP_NAME, "weight1, weight2",
-            (std::string("[") + Ops::Base::ToString(w1DataType) + ", " + Ops::Base::ToString(w2DataType) + "]").c_str(),
-            "The dtypes of weight1 and weight2 must be the same."),
-        return GRAPH_FAILED);
-    ge::Format w2Format = static_cast<ge::Format>(ge::GetPrimaryFormat(w2Desc->GetStorageFormat()));
-    OP_TILING_CHECK(w2Format != ge::FORMAT_ND && w2Format != ge::FORMAT_FRACTAL_NZ,
-                    OP_LOGE_FOR_INVALID_FORMAT(K_OP_NAME, "weight2", Ops::Base::ToString(w2Format).c_str(),
-                                               "FORMAT_ND or FORMAT_FRACTAL_NZ"),
-                    return GRAPH_FAILED);
-    OP_TILING_CHECK(
-        w1Format != w2Format,
-        OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON(
-            K_OP_NAME, "weight1, weight2",
-            (std::string("[") + Ops::Base::ToString(w1Format) + ", " + Ops::Base::ToString(w2Format) + "]").c_str(),
-            "The formats of weight1 and weight2 must be the same."),
-        return GRAPH_FAILED);
-
-    uint32_t w2ExpertPerRank = GetDynamicInputTensorListLen(context, WEIGHT2_INDEX);
-    OP_TILING_CHECK(w2ExpertPerRank != expertPerRank,
-                    OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
-                        K_OP_NAME, "weight2, weight1",
-                        (std::to_string(w2ExpertPerRank) + ", " + std::to_string(expertPerRank)).c_str(),
-                        "The tensor list lengths of weight1 and weight2 must be the same."),
-                    return GRAPH_FAILED);
-
-    uint32_t n2 = N / 2;
-    OP_TILING_CHECK(n2 % HIDDEN_SIZE_ALIGN != 0,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(K_OP_NAME, "weight2",
-                                                          Ops::Base::ToString(w2Tensor->GetStorageShape()).c_str(),
-                                                          "dim0 (intermediate_hidden) must be aligned to 512"),
-                    return GRAPH_FAILED);
-
-    OP_TILING_CHECK(n2 < MIN_INTERMEDIATE_HIDDEN,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(K_OP_NAME, "weight2",
-                                                          Ops::Base::ToString(w2Tensor->GetStorageShape()).c_str(),
-                                                          "dim0 (intermediate_hidden) must be >= 512"),
-                    return GRAPH_FAILED);
-
     for (uint32_t i = 0; i < expertPerRank; i++) {
         std::string tensorName = "weight2[" + std::to_string(i) + "]";
         auto wTensorI = context->GetDynamicInputTensor(WEIGHT2_INDEX, i);
@@ -981,6 +933,80 @@ static ge::graphStatus CheckWeight2Input(gert::TilingContext *context, int64_t h
                             K_OP_NAME, tensorName.c_str(), Ops::Base::ToString(wTensorI->GetStorageShape()).c_str(),
                             ("dim1 must equal hidden_size (" + std::to_string(hiddenSize) + ")").c_str()),
                         return GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+// 校验 weight2 动态输入，与 weight1 做交叉校验
+static ge::graphStatus CheckWeight2Desc(gert::TilingContext *context, ge::DataType w1DataType, ge::Format w1Format,
+                                        ge::DataType &w2DataType)
+{
+    auto w2Desc = context->GetDynamicInputDesc(WEIGHT2_INDEX, 0);
+    OP_TILING_CHECK(w2Desc == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "weight2"), return GRAPH_FAILED);
+    w2DataType = w2Desc->GetDataType();
+    OP_TILING_CHECK(w2DataType != ge::DT_BF16 && w2DataType != ge::DT_INT8 && w2DataType != ge::DT_INT4,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(K_OP_NAME, "weight2", Ops::Base::ToString(w2DataType).c_str(),
+                                                          "The dtype of weight2 must be DT_BF16, DT_INT8 or DT_INT4."),
+                    return GRAPH_FAILED);
+    OP_TILING_CHECK(
+        w1DataType != w2DataType,
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            K_OP_NAME, "weight1, weight2",
+            (std::string("[") + Ops::Base::ToString(w1DataType) + ", " + Ops::Base::ToString(w2DataType) + "]").c_str(),
+            "The dtypes of weight1 and weight2 must be the same."),
+        return GRAPH_FAILED);
+    ge::Format w2Format = static_cast<ge::Format>(ge::GetPrimaryFormat(w2Desc->GetStorageFormat()));
+    OP_TILING_CHECK(w2Format != ge::FORMAT_ND && w2Format != ge::FORMAT_FRACTAL_NZ,
+                    OP_LOGE_FOR_INVALID_FORMAT(K_OP_NAME, "weight2", Ops::Base::ToString(w2Format).c_str(),
+                                               "FORMAT_ND or FORMAT_FRACTAL_NZ"),
+                    return GRAPH_FAILED);
+    OP_TILING_CHECK(
+        w1Format != w2Format,
+        OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON(
+            K_OP_NAME, "weight1, weight2",
+            (std::string("[") + Ops::Base::ToString(w1Format) + ", " + Ops::Base::ToString(w2Format) + "]").c_str(),
+            "The formats of weight1 and weight2 must be the same."),
+        return GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckWeight2Input(gert::TilingContext *context, int64_t hiddenSize, uint32_t N,
+                                         uint32_t expertPerRank, ge::DataType w1DataType, ge::Format w1Format,
+                                         ge::DataType &outW2DataType)
+{
+    auto w2Tensor = context->GetDynamicInputTensor(WEIGHT2_INDEX, 0);
+    OP_TILING_CHECK(w2Tensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "weight2"), return GRAPH_FAILED);
+
+    ge::DataType w2DataType = ge::DT_UNDEFINED;
+    auto status = CheckWeight2Desc(context, w1DataType, w1Format, w2DataType);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
+    }
+
+    uint32_t w2ExpertPerRank = GetDynamicInputTensorListLen(context, WEIGHT2_INDEX);
+    OP_TILING_CHECK(w2ExpertPerRank != expertPerRank,
+                    OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
+                        K_OP_NAME, "weight2, weight1",
+                        (std::to_string(w2ExpertPerRank) + ", " + std::to_string(expertPerRank)).c_str(),
+                        "The tensor list lengths of weight1 and weight2 must be the same."),
+                    return GRAPH_FAILED);
+
+    uint32_t n2 = N / 2;
+    OP_TILING_CHECK(n2 % HIDDEN_SIZE_ALIGN != 0,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(K_OP_NAME, "weight2",
+                                                          Ops::Base::ToString(w2Tensor->GetStorageShape()).c_str(),
+                                                          "dim0 (intermediate_hidden) must be aligned to 512"),
+                    return GRAPH_FAILED);
+
+    OP_TILING_CHECK(n2 < MIN_INTERMEDIATE_HIDDEN,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(K_OP_NAME, "weight2",
+                                                          Ops::Base::ToString(w2Tensor->GetStorageShape()).c_str(),
+                                                          "dim0 (intermediate_hidden) must be >= 512"),
+                    return GRAPH_FAILED);
+
+    status = CheckWeight2TensorShapes(context, hiddenSize, n2, expertPerRank);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
     }
 
     outW2DataType = w2DataType;
@@ -1301,7 +1327,7 @@ static ge::graphStatus MegaMoeA2A3CheckHcclBuffSize(const gert::TilingContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MegaMoeA2A3CheckOutputTensor(gert::TilingContext *context, const MegaMoeA2A3TilingData &info)
+static ge::graphStatus CheckYOutput(gert::TilingContext *context, const MegaMoeA2A3TilingData &info)
 {
     // ==================== 1. y 输出校验 ====================
     const gert::StorageShape *yStorageShape = context->GetOutputShape(OUTPUT_Y_INDEX);
@@ -1343,6 +1369,11 @@ static ge::graphStatus MegaMoeA2A3CheckOutputTensor(gert::TilingContext *context
     OP_LOGD(K_INNER_DEBUG, "y dim1 = %ld", yDim1);
     OP_LOGD(K_INNER_DEBUG, "y dataType = %d", static_cast<int>(yDataType));
 
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckExpertTokenNumsOutput(gert::TilingContext *context, const MegaMoeA2A3TilingData &info)
+{
     // ==================== 2. expert_token_nums 输出校验 ====================
     const gert::StorageShape *expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OP_TILING_CHECK(expertTokenNumsStorageShape == nullptr,
@@ -1381,6 +1412,15 @@ static ge::graphStatus MegaMoeA2A3CheckOutputTensor(gert::TilingContext *context
     OP_LOGD(K_INNER_DEBUG, "expert_token_nums dataType = %d", static_cast<int>(expertTokenNumsDesc->GetDataType()));
 
     return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus MegaMoeA2A3CheckOutputTensor(gert::TilingContext *context, const MegaMoeA2A3TilingData &info)
+{
+    auto status = CheckYOutput(context, info);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
+    }
+    return CheckExpertTokenNumsOutput(context, info);
 }
 
 static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext *context)

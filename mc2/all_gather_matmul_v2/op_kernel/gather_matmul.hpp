@@ -169,52 +169,74 @@ public:
         return GemmCoord{mActual, nActual, kActual};
     }
 
+    // Per-block geometry shared by the local-block matmul loops below.
+    struct LocalBlockInfo {
+        GemmCoord blockLocCoord;
+        GemmCoord blockSizeCoord;
+        GemmCoord nextBlockSizeCoord;
+        uint64_t gmOffsetA;
+        uint64_t gmOffsetB;
+        uint64_t gmOffsetC;
+        uint64_t gmOffsetNextA;
+        uint64_t gmOffsetNextB;
+        bool isFirstBlock;
+        bool hasNextBlock;
+    };
+
+    inline __aicore__ LocalBlockInfo GetLocalBlockInfo(int32_t loopIdx, Params const &params)
+    {
+        GemmCoord blockIdxCoord = GetBlockIdCoord(loopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
+        GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
+        GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, mLoops, params.problemShape.m(),
+                                                     nLoops, params.problemShape.n(), params.problemShape.k());
+        MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
+        MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
+        MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
+        uint64_t dstSt = params.rankIdx * static_cast<uint64_t>(params.problemShape.m()) * params.problemShape.n();
+
+        GemmCoord nextBlockLocCoord;
+        GemmCoord nextBlockSizeCoord;
+        int32_t nextLoopIdx = loopIdx + coreNum;
+        bool hasNextBlock = false;
+        if (nextLoopIdx < coreLoops) {
+            hasNextBlock = true;
+            GemmCoord nextBlockIdCoord =
+                GetBlockIdCoord(nextLoopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
+            nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
+            nextBlockSizeCoord = GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, mLoops, params.problemShape.m(),
+                                                   nLoops, params.problemShape.n(), params.problemShape.k());
+        }
+        MatrixCoord offsetNextA{nextBlockLocCoord.m(), nextBlockLocCoord.k()};
+        MatrixCoord offsetNextB{nextBlockLocCoord.k(), nextBlockLocCoord.n()};
+
+        LocalBlockInfo info{};
+        info.blockLocCoord = blockLocCoord;
+        info.blockSizeCoord = blockSizeCoord;
+        info.nextBlockSizeCoord = nextBlockSizeCoord;
+        info.gmOffsetA = params.layoutA.GetOffset(offsetA);
+        info.gmOffsetB = params.layoutB.GetOffset(offsetB);
+        info.gmOffsetC = dstSt + params.layoutC.GetOffset(offsetC);
+        info.gmOffsetNextA = params.layoutA.GetOffset(offsetNextA);
+        info.gmOffsetNextB = params.layoutB.GetOffset(offsetNextB);
+        info.isFirstBlock = (loopIdx < coreNum);
+        info.hasNextBlock = hasNextBlock;
+        return info;
+    }
+
     CATLASS_DEVICE
     void DoLocalMatmul(Params const &params)
     {
         BlockMmad blockMmad(resource);
 
         AscendC::GlobalTensor<ElementC> gmDst = outputTypeInt32 ? gmWorkSpace : gmC;
-        uint64_t dstSt = params.rankIdx * static_cast<uint64_t>(params.problemShape.m()) * params.problemShape.n();
         for (int32_t loopIdx = 0; loopIdx < coreLoops; loopIdx++) {
             if (loopIdx % coreNum != coreIdx) {
                 continue;
             }
-            GemmCoord blockIdxCoord = GetBlockIdCoord(loopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
-            GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
-            GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, mLoops, params.problemShape.m(),
-                                                         nLoops, params.problemShape.n(), params.problemShape.k());
-
-            MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
-            MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
-            MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
-            uint64_t gmOffsetA = params.layoutA.GetOffset(offsetA);
-            uint64_t gmOffsetB = params.layoutB.GetOffset(offsetB);
-            uint64_t gmOffsetC = dstSt + params.layoutC.GetOffset(offsetC);
-
-            bool isFirstBlock = (loopIdx < coreNum);
-            bool hasNextBlock = false;
-            GemmCoord nextBlockIdCoord;
-            GemmCoord nextBlockLocCoord;
-            GemmCoord nextBlockSizeCoord;
-            int32_t nextLoopIdx = loopIdx + coreNum;
-            if (nextLoopIdx < coreLoops) {
-                hasNextBlock = true;
-                nextBlockIdCoord =
-                    GetBlockIdCoord(nextLoopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
-                nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
-                nextBlockSizeCoord =
-                    GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, mLoops, params.problemShape.m(), nLoops,
-                                      params.problemShape.n(), params.problemShape.k());
-            }
-            MatrixCoord offsetNextA{nextBlockLocCoord.m(), nextBlockLocCoord.k()};
-            MatrixCoord offsetNextB{nextBlockLocCoord.k(), nextBlockLocCoord.n()};
-            uint64_t gmOffsetNextA = params.layoutA.GetOffset(offsetNextA);
-            uint64_t gmOffsetNextB = params.layoutB.GetOffset(offsetNextB);
-
-            blockMmad(gmA[gmOffsetA], params.layoutA, gmB[gmOffsetB], params.layoutB, gmDst[gmOffsetC], params.layoutC,
-                      gmA[gmOffsetNextA], gmB[gmOffsetNextB], blockSizeCoord, nextBlockSizeCoord, isFirstBlock,
-                      hasNextBlock);
+            LocalBlockInfo info = GetLocalBlockInfo(loopIdx, params);
+            blockMmad(gmA[info.gmOffsetA], params.layoutA, gmB[info.gmOffsetB], params.layoutB, gmDst[info.gmOffsetC],
+                      params.layoutC, gmA[info.gmOffsetNextA], gmB[info.gmOffsetNextB], info.blockSizeCoord,
+                      info.nextBlockSizeCoord, info.isFirstBlock, info.hasNextBlock);
         }
     }
 
@@ -223,132 +245,161 @@ public:
     {
         FixpipeBlockMmad fixpipeBlockMmad(resource);
 
-        uint64_t dstSt = params.rankIdx * static_cast<uint64_t>(params.problemShape.m()) * params.problemShape.n();
         for (int32_t loopIdx = 0; loopIdx < coreLoops; loopIdx++) {
             if (loopIdx % coreNum != coreIdx) {
                 continue;
             }
-            GemmCoord blockIdxCoord = GetBlockIdCoord(loopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
-            GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
-            GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, mLoops, params.problemShape.m(),
-                                                         nLoops, params.problemShape.n(), params.problemShape.k());
+            LocalBlockInfo info = GetLocalBlockInfo(loopIdx, params);
+            uint64_t gmOffsetScale = info.blockLocCoord.n();
+            fixpipeBlockMmad(gmAInt8[info.gmOffsetA], params.layoutA, gmBInt8[info.gmOffsetB], params.layoutB,
+                             gmCHalf[info.gmOffsetC], params.layoutC, gmScale[gmOffsetScale], params.layoutScale,
+                             gmAInt8[info.gmOffsetNextA], gmBInt8[info.gmOffsetNextB], info.blockSizeCoord,
+                             info.nextBlockSizeCoord, info.isFirstBlock, info.hasNextBlock);
+        }
+    }
 
-            MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
-            MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
-            MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
-            uint64_t gmOffsetA = params.layoutA.GetOffset(offsetA);
-            uint64_t gmOffsetB = params.layoutB.GetOffset(offsetB);
-            uint64_t gmOffsetC = dstSt + params.layoutC.GetOffset(offsetC);
+    // Loop-scope values shared by the cross-rank (remote-block) matmul loops below.
+    struct RemoteLoopContext {
+        int32_t otherRankNum;
+        int32_t actualPValue;
+        int32_t blockM;
+        int32_t calIdx;
+        int32_t flagIdx;
+        int32_t pingPongSt;
+        int32_t loopNumInOtherRank;
+        uint64_t blockSize;
+        uint64_t outputBlockSize;
+        uint64_t mnSize;
+    };
 
-            bool isFirstBlock = (loopIdx < coreNum);
-            bool hasNextBlock = false;
-            GemmCoord nextBlockIdCoord;
-            GemmCoord nextBlockLocCoord;
-            GemmCoord nextBlockSizeCoord;
-            int32_t nextLoopIdx = loopIdx + coreNum;
-            if (nextLoopIdx < coreLoops) {
-                hasNextBlock = true;
-                nextBlockIdCoord =
-                    GetBlockIdCoord(nextLoopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
-                nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
-                nextBlockSizeCoord =
-                    GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, mLoops, params.problemShape.m(), nLoops,
-                                      params.problemShape.n(), params.problemShape.k());
-            }
+    struct RemoteBlockInfo {
+        GemmCoord blockLocCoord;
+        GemmCoord blockSizeCoord;
+        GemmCoord nextBlockSizeCoord;
+        int64_t gmOffsetC;
+        uint64_t gmOffsetA;
+        uint64_t gmOffsetB;
+        uint64_t gmOffsetNextA;
+        uint64_t gmOffsetNextB;
+        bool aIsLocal;
+        bool aNextIsLocal;
+        bool isFirstBlock;
+        bool hasNextBlock;
+    };
+
+    inline __aicore__ RemoteBlockInfo GetRemoteBlockInfo(int32_t loopOffset, RemoteLoopContext const &ctx,
+                                                         bool accumWorkSpacePingPong, Params const &params)
+    {
+        int32_t loopOffsetInBlock = loopOffset / ctx.otherRankNum;
+        int32_t dstBlockIdx = loopOffset % ctx.otherRankNum;
+        GemmCoord blockIdxCoord =
+            GetBlockIdCoord(loopOffsetInBlock, ctx.actualPValue, nLoops, params.swizzlDirect, params.swizzlCount);
+        GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
+        GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, ctx.actualPValue, ctx.blockM, nLoops,
+                                                     params.problemShape.n(), params.problemShape.k());
+        MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
+        MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
+        MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
+
+        int64_t gmOffsetC;
+        if (accumWorkSpacePingPong) {
+            gmOffsetC = (static_cast<int64_t>(dstBlockIdx) + static_cast<int64_t>(ctx.flagIdx) * params.rankSize) *
+                            ctx.outputBlockSize +
+                        params.layoutC.GetOffset(offsetC);
+        } else {
+            gmOffsetC = dstBlockIdx * ctx.mnSize + ctx.calIdx * ctx.outputBlockSize + params.layoutC.GetOffset(offsetC);
+        }
+
+        bool aIsLocal = (dstBlockIdx == params.rankIdx);
+        uint64_t gmOffsetA =
+            aIsLocal ? (ctx.calIdx * ctx.blockSize + params.layoutA.GetOffset(offsetA)) :
+                       (ctx.pingPongSt + dstBlockIdx * ctx.blockSize + params.layoutPeerMem.GetOffset(offsetA));
+
+        GemmCoord nextBlockLocCoord;
+        GemmCoord nextBlockSizeCoord;
+        uint64_t gmOffsetNextA = 0;
+        uint64_t gmOffsetNextB = 0;
+        bool aNextIsLocal = false;
+        bool hasNextBlock = false;
+        int32_t nextLoopOffset = loopOffset + coreNum;
+        if (nextLoopOffset < ctx.loopNumInOtherRank) {
+            hasNextBlock = true;
+            int32_t nextLoopOffsetInBlock = nextLoopOffset / ctx.otherRankNum;
+            int32_t nextDstBlockIdx = nextLoopOffset % ctx.otherRankNum;
+            GemmCoord nextBlockIdCoord = GetBlockIdCoord(nextLoopOffsetInBlock, ctx.actualPValue, nLoops,
+                                                         params.swizzlDirect, params.swizzlCount);
+            nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
+            nextBlockSizeCoord = GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, ctx.actualPValue, ctx.blockM,
+                                                   nLoops, params.problemShape.n(), params.problemShape.k());
             MatrixCoord offsetNextA{nextBlockLocCoord.m(), nextBlockLocCoord.k()};
             MatrixCoord offsetNextB{nextBlockLocCoord.k(), nextBlockLocCoord.n()};
-            uint64_t gmOffsetNextA = params.layoutA.GetOffset(offsetNextA);
-            uint64_t gmOffsetNextB = params.layoutB.GetOffset(offsetNextB);
-
-            uint64_t gmOffsetScale = blockLocCoord.n();
-            fixpipeBlockMmad(gmAInt8[gmOffsetA], params.layoutA, gmBInt8[gmOffsetB], params.layoutB, gmCHalf[gmOffsetC],
-                             params.layoutC, gmScale[gmOffsetScale], params.layoutScale, gmAInt8[gmOffsetNextA],
-                             gmBInt8[gmOffsetNextB], blockSizeCoord, nextBlockSizeCoord, isFirstBlock, hasNextBlock);
+            aNextIsLocal = (nextDstBlockIdx == params.rankIdx);
+            gmOffsetNextA =
+                aNextIsLocal ?
+                    (ctx.calIdx * ctx.blockSize + params.layoutA.GetOffset(offsetNextA)) :
+                    (ctx.pingPongSt + nextDstBlockIdx * ctx.blockSize + params.layoutPeerMem.GetOffset(offsetNextA));
+            gmOffsetNextB = params.layoutB.GetOffset(offsetNextB);
         }
+
+        RemoteBlockInfo info{};
+        info.blockLocCoord = blockLocCoord;
+        info.blockSizeCoord = blockSizeCoord;
+        info.nextBlockSizeCoord = nextBlockSizeCoord;
+        info.gmOffsetC = gmOffsetC;
+        info.gmOffsetA = gmOffsetA;
+        info.gmOffsetB = params.layoutB.GetOffset(offsetB);
+        info.gmOffsetNextA = gmOffsetNextA;
+        info.gmOffsetNextB = gmOffsetNextB;
+        info.aIsLocal = aIsLocal;
+        info.aNextIsLocal = aNextIsLocal;
+        info.isFirstBlock = (loopOffset < coreNum);
+        info.hasNextBlock = hasNextBlock;
+        return info;
+    }
+
+    inline __aicore__ RemoteLoopContext GetRemoteLoopContext(int32_t calIdx, Params const &params)
+    {
+        RemoteLoopContext ctx;
+        ctx.otherRankNum = params.rankSize;
+        ctx.blockM = params.pValue * L1TileShape::M;
+        ctx.blockSize = static_cast<uint64_t>(ctx.blockM) * kAlign;
+        ctx.outputBlockSize = static_cast<uint64_t>(ctx.blockM) * params.problemShape.n();
+        ctx.mnSize = static_cast<uint64_t>(params.problemShape.m()) * params.problemShape.n();
+        ctx.calIdx = calIdx;
+        ctx.flagIdx = calIdx % MAX_BLOCK_COUNT;
+        ctx.actualPValue = params.pValue;
+        if (calIdx == calCount - 1) {
+            ctx.actualPValue = mLoops - calIdx * params.pValue;
+            ctx.blockM = params.problemShape.m() - calIdx * ctx.blockM;
+        }
+        ctx.pingPongSt = ctx.flagIdx * pingPongSize;
+        ctx.loopNumInOtherRank = ctx.actualPValue * ctx.otherRankNum * nLoops;
+        return ctx;
     }
 
     inline __aicore__ void FixpipeMatmul(Params const &params)
     {
         FixpipeBlockMmad fixpipeBlockMmad(resource);
 
-        int32_t otherRankNum = params.rankSize;
-        int32_t blockM = params.pValue * L1TileShape::M;
-        uint64_t blockSize = static_cast<uint64_t>(blockM) * kAlign;
-        uint64_t outputBlockSize = static_cast<uint64_t>(blockM) * params.problemShape.n();
-        uint64_t mnSize = static_cast<uint64_t>(params.problemShape.m()) * params.problemShape.n();
         for (int32_t calIdx = 0; calIdx < calCount; calIdx++) {
-            int32_t flagIdx = calIdx % MAX_BLOCK_COUNT;
-            int32_t actualPValue = params.pValue;
-            if (calIdx == calCount - 1) {
-                actualPValue = mLoops - calIdx * params.pValue;
-                blockM = params.problemShape.m() - calIdx * blockM;
-            }
-
-            WaitEvent(flagIdx);
-
-            int32_t pingPongSt = flagIdx * pingPongSize;
-            int32_t loopNumInOtherRank = actualPValue * otherRankNum * nLoops;
-            int32_t loopSt = coreLoops + calIdx * params.pValue * nLoops * otherRankNum;
-            for (int32_t loopOffset = 0; loopOffset < loopNumInOtherRank; loopOffset++) {
+            RemoteLoopContext ctx = GetRemoteLoopContext(calIdx, params);
+            WaitEvent(ctx.flagIdx);
+            int32_t loopSt = coreLoops + calIdx * params.pValue * nLoops * ctx.otherRankNum;
+            for (int32_t loopOffset = 0; loopOffset < ctx.loopNumInOtherRank; loopOffset++) {
                 int32_t loopIdx = loopSt + loopOffset;
                 if (loopIdx % coreNum != coreIdx) {
                     continue;
                 }
-                int32_t loopOffsetInBlock = loopOffset / otherRankNum;
-                int32_t dstBlockIdx = loopOffset % otherRankNum;
-                GemmCoord blockIdxCoord =
-                    GetBlockIdCoord(loopOffsetInBlock, actualPValue, nLoops, params.swizzlDirect, params.swizzlCount);
-                GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
-                GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, actualPValue, blockM, nLoops,
-                                                             params.problemShape.n(), params.problemShape.k());
-                MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
-                MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
-                MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
-                uint64_t gmOffsetA = pingPongSt + dstBlockIdx * blockSize + params.layoutPeerMem.GetOffset(offsetA);
-                uint64_t gmOffsetB = params.layoutB.GetOffset(offsetB);
-                int64_t gmOffsetC = dstBlockIdx * mnSize + calIdx * outputBlockSize + params.layoutC.GetOffset(offsetC);
-
-                AscendC::GlobalTensor<ElementAInt8> gmAIn = gmPeerMemInt8;
-                if (dstBlockIdx == params.rankIdx) { // 从gmA里面取
-                    gmAIn = gmAInt8;
-                    gmOffsetA = calIdx * blockSize + params.layoutA.GetOffset(offsetA);
-                }
-
-                bool isFirstBlock = (loopOffset < coreNum);
-                bool hasNextBlock = false;
-                GemmCoord nextBlockIdCoord;
-                GemmCoord nextBlockLocCoord;
-                GemmCoord nextBlockSizeCoord;
-                int32_t nextLoopOffset = loopOffset + coreNum;
-                int32_t nextLoopOffsetInBlock = nextLoopOffset / otherRankNum;
-                int32_t nextDstBlockIdx = nextLoopOffset % otherRankNum;
-                if (nextLoopOffset < loopNumInOtherRank) {
-                    hasNextBlock = true;
-                    nextBlockIdCoord = GetBlockIdCoord(nextLoopOffsetInBlock, actualPValue, nLoops, params.swizzlDirect,
-                                                       params.swizzlCount);
-                    nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
-                    nextBlockSizeCoord = GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, actualPValue, blockM,
-                                                           nLoops, params.problemShape.n(), params.problemShape.k());
-                }
-                MatrixCoord offsetNextA{nextBlockLocCoord.m(), nextBlockLocCoord.k()};
-                MatrixCoord offsetNextB{nextBlockLocCoord.k(), nextBlockLocCoord.n()};
-                uint64_t gmOffsetNextA =
-                    pingPongSt + nextDstBlockIdx * blockSize + params.layoutPeerMem.GetOffset(offsetNextA);
-                uint64_t gmOffsetNextB = params.layoutB.GetOffset(offsetNextB);
-
-                AscendC::GlobalTensor<ElementAInt8> gmANextIn = gmPeerMemInt8;
-                if (nextDstBlockIdx == params.rankIdx) { // 从gmA里面取
-                    gmANextIn = gmAInt8;
-                    gmOffsetNextA = calIdx * blockSize + params.layoutA.GetOffset(offsetNextA);
-                }
-
-                uint64_t gmOffsetScale = blockLocCoord.n();
-                fixpipeBlockMmad(gmAIn[gmOffsetA], params.layoutPeerMem, gmBInt8[gmOffsetB], params.layoutB,
-                                 gmCHalf[gmOffsetC], params.layoutC, gmScale[gmOffsetScale], params.layoutScale,
-                                 gmANextIn[gmOffsetNextA], gmBInt8[gmOffsetNextB], blockSizeCoord, nextBlockSizeCoord,
-                                 isFirstBlock, hasNextBlock);
+                RemoteBlockInfo info = GetRemoteBlockInfo(loopOffset, ctx, false, params);
+                AscendC::GlobalTensor<ElementAInt8> gmAIn = info.aIsLocal ? gmAInt8 : gmPeerMemInt8;
+                AscendC::GlobalTensor<ElementAInt8> gmANextIn = info.aNextIsLocal ? gmAInt8 : gmPeerMemInt8;
+                uint64_t gmOffsetScale = info.blockLocCoord.n();
+                fixpipeBlockMmad(gmAIn[info.gmOffsetA], params.layoutPeerMem, gmBInt8[info.gmOffsetB], params.layoutB,
+                                 gmCHalf[info.gmOffsetC], params.layoutC, gmScale[gmOffsetScale], params.layoutScale,
+                                 gmANextIn[info.gmOffsetNextA], gmBInt8[info.gmOffsetNextB], info.blockSizeCoord,
+                                 info.nextBlockSizeCoord, info.isFirstBlock, info.hasNextBlock);
             }
-            FFTSCrossCoreSync<PIPE_FIX, 2>(flagIdx);
+            FFTSCrossCoreSync<PIPE_FIX, 2>(ctx.flagIdx);
         }
     }
 
@@ -357,87 +408,23 @@ public:
         BlockMmad blockMmad(resource);
 
         AscendC::GlobalTensor<ElementC> gmDst = outputTypeInt32 ? gmWorkSpace : gmC;
-        int32_t otherRankNum = params.rankSize;
-        int32_t blockM = params.pValue * L1TileShape::M;
-        uint64_t blockSize = static_cast<uint64_t>(blockM) * kAlign;
-        uint64_t outputBlockSize = static_cast<uint64_t>(blockM) * params.problemShape.n();
-        uint64_t mnSize = static_cast<uint64_t>(params.problemShape.m()) * params.problemShape.n();
         for (int32_t calIdx = 0; calIdx < calCount; calIdx++) {
-            int32_t flagIdx = calIdx % MAX_BLOCK_COUNT;
-            int32_t actualPValue = params.pValue;
-            if (calIdx == calCount - 1) {
-                actualPValue = mLoops - calIdx * params.pValue;
-                blockM = params.problemShape.m() - calIdx * blockM;
-            }
-
-            WaitEvent(flagIdx);
-
-            int32_t pingPongSt = flagIdx * pingPongSize;
-            int32_t loopNumInOtherRank = actualPValue * otherRankNum * nLoops;
-            int32_t loopSt = coreLoops + calIdx * params.pValue * nLoops * otherRankNum;
-            for (int32_t loopOffset = 0; loopOffset < loopNumInOtherRank; loopOffset++) {
+            RemoteLoopContext ctx = GetRemoteLoopContext(calIdx, params);
+            WaitEvent(ctx.flagIdx);
+            int32_t loopSt = coreLoops + calIdx * params.pValue * nLoops * ctx.otherRankNum;
+            for (int32_t loopOffset = 0; loopOffset < ctx.loopNumInOtherRank; loopOffset++) {
                 int32_t loopIdx = loopSt + loopOffset;
                 if (loopIdx % coreNum != coreIdx) {
                     continue;
                 }
-                int32_t loopOffsetInBlock = loopOffset / otherRankNum;
-                int32_t dstBlockIdx = loopOffset % otherRankNum;
-                GemmCoord blockIdxCoord =
-                    GetBlockIdCoord(loopOffsetInBlock, actualPValue, nLoops, params.swizzlDirect, params.swizzlCount);
-                GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
-                GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, actualPValue, blockM, nLoops,
-                                                             params.problemShape.n(), params.problemShape.k());
-                MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
-                MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
-                MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
-                uint64_t gmOffsetA = pingPongSt + dstBlockIdx * blockSize + params.layoutPeerMem.GetOffset(offsetA);
-                uint64_t gmOffsetB = params.layoutB.GetOffset(offsetB);
-                int64_t gmOffsetC = dstBlockIdx * mnSize + calIdx * outputBlockSize + params.layoutC.GetOffset(offsetC);
-                if (params.accumWorkSpacePingPong) {
-                    gmOffsetC = (static_cast<int64_t>(dstBlockIdx) + static_cast<int64_t>(flagIdx) * params.rankSize) *
-                                    outputBlockSize +
-                                params.layoutC.GetOffset(offsetC);
-                }
-
-                AscendC::GlobalTensor<ElementA> gmAIn = gmPeerMem;
-                if (dstBlockIdx == params.rankIdx) { // 从gmA里面取
-                    gmAIn = gmA;
-                    gmOffsetA = calIdx * blockSize + params.layoutA.GetOffset(offsetA);
-                }
-
-                bool isFirstBlock = (loopOffset < coreNum);
-                bool hasNextBlock = false;
-                GemmCoord nextBlockIdCoord;
-                GemmCoord nextBlockLocCoord;
-                GemmCoord nextBlockSizeCoord;
-                int32_t nextLoopOffset = loopOffset + coreNum;
-                int32_t nextLoopOffsetInBlock = nextLoopOffset / otherRankNum;
-                int32_t nextDstBlockIdx = nextLoopOffset % otherRankNum;
-                if (nextLoopOffset < loopNumInOtherRank) {
-                    hasNextBlock = true;
-                    nextBlockIdCoord = GetBlockIdCoord(nextLoopOffsetInBlock, actualPValue, nLoops, params.swizzlDirect,
-                                                       params.swizzlCount);
-                    nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
-                    nextBlockSizeCoord = GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, actualPValue, blockM,
-                                                           nLoops, params.problemShape.n(), params.problemShape.k());
-                }
-                MatrixCoord offsetNextA{nextBlockLocCoord.m(), nextBlockLocCoord.k()};
-                MatrixCoord offsetNextB{nextBlockLocCoord.k(), nextBlockLocCoord.n()};
-                uint64_t gmOffsetNextA =
-                    pingPongSt + nextDstBlockIdx * blockSize + params.layoutPeerMem.GetOffset(offsetNextA);
-                uint64_t gmOffsetNextB = params.layoutB.GetOffset(offsetNextB);
-
-                AscendC::GlobalTensor<ElementA> gmAInNext = gmPeerMem;
-                if (nextDstBlockIdx == params.rankIdx) { // 从gmA里面取
-                    gmAInNext = gmA;
-                    gmOffsetNextA = calIdx * blockSize + params.layoutA.GetOffset(offsetNextA);
-                }
-
-                blockMmad(gmAIn[gmOffsetA], params.layoutPeerMem, gmB[gmOffsetB], params.layoutB, gmDst[gmOffsetC],
-                          params.layoutC, gmAInNext[gmOffsetNextA], gmB[gmOffsetNextB], blockSizeCoord,
-                          nextBlockSizeCoord, isFirstBlock, hasNextBlock);
+                RemoteBlockInfo info = GetRemoteBlockInfo(loopOffset, ctx, params.accumWorkSpacePingPong, params);
+                AscendC::GlobalTensor<ElementA> gmAIn = info.aIsLocal ? gmA : gmPeerMem;
+                AscendC::GlobalTensor<ElementA> gmAInNext = info.aNextIsLocal ? gmA : gmPeerMem;
+                blockMmad(gmAIn[info.gmOffsetA], params.layoutPeerMem, gmB[info.gmOffsetB], params.layoutB,
+                          gmDst[info.gmOffsetC], params.layoutC, gmAInNext[info.gmOffsetNextA], gmB[info.gmOffsetNextB],
+                          info.blockSizeCoord, info.nextBlockSizeCoord, info.isFirstBlock, info.hasNextBlock);
             }
-            FFTSCrossCoreSync<PIPE_FIX, 2>(flagIdx);
+            FFTSCrossCoreSync<PIPE_FIX, 2>(ctx.flagIdx);
         }
     }
 

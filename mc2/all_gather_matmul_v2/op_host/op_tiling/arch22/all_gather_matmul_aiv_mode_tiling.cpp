@@ -643,7 +643,8 @@ ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext *context)
     uint32_t elementSize = 0;
     uint32_t nElemAlign = 0;
     if (aType == ge::DT_INT4) {
-        nElemAlign = HALF_KBYTE * 2;
+        constexpr uint32_t INT4_ELEMENTS_PER_BYTE = 2U;
+        nElemAlign = HALF_KBYTE * INT4_ELEMENTS_PER_BYTE;
     } else {
         elementSize = D_TYPE_SIZE_MAP.at(aType);
         nElemAlign = HALF_KBYTE / elementSize;

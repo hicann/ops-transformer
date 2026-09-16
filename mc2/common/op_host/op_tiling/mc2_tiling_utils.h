@@ -141,6 +141,13 @@ uint8_t Mc2GetCommAlgo(int64_t rankDim, uint64_t mValue, const char *group, cons
 
 bool CheckDataTypeVaild(ge::DataType type, std::initializer_list<ge::DataType> supportDtypeList);
 
+// 解析commAlg属性：未配置(空或"0")时按HCCL环境变量回退选择分层/全互联方案；
+// 返回GRAPH_FAILED表示commAlg取值非法，由调用方负责打印错误日志
+ge::graphStatus ParseCommAlgWithEnvFallback(const char *entityName, const char *commAlg, bool &isLayered);
+
+// 读取HCCL环境变量判断是否使用分层(HCCL_INTRA_PCIE_ENABLE=1且HCCL_INTRA_ROCE_ENABLE=0)
+bool IsHcclPcieLayered(const char *entityName);
+
 void UpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args &mmV3Args, const mc2tiling::TilingArgs &args,
                         const char *opName);
 ge::graphStatus GetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int32_t> &priorities, const char *opName);

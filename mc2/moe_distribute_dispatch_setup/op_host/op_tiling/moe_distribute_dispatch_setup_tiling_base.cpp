@@ -189,32 +189,7 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetRequiredAttrAndSetTilin
 const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckSharedExpertAttrValue(
     const uint32_t sharedExpertNum, const uint32_t sharedExpertRankNum)
 {
-    // 共享专家卡数>=共享专家数且可以整除
-    if (sharedExpertRankNum == 0) {
-        return ge::GRAPH_SUCCESS;
-    }
-    OP_TILING_CHECK((sharedExpertNum == 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertNum != 0"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((sharedExpertNum > sharedExpertRankNum),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertNum <= sharedExpertRankNum"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((sharedExpertRankNum % sharedExpertNum != 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertRankNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertRankNum % sharedExpertNum == 0"),
-                    return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
+    return MoeTilingBase::CheckSharedExpertAttrValue(nodeName_.c_str(), sharedExpertNum, sharedExpertRankNum);
 }
 
 const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckOptionalAttrValue()
@@ -456,33 +431,9 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorDim()
     return ge::GRAPH_SUCCESS;
 }
 
-const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorShapeRelation()
+ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckScaleWidth(const gert::StorageShape *xStorageShape,
+                                                                      const gert::StorageShape *scalesShape)
 {
-    auto xStorageShape = context_->GetInputShape(X_INDEX);
-    auto expertIdsShape = context_->GetInputShape(EXPERT_IDS_INDEX);
-    auto xActiveMaskShape = context_->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
-    auto scalesShape = context_->GetOptionalInputShape(SCALES_INDEX);
-
-    // BS校验
-    OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDim(0) != expertIdsShape->GetStorageShape().GetDim(0),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        nodeName_, "x/expertIds",
-                        (std::string("x dim0=") + std::to_string(xStorageShape->GetStorageShape().GetDim(0)) +
-                         ", expertIds dim0=" + std::to_string(expertIdsShape->GetStorageShape().GetDim(0)))
-                            .c_str(),
-                        "Dim0 of x must be equal to dim0 of expertIds"),
-                    return ge::GRAPH_FAILED);
-    if (xActiveMaskShape != nullptr) {
-        OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDim(0) != xActiveMaskShape->GetStorageShape().GetDim(0),
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            nodeName_, "x/xActiveMask",
-                            (std::string("x dim0=") + std::to_string(xStorageShape->GetStorageShape().GetDim(0)) +
-                             ", xActiveMask dim0=" + std::to_string(xActiveMaskShape->GetStorageShape().GetDim(0)))
-                                .c_str(),
-                            "Dim0 of x must be equal to dim0 of xActiveMask"),
-                        return ge::GRAPH_FAILED);
-    }
-
     // H校验
     int64_t quantMode = tilingData_->moeDistributeDispatchSetupInfo.quantMode;
     if (scalesShape != nullptr) {
@@ -514,6 +465,39 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorShapeRela
                                 "Dim1 of x must be equal to dim1 of scales"),
                             return ge::GRAPH_FAILED);
         }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorShapeRelation()
+{
+    auto xStorageShape = context_->GetInputShape(X_INDEX);
+    auto expertIdsShape = context_->GetInputShape(EXPERT_IDS_INDEX);
+    auto xActiveMaskShape = context_->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    auto scalesShape = context_->GetOptionalInputShape(SCALES_INDEX);
+
+    // BS校验
+    OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDim(0) != expertIdsShape->GetStorageShape().GetDim(0),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        nodeName_, "x/expertIds",
+                        (std::string("x dim0=") + std::to_string(xStorageShape->GetStorageShape().GetDim(0)) +
+                         ", expertIds dim0=" + std::to_string(expertIdsShape->GetStorageShape().GetDim(0)))
+                            .c_str(),
+                        "Dim0 of x must be equal to dim0 of expertIds"),
+                    return ge::GRAPH_FAILED);
+    if (xActiveMaskShape != nullptr) {
+        OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDim(0) != xActiveMaskShape->GetStorageShape().GetDim(0),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            nodeName_, "x/xActiveMask",
+                            (std::string("x dim0=") + std::to_string(xStorageShape->GetStorageShape().GetDim(0)) +
+                             ", xActiveMask dim0=" + std::to_string(xActiveMaskShape->GetStorageShape().GetDim(0)))
+                                .c_str(),
+                            "Dim0 of x must be equal to dim0 of xActiveMask"),
+                        return ge::GRAPH_FAILED);
+    }
+
+    if (CheckScaleWidth(xStorageShape, scalesShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }

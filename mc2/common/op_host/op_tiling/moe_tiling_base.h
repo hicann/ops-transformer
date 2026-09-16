@@ -40,6 +40,9 @@ protected:
     ge::graphStatus GetWorkspaceSize() override;
     ge::graphStatus PostTiling() override;
 
+    ge::graphStatus CheckSharedExpertAttrValue(const char *nodeName, const uint32_t sharedExpertNum,
+                                               const uint32_t sharedExpertRankNum);
+
     NpuArch npuArch_;
 };
 } // namespace optiling

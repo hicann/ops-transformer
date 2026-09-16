@@ -14,149 +14,29 @@
  */
 
 #include "register/op_def_registry.h"
+#include "../../common/op_host/mc2_moe_input_registration.h"
 
 namespace ops {
 class MoeDistributeCombineV3 : public OpDef {
 public:
-    explicit MoeDistributeCombineV3(const char *name) : OpDef(name)
+    explicit MoeDistributeCombineV3(const char *name)
+        : OpDef(name)
     {
         this->Input("context")
             .ParamType(REQUIRED)
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Input("expand_x")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("expert_ids")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("assist_info_for_combine")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("ep_send_counts")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("expert_scales")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("tp_send_counts")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("x_active_mask")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_BOOL, ge::DT_BOOL, ge::DT_BOOL, ge::DT_BOOL})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("activation_scale")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("weight_scale")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("group_list")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_INT64, ge::DT_INT64, ge::DT_INT64, ge::DT_INT64})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("expand_scales")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("shared_expert_x")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("elastic_info")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("ori_x")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("const_expert_alpha_1")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("const_expert_alpha_2")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("const_expert_v")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("performance_info")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_INT64, ge::DT_INT64, ge::DT_INT64, ge::DT_INT64})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
+        Mc2OpDef::DefineCombineRequiredInputs(*this);
+
+        Mc2OpDef::DefineCombineOptionalInputs(*this);
 
         this->Output("x")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT16})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
-
-        this->Attr("ep_world_size").AttrType(REQUIRED).Int();
-        this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
-        this->Attr("moe_expert_num").AttrType(REQUIRED).Int();
-        this->Attr("ccl_buffer_size").AttrType(REQUIRED).Int();
-        this->Attr("tp_world_size").AttrType(OPTIONAL).Int(0);
-        this->Attr("tp_rank_id").AttrType(OPTIONAL).Int(0);
-        this->Attr("expert_shard_type").AttrType(OPTIONAL).Int(0);
-        this->Attr("shared_expert_num").AttrType(OPTIONAL).Int(1);
-        this->Attr("shared_expert_rank_num").AttrType(OPTIONAL).Int(0);
-        this->Attr("global_bs").AttrType(OPTIONAL).Int(0);
-        this->Attr("out_dtype").AttrType(OPTIONAL).Int(0);
-        this->Attr("comm_quant_mode").AttrType(OPTIONAL).Int(0);
-        this->Attr("group_list_type").AttrType(OPTIONAL).Int(0);
-        this->Attr("comm_alg").AttrType(OPTIONAL).String("");
-        this->Attr("zero_expert_num").AttrType(OPTIONAL).Int(0);
-        this->Attr("copy_expert_num").AttrType(OPTIONAL).Int(0);
-        this->Attr("const_expert_num").AttrType(OPTIONAL).Int(0);
+        DefineAttributes();
 
         // A3 (arch22): _a3 entry (opFile -> arch22/..._a3.cpp). Reuses the class-level I/O.
         OpAICoreConfig aicore_config_a3;
@@ -188,6 +68,28 @@ public:
 
         this->AICore().AddConfig("ascend910_93", aicore_config_a3);
         this->AICore().AddConfig("ascend950", aicore_config_apt);
+    }
+
+private:
+    void DefineAttributes()
+    {
+        this->Attr("ep_world_size").AttrType(REQUIRED).Int();
+        this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
+        this->Attr("moe_expert_num").AttrType(REQUIRED).Int();
+        this->Attr("ccl_buffer_size").AttrType(REQUIRED).Int();
+        this->Attr("tp_world_size").AttrType(OPTIONAL).Int(0);
+        this->Attr("tp_rank_id").AttrType(OPTIONAL).Int(0);
+        this->Attr("expert_shard_type").AttrType(OPTIONAL).Int(0);
+        this->Attr("shared_expert_num").AttrType(OPTIONAL).Int(1);
+        this->Attr("shared_expert_rank_num").AttrType(OPTIONAL).Int(0);
+        this->Attr("global_bs").AttrType(OPTIONAL).Int(0);
+        this->Attr("out_dtype").AttrType(OPTIONAL).Int(0);
+        this->Attr("comm_quant_mode").AttrType(OPTIONAL).Int(0);
+        this->Attr("group_list_type").AttrType(OPTIONAL).Int(0);
+        this->Attr("comm_alg").AttrType(OPTIONAL).String("");
+        this->Attr("zero_expert_num").AttrType(OPTIONAL).Int(0);
+        this->Attr("copy_expert_num").AttrType(OPTIONAL).Int(0);
+        this->Attr("const_expert_num").AttrType(OPTIONAL).Int(0);
     }
 };
 

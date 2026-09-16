@@ -14,6 +14,7 @@
  */
 
 #include <cstdlib>
+#include <cstring>
 
 #include "graph/utils/type_utils.h"
 #include "mc2_hcom_topo_info.h"
@@ -247,6 +248,54 @@ bool CheckRankSize(const NpuArch npuArch, const uint32_t rankSize)
 bool CheckDataTypeVaild(ge::DataType type, std::initializer_list<ge::DataType> supportDtypeList)
 {
     return std::find(supportDtypeList.begin(), supportDtypeList.end(), type) != supportDtypeList.end();
+}
+
+ge::graphStatus ParseCommAlgWithEnvFallback(const char *entityName, const char *commAlg, bool &isLayered)
+{
+    if (commAlg == nullptr || strlen(commAlg) == 0 || strcmp(commAlg, "0") == 0) {
+        OP_LOGW(entityName, "Attr commAlg is invalid, please configure fullmesh or hierarchy.");
+
+        const char *hcclIntraPcieEnable = getenv("HCCL_INTRA_PCIE_ENABLE");
+        const char *hcclIntraRoceEnable = getenv("HCCL_INTRA_ROCE_ENABLE");
+        if (hcclIntraPcieEnable != nullptr && hcclIntraRoceEnable != nullptr && strcmp(hcclIntraPcieEnable, "1") == 0 &&
+            strcmp(hcclIntraRoceEnable, "0") == 0) {
+            OP_LOGD(entityName,
+                    "ENV HCCL_INTRA_PCIE_ENABLE = 1 and HCCL_INTRA_ROCE_ENABLE = 0, use hierarchy algorithm.");
+            isLayered = true;
+        } else {
+            OP_LOGD(entityName,
+                    "ENV HCCL_INTRA_PCIE_ENABLE != 1 or HCCL_INTRA_ROCE_ENABLE != 0, use default fullmesh algorithm.");
+        }
+        return ge::GRAPH_SUCCESS;
+    }
+
+    OP_LOGI(entityName, "commAlg is %s", commAlg);
+
+    if (strcmp(commAlg, "fullmesh") == 0) {
+        return ge::GRAPH_SUCCESS;
+    }
+    if (strcmp(commAlg, "hierarchy") == 0) {
+        isLayered = true;
+        return ge::GRAPH_SUCCESS;
+    }
+    return ge::GRAPH_FAILED;
+}
+
+bool IsHcclPcieLayered(const char *entityName)
+{
+    const char *hcclIntraPcieEnable = getenv("HCCL_INTRA_PCIE_ENABLE");
+    const char *hcclIntraRoceEnable = getenv("HCCL_INTRA_ROCE_ENABLE");
+
+    if (hcclIntraPcieEnable == nullptr || hcclIntraRoceEnable == nullptr) {
+        OP_LOGD(entityName, "ENV HCCL_INTRA_PCIE_ENABLE or HCCL_INTRA_ROCE_ENABLE don't set");
+        return false;
+    }
+    if (strcmp(hcclIntraPcieEnable, "1") == 0 && strcmp(hcclIntraRoceEnable, "0") == 0) {
+        OP_LOGD(entityName, "ENV HCCL_INTRA_PCIE_ENABLE = 1 and HCCL_INTRA_ROCE_ENABLE = 0, use layered solution.");
+        return true;
+    }
+    OP_LOGD(entityName, "ENV HCCL_INTRA_PCIE_ENABLE != 1 or HCCL_INTRA_ROCE_ENABLE != 0, use default solution.");
+    return false;
 }
 
 void UpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args &mmV3Args, const TilingArgs &args,

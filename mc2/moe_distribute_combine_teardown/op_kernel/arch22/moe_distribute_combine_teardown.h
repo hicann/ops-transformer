@@ -57,6 +57,7 @@ public:
     __aicore__ inline void Process();
 
 private:
+    __aicore__ inline void InitTilingDimensions(const MoeDistributeCombineTeardownTilingData *tilingData);
     __aicore__ inline void InitStatusTargetSum();
     __aicore__ inline void AlltoAllBuffInit();
     __aicore__ inline void ReduceScatterTrans();
@@ -150,6 +151,29 @@ private:
 };
 
 template <TemplateMC2TypeClass>
+__aicore__ inline void MoeDistributeCombineTeardown<TemplateMC2TypeFunc>::InitTilingDimensions(
+    const MoeDistributeCombineTeardownTilingData *tilingData)
+{
+    axisBS_ = tilingData->moeDistributeCombineTeardownInfo.bs;
+    axisH_ = tilingData->moeDistributeCombineTeardownInfo.h;
+    axisK_ = tilingData->moeDistributeCombineTeardownInfo.k;
+    sharedExpertNum_ = tilingData->moeDistributeCombineTeardownInfo.sharedExpertNum;
+    sharedExpertRankNum_ = tilingData->moeDistributeCombineTeardownInfo.sharedExpertRankNum;
+    moeExpertNum_ = tilingData->moeDistributeCombineTeardownInfo.moeExpertNum;
+    epWorldSize_ = tilingData->moeDistributeCombineTeardownInfo.epWorldSize;
+    axisMaxBS_ = tilingData->moeDistributeCombineTeardownInfo.globalBs / epWorldSize_;
+    aivNum_ = tilingData->moeDistributeCombineTeardownInfo.aivNum;
+    moeExpertPerRankNum_ = 1U;
+    moeSendNum_ = epWorldSize_ * moeExpertPerRankNum_;
+    totalWinSize_ = tilingData->moeDistributeCombineTeardownInfo.totalWinSize;
+    stateOffset_ = (moeSendNum_ > 512U) ? static_cast<uint32_t>(STATE_OFFSET / 2) : static_cast<uint32_t>(STATE_OFFSET);
+    expertPerSizeOnWin_ =
+        static_cast<uint64_t>(axisMaxBS_) * static_cast<uint64_t>(axisH_) * static_cast<uint64_t>(sizeof(ExpandXType));
+    winDataSizeOffset_ =
+        static_cast<uint64_t>(dataState_) * (tilingData->moeDistributeCombineTeardownInfo.totalWinSize / 2UL);
+}
+
+template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeCombineTeardown<TemplateMC2TypeFunc>::Init(
     GM_ADDR expandX, GM_ADDR quantExpandX, GM_ADDR expertIds, GM_ADDR expandIdx, GM_ADDR expertScales,
     GM_ADDR commCmdInfo, GM_ADDR xActiveMask, GM_ADDR sharedExpertX, GM_ADDR XOut, GM_ADDR workspaceGM, TPipe *pipe,
@@ -179,23 +203,8 @@ __aicore__ inline void MoeDistributeCombineTeardown<TemplateMC2TypeFunc>::Init(
     expandIdxGM_.SetGlobalBuffer((__gm__ ExpandIdxType *)expandIdx);
     expandScalesGM_.SetGlobalBuffer((__gm__ float *)expertScales);
     expandOutGlobal_.SetGlobalBuffer((__gm__ ExpandXType *)XOut);
-    axisBS_ = tilingData->moeDistributeCombineTeardownInfo.bs;
-    axisH_ = tilingData->moeDistributeCombineTeardownInfo.h;
-    axisK_ = tilingData->moeDistributeCombineTeardownInfo.k;
-    sharedExpertNum_ = tilingData->moeDistributeCombineTeardownInfo.sharedExpertNum;
-    sharedExpertRankNum_ = tilingData->moeDistributeCombineTeardownInfo.sharedExpertRankNum;
-    moeExpertNum_ = tilingData->moeDistributeCombineTeardownInfo.moeExpertNum;
-    epWorldSize_ = tilingData->moeDistributeCombineTeardownInfo.epWorldSize;
-    axisMaxBS_ = tilingData->moeDistributeCombineTeardownInfo.globalBs / epWorldSize_;
-    aivNum_ = tilingData->moeDistributeCombineTeardownInfo.aivNum;
-    moeExpertPerRankNum_ = 1U;
-    moeSendNum_ = epWorldSize_ * moeExpertPerRankNum_;
-    totalWinSize_ = tilingData->moeDistributeCombineTeardownInfo.totalWinSize;
-    stateOffset_ = (moeSendNum_ > 512U) ? static_cast<uint32_t>(STATE_OFFSET / 2) : static_cast<uint32_t>(STATE_OFFSET);
-    expertPerSizeOnWin_ =
-        static_cast<uint64_t>(axisMaxBS_) * static_cast<uint64_t>(axisH_) * static_cast<uint64_t>(sizeof(ExpandXType));
-    winDataSizeOffset_ =
-        static_cast<uint64_t>(dataState_) * (tilingData->moeDistributeCombineTeardownInfo.totalWinSize / 2UL);
+    InitTilingDimensions(tilingData);
+
     epWindowGM_ = GetWinAddrByRankId(epRankId_);
     epStatusSpaceGm_ = GetWinStateAddrByRankId(epRankId_);
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1

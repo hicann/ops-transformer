@@ -18,7 +18,49 @@
 namespace ops {
 class MoeDistributeCombineAddRmsNorm : public OpDef {
 public:
-    explicit MoeDistributeCombineAddRmsNorm(const char *name) : OpDef(name)
+    explicit MoeDistributeCombineAddRmsNorm(const char *name)
+        : OpDef(name)
+    {
+        DefineRequiredInputs();
+        DefineOptionalInputs();
+        DefineOutputs();
+        DefineAttributes();
+
+        // A3 (arch22): _a3 entry (opFile -> arch22/..._a3.cpp). Reuses the class-level I/O.
+        OpAICoreConfig aicore_config_a3;
+        aicore_config_a3.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+            .ExtendCfgInfo("opFile.value", "moe_distribute_combine_add_rms_norm_a3");
+
+        // A5 (arch35): dedicated kernel entry (opFile -> arch35/..._apt.cpp).
+        OpAICoreConfig aicore_config_apt;
+        aicore_config_apt.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+            .ExtendCfgInfo("opFile.value", "moe_distribute_combine_add_rms_norm_apt");
+
+        this->AICore().AddConfig("ascend910_93", aicore_config_a3);
+        this->AICore().AddConfig("ascend950", aicore_config_apt);
+        this->MC2().HcclGroup({"group_ep", "group_tp"});
+    }
+
+private:
+    void DefineRequiredInputs()
     {
         this->Input("expand_x")
             .ParamType(REQUIRED)
@@ -62,6 +104,10 @@ public:
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
+    }
+
+    void DefineOptionalInputs()
+    {
         this->Input("tp_send_counts")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_INT32})
@@ -134,7 +180,10 @@ public:
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
+    }
 
+    void DefineOutputs()
+    {
         this->Output("y")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16})
@@ -150,7 +199,10 @@ public:
             .DataType({ge::DT_BF16})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
+    }
 
+    void DefineAttributes()
+    {
         this->Attr("group_ep").AttrType(REQUIRED).String();
         this->Attr("ep_world_size").AttrType(REQUIRED).Int();
         this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
@@ -170,38 +222,6 @@ public:
         this->Attr("zero_expert_num").AttrType(OPTIONAL).Int(0);
         this->Attr("copy_expert_num").AttrType(OPTIONAL).Int(0);
         this->Attr("const_expert_num").AttrType(OPTIONAL).Int(0);
-
-        // A3 (arch22): _a3 entry (opFile -> arch22/..._a3.cpp). Reuses the class-level I/O.
-        OpAICoreConfig aicore_config_a3;
-        aicore_config_a3.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
-            .ExtendCfgInfo("jitCompile.flag", "static_true")
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
-            .ExtendCfgInfo("opFile.value", "moe_distribute_combine_add_rms_norm_a3");
-
-        // A5 (arch35): dedicated kernel entry (opFile -> arch35/..._apt.cpp).
-        OpAICoreConfig aicore_config_apt;
-        aicore_config_apt.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
-            .ExtendCfgInfo("jitCompile.flag", "static_true")
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
-            .ExtendCfgInfo("opFile.value", "moe_distribute_combine_add_rms_norm_apt");
-
-        this->AICore().AddConfig("ascend910_93", aicore_config_a3);
-        this->AICore().AddConfig("ascend950", aicore_config_apt);
-        this->MC2().HcclGroup({"group_ep", "group_tp"});
     }
 };
 

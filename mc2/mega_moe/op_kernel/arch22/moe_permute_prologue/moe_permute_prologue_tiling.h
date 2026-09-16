@@ -45,8 +45,10 @@ private:
     // workspace: expandedRowIdx 全量 + preSumBeforeRank/cumsumMM 元数据 + 16MB 余量
     uint64_t CalcWorkspaceSize() const
     {
+        constexpr size_t METADATA_ARRAY_COUNT = 2U;                                    // preSumBeforeRank + cumsumMM
         size_t metadataWs = static_cast<size_t>(numTokens_) * topK_ * sizeof(int32_t); // expandedRowIdx 全量
-        metadataWs += static_cast<size_t>(expertNum_) * sizeof(int32_t) * 2;           // preSumBeforeRank + cumsumMM
+        metadataWs +=
+            static_cast<size_t>(expertNum_) * sizeof(int32_t) * METADATA_ARRAY_COUNT; // preSumBeforeRank + cumsumMM
         constexpr size_t RESERVED_16MB = 16U * 1024U * 1024U;
         return static_cast<uint64_t>(metadataWs + RESERVED_16MB);
     }

@@ -599,7 +599,7 @@ private:
     CATLASS_DEVICE
     void GMM1(Params const &params)
     {
-        icache_preload(8);
+        icache_preload(ICACHE_PRELOAD_LINES);
         BlockScheduler blockScheduler;
         BlockMmad blockMmad(resource);
 
@@ -706,7 +706,7 @@ private:
     CATLASS_DEVICE
     void GMM2(Params const &params)
     {
-        icache_preload(8);
+        icache_preload(ICACHE_PRELOAD_LINES);
         BlockScheduler blockScheduler;
         BlockMmad blockMmad(resource);
 
@@ -1064,7 +1064,7 @@ private:
     void DispatchAndCombine(Params const &params)
     {
         const int32_t rank = RuntimeRank(params);
-        icache_preload(8);
+        icache_preload(ICACHE_PRELOAD_LINES);
         exceptionDump_.Dump(shmem() + peermemInfo.offsetPeerTokenPerExpert,
                             static_cast<size_t>(AlignUp(params.EP * params.expertPerRank, ALIGN_128)) *
                                 params.expertPerRank * static_cast<uint32_t>(shmem.RankSize()) * sizeof(int32_t));
@@ -1115,11 +1115,13 @@ private:
             // chunk（MAX_TOKENS=1024）分配，numTokens 必须按 chunk 传入，不得使用全量 bs。
             exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::MOE_INIT_ROUTING);
             {
-                // prologue 模板首参为 UB 流水级数（样例取值 2），后续为 Policy/Src/Dst
-                typename MoePermute::MoePermutePrologue<2, ProloguePolicy, PrologueSrc, PrologueDst>::Params
-                    prologueParams(chunkTokens, hidden, topK, params.expertPerRank * params.EP);
-                MoePermute::MoePermutePrologue<2, ProloguePolicy, PrologueSrc, PrologueDst> prologue(resource,
-                                                                                                     prologueParams);
+                // prologue 模板首参为 UB 流水级数，后续为 Policy/Src/Dst
+                typename MoePermute::MoePermutePrologue<PROLOGUE_UB_STAGES, ProloguePolicy, PrologueSrc,
+                                                        PrologueDst>::Params prologueParams(chunkTokens, hidden, topK,
+                                                                                            params.expertPerRank *
+                                                                                                params.EP);
+                MoePermute::MoePermutePrologue<PROLOGUE_UB_STAGES, ProloguePolicy, PrologueSrc, PrologueDst> prologue(
+                    resource, prologueParams);
                 AscendC::GlobalTensor<PrologueSrc> gmPermX;
                 gmPermX.SetGlobalBuffer(reinterpret_cast<__gm__ PrologueSrc *>(
                     reinterpret_cast<GM_ADDR>(params.ptrA) + tokenBase * hidden * sizeof(PrologueSrc)));
@@ -1190,7 +1192,7 @@ private:
             uint32_t dequantSum2 = 0;
             uint32_t prevGroupSum2 = 0;
 
-            icache_preload(8);
+            icache_preload(ICACHE_PRELOAD_LINES);
             exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::DISPATCH);
             for (int32_t groupIdx = 0; groupIdx < params.expertPerRank; ++groupIdx) {
                 // rank 本轮专家组接收的 token 总数（所有 source rank 之和）
@@ -1373,7 +1375,7 @@ private:
             if (get_subblockid() == 1) {
                 exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::UNPERMUTE);
                 MoeTokenUnpermuteTilingData tilingData;
-                MoeTokenUnpermuteTiling(chunkTokens * topK, n2, topK, tilingData, coreNum / 2);
+                MoeTokenUnpermuteTiling(chunkTokens * topK, n2, topK, tilingData, coreNum / AIV_PER_AIC);
                 KernelMoeTokenUnpermute<ElementD2, int32_t, float, true> kernelMoeTokenUnpermuteOp;
                 kernelMoeTokenUnpermuteOp.Init(
                     shmem() + peermemInfo.offsetD, workspaceInfo.expandedRowIdx,
@@ -1393,19 +1395,20 @@ private:
         BlockScheduler blockScheduler;
         int32_t syncLoopIdx = 0;
         uint32_t startCoreIdx = 0;
-        uint32_t aicCoreNum = coreNum / 2;
+        uint32_t aicCoreNum = coreNum / AIV_PER_AIC;
         uint32_t aicCoreIdx = get_block_idx();
         uint32_t aivSubCoreIdx = get_subblockid();
         uint32_t preSrcExpertSum = 0;
         uint32_t n2 = params.problemShape.k();
         uint32_t k2 = params.problemShape.n() / 2;
-        AscendC::LocalTensor<uint64_t> rdmaUbLocal = resource.ubBuf.template GetBufferByByte<uint64_t>(128 * 1024);
+        AscendC::LocalTensor<uint64_t> rdmaUbLocal =
+            resource.ubBuf.template GetBufferByByte<uint64_t>(RDMA_UB_OFFSET_BYTES);
         AscendC::LocalTensor<uint32_t> rdmaUbLocalHead =
-            resource.ubBuf.template GetBufferByByte<uint32_t>(128 * 1024 + UB_ALIGN);
+            resource.ubBuf.template GetBufferByByte<uint32_t>(RDMA_UB_OFFSET_BYTES + UB_ALIGN);
         AscendC::GlobalTensor<ElementD2> gmLocalWindowsOut;
         gmLocalWindowsOut.SetGlobalBuffer(
             reinterpret_cast<__gm__ ElementD2 *>(shmem.windowsOutAddr() + peermemInfo.offsetWinOutD));
-        icache_preload(8);
+        icache_preload(ICACHE_PRELOAD_LINES);
         for (uint32_t groupIdx = 0; groupIdx < params.expertPerRank; ++groupIdx) {
             uint32_t currentExpertM = cumsumMM(tokenPerExpertLayout(params.EP - 1, RuntimeRank(params), groupIdx));
             if (preSrcExpertSum >= params.maxOutputSize) {
@@ -1425,13 +1428,13 @@ private:
                 int32_t m0 = 16;
                 //  Block count, the shape of each block is (m0, actualBlockShape.n())
                 int32_t m_rows = (actualBlockShape.m() + m0 - 1) / m0;
-                int32_t aiv_m_rows = m_rows / 2;
-                if (aivSubCoreIdx == 1 && aiv_m_rows * 2 < m_rows) {
+                int32_t aiv_m_rows = m_rows / SUBBLOCK_NUM_PER_AIC;
+                if (aivSubCoreIdx == 1 && aiv_m_rows * SUBBLOCK_NUM_PER_AIC < m_rows) {
                     aiv_m_rows += 1;
                 }
                 uint32_t m_offset = blockCoord.m() * L1TileShape::M; // blockOffset
                 if (aivSubCoreIdx == 1) {
-                    m_offset += (m_rows / 2) * m0;
+                    m_offset += (m_rows / SUBBLOCK_NUM_PER_AIC) * m0;
                 }
 
                 for (; syncLoopIdx <= groupIdx; syncLoopIdx++) {
@@ -1443,7 +1446,7 @@ private:
                     GemmCoord realTileCoord{m_offset, blockCoord.n() * L1TileShape::N, 1};
                     uint32_t actualm = m0;
                     if (aivSubCoreIdx == 1 && cur_row == aiv_m_rows - 1) {
-                        actualm = actualBlockShape.m() - (m_rows / 2) * m0 - cur_row * m0;
+                        actualm = actualBlockShape.m() - (m_rows / SUBBLOCK_NUM_PER_AIC) * m0 - cur_row * m0;
                     }
                     GemmCoord realTileShape{actualm, actualBlockShape.n(), 1};
                     blockEpilogue(gmC2, gmPerTokenScale2, realTileCoord, realTileShape, groupIdx, preSrcExpertSum,

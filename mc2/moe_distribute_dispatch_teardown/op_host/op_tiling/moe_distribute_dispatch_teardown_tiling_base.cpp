@@ -199,6 +199,30 @@ ge::graphStatus MoeDistributeDispatchTeardownTilingBase::GetRequiredAttrAndSetTi
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckSharedExpertAttributes(
+    const int64_t *expertShardTypePtr, const int64_t *sharedExpertNumPtr, const int64_t *sharedExpertRankNumPtr,
+    const int64_t *epWorldSizePtr)
+{
+    OP_TILING_CHECK(
+        (*expertShardTypePtr != 0),
+        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "expertShardType", std::to_string(*expertShardTypePtr).c_str(), "0"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(((*sharedExpertNumPtr < MIN_SHARED_EXPERT_NUM) || (*sharedExpertNumPtr > MAX_SHARED_EXPERT_NUM)),
+                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum", std::to_string(*sharedExpertNumPtr).c_str(),
+                                              (std::string("[") + std::to_string(MIN_SHARED_EXPERT_NUM) + ", " +
+                                               std::to_string(MAX_SHARED_EXPERT_NUM) + "]")
+                                                  .c_str()),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        ((*sharedExpertRankNumPtr < MIN_SHARED_EXPERT_RANK_NUM) || (*sharedExpertRankNumPtr > *epWorldSizePtr / 2)),
+        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertRankNum", std::to_string(*sharedExpertRankNumPtr).c_str(),
+                                  (std::string("[") + std::to_string(MIN_SHARED_EXPERT_RANK_NUM) + ", " +
+                                   std::to_string(*epWorldSizePtr / 2) + "]")
+                                      .c_str()),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckOptionalAttrValue()
 {
     auto xShape = context_->GetInputShape(INPUT_X_INDEX);
@@ -219,23 +243,10 @@ const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckOptionalAttr
     auto commTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_COMM_TYPE_INDEX);
     auto commAlgPtr = attrs->GetAttrPointer<char>(ATTR_COMM_ALG_INDEX);
 
-    OP_TILING_CHECK(
-        (*expertShardTypePtr != 0),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "expertShardType", std::to_string(*expertShardTypePtr).c_str(), "0"),
-        return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(((*sharedExpertNumPtr < MIN_SHARED_EXPERT_NUM) || (*sharedExpertNumPtr > MAX_SHARED_EXPERT_NUM)),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum", std::to_string(*sharedExpertNumPtr).c_str(),
-                                              (std::string("[") + std::to_string(MIN_SHARED_EXPERT_NUM) + ", " +
-                                               std::to_string(MAX_SHARED_EXPERT_NUM) + "]")
-                                                  .c_str()),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        ((*sharedExpertRankNumPtr < MIN_SHARED_EXPERT_RANK_NUM) || (*sharedExpertRankNumPtr > *epWorldSizePtr / 2)),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertRankNum", std::to_string(*sharedExpertRankNumPtr).c_str(),
-                                  (std::string("[") + std::to_string(MIN_SHARED_EXPERT_RANK_NUM) + ", " +
-                                   std::to_string(*epWorldSizePtr / 2) + "]")
-                                      .c_str()),
-        return ge::GRAPH_FAILED);
+    if (CheckSharedExpertAttributes(expertShardTypePtr, sharedExpertNumPtr, sharedExpertRankNumPtr, epWorldSizePtr) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     OP_TILING_CHECK(((*quantModePtr < UNQUANT) || (*quantModePtr > MX_QUANT)),
                     OP_LOGE_WITH_INVALID_ATTR(nodeName_, "quantMode", std::to_string(*quantModePtr).c_str(), "[0, 4]"),
                     return ge::GRAPH_FAILED);
@@ -674,7 +685,7 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckRelationTensorDataType(
     OP_TILING_CHECK((context_->GetOutputDesc(OUTPUT_EXPERT_TOKEN_NUMS_INDEX) == nullptr),
                     OP_LOGE_WITH_INVALID_INPUT(nodeName_, "expertTokenNumsOut"), return false);
 
-    if ((quantMode == PERTOKEN_DYNAMIC_QUANT) && (quantMode = PERGROUP_DYNAMIC_QUANT)) {
+    if (quantMode == PERTOKEN_DYNAMIC_QUANT) {
         OP_TILING_CHECK(
             (context_->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX)->GetDataType() != ge::DT_FLOAT),
             OP_LOGE_FOR_INVALID_DTYPE(

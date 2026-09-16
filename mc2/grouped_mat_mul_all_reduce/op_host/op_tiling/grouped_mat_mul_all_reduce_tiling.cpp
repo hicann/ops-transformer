@@ -187,6 +187,9 @@ protected:
     ge::graphStatus DoAiCoreTiling(const gert::TilingContext *context);
     ge::graphStatus SetBaseParams();
     inline void SetArgsValue(uint32_t i);
+    ge::graphStatus InitializeLoopDataType(const gert::TilingContext *context, int64_t &maxMKN);
+    void SetFusionArguments(uint32_t AIC_NUM);
+    void SetMessageBufferMetadata(Mc2Msg &msg);
     ge::graphStatus InitForLoop(const gert::TilingContext *context, uint32_t &groupNum);
     inline void SetMsgValue(Mc2Msg &msg) const;
     void CalculateMMTiling(CoreTilingInfo &coreTilingInfo) const;
@@ -220,6 +223,27 @@ private:
     const char *opName;
 };
 
+ge::graphStatus GMMAllReduceTiling::InitializeLoopDataType(const gert::TilingContext *context, int64_t &maxMKN)
+{
+    // Determine whether all data types are consistent.
+    if (mmDType == ge::DT_UNDEFINED) { // if is first loop
+        auto inputDescPtr0 = context->GetInputDesc(0);
+        auto inputDescPtr1 = context->GetInputDesc(1);
+        OP_TILING_CHECK(inputDescPtr0 == nullptr || inputDescPtr1 == nullptr,
+                        OP_LOGE_WITH_INVALID_INPUT(opName, "inputDescPtr"), return ge::GRAPH_FAILED);
+        mmDType = inputDescPtr0->GetDataType();     // save x dtype
+        weightDtype = inputDescPtr1->GetDataType(); // save weight dtype
+        mmDataTypeSize = GetSizeByDataType(mmDType);
+        OP_TILING_CHECK(mmDataTypeSize == 0,
+                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                            opName, "mmDType", TypeUtils::DataTypeToAscendString(mmDType).GetString(), "get size is 0"),
+                        return ge::GRAPH_FAILED);
+        uint32_t numInOneBlk = std::max<uint32_t>(1, ONE_BLK_SIZE / mmDataTypeSize);
+        maxMKN = INT_MAX / numInOneBlk * numInOneBlk;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus GMMAllReduceTiling::InitForLoop(const gert::TilingContext *context, uint32_t &groupNum)
 {
     // Get shape, dtype information, and the total number of data.
@@ -243,22 +267,8 @@ ge::graphStatus GMMAllReduceTiling::InitForLoop(const gert::TilingContext *conte
         for (size_t j = 1; j < bsDimNum; ++j) {
             bs *= xShape.GetDim(j);
         }
-        // Determine whether all data types are consistent.
-        if (mmDType == ge::DT_UNDEFINED) { // if is first loop
-            auto inputDescPtr0 = context->GetInputDesc(0);
-            auto inputDescPtr1 = context->GetInputDesc(1);
-            OP_TILING_CHECK(inputDescPtr0 == nullptr || inputDescPtr1 == nullptr,
-                            OP_LOGE_WITH_INVALID_INPUT(opName, "inputDescPtr"), return ge::GRAPH_FAILED);
-            mmDType = inputDescPtr0->GetDataType();     // save x dtype
-            weightDtype = inputDescPtr1->GetDataType(); // save weight dtype
-            mmDataTypeSize = GetSizeByDataType(mmDType);
-            OP_TILING_CHECK(
-                mmDataTypeSize == 0,
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                    opName, "mmDType", TypeUtils::DataTypeToAscendString(mmDType).GetString(), "get size is 0"),
-                return ge::GRAPH_FAILED);
-            uint32_t numInOneBlk = std::max<uint32_t>(1, ONE_BLK_SIZE / mmDataTypeSize);
-            maxMKN = INT_MAX / numInOneBlk * numInOneBlk;
+        if (InitializeLoopDataType(context, maxMKN) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
         }
         OP_TILING_CHECK(bs > maxMKN || xShape.GetDim(xDimNum - 1) > maxMKN || wShape.GetDim(1) > maxMKN,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "shape dimension", std::to_string(maxMKN).c_str(),
@@ -317,6 +327,24 @@ ge::graphStatus GMMAllReduceTiling::Init(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
+void GMMAllReduceTiling::SetFusionArguments(uint32_t AIC_NUM)
+{
+    args_.cmdType = mc2tiling::AicpuComType::HCCL_CMD_ALLREDUCE; // all reduce
+    args_.commTurn = commTurn_;                                  // communication turn num
+    args_.enablePad = true;
+    args_.enableSplitK = false;
+    args_.inputDtypeSize = mmDataTypeSize;
+    args_.isATrans = false;
+    args_.isBias = isBias;
+    args_.isBTrans = false;
+    args_.isStorageGather = false;
+    args_.outputDtypeSize = mmDataTypeSize;
+    args_.aicCoreNum = AIC_NUM;
+    args_.rankDim = rankSize_;
+    args_.rankTileNum = 1;       // 1: tile num
+    args_.usedCoreNum = AIC_NUM; // cube num
+}
+
 ge::graphStatus GMMAllReduceTiling::RunFusionKernelTiling(gert::TilingContext *context)
 {
     OP_LOGD(opName, "begin RunFusionKernelTiling.");
@@ -348,21 +376,7 @@ ge::graphStatus GMMAllReduceTiling::RunFusionKernelTiling(gert::TilingContext *c
                     return ge::GRAPH_FAILED);
 
     ubSize_ = PLATFORM_SIZE.ubSize;
-    args_.cmdType = mc2tiling::AicpuComType::HCCL_CMD_ALLREDUCE; // all reduce
-    args_.commTurn = commTurn_;                                  // communication turn num
-    args_.enablePad = true;
-    args_.enableSplitK = false;
-    args_.inputDtypeSize = mmDataTypeSize;
-    args_.isATrans = false;
-    args_.isBias = isBias;
-    args_.isBTrans = false;
-    args_.isStorageGather = false;
-    args_.outputDtypeSize = mmDataTypeSize;
-    args_.aicCoreNum = AIC_NUM;
-    args_.rankDim = rankSize_;
-    args_.rankTileNum = 1;       // 1: tile num
-    args_.usedCoreNum = AIC_NUM; // cube num
-
+    SetFusionArguments(AIC_NUM);
     // aicore tiling
     OP_TILING_CHECK(DoAiCoreTiling(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName, "GMM_All_Reduce DoAiCoreTiling failed."), return ge::GRAPH_FAILED);
@@ -431,6 +445,20 @@ void GMMAllReduceTiling::CalculateMMTiling(CoreTilingInfo &coreTilingInfo) const
             numBlocksN, coreTilingInfo.lambdaN, coreTilingInfo.singleN);
 }
 
+void GMMAllReduceTiling::SetMessageBufferMetadata(Mc2Msg &msg)
+{
+    // workspace 地址
+    msg.set_useBufferType(static_cast<uint8_t>(mc2tiling::MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_OUTPUT));
+    msg.set_workspaceOff(libApiWorkSpaceSize_);
+    // 消息队列的开始  device notify write/read value偏移
+    msg.set_notifyOff(sizeof(KFCMsgBody));
+    msg.set_notifyBeginCnt(mc2tiling::NOTIFY_WRITE_CNT); // notify write value的使用个数
+    msg.set_notifyEndCnt(1);                             // notify read value的使用个数
+    msg.set_dataType(hcclDataType);                      // hccl 数据类型
+    msg.set_sendArgIndex(0);
+    msg.set_recvArgIndex(Y_INDEX);
+}
+
 ge::graphStatus GMMAllReduceTiling::DoAllReduceTiling()
 {
     OP_LOGD(opName, "begin DoAllReduceTiling.");
@@ -473,16 +501,7 @@ ge::graphStatus GMMAllReduceTiling::DoAllReduceTiling()
         msg.set_totalCnt(args_.orgMValue * args_.orgNValue);
         msg.set_turnNum(coreTilingInfo.tileTurnNum + coreTilingInfo.tailTurnNum); // 总轮次
         msg.set_tailNum(coreTilingInfo.tailTurnNum);                              // 尾块的轮次
-        // workspace 地址
-        msg.set_useBufferType(static_cast<uint8_t>(mc2tiling::MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_OUTPUT));
-        msg.set_workspaceOff(libApiWorkSpaceSize_);
-        // 消息队列的开始  device notify write/read value偏移
-        msg.set_notifyOff(sizeof(KFCMsgBody));
-        msg.set_notifyBeginCnt(mc2tiling::NOTIFY_WRITE_CNT); // notify write value的使用个数
-        msg.set_notifyEndCnt(1);                             // notify read value的使用个数
-        msg.set_dataType(hcclDataType);                      // hccl 数据类型
-        msg.set_sendArgIndex(0);
-        msg.set_recvArgIndex(Y_INDEX);
+        SetMessageBufferMetadata(msg);
         PrintTilingData(msg); // print msg data
     }
     OP_LOGD(opName, "end DoAllReduceTiling.");

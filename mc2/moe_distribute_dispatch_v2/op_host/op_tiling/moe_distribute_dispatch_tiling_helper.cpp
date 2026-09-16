@@ -20,31 +20,9 @@
 using namespace ge;
 
 namespace optiling {
-inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::TilingContext *context,
-                                                                   const char *nodeName, const bool isScales,
-                                                                   const uint32_t quantMode)
+static bool CheckOptionalScaleDimensions(const gert::TilingContext *context, const char *nodeName, bool isScales,
+                                         uint32_t quantMode)
 {
-    const gert::StorageShape *xStorageShape = context->GetInputShape(X_INDEX);
-    OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xShape"), return false);
-    OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "xShape", std::to_string(xStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of xShape must be 2D."),
-                    return false);
-    OP_LOGD(nodeName, "x dim0 = %ld", xStorageShape->GetStorageShape().GetDim(0));
-    OP_LOGD(nodeName, "x dim1 = %ld", xStorageShape->GetStorageShape().GetDim(1));
-
-    const gert::StorageShape *expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
-    OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertIdShape"),
-                    return false);
-    OP_TILING_CHECK(
-        expertIdStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-            nodeName, "expertIdShape", std::to_string(expertIdStorageShape->GetStorageShape().GetDimNum()).c_str(),
-            "The shape dim of expertIdShape must be 2D."),
-        return false);
-    OP_LOGD(nodeName, "expertId dim0 = %ld", expertIdStorageShape->GetStorageShape().GetDim(0));
-    OP_LOGD(nodeName, "expertId dim1 = %ld", expertIdStorageShape->GetStorageShape().GetDim(1));
     // 如果scales不为空进行shape维度检查
     if (isScales) {
         const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
@@ -79,6 +57,37 @@ inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::T
                 OP_LOGD(nodeName, "scales dim1 = %ld", scalesStorageShape->GetStorageShape().GetDim(1));
             }
         }
+    }
+    return true;
+}
+
+inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::TilingContext *context,
+                                                                   const char *nodeName, const bool isScales,
+                                                                   const uint32_t quantMode)
+{
+    const gert::StorageShape *xStorageShape = context->GetInputShape(X_INDEX);
+    OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xShape"), return false);
+    OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        nodeName, "xShape", std::to_string(xStorageShape->GetStorageShape().GetDimNum()).c_str(),
+                        "The shape dim of xShape must be 2D."),
+                    return false);
+    OP_LOGD(nodeName, "x dim0 = %ld", xStorageShape->GetStorageShape().GetDim(0));
+    OP_LOGD(nodeName, "x dim1 = %ld", xStorageShape->GetStorageShape().GetDim(1));
+
+    const gert::StorageShape *expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertIdShape"),
+                    return false);
+    OP_TILING_CHECK(
+        expertIdStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "expertIdShape", std::to_string(expertIdStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of expertIdShape must be 2D."),
+        return false);
+    OP_LOGD(nodeName, "expertId dim0 = %ld", expertIdStorageShape->GetStorageShape().GetDim(0));
+    OP_LOGD(nodeName, "expertId dim1 = %ld", expertIdStorageShape->GetStorageShape().GetDim(1));
+    if (!CheckOptionalScaleDimensions(context, nodeName, isScales, quantMode)) {
+        return false;
     }
     return true;
 }

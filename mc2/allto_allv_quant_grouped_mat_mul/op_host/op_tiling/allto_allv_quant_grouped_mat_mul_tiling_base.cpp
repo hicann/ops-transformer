@@ -669,6 +669,25 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckPermuteOutShapeInfo() const
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckOptionalMatmulFormats()
+{
+    auto mmXDesc = context_->GetOptionalInputDesc(MM_X_INDEX);
+    if (mmXDesc != nullptr) {
+        OP_TILING_CHECK(mmXDesc->GetStorageFormat() != ge::Format::FORMAT_ND,
+                        OP_LOGE_FOR_INVALID_FORMAT(context_->GetNodeName(), "mmX",
+                                                   Ops::Base::ToString(mmXDesc->GetStorageFormat()), "ND"),
+                        return ge::GRAPH_FAILED);
+    }
+    auto mmWeightDesc = context_->GetOptionalInputDesc(MM_WEIGHT_INDEX);
+    if (mmWeightDesc != nullptr) {
+        OP_TILING_CHECK(mmWeightDesc->GetStorageFormat() != ge::Format::FORMAT_ND,
+                        OP_LOGE_FOR_INVALID_FORMAT(context_->GetNodeName(), "mmWeight",
+                                                   Ops::Base::ToString(mmWeightDesc->GetStorageFormat()), "ND"),
+                        return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckFormat()
 {
     OP_LOGD(context_->GetNodeName(), "start CheckFormat.");
@@ -686,19 +705,8 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckFormat()
                     OP_LOGE_FOR_INVALID_FORMAT(context_->GetNodeName(), "gmmWeight",
                                                Ops::Base::ToString(gmmWeightDesc->GetStorageFormat()), "ND"),
                     return ge::GRAPH_FAILED);
-    auto mmXDesc = context_->GetOptionalInputDesc(MM_X_INDEX);
-    if (mmXDesc != nullptr) {
-        OP_TILING_CHECK(mmXDesc->GetStorageFormat() != ge::Format::FORMAT_ND,
-                        OP_LOGE_FOR_INVALID_FORMAT(context_->GetNodeName(), "mmX",
-                                                   Ops::Base::ToString(mmXDesc->GetStorageFormat()), "ND"),
-                        return ge::GRAPH_FAILED);
-    }
-    auto mmWeightDesc = context_->GetOptionalInputDesc(MM_WEIGHT_INDEX);
-    if (mmWeightDesc != nullptr) {
-        OP_TILING_CHECK(mmWeightDesc->GetStorageFormat() != ge::Format::FORMAT_ND,
-                        OP_LOGE_FOR_INVALID_FORMAT(context_->GetNodeName(), "mmWeight",
-                                                   Ops::Base::ToString(mmWeightDesc->GetStorageFormat()), "ND"),
-                        return ge::GRAPH_FAILED);
+    if (CheckOptionalMatmulFormats() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
     auto gmmYDesc = context_->GetOutputDesc(OUTPUT_GMM_Y_INDEX);
     OP_TILING_CHECK(gmmYDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "gmmY"),

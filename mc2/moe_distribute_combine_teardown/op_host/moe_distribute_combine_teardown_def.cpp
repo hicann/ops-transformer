@@ -19,7 +19,32 @@ namespace ops {
 
 class MoeDistributeCombineTeardown : public OpDef {
 public:
-    explicit MoeDistributeCombineTeardown(const char *name) : OpDef(name)
+    explicit MoeDistributeCombineTeardown(const char *name)
+        : OpDef(name)
+    {
+        DefineRequiredInputs();
+        DefineOptionalInputs();
+        this->Output("x").ParamType(REQUIRED).DataType({ge::DT_BF16, ge::DT_FLOAT16}).FormatList({ge::FORMAT_ND});
+        DefineAttributes();
+
+        OpAICoreConfig aicore_config;
+        aicore_config.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
+
+        this->AICore().AddConfig("ascend950", aicore_config);
+        this->MC2().HcclGroup("group_ep");
+    }
+
+private:
+    void DefineRequiredInputs()
     {
         this->Input("expand_x")
             .ParamType(REQUIRED)
@@ -51,6 +76,10 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+    }
+
+    void DefineOptionalInputs()
+    {
         this->Input("x_active_mask")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_BOOL})
@@ -61,7 +90,10 @@ public:
             .DataType({ge::DT_BF16, ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Output("x").ParamType(REQUIRED).DataType({ge::DT_BF16, ge::DT_FLOAT16}).FormatList({ge::FORMAT_ND});
+    }
+
+    void DefineAttributes()
+    {
         this->Attr("group_ep").AttrType(REQUIRED).String();
         this->Attr("ep_world_size").AttrType(REQUIRED).Int();
         this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
@@ -73,21 +105,6 @@ public:
         this->Attr("comm_quant_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("comm_type").AttrType(OPTIONAL).Int(0);
         this->Attr("comm_alg").AttrType(OPTIONAL).String("");
-
-        OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
-            .ExtendCfgInfo("jitCompile.flag", "static_true")
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
-
-        this->AICore().AddConfig("ascend950", aicore_config);
-        this->MC2().HcclGroup("group_ep");
     }
 };
 

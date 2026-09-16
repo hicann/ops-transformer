@@ -60,144 +60,15 @@ public:
     explicit MatmulAllReduce(const char *name)
         : OpDef(name)
     {
-        this->Input("x1")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_INT8,          ge::DT_FLOAT16,
-                       ge::DT_BF16,          ge::DT_INT8,          ge::DT_FLOAT16,       ge::DT_BF16,
-                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_FLOAT16,       ge::DT_BF16,
-                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,
-                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,
-                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_FLOAT16,       ge::DT_BF16,
-                       ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,
-                       ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E4M3FN})
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950);
-        this->Input("x2")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_INT8,          ge::DT_INT8,
-                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT4,          ge::DT_INT4,
-                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,
-                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,
-                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,
-                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,
-                       ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
-                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
-                       ge::DT_FLOAT8_E4M3FN})
-            .Format(x2Formats950)
-            .UnknownShapeFormat(x2Formats950)
-            .IgnoreContiguous();
-        this->Input("bias")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_INT32, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT32,
-                       ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_INT32, ge::DT_INT32,   ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT32,   ge::DT_INT32, ge::DT_INT32, ge::DT_INT32,   ge::DT_FLOAT,   ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT})
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950);
-        this->Input("x3")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes950)
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950);
-        this->Input("antiquant_scale")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes950)
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950)
-            .IgnoreContiguous();
-        this->Input("antiquant_offset")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes950)
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950)
-            .IgnoreContiguous();
-        this->Input("dequant_scale")
-            .ParamType(OPTIONAL)
-            .DataType(
-                {ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_UINT64,      ge::DT_FLOAT16,     ge::DT_BF16,
-                 ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_INT64,       ge::DT_FLOAT,
-                 ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_UINT64,      ge::DT_BF16,        ge::DT_INT64,
-                 ge::DT_FLOAT,       ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,
-                 ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,
-                 ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,
-                 ge::DT_UINT64,      ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_BF16,
-                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950)
-            .IgnoreContiguous();
-        this->Input("pertoken_scale")
-            .ParamType(OPTIONAL)
-            .DataType(
-                {ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                 ge::DT_FLOAT,       ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_BF16,
-                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950);
-        this->Input("comm_quant_scale_1")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes950)
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950);
-        this->Input("comm_quant_scale_2")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes950)
-            .Format(ndFormats950)
-            .UnknownShapeFormat(ndFormats950);
+        DefineRequiredInputs();
+        DefineOptionalInputs();
+        DefineCommQuantInputs();
         this->Output("y")
             .ParamType(REQUIRED)
             .DataType(floatDtypes950)
             .Format(ndFormats950)
             .UnknownShapeFormat(ndFormats950);
-
-        this->Attr("group").AttrType(REQUIRED).String();
-        this->Attr("reduce_op").AttrType(OPTIONAL).String("sum");
-        this->Attr("is_trans_a").AttrType(OPTIONAL).Bool(false);
-        this->Attr("is_trans_b").AttrType(OPTIONAL).Bool(false);
-        this->Attr("comm_turn").AttrType(OPTIONAL).Int(0);
-        this->Attr("antiquant_group_size").AttrType(OPTIONAL).Int(0);
-        this->Attr("group_size").AttrType(OPTIONAL).Int(0);
-        this->Attr("y_dtype").AttrType(OPTIONAL).Int(static_cast<int>(ge::DT_UNDEFINED));
-        this->Attr("comm_quant_mode").AttrType(OPTIONAL).Int(0);
-        this->Attr("comm_mode").AttrType(OPTIONAL).String("ai_cpu");
+        DefineAttributes();
 
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)
@@ -214,76 +85,8 @@ public:
         this->MC2().HcclGroup("group");
 
         OpAICoreConfig aicore_config_910b;
-        aicore_config_910b.Input("x1")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8,
-                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8,
-                       ge::DT_INT8, ge::DT_INT8, ge::DT_INT8})
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .AutoContiguous();
-        aicore_config_910b.Input("x2")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT4,
-                       ge::DT_INT4, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8,
-                       ge::DT_INT8, ge::DT_INT8})
-            .Format(x2Formats910b)
-            .UnknownShapeFormat(x2Formats910b)
-            .IgnoreContiguous();
-        aicore_config_910b.Input("bias")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32,
-                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32, ge::DT_INT32, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .AutoContiguous();
-        aicore_config_910b.Input("x3")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes910b)
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .AutoContiguous();
-        aicore_config_910b.Input("antiquant_scale")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes910b)
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .IgnoreContiguous();
-        aicore_config_910b.Input("antiquant_offset")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes910b)
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .IgnoreContiguous();
-        aicore_config_910b.Input("dequant_scale")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_UINT64, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT64, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_UINT64, ge::DT_BF16, ge::DT_INT64, ge::DT_FLOAT})
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .AutoContiguous();
-        aicore_config_910b.Input("pertoken_scale")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_FLOAT})
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .AutoContiguous();
-        aicore_config_910b.Input("comm_quant_scale_1")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes910b)
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .AutoContiguous();
-        aicore_config_910b.Input("comm_quant_scale_2")
-            .ParamType(OPTIONAL)
-            .DataType(floatDtypes910b)
-            .Format(ndFormats910b)
-            .UnknownShapeFormat(ndFormats910b)
-            .AutoContiguous();
+        DefineAicoreConfig910bRequiredInputs(aicore_config_910b);
+        DefineAicoreConfig910bOptionalInputs(aicore_config_910b);
         aicore_config_910b.Output("y")
             .ParamType(REQUIRED)
             .DataType(floatDtypes910b)
@@ -384,6 +187,233 @@ public:
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
         this->AICore().AddConfig("ascend310p", aicore_config_310p);
         this->MC2().HcclGroup("group");
+    }
+
+private:
+    void DefineRequiredInputs()
+    {
+        this->Input("x1")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_INT8,          ge::DT_FLOAT16,
+                       ge::DT_BF16,          ge::DT_INT8,          ge::DT_FLOAT16,       ge::DT_BF16,
+                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_FLOAT16,       ge::DT_BF16,
+                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,
+                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,
+                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_FLOAT16,       ge::DT_BF16,
+                       ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,
+                       ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E4M3FN})
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950);
+        this->Input("x2")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_INT8,          ge::DT_INT8,
+                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT4,          ge::DT_INT4,
+                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,
+                       ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,          ge::DT_INT8,
+                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,
+                       ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,      ge::DT_HIFLOAT8,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,
+                       ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_FLOAT8_E4M3FN})
+            .Format(x2Formats950)
+            .UnknownShapeFormat(x2Formats950)
+            .IgnoreContiguous();
+    }
+
+    void DefineOptionalInputs()
+    {
+        this->Input("bias")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_INT32, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT32,
+                       ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_INT32, ge::DT_INT32,   ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_INT32,   ge::DT_INT32, ge::DT_INT32, ge::DT_INT32,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,   ge::DT_FLOAT})
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950);
+        this->Input("x3")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes950)
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950);
+        this->Input("antiquant_scale")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes950)
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950)
+            .IgnoreContiguous();
+        this->Input("antiquant_offset")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes950)
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950)
+            .IgnoreContiguous();
+        this->Input("dequant_scale")
+            .ParamType(OPTIONAL)
+            .DataType(
+                {ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_UINT64,      ge::DT_FLOAT16,     ge::DT_BF16,
+                 ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_INT64,       ge::DT_FLOAT,
+                 ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_UINT64,      ge::DT_BF16,        ge::DT_INT64,
+                 ge::DT_FLOAT,       ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,
+                 ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,
+                 ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,      ge::DT_UINT64,
+                 ge::DT_UINT64,      ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_BF16,
+                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950)
+            .IgnoreContiguous();
+        this->Input("pertoken_scale")
+            .ParamType(OPTIONAL)
+            .DataType(
+                {ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                 ge::DT_FLOAT,       ge::DT_FLOAT16,     ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_BF16,
+                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                 ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950);
+    }
+
+    void DefineCommQuantInputs()
+    {
+        this->Input("comm_quant_scale_1")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes950)
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950);
+        this->Input("comm_quant_scale_2")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes950)
+            .Format(ndFormats950)
+            .UnknownShapeFormat(ndFormats950);
+    }
+
+    void DefineAttributes()
+    {
+        this->Attr("group").AttrType(REQUIRED).String();
+        this->Attr("reduce_op").AttrType(OPTIONAL).String("sum");
+        this->Attr("is_trans_a").AttrType(OPTIONAL).Bool(false);
+        this->Attr("is_trans_b").AttrType(OPTIONAL).Bool(false);
+        this->Attr("comm_turn").AttrType(OPTIONAL).Int(0);
+        this->Attr("antiquant_group_size").AttrType(OPTIONAL).Int(0);
+        this->Attr("group_size").AttrType(OPTIONAL).Int(0);
+        this->Attr("y_dtype").AttrType(OPTIONAL).Int(static_cast<int>(ge::DT_UNDEFINED));
+        this->Attr("comm_quant_mode").AttrType(OPTIONAL).Int(0);
+        this->Attr("comm_mode").AttrType(OPTIONAL).String("ai_cpu");
+    }
+
+    void DefineAicoreConfig910bRequiredInputs(OpAICoreConfig &aicore_config_910b)
+    {
+        aicore_config_910b.Input("x1")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8,
+                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8,
+                       ge::DT_INT8, ge::DT_INT8, ge::DT_INT8})
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .AutoContiguous();
+        aicore_config_910b.Input("x2")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT4,
+                       ge::DT_INT4, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8,
+                       ge::DT_INT8, ge::DT_INT8})
+            .Format(x2Formats910b)
+            .UnknownShapeFormat(x2Formats910b)
+            .IgnoreContiguous();
+    }
+
+    void DefineAicoreConfig910bOptionalInputs(OpAICoreConfig &aicore_config_910b)
+    {
+        aicore_config_910b.Input("bias")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32,
+                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32, ge::DT_INT32, ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .AutoContiguous();
+        aicore_config_910b.Input("x3")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes910b)
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .AutoContiguous();
+        aicore_config_910b.Input("antiquant_scale")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes910b)
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .IgnoreContiguous();
+        aicore_config_910b.Input("antiquant_offset")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes910b)
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .IgnoreContiguous();
+        aicore_config_910b.Input("dequant_scale")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_UINT64, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
+                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT64, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_UINT64, ge::DT_BF16, ge::DT_INT64, ge::DT_FLOAT})
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .AutoContiguous();
+        aicore_config_910b.Input("pertoken_scale")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT})
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .AutoContiguous();
+        aicore_config_910b.Input("comm_quant_scale_1")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes910b)
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .AutoContiguous();
+        aicore_config_910b.Input("comm_quant_scale_2")
+            .ParamType(OPTIONAL)
+            .DataType(floatDtypes910b)
+            .Format(ndFormats910b)
+            .UnknownShapeFormat(ndFormats910b)
+            .AutoContiguous();
     }
 };
 

@@ -180,6 +180,7 @@ private:
     ge::graphStatus CheckEpWorldSizeValue();
     ge::graphStatus CheckCommCountsRange();
     ge::graphStatus CheckCommCountsValue();
+    ge::graphStatus CheckOptionalMatmulFormats();
     ge::graphStatus CheckFormat();
 };
 } // namespace optiling

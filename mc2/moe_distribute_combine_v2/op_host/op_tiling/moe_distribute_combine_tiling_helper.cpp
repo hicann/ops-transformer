@@ -174,15 +174,8 @@ inline bool MoeDistributeCombineTilingHelper::CheckActiveMask(const gert::Tiling
 }
 
 // 校验数据类型
-bool MoeDistributeCombineTilingHelper::CheckTensorDataType(const gert::TilingContext *context, const char *nodeName)
+static bool CheckRoutingTensorDataTypes(const gert::TilingContext *context, const char *nodeName)
 {
-    auto expandXDesc = context->GetInputDesc(EXPAND_X_INDEX);
-    OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandxDesc"), return false);
-    OP_TILING_CHECK((expandXDesc->GetDataType() != ge::DT_BF16) && (expandXDesc->GetDataType() != ge::DT_FLOAT16),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "expandX",
-                                                          Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
-                                                          "The dtype of expandX must be bf16 or float16."),
-                    return false);
     auto expertIdsDesc = context->GetInputDesc(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdsDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertIdsDesc"), return false);
     OP_TILING_CHECK((expertIdsDesc->GetDataType() != ge::DT_INT32),
@@ -205,6 +198,21 @@ bool MoeDistributeCombineTilingHelper::CheckTensorDataType(const gert::TilingCon
                                                           Ops::Base::ToString(epSendCountsDesc->GetDataType()).c_str(),
                                                           "The dtype of epSendCounts must be int32."),
                     return false);
+    return true;
+}
+
+bool MoeDistributeCombineTilingHelper::CheckTensorDataType(const gert::TilingContext *context, const char *nodeName)
+{
+    auto expandXDesc = context->GetInputDesc(EXPAND_X_INDEX);
+    OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandxDesc"), return false);
+    OP_TILING_CHECK((expandXDesc->GetDataType() != ge::DT_BF16) && (expandXDesc->GetDataType() != ge::DT_FLOAT16),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "expandX",
+                                                          Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
+                                                          "The dtype of expandX must be bf16 or float16."),
+                    return false);
+    if (!CheckRoutingTensorDataTypes(context, nodeName)) {
+        return false;
+    }
     auto expertScalesDesc = context->GetInputDesc(EXPERT_SCALES_INDEX);
     OP_TILING_CHECK(expertScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertScalesDesc"),
                     return false);

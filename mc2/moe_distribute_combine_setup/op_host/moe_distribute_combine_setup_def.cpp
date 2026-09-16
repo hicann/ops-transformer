@@ -18,7 +18,31 @@
 namespace ops {
 class MoeDistributeCombineSetup : public OpDef {
 public:
-    explicit MoeDistributeCombineSetup(const char *name) : OpDef(name)
+    explicit MoeDistributeCombineSetup(const char *name)
+        : OpDef(name)
+    {
+        DefineRequiredInputs();
+        DefineOutputs();
+        DefineAttributes();
+
+        OpAICoreConfig aicore_config;
+        aicore_config.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("jitCompile.flag", "static_false")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
+
+        this->AICore().AddConfig("ascend950", aicore_config);
+        this->MC2().HcclGroup({"group_ep"});
+    }
+
+private:
+    void DefineRequiredInputs()
     {
         this->Input("expand_x")
             .ParamType(REQUIRED)
@@ -38,6 +62,10 @@ public:
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND})
             .AutoContiguous();
+    }
+
+    void DefineOutputs()
+    {
         this->Output("quant_expand_x")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT8, ge::DT_INT8})
@@ -48,7 +76,10 @@ public:
             .DataType({ge::DT_INT32, ge::DT_INT32})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
+    }
 
+    void DefineAttributes()
+    {
         this->Attr("group_ep").AttrType(REQUIRED).String();
         this->Attr("ep_world_size").AttrType(REQUIRED).Int();
         this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
@@ -60,21 +91,6 @@ public:
         this->Attr("comm_quant_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("comm_type").AttrType(OPTIONAL).Int(0);
         this->Attr("comm_alg").AttrType(OPTIONAL).String("");
-
-        OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
-            .ExtendCfgInfo("jitCompile.flag", "static_false")
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
-
-        this->AICore().AddConfig("ascend950", aicore_config);
-        this->MC2().HcclGroup({"group_ep"});
     }
 };
 

@@ -22,6 +22,7 @@
 #include "kernel_operator.h"
 #include "catlass/catlass.hpp"
 #include "catlass/arch/resource.hpp"
+#include "../utils/const_args.hpp"
 
 namespace MoePermute {
 
@@ -139,8 +140,10 @@ public:
         }
         if constexpr (std::is_same_v<ElementDst, int8_t>) {
             // 量化临时缓冲：work [0,h) + abs/max 复用 [h,2h)；int32/half 复用 work，取 2*hidden 个 float
+            constexpr int32_t QUANT_TMP_FLOATS_PER_HIDDEN = 2; // work + abs/max 复用区
             tmpBuffer = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
-            ubOffset += RoundUp<Catlass::BYTE_PER_BLK>(static_cast<uint32_t>(2 * hidden * sizeof(float)));
+            ubOffset += RoundUp<Catlass::BYTE_PER_BLK>(
+                static_cast<uint32_t>(QUANT_TMP_FLOATS_PER_HIDDEN * hidden * sizeof(float)));
         }
     }
 

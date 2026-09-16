@@ -149,6 +149,29 @@ static graphStatus CheckSplitItem1(gert::InferShapeContext *context, size_t &idx
     return GRAPH_SUCCESS;
 }
 
+static graphStatus InferCombinedOutputM(gert::InferShapeContext *context, size_t &idx, const int32_t *splitItem,
+                                        const gert::Shape *w0Shape)
+{
+    int64_t m = 0;
+    while (1) {
+        const gert::Shape *xShape = context->GetDynamicInputShape(INDEX_IN_X, idx);
+        if (xShape == nullptr) {
+            break;
+        }
+        const gert::Shape *weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
+        OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
+        OPS_CHECK(CheckDims(context, xShape, weightShape, *splitItem) == GRAPH_FAILED,
+                  VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Invalid dims of x or weight."),
+                  return GRAPH_FAILED);
+        m += xShape->GetDim(0);
+        idx++;
+    }
+    OPS_CHECK(UpdateShapeYGMMAllReduce(context, INDEX_OUT_Y, m, w0Shape->GetDim(1)) != GRAPH_SUCCESS,
+              VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Failed to update shape of y."),
+              return GRAPH_FAILED);
+    return GRAPH_SUCCESS;
+}
+
 static graphStatus InferMAxisShape(gert::InferShapeContext *context)
 {
     const gert::RuntimeAttrs *attrs = context->GetAttrs();
@@ -171,23 +194,9 @@ static graphStatus InferMAxisShape(gert::InferShapeContext *context)
                   VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "CheckSplitItem1 failed"),
                   return GRAPH_FAILED);
     } else if (*splitItem == IN_NOT_SPLIT_OUT_SPLIT) {
-        int64_t m = 0;
-        while (1) {
-            const gert::Shape *xShape = context->GetDynamicInputShape(INDEX_IN_X, idx);
-            if (xShape == nullptr) {
-                break;
-            }
-            const gert::Shape *weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
-            OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
-            OPS_CHECK(CheckDims(context, xShape, weightShape, *splitItem) == GRAPH_FAILED,
-                      VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Invalid dims of x or weight."),
-                      return GRAPH_FAILED);
-            m += xShape->GetDim(0);
-            idx++;
+        if (InferCombinedOutputM(context, idx, splitItem, w0Shape) != GRAPH_SUCCESS) {
+            return GRAPH_FAILED;
         }
-        OPS_CHECK(UpdateShapeYGMMAllReduce(context, INDEX_OUT_Y, m, w0Shape->GetDim(1)) != GRAPH_SUCCESS,
-                  VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Failed to update shape of y."),
-                  return GRAPH_FAILED);
     } else if (*splitItem == IN_SPLIT_OUT_SPLIT) {
         const gert::Shape *xShape = context->GetDynamicInputShape(INDEX_IN_X, 0);
         OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
