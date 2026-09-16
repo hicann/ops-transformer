@@ -45,7 +45,7 @@
   ```text
   logits[q, r] = G[q * cmpRatio + r] + ape[r]
   weight = softmax(logits, dim=0)
-  pooledKeyOut[b, q - startPool[b]] = sum(weight[r] * K_norm[q * cmpRatio + r], dim=0)
+  pooled[b, q - startPool[b]] = sum(weight[r] * K_norm[q * cmpRatio + r], dim=0)
   ```
 
   历史token通过`cacheBlockTable`从`stateCache`读取，当前输入token的投影
@@ -294,10 +294,10 @@ aclnnStatus aclnnKeyPool(
     <td>pooledKeyOut（aclTensor*）</td>
     <td>输出</td>
     <td>表示按cmpRatio个token池化后的K。</td>
-    <td><ul><li>支持B=0、S=0或T=0的空Tensor；输出为固定容量的BSH Tensor。</li><li>shape为[B,Sr,D]。</li></ul></td>
+    <td><ul><li>支持B=0、S=0或T=0的空Tensor。</li><li>BSH输出shape为[B,Sr,D]，Sr=ceil(S/cmpRatio)。</li><li>TH输出shape为[Tr,D]，Tr=min(T,T/cmpRatio向下取整+B)。</li><li>仅有效压缩结果有定义，其余输出行未初始化。</li></ul></td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
-    <td>3</td>
+    <td>2、3</td>
     <td>×</td>
   </tr>
   <tr>
@@ -330,7 +330,11 @@ aclnnStatus aclnnKeyPool(
 - `N`为物理block数；
 - `BS`为block size；
 - `L`为每个Batch的最大逻辑block数；
-- `Sr=ceil(L*BS/cmpRatio)`，表示pooledKeyOut的容量。
+- BSH输出为`[B,Sr,D]`，`Sr=ceil(S/cmpRatio)`。
+- TH输出为`[Tr,D]`，`Tr=min(T,floor(T/cmpRatio)+B)`。
+- 每个Batch的有效行数为`n[b]=floor((startPos[b]+seqLen[b])/cmpRatio)-floor(startPos[b]/cmpRatio)`。
+  BSH将有效结果放在`pooledKeyOut[b,:n[b]]`；TH按Batch顺序将有效结果连续拼接，
+  第b个Batch的起点为前面所有Batch的`n`之和。其余输出行未初始化。
 - `BSH`：Batch-Sequence-Hidden的输入布局，`hiddenStates`的shape为
   `[B,S,H]`。其中`B`表示BatchSize，`S`表示每个Batch当前输入的序列
   长度，`H`表示hiddensize。
@@ -573,7 +577,7 @@ int main()
     constexpr int64_t blockSize = 4;
     constexpr int64_t maxBlockNumPerBatch = (seqLength + blockSize - 1) / blockSize;
     constexpr int64_t blockNum = batchSize * maxBlockNumPerBatch + 1; // block 0 is reserved.
-    constexpr int64_t pooledSeqLength = (maxBlockNumPerBatch * blockSize + cmpRatio - 1) / cmpRatio;
+    constexpr int64_t pooledSeqLength = (seqLength + cmpRatio - 1) / cmpRatio;
     constexpr double normEps = 1e-6;
     constexpr int64_t rotaryMode = 1;
     constexpr int64_t stateCacheStrideDim0 = blockSize * 2 * headDim;

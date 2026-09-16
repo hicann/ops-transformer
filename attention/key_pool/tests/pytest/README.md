@@ -26,7 +26,7 @@ optional LayerNorm
 state-cache update and Block Table addressing
 Gate + APE pooling
 all supported compression ratios
-fixed-capacity pooled output and zero tail
+current-input output capacity with undefined unused tail
 non-empty RoPE rejection through the public interface contract
 ```
 
@@ -48,3 +48,13 @@ start positions, shuffled block tables, zero-length TH batches, and multiple
 compression ratios. It validates both `pooled_key` and the in-place
 `state_cache` update against the CPU Golden and exits with a non-zero status
 when any case fails.
+
+BSH output is `[B, ceil(S/r), D]`; TH output is `[min(T, T//r+B), D]`.
+The operator does not initialize unused output rows. For each batch, only
+`(start_pos + seq_len) // cmp_ratio - start_pos // cmp_ratio` rows are valid.
+TH concatenates valid batch results without gaps; unused rows are at the end
+of the whole output. BSH has an unused tail per batch.
+The precision comparison zeros unused rows in CPU comparison copies of both
+outputs; it does not change the operator output or the state cache. Valid
+output elements are also checked separately so unused capacity cannot dilute
+the precision metric. Performance measurements do not perform this masking.

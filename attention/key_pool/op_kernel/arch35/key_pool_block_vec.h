@@ -55,7 +55,6 @@ public:
     __aicore__ inline void FreeEventID();
     // =================================执行计算=================================
     __aicore__ inline void ComputeVec1(const Vec1RunInfo &info);
-    __aicore__ inline void ComputeIncrementalPool();
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<T> kvMm1ResGm, GlobalTensor<T> scoreMm1ResGm,
                                                 GlobalTensor<T> kvCacheTcGm, GlobalTensor<T> scoreCacheTcGm,
                                                 GlobalTensor<T> normalizedKvGm);
@@ -988,26 +987,32 @@ __aicore__ inline void KeyPoolBlockVector<COMP>::CopyOutVec1ResToOutput(const Lo
     Cast(outputUb, comperssoredUb, RoundMode::CAST_ROUND, compressTcSize * dDealSize);
     outputQue2.EnQue(outputUb);
     outputQue2.DeQue<HIDDEN_STATES_T>();
-    uint32_t outputPoolCapacity = CeilDivT(constInfo_.maxBlockNumPerBatch * constInfo_.blockSize, cmpRatio_);
-    uint32_t bIdx = sliceInfo.bIdx;
-    uint32_t sIdx = sliceInfo.sIdx;
-    uint64_t ubOffset = 0;
-    while (compressTcSize > 0) {
-        uint32_t bStartPos = GetStartPos(bIdx);
-        uint32_t preScSize = (sIdx + bStartPos) / cmpRatio_;
-        uint32_t totalScSize = (GetSeqUsed(bIdx) + bStartPos) / cmpRatio_;
-        if (preScSize < totalScSize) {
-            uint32_t curScSize = min(compressTcSize, totalScSize - preScSize);
-            uint64_t outputPoolIdx =
-                static_cast<uint64_t>(bIdx) * outputPoolCapacity + preScSize - bStartPos / cmpRatio_;
-            uint64_t outGmOffset = outputPoolIdx * constInfo_.headDim + dStartIdx;
-            DataCopyAlignUbToGm(cmpKvOutGm_[outGmOffset], outputUb[ubOffset], curScSize, dDealSize, dDealSize,
-                                constInfo_.headDim);
-            compressTcSize -= curScSize;
-            ubOffset += curScSize * dDealSize;
+    if constexpr (COMP::hiddenStatesLayout == HIDDEN_STATES_LAYOUT::BSH) {
+        uint32_t outputPoolCapacity = CeilDivT(GetSeqLength(sliceInfo.bIdx), cmpRatio_);
+        uint32_t bIdx = sliceInfo.bIdx;
+        uint32_t sIdx = sliceInfo.sIdx;
+        uint64_t ubOffset = 0;
+        while (compressTcSize > 0) {
+            uint32_t bStartPos = GetStartPos(bIdx);
+            uint32_t preScSize = (sIdx + bStartPos) / cmpRatio_;
+            uint32_t totalScSize = (GetSeqUsed(bIdx) + bStartPos) / cmpRatio_;
+            if (preScSize < totalScSize) {
+                uint32_t curScSize = min(compressTcSize, totalScSize - preScSize);
+                uint64_t outputPoolIdx =
+                    static_cast<uint64_t>(bIdx) * outputPoolCapacity + preScSize - bStartPos / cmpRatio_;
+                uint64_t outGmOffset = outputPoolIdx * constInfo_.headDim + dStartIdx;
+                DataCopyAlignUbToGm(cmpKvOutGm_[outGmOffset], outputUb[ubOffset], curScSize, dDealSize, dDealSize,
+                                    constInfo_.headDim);
+                compressTcSize -= curScSize;
+                ubOffset += curScSize * dDealSize;
+            }
+            bIdx++;
+            sIdx = 0;
         }
-        bIdx++;
-        sIdx = 0;
+    } else {
+        uint64_t outGmOffset = static_cast<uint64_t>(compressedCnt_) * constInfo_.headDim + dStartIdx;
+        DataCopyAlignUbToGm(cmpKvOutGm_[outGmOffset], outputUb, compressTcSize, dDealSize, dDealSize,
+                            constInfo_.headDim);
     }
     outputQue2.FreeTensor(outputUb);
 }
@@ -1050,6 +1055,9 @@ __aicore__ inline void KeyPoolBlockVector<COMP>::OverLapScoreKv(
         uint64_t normalizedOffset =
             normalizedKvDbOffset_ +
             static_cast<uint64_t>(compressedCnt_ - normalizedPoolBase_) * cmpRatio_ * constInfo_.headDim + dStartIdx;
+        event_t eventIdVToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+        SetFlag<HardEvent::V_MTE2>(eventIdVToMte2);
+        WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2);
         DataCopyAlignGmToUb(kvLocal, normalizedKvGm_[normalizedOffset], statisticInfo.key_poolScCnt * cmpRatio_,
                             dDealSize, constInfo_.headDim, dDealSize);
         event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
@@ -1464,35 +1472,5 @@ __aicore__ inline void KeyPoolBlockVector<COMP>::ComputeVec1(const Vec1RunInfo &
     compressedCnt_ = preCompressedCnt + splitInfo.totalCompressedCnt;
 }
 
-template <typename COMP>
-__aicore__ inline void KeyPoolBlockVector<COMP>::ComputeIncrementalPool()
-{
-    uint32_t dDealSize = BlockElementNum<HIDDEN_STATES_T>();
-    uint32_t dStartIdx = constInfo_.aiCoreIdx * dDealSize;
-    if (dStartIdx >= constInfo_.headDim) {
-        return;
-    }
-    dDealSize = min(dDealSize, constInfo_.headDim - dStartIdx);
-    uint32_t outputPoolCapacity = CeilDivT(constInfo_.maxBlockNumPerBatch * constInfo_.blockSize, cmpRatio_);
-
-    for (uint32_t bIdx = 0; bIdx < constInfo_.batchSize; bIdx++) {
-        uint32_t startPool = GetStartPos(bIdx) / cmpRatio_;
-        uint32_t validPoolCount = (GetStartPos(bIdx) + GetSeqUsed(bIdx)) / cmpRatio_;
-        uint32_t newPoolCount = validPoolCount > startPool ? validPoolCount - startPool : 0;
-        const uint32_t clearPoolCapacity =
-            max(1U, static_cast<uint32_t>(BUFFER_SIZE_BYTE_16K / (dDealSize * sizeof(HIDDEN_STATES_T))));
-        for (uint32_t clearStart = newPoolCount; clearStart < outputPoolCapacity; clearStart += clearPoolCapacity) {
-            uint32_t clearCount = min(clearPoolCapacity, outputPoolCapacity - clearStart);
-            LocalTensor<HIDDEN_STATES_T> zeroUb = outputQue2.AllocTensor<HIDDEN_STATES_T>();
-            Duplicate(zeroUb, static_cast<HIDDEN_STATES_T>(0), clearCount * dDealSize);
-            outputQue2.EnQue(zeroUb);
-            outputQue2.DeQue<HIDDEN_STATES_T>();
-            uint64_t outGmOffset =
-                (static_cast<uint64_t>(bIdx) * outputPoolCapacity + clearStart) * constInfo_.headDim + dStartIdx;
-            DataCopyAlignUbToGm(cmpKvOutGm_[outGmOffset], zeroUb, clearCount, dDealSize, dDealSize, constInfo_.headDim);
-            outputQue2.FreeTensor(zeroUb);
-        }
-    }
-}
 } // namespace KeyPool
 #endif // KEY_POOL_BLOCK_VECTOR_H

@@ -266,7 +266,7 @@ def _pool_one_batch_loop(
         logits = torch.stack(gates, dim=0)
         probabilities = torch.softmax(logits, dim=0)
         probabilities = probabilities.to(torch.bfloat16).float()
-        output[batch, pool - first_pool] = (
+        output[pool - first_pool] = (
             (probabilities * key_tensor).sum(dim=0).to(torch.bfloat16)
         )
 
@@ -325,16 +325,29 @@ def run_key_pool_golden(
             state_cache, cache_block_table, start_pos, batch, k, gate, cmp_ratio
         )
 
-    pcap = (
-        cache_block_table.size(1) * state_cache.size(1) + cmp_ratio - 1
-    ) // cmp_ratio
+    if hidden_states.dim() == 3:
+        pcap = (hidden_states.size(1) + cmp_ratio - 1) // cmp_ratio
+        output_shape = (len(batch_hidden), pcap, wk.size(0))
+    else:
+        pcap = min(
+            hidden_states.size(0),
+            hidden_states.size(0) // cmp_ratio + len(batch_hidden),
+        )
+        output_shape = (pcap, wk.size(0))
     output = torch.zeros(
-        (len(batch_hidden), pcap, wk.size(0)),
+        output_shape,
         dtype=torch.bfloat16,
         device=state_cache.device,
     )
+    output_offset = 0
     for batch, length in enumerate(lengths):
         updated_len = int(start_pos[batch]) + length
+        count = updated_len // cmp_ratio - int(start_pos[batch]) // cmp_ratio
+        batch_output = (
+            output[batch]
+            if hidden_states.dim() == 3
+            else output[output_offset : output_offset + count]
+        )
         _pool_one_batch_loop(
             state_cache,
             cache_block_table,
@@ -345,8 +358,9 @@ def run_key_pool_golden(
             gate_parts[batch],
             cmp_ratio,
             ape,
-            output,
+            batch_output,
         )
+        output_offset += count
     intermediates = {
         "k_projection": torch.cat(k_parts, dim=0) if k_parts else torch.empty(0),
         "gate_projection": torch.cat(gate_parts, dim=0)
@@ -412,7 +426,20 @@ def run_key_pool_oracle(
 
     batch_size = len(batch_hidden)
     block_size = state_cache.size(1)
-    pcap = (cache_block_table.size(1) * block_size + cmp_ratio - 1) // cmp_ratio
+    pcap = (max(lengths, default=0) + cmp_ratio - 1) // cmp_ratio
+    if batch_size == 0 or pcap == 0:
+        shape = (
+            (
+                batch_size,
+                (hidden_states.size(1) + cmp_ratio - 1) // cmp_ratio,
+                wk.size(0),
+            )
+            if hidden_states.dim() == 3
+            else (0, wk.size(0))
+        )
+        return torch.zeros(
+            shape, dtype=hidden_states.dtype, device=state_cache.device
+        ), state_cache
     first_pool = torch.div(start_pos.to(torch.long), cmp_ratio, rounding_mode="floor")
     logical_positions = (
         first_pool[:, None] * cmp_ratio
@@ -466,7 +493,22 @@ def run_key_pool_oracle(
     pooled = (probabilities * keys).sum(dim=2).to(torch.bfloat16)
     complete = valid.all(dim=2)
     pooled = pooled.masked_fill(~complete[..., None], 0)
-    return pooled, state_cache
+    if hidden_states.dim() == 3:
+        return pooled, state_cache
+    capacity = min(
+        hidden_states.size(0), hidden_states.size(0) // cmp_ratio + batch_size
+    )
+    output = torch.zeros(
+        (capacity, wk.size(0)), dtype=hidden_states.dtype, device=state_cache.device
+    )
+    offset = 0
+    for batch, length in enumerate(lengths):
+        count = (int(start_pos[batch]) + length) // cmp_ratio - int(
+            start_pos[batch]
+        ) // cmp_ratio
+        output[offset : offset + count] = pooled[batch, :count]
+        offset += count
+    return output, state_cache
 
 
 def compare_golden_and_oracle(

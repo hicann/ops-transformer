@@ -40,10 +40,15 @@ at::Tensor ConstructKeyPoolOutputTensor(const at::Tensor &hidden_states, const a
                 "] should be 2 or 3");
     TORCH_CHECK(stateCache.dim() == DIM_THREE, "state_cache dim num[", stateCache.dim(), "] should be 3");
     TORCH_CHECK(cacheBlockTable.dim() == DIM_TWO, "cache_block_table dim num[", cacheBlockTable.dim(), "] should be 2");
-    int64_t pcap = (cacheBlockTable.size(1) * stateCache.size(1) + cmpRatio - 1) / cmpRatio;
-    pooledKeySize = {cacheBlockTable.size(0), pcap, wk.size(0)};
+    if (hiddenStatesDim == DIM_THREE) {
+        int64_t pcap = (hidden_states.size(1) + cmpRatio - 1) / cmpRatio;
+        pooledKeySize = {hidden_states.size(0), pcap, wk.size(0)};
+    } else {
+        int64_t pcap = std::min(hidden_states.size(0), hidden_states.size(0) / cmpRatio + cacheBlockTable.size(0));
+        pooledKeySize = {pcap, wk.size(0)};
+    }
 
-    pooledKey = at::zeros(pooledKeySize, hidden_states.options().dtype(hidden_states.dtype()));
+    pooledKey = at::empty(pooledKeySize, hidden_states.options().dtype(hidden_states.dtype()));
     return pooledKey;
 }
 

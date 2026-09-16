@@ -1048,7 +1048,6 @@ ge::graphStatus DenseLightningIndexerGradKLLossTilingBase::GetShapeAttrsInfo()
     dliGradkllossBaseParams_->set_s2Size(s2Size);
     dliGradkllossBaseParams_->set_dSizeQuery(dSizeQuery);
     dliGradkllossBaseParams_->set_dSizeQueryIndex(dSizeQueryIndex);
-    dliGradkllossBaseParams_->set_kSize(2048); // TODO: dense这里应该要改
     dliGradkllossBaseParams_->set_sparseMode(sparseMode);
     dliGradkllossBaseParams_->set_scaleValue(scaleValue);
 

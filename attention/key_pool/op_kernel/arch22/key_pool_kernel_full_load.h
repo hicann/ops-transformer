@@ -320,11 +320,6 @@ __aicore__ inline void KeyPoolKernelFullLoad<COMP>::Process()
             ComputeVec();
         }
     }
-    if ASCEND_IS_AIV {
-        PipeBarrier<PIPE_ALL>();
-        SyncAll();
-        blockVec_.ComputeIncrementalPool();
-    }
     FreeEventID();
 }
 

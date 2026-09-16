@@ -142,7 +142,7 @@ torch.ops.cann_ops_transformer.key_pool(
 
 | 返回值 | 返回值类型 | 描述 | 数据类型 | 维度（shape） |
 | ---- | ---- | ---- | ---- | ---- |
-| pooled_key | Tensor | 按 `cmp_ratio` 对 K 加权池化后的结果。 | bfloat16、float16 | `[B,Sr,D]` |
+| pooled_key | Tensor | 按 `cmp_ratio` 对 K 加权池化后的结果。 | bfloat16、float16 | BSH：`[B,Sr,D]`；TH：`[Tr,D]` |
 
 其中：
 
@@ -152,7 +152,16 @@ torch.ops.cann_ops_transformer.key_pool(
 - `H` 表示 hidden size；
 - `D` 表示 K 和 Gate 的 head dimension，由 `wk.size(0)` 决定；
 - `L` 表示 `cache_block_table` 的逻辑 block 数；
-- `Sr = ceil(L * block_size / cmp_ratio)`，表示输出的固定容量。
+- `Sr = ceil(S / cmp_ratio)`，表示 BSH 每个 Batch 的输出容量；
+- `Tr = min(T, T // cmp_ratio + B)`，表示 TH 的总输出容量。
+
+每个 Batch 的有效输出数量为 `valid_count`，
+`valid_count = (start_pos + seq_len) // cmp_ratio - start_pos // cmp_ratio`。
+BSH 的 `seq_len` 为 `S`，TH 的 `seq_len` 为相邻 `cu_seqlens` 的差值。
+BSH 的有效输出位于 `pooled_key[b, :valid_count[b]]`；TH 按 Batch 顺序连续
+拼接有效输出，第 b 个 Batch 的起点为前面各 Batch 的有效数量之和，全部有效
+结果占据输出前 `sum(valid_count)` 行。其余输出行未初始化，数值未定义，调用者只能使用有效范围；精度验证时可在
+用于比较的副本中将无效行清零，不能将该清零计入算子性能。
 
 `BSH` 表示 Batch-Sequence-Hidden 布局，`hidden_states` 的 shape 为
 `[B,S,H]`。`TH` 表示 Token-Hidden 布局，`hidden_states` 的 shape 为

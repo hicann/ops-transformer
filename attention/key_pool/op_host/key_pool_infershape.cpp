@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <algorithm>
 #include <graph/utils/type_utils.h>
 #include <register/op_impl_registry.h>
 #include "err/ops_err.h"
@@ -85,30 +86,29 @@ ge::graphStatus GetKeyPoolShapeDim(const gert::InferShapeContext *context, KeyPo
         shapeParam.isBsMerge = true;
         auto cuSeqlensShape = context->GetOptionalInputShape(CU_SEQLENS_INPUT_INDEX);
         shapeParam.B = cuSeqlensShape->GetDim(DIM_INDEX_0) - 1;
-        shapeParam.Sr =
-            (cacheBlockTableShape->GetDim(DIM_INDEX_1) * stateCacheShape->GetDim(DIM_INDEX_1) + cmpRatio - 1) /
-            cmpRatio;
+        const int64_t tokenSize = hiddenStatesShape->GetDim(DIM_INDEX_0);
+        shapeParam.Sr = std::min(tokenSize, tokenSize / cmpRatio + shapeParam.B);
     }
 
     shapeParam.D = wkShape->GetDim(DIM_INDEX_0);
-    if (!shapeParam.isBsMerge) {
-        shapeParam.Sr =
-            (cacheBlockTableShape->GetDim(DIM_INDEX_1) * stateCacheShape->GetDim(DIM_INDEX_1) + cmpRatio - 1) /
-            cmpRatio;
-    }
 
     return GRAPH_SUCCESS;
 }
 
 ge::graphStatus SetKeyPoolShapeDim(const KeyPoolProtoShapeParam &shapeParam, gert::InferShapeContext *context)
 {
-    // KeyPool always returns a fixed-capacity BSH tensor.
     auto pooledKeyShape = context->GetOutputShape(POOLED_KEY_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, pooledKeyShape);
-    pooledKeyShape->SetDimNum(DIM_NUM_3);
-    pooledKeyShape->SetDim(DIM_INDEX_0, shapeParam.B);
-    pooledKeyShape->SetDim(DIM_INDEX_1, shapeParam.Sr);
-    pooledKeyShape->SetDim(DIM_INDEX_2, shapeParam.D);
+    if (shapeParam.isBsMerge) {
+        pooledKeyShape->SetDimNum(DIM_NUM_2);
+        pooledKeyShape->SetDim(DIM_INDEX_0, shapeParam.Sr);
+        pooledKeyShape->SetDim(DIM_INDEX_1, shapeParam.D);
+    } else {
+        pooledKeyShape->SetDimNum(DIM_NUM_3);
+        pooledKeyShape->SetDim(DIM_INDEX_0, shapeParam.B);
+        pooledKeyShape->SetDim(DIM_INDEX_1, shapeParam.Sr);
+        pooledKeyShape->SetDim(DIM_INDEX_2, shapeParam.D);
+    }
 
     return GRAPH_SUCCESS;
 }

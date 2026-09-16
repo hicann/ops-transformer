@@ -71,11 +71,15 @@ class KeyPoolOpBuilder(OpBuilder):
                 raise ValueError("cu_seqlens must be absent for BSH layout")
             if seqused is not None:
                 raise ValueError("seqused is reserved and must be None in this stage")
-            b = cache_block_table.size(0)
-            pcap = (
-                cache_block_table.size(1) * state_cache.size(1) + cmp_ratio - 1
-            ) // cmp_ratio
-            pooled_key_size = (b, pcap, wk.size(0))
+            if hidden_states.dim() == 3:
+                pcap = (hidden_states.size(1) + cmp_ratio - 1) // cmp_ratio
+                pooled_key_size = (hidden_states.size(0), pcap, wk.size(0))
+            else:
+                pcap = min(
+                    hidden_states.size(0),
+                    hidden_states.size(0) // cmp_ratio + cache_block_table.size(0),
+                )
+                pooled_key_size = (pcap, wk.size(0))
 
             return torch.empty(
                 pooled_key_size, dtype=hidden_states.dtype, device="meta"
@@ -146,7 +150,8 @@ def key_pool(
             RoPE computation is not implemented in this version.
 
     Returns:
-        The pooled key tensor with shape ``[B, Sr, D]`` and the same dtype as
+        The pooled key tensor with shape ``[B, ceil(S/r), D]`` for BSH or
+        ``[min(T, T//r+B), D]`` for TH, and the same dtype as
         ``hidden_states``. ``state_cache`` is updated in place.
     """
     if (norm_weight is None) != (norm_bias is None):

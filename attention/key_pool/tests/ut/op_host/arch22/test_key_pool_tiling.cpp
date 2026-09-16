@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 
 #include "../../../../op_host/arch22/key_pool_tiling.h"
+#include "gmm_csv_ge_parse_utils.h"
 #include "tiling_case_executor.h"
 #include "tiling_context_faker.h"
 
@@ -45,7 +46,7 @@ const char *kA2SocInfo = "{"
 
 TensorDesc Desc(const std::vector<int64_t> &dims, ge::DataType dtype)
 {
-    return TensorDesc(gert::StorageShape(dims, dims), dtype, ge::FORMAT_ND);
+    return TensorDesc(ops::ut::MakeGertStorageShape(dims), dtype, ge::FORMAT_ND);
 }
 
 TensorDesc Empty(ge::DataType dtype)
@@ -74,46 +75,49 @@ gert::TilingContextPara MakePara(const std::string &layout, ge::DataType dtype, 
     inputs.emplace_back(layout == "TH" ? Desc({batch + 1}, ge::DT_INT32) : Empty(ge::DT_INT32));
     inputs.emplace_back(Empty(ge::DT_INT32));
 
-    const int64_t outputCapacity = (maxBlocks * blockSize + cmpRatio - 1) / cmpRatio;
-    std::vector<TensorDesc> outputs{Desc({batch, outputCapacity, headDim}, dtype)};
+    const int64_t outputCapacity =
+        layout == "BSH" ? (sequence + cmpRatio - 1) / cmpRatio : std::min(tokenCount, tokenCount / cmpRatio + batch);
+    std::vector<TensorDesc> outputs{layout == "BSH" ? Desc({batch, outputCapacity, headDim}, dtype) :
+                                                      Desc({outputCapacity, headDim}, dtype)};
     std::vector<OpAttr> attrs{
         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(cmpRatio)},
         {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6F)},
         {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
         {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockSize * 2 * headDim)},
     };
-    return gert::TilingContextPara("KeyPool", inputs, outputs, attrs, nullptr, "Ascend910B", kA2SocInfo, 4096);
+    static optiling::KeyPoolCompileInfo compileInfo{};
+    return gert::TilingContextPara("KeyPool", inputs, outputs, attrs, &compileInfo, "Ascend910B", kA2SocInfo, 4096);
 }
 } // namespace
 
 TEST(KeyPoolTilingArch22, BshBf16)
 {
     auto para = MakePara("BSH", ge::DT_BF16, 2, 8, 4096, 512, 4, 4, 2);
-    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 32);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0);
 }
 
 TEST(KeyPoolTilingArch22, BshFp16)
 {
     auto para = MakePara("BSH", ge::DT_FLOAT16, 1, 256, 4096, 512, 128, 128, 2);
-    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 34);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2);
 }
 
 TEST(KeyPoolTilingArch22, BshLayerNorm)
 {
     auto para = MakePara("BSH", ge::DT_BF16, 2, 16, 2048, 128, 8, 8, 2, true);
-    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 32);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0);
 }
 
 TEST(KeyPoolTilingArch22, ThUnevenBatch)
 {
     auto para = MakePara("TH", ge::DT_BF16, 3, 17, 4096, 512, 4, 4, 4);
-    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 33);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 1);
 }
 
 TEST(KeyPoolTilingArch22, EmptyBatch)
 {
     auto para = MakePara("BSH", ge::DT_BF16, 0, 8, 4096, 512, 4, 4, 2);
-    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 48);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 32);
 }
 
 TEST(KeyPoolTilingArch22, RejectsUnsupportedCompressionRatio)

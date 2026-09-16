@@ -219,30 +219,71 @@ def compare_precision(
     operator_state_cache: torch.Tensor,
     golden_state_cache: torch.Tensor,
     case_name: str,
+    valid_counts: list[int],
 ) -> None:
-    """Compare pooled output and the in-place state-cache result."""
-    actual = operator_output.detach().cpu().float()
-    expected = golden_output.detach().cpu().float()
+    """Mask undefined output tails in comparison copies and check valid data."""
+    actual = operator_output.detach().cpu().float().clone()
+    expected = golden_output.detach().cpu().float().clone()
+    if actual.shape != expected.shape or actual.dim() not in (2, 3):
+        raise AssertionError("Output shapes must match and have rank 2 or 3")
+    if actual.dim() == 3:
+        if len(valid_counts) != actual.size(0):
+            raise AssertionError("Valid-count batch size must match BSH output")
+        valid_mask = torch.zeros(actual.shape[:2], dtype=torch.bool)
+        for batch, count in enumerate(valid_counts):
+            if not 0 <= count <= actual.size(1):
+                raise AssertionError(f"Invalid pooled count for batch {batch}: {count}")
+            # Only comparison copies are cleared; the operator output is unchanged.
+            actual[batch, count:] = 0
+            expected[batch, count:] = 0
+            valid_mask[batch, :count] = True
+    else:
+        count = sum(valid_counts)
+        if any(value < 0 for value in valid_counts) or count > actual.size(0):
+            raise AssertionError("Invalid total pooled count for TH output")
+        valid_mask = torch.arange(actual.size(0)) < count
+        actual[count:] = 0
+        expected[count:] = 0
     actual_cache = operator_state_cache.detach().cpu().float()
     expected_cache = golden_state_cache.detach().cpu().float()
     output_close = torch.isclose(
-        actual, expected, rtol=0.0078125, atol=0.0001, equal_nan=True
+        actual, expected, rtol=0.0078125, atol=0.0001, equal_nan=False
     )
     cache_close = torch.isclose(
-        actual_cache, expected_cache, rtol=0.0078125, atol=0.0001, equal_nan=True
+        actual_cache, expected_cache, rtol=0.0078125, atol=0.0001, equal_nan=False
     )
-    output_percent = float(output_close.float().mean()) * 100.0
-    cache_percent = float(cache_close.float().mean()) * 100.0
+    output_percent = (
+        float(output_close.float().mean()) * 100.0 if actual.numel() else 100.0
+    )
+    cache_percent = (
+        float(cache_close.float().mean()) * 100.0 if actual_cache.numel() else 100.0
+    )
+    valid_close = output_close[valid_mask]
+    valid_percent = (
+        float(valid_close.float().mean()) * 100.0 if valid_close.numel() else 100.0
+    )
     output_max = float((actual - expected).abs().max()) if actual.numel() else 0.0
     cache_max = (
         float((actual_cache - expected_cache).abs().max())
         if actual_cache.numel()
         else 0.0
     )
-    passed = output_percent >= 99.5 and cache_percent >= 99.5
+    finite = bool(
+        torch.isfinite(actual).all()
+        and torch.isfinite(expected).all()
+        and torch.isfinite(actual_cache).all()
+        and torch.isfinite(expected_cache).all()
+    )
+    passed = (
+        finite
+        and output_percent >= 99.5
+        and valid_percent >= 99.5
+        and cache_percent >= 99.5
+    )
     print(
         f"{case_name}: {'PASS' if passed else 'FAIL'}; "
         f"pooled_key={output_percent:.4f}% max_abs={output_max:.6g}; "
+        f"valid_pooled_key={valid_percent:.4f}%; "
         f"state_cache={cache_percent:.4f}% max_abs={cache_max:.6g}"
     )
     if not passed:
@@ -265,12 +306,24 @@ if __name__ == "__main__":
             actual_output = call_operator(**actual_inputs)
             torch_npu.npu.synchronize()
             golden_output = golden_call(**golden_inputs)
+            lengths = (
+                [actual_inputs["hidden_states"].size(1)]
+                * actual_inputs["start_pos"].numel()
+                if actual_inputs["cu_seqlens"] is None
+                else actual_inputs["cu_seqlens"].diff().tolist()
+            )
+            ratio = actual_inputs["cmp_ratio"]
+            valid_counts = [
+                (int(start) + length) // ratio - int(start) // ratio
+                for start, length in zip(actual_inputs["start_pos"], lengths)
+            ]
             compare_precision(
                 actual_output,
                 golden_output,
                 actual_inputs["state_cache"],
                 golden_inputs["state_cache"],
                 case["case"],
+                valid_counts,
             )
         except Exception as error:
             failures += 1
