@@ -32,7 +32,7 @@ enum class SFA_LAYOUT {
 
 template <typename Q_T, typename KV_T, typename OUT_T, const bool FLASH_DECODE = false,
           SFA_LAYOUT LAYOUT_T = SFA_LAYOUT::BSND, SFA_LAYOUT KV_LAYOUT_T = SFA_LAYOUT::BSND,
-          const int TEMPLATE_MODE = C_TEMPLATE, typename... Args>
+          const int TEMPLATE_MODE = C_TEMPLATE, const bool HAS_ROPE = true, typename... Args>
 struct SFAType {
     using queryType = Q_T;
     using kvType = KV_T;
@@ -42,6 +42,7 @@ struct SFAType {
     static constexpr SFA_LAYOUT kvLayout = KV_LAYOUT_T;
     static constexpr int templateMode = TEMPLATE_MODE;
     static constexpr bool pageAttention = (KV_LAYOUT_T == SFA_LAYOUT::PA_BSND);
+    static constexpr bool hasRope = HAS_ROPE;
 };
 
 // ================================Util functions==================================

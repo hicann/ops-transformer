@@ -100,7 +100,7 @@ private:
     static constexpr uint64_t kvHeadNum = 1ULL;
     static constexpr uint64_t headDim = 512ULL;
     static constexpr uint64_t headDimAlign = 512ULL;
-    static constexpr uint64_t headDimRope = 64ULL;
+    static constexpr uint64_t headDimRope = SFAT::hasRope ? 64ULL : 0ULL;
     static constexpr uint32_t msdIterNum = 2U;
 
     static constexpr uint32_t dbWorkspaceRatio = PRELOAD_NUM;
@@ -446,8 +446,10 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
     queryGm.SetGlobalBuffer((__gm__ Q_T *)query);
     keyGm.SetGlobalBuffer((__gm__ KV_T *)keyPtr);
     valueGm.SetGlobalBuffer((__gm__ KV_T *)valuePtr);
-    qRopeGm.SetGlobalBuffer((__gm__ Q_ROPE_T *)queryRope);
-    kRopeGm.SetGlobalBuffer((__gm__ K_ROPE_T *)keyRope);
+    if constexpr (SFAT::hasRope) {
+        qRopeGm.SetGlobalBuffer((__gm__ Q_ROPE_T *)queryRope);
+        kRopeGm.SetGlobalBuffer((__gm__ K_ROPE_T *)keyRope);
+    }
 
     attentionOutGm.SetGlobalBuffer((__gm__ OUT_T *)attentionOut);
     softmaxMaxGm.SetGlobalBuffer((__gm__ T *)softmaxMax);
@@ -738,7 +740,11 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::ComputeMm1(const RunInfo &
         MSplitInfo mSplitInfo;
         mSplitInfo.nBufferStartM = i * constInfo.nBufferMBaseSize;
         mSplitInfo.nBufferDealM = (i + 1 != nBufferLoopTimes) ? constInfo.nBufferMBaseSize : nBufferTail;
-        matmulService.ComputeMm1(info, mSplitInfo);
+        if constexpr (SFAT::hasRope) {
+            matmulService.ComputeMm1(info, mSplitInfo);
+        } else {
+            matmulService.ComputeMm1NoRope(info, mSplitInfo);
+        }
         CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(constInfo.syncC1V1);
     }
 }

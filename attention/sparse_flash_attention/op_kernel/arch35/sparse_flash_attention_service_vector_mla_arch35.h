@@ -46,7 +46,7 @@ public:
     static constexpr uint32_t vec1Srcstride = (s1BaseSize >> 1) + 1;
     static constexpr uint32_t dVTemplateType = 512;
     static constexpr uint32_t sfaDTemplateAlign64 = Align64Func(dVTemplateType);
-    static constexpr uint32_t dVTemplateTypeInput = 576;
+    static constexpr uint32_t dVTemplateTypeInput = HAS_ROPE ? 576 : 512;
     static constexpr float R0 = 1.0f;
     static constexpr uint64_t SYNC_SINKS_BUF_FLAG = 6;
 
@@ -54,7 +54,8 @@ public:
     __aicore__ inline SFAVectorService(){};
     __aicore__ inline void InitVecBlock(TPipe *pipe, const SparseFlashAttentionTilingDataMla *__restrict tiling,
                                         CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx,
-                                        __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths)
+                                        __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
+                                        int64_t dSizeRope)
     {
         if ASCEND_IS_AIV {
             tPipe = pipe;
@@ -65,7 +66,7 @@ public:
             if (actualSeqLengths != nullptr) {
                 actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengths);
             }
-            this->InitCubeVecSharedParams(sharedParams, aicIdx, subBlockIdx);
+            this->InitCubeVecSharedParams(sharedParams, aicIdx, subBlockIdx, dSizeRope);
             this->GetExtremeValue(this->negativeFloatScalar);
         }
     }
@@ -121,7 +122,8 @@ private:
                                                int64_t sfaVec2CalcSize);
     __aicore__ inline void SoftmaxInitBuffer();
     __aicore__ inline void CopyFALseToGm(RunInfo &runInfo, ConstInfo &constInfo);
-    __aicore__ inline void InitCubeVecSharedParams(CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx);
+    __aicore__ inline void InitCubeVecSharedParams(CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx,
+                                                   int64_t dSizeRope);
     __aicore__ inline void ComputeNeedInitSFA(CVSharedParams &sharedParams) const;
     __aicore__ inline void GetExtremeValue(T &negativeScalar);
     __aicore__ inline void InitSinksBuffer(ConstInfo &constInfo);
@@ -245,14 +247,15 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
     padParams.leftPadding = 0;
     padParams.rightPadding = combineDimAlign - combineDim;
     padParams.paddingValue = 0;
-    DataCopyPad(kvInUb[startRow * 576], keyGm[keyOffset * 512], intriParams,
-                padParams); // 512: Key特征维度; 576: 局部Buffer行跨度
-
-    intriParams.blockLen = constInfo.sparseBlockSize * constInfo.dSizeRope * sizeof(KV_T);
-    intriParams.dstStride = 512 / BUFFER_SIZE_BYTE_32B; // 512: 模型特征维度(dSize)
-    DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * 64], intriParams,
-                padParams); // 576: 局部Buffer行跨度（Leading Dimension）; 512: Key特征维度（dSize）;
-                            // 64：RoPE索引数据每Token/块的行跨度（Stride）
+    DataCopyPad(kvInUb[startRow * dVTemplateTypeInput], keyGm[keyOffset * 512], intriParams,
+                padParams); // 512: Key特征维度; dVTemplateTypeInput: 局部Buffer行跨度
+    if constexpr (HAS_ROPE) {
+        intriParams.blockLen = constInfo.sparseBlockSize * 64 * sizeof(KV_T);
+        intriParams.dstStride = 512 / BUFFER_SIZE_BYTE_32B; // 512: 模型特征维度(dSize)
+        DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * 64], intriParams,
+                    padParams); // 576: 局部Buffer行跨度（Leading Dimension）; 512: Key特征维度（dSize）;
+                                // 64：RoPE索引数据每Token/块的行跨度（Stride）
+    }
 }
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline uint32_t SFAVectorService<TEMPLATE_ARGS>::CopyInKvSparse(
@@ -266,8 +269,11 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline uint32_t SFAVectorService<TEMPLATE_AR
     }
     int64_t blkTableSrcStride =
         ((keyOffset0 > keyOffset1 ? (keyOffset0 - keyOffset1) : (keyOffset1 - keyOffset0)) - constInfo.sparseBlockSize);
-    int64_t keySrcStride = blkTableSrcStride * constInfo.dSizeNope * sizeof(KV_T);
-    int64_t keyRopeSrcStride = blkTableSrcStride * constInfo.dSizeRope * sizeof(KV_T);
+    int64_t keySrcStride = blkTableSrcStride * 512 * sizeof(KV_T);
+    int64_t keyRopeSrcStride = 0;
+    if constexpr (HAS_ROPE) {
+        keyRopeSrcStride = blkTableSrcStride * 64 * sizeof(KV_T);
+    }
     if (unlikely(keyOffset1 < 0)) {
         CopyInSingleKv(kvInUb, startRow, keyOffset0, constInfo);
     } else if (keySrcStride >= INT32_MAX || keySrcStride < 0 || constInfo.sparseBlockSize > 1) {
@@ -277,24 +283,29 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline uint32_t SFAVectorService<TEMPLATE_AR
     } else {
         DataCopyExtParams intriParams;
         intriParams.blockCount = (keyOffset0 >= 0) + (keyOffset1 >= 0);
-        intriParams.blockLen = constInfo.sparseBlockSize * constInfo.dSizeNope * sizeof(KV_T);
-        intriParams.dstStride = constInfo.dSizeRope * sizeof(KV_T) / BUFFER_SIZE_BYTE_32B;
-        intriParams.srcStride = keySrcStride;
+        intriParams.blockLen = constInfo.sparseBlockSize * 512 * sizeof(KV_T);
         DataCopyPadExtParams<KV_T> padParams;
 
         int64_t keyOffset = keyOffset0 > -1 ? keyOffset0 : keyOffset1;
         if (keyOffset1 > -1 && keyOffset1 < keyOffset0) {
             keyOffset = keyOffset1;
         }
-        DataCopyPad(kvInUb[startRow * 576], keyGm[keyOffset * constInfo.dSizeNope], // 576: 局部Buffer行跨度
-                    intriParams, padParams);                                        // combineDimAlign
+        if constexpr (HAS_ROPE) {
+            intriParams.dstStride = 64 * sizeof(KV_T) / BUFFER_SIZE_BYTE_32B;
+            intriParams.srcStride = keySrcStride;
+            DataCopyPad(kvInUb[startRow * 576], keyGm[keyOffset * 512], // 576: 局部Buffer行跨度
+                        intriParams, padParams);                        // combineDimAlign
 
-        intriParams.blockLen = constInfo.sparseBlockSize * constInfo.dSizeRope * sizeof(KV_T);
-        intriParams.dstStride = constInfo.dSizeNope * sizeof(KV_T) / BUFFER_SIZE_BYTE_32B;
-        intriParams.srcStride = keyRopeSrcStride;
-        // 512: Key特征维度; 576: 局部Buffer行跨度
-        DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * constInfo.dSizeRope], intriParams,
-                    padParams); // combineDimAlign
+            intriParams.blockLen = constInfo.sparseBlockSize * 64 * sizeof(KV_T);
+            intriParams.dstStride = 512 * sizeof(KV_T) / BUFFER_SIZE_BYTE_32B;
+            intriParams.srcStride = keyRopeSrcStride;
+            DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * 64], intriParams,
+                        padParams); // combineDimAlign
+        } else {
+            intriParams.dstStride = 0;
+            intriParams.srcStride = keySrcStride;
+            DataCopyPad(kvInUb[startRow * 512], keyGm[keyOffset * 512], intriParams, padParams);
+        }
     }
     return (keyOffset0 > -1) + (keyOffset1 > -1);
 }
@@ -342,7 +353,8 @@ __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>::CopyOutKvUb2Gm(
     int64_t s2StartIdx, const RunInfo &runInfo, ConstInfo &constInfo)
 {
     GlobalTensor<Q_T> v0ResGmTensor = v0ResGm.template GetTensor<Q_T>();
-    DataCopy(v0ResGmTensor[s2StartIdx * 576], kvOutUb, dealRow * 576); // 576: KV Cache 每 Token 的特征宽度
+    DataCopy(v0ResGmTensor[s2StartIdx * dVTemplateTypeInput], kvOutUb,
+             dealRow * dVTemplateTypeInput); // dVTemplateTypeInput: KV Cache 每 Token 的特征宽度
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -689,7 +701,9 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
         ;
     }
     sparseIndicesGm.SetGlobalBuffer((__gm__ int32_t *)sparseIndices);
-    keyRopeGm.SetGlobalBuffer((__gm__ KV_T *)(keyRope));
+    if constexpr (HAS_ROPE) {
+        keyRopeGm.SetGlobalBuffer((__gm__ KV_T *)(keyRope));
+    }
     if (sinks != nullptr) {
         sinksGm.SetGlobalBuffer((__gm__ T *)sinks);
         this->isSinks = true;
@@ -765,9 +779,9 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
     lseUb = this->lseBuf.template Get<float>();
 
     tPipe->InitBuffer(stage0OutBuf[0],
-                      576 * 16 * sizeof(KV_T)); // 576: 模型特征维度(dSize); 16 : 注意力头数 (num_heads)
+                      dVTemplateTypeInput * 16 * sizeof(KV_T)); // dVTemplateTypeInput: 模型特征维度; 16 : 注意力头数
     tPipe->InitBuffer(stage0OutBuf[1],
-                      576 * 16 * sizeof(KV_T)); // 576: 模型特征维度(dSize); 16 : 注意力头数 (num_heads)
+                      dVTemplateTypeInput * 16 * sizeof(KV_T)); // dVTemplateTypeInput: 模型特征维度; 16 : 注意力头数
 
     tPipe->InitBuffer(stage1OutQue[0], 1, vec1Srcstride * s2BaseSize * sizeof(Q_T));
     tPipe->InitBuffer(stage1OutQue[1], 1, vec1Srcstride * s2BaseSize * sizeof(Q_T));
@@ -796,8 +810,9 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
 }
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>::InitCubeVecSharedParams(
-    CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx)
+    CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx, int64_t dSizeRope)
 {
+    (void)dSizeRope;
     auto &sparseAttnSharedkvBaseParams = this->tilingData->baseParams;
     sharedParams.bSize = sparseAttnSharedkvBaseParams.batchSize;
     sharedParams.n2Size = 1;
@@ -807,7 +822,11 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
     sharedParams.sparseBlockCount = sparseAttnSharedkvBaseParams.sparseBlockCount;
     sharedParams.maskMode = sparseAttnSharedkvBaseParams.sparseMode;
     sharedParams.layoutType = sparseAttnSharedkvBaseParams.outputLayout;
-    sharedParams.dSizeRope = 64; // 64: 编码维度
+    if constexpr (HAS_ROPE) {
+        sharedParams.dSizeRope = 64; // 64: 编码维度
+    } else {
+        sharedParams.dSizeRope = 0;
+    }
     sharedParams.softmaxScale = sparseAttnSharedkvBaseParams.scaleValue;
     sharedParams.dSize = 512;       // 512: 模型特征维度(dSize)
     sharedParams.dSizeVInput = 512; // 512: 模型特征维度(dSize)
@@ -892,7 +911,8 @@ public:
     {}
     __aicore__ inline void InitVecBlock(TPipe *pipe, const SparseFlashAttentionTilingDataMla *__restrict tiling,
                                         CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx,
-                                        __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths) {};
+                                        __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
+                                        int64_t dSizeRope) {};
     __aicore__ inline void InitLocalBuffer(TPipe *pipe, ConstInfo &constInfo) {}
     __aicore__ inline void ProcessVec1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
                                        Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,

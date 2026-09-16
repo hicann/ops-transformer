@@ -225,7 +225,12 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>queryRope（aclTensor）</td>
       <td>输入</td>
       <td>表示MLA结构中的query的rope信息。</td>
-      <td>不支持空tensor。</td>
+      <td>
+          <ul>
+                <li>可选项。须与keyRope成对为空指针（不使用rope），或成对传入非空tensor（使用rope，Dr为64）。</li>
+                <li>不支持空tensor。</li>
+          </ul>
+      </td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>
@@ -240,7 +245,12 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>keyRope（aclTensor）</td>
       <td>输入</td>
       <td>表示MLA结构中的key的rope信息。</td>
-      <td>不支持空tensor。</td>
+      <td>
+          <ul>
+                <li>可选项。须与queryRope成对为空指针（不使用rope），或成对传入非空tensor（使用rope，Dr为64）。</li>
+                <li>不支持空tensor。</li>
+          </ul>
+      </td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>
@@ -514,7 +524,8 @@ aclnnStatus aclnnSparseFlashAttention(
 - 该接口支持推理场景下使用。
 - N2仅支持1。
 - blockSize为一个block的token数，blockSize取值为16的倍数，且最大支持1024。
-- 参数query中的D和key、value的D值相等为512，参数queryRope中的Dr和keyRope的Dr值相等为64。
+- 参数query中的D和key、value的D值相等为512。
+- queryRope与keyRope须成对为空指针或成对传入非空tensor：均为空指针时表示不使用rope，仅对512维nope部分做注意力计算；均传入非空tensor时Dr相等为64。不支持空tensor。
 - 参数query、key、value的数据类型必须保持一致。
 - <term>Ascend 950PR/Ascend 950DT</term>：
   - N1支持1~128。
