@@ -89,6 +89,7 @@ public:
 
 private:
     __aicore__ inline void SendChannelFlag(uint32_t dstRank, uint32_t channelIndex);
+    __aicore__ inline void EnsureHcommInitialized();
     __aicore__ inline void BeginPreparedWrites(uint32_t dstRank, uint32_t channelIndex);
     __aicore__ inline void InitFlagSource();
     template <auto const &config>
@@ -108,7 +109,7 @@ private:
 
     __aicore__ inline uint64_t GetCommHandle(uint32_t rankId, uint32_t channelIndex)
     {
-        return hcommHandle_[rankId * channelsPerRank_ + channelIndex];
+        return mc2Context_->hcommHandle[rankId * channelsPerRank_ + channelIndex];
     }
     __aicore__ inline GM_ADDR GetUrmaWinAddrByRankId(uint32_t rankId, uint64_t offset)
     {
@@ -163,13 +164,13 @@ private:
     using HcommBatchHandle = AscendC::BatchHandle<AscendC::ChannelHandle>;
 
     GM_ADDR winRankAddr_[Mc2Aclnn::HCCL_MAX_RANK_SIZE];
-    uint64_t hcommHandle_[Mc2Aclnn::HCCL_MAX_RANK_SIZE];
     GM_ADDR flagSourceWinAddr_{nullptr};
     uint32_t aivId_{0};
     HcommBatchHandle activeBatchHandle_{};
     uint64_t activeBatchChannel_{0};
     uint32_t preparedWriteCount_{0};
     uint32_t sqWriteCount_{0};
+    bool hcommInitialized_{false};
     bool activeBatchInitialized_{false};
 };
 
@@ -195,12 +196,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
     aivNum_ = tilingData_->aivNum;
     recvCapacity_ = tilingData_->recvCapacity;
     tpipe_->InitBuffer(hcommBuf_, HCOMM_INIT_SIZE);
-    hcommTensor_ = hcommBuf_.Get<uint8_t>();
-    hcomm_.Init(hcommTensor_, HCOMM_INIT_SIZE);
     tpipe_->InitBuffer(hcommBatchBuf_, HCOMM_BATCH_BUFFER_BYTES);
-    hcommBatchTensor_ = hcommBatchBuf_.Get<uint8_t>();
-    Duplicate<uint8_t>(hcommBatchTensor_, 0U, HCOMM_BATCH_BUFFER_BYTES);
-    SyncFunc<AscendC::HardEvent::V_S>();
 
     mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext *>(context);
     rankId_ = mc2Context_->epRankId;
@@ -217,10 +213,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
 
     for (uint32_t i = 0; i < epWorldSize_; ++i) {
         winRankAddr_[i] = (GM_ADDR)mc2Context_->epHcclBuffer[i];
-    }
-    uint32_t handleCount = epWorldSize_ * channelsPerRank_;
-    for (uint32_t i = 0; i < handleCount; ++i) {
-        hcommHandle_[i] = mc2Context_->hcommHandle[i];
     }
 
     combineStateWinOffset_ = tilingData->combineStateWinOffset;
@@ -260,6 +252,20 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
 }
 
 template <TemplateMoeEpCombineTypeClass>
+__aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::EnsureHcommInitialized()
+{
+    if (hcommInitialized_) {
+        return;
+    }
+    hcommTensor_ = hcommBuf_.Get<uint8_t>();
+    hcomm_.Init(hcommTensor_, HCOMM_INIT_SIZE);
+    hcommBatchTensor_ = hcommBatchBuf_.Get<uint8_t>();
+    Duplicate<uint8_t>(hcommBatchTensor_, 0U, HCOMM_BATCH_BUFFER_BYTES);
+    SyncFunc<AscendC::HardEvent::V_S>();
+    hcommInitialized_ = true;
+}
+
+template <TemplateMoeEpCombineTypeClass>
 __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::FlushPreparedWrites(bool keepHandle)
 {
     if (preparedWriteCount_ != 0) {
@@ -277,6 +283,7 @@ template <TemplateMoeEpCombineTypeClass>
 __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::BeginPreparedWrites(uint32_t dstRank,
                                                                                        uint32_t channelIndex)
 {
+    EnsureHcommInitialized();
     uint64_t commHandle = GetCommHandle(dstRank, channelIndex);
     if (activeBatchInitialized_ && activeBatchChannel_ == commHandle) {
         return;
