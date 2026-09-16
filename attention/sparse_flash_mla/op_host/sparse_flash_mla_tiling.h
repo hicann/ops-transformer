@@ -384,7 +384,7 @@ public:
     ge::graphStatus GetQueryAndOutLayout();
     ge::graphStatus GetKvLayout();
     ge::graphStatus GetSMLATemplateMode();
-    void SetSMLAShape();
+    ge::graphStatus SetSMLAShape();
     ge::graphStatus GetN1Size();
     ge::graphStatus GetN2Size();
     ge::graphStatus GetGSize();
