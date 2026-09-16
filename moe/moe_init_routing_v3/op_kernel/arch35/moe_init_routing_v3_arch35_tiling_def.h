@@ -106,6 +106,12 @@ struct MoeV3Arch35CountingSortTilingData {
     int64_t coutSortAggrEnable{0};      // 聚合搬出开关：0=逐行(现状), 1=按专家k行切批
     int64_t coutSortAggrOutRows{0};     // 搬出聚合 UB 容纳行数 k
     int64_t coutSortAggrOutBufBytes{0}; // 搬出聚合区字节数 = k * colsAligned * sizeof(T)
+    // CutOrigin UB 布局，host 计算后下发，kernel 不再自行推导
+    int64_t coutSortPersistentSize{0};     // 常驻区字节数（expertCountLocal）
+    int64_t coutSortExpertCountAlign{0};   // expertCount 每段对齐字节数
+    int64_t coutSortBatchBufSize{0};       // batchBuf 字节数
+    int64_t coutSortPairsBatchElements{0}; // 离散搬出 pair 批元素数
+    int64_t coutSortTotalBufSize{0};       // InitBuffer 申请的总字节数
 };
 
 // Arch35用的TilingData
