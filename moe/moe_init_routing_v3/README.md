@@ -245,7 +245,7 @@
   - quantMode在DropPad模式下仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8。
   - expandedXOut必须是3D Tensor，shape为[expertNum, expertCapacity, H]。
 
-- 其他限制：该算子部分产品支持两种性能模板，进入两种性能模板需要分别额外满足以下条件，不满足条件则进入通用模板。
+- 其他限制：该算子部分产品支持多种性能模板，进入各性能模板需要分别额外满足以下条件，不满足条件则进入通用模板。
   - 支持性能模板的产品：
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品。</term>
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品。</term>
@@ -263,3 +263,23 @@
     - quantMode=-1
     - rowIdxType=1
     - expertTokensNumType=1
+
+  - 支持计数排序性能模板的产品：
+    - <term>Ascend 950PR/Ascend 950DT</term>。
+
+  - 进入计数排序FullLoad性能模板需要同时满足以下条件：
+    - x数据类型为BFLOAT16、FLOAT16、FLOAT32、INT8
+    - expertNum<=1024
+    - expertEnd-expertStart<=32
+    - quantMode=-1
+    - dropPadMode=0
+    - UB空间满足该模板各缓冲区叠加后的全载需求
+
+  - 进入计数排序CutOrigin性能模板需要同时满足以下条件（不满足FullLoad条件时才尝试该模板）：
+    - expertNum<=1024
+    - expertEnd-expertStart<=128
+    - quantMode为-1或0
+    - NUM_ROWS * H * x.dtype >= 1.5 * totalUbSize
+    - NUM_ROWS * K >= 8192
+    - dropPadMode=1（DropPad场景）时还需NUM_ROWS>=512
+    - UB空间满足该模板各缓冲区叠加后的需求
