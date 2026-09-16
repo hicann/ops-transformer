@@ -23,6 +23,9 @@ const int64_t DIM_THREE = 3;
 const int64_t MAX_DIM_SIZE = 8;
 const int64_t VALUE_0 = 0;
 const int64_t VALUE_1 = 1;
+const int64_t VALUE_2 = 2;
+const int64_t CMP_RATIO_MIN = 2;
+const int64_t CMP_RATIO_MAX = 128;
 
 inline TensorWrapper make_wrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
 {
@@ -95,7 +98,8 @@ at::Tensor QuantCompressor(const at::Tensor &x, const at::Tensor &wkv, const at:
     auto xDim = x.dim();
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
-    TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
+    TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
+                cmpRatio);
     TORCH_CHECK(coff > VALUE_0, "coff should be greater than 0");
 
     at::Tensor cmpKv = ConstructQuantCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);
@@ -137,7 +141,8 @@ at::Tensor QuantCompressorMeta(const at::Tensor &x, const at::Tensor &wkv, const
     auto xDim = x.dim();
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
-    TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
+    TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
+                cmpRatio);
     TORCH_CHECK(coff > VALUE_0, "coff should be greater than 0");
 
     return ConstructQuantCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);

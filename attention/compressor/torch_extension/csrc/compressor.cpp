@@ -24,6 +24,8 @@ const int64_t MAX_DIM_SIZE = 8;
 const int64_t VALUE_0 = 0;
 const int64_t VALUE_1 = 1;
 const int64_t VALUE_2 = 2;
+const int64_t CMP_RATIO_MIN = 2;
+const int64_t CMP_RATIO_MAX = 128;
 
 std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
 {
@@ -96,7 +98,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> Compressor(
     auto xDim = x.dim();
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
-    TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
+    TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
+                cmpRatio);
     auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, ape, cuSeqlens, cmpRatio, coff);
     auto stateCacheDim = stateCache.dim();
     TORCH_CHECK(stateCacheDim == DIM_THREE, "state_cache dim num[", stateCacheDim, "] should be 3");
@@ -128,7 +131,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> CompressorBackward(
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
-    TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
+    TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
+                cmpRatio);
 
     dxSize = x.sizes().vec();
     dx = at::empty(dxSize, x.options().dtype(x.dtype()));
@@ -155,7 +159,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> CompressorMeta(
     auto xDim = x.dim();
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
-    TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
+    TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
+                cmpRatio);
 
     auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, ape, cuSeqlens, cmpRatio, coff);
     return std::tuple<at::Tensor, at::Tensor, at::Tensor>(cmpKv, softmaxScore, kv);

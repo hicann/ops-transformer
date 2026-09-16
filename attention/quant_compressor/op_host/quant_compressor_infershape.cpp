@@ -65,6 +65,68 @@ struct QuantCompressorProtoShapeParam {
     int64_t D{0};
 };
 
+static ge::graphStatus GetQuantCompressorAttrs(const gert::InferShapeContext *context, int64_t &cmpRatio, int64_t &coff)
+{
+    auto attr = context->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context, attr);
+    const int64_t *cmpRatioPtr = attr->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_INDEX);
+    OP_CHECK_IF((cmpRatioPtr == nullptr),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "cmp_ratio", "attr is required"),
+                return ge::GRAPH_FAILED);
+    cmpRatio = *cmpRatioPtr;
+    OP_CHECK_IF((cmpRatio < CMP_RATIO_MIN || cmpRatio > CMP_RATIO_MAX),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "cmp_ratio", std::to_string(cmpRatio),
+                                                      "cmp_ratio should be within [" + std::to_string(CMP_RATIO_MIN) +
+                                                          ", " + std::to_string(CMP_RATIO_MAX) + "]"),
+                return ge::GRAPH_FAILED);
+    const int64_t *coffPtr = attr->GetAttrPointer<int64_t>(COFF_ATTR_INDEX);
+    coff = (coffPtr != nullptr) ? *coffPtr : COFF_DEFAULT;
+    OP_CHECK_IF((coff != COFF_VALUE_1 && coff != COFF_VALUE_2),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "coff", std::to_string(coff),
+                                                      "coff should be 1 or 2"),
+                return ge::GRAPH_FAILED);
+    return GRAPH_SUCCESS;
+}
+
+static void GetQuantCompressorBshShape(const gert::Shape *xShape, int64_t cmpRatio,
+                                       QuantCompressorProtoShapeParam &shapeParam)
+{
+    shapeParam.isBsMerge = false;
+    shapeParam.B = xShape->GetDim(DIM_INDEX_0);
+    shapeParam.S = xShape->GetDim(DIM_INDEX_1);
+    shapeParam.Sr = (xShape->GetDim(DIM_INDEX_1) > DIM_NUM_0) ?
+                        ((xShape->GetDim(DIM_INDEX_1) - DIM_NUM_1) / cmpRatio + DIM_NUM_1) :
+                        DIM_NUM_0;
+    shapeParam.H = xShape->GetDim(DIM_INDEX_2);
+}
+
+static ge::graphStatus GetQuantCompressorThShape(const gert::InferShapeContext *context, const gert::Shape *xShape,
+                                                 int64_t cmpRatio, QuantCompressorProtoShapeParam &shapeParam)
+{
+    shapeParam.isBsMerge = true;
+    shapeParam.T = xShape->GetDim(DIM_INDEX_0);
+    shapeParam.H = xShape->GetDim(DIM_INDEX_1);
+    auto cuSeqlensShape = context->GetOptionalInputShape(CU_SEQ_LEN_INPUT_INDEX);
+    OP_CHECK_IF((cuSeqlensShape == nullptr),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "cu_seqlens",
+                                                         "is null but required for TH layout"),
+                return ge::GRAPH_FAILED);
+    int64_t cuSeqLenDim0 = cuSeqlensShape->GetDim(DIM_INDEX_0);
+    OP_CHECK_IF((cuSeqLenDim0 < DIM_NUM_1),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "cu_seqlens",
+                                                      std::to_string(cuSeqLenDim0), "dim0 must be positive"),
+                return ge::GRAPH_FAILED);
+    int64_t Bsize = cuSeqLenDim0 - DIM_NUM_1;
+    int64_t tDivR = shapeParam.T / cmpRatio;
+    // Bsize 已由上方校验保证非负，此处仅保护 tDivR + Bsize 不发生加法溢出
+    if (tDivR <= INT64_MAX - Bsize) {
+        shapeParam.Sr = std::min(shapeParam.T, tDivR + Bsize);
+    } else {
+        shapeParam.Sr = shapeParam.T;
+    }
+    return GRAPH_SUCCESS;
+}
+
 ge::graphStatus GetQuantCompressorShapeDim(const gert::InferShapeContext *context,
                                            QuantCompressorProtoShapeParam &shapeParam)
 {
@@ -78,55 +140,15 @@ ge::graphStatus GetQuantCompressorShapeDim(const gert::InferShapeContext *contex
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "x", std::to_string(xDim) + "D", "2D or 3D"),
                 return ge::GRAPH_FAILED);
 
-    auto attr = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attr);
-    const int64_t *cmpRatioPtr = attr->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_INDEX);
-    OP_CHECK_IF((cmpRatioPtr == nullptr),
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "cmp_ratio", "attr is required"),
-                return ge::GRAPH_FAILED);
-    int64_t cmpRatio = *cmpRatioPtr;
-    OP_CHECK_IF((cmpRatio < CMP_RATIO_MIN || cmpRatio > CMP_RATIO_MAX),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "cmp_ratio", std::to_string(cmpRatio),
-                                                      "cmp_ratio should be within [" + std::to_string(CMP_RATIO_MIN) +
-                                                          ", " + std::to_string(CMP_RATIO_MAX) + "]"),
-                return ge::GRAPH_FAILED);
-    const int64_t *coffPtr = attr->GetAttrPointer<int64_t>(COFF_ATTR_INDEX);
-    int64_t coff = (coffPtr != nullptr) ? *coffPtr : COFF_DEFAULT;
-    OP_CHECK_IF((coff != COFF_VALUE_1 && coff != COFF_VALUE_2),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "coff", std::to_string(coff),
-                                                      "coff should be 1 or 2"),
-                return ge::GRAPH_FAILED);
+    int64_t cmpRatio = 0;
+    int64_t coff = 0;
+    OP_CHECK_IF(GetQuantCompressorAttrs(context, cmpRatio, coff) != GRAPH_SUCCESS, , return ge::GRAPH_FAILED);
 
     if (xShape->GetDimNum() == DIM_NUM_3) {
-        shapeParam.isBsMerge = false;
-        shapeParam.B = xShape->GetDim(DIM_INDEX_0);
-        shapeParam.S = xShape->GetDim(DIM_INDEX_1);
-        shapeParam.Sr = (xShape->GetDim(DIM_INDEX_1) > DIM_NUM_0) ?
-                            ((xShape->GetDim(DIM_INDEX_1) - DIM_NUM_1) / cmpRatio + DIM_NUM_1) :
-                            DIM_NUM_0;
-        shapeParam.H = xShape->GetDim(DIM_INDEX_2);
+        GetQuantCompressorBshShape(xShape, cmpRatio, shapeParam);
     } else {
-        shapeParam.isBsMerge = true;
-        shapeParam.T = xShape->GetDim(DIM_INDEX_0);
-        shapeParam.H = xShape->GetDim(DIM_INDEX_1);
-        auto cuSeqlensShape = context->GetOptionalInputShape(CU_SEQ_LEN_INPUT_INDEX);
-        OP_CHECK_IF((cuSeqlensShape == nullptr),
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "cu_seqlens",
-                                                             "is null but required for TH layout"),
+        OP_CHECK_IF(GetQuantCompressorThShape(context, xShape, cmpRatio, shapeParam) != GRAPH_SUCCESS, ,
                     return ge::GRAPH_FAILED);
-        int64_t cuSeqLenDim0 = cuSeqlensShape->GetDim(DIM_INDEX_0);
-        OP_CHECK_IF((cuSeqLenDim0 < DIM_NUM_1),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "cu_seqlens",
-                                                          std::to_string(cuSeqLenDim0), "dim0 must be positive"),
-                    return ge::GRAPH_FAILED);
-        int64_t Bsize = cuSeqLenDim0 - DIM_NUM_1;
-        int64_t tDivR = shapeParam.T / cmpRatio;
-        // Bsize 已由上方校验保证非负，此处仅保护 tDivR + Bsize 不发生加法溢出
-        if (tDivR <= INT64_MAX - Bsize) {
-            shapeParam.Sr = std::min(shapeParam.T, tDivR + Bsize);
-        } else {
-            shapeParam.Sr = shapeParam.T;
-        }
     }
 
     shapeParam.D = wkvShape->GetDim(DIM_INDEX_0) / coff;

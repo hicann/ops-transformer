@@ -337,7 +337,6 @@ ge::graphStatus CompressorGradTilingImpl::SetBaseInfo()
     baseParams_.headDim = context_->wkv.shape->GetStorageShape().GetDim(COMPRESSOR_GRAD_DIM_INDEX_0) / coff_;
     baseParams_.featureDim = context_->wkv.shape->GetStorageShape().GetDim(COMPRESSOR_GRAD_DIM_INDEX_0);
     baseParams_.cmpRatio = static_cast<uint32_t>(*context_->cmpRatio);
-    baseParams_.nSize = 2; // 预留（当前未参与 tiling 决策）
     baseParams_.usedCoreNum = aicNum_;
     OP_LOGI(context_->opName, "[TILING] bSize:%u  tSize:%u cmpRatio:%u coff:%u", baseParams_.batchSize,
             baseParams_.tokenSize, baseParams_.cmpRatio, coff_);
@@ -374,16 +373,16 @@ ge::graphStatus CompressorGradTilingImpl::CalcWorkSpace()
     uint64_t dXCacheWorkSpaceSize = static_cast<uint64_t>(dbRatio) * cmpRatio * hiddenSize;
 
     workspaceSize_ = libapiSize_;
-    workspaceSize_ +=
-        (apeWorkSpaceSize + dXWorkSpaceSize + dWeightWorkSpaceSize * 2 + xWorkSpaceSize + dXCacheWorkSpaceSize) *
-        MM1_RES_ELEM_SIZE;
+    workspaceSize_ += (apeWorkSpaceSize + dXWorkSpaceSize + dWeightWorkSpaceSize * WEIGHT_NUM + xWorkSpaceSize +
+                       dXCacheWorkSpaceSize) *
+                      MM1_RES_ELEM_SIZE;
 
     if (context_->workSpaces) {
         context_->workSpaces[0] = workspaceSize_;
     }
 
     OP_LOGI(context_->opName, "Tiling info: workspaceSize = %zu (ape=%llu dx=%llu dw=%llu x=%llu dxcache=%llu)",
-            workspaceSize_, apeWorkSpaceSize, dXWorkSpaceSize, dWeightWorkSpaceSize * 2, xWorkSpaceSize,
+            workspaceSize_, apeWorkSpaceSize, dXWorkSpaceSize, dWeightWorkSpaceSize * WEIGHT_NUM, xWorkSpaceSize,
             dXCacheWorkSpaceSize);
     return ge::GRAPH_SUCCESS;
 }
@@ -899,7 +898,7 @@ ge::graphStatus CompressorGradTilingImpl::SetTilingData()
     tilingData->head_dim = baseParams_.headDim;
     // ── 核数（与 launch block_dim 一致；vec 每核 2 子核）──
     tilingData->cube_core_num = aicNum_;
-    tilingData->core_num = aicNum_ * 2;
+    tilingData->core_num = aivNum_;
     // ── shape 派生 ──
     tilingData->total_head_dim = coff * baseParams_.headDim;
     tilingData->cmp_row_cnt = coff * baseParams_.cmpRatio;
@@ -1004,7 +1003,7 @@ static ge::graphStatus TilingCompressorGrad(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingParseForCompressorGrad(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForCompressorGrad(gert::TilingParseContext *const context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
