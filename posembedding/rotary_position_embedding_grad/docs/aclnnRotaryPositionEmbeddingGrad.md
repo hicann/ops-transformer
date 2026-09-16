@@ -406,6 +406,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingGrad(
 
 ## 约束说明
 
+- 本接口不支持非连续输出。
 - 确定性计算：
   - aclnnRotaryPositionEmbeddingGrad默认确定性实现。
 

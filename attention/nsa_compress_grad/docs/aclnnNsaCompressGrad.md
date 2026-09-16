@@ -300,6 +300,7 @@ aclnnStatus aclnnNsaCompressGrad(
 
 - 确定性计算：
   - aclnnNsaCompressGrad默认确定性实现。
+- 本接口不支持非连续输出。
 - compressBlockSize和compressStride必须是16的整数倍，且compressBlockSize > compressStride
 
 ## 调用示例

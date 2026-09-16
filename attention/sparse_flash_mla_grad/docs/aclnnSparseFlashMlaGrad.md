@@ -708,6 +708,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
     <!-- end id9 -->
 
 - 公共约束
+    - 本接口不支持非连续输出。
     - 入参为空的场景处理：
         - query为空Tensor：直接返回。
 
