@@ -567,15 +567,24 @@ static ge::graphStatus CheckInputTensor(const gert::TilingContext *context, cons
                     OP_LOGE(nodeName, "Check scales input failed."), return ge::GRAPH_FAILED);
 
     uint32_t xDtypeSize = isXFp8 ? FP8_DTYPE_SIZE : MAX_OUT_DTYPE_SIZE;
-    uint32_t hAlign32 = ((info.cfg.hidden * xDtypeSize + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
+    uint32_t tokenSize = info.cfg.hidden * xDtypeSize;
     uint32_t kAlign32 = ((info.cfg.topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
     uint32_t scalesSizeAlign32 = isXFp8 ? ((info.scalesBytes + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN : 0;
-    info.perSlotBytes =
-        ((hAlign32 + scalesSizeAlign32 + kAlign32 * TOPK_AND_TOPK_WEIGHT_NUMBER + UB_ALIGN + WIN_ADDR_ALIGN - 1) /
-         WIN_ADDR_ALIGN) *
-        WIN_ADDR_ALIGN;
+    // stash 的元数据 slot：scales + topk + topkWeights + pad（不含 x）
+    uint32_t metaSize = scalesSizeAlign32 + kAlign32 * TOPK_AND_TOPK_WEIGHT_NUMBER + UB_ALIGN;
+    if (info.networkMode == NETWORK_HYBRID) {
+        // hybrid 槽布局保持原样: [x: ALIGN32(tokenSize)][scales][meta]，整槽 512 对齐（hybrid kernel 整槽搬运）
+        uint32_t hAlign32 = ((tokenSize + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
+        info.metaSlotBytes = metaSize;
+        info.perSlotBytes = ((hAlign32 + metaSize + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN) * WIN_ADDR_ALIGN;
+    } else {
+        // direct 紧凑槽布局: [x: tokenSize][meta: metaSlotBytes]，multi-sge 连续打包
+        info.metaSlotBytes = (metaSize + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN * WIN_ADDR_ALIGN;
+        info.perSlotBytes = tokenSize + info.metaSlotBytes;
+    }
     info.isTopkWeights = (context->GetOptionalInputShape(TOPK_WEIGHTS_INDEX) != nullptr) ? 1 : 0;
-    OP_LOGD(nodeName, "perSlotBytes = %u (hidden=%u)", info.perSlotBytes, info.cfg.hidden);
+    OP_LOGD(nodeName, "metaSlotBytes = %u, perSlotBytes = %u(hidden=%u, networkMode=%u)", info.metaSlotBytes,
+            info.perSlotBytes, info.cfg.hidden, info.networkMode);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -734,16 +743,31 @@ static uint64_t BuildDispatchWorkspaceLayout(MoeEpDispatchInfo &info)
     uint64_t moeExpertNumPerRank = static_cast<uint64_t>(info.cfg.numLocalExperts);
     uint64_t aivNum = static_cast<uint64_t>(info.aivNum);
     uint64_t superNodeCount = static_cast<uint64_t>(info.hybrid.serverNum);
+    uint64_t numTokens = static_cast<uint64_t>(info.cfg.numTokens);
 
-    // counter 区: 两边都按每核一份, 多核并行写
-    uint64_t counterBytes = aivNum * AlignUpWin(epWorldSize * sizeof(int32_t));
+    // counter 区: [aivNum][epAlignWin] 布局，每核写自己的行
+    uint64_t epAlignWinBytes = AlignUpWin(epWorldSize * sizeof(int32_t));
+    uint64_t counterBytes = aivNum * epAlignWinBytes;
+
+    // sendCntPerRank 区  HYBRID [ep][512B]， DIRECT [epAlignWin]
+    uint64_t sendCntPerRankBytes =
+        (info.networkMode == NETWORK_HYBRID) ? epWorldSize * WIN_ADDR_ALIGN : epAlignWinBytes;
+
     // sendCntPerExpert 区: 两边一致
     uint64_t sendCntPerExpertBytes = AlignUpWin(moeExpertNumPerRank * epWorldSize * sizeof(int32_t));
 
-    // sendCntPerRank 按 512B/rank 对齐，前 8B 保存 state 和 dstRankRecvNum。
-    uint64_t sendCntPerRankBytes = epWorldSize * WIN_ADDR_ALIGN;
+    // dstRank 区 [BS][K]
+    uint64_t dstRankInfoBytes = AlignUpWin(numTokens * info.cfg.topK * sizeof(int16_t));
+
+    // tokenHit 发送列表区 [ep][bsAlign]：统一存 tokenId(int32)，
+    uint64_t srcTokenListBytes = AlignUpWin(numTokens * sizeof(int32_t));
+    uint64_t srcTokenTableBytes = epWorldSize * srcTokenListBytes;
 
     uint64_t sendCntBytes = counterBytes + sendCntPerRankBytes + sendCntPerExpertBytes;
+    info.workspace.dstRankInfoOffset = sendCntBytes;
+    info.workspace.srcTokenTableOffset = sendCntBytes + dstRankInfoBytes;
+    info.workspace.srcTokenListBytes = srcTokenListBytes;
+
     // scaleout counter 与 scaleup counter 一样按每 AIV 一份，SendPhase 用它做 slot prefix。
     uint64_t scaleoutCounterBytes =
         (info.networkMode == NETWORK_HYBRID) ? aivNum * AlignUpWin(superNodeCount * sizeof(int32_t)) : 0UL;
@@ -764,7 +788,7 @@ static uint64_t BuildDispatchWorkspaceLayout(MoeEpDispatchInfo &info)
     info.workspace.routeWorkspaceOffset = 0UL;
     info.workspace.scaleoutSendEntryOffset = 0UL;
     info.workspace.scaleupSendEntryOffset = 0UL;
-    return SYSTEM_NEED_WORKSPACE + sendCntBytes + globalABytes;
+    return SYSTEM_NEED_WORKSPACE + sendCntBytes + dstRankInfoBytes + srcTokenTableBytes + globalABytes;
 }
 
 static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *context, MoeEpDispatchInfo &info,
@@ -775,6 +799,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
     OP_TILING_CHECK(cclBufferSizePtr == nullptr, OP_LOGE(nodeName, "cclBufferSizePtr is null."),
                     return ge::GRAPH_FAILED);
     const uint64_t maxWindowSize = static_cast<uint64_t>(*cclBufferSizePtr);
+    uint32_t aivNum = info.aivNum;
     const MoeEpWindowLayoutParams params = {
         info.cfg.epWorldSize, info.cfg.numLocalExperts, info.cfg.numMaxTokensPerRank, info.cfg.topK,
         info.cfg.hidden,      info.networkMode,         info.hybrid.rankNumPerServer, info.hybrid.serverNum};
@@ -783,12 +808,22 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
                     OP_LOGE(nodeName, "Calculate Moe EP window layout failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMoeEpWindowCapacity(layout.requiredBytes, maxWindowSize, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Check Moe EP window capacity failed."), return ge::GRAPH_FAILED);
+    //  kernel 按 perSlotBytes 步长写接收区、按 align512(metaSlotBytes) 步长写 stash 区, 均不得超过窗口预留, 避免踩踏
+    OP_TILING_CHECK(static_cast<uint64_t>(info.perSlotBytes) > layout.dispatchReservedPerSlotBytes,
+                    OP_LOGE(nodeName, "perSlotBytes %u exceeds window reserved slot bytes %lu.", info.perSlotBytes,
+                            layout.dispatchReservedPerSlotBytes),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(AlignUpWin(info.metaSlotBytes) > layout.dispatchMetaPerSlotBytes,
+                    OP_LOGE(nodeName, "metaSlotBytes %u exceeds window stash reserved bytes %lu.", info.metaSlotBytes,
+                            layout.dispatchMetaPerSlotBytes),
+                    return ge::GRAPH_FAILED);
 
-    info.dumpMetadata = BuildMoeEpDumpMetadata(params, layout, info.aivNum);
+    info.dumpMetadata = BuildMoeEpDumpMetadata(params, layout, aivNum);
     info.totalWinSizeEp = maxWindowSize;
     info.dispatchNotifyCount = layout.dispatchNotifyCount;
     info.window.cntWinStateOffset = layout.cntWinStateOffset;
     info.window.slotWinStateOffset = layout.slotWinStateOffset;
+    info.window.payloadWinStateOffset = layout.payloadWinStateOffset;
     info.window.winDataOffset = layout.winDataOffset;
     info.window.scaleoutRecvDataOffset = layout.scaleoutRecvDataOffset;
     info.window.scaleoutRecvStatusOffset = layout.scaleoutRecvStatusOffset;

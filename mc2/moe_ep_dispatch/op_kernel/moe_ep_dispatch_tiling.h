@@ -45,6 +45,7 @@ struct MoeEpDispatchWindowLayout {
     uint32_t scaleoutSlotAlignedBytes; // scaleout 数据和转发元信息 slot 字节数
     uint64_t cntWinStateOffset;
     uint64_t slotWinStateOffset;
+    uint64_t payloadWinStateOffset; // payload 发送状态位区偏移（slot 状态区之后）
     uint64_t winDataOffset;
     uint64_t scaleoutRecvDataOffset;
     uint64_t scaleoutRecvStatusOffset;
@@ -53,6 +54,9 @@ struct MoeEpDispatchWindowLayout {
 
 struct MoeEpDispatchWorkspaceLayout {
     uint64_t sendEntryTokenRangeBytes; // 单个 token 范围的发送记录字节数
+    uint64_t srcTokenListBytes;        // 发送到每个对端卡的 token索引表 字节数（512B 对齐，int32）
+    uint64_t dstRankInfoOffset;        // dstRank 区偏移（sendCnt 区之后），布局 [BS][K] int16
+    uint64_t srcTokenTableOffset;      // srcTokenTable 区偏移（dstRank 区之后），布局 [ep][nmtAlign] int32
     uint64_t routeWorkspaceOffset;
     uint64_t scaleoutSendEntryOffset;
     uint64_t scaleupSendEntryOffset;
@@ -69,6 +73,7 @@ struct MoeEpDispatchInfo {
     uint64_t totalUbSize;
     uint32_t scalesBytes;
     uint32_t perSlotBytes;
+    uint32_t metaSlotBytes; // stash 元数据 slot 字节数（scales+topk+weights+pad，无 hidden）
     uint32_t doCpuSync;
     uint32_t isCached;
     uint32_t isTopkWeights;
