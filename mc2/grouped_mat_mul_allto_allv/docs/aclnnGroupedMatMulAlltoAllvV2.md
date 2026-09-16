@@ -398,7 +398,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - A和BSK均需在[1, 5000000]范围内；N1不超过32768。
   - `sendCounts`和`recvCounts`均为INT64直接计数数组，按`[rank][localExpert]`顺序展平，长度均须等于e * epWorldSize。元素为非负数，分别不超过A和BSK，累加和分别等于A和BSK。
-  - 通信域内各卡的`HCCL_BUFFSIZE`需按最大发送量设置，满足`HCCL_BUFFSIZE >= max(200, ceil(A * N1 * 2 / 1048576) + 21)`，单位为MiB。FLOAT16和BFLOAT16每个元素均占2字节，21 MiB为控制区预留空间。
+  - 通信域内各卡的`HCCL_BUFFSIZE`需按最大发送量设置，满足`HCCL_BUFFSIZE >= max(200, ceil(A * N1 * 2 / 1048576) + 21)`，单位为MiB。FLOAT16和BFLOAT16每个元素均占2 Byte，21 MiB为控制区预留空间。
 
 <!-- end id13 -->
 

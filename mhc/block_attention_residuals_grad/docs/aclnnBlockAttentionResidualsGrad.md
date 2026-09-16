@@ -94,6 +94,7 @@ aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
     uint64_t        *workspaceSize,
     aclOpExecutor   **executor);
 ```
+
 ```c++
 aclnnStatus aclnnBlockAttentionResidualsGrad(
     void          *workspace,

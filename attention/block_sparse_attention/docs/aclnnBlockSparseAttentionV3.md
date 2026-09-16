@@ -687,7 +687,6 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 
   - 仅Ascend 950PR/Ascend 950DT支持。
   - 输入的query、key、value采用FLOAT8_E4M3FN数据类型，需要提供以下量化缩放因子参数：
-  - 输入的query、key、value采用FLOAT8_E4M3FN数据类型，需要提供以下量化缩放因子参数：
     - qDequantScale（query量化缩放因子）
 
       - 数据类型：FLOAT32
