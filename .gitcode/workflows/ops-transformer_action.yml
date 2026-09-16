@@ -260,7 +260,6 @@ stages:
       JOB_ut:
         name: UT_ops-transformer
         uses: .gitcode/workflows/ut_action.yml
-        timeout-minutes: 90
         with:
           image_version: ${{ jobs.JOB_image.outputs.UT_Test }}
       A2_smoke:
