@@ -132,7 +132,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     deviceInfo.aicCoreMaxNum = aicCoreNum_;
     deviceInfo.aivCoreMaxNum = aivCoreNum_;
     deviceInfo.aicCoreMinNum = aicCoreNum_;
-    deviceInfo.aicCoreMinNum = 1;
+    deviceInfo.aivCoreMinNum = aivCoreNum_;
     baseInfo.querySeqSize = maxSeqlenQ_;
     baseInfo.kvSeqSize = maxSeqlenKv_;
     baseInfo.isCumulativeQuerySeq = layoutQ_ == "TND" || layoutQ_ == "NTD";
