@@ -20,6 +20,8 @@
 
 本阶段目的是**快速体验项目标准流程**，验证环境能否成功进行算子源码编译、打包、安装和运行。
 
+> 本指南以单算子编译过程为例，也支持编译整个算子库算子、离线编译等多种场景，编译过程中的常见问题均可参考[《源码构建指南》](zh/install/compile.md)。
+
 ### 1. 进入项目源码
 
 - CANNLab云开发环境：
@@ -98,8 +100,10 @@ export LD_LIBRARY_PATH=${ASCEND_HOME_PATH}/opp/vendors/custom_transformer/op_api
 以AddExample为例，其提供了简单算子样例`add_example/examples/test_aclnn_add_example.cpp`，运行该样例验证算子功能是否正常。
 
 ```bash
-bash build.sh --run_example add_example eager cust --vendor_name=custom
+bash build.sh --run_example add_example eager cust --vendor_name=custom --soc=${soc_version}
 ```
+
+> **注意**：运行样例时需确保`--soc`参数与编译算子包时使用的`--soc`取值一致，否则可能报`error 161001`（如`aclnnXxxGetWorkspaceSize failed`）。如遇此错误，请回到[第2节](#2-编译addexample算子)核对`--soc`取值后重新编译安装。
 
 - <算子名>:add_example
 - <运行模式>：eager
@@ -165,7 +169,7 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
 3. **重新验证**：
 
     ```bash
-    bash build.sh --run_example add_example eager cust --vendor_name=custom
+    bash build.sh --run_example add_example eager cust --vendor_name=custom --soc=${soc_version}
     ```
 
 4. **成功标志**：输出结果变成乘法结果。
@@ -222,7 +226,7 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
     调用AddExample算子的example样例，生成可执行文件（test_aclnn_add_example），该文件位于项目`ops-transformer/build`目录。
 
     ```bash
-    bash build.sh --run_example add_example eager cust --vendor_name=custom
+    bash build.sh --run_example add_example eager cust --vendor_name=custom --soc=${soc_version}
     ```
 
 - **采集性能数据**
@@ -275,7 +279,7 @@ int main() {
 2. 重新执行验证命令：
 
     ```bash
-    bash build.sh --run_example add_example eager cust --vendor_name=custom
+    bash build.sh --run_example add_example eager cust --vendor_name=custom --soc=${soc_version}
     ```
 
 3. 观察算子输出结果是否符合预期。
