@@ -241,8 +241,10 @@ aclnnStatus aclnnMoeInitRoutingV4(
         <li>HIF8直转和HIF8 PERTOKEN量化场景下（quantMode为6、8）不输入。</li>
         <li>HIF8 PERTENSOR量化场景下（quantMode为7）必须输入,输入要求为1D的Tensor，shape为[1, ]。</li>
         <li>MXFP4量化场景下（quantMode为9）不输入。</li>
+        <li>FP8 PerGroup量化场景下（quantMode为4、5、14、15）不输入。</li>
         <li>FP8 PerBlock量化场景下（quantMode为11、12）不输入。</li>
-        </ul></td>
+        <li>MXFP8 RoundScale+Amax量化场景下（quantMode为16、17）不输入。</li>
+      </ul></td>
       <td>FLOAT32、FLOAT8_E8M0</td>
       <td>ND</td>
       <td>1-3</td>
@@ -254,7 +256,7 @@ aclnnStatus aclnnMoeInitRoutingV4(
       <td>表示用于计算quant结果的偏移值</td>
       <td><ul>
         <li>在非量化场景下不输入;</li><li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]；</li>
-        <li>动态量化、MXFP8量化、HIF8量化、MXFP4量化场景下不输入。</li>
+        <li>动态量化（quantMode为1）、MXFP8量化（quantMode为2、3）、HIF8量化（quantMode为6、7、8）、MXFP4量化（quantMode为9）、FP8 PerGroup量化（quantMode为4、5、14、15）、FP8 PerBlock量化（quantMode为11、12）、INT4动态量化（quantMode为13）、MXFP8 RoundScale+Amax量化场景下（quantMode为16、17）不输入。</li>
       </ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -606,7 +608,7 @@ aclnnStatus aclnnMoeInitRoutingV4(
   - rowIdxType仅支持0（gather索引）。
   - activeExpertRangeOptional必须为[0, expertNum]。
 
-- quantMode为13的INT4动态量化场景，需同时满足：x数据类型为FLOAT32或BFLOAT16；H为偶数。
+- quantMode为9或13的MXFP4/INT4动态量化场景，以及quantMode为-1且x数据类型为FLOAT4_E2M1的非量化透传场景，H要求为偶数。quantMode为13的INT4动态量化场景还需满足：x数据类型为FLOAT32或BFLOAT16，dropPadMode为0，offsetOptional不输入。
 
 - 空tensor处理：
   - <term>Ascend 950PR/Ascend 950DT</term>：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。
