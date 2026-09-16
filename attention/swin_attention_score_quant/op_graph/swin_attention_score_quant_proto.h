@@ -19,35 +19,38 @@
 
 namespace ge {
 /**
-* @brief SwiGlu and DynamicQuant are integrated to implement quantization. Only MOE group quantization is supported.
+* @brief Quantized window attention score (W8A8): computes attention scores from int8
+*        query/key/value with dequant scales, softmax and requantized PV matmul.
+*        Currently used by Swin window attention.
 
 * @par Inputs:
-* @li x: A matrix tensor. Must be one of the following types: float32,float16,bfloat16, has format ND.
-* @li smooth_scales: A optional tensor. Describing the result of dynamic quantize scales.
-        A tensor of type float32, has format ND.
-* @li offsets: A optional tensor, describing the data of offsets, a tensor of type float32, has format ND.
-* @li group_index: A optional tensor, described grouping data, a tensor of type int32, has format ND.
+* @li query: A tensor of type int8, format ND. Shape [b, n, s, h].
+* @li key: A tensor of type int8, format ND.
+* @li value: A tensor of type int8, format ND.
+* @li scale_quant: A tensor of type float16, format ND. Quantization scale for the
+*        softmax output (P) before the PV matmul.
+* @li scale_dequant1: A tensor of type uint64, format ND. Dequant scale applied to the
+*        quantized key operand of the QK^T matmul, one per key position (s values).
+* @li scale_dequant2: A tensor of type uint64, format ND. Dequant scale applied to the
+*        quantized value operand of the PV matmul, one per channel of h.
+* @li bias_quant: An optional tensor of type float16, format ND. Quantization bias for P.
+* @li bias_dequant1: An optional tensor of type int32, format ND. Bias added to the
+*        QK^T matmul result, one per key position (s values).
+* @li bias_dequant2: An optional tensor of type int32, format ND. Bias added to the
+*        PV matmul result, one per channel of h.
+* @li padding_mask1: An optional tensor of type float16, format ND. Additive mask applied
+*        to the attention score before softmax, shape [n, s, s].
+* @li padding_mask2: An optional tensor of type float16, format ND. Currently reserved
+*        and not consumed by the operator.
 
 * @par Attributes:
-* @li activate_left: A optional bool.
-*     The SwiGlu activate_left algorithm to use:
-*     'false' (activate right) or 'true' (activate left), defalut is 'false' (activate right).
-* @li quant_mode: Optional parameter, which formula used for quantized computation.
-      Type is String, the value must be "dynamic" or "static" or "dynamic_msd", "static" indicates static quantization,
-      "dynamic" indicates dynamic quantization, and "dynamic_msd" indicates dynamic mean squared displacement quantization, defaults to dynamic.
-      Now only support "dynamic" and "static" mode.
-* @li group_list_type: Optional parameter, which used to describe group_index mode.
-      Type is Int, the value must be 0 or 1, 0 indicates "cumsum" mode, 1 indicates "count" mode.
-      Now only support "cumsum" and "count" mode.
-* @li dst_type: Optional parameter, which used to describe quant output mode.
-      Type is Int, the value must be 2(DT_INT8 enum value) or 29(DT_INT4 enum value), 2 indicates "int8 quant output" mode, 29 indicates "int4 quant output" mode.
-      Now only support "int8 quant output" and "int4 quant output" mode.
+* @li query_transpose: An optional bool. Whether query is transposed, default is false.
+* @li key_transpose: An optional bool. Whether key is transposed, default is false.
+* @li value_transpose: An optional bool. Whether value is transposed, default is false.
+* @li softmax_axes: An optional int. The axis of softmax, default is -1.
 
 * @par Outputs:
-* @li y: A tensor ,type is int8 or int4, the size of the last dimension of output y is half of the size of input x.
-       And the size of other dimensions is the same as that of input x, now only support DT_INT8.
-* @li scale: A tensor. Type is float32.
-      The shape of scale matches the shape of x across all dimensions except for the last dimension.
+* @li attention_score: A tensor of type float16, format ND. Shape [b, n, s, h].
 */
 REG_OP(SwinAttentionScoreQuant)
     .INPUT(query, TensorType({DT_INT8}))
@@ -67,7 +70,6 @@ REG_OP(SwinAttentionScoreQuant)
     .ATTR(value_transpose, Bool, false)
     .ATTR(softmax_axes, Int, -1)
     .OP_END_FACTORY_REG(SwinAttentionScoreQuant)
-}  // namespace ge
+} // namespace ge
 
-#endif  // OPS_QUANT_SWIN_ATTENTION_SCORE_QUANT_PROTO_H_
-
+#endif // OPS_QUANT_SWIN_ATTENTION_SCORE_QUANT_PROTO_H_
