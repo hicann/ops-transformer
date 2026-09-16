@@ -262,7 +262,7 @@
   - H为偶数，用于沿H维每两个INT4值打包为1个字节。
   - scaleOptional不输入，或输入shape为(1, H)、数据类型为FLOAT32；offsetOptional不输入。
 - DropPad模式特殊约束（dropPadMode=1时）：
-  - quantMode仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
+  - quantMode仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8。
   - rowIdxType仅支持0（gather索引）。
 
 ## 调用说明

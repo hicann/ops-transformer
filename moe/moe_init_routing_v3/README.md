@@ -242,7 +242,7 @@
   - rowIdxType仅支持取值为0（gather索引）。
   - activeExpertRangeOptional必须为[0, expertNum]。
   - expertTokensNumType仅支持取值为1（count模式）。
-  - quantMode在DropPad模式下仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
+  - quantMode在DropPad模式下仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8。
   - expandedXOut必须是3D Tensor，shape为[expertNum, expertCapacity, H]。
 
 - 其他限制：该算子部分产品支持两种性能模板，进入两种性能模板需要分别额外满足以下条件，不满足条件则进入通用模板。

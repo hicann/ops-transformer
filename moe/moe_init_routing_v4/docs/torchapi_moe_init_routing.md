@@ -155,6 +155,7 @@ cann_ops_transformer.moe_init_routing(
     quant_mode: int = -1,
     active_expert_range: Optional[List[int]] = None,
     row_idx_type: int = 0,
+    x_dtype: Optional[int] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 ```
 
@@ -162,7 +163,7 @@ cann_ops_transformer.moe_init_routing(
 
 |  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
 |---------|----------|----------|---------------|---------------|------------|
-|  x  |  Tensor |  必选  |  表示MoE的输入即token特征输入，对应公式中x。shape为(NUM_ROWS, H)。  |   float16、bfloat16、float32、int8   |  2  |
+|  x  |  Tensor |  必选  |  表示MoE的输入即token特征输入，对应公式中x。shape为(NUM_ROWS, H)。数据类型支持float16、bfloat16、float32、int8、hifloat8、float8_e5m2、float8_e4m3fn、float4_e2m1（PyTorch原生dtype无法表达的类型以`torch.uint8`等原生dtype存储，需通过`x_dtype`参数指定）。  |   float16、bfloat16、float32、int8、hifloat8、float8_e5m2、float8_e4m3fn、float4_e2m1   |  2  |
 |  expert_idx  |  Tensor |  必选  |  表示moe_gating_top_k_softmax输出每一行特征对应的K个处理专家，对应公式中expertIdx。shape为(NUM_ROWS, K)，且专家id不能超过专家数。  |  int32   | 2  |
 |  scale  |  Tensor |  可选  |  用于计算量化结果的参数，对应公式中scaleOptional。默认值为None，不输入表示计算时不使用scale，且输出`expanded_scale`中的值无意义。不同场景下的输入要求见下方说明。  |  float32、float8_e8m0   | 1-3  |
 |  offset  |  Tensor |  可选  |  用于计算量化结果的偏移值，对应公式中offsetOptional。默认值为None。  |  float32   | 1  |
@@ -176,10 +177,12 @@ cann_ops_transformer.moe_init_routing(
 |  quant_mode  |  int |  可选  |  表示量化模式。默认值为-1，支持取值见下方说明。  |  -  | - |
 |  active_expert_range  |  List[int] |  可选  |  表示活跃expert的范围。默认值为None，长度为2，数组内的值为[expert_start, expert_end]，左闭右开，要求值大于等于0，并且expert_end不大于`expert_num`。Drop/Pad场景下，expert_start等于0，expert_end等于`expert_num`。传入None时，视为活跃的expert范围在0到`expert_num`之间。  |  -  | - |
 |  row_idx_type  |  int |  可选  |  表示输出`expanded_row_idx`使用的索引类型。默认值为0，取值为0和1。0表示gather类型的索引；1表示scatter类型的索引。DropPad场景下仅支持0。  |  -  | - |
+|  x_dtype  |  int |  可选  |  用于指定`x`的非原生数据类型（PyTorch原生dtype无法表达、以`torch.uint8`等原生dtype存储的类型），取值为`torch_npu`的dtype枚举。默认值为None，支持的全部枚举值为：`torch_npu.hifloat8`、`torch_npu.float4_e2m1fn_x2`、`torch_npu.int4`。不同quant_mode下的取值约束见下方说明。  |  -  | - |
 
 **scale参数不同场景下的输入要求：**
 
 - 非量化场景下，如果输入则要求为1维张量，shape为(NUM_ROWS,)。
+- 非量化场景且`x`数据类型为`float8_e5m2`、`float8_e4m3fn`或`float4_e2m1`（通过`x_dtype`指定）时，要求为3维张量，shape为(NUM_ROWS, CeilDiv(H, 64), 2)，数据类型为`float8_e8m0`。
 - 静态量化场景必须输入，输入要求为1D的Tensor，shape为(1,)。
 - 动态量化场景下，如果输入则要求为2维张量，shape为(expert_end-expert_start, H)或(1, H)。
 - quantMode为1的INT8动态量化场景下为可选输入，如果输入则要求为2D的Tensor，shape为(expert_end-expert_start, H)；quantMode为13的INT4动态量化场景下为可选输入，如果输入则要求shape为(1, H)，表示按H维广播的smooth scale。
@@ -207,6 +210,11 @@ cann_ops_transformer.moe_init_routing(
 - 15：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale+Amax），`expanded_x`量化到float8_e4m3fn。
 - 16：表示MXFP8 RoundScale+Amax量化场景，`expanded_x`量化到float8_e5m2。
 - 17：表示MXFP8 RoundScale+Amax量化场景，`expanded_x`量化到float8_e4m3fn。
+
+**x_dtype不同场景下的取值约束：**
+
+- `quant_mode`为-1（不量化透传）时，`x_dtype`支持`torch_npu.hifloat8`、`torch_npu.float4_e2m1fn_x2`。`torch.float8_e5m2`、`torch.float8_e4m3fn`为PyTorch原生dtype，直接作为`x`的数据类型传入即可，无需通过`x_dtype`指定。
+- `quant_mode`为13（INT4动态量化）时，`x_dtype`仅支持`torch_npu.int4`或None。
 
 ## 返回值说明
 
@@ -246,10 +254,10 @@ cann_ops_transformer.moe_init_routing(
 - 该接口支持单算子模式和TorchAir图模式调用。
 - `topk_weight`不受`quant_mode`影响，`expanded_topk_weight`数据类型始终为`float32`。
 - `expert_num`必须大于0。
-- `drop_pad_mode=1`时，`row_idx_type`仅支持取值为0（gather索引），`quant_mode`仅支持-1（非量化）。
+- `drop_pad_mode=1`时，`row_idx_type`仅支持取值为0（gather索引），`quant_mode`仅支持-1（非量化），且`x`数据类型仅支持`float16`、`bfloat16`、`float32`、`int8`、`hifloat8`。
 - `expert_tokens_num_flag`仅支持取值为true。
 - `active_num`仅支持值等于NUM_ROWS*K。
-- quantMode为13的INT4动态量化场景，需同时满足：`x`数据类型为`float32`或`bfloat16`；H为偶数。
+- quantMode为9或13的MXFP4/INT4动态量化场景，`x`的最后一维H要求为偶数。quantMode为13的INT4动态量化场景还需满足：`x`数据类型为`float32`或`bfloat16`，`drop_pad_mode`为0，不支持输入`offset`。
 - 空tensor处理：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。NUM_ROWS*K>0且H=0时仍走正常路由流程，生成`expanded_row_idx`和`expert_token_cumsum_or_count`。
 - **自动反向（autograd）约束**：自动反向仅在正向退化为aclnnMoeInitRoutingV2场景时支持，即不使用aclnnMoeInitRoutingV4特有特性。具体要求：`scale`不传入、`offset`不传入、`topk_weight`不传入、`quant_mode=-1`（非量化）、`row_idx_type=0`（gather索引）、`x_dtype`为None、`drop_pad_mode`为0或1。当使用了aclnnMoeInitRoutingV4特有特性（量化、`scale`、`offset`、`topk_weight`、`x_dtype`、`row_idx_type`非0等）时，调用自动反向会抛出`NotImplementedError`。`active_expert_range`不影响反向，不视为aclnnMoeInitRoutingV4特有特性。
 - 自动反向仅对`x`求梯度，`expert_idx`为整数索引张量无梯度，`expanded_row_idx`及其他整数/统计输出无梯度。
