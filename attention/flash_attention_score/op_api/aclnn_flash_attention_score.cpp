@@ -1622,7 +1622,7 @@ aclnnStatus aclnnFlashAttentionScoreV4GetWorkspaceSize(
                           attenMaskOptional, queryRopeOptional, keyRopeOptional, dScaleQOptional, dScaleKOptional,
                           dScaleVOptional, sinkOptional, prefixOptional, actualSeqQLenOptional, actualSeqKvLenOptional,
                           qStartIdxOptional, kvStartIdxOptional, scaleValue, keepProb, preTokens, nextTokens, headNum,
-                          inputLayout, innerPrecise, sparseMode, outDtype, pseType, seed, offset),
+                          inputLayout, innerPrecise, sparseMode, outDtype, pseType, softmaxOutLayout, seed, offset),
                    DFX_OUT(softmaxMaxOut, softmaxSumOut, softmaxOutOut, attentionOutOut));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
