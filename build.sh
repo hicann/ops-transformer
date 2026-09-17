@@ -380,6 +380,7 @@ function help_info() {
     echo "    --opkernel_aicpu build aicpu kernel"
     echo "    --mssanitizer Build with mssanitizer mode on the kernel side (with '-g -sanitizer'; cannot be used with: --oom, --dump_cce, --bisheng_flags, --build-type=Debug)"
     echo "    --dump_cce Dump kernel precompiled files"
+    echo "    --bisheng_flags Specify bisheng compiler flags (comma-separated for multiple), like: --bisheng_flags=ccec_g (cannot be used with: --mssanitizer, --oom, --dump_cce)"
     echo "    --opapi_test build and run opapi unit tests"
     echo "    --ophost_test build and run ophost unit tests"
     echo "    --opgraph_test build and run opgraph unit tests"
