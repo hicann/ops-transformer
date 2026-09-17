@@ -543,9 +543,11 @@ class ElasticBuffer:
             num_topk: top-k value for MoE dispatch/combine.
             with_grad: whether to enable training mode.
             explicitly_destroy: if True, the caller needs to explicitly
-                invoke ``destroy`` to release resources; if False (default),
-                resources are released automatically when the instance is
-                garbage collected.
+                invoke ``destroy`` to release instance resources; if False
+                (default), ``destroy`` is invoked automatically when the
+                instance is garbage collected. Note that Engram host pinned
+                memory is retained in a process-level pool after ``destroy``
+                and freed when the process exits (see ``destroy``).
         """
         moe_args = (num_max_tokens_per_rank, hidden, num_topk)
         self._validate_init_args(group, num_cpu_bytes, moe_args, with_grad)
@@ -1087,7 +1089,18 @@ class ElasticBuffer:
 
     def destroy(self) -> None:
         """
-        Destroy the ElasticBuffer and free host pinned memory.
+        Destroy the ElasticBuffer instance and release its resources.
+
+        Note: the Engram host pinned memory (including self-allocated pinned
+        memory and the registration mapping of caller-provided zero-copy
+        storage) is registered into the HCCL engine context and cannot be
+        unregistered. After ``destroy``, it is retained in a process-level
+        pool keyed by the communication domain and freed when the process
+        exits; the caller's storage memory itself is never freed. Rebuilding
+        an ElasticBuffer on the same group reuses the pooled memory:
+        self-allocated rebuild must not exceed the first-built size, and
+        zero-copy rebuild must use the same storage address and size as the
+        first registration.
 
         Returns:
             None
