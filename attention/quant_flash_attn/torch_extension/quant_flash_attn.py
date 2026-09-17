@@ -500,7 +500,7 @@ def quant_flash_attn(
         v.dim() == kv_expected,
         lambda: f"v with layout {layout_kv} expects {kv_expected} dims, but got {v.dim()} dims",
     )
-    out_expected = _OUT_LAYOUT_EXPECTED_NDIM.get(layout_q)
+    out_expected = _OUT_LAYOUT_EXPECTED_NDIM.get(layout_out)
     torch._check(
         out_expected is not None,
         lambda: f"Unsupported layout_out: {layout_out!r}, expected one of TND/BSND/BNSD",
