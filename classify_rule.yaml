@@ -147,7 +147,7 @@ transformer-2@ops-transformer:
                 - ops/ops-transformer/attention/sparse_flash_attention/op_host/
                 - ops/ops-transformer/attention/sparse_flash_attention/op_kernel/
                 - ops/ops-transformer/attention/quant_lightning_indexer/op_host/
-                - ops/ops-transformer/attention/quant_lightning_indexer/op_kernel/
+                - ops/ops-transformer/attention/quant_lightning_indexer/op_kernel/arch35/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/op_host/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/op_kernel/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/op_host/
@@ -160,7 +160,7 @@ transformer-2@ops-transformer:
                 - ops/ops-transformer/attention/lightning_indexer_v2/op_host/
                 - ops/ops-transformer/attention/lightning_indexer_v2/op_kernel/arch35/
                 - ops/ops-transformer/attention/quant_lightning_indexer_v2/op_host/
-                - ops/ops-transformer/attention/quant_lightning_indexer_v2/op_kernel/
+                - ops/ops-transformer/attention/quant_lightning_indexer_v2/op_kernel/arch35/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention_v2/op_host/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention_v2/op_kernel/
             opensource_style: null
