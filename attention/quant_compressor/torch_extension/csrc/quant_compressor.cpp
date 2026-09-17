@@ -44,7 +44,7 @@ std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
 
     std::vector<int64_t> contiguousStride(ndim, 1);
     for (int64_t i = ndim - 2; i >= 0; i--) {
-        contiguousStride[i] = contiguousStride[i + 1] * sizes[i + 1];
+        contiguousStride[i] = contiguousStride[i + 1] * std::max(sizes[i + 1], int64_t(1));
     }
 
     for (int64_t i = 0; i < ndim; i++) {
@@ -65,6 +65,7 @@ at::Tensor ConstructQuantCompressorOutputTensor(const at::Tensor &x, const at::T
     TORCH_CHECK(wkv.defined(), "Check wkv != nullptr failed");
     auto wkvDim = wkv.dim();
     TORCH_CHECK(wkvDim == DIM_TWO, "wkv dim num[", wkvDim, "] should be 2");
+    TORCH_CHECK(wkv.size(0) > VALUE_0, "wkv dim 0 should be greater than 0");
 
     auto D = wkv.size(0) / coff;
     if (xDim == DIM_THREE) {

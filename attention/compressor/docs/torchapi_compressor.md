@@ -109,8 +109,8 @@ cann_ops_transformer.compressor(
 | state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。支持0轴非连续，数据格式支持ND。计算后 kv_state 和 score_state 会原位更新到此 Tensor | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
 | ape | Tensor | 必选 | positional biases，对应公式中的 $Ape$。不支持非连续，数据格式支持ND。 | float32 | [cmp_ratio,coff\*D] |
 | cmp_ratio | int | 必选 | 数据压缩率。取值范围为[2, 128]内的整数。 | - | - |
-| state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B]。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作 |
-| cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0。 | int32 | [B+1,] |
+| state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B] |
+| cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0，最后一位必须为T。 | int32 | [B+1,] |
 | seqused | Tensor | 可选 | 不同Batch中实际参与压缩的token数。不支持非连续，数据格式支持ND。<br>指定为None时，数值等于每个Batch上的Sequence Length。<br>[B,S,H]场景：0 ≤ seqused[n] ≤ S<br>[T,H]场景：0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。 | int32 | [B,] |
 | start_pos | Tensor | 可选 | 计算起始位置。不支持非连续，数据格式支持ND，输入为None时从0开始计算 | int32 | [B,] |
 | coff | int | 可选 | 表示是否进行overlap数据重排，默认值为1。<br>仅支持1/2：<br>coff=1：无需进行overlap数据重排。<br>coff=2：需要进行overlap数据重排。 | int | - |
@@ -169,6 +169,7 @@ cann_ops_transformer.compressor(
     </table>
     </div>
 - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下state_cache不做更新，输出cmp_kv为空tensor。
+- state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。
 - 支持D为128/512。
 - 支持H为1K~10K，512对齐。
 - 支持block_size为1~1024。

@@ -134,7 +134,7 @@
   <tr>
     <td>state_block_table</td>
     <td>可选输入</td>
-    <td>表示state_cache存储使用的block映射表。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作。</td>
+    <td>表示state_cache存储使用的block映射表。</td>
     <td>INT32</td>
     <td>ND</td>
   </tr>
@@ -221,7 +221,7 @@
 - 输入shape限制：
     - state_cache支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]：
-        - cu_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。
+        - cu_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0，最后一位必须为T。
         - seqused，支持输入shape为[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu_seqlens[n+1] - cu_seqlens[n]，且不小于0。
         - cache_mode=1时，state_block_table支持输入shape为[B, ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，state_block_table支持输入shape为[B]。
         - cmp_kv，输出shape为[min(T, T/cmp_ratio+B), D]：compressed_tokens + compressed_tokens + ... + compressed_tokens + pad。
@@ -254,6 +254,7 @@
       </tbody>
       </table>
   - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下state_cache不做更新，输出cmp_kv为空tensor。
+  - state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。
 - 输入属性限制：
   - 支持D为128/512。
   - 支持H为1K~10K，512对齐。

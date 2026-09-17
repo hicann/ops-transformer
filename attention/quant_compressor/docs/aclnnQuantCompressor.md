@@ -231,7 +231,7 @@ aclnnStatus aclnnQuantCompressor(
     <tr>
       <td>stateBlockTableOptional（const aclTensor*）</td>
       <td>可选输入</td>
-      <td>表示state_cache存储使用的block映射表。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作。</td>
+      <td>表示state_cache存储使用的block映射表。</td>
       <td><ul><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(startPosOptional)+S；当x的shape为[T,H]时，Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。</li><li>cacheMode=2时，shape为[B]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -443,7 +443,7 @@ aclnnStatus aclnnQuantCompressor(
 - 输入shape限制：
     - stateCache支持输入shape[block_num,block_size,2\*coff\*D]，要求blockNum>0，cacheMode=2时，需要满足blockSize >= coff * cmp_ratio + S - 1。
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]
-        - cuSeqlensOptional输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。
+        - cuSeqlensOptional输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0，最后一位必须为T。
         - sequsedOptional，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即sequsedOptional[n] <= cuSeqlensOptional[n+1] - cuSeqlensOptional[n]，且不小于0。
         - cacheMode=1时，stateBlockTableOptional支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。cacheMode=2时，stateBlockTableOptional支持输入shape[B]。
         - cmpKv，输出shape为[min(T,T//cmp_ratio+B),D]：compressed_tokens + compressed_tokens + ... + compressed_tokens + pad。
@@ -491,6 +491,7 @@ aclnnStatus aclnnQuantCompressor(
       </table>
       </div>
 - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下stateCache不做更新，输出cmpKv为空tensor。
+- stateBlockTableOptional元素取值范围为[0, block_num)，block_num为stateCacheRef第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cacheMode=1（连续buffer）下写state_cache操作跳过该位置；cacheMode=2（循环buffer）下读写操作均不跳过。
 - 输入属性限制：
   - quantMode取值为1（A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL），此时xDescale、wkvDescale、wgateDescale为必选输入。
   - 支持D为128/512。
