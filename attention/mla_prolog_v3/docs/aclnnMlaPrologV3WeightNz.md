@@ -860,7 +860,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <tr>
         <td>N</td>
         <td>Head-Num（多头数）</td>
-        <td>取值范围：1、2、4、8、16、32、64、128</td>
+        <td>取值范围：1-128</td>
       </tr>
       <tr>
         <td>Hckv</td>

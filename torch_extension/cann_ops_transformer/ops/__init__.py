@@ -163,6 +163,7 @@ _legacy_map = {
     "block_attention_residuals_backward": "mhc.block_attention_residuals_grad",
     "apply_rotary_pos_emb": "posembedding.apply_rotary_pos_emb",
     "apply_rotary_pos_emb_grad": "posembedding.apply_rotary_pos_emb_grad",
+    "mla_prolog": "attention.mla_prolog_v3",
 }
 
 if __name__ == "cann_ops_transformer.ops":
