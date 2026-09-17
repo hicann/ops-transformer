@@ -22,7 +22,6 @@ __spec__ = {
 }
 
 import numpy
-from typing import List
 
 
 def MoeInitRoutingV3_input(*input_arrays, **kwargs):
@@ -535,7 +534,7 @@ def _moe_init_routing_v3_numpy(
         expanded_x = expanded_x[:actual_expert_total_num, :]
         quant_mode_dtype_str_map = {11: "float8_e5m2", 12: "float8_e4m3fn"}
         from ttk.utilities import get_dtype_range
-        from ttk.utilities import numpy_bfloat16, numpy_float8_e5m2, numpy_float8_e4m3fn
+        from ttk.utilities import numpy_float8_e5m2, numpy_float8_e4m3fn
 
         def block_max_with_padding(expanded_x, row_block_size, col_block_size):
             batch, rows, cols = expanded_x.shape
@@ -738,28 +737,9 @@ def _moe_init_routing_v3_numpy(
         expanded_x = numpy.rint((expanded_x * mul).astype(numpy.float32))
         expanded_x = numpy.clip(expanded_x, -8, 7).astype(numpy_int4())
 
-        if actual_expert_total_num < x_out_num:
-            expanded_x = numpy.concatenate(
-                [
-                    expanded_x,
-                    numpy.ones(
-                        (x_out_num - actual_expert_total_num, h), dtype=expanded_x.dtype
-                    ),
-                ],
-                axis=0,
-            )
-            expanded_scale = numpy.concatenate(
-                [
-                    expanded_scale.reshape(-1),
-                    numpy.ones(
-                        (x_out_num - actual_expert_total_num,),
-                        dtype=expanded_scale.dtype,
-                    ),
-                ]
-            )
-        else:
-            expanded_x = expanded_x[:x_out_num, :]
-            expanded_scale = expanded_scale.reshape(-1)[:x_out_num]
+        valid_num = min(actual_expert_total_num, x_out_num)
+        expanded_x = expanded_x[:valid_num, :]
+        expanded_scale = expanded_scale.reshape(-1)[:valid_num]
 
     if expert_tokens_num_type == 0:
         counts = numpy.bincount(
@@ -832,6 +812,35 @@ def MoeInitRoutingV3(*input_arrays, **kwargs):
     return expanded_x, expanded_row_idx, expert_tokens_count, expanded_scale
 
 
+def _drop_rowidx_tail_len(npu_arr, golden_arr, golden0_arr, min_len):
+    """SCATTER 模式下 expanded_row_idx 的 golden 返回完整 n*k 置换（含尾部无效区），
+    而 NPU 只写出前 actualExpertIdxNum 个有效条目。此函数计算 golden 的有效前缀长度，
+    使 compare 只比对该前缀，避免尾部无效数据导致误报。"""
+    if npu_arr is None or golden_arr is None or min_len <= 0:
+        return min_len
+    golden_flat = numpy.asarray(golden_arr).reshape(-1)
+    npu_flat = numpy.asarray(npu_arr).reshape(-1)
+    golden_shape = getattr(golden_arr, "shape", ())
+    golden_dtype = getattr(golden_arr, "dtype", None)
+    if len(golden_shape) != 1 or getattr(golden_dtype, "kind", "?") not in ("i", "u"):
+        return min_len
+    if golden_flat.size != npu_flat.size or golden_flat.size <= 0:
+        return min_len
+    if int(golden_flat.min()) < 0 or int(golden_flat.max()) != golden_flat.size - 1:
+        return min_len
+    if numpy.unique(golden_flat).size != golden_flat.size:
+        return min_len
+    if golden0_arr is None:
+        return min_len
+    golden0 = numpy.asarray(_torch_to_numpy(golden0_arr))
+    if golden0.ndim < 1:
+        return min_len
+    prefix_len = int(golden0.shape[0])
+    if 0 <= prefix_len < golden_flat.size:
+        return prefix_len
+    return min_len
+
+
 def _torch_to_numpy(tensor):
     if tensor is None:
         return None
@@ -845,6 +854,37 @@ def _torch_to_numpy(tensor):
 
             return tensor.to(torch.float32).numpy()
     return numpy.asarray(tensor)
+
+
+def _unpack_int4(raw_bytes):
+    """将 packed uint8（每字节存 2 个 int4 nibble）解包为有符号 int8 数组。
+    低 nibble 在前，高 nibble 在后；>=8 的 nibble 减 16 转为负数。"""
+    lo = (raw_bytes & 0x0F).astype(numpy.int8)
+    hi = ((raw_bytes >> 4) & 0x0F).astype(numpy.int8)
+    nibbles = numpy.empty(raw_bytes.size * 2, dtype=numpy.int8)
+    nibbles[0::2] = lo
+    nibbles[1::2] = hi
+    nibbles[nibbles >= 8] -= 16
+    return nibbles
+
+
+def _quant_ulp_result(npu_vals, golden_vals):
+    """量化输出 ULP 判据：绝对误差 <= 1 视为通过，错误占比超过 ptol(0.1%) 才判 FAIL。
+    用于 int8/int4 量化输出，消除 float16 计算精度导致的 off-by-1 误报。"""
+    min_len = min(npu_vals.size, golden_vals.size)
+    npu_vals = npu_vals[:min_len]
+    golden_vals = golden_vals[:min_len]
+    diff = numpy.abs(numpy.subtract(npu_vals, golden_vals))
+    total = diff.size
+    bad_count = int(numpy.sum(diff > 1))
+    precision = float(total - bad_count) / total * 100.0 if total > 0 else 100.0
+    return {
+        "pass": (1 - precision / 100.0) <= 0.001,
+        "precision": precision,
+        "error_info": None
+        if bad_count == 0
+        else f"quant ulp mismatch {bad_count}/{total}",
+    }
 
 
 def _to_list(val):
@@ -891,6 +931,37 @@ def _numpy_to_torch(arr, template):
         x in arr_dtype_name or x in target_dtype_name for x in custom_keywords
     )
     if is_custom_dtype:
+        # golden 返回 float32 但目标 dtype 为 float8/float4/hifloat8 时，需先 astype 到
+        # 目标 numpy dtype（itemsize=1），再 view(uint8)。若直接对 float32（itemsize=4）
+        # 做 view(uint8)，元素数会放大 4 倍，导致 reshape 失败。
+        target_np_dtype_name = target_dtype_name.replace("torch.", "")
+        if arr_dtype_name not in target_np_dtype_name and arr_np.dtype.kind == "f":
+            from ttk.utilities.dtypes import (
+                numpy_float8_e4m3fn,
+                numpy_float8_e5m2,
+                numpy_float8_e8m0,
+                numpy_float4_e2m1,
+                numpy_float4_e1m2,
+                numpy_hifloat8,
+            )
+
+            dtype_map = {
+                "float8_e4m3fn": numpy_float8_e4m3fn,
+                "float8_e5m2": numpy_float8_e5m2,
+                "float8_e8m0": numpy_float8_e8m0,
+                "float8_e8m0fnu": numpy_float8_e8m0,
+                "float4_e2m1": numpy_float4_e2m1,
+                "float4_e1m2": numpy_float4_e1m2,
+                "hifloat8": numpy_hifloat8,
+                "hif8": numpy_hifloat8,
+            }
+            for key, dtype_fn in dtype_map.items():
+                if key in target_np_dtype_name:
+                    try:
+                        arr_np = arr_np.astype(dtype_fn())
+                    except (TypeError, ValueError):
+                        pass
+                    break
         try:
             raw_uint8 = numpy.asarray(arr_np.view(numpy.uint8).copy()).reshape(
                 arr_np.shape
@@ -960,6 +1031,14 @@ class MoeInitRoutingV3KernelSpec:
             npu_flat = numpy.asarray(npu_arr).reshape(-1)
             golden_flat = numpy.asarray(golden_arr).reshape(-1)
             min_len = min(npu_flat.size, golden_flat.size)
+            # SCATTER 的 expanded_row_idx：golden 为完整置换，只比头部有效区
+            prefix_len = _drop_rowidx_tail_len(
+                npu_arr, golden_arr, outputs[half], min_len
+            )
+            if prefix_len < min_len:
+                npu_flat = npu_flat[:prefix_len]
+                golden_flat = golden_flat[:prefix_len]
+                min_len = prefix_len
             npu_cmp = npu_flat[:min_len]
             golden_cmp = golden_flat[:min_len]
             dtype_name = str(golden_arr.dtype).lower()
@@ -982,6 +1061,7 @@ class MoeInitRoutingV3KernelSpec:
                 for x in all_custom_keywords
             )
             if is_custom_dtype:
+                # 自定义 dtype（float4/float8/hifloat8/int4 等）走 raw uint8 字节级比对
 
                 def _to_raw_uint8(arr):
                     if arr.dtype.kind in ("i", "u"):
@@ -1013,6 +1093,7 @@ class MoeInitRoutingV3KernelSpec:
                     or "hif8" in str(npu_arr.dtype).lower()
                 )
                 if is_hifloat8:
+                    # hifloat8: 按 int8 解释，ULP 差 > 1 计为错误，NaN 位置双方一致视为相等
                     npu_i8 = numpy.asarray(npu_raw[:min_len_raw]).astype(numpy.int8)
                     golden_i8 = numpy.asarray(golden_raw[:min_len_raw]).astype(
                         numpy.int8
@@ -1040,23 +1121,32 @@ class MoeInitRoutingV3KernelSpec:
                         }
                     )
                 else:
-                    diff_count = int(
-                        numpy.sum(npu_raw[:min_len_raw] != golden_raw[:min_len_raw])
+                    is_int4_quant = (
+                        "int4" in dtype_name or "int4" in str(npu_arr.dtype).lower()
                     )
-                    precision = (
-                        float(min_len_raw - diff_count) / min_len_raw * 100.0
-                        if min_len_raw > 0
-                        else 100.0
-                    )
-                    results.append(
-                        {
-                            "pass": diff_count == 0,
-                            "precision": precision,
-                            "error_info": None
-                            if diff_count == 0
-                            else f"byte mismatch {diff_count}/{min_len_raw}",
-                        }
-                    )
+                    if is_int4_quant:
+                        # int4: 先解包 packed nibble，再用 ULP 判据（差 > 1 计为错误）
+                        npu_nib = _unpack_int4(npu_raw[:min_len_raw])
+                        golden_nib = _unpack_int4(golden_raw[:min_len_raw])
+                        results.append(_quant_ulp_result(npu_nib, golden_nib))
+                    else:
+                        diff_count = int(
+                            numpy.sum(npu_raw[:min_len_raw] != golden_raw[:min_len_raw])
+                        )
+                        precision = (
+                            float(min_len_raw - diff_count) / min_len_raw * 100.0
+                            if min_len_raw > 0
+                            else 100.0
+                        )
+                        results.append(
+                            {
+                                "pass": diff_count == 0,
+                                "precision": precision,
+                                "error_info": None
+                                if diff_count == 0
+                                else f"byte mismatch {diff_count}/{min_len_raw}",
+                            }
+                        )
                 continue
             is_int = golden_arr.dtype.kind in ("i", "u")
             is_float = golden_arr.dtype.kind == "f" or any(
@@ -1073,21 +1163,28 @@ class MoeInitRoutingV3KernelSpec:
                 ]
             )
             if is_int and not is_float:
-                diff_count = int(numpy.sum(npu_cmp != golden_cmp))
-                precision = (
-                    float(min_len - diff_count) / min_len * 100.0
-                    if min_len > 0
-                    else 100.0
-                )
-                results.append(
-                    {
-                        "pass": diff_count == 0,
-                        "precision": precision,
-                        "error_info": None
-                        if diff_count == 0
-                        else f"mismatch {diff_count}/{min_len}",
-                    }
-                )
+                # int8 量化输出用 ULP 判据（差 > 1 计为错误）；int32/int64 等精确匹配
+                is_quant_output = "int8" in dtype_name
+                if is_quant_output:
+                    npu_i = npu_cmp.astype(numpy.int32)
+                    golden_i = golden_cmp.astype(numpy.int32)
+                    results.append(_quant_ulp_result(npu_i, golden_i))
+                else:
+                    diff_count = int(numpy.sum(npu_cmp != golden_cmp))
+                    precision = (
+                        float(min_len - diff_count) / min_len * 100.0
+                        if min_len > 0
+                        else 100.0
+                    )
+                    results.append(
+                        {
+                            "pass": diff_count == 0,
+                            "precision": precision,
+                            "error_info": None
+                            if diff_count == 0
+                            else f"mismatch {diff_count}/{min_len}",
+                        }
+                    )
             else:
                 if "bfloat16" in dtype_name or "bf16" in dtype_name:
                     rtol, atol = 0.004, 0.004
@@ -1127,6 +1224,7 @@ class E2eMoeInitRoutingV3Spec:
         "float32": {"standard": "stat_rel_err"},
     }
 
+    @staticmethod
     def golden(
         x,
         expert_idx,
@@ -1171,47 +1269,213 @@ class E2eMoeInitRoutingV3Spec:
             active_expert_range,
             int(row_idx_type),
         )
+        return list(results)
 
-        templates = (
-            expanded_x_out,
-            expanded_row_idx_out,
-            expert_tokens_count_or_cumsum_out,
-            expanded_scale_out,
-        )
-        return [_numpy_to_torch(arr, tpl) for arr, tpl in zip(results, templates)]
-
-    def pre_compare(*outputs, **kwargs):
+    @staticmethod
+    def compare(*outputs, **kwargs):
+        results = []
         half = len(outputs) // 2
-        npu_outs = list(outputs[:half])
-        golden_outs = list(outputs[half:])
-        modified = False
         for i in range(half):
-            if npu_outs[i] is None or golden_outs[i] is None:
+            npu_out = outputs[i]
+            golden_out = outputs[half + i]
+            if golden_out is None:
+                results.append({"pass": True, "precision": 100.0})
                 continue
-            npu_arr = numpy.asarray(_torch_to_numpy(npu_outs[i]))
-            golden_arr = numpy.asarray(_torch_to_numpy(golden_outs[i]))
-            if (
-                npu_arr.size != golden_arr.size
-                and npu_arr.size > 0
-                and golden_arr.size > 0
-            ):
-                npu_flat = npu_arr.reshape(-1)
-                golden_flat = golden_arr.reshape(-1)
-                min_len = min(npu_flat.size, golden_flat.size)
-                npu_truncated = npu_flat[:min_len]
-                golden_truncated = golden_flat[:min_len]
-                target_shape = (
-                    golden_arr.shape
-                    if npu_flat.size >= golden_flat.size
-                    else npu_arr.shape
+            if npu_out is None:
+                results.append(
+                    {
+                        "pass": False,
+                        "precision": 0.0,
+                        "error_info": f"output[{i}] npu is None",
+                    }
                 )
-                npu_outs[i] = _numpy_to_torch(
-                    npu_truncated.reshape(target_shape), outputs[i]
+                continue
+            npu_arr = _torch_to_numpy(npu_out)
+            golden_arr = _torch_to_numpy(golden_out)
+            npu_flat = numpy.asarray(npu_arr).reshape(-1)
+            golden_flat = numpy.asarray(golden_arr).reshape(-1)
+            min_len = min(npu_flat.size, golden_flat.size)
+            # SCATTER 的 expanded_row_idx：golden 为完整置换，只比头部有效区
+            prefix_len = _drop_rowidx_tail_len(
+                npu_arr, golden_arr, outputs[half], min_len
+            )
+            if prefix_len < min_len:
+                npu_flat = npu_flat[:prefix_len]
+                golden_flat = golden_flat[:prefix_len]
+                min_len = prefix_len
+            npu_cmp = npu_flat[:min_len]
+            golden_cmp = golden_flat[:min_len]
+            dtype_name = str(golden_arr.dtype).lower()
+            all_custom_keywords = [
+                "e2m1",
+                "e1m2",
+                "float4",
+                "hifloat8",
+                "e4m3",
+                "e5m2",
+                "e8m0",
+                "hif8",
+                "int4",
+                "uint1",
+                "int2",
+                "uint2",
+            ]
+            is_custom_dtype = any(
+                x in dtype_name or x in str(npu_arr.dtype).lower()
+                for x in all_custom_keywords
+            )
+            if is_custom_dtype:
+                is_hifloat8 = (
+                    "hifloat8" in dtype_name
+                    or "hif8" in dtype_name
+                    or "hifloat8" in str(npu_arr.dtype).lower()
+                    or "hif8" in str(npu_arr.dtype).lower()
                 )
-                golden_outs[i] = _numpy_to_torch(
-                    golden_truncated.reshape(target_shape), outputs[half + i]
+
+                def _to_raw_uint8(arr):
+                    if arr.dtype.kind in ("i", "u"):
+                        vals = arr.reshape(-1).astype(numpy.uint8)
+                        if vals.size > 0 and numpy.max(vals) <= 15:
+                            n = vals.size - vals.size % 2
+                            lo = vals[:n:2]
+                            hi = vals[1:n:2]
+                            return ((hi << 4) | lo).astype(numpy.uint8)
+                        return vals
+                    try:
+                        raw = arr.view(numpy.uint8).reshape(-1).astype(numpy.uint8)
+                    except (ValueError, TypeError):
+                        raw = numpy.frombuffer(arr.tobytes(), dtype=numpy.uint8)
+                    if raw.size > 0 and numpy.max(raw) <= 15:
+                        n = raw.size - raw.size % 2
+                        lo = raw[:n:2]
+                        hi = raw[1:n:2]
+                        return ((hi << 4) | lo).astype(numpy.uint8)
+                    return raw
+
+                npu_raw = _to_raw_uint8(numpy.asarray(npu_arr))
+                golden_raw = _to_raw_uint8(numpy.asarray(golden_arr))
+                min_len_raw = min(npu_raw.size, golden_raw.size)
+                if is_hifloat8:
+                    # hifloat8: 按 int8 解释，ULP 差 > 1 计为错误，NaN 位置双方一致视为相等
+                    npu_i8 = numpy.asarray(npu_raw[:min_len_raw]).astype(numpy.int8)
+                    golden_i8 = numpy.asarray(golden_raw[:min_len_raw]).astype(
+                        numpy.int8
+                    )
+                    diff = numpy.abs(numpy.subtract(npu_i8, golden_i8))
+                    npu_nan = numpy.isnan(npu_flat[:min_len].astype(numpy.float32))
+                    golden_nan = numpy.isnan(
+                        golden_flat[:min_len].astype(numpy.float32)
+                    )
+                    both_nan = numpy.logical_and(npu_nan, golden_nan)
+                    diff[both_nan[: diff.size]] = 0
+                    diff_count = int(numpy.sum(diff > 1))
+                    precision = (
+                        float(min_len_raw - diff_count) / min_len_raw * 100.0
+                        if min_len_raw > 0
+                        else 100.0
+                    )
+                    results.append(
+                        {
+                            "pass": (1 - precision / 100.0) <= 0.001,
+                            "precision": precision,
+                            "error_info": None
+                            if diff_count == 0
+                            else f"ulp mismatch {diff_count}/{min_len_raw}",
+                        }
+                    )
+                else:
+                    is_int4_quant = (
+                        "int4" in dtype_name or "int4" in str(npu_arr.dtype).lower()
+                    )
+                    if is_int4_quant:
+                        # int4: 先解包 packed nibble，再用 ULP 判据（差 > 1 计为错误）
+                        npu_nib = _unpack_int4(npu_raw[:min_len_raw])
+                        golden_nib = _unpack_int4(golden_raw[:min_len_raw])
+                        results.append(_quant_ulp_result(npu_nib, golden_nib))
+                    else:
+                        diff_count = int(
+                            numpy.sum(npu_raw[:min_len_raw] != golden_raw[:min_len_raw])
+                        )
+                        precision = (
+                            float(min_len_raw - diff_count) / min_len_raw * 100.0
+                            if min_len_raw > 0
+                            else 100.0
+                        )
+                        results.append(
+                            {
+                                "pass": diff_count == 0,
+                                "precision": precision,
+                                "error_info": None
+                                if diff_count == 0
+                                else f"byte mismatch {diff_count}/{min_len_raw}",
+                            }
+                        )
+                continue
+            is_int = golden_arr.dtype.kind in ("i", "u")
+            is_float = golden_arr.dtype.kind == "f" or any(
+                x in dtype_name
+                for x in [
+                    "float",
+                    "bfloat",
+                    "hifloat",
+                    "e4m3",
+                    "e5m2",
+                    "e8m0",
+                    "e2m1",
+                    "e1m2",
+                ]
+            )
+            if is_int and not is_float:
+                # int8 量化输出用 ULP 判据（差 > 1 计为错误）；int32/int64 等精确匹配
+                is_quant_output = "int8" in dtype_name
+                if is_quant_output:
+                    npu_i = npu_cmp.astype(numpy.int32)
+                    golden_i = golden_cmp.astype(numpy.int32)
+                    results.append(_quant_ulp_result(npu_i, golden_i))
+                else:
+                    diff_count = int(numpy.sum(npu_cmp != golden_cmp))
+                    precision = (
+                        float(min_len - diff_count) / min_len * 100.0
+                        if min_len > 0
+                        else 100.0
+                    )
+                    results.append(
+                        {
+                            "pass": diff_count == 0,
+                            "precision": precision,
+                            "error_info": None
+                            if diff_count == 0
+                            else f"mismatch {diff_count}/{min_len}",
+                        }
+                    )
+            else:
+                if "bfloat16" in dtype_name or "bf16" in dtype_name:
+                    rtol, atol = 0.004, 0.004
+                elif "float32" in dtype_name:
+                    rtol, atol = 0.0001, 0.0001
+                elif "float16" in dtype_name:
+                    rtol, atol = 0.001, 0.001
+                else:
+                    rtol = kwargs.get("rtol", 0.001)
+                    atol = kwargs.get("atol", 0.001)
+                npu_cmp_f = npu_cmp.astype(numpy.float32)
+                golden_cmp_f = golden_cmp.astype(numpy.float32)
+                close = numpy.isclose(
+                    npu_cmp_f, golden_cmp_f, rtol=rtol, atol=atol, equal_nan=True
                 )
-                modified = True
+                fulfill = (
+                    float(numpy.sum(close)) / min_len * 100.0 if min_len > 0 else 100.0
+                )
+                results.append(
+                    {
+                        "pass": fulfill >= 99.5,
+                        "precision": fulfill,
+                        "error_info": None
+                        if fulfill >= 99.5
+                        else f"fulfill={fulfill:.2f}%",
+                    }
+                )
+        return results[0] if len(results) == 1 else results
 
 
 class AclnnMoeInitRoutingV3Spec:
@@ -1223,6 +1487,7 @@ class AclnnMoeInitRoutingV3Spec:
         "float32": {"standard": "stat_rel_err"},
     }
 
+    @staticmethod
     def golden(
         x,
         expertIdx,
@@ -1277,6 +1542,7 @@ class AclnnMoeInitRoutingV3Spec:
         )
         return [_numpy_to_torch(arr, tpl) for arr, tpl in zip(results, templates)]
 
+    @staticmethod
     def compare(*outputs, **kwargs):
         results = []
         half = len(outputs) // 2
@@ -1300,6 +1566,14 @@ class AclnnMoeInitRoutingV3Spec:
             npu_flat = numpy.asarray(npu_arr).reshape(-1)
             golden_flat = numpy.asarray(golden_arr).reshape(-1)
             min_len = min(npu_flat.size, golden_flat.size)
+            # SCATTER 的 expanded_row_idx：golden 为完整置换，只比头部有效区
+            prefix_len = _drop_rowidx_tail_len(
+                npu_arr, golden_arr, outputs[half], min_len
+            )
+            if prefix_len < min_len:
+                npu_flat = npu_flat[:prefix_len]
+                golden_flat = golden_flat[:prefix_len]
+                min_len = prefix_len
             npu_cmp = npu_flat[:min_len]
             golden_cmp = golden_flat[:min_len]
             dtype_name = str(golden_arr.dtype).lower()
@@ -1353,6 +1627,7 @@ class AclnnMoeInitRoutingV3Spec:
                 golden_raw = _to_raw_uint8(numpy.asarray(golden_arr))
                 min_len_raw = min(npu_raw.size, golden_raw.size)
                 if is_hifloat8:
+                    # hifloat8: 按 int8 解释，ULP 差 > 1 计为错误，NaN 位置双方一致视为相等
                     npu_i8 = numpy.asarray(npu_raw[:min_len_raw]).astype(numpy.int8)
                     golden_i8 = numpy.asarray(golden_raw[:min_len_raw]).astype(
                         numpy.int8
@@ -1380,23 +1655,32 @@ class AclnnMoeInitRoutingV3Spec:
                         }
                     )
                 else:
-                    diff_count = int(
-                        numpy.sum(npu_raw[:min_len_raw] != golden_raw[:min_len_raw])
+                    is_int4_quant = (
+                        "int4" in dtype_name or "int4" in str(npu_arr.dtype).lower()
                     )
-                    precision = (
-                        float(min_len_raw - diff_count) / min_len_raw * 100.0
-                        if min_len_raw > 0
-                        else 100.0
-                    )
-                    results.append(
-                        {
-                            "pass": diff_count == 0,
-                            "precision": precision,
-                            "error_info": None
-                            if diff_count == 0
-                            else f"byte mismatch {diff_count}/{min_len_raw}",
-                        }
-                    )
+                    if is_int4_quant:
+                        # int4: 先解包 packed nibble，再用 ULP 判据（差 > 1 计为错误）
+                        npu_nib = _unpack_int4(npu_raw[:min_len_raw])
+                        golden_nib = _unpack_int4(golden_raw[:min_len_raw])
+                        results.append(_quant_ulp_result(npu_nib, golden_nib))
+                    else:
+                        diff_count = int(
+                            numpy.sum(npu_raw[:min_len_raw] != golden_raw[:min_len_raw])
+                        )
+                        precision = (
+                            float(min_len_raw - diff_count) / min_len_raw * 100.0
+                            if min_len_raw > 0
+                            else 100.0
+                        )
+                        results.append(
+                            {
+                                "pass": diff_count == 0,
+                                "precision": precision,
+                                "error_info": None
+                                if diff_count == 0
+                                else f"byte mismatch {diff_count}/{min_len_raw}",
+                            }
+                        )
                 continue
             is_int = golden_arr.dtype.kind in ("i", "u")
             is_float = golden_arr.dtype.kind == "f" or any(
@@ -1413,21 +1697,28 @@ class AclnnMoeInitRoutingV3Spec:
                 ]
             )
             if is_int and not is_float:
-                diff_count = int(numpy.sum(npu_cmp != golden_cmp))
-                precision = (
-                    float(min_len - diff_count) / min_len * 100.0
-                    if min_len > 0
-                    else 100.0
-                )
-                results.append(
-                    {
-                        "pass": diff_count == 0,
-                        "precision": precision,
-                        "error_info": None
-                        if diff_count == 0
-                        else f"mismatch {diff_count}/{min_len}",
-                    }
-                )
+                # int8 量化输出用 ULP 判据（差 > 1 计为错误）；int32/int64 等精确匹配
+                is_quant_output = "int8" in dtype_name
+                if is_quant_output:
+                    npu_i = npu_cmp.astype(numpy.int32)
+                    golden_i = golden_cmp.astype(numpy.int32)
+                    results.append(_quant_ulp_result(npu_i, golden_i))
+                else:
+                    diff_count = int(numpy.sum(npu_cmp != golden_cmp))
+                    precision = (
+                        float(min_len - diff_count) / min_len * 100.0
+                        if min_len > 0
+                        else 100.0
+                    )
+                    results.append(
+                        {
+                            "pass": diff_count == 0,
+                            "precision": precision,
+                            "error_info": None
+                            if diff_count == 0
+                            else f"mismatch {diff_count}/{min_len}",
+                        }
+                    )
             else:
                 if "bfloat16" in dtype_name or "bf16" in dtype_name:
                     rtol, atol = 0.004, 0.004

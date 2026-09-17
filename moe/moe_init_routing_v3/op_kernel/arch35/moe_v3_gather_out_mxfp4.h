@@ -57,6 +57,7 @@ private:
 
     int64_t blockIdx_;
     int64_t cols_;
+    int64_t scaleCols_;
     int64_t n_;
     int64_t k_;
 
@@ -91,6 +92,7 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::InitBasicParams(GM_ADDR workspace
     blockIdx_ = GetBlockIdx();
 
     cols_ = tilingData->cols;
+    scaleCols_ = Ceil(cols_, SCALE_BLOCK_SIZE) * SCALE_THIRD_DIM_SIZE;
     n_ = tilingData->n;
     k_ = tilingData->k;
 
@@ -134,12 +136,11 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::Init(GM_ADDR x, GM_ADDR scale, GM
 {
     InitBasicParams(workspace, tilingData, tPipe);
     xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t *)x, n_ * cols_ / NUM_TWO);
-    xGscaleGm_.SetGlobalBuffer((__gm__ uint8_t *)scale, n_ * cols_ / SCALE_FACTOR_WITH_X);
+    xGscaleGm_.SetGlobalBuffer((__gm__ uint8_t *)scale, n_ * scaleCols_);
     expandedXGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_ / NUM_TWO,
                                  curCoreIndicesElements_ * cols_ / NUM_TWO);
-    expandedScaleGm_.SetGlobalBuffer(
-        (__gm__ uint8_t *)expandedScale + blockIdx_ * perCoreIndicesElements_ * cols_ / SCALE_FACTOR_WITH_X,
-        curCoreIndicesElements_ * cols_ / SCALE_FACTOR_WITH_X);
+    expandedScaleGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedScale + blockIdx_ * perCoreIndicesElements_ * scaleCols_,
+                                     curCoreIndicesElements_ * scaleCols_);
 
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_OUT_BUFFER_NUM,
                       AlignBytes(curCorePerLoopIndicesElements_, sizeof(int32_t)));
@@ -228,8 +229,8 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::Process()
             for (int64_t indicesIndex = 0; indicesIndex < curLoopElements; indicesIndex++) {
                 int64_t rowIdx = subRowIdxLocal.GetValue(indicesIndex);
                 int64_t xSrcOffset = rowIdx / k_ * cols_ / NUM_TWO;
-                int64_t scaleSrcOffset = rowIdx / k_ * cols_ / SCALE_FACTOR_WITH_X;
-                int64_t scaleDstOffset = (curExpertLoopOffset + indicesIndex) * cols_ / SCALE_FACTOR_WITH_X;
+                int64_t scaleSrcOffset = rowIdx / k_ * scaleCols_;
+                int64_t scaleDstOffset = (curExpertLoopOffset + indicesIndex) * scaleCols_;
                 int64_t xDstOffset = (curExpertLoopOffset + indicesIndex) * cols_ / NUM_TWO;
                 SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
                 int64_t curLoopCols = perLoopCols_;
@@ -238,10 +239,11 @@ __aicore__ inline void MoeV3GatherOutMxFp4<T>::Process()
                         curLoopCols = lastLoopCols_;
                     }
                     if (isInputScale_ == 1) {
-                        CopyScaleIn(scaleSrcOffset + colsLoop * perLoopCols_ / SCALE_FACTOR_WITH_X,
-                                    curLoopCols / SCALE_FACTOR_WITH_X);
-                        CopyScaleOut(scaleDstOffset + colsLoop * perLoopCols_ / SCALE_FACTOR_WITH_X,
-                                     curLoopCols / SCALE_FACTOR_WITH_X);
+                        int64_t scaleLoopOffset = colsLoop * perLoopCols_ / SCALE_FACTOR_WITH_X;
+                        int64_t curLoopScaleCols = colsLoop == colsLoops_ - 1 ? scaleCols_ - scaleLoopOffset :
+                                                                                perLoopCols_ / SCALE_FACTOR_WITH_X;
+                        CopyScaleIn(scaleSrcOffset + scaleLoopOffset, curLoopScaleCols);
+                        CopyScaleOut(scaleDstOffset + scaleLoopOffset, curLoopScaleCols);
                     }
                     int64_t colsLoopOffset = colsLoop * perLoopCols_ / NUM_TWO;
                     CopyXIn(xSrcOffset + colsLoopOffset, curLoopCols / NUM_TWO);
