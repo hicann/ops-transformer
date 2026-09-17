@@ -625,6 +625,8 @@ attention:
       - attention/lightning_indexer_v2/README.md
     ut_cov_exclude:
       - attention/lightning_indexer_v2/tests
+      - attention/lightning_indexer_v2/op_host/lightning_indexer_v2_tiling_info_parser.h
+      - attention/lightning_indexer_v2/op_host/checkers/checker_adapter_lightning_indexer_v2.h
     test:
       examples: False
       ut: True
@@ -689,6 +691,7 @@ attention:
       - attention/quant_lightning_indexer_v2/README.md
     ut_cov_exclude:
       - attention/quant_lightning_indexer_v2/tests
+      - attention/quant_lightning_indexer_v2/op_host/quant_lightning_indexer_v2_tiling_info_parser.h
     test:
       examples: False
       ut: True

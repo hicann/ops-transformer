@@ -202,6 +202,11 @@ transformer-2@ops-transformer:
             - ops/ops-transformer/attention/*/op_kernel/
             - ops/ops-transformer/attention/*/op_api/
             - ops/ops-transformer/attention/*/op_graph/
+            - ops/ops-transformer/attention/kv_quant_sparse_flash_attention_v2/op_host/kv_quant_sparse_flash_attention_v2_tiling_register.cpp
+            - ops/ops-transformer/attention/sparse_flash_mla/op_host/checkers/checker_context.h
+            - ops/ops-transformer/attention/lightning_indexer_v2/op_host/lightning_indexer_v2_tiling_info_parser.h
+            - ops/ops-transformer/attention/quant_lightning_indexer_v2/op_host/quant_lightning_indexer_v2_tiling_info_parser.h
+            - ops/ops-transformer/attention/lightning_indexer_v2/op_host/checkers/checker_adapter_lightning_indexer_v2.h
 
 transformer-pfa_unevolved@ops-transformer:
     src:
