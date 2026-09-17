@@ -81,7 +81,7 @@ def _non_python_files(directory):
                 continue
         for filename in filenames:
             if filename.endswith((".h", ".cpp")):
-                paths.append(os.path.join(path, filename))
+                paths.append(os.path.relpath(os.path.join(path, filename), directory))
     return paths
 
 
