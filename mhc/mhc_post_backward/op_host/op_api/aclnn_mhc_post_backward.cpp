@@ -481,6 +481,9 @@ aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor *gradOutput, co
                                                  aclTensor *gradHres, aclTensor *gradHout, aclTensor *gradHpost,
                                                  uint64_t *workspaceSize, aclOpExecutor **executor)
 {
+    L2_DFX_PHASE_1(aclnnMhcPostBackward, DFX_IN(gradOutput, x, hRes, hOut, hPost),
+                   DFX_OUT(gradX, gradHres, gradHout, gradHpost));
+
     CHECK_COND(CheckNotNull(gradOutput, x, hRes, hOut, hPost, gradX, gradHres, gradHout, gradHpost) == ACLNN_SUCCESS,
                ACLNN_ERR_PARAM_NULLPTR, "one of required inputs for aclnnMhcPostBackwardGetWorkspaceSize is nullptr.");
     // Check if input tensors are empty
@@ -500,9 +503,6 @@ aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor *gradOutput, co
     aclTensor *outGradHres = nullptr;
     aclTensor *outGradHout = nullptr;
     aclTensor *outGradHpost = nullptr;
-
-    L2_DFX_PHASE_1(aclnnMhcPostBackward, DFX_IN(params.gradOutput, params.x, params.hRes, params.hOut, params.hPost),
-                   DFX_OUT(params.gradX, params.gradHres, params.gradHout, params.gradHpost));
 
     // Convert input tensors to contiguous
     auto reformatedGradOutput = l0op::Contiguous(gradOutput, uniqueExecutor.get());
