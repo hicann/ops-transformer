@@ -120,6 +120,11 @@ _LAYOUT_EXPECTED_NDIM = {
     "PA_BNBD": 4,
     "PA_BBND": 4,
 }
+_OUT_LAYOUT_EXPECTED_NDIM = {
+    "TND": 3,
+    "BSND": 4,
+    "BNSD": 4,
+}
 
 
 def _get_output_shape_sizes(q, v, layout_q, layout_kv):
@@ -494,6 +499,11 @@ def quant_flash_attn(
     torch._check(
         v.dim() == kv_expected,
         lambda: f"v with layout {layout_kv} expects {kv_expected} dims, but got {v.dim()} dims",
+    )
+    out_expected = _OUT_LAYOUT_EXPECTED_NDIM.get(layout_q)
+    torch._check(
+        out_expected is not None,
+        lambda: f"Unsupported layout_out: {layout_out!r}, expected one of TND/BSND/BNSD",
     )
     # 异常拦截: 仅校验决定输出 shape 的维度(q 除 D 外的 B/T/S/N 维度及 v 的 D 维度),
     # 其余维度(如 q 的 D 维)不影响输出 shape, 不在此拦截
