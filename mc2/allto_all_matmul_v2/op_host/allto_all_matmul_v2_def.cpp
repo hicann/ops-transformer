@@ -81,7 +81,7 @@ public:
         this->Attr("transpose_x1").AttrType(OPTIONAL).Bool(false);
         this->Attr("transpose_x2").AttrType(OPTIONAL).Bool(false);
         this->Attr("group_size").AttrType(OPTIONAL).Int(0);
-        this->Attr("comm_mode").AttrType(OPTIONAL).String("ai_cpu");
+        this->Attr("comm_mode").AttrType(OPTIONAL).String("aiv_urma");
         this->Attr("precision_mode").AttrType(OPTIONAL).Int(0);
 
         OpAICoreConfig aicoreConfig950;
