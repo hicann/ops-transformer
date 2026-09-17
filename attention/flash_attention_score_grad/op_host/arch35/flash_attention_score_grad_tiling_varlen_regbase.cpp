@@ -105,12 +105,20 @@ inline bool TNDRunIsLineWorthy(int64_t k, int64_t virtM, int64_t virtN, int64_t 
     return pairCount > 0 && virtN * pairCount >= k && virtM >= std::min(k, virtN);
 }
 
+enum class TNDRunShapeKind : uint8_t {
+    INVALID = 0,
+    CAUSAL_LEFT_UP,
+    CAUSAL_RIGHT_DOWN,
+    BAND,
+    BAND_DENSE,
+};
+
 struct TNDRunShape {
     int64_t m = 1;
     int64_t n = 1;
     int64_t p = 0;
     int64_t q = 0;
-    int64_t kind = 0;
+    TNDRunShapeKind kind = TNDRunShapeKind::INVALID;
 };
 
 inline bool SameTNDRunShape(const TNDRunShape &a, const TNDRunShape &b)
@@ -126,10 +134,10 @@ inline TNDRunShape MakeTNDCausalRunShape(const FuzzyBaseInfoParamsRegbase &p, in
         if (s.m < s.n) {
             s.n = s.m;
         }
-        s.kind = 2;
+        s.kind = TNDRunShapeKind::CAUSAL_LEFT_UP;
     } else {
         s.m -= GetTNDRightDownRowShift(s.m, s.n);
-        s.kind = 3;
+        s.kind = TNDRunShapeKind::CAUSAL_RIGHT_DOWN;
     }
     return s;
 }
@@ -181,7 +189,7 @@ inline TNDRunShape MakeTNDBandRunShape(FuzzyBaseInfoParamsRegbase &p, int64_t bI
 {
     TNDRunShape s;
     GetTNDBandMN(p, bIdx, s.m, s.n, s.p, s.q);
-    s.kind = (s.p >= s.m) ? 43 : 4;
+    s.kind = (s.p >= s.m) ? TNDRunShapeKind::BAND_DENSE : TNDRunShapeKind::BAND;
     return s;
 }
 
@@ -211,7 +219,7 @@ inline void StoreTNDPrefix(const std::vector<int64_t> &raw, int64_t step, int64_
 {
     std::vector<int64_t> sliced = SliceVector(raw, step);
     sliced.push_back(tailValue);
-    CopyTNDPrefix(sliced, dst, 132);
+    CopyTNDPrefix(sliced, dst, DETER_PREFIX_ARRAY_SIZE);
 }
 
 inline int64_t CalTNDBandWideCols(int64_t m, int64_t n, int64_t p, int64_t q)
@@ -292,7 +300,7 @@ inline bool PreferTNDLineDeter(FuzzyBaseInfoParamsRegbase &p)
             if (!leftUp && runHasSingle && shape.m < std::min(k, shape.n)) {
                 return false;
             }
-        } else if (shape.kind == 43) {
+        } else if (shape.kind == TNDRunShapeKind::BAND_DENSE) {
             if (!TNDRunIsLineWorthy(k, shape.m, shape.n, total)) {
                 return false;
             }
@@ -350,7 +358,7 @@ inline TNDLineDeterPack BuildTNDLineDeter(FuzzyBaseInfoParamsRegbase &p)
                                                                       (CeilDivideBy(shape.n, k) * shape.m)) :
                                                             0;
                 runSolo = pairRounds + singleRounds;
-            } else if (shape.kind == 43) {
+            } else if (shape.kind == TNDRunShapeKind::BAND_DENSE) {
                 runSolo = CeilDivideBy(shape.n * total, k) * shape.m;
             } else if (shape.p + shape.q <= shape.m) {
                 runSolo = CalTNDBandNarrowRounds(k, total, shape.m, shape.n, shape.p, shape.q);
