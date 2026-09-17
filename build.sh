@@ -1063,6 +1063,11 @@ function process_soc_input(){
 # 映射为编译用 soc_version 并赋值给 ASCEND_SOC_UNITS; 探测失败则保持默认值(ascend910b)。
 # 映射依据: cmake/scripts/util/const_var.py 的 SOC_MAP_EXT 与 opdesc_parser.py 的 SOC_TO_SHORT_SOC_MAP。
 function detect_soc_from_lspci() {
+    # torch_extension 模式为纯 Python 打包, 与 NPU 型号无关, 跳过探测避免误导性日志
+    if [[ "$ENABLE_TORCH_EXTENSION_ONLY" == "TRUE" ]]; then
+        return 0
+    fi
+
     # 用户已显式指定 --soc, 跳过自动探测
     if [[ "$SOC_USER_SPECIFIED" == "true" ]]; then
         return 0
