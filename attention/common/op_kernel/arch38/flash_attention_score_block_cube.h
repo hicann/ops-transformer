@@ -597,6 +597,9 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm2(
             this->valueGm.offsetCalculator.Init(0, constInfo.n2Size, runInfo.s2InCurrentBatch, constInfo.dSizeV);
         }
     }
+
+    WaitFlag<HardEvent::MTE3_MTE1>(SYNC_V1_C2_FLAG[runInfo.taskIdMod3]);
+
     if constexpr (IsSameType<INPUT_T, float>::value || (uint32_t)dVTemplateType > 256 ||
                   (uint32_t)dTemplateType > 256) {
         IterateBmm2L1SplitN(outputBuf, inputBuf, runInfo, constInfo);
@@ -659,6 +662,8 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm2(
         mm2ResL0C.Set<HardEvent::M_FIX>();  // 通知
         mm2ResL0C.Wait<HardEvent::M_FIX>(); // 等待
 
+        WaitFlag<HardEvent::V_FIX>(SYNC_C2_V2_FLAG[runInfo.taskIdMod2]);
+
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB;FixpipeParamsM300:L0C→UB
         fixpipeParams.nSize = constInfo.dSizeV;                // L0C上的bmm1结果矩阵N方向的size大小
 
@@ -682,6 +687,7 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm2(
                                                  fixpipeParams); // 将matmul结果从L0C搬运到UB
         mm2ResL0C.Set<HardEvent::FIX_M>();                       // 释放
     }
+    SetFlag<HardEvent::FIX_V>(SYNC_C2_V2_FLAG[runInfo.taskIdMod2]);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -1071,18 +1077,22 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm1Nd(
     mm1ResL0C.Set<HardEvent::M_FIX>();  // 通知
     mm1ResL0C.Wait<HardEvent::M_FIX>(); // 等待L0C
 
+    WaitFlag<HardEvent::V_FIX>(SYNC_C1_V1_FLAG[runInfo.taskIdMod2]);
+
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB
-    fixpipeParams.nSize =
-        (runInfo.s2RealSize + 7) >>
-        3 << 3; // L0C上的bmm1结果矩阵N方向的size大小; 同mmadParams.n; 为什么要8个元素对齐(32B对齐) // 128
-    fixpipeParams.mSize =
-        (runInfo.s1RealSize + 1) >>
-        1 << 1; // 有效数据不足16行，只需要输出部分行即可; L0C上的bmm1结果矩阵M方向的size大小(必须为偶数) // 128
-    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) *
-                              16; // L0C上bmm1结果相邻连续数据片段间隔(前面一个数据块的头与后面数据块的头的间隔),
-                                  // 单位为16*sizeof(T) // 源Nz矩阵中相邻大Z排布的起始地址偏移
-    fixpipeParams.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 // 128:根据比对dump文件得到,
-                                          // ND方案(S1*S2)时脏数据用mask剔除
+
+    // L0C上的bmm1结果矩阵N方向的size大小; 同mmadParams.n; 需要16对齐
+    fixpipeParams.nSize = (runInfo.s2RealSize + 15) >> 4 << 4;
+
+    constexpr uint32_t fixpAlign = 32 / sizeof(T);
+    // L0C上的bmm1结果矩阵M方向的size大小 // 需要做32B对齐
+    fixpipeParams.mSize = (static_cast<uint32_t>(runInfo.s1RealSize) + fixpAlign - 1) / fixpAlign * fixpAlign;
+
+    // L0C上bmm1结果相邻连续数据片段间隔(前面一个数据块的头与后面数据块的头的间隔) // 单位为16*sizeof(T) //
+    // 源Nz矩阵中相邻大Z排布的起始地址偏移
+    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16;
+    // mmResUb上两行之间的间隔，单位：element // ND方案(S1*S2)时脏数据用mask剔除
+    fixpipeParams.dstStride = s2BaseSize;
     fixpipeParams.dualDstCtl = 0; // 双目标模式，按M维度拆分，M / 2 * N写入每个UB, M必须为2的倍数
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
@@ -1093,6 +1103,7 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm1Nd(
     Fixpipe<T, L0C_TYPE, BMM1_FIXPIPE_CONFIG>(outputBuf.template GetTensor<T>(), mm1ResL0C.GetTensor<L0C_TYPE>(),
                                               fixpipeParams); // 将matmul结果从L0C搬运到UB
     mm1ResL0C.Set<HardEvent::FIX_M>();                        // 释放L0C
+    SetFlag<HardEvent::FIX_V>(SYNC_C1_V1_FLAG[runInfo.taskIdMod2]);
 }
 
 /* 针对S1Base=128, S2Base = 128, D > 256场景，L1层面切K，且左矩阵单Buffer+驻留，右矩阵每次重新搬运。*/
@@ -1294,6 +1305,8 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm1Dn(
     mm1ResL0C.Set<HardEvent::M_FIX>();  // 通知
     mm1ResL0C.Wait<HardEvent::M_FIX>(); // 等待L0C
 
+    WaitFlag<HardEvent::V_FIX>(SYNC_C1_V1_FLAG[runInfo.taskIdMod2]);
+
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB
     fixpipeParams.nSize =
         (runInfo.s1RealSize + 31) >>
@@ -1315,6 +1328,7 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm1Dn(
     Fixpipe<T, int32_t, PFA_CFG_ROW_MAJOR_UB>(outputBuf.template GetTensor<T>(), mm1ResL0C.GetTensor<int32_t>(),
                                               fixpipeParams); // 将matmul结果从L0C搬运到UB
     mm1ResL0C.Set<HardEvent::FIX_M>();                        // 释放L0C
+    SetFlag<HardEvent::FIX_V>(SYNC_C1_V1_FLAG[runInfo.taskIdMod2]);
 }
 
 TEMPLATES_DEF

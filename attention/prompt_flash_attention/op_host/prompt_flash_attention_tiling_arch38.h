@@ -23,6 +23,17 @@ namespace optiling {
 namespace arch38 {
 
 std::string GetPfaDataTypeStr(ge::DataType type);
+
+// arch38 已验证的 head size 白名单，PFA 与 IFA 两条场景门禁共用
+constexpr int64_t ARCH38_SUPPORTED_D_64 = 64;
+constexpr int64_t ARCH38_SUPPORTED_D_80 = 80;
+constexpr int64_t ARCH38_SUPPORTED_D_128 = 128;
+
+inline bool IsArch38SupportedHeadSize(int64_t d)
+{
+    return (d == ARCH38_SUPPORTED_D_64) || (d == ARCH38_SUPPORTED_D_80) || (d == ARCH38_SUPPORTED_D_128);
+}
+
 class PromptFlashAttentionTilingArch38 : public FiaTilingBase {
 public:
     platform_ascendc::PlatformAscendC ascendcPlatform;
@@ -227,6 +238,9 @@ protected:
     bool CheckAlibiPseShiftTypeAndShape(ContextParamsForPFATiling &contextKeyParams, uint32_t n);
     ge::graphStatus SetQKVStartIdx(ContextParamsForPFATiling &contextKeyParams);
     bool CheckAlibiPseCrossover(ContextParamsForPFATiling &contextKeyParams);
+
+    bool CheckArch38ScenarioSupported(const ContextParamsForPFATiling &contextKeyParams,
+                                      const PFAShapeInfo &queryShapeInfo, const PFAShapeInfo &valueShapeInfo) const;
 
 protected:
     ContextParamsForPFATiling *contextKeyParamsPtr = nullptr;

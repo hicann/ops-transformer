@@ -40,6 +40,8 @@ public:
     ge::graphStatus DoOpTiling() override;
     ge::graphStatus DoSubOpTiling(IncreFlashAttentionContext &ifaContext);
     static ge::graphStatus ConvertContext(gert::TilingContext &context, IncreFlashAttentionContext &ifaContext);
+    // FIA 在非伪量化的 IFA 场景下复用 PFA 模板，单独调用本门禁
+    bool CheckArch38ScenarioSupported(const IncreFlashAttentionContext &ifaContext) const;
 };
 
 } // namespace arch38

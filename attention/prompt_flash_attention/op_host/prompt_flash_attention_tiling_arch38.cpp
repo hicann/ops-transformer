@@ -100,6 +100,10 @@ constexpr uint32_t SLIMIT = 20971520; // s, kvs <= 20MB
 constexpr uint32_t DLIMIT = 512;      // D <= 512
 constexpr uint32_t HLIMIT = 65535;    // warning: H <= 65536
 
+// Validated scenario boundary of this platform, out-of-range cases are rejected instead of silently mis-computed.
+constexpr int64_t ARCH38_SUPPORTED_MAX_SEQ = 4096;
+constexpr int64_t ARCH38_SUPPORTED_MAX_N = 128;
+
 constexpr uint32_t MLA_QKD_SIZE = 192;
 constexpr uint32_t MLA_VD_SIZE = 128; // typical scene for PFA MLA, can be deleted after subsequent generalization.
 
@@ -4034,6 +4038,91 @@ bool PromptFlashAttentionTilingArch38::CheckAlibiPseCrossover(ContextParamsForPF
     return true;
 }
 
+bool PromptFlashAttentionTilingArch38::CheckArch38ScenarioSupported(const ContextParamsForPFATiling &contextKeyParams,
+                                                                    const PFAShapeInfo &queryShapeInfo,
+                                                                    const PFAShapeInfo &valueShapeInfo) const
+{
+    // IFA / MLA / 合轴路径各有自己的门禁，且 queryShapeInfo.n 与 .s 在调用点之前已按 gSize 改写，
+    // 与下面 qs == kvs、qs > 1 等 PFA 约束天然不兼容，此处直接放行
+    if (enableIFA || enableIFAMLA || enablePFAMerge || enablePFAMLA) {
+        return true;
+    }
+
+    OP_CHECK_IF((inputLayout != InputLayout::BNSD),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "only BNSD layout is supported on this platform."),
+                return false);
+
+    OP_CHECK_IF(
+        (queryShapeInfo.b != 1U),
+        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "batch size must be 1, but b = %u.", queryShapeInfo.b),
+        return false);
+
+    OP_CHECK_IF((queryShapeInfo.s != static_cast<uint64_t>(S2)),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                            "query seq length must equal kv seq length, but qs = %lu, kvs = %u.",
+                                            queryShapeInfo.s, S2),
+                return false);
+
+    OP_CHECK_IF(((queryShapeInfo.s <= 1UL) || (S2 <= 1U)),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                            "query and kv seq length must be greater than 1, but qs = %lu, kvs = %u.",
+                                            queryShapeInfo.s, S2),
+                return false);
+
+    OP_CHECK_IF((queryShapeInfo.s > static_cast<uint64_t>(ARCH38_SUPPORTED_MAX_SEQ)),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "seq length must be <= %ld, but seq = %lu.",
+                                            ARCH38_SUPPORTED_MAX_SEQ, queryShapeInfo.s),
+                return false);
+
+    OP_CHECK_IF((!IsArch38SupportedHeadSize(static_cast<int64_t>(queryShapeInfo.d)) ||
+                 !IsArch38SupportedHeadSize(static_cast<int64_t>(valueShapeInfo.d))),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                            "head size only supports 64/80/128, but query d = %u, value d = %u.",
+                                            queryShapeInfo.d, valueShapeInfo.d),
+                return false);
+
+    const int64_t nQ = *contextKeyParams.headsNumber;
+    const int64_t nKV = (*contextKeyParams.numKeyValueHeads > 0) ? *contextKeyParams.numKeyValueHeads : nQ;
+    OP_CHECK_IF(((nQ <= 0) || (nQ > ARCH38_SUPPORTED_MAX_N) || (nKV <= 0) || (nKV > ARCH38_SUPPORTED_MAX_N)),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                            "head num must be in (0, %ld], but numHeads = %ld, "
+                                            "numKeyValueHeads = %ld.",
+                                            ARCH38_SUPPORTED_MAX_N, nQ, nKV),
+                return false);
+
+    // Guarantees the kernel never takes the InitOutput branch.
+    OP_CHECK_IF((needInit != 0U),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                            "output must be fully covered by main loop (needInit = 0), "
+                                            "check actual_seq_lengths / preTokens / left padding configuration."),
+                return false);
+
+    OP_CHECK_IF(
+        (sparseModeVal != SPARSE_MODE_NO_MASK),
+        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                    "attention mask only supports sparseMode = 0, but sparseMode = %d.", sparseModeVal),
+        return false);
+
+    if (!enableMask) {
+        return true;
+    }
+
+    // With sparseMode = 0, nextTokensPerbatch always equals this attribute, no per-batch conversion needed.
+    OP_CHECK_IF(
+        (sparseNextTokens != 0),
+        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                    "attention mask requires nextTokens = 0, but nextTokens = %ld.", sparseNextTokens),
+        return false);
+
+    OP_CHECK_IF(
+        (sparsePreTokens <= 0),
+        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                    "attention mask requires preTokens > 0, but preTokens = %ld.", sparsePreTokens),
+        return false);
+
+    return true;
+}
+
 ge::graphStatus PromptFlashAttentionTilingArch38::CheckCrossoverAttribute(ContextParamsForPFATiling &contextKeyParams,
                                                                           PFAShapeInfo &queryShapeInfo,
                                                                           std::vector<int64_t> &actualSeqLengths,
@@ -4507,6 +4596,11 @@ ge::graphStatus PromptFlashAttentionTilingArch38::RunBigKernelTilingWithParams(
     // Check crossover attribute
     if (CheckCrossoverAttribute(contextKeyParams, queryShapeInfo, actualSeqLengths, actualSeqLengthsKV, tilingData) !=
         ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    // needInit is available only after CheckCrossoverAttribute, so the scenario gate is placed here.
+    if (!CheckArch38ScenarioSupported(contextKeyParams, queryShapeInfo, valueShapeInfo)) {
         return ge::GRAPH_FAILED;
     }
 

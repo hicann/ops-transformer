@@ -92,9 +92,7 @@ public:
     static constexpr bool bmm2Write2Ub = CubeBlockType::bmm2Write2Ub;
     static constexpr bool splitD = CubeBlockType::splitD;
     static constexpr uint64_t SYNC_MODE = 4;
-    static constexpr uint64_t SYNC_C1_V1_FLAG[2] = {0, 1};
-    static constexpr uint64_t SYNC_V1_C2_FLAG[3] = {2, 3, 4};
-    static constexpr uint64_t SYNC_C2_V2_FLAG[2] = {5, 6};
+
     /* 核间通道 */
     BufferManager<BufferType::GM> gmBufferManager;
     BuffersPolicy3buff<BufferType::GM, SyncType::CROSS_CORE_SYNC_FORWARD> bmm2ResGmBuffers;
@@ -243,13 +241,11 @@ __aicore__ inline void FlashAttentionScoreKernelBase<ChildClass, CubeBlockType, 
     constexpr uint32_t mm2LeftSize = s1BaseSize * s2BaseSize * sizeof(INPUT_T);
     l1BufferManager.Init(pipe, 524288); // 512 * 1024
     // 保存p结果的L1内存必须放在第一个L1 policy上，保证和vec申请的地址相同
-    PipeBarrier<PIPE_ALL>();
     l1PBuffers.Init(l1BufferManager, mm2LeftSize);
-    PipeBarrier<PIPE_ALL>();
+
     if constexpr (bmm2Write2Ub) {
         if constexpr (!(useDn && isFp8)) {
             ubBufferManager.Init(pipe, mm1ResultSize * 2 + mm2ResultSize * 2);
-            PipeBarrier<PIPE_ALL>();
             bmm2Buffers.Init(ubBufferManager, mm2ResultSize);
         } else {
             ubBufferManager.Init(pipe, mm1ResultSize * 2 + mm2ResultSize);

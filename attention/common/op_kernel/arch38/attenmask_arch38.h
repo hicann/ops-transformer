@@ -211,7 +211,7 @@ __aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t &delta, 
 #ifndef __CCE_KT_TEST__
 template <bool hasAtten>
 __aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
-                                         int32_t &halfS1RealSize, int64_t s2BaseSize)
+                                         int32_t &s1RealSize, int64_t s2BaseSize)
 {
     uint64_t maskPreUb = maskPre.GetPhyAddr();
     uint64_t maskNextUb = maskNext.GetPhyAddr();
@@ -224,8 +224,8 @@ __aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t> &maskPre, LocalTen
         rowNumEachLoop = regBytes / static_cast<uint16_t>(s2BaseSize);
         rowNumTimesEachLoop = 1;
     }
-    uint16_t halfS1RealSizeLoop = static_cast<uint16_t>(halfS1RealSize) + 1;
-    uint16_t loopCount = (halfS1RealSizeLoop / rowNumEachLoop) * rowNumTimesEachLoop;
+    uint16_t s1RealSizeLoop = static_cast<uint16_t>(s1RealSize) + 1;
+    uint16_t loopCount = (s1RealSizeLoop / rowNumEachLoop) * rowNumTimesEachLoop;
 
     __VEC_SCOPE__
     {
@@ -249,7 +249,7 @@ __aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t> &maskPre, LocalTen
 
 template <bool hasAtten>
 __aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
-                                           int32_t &halfS1RealSize, int64_t s2BaseSize)
+                                           int32_t &s1RealSize, int64_t s2BaseSize)
 {
     uint64_t maskPreUb = maskPre.GetPhyAddr();
     uint64_t maskNextUb = maskNext.GetPhyAddr();
@@ -262,8 +262,8 @@ __aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t> &maskPre, LocalT
         rowNumEachLoop = regBytes / static_cast<uint16_t>(s2BaseSize);
         rowNumTimesEachLoop = 1;
     }
-    uint16_t halfS1RealSizeLoop = static_cast<uint16_t>(halfS1RealSize) + 1;
-    uint16_t loopCount = (halfS1RealSizeLoop / rowNumEachLoop) * rowNumTimesEachLoop;
+    uint16_t s1RealSizeLoop = static_cast<uint16_t>(s1RealSize) + 1;
+    uint16_t loopCount = (s1RealSizeLoop / rowNumEachLoop) * rowNumTimesEachLoop;
 
     __VEC_SCOPE__
     {
@@ -440,7 +440,7 @@ __aicore__ inline void AttenMaskCopyIn(TQue<QuePosition::VECIN, 1> &attenMaskInQ
     if constexpr (hasAtten == true) {
         LocalTensor<uint8_t> attenMaskUb = attenMaskInQue.template AllocTensor<uint8_t>();
         int64_t maskOffset = ComputeAttenMaskOffset<hasAtten>(runInfo, constInfo, attenMaskInfo);
-        BoolCopyInRegbase<isInfer>(attenMaskUb, srcTensor, maskOffset, runInfo.halfS1RealSize, runInfo.s2RealSize,
+        BoolCopyInRegbase<isInfer>(attenMaskUb, srcTensor, maskOffset, runInfo.s1RealSize, runInfo.s2RealSize,
                                    attenMaskInfo.attenMaskS2Size, constInfo.s2BaseSize, constInfo);
         attenMaskInQue.template EnQue(attenMaskUb);
         return;
@@ -463,38 +463,37 @@ __aicore__ inline void AttenMaskCopyIn(TQue<QuePosition::VECIN, 1> &attenMaskInQ
             if (attenMaskInfo.computeMode == AttenMaskComputeMode::PREFIX_N_COMPUTE_MODE) {
                 maskOffset = attenMaskInfo.attenMaskOffsetPre;
             }
-            BoolCopyInRegbase<isInfer>(attenMaskUb, srcTensor, maskOffset, runInfo.halfS1RealSize, runInfo.s2RealSize,
+            BoolCopyInRegbase<isInfer>(attenMaskUb, srcTensor, maskOffset, runInfo.s1RealSize, runInfo.s2RealSize,
                                        attenMaskInfo.attenMaskS2Size, constInfo.s2BaseSize, constInfo);
             attenMaskInQue.template EnQue(attenMaskUb);
             if (attenMaskInfo.computeMode == AttenMaskComputeMode::PREFIX_COMPUTE_MODE) {
                 LocalTensor<uint8_t> attenMaskUbPre = attenMaskInQuePre.template AllocTensor<uint8_t>();
                 BoolCopyInRegbase<isInfer>(attenMaskUbPre, srcTensor, attenMaskInfo.attenMaskOffsetPre,
-                                           runInfo.halfS1RealSize, runInfo.s2RealSize, attenMaskInfo.attenMaskS2Size,
+                                           runInfo.s1RealSize, runInfo.s2RealSize, attenMaskInfo.attenMaskS2Size,
                                            constInfo.s2BaseSize, constInfo);
                 attenMaskInQuePre.template EnQue(attenMaskUbPre);
                 attenMaskInQuePre.template DeQue<uint8_t>();
                 attenMaskInQue.template DeQue<uint8_t>();
-                MergePrefixModeMask<hasAtten>(attenMaskUbPre, attenMaskUb, runInfo.halfS1RealSize,
-                                              constInfo.s2BaseSize);
+                MergePrefixModeMask<hasAtten>(attenMaskUbPre, attenMaskUb, runInfo.s1RealSize, constInfo.s2BaseSize);
                 attenMaskInQuePre.template FreeTensor(attenMaskUbPre);
                 attenMaskInQue.template EnQue(attenMaskUb);
             }
             return;
         }
-        BoolCopyInRegbase<isInfer>(attenMaskUb, srcTensor, maskOffset, runInfo.halfS1RealSize, runInfo.s2RealSize,
+        BoolCopyInRegbase<isInfer>(attenMaskUb, srcTensor, maskOffset, runInfo.s1RealSize, runInfo.s2RealSize,
                                    attenMaskInfo.attenMaskS2Size, constInfo.s2BaseSize, constInfo);
         attenMaskInQue.template EnQue(attenMaskUb);
         if (attenMaskInfo.compressMode == static_cast<uint8_t>(AttenMaskCompressMode::BAND_MODE) &&
             (attenMaskInfo.computeMode == AttenMaskComputeMode::PRE_ONLY_MODE ||
              attenMaskInfo.computeMode == AttenMaskComputeMode::PRE_AND_NEXT_MODE)) {
             LocalTensor<uint8_t> attenMaskUbPre = attenMaskInQuePre.template AllocTensor<uint8_t>();
-            BoolCopyInRegbase<isInfer>(attenMaskUbPre, srcTensor, attenMaskInfo.attenMaskOffsetPre,
-                                       runInfo.halfS1RealSize, runInfo.s2RealSize, attenMaskInfo.attenMaskS2Size,
-                                       constInfo.s2BaseSize, constInfo);
+            BoolCopyInRegbase<isInfer>(attenMaskUbPre, srcTensor, attenMaskInfo.attenMaskOffsetPre, runInfo.s1RealSize,
+                                       runInfo.s2RealSize, attenMaskInfo.attenMaskS2Size, constInfo.s2BaseSize,
+                                       constInfo);
             attenMaskInQuePre.template EnQue(attenMaskUbPre);
             attenMaskInQuePre.template DeQue<uint8_t>();
             attenMaskInQue.template DeQue<uint8_t>();
-            MergeBandModeMask<hasAtten>(attenMaskUbPre, attenMaskUb, runInfo.halfS1RealSize, constInfo.s2BaseSize);
+            MergeBandModeMask<hasAtten>(attenMaskUbPre, attenMaskUb, runInfo.s1RealSize, constInfo.s2BaseSize);
             attenMaskInQuePre.template FreeTensor(attenMaskUbPre);
             attenMaskInQue.template EnQue(attenMaskUb);
         }

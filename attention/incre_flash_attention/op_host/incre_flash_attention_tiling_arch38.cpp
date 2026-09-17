@@ -1,13 +1,12 @@
 /**
- * This program is free software, you can redistribute it and/or modify.
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING
-BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file incre_flash_attention_tiling_arch38.cpp
@@ -29,6 +28,13 @@ namespace arch38 {
 
 const int64_t tokenDefault = 2147483647; // for token default value
 const int32_t sparseDefault = 0;
+
+// Validated scenario boundary of this platform, out-of-range cases are rejected instead of silently mis-computed.
+constexpr int64_t ARCH38_IFA_SUPPORTED_MAX_N = 128;
+constexpr int64_t ARCH38_IFA_SUPPORTED_MAX_SKV = 4101;
+constexpr size_t BNSD_DIM_NUM = 4U;
+constexpr size_t BNSD_DIM_S = 2U;
+constexpr size_t BNSD_DIM_D = 3U;
 
 ge::graphStatus PFAConvertContext(ContextParamsForPFATiling &contextKeyParams, gert::TilingContext *context)
 {
@@ -204,8 +210,71 @@ ge::graphStatus IFATilingArch38::DoOpTiling()
     return ret;
 }
 
+bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionContext &ifaContext) const
+{
+    const char *opName = context_->GetNodeName();
+    // PagedAttention lays key out by block, its shape carries no real kv seq length for the check below
+    OP_CHECK_IF((ifaContext.blockTable.tensor != nullptr),
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "PagedAttention is not supported on this platform."), return false);
+
+    // BNSD_BSND shares the BNSD input layout, it only transposes the output, same as PFA's SetInputLayout
+    const std::string layoutStr = (ifaContext.layOut == nullptr) ? "" : std::string(ifaContext.layOut);
+    OP_CHECK_IF((layoutStr != "BNSD"),
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "only BNSD layout is supported on this platform."), return false);
+
+    OP_CHECK_IF(((ifaContext.query.shape == nullptr) || (ifaContext.key.shape == nullptr) ||
+                 (ifaContext.value.shape == nullptr)),
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "shape of query, key or value is null."), return false);
+
+    const auto &queryShape = ifaContext.query.shape->GetStorageShape();
+    const auto &keyShape = ifaContext.key.shape->GetStorageShape();
+    const auto &valueShape = ifaContext.value.shape->GetStorageShape();
+    OP_CHECK_IF(((queryShape.GetDimNum() != BNSD_DIM_NUM) || (keyShape.GetDimNum() != BNSD_DIM_NUM) ||
+                 (valueShape.GetDimNum() != BNSD_DIM_NUM)),
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "BNSD layout requires 4-dim query, key and value shapes."),
+                return false);
+
+    const int64_t sQ = queryShape.GetDim(BNSD_DIM_S);
+    OP_CHECK_IF((sQ != 1), OPS_REPORT_VECTOR_INNER_ERR(opName, "query seq length must be 1, but qs = %ld.", sQ),
+                return false);
+
+    const int64_t sKV = keyShape.GetDim(BNSD_DIM_S);
+    OP_CHECK_IF(((sKV <= 1) || (sKV > ARCH38_IFA_SUPPORTED_MAX_SKV)),
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "kv seq length must be in (1, %ld], but kvs = %ld.",
+                                            ARCH38_IFA_SUPPORTED_MAX_SKV, sKV),
+                return false);
+
+    OP_CHECK_IF((ifaContext.numHeads == nullptr), OPS_REPORT_VECTOR_INNER_ERR(opName, "numHeads got from ge is null."),
+                return false);
+    const int64_t nQ = static_cast<int64_t>(*ifaContext.numHeads);
+    // numKeyValueHeads defaults to numHeads when it is absent or left as 0
+    const int64_t nKV = ((ifaContext.kvHeadNums != nullptr) && (*ifaContext.kvHeadNums != 0U)) ?
+                            static_cast<int64_t>(*ifaContext.kvHeadNums) :
+                            nQ;
+    OP_CHECK_IF(((nQ <= 0) || (nQ > ARCH38_IFA_SUPPORTED_MAX_N) || (nKV <= 0) || (nKV > ARCH38_IFA_SUPPORTED_MAX_N)),
+                OPS_REPORT_VECTOR_INNER_ERR(opName,
+                                            "head num must be in (0, %ld], but numHeads = %ld, "
+                                            "numKeyValueHeads = %ld.",
+                                            ARCH38_IFA_SUPPORTED_MAX_N, nQ, nKV),
+                return false);
+
+    const int64_t dQ = queryShape.GetDim(BNSD_DIM_D);
+    const int64_t dV = valueShape.GetDim(BNSD_DIM_D);
+    OP_CHECK_IF((!IsArch38SupportedHeadSize(dQ) || !IsArch38SupportedHeadSize(dV)),
+                OPS_REPORT_VECTOR_INNER_ERR(opName,
+                                            "head size only supports 64/80/128, but query d = %ld, "
+                                            "value d = %ld.",
+                                            dQ, dV),
+                return false);
+
+    return true;
+}
+
 ge::graphStatus IFATilingArch38::DoSubOpTiling(IncreFlashAttentionContext &ifaContext)
 {
+    OP_CHECK_IF(!CheckArch38ScenarioSupported(ifaContext),
+                OP_LOGE(context_->GetNodeName(), "unsupported scenario on this platform."), return ge::GRAPH_FAILED);
+
     auto platformInfoPtr = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "platformInfoPtr is null!"),
@@ -225,7 +294,8 @@ ge::graphStatus IFATilingArch38::DoSubOpTiling(IncreFlashAttentionContext &ifaCo
     return ret;
 }
 
-REGISTER_TILING_TEMPLATE_FIA(IncreFlashAttention, IFATilingArch38, std::vector<int32_t>({(int32_t)NpuArch::DAV_5102}), 92);
+REGISTER_TILING_TEMPLATE_FIA(IncreFlashAttention, IFATilingArch38, std::vector<int32_t>({(int32_t)NpuArch::DAV_5102}),
+                             92);
 
 } // namespace arch38
 } // namespace optiling

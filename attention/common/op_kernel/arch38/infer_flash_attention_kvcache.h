@@ -487,11 +487,9 @@ __aicore__ inline void ComputeOffset(const RunParamStr<isInfer> &runParam, const
         }
     }
 
-    if (!constInfo.isGqa) {
-        runInfo.vecCoreOffset = constInfo.subBlockIdx * runInfo.firstHalfS1RealSize;
-    } else {
-        runInfo.vecCoreOffset = 0;
-    }
+    // arch38一个cube对应一个vector，没有subblock再分块，vec从S1基本块起始处算完整的一块，
+    // 因此mask/pse的S1方向不需要偏移
+    runInfo.vecCoreOffset = 0;
     if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH || layout == LayOutTypeEnum::LAYOUT_TND) {
         runInfo.valueOffset = runParam.valueCoreOffset + sInnerLoopIdx * constInfo.s2BaseN2Dv;
         if constexpr (isFd) {

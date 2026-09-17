@@ -39,6 +39,13 @@ REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1002312000040021212, FlashAt
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1001311000000001212, FlashAttentionScoreSimplifiedTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1001311000000021212, FlashAttentionScoreSimplifiedTilingData)
 
+// attenMask使能场景，mask占tilingKey第8位(1e8)，且使能mask时DN(4e7)必然关闭
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1002312000100001212, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1002312000100021212, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1001311000100001212, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1001311000100021212, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1002122000100021012, FlashAttentionScoreSimplifiedTilingData)
+
 // Inputs Index
 constexpr uint32_t QUERY_DIM_0 = 0;
 constexpr uint32_t QUERY_DIM_1 = 1;
@@ -1194,10 +1201,10 @@ ge::graphStatus FusedInferAttentionScoreTilingArch38::DoOpTiling()
     auto kDType = context_->GetInputDesc(KEY_INDEX)->GetDataType();
     // IFA非MLA或伪量化场景走IFA模板
     // IFA的MLA或PFA非伪量化场景走PFA模板
-    if ((qDType != kDType) ||
-        ((s == 1) && ((inputLayoutStr == "BSH") || (inputLayoutStr == "BNSD") || (inputLayoutStr == "BSND")) &&
-         ((context_->GetOptionalInputShape(QUERY_ROPE_INDEX) == nullptr) &&
-          (context_->GetOptionalInputShape(KEY_ROPE_INDEX) == nullptr)))) {
+    const bool isIfaNonMlaScenario = (s == 1) && (inputLayoutStr == "BNSD") &&
+                                     (context_->GetOptionalInputShape(QUERY_ROPE_INDEX) == nullptr) &&
+                                     (context_->GetOptionalInputShape(KEY_ROPE_INDEX) == nullptr);
+    if ((qDType != kDType) || isIfaNonMlaScenario) {
         auto platformInfoPtr = context_->GetPlatformInfo();
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
         if (qDType == kDType) {
@@ -1222,6 +1229,19 @@ ge::graphStatus FusedInferAttentionScoreTilingArch38::DoOpTiling()
         return ret;
     } else {
         // PFA tiling process
+        // 非伪量化的 IFA 场景复用 PFA 模板，使用IFA门禁
+        if (isIfaNonMlaScenario) {
+            IncreFlashAttentionContext ifaCheckContext{};
+            OP_CHECK_IF(
+                ConvertContextToParamsIFA(*context_, ifaCheckContext, isMaxWorkspace) != ge::GRAPH_SUCCESS,
+                OP_LOGE(context_->GetNodeName(), "Error occurred while converting tilingContext to ifa context!"),
+                return ge::GRAPH_FAILED);
+            IFATilingArch38 ifaTilingArch38(context_);
+            OP_CHECK_IF(!ifaTilingArch38.CheckArch38ScenarioSupported(ifaCheckContext),
+                        OP_LOGE(context_->GetNodeName(), "unsupported IFA scenario on this platform."),
+                        return ge::GRAPH_FAILED);
+        }
+
         constexpr int64_t D_ALIGN_32 = 32;
         constexpr int64_t D_ALIGN_16 = 16;
 

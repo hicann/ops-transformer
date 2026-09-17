@@ -282,8 +282,8 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::InitUniqueLocalBuffer(ConstInfo<isInfer, hasRope> &constInfo)
 {
     if (constInfo.isSoftmaxLseEnable) {
-        // 8: 适配TND，每行的结果存为8个重复lse元素（32B对齐）
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize >> 1U) * sizeof(float) * 8);
+        // 8: 适配TND，每行的结果存为8个重复lse元素（32B对齐）；无subblock再分块，vec1算完整的S1基本块
+        this->tPipe->InitBuffer(softmaxLseQueue, 1, BaseClass::s1BaseSize * sizeof(float) * 8);
     }
     if constexpr (POST_QUANT) {
         this->tPipe->InitBuffer(postQuantScaleQue, 1, 2048); // 2K
