@@ -347,7 +347,6 @@ class SymmBuffer:
         self.mask_buffer = None
 
     def _check_params(self) -> None:
-        intermediate_hidden = self.intermediate_hidden
         if "Ascend950" in torch.npu.get_device_name():
             _check_int_type(self.dispatch_quant_mode, "dispatch_quant_mode")
             if self.dispatch_quant_mode != 4:
@@ -372,15 +371,6 @@ class SymmBuffer:
                 raise ValueError(
                     "topk_weights_type only supports 0 or 1 on Ascend950, "
                     f"got {self.topk_weights_type!r} (type: {type(self.topk_weights_type).__name__})."
-                )
-            # arch35 checks the full GMM1 output width: 2 * intermediate_hidden.
-            _check_int_type(intermediate_hidden, "intermediate_hidden")
-            if not (
-                256 <= intermediate_hidden <= 4096 and intermediate_hidden % 128 == 0
-            ):
-                raise ValueError(
-                    "intermediate_hidden must be in [256, 4096] and a multiple of 128 "
-                    f"on Ascend950, got {intermediate_hidden!r} (type: {type(intermediate_hidden).__name__})."
                 )
 
     def _create_mask_buffer(self, ep_world_size: int) -> torch.Tensor:

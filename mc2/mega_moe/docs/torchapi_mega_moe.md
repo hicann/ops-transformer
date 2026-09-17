@@ -710,7 +710,7 @@ sym_buffer.update_group(group) -> None
         <td>intermediate_hidden</td>
         <td>int</td>
         <td>必选</td>
-        <td>激活后的中间特征维度。Linear1同时生成gate和up两个分支，因此Linear1的完整输出宽度为2 × intermediate_hidden。</td>
+        <td>激活后的中间特征维度。Linear1同时生成gate和up两个分支，因此Linear1的完整输出宽度为2 × intermediate_hidden。当前暂未使用，不参与通信缓冲区大小计算。</td>
     </tr>
     <tr>
         <td>max_recv_token_num</td>
