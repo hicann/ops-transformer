@@ -31,7 +31,7 @@ extern "C" {
  * biasOptional：表示公式中的bias，数据类型支持FLOAT16、BFLOAT16、FLOAT32、INT32，数据格式支持ND。
  * 部分场景支持的最大长度为1024个（详见接口文档约束说明），其他场景支持的最大长度为128个。
  * @param [in]
- * scaleOptional：代表量化参数中的缩放因子，数据类型支持BFLOAT16、FLOAT32、INT64、UINT64、FLOAT8_E8M0，数据格式支持ND，长度与weight相同。
+ * scaleOptional：代表量化参数中的缩放因子，数据类型支持BFLOAT16、FLOAT32、INT64、UINT64、FLOAT8_E8M0，数据格式支持ND和FRACTAL_NZ，长度与weight相同。
  * @param [in] offsetOptional：代表量化参数中的偏移量，数据类型支持FLOAT32，数据格式支持ND，长度与weight相同。
  * @param [in]
  * antiquantScaleOptional：代表伪量化参数中的缩放因子，数据类型支持FLOAT16、BFLOAT16、FLOAT8_E8M0，数据格式支持ND，长度与weight相同。
