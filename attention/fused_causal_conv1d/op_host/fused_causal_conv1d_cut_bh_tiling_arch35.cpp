@@ -342,9 +342,9 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetStrideInfo()
                                                          "The shape dim of x stride must be 3");
                 return ge::GRAPH_FAILED;
             }
-            // [batch, seq_len, dim]：token 维（dim1）stride >= 1，其余维 stride 必须 == 1
+            // [batch, seq_len, dim]：token 维（dim1）stride >= 1，dim维 stride 必须 == 1
             xStride_ = xStride->GetStride(DIM_1);
-            if (xStride_ < 1 || xStride->GetStride(DIM_0) != 1 || xStride->GetStride(DIM_2) != 1) {
+            if (xStride_ < 1 || xStride->GetStride(DIM_2) != 1) {
                 OP_LOGE_FOR_INVALID_STRIDE(
                     context_->GetNodeName(), "x",
                     (std::to_string(xStride->GetStride(DIM_0)) + ", " + std::to_string(xStride->GetStride(DIM_1)) +
