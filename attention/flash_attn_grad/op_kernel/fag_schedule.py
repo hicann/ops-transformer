@@ -261,8 +261,8 @@ def need_load_kv(constInfo, gIdx, localIdx):
     gPrev = s2_group_of(constInfo, pl.max(gIdx - 1, 0))
     lin = pl.max(isFirst, pl.min(gCur - gPrev, 1))
     if constInfo.enableSwizzle:
-        return pl.astype(swz, pl.DT_INT32)
-    return pl.astype(lin, pl.DT_INT32)
+        return swz
+    return lin
 
 
 def next_s2_same(constInfo, gIdx, localIdx):
@@ -270,8 +270,8 @@ def next_s2_same(constInfo, gIdx, localIdx):
     swz = pl.min((localIdx + 1) % constInfo.s1Outer, 1)
     lin = 1 - pl.min(s2_group_of(constInfo, gIdx + 1) - s2_group_of(constInfo, gIdx), 1)
     if constInfo.enableSwizzle:
-        return pl.astype(swz, pl.DT_INT32)
-    return pl.astype(lin, pl.DT_INT32)
+        return swz
+    return lin
 
 
 # ==================================================================
