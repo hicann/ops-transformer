@@ -456,11 +456,11 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 
 ### destroy
 
-**功能**：释放ElasticBuffer资源，包括host pinned内存（推理模式）、Engram运行时资源（训练模式下同时解除上层表内存的注册映射，不会释放调用方的内存）和Dispatch/Combine通信上下文。训练模式下HCCL默认通信buffer由框架管理，无需手动释放。当构造时 `explicitly_destroy=False`（默认）时，实例被垃圾回收时会自动调用本方法；当 `explicitly_destroy=True` 时，需要由调用方显式调用。
+**功能**：释放ElasticBuffer实例持有的资源，包括Dispatch/Combine通信上下文。注意：Engram通信的host pinned内存（含推理模式自建的host pinned内存、训练模式下调用方零拷贝存储的注册映射）在创建时已注册进HCCL引擎上下文且无反注册接口，destroy后该部分内存由进程级共享池按通信域保留、随进程退出统一释放，destroy不会释放该部分内存（调用方的存储内存本体始终不会被释放）。同通信域销毁后重建ElasticBuffer时直接复用共享池内存，复用约束：自建buffer重建容量不得超过首建值；外部零拷贝buffer重建时地址与大小必须与首建注册一致，否则接口报错，此时需更换新的通信域。训练模式下HCCL默认通信buffer由框架管理，无需手动释放。当构造时 `explicitly_destroy=False`（默认）时，实例被垃圾回收时会自动调用本方法；当 `explicitly_destroy=True` 时，需要由调用方显式调用。
 
 **输入参数**：无参数。
 
-**输出**：无返回值，资源释放完成。
+**输出**：无返回值，实例资源释放完成。
 
 ## 约束说明
 
