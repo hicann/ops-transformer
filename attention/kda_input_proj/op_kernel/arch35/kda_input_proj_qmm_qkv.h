@@ -118,6 +118,7 @@ __aicore__ inline typename KdaInputProjQmmQkv<TypePack>::Params KdaInputProjQmmQ
     params.qbmmParams.baseK = td.baseK;
     params.qbmmParams.isBias = NO_BIAS;
     params.qbmmParams.dbL0C = td.dbL0C;
+    params.qbmmParams.bMustHitL2 = td.bMustHitL2;
     return params;
 }
 

@@ -88,6 +88,8 @@ struct alignas(8) KdaInputProjQmmQkvParams {
     uint32_t nTailMain = 0;
     uint8_t nBufferNum = 0;
     uint8_t dbL0C = 0;
+    // 1: B 走 L2 NORMAL（同一核沿 M 复用权重时有收益）；0: streaming，关掉 L2
+    uint8_t bMustHitL2 = 1;
 };
 
 // Stage2 AIV：1D EleWise inplace Sigmoid(beta)。填值约定：

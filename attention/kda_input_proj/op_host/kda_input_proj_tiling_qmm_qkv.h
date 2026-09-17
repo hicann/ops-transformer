@@ -79,12 +79,20 @@ public:
         params.baseK = static_cast<uint32_t>(baseK);
         params.nBufferNum = nBufferNum;
         params.dbL0C = CalcDbL0C(baseM, baseN);
-        CalcTailTiles(baseM, baseN, params);
+        const uint64_t mCnt = Ops::Base::CeilDiv(m_, baseM);
+        const uint64_t nCnt = Ops::Base::CeilDiv(n_, baseN);
+        const uint64_t qmmTiles = mCnt * nCnt;
+        const uint32_t qmmUsedAic = static_cast<uint32_t>(std::min(qmmTiles, static_cast<uint64_t>(aicNum_)));
+        CalcTailTiles(baseM, baseN, qmmUsedAic, params);
+        // 单 M 轮时 B 只扫一遍，kernel replay 还会清 L2；streaming 少占 cache。
+        // mCnt>1 时同一核可能沿 M 复用 B，保持 L2 NORMAL。
+        params.bMustHitL2 = (mCnt > 1UL) ? 1U : 0U;
 
         OP_LOGI(opName_,
-                "KdaInputProj QMM tiling: m=%lu n=%lu k=%lu base(%u,%u,%u) kL1=%u scaleKL1=%u nBuf=%u dbL0C=%u", m_, n_,
-                k_, params.baseM, params.baseN, params.baseK, params.kL1, params.scaleKL1, params.nBufferNum,
-                params.dbL0C);
+                "KdaInputProj QMM tiling: m=%lu n=%lu k=%lu base(%u,%u,%u) tiles=%lu x %lu = %lu usedAic=%u/%u "
+                "kL1=%u scaleKL1=%u nBuf=%u dbL0C=%u bMustHitL2=%u l1=%lu/%lu",
+                m_, n_, k_, params.baseM, params.baseN, params.baseK, mCnt, nCnt, qmmTiles, qmmUsedAic, aicNum_,
+                params.kL1, params.scaleKL1, params.nBufferNum, params.dbL0C, params.bMustHitL2, finalL1, l1Size_);
         return ge::GRAPH_SUCCESS;
     }
 
@@ -122,30 +130,11 @@ private:
         const uint64_t nAlign = transWeight_ ? CUBE_BLOCK : L1_ALIGN_SIZE;
         const uint64_t kAlign = MXFP_DIVISOR_SIZE;
 
+        // 保持 256 级基本块。T=8、N=4608 时 nCnt=18
         baseM = Ops::Base::CeilAlign(std::min(m_, BASIC_BLOCK_256), mAlign);
         baseN = Ops::Base::CeilAlign(std::min(n_, BASIC_BLOCK_256), nAlign);
         baseK = Ops::Base::CeilAlign(std::min(k_, BASIC_BLOCK_128), kAlign);
-        if (baseM == 0UL || baseN == 0UL || baseK == 0UL) {
-            return false;
-        }
-
-        uint64_t mCnt = Ops::Base::CeilDiv(m_, baseM);
-        uint64_t nCnt = Ops::Base::CeilDiv(n_, baseN);
-        while (mCnt * nCnt < aicNum_ && (baseM > mAlign || baseN > nAlign)) {
-            if (baseM >= baseN && baseM > mAlign) {
-                baseM = std::max(mAlign, Ops::Base::FloorAlign(baseM / 2UL, mAlign));
-            } else if (baseN > nAlign) {
-                baseN = std::max(nAlign, Ops::Base::FloorAlign(baseN / 2UL, nAlign));
-            } else {
-                break;
-            }
-            if (baseM == 0UL || baseN == 0UL) {
-                return false;
-            }
-            mCnt = Ops::Base::CeilDiv(m_, baseM);
-            nCnt = Ops::Base::CeilDiv(n_, baseN);
-        }
-        return true;
+        return baseM != 0UL && baseN != 0UL && baseK != 0UL;
     }
 
     uint64_t GetDepthA1B1(uint64_t baseM, uint64_t baseN, uint64_t baseK) const
@@ -269,21 +258,10 @@ private:
         if (fullCover <= params.scaleKL1) {
             return params.scaleKL1;
         }
-        // params 是按值传入的副本，必须先存下原值：否则赋值后两个分支返回的都是
-        // fullCover，放不下时的回退失效，会让 L1 超配并触发 LOAD2D 读越界。
+
         const uint64_t fallback = params.scaleKL1;
         params.scaleKL1 = fullCover;
         return CanFitL1BufferNum(params, l1BufferNum) ? fullCover : fallback;
-    }
-
-    bool IsInnerKAlignedForStepK2(uint64_t stepKTwoKL1) const
-    {
-        // A is ND: K is inner. B transposed: K is inner.
-        const bool aOk = (k_ % L2_ALIGN_SIZE == 0UL);
-        const bool bOk = !transWeight_ || (k_ % L2_ALIGN_SIZE == 0UL);
-        const bool a2 = (stepKTwoKL1 % BASIC_BLOCK_256 == 0UL);
-        const bool b2 = !transWeight_ || (stepKTwoKL1 % BASIC_BLOCK_256 == 0UL);
-        return aOk && bOk && a2 && b2;
     }
 
     void ApplyMultiBuffer(const L1Estimate &params, uint32_t l1BufferNum, uint64_t &kL1, uint64_t &scaleKL1,
@@ -294,43 +272,65 @@ private:
         nBufferNum = static_cast<uint8_t>(l1BufferNum);
     }
 
+    bool TryL1Config(uint64_t baseM, uint64_t baseN, uint64_t kL1Cand, uint64_t initScaleKL1, uint32_t l1BufferNum,
+                     L1Estimate &out) const
+    {
+        if (kL1Cand == 0UL || l1BufferNum < L1_TWO_BUFFER) {
+            return false;
+        }
+        L1Estimate est{kL1Cand, GetHalfKFallbackScaleKL1(kL1Cand, initScaleKL1), baseM, baseN};
+        est.scaleKL1 = GetFullCoverScaleKL1IfPossible(est, l1BufferNum);
+        if (CanFitL1BufferNum(est, l1BufferNum)) {
+            out = est;
+            return true;
+        }
+        // 全 K scale 放不下时退回按 kL1 对齐的 scale 窗
+        est.scaleKL1 = GetHalfKFallbackScaleKL1(kL1Cand, initScaleKL1);
+        if (CanFitL1BufferNum(est, l1BufferNum)) {
+            out = est;
+            return true;
+        }
+        return false;
+    }
+
     void CalcNBufferNum(uint64_t baseM, uint64_t baseN, uint64_t baseK, uint64_t stepKa, uint64_t stepKb,
                         uint64_t initScaleKL1, uint64_t &kL1, uint64_t &scaleKL1, uint8_t &nBufferNum) const
     {
-        const uint64_t stepK = std::min(stepKa, stepKb);
-        const uint64_t currentKL1 = stepK * baseK;
-        L1Estimate current{currentKL1, GetHalfKFallbackScaleKL1(currentKL1, initScaleKL1), baseM, baseN};
-        const bool twoBufNotOverK = currentKL1 * L1_TWO_BUFFER < k_;
+        const uint64_t kAlign = std::max(baseK, L2_ALIGN_SIZE);
+        const uint64_t kL1Max = Ops::Base::FloorAlign(k_, kAlign);
+        L1Estimate best{};
+        uint32_t bestBuf = L1_TWO_BUFFER;
+        bool found = false;
+        uint64_t bestScore = 0UL;
 
-        if (CanFitL1BufferNum(current, L1_FOUR_BUFFER)) {
-            ApplyMultiBuffer(current, L1_FOUR_BUFFER, kL1, scaleKL1, nBufferNum);
-            return;
-        }
-
-        const uint64_t stepKTwoKL1 = 2UL * baseK;
-        const bool canReduce =
-            twoBufNotOverK && (stepK == 3UL || stepK == 4UL) && IsInnerKAlignedForStepK2(stepKTwoKL1);
-        L1Estimate step2 = current;
-        if (canReduce) {
-            step2 = {stepKTwoKL1, GetHalfKFallbackScaleKL1(stepKTwoKL1, initScaleKL1), baseM, baseN};
-            if (CanFitL1BufferNum(step2, L1_FOUR_BUFFER)) {
-                ApplyMultiBuffer(step2, L1_FOUR_BUFFER, kL1, scaleKL1, nBufferNum);
-                return;
+        for (uint64_t cand = kL1Max; cand >= kAlign; cand -= kAlign) {
+            const uint32_t bufs[] = {L1_FOUR_BUFFER, L1_THREE_BUFFER, L1_TWO_BUFFER};
+            for (uint32_t nBuf : bufs) {
+                L1Estimate est{};
+                if (!TryL1Config(baseM, baseN, cand, initScaleKL1, nBuf, est)) {
+                    continue;
+                }
+                const uint64_t score =
+                    est.kL1 * 1000UL + static_cast<uint64_t>(nBuf) * 10UL + (est.scaleKL1 >= k_ ? 1UL : 0UL);
+                if (!found || score > bestScore) {
+                    found = true;
+                    best = est;
+                    bestBuf = nBuf;
+                    bestScore = score;
+                }
+            }
+            if (found && best.kL1 >= cand) {
+                break;
             }
         }
 
-        if (twoBufNotOverK && CanFitL1BufferNum(current, L1_THREE_BUFFER)) {
-            ApplyMultiBuffer(current, L1_THREE_BUFFER, kL1, scaleKL1, nBufferNum);
-            return;
+        if (!found) {
+            const uint64_t stepK = std::min(stepKa, stepKb);
+            const uint64_t fallbackKL1 = stepK * baseK;
+            best = L1Estimate{fallbackKL1, GetHalfKFallbackScaleKL1(fallbackKL1, initScaleKL1), baseM, baseN};
+            bestBuf = L1_TWO_BUFFER;
         }
-        if (canReduce && twoBufNotOverK && CanFitL1BufferNum(step2, L1_THREE_BUFFER)) {
-            ApplyMultiBuffer(step2, L1_THREE_BUFFER, kL1, scaleKL1, nBufferNum);
-            return;
-        }
-
-        kL1 = current.kL1;
-        scaleKL1 = current.scaleKL1;
-        nBufferNum = L1_TWO_BUFFER;
+        ApplyMultiBuffer(best, bestBuf, kL1, scaleKL1, nBufferNum);
     }
 
     uint8_t CalcDbL0C(uint64_t baseM, uint64_t baseN) const
@@ -339,7 +339,7 @@ private:
         return need <= l0cSize_ ? static_cast<uint8_t>(DOUBLE_BUFFER) : 1U;
     }
 
-    void CalcTailTiles(uint64_t baseM, uint64_t baseN, KdaInputProjQmmQkvParams &params) const
+    void CalcTailTiles(uint64_t baseM, uint64_t baseN, uint32_t usedAic, KdaInputProjQmmQkvParams &params) const
     {
         params.mTailTile = 1;
         params.nTailTile = 1;
@@ -351,10 +351,10 @@ private:
         const uint64_t mCnt = Ops::Base::CeilDiv(m_, baseM);
         const uint64_t nCnt = Ops::Base::CeilDiv(n_, baseN);
         const uint64_t total = mCnt * nCnt;
-        if (total == 0UL || aicNum_ == 0U) {
+        if (total == 0UL || usedAic == 0U) {
             return;
         }
-        const uint64_t tailBlocks = total % aicNum_;
+        const uint64_t tailBlocks = total % static_cast<uint64_t>(usedAic);
         if (tailBlocks == 0UL) {
             return;
         }
@@ -363,7 +363,7 @@ private:
         uint64_t bestN = 1UL;
         for (uint64_t mt = 1UL; mt <= 4UL; ++mt) {
             for (uint64_t nt = 1UL; nt <= 4UL; ++nt) {
-                if (tailBlocks * mt * nt <= aicNum_ && mt * nt >= bestM * bestN) {
+                if (tailBlocks * mt * nt <= static_cast<uint64_t>(usedAic) && mt * nt >= bestM * bestN) {
                     bestM = mt;
                     bestN = nt;
                 }
