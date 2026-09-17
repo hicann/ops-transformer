@@ -925,6 +925,8 @@ template <class T, class P>
 __aicore__ inline void MhcPreBackwardKernel<T, P>::ProcessC0C1Pipeline()
 {
     if (GetBlockIdx() >= v1UsedCubeCoreNum_) {
+        // Init会在所有AIC上设置缓冲区令牌，未参与计算的AIC也必须回收，避免残留事件影响后续下发。
+        cubeCompute_.End();
         return;
     }
     bool enableHf32 = tiling_->implMode == MHC_PRE_BACKWARD_IMPL_MODE_HF32;
