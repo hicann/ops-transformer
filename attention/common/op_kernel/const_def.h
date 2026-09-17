@@ -15,6 +15,14 @@
 #ifndef CONST_DEF_H
 #define CONST_DEF_H
 
+// 静态布局成员偏移/大小推断（将空指针强制转换后的成员地址作为偏移，用于按偏移重建子Tensor）
+#ifndef OFFSET_OF_MEMBER
+#define OFFSET_OF_MEMBER(TYPE, MEMBER) ((uint64_t) & ((TYPE *)0)->MEMBER)
+#endif
+#ifndef SIZE_OF_MEMBER
+#define SIZE_OF_MEMBER(TYPE, MEMBER) (sizeof(((TYPE *)0)->MEMBER))
+#endif
+
 namespace AttentionCommon {
 constexpr uint64_t BYTE_BLOCK = 32UL;
 constexpr uint32_t FP32_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(float);
