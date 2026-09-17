@@ -184,3 +184,4 @@
 | 调用方式 | 调用样例 | 说明 |
 | :--- | :--- | :--- |
 | aclnn调用 | [test_aclnn_mhc_pre_backward.cpp](examples/test_aclnn_mhc_pre_backward.cpp) | 通过[aclnnMhcPreBackward](docs/aclnnMhcPreBackward.md)接口方式调用MhcPreBackward算子。 |
+| aclnn调用 | [test_aclnn_mhc_pre_backward_v2.cpp](examples/test_aclnn_mhc_pre_backward_v2.cpp) | 通过[aclnnMhcPreBackwardV2](docs/aclnnMhcPreBackwardV2.md)接口指定Cube计算模式并调用MhcPreBackward算子。 |

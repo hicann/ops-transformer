@@ -20,14 +20,24 @@
 #include "op_host/tiling_base.h"
 #include "err/ops_err.h"
 #include "platform/platform_infos_def.h"
-#include "../../../op_kernel/arch35/mhc_pre_backward_tiling_key.h"
 #include "../mhc_pre_backward_tiling.h"
 
 namespace optiling {
 
+BEGIN_TILING_DATA_DEF(MMConfig)
+TILING_DATA_FIELD_DEF(uint32_t, baseM);
+TILING_DATA_FIELD_DEF(uint32_t, baseN);
+TILING_DATA_FIELD_DEF(uint32_t, baseK);
+TILING_DATA_FIELD_DEF(uint32_t, l1K);
+TILING_DATA_FIELD_DEF(uint32_t, depthA1);
+TILING_DATA_FIELD_DEF(uint32_t, depthB1);
+TILING_DATA_FIELD_DEF(uint32_t, dbL0A);
+TILING_DATA_FIELD_DEF(uint32_t, dbL0B);
+TILING_DATA_FIELD_DEF(uint32_t, dbL0C);
+END_TILING_DATA_DEF;
+REGISTER_TILING_DATA_CLASS(MMConfigOp, MMConfig);
+
 BEGIN_TILING_DATA_DEF(MhcPreBackwardTilingData)
-TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, matmulTilingC0);
-TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, matmulTilingC1);
 TILING_DATA_FIELD_DEF(uint32_t, coreNum);
 TILING_DATA_FIELD_DEF(uint32_t, vecCoreNum);
 TILING_DATA_FIELD_DEF(uint64_t, totalLength);
@@ -36,6 +46,22 @@ TILING_DATA_FIELD_DEF(uint64_t, N);
 TILING_DATA_FIELD_DEF(uint64_t, D);
 TILING_DATA_FIELD_DEF(uint64_t, fusionSize); // N ^ 2 + 2 * N
 TILING_DATA_FIELD_DEF(float, hcEps);
+TILING_DATA_FIELD_DEF(uint32_t, implMode);
+TILING_DATA_FIELD_DEF_STRUCT(MMConfig, mmConfigC0);
+TILING_DATA_FIELD_DEF_STRUCT(MMConfig, mmConfigC1);
+TILING_DATA_FIELD_DEF(uint32_t, maxBufferDepth);
+TILING_DATA_FIELD_DEF(uint32_t, l1UsedBytes);
+TILING_DATA_FIELD_DEF(uint32_t, l1BOffsetElems);
+TILING_DATA_FIELD_DEF(uint32_t, l1SingleBufferElems);
+TILING_DATA_FIELD_DEF(uint32_t, l0ABUsedBytes);
+TILING_DATA_FIELD_DEF(uint32_t, l0ABSingleBufferElems);
+TILING_DATA_FIELD_DEF(uint32_t, l0CUsedBytes);
+TILING_DATA_FIELD_DEF(uint32_t, l0CSingleBufferElems);
+TILING_DATA_FIELD_DEF(uint32_t, c0MBlock);
+TILING_DATA_FIELD_DEF(uint32_t, c0NBlock);
+TILING_DATA_FIELD_DEF(uint32_t, c1KBlock);
+TILING_DATA_FIELD_DEF(uint32_t, c0ToV2Rows);
+TILING_DATA_FIELD_DEF(uint32_t, v2ToC1Rows);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MhcPreBackward, MhcPreBackwardTilingData);
@@ -53,10 +79,7 @@ protected:
         return true;
     }
     // 1、获取平台信息比如CoreNum、UB/L1/L0C资源大小
-    ge::graphStatus GetPlatformInfo() override
-    {
-        return ge::GRAPH_SUCCESS;
-    };
+    ge::graphStatus GetPlatformInfo() override;
     // 2、获取INPUT/OUTPUT/ATTR信息
     ge::graphStatus GetShapeAttrsInfo() override
     {
@@ -64,7 +87,7 @@ protected:
     };
     // 3、计算数据切分TilingData
     ge::graphStatus DoOpTiling() override;
-    // 4、计算高阶API的TilingData
+    // 4、库API Tiling阶段
     ge::graphStatus DoLibApiTiling() override
     {
         return ge::GRAPH_SUCCESS;
@@ -88,15 +111,12 @@ protected:
     ge::graphStatus ParseTNDFormat(const gert::Tensor *gradHInTensor, const gert::Tensor *gradHPostTensor,
                                    const gert::Tensor *gradHResTensor);
     ge::graphStatus ValidateShapeParams();
+    void SetMmConfig();
+    ge::graphStatus ValidateMmConfig();
     void PrintTilingData();
     ge::graphStatus ParseInputAndAttr();
     void FillTilingData();
-    void SetC0TilingParams();
-    void SetC1TilingParams();
     void SetCommonTilingParams();
-    void SetMatmulC0Tiling(matmul_tiling::MatmulApiTiling &mm);
-    void SetMatmulC1Tiling(matmul_tiling::MatmulApiTiling &mm);
-    ge::graphStatus GetMatmulTiling(matmul_tiling::MatmulApiTiling &mm, bool isC0);
     ge::graphStatus TilingProcess();
 
     static uint64_t CalculateWorkspaceSize(uint64_t totalLength, uint64_t fusionSize, uint64_t cubeCoreNum,
@@ -110,7 +130,22 @@ private:
     uint64_t N_{0};
     uint64_t D_{0};
     float hcEps_{0.0f};
+    uint32_t implMode_{0U};
     uint64_t fusionSize_{0};
+    uint64_t ubSize_{0};
+    uint64_t l1Size_{0};
+    uint64_t l2Size_{0};
+    uint64_t l0ASize_{0};
+    uint64_t l0BSize_{0};
+    uint64_t l0CSize_{0};
+    uint32_t maxBufferDepth_{0};
+    uint32_t l1UsedBytes_{0};
+    uint32_t l1BOffsetElems_{0};
+    uint32_t l1SingleBufferElems_{0};
+    uint32_t l0ABUsedBytes_{0};
+    uint32_t l0ABSingleBufferElems_{0};
+    uint32_t l0CUsedBytes_{0};
+    uint32_t l0CSingleBufferElems_{0};
 };
 
 } // namespace optiling

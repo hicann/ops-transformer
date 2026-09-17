@@ -17,7 +17,7 @@
 #include <vector>
 #include <numeric>
 #include "acl/acl.h"
-#include "aclnnop/aclnn_mhc_pre_backward.h"
+#include "aclnnop/aclnn_mhc_pre_backward_v2.h"
 
 #define CHECK_RET(cond, return_expr) \
     do { \
@@ -234,16 +234,17 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     float hc_eps = 1e-6;
+    int64_t opImplMode = 1;
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor;
 
-    // 调用aclnnMhcPreBackward第一段接口
-    ret = aclnnMhcPreBackwardGetWorkspaceSize(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost,
-                                              gamma, gradXPostOptional, hc_eps, gradX, gradPhi, gradAlpha, gradBias,
-                                              gradGamma, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMhcPreBackwardGetWorkspaceSize failed. ERROR: %d\n", ret);
+    // 调用aclnnMhcPreBackwardV2第一段接口
+    ret = aclnnMhcPreBackwardV2GetWorkspaceSize(x, phi, alpha, gradHIn, gradHPost, gradHRes, invRms, hMix, hPre, hPost,
+                                                gamma, gradXPostOptional, hc_eps, opImplMode, gradX, gradPhi, gradAlpha,
+                                                gradBias, gradGamma, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMhcPreBackwardV2GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
@@ -253,9 +254,9 @@ int main()
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
 
-    // 调用aclnnMhcPreBackward第二段接口
-    ret = aclnnMhcPreBackward(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMhcPreBackward failed. ERROR: %d\n", ret); return ret);
+    // 调用aclnnMhcPreBackwardV2第二段接口
+    ret = aclnnMhcPreBackwardV2(workspaceAddr, workspaceSize, executor, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMhcPreBackwardV2 failed. ERROR: %d\n", ret); return ret);
 
     // 4. （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);

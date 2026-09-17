@@ -13,6 +13,7 @@
  * \brief
  */
 #include "mhc_pre_backward_tiling.h"
+#include "../../../op_kernel/arch35/mhc_pre_backward_tiling_key.h"
 #include "op_host/tiling_templates_registry.h"
 #include "register/op_def_registry.h"
 #include "platform/platform_infos_def.h"
@@ -38,9 +39,6 @@ const constexpr int64_t INDEX_T = 0;
 const constexpr int64_t INDEX_N = 1;
 const constexpr int64_t INDEX_D_TND = 1;
 
-const constexpr int32_t C0_BASE_M = 256;
-const constexpr int32_t C0_BASE_N = 128;
-const constexpr int32_t C0_BASE_K = 32;
 const constexpr uint32_t MIN_D_LENGTH = 1;
 const constexpr uint32_t MAX_D_LENGTH = 16384;
 const constexpr uint32_t D_ALIGN = 64;
@@ -49,8 +47,10 @@ const constexpr uint32_t DEFAULT_TILING_PRIORITY = 1000;
 const constexpr uint32_t LEGAL_N_VALUES[] = {4, 6, 8};
 const constexpr uint32_t LEGAL_N_COUNT = 3;
 const constexpr float DEFAULT_HC_EPS = 1e-6f;
+const constexpr int64_t IMPL_MODE_FP32 = 0;
+const constexpr int64_t IMPL_MODE_HF32 = 1;
+const constexpr uint32_t IMPL_MODE_ATTR_INDEX = 1;
 
-const constexpr uint32_t C0_SET_VALUE = 1;
 const constexpr uint32_t ALPHA_GRAD_CORE_FACTOR = 24;
 const constexpr uint32_t BUFFER_NUM = 2;
 const constexpr uint32_t EXTRA_BUFFER_SIZE = 2 * 1024 * 1024;
@@ -58,12 +58,75 @@ const constexpr uint32_t WORKSPACE_ALIGN_SIZE = 32;
 const constexpr uint64_t SYSTEM_WORKSPACE_SIZE = 40 * 1024 * 1024;
 const constexpr int32_t SCHEDULE_MODE = 1;
 
-const constexpr uint32_t C0_SET_SHAPE_M = 1024;
-const constexpr uint32_t C0_SET_SHAPE_N = 128;
-const constexpr uint32_t C1_SET_SHAPE_M_BASE = 128;
-const constexpr uint32_t C1_SET_SHAPE_K = 1024;
+const constexpr uint32_t C0_SET_SHAPE_M = 512U;
+const constexpr uint32_t C0_SET_SHAPE_N = 128U;
+const constexpr uint32_t C1_SET_SHAPE_K = 512U;
+const constexpr uint32_t C0_TO_V2_ROWS = 128U;
+const constexpr uint32_t V2_TO_C1_ROWS = 512U;
+
+const constexpr uint32_t C0_BASE_M = 128U;
+const constexpr uint32_t C0_BASE_N = 128U;
+const constexpr uint32_t C0_BASE_K = 32U;
+const constexpr uint32_t C0_L1_K = 64U;
+const constexpr uint32_t C0_DEPTH_A1 = 2U;
+const constexpr uint32_t C0_DEPTH_B1 = 2U;
+const constexpr uint32_t C0_DB_L0A = 2U;
+const constexpr uint32_t C0_DB_L0B = 2U;
+const constexpr uint32_t C0_DB_L0C = 2U;
+
+const constexpr uint32_t C1_BASE_M = 128U;
+const constexpr uint32_t C1_BASE_N = 128U;
+const constexpr uint32_t C1_BASE_K = 32U;
+const constexpr uint32_t C1_L1_K = 64U;
+const constexpr uint32_t C1_DEPTH_A1 = 2U;
+const constexpr uint32_t C1_DEPTH_B1 = 2U;
+const constexpr uint32_t C1_DB_L0A = 2U;
+const constexpr uint32_t C1_DB_L0B = 2U;
+const constexpr uint32_t C1_DB_L0C = 2U;
 
 REGISTER_OPS_TILING_TEMPLATE(MhcPreBackward, MhcPreBackwardTiling, DEFAULT_TILING_PRIORITY);
+
+ge::graphStatus MhcPreBackwardTiling::GetPlatformInfo()
+{
+    const auto *compileInfo = context_->GetCompileInfo<MhcPreBackwardCompileInfo>();
+    OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(context_->GetNodeName(), "get compile info failed"),
+                return ge::GRAPH_FAILED);
+
+    auto platformInfo = context_->GetPlatformInfo();
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_->GetNodeName(), "get platform info failed"),
+                return ge::GRAPH_FAILED);
+    platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
+
+    uint64_t aicNum = compileInfo->aicNum != 0U ? compileInfo->aicNum : ascendcPlatform.GetCoreNumAic();
+    uint64_t aivNum = compileInfo->aivNum != 0U ? compileInfo->aivNum : ascendcPlatform.GetCoreNumAiv();
+    OP_CHECK_IF(aicNum == 0U || aivNum == 0U || aicNum > UINT32_MAX || aivNum > UINT32_MAX,
+                OP_LOGE(context_->GetNodeName(), "invalid core count, aic=%lu, aiv=%lu", aicNum, aivNum),
+                return ge::GRAPH_FAILED);
+    blockDim_ = static_cast<uint32_t>(aicNum);
+    vecCoreNum_ = static_cast<uint32_t>(aivNum);
+
+    auto getMemorySize = [&ascendcPlatform](uint64_t parsedSize, platform_ascendc::CoreMemType type) {
+        if (parsedSize != 0U) {
+            return parsedSize;
+        }
+        uint64_t platformSize = 0U;
+        ascendcPlatform.GetCoreMemSize(type, platformSize);
+        return platformSize;
+    };
+    ubSize_ = getMemorySize(compileInfo->ubSize, platform_ascendc::CoreMemType::UB);
+    l1Size_ = getMemorySize(compileInfo->l1Size, platform_ascendc::CoreMemType::L1);
+    l2Size_ = getMemorySize(compileInfo->l2Size, platform_ascendc::CoreMemType::L2);
+    l0ASize_ = getMemorySize(compileInfo->l0ASize, platform_ascendc::CoreMemType::L0_A);
+    l0BSize_ = getMemorySize(compileInfo->l0BSize, platform_ascendc::CoreMemType::L0_B);
+    l0CSize_ = getMemorySize(compileInfo->l0CSize, platform_ascendc::CoreMemType::L0_C);
+    OP_CHECK_IF(ubSize_ == 0U || l1Size_ == 0U || l0ASize_ == 0U || l0BSize_ == 0U || l0CSize_ == 0U,
+                OP_LOGE(context_->GetNodeName(), "invalid platform memory, ub=%lu, l1=%lu, l0a=%lu, l0b=%lu, l0c=%lu",
+                        ubSize_, l1Size_, l0ASize_, l0BSize_, l0CSize_),
+                return ge::GRAPH_FAILED);
+    OP_LOGI(context_->GetNodeName(), "platform info: aic=%u, aiv=%u, ub=%lu, l1=%lu, l2=%lu, l0a=%lu, l0b=%lu, l0c=%lu",
+            blockDim_, vecCoreNum_, ubSize_, l1Size_, l2Size_, l0ASize_, l0BSize_, l0CSize_);
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus MhcPreBackwardTiling::GetInputTensors(const gert::Tensor *&gradHInTensor,
                                                       const gert::Tensor *&gradHPostTensor,
@@ -181,6 +244,89 @@ ge::graphStatus MhcPreBackwardTiling::ValidateShapeParams()
     return ge::GRAPH_SUCCESS;
 }
 
+void MhcPreBackwardTiling::SetMmConfig()
+{
+    tilingData_.mmConfigC0.set_baseM(C0_BASE_M);
+    tilingData_.mmConfigC0.set_baseN(C0_BASE_N);
+    tilingData_.mmConfigC0.set_baseK(C0_BASE_K);
+    tilingData_.mmConfigC0.set_l1K(C0_L1_K);
+    tilingData_.mmConfigC0.set_depthA1(C0_DEPTH_A1);
+    tilingData_.mmConfigC0.set_depthB1(C0_DEPTH_B1);
+    tilingData_.mmConfigC0.set_dbL0A(C0_DB_L0A);
+    tilingData_.mmConfigC0.set_dbL0B(C0_DB_L0B);
+    tilingData_.mmConfigC0.set_dbL0C(C0_DB_L0C);
+
+    tilingData_.mmConfigC1.set_baseM(C1_BASE_M);
+    tilingData_.mmConfigC1.set_baseN(C1_BASE_N);
+    tilingData_.mmConfigC1.set_baseK(C1_BASE_K);
+    tilingData_.mmConfigC1.set_l1K(C1_L1_K);
+    tilingData_.mmConfigC1.set_depthA1(C1_DEPTH_A1);
+    tilingData_.mmConfigC1.set_depthB1(C1_DEPTH_B1);
+    tilingData_.mmConfigC1.set_dbL0A(C1_DB_L0A);
+    tilingData_.mmConfigC1.set_dbL0B(C1_DB_L0B);
+    tilingData_.mmConfigC1.set_dbL0C(C1_DB_L0C);
+}
+
+ge::graphStatus MhcPreBackwardTiling::ValidateMmConfig()
+{
+    MMConfig &mmConfigC0_ = tilingData_.mmConfigC0;
+    MMConfig &mmConfigC1_ = tilingData_.mmConfigC1;
+    constexpr uint64_t elementSize = sizeof(float);
+
+    uint64_t c0A1SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC0_.get_baseM()) * mmConfigC0_.get_l1K() * elementSize;
+    uint64_t c0B1SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC0_.get_baseN()) * mmConfigC0_.get_l1K() * elementSize;
+    uint64_t c1A1SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC1_.get_baseM()) * mmConfigC1_.get_l1K() * elementSize;
+    uint64_t c1B1SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC1_.get_baseN()) * mmConfigC1_.get_l1K() * elementSize;
+    uint64_t l1SingleBufferBytes = std::max(std::max(c0A1SingleBufferBytes, c0B1SingleBufferBytes),
+                                            std::max(c1A1SingleBufferBytes, c1B1SingleBufferBytes));
+
+    uint64_t c0A2SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC0_.get_baseM()) * mmConfigC0_.get_baseK() * elementSize;
+    uint64_t c0B2SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC0_.get_baseN()) * mmConfigC0_.get_baseK() * elementSize;
+    uint64_t c1A2SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC1_.get_baseM()) * mmConfigC1_.get_baseK() * elementSize;
+    uint64_t c1B2SingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC1_.get_baseN()) * mmConfigC1_.get_baseK() * elementSize;
+    uint64_t l0ABSingleBufferBytes = std::max(std::max(c0A2SingleBufferBytes, c0B2SingleBufferBytes),
+                                              std::max(c1A2SingleBufferBytes, c1B2SingleBufferBytes));
+
+    uint64_t c0L0CSingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC0_.get_baseM()) * mmConfigC0_.get_baseN() * elementSize;
+    uint64_t c1L0CSingleBufferBytes =
+        static_cast<uint64_t>(mmConfigC1_.get_baseM()) * mmConfigC1_.get_baseN() * elementSize;
+    uint64_t l0CSingleBufferBytes = std::max(c0L0CSingleBufferBytes, c1L0CSingleBufferBytes);
+    uint64_t depthA1 = std::max(mmConfigC0_.get_depthA1(), mmConfigC1_.get_depthA1());
+    uint64_t depthB1 = std::max(mmConfigC0_.get_depthB1(), mmConfigC1_.get_depthB1());
+    uint64_t dbL0 = std::max(std::max(mmConfigC0_.get_dbL0A(), mmConfigC1_.get_dbL0A()),
+                             std::max(mmConfigC0_.get_dbL0B(), mmConfigC1_.get_dbL0B()));
+    uint64_t dbL0C = std::max(mmConfigC0_.get_dbL0C(), mmConfigC1_.get_dbL0C());
+    uint64_t l1UsedBytes = (depthA1 + depthB1) * l1SingleBufferBytes;
+    uint64_t l0ABUsedBytes = dbL0 * l0ABSingleBufferBytes;
+    uint64_t l0CUsedBytes = dbL0C * l0CSingleBufferBytes;
+    OP_CHECK_IF(l1UsedBytes > l1Size_ || l0ABUsedBytes > l0ASize_ || l0ABUsedBytes > l0BSize_ ||
+                    l0CUsedBytes > l0CSize_ || l1UsedBytes > UINT32_MAX || l0ABUsedBytes > UINT32_MAX ||
+                    l0CUsedBytes > UINT32_MAX,
+                OP_LOGE(context_->GetNodeName(),
+                        "MM config exceeds platform memory: L1=%lu/%lu, L0A/B=%lu/%lu/%lu, L0C=%lu/%lu", l1UsedBytes,
+                        l1Size_, l0ABUsedBytes, l0ASize_, l0BSize_, l0CUsedBytes, l0CSize_),
+                return ge::GRAPH_FAILED);
+    maxBufferDepth_ = static_cast<uint32_t>(std::max(std::max(depthA1, depthB1), std::max(dbL0, dbL0C)));
+    l1UsedBytes_ = static_cast<uint32_t>(l1UsedBytes);
+    l1SingleBufferElems_ = static_cast<uint32_t>(l1SingleBufferBytes / elementSize);
+    l1BOffsetElems_ = static_cast<uint32_t>(depthA1 * l1SingleBufferElems_);
+    l0ABUsedBytes_ = static_cast<uint32_t>(l0ABUsedBytes);
+    l0ABSingleBufferElems_ = static_cast<uint32_t>(l0ABSingleBufferBytes / elementSize);
+    l0CUsedBytes_ = static_cast<uint32_t>(l0CUsedBytes);
+    l0CSingleBufferElems_ = static_cast<uint32_t>(l0CSingleBufferBytes / elementSize);
+
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MhcPreBackwardTiling::GetInputShape()
 {
     const gert::Tensor *gradHInTensor = nullptr;
@@ -227,15 +373,6 @@ ge::graphStatus MhcPreBackwardTiling::ParseInputAndAttr()
         return ge::GRAPH_FAILED;
     }
 
-    auto platformInfo = context_->GetPlatformInfo();
-    if (platformInfo == nullptr) {
-        OP_LOGE(context_->GetNodeName(), "get platform info failed");
-        return ge::GRAPH_FAILED;
-    }
-    platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
-    blockDim_ = ascendcPlatform.GetCoreNumAic();
-    vecCoreNum_ = ascendcPlatform.GetCoreNumAiv();
-
     auto attrs = context_->GetAttrs();
     if (attrs == nullptr) {
         OP_LOGE(context_->GetNodeName(), "get attrs failed");
@@ -244,32 +381,16 @@ ge::graphStatus MhcPreBackwardTiling::ParseInputAndAttr()
     auto hcEpsPtr = attrs->GetAttrPointer<float>(0);
     hcEps_ = (hcEpsPtr != nullptr) ? *hcEpsPtr : DEFAULT_HC_EPS;
 
+    auto implModePtr = attrs->GetAttrPointer<int64_t>(IMPL_MODE_ATTR_INDEX);
+    int64_t implMode = (implModePtr != nullptr) ? *implModePtr : IMPL_MODE_FP32;
+    if (implMode != IMPL_MODE_FP32 && implMode != IMPL_MODE_HF32) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "op_impl_mode", std::to_string(implMode).c_str(),
+                                              "op_impl_mode must be 0 (FP32) or 1 (HF32)");
+        return ge::GRAPH_FAILED;
+    }
+    implMode_ = static_cast<uint32_t>(implMode);
+
     return ge::GRAPH_SUCCESS;
-}
-
-void MhcPreBackwardTiling::SetC0TilingParams()
-{
-    tilingData_.matmulTilingC0.set_dbL0C(C0_SET_VALUE);
-    tilingData_.matmulTilingC0.set_stepKa(C0_SET_VALUE);
-    tilingData_.matmulTilingC0.set_stepKb(C0_SET_VALUE);
-    tilingData_.matmulTilingC0.set_depthA1(C0_SET_VALUE);
-    tilingData_.matmulTilingC0.set_depthB1(C0_SET_VALUE);
-    tilingData_.matmulTilingC0.set_stepM(C0_SET_VALUE);
-    tilingData_.matmulTilingC0.set_stepN(C0_SET_VALUE);
-    tilingData_.matmulTilingC0.set_baseM(C0_BASE_M);
-    tilingData_.matmulTilingC0.set_baseN(C0_BASE_N);
-    tilingData_.matmulTilingC0.set_baseK(C0_BASE_K);
-}
-
-void MhcPreBackwardTiling::SetC1TilingParams()
-{
-    tilingData_.matmulTilingC1.set_dbL0C(C0_SET_VALUE);
-    tilingData_.matmulTilingC1.set_stepKa(C0_SET_VALUE);
-    tilingData_.matmulTilingC1.set_stepKb(C0_SET_VALUE);
-    tilingData_.matmulTilingC1.set_depthA1(C0_SET_VALUE);
-    tilingData_.matmulTilingC1.set_depthB1(C0_SET_VALUE);
-    tilingData_.matmulTilingC1.set_stepM(C0_SET_VALUE);
-    tilingData_.matmulTilingC1.set_stepN(C0_SET_VALUE);
 }
 
 void MhcPreBackwardTiling::SetCommonTilingParams()
@@ -282,12 +403,24 @@ void MhcPreBackwardTiling::SetCommonTilingParams()
     tilingData_.set_N(N_);
     tilingData_.set_D(D_);
     tilingData_.set_hcEps(hcEps_);
+    tilingData_.set_implMode(implMode_);
+    tilingData_.set_maxBufferDepth(maxBufferDepth_);
+    tilingData_.set_l1UsedBytes(l1UsedBytes_);
+    tilingData_.set_l1BOffsetElems(l1BOffsetElems_);
+    tilingData_.set_l1SingleBufferElems(l1SingleBufferElems_);
+    tilingData_.set_l0ABUsedBytes(l0ABUsedBytes_);
+    tilingData_.set_l0ABSingleBufferElems(l0ABSingleBufferElems_);
+    tilingData_.set_l0CUsedBytes(l0CUsedBytes_);
+    tilingData_.set_l0CSingleBufferElems(l0CSingleBufferElems_);
+    tilingData_.set_c0MBlock(C0_SET_SHAPE_M);
+    tilingData_.set_c0NBlock(C0_SET_SHAPE_N);
+    tilingData_.set_c1KBlock(C1_SET_SHAPE_K);
+    tilingData_.set_c0ToV2Rows(C0_TO_V2_ROWS);
+    tilingData_.set_v2ToC1Rows(V2_TO_C1_ROWS);
 }
 
 void MhcPreBackwardTiling::FillTilingData()
 {
-    SetC0TilingParams();
-    SetC1TilingParams();
     SetCommonTilingParams();
 }
 
@@ -307,68 +440,10 @@ uint64_t MhcPreBackwardTiling::CalculateWorkspaceSize(uint64_t totalLength, uint
     return totalElements * elementSize;
 }
 
-void MhcPreBackwardTiling::SetMatmulC0Tiling(matmul_tiling::MatmulApiTiling &mm)
-{
-    mm.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT, false);
-    mm.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT, false);
-    mm.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
-    mm.SetBias(false);
-    mm.SetShape(C0_SET_SHAPE_M, C0_SET_SHAPE_N, N_ * N_ + 2 * N_);
-    mm.SetOrgShape(totalLength_, N_ * D_, N_ * N_ + 2 * N_);
-    mm.SetBufferSpace(-1, -1, -1);
-}
-
-void MhcPreBackwardTiling::SetMatmulC1Tiling(matmul_tiling::MatmulApiTiling &mm)
-{
-    mm.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT, true);
-    mm.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT, false);
-    mm.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
-    mm.SetBias(false);
-    mm.SetShape(N_ * N_ + 2 * N_, C1_SET_SHAPE_M_BASE, C1_SET_SHAPE_K);
-    mm.SetOrgShape(N_ * N_ + 2 * N_, N_ * D_, totalLength_);
-    mm.SetBufferSpace(-1, -1, -1);
-}
-
-ge::graphStatus MhcPreBackwardTiling::GetMatmulTiling(matmul_tiling::MatmulApiTiling &mm, bool isC0)
-{
-    if (isC0) {
-        SetMatmulC0Tiling(mm);
-    } else {
-        SetMatmulC1Tiling(mm);
-    }
-    if (mm.GetTiling(isC0 ? tilingData_.matmulTilingC0 : tilingData_.matmulTilingC1) == -1) {
-        OP_LOGE(context_->GetNodeName(), "ProcessC%d Get Tiling Failed!, m = %lu, n = %lu, k = %lu", isC0 ? 0 : 1,
-                isC0 ? totalLength_ : N_ * N_ + 2 * N_, N_ * D_, isC0 ? N_ * N_ + 2 * N_ : totalLength_);
-        return ge::GRAPH_FAILED;
-    }
-    return ge::GRAPH_SUCCESS;
-}
-
 ge::graphStatus MhcPreBackwardTiling::TilingProcess()
 {
     size_t userWorkspaceSize = CalculateWorkspaceSize(totalLength_, fusionSize_, blockDim_, vecCoreNum_, sizeof(float));
     size_t systemWorkspaceSize = SYSTEM_WORKSPACE_SIZE;
-
-    auto platformInfo = context_->GetPlatformInfo();
-    if (platformInfo == nullptr) {
-        OP_LOGE(context_->GetNodeName(), "get platform info failed");
-        return ge::GRAPH_FAILED;
-    }
-    platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
-
-    matmul_tiling::MatmulApiTiling mm0_(ascendcPlatform);
-    matmul_tiling::MatmulApiTiling mm1_(ascendcPlatform);
-
-    auto ret = GetMatmulTiling(mm0_, true);
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
-
-    ret = GetMatmulTiling(mm1_, false);
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
-
     workspaceSize_ = userWorkspaceSize + systemWorkspaceSize;
     return ge::GRAPH_SUCCESS;
 }
@@ -385,6 +460,10 @@ ge::graphStatus MhcPreBackwardTiling::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
 
+    SetMmConfig();
+    if (ValidateMmConfig() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (TilingProcess() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -403,6 +482,17 @@ void MhcPreBackwardTiling::PrintTilingData()
     OP_LOGD(context_->GetNodeName(), "nD: [%lu]", tilingData_.get_nD());
     OP_LOGD(context_->GetNodeName(), "fusionSize: [%lu]", tilingData_.get_fusionSize());
     OP_LOGD(context_->GetNodeName(), "hcEps: [%f]", tilingData_.get_hcEps());
+    OP_LOGD(context_->GetNodeName(), "implMode: [%u]", tilingData_.get_implMode());
+    OP_LOGD(context_->GetNodeName(),
+            "mmConfig: C0=[%u,%u,%u,L1K=%u], C1=[%u,%u,%u,L1K=%u], depth=[%u,%u,%u,%u,%u], "
+            "block=[%u,%u,%u], sync=[%u,%u]",
+            tilingData_.mmConfigC0.get_baseM(), tilingData_.mmConfigC0.get_baseN(), tilingData_.mmConfigC0.get_baseK(),
+            tilingData_.mmConfigC0.get_l1K(), tilingData_.mmConfigC1.get_baseM(), tilingData_.mmConfigC1.get_baseN(),
+            tilingData_.mmConfigC1.get_baseK(), tilingData_.mmConfigC1.get_l1K(), tilingData_.mmConfigC0.get_depthA1(),
+            tilingData_.mmConfigC0.get_depthB1(), tilingData_.mmConfigC0.get_dbL0A(),
+            tilingData_.mmConfigC0.get_dbL0B(), tilingData_.mmConfigC0.get_dbL0C(), tilingData_.get_c0MBlock(),
+            tilingData_.get_c0NBlock(), tilingData_.get_c1KBlock(), tilingData_.get_c0ToV2Rows(),
+            tilingData_.get_v2ToC1Rows());
 }
 
 uint64_t MhcPreBackwardTiling::GetTilingKey() const
