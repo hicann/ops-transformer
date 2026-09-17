@@ -25,7 +25,7 @@
 
 #include <limits>
 
-#include "../utils/attenmask_gs1.h"
+#include "../utils/flash_mla_with_kvcache_attenmask_gs1.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "adv_api/activation/softmax.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
@@ -37,7 +37,7 @@
 #include "../../../common/op_kernel/const_def.h"
 #include "flash_mla_with_kvcache_public_define_arch35.h"
 #include "../../../common/op_kernel/vector_common.h"
-#include "memory_copy_arch35.h"
+#include "../utils/flash_mla_with_kvcache_memory_copy_arch35.h"
 #include "../utils/flash_mla_with_kvcache_type.h"
 
 using namespace AscendC;

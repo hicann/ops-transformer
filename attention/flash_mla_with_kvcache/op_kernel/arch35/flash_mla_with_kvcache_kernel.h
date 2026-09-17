@@ -20,7 +20,7 @@
 #include "flash_mla_with_kvcache_public_define_arch35.h"
 #include "flash_mla_with_kvcache_block_cube.h"
 #include "flash_mla_with_kvcache_block_vec.h"
-#include "memory_copy_arch35.h"
+#include "../utils/flash_mla_with_kvcache_memory_copy_arch35.h"
 #include "flash_mla_with_kvcache_block_vec_flashdecode.h"
 
 #if ASC_DEVKIT_MAJOR >= 9

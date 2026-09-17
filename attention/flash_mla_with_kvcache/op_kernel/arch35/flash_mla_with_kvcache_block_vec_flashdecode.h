@@ -15,11 +15,11 @@
 #ifndef FLASH_MLA_WITH_KVCACHE_BLOCK_VEC_FLASHDECODE_H
 #define FLASH_MLA_WITH_KVCACHE_BLOCK_VEC_FLASHDECODE_H
 
-#include "../utils/attenmask_gs1.h"
+#include "../utils/flash_mla_with_kvcache_attenmask_gs1.h"
 
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
 
-#include "memory_copy_arch35.h"
+#include "../utils/flash_mla_with_kvcache_memory_copy_arch35.h"
 #include "flash_mla_with_kvcache_public_define_arch35.h"
 #include "../utils/flash_mla_with_kvcache_type.h"
 

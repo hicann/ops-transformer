@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef MEMORY_COPY_ARCH35_H
-#define MEMORY_COPY_ARCH35_H
+#ifndef FLASH_MLA_WITH_KVCACHE_MEMORY_COPY_ARCH35_H
+#define FLASH_MLA_WITH_KVCACHE_MEMORY_COPY_ARCH35_H
 
 #include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/memcopy/gm_layout.h"

@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file attenmask_gs1.h
+ * \file flash_mla_with_kvcache_attenmask_gs1.h
  * \brief
  */
 
-#ifndef ATTENMASK_GS1_H
-#define ATTENMASK_GS1_H
+#ifndef FLASH_MLA_WITH_KVCACHE_ATTENMASK_GS1_H
+#define FLASH_MLA_WITH_KVCACHE_ATTENMASK_GS1_H
 
 enum MaskFormat {
     GS,

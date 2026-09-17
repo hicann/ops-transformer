@@ -15,7 +15,7 @@
  *        is supplied by FlashMlaWithKvcacheMetadata.
  */
 
-#include "flash_mla_with_kvcache_tiling.h"
+#include "flash_mla_with_kvcache_tiling_arch35.h"
 #include "../flash_mla_with_kvcache_tiling.h"
 #include <cstring>
 #include <vector>

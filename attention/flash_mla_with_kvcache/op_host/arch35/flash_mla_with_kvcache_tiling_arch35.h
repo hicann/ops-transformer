@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file flash_mla_with_kvcache_tiling.h
+ * \file flash_mla_with_kvcache_tiling_arch35.h
  * \brief FlashMlaWithKvcache arch35 tiling implementation
  */
-#ifndef FLASH_MLA_WITH_KVCACHE_TILING_IMPL_H_
-#define FLASH_MLA_WITH_KVCACHE_TILING_IMPL_H_
+#ifndef FLASH_MLA_WITH_KVCACHE_TILING_ARCH35_H_
+#define FLASH_MLA_WITH_KVCACHE_TILING_ARCH35_H_
 
 #include "register/tilingdata_base.h"
 #include "exe_graph/runtime/tiling_context.h"
@@ -100,4 +100,4 @@ private:
 
 } // namespace flash_mla_with_kvcache
 } // namespace optiling
-#endif // FLASH_MLA_WITH_KVCACHE_TILING_IMPL_H_
+#endif // FLASH_MLA_WITH_KVCACHE_TILING_ARCH35_H_
