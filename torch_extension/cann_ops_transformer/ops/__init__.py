@@ -99,6 +99,8 @@ _all_ops.update(_ep_ops)
 for _name, _target in _all_ops.items():
     _load_op(_name, _target)
 
+_ep_overridden_ops = frozenset(_ep_ops)
+
 try:
     del _discover_ops_from_entry_points, _discover_ops_from_dir, _load_op
     del _ep_ops, _dir_ops, _all_ops, _name, _target
@@ -165,6 +167,12 @@ _legacy_map = {
 
 if __name__ == "cann_ops_transformer.ops":
     for _old_name, _new_target in _legacy_map.items():
+        if _old_name in _ep_overridden_ops:
+            logger.warning(
+                "legacy module '%s' is overridden by a package entry point, skip registering it",
+                _old_name,
+            )
+            continue
         try:
             _new_mod = importlib.import_module(
                 "cann_ops_transformer.ops.%s" % _new_target
