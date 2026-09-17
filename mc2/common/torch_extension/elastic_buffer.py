@@ -515,6 +515,8 @@ class _DispatchArgs:
     cached_route_dst_scaleout: Optional[torch.Tensor]
     cached_route_scaleout_slot: Optional[torch.Tensor]
     cached_recv_src_metadata: Optional[torch.Tensor]
+    cached_num_recv_per_rank: Optional[torch.Tensor]
+    cached_num_recv_per_expert: Optional[torch.Tensor]
     num_experts: int
     num_max_tokens_per_rank: int
     expert_alignment: int
@@ -1026,6 +1028,11 @@ class ElasticBuffer:
             hp_addr,
             ccl_buffer_size,
         )
+        if args.cached_output_capacity is not None:
+            # cache 模式 kernel 跳过路由计算，输出直接复用 handle 携带的上一步值
+            num_recv_per_rank = args.cached_num_recv_per_rank
+            num_recv_per_expert = args.cached_num_recv_per_expert
+            dst_slot = args.cached_dst_slot_idx
 
         actual_a = self._get_dispatch_recv_count(args)
         recv_x, recv_src_meta, recv_topk_weights, recv_scales = (
@@ -1344,6 +1351,8 @@ class ElasticBuffer:
                 handle.route_dst_scaleout,
                 handle.route_scaleout_slot,
                 packed_metadata,
+                handle.num_recv_tokens_per_rank,
+                handle.num_recv_tokens_per_expert,
                 handle.num_experts,
                 handle.num_max_tokens_per_rank,
                 handle.expert_alignment,
@@ -1362,6 +1371,8 @@ class ElasticBuffer:
             x,
             scales,
             topk_idx,
+            None,
+            None,
             None,
             None,
             None,

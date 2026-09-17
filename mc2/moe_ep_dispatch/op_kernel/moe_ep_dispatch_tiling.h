@@ -54,9 +54,7 @@ struct MoeEpDispatchWindowLayout {
 
 struct MoeEpDispatchWorkspaceLayout {
     uint64_t sendEntryTokenRangeBytes; // 单个 token 范围的发送记录字节数
-    uint64_t srcTokenListBytes;        // 发送到每个对端卡的 token索引表 字节数（512B 对齐，int32）
     uint64_t dstRankInfoOffset;        // dstRank 区偏移（sendCnt 区之后），布局 [BS][K] int16
-    uint64_t srcTokenTableOffset;      // srcTokenTable 区偏移（dstRank 区之后），布局 [ep][nmtAlign] int32
     uint64_t routeWorkspaceOffset;
     uint64_t scaleoutSendEntryOffset;
     uint64_t scaleupSendEntryOffset;

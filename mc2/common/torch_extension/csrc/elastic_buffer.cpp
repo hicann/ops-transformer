@@ -2132,6 +2132,7 @@ Mc2Api::ElasticBuffer::DispatchTensorList Mc2Api::ElasticBuffer::MoeEpDispatch(
     bool allCachedRoute =
         cachedRouteCount.has_value() && cachedRouteDstScaleout.has_value() && cachedRouteScaleoutSlot.has_value();
     TORCH_CHECK(!anyCachedRoute || allCachedRoute, "cached route tensors must be all present or all absent");
+    bool isDirect = (topoType == NETWORK_DIRECT);
     bool hybridCached = anyCached && topoType == NETWORK_HYBRID;
     TORCH_CHECK(!hybridCached || allCachedRoute, "hybrid cached dispatch requires all cached route tensors");
 
@@ -2143,7 +2144,8 @@ Mc2Api::ElasticBuffer::DispatchTensorList Mc2Api::ElasticBuffer::MoeEpDispatch(
 
     at::Tensor numRecvPerRank = at::empty({epWorldSize}, x.options().dtype(at::kInt));
     at::Tensor numRecvPerExpert = at::empty({numLocalExperts}, x.options().dtype(at::kLong));
-    at::Tensor dstSlot = at::empty({numTokens, topK}, x.options().dtype(at::kInt));
+    at::Tensor dstSlot = isDirect ? at::full({epWorldSize, numTokens + 1}, -1, x.options().dtype(at::kInt)) :
+                                    at::full({numTokens, topK}, -1, x.options().dtype(at::kInt));
     at::Tensor routeCount = at::zeros({numTokens}, x.options().dtype(at::kInt));
     at::Tensor routeDstScaleout = at::full({numTokens, routeCapacity}, -1, x.options().dtype(at::kInt));
     at::Tensor routeScaleoutSlot = at::full({numTokens, routeCapacity}, -1, x.options().dtype(at::kInt));
