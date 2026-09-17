@@ -56,6 +56,14 @@ using _HcomGetCommHandleByGroup = HcclResult (*)(const char *, HcclComm *);
 using _HcclRankGraphGetLinks = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t, CommLink **, uint32_t *);
 // 获取网络层信息
 using _HcclRankGraphGetLayers = HcclResult (*)(HcclComm, uint32_t **, uint32_t *);
+// 获取每层硬件连接拓扑类型
+using _HcclRankGraphGetTopoTypeByLayer = HcclResult (*)(HcclComm, uint32_t, CommTopo *);
+// Query topology instances and their local endpoints within CUSTOM layers.
+using _HcclRankGraphGetTopoInstsByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t **, uint32_t *);
+using _HcclRankGraphGetTopoType = HcclResult (*)(HcclComm, uint32_t, uint32_t, CommTopo *);
+using _HcclRankGraphGetRanksByTopoInst = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t **, uint32_t *);
+using _HcclRankGraphGetEndpointNum = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t *);
+using _HcclRankGraphGetEndpointDesc = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t *, EndpointDesc *);
 // 获取每层rank数量
 using _HcclRankGraphGetRankSizeByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t *);
 // 初始化channel描述符
@@ -92,6 +100,12 @@ static _HcclGetHcclBuffer HcclGetHcclBufferFunc = nullptr;
 static _HcomGetCommHandleByGroup HcomGetCommHandleByGroupFunc = nullptr;
 static _HcclRankGraphGetLinks HcclRankGraphGetLinksFunc = nullptr;
 static _HcclRankGraphGetLayers HcclRankGraphGetLayersFunc = nullptr;
+static _HcclRankGraphGetTopoTypeByLayer HcclRankGraphGetTopoTypeByLayerFunc = nullptr;
+static _HcclRankGraphGetTopoInstsByLayer HcclRankGraphGetTopoInstsByLayerFunc = nullptr;
+static _HcclRankGraphGetTopoType HcclRankGraphGetTopoTypeFunc = nullptr;
+static _HcclRankGraphGetRanksByTopoInst HcclRankGraphGetRanksByTopoInstFunc = nullptr;
+static _HcclRankGraphGetEndpointNum HcclRankGraphGetEndpointNumFunc = nullptr;
+static _HcclRankGraphGetEndpointDesc HcclRankGraphGetEndpointDescFunc = nullptr;
 static _HcclRankGraphGetRankSizeByLayer HcclRankGraphGetRankSizeByLayerFunc = nullptr;
 static _HcclRankGraphGetRanksByLayer HcclRankGraphGetRanksByLayerFunc = nullptr;
 static _HcclChannelAcquire HcclChannelAcquireFunc = nullptr;
@@ -175,21 +189,42 @@ inline void InitHcclFunctions()
     TORCH_CHECK(HcclBarrierFunc != nullptr, "getFuncHcclBarrier failed.");
 }
 
-// 初始化新的EngineCtx API (从libhccl_fwk.so加载)
-inline void InitHcclEngineCtxFunctions()
+inline void InitHcclRankGraphFunctions()
 {
-    HcomGetCommHandleByGroupFunc = GetHcclFwkFuncAddr<_HcomGetCommHandleByGroup>("HcomGetCommHandleByGroup");
-    TORCH_CHECK(HcomGetCommHandleByGroupFunc != nullptr, "getHcomGetCommHandleByGroup failed.");
     HcclRankGraphGetLinksFunc = GetHcclFwkFuncAddr<_HcclRankGraphGetLinks>("HcclRankGraphGetLinks");
     TORCH_CHECK(HcclRankGraphGetLinksFunc != nullptr, "getHcclRankGraphGetLinks failed.");
     HcclRankGraphGetLayersFunc = GetHcclFwkFuncAddr<_HcclRankGraphGetLayers>("HcclRankGraphGetLayers");
     TORCH_CHECK(HcclRankGraphGetLayersFunc != nullptr, "getHcclRankGraphGetLayers failed.");
+    HcclRankGraphGetTopoTypeByLayerFunc =
+        GetHcclFwkFuncAddr<_HcclRankGraphGetTopoTypeByLayer>("HcclRankGraphGetTopoTypeByLayer");
+    TORCH_CHECK(HcclRankGraphGetTopoTypeByLayerFunc != nullptr, "getHcclRankGraphGetTopoTypeByLayer failed.");
+    HcclRankGraphGetTopoInstsByLayerFunc =
+        GetHcclFwkFuncAddr<_HcclRankGraphGetTopoInstsByLayer>("HcclRankGraphGetTopoInstsByLayer");
+    TORCH_CHECK(HcclRankGraphGetTopoInstsByLayerFunc != nullptr, "getHcclRankGraphGetTopoInstsByLayer failed.");
+    HcclRankGraphGetTopoTypeFunc = GetHcclFwkFuncAddr<_HcclRankGraphGetTopoType>("HcclRankGraphGetTopoType");
+    TORCH_CHECK(HcclRankGraphGetTopoTypeFunc != nullptr, "getHcclRankGraphGetTopoType failed.");
+    HcclRankGraphGetRanksByTopoInstFunc =
+        GetHcclFwkFuncAddr<_HcclRankGraphGetRanksByTopoInst>("HcclRankGraphGetRanksByTopoInst");
+    TORCH_CHECK(HcclRankGraphGetRanksByTopoInstFunc != nullptr, "getHcclRankGraphGetRanksByTopoInst failed.");
+    HcclRankGraphGetEndpointNumFunc = GetHcclFwkFuncAddr<_HcclRankGraphGetEndpointNum>("HcclRankGraphGetEndpointNum");
+    TORCH_CHECK(HcclRankGraphGetEndpointNumFunc != nullptr, "getHcclRankGraphGetEndpointNum failed.");
+    HcclRankGraphGetEndpointDescFunc =
+        GetHcclFwkFuncAddr<_HcclRankGraphGetEndpointDesc>("HcclRankGraphGetEndpointDesc");
+    TORCH_CHECK(HcclRankGraphGetEndpointDescFunc != nullptr, "getHcclRankGraphGetEndpointDesc failed.");
     HcclRankGraphGetRankSizeByLayerFunc =
         GetHcclFwkFuncAddr<_HcclRankGraphGetRankSizeByLayer>("HcclRankGraphGetRankSizeByLayer");
     TORCH_CHECK(HcclRankGraphGetRankSizeByLayerFunc != nullptr, "getHcclRankGraphGetRankSizeByLayer failed.");
     HcclRankGraphGetRanksByLayerFunc =
         GetHcclFwkFuncAddr<_HcclRankGraphGetRanksByLayer>("HcclRankGraphGetRanksByLayer");
     TORCH_CHECK(HcclRankGraphGetRanksByLayerFunc != nullptr, "getHcclRankGraphGetRanksByLayer failed.");
+}
+
+// 初始化新的EngineCtx API (从libhccl_fwk.so加载)
+inline void InitHcclEngineCtxFunctions()
+{
+    HcomGetCommHandleByGroupFunc = GetHcclFwkFuncAddr<_HcomGetCommHandleByGroup>("HcomGetCommHandleByGroup");
+    TORCH_CHECK(HcomGetCommHandleByGroupFunc != nullptr, "getHcomGetCommHandleByGroup failed.");
+    InitHcclRankGraphFunctions();
     HcclChannelAcquireFunc = GetHcclFwkFuncAddr<_HcclChannelAcquire>("HcclChannelAcquire");
     TORCH_CHECK(HcclChannelAcquireFunc != nullptr, "getHcclChannelAcquire failed.");
     HcclChannelGetHcclBufferFunc = GetHcclFwkFuncAddr<_HcclChannelGetHcclBuffer>("HcclChannelGetHcclBuffer");
