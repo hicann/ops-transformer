@@ -313,7 +313,7 @@ __aicore__ inline uint64_t GetExpertCountWorkspaceOffset(const BlockWorkspaceCon
 __aicore__ inline void GmSignalWaitBarrier(__gm__ int32_t *sigAddr, int32_t compareValue)
 {
     do {
-        if (ReadGmByPassDCache(sigAddr) == compareValue) {
+        if (ReadGmBypassDCache(sigAddr) == compareValue) {
             return;
         }
     } while (true);
@@ -404,7 +404,7 @@ __aicore__ inline uint32_t AdvanceExpertTokenPositionInWave(uint32_t expertToken
 // 轮询 GM 中的 int32 ready flag，并在两次读取之间加入短暂退避。
 __aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ int32_t *flagAddr)
 {
-    while (AscendC::ReadGmByPassDCache(flagAddr) == 0) {
+    while (AscendC::ReadGmBypassDCache(flagAddr) == 0) {
         int64_t startCycle = AscendC::GetSystemCycle();
         while (AscendC::GetSystemCycle() - startCycle < GM_FLAG_POLL_BACKOFF_CYCLES) {
         }
@@ -432,7 +432,7 @@ __aicore__ inline uint32_t GetExpertTokenCountFromWorkspace(GM_ADDR expertTokenC
     uint64_t countSlotIndex = GetExpertCountWorkspaceOffset(countWorkspace, expertCount, expertIdx, true);
     __gm__ int32_t *expertTokenCountAddr =
         reinterpret_cast<__gm__ int32_t *>(expertTokenCountWorkspace) + countSlotIndex;
-    return static_cast<uint32_t>(AscendC::ReadGmByPassDCache(expertTokenCountAddr));
+    return static_cast<uint32_t>(AscendC::ReadGmBypassDCache(expertTokenCountAddr));
 }
 
 /*
@@ -472,9 +472,9 @@ __aicore__ inline ExpertTokenRange PlanNextExpertTokenRangeInWave(GM_ADDR expert
 __aicore__ inline void SyncTopkValidIndexSendCores(GM_ADDR syncPtr, const AivJobContext &job, int32_t phase)
 {
     auto *arrivals = reinterpret_cast<__gm__ int32_t *>(syncPtr);
-    WriteGmByPassDCache(arrivals + job.jobIndex * INT_CACHELINE, phase);
+    WriteGmBypassDCache(arrivals + job.jobIndex * INT_CACHELINE, phase);
     for (uint32_t peer = 0; peer < job.totalJobs; ++peer) {
-        while (ReadGmByPassDCache(arrivals + peer * INT_CACHELINE) < phase) {
+        while (ReadGmBypassDCache(arrivals + peer * INT_CACHELINE) < phase) {
             const int64_t pollStart = GetSystemCycle();
             while (GetSystemCycle() - pollStart < GM_FLAG_POLL_BACKOFF_CYCLES) {
             }
@@ -487,13 +487,13 @@ __aicore__ inline int32_t CrossRankHandshakeInWorldSize(GM_ADDR rankSyncInWorldP
                                                         const AivJobContext &syncJob, __gm__ int32_t *syncCount)
 {
     auto *syncRank = reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr);
-    const int32_t count = ReadGmByPassDCache(syncCount) + 1;
+    const int32_t count = ReadGmBypassDCache(syncCount) + 1;
     for (uint32_t rankIdx = syncJob.jobIndex; rankIdx < worldSize; rankIdx += syncJob.totalJobs) {
         auto *remoteSyncAddr = reinterpret_cast<__gm__ int32_t *>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
-        WriteGmByPassDCache(remoteSyncAddr, count);
+        WriteGmBypassDCache(remoteSyncAddr, count);
         GmSignalWaitBarrier(syncRank + rankIdx * INT_CACHELINE, count);
     }
-    WriteGmByPassDCache(syncCount, count);
+    WriteGmBypassDCache(syncCount, count);
     return count;
 }
 
@@ -527,7 +527,7 @@ __aicore__ inline void CrossRankSyncInWorldSize(GM_ADDR rankSyncInWorldPtr, uint
                                            static_cast<uint64_t>(firstPhysicalCoreIdx) * RANK_SYNC_COUNTER_SLOT_BYTES);
     const int32_t count = CrossRankHandshakeInWorldSize(rankSyncInWorldPtr, rankId, worldSize, syncJob, syncCount);
     // Handshake updated AIV0; update AIV1 for the later full-AIV output synchronization.
-    WriteGmByPassDCache(syncCount + RANK_SYNC_COUNTER_SLOT_BYTES / sizeof(int32_t), count);
+    WriteGmBypassDCache(syncCount + RANK_SYNC_COUNTER_SLOT_BYTES / sizeof(int32_t), count);
     PipeBarrier<PIPE_ALL>();
     SyncTopkValidIndexSendCores(sendCoreSyncPtr, syncJob, ++phase);
 }

@@ -468,12 +468,12 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendMaskC
             if (curRankId == rankId_) {
                 __gm__ int32_t *winCountPtr =
                     reinterpret_cast<__gm__ int32_t *>(GetRankWinAddrWithOffset(rankId_, dstOffset + maskAlignSize_));
-                WriteGmByPassDCache(winCountPtr, static_cast<int32_t>(totalSendCnt));
+                WriteGmBypassDCache(winCountPtr, static_cast<int32_t>(totalSendCnt));
                 PipeBarrier<PIPE_ALL>();
             } else {
                 __gm__ int32_t *wsCountPtr =
                     reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.maskSlotPtr + srcOffset + maskAlignSize_);
-                WriteGmByPassDCache(wsCountPtr, static_cast<int32_t>(totalSendCnt));
+                WriteGmBypassDCache(wsCountPtr, static_cast<int32_t>(totalSendCnt));
                 PipeBarrier<PIPE_ALL>();
                 GM_ADDR remoteDataAddr = GetRankWinAddrWithOffset(curRankId, dstOffset);
                 GM_ADDR localGmAddr = params_.workspaceInfo.maskSlotPtr + srcOffset;
@@ -582,7 +582,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetDisp
     for (uint32_t targetServer = aivCoreIdx_; targetServer < serverNum_; targetServer += blockAivNum_) {
         __gm__ int32_t *countPtr = reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.dispatchRelaySendQueuePtr +
                                                                       DispatchRelayQueueServerOffset(targetServer));
-        WriteGmByPassDCache(countPtr, int32_t(0));
+        WriteGmBypassDCache(countPtr, int32_t(0));
     }
     // 远端 ready flag 仍是一级数据到达 relay 后供二级 Dispatch 使用的完成协议。
     ResetContiguousGm(params_.peermemInfo.dispatchFlagPtr,
@@ -722,7 +722,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendTok
                               static_cast<uint64_t>(slotIdx) * DISPATCH_RELAY_QUEUE_ENTRY_BYTES;
         __gm__ int32_t *metaPtr =
             reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.dispatchRelaySendQueuePtr + metaOffset);
-        WriteGmByPassDCache(metaPtr, static_cast<int32_t>(tokenIdx));
+        WriteGmBypassDCache(metaPtr, static_cast<int32_t>(tokenIdx));
     }
 }
 
@@ -751,7 +751,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDis
                           static_cast<uint64_t>(slot) * DISPATCH_RELAY_QUEUE_ENTRY_BYTES;
     __gm__ int32_t *srcMetaPtr =
         reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.dispatchRelaySendQueuePtr + metaOffset);
-    int32_t tokenIdx = ReadGmByPassDCache(srcMetaPtr);
+    int32_t tokenIdx = ReadGmBypassDCache(srcMetaPtr);
     uint64_t relayOffset = RelayTokenOffset(serverId_, static_cast<uint32_t>(tokenIdx));
     GM_ADDR srcAddr = GetRankWinAddrWithOffset(rankId_, dispatchWinOffset_) + relayOffset;
     GM_ADDR dstAddr = GetRankWinAddrWithOffset(relayRank, dispatchWinOffset_) + relayOffset;
@@ -766,7 +766,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDis
                           static_cast<uint64_t>(slot) * DISPATCH_RELAY_QUEUE_ENTRY_BYTES;
     __gm__ int32_t *srcMetaPtr =
         reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.dispatchRelaySendQueuePtr + metaOffset);
-    int32_t tokenIdx = ReadGmByPassDCache(srcMetaPtr);
+    int32_t tokenIdx = ReadGmBypassDCache(srcMetaPtr);
     uint64_t flagOffset = RelayFlagOffset(serverId_, static_cast<uint32_t>(tokenIdx));
     GM_ADDR localFlagAddr = GetRankWinAddrWithOffset(rankId_, dispatchFlagWinOffset_) + flagOffset;
     GM_ADDR remoteFlagAddr = GetRankWinAddrWithOffset(relayRank, dispatchFlagWinOffset_) + flagOffset;
@@ -815,7 +815,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendDispa
         // 队列已经由全部 AIV 构建并同步完成，[0, count) 可直接按连续 slot 分批发送。
         __gm__ int32_t *countPtr = reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.dispatchRelaySendQueuePtr +
                                                                       DispatchRelayQueueServerOffset(targetServer));
-        int32_t tokenCount = ReadGmByPassDCache(countPtr);
+        int32_t tokenCount = ReadGmBypassDCache(countPtr);
         for (int32_t batchStart = 0; batchStart < tokenCount;
              batchStart += static_cast<int32_t>(DISPATCH_SEND_BATCH_TOKEN_CAPACITY)) {
             int32_t remaining = tokenCount - batchStart;
@@ -836,7 +836,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadToken
 {
     __gm__ uint64_t *readyFlag = reinterpret_cast<__gm__ uint64_t *>(params_.peermemInfo.dispatchFlagPtr +
                                                                      RelayFlagOffset(srcServer, tokenIndex));
-    while (ReadGmByPassDCache(readyFlag) != uint64_t(1)) {
+    while (ReadGmBypassDCache(readyFlag) != uint64_t(1)) {
     }
 
     uint64_t remoteCopyOffset = RelayTokenOffset(srcServer, tokenIndex);
@@ -863,7 +863,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PublishEx
         __gm__ int32_t *rankCountPtr = reinterpret_cast<__gm__ int32_t *>(
             params_.peermemInfo.maskRecvPtr + static_cast<uint64_t>(expertIdx) * worldSize_ * maskSlotSize_ +
             static_cast<uint64_t>(srcRank) * maskSlotSize_ + maskAlignSize_);
-        int32_t rankTokenCount = ReadGmByPassDCache(rankCountPtr);
+        int32_t rankTokenCount = ReadGmBypassDCache(rankCountPtr);
         tokenCount += static_cast<uint64_t>(rankTokenCount);
         cumsumRevCntInRank_ += static_cast<uint64_t>(rankTokenCount);
         cumsumInfoTensor_.SetValue(expertRankOffset + srcRank, static_cast<int32_t>(cumsumRevCntInRank_));
@@ -886,7 +886,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PublishEx
             reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.cumsumInfoPtr + cumsumStride * blockIdx_) +
             expertRankOffset;
         for (uint32_t srcRank = 0U; srcRank < worldSize_; ++srcRank) {
-            WriteGmByPassDCache(cumsumDst + srcRank, cumsumInfoTensor_.GetValue(expertRankOffset + srcRank));
+            WriteGmBypassDCache(cumsumDst + srcRank, cumsumInfoTensor_.GetValue(expertRankOffset + srcRank));
         }
     }
     SyncFuncStatic<AscendC::HardEvent::MTE3_S, SYNC_EVENT_ID2>();
@@ -1143,7 +1143,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
             uint32_t topkIndex = static_cast<uint32_t>(record.GetValue(TOPK_INDEX));
             __gm__ int32_t *weightGmI32 = reinterpret_cast<__gm__ int32_t *>(
                 params_.workspaceInfo.dispatchRevWeightsPtr + static_cast<uint64_t>(dstRow) * weightAlignBytes_);
-            record.SetValue(WEIGHT_INDEX, ReadGmByPassDCache(weightGmI32 + topkIndex));
+            record.SetValue(WEIGHT_INDEX, ReadGmBypassDCache(weightGmI32 + topkIndex));
         }
     }
 
@@ -1239,7 +1239,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveDi
                     params_.peermemInfo.maskRecvPtr + static_cast<uint64_t>(expertIdx) * worldSize_ * maskSlotSize_ +
                     static_cast<uint64_t>(srcRank) * maskSlotSize_);
                 __gm__ int32_t *rankCountPtr = reinterpret_cast<__gm__ int32_t *>(rankMaskBasePtr + maskAlignSize_);
-                const int32_t rankTokenCount = ReadGmByPassDCache(rankCountPtr);
+                const int32_t rankTokenCount = ReadGmBypassDCache(rankCountPtr);
                 if (rankTokenCount <= 0) {
                     continue;
                 }

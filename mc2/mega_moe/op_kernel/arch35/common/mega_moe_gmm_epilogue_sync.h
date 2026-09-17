@@ -36,7 +36,7 @@ enum class GmmEventPair : uint16_t {
 __aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t *flagAddr, int32_t expectedValue,
                                              int64_t pollBackoffCycles = GM_FLAG_POLL_BACKOFF_CYCLES)
 {
-    while (AscendC::ReadGmByPassDCache(flagAddr) != expectedValue) {
+    while (AscendC::ReadGmBypassDCache(flagAddr) != expectedValue) {
         int64_t startCycle = AscendC::GetSystemCycle();
         while (AscendC::GetSystemCycle() - startCycle < pollBackoffCycles) {
         }
@@ -46,7 +46,7 @@ __aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t *flagAddr, int32_t e
 // 轮询 GM 中的 int32 计数直至不小于目标值，并在两次读取之间加入短暂退避。
 __aicore__ inline void WaitUntilGmFlagAtLeast(__gm__ int32_t *flagAddr, int32_t targetValue)
 {
-    while (AscendC::ReadGmByPassDCache(flagAddr) < targetValue) {
+    while (AscendC::ReadGmBypassDCache(flagAddr) < targetValue) {
         int64_t startCycle = AscendC::GetSystemCycle();
         while (AscendC::GetSystemCycle() - startCycle < GM_FLAG_POLL_BACKOFF_CYCLES) {
         }
@@ -221,9 +221,9 @@ public:
             AscendC::WaitFlag<AscendC::HardEvent::FIX_S>(0);
             if constexpr (TopkWeightsPrefetch) {
                 __gm__ int32_t *status = addresses_.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
-                AscendC::WriteGmByPassDCache(status, static_cast<int32_t>(expertIdx + 1));
+                AscendC::WriteGmBypassDCache(status, static_cast<int32_t>(expertIdx + 1));
             } else {
-                AscendC::WriteGmByPassDCache(addresses_.gmmToEpilogueFlag, ++(*sequence_));
+                AscendC::WriteGmBypassDCache(addresses_.gmmToEpilogueFlag, ++(*sequence_));
             }
         }
     }
@@ -275,7 +275,7 @@ public:
     {
         if constexpr (g_coreType == AscendC::AIV) {
             if (subBlockIdx_ == activationSubBlockIdx_) {
-                AscendC::WriteGmByPassDCache(flag_, tag_);
+                AscendC::WriteGmBypassDCache(flag_, tag_);
             }
         } else {
             WaitUntilGmFlagEquals(flag_, tag_);

@@ -116,7 +116,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
         uint32_t syncSlotCount = 0;
         GetGroupSyncSlotRange(targetGroup, slotLayout, firstSyncSlot, syncSlotCount);
         __gm__ int32_t *counterAddr = GetCombineSyncCounterAddress(expertCounterBase, firstSyncSlot);
-        if (AscendC::ReadGmByPassDCache(counterAddr) < static_cast<int32_t>(nTilesPerGroup)) {
+        if (AscendC::ReadGmBypassDCache(counterAddr) < static_cast<int32_t>(nTilesPerGroup)) {
             continue;
         }
 

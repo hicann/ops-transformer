@@ -84,6 +84,7 @@ protected:
     __aicore__ inline void EnterSteadyDispatch();
     __aicore__ inline void InitQuantTokenBufferConfig();
     __aicore__ inline UnpermuteBufferConfig InitTokenUnpermuteBuffers();
+    __aicore__ inline void SendTopkIdsIndexAndCount(const AivJobContext &job);
     __aicore__ inline void ProcessInputPreparationStage();
     __aicore__ inline void SyncInputAcrossRanks();
     __aicore__ inline void RunGmm2CombineForExpert(ExpertLoopState &state, GMMAddrInfo &gmmAddrInfo,
@@ -456,6 +457,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::SendAndQuantBuffInit()
         return;
     }
 
+    sendMaskScratch_.topkIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params_.expertIdxGmAddr));
+
     // 与 route batch 无关的固定占用
     uint64_t totalFlagInt32 = static_cast<uint64_t>(params_.workspaceInfo.flagResetElementCount);
     if constexpr (TopkWeightsPrefetch) {
@@ -486,11 +489,11 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::SendAndQuantBuffInit()
     sendMaskScratch_.topkIdsTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, topkIdsTensorAddr, topkIdsTensorSize / sizeof(int32_t));
 
-    uint32_t topkIndexTensorAddr = topkIdsTensorAddr + topkIdsTensorSize;
-    sendMaskScratch_.topkIndexTensor =
-        LocalTensor<int32_t>(TPosition::VECCALC, topkIndexTensorAddr, topkIdsTensorSize / sizeof(int32_t));
+    uint32_t topkIdsIndexTensorAddr = topkIdsTensorAddr + topkIdsTensorSize;
+    sendMaskScratch_.topkIdsIndexTensor =
+        LocalTensor<int32_t>(TPosition::VECCALC, topkIdsIndexTensorAddr, topkIdsTensorSize / sizeof(int32_t));
 
-    uint32_t resetAddrActual = topkIndexTensorAddr + topkIdsTensorSize;
+    uint32_t resetAddrActual = topkIdsIndexTensorAddr + topkIdsTensorSize;
     resetTensor_ = LocalTensor<int32_t>(TPosition::VECCALC, resetAddrActual, resetTensorSize / sizeof(int32_t));
     Duplicate<int32_t>(resetTensor_, 0, (resetTensorSize / sizeof(int32_t)));
     resetBatchElementCount_ = resetBatchElementCount;
@@ -690,6 +693,25 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::PrepareGmmExpertState(E
     UpdateExpertLoopState(state, expertIdx, expertTokenCount);
 }
 
+// 按发送任务分配专家范围，并依次发送下标和数量；调用方负责选择参与的 AIV。
+template <TemplateMegaMoeTypeClass>
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::SendTopkIdsIndexAndCount(const AivJobContext &job)
+{
+    const WorkRange ownedExpertRange =
+        GetBalancedWorkRange(commonConfig_.worldSize * commonConfig_.moeExpertPerRank, job.jobIndex, job.totalJobs);
+    if (ownedExpertRange.count == 0U) {
+        return;
+    }
+    SendTopkIdsIndexForExperts(ownedExpertRange, commonConfig_, g_winRankAddr_, sendMaskConfig_, sendMaskScratch_);
+    // 专家范围按逻辑任务分配，epoch 始终读取当前物理 AIV 的计数槽。
+    const uint32_t physicalCoreIdx = GetBlockIdx();
+    __gm__ int32_t *launchCountSlot =
+        reinterpret_cast<__gm__ int32_t *>(params_.peermemInfo.rankSyncInWorldPtr + RANK_SYNC_COUNTER_OFFSET_BYTES +
+                                           static_cast<uint64_t>(physicalCoreIdx) * RANK_SYNC_COUNTER_SLOT_BYTES);
+    SendTopkIdsCountForExperts(ownedExpertRange, commonConfig_, launchCountSlot, g_winRankAddr_, sendMaskConfig_,
+                               sendMaskScratch_);
+}
+
 template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessInputPreparationStage()
 {
@@ -704,9 +726,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessInputPreparation
                                                         sharedQuantScratch_);
         }
     }
-    if (sharedExpertNum_ == 0U) {
-        GatherAndSendExpertCompactRoutes(aivJob_, commonConfig_, params_, g_winRankAddr_, sendMaskConfig_,
-                                         sendMaskScratch_);
+    if constexpr (g_coreType == AIV) {
+        if (sharedExpertNum_ == 0U) {
+            SendTopkIdsIndexAndCount(aivJob_);
+        }
     }
     ResetSyncStatus<TopkWeightsPrefetch>(aivJob_, params_, resetBatchElementCount_, resetTensor_);
 }
@@ -755,10 +778,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessWave(Derived &de
      * 共享专家使用 A8W4：AIC/AIV0 执行共享 GMM1 和权重转换，AIV1 完成发送及同步后执行共享激活。
      * 子组同步只等待 AIV1，避免阻塞正在执行共享计算的 AIV0。
      */
-    if (sharedExpertNum_ > 0U && GetSubBlockIdx() == 1U) {
-        const AivJobContext topkValidIndexJob{.jobIndex = blockIdx_, .totalJobs = blockNum_};
-        GatherAndSendExpertCompactRoutes(topkValidIndexJob, commonConfig_, params_, g_winRankAddr_, sendMaskConfig_,
-                                         sendMaskScratch_);
+    if constexpr (g_coreType == AIV) {
+        if (sharedExpertNum_ > 0U && GetSubBlockIdx() == 1U) {
+            SendTopkIdsIndexAndCount({.jobIndex = blockIdx_, .totalJobs = blockNum_});
+        }
     }
     exceptionDump_.UpdateStage(MegaMoeImpl::Stage::CROSS_RANK_SYNC_INPUT);
     SyncInputAcrossRanks();

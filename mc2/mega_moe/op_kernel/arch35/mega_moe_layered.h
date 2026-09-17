@@ -832,8 +832,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CrossRank
     int64_t syncCountOffset = CalcUrmaSyncCountOffset(static_cast<int64_t>(worldSize_));
     __gm__ int32_t *syncCount = (__gm__ int32_t *)(params_.peermemInfo.rankSyncInWorldPtr + syncCountOffset +
                                                    aivCoreIdx_ * PEERMEM_SYNC_SLOT_SIZE);
-    int count = ReadGmByPassDCache(syncCount) + 1;
-    WriteGmByPassDCache(syncCount, count);
+    int count = ReadGmBypassDCache(syncCount) + 1;
+    WriteGmBypassDCache(syncCount, count);
     // 先向本 AIV 负责的所有 peer 发出通知，再进入等待。256P 场景下可同时维持多个
     // channel 在途，避免原实现逐 peer“写-等-Drain”造成的串行握手。
     for (int rankIndex = aivCoreIdx_; rankIndex < worldSize_; rankIndex += blockAivNum_) {

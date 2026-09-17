@@ -451,7 +451,7 @@ __aicore__ inline uint32_t MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Fin
                     GetExpertCountWorkspaceOffset(countWorkspace_, moeExpertPerRank_, expertIdx, true);
                 __gm__ int32_t *expertTokenCountAddr =
                     reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.expertRecvTokenCountPtr) + countOffset;
-                if (AscendC::ReadGmByPassDCache(expertTokenCountAddr) != 0) {
+                if (AscendC::ReadGmBypassDCache(expertTokenCountAddr) != 0) {
                     return expertIdx;
                 }
             }
