@@ -46,6 +46,7 @@ private:
     void InitLoadBalanceParams();
     void LoadActualQuerySeq();
     void LoadActualKvSeq();
+    static int64_t CostFunc(uint32_t basicM, uint32_t basicS2);
 
     void SetMetadataHead(const load_balance::SectionStreamKResult &splitRes, optiling::detail::FaMetadata &faMetadata);
     void SetMetadataFa(const load_balance::SectionStreamKResult &splitRes, optiling::detail::FaMetadata &faMetadata);

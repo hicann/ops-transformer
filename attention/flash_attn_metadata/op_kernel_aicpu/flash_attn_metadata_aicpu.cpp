@@ -194,6 +194,20 @@ void FlashAttnMetadataCpuKernel::InitDeviceInfo()
     deviceInfo.aivCoreMinNum = maxUsedAivCores;
 }
 
+int64_t FlashAttnMetadataCpuKernel::CostFunc(uint32_t basicM, uint32_t basicS2)
+{
+    const uint32_t mAlignCoef = 16U;
+    const uint32_t s2AlignCoef = 64U;
+    const float mCoef = -0.037f;
+    const float s2Coef = 0.11f;
+    const float constant = 3.45f;
+
+    float alignBasicM = static_cast<float>(load_balance::CeilDiv(basicM, mAlignCoef));
+    float alignBasicS2 = static_cast<float>(load_balance::CeilDiv(basicS2, s2AlignCoef));
+
+    return static_cast<int64_t>(mCoef * alignBasicM + s2Coef * alignBasicS2 + constant);
+}
+
 void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
 {
     uint32_t qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_BNSD;
@@ -213,6 +227,7 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     param.fdTolerance = 10;             // 10: tolerance block
     param.fdLeastBlock = 3;             // 3: least block
     param.fdOn = true;
+    param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
     param.outputLayout = load_balance::OutputLayout::BN2_S1G;
 }
 
