@@ -182,6 +182,7 @@ private:
     TBuf<> stage2OutBuf;
     TEventID mte3ToVId[2]; // 存放MTE3_V的eventId, 2份表示可能存在pingpong
     TEventID vToMte3Id[2]; // 存放V_MTE3的eventId, 2份表示可能存在pingpong
+    TEventID initOutputEventId;
     TBuf<> softmaxMaxBuf[2];
     TBuf<> softmaxSumBuf[2];
     TBuf<> softmaxExpBuf[2];
@@ -814,7 +815,9 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitOutputSingleCore(Co
         uint64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
         if (constInfo.aivIdx * singleCoreSize < totalOutputSize && singleInitOutputSize > 0) {
             GlobalTensor<OUTPUT_T> attentionOutEodGm = this->attentionOutGm[constInfo.aivIdx * singleCoreSize];
+            WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
             AscendC::Fill<OUTPUT_T>(attentionOutEodGm, singleInitOutputSize, static_cast<OUTPUT_T>(0));
+            SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
 #if KVQSFA_VERSION >= 2
@@ -832,9 +835,13 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitOutputSingleCore(Co
             if (constInfo.aivIdx * singleCoreLseSize < totalLseSize && singleInitLseSize > 0) {
                 GlobalTensor<float> softmaxSumEodGm = this->softmaxSumGm[constInfo.aivIdx * singleCoreLseSize];
                 GlobalTensor<float> softmaxMaxEodGm = this->softmaxMaxGm[constInfo.aivIdx * singleCoreLseSize];
+                WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
                 AscendC::Fill<float>(softmaxSumEodGm, singleInitLseSize, static_cast<float>(0.0));
+                SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
+                WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
                 AscendC::Fill<float>(softmaxMaxEodGm, singleInitLseSize,
                                      static_cast<float>(-std::numeric_limits<float>::infinity()));
+                SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
             }
         }
     }
@@ -885,7 +892,10 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CleanOutput(__gm__ uint
         this->softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
         this->softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
         if (constInfo.needInit == 1) {
+            initOutputEventId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
+            SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId); // 释放剩余ub
             InitOutputSingleCore(constInfo);
+            WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
 }
@@ -913,7 +923,10 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CleanOutput(__gm__ uint
     if ASCEND_IS_AIV {
         this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
         if (constInfo.needInit == 1) {
+            initOutputEventId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
+            SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId); // 释放剩余ub
             InitOutputSingleCore(constInfo);
+            WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
 }

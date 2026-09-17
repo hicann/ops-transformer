@@ -61,20 +61,9 @@ aclnnStatus aclnnSparseFlashAttentionV2GetWorkspaceSize(
     const aclTensor *valueTensor = (value == nullptr) ? key : value;
     if (returnSoftmaxLse) {
         if (softmaxMax == nullptr || softmaxSum == nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "when returnSoftmaxLse is true,\
-            softmaxMax and softmaxSum cannot be nullptr.");
-            return ge::GRAPH_FAILED;
-        }
-    } else {
-        if (softmaxMax == nullptr && softmaxSum == nullptr) {
-            if (softmaxMax == nullptr) {
-                OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Failed to create the holder of tensor softmaxMax!");
-                return ge::GRAPH_FAILED;
-            }
-            if (softmaxSum == nullptr) {
-                OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Failed to create the holder of tensor softmaxSum!");
-                return ge::GRAPH_FAILED;
-            }
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
+                    "when returnSoftmaxLse is true, softmaxMax and softmaxSum cannot be nullptr.");
+            return ACLNN_ERR_PARAM_NULLPTR;
         }
     }
     return aclnnInnerSparseFlashAttentionGetWorkspaceSize(
