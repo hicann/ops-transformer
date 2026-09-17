@@ -196,6 +196,7 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl128Mxfp8FullquantVFSubloop0(
         Muls(vreg_src_max, vreg_src_max, INV_LN2, preg_all_float);
         Truncate<T, RoundMode::CAST_CEIL>(vreg_src_max, vreg_src_max, preg_all_float);
         Muls(vreg_src_max, vreg_src_max, LN2, preg_all_float);
+        Sub(vreg_src_max, vreg_src_max, vreg_ln_p_scale, preg_all_float);
         Compare<float, CMPMODE::LE>(preg_compare_max, vreg_src_max, vreg_min, preg_all_float);
         Select(vreg_src_max, vreg_min, vreg_src_max, preg_compare_max);
         StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)maxUb), vreg_src_max, ureg_max, 1);
@@ -209,7 +210,6 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl128Mxfp8FullquantVFSubloop0(
 
     for (uint16_t i = 0; i < m; ++i) {
         LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max_brc, maxUbStart + i);
-        Sub(vreg_max_brc, vreg_max_brc, vreg_ln_p_scale, preg_all_float);
         if constexpr (IsSameType<T2, float>::value) {
             LoadAlign(vreg_src_x, srcUb + i * s2BaseSize);
             LoadAlign(vreg_src_x_unroll, srcUb + i * s2BaseSize + (s2BaseSize >> 1));
@@ -528,6 +528,7 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl128Mxfp8FullquantVFSubloop1(
         Muls(vreg_input_max, vreg_input_max, INV_LN2, preg_all);
         Truncate<T, RoundMode::CAST_CEIL>(vreg_input_max, vreg_input_max, preg_all);
         Muls(vreg_input_max, vreg_input_max, LN2, preg_all);
+        Sub(vreg_input_max, vreg_input_max, vreg_ln_p_scale, preg_all);
         Compare<float, CMPMODE::LE>(preg_compare_max, vreg_input_max, vreg_min, preg_all);
         Select(vreg_input_max, vreg_min, vreg_input_max, preg_compare_max);
         StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), vreg_input_max, ureg_max, 1);
@@ -550,7 +551,6 @@ __simd_vf__ void ProcessVec1NoUpdateGeneralImpl128Mxfp8FullquantVFSubloop1(
 
     for (uint16_t i = 0; i < m; ++i) {
         LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max_brc, maxUbStart + i);
-        Sub(vreg_max_brc, vreg_max_brc, vreg_ln_p_scale, preg_all);
         if constexpr (IsSameType<T2, float>::value) {
             LoadAlign(vreg_src_x, srcUb + i * s2BaseSize);
             LoadAlign(vreg_src_x_unroll, srcUb + i * s2BaseSize + (s2BaseSize >> 1));
