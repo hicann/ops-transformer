@@ -42,7 +42,7 @@ class _AllGatherQuantMatmulOpBuilder(OpBuilder):
             "int[] group_sizes=[], "
             "int? x1_dtype=None, int? x2_dtype=None, "
             "int? x1_scale_dtype=None, int? x2_scale_dtype=None, "
-            'int? y_dtype=None, str comm_mode="ai_cpu"'
+            "int? y_dtype=None, str comm_mode=None"
             ") -> (Tensor, Tensor, Tensor)"
         )
 
@@ -64,7 +64,7 @@ class _AllGatherQuantMatmulOpBuilder(OpBuilder):
             x1_scale_dtype=None,
             x2_scale_dtype=None,
             y_dtype=None,
-            comm_mode="ai_cpu",
+            comm_mode=None,
         ):
             if rank_size <= 0:
                 raise ValueError("rank_size should be greater than 0.")
@@ -107,7 +107,7 @@ def _npu_all_gather_quant_matmul(
     x1_scale_dtype=None,
     x2_scale_dtype=None,
     y_dtype=None,
-    comm_mode="ai_cpu",
+    comm_mode=None,
 ):
     result = _op_module.npu_all_gather_quant_matmul(
         context,
@@ -125,7 +125,7 @@ def _npu_all_gather_quant_matmul(
         x1_scale_dtype,
         x2_scale_dtype,
         y_dtype,
-        comm_mode,
+        comm_mode if comm_mode is not None else "aiv_urma",
     )
     return result
 
@@ -252,7 +252,7 @@ def all_gather_quant_matmul(
     x1_scale_dtype: Optional[int] = None,
     x2_scale_dtype: Optional[int] = None,
     y_dtype: Optional[int] = None,
-    comm_mode: Optional[str] = "ai_cpu",
+    comm_mode: Optional[str] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """AllGather + MX quantized Matmul fused computation (apace UDMA path).
 
@@ -281,7 +281,7 @@ def all_gather_quant_matmul(
         y_dtype (int, optional): Output dtype enum, None means default bfloat16.
             Only bfloat16/float16 are supported.
         comm_mode (str, optional): Communication engine. Only ``"aiv_urma"`` is supported;
-            the default ``"ai_cpu"`` is rejected, so pass ``"aiv_urma"`` explicitly.
+            defaults to ``"aiv_urma"``.
 
     Returns:
         Tuple[Tensor, Tensor, Tensor]: (y, gather_out, amax_out) where y has
@@ -291,6 +291,8 @@ def all_gather_quant_matmul(
     """
     if group_sizes is None:
         group_sizes = []
+    if comm_mode is None:
+        comm_mode = "aiv_urma"
     _check_params(
         x1,
         x2,
