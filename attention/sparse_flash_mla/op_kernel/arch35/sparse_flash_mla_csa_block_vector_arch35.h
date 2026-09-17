@@ -486,10 +486,16 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyInKvSparse(LocalTensor<KV
             }
         }
         int64_t combineBytes = constInfo.dSizeVInput * sizeof(KV_T);
-        int64_t keySrcStride =
-            (smlaKeyOffset0 > smlaKeyOffset1 ? (smlaKeyOffset0 - smlaKeyOffset1) : (smlaKeyOffset1 - smlaKeyOffset0)) *
-                sizeof(KV_T) -
-            combineBytes;
+        int64_t keySrcStride;
+        if constexpr (IS_BATCH_CONSISTENCY) {
+            // batch一致性场景，token读取顺序只与逻辑顺序有关，为保证确定性不可交换读取顺序
+            keySrcStride = (smlaKeyOffset1 - smlaKeyOffset0) * sizeof(KV_T) - combineBytes;
+        } else {
+            keySrcStride = (smlaKeyOffset0 > smlaKeyOffset1 ? (smlaKeyOffset0 - smlaKeyOffset1) :
+                                                              (smlaKeyOffset1 - smlaKeyOffset0)) *
+                               sizeof(KV_T) -
+                           combineBytes;
+        }
         if (unlikely(keySrcStride >= INT32_MAX || keySrcStride < 0) || constInfo.sparseBlockSize > 1) {
             // stride溢出、stride为负数、s2超长等异常场景，还原成2条搬运指令
             CopyInSingleKv(kvInUb, startRow, smlaKeyOffset0, constInfo);
