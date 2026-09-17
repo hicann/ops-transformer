@@ -257,6 +257,7 @@ __aicore__ inline void EngramFetchArch35::GatherRankTokens(uint32_t ownerRank, u
     AscendC::LocalTensor<int32_t> dstRegion = tokenIdxInRank[runningOffset].ReinterpretCast<int32_t>();
     uint64_t rsvdCnt = 0;
     AscendC::GatherMask(dstRegion, positions, mask.ReinterpretCast<uint32_t>(), true, batchLen, {1, 1, 0, 0}, rsvdCnt);
+    AscendC::PipeBarrier<PIPE_V>();
     SyncFunc<AscendC::HardEvent::V_S>();
 
     uint32_t count = static_cast<uint32_t>(rsvdCnt);
@@ -283,6 +284,7 @@ __aicore__ inline void EngramFetchArch35::ScatterByRank(uint32_t batchLen)
     AscendC::PipeBarrier<PIPE_V>();
 
     AscendC::Div<int32_t>(rankIDs, indicesLocal, divisor, batchLen);
+    AscendC::PipeBarrier<PIPE_V>();
     SyncFunc<AscendC::HardEvent::V_S>();
 
     uint32_t runningOffset = 0;
