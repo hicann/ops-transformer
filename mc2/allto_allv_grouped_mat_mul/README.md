@@ -175,7 +175,7 @@
   - BSK：本卡发送的token数，是sendCounts参数累加之和，取值范围(0, 52428800)。
   - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
   - H2：表示共享专家hidden size隐藏层大小，取值范围(0, 12288]。
-  - e：表示单卡上专家个数。除下述AIV附加约束外，e<=32，e * epWorldSize最大支持256。
+  - e：表示单卡上专家个数。e<=32，e * epWorldSize最大支持256。AIV模式除外，详情见下方AIV附加约束。
   - N1：表示路由专家的head_num，取值范围(0, 65536)。
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。

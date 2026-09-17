@@ -57,10 +57,8 @@ bool IsSupportedAivDType(ge::DataType dtype)
 uint32_t ResolveExpertOverlapMode(const int32_t *recvPrefix, uint32_t rankSize, uint32_t expertPerRank, uint32_t k,
                                   uint32_t n)
 {
-    const bool protocolSafe =
-        AlltoAllvGroupedMatMulAivMode::IsExpertOverlapProtocolSafe(recvPrefix, rankSize, expertPerRank);
-    const bool automatic = protocolSafe && AlltoAllvGroupedMatMulAivMode::ShouldUseAutomaticExpertOverlap(
-                                               recvPrefix, rankSize, expertPerRank, k, n);
+    const bool automatic =
+        AlltoAllvGroupedMatMulAivMode::ShouldUseAutomaticExpertOverlap(recvPrefix, rankSize, expertPerRank, k, n);
     return automatic ? A2AVGMM_EXPERT_OVERLAP_ENABLED : A2AVGMM_EXPERT_OVERLAP_DISABLED;
 }
 
@@ -367,29 +365,21 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
     const bool windowQuerySucceeded =
         mc2tiling::GetCclBufferSize(group, &actualWindowBytes, nodeName) == ge::GRAPH_SUCCESS;
     if (!windowQuerySucceeded) {
-        actualWindowBytes = 0U;
+        OP_LOGE(nodeName, "Failed to query AIV HCCL window size; refusing to launch a mixed-core kernel.");
+        return ge::GRAPH_FAILED;
     }
     tilingData->actualWindowBytes = actualWindowBytes;
     tilingData->requiredWindowBytes = window.requiredBytes;
     tilingData->payloadBytes = window.payloadBytes;
     tilingData->countBytes = window.countBytes;
     tilingData->controlBytes = window.controlBytes;
-    if (!windowQuerySucceeded) {
-        OP_LOGE(nodeName,
-                "AIV HCCL window actual=%lu required=%lu payload=%lu count=%lu control=%lu, "
-                "BSK=%lld H1=%lld dtypeBytes=2 globalExpertNum=%lu.",
-                actualWindowBytes, window.requiredBytes, window.payloadBytes, window.countBytes, window.controlBytes,
-                static_cast<long long>(inputM), static_cast<long long>(inputK), countNum);
-    } else {
-        OP_TILING_CHECK(
-            actualWindowBytes < window.requiredBytes,
-            OP_LOGE(nodeName,
-                    "AIV HCCL window actual=%lu required=%lu payload=%lu count=%lu control=%lu, "
-                    "BSK=%lld H1=%lld dtypeBytes=2 globalExpertNum=%lu.",
-                    actualWindowBytes, window.requiredBytes, window.payloadBytes, window.countBytes,
-                    window.controlBytes, static_cast<long long>(inputM), static_cast<long long>(inputK), countNum),
-            return ge::GRAPH_FAILED);
-    }
+    OP_TILING_CHECK(
+        actualWindowBytes < window.requiredBytes,
+        OP_LOGE(nodeName, "AIV HCCL window actual=%lu required=%lu payload=%lu count=%lu control=%lu.",
+                actualWindowBytes, window.requiredBytes, window.payloadBytes, window.countBytes, window.controlBytes),
+        return ge::GRAPH_FAILED);
+    OP_LOGD(nodeName, "AIV HCCL window actual=%lu required=%lu payload=%lu payloadPercent=%lu.", actualWindowBytes,
+            window.requiredBytes, window.payloadBytes, window.payloadBytes * 100U / actualWindowBytes);
 
     const uint64_t tilingKey =
         GET_TPL_TILING_KEY(*transGmmWeight, hasMmX ? *transMmWeight : false, Mc2Comm::COMM_MODE_AIV);

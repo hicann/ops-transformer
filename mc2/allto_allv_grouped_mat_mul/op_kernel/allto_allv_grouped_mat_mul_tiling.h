@@ -107,8 +107,7 @@ A2AVGMM_AIV_TILING_HOST_DEVICE bool ShouldUseAutomaticExpertOverlap(const int32_
              k >= A2AVGMM_MIN_EXPERT_OVERLAP_DIMENSION && n >= A2AVGMM_MIN_EXPERT_OVERLAP_DIMENSION));
 }
 
-// Nine routed flags, each with at most fifteen outstanding notifications.
-// Mixed-core SyncAll uses the runtime-reserved flag 13, outside 0..10.
+// 使用九个路由通知标志，每个标志的软件未消费通知上限为十五。混合核 SyncAll 使用运行时保留的标志 13，不占用 0 至 10。
 constexpr uint32_t kExpertReadyFlagCount = 9U;
 constexpr uint32_t kExpertReadyCountPerFlag = 15U;
 constexpr uint32_t kExpertReadyWindow = kExpertReadyFlagCount * kExpertReadyCountPerFlag;
@@ -132,7 +131,7 @@ A2AVGMM_AIV_TILING_HOST_DEVICE uint32_t CopyMoveCapacity(uint64_t ubBytes)
     if (ubBytes <= kCopyFlagBufferBytes) {
         return 0U;
     }
-    // FP16/BF16: reserve metadata, then divide between two 32-byte-aligned buffers.
+    // FP16/BF16：先预留元数据空间，再分配两个按 32 字节对齐的缓冲区。
     const uint64_t elements = (ubBytes - kCopyFlagBufferBytes) / (kCopyBufferCount * 2U);
     const uint64_t capped = elements < 16384U ? elements : 16384U;
     return static_cast<uint32_t>(capped / 16U * 16U);
@@ -165,19 +164,6 @@ struct AlltoAllvGmmCoCTiling {
     uint32_t ubMoveNum = 0U;
     uint32_t swizzlCount = 0U;
     uint32_t swizzlDirect = 0U;
-};
-
-struct AlltoAllvGmmExpertMeta {
-    uint64_t recvTokenBase = 0U;
-    uint32_t tokenCount = 0U;
-    uint32_t reserved = 0U;
-};
-
-struct AlltoAllvGmmExpertSourceMeta {
-    uint64_t dstTokenOffset = 0U;
-    uint64_t srcTokenOffset = 0U;
-    uint32_t tokenCount = 0U;
-    uint32_t sourceRank = 0U;
 };
 
 struct AlltoAllvGmmAivTilingData {
@@ -213,9 +199,8 @@ struct AlltoAllvGmmTilingData {
     Mc2GroupedMatmulTilingData::GMMQuantTilingData mmQuantTilingData;
 };
 
-// The generated binary advertises one default opParaSize for every tiling key.
-// Keep the legacy layout at offset zero, but reserve enough bytes for the AIV
-// prefix ABI so runtime tiling is not truncated at the former default size.
+// 生成的二进制对所有 tiling key 使用统一的默认 opParaSize。保留偏移零处的旧布局，同时为 AIV 前缀 ABI
+// 预留足够空间，防止运行时 tiling 被旧的默认大小截断。
 static_assert(sizeof(AlltoAllvGmmTilingData) <= sizeof(AlltoAllvGmmAivTilingData),
               "AIV tiling must define the default capacity");
 struct AlltoAllvGmmKernelTilingData : public AlltoAllvGmmTilingData {
