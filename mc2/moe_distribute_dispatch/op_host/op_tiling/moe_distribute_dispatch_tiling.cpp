@@ -355,6 +355,70 @@ ge::graphStatus MoeDistributeDispatchTilingBase::CheckAttrs(gert::TilingContext 
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckExpertScalesShape(gert::TilingContext *context, const char *nodeName, int64_t expertIdsDim0,
+                                              int64_t expertIdsDim1)
+{
+    const gert::StorageShape *expertScalesStorageShape = context->GetOptionalInputShape(EXPERT_SCALES_INDEX);
+    if (expertScalesStorageShape != nullptr) {
+        const auto &expertScalesShape = expertScalesStorageShape->GetStorageShape();
+        OP_TILING_CHECK(
+            expertScalesShape.GetDimNum() != INPUT_DIM_TWO,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                nodeName, "expert_scales", Ops::Base::ToString(expertScalesShape).c_str(), "expert_scales must be 2D"),
+            return ge::GRAPH_FAILED);
+        const int64_t expertScalesDim0 = expertScalesShape.GetDim(0);
+        const int64_t expertScalesDim1 = expertScalesShape.GetDim(1);
+        if ((expertScalesDim0 != expertIdsDim0) || (expertScalesDim1 != expertIdsDim1)) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                nodeName, "expert_scales/expert_ids",
+                (std::string("expert_scales shape=[") + std::to_string(expertScalesDim0) + ", " +
+                 std::to_string(expertScalesDim1) + "], expert_ids shape=[" + std::to_string(expertIdsDim0) + ", " +
+                 std::to_string(expertIdsDim1) + "]")
+                    .c_str(),
+                "expert_scales shape must be equal to expert_ids shape");
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckOptionalScalesShape(gert::TilingContext *context, const char *nodeName, bool isScales,
+                                                uint32_t sharedExpertRankNum, int64_t moeExpertNum, int64_t xDim1)
+{
+    // 校验scales的维度
+    if (isScales) {
+        const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
+        const int64_t scalesDim0 = scalesStorageShape->GetStorageShape().GetDim(0);
+        const int64_t scalesDim1 = scalesStorageShape->GetStorageShape().GetDim(1);
+        if (sharedExpertRankNum == 0U) {
+            if (scalesDim0 != moeExpertNum) {
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    nodeName, "scales", (std::string("dim0=") + std::to_string(scalesDim0)).c_str(),
+                    "scales dim0 should be equal to moeExpertNum when sharedExpertRankNum == 0");
+                return ge::GRAPH_FAILED;
+            }
+        } else {
+            if (scalesDim0 != (moeExpertNum + 1)) {
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    nodeName, "scales", (std::string("dim0=") + std::to_string(scalesDim0)).c_str(),
+                    "scales dim0 should be equal to moeExpertNum + 1 when sharedExpertRankNum != 0");
+                return ge::GRAPH_FAILED;
+            }
+        }
+        if (xDim1 != scalesDim1) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                nodeName, "x/scales",
+                (std::string("x dim1=") + std::to_string(xDim1) + ", scales dim1=" + std::to_string(scalesDim1))
+                    .c_str(),
+                "Dim1 of x must be equal to dim1 of scales");
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
 static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const char *nodeName,
                                              MoeDistributeDispatchTilingData &tilingData, const bool isScales)
 {
@@ -387,56 +451,13 @@ static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const
                     return ge::GRAPH_FAILED);
     tilingData.moeDistributeDispatchInfo.k = static_cast<uint32_t>(expertIdsDim1);
 
-    const gert::StorageShape *expertScalesStorageShape = context->GetOptionalInputShape(EXPERT_SCALES_INDEX);
-    if (expertScalesStorageShape != nullptr) {
-        const auto &expertScalesShape = expertScalesStorageShape->GetStorageShape();
-        OP_TILING_CHECK(
-            expertScalesShape.GetDimNum() != INPUT_DIM_TWO,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                nodeName, "expert_scales", Ops::Base::ToString(expertScalesShape).c_str(), "expert_scales must be 2D"),
-            return ge::GRAPH_FAILED);
-        const int64_t expertScalesDim0 = expertScalesShape.GetDim(0);
-        const int64_t expertScalesDim1 = expertScalesShape.GetDim(1);
-        if ((expertScalesDim0 != expertIdsDim0) || (expertScalesDim1 != expertIdsDim1)) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                nodeName, "expert_scales/expert_ids",
-                (std::string("expert_scales shape=[") + std::to_string(expertScalesDim0) + ", " +
-                 std::to_string(expertScalesDim1) + "], expert_ids shape=[" + std::to_string(expertIdsDim0) + ", " +
-                 std::to_string(expertIdsDim1) + "]")
-                    .c_str(),
-                "expert_scales shape must be equal to expert_ids shape");
-            return ge::GRAPH_FAILED;
-        }
+    if (CheckExpertScalesShape(context, nodeName, expertIdsDim0, expertIdsDim1) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
-    // 校验scales的维度
-    if (isScales) {
-        const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
-        const int64_t scalesDim0 = scalesStorageShape->GetStorageShape().GetDim(0);
-        const int64_t scalesDim1 = scalesStorageShape->GetStorageShape().GetDim(1);
-        if (sharedExpertRankNum == 0U) {
-            if (scalesDim0 != moeExpertNum) {
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    nodeName, "scales", (std::string("dim0=") + std::to_string(scalesDim0)).c_str(),
-                    "scales dim0 should be equal to moeExpertNum when sharedExpertRankNum == 0");
-                return ge::GRAPH_FAILED;
-            }
-        } else {
-            if (scalesDim0 != (moeExpertNum + 1)) {
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    nodeName, "scales", (std::string("dim0=") + std::to_string(scalesDim0)).c_str(),
-                    "scales dim0 should be equal to moeExpertNum + 1 when sharedExpertRankNum != 0");
-                return ge::GRAPH_FAILED;
-            }
-        }
-        if (xDim1 != scalesDim1) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                nodeName, "x/scales",
-                (std::string("x dim1=") + std::to_string(xDim1) + ", scales dim1=" + std::to_string(scalesDim1))
-                    .c_str(),
-                "Dim1 of x must be equal to dim1 of scales");
-            return ge::GRAPH_FAILED;
-        }
+    if (CheckOptionalScalesShape(context, nodeName, isScales, sharedExpertRankNum, moeExpertNum, xDim1) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
     return ge::GRAPH_SUCCESS;
@@ -482,6 +503,47 @@ static ge::graphStatus CheckCommTensorShape(gert::TilingContext *context, const 
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckExpertTokenCountShape(gert::TilingContext *context, const char *nodeName,
+                                                  bool isSharedExpert, int64_t localMoeExpertNum)
+{
+    // 校验expertTokenNums的维度
+    const gert::StorageShape *expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    const int64_t expertTokenNumsDim0 = expertTokenNumsStorageShape->GetStorageShape().GetDim(0);
+    if (isSharedExpert) {
+        if (expertTokenNumsDim0 != 1) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "expertTokenNums",
+                                                  (std::string("dim0=") + std::to_string(expertTokenNumsDim0)).c_str(),
+                                                  "shared expertTokenNums dim0 should be 1");
+            return ge::GRAPH_FAILED;
+        }
+    } else {
+        if (expertTokenNumsDim0 != localMoeExpertNum) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "expertTokenNums",
+                                                  (std::string("dim0=") + std::to_string(expertTokenNumsDim0)).c_str(),
+                                                  "moe expertTokenNums dim0 should be equal to localMoeExpertNum");
+            return ge::GRAPH_FAILED;
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckDynamicScaleOutputShape(gert::TilingContext *context, const char *nodeName,
+                                                    uint32_t quantMode, uint32_t A)
+{
+    // 校验dynamicScales的维度
+    if (quantMode != NO_SCALES) {
+        const gert::StorageShape *dynamicScalesStorageShape = context->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
+        const int64_t dynamicScalesDim0 = dynamicScalesStorageShape->GetStorageShape().GetDim(0);
+        OP_TILING_CHECK(
+            dynamicScalesDim0 < static_cast<int64_t>(A),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                nodeName, "dynamic_scales", Ops::Base::ToString(dynamicScalesStorageShape->GetStorageShape()).c_str(),
+                (std::string("dim 0 must be at least ") + std::to_string(A)).c_str()),
+            return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 static ge::graphStatus CheckOutputTensorShape(gert::TilingContext *context, const char *nodeName,
                                               MoeDistributeDispatchTilingData &tilingData, const uint32_t quantMode,
                                               const bool isSharedExpert, const int64_t localMoeExpertNum,
@@ -510,17 +572,10 @@ static ge::graphStatus CheckOutputTensorShape(gert::TilingContext *context, cons
                                                    .c_str(),
                                                "their dim 1 values must be equal"),
         return ge::GRAPH_FAILED);
-    // 校验dynamicScales的维度
-    if (quantMode != NO_SCALES) {
-        const gert::StorageShape *dynamicScalesStorageShape = context->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
-        const int64_t dynamicScalesDim0 = dynamicScalesStorageShape->GetStorageShape().GetDim(0);
-        OP_TILING_CHECK(
-            dynamicScalesDim0 < static_cast<int64_t>(A),
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                nodeName, "dynamic_scales", Ops::Base::ToString(dynamicScalesStorageShape->GetStorageShape()).c_str(),
-                (std::string("dim 0 must be at least ") + std::to_string(A)).c_str()),
-            return ge::GRAPH_FAILED);
+    if (CheckDynamicScaleOutputShape(context, nodeName, quantMode, A) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
+
     // 校验expandIdx的维度
     const gert::StorageShape *expandIdxStorageShape = context->GetOutputShape(OUTPUT_EXPAND_IDX_INDEX);
     const int64_t expandIdxDim0 = expandIdxStorageShape->GetStorageShape().GetDim(0);
@@ -530,24 +585,10 @@ static ge::graphStatus CheckOutputTensorShape(gert::TilingContext *context, cons
                                               "expandIdx dim0 should be bs * k");
         return ge::GRAPH_FAILED;
     }
-    // 校验expertTokenNums的维度
-    const gert::StorageShape *expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
-    const int64_t expertTokenNumsDim0 = expertTokenNumsStorageShape->GetStorageShape().GetDim(0);
-    if (isSharedExpert) {
-        if (expertTokenNumsDim0 != 1) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "expertTokenNums",
-                                                  (std::string("dim0=") + std::to_string(expertTokenNumsDim0)).c_str(),
-                                                  "shared expertTokenNums dim0 should be 1");
-            return ge::GRAPH_FAILED;
-        }
-    } else {
-        if (expertTokenNumsDim0 != localMoeExpertNum) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "expertTokenNums",
-                                                  (std::string("dim0=") + std::to_string(expertTokenNumsDim0)).c_str(),
-                                                  "moe expertTokenNums dim0 should be equal to localMoeExpertNum");
-            return ge::GRAPH_FAILED;
-        }
+    if (CheckExpertTokenCountShape(context, nodeName, isSharedExpert, localMoeExpertNum) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
+
     // 校验通信参数的维度
     OP_TILING_CHECK(
         CheckCommTensorShape(context, nodeName, tilingData, isSharedExpert, localMoeExpertNum) != ge::GRAPH_SUCCESS,
@@ -665,24 +706,9 @@ static ge::graphStatus CheckWinSize(const gert::TilingContext *context, MoeDistr
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingBase::MoeDistributeDispatchA3A5TilingCheckAttr(gert::TilingContext *context,
-                                                                                          uint32_t &quantMode,
-                                                                                          bool &isScales)
+static ge::graphStatus CheckQuantizationAndTensorMetadata(gert::TilingContext *context, const char *nodeName,
+                                                          bool isScales, uint32_t quantMode)
 {
-    const char *nodeName = context->GetNodeName();
-    MoeDistributeDispatchTilingData *tilingData = context->GetTilingData<MoeDistributeDispatchTilingData>();
-    std::string groupEp = "";
-    uint32_t localMoeExpertNum = 1;
-    // 获取入参属性
-    OP_TILING_CHECK(
-        GetAttrAndSetTilingData(context, nodeName, *tilingData, groupEp) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "attr", "invalid", "Get attr and set tiling data failed"),
-        return ge::GRAPH_FAILED);
-    // 获取scales
-    const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
-    isScales = (scalesStorageShape != nullptr);
-    tilingData->moeDistributeDispatchInfo.isQuant = isScales;
-    quantMode = tilingData->moeDistributeDispatchInfo.quantMode;
     // 检查quantMode和scales是否匹配
     OP_TILING_CHECK(quantMode == STATIC_SCALES, OP_LOGE_FOR_INVALID_VALUE(nodeName, "quantMode", "static", "dynamic"),
                     return ge::GRAPH_FAILED);
@@ -701,6 +727,30 @@ ge::graphStatus MoeDistributeDispatchTilingBase::MoeDistributeDispatchA3A5Tiling
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "expert_scales", "invalid",
                                                           "expert_scales dtype or format check failed"),
                     return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeDistributeDispatchTilingBase::MoeDistributeDispatchA3A5TilingCheckAttr(gert::TilingContext *context,
+                                                                                          uint32_t &quantMode,
+                                                                                          bool &isScales)
+{
+    const char *nodeName = context->GetNodeName();
+    MoeDistributeDispatchTilingData *tilingData = context->GetTilingData<MoeDistributeDispatchTilingData>();
+    std::string groupEp = "";
+    uint32_t localMoeExpertNum = 1;
+    // 获取入参属性
+    OP_TILING_CHECK(
+        GetAttrAndSetTilingData(context, nodeName, *tilingData, groupEp) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "attr", "invalid", "Get attr and set tiling data failed"),
+        return ge::GRAPH_FAILED);
+    // 获取scales
+    const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
+    isScales = (scalesStorageShape != nullptr);
+    tilingData->moeDistributeDispatchInfo.isQuant = isScales;
+    quantMode = tilingData->moeDistributeDispatchInfo.quantMode;
+    if (CheckQuantizationAndTensorMetadata(context, nodeName, isScales, quantMode) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     // 检查属性的取值是否合法
     OP_TILING_CHECK(CheckAttrs(context, nodeName, *tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "attr", "invalid", "Attr value check failed"),

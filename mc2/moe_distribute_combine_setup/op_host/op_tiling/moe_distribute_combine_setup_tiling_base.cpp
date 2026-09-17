@@ -167,32 +167,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckSharedExpertAttrValue(
 {
     const uint32_t &sharedExpertNum = tilingData_->moeDistributeCombineSetupInfo.sharedExpertNum;
     const uint32_t &sharedExpertRankNum = tilingData_->moeDistributeCombineSetupInfo.sharedExpertRankNum;
-    // 共享专家卡数>=共享专家数且可以整除
-    if (sharedExpertRankNum == 0) {
-        return ge::GRAPH_SUCCESS;
-    }
-    OP_TILING_CHECK((sharedExpertNum == 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertNum != 0"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((sharedExpertNum > sharedExpertRankNum),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertNum <= sharedExpertRankNum"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((sharedExpertRankNum % sharedExpertNum != 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertRankNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertRankNum % sharedExpertNum == 0"),
-                    return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
+    return MoeTilingBase::CheckSharedExpertAttrValue(nodeName_.c_str(), sharedExpertNum, sharedExpertRankNum);
 }
 
 ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckSharedExpertAttr()

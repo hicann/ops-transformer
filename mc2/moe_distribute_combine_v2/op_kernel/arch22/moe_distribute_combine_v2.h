@@ -98,6 +98,7 @@ private:
     __aicore__ inline void CalConstExpertAlpha(GlobalTensor<ExpandXType> constExpertAlphaGM, uint32_t const_expert_idx,
                                                float &alphaFloat);
     __aicore__ inline void LocalWindowCopy();
+    __aicore__ inline void InitQuantizationBuffers();
     __aicore__ inline void BuffInit();
     __aicore__ inline void SplitCoreCal();
     __aicore__ inline bool WaitDispatch(uint32_t tokenIndex, uint64_t performanceTimeStart, uint32_t copyCount,
@@ -517,15 +518,8 @@ __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::Init(
 }
 
 template <CombineMC2TypeClass>
-__aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::BuffInit()
+__aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::InitQuantizationBuffers()
 {
-    tpipe_->Reset();
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510) // reset后 ctrl寄存器会复位为默认值
-    // 单指令饱和模式
-    AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
-#endif
-    tpipe_->InitBuffer(calBeginBuf_, UB_ALIGN);  // UB用量探测起点
-    tpipe_->InitBuffer(readStateBuf_, UB_ALIGN); // 32
     if constexpr (QuantMode > UNQUANT) {
         tpipe_->InitBuffer(xAbsBuf_, hFloatAlign256Size_); // 28K blockReduceMax计算及后续Cast计算，256对齐
         uint32_t hFloatAlign256Cnt = hFloatAlign256Size_ / sizeof(float);
@@ -542,6 +536,19 @@ __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::BuffInit()
         quantInst_.SetQuantInitParams(winTpSendCountFloatTensor_, fp16CastTensor_, absFloatTensor_,
                                       reduceMaxFloatTensor_, scaleDupLocalTensor_);
     }
+}
+
+template <CombineMC2TypeClass>
+__aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::BuffInit()
+{
+    tpipe_->Reset();
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510) // reset后 ctrl寄存器会复位为默认值
+    // 单指令饱和模式
+    AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
+#endif
+    tpipe_->InitBuffer(calBeginBuf_, UB_ALIGN);  // UB用量探测起点
+    tpipe_->InitBuffer(readStateBuf_, UB_ALIGN); // 32
+    InitQuantizationBuffers();
     if (isScalingDownFlag_) {
         elasticInst_.InitElasticInfoTensor(epWorldSizeOriginal_, elasticInfoTensor_);
     }

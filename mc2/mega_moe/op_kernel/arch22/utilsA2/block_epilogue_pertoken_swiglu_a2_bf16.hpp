@@ -21,6 +21,7 @@
 #include "catlass/layout/layout.hpp"
 #include "catlass/detail/callback.hpp"
 #include "../utils/gated_activation.hpp"
+#include "../utils/const_args.hpp"
 
 namespace Catlass::Epilogue::Block {
 
@@ -55,8 +56,8 @@ public:
                   "The scale input batch must be block aligned");
     static constexpr uint32_t SCALE_INPUT_BYTES = SCALE_INPUT_COUNT * sizeof(float);
     static constexpr size_t BUFFER_SIZE =
-        UB_STAGES *
-            (2 * TILE_LENGTH * sizeof(ElementC) + TILE_LENGTH * sizeof(ElementD) + 3 * TILE_LENGTH * sizeof(float)) +
+        UB_STAGES * (GATE_UP_ROWS_PER_TOKEN * TILE_LENGTH * sizeof(ElementC) + TILE_LENGTH * sizeof(ElementD) +
+                     3 * TILE_LENGTH * sizeof(float)) +
         SCALE_BUFFER_COUNT * SCALE_BUFFER_BYTES + ROW_MAX_BYTES + SCALE_INPUT_BYTES;
     static_assert(UB_STAGES >= 2, "The pipelined activation epilogue requires double buffering");
     static_assert(SCALE_BATCH_COUNT % (BYTE_PER_BLK / sizeof(ElementPerTokenScale)) == 0,
@@ -86,7 +87,7 @@ public:
 
         for (uint32_t i = 0; i < UB_STAGES; ++i) {
             ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
-            ubOffset += 2 * TILE_LENGTH * sizeof(ElementC);
+            ubOffset += GATE_UP_ROWS_PER_TOKEN * TILE_LENGTH * sizeof(ElementC);
             ubDList[i] = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);
             ubOffset += TILE_LENGTH * sizeof(ElementD);
             ubGateFp32List[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);

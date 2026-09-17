@@ -142,7 +142,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckOpInputSingleParamsTensorM
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsGmm()
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmDtypes(const gert::StorageShape *&gmmWeightStorageShape)
 {
     auto gmmXDesc = context_->GetInputDesc(GMM_X_INDEX);
     OP_TILING_CHECK(gmmXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmX"), return ge::GRAPH_FAILED);
@@ -152,9 +152,10 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsGmm()
                                               "DT_FLOAT16 or DT_BF16"),
                     return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *gmmWeightStorageShape = context_->GetInputShape(GMM_WEIGHT_INDEX);
+    gmmWeightStorageShape = context_->GetInputShape(GMM_WEIGHT_INDEX);
     OP_TILING_CHECK(gmmWeightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmWeight"),
                     return ge::GRAPH_FAILED);
+
     auto gmmWeightDesc = context_->GetInputDesc(GMM_WEIGHT_INDEX);
     OP_TILING_CHECK(gmmWeightDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmWeight"),
                     return ge::GRAPH_FAILED);
@@ -184,6 +185,11 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsGmm()
         return ge::GRAPH_FAILED);
     localParams_.gmmYDtype = localParams_.yDtype;
 
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmShapes(const gert::StorageShape *gmmWeightStorageShape)
+{
     const gert::StorageShape *gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
     const gert::StorageShape *yStorageShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
     OP_TILING_CHECK(gmmXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmX"), return ge::GRAPH_FAILED);
@@ -207,11 +213,18 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsGmm()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsMm()
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsGmm()
 {
-    if (!localParams_.hasSharedMm) {
-        return ge::GRAPH_SUCCESS;
+    const gert::StorageShape *gmmWeightStorageShape = nullptr;
+    auto status = CheckAndSetGmmDtypes(gmmWeightStorageShape);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
     }
+    return CheckAndSetGmmShapes(gmmWeightStorageShape);
+}
+
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetMmDtypes()
+{
     auto mmXDesc = context_->GetOptionalInputDesc(MM_X_OPTIONAL_INDEX);
     auto mmWeightDesc = context_->GetOptionalInputDesc(MM_WEIGHT_OPTIONAL_INDEX);
     OP_TILING_CHECK(mmXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmX"), return ge::GRAPH_FAILED);
@@ -250,6 +263,11 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsMm()
                                               "The dtype of mmY must be the same as that of mmX"),
         return ge::GRAPH_FAILED);
 
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetMmShapes()
+{
     const gert::StorageShape *mmXStorageShape = context_->GetOptionalInputShape(MM_X_OPTIONAL_INDEX);
     const gert::StorageShape *mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_OPTIONAL_INDEX);
     const gert::StorageShape *mmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_OPTIONAL_INDEX);
@@ -278,6 +296,18 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsMm()
     localParams_.N2 = mmYStorageShape->GetStorageShape().GetDim(DIM_ONE);
 
     return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsMm()
+{
+    if (!localParams_.hasSharedMm) {
+        return ge::GRAPH_SUCCESS;
+    }
+    auto status = CheckAndSetMmDtypes();
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
+    }
+    return CheckAndSetMmShapes();
 }
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsAttr()
@@ -512,11 +542,9 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvMteTiling::PostTiling()
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::FillTaskTiling(
+    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const
 {
-    context_->SetBlockDim(localParams_.aicCoreNum);
-
-    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData outData{};
     auto &taskTiling = outData.taskTilingInfo;
     taskTiling.BSK = localParams_.BsK;
     taskTiling.BS = localParams_.Bs;
@@ -534,6 +562,12 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::PostTiling()
         taskTiling.sendCnt[i] = sendCounts_[i];
         taskTiling.recvCnt[i] = recvCounts_[i];
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::FillCommTiling(
+    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const
+{
     const gert::RuntimeAttrs *attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
     const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
@@ -550,7 +584,12 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::PostTiling()
                     OP_LOGE(opName_, "Failed to generate the MTE Mc2CcTiling descriptor."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(mc2tiling::GetCclBufferSize(group, &outData.commBufferSize, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Failed to get CCL buffer size for MTE communication."), return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
 
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckCommBuffer(
+    const MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const
+{
     const uint64_t countMatrixBytes =
         mc2tiling::AlignUp(localParams_.epWorldSize * localParams_.ep * sizeof(int32_t),
                            MC2KernelTemplate::Gmma2avMteTiling::COUNT_TABLE_ALIGNMENT_BYTES);
@@ -592,9 +631,15 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::PostTiling()
                     OP_LOGE(opName_, "CCL buffer=%lu bytes does not preserve %lu-byte sync-slot alignment.",
                             outData.commBufferSize, MC2KernelTemplate::Gmma2avMteTiling::SYNC_SLOT_BYTES),
                     return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
 
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::FinishPostTiling(
+    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData)
+{
     MC2_CHECK_LOG_RET(opName_, CheckExpertPipeline());
     MC2_CHECK_LOG_RET(opName_, SetExpertChunkRows(outData.expertChunkRows));
+    const uint64_t dtypeSize = mc2tiling::GetDataTypeSize(opName_, localParams_.gmmYDtype);
 
     outData.cumsumWorkspaceOffset = mc2tiling::AlignUp(localParams_.A * localParams_.N1 * dtypeSize,
                                                        MC2KernelTemplate::Gmma2avMteTiling::WORKSPACE_ALIGNMENT);
@@ -620,6 +665,25 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::PostTiling()
                     return ge::GRAPH_FAILED);
     context_->GetRawTilingData()->SetDataSize(sizeof(outData));
     return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::PostTiling()
+{
+    context_->SetBlockDim(localParams_.aicCoreNum);
+    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData outData{};
+    auto status = FillTaskTiling(outData);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
+    }
+    status = FillCommTiling(outData);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
+    }
+    status = CheckCommBuffer(outData);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
+    }
+    return FinishPostTiling(outData);
 }
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckExpertPipeline() const

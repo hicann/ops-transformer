@@ -135,6 +135,26 @@ private:
     float activationClamp_;
     float activationParams1_;
     float activationParams2_;
+
+    // Quant/NonQuant 两种 tiling 结构的 common 字段类型一致，此处统一加载公共字段
+    __aicore__ inline void LoadCommonTiling(const MegaMoeA2A3TilingData &common)
+    {
+        aivNum_ = common.aivNum;
+        m_ = common.M;
+        k_ = common.K;
+        n_ = common.N;
+        epWorldSize_ = common.worldSize;
+        topK_ = common.topK;
+        expertPerRank_ = common.expertPerRank;
+        // maxOutputSize 语义 = 单轮接收预算 B（recvRoundBudget）；接收行超出 B 由 kernel 接收端轮次切分处理
+        maxOutputSize_ = common.recvRoundBudget;
+        recvRoundsMax_ = common.recvRoundsMax;
+        listLen_ = common.listLen;
+        activationCode_ = common.activationCode;
+        activationClamp_ = common.activationClamp;
+        activationParams1_ = common.activationParams1;
+        activationParams2_ = common.activationParams2;
+    }
 };
 
 template <MegaMoeClass>
@@ -168,42 +188,10 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Init(GM_ADDR contextGM, GM_ADDR xGM
 
     if constexpr (kRoutingIsQuant) {
         GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataQuant, tilingData, tilingGM);
-
-        aivNum_ = tilingData.common.aivNum;
-        m_ = tilingData.common.M;
-        k_ = tilingData.common.K;
-        n_ = tilingData.common.N;
-        epWorldSize_ = tilingData.common.worldSize;
-        topK_ = tilingData.common.topK;
-        expertPerRank_ = tilingData.common.expertPerRank;
-        // maxOutputSize 语义 = 单轮接收预算 B（recvRoundBudget）；接收行超出 B 由 kernel 接收端轮次切分处理
-        maxOutputSize_ = tilingData.common.recvRoundBudget;
-        recvRoundsMax_ = tilingData.common.recvRoundsMax;
-        listLen_ = tilingData.common.listLen;
-
-        activationCode_ = tilingData.common.activationCode;
-        activationClamp_ = tilingData.common.activationClamp;
-        activationParams1_ = tilingData.common.activationParams1;
-        activationParams2_ = tilingData.common.activationParams2;
+        LoadCommonTiling(tilingData.common);
     } else {
         GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataNonQuant, tilingData, tilingGM);
-
-        aivNum_ = tilingData.common.aivNum;
-        m_ = tilingData.common.M;
-        k_ = tilingData.common.K;
-        n_ = tilingData.common.N;
-        epWorldSize_ = tilingData.common.worldSize;
-        topK_ = tilingData.common.topK;
-        expertPerRank_ = tilingData.common.expertPerRank;
-        // maxOutputSize 语义 = 单轮接收预算 B（recvRoundBudget）；接收行超出 B 由 kernel 接收端轮次切分处理
-        maxOutputSize_ = tilingData.common.recvRoundBudget;
-        recvRoundsMax_ = tilingData.common.recvRoundsMax;
-        listLen_ = tilingData.common.listLen;
-
-        activationCode_ = tilingData.common.activationCode;
-        activationClamp_ = tilingData.common.activationClamp;
-        activationParams1_ = tilingData.common.activationParams1;
-        activationParams2_ = tilingData.common.activationParams2;
+        LoadCommonTiling(tilingData.common);
     }
 }
 
@@ -323,93 +311,46 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
         epilogueGranularity = (expertPerRank_ > 2) ? static_cast<uint32_t>(expertPerRank_ - 2) : 1u;
     }
 
-    constexpr bool kRoutingIsQuant =
-        std::is_same_v<BType_, AscendC::int4b_t> || std::is_same_v<BType_, int32_t> || std::is_same_v<BType_, int8_t>;
-
-    typename MatmulKernel::Params params;
-    if constexpr (kRoutingIsQuant) {
-        params = typename MatmulKernel::Params{problemShape,
-                                               static_cast<uint32_t>(epWorldSize_),
-                                               static_cast<uint32_t>(listLen_),
-                                               static_cast<uint32_t>(expertPerRank_),
-                                               static_cast<uint64_t>(maxOutputSize_),
-                                               static_cast<uint32_t>(topK_),
-                                               epilogueCoreNum,
-                                               contextGM_,
-                                               xGM_,
-                                               layoutA1,
-                                               layoutA2,
-                                               weight1GM_,
-                                               layoutB1,
-                                               bias1GM_,
-                                               weight2GM_,
-                                               layoutB2,
-                                               bias2GM_,
-                                               weightScales1GM_,
-                                               layoutScale1,
-                                               weightScales2GM_,
-                                               layoutScale2,
-                                               yGM_,
-                                               layoutD1,
-                                               layoutD2,
-                                               topkIdsGM_,
-                                               moeInitRoutingQuantV2Scale_,
-                                               moeInitRoutingQuantV2Offset_,
-                                               expertTokensBeforeCapacity_,
-                                               topkWeightsGM_,
-                                               workspaceGM_,
-                                               gmExpertTokenNums_,
-                                               xActiveMaskGM_,
-                                               scalesGM_,
-                                               epilogueGranularity,
-                                               activationClamp_,
-                                               activationCode_,
-                                               activationParams1_,
-                                               activationParams2_,
-                                               tilingGM_,
-                                               maskBufferGM_};
-    } else {
-        params = typename MatmulKernel::Params{problemShape,
-                                               static_cast<uint32_t>(epWorldSize_),
-                                               static_cast<uint32_t>(listLen_),
-                                               static_cast<uint32_t>(expertPerRank_),
-                                               static_cast<uint64_t>(maxOutputSize_),
-                                               static_cast<uint32_t>(topK_),
-                                               epilogueCoreNum,
-                                               contextGM_,
-                                               xGM_,
-                                               layoutA1,
-                                               layoutA2,
-                                               weight1GM_,
-                                               layoutB1,
-                                               bias1GM_,
-                                               weight2GM_,
-                                               layoutB2,
-                                               bias2GM_,
-                                               weightScales1GM_,
-                                               layoutScale1,
-                                               weightScales2GM_,
-                                               layoutScale2,
-                                               yGM_,
-                                               layoutD1,
-                                               layoutD2,
-                                               topkIdsGM_,
-                                               moeInitRoutingQuantV2Scale_,
-                                               moeInitRoutingQuantV2Offset_,
-                                               expertTokensBeforeCapacity_,
-                                               topkWeightsGM_,
-                                               workspaceGM_,
-                                               gmExpertTokenNums_,
-                                               xActiveMaskGM_,
-                                               scalesGM_,
-                                               epilogueGranularity,
-                                               activationClamp_,
-                                               activationCode_,
-                                               activationParams1_,
-                                               activationParams2_,
-                                               tilingGM_,
-                                               maskBufferGM_};
-    }
+    typename MatmulKernel::Params params{problemShape,
+                                         static_cast<uint32_t>(epWorldSize_),
+                                         static_cast<uint32_t>(listLen_),
+                                         static_cast<uint32_t>(expertPerRank_),
+                                         static_cast<uint64_t>(maxOutputSize_),
+                                         static_cast<uint32_t>(topK_),
+                                         epilogueCoreNum,
+                                         contextGM_,
+                                         xGM_,
+                                         layoutA1,
+                                         layoutA2,
+                                         weight1GM_,
+                                         layoutB1,
+                                         bias1GM_,
+                                         weight2GM_,
+                                         layoutB2,
+                                         bias2GM_,
+                                         weightScales1GM_,
+                                         layoutScale1,
+                                         weightScales2GM_,
+                                         layoutScale2,
+                                         yGM_,
+                                         layoutD1,
+                                         layoutD2,
+                                         topkIdsGM_,
+                                         moeInitRoutingQuantV2Scale_,
+                                         moeInitRoutingQuantV2Offset_,
+                                         expertTokensBeforeCapacity_,
+                                         topkWeightsGM_,
+                                         workspaceGM_,
+                                         gmExpertTokenNums_,
+                                         xActiveMaskGM_,
+                                         scalesGM_,
+                                         epilogueGranularity,
+                                         activationClamp_,
+                                         activationCode_,
+                                         activationParams1_,
+                                         activationParams2_,
+                                         tilingGM_,
+                                         maskBufferGM_};
 
     params.recvRoundsMax = recvRoundsMax_;
 

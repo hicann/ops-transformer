@@ -18,61 +18,13 @@
 namespace ops {
 class MoeDistributeDispatch : public OpDef {
 public:
-    explicit MoeDistributeDispatch(const char *name) : OpDef(name)
+    explicit MoeDistributeDispatch(const char *name)
+        : OpDef(name)
     {
-        this->Input("x")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT16})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("expert_ids")
-            .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_INT32})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("scales")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("x_active_mask")
-            .ParamType(OPTIONAL)
-            .DataTypeList({ge::DT_BOOL})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("expert_scales")
-            .ParamType(OPTIONAL)
-            .DataTypeList({ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-
-        this->Output("expand_x")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16, ge::DT_INT8, ge::DT_FLOAT16, ge::DT_INT8})
-            .FormatList({ge::FORMAT_ND});
-        this->Output("dynamic_scales")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND});
-        this->Output("expand_idx").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
-        this->Output("expert_token_nums").ParamType(REQUIRED).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
-        this->Output("ep_recv_count").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
-        this->Output("tp_recv_count").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
-        this->Output("expand_scales").ParamType(REQUIRED).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
-
-        this->Attr("group_ep").AttrType(REQUIRED).String();
-        this->Attr("ep_world_size").AttrType(REQUIRED).Int();
-        this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
-        this->Attr("moe_expert_num").AttrType(REQUIRED).Int();
-        this->Attr("group_tp").AttrType(OPTIONAL).String("");
-        this->Attr("tp_world_size").AttrType(OPTIONAL).Int(0);
-        this->Attr("tp_rank_id").AttrType(OPTIONAL).Int(0);
-        this->Attr("expert_shard_type").AttrType(OPTIONAL).Int(0);
-        this->Attr("shared_expert_num").AttrType(OPTIONAL).Int(1);
-        this->Attr("shared_expert_rank_num").AttrType(OPTIONAL).Int(0);
-        this->Attr("quant_mode").AttrType(OPTIONAL).Int(0);
-        this->Attr("global_bs").AttrType(OPTIONAL).Int(0);
-        this->Attr("expert_token_nums_type").AttrType(OPTIONAL).Int(1);
+        DefineRequiredInputs();
+        DefineOptionalInputs();
+        DefineOutputs();
+        DefineAttributes();
 
         // A2 (arch22): _a2 entry (opFile -> arch22/..._a2.cpp).
         OpAICoreConfig aicore_config_a2;
@@ -120,6 +72,74 @@ public:
         this->AICore().AddConfig("ascend910_93", aicore_config_a3);
         this->AICore().AddConfig("ascend950", aicore_config_apt);
         this->MC2().HcclGroup({"group_ep", "group_tp"});
+    }
+
+private:
+    void DefineRequiredInputs()
+    {
+        this->Input("x")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("expert_ids")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+    }
+
+    void DefineOptionalInputs()
+    {
+        this->Input("scales")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("x_active_mask")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_BOOL})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("expert_scales")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+    }
+
+    void DefineOutputs()
+    {
+        this->Output("expand_x")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_BF16, ge::DT_INT8, ge::DT_FLOAT16, ge::DT_INT8})
+            .FormatList({ge::FORMAT_ND});
+        this->Output("dynamic_scales")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND});
+        this->Output("expand_idx").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("expert_token_nums").ParamType(REQUIRED).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
+        this->Output("ep_recv_count").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("tp_recv_count").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("expand_scales").ParamType(REQUIRED).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
+    }
+
+    void DefineAttributes()
+    {
+        this->Attr("group_ep").AttrType(REQUIRED).String();
+        this->Attr("ep_world_size").AttrType(REQUIRED).Int();
+        this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
+        this->Attr("moe_expert_num").AttrType(REQUIRED).Int();
+        this->Attr("group_tp").AttrType(OPTIONAL).String("");
+        this->Attr("tp_world_size").AttrType(OPTIONAL).Int(0);
+        this->Attr("tp_rank_id").AttrType(OPTIONAL).Int(0);
+        this->Attr("expert_shard_type").AttrType(OPTIONAL).Int(0);
+        this->Attr("shared_expert_num").AttrType(OPTIONAL).Int(1);
+        this->Attr("shared_expert_rank_num").AttrType(OPTIONAL).Int(0);
+        this->Attr("quant_mode").AttrType(OPTIONAL).Int(0);
+        this->Attr("global_bs").AttrType(OPTIONAL).Int(0);
+        this->Attr("expert_token_nums_type").AttrType(OPTIONAL).Int(1);
     }
 };
 

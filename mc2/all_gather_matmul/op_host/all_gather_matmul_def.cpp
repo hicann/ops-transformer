@@ -17,45 +17,18 @@
 namespace ops {
 class AllGatherMatmul : public OpDef {
 public:
-    explicit AllGatherMatmul(const char *name) : OpDef(name)
+    explicit AllGatherMatmul(const char *name)
+        : OpDef(name)
     {
-        this->Input("x1")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("x2")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND})
-            .IgnoreContiguous();
+        DefineRequiredInputs();
         this->Input("bias")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND})
             .AutoContiguous();
-
-        this->Output("y")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
-        this->Output("gather_out")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
-
-        this->Attr("group").AttrType(REQUIRED).String();
-        this->Attr("is_trans_a").AttrType(OPTIONAL).Bool(false);
-        this->Attr("is_trans_b").AttrType(OPTIONAL).Bool(false);
-        this->Attr("gather_index").AttrType(OPTIONAL).Int(0);
-        this->Attr("comm_turn").AttrType(OPTIONAL).Int(0);
-        this->Attr("rank_size").AttrType(OPTIONAL).Int(0);
-        this->Attr("is_gather_out").AttrType(OPTIONAL).Bool(true);
+        DefineOutputs();
+        DefineAttributes();
 
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)
@@ -71,6 +44,48 @@ public:
         this->AICore().AddConfig("ascend910_93", aicore_config);
         this->AICore().AddConfig("ascend950", aicore_config);
         this->MC2().HcclGroup("group");
+    }
+
+private:
+    void DefineRequiredInputs()
+    {
+        this->Input("x1")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("x2")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND})
+            .IgnoreContiguous();
+    }
+
+    void DefineOutputs()
+    {
+        this->Output("y")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
+        this->Output("gather_out")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
+    }
+
+    void DefineAttributes()
+    {
+        this->Attr("group").AttrType(REQUIRED).String();
+        this->Attr("is_trans_a").AttrType(OPTIONAL).Bool(false);
+        this->Attr("is_trans_b").AttrType(OPTIONAL).Bool(false);
+        this->Attr("gather_index").AttrType(OPTIONAL).Int(0);
+        this->Attr("comm_turn").AttrType(OPTIONAL).Int(0);
+        this->Attr("rank_size").AttrType(OPTIONAL).Int(0);
+        this->Attr("is_gather_out").AttrType(OPTIONAL).Bool(true);
     }
 };
 

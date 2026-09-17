@@ -125,17 +125,9 @@ static bool CheckGroupListOptional(const GroupedMatMulAllReduceParams &gmmParams
     return true;
 }
 
-static aclnnStatus CheckParamDimAndLengthGmmAr(const GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CheckInputGroupSizes(const GroupedMatMulAllReduceParams &gmmParams, uint64_t xGroupedSize,
+                                        uint64_t weightGroupedSize)
 {
-    uint64_t xGroupedSize = gmmParams.x->Size();
-    uint64_t weightGroupedSize = gmmParams.weight->Size();
-    uint64_t yGroupedSize = gmmParams.y->Size();
-    if (weightGroupedSize > MAX_GROUP_LIST_SIZE) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnGroupedMatMulAllReduce", "weight group size",
-                                              std::to_string(weightGroupedSize).c_str(),
-                                              "should not exceed " + std::to_string(MAX_GROUP_LIST_SIZE));
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     if (gmmParams.splitItemOptional == Y_SEPARATED || gmmParams.splitItemOptional == NO_SEPARATED) {
         if (xGroupedSize != 1) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnGroupedMatMulAllReduce", "x group size",
@@ -163,22 +155,36 @@ static aclnnStatus CheckParamDimAndLengthGmmAr(const GroupedMatMulAllReduceParam
                                               "only support 0/1/2/3");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (gmmParams.splitItemOptional == X_SEPARATED || gmmParams.splitItemOptional == NO_SEPARATED) {
-        if (yGroupedSize != 1) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnGroupedMatMulAllReduce", "y group size",
-                                                  std::to_string(yGroupedSize).c_str(),
-                                                  "When splitItemOptional is 2/3, y group size must be 1");
+    return ACLNN_SUCCESS;
+}
+
+static aclnnStatus CheckBiasGroupDimensions(const GroupedMatMulAllReduceParams &gmmParams, uint64_t weightGroupedSize)
+{
+    if (gmmParams.bias != nullptr) {
+        uint64_t biasGroupedSize = gmmParams.bias->Size();
+        if (weightGroupedSize != biasGroupedSize) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                "aclnnGroupedMatMulAllReduce", "bias group size", std::to_string(biasGroupedSize).c_str(),
+                "should equal weight group size " + std::to_string(weightGroupedSize));
             return ACLNN_ERR_PARAM_INVALID;
         }
-    } else {
-        if (yGroupedSize != weightGroupedSize) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                "aclnnGroupedMatMulAllReduce", "y group size", std::to_string(yGroupedSize).c_str(),
-                "When splitItemOptional is 0/1, y group size must equal weight group size " +
-                    std::to_string(weightGroupedSize));
-            return ACLNN_ERR_PARAM_INVALID;
+        for (size_t i = 0; i < biasGroupedSize; ++i) {
+            OP_CHECK_NULL((*gmmParams.bias)[i], continue);
+            size_t biasDims = (*gmmParams.bias)[i]->GetViewShape().GetDimNum();
+            if (biasDims != 1) {
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnGroupedMatMulAllReduce",
+                                                         ("bias[" + std::to_string(i) + "]").c_str(),
+                                                         std::to_string(biasDims).c_str(), "Dim must be 1");
+                return ACLNN_ERR_PARAM_INVALID;
+            }
         }
     }
+    return ACLNN_SUCCESS;
+}
+
+static aclnnStatus CheckInputGroupDimensions(const GroupedMatMulAllReduceParams &gmmParams, uint64_t xGroupedSize,
+                                             uint64_t weightGroupedSize)
+{
     for (size_t i = 0; i < xGroupedSize; ++i) {
         OP_CHECK_NULL((*gmmParams.x)[i], continue);
         size_t xDims = (*gmmParams.x)[i]->GetViewShape().GetDimNum();
@@ -199,24 +205,44 @@ static aclnnStatus CheckParamDimAndLengthGmmAr(const GroupedMatMulAllReduceParam
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
-    if (gmmParams.bias != nullptr) {
-        uint64_t biasGroupedSize = gmmParams.bias->Size();
-        if (weightGroupedSize != biasGroupedSize) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                "aclnnGroupedMatMulAllReduce", "bias group size", std::to_string(biasGroupedSize).c_str(),
-                "should equal weight group size " + std::to_string(weightGroupedSize));
+    return ACLNN_SUCCESS;
+}
+
+static aclnnStatus CheckParamDimAndLengthGmmAr(const GroupedMatMulAllReduceParams &gmmParams)
+{
+    uint64_t xGroupedSize = gmmParams.x->Size();
+    uint64_t weightGroupedSize = gmmParams.weight->Size();
+    uint64_t yGroupedSize = gmmParams.y->Size();
+    if (weightGroupedSize > MAX_GROUP_LIST_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnGroupedMatMulAllReduce", "weight group size",
+                                              std::to_string(weightGroupedSize).c_str(),
+                                              "should not exceed " + std::to_string(MAX_GROUP_LIST_SIZE));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckInputGroupSizes(gmmParams, xGroupedSize, weightGroupedSize) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (gmmParams.splitItemOptional == X_SEPARATED || gmmParams.splitItemOptional == NO_SEPARATED) {
+        if (yGroupedSize != 1) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnGroupedMatMulAllReduce", "y group size",
+                                                  std::to_string(yGroupedSize).c_str(),
+                                                  "When splitItemOptional is 2/3, y group size must be 1");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        for (size_t i = 0; i < biasGroupedSize; ++i) {
-            OP_CHECK_NULL((*gmmParams.bias)[i], continue);
-            size_t biasDims = (*gmmParams.bias)[i]->GetViewShape().GetDimNum();
-            if (biasDims != 1) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnGroupedMatMulAllReduce",
-                                                         ("bias[" + std::to_string(i) + "]").c_str(),
-                                                         std::to_string(biasDims).c_str(), "Dim must be 1");
-                return ACLNN_ERR_PARAM_INVALID;
-            }
+    } else {
+        if (yGroupedSize != weightGroupedSize) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                "aclnnGroupedMatMulAllReduce", "y group size", std::to_string(yGroupedSize).c_str(),
+                "When splitItemOptional is 0/1, y group size must equal weight group size " +
+                    std::to_string(weightGroupedSize));
+            return ACLNN_ERR_PARAM_INVALID;
         }
+    }
+    if (CheckInputGroupDimensions(gmmParams, xGroupedSize, weightGroupedSize) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckBiasGroupDimensions(gmmParams, weightGroupedSize) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
 }
@@ -263,34 +289,41 @@ static aclnnStatus CheckDimK(const GroupedMatMulAllReduceParams &gmmParams)
     return ACLNN_SUCCESS;
 }
 
+static aclnnStatus CheckSeparatedXYDimensions(const GroupedMatMulAllReduceParams &gmmParams)
+{
+    for (size_t i = 0; i < gmmParams.x->Size(); ++i) {
+        auto xTensor = (*gmmParams.x)[i];
+        auto yTensor = (*gmmParams.y)[i];
+        if (xTensor == nullptr) {
+            if (yTensor != nullptr) {
+                OP_LOGE_WITH_INVALID_INPUT("aclnnGroupedMatMulAllReduce", ("x[" + std::to_string(i) + "]").c_str());
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+            continue;
+        } else {
+            if (yTensor == nullptr) {
+                OP_LOGE_WITH_INVALID_INPUT("aclnnGroupedMatMulAllReduce", ("y[" + std::to_string(i) + "]").c_str());
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+        }
+        size_t xDims = xTensor->GetViewShape().GetDimNum();
+        size_t yDims = yTensor->GetViewShape().GetDimNum();
+        if (xDims != yDims || xDims >= MAX_FM_DIM) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                "aclnnGroupedMatMulAllReduce", ("x[" + std::to_string(i) + "]/y[" + std::to_string(i) + "]").c_str(),
+                ("x:" + std::to_string(xDims) + "D, y:" + std::to_string(yDims) + "D").c_str(),
+                "When splitItem is 0, x dims must equal y dims and not greater than " + std::to_string(MAX_FM_DIM));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
 static aclnnStatus CheckDims(const GroupedMatMulAllReduceParams &gmmParams)
 {
     if (gmmParams.splitItemOptional == X_Y_SEPARATED) {
-        for (size_t i = 0; i < gmmParams.x->Size(); ++i) {
-            auto xTensor = (*gmmParams.x)[i];
-            auto yTensor = (*gmmParams.y)[i];
-            if (xTensor == nullptr) {
-                if (yTensor != nullptr) {
-                    OP_LOGE_WITH_INVALID_INPUT("aclnnGroupedMatMulAllReduce", ("x[" + std::to_string(i) + "]").c_str());
-                    return ACLNN_ERR_PARAM_INVALID;
-                }
-                continue;
-            } else {
-                if (yTensor == nullptr) {
-                    OP_LOGE_WITH_INVALID_INPUT("aclnnGroupedMatMulAllReduce", ("y[" + std::to_string(i) + "]").c_str());
-                    return ACLNN_ERR_PARAM_INVALID;
-                }
-            }
-            size_t xDims = xTensor->GetViewShape().GetDimNum();
-            size_t yDims = yTensor->GetViewShape().GetDimNum();
-            if (xDims != yDims || xDims >= MAX_FM_DIM) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                    "aclnnGroupedMatMulAllReduce",
-                    ("x[" + std::to_string(i) + "]/y[" + std::to_string(i) + "]").c_str(),
-                    ("x:" + std::to_string(xDims) + "D, y:" + std::to_string(yDims) + "D").c_str(),
-                    "When splitItem is 0, x dims must equal y dims and not greater than " + std::to_string(MAX_FM_DIM));
-                return ACLNN_ERR_PARAM_INVALID;
-            }
+        if (CheckSeparatedXYDimensions(gmmParams) != ACLNN_SUCCESS) {
+            return ACLNN_ERR_PARAM_INVALID;
         }
     } else {
         for (size_t i = 0; i < gmmParams.x->Size(); i++) {

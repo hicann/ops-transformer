@@ -39,4 +39,20 @@ constexpr static int64_t PERMUTE_MAX_CORES = 128;
 // 三处同步（SendTokensV3 / RecvTokensV3 / V2 allgather）统一使用该值，需配合
 // ResetTokenPerExpert 每轮清零 flag 区，确保上一轮残留不会撞上本值
 constexpr static int32_t FLAG_VALUE_MAGIC = 123456789; // 0x075BCD15
+// A2/A3 每个 Cube 核附带 1 个 Vector 核，核数 / 2 即 Cube（matmul tile）数
+constexpr static int32_t AIV_PER_AIC = 2;
+// AIC 内 m 维拆分给两个 subblock 处理
+constexpr static int32_t SUBBLOCK_NUM_PER_AIC = 2;
+// W4 SwiGLU 场景 GMM/Combine 的 M 维展开倍数（gate+up 双行）
+constexpr static uint32_t GATE_UP_ROWS_PER_TOKEN = 2;
+// int4 打包密度：每字节 2 个 nibble
+constexpr static int32_t INT4_NUM_PER_BYTE = 2;
+// icache 预取行数
+constexpr static int32_t ICACHE_PRELOAD_LINES = 8;
+// rdma 描述符区在 UB 中的起始偏移（128KB）
+constexpr static uint32_t RDMA_UB_OFFSET_BYTES = 128 * 1024;
+// MoePermutePrologue UB 流水级数（双缓冲）
+constexpr static uint32_t PROLOGUE_UB_STAGES = 2;
+// GetSumPreRank 每核槽位步长（元素），16 元素 = 64B，避免跨核伪共享
+constexpr static int32_t PRE_SUM_SLOT_STRIDE = 16;
 #endif

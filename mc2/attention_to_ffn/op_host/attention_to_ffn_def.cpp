@@ -18,7 +18,29 @@
 namespace ops {
 class AttentionToFFN : public OpDef {
 public:
-    explicit AttentionToFFN(const char *name) : OpDef(name)
+    explicit AttentionToFFN(const char *name)
+        : OpDef(name)
+    {
+        DefineRequiredInputs();
+        DefineOptionalInputs();
+        DefineAttributes();
+
+        OpAICoreConfig aicore_config;
+        aicore_config.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
+        this->AICore().AddConfig("ascend910_93", aicore_config);
+        this->MC2().HcclGroup({"group"});
+    }
+
+private:
+    void DefineRequiredInputs()
     {
         this->Input("x")
             .ParamType(REQUIRED)
@@ -50,6 +72,10 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+    }
+
+    void DefineOptionalInputs()
+    {
         this->Input("scales")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT})
@@ -60,6 +86,10 @@ public:
             .DataTypeList({ge::DT_BOOL})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+    }
+
+    void DefineAttributes()
+    {
         this->Attr("group").AttrType(REQUIRED).String();
         this->Attr("world_size").AttrType(REQUIRED).Int();
         this->Attr("ffn_token_info_table_shape").AttrType(REQUIRED).ListInt();
@@ -69,19 +99,6 @@ public:
         this->Attr("quant_mode").AttrType(OPTIONAL).Int();
         this->Attr("sync_flag").AttrType(OPTIONAL).Int();
         this->Attr("ffn_start_rank_id").AttrType(OPTIONAL).Int();
-
-        OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("jitCompile.flag", "static_true")
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
-        this->AICore().AddConfig("ascend910_93", aicore_config);
-        this->MC2().HcclGroup({"group"});
     }
 };
 

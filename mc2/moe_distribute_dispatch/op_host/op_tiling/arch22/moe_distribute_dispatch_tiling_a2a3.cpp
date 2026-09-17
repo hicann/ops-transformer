@@ -14,6 +14,7 @@
  */
 
 #include "moe_distribute_dispatch_tiling_a2a3.h"
+#include "op_host/op_tiling/mc2_tiling_utils.h"
 
 using namespace Ops::Transformer::OpTiling;
 using namespace Mc2Tiling;
@@ -231,18 +232,7 @@ static ge::graphStatus MoeDistributeDispatchA2GetPlatformInfoAndSetTiling(gert::
 
 static bool MoeDistributeDispatchA2IsLayered()
 {
-    const char *hcclIntraPcieEnable = getenv("HCCL_INTRA_PCIE_ENABLE");
-    const char *hcclIntraRoceEnable = getenv("HCCL_INTRA_ROCE_ENABLE");
-
-    if (hcclIntraPcieEnable == nullptr || hcclIntraRoceEnable == nullptr) {
-        OP_LOGD(K_INNER_DEBUG, "ENV HCCL_INTRA_PCIE_ENABLE or HCCL_INTRA_ROCE_ENABLE don't set");
-        return false;
-    } else if (strcmp(hcclIntraPcieEnable, "1") == 0 && strcmp(hcclIntraRoceEnable, "0") == 0) {
-        OP_LOGD(K_INNER_DEBUG, "ENV HCCL_INTRA_PCIE_ENABLE = 1 and HCCL_INTRA_ROCE_ENABLE = 0, use layered solution.");
-        return true;
-    }
-    OP_LOGD(K_INNER_DEBUG, "ENV HCCL_INTRA_PCIE_ENABLE != 1 or HCCL_INTRA_ROCE_ENABLE != 0, use default solution.");
-    return false;
+    return mc2tiling::IsHcclPcieLayered(K_INNER_DEBUG);
 }
 
 static uint64_t MoeDistributeDispatchA2CalcTilingKey(gert::TilingContext *context, const bool isLayered)

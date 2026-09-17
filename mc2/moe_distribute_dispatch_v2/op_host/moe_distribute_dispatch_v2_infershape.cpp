@@ -129,6 +129,80 @@ static ge::DataType InferDataTypeDynamicScales(int64_t quantMode, ge::DataType s
     return dynamicScalesDtype;
 }
 
+// 校验ep_rank_id与shared expert相关attr的合法性，并输出moeRankNum及共享专家场景标志
+static ge::graphStatus CheckEpRankAndSharedAttrs(gert::InferShapeContext *context, const int64_t *epRankId,
+                                                 const int64_t *epWorldSize, const int64_t *sharedExpertNum,
+                                                 const int64_t *sharedExpertRankNum, int64_t &moeRankNum,
+                                                 bool &isSharedDefault, bool &isNoShared)
+{
+    if ((*epRankId < 0) || (*epRankId >= *epWorldSize)) {
+        std::string reason = "ep_rank_id should be in [0, epWorldSize)";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ep_rank_id", std::to_string(*epRankId).c_str(),
+                                              reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
+    if ((*sharedExpertRankNum < 0) || (*sharedExpertRankNum >= *epWorldSize)) {
+        std::string reason = "shared_expert_rank_num should be in [0, epWorldSize)";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "shared_expert_rank_num",
+                                              std::to_string(*sharedExpertRankNum).c_str(), reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
+    isSharedDefault = ((*sharedExpertNum == 1) && (*sharedExpertRankNum == 0));
+    isNoShared = ((*sharedExpertNum == 0) && (*sharedExpertRankNum == 0));
+    bool isValidShared = ((*sharedExpertNum > 0) && ((*sharedExpertRankNum / *sharedExpertNum) > 0) &&
+                          ((*sharedExpertRankNum % *sharedExpertNum) == 0));
+    bool isSharedSettingValid = (isSharedDefault || isNoShared || isValidShared);
+    if (!isSharedSettingValid) {
+        std::string valueStr = "sharedExpertRankNum=" + std::to_string(*sharedExpertRankNum) +
+                               ", sharedExpertNum=" + std::to_string(*sharedExpertNum);
+        std::string reason = "shared_expert_rank_num and shared_expert_num combination is invalid";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "shared_expert_rank_num and shared_expert_num",
+                                              valueStr.c_str(), reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
+    moeRankNum = *epWorldSize - *sharedExpertRankNum;
+    if (moeRankNum <= 0) {
+        std::string reason = "moeRankNum (epWorldSize - sharedExpertRankNum) should be larger than 0";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ep_world_size and shared_expert_rank_num",
+                                              std::to_string(moeRankNum).c_str(), reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+// 计算expandX的token数a及本地专家数localExpertNum
+static void CalcExpandTokenNum(gert::InferShapeContext *context, const int64_t *epRankId, const int64_t *epWorldSize,
+                               const int64_t *sharedExpertNum, const int64_t *sharedExpertRankNum,
+                               const gert::Shape *elasticInfoShape, const bool isSharedDefault, const bool isNoShared,
+                               const int64_t localMoeExpertNum, const int64_t globalBsReal, const int64_t k, int64_t &a,
+                               int64_t &localExpertNum)
+{
+    if (*epRankId < *sharedExpertRankNum) {
+        localExpertNum = 1;
+        int64_t maxBs = globalBsReal / *epWorldSize;
+        int64_t rankNumPerSharedExpert = *sharedExpertRankNum / *sharedExpertNum;
+        int64_t maxSharedGroupNum = (*epWorldSize + rankNumPerSharedExpert - 1) / rankNumPerSharedExpert;
+        a = maxBs * maxSharedGroupNum;
+    } else {
+        localExpertNum = localMoeExpertNum;
+        a = globalBsReal * std::min(localExpertNum, k);
+    }
+    if (!IsTargetSocVersionInfershape(context->GetNodeName(), PLATFORM_A2) && elasticInfoShape != nullptr) {
+        localExpertNum = std::max(static_cast<int64_t>(1), localMoeExpertNum);
+        if ((isSharedDefault) || (isNoShared)) {
+            a = globalBsReal * std::min(localExpertNum, k);
+        } else { // 除零保护
+            int64_t maxBs = globalBsReal / *epWorldSize;
+            int64_t rankNumPerSharedExpert = *sharedExpertRankNum / *sharedExpertNum;
+            int64_t maxSharedGroupNum = (*epWorldSize + rankNumPerSharedExpert - 1) / rankNumPerSharedExpert;
+            a = std::max(maxBs * maxSharedGroupNum, globalBsReal * std::min(localMoeExpertNum, k));
+        }
+    }
+    if (globalBsReal < 0) {
+        a = -1;
+    }
+}
+
 static ge::graphStatus InferShapeMoeDistributeDispatchV2(gert::InferShapeContext *context)
 {
     if (context == nullptr) {
@@ -193,36 +267,11 @@ static ge::graphStatus InferShapeMoeDistributeDispatchV2(gert::InferShapeContext
     const auto globalBs = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_GLOBAL_BS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, globalBs);
 
-    if ((*epRankId < 0) || (*epRankId >= *epWorldSize)) {
-        std::string reason = "ep_rank_id should be in [0, epWorldSize)";
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ep_rank_id", std::to_string(*epRankId).c_str(),
-                                              reason.c_str());
-        return ge::GRAPH_FAILED;
-    }
-    if ((*sharedExpertRankNum < 0) || (*sharedExpertRankNum >= *epWorldSize)) {
-        std::string reason = "shared_expert_rank_num should be in [0, epWorldSize)";
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "shared_expert_rank_num",
-                                              std::to_string(*sharedExpertRankNum).c_str(), reason.c_str());
-        return ge::GRAPH_FAILED;
-    }
-    bool isSharedDefault = ((*sharedExpertNum == 1) && (*sharedExpertRankNum == 0));
-    bool isNoShared = ((*sharedExpertNum == 0) && (*sharedExpertRankNum == 0));
-    bool isValidShared = ((*sharedExpertNum > 0) && ((*sharedExpertRankNum / *sharedExpertNum) > 0) &&
-                          ((*sharedExpertRankNum % *sharedExpertNum) == 0));
-    bool isSharedSettingValid = (isSharedDefault || isNoShared || isValidShared);
-    if (!isSharedSettingValid) {
-        std::string valueStr = "sharedExpertRankNum=" + std::to_string(*sharedExpertRankNum) +
-                               ", sharedExpertNum=" + std::to_string(*sharedExpertNum);
-        std::string reason = "shared_expert_rank_num and shared_expert_num combination is invalid";
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "shared_expert_rank_num and shared_expert_num",
-                                              valueStr.c_str(), reason.c_str());
-        return ge::GRAPH_FAILED;
-    }
-    int64_t moeRankNum = *epWorldSize - *sharedExpertRankNum;
-    if (moeRankNum <= 0) {
-        std::string reason = "moeRankNum (epWorldSize - sharedExpertRankNum) should be larger than 0";
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ep_world_size and shared_expert_rank_num",
-                                              std::to_string(moeRankNum).c_str(), reason.c_str());
+    int64_t moeRankNum = 0;
+    bool isSharedDefault = false;
+    bool isNoShared = false;
+    if (CheckEpRankAndSharedAttrs(context, epRankId, epWorldSize, sharedExpertNum, sharedExpertRankNum, moeRankNum,
+                                  isSharedDefault, isNoShared) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     size_t xDimNum = xShape->GetDimNum();
@@ -246,30 +295,8 @@ static ge::graphStatus InferShapeMoeDistributeDispatchV2(gert::InferShapeContext
         globalBsReal = -1;
     }
 
-    if (*epRankId < *sharedExpertRankNum) {
-        localExpertNum = 1;
-        int64_t maxBs = globalBsReal / *epWorldSize;
-        int64_t rankNumPerSharedExpert = *sharedExpertRankNum / *sharedExpertNum;
-        int64_t maxSharedGroupNum = (*epWorldSize + rankNumPerSharedExpert - 1) / rankNumPerSharedExpert;
-        a = maxBs * maxSharedGroupNum;
-    } else {
-        localExpertNum = localMoeExpertNum;
-        a = globalBsReal * std::min(localExpertNum, k);
-    }
-    if (!IsTargetSocVersionInfershape(context->GetNodeName(), PLATFORM_A2) && elasticInfoShape != nullptr) {
-        localExpertNum = std::max(static_cast<int64_t>(1), localMoeExpertNum);
-        if ((isSharedDefault) || (isNoShared)) {
-            a = globalBsReal * std::min(localExpertNum, k);
-        } else { // 除零保护
-            int64_t maxBs = globalBsReal / *epWorldSize;
-            int64_t rankNumPerSharedExpert = *sharedExpertRankNum / *sharedExpertNum;
-            int64_t maxSharedGroupNum = (*epWorldSize + rankNumPerSharedExpert - 1) / rankNumPerSharedExpert;
-            a = std::max(maxBs * maxSharedGroupNum, globalBsReal * std::min(localMoeExpertNum, k));
-        }
-    }
-    if (globalBsReal < 0) {
-        a = -1;
-    }
+    CalcExpandTokenNum(context, epRankId, epWorldSize, sharedExpertNum, sharedExpertRankNum, elasticInfoShape,
+                       isSharedDefault, isNoShared, localMoeExpertNum, globalBsReal, k, a, localExpertNum);
 
     expandXShape->SetDimNum(DIM_TWO);
     auto realA = a;

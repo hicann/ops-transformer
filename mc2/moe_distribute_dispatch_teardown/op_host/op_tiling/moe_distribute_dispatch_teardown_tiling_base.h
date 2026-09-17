@@ -37,6 +37,8 @@ protected:
 
     const ge::graphStatus CheckRequiredAttrValue() const;
     ge::graphStatus GetRequiredAttrAndSetTilingData();
+    ge::graphStatus CheckSharedExpertAttributes(const int64_t *expertShardTypePtr, const int64_t *sharedExpertNumPtr,
+                                                const int64_t *sharedExpertRankNumPtr, const int64_t *epWorldSizePtr);
     const ge::graphStatus CheckOptionalAttrValue();
     ge::graphStatus GetOptionalAttrAndSetTilingData();
 

@@ -17,7 +17,49 @@
 namespace ops {
 class AllGatherMatmulV2 : public OpDef {
 public:
-    explicit AllGatherMatmulV2(const char *name) : OpDef(name)
+    explicit AllGatherMatmulV2(const char *name)
+        : OpDef(name)
+    {
+        DefineRequiredInputs();
+        DefineOptionalInputs();
+        DefineOutputs();
+        DefineAttributes();
+
+        OpAICoreConfig aicore_config;
+        aicore_config.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+            .ExtendCfgInfo("opFile.value", "all_gather_matmul_v2_apt");
+        this->AICore().AddConfig("ascend950", aicore_config);
+        this->MC2().HcclGroup("group");
+
+        OpAICoreConfig aicore_config_910b;
+        DefineAicoreConfig910bRequiredInputs(aicore_config_910b);
+        DefineAicoreConfig910bOptionalInputs(aicore_config_910b);
+        DefineAicoreConfig910bOutputs(aicore_config_910b);
+
+        aicore_config_910b.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
+        this->AICore().AddConfig("ascend910b", aicore_config_910b);
+        this->AICore().AddConfig("ascend910_93", aicore_config_910b);
+        this->MC2().HcclGroup("group");
+    }
+
+private:
+    void DefineRequiredInputs()
     {
         this->Input("x1")
             .ParamType(REQUIRED)
@@ -43,7 +85,10 @@ public:
                        ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1})
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
+    }
 
+    void DefineOptionalInputs()
+    {
         this->Input("bias")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
@@ -86,7 +131,10 @@ public:
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+    }
 
+    void DefineOutputs()
+    {
         this->Output("y")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,  ge::DT_FLOAT,   ge::DT_FLOAT16,
@@ -115,7 +163,10 @@ public:
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND});
+    }
 
+    void DefineAttributes()
+    {
         this->Attr("group").AttrType(REQUIRED).String();
         this->Attr("is_trans_a").AttrType(OPTIONAL).Bool(false);
         this->Attr("is_trans_b").AttrType(OPTIONAL).Bool(false);
@@ -128,22 +179,10 @@ public:
         this->Attr("is_amax_out").AttrType(OPTIONAL).Bool(false);
         this->Attr("y_dtype").AttrType(OPTIONAL).Int(static_cast<int>(ge::DT_UNDEFINED));
         this->Attr("comm_mode").AttrType(REQUIRED).String("ai_cpu");
+    }
 
-        OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
-            .ExtendCfgInfo("opFile.value", "all_gather_matmul_v2_apt");
-        this->AICore().AddConfig("ascend950", aicore_config);
-        this->MC2().HcclGroup("group");
-
-        OpAICoreConfig aicore_config_910b;
+    void DefineAicoreConfig910bRequiredInputs(OpAICoreConfig &aicore_config_910b)
+    {
         aicore_config_910b.Input("x1")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8,
@@ -164,6 +203,10 @@ public:
                                  ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
                                  ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND})
             .IgnoreContiguous();
+    }
+
+    void DefineAicoreConfig910bOptionalInputs(OpAICoreConfig &aicore_config_910b)
+    {
         aicore_config_910b.Input("bias")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
@@ -200,6 +243,10 @@ public:
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
                                  ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
                                  ge::FORMAT_ND, ge::FORMAT_ND});
+    }
+
+    void DefineAicoreConfig910bOutputs(OpAICoreConfig &aicore_config_910b)
+    {
         aicore_config_910b.Output("y")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16,
@@ -227,19 +274,6 @@ public:
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
                                  ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
                                  ge::FORMAT_ND, ge::FORMAT_ND});
-
-        aicore_config_910b.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
-        this->AICore().AddConfig("ascend910b", aicore_config_910b);
-        this->AICore().AddConfig("ascend910_93", aicore_config_910b);
-        this->MC2().HcclGroup("group");
     }
 };
 
