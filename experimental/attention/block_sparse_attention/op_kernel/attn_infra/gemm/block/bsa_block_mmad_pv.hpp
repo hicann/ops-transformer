@@ -18,6 +18,7 @@
 #include "../../../attn_infra/gemm/bsa_gemm_dispatch_policy.hpp"
 #include "../../../attn_infra/gemm/bsa_helper.hpp"
 #include "../../../attn_infra/bsa_gemm_coord.hpp"
+#include "bsa_eff_rows_tile.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_gemm_tile_copy.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_tile_mmad.hpp"
 
@@ -104,7 +105,7 @@ public:
                                       LayoutC layoutC, GemmCoord actualOriShape, uint32_t &nIdx, uint32_t &nLoop,
                                       uint32_t &blockSize, uint32_t kvSeqlen, uint32_t strideKV, uint32_t blockStackNum,
                                       Arch::CrossCoreFlag softmaxFlag, uint32_t &y, uint32_t &selectNum,
-                                      uint32_t &kvYBlockNum)
+                                      uint32_t &kvYBlockNum, const EffRowsCtx &effRowsCtx)
     {
         uint32_t rowNum = actualOriShape[0];
         uint32_t embed = actualOriShape[1];
@@ -122,45 +123,62 @@ public:
             uint32_t kActual = actualShape.k();
             uint32_t nActual = actualShape.n();
 
-            uint32_t processSize = 0;
-            uint32_t nBlockOffset = nowNIdx * blockSize;
-            uint32_t currentSelectYIdx = nBlockOffset / y;
-            uint32_t currentYoffset = nBlockOffset % y;
-            uint32_t currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
-            uint32_t offsetInKV = currentYIdx * y + currentYoffset;
-
-            while (processSize < kActual && currentSelectYIdx < selectNum && currentYIdx < kvYBlockNum &&
-                   offsetInKV < kvSeqlen) {
-                uint32_t yAcutal =
-                    (currentSelectYIdx == selectNum - 1 && currentYIdx == kvYBlockNum - 1 && kvSeqlen % y != 0) ?
-                        (kvSeqlen - y * currentYIdx) :
-                        y;
-                uint32_t remainingInYBlock = yAcutal - currentYoffset;
-                uint32_t remainingInNBlock = kActual - processSize;
-
-                uint32_t actualYSize = min(remainingInNBlock, remainingInYBlock);
-                if (actualYSize == 0) {
-                    break;
-                }
-
-                auto layoutBTile = layoutB.GetTileLayout(MakeCoord(actualYSize, nActual));
-                MatrixCoord l1BTileCoord{blockStackIdx * blockSize + processSize, 0};
-                auto l1BTile = l1BTensor[layoutBInL1.GetOffset(l1BTileCoord)];
-
-                copyGmToL1B(l1BTile, gB[offsetInKV * strideKV], layoutBInL1, layoutBTile);
-
-                processSize += actualYSize;
-                currentYoffset += actualYSize;
-                offsetInKV += actualYSize;
-
-                if (currentYoffset >= yAcutal) {
-                    currentSelectYIdx++;
-                    if (currentSelectYIdx >= selectNum) {
+            if (effRowsCtx.enabled) {
+                uint32_t dealtLenAccum = 0;
+                while (dealtLenAccum < kActual) {
+                    EffRowsTile effRowsTile = NextEffRowsTile(gSelectIdx, effRowsCtx.gBlockEffRows, effRowsCtx.gmOffset,
+                                                              selectNum, y, kvSeqlen, kActual - dealtLenAccum,
+                                                              *effRowsCtx.curBlockIdx, *effRowsCtx.curBlockCopied);
+                    if (effRowsTile.validRows == 0) {
                         break;
                     }
-                    currentYoffset = 0;
-                    currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
-                    offsetInKV = currentYIdx * y;
+                    auto layoutBTile = layoutB.GetTileLayout(MakeCoord(effRowsTile.validRows, nActual));
+                    MatrixCoord l1BTileCoord{blockStackIdx * blockSize + dealtLenAccum, 0};
+                    auto l1BTile = l1BTensor[layoutBInL1.GetOffset(l1BTileCoord)];
+                    copyGmToL1B(l1BTile, gB[effRowsTile.oriSeqOffset * strideKV], layoutBInL1, layoutBTile);
+                    dealtLenAccum += effRowsTile.validRows;
+                }
+            } else {
+                uint32_t processSize = 0;
+                uint32_t nBlockOffset = nowNIdx * blockSize;
+                uint32_t currentSelectYIdx = nBlockOffset / y;
+                uint32_t currentYoffset = nBlockOffset % y;
+                uint32_t currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
+                uint32_t offsetInKV = currentYIdx * y + currentYoffset;
+
+                while (processSize < kActual && currentSelectYIdx < selectNum && currentYIdx < kvYBlockNum &&
+                       offsetInKV < kvSeqlen) {
+                    uint32_t yAcutal =
+                        (currentSelectYIdx == selectNum - 1 && currentYIdx == kvYBlockNum - 1 && kvSeqlen % y != 0) ?
+                            (kvSeqlen - y * currentYIdx) :
+                            y;
+                    uint32_t remainingInYBlock = yAcutal - currentYoffset;
+                    uint32_t remainingInNBlock = kActual - processSize;
+
+                    uint32_t actualYSize = min(remainingInNBlock, remainingInYBlock);
+                    if (actualYSize == 0) {
+                        break;
+                    }
+
+                    auto layoutBTile = layoutB.GetTileLayout(MakeCoord(actualYSize, nActual));
+                    MatrixCoord l1BTileCoord{blockStackIdx * blockSize + processSize, 0};
+                    auto l1BTile = l1BTensor[layoutBInL1.GetOffset(l1BTileCoord)];
+
+                    copyGmToL1B(l1BTile, gB[offsetInKV * strideKV], layoutBInL1, layoutBTile);
+
+                    processSize += actualYSize;
+                    currentYoffset += actualYSize;
+                    offsetInKV += actualYSize;
+
+                    if (currentYoffset >= yAcutal) {
+                        currentSelectYIdx++;
+                        if (currentSelectYIdx >= selectNum) {
+                            break;
+                        }
+                        currentYoffset = 0;
+                        currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
+                        offsetInKV = currentYIdx * y;
+                    }
                 }
             }
         }

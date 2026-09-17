@@ -17,6 +17,7 @@
 #include "../../../attn_infra/gemm/bsa_gemm_dispatch_policy.hpp"
 #include "../../../attn_infra/gemm/bsa_helper.hpp"
 #include "../../../attn_infra/bsa_gemm_coord.hpp"
+#include "bsa_eff_rows_tile.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_gemm_tile_copy.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_tile_mmad.hpp"
 
@@ -127,7 +128,7 @@ public:
                                       AscendC::GlobalTensor<int32_t> gSelectIdx, LayoutA layoutA, LayoutB layoutB,
                                       LayoutC layoutC, GemmCoord actualOriShape, uint32_t &nIdx, uint32_t &nLoop,
                                       uint32_t &blockSize, uint32_t strideKV, uint32_t &y, uint32_t &selectNum,
-                                      uint32_t &kvYBlockNum, uint32_t &kvSeqlen)
+                                      uint32_t &kvYBlockNum, uint32_t &kvSeqlen, const EffRowsCtx &effRowsCtx)
     {
         uint32_t rowNum = actualOriShape[0];
         uint32_t stackSeqTile = actualOriShape[1];
@@ -156,47 +157,63 @@ public:
 
             LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(kActual, nActual);
 
-            uint32_t processSize = 0;
-            uint32_t nBlockOffset = nowNIdx * blockSize;
-            uint32_t currentSelectYIdx = nBlockOffset / y;
-            uint32_t currentYoffset = nBlockOffset % y;
-
-            uint32_t currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
-            uint32_t offsetInKV = currentYIdx * y + currentYoffset;
-
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1KvPingPongFlag);
-
-            while (processSize < nActual && currentSelectYIdx < selectNum && currentYIdx < kvYBlockNum &&
-                   offsetInKV < kvSeqlen) {
-                uint32_t yAcutal =
-                    (currentSelectYIdx == selectNum - 1 && currentYIdx == kvYBlockNum - 1 && kvSeqlen % y != 0) ?
-                        (kvSeqlen - y * currentYIdx) :
-                        y;
-                uint32_t remainingInYBlock = yAcutal - currentYoffset;
-                uint32_t remainingInNBlock = nActual - processSize;
-
-                uint32_t actualYSize = min(remainingInNBlock, remainingInYBlock);
-                if (actualYSize == 0) {
-                    break;
-                }
-
-                auto layoutBTile = layoutB.GetTileLayout(MakeCoord(kActual, actualYSize));
-
-                copyGmToL1B(l1BTensor[l1KvPingPongFlag][processSize], gB[offsetInKV * strideKV], layoutBInL1,
-                            layoutBTile);
-
-                processSize += actualYSize;
-                currentYoffset += actualYSize;
-                offsetInKV += actualYSize;
-
-                if (currentYoffset >= yAcutal) {
-                    currentSelectYIdx++;
-                    if (currentSelectYIdx >= selectNum) {
+            if (effRowsCtx.enabled) {
+                uint32_t dealtLenAccum = 0;
+                while (dealtLenAccum < nActual) {
+                    EffRowsTile effRowsTile = NextEffRowsTile(gSelectIdx, effRowsCtx.gBlockEffRows, effRowsCtx.gmOffset,
+                                                              selectNum, y, kvSeqlen, nActual - dealtLenAccum,
+                                                              *effRowsCtx.curBlockIdx, *effRowsCtx.curBlockCopied);
+                    if (effRowsTile.validRows == 0) {
                         break;
                     }
-                    currentYoffset = 0;
-                    currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
-                    offsetInKV = currentYIdx * y;
+                    auto layoutBTile = layoutB.GetTileLayout(MakeCoord(kActual, effRowsTile.validRows));
+                    MatrixCoord l1BTileCoord{0, dealtLenAccum};
+                    auto l1BTile = l1BTensor[l1KvPingPongFlag][layoutBInL1.GetOffset(l1BTileCoord)];
+                    copyGmToL1B(l1BTile, gB[effRowsTile.oriSeqOffset * strideKV], layoutBInL1, layoutBTile);
+                    dealtLenAccum += effRowsTile.validRows;
+                }
+            } else {
+                uint32_t processSize = 0;
+                uint32_t nBlockOffset = nowNIdx * blockSize;
+                uint32_t currentSelectYIdx = nBlockOffset / y;
+                uint32_t currentYoffset = nBlockOffset % y;
+
+                uint32_t currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
+                uint32_t offsetInKV = currentYIdx * y + currentYoffset;
+
+                while (processSize < nActual && currentSelectYIdx < selectNum && currentYIdx < kvYBlockNum &&
+                       offsetInKV < kvSeqlen) {
+                    uint32_t yAcutal =
+                        (currentSelectYIdx == selectNum - 1 && currentYIdx == kvYBlockNum - 1 && kvSeqlen % y != 0) ?
+                            (kvSeqlen - y * currentYIdx) :
+                            y;
+                    uint32_t remainingInYBlock = yAcutal - currentYoffset;
+                    uint32_t remainingInNBlock = nActual - processSize;
+
+                    uint32_t actualYSize = min(remainingInNBlock, remainingInYBlock);
+                    if (actualYSize == 0) {
+                        break;
+                    }
+
+                    auto layoutBTile = layoutB.GetTileLayout(MakeCoord(kActual, actualYSize));
+
+                    copyGmToL1B(l1BTensor[l1KvPingPongFlag][processSize], gB[offsetInKV * strideKV], layoutBInL1,
+                                layoutBTile);
+
+                    processSize += actualYSize;
+                    currentYoffset += actualYSize;
+                    offsetInKV += actualYSize;
+
+                    if (currentYoffset >= yAcutal) {
+                        currentSelectYIdx++;
+                        if (currentSelectYIdx >= selectNum) {
+                            break;
+                        }
+                        currentYoffset = 0;
+                        currentYIdx = gSelectIdx.GetValue(currentSelectYIdx);
+                        offsetInKV = currentYIdx * y;
+                    }
                 }
             }
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1KvPingPongFlag);

@@ -17,6 +17,7 @@
 #define BLOCK_SPARSE_ATTENTION_KERNEL_H
 
 #include "block_sparse_attention_kernel_common.hpp"
+#include "attn_infra/gemm/block/bsa_eff_rows_tile.hpp"
 
 using namespace NpuArch;
 using namespace BsaKernelCommon;
@@ -257,6 +258,8 @@ public:
         maxKvBlockNum = blockSparseAttentionTilingData->maxKvBlockNum;
         uint32_t maxKvBlockNumPad = CeilDiv(maxKvBlockNum, 32) * 32;
         maxQBlockNum = blockSparseAttentionTilingData->maxQBlockNum;
+        uint32_t enableEffRows = blockSparseAttentionTilingData->enableEffRows;
+        uint32_t maxBlockNumEff = blockSparseAttentionTilingData->maxBlockNumEff;
         avgRowPerSubCore = blockSparseAttentionTilingData->avgRowNumPerSubCore;
         preActivateSubCoreNum = blockSparseAttentionTilingData->preActivateSubCoreNum;
 
@@ -291,6 +294,10 @@ public:
             (__gm__ int32_t *)(params.workspace + mm1OutSize + smOnlineOutSize + mm2OutSize + updateSize));
         AscendC::GlobalTensor<uint8_t> gBlockSparseMask;
         gBlockSparseMask.SetGlobalBuffer((__gm__ uint8_t *)params.blockSparseMask);
+        AscendC::GlobalTensor<int32_t> gBlockEffRows;
+        if (enableEffRows) {
+            gBlockEffRows.SetGlobalBuffer((__gm__ int32_t *)params.mask);
+        }
         AscendC::GlobalTensor<ElementO> gO;
         gO.SetGlobalBuffer((__gm__ ElementO *)params.o);
         AscendC::GlobalTensor<ElementLse> gLse;
@@ -497,12 +504,26 @@ public:
             if (curSelectNum == 0) {
                 continue;
             }
-            uint32_t lastSelectIdx =
-                static_cast<int32_t>(gSelectIdx.GetValue(curSelectIdx * maxKvBlockNum + curSelectNum - 1));
             uint32_t kvYBlockNum = (kvSeqlen + qBlockY - 1) / qBlockY; // CeilDiv
-            uint32_t curKvSeqLen = (lastSelectIdx == kvYBlockNum - 1 && kvSeqlen % qBlockY != 0) ?
+            uint64_t effRowsBase = 0;
+            int64_t gatheredKvSeqlen = 0;
+            if (enableEffRows) {
+                // A2/A3 attenMask is shared across batch and heads: [maxBlockNum, 2].
+                effRowsBase = 0;
+                for (uint32_t i = 0; i < curSelectNum; ++i) {
+                    uint32_t oriYBlockIdx =
+                        static_cast<uint32_t>(gSelectIdx.GetValue(curSelectIdx * maxKvBlockNum + i));
+                    uint32_t effectiveY = gBlockEffRows.GetValue(effRowsBase + oriYBlockIdx * 2 + 1);
+                    effectiveY = Gemm::Block::ClampEffectiveRows(effectiveY, oriYBlockIdx, qBlockY, kvSeqlen);
+                    gatheredKvSeqlen += effectiveY;
+                }
+            } else {
+                uint32_t lastSelectIdx =
+                    static_cast<uint32_t>(gSelectIdx.GetValue(curSelectIdx * maxKvBlockNum + curSelectNum - 1));
+                gatheredKvSeqlen = (lastSelectIdx == kvYBlockNum - 1 && kvSeqlen % qBlockY != 0) ?
                                        qBlockY * (curSelectNum - 1) + kvSeqlen % qBlockY :
                                        qBlockY * curSelectNum;
+            }
             // Calculate offsets based on layout (compile-time optimization)
             uint64_t gmOffsetQ = 0;
             uint64_t gmOffsetK = 0;
@@ -542,13 +563,22 @@ public:
                                                                curQSBlockTile) :
                     ((qXInnerIdx == qBlockInX - 1) ? qBlockX - qXInnerIdx * curQSBlockTile : curQSBlockTile);
 
+            if (enableEffRows) {
+                uint32_t effectiveX = gBlockEffRows.GetValue(effRowsBase + qXIdx * 2);
+                uint32_t qSTileOffset = qXInnerIdx * curQSBlockTile;
+                if (qSTileOffset >= effectiveX) {
+                    continue;
+                }
+                qSBlockSize = Min(qSBlockSize, effectiveX - qSTileOffset);
+            }
+
             uint32_t qNBlockSize = (qNBlockIdxCurGroup == (qNBlockNumPerGroup - 1)) ?
                                        (groupSize - qNBlockIdxCurGroup * curQNBlockTile) :
                                        curQNBlockTile;
             uint32_t rowNum = qSBlockSize * qNBlockSize;
             uint32_t rowNumRound = AlignUp<uint32_t>(rowNum, BLOCK_SIZE);
 
-            uint32_t noSkipKvS = curKvSeqLen;
+            uint32_t noSkipKvS = static_cast<uint32_t>(gatheredKvSeqlen);
             uint32_t kvSLoopNumTotal = (noSkipKvS + pagedBlockSize - 1) / pagedBlockSize; // CeilDiv
 
             uint32_t blockStackNum = MAX_KV_STACK_LEN / pagedBlockSize;
@@ -556,6 +586,10 @@ public:
             uint32_t stackSeqTilePad = blockStackNum * pagedBlockSize;
             uint32_t preKVNum = PRE_LAUNCH * blockStackNum;
             int32_t stackSeqCount = 0;
+            uint32_t kCurBlockIdx = 0;
+            uint32_t kCurBlockCopied = 0;
+            uint32_t vCurBlockIdx = 0;
+            uint32_t vCurBlockCopied = 0;
 
 #ifdef __DAV_C220_CUBE__
             LayoutQ layoutQTemp(rowNum, embed);
@@ -601,7 +635,9 @@ public:
                     blockMmadQK(gQ[gmOffsetQ], gK[gmOffsetK], gS[gmOffsetS], gBlockTable[blockBOffset],
                                 gSelectIdx[curSelectIdx * maxKvBlockNum], layoutQTemp, layoutKTemp, layOutS,
                                 actualBlockShapeQK, kvSIdx, kvSLoopNumTotal, pagedBlockSize, actualStrideKVForQK,
-                                qBlockY, curSelectNum, kvYBlockNum, kvSeqlen);
+                                qBlockY, curSelectNum, kvYBlockNum, kvSeqlen,
+                                Gemm::Block::EffRowsCtx{gBlockEffRows, effRowsBase, enableEffRows != 0, &kCurBlockIdx,
+                                                        &kCurBlockCopied, true, 0});
                     NpuArch::Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(qkReady);
 #endif
 #ifdef __DAV_C220_VEC__
@@ -642,7 +678,9 @@ public:
                     blockMmadPV(gP[gmOffsetP], gV[gmOffsetV], gOTmp[gmOffsetOTmp], gBlockTable[blockBOffset],
                                 gSelectIdx[curSelectIdx * maxKvBlockNum], layoutPTemp, layoutVTemp, layoutOTmp,
                                 actualBlockShapePV, nowkvSIdx, kvSLoopNumTotal, pagedBlockSize, kvSeqlen,
-                                actualStrideKVForPV, blockStackNum, softmaxReady, qBlockY, curSelectNum, kvYBlockNum);
+                                actualStrideKVForPV, blockStackNum, softmaxReady, qBlockY, curSelectNum, kvYBlockNum,
+                                Gemm::Block::EffRowsCtx{gBlockEffRows, effRowsBase, enableEffRows != 0, &vCurBlockIdx,
+                                                        &vCurBlockCopied, true, 0});
                     NpuArch::Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(pvReady);
 #endif
 #ifdef __DAV_C220_VEC__

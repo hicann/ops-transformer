@@ -189,6 +189,10 @@ private:
     ge::graphStatus ParseSeqlens(gert::TilingContext *bsaContext);
     ge::graphStatus ParseSparsePattern(gert::TilingContext *bsaContext);
     ge::graphStatus ParseAttenMask(gert::TilingContext *bsaContext);
+    ge::graphStatus ParseA2A3AttenMask(gert::TilingContext *bsaContext, const gert::Tensor *attenMaskTensor,
+                                       uint32_t &attenMaskMaxBlockNum);
+    ge::graphStatus ParseA5AttenMask(gert::TilingContext *bsaContext, const gert::Tensor *attenMaskTensor,
+                                     uint32_t &attenMaskMaxBlockNum);
     ge::graphStatus ParseBlockTable(gert::TilingContext *bsaContext);
     ge::graphStatus CheckSparsePattern(gert::TilingContext *bsaContext, const int64_t defaultShape);
     ge::graphStatus ValidateGenericDequantScale(gert::TilingContext *bsaContext, const int parameterIndex);

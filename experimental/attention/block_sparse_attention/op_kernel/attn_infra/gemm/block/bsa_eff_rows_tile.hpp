@@ -12,7 +12,20 @@
 
 #include <cstdint>
 
+#include <kernel_operator.h>
+
 namespace NpuArch::Gemm::Block {
+
+// effectiveRows (per-block active rows)上下文，打包effRows相关参数避免函数签名过长
+struct EffRowsCtx {
+    AscendC::GlobalTensor<int32_t> gBlockEffRows;
+    uint64_t gmOffset = 0;
+    bool enabled = false;
+    uint32_t *curBlockIdx = nullptr;
+    uint32_t *curBlockCopied = nullptr;
+    bool gatherAcrossBlocks = true; // per-head 跨块 gather 填充; per-tile 只拷贝块内一段。
+    int64_t oriSeqOffset = 0;       // per-tile 片段在原始 kv 序列中的起始行偏移。
+};
 
 // 把块的有效行数先 clamp 到 blockShapeY，再 clamp 到尾块剩余行数(非尾块时第二步为 no-op)
 __aicore__ inline uint32_t ClampEffectiveRows(uint32_t effectiveRows, uint32_t oriBlockIdx, uint32_t blockShapeY,

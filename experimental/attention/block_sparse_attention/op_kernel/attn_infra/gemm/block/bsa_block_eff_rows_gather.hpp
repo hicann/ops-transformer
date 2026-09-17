@@ -15,21 +15,11 @@
 
 #include <kernel_operator.h>
 
+#include "bsa_eff_rows_tile.hpp"
 #include "../../../tla/layout_bsa.hpp"
 #include "../../../tla/tensor_bsa.hpp"
 
 namespace NpuArch::Gemm::Block {
-
-// effectiveRows (per-block active rows)上下文，打包effRows相关参数避免函数签名过长
-struct EffRowsCtx {
-    AscendC::GlobalTensor<int32_t> gBlockEffRows;
-    uint64_t gmOffset = 0;
-    bool enabled = false;
-    uint32_t *curBlockIdx = nullptr;
-    uint32_t *curBlockCopied = nullptr;
-    bool gatherAcrossBlocks = true; // per-head 跨块 gather 填充; per-tile 只拷贝块内一段。
-    int64_t oriSeqOffset = 0;       // per-tile 片段在原始 kv 序列中的起始行偏移。
-};
 
 // effRows 模式的搬运：按 effectiveY 逐 block 搬移填充目标 tile
 // Transposed=true  用于 K（L1B 布局为 [embed, N]，tile 坐标 (0, dealtLenAccum)）
