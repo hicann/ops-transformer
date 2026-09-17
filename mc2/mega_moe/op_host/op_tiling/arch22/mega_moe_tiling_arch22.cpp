@@ -118,7 +118,7 @@ constexpr uint32_t ONE_DIM = 1U;
 constexpr uint32_t THREE_DIMS = 3U;
 
 //
-constexpr int64_t DISPATCH_QUANT_MODE_NO_QUANT = 0;
+constexpr int64_t DISPATCH_QUANT_MODE_PASSTHROUGH = 0;
 constexpr int64_t DISPATCH_QUANT_MODE_PER_TENSOR = 2;
 
 // A3 发送侧逐 chunk 处理的 chunk 大小（与 kernel 侧 PERMUTE_CHUNK=1024 一致）
@@ -241,7 +241,7 @@ static ge::graphStatus CheckDispatchQuantAttrs(gert::TilingContext *context, con
     if (w1DataType == ge::DT_INT4 || w1DataType == ge::DT_INT8) {
         expectedDispatchQuantMode = DISPATCH_QUANT_MODE_PER_TENSOR;
     } else if (w1DataType == ge::DT_BF16 || w1DataType == ge::DT_FLOAT16) {
-        expectedDispatchQuantMode = DISPATCH_QUANT_MODE_NO_QUANT;
+        expectedDispatchQuantMode = DISPATCH_QUANT_MODE_PASSTHROUGH;
     }
     OP_TILING_CHECK(
         *dispatchQuantModePtr != expectedDispatchQuantMode,

@@ -23,26 +23,12 @@ namespace ops {
 
 static constexpr size_t DIM_ONE = 1UL;
 static constexpr size_t DIM_TWO = 2UL;
-static constexpr int64_t NEG_ONE = -1;
 
-static constexpr size_t DISPATCH_FFN_COMBINE_INPUT_CONTEXT_INDEX = 0;
-static constexpr size_t DISPATCH_FFN_COMBINE_INPUT_X_INDEX = 1;
-static constexpr size_t DISPATCH_FFN_COMBINE_INPUT_TOPK_IDS_INDEX = 2;
-static constexpr size_t DISPATCH_FFN_COMBINE_INPUT_TOPK_WEIGHTS_INDEX = 3;
-
-static constexpr size_t DISPATCH_FFN_COMBINE_OUTPUT_Y_INDEX = 0;
-static constexpr size_t DISPATCH_FFN_COMBINE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX = 1;
-
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_MOE_EXPERT_NUM_INDEX = 0;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_EP_WORLD_SIZE_INDEX = 1;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_CCL_BUFFER_SIZE_INDEX = 2;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_MAX_RECV_TOKEN_NUM_INDEX = 3;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_DISPATCH_QUANT_MODE_INDEX = 4;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_DISPATCH_QUANT_OUT_DTYPE_INDEX = 5;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_SHARED_EXPERT_QUANT_OUT_DTYPE_INDEX = 6;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_COMBINE_QUANT_MODE_INDEX = 7;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_COMM_ALG_INDEX = 8;
-static constexpr size_t DISPATCH_FFN_COMBINE_ATTR_GLOBAL_BS_INDEX = 9;
+static constexpr size_t MEGA_MOE_INPUT_X_INDEX = 1;
+static constexpr size_t MEGA_MOE_OUTPUT_Y_INDEX = 0;
+static constexpr size_t MEGA_MOE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX = 1;
+static constexpr size_t MEGA_MOE_ATTR_MOE_EXPERT_NUM_INDEX = 0;
+static constexpr size_t MEGA_MOE_ATTR_EP_WORLD_SIZE_INDEX = 1;
 
 static ge::graphStatus InferShapeMegaMoe(gert::InferShapeContext *context)
 {
@@ -51,22 +37,22 @@ static ge::graphStatus InferShapeMegaMoe(gert::InferShapeContext *context)
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMegaMoe.");
 
-    const gert::Shape *xShape = context->GetInputShape(DISPATCH_FFN_COMBINE_INPUT_X_INDEX);
+    const gert::Shape *xShape = context->GetInputShape(MEGA_MOE_INPUT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
 
-    gert::Shape *yShape = context->GetOutputShape(DISPATCH_FFN_COMBINE_OUTPUT_Y_INDEX);
+    gert::Shape *yShape = context->GetOutputShape(MEGA_MOE_OUTPUT_Y_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
-    gert::Shape *expertTokenNumsShape = context->GetOutputShape(DISPATCH_FFN_COMBINE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    gert::Shape *expertTokenNumsShape = context->GetOutputShape(MEGA_MOE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumsShape);
 
     const auto attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const auto moeExpertNum = attrs->GetAttrPointer<int64_t>(DISPATCH_FFN_COMBINE_ATTR_MOE_EXPERT_NUM_INDEX);
+    const auto moeExpertNum = attrs->GetAttrPointer<int64_t>(MEGA_MOE_ATTR_MOE_EXPERT_NUM_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, moeExpertNum);
 
-    const auto epWorldSize = attrs->GetAttrPointer<int64_t>(DISPATCH_FFN_COMBINE_ATTR_EP_WORLD_SIZE_INDEX);
+    const auto epWorldSize = attrs->GetAttrPointer<int64_t>(MEGA_MOE_ATTR_EP_WORLD_SIZE_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, epWorldSize);
 
     OP_CHECK_IF(*epWorldSize <= 0,
@@ -93,9 +79,13 @@ static ge::graphStatus InferDataTypeMegaMoe(gert::InferDataTypeContext *context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMegaMoe.");
 
-    auto xDtype = context->GetInputDataType(DISPATCH_FFN_COMBINE_INPUT_X_INDEX);
-    context->SetOutputDataType(DISPATCH_FFN_COMBINE_OUTPUT_Y_INDEX, xDtype);
-    context->SetOutputDataType(DISPATCH_FFN_COMBINE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX, ge::DT_INT32);
+    auto xDtype = context->GetInputDataType(MEGA_MOE_INPUT_X_INDEX);
+    const bool isPreQuantizedX =
+        xDtype == ge::DT_FLOAT8_E5M2 || xDtype == ge::DT_FLOAT8_E4M3FN || xDtype == ge::DT_FLOAT4_E2M1;
+    // 950 预量化 token 输入由 MX GMM 消费，公共输出仍保持 BF16。
+    // 对 FP16/BF16 输入保留历史 Arch22 行为。
+    context->SetOutputDataType(MEGA_MOE_OUTPUT_Y_INDEX, isPreQuantizedX ? ge::DT_BF16 : xDtype);
+    context->SetOutputDataType(MEGA_MOE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX, ge::DT_INT32);
 
     OP_LOGD(context->GetNodeName(), "End to do InferDataTypeMegaMoe.");
     return ge::GRAPH_SUCCESS;

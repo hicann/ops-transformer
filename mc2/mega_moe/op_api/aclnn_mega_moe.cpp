@@ -101,7 +101,7 @@ aclnnStatus aclnnMegaMoeGetWorkspaceSize(
     const aclTensor *context, const aclTensor *x, const aclTensor *topkIds, const aclTensor *topkWeights,
     const aclTensorList *weight1, const aclTensorList *weight2, const aclTensorList *weightScales1Optional,
     const aclTensorList *weightScales2Optional, const aclTensorList *bias1Optional, const aclTensorList *bias2Optional,
-    const aclTensor *xActiveMaskOptional, const aclTensorList *sharedWeight1Optional,
+    const aclTensor *xActiveMaskOptional, const aclTensor *scalesOptional, const aclTensorList *sharedWeight1Optional,
     const aclTensorList *sharedWeight2Optional, const aclTensorList *sharedWeightScales1Optional,
     const aclTensorList *sharedWeightScales2Optional, const aclTensorList *sharedBias1Optional,
     const aclTensorList *sharedBias2Optional, const aclTensor *maskBufferOptional, int64_t moeExpertNum,
@@ -196,7 +196,7 @@ aclnnStatus aclnnMegaMoeGetWorkspaceSize(
 
     aclnnStatus getWorkspaceSizesRes = aclnnInnerMegaMoeGetWorkspaceSize(
         context, x, topkIds, topkWeights, weight1, weight2, weightScales1Optional, weightScales2Optional, bias1Optional,
-        bias2Optional, xActiveMaskOptional, nullptr, sharedWeight1Optional, sharedWeight2Optional,
+        bias2Optional, xActiveMaskOptional, scalesOptional, sharedWeight1Optional, sharedWeight2Optional,
         sharedWeightScales1Optional, sharedWeightScales2Optional, sharedBias1Optional, sharedBias2Optional,
         maskBufferOptional, moeExpertNum, epWorldSize, cclBufferSize, maxRecvTokenNum, dispatchQuantMode,
         dispatchQuantOutDtype, sharedExpertQuantOutDtype, combineQuantMode, commAlgData, numMaxTokensPerRank,

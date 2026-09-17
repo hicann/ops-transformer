@@ -28,6 +28,34 @@ _ALLOWED_ACTIVATION_KEYS = {
 }
 
 
+_FLOAT8_E5M2_DTYPE_VALUE = 23
+_FLOAT8_E4M3FN_DTYPE_VALUE = 24
+_FLOAT4_E2M1_DTYPE_VALUE = 296
+
+
+def _is_packed_fp4_x(
+    dispatch_quant_mode: int,
+    dispatch_quant_out_dtype: Optional[torch.dtype],
+) -> bool:
+    return (
+        dispatch_quant_mode == 0
+        and _dtype_to_int(dispatch_quant_out_dtype) == _FLOAT4_E2M1_DTYPE_VALUE
+    )
+
+
+def _logical_hidden_size(
+    x: torch.Tensor,
+    dispatch_quant_mode: int,
+    dispatch_quant_out_dtype: Optional[torch.dtype],
+):
+    torch._check(x.dim() == 2, lambda: "x must be 2D.")
+    return (
+        x.size(1) * 2
+        if _is_packed_fp4_x(dispatch_quant_mode, dispatch_quant_out_dtype)
+        else x.size(1)
+    )
+
+
 def _normalize_activation_params(
     activation: str,
     activation_clamp: Optional[float] = None,
@@ -80,6 +108,7 @@ class _MegaMoeOpBuilder(OpBuilder):
             "Tensor[]? weight_scales1=None, Tensor[]? weight_scales2=None, "
             "Tensor[]? bias1=None, Tensor[]? bias2=None, "
             "Tensor? x_active_mask=None, "
+            "Tensor? scales=None, "
             "Tensor[]? shared_weight1=None, Tensor[]? shared_weight2=None, "
             "Tensor[]? shared_weight_scales1=None, Tensor[]? shared_weight_scales2=None, "
             "Tensor[]? shared_bias1=None, Tensor[]? shared_bias2=None, "
@@ -111,6 +140,7 @@ class _MegaMoeOpBuilder(OpBuilder):
             bias1=None,
             bias2=None,
             x_active_mask=None,
+            scales=None,
             shared_weight1=None,
             shared_weight2=None,
             shared_weight_scales1=None,
@@ -140,10 +170,10 @@ class _MegaMoeOpBuilder(OpBuilder):
                 ep_world_size != 0,
                 lambda: (f"ep_world_size should not be 0, {ops_error(ErrCode.VALUE)}."),
             )
+            h = _logical_hidden_size(x, dispatch_quant_mode, dispatch_quant_out_dtype)
             bs = x.size(0)
-            h = x.size(1)
             local_moe_expert_num = moe_expert_num // ep_world_size
-            y = x.new_empty(tuple([bs, h]), dtype=x.dtype)
+            y = x.new_empty((bs, h), dtype=torch.bfloat16)
             expert_token_nums = x.new_empty((local_moe_expert_num), dtype=torch.int32)
             return (y, expert_token_nums)
 
@@ -168,6 +198,7 @@ def _npu_mega_moe(
     bias1=None,
     bias2=None,
     x_active_mask=None,
+    scales=None,
     shared_weight1=None,
     shared_weight2=None,
     shared_weight_scales1=None,
@@ -212,6 +243,7 @@ def _npu_mega_moe(
         bias1,
         bias2,
         x_active_mask,
+        scales,
         shared_weight1,
         shared_weight2,
         shared_weight_scales1,
@@ -349,9 +381,10 @@ class SymmBuffer:
     def _check_params(self) -> None:
         if "Ascend950" in torch.npu.get_device_name():
             _check_int_type(self.dispatch_quant_mode, "dispatch_quant_mode")
-            if self.dispatch_quant_mode != 4:
+            if self.dispatch_quant_mode not in (0, 4):
                 raise ValueError(
-                    "dispatch_quant_mode only supports 4 (MXFP) on Ascend950, "
+                    "dispatch_quant_mode only supports 0 (pre-quantized passthrough) "
+                    "or 4 (MXFP) on Ascend950, "
                     f"got {self.dispatch_quant_mode!r} (type: {type(self.dispatch_quant_mode).__name__})."
                 )
             if _dtype_to_int(self.dispatch_quant_out_dtype) not in (23, 24, 296):
@@ -511,8 +544,8 @@ class SymmBuffer:
 
 
 _TORCH_DTYPE_TO_INT = {  # torch枚举
-    torch.float8_e5m2: 23,
-    torch.float8_e4m3fn: 24,
+    torch.float8_e5m2: _FLOAT8_E5M2_DTYPE_VALUE,
+    torch.float8_e4m3fn: _FLOAT8_E4M3FN_DTYPE_VALUE,
     torch.int8: 1,
 }
 
@@ -610,6 +643,7 @@ def mega_moe(
     l1_bias: Optional[List[torch.Tensor]] = None,
     l2_bias: Optional[List[torch.Tensor]] = None,
     x_active_mask: Optional[torch.Tensor] = None,
+    scales: Optional[torch.Tensor] = None,
     activation: str = "swiglu",
     activation_clamp: Optional[float] = None,
     activation_params: Optional[Dict[str, float]] = None,
@@ -643,6 +677,7 @@ def mega_moe(
         bias1=l1_bias,
         bias2=l2_bias,
         x_active_mask=x_active_mask,
+        scales=scales,
         shared_weight1=shared_l1_weights,
         shared_weight2=shared_l2_weights,
         shared_weight_scales1=shared_l1_weights_sf,

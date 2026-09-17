@@ -107,6 +107,7 @@ struct ExpertWeightTensorListAddrs {
 
 struct Params {
     GM_ADDR aGmAddr;
+    GM_ADDR xScaleGmAddr;
     GM_ADDR expertIdxGmAddr;
     GM_ADDR bGmAddr;
     GM_ADDR bScaleGmAddr;

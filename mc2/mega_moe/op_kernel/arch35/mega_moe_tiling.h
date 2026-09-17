@@ -209,5 +209,7 @@ struct MegaMoeTilingData {
     uint32_t numMaxTokensPerRank;
     // URMA 分层拓扑；Host workspace 计算与 Device 通道映射必须使用同一个值。
     uint32_t rankNumPerServer;
+    // MTE 下 MoE/shared 量化输出类型不同时，需要为共享专家准备独立的 token/scale 拼接数据。
+    bool isSharedQuantIndependent;
 };
 #endif

@@ -127,7 +127,9 @@ private:
         InitializeGmm1TileStatus(tilingData);
         if (tilingData->sharedExpertNum > 0) {
             InitializeSharedExpertGmmOutputs(tilingData);
-            InitializeMteSharedExpertInput(tilingData);
+            if (tilingData->isSharedQuantIndependent == 1U) {
+                InitializeMteSharedExpertInput(tilingData);
+            }
             InitializeSharedExpertActivationBuffers(tilingData);
         }
     }
@@ -155,7 +157,11 @@ private:
     HOST_DEVICE void InitializeDispatchBuffers(const MegaMoeTilingData *tilingData)
     {
         dispatchRevDataOffset = workspaceSize;
-        workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * tilingData->h, ALIGN_512);
+        // dispatchRevData 按 GMM1 激活的实际物理字节数分配：FP8 每字节 1 个元素，FP4 每字节 2 个元素。
+        const int64_t dispatchDataElementsPerByte = IsA4W4GmmMode(tilingData->moeGmmMode) ? 2LL : 1LL;
+        const int64_t dispatchDataBytesPerToken = static_cast<int64_t>(tilingData->h) / dispatchDataElementsPerByte;
+        workspaceSize += Ops::Base::CeilAlign(
+            static_cast<int64_t>(tilingData->maxOutputSize) * dispatchDataBytesPerToken, ALIGN_512);
         dispatchRevScaleOffset = workspaceSize;
 
         int64_t dispatchScaleElementsPerToken =
@@ -353,7 +359,7 @@ private:
 
     HOST_DEVICE void InitializeMteSharedExpertInput(const MegaMoeTilingData *tilingData)
     {
-        // MTE shared GMM1 统一读取逐 token 交织记录 [Align256(data) | Align32(scale)]。
+        // MTE 共享专家使用逐 token 交织数据 [Align256(data) | Align32(scale)]，仅独立量化时分配。
         sharedExpertInputOffset = workspaceSize;
         uint32_t elementsPerByte = IsA4W4GmmMode(tilingData->sharedGmmMode) ? 2U : 1U;
         int64_t recordBytes =

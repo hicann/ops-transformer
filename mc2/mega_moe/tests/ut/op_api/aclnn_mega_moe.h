@@ -42,6 +42,8 @@ extern "C" {
  * @param [in] bias2Optional: 计算可选输入，TensorList，数据类型float32，数据格式支持ND。
  *                             GroupMatmul2的偏置参数。
  * @param [in] xActiveMaskOptional: 计算可选输入，Tensor，数据类型int8，数据格式支持ND。预留参数，暂不支持。
+ * @param [in] scalesOptional: 预量化 x 的 MX 反量化系数，数据类型float8_e8m0，
+ *                            shape为[BS, CeilDiv(H, 32)]。BF16 x时必须为空。
  * @param [in] sharedWeight1Optional: 计算可选输入，TensorList，共享专家GroupMatmul1的右矩阵。
  * @param [in] sharedWeight2Optional: 计算可选输入，TensorList，共享专家GroupMatmul2的右矩阵。
  * @param [in] sharedWeightScales1Optional: 计算可选输入，TensorList，共享专家GroupMatmul1右矩阵反量化参数。
@@ -52,7 +54,8 @@ extern "C" {
  * @param [in] epWorldSize: 计算输入，int。专家并行通信域大小。
  * @param [in] cclBufferSize: 计算输入，int。CCL通信缓冲区大小。
  * @param [in] maxRecvTokenNum: 计算可选输入，int。每个Rank最大可接收Token数，默认值为0表示自动计算。
- * @param [in] dispatchQuantMode: 计算可选输入，int。dispatch通信时量化模式，目前仅支持4（MXFP模式）。默认值为0。
+ * @param [in] dispatchQuantMode: 计算可选输入，int。BF16动态量化使用4（MXFP模式）；预量化x直通时
+ *                               不传该属性，使用默认值0。
  * @param [in] dispatchQuantOutDtype:
  * 计算可选输入，int。dispatch量化后输出的数据类型。支持23（FP8_E5M2）或24（FP8_E4M3）。
  * @param [in] sharedExpertQuantOutDtype:
@@ -80,7 +83,7 @@ ACLNN_API aclnnStatus aclnnMegaMoeGetWorkspaceSize(
     const aclTensor *context, const aclTensor *x, const aclTensor *topkIds, const aclTensor *topkWeights,
     const aclTensorList *weight1, const aclTensorList *weight2, const aclTensorList *weightScales1Optional,
     const aclTensorList *weightScales2Optional, const aclTensorList *bias1Optional, const aclTensorList *bias2Optional,
-    const aclTensor *xActiveMaskOptional, const aclTensorList *sharedWeight1Optional,
+    const aclTensor *xActiveMaskOptional, const aclTensor *scalesOptional, const aclTensorList *sharedWeight1Optional,
     const aclTensorList *sharedWeight2Optional, const aclTensorList *sharedWeightScales1Optional,
     const aclTensorList *sharedWeightScales2Optional, const aclTensorList *sharedBias1Optional,
     const aclTensorList *sharedBias2Optional, const aclTensor *maskBufferOptional, int64_t moeExpertNum,

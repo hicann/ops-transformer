@@ -130,6 +130,11 @@ static MegaMoeExpertParams MakeExpertParams(const MegaMoeConfig &config)
     return params;
 }
 
+static bool IsPreQuantizedXType(ge::DataType dataType)
+{
+    return dataType == ge::DT_FLOAT8_E5M2 || dataType == ge::DT_FLOAT8_E4M3FN || dataType == ge::DT_FLOAT4_E2M1;
+}
+
 /*
  * 根据 GMM1/GMM2 的逻辑 tile 数和 AIC 数量，计算单个 wave 覆盖的 M group 数。
  */
@@ -195,32 +200,10 @@ static int64_t GetSingleExpertTensorDimSize(const gert::StorageShape *tensorShap
 } // namespace
 
 /*
- * 输出问题规模、执行模式以及各阶段自适应缓冲区配置，供 tiling 诊断使用。
+ * 输出各阶段的 UB 分批及缓冲区配置。
  */
-void PrintMegaMoeTilingData(const MegaMoeTilingData *tilingData, const char *nodeName)
+static void PrintMegaMoeBufferConfigs(const MegaMoeTilingData *tilingData, const char *nodeName)
 {
-    OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return);
-    OP_LOGD(nodeName, "========== MegaMoeTilingData ==========");
-
-    // 问题规模、专家拓扑及执行模式。
-    OP_LOGD(nodeName,
-            "shape: bs=%u, numMaxTokensPerRank=%u, h=%u, hiddenDim=%u, topK=%u, maxOutputSize=%u, "
-            "isPerExpertWeightTensor=%d",
-            tilingData->bs, tilingData->numMaxTokensPerRank, tilingData->h, tilingData->hiddenDim, tilingData->topK,
-            tilingData->maxOutputSize, tilingData->isPerExpertWeightTensor);
-    OP_LOGD(nodeName,
-            "topology: moeExpertPerRank=%u, sharedExpertNum=%u, epWorldSize=%u, aicNum=%u, blockAivNum=%u, "
-            "blockNumPerEP=%u, topoType=%ld, rankNumPerServer=%u",
-            tilingData->moeExpertPerRank, tilingData->sharedExpertNum, tilingData->epWorldSize, tilingData->aicNum,
-            tilingData->blockAivNum, tilingData->blockNumPerEP, tilingData->topoType, tilingData->rankNumPerServer);
-    OP_LOGD(nodeName, "mode: moeGmmMode=%u, sharedGmmMode=%u, combineQuantMode=%ld, clampLimit=%f",
-            static_cast<uint32_t>(tilingData->moeGmmMode), static_cast<uint32_t>(tilingData->sharedGmmMode),
-            tilingData->combineQuantMode, tilingData->clampLimit);
-    OP_LOGD(nodeName, "combineSync: slotCountPerExpert=%lu", tilingData->combineSyncSlotCountPerExpert);
-    OP_LOGD(nodeName, "topkWeightsPrefetch is %d", tilingData->topkWeightsPrefetch);
-    OP_LOGD(nodeName, "mGroupsPerWave is %u", tilingData->mGroupsPerWave);
-
-    // 各阶段的 UB 分批及缓冲区配置。
     const auto &dispatchConfig = tilingData->dispatchBufferConfig;
     OP_LOGD(nodeName, "dispatch: routeItemsPerBatch=%d, routeBatchCount=%d, bufferCount=%d, copyBufferBytes=%u",
             dispatchConfig.routeItemsPerBatch, dispatchConfig.routeBatchCount, dispatchConfig.bufferCount,
@@ -256,6 +239,38 @@ void PrintMegaMoeTilingData(const MegaMoeTilingData *tilingData, const char *nod
 }
 
 /*
+ * 输出问题规模、执行模式以及各阶段自适应缓冲区配置，供 tiling 诊断使用。
+ */
+void PrintMegaMoeTilingData(const MegaMoeTilingData *tilingData, const char *nodeName)
+{
+    OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return);
+    OP_LOGD(nodeName, "========== MegaMoeTilingData ==========");
+
+    // 问题规模、专家拓扑及执行模式。
+    OP_LOGD(nodeName,
+            "shape: bs=%u, numMaxTokensPerRank=%u, h=%u, hiddenDim=%u, topK=%u, maxOutputSize=%u, "
+            "isPerExpertWeightTensor=%d",
+            tilingData->bs, tilingData->numMaxTokensPerRank, tilingData->h, tilingData->hiddenDim, tilingData->topK,
+            tilingData->maxOutputSize, tilingData->isPerExpertWeightTensor);
+    OP_LOGD(nodeName,
+            "topology: moeExpertPerRank=%u, sharedExpertNum=%u, epWorldSize=%u, aicNum=%u, blockAivNum=%u, "
+            "blockNumPerEP=%u, topoType=%ld, rankNumPerServer=%u",
+            tilingData->moeExpertPerRank, tilingData->sharedExpertNum, tilingData->epWorldSize, tilingData->aicNum,
+            tilingData->blockAivNum, tilingData->blockNumPerEP, tilingData->topoType, tilingData->rankNumPerServer);
+    OP_LOGD(nodeName,
+            "mode: moeGmmMode=%u, sharedGmmMode=%u, isSharedQuantIndependent=%u, combineQuantMode=%ld, "
+            "clampLimit=%f",
+            static_cast<uint32_t>(tilingData->moeGmmMode), static_cast<uint32_t>(tilingData->sharedGmmMode),
+            static_cast<uint32_t>(tilingData->isSharedQuantIndependent), tilingData->combineQuantMode,
+            tilingData->clampLimit);
+    OP_LOGD(nodeName, "combineSync: slotCountPerExpert=%lu", tilingData->combineSyncSlotCountPerExpert);
+    OP_LOGD(nodeName, "topkWeightsPrefetch is %d", tilingData->topkWeightsPrefetch);
+    OP_LOGD(nodeName, "mGroupsPerWave is %u", tilingData->mGroupsPerWave);
+
+    PrintMegaMoeBufferConfigs(tilingData, nodeName);
+}
+
+/*
  * 输出 workspace 各分区的偏移和总大小，供 host/device 布局核对使用。
  */
 void PrintWorkspaceLayout(const struct WorkspaceLayout *layout, const char *nodeName)
@@ -274,6 +289,7 @@ void PrintWorkspaceLayout(const struct WorkspaceLayout *layout, const char *node
     OP_LOGD(nodeName, "gmm2ReadyOffset:               %ld\n", layout->gmm2ReadyOffset);
     OP_LOGD(nodeName, "gmm2CombineSyncCounterOffset:  %ld\n", layout->gmm2CombineSyncCounterOffset);
     OP_LOGD(nodeName, "gmm2MmadResOffset:             %ld\n", layout->gmm2MmadResOffset);
+    OP_LOGD(nodeName, "sharedExpertInputOffset:       %ld\n", layout->sharedExpertInputOffset);
     OP_LOGD(nodeName, "workspaceSize:                 %ld\n", layout->workspaceSize);
 }
 
@@ -308,15 +324,16 @@ void PrintPeermemInfo(const MegaMoeTilingData *tilingData, const char *nodeName)
 }
 
 /*
- * 将专家权重类型、量化输出类型、通信拓扑和可选能力编码为 kernel tiling key。
+ * 将专家权重类型、dispatch 输入处理模式、量化输出类型、通信拓扑和可选能力编码为 kernel tiling key。
  */
-static uint64_t CalcTilingKey(const gert::TilingContext *context, const MegaMoeExpertParams &expertParams,
-                              const MegaMoeTilingData *tilingData)
+static uint64_t CalcTilingKey(const gert::TilingContext *context, const MegaMoeConfig &config,
+                              const MegaMoeExpertParams &expertParams, const MegaMoeTilingData *tilingData)
 {
     auto moeWeightDesc = context->GetDynamicInputDesc(expertParams.moe.inputs.weightOne, 0);
     auto sharedWeightDesc = expertParams.shared.expertCount > 0 ?
                                 context->GetDynamicInputDesc(expertParams.shared.inputs.weightOne, 0) :
                                 moeWeightDesc;
+    auto dispatchQuantModePtr = context->GetAttrs()->GetAttrPointer<int64_t>(config.attrDispatchQuantModeIndex);
 
     int64_t topoType = TILINGKEY_TPL_MTE;
     if (tilingData->topoType == TOPO_TYPE_URMA) {
@@ -325,7 +342,7 @@ static uint64_t CalcTilingKey(const gert::TilingContext *context, const MegaMoeE
 
     return GET_TPL_TILING_KEY(
         static_cast<int64_t>(moeWeightDesc->GetDataType()), static_cast<int64_t>(sharedWeightDesc->GetDataType()),
-        DISPATCH_QUANT_MODE_MXFP, EXPERT_QUANT_MODE_MAP.at(expertParams.moe.quantOutDtype),
+        *dispatchQuantModePtr, EXPERT_QUANT_MODE_MAP.at(expertParams.moe.quantOutDtype),
         EXPERT_QUANT_MODE_MAP.at(expertParams.shared.quantOutDtype), static_cast<int64_t>(tilingData->combineQuantMode),
         topoType, static_cast<int64_t>(tilingData->topkWeightsPrefetch));
 }
@@ -633,6 +650,7 @@ static uint8_t ResolveExpertGmmMode(ge::DataType quantOutDtype, ge::DataType wei
 
 /*
  * 校验 dispatch 和 combine 阶段的量化模式，并将 combine 模式写入 tiling data。
+ * dispatch_quant_mode 为 0 表示不在算子内部量化，为 4 表示算子内部执行 MX 量化。
  */
 static ge::graphStatus CheckAndSetQuantModeAttrs(const gert::TilingContext *context, const MegaMoeConfig &config,
                                                  MegaMoeTilingData *tilingData, const char *nodeName)
@@ -640,9 +658,9 @@ static ge::graphStatus CheckAndSetQuantModeAttrs(const gert::TilingContext *cont
     auto attrs = context->GetAttrs();
     auto dispatchQuantModePtr = attrs->GetAttrPointer<int64_t>((config.attrDispatchQuantModeIndex));
     OP_TILING_CHECK(
-        *dispatchQuantModePtr != DISPATCH_QUANT_MODE_MXFP,
+        *dispatchQuantModePtr != DISPATCH_QUANT_MODE_PASSTHROUGH && *dispatchQuantModePtr != DISPATCH_QUANT_MODE_MXFP,
         OP_LOGE_WITH_INVALID_ATTR(nodeName, "dispatch_quant_mode", std::to_string(*dispatchQuantModePtr).c_str(),
-                                  std::to_string(DISPATCH_QUANT_MODE_MXFP).c_str()),
+                                  "0 (no internal quantization) or 4 (internal MXFP quantization)"),
         return ge::GRAPH_FAILED);
 
     auto combineQuantModePtr = attrs->GetAttrPointer<int64_t>((config.attrCombineQuantModeIndex));
@@ -658,14 +676,51 @@ static ge::graphStatus CheckAndSetQuantModeAttrs(const gert::TilingContext *cont
 }
 
 /*
- * 校验并设置 MoE 与共享专家的量化输出类型，同时解析共享专家类型的继承语义。
+ * 校验预量化输入的逻辑类型、通信拓扑及共享专家类型约束。
+ */
+static ge::graphStatus CheckPreQuantizedXAttrs(const gert::TilingContext *context, const MegaMoeConfig &config,
+                                               ge::DataType moeQuantOutDtype, ge::DataType sharedQuantOutDtype,
+                                               int64_t topoType, const char *nodeName)
+{
+    auto xDesc = context->GetInputDesc(config.xIndex);
+    // 预量化输入不再由 x dtype 反推类型，属性与接口补充的逻辑 descriptor 必须严格一致。
+    OP_TILING_CHECK(
+        xDesc->GetDataType() != moeQuantOutDtype,
+        OP_LOGE_WITH_INVALID_ATTR(nodeName, "dispatch_quant_out_dtype", std::to_string(moeQuantOutDtype).c_str(),
+                                  (std::string("the same dtype as x (") + Ops::Base::ToString(xDesc->GetDataType()) +
+                                   ") for pre-quantized input")
+                                      .c_str()),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topoType != TOPO_TYPE_MTE,
+                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "topo_type", std::to_string(topoType).c_str(),
+                                              "0 (MTE), because pre-quantized x does not support URMA"),
+                    return ge::GRAPH_FAILED);
+
+    // 预量化 x 只有一份 data/scales；共享专家显式配置类型时只能与 MoE 专家保持一致。
+    const bool hasExplicitSharedQuantDtype = sharedQuantOutDtype != ge::DT_UNDEFINED;
+    OP_TILING_CHECK(hasExplicitSharedQuantDtype && sharedQuantOutDtype != moeQuantOutDtype,
+                    OP_LOGE_WITH_INVALID_ATTR(
+                        nodeName, "shared_expert_quant_out_dtype", std::to_string(sharedQuantOutDtype).c_str(),
+                        (std::string("DT_UNDEFINED or the same dtype as dispatch_quant_out_dtype (") +
+                         std::to_string(moeQuantOutDtype) + ") for pre-quantized x")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+/*
+ * 校验并设置 MoE 与共享专家使用的量化类型。mode 4 下该属性表示内部量化输出类型，
+ * mode 0 且类型为 FP8/FP4 时，该属性表示预量化 x 的逻辑类型；同时解析共享专家类型的继承语义。
  */
 static ge::graphStatus CheckAndSetQuantOutDtypes(const gert::TilingContext *context, const MegaMoeConfig &config,
-                                                 MegaMoeExpertParams &params, const char *nodeName)
+                                                 MegaMoeExpertParams &params, int64_t topoType, const char *nodeName)
 {
     auto attrs = context->GetAttrs();
+    auto dispatchQuantModePtr = attrs->GetAttrPointer<int64_t>((config.attrDispatchQuantModeIndex));
     auto dispatchQuantOutDtypePtr = attrs->GetAttrPointer<int64_t>((config.attrDispatchQuantOutDtypeIndex));
     ge::DataType moeQuantOutDtype = static_cast<ge::DataType>(*dispatchQuantOutDtypePtr);
+
+    // 两种 dispatch 模式均由 dispatch_quant_out_dtype 指定 GMM 收到的量化数据类型。
     OP_TILING_CHECK(!IsSupportedExpertQuantDtype(moeQuantOutDtype),
                     OP_LOGE_WITH_INVALID_ATTR(nodeName, "dispatch_quant_out_dtype",
                                               std::to_string(*dispatchQuantOutDtypePtr).c_str(),
@@ -680,6 +735,21 @@ static ge::graphStatus CheckAndSetQuantOutDtypes(const gert::TilingContext *cont
                                               std::to_string(*sharedQuantOutDtypePtr).c_str(),
                                               "DT_UNDEFINED, fp8_e5m2, fp8_e4m3fn or fp4_e2m1"),
                     return ge::GRAPH_FAILED);
+
+    const bool isPreQuantizedX =
+        *dispatchQuantModePtr == DISPATCH_QUANT_MODE_PASSTHROUGH && IsSupportedExpertQuantDtype(moeQuantOutDtype);
+    if (isPreQuantizedX) {
+        OP_TILING_CHECK(CheckPreQuantizedXAttrs(context, config, moeQuantOutDtype, sharedQuantOutDtype, topoType,
+                                                nodeName) != ge::GRAPH_SUCCESS,
+                        OP_LOGE(nodeName, "pre-quantized x attributes are invalid."), return ge::GRAPH_FAILED);
+    } else {
+        auto xDesc = context->GetInputDesc(config.xIndex);
+        OP_TILING_CHECK(
+            xDesc->GetDataType() != ge::DT_BF16,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(),
+                                                  "When dispatch_quant_mode is 4, the dtype of x must be DT_BF16"),
+            return ge::GRAPH_FAILED);
+    }
 
     params.moe.quantOutDtype = moeQuantOutDtype;
     params.shared.quantOutDtype =
@@ -751,6 +821,8 @@ static ge::graphStatus CheckAndSetExpertGmmModes(const gert::TilingContext *cont
 
     tilingData->moeGmmMode = params.moe.gmmMode;
     tilingData->sharedGmmMode = params.shared.gmmMode;
+    tilingData->isSharedQuantIndependent =
+        params.shared.expertCount > 0 && params.shared.quantOutDtype != params.moe.quantOutDtype;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1287,7 +1359,7 @@ static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData *tilingData)
 static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData *tilingData,
                                                    uint32_t moeActivationElementsPerByte,
                                                    uint32_t sharedActivationElementsPerByte,
-                                                   bool needsIndependentSharedQuant, uint32_t topkValidIndexCoreNum)
+                                                   bool isSharedQuantIndependent, uint32_t topkValidIndexCoreNum)
 {
     uint64_t totalFlagElementCount = CalcHostFlagElementCount(tilingData);
     uint32_t resetElementCountPerCore =
@@ -1298,7 +1370,7 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData *tili
 
     uint32_t moeQuantOutputBufferBytes = CalcDispatchCopyBufferBytes(tilingData, moeActivationElementsPerByte);
     uint32_t quantOutputBufferBytes = moeQuantOutputBufferBytes;
-    if (needsIndependentSharedQuant) {
+    if (isSharedQuantIndependent == 1U) {
         // 两侧量化分时复用同一组 xOut UB，按较大的单 token 记录预留；共享专家不存储 topK weight。
         uint32_t sharedQuantOutputBufferBytes =
             CalcQuantTokenAndScaleBytes(tilingData, sharedActivationElementsPerByte);
@@ -1323,14 +1395,14 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData *tili
  * 该字段必须在调用前写好。
  */
 static void SetTopkValidIndexBufferConfigs(MegaMoeTilingData *tilingData, uint32_t moeActivationElementsPerByte,
-                                           uint32_t sharedActivationElementsPerByte, bool needsIndependentSharedQuant,
+                                           uint32_t sharedActivationElementsPerByte, bool isSharedQuantIndependent,
                                            uint32_t availableUbBytes)
 {
     const bool sharedMte = tilingData->sharedExpertNum > 0U && tilingData->topoType == TOPO_TYPE_MTE;
     const uint32_t topkValidIndexCoreNum = sharedMte ? tilingData->aicNum : tilingData->blockAivNum;
     uint32_t sendMaskFixedBufferBytes =
         CalcTopkValidIndexFixedBufferBytes(tilingData, moeActivationElementsPerByte, sharedActivationElementsPerByte,
-                                           needsIndependentSharedQuant, topkValidIndexCoreNum);
+                                           isSharedQuantIndependent, topkValidIndexCoreNum);
 
     /*
      * 按发送核数均衡分配专家，前 remainder 个发送核多处理一个专家。
@@ -1388,8 +1460,6 @@ static void SetAdaptiveBufferConfigs(const gert::TilingContext *context, const M
 
     uint32_t activationElementsPerByte = expertParams.moe.quantOutDtype == ge::DT_FLOAT4_E2M1 ? 2U : 1U;
     uint32_t sharedActivationElementsPerByte = expertParams.shared.quantOutDtype == ge::DT_FLOAT4_E2M1 ? 2U : 1U;
-    bool needsIndependentSharedQuant =
-        expertParams.shared.expertCount > 0 && expertParams.shared.quantOutDtype != expertParams.moe.quantOutDtype;
     // 所有 AIV 核共用同一套 dispatch UB 配置，该布局与分核方式无关。
     // 若 kernel 改为按核拆分 tensor 或调整 copyTmp 槽位布局，需同步更新此处计算。
     tilingData->dispatchBufferConfig =
@@ -1400,7 +1470,7 @@ static void SetAdaptiveBufferConfigs(const gert::TilingContext *context, const M
     tilingData->combineSyncSlotCountPerExpert = CalcCombineSyncSlotCountPerExpert(tilingData);
 
     SetTopkValidIndexBufferConfigs(tilingData, activationElementsPerByte, sharedActivationElementsPerByte,
-                                   needsIndependentSharedQuant, availableUbBytes);
+                                   tilingData->isSharedQuantIndependent == 1U, availableUbBytes);
 
     ge::DataType topKWeightsDataType = topKWeightsDesc->GetDataType();
     SetUnpermuteBufferConfigs(tilingData, topKWeightsDataType, availableUbBytes);
@@ -1483,17 +1553,41 @@ static ge::graphStatus CheckRequiredTensorPtrNullptr(const gert::TilingContext *
 }
 
 /*
- * arch35 当前不支持 xActiveMask 和 scales，可选输入一旦传入即拒绝。
+ * arch35 当前不支持 xActiveMask，可选输入一旦传入即拒绝。
  */
 static ge::graphStatus CheckUnsupportedOptionalInputs(const gert::TilingContext *context, const MegaMoeConfig &config,
                                                       const char *nodeName)
 {
     auto xActiveMaskDesc = context->GetOptionalInputDesc(config.xActiveMaskIndex);
-    auto scalesDesc = context->GetOptionalInputDesc(config.scalesIndex);
     OP_TILING_CHECK(xActiveMaskDesc != nullptr, OP_LOGE_FOR_INVALID_VALUE(nodeName, "xActiveMask", "not null", "null"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(scalesDesc != nullptr, OP_LOGE_FOR_INVALID_VALUE(nodeName, "scales", "not null", "null"),
-                    return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
+}
+
+/*
+ * 单独校验 scales 的传入条件：预量化输入必须传入且 shape 指针有效，其他场景不允许传入。
+ */
+static ge::graphStatus CheckScalesInput(const gert::TilingContext *context, const MegaMoeConfig &config,
+                                        const char *nodeName)
+{
+    auto attrs = context->GetAttrs();
+    auto dispatchQuantModePtr = attrs->GetAttrPointer<int64_t>((config.attrDispatchQuantModeIndex));
+    auto dispatchQuantOutDtypePtr = attrs->GetAttrPointer<int64_t>((config.attrDispatchQuantOutDtypeIndex));
+    const bool isPreQuantizedX = *dispatchQuantModePtr == DISPATCH_QUANT_MODE_PASSTHROUGH &&
+                                 IsSupportedExpertQuantDtype(static_cast<ge::DataType>(*dispatchQuantOutDtypePtr));
+    auto scalesDesc = context->GetOptionalInputDesc(config.scalesIndex);
+    if (isPreQuantizedX) {
+        OP_TILING_CHECK(scalesDesc == nullptr,
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "scales", "null", "not null for pre-quantized x"),
+                        return ge::GRAPH_FAILED);
+        auto scalesShape = context->GetOptionalInputShape(config.scalesIndex);
+        OP_CHECK_NULL_WITH_CONTEXT(context, scalesShape);
+    } else {
+        OP_TILING_CHECK(scalesDesc != nullptr,
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "scales", "not null", "null when x is not pre-quantized"),
+                        return ge::GRAPH_FAILED);
+    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1830,7 +1924,7 @@ static ge::graphStatus CheckWeightPairShapeRelations(const gert::TilingContext *
 
     // 单专家 GMM 形状：weight1=[N, H]，weight2=[H, N/2]，x=[BS, H]。
     const gert::StorageShape *xStorageShape = context->GetInputShape(xIndex);
-    const int64_t xColumnCount = xStorageShape->GetStorageShape().GetDim(1);
+    const int64_t xColumnCount = xStorageShape->GetOriginShape().GetDim(1);
     const std::string commonMatrixDimensionsString = "[" + std::to_string(weightOneColumnCount) + ", " +
                                                      std::to_string(weightTwoRowCount) + ", " +
                                                      std::to_string(xColumnCount) + "]";
@@ -1877,8 +1971,8 @@ static ge::graphStatus CheckYShape(const gert::TilingContext *context, const Meg
 {
     const gert::StorageShape *xStorageShape = context->GetInputShape(config.xIndex);
 
-    int64_t bs = xStorageShape->GetStorageShape().GetDim(0);
-    int64_t h = xStorageShape->GetStorageShape().GetDim(1);
+    int64_t bs = xStorageShape->GetOriginShape().GetDim(0);
+    int64_t h = xStorageShape->GetOriginShape().GetDim(1);
     auto yStorageShape = context->GetOutputShape(config.yIndex);
     if (CheckTensorDimNum(yStorageShape, TWO_DIMS, "y", nodeName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -1991,22 +2085,44 @@ static ge::graphStatus CheckWeightScaleShapeRelations(const gert::TilingContext 
 }
 
 /*
- * 校验非权重输入的维数，并校验 x、topk_ids 和 topk_weights 的 token/topK 维一致性。
+ * 校验已传入的 x scales 维数及其与逻辑 BS/H 的 shape 关系。
  */
-static ge::graphStatus CheckNonWeightInputShapes(const gert::TilingContext *context, const MegaMoeConfig &config,
-                                                 const char *nodeName)
+static ge::graphStatus CheckXScalesShape(const gert::TilingContext *context, const MegaMoeConfig &config, int64_t bs,
+                                         int64_t h, const char *nodeName)
 {
-    const gert::StorageShape *contextStorageShape = context->GetInputShape(config.contextIndex);
-    if (CheckTensorDimNum(contextStorageShape, ONE_DIM, "context", nodeName) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
+    const auto *scalesDesc = context->GetOptionalInputDesc(config.scalesIndex);
+    if (scalesDesc == nullptr) {
+        return ge::GRAPH_SUCCESS;
     }
 
-    const gert::StorageShape *xStorageShape = context->GetInputShape(config.xIndex);
-    if (CheckTensorDimNum(xStorageShape, TWO_DIMS, "x", nodeName) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-    const int64_t xDim0 = xStorageShape->GetStorageShape().GetDim(0);
+    const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(config.scalesIndex);
+    const auto &scalesShape = scalesStorageShape->GetOriginShape();
+    OP_TILING_CHECK(
+        scalesShape.GetDimNum() != TWO_DIMS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName, "scales", (std::to_string(scalesShape.GetDimNum()) + "D").c_str(),
+                                     (std::to_string(TWO_DIMS) + "D").c_str()),
+        return ge::GRAPH_FAILED);
+    const int64_t expectedScaleDim1 = ops::CeilDiv<int64_t>(h, H_ALIGN);
+    OP_TILING_CHECK(scalesShape.GetDim(0) != bs || scalesShape.GetDim(1) != expectedScaleDim1,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        nodeName, "scales",
+                        (std::string("[") + std::to_string(scalesShape.GetDim(0)) + ", " +
+                         std::to_string(scalesShape.GetDim(1)) + "]")
+                            .c_str(),
+                        (std::string("For pre-quantized x, scales must be [BS, CeilDiv(H, 32)] = [") +
+                         std::to_string(bs) + ", " + std::to_string(expectedScaleDim1) + "]")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
 
+    return ge::GRAPH_SUCCESS;
+}
+
+/*
+ * 校验路由输入的维数、token 数及 topK 维一致性。
+ */
+static ge::graphStatus CheckRoutingInputShapes(const gert::TilingContext *context, const MegaMoeConfig &config,
+                                               int64_t bs, const char *nodeName)
+{
     const gert::StorageShape *topkIdsStorageShape = context->GetInputShape(config.topkIdsIndex);
     if (CheckTensorDimNum(topkIdsStorageShape, TWO_DIMS, "topkIds", nodeName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -2021,10 +2137,10 @@ static ge::graphStatus CheckNonWeightInputShapes(const gert::TilingContext *cont
     const int64_t topkWeightsDim0 = topkWeightsStorageShape->GetStorageShape().GetDim(0);
     const int64_t topkWeightsDim1 = topkWeightsStorageShape->GetStorageShape().GetDim(1);
 
-    OP_TILING_CHECK(xDim0 != topkIdsDim0 || xDim0 != topkWeightsDim0,
+    OP_TILING_CHECK(bs != topkIdsDim0 || bs != topkWeightsDim0,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         nodeName, "x, topkIds, topkWeights",
-                        (std::string("[") + std::to_string(xDim0) + ", " + std::to_string(topkIdsDim0) + ", " +
+                        (std::string("[") + std::to_string(bs) + ", " + std::to_string(topkIdsDim0) + ", " +
                          std::to_string(topkWeightsDim0) + "]")
                             .c_str(),
                         "The shape [dim0] of x, topkIds, and topkWeights must be equal."),
@@ -2038,6 +2154,30 @@ static ge::graphStatus CheckNonWeightInputShapes(const gert::TilingContext *cont
             "The shape [dim1] of topkIds and topkWeights must be equal."),
         return ge::GRAPH_FAILED);
 
+    return ge::GRAPH_SUCCESS;
+}
+
+/*
+ * 校验 dispatch 基础输入维数，并按顺序校验 x scales 和路由输入的 shape 关系。
+ */
+static ge::graphStatus CheckDispatchInputShapes(const gert::TilingContext *context, const MegaMoeConfig &config,
+                                                const char *nodeName)
+{
+    const gert::StorageShape *contextStorageShape = context->GetInputShape(config.contextIndex);
+    if (CheckTensorDimNum(contextStorageShape, ONE_DIM, "context", nodeName) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    const gert::StorageShape *xStorageShape = context->GetInputShape(config.xIndex);
+    if (CheckTensorDimNum(xStorageShape, TWO_DIMS, "x", nodeName) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    const int64_t bs = xStorageShape->GetOriginShape().GetDim(0);
+    const int64_t h = xStorageShape->GetOriginShape().GetDim(1);
+    OP_TILING_CHECK(CheckXScalesShape(context, config, bs, h, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "x scales shape is invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckRoutingInputShapes(context, config, bs, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "routing input shapes are invalid."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -2097,10 +2237,18 @@ static ge::graphStatus CheckNonWeightInputDataTypes(const gert::TilingContext *c
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(
-        xDesc->GetDataType() != ge::DT_BF16,
+        xDesc->GetDataType() != ge::DT_BF16 && !IsPreQuantizedXType(xDesc->GetDataType()),
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(),
-                                              "The dtype of x must be DT_BF16."),
+                                              "The dtype of x must be DT_BF16, DT_FLOAT8_E5M2, "
+                                              "DT_FLOAT8_E4M3FN or DT_FLOAT4_E2M1"),
         return ge::GRAPH_FAILED);
+
+    auto scalesDesc = context->GetOptionalInputDesc(config.scalesIndex);
+    OP_TILING_CHECK(scalesDesc != nullptr && scalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        nodeName, "scales", Ops::Base::ToString(scalesDesc->GetDataType()).c_str(),
+                        "For pre-quantized x, the dtype of scales must be DT_FLOAT8_E8M0"),
+                    return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(topkIdsDesc->GetDataType() != ge::DT_INT32,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "topkIds",
@@ -2168,6 +2316,12 @@ static ge::graphStatus CheckNonWeightTensorFormats(const gert::TilingContext *co
                                                    "a non-FRACTAL_NZ format"),
                         return ge::GRAPH_FAILED);
     }
+
+    auto scalesDesc = context->GetOptionalInputDesc(config.scalesIndex);
+    OP_TILING_CHECK(scalesDesc != nullptr && scalesDesc->GetStorageFormat() != ge::FORMAT_ND,
+                    OP_LOGE_FOR_INVALID_FORMAT(
+                        nodeName, "scales", Ops::Base::ToString(scalesDesc->GetStorageFormat()).c_str(), "FORMAT_ND"),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -2235,8 +2389,8 @@ static ge::graphStatus CheckAndSetTensorMetadata(const gert::TilingContext *cont
                     OP_LOGE(nodeName, "output dtype is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckWeightScaleDataTypesAndFormats(context, expertParams, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "weight scale dtypes or formats are invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckNonWeightInputShapes(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "non-weight input shape is invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckDispatchInputShapes(context, config, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "dispatch input shapes are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckWeightAndScaleShapeRelations(context, config, expertParams, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "weight or scale shape relation is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckYShape(context, config, nodeName) != ge::GRAPH_SUCCESS,
@@ -2253,7 +2407,7 @@ static ge::graphStatus CheckAndSetTokenDimensions(const gert::TilingContext *con
 {
     const gert::StorageShape *xStorageShape = context->GetInputShape(config.xIndex);
     const gert::StorageShape *topkIdsStorageShape = context->GetInputShape(config.topkIdsIndex);
-    int64_t bs = xStorageShape->GetStorageShape().GetDim(0);
+    int64_t bs = xStorageShape->GetOriginShape().GetDim(0);
     int64_t topkIdsDim1 = topkIdsStorageShape->GetStorageShape().GetDim(1);
 
     // 校验 topK 取值范围。
@@ -2262,7 +2416,7 @@ static ge::graphStatus CheckAndSetTokenDimensions(const gert::TilingContext *con
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "topK", std::to_string(topkIdsDim1).c_str(), "only support [1, 32]"),
         return ge::GRAPH_FAILED);
 
-    int64_t xDim1 = xStorageShape->GetStorageShape().GetDim(1);
+    int64_t xDim1 = xStorageShape->GetOriginShape().GetDim(1);
     // 校验 H 取值范围。
     OP_TILING_CHECK(
         xDim1 < MIN_H || xDim1 > MAX_H,
@@ -2327,7 +2481,7 @@ static ge::graphStatus CheckAndSetTopoType(const gert::TilingContext *context, c
 }
 
 /*
- * 校验并记录不依赖 tensor 元数据或问题规模的算子属性。
+ * 校验并记录不依赖权重元数据或问题规模的算子属性；dispatch_quant_mode 区分内部 MX 量化与预量化直通。
  * 直接属性：topo_type、ep_world_size、comm_alg、dispatch_quant_mode、combine_quant_mode、
  * activation、activation_params 和 topk_weights_type。
  * 具体属性的拦截项由各子函数保留，本函数只表达该阶段的执行顺序。
@@ -2353,15 +2507,17 @@ static ge::graphStatus CheckAndSetIndependentAttrs(const gert::TilingContext *co
 
 /*
  * 基于已校验的属性和 tensor 元数据，解析专家 GMM 模式、问题维度和专家数量。
- * 直接属性：dispatch_quant_out_dtype、shared_expert_quant_out_dtype 和 moe_expert_num；
+ * 直接属性：dispatch_quant_out_dtype、shared_expert_quant_out_dtype 和 moe_expert_num；前两个属性在
+ * mode 4 下表示内部量化输出类型，在 mode 0 下表示预量化输入逻辑类型。
  * GMM 模式、token 维度、hiddenDim 及 shared expert 数量由已校验的 tensor 元数据派生。
  */
 static ge::graphStatus CheckAndSetExpertExecutionParams(const gert::TilingContext *context, const MegaMoeConfig &config,
                                                         MegaMoeExpertParams &expertParams,
                                                         MegaMoeTilingData *tilingData, const char *nodeName)
 {
-    OP_TILING_CHECK(CheckAndSetQuantOutDtypes(context, config, expertParams, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "expert quantization output dtypes are invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckAndSetQuantOutDtypes(context, config, expertParams, tilingData->topoType, nodeName) != ge::GRAPH_SUCCESS,
+        OP_LOGE(nodeName, "expert quantization settings are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetExpertGmmModes(context, expertParams, tilingData->topoType, tilingData, nodeName) !=
                         ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "expert GMM modes are invalid."), return ge::GRAPH_FAILED);
@@ -2376,6 +2532,21 @@ static ge::graphStatus CheckAndSetExpertExecutionParams(const gert::TilingContex
     OP_TILING_CHECK(
         CheckExpertTokenNumsShape(context, config, tilingData->moeExpertPerRank, nodeName) != ge::GRAPH_SUCCESS,
         OP_LOGE(nodeName, "expertTokenNums tensor shape is invalid."), return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+/*
+ * 校验并设置 token 容量属性，同时检查 CCL 缓冲区容量。
+ */
+static ge::graphStatus CheckAndSetCapacityAttrs(const gert::TilingContext *context, const MegaMoeConfig &config,
+                                                MegaMoeTilingData *tilingData, const char *nodeName)
+{
+    OP_TILING_CHECK(CheckAndSetMaxTokensPerRankAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "maximum tokens per rank is invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckAndSetMaxRecvTokenNumAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "maximum received token count is invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckCclBufferCapacity(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "CCL buffer capacity is insufficient."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -2405,8 +2576,9 @@ static ge::graphStatus CheckAndSetPlatformParams(gert::TilingContext *context, M
 /*
  * 在所有校验和资源规划完成后，统一提交 workspace、block dim、tiling key 及诊断信息。
  */
-static ge::graphStatus CommitTilingResult(gert::TilingContext *context, const MegaMoeExpertParams &expertParams,
-                                          MegaMoeTilingData *tilingData, const char *nodeName)
+static ge::graphStatus CommitTilingResult(gert::TilingContext *context, const MegaMoeConfig &config,
+                                          const MegaMoeExpertParams &expertParams, MegaMoeTilingData *tilingData,
+                                          const char *nodeName)
 {
     WorkspaceLayout workspaceLayout(tilingData);
     OP_TILING_CHECK(SetWorkspace(context, workspaceLayout, nodeName) != ge::GRAPH_SUCCESS,
@@ -2416,7 +2588,7 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext *context, const Me
     context->SetBlockDim(
         ascendcPlatform.CalcTschBlockDim(tilingData->blockAivNum, tilingData->aicNum, tilingData->blockAivNum));
     context->SetScheduleMode(1); // batch model, all cores start at the same time
-    uint64_t tilingKey = CalcTilingKey(context, expertParams, tilingData);
+    uint64_t tilingKey = CalcTilingKey(context, config, expertParams, tilingData);
     OP_LOGI(nodeName, "OP TilingKey is %lu", tilingKey);
     context->SetTilingKey(tilingKey);
 
@@ -2445,6 +2617,9 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
     // activation、activation_params 和 topk_weights_type。
     OP_TILING_CHECK(CheckAndSetIndependentAttrs(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "independent attributes are invalid."), return ge::GRAPH_FAILED);
+    // scales 的 descriptor/shape 判空必须先于后续 dtype、format 和 shape 校验。
+    OP_TILING_CHECK(CheckScalesInput(context, config, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "scales input requirements are not satisfied."), return ge::GRAPH_FAILED);
 
     // Tensor 契约：不读取 attr；先确定 weight/scale 组织形式，再校验 dtype、format 和 shape。
     MegaMoeExpertParams expertParams = MakeExpertParams(config);
@@ -2457,12 +2632,8 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
         OP_LOGE(nodeName, "expert execution parameters are invalid."), return ge::GRAPH_FAILED);
 
     // 容量属性：num_max_tokens_per_rank、max_recv_token_num 和 ccl_buffer_size。
-    OP_TILING_CHECK(CheckAndSetMaxTokensPerRankAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "maximum tokens per rank is invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckAndSetMaxRecvTokenNumAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "maximum received token count is invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckCclBufferCapacity(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CCL buffer capacity is insufficient."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckAndSetCapacityAttrs(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "capacity attributes are invalid."), return ge::GRAPH_FAILED);
 
     // 平台与资源规划。
     uint32_t aicNum = 0U;
@@ -2473,7 +2644,7 @@ ge::graphStatus MegaMoeTilingFuncImplPublic(gert::TilingContext *context, MegaMo
     SetPrefetchAndWaveParams(tilingData, aicNum);
     SetAdaptiveBufferConfigs(context, config, expertParams, tilingData, static_cast<uint32_t>(ubSize));
 
-    return CommitTilingResult(context, expertParams, tilingData, nodeName);
+    return CommitTilingResult(context, config, expertParams, tilingData, nodeName);
 }
 
 /*

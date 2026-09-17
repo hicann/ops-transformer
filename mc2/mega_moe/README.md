@@ -699,14 +699,14 @@
   <tr>
    <td>sharedWeight1</td>
    <td>可选输入</td>
-   <td>共享专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。</td>
+   <td>共享专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。数据类型必须与MoE专家第一线性层权重weight1的数据类型一致。</td>
    <td>FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
    <td>ND、FRACTAL_NZ、FORMAT_FRACTAL_NZ_C0_32</td>
   </tr>
   <tr>
    <td>sharedWeight2</td>
    <td>可选输入</td>
-   <td>共享专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型与weight1一致。</td>
+   <td>共享专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型必须与MoE专家第二线性层权重weight2的数据类型一致。</td>
    <td>FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
    <td>ND、FRACTAL_NZ、FORMAT_FRACTAL_NZ_C0_32</td>
   </tr>
