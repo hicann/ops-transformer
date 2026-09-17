@@ -154,9 +154,11 @@ def three_way_report(name, npu_out, golden_out, ref_out, data_type):
     RATIO = {"MARE": 10.0, "MERE": 2.0, "RMSE": 2.0}
     err = ERR_BY_DTYPE[data_type]
     error = ERROR_BY_DTYPE[data_type]
-    a = npu_out.detach().cpu().float()
-    b = golden_out.detach().cpu().float()
-    c = ref_out.detach().cpu().float()
+    # 统一 flatten：NPU 输出与 golden 形状可能不同（如 d_x: NPU (B,S,H) vs golden (T,H)），
+    # 逐元素比较前先拉平，避免 mask/广播形状不匹配。
+    a = npu_out.detach().cpu().float().reshape(-1)
+    b = golden_out.detach().cpu().float().reshape(-1)
+    c = ref_out.detach().cpu().float().reshape(-1)
     if a.numel() == 0:
         print_log(f"[three-way] {name}: empty output, skip")
         return {"status": "PASS", "ratios": {"MARE": 0.0, "MERE": 0.0, "RMSE": 0.0}}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
@@ -205,13 +206,13 @@ def _vf_scatter_backward(
                 offset = sc_offset + t_idx * d_deal_size + d_offset
                 vreg_softmax_score = vf.load_align(softmax_score_tile, offset)
                 vreg_kv = vf.load_align(kv_tile, offset)
-                # TwoSum(kv, -w): s=fl(kv-w); z=fl(s-kv); e=(kv-(s-z)) - (w+z)
-                vreg_s = vf.sub(vreg_kv, vreg_w, mask)
-                vreg_z = vf.sub(vreg_s, vreg_kv, mask)
-                vreg_a = vf.sub(vreg_s, vreg_z, mask)
-                vreg_b = vf.sub(vreg_kv, vreg_a, mask)
-                vreg_c = vf.add(vreg_w, vreg_z, mask)
-                vreg_e = vf.sub(vreg_b, vreg_c, mask)
+                # TwoSum 精确分解 kv − w = s + e
+                vreg_s = vf.sub(vreg_kv, vreg_w, mask)  # s = fl(kv − w)
+                vreg_z = vf.sub(vreg_s, vreg_kv, mask)  # z = fl(s − kv)
+                vreg_a = vf.sub(vreg_s, vreg_z, mask)  # a = fl(s − z)
+                vreg_b = vf.sub(vreg_kv, vreg_a, mask)  # b = fl(kv − a)
+                vreg_c = vf.add(vreg_w, vreg_z, mask)  # c = fl(w + z)
+                vreg_e = vf.sub(vreg_b, vreg_c, mask)  # e = fl(b − c) 补偿项
                 # d_score = sm * (dC*s + dC*e)（两项乘积分别舍入，保留低半）
                 vreg_p1 = vf.mul(vreg_d_cmp_kv, vreg_s, mask)
                 vreg_p2 = vf.mul(vreg_d_cmp_kv, vreg_e, mask)
@@ -336,13 +337,13 @@ def _vf_reduce_dscore_to_ape(
                 block_off = k * block_stride
                 row_off = block_off + m * row_stride + half_off
                 vreg_d_score = vf.load_align(d_score_tile + row_off, 0)
-                # Kahan: y = x - c; t = s + y; c = (t - s) - y; s = t
-                vreg_y = vf.sub(vreg_d_score, ape_comp, mask)
-                vreg_t = vf.add(ape_reg, vreg_y, mask)
-                vreg_c = vf.sub(vreg_t, ape_reg, mask)
-                vreg_c = vf.sub(vreg_c, vreg_y, mask)
-                ape_reg = vf.move(vreg_t, mask)
-                ape_comp = vf.move(vreg_c, mask)
+                # Kahan 补偿累加（s 累加和，c 补偿项）
+                vreg_y = vf.sub(vreg_d_score, ape_comp, mask)  # y = x − c
+                vreg_t = vf.add(ape_reg, vreg_y, mask)  # t = s + y
+                vreg_c = vf.sub(vreg_t, ape_reg, mask)  # c = (t − s) − y
+                vreg_c = vf.sub(vreg_c, vreg_y, mask)  # c = c − y
+                ape_reg = vf.move(vreg_t, mask)  # s = t
+                ape_comp = vf.move(vreg_c, mask)  # c 更新
             vf.store_align(ape_tile + ape_off, ape_reg, mask)
     vf.mem_bar(mode=pl.MemBarMode.VST_VLD)
 
@@ -530,22 +531,11 @@ def _skip_blocks(block_count, b_idx, sc_idx, start_pos, seq_used, cu_seqlens, ct
 #  Phase 2 matmul sub-functions（从 kernel 提取，coff=1/2 统一）
 # ================================================================
 def _mm1_nl0_block(
-    matmul_ctx,
-    n_tile_rows,
-    d_coff_idx,
-    dx_row_off,
-    h,
-    w_idx,
-    n_l0,
-    cv_l0b,
-    cv_l0c,
-    w_l1,
-    l0a,
-    d_x_result_gm,
+    matmul_ctx, mx, n_tile_rows, d_coff_idx, dx_row_off, h, w_idx, n_l0, w_l1, l0a
 ):
     """mm1 nL0 内层：L0B/L0C 轮转 + matmul（w_idx=0 首次写，w_idx=1 累加）+ store dX partial"""
-    l0b = cv_l0b.next()
-    l0c = cv_l0c.next()
+    l0b = mx.cv_l0b.next()
+    l0c = mx.cv_l0c.next()
     pl.set_validshape(l0b, [D_BASE_SIZE, H_BASE_SIZE])
     pl.set_validshape(l0c, [n_tile_rows, H_BASE_SIZE])
     pl.move(l0b, w_l1, offset=[0, n_l0])
@@ -556,29 +546,10 @@ def _mm1_nl0_block(
     else:
         if n_tile_rows > 0:
             pl.matmul_acc(l0c, l0c, l0a, l0b)
-        pl.store(d_x_result_gm, l0c, [d_coff_idx, dx_row_off, h + n_l0])
+        pl.store(mx.d_x_result_gm, l0c, [d_coff_idx, dx_row_off, h + n_l0])
 
 
-def _mm1_sub_tile(
-    matmul_ctx,
-    h,
-    w_idx,
-    sub_vec_idx,
-    db_idx,
-    cv_l0a,
-    cv_l0b,
-    cv_l0c,
-    l1_w_db,
-    l1_kv0,
-    l1_kv1,
-    l1_sb0,
-    l1_sb1,
-    wkv_t,
-    wgate_t,
-    d_x_result_gm,
-    n_start,
-    dx_row_base,
-):
+def _mm1_sub_tile(matmul_ctx, mx, h, w_idx, sub_vec_idx, db_idx, n_start, dx_row_base):
     """mm1 单个 (wIdx, subVecIdx) 块：L0A 搬移 + w 权重加载 + nL0 内层 matmul"""
     n_tile_rows = (
         matmul_ctx.n_tile_rows0 if sub_vec_idx == 0 else matmul_ctx.n_tile_rows1
@@ -588,13 +559,15 @@ def _mm1_sub_tile(
         sub_vec_idx * matmul_ctx.deal_sc_num * matmul_ctx.cmp_ratio if Coff == 1 else 0
     )
     d_coff_idx = 0 if Coff == 1 else sub_vec_idx
-    l0a = cv_l0a.next()
+    l0a = mx.cv_l0a.next()
     pl.set_validshape(l0a, [n_tile_rows, D_BASE_SIZE])
-    w_l1 = l1_w_db.next() if (sub_vec_idx == 0 or Coff == 2) else l1_w_db.current()
+    w_l1 = (
+        mx.l1_w_db.next() if (sub_vec_idx == 0 or Coff == 2) else mx.l1_w_db.current()
+    )
     src_l1 = (
-        (l1_kv0 if sub_vec_idx == 0 else l1_kv1)
+        (mx.l1_kv0 if sub_vec_idx == 0 else mx.l1_kv1)
         if w_idx == 0
-        else (l1_sb0 if sub_vec_idx == 0 else l1_sb1)
+        else (mx.l1_sb0 if sub_vec_idx == 0 else mx.l1_sb1)
     )
     pl.set_validshape(src_l1, [n_tile_rows, D_BASE_SIZE])
     pl.move(l0a, src_l1)
@@ -602,23 +575,21 @@ def _mm1_sub_tile(
     if sub_vec_idx == 0 or Coff == 2:
         w_row_off = 0 if Coff == 1 else sub_vec_idx * matmul_ctx.head_dim
         if w_idx == 0:
-            pl.load(w_l1, wkv_t, [n_start + w_row_off, h])
+            pl.load(w_l1, mx.wkv_t, [n_start + w_row_off, h])
         else:
-            pl.load(w_l1, wgate_t, [n_start + w_row_off, h])
+            pl.load(w_l1, mx.wgate_t, [n_start + w_row_off, h])
     for n_l0 in pl.range(0, H_L1_BASE_SIZE, H_BASE_SIZE):
         _mm1_nl0_block(
             matmul_ctx,
+            mx,
             n_tile_rows,
             d_coff_idx,
             dx_row_base + m_off,
             h,
             w_idx,
             n_l0,
-            cv_l0b,
-            cv_l0c,
             w_l1,
             l0a,
-            d_x_result_gm,
         )
 
 
@@ -647,142 +618,84 @@ def _compute_dx_partial(
     dx_row_base = (
         db_idx * matmul_ctx.cube_core_num + cube_core_idx
     ) * matmul_ctx.cube_m_base_size
+    mx = pl.make_tuple(
+        cv_l0a=cv_l0a,
+        cv_l0b=cv_l0b,
+        cv_l0c=cv_l0c,
+        l1_w_db=l1_w_db,
+        l1_kv0=l1_kv0,
+        l1_kv1=l1_kv1,
+        l1_sb0=l1_sb0,
+        l1_sb1=l1_sb1,
+        wkv_t=wkv_t,
+        wgate_t=wgate_t,
+        d_x_result_gm=d_x_result_gm,
+    )
     for h in pl.range(0, matmul_ctx.hidden_size, H_L1_BASE_SIZE):
         for w_idx in pl.range(0, 2):
             for sub_vec_idx in pl.range(0, 2):
                 _mm1_sub_tile(
-                    matmul_ctx,
-                    h,
-                    w_idx,
-                    sub_vec_idx,
-                    db_idx,
-                    cv_l0a,
-                    cv_l0b,
-                    cv_l0c,
-                    l1_w_db,
-                    l1_kv0,
-                    l1_kv1,
-                    l1_sb0,
-                    l1_sb1,
-                    wkv_t,
-                    wgate_t,
-                    d_x_result_gm,
-                    n_start,
-                    dx_row_base,
+                    matmul_ctx, mx, h, w_idx, sub_vec_idx, db_idx, n_start, dx_row_base
                 )
 
 
-def _mm2_store(
-    matmul_ctx,
-    round_idx,
-    w_idx,
-    row_off,
-    col_off,
-    l0c,
-    d_wkv_result_gm,
-    d_w_gate_result_gm,
-):
+def _mm2_store(mm, w_idx, row_off, col_off, l0c):
     """mm2 单个 (wIdx) 结果写回：round 0 覆盖写 / round 1+ 原子加（跨轮累加）"""
     if w_idx == 0:
-        if round_idx == 0:
-            pl.store(d_wkv_result_gm, l0c, [row_off, col_off])
+        if mm.round_idx == 0:
+            pl.store(mm.d_wkv_result_gm, l0c, [row_off, col_off])
         else:
             pl.store(
-                d_wkv_result_gm, l0c, [row_off, col_off], atomic=pl.AtomicType.AtomicAdd
+                mm.d_wkv_result_gm,
+                l0c,
+                [row_off, col_off],
+                atomic=pl.AtomicType.AtomicAdd,
             )
     else:
-        if round_idx == 0:
-            pl.store(d_w_gate_result_gm, l0c, [row_off, col_off])
+        if mm.round_idx == 0:
+            pl.store(mm.d_w_gate_result_gm, l0c, [row_off, col_off])
         else:
             pl.store(
-                d_w_gate_result_gm,
+                mm.d_w_gate_result_gm,
                 l0c,
                 [row_off, col_off],
                 atomic=pl.AtomicType.AtomicAdd,
             )
 
 
-def _mm2_l0a_load(
-    matmul_ctx,
-    sub_vec_idx,
-    w_idx,
-    n_tile_rows,
-    m_start,
-    h,
-    l0a,
-    w_l1,
-    l1_kv0_t,
-    l1_kv1_t,
-    l1_sb0_t,
-    l1_sb1_t,
-    x_arrange_gm,
-):
+def _mm2_l0a_load(matmul_ctx, mm, sub_vec_idx, w_idx, n_tile_rows, h, l0a, w_l1):
     """mm2 nL0==0 时：L0A 搬移（dkv/dsb 半区）+ x 权重加载到 L1W（w_idx==0 时）"""
     src_l1 = (
-        (l1_kv0_t if sub_vec_idx == 0 else l1_kv1_t)
+        (mm.l1_kv0_t if sub_vec_idx == 0 else mm.l1_kv1_t)
         if w_idx == 0
-        else (l1_sb0_t if sub_vec_idx == 0 else l1_sb1_t)
+        else (mm.l1_sb0_t if sub_vec_idx == 0 else mm.l1_sb1_t)
     )
     pl.set_validshape(src_l1, [D_BASE_SIZE, n_tile_rows])
     pl.move(l0a, src_l1)
     if w_idx == 0:
         x_off = (
-            m_start + sub_vec_idx * matmul_ctx.deal_sc_num * matmul_ctx.cmp_ratio
+            mm.m_start + sub_vec_idx * matmul_ctx.deal_sc_num * matmul_ctx.cmp_ratio
             if Coff == 1
-            else m_start
+            else mm.m_start
         )
         if Coff == 2 and sub_vec_idx == 0:
             x_off = x_off - matmul_ctx.cmp_ratio
         pl.set_validshape(w_l1, [n_tile_rows, H_L1_BASE_SIZE])
-        pl.load(w_l1, x_arrange_gm, [matmul_ctx.intra_group_idx, x_off, h])
+        pl.load(w_l1, mm.x_arrange_gm, [matmul_ctx.intra_group_idx, x_off, h])
 
 
-def _mm2_core(
-    matmul_ctx,
-    round_idx,
-    sub_vec_idx,
-    w_idx,
-    n_l0,
-    h,
-    dw_row_base,
-    m_start,
-    cv_l0a,
-    cv_l0b,
-    cv_l0c,
-    l1_w_db,
-    l1_kv0_t,
-    l1_kv1_t,
-    l1_sb0_t,
-    l1_sb1_t,
-    x_arrange_gm,
-    d_wkv_result_gm,
-    d_w_gate_result_gm,
-):
+def _mm2_core(matmul_ctx, mm, sub_vec_idx, w_idx, n_l0, h):
     """mm2 单个 (wIdx) 核心：L0A/L0B/L0C 轮转 + matmul + 结果写回"""
     n_tile_rows = (
         matmul_ctx.n_tile_rows0 if sub_vec_idx == 0 else matmul_ctx.n_tile_rows1
     )
-    l0a = cv_l0a.next()
+    l0a = mm.cv_l0a.next()
     pl.set_validshape(l0a, [D_BASE_SIZE, n_tile_rows])
-    w_l1 = l1_w_db.next() if (n_l0 == 0 and w_idx == 0) else l1_w_db.current()
+    w_l1 = mm.l1_w_db.next() if (n_l0 == 0 and w_idx == 0) else mm.l1_w_db.current()
     if n_l0 == 0:
-        _mm2_l0a_load(
-            matmul_ctx,
-            sub_vec_idx,
-            w_idx,
-            n_tile_rows,
-            m_start,
-            h,
-            l0a,
-            w_l1,
-            l1_kv0_t,
-            l1_kv1_t,
-            l1_sb0_t,
-            l1_sb1_t,
-            x_arrange_gm,
-        )
-    l0b = cv_l0b.next() if w_idx == 0 else cv_l0b.current()
-    l0c = cv_l0c.next()
+        _mm2_l0a_load(matmul_ctx, mm, sub_vec_idx, w_idx, n_tile_rows, h, l0a, w_l1)
+    l0b = mm.cv_l0b.next() if w_idx == 0 else mm.cv_l0b.current()
+    l0c = mm.cv_l0c.next()
     pl.set_validshape(l0b, [n_tile_rows, H_BASE_SIZE])
     pl.set_validshape(l0c, [D_BASE_SIZE, H_BASE_SIZE])
     pl.move(l0b, w_l1, offset=[0, n_l0])
@@ -793,104 +706,19 @@ def _mm2_core(
         pl.matmul(l0c, l0a, l0b)
     if sub_vec_idx == 1 or Coff == 2:
         dw_row_off = 0 if Coff == 1 else sub_vec_idx * matmul_ctx.head_dim
-        _mm2_store(
-            matmul_ctx,
-            round_idx,
-            w_idx,
-            dw_row_base + dw_row_off,
-            h + n_l0,
-            l0c,
-            d_wkv_result_gm,
-            d_w_gate_result_gm,
-        )
+        _mm2_store(mm, w_idx, mm.dw_row_base + dw_row_off, h + n_l0, l0c)
 
 
-def _mm2_sub_block(
-    matmul_ctx,
-    round_idx,
-    sub_vec_idx,
-    n_l0,
-    h,
-    dw_row_base,
-    m_start,
-    cv_l0a,
-    cv_l0b,
-    cv_l0c,
-    l1_w_db,
-    l1_kv0_t,
-    l1_kv1_t,
-    l1_sb0_t,
-    l1_sb1_t,
-    x_arrange_gm,
-    d_wkv_result_gm,
-    d_w_gate_result_gm,
-):
+def _mm2_sub_block(matmul_ctx, mm, sub_vec_idx, n_l0, h):
     """mm2 nL0 块：wIdx（wkv/wgate）遍历"""
     for w_idx in pl.range(0, 2):
-        _mm2_core(
-            matmul_ctx,
-            round_idx,
-            sub_vec_idx,
-            w_idx,
-            n_l0,
-            h,
-            dw_row_base,
-            m_start,
-            cv_l0a,
-            cv_l0b,
-            cv_l0c,
-            l1_w_db,
-            l1_kv0_t,
-            l1_kv1_t,
-            l1_sb0_t,
-            l1_sb1_t,
-            x_arrange_gm,
-            d_wkv_result_gm,
-            d_w_gate_result_gm,
-        )
+        _mm2_core(matmul_ctx, mm, sub_vec_idx, w_idx, n_l0, h)
 
 
-def _mm2_sub_vec(
-    matmul_ctx,
-    round_idx,
-    sub_vec_idx,
-    h,
-    dw_row_base,
-    m_start,
-    cv_l0a,
-    cv_l0b,
-    cv_l0c,
-    l1_w_db,
-    l1_kv0_t,
-    l1_kv1_t,
-    l1_sb0_t,
-    l1_sb1_t,
-    x_arrange_gm,
-    d_wkv_result_gm,
-    d_w_gate_result_gm,
-):
+def _mm2_sub_vec(matmul_ctx, mm, sub_vec_idx, h):
     """mm2 subVecIdx 块：nL0 遍历"""
     for n_l0 in pl.range(0, H_L1_BASE_SIZE, H_BASE_SIZE):
-        _mm2_sub_block(
-            matmul_ctx,
-            round_idx,
-            sub_vec_idx,
-            n_l0,
-            h,
-            dw_row_base,
-            m_start,
-            cv_l0a,
-            cv_l0b,
-            cv_l0c,
-            l1_w_db,
-            l1_kv0_t,
-            l1_kv1_t,
-            l1_sb0_t,
-            l1_sb1_t,
-            x_arrange_gm,
-            d_wkv_result_gm,
-            d_w_gate_result_gm,
-        )
+        _mm2_sub_block(matmul_ctx, mm, sub_vec_idx, n_l0, h)
 
 
 def _compute_dw_partial(
@@ -928,32 +756,27 @@ def _compute_dw_partial(
         + group_idx * matmul_ctx.group_row_stride
         + (Coff - 1) * matmul_ctx.cmp_ratio
     )
+    mm = pl.make_tuple(
+        round_idx=round_idx,
+        dw_row_base=dw_row_base,
+        m_start=m_start,
+        cv_l0a=cv_l0a,
+        cv_l0b=cv_l0b,
+        cv_l0c=cv_l0c,
+        l1_w_db=l1_w_db,
+        l1_kv0_t=l1_kv0_t,
+        l1_kv1_t=l1_kv1_t,
+        l1_sb0_t=l1_sb0_t,
+        l1_sb1_t=l1_sb1_t,
+        x_arrange_gm=x_arrange_gm,
+        d_wkv_result_gm=d_wkv_result_gm,
+        d_w_gate_result_gm=d_w_gate_result_gm,
+    )
     for h in pl.range(0, matmul_ctx.hidden_size, H_L1_BASE_SIZE):
         for sub_vec_idx in pl.range(0, 2):
-            _mm2_sub_vec(
-                matmul_ctx,
-                round_idx,
-                sub_vec_idx,
-                h,
-                dw_row_base,
-                m_start,
-                cv_l0a,
-                cv_l0b,
-                cv_l0c,
-                l1_w_db,
-                l1_kv0_t,
-                l1_kv1_t,
-                l1_sb0_t,
-                l1_sb1_t,
-                x_arrange_gm,
-                d_wkv_result_gm,
-                d_w_gate_result_gm,
-            )
+            _mm2_sub_vec(matmul_ctx, mm, sub_vec_idx, h)
 
 
-# ================================================================
-#  Phase 3 reduce sub-functions（从 kernel 提取）
-# ================================================================
 def _reduce_ape(
     vec_ctx,
     core_idx,
@@ -1198,80 +1021,58 @@ def _cast_to_l1_channel(
         pl.move(tile_nz_md_cur, temp_tile)
 
 
-def _cast_dkv_dsb_to_l1(
-    vec_ctx,
-    n_tile_rows,
-    deal_tc_size,
-    sub_idx,
-    tile_temp,
-    tile_dkv_cast,
-    tile_dkv_cast_md,
-    tile_dkv_nz,
-    tile_dkv_nz_md_prev,
-    tile_dkv_nz_md_cur,
-    tile_dsb_cast,
-    tile_dsb_cast_md,
-    tile_dsb_nz,
-    tile_softmax,
-    tile_dsb_nz_md_prev,
-    tile_dsb_nz_md_cur,
-    temp_tile_group,
-    l1_kv0_g,
-    l1_kv1_g,
-    l1_sb0_g,
-    l1_sb1_g,
-):
+def _cast_dkv_dsb_to_l1(cl):
     """Phase 1: dkv/dsb FP32→FP16 cast + ND→NZ + insert L1（coff=1/2 统一）"""
-    d_deal_size = vec_ctx.d_deal_size
-    cmp_ratio = vec_ctx.cmp_ratio
+    d_deal_size = cl.vec_ctx.d_deal_size
+    cmp_ratio = cl.vec_ctx.cmp_ratio
     # dkv 通路
     _cast_to_l1_channel(
-        vec_ctx,
-        n_tile_rows,
-        deal_tc_size,
-        tile_dkv_cast,
-        tile_dkv_nz,
-        tile_dkv_cast_md,
-        tile_dkv_nz_md_prev,
-        tile_dkv_nz_md_cur,
-        tile_temp,
-        temp_tile_group,
+        cl.vec_ctx,
+        cl.n_tile_rows,
+        cl.deal_tc_size,
+        cl.tile_dkv_cast,
+        cl.tile_dkv_nz,
+        cl.tile_dkv_cast_md,
+        cl.tile_dkv_nz_md_prev,
+        cl.tile_dkv_nz_md_cur,
+        cl.tile_temp,
+        cl.temp_tile_group,
     )
     # dsb 通路
     _cast_to_l1_channel(
-        vec_ctx,
-        n_tile_rows,
-        deal_tc_size,
-        tile_dsb_cast,
-        tile_dsb_nz,
-        tile_dsb_cast_md,
-        tile_dsb_nz_md_prev,
-        tile_dsb_nz_md_cur,
-        tile_softmax,
-        temp_tile_group,
+        cl.vec_ctx,
+        cl.n_tile_rows,
+        cl.deal_tc_size,
+        cl.tile_dsb_cast,
+        cl.tile_dsb_nz,
+        cl.tile_dsb_cast_md,
+        cl.tile_dsb_nz_md_prev,
+        cl.tile_dsb_nz_md_cur,
+        cl.tile_softmax,
+        cl.temp_tile_group,
     )
     # insert L1
     if Coff == 1:
-        l1_kv = l1_kv0_g.next() if sub_idx == 0 else l1_kv1_g.next()
-        l1_sb = l1_sb0_g.next() if sub_idx == 0 else l1_sb1_g.next()
-        pl.set_validshape(l1_kv, [n_tile_rows, d_deal_size])
-        pl.set_validshape(l1_sb, [n_tile_rows, d_deal_size])
-        pl.insert(l1_kv, tile_dkv_nz, [0, 0])
-        pl.insert(l1_sb, tile_dsb_nz, [0, 0])
+        l1_kv = cl.l1_kv0_g.next() if cl.sub_idx == 0 else cl.l1_kv1_g.next()
+        l1_sb = cl.l1_sb0_g.next() if cl.sub_idx == 0 else cl.l1_sb1_g.next()
+        pl.set_validshape(l1_kv, [cl.n_tile_rows, d_deal_size])
+        pl.set_validshape(l1_sb, [cl.n_tile_rows, d_deal_size])
+        pl.insert(l1_kv, cl.tile_dkv_nz, [0, 0])
+        pl.insert(l1_sb, cl.tile_dsb_nz, [0, 0])
     else:
-        l1_kv0 = l1_kv0_g.next()
-        l1_kv1 = l1_kv1_g.next()
-        l1_sb0 = l1_sb0_g.next()
-        l1_sb1 = l1_sb1_g.next()
-        col_offset = 0 if sub_idx == 0 else d_deal_size
-        pl.set_validshape(l1_kv0, [deal_tc_size * cmp_ratio, D_BASE_SIZE])
-        pl.set_validshape(l1_kv1, [deal_tc_size * cmp_ratio, D_BASE_SIZE])
-        pl.set_validshape(l1_sb0, [deal_tc_size * cmp_ratio, D_BASE_SIZE])
-        pl.set_validshape(l1_sb1, [deal_tc_size * cmp_ratio, D_BASE_SIZE])
-        pl.insert(l1_kv0, tile_dkv_nz_md_prev, [0, col_offset])
-        pl.insert(l1_kv1, tile_dkv_nz_md_cur, [0, col_offset])
-        pl.insert(l1_sb0, tile_dsb_nz_md_prev, [0, col_offset])
-        pl.insert(l1_sb1, tile_dsb_nz_md_cur, [0, col_offset])
+        l1_kv0 = cl.l1_kv0_g.next()
+        l1_kv1 = cl.l1_kv1_g.next()
+        l1_sb0 = cl.l1_sb0_g.next()
+        l1_sb1 = cl.l1_sb1_g.next()
+        col_offset = 0 if cl.sub_idx == 0 else d_deal_size
+        pl.set_validshape(l1_kv0, [cl.deal_tc_size * cmp_ratio, D_BASE_SIZE])
+        pl.set_validshape(l1_kv1, [cl.deal_tc_size * cmp_ratio, D_BASE_SIZE])
+        pl.set_validshape(l1_sb0, [cl.deal_tc_size * cmp_ratio, D_BASE_SIZE])
+        pl.set_validshape(l1_sb1, [cl.deal_tc_size * cmp_ratio, D_BASE_SIZE])
+        pl.insert(l1_kv0, cl.tile_dkv_nz_md_prev, [0, col_offset])
+        pl.insert(l1_kv1, cl.tile_dkv_nz_md_cur, [0, col_offset])
+        pl.insert(l1_sb0, cl.tile_dsb_nz_md_prev, [0, col_offset])
+        pl.insert(l1_sb1, cl.tile_dsb_nz_md_cur, [0, col_offset])
 
 
 def _reduce_dx_ws_offset(
@@ -1295,62 +1096,54 @@ def _reduce_dx_ws_offset(
     )
 
 
-def _reduce_dx_setup(
-    vec_ctx,
-    core_idx,
-    round_idx,
-    b_idx_start,
-    sc_idx_start,
-    b_idx_end,
-    sc_idx_end,
-    start_pos,
-    seq_used,
-    cu_seqlens,
-    seq_ctx,
-):
+def _reduce_dx_setup(rds):
     """行分片与轮节点计算：返回 7 元组（myRowS/myRowE/startTidx/roundEndScIdx/bStart/sStart/prevScIdx）"""
-    core_num = vec_ctx.core_num
-    round_cnt = vec_ctx.round_cnt
-    cmp_ratio = vec_ctx.cmp_ratio
-    batch_size = vec_ctx.batch_size
+    core_num = rds.vec_ctx.core_num
+    round_cnt = rds.vec_ctx.round_cnt
+    cmp_ratio = rds.vec_ctx.cmp_ratio
+    batch_size = rds.vec_ctx.batch_size
     # start 节点局部副本（避免别名修改传入的 scIdxStart）
-    start_sc_idx = sc_idx_start
+    start_sc_idx = rds.sc_idx_start
     prev_sc_idx = 0
     if Coff == 2 and start_sc_idx != 0:
         start_sc_idx -= 1
         prev_sc_idx += 1
-    b_start = b_idx_start
-    b_end = b_idx_end - 1 if sc_idx_end == 0 else b_idx_end
+    b_start = rds.b_idx_start
+    b_end = rds.b_idx_end - 1 if rds.sc_idx_end == 0 else rds.b_idx_end
     s_start = (
         0
         if start_sc_idx == 0
         else start_sc_idx * cmp_ratio
-        - (_get_start_pos(b_start, start_pos, seq_ctx) % cmp_ratio)
+        - (_get_start_pos(b_start, rds.start_pos, rds.seq_ctx) % cmp_ratio)
     )
     s_end = (
-        _get_seq_length(b_end, cu_seqlens, seq_ctx)
-        if sc_idx_end == 0
-        else sc_idx_end * cmp_ratio
-        - (_get_start_pos(b_end, start_pos, seq_ctx) % cmp_ratio)
+        _get_seq_length(b_end, rds.cu_seqlens, rds.seq_ctx)
+        if rds.sc_idx_end == 0
+        else rds.sc_idx_end * cmp_ratio
+        - (_get_start_pos(b_end, rds.start_pos, rds.seq_ctx) % cmp_ratio)
     )
-    if round_idx == round_cnt - 1:
+    if rds.round_idx == round_cnt - 1:
         b_end = batch_size - 1
-        s_end = _get_seq_length(b_end, cu_seqlens, seq_ctx)
-    total_rows = _get_row_count(b_start, s_start, b_end, s_end, cu_seqlens, seq_ctx)
+        s_end = _get_seq_length(b_end, rds.cu_seqlens, rds.seq_ctx)
+    total_rows = _get_row_count(
+        b_start, s_start, b_end, s_end, rds.cu_seqlens, rds.seq_ctx
+    )
     rows_per_core = total_rows // core_num
     rows_remain = total_rows % core_num
-    my_row_s = core_idx * rows_per_core + (
-        core_idx if core_idx < rows_remain else rows_remain
+    my_row_s = rds.core_idx * rows_per_core + (
+        rds.core_idx if rds.core_idx < rows_remain else rows_remain
     )
-    my_row_e = my_row_s + rows_per_core + (1 if core_idx < rows_remain else 0)
+    my_row_e = my_row_s + rows_per_core + (1 if rds.core_idx < rows_remain else 0)
     round_end_sc_idx = (
-        _get_cmp_block_count(b_end, s_end, start_pos, seq_used, cu_seqlens, seq_ctx)
+        _get_cmp_block_count(
+            b_end, s_end, rds.start_pos, rds.seq_used, rds.cu_seqlens, rds.seq_ctx
+        )
         - _get_cmp_block_count(
-            b_start, s_start, start_pos, seq_used, cu_seqlens, seq_ctx
+            b_start, s_start, rds.start_pos, rds.seq_used, rds.cu_seqlens, rds.seq_ctx
         )
         - 1
     )
-    start_tidx = _get_token_idx(b_start, s_start, cu_seqlens, seq_ctx)
+    start_tidx = _get_token_idx(b_start, s_start, rds.cu_seqlens, rds.seq_ctx)
     return (
         my_row_s,
         my_row_e,
@@ -1362,117 +1155,101 @@ def _reduce_dx_setup(
     )
 
 
-def _reduce_dx_row(
-    vec_ctx,
-    db_idx,
-    prev_sc_idx,
-    p3l_sc_idx,
-    round_end_sc_idx,
-    batch_end_sc_idx,
-    sc_inner_idx,
-    reduce_acc,
-    reduce_ld_group,
-    d_x_cache_gm,
-    d_x_result_gm,
-):
+def _reduce_dx_row(rdr):
     """单行压缩区累加：跨轮 cache 起算或 result 槽位起算 + 组间累加 + coff=2 下一块累加"""
-    cube_core_num = vec_ctx.cube_core_num
-    hidden_size = vec_ctx.hidden_size
-    group_size = vec_ctx.group_size
-    if p3l_sc_idx < prev_sc_idx:
-        ws_offset = db_idx * cube_core_num * vec_ctx.cube_m_base_size + sc_inner_idx
-        pl.set_validshape(reduce_acc, [1, hidden_size])
+    cube_core_num = rdr.vec_ctx.cube_core_num
+    hidden_size = rdr.vec_ctx.hidden_size
+    group_size = rdr.vec_ctx.group_size
+    if rdr.p3l_sc_idx < rdr.prev_sc_idx:
+        ws_offset = (
+            rdr.db_idx * cube_core_num * rdr.vec_ctx.cube_m_base_size + rdr.sc_inner_idx
+        )
+        pl.set_validshape(rdr.reduce_acc, [1, hidden_size])
         pl.load(
-            reduce_acc, d_x_cache_gm, [db_idx * vec_ctx.cmp_ratio + sc_inner_idx, 0]
+            rdr.reduce_acc,
+            rdr.d_x_cache_gm,
+            [rdr.db_idx * rdr.vec_ctx.cmp_ratio + rdr.sc_inner_idx, 0],
         )
         for r in pl.range(0, group_size):
-            reduce_ld = reduce_ld_group.next()
+            reduce_ld = rdr.reduce_ld_group.next()
             pl.set_validshape(reduce_ld, [1, hidden_size])
             pl.load(
                 reduce_ld,
-                d_x_result_gm,
-                [0, ws_offset + r * vec_ctx.cube_m_base_size, 0],
+                rdr.d_x_result_gm,
+                [0, ws_offset + r * rdr.vec_ctx.cube_m_base_size, 0],
             )
-            pl.add(reduce_acc, reduce_acc, reduce_ld)
+            pl.add(rdr.reduce_acc, rdr.reduce_acc, reduce_ld)
     else:
         ws_offset = _reduce_dx_ws_offset(
-            db_idx,
+            rdr.db_idx,
             cube_core_num,
-            vec_ctx.cube_m_base_size,
+            rdr.vec_ctx.cube_m_base_size,
             group_size,
-            vec_ctx.group_deal_sc_num,
-            vec_ctx.cmp_ratio,
-            p3l_sc_idx,
-            prev_sc_idx,
-            sc_inner_idx,
+            rdr.vec_ctx.group_deal_sc_num,
+            rdr.vec_ctx.cmp_ratio,
+            rdr.p3l_sc_idx,
+            rdr.prev_sc_idx,
+            rdr.sc_inner_idx,
         )
-        pl.set_validshape(reduce_acc, [1, hidden_size])
-        pl.load(reduce_acc, d_x_result_gm, [Coff - 1, ws_offset, 0])
+        pl.set_validshape(rdr.reduce_acc, [1, hidden_size])
+        pl.load(rdr.reduce_acc, rdr.d_x_result_gm, [Coff - 1, ws_offset, 0])
         if group_size > 1:
             for r in pl.range(1, group_size):
-                reduce_ld = reduce_ld_group.next()
+                reduce_ld = rdr.reduce_ld_group.next()
                 pl.set_validshape(reduce_ld, [1, hidden_size])
                 pl.load(
                     reduce_ld,
-                    d_x_result_gm,
-                    [Coff - 1, ws_offset + r * vec_ctx.cube_m_base_size, 0],
+                    rdr.d_x_result_gm,
+                    [Coff - 1, ws_offset + r * rdr.vec_ctx.cube_m_base_size, 0],
                 )
-                pl.add(reduce_acc, reduce_acc, reduce_ld)
+                pl.add(rdr.reduce_acc, rdr.reduce_acc, reduce_ld)
         if (
             Coff == 2
-            and p3l_sc_idx != round_end_sc_idx
-            and p3l_sc_idx != batch_end_sc_idx
+            and rdr.p3l_sc_idx != rdr.round_end_sc_idx
+            and rdr.p3l_sc_idx != rdr.batch_end_sc_idx
         ):
-            pl.set_validshape(reduce_acc, [1, hidden_size])
+            pl.set_validshape(rdr.reduce_acc, [1, hidden_size])
             next_ws_offset = _reduce_dx_ws_offset(
-                db_idx,
+                rdr.db_idx,
                 cube_core_num,
-                vec_ctx.cube_m_base_size,
+                rdr.vec_ctx.cube_m_base_size,
                 group_size,
-                vec_ctx.group_deal_sc_num,
-                vec_ctx.cmp_ratio,
-                p3l_sc_idx + 1,
-                prev_sc_idx,
-                sc_inner_idx,
+                rdr.vec_ctx.group_deal_sc_num,
+                rdr.vec_ctx.cmp_ratio,
+                rdr.p3l_sc_idx + 1,
+                rdr.prev_sc_idx,
+                rdr.sc_inner_idx,
             )
             for r in pl.range(0, group_size):
-                reduce_ld = reduce_ld_group.next()
+                reduce_ld = rdr.reduce_ld_group.next()
                 pl.set_validshape(reduce_ld, [1, hidden_size])
                 pl.load(
                     reduce_ld,
-                    d_x_result_gm,
-                    [0, next_ws_offset + r * vec_ctx.cube_m_base_size, 0],
+                    rdr.d_x_result_gm,
+                    [0, next_ws_offset + r * rdr.vec_ctx.cube_m_base_size, 0],
                 )
-                pl.add(reduce_acc, reduce_acc, reduce_ld)
+                pl.add(rdr.reduce_acc, rdr.reduce_acc, reduce_ld)
 
 
-def _reduce_dx_store(
-    vec_ctx,
-    db_idx,
-    p3l_sc_idx,
-    round_end_sc_idx,
-    batch_end_sc_idx,
-    sc_inner_idx,
-    t_idx,
-    reduce_acc,
-    p3_cast,
-    d_x_cache_gm,
-    d_x_out_gm,
-):
+def _reduce_dx_store(rdst, reduce_acc, p3_cast):
     """行结果写回：coff=2 轮末块存 dXCache（下轮跨轮累加），否则 cast+store d_x"""
-    cmp_ratio = vec_ctx.cmp_ratio
-    hidden_size = vec_ctx.hidden_size
-    db_ratio = vec_ctx.db_ratio
-    if Coff == 2 and p3l_sc_idx == round_end_sc_idx and p3l_sc_idx != batch_end_sc_idx:
+    cmp_ratio = rdst.vec_ctx.cmp_ratio
+    hidden_size = rdst.vec_ctx.hidden_size
+    db_ratio = rdst.vec_ctx.db_ratio
+    if (
+        Coff == 2
+        and rdst.p3l_sc_idx == rdst.round_end_sc_idx
+        and rdst.p3l_sc_idx != rdst.batch_end_sc_idx
+    ):
         pl.store(
-            d_x_cache_gm,
+            rdst.d_x_cache_gm,
             reduce_acc,
-            [(db_idx + 1) % db_ratio * cmp_ratio + sc_inner_idx, 0],
+            [(rdst.db_idx + 1) % db_ratio * cmp_ratio + rdst.sc_inner_idx, 0],
         )
     else:
         pl.set_validshape(p3_cast, [1, hidden_size])
         pl.cast(p3_cast, reduce_acc, mode=pl.RoundMode.CAST_ROUND)
-        pl.store(d_x_out_gm, p3_cast, [t_idx, 0])
+        pl.store(rdst.d_x_out_gm, p3_cast, [rdst.t_idx, 0])
 
 
 def _reduce_dx_zero_row(p3_cast, hidden_size, d_x_out_gm, t_idx):
@@ -1485,24 +1262,11 @@ def _reduce_dx_zero_row(p3_cast, hidden_size, d_x_out_gm, t_idx):
     pl.store(d_x_out_gm, p3_cast, [t_idx, 0])
 
 
-def _reduce_dx_advance_batch(
-    vec_ctx,
-    b,
-    local_s,
-    p3l_sc_idx,
-    cmp_limit,
-    b_start,
-    s_start,
-    batch_size,
-    start_pos,
-    seq_used,
-    cu_seqlens,
-    seq_ctx,
-):
+def _reduce_dx_advance_batch(rda, b, local_s, p3l_sc_idx, cmp_limit):
     """跨 batch 转移：前序批有压缩块（cmpLimit>0）→ 块索引 +1；0 块 → 不变。
     返回 8 元组（b/localS/p3lScIdx/bStartPos/bSeqUsed/bSeqLength/cmpLimit/batchEndScIdx）；
     b 越界（==batchSize）时返回哨兵值，由调用方 break。⚠️ local_s 必须重置 0。"""
-    cmp_ratio = vec_ctx.cmp_ratio
+    cmp_ratio = rda.vec_ctx.cmp_ratio
     if cmp_limit > 0:
         p3l_sc_idx += 1
     local_s = 0
@@ -1512,17 +1276,22 @@ def _reduce_dx_advance_batch(
     b_seq_length = 0
     cmp_limit = 0
     batch_end_sc_idx = 0
-    while b < batch_size:
-        b_start_pos = _get_start_pos(b, start_pos, seq_ctx)
-        b_seq_used = _get_seq_used(b, seq_used, cu_seqlens, seq_ctx)
-        b_seq_length = _get_seq_length(b, cu_seqlens, seq_ctx)
+    while b < rda.batch_size:
+        b_start_pos = _get_start_pos(b, rda.start_pos, rda.seq_ctx)
+        b_seq_used = _get_seq_used(b, rda.seq_used, rda.cu_seqlens, rda.seq_ctx)
+        b_seq_length = _get_seq_length(b, rda.cu_seqlens, rda.seq_ctx)
         cmp_limit = (b_start_pos + b_seq_used) // cmp_ratio * cmp_ratio - b_start_pos
         batch_end_sc_idx = (
             _get_cmp_block_count(
-                b, b_seq_used, start_pos, seq_used, cu_seqlens, seq_ctx
+                b, b_seq_used, rda.start_pos, rda.seq_used, rda.cu_seqlens, rda.seq_ctx
             )
             - _get_cmp_block_count(
-                b_start, s_start, start_pos, seq_used, cu_seqlens, seq_ctx
+                rda.b_start,
+                rda.s_start,
+                rda.start_pos,
+                rda.seq_used,
+                rda.cu_seqlens,
+                rda.seq_ctx,
             )
             - 1
         )
@@ -1612,6 +1381,19 @@ def _reduce_dx(
     hidden_size = vec_ctx.hidden_size
     cmp_ratio = vec_ctx.cmp_ratio
     batch_size = vec_ctx.batch_size
+    rds = pl.make_tuple(
+        vec_ctx=vec_ctx,
+        core_idx=core_idx,
+        round_idx=round_idx,
+        b_idx_start=b_idx_start,
+        sc_idx_start=sc_idx_start,
+        b_idx_end=b_idx_end,
+        sc_idx_end=sc_idx_end,
+        start_pos=start_pos,
+        seq_used=seq_used,
+        cu_seqlens=cu_seqlens,
+        seq_ctx=seq_ctx,
+    )
     (
         my_row_s,
         my_row_e,
@@ -1620,19 +1402,7 @@ def _reduce_dx(
         b_start,
         s_start,
         prev_sc_idx,
-    ) = _reduce_dx_setup(
-        vec_ctx,
-        core_idx,
-        round_idx,
-        b_idx_start,
-        sc_idx_start,
-        b_idx_end,
-        sc_idx_end,
-        start_pos,
-        seq_used,
-        cu_seqlens,
-        seq_ctx,
-    )
+    ) = _reduce_dx_setup(rds)
     if my_row_s < my_row_e:
         (
             b,
@@ -1659,32 +1429,32 @@ def _reduce_dx(
         for _ in pl.range(my_row_s, my_row_e):
             in_compress = local_s < cmp_limit
             if in_compress:
-                _reduce_dx_row(
-                    vec_ctx,
-                    db_idx,
-                    prev_sc_idx,
-                    p3l_sc_idx,
-                    round_end_sc_idx,
-                    batch_end_sc_idx,
-                    sc_inner_idx,
-                    reduce_acc,
-                    reduce_ld_group,
-                    d_x_cache_gm,
-                    d_x_result_gm,
+                rdr = pl.make_tuple(
+                    vec_ctx=vec_ctx,
+                    db_idx=db_idx,
+                    prev_sc_idx=prev_sc_idx,
+                    p3l_sc_idx=p3l_sc_idx,
+                    round_end_sc_idx=round_end_sc_idx,
+                    batch_end_sc_idx=batch_end_sc_idx,
+                    sc_inner_idx=sc_inner_idx,
+                    reduce_acc=reduce_acc,
+                    reduce_ld_group=reduce_ld_group,
+                    d_x_cache_gm=d_x_cache_gm,
+                    d_x_result_gm=d_x_result_gm,
                 )
-                _reduce_dx_store(
-                    vec_ctx,
-                    db_idx,
-                    p3l_sc_idx,
-                    round_end_sc_idx,
-                    batch_end_sc_idx,
-                    sc_inner_idx,
-                    t_idx,
-                    reduce_acc,
-                    p3_cast,
-                    d_x_cache_gm,
-                    d_x_out_gm,
+                _reduce_dx_row(rdr)
+                rdst = pl.make_tuple(
+                    vec_ctx=vec_ctx,
+                    db_idx=db_idx,
+                    p3l_sc_idx=p3l_sc_idx,
+                    round_end_sc_idx=round_end_sc_idx,
+                    batch_end_sc_idx=batch_end_sc_idx,
+                    sc_inner_idx=sc_inner_idx,
+                    t_idx=t_idx,
+                    d_x_cache_gm=d_x_cache_gm,
+                    d_x_out_gm=d_x_out_gm,
                 )
+                _reduce_dx_store(rdst, reduce_acc, p3_cast)
             else:
                 if p3l_sc_idx < prev_sc_idx:
                     continue
@@ -1695,6 +1465,16 @@ def _reduce_dx(
                 # ── 跨 batch 转移：压缩块索引全局连续，新批首块是前序批末块的后继。
                 # 前序批有压缩块（cmpLimit>0，此刻 cmpLimit 仍是前序批的值）→ +1；
                 # 前序批 0 块 → 索引不变（块索引跨批不连续，不能无条件 +1）。
+                rda = pl.make_tuple(
+                    vec_ctx=vec_ctx,
+                    b_start=b_start,
+                    s_start=s_start,
+                    batch_size=batch_size,
+                    start_pos=start_pos,
+                    seq_used=seq_used,
+                    cu_seqlens=cu_seqlens,
+                    seq_ctx=seq_ctx,
+                )
                 (
                     b,
                     local_s,
@@ -1704,20 +1484,7 @@ def _reduce_dx(
                     b_seq_length,
                     cmp_limit,
                     batch_end_sc_idx,
-                ) = _reduce_dx_advance_batch(
-                    vec_ctx,
-                    b,
-                    local_s,
-                    p3l_sc_idx,
-                    cmp_limit,
-                    b_start,
-                    s_start,
-                    batch_size,
-                    start_pos,
-                    seq_used,
-                    cu_seqlens,
-                    seq_ctx,
-                )
+                ) = _reduce_dx_advance_batch(rda, b, local_s, p3l_sc_idx, cmp_limit)
                 if b >= batch_size:
                     break
             else:
@@ -1756,120 +1523,83 @@ def _process_mask_fill(
         )
 
 
-def _process_scatter_slice(
-    vec_ctx,
-    round_idx,
-    total_sc_num_per_round,
-    pre_deal_tc_size,
-    processed,
-    b_idx,
-    sc_idx,
-    taken,
-    n_start,
-    b_start_pos,
-    tile_dc_f16,
-    tile_dc_f32,
-    tile_kv,
-    tile_softmax,
-    tile_temp,
-    d_cmp_kv_gm,
-    kv_gm,
-    softmax_score_gm,
-):
-    """单个 taken 块：load dc/kv/sm → cast → VF 反向 → mask cache fill"""
-    cmp_ratio = vec_ctx.cmp_ratio
-    cmp_row_cnt = vec_ctx.cmp_row_cnt
-    d_deal_size = vec_ctx.d_deal_size
+def _process_scatter_slice(ss):
+    """单个 ss.taken 块：load dc/kv/sm → cast → VF 反向 → mask cache fill"""
+    cmp_ratio = ss.vec_ctx.cmp_ratio
+    cmp_row_cnt = ss.vec_ctx.cmp_row_cnt
+    d_deal_size = ss.vec_ctx.d_deal_size
     if Layout == 1:
         global_blk_idx = (
-            round_idx * total_sc_num_per_round + pre_deal_tc_size + processed
+            ss.round_idx * ss.total_sc_num_per_round
+            + ss.pre_deal_tc_size
+            + ss.processed
         )
     else:
-        global_blk_idx = b_idx * vec_ctx.cmp_kv_batch_stride + sc_idx
-    n_tile_rows = taken * cmp_row_cnt
-    dc_tile = tile_dc_f16[processed:, :]
-    dc_f32 = tile_dc_f32[processed:, :]
-    kv_tile = tile_kv[processed * cmp_row_cnt :, :]
-    sm_tile = tile_softmax[processed * cmp_row_cnt :, :]
-    dkv_tile = tile_temp[processed * cmp_row_cnt :, :]
-    pl.set_validshape(dc_tile, [taken, d_deal_size])
+        global_blk_idx = ss.b_idx * ss.vec_ctx.cmp_kv_batch_stride + ss.sc_idx
+    n_tile_rows = ss.taken * cmp_row_cnt
+    dc_tile = ss.tile_dc_f16[ss.processed :, :]
+    dc_f32 = ss.tile_dc_f32[ss.processed :, :]
+    kv_tile = ss.tile_kv[ss.processed * cmp_row_cnt :, :]
+    sm_tile = ss.tile_softmax[ss.processed * cmp_row_cnt :, :]
+    dkv_tile = ss.tile_temp[ss.processed * cmp_row_cnt :, :]
+    pl.set_validshape(dc_tile, [ss.taken, d_deal_size])
     pl.set_validshape(kv_tile, [n_tile_rows, d_deal_size])
     pl.set_validshape(sm_tile, [n_tile_rows, d_deal_size])
-    pl.load(dc_tile, d_cmp_kv_gm, [global_blk_idx, n_start])
-    pl.load(kv_tile, kv_gm, [global_blk_idx, 0, n_start])
-    pl.load(sm_tile, softmax_score_gm, [global_blk_idx, 0, n_start])
-    pl.set_validshape(dc_f32, [taken, d_deal_size])
+    pl.load(dc_tile, ss.d_cmp_kv_gm, [global_blk_idx, ss.n_start])
+    pl.load(kv_tile, ss.kv_gm, [global_blk_idx, 0, ss.n_start])
+    pl.load(sm_tile, ss.softmax_score_gm, [global_blk_idx, 0, ss.n_start])
+    pl.set_validshape(dc_f32, [ss.taken, d_deal_size])
     pl.cast(dc_f32, dc_tile, mode=pl.RoundMode.CAST_ROUND)
     _vf_scatter_backward(
         dc_f32,
         kv_tile,
         sm_tile,
         dkv_tile,
-        taken,
+        ss.taken,
         cmp_row_cnt,
         d_deal_size,
     )
     _process_mask_fill(
-        sm_tile, dkv_tile, b_start_pos, sc_idx, cmp_ratio, d_deal_size, taken
+        sm_tile, dkv_tile, ss.b_start_pos, ss.sc_idx, cmp_ratio, d_deal_size, ss.taken
     )
 
 
-def _process_scatter(
-    vec_ctx,
-    round_idx,
-    total_sc_num_per_round,
-    pre_deal_tc_size,
-    deal_tc_size,
-    b_idx,
-    sc_idx,
-    tile_dc_f16,
-    tile_dc_f32,
-    tile_kv,
-    tile_softmax,
-    tile_temp,
-    d_cmp_kv_gm,
-    kv_gm,
-    softmax_score_gm,
-    n_start,
-    start_pos,
-    seq_used,
-    cu_seqlens,
-    seq_ctx,
-):
+def _process_scatter(sc, b_idx, sc_idx):
     """Phase 1: scatter（按 batch 边界推进块索引，逐 taken 块 load/cast/VF）"""
-    cmp_ratio = vec_ctx.cmp_ratio
-    d_deal_size = vec_ctx.d_deal_size
-    batch_size = vec_ctx.batch_size
+    cmp_ratio = sc.vec_ctx.cmp_ratio
+    d_deal_size = sc.vec_ctx.d_deal_size
+    batch_size = sc.vec_ctx.batch_size
     processed = 0
-    while processed < deal_tc_size:
-        b_start_pos = _get_start_pos(b_idx, start_pos, seq_ctx)
-        sq_val = _get_seq_used(b_idx, seq_used, cu_seqlens, seq_ctx)
+    while processed < sc.deal_tc_size:
+        b_start_pos = _get_start_pos(b_idx, sc.start_pos, sc.seq_ctx)
+        sq_val = _get_seq_used(b_idx, sc.seq_used, sc.cu_seqlens, sc.seq_ctx)
         cmp_limit = (b_start_pos + sq_val) // cmp_ratio * cmp_ratio
         # startPos%cmpRatio!=0 时首块为部分块但仍计 1 块 → 向上取整（_ceil_div）
         blk_in_batch = _ceil_div(cmp_limit - b_start_pos, cmp_ratio)
         remaining = blk_in_batch - sc_idx
         if remaining > 0:
-            taken = min(deal_tc_size - processed, remaining)
-            _process_scatter_slice(
-                vec_ctx,
-                round_idx,
-                total_sc_num_per_round,
-                pre_deal_tc_size,
-                processed,
-                b_idx,
-                sc_idx,
-                taken,
-                n_start,
-                b_start_pos,
-                tile_dc_f16,
-                tile_dc_f32,
-                tile_kv,
-                tile_softmax,
-                tile_temp,
-                d_cmp_kv_gm,
-                kv_gm,
-                softmax_score_gm,
+            taken = min(sc.deal_tc_size - processed, remaining)
+            ss = pl.make_tuple(
+                vec_ctx=sc.vec_ctx,
+                round_idx=sc.round_idx,
+                total_sc_num_per_round=sc.total_sc_num_per_round,
+                pre_deal_tc_size=sc.pre_deal_tc_size,
+                processed=processed,
+                b_idx=b_idx,
+                sc_idx=sc_idx,
+                taken=taken,
+                n_start=sc.n_start,
+                b_start_pos=b_start_pos,
+                tile_dc_f16=sc.tile_dc_f16,
+                tile_dc_f32=sc.tile_dc_f32,
+                tile_kv=sc.tile_kv,
+                tile_softmax=sc.tile_softmax,
+                tile_temp=sc.tile_temp,
+                d_cmp_kv_gm=sc.d_cmp_kv_gm,
+                kv_gm=sc.kv_gm,
+                softmax_score_gm=sc.softmax_score_gm,
             )
+            _process_scatter_slice(ss)
             processed += taken
             sc_idx += taken
         b_idx, sc_idx, ended = _advance_block_boundary(
@@ -1964,39 +1694,23 @@ def _arrange_x_prev_head(
         )
 
 
-def _arrange_x_batch_slice(
-    vec_ctx,
-    intra_group_idx,
-    db_idx,
-    group_idx,
-    db_row_cnt,
-    b_idx,
-    sc_idx,
-    sub_slot,
-    processed,
-    taken,
-    move_x_tiles,
-    x_gm,
-    x_arrange_gm,
-    start_pos,
-    seq_used,
-    cu_seqlens,
-    seq_ctx,
-):
+def _arrange_x_batch_slice(axs, taken):
     """单个 taken 块：槽位计算 + 首块部分块清零 + coff=2 prev 头部 + 主拷贝"""
-    cmp_ratio = vec_ctx.cmp_ratio
-    hidden_size = vec_ctx.hidden_size
-    b_start_pos = _get_start_pos(b_idx, start_pos, seq_ctx)
+    cmp_ratio = axs.vec_ctx.cmp_ratio
+    hidden_size = axs.vec_ctx.hidden_size
+    b_start_pos = _get_start_pos(axs.b_idx, axs.start_pos, axs.seq_ctx)
     # 块槽位相对化：group 区域步长用实际值 groupRowStride（= gs*cr + coff=2 头部 cr），
-    # 与 mm2 mStart 逐字节对齐；槽位 = subSlot(coff=1 子核偏移) + processed(块序)
+    # 与 mm2 mStart 逐字节对齐；槽位 = subSlot(coff=1 子核偏移) + axs.processed(块序)
     dst_idx = (
-        db_idx * db_row_cnt
-        + group_idx * vec_ctx.group_row_stride
-        + (sub_slot + processed) * cmp_ratio
+        axs.db_idx * axs.db_row_cnt
+        + axs.group_idx * axs.vec_ctx.group_row_stride
+        + (axs.sub_slot + axs.processed) * cmp_ratio
         + (Coff - 1) * cmp_ratio
     )
-    mxs_idx = 0 if sc_idx == 0 else sc_idx * cmp_ratio - (b_start_pos % cmp_ratio)
-    src_idx = _get_token_idx(b_idx, mxs_idx, cu_seqlens, seq_ctx)
+    mxs_idx = (
+        0 if axs.sc_idx == 0 else axs.sc_idx * cmp_ratio - (b_start_pos % cmp_ratio)
+    )
+    src_idx = _get_token_idx(axs.b_idx, mxs_idx, axs.cu_seqlens, axs.seq_ctx)
     mx_rows = taken * cmp_ratio
     if mxs_idx == 0:
         mx_rows -= b_start_pos % cmp_ratio
@@ -2009,29 +1723,29 @@ def _arrange_x_batch_slice(
         zero_rows = b_start_pos % cmp_ratio
         cur_base = dst_idx - zero_rows
         _arrange_x_zero_fill(
-            move_x_tiles,
-            x_arrange_gm,
-            intra_group_idx,
+            axs.move_x_tiles,
+            axs.x_arrange_gm,
+            axs.intra_group_idx,
             zero_rows,
             cur_base,
             hidden_size,
         )
-    if Coff == 2 and processed == 0 and group_idx > 0:
+    if Coff == 2 and axs.processed == 0 and axs.group_idx > 0:
         _arrange_x_prev_head(
-            vec_ctx,
-            intra_group_idx,
-            db_idx,
-            group_idx,
+            axs.vec_ctx,
+            axs.intra_group_idx,
+            axs.db_idx,
+            axs.group_idx,
             src_idx,
-            move_x_tiles,
-            x_gm,
-            x_arrange_gm,
+            axs.move_x_tiles,
+            axs.x_gm,
+            axs.x_arrange_gm,
         )
     _arrange_x_copy_zone(
-        move_x_tiles,
-        x_gm,
-        x_arrange_gm,
-        intra_group_idx,
+        axs.move_x_tiles,
+        axs.x_gm,
+        axs.x_arrange_gm,
+        axs.intra_group_idx,
         mx_rows,
         src_idx,
         dst_idx,
@@ -2101,25 +1815,25 @@ def _arrange_x(
         remaining = blk_in_batch - sc_idx
         if remaining > 0:
             taken = min(deal_tc_size - processed, remaining)
-            _arrange_x_batch_slice(
-                vec_ctx,
-                intra_group_idx,
-                db_idx,
-                group_idx,
-                db_row_cnt,
-                b_idx,
-                sc_idx,
-                sub_slot,
-                processed,
-                taken,
-                move_x_tiles,
-                x_gm,
-                x_arrange_gm,
-                start_pos,
-                seq_used,
-                cu_seqlens,
-                seq_ctx,
+            axs = pl.make_tuple(
+                vec_ctx=vec_ctx,
+                intra_group_idx=intra_group_idx,
+                db_idx=db_idx,
+                group_idx=group_idx,
+                db_row_cnt=db_row_cnt,
+                b_idx=b_idx,
+                sc_idx=sc_idx,
+                sub_slot=sub_slot,
+                processed=processed,
+                move_x_tiles=move_x_tiles,
+                x_gm=x_gm,
+                x_arrange_gm=x_arrange_gm,
+                start_pos=start_pos,
+                seq_used=seq_used,
+                cu_seqlens=cu_seqlens,
+                seq_ctx=seq_ctx,
             )
+            _arrange_x_batch_slice(axs, taken)
             processed += taken
             sc_idx += taken
         b_idx, sc_idx, ended = _advance_block_boundary(
@@ -2129,38 +1843,25 @@ def _arrange_x(
             break
 
 
-def _accumulate_ape(
-    vec_ctx,
-    round_idx,
-    core_idx,
-    group_idx,
-    n_start,
-    tile_ape_local,
-    tile_softmax,
-    tensor_ape,
-    deal_tc_size,
-    cmp_row_cnt,
-    d_deal_size,
-    coff_coef,
-):
+def _accumulate_ape(ap):
     """APE 局部累加 + 写 workspace（round0 清零 / round>0 读旧值，VF 内累加，一次 MTE3）"""
-    local_slot = group_idx * coff_coef * cmp_row_cnt
-    if Coff == 1 and core_idx % 2 == 1:
-        local_slot += cmp_row_cnt
-    pl.set_validshape(tile_ape_local, [cmp_row_cnt, d_deal_size])
-    if round_idx == 0:
-        _vf_tile_zero(tile_ape_local, cmp_row_cnt, d_deal_size)
+    local_slot = ap.group_idx * ap.coff_coef * ap.cmp_row_cnt
+    if Coff == 1 and ap.core_idx % 2 == 1:
+        local_slot += ap.cmp_row_cnt
+    pl.set_validshape(ap.tile_ape_local, [ap.cmp_row_cnt, ap.d_deal_size])
+    if ap.round_idx == 0:
+        _vf_tile_zero(ap.tile_ape_local, ap.cmp_row_cnt, ap.d_deal_size)
     else:
-        pl.load(tile_ape_local, tensor_ape, [local_slot, n_start])
+        pl.load(ap.tile_ape_local, ap.tensor_ape, [local_slot, ap.n_start])
     _vf_reduce_dscore_to_ape(
-        tile_softmax,
-        tile_ape_local,
-        deal_tc_size,
-        cmp_row_cnt,
-        d_deal_size,
-        d_deal_size,
+        ap.tile_softmax,
+        ap.tile_ape_local,
+        ap.deal_tc_size,
+        ap.cmp_row_cnt,
+        ap.d_deal_size,
+        ap.d_deal_size,
     )
-    pl.store(tensor_ape, tile_ape_local, [local_slot, n_start])
+    pl.store(ap.tensor_ape, ap.tile_ape_local, [local_slot, ap.n_start])
 
 
 # ================================================================
@@ -2252,71 +1953,72 @@ def _phase1_scatter(
         dtype=pl.DT_FP32,
     )
     # scatter：before → after 窗口内逐 taken 块处理（b_idx/sc_idx 传值局部推进）
-    _process_scatter(
-        vec_ctx,
-        round_idx,
-        total_sc_num_per_round,
-        pre_deal_tc_size,
-        deal_tc_size,
-        b_idx,
-        sc_idx,
-        tile_dc_f16,
-        tile_dc_f32,
-        tile_kv,
-        tile_softmax,
-        tile_temp,
-        d_cmp_kv_gm,
-        kv_gm,
-        softmax_score_gm,
-        n_start,
-        start_pos,
-        seq_used,
-        cu_seqlens,
-        seq_ctx,
+    sc = pl.make_tuple(
+        vec_ctx=vec_ctx,
+        round_idx=round_idx,
+        total_sc_num_per_round=total_sc_num_per_round,
+        pre_deal_tc_size=pre_deal_tc_size,
+        deal_tc_size=deal_tc_size,
+        tile_dc_f16=tile_dc_f16,
+        tile_dc_f32=tile_dc_f32,
+        tile_kv=tile_kv,
+        tile_softmax=tile_softmax,
+        tile_temp=tile_temp,
+        d_cmp_kv_gm=d_cmp_kv_gm,
+        kv_gm=kv_gm,
+        softmax_score_gm=softmax_score_gm,
+        n_start=n_start,
+        start_pos=start_pos,
+        seq_used=seq_used,
+        cu_seqlens=cu_seqlens,
+        seq_ctx=seq_ctx,
     )
+    _process_scatter(sc, b_idx, sc_idx)
 
     n_tile_rows = deal_tc_size * cmp_row_cnt
 
     # APE: local_ape 累加 + 写 workspace（round0 清零 / round>0 读旧值，VF 内累加，一次 MTE3）
-    _accumulate_ape(
-        vec_ctx,
-        round_idx,
-        core_idx,
-        group_idx,
-        n_start,
-        tile_ape_local,
-        tile_softmax,
-        tensor_ape,
-        deal_tc_size,
-        cmp_row_cnt,
-        d_deal_size,
-        coff_coef,
+    ap = pl.make_tuple(
+        vec_ctx=vec_ctx,
+        round_idx=round_idx,
+        core_idx=core_idx,
+        group_idx=group_idx,
+        n_start=n_start,
+        tile_ape_local=tile_ape_local,
+        tile_softmax=tile_softmax,
+        tensor_ape=tensor_ape,
+        deal_tc_size=deal_tc_size,
+        cmp_row_cnt=cmp_row_cnt,
+        d_deal_size=d_deal_size,
+        coff_coef=coff_coef,
     )
+    _accumulate_ape(ap)
     sub_idx = core_idx % 2
     # ── Cast dkv/dsb FP32→BF16/FP16 + ND→NZ + insert L1（子函数）──
-    _cast_dkv_dsb_to_l1(
-        vec_ctx,
-        n_tile_rows,
-        deal_tc_size,
-        sub_idx,
-        tile_temp,
-        tile_dkv_cast,
-        tile_dkv_cast_md,
-        tile_dkv_nz,
-        tile_dkv_nz_md_prev,
-        tile_dkv_nz_md_cur,
-        tile_dsb_cast,
-        tile_dsb_cast_md,
-        tile_dsb_nz,
-        tile_softmax,
-        tile_dsb_nz_md_prev,
-        tile_dsb_nz_md_cur,
-        temp_tile_group,
-        l1_kv0_tile_group_nz,
-        l1_kv1_tile_group_nz,
-        l1_score0_tile_group_nz,
-        l1_score1_tile_group_nz,
+    cl = pl.make_tuple(
+        vec_ctx=vec_ctx,
+        n_tile_rows=n_tile_rows,
+        deal_tc_size=deal_tc_size,
+        sub_idx=sub_idx,
+        tile_temp=tile_temp,
+        tile_dkv_cast=tile_dkv_cast,
+        tile_dkv_cast_md=tile_dkv_cast_md,
+        tile_dkv_nz=tile_dkv_nz,
+        tile_dkv_nz_md_prev=tile_dkv_nz_md_prev,
+        tile_dkv_nz_md_cur=tile_dkv_nz_md_cur,
+        tile_dsb_cast=tile_dsb_cast,
+        tile_dsb_cast_md=tile_dsb_cast_md,
+        tile_dsb_nz=tile_dsb_nz,
+        tile_softmax=tile_softmax,
+        tile_dsb_nz_md_prev=tile_dsb_nz_md_prev,
+        tile_dsb_nz_md_cur=tile_dsb_nz_md_cur,
+        temp_tile_group=temp_tile_group,
+        l1_kv0_g=l1_kv0_tile_group_nz,
+        l1_kv1_g=l1_kv1_tile_group_nz,
+        l1_sb0_g=l1_score0_tile_group_nz,
+        l1_sb1_g=l1_score1_tile_group_nz,
     )
+    _cast_dkv_dsb_to_l1(cl)
 
     # 搬运x（subSlot: coff=1 的 M 轴子核槽位偏移；coff=2 恒 0）
     sub_slot = sub_core_idx * deal_sc_num if Coff == 1 else 0
@@ -2341,249 +2043,185 @@ def _phase1_scatter(
         )
 
 
-def _phase2_matmul(
-    round_idx,
-    db_idx,
-    deal_tc_size,
-    hidden_size,
-    head_dim,
-    deal_sc_num,
-    cube_m_base_size,
-    cmp_ratio,
-    cube_core_num,
-    group_size,
-    group_num,
-    total_head_dim,
-    db_row_cnt,
-    group_row_stride,
-    intra_group_idx,
-    cv_l0a,
-    cv_l0b,
-    cv_l0c,
-    l1_w_db,
-    l1_kv0_tile_group_nz,
-    l1_kv1_tile_group_nz,
-    l1_score0_tile_group_nz,
-    l1_score1_tile_group_nz,
-    l1_kv0_tile_group_zn,
-    l1_kv1_tile_group_zn,
-    l1_score0_tile_group_zn,
-    l1_score1_tile_group_zn,
-    wkv,
-    wgate,
-    io_d_type,
-    d_x_result_gm,
-    x_arrange_gm,
-    d_wkv_result_gm,
-    d_w_gate_result_gm,
-):
-    """Phase 2: dkv@wkv + dsb@wgate → dX partial；dkv@x + dsb@x → dW partial"""
+def _phase2_matmul(p2, io_d_type):
+    """Phase 2: dkv@p2.wkv + dsb@p2.wgate → dX partial；dkv@x + dsb@x → dW partial"""
     wkv_t = pl.make_tensor(
-        wkv, [total_head_dim, hidden_size], [hidden_size, 1], dtype=io_d_type
+        p2.wkv,
+        [p2.total_head_dim, p2.hidden_size],
+        [p2.hidden_size, 1],
+        dtype=io_d_type,
     )
     wgate_t = pl.make_tensor(
-        wgate, [total_head_dim, hidden_size], [hidden_size, 1], dtype=io_d_type
+        p2.wgate,
+        [p2.total_head_dim, p2.hidden_size],
+        [p2.hidden_size, 1],
+        dtype=io_d_type,
     )
-    l1_kv0 = l1_kv0_tile_group_nz.next()
-    l1_kv1 = l1_kv1_tile_group_nz.next()
-    l1_sb0 = l1_score0_tile_group_nz.next()
-    l1_sb1 = l1_score1_tile_group_nz.next()
+    l1_kv0 = p2.l1_kv0_tile_group_nz.next()
+    l1_kv1 = p2.l1_kv1_tile_group_nz.next()
+    l1_sb0 = p2.l1_score0_tile_group_nz.next()
+    l1_sb1 = p2.l1_score1_tile_group_nz.next()
 
-    l1_kv0_t = l1_kv0_tile_group_zn.next()
-    l1_kv1_t = l1_kv1_tile_group_zn.next()
-    l1_sb0_t = l1_score0_tile_group_zn.next()
-    l1_sb1_t = l1_score1_tile_group_zn.next()
+    l1_kv0_t = p2.l1_kv0_tile_group_zn.next()
+    l1_kv1_t = p2.l1_kv1_tile_group_zn.next()
+    l1_sb0_t = p2.l1_score0_tile_group_zn.next()
+    l1_sb1_t = p2.l1_score1_tile_group_zn.next()
 
     n_tile_rows0 = (
-        min(deal_tc_size, deal_sc_num) * cmp_ratio
+        min(p2.deal_tc_size, p2.deal_sc_num) * p2.cmp_ratio
         if Coff == 1
-        else deal_tc_size * cmp_ratio
+        else p2.deal_tc_size * p2.cmp_ratio
     )
     n_tile_rows1 = (
-        max(deal_tc_size - deal_sc_num, 0) * cmp_ratio
+        max(p2.deal_tc_size - p2.deal_sc_num, 0) * p2.cmp_ratio
         if Coff == 1
-        else deal_tc_size * cmp_ratio
+        else p2.deal_tc_size * p2.cmp_ratio
     )
 
     matmul_ctx = pl.struct(
         "MatmulCtx",
-        hidden_size=hidden_size,
+        hidden_size=p2.hidden_size,
         n_tile_rows0=n_tile_rows0,
         n_tile_rows1=n_tile_rows1,
-        head_dim=head_dim,
-        deal_sc_num=deal_sc_num,
-        cube_m_base_size=cube_m_base_size,
-        cmp_ratio=cmp_ratio,
-        cube_core_num=cube_core_num,
-        group_size=group_size,
-        group_num=group_num,
-        total_head_dim=total_head_dim,
-        db_row_cnt=db_row_cnt,
-        group_row_stride=group_row_stride,
-        intra_group_idx=intra_group_idx,
+        head_dim=p2.head_dim,
+        deal_sc_num=p2.deal_sc_num,
+        cube_m_base_size=p2.cube_m_base_size,
+        cmp_ratio=p2.cmp_ratio,
+        cube_core_num=p2.cube_core_num,
+        group_size=p2.group_size,
+        group_num=p2.group_num,
+        total_head_dim=p2.total_head_dim,
+        db_row_cnt=p2.db_row_cnt,
+        group_row_stride=p2.group_row_stride,
+        intra_group_idx=p2.intra_group_idx,
     )
 
     # ── Matmul #1/#2：提取子函数（coff=1/2 统一）──
     _compute_dx_partial(
         matmul_ctx,
-        db_idx,
-        cv_l0a,
-        cv_l0b,
-        cv_l0c,
-        l1_w_db,
+        p2.db_idx,
+        p2.cv_l0a,
+        p2.cv_l0b,
+        p2.cv_l0c,
+        p2.l1_w_db,
         l1_kv0,
         l1_kv1,
         l1_sb0,
         l1_sb1,
         wkv_t,
         wgate_t,
-        d_x_result_gm,
+        p2.d_x_result_gm,
     )
     _compute_dw_partial(
         matmul_ctx,
-        round_idx,
-        db_idx,
-        cv_l0a,
-        cv_l0b,
-        cv_l0c,
-        l1_w_db,
+        p2.round_idx,
+        p2.db_idx,
+        p2.cv_l0a,
+        p2.cv_l0b,
+        p2.cv_l0c,
+        p2.l1_w_db,
         l1_kv0_t,
         l1_kv1_t,
         l1_sb0_t,
         l1_sb1_t,
-        x_arrange_gm,
-        d_wkv_result_gm,
-        d_w_gate_result_gm,
+        p2.x_arrange_gm,
+        p2.d_wkv_result_gm,
+        p2.d_w_gate_result_gm,
     )
 
 
-def _phase3_reduce(
-    vec_ctx,
-    core_idx,
-    group_idx,
-    round_idx,
-    round_cnt,
-    max_round_blocks,
-    prev_db_idx,
-    prev_b_idx_start,
-    prev_sc_idx_start,
-    prev_b_idx_end,
-    prev_sc_idx_end,
-    reduce_acc,
-    reduce_comp,
-    reduce_load_tile_group,
-    p3_cast,
-    d_x_cache_gm,
-    d_x_result_gm,
-    d_x,
-    d_wkv,
-    d_wgate,
-    d_ape,
-    io_d_type,
-    x_rows,
-    total_head_dim,
-    hidden_size,
-    cmp_size,
-    d_weight_work_space_size,
-    work_space_ptr,
-    d_w_kv_work_space_ptr,
-    d_w_gate_work_space_ptr,
-    start_pos,
-    seq_used,
-    cu_seqlens,
-    seq_ctx,
-):
+def _phase3_reduce(p3, io_d_type):
     """Phase 3: dX reduce（上一轮 start/end 节点）+ 末轮 dApe/dW 一次性跨核归约"""
     d_x_out_gm = pl.make_tensor(
-        d_x, [x_rows, hidden_size], [hidden_size, 1], dtype=io_d_type
+        p3.d_x, [p3.x_rows, p3.hidden_size], [p3.hidden_size, 1], dtype=io_d_type
     )
     tensor_d_ape_flat = pl.make_tensor(
-        d_ape, [1, cmp_size], [cmp_size, 1], dtype=pl.DT_FP32
+        p3.d_ape, [1, p3.cmp_size], [p3.cmp_size, 1], dtype=pl.DT_FP32
     )
     tensor_d_ape_ws_flat = pl.make_tensor(
-        work_space_ptr,
-        [vec_ctx.group_num * vec_ctx.coff_coef, cmp_size],
-        [cmp_size, 1],
+        p3.work_space_ptr,
+        [p3.vec_ctx.group_num * p3.vec_ctx.coff_coef, p3.cmp_size],
+        [p3.cmp_size, 1],
         dtype=pl.DT_FP32,
     )
     tensor_dw_kv_ws_flat = pl.make_tensor(
-        d_w_kv_work_space_ptr,
+        p3.d_w_kv_work_space_ptr,
         [
-            d_weight_work_space_size // (total_head_dim * hidden_size),
-            total_head_dim * hidden_size,
+            p3.d_weight_work_space_size // (p3.total_head_dim * p3.hidden_size),
+            p3.total_head_dim * p3.hidden_size,
         ],
-        [total_head_dim * hidden_size, 1],
+        [p3.total_head_dim * p3.hidden_size, 1],
         dtype=pl.DT_FP32,
     )
     tensor_dw_gate_ws_flat = pl.make_tensor(
-        d_w_gate_work_space_ptr,
+        p3.d_w_gate_work_space_ptr,
         [
-            d_weight_work_space_size // (total_head_dim * hidden_size),
-            total_head_dim * hidden_size,
+            p3.d_weight_work_space_size // (p3.total_head_dim * p3.hidden_size),
+            p3.total_head_dim * p3.hidden_size,
         ],
-        [total_head_dim * hidden_size, 1],
+        [p3.total_head_dim * p3.hidden_size, 1],
         dtype=pl.DT_FP32,
     )
     # dW 输出为 FP16/BF16（与 op 注册一致），归约在 FP32 完成、写回前 cast
     tensor_dw_kv_flat = pl.make_tensor(
-        d_wkv,
-        [1, total_head_dim * hidden_size],
-        [total_head_dim * hidden_size, 1],
+        p3.d_wkv,
+        [1, p3.total_head_dim * p3.hidden_size],
+        [p3.total_head_dim * p3.hidden_size, 1],
         dtype=io_d_type,
     )
     tensor_dw_gate_flat = pl.make_tensor(
-        d_wgate,
-        [1, total_head_dim * hidden_size],
-        [total_head_dim * hidden_size, 1],
+        p3.d_wgate,
+        [1, p3.total_head_dim * p3.hidden_size],
+        [p3.total_head_dim * p3.hidden_size, 1],
         dtype=io_d_type,
     )
     _reduce_dx(
-        vec_ctx,
-        core_idx,
-        prev_db_idx,
-        round_idx - 1,
-        prev_b_idx_start,
-        prev_sc_idx_start,
-        prev_b_idx_end,
-        prev_sc_idx_end,
-        reduce_acc,
-        reduce_load_tile_group,
-        p3_cast,
-        d_x_cache_gm,
-        d_x_result_gm,
+        p3.vec_ctx,
+        p3.core_idx,
+        p3.prev_db_idx,
+        p3.round_idx - 1,
+        p3.prev_b_idx_start,
+        p3.prev_sc_idx_start,
+        p3.prev_b_idx_end,
+        p3.prev_sc_idx_end,
+        p3.reduce_acc,
+        p3.reduce_load_tile_group,
+        p3.p3_cast,
+        p3.d_x_cache_gm,
+        p3.d_x_result_gm,
         d_x_out_gm,
-        start_pos,
-        seq_used,
-        cu_seqlens,
-        seq_ctx,
+        p3.start_pos,
+        p3.seq_used,
+        p3.cu_seqlens,
+        p3.seq_ctx,
     )
 
     # ── 末轮：dApe/dW 一次性跨核归约（生产者侧已按轮累加至 ws 固定槽）──
     # roundBlocks 传 maxRoundBlocks：validRows 只覆盖写过数据的行
     # （不满轮时 groupIdx >= ceil(maxRoundBlocks/groupDealScNum) 的核未执行
     #  Phase 1/2 写入，其 ws 区域是初始值，不能参与归约）
-    if round_idx == round_cnt:
+    if p3.round_idx == p3.round_cnt:
         _reduce_ape(
-            vec_ctx,
-            core_idx,
-            group_idx,
+            p3.vec_ctx,
+            p3.core_idx,
+            p3.group_idx,
             0,
-            max_round_blocks,
-            reduce_acc,
-            reduce_comp,
-            reduce_load_tile_group,
+            p3.max_round_blocks,
+            p3.reduce_acc,
+            p3.reduce_comp,
+            p3.reduce_load_tile_group,
             tensor_d_ape_flat,
             tensor_d_ape_ws_flat,
         )
         _reduce_d_weight(
-            vec_ctx,
-            core_idx,
-            group_idx,
+            p3.vec_ctx,
+            p3.core_idx,
+            p3.group_idx,
             0,
-            max_round_blocks,
-            reduce_acc,
-            reduce_load_tile_group,
-            p3_cast,
+            p3.max_round_blocks,
+            p3.reduce_acc,
+            p3.reduce_load_tile_group,
+            p3.p3_cast,
             tensor_dw_kv_flat,
             tensor_dw_kv_ws_flat,
             tensor_dw_gate_flat,
@@ -2962,31 +2600,33 @@ def _init_vec_tile_groups(io_d_type, group_size, d_deal_size):
         group_idx,
         intra_group_idx,
         n_start,
-        tile_dc_f16,
-        tile_dc_f32,
-        tile_kv,
-        tile_softmax,
-        tile_dsb_cast,
-        tile_dsb_cast_md,
-        tile_temp,
-        tile_dkv_cast,
-        tile_dkv_cast_md,
-        tile_ape_local,
-        tile_dkv_nz,
-        tile_dsb_nz,
-        tile_dkv_nz_md_prev,
-        tile_dsb_nz_md_prev,
-        tile_dkv_nz_md_cur,
-        tile_dsb_nz_md_cur,
-        reduce_acc,
-        reduce_comp,
-        p3_cast,
-        move_x_tile_group,
-        reduce_load_tile_group,
-        reduce_acc_tile_group,
-        reduce_comp_tile_group,
-        reduce_result_tile_group,
-        temp_tile_group,
+        pl.make_tuple(
+            tile_dc_f16=tile_dc_f16,
+            tile_dc_f32=tile_dc_f32,
+            tile_kv=tile_kv,
+            tile_softmax=tile_softmax,
+            tile_dsb_cast=tile_dsb_cast,
+            tile_dsb_cast_md=tile_dsb_cast_md,
+            tile_temp=tile_temp,
+            tile_dkv_cast=tile_dkv_cast,
+            tile_dkv_cast_md=tile_dkv_cast_md,
+            tile_ape_local=tile_ape_local,
+            tile_dkv_nz=tile_dkv_nz,
+            tile_dsb_nz=tile_dsb_nz,
+            tile_dkv_nz_md_prev=tile_dkv_nz_md_prev,
+            tile_dsb_nz_md_prev=tile_dsb_nz_md_prev,
+            tile_dkv_nz_md_cur=tile_dkv_nz_md_cur,
+            tile_dsb_nz_md_cur=tile_dsb_nz_md_cur,
+            reduce_acc=reduce_acc,
+            reduce_comp=reduce_comp,
+            p3_cast=p3_cast,
+            move_x_tile_group=move_x_tile_group,
+            reduce_load_tile_group=reduce_load_tile_group,
+            reduce_acc_tile_group=reduce_acc_tile_group,
+            reduce_comp_tile_group=reduce_comp_tile_group,
+            reduce_result_tile_group=reduce_result_tile_group,
+            temp_tile_group=temp_tile_group,
+        ),
     )
 
 
@@ -3201,31 +2841,7 @@ def compressor_grad(
             group_idx,
             intra_group_idx,
             n_start,
-            tile_dc_f16,
-            tile_dc_f32,
-            tile_kv,
-            tile_softmax,
-            tile_dsb_cast,
-            tile_dsb_cast_md,
-            tile_temp,
-            tile_dkv_cast,
-            tile_dkv_cast_md,
-            tile_ape_local,
-            tile_dkv_nz,
-            tile_dsb_nz,
-            tile_dkv_nz_md_prev,
-            tile_dsb_nz_md_prev,
-            tile_dkv_nz_md_cur,
-            tile_dsb_nz_md_cur,
-            reduce_acc,
-            reduce_comp,
-            p3_cast,
-            move_x_tile_group,
-            reduce_load_tile_group,
-            reduce_acc_tile_group,
-            reduce_comp_tile_group,
-            reduce_result_tile_group,
-            temp_tile_group,
+            vec_tiles,
         ) = _init_vec_tile_groups(io_d_type, tiling.group_size, tiling.d_deal_size)
 
     # ════════════════════════════════════════════════════════════
@@ -3256,8 +2872,8 @@ def compressor_grad(
                 d_wgate,
                 d_ape,
                 io_d_type,
-                reduce_acc,
-                p3_cast,
+                vec_tiles.reduce_acc,
+                vec_tiles.p3_cast,
             )
         return
     # ════════════════════════════════════════════════════════════
@@ -3335,11 +2951,11 @@ def compressor_grad(
                         tiling.db_row_cnt,
                         tiling.deal_sc_num,
                         tiling.total_sc_num_per_round,
-                        tile_dc_f16,
-                        tile_dc_f32,
-                        tile_kv,
-                        tile_softmax,
-                        tile_temp,
+                        vec_tiles.tile_dc_f16,
+                        vec_tiles.tile_dc_f32,
+                        vec_tiles.tile_kv,
+                        vec_tiles.tile_softmax,
+                        vec_tiles.tile_temp,
                         d_cmp_kv,
                         kv,
                         softmax_score,
@@ -3352,23 +2968,23 @@ def compressor_grad(
                         work_space_ptr,
                         tiling.group_num,
                         intra_group_idx,
-                        tile_ape_local,
-                        tile_dkv_cast,
-                        tile_dkv_cast_md,
-                        tile_dkv_nz,
-                        tile_dkv_nz_md_prev,
-                        tile_dkv_nz_md_cur,
-                        tile_dsb_cast,
-                        tile_dsb_cast_md,
-                        tile_dsb_nz,
-                        tile_dsb_nz_md_prev,
-                        tile_dsb_nz_md_cur,
-                        temp_tile_group,
+                        vec_tiles.tile_ape_local,
+                        vec_tiles.tile_dkv_cast,
+                        vec_tiles.tile_dkv_cast_md,
+                        vec_tiles.tile_dkv_nz,
+                        vec_tiles.tile_dkv_nz_md_prev,
+                        vec_tiles.tile_dkv_nz_md_cur,
+                        vec_tiles.tile_dsb_cast,
+                        vec_tiles.tile_dsb_cast_md,
+                        vec_tiles.tile_dsb_nz,
+                        vec_tiles.tile_dsb_nz_md_prev,
+                        vec_tiles.tile_dsb_nz_md_cur,
+                        vec_tiles.temp_tile_group,
                         l1_kv0_tile_group_nz,
                         l1_kv1_tile_group_nz,
                         l1_score0_tile_group_nz,
                         l1_score1_tile_group_nz,
-                        move_x_tile_group,
+                        vec_tiles.move_x_tile_group,
                         x_arrange_gm,
                         start_pos,
                         seq_used,
@@ -3398,42 +3014,42 @@ def compressor_grad(
             if round_idx > 0:
                 pl.system.sync_all(core_type=pl.SyncCoreType.MIX)
 
-                _phase3_reduce(
-                    vec_ctx,
-                    core_idx,
-                    group_idx,
-                    round_idx,
-                    round_cnt,
-                    max_round_blocks,
-                    prev_db_idx,
-                    prev_b_idx_start,
-                    prev_sc_idx_start,
-                    prev_b_idx_end,
-                    prev_sc_idx_end,
-                    reduce_acc,
-                    reduce_comp,
-                    reduce_load_tile_group,
-                    p3_cast,
-                    d_x_cache_gm,
-                    d_x_result_gm,
-                    d_x,
-                    d_wkv,
-                    d_wgate,
-                    d_ape,
-                    io_d_type,
-                    tiling.x_rows,
-                    tiling.total_head_dim,
-                    tiling.hidden_size,
-                    tiling.cmp_size,
-                    d_weight_work_space_size,
-                    work_space_ptr,
-                    d_w_kv_work_space_ptr,
-                    d_w_gate_work_space_ptr,
-                    start_pos,
-                    seq_used,
-                    cu_seqlens,
-                    seq_ctx,
+                p3 = pl.make_tuple(
+                    vec_ctx=vec_ctx,
+                    core_idx=core_idx,
+                    group_idx=group_idx,
+                    round_idx=round_idx,
+                    round_cnt=round_cnt,
+                    max_round_blocks=max_round_blocks,
+                    prev_db_idx=prev_db_idx,
+                    prev_b_idx_start=prev_b_idx_start,
+                    prev_sc_idx_start=prev_sc_idx_start,
+                    prev_b_idx_end=prev_b_idx_end,
+                    prev_sc_idx_end=prev_sc_idx_end,
+                    reduce_acc=vec_tiles.reduce_acc,
+                    reduce_comp=vec_tiles.reduce_comp,
+                    reduce_load_tile_group=vec_tiles.reduce_load_tile_group,
+                    p3_cast=vec_tiles.p3_cast,
+                    d_x_cache_gm=d_x_cache_gm,
+                    d_x_result_gm=d_x_result_gm,
+                    d_x=d_x,
+                    d_wkv=d_wkv,
+                    d_wgate=d_wgate,
+                    d_ape=d_ape,
+                    x_rows=tiling.x_rows,
+                    total_head_dim=tiling.total_head_dim,
+                    hidden_size=tiling.hidden_size,
+                    cmp_size=tiling.cmp_size,
+                    d_weight_work_space_size=d_weight_work_space_size,
+                    work_space_ptr=work_space_ptr,
+                    d_w_kv_work_space_ptr=d_w_kv_work_space_ptr,
+                    d_w_gate_work_space_ptr=d_w_gate_work_space_ptr,
+                    start_pos=start_pos,
+                    seq_used=seq_used,
+                    cu_seqlens=cu_seqlens,
+                    seq_ctx=seq_ctx,
                 )
+                _phase3_reduce(p3, io_d_type)
 
                 # ── V2 结束后轮换：本轮快照 cur → prev（供下一轮 V2(i) 使用）──
                 (
@@ -3461,41 +3077,41 @@ def compressor_grad(
                 )
                 pl.system.sync_all(core_type=pl.SyncCoreType.MIX)
                 if pre_deal_tc_size < round_blocks:
-                    _phase2_matmul(
-                        round_idx,
-                        db_idx,
-                        deal_tc_size,
-                        tiling.hidden_size,
-                        tiling.head_dim,
-                        tiling.deal_sc_num,
-                        tiling.cube_m_base_size,
-                        tiling.cmp_ratio,
-                        tiling.cube_core_num,
-                        tiling.group_size,
-                        tiling.group_num,
-                        tiling.total_head_dim,
-                        tiling.db_row_cnt,
-                        group_row_stride,
-                        intra_group_idx,
-                        cv_l0a,
-                        cv_l0b,
-                        cv_l0c,
-                        l1_w_db,
-                        l1_kv0_tile_group_nz,
-                        l1_kv1_tile_group_nz,
-                        l1_score0_tile_group_nz,
-                        l1_score1_tile_group_nz,
-                        l1_kv0_tile_group_zn,
-                        l1_kv1_tile_group_zn,
-                        l1_score0_tile_group_zn,
-                        l1_score1_tile_group_zn,
-                        wkv,
-                        wgate,
-                        io_d_type,
-                        d_x_result_gm,
-                        x_arrange_gm,
-                        d_wkv_result_gm,
-                        d_w_gate_result_gm,
+                    p2 = pl.make_tuple(
+                        round_idx=round_idx,
+                        db_idx=db_idx,
+                        deal_tc_size=deal_tc_size,
+                        hidden_size=tiling.hidden_size,
+                        head_dim=tiling.head_dim,
+                        deal_sc_num=tiling.deal_sc_num,
+                        cube_m_base_size=tiling.cube_m_base_size,
+                        cmp_ratio=tiling.cmp_ratio,
+                        cube_core_num=tiling.cube_core_num,
+                        group_size=tiling.group_size,
+                        group_num=tiling.group_num,
+                        total_head_dim=tiling.total_head_dim,
+                        db_row_cnt=tiling.db_row_cnt,
+                        group_row_stride=group_row_stride,
+                        intra_group_idx=intra_group_idx,
+                        cv_l0a=cv_l0a,
+                        cv_l0b=cv_l0b,
+                        cv_l0c=cv_l0c,
+                        l1_w_db=l1_w_db,
+                        l1_kv0_tile_group_nz=l1_kv0_tile_group_nz,
+                        l1_kv1_tile_group_nz=l1_kv1_tile_group_nz,
+                        l1_score0_tile_group_nz=l1_score0_tile_group_nz,
+                        l1_score1_tile_group_nz=l1_score1_tile_group_nz,
+                        l1_kv0_tile_group_zn=l1_kv0_tile_group_zn,
+                        l1_kv1_tile_group_zn=l1_kv1_tile_group_zn,
+                        l1_score0_tile_group_zn=l1_score0_tile_group_zn,
+                        l1_score1_tile_group_zn=l1_score1_tile_group_zn,
+                        wkv=wkv,
+                        wgate=wgate,
+                        d_x_result_gm=d_x_result_gm,
+                        x_arrange_gm=x_arrange_gm,
+                        d_wkv_result_gm=d_wkv_result_gm,
+                        d_w_gate_result_gm=d_w_gate_result_gm,
                     )
+                    _phase2_matmul(p2, io_d_type)
 
                 pl.system.sync_all(core_type=pl.SyncCoreType.MIX)

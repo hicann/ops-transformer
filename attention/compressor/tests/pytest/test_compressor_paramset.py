@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -12,7 +12,7 @@ import torch
 
 # 定义测试参数组合
 TEST_PARAMS = {
-    "Prefill0":{
+    "Prefill0": {
         "batch_size": [1],
         "hidden_size": [4096],
         "Seq_len": [8192],
@@ -24,8 +24,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -34,7 +34,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "Prefill1":{
+    "Prefill1": {
         "batch_size": [1],
         "hidden_size": [4096],
         "Seq_len": [8192],
@@ -46,8 +46,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -56,7 +56,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "Prefill2":{
+    "Prefill2": {
         "batch_size": [1],
         "hidden_size": [4096],
         "Seq_len": [8192],
@@ -66,10 +66,10 @@ TEST_PARAMS = {
         "coff": [1],
         "start_p": [0],
         "cache_mode": [1],
-        "layout_x": ["TH"],#TH BSH
+        "layout_x": ["TH"],  # TH BSH
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -78,7 +78,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "decode0":{
+    "decode0": {
         "batch_size": [1],
         "hidden_size": [4096],
         "Seq_len": [1],
@@ -90,8 +90,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -100,7 +100,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "decode1":{
+    "decode1": {
         "batch_size": [1],
         "hidden_size": [4096],
         "Seq_len": [1],
@@ -112,8 +112,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -122,7 +122,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "decode2":{
+    "decode2": {
         "batch_size": [1],
         "hidden_size": [4096],
         "Seq_len": [1],
@@ -134,8 +134,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -144,7 +144,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "decode3":{
+    "decode3": {
         "batch_size": [8],
         "hidden_size": [4096],
         "Seq_len": [3],
@@ -156,8 +156,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -166,7 +166,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "decode4":{
+    "decode4": {
         "batch_size": [8],
         "hidden_size": [4096],
         "Seq_len": [3],
@@ -178,8 +178,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -188,7 +188,7 @@ TEST_PARAMS = {
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
     },
-    "decode5":{
+    "decode5": {
         "batch_size": [8],
         "hidden_size": [4096],
         "Seq_len": [3],
@@ -200,8 +200,8 @@ TEST_PARAMS = {
         "cache_mode": [1],
         "layout_x": ["TH"],
         "data_type": [torch.bfloat16],
-        "cu_seqlens":[None],
-        "seqused":[None],
+        "cu_seqlens": [None],
+        "seqused": [None],
         "start_pos": [None],
         "x_datarange": [[-10, 10]],
         "wkv_datarange": [[-10, 10]],
@@ -209,10 +209,41 @@ TEST_PARAMS = {
         "ape_datarange": [[-10, 10]],
         "kv_state_datarange": [[-10, 10]],
         "score_state_datarange": [[-10, 10]],
-    }
-}#注意单个用例组内的用例尽量不要超过32
-FIRST_CASE = [TEST_PARAMS["Prefill0"], TEST_PARAMS["Prefill1"], TEST_PARAMS["Prefill2"], TEST_PARAMS["decode0"],
-            TEST_PARAMS["decode1"], TEST_PARAMS["decode2"], TEST_PARAMS["decode3"], TEST_PARAMS["decode4"], 
-            TEST_PARAMS["decode5"]]
+    },
+}  # 注意单个用例组内的用例尽量不要超过32
+RingBuffer0 = {
+    "batch_size": [1],
+    "hidden_size": [4096],
+    "Seq_len": [3],
+    "head_dim": [512],
+    "block_size": [128],
+    "cmp_ratio": [4],
+    "coff": [2],
+    "start_p": [8193],
+    "cache_mode": [2],
+    "layout_x": ["TH"],
+    "data_type": [torch.bfloat16],
+    "cu_seqlens": [None],
+    "seqused": [None],
+    "start_pos": [None],
+    "x_datarange": [[-10, 10]],
+    "wkv_datarange": [[-10, 10]],
+    "wgate_datarange": [[-10, 10]],
+    "ape_datarange": [[-10, 10]],
+    "kv_state_datarange": [[-10, 10]],
+    "score_state_datarange": [[-10, 10]],
+}
+FIRST_CASE = [
+    TEST_PARAMS["Prefill0"],
+    TEST_PARAMS["Prefill1"],
+    TEST_PARAMS["Prefill2"],
+    TEST_PARAMS["decode0"],
+    TEST_PARAMS["decode1"],
+    TEST_PARAMS["decode2"],
+    TEST_PARAMS["decode3"],
+    TEST_PARAMS["decode4"],
+    TEST_PARAMS["decode5"],
+    RingBuffer0,
+]
 # 按需选择要启用的测试参数（例如默认启用所有）
-ENABLED_PARAMS = FIRST_CASE #按需增加需要的case即可
+ENABLED_PARAMS = FIRST_CASE  # 按需增加需要的case即可

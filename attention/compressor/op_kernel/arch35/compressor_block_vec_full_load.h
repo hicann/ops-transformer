@@ -18,9 +18,9 @@
 
 #include "compressor_block_vec.h"
 #include "compressor_tools.h"
-#include "vf/vf_softmax.h"
-#include "vf/vf_add.h"
-#include "vf/vf_mul.h"
+#include "vf/compressor_vf_softmax.h"
+#include "vf/compressor_vf_add.h"
+#include "vf/compressor_vf_mul.h"
 #include "limits"
 
 using namespace AscendC;
@@ -61,6 +61,11 @@ private:
     __aicore__ inline void DealVec1BaseBlock(CompressorVec1SliceIterator<COMP> &sliceIterator, const LoopInfo &loopInfo,
                                              uint32_t dStartIdx, uint32_t dBaseOffset, uint32_t dDealSize,
                                              uint32_t dBaseSize, uint32_t dealSeqStartIdx);
+    __aicore__ inline bool ProcessSaveStateLoop(CompressorVec1SliceIterator<COMP> &sliceIterator,
+                                                Vec1SplitInfo &splitInfo, uint32_t curLoopBatchNum, uint64_t baseOffset,
+                                                bool isApeFullLoad, uint32_t &curLoopCompressedCnt);
+    __aicore__ inline void ProcessComputeLoop(CompressorVec1SliceIterator<COMP> &sliceIterator,
+                                              Vec1SplitInfo &splitInfo, LoopInfo &loopInfo, uint64_t baseOffset);
     __aicore__ inline void CalcGroupInfo(Vec1SplitInfo &splitInfo);
     __aicore__ inline void CalcTaskDistribution(Vec1SplitInfo &splitInfo);
     __aicore__ inline void UpdateIteratorState(Vec1SplitInfo &splitInfo);
@@ -364,13 +369,7 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ComputeVec1()
         return;
     }
 
-    LoopInfo loopInfo;
-    loopInfo.groupSize = splitInfo.vec1GroupSize;
-    loopInfo.groupNum = splitInfo.vec1GroupNum;
-    loopInfo.coreRowIdx = GetBlockIdx() / splitInfo.vec1GroupSize;
-    loopInfo.coreColIdx = GetBlockIdx() % splitInfo.vec1GroupSize;
-    loopInfo.isCoreRowLast = loopInfo.coreRowIdx == splitInfo.vec1GroupNum - 1;
-    loopInfo.isCoreRowFirst = loopInfo.coreRowIdx == 0;
+    LoopInfo loopInfo = this->GetLoopInfo(splitInfo);
 
     CompressorVec1SliceIterator sliceIterator(this->tools_);
     sliceIterator.SetMaxBatchSize(this->constInfo_.batchSize);
@@ -386,64 +385,79 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ComputeVec1()
     }
     for (uint32_t idx = 0; idx < loopTimes; idx++) {
         uint32_t curLoopBatchNum = min(singleLoopBatchNum, splitInfo.dealBatchNum - singleLoopBatchNum * idx);
-        scoreUb = this->inputQue1.template AllocTensor<T>();
-        kvUb = scoreUb[BUFFER_SIZE_BYTE_16K / sizeof(T)];
-        this->FromWokrSpaceToUb(scoreUb, this->scoreMm1ResGm_, splitInfo.dealSeqStartIdx,
-                                curLoopBatchNum * this->constInfo_.sSize, baseOffset, splitInfo.dBaseSize);
-        this->FromWokrSpaceToUb(kvUb, this->kvMm1ResGm_, splitInfo.dealSeqStartIdx,
-                                curLoopBatchNum * this->constInfo_.sSize, baseOffset, splitInfo.dBaseSize);
-        this->inputQue1.template EnQue(scoreUb);
-        this->inputQue1.template DeQue<T>();
-        splitInfo.dealTcNum = 0;
         uint32_t curLoopCompressedCnt = 0;
-        for (uint32_t curB = splitInfo.curBStart; curB < splitInfo.curBStart + curLoopBatchNum; curB++) {
-            uint32_t startPos = this->GetStartPos(curB);
-            uint32_t seqLength = this->GetSeqLength(curB);
-            uint32_t seqUsed = this->GetSeqUsed(curB);
-            splitInfo.dealTcNum += CeilDivT(startPos + seqLength, this->cmpRatio_) - (startPos / this->cmpRatio_);
-            curLoopCompressedCnt += (startPos + seqUsed) / this->cmpRatio_ - startPos / this->cmpRatio_;
-        }
-        sliceIterator.Reset(splitInfo.curBStart, splitInfo.curSStart, 0U, 0U);
-        sliceIterator.SetNeedDealTcSize(splitInfo.dealTcNum);
-        sliceIterator.SetDealedTcCnt(0U);
-        Vec1SliceInfo &sliceInfo = sliceIterator.GetSlice();
-        while (!sliceIterator.IsEnd()) {
-            sliceIterator.GetSlice();
-            this->SaveState(kvUb, this->stateCacheGm_, this->stateBlockTableGm_, sliceInfo, baseOffset,
-                            splitInfo.dBaseSize, splitInfo.dBaseSize, kvStateIdx_);
-
-            AddApeToScore(scoreUb, sliceInfo, splitInfo.dBaseSize, splitInfo.dBaseSize, baseOffset, isApeFullLoad);
-            this->SaveState(scoreUb, this->stateCacheGm_, this->stateBlockTableGm_, sliceInfo, baseOffset,
-                            splitInfo.dBaseSize, splitInfo.dBaseSize, scoreStateIdx_);
-            sliceIterator.IteratorSlice();
-        }
-
-        if (curLoopCompressedCnt == 0) {
-            this->inputQue1.template FreeTensor(scoreUb);
+        if (ProcessSaveStateLoop(sliceIterator, splitInfo, curLoopBatchNum, baseOffset, isApeFullLoad,
+                                 curLoopCompressedCnt)) {
             continue;
         }
-        for (uint32_t dLoopIdx = 0; dLoopIdx < splitInfo.dLoopCount; dLoopIdx++) {
-            uint64_t dBaseOffset = baseOffset + dLoopIdx * splitInfo.dSplitSize;
-            loopInfo.dLoopIdx = dLoopIdx;
-
-            sliceIterator.Reset(splitInfo.curBStart, splitInfo.curSStart, 0U, 0U);
-            this->compressedCnt_ = splitInfo.preCompressedCnt;
-            for (uint32_t tcIdx = 0; tcIdx < splitInfo.dealTcNum; tcIdx += splitInfo.tcSplitSize) {
-                uint32_t actDealTcSize = min(splitInfo.tcSplitSize, splitInfo.dealTcNum - tcIdx);
-
-                loopInfo.isCoreLoopFirst = tcIdx == 0;
-                loopInfo.isCoreLoopLast = tcIdx + splitInfo.tcSplitSize >= splitInfo.dealTcNum;
-                // 处理单个切块
-                sliceIterator.SetNeedDealTcSize(actDealTcSize);
-                sliceIterator.SetDealedTcCnt(0U);
-                DealVec1BaseBlock(sliceIterator, loopInfo, baseOffset, dLoopIdx * splitInfo.dSplitSize,
-                                  splitInfo.dSplitSize, splitInfo.dBaseSize, splitInfo.dealSeqStartIdx);
-            }
-        }
+        ProcessComputeLoop(sliceIterator, splitInfo, loopInfo, baseOffset);
         this->inputQue1.template FreeTensor(scoreUb);
         splitInfo.curBStart += curLoopBatchNum;
         splitInfo.dealSeqStartIdx += curLoopBatchNum * this->constInfo_.sSize;
         splitInfo.preCompressedCnt += curLoopCompressedCnt;
+    }
+}
+
+template <typename COMP>
+__aicore__ inline bool CompressorBlockVectorFullLoad<COMP>::ProcessSaveStateLoop(
+    CompressorVec1SliceIterator<COMP> &sliceIterator, Vec1SplitInfo &splitInfo, uint32_t curLoopBatchNum,
+    uint64_t baseOffset, bool isApeFullLoad, uint32_t &curLoopCompressedCnt)
+{
+    scoreUb = this->inputQue1.template AllocTensor<T>();
+    kvUb = scoreUb[BUFFER_SIZE_BYTE_16K / sizeof(T)];
+    this->FromWokrSpaceToUb(scoreUb, this->scoreMm1ResGm_, splitInfo.dealSeqStartIdx,
+                            curLoopBatchNum * this->constInfo_.sSize, baseOffset, splitInfo.dBaseSize);
+    this->FromWokrSpaceToUb(kvUb, this->kvMm1ResGm_, splitInfo.dealSeqStartIdx,
+                            curLoopBatchNum * this->constInfo_.sSize, baseOffset, splitInfo.dBaseSize);
+    this->inputQue1.template EnQue(scoreUb);
+    this->inputQue1.template DeQue<T>();
+    splitInfo.dealTcNum = 0;
+    curLoopCompressedCnt = 0;
+    for (uint32_t curB = splitInfo.curBStart; curB < splitInfo.curBStart + curLoopBatchNum; curB++) {
+        uint32_t startPos = this->GetStartPos(curB);
+        uint32_t seqLength = this->GetSeqLength(curB);
+        uint32_t seqUsed = this->GetSeqUsed(curB);
+        splitInfo.dealTcNum += CeilDivT(startPos + seqLength, this->cmpRatio_) - (startPos / this->cmpRatio_);
+        curLoopCompressedCnt += (startPos + seqUsed) / this->cmpRatio_ - startPos / this->cmpRatio_;
+    }
+    sliceIterator.Reset(splitInfo.curBStart, splitInfo.curSStart, 0U, 0U);
+    sliceIterator.SetNeedDealTcSize(splitInfo.dealTcNum);
+    sliceIterator.SetDealedTcCnt(0U);
+    Vec1SliceInfo &sliceInfo = sliceIterator.GetSlice();
+    while (!sliceIterator.IsEnd()) {
+        sliceIterator.GetSlice();
+        this->SaveState(kvUb, this->stateCacheGm_, this->stateBlockTableGm_, sliceInfo, baseOffset, splitInfo.dBaseSize,
+                        splitInfo.dBaseSize, kvStateIdx_);
+        AddApeToScore(scoreUb, sliceInfo, splitInfo.dBaseSize, splitInfo.dBaseSize, baseOffset, isApeFullLoad);
+        this->SaveState(scoreUb, this->stateCacheGm_, this->stateBlockTableGm_, sliceInfo, baseOffset,
+                        splitInfo.dBaseSize, splitInfo.dBaseSize, scoreStateIdx_);
+        sliceIterator.IteratorSlice();
+    }
+    if (curLoopCompressedCnt == 0) {
+        this->inputQue1.template FreeTensor(scoreUb);
+        return true; // 空轮：无压缩块，跳过核心计算
+    }
+    return false;
+}
+
+template <typename COMP>
+__aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ProcessComputeLoop(
+    CompressorVec1SliceIterator<COMP> &sliceIterator, Vec1SplitInfo &splitInfo, LoopInfo &loopInfo, uint64_t baseOffset)
+{
+    for (uint32_t dLoopIdx = 0; dLoopIdx < splitInfo.dLoopCount; dLoopIdx++) {
+        loopInfo.dLoopIdx = dLoopIdx;
+        sliceIterator.Reset(splitInfo.curBStart, splitInfo.curSStart, 0U, 0U);
+        this->compressedCnt_ = splitInfo.preCompressedCnt;
+        for (uint32_t tcIdx = 0; tcIdx < splitInfo.dealTcNum; tcIdx += splitInfo.tcSplitSize) {
+            uint32_t actDealTcSize = min(splitInfo.tcSplitSize, splitInfo.dealTcNum - tcIdx);
+            loopInfo.isCoreLoopFirst = tcIdx == 0;
+            loopInfo.isCoreLoopLast = tcIdx + splitInfo.tcSplitSize >= splitInfo.dealTcNum;
+            // 处理单个切块
+            sliceIterator.SetNeedDealTcSize(actDealTcSize);
+            sliceIterator.SetDealedTcCnt(0U);
+            DealVec1BaseBlock(sliceIterator, loopInfo, baseOffset, dLoopIdx * splitInfo.dSplitSize,
+                              splitInfo.dSplitSize, splitInfo.dBaseSize, splitInfo.dealSeqStartIdx);
+        }
     }
 }
 } // namespace Compressor

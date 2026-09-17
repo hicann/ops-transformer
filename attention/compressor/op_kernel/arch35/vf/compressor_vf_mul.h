@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file vf_mul.h
+ * \file compressor_vf_mul.h
  * \brief
  */
 
-#ifndef VF_MUL_H
-#define VF_MUL_H
+#ifndef COMPRESSOR_VF_MUL_H
+#define COMPRESSOR_VF_MUL_H
 
 #include "kernel_operator.h"
 #include <cstdint>

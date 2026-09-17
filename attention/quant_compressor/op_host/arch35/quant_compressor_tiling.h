@@ -82,6 +82,10 @@ constexpr uint32_t MIN_BLOCK_SIZE = 1;
 constexpr uint32_t MAX_BLOCK_SIZE = 1024;
 constexpr uint32_t MAX_CMPRATIO_SIZE = 128;
 constexpr uint32_t MIN_CMPRATIO_SIZE = 2;
+constexpr uint32_t DB_WORKSPACE_RATIO = 2;
+constexpr uint32_t COFF_VALUE_2 = 2;
+constexpr uint32_t FULL_LOAD_MAX_SEQ_SIZE = 4;
+constexpr uint32_t FULL_LOAD_MAX_TOKEN_SIZE = 256;
 
 constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
 
@@ -264,21 +268,23 @@ public:
     {}
     ~QuantCompressorTiling() = default;
 
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, QuantCompressorContext &compressorContext);
+    static ge::graphStatus ConvertContext(gert::TilingContext &context, QuantCompressorContext &quantCompressorContext);
     ge::graphStatus RunBigKernelTiling(QuantCompressorTilingData *tilingData);
 
 private:
     static ge::graphStatus ConvertRequiredParams(gert::TilingContext &context,
-                                                 QuantCompressorContext &compressorContext);
+                                                 QuantCompressorContext &quantCompressorContext);
 
-    static void ConvertOptionalParams(gert::TilingContext &context, QuantCompressorContext &compressorContext);
+    static void ConvertOptionalParams(gert::TilingContext &context, QuantCompressorContext &quantCompressorContext);
     ge::graphStatus GetNpuInfo();
     ge::graphStatus SetBaseInfo();
-    ge::graphStatus SetPageAttentionInfo();
-    ge::graphStatus SetWorkSpaceInfo();
-    ge::graphStatus SetScenarioInfo();
-    ge::graphStatus SetTemplateId();
-    ge::graphStatus SetInnerSplitInfo();
+    ge::graphStatus SetPageAttentionInfo() const;
+    ge::graphStatus SetWorkSpaceInfo() const;
+    ge::graphStatus SetScenarioInfo() const;
+    ge::graphStatus SetTemplateId() const;
+    ge::graphStatus SetInnerSplitInfo() const;
+    ge::graphStatus SetFullLoadSplitInfo() const;
+    ge::graphStatus SetNormalSplitInfo() const;
     ge::graphStatus CalcWorkSpace();
     ge::graphStatus GenTilingKey() const;
     // ================================通用检查辅助函数==================================

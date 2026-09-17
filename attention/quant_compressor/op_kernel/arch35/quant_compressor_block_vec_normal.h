@@ -93,18 +93,7 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::InitBuffers(TPipe
     this->xWKvDescaleUb = this->wKvDescaleBuf.template Get<T>();
     this->xWGateDescaleUb = this->wGateDescaleBuf.template Get<T>();
     if constexpr (COMP::quantMode == QUANT_MODE::A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL) {
-        LocalTensor<T> wDescale = this->inputQue3.template AllocTensor<T>();
-        DataCopy(wDescale, this->wKvDescaleGm_, this->coff_ * this->constInfo_.headDim);
-        DataCopy(wDescale[BUFFER_SIZE_BYTE_8K / sizeof(T)], this->wGateDescaleGm_,
-                 this->coff_ * this->constInfo_.headDim);
-        this->inputQue3.template EnQue(wDescale);
-        this->inputQue3.template DeQue<T>();
-        DataCopy(this->xWKvDescaleUb, wDescale, this->coff_ * this->constInfo_.headDim);
-        DataCopy(this->xWGateDescaleUb, wDescale[BUFFER_SIZE_BYTE_8K / sizeof(T)],
-                 this->coff_ * this->constInfo_.headDim);
-        this->inputQue3.template FreeTensor(wDescale);
-        MulsVF(this->xWKvDescaleUb, this->xWKvDescaleUb, this->xDescale_, this->coff_, this->constInfo_.headDim);
-        MulsVF(this->xWGateDescaleUb, this->xWGateDescaleUb, this->xDescale_, this->coff_, this->constInfo_.headDim);
+        this->LoadDescale();
     }
     PipeBarrier<PIPE_V>();
 }
@@ -420,13 +409,7 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::ComputeVec1(const
         return;
     }
 
-    LoopInfo loopInfo;
-    loopInfo.groupSize = splitInfo.vec1GroupSize;
-    loopInfo.groupNum = splitInfo.vec1GroupNum;
-    loopInfo.coreRowIdx = GetBlockIdx() / splitInfo.vec1GroupSize;
-    loopInfo.coreColIdx = GetBlockIdx() % splitInfo.vec1GroupSize;
-    loopInfo.isCoreRowLast = loopInfo.coreRowIdx == splitInfo.vec1GroupNum - 1;
-    loopInfo.isCoreRowFirst = loopInfo.coreRowIdx == 0;
+    LoopInfo loopInfo = this->GetLoopInfo(splitInfo);
 
     QuantCompressorVec1SliceIterator sliceIterator(this->tools_);
     sliceIterator.SetMaxBatchSize(this->constInfo_.batchSize);

@@ -105,7 +105,7 @@ def output_operator(params):
 
     else:
         cu_seqlens = None
-        if start_pos is not None:
+        if start_pos is not None and len(start_pos) > 0:
             S_max = max(start_pos) + Seq_len
         else:
             S_max = Seq_len

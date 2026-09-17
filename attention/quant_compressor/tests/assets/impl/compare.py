@@ -498,8 +498,10 @@ def compare(*outputs, **kwargs):
         }
 
     GOLDEN_OUTPUT_COUNT = 2
+    outputs = tuple(_to_torch(o) for o in outputs)
     golden_outputs = list(outputs[-GOLDEN_OUTPUT_COUNT:])
     npu_outputs = list(outputs[:-GOLDEN_OUTPUT_COUNT])
+
     cmp_kv_mask = kwargs.get("cmp_kv_mask", None)
 
     # Fallback: single NPU output (cmp_kv only) — compare cmp_kv, skip state_cache
@@ -525,7 +527,7 @@ def compare(*outputs, **kwargs):
 
     npu_cmp_kv = npu_outputs[0]
     npu_state_cache = npu_outputs[1]
-    cpu_cmp_kv = golden_outputs[0]
+    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype)
     cpu_state_cache = golden_outputs[1]
 
     update_kv = kwargs.get("update_kv", None)
@@ -598,13 +600,23 @@ def compare(*outputs, **kwargs):
     return results
 
 
+def _try_hifloat8_dtype():
+    try:
+        return np.dtype("hifloat8")
+    except TypeError:
+        return None
+
+
+_HIF8_DTYPE = _try_hifloat8_dtype()
+
+
 def _to_torch(val):
     if val is None:
         return None
     if torch.is_tensor(val):
         return val
     if isinstance(val, np.ndarray):
-        if val.dtype == np.dtype("hifloat8"):
+        if _HIF8_DTYPE is not None and val.dtype == _HIF8_DTYPE:
             return torch.from_numpy(val.view(np.uint8))
         if val.dtype.itemsize == 2 and str(val.dtype) == "bfloat16":
             return torch.from_numpy(val.view(np.uint16)).view(torch.bfloat16)
@@ -631,7 +643,9 @@ def compare_aclnn(*outputs, **kwargs):
         results = [
             _tensor_compare(
                 npu_outputs[0][cmp_kv_mask].to(torch.float32),
-                golden_outputs[1][cmp_kv_mask].to(torch.float32),
+                golden_outputs[1][cmp_kv_mask]
+                .to(npu_outputs[0].dtype)
+                .to(torch.float32),
                 "cmp_kv",
             )
         ]
@@ -649,12 +663,12 @@ def compare_aclnn(*outputs, **kwargs):
             results.append(result_consistency)
         return results
 
-    npu_state_cache = npu_outputs[0].to(torch.float32)
-    npu_cmp_kv = npu_outputs[1].to(torch.float32)
+    npu_state_cache = npu_outputs[1].to(torch.float32)
+    npu_cmp_kv = npu_outputs[0].to(torch.float32)
     # aclnn golden return order aligns with output_tensor_indexes=(3,12):
     #   golden[0] = state_cache (idx 3), golden[1] = cmp_kv (idx 12)
-    cpu_state_cache = golden_outputs[0].to(torch.float32)
-    cpu_cmp_kv = golden_outputs[1].to(torch.float32)
+    cpu_state_cache = golden_outputs[1].to(torch.float32)
+    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype).to(torch.float32)
 
     update_kv = kwargs.get("update_kv", None)
     update_score = kwargs.get("update_score", None)

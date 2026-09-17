@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -24,8 +24,8 @@ import ast
 import argparse
 import custom_ops
 
-def load_excel_test_cases(excel_file_path: str, sheetname: str):
 
+def load_excel_test_cases(excel_file_path: str, sheetname: str):
     """
     从 Excel 文件加载测试用例。
 
@@ -39,7 +39,7 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
     """
     # 优先使用传入的 sheetname，否则尝试从环境变量获取
     if sheetname is None:
-        sheetname = 'Sheet1'
+        sheetname = "Sheet1"
 
     # 检查文件是否存在
     if not os.path.exists(excel_file_path):
@@ -52,42 +52,65 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
 
         # 定义必需的列名
         required_columns = [
-            'Testcase_Name', 'batch_size', 'hidden_size', 'Seq_len', 'head_dim', 'block_size', 'cmp_ratio',
-            'coff', 'start_p', 'cache_mode', 'layout_x', 'data_type', 'cu_seqlens', 'seqused', 'start_pos',
-            'x_datarange','wkv_datarange','wgate_datarange','ape_datarange','kv_state_datarange','score_state_datarange'
+            "Testcase_Name",
+            "batch_size",
+            "hidden_size",
+            "Seq_len",
+            "head_dim",
+            "block_size",
+            "cmp_ratio",
+            "coff",
+            "start_p",
+            "cache_mode",
+            "layout_x",
+            "data_type",
+            "cu_seqlens",
+            "seqused",
+            "start_pos",
+            "x_datarange",
+            "wkv_datarange",
+            "wgate_datarange",
+            "ape_datarange",
+            "kv_state_datarange",
+            "score_state_datarange",
         ]
 
         # 检查是否缺少必要列
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
-            pytest.skip(f"Missing required columns in Excel: {missing_cols}", allow_module_level=True)
+            pytest.skip(
+                f"Missing required columns in Excel: {missing_cols}",
+                allow_module_level=True,
+            )
 
         # 构建测试用例列表
         test_cases = []
         for _, row in df.iterrows():
-            test_cases.append((
-                row['Testcase_Name'],
-                row['batch_size'], 
-                row['hidden_size'], 
-                row['Seq_len'], 
-                row['head_dim'], 
-                row['block_size'], 
-                row['cmp_ratio'], 
-                row['coff'], 
-                row['start_p'], 
-                row['cache_mode'],
-                row['layout_x'], 
-                row['data_type'], 
-                row['cu_seqlens'], 
-                row['seqused'], 
-                row['start_pos'], 
-                row['x_datarange'], 
-                row['wkv_datarange'], 
-                row['wgate_datarange'], 
-                row['ape_datarange'], 
-                row['kv_state_datarange'], 
-                row['score_state_datarange']
-            ))
+            test_cases.append(
+                (
+                    row["Testcase_Name"],
+                    row["batch_size"],
+                    row["hidden_size"],
+                    row["Seq_len"],
+                    row["head_dim"],
+                    row["block_size"],
+                    row["cmp_ratio"],
+                    row["coff"],
+                    row["start_p"],
+                    row["cache_mode"],
+                    row["layout_x"],
+                    row["data_type"],
+                    row["cu_seqlens"],
+                    row["seqused"],
+                    row["start_pos"],
+                    row["x_datarange"],
+                    row["wkv_datarange"],
+                    row["wgate_datarange"],
+                    row["ape_datarange"],
+                    row["kv_state_datarange"],
+                    row["score_state_datarange"],
+                )
+            )
 
         return test_cases
 
@@ -95,40 +118,75 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
         pytest.skip(f"Failed to read Excel file: {e}", allow_module_level=True)
         return None
 
-class Generalized_operator():
-    def forward(self,
-                x,
-                wkv,
-                wgate,
-                kv_state,
-                score_state,
-                update_kv_position,
-                update_score_position,
-                ape,
-                block_table,
-                cu_seqlens,
-                seqused,
-                start_pos,
-                cmp_ratio,
-                coff,
-                cache_mode):
+
+class Generalized_operator:
+    def forward(
+        self,
+        x,
+        wkv,
+        wgate,
+        kv_state,
+        score_state,
+        update_kv_position,
+        update_score_position,
+        ape,
+        block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+        cmp_ratio,
+        coff,
+        cache_mode,
+    ):
         return cpu_compressor(
-            x, wkv, wgate, kv_state, score_state, update_kv_position, update_score_position, ape,
-            block_table=block_table, cu_seqlens=cu_seqlens, seqused=seqused, start_pos=start_pos,
-            cmp_ratio=cmp_ratio, coff=coff,cache_mode=cache_mode)
+            x,
+            wkv,
+            wgate,
+            kv_state,
+            score_state,
+            update_kv_position,
+            update_score_position,
+            ape,
+            block_table=block_table,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos,
+            cmp_ratio=cmp_ratio,
+            coff=coff,
+            cache_mode=cache_mode,
+        )
 
 
 def compressor_output_single(data_case):
     casename = data_case[0]
     params = data_case[1:]
 
-    batch_size, hidden_size, Seq_len, head_dim, block_size, cmp_ratio, coff, \
-    start_p, cache_mode, layout_x, data_type, cu_seqlens, seqused, start_pos, x_datarange, wkv_datarange,  \
-    wgate_datarange, ape_datarange, kv_state_datarange, score_state_datarange = params
+    (
+        batch_size,
+        hidden_size,
+        Seq_len,
+        head_dim,
+        block_size,
+        cmp_ratio,
+        coff,
+        start_p,
+        cache_mode,
+        layout_x,
+        data_type,
+        cu_seqlens,
+        seqused,
+        start_pos,
+        x_datarange,
+        wkv_datarange,
+        wgate_datarange,
+        ape_datarange,
+        kv_state_datarange,
+        score_state_datarange,
+    ) = params
 
-    if data_type == 'FP16':
-        data_type =  torch.float16
-    elif data_type == 'BF16':
+    if data_type == "FP16":
+        data_type = torch.float16
+    elif data_type == "BF16":
         data_type = torch.bfloat16
 
     # 处理B+1
@@ -138,14 +196,14 @@ def compressor_output_single(data_case):
     elif isinstance(cu_seqlens, list):
         cu_seqlens = cu_seqlens
     elif cu_seqlens is not None:
-        cu_seqlens = [int(x.strip()) for x in cu_seqlens.split(',')]
+        cu_seqlens = [int(x.strip()) for x in cu_seqlens.split(",")]
     # print(f"===== {start_pos} =====")
     if isinstance(start_pos, int):
         start_pos = [start_pos]
     elif isinstance(start_pos, list):
         start_pos = start_pos
-    elif start_pos is not None and batch_size !=1:
-        start_pos = [int(x.strip()) for x in start_pos.split(',')]
+    elif start_pos is not None and batch_size != 1:
+        start_pos = [int(x.strip()) for x in start_pos.split(",")]
     elif start_pos is not None:
         start_pos = [int(start_pos)]
     # print(f"===== {seqused} =====")
@@ -153,17 +211,17 @@ def compressor_output_single(data_case):
         seqused = [seqused]
     elif isinstance(seqused, list):
         seqused = seqused
-    elif seqused is not None and batch_size !=1:
-        seqused = [int(x.strip()) for x in seqused.split(',')]
+    elif seqused is not None and batch_size != 1:
+        seqused = [int(x.strip()) for x in seqused.split(",")]
     elif seqused is not None:
         seqused = [int(seqused)]
 
-    x_datarange = [float(x.strip()) for x in x_datarange.split(',')]
-    wkv_datarange = [float(x.strip()) for x in wkv_datarange.split(',')]
-    wgate_datarange = [float(x.strip()) for x in wgate_datarange.split(',')]
-    ape_datarange = [float(x.strip()) for x in ape_datarange.split(',')]
-    kv_state_datarange = [float(x.strip()) for x in kv_state_datarange.split(',')]
-    score_state_datarange = [float(x.strip()) for x in score_state_datarange.split(',')]
+    x_datarange = [float(x.strip()) for x in x_datarange.split(",")]
+    wkv_datarange = [float(x.strip()) for x in wkv_datarange.split(",")]
+    wgate_datarange = [float(x.strip()) for x in wgate_datarange.split(",")]
+    ape_datarange = [float(x.strip()) for x in ape_datarange.split(",")]
+    kv_state_datarange = [float(x.strip()) for x in kv_state_datarange.split(",")]
+    score_state_datarange = [float(x.strip()) for x in score_state_datarange.split(",")]
 
     S_max = 0
     save_state_seqlens = None
@@ -179,36 +237,40 @@ def compressor_output_single(data_case):
         bs_combine_flag = True
         if cu_seqlens is None:
             T = batch_size * Seq_len
-            if T !=0:
+            if T != 0:
                 cu_seqlens = torch.arange(0, T + 1, Seq_len, dtype=torch.int32)
             else:
-                cu_seqlens = torch.zeros((batch_size+1), dtype=torch.int32)
+                cu_seqlens = torch.zeros((batch_size + 1), dtype=torch.int32)
         else:
             cu_seqlens = torch.tensor(cu_seqlens).to(torch.int32)
         for i in range(batch_size):
             if start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] > S_max:
-                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] 
+                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i]
     else:
         cu_seqlens = None
-        S_max = max(start_pos) + Seq_len
- # ======================== set input params finish ========================
+        S_max = (max(start_pos) if len(start_pos) > 0 else 0) + Seq_len
+    # ======================== set input params finish ========================
     if bs_combine_flag:
         # cu_seqlens = [0, 1] # (batch_size+1,), None时表示非BSh，否则为Th
         if cu_seqlens is None:
-            print(f"Error: layout of x is [T, hidden_size], cu_seqlens is required!!!")
+            print("Error: layout of x is [T, hidden_size], cu_seqlens is required!!!")
             return
         old_S = Seq_len
         if seqused is not None:
-            Seq_len = max(seqused)
+            Seq_len = max(seqused) if len(seqused) > 0 else 0
         else:
             Seq_len = 0
             for i in range(batch_size):
                 if (cu_seqlens[i + 1] - cu_seqlens[i]) > Seq_len:
                     Seq_len = cu_seqlens[i + 1] - cu_seqlens[i]
-        print(f"Warning: layout of x is [T, hidden_size], Seq_len={old_S}, it is modified to Seq_len={Seq_len}!!!")
+        print(
+            f"Warning: layout of x is [T, hidden_size], Seq_len={old_S}, it is modified to Seq_len={Seq_len}!!!"
+        )
     else:
         if cu_seqlens is not None:
-            print(f"Warning: layout of x is [batch_size, Seq_len, hidden_size], but cu_seqlens is not None, it is modified to None!!!")
+            print(
+                "Warning: layout of x is [batch_size, Seq_len, hidden_size], but cu_seqlens is not None, it is modified to None!!!"
+            )
         cu_seqlens = None
     exist_start_pos = True
     if start_pos is None:
@@ -218,44 +280,62 @@ def compressor_output_single(data_case):
     # ======================== check input params start ========================
     if start_pos is not None:
         if len(start_pos) != batch_size:
-            print(f"Error: the len of start_pos is {len(start_pos)}, it should be batch_size({batch_size})")
+            print(
+                f"Error: the len of start_pos is {len(start_pos)}, it should be batch_size({batch_size})"
+            )
             return
     if seqused is not None:
         if len(seqused) != batch_size:
-            print(f"Error: the len of seqused is {len(seqused)}, it should be batch_size({batch_size})")
+            print(
+                f"Error: the len of seqused is {len(seqused)}, it should be batch_size({batch_size})"
+            )
             return
     if cu_seqlens is not None:
         if len(cu_seqlens) != (batch_size + 1):
-            print(f"Error: the len of cu_seqlens is {len(cu_seqlens)}, it should be equal to batch_size({batch_size}) + 1")
+            print(
+                f"Error: the len of cu_seqlens is {len(cu_seqlens)}, it should be equal to batch_size({batch_size}) + 1"
+            )
             return
     if bs_combine_flag:
         for i in range(batch_size):
             if start_pos[i] + (cu_seqlens[i + 1] - cu_seqlens[i]) > S_max:
-                print(f"Error: for batch {i} when shape of x is (T, hidden_size), start_pos[{i}] + (cu_seqlens[{i + 1}] - cu_seqlens[{i}]) > S_max, "
-                    f"start_pos[{i}]={start_pos[i]}, cu_seqlens[{i + 1}]={cu_seqlens[i + 1]}, cu_seqlens[{i}]={cu_seqlens[i]}, S_max={S_max}")
+                print(
+                    f"Error: for batch {i} when shape of x is (T, hidden_size), start_pos[{i}] + (cu_seqlens[{i + 1}] - cu_seqlens[{i}]) > S_max, "
+                    f"start_pos[{i}]={start_pos[i]}, cu_seqlens[{i + 1}]={cu_seqlens[i + 1]}, cu_seqlens[{i}]={cu_seqlens[i]}, S_max={S_max}"
+                )
                 return
             if seqused is not None:
                 if seqused[i] > (cu_seqlens[i + 1] - cu_seqlens[i]):
-                    print(f"Error: for batch {i} when shape of x is (T, hidden_size), seqused[{i}] > (cu_seqlens[{i + 1}] - cu_seqlens[{i}]), "
-                        f"seqused[{i}]={seqused[i]}, cu_seqlens[{i + 1}]={cu_seqlens[i + 1]}, cu_seqlens[{i}]={cu_seqlens[i]}")
+                    print(
+                        f"Error: for batch {i} when shape of x is (T, hidden_size), seqused[{i}] > (cu_seqlens[{i + 1}] - cu_seqlens[{i}]), "
+                        f"seqused[{i}]={seqused[i]}, cu_seqlens[{i + 1}]={cu_seqlens[i + 1]}, cu_seqlens[{i}]={cu_seqlens[i]}"
+                    )
                     return
     else:
         for i in range(batch_size):
             if start_pos[i] + Seq_len > S_max:
-                print(f"Error: for batch {i} when shape of x is (batch_size, Seq_len, hidden_size), start_pos[{i}] + Seq_len > S_max, start_pos[{i}]={start_pos[i]}, Seq_len={Seq_len}, S_max={S_max}")
+                print(
+                    f"Error: for batch {i} when shape of x is (batch_size, Seq_len, hidden_size), start_pos[{i}] + Seq_len > S_max, start_pos[{i}]={start_pos[i]}, Seq_len={Seq_len}, S_max={S_max}"
+                )
                 return
             if seqused is not None:
                 if seqused[i] > Seq_len:
-                    print(f"Error: for batch {i} when shape of x is (batch_size, Seq_len, hidden_size), seqused[{i}] > Seq_len, seqused[{i}]={seqused[i]}, Seq_len={Seq_len}")
+                    print(
+                        f"Error: for batch {i} when shape of x is (batch_size, Seq_len, hidden_size), seqused[{i}] > Seq_len, seqused[{i}]={seqused[i]}, Seq_len={Seq_len}"
+                    )
                     return
     if save_state_seqlens is not None:
         if len(save_state_seqlens) != batch_size:
-            print(f"Error: the len of save_state_seqlens is {len(save_state_seqlens)}, it should be equal to batch_size({batch_size})")
+            print(
+                f"Error: the len of save_state_seqlens is {len(save_state_seqlens)}, it should be equal to batch_size({batch_size})"
+            )
             return
         for i in range(batch_size):
             b_seqused = get_seq_used_by_batch(i, Seq_len, seqused, cu_seqlens)
             if b_seqused < save_state_seqlens[i]:
-                print(f"Error: for batch {i}, b_seqused < save_state_seqlens[{i}], b_seqused={b_seqused}, save_state_seqlens[{i}]={save_state_seqlens[i]}")
+                print(
+                    f"Error: for batch {i}, b_seqused < save_state_seqlens[{i}], b_seqused={b_seqused}, save_state_seqlens[{i}]={save_state_seqlens[i]}"
+                )
                 return
 
     # ======================== check input params finish ========================
@@ -266,7 +346,9 @@ def compressor_output_single(data_case):
         block_num = batch_size * max_block_num_per_batch
         next_block_id = 1
         print(f"max_block_num_per_batch: {max_block_num_per_batch}")
-        block_table = torch.zeros(size=(batch_size, max_block_num_per_batch), dtype=torch.int32)
+        block_table = torch.zeros(
+            size=(batch_size, max_block_num_per_batch), dtype=torch.int32
+        )
         for i in range(batch_size):
             # 需要读取state的范围
             cur_start = start_pos[i] // cmp_ratio * cmp_ratio - cmp_ratio
@@ -286,7 +368,9 @@ def compressor_output_single(data_case):
                 next_start = start_pos[i] + end_pos - save_state_seqlens[i]
                 next_end = start_pos[i] + end_pos
             else:
-                next_start = (start_pos[i] + end_pos) // cmp_ratio * cmp_ratio - cmp_ratio
+                next_start = (
+                    start_pos[i] + end_pos
+                ) // cmp_ratio * cmp_ratio - cmp_ratio
                 next_end = (start_pos[i] + end_pos) // cmp_ratio * cmp_ratio + cmp_ratio
                 if (start_pos[i] + end_pos) % cmp_ratio == 0:
                     next_end = start_pos[i] + end_pos
@@ -297,82 +381,157 @@ def compressor_output_single(data_case):
                 if next_block_id < block_num and block_table[i][j] == 0:
                     block_table[i][j] = next_block_id
                     next_block_id = next_block_id + 1
-        if batch_size==0:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (0, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (0, block_size, coff * head_dim))).to(torch.float32)
+        if batch_size == 0:
+            kv_state = torch.tensor(
+                np.random.uniform(
+                    kv_state_datarange[0],
+                    kv_state_datarange[1],
+                    (0, block_size, coff * head_dim),
+                )
+            ).to(torch.float32)
+            score_state = torch.tensor(
+                np.random.uniform(
+                    score_state_datarange[0],
+                    score_state_datarange[1],
+                    (0, block_size, coff * head_dim),
+                )
+            ).to(torch.float32)
         else:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (block_num, block_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (block_num, block_size, coff * head_dim))).to(torch.float32)
+            kv_state = torch.tensor(
+                np.random.uniform(
+                    kv_state_datarange[0],
+                    kv_state_datarange[1],
+                    (block_num, block_size, coff * head_dim),
+                )
+            ).to(torch.float32)
+            score_state = torch.tensor(
+                np.random.uniform(
+                    score_state_datarange[0],
+                    score_state_datarange[1],
+                    (block_num, block_size, coff * head_dim),
+                )
+            ).to(torch.float32)
     else:
-        block_table = torch.tensor(random.sample(list(range(batch_size)), batch_size), dtype=torch.int32)
-        token_size = (2*cmp_ratio+Seq_len-1) if coff == 2 else (cmp_ratio+Seq_len-1)
-        if batch_size==0:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (batch_size, token_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (0, token_size, coff * head_dim))).to(torch.float32)
+        block_table = torch.tensor(
+            random.sample(list(range(batch_size)), batch_size), dtype=torch.int32
+        )
+        token_size = (
+            (2 * cmp_ratio + Seq_len - 1) if coff == 2 else (cmp_ratio + Seq_len - 1)
+        )
+        if batch_size == 0:
+            kv_state = torch.tensor(
+                np.random.uniform(
+                    kv_state_datarange[0],
+                    kv_state_datarange[1],
+                    (batch_size, token_size, coff * head_dim),
+                )
+            ).to(torch.float32)
+            score_state = torch.tensor(
+                np.random.uniform(
+                    score_state_datarange[0],
+                    score_state_datarange[1],
+                    (0, token_size, coff * head_dim),
+                )
+            ).to(torch.float32)
         else:
-            kv_state = torch.tensor(np.random.uniform(kv_state_datarange[0], kv_state_datarange[1], (batch_size, token_size, coff * head_dim))).to(torch.float32)
-            score_state = torch.tensor(np.random.uniform(score_state_datarange[0], score_state_datarange[1], (batch_size, token_size, coff * head_dim))).to(torch.float32)
-        
+            kv_state = torch.tensor(
+                np.random.uniform(
+                    kv_state_datarange[0],
+                    kv_state_datarange[1],
+                    (batch_size, token_size, coff * head_dim),
+                )
+            ).to(torch.float32)
+            score_state = torch.tensor(
+                np.random.uniform(
+                    score_state_datarange[0],
+                    score_state_datarange[1],
+                    (batch_size, token_size, coff * head_dim),
+                )
+            ).to(torch.float32)
+
     # other input
     if layout_x == "TH":
         x_shape = (cu_seqlens[-1], hidden_size)
     else:
         x_shape = (batch_size, Seq_len, hidden_size)
 
-    x = torch.tensor(np.random.uniform(x_datarange[0], x_datarange[1], x_shape)).to(data_type)
-    wkv = torch.tensor(np.random.uniform(wkv_datarange[0], wkv_datarange[1], (coff * head_dim, hidden_size))).to(data_type)
-    wgate = torch.tensor(np.random.uniform(wgate_datarange[0], wgate_datarange[1], (coff * head_dim, hidden_size))).to(data_type)
-    ape = torch.tensor(np.random.uniform(ape_datarange[0], ape_datarange[1], (cmp_ratio, coff * head_dim))).to(torch.float32)
+    x = torch.tensor(np.random.uniform(x_datarange[0], x_datarange[1], x_shape)).to(
+        data_type
+    )
+    wkv = torch.tensor(
+        np.random.uniform(
+            wkv_datarange[0], wkv_datarange[1], (coff * head_dim, hidden_size)
+        )
+    ).to(data_type)
+    wgate = torch.tensor(
+        np.random.uniform(
+            wgate_datarange[0], wgate_datarange[1], (coff * head_dim, hidden_size)
+        )
+    ).to(data_type)
+    ape = torch.tensor(
+        np.random.uniform(
+            ape_datarange[0], ape_datarange[1], (cmp_ratio, coff * head_dim)
+        )
+    ).to(torch.float32)
     ### ======================== gen input data finish =============================
     ### ======================== execute cpu start =================================
     cpu_kv_state = kv_state.clone()
     cpu_score_state = score_state.clone()
 
-    update_kv = torch.zeros((cpu_kv_state.shape[0],cpu_kv_state.shape[1],cpu_kv_state.shape[2]), dtype=torch.bool)
-    update_score = torch.zeros((cpu_score_state.shape[0],cpu_score_state.shape[1],cpu_score_state.shape[2]), dtype=torch.bool)
+    update_kv = torch.zeros(
+        (cpu_kv_state.shape[0], cpu_kv_state.shape[1], cpu_kv_state.shape[2]),
+        dtype=torch.bool,
+    )
+    update_score = torch.zeros(
+        (cpu_score_state.shape[0], cpu_score_state.shape[1], cpu_score_state.shape[2]),
+        dtype=torch.bool,
+    )
 
     test_operator = Generalized_operator()
-    cpu_result, kv_mask_result = test_operator.forward( x,
-                                        wkv,
-                                        wgate,
-                                        cpu_kv_state,
-                                        cpu_score_state,
-                                        update_kv,
-                                        update_score,
-                                        ape,
-                                        block_table = block_table,
-                                        cu_seqlens = cu_seqlens,
-                                        seqused = seqused,
-                                        start_pos = start_pos,
-                                        cmp_ratio = cmp_ratio,
-                                        coff = coff,
-                                        cache_mode = cache_mode)
+    cpu_result, kv_mask_result = test_operator.forward(
+        x,
+        wkv,
+        wgate,
+        cpu_kv_state,
+        cpu_score_state,
+        update_kv,
+        update_score,
+        ape,
+        block_table=block_table,
+        cu_seqlens=cu_seqlens,
+        seqused=seqused,
+        start_pos=start_pos,
+        cmp_ratio=cmp_ratio,
+        coff=coff,
+        cache_mode=cache_mode,
+    )
     update_kv = cpu_kv_state != kv_state
     update_score = cpu_score_state != score_state
 
     output_tensors = {
-        "params":params,
+        "params": params,
         "cpu_result": cpu_result,
         "kv_mask_result": kv_mask_result,
-        "update_kv":update_kv,
-        "update_score":update_score,
-        "cpu_kv_state":cpu_kv_state,
-        "cpu_score_state":cpu_score_state,
-        "x":x,
-        "wkv":wkv,
-        "wgate":wgate,
-        "kv_state":kv_state,
-        "score_state":score_state,
-        "ape":ape,
-        "block_table":block_table,
-        "cu_seqlens":cu_seqlens,
-        "seqused":seqused,
-        "start_pos":start_pos,
-        "cmp_ratio":cmp_ratio,
-        "coff":coff,
-        "cache_mode":cache_mode
+        "update_kv": update_kv,
+        "update_score": update_score,
+        "cpu_kv_state": cpu_kv_state,
+        "cpu_score_state": cpu_score_state,
+        "x": x,
+        "wkv": wkv,
+        "wgate": wgate,
+        "kv_state": kv_state,
+        "score_state": score_state,
+        "ape": ape,
+        "block_table": block_table,
+        "cu_seqlens": cu_seqlens,
+        "seqused": seqused,
+        "start_pos": start_pos,
+        "cmp_ratio": cmp_ratio,
+        "coff": coff,
+        "cache_mode": cache_mode,
     }
-    return  casename, output_tensors
+    return casename, output_tensors
+
 
 def save_test_case(test_cases, file_path):
     print("正在保存pt文件...")
@@ -394,16 +553,17 @@ def save_test_case(test_cases, file_path):
             print(f"[失败] 生成 pt 文件失败: {case[0]} (索引: {idx})")
             print(f"错误详情: {e}")
 
+
 def main():
-    parser = argparse.ArgumentParser(description='compressor_pt_save.py 接收路径参数')
-    parser.add_argument('path1', type=str, help='第一个路径')
-    parser.add_argument('path2', type=str, help='第二个路径')
+    parser = argparse.ArgumentParser(description="compressor_pt_save.py 接收路径参数")
+    parser.add_argument("path1", type=str, help="第一个路径")
+    parser.add_argument("path2", type=str, help="第二个路径")
     args = parser.parse_args()
     path1 = args.path1
     path2 = args.path2
-    testcase =  load_excel_test_cases(path1, "Sheet1")
+    testcase = load_excel_test_cases(path1, "Sheet1")
     save_test_case(testcase, path2)
+
 
 if __name__ == "__main__":
     main()
-

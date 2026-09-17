@@ -29,7 +29,7 @@ try:
 except ImportError:
     _HAS_TORCH_NPU = False
 
-from cann_ops_transformer.ops.compressor import _compressor_forward
+from cann_ops_transformer.ops.attention.compressor.compressor import _compressor_forward
 
 
 def _valid_block_mask(cmp_kv, cu_seqlens, seqused, start_pos, cmp_ratio, seq_size=None):
@@ -169,7 +169,7 @@ class NPUBackend:
         wgate.requires_grad_(True)
         ape.requires_grad_(True)
 
-        cmp_kv, softmax_score, kv, _ = _compressor_forward(
+        cmp_kv, softmax_score, kv = _compressor_forward(
             x,
             wkv,
             wgate,

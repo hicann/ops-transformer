@@ -18,9 +18,9 @@
 
 #include "compressor_block_vec.h"
 #include "compressor_tools.h"
-#include "vf/vf_softmax.h"
-#include "vf/vf_add.h"
-#include "vf/vf_mul.h"
+#include "vf/compressor_vf_softmax.h"
+#include "vf/compressor_vf_add.h"
+#include "vf/compressor_vf_mul.h"
 #include "limits"
 
 using namespace AscendC;
@@ -383,13 +383,7 @@ __aicore__ inline void CompressorBlockVectorNormal<COMP>::ComputeVec1(const Vec1
         return;
     }
 
-    LoopInfo loopInfo;
-    loopInfo.groupSize = splitInfo.vec1GroupSize;
-    loopInfo.groupNum = splitInfo.vec1GroupNum;
-    loopInfo.coreRowIdx = GetBlockIdx() / splitInfo.vec1GroupSize;
-    loopInfo.coreColIdx = GetBlockIdx() % splitInfo.vec1GroupSize;
-    loopInfo.isCoreRowLast = loopInfo.coreRowIdx == splitInfo.vec1GroupNum - 1;
-    loopInfo.isCoreRowFirst = loopInfo.coreRowIdx == 0;
+    LoopInfo loopInfo = this->GetLoopInfo(splitInfo);
 
     CompressorVec1SliceIterator sliceIterator(this->tools_);
     sliceIterator.SetMaxBatchSize(this->constInfo_.batchSize);

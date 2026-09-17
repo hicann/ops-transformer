@@ -30,3 +30,44 @@ def pytest_addoption(parser):
         help="精度比对模式: 2=两方(现有golden, 回归用) "
         "3=三方(NPU小算子+float64高精度, 默认)",
     )
+
+
+def pytest_runtest_call(item):
+    """每个 case 执行前打印测试名和参数；skip 的 case（通路不匹配）不打印。"""
+    # 测试函数名 → pathway 映射（与 test_compressor_grad.py 中 skip 逻辑一致）
+    _PATHWAY_OF_TEST = {
+        "test_compressor_grad": 1,
+        "test_compressor_grad_backward": 2,
+        "test_compressor_grad_small_ops": 3,
+        "test_compressor_grad_backward_direct": 4,
+        "test_compressor_grad_forward_direct": 5,
+    }
+    test_name = item.name.split("[")[0]
+    pathway = _PATHWAY_OF_TEST.get(test_name)
+    cur = item.config.getoption("--pathway")
+    if pathway != cur:
+        return  # 该 case 将被 pytest.skip，不打印
+    case = item.callspec.params.get("case")
+    if case:
+        name = case.get("testcase_name", "unknown")
+        params = {
+            k: case.get(k)
+            for k in (
+                "B",
+                "S1",
+                "H",
+                "D",
+                "cmp_ratio",
+                "coff",
+                "dtype",
+                "input_layout",
+                "seqused_q",
+            )
+            if k in case
+        }
+        print(f"\n{'=' * 60}")
+        print(f"[RUN] {name}")
+        for k, v in params.items():
+            if v is not None:
+                print(f"      {k}={v}")
+        print(f"{'=' * 60}")

@@ -172,7 +172,7 @@ ge::graphStatus QuantCompressorTiling::SetBaseInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetPageAttentionInfo()
+ge::graphStatus QuantCompressorTiling::SetPageAttentionInfo() const
 {
     pageAttentionParams_->blockNum = context_->stateCache.shape->GetStorageShape().GetDim(COMPRESSOR_DIM_INDEX_0);
     pageAttentionParams_->blockSize = context_->stateCache.shape->GetStorageShape().GetDim(COMPRESSOR_DIM_INDEX_1);
@@ -184,24 +184,24 @@ ge::graphStatus QuantCompressorTiling::SetPageAttentionInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetWorkSpaceInfo()
+ge::graphStatus QuantCompressorTiling::SetWorkSpaceInfo() const
 {
-    workspaceParams_->dbWorkspaceRatio = 2; // 2: dbWorkspaceRatio
+    workspaceParams_->dbWorkspaceRatio = DB_WORKSPACE_RATIO;
     workspaceParams_->mm1KvResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * coff;
     workspaceParams_->mm1ScoreResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * coff;
-    if (coff == 2) { // 2: overlap
+    if (coff == COFF_VALUE_2) {
         workspaceParams_->vec1TailCacheSize = baseParams_->cmpRatio * baseParams_->headDim;
     }
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetScenarioInfo()
+ge::graphStatus QuantCompressorTiling::SetScenarioInfo() const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetTemplateId()
+ge::graphStatus QuantCompressorTiling::SetTemplateId() const
 {
     if (context_->templateId == TemplateId::EMPTY_X) {
         return ge::GRAPH_SUCCESS;
@@ -209,7 +209,8 @@ ge::graphStatus QuantCompressorTiling::SetTemplateId()
     if (socVersion_ == platform_ascendc::SocVersion::ASCEND950) {
         // 设置高性能模板
         // 4: max S; 256: max tokensize
-        if (context_->layout == LayoutType::LAYOUT_BSH && baseParams_->seqSize <= 4 && baseParams_->tokenSize <= 256) {
+        if (context_->layout == LayoutType::LAYOUT_BSH && baseParams_->seqSize <= FULL_LOAD_MAX_SEQ_SIZE &&
+            baseParams_->tokenSize <= FULL_LOAD_MAX_TOKEN_SIZE) {
             context_->templateId = TemplateId::FULL_LOAD;
         }
         return ge::GRAPH_SUCCESS;
@@ -217,56 +218,65 @@ ge::graphStatus QuantCompressorTiling::SetTemplateId()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetInnerSplitInfo()
+ge::graphStatus QuantCompressorTiling::SetFullLoadSplitInfo() const
 {
-    if (context_->templateId == TemplateId::FULL_LOAD) {
-        innerSplitParams_->mBaseSize = 256;              // 256:核间切分，M轴基本块大小
-        innerSplitParams_->dBaseSize = 256 / (coff * 2); // nBase = dBase * coff * 2
-        uint32_t dBaseNum = baseParams_->headDim / innerSplitParams_->dBaseSize;
-        uint32_t mBaseNum = (baseParams_->tokenSize + innerSplitParams_->mBaseSize - 1) / innerSplitParams_->mBaseSize;
-        baseParams_->coreGroupNum = baseParams_->usedCoreNum / dBaseNum;
-        baseParams_->kBaseNum = 1;
-        baseParams_->kBaseSize = baseParams_->hiddenSize;
-        if ((dBaseNum * mBaseNum) < baseParams_->usedCoreNum && baseParams_->batchConsistency != BATCH_CONSISTENCY) {
-            baseParams_->kBaseNum = baseParams_->usedCoreNum / dBaseNum;
-            uint32_t kAlignSize = (baseParams_->hiddenSize + baseParams_->kBaseNum - 1) / baseParams_->kBaseNum;
-            baseParams_->kBaseSize = kAlignSize / 32 * 32; // 切k的size需要32对齐(hifloat8)
-        }
-        for (uint32_t i = 0; i < baseParams_->usedCoreNum; i++) {
-            baseParams_->splitCoreParam[i].nStart = (i % dBaseNum) * innerSplitParams_->dBaseSize;
-            baseParams_->splitCoreParam[i].nEnd = baseParams_->splitCoreParam[i].nStart + innerSplitParams_->dBaseSize;
-            if (baseParams_->kBaseNum > 1) {
-                uint32_t kStartIdx = i / dBaseNum;
-                if (kStartIdx + 1 < baseParams_->coreGroupNum) {
-                    uint32_t dealKSize = baseParams_->kBaseSize;
-                    baseParams_->splitCoreParam[i].kStart = kStartIdx * baseParams_->kBaseSize;
-                    baseParams_->splitCoreParam[i].kEnd = baseParams_->splitCoreParam[i].kStart + dealKSize;
-                } else {
-                    uint32_t dealKSize = kStartIdx < baseParams_->coreGroupNum ?
-                                             baseParams_->hiddenSize - kStartIdx * baseParams_->kBaseSize :
-                                             0;
-                    baseParams_->splitCoreParam[i].kStart = kStartIdx * baseParams_->kBaseSize;
-                    baseParams_->splitCoreParam[i].kEnd = baseParams_->splitCoreParam[i].kStart + dealKSize;
-                }
-                baseParams_->splitCoreParam[i].mStart = 0;
-                baseParams_->splitCoreParam[i].mEnd = baseParams_->tokenSize;
-                baseParams_->mLoopNum = 1;
+    innerSplitParams_->mBaseSize = 256;              // 256:核间切分，M轴基本块大小
+    innerSplitParams_->dBaseSize = 256 / (coff * 2); // nBase = dBase * coff * 2
+    uint32_t dBaseNum = baseParams_->headDim / innerSplitParams_->dBaseSize;
+    uint32_t mBaseNum = (baseParams_->tokenSize + innerSplitParams_->mBaseSize - 1) / innerSplitParams_->mBaseSize;
+    baseParams_->coreGroupNum = baseParams_->usedCoreNum / dBaseNum;
+    baseParams_->kBaseNum = 1;
+    baseParams_->kBaseSize = baseParams_->hiddenSize;
+    if ((dBaseNum * mBaseNum) < baseParams_->usedCoreNum && baseParams_->batchConsistency != BATCH_CONSISTENCY) {
+        baseParams_->kBaseNum = baseParams_->usedCoreNum / dBaseNum;
+        uint32_t kAlignSize = (baseParams_->hiddenSize + baseParams_->kBaseNum - 1) / baseParams_->kBaseNum;
+        baseParams_->kBaseSize = kAlignSize / 32 * 32; // 切k的size需要32对齐(hifloat8)
+    }
+    for (uint32_t i = 0; i < baseParams_->usedCoreNum; i++) {
+        baseParams_->splitCoreParam[i].nStart = (i % dBaseNum) * innerSplitParams_->dBaseSize;
+        baseParams_->splitCoreParam[i].nEnd = baseParams_->splitCoreParam[i].nStart + innerSplitParams_->dBaseSize;
+        if (baseParams_->kBaseNum > 1) {
+            uint32_t kStartIdx = i / dBaseNum;
+            if (kStartIdx + 1 < baseParams_->coreGroupNum) {
+                uint32_t dealKSize = baseParams_->kBaseSize;
+                baseParams_->splitCoreParam[i].kStart = kStartIdx * baseParams_->kBaseSize;
+                baseParams_->splitCoreParam[i].kEnd = baseParams_->splitCoreParam[i].kStart + dealKSize;
             } else {
-                baseParams_->splitCoreParam[i].kStart = 0;
-                baseParams_->splitCoreParam[i].kEnd = baseParams_->splitCoreParam[i].kStart + baseParams_->kBaseSize;
-                uint32_t mStart = (i / dBaseNum) * innerSplitParams_->mBaseSize;
-                baseParams_->splitCoreParam[i].mStart =
-                    mStart < baseParams_->tokenSize ? mStart : baseParams_->tokenSize;
-                uint32_t mEnd = baseParams_->splitCoreParam[i].mStart + innerSplitParams_->mBaseSize;
-                baseParams_->splitCoreParam[i].mEnd = mEnd < baseParams_->tokenSize ? mEnd : baseParams_->tokenSize;
-                baseParams_->mLoopNum = mBaseNum / baseParams_->coreGroupNum;
+                uint32_t dealKSize = kStartIdx < baseParams_->coreGroupNum ?
+                                         baseParams_->hiddenSize - kStartIdx * baseParams_->kBaseSize :
+                                         0;
+                baseParams_->splitCoreParam[i].kStart = kStartIdx * baseParams_->kBaseSize;
+                baseParams_->splitCoreParam[i].kEnd = baseParams_->splitCoreParam[i].kStart + dealKSize;
             }
+            baseParams_->splitCoreParam[i].mStart = 0;
+            baseParams_->splitCoreParam[i].mEnd = baseParams_->tokenSize;
+            baseParams_->mLoopNum = 1;
+        } else {
+            baseParams_->splitCoreParam[i].kStart = 0;
+            baseParams_->splitCoreParam[i].kEnd = baseParams_->splitCoreParam[i].kStart + baseParams_->kBaseSize;
+            uint32_t mStart = (i / dBaseNum) * innerSplitParams_->mBaseSize;
+            baseParams_->splitCoreParam[i].mStart = mStart < baseParams_->tokenSize ? mStart : baseParams_->tokenSize;
+            uint32_t mEnd = baseParams_->splitCoreParam[i].mStart + innerSplitParams_->mBaseSize;
+            baseParams_->splitCoreParam[i].mEnd = mEnd < baseParams_->tokenSize ? mEnd : baseParams_->tokenSize;
+            baseParams_->mLoopNum = mBaseNum / baseParams_->coreGroupNum;
         }
-    } else {
-        innerSplitParams_->mBaseSize = 256;        // 256:核间切分，M轴基本块大小
-        innerSplitParams_->dBaseSize = 128 / coff; // 128：核间切分，D轴基本块大小
     }
     return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QuantCompressorTiling::SetNormalSplitInfo() const
+{
+    innerSplitParams_->mBaseSize = 256;        // 256:核间切分，M轴基本块大小
+    innerSplitParams_->dBaseSize = 128 / coff; // 128：核间切分，D轴基本块大小
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QuantCompressorTiling::SetInnerSplitInfo() const
+{
+    if (context_->templateId == TemplateId::FULL_LOAD) {
+        return SetFullLoadSplitInfo();
+    }
+    return SetNormalSplitInfo();
 }
 
 ge::graphStatus QuantCompressorTiling::CalcWorkSpace()
@@ -452,7 +462,7 @@ ge::graphStatus QuantCompressorTiling::CheckAttrValueSupport(const T *attrValue,
 template <typename T>
 std::string to_string(const T &value)
 {
-    if (std::is_same_v<T, bool>) {
+    if constexpr (std::is_same_v<T, bool>) {
         return value ? "true" : "false";
     } else {
         return std::to_string(value);
@@ -466,9 +476,11 @@ void QuantCompressorTiling::LogErrorNumberSupport(const std::vector<T> &expectNu
     std::ostringstream oss;
     for (size_t i = 0; i < expectNumberList.size(); ++i) {
         oss << to_string(expectNumberList[i]);
-        if (i + 2 < expectNumberList.size()) {
+        const size_t nextOffset = i + 1;
+        const size_t secondOffset = nextOffset + 1;
+        if (secondOffset < expectNumberList.size()) {
             oss << ", ";
-        } else if (i + 1 < expectNumberList.size()) {
+        } else if (nextOffset < expectNumberList.size()) {
             oss << " or ";
         }
     }
@@ -753,7 +765,7 @@ ge::graphStatus QuantCompressorTiling::CheckSingleParaCmpRatio() const
 
 ge::graphStatus QuantCompressorTiling::CheckSingleParaCoff() const
 {
-    if (CheckAttrValueSupport(context_->coff, COFF, COFF_NAME)) {
+    if (ge::GRAPH_SUCCESS != CheckAttrValueSupport(context_->coff, COFF, COFF_NAME)) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -821,81 +833,61 @@ ge::graphStatus QuantCompressorTiling::CheckRequiredParaExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::CheckRequiredInOutExistence() const
+// ── 辅助函数：检查单个 tensor 的 shape 和 desc 均不为空 ──
+static ge::graphStatus CheckTensorShapeAndDesc(const char *opName, const char *tensorName,
+                                               const gert::CompileTimeTensorDesc *desc, const gert::StorageShape *shape)
 {
-    OP_CHECK_IF(context_->x.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x", "x shape is nullptr"),
+    OP_CHECK_IF(shape == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, tensorName, "shape is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->x.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x", "x desc is nullptr"),
+    OP_CHECK_IF(desc == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, tensorName, "desc is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->wkv.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv", "wkv shape is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->wkv.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv", "wkv desc is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->wgate.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate", "wgate shape is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->wgate.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate", "wgate desc is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        context_->stateCache.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_cache", "state_cache shape is nullptr"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        context_->stateCache.desc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_cache", "state_cache desc is nullptr"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->ape.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "ape shape is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->ape.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "ape desc is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->stateBlockTable.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_block_table",
-                                                         "state_block_table shape is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->stateBlockTable.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_block_table",
-                                                         "state_block_table desc is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->cmpKv.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_kv", "cmp_kv shape is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->cmpKv.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cmp_kv", "cmp_kv desc is nullptr"),
-                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+struct TensorCheckItem {
+    const char *name;
+    const gert::CompileTimeTensorDesc *desc;
+    const gert::StorageShape *shape;
+};
+
+static ge::graphStatus CheckTensorList(const char *opName, const TensorCheckItem *items, size_t count)
+{
+    for (size_t i = 0; i < count; i++) {
+        if (CheckTensorShapeAndDesc(opName, items[i].name, items[i].desc, items[i].shape) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+graphStatus QuantCompressorTiling::CheckRequiredInOutExistence() const
+{
+    const TensorCheckItem requiredTensors[] = {
+        {"x", context_->x.desc, context_->x.shape},
+        {"wkv", context_->wkv.desc, context_->wkv.shape},
+        {"wgate", context_->wgate.desc, context_->wgate.shape},
+        {"stateCache", context_->stateCache.desc, context_->stateCache.shape},
+        {"ape", context_->ape.desc, context_->ape.shape},
+        {"stateBlockTable", context_->stateBlockTable.desc, context_->stateBlockTable.shape},
+        {"cmpKv", context_->cmpKv.desc, context_->cmpKv.shape},
+    };
+    if (CheckTensorList(context_->opName, requiredTensors, sizeof(requiredTensors) / sizeof(requiredTensors[0])) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (static_cast<uint8_t>(*context_->quantMode) ==
         static_cast<uint8_t>(QUANT_MODE::A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL)) {
-        OP_CHECK_IF(context_->xDescale.desc == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x_descale",
-                                                             "x_descale should not be nullptr in quant_mode = 1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(context_->xDescale.shape == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "x_descale",
-                                                             "x_descale should not be nullptr in quant_mode = 1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(context_->wkvDescale.desc == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv_descale",
-                                                             "wkv_descale should not be nullptr in quant_mode = 1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(context_->wkvDescale.shape == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wkv_descale",
-                                                             "wkv_descale should not be nullptr in quant_mode = 1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(context_->wgateDescale.desc == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate_descale",
-                                                             "wgate_descale should not be nullptr in quant_mode = 1"),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(context_->wgateDescale.shape == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "wgate_descale",
-                                                             "wgate_descale should not be nullptr in quant_mode = 1"),
-                    return ge::GRAPH_FAILED);
+        const TensorCheckItem descaleTensors[] = {
+            {"x_descale", context_->xDescale.desc, context_->xDescale.shape},
+            {"wkv_descale", context_->wkvDescale.desc, context_->wkvDescale.shape},
+            {"wgate_descale", context_->wgateDescale.desc, context_->wgateDescale.shape},
+        };
+        if (CheckTensorList(context_->opName, descaleTensors, sizeof(descaleTensors) / sizeof(descaleTensors[0])) !=
+            ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
     }
+    // cuSeqlens 特殊校验：TH 布局必须非空，BSH 布局必须为空
     if (context_->layout == LayoutType::LAYOUT_TH) {
         OP_CHECK_IF(context_->cuSeqlens.desc == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "cu_seqlens",
@@ -1065,7 +1057,7 @@ CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForQuantCompressor(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForQuantCompressor(gert::TilingParseContext *const context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

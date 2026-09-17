@@ -508,6 +508,47 @@ def rebuild_golden_context(
         pass
 
 
+def rebuild_golden_aclnn_context(
+    x,
+    wkv,
+    wgate,
+    state_cache,
+    ape,
+    cmp_ratio,
+    *,
+    state_block_table=None,
+    cu_seqlens=None,
+    seqused=None,
+    start_pos=None,
+    coff=1,
+    cache_mode=1,
+    grad_enabled=False,
+):
+    _GOLDEN_CONTEXT.clear()
+    try:
+        aclnn_compressor_golden(
+            x,
+            wkv,
+            wgate,
+            state_cache,
+            ape,
+            state_block_table,
+            cu_seqlens,
+            seqused,
+            start_pos,
+            cmp_ratio,
+            coff,
+            cache_mode,
+            0,
+            grad_enabled,
+            None,
+            None,
+            None,
+        )
+    except Exception:
+        pass
+
+
 def rebuild_golden_context_from_compare_context(compare_context, api_kind="e2e"):
     if compare_context is None:
         return
@@ -531,7 +572,7 @@ def rebuild_golden_context_from_compare_context(compare_context, api_kind="e2e")
         _grad_enabled = _attr("grad_enabled", "gradEnabled", default=False)
 
         if api_kind == "aclnn":
-            rebuild_golden_context(
+            rebuild_golden_aclnn_context(
                 _t(0),
                 _t(1),
                 _t(2),
@@ -544,6 +585,7 @@ def rebuild_golden_context_from_compare_context(compare_context, api_kind="e2e")
                 start_pos=_t(8),
                 coff=coff,
                 cache_mode=cache_mode,
+                grad_enabled=_grad_enabled,
             )
         else:
             rebuild_golden_context(

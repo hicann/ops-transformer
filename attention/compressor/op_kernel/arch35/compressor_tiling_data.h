@@ -16,7 +16,6 @@
 #ifndef COMPRESSOR_TILING_DATA_H
 #define COMPRESSOR_TILING_DATA_H
 #include <cstdint>
-#include "kernel_tiling/kernel_tiling.h"
 
 const uint32_t CMP_MAX_AIC_CORE_NUM = 36;
 constexpr uint32_t BATCH_CONSISTENCY = 3;
