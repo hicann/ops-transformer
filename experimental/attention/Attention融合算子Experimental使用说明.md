@@ -162,6 +162,17 @@
     <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/typhoon_mla/README.md">README文档</a>。</td>
   </tr>
   <tr>
+    <td>chunk_gated_delta_rule_compute_wy</td>
+    <td><a href="./chunk_gated_delta_rule_compute_wy/README.md">文档</a></td>
+    <td>√</td>
+    <td>√</td>
+    <td>√</td>
+    <td>×</td>
+    <td>√</td>
+    <td>AI Core</td>
+    <td>该算子完成GDN prefill阶段chunk内的WY/UT前处理变换，一次性输出后续chunk扫描所需的q、k、w、u、g，替换框架侧的torch算子序列。仅支持<term>Atlas 推理系列产品</term>。</td>
+  </tr>
+  <tr>
     <td>fused_gdn_decode</td>
     <td><a href="./fused_gdn_decode/README.md">文档</a></td>
     <td>√</td>
