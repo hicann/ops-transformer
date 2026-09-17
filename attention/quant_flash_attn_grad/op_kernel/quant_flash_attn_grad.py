@@ -2082,7 +2082,7 @@ def process_post_dqkv(const_info, tensor_info):
                     else:
                         pl.store(tensor_info.tensor_dv_out_flat, out_ping, [0, idx])
                     if pong_off < end:
-                        pong_size = TS * TS if pong_off < total else tail
+                        pong_size = TS * TS if pong_off + TS * TS < total else tail
                         pl.set_validshape(in_pong, [1, pong_size])
 
                         if qkv == 0:
